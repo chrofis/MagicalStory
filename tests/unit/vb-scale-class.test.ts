@@ -333,6 +333,8 @@ describe('elementScaleNote — the enum renders, the token never does', () => {
 });
 
 describe('the built page prompt carries the PHRASE and never the token', () => {
+  // buildImagePrompt has no hardcoded fallback (deleted 2026-10-04, review B4).
+  beforeAll(async () => { await loadPromptTemplates(); });
   const brief = (objects: string[]) =>
     'The main character stands on the quay holding a roasted chestnut.'
     + '\n\n---METADATA---\n' + JSON.stringify({
@@ -447,7 +449,9 @@ describe('scaleClass — the parser the pipeline actually runs', () => {
   // band and a pre-enum stored size stay on the entry for the page readers.
   it('computes an animal description with NO scale, and keeps the scale on the entry', () => {
     const classed = parse({ animals: [{ id: 'ANI001', name: 'Fauchi', pages: [1], species: 'dragon', coloring: 'green', scaleClass: 'house' }] });
-    expect(classed.animals[0].description).toBe('dragon. green');
+    // A house-height creature leads with its MATURITY (identity, 2026-09-26 —
+    // creature-size-page.test.ts), still no scale phrase.
+    expect(classed.animals[0].description).toBe('a fully grown adult dragon with adult body proportions. green');
     expect(elementScaleNote(classed.animals[0])).toBe('several adults high, the size of a house');
     const stored = parse({ animals: [{ id: 'ANI001', name: 'Fauchi', pages: [1], species: 'dragon', size: 'as long as a city bus' }] });
     expect(stored.animals[0].description).toBe('dragon');
@@ -473,6 +477,7 @@ describe('scaleClass — the parser the pipeline actually runs', () => {
  * with no other test failure and no log line.
  */
 describe('the stored-`size` fallback is permanent — real pre-enum bibles', () => {
+  beforeAll(async () => { await loadPromptTemplates(); });
   // verbatim from stories.data->visualBible on staging (read-only pull)
   const STORED_ARTIFACT = {
     id: 'ART004',
@@ -541,7 +546,7 @@ describe('the authoring templates offer exactly the code enum', () => {
   const fs = require('fs');
   const path = require('path');
   const ROOT = path.resolve(__dirname, '../..');
-  const SITES = ['prompts/scene-expansion-all.txt', 'prompts/story-trial.txt'];
+  const SITES = ['prompts/visual-bible.txt', 'prompts/story-trial.txt'];
 
   const trialInput = {
     language: 'en',
@@ -576,7 +581,7 @@ describe('the authoring templates offer exactly the code enum', () => {
   beforeAll(async () => {
     await loadPromptTemplates();
     built = {
-      all: String(PB.buildSceneExpansionAllPrompt(allInput, BEATS, {})),
+      all: String(PB.buildVisualBibleCallPrompt(allInput, BEATS, {})),
       trial: String(PB.buildTrialStoryPrompt(trialInput, 5)),
     };
   });

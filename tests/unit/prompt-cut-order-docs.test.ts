@@ -20,6 +20,9 @@ describe('prompt cut order docs', () => {
     const data = sync.cutOrder();
     const md = sync.renderMarkdown(data);
     data.steps.forEach((s: any, i: number) => expect(md).toContain(`${i + 1}. **${s.label}**`));
-    expect(md).toContain('7,900');
+    // The caps shown are the config's (UTF-8 bytes; raised 2026-10-04, decisions.md "Grok prompt caps are 16,000 / 64,000 bytes").
+    expect(data.grokCaps.length).toBeGreaterThan(0);
+    for (const cap of data.grokCaps) expect(md).toContain(cap.toLocaleString('en-US'));
+    expect(md).toContain('15,900');
   });
 });

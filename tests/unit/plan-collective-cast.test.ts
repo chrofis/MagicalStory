@@ -59,7 +59,7 @@ const withCovers = (covers: Record<number, string[]>) => {
 const ROSTER_WITH_COVERS = withCovers({ 12: COMMISSIONED, 18: COMMISSIONED });
 
 const run = (roster: Map<number, any>) => runPlanCounters({
-  pages: PAGES, commissionedNames: COMMISSIONED, maxCharactersPerScene: MAX_CAST, roster,
+  pages: PAGES, commissionedNames: COMMISSIONED, maxCharactersPerScene: MAX_CAST, roster, mainName: 'Levin',
 });
 
 const pagesOf = (res: any, code: string) =>

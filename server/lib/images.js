@@ -15,9 +15,10 @@ const { PROMPT_TEMPLATES, fillTemplate, guardPromptString, assertPromptFilled } 
 const { MODEL_DEFAULTS, withRetry } = require('./textModels');
 const { buildCastIndex, resolveEntity } = require('./castResolver');
 const { generateWithRunware, isRunwareConfigured, RUNWARE_MODELS } = require('./runware');
-const { generateWithGrok, editWithGrok, isGrokConfigured, packReferences, cropToFrontColumn, MAX_MAGENTA_EXTENSION_PREFIX_LENGTH } = require('./grok');
-const { PromptFitError } = require('./promptFitError');
+const { generateWithGrok, editWithGrok, isGrokConfigured, packReferences } = require('./grok');
+const { PromptFitError, promptBytes } = require('./promptFitError');
 const { MODEL_PRICING } = require('../config/models');
+const { geminiUsage, xaiUsage, openRouterUsage } = require('./providerUsage');
 const { getCurrentLogger } = require('./generationLogger');
 const r2Lib = require('./r2');
 // Analyzer URL + in-flight cap now live in photoAnalyzerClient.js — shared
@@ -56,10 +57,16 @@ function carryEvalEvidence(qualityResult) {
     // The required lettering every judge was told about (VB strings + a painted
     // cover title). The consolidator reads it so no repair plan removes it.
     requiredTexts: qualityResult?.requiredTexts ?? null,
+    // The scene text the quality and semantic judges scored against; the
+    // consolidator reads it (feedbackConsolidator.consolidateFeedback).
+    judgedPrompt: qualityResult?.judgedPrompt ?? null,
     // The blind inventory's lettering list + the declared strings the
     // undeclared-lettering check compared it against. null = the check did
     // not run on this image; {items: []} = it ran and saw no writing.
     letteringInventory: qualityResult?.letteringInventory ?? null,
+    // Quality findings the landmark guard suppressed (recording only, zero
+    // points; 2026-09-26). null = the evaluator predates the field.
+    suppressedIssues: qualityResult?.suppressedIssues ?? null,
   };
 }
 // Eval cluster now lives in evalPipeline.js (verbatim move; see its header).
@@ -254,9 +261,10 @@ async function callGrokVisionAPI(modelKey, modelId, geminiParts, promptText) {
 
   const result = await response.json();
   const elapsed = Date.now() - startTime;
-  const inputTokens = result.usage?.prompt_tokens || 0;
-  const outputTokens = result.usage?.completion_tokens || 0;
-  log.debug(`📊 [GROK VISION] ${modelKey} (${elapsed}ms): ${inputTokens} in, ${outputTokens} out`);
+  // xAI bills reasoning tokens OUTSIDE completion_tokens — carried as
+  // thoughtsTokenCount so every Gemini-shape reader prices them.
+  const usage = xaiUsage(result.usage);
+  log.debug(`📊 [GROK VISION] ${modelKey} (${elapsed}ms): ${usage.input_tokens} in, ${usage.output_tokens} out, ${usage.thinking_tokens} reasoning`);
 
   // Convert Grok response to Gemini-compatible format so existing parsing works
   const text = result.choices?.[0]?.message?.content || '';
@@ -265,9 +273,9 @@ async function callGrokVisionAPI(modelKey, modelId, geminiParts, promptText) {
     json: async () => ({
       candidates: [{ content: { parts: [{ text }] }, finishReason: 'STOP' }],
       usageMetadata: {
-        promptTokenCount: inputTokens,
-        candidatesTokenCount: outputTokens,
-        thoughtsTokenCount: 0
+        promptTokenCount: usage.input_tokens,
+        candidatesTokenCount: usage.output_tokens,
+        thoughtsTokenCount: usage.thinking_tokens
       }
     })
   };
@@ -320,15 +328,15 @@ async function callOpenRouterVisionAPI(modelKey, modelId, geminiParts, promptTex
     return response;
   }
   const result = await response.json();
-  const inputTokens = result.usage?.prompt_tokens || 0;
-  const outputTokens = result.usage?.completion_tokens || 0;
-  log.debug(`📊 [OPENROUTER VISION] ${modelKey} (${Date.now() - startTime}ms): ${inputTokens} in, ${outputTokens} out`);
+  // OpenRouter's completion_tokens already include reasoning → thoughts stay 0.
+  const usage = openRouterUsage(result.usage);
+  log.debug(`📊 [OPENROUTER VISION] ${modelKey} (${Date.now() - startTime}ms): ${usage.input_tokens} in, ${usage.output_tokens} out (${usage.reasoning_tokens} reasoning, included)`);
   const text = result.choices?.[0]?.message?.content || '';
   return {
     ok: true,
     json: async () => ({
       candidates: [{ content: { parts: [{ text }] }, finishReason: 'STOP' }],
-      usageMetadata: { promptTokenCount: inputTokens, candidatesTokenCount: outputTokens, thoughtsTokenCount: 0 }
+      usageMetadata: { promptTokenCount: usage.input_tokens, candidatesTokenCount: usage.output_tokens, thoughtsTokenCount: usage.thinking_tokens }
     })
   };
 }
@@ -562,6 +570,20 @@ function generateImageCacheKey(prompt, characterPhotos = [], sequentialMarker = 
 }
 
 /**
+ * The route-defining inputs of an image call, as cache-key markers. Two calls with
+ * the same prompt and photos but a different model, backend, aspect or Lab packing
+ * knob render different pictures, so they must not share a cached image (code
+ * review 2026-10 A11: the second arm of a Lab A/B got the first arm's image).
+ */
+function imageRouteCacheMarkers({ model = null, backend = null, aspect = null, maxRefSlots = null, vbColumnFraction = null } = {}) {
+  return [
+    `model:${model || ''}`, `backend:${backend || ''}`, `aspect:${aspect || ''}`,
+    maxRefSlots ? `slots:${maxRefSlots}` : null,
+    vbColumnFraction ? `vbcol:${vbColumnFraction}` : null,
+  ];
+}
+
+/**
  * Crop image to change aspect ratio for sequential mode
  * Used in sequential mode to prevent AI from copying too much from the reference image
  * Crops 15% from top and 15% from bottom to force regeneration while preserving central context
@@ -741,30 +763,14 @@ function resolveOutputAspect(evaluationType, aspectRatioOverride) {
         : MODEL_DEFAULTS.pageAspect);
 }
 
-/**
- * Truncate a prompt to a backend's max length, emitting the same "Prompt too
- * long" warning every dispatch site used to hand-roll. Returns the prompt
- * unchanged when it already fits. `modelName` is optional — when supplied the
- * warning appends " for <model>" (three sites logged it, the gen-only Gemini
- * site did not), so the emitted string stays byte-identical to each original.
- * The caller keeps any follow-on side effect (e.g. updating parts[0] on the
- * Gemini path) by testing `result !== prompt`, which is true iff truncated.
- */
-function truncatePromptForModel(prompt, maxPromptLength, logLabel, modelName = null) {
-  if (prompt.length <= maxPromptLength) return prompt;
-  const forClause = modelName != null ? ` for ${modelName}` : '';
-  log.warn(`✂️ [${logLabel}] Prompt too long (${prompt.length} chars), truncating to ${maxPromptLength}${forClause}`);
-  return prompt.substring(0, maxPromptLength - 3) + '...';
-}
-
 // Over-budget prompts are SHRUNK, never blind-cut: the blunt substring cut
 // dropped whole tail sections — a page whose 9.4k prompt was cut at 7.5k lost
 // its entire ART STYLE block and rendered photographic on every roll (3/3
 // measured), and lost its object specs (map drawn with a ship instead of the
 // described bridge). Order: deterministic dedupe → LLM compression → a
 // section-aware cut that always preserves the tail sections as the final
-// guarantee. truncatePromptForModel above remains only as the last-resort
-// fallback inside that guarantee.
+// guarantee. There is no blind cut left: a prompt the ranked cut cannot fit
+// throws PromptFitError.
 function dedupeIdenticalBullets(prompt) {
   // Merge "- Name: body" bullet lines whose body text is identical (sibling
   // characters often share verbatim proportion boilerplate) into one line:
@@ -909,6 +915,16 @@ function compositionBulletUnit(bullet) {
  * reference-photo binding, the frame rule — go last, as the 2026-09-21 ranking
  * set them. `approxChars` is the block's size on a typical page (staging
  * job_1790100385959_1nitlympp, measured 2026-09-24).
+ *
+ * SIZE IS NEVER CUT (2026-10-04). `Composition: size` and `DEPTH AND SIZE` were
+ * steps #2 and #4, so the size information went first: staging
+ * job_1791040103540_atbttop6w (dragon run 9) spent one or both on 13 of its 14
+ * over-cap prompts, and the grown dragon rendered egg-sized on p17/p18. Both
+ * are on PROMPT_NEVER_CUT now, beside the REQUIRED OBJECTS scale riders the
+ * protected tail already holds. The size bullet is the Composition block's last
+ * bullet and is never removed, so the header always stays with it. A prompt
+ * still over the cap once every step below has run has its SCENE PROSE
+ * shortened (sceneShorten.js, owner 2026-09-30) — never a size block.
  */
 const PROMPT_CUT_ORDER = [
   {
@@ -919,13 +935,6 @@ const PROMPT_CUT_ORDER = [
     unit: () => exactTextUnit(COUNTS_RULE),
   },
   {
-    label: 'Composition: size',
-    what: 'the vessel / building / vehicle true-size bullet',
-    why: 'the REQUIRED OBJECTS scale riders and DEPTH AND SIZE ("a size stated for an element always wins") state it per element',
-    approxChars: 305,
-    unit: () => compositionBulletUnit(COMPOSITION_SIZE_BULLET),
-  },
-  {
     label: 'Composition: facing',
     what: 'the "faces the target, not the camera" bullet',
     why: 'yields to every declared facing, and EXACT POSES / EXPRESSIONS AND EYES declare one per figure; never built on a cover',
@@ -933,15 +942,8 @@ const PROMPT_CUT_ORDER = [
     unit: () => compositionBulletUnit(COMPOSITION_FACING_BULLET),
   },
   {
-    label: 'DEPTH AND SIZE',
-    what: 'the foreground / midground / background definitions',
-    why: 'defines the brief\'s depth words; the prose still places every figure',
-    approxChars: 647,
-    unit: () => exactTextUnit(templateParagraph('**DEPTH AND SIZE:**')),
-  },
-  {
     label: 'Composition: ground',
-    what: 'the feet-on-the-ground bullet (the header goes with it)',
+    what: 'the feet-on-the-ground bullet',
     why: 'the one feet-on-the-ground rule for pages and covers; kept longer than the generic rules above',
     approxChars: 600,
     unit: () => compositionBulletUnit(COMPOSITION_GROUND_BULLET),
@@ -954,13 +956,11 @@ const PROMPT_CUT_ORDER = [
     approxChars: 140,
     unit: () => regexUnit(/^\*\*HEIGHT ORDER[^\n]*\n/m),
   },
-  {
-    label: 'AGE & PROPORTIONS',
-    what: 'the per-age head-count proportions',
-    why: 'a page fact: without it an infant is drawn as a preschooler',
-    approxChars: 485,
-    unit: () => regexUnit(/^AGE & PROPORTIONS[\s\S]*?(?=\n\n|$)/m),
-  },
+  // AGE & PROPORTIONS left the cut order on 2026-09-27 (owner: "keep the lines,
+  // stop cutting"). Its unit's `$` matched the heading's own line end under the
+  // `m` flag, so the step removed only the heading and logged a cut while the
+  // per-character bullets shipped headless (staging job_1790529840433_ar4u7qry3,
+  // Lab 1580). The block now always ships whole — PROMPT_NEVER_CUT.
   {
     label: 'reference-photo rule',
     what: 'which attached photo is a place and which is a person',
@@ -981,10 +981,12 @@ const PROMPT_CUT_ORDER = [
  * NEVER CUT. None of these is a step above, and no step may reach one:
  * cutBlocks() throws if a step would remove an exact-text entry (`text`).
  * Entries with a `marker` open the PROTECTED TAIL — everything from the first
- * of them to the end of the prompt (protectedTailStart). Once every step has
- * run, only the text before that tail (the scene prose and the page's own
- * lines) is trimmed, at a sentence boundary; if the tail alone leaves no room
- * the render fails loudly instead (owner, 2026-09-23).
+ * of them to the end of the prompt (protectedTailStart). The labelled blocks
+ * before that tail (THIS IMAGE DEPICTS, the cast, age, feature, card and worn
+ * lines) are never cut either (owner, 2026-09-23 for the tail). Once every step
+ * has run and the prompt still does not fit, only the brief's scene prose is
+ * shortened (sceneShorten.js, owner 2026-09-30, superseding 2026-09-26's "the
+ * scene is never cut"); a prompt that cannot fit even with no prose fails loudly.
  */
 const PROMPT_NEVER_CUT = [
   { label: 'NO MARKS', why: 'generator half of D-24 (sibling-registry page-image-generator-vs-critics parity anchor)', text: () => NO_CHARACTER_MARKING_RULE },
@@ -994,13 +996,20 @@ const PROMPT_NEVER_CUT = [
   // staging job_1790277448294_5herh01j7 (p3, p10, p14 and the back cover's Grok
   // edit, 7388 -> 6886 against 7290), and on p14 a character then wore a coat
   // that should have lain on the heap. It sits after ART STYLE, inside the
-  // protected tail, so no prose trim reaches it either.
+  // protected tail.
   { label: 'REQUIRED CAST', why: 'the generator half of D-03 / D-04b: every named character in frame, exactly one of each, nobody added', text: () => '**REQUIRED CAST:**' },
-  { label: 'REQUIRED OBJECTS', why: 'the commissioned elements of the page', marker: '**REQUIRED OBJECTS' },
+  // Size left the cut order on 2026-10-04: staging job_1791040103540_atbttop6w
+  // spent one or both on 13 of its 14 over-cap prompts and the grown dragon came
+  // out egg-sized on p17/p18. With the per-element scale riders on REQUIRED
+  // OBJECTS (the tail, below) they are the prompt's whole statement of size.
+  { label: 'Composition: size', why: 'a vessel, building or vehicle and a held object keep their true size against the figures', text: () => COMPOSITION_SIZE_BULLET },
+  { label: 'DEPTH AND SIZE', why: 'a size stated for an element wins over its depth; a genuinely large element dominates the foreground', text: () => templateParagraph('**DEPTH AND SIZE:**') },
+  { label: 'REQUIRED OBJECTS', why: 'the commissioned elements of the page, each with its size against the cast (the scale riders)', marker: '**REQUIRED OBJECTS' },
   { label: 'SEASON', why: 'the book-wide season, even against a reference photo from another season', marker: '**SEASON:**' },
   { label: 'LIGHT', why: "the page's declared time of day and weather, which wins over the plate's light (sceneLight.js)", marker: '**LIGHT:**' },
   { label: 'COMPOSITION GUIDELINES', why: 'a cover\'s own composition: title-safe top third, group, bottom margin', marker: '**COMPOSITION GUIDELINES:**' },
   { label: 'ART STYLE', why: 'the style the book is commissioned in', marker: '**ART STYLE' },
+  { label: 'AGE & PROPORTIONS', why: 'the per-age head-count proportions, heading and bullets (owner, 2026-09-27): without them an infant is drawn as a preschooler' },
   { label: 'SHOT', why: 'the page\'s declared framing (a cover carries none)' },
   { label: 'EXACT POSES / EXPRESSIONS AND EYES', why: 'the declared pose and gaze per figure' },
 ];
@@ -1068,43 +1077,24 @@ function sectionAwareCut(prompt, maxLen, logLabel) {
     }
   }
 
-  let proseCut = 0;
   if (out.length > maxLen) {
-    // Nothing droppable is left and the page still does not fit. Trim the SCENE
-    // PROSE at a sentence boundary — never mid-word, never a character index
-    // (owner, 2026-08-17): the head is written in reading order, so slicing at
-    // a byte offset deletes the LAST-described characters outright while the
-    // evaluator still scores the render against a contract they were cut from.
     const tailStart = protectedTailStart(out);
     if (tailStart < 0) {
-      // Not an image prompt (the Grok edit body, the composite blend): no
-      // section markers, nothing must-keep to protect.
-      const truncated = truncatePromptForModel(out, maxLen, logLabel);
-      return { text: truncated, dropped, droppedSteps, proseCut: out.length - truncated.length };
+      // No section markers (the composite blend, a Grok edit body): nothing
+      // tells the must-keep text apart from the rest. A blind cut here once
+      // chopped the END of the prompt silently — the end is where ART STYLE
+      // and the text directive live. Fail loudly instead (2026-09-30).
+      throw new PromptFitError(`prompt-shrink [${logLabel}]: ${out.length} chars after every allowed drop (${dropped.join(', ') || 'none'}), cap ${maxLen}; the prompt has no section markers, so nothing more can be cut safely — refusing a blind cut`);
     }
-    const tail = out.slice(tailStart);
-    const headBudget = maxLen - tail.length - 5;
-    if (headBudget < 500) {
-      // The MUST-KEEP tail alone leaves no room for the scene. A blunt cut here
-      // would delete must-keep text (it used to: truncatePromptForModel sliced
-      // the end off, ART STYLE first). Fail the render instead (owner,
-      // 2026-09-23: must-keep sections are never cut; if it cannot fit, fail
-      // loudly).
-      throw new PromptFitError(`prompt-shrink [${logLabel}]: ${out.length} chars after every drop, cap ${maxLen}; the must-keep sections alone are ${tail.length} chars — refusing to cut them`);
-    }
-    let head = out.slice(0, tailStart);
-    const keep = head.slice(0, headBudget);
-    const lastStop = Math.max(keep.lastIndexOf('. '), keep.lastIndexOf('.\n'));
-    const cut = lastStop > headBudget * 0.5 ? lastStop + 1 : headBudget;
-    proseCut = head.length - cut;
-    head = head.slice(0, cut);
-    out = head.trimEnd() + '\n' + tail;
+    // Every ranked block is gone and the prompt still does not fit. What is
+    // left is the page's scene and its must-keep sections: the caller
+    // (shrinkPromptForModel) shortens the scene prose next (owner, 2026-09-30).
+    return { text: out, dropped, droppedSteps, proseCut: 0, over: true, tailStart };
   }
 
   log.warn(`✂️ [${logLabel}] Section-aware cut: ${prompt.length}→${out.length} chars`
-    + (droppedSteps.length ? `, cut in order: ${describeCutSteps(droppedSteps)}` : '')
-    + (proseCut ? `, AND ${proseCut} chars of scene prose — a character may be missing` : ''));
-  return { text: out, dropped, droppedSteps, proseCut };
+    + (droppedSteps.length ? `, cut in order: ${describeCutSteps(droppedSteps)}` : ''));
+  return { text: out, dropped, droppedSteps, proseCut: 0 };
 }
 
 /** "#1 COUNTS (-235) > #2 Composition: size (-305)" — step numbers are PROMPT_CUT_ORDER positions. */
@@ -1146,13 +1136,13 @@ function sceneHeadOf(prompt) {
 /**
  * FIT A BUILT IMAGE PROMPT INTO THE MODEL'S CHARACTER CAP.
  *
- * Two deterministic steps, in order: merge duplicated bullet bodies, then drop
- * ranked blocks (sectionAwareCut). There is no third, paid step. A deepseek
- * head-rewrite lived between them until 2026-09-21; measured over staging
- * job_1789853503332_riqncqg1i it made 34 calls ($0.13, ~180 s) whose output
- * appears in ZERO stored prompts — on pages the head budget was under its own
- * 1,500-char floor so it never ran, and on covers it ran, was rejected for
- * overshooting, and the cut ran anyway. See docs/decisions.md 2026-09-21.
+ * In order, stopping as soon as it fits: merge duplicated bullet bodies; drop
+ * ranked blocks (sectionAwareCut); then, only when the scene and the must-keep
+ * blocks alone overrun the cap, shorten the SCENE PROSE — one LLM try, then a
+ * sentence cut from its end (sceneShorten.js, owner 2026-09-30). The labelled
+ * blocks and the protected tail are never touched. The 2026-08 compressor
+ * (retired 2026-09-21) ran BEFORE the drops and rewrote the whole head; this
+ * one runs only on the pages that would otherwise ship with no image.
  *
  * @param {Object|null} meta - optional out-param. Whenever this function
  *   actually CHANGES the prompt, `meta.compressedScene` receives the SCENE
@@ -1169,7 +1159,24 @@ function sceneHeadOf(prompt) {
  *   prompt.
  */
 async function shrinkPromptForModel(prompt, maxPromptLength, logLabel, modelName = null, meta = null) {
-  if (!prompt || prompt.length <= maxPromptLength) return prompt;
+  if (!prompt || promptBytes(prompt) <= maxPromptLength) return prompt;
+  // The cap is UTF-8 bytes (xAI counts bytes, 2026-10-04); every shrink step
+  // below counts chars. Shrink to a char budget, measure the bytes, tighten
+  // the budget by the overshoot. An ASCII prompt fits on the first pass.
+  let charBudget = maxPromptLength;
+  for (let pass = 0; pass < 4; pass++) {
+    const out = await shrinkToCharBudget(prompt, charBudget, logLabel, modelName, meta);
+    const over = promptBytes(out) - maxPromptLength;
+    if (over <= 0) return out;
+    // From what came back, not what was asked: sentence and block cuts land
+    // under the budget, and lowering the budget alone can return the same text.
+    charBudget = Math.min(charBudget, out.length) - over;
+  }
+  throw new PromptFitError(`prompt-shrink [${logLabel}]: still over the ${maxPromptLength}-byte cap after 4 byte-tightening passes`);
+}
+
+async function shrinkToCharBudget(prompt, maxPromptLength, logLabel, modelName, meta) {
+  if (prompt.length <= maxPromptLength) return prompt;
 
   // 1. Deterministic: merge duplicated bullet bodies, collapse blank runs.
   let out = dedupeIdenticalBullets(prompt);
@@ -1181,12 +1188,36 @@ async function shrinkPromptForModel(prompt, maxPromptLength, logLabel, modelName
     return out;
   }
 
-  // 2. Guarantee: drop ranked blocks, generic guidance before page facts.
+  // 2. Drop ranked blocks, generic guidance before page facts.
   const cut = sectionAwareCut(out, maxPromptLength, logLabel);
-  recordPromptShrink({ logLabel, modelName, branch: 'cut', before: prompt.length, after: cut.text.length,
-    cap: maxPromptLength, dropped: cut.dropped, droppedSteps: cut.droppedSteps, proseCut: cut.proseCut });
-  if (meta) meta.compressedScene = sceneHeadOf(cut.text) || undefined;
-  return cut.text;
+  let text = cut.text;
+  let branch = 'cut';
+  let proseCut = cut.proseCut;
+  let llmChars = 0;
+  if (cut.over) {
+    // 3 + 4. Still over: the scene prose is shortened — one LLM try, then a
+    // sentence cut from its end until it fits (owner, 2026-09-30). Every
+    // labelled block and the protected tail stay byte-exact (sceneShorten.js).
+    const fitted = await require('./sceneShorten').shortenSceneToFit(text, maxPromptLength, cut.tailStart, logLabel);
+    if (!fitted) {
+      throw new PromptFitError(`prompt-shrink [${logLabel}]: ${text.length} chars after every allowed drop (${cut.dropped.join(', ') || 'none'}), cap ${maxPromptLength}; the must-keep sections (${text.length - cut.tailStart} chars) and the labelled head blocks do not fit even with the scene prose gone`);
+    }
+    ({ text, proseCut, llmChars } = fitted);
+    branch = proseCut ? 'scene-cut' : 'scene-shorten';
+  }
+  recordPromptShrink({ logLabel, modelName, branch, before: prompt.length, after: text.length,
+    cap: maxPromptLength, dropped: cut.dropped, droppedSteps: cut.droppedSteps, proseCut, llmChars });
+  if (meta) meta.compressedScene = sceneHeadOf(text) || undefined;
+  return text;
+}
+
+/**
+ * The size of `prompt` once every ranked block drop has run — before any
+ * scene shortening. The fixed blocks are compact when this sits under the cap
+ * with room to spare, so a full scene needs no shortening at all.
+ */
+function promptFloor(prompt) {
+  return sectionAwareCut(dedupeIdenticalBullets(prompt), 1, 'floor').text.length;
 }
 
 /**
@@ -1237,16 +1268,16 @@ const PLATE_CUT_ORDER = [
 ];
 
 /**
- * Fit a plate prompt into `maxLen`, dropping only PLATE_CUT_ORDER steps.
+ * Fit a plate prompt into `maxLen` UTF-8 bytes, dropping only PLATE_CUT_ORDER steps.
  * Throws PromptFitError when it still does not fit — never cuts anything else.
  */
 function fitPlatePrompt(prompt, maxLen, logLabel, modelName = null) {
-  if (!prompt || prompt.length <= maxLen) return prompt;
+  if (!prompt || promptBytes(prompt) <= maxLen) return prompt;
   let out = prompt;
   const dropped = [];
   const droppedSteps = [];
   PLATE_CUT_ORDER.forEach((step, i) => {
-    if (out.length <= maxLen || !step.applies(out)) return;
+    if (promptBytes(out) <= maxLen || !step.applies(out)) return;
     const text = step.piece(out);
     if (!text) return;
     const before = out.length;
@@ -1254,8 +1285,8 @@ function fitPlatePrompt(prompt, maxLen, logLabel, modelName = null) {
     dropped.push(step.label);
     droppedSteps.push({ step: i + 1, label: step.label, chars: before - out.length });
   });
-  if (out.length > maxLen) {
-    throw new PromptFitError(`plate-fit [${logLabel}]: ${out.length} chars after every allowed cut${dropped.length ? ` (${dropped.join(', ')})` : ''}, cap ${maxLen}; the rest of a plate prompt must stay — refusing to cut it`);
+  if (promptBytes(out) > maxLen) {
+    throw new PromptFitError(`plate-fit [${logLabel}]: ${promptBytes(out)} bytes after every allowed cut${dropped.length ? ` (${dropped.join(', ')})` : ''}, cap ${maxLen}; the rest of a plate prompt must stay — refusing to cut it`);
   }
   log.warn(`✂️ [${logLabel}] Plate prompt ${prompt.length}→${out.length} chars (cap ${maxLen}), cut in order: ${describeCutSteps(droppedSteps)}`);
   recordPromptShrink({ logLabel, modelName, branch: 'plate-cut', before: prompt.length, after: out.length,
@@ -1287,15 +1318,16 @@ function rethrowLocalFault(err, { logLabel, pageLabel = '', provider }) {
  * per page, so a whole book could ship with AGE & PROPORTIONS missing from
  * every prompt and nothing in the story record said so.
  */
-function recordPromptShrink({ logLabel, modelName, branch, before, after, cap, dropped, droppedSteps = [], proseCut }) {
+function recordPromptShrink({ logLabel, modelName, branch, before, after, cap, dropped, droppedSteps = [], proseCut, llmChars = 0 }) {
   const genLog = getCurrentLogger();
   if (!genLog) return;  // not in a generation context (ad-hoc Lab / script call)
   const details = { label: logLabel, model: modelName || null, branch, before, after, cap,
-    charsCut: before - after, dropped, droppedSteps, proseCut };
+    charsCut: before - after, dropped, droppedSteps, proseCut, llmChars };
   const msg = `${logLabel}: ${before}→${after} chars (cap ${cap}) via ${branch}`
     + (droppedSteps.length ? `, cut in order: ${describeCutSteps(droppedSteps)}` : '')
+    + (llmChars ? `, scene shortened by ${llmChars} chars (LLM)` : '')
     + (proseCut ? `, ${proseCut} chars of scene prose trimmed` : '');
-  if (dropped.length || proseCut) genLog.warn('prompt_shrink', msg, null, details);
+  if (dropped.length || proseCut || llmChars) genLog.warn('prompt_shrink', msg, null, details);
   else genLog.info('prompt_shrink', msg, null, details);
 }
 
@@ -1427,18 +1459,22 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
   // sentinel, so a failing fallback reports both errors (withUpstreamErrors).
   const upstreamErrors = [];
 
-  // Whether slot-0 scene plates get magenta-extension padding (gen-only only).
-  const slot0IsScenePlate = usePadExtension && !!(sceneBackground || (Array.isArray(landmarkPhotos) && landmarkPhotos.length) || previousImage);
+  // Whether slot 0 gets magenta-extension padding (gen-only only): a page
+  // render editing onto a plate or a previous image, or a cast-0 page anchored
+  // on its landmark photo. Never a PLATE call (landmarkScene 'plate'):
+  // packReferences centre-crops the plate's landmark photo to the page aspect,
+  // so no pad and no prefix reach Grok (decisions.md 2026-09-26).
+  const slot0IsScenePlate = usePadExtension && landmarkScene !== 'plate' && !!(sceneBackground || (Array.isArray(landmarkPhotos) && landmarkPhotos.length) || previousImage);
 
   // A PLATE call (emptyScenePlateRouting marks it landmarkScene 'plate') is
-  // fitted by its own cut order, with the worst-case magenta-extension prefix
-  // reserved up front: editWithGrok prepends that prefix after this fit, and a
-  // plate prompt cannot be refitted there (owner, 2026-09-25). Every other
-  // prompt keeps the page shrink and editWithGrok's exact-prefix refit.
+  // fitted by its own cut order against the full cap: it carries no
+  // magenta-extension prefix, so the prompt that is fitted is the prompt that
+  // is sent (owner, 2026-09-25/26). Every other prompt keeps the page shrink
+  // and editWithGrok's exact-prefix refit.
   const fitPrompt = async (p, cap, model, meta) => {
     try {
       return landmarkScene === 'plate'
-        ? fitPlatePrompt(p, cap - (slot0IsScenePlate ? MAX_MAGENTA_EXTENSION_PREFIX_LENGTH : 0), logLabel, model)
+        ? fitPlatePrompt(p, cap, logLabel, model)
         : await shrinkPromptForModel(p, cap, logLabel, model, meta);
     } catch (fitErr) {
       rethrowLocalFault(fitErr, { logLabel, pageLabel, provider: model || 'the image model' });
@@ -1459,6 +1495,12 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
   } else {
     log.info(`🎨 [${logLabel}] Backend: ${imageBackend}`);
   }
+
+  // Set when a PRIMARY provider call has already failed. The model-routed branches
+  // below resolve to the same provider for the same model, so without this a failed
+  // primary call was repeated (a second paid Grok call with reduced packing) before
+  // Gemini ran (code review 2026-10 A1).
+  let primaryProviderFailed = null;
 
   // ── Primary Runware (cheap FLUX Schnell) ──────────────────────────────────
   if (imageBackend === 'runware' && isRunwareConfigured()) {
@@ -1483,6 +1525,7 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
         ? `❌ [RUNWARE] Generation failed, falling back to Gemini: ${runwareError.message}`
         : `❌ [${logLabel}] Runware failed, falling back to Gemini: ${runwareError.message}`);
       upstreamErrors.push(recordProviderFallback({ logLabel, provider: 'runware', route: 'primary', model: RUNWARE_MODELS.FLUX_SCHNELL, pageLabel, error: runwareError }));
+      primaryProviderFailed = 'runware';
       // Fall through to Gemini
     }
   }
@@ -1529,6 +1572,7 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
         ? `❌ [GROK] Generation failed, falling back to Gemini: ${grokError.message}`
         : `❌ [${logLabel}] Grok failed, falling back to Gemini: ${grokError.message}`);
       upstreamErrors.push(recordProviderFallback({ logLabel, provider: 'grok', route: 'primary', model: grokModel, pageLabel, error: grokError }));
+      primaryProviderFailed = 'grok';
       // Fall through to Gemini
     }
   }
@@ -1709,7 +1753,7 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
   }
 
   // ── Model-routed Runware (model config says backend='runware') ────────────
-  if (modelConfig?.backend === 'runware' && isRunwareConfigured()) {
+  if (modelConfig?.backend === 'runware' && isRunwareConfigured() && primaryProviderFailed !== 'runware') {
     log.info(verbose
       ? `🎨 [${logLabel}] Model ${modelId} uses Runware backend - routing to Runware`
       : `🎨 [${logLabel}] Model ${modelId} uses Runware backend`);
@@ -1735,7 +1779,7 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
   }
 
   // ── Model-routed Grok (model config says backend='grok') ──────────────────
-  if (modelConfig?.backend === 'grok' && isGrokConfigured()) {
+  if (modelConfig?.backend === 'grok' && isGrokConfigured() && primaryProviderFailed !== 'grok') {
     log.info(verbose
       ? `🎨 [${logLabel}] Model ${modelId} uses Grok backend - routing to Grok`
       : `🎨 [${logLabel}] Model ${modelId} uses Grok backend`);
@@ -1813,7 +1857,8 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
   const pageNumber = pageMatch ? parseInt(pageMatch[1], 10) : null;
 
   // Check cache first (include previousImage presence and page number in cache key)
-  const cacheKey = generateImageCacheKey(prompt, characterPhotos, previousImage ? 'seq' : null, pageNumber);
+  const cacheKey = generateImageCacheKey(prompt, characterPhotos, previousImage ? 'seq' : null, pageNumber,
+    ...imageRouteCacheMarkers({ model: imageModelOverride, backend: imageBackendOverride, aspect: aspectRatioOverride }));
 
   if (imageCache.has(cacheKey)) {
     log.debug(`💾 [IMAGE CACHE] HIT (${imageCache.size} cached)`);
@@ -2071,11 +2116,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
     }, { maxRetries: 2, baseDelay: 2000 });
   
     // Extract token usage from response (including thinking tokens for Gemini 2.5)
-    const imageUsage = {
-      input_tokens: data.usageMetadata?.promptTokenCount || 0,
-      output_tokens: data.usageMetadata?.candidatesTokenCount || 0,
-      thinking_tokens: data.usageMetadata?.thoughtsTokenCount || 0
-    };
+    const imageUsage = geminiUsage(data.usageMetadata);
     if (imageUsage.input_tokens > 0 || imageUsage.output_tokens > 0) {
       const thinkingInfo = imageUsage.thinking_tokens > 0 ? `, thinking: ${imageUsage.thinking_tokens.toLocaleString()}` : '';
       log.debug(`📊 [IMAGE GEN] Token usage - input: ${imageUsage.input_tokens.toLocaleString()}, output: ${imageUsage.output_tokens.toLocaleString()}${thinkingInfo}`);
@@ -2143,7 +2184,6 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
           // Extract score, reasoning, and text error info from quality result
           const score = qualityResult ? qualityResult.score : null;
           const reasoning = qualityResult ? qualityResult.reasoning : null;
-          const textIssue = qualityResult ? qualityResult.textIssue : null;
           const textErrorOnly = qualityResult ? qualityResult.textErrorOnly : false;
           const expectedText = qualityResult ? qualityResult.expectedText : null;
           const actualText = qualityResult ? qualityResult.actualText : null;
@@ -2160,7 +2200,6 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
             imageData: compressedImageData,
             score,
             reasoning,
-            textIssue,
             textErrorOnly,
             expectedText,
             actualText,
@@ -2283,7 +2322,8 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
   }
 
   // Check cache first (include previousImage presence and page number in cache key)
-  const cacheKey = generateImageCacheKey(prompt, characterPhotos, previousImage ? 'seq' : null, pageNumber, sceneBackground ? 'bg' : null);
+  const cacheKey = generateImageCacheKey(prompt, characterPhotos, previousImage ? 'seq' : null, pageNumber, sceneBackground ? 'bg' : null,
+    ...imageRouteCacheMarkers({ model: imageModelOverride, backend: imageBackendOverride, aspect: aspectRatio, maxRefSlots, vbColumnFraction }));
 
   // For generateImageOnly, we use a separate cache namespace to avoid conflicts with evaluated images
   const genOnlyCacheKey = `genonly_${cacheKey}`;
@@ -2524,11 +2564,7 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
         }, { maxRetries: 2, baseDelay: 2000 });
   
         // Extract token usage
-        const usage = {
-          input_tokens: data.usageMetadata?.promptTokenCount || 0,
-          output_tokens: data.usageMetadata?.candidatesTokenCount || 0,
-          thinking_tokens: data.usageMetadata?.thoughtsTokenCount || 0
-        };
+        const usage = geminiUsage(data.usageMetadata);
   
         if (!data.candidates || data.candidates.length === 0) {
           // No candidates = likely safety block
@@ -2850,6 +2886,128 @@ function composeEvalReferencePhotos(pagePhotos, wholeCastPhotos) {
   return [...page, ...cast.filter(p => !onPage.has(key(p)))];
 }
 
+/**
+ * What evaluateImageBatch hands evaluateImageQuality for ONE page: the scene
+ * text the judge scores against, the reference list, the evaluation type and
+ * the evalOptions. Moved verbatim out of evaluateImageBatch on 2026-09-27 so
+ * the Test Lab eval stages build the call production makes (owner: "The Lab
+ * must use 100% identical code to production").
+ *
+ * `options.evalOptionOverrides` is the Test Lab's A/B channel (template, judge
+ * or compliance swaps), merged last, and `options.recordStats: false` keeps a Lab
+ * re-eval out of eval_finding_stats; the run passes neither.
+ *
+ * @param {object} img - one evaluateImageBatch input (repairPipeline.buildEvalInput)
+ * @param {object} options - evaluateImageBatch's options
+ * @returns {{sceneDescription: string, referenceImages: Array, evaluationType: string, evalOptions: object}}
+ */
+function batchEvalQualityCall(img, options = {}) {
+  const {
+    visualBible = null,
+    clothingRequirements = null,
+    artStyle = null,
+    storyData = null,
+    storyId = null,
+    genre = null,
+    language = null,
+    evalOptionOverrides = null,
+    recordStats = true,
+  } = options;
+  // The clothing facts now travel as the CLOTHING CONTRACT input, built
+  // inside evaluateImageQuality from these same photos — prepending them to
+  // the prompt as well would state the outfit twice.
+  //
+  // NOT the sent prompt, deliberately: this site feeds the judge the scene
+  // DESCRIPTION, and the resolveEvalArtStyle call below depends on that —
+  // ORIGINAL_PROMPT here must carry no ART STYLE block.
+  //
+  // But when the page's built prompt went over the model cap,
+  // shrinkPromptForModel COMPRESSED the scene prose before sending it, and
+  // the description stored on the page still names clauses the model never
+  // received. The shrink path now hands its compressed scene block back
+  // (`compressedScene`), so that is what the judge scores against when it
+  // exists. No shrink → the exact chain this site always used. The resolver
+  // also re-checks the ART STYLE invariant on the compressed string, since
+  // that head is LLM-rewritten. See
+  // sceneMetadata.resolveEvalSceneDescription (sibling of
+  // resolveEvalImagePrompt, which closed the six prompt-side sites).
+  const sceneDescWithClothing = resolveEvalSceneDescription({
+    compressedScene: img.compressedScene,
+    sceneDescription: img.sceneDescription,
+    prompt: img.prompt,
+  });
+
+  // Run quality evaluation (with parallel semantic fidelity check if pageText provided)
+  // Use img.evaluationType if set (covers use 'cover' for text-focused eval)
+  // Lab/staging parity: resolveEvalArtStyle is the ONE resolver both this
+  // path and the Test Lab quality_eval stage use. ORIGINAL_PROMPT here is the
+  // scene DESCRIPTION (no ART STYLE block), so without this every
+  // style-dependent evaluator rule skipped silently in production too.
+  //
+  // The judge's reference list, and with it the CLOTHING CONTRACT the
+  // eval builds from these refs' clothingDescription. The page's own
+  // photos come first: they carry the outfit the page was actually
+  // generated against (costumes, worn-item strips). A cover's description
+  // has no clothing text, so a contract built from the story-level outfit
+  // ruled the requested costume "unrequested" and the repair stripped it.
+  // The whole-cast list then adds the characters the page did not list,
+  // so identity checks still see the full cast.
+  const refsForEval = composeEvalReferencePhotos(img.characterPhotos, img.allCharacterPhotos);
+  const evalOptions = {
+    // The bible the batch caller already holds. Reaches the evaluators'
+    // INTERACTIONS_BLOCK and the cover fidelity reference, both of which
+    // used to render raw VB ids into a judge's prompt.
+    visualBible,
+    artStyle: require('../services/prompts').resolveEvalArtStyle(artStyle, img.prompt || null),
+    // Same reason the style is read off the built prompt here: the
+    // REQUIRED OBJECTS checklist lives in the prompt TAIL, which the
+    // judge's ORIGINAL_PROMPT (the scene description) deliberately does
+    // not carry. Passed as its own input so D-16b can fire; falls back to
+    // sceneMetadata.objects when no prompt was stored.
+    pagePrompt: img.prompt || null,
+    storyData,
+    clothingRequirements,
+    // Structured cover text contract from the pseudo-page record
+    // (expectedText / textMode) — see evaluateImageQuality's cover branch.
+    expectedText: img.expectedText ?? null,
+    textMode: img.textMode ?? null,
+    // Whether this cover was briefed as a page (runs the lettering check).
+    coverIsPage: img.coverIsPage === true,
+    // Era-aware landmark protection: set by buildEvalInputs in the repair
+    // pipeline (landmark refs + scene era). Absent → no protection.
+    landmarkPhotos: img.landmarkPhotos || null,
+    era: img.era || null,
+    // The page's PARSED metadata, so the EXPECTED CAST roster reads the
+    // brief's `objects[]` even when sceneHint is a plan line.
+    sceneMetadata: img.sceneMetadata || null,
+    // Covers only: the characters the generator was ORDERED to leave off
+    // (cap + exclusion list, server/lib/coverCastRoster.js). The cover
+    // branch of buildExpectedCastBlock reads the cover prose, which still
+    // names them — without this the judge holds a roster the generator
+    // was told to violate.
+    excludedCastNames: img.excludedCastNames || null,
+    // Detector figure count for the EXPECTED CAST block — present on
+    // repair-round re-evaluations that carry the previous detection;
+    // null on a first-round eval, which runs before detection.
+    // Phase 5b-pre already detected on these exact bytes; the repair
+    // rounds carry their own. Shared first, page second — never a new call.
+    detectedFigures: img.sharedBboxDetection?.figures || img.bboxDetection?.figures || null,
+    storyMeta: {
+      storyId, pageNumber: img.pageNumber, artStyle, genre, language,
+      charCount: Array.isArray(img.sceneCharacters) ? img.sceneCharacters.length : null,
+      // The Test Lab re-judges a stored page: it keeps the eval_finding_stats
+      // aggregate to the run's own evaluations. The run passes nothing.
+      ...(recordStats === false ? { recordStats: false } : {}),
+    },
+  };
+  return {
+    sceneDescription: sceneDescWithClothing,
+    referenceImages: refsForEval,
+    evaluationType: img.evaluationType || 'scene',
+    evalOptions: evalOptionOverrides ? { ...evalOptions, ...evalOptionOverrides } : evalOptions,
+  };
+}
+
 async function evaluateImageBatch(images, options = {}) {
   const {
     concurrency = 100,
@@ -2889,99 +3047,19 @@ async function evaluateImageBatch(images, options = {}) {
         };
       }
 
-      // The clothing facts now travel as the CLOTHING CONTRACT input, built
-      // inside evaluateImageQuality from these same photos — prepending them to
-      // the prompt as well would state the outfit twice.
-      //
-      // NOT the sent prompt, deliberately: this site feeds the judge the scene
-      // DESCRIPTION, and the resolveEvalArtStyle call below depends on that —
-      // ORIGINAL_PROMPT here must carry no ART STYLE block.
-      //
-      // But when the page's built prompt went over the model cap,
-      // shrinkPromptForModel COMPRESSED the scene prose before sending it, and
-      // the description stored on the page still names clauses the model never
-      // received. The shrink path now hands its compressed scene block back
-      // (`compressedScene`), so that is what the judge scores against when it
-      // exists. No shrink → the exact chain this site always used. The resolver
-      // also re-checks the ART STYLE invariant on the compressed string, since
-      // that head is LLM-rewritten. See
-      // sceneMetadata.resolveEvalSceneDescription (sibling of
-      // resolveEvalImagePrompt, which closed the six prompt-side sites).
-      const sceneDescWithClothing = resolveEvalSceneDescription({
-        compressedScene: img.compressedScene,
-        sceneDescription: img.sceneDescription,
-        prompt: img.prompt,
-      });
-
-      // Run quality evaluation (with parallel semantic fidelity check if pageText provided)
-      // Use img.evaluationType if set (covers use 'cover' for text-focused eval)
-      // Lab/staging parity: resolveEvalArtStyle is the ONE resolver both this
-      // path and the Test Lab quality_eval stage use. ORIGINAL_PROMPT here is the
-      // scene DESCRIPTION (no ART STYLE block), so without this every
-      // style-dependent evaluator rule skipped silently in production too.
-      //
-      // The judge's reference list, and with it the CLOTHING CONTRACT the
-      // eval builds from these refs' clothingDescription. The page's own
-      // photos come first: they carry the outfit the page was actually
-      // generated against (costumes, worn-item strips). A cover's description
-      // has no clothing text, so a contract built from the story-level outfit
-      // ruled the requested costume "unrequested" and the repair stripped it.
-      // The whole-cast list then adds the characters the page did not list,
-      // so identity checks still see the full cast.
-      const refsForEval = composeEvalReferencePhotos(img.characterPhotos, img.allCharacterPhotos);
+      const evalCall = batchEvalQualityCall(img, options);
+      const refsForEval = evalCall.referenceImages;
       const qualityResult = await evaluateImageQuality(
         img.imageData,
-        sceneDescWithClothing,
+        evalCall.sceneDescription,
         refsForEval,
-        img.evaluationType || 'scene',
+        evalCall.evaluationType,
         qualityModelOverride,
         pageLabel,
         img.pageText || null,  // Story text for semantic fidelity check
         img.sceneHint || null, // Scene hint for semantic evaluation
         img.sceneCharacters || null,  // Enables STEP 2C head-to-body proportion check
-        // evalOptions: story-level context so the eval records per-style/genre
-        // stats to eval_findings (best-effort; no behaviour change).
-        {
-          // The bible the batch caller already holds. Reaches the evaluators'
-          // INTERACTIONS_BLOCK and the cover fidelity reference, both of which
-          // used to render raw VB ids into a judge's prompt.
-          visualBible,
-          artStyle: require('../services/prompts').resolveEvalArtStyle(artStyle, img.prompt || null),
-          // Same reason the style is read off the built prompt here: the
-          // REQUIRED OBJECTS checklist lives in the prompt TAIL, which the
-          // judge's ORIGINAL_PROMPT (the scene description) deliberately does
-          // not carry. Passed as its own input so D-16b can fire; falls back to
-          // sceneMetadata.objects when no prompt was stored.
-          pagePrompt: img.prompt || null,
-          storyData,
-          clothingRequirements,
-          // Structured cover text contract from the pseudo-page record
-          // (expectedText / textMode) — see evaluateImageQuality's cover branch.
-          expectedText: img.expectedText ?? null,
-          textMode: img.textMode ?? null,
-          // Era-aware landmark protection: set by buildEvalInputs in the repair
-          // pipeline (landmark refs + scene era). Absent → no protection.
-          landmarkPhotos: img.landmarkPhotos || null,
-          era: img.era || null,
-          // The page's PARSED metadata, so the EXPECTED CAST roster reads the
-          // brief's `objects[]` even when sceneHint is a plan line.
-          sceneMetadata: img.sceneMetadata || null,
-          // Covers only: the characters the generator was ORDERED to leave off
-          // (cap + exclusion list, server/lib/coverCastRoster.js). The cover
-          // branch of buildExpectedCastBlock reads the cover prose, which still
-          // names them — without this the judge holds a roster the generator
-          // was told to violate.
-          excludedCastNames: img.excludedCastNames || null,
-          // Detector figure count for the EXPECTED CAST block — present on
-          // repair-round re-evaluations that carry the previous detection;
-          // null on a first-round eval, which runs before detection.
-          // Phase 5b-pre already detected on these exact bytes; the repair
-          // rounds carry their own. Shared first, page second — never a new call.
-          detectedFigures: img.sharedBboxDetection?.figures || img.bboxDetection?.figures || null,
-          storyMeta: {
-          storyId, pageNumber: img.pageNumber, artStyle, genre, language,
-          charCount: Array.isArray(img.sceneCharacters) ? img.sceneCharacters.length : null,
-        } }
+        evalCall.evalOptions
       );
 
       // FLOOR (owner, 2026-08-26): an EMPTY figure inventory on a page whose
@@ -3272,7 +3350,6 @@ async function evaluateImageBatch(images, options = {}) {
         // this — only the score + issuesSummary survived.
         ...carryEvalEvidence(qualityResult),
         // Text error info for covers
-        textIssue: qualityResult?.textIssue || null,
         expectedText: qualityResult?.expectedText || null,
         actualText: qualityResult?.actualText || null
       };
@@ -3320,11 +3397,32 @@ async function evaluateImageBatch(images, options = {}) {
  * job_1790277448294_5herh01j7 p15, "remove the street lamp"). The light is read
  * from the same brief the semantic judge reads its DECLARED LIGHT from.
  */
-function buildInpaintInstruction({ editInstruction, preserveClause = '', quietZoneSuffix = '', requiredTextClause = '', sceneDescription = '' }) {
+function buildInpaintInstruction({ editInstruction, preserveClause = '', sizeClause = '', quietZoneSuffix = '', requiredTextClause = '', sceneDescription = '' }) {
   const { buildRepairLightLine, declaredLightOfBrief } = require('./sceneLight');
   const lightLine = buildRepairLightLine(declaredLightOfBrief(sceneDescription));
   const lightClause = lightLine ? `\n\n${lightLine}` : '';
-  return `Fix these issues in this children's book illustration:\n${editInstruction}${preserveClause}${quietZoneSuffix}${requiredTextClause}${lightClause}`;
+  return `Fix these issues in this children's book illustration:\n${editInstruction}${preserveClause}${sizeClause}${quietZoneSuffix}${requiredTextClause}${lightClause}`;
+}
+
+/**
+ * The size every creature, object and vehicle the page cites keeps after a
+ * repaint (owner, 2026-09-26), named for the image model: the same page-scale
+ * note the page prompt carried (promptBuilders.elementPageScaleNote, in its
+ * unnamed form), with every cast and creature name swapped for its descriptor
+ * through the page's repair name map. Staging job_1790373080139_vnx5l8iy7 p10:
+ * the round-1 inpaint regenerated the dragon from "Regenerate this character
+ * high above in the linden tree crown" — no size — and drew it cat-sized. ''
+ * when the page cites no sized element. Shared by the pipeline inpaint and the
+ * manual repair route.
+ */
+function buildElementSizeClauseForRepair({ visualBible, sceneMetadata, characters, nameMap }) {
+  const { buildElementSizeRepairClause, castFiguresInFrame, wholeFiguresInFrame } = require('./promptBuilders');
+  const objectIds = Array.isArray(sceneMetadata?.objects) ? sceneMetadata.objects : [];
+  const figures = wholeFiguresInFrame(castFiguresInFrame(characters, sceneMetadata?.characters), sceneMetadata);
+  const interactions = sceneMetadata?.interactions || sceneMetadata?.fullData?.interactions || [];
+  const clause = buildElementSizeRepairClause(visualBible, objectIds, figures, interactions);
+  if (!clause) return '';
+  return require('./repairLogic').nameRepairText(clause, nameMap);
 }
 
 /**
@@ -3890,7 +3988,20 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     // Loud: a declared string that cannot be resolved must not be swallowed.
     log.error(`[INPAINT PAGE] Page ${pageNumber}: required-text clause could not be built - ${err.message}`);
   }
-  const fullInstruction = buildInpaintInstruction({ editInstruction, preserveClause, quietZoneSuffix, requiredTextClause, sceneDescription });
+  // ELEMENT SIZES (2026-09-26) — see buildElementSizeClauseForRepair.
+  let sizeClause = '';
+  try {
+    sizeClause = buildElementSizeClauseForRepair({
+      visualBible,
+      sceneMetadata: sceneMetadata || (sceneDescription ? require('./sceneMetadata').extractSceneMetadata(sceneDescription) : null),
+      characters,
+      nameMap: repairNameMap,
+    });
+  } catch (err) {
+    // Loud: a creature repainted without its size is how p10 lost it.
+    log.error(`[INPAINT PAGE] Page ${pageNumber}: element size clause could not be built - ${err.message}`);
+  }
+  const fullInstruction = buildInpaintInstruction({ editInstruction, preserveClause, sizeClause, quietZoneSuffix, requiredTextClause, sceneDescription });
   log.info(`[INPAINT PAGE] Inpainting (refs: ${referenceImages.length}): ${editInstruction.substring(0, 200)}`);
 
   try {
@@ -4048,6 +4159,12 @@ async function renderStoryPagePlate({
         const emptyPrompt = buildEmptyScenePrompt({
           style: artStyleDesc,
           description: plateDescription,
+          // The same band note the story run's per-page plate carries
+          // (shotVocabulary.buildPlateSurfaceNote): surfaces only.
+          characterSpace: require('./shotVocabulary').buildPlateSurfaceNote(
+            sceneMetadata?.fullData?.characters || sceneMetadata?.characters || [],
+            sceneMetadata?.fullData?.shot || sceneMetadata?.shot || '',
+          ),
           textAreaInstruction: textPos ? buildTextZoneInstruction(textPos, iterateTextZoneDesc, (storyData?.languageLevel === '1st-grade' ? '10%' : storyData?.languageLevel === 'advanced' ? '40%' : '30%'), { isEmptyScene: true }) : '',
           eraGuard: buildEraGuard(iterateEra),
           landmarkFidelity: buildLandmarkFidelityBlock(landmarkPhotos?.[0], { era: iterateEra }),
@@ -4194,6 +4311,24 @@ async function resolveIteratePlate({
 }
 
 /**
+ * The scene an iterate rewrites: `{ pageNumber, description, outlineExtract }`.
+ * A story page's row comes from `storyData.sceneDescriptions[]`, whose brief
+ * is `description` (sceneMetadata.sceneDescriptionRecord — the stored story
+ * and the in-generation repair pipeline's story data are both that shape). A
+ * full-story cover's brief lives on its coverImages record (covers are pages,
+ * 2026-09-24). No brief throws: an iterate with nothing to rewrite is refused.
+ */
+function resolveIterateScene(storyData, pageNumber, coverRecord = null) {
+  const currentScene = coverRecord
+    ? { pageNumber, description: coverRecord.sceneDescription, outlineExtract: coverRecord.outlineExtract }
+    : (storyData.sceneDescriptions || []).find(s => s.pageNumber === pageNumber);
+  if (!currentScene || !currentScene.description) {
+    throw new Error(`No scene description found for page ${pageNumber}`);
+  }
+  return currentScene;
+}
+
+/**
  * Core iterate function — shared by the pipeline (executeIterateAction) and the
  * UI route (POST /:id/iterate/:pageNum).  Analyzes the current image, re-expands
  * the scene description with Claude's 17-check prompt, then regenerates.
@@ -4280,7 +4415,6 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   const {
     getPageText,
     buildSceneDescriptionPrompt,
-    buildImagePrompt,
     getCharacterPhotoDetails,
     buildAvailableAvatarsForPrompt,
     extractSceneMetadata,
@@ -4312,13 +4446,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     throw new Error(`Page ${pageNumber} text not found`);
   }
 
-  // Get current scene description — a cover's brief lives on its own record.
-  const currentScene = coverKey
-    ? { pageNumber, description: coverRecord.sceneDescription, outlineExtract: coverRecord.outlineExtract }
-    : sceneDescriptions.find(s => s.pageNumber === pageNumber);
-  if (!currentScene || !currentScene.description) {
-    throw new Error(`No scene description found for page ${pageNumber}`);
-  }
+  const currentScene = resolveIterateScene(storyData, pageNumber, coverRecord);
 
   // The page's textPosition is locked at first generation — iterate must NOT
   // re-pick it (would break the spread rule and shift the calm zone). Pull the
@@ -4367,7 +4495,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
       // decides which one this is.
       const metaNames = (() => {
         try {
-          const m = extractSceneMetadata(currentScene.description || currentScene.sceneDescription || '');
+          const m = extractSceneMetadata(currentScene.description);
           const cs = m?.characters;
           return Array.isArray(cs) ? cs.map(c => String(c?.name || c || '').trim()).filter(Boolean) : [];
         } catch { return []; }
@@ -4471,8 +4599,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   const availableAvatars = buildAvailableAvatarsForPrompt(characters, clothingRequirements);
 
   // Extract short scene description from current scene
-  // Handle both field names: 'description' (saved stories) and 'sceneDescription' (pipeline)
-  const sceneDescText = currentScene.description || currentScene.sceneDescription || '';
+  const sceneDescText = currentScene.description;
   let shortSceneDesc = '';
   const sceneMetadata = extractSceneMetadata(sceneDescText);
   // THE PARENT BRIEF'S METADATA -- ONE RESOLVER (2026-09-17, staging
@@ -4603,6 +4730,9 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     // which the evaluator then judges the render against.
     {
       freeIterate, textInImage: iterateTextInImage, extraRule: options.sceneExtraRule || null, clothingRequirements,
+      // A strict rewrite of a page whose shot the decision layer fixed stages
+      // inside that shot (owner, 2026-09-28): the shot rules are worded for it.
+      fixedShot: !freeIterate && !!(savedScene && savedScene.jevFixed && savedScene.jevFixed.shot),
       stagedFigures: renderStagedFiguresBlock(stagedFigures),
       // THE STORY, for the two page facts the Art Director is given and the
       // rewriter was not: the book's SEASON and the creature-tone band. A
@@ -4849,6 +4979,21 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     }
     if (briefFindings.length > 0) {
       log.error(`❌ [ITERATE] Page ${pageNumber}: shipping a rewrite that fails a check an authored brief is held to:\n${describeBriefFindings(briefFindings)}`);
+    }
+  }
+
+  // THE DECIDED FIELDS HOLD ON A REWRITE (owner, 2026-09-28, Q6). A page whose
+  // fields the Jev decision layer fixed keeps them: a strict iterate every one,
+  // a free iterate every one but the shot (free exists to reframe). Code
+  // restores what the rewrite moved and says so; the prose is not touched.
+  const jevFixedOfPage = savedScene && savedScene.jevFixed;
+  if (jevFixedOfPage) {
+    const { pinBrief } = require('./jevDecisions');
+    const pinned = pinBrief(newSceneDescription, freeIterate ? { ...jevFixedOfPage, shot: undefined } : jevFixedOfPage);
+    const moved = [...new Set(pinned.changes.filter(c => !c.problem).map(c => c.field))];
+    if (moved.length) {
+      newSceneDescription = pinned.brief;
+      log.warn(`📌 [ITERATE] Page ${pageNumber}: the rewrite moved decided field(s) ${moved.join(', ')} — restored (mode=${freeIterate ? 'free' : 'strict'})`);
     }
   }
 
@@ -5111,15 +5256,15 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   // scene-expansion metadata so the cell matches the figure's intended
   // facing direction on this page. Skips characters with no story sheet.
   if (useStorySheetCells && storyData?.characterAvatars) {
-    const { cropAvatarCell } = require('./sceneComposite');
     const metaChars = newSceneMetadata?.fullData?.characters
       || newSceneMetadata?.characters
       || sceneCharacters
       || [];
-    // Pose + depth resolution is shared with applyStoryCellRefs — beats
-    // metadata carries `perspective` prose, not `pose`, and the inline copy
-    // here served threeQuarter to every declared back-view figure.
-    const { resolveCellPose, resolveSheetForRef, wornResolvedForPage } = require('./storyAvatars');
+    // ONE implementation of the cell crop (storyAvatars.applyStoryCellRefs): pose
+    // resolution, sheet/wardrobe resolution, the close-up head crop and the loud
+    // warnings all live there. The hand-copy that stood here dropped the close-up
+    // head crop and skipped missing sheets silently (code review 2026-10 C3).
+    const { applyStoryCellRefs, wornResolvedForPage } = require('./storyAvatars');
     // WARDROBE STATE ON A REWRITTEN PAGE. scene-iteration.txt emits no
     // `wornItems`, so the rewrite's own metadata says nothing about what this
     // page takes off — the carry-forward is the ONLY thing that keeps an
@@ -5133,38 +5278,10 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
       metaChars,
       pageNumber
     );
-    const poseByName = new Map();
-    for (const sc of metaChars) {
-      const nm = (typeof sc === 'string' ? sc : sc?.name) || '';
-      if (!nm) continue;
-      poseByName.set(nm.toLowerCase(), resolveCellPose(sc));
-    }
-    for (const ref of referencePhotos) {
-      const charName = ref.name;
-      if (!charName) continue;
-      const story = storyData.characterAvatars[charName];
-      if (!story) continue;
-      // Shared resolver: slot mapping, the wardrobe-state variant, and the loud
-      // costumed fallback (which also corrects ref.clothingCategory) all live in
-      // storyAvatars.js. The inline copy here fell back silently.
-      const resolved = resolveSheetForRef(story, ref, { wornResolved });
-      if (!resolved) continue;
-      const { uri: sheetUri, slotKey } = resolved;
-      const pf = poseByName.get(charName.toLowerCase()) || { pose: 'threeQuarter', depth: 'foreground' };
-      const includeFace = pf.depth === 'foreground';
-      try {
-        const { body, stacked } = await cropAvatarCell(sheetUri, { pose: pf.pose, includeFace, stack: includeFace });
-        const buf = stacked || body;
-        ref.photoUrl = `data:image/png;base64,${buf.toString('base64')}`;
-        ref.photoType = `cell-${pf.pose}${includeFace ? '-headbody' : ''}`;
-        ref.cellPose = pf.pose;
-        ref.cellDepth = pf.depth;
-        ref.cellIncludesFace = includeFace;
-        log.debug(`[CELL REFS] ${charName}: cropped ${pf.pose}${includeFace ? ' + head' : ''} (depth=${pf.depth}) from ${slotKey}`);
-      } catch (err) {
-        log.warn(`[CELL REFS] crop failed for ${charName}: ${err.message} — falling back to existing ref`);
-      }
-    }
+    await applyStoryCellRefs(referencePhotos, storyData.characterAvatars, metaChars, {
+      closeUp: newSceneMetadata?.fullData?.shot === 'close-up',
+      wornResolved,
+    });
   }
 
   // The rewrite's metadata is the working copy, but scene-iteration.txt does
@@ -5192,12 +5309,6 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     })(),
     crowdExpected: newSceneMetadata?.crowdExpected === true
       || savedMeta.crowdExpected === true || savedMeta.fullData?.crowdExpected === true,
-    // MEASURED, NOT DECLARED — and never re-decidable by a rewrite. The
-    // plate-derived population is a reading of the page's own empty-scene
-    // plate (2026-09-19); scene-iteration.txt neither sees a plate nor emits
-    // the field, so it carries forward verbatim or the repaired page loses the
-    // evidence and its background extras come back as an extra_character.
-    platePopulation: savedMeta.platePopulation || savedMeta.fullData?.platePopulation || null,
     // Same class again: scene-iteration.txt does not emit `wornItems`, and the
     // metadata parser turns an absent field into `[]`. An undeclared row makes
     // resolveWornItemsForPage default the item to `worn`, so an iterated page
@@ -5207,23 +5318,23 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     wornItems: require('./wornItems').carryForwardWornItems(newSceneMetadata, savedMeta),
     // Same class, two more fields the rewrite may legitimately re-decide and
     // must never silently drop: `shot` drives the background plate's framing,
-    // the scale repair's foreground/background split and the reference mode;
-    // `landmarkView` picks the landmark reference photo. Both were emitted by
-    // the Art Director on every page of both staging runs and by NONE of the 11
-    // rewrites. A rewrite that states one wins; a rewrite that is silent keeps
-    // the page's own.
+    // the scale repair's foreground/background split and the reference mode.
+    // It was emitted by the Art Director on every page of both staging runs
+    // and by NONE of the 11 rewrites. A rewrite that states one wins; a
+    // rewrite that is silent keeps the page's own.
     shot: newSceneMetadata?.shot || newSceneMetadata?.fullData?.shot
       || savedMeta.shot || savedMeta.fullData?.shot || null,
-    landmarkView: newSceneMetadata?.landmarkView || newSceneMetadata?.fullData?.landmarkView
-      || savedMeta.landmarkView || savedMeta.fullData?.landmarkView || null,
+    // The page's OWN landmark photo citation: a rewrite that writes a fresh
+    // plate cites the photo that plate shows; one that keeps the plate cites
+    // none, and the page's vantage citation stands (landmarkPhotoCitation).
+    // Same carry-forward as `shot`: a page cited earlier keeps its citation.
+    landmarkPhoto: newSceneMetadata?.landmarkPhoto ?? newSceneMetadata?.fullData?.landmarkPhoto
+      ?? savedMeta.landmarkPhoto ?? savedMeta.fullData?.landmarkPhoto ?? null,
   };
 
   // Build landmark photos — from the MERGED metadata, not the raw rewrite.
-  // getLandmarkPhotosForScene reads `landmarkView` to pick the reference photo,
-  // and the rewrite emitted none on 11 of 11 stored iterate rounds across two
-  // staging runs, so every repaired page chose its landmark photo blind. The
-  // merge below is what restores the parent's value; running it first is the
-  // whole point. (2026-09-17.)
+  // getLandmarkPhotosForScene reads the page's citation (its own, else its
+  // vantage's), so the merge above runs first. (2026-09-17, 2026-09-26.)
   const pageLandmarkPhotos = visualBible ? await getLandmarkPhotosForScene(visualBible, iterateSceneMetadata, { pageNumber }) : [];
 
   // Determine image model and backend (needed before empty scene generation)
@@ -5285,16 +5396,20 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   // The iterate output is prose + ---METADATA--- + JSON (same shape as initial
   // expansion). buildImagePrompt's prose branch strips the metadata block and
   // uses only the prose for the image prompt — no JSON-scene extraction needed.
-  let imagePrompt = buildImagePrompt(newSceneDescription, storyData, sceneCharacters, visualBible, pageNumber, referencePhotos, {
-    imageBackend: iterateImageBackend,
-    textPositionOverride: lockedTextPosition,
-    // Grid is already built above — pass exactly the elements it contains so
-    // the REQUIRED OBJECTS checklist can point at the attached references.
-    vbRefElementIds: (visualBibleGrid?.rawElements || []).map(e => e.id).filter(Boolean),
-  });
-  // A baked front cover's REQUIRED TEXT block, at the prompt's absolute end —
-  // the same tail the generation path appends.
-  if (coverOpts?.bakeTitle) imagePrompt = getStoryHelpers().withBakedTitle(imagePrompt, coverOpts.bakeTitle);
+  //
+  // ONE PROMPT CONSTRUCTION (2026-09-28): the repair builds its prompt through
+  // the same closure the first render and the Lab use (pageRenderCall
+  // .makePageImagePrompt) — the Grok VB-prose skip and a cover's baked title
+  // included. It called buildImagePrompt itself until this date, without the
+  // skip, so a Grok repair could carry a Visual Bible block the first render
+  // never sent (staging job_1790539784661_6mjcny1c7 p18's repair missed the cap).
+  // Grid is already built above — pass exactly the elements it contains so the
+  // REQUIRED OBJECTS checklist can point at the attached references.
+  let imagePrompt = require('./pageRenderCall').makePageImagePrompt({
+    sceneDescription: newSceneDescription, inputData: storyData, sceneCharacters, visualBible, pageNumber,
+    characterPhotos: referencePhotos, pageImageModel: imageModelOverride, coverOpts,
+    extraOptions: { imageBackend: iterateImageBackend, textPositionOverride: lockedTextPosition },
+  })((visualBibleGrid?.rawElements || []).map(e => e.id).filter(Boolean));
 
   // Eval feedback was already routed to Claude via previewFeedback.fixIssues
   // (see Step 2 above). The image API gets a prose-only prompt — it cannot
@@ -5478,7 +5593,9 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
           iterLabel, null, null, sceneCharacters, {
             // A cover's text contract (baked title / app-side typography),
             // resolved by the same resolver as its first render.
-            ...(coverOpts ? { expectedText: coverOpts.expectedText, textMode: coverOpts.textMode } : {}),
+            // Only a full-story cover page iterates here (coverRender), so a
+            // cover on this path is always one briefed as a page.
+            ...(coverOpts ? { expectedText: coverOpts.expectedText, textMode: coverOpts.textMode, coverIsPage: true } : {}),
             // Era-aware landmark protection — iterate uses the same refs it
             // just rendered from and the era it resolved above.
             landmarkPhotos: refApplied.landmarkPhotos || null,
@@ -5855,7 +5972,9 @@ async function editImageWithPrompt(imageData, editInstruction, model, referenceI
   if (backend === 'grok') {
     // Grok edit path — uses /images/edits endpoint with reference images
     // Include the current image + any additional character/VB references
-    const allRefs = [imageData, ...referenceImages].slice(0, 3); // Grok max 3 refs
+    // editWithGrok applies the tier's own reference cap; the sanitized retry below
+    // sends this SAME list so it does not lose the character / VB references.
+    const allRefs = [imageData, ...referenceImages];
     try {
       const grokResult = await editWithGrok(editPrompt, allRefs, { model: modelConfig.modelId, aspectRatio });
       log.info(`✅ [IMAGE EDIT] Successfully edited image via Grok`);
@@ -5869,7 +5988,8 @@ async function editImageWithPrompt(imageData, editInstruction, model, referenceI
     } catch (grokErr) {
       rethrowLocalFault(grokErr, { logLabel: 'IMAGE EDIT', provider: 'grok' });
       // Content moderation block — sanitize prompt and retry, then fall back to Gemini
-      if (grokErr.message?.includes('content moderation') || grokErr.message?.includes('400')) {
+      // Only Grok's structured moderation verdict (err.moderated) — not any 400.
+      if (grokErr.moderated === true) {
         log.warn(`⚠️ [IMAGE EDIT] Grok blocked by content moderation, sanitizing prompt and retrying...`);
         // Soften violent/weapon language for retry.
         //
@@ -5898,7 +6018,7 @@ async function editImageWithPrompt(imageData, editInstruction, model, referenceI
         if (sanitized !== editPrompt) {
           log.info(`🔄 [IMAGE EDIT] Retrying with sanitized prompt: "${sanitized.substring(0, 120)}..."`);
           try {
-            const retryResult = await editWithGrok(sanitized, [imageData], { model: modelConfig.modelId, aspectRatio });
+            const retryResult = await editWithGrok(sanitized, allRefs, { model: modelConfig.modelId, aspectRatio });
             log.info(`✅ [IMAGE EDIT] Sanitized retry succeeded via Grok`);
             return {
               imageData: retryResult.imageData,
@@ -5981,9 +6101,7 @@ async function editImageWithPrompt(imageData, editInstruction, model, referenceI
     const data = await response.json();
 
     // Extract token usage
-    const inputTokens = data.usageMetadata?.promptTokenCount || 0;
-    const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
-    const thinkingTokens = data.usageMetadata?.thoughtsTokenCount || 0;
+    const { input_tokens: inputTokens, output_tokens: outputTokens, thinking_tokens: thinkingTokens } = geminiUsage(data.usageMetadata);
     log.debug(`📊 [IMAGE EDIT] Token usage - input: ${inputTokens}, output: ${outputTokens}${thinkingTokens ? `, thinking: ${thinkingTokens}` : ''}, model: ${geminiModelId}`);
 
     // Extract thinking text
@@ -6271,6 +6389,7 @@ module.exports = {
   // Utility functions
   hashImageData,
   generateImageCacheKey,
+  imageRouteCacheMarkers,
   cropImageForSequential,
   compressImageToJPEG,
   // Live shared ref-compression LRU — single instance; evalPipeline.js reaches
@@ -6296,14 +6415,17 @@ module.exports = {
   generateWithIterativePlacement,
   applyStyleTransfer,
   evaluateImageBatch,
+  batchEvalQualityCall,
   composeEvalReferencePhotos,
 
   // Unified repair pipeline (the only active repair pipeline)
   inpaintPage,
   buildInpaintInstruction,
+  buildElementSizeClauseForRepair,
 
   // Active repair primitives
   iteratePageCore,
+  resolveIterateScene,
   iteratePage,
   repairCharacterMismatch,
 
@@ -6377,8 +6499,9 @@ module.exports = {
 
   // Pure dispatch helpers (exported for unit tests / reuse)
   resolveOutputAspect,
-  truncatePromptForModel,
   shrinkPromptForModel,
+  promptFloor,
+  dedupeIdenticalBullets,
   fitPlatePrompt,
   PLATE_CUT_ORDER,
   PROMPT_CUT_ORDER,

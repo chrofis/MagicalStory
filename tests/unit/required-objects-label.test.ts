@@ -1,4 +1,8 @@
 import { describe, it, expect } from 'vitest';
+import { beforeAll } from 'vitest';
+import { createRequire as createRequireForTemplates } from 'node:module';
+// buildImagePrompt has no hardcoded fallback (deleted 2026-10-04, review B4): load the real template.
+beforeAll(async () => { await createRequireForTemplates(import.meta.url)('../../server/services/prompts').loadPromptTemplates(); });
 
 // The bug this file locks down (staging job_1788641639919_mpjwlzkf1):
 //
@@ -238,7 +242,7 @@ describe('an ANIMAL carries its size too (D11, owner 2026-09-11)', () => {
 describe('the Art Director is told a creature holds its size (D11)', () => {
   const fs = require('fs');
   const path = require('path');
-  for (const f of ['prompts/scene-expansion.txt', 'prompts/scene-expansion-all.txt']) {
+  for (const f of ['prompts/scene-expansion.txt', 'prompts/scene-briefs-all.txt']) {
     it(`${f} rule 8f covers creatures, not only vessels and buildings`, () => {
       const t = withRules(fs.readFileSync(path.join(process.cwd(), f), 'utf8'));
       expect(t).toMatch(/A vessel, building, vehicle or creature holds its real size/);

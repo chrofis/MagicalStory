@@ -24,6 +24,7 @@ const fs = require('fs');
 const path = require('path');
 const sharp = require('sharp');
 const { log } = require('../utils/logger');
+const { geminiUsage } = require('./providerUsage');
 const { editWithGrok, GROK_MODELS } = require('./grok');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { assertPromptFilled, guardPromptString } = require('../services/prompts');
@@ -58,7 +59,7 @@ async function editWithGeminiImage(prompt, refImages, { aspectRatio = '16:9', mo
     // a bare "no image", leaving the operator nothing to act on.
     throw new Error(`Gemini returned no image (style transfer): ${describeImageOutcome(assessImageResponse(j))}`);
   }
-  const usage = j?.usageMetadata ? { input_tokens: j.usageMetadata.promptTokenCount || 0, output_tokens: j.usageMetadata.candidatesTokenCount || 0 } : null;
+  const usage = j?.usageMetadata ? geminiUsage(j.usageMetadata) : null;
   return { imageData: 'data:image/jpeg;base64,' + inline.data, usage, modelId: model, sentToGrok: refImages };
 }
 
@@ -123,6 +124,33 @@ const REAR_TURN_POSE = 'shoulders and body fully away from camera, head rotated 
 // behind the figures and the cell dividers gone, and every judge passed them.
 // A wash rides into each page as part of the character's reference cell.
 const SHEET_GROUND_RULE = "The ground stays plain white paper and the thin cell dividers stay: nothing is painted behind or around a figure — no wash, shape, scenery or cast shadow.";
+
+// Garment colours across the style transfer, ONE definition: the pass-2 prompt
+// states it about Image 1 (the pass-1 sheet) and the pass-2 style judge scores
+// it about Image 2 (the same sheet, filled into its template as {GARMENT_COLOUR}).
+// Until 2026-10-04 the restyler protected only hair and skin and the judge was
+// told the outfit is not scored: staging job_1791040103540_atbttop6w drew a
+// purple jacket on pass 1 and pass 2 repainted it navy, unchecked.
+// Lettering on the sheet, ONE definition: every sheet generator states it and
+// every sheet judge that checks marks scores it ({SHEET_LETTERING}). Staging
+// job_1791040103540_atbttop6w: Max's body row printed the cell names from the
+// prompt ("FRONT / THREE-QUARTER / PROFILE / REAR TURN") above and below every
+// figure; pass 2 kept them; no judge looked for text off the character's head.
+const SHEET_NO_LETTERING_RULE = 'The sheet is pictures only: the paper around every figure stays blank, with no caption, word, letter or number in or between the cells.';
+// Row generators name the cells (front, three-quarter, …); those names are
+// what the model printed. Generator-only: judges never see the cell names.
+const CELL_NAMES_NOT_DRAWN = 'The cell names here say which way each figure faces; they are never written on the sheet.';
+
+const garmentColourRule = (sheet) => `Every garment keeps the colour ${sheet} shows it in: the same hue, with only the new medium's shading on it.`;
+
+/**
+ * A GARMENT TAKEN OFF IS GONE FROM EVERY CELL (2026-10-04). One rule for the
+ * redress generator (buildRedressPrompt) and its judge (checkGarmentGone fills
+ * GARMENT_PARTS into its own question): the off-garment sheet exists so a page
+ * that takes a garment off is drawn from a reference without it.
+ */
+const GARMENT_PARTS = 'sleeve, collar, hem, hood, zip or strap';
+const GARMENT_OFF_SHEET_RULE = `No cell shows any part of a garment taken off — no ${GARMENT_PARTS} of it, worn or held; the garment it leaves outermost is drawn in its place.`;
 
 const ASSETS_DIR = path.resolve(__dirname, '..', 'assets');
 // The -axes variants overlay a 3-axis RGB gizmo (red X / green Y / blue Z)
@@ -333,7 +361,7 @@ Output a 1×4 grid: ONE row, four cells side by side, thin black vertical divide
 Each cell shows the SAME PERSON as Image 3 rendered as a COMPLETE FULL BODY from the very top of the head to the figure's lowest point, wearing the costume. Cell 1 front, cell 2 three-quarter, cell 3 profile, cell 4 is a REAR TURN: ${REAR_TURN_POSE}. Cell 4 is never a profile and never a flat back view with no face showing — Image 1's cell 4 is a plain reference silhouette only, ignore its exact head angle. Normally that lowest point is both feet with shoes, and the whole figure — head, hair, face, torso, legs, feet — sits inside its cell. When the costume replaces the legs (a tail, a fin, a single fused lower body), the figure has NO legs, NO feet and NO footwear: it ends at the tip of that form, which is then the lowest point. Never crop the head and never crop the lowest point; if the figure does not fit, scale it down until the whole figure is inside the cell, with white margin above and below. ${proportionsRule}
 ${buildFootwearRule(redress, seasonOutfit?.footwear)}
 ${buildGarmentRule()}
-The outfit is identical in all four cells, layers included. ${buildUnnamedTrimRule(redress)} When the costume has an outer layer — vest, jacket, cardigan, coat, or overshirt — it stays on in the profile and back cells. Seen edge-on in the profile, its front opening runs as a vertical band down the side of the torso, with the shoulder seam, armhole, and the back panel visible behind the arm. No text, numbers, labels, arrows, or symbols anywhere.`;
+The outfit is identical in all four cells, layers included. ${buildUnnamedTrimRule(redress)} When the costume has an outer layer — vest, jacket, cardigan, coat, or overshirt — it stays on in the profile and back cells. Seen edge-on in the profile, its front opening runs as a vertical band down the side of the torso, with the shoulder seam, armhole, and the back panel visible behind the arm. No arrows or symbols anywhere. ${SHEET_NO_LETTERING_RULE} ${CELL_NAMES_NOT_DRAWN}`;
 }
 
 // Head-row prompt (call 2): one row of 4 head-shots that match the body sheet.
@@ -353,7 +381,7 @@ Image 3 is the character's full-body reference sheet — match the SAME face, ha
 ${buildGarmentRule()} Where the neckline shows, it is the one Image 3 wears. ${buildUnnamedTrimRule(redress)}${hairBlock}
 Output a 1×4 grid: ONE row, four cells side by side, thin black vertical dividers, pure white background. Each cell is framed like a passport photo of the SAME PERSON: head, neck and the top of the shoulders wearing the costume, cut off at the upper chest, with plain white above the hair and filling the rest of the cell; no bare skin below the neck. No waist, hands or lower body in any cell. Never crop the top of the head. Cell 1 front, cell 2 three-quarter, cell 3 profile.
 Cell 4 is a REAR TURN, distinct from cell 3's profile: ${REAR_TURN_POSE}. Cell 4 is never a second profile and never a flat back of the head with no face showing — Image 1's cell 4 is a plain placeholder silhouette, ignore its exact head angle entirely.
-Photographic / lifelike; identity from Image 2; hair, skin tone, and costume consistent with Image 3.${declaredAgeBlock(character)} No text, numbers, labels, arrows, or symbols.`;
+Photographic / lifelike; identity from Image 2; hair, skin tone, and costume consistent with Image 3.${declaredAgeBlock(character)} No arrows or symbols. ${SHEET_NO_LETTERING_RULE} ${CELL_NAMES_NOT_DRAWN}`;
 }
 
 // Composite the head row (top) over the body row (bottom) into one 2×4 sheet,
@@ -914,12 +942,12 @@ function buildStyleTransferPrompt(artStyle, { hasAnchor = false } = {}) {
   // swatch, and state the single-subject rule as a property of the OUTPUT
   // ("alone in every cell") rather than a negation about Image 2.
   const anchorLine = hasAnchor
-    ? '\nImage 2 is a swatch of the painting technique, palette, and paper texture only. Take nothing else from it: no figure, face, garment, or composition — every painted element in the output comes from Image 1. Where Image 2 and the style text above disagree, the style text wins.'
+    ? '\nImage 2 is a swatch of the painting technique, brushwork and paper texture only. Take nothing else from it: no figure, face, garment, garment colour, or composition — every painted element and every garment colour in the output comes from Image 1. Where Image 2 and the style text above disagree, the style text wins.'
     : '';
   return `Change the art style of Image 1 — a 2×4 character reference sheet (8 cells) — to: ${styleLine}
 Render all 8 cells uniformly in this style — no cell left photographic.
 
-Keep the content of Image 1 unchanged; only the art style changes. Every cell shows the same single character as Image 1, alone — no other person or figure anywhere on the sheet. Hair colour and skin tone stay as Image 1 shows them, with no colour patch on the face that Image 1 does not have. ${SHEET_GROUND_RULE}${anchorLine}`;
+Keep the content of Image 1 unchanged; only the art style changes. Every cell shows the same single character as Image 1, alone — no other person or figure anywhere on the sheet. Hair colour and skin tone stay as Image 1 shows them, with no colour patch on the face that Image 1 does not have. ${garmentColourRule('Image 1')} ${SHEET_GROUND_RULE} ${SHEET_NO_LETTERING_RULE}${anchorLine}`;
 }
 
 // Optional per-art-style STYLE ANCHOR asset (server/assets/style-anchor-<style>.jpg|png)
@@ -948,12 +976,17 @@ async function evaluateStyledSheetWithGemini(sourcePhoto, realisticSheet, styled
   // Pass 2 is a STYLE TRANSFER: the restyler is never told which garments to
   // produce (buildStyleTransferPrompt takes no costume), so the judge must not
   // ask. The outfit is decided and scored on pass 1 — no costume input here.
-  const { model = 'gemini-2.5-flash', promptOverride = null } = opts;
+  // What pass 2 IS told is to keep each garment's colour from the pass-1 sheet
+  // (garmentColourRule), so the judge scores exactly that, against Image 2.
+  // imageLabels: Test Lab A/B only (sheetJudgeArms.js) — three caption strings
+  // sent as text parts before Image 1/2/3. Production passes none: the images
+  // go first, unlabelled, then the prompt.
+  const { model = 'gemini-2.5-flash', promptOverride = null, imageLabels = null } = opts;
   const styleLabel = resolveStyleLineForSheet(artStyle);
 
   let prompt = promptOverride || PROMPT_TEMPLATES.sheet2x4StyleEval;
   if (!prompt) throw new Error('sheet2x4StyleEval prompt template not loaded');
-  prompt = fillTemplate(prompt, { REAR_TURN: REAR_TURN_POSE, SHEET_GROUND: SHEET_GROUND_RULE });
+  prompt = fillTemplate(prompt, { REAR_TURN: REAR_TURN_POSE, SHEET_GROUND: SHEET_GROUND_RULE, SHEET_LETTERING: SHEET_NO_LETTERING_RULE, GARMENT_COLOUR: garmentColourRule('Image 2') });
   prompt = prompt.replace(/REQUESTED_STYLE/g, `REQUESTED_STYLE: ${styleLabel}`);
   // TASK 6 age gate — style transfer is where kids drift younger (the art
   // style's cute prior). Unknown age disables the task (prompt scores it 10).
@@ -967,14 +1000,68 @@ async function evaluateStyledSheetWithGemini(sourcePhoto, realisticSheet, styled
 
   // No output cap (owner rule): a 2500 cap once truncated this JSON mid-string
   // when the TASK-5 colour enumeration made the model think longer.
+  const images = [sourcePhoto, realisticSheet, styledSheet].map(toInlinePart);
+  if (imageLabels != null && (!Array.isArray(imageLabels) || imageLabels.length !== 3)) {
+    throw new Error('evaluateStyledSheetWithGemini: imageLabels must be three strings (Image 1, 2, 3)');
+  }
   const parts = [
-    toInlinePart(sourcePhoto),
-    toInlinePart(realisticSheet),
-    toInlinePart(styledSheet),
+    ...(imageLabels ? images.flatMap((img, i) => [{ text: String(imageLabels[i]) }, img]) : images),
     { text: prompt },
   ];
   const report = await askSheetJudge({ model, parts, prompt, label: 'style-eval', usageTracker, usageFn: 'character_2x4_style_eval', apiKey: geminiApiKey });
   return { report: scoreStyleReport(report), promptUsed: prompt };
+}
+
+/**
+ * IS ONE TAKEN-OFF GARMENT STILL ON THE SHEET? One question, one garment, the
+ * variant image ALONE (owner, 2026-10-04). Inside the style judge the same
+ * question was read as an exemption: Image 2 still wears the garment, so "TASK 9
+ * does not score it" and "no garments were requested to be taken off" passed
+ * sheets that still wore it (Lab #1597/#1598: 3 of 4 control runs). With no
+ * reference image there is nothing to excuse it. Same provider and model as the
+ * style judge (askSheetJudge: Gemini Flash, temperature 0, echo guard).
+ * A failed call throws — the caller rejects the variant, never ships it unchecked.
+ *
+ * @returns {Promise<{garment: string, visible: boolean, cells: string, reason: string}>}
+ */
+async function checkGarmentGone(sheet, garment, opts = {}) {
+  const { model = 'gemini-2.5-flash', usageTracker = null } = opts;
+  const name = String(garment || '').trim();
+  if (!name) throw new Error('checkGarmentGone: no garment named');
+  const template = PROMPT_TEMPLATES.sheetGarmentGoneCheck;
+  if (!template) throw new Error('sheetGarmentGoneCheck prompt template not loaded');
+  const prompt = fillTemplate(template, { GARMENT: name, PARTS: `${GARMENT_PARTS} of it, worn or held` });
+  const report = await askSheetJudge({
+    model, parts: [inlinePartOf(sheet), { text: prompt }], prompt,
+    label: `garment-gone check (${name})`, usageTracker, usageFn: 'character_2x4_garment_gone_check', apiKey: process.env.GEMINI_API_KEY,
+  });
+  if (typeof report?.visible !== 'boolean') throw new Error(`garment-gone check (${name}) returned no visible true/false`);
+  return { garment: name, visible: report.visible, cells: String(report.cells ?? ''), reason: String(report.reason ?? '') };
+}
+
+/**
+ * THE VARIANT GATE: the pass-2 style judge AND one garment-gone check per
+ * removed garment. It passes only when the style judge passes and every check
+ * says not visible. The checks ride on the style verdict as `garmentChecks`;
+ * a visible garment sets removedScore 1 and `removed.reason`, so the
+ * finding/axis plumbing reads it as an axis.
+ */
+async function evaluateVariantSheet(sheet, opts = {}) {
+  const { removedGarments = [], usageTracker = null, ...styleOpts } = opts;
+  const names = (Array.isArray(removedGarments) ? removedGarments : []).map(s => String(s || '').trim()).filter(Boolean);
+  const styled = await evaluateAvatarSheet(sheet, { ...styleOpts, pass: 2, usageTracker });
+  const checks = await Promise.all(names.map(g => checkGarmentGone(sheet, g, { usageTracker })));
+  const verdict = styled.verdict;
+  verdict.garmentChecks = checks;
+  const still = checks.filter(c => c.visible);
+  verdict.removedScore = still.length ? 1 : 10;
+  verdict.removed = { score: verdict.removedScore, reason: still.length ? still.map(c => `${c.garment} is still visible: ${c.reason}`).join('; ') : 'no taken-off garment is visible in any cell' };
+  if (still.length) {
+    verdict.finalScore = Math.min(verdict.finalScore, verdict.removedScore);
+    verdict.valid = false;
+    verdict.failureReasons = [...(verdict.failureReasons || []), ...still.map(c => `removed: ${c.garment} is still visible — ${c.reason}`)];
+  }
+  return { ...styled, verdict };
 }
 
 // ── Every sheet judge's final score is computed HERE ─────────────────────────
@@ -1027,7 +1114,7 @@ function scoreHeadsReport(report) {
   return stampVerdict(report, lowestAxis(report, HEADS_AXES, 'row eval (heads)'));
 }
 
-const STYLE_AXES = ['layout', 'identity', 'style', 'clean', 'bodyFace', 'age', 'solo', 'background']
+const STYLE_AXES = ['layout', 'identity', 'style', 'clean', 'bodyFace', 'age', 'solo', 'background', 'garment']
   .map(n => [n, r => r[`${n}Score`] ?? r[n]?.score]);
 // The style-judge axes a styled sheet may NOT fail and still ship: a different
 // person (identity) or extra people in the sheet (solo). Every other axis ships
@@ -1125,10 +1212,7 @@ async function askSheetJudge({ model, parts, prompt, label, usageTracker, usageF
     const { text, usageMetadata } = await callSheetJudge(model, parts, null, apiKey);
     if (!text) throw new Error(`${label} (${model}) returned no text`);
     if (usageTracker && usageMetadata) {
-      usageTracker('gemini_quality', {
-        input_tokens: usageMetadata.promptTokenCount || 0,
-        output_tokens: usageMetadata.candidatesTokenCount || 0,
-      }, usageFn, model);
+      usageTracker('gemini_quality', geminiUsage(usageMetadata), usageFn, model);
     }
     const verdict = parseJudgeJson(text);
     if (!isEchoedJudgeVerdict(verdict, prompt)) return verdict;
@@ -1238,6 +1322,7 @@ async function evaluateSheetRow(rowImageData, which, opts = {}) {
   const ageNum = parseInt(declaredAge, 10);
   prompt = fillTemplate(prompt, {
     REAR_TURN: REAR_TURN_POSE,
+    SHEET_LETTERING: SHEET_NO_LETTERING_RULE,
     REQUESTED_OUTFIT: costumeDescription ? `REQUESTED_OUTFIT: ${costumeDescription}` : '',
     ...(which === 'bodies'
       ? {
@@ -1363,6 +1448,7 @@ async function evaluateAvatarSheet(sheet, opts = {}) {
     pass, facePhoto = null, standardAvatar = null, realisticSheet = null,
     costumeDescription = 'standard outfit', costumeName = null, artStyle = 'watercolor',
     declaredAge = null, model = null, promptOverrides = {}, usageTracker = null,
+    imageLabels = null,
   } = opts;
   // promptOverrides (Test Lab only) name the ONE judge template each replaces:
   // heads / bodies / identity on pass 1, style on pass 2. An override for a
@@ -1379,7 +1465,7 @@ async function evaluateAvatarSheet(sheet, opts = {}) {
   }
   const styled = await evaluateStyledSheetWithGemini(
     facePhoto, realisticSheet, sheet, artStyle, process.env.GEMINI_API_KEY,
-    usageTracker, declaredAge, { model: model || undefined, promptOverride: promptOverrides?.style || null }
+    usageTracker, declaredAge, { model: model || undefined, promptOverride: promptOverrides?.style || null, imageLabels }
   );
   return { verdict: styled.report, split: null, promptUsed: styled.promptUsed };
 }
@@ -1697,7 +1783,7 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
       ({ verdict, promptUsed: judgePrompt } = await evaluateAvatarSheet(result.imageData, {
         pass: 2, facePhoto, realisticSheet: pass1ImageData, artStyle, declaredAge: characterAge, usageTracker,
       }));
-      log.info(`[CHARACTER 2×4]   Pass 2 eval: layout=${verdict.layoutScore} identity=${verdict.identityScore} style=${verdict.styleScore} clean=${verdict.cleanScore} bodyFace=${verdict.bodyFaceScore} age=${verdict.ageScore ?? '-'} background=${verdict.backgroundScore ?? '-'} final=${verdict.finalScore} valid=${verdict.valid}`);
+      log.info(`[CHARACTER 2×4]   Pass 2 eval: layout=${verdict.layoutScore} identity=${verdict.identityScore} style=${verdict.styleScore} clean=${verdict.cleanScore} bodyFace=${verdict.bodyFaceScore} age=${verdict.ageScore ?? '-'} background=${verdict.backgroundScore ?? '-'} garment=${verdict.garmentScore ?? '-'} final=${verdict.finalScore} valid=${verdict.valid}`);
     } catch (err) {
       // A Gemini eval failure must NOT lock in this attempt and break the retry
       // loop. It is UNSCORED (null), so it ranks below every judged attempt: a
@@ -1730,6 +1816,7 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
       ageScore: verdict.ageScore,
       soloScore: verdict.soloScore,
       backgroundScore: verdict.backgroundScore,
+      garmentScore: verdict.garmentScore,
       reasons: verdict.failureReasons || [],
       imageData: result.imageData,
       sentToGrok: result.sentToGrok || null,
@@ -1810,22 +1897,33 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
  * attached: the input is already in the story's style, and the anchor's own
  * figures are a known contaminant.
  *
- * The gate is evaluateSheetSplit, not the Pass-2 style judge: a style judge
- * asked whether an already-styled sheet "had the style applied" answers with an
- * echo verdict and rejects every redress. What actually matters here is that
- * the layout survived, the face is still the same person, and the outfit now
- * matches the stripped contract — which is exactly what the split evaluator
- * scores, with the base sheet's own head row as the identity reference.
+ * THE GATE IS THE JUDGE THAT APPROVED THE BASE SHEET (owner, 2026-10-04): the
+ * Pass-2 style judge, shown the base's own Pass-1 realistic sheet as Image 2 —
+ * exactly the inputs that approved the base — plus one garment-gone check per
+ * garment taken off (evaluateVariantSheet; GARMENT_OFF_SHEET_RULE is also
+ * stated to the generator). It used to
+ * be evaluateSheetSplit, the Pass-1 row judges: absolute crop and outfit scores
+ * the approved base itself fails (staging job_1791040103540_atbttop6w, Kiaan's
+ * base sheet 1/10 on crop, outfit and "costumeReads"), so every redress, which
+ * inherits the base layout, was rejected and no off-garment sheet was stored
+ * after ~2026-09-26. The earlier worry that a style judge "rejects every
+ * redress" held for a styled base as Image 2 (style applied? no change), not
+ * for the realistic Pass-1 sheet it is given here.
+ *
+ * No Pass-1 sheet or no face photo for the base = nothing to judge against:
+ * NO variant, logged as an error (the page then records the missing sheet).
  *
  * Returns null when every attempt is rejected. The caller then stores no
- * variant, and the page falls back to the worn sheet plus the "leave it off"
- * text line — today's behaviour, never worse.
+ * variant; the page renders with the worn sheet and records a shipped defect.
  *
  * @param {string} baseSheetImageData - the approved styled 2×4 sheet
  * @param {Object} opts
  * @param {string} opts.characterName
  * @param {Array<string>} opts.removedItems - the garment names being taken off (logging only)
  * @param {string} opts.authoredWardrobe - the Art Director's wardrobe instruction; required
+ * @param {string} opts.realisticSheet - the base sheet's own Pass-1 realistic sheet (the style judge's Image 2); required
+ * @param {string} opts.facePhoto - the source face photo (the style judge's Image 1); required
+ * @param {string} opts.artStyle - the story's art style
  * @returns {Promise<{imageData, verdict, attempts, prompt}|null>}
  */
 /**
@@ -1856,14 +1954,15 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
  * keeps the pre-feature behaviour (the worn sheet plus the "is NOT wearing"
  * text line). An absent sheet is not a fallback implementation.
  */
-function buildRedressPrompt(authoredWardrobe) {
+function buildRedressPrompt(authoredWardrobe, removedGarments = []) {
   const wardrobeHalf = String(authoredWardrobe || '').trim();
+  const removed = (Array.isArray(removedGarments) ? removedGarments : []).map(s => String(s || '').trim()).filter(Boolean);
   if (!wardrobeHalf) {
     throw new Error('[WARDROBE-VARIANT] no authored wardrobe instruction — nothing else writes one');
   }
   return `Edit Image 1 — a 2×4 character reference sheet (8 cells).
 ${wardrobeHalf}
-Image 1 is the only authority for how anything the character keeps on looks — its colour, cut, fabric and weave: copy them, do not redraw them from words.
+${removed.length ? `Taken off: ${removed.join('; ')}. ${GARMENT_OFF_SHEET_RULE}\n` : ''}Image 1 is the only authority for how anything the character keeps on looks — its colour, cut, fabric and weave: copy them, do not redraw them from words.
 Draw every garment right round the body: in a cell facing the viewer its front, in a cell turned away its back — which this sheet has never shown, so draw it rather than uncover it.
 Change nothing else. Same character, same face, same hair, same body, same poses, same cell layout, same art style.`;
 }
@@ -1872,7 +1971,7 @@ async function redressSheetVariant(baseSheetImageData, opts = {}) {
   const {
     characterName = 'character', characterAge = null, facePhoto = null,
     removedItems = [], usageTracker = null, skipQualityEval = false,
-    backendOverride = null, authoredWardrobe = null,
+    backendOverride = null, authoredWardrobe = null, realisticSheet = null, artStyle = null,
   } = opts;
   if (!baseSheetImageData) return null;
 
@@ -1882,7 +1981,12 @@ async function redressSheetVariant(baseSheetImageData, opts = {}) {
     log.error(`[WARDROBE-VARIANT] ${characterName}: no authored wardrobe instruction (off: ${items.join(', ') || 'unknown'}) — NO variant sheet. Nothing else writes this instruction.`);
     return null;
   }
-  const prompt = buildRedressPrompt(wardrobeHalf);
+  const judged = !skipQualityEval && !!process.env.GEMINI_API_KEY;
+  if (judged && (!realisticSheet || !facePhoto)) {
+    log.error(`[WARDROBE-VARIANT] ${characterName}: the base sheet's ${!realisticSheet ? 'Pass-1 realistic sheet' : 'face photo'} is not available — the style judge that approved the base cannot judge the variant. NO variant sheet.`);
+    return null;
+  }
+  const prompt = buildRedressPrompt(wardrobeHalf, items);
 
   const totalAttempts = 1 + MAX_SHEET_RETRIES;
   const attempts = [];
@@ -1912,7 +2016,7 @@ async function redressSheetVariant(baseSheetImageData, opts = {}) {
       continue;
     }
 
-    if (skipQualityEval || !process.env.GEMINI_API_KEY) {
+    if (!judged) {
       // Nothing can judge it; one roll, shipped, and said so.
       log.warn(`[WARDROBE-VARIANT] ${characterName} redress shipped UNSCORED (${skipQualityEval ? 'eval skipped by caller' : 'no GEMINI_API_KEY'})`);
       return { imageData: result.imageData, verdict: null, attempts, prompt };
@@ -1920,20 +2024,13 @@ async function redressSheetVariant(baseSheetImageData, opts = {}) {
 
     let verdict = null;
     try {
-      const split = await evaluateSheetSplit(result.imageData, {
-        facePhoto,
-        // The base sheet IS the identity reference — the variant must match the
-        // sheet it was redressed from, not a photo taken years earlier.
-        standardAvatar: baseSheetImageData,
-        costumeDescription: wardrobeHalf,
-        usageTracker,
-        declaredAge: characterAge,
-      });
-      verdict = split.verdict;
+      ({ verdict } = await evaluateVariantSheet(result.imageData, {
+        facePhoto, realisticSheet, artStyle, declaredAge: characterAge, usageTracker,
+        removedGarments: items,
+      }));
     } catch (err) {
-      log.warn(`[WARDROBE-VARIANT] ${characterName} redress eval threw: ${err.message} — attempt kept but unscored`);
-      attempts.push({ attempt, stage: 'eval-error', score: null, reason: err.message, imageData: result.imageData });
-      if (!best) best = { imageData: result.imageData, verdict: null, score: null };
+      log.error(`[WARDROBE-VARIANT] ${characterName} redress eval threw: ${err.message} — attempt rejected, never shipped unchecked`);
+      attempts.push({ attempt, stage: 'eval-error', score: null, reason: err.message });
       continue;
     }
     attempts.push({ attempt, stage: 'judged', score: verdict.finalScore, valid: verdict.valid, reason: (verdict.failureReasons || []).join('; ') || null });
@@ -1941,13 +2038,13 @@ async function redressSheetVariant(baseSheetImageData, opts = {}) {
       best = { imageData: result.imageData, verdict, score: verdict.finalScore };
     }
     if (verdict.valid) {
-      log.info(`[WARDROBE-VARIANT] ${characterName} redress accepted (score=${verdict.finalScore}/10)`);
+      log.info(`[WARDROBE-VARIANT] ${characterName} redress accepted (score=${verdict.finalScore}/10, removed=${verdict.removedScore}/10)`);
       return { imageData: result.imageData, verdict, attempts, prompt };
     }
   }
 
   const why = (best?.verdict?.failureReasons || []).join('; ') || 'no attempt produced a usable sheet';
-  log.error(`[WARDROBE-VARIANT] ${characterName} redress REJECTED after ${attempts.length} attempt(s) (best=${best?.score ?? 'unscored'}/10: ${why}) — no variant stored; the page keeps the worn sheet + the "leave it off" line`);
+  log.error(`[WARDROBE-VARIANT] ${characterName} redress REJECTED after ${attempts.length} attempt(s) (best=${best?.score ?? 'unscored'}/10: ${why}) — no variant stored; every page that takes ${items.join(', ')} off records a missing off sheet`);
   return null;
 }
 
@@ -1955,6 +2052,9 @@ module.exports = {
   generateCharacter2x4Sheet,
   redressSheetVariant,
   buildRedressPrompt,
+  GARMENT_OFF_SHEET_RULE,
+  checkGarmentGone,
+  evaluateVariantSheet,
   // Exported for tests: the declared-age proportion block must reach the prompt.
   declaredAgeBlock,
   buildBodyRowPrompt,
@@ -1966,5 +2066,5 @@ module.exports = {
   resolveFacePhoto,
   buildStyleTransferPrompt,
   // exposed for tests
-  _internal: { parseJudgeJson, buildBodyRowPrompt, buildHeadRowPrompt, buildFootwearRule, buildGarmentRule, buildSeasonOutfitBlock, buildStyleTransferPrompt, resolveFacePhoto, resolveStandardAvatar, quickLayoutCheck, evaluateStyledSheetWithGemini, runStyleTransferPass, splitSheetRows, evaluateSheetRow, evaluateIdentity, evaluateSheetSplit, evaluateAvatarSheet, isEchoedJudgeVerdict, REAR_TURN_POSE, SHEET_GROUND_RULE, buildUnnamedTrimRule, scoreHeadsReport, scoreStyleReport, scoreIdentityReport },
+  _internal: { parseJudgeJson, buildBodyRowPrompt, buildHeadRowPrompt, buildFootwearRule, buildGarmentRule, buildSeasonOutfitBlock, buildStyleTransferPrompt, resolveFacePhoto, resolveStandardAvatar, quickLayoutCheck, evaluateStyledSheetWithGemini, runStyleTransferPass, splitSheetRows, evaluateSheetRow, evaluateIdentity, evaluateSheetSplit, evaluateAvatarSheet, isEchoedJudgeVerdict, REAR_TURN_POSE, SHEET_GROUND_RULE, SHEET_NO_LETTERING_RULE, CELL_NAMES_NOT_DRAWN, garmentColourRule, buildUnnamedTrimRule, scoreHeadsReport, scoreStyleReport, scoreIdentityReport },
 };

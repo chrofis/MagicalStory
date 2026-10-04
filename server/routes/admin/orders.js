@@ -52,8 +52,10 @@ router.get('/', authenticateToken, requireAdmin, async (req, res) => {
         o.gelato_status,
         o.created_at,
         o.updated_at,
+        -- A paid order with no Gelato order is an issue whether it is still 'paid', stuck in
+        -- 'processing' (process died mid-run) or 'failed' (review 2026-10-04 P8).
         CASE
-          WHEN o.payment_status = 'paid' AND o.gelato_order_id IS NULL THEN true
+          WHEN o.payment_status IN ('paid', 'processing', 'failed') AND o.gelato_order_id IS NULL THEN true
           ELSE false
         END as has_issue
       FROM orders o

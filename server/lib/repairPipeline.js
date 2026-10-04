@@ -31,7 +31,6 @@ const { pickBestVersionIndex, applyScore, computeFinalScore } = require('./scori
 const { decideRepairMethod, findBadPages, collectCriticalFindings, resolveDeclaredCast, inheritSceneContract, resolveVersionCompressedScene, resolveVersionPrompt, resolveOwnRenderPrompt, AUDIT_ADMIT_MAX } = require('./repairLogic');
 const { sanitizeIssueForInpaint } = require('./imageCompositing');
 const pLimit = require('p-limit');
-const { getFacePhoto } = require('./characterPhotos');
 
 const getStoryHelpers = () => require('./storyHelpers');
 // Leaf module (parsers only) — safe to require eagerly, no cycle back here.
@@ -176,7 +175,7 @@ function forcedStrategyAfterFailures(versions) {
  */
 function lastRepairRegressed(versions) {
   if (!Array.isArray(versions) || versions.length < 2) return null;
-  const scoreOf = (v) => v?.evaluation?.score ?? v?.score ?? v?.qualityScore ?? null;
+  const scoreOf = computeFinalScore; // the picker's number (entity penalty + consolidation), not the raw evaluator score (code review 2026-10 D2)
   // Find the most recent repair version and its index.
   let lastIdx = -1;
   for (let i = versions.length - 1; i >= 0; i--) {
@@ -194,6 +193,12 @@ function lastRepairRegressed(versions) {
   }
   if (!isFinite(priorBest)) return null;
   if (lastScore >= priorBest) return null;
+  // Critical-gone wins (scoring.js dominatesByCritical): a repair that cleared
+  // a CRITICAL every higher-scoring earlier version still carries did not
+  // regress — the picker ships it over them.
+  const { dominatesByCritical } = require('./scoring');
+  const outscoring = versions.slice(0, lastIdx).filter(v => { const s = scoreOf(v); return s != null && s > lastScore; });
+  if (outscoring.every(v => dominatesByCritical(last, v))) return null;
   return last.source.startsWith('inpaint-') ? 'iterate' : 'inpaint';
 }
 
@@ -205,7 +210,7 @@ function lastRepairRegressed(versions) {
  */
 function bothStrategiesTriedAndRegressed(versions) {
   if (!Array.isArray(versions) || versions.length < 3) return false;
-  const scoreOf = (v) => v?.evaluation?.score ?? v?.score ?? v?.qualityScore ?? null;
+  const scoreOf = computeFinalScore; // the picker's number (entity penalty + consolidation), not the raw evaluator score (code review 2026-10 D2)
   let hasInpaint = false;
   let hasIterate = false;
   let repairBest = -Infinity;
@@ -219,7 +224,20 @@ function bothStrategiesTriedAndRegressed(versions) {
   }
   if (!hasInpaint || !hasIterate) return false;
   if (!isFinite(preRepairBest)) return false;
-  return repairBest <= preRepairBest;
+  if (repairBest > preRepairBest) return false;
+  // Critical-gone wins (scoring.js dominatesByCritical): a repair that cleared
+  // a CRITICAL every pre-repair version scoring at least as high still carries
+  // improved the page, whatever its score.
+  const { dominatesByCritical } = require('./scoring');
+  const isRepair = (v) => /^(inpaint|iterate)-/.test(v?.source || '');
+  const preRepair = versions.filter(v => !isRepair(v));
+  const cleared = versions.filter(isRepair).some(r => {
+    const rs = scoreOf(r);
+    if (rs == null) return false;
+    const atLeastAsHigh = preRepair.filter(v => { const s = scoreOf(v); return s != null && s >= rs; });
+    return atLeastAsHigh.length > 0 && atLeastAsHigh.every(v => dominatesByCritical(r, v));
+  });
+  return !cleared;
 }
 
 // resolveCharBbox now lives in charRepairTarget.js — ONE targeting
@@ -264,17 +282,268 @@ function mergeEntityIssues(base, fresh, repairedPages) {
     const declaredOffByPage = { ...(b.declaredOffByPage || {}) };
     for (const p of pages) delete declaredOffByPage[p];
     Object.assign(declaredOffByPage, f?.declaredOffByPage || {});
-    merged.characters[name] = { ...b, issues, declaredOffByPage, totalIssues: issues.length, overallConsistent: issues.length === 0 };
+    // A character whose check failed to run (base or fresh) is not verified by a
+    // merge that finds zero issues (review B3, 2026-10-04).
+    const charEvalFailed = !!b.evalFailed || !!f?.evalFailed;
+    merged.characters[name] = { ...b, issues, declaredOffByPage, totalIssues: issues.length, overallConsistent: issues.length === 0 && !charEvalFailed,
+      ...(charEvalFailed ? { evalFailed: true } : {}) };
     total += issues.length;
   }
   merged.totalIssues = total;
   // evalFailed sticky across merges (same rule as entityConsistency.js's
   // per-character aggregation): a round re-check of a few repaired pages must
   // not launder a base report whose check FAILED to run into a clean pass.
-  merged.evalFailed = !!base.evalFailed || !!fresh.evalFailed;
+  merged.evalFailed = !!base.evalFailed || !!fresh.evalFailed
+    || Object.values(merged.characters).some(c => c && c.evalFailed);
   merged.overallConsistent = total === 0 && !merged.evalFailed;
   merged.summary = `${names.size} entities checked: ${total} consistency issue(s) (merged after round update)`;
   return merged;
+}
+
+/**
+ * ONE evaluateImageBatch input for a page version: `entry` is the version being
+ * judged, `orig` the page's first-render record (the run's rawImages entry), and
+ * `allCharacterPhotos` the whole-cast reference list. The repair round's
+ * builder, exported on 2026-09-27 so the Test Lab eval stages hand the batch the
+ * same input for a stored page (owner: "The Lab must use 100% identical code to
+ * production").
+ */
+function buildEvalInput(entry, orig, allCharacterPhotos) {
+  const { resolveSceneEra } = require('./landmarkProtection');
+  // sharedBboxDetection is the bbox detection that ran on the ORIGINAL
+  // image bytes pre-pipeline (server.js:5570). Reusing it skips a redundant
+  // Gemini call when re-evaluating the same image. But it MUST NOT be
+  // reused when the entry's imageData differs from the original — that
+  // happens on every round-result image (iterate / inpaint / char-fix
+  // produce new bytes). Page 5 of job_1778525478433_fkl0f12x4 showed v3
+  // and v4 carrying v0's bbox figures even though their pixel content was
+  // completely different — because every round eval got the same
+  // sharedBboxDetection forwarded.
+  const isOriginalImage = entry.imageData === orig.imageData;
+  // A repaired version is evaluated against ITS OWN contract when it has
+  // one (iterate rewrites the scene — prompt, description, characters,
+  // metadata can all legitimately differ from the original plan). Falling
+  // back to orig.* for entries without a rewrite (inpaint, char-fix keep
+  // the original scene contract).
+  return {
+    imageData: entry.imageData,
+    pageNumber: entry.pageNumber,
+    prompt: entry.prompt || orig.prompt,
+    characterPhotos: orig.characterPhotos,
+    allCharacterPhotos,
+    sceneDescription: entry.description || orig.sceneDescription,
+    // The post-shrink prose THIS version's render actually received, by
+    // lineage — its own when it was compressed, the page's when it is
+    // original-lineage, null when it authored a brief that fit. One rule,
+    // shared with the promotion at final assembly (resolveVersionCompressedScene).
+    compressedScene: resolveVersionCompressedScene(entry, orig),
+    // An ARRAY on the entry is that version's own declaration (an iterate
+    // rewrite can legitimately empty the cast); anything else inherits the
+    // page's. `||` cannot say that — `[]` is truthy. See resolveDeclaredCast.
+    sceneCharacters: resolveDeclaredCast(entry.sceneCharacters, orig.sceneCharacters),
+    sceneMetadata: entry.sceneMetadata || orig.sceneMetadata,
+    pageText: orig.text,
+    // Era-aware landmark protection (2026-09-05): the real-landmark refs this
+    // page was rendered from + the story era. The compliance judge uses them
+    // to keep a present-day landmark's own structures out of `object_presence`.
+    landmarkPhotos: orig.landmarkPhotos || null,
+    era: resolveSceneEra(entry.sceneMetadata || orig.sceneMetadata),
+    // SCENE_HINT = what the image was MADE from. One resolver for every eval
+    // call site (sceneMetadata.resolveEvalSceneHint) — the inline `||` chain
+    // this replaced assumed pages never set `outlineExtract`, an assumption
+    // 824fb02d9 broke two days later by storing "PLAN: <planLine>" on every
+    // beats page. See the helper's own comment for the full history.
+    sceneHint: resolveEvalSceneHint({
+      evaluationType: orig.evaluationType,
+      entryDescription: entry.description,
+      sceneDescription: orig.sceneDescription,
+      outlineExtract: orig.scene?.outlineExtract,
+      sceneHint: orig.scene?.sceneHint,
+    }),
+    evaluationType: orig.evaluationType,
+    // Structured cover text contract (replaces the old prompt-string surgery):
+    // 'appOverlay' → evaluator must never flag the (textless) title missing;
+    // 'painted' + expectedText → evaluator letter-checks the painted text.
+    expectedText: orig.expectedText ?? null,
+    textMode: orig.textMode ?? null,
+    coverIsPage: orig.coverIsPage === true,
+    // Detection reuse, in pairing order: the entry's OWN detection first —
+    // a round-result entry carries the detection made on its accepted new
+    // bytes (iterate's internal re-detect, or the round pre-detect step) —
+    // else the pre-pipeline shared detection when the bytes are still the
+    // original's. Never the original's detection for repaired bytes.
+    // bboxPairsWith re-verifies the fingerprint before any reuse.
+    sharedBboxDetection: entry.bboxDetection
+      || (isOriginalImage ? (orig.sharedBboxDetection || null) : null),
+  };
+
+}
+
+/**
+ * What the repair round hands images.inpaintPage for one page (executeInpaintAction),
+ * moved verbatim on 2026-09-27 so the Test Lab inpaint stage makes the run's
+ * call: the evaluation with the landmark hard guard applied, the plan that
+ * evaluation was scored with, the page's worn clothing, aspect and text
+ * position, the detection, and the cover text contract.
+ *
+ * @param {object} a
+ * @param {object} a.img - the page's first-render record (rawImages entry)
+ * @param {object} a.latestEval - the evaluation being repaired
+ * @param {object|null} a.bestSoFar - the page's best version so far
+ * @param {boolean} a.restampCoverAfter - the textless art layer is repainted and restamped
+ * @returns {{inpaintEval: object, options: object}}
+ */
+function buildInpaintCall({ img, latestEval, bestSoFar = null, roundNum = null, restampCoverAfter = false, storyData, characters, artStyle, jobId }) {
+  const { resolveSceneEra, computeLandmarkProtection, filterProtectedRemovals } = require('./landmarkProtection');
+  // Parse per-character clothing for this page so the avatar lookup picks the
+  // styled+costumed variant matching what's actually drawn on this page.
+  // Without this, inpaint attaches unstyled base photos and Grok has no visual
+  // reference for the current costume/style.
+  const { parseCharacterClothing } = getStoryHelpers();
+  const pageCharacterClothing = parseCharacterClothing(img.sceneDescription || img.description || '') || {};
+  // Same aspect resolution as iteratePage above — the page's stored
+  // imageAspect is the source of truth. Without this, inpaint silently
+  // crops square (advanced/Jugendbuch) pages to 3:4 on round 1.
+  const sceneAspect = img.imageAspect
+    || storyData?.sceneImages?.find(s => s.pageNumber === img.pageNumber)?.imageAspect
+    || null;
+  // Look up the page's locked text-overlay corner so inpaint can warn
+  // Grok not to paint high-contrast detail in that zone. textPosition is
+  // only persisted on overlay layouts (gated at the persistence site in
+  // server.js — see docs/calm-zone-pipeline.md), so a non-null value here
+  // means the story uses overlay and the suffix is correct.
+  const pageTextPosition = (storyData?.sceneImages || []).find(s => s.pageNumber === img.pageNumber)?.textPosition || null;
+  // ---------------------------------------------------------------------
+  // HARD GUARD (owner ruling 2026-09-05). An `object_presence` removal on a
+  // page carrying real landmark photos in a NON-HISTORICAL era must never
+  // execute — inpaint dispatches it as an UNMASKED whole-frame edit
+  // (targetBbox null) that repaints the whole background and erases the real
+  // place. job_1788614817116_vxnu60yjg p2: "Remove red-white transmission
+  // tower and grey-red tower from background" wiped the Uetliberg Fernsehturm
+  // and Uto Kulm spire off the ridge, and the erased version scored HIGHER.
+  // The finding is dropped with a WARN naming the page and the landmark —
+  // loudly, never silently. Belt-and-braces: the compliance eval and the
+  // consolidator already drop it upstream; this is the last gate before Grok.
+  // ---------------------------------------------------------------------
+  let inpaintEval = latestEval || {};
+  {
+    const prot = computeLandmarkProtection({
+      landmarkPhotos: img.landmarkPhotos || null,
+      era: resolveSceneEra(img.sceneMetadata),
+    });
+    if (prot.protect && inpaintEval && typeof inpaintEval === 'object') {
+      const ctx = { pageNumber: img.pageNumber, label: '[INPAINT dispatch]' };
+      const fx = filterProtectedRemovals(inpaintEval.fixableIssues || [], prot, ctx);
+      const sem = filterProtectedRemovals(
+        require('./repairLogic').semanticFindings(inpaintEval.semanticResult), prot, ctx);
+      const cmp = filterProtectedRemovals(inpaintEval.threeStageResult?.fixableIssues || [], prot, ctx);
+      if (fx.dropped.length || sem.dropped.length || cmp.dropped.length) {
+        inpaintEval = { ...inpaintEval, fixableIssues: fx.kept };
+        if (inpaintEval.semanticResult) {
+          inpaintEval.semanticResult = { ...inpaintEval.semanticResult };
+          if (Array.isArray(inpaintEval.semanticResult.semanticIssues)) inpaintEval.semanticResult.semanticIssues = sem.kept;
+        }
+        if (inpaintEval.threeStageResult) {
+          inpaintEval.threeStageResult = { ...inpaintEval.threeStageResult, fixableIssues: cmp.kept };
+        }
+      }
+    }
+  }
+  // THE PLAN THIS EVALUATION WAS SCORED WITH (B2). consolidatePageEval ran it
+  // once when the eval landed; the version carries it and roundEvalPages
+  // mirrors it onto the eval object. Inpaint no longer consolidates.
+  const planForInpaint = inpaintEval.consolidatedPlan
+    || bestSoFar?.consolidatedPlan
+    || null;
+  const options = {
+    visualBible: storyData?.visualBible || null,
+    characters: storyData?.characters || characters || null,
+    consolidatedPlan: planForInpaint,
+    pageNumber: img.pageNumber,
+    sceneDescription: img.sceneDescription || img.description || '',
+    artStyle: storyData?.artStyle || artStyle || null,
+    characterClothing: pageCharacterClothing,
+    // Lets a fix instruction say WHERE a figure stands, not only what it wears.
+    detectedFigures: img?.sharedBboxDetection?.figures || img?.bboxDetection?.figures || null,
+    clothingRequirements: storyData?.clothingRequirements || null,
+    // Thread storyId + round so consolidator calls get persisted
+    storyId: storyData?.id || jobId || null,
+    round: roundNum,
+    aspectRatio: sceneAspect,
+    textPosition: pageTextPosition,
+    // Era-aware landmark protection for inpaint's own consolidator call.
+    landmarkPhotos: img.landmarkPhotos || null,
+    era: resolveSceneEra(img.sceneMetadata),
+    sceneMetadata: img.sceneMetadata || null,
+    // A cover whose lettering lives in the pixels (baked title) must keep it
+    // through the edit — the contract joins the required-text clause. When
+    // the textless art layer is being repainted, the text is restamped
+    // afterward, so the edit is told nothing about it.
+    expectedText: restampCoverAfter ? null : (img.expectedText ?? null),
+    textMode: restampCoverAfter ? null : (img.textMode ?? null),
+  };
+  return { inpaintEval, options };
+}
+
+/**
+ * What the repair round hands the feedback consolidator for ONE evaluation
+ * (consolidatePageEval), moved verbatim on 2026-09-27 so the Test Lab
+ * consolidate and inpaint stages consolidate a stored page as the run does:
+ * the page's entity issues, the clothing the page actually wears, the book
+ * audit's reader findings for this version, the landmark refs and era.
+ *
+ * @param {object} a
+ * @param {object} a.ev - the evaluation
+ * @param {Array} a.entityIssues - entityIssuesForPage(pageNumber, entityReport).issues
+ * @param {object} a.orig - the page's first-render record (rawImages entry)
+ */
+function consolidationInputs({ ev, entityIssues, orig, pageNumber, round, sceneDescriptionOverride = null, readerFindings = [], storyData, characters, artStyle, visualBible, storyId }) {
+  const { resolveSceneEra } = require('./landmarkProtection');
+  // The variant this page actually wears. Inpaint used to resolve this for
+  // its own (now deleted) consolidator call; with one consolidation per
+  // evaluation the single call must carry it, or the consolidator writes
+  // modern-wardrobe fixes for a costumed page.
+  const { parseCharacterClothing, resolveSceneClothingDescriptions } = require('./clothingResolve');
+  const sceneClothing = resolveSceneClothingDescriptions({
+    characterClothing: parseCharacterClothing(orig?.sceneDescription || orig?.description || '') || {},
+    clothingRequirements: storyData?.clothingRequirements || null,
+    characters: characters || [],
+    artStyle: storyData?.artStyle || artStyle || null,
+  });
+  return {
+    evalResult: ev,
+    entityIssues,
+    sceneClothing,
+    readerFindings,
+    // A repaired version is consolidated against ITS OWN contract (an
+    // iterate rewrite resolves spec conflicts — checking the ORIGINAL
+    // description would re-flag the fixed version and loop the repair).
+    sceneDescription: sceneDescriptionOverride || orig?.sceneDescription || '',
+    characters: characters || [],
+    storyId,
+    pageNumber,
+    round,
+    // Resolves raw VB ids out of the consolidator's input AND out of the
+    // instruction fields it writes back (which reach Grok).
+    visualBible,
+    // Era-aware landmark protection: drops `object_presence` removal
+    // findings on a present-day page carrying a real landmark, and seeds
+    // scene_fix.preserve with the landmark names.
+    landmarkPhotos: orig?.landmarkPhotos || null,
+    era: resolveSceneEra(orig?.sceneMetadata),
+  };
+}
+
+/**
+ * The story identity evaluateImageBatch records its counters under — shared
+ * with the Test Lab eval stages.
+ */
+function evalStoryMetaOf(storyData, jobId = null) {
+  return {
+    storyId: storyData?.id || jobId || null,
+    language: storyData?.language || null,
+    genre: storyData?.genre || null,
+  };
 }
 
 /**
@@ -368,11 +637,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   // (presence_*, eval_matches_missing) off it — so with no caller passing it,
   // those counters went to the NOOP recorder and no story ever stored one.
   // Same id the repair pipeline already uses for its own counters below.
-  const evalStoryMeta = {
-    storyId: storyData?.id || jobId || null,
-    language: storyData?.language || null,
-    genre: storyData?.genre || null,
-  };
+  const evalStoryMeta = evalStoryMetaOf(storyData, jobId);
 
   const imagesWithData = rawImages.filter(r => r.imageData);
   const effectiveUseIteratePage = useIteratePage && !!storyData;
@@ -431,74 +696,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   );
 
   // Reusable helper: build eval inputs for an array of image entries
-  const buildEvalInputs = (imageEntries) => imageEntries.map(entry => {
-    const orig = rawImages.find(img => img.pageNumber === entry.pageNumber) || entry;
-    // sharedBboxDetection is the bbox detection that ran on the ORIGINAL
-    // image bytes pre-pipeline (server.js:5570). Reusing it skips a redundant
-    // Gemini call when re-evaluating the same image. But it MUST NOT be
-    // reused when the entry's imageData differs from the original — that
-    // happens on every round-result image (iterate / inpaint / char-fix
-    // produce new bytes). Page 5 of job_1778525478433_fkl0f12x4 showed v3
-    // and v4 carrying v0's bbox figures even though their pixel content was
-    // completely different — because every round eval got the same
-    // sharedBboxDetection forwarded.
-    const isOriginalImage = entry.imageData === orig.imageData;
-    // A repaired version is evaluated against ITS OWN contract when it has
-    // one (iterate rewrites the scene — prompt, description, characters,
-    // metadata can all legitimately differ from the original plan). Falling
-    // back to orig.* for entries without a rewrite (inpaint, char-fix keep
-    // the original scene contract).
-    return {
-      imageData: entry.imageData,
-      pageNumber: entry.pageNumber,
-      prompt: entry.prompt || orig.prompt,
-      characterPhotos: orig.characterPhotos,
-      allCharacterPhotos,
-      sceneDescription: entry.description || orig.sceneDescription,
-      // The post-shrink prose THIS version's render actually received, by
-      // lineage — its own when it was compressed, the page's when it is
-      // original-lineage, null when it authored a brief that fit. One rule,
-      // shared with the promotion at final assembly (resolveVersionCompressedScene).
-      compressedScene: resolveVersionCompressedScene(entry, orig),
-      // An ARRAY on the entry is that version's own declaration (an iterate
-      // rewrite can legitimately empty the cast); anything else inherits the
-      // page's. `||` cannot say that — `[]` is truthy. See resolveDeclaredCast.
-      sceneCharacters: resolveDeclaredCast(entry.sceneCharacters, orig.sceneCharacters),
-      sceneMetadata: entry.sceneMetadata || orig.sceneMetadata,
-      pageText: orig.text,
-      // Era-aware landmark protection (2026-09-05): the real-landmark refs this
-      // page was rendered from + the story era. The compliance judge uses them
-      // to keep a present-day landmark's own structures out of `object_presence`.
-      landmarkPhotos: orig.landmarkPhotos || null,
-      era: resolveSceneEra(entry.sceneMetadata || orig.sceneMetadata),
-      // SCENE_HINT = what the image was MADE from. One resolver for every eval
-      // call site (sceneMetadata.resolveEvalSceneHint) — the inline `||` chain
-      // this replaced assumed pages never set `outlineExtract`, an assumption
-      // 824fb02d9 broke two days later by storing "PLAN: <planLine>" on every
-      // beats page. See the helper's own comment for the full history.
-      sceneHint: resolveEvalSceneHint({
-        evaluationType: orig.evaluationType,
-        entryDescription: entry.description,
-        sceneDescription: orig.sceneDescription,
-        outlineExtract: orig.scene?.outlineExtract,
-        sceneHint: orig.scene?.sceneHint,
-      }),
-      evaluationType: orig.evaluationType,
-      // Structured cover text contract (replaces the old prompt-string surgery):
-      // 'appOverlay' → evaluator must never flag missing/present title text;
-      // 'painted' + expectedText → evaluator letter-checks the painted text.
-      expectedText: orig.expectedText ?? null,
-      textMode: orig.textMode ?? null,
-      // Detection reuse, in pairing order: the entry's OWN detection first —
-      // a round-result entry carries the detection made on its accepted new
-      // bytes (iterate's internal re-detect, or the round pre-detect step) —
-      // else the pre-pipeline shared detection when the bytes are still the
-      // original's. Never the original's detection for repaired bytes.
-      // bboxPairsWith re-verifies the fingerprint before any reuse.
-      sharedBboxDetection: entry.bboxDetection
-        || (isOriginalImage ? (orig.sharedBboxDetection || null) : null),
-    };
-  });
+  // (the per-entry builder is shared with the Test Lab eval stages).
+  const buildEvalInputs = (imageEntries) => imageEntries.map(entry => buildEvalInput(
+    entry, rawImages.find(img => img.pageNumber === entry.pageNumber) || entry, allCharacterPhotos));
 
   // Reusable helper: build entity check data for an array of image entries
   const buildEntityCheckData = (imageEntries) => ({
@@ -665,7 +865,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   if (entityReport?.tokenUsage && usageTracker) {
     usageTracker('gemini_quality', {
       input_tokens: entityReport.tokenUsage.inputTokens || 0,
-      output_tokens: entityReport.tokenUsage.outputTokens || 0
+      output_tokens: entityReport.tokenUsage.outputTokens || 0,
+      thinking_tokens: entityReport.tokenUsage.thinkingTokens || 0
     }, 'entity_consistency_check', entityReport.tokenUsage.model || 'gemini-2.5-flash');
   }
 
@@ -798,48 +999,19 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   const consolidatePageEval = async (ev, entityIssues, pageNumber, round, sceneDescriptionOverride = null, readerFindings = []) => {
     try {
       const orig = rawImages.find(i => i.pageNumber === pageNumber);
-      // The variant this page actually wears. Inpaint used to resolve this for
-      // its own (now deleted) consolidator call; with one consolidation per
-      // evaluation the single call must carry it, or the consolidator writes
-      // modern-wardrobe fixes for a costumed page.
-      const { parseCharacterClothing, resolveSceneClothingDescriptions } = require('./clothingResolve');
-      const sceneClothing = resolveSceneClothingDescriptions({
-        characterClothing: parseCharacterClothing(orig?.sceneDescription || orig?.description || '') || {},
-        clothingRequirements: storyData?.clothingRequirements || null,
-        characters: characters || [],
-        artStyle: storyData?.artStyle || artStyle || null,
-      });
-      const res = await consolidateEvaluation({
-        evalResult: ev,
-        entityIssues,
-        sceneClothing,
-        readerFindings,
-        // A repaired version is consolidated against ITS OWN contract (an
-        // iterate rewrite resolves spec conflicts — checking the ORIGINAL
-        // description would re-flag the fixed version and loop the repair).
-        sceneDescription: sceneDescriptionOverride || orig?.sceneDescription || '',
-        characters: characters || [],
-        storyId: consolidatorStoryId,
-        pageNumber,
-        round,
-        // Resolves raw VB ids out of the consolidator's input AND out of the
-        // instruction fields it writes back (which reach Grok).
-        visualBible,
-        // Era-aware landmark protection: drops `object_presence` removal
-        // findings on a present-day page carrying a real landmark, and seeds
-        // scene_fix.preserve with the landmark names.
-        landmarkPhotos: orig?.landmarkPhotos || null,
-        era: resolveSceneEra(orig?.sceneMetadata),
-      });
+      const res = await consolidateEvaluation(consolidationInputs({
+        ev, entityIssues, orig, pageNumber, round, sceneDescriptionOverride, readerFindings,
+        storyData, characters, artStyle, visualBible, storyId: consolidatorStoryId,
+      }));
       if (res.usage && usageTracker) {
         usageTracker('anthropic', res.usage, 'eval_consolidation', 'claude-sonnet');
       }
       if (res.error) {
-        log.warn(`🧠 [EVAL-CONSOLIDATION] P${pageNumber}: failed (${res.error}) — scoring falls back to raw issues`);
+        log.warn(`🧠 [EVAL-CONSOLIDATION] P${pageNumber}: failed (${res.error}) — the version will be left unevaluated (never scored on raw issues)`);
       }
       return res.plan || null;
     } catch (err) {
-      log.warn(`🧠 [EVAL-CONSOLIDATION] P${pageNumber}: threw (${err.message}) — scoring falls back to raw issues`);
+      log.warn(`🧠 [EVAL-CONSOLIDATION] P${pageNumber}: threw (${err.message}) — the version will be left unevaluated (never scored on raw issues)`);
       return null;
     }
   };
@@ -1064,6 +1236,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           // the drift: originals scored RAW at creation, CONSOLIDATED at save,
           // and the pick sat between the two states (p9 −77/−65, task #15/16).
           consolidatedPlan: v.consolidatedPlan || null,
+          requireConsolidation: true, // a failed consolidation = not evaluated, never raw (D3)
         });
       }
     }
@@ -1163,24 +1336,6 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     // inputOverride carries the garment recolour applied moments ago — the
     // repair must work on the corrected pixels, not the drifted ones.
     let inputImage = inputOverride || bestSoFar?.imageData || img.imageData;
-    // Parse per-character clothing for this page so the avatar lookup picks the
-    // styled+costumed variant matching what's actually drawn on this page.
-    // Without this, inpaint attaches unstyled base photos and Grok has no visual
-    // reference for the current costume/style.
-    const { parseCharacterClothing } = getStoryHelpers();
-    const pageCharacterClothing = parseCharacterClothing(img.sceneDescription || img.description || '') || {};
-    // Same aspect resolution as iteratePage above — the page's stored
-    // imageAspect is the source of truth. Without this, inpaint silently
-    // crops square (advanced/Jugendbuch) pages to 3:4 on round 1.
-    const sceneAspect = img.imageAspect
-      || storyData?.sceneImages?.find(s => s.pageNumber === img.pageNumber)?.imageAspect
-      || null;
-    // Look up the page's locked text-overlay corner so inpaint can warn
-    // Grok not to paint high-contrast detail in that zone. textPosition is
-    // only persisted on overlay layouts (gated at the persistence site in
-    // server.js — see docs/calm-zone-pipeline.md), so a non-null value here
-    // means the story uses overlay and the suffix is correct.
-    const pageTextPosition = (storyData?.sceneImages || []).find(s => s.pageNumber === img.pageNumber)?.textPosition || null;
     // Cover text preservation. Covers render TEXTLESS; the title / dedication /
     // "magicalstory.ch" branding is composited app-side (composeCover). If the
     // post-persist bake has already run (${key}Art row exists → post-generation
@@ -1213,75 +1368,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         }
       } catch (e) { /* fall back: inpaint the served image, no restamp */ }
     }
-    // ---------------------------------------------------------------------
-    // HARD GUARD (owner ruling 2026-09-05). An `object_presence` removal on a
-    // page carrying real landmark photos in a NON-HISTORICAL era must never
-    // execute — inpaint dispatches it as an UNMASKED whole-frame edit
-    // (targetBbox null) that repaints the whole background and erases the real
-    // place. job_1788614817116_vxnu60yjg p2: "Remove red-white transmission
-    // tower and grey-red tower from background" wiped the Uetliberg Fernsehturm
-    // and Uto Kulm spire off the ridge, and the erased version scored HIGHER.
-    // The finding is dropped with a WARN naming the page and the landmark —
-    // loudly, never silently. Belt-and-braces: the compliance eval and the
-    // consolidator already drop it upstream; this is the last gate before Grok.
-    // ---------------------------------------------------------------------
-    let inpaintEval = latestEval || {};
-    {
-      const prot = computeLandmarkProtection({
-        landmarkPhotos: img.landmarkPhotos || null,
-        era: resolveSceneEra(img.sceneMetadata),
-      });
-      if (prot.protect && inpaintEval && typeof inpaintEval === 'object') {
-        const ctx = { pageNumber: img.pageNumber, label: '[INPAINT dispatch]' };
-        const fx = filterProtectedRemovals(inpaintEval.fixableIssues || [], prot, ctx);
-        const sem = filterProtectedRemovals(
-          require('./repairLogic').semanticFindings(inpaintEval.semanticResult), prot, ctx);
-        const cmp = filterProtectedRemovals(inpaintEval.threeStageResult?.fixableIssues || [], prot, ctx);
-        if (fx.dropped.length || sem.dropped.length || cmp.dropped.length) {
-          inpaintEval = { ...inpaintEval, fixableIssues: fx.kept };
-          if (inpaintEval.semanticResult) {
-            inpaintEval.semanticResult = { ...inpaintEval.semanticResult };
-            if (Array.isArray(inpaintEval.semanticResult.semanticIssues)) inpaintEval.semanticResult.semanticIssues = sem.kept;
-          }
-          if (inpaintEval.threeStageResult) {
-            inpaintEval.threeStageResult = { ...inpaintEval.threeStageResult, fixableIssues: cmp.kept };
-          }
-        }
-      }
-    }
-    // THE PLAN THIS EVALUATION WAS SCORED WITH (B2). consolidatePageEval ran it
-    // once when the eval landed; the version carries it and roundEvalPages
-    // mirrors it onto the eval object. Inpaint no longer consolidates.
-    const planForInpaint = inpaintEval.consolidatedPlan
-      || bestSoFar?.consolidatedPlan
-      || null;
-    const result = await images().inpaintPage(inputImage, inpaintEval, {
-      visualBible: storyData?.visualBible || null,
-      characters: storyData?.characters || characters || null,
-      consolidatedPlan: planForInpaint,
-      pageNumber: img.pageNumber,
-      sceneDescription: img.sceneDescription || img.description || '',
-      artStyle: storyData?.artStyle || artStyle || null,
-      characterClothing: pageCharacterClothing,
-      // Lets a fix instruction say WHERE a figure stands, not only what it wears.
-      detectedFigures: img?.sharedBboxDetection?.figures || img?.bboxDetection?.figures || null,
-      clothingRequirements: storyData?.clothingRequirements || null,
-      // Thread storyId + round so consolidator calls get persisted
-      storyId: storyData?.id || jobId || null,
-      round: roundNum,
-      aspectRatio: sceneAspect,
-      textPosition: pageTextPosition,
-      // Era-aware landmark protection for inpaint's own consolidator call.
-      landmarkPhotos: img.landmarkPhotos || null,
-      era: resolveSceneEra(img.sceneMetadata),
-      sceneMetadata: img.sceneMetadata || null,
-      // A cover whose lettering lives in the pixels (baked title) must keep it
-      // through the edit — the contract joins the required-text clause. When
-      // the textless art layer is being repainted, the text is restamped
-      // afterward, so the edit is told nothing about it.
-      expectedText: restampCoverAfter ? null : (img.expectedText ?? null),
-      textMode: restampCoverAfter ? null : (img.textMode ?? null),
+    const { inpaintEval, options: inpaintOptions } = buildInpaintCall({
+      img, latestEval, bestSoFar, roundNum, restampCoverAfter, storyData, characters, artStyle, jobId,
     });
+    const result = await images().inpaintPage(inputImage, inpaintEval, inpaintOptions);
     // Re-composite the cover text onto the repainted textless art (reuses
     // composeCover). The served image keeps its title; artImageData is the new
     // textless source for future no-AI title edits.
@@ -1305,6 +1395,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       usageTracker(provider, {
         input_tokens: result.usage?.inputTokens || 0,
         output_tokens: result.usage?.outputTokens || 0,
+        thinking_tokens: result.usage?.thinkingTokens || 0,
         cost: result.usage?.cost,
         direct_cost: result.usage?.cost,  // Grok/Runware track via direct_cost
       }, 'inpaint', inpaintModel || 'grok-text-edit');
@@ -1336,258 +1427,23 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     const currentImageData = inputOverride || best?.imageData || img.imageData;
     const bestEval = best?.evaluation;
 
-    // Single bbox source-of-truth — same helper feeds target + protection
-    // so they can't disagree. detectAllBoundingBoxes is NOT re-called on miss;
-    // its internal safety+model retries already exhausted before storing the
-    // result, so a re-call just burns another API hit.
-    // A decision carrying `targetFigure` (the presence model's MIXED case)
-    // paints THAT figure into `charName`; the name is on no figure yet.
-    const byFigure = decision.targetFigure != null;
-    const targetResolved = byFigure
-      ? require('./charRepairTarget').resolveFigureBbox(decision.targetFigure, { bestEval })
-      : resolveCharBbox(charName, {
-        bestEval, entityReport: currentEntityReport, pageNumber, imageData: currentImageData,
-      });
-    const faceBbox = targetResolved.faceBbox;
-    const bodyBbox = targetResolved.bodyBbox;
-    if (!faceBbox && !bodyBbox) {
-      return { pageNumber, imageData: null, error: byFigure ? `no box for figure ${decision.targetFigure} (target ${charName})` : `no bbox for ${charName}` };
-    }
-
-    // SAME GUARD THE MANUAL ENDPOINT USES. The detector distributes the names
-    // it is given across the figures it sees and never refuses, so a page whose
-    // brief names more characters than the render drew hands somebody a
-    // borrowed label. Repainting the face under a borrowed label destroys a
-    // bystander — an automatic repair does it without anyone watching, which is
-    // worse than the manual case, not better.
-    // Not for a figure-targeted repaint: there the figure is chosen by id from
-    // the evaluation, and no detector label is borrowed.
-    const { findBorrowedLabel } = require('./charRepairTarget');
-    const borrowed = !byFigure && findBorrowedLabel({
-      figures: Array.isArray(targetResolved.figures) ? targetResolved.figures : null,
-      sceneCharacters: img.sceneCharacters || [],
-      sceneMetadata: img.sceneMetadata || {},
-      characterName: charName,
-      pageNumber,
+    // Every input of the repair — target box (one targeting ladder, no re-detect:
+    // detectAllBoundingBoxes' own retries already ran), borrowed-label and
+    // reference-gap guards, the outfit it was rendered in and its wardrobe-state
+    // sheet, the axes, protection, clothing text and the request — built by the
+    // ONE builder the Test Lab char_repair stage calls too (charFixCall.js).
+    const call = await require('./charFixCall').buildCharFixCall({
+      storyData, characters, artStyle, img, decision, currentImageData, bestEval,
+      entityReport: currentEntityReport, jobKey: storyData?.id || jobId,
     });
-    if (borrowed) {
-      require('./runMetrics').forJob(storyData?.id || jobId).count('char_repair_reject_borrowed_label');
-      return { pageNumber, imageData: null, error: borrowed.message, borrowedLabel: borrowed };
-    }
-
-    // "not found" was the wrong sentence for the commonest case: the figure is
-    // right there, drawn and detected, and what is missing is the REFERENCE a
-    // repaint needs. charFixReferenceGap says which — one answer shared with
-    // the router (which now declines earlier) and the manual endpoint.
-    const { charFixReferenceGap } = require('./charRepairTarget');
-    const refGap = charFixReferenceGap({ characters, characterName: charName });
-    if (refGap) {
-      require('./runMetrics').forJob(storyData?.id || jobId).count('char_repair_skip_no_reference');
-      log.warn(`🚫 [CHAR-FIX] p${pageNumber}: ${refGap.message}`);
-      return { pageNumber, imageData: null, error: `char-fix skipped: ${refGap.message}`, referenceGap: refGap.reason };
-    }
-    // Same comparison the gap check just made, so the two can never disagree:
-    // a canonical match that passed the gap must resolve to a character here.
-    const { canonicalName } = require('./castResolver');
-    const character = characters.find(c => c && c.name === charName)
-      || characters.find(c => c && c.name && canonicalName(c.name) === canonicalName(charName));
-
-    // Case-insensitive lookup — scene metadata can key perCharClothing with
-    // different casing than the canonical character name, and an exact-key
-    // miss silently degraded the repair to 'standard' clothing.
-    const perCharClothingKey = Object.keys(img.perCharClothing || {})
-      .find(k => k.toLowerCase() === charName.toLowerCase());
-    const { normalizeClothingCategory: normCat, resolvePageClothingCategory: pageCat } = require('./clothingCategories');
-    const rawCharClothing = perCharClothingKey && img.perCharClothing[perCharClothingKey];
-    // NO DEFAULT (owner, 2026-08-07): the resolved category picks the styled
-    // avatar this repair paints the character to match, so a guessed 'standard'
-    // repaints the story outfit into a wardrobe from an unrelated story.
-    const clothingCategory = rawCharClothing
-      ? normCat(rawCharClothing)
-      : pageCat(storyData, pageNumber, charName);
-    if (!clothingCategory) {
-      return { pageNumber, imageData: null, error: `no clothing category for ${charName} (perCharClothing and pageClothing both empty) — refusing to repair into a guessed outfit` };
-    }
-    if (!rawCharClothing) {
-      log.warn(`⚠️ [UNIFIED PIPELINE] Char-fix ${charName} p${pageNumber}: no perCharClothing entry — resolved "${clothingCategory}" from pageClothing`);
-    }
-    // WARDROBE STATE — the third repair entry point gets the same sheet the
-    // page was generated against. Without it a character repair repaints the
-    // garment the brief took off straight back onto the body, because the only
-    // reference it holds shows it worn.
-    const wardrobeLookupCategory = (() => {
-      try {
-        const { wornResolvedForPage } = require('./storyAvatars');
-        const { offIdsForCharacter, buildOffCategory } = require('./wardrobeVariants');
-        const worn = wornResolvedForPage(storyData?.visualBible || null, img.sceneMetadata, img.sceneCharacters, pageNumber);
-        const offIds = offIdsForCharacter(charName, worn);
-        return offIds.length > 0 ? buildOffCategory(clothingCategory, offIds) : clothingCategory;
-      } catch (err) {
-        log.warn(`👕 [UNIFIED PIPELINE] Char-fix ${charName} p${pageNumber}: wardrobe-state lookup failed (${err.message}) — using the base sheet`);
-        return clothingCategory;
-      }
-    })();
-    const styledAvatar = await getStyledAvatarForClothing(character, artStyle, wardrobeLookupCategory);
-    let avatarPhoto = styledAvatar || getFacePhoto(character);
-    let avatarPhotoType = styledAvatar
-      ? (clothingCategory.startsWith('costumed') ? `costumed-${clothingCategory.split(':')[1] || 'default'}` : `styled-${clothingCategory}`)
-      : 'face';
-    if (!avatarPhoto) {
-      return { pageNumber, imageData: null, error: `no avatar photo for ${charName}` };
-    }
-
-    // Repair axes resolved by the ONE central rule (resolveRepairAxes) against
-    // the ACTUAL detected face box — replaces the old inline useFaceOnly
-    // derivation. Prefer the intent the decision already emitted (repairParams),
-    // but finalise faceOnly here since only now do we know a face box exists.
-    const { resolveRepairAxes } = require('./faceRepair');
-    // A figure repainted INTO another character is a whole-figure redraw, never
-    // a face patch.
-    const repairAxes = resolveRepairAxes({ hasFaceBbox: !!faceBbox, issueTypes: decision.issueTypes || null, ...(byFigure ? { forceTarget: 'body' } : {}) });
-    const useFaceOnly = repairAxes.faceOnly;
-    // THE FIGURE BOX, for a face repair too — the face goes separately as
-    // `faceBbox`, and the face crop is built from that. Passing the face box
-    // here made it the "body" box downstream, so the large-face-box guard
-    // (face area / body area >= 0.6) saw face == body on every face repair and
-    // turned it into a full-figure crosshatch confined to the face box + 10%:
-    // the hatch and the paste ended in straight crop lines through the torso
-    // (job_1790100385959 p14: a hard horizontal seam across the jacket and a
-    // blocky patch at the shoulder). The manual endpoint, the entity repair and
-    // the Lab already pass the body box here.
-    const repairBbox = bodyBbox || faceBbox;
-
-    // Pick the sheet CELL matching the figure's declared facing — the same
-    // resolveCellPose/cropAvatarCell chain every generation path uses (page,
-    // cover, iterate, regeneration; storyAvatars.js: "never inline a copy").
-    // Char repair was the one consumer still sending the RAW 2x4 sheet, whose
-    // top row is four close-up heads: a full-figure repaint copied its head
-    // scale from those (measured: 1/5 clean with the sheet, 6/6 with body
-    // cells — Lab #785 vs #792/#793). Body repair gets the pose-matched body
-    // cell; face repair gets the face cell stacked above it.
-    if (styledAvatar) {
-      try {
-        const { resolveCellPose } = require('./storyAvatars');
-        const { cropAvatarCell } = require('./sceneComposite');
-        const metaChars = img.sceneMetadata?.fullData?.characters
-          || img.sceneMetadata?.characters || img.sceneCharacters || [];
-        const sc = (Array.isArray(metaChars) ? metaChars : []).find(c =>
-          ((typeof c === 'string' ? c : c?.name) || '').toLowerCase() === charName.toLowerCase());
-        const pf = resolveCellPose(sc || {});
-        const { body, stacked } = await cropAvatarCell(styledAvatar,
-          { pose: pf.pose, includeFace: useFaceOnly, stack: useFaceOnly });
-        const cell = useFaceOnly ? (stacked || body) : body;
-        if (cell) {
-          avatarPhoto = cell;
-          avatarPhotoType = `${avatarPhotoType}+cell-${pf.pose}${useFaceOnly ? '-stacked' : ''}`;
-        }
-      } catch (err) {
-        log.warn(`⚠️ [UNIFIED PIPELINE] Char-fix ${charName} p${pageNumber}: cell crop failed (${err.message}) — sending the full sheet`);
-      }
-    }
-
-    // Protection list: same helper, iterated over sceneCharacters so
-    // protection draws from the same source as the target lookup. If a
-    // character has no bbox in any tier we skip them (can't protect what we
-    // can't locate) rather than abort the repair.
-    const protectedFaces = [];
-    const protectedBodies = [];
-    const protectedNames = [];
-    const otherChars = (img.sceneCharacters || []).filter(c =>
-      c?.name && c.name.toLowerCase() !== charName.toLowerCase()
-    );
-    for (const otherChar of otherChars) {
-      const r = resolveCharBbox(otherChar.name, {
-        bestEval, entityReport: currentEntityReport, pageNumber, imageData: currentImageData,
-      });
-      if (r.faceBbox) protectedFaces.push(r.faceBbox);
-      if (r.bodyBbox) protectedBodies.push(r.bodyBbox);
-      if (r.faceBbox || r.bodyBbox) protectedNames.push(otherChar.name);
-    }
+    if (call.failure) return { pageNumber, ...call.failure, imageData: null };
+    const { targetResolved, faceBbox, repairBbox, useFaceOnly, protectedNames } = call;
     log.info(`🛡️ [CHAR-FIX] Round ${roundNum} char-fix ${charName} on p${pageNumber}: target bbox source=${targetResolved.source}, protection bboxes for: ${protectedNames.length ? protectedNames.join(', ') : '(none)'}`);
-
-    // Detection's silhouette for the ORIGINAL figure: in-memory on this run,
-    // else the stored figure_mask. Body mode only — the detection mask is a
-    // full-figure silhouette, not a head mask.
-    // Face repairs included: the treatments clip the silhouette to the DINO
-    // face box, so the stored full-figure mask yields the head mask.
-    const figureMaskPng = await require('./charRepairTarget')
-      .resolveFigureMask(charName, targetResolved, { storyId: storyData?.id || jobId || null, pageNumber });
-
-    // Per-story clothingRequirements is the source of truth (correct for THIS
-    // story); avatars.clothing is character-level metadata that persists
-    // across stories and can carry stale colours from a previous run. Without
-    // this preference, the repair Grok prompt sends stale clothing text while
-    // the eval (driven by the new story's requirements) keeps flagging the
-    // colour mismatch — repair runs N times for nothing. Same priority as
-    // storyHelpers.resolveClothingDescription.
-    const clothingDesc = (() => {
-      const reqs = require('./clothingCategories').resolveCharacterReqs(storyData?.clothingRequirements, charName);
-      if (reqs && reqs[clothingCategory]) {
-        const cat = reqs[clothingCategory];
-        if (cat.signature && cat.signature !== 'none') return cat.signature;
-        if (cat.description) return cat.description;
-      }
-      return character.avatars?.clothing?.[clothingCategory] || '';
-    })();
-    const sceneDesc = img.sceneDescription || img.text || '';
-    // …and then THIS PAGE's worn state on top (2026-09-15). A repaint dresses
-    // the character the way the page did, through the same one resolver the
-    // image prompt and every judge use — otherwise it paints the story-level
-    // contract back onto a page that took a garment off or swapped it.
-    const pageClothingDesc = require('./wornItems')
-      .resolveOutfitForStoryPage(clothingDesc, charName, storyData, pageNumber, sceneDesc);
-    const pageTextPosition = (storyData?.sceneImages || []).find(s => s.pageNumber === pageNumber)?.textPosition || null;
-    // Appearance text for the repair prompt (face/hair/build). The Lab passed
-    // this; PRODUCTION did not, so every live repair rendered the appearance
-    // slot empty and identity rested on the avatar alone (found while auditing
-    // story job_1786024729214_zrjgzqiey, 4 char-fix rounds).
-    const charDescForPrompt = (() => {
-      const d = img.bboxDetection?.characterDescriptions?.[charName]
-        ?? (storyData?.sceneImages || []).find(s => s.pageNumber === pageNumber)?.bboxDetection?.characterDescriptions?.[charName];
-      const txt = (typeof d === 'string' ? d : d?.richDescription) || '';
-      return txt || (character?.description || '');
-    })();
-
     log.info(`👤 [UNIFIED PIPELINE] Round ${roundNum} char-fix ${charName} on p${pageNumber}: ${useFaceOnly ? 'FACE' : 'BODY'} bbox=[${(useFaceOnly ? faceBbox : repairBbox).map(v => Math.round(v * 100) + '%').join(', ')}] (${decision.severity})`);
     require('./runMetrics').forJob(storyData?.id || jobId).count('consistency_regen');
     let repairResult;
     try {
-      // ONE contract, shared with the Test Lab stage (charRepairRequest.js).
-      // Assembling this by hand in two places is what let the Lab drift from
-      // production and hid the missing artStyle from both.
-      const { buildCharRepairRequest } = require('./charRepairRequest');
-      repairResult = await images().repairCharacterMismatch(currentImageData, avatarPhoto, repairBbox, charName, buildCharRepairRequest({
-        imageBackend: 'grok',
-        // Structured type only — the prompt never carries the judge's sentence.
-        defectTypes: decision.issueTypes || null,
-        clothingDescription: pageClothingDesc,
-        characterDescription: charDescForPrompt,
-        photoType: avatarPhotoType,
-        sceneDescription: sceneDesc,
-        faceBbox,
-        protectedFaces,
-        protectedBodies,
-        whiteoutTarget: useFaceOnly ? 'face' : 'body',
-        // Detection's silhouette for the ORIGINAL figure, so SAM is not re-run
-        // on the same pixels. Face mode included — the treatment clips it to
-        // the face box. Null → a reported re-segmentation.
-        detectionBodyMask: figureMaskPng,
-        textPosition: pageTextPosition,
-        // The repair prompt builds an "Art style — match this medium and
-        // rendering exactly: <full descriptor>" block from this, and falls back
-        // to NOTHING when it is absent. Every production character repair ran
-        // without it: the model was told to "match the surrounding style"
-        // without ever being told what that style is, while holding a portrait
-        // reference. Measured on a shipped page, 4 of 5 full-figure repairs came
-        // back in a different rendering from the page they were painted into.
-        artStyle: storyData?.artStyle || artStyle || null,
-        includeDebug: true,
-        // Pose lines name other figures by sight, never by name.
-        repairNames: require('./repairLogic').buildPageRepairNameMap({
-          storyData, sceneDescription: sceneDesc, pageNumber, artStyle,
-          detectedFigures: img?.sharedBboxDetection?.figures || img?.bboxDetection?.figures || null,
-        }),
-      }));
+      repairResult = await images().repairCharacterMismatch(currentImageData, call.avatarPhoto, repairBbox, charName, call.request);
     } catch (err) {
       // Literal, not a bare `method`: this closure has no such binding (the
       // round runner destructures one from pageStrategies, a different scope),
@@ -1598,7 +1454,11 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     }
 
     if (!repairResult?.imageData || repairResult.imageData.length < 1000) {
-      return { pageNumber, imageData: null, error: 'char-fix produced no usable image' };
+      // The gate that refused travels with the failure (repairLogic.describeCharFixFailure)
+      // into the log, retryHistory, failedRepairs and repairRounds.
+      const error = require('./repairLogic').describeCharFixFailure(repairResult);
+      log.warn(`🚫 [CHAR-FIX] Page ${pageNumber} ${charName}: ${error}`);
+      return { pageNumber, imageData: null, method: 'char-fix', error };
     }
 
     // FACE-INTEGRITY GATE — one implementation, shared with the two manual
@@ -1607,7 +1467,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       currentImageData,
       repairResult.imageData,
       charName,
-      { log, usageTracker, jobKey: storyData?.id || jobId, context: `CHAR-FIX Page ${pageNumber} ${charName}` }
+      { log, jobKey: storyData?.id || jobId, context: `CHAR-FIX Page ${pageNumber} ${charName}` }
     );
     if (!faceGate.ok) {
       log.warn(`🚫 [CHAR-FIX] Page ${pageNumber} ${charName}: REFUSED — the repair left the face unreadable (${faceGate.reason}). Keeping the original.`);
@@ -2049,7 +1909,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     version.readerFindings = findings;
     version.readerFindingsRound = round;
     version.pageNumber = pageNumber;
-    applyScore(version, { evalResult: ev, entityResult, consolidatedPlan: plan });
+    applyScore(version, { evalResult: ev, entityResult, consolidatedPlan: plan, requireConsolidation: true });
     log.info(`📖 [BOOK-AUDIT] Round ${round} p${pageNumber}: ${findings.length} reader finding(s) charged to ${version.source || '?'} (the version read) — finalScore ${before} → ${version.finalScore}`);
   };
 
@@ -2323,9 +2183,13 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     // the per-method effectiveness record; taken here because roundEvalPages is
     // rebuilt at the top of every round.
     const roundBeforeScores = {};
+    // The version each page carries INTO the round, for the critical-gone
+    // comparison in the effectiveness record below.
+    const roundBeforeVersions = {};
     for (const img of badPages) {
       const fs = roundEvalPages[img.pageNumber]?.finalScore;
       roundBeforeScores[img.pageNumber] = typeof fs === 'number' ? fs : null;
+      roundBeforeVersions[img.pageNumber] = selectBestVersion(pageVersions.get(img.pageNumber) || []);
     }
     if (colourOnlyNums.length) {
       log.info(`🎨 [GARMENT-COLOUR] Round ${round}: ${colourOnlyNums.length} colour-only page(s) pulled in: ${colourOnlyNums.join(', ')}`);
@@ -2564,6 +2428,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
               evalResult: ev,
               entityResult: evEntityResult,
               consolidatedPlan: recolourConsolidated.get(ev.pageNumber) || null,
+              requireConsolidation: true,
             });
             // Creation-time integrity tripwire: the bytes this version stores
             // must be the bytes its eval graded (job_1786571353564 p4 shipped
@@ -2866,12 +2731,14 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         images().evaluateImageBatch(roundEvalInputs, { concurrency: evalConcurrency, qualityModelOverride, visualBible, clothingRequirements: storyData?.clothingRequirements || null, storyData, artStyle, ...evalStoryMeta }),
       ]);
 
+      const roundEntityOk = freshEntityResult.status === 'fulfilled';
       if (freshEntityResult.status === 'fulfilled') {
         const freshEntity = freshEntityResult.value;
         if (freshEntity?.tokenUsage && usageTracker) {
           usageTracker('gemini_quality', {
             input_tokens: freshEntity.tokenUsage.inputTokens || 0,
-            output_tokens: freshEntity.tokenUsage.outputTokens || 0
+            output_tokens: freshEntity.tokenUsage.outputTokens || 0,
+            thinking_tokens: freshEntity.tokenUsage.thinkingTokens || 0
           }, `entity_consistency_r${round}`, freshEntity.tokenUsage.model || 'gemini-2.5-flash');
         }
         // Merge: repaired pages' issues are REPLACED by the fresh (per-image)
@@ -2895,14 +2762,32 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       if (evalsResult.status === 'fulfilled') {
         roundEvals = evalsResult.value;
       } else {
-        log.warn(`⚠️ [UNIFIED PIPELINE] Round ${round}: Quality eval failed: ${evalsResult.reason?.message || evalsResult.reason}`);
+        log.error(`❌ [UNIFIED PIPELINE] Round ${round}: Quality eval failed: ${evalsResult.reason?.message || evalsResult.reason} — the round's ${roundSuccess.length} paid repair(s) are kept as NOT-EVALUATED versions`);
         roundEvals = [];
+      }
+      // A page the batch returned nothing for (a rejected batch, or a missing row)
+      // still has a paid repair result. It used to vanish without a trace, so the
+      // next round could pay for the same method again (code review 2026-10 D4).
+      // It becomes a version marked not-evaluated: the picker ignores it, the
+      // dev panel shows it, and the parent records the failed method.
+      const evaluatedPages = new Set(roundEvals.map(e => e.pageNumber));
+      for (const r of roundSuccess) {
+        if (evaluatedPages.has(r.pageNumber)) continue;
+        roundEvals.push({
+          pageNumber: r.pageNumber, evaluated: false, score: null,
+          evalError: `round ${round} quality eval returned no result for this page`,
+        });
+        const parent = roundParent.get(r.pageNumber);
+        if (parent) {
+          const { baseRepairMethod } = require('./repairLogic');
+          parent.failedRepairs = [...(parent.failedRepairs || []), { method: baseRepairMethod(r.method), round, error: 'round quality eval returned no result — repair result stored unscored' }];
+        }
       }
 
       // Consolidate each round evaluation before scoring — same dedupe step
       // as the initial pass (one Sonnet call per repaired page, parallel).
       const roundConsolidated = new Map();
-      await Promise.all(roundEvals.map(ev => consolidateLimit(async () => {
+      await Promise.all(roundEvals.filter(ev => ev.evaluated !== false).map(ev => consolidateLimit(async () => {
         const entityResult = getEntityPenaltyAndIssues(ev.pageNumber, currentEntityReport);
         // Consolidate against the round entry's OWN scene contract when the
         // repair rewrote it (iterate) — the original description would
@@ -2927,7 +2812,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         const repairResult = roundSuccess.find(r => r.pageNumber === ev.pageNumber);
         if (versions && repairResult) {
           const evScore = ev.score ?? ev.qualityScore ?? null;
-          const evEntityResult = getEntityPenaltyAndIssues(ev.pageNumber, currentEntityReport);
+          const evEntityResult = roundEntityOk
+            ? getEntityPenaltyAndIssues(ev.pageNumber, currentEntityReport)
+            : { issues: [], penalty: 0 }; // never the previous image's report (D4)
           const { applyScore } = require('./scoring');
           const newVersion = {
             imageData: repairResult.imageData,
@@ -3005,12 +2892,17 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           // the saved activeVersion could disagree.
           newVersion.pageNumber = ev.pageNumber;
           applyScore(newVersion, {
-            evalResult: ev,
+            // A rejected entity check leaves currentEntityReport describing the
+            // PREVIOUS image of this page; charging it to the new bytes would score
+            // them on someone else's evidence, so the version is not evaluated
+            // instead (code review 2026-10 D4).
+            evalResult: roundEntityOk ? ev : { ...ev, evaluated: false, evalError: `round ${round} entity check failed` },
             entityResult: evEntityResult,
             // Deduped issue list drives the math score; also persisted on
             // the version (consolidatedPlan) for the dev panel + finalize
             // re-stamp.
             consolidatedPlan: roundConsolidated.get(ev.pageNumber) || null,
+            requireConsolidation: true, // failed consolidation = not evaluated (D3)
           });
           versions.push(newVersion);
         }
@@ -3025,17 +2917,22 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     // as `unknown` rather than being counted as unchanged.
     {
       const { summarizeRepairRound, repairAttemptFromResult } = require('./repairLogic');
+      const { dominatesByCritical } = require('./scoring');
       const roundAfterScores = {};
+      const roundCriticalCleared = {};
       for (const r of roundSuccess) {
         const versions = pageVersions.get(r.pageNumber) || [];
         const latest = versions[versions.length - 1];
         roundAfterScores[r.pageNumber] = typeof latest?.finalScore === 'number' ? latest.finalScore : null;
+        const before = roundBeforeVersions[r.pageNumber];
+        if (before && latest && before !== latest && dominatesByCritical(latest, before)) roundCriticalCleared[r.pageNumber] = true;
       }
       repairRounds.push(summarizeRepairRound({
         round,
         attempts: roundResults.filter(Boolean).map(repairAttemptFromResult),
         beforeScores: roundBeforeScores,
         afterScores: roundAfterScores,
+        criticalCleared: roundCriticalCleared,
       }));
       const summary = repairRounds[repairRounds.length - 1];
       const methodLine = Object.entries(summary.byMethod)
@@ -3169,7 +3066,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         // version with its own rewritten description is consolidated against
         // THAT, not the original.
         const rescuePlan = await consolidatePageEval(ev, entityResult.issues, ev.pageNumber, null, entry.version?.description || null);
-        rescueApplyScore(entry.version, { evalResult: ev, entityResult, consolidatedPlan: rescuePlan });
+        rescueApplyScore(entry.version, { evalResult: ev, entityResult, consolidatedPlan: rescuePlan, requireConsolidation: true });
         const repicked = selectBestVersion(pageVersions.get(ev.pageNumber));
         const prevBest = finalBestPerPage.get(ev.pageNumber);
         finalBestPerPage.set(ev.pageNumber, repicked);
@@ -3213,6 +3110,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       log.info(`📝 [POST-REPAIR-TEXT] Re-checking calm zone on ${postRepairTextPages.length} repaired pages`);
     }
 
+    const textSpaceCandidates = [];
     await Promise.all(postRepairTextPages.map(async (img) => {
       const pageNumber = img.pageNumber;
       const versions = pageVersions.get(pageNumber);
@@ -3233,8 +3131,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           storyId: storyData?.id || null, pageNumber, label: 'POST-REPAIR-TEXT',
         });
         return images().generateImageOnly(repairPrompt, img.characterPhotos || [], {
-          imageModelOverride: img.sceneMetadata?.pageImageModel || null,
-          imageBackendOverride: img.sceneMetadata?.pageImageBackend || null,
+          imageModelOverride: opts.imageModelOverride,
           landmarkPhotos: img.landmarkPhotos || [],
           landmarkScene: repairScene.landmarkScene,
           sceneBackground: repairScene.sceneBackground,
@@ -3278,15 +3175,18 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       }
 
       // If the winner is the original (no improvement), just refresh the
-      // report. Otherwise push the recovery winner as a new version and
-      // re-point finalBestPerPage so the build-final-results loop sees it.
+      // report. Otherwise the recovery winner becomes a CANDIDATE: it is scored
+      // on its OWN bytes below and only then competes (code review 2026-10 D1).
+      // It used to copy the predecessor's evaluation, whose evalImageFp describes
+      // different pixels, so pickBestVersionIndex refused the score every time
+      // and the paid re-render could never win.
       if (result.winnerIndex > 0) {
         const w = result.winnerCandidate;
         const newVersion = {
           imageData: w.imageData,
-          score: best.score,
+          score: null,
           source: 'post-repair-text-space',
-          evaluation: best.evaluation || null,
+          evaluation: null,
           modelId: w.modelId || best.modelId,
           grokRefImages: w.grokRefImages,
           entityIssues: best.entityIssues || [],
@@ -3294,30 +3194,39 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           prompt: w.prompt,
           pageNumber,
         };
-        // Canonical stamp (inherits the pre-recovery best's evaluation).
-        // Previously this copied finalScore inline WITHOUT an .evaluation-aware
-        // stamp, so the (since-deleted) persist-time re-stamp nulled its finalScore and the
-        // chosen text-space winner could never win pickBestVersionIndex —
-        // activeVersion then pointed at a different version than the flattened
-        // root imageData.
-        const { applyScore: stampTextSpace } = require('./scoring');
         // Lineage: recomposed from the picked best — its contract, its brief.
         inheritSceneContract(newVersion, best);
-        newVersion.consolidatedPlan = best.consolidatedPlan || null;
-        stampTextSpace(newVersion, {
-          evalResult: newVersion.evaluation,
-          entityResult: { issues: newVersion.entityIssues, penalty: best.entityPenaltyRaw ?? best.entityPenalty ?? 0 },
-          consolidatedPlan: newVersion.consolidatedPlan,
-        });
-        versions.push(newVersion);
-        // COMPETE, DO NOT APPOINT (owner, 2026-08-09). This used to force
-        // itself in as the best version regardless of score, so a repair that
-        // scored WORSE than what it replaced still shipped. One image, one
-        // score, highest wins — no exceptions and no side doors.
-        finalBestPerPage.set(pageNumber, selectBestVersion(versions));
+        textSpaceCandidates.push({ pageNumber, best, newVersion, versions });
       }
       img.textCoverageReport = { ...result.report, postRepairChecked: true };
     }));
+
+    // Score every recovery candidate on its own bytes (the same evaluateImageBatch
+    // + consolidation + applyScore every other writer uses), then let it COMPETE,
+    // DO NOT APPOINT (owner, 2026-08-09): one image, one score, highest wins.
+    if (textSpaceCandidates.length > 0) {
+      const tsEntries = textSpaceCandidates.map(c => ({ pageNumber: c.pageNumber, imageData: c.newVersion.imageData, ...c.newVersion }));
+      const tsEvals = await images().evaluateImageBatch(buildEvalInputs(tsEntries), { concurrency: evalConcurrency, qualityModelOverride, visualBible, clothingRequirements: storyData?.clothingRequirements || null, storyData, artStyle, ...evalStoryMeta });
+      for (const c of textSpaceCandidates) {
+        const ev = tsEvals.find(e => e.pageNumber === c.pageNumber);
+        if (ev?.usage && usageTracker) usageTracker('gemini_quality', ev.usage, 'post_repair_text_quality', ev.modelId);
+        if (!ev || ev.evaluated === false) {
+          log.error(`❌ [POST-REPAIR-TEXT] P${c.pageNumber}: the re-rendered image could not be evaluated (${ev?.evalError || ev?.error || 'no result'}) — it cannot compete, keeping the current best`);
+          continue;
+        }
+        // The re-render edits the picked best (same scene, same figures), so the
+        // entity evidence stays the best's own stamp; the eval and the
+        // consolidation are fresh, on the new bytes.
+        const entityResult = { issues: c.best.entityIssues || [], penalty: c.best.entityPenaltyRaw ?? c.best.entityPenalty ?? 0 };
+        const plan = await consolidatePageEval(ev, entityResult.issues, c.pageNumber, null, c.newVersion.description || null);
+        c.newVersion.evaluation = ev;
+        c.newVersion.score = ev.score ?? ev.qualityScore ?? null;
+        c.newVersion.consolidatedPlan = plan;
+        applyScore(c.newVersion, { evalResult: ev, entityResult, consolidatedPlan: plan, requireConsolidation: true });
+        c.versions.push(c.newVersion);
+        finalBestPerPage.set(c.pageNumber, selectBestVersion(c.versions));
+      }
+    }
   } catch (postRepairErr) {
     log.warn(`⚠️ [POST-REPAIR-TEXT] Recovery phase failed: ${postRepairErr.message} — keeping pre-recovery best versions`);
   }
@@ -3867,6 +3776,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       // told apart from one the check never ran on.
       // null = the check did not run; {items: []} = it ran and saw no writing.
       letteringInventory: v.evaluation?.letteringInventory ?? null,
+      // Quality findings the landmark guard suppressed — the record, never the
+      // deduction (2026-09-26). The semantic judge's ride on semanticResult.
+      suppressedIssues: v.evaluation?.suppressedIssues ?? null,
       // The style repaint's own record — which anchor it aimed at, and the
       // comparative verdict the gate decided on. Same whitelist lesson as
       // rawOutput and styleGate above: without this line the field exists only
@@ -4210,6 +4122,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
 }
 
 module.exports = {
+  buildEvalInput,
+  buildInpaintCall,
+  consolidationInputs,
+  evalStoryMetaOf,
   runUnifiedRepairPipeline,
   // Exported for the Test Lab `style_repair` stage: the A/B that decides
   // whether `styleRepairCharacterRefs` ships needs the SAME sheet-collection

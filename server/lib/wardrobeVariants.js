@@ -17,9 +17,12 @@
  * the garment, the slot and the exact off-combination writes it (owner,
  * 2026-09-19: "The AD should create the full prompt that is needed to strip the
  * avatar later"). There is NO second, code-side way to word one. An off-set the
- * Art Director left unwritten produces NO variant and says so loudly; the page
- * then keeps the pre-feature behaviour — the worn sheet plus the existing "is
- * NOT wearing" text line — which is an absence, not a fallback implementation.
+ * Art Director left unwritten produces NO variant and says so loudly. A page
+ * with no off sheet — none authored, or the redress rejected — still renders
+ * from the sheet that WEARS the garment, plus the "is NOT wearing" line; that
+ * is a known defect (owner, 2026-10-04): logged at ERROR and recorded on the
+ * page as wardrobe_state_reference / off_sheet_missing in
+ * finalChecksReport.notEvaluated. Costumed sheets get variants the same way.
  *
  * ONE VARIANT PER OBSERVED DISTINCT OFF-SET, never the power set. A page with
  * two of a character's garments off at once keys the UNION.
@@ -143,18 +146,35 @@ function versionRedressNote(versions) {
 }
 
 /**
- * The non-costumed category a character's story actually uses.
+ * The sheet category a character's off-garment sheet is redressed from.
  *
- * Costumed characters get no off-variant: the costume IS the outfit, it is
- * generated rather than converted, and nothing in this story's data says which
- * clause of a costume a removable garment occupies. Out of scope, and silent
- * about it would be wrong — the caller logs the skip.
+ * THE PAGE'S OWN DECLARED CLOTHING FIRST (characters[].clothing in its brief),
+ * else the one category the story uses for that character. A COSTUMED sheet is
+ * redressed the same way as a plain one (owner, 2026-10-04): it used to be out
+ * of scope, and a garment taken off a costumed character was drawn from the
+ * costume sheet wearing it with no warning at all (staging
+ * job_1790446348343_z3fw660ie, four pages). One costume per character per
+ * story, so 'costumed' names the sheet.
  */
+const SHEET_BASE_CATEGORIES = ['standard', 'winter', 'summer', 'costumed'];
+function sheetCategoryOf(raw) {
+  const c = String(raw || '').trim().toLowerCase();
+  if (c.startsWith('costumed')) return 'costumed';
+  return SHEET_BASE_CATEGORIES.includes(c) ? c : null;
+}
+function pageCategoryFor(meta, characterName) {
+  const direct = meta?.characterClothing && Object.entries(meta.characterClothing)
+    .find(([n]) => sameName(n, characterName));
+  if (direct) return sheetCategoryOf(direct[1]);
+  const row = (Array.isArray(meta?.fullData?.characters) ? meta.fullData.characters : [])
+    .find(c => c && typeof c === 'object' && sameName(c.name, characterName));
+  return row ? sheetCategoryOf(row.clothing) : null;
+}
 function baseCategoryFor(clothingRequirements, characterName) {
   const { resolveCharacterReqs } = require('./clothingCategories');
   const charReqs = resolveCharacterReqs(clothingRequirements, characterName);
   if (!charReqs) return null;
-  if (charReqs.costumed?.used === true) return null;
+  if (charReqs.costumed?.used === true) return 'costumed';
   for (const cat of ['standard', 'winter', 'summer']) {
     if (charReqs[cat]?.used === true) return cat;
   }
@@ -258,7 +278,8 @@ function deriveWardrobeVariantRequirements({ visualBible, scenes, clothingRequir
       if (castFilter && !castFilter.some(n => sameName(n, name))) continue;
       const offIds = offIdsForCharacter(name, resolved);
       if (offIds.length === 0) continue;
-      const key = `${String(name).trim().toLowerCase()}|${offIds.join('+')}`;
+      const category = pageCategoryFor(meta, name) || baseCategoryFor(clothingRequirements, name);
+      const key = `${String(name).trim().toLowerCase()}|${category || '?'}|${offIds.join('+')}`;
       const rows = resolved.filter(r => offIds.includes(String(r.id).toUpperCase())
         && (outfitVersionOf(r.entry) ? r.state === 'worn' : isOffForCharacter(r, name)));
       // The Art Director authors the wardrobe half of the redress instruction
@@ -275,6 +296,7 @@ function deriveWardrobeVariantRequirements({ visualBible, scenes, clothingRequir
       observed.set(key, {
         name,
         offIds,
+        category,
         // The resolved rows for exactly these ids, as this page stated them —
         // what the stripper needs, and nothing more.
         rows,
@@ -284,7 +306,7 @@ function deriveWardrobeVariantRequirements({ visualBible, scenes, clothingRequir
     }
   }
 
-  for (const { name, offIds, rows, pages, notes } of observed.values()) {
+  for (const { name, offIds, category, rows, pages, notes } of observed.values()) {
     const where = `${name} off:${offIds.join('+')} (page${pages.length > 1 ? 's' : ''} ${pages.join(', ')})`;
     // OUTFIT VERSION (2026-09-24): the set holds a garment the Visual Bible put
     // in place of a contract garment. Its sheet is the approved base sheet of
@@ -321,10 +343,10 @@ function deriveWardrobeVariantRequirements({ visualBible, scenes, clothingRequir
       log.info(`👕 [WARDROBE-VARIANT] ${where}: outfit version requested as "${buildOffCategory(baseCat, offIds)}"`);
       continue;
     }
-    const baseCategory = baseCategoryFor(clothingRequirements, name);
+    const baseCategory = category;
     if (!baseCategory) {
-      log.info(`👕 [WARDROBE-VARIANT] ${where}: no plain clothing category in use (costumed, or nothing declared) — no variant; the page keeps the base sheet + the "leave it off" line`);
-      refusals.push({ name, offIds, pages, reason: 'no-plain-category' });
+      log.error(`👕 [WARDROBE-VARIANT] ${where}: no clothing category declared for this character — no variant; every such page records a missing off sheet`);
+      refusals.push({ name, offIds, pages, reason: 'no-sheet-category' });
       continue;
     }
     // THE AUTHORED INSTRUCTION IS THE ONLY SOURCE (owner, 2026-09-19). There is

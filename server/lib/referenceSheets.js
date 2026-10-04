@@ -14,6 +14,7 @@ const { photoAnalyzerUrl } = require('./photoAnalyzerClient');
 
 const sharp = require('sharp');
 const { log } = require('../utils/logger');
+const { geminiUsage } = require('./providerUsage');
 const r2Lib = require('./r2');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { guardPromptString } = require('../services/prompts');
@@ -92,7 +93,7 @@ async function identifySheetCellsImpl(buffer, cells, elements) {
   const usage = j?.usageMetadata;
   if (usage) {
     const { recordTextUsage } = require('./usageContext');
-    recordTextUsage('gemini_text', { input_tokens: usage.promptTokenCount || 0, output_tokens: usage.candidatesTokenCount || 0 }, 'vb_sheet_cell_id', cfg.modelId);
+    recordTextUsage('gemini_text', geminiUsage(usage), 'vb_sheet_cell_id', cfg.modelId);
   }
   const raw = String(j?.candidates?.[0]?.content?.parts?.[0]?.text || '').trim();
   return parseCellIdentification(raw, elements.length, cells.length);
@@ -831,12 +832,13 @@ async function checkCharacterCellRender(cellBase64, styleDescription = '', age =
  * @param {string} prompt
  * @returns {Promise<Object>} the parsed JSON reply
  */
-async function askCellGate(cellsBase64, prompt) {
+async function askCellGate(cellsBase64, prompt, modelKey = 'gemini-2.5-flash-lite') {
   prompt = guardPromptString(prompt, 'askCellGate');
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('Gemini API key not configured (GEMINI_API_KEY)');
   const { TEXT_MODELS } = require('../config/models');
-  const cfg = TEXT_MODELS['gemini-2.5-flash-lite'];
+  const cfg = TEXT_MODELS[modelKey];
+  if (!cfg || cfg.provider !== 'google') throw new Error(`cell gate model "${modelKey}" is not a Gemini model`);
   const body = {
     contents: [{ parts: [
       // Stored VB cells are JPEG (R2), fresh cuts are PNG; Gemini returns 400
@@ -855,7 +857,7 @@ async function askCellGate(cellsBase64, prompt) {
   const usage = j?.usageMetadata;
   if (usage) {
     const { recordTextUsage } = require('./usageContext');
-    recordTextUsage('gemini_text', { input_tokens: usage.promptTokenCount || 0, output_tokens: usage.candidatesTokenCount || 0 }, 'vb_cell_gate', cfg.modelId);
+    recordTextUsage('gemini_text', geminiUsage(usage), 'vb_cell_gate', cfg.modelId);
   }
   const raw = String(j?.candidates?.[0]?.content?.parts?.[0]?.text || '').trim();
   // flash-lite occasionally emits two JSON objects back-to-back despite
@@ -902,7 +904,11 @@ function stateCellsGatePrompt(parent, cells) {
   const kind = rawType && !POOL_LABELS.has(rawType.toLowerCase()) ? rawType : (String(parent?.build || '').trim() || elementDisplayLabel(parent));
   const desc = String(parent?.description || '').trim();
   const list = cells.map((c, i) => `${i + 1}. ${c.stateName || stateLabelOf(parent, c)}: ${c.delta || ''}`.trim()).join(' ');
-  return `You are checking ${cells.length} cells cut from a reference sheet for an illustrated children's book. They are meant to show ONE object, ${article(kind)} ${kind}, described as: "${desc}", in ${cells.length} states, in this order: ${list} Judge strictly: is it the same object in every cell — same shape, build, material and colour — differing only in the named state? Two different objects, or a change that is not the one named, fails. Reply as JSON: {"ok": true or false, "reason": "one short sentence"}`;
+  // EACH LISTED CHANGE IS INTENDED (owner, 2026-09-28). "same … colour" read
+  // as a rule every cell must obey, so a state whose delta IS a colour change
+  // failed for making it: staging job_1790539784661_6mjcny1c7, recheck "grey in
+  // the second image … not described" against the delta "dull grey scales".
+  return `You are checking ${cells.length} cells cut from a reference sheet for an illustrated children's book. They are meant to show ONE object, ${article(kind)} ${kind}, described as: "${desc}", in ${cells.length} states, in this order: ${list} Each listed change is intended: whatever a state names — a colour, a surface, a glow, a part added, missing or broken — is expected in that cell, and where it differs from the description the state wins for that cell. Judge strictly: is it the same object in every cell — same shape, build and material, and the same colour except where a state names a colour change — differing only in what the states name? Two different objects, or a change no state names, fails. Reply as JSON: {"ok": true or false, "reason": "one short sentence"}`;
 }
 
 async function checkElementCellRender(cellBase64, el, styleDescription = '') {
@@ -911,7 +917,8 @@ async function checkElementCellRender(cellBase64, el, styleDescription = '') {
 }
 
 async function checkStateCellsConsistency(cellsBase64, parent, cells) {
-  const parsed = await askCellGate(cellsBase64, stateCellsGatePrompt(parent, cells));
+  const { MODEL_DEFAULTS } = require('../config/models');
+  const parsed = await askCellGate(cellsBase64, stateCellsGatePrompt(parent, cells), MODEL_DEFAULTS.vbStateCellGate);
   return { ok: parsed.ok !== false, reason: String(parsed.reason || '') };
 }
 

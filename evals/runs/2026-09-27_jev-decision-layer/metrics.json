@@ -1,0 +1,756 @@
+{
+  "run": "2026-09-27_jev-decision-layer",
+  "calls": 1563,
+  "costUsd": 0.18239,
+  "latencyMs": {
+    "p50": 285,
+    "p90": 347,
+    "max": 681
+  },
+  "kinds": {
+    "grouppage": {
+      "n": 34,
+      "keep": 20,
+      "cut": 14,
+      "need": {
+        "auc": 0.407,
+        "cutAt": [
+          {
+            "thr": 0.8,
+            "tp": 0,
+            "fp": 0,
+            "fn": 14,
+            "precision": null,
+            "recall": 0
+          },
+          {
+            "thr": 0.7,
+            "tp": 0,
+            "fp": 1,
+            "fn": 14,
+            "precision": 0,
+            "recall": 0
+          },
+          {
+            "thr": 0.6,
+            "tp": 1,
+            "fp": 3,
+            "fn": 13,
+            "precision": 0.25,
+            "recall": 0.071
+          },
+          {
+            "thr": 0.5,
+            "tp": 5,
+            "fp": 6,
+            "fn": 9,
+            "precision": 0.455,
+            "recall": 0.357
+          }
+        ],
+        "flips": 6
+      },
+      "tog": {
+        "auc": 0.9,
+        "cutAt": [
+          {
+            "thr": 0.8,
+            "tp": 2,
+            "fp": 2,
+            "fn": 12,
+            "precision": 0.5,
+            "recall": 0.143
+          },
+          {
+            "thr": 0.7,
+            "tp": 6,
+            "fp": 2,
+            "fn": 8,
+            "precision": 0.75,
+            "recall": 0.429
+          },
+          {
+            "thr": 0.6,
+            "tp": 10,
+            "fp": 2,
+            "fn": 4,
+            "precision": 0.833,
+            "recall": 0.714
+          },
+          {
+            "thr": 0.5,
+            "tp": 11,
+            "fp": 2,
+            "fn": 3,
+            "precision": 0.846,
+            "recall": 0.786
+          }
+        ],
+        "flips": 1
+      },
+      "positional": {
+        "thr": 0.5,
+        "tp": 14,
+        "fp": 8,
+        "fn": 0,
+        "precision": 0.636,
+        "recall": 1
+      },
+      "budgetPick": [
+        {
+          "story": "riqncqg1i",
+          "groupPages": 4,
+          "budget": 3,
+          "mustCut": 1,
+          "jevCuts": [
+            "p8:reading-cut"
+          ]
+        },
+        {
+          "story": "1nitlympp",
+          "groupPages": 5,
+          "budget": 3,
+          "mustCut": 2,
+          "jevCuts": [
+            "p9:reading-cut",
+            "p11:reading-cut"
+          ]
+        },
+        {
+          "story": "5herh01j7",
+          "groupPages": 4,
+          "budget": 3,
+          "mustCut": 1,
+          "jevCuts": [
+            "p10:reading-cut"
+          ]
+        },
+        {
+          "story": "vnx5l8iy7",
+          "groupPages": 4,
+          "budget": 3,
+          "mustCut": 1,
+          "jevCuts": [
+            "p7:reading-cut"
+          ]
+        },
+        {
+          "story": "dka3jpog9",
+          "groupPages": 5,
+          "budget": 3,
+          "mustCut": 2,
+          "jevCuts": [
+            "p6:reading-cut",
+            "p11:reading-cut"
+          ]
+        }
+      ]
+    },
+    "grouppick": {
+      "n": 8,
+      "pickedReadingCut": 1,
+      "pickedReadingKeep": 7,
+      "unlabelled": 0,
+      "flips": 1
+    },
+    "chardrop": {
+      "n": 89,
+      "needed": 26,
+      "notNeeded": 63,
+      "auc": 0.983,
+      "dropAt": [
+        {
+          "thr": 0.9,
+          "tp": 0,
+          "fp": 0,
+          "fn": 63,
+          "precision": null,
+          "recall": 0
+        },
+        {
+          "thr": 0.8,
+          "tp": 4,
+          "fp": 0,
+          "fn": 59,
+          "precision": 1,
+          "recall": 0.063
+        },
+        {
+          "thr": 0.7,
+          "tp": 23,
+          "fp": 0,
+          "fn": 40,
+          "precision": 1,
+          "recall": 0.365
+        },
+        {
+          "thr": 0.6,
+          "tp": 33,
+          "fp": 0,
+          "fn": 30,
+          "precision": 1,
+          "recall": 0.524
+        },
+        {
+          "thr": 0.5,
+          "tp": 51,
+          "fp": 0,
+          "fn": 12,
+          "precision": 1,
+          "recall": 0.81
+        }
+      ],
+      "flips": 10,
+      "groups": 201,
+      "labObserved": {
+        "n": 27,
+        "removedByReplanner": 12,
+        "jevLowestIsRemoved": null
+      },
+      "least": {
+        "pages": 47,
+        "pickNotNeeded": 23,
+        "pickNeeded": 0,
+        "unlabelled": 24,
+        "flips": 6
+      }
+    },
+    "meta": {
+      "timeOfDay": {
+        "n": 70,
+        "agreeAd": 0.829,
+        "flips": 1,
+        "disagreements": {
+          "ad:night→jev:evening": 5,
+          "ad:dusk→jev:evening": 3,
+          "ad:evening→jev:afternoon": 3,
+          "ad:afternoon→jev:dusk": 1
+        },
+        "reading": {
+          "n": 12,
+          "jevRight": 12,
+          "adRight": 11
+        }
+      },
+      "weather": {
+        "n": 70,
+        "agreeAd": 0.7,
+        "flips": 4,
+        "disagreements": {
+          "ad:clear→jev:overcast": 12,
+          "ad:storm→jev:fog": 5,
+          "ad:fog→jev:clear": 1,
+          "ad:none→jev:clear": 1,
+          "ad:overcast→jev:none": 1,
+          "ad:clear→jev:fog": 1
+        },
+        "reading": {
+          "n": 21,
+          "jevRight": 15,
+          "adRight": 15
+        }
+      },
+      "indoor": {
+        "n": 70,
+        "agreeAd": 0.986,
+        "flips": 0,
+        "disagreements": {
+          "ad:indoor→jev:outdoor": 1
+        },
+        "reading": {
+          "n": 1,
+          "jevRight": 1,
+          "adRight": 0
+        }
+      },
+      "population": {
+        "n": 70,
+        "agreeAd": 0.586,
+        "flips": 6,
+        "disagreements": {
+          "ad:cast_only→jev:ambient": 16,
+          "ad:ambient→jev:cast_only": 13
+        },
+        "reading": {
+          "n": 29,
+          "jevRight": 16,
+          "adRight": 13
+        }
+      },
+      "emotion": {
+        "n": 139,
+        "agreeAd": 0.604,
+        "flips": 4,
+        "disagreements": {
+          "ad:happy→jev:neutral": 17,
+          "ad:angry→jev:neutral": 10,
+          "ad:afraid→jev:neutral": 10,
+          "ad:neutral→jev:surprised": 5,
+          "ad:surprised→jev:afraid": 2,
+          "ad:sad→jev:neutral": 2,
+          "ad:surprised→jev:neutral": 1,
+          "ad:scared→jev:afraid": 1,
+          "ad:angry→jev:sad": 1,
+          "ad:sad→jev:afraid": 1,
+          "ad:neutral→jev:angry": 1,
+          "ad:angry→jev:surprised": 1,
+          "ad:strained→jev:neutral": 1,
+          "ad:strained→jev:afraid": 1,
+          "ad:angry→jev:afraid": 1
+        },
+        "reading": {
+          "n": 72,
+          "jevRight": 40,
+          "adRight": 51
+        }
+      },
+      "emotionStory": {
+        "n": 139,
+        "agreeAd": 0.597,
+        "flips": 7,
+        "disagreements": {
+          "ad:happy→jev:neutral": 8,
+          "ad:neutral→jev:happy": 7,
+          "ad:angry→jev:neutral": 6,
+          "ad:neutral→jev:surprised": 5,
+          "ad:afraid→jev:neutral": 5,
+          "ad:neutral→jev:afraid": 4,
+          "ad:neutral→jev:angry": 3,
+          "ad:surprised→jev:afraid": 3,
+          "ad:angry→jev:sad": 3,
+          "ad:angry→jev:afraid": 3,
+          "ad:strained→jev:neutral": 2,
+          "ad:surprised→jev:sad": 1,
+          "ad:scared→jev:afraid": 1,
+          "ad:sad→jev:neutral": 1,
+          "ad:sad→jev:afraid": 1,
+          "ad:angry→jev:happy": 1,
+          "ad:surprised→jev:happy": 1,
+          "ad:happy→jev:surprised": 1
+        },
+        "reading": {
+          "n": 72,
+          "jevRight": 56,
+          "adRight": 51
+        }
+      },
+      "shot": {
+        "n": 70,
+        "agreeAd": 0.6,
+        "flips": 2,
+        "disagreements": {
+          "ad:closeup→jev:medium": 17,
+          "ad:medium→jev:wide": 6,
+          "ad:wide→jev:medium": 4,
+          "ad:closeup→jev:wide": 1
+        },
+        "agreePlanner": 0.6,
+        "plannerMajority": {
+          "bin": "closeup",
+          "share": 0.357
+        },
+        "plannerVsAd": 1,
+        "groupRule": {
+          "pagesOver3": 15,
+          "adShotNotWider": [
+            "vnx5l8iy7#p6#meta:medium",
+            "vnx5l8iy7#p7#meta:over-the-shoulder",
+            "z3fw660ie#p1#meta:medium",
+            "z3fw660ie#p6#meta:medium"
+          ],
+          "planShotNotWider": [
+            "vnx5l8iy7#p6#meta:medium",
+            "vnx5l8iy7#p7#meta:over-the-shoulder",
+            "z3fw660ie#p1#meta:medium",
+            "z3fw660ie#p6#meta:medium"
+          ]
+        }
+      }
+    },
+    "vbentity": {
+      "n": 522,
+      "labelled": 416,
+      "byType": {
+        "creature": {
+          "n": 119,
+          "present": 31,
+          "auc": 1,
+          "at": [
+            {
+              "thr": 0.3,
+              "tp": 31,
+              "fp": 3,
+              "fn": 0,
+              "precision": 0.912,
+              "recall": 1
+            },
+            {
+              "thr": 0.5,
+              "tp": 31,
+              "fp": 1,
+              "fn": 0,
+              "precision": 0.969,
+              "recall": 1
+            },
+            {
+              "thr": 0.7,
+              "tp": 31,
+              "fp": 0,
+              "fn": 0,
+              "precision": 1,
+              "recall": 1
+            },
+            {
+              "thr": 0.85,
+              "tp": 27,
+              "fp": 0,
+              "fn": 4,
+              "precision": 1,
+              "recall": 0.871
+            }
+          ],
+          "ad": {
+            "thr": 0.5,
+            "tp": 29,
+            "fp": 1,
+            "fn": 2,
+            "precision": 0.967,
+            "recall": 0.935
+          },
+          "vbPages": {
+            "thr": 0.5,
+            "tp": 29,
+            "fp": 1,
+            "fn": 2,
+            "precision": 0.967,
+            "recall": 0.935
+          },
+          "flips": 0,
+          "all": 124
+        },
+        "secondary": {
+          "n": 59,
+          "present": 9,
+          "auc": 0.944,
+          "at": [
+            {
+              "thr": 0.3,
+              "tp": 7,
+              "fp": 3,
+              "fn": 2,
+              "precision": 0.7,
+              "recall": 0.778
+            },
+            {
+              "thr": 0.5,
+              "tp": 7,
+              "fp": 0,
+              "fn": 2,
+              "precision": 1,
+              "recall": 0.778
+            },
+            {
+              "thr": 0.7,
+              "tp": 7,
+              "fp": 0,
+              "fn": 2,
+              "precision": 1,
+              "recall": 0.778
+            },
+            {
+              "thr": 0.85,
+              "tp": 7,
+              "fp": 0,
+              "fn": 2,
+              "precision": 1,
+              "recall": 0.778
+            }
+          ],
+          "ad": {
+            "thr": 0.5,
+            "tp": 6,
+            "fp": 0,
+            "fn": 3,
+            "precision": 1,
+            "recall": 0.667
+          },
+          "vbPages": {
+            "thr": 0.5,
+            "tp": 7,
+            "fp": 0,
+            "fn": 2,
+            "precision": 1,
+            "recall": 0.778
+          },
+          "flips": 2,
+          "all": 66
+        },
+        "object": {
+          "n": 196,
+          "present": 53,
+          "auc": 0.993,
+          "at": [
+            {
+              "thr": 0.3,
+              "tp": 53,
+              "fp": 28,
+              "fn": 0,
+              "precision": 0.654,
+              "recall": 1
+            },
+            {
+              "thr": 0.5,
+              "tp": 52,
+              "fp": 9,
+              "fn": 1,
+              "precision": 0.852,
+              "recall": 0.981
+            },
+            {
+              "thr": 0.7,
+              "tp": 38,
+              "fp": 1,
+              "fn": 15,
+              "precision": 0.974,
+              "recall": 0.717
+            },
+            {
+              "thr": 0.85,
+              "tp": 30,
+              "fp": 0,
+              "fn": 23,
+              "precision": 1,
+              "recall": 0.566
+            }
+          ],
+          "ad": {
+            "thr": 0.5,
+            "tp": 46,
+            "fp": 1,
+            "fn": 7,
+            "precision": 0.979,
+            "recall": 0.868
+          },
+          "vbPages": {
+            "thr": 0.5,
+            "tp": 46,
+            "fp": 1,
+            "fn": 7,
+            "precision": 0.979,
+            "recall": 0.868
+          },
+          "flips": 6,
+          "all": 210
+        },
+        "vehicle": {
+          "n": 14,
+          "present": 10,
+          "auc": 1,
+          "at": [
+            {
+              "thr": 0.3,
+              "tp": 10,
+              "fp": 0,
+              "fn": 0,
+              "precision": 1,
+              "recall": 1
+            },
+            {
+              "thr": 0.5,
+              "tp": 10,
+              "fp": 0,
+              "fn": 0,
+              "precision": 1,
+              "recall": 1
+            },
+            {
+              "thr": 0.7,
+              "tp": 8,
+              "fp": 0,
+              "fn": 2,
+              "precision": 1,
+              "recall": 0.8
+            },
+            {
+              "thr": 0.85,
+              "tp": 2,
+              "fp": 0,
+              "fn": 8,
+              "precision": 1,
+              "recall": 0.2
+            }
+          ],
+          "ad": {
+            "thr": 0.5,
+            "tp": 7,
+            "fp": 0,
+            "fn": 3,
+            "precision": 1,
+            "recall": 0.7
+          },
+          "vbPages": {
+            "thr": 0.5,
+            "tp": 7,
+            "fp": 0,
+            "fn": 3,
+            "precision": 1,
+            "recall": 0.7
+          },
+          "flips": 0,
+          "all": 16
+        },
+        "clothing": {
+          "n": 28,
+          "present": 21,
+          "auc": 0.925,
+          "at": [
+            {
+              "thr": 0.3,
+              "tp": 20,
+              "fp": 2,
+              "fn": 1,
+              "precision": 0.909,
+              "recall": 0.952
+            },
+            {
+              "thr": 0.5,
+              "tp": 17,
+              "fp": 1,
+              "fn": 4,
+              "precision": 0.944,
+              "recall": 0.81
+            },
+            {
+              "thr": 0.7,
+              "tp": 13,
+              "fp": 0,
+              "fn": 8,
+              "precision": 1,
+              "recall": 0.619
+            },
+            {
+              "thr": 0.85,
+              "tp": 2,
+              "fp": 0,
+              "fn": 19,
+              "precision": 1,
+              "recall": 0.095
+            }
+          ],
+          "ad": {
+            "thr": 0.5,
+            "tp": 3,
+            "fp": 0,
+            "fn": 18,
+            "precision": 1,
+            "recall": 0.143
+          },
+          "vbPages": {
+            "thr": 0.5,
+            "tp": 21,
+            "fp": 0,
+            "fn": 0,
+            "precision": 1,
+            "recall": 1
+          },
+          "flips": 5,
+          "all": 106
+        }
+      }
+    }
+  },
+  "perStoryOneRep": {
+    "iqvhj4l8m": {
+      "calls": 13,
+      "usd": 0.00141
+    },
+    "mpjwlzkf1": {
+      "calls": 5,
+      "usd": 0.00046
+    },
+    "1dpnym94p": {
+      "calls": 5,
+      "usd": 0.00053
+    },
+    "622wecmhj": {
+      "calls": 6,
+      "usd": 0.00056
+    },
+    "z18dmvnt6": {
+      "calls": 5,
+      "usd": 0.00046
+    },
+    "apslnsq1z": {
+      "calls": 11,
+      "usd": 0.00122
+    },
+    "z2c779f7i": {
+      "calls": 5,
+      "usd": 0.00046
+    },
+    "9oxos7dwv": {
+      "calls": 6,
+      "usd": 0.00059
+    },
+    "zly5rcdej": {
+      "calls": 5,
+      "usd": 0.00048
+    },
+    "3kxqshifx": {
+      "calls": 6,
+      "usd": 0.00061
+    },
+    "rts4wqupm": {
+      "calls": 5,
+      "usd": 0.00052
+    },
+    "riqncqg1i": {
+      "calls": 21,
+      "usd": 0.00211
+    },
+    "1nitlympp": {
+      "calls": 29,
+      "usd": 0.00294
+    },
+    "5herh01j7": {
+      "calls": 93,
+      "usd": 0.01166
+    },
+    "vnx5l8iy7": {
+      "calls": 95,
+      "usd": 0.01066
+    },
+    "z3fw660ie": {
+      "calls": 83,
+      "usd": 0.0125
+    },
+    "dka3jpog9": {
+      "calls": 97,
+      "usd": 0.01086
+    },
+    "lab1326:wkt20ckod": {
+      "calls": 6,
+      "usd": 0.00056
+    },
+    "lab1332:zly5rcdej": {
+      "calls": 3,
+      "usd": 0.00029
+    },
+    "lab1491:5herh01j7": {
+      "calls": 3,
+      "usd": 0.00027
+    },
+    "lab1494:5herh01j7": {
+      "calls": 3,
+      "usd": 0.00028
+    },
+    "lab1498:l43qgl34w": {
+      "calls": 3,
+      "usd": 0.0003
+    },
+    "lab1558:vnx5l8iy7": {
+      "calls": 13,
+      "usd": 0.00108
+    }
+  }
+}

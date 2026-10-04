@@ -2,13 +2,13 @@
  * SHOT VOCABULARY — one definition of the camera-framing words, for every stage
  * that writes, counts, or acts on one.
  *
- * A shot word is PRODUCED by the beats planner (prompts/story-beats.txt, which
- * states the distribution shotDistributionPhrase below builds), COUNTED here by
- * planCounters
- * (SHOT_VARIETY / SHOT_CLOSEUP_COUNT / SHOT_ULTRAWIDE_COUNT), carried through
- * the Art Director's `shot` field (prompts/scene-expansion.txt,
- * scene-expansion-all.txt) and finally ACTED ON by the illustrator
- * (prompts/image-generation.txt).
+ * A shot word is CHOSEN by the Jev decision layer and WRITTEN by code into
+ * field 0 of every plan line (server/lib/jevDecisions.js: the SHOTS definitions
+ * below are the questions, shotFloors the budget the assignment holds; owner,
+ * 2026-09-27 — the planner no longer authors a shot and writes
+ * PLAN_SHOT_PLACEHOLDER), carried through the Art Director's `shot` field
+ * (prompts/scene-expansion.txt, scene-expansion-all.txt) and finally ACTED ON
+ * by the illustrator (prompts/image-generation.txt).
  *
  * It was declared separately at each of those stops and the sets did not match:
  * the planner asks for `ultra-wide` pages, while the Art Director enum offered
@@ -39,6 +39,19 @@
  * pose-category word and ignores the qualifier after it.
  */
 const OTS_NEAR_FIGURE_CROP = 'the back of the head, one shoulder and the upper arm, large in a front corner and cut by the frame edge; nothing below the shoulder blades is in frame. The camera sees the back of their head and their hair; their face is turned away from us, into the picture';
+
+/**
+ * WHICH FIGURE IS THE NEAR ONE (owner, 2026-09-28). Staging
+ * job_1790539784661_6mjcny1c7 p12: the plan line had the creature turn its
+ * face away from the child, and the brief made the creature the near crop —
+ * a back of a head turned away from the only other figure, so the picture's
+ * axis pointed at nothing. The near figure is the one whose look carries the
+ * camera's axis to the far figure. One sentence, in the shot's definition (the
+ * illustrator and the Jev fit question), OTS_NEAR_FIGURE_RULE (both Art
+ * Director templates, both iterate templates) and the scene review's
+ * over-the-shoulder check.
+ */
+const OTS_NEAR_FIGURE_FACING = 'The near figure is the one whose look runs into the picture toward the far figure — never a figure turning away from the far one; when the moment has one figure turn away from another, the one left looking stands nearest the camera.';
 
 /**
  * The shots, TIGHTEST FIRST. `id` is the word every stage writes and reads,
@@ -89,7 +102,7 @@ const SHOTS = [
     id: 'over-the-shoulder',
     axis: 'position',
     match: /\b(?:over[-\s]?the[-\s]?shoulder|over[-\s]?shoulder)\b/i,
-    definition: `An over-the-shoulder shot stands behind one figure, who is a crop: ${OTS_NEAR_FIGURE_CROP}. What they face sits far across the frame, small and deep in the opposite corner, several body lengths away. The camera's own axis is the line between them, so the picture states who is acting on whom without having to work it out.`,
+    definition: `An over-the-shoulder shot stands behind one figure, who is a crop: ${OTS_NEAR_FIGURE_CROP}. What they face sits far across the frame, small and deep in the opposite corner, several body lengths away. The camera's own axis is the line between them, so the picture states who is acting on whom without having to work it out. ${OTS_NEAR_FIGURE_FACING}`,
   },
   {
     id: 'high-angle',
@@ -140,11 +153,27 @@ const SHOTS = [
 const OTS_NO_CONTACT_RULE = "Over-the-shoulder never goes on a page where the near figure touches what they face — a hand laid on it, a grip, a lean against it, a hand-over: whatever is touched is within arm's reach and cannot sit small and deep in the far corner. Such a page takes another shot.";
 
 /**
+ * AN OVER-THE-SHOULDER NEEDS A NEAR FIGURE AND SOMEONE IT FACES (owner,
+ * 2026-09-28). Staging job_1790539784661_6mjcny1c7: the Jev shot assignment
+ * put the book's two mandatory over-the-shoulder pages on p4 and p15, whose
+ * who column holds one figure each (the creature alone). With nobody to stand
+ * behind, the Art Director either drew the lone figure as the near crop
+ * turning away from nothing or quietly changed the shot to `medium` (p15).
+ *
+ * The assignment (jevDecisions.allowedShot) therefore offers the shot only on
+ * a page whose who column puts at least this many figures in frame; the floor
+ * moves to an eligible page, and a book with none leaves the floor unmet
+ * (logged, never forced). A count, read from the plan check's structured
+ * `present` list — never from the plan line's prose.
+ */
+const OTS_MIN_IN_FRAME = 2;
+
+/**
  * The Art Director / iterate half: which perspective the near figure gets and
  * what its prose may describe. Filled into scene-expansion.txt,
  * scene-expansion-all.txt, scene-iteration.txt and scene-iteration-free.txt.
  */
-const OTS_NEAR_FIGURE_RULE = `On an \`over-the-shoulder\` page the figure nearest the camera gets \`perspective: over-the-shoulder\` — never \`back view\` and never a glance over the shoulder — and is seen as a crop: ${OTS_NEAR_FIGURE_CROP}. Describe only what that crop shows: the hair, the collar and sleeve of the upper garment, anything held up into frame. That figure's prose names no legs, trousers, footwear or stance, and it looks straight ahead into the scene toward what it faces — never up at it. ${OTS_NO_CONTACT_RULE}`;
+const OTS_NEAR_FIGURE_RULE = `On an \`over-the-shoulder\` page the figure nearest the camera gets \`perspective: over-the-shoulder\` — never \`back view\` and never a glance over the shoulder — and is seen as a crop: ${OTS_NEAR_FIGURE_CROP}. Describe only what that crop shows: the hair, the collar and sleeve of the upper garment, anything held up into frame. That figure's prose names no legs, trousers, footwear or stance, and it looks straight ahead into the scene toward what it faces — never up at it. ${OTS_NEAR_FIGURE_FACING} ${OTS_NO_CONTACT_RULE}`;
 
 /**
  * Whether a character annotation declares the over-the-shoulder near figure.
@@ -249,21 +278,19 @@ function buildShotDefinitions(shotHint, sceneText = null) {
 }
 
 /**
- * HOW MANY PAGES OF EACH — the one declaration of the distribution, read by the
- * planner that WRITES the shots (prompts/story-beats.txt, via
- * shotDistributionPhrase) and by the counters that MEASURE them
- * (server/lib/planCounters.js, via shotFloors). One table, so the book is never
- * marked down against a spread nobody asked it for.
+ * HOW MANY PAGES OF EACH — the one declaration of the distribution. Since
+ * 2026-09-27 it is the BUDGET the Jev shot assignment holds by construction
+ * (jevDecisions.assign via shotFloors): code writes every page's shot, so no
+ * counter measures it afterwards and no planner is told it.
  *
  * MEASURED, 11 staging books / 180 pages over the 14 days to 2026-09-20:
  * medium 76 (42%), wide 54 (30%), close-up 37 (21%), ultra-wide 10 (5.6%),
  * high-angle 2 (1.1%), over-the-shoulder 1 (0.6%), aerial 0. Medium plus wide
  * is 72% of every page shipped, and a camera position appears on 3 pages in 180.
  *
- * The planner was COMPLYING. The prompt asked for "about two close-ups and two
- * ultra-wides, the rest medium or wide", which on an 18-page book is an explicit
- * request for ~78% medium-or-wide. The fix is therefore the prompt first — it
- * now states this table — and the counters second (owner, 2026-09-20).
+ * The planner was COMPLYING with a prompt that asked for ~78% medium-or-wide;
+ * the table fixed that (owner, 2026-09-20), and the planner still broke it
+ * (72 rule violations over 17 books, 0 clean) — which is why code now assigns.
  *
  * Why a SHARE and not a count: the cap scales to any book length with no
  * threshold to maintain. Why TIERED floors: a 6-page trial must not be asked for
@@ -273,6 +300,12 @@ function buildShotDefinitions(shotHint, sceneText = null) {
  * different axes, each with its own floor. They are never folded together.
  */
 const MAX_MEDIUM_WIDE_SHARE = 0.5;
+
+// ───────────────────────── THE JEV-OUTAGE BACKUP (owner exception, 2026-09-27) ─────────────────────────
+// The planner-authored shot path as it stood before the Jev decision layer:
+// used ONLY when a story runs its backup (jevDecisions: the pre-start probe
+// found Jev down). One copy each — the Jev path reads shotFloors, never these.
+// see docs/decisions.md 2026-09-27 "Jev outage: wait, then today's setup as backup"
 
 /**
  * The two middle distances the cap is about — the default framings a book falls
@@ -328,6 +361,15 @@ const SHOT_FLOOR_CODE = {
 };
 
 /**
+ * FIELD 0 OF A PLAN LINE BEFORE CODE WRITES IT (owner, 2026-09-27). The beats
+ * planner divides the book and writes this literal word where the shot goes;
+ * after the re-plan, jevDecisions.decideShots picks each page's shot under the
+ * budget below and code writes the word in (jevDecisions.applyShots). One
+ * author, one constant — the planner prompt fills it from here.
+ */
+const PLAN_SHOT_PLACEHOLDER = 'SHOT';
+
+/**
  * Tightest tier first; a book takes the first tier whose `maxPages` it fits.
  * `positionsTotal` is a floor on camera positions TAKEN TOGETHER, on top of the
  * per-shot floors — null where the tier asks for no total.
@@ -359,7 +401,7 @@ for (const tier of SHOT_FLOOR_TIERS) {
       throw new Error(`shotVocabulary: SHOT_FLOOR_TIERS floors an unknown shot \`${id}\``);
     }
     if (!SHOT_FLOOR_CODE[id]) {
-      throw new Error(`shotVocabulary: no finding code for the floored shot \`${id}\` — a floor nothing can report is not enforceable`);
+      throw new Error(`shotVocabulary: no finding code for the floored shot \`${id}\` — the backup path's counters could not report it`);
     }
   }
 }
@@ -385,9 +427,7 @@ function shotFloors(pageCount) {
   const maxMediumWide = Math.floor(pages * MAX_MEDIUM_WIDE_SHARE);
   // THE PAGES THE BOOK OWES, counted once here so no caller re-derives it.
   // Every floor costs a page, plus any position pages the tier's TOTAL asks for
-  // beyond the per-shot position floors. The mandatory people-free page costs
-  // NOTHING: it rides the ultra-wide page (PEOPLELESS_SHARED_SHOT), which is
-  // already in `floors` wherever it is floored at all.
+  // beyond the per-shot position floors.
   const mandatedPages = Object.values(floors).reduce((n, v) => n + Number(v), 0)
     + Math.max(0, positionsTotal - positionFloorSum);
   return {
@@ -506,6 +546,14 @@ const CLOSEUP_BELOW_WAIST_PHRASE = CLOSEUP_BELOW_WAIST_VERBS
  */
 const CLOSEUP_KEPT_RULE = 'A close-up the page\'s plan asks for stays `close-up`: restage the moment waist-up — holding, reaching, reacting — and never widen the shot for staging the plan does not name. '
   + `Only a plan whose own words put the subject below the frame line — ${CLOSEUP_BELOW_WAIST_PHRASE} — makes that page \`medium\`.`;
+
+/**
+ * THE SHOT IS FIXED (owner, 2026-09-28, "Jev first"): on a page whose shot the
+ * decision layer fixed, no author changes it — a rule that used to pick or
+ * widen a shot applies to the staging inside it. Covers and the Jev-outage
+ * backup keep the wording above; promptBuilders.shotRuleFills picks per call.
+ */
+const CLOSEUP_KEPT_FIXED_SHOT_RULE = 'A `close-up` stays `close-up`: restage the moment waist-up — holding, reaching, reacting — and bring what the moment acts on up into the frame.';
 
 /**
  * A capitalised name or a person pronoun — kept for the entry that needs an
@@ -636,15 +684,100 @@ if ([...PLATE_DERIVED_SHOTS].some(id => !DERIVE_CAMERA_MOVE[id])) {
  * "Frame edge" check.
  */
 const PLATE_MARKS = 'signature, monogram or initials';
-const PLATE_SURROUNDS = 'paper margin, mat, border, keyline or frame around the picture';
+// Deckle, torn paper and vignette named 2026-09-25: Lab 1480 (a cream deckle
+// edge) and 1479 (a torn-paper corner) passed the plate QC, whose judge did not
+// read a deckle edge as a "margin".
+const PLATE_SURROUNDS = 'paper margin, mat, deckle or torn-paper edge, vignette, border, keyline or frame around the picture';
 const PLATE_EDGE_RULE = `The painting fills the frame edge to edge, the scene itself reaching all four sides; it carries no ${PLATE_MARKS} and no ${PLATE_SURROUNDS}.`;
+
+/**
+ * A plate holds NO people (owner, 2026-09-26). A vantage plate is shared by
+ * every page on it, so a passer-by painted on the plate is repeated on each of
+ * those pages: staging job_1789506283204_3kxqshifx showed the same six people on
+ * 17 pages. Background people — passers-by, onlookers, a crowd — are drawn in
+ * each PAGE render instead, from the brief's `population`
+ * (promptBuilders.buildRequiredCastRule). One source for both sides: the plate
+ * author (empty-scene.txt) and the derive edit (plate-derive.txt) get
+ * PLATE_NO_PEOPLE_RULE; the plate QC (empty-scene-qc.txt) fails any PLATE_PEOPLE
+ * item in its "Figures" check.
+ */
+// "part or faint trace of one" named 2026-09-26: Lab 1505 carried a
+// half-erased ghost of a person and passed the Figures check.
+const PLATE_PEOPLE = 'person, passer-by, crowd, rider, silhouette of a person, or part or faint trace of one';
+const PLATE_NO_PEOPLE_RULE = `The place is painted with no people in it: no ${PLATE_PEOPLE} anywhere in the frame, however small or distant, even where such a place is normally busy or the description mentions people.`;
+
+/**
+ * What a landmark plate is told about its reference photo, and what its judge
+ * is told the plate was told (2026-09-26). The plate renders the part of the
+ * place its camera sees — the landmark, a part of it, or the view from it — so
+ * the judge holds only that part to the photograph. Lab 1506 failed its
+ * landmark check on a plate that looked from the landmark toward other towers
+ * the brief named. One sentence for both sides: empty-scene's REFERENCE line
+ * (prompts.js buildEmptyScenePrompt) and the plate QC's LANDMARK_CHECK.
+ */
+const PLATE_LANDMARK_REFERENCE = 'The place in this scene is the one shown in the attached reference image — render the part of it the camera sees, consistent in colour and construction.';
+
+/**
+ * The plate's band note: which depth bands must give FOOTING, and which of them
+ * stay open from side to side. It names SURFACES only — never a character, and
+ * never a count (owner, 2026-09-26). The per-page note used to read "1 character
+ * in the foreground (1 on the left) and 1 character in the midground (1 on the
+ * right) will be composited into this scene later", and the plate model painted
+ * exactly those figures (staging job_1789348171785_9oxos7dwv p8/p16,
+ * job_1789343124794_z2c779f7i p18).
+ *
+ * @param {Array|null} characters the page's brief characters (`depth`,
+ *   `position`), or null for a vantage plate shared by several pages — then
+ *   every band shows the place's own surface.
+ * @param {string} [shot] the page's shot (close-up / medium add a floor line)
+ * @returns {string} '' when the page places no character
+ */
+function buildPlateSurfaceNote(characters, shot = '') {
+  if (!Array.isArray(characters)) {
+    return 'Render this as an empty location backdrop. The foreground, midground and background all show the place\'s own ground, floor or water surface continuing unbroken. No animals.';
+  }
+  // Depth AND lateral side, so each band is told whether both of its sides
+  // stay open ("far-left and far-right") instead of being walled in.
+  const buckets = { fgLeft: 0, fgRight: 0, fgCenter: 0, mgLeft: 0, mgRight: 0, mgCenter: 0, bgLeft: 0, bgRight: 0, bgCenter: 0 };
+  for (const c of characters) {
+    const depth = String(c?.depth || '').toLowerCase();
+    const pos = String(c?.position || '').toLowerCase();
+    const isBg = depth === 'background' || pos.includes('far background') || pos.includes('tiny figure') || pos.includes('background');
+    const isMg = !isBg && (depth === 'midground' || pos.includes('midground'));
+    const isLeft = /\bfar[-\s]?left|\bleft\b/.test(pos) && !/right/.test(pos);
+    const isRight = /\bfar[-\s]?right|\bright\b/.test(pos) && !/left/.test(pos);
+    buckets[(isBg ? 'bg' : isMg ? 'mg' : 'fg') + (isLeft ? 'Left' : isRight ? 'Right' : 'Center')]++;
+  }
+  const BAND_LABEL = { fg: 'foreground', mg: 'midground', bg: 'far background' };
+  const used = ['fg', 'mg', 'bg'].filter(d => buckets[`${d}Left`] + buckets[`${d}Right`] + buckets[`${d}Center`] > 0);
+  if (used.length === 0) return '';
+  const labels = used.map(d => BAND_LABEL[d]);
+  const bandList = labels.length === 1 ? labels[0] : `${labels.slice(0, -1).join(', ')} and ${labels[labels.length - 1]}`;
+  const many = labels.length > 1;
+  // Scene material, never "open space" or "leave room": Grok resolves those
+  // with blank patches and half-finished building fragments. FOOTING, never
+  // "natural surface": on a river panorama that was open water, and a figure
+  // later drawn into that band floated on it.
+  let note = `The ${bandList} ${many ? 'each show' : 'shows'} a standable surface — ground, path, bank, floor, deck, walkway, jetty, or the floor of a shaft or pit — continuing unbroken, the light and surface texture carrying across. `
+    + `Open water, air or a drop fills ${many ? 'those bands' : 'that band'} only where the description above puts it. `
+    + `${many ? 'They hold' : 'It holds'} no props, signage, vehicles or extra structures, and ${many ? 'are' : 'is'} painted as part of the scene — never a blank, white or unfinished patch, never an abrupt building cutoff.`;
+  const bothSides = used.find(d => buckets[`${d}Left`] > 0 && buckets[`${d}Right`] > 0);
+  if (bothSides) {
+    note += ` The far left and far right of the ${BAND_LABEL[bothSides]} are both flat continuous ground, with no building wall, prop or barrier closing either side.`;
+  }
+  const s = String(shot || '').toLowerCase();
+  if (s.includes('close') || s.includes('medium')) {
+    note += ` This is a ${s.includes('close') ? 'close-up' : 'medium'} shot: the frame keeps open floor or ground in front of the backdrop, never filled edge to edge with furniture.`;
+  }
+  return note;
+}
 
 /*
  * What stays is the place's STRUCTURE, never an object's "position": in an
  * image edit that word means position in the frame, and it pinned the camera
  * the instruction was asking to move (run 6 p2, 2026-09-23).
  */
-function buildPlateDeriveInstruction(baseShot, targetShot, { relight = '' } = {}) {
+function buildPlateDeriveInstruction(baseShot, targetShot, { relight = '', keepLight = '' } = {}) {
   const target = SHOTS.find(s => s.id === targetShot);
   if (!target) return null;
   const from = String(baseShot || '').trim();
@@ -654,15 +787,58 @@ function buildPlateDeriveInstruction(baseShot, targetShot, { relight = '' } = {}
   // `relight`: sceneLight.relightClause — the page this plate serves declares
   // a different time of day or weather than the base plate was painted in, so
   // the one edit moves the camera AND re-lights (2026-09-24).
+  // `keepLight`: sceneLight.keepLightClause — the page keeps the base plate's
+  // declared light, named with its weather, so a derive never drops the sky
+  // (2026-09-26: the generic "same direction and time of day" left a fog plate's
+  // weather out, and a sunny-rendered base stayed sunny).
   const light = relight
     ? `the palette and the season stay identical. ${relight}`
-    : 'the palette and the season stay identical, and the light keeps the same direction and time of day.';
+    : keepLight
+      ? `the palette and the season stay identical. ${keepLight}`
+      : 'the palette and the season stay identical, and the light keeps the same direction and time of day.';
   return `This backdrop is ${fromPhrase} of a place. ${move} `
     + `The buildings, walls, roofs, trees, paths and surfaces keep their shape, material and colour and their arrangement relative to each other; ${light} The camera moves; the place stays as it is, and no one is added to it.`;
 }
 
+/**
+ * STAGING A GROUP (owner, 2026-09-27).
+ *
+ * The Art Director's rule 4 said it in prose and no critic checked it. Staging
+ * job_1790446348343_z3fw660ie: p1 and p6 put five figures on a `medium` shot
+ * (p6 scored 9, the book's worst page), and p16 put five on a `wide` shot all
+ * looking at a ship deep in the frame with nobody turned away — a posed row of
+ * faces (score 15).
+ *
+ * ONE sentence, read by both Art Director templates (rule 4), both iterate
+ * templates and scene-review check [group_staging]; the brief check
+ * (sceneBriefCheck.checkGroupStaging) measures the same two halves from the
+ * structured fields: the shot class against GROUP_WIDER_SHOTS, and the gaze /
+ * perspective of each figure.
+ *
+ * Which shots are "wider": the two far distances, and the two camera positions
+ * that look down on the group from above so every figure sits at one depth.
+ * `medium` keeps each figure whole but large, `close-up` is faces, a
+ * `low-angle` makes its subject tower, and an `over-the-shoulder` puts one
+ * figure large in front of the others by definition.
+ */
+const GROUP_STAGING_MAX = 3; // the "three" GROUP_STAGING_RULE states
+const GROUP_WIDER_SHOTS = ['wide', 'ultra-wide', 'high-angle', 'aerial'];
+if (GROUP_WIDER_SHOTS.some(id => !SHOT_TYPES.includes(id))) {
+  throw new Error('shotVocabulary: GROUP_WIDER_SHOTS names a shot that does not exist');
+}
+const GROUP_STAGING_TAIL = 'never five detailed close foreground faces. The group turns to each other or to what they look at, never lined up facing the viewer: a group looking at something deeper in the frame is seen from behind.';
+const GROUP_STAGING_RULE = `When more than three characters share the frame, keep the whole group together at one depth in a wider shot — ${GROUP_WIDER_SHOTS.map(id => '`' + id + '`').join(', ').replace(/, ([^,]*)$/, ' or $1')} — or show them from behind (\`perspective: back view\`) as they move away; ${GROUP_STAGING_TAIL}`;
+/** The same rule on a page whose shot is fixed: the shot assignment already holds GROUP_WIDER_SHOTS (jevDecisions.assign). */
+const GROUP_STAGING_FIXED_SHOT_RULE = `When more than three characters share the frame, keep the whole group together at one depth, or show them from behind (\`perspective: back view\`) as they move away; ${GROUP_STAGING_TAIL}`;
+
 module.exports = {
+  GROUP_STAGING_MAX,
+  GROUP_WIDER_SHOTS,
+  GROUP_STAGING_RULE,
+  GROUP_STAGING_FIXED_SHOT_RULE,
   OTS_NEAR_FIGURE_CROP,
+  OTS_NEAR_FIGURE_FACING,
+  OTS_MIN_IN_FRAME,
   OTS_NO_CONTACT_RULE,
   OTS_NEAR_FIGURE_RULE,
   isOverTheShoulderPerspective,
@@ -678,6 +854,10 @@ module.exports = {
   PLATE_MARKS,
   PLATE_SURROUNDS,
   PLATE_EDGE_RULE,
+  PLATE_PEOPLE,
+  PLATE_NO_PEOPLE_RULE,
+  PLATE_LANDMARK_REFERENCE,
+  buildPlateSurfaceNote,
   DISTANCE_SHOTS,
   POSITION_SHOTS,
   SHOT_PATTERNS,
@@ -688,12 +868,14 @@ module.exports = {
   buildShotDefinitions,
   resolveShotId,
   MAX_MEDIUM_WIDE_SHARE,
+  PLAN_SHOT_PLACEHOLDER,
   MID_DISTANCE_SHOTS,
   PEOPLELESS_SHARED_SHOT,
   SHOT_FLOOR_CODE,
   SHOT_FLOOR_TIERS,
   CLOSEUP_BELOW_WAIST_VERBS,
   CLOSEUP_KEPT_RULE,
+  CLOSEUP_KEPT_FIXED_SHOT_RULE,
   CLOSEUP_BELOW_WAIST_PHRASE,
   closeUpBelowWaistVerbs,
   shotFloors,

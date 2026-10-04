@@ -57,6 +57,19 @@ function ageCopy(A, Y) {
   };
 }
 
+// Girls' keywords, added 2026-09-27 (owner). Keyword Planner returns nothing for `mädchen` seeds in CH, so
+// these are NOT planner rows and NOT built from a pattern: each is a search term that actually showed one of
+// our ads (search_term_view, account history to 2026-09-27). 4 of the 8 queries that reached Search-Cheap-Age-CH
+// in its first week were for girls while its keywords said "jungs". Left out on purpose: baby / birth / baptism /
+// 1st birthday (baby as recipient), ages 12 and 14 (outside 3-10), and the ageless "personalisierte geschenke
+// mädchen" family, which Search-Deutschschweiz-v1 already wins at its higher bid.
+const GIRLS = {
+  'Alter-4': ['geschenk für 4 jähriges mädchen', 'personalisiertes geschenk mädchen 4 jahre'],
+  'Alter-5': ['geschenkideen mädchen 5 jahre', 'geburtstagsgeschenk 5 jahre mädchen'],
+  'Alter-7-8': ['personalisierte geschenke mädchen 8 jahre'],
+  'Alter-9-10': ['personalisierte geschenke mädchen 9 jahre'],
+};
+
 const AGE_GROUPS = [
   { name: 'Alter-3', lp: '/geschenk/geschenk-3-jahre', path: ['Geschenk', '3-Jahre'], copy: ageCopy('3-Jährige', '3 Jahre'),
     keywords: ['geschenke 3 jährige jungs', 'geschenk 3 jährig', 'geschenke für 3 jährige', 'geschenke für jungs 3 jahre', 'geschenk 3 jahre',
@@ -65,11 +78,13 @@ const AGE_GROUPS = [
   { name: 'Alter-4', lp: '/geschenk/geschenk-4-jahre', path: ['Geschenk', '4-Jahre'], copy: ageCopy('4-Jährige', '4 Jahre'),
     keywords: ['geschenk 4 jährige jungs', 'geschenke für jungs 4 jahre', 'geschenk 4 jährig', 'geschenke für 4 jährige', 'geschenke für 4 jährige jungs',
       'geschenk 4 jahre', 'geschenkideen 4 jährige jungs', 'geschenke zum 4 geburtstag', 'geburtstagsgeschenk 4 jährige', 'geburtstagsgeschenk 4 jahre',
-      'weihnachtsgeschenk 4 jährige', 'geschenkideen 4 jährige', 'geschenke für vierjährige', 'geschenk ab 4 jahren', 'geschenk für 4 jährige tochter'] },
+      'weihnachtsgeschenk 4 jährige', 'geschenkideen 4 jährige', 'geschenke für vierjährige', 'geschenk ab 4 jahren', 'geschenk für 4 jährige tochter',
+      ...GIRLS['Alter-4']] },
   { name: 'Alter-5', lp: '/geschenk/geschenk-5-jahre', path: ['Geschenk', '5-Jahre'], copy: ageCopy('5-Jährige', '5 Jahre'),
     keywords: ['geschenke für jungs 5 jahre', 'geschenk für 5 jährige jungs', 'sinnvolles geschenk für 5 jährige jungs', 'geschenke für 5 jährige',
       'geschenk für 5 jährige', 'geschenk 5 jahre', 'geschenke 5 jährige', 'geschenke zum 5 geburtstag', 'weihnachtsgeschenk 5 jährige',
-      'geschenkideen 5 jährige', 'geburtstagsgeschenk 5 jährige', 'geburtstagsgeschenk 5 jahre', 'geschenk ab 5 jahre', 'geschenk für 5 jährige tochter'] },
+      'geschenkideen 5 jährige', 'geburtstagsgeschenk 5 jährige', 'geburtstagsgeschenk 5 jahre', 'geschenk ab 5 jahre', 'geschenk für 5 jährige tochter',
+      ...GIRLS['Alter-5']] },
   { name: 'Alter-6', lp: '/geschenk/geschenk-6-jahre', path: ['Geschenk', '6-Jahre'], copy: ageCopy('6-Jährige', '6 Jahre'),
     keywords: ['geschenke für jungs 6 jahre', 'kindergeschenke 6 jahre', 'geschenke 6 jährige', 'geschenk 6 jahre', 'sinnvolles geschenk für 6 jährigen',
       'mädchengeschenke 6 jahre', 'geschenke zum 6 geburtstag', 'geburtstagsgeschenk 6 jährige', 'geburtstagsgeschenk 6 jahre', 'geschenk für 6 jährigen',
@@ -77,11 +92,12 @@ const AGE_GROUPS = [
   { name: 'Alter-7-8', lp: '/geschenk/geschenk-7-8-jahre', path: ['Geschenk', '7-8-Jahre'], copy: ageCopy('7- und 8-Jährige', '7–8 Jahre'),
     keywords: ['geschenke 8 jährige jungs', 'geschenke für 7 jährige jungs', 'sinnvolle geschenke für 8 jährige jungs', 'geschenke 7 jährige', 'geschenk 7 jahre',
       'coole geschenke für 7 jährige', 'geschenke 8 jährige', 'geschenk 8 jahre', 'geschenke für jungs ab 8', 'geschenk 7 jähriger', 'sinnvolle geschenke für 8 jährige',
-      'geschenke zum 7 geburtstag', 'geschenkideen 7 jährige jungs', 'geburtstagsgeschenk 7 jährige', 'geschenk für 7 jährige tochter', 'geschenk für 8 jährige tochter'] },
+      'geschenke zum 7 geburtstag', 'geschenkideen 7 jährige jungs', 'geburtstagsgeschenk 7 jährige', 'geschenk für 7 jährige tochter', 'geschenk für 8 jährige tochter',
+      ...GIRLS['Alter-7-8']] },
   { name: 'Alter-9-10', lp: '/geschenk/fuer-kinder', path: ['Geschenk', '9-10-Jahre'], copy: ageCopy('9- und 10-Jährige', '9–10 Jahre'),
     keywords: ['geschenke für 10 jährige jungs', 'geschenke für jungs ab 10', 'sinnvolle geschenke für 9 jährige', 'sinnvolle geschenke für 9 jährige jungs',
       'geschenk 10 jährige', 'geschenke jungs 10 jahre', 'coole geschenke für 10 jährige jungs', 'geschenkideen 9 jährige jungs', 'geburtstagsgeschenk 10 jährige',
-      'coole geschenke für 9 jährige jungs'] },
+      'coole geschenke für 9 jährige jungs', ...GIRLS['Alter-9-10']] },
 ];
 
 const OCCASION_GROUPS = [
@@ -149,7 +165,7 @@ const NEGATIVES = [
   // baby as recipient
   'baby', 'taufe', 'taufgeschenk', 'neugeborene', { text: '1 geburtstag', match: 'PHRASE' }, { text: 'erster geburtstag', match: 'PHRASE' },
   // specific products, not a book
-  'spielzeug', 'spielzeuge', 'spielsachen', 'lego', 'playmobil', 'puzzle', 'kuscheltier', 'fahrrad', 'velo', 'laufrad', 'trottinett', 'tonies', 'tonie',
+  'spielzeug', 'spielzeuge', 'kinderspielzeug', 'spielsachen', 'lego', 'playmobil', 'puzzle', 'kuscheltier', 'fahrrad', 'velo', 'laufrad', 'trottinett', 'tonies', 'tonie',
   'schultüte', 'schultüten', 'inhalt', 'gastgeschenk', 'gastgeschenke', 'fotoalbum', 'montessori', 'outdoor', 'fussball', 'fußball', 'einhorn', 'kleidung', 'gymnasium',
   // competitor / licensed / retailer
   'peppa', 'bibi und tina', 'feuerwehrmann sam', 'lausemaus', 'tchibo', 'etsy', 'amazon', 'galaxus', 'manor', 'migros', 'coop',
@@ -170,6 +186,9 @@ const SPECS = {
     ...COMMON,
     name: 'Search-Cheap-Occasion-CH',
     budgetName: 'Search-Cheap-Occasion-CH-Budget',
+    // BROAD since 2026-09-27 (owner): 6 days on PHRASE, 0 impressions and no eligible auctions in Goettikind /
+    // Einschulung - the phrases were too narrow for Swiss volume, so bidding more could not help.
+    matchType: 'BROAD',
     dailyBudgetMicros: CHF(2),
     utm: 'utm_source=google&utm_medium=search&utm_campaign=cheap-occasion-ch&utm_term={keyword}',
     adGroups: OCCASION_GROUPS,

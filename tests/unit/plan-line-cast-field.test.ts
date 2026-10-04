@@ -73,7 +73,7 @@ describe('both templates actually consume their half', () => {
   });
 
   it('the Art Director templates carry the consumer placeholder', () => {
-    expect(read('scene-expansion-all.txt')).toContain('{PLAN_LINE_CAST}');
+    expect(read('scene-briefs-all.txt')).toContain('{PLAN_LINE_CAST}');
     expect(read('scene-expansion.txt')).toContain('{PLAN_LINE_CAST}');
   });
 

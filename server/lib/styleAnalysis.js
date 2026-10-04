@@ -15,6 +15,7 @@
  */
 
 const { log } = require('../utils/logger');
+const { geminiUsage } = require('./providerUsage');
 const { MODEL_DEFAULTS } = require('../config/models');
 // r2 is a leaf module (no require cycle) — `stripDataUriPrefix` is used by every
 // vision call below. It was referenced as `r2Lib` without ever being required,
@@ -105,7 +106,7 @@ Output ONLY the style description as a single paragraph (3-5 sentences) that cou
   if (!text) throw new Error('No style analysis returned');
 
   log.info(`🎨 [STYLE ANALYZE] Result: ${text.substring(0, 150)}...`);
-  return { style: text, usage: { input_tokens: data.usageMetadata?.promptTokenCount || 0, output_tokens: data.usageMetadata?.candidatesTokenCount || 0 } };
+  return { style: text, usage: geminiUsage(data.usageMetadata) };
 }
 
 /**

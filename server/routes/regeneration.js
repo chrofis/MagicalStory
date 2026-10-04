@@ -17,12 +17,14 @@ const { imageRegenerationLimiter } = require('../middleware/rateLimit');
 
 // Config
 const { CREDIT_CONFIG, CREDIT_COSTS } = require('../config/credits');
-const { calculateImageCost, formatCostSummary, MODEL_DEFAULTS, MODEL_PRICING, REPAIR_DEFAULTS, IMAGE_MODELS, TEXT_MODELS } = require('../config/models');
+const { calculateImageCost, calculateTextCost, formatCostSummary, MODEL_DEFAULTS, MODEL_PRICING, REPAIR_DEFAULTS, IMAGE_MODELS, TEXT_MODELS } = require('../config/models');
+const { sumUsage } = require('../lib/providerUsage');
 
 // Services
 const { log } = require('../utils/logger');
-const { saveStoryData, saveScenePageData, saveCoverData, rehydrateStoryImages, saveStoryImage, getStoryImage, getActiveVersion, setActiveVersion, getNextVersionIndex, getPool, dbQuery, saveStyleLabImage, getStyleLabThumbnails, getStyleLabRunImages } = require('../services/database');
+const { saveStoryData, saveScenePageData, saveCoverData, saveFinalChecksReport, rehydrateStoryImages, saveStoryImage, getStoryImage, getActiveVersion, setActiveVersion, getNextVersionIndex, getPool, dbQuery, saveStyleLabImage, getStyleLabThumbnails, getStyleLabRunImages } = require('../services/database');
 const { PROMPT_TEMPLATES, fillTemplate, assertPromptFilled } = require('../services/prompts');
+const { chargeCredits } = require('../lib/jobCredits');
 
 // Shared repair logic
 const { findBadPages, selectCharRepairTasks } = require('../lib/repairLogic');
@@ -64,6 +66,8 @@ async function stampCanonicalScore(version, imageResult, opts = {}) {
     threeStageResult: imageResult.threeStageResult || null,
     // The required lettering the judges saw — the consolidator must see it too.
     requiredTexts: imageResult.requiredTexts || [],
+    // The scene the judges scored — the consolidator reads this, not the brief.
+    judgedPrompt: imageResult.judgedPrompt || null,
   } : null;
   const entityResult = (opts.entityIssues || opts.entityPenalty != null)
     ? { issues: opts.entityIssues || [], penalty: opts.entityPenalty || 0 }
@@ -134,6 +138,7 @@ const {
   evaluateImageQuality,
   editImageWithPrompt,
   buildInpaintInstruction,
+  buildElementSizeClauseForRepair,
   deleteFromImageCache,
   generateImageCacheKey,
   iteratePageCore,
@@ -164,6 +169,7 @@ const { hasPhotos: hasCharacterPhotos, getStandardAvatar } = require('../lib/cha
 const { isGrokConfigured } = require('../lib/grok');
 const { coverKeyToType, coverTypeToKey, coverLabel, COVER_PAGE_NUMBERS } = require('../lib/coverKeys');
 const { buildStoryEvalOptions } = require('../lib/evalReplayInputs');
+const { resolveCoverEvalImage, applyCoverEvalView, loadCoverArtForRepair, restampRepairedCover } = require('../lib/coverEvalLayer');
 const r2 = require('../lib/r2');
 
 // Cover type ↔ virtual page number mapping
@@ -172,6 +178,28 @@ const COVER_TYPE_TO_PAGE = { frontCover: -1, initialPage: -2, backCover: -3 };
 function isCoverPage(pageNumber) { return pageNumber < 0; }
 function getCoverType(pageNumber) { return COVER_PAGE_MAP[String(pageNumber)]; }
 function getCoverData(storyData, coverType) { return storyData.coverImages?.[coverType]; }
+
+/**
+ * Persist ONLY the named pages/covers, each atomically (saveScenePageData /
+ * saveCoverData = jsonb_set on that one entry). The repair-workflow routes read
+ * the story at request start and then run for minutes; a whole-blob
+ * saveStoryData from that snapshot wrote every OTHER page back as it was then,
+ * reverting any repair saved in between (code review 2026-10 B5; same class as
+ * bug cover-save-clobbers-scene-page). A page that is not in the stored story
+ * is logged as an error, never rescued by a whole-blob save.
+ */
+async function savePagesAtomically(id, storyData, pageNumbers, tag) {
+  for (const pageNumber of pageNumbers) {
+    try {
+      const ok = isCoverPage(pageNumber)
+        ? await saveCoverData(id, getCoverType(pageNumber), getCoverData(storyData, getCoverType(pageNumber)))
+        : await saveScenePageData(id, pageNumber, storyData.sceneImages.find(sc => sc.pageNumber === pageNumber));
+      if (!ok) log.error(`❌ [${tag}] ${id} page ${pageNumber}: not found in the stored story, change not saved`);
+    } catch (saveErr) {
+      log.error(`❌ [${tag}] ${id} page ${pageNumber}: failed to save: ${saveErr.message}`);
+    }
+  }
+}
 
 // Look up a scene image or cover image by page number
 function findSceneOrCover(sData, pageNum) {
@@ -269,12 +297,6 @@ async function rehydrateActivePageImage(storyId, storyData, pageNumber) {
   return storyData;
 }
 
-// Calculate token-based API cost for Gemini models
-function calculateTokenCost(modelId, inputTokens, outputTokens) {
-  const pricing = MODEL_PRICING[modelId] || { input: 0.10, output: 0.40 };
-  if (pricing.perImage) return 0; // Image models use per-image pricing
-  return ((inputTokens / 1_000_000) * pricing.input) + ((outputTokens / 1_000_000) * pricing.output);
-}
 
 // Atomically add repair cost to story analytics
 async function addRepairCost(storyId, cost, stepName) {
@@ -1019,9 +1041,11 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
       [id, [String(pageNumber)], JSON.stringify(imagePrompt)]
     );
 
-    // Active version is picked by recomputeAllActiveVersions inside
-    // saveScenePageData/saveStoryData (best score wins) — no explicit
-    // setActiveVersion needed here.
+    // The user paid for THIS render: pin it. Left to recomputeAllActiveVersions
+    // (best score wins) a lower-scoring new render would lose to an older version and
+    // reloads, PDF and print would show the old picture (decisions.md: every
+    // interactive flow PINS its choice). Newest row = MAX(version_index) after the save.
+    await setActiveVersion(id, `${pageNumber}`, (await getNextVersionIndex(id, 'scene', pageNumber)) - 1, { pinned: true });
 
     // Deduct credits after successful generation (skip for infinite credits or impersonating admin)
     // Atomic deduct with a balance floor (BILL-1): the pre-check ran before the long
@@ -1029,21 +1053,15 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
     // prevents driving the balance negative and gives us the true post-balance.
     let newCredits = hasInfiniteCredits ? -1 : userCredits - creditCost;
     if (!hasInfiniteCredits) {
-      const deduct = await getDbPool().query(
-        'UPDATE users SET credits = credits - $1 WHERE id = $2 AND credits >= $1 RETURNING credits',
-        [creditCost, req.user.id]
-      );
-      if (deduct.rows.length === 0) {
+      const charge = await chargeCredits(getDbPool(), {
+        userId: req.user.id, cost: creditCost, transactionType: 'image_regeneration',
+        description: `Regenerate image for page ${pageNumber}`,
+      });
+      if (!charge.charged) {
         newCredits = userCredits - creditCost;
         log.warn(`⚠️ [BILL-1] Image regen for user ${req.user.id} completed but credits not charged (balance raced below ${creditCost})`);
       } else {
-        newCredits = deduct.rows[0].credits;
-        // Log credit transaction with the real post-deduction balance
-        await getDbPool().query(
-          `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, description)
-           VALUES ($1, $2, $3, 'image_regeneration', $4)`,
-          [req.user.id, -creditCost, newCredits, `Regenerate image for page ${pageNumber}`]
-        );
+        newCredits = charge.credits;
         log.info(`✅ Image regenerated for story ${id}, page ${pageNumber} (quality: ${imageResult.score}, cost: ${creditCost} credits, remaining: ${newCredits})`);
       }
     } else if (isImpersonating) {
@@ -1270,46 +1288,14 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
     // figure's intended facing direction on this page. Falls through when
     // the story doesn't yet have a sheet for the character.
     if (useStorySheetCells && storyData?.characterAvatars && Array.isArray(refApplied.characterPhotos)) {
-      const { cropAvatarCell } = require('../lib/sceneComposite');
+      const sav = require('../lib/storyAvatars');
       const metaChars = sceneMetadata?.fullData?.characters || sceneMetadata?.characters || [];
-      // Shared resolver — beats metadata carries `perspective` prose, not
-      // `pose`; the inline copy here served threeQuarter to every declared
-      // back-view figure.
-      const { resolveCellPose, resolveSheetForRef, wornResolvedForPage } = require('../lib/storyAvatars');
-      // Wardrobe state — same sheet choice as generation and as the other two
-      // repair entry points; never a fourth inline copy of the lookup.
-      const wornResolved = wornResolvedForPage(visualBible, sceneMetadata, metaChars, pageNumber);
-      const poseByName = new Map();
-      for (const sc of metaChars) {
-        const nm = (typeof sc === 'string' ? sc : sc?.name) || '';
-        if (!nm) continue;
-        poseByName.set(nm.toLowerCase(), resolveCellPose(sc));
-      }
-      for (const ref of refApplied.characterPhotos) {
-        const charName = ref.name;
-        if (!charName) continue;
-        const story = storyData.characterAvatars[charName];
-        if (!story) continue;
-        // Shared resolver (slot mapping + wardrobe state + loud costumed fallback).
-        const resolved = resolveSheetForRef(story, ref, { wornResolved });
-        if (!resolved) continue;
-        const { uri: sheetUri, slotKey } = resolved;
-        const pf = poseByName.get(charName.toLowerCase()) || { pose: 'threeQuarter', flip: false, depth: 'foreground' };
-        const includeFace = pf.depth === 'foreground';
-        try {
-          const { body, stacked } = await cropAvatarCell(sheetUri, { pose: pf.pose, flip: pf.flip, includeFace, stack: includeFace });
-          const buf = stacked || body;
-          ref.photoUrl = `data:image/png;base64,${buf.toString('base64')}`;
-          ref.photoType = `cell-${pf.pose}${pf.flip ? '-flip' : ''}${includeFace ? '-headbody' : ''}`;
-          ref.cellPose = pf.pose;
-          ref.cellFlip = pf.flip;
-          ref.cellDepth = pf.depth;
-          ref.cellIncludesFace = includeFace;
-          log.debug(`[CELL REFS] ${charName}: cropped ${pf.pose}${pf.flip ? ' flipped' : ''}${includeFace ? ' + head' : ''} (depth=${pf.depth}) from ${slotKey}`);
-        } catch (err) {
-          log.warn(`[CELL REFS] crop failed for ${charName}: ${err.message}`);
-        }
-      }
+      // The one shared cell-crop (code review 2026-10 C3): same sheet, wardrobe
+      // state and close-up head crop as generation and the other repair entries.
+      await sav.applyStoryCellRefs(refApplied.characterPhotos, storyData.characterAvatars, metaChars, {
+        closeUp: sceneMetadata?.fullData?.shot === 'close-up',
+        wornResolved: sav.wornResolvedForPage(visualBible, sceneMetadata, metaChars, pageNumber),
+      });
     }
     // Snapshot of inputs that every model in this run was given. Surfaced in
     // the response so the panel can show "what was sent to the model" next to
@@ -1451,8 +1437,9 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
           // Strip scene prose from the brief (same logic as server.js).
           const rawBrief = pageData.prompt || '';
           const headerIdx = rawBrief.search(/\*\*(THIS IMAGE DEPICTS|Clothing|HEIGHT ORDER|REQUIRED OBJECTS|ERFORDERLICHE OBJEKTE|OBJETS REQUIS)/i);
-          let compositeBrief = headerIdx >= 0 ? rawBrief.slice(headerIdx).trim() : rawBrief;
-          if (compositeBrief.length > 5500) compositeBrief = compositeBrief.slice(0, 5500).trim();
+          // No pre-slice: the composite prompt builder trims the brief to the
+          // Grok cap itself (a blind 5,500-char cut here dated from the 8,000 cap).
+          const compositeBrief = headerIdx >= 0 ? rawBrief.slice(headerIdx).trim() : rawBrief;
           // VB grid normalisation — buildVisualBibleGrid returns Buffer here.
           const vbGridUri = Buffer.isBuffer(visualBibleGrid)
             ? `data:image/jpeg;base64,${visualBibleGrid.toString('base64')}`
@@ -1594,10 +1581,10 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
           const vbGridUri = Buffer.isBuffer(refs.visualBibleGrid)
             ? `data:image/jpeg;base64,${refs.visualBibleGrid.toString('base64')}`
             : (typeof refs.visualBibleGrid === 'string' && refs.visualBibleGrid ? refs.visualBibleGrid : null);
-          // Composite brief: use cover prompt if available; trimmed to
-          // BLEND_PROMPT_HARD_CAP room (the prompt builder trims again).
+          // Composite brief: the cover prompt, untrimmed — the composite prompt
+          // builder trims it to the Grok cap.
           const coverPrompt = storyData.coverImages?.[coverType]?.prompt || '';
-          const compositeBrief = coverPrompt.length > 5500 ? coverPrompt.slice(0, 5500).trim() : coverPrompt;
+          const compositeBrief = coverPrompt;
           const compResult = await generateSceneComposite({
             cleanBackgroundPrompt: refs.sceneMetadata?.emptyScenePrompt
               || storyData.coverImages?.[coverType]?.description
@@ -1682,10 +1669,13 @@ router.post('/:id/style-check', authenticateToken, async (req, res) => {
     const story = storyResult.rows[0];
     let storyData = typeof story.data === 'string' ? JSON.parse(story.data) : story.data;
     storyData = await rehydrateStoryImages(id, storyData);
+    // Covers are judged on their textless art (coverEvalLayer.js); a stamped
+    // cover with no art layer is left out and named in the response.
+    const { notEvaluated: coversNotEvaluated } = await applyCoverEvalView(id, storyData);
 
     const { checkStoryStyleConsistency } = require('../lib/styleConsistency');
     const result = await checkStoryStyleConsistency(storyData);
-    res.json({ success: true, ...result });
+    res.json({ success: true, ...result, coversNotEvaluated });
   } catch (err) {
     log.error('Error in style-check:', err);
     res.status(500).json({ error: 'Style check failed: ' + err.message });
@@ -2412,6 +2402,10 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       const freshCharData = freshCharResult.rows[0]?.data || {};
       const freshCharacters = freshCharData.characters || [];
 
+      // COVER tier, not the page/edit tier (code review 2026-10 A2): a trial back
+      // cover used to reach generateImageOnly with no model and fall to
+      // MODEL_DEFAULTS.pageImage. Passed to the render AND used for the booking.
+      const coverImageModelId = imageModel || MODEL_DEFAULTS.coverImage;
       let imageResult;
       if (coverPath === 'page') {
         // Same avatar re-hydration the page branch does below.
@@ -2429,7 +2423,7 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       } else {
         const { iterateCover } = require('../lib/coverIterate');
         imageResult = await iterateCover(coverKey, storyData, {
-          imageModel: imageModel || null,
+          imageModel: coverImageModelId,
           evaluationFeedback,
           useOriginalAsReference: !!useOriginalAsReference,
           blackoutIssues: !!blackoutIssues,
@@ -2443,7 +2437,7 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       // cover record carry the rewrite, exactly as a page's do.
       const sceneDescription = coverPath === 'page'
         ? imageResult.newScene
-        : (existingCover.description || 'A beautiful illustrated cover page.');
+        : existingCover.description; // iterateCover throws when it is missing (A5)
 
       const previousImageData = imageResult.previousImage;
       const previousScore = imageResult.previousScore;
@@ -2451,7 +2445,6 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       const coverLandmarkPhotos = []; // Covers don't use landmark photos
       const coverVbGrid = null; // No VB grid for covers
       const coverPrompt = imageResult.prompt;
-      const coverImageModelId = imageModel || MODEL_DEFAULTS.coverImage;
 
       log.info(`🔄 [ITERATE] Cover ${coverKey}: New image generated (score: ${imageResult.score}, attempts: ${imageResult.totalAttempts})`);
 
@@ -2603,17 +2596,15 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       await setActiveVersion(id, coverKey, newVersionIndex, { pinned: true });
 
       // Deduct credits if not unlimited
+      // BILL-1: atomic debit, ledger row only when the debit matched a row.
       let newCredits = hasInfiniteCredits ? -1 : userCredits - creditCost;
       if (!hasInfiniteCredits) {
-        await getDbPool().query(
-          'UPDATE users SET credits = credits - $1 WHERE id = $2 AND credits >= $1',
-          [creditCost, req.user.id]
-        );
-        await getDbPool().query(
-          `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, description)
-           VALUES ($1, $2, $3, 'image_iteration', $4)`,
-          [req.user.id, -creditCost, newCredits, `Iterate cover ${coverKey}`]
-        );
+        const charge = await chargeCredits(getDbPool(), {
+          userId: req.user.id, cost: creditCost, transactionType: 'image_iteration',
+          description: `Iterate cover ${coverKey}`,
+        });
+        if (charge.charged) newCredits = charge.credits;
+        else log.warn(`⚠️ [BILL-1] Cover iterate for user ${req.user.id} completed but credits not charged (balance raced below ${creditCost})`);
       }
 
       log.info(`✅ [ITERATE] Cover ${coverKey}: Iteration complete (score: ${imageResult.score})`);
@@ -2650,7 +2641,7 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       }));
 
       // Persist repair cost in background (fire before return so it's not skipped)
-      const coverIterateCost = calculateImageCost(coverImageModelId, imageResult.totalAttempts || 1);
+      const coverIterateCost = calculateImageCost(imageResult.modelId || coverImageModelId, imageResult.totalAttempts || 1);
       addRepairCost(id, coverIterateCost, `Iterate cover ${coverKey}`).catch(err => log.error('Failed to save cover iterate cost:', err.message));
 
       return res.json({
@@ -2968,17 +2959,15 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
     await setActiveVersion(id, `${pageNumber}`, iterateNewVersionIndex, { pinned: true });
 
     // Deduct credits if not unlimited
+    // BILL-1: atomic debit, ledger row only when the debit matched a row.
     let newCredits = hasInfiniteCredits ? -1 : userCredits - creditCost;
     if (!hasInfiniteCredits) {
-      await getDbPool().query(
-        'UPDATE users SET credits = credits - $1 WHERE id = $2 AND credits >= $1',
-        [creditCost, req.user.id]
-      );
-      await getDbPool().query(
-        `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, description)
-         VALUES ($1, $2, $3, 'image_iteration', $4)`,
-        [req.user.id, -creditCost, newCredits, `Iterate image for page ${pageNumber}`]
-      );
+      const charge = await chargeCredits(getDbPool(), {
+        userId: req.user.id, cost: creditCost, transactionType: 'image_iteration',
+        description: `Iterate image for page ${pageNumber}`,
+      });
+      if (charge.charged) newCredits = charge.credits;
+      else log.warn(`⚠️ [BILL-1] Page iterate for user ${req.user.id} completed but credits not charged (balance raced below ${creditCost})`);
     }
 
     log.info(`✅ [ITERATE] Page ${pageNumber}: Iteration complete (${previewMismatches.length} mismatches addressed, score: ${iterResult.score})`);
@@ -3371,6 +3360,7 @@ router.post('/:id/regenerate/cover/:coverType', authenticateToken, imageRegenera
         sceneCharacters: iterResult.newSceneCharacters || existingCover.sceneCharacters || null,
         compressedScene: iterResult.compressedScene || null,
         outlineExtract: existingCover.outlineExtract || null,
+        jevFixed: existingCover.jevFixed || null,
         perCharClothing: existingCover.perCharClothing || null,
         titleBaked: existingCover.titleBaked === true,
         emptySceneImage: existingCover.emptySceneImage || null,
@@ -3425,20 +3415,15 @@ router.post('/:id/regenerate/cover/:coverType', authenticateToken, imageRegenera
     // concurrent purchase/deduction. Decrement relatively and use the real balance.
     let newCredits = hasInfiniteCredits ? -1 : userCredits - requiredCredits;
     if (!hasInfiniteCredits) {
-      const deduct = await getDbPool().query(
-        'UPDATE users SET credits = credits - $1 WHERE id = $2 AND credits >= $1 RETURNING credits',
-        [requiredCredits, req.user.id]
-      );
-      if (deduct.rows.length === 0) {
+      const charge = await chargeCredits(getDbPool(), {
+        userId: req.user.id, cost: requiredCredits, transactionType: 'cover_regeneration',
+        description: `Regenerated ${normalizedCoverType} cover for story ${id}`,
+      });
+      if (!charge.charged) {
         newCredits = userCredits - requiredCredits;
         log.warn(`⚠️ [BILL-2] Cover regen for user ${req.user.id} completed but credits not charged (balance raced below ${requiredCredits})`);
       } else {
-        newCredits = deduct.rows[0].credits;
-        await getDbPool().query(
-          `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, description)
-           VALUES ($1, $2, $3, $4, $5)`,
-          [req.user.id, -requiredCredits, newCredits, 'cover_regeneration', `Regenerated ${normalizedCoverType} cover for story ${id}`]
-        );
+        newCredits = charge.credits;
         log.info(`✅ ${normalizedCoverType} cover regenerated for story ${id} (score: ${coverResult.score}, credits: ${requiredCredits} used, ${newCredits} remaining)`);
       }
     } else if (isImpersonating) {
@@ -3657,26 +3642,21 @@ router.post('/:id/edit/image/:pageNum', authenticateToken, imageRegenerationLimi
       if (!savedAtomically) {
         await saveStoryData(id, storyData);
       }
+      // Paid edit: pin the new version (same contract as the sibling cover edit/regen
+      // routes) — an unpinned lower-scoring edit loses to an older version on reload.
+      await setActiveVersion(id, `${pageNumber}`, (await getNextVersionIndex(id, 'scene', pageNumber)) - 1, { pinned: true });
     }
 
     // Deduct after a successful edit only — same atomic-with-floor pattern as
     // the regenerate route (BILL-1): the pre-check ran before a long AI call.
     let newCredits = hasInfiniteCredits ? -1 : userCredits - creditCost;
     if (!hasInfiniteCredits) {
-      const deduct = await getDbPool().query(
-        'UPDATE users SET credits = credits - $1 WHERE id = $2 AND credits >= $1 RETURNING credits',
-        [creditCost, req.user.id]
-      );
-      if (deduct.rows.length === 0) {
-        log.warn(`⚠️ [BILL-1] Image edit for user ${req.user.id} completed but credits not charged (balance raced below ${creditCost})`);
-      } else {
-        newCredits = deduct.rows[0].credits;
-        await getDbPool().query(
-          `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, description)
-           VALUES ($1, $2, $3, 'image_regeneration', $4)`,
-          [req.user.id, -creditCost, newCredits, `Edit image for page ${pageNumber}`]
-        );
-      }
+      const charge = await chargeCredits(getDbPool(), {
+        userId: req.user.id, cost: creditCost, transactionType: 'image_regeneration',
+        description: `Edit image for page ${pageNumber}`,
+      });
+      if (charge.charged) newCredits = charge.credits;
+      else log.warn(`⚠️ [BILL-1] Image edit for user ${req.user.id} completed but credits not charged (balance raced below ${creditCost})`);
     }
 
     log.info(`✅ Image edited for story ${id}, page ${pageNumber} (new score: ${qualityScore}, cost: ${creditCost} credits)`);
@@ -3854,8 +3834,19 @@ router.post('/:id/repair/image/:pageNum', authenticateToken, imageRegenerationLi
           });
           // The same instruction builder as the pipeline inpaint (images.js),
           // so this edit carries the page's declared light like every other.
+          // The size every cited creature, object and vehicle keeps
+          // (2026-09-26) — the same clause, from the same builder, as the
+          // pipeline inpaint.
+          const sizeClause = buildElementSizeClauseForRepair({
+            visualBible: storyData.visualBible || null,
+            sceneMetadata: currentScene.sceneMetadata
+              || require('../lib/sceneMetadata').extractSceneMetadata(currentScene.sceneDescription || currentScene.description || ''),
+            characters: storyData.characters || [],
+            nameMap: repairNames,
+          });
           const sentInstruction = buildInpaintInstruction({
             editInstruction: sanitizeIssueForInpaint(nameRepairText(editInstruction, repairNames)),
+            sizeClause,
             sceneDescription: repairEvalSceneHint,
           });
           const editResult = await editImageWithPrompt(currentImageData, sentInstruction);
@@ -4086,17 +4077,22 @@ router.post('/:id/repair/image/:pageNum', authenticateToken, imageRegenerationLi
 // =============================================================================
 
 // Step 4: Re-evaluate pages
-router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, res) => {
+router.post('/:id/repair-workflow/re-evaluate', authenticateToken, imageRegenerationLimiter, async (req, res) => {
   try {
     const { id } = req.params;
-    const { pageNumbers, qualityModelOverride, scoreThreshold } = req.body;
+    const { qualityModelOverride, scoreThreshold } = req.body;
+    const requestedPageNumbers = req.body.pageNumbers;
 
-    if (!pageNumbers || !Array.isArray(pageNumbers) || pageNumbers.length === 0) {
+    if (!requestedPageNumbers || !Array.isArray(requestedPageNumbers) || requestedPageNumbers.length === 0) {
       return res.status(400).json({ error: 'pageNumbers array is required' });
     }
-    if (!pageNumbers.every(n => Number.isInteger(n))) {
+    if (!requestedPageNumbers.every(n => Number.isInteger(n))) {
       return res.status(400).json({ error: 'All pageNumbers must be integers' });
     }
+    // One paid evaluation per distinct page: `[1,1,1,...]` used to run one Gemini
+    // eval per entry (code review 2026-10 B4). The cap against the story's own page
+    // count is applied once the story is loaded below.
+    const pageNumbers = [...new Set(requestedPageNumbers)];
     // Validate qualityModelOverride against a bbox-capable eval allowlist. It is
     // interpolated raw into the Gemini API URL, so an unvalidated value on this
     // non-admin endpoint allowed arbitrary (expensive) model spend + path
@@ -4117,6 +4113,12 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
 
     const story = storyResult.rows[0];
     let storyData = typeof story.data === 'string' ? JSON.parse(story.data) : story.data;
+
+    // The story's own pages + its three covers are the most this can evaluate.
+    const maxEvaluablePages = (storyData.sceneImages?.length || 0) + 3;
+    if (pageNumbers.length > maxEvaluablePages) {
+      return res.status(400).json({ error: `pageNumbers lists ${pageNumbers.length} distinct pages, but the story has at most ${maxEvaluablePages}` });
+    }
 
     // Rehydrate images from story_images table (they're stripped from JSON on save)
     storyData = await rehydrateStoryImages(id, storyData);
@@ -4164,7 +4166,20 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
       try {
         // Get image data - look up active version from DB, then fallback to scene.imageData
         let imageData = scene.imageData;
-        if (scene.imageVersions?.length > 0) {
+        if (evaluationType === 'cover') {
+          // A cover is judged on the TEXTLESS art of its active version, never
+          // on the served bytes with the app's title / dedication /
+          // "magicalstory.ch" stamped on (coverEvalLayer.js). A stamped cover
+          // with no art layer is not judged.
+          try {
+            imageData = (await resolveCoverEvalImage(id, versionType, null)).imageData;
+          } catch (layerErr) {
+            if (layerErr.code !== 'NO_ART_LAYER') throw layerErr;
+            log.error(`❌ [REPAIR-WORKFLOW] ${pageLabel}: ${layerErr.message}`);
+            pages[pageNumber] = { qualityScore: null, fixableIssues: [], error: layerErr.message };
+            return;
+          }
+        } else if (scene.imageVersions?.length > 0) {
           const activeDbIndex = await getActiveVersion(id, versionKey);
           const activeVersion = scene.imageVersions?.[arrayIndexForDb(scene.imageVersions, activeDbIndex, versionType)];
           if (activeVersion?.imageData) {
@@ -4384,22 +4399,22 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
     })));
 
     // Calculate cost before responding
-    let totalInput = 0, totalOutput = 0;
-    for (const pageData of Object.values(pages)) {
-      if (pageData.usage) {
-        totalInput += pageData.usage.input_tokens || 0;
-        totalOutput += pageData.usage.output_tokens || 0;
-      }
-    }
     const evalModel = qualityModelOverride || 'gemini-2.5-flash';
-    const apiCost = calculateTokenCost(evalModel, totalInput, totalOutput);
+    const apiCost = calculateTextCost(evalModel, sumUsage(Object.values(pages).map(p => p.usage)));
 
     log.info(`✅ [REPAIR-WORKFLOW] Re-evaluation complete for ${Object.keys(pages).length} pages`);
     const badPages = findBadPages(pages, scoreThreshold ? { scoreThreshold } : {});
     res.json({ pages, badPages, apiCost });
 
-    // Save to DB in background (don't block the response)
-    saveStoryData(id, storyData).catch(err => log.error('Failed to save re-evaluation:', err.message));
+    // Save to DB in background (don't block the response). PER PAGE, atomically
+    // (saveScenePageData / saveCoverData = jsonb_set on that one entry): this
+    // evaluation can take minutes, and a whole-blob saveStoryData from the snapshot
+    // read at request start wrote every OTHER page back as it was then, reverting
+    // any repair saved in between (code review 2026-10 B5; same class as bug
+    // cover-save-clobbers-scene-page). Only pages that were actually re-scored are written.
+    savePagesAtomically(id, storyData,
+      Object.entries(pages).filter(([, result]) => result && !result.error).map(([pn]) => Number(pn)),
+      'RE-EVALUATE');
     addRepairCost(id, apiCost, 'Re-evaluate').catch(err => log.error('Failed to save re-eval cost:', err.message));
   } catch (err) {
     log.error('❌ [RE-EVALUATE] Failed to re-evaluate pages:', err);
@@ -4474,9 +4489,19 @@ router.post('/:id/evaluate-single/:pageNum', authenticateToken, async (req, res)
       return res.status(404).json({ error: `Page ${pageNumber} not found` });
     }
 
-    // Get active version's image data
+    // Get active version's image data. A cover: the TEXTLESS art of its active
+    // version (coverEvalLayer.js) — every judge below reads this one image, so
+    // none of them sees the app's stamped title / dedication / brand line.
     let imageData = scene.imageData;
-    if (scene.imageVersions?.length > 0) {
+    if (evaluationType === 'cover') {
+      try {
+        imageData = (await resolveCoverEvalImage(id, versionType, null)).imageData;
+      } catch (layerErr) {
+        if (layerErr.code !== 'NO_ART_LAYER') throw layerErr;
+        log.error(`❌ [EVAL-SINGLE] ${pageLabel}: ${layerErr.message}`);
+        return res.status(409).json({ error: layerErr.message });
+      }
+    } else if (scene.imageVersions?.length > 0) {
       const activeDbIndex = await getActiveVersion(id, versionKey);
       const activeVersion = scene.imageVersions?.[arrayIndexForDb(scene.imageVersions, activeDbIndex, versionType)];
       if (activeVersion?.imageData) {
@@ -5170,7 +5195,7 @@ router.post('/:id/iterate-bbox/:pageNum', authenticateToken, async (req, res) =>
 });
 
 // Step 5: Run entity consistency check
-router.post('/:id/repair-workflow/consistency-check', authenticateToken, async (req, res) => {
+router.post('/:id/repair-workflow/consistency-check', authenticateToken, imageRegenerationLimiter, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -5188,10 +5213,15 @@ router.post('/:id/repair-workflow/consistency-check', authenticateToken, async (
 
     // Rehydrate image data into a COPY for crop extraction (don't modify original)
     const rehydratedData = await rehydrateStoryImages(id, JSON.parse(JSON.stringify(storyData)));
+    // Covers are judged on their textless art (coverEvalLayer.js), on this
+    // eval-only copy. A stamped cover with no art layer is left out of the
+    // check (logged) and named in the response.
+    const { notEvaluated: coversNotEvaluated, servedByKey: coverServedBytes } = await applyCoverEvalView(id, rehydratedData);
 
     // Run entity consistency check with rehydrated data
     const characters = rehydratedData.characters || [];
     const report = await runEntityConsistencyChecks(rehydratedData, characters);
+    if (coversNotEvaluated.length) report.coversNotEvaluated = coversNotEvaluated;
 
     // Save any newly-generated bboxDetection back to the original storyData
     // so it's cached in retryHistory for next time (avoids redundant API calls)
@@ -5203,6 +5233,13 @@ router.post('/:id/repair-workflow/consistency-check', authenticateToken, async (
         for (const [coverType, bbox] of Object.entries(report.coverBboxDetections)) {
           const cover = storyData.coverImages[coverType];
           if (!cover) continue;
+          // This detection ran on the textless art; the stored one pairs with
+          // the SERVED (stamped) bytes. The stamp moves no figure, so re-point
+          // its fingerprint (the cover-text exception of
+          // restampDetectionForCoverText).
+          if (coverServedBytes[coverType]) {
+            require('../lib/bboxDetection').restampDetectionForCoverText(bbox, coverServedBytes[coverType]);
+          }
           cover.bboxDetection = bbox;
           if (cover.imageVersions?.length > 0) {
             // Active version from image_version_meta (single source of truth).
@@ -5290,14 +5327,20 @@ router.post('/:id/repair-workflow/consistency-check', authenticateToken, async (
       report.overallConsistent !== false && (report.totalIssues || 0) + legacyIssues === 0;
 
     // Calculate cost before responding
-    const { inputTokens = 0, outputTokens = 0, model: checkModel } = report.tokenUsage || {};
-    const apiCost = calculateTokenCost(checkModel || 'gemini-2.5-flash', inputTokens, outputTokens);
+    const { inputTokens = 0, outputTokens = 0, thinkingTokens = 0, model: checkModel } = report.tokenUsage || {};
+    const apiCost = calculateTextCost(checkModel || 'gemini-2.5-flash', { input_tokens: inputTokens, output_tokens: outputTokens, thinking_tokens: thinkingTokens });
 
     log.info(`✅ [REPAIR-WORKFLOW] Consistency check complete: ${report.totalIssues} issues found`);
     res.json({ report, apiCost });
 
-    // Save to DB in background (don't block the response)
-    saveStoryData(id, storyData).catch(err => log.error('Failed to save entity report:', err.message));
+    // Save to DB in background (don't block the response). The check runs for
+    // minutes, so the whole-blob save is out: the report goes through its own
+    // jsonb_set and only the pages whose fresh bbox detection was cached are
+    // written, each atomically (batch 8, B5 class).
+    saveFinalChecksReport(id, storyData.finalChecksReport)
+      .then(ok => { if (!ok) log.error(`❌ [CONSISTENCY-CHECK] ${id}: story not found, entity report not saved`); })
+      .catch(err => log.error('Failed to save entity report:', err.message));
+    if (report.pagesWithNewBbox?.length > 0) savePagesAtomically(id, storyData, report.pagesWithNewBbox, 'CONSISTENCY-CHECK');
     addRepairCost(id, apiCost, 'Consistency check').catch(err => log.error('Failed to save repair cost:', err.message));
   } catch (err) {
     log.error('Error in consistency check:', err);
@@ -5412,8 +5455,12 @@ router.post('/:id/repair-workflow/pick-best-versions', authenticateToken, async 
     log.info(`✅ [REPAIR-WORKFLOW] Pick-best complete: ${Object.values(results).filter(r => r.switched).length} pages switched`);
     res.json({ results });
 
-    // Save to DB in background (don't block the response)
-    saveStoryData(id, storyData).catch(err => log.error('Failed to save pick-best:', err.message));
+    // Save to DB in background (don't block the response). Only the pages whose
+    // active version switched were changed (syncVersionToRoot), so only those are
+    // written, each atomically.
+    savePagesAtomically(id, storyData,
+      Object.entries(results).filter(([, r]) => r.switched).map(([pn]) => Number(pn)),
+      'PICK-BEST');
   } catch (err) {
     log.error('❌ [REPAIR-WORKFLOW] Failed to pick best versions:', err);
     const isAdmin = req.user?.role === 'admin' || req.user?.impersonating;
@@ -5509,12 +5556,22 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
       }
     }
 
+    // The charge is per repaired page, so the pre-check must cover every requested page
+    // (a one-page pre-check let a multi-page / autoSelect call repair for free).
+    const requestedRepairPages = repairs.reduce((n, r) => n + (Array.isArray(r.pages) ? r.pages.length : 0), 0);
+    if (!hasInfiniteCredits && userCredits < requestedRepairPages * creditCost) {
+      return res.status(402).json({
+        error: 'Insufficient credits',
+        required: requestedRepairPages * creditCost,
+        available: userCredits
+      });
+    }
+
     const repairMethod = useGeminiRepair ? 'Gemini' : grokRepairMode ? `Grok ${grokRepairMode}` : useMagicApiRepair ? 'MagicAPI' : isGrokConfigured() ? 'Grok blended' : 'Gemini';
     log.info(`👤 [REPAIR-WORKFLOW] Starting character repair for story ${id} using ${repairMethod}`);
 
     const results = [];
     let totalGeminiRepairs = 0, totalMagicApiRepairs = 0, totalGrokRepairs = 0;
-    let totalVerifyTokensIn = 0, totalVerifyTokensOut = 0;
     const artStyle = storyData.artStyle || 'pixar';
 
     // Flatten all (character, page) pairs into parallel repair tasks
@@ -5605,6 +5662,33 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
     const multiCharPages = [...tasksByPage.values()].filter(t => t.length > 1).length;
     log.info(`🔧 [REPAIR-WORKFLOW] Running ${repairTasks.length} repair tasks across ${tasksByPage.size} pages (${multiCharPages} pages with multiple characters — sequential within page)...`);
 
+    // A COVER IS REPAIRED ON ITS TEXTLESS ART, THEN RESTAMPED (owner,
+    // 2026-09-26). The served cover carries the app's title / dedication /
+    // "magicalstory.ch"; repairing those pixels bakes the stamp into a version
+    // that then gets no art row and no restamp. Every repair method below reads
+    // the cover through findSceneOrCover, so the in-memory cover takes the art
+    // of its active version here (the top-level bytes of a stored story are
+    // never persisted, and Phase 2 re-reads the story anyway). Its detection is
+    // re-pointed at the art on a clone (the stamp moves no figure). A stamped
+    // cover without its art layer is refused.
+    const coverRepair = new Map();   // coverKey -> { restamp }
+    const coverRefused = new Map();  // pageNumber -> reason
+    for (const pageNumber of tasksByPage.keys()) {
+      if (pageNumber >= 0) continue;
+      const coverKey = getCoverType(pageNumber);
+      const cover = storyData.coverImages?.[coverKey];
+      if (!cover) continue;
+      try {
+        const prep = await loadCoverArtForRepair(id, coverKey, cover);
+        coverRepair.set(coverKey, prep);
+        log.info(`🅰️ [CHAR REPAIR] ${coverKey}: repairing v${prep.versionIndex} ${prep.restamp ? 'textless art layer (restamped after)' : 'unstamped render'}`);
+      } catch (layerErr) {
+        if (layerErr.code !== 'NO_ART_LAYER') throw layerErr;
+        log.error(`❌ [CHAR REPAIR] ${layerErr.message}`);
+        coverRefused.set(pageNumber, layerErr.message);
+      }
+    }
+
     const repairLimit = pLimit(50);
     // Each "unit" is one page — characters on that page run sequentially
     const apiResults = (await Promise.all([...tasksByPage.entries()].map(([pageNumber, pageTasks]) => repairLimit(async () => {
@@ -5628,6 +5712,9 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
         }
         const result = await (async () => {
       const { characterName, character, pageNumber, charIssues } = task;
+      if (coverRefused.has(pageNumber)) {
+        return { task, error: true, failReason: coverRefused.get(pageNumber), rejectedReason: 'no_art_layer' };
+      }
       try {
         log.info(`🔧 [REPAIR-WORKFLOW] Repairing ${characterName} on page ${pageNumber} with ${repairMethod}`);
 
@@ -5747,45 +5834,15 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
             return { task, error: true, failReason: 'No scene image data for this page' };
           }
 
-          // Determine clothing for this character on this page.
-          // Priority: sceneCharacterClothing (persisted from generation — source of truth)
-          //         > scene metadata > clothingRequirements > 'standard'
-          // sceneCharacterClothing was set by the unified pipeline at generation time and
-          // holds the actual perCharClothing used to render the page, so the styled avatar
-          // we pick to repair will match the avatar that drew the page.
-          let pageClothing = 'standard';
-          const persistedClothing = sceneImage.sceneCharacterClothing || sceneImage.characterClothing || null;
-          if (persistedClothing && persistedClothing[characterName]) {
-            pageClothing = persistedClothing[characterName];
-            log.info(`👕 [CHAR REPAIR] ${characterName} on page ${pageNumber}: using persisted clothing "${pageClothing}" (from generation)`);
-          } else {
-            const sceneMetadata = sceneImage.sceneMetadata || (sceneImage.description ? extractSceneMetadata(sceneImage.description) : null);
-            if (sceneMetadata?.characterClothing?.[characterName]) {
-              pageClothing = sceneMetadata.characterClothing[characterName];
-            } else if (storyData.clothingRequirements?.[characterName]) {
-              const charReqs = storyData.clothingRequirements[characterName];
-              if (charReqs?.costumed?.used && charReqs.costumed.costume) {
-                pageClothing = `costumed:${charReqs.costumed.costume}`;
-              } else {
-                // Covers have no persisted per-page clothing, so this chain
-                // used to fall through to 'standard' — the repair then sent
-                // the standard avatar and Grok redressed the character out
-                // of the story outfit (staging back-cover, 2026-07-11).
-                // Resolve like cover generation does: parse the description,
-                // else take the single category the story actually uses.
-                const parsed = parseClothingCategory(sceneImage.description || '', false);
-                const usedCats = ['winter', 'summer', 'standard'].filter(k => charReqs?.[k]?.used);
-                if (parsed) {
-                  pageClothing = parsed;
-                } else if (usedCats.length === 1) {
-                  pageClothing = usedCats[0];
-                }
-                if (pageClothing !== 'standard') {
-                  log.info(`👕 [CHAR REPAIR] ${characterName} on page ${pageNumber}: no persisted clothing — resolved "${pageClothing}" (${parsed ? 'parsed from description' : 'single used category'})`);
-                }
-              }
-            }
-          }
+          // The outfit this character was RENDERED in on this page or cover —
+          // the page's persisted per-character clothing, else the cover brief /
+          // cover hint / pageClothing. One resolver with the Lab and the in-run
+          // char-fix. This chain used to default to 'standard' and read only
+          // sceneCharacterClothing, which a cover never has; the repair then
+          // described one outfit while its reference showed another (Lab 1554).
+          // null → the NO DEFAULT refusal below.
+          const pageClothing = require('../lib/clothingCategories')
+            .resolveRenderedClothingCategory(storyData, pageNumber, characterName, sceneImage);
 
           // Stored boxes are only usable with the bytes they were computed on
           // (sourceImageFp stamp) — a stale box repaints the wrong region of a
@@ -5805,7 +5862,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
           // own cast builder and its own three-tier ladder; that divergence is
           // what let "Sarah" land on a Visual Bible secondary and a face repair
           // white out the wrong person's head.
-          const { buildPageCast, findBorrowedLabel, resolveCharBbox } = require('../lib/charRepairTarget');
+          const { findBorrowedLabel, resolveCharBbox } = require('../lib/charRepairTarget');
           const { buildCharRepairRequest } = require('../lib/charRepairRequest');
 
           let resolved = resolveCharBbox(characterName, {
@@ -5826,24 +5883,9 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
           // Nothing stored → detect now, with the SAME cast the pipeline builds.
           if (!resolved.faceBbox && !resolved.bodyBbox) {
             log.info(`🔍 [CHAR REPAIR] No stored bbox for ${characterName} on page ${pageNumber}, running fresh detection...`);
-            const expectedCharacters = buildPageCast({
-              storyData,
-              sceneCharacters: sceneImage.sceneCharacters || [],
-              sceneMetadata: sceneImage.sceneMetadata || {},
-              clothingByName: sceneImage.sceneCharacterClothing || null,
-              outlineCharacters: sceneImage.outlineCharacters || [],
-              artStyle,
-              visualBible: storyData.visualBible || null,
-              requiredName: characterName,
-              label: `p${pageNumber} manual-repair `,
-            });
-            const detection = await detectAllBoundingBoxes(sceneImage.imageData, {
-              expectedCharacters,
-              expectedObjects: Array.isArray(sceneImage.sceneMetadata?.objects)
-                ? sceneImage.sceneMetadata.objects.filter(x => typeof x === 'string') : [],
-              sceneContext: sceneImage.description || sceneImage.sceneDescription || null,
-              pageContext: `PAGE ${pageNumber} manual-repair`,
-              artStyle,
+            // One implementation with the Test Lab char_repair stage.
+            const { detection, expectedCharacters } = await require('../lib/charRepairTarget').detectPageForRepair({
+              storyData, sceneImage, imageData: sceneImage.imageData, characterName, pageNumber, artStyle, label: 'manual-repair',
             });
             freshDetection = detection;
             boxDiag.boxSource = 'fresh-detection';
@@ -5901,17 +5943,15 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
             clothing: resolved.clothing || pageClothing,
           };
 
-          const { normalizeClothingCategory, resolvePageClothingCategory } = require('../lib/clothingCategories');
+          const { normalizeClothingCategory } = require('../lib/clothingCategories');
           // NO DEFAULT (owner, 2026-08-07): this category picks the styled
-          // avatar the repair paints the character to match.
+          // avatar the repair paints the character to match. pageClothing above
+          // already ran the full rendered-outfit chain, so null here is final.
           const clothingCategory = storedAppearance.clothing
             ? normalizeClothingCategory(storedAppearance.clothing)
-            : resolvePageClothingCategory(storyData, pageNumber, characterName);
+            : null;
           if (!clothingCategory) {
-            return res.status(422).json({ error: `${characterName} p${pageNumber}: no clothing category (stored appearance and pageClothing both empty) — refusing to repair into a guessed outfit` });
-          }
-          if (!storedAppearance.clothing) {
-            log.warn(`⚠️ [CHAR REPAIR] ${characterName} p${pageNumber}: no stored appearance clothing — resolved "${clothingCategory}" from pageClothing`);
+            return res.status(422).json({ error: `${characterName} p${pageNumber}: no clothing category (stored appearance, page record, cover brief and pageClothing all empty) — refusing to repair into a guessed outfit` });
           }
           const styledAvatar = await getStyledAvatarForClothing(character, artStyle, clothingCategory);
           const avatarData = styledAvatar || character.avatars?.standard || character.avatarUrl;
@@ -6070,6 +6110,10 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
                 whiteoutTarget: whiteoutTarget || (useFaceOnly ? 'face' : 'body'),
                 includeDebug: req.user.role === 'admin',
                 photoType: avatarPhotoType,
+                // The figure's pose picks the sheet cell; the spine sends the
+                // face cell alone for a face repair, the body cell alone for a
+                // body repair — this route used to send the whole 2x4 sheet.
+                referencePose: require('../lib/charRepairReference').referencePoseFor(sceneImage, characterName),
                 artStyle,
                 // LAB/BUTTON PARITY (2026-09-06). The automatic pipeline
                 // (repairPipeline.js) and the Test Lab stage both send this;
@@ -6295,11 +6339,6 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
       } else {
         totalGeminiRepairs++;
       }
-      // Track verify tokens (only for non-Grok methods — Grok returns direct_cost, not token counts)
-      if (repairResult.usage && !repairResult.method?.startsWith('grok_')) {
-        totalVerifyTokensIn += repairResult.usage.promptTokenCount || 0;
-        totalVerifyTokensOut += repairResult.usage.candidatesTokenCount || 0;
-      }
 
       if (!repairResult.success) {
         const reason = repairResult.reason || repairResult.error || 'Unknown error';
@@ -6357,11 +6396,34 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
             }];
           }
 
+          // A cover was repaired on its textless art (above): that art is this
+          // version's `${coverType}Art` row, and the served bytes get the app's
+          // text restamped on it (coverTypography.restampCover). The new
+          // version takes the next free DB index, so its art row pairs with it.
+          let servedImageData = update.imageData;
+          let coverArtData = null;
+          let coverVersionIndex = null;
+          if (isCover) {
+            coverVersionIndex = await getNextVersionIndex(id, coverType, null);
+            if (coverRepair.get(coverType)?.restamp) {
+              try {
+                ({ servedImageData, artImageData: coverArtData } = await restampRepairedCover(storyData, coverType, update.imageData, {
+                  restamp: true, figures: carryForwardBbox?.figures || [],
+                }));
+              } catch (stampErr) {
+                log.error(`❌ [CHAR REPAIR] ${coverType}: restamp failed (${stampErr.message}) — repair not saved`);
+                charResult.pagesFailed.push({ pageNumber: update.pageNumber, reason: `restamp failed: ${stampErr.message}` });
+                continue;
+              }
+            }
+          }
+
           const isMagicApiMethod = repairResult.method === 'magicapi';
           const isGrokMethod = repairResult.method?.startsWith('grok_');
           const repairModelId = isMagicApiMethod ? 'magicapi-faceswap-hair' : isGrokMethod ? `grok-imagine (${repairResult.method})` : 'gemini-2.0-flash-preview-image-generation';
           existingImage.imageVersions.push({
-            imageData: update.imageData,
+            imageData: servedImageData,
+            ...(coverVersionIndex !== null ? { dbVersionIndex: coverVersionIndex } : {}),
             description: existingImage.description,
             prompt: existingImage.prompt,
             modelId: repairModelId,
@@ -6371,7 +6433,11 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
             qualityScore: null,
             entityRepairedFor: characterName,
             clothingCategory: repairResult.clothingCategory,
-            bboxDetection: carryForwardBbox,
+            // The stamp moves no figure: a restamped cover's boxes are re-pointed
+            // at its served bytes (restampDetectionForCoverText), on a clone.
+            bboxDetection: coverArtData && carryForwardBbox
+              ? require('../lib/bboxDetection').restampDetectionForCoverText({ ...carryForwardBbox }, servedImageData)
+              : carryForwardBbox,
             // Per-version char-repair pipeline artifacts — dev panel uses these
             // to show what Grok was given, what it returned BEFORE feathering,
             // and the soft-edge blend mask used to composite back. Without
@@ -6395,6 +6461,8 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
             const evalType = isCover ? 'cover' : 'scene';
             const evalPrompt = existingImage.description || existingImage.prompt || '';
             const pageLabel = isCover ? `[${coverType}]` : `[Page ${update.pageNumber}]`;
+            // update.imageData is the repair output BEFORE any restamp — a cover
+            // is judged on its textless art (coverEvalLayer.js).
             log.info(`🔍 [CHAR REPAIR] ${pageLabel} Evaluating repaired image (before: ${beforeScore}%)...`);
             // The page text and the brief, as /evaluate-single resolves them, so
             // the semantic judge runs and judges the repaired version's light
@@ -6448,6 +6516,9 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
           if (!isCover) {
             storyData.sceneImages = sceneImages;
           }
+          if (coverArtData) {
+            await saveStoryImage(id, `${coverType}Art`, null, coverArtData, { versionIndex: coverVersionIndex });
+          }
           await saveStoryData(id, storyData);
           // Active version is picked by recomputeAllActiveVersions inside
           // saveStoryData. Char-repair's new version has a qualityScore from
@@ -6457,7 +6528,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
           const comparison = repairResult.comparison || null;
           charResult.pagesRepaired.push({
             pageNumber: update.pageNumber,
-            imageData: update.imageData,
+            imageData: servedImageData,
             versionIndex: newDbVersionIndex,
             comparison,
             verification: repairResult.verification || null,
@@ -6489,22 +6560,26 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
     const perImageCost = MODEL_PRICING['gemini-2.5-flash-image']?.perImage ?? 0.04;
     const grokPerImageCost = MODEL_PRICING['grok-imagine-image']?.perImage ?? 0.02;
     const imageGenCost = totalGeminiRepairs * perImageCost + totalGrokRepairs * grokPerImageCost;
-    const verifyTokenCost = calculateTokenCost('gemini-2.5-flash', totalVerifyTokensIn, totalVerifyTokensOut);
-    const apiCost = imageGenCost + verifyTokenCost;
+    // No verify-token term: repairSinglePage returns usage only from its Grok
+    // path (priced per image above); the Gemini-shaped reader here never fired.
+    const apiCost = imageGenCost;
     const totalAttempts = totalGeminiRepairs + totalMagicApiRepairs + totalGrokRepairs;
     // Deduct credits: 5 per page actually repaired
     const totalPagesRepaired = results.reduce((sum, r) => sum + (r.pagesRepaired?.length || 0), 0);
     const totalCreditCost = totalPagesRepaired * creditCost;
     let creditsRemaining = hasInfiniteCredits ? -1 : userCredits;
     if (totalPagesRepaired > 0 && !hasInfiniteCredits) {
-      await getDbPool().query('UPDATE users SET credits = credits - $1 WHERE id = $2 AND credits >= $1', [totalCreditCost, req.user.id]);
-      creditsRemaining = userCredits - totalCreditCost;
-      await getDbPool().query(
-        `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, description)
-         VALUES ($1, $2, $3, 'character_repair', $4)`,
-        [req.user.id, -totalCreditCost, creditsRemaining, `Character repair: ${totalPagesRepaired} page(s)`]
-      );
-      log.info(`💰 [REPAIR-WORKFLOW] Deducted ${totalCreditCost} credits for ${totalPagesRepaired} page(s) repaired (remaining: ${creditsRemaining})`);
+      const charge = await chargeCredits(getDbPool(), {
+        userId: req.user.id, cost: totalCreditCost, transactionType: 'character_repair',
+        description: `Character repair: ${totalPagesRepaired} page(s)`,
+      });
+      if (charge.charged) {
+        creditsRemaining = charge.credits;
+        log.info(`💰 [REPAIR-WORKFLOW] Deducted ${totalCreditCost} credits for ${totalPagesRepaired} page(s) repaired (remaining: ${creditsRemaining})`);
+      } else {
+        creditsRemaining = userCredits;
+        log.warn(`⚠️ [BILL-1] Character repair for user ${req.user.id} completed but credits not charged (balance raced below ${totalCreditCost})`);
+      }
     }
 
     log.info(`✅ [REPAIR-WORKFLOW] Character repair complete`);
@@ -6712,32 +6787,23 @@ router.post('/:id/edit/cover/:coverType', authenticateToken, async (req, res) =>
     const previousReasoning = prevVersionEntry?.qualityReasoning ?? (typeof existingCover === 'object' ? existingCover.qualityReasoning || null : null);
     log.debug(`✏️ [COVER EDIT] Capturing previous image (score: ${previousScore})`);
 
-    // Edit the TEXTLESS art layer, not the titled served image — Grok re-renders
-    // the raster and mangles/drops the baked title/dedication/branding. Load the
-    // ${coverKey}Art for the active version; fall back to the titled image only
-    // for legacy covers with no Art row. The text is re-composited after editing.
-    const { dbQuery } = require('../services/database');
-    let editBaseSrc = currentImageData;   // fallback: titled served image
-    let editedTextless = false;
+    // Edit the TEXTLESS art layer of the ACTIVE version, never the titled
+    // served image — Grok re-renders the raster and mangles/drops the stamped
+    // title/dedication/branding; the text is re-composited after editing
+    // (coverEvalLayer.resolveCoverEvalImage). A cover the app never stamped
+    // (baked title, pre-typography story) is its own art and gets no restamp. A
+    // stamped cover whose active version has no art row is refused: it used to
+    // fall back to the LATEST art row, i.e. edit a different render.
+    let editBaseSrc;
+    let editedTextless;
     try {
-      const meta = (await dbQuery('SELECT image_version_meta FROM stories WHERE id=$1', [id]))[0]?.image_version_meta || {};
-      const activeIdx = meta[coverKey]?.activeVersion ?? 0;
-      // Prefer the textless art for the ACTIVE version; fall back to the latest
-      // ${key}Art (legacy versions repainted before this fix have no lockstep
-      // art row), then to the titled image for truly legacy covers.
-      let artRows = await dbQuery(
-        "SELECT image_url, image_data FROM story_images WHERE story_id=$1 AND image_type=$2 AND version_index=$3 AND NOT is_test LIMIT 1",
-        [id, `${coverKey}Art`, activeIdx]);
-      if (!artRows.length) {
-        artRows = await dbQuery(
-          "SELECT image_url, image_data FROM story_images WHERE story_id=$1 AND image_type=$2 AND NOT is_test ORDER BY version_index DESC LIMIT 1",
-          [id, `${coverKey}Art`]);
-      }
-      const artRow = artRows[0];
-      const artSrc = artRow ? (artRow.image_url || (artRow.image_data ? 'data:image/jpeg;base64,' + artRow.image_data.toString('base64') : null)) : null;
-      if (artSrc) { editBaseSrc = artSrc; editedTextless = true; }
-    } catch (e) {
-      log.warn(`✏️ [COVER EDIT] could not load ${coverKey}Art (${e.message}) — editing the titled image`);
+      const layer = await resolveCoverEvalImage(id, coverKey, null);
+      editBaseSrc = layer.imageData;
+      editedTextless = layer.layer === 'art';
+    } catch (layerErr) {
+      if (layerErr.code !== 'NO_ART_LAYER') throw layerErr;
+      log.error(`❌ [COVER EDIT] ${layerErr.message}`);
+      return res.status(409).json({ error: layerErr.message });
     }
 
     // Edit the cover image (pure text/instruction based - no character photos to avoid regeneration artifacts)
@@ -6757,6 +6823,10 @@ router.post('/:id/edit/cover/:coverType', authenticateToken, async (req, res) =>
     // image again and editedArt holds the new textless source. Mutating
     // editResult.imageData keeps every downstream use (eval / version / save /
     // response) on the titled bytes with no further changes.
+    // The edit's own output, before any text is stamped on it: the image the
+    // judge reads below (coverEvalLayer.js — covers are evaluated first, the
+    // app's text is added after).
+    const editedUnstamped = editResult.imageData;
     let editedArt = null;
     if (editedTextless) {
       try {
@@ -6782,7 +6852,7 @@ router.post('/:id/edit/cover/:coverType', authenticateToken, async (req, res) =>
       // resolvers as every other cover eval site.
       const coverPageNumber = COVER_PAGE_NUMBERS[coverKey];
       const evaluation = await evaluateImageQuality(
-        editResult.imageData,
+        editedUnstamped,
         coverPrompt,
         buildWholeCastReferencePhotos(
           storyData.characters || [],
@@ -6871,20 +6941,12 @@ router.post('/:id/edit/cover/:coverType', authenticateToken, async (req, res) =>
 
     let newCredits = hasInfiniteCredits ? -1 : userCredits - creditCost;
     if (!hasInfiniteCredits) {
-      const deduct = await getDbPool().query(
-        'UPDATE users SET credits = credits - $1 WHERE id = $2 AND credits >= $1 RETURNING credits',
-        [creditCost, req.user.id]
-      );
-      if (deduct.rows.length === 0) {
-        log.warn(`⚠️ [BILL-1] Cover edit for user ${req.user.id} completed but credits not charged (balance raced below ${creditCost})`);
-      } else {
-        newCredits = deduct.rows[0].credits;
-        await getDbPool().query(
-          `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, description)
-           VALUES ($1, $2, $3, 'image_regeneration', $4)`,
-          [req.user.id, -creditCost, newCredits, `Edit ${normalizedCoverType} cover`]
-        );
-      }
+      const charge = await chargeCredits(getDbPool(), {
+        userId: req.user.id, cost: creditCost, transactionType: 'image_regeneration',
+        description: `Edit ${normalizedCoverType} cover`,
+      });
+      if (charge.charged) newCredits = charge.credits;
+      else log.warn(`⚠️ [BILL-1] Cover edit for user ${req.user.id} completed but credits not charged (balance raced below ${creditCost})`);
     }
 
     log.info(`✅ Cover edited for story ${id}, type: ${normalizedCoverType} (new score: ${qualityScore}, cost: ${creditCost} credits)`);

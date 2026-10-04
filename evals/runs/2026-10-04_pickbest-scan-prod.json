@@ -1,0 +1,88 @@
+{
+ "summary": {
+  "env": "prod",
+  "since": "2026-09-26",
+  "stories": 8,
+  "storiesWithMultiVersionPages": 4,
+  "pagesAndCovers": 98,
+  "multiVersion": 24,
+  "scoreableMulti": 24,
+  "hitsTodayShipsCriticalWhileAnotherCleanExists": 0,
+  "triggerFires": 2,
+  "recordedActiveMismatchesUnpinned": 1
+ },
+ "hits": [],
+ "triggers": [
+  {
+   "story": "job_1790719546789_9n47zi342",
+   "created": "2026-09-29T20:05:47.094Z",
+   "page": 10,
+   "type": "scene",
+   "versions": 4,
+   "today": 2,
+   "recorded": 2,
+   "pinned": false,
+   "trigger": {
+    "top": 2,
+    "partner": 0
+   },
+   "topFindings": [
+    "[critical] action_interaction Noam: Noam is seated on the saddle instead of plunging arms into the hay basket to pull it free"
+   ],
+   "partnerFindings": [
+    "[critical] missing_element the brown leather saddle: The forearm-sized brown leather saddle is missing from the hay basket"
+   ],
+   "scores": [
+    70,
+    60
+   ],
+   "sources": [
+    "original",
+    "inpaint-round-1",
+    "inpaint-round-2",
+    "iterate-round-3"
+   ]
+  },
+  {
+   "story": "job_1791116880928_j905g63bx",
+   "created": "2026-10-04T10:28:01.092Z",
+   "page": 7,
+   "type": "scene",
+   "versions": 3,
+   "today": 1,
+   "recorded": 1,
+   "pinned": false,
+   "trigger": {
+    "top": 1,
+    "partner": 0
+   },
+   "topFindings": [
+    "[critical] action_interaction Chris: Chris's hands are digging into the pinecones, not 'pats both hands flat against' or 'palms pressing firmly down onto'"
+   ],
+   "partnerFindings": [
+    "[critical] action_interaction Emma: Emma is holding a phone instead of calling out with hand cupped near mouth"
+   ],
+   "scores": [
+    53,
+    51
+   ],
+   "sources": [
+    "original",
+    "inpaint-round-1",
+    "iterate-round-2"
+   ]
+  }
+ ],
+ "mismatches": [
+  {
+   "story": "job_1791116880928_j905g63bx",
+   "created": "2026-10-04T10:28:01.092Z",
+   "page": 2,
+   "type": "scene",
+   "versions": 2,
+   "today": 0,
+   "recorded": 1,
+   "pinned": false
+  }
+ ]
+}

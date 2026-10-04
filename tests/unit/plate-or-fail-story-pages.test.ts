@@ -162,7 +162,12 @@ describe('the pipeline page paths', () => {
   });
   it('the first render fails without a plate; the render and the retry declare the cast-0 role', () => {
     expect(src).toContain('if (pageNeedsPlate(pageData, refApplied.landmarkPhotos) && !refApplied.sceneBackground) {');
-    expect((src.match(/landmarkScene: pageLandmarkScene\(pageData\),/g) || []).length).toBe(2);
+    // The first render's options come from the shared page-render builder
+    // (pageRenderCall.pageRenderOptions, also the Test Lab's); the retry
+    // declares the role inline.
+    expect(src).toMatch(/pageRenderOptions\(\{\s*page: pageData,/);
+    expect(read('server/lib/pageRenderCall.js')).toContain('landmarkScene: pageLandmarkScene(page),');
+    expect((src.match(/landmarkScene: pageLandmarkScene\(pageData\),/g) || []).length).toBe(1);
   });
   it('every calm-zone repair wrapper resolves its plate (pipeline, repair pipeline, Lab mirror)', () => {
     for (const f of ['storyJobPipeline.js', 'server/lib/repairPipeline.js', 'server/lib/testlab.js']) {

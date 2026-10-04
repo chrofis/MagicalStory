@@ -39,7 +39,9 @@ const { photoAnalyzerUrl } = require('./photoAnalyzerClient');
 
 const sharp = require('sharp');
 const { log } = require('../utils/logger');
-const { generateWithGrok, editWithGrok, GROK_MODELS } = require('./grok');
+const { geminiUsage } = require('./providerUsage');
+const { generateWithGrok, editWithGrok, GROK_MODELS, grokPromptBudget } = require('./grok');
+const { promptBytes } = require('./promptFitError');
 const { renderCharacterInPhantomPose } = require('./phantomPoseRender');
 const { stripDataUriPrefix, bytesFromAnyImage } = require('./r2');
 const { GROK_ASPECT_PRESETS, closestGrokAspect } = require('./grokAspect');
@@ -1016,11 +1018,16 @@ async function cropSheetCell(sheetBuf, cellIdx, sheetKey = null) {
   const key = sheetKey || sheetKeyOf(sheetBuf);
   if (!_sheetSplitCache.has(key)) {
     _cacheSet(_sheetSplitCache, key, (async () => {
+      await null; // let _cacheSet run first so a failure's delete below always lands
       _sheetSplitCalls++;
       try {
         return await splitSheetByEdgeDetection(sheetBuf);
       } catch (err) {
-        log.warn(`[SCENE COMPOSITE] edge-detection split failed: ${err.message} — falling back to fixed-math crop`);
+        log.warn(`[SCENE COMPOSITE] edge-detection split failed: ${err.message} — falling back to fixed-math crop for this call (decisions 2026-09-19)`);
+        // Never cache a transient analyzer failure (code review 2026-10 C5): a
+        // cached null pinned the sheet to the fixed grid until LRU eviction.
+        // The fixed-grid crop itself is the documented fallback and stays.
+        _sheetSplitCache.delete(key);
         return null;
       }
     })());
@@ -2092,7 +2099,7 @@ async function judgePopulatedPlate(plateBase64, castLines, styleDescription = ''
   const usage = j?.usageMetadata;
   if (usage) {
     const { recordTextUsage } = require('./usageContext');
-    recordTextUsage('gemini_text', { input_tokens: usage.promptTokenCount || 0, output_tokens: usage.candidatesTokenCount || 0 }, 'composite_plate_judge', cfg.modelId);
+    recordTextUsage('gemini_text', geminiUsage(usage), 'composite_plate_judge', cfg.modelId);
   }
   const raw = String(j?.candidates?.[0]?.content?.parts?.[0]?.text || '').trim();
   let parsed;
@@ -2109,7 +2116,7 @@ function buildPopulatedPlatePrompt(scene, cast, cleanBackgroundPrompt, sceneCrea
   const settingBlock = (cleanBackgroundPrompt && cleanBackgroundPrompt.trim())
     || (scene?.description && String(scene.description).trim())
     || 'an outdoor scene';
-  // Grok rejects anything over 8000 chars outright, and the setting block is
+  // Grok rejects anything over its cap outright, and the setting block is
   // the only part that varies enough to blow it — a five-character page with
   // a full empty-scene prompt measured over the limit and 400'd the whole run.
   // Trim the SETTING to fit rather than truncating blind: keep the opening of
@@ -2155,12 +2162,10 @@ SILHOUETTE RENDERING DETAILS:
 
 NO TEXT in the output.`;
 
-  const MAX = 8000;
   let out = assemble(settingBlock);
-  if (out.length > MAX) {
-    const excess = out.length - MAX + 200; // 200 char safety margin
-    out = assemble(shrinkSetting(settingBlock, excess));
-  }
+  // Each char cut removes >= 1 byte, so cutting the byte overshoot in chars fits.
+  const excess = promptBytes(out) - compositePromptCap();
+  if (excess > 0) out = assemble(shrinkSetting(settingBlock, excess));
   return out;
 }
 
@@ -2244,11 +2249,19 @@ function _blendStyleLine(artStyle) {
   return BLEND_STYLE_LINES.watercolor;
 }
 
-// Grok's edit endpoint caps prompts at 8000 chars. Reserve ~300 char
-// headroom so future tweaks to the boilerplate don't silently re-blow
-// the budget. The boilerplate below is ~2400 chars; that leaves the
-// brief ~5300 chars of room.
-const BLEND_PROMPT_HARD_CAP = 7700;
+// Budget for every composite prompt, in UTF-8 bytes: the Grok Standard cap
+// (every composite edit is pinned to Standard) less 200 bytes of headroom so
+// future boilerplate tweaks don't silently re-blow it. Read from config —
+// this was a hardcoded 7,700 against the old 8,000 cap (decisions.md
+// 2026-10-04 "Grok prompt caps are 16,000 / 64,000 bytes").
+const compositePromptCap = () => grokPromptBudget(GROK_MODELS.STANDARD) - 200;
+
+// Room for a brief, in chars, that keeps the whole prompt under the cap in
+// bytes: the brief's multibyte excess is charged up front, so a slice of it
+// can never be more bytes than chars + that excess.
+function briefCharRoom(fixedBytes, brief) {
+  return Math.max(0, compositePromptCap() - fixedBytes - (promptBytes(brief) - (brief || '').length));
+}
 
 /**
  * Build a text-rendering directive for cover blend prompts. When the caller
@@ -2501,18 +2514,18 @@ DO NOT:
   // accounted for in briefRoom.
   const textDirective = buildTextOverlayDirective(scene.textOverlay, scene.artStyle);
 
-  // Tight cap: trim the brief if total prompt would exceed Grok's 8000-char
-  // edit limit. The earlier 5500-char compositeBrief slice in regeneration.js
+  // Tight cap: trim the brief if total prompt would exceed Grok's edit
+  // limit. The earlier 5500-char compositeBrief slice in regeneration.js
   // left no room for boilerplate when fully populated (8058 chars in
   // production smoke). Re-slice at the prompt builder so both the test-
   // models route AND the main pipeline are protected.
-  const fixedLen = boilerplate.length + (brief ? briefHeader.length : 0) + textDirective.length;
-  const briefRoom = Math.max(0, BLEND_PROMPT_HARD_CAP - fixedLen);
+  const fixedLen = promptBytes(boilerplate) + (brief ? promptBytes(briefHeader) : 0) + promptBytes(textDirective);
+  const briefRoom = briefCharRoom(fixedLen, brief);
   const trimmedBrief = brief.length > briefRoom ? brief.slice(0, briefRoom).trim() + '\n[...]' : brief;
   const briefBlock = trimmedBrief ? `${briefHeader}${trimmedBrief}` : '';
   const full = `${boilerplate}${briefBlock}${textDirective}`;
-  if (full.length > 8000) {
-    log.warn(`[SCENE COMPOSITE] blend prompt at ${full.length} chars after trim — still over Grok's 8000 limit (brief input was ${brief.length})`);
+  if (promptBytes(full) > grokPromptBudget(GROK_MODELS.STANDARD)) {
+    log.warn(`[SCENE COMPOSITE] blend prompt at ${promptBytes(full)} bytes after trim — still over Grok's cap (brief input was ${brief.length} chars)`);
   }
   return full;
 }
@@ -2661,9 +2674,6 @@ function buildBackCharLines(cast) {
  * Reference images shipped alongside: one 2×4 sheet per back-stratum char,
  * so Grok knows who they are without consuming a front-stratum cutout pass.
  */
-// Grok edit/generate endpoint hard limit is 8000 chars. Leave 300 char
-// headroom so future prompt tweaks don't silently re-blow the budget.
-const STRATIFIED_PROMPT_HARD_CAP = 7700;
 
 // Foreground-first anchor-plate prompt. Renders the FRONT stratum
 // (closer-to-camera characters) as REAL characters using the identity pack,
@@ -2752,13 +2762,13 @@ ${backBlock}`;
   const tail = textDirective || `\nNO TEXT in the output.`;
   const rawBrief = scene?.pageBrief ? String(scene.pageBrief).trim() : '';
   const filteredBrief = filterBriefByStratum(rawBrief, frontNames, backNames, backSubs);
-  const fixedLen = head.length + tail.length + (filteredBrief ? briefHeader.length + 1 : 0);
-  const briefRoom = Math.max(0, STRATIFIED_PROMPT_HARD_CAP - fixedLen);
+  const fixedLen = promptBytes(head) + promptBytes(tail) + (filteredBrief ? promptBytes(briefHeader) + 1 : 0);
+  const briefRoom = briefCharRoom(fixedLen, filteredBrief);
   const trimmedBrief = sliceBriefAtSentence(filteredBrief, briefRoom);
   const briefBlock = trimmedBrief ? `${briefHeader}${trimmedBrief}\n` : '';
   const full = `${head}${briefBlock}${tail}`;
-  if (full.length > 8000) {
-    log.warn(`[SCENE COMPOSITE/STRATIFIED] anchor prompt ${full.length} chars after trim — still over 8000 (brief input ${rawBrief.length}, filtered ${filteredBrief.length}, fixed ${fixedLen})`);
+  if (promptBytes(full) > grokPromptBudget(GROK_MODELS.STANDARD)) {
+    log.warn(`[SCENE COMPOSITE/STRATIFIED] anchor prompt ${promptBytes(full)} bytes after trim — still over Grok's cap (brief input ${rawBrief.length}, filtered ${filteredBrief.length}, fixed ${fixedLen})`);
   }
   return full;
 }
@@ -2843,13 +2853,13 @@ DO NOT:
   const briefHeader = `\nPAGE BRIEF (background characters only — the ones being rendered HERE) — canonical descriptions of the silhouette characters and their costumes. Use these (with the identity pack) for face, hair, clothing.\n\n`;
   const rawBrief = scene?.pageBrief ? String(scene.pageBrief).trim() : '';
   const filteredBrief = filterBriefByStratum(rawBrief, frontNames, backNames, backSubs);
-  const fixedLen = head.length + tail.length + offCanvasNote.length + (filteredBrief ? briefHeader.length + 1 : 0);
-  const briefRoom = Math.max(0, STRATIFIED_PROMPT_HARD_CAP - fixedLen);
+  const fixedLen = promptBytes(head) + promptBytes(tail) + promptBytes(offCanvasNote) + (filteredBrief ? promptBytes(briefHeader) + 1 : 0);
+  const briefRoom = briefCharRoom(fixedLen, filteredBrief);
   const trimmedBrief = sliceBriefAtSentence(filteredBrief, briefRoom);
   const briefBlock = trimmedBrief ? `${briefHeader}${trimmedBrief}\n` : '';
   const full = `${head}${offCanvasNote}${briefBlock}${tail}`;
-  if (full.length > 8000) {
-    log.warn(`[SCENE COMPOSITE/STRATIFIED] front-inset prompt ${full.length} chars after trim — still over 8000 (brief input ${rawBrief.length}, filtered ${filteredBrief.length}, fixed ${fixedLen})`);
+  if (promptBytes(full) > grokPromptBudget(GROK_MODELS.STANDARD)) {
+    log.warn(`[SCENE COMPOSITE/STRATIFIED] front-inset prompt ${promptBytes(full)} bytes after trim — still over Grok's cap (brief input ${rawBrief.length}, filtered ${filteredBrief.length}, fixed ${fixedLen})`);
   }
   return full;
 }
@@ -3539,15 +3549,13 @@ async function blendPastedCanvas({
   // generation uses: it holds the REQUIRED OBJECTS + ART STYLE tail back and
   // reattaches it verbatim. A blind cut is not an option — one measured at 7.5k
   // dropped the whole ART STYLE block and rendered photographic 3 times out of 3.
-  if (blendPrompt.length > BLEND_PROMPT_HARD_CAP) {
-    try {
-      const { shrinkPromptForModel } = require('./images');
-      const before = blendPrompt.length;
-      blendPrompt = await shrinkPromptForModel(blendPrompt, BLEND_PROMPT_HARD_CAP, 'SCENE COMPOSITE BLEND', GROK_MODELS.STANDARD);
-      log.info(`[SCENE COMPOSITE]   blend prompt ${before} → ${blendPrompt.length} chars (budget ${BLEND_PROMPT_HARD_CAP})`);
-    } catch (err) {
-      log.warn(`[SCENE COMPOSITE] blend prompt shrink failed (${err.message}) — sending as built at ${blendPrompt.length} chars`);
-    }
+  // A shrink that cannot fit throws PromptFitError — it is never "sent as built"
+  // (editWithGrok would refuse it anyway, 2026-09-30).
+  if (promptBytes(blendPrompt) > compositePromptCap()) {
+    const { shrinkPromptForModel } = require('./images');
+    const before = promptBytes(blendPrompt);
+    blendPrompt = await shrinkPromptForModel(blendPrompt, compositePromptCap(), 'SCENE COMPOSITE BLEND', GROK_MODELS.STANDARD);
+    log.info(`[SCENE COMPOSITE]   blend prompt ${before} → ${promptBytes(blendPrompt)} bytes (budget ${compositePromptCap()})`);
   }
   debug.blendPrompt = blendPrompt;
   // VB grid as Image 2 — labelled portrait grid serves as the authoritative face /

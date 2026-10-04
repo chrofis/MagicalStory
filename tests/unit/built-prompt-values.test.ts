@@ -53,6 +53,9 @@ const PAGE_TEXT = 'The lamp guttered twice and then went out, and nobody said a 
 const BEFORE_TEXT = 'The lamp guttered and went out.';
 const ARC_LINE = 'The keeper must relight the lamp before the tide turns.';
 const PLAN_LINE = 'wide — the main character on the pier — she lifts the lantern — the lamp is lit';
+const LOGIC_FACT = 'the old ropes are brittle and only the tarred line will hold a weight';
+const STORY_LOGIC = `Facts:
+- ${LOGIC_FACT}.`;
 const BRIEF_PROSE = `The main character stands on ${PLACE}, lifting a brass lantern above her head.`;
 const STYLE = 'Soft watercolour with visible paper grain. Never photographic.';
 // The landmark block, from the ONE builder all three judges are filled from.
@@ -175,16 +178,29 @@ const CASES: Case[] = [
     blind: () => PB.buildSceneExpansionPrompt(1, 'She walked home.', CHARACTERS, 'en', VISUAL_BIBLE, '', null, {}),
   },
   {
-    name: 'buildSceneExpansionAllPrompt (Art Director, all pages)',
+    name: 'buildVisualBibleCallPrompt (Art Director call 1, the Visual Bible)',
     probe: PLAN_LINE,
-    build: () => PB.buildSceneExpansionAllPrompt(inputData, BEATS, {}),
-    blind: () => PB.buildSceneExpansionAllPrompt(inputData, [{ pageNumber: 1, planLine: 'close — she walks home' }], {}),
+    build: () => PB.buildVisualBibleCallPrompt(inputData, BEATS, {}),
+    blind: () => PB.buildVisualBibleCallPrompt(inputData, [{ pageNumber: 1, planLine: 'close — she walks home' }], {}),
   },
   {
-    name: 'buildSceneReviewPrompt (all briefs at once)',
+    name: 'buildSceneBriefsAllPrompt (Art Director call 2, all page briefs)',
+    probe: PLAN_LINE,
+    build: () => PB.buildSceneBriefsAllPrompt(inputData, BEATS, { visualBible: JSON.stringify(VISUAL_BIBLE) }),
+    blind: () => PB.buildSceneBriefsAllPrompt(inputData, [{ pageNumber: 1, planLine: 'close — she walks home' }], { visualBible: JSON.stringify(VISUAL_BIBLE) }),
+  },
+  {
+    // Call 2 writes from the bible call 1 wrote: the bible itself is its input.
+    name: 'buildSceneBriefsAllPrompt — the Visual Bible call 1 wrote',
+    probe: ELEMENT_DESC,
+    build: () => PB.buildSceneBriefsAllPrompt(inputData, BEATS, { visualBible: JSON.stringify(VISUAL_BIBLE) }),
+    blind: () => PB.buildSceneBriefsAllPrompt(inputData, BEATS, {}),
+  },
+  {
+    name: 'buildBriefReaskPrompt (the one brief re-ask)',
     probe: BRIEF_PROSE,
-    build: () => PB.buildSceneReviewPrompt(inputData, SCENES, { beats: BEATS, visualBible: VISUAL_BIBLE }),
-    blind: () => PB.buildSceneReviewPrompt(inputData, [{ pageNumber: 1, brief: 'An empty room.' }], { beats: BEATS, visualBible: VISUAL_BIBLE }),
+    build: () => PB.buildBriefReaskPrompt({ contextPrompt: 'the page-brief prompt', pages: [{ pageNumber: 1, brief: SCENES[0].brief, findings: '- [negation_named] a fault' }] }),
+    blind: () => PB.buildBriefReaskPrompt({ contextPrompt: 'the page-brief prompt', pages: [{ pageNumber: 1, brief: 'An empty room.', findings: '- [negation_named] a fault' }] }),
   },
   {
     name: 'buildBeatsPrompt (page planner)',
@@ -197,6 +213,18 @@ const CASES: Case[] = [
     probe: PLAN_LINE,
     build: () => PB.buildPlanCheckPrompt(inputData, BEATS, ARC_LINE, ''),
     blind: () => PB.buildPlanCheckPrompt(inputData, [{ pageNumber: 1, planLine: 'close — she walks home' }], ARC_LINE, ''),
+  },
+  {
+    name: 'buildBeatsPrompt (page planner) — the story logic',
+    probe: LOGIC_FACT,
+    build: () => PB.buildBeatsPrompt(inputData, 4, { finalArc: ARC_LINE, storyLogic: STORY_LOGIC }),
+    blind: () => PB.buildBeatsPrompt(inputData, 4, { finalArc: ARC_LINE }),
+  },
+  {
+    name: 'buildPlanCheckPrompt — the story logic (question 18)',
+    probe: LOGIC_FACT,
+    build: () => PB.buildPlanCheckPrompt(inputData, BEATS, ARC_LINE, '', { storyLogic: STORY_LOGIC }),
+    blind: () => PB.buildPlanCheckPrompt(inputData, BEATS, ARC_LINE, ''),
   },
   {
     name: 'buildArcCreatePrompt (the arc machine)',
@@ -465,14 +493,14 @@ describe('the Art Director is told to name a size ratio', () => {
     (String(prompt).split('\n').find((l) => l.startsWith('8f.')) || '');
 
   it('both Art Director prompts carry the rule, worded identically', () => {
-    const all = ruleOf(PB.buildSceneExpansionAllPrompt(inputData, BEATS, {}));
+    const all = ruleOf(PB.buildSceneBriefsAllPrompt(inputData, BEATS, {}));
     const one = ruleOf(PB.buildSceneExpansionPrompt(1, PAGE_TEXT, CHARACTERS, 'en', VISUAL_BIBLE, '', null, {}));
     expect(all.length, 'the all-pages Art Director prompt lost rule 8f').toBeGreaterThan(50);
     expect(one, 'the per-page Art Director fallback drifted from the all-pages rule set').toBe(all);
   });
 
   it('the rule demands a ratio unconditionally', () => {
-    const rule = ruleOf(PB.buildSceneExpansionAllPrompt(inputData, BEATS, {}));
+    const rule = ruleOf(PB.buildSceneBriefsAllPrompt(inputData, BEATS, {}));
     // A ratio is asked for...
     expect(rule).toMatch(/\bratio\b/);
     // ...and not behind a condition the model can rule out. The only carve-out
@@ -609,7 +637,8 @@ describe('the re-plan asks for only the pages it changes', () => {
 
   it('a first plan still demands every page through the page count', () => {
     const p = firstPrompt();
-    expect(p).toMatch(/One line per page, through page 4\./);
+    // Since 2026-09-25 the CAST block precedes the plan lines (castCoverage.castTableFormat).
+    expect(p).toMatch(/The CAST block, then one line per page, through page 4\./);
     expect(p).not.toMatch(/named under RE-DIVIDE/);
     expect(unfilled(p)).toEqual([]);
   });
@@ -638,7 +667,7 @@ describe('the light rule agrees across every template that states it', () => {
   const path = require('path');
   const PROMPTS = path.join(__dirname, '../../prompts');
   // story-unified.txt was a member until 2026-09-15 (deleted as unreachable).
-  const FILES = ['scene-expansion-all.txt', 'story-trial.txt'];
+  const FILES = ['visual-bible.txt', 'story-trial.txt'];
 
   const lightLine = (file: string) =>
     fs.readFileSync(path.join(PROMPTS, file), 'utf8')
@@ -693,7 +722,7 @@ describe('object counts are exact up to three and non-numeric above', () => {
     (String(prompt).split('\n').find((l) => l.startsWith('Counting rule:')) || '');
 
   it('both Art Director prompts carry the rule from ONE constant', () => {
-    const all = countingLineOf(PB.buildSceneExpansionAllPrompt(inputData, BEATS, {}));
+    const all = countingLineOf(PB.buildSceneBriefsAllPrompt(inputData, BEATS, {}));
     const one = countingLineOf(
       PB.buildSceneExpansionPrompt(1, PAGE_TEXT, CHARACTERS, 'en', VISUAL_BIBLE, '', null, {}));
     expect(all, 'the all-pages Art Director prompt lost the counting rule').toBe(PB.COUNTING_RULE);
@@ -701,7 +730,7 @@ describe('object counts are exact up to three and non-numeric above', () => {
   });
 
   it('the rule allows three and refuses an exact number above it', () => {
-    const rule = countingLineOf(PB.buildSceneExpansionAllPrompt(inputData, BEATS, {}));
+    const rule = countingLineOf(PB.buildSceneBriefsAllPrompt(inputData, BEATS, {}));
     expect(rule).toMatch(/only up to three/i);
     expect(rule).toMatch(/more than three/i);
     expect(rule, 'the old limit of two is back').not.toMatch(/above two/i);
@@ -774,16 +803,16 @@ describe('both Visual Bible authoring templates forbid a shared proper name', ()
       .map((l: string) => l.trim())
       .find((l: string) => l.includes('`properName`') && l.includes('nowhere else')) || '');
 
-  it('the all-pages Art Director states it', () => {
-    expect(properNameLine('scene-expansion-all.txt')).toMatch(/never share a name/i);
+  it('the Art Director\'s Visual Bible call states it', () => {
+    expect(properNameLine('visual-bible.txt')).toMatch(/never share a name/i);
   });
 
   it('the trial writer states it identically', () => {
-    expect(properNameLine('story-trial.txt')).toBe(properNameLine('scene-expansion-all.txt'));
+    expect(properNameLine('story-trial.txt')).toBe(properNameLine('visual-bible.txt'));
   });
 
   it('the rule names the transformation case without naming a story', () => {
-    const line = properNameLine('scene-expansion-all.txt');
+    const line = properNameLine('visual-bible.txt');
     expect(line).toMatch(/transforms later/i);
     expect(line).toMatch(/separate ids/i);
   });

@@ -107,7 +107,8 @@ describe('the repair router declines a char fix it cannot execute', () => {
 
 describe('every char-repair entry point reports the same reason', () => {
   it('the pipeline round and the manual endpoint both ask charFixReferenceGap', () => {
-    expect(read('server/lib/repairPipeline.js')).toMatch(/charFixReferenceGap\(\{ characters, characterName: charName \}\)/);
+    // The repair round's call is built by charFixCall.js (shared with the Lab char_repair stage).
+    expect(read('server/lib/charFixCall.js')).toMatch(/charFixReferenceGap\(\{ characters, characterName: charName \}\)/);
     expect(read('server/routes/regeneration.js')).toMatch(/charFixReferenceGap\(\{ characters: storyData\.characters/);
   });
 
@@ -119,31 +120,15 @@ describe('every char-repair entry point reports the same reason', () => {
 
 // ── 2. THE LAB REPLAY IS GIVEN WHAT PRODUCTION IS GIVEN ──────────────────────
 
-describe('the scene-review replay passes all four options production passes', () => {
-  const testlab = read('server/lib/testlab.js');
-
-  it('the replay stage passes brief findings alongside clothing, beats and the bible', () => {
-    expect(testlab).toMatch(/prompt = buildSceneReviewPrompt\(storyData, scenes, \{[\s\S]{0,300}?briefFindings: briefFindingsBlock,/);
-    expect(testlab).toMatch(/prompt = buildSceneReviewPrompt\(storyData, scenes, \{[\s\S]{0,300}?visualBible: storyData\.visualBible,/);
-  });
-
-  it('it computes them from the same check production runs, with the bible secondaries in the cast', () => {
+describe('the brief checks count the bible secondaries in the cast', () => {
+  it('computes the findings from the same check production runs, with the bible secondaries in the cast', () => {
     // A figure the story invents can never trigger cast_unlisted unless the
-    // bible's secondaries are in the name list — the same reason beatsPipeline
-    // builds it that way.
-    expect(testlab).toMatch(/require\('\.\/sceneBriefCheck'\)/);
-    expect(testlab).toMatch(/visualBible\?\.secondaryCharacters/);
-  });
-
-  it('the block only reaches the reviewer when the option is passed', async () => {
-    const { loadPromptTemplates } = require_('../../server/services/prompts');
-    await loadPromptTemplates();
-    const PB = require_('../../server/lib/promptBuilders');
-    const inputData = { characters: [{ name: 'Mila' }], language: 'de', pages: 1 };
-    const scenes = [{ pageNumber: 1, brief: 'A hallway.' }];
-    const block = '# BRIEF FAULTS\n\n- Page 1:\n  - [cast_unlisted] the prose names a second figure';
-    expect(PB.buildSceneReviewPrompt(inputData, scenes, {})).not.toContain('# BRIEF FAULTS');
-    expect(PB.buildSceneReviewPrompt(inputData, scenes, { briefFindings: block })).toContain('# BRIEF FAULTS');
+    // bible's secondaries are in the name list. The scene review built it that
+    // way until its deletion (2026-09-28); the one re-ask's checks do now, in the
+    // Lab's beats_scenes and in production alike (both call runBriefChecks).
+    const checks = read('server/lib/briefChecks.js');
+    expect(checks).toMatch(/require\('\.\/sceneBriefCheck'\)/);
+    expect(checks).toMatch(/visualBible\?\.secondaryCharacters/);
   });
 });
 
@@ -242,7 +227,7 @@ describe('resolveFindingOutcomes separates a refuted claim from an unanswered fi
     const src = read('server/lib/textRefine.js');
     expect(src).toMatch(/const returnedIdentical = returnedPages\.filter\(n => !changedPages\.includes\(n\)\)/);
     expect(src).toMatch(/const changedUnasked = changedPages\.filter\(n => !askedPages\.has\(n\)\)/);
-    expect(src).toMatch(/resolveFindingOutcomes\(findings, base, changedPages, returnedPages\)/);
+    expect(src).toMatch(/resolveFindingOutcomes\(findings, base, changedPages, returnedPages, parseDeclinedFindings\(parsed\.analysis, findings\.length\)\)/);
     expect(read('server/lib/textRefine.js')).toMatch(/returnedIdentical: r\.returnedIdentical \|\| \[\]/);
   });
 });

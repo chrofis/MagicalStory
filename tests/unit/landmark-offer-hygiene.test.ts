@@ -68,7 +68,7 @@ describe('a photo with no stored description is not offered as a photo', () => {
 });
 
 describe('the landmark rule is stated ONCE, and only its consumer hears the JSON contract', () => {
-  const { buildArcCreatePrompt, buildSceneExpansionAllPrompt } = require('../../server/lib/promptBuilders');
+  const { buildArcCreatePrompt, buildVisualBibleCallPrompt } = require('../../server/lib/promptBuilders');
   const { loadPromptTemplates } = require('../../server/services/prompts');
   beforeAll(async () => { await loadPromptTemplates(); });
 

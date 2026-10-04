@@ -345,6 +345,31 @@ function filterProtectedRemovals(issues, protection, ctx = {}) {
 }
 
 /**
+ * Guard a judge's RECORD in place: `holder[key]` becomes the kept findings and
+ * the dropped ones are appended to `holder.suppressedIssues` (stamped by
+ * markSuppressed). The eval merge applies it to the quality and semantic lists
+ * so the stored record, the score and every repair reader agree (2026-09-26);
+ * the compliance judge does the same inside evaluateThreeStage.
+ *
+ * A null holder or a non-array list is left untouched. On a page the guard
+ * does not protect the list is unchanged and `suppressedIssues` is `[]`.
+ *
+ * @param {object|null} holder
+ * @param {string} key
+ * @param {ReturnType<typeof computeLandmarkProtection>} protection
+ * @param {{pageNumber?: number|string|null, label?: string, quiet?: boolean}} [ctx]
+ * @returns {Array} the suppressed findings added by this call
+ */
+function guardLandmarkRecord(holder, key, protection, ctx = {}) {
+  if (!holder || typeof holder !== 'object' || !Array.isArray(holder[key])) return [];
+  const guarded = filterProtectedRemovals(holder[key], protection, ctx);
+  holder[key] = guarded.kept;
+  const prior = Array.isArray(holder.suppressedIssues) ? holder.suppressedIssues : [];
+  holder.suppressedIssues = [...prior, ...guarded.suppressed];
+  return guarded.suppressed;
+}
+
+/**
  * Seed the consolidated plan's scene_fix.preserve with the landmark names,
  * unconditionally, on a protected page. The consolidator writes preserve from
  * the scene prose and never named the landmark — so the fixer had nothing
@@ -385,5 +410,6 @@ module.exports = {
   markSuppressed,
   isRemovalShapedFix,
   filterProtectedRemovals,
+  guardLandmarkRecord,
   seedPreserveWithLandmarks,
 };

@@ -1,0 +1,27 @@
+{
+ "_doc": "The 20 stories of jev-text-audit-v1 (pulled 2026-09-27). Text is NOT committed (GDPR); rebuild with: node scripts/analysis/jev-text-audit-dataset.js --extract",
+ "prod": [
+  "job_1790496731630_m9pp92go3",
+  "job_1790282439176_ppgelxibt",
+  "job_1790256136168_pbxibjv0r",
+  "job_1790107559778_fcmlfa8kn",
+  "job_1789975900382_dyc1g7wue",
+  "job_1789944735873_vmbd0or30",
+  "job_1789643978035_ljafiqwgg",
+  "job_1789292742265_mgxmrkfpd",
+  "job_1789227389389_z18dmvnt6",
+  "job_1788727233899_1dpnym94p",
+  "job_1788432259135_fr3egn0tn",
+  "job_1788181867610_qfo6zmnvw",
+  "job_1787689073034_1v6ew0y1kae",
+  "job_1786918670311_qgrdbmlr8",
+  "job_1787469664089_9e27p42el7l",
+  "job_1785441560733_9xigyv8u6"
+ ],
+ "staging": [
+  "job_1790446348343_z3fw660ie",
+  "job_1790373080139_vnx5l8iy7",
+  "job_1790277448294_5herh01j7",
+  "job_1790100385959_1nitlympp"
+ ]
+}

@@ -11,7 +11,7 @@ const fs = require('fs').promises;
 const path = require('path');
 
 // Middleware
-const { authenticateToken } = require('../middleware/auth');
+const { authenticateToken, verifySession } = require('../middleware/auth');
 
 // Config
 const { CREDIT_CONFIG } = require('../config/credits');
@@ -22,7 +22,7 @@ const { getPool, rehydrateStoryImages, logActivity } = require('../services/data
 
 // Lib modules
 const { generatePrintPdf, generateViewPdf, generateCombinedBookPdf, parseStoryPages } = require('../lib/pdf');
-const { processBookOrder, getCoverDimensions } = require('../lib/gelato');
+const { processBookOrder, resumeBookOrder, getCoverDimensions, countBookContentPages, computeBookPageInfo } = require('../lib/gelato');
 const { stripDataUriPrefix } = require('../lib/r2');
 const email = require('../../email');
 
@@ -1224,171 +1224,37 @@ router.post('/generate-book-pdf', authenticateToken, async (req, res) => {
     res.status(500).json({ error: 'Failed to generate book PDF', details: err.message });
   }
 });
-// Admin - Retry failed print provider order
+// Admin - Retry a paid order that has no print provider order yet (review 2026-10-04 P2).
+// Runs the SAME function the Stripe webhook uses (processBookOrder, via resumeBookOrder) from the
+// Stripe session the customer paid with, so every story, the quantity, cover type and format are
+// the paid ones. The Gelato order type follows the ORDER's stripe_mode, not the admin's role.
 router.post('/admin/orders/:orderId/retry-print-order', authenticateToken, async (req, res) => {
   try {
     if (req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Admin access required' });
     }
-
     const { orderId } = req.params;
-    log.debug(`🔄 [ADMIN] Retrying print order for order ID: ${orderId}`);
-
-    // Get order details
-    const orderResult = await getDbPool().query(`
-      SELECT * FROM orders WHERE id = $1
-    `, [orderId]);
-
+    const orderResult = await getDbPool().query('SELECT * FROM orders WHERE id = $1', [orderId]);
     if (orderResult.rows.length === 0) {
       return res.status(404).json({ error: 'Order not found' });
     }
-
     const order = orderResult.rows[0];
-
-    // Check if order already has a print order
     if (order.gelato_order_id) {
       return res.status(400).json({ error: 'Order already has a print order ID', printOrderId: order.gelato_order_id });
     }
-
-    // Find the PDF file for this story
-    const pdfResult = await getDbPool().query(`
-      SELECT id FROM files WHERE story_id = $1 AND file_type = 'story_pdf' ORDER BY created_at DESC LIMIT 1
-    `, [order.story_id]);
-
-    if (pdfResult.rows.length === 0) {
-      return res.status(400).json({ error: 'No PDF found for this story. PDF needs to be regenerated.' });
+    const { getStripeClientForOrder } = req.app.locals;
+    const stripe = typeof getStripeClientForOrder === 'function' ? getStripeClientForOrder(order) : null;
+    if (!stripe) {
+      return res.status(500).json({ error: `No Stripe client for stripe_mode=${order.stripe_mode || 'live'}` });
     }
 
-    const pdfFileId = pdfResult.rows[0].id;
-    const baseUrl = process.env.BASE_URL || 'https://www.magicalstory.ch';
-    const pdfUrl = `${baseUrl}/api/files/${pdfFileId}`;
-
-    // Get story data to determine page count
-    const storyResult = await getDbPool().query(`SELECT data FROM stories WHERE id = $1`, [order.story_id]);
-    if (storyResult.rows.length === 0) {
-      return res.status(400).json({ error: 'Story not found' });
-    }
-
-    const storyData = JSON.parse(storyResult.rows[0].data);
-    const storyScenes = storyData.pages || storyData.sceneImages?.length || 15;
-
-    // Calculate total PDF pages (cover spread + blank + dedication + story pages)
-    // Picture-book layout for all reading levels: 1 scene = 1 print page
-    const frontMatterPages = 2; // blank left page + dedication right page
-    let interiorPages = frontMatterPages + storyScenes;
-    if (interiorPages % 2 !== 0) interiorPages += 1; // Pad to even
-    const printPageCount = 1 + interiorPages; // +1 for cover spread
-    log.debug(`📄 [ADMIN RETRY] Story has ${storyScenes} scenes, interior=${interiorPages}, total=${printPageCount}`);
-
-    // Get print product UID - prefer softcover for retry (can be changed in admin UI)
-    const productsResult = await getDbPool().query(
-      'SELECT product_uid, product_name, cover_type, min_pages, max_pages FROM gelato_products WHERE is_active = true ORDER BY cover_type ASC'
-    );
-
-    let printProductUid = null;
-    if (productsResult.rows.length > 0) {
-      // Find product matching the page count (prefer softcover)
-      const matchingProduct = productsResult.rows.find(p =>
-        printPageCount >= (p.min_pages || 0) && printPageCount <= (p.max_pages || 999)
-      );
-      if (matchingProduct) {
-        printProductUid = matchingProduct.product_uid;
-        log.debug(`📦 [ADMIN RETRY] Using product: ${matchingProduct.product_name} (${matchingProduct.cover_type})`);
-      } else {
-        // Use first product if no page count match
-        printProductUid = productsResult.rows[0].product_uid;
-        log.warn(`📦 [ADMIN RETRY] No product matches page count ${printPageCount}, using first: ${productsResult.rows[0].product_name}`);
-      }
-    }
-
-    if (!printProductUid) {
-      printProductUid = process.env.GELATO_PHOTOBOOK_UID;
-      if (!printProductUid) {
-        return res.status(500).json({ error: 'No active products configured. Please add products in admin dashboard.' });
-      }
-    }
-
-    const printApiKey = process.env.GELATO_API_KEY;
-    if (!printApiKey) {
-      return res.status(500).json({ error: 'GELATO_API_KEY not configured' });
-    }
-
-    // Admin retry: Use user role to determine Gelato order type
-    // Admins get draft for testing, but can force real order if needed
-    const orderType = isUserTestMode(req.user) ? 'draft' : 'order';
-    log.debug(`📦 [GELATO] Retry: Creating ${orderType} (user role: ${req.user.role})`);
-
-    const printOrderPayload = {
-      orderType: orderType,
-      orderReferenceId: `retry-${order.story_id}-${Date.now()}`,
-      customerReferenceId: order.user_id,
-      currency: 'CHF',
-      items: [{
-        itemReferenceId: `item-retry-${order.story_id}-${Date.now()}`,
-        productUid: printProductUid,
-        pageCount: printPageCount,
-        files: [{
-          type: 'default',
-          url: pdfUrl
-        }],
-        quantity: 1
-      }],
-      shipmentMethodUid: 'standard',
-      shippingAddress: {
-        firstName: (order.shipping_name || order.customer_name || '').split(' ')[0] || 'Customer',
-        lastName: (order.shipping_name || order.customer_name || '').split(' ').slice(1).join(' ') || '',
-        addressLine1: order.shipping_address_line1 || '',
-        addressLine2: order.shipping_address_line2 || '',
-        city: order.shipping_city || '',
-        postCode: order.shipping_postal_code || '',
-        state: order.shipping_state || '',
-        country: order.shipping_country || 'CH',
-        email: order.customer_email,
-        phone: ''
-      }
-    };
-
-    log.debug(`📦 [ADMIN] Retry print order payload: productUid=${printProductUid}, pageCount=${printPageCount}, pdfUrl=${pdfUrl}`);
-
-    const printResponse = await fetch('https://order.gelatoapis.com/v4/orders', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-API-KEY': printApiKey
-      },
-      body: JSON.stringify(printOrderPayload)
+    log.info(`🔄 [ADMIN] Retrying print order for order ${orderId} (session ${order.stripe_session_id}, stripe_mode=${order.stripe_mode || 'live'})`);
+    // PDF generation takes minutes: run in the background like the webhook does. processBookOrder
+    // marks the order failed and alerts the admin itself if the retry fails.
+    resumeBookOrder(getDbPool(), order, stripe).catch(err => {
+      log.error(`❌ [ADMIN] Retry of print order ${orderId} failed: ${err.message}`);
     });
-
-    if (!printResponse.ok) {
-      const errorText = await printResponse.text();
-      log.error(`❌ [ADMIN] Print provider API error: ${printResponse.status} - ${errorText}`);
-      return res.status(printResponse.status).json({
-        error: 'Print provider order failed',
-        details: errorText
-      });
-    }
-
-    const printOrder = await printResponse.json();
-    // Gelato v4 API returns 'id', not 'orderId'
-    const gelatoOrderId = printOrder.id || printOrder.orderId;
-    console.log('✅ [ADMIN] Print order created:', gelatoOrderId);
-
-    // Update order with print order ID
-    await getDbPool().query(`
-      UPDATE orders
-      SET gelato_order_id = $1,
-          gelato_status = 'submitted',
-          payment_status = 'completed',
-          updated_at = CURRENT_TIMESTAMP
-      WHERE id = $2
-    `, [gelatoOrderId, orderId]);
-
-    res.json({
-      success: true,
-      message: 'Print order created successfully',
-      printOrderId: gelatoOrderId
-    });
-
+    res.status(202).json({ success: true, message: 'Print order retry started', orderId: order.id });
   } catch (err) {
     log.error('❌ [ADMIN] Error retrying print order:', err);
     res.status(500).json({ error: err.message });
@@ -1469,8 +1335,8 @@ async function getPriceForPages(pageCount, isHardcover) {
 
 // ── Referral / promo code helpers ───────────────────────────────────────────
 
-const { generateReferralCode } = require('../lib/referral');
-const { hasPaidOrder } = require('../lib/orders');
+const { generateReferralCode, normalizeEmailForSelfReferral } = require('../lib/referral');
+const { hasPaidOrder, orderStatusView } = require('../lib/orders');
 const referralBalance = require('../lib/referralBalance');
 
 /**
@@ -1483,7 +1349,7 @@ async function validateReferralCodeForUser(code, buyerUserId) {
 
   // Look up the code owner (case-insensitive — codes are mixed case like MagicRoger42)
   const ownerResult = await getDbPool().query(
-    'SELECT id, referral_code FROM users WHERE LOWER(referral_code) = LOWER($1)', [trimmed]
+    'SELECT id, referral_code, email FROM users WHERE LOWER(referral_code) = LOWER($1)', [trimmed]
   );
   if (ownerResult.rows.length === 0) return { valid: false, reason: 'Code not found' };
   const referrerUserId = ownerResult.rows[0].id;
@@ -1494,8 +1360,13 @@ async function validateReferralCodeForUser(code, buyerUserId) {
 
   // Buyer can only use ONE referral code ever
   const buyerResult = await getDbPool().query(
-    'SELECT referred_by FROM users WHERE id = $1', [buyerUserId]
+    'SELECT referred_by, email FROM users WHERE id = $1', [buyerUserId]
   );
+  // Second account of the same person (P9): same inbox after +tag / gmail-dot normalisation.
+  const referrerEmail = normalizeEmailForSelfReferral(ownerResult.rows[0].email);
+  if (referrerEmail && referrerEmail === normalizeEmailForSelfReferral(buyerResult.rows[0]?.email)) {
+    return { valid: false, reason: 'Cannot use your own code' };
+  }
   if (buyerResult.rows.length > 0 && buyerResult.rows[0].referred_by) {
     return { valid: false, reason: 'You have already used a referral code' };
   }
@@ -1691,35 +1562,25 @@ router.post('/referral/cash-out', authenticateToken, async (req, res) => {
         failed.push({ orderId: order.orderId, error: 'No Stripe client for mode ' + order.stripeMode });
         continue;
       }
-      try {
-        const refund = await stripe.refunds.create({
-          payment_intent: order.paymentIntentId,
-          amount: refundAmount,
-          reason: 'requested_by_customer',
-          metadata: { type: 'referral_cashout', user_id: userId, order_session_id: order.sessionId },
-        });
-        await referralBalance.spendForRefund({
-          userId,
-          amountCents: refundAmount,
-          refundId: refund.id,
-          sessionId: order.sessionId,
-        });
-        succeeded.push({ orderId: order.orderId, refundId: refund.id, amountCents: refundAmount });
-        remaining -= refundAmount;
-        log.info(`💸 [REFERRAL CASHOUT] Refunded CHF ${(refundAmount / 100).toFixed(2)} to ${userId} via ${refund.id} (PI ${order.paymentIntentId})`);
-        await logActivity(userId, req.user.username, 'REFERRAL_CASHOUT_REFUND', {
-          orderId: order.orderId,
-          sessionId: order.sessionId,
-          paymentIntentId: order.paymentIntentId,
-          refundId: refund.id,
-          amountCents: refundAmount,
-          stripeMode: order.stripeMode,
-        }, req.user);
-      } catch (stripeErr) {
-        failed.push({ orderId: order.orderId, error: stripeErr.message, code: stripeErr.code });
-        log.warn(`⚠️ [REFERRAL CASHOUT] Refund failed for order ${order.orderId} (PI ${order.paymentIntentId}): ${stripeErr.message}`);
-        // Continue to next order — Stripe has no "un-refund"
+      // Debit first, refund with an idempotency key, restore on failure (P1).
+      const leg = await referralBalance.cashOutToCard({ userId, order, amountCents: refundAmount, stripe });
+      if (!leg.ok) {
+        failed.push({ orderId: order.orderId, error: leg.error, code: leg.code });
+        log.warn(`⚠️ [REFERRAL CASHOUT] Cash-out leg failed for order ${order.orderId} (PI ${order.paymentIntentId}): ${leg.error}`);
+        if (leg.code === 'insufficient_available') break; // balance gone (concurrent cash-out): stop, don't try other orders
+        continue;
       }
+      succeeded.push({ orderId: order.orderId, refundId: leg.refundId, amountCents: refundAmount });
+      remaining -= refundAmount;
+      log.info(`💸 [REFERRAL CASHOUT] Refunded CHF ${(refundAmount / 100).toFixed(2)} to ${userId} via ${leg.refundId} (PI ${order.paymentIntentId})`);
+      await logActivity(userId, req.user.username, 'REFERRAL_CASHOUT_REFUND', {
+        orderId: order.orderId,
+        sessionId: order.sessionId,
+        paymentIntentId: order.paymentIntentId,
+        refundId: leg.refundId,
+        amountCents: refundAmount,
+        stripeMode: order.stripeMode,
+      }, req.user);
     }
 
     const after = await referralBalance.getBalance(userId);
@@ -1733,6 +1594,36 @@ router.post('/referral/cash-out', authenticateToken, async (req, res) => {
   } catch (err) {
     log.error('❌ Error processing referral cashout:', err);
     res.status(500).json({ error: 'Failed to process cashout' });
+  }
+});
+
+// Pre-payment preview for the book builder: how many pages the printed book
+// will have and how many of them are blank. Same computeBookPageInfo the order
+// flow pads the PDF with — see DECISIONS / commit message.
+router.post('/book-page-info', authenticateToken, async (req, res) => {
+  try {
+    const { storyIds, coverType = 'softcover', bookFormat = 'A4' } = req.body;
+    if (!Array.isArray(storyIds) || storyIds.length === 0) {
+      return res.status(400).json({ error: 'Missing or invalid storyIds array' });
+    }
+    if (!['softcover', 'hardcover'].includes(coverType) || !['A4', 'square'].includes(bookFormat)) {
+      return res.status(400).json({ error: 'Invalid coverType or bookFormat' });
+    }
+    const storyDatas = [];
+    for (const sid of storyIds) {
+      const r = await getDbPool().query('SELECT data FROM stories WHERE id = $1 AND user_id = $2', [sid, req.user.id]);
+      if (r.rows.length === 0) return res.status(404).json({ error: `Story not found: ${sid}` });
+      storyDatas.push(typeof r.rows[0].data === 'string' ? JSON.parse(r.rows[0].data) : r.rows[0].data);
+    }
+    const info = await computeBookPageInfo(getDbPool(), storyDatas, coverType, bookFormat);
+    res.json({
+      contentPages: info.contentPages,
+      printedPages: info.printedPages,
+      blankPages: info.blankPages,
+    });
+  } catch (err) {
+    log.error('Error computing book page info:', err);
+    res.status(500).json({ error: 'Failed to compute book page info' });
   }
 });
 
@@ -1766,7 +1657,6 @@ router.post('/stripe/create-checkout-session', authenticateToken, async (req, re
 
     // Fetch all stories and calculate total pages
     const stories = [];
-    let totalPages = 0;
     for (const sid of allStoryIds) {
       const storyResult = await getDbPool().query('SELECT data FROM stories WHERE id = $1 AND user_id = $2', [sid, userId]);
       if (storyResult.rows.length === 0) {
@@ -1776,23 +1666,10 @@ router.post('/stripe/create-checkout-session', authenticateToken, async (req, re
         ? JSON.parse(storyResult.rows[0].data)
         : storyResult.rows[0].data;
       stories.push({ id: sid, data: storyData });
-
-      // Picture-book layout for all reading levels: 1 scene = 1 print page
-      const sceneCount = storyData.sceneImages?.length || storyData.pages || 5;
-      totalPages += sceneCount;
     }
-
-    // Story 1: 1 page (dedication, blank if trial)
-    // Story 2+: 2 pages (title + dedication) + back cover + separator if applicable
-    totalPages += 1; // dedication for first story
-    for (let si = 1; si < stories.length; si++) {
-      totalPages += 2; // title + dedication page
-      const hasBackCover = !!stories[si].data?.coverImages?.backCover;
-      if (hasBackCover) {
-        totalPages += 1; // back cover
-        if (si < stories.length - 1) totalPages += 1; // separator
-      }
-    }
+    // Same counter the print PDF and the book-builder preview use
+    // (dedication + story pages + per-extra-story title/dedication/back cover).
+    const totalPages = countBookContentPages(stories.map(s => s.data));
 
     // Calculate price based on pages and cover type (using database pricing)
     // Pricing tiers store the BOOK price only — shipping is added once per order.
@@ -2007,6 +1884,13 @@ router.get('/stripe/order-status/:sessionId', async (req, res) => {
 
     log.debug(`🔍 Checking order status for session: ${sessionId}`);
 
+    // Optional login: the owner additionally gets the shipping recipient details (P10).
+    let viewerUserId = null;
+    try {
+      const bearer = (req.headers['authorization'] || '').split(' ')[1];
+      if (bearer) viewerUserId = (await verifySession(bearer)).id || null;
+    } catch { /* anonymous viewer */ }
+
     // Check database for order with retries (webhook might still be processing)
     if (STORAGE_MODE === 'database') {
       const maxRetries = 5;
@@ -2030,7 +1914,7 @@ router.get('/stripe/order-status/:sessionId', async (req, res) => {
           else if (ps === 'failed' || ps === 'cancelled') status = ps;
           else if (ps === 'pending' || ps === 'processing' || ps === '') status = 'processing';
           console.log(`✅ Order found in database (attempt ${attempt}): id=${row.id}, payment_status=${ps}, ui_status=${status}`);
-          return res.json({ status, order: row });
+          return res.json({ status, order: orderStatusView(row, viewerUserId) });
         }
 
         if (attempt < maxRetries) {
@@ -2075,7 +1959,8 @@ router.get('/stripe/order-status/:sessionId', async (req, res) => {
       log.debug(`📦 Constructing order from Stripe session data`);
       return res.json({
         status: 'processing', // Webhook hasn't completed yet but payment succeeded
-        order: {
+        order: orderStatusView({
+          user_id: session.metadata?.userId,
           customer_name: customerDetails.name || 'Customer',
           customer_email: customerDetails.email || '',
           shipping_name: shippingDetails.name || customerDetails.name || 'Customer',
@@ -2086,7 +1971,7 @@ router.get('/stripe/order-status/:sessionId', async (req, res) => {
           amount_total: session.amount_total,
           currency: session.currency,
           tokens_credited: tokensExpected // Expected tokens (will be credited when webhook completes)
-        }
+        }, viewerUserId)
       });
     }
 

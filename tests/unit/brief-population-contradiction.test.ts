@@ -96,9 +96,4 @@ describe('population_contradicted', () => {
     const findings = checkPage({ pageNumber: 1, brief }, CAST, null, {});
     expect(findings.some((f: any) => f.type === 'population_contradicted')).toBe(true);
   });
-
-  it('the scene review answers the tag', () => {
-    const tpl = fs.readFileSync(path.join(__dirname, '../../prompts/scene-review.txt'), 'utf8');
-    expect(tpl).toContain('[population_contradicted]');
-  });
 });

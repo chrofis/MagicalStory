@@ -20,7 +20,7 @@
  * parsed as a commissioned character (C2), and the two version fields the
  * round whitelist dropped (D).
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import { createRequire } from 'module';
 import fs from 'fs';
 import path from 'path';
@@ -211,6 +211,9 @@ describe('A3 — a cited facet the bible does not declare falls back to the bare
 });
 
 describe('A4 — REQUIRED OBJECTS is never a heading with nothing under it', () => {
+  // Without the template this ran against buildImagePrompt's hardcoded fallback
+  // (deleted 2026-10-04, review B4) and proved nothing about the shipped prompt.
+  beforeAll(async () => { await require_('../../server/services/prompts').loadPromptTemplates(); });
   const buildP16 = (meta: any) => buildImagePrompt(
     brief(meta), { language: 'de-ch', artStyle: 'pixar', layout: { textInImage: true } },
     null, visualBible, 16, null, {},

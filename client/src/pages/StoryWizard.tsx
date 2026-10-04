@@ -1,3 +1,4 @@
+import { defaultMainCharacterId, addMainCharacter, trimMainCharacters } from '@/utils/mainCharacters';
 import { useState, useEffect, useRef, lazy, Suspense, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useLanguage } from '@/context/LanguageContext';
@@ -421,6 +422,7 @@ export default function StoryWizard() {
   const [beatsReviewReport, setBeatsReviewReport] = useState<any>(null); // Per-page beats-review before/after (dev mode)
   const [clothingReviewReport, setClothingReviewReport] = useState<any>(null); // Wardrobe review: outfits in, outfits rewritten (dev mode)
   const [sceneReviewReport, setSceneReviewReport] = useState<any>(null); // Per-page scene-review before/after (dev mode)
+  const [briefCheckReport, setBriefCheckReport] = useState<any>(null); // Brief checks + the one re-ask (dev mode, 2026-09-28)
   const [storyTextPrompts, setStoryTextPrompts] = useState<Array<{ batch: number; startPage: number; endPage: number; prompt: string; modelId?: string; usage?: { input_tokens: number; output_tokens: number } }>>([]); // API prompts for story text (dev mode)
   const [visualBible, setVisualBible] = useState<VisualBible | null>(null); // Visual Bible for dev mode
   const [clothingRequirements, setClothingRequirements] = useState<Record<string, { standard?: { used: boolean; signature?: string }; winter?: { used: boolean; signature?: string }; summer?: { used: boolean; signature?: string }; costumed?: { used: boolean; costume?: string; description?: string } }> | null>(null); // Clothing requirements per character (dev mode)
@@ -1165,6 +1167,7 @@ export default function StoryWizard() {
             setBeatsReviewReport((fullMeta as any).beatsReviewReport || null);
             setClothingReviewReport((fullMeta as any).clothingReviewReport || null);
             setSceneReviewReport((fullMeta as any).sceneReviewReport || null);
+            setBriefCheckReport((fullMeta as any).briefCheckReport || null);
             setSceneExpansionReport((fullMeta as any).sceneExpansionReport || null);
             setStoryTextPrompts(fullMeta.storyTextPrompts || []);
             setStyledAvatarGeneration(fullMeta.styledAvatarGeneration || []);
@@ -1651,31 +1654,12 @@ export default function StoryWizard() {
     }
   }, [searchParams, setSearchParams]);
 
-  // Auto-select main characters based on age
+  // Auto-select ONE main character: the first-created child (see defaultMainCharacterId)
   const autoSelectMainCharacters = (charactersList: Character[]) => {
-    if (charactersList.length === 0) return;
-
-    // Find characters aged 1-10
-    const youngCharacters = charactersList.filter(char => {
-      const age = parseInt(char.age);
-      return age >= 1 && age <= 10;
-    });
-
-    if (youngCharacters.length > 0) {
-      // Select all characters aged 1-10 as main characters
-      const mainCharIds = youngCharacters.map(char => char.id);
-      setMainCharacters(mainCharIds);
-      log.info(`Auto-selected ${youngCharacters.length} main character(s) aged 1-10`);
-    } else {
-      // No characters aged 1-10, select the youngest one
-      const youngest = charactersList.reduce((min, char) => {
-        const age = parseInt(char.age) || 999;
-        const minAge = parseInt(min.age) || 999;
-        return age < minAge ? char : min;
-      });
-      setMainCharacters([youngest.id]);
-      log.info(`Auto-selected youngest character as main: ${youngest.name} (age ${youngest.age})`);
-    }
+    const mainId = defaultMainCharacterId(charactersList);
+    if (mainId === null) return;
+    setMainCharacters([mainId]);
+    log.info(`Auto-selected main character: ${charactersList.find(c => c.id === mainId)?.name}`);
   };
 
   // Load characters and relationships on mount
@@ -1991,6 +1975,25 @@ export default function StoryWizard() {
   useEffect(() => {
     localStorage.setItem('story_art_style', artStyle);
   }, [artStyle]);
+
+  // Rank the town's landmarks for this story kind the moment it is picked, so
+  // the idea request below reads a ready ranking and never waits for one
+  // (server: POST /api/prepare-idea-landmarks). Same fields the idea request
+  // sends; re-fired only when one of them changes.
+  const preparedLandmarksKeyRef = useRef('');
+  useEffect(() => {
+    if (!storyCategory || !(storyTheme || storyTopic) || !userLocation?.city || storyCategory === 'historical') return;
+    const cast = characters.filter(c => !excludedCharacters.includes(c.id)).map(c => ({ age: c.age, gender: c.gender }));
+    if (!cast.length) return;
+    const data = {
+      storyCategory, storyTopic: storyTopic || undefined, storyTheme: storyTheme || undefined,
+      language: storyLanguage, characters: cast, userLocation,
+    };
+    const key = JSON.stringify(data);
+    if (key === preparedLandmarksKeyRef.current) return;
+    preparedLandmarksKeyRef.current = key;
+    storyService.prepareIdeaLandmarks(data);
+  }, [storyCategory, storyTopic, storyTheme, storyLanguage, userLocation, characters, excludedCharacters]);
 
   // Pre-generate story ideas when user reaches step 4 (art style) if we have enough info
   // This way ideas are ready by the time they reach step 5 (summary)
@@ -3625,14 +3628,34 @@ export default function StoryWizard() {
       setExcludedCharacters(prev => prev.filter(id => id !== charId));
       setMainCharacters(prev => prev.filter(id => id !== charId));
     } else if (role === 'main') {
-      // Remove from excluded, add to main
+      // Remove from excluded, add to main (limit 1 = radio swap; see utils/mainCharacters)
+      const stillIn = characters.filter(c => c.id === charId || !excludedCharacters.includes(c.id));
+      const nextMain = addMainCharacter(stillIn.length, mainCharacters, charId);
+      const dropped = mainCharacters.filter(id => !nextMain.includes(id));
       setExcludedCharacters(prev => prev.filter(id => id !== charId));
-      setMainCharacters(prev => prev.includes(charId) ? prev : [...prev, charId]);
+      setMainCharacters(nextMain);
+      if (dropped.length > 0) {
+        setCharacters(prev => prev.map(c => dropped.includes(c.id) ? { ...c, storyRole: 'in' } : c));
+      }
     }
     rolesDirty.current = true; // Mark as modified
     // Also update storyRole on the character object so it's sent with saveAllCharacterData
     setCharacters(prev => prev.map(c => c.id === charId ? { ...c, storyRole: role } : c));
   };
+
+  // Keep the mains within the server's limit for the cast now in the story: covers a
+  // character set to "out", a deleted one, and stored roles that exceed it on load.
+  // Keeps the first-selected mains; the rest become "in" and are persisted like any role change.
+  useEffect(() => {
+    if (!initialCharacterLoadDone) return;
+    const inStoryIds = characters.filter(c => !excludedCharacters.includes(c.id)).map(c => c.id);
+    const trimmed = trimMainCharacters(inStoryIds, mainCharacters);
+    if (trimmed.length === mainCharacters.length) return;
+    const dropped = mainCharacters.filter(id => !trimmed.includes(id));
+    setMainCharacters(trimmed);
+    setCharacters(prev => prev.map(c => dropped.includes(c.id) && !excludedCharacters.includes(c.id) ? { ...c, storyRole: 'in' } : c));
+    rolesDirty.current = true;
+  }, [characters, excludedCharacters, mainCharacters, initialCharacterLoadDone]);
 
   // Save character roles to database
   const saveCharacterRoles = async () => {
@@ -4342,6 +4365,7 @@ export default function StoryWizard() {
           setBeatsReviewReport((status.result as any).beatsReviewReport || null);
           setClothingReviewReport((status.result as any).clothingReviewReport || null);
           setSceneReviewReport((status.result as any).sceneReviewReport || null);
+          setBriefCheckReport((status.result as any).briefCheckReport || null);
           setStoryTextPrompts(status.result.storyTextPrompts || []);
           setStyledAvatarGeneration(status.result.styledAvatarGeneration || []);
           setCostumedAvatarGeneration(status.result.costumedAvatarGeneration || []);
@@ -4931,6 +4955,7 @@ export default function StoryWizard() {
               beatsReviewReport={beatsReviewReport}
               clothingReviewReport={clothingReviewReport}
               sceneReviewReport={sceneReviewReport}
+              briefCheckReport={briefCheckReport}
               storyTextPrompts={storyTextPrompts}
               visualBible={visualBible || undefined}
               sceneImages={displaySceneImages}

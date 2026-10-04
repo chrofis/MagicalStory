@@ -1,0 +1,94 @@
+{
+ "tag": "pro-alt-as-B-rest",
+ "totalCost": 0.4001,
+ "calls": [
+  {
+   "case": 1,
+   "altPosition": "B",
+   "winner": "alt",
+   "confidence": 0.9,
+   "model": "google/gemini-3.1-pro-preview",
+   "cost": 0.047714,
+   "in": 12781,
+   "out": 1846,
+   "reasoning": 1477
+  },
+  {
+   "case": 2,
+   "altPosition": "B",
+   "winner": "alt",
+   "confidence": 0.85,
+   "model": "google/gemini-3.1-pro-preview",
+   "cost": 0.049446,
+   "in": 13383,
+   "out": 1890,
+   "reasoning": 1643
+  },
+  {
+   "case": 4,
+   "altPosition": "B",
+   "winner": "alt",
+   "confidence": 0.7,
+   "model": "google/gemini-3.1-pro-preview",
+   "cost": 0.060608,
+   "in": 13510,
+   "out": 2799,
+   "reasoning": 2471
+  },
+  {
+   "case": 5,
+   "altPosition": "B",
+   "winner": "shipped",
+   "confidence": 0.7,
+   "model": "google/gemini-3.1-pro-preview",
+   "cost": 0.05625,
+   "in": 12891,
+   "out": 2539,
+   "reasoning": 2147
+  },
+  {
+   "case": 6,
+   "altPosition": "B",
+   "winner": "shipped",
+   "confidence": 0.8,
+   "model": "google/gemini-3.1-pro-preview",
+   "cost": 0.049348,
+   "in": 13250,
+   "out": 1904,
+   "reasoning": 1622
+  },
+  {
+   "case": 8,
+   "altPosition": "B",
+   "winner": "shipped",
+   "confidence": 0.95,
+   "model": "google/gemini-3.1-pro-preview",
+   "cost": 0.042874,
+   "in": 11993,
+   "out": 1574,
+   "reasoning": 1348
+  },
+  {
+   "case": 9,
+   "altPosition": "B",
+   "winner": "alt",
+   "confidence": 0.9,
+   "model": "google/gemini-3.1-pro-preview",
+   "cost": 0.046178,
+   "in": 12205,
+   "out": 1814,
+   "reasoning": 1671
+  },
+  {
+   "case": 10,
+   "altPosition": "B",
+   "winner": "shipped",
+   "confidence": 0.6,
+   "model": "google/gemini-3.1-pro-preview",
+   "cost": 0.047654,
+   "in": 11857,
+   "out": 1995,
+   "reasoning": 1707
+  }
+ ]
+}

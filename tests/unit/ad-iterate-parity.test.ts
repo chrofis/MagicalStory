@@ -3,7 +3,7 @@
  *
  * WHY THIS EXISTS — owner directive, 2026-09-17. A page brief is authored at
  * FOUR sites: the two Art Director templates that write it the first time
- * (scene-expansion.txt, scene-expansion-all.txt) and the two iterate templates
+ * (scene-expansion.txt, scene-briefs-all.txt) and the two iterate templates
  * that REWRITE it when the render proves it unbuildable (scene-iteration.txt,
  * scene-iteration-free.txt). The rewrite replaces the brief wholesale and
  * becomes the page's contract with the image model, so a rule only the first
@@ -84,7 +84,7 @@ const BEATS = [
 
 const PAGE_TEXT = 'The lamp guttered twice and then went out, and nobody said a word.';
 
-const buildAdAll = () => PB.buildSceneExpansionAllPrompt(inputData, BEATS, {});
+const buildAdAll = () => PB.buildSceneBriefsAllPrompt(inputData, BEATS, {});
 const buildAdOne = () => PB.buildSceneExpansionPrompt(
   1, PAGE_TEXT, CHARACTERS, 'en', VISUAL_BIBLE, '', null, { story: inputData });
 const buildIterate = (freeIterate: boolean) => PB.buildSceneDescriptionPrompt(
@@ -109,16 +109,22 @@ const CONSTANT_FOR: Record<string, string> = {
   '{WORN_ITEMS_ROW}': 'WORN_ITEMS_ROW_RULE',
   '{WORN_ON_OTHER}': 'WORN_ON_OTHER_RULE',
   '{NEVER_NAME_ABSENT}': 'ABSENT_THING_RULE',
+  '{NO_HEADLINE_PHRASES}': 'HEADLINE_PHRASE_RULE',
   '{SCENE_INTENT_FIELD}': 'SCENE_INTENT_FIELD_RULE',
   '{SCENE_LIGHT_FIELD}': 'SCENE_LIGHT_FIELD_RULE',
   '{CONCEALED_OBJECT}': 'CONCEALED_OBJECT_RULE',
   '{EYES_OPEN}': 'EYES_OPEN_RULE',
   '{CREATURE_FACE}': 'CREATURE_FACE_RULE',
+  '{CREATURE_FIELD}': 'CREATURE_FIELD_RULE',
+  '{ELEMENT_SIZE_WORD}': 'ELEMENT_SIZE_WORD_RULE',
   '{CONTACT_VERB}': 'CONTACT_VERB_RULE',
   '{REACHABLE_CONTACT}': 'REACHABLE_CONTACT_RULE',
+  '{SMALL_PROP_CONTACT}': 'SMALL_PROP_CONTACT_RULE',
   '{PLAN_LINE_CAST}': 'PLAN_LINE_CAST_RULE',
   '{COUNTING_RULE}': 'COUNTING_RULE',
   '{MULTI_PICTURE_PROP}': 'MULTI_PICTURE_PROP_RULE',
+  '{SHARED_GRIP}': 'SHARED_GRIP_RULE',
+  '{TRUE_RELATIVE_SIZE}': 'TRUE_RELATIVE_SIZE_RULE',
 };
 const COMPUTED = new Set(['{CREATURE_TONE}', '{VB_ELEMENT_BUDGET}', '{SHOT_ENUM}', '{SEASON}']);
 
@@ -128,7 +134,7 @@ describe('the four page-brief authoring sites', () => {
   it('builds all four prompts', async () => {
     await loadPromptTemplates();
     BUILT = [
-      { name: 'scene-expansion-all.txt (Art Director, all pages)', text: buildAdAll() },
+      { name: 'scene-briefs-all.txt (Art Director, all pages)', text: buildAdAll() },
       { name: 'scene-expansion.txt (Art Director, per page)', text: buildAdOne() },
       { name: 'scene-iteration.txt (rewrite, strict)', text: buildIterate(false) },
       { name: 'scene-iteration-free.txt (rewrite, free)', text: buildIterate(true) },
@@ -139,7 +145,7 @@ describe('the four page-brief authoring sites', () => {
   it('the registry set names all four, and every anchor is resolvable here', () => {
     expect(SET, 'sibling set art-director-vs-iterate is gone from the registry').toBeTruthy();
     expect(SET.members.slice().sort()).toEqual([
-      'prompts/scene-expansion-all.txt',
+      'prompts/scene-briefs-all.txt',
       'prompts/scene-expansion.txt',
       'prompts/scene-iteration-free.txt',
       'prompts/scene-iteration.txt',
@@ -224,7 +230,7 @@ describe('the rewrite emits the fields the brief it replaces carried', () => {
   const free = declaredFields(read('prompts/scene-iteration-free.txt'));
 
   it('the per-page Art Director still declares the page-brief schema', () => {
-    for (const f of ['sceneIntent', 'characters', 'shot', 'landmarkView', 'objects', 'interactions', 'wornItems']) {
+    for (const f of ['sceneIntent', 'characters', 'shot', 'objects', 'interactions', 'wornItems']) {
       expect(adFields.has(f), `the Art Director no longer declares ${f}`).toBe(true);
     }
   });

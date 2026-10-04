@@ -4,7 +4,7 @@ import path from 'path';
 
 const ROOT = path.resolve(__dirname, '../..');
 const PER_PAGE = path.join(ROOT, 'prompts/scene-expansion.txt');
-const ALL_PAGES = path.join(ROOT, 'prompts/scene-expansion-all.txt');
+const ALL_PAGES = path.join(ROOT, 'prompts/scene-briefs-all.txt');
 
 const FENCE = /^```[a-z]*\r?\n([\s\S]*?)^```/gm;
 

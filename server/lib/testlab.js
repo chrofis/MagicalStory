@@ -18,12 +18,13 @@
 'use strict';
 
 const { log } = require('../utils/logger');
+const { geminiUsage } = require('./providerUsage');
 const { samUnionBlend, maskBlurThreshold, fetchMaskWithRetry, BLEND_RULE_VERSION } = require('./samBlend');
-const { assessSceneReview, assertReviewedArtifactUsable, pickReviewedBrief } = require('./sceneReviewGuard');
+const { assertReviewedArtifactUsable, pickReviewedBrief } = require('./sceneReviewGuard');
 // Production's arguments for the beats writer/Art-Director calls, resolved from
 // a stored story. Every replay stage builds its inputs through these so a
 // divergent, thinner expression cannot be written a fourth time.
-const { buildReplayTextArgs, buildReplaySceneOptions, resolveReplayArc, resolveReplayArcHints, resolveReplayCentralFigure } = require('./beatsReplayInputs');
+const { buildReplayTextArgs, buildReplaySceneOptions, resolveReplayArc, resolveReplayArcHints, resolveReplayCentralFigure, resolveReplayPresent, resolveReplayStoryLogic, resolveArcFromExperiment, resolveReplayInputData } = require('./beatsReplayInputs');
 // Production's evalOptions for evaluateImageQuality, resolved from a stored
 // story. Same rule as above: every eval stage builds its options through this
 // so a thinner, silently-check-disabling expression cannot be written again.
@@ -71,10 +72,15 @@ async function loadSceneContext(storyId, pageNumber) {
               data->>'language' AS language,
               data->>'languageLevel' AS language_level,
               data->>'storyType' AS story_type,
+              data->>'storyTheme' AS story_theme,
+              data->>'storyTopic' AS story_topic,
               data->>'title' AS title,
+              data->>'dedication' AS dedication,
               data->'layout' AS layout,
               (data->'visualBible')::text AS visual_bible,
               (data->'clothingRequirements')::text AS clothing_reqs,
+              (data->'pageClothing')::text AS page_clothing,
+              (data->'coverHints')::text AS cover_hints,
               (data->'characters')::text AS characters_json,
               (data->'characterAvatars')::text AS character_avatars
        FROM stories WHERE stories.id = $1`,
@@ -86,10 +92,15 @@ async function loadSceneContext(storyId, pageNumber) {
               data->>'language' AS language,
               data->>'languageLevel' AS language_level,
               data->>'storyType' AS story_type,
+              data->>'storyTheme' AS story_theme,
+              data->>'storyTopic' AS story_topic,
               data->>'title' AS title,
+              data->>'dedication' AS dedication,
               data->'layout' AS layout,
               (data->'visualBible')::text AS visual_bible,
               (data->'clothingRequirements')::text AS clothing_reqs,
+              (data->'pageClothing')::text AS page_clothing,
+              (data->'coverHints')::text AS cover_hints,
               (data->'characters')::text AS characters_json,
               (data->'characterAvatars')::text AS character_avatars
        FROM stories, jsonb_array_elements(data->'sceneImages') scene
@@ -114,6 +125,15 @@ async function loadSceneContext(storyId, pageNumber) {
   try {
     clothingRequirements = rows[0].clothing_reqs ? JSON.parse(rows[0].clothing_reqs) : null;
   } catch { /* run without — repairs fall back to avatar clothing */ }
+  // The story's clothing plan: what a page or cover resolves to when its own
+  // record names no per-character outfit (clothingCategories
+  // .resolveRenderedClothingCategory), the same fallback production uses.
+  let pageClothing = null;
+  let coverHints = null;
+  try {
+    pageClothing = rows[0].page_clothing ? JSON.parse(rows[0].page_clothing) : null;
+    coverHints = rows[0].cover_hints ? JSON.parse(rows[0].cover_hints) : null;
+  } catch { /* malformed — a stage that needs it refuses */ }
   let characters = [];
   try {
     characters = rows[0].characters_json ? JSON.parse(rows[0].characters_json) : [];
@@ -144,8 +164,13 @@ async function loadSceneContext(storyId, pageNumber) {
     language: rows[0].language || 'de',
     languageLevel: rows[0].language_level || 'standard',
     storyType: rows[0].story_type || null,
+    storyTheme: rows[0].story_theme || null,
+    storyTopic: rows[0].story_topic || null,
     title: rows[0].title || null,
+    dedication: rows[0].dedication || null,
     clothingRequirements,
+    pageClothing,
+    coverHints,
     characters,
     characterAvatars,
     referencePhotos,
@@ -224,30 +249,40 @@ async function loadActivePageImage(storyId, pageNumber, versionIndex = null, ima
   // loadedFrom={unrecorded} symptom AND the 2026-08-19 "detected on v0
   // although activeVersion=2" mystery (bug lab-unpinned-loads-v0).
   const pinned = pinnedVersionIndex(versionIndex);
+  // A COVER is its TEXTLESS art layer here, for every stage — the image a
+  // judge reads and a repair edits, as in production (owner, 2026-09-26:
+  // "evaluate first, then add the text"). The served cover carries the app's
+  // title / dedication / "magicalstory.ch"; coverEvalLayer resolves the art of
+  // exactly this version (active, or the pinned one — a Lab cover version
+  // stores its own art row) and throws for a stamped version without one.
+  // Only a pinned intermediate of ANOTHER type (a tl_step, a plate) is not a
+  // cover image and loads below.
+  const pinnedOtherType = pinned !== null && !!imageType && imageType !== coverKey;
+  if (coverKey && !pinnedOtherType) {
+    const { resolveCoverEvalImage } = require('./coverEvalLayer');
+    const res = await resolveCoverEvalImage(storyId, coverKey, pinned);
+    _lastPageLoad = { storyId, pageNumber, activeIdx: pinned === null ? res.versionIndex : null, loadedVersion: res.versionIndex, fellBackToV0: false, coverLayer: res.layer };
+    log.info(`[TESTLAB] ${storyId} ${coverKey}: loaded v${res.versionIndex} ${res.layer === 'art' ? 'textless art layer' : 'unstamped render'}`);
+    return res.imageData;
+  }
   // A Lab step image is written with is_test = true, and getStoryImage filters
   // those out — so an intermediate has to come through loadTestImage, which
   // does not.
-  if (pinned !== null && imageType) {
+  if (pinnedOtherType) {
     const img = await loadTestImage(storyId, imageType, pageNumber, pinned);
     if (!img?.imageData) throw new Error(`No ${imageType} v${pinned} for ${storyId} page ${pageNumber}`);
     return img.imageData;
   }
   if (pinned !== null) {
-    const row = await getStoryImage(storyId, coverKey || 'scene', coverKey ? null : pageNumber, pinned);
+    const row = await getStoryImage(storyId, 'scene', pageNumber, pinned);
     if (!row) throw new Error(`No version ${pinned} for ${storyId} page ${pageNumber}`);
     const bytes = await bytesFor(row);
     if (!bytes) throw new Error(`Bytes unavailable for ${storyId} page ${pageNumber} v${pinned}`);
     return bytes;
   }
-  // Cover rows live in story_images as image_type=<coverKey> with NULL
-  // page_number; active-version meta is keyed by the cover key string.
-  const activeIdx = await getActiveVersion(storyId, coverKey || pageNumber);
-  const atActive = coverKey
-    ? await getStoryImage(storyId, coverKey, null, activeIdx)
-    : await getStoryImage(storyId, 'scene', pageNumber, activeIdx);
-  const img = atActive || (coverKey
-    ? await getStoryImage(storyId, coverKey, null, 0)
-    : await getStoryImage(storyId, 'scene', pageNumber, 0));
+  const activeIdx = await getActiveVersion(storyId, pageNumber);
+  const atActive = await getStoryImage(storyId, 'scene', pageNumber, activeIdx);
+  const img = atActive || await getStoryImage(storyId, 'scene', pageNumber, 0);
   // OBSERVABLE, ALWAYS (owner, 2026-08-19). Three unpinned Lab runs on
   // job_1787120984020_pg71z58ba9 p7 detected on v0 content although
   // image_version_meta says activeVersion=2 and the pinned load of v2 works —
@@ -394,6 +429,24 @@ async function saveTestVersion(storyId, imageType, pageNumber, imageData, experi
   return run;
 }
 
+/**
+ * A Lab COVER version: the served image AND its textless art layer, at the
+ * same version index — the pair production keeps (`${coverKey}` +
+ * `${coverKey}Art`), so a later Lab eval of this version reads its art
+ * (coverEvalLayer.resolveCoverEvalImage), never its stamped bytes.
+ * `artImageData` is the textless render; when the served image was not
+ * stamped (baked title, typography skipped) it is the served image itself.
+ */
+async function saveTestCoverVersion(storyId, coverKey, servedImageData, artImageData, experimentId, qualityScore = null) {
+  if (!artImageData) throw new Error(`saveTestCoverVersion: ${coverKey} has no textless art to store`);
+  const versionIndex = await saveTestVersion(storyId, coverKey, null, servedImageData, experimentId, qualityScore);
+  const { saveStoryImage } = require('../services/database');
+  await saveStoryImage(storyId, `${coverKey}Art`, null, artImageData, {
+    versionIndex, isTest: true, experimentId, generatedAt: new Date().toISOString(),
+  });
+  return versionIndex;
+}
+
 // ─────────────────────────────────────────────────────────────────────
 // Stage runners — each returns a JSON-safe result object (no image bytes;
 // images are referenced by {imageType, versionIndex} test rows).
@@ -424,12 +477,38 @@ function briefOverrideOf(params) {
   return typeof v === 'string' && v.trim() ? v : null;
 }
 
-function evalSceneDescription(ctx, params = null) {
+function evalSceneDescription(ctx, params = null, render = null) {
   // A/B runs with sceneDescriptionOverride generate FROM the override — the
   // eval contract must be the same override, or the judge deducts for lacking
   // exactly the defects the override removed (observed: three P6 A/B renders
   // scored sem=0 against the stored brief's "gap in the railing"/"ankle-deep").
-  return `${briefOverrideOf(params) || ctx.scene.sceneDescription || ''}`;
+  //
+  // THE SCENE AS SENT (owner, 2026-09-26: "The eval should judge the same thing
+  // as image generation"): the one resolver the production batch eval uses
+  // (sceneMetadata.resolveEvalSceneDescription) over the render being judged —
+  // a fresh Lab render (`render`: its own sent prompt and compressedScene), a
+  // pinned stored version, or the page's stored record.
+  const { resolveEvalSceneDescription } = require('./sceneMetadata');
+  const brief = briefOverrideOf(params) || ctx.scene.sceneDescription || '';
+  if (render) {
+    return resolveEvalSceneDescription({
+      compressedScene: render.compressedScene || null, sceneDescription: brief, prompt: render.prompt || null,
+    });
+  }
+  const pinned = pinnedVersionIndex(ctx.target?.versionIndex);
+  if (pinned !== null) {
+    const version = (ctx.scene.imageVersions || [])[pinned];
+    if (!version) throw new Error(`evalSceneDescription: no stored imageVersions[${pinned}] for ${ctx.storyId} p${ctx.pageNumber}`);
+    const { resolveVersionCompressedScene } = require('./repairLogic');
+    return resolveEvalSceneDescription({
+      compressedScene: resolveVersionCompressedScene(version, ctx.scene),
+      sceneDescription: version.description || brief,
+      prompt: version.prompt || ctx.scene.prompt || null,
+    });
+  }
+  return resolveEvalSceneDescription({
+    compressedScene: ctx.scene.compressedScene || null, sceneDescription: brief, prompt: ctx.scene.prompt || null,
+  });
 }
 
 /**
@@ -449,6 +528,139 @@ function evalSceneHint(ctx, params = null) {
   return briefOverrideOf(params) || ctx.outlineHint || null;
 }
 
+/**
+ * THE RUN'S PAGE EVAL CALL for a Lab image (owner 2026-09-27: "The Lab must
+ * use 100% identical code to production"): the run's first-render record for
+ * the page (its `rawImages` entry, rebuilt from the stored page), the version
+ * being judged as the repair round's entry, `repairPipeline.buildEvalInput` on
+ * the two with the whole-cast references, and evaluateImageBatch's options.
+ * The eval stages hand these to `images.evaluateImageBatch` or, for a single
+ * judge, to the batch's own `batchEvalQualityCall`.
+ *
+ * Which bytes: a fresh Lab render (`render`: its sent prompt and
+ * compressedScene, judged as the run judges a first render), a fixture's own
+ * image (`ctx.imageDataOverride`, fresh bytes, no stored detection), or a stored
+ * version — pinned or active — judged against that version's own record
+ * (description, prompt, cast, metadata, detection), as a repair round judges
+ * it.
+ *
+ * Not stored, so the run's defaults stand in: `modelOverrides` (coverTitleMode).
+ * The run's `storyData` is a working object; the eval reads only its
+ * `characters`. `recordStats: false` keeps a Lab re-eval out of the
+ * eval_finding_stats aggregate (a statistics sink; no score reads it).
+ */
+function labEvalCall(ctx, { imageData, render = null, params = null, evalOptionOverrides = null, qualityModelOverride = null, loadedVersion = null } = {}) {
+  const { buildEvalInput, evalStoryMetaOf } = require('./repairPipeline');
+  const { buildWholeCastReferencePhotos } = require('./storyHelpers');
+  const scene = ctx.scene || {};
+  const brief = briefOverrideOf(params);
+  const coverOpts = require('./coverRender').coverRenderOptions(ctx.pageNumber, { title: ctx.title || '', dedication: ctx.dedication || null });
+  // A cover the run briefed as a page carries the page path's cover fields
+  // (storyJobPipeline.js rawImages); an older cover was judged by the cover
+  // path, whose text contract and roster buildEvalReplayOptions resolves.
+  let coverFields = {};
+  if (coverOpts && scene.briefedAsPage === true) {
+    coverFields = { evaluationType: 'cover', expectedText: coverOpts.expectedText, textMode: coverOpts.textMode, coverIsPage: true, excludedCastNames: [] };
+  } else if (coverOpts) {
+    const legacy = buildEvalReplayOptions(ctx, { detectedFigures: null }).options;
+    coverFields = { evaluationType: 'cover', expectedText: legacy.expectedText, textMode: legacy.textMode, coverIsPage: false, excludedCastNames: legacy.excludedCastNames };
+  }
+  const orig = {
+    pageNumber: ctx.pageNumber,
+    imageData: null,
+    prompt: scene.prompt || null,
+    compressedScene: scene.compressedScene || null,
+    characterPhotos: ctx.referencePhotos || [],
+    landmarkPhotos: ctx.landmarkPhotos || null,
+    sceneDescription: brief || scene.sceneDescription || '',
+    text: scene.text,
+    sceneCharacters: scene.sceneCharacters || null,
+    sceneMetadata: scene.sceneMetadata || null,
+    scene: { outlineExtract: scene.outlineExtract || null, sceneHint: scene.sceneHint || null },
+    sharedBboxDetection: null,
+    ...coverFields,
+  };
+  let entry;
+  if (render) {
+    // A first render: the run's rawImages record IS this render.
+    Object.assign(orig, { imageData, prompt: render.prompt || orig.prompt, compressedScene: render.compressedScene || null });
+    entry = { imageData, pageNumber: ctx.pageNumber };
+  } else if (ctx.imageDataOverride) {
+    entry = { imageData, pageNumber: ctx.pageNumber };
+  } else {
+    const versions = scene.imageVersions || [];
+    const { arrayIndexForDb } = require('./versionManager');
+    const v = loadedVersion != null ? versions[arrayIndexForDb(versions, loadedVersion, 'scene')] : null;
+    entry = v
+      ? { imageData, pageNumber: ctx.pageNumber, description: v.description || null, prompt: v.prompt || null, compressedScene: v.compressedScene, sceneCharacters: v.sceneCharacters, sceneMetadata: v.sceneMetadata || null, bboxDetection: v.bboxDetection || null }
+      // A story stored before per-version records: the page record and its detection.
+      : { imageData, pageNumber: ctx.pageNumber, bboxDetection: scene.bboxDetection || null };
+    if (brief) entry.description = brief;
+  }
+  const storyData = {
+    id: ctx.storyId, characters: ctx.characters || [], visualBible: ctx.visualBible || null,
+    clothingRequirements: ctx.clothingRequirements || null, artStyle: ctx.artStyle, language: ctx.language,
+  };
+  const allCharacterPhotos = buildWholeCastReferencePhotos(ctx.characters || [], ctx.artStyle, ctx.clothingRequirements || null);
+  const input = buildEvalInput(entry, orig, allCharacterPhotos);
+  const options = {
+    concurrency: 1,
+    qualityModelOverride,
+    visualBible: ctx.visualBible || null,
+    clothingRequirements: ctx.clothingRequirements || null,
+    storyData,
+    artStyle: ctx.artStyle,
+    ...evalStoryMetaOf(storyData),
+    evalOptionOverrides,
+    recordStats: false,
+  };
+  return { input, options, orig, entry, storyData };
+}
+
+/**
+ * The evaluation a repair round holds for a stored version, as it holds it:
+ * the version's stored findings, detection and the plan it was scored with,
+ * plus the two fields evaluateImageQuality returns and the version record does
+ * not store — `judgedPrompt` and `requiredTexts` — rebuilt by the same builders
+ * (the batch call and prepareEvalJudgeInputs) from the same stored inputs.
+ * Also returns the run's first-render record of the page (`orig`) and the
+ * version record (`version`, null on a story stored before per-version records).
+ */
+function labStoredPageEval(ctx, { imageData, loadedVersion = null }) {
+  const call = labEvalCall(ctx, { imageData, loadedVersion });
+  const versions = ctx.scene.imageVersions || [];
+  const { arrayIndexForDb } = require('./versionManager');
+  const version = loadedVersion != null ? (versions[arrayIndexForDb(versions, loadedVersion, 'scene')] || null) : null;
+  const src = version || ctx.scene;
+  const batchCall = require('./images').batchEvalQualityCall(call.input, call.options);
+  const { judgedSceneText, prepareEvalJudgeInputs } = require('./evalPipeline');
+  const judgedPrompt = judgedSceneText(batchCall.sceneDescription);
+  const pageContext = `testlab-P${ctx.pageNumber}`;
+  const judgeInputs = prepareEvalJudgeInputs({
+    originalPrompt: judgedPrompt, referenceImages: batchCall.referenceImages, evaluationType: batchCall.evaluationType, pageContext,
+    storyText: call.input.pageText || null, sceneHint: call.input.sceneHint || null, sceneCharacters: call.input.sceneCharacters || null,
+    evalOptions: batchCall.evalOptions, notEvaluated: require('./notEvaluated').createNotEvaluatedRecorder({ pageContext }),
+  });
+  const evaluation = {
+    pageNumber: ctx.pageNumber,
+    score: src.finalScore ?? src.evalScore ?? null,
+    qualityScore: src.evalScore ?? src.qualityScore ?? null,
+    fixableIssues: src.fixableIssues || [],
+    fixTargets: src.fixTargets || [],
+    figures: src.figures || [],
+    matches: src.matches || [],
+    objectMatches: src.objectMatches || [],
+    semanticResult: src.semanticResult || null,
+    threeStageResult: src.threeStageResult || null,
+    bboxDetection: src.bboxDetection || null,
+    issuesSummary: src.issuesSummary || src.qualityReasoning || null,
+    consolidatedPlan: src.consolidatedPlan || null,
+    judgedPrompt: judgedPrompt || null,
+    requiredTexts: judgeInputs.requiredTextItems,
+  };
+  return { evaluation, version, orig: call.orig, storyData: call.storyData };
+}
+
 /** Reference photos for eval, guaranteed to carry clothingDescription. */
 function evalReferencePhotos(ctx) {
   const photos = (ctx.referencePhotos || []).filter(p => p?.name && p?.clothingDescription);
@@ -461,36 +673,54 @@ function evalReferencePhotos(ctx) {
 async function runImageStage(ctx, { promptOverride, experimentId, autoEval = true, params = {} }) {
   const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../services/prompts');
   await loadPromptTemplates();
-  const { buildImagePrompt } = require('./storyHelpers');
   const { generateImageOnly } = require('./images');
-  const { buildPageCompositeRefs } = require('./referenceSheets');
-  const { getTextAreaMask } = require('./textMasks');
+  const { buildVisualBibleGrid } = require('./referenceSheets');
   const { MODEL_DEFAULTS, IMAGE_MODELS } = require('../config/models');
+  // THE PRODUCTION PAGE RENDER, built by the SAME builders the story run's
+  // Phase 5a uses (pageRenderCall.js, owner 2026-09-27: "The Lab must use 100%
+  // identical code to production"). With no params this stage sends the model,
+  // prompt, references and options production sends for the stored page; every
+  // params.* below is an explicit A/B override on top of that. Pinned by
+  // tests/unit/lab-prod-call-parity.test.ts.
+  const pageRender = require('./pageRenderCall');
+  const { applyReferenceMode } = require('./clothingResolve');
+  const { decidePageRoute } = require('./imageRouter');
+  const { pageNeedsPlate } = require('./landmarkScene');
 
+  // A cover renders through the page path with its cover options, rebuilt from
+  // the stored story exactly as the run built them (coverRender.js).
+  const coverOpts = require('./coverRender').coverRenderOptions(ctx.pageNumber, {
+    title: ctx.title || '', dedication: ctx.dedication || null,
+  });
   // artStyleOverride: render the page in a different art style than the story's
   // (style-matrix benchmark runs). Caveat: reference photos stay the story's
   // original styled avatars — the style prompt dominates rendering.
   const artStyle = params.artStyleOverride || ctx.artStyle;
+  // The fields of the job's inputData the page prompt reads (buildImagePrompt:
+  // artStyle, language, languageLevel, layout) — from the stored story, which
+  // carries the job's values. `layout` decides textInImage: without it the
+  // prompt defaulted to text-in-image and sent a COPY SPACE block on every
+  // text-below story (2026-09-27).
   const inputData = {
     artStyle,
     language: ctx.language,
-    ageFrom: 3,
-    ageTo: 8,
     languageLevel: ctx.languageLevel,
+    layout: ctx.layout,
   };
+  // aboardOverride is the empty_scene stage's knob for stories whose stored
+  // metadata predates the field; it reaches the grid filter the same way.
+  const sceneMetadata = params.aboardOverride !== undefined
+    ? { ...(ctx.scene.sceneMetadata || {}), aboard: params.aboardOverride }
+    : (ctx.scene.sceneMetadata || null);
+  const page = { pageNumber: ctx.pageNumber, sceneMetadata, sceneCharacters: ctx.scene.sceneCharacters || null };
 
-  // Same VB-text rule as production: Grok's 8000-char limit means the VB prose
-  // is skipped and the grid image carries the references instead.
-  const isGrokImage = IMAGE_MODELS[MODEL_DEFAULTS.pageImage]?.backend === 'grok';
-
-  // THE PLATE AND THE GRID ARE RESOLVED BEFORE THE PROMPT (2026-09-18), because
-  // the prompt has to know which references the call actually carries. This is
-  // the same ordering production settled on 2026-09-15 (storyJobPipeline.js
-  // `makeImagePrompt` + the 5a-pre-grid rebuild) and that images.js `iterate`
-  // already had: build the grid, then build the prompt from the cells that are
-  // in it. Nothing else moved — the reference-photo knobs (avatarSheets,
-  // refCrop) still run after the prompt, exactly as before, because they change
-  // the PIXELS of a character card and nothing the prompt reads.
+  // The page model tier, as the run resolves it. params.imageModel is the A/B lever.
+  const tier = pageRender.pageRenderModel({ sceneMetadata, coverOpts, pageNumber: ctx.pageNumber });
+  const pageImageModel = params.imageModel || tier.pageImageModel;
+  const pageImageBackend = params.imageModel ? (IMAGE_MODELS[params.imageModel]?.backend || null) : tier.pageImageBackend;
+  // The route (cast size → reference mode), decided by the run's router.
+  const route = decidePageRoute(page, {}, MODEL_DEFAULTS);
+  const refMode = route.refMode || MODEL_DEFAULTS.referenceMode || 'strict';
 
   // backgroundRef: use a specific (test) empty-scene version as the background
   // anchor — style-matrix runs chain empty_scene(style) → image(style, that bg).
@@ -506,63 +736,54 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
   } else {
     emptyScene = await loadEmptyScene(ctx.storyId, ctx.pageNumber);
   }
-  const textInImage = ctx.layout?.textInImage !== false;
-  const textAreaMask = textInImage && ctx.textPosition ? getTextAreaMask(ctx.textPosition, ctx.languageLevel) : null;
+  const textInImage = coverOpts ? true : ctx.layout?.textInImage !== false;
+  const renderAspect = coverOpts ? coverOpts.aspectRatio : (ctx.layout?.imageAspect || MODEL_DEFAULTS.pageAspect);
+  // The mask the page's plate was rendered with, which the render then attaches:
+  // a per-page plate carries the page's copy-space mask, a vantage plate none
+  // (storyJobPipeline.js Phase 5a-pre-vantage stores textAreaMask: null), and
+  // a plateless page none.
+  const plateTextAreaMask = (emptyScene && !ctx.scene.vantageId)
+    ? pageRender.pageTextAreaMask({
+      textInImage,
+      rawTextPosition: coverOpts?.textPosition || sceneMetadata?.textPosition || null,
+      pageNumber: ctx.pageNumber,
+      languageLevel: ctx.languageLevel,
+    })
+    : null;
 
-  // Visual Bible grid + landmark refs — production's shared helper (a plate
-  // background drops plate-borne elements and landmarks).
-  let visualBibleGrid = null;
-  let genLandmarkPhotos = ctx.landmarkPhotos;
-  if (ctx.visualBible) {
-    try {
-      const refs = await buildPageCompositeRefs(ctx.visualBible, ctx.pageNumber, ctx.landmarkPhotos, {
-        hasBackground: !!emptyScene,
-        logTag: 'TESTLAB',
-        // aboardOverride is the empty_scene stage's knob for stories whose
-        // stored metadata predates the field; honour it here too so a Lab page
-        // render matches production's grid exactly.
-        aboardId: params.aboardOverride ?? ctx.scene?.sceneMetadata?.aboard ?? null,
-        sceneMetadata: ctx.scene?.sceneMetadata ?? null,
-      });
-      visualBibleGrid = refs.visualBibleGrid;
-      genLandmarkPhotos = refs.landmarkPhotos;
-    } catch (err) {
-      log.warn(`[TESTLAB] VB grid build failed (continuing without): ${err.message}`);
-    }
-  }
+  // The grid, as Phase 5a-pre-grid builds it: select, drop what the SENT plate
+  // carries (the route's reference mode decides whether the plate is sent),
+  // then build from the cells kept.
+  const hasPlate = !!applyReferenceMode({ mode: refMode, sceneBackground: emptyScene, sceneMetadata }).sceneBackground;
+  const kept = pageRender.keepPageGridElements(
+    pageRender.selectPageElementRefs(ctx.visualBible, ctx.pageNumber, sceneMetadata), { hasPlate, sceneMetadata });
+  const visualBibleGrid = kept.length > 0 ? await buildVisualBibleGrid(kept, []) : null;
 
+  // The prompt closure production uses, rebuilt from the cells actually sent.
   // buildImagePrompt reads PROMPT_TEMPLATES.imageGeneration internally and is
   // SYNCHRONOUS — swap the key only around this call (no await inside the
   // window, so concurrent generations can never observe the override).
+  const makePrompt = pageRender.makePageImagePrompt({
+    // sceneDescriptionOverride: test a corrected scene brief without
+    // regenerating the story.
+    sceneDescription: params.sceneDescriptionOverride || ctx.scene.sceneDescription,
+    inputData,
+    sceneCharacters: ctx.scene.sceneCharacters || null,
+    visualBible: ctx.visualBible,
+    pageNumber: ctx.pageNumber,
+    characterPhotos: ctx.referencePhotos,
+    pageImageModel,
+    coverOpts,
+    // pageScaleScope (TEST LAB ONLY, 2026-09-26): narrows which elements'
+    // REQUIRED OBJECTS lines gain a yardstick against the figures in frame.
+    // Unset = production.
+    extraOptions: params.pageScaleScope ? { pageScaleScope: params.pageScaleScope } : null,
+  });
   let prompt;
   const origTemplate = PROMPT_TEMPLATES.imageGeneration;
   if (promptOverride) PROMPT_TEMPLATES.imageGeneration = promptOverride;
   try {
-    prompt = buildImagePrompt(
-      // sceneDescriptionOverride: test a corrected scene brief (e.g. removing a
-      // duplicated object) without regenerating the story's unified outline.
-      params.sceneDescriptionOverride || ctx.scene.sceneDescription,
-      inputData,
-      ctx.scene.sceneCharacters || null,
-      ctx.visualBible,
-      ctx.pageNumber,
-      ctx.referencePhotos,
-      {
-        textPositionOverride: ctx.textPosition || undefined,
-        skipVisualBible: isGrokImage,
-        // THE ELEMENTS WHOSE REFERENCE RENDER RIDES WITH THIS CALL — the cells
-        // the grid above actually holds, and nothing else. `rawElements` is set
-        // by buildVisualBibleGrid from the cells whose bytes loaded, so an
-        // element that was selected but has no usable render is correctly
-        // absent. Without this the Lab's REQUIRED OBJECTS block claimed no
-        // attached reference for any element while production's named them
-        // ("The attached reference images include a rough image of X — match
-        // its look"), so every Lab measurement of that block was made against a
-        // prompt production never sends. Empty grid → empty set, which is the
-        // honest answer, not a missing argument.
-        vbRefElementIds: (visualBibleGrid?.rawElements || []).map(e => e.id).filter(Boolean),
-      }
-    );
+    prompt = makePrompt(kept.map(e => e.id).filter(Boolean));
   } finally {
     PROMPT_TEMPLATES.imageGeneration = origTemplate;
   }
@@ -672,58 +893,54 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
   }
 
   const t0 = Date.now();
-  const result = await generateImageOnly(prompt, ctx.referencePhotos, {
-    aspectRatio: ctx.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
-    // params.imageModel: A/B the page render model (grok-imagine vs
-    // gemini-2.5-flash-image) — style-adherence routing tests. Null = prod default.
-    imageModelOverride: params.imageModel || null,
-    landmarkPhotos: genLandmarkPhotos,
-    // Plate or fail, as in production: only a cast-0 page may render on its
-    // landmark photo; any other landmark page needs the plate (emptyScene).
-    landmarkScene: require('./landmarkScene').pageLandmarkScene({ sceneMetadata: ctx.scene?.sceneMetadata || null }),
+  // The route's reference mode over the page's stored references (after any
+  // Lab reference knob above), exactly as the run applies it before rendering.
+  const refApplied = applyReferenceMode({
+    mode: refMode,
+    characterPhotos: ctx.referencePhotos,
     visualBibleGrid,
-    artStyle,
+    landmarkPhotos: ctx.landmarkPhotos,
     sceneBackground: emptyScene,
-    textAreaMask,
-    pageNumber: ctx.pageNumber,
+    sceneMetadata,
+  });
+  // PLATE OR FAIL, as the run: a landmark page with no plate is not rendered on
+  // the raw photo.
+  if (pageNeedsPlate(page, refApplied.landmarkPhotos) && !refApplied.sceneBackground) {
+    throw new Error(`page ${ctx.pageNumber} has a landmark photo and no plate — production refuses this render too`);
+  }
+  const result = await generateImageOnly(prompt, refApplied.characterPhotos, {
+    ...pageRender.pageRenderOptions({
+      page, renderAspect, pageImageModel, pageImageBackend, refApplied, textInImage, plateTextAreaMask, coverOpts,
+    }),
+    // Lab MECHANIC, not a behaviour difference: the gen-only cache would hand
+    // back the stored render instead of rendering.
     skipCache: true,
     // maxRefSlots: raise Grok's reference-slot budget above the production
-    // default of 3 (xAI's documented edit cap is 5, re-verified 2026-09-02) —
-    // e.g. give each of 4 characters their own slot instead of pairing 2-per-slot.
-    maxRefSlots: params.maxRefSlots || null,
+    // default (xAI's documented edit cap is 5). Unset = production.
+    ...(params.maxRefSlots ? { maxRefSlots: params.maxRefSlots } : {}),
     // vbColumnFraction: the ONE variable of the 2026-09-19 cell-geometry
-    // experiment - how wide the VB element column is, i.e. how large an
-    // element is DRAWN. Character cards are height-limited and narrower than
-    // either column width, so they render identically in both arms.
-    vbColumnFraction: params.vbColumnFraction || null,
+    // experiment - how wide the VB element column is. Unset = production.
+    ...(params.vbColumnFraction ? { vbColumnFraction: params.vbColumnFraction } : {}),
   });
+
   const elapsedMs = Date.now() - t0;
   if (!result?.imageData) throw new Error('Image generation returned no image');
 
   let scores = null;
   if (autoEval) {
     try {
-      const { evaluateImageQuality } = require('./images');
-      // PRODUCTION'S OPTION SET, one resolver (buildEvalReplayOptions). This
-      // site used to pass five keys; without visualBible the judge's CLOTHING
-      // CONTRACT still named a garment the page declared `off`, and without
-      // artStyle every style-dependent rule skipped. See evalReplayInputs.js.
-      // No figure count: these are FRESH bytes and no detector runs in this
-      // stage, so the stored detection belongs to a different image. Null makes
-      // the roster decline to judge the count rather than judge it against the
-      // wrong picture.
-      const replay = buildEvalReplayOptions(ctx, {
-        detectedFigures: null,
-        // The A/B renders in params.artStyleOverride when set — the judge must
-        // be told the style it is actually looking at, not the story's.
-        artStyleKey: params.artStyleOverride || undefined,
-      });
-      const evalRes = await evaluateImageQuality(
-        result.imageData, evalSceneDescription(ctx, params), evalReferencePhotos(ctx), replay.evaluationType,
-        null, `testlab-exp${experimentId}-P${ctx.pageNumber}`,
-        ctx.scene.text || null, evalSceneHint(ctx, params), ctx.scene.sceneCharacters || null,
-        replay.options
-      );
+      // THE RUN'S FIRST-ROUND EVAL of a fresh render: evaluateImageBatch on the
+      // input buildEvalInput builds when this render is the page's rawImages
+      // record (its sent prompt and compressedScene). No stored detection
+      // belongs to these bytes, so the batch detects them, as the run's
+      // Phase 5b-pre does before its eval. The A/B renders in
+      // params.artStyleOverride when set — the judge is told that style.
+      const { input, options } = labEvalCall(
+        params.artStyleOverride ? { ...ctx, artStyle: params.artStyleOverride } : ctx,
+        { imageData: result.imageData, render: result, params });
+      const [batchRes] = await require('./images').evaluateImageBatch([input], options);
+      const evalRes = batchRes?.evaluated ? batchRes : null;
+      if (batchRes && !batchRes.evaluated) throw new Error(batchRes.error || batchRes.evalError || 'evaluation failed');
       if (evalRes) {
         scores = {
           quality: evalRes.qualityScore ?? evalRes.score ?? null,
@@ -754,188 +971,306 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
     }
   }
 
-  return { imageType: 'scene', versionIndex, promptUsed: prompt, modelId: result.modelId || null, elapsedMs, scores, artStyle: params.artStyleOverride || undefined, ...(steps.length ? { steps } : {}) };
+  // promptUsed is the string the model RECEIVED (post-shrink), the value the
+  // run stores on the page (storyJobPipeline.js `genResult.prompt || pageData.prompt`),
+  // so a Lab prompt is byte-comparable with the stored production one.
+  return { imageType: 'scene', versionIndex, promptUsed: result.prompt || prompt, modelId: result.modelId || null, elapsedMs, scores, artStyle: params.artStyleOverride || undefined, ...(steps.length ? { steps } : {}) };
+}
+
+/**
+ * validateEmptyScene options for a Lab plate — the per-page plate QC's option
+ * set (storyJobPipeline.js `pageQcOpts`), field for field: the page's declared
+ * placements, the scene prose the geometry is graded on, the setting text and
+ * the plate text as its FRAMING (two fields, each whole), the brief's `era`
+ * (the one its plate author's era guard was built from; the QC classifies it
+ * with the same buildEraGuard), the full art style, the shot, the landmark
+ * photo, the light, and the STRUCTURES text and Visual Bible grid the plate
+ * call carried (labPlateStructureInputs).
+ */
+function labPlateQcOptions(ctx, { sceneDescription, framing = null, shot, artStyle, structures = '', structureGrid = null }) {
+  const meta = ctx.scene.sceneMetadata || {};
+  const placements = (meta.fullData?.characters || [])
+    .filter(c => c?.name && c?.position)
+    .map(c => ({ name: c.name, position: c.position, depth: c.depth }));
+  return {
+    sceneDescription,
+    characterPlacements: placements.length > 0 ? placements : null,
+    mainScenePrompt: ctx.scene.sceneDescription || null,
+    framing: String(framing || '').trim() || null,
+    era: meta.era || null,
+    artStyle,
+    shot: String(shot || '').trim() || null,
+    pageNumber: ctx.pageNumber,
+    landmarkPhoto: ctx.landmarkPhotos?.[0] || null,
+    light: require('./sceneLight').declaredLight(meta),
+    structures: structures || '',
+    structureGrid: structureGrid || null,
+  };
+}
+
+/**
+ * The STRUCTURES text and the Visual Bible grid a plate of this page is
+ * painted with — the same builders the story run's plate calls use
+ * (prompts.buildPlateStructuresText, referenceSheets.buildEmptySceneVbGrid),
+ * with the same aboard and objects[] gates. `grid` passes a grid the caller
+ * already built for the plate call, so the Lab judges the one it sent.
+ */
+async function labPlateStructureInputs(ctx, { aboardId = undefined, grid = undefined } = {}) {
+  const meta = ctx.scene.sceneMetadata || {};
+  const aboard = aboardId !== undefined ? aboardId : (meta.aboard ?? null);
+  const structureGrid = grid !== undefined ? grid
+    : await require('./referenceSheets').buildEmptySceneVbGrid(ctx.visualBible, ctx.pageNumber, ctx.landmarkPhotos || [], aboard, meta.objects || null);
+  const structures = require('../services/prompts').buildPlateStructuresText({
+    visualBible: ctx.visualBible, pageNumber: ctx.pageNumber ?? null, aboardId: aboard, sceneObjects: meta.objects || null,
+  });
+  return { structures, structureGrid: structureGrid || null };
+}
+
+/**
+ * The page's plate text as the per-page plate path builds it: the plate text
+ * production resolves (resolvePagePlate) under the page's SHOT line. One
+ * helper for the empty_scene stage (the text it renders from) and the
+ * judge_fixture plate replay (the text a stored plate is judged against).
+ * `shotLine` is what the QC reads as EXPECTED SCENE beside the plate text as
+ * FRAMING (storyJobPipeline.js `pageQcOpts`).
+ */
+function labPagePlateText(ctx) {
+  const meta = ctx.scene.sceneMetadata || {};
+  const { resolvePagePlate } = require('./storyHelpers');
+  const pagePlate = resolvePagePlate({
+    pageNumber: ctx.pageNumber, sceneMetadata: meta, visualBible: ctx.visualBible, outlinePlate: '',
+  });
+  const pageShot = String(meta.fullData?.shot || '').trim();
+  const shotLine = pageShot ? `**SHOT:** ${pageShot}` : '';
+  const description = pagePlate.text ? `${shotLine ? `${shotLine}\n\n` : ''}${pagePlate.text}` : '';
+  return { pagePlate, pageShot, shotLine, description };
+}
+
+/**
+ * validateEmptyScene options for a DERIVED plate — the story run's
+ * `derivedQcOpts` (storyJobPipeline.js): no text zone, its own camera class,
+ * the medium, the place (the vantage's setting text, no FRAMING), the base
+ * plate's structures; not the page's geometry facts or placements, which the
+ * derive edit never saw. Shared by edit_image (a replayed derive) and the
+ * judge_fixture plate replay (a stored derived plate).
+ */
+async function labDerivedPlateQcOptions(ctx) {
+  const { resolvePagePlate, resolveArtStyle, getPrimaryVantageForPage, vantageSettingText } = require('./storyHelpers');
+  const meta = ctx.scene.sceneMetadata || {};
+  const vantage = getPrimaryVantageForPage(meta, ctx.visualBible, { pageNumber: ctx.pageNumber, emptyScenePrompt: meta.emptyScenePrompt || '' });
+  const plateText = resolvePagePlate({ pageNumber: ctx.pageNumber, sceneMetadata: meta, visualBible: ctx.visualBible, outlinePlate: '' }).text;
+  const opts = labPlateQcOptions(ctx, {
+    // A page with no vantage has a per-page plate, whose author gets no setting
+    // text besides its plate text (which is not this plate's FRAMING either).
+    sceneDescription: vantage ? vantageSettingText(vantage, plateText) : '',
+    shot: require('./shotVocabulary').plateClass(String(meta.fullData?.shot || '').trim()),
+    artStyle: resolveArtStyle(ctx.artStyle || 'pixar') || '',
+    ...(await labPlateStructureInputs(ctx)),
+  });
+  return { ...opts, characterPlacements: null, mainScenePrompt: null };
+}
+
+/**
+ * The run's `pageDataArray`, as far as the plate functions read it, rebuilt
+ * from the stored story with the run's own builders (coverRender,
+ * pageRenderCall.pageRenderModel, platePipeline.outlineEmptyScenePromptOf).
+ * Every stored story page, plus the target when it is a cover. The target
+ * carries the context's landmark bytes; the other pages' photos are only read
+ * for a page's own plate, which the Lab never renders for them.
+ *
+ * Not stored, so the defaults stand in: `modelOverrides` (the page tier's
+ * sceneRouting) and the job's route overrides.
+ */
+async function labPlatePageDataArray(ctx, inputData) {
+  const { dbQuery } = require('../services/database');
+  const { coverRenderOptions } = require('./coverRender');
+  const { pageRenderModel } = require('./pageRenderCall');
+  const { outlineEmptyScenePromptOf } = require('./platePipeline');
+  const { MODEL_DEFAULTS } = require('../config/models');
+  const rows = await dbQuery(
+    `SELECT (s)::text AS scene_text FROM stories, jsonb_array_elements(data->'sceneImages') s WHERE stories.id = $1`,
+    [ctx.storyId]
+  );
+  const scenes = rows.map(r => JSON.parse(r.scene_text)).filter(s => s && s.pageNumber !== ctx.pageNumber);
+  scenes.push({ ...ctx.scene, pageNumber: ctx.pageNumber });
+  return scenes.map((scene) => {
+    const pageNumber = scene.pageNumber;
+    const coverOpts = coverRenderOptions(pageNumber, { title: ctx.title || '', dedication: ctx.dedication || null, coverTitleMode: null });
+    const sceneMetadata = scene.sceneMetadata || null;
+    const { pageImageBackend } = pageRenderModel({ sceneMetadata, modelOverrides: {}, coverOpts, pageNumber });
+    return {
+      pageNumber,
+      scene: { sceneDescription: scene.sceneDescription },
+      sceneMetadata,
+      sceneCharacters: scene.sceneCharacters || null,
+      emptyScenePrompt: outlineEmptyScenePromptOf(scene),
+      pageImageBackend,
+      coverOpts,
+      landmarkPhotos: pageNumber === ctx.pageNumber ? (ctx.landmarkPhotos || []) : [],
+      renderAspect: coverOpts ? coverOpts.aspectRatio : (inputData?.layout?.imageAspect || MODEL_DEFAULTS.pageAspect),
+      textInImage: coverOpts ? true : (inputData?.layout?.textInImage !== false),
+    };
+  }).sort((a, b) => a.pageNumber - b.pageNumber);
+}
+
+/**
+ * Which plate the run gives this page, decided by the run's own rules
+ * (storyJobPipeline.js Phase 5a-pre-vantage / 5a-pre): the page's vantage
+ * canvas when its vantage group renders one, else its own per-page plate,
+ * else none (a cast-0 page, or plates off).
+ */
+function labPlateRoute(pageDataArray, pageNumber, visualBible, inputData) {
+  const { MODEL_DEFAULTS } = require('../config/models');
+  const { decidePageRoute } = require('./imageRouter');
+  const { groupPagesByVantage } = require('./storyHelpers');
+  const { pageNeedsPlate } = require('./landmarkScene');
+  const platelessByRoute = (pn) => decidePageRoute(pageDataArray.find(pd => pd.pageNumber === pn), inputData, MODEL_DEFAULTS).emptyScene === 'skip';
+  // modelOverrides are not stored: the run's defaults.
+  const runSinglePassScene = MODEL_DEFAULTS.singlePassScene === true;
+  const platesOn = !runSinglePassScene;
+  const target = pageDataArray.find(pd => pd.pageNumber === pageNumber);
+  if (platesOn && visualBible?.locations?.length > 0 && !target.coverOpts) {
+    const groups = groupPagesByVantage(pageDataArray.filter(pd => !pd.coverOpts), visualBible);
+    for (const [vantageId, group] of groups) {
+      if (vantageId === '__unassigned__' || !group.pageNumbers.includes(pageNumber)) continue;
+      if (group.pageNumbers.some(pn => !platelessByRoute(pn))) return { kind: 'vantage', vantageId, group };
+    }
+  }
+  if (!(platesOn || pageNeedsPlate(target, target.landmarkPhotos))) return { kind: 'none', reason: 'plates are off for this page' };
+  if (platelessByRoute(pageNumber)) return { kind: 'none', reason: 'cast=0 → the run renders no plate (the render is the scene)' };
+  return { kind: 'page' };
 }
 
 async function runEmptySceneStage(ctx, { promptOverride, experimentId, params = {} }) {
-  const { loadPromptTemplates, buildEmptyScenePrompt } = require('../services/prompts');
+  const { loadPromptTemplates } = require('../services/prompts');
   await loadPromptTemplates();
-  const { buildTextZoneInstruction, buildEraGuard, buildLandmarkFidelityBlock, resolveArtStyle } = require('./storyHelpers');
-  const { generateImageOnly } = require('./images');
-  const { getTextAreaMask } = require('./textMasks');
-  const { MODEL_DEFAULTS, emptyScenePlateRouting } = require('../config/models');
+  const plates = require('./platePipeline');
+  // THE RUN'S OWN PLATE CODE (owner 2026-09-27: "The Lab must use 100%
+  // identical code to production"). The plate is rendered by the functions
+  // Phase 5a-pre-vantage and 5a-pre call (platePipeline.js), on the run's
+  // pageDataArray rebuilt from the stored pages: a vantage page gets the
+  // canvas painted from its vantage's representative page (and its derived
+  // plate when its camera or light earns one), a page off every vantage its
+  // own plate with the run's spread-rule text mask, both judged and retried
+  // once with the feedback exactly as in the run. Every params.* below is an
+  // explicit A/B override on top. Pinned by tests/unit/lab-prod-call-parity.test.ts.
+  const inputData = {
+    artStyle: params.artStyleOverride || ctx.artStyle,
+    language: ctx.language,
+    languageLevel: ctx.languageLevel,
+    layout: ctx.layout,
+  };
+  const pageDataArray = await labPlatePageDataArray(ctx, inputData);
+  const route = labPlateRoute(pageDataArray, ctx.pageNumber, ctx.visualBible, inputData);
+  if (route.kind === 'none') throw new Error(`Page ${ctx.pageNumber} gets no plate in the story run: ${route.reason}`);
 
-  const meta = ctx.scene.sceneMetadata || {};
-  // descriptionOverride: test a corrected empty-scene brief (e.g. fixing a
-  // contradictory exterior/interior description, or a stair-direction) without
-  // regenerating the whole story. Otherwise the plate text production uses
-  // (resolvePagePlate: outline, then the vantage's own plate, then the brief's)
-  // under the page's SHOT line, as the per-page plate path builds it. It used
-  // to take the stored page's `emptyScenePrompt` and then its full scene
-  // description, neither of which is plate text; staging
-  // job_1790277448294_5herh01j7 p1 built an 11,684-char plate prompt (Lab 1478,
-  // refused by the plate fit — before the fit it would have gone to Gemini).
-  // No outline plate: ctx.scene is the STORED page record, whose
-  // `emptyScenePrompt` is the fully BUILT plate prompt of the run, not plate
-  // text — wrapping it in the template again doubled it (Lab 1482: 11,761 chars).
-  const { resolvePagePlate } = require('./storyHelpers');
-  const pagePlateText = resolvePagePlate({
-    pageNumber: ctx.pageNumber, sceneMetadata: meta, visualBible: ctx.visualBible, outlinePlate: '',
-  }).text;
-  const pageShot = String(meta.fullData?.shot || '').trim();
-  const description = params.descriptionOverride
-    || (pagePlateText ? `${pageShot ? `**SHOT:** ${pageShot}\n\n` : ''}${pagePlateText}` : '');
-  if (!description) throw new Error('No plate text for this page: the vantage and the brief carry no emptyScenePrompt (pass params.descriptionOverride)');
-
-  // Text zone only when this story overlays text on the image AND the scene
-  // has a position — production omits it for text-below layouts.
-  const wantsTextZone = ctx.layout?.textInImage !== false && !!ctx.textPosition;
-  // aboardOverride: test the aboard fix on a story whose stored AD metadata
-  // predates the `aboard` field.
-  const aboardId = params.aboardOverride ?? meta.aboard ?? null;
-  // Production attaches the VB element grid to every plate call
-  // (buildEmptySceneVbGrid); the Lab stage did not, so a plate rendered here
-  // saw only the text channel and a prompt change that fixes the image channel
-  // was invisible to the Lab. Same helper, same aboard filter.
-  // Built BEFORE the prompt: which reference family is attached decides the
-  // REFERENCE line (referenceKind below), exactly as at the production call
-  // sites (storyJobPipeline.js Phase 5a-pre-vantage and the trial plate).
-  const { buildEmptySceneVbGrid } = require('./referenceSheets');
-  const emptySceneVbGrid = await buildEmptySceneVbGrid(
-    ctx.visualBible, ctx.pageNumber, ctx.landmarkPhotos, aboardId, meta.objects || null
-  );
-
-  // One style string for the plate prompt and its QC, and the SAME one
-  // production sends: the book's full style (storyJobPipeline.js plate call
-  // sites use resolveArtStyle). The stripped "empty-scene" variant collapsed
-  // pixar to "Never photographic." and dropped "watercolor" (2026-09-25).
-  const plateStyle = resolveArtStyle(params.artStyleOverride || ctx.artStyle || 'pixar') || '';
-  const prompt = buildEmptyScenePrompt({
-    template: promptOverride || undefined,
-    style: plateStyle,
-    description,
-    characterSpace: meta.characterSpace || '',
-    textAreaInstruction: wantsTextZone
-      ? buildTextZoneInstruction(ctx.textPosition, meta.textZoneDescription || null, 'a quarter of the frame', { isEmptyScene: true })
-      : '',
-    eraGuard: buildEraGuard(meta.era),
-    landmarkFidelity: buildLandmarkFidelityBlock(ctx.landmarkPhotos[0] || null, { era: meta.era }),
-    // Tells the model what the attached reference IS. Without it the Lab tested
-    // a DIFFERENT prompt than production, which passes it at every plate call
-    // site (storyJobPipeline.js vantage plate + retry, the per-page 5a-pre path,
-    // and the trial plate — every one of them passes it).
-    referenceKind: (ctx.landmarkPhotos?.length > 0) ? 'landmark' : (emptySceneVbGrid ? 'element' : null),
-    visualBible: ctx.visualBible,
-    pageNumber: ctx.pageNumber ?? null,
-    aboardId,
-    // AD objects[] gates which vehicles enter the plate prompt + grid — same
-    // gate production runs (AD is the authority on vehicle presence).
-    sceneObjects: meta.objects || null,
-    // The page's declared time of day and weather — the plate's LIGHT line, as
-    // at every production plate call site (sceneLight.js).
-    light: require('./sceneLight').declaredLight(meta),
-    // The geometry facts the plate is GRADED on (validateEmptyScene reads the
-    // same scene prose). Production passes these at every page/vantage plate
-    // call site; without them the Lab renders a plate blind to the geometry and
-    // measures a different prompt than production runs.
-    mainScenePrompt: ctx.scene.sceneDescription || null,
-    castNames: (meta.fullData?.characters || meta.characters || []).map(c => (typeof c === 'string' ? c : c?.name)).filter(Boolean),
-  });
-
-  const t0 = Date.now();
-  const result = await generateImageOnly(prompt, [], {
-    // Plates stay on the plate tier regardless of the page tier — same pinned
-    // routing as every production plate call site (docs/image-routing.md).
-    ...emptyScenePlateRouting(),
-    aspectRatio: ctx.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
-    landmarkPhotos: ctx.landmarkPhotos,
-    visualBibleGrid: emptySceneVbGrid,
-    textAreaMask: wantsTextZone ? getTextAreaMask(ctx.textPosition, ctx.languageLevel) : null,
-    pageNumber: ctx.pageNumber,
-    skipCache: true,
-  });
-  const elapsedMs = Date.now() - t0;
-  if (!result?.imageData) throw new Error('Empty-scene generation returned no image');
-
-  // Same QC the pipeline runs (pixel + Gemini vision) — report-only here, no
-  // retry loop: the point is seeing whether a prompt variant passes the gate.
-  // The calm-zone half needs a text position, so QC is skipped for text-below
-  // layouts (production never validates those either).
-  let qc = null;
-  if (!wantsTextZone) qc = { pass: true, issues: [], skipped: 'no text zone (text-below layout)' };
-  else try {
-    const { validateEmptyScene } = require('./images');
-    const qcRes = await validateEmptyScene(result.imageData, ctx.textPosition, `testlab-exp${experimentId}-P${ctx.pageNumber}`, {
-      sceneDescription: description,
-      mainScenePrompt: ctx.scene.sceneDescription || null,
-      storyEra: meta.era || null,
-      artStyle: plateStyle,
-      shot: (meta.fullData?.shot || meta.shot || '').trim() || null,
-      landmarkPhoto: ctx.landmarkPhotos?.[0] || null,
-      light: require('./sceneLight').declaredLight(meta),
-    });
-    qc = { pass: qcRes.pass, issues: qcRes.issues || [], findings: qcRes.findings || [], visionFeedback: qcRes.visionFeedback || null };
-  } catch (err) {
-    log.warn(`[TESTLAB] empty-scene QC failed: ${err.message}`);
-    qc = { error: err.message };
+  // descriptionOverride: test a corrected plate text without regenerating the
+  // story — it stands in as the outline plate (resolvePagePlate's first
+  // choice) of every page whose text can frame this plate. aboardOverride:
+  // test the aboard gate on a story whose stored metadata predates the field.
+  const framingPages = route.kind === 'vantage' ? route.group.pageNumbers : [ctx.pageNumber];
+  for (const pd of pageDataArray) {
+    if (!framingPages.includes(pd.pageNumber)) continue;
+    if (params.descriptionOverride) pd.emptyScenePrompt = params.descriptionOverride;
+    if (params.aboardOverride !== undefined) pd.sceneMetadata = { ...(pd.sceneMetadata || {}), aboard: params.aboardOverride };
   }
 
-  const versionIndex = await saveTestVersion(ctx.storyId, 'empty_scene', ctx.pageNumber, result.imageData, experimentId);
-  return { imageType: 'empty_scene', versionIndex, promptUsed: prompt, modelId: result.modelId || null, elapsedMs, qc, artStyle: params.artStyleOverride || undefined };
+  const qcRuns = [];
+  const models = [];
+  const events = [];
+  const record = (level) => (event, message) => { events.push({ level, event, message }); };
+  const env = {
+    visualBible: ctx.visualBible,
+    inputData,
+    pageDataArray,
+    addUsage: (provider, usage, fn, modelId) => { models.push(modelId || usage?.model || null); },
+    imageGenHeartbeat: () => {},
+    genLog: { info: record('info'), warn: record('warn'), error: record('error'), debug: record('debug') },
+    onQc: (q) => qcRuns.push({ label: q.label, textPosition: q.textPosition, pass: q.qc.pass, issues: q.qc.issues || [], findings: q.qc.findings || [], visionFeedback: q.qc.visionFeedback || null }),
+    plateTemplate: promptOverride || null,
+    // One page replayed: derive only its plate.
+    derivePages: [ctx.pageNumber],
+  };
+
+  const t0 = Date.now();
+  const target = pageDataArray.find(pd => pd.pageNumber === ctx.pageNumber);
+  let plate = null;
+  let plateSource = 'page';
+  if (route.kind === 'vantage') {
+    const vantagePlates = await plates.renderVantagePlates(route.vantageId, route.group, env);
+    plate = vantagePlates.get(ctx.pageNumber) || null;
+    plateSource = 'vantage';
+  }
+  // A vantage canvas that failed leaves the slot empty, and the run's
+  // Phase 5a-pre then renders the page's own plate — the same sequence here.
+  if (!plate) {
+    plate = await plates.renderPagePlate(target, env);
+    plateSource = 'page';
+  }
+  const elapsedMs = Date.now() - t0;
+  if (!plate?.imageData) {
+    throw new Error(`Empty-scene generation returned no image${events.length ? ` (${events.map(e => `${e.event}: ${e.message}`).join('; ')})` : ''}`);
+  }
+
+  // The verdict of the plate that shipped: its first attempt's, or the
+  // retry's when the retry was kept. Every attempt's verdict is in qcRuns.
+  const baseLabels = plateSource === 'vantage' ? [`vantage-${plate.vantageId}`, `vantage-${plate.vantageId}-retry`] : null;
+  const shippedRuns = !baseLabels ? qcRuns
+    : plate.plateDerivedFor ? qcRuns.filter(q => !baseLabels.includes(q.label)) : qcRuns.filter(q => baseLabels.includes(q.label));
+  const kept = plate.keptAttempt === 'retry' ? shippedRuns[1] : shippedRuns[0];
+  const qc = kept ? { ...kept, attempts: qcRuns } : null;
+  const versionIndex = await saveTestVersion(ctx.storyId, 'empty_scene', ctx.pageNumber, plate.imageData, experimentId);
+  return {
+    imageType: 'empty_scene', versionIndex, promptUsed: plate.prompt, modelId: models.find(Boolean) || null, elapsedMs, qc,
+    plateSource, vantageId: plate.vantageId || null, plateDerivedFor: plate.plateDerivedFor || null, plateLight: plate.plateLight || null,
+    keptAttempt: plate.keptAttempt || null, events,
+    artStyle: params.artStyleOverride || undefined,
+  };
 }
 
 async function runQualityEvalStage(ctx, { promptOverride, experimentId, params = {} }) {
   const { loadPromptTemplates } = require('../services/prompts');
   await loadPromptTemplates();
-  const { evaluateImageQuality } = require('./images');
+  const images = require('./images');
 
   // A pinned target evaluates THAT version (2026-09-12). Without this the stage
   // always judged the active one, so two versions of a page — an original and
   // the repair that replaced it — could not be scored against each other.
-  const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber, ctx.versionIndex ?? null);
+  // ctx.imageDataOverride: the judge_fixture stage hands the fixture's own
+  // stored image (by R2 URL), so a fixture judges exactly the picture it pins.
+  const imageData = ctx.imageDataOverride || await loadActivePageImage(ctx.storyId, ctx.pageNumber, ctx.versionIndex ?? null);
+  const loaded = ctx.imageDataOverride ? null : getLastPageLoad();
   const t0 = Date.now();
-  // PRODUCTION'S OPTION SET (buildEvalReplayOptions) + this stage's explicit
-  // A/B knobs. The baseline must equal production; the overrides are the point
-  // of the experiment. visualBible / clothingRequirements / storyData were all
-  // missing here, which is why every clothing finding this stage has ever
-  // produced was judged against the unstripped story-level outfit.
-  const replay = buildEvalReplayOptions(ctx, {
-    // The stored detection was made on the ACTIVE version's bytes. When a
-    // different version is pinned it describes a different picture, so the
-    // count is withheld rather than guessed.
-    detectedFigures: (ctx.versionIndex ?? null) === null
-      ? (ctx.scene.bboxDetection?.figures || null) : null,
-    overrides: {
-      evalTemplateOverride: promptOverride || null,
-      // Stage-2 compliance A/B: swap the model (default qwen-plus) and/or its
-      // template to test the over-strict-CRITICAL problem.
-      complianceModelOverride: params.complianceModel || null,
-      compliancePromptOverride: params.compliancePrompt || null,
-      // THE COMPLIANCE JUDGE IS OFF IN PRODUCTION (2026-09-19,
-      // MODEL_DEFAULTS.promptComplianceJudge). This stage's baseline must equal
-      // production, so it follows the flag by default rather than forcing the
-      // judge on — otherwise every image_eval run would score against a judge
-      // prod never consults. Two ways to measure it anyway:
-      //   - `complianceJudge: true` asks for it outright (how experiment 1333
-      //     would be re-run);
-      //   - setting `complianceModel` or `compliancePrompt` IS asking for it —
-      //     an A/B on the judge's model or template is meaningless with the
-      //     judge off, so either one implies it.
-      complianceJudgeOverride: params.complianceJudge != null
-        ? !!params.complianceJudge
-        : ((params.complianceModel || params.compliancePrompt) ? true : null),
-    },
-  });
-  const result = await evaluateImageQuality(
-    imageData, evalSceneDescription(ctx), evalReferencePhotos(ctx), replay.evaluationType,
+  // THE RUN'S PAGE EVAL (owner 2026-09-27: "The Lab must use 100% identical
+  // code to production"): the repair round's evaluateImageBatch on the input
+  // its own buildEvalInput builds for this page — the page prompt (REQUIRED
+  // OBJECTS), the whole-cast references, the scene hint by resolveEvalSceneHint,
+  // the story language — and the batch's post-eval steps (the empty-inventory
+  // cap, detection enrichment, the identity reconcile). The stage used to call
+  // evaluateImageQuality itself with a thinner input. Every params.* below is an
+  // explicit A/B override on top.
+  const evalOptionOverrides = {};
+  if (promptOverride) evalOptionOverrides.evalTemplateOverride = promptOverride;
+  // Stage-2 compliance A/B: swap the model and/or its template.
+  if (params.complianceModel) evalOptionOverrides.complianceModelOverride = params.complianceModel;
+  if (params.compliancePrompt) evalOptionOverrides.compliancePromptOverride = params.compliancePrompt;
+  // THE COMPLIANCE JUDGE IS OFF IN PRODUCTION (2026-09-19,
+  // MODEL_DEFAULTS.promptComplianceJudge); unset follows the flag. Two ways to
+  // measure it anyway: `complianceJudge: true`, or a complianceModel /
+  // compliancePrompt A/B (meaningless with the judge off, so either implies it).
+  if (params.complianceJudge != null) evalOptionOverrides.complianceJudgeOverride = !!params.complianceJudge;
+  else if (params.complianceModel || params.compliancePrompt) evalOptionOverrides.complianceJudgeOverride = true;
+  const { input, options } = labEvalCall(ctx, {
+    imageData,
+    loadedVersion: loaded?.loadedVersion ?? null,
+    evalOptionOverrides: Object.keys(evalOptionOverrides).length ? evalOptionOverrides : null,
     // Quality-judge A/B (2026-09-08): params.model swaps the P2 judge (and,
     // because an override wins there too, the P1 inventory) for one experiment.
-    params.model || null, `testlab-exp${experimentId}-P${ctx.pageNumber}`,
-    ctx.scene.text || null, ctx.outlineHint, ctx.scene.sceneCharacters || null,
-    replay.options
-  );
+    qualityModelOverride: params.model || null,
+  });
+  const [result] = await images.evaluateImageBatch([input], options);
   const elapsedMs = Date.now() - t0;
-  if (!result) throw new Error('Quality evaluation returned null');
+  if (!result || !result.evaluated) throw new Error(`Quality evaluation failed: ${result?.error || result?.evalError || 'no result'}`);
 
   return {
     elapsedMs,
@@ -962,10 +1297,15 @@ async function runQualityEvalStage(ctx, { promptOverride, experimentId, params =
     // the inventory said `complete: false`, the prompt carried the rule, and
     // nothing arrived — no way to tell which side lost it).
     complianceRaw: result.threeStageResult?.complianceResult || null,
+    // Who-is-who between the judge and the detector, as the batch settled it.
+    identityAgreement: result.identityAgreement || null,
     // What RAN, not what was asked: the judge key and the per-stage token
     // counts (a model's input-token signature is how a swap is verified).
     modelId: params.model || require('../config/models').MODEL_DEFAULTS.qualityEval,
     usage: { ...(result.threeStageResult?.usage || {}), quality_input_tokens: result.usage?.input_tokens ?? null, quality_output_tokens: result.usage?.output_tokens ?? null },
+    // The whole call's aggregate (quality + P1 + three-stage), as the pipeline
+    // records it — what the judge_fixture stage prices a replay from.
+    totalUsage: result.usage || null,
     storedBaseline: { qualityScore: ctx.scene.qualityScore ?? null, semanticScore: ctx.scene.semanticScore ?? null },
   };
 }
@@ -1044,20 +1384,16 @@ async function runEvalVarianceStage(ctx, { experimentId, params = {} }) {
 
   // Frozen inputs, resolved ONCE and reused by every repeat — re-deriving them
   // per run would let an input drift and be mistaken for judge variance.
-  const sceneDescription = evalSceneDescription(ctx);
-  const referencePhotos = evalReferencePhotos(ctx);
-  // Production's option set, frozen with everything else. Measuring the judge's
-  // variance against a THINNER input set than production's measures a different
-  // judge: a missing visualBible turns the clothing contract into the
-  // unstripped story-level outfit, and worn-item findings then flip on every
-  // repeat for a reason that has nothing to do with judge stability.
-  const replay = buildEvalReplayOptions(ctx, {
-    // Frozen with the other inputs: a count that changed between repeats would
-    // be read as judge variance. Withheld when a version is pinned (the stored
-    // detection is the active version's).
-    detectedFigures: versionIndex === null
-      ? (ctx.scene.bboxDetection?.figures || null) : null,
-  });
+  // THE RUN'S EVAL CALL for this page (labEvalCall → the batch's own
+  // batchEvalQualityCall): the arguments evaluateImageBatch hands
+  // evaluateImageQuality, the judged version's own detection count included.
+  // Measuring the judge's variance against a different input set than
+  // production's measures a different judge. The batch's post-eval steps
+  // (detection enrichment, identity reconcile) are not repeated: this stage
+  // scores the evaluators' findings itself (composeDeductions).
+  const { input: evalInput, options: evalBatchOptions } = labEvalCall(ctx, { imageData, loadedVersion: getLastPageLoad()?.loadedVersion ?? null });
+  const evalCall = require('./images').batchEvalQualityCall(evalInput, evalBatchOptions);
+  const sceneDescription = evalCall.sceneDescription;
 
   const runs = [];
   for (let i = 1; i <= repeats; i++) {
@@ -1066,10 +1402,10 @@ async function runEvalVarianceStage(ctx, { experimentId, params = {} }) {
     let error = null;
     try {
       evalResult = await evaluateImageQuality(
-        imageData, sceneDescription, referencePhotos, replay.evaluationType,
+        imageData, evalCall.sceneDescription, evalCall.referenceImages, evalCall.evaluationType,
         null, `testlab-var${experimentId}-P${ctx.pageNumber}-r${i}`,
-        ctx.scene.text || null, ctx.outlineHint, ctx.scene.sceneCharacters || null,
-        replay.options
+        evalInput.pageText || null, evalInput.sceneHint || null, evalInput.sceneCharacters || null,
+        evalCall.evalOptions
       );
     } catch (err) { error = err.message; }
     const elapsedMs = Date.now() - t0;
@@ -1285,59 +1621,33 @@ async function runSemanticEvalStage(ctx, { promptOverride, experimentId }) {
   // A pinned target evaluates THAT version, as quality_eval and inventory_ab
   // already do — judging the active version instead makes an original-vs-repair
   // comparison compare the repair with itself.
-  const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber, ctx.versionIndex ?? null);
-  const storyText = ctx.scene.text || null;
-  if (!storyText) throw new Error('Scene has no story text — semantic eval needs it');
-
-  // THE SIXTH ARGUMENT. Production never calls evaluateSemanticFidelity bare —
-  // evalPipeline.js hands it the art style, the CLOTHING CONTRACT and the
-  // EXPECTED CAST roster it built for all three judges. This stage passed none
-  // of them, so its judge saw no outfit contract at all (clothing findings
-  // suppressed outright) and no kind labels to keep an `(animal)` entry out of
-  // the named-character count. Same three inputs, same builders.
-  const replay = buildEvalReplayOptions(ctx, {
-    detectedFigures: ctx.scene.bboxDetection?.figures || null,
+  const imageData = ctx.imageDataOverride || await loadActivePageImage(ctx.storyId, ctx.pageNumber, ctx.versionIndex ?? null);
+  // THE RUN'S SEMANTIC CALL (owner 2026-09-27: "The Lab must use 100% identical
+  // code to production"). evaluateImageQuality builds every judge's inputs in
+  // evalPipeline.prepareEvalJudgeInputs and hands the semantic judge
+  // semanticFidelityOptions of them; this stage runs the same two functions on
+  // the arguments the run's batch eval passes for this page (labEvalCall →
+  // batchEvalQualityCall). It used to rebuild three of the inputs itself and
+  // missed the REQUIRED TEXT rules, the cover fidelity reference (a cover's
+  // reference is its brief), the Visual Bible reference cells and the story
+  // language; its scene hint was not resolveEvalSceneHint's.
+  const { input, options } = labEvalCall(ctx, { imageData, loadedVersion: ctx.imageDataOverride ? null : (getLastPageLoad()?.loadedVersion ?? null) });
+  const evalCall = require('./images').batchEvalQualityCall(input, options);
+  const { judgedSceneText, prepareEvalJudgeInputs, semanticFidelityOptions } = require('./evalPipeline');
+  const pageContext = `testlab-exp${experimentId}-P${ctx.pageNumber}`;
+  const originalPrompt = judgedSceneText(evalCall.sceneDescription);
+  const judgeInputs = prepareEvalJudgeInputs({
+    originalPrompt, referenceImages: evalCall.referenceImages, evaluationType: evalCall.evaluationType, pageContext,
+    storyText: input.pageText || null, sceneHint: input.sceneHint || null, sceneCharacters: input.sceneCharacters || null,
+    evalOptions: evalCall.evalOptions,
+    notEvaluated: require('./notEvaluated').createNotEvaluatedRecorder({ pageContext }),
   });
-  const { buildExpectedCastBlock, buildEvalClothingContract } = require('./evalPipeline');
-  const semanticOpts = {
-    artStyle: replay.options.artStyle,
-    clothingContract: buildEvalClothingContract({
-      sceneCharacters: ctx.scene.sceneCharacters || null,
-      referenceImages: evalReferencePhotos(ctx),
-      artStyle: replay.options.artStyle,
-      visualBible: replay.options.visualBible,
-      clothingRequirements: replay.options.clothingRequirements,
-      sceneMetadata: replay.options.sceneMetadata,
-      sceneHint: ctx.outlineHint,
-      originalPrompt: ctx.scene.sceneDescription || '',
-    }).block,
-    expectedCast: buildExpectedCastBlock({
-      sceneCharacters: ctx.scene.sceneCharacters || null,
-      sceneHint: ctx.outlineHint,
-      originalPrompt: ctx.scene.sceneDescription || '',
-      visualBible: replay.options.visualBible,
-      evaluationType: replay.evaluationType,
-      detectedFigureCount: Array.isArray(replay.options.detectedFigures)
-        ? require('./bboxDetection').countRealFigures(replay.options.detectedFigures) : null,
-      pageLabel: `testlab-exp${experimentId}-P${ctx.pageNumber} `,
-      sceneMetadata: replay.options.sceneMetadata,
-      storyData: replay.options.storyData,
-      pageNumber: replay.options.pageNumber,
-    }).block,
-    // THE LANDMARK BLOCK — the fourth input production hands this judge since
-    // 2026-09-18. Built from the replay's own landmarkPhotos + era, by the same
-    // builder evalPipeline uses, so a Lab arm judges the page production judges.
-    landmarkContext: require('./landmarkProtection').buildLandmarkContextBlock(
-      require('./landmarkProtection').computeLandmarkProtection({
-        landmarkPhotos: replay.options.landmarkPhotos,
-        era: replay.options.era,
-      })),
-  };
+  if (!judgeInputs.runFidelity) throw new Error('The run gives this page no semantic judge: it has neither page prose nor a cover brief');
 
   const t0 = Date.now();
   const result = await evaluateSemanticFidelity(
-    imageData, storyText, ctx.scene.sceneDescription,
-    ctx.outlineHint, promptOverride || null, semanticOpts
+    imageData, judgeInputs.fidelityRef, originalPrompt,
+    input.sceneHint || null, promptOverride || null, semanticFidelityOptions(judgeInputs, evalCall.evalOptions)
   );
   const elapsedMs = Date.now() - t0;
   if (!result) throw new Error('Semantic evaluation returned null');
@@ -1349,6 +1659,7 @@ async function runSemanticEvalStage(ctx, { promptOverride, experimentId }) {
     visible: result.visible || null,
     expected: result.expected || null,
     storedBaseline: { semanticScore: ctx.scene.semanticScore ?? null },
+    usage: result.usage || null,
   };
 }
 
@@ -1857,197 +2168,144 @@ async function runCharRepairStage(ctx, opts) {
     return { ...r, backend: params.backend, repairMode: `${params.backend}-insert` };
   }
 
+  // THE RUN'S CHAR-FIX, on the stored page (owner, 2026-09-27: "The Lab must use
+  // 100% identical code to production"). Every input — target box, borrowed-
+  // label and reference-gap guards, the rendered outfit and its wardrobe-state
+  // sheet, the axes (face vs body from the finding types), protection, clothing
+  // text, the request — comes from the builder the repair round calls
+  // (charFixCall.js); after the repaint the same face-integrity gate runs, and a
+  // cover is restamped as the manual route restamps it. With no params the call
+  // equals production's; every params.* below is an explicit override on top,
+  // listed in docs/lab-divergences.md. The only other difference is WHERE the
+  // result goes: a Lab test version, never the story.
+  //
   // target.versionIndex pins a stored version — repairing the ORIGINAL render
   // rather than whatever is active is how a repair is re-run under the same
-  // conditions production saw. Null keeps the active version (previous default).
+  // conditions production saw. Null keeps the active version. A cover loads its
+  // textless art layer (loadActivePageImage), as production repairs it.
   const pinnedVersion = pinnedVersionIndex(ctx.target?.versionIndex);
   const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber, pinnedVersion);
-  // IDENTITY-TRANSFER TEST: params.referenceCharacter sends a DIFFERENT character's
-  // avatar while still targeting charName's box. If the repair returns the original
-  // character, identity is being copied from the page instead of the reference —
-  // the sharpest test there is for a treatment (owner, 2026-08-05).
-  const refName = params.referenceCharacter || charName;
-  let ref = ctx.referencePhotos.find(p => (p.name || '').toLowerCase() === refName.toLowerCase());
-  if (!ref && params.referenceCharacter) ref = await resolveSwapReference(ctx, refName, params.artStyleOverride);
-  if (!ref) {
-    const avail = ctx.referencePhotos.map(p => p.name).filter(Boolean).join(', ');
-    throw new Error(`No reference photo for character "${refName}" on this page (available: ${avail || 'none'})`);
+  const coverLayer = getLastPageLoad()?.coverLayer || null;
+  const { storyData: storedStory } = await loadStoryDataFull(ctx.storyId, { rehydrate: false });
+  const artStyle = params.artStyleOverride || storedStory.artStyle || ctx.artStyle || 'pixar';
+  const storyData = params.artStyleOverride ? { ...storedStory, artStyle } : storedStory;
+  const characters = storyData.characters || [];
+  const img = { ...ctx.scene, pageNumber: ctx.pageNumber };
+  // THE DECISION the run's repair round would hand this character: the finding
+  // types of its routable entity finding on this page, through the filter
+  // decideRepairMethod uses (repairLogic.charFixEntityFindings). The run only
+  // char-fixes a CRITICAL one; a Lab run may target a major/minor finding and is
+  // told so (productionWouldRepair). params.issueTypes / whiteoutTarget override.
+  const { charFixEntityFindings } = require('./repairLogic');
+  const { canonicalName } = require('./castResolver');
+  const routable = charFixEntityFindings(ctx.pageNumber, storyData.finalChecksReport?.entity || null, { severities: ['critical', 'major', 'minor'] })
+    .filter(f => canonicalName(f.charName) === canonicalName(charName));
+  const productionWouldRepair = routable.some(f => f.severity === 'critical');
+  const finding = routable.find(f => f.severity === 'critical') || routable[0] || null;
+  const decision = {
+    charName,
+    issueTypes: Array.isArray(params.issueTypes) ? params.issueTypes
+      : (finding ? [finding.issue.subType || finding.issue.type].filter(Boolean) : null),
+    ...(params.whiteoutTarget === 'face' || params.whiteoutTarget === 'body' ? { forceTarget: params.whiteoutTarget } : {}),
+    ...(params.targetFigure != null ? { targetFigure: params.targetFigure } : {}),
+  };
+  if (!decision.issueTypes && !decision.forceTarget && decision.targetFigure == null) {
+    throw new Error(`No entity finding on page ${ctx.pageNumber} for "${charName}" whose type decides face vs full figure — the run would not char-fix it. Pass params.issueTypes (e.g. ["face_mismatch"]) or params.whiteoutTarget ("face"|"body").`);
   }
+  const { buildCharFixCall } = require('./charFixCall');
+  const buildCall = (bestEval, entityReport) => buildCharFixCall({
+    storyData, characters, artStyle, img, decision, currentImageData: imageData, bestEval, entityReport, jobKey: ctx.storyId,
+  });
+
+  // The evaluation of the bytes being repaired. The run holds it in memory; a
+  // stored page carries its detection and matches (fingerprint-checked against
+  // the bytes by the ladder). When they do not locate the character — a pinned
+  // older version, a stale stamp — the page is detected afresh with the manual
+  // route's detector call (charRepairTarget.detectPageForRepair), which is the
+  // detection the run would have held for these bytes.
+  // Lab knobs: params.detection (a chained experiment's detection, authoritative)
+  // and params.freshDetection (skip the stored one).
+  let call = null;
+  let boxSource;
+  let freshDetection = null;
+  if (params.detection) {
+    call = await buildCall({ bboxDetection: params.detection }, null);
+    boxSource = 'chained-detection';
+  } else if (!params.freshDetection) {
+    call = await buildCall({ bboxDetection: ctx.scene.bboxDetection, matches: ctx.scene.matches }, storyData.finalChecksReport?.entity || null);
+    boxSource = 'stored';
+  }
+  if (!call || call.failure?.noBox) {
+    if (params.detection) throw new Error(`"${charName}" not located by the chained detection — refusing the stored generation-time box, it can point at the wrong figure.`);
+    const { detectPageForRepair } = require('./charRepairTarget');
+    ({ detection: freshDetection } = await detectPageForRepair({
+      storyData, sceneImage: img, imageData, characterName: charName, pageNumber: ctx.pageNumber, artStyle, label: 'testlab',
+    }));
+    call = await buildCall({ bboxDetection: freshDetection }, null);
+    boxSource = 'fresh-detection';
+  }
+  if (call.failure) {
+    // The run refuses this repair too — that refusal IS the result.
+    const err = new Error(`char-fix refused (as in production): ${call.failure.error}`);
+    err.partialResult = { characterName: charName, boxSource, failure: call.failure };
+    throw err;
+  }
+  boxSource = `${boxSource}:${call.targetResolved.source}`;
+
+  // ── Lab overrides (explicit A/B knobs; none set = production) ──────────────
+  const overrides = {};
+  let avatarPhoto = call.avatarPhoto;
+  let avatarPhotoType = call.avatarPhotoType;
+  let bbox = call.repairBbox;
+  let faceBbox = call.faceBbox;
+  // IDENTITY-TRANSFER TEST: params.referenceCharacter sends a DIFFERENT
+  // character's avatar (and outfit/appearance text) while still targeting
+  // charName's box. If the repair returns the original character, identity is
+  // being copied from the page instead of the reference (owner, 2026-08-05).
+  const refName = params.referenceCharacter || charName;
   if (params.referenceCharacter) {
+    const { getStyledAvatarForClothing, buildClothingDescription } = require('./entityConsistency');
+    const refChar = characters.find(c => (c.name || '').toLowerCase() === refName.toLowerCase()) || null;
+    const styled = refChar ? await getStyledAvatarForClothing(refChar, artStyle, call.clothingCategory).catch(() => null) : null;
+    avatarPhoto = (styled && await toDataUri(styled)) || (await resolveSwapReference(ctx, refName, artStyle)).photoUrl;
+    avatarPhotoType = `swap-${refName}`;
+    overrides.clothingDescription = refChar ? (buildClothingDescription(refChar, call.clothingCategory, artStyle, storyData.clothingRequirements) || '') : '';
+    const d = ctx.scene.bboxDetection?.characterDescriptions?.[refName];
+    overrides.characterDescription = (typeof d === 'string' ? d : d?.richDescription) || refChar?.description || '';
     log.info(`[TESTLAB] IDENTITY SWAP: repairing ${charName}'s region with ${refName}'s reference`);
   }
-
-  // Bbox: explicit param → stored detection → fresh detection on the image.
-  // params.freshDetection skips the stored box (stale/misattributed names on
-  // older stories) and always re-detects.
-  let bbox = params.bbox || null;
-  let faceBbox = params.faceBbox || null;
-  let boxSource = bbox ? 'param' : null;
-  if (!bbox) {
-    if (params.freshDetection) ctx._skipStoredBox = true;
-    const resolved = await resolveCharacterBox(ctx, imageData, charName, { detection: params.detection || null });
-    delete ctx._skipStoredBox;
-    if (resolved) { bbox = resolved.bbox; faceBbox = faceBbox || resolved.faceBbox; boxSource = resolved.source; }
+  if (params.bbox?.length === 4) { bbox = params.bbox; boxSource = 'param'; }
+  if (params.faceBbox?.length === 4) { faceBbox = params.faceBbox; overrides.faceBbox = faceBbox; }
+  if (params.treatment) overrides.treatment = params.treatment;
+  if (params.regionSource) overrides.regionSource = params.regionSource;
+  if (params.faceOnly !== undefined) overrides.faceOnly = !!params.faceOnly;
+  const backend = params.backend || 'grok';
+  if (!['grok', 'gemini'].includes(backend)) throw new Error(`Unknown backend "${backend}" — use grok|gemini|qwen`);
+  if (backend !== 'grok') overrides.imageBackend = backend;
+  // The Gemini path is a single full-image repaint — it consumes NONE of the
+  // mode flags. Refuse a mode request it would silently ignore.
+  if (backend === 'gemini' && params.repairMode && params.repairMode !== 'auto') {
+    throw new Error(`backend "gemini" ignores repairMode — it always does a full-image repaint. Use grok for blended/cutout/fullscene.`);
   }
-  if (!bbox || bbox.length !== 4) {
-    throw new Error(`"${charName}" not found on the page image (stored detection AND fresh detection both missed) — is the character actually visible?`);
-  }
-
-  // Mode mapping — the real repair options are the useBlended/useCutout/
-  // useFullScene flags; 'auto' passes none and lets whiteoutTarget pick the
-  // default exactly as the automatic pipeline does.
-  const repairMode = params.repairMode || 'blended';
+  // Legacy mode flags pick the method through the SAME adapter production
+  // reads. Production passes none, so unset/'auto' = production.
+  const repairMode = params.repairMode || 'auto';
   const modeFlags = {};
   if (repairMode === 'blended') modeFlags.useBlended = true;
   else if (repairMode === 'cutout') modeFlags.useCutout = true;
   else if (repairMode === 'fullscene') modeFlags.useFullScene = true;
   else if (repairMode !== 'auto') throw new Error(`Unknown repairMode "${repairMode}" — use blended|cutout|fullscene|auto`);
-
-  const backend = params.backend || 'grok';
-  if (!['grok', 'gemini'].includes(backend)) throw new Error(`Unknown backend "${backend}" — use grok|gemini|qwen`);
-  // The Gemini path is a single full-image repaint — it consumes NONE of the
-  // mode flags / whiteoutTarget / faceBbox. Refuse a mode request it would
-  // silently ignore instead of reporting it as honored.
-  if (backend === 'gemini' && params.repairMode && params.repairMode !== 'auto') {
-    throw new Error(`backend "gemini" ignores repairMode — it always does a full-image repaint. Use grok for blended/cutout/fullscene.`);
-  }
-
-  // Face repair with no face box: recover (zoom into the known body box,
-  // re-run face detection) or fail loudly — never silently repair the body.
-  const whiteoutTarget = params.whiteoutTarget || 'face';
-  if (backend === 'grok' && whiteoutTarget === 'face' && !(faceBbox?.length === 4)) {
-    const { recoverFaceBox } = require('./figureDetection');
-    faceBbox = await recoverFaceBox(imageData, bbox, `testlab-P${ctx.pageNumber} ${charName}: `);
-    if (faceBbox) boxSource = `${boxSource} + face-recovered`;
-    else throw new Error(`Face repair requested for "${charName}" but no face box — full-page detection AND body-crop zoom recovery both found no face. Use whiteoutTarget "body" explicitly if a body repair is intended.`);
-  }
-
-  // Production-parity inputs — same as the automatic char-fix path: the
-  // clothing-scoped styled avatar, the story's resolved clothing description
-  // (clothingRequirements is canonical, avatars.clothing can be stale), and
-  // protection boxes for every OTHER named character on the page.
-  const { normalizeClothingCategory, resolveCharacterReqs } = require('./clothingCategories');
-  const { getStyledAvatarForClothing } = require('./entityConsistency');
-  // The styled avatar must follow the REFERENCE, not the target region — looking
-  // it up by charName silently replaced a swapped reference with the original
-  // character's avatar, so the identity-swap test ran with the wrong image and
-  // its result was meaningless (owner caught this on exp #320).
-  const character = (ctx.characters || []).find(c => (c.name || '').toLowerCase() === refName.toLowerCase()) || null;
-  const clothingKey = Object.keys(ctx.scene.sceneCharacterClothing || {})
-    .find(k => k.toLowerCase() === charName.toLowerCase());
-  const clothingCategory = clothingKey
-    ? normalizeClothingCategory(ctx.scene.sceneCharacterClothing[clothingKey])
-    : 'standard';
-  let avatarPhoto = ref.photoUrl;
-  let avatarPhotoType = 'reference';
-  if (character) {
-    try {
-      const styled = await getStyledAvatarForClothing(character, ctx.artStyle, clothingCategory);
-      if (styled) {
-        avatarPhoto = (await toDataUri(styled)) || avatarPhoto;
-        avatarPhotoType = clothingCategory.startsWith('costumed')
-          ? `costumed-${clothingCategory.split(':')[1] || 'default'}` : `styled-${clothingCategory}`;
-      }
-    } catch (err) {
-      log.warn(`[TESTLAB] styled avatar lookup failed for ${charName} (${err.message}) — using page reference photo`);
-    }
-  }
-
-  // Same cell selection as production's char-fix (repairPipeline): the shared
-  // resolveCellPose/cropAvatarCell chain picks the sheet cell matching the
-  // figure's declared facing — body cell for a body repair, face cell stacked
-  // above it for a face repair. params.referenceCells overrides for A/B:
-  // 'full' forces the raw 2x4 sheet (the old behaviour), 'body4' the body row,
-  // 'body1' the front body cell.
-  if (avatarPhoto && params.referenceCells !== 'full') {
-    try {
-      const sharpRC = require('sharp');
-      const r2RC = require('./r2');
-      if (params.referenceCells === 'body4' || params.referenceCells === 'body1') {
-        const rcBuf = Buffer.from(r2RC.stripDataUriPrefix(await toDataUri(avatarPhoto) || avatarPhoto), 'base64');
-        const rcMeta = await sharpRC(rcBuf).metadata();
-        const W = rcMeta.width, H = rcMeta.height;
-        const region = params.referenceCells === 'body1'
-          ? { left: 0, top: Math.round(H / 2), width: Math.round(W / 4), height: Math.round(H / 2) }
-          : { left: 0, top: Math.round(H / 2), width: W, height: Math.round(H / 2) };
-        const cropped = await sharpRC(rcBuf).extract(region).jpeg({ quality: 92 }).toBuffer();
-        avatarPhoto = `data:image/jpeg;base64,${cropped.toString('base64')}`;
-        avatarPhotoType = `${avatarPhotoType}+${params.referenceCells}`;
-      } else {
-        const { resolveCellPose } = require('./storyAvatars');
-        const { cropAvatarCell } = require('./sceneComposite');
-        const metaChars = ctx.scene.sceneMetadata?.fullData?.characters
-          || ctx.scene.sceneMetadata?.characters || ctx.scene.sceneCharacters || [];
-        const sc = (Array.isArray(metaChars) ? metaChars : []).find(c =>
-          ((typeof c === 'string' ? c : c?.name) || '').toLowerCase() === refName.toLowerCase());
-        const pf = resolveCellPose(sc || {});
-        const wantFace = whiteoutTarget === 'face';
-        const { body, stacked } = await cropAvatarCell(avatarPhoto,
-          { pose: pf.pose, includeFace: wantFace, stack: wantFace });
-        const cell = wantFace ? (stacked || body) : body;
-        if (cell) {
-          avatarPhoto = cell;
-          avatarPhotoType = `${avatarPhotoType}+cell-${pf.pose}${wantFace ? '-stacked' : ''}`;
-        }
-      }
-    } catch (err) {
-      log.warn(`[TESTLAB] cell selection failed (${err.message}) — sending the full sheet`);
-    }
-  }
-
-  const clothingDescription = (() => {
-    // Follows the REFERENCE character: during an identity swap the prompt must
-    // not keep demanding the TARGET's outfit, or the model is told to paint the
-    // original clothing onto the swapped person and nothing changes (owner:
-    // "neither changed the clothing", exp #326).
-    const reqs = resolveCharacterReqs(ctx.clothingRequirements, refName);
-    if (reqs?.[clothingCategory]) {
-      const cat = reqs[clothingCategory];
-      if (cat.signature && cat.signature !== 'none') return cat.signature;
-      if (cat.description) return cat.description;
-    }
-    return character?.avatars?.clothing?.[clothingCategory] || '';
-  })();
-  const detFigures = params.detection?.figures
-    || ctx.scene.bboxDetection?.figures || ctx.scene.bboxDetection?.characters || [];
-  const protectedFaces = [];
-  const protectedBodies = [];
-  const protectedNames = [];
-  for (const f of detFigures) {
-    const n = (f?.name || '').trim();
-    // Named characters only — mirrors production, which protects sceneCharacters.
-    if (!n || n.toUpperCase() === 'UNKNOWN' || n.toLowerCase() === charName.toLowerCase()) continue;
-    const fb = f.faceBox || f.faceBbox;
-    const bb = f.bodyBox || f.bbox || f.box_2d;
-    if (fb?.length === 4) protectedFaces.push(fb);
-    if (bb?.length === 4) protectedBodies.push(bb);
-    if (fb?.length === 4 || bb?.length === 4) protectedNames.push(n);
-  }
-
   // LAB DIVERGENCE (indexed): protectTargetFace adds the TARGET's own face box
-  // to the protected set, so a body repaint keeps the original head pixels
-  // instead of repainting them. Tests the two-pass idea — fix the body first,
-  // then the face — against the measured failure where a full-figure repaint
-  // returns a head in the wrong medium and proportion 7 times in 8. Production
-  // does not have this option yet; promote or reject per docs/lab-divergences.md.
+  // to the protected set, so a body repaint keeps the original head pixels.
+  // Production does not have this option; promote or reject per
+  // docs/lab-divergences.md.
+  const protectedNames = [...call.protectedNames];
   if (params.protectTargetFace && faceBbox?.length === 4) {
-    protectedBodies.push(faceBbox);
+    overrides.protectedBodies = [...(call.request.protectedBodies || []), faceBbox];
     protectedNames.push(`${charName}'s own face (protected)`);
   }
-
-  // Route through the unified spine (server/lib/faceRepair.js). Legacy
-  // repairMode flags + whiteoutTarget + backend → axes via legacyFlagsToAxes;
-  // the spine blends INTERNALLY through samUnionBlend, so the old post-hoc
-  // re-blend is gone. That re-blend was the testlab↔prod divergence — it stacked
-  // a SECOND samUnionBlend on TOP of the production repair's own composite, so
-  // the lab never saw what prod actually ships. Now both use the one spine.
-  // Axes are NOT resolved here. The stage calls the same entry point the story
-  // pipeline calls (images.repairCharacterMismatch), which owns bbox validation,
-  // the face-box union expansion — "if a separate face box pokes outside the
-  // body box, expand the body box so the treatment mask doesn't miss half the
-  // face" — the char_repair_run metric, and legacyFlagsToAxes itself. Resolving
-  // axes here meant the Lab skipped all of that and repaired a different region
-  // than production would have.
+  const { buildCharRepairRequest } = require('./charRepairRequest');
+  const request = buildCharRepairRequest(call.request, { overrides });
 
   // Intermediates saved as tl_step versions so the UI shows the full chain. The
   // spine emits its SAM round-1/2 views through this addStep (threaded into
@@ -2058,7 +2316,8 @@ async function runCharRepairStage(ctx, opts) {
     const v = await saveTestVersion(ctx.storyId, 'tl_step', ctx.pageNumber, dataUri, experimentId);
     steps.push({ label, imageType: 'tl_step', versionIndex: v });
   };
-  await addStep(`input: character reference (${avatarPhotoType})`, avatarPhoto);
+  const avatarUri = String(avatarPhoto).startsWith('data:') ? avatarPhoto : ((await toDataUri(avatarPhoto)) || avatarPhoto);
+  await addStep(`input: character sheet (${avatarPhotoType})`, avatarUri);
 
   // Replay support for the crosshatch/blur spine: params.reuseModelOutput is a
   // tl_step version index (or a data URI) holding a previous 'model raw output'.
@@ -2067,101 +2326,62 @@ async function runCharRepairStage(ctx, opts) {
     const v = params.reuseModelOutput;
     if (typeof v === 'string' && v.startsWith('data:image')) reuseCandidateUri = v;
     else {
-      const img = await loadTestImage(ctx.storyId, 'tl_step', ctx.pageNumber, Number(v));
-      if (!img?.imageData) throw new Error(`reuseModelOutput: tl_step v${v} not found on this page`);
-      reuseCandidateUri = img.imageData;
+      const stepImg = await loadTestImage(ctx.storyId, 'tl_step', ctx.pageNumber, Number(v));
+      if (!stepImg?.imageData) throw new Error(`reuseModelOutput: tl_step v${v} not found on this page`);
+      reuseCandidateUri = stepImg.imageData;
     }
     log.info(`[TESTLAB] spine replay: reusing stored model output ${typeof v === 'number' ? 'tl_step v' + v : '(data URI)'}`);
   }
 
   const t0 = Date.now();
-  // The SHARED production contract (charRepairRequest.js). Built from the same
-  // field list the unified pipeline uses, so a Lab run sends what production
-  // sends; anything this stage deliberately does differently is an override or
-  // a Lab-only mechanic below, and every one is indexed in
-  // docs/lab-divergences.md.
-  const { buildCharRepairRequest } = require('./charRepairRequest');
-  const sharedRequest = buildCharRepairRequest({
-    imageBackend: backend,
-    defectTypes: Array.isArray(params.issueTypes) ? params.issueTypes : null,
-    clothingDescription,
-    // Face/hair/build text for the prompt. Follows refName so an identity swap
-    // describes the person we actually want painted.
-    characterDescription: (() => {
-      const d = ctx.scene.bboxDetection?.characterDescriptions?.[refName];
-      return (typeof d === 'string' ? d : d?.richDescription) || '';
-    })(),
-    photoType: avatarPhotoType,
-    sceneDescription: ctx.scene.sceneDescription || ctx.scene.text || '',
-    artStyle: params.artStyleOverride || ctx.artStyle || null,
-    faceBbox: faceBbox || null,
-    bodyBbox: bbox,
-    whiteoutTarget,
-    // SAME AS PRODUCTION: reuse the stored detection silhouette. This was
-    // hardcoded null on the grounds that "a Lab run has no detection pass" —
-    // true before masks were persisted, false now that detection writes
-    // figure_mask rows. Left as null the Lab re-segmented on a crop while
-    // production reused, so a Lab result was not evidence about production.
-    // Resolves to null for a story with no stored mask, which is the old
-    // behaviour and is reported as a miss.
-    detectionBodyMask: await require('./charRepairTarget').resolveFigureMask(
-      // sourceImageFp along for the ride: fp-guarded mask rows refuse an
-      // unstamped lookup (migration 034), and the Lab must reuse exactly what
-      // production reuses or its result is not evidence about production.
-      charName, { figures: ctx.scene.bboxDetection?.figures || [], sourceImageFp: ctx.scene.bboxDetection?.sourceImageFp || null },
-      { storyId: ctx.storyId, pageNumber: ctx.pageNumber },
-    ),
-    protectedFaces,
-    protectedBodies,
-    textPosition: ctx.textPosition,
-    includeDebug: true,
-    // SAME AS PRODUCTION: pose lines name other figures by sight.
-    repairNames: labRepairNames(ctx),
-    // Axis overrides — omitted unless the experiment names one, so an unset run
-    // resolves exactly as production does. This is what lets the Lab A/B a
-    // treatment (blur vs whiteout on a face) instead of only a legacy mode.
-    ...(params.treatment ? { treatment: params.treatment } : {}),
-    ...(params.regionSource ? { regionSource: params.regionSource } : {}),
-    ...(params.faceOnly !== undefined ? { faceOnly: !!params.faceOnly } : {}),
-  });
   const { repairCharacterMismatch } = require('./images');
   const result = await repairCharacterMismatch(imageData, avatarPhoto, bbox, charName, {
-    ...sharedRequest,
-    // The A/B knob: legacy mode flags are what production's adapter reads to
-    // pick the method, so forcing a mode here goes through the SAME resolution
-    // production uses instead of bypassing it.
+    ...request,
     ...modeFlags,
     // Lab-only MECHANICS (not behaviour deviations): per-step image capture and
     // deterministic replay of a stored model output.
     addStep,
     ...(reuseCandidateUri ? { reuseCandidate: reuseCandidateUri } : {}),
     // FULL identity swap: the prompt must NAME the reference character, or the
-    // text keeps ordering the target back (exp #329: Roger's avatar + 'paint one
-    // Lukas' = no change). Region/pose stay the target's.
+    // text keeps ordering the target back (exp #329). Region/pose stay the target's.
     ...(params.referenceCharacter ? { promptName: refName } : {}),
     ...(params.blurStrength ? { blurStrength: params.blurStrength } : {}),
     ...(params.r2Prompt ? { r2Prompt: params.r2Prompt } : {}),
-    // Crosshatch carries a blurred head by default (body pose from the hatch,
-    // identity from the avatar). params.blurFace=false A/Bs the plain hatch.
     ...(params.blurFace !== undefined ? { blurFace: params.blurFace } : {}),
   });
   const elapsedMs = Date.now() - t0;
-  const finalImage = result?.imageData;
-  if (!finalImage) {
+  // What the spine actually sent as the reference (face cell or body cell,
+  // upscaled and padded to the call's aspect).
+  if (result?.croppedAvatar) await addStep('reference sent to model', result.croppedAvatar);
+  let finalImage = result?.imageData;
+  // The run's failure test and its reason (repairLogic.describeCharFixFailure).
+  let rejectedReason = null;
+  let gateMessage = null;
+  if (!finalImage || finalImage.length < 1000) {
+    rejectedReason = result?.rejectedReason || 'unknown';
+    gateMessage = require('./repairLogic').describeCharFixFailure(result);
+  } else {
+    // FACE-INTEGRITY GATE — the run refuses a repair that left the face
+    // unreadable (faceIntegrityGate.js); so does the Lab.
+    const faceGate = await require('./faceIntegrityGate').checkFaceIntegrity(
+      imageData, finalImage, charName, { log, jobKey: ctx.storyId, context: `TESTLAB char_repair p${ctx.pageNumber} ${charName}` });
+    if (!faceGate.ok) { rejectedReason = 'face_integrity'; gateMessage = `face not intact after repair (${faceGate.reason})`; }
+  }
+  if (rejectedReason) {
     // A GATE rejection is a result, not a void: show WHY and what the model
-    // produced. Previously the card said only "returned no image (blend_gate)"
-    // with zero steps, so a rejected treatment was undiagnosable (exp #306 blur).
+    // produced (exp #306 blur).
     if (result?.blackoutImage) await addStep('sent to model (treated input)', result.blackoutImage);
     if (result?.grokRawResult) await addStep('model raw output (REJECTED)', result.grokRawResult);
-    const err = new Error(`Character repair REJECTED by the ${result?.rejectedReason || 'unknown'} gate: ${result?.gateMessage || 'no detail'}`);
+    if (rejectedReason === 'face_integrity' && finalImage) await addStep('repaired image (REJECTED by face gate)', finalImage);
+    const err = new Error(`Character repair REJECTED by the ${rejectedReason} gate: ${gateMessage || 'no detail'}`);
     err.partialResult = {
       steps,
       characterName: charName,
       bbox,
       faceBbox: faceBbox || undefined,
       descriptor: result?.descriptor,
-      rejectedReason: result?.rejectedReason || 'unknown',
-      gateMessage: result?.gateMessage || null,
+      rejectedReason,
+      gateMessage,
       promptUsed: result?.promptSent || null,
       elapsedMs,
     };
@@ -2170,7 +2390,8 @@ async function runCharRepairStage(ctx, opts) {
 
   await addStep('sent to model (whiteout/crosshatch)', result.blackoutImage);
   await addStep('model raw output', result.grokRawResult);
-
+  const detFigures = freshDetection?.figures || params.detection?.figures
+    || ctx.scene.bboxDetection?.figures || ctx.scene.bboxDetection?.characters || [];
   // PER-FIGURE SAM AFTER THE REPAIR. One silhouette per detected character,
   // segmented from the FINAL image: the direct way to see whether a repair
   // damaged a neighbour or absorbed part of them (owner request). Diagnostic
@@ -2204,11 +2425,32 @@ async function runCharRepairStage(ctx, opts) {
     log.warn(`[TESTLAB] per-figure SAM diagnostic failed (${err.message}) — skipped`);
   }
 
-  const versionIndex = await saveTestVersion(ctx.storyId, 'scene', ctx.pageNumber, finalImage, experimentId);
+  // WHERE IT GOES — the one deliberate difference from production. A cover was
+  // repaired on its textless art and is restamped exactly as the manual repair
+  // route restamps it (coverEvalLayer.restampRepairedCover), then stored as a
+  // Lab cover version (served + art pair); a page is a Lab scene version.
+  let versionIndex;
+  let imageType = 'scene';
+  const coverKey = ctx.pageNumber < 0 ? COVER_KEY_BY_PAGE[String(ctx.pageNumber)] : null;
+  if (coverKey) {
+    const { restampRepairedCover } = require('./coverEvalLayer');
+    const { servedImageData, artImageData } = await restampRepairedCover(storyData, coverKey, finalImage, {
+      restamp: coverLayer === 'art', figures: detFigures,
+    });
+    versionIndex = await saveTestCoverVersion(ctx.storyId, coverKey, servedImageData, artImageData || finalImage, experimentId);
+    imageType = coverKey;
+    if (artImageData) await addStep('cover restamped (served)', servedImageData);
+  } else {
+    versionIndex = await saveTestVersion(ctx.storyId, 'scene', ctx.pageNumber, finalImage, experimentId);
+  }
   return {
-    imageType: 'scene', versionIndex, characterName: charName, bbox, faceBbox: faceBbox || undefined, boxSource, backend,
+    imageType, versionIndex, characterName: charName, bbox, faceBbox: faceBbox || undefined, boxSource, backend,
     repairMode: backend === 'grok' ? repairMode : null,
-    clothingCategory, avatarPhotoType,
+    clothingCategory: call.clothingCategory, avatarPhotoType,
+    whiteoutTarget: request.whiteoutTarget,
+    // Whether the run itself would char-fix this character here (a CRITICAL
+    // routable entity finding) — a Lab run may target a lesser one.
+    productionWouldRepair,
     protectedCharacters: protectedNames.length ? protectedNames : undefined,
     samBlend: true,
     blendRule: BLEND_RULE_VERSION,
@@ -2247,6 +2489,9 @@ async function runEntityStage(ctx, { experimentId, params = {} }) {
   if (rows.length === 0) throw new Error('Story not found');
   let storyData = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
   storyData = await rehydrateStoryImages(ctx.storyId, storyData);
+  // Covers are judged on their textless art (coverEvalLayer.js); a stamped
+  // cover with no art layer is left out and named in the result.
+  const { notEvaluated: coversNotEvaluated } = await require('./coverEvalLayer').applyCoverEvalView(ctx.storyId, storyData);
 
   const stripImages = (obj) => JSON.parse(JSON.stringify(obj, (key, value) => {
     if (typeof value === 'string' && value.startsWith('data:image')) return `[image ${Math.round(value.length / 1024)}KB]`;
@@ -2280,11 +2525,19 @@ async function runEntityStage(ctx, { experimentId, params = {} }) {
     };
   };
 
+  // params.character: judge ONE character's grid (a judge fixture pins one
+  // character), instead of paying for every character's call.
+  const allCharacters = storyData.characters || [];
+  const characters = params.character
+    ? allCharacters.filter(c => String(c?.name || '').toLowerCase() === String(params.character).toLowerCase())
+    : allCharacters;
+  if (params.character && !characters.length) throw new Error(`No character "${params.character}" in story ${ctx.storyId}`);
+
   const runs = [];
   let firstReport = null;
   for (let i = 1; i <= repeats; i++) {
     const t0 = Date.now();
-    const report = await runEntityConsistencyChecks(storyData, storyData.characters || [], {
+    const report = await runEntityConsistencyChecks(storyData, characters, {
       checkCharacters: true,
       checkObjects: false,
       saveGrids: false,
@@ -2293,7 +2546,7 @@ async function runEntityStage(ctx, { experimentId, params = {} }) {
     runs.push({ run: i, elapsedMs: Date.now() - t0, ...extract(report) });
   }
 
-  if (repeats === 1) return { elapsedMs: runs[0].elapsedMs, report: firstReport };
+  if (repeats === 1) return { elapsedMs: runs[0].elapsedMs, report: firstReport, coversNotEvaluated };
 
   // Match issues across runs by the SAME rule the ranker uses to merge findings
   // across evaluators, so "did it find the same thing twice?" is not a second
@@ -2317,7 +2570,7 @@ async function runEntityStage(ctx, { experimentId, params = {} }) {
   const spread = (vals) => ({ values: vals, min: Math.min(...vals), max: Math.max(...vals), range: Math.max(...vals) - Math.min(...vals) });
 
   return {
-    storyId: ctx.storyId, repeats,
+    storyId: ctx.storyId, repeats, coversNotEvaluated,
     issueCountSpread: spread(runs.map(r => r.issues.length)),
     penaltySpread: spread(runs.map(r => r.penaltyTotal)),
     evalFailureSpread: spread(runs.map(r => r.evalFailures)),
@@ -2715,6 +2968,14 @@ function storedEvalFromScene(scene) {
     // runs but not in the lab).
     threeStageResult: scene.threeStageResult || newestWith('threeStageResult') || null,
     consolidatedPlan: scene.consolidatedPlan || newestWith('consolidatedPlan') || null,
+    // The scene the judges scored, rebuilt the way the pipeline's batch eval
+    // built it for this record (resolveEvalSceneDescription, then the judges'
+    // own metadata strip) — the consolidator reads this, never the brief.
+    judgedPrompt: require('./evalPipeline').judgedSceneText(require('./sceneMetadata').resolveEvalSceneDescription({
+      compressedScene: scene.compressedScene || null,
+      sceneDescription: scene.sceneDescription || null,
+      prompt: scene.prompt || null,
+    })) || null,
   };
 }
 
@@ -2786,8 +3047,9 @@ async function runCoverStage(target, { experimentId, promptOverride, params = {}
     });
     const elapsed = Date.now() - t0;
     if (!pageResult?.imageData) throw new Error('Cover render returned no image');
-    const vIdx = await saveTestVersion(
-      target.storyId, coverKey, null, pageResult.imageData, experimentId,
+    // artImageData null = the served bytes are the raw render (stampRepaintedCover).
+    const vIdx = await saveTestCoverVersion(
+      target.storyId, coverKey, pageResult.imageData, pageResult.artImageData || pageResult.imageData, experimentId,
       pageResult.score != null ? Math.round(pageResult.score) : null
     );
     return {
@@ -2817,8 +3079,9 @@ async function runCoverStage(target, { experimentId, promptOverride, params = {}
   const elapsedMs = Date.now() - t0;
   if (!result?.imageData) throw new Error('Cover render returned no image');
 
-  const versionIndex = await saveTestVersion(
-    target.storyId, coverKey, null, result.imageData, experimentId,
+  // artImageData null = the served bytes are the raw render (stampRepaintedCover).
+  const versionIndex = await saveTestCoverVersion(
+    target.storyId, coverKey, result.imageData, result.artImageData || result.imageData, experimentId,
     result.score != null ? Math.round(result.score) : null
   );
   return {
@@ -2942,13 +3205,14 @@ async function runCoverTitlePaintinStage(target, { experimentId, promptOverride,
   // stories, so reading that and falling back to `cover.imageData` fed the
   // SERVED, ALREADY-TITLED cover into the pipeline (exp #311 — every crop went
   // to Qwen with the title baked in twice, and "Das Seil fliegt…" came back
-  // showing two titles). Read the Art row; fail loudly if there is none.
-  const artRow = await loadTestImage(target.storyId, `${coverKey}Art`, null, 0);
-  const artSrc = artRow?.imageData || cover.artImageData;
-  if (!artSrc) {
-    throw new Error(`No textless cover plate (story_images ${coverKey}Art) — this story predates `
+  // showing two titles). Read the Art row OF THE ACTIVE VERSION (it used to
+  // read v0 whatever was active); fail loudly if there is none.
+  const artLayer = await require('./coverEvalLayer').resolveCoverEvalImage(target.storyId, coverKey, null);
+  if (artLayer.layer !== 'art') {
+    throw new Error(`No textless cover plate (story_images ${coverKey}Art v${artLayer.versionIndex}) — this story predates `
       + 'app-side typography, so compositing a title would double-stamp it.');
   }
+  const artSrc = artLayer.imageData;
   const artBytes = await r2.bytesFromAnyImage(artSrc);
   if (!artBytes) throw new Error('Could not resolve cover art bytes');
 
@@ -3056,7 +3320,7 @@ async function runCoverTitlePaintinStage(target, { experimentId, promptOverride,
     const elapsedP = Date.now() - t0p;
     if (r.debug?.plate) await addStep('INPUT 2 (edited): title strip on WHITE, preset-padded', r.debug.plate);
     if (r.debug?.raw) await addStep('raw model output (lettering plate)', r.debug.raw);
-    const viP = await saveTestVersion(target.storyId, coverKey, null, r.imageData, experimentId);
+    const viP = await saveTestCoverVersion(target.storyId, coverKey, r.imageData, artSrc, experimentId);
     return {
       imageType: coverKey, coverType: coverKey, versionIndex: viP, steps,
       modelId: params.model || params.backend || 'grok-imagine', elapsedMs: elapsedP, cost: r.cost ?? null,
@@ -3528,7 +3792,7 @@ async function runCoverTitlePaintinStage(target, { experimentId, promptOverride,
     gateError = e.message;
   }
 
-  const versionIndex = await saveTestVersion(target.storyId, coverKey, null, finalUri, experimentId);
+  const versionIndex = await saveTestCoverVersion(target.storyId, coverKey, finalUri, artSrc, experimentId);
   return {
     imageType: coverKey, coverType: coverKey, versionIndex, steps,
     promptUsed: prompt, modelId: result.modelId || params.model || backend, elapsedMs,
@@ -3577,6 +3841,8 @@ async function runStyleCheckStage(target, { experimentId }) {
   await loadPromptTemplates();
   const { checkStoryStyleConsistency } = require('./styleConsistency');
   const { storyData } = await loadStoryDataFull(target.storyId);
+  // Covers are judged on their textless art (coverEvalLayer.js).
+  const { notEvaluated: coversNotEvaluated } = await require('./coverEvalLayer').applyCoverEvalView(target.storyId, storyData);
   const t0 = Date.now();
   const result = await checkStoryStyleConsistency(storyData);
   const elapsedMs = Date.now() - t0;
@@ -3584,7 +3850,7 @@ async function runStyleCheckStage(target, { experimentId }) {
     if (typeof value === 'string' && value.startsWith('data:image')) return `[image ${Math.round(value.length / 1024)}KB]`;
     return value;
   }));
-  return { elapsedMs, report: safe };
+  return { elapsedMs, report: safe, coversNotEvaluated };
 }
 
 /**
@@ -3601,6 +3867,9 @@ async function runBookAuditStage(target, { params = {}, promptOverride = null })
   const { auditStoryBook } = require('./bookAudit');
   const { calculateTextCost } = require('../config/models');
   const { storyData } = await loadStoryDataFull(target.storyId);
+  // Covers are audited on their textless art, as in the story run
+  // (coverEvalLayer.js); a stamped cover with no art layer is left out.
+  const { notEvaluated: coversNotEvaluated } = await require('./coverEvalLayer').applyCoverEvalView(target.storyId, storyData);
   const t0 = Date.now();
   // Same collector every other paid Lab stage uses. Without a tracker
   // bookAudit's `if (usageTracker …)` branch never fires, so a Lab audit spent
@@ -3639,6 +3908,7 @@ async function runBookAuditStage(target, { params = {}, promptOverride = null })
     byRoute: audit.byRoute,
     pagesRead: audit.pagesRead,
     pagesSkipped: audit.pagesSkipped,
+    coversNotEvaluated,
     // The fault lines verbatim — the same yardstick countFaults reads.
     logLines: [...audit.byRoute.IMG, ...audit.byRoute.TEXT]
       .sort((a, b) => (a.page ?? 0) - (b.page ?? 0))
@@ -3792,7 +4062,7 @@ async function runAuditReplayStage(target, { params = {}, promptOverride = null 
  * and after a scene-expansion prompt change to see whether the hazard count
  * actually moved.
  *
- * params.models : comma list of TEXT_MODELS keys (default sceneReviewModel)
+ * params.models : comma list of TEXT_MODELS keys (default briefCorrectionModel, the brief critic)
  * params.source : 'briefs' (default, data.sceneImages[].sceneDescription)
  *                 | 'beats' (PLAN lines from the stored outline's ---BEATS---; legacy SCENE lines parse the same)
  */
@@ -3807,7 +4077,7 @@ async function runSceneHazardCountStage(target, { params = {}, promptOverride = 
 
   const source = String(params.source || 'briefs').toLowerCase();
   if (!['briefs', 'beats'].includes(source)) throw new Error(`params.source must be briefs | beats, got "${params.source}"`);
-  const models = String(params.models || params.model || MODEL_DEFAULTS.sceneReviewModel || MODEL_DEFAULTS.outlineReviewModel)
+  const models = String(params.models || params.model || MODEL_DEFAULTS.briefCorrectionModel)
     .split(',').map(x => x.trim()).filter(Boolean);
   for (const m of models) if (!TEXT_MODELS[m]) throw new Error(`Unknown model "${m}"`);
 
@@ -3936,7 +4206,7 @@ async function runSceneHazardCountStage(target, { params = {}, promptOverride = 
  * "not beatsMode, not trialMode, splitOutlineReviewEnabled", and runtime.js sets
  * pipelineMode:'beats' in every environment — so production never makes either
  * call. The stage measured a configuration that cannot ship, and its beats
- * analogues are their own stages (arc_review, text_refine, scene_review).
+ * analogues are their own stages (arc_review, text_refine).
  *
  * Stored experiments keep rendering: the result renderer keys off
  * result.stageKind === 'outline_review', which is untouched.
@@ -3989,117 +4259,6 @@ async function runSceneHazardCountStage(target, { params = {}, promptOverride = 
  *   planning the same cast and setting from a different idea.
  */
 /**
- * Land reviewer rewrites on the expansions. The FIRST reviewer is primary and
- * fills `reviewedBrief` / `reviewRewrote` (unchanged single-reviewer behaviour);
- * every OTHER reviewer that passed the truncation guard stores its rewrite in
- * `reviewedBriefs[modelKey]` so a multi-reviewer fan-out can be judged per
- * reviewer (scene_hazard_count params.reviewer). A failed reviewer stores
- * nothing — its pages must never read as reviewed. Pure; unit-tested.
- */
-function applyReviewerPages(sceneExpansions, sceneReviews) {
-  sceneReviews.forEach((r, i) => {
-    if (!r || r.ok === false || !Array.isArray(r._pages)) return;
-    const byPage = new Map(r._pages.map(x => [x.pageNumber, x.text]));
-    for (const x of sceneExpansions) {
-      const reviewed = byPage.get(x.pageNumber);
-      if (!reviewed) continue;
-      // Production's rule (beatsPipeline keepDeclaredWornRows): a reviewed
-      // brief keeps every worn-state row the raw expansion declared.
-      const carry = require('./wornItems').carryForwardWornItemsInBrief(reviewed, x.fromBeats);
-      const fixed = carry ? carry.brief : reviewed;
-      if (i === 0) { x.reviewedBrief = fixed; x.reviewRewrote = true; }
-      else { (x.reviewedBriefs = x.reviewedBriefs || {})[r.modelKey] = fixed; }
-    }
-  });
-  for (const r of sceneReviews) if (r) delete r._pages;
-}
-
-/**
- * The all-pages scene expansion, with production's recovery.
- *
- * WHY THIS EXISTS - Test Lab experiment 1275 (`beats_scenes`, 16 pages): the Art
- * Director's all-pages reply was cut mid-JSON inside page 9. The stage took every
- * `## Page N` chunk verbatim, so it reported sixteen expansions of which seven
- * were empty and one was half a spec - and the run still read as a success.
- * An experiment that reports 16 and measured 9 produces conclusions nobody can
- * trust. Production never had that hole: `beatsPipeline.js` refuses a brief that
- * fails the scene-brief contract, retries the batch once, and re-expands whatever
- * is still missing page by page. This is those three guards, calling the SAME
- * contract helper (`iterateBriefGuard.partitionSceneBriefs`), not a second copy.
- *
- * It is dependency-injected - the batch call, the parser, the per-page fallback -
- * because the stage around it needs a story, a DB and paid models, and the
- * recovery decisions must be pinnable without any of those.
- *
- * @param {object} o
- * @param {Array<{pageNumber:number}>} o.expected  pages the batch owes
- * @param {function():Promise<object>} o.callBatch  one paid all-pages call
- * @param {function(object):Array<{pageNumber:number,text:string}>} o.parsePages
- * @param {function(object):Promise<object>} o.expandOnePage  per-page fallback
- * @param {function(object):void} [o.onAttempt]  each reply, before parsing
- * @param {function(object):number} [o.costOf]
- * @param {number} [o.attempts=2]  batch attempts, production's number
- * @returns {Promise<{byPage:Map, recovered:Array, cost:number, lastRes:object|null, attemptsMade:number}>}
- */
-async function collectAllPagesBriefs(o) {
-  const { partitionSceneBriefs, describeSceneBrief } = require('./iterateBriefGuard');
-  const expected = o.expected || [];
-  const attempts = o.attempts || 2;
-  const costOfRes = o.costOf || (() => 0);
-  // First attempt's pages win, so a retry can only FILL gaps, never rewrite a
-  // page already parsed.
-  const byPage = new Map();
-  let lastRes = null;
-  let cost = 0;
-  let attemptsMade = 0;
-  for (let attempt = 1; attempt <= attempts; attempt++) {
-    let res;
-    attemptsMade = attempt;
-    try {
-      res = await o.callBatch(attempt);
-    } catch (err) {
-      log.error(`\u{1F6A8} [TESTLAB] beats_scenes: all-pages attempt ${attempt} failed (${err.message}) - falling back to per-page expansion`);
-      break;
-    }
-    lastRes = res;
-    cost += costOfRes(res) || 0;
-    if (o.onAttempt) o.onAttempt(res);
-    const { whole, cut, formatWide } = partitionSceneBriefs(o.parsePages(res) || []);
-    for (const p of (formatWide ? cut : whole)) {
-      if (!byPage.has(p.pageNumber)) byPage.set(p.pageNumber, { text: p.text, res });
-    }
-    if (formatWide) {
-      // Not one page meets the contract: the reply is in a shape the parser does
-      // not know rather than a truncated one, and re-expanding a whole book page
-      // by page would spend a paid call each to get the same shape back.
-      log.error(`\u{1F6A8} [TESTLAB] beats_scenes attempt ${attempt}: not one of the ${cut.length} brief(s) meets the brief contract (${describeSceneBrief(cut[0].verdict)}) - accepting them as written rather than re-expanding the whole book`);
-    } else if (cut.length > 0) {
-      log.error(`\u{1F6A8} [TESTLAB] beats_scenes attempt ${attempt}: incomplete brief(s) - ${cut.map(p => `p${p.pageNumber} (${describeSceneBrief(p.verdict)})`).join('; ')} - treating them as NOT delivered`);
-    }
-    if (byPage.size >= expected.length) break;
-    if (attempt < attempts) {
-      const missingNow = expected.filter(b => !byPage.has(b.pageNumber)).map(b => b.pageNumber);
-      log.error(`\u{1F6A8} [TESTLAB] beats_scenes: all-pages call returned ${byPage.size}/${expected.length} briefs, missing page(s) ${missingNow.join(', ')} - retrying the batch ONCE at full cap`);
-    }
-  }
-
-  // Per-page fallback for whatever the batch still owes. A page that fails here
-  // too stays a NON-result: ok:false and no brief text, so neither the scene
-  // review nor the comparison can mistake half a spec for a measurement.
-  let recovered = [];
-  const stillMissing = expected.filter(b => !byPage.has(b.pageNumber));
-  if (stillMissing.length > 0) {
-    log.error(`\u{1F6A8} [TESTLAB] beats_scenes: ${byPage.size}/${expected.length} briefs after ${attemptsMade} batch attempt(s) - re-expanding page(s) ${stillMissing.map(b => b.pageNumber).join(', ')} per-page`);
-    recovered = await Promise.all(stillMissing.map(b => o.expandOnePage(b)));
-    for (const r of recovered) r.recoveredBy = 'per-page fallback';
-    const okAgain = recovered.filter(r => r.ok).map(r => r.pageNumber);
-    const lost = recovered.filter(r => !r.ok).map(r => r.pageNumber);
-    log.error(`\u{1F6A8} [TESTLAB] beats_scenes: per-page fallback recovered page(s) ${okAgain.length ? okAgain.join(', ') : 'none'}; still missing ${lost.length ? lost.join(', ') : 'none'}`);
-  }
-  return { byPage, recovered, cost, lastRes, attemptsMade };
-}
-
-/**
  * "N of M pages measured" - the marker a partial beats_scenes run announces
  * itself with. Null when every page has a brief.
  */
@@ -4123,7 +4282,9 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
   const { callTextModelStreaming } = require('./textModels');
   const { TEXT_MODELS, MODEL_DEFAULTS, calculateTextCost } = require('../config/models');
 
-  const { storyData: loaded } = await loadStoryDataFull(target.storyId, { rehydrate: false });
+  // The run's inputData: the stored landmark list and model overrides
+  // (resolveReplayInputData, stored since 2026-09-27).
+  const loaded = resolveReplayInputData((await loadStoryDataFull(target.storyId, { rehydrate: false })).storyData);
   // Same cast, same setting, different idea — the only way to measure a change
   // to the idea generator downstream of it.
   const storyData = params.storyDetails
@@ -4168,6 +4329,14 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
     plainStoredBeats = stored;
   }
 
+  // A FRESH PLAN HAS NO SHOTS (2026-09-27). Field 0 is the placeholder until
+  // the plan check's roster exists and the Jev shot assignment writes it
+  // (beatsPipeline.finalizePlanShots, run by beats_replan). The Art Director
+  // is never handed a placeholder in production, so it is not handed one here.
+  if (!plainStoredBeats && params.expandScenes !== false) {
+    throw new Error('beats_scenes: a fresh plan carries no shot (field 0 is the placeholder until the plan check and the Jev shot assignment run) — run beats_scenes with plainStoredBeats, or beats_replan for the plan');
+  }
+
   // ── Step 1: plan ────────────────────────────────────────────────────────
   // plainStoredBeats skips planning and review — the beats are the frozen input.
   let plannerPrompt = null;
@@ -4183,6 +4352,7 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
       finalArc: resolveReplayArc(storyData, { parseBeats }),
       arcHints: resolveReplayArcHints(storyData),
       centralFigure: resolveReplayCentralFigure(storyData),
+      storyLogic: resolveReplayStoryLogic(storyData),
     });
     if (!plannerPrompt) throw new Error('story-beats template unavailable');
     if (promptOverride) plannerPrompt = promptOverride;
@@ -4227,336 +4397,137 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
   // description the real pipeline produced for the same page, so "good enough to
   // draw from" is a judgement about two visible artefacts rather than a guess.
   let sceneExpansions = null;
-  let sceneReview = null;
-  let sceneReviews = null;
+  let briefChecks = null;
   let authoredBible = null;
   let timeToScenesMs = null;
-  // All-pages batch: dollars across BOTH attempts (a retry that fills no gap
-  // still costs money and must show up somewhere), and the model that answered.
   let allPagesCost = null;
   let allPagesModelId = null;
+  let landmarkPhotoCitations = null;
+  let labJevReport = null;
+  const events = [];
   if (params.expandScenes !== false) {
-    const { buildSceneExpansionPrompt, buildAvailableAvatarsForPrompt } = require('./storyHelpers');
-    const { callTextModelStreaming: callStream } = require('./textModels');
-    const { IMAGE_MODELS } = require('../config/models');
-
-    const expandLimit = parseInt(params.expandPages, 10) || finalBeats.length;
-    // THE COVER PAGES ride with the story pages, exactly as in production
-    // (beatsPipeline: covers are pages the Art Director briefs from code-written
-    // beats, 2026-09-24). `params.coverBeats: false` measures the story pages alone.
-    const { buildCoverBeats } = require('./coverBeats');
-    const { coverTypesFor } = require('./coverKeys');
-    // The front cover names the arc's central figure, as in production: the
-    // stored one (arcReviewReport.centralFigure), or `params.centralFigure`
-    // (names array) for a story stored before the arc recorded it.
-    const { resolveReplayCentralFigure } = require('./beatsReplayInputs');
-    const labCentralFigure = Array.isArray(params.centralFigure) ? params.centralFigure : resolveReplayCentralFigure(storyData);
-    const labCoverBeats = params.coverBeats === false ? [] : buildCoverBeats(storyData, {
-      coverTypes: coverTypesFor(storyData), clothingRequirements: storyData.clothingRequirements || null,
-      centralFigure: labCentralFigure,
-    });
-    const toExpand = [...finalBeats.slice(0, expandLimit), ...labCoverBeats];
-    const lang = storyData.language || 'en';
-    const imgModelConfig = IMAGE_MODELS[storyData.modelOverrides?.imageModel || MODEL_DEFAULTS.pageRenderImage];
-    const availableAvatars = buildAvailableAvatarsForPrompt
-      ? buildAvailableAvatarsForPrompt(storyData.characters || [], storyData.clothingRequirements || null)
-      : '';
+    // THE RUN'S OWN ART DIRECTOR AND BRIEF CHECKS (owner 2026-09-27: "The Lab
+    // must use 100% identical code to production"): beatsPipeline.runArtDirector
+    // (the Visual Bible call and its adoption — label round, age clamp,
+    // transcript sync, landmark link, wardrobe-vs-bible corrections — the Jev
+    // decisions before the briefs, the page-brief call with its retry and the
+    // per-page fallback, the pin) and briefChecks.runBriefChecks (2026-09-28),
+    // on the inputs the run held.
+    const { runArtDirector } = require('./beatsPipeline');
+    const { calculateTextCost: textCost } = require('../config/models');
+    const record = (level) => (event, message) => { events.push({ level, event, message }); };
+    const gl = { info: record('info'), warn: record('warn'), error: record('error'), debug: record('debug') };
     const storedByPage = new Map((storyData.sceneImages || []).map(s => [s.pageNumber, s.sceneDescription || '']));
-
-    // ONE resolver for BOTH Art-Director call shapes in this stage — the
-    // all-pages builder below and the per-page `expandOnePage` fallback. That
-    // is why buildReplaySceneOptions exists: the all-pages sibling was routed
-    // through it and the per-page one was not, so the two measured different
-    // inputs from the same stored story (no clothing contract at all on the
-    // per-page side).
-    const replayScene = buildReplaySceneOptions(storyData, {
-      availableAvatars,
-      maxCharactersPerScene: imgModelConfig?.maxCharactersPerScene || 3,
-      parseBeats,
-    });
-
-    // THE BIBLE THIS RUN AUTHORED, parsed ONCE and read by every consumer in
-    // this stage. Production adopts `adBible.visualBible` before the per-page
-    // fallback runs, "so a recovered page is expanded against the same bible
-    // the batch wrote" (beatsPipeline.js). The Lab had the parse in exactly one
-    // place — the brief pre-check — so the per-page expansion and the pre-check
-    // read different bibles, and the stored one is a different id space
-    // (Lab #1195: findings naming ART002 as an egg while the new bible's ART002
-    // was a coin). The stored bible stays the fallback for a run that authored
-    // none (`params.perPageExpansion`, where no batch call happens at all).
-    //
-    // Declared HERE, above the batch call, on purpose: `expandOnePage` runs as
-    // the batch's recovery callback, so a `let` further down would still be in
-    // its temporal dead zone when the first recovered page asks for the bible.
-    let _runVb;
-    function runVisualBible() {
-      if (_runVb !== undefined) return _runVb;
-      _runVb = storyData.visualBible || null;
-      if (authoredBible?.body) {
-        try {
-          const { UnifiedStoryParser } = require('./outlineParser/unified');
-          const parsed = new UnifiedStoryParser(authoredBible.body).extractVisualBible();
-          if (parsed) _runVb = parsed;
-        } catch (vbErr) {
-          log.warn(`[TESTLAB] beats_scenes: authored bible did not parse (${vbErr.message}) — falling back to the stored bible`);
-        }
-      }
-      return _runVb;
+    // expandPages (Lab only): brief the first N story pages alone.
+    const expandLimit = parseInt(params.expandPages, 10) || finalBeats.length;
+    const beatsIn = finalBeats.slice(0, expandLimit).map(b => ({ pageNumber: b.pageNumber, planLine: b.planLine }));
+    // The landmark list the run's Art Director read: stored since 2026-09-27
+    // (replayInputs). An older story has none stored; the run's resolver
+    // rebuilds it, unshuffled, and the order may differ from the run's.
+    if (!storyData.replayInputsStored && storyData.userLocation?.city && storyData.storyCategory !== 'historical' && params.landmarks !== false) {
+      const { resolveAvailableLandmarks } = require('./landmarkPhotos');
+      storyData.availableLandmarks = await resolveAvailableLandmarks(storyData.userLocation, {
+        limit: 20, discoverOnMiss: false, language: storyData.language, shuffle: false,
+        premiseText: [storyData.storyDetails, storyData.title].filter(Boolean).join('\n'),
+      });
     }
-
+    if (params.landmarks === false) storyData.availableLandmarks = undefined;
+    const sceneModel = params.sceneModel || storyData.modelOverrides.sceneDescriptionModel || MODEL_DEFAULTS.sceneDescription;
+    const adCalls = [];
+    labJevReport = { light: null, vb: null, population: null, gaze: null, coverPlaces: null, fixedChanges: null };
     const expStart = Date.now();
+    const meta = { timings: {}, labelRound: null };
+    const ad = await runArtDirector({
+      inputData: { ...storyData, pageClothing: null }, modelOverrides: storyData.modelOverrides,
+      clothingRequirements: storyData.clothingRequirements || null, visualBible: null, bibleSections: null,
+      sceneModel, onChunk: null, gl, meta, stage: async () => {}, beats: beatsIn,
+      arcCentralFigure: Array.isArray(params.centralFigure) ? params.centralFigure : resolveReplayCentralFigure(storyData),
+      approvedArc: resolveReplayArc(storyData, { parseBeats }), onVisualBible: null, wardrobeBibleReport: null,
+      // The run's gaze roster: the shipped division's head count, as stored.
+      present: resolveReplayPresent(storyData),
+      labCallOptions: params.sceneNoReasoning ? { reasoning: { enabled: false } } : {},
+      labForcePerPage: params.perPageExpansion === true,
+      onCall: (res) => adCalls.push(res),
+      // The run's Jev decision report (light before the AD; elements, aboard,
+      // population, gaze and the covers' places after it) — the same
+      // function, the same fields.
+      jevReport: labJevReport,
+    });
+    const costOfCall = (r) => r.usage?.direct_cost ?? textCost(r.modelId || '', r.usage || {});
+    allPagesCost = adCalls.reduce((a, r) => a + costOfCall(r), 0);
+    allPagesModelId = adCalls[adCalls.length - 1]?.modelId || null;
+    authoredBible = ad.visualBible ? { visualBible: ad.visualBible, bibleSections: ad.bibleSections, wardrobeBibleReport: ad.wardrobeBibleReport, labelRound: meta.labelRound || null } : null;
+    const fallbackPages = new Set(ad.sceneExpansionReport.fallbackPages || []);
+    sceneExpansions = ad.briefBeats.map((b) => {
+      const x = ad.expansions.find(e => e.pageNumber === b.pageNumber);
+      if (!x) return { pageNumber: b.pageNumber, ok: false, error: 'the Art Director delivered no brief for this page' };
+      return {
+        pageNumber: b.pageNumber, ok: true, modelId: x.modelId, promptChars: String(x.prompt || '').length, prompt: x.prompt,
+        fromBeats: String(x.brief || '').slice(0, 20000),
+        storedProduction: (storedByPage.get(b.pageNumber) || '').slice(0, 20000),
+        ...(fallbackPages.has(b.pageNumber) ? { recoveredBy: 'per-page fallback' } : {}),
+      };
+    });
+    timeToScenesMs = Date.now() - lockStart;
 
-    // ALL-PAGES PATH — what production actually runs (owner, 2026-08-09).
-    // beatsPipeline expands every page in ONE call via buildSceneExpansionAllPrompt
-    // and hands the Art Director each character's resolved OUTFIT TEXT. This
-    // harness was still calling the PER-PAGE builder with no clothing at all, so
-    // it measured a code path production no longer uses and would have
-    // reproduced the old outfit bug no matter what shipped. Opt out with
-    // params.perPageExpansion for the historical comparison.
-    //
-    // `primaryClothing` is deliberately NOT passed: production cannot have it
-    // here (pageClothing is derived from THIS stage's output), and a finished
-    // story does, so passing it made the lab resolve outfits down a branch
-    // production never takes — masking exactly the bug that shipped.
-    if (params.perPageExpansion !== true) {
-      const { buildSceneExpansionAllPrompt, parseRefinedText: parseAll, BRIEF_TRAILING_MARKERS } = require('./storyHelpers');
-      const allPrompt = buildSceneExpansionAllPrompt(
-        { ...storyData, characters: storyData.characters || [], pageClothing: null },
-        toExpand.map(b => ({ pageNumber: b.pageNumber, planLine: b.planLine })),
-        // No visualBible: the Art Director AUTHORS it now (2026-09-11), ahead
-        // of page 1. The stage still measures the page briefs — parseAll
-        // reads the `## Page N` blocks and ignores the leading sections.
-        //
-        // finalArc comes through the shared resolver: production passes
-        // `finalArc: approvedArc` (beatsPipeline.js:1511) and this stage passed
-        // nothing, so FINAL_ARC rendered as "(no arc was recorded for this
-        // story)" on every run while production's Art Director staged each page
-        // with the whole arc in view. It is the SAME arc the stage already hands
-        // its own planner above — one expression for both, now.
-        replayScene
-      );
-      if (allPrompt) {
-        const tAll = Date.now();
-        // TRUNCATION RECOVERY - production's three guards, in the Lab.
-        const collected = await collectAllPagesBriefs({
-          expected: toExpand,
-          callBatch: () => callStream(allPrompt, null, null, params.sceneModel || MODEL_DEFAULTS.sceneDescription, {
-            usageLabel: 'testlab_beats_scene_expansion_all',
-            ...(params.sceneNoReasoning ? { reasoning: { enabled: false } } : {}),
+    // Each real landmark's plate citation, read off the bible the Art Director
+    // wrote and the run's landmark link.
+    if (ad.visualBible) {
+      try {
+        const { landmarkPhotoCitationFaults } = require('./storyHelpers');
+        const { servablePhotos } = require('./landmarkPhotos');
+        landmarkPhotoCitations = {
+          plates: (ad.visualBible.locations || []).filter(l => l && l.isRealLandmark).flatMap((l) => {
+            const photos = servablePhotos(l.photoVariants).map(v => ({ n: v.variantNumber, kind: v.kind, framing: v.framing, description: v.description }));
+            const plates = Array.isArray(l.vantages) && l.vantages.length > 0
+              ? l.vantages.filter(Boolean).map(v => ({ plateId: v.id, name: v.name, pages: v.pages, landmarkPhoto: v.landmarkPhoto ?? null }))
+              : [{ plateId: l.id, name: l.name, pages: l.pages, landmarkPhoto: l.landmarkPhoto ?? null }];
+            return plates.map(p => ({ locId: l.id, landmark: l.landmarkQuery || l.name, ...p, photos }));
           }),
-          parsePages: (res) => (parseAll(res.text || '', toExpand.map(b => b.pageNumber), 'SCENES', BRIEF_TRAILING_MARKERS).pages || []),
-          costOf,
-          // The bible this call AUTHORS, kept on the result. Without it the stage
-          // measures page briefs written against a bible nobody can read back,
-          // and a bible fault in a Lab run is invisible. The first attempt that
-          // carries one wins, exactly as production's `adBible` does.
-          onAttempt: (res) => {
-            if (authoredBible) return;
-            try {
-              const { extractBibleSections, AD_BIBLE_MARKERS } = require('./beatsPipeline');
-              authoredBible = extractBibleSections(res.text || '', AD_BIBLE_MARKERS) || null;
-            } catch (err) {
-              log.warn(`[TESTLAB] beats_scenes: could not extract the authored bible (${err.message})`);
-            }
-          },
-          expandOnePage,
-        });
-        sceneExpansions = toExpand
-          .filter(b => collected.byPage.has(b.pageNumber))
-          .map(b => {
-            const hit = collected.byPage.get(b.pageNumber);
-            return {
-              pageNumber: b.pageNumber,
-              ok: true,
-              elapsedMs: Date.now() - tAll,
-              modelId: hit.res.modelId,
-              provider: hit.res.provider || null,
-              usage: hit.res.usage,
-              cost: costOf(hit.res),
-              promptChars: allPrompt.length,
-              prompt: allPrompt,
-              fromBeats: String(hit.text || '').slice(0, 20000),
-              storedProduction: (storedByPage.get(b.pageNumber) || '').slice(0, 20000),
-            };
-          })
-          .concat(collected.recovered.map(r => ({
-            ...r,
-            storedProduction: (storedByPage.get(r.pageNumber) || '').slice(0, 20000),
-          })))
-          .sort((a, b) => a.pageNumber - b.pageNumber);
-        allPagesCost = collected.cost;
-        allPagesModelId = collected.lastRes?.modelId || null;
-        timeToScenesMs = Date.now() - lockStart;
+          faults: landmarkPhotoCitationFaults(ad.visualBible),
+        };
+      } catch (lmErr) {
+        log.error(`❌ [TESTLAB] beats_scenes: landmark citations not reported (${lmErr.message})`);
+        landmarkPhotoCitations = { error: lmErr.message };
       }
     }
 
-    // Per-page expansion. TWO callers: the historical per-page comparison
-    // (params.perPageExpansion) and the all-pages RECOVERY above — production
-    // re-expands a missing page exactly this way (beatsPipeline.js
-    // `expandOnePage`), so the Lab's fallback is the same call, not a copy of a
-    // different one. A function DECLARATION so the block above can call it.
-    async function expandOnePage(b) {
-      // BEAT + PLAN line stands in for page.text. No rawOutlineContext: in a
-      // beats-first run there is no outline block yet, so this measures the
-      // Art Director working from the plan alone.
-      const pageContent = `PLAN: ${b.planLine || ''}`;
-      const prompt = buildSceneExpansionPrompt(
-        b.pageNumber, pageContent, storyData.characters || [], lang,
-        runVisualBible(), replayScene.availableAvatars, null,
-        {
-          maxCharactersPerScene: replayScene.maxCharactersPerScene,
-          artStyleId: storyData.artStyle,
-          imageBackend: imgModelConfig?.backend,
-          // THE TWO OPTIONS PRODUCTION PASSES AND THIS CALL DID NOT
-          // (beatsPipeline.js `expandOnePage`). Both are measurable in the
-          // built prompt, on every page:
-          //   - `clothingRequirements` — the per-page fallback attaches no
-          //     referencePhotos, so the contract is the ONLY outfit source.
-          //     Without it every character's CHARACTER DETAILS line ended at
-          //     its face and carried no `Wearing:` clause at all.
-          //   - `story` — decides the book's SEASON and whether the text-zone
-          //     rule family is asked for. With neither, `seasonLabel` fell back
-          //     to TODAY's date (a summer story replayed in September was told
-          //     "the season is Autumn on every page") and the text-zone rules
-          //     were always on, where 94 of 118 recent stories gate them off.
-          clothingRequirements: replayScene.clothingRequirements,
-          story: storyData,
-        }
-      );
-      const t = Date.now();
+    // ── the run's brief checks and its one re-ask (2026-09-28) ─────────────
+    // beatsPipeline's own step (briefChecks.runBriefChecks), on the briefs and
+    // the bible this run's Art Director wrote — the step that replaced the
+    // scene review. A taken rewrite lands on `reviewedBrief` with
+    // `rewrittenBy: 'brief re-ask'`, so the page view shows it beside the brief.
+    if (params.checkBriefs !== false && ad.expansions.length > 0) {
+      const { runBriefChecks } = require('./briefChecks');
+      const reaskCalls = [];
+      const armEvents = [];
+      const rec = (level) => (event, message) => { armEvents.push({ level, event, message }); };
+      const expansions = ad.expansions.map(x => ({ pageNumber: x.pageNumber, brief: x.brief }));
+      const t2 = Date.now();
       try {
-        const res = await callStream(prompt, null, null, params.sceneModel || MODEL_DEFAULTS.sceneDescription, {
-          usageLabel: 'testlab_beats_scene_expansion',
-          // Scene expansion is transcription, not judgement — reasoning is pure
-          // waste here (measured 14,867 reasoning tokens for 2,505 of answer).
-          ...(params.sceneNoReasoning ? { reasoning: { enabled: false } } : {}),
+        const report = await runBriefChecks({
+          inputData: storyData, expansions, briefBeats: ad.briefBeats, visualBible: ad.visualBible,
+          clothingRequirements: storyData.clothingRequirements || null,
+          visualBibleJson: ad.visualBibleJson, availableAvatars: ad.availableAvatars, maxCharactersPerScene: ad.maxCharactersPerScene,
+          model: sceneModel, gl: { info: rec('info'), warn: rec('warn'), error: rec('error'), debug: rec('debug') },
+          onCall: (res) => reaskCalls.push(res),
+          labCallOptions: params.sceneNoReasoning ? { reasoning: { enabled: false } } : {},
         });
-        return {
-          pageNumber: b.pageNumber,
-          ok: true,
-          elapsedMs: Date.now() - t,
-          modelId: res.modelId,
-          provider: res.provider || null,
-          ttftMs: res.ttft ?? null,
-          usage: res.usage,
-          cost: costOf(res),
-          promptChars: prompt.length,
-          prompt,
-          fromBeats: (res.text || '').slice(0, 20000),
-          storedProduction: (storedByPage.get(b.pageNumber) || '').slice(0, 20000),
+        for (const x of sceneExpansions) {
+          const taken = report.pages.find(p => p.pageNumber === x.pageNumber);
+          if (taken) { x.reviewedBrief = taken.after; x.reviewRewrote = true; x.rewrittenBy = 'brief re-ask'; }
+        }
+        briefChecks = {
+          ok: !report.reask?.failed, error: report.reask?.failed || null, elapsedMs: Date.now() - t2,
+          model: report.reask?.model || null, cost: reaskCalls.reduce((acc, r) => acc + costOfCall(r), 0), usage: reaskCalls[0]?.usage || null,
+          findingsBefore: report.findingsBefore, withheld: report.withheld, verdicts: report.verdicts,
+          findingsAfter: report.findingsAfter, introduced: report.introduced, survived: report.survived,
+          wornUnresolvedPages: report.wornUnresolvedPages, bibleText: report.bibleText, reaskPrompt: report.reask?.prompt || null, events: armEvents,
         };
       } catch (err) {
-        return { pageNumber: b.pageNumber, ok: false, elapsedMs: Date.now() - t, error: err.message };
+        briefChecks = { ok: false, error: err.message, elapsedMs: Date.now() - t2, events: armEvents };
       }
     }
-
-    if (!sceneExpansions) sceneExpansions = await Promise.all(toExpand.map(expandOnePage));
-    // ── Step 4: ONE review over ALL scene briefs ──────────────────────────
-    // Repetition between pages, visual arc and continuity are invisible to a
-    // per-scene reviewer — they only exist across the set — so every brief goes
-    // into a single call. Reviews whatever model wrote the scenes, so Sonnet vs
-    // DeepSeek can be compared as REVIEWER independently of who generated.
-    const okScenes = sceneExpansions.filter(x => x.ok);
-    if (params.reviewScenes !== false && okScenes.length > 0) {
-      const { buildSceneReviewPrompt, parseRefinedText, BRIEF_TRAILING_MARKERS } = require('./storyHelpers');
-      // Comma-separated list runs every model against ONE frozen set of briefs.
-      // Scene expansion is non-deterministic, so two separate experiments give
-      // the reviewers different inputs — measured on exp 357 vs 358, where the
-      // page-3 cast differed and made the comparison meaningless. Fanning out
-      // from a single expansion is the only way the difference is the reviewer.
-      const srModels = String(params.sceneReviewModel || MODEL_DEFAULTS.outlineReviewModel)
-        .split(',').map(s => s.trim()).filter(Boolean);
-      for (const m of srModels) if (!TEXT_MODELS[m]) throw new Error('Unknown model "' + m + '"');
-      const expectedPages = okScenes.map(x => x.pageNumber);
-      // Deterministic brief pre-check → {BRIEF_FINDINGS}, exactly as production
-      // does it (beatsPipeline.js). Without this the harness handed the reviewer
-      // a WEAKER prompt than the real pipeline and could never measure whether a
-      // finding changes what it rewrites: exp 821 produced four two-action pages
-      // and the review prompt carried no BRIEF FAULTS block at all.
-      let briefFindings = '';
-      // CHECK THE BIBLE THIS RUN AUTHORED, not the one the story shipped with
-      // (2026-09-12). The Art Director writes a fresh bible ahead of page 1, so
-      // the stored one is a different id space: on Lab #1195 the findings named
-      // "The Dragon Egg (ART002)" while the new bible's ART002 was a coin, no
-      // finding could name it by an id that meant the same thing in both
-      // bibles, and the reviewer was told to drop an element by an id that
-      // meant something else in its own bible. Declared out here so the
-      // scene-review prompt below gets the SAME bible the pre-check read —
-      // production passes it (beatsPipeline.js) and a Lab that did not would
-      // stop reproducing the review it is measuring. `runVisualBible` is the
-      // one parse, shared with the per-page expansion above.
-      const vb = runVisualBible();
-      try {
-        const { checkScenes: checkBriefs, renderFindingsBlock: renderBriefBlock } = require('./sceneBriefCheck');
-        const secondaryList = Array.isArray(vb?.secondaryCharacters)
-          ? vb.secondaryCharacters : Object.values(vb?.secondaryCharacters || {});
-        const seen = new Set();
-        const castNames = [
-          ...(storyData.characters || []).map(c => c && c.name),
-          ...secondaryList.map(c => c && c.name),
-        ].filter(Boolean).filter((n) => {
-          const k = String(n).trim().toLowerCase();
-          if (!k || seen.has(k)) return false;
-          seen.add(k);
-          return true;
-        });
-        const res = checkBriefs(okScenes.map(x => ({ pageNumber: x.pageNumber, brief: x.fromBeats })), castNames, vb);
-        briefFindings = renderBriefBlock(res.byPage);
-        log.info(`[TESTLAB] beats_scenes brief pre-check: ${res.findings.length} finding(s), block ${briefFindings ? briefFindings.length + ' chars' : 'empty'}`);
-      } catch (bcErr) {
-        log.warn(`[TESTLAB] beats_scenes brief pre-check failed (non-fatal): ${bcErr.message}`);
-      }
-      // finalBeats feeds the review's check 5 (character in beat vs brief),
-      // same as the production callsite in beatsPipeline.js.
-      const srPrompt = buildSceneReviewPrompt(storyData, okScenes.map(x => ({ pageNumber: x.pageNumber, brief: x.fromBeats })), { beats: toExpand, briefFindings, visualBible: vb, clothingRequirements: storyData.clothingRequirements || null });
-      if (srPrompt) {
-        const reviewOnce = async (srModel) => {
-          const t2 = Date.now();
-          try {
-            // null = model max, exactly as production (beatsPipeline.js). The
-            // former 16000 cap silently truncated 6 of 8 reviews in the
-            // 2026-09-10 AD redo (1107-1124) — no error, briefs kept as raw.
-            const srRes = await callStream(srPrompt, null, null, srModel, { usageLabel: 'testlab_scene_review' });
-            const parsed = parseRefinedText(srRes.text || '', expectedPages, 'SCENES', BRIEF_TRAILING_MARKERS);
-            const outTok = srRes.usage?.output_tokens ?? null;
-            const capInForce = TEXT_MODELS[srModel]?.maxOutputTokens ?? null;
-            const verdict = assessSceneReview({
-              text: srRes.text, outputTokens: outTok, stopReason: srRes.stop_reason || null,
-              capInForce, parsedPageCount: parsed.pages.length,
-            });
-            if (!verdict.ok) {
-              log.warn(`⚠️ [TESTLAB] beats_scenes scene review FAILED (story ${target.storyId}, reviewer ${srModel} → ${srRes.modelId || '?'} via ${srRes.provider || '?'}, out ${outTok ?? '?'} tok, cap ${capInForce ?? '?'}): ${verdict.error}`);
-            }
-            return {
-              modelKey: srModel,
-              modelId: srRes.modelId,
-              provider: srRes.provider || null,
-              ok: verdict.ok,
-              error: verdict.error,
-              elapsedMs: Date.now() - t2,
-              ttftMs: srRes.ttft ?? null,
-              usage: srRes.usage,
-              stopReason: srRes.stop_reason || null,
-              capInForce,
-              cost: costOf(srRes),
-              promptChars: srPrompt.length,
-              prompt: srPrompt,
-              // Storage clip only (dev-panel display) — not a model truncation.
-              rawResponse: (srRes.text || '').slice(0, 40000),
-              analysis: (parsed.analysis || '').slice(0, 40000),
-              rewrotePages: verdict.ok ? parsed.pages.map(x => x.pageNumber) : [],
-              _pages: verdict.ok ? parsed.pages : [],
-            };
-          } catch (err) {
-            return { modelKey: srModel, ok: false, elapsedMs: Date.now() - t2, error: err.message };
-          }
-        };
-        sceneReviews = await Promise.all(srModels.map(reviewOnce));
-        applyReviewerPages(sceneExpansions, sceneReviews);
-        sceneReview = sceneReviews[0] || null;
-      }
-    }
-    // Parallel, as production runs them — so this is wall-clock, not the sum.
     timeToScenesMs = timeToLockMs + (Date.now() - expStart);
   }
 
@@ -4573,12 +4544,15 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
   return {
     stageKind: 'beats_scenes',
     sceneExpansions,
+    jevDecisions: labJevReport,
+    events,
+    replayInputsStored: storyData.replayInputsStored,
     sceneExpansionIncomplete,
     allPagesCost,
     allPagesModelId,
-    sceneReview,
-    sceneReviews,
+    briefChecks,
     authoredBible,
+    landmarkPhotoCitations,
     timeToScenesMs,
     storyId: target.storyId,
     title: storyData.title || null,
@@ -4631,7 +4605,19 @@ async function runTextRefineStage(target, { params = {}, promptOverride = null }
     log.info(`[TESTLAB] text_refine exact replay: ${moved}/${pages.length} page(s) restored to the writer's text (report lists ${before.size})`);
   }
 
+  // params.auditsFromStory (2026-10-04): replay the stored audit findings so
+  // a repair-model A/B (params.model) answers the identical fault list. Only
+  // meaningful on the writer's text, so it requires fromWriterText.
+  let audits;
+  if (params.auditsFromStory === true || params.auditsFromStory === 'true') {
+    if (!(params.fromWriterText === true || params.fromWriterText === 'true')) {
+      throw new Error('auditsFromStory needs fromWriterText — the stored audits were run on the writer text');
+    }
+    audits = storedRefineAudits(storyData, target.storyId);
+  }
+
   const res = await refineStoryText(storyData, pages, {
+    audits,
     arc: storyData.arcReviewReport?.finalArc || storyData.beatsReviewReport?.arc || '',
     arcHints: resolveReplayArcHints(storyData),
     model: params.model,
@@ -4838,6 +4824,7 @@ async function runTextZoneStage(ctx, { experimentId, params = {} }) {
       storyId: ctx.storyId, pageNumber: ctx.pageNumber, label: 'LAB TEXT-ZONE',
     });
     return generateImageOnly(repairPrompt, ctx.referencePhotos, {
+      imageModelOverride: opts.imageModelOverride,
       landmarkPhotos: ctx.landmarkPhotos,
       landmarkScene: repairScene.landmarkScene,
       sceneBackground: repairScene.sceneBackground,
@@ -4877,28 +4864,46 @@ async function runTextZoneStage(ctx, { experimentId, params = {} }) {
   };
 }
 
-/** Feedback consolidator on the page's stored eval + entity issues (report only). */
+/**
+ * The consolidator call the repair round makes for the page's stored version
+ * (repairPipeline.consolidationInputs, the run's own builder): the version's
+ * evaluation, the page's entity issues from the stored entity report, the
+ * clothing the page wears, the book audit's reader findings for this version,
+ * and the version's own brief. Returns the input object; params overrides are
+ * the caller's.
+ */
+async function labConsolidationInputs(ctx, { evaluation, orig, version, params = {} }) {
+  const { consolidationInputs } = require('./repairPipeline');
+  const { entityIssuesForPage } = require('./scoring');
+  const { storyData } = await loadStoryDataFull(ctx.storyId, { rehydrate: false });
+  const entityIssues = params.entityIssues
+    || entityIssuesForPage(ctx.pageNumber, storyData.finalChecksReport?.entity || null).issues;
+  return consolidationInputs({
+    ev: evaluation, entityIssues, orig, pageNumber: ctx.pageNumber, round: 0,
+    sceneDescriptionOverride: version?.description || null,
+    readerFindings: version?.readerFindings || [],
+    storyData, characters: storyData.characters || [], artStyle: storyData.artStyle || ctx.artStyle,
+    visualBible: ctx.visualBible || null, storyId: ctx.storyId,
+  });
+}
+
+/**
+ * Feedback consolidator on the page's stored evaluation, with the inputs the
+ * repair round hands it (report only). With no params it re-consolidates the
+ * version the page serves; `params.evaluation` / `params.entityIssues` replace
+ * those inputs, `promptOverride` / `params.model` are the A/B knobs.
+ */
 async function runConsolidateStage(ctx, { promptOverride, experimentId, params = {} }) {
   const { loadPromptTemplates } = require('../services/prompts');
   await loadPromptTemplates();
   const { consolidateEvaluation } = require('./feedbackConsolidator');
-  const { storyData } = await loadStoryDataFull(ctx.storyId, { rehydrate: false });
 
-  const evalResult = params.evaluation || storedEvalFromScene(ctx.scene);
+  const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber, ctx.versionIndex ?? null);
+  const stored = labStoredPageEval(ctx, { imageData, loadedVersion: getLastPageLoad()?.loadedVersion ?? null });
+  const inputs = await labConsolidationInputs(ctx, { evaluation: params.evaluation || stored.evaluation, orig: stored.orig, version: stored.version, params });
   const t0 = Date.now();
   const result = await consolidateEvaluation({
-    evalResult,
-    entityIssues: params.entityIssues || [],
-    sceneDescription: ctx.scene.sceneDescription || '',
-    characters: storyData.characters || [],
-    storyId: ctx.storyId,
-    pageNumber: ctx.pageNumber,
-    round: 0,
-    // Era-aware landmark protection (2026-09-05) — the page's stored landmark
-    // refs + its scene era, so Lab repair stages reproduce production.
-    visualBible: ctx.visualBible || null,
-    landmarkPhotos: ctx.scene.landmarkPhotos || null,
-    era: require('./landmarkProtection').resolveSceneEra(ctx.scene.sceneMetadata),
+    ...inputs,
     // A/B knobs: `promptOverride` swaps the consolidator's rules (severity
     // policy, dedupe, MINOR definition); `params.model` swaps the model that
     // applies them (shipped default is the configured eval model).
@@ -4927,69 +4932,70 @@ async function runConsolidateStage(ctx, { promptOverride, experimentId, params =
     issueCount: issues.length,
     severityMix,
     singleSourceAboveModerate,
+    entityIssueCount: (inputs.entityIssues || []).length,
+    readerFindingCount: (inputs.readerFindings || []).length,
   };
 }
 
-/** Targeted inpaint from the stored (or supplied) eval — the pipeline's inpaintPage. */
+/**
+ * Targeted inpaint of the served version — the repair round's inpaint
+ * (repairPipeline.buildInpaintCall → images.inpaintPage, then the cover
+ * restamp). The evaluation is the version's stored one and the plan the one it
+ * was scored with; a supplied `params.evaluation` without a plan is
+ * consolidated first, as the run consolidates every evaluation when it lands.
+ */
 async function runInpaintStage(ctx, { experimentId, params = {} }) {
   const { loadPromptTemplates } = require('../services/prompts');
   await loadPromptTemplates();
   const { inpaintPage } = require('./images');
-  const { MODEL_DEFAULTS } = require('../config/models');
+  const { buildInpaintCall } = require('./repairPipeline');
   const { storyData } = await loadStoryDataFull(ctx.storyId, { rehydrate: false });
 
-  const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber);
-  const evaluation = params.evaluation || storedEvalFromScene(ctx.scene);
+  const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber, ctx.versionIndex ?? null);
+  const loaded = getLastPageLoad();
+  const stored = labStoredPageEval(ctx, { imageData, loadedVersion: loaded?.loadedVersion ?? null });
+  let evaluation = params.evaluation || stored.evaluation;
+  if (!evaluation.consolidatedPlan) {
+    const { consolidateEvaluation } = require('./feedbackConsolidator');
+    const res = await consolidateEvaluation(await labConsolidationInputs(ctx, { evaluation, orig: stored.orig, version: stored.version, params }));
+    evaluation = { ...evaluation, consolidatedPlan: res.plan || null };
+  }
+  if (params.consolidatedPlan) evaluation = { ...evaluation, consolidatedPlan: params.consolidatedPlan };
 
-  // inpaintPage takes the consolidated plan as an INPUT (2026-09-21, B2): in
-  // production it is produced once where the evaluation is scored. The Lab
-  // stage starts from a stored eval, so it produces the plan here — one
-  // consolidator call, exactly as before, just made visible at the call site.
-  const { consolidateEvaluation } = require('./feedbackConsolidator');
-  const consolidated = await consolidateEvaluation({
-    evalResult: evaluation,
-    sceneDescription: ctx.scene.sceneDescription || '',
-    characters: storyData.characters || [],
-    storyId: ctx.storyId,
-    pageNumber: ctx.pageNumber,
-    visualBible: ctx.visualBible,
-    landmarkPhotos: ctx.scene.landmarkPhotos || null,
-    era: require('./landmarkProtection').resolveSceneEra(ctx.scene.sceneMetadata),
+  // The run's page record as the round reads it: the page's first detection
+  // (Phase 5b-pre) and the pipeline storyData's per-page aspect and text
+  // position (storyJobPipeline.js pipelineStoryData.sceneImages).
+  const versions = ctx.scene.imageVersions || [];
+  const img = { ...stored.orig, sharedBboxDetection: versions[0]?.bboxDetection || ctx.scene.bboxDetection || null };
+  const callStoryData = {
+    ...storyData,
+    sceneImages: [{ pageNumber: ctx.pageNumber, imageAspect: ctx.layout?.imageAspect, textPosition: ctx.scene.textPosition || null }],
+  };
+  // A post-generation cover repaints its TEXTLESS art layer and is restamped.
+  const coverKey = COVER_KEY_BY_PAGE[String(ctx.pageNumber)] || null;
+  const restampCoverAfter = !!coverKey && loaded?.coverLayer === 'art';
+  const { inpaintEval, options } = buildInpaintCall({
+    img, latestEval: evaluation, bestSoFar: null, roundNum: null, restampCoverAfter,
+    storyData: callStoryData, characters: storyData.characters || [], artStyle: storyData.artStyle || ctx.artStyle, jobId: ctx.storyId,
   });
-
-  const coverTextContract = buildEvalReplayOptions(ctx, { detectedFigures: null }).options;
   const t0 = Date.now();
-  const result = await inpaintPage(imageData, evaluation, {
-    consolidatedPlan: params.consolidatedPlan || consolidated.plan || null,
-    detectedFigures: ctx.scene?.bboxDetection?.figures || null,
-    visualBible: ctx.visualBible,
-    characters: storyData.characters || [],
-    pageNumber: ctx.pageNumber,
-    sceneDescription: ctx.scene.sceneDescription || '',
-    artStyle: ctx.artStyle,
-    clothingRequirements: storyData.clothingRequirements || null,
-    storyId: ctx.storyId,
-    aspectRatio: ctx.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
-    // Era-aware landmark protection (2026-09-05) — the page's stored landmark
-    // refs + its scene era, so Lab repair stages reproduce production.
-    landmarkPhotos: ctx.scene.landmarkPhotos || null,
-    era: require('./landmarkProtection').resolveSceneEra(ctx.scene.sceneMetadata),
-    sceneMetadata: ctx.scene.sceneMetadata || null,
-    // A cover target's text contract, from the same resolver the Lab evals use,
-    // so a baked title is kept through the edit exactly as in production.
-    expectedText: coverTextContract.expectedText,
-    textMode: coverTextContract.textMode,
-  });
+  const result = await inpaintPage(imageData, inpaintEval, options);
   const elapsedMs = Date.now() - t0;
   if (!result?.repaired || !result?.imageData) {
     throw new Error(result?.error || 'inpaint produced no result (nothing actionable?)');
+  }
+  if (restampCoverAfter) {
+    const { restampCover } = require('./coverTypography');
+    const figures = storyData?.coverImages?.[coverKey]?.bboxDetection?.figures || [];
+    const stamped = await restampCover(storyData, coverKey, result.imageData, { seed: storyData?.title, figures });
+    result.imageData = stamped.titledData;
   }
 
   const versionIndex = await saveTestVersion(ctx.storyId, 'scene', ctx.pageNumber, result.imageData, experimentId);
   return {
     imageType: 'scene', versionIndex, elapsedMs,
     inpaintInstruction: result.instruction || null,
-    plan: result.consolidatedPlan || null,
+    plan: result.consolidatedPlan || inpaintEval.consolidatedPlan || null,
   };
 }
 
@@ -5618,16 +5624,38 @@ async function runEditImageStage(ctx, { experimentId, promptOverride, params = {
 
   const t0 = Date.now();
   const result = onPlate
-    ? await editImageWithPrompt(imageData, instruction, MODEL_DEFAULTS.emptyScenePlateModel, [], ctx.artStyle, null, { plateDerive: true })
+    // The derive's aspect is the book layout's, as the run passes it
+    // (storyJobPipeline.js Phase 5a-pre-vantage `layoutAspect`); null let the
+    // edit fall to the input's own aspect.
+    ? await editImageWithPrompt(imageData, instruction, MODEL_DEFAULTS.emptyScenePlateModel, [], ctx.artStyle || null,
+      ctx.layout?.imageAspect || MODEL_DEFAULTS.pageAspect, { plateDerive: true })
     : await editImageWithPrompt(imageData, instruction, null, [], ctx.artStyle);
   const elapsedMs = Date.now() - t0;
   const edited = result?.imageData || null;
   if (!edited) throw new Error('edit produced no image');
 
+  // An edited PLATE is judged like the story run's derived plate
+  // (storyJobPipeline.js `derivedQcOpts`): no text zone, its own camera class,
+  // the medium, the place — not the page's geometry facts or placements, which
+  // the edit never saw. Without it the Lab replayed the derive and skipped the
+  // QC production runs on its output.
+  let qc;
+  if (onPlate) {
+    try {
+      const { validateEmptyScene } = require('./images');
+      const qcRes = await validateEmptyScene(edited, null, `testlab-exp${experimentId}-P${ctx.pageNumber}-edit`,
+        await labDerivedPlateQcOptions(ctx));
+      qc = { pass: qcRes.pass, issues: qcRes.issues || [], findings: qcRes.findings || [], visionFeedback: qcRes.visionFeedback || null, textPosition: null };
+    } catch (err) {
+      log.warn(`[TESTLAB] edited-plate QC failed: ${err.message}`);
+      qc = { error: err.message };
+    }
+  }
+
   const imageType = onPlate ? 'empty_scene' : 'scene';
   const versionIndex = await saveTestVersion(ctx.storyId, imageType, ctx.pageNumber, edited, experimentId);
   // editImageWithPrompt reports the model at usage.model (no top-level modelId).
-  return { imageType, versionIndex, elapsedMs, modelId: result.usage?.model || null, promptUsed: instruction };
+  return { imageType, versionIndex, elapsedMs, modelId: result.usage?.model || null, promptUsed: instruction, ...(qc ? { qc } : {}) };
 }
 
 /**
@@ -5728,7 +5756,7 @@ async function runStyleTransferStage(ctx, { experimentId, params = {} }) {
  * qualityScore). Pinning lives in stories.image_version_meta, not on the scene.
  */
 async function runPickBestStage(ctx, { experimentId }) {
-  const { computeFinalScore, pickBestVersionIndex } = require('./scoring');
+  const { computeFinalScore } = require('./scoring');
   const { dbQuery } = require('../services/database');
 
   const raw = ctx.scene.imageVersions || [];
@@ -5741,7 +5769,11 @@ async function runPickBestStage(ctx, { experimentId }) {
   if (versions.length === 0) {
     return { versions: [], winner: null, note: 'Page has no imageVersions entries — nothing to rank', elapsedMs: 0 };
   }
-  const winnerIdx = pickBestVersionIndex(raw, { tieBreak: 'latest' });
+  // THE RUN'S PICK (repairPipeline.selectBestVersion: the canonical ranking
+  // with the pipeline's 'earliest' tie-break — on a full tie the least-mangled
+  // original wins). The stage used the interactive 'latest' rule (2026-09-27).
+  const { selectBestVersion } = require('./repairPipeline');
+  const winnerIdx = raw.indexOf(selectBestVersion(raw));
   const metaRows = await dbQuery('SELECT image_version_meta FROM stories WHERE id = $1', [ctx.storyId]);
   const pageMeta = metaRows[0]?.image_version_meta?.[String(ctx.pageNumber)] || null;
   return {
@@ -5755,6 +5787,30 @@ async function runPickBestStage(ctx, { experimentId }) {
 // ─────────────────────────────────────────────────────────────────────
 // Text-side stages (LLM only)
 // ─────────────────────────────────────────────────────────────────────
+
+/**
+ * The options production passes buildSceneExpansionPrompt (beatsPipeline.js
+ * expandOnePage), rebuilt from the stored story, so a Lab expansion measures the
+ * prompt production sends: the story (season, text-zone family), art style and
+ * image backend, character cap and clothing contract.
+ * `jevBackup: true`: a Lab single-page expansion runs with no decision layer, so
+ * no FIXED block exists and nothing is fixed upstream; the shot and fixed-field
+ * rules must say the same (review 2026-10-04 B2).
+ */
+function labSceneExpansionOptions(ctx, storyData, extra = {}) {
+  const { MODEL_DEFAULTS, IMAGE_MODELS } = require('../config/models');
+  const imgModelConfig = IMAGE_MODELS[storyData.modelOverrides?.imageModel || MODEL_DEFAULTS.pageRenderImage];
+  return {
+    maxCharactersPerScene: imgModelConfig?.maxCharactersPerScene || 3,
+    artStyleId: ctx.artStyle,
+    imageBackend: imgModelConfig?.backend,
+    clothingRequirements: storyData.clothingRequirements || null,
+    story: storyData,
+    jevBackup: true,
+    referencePhotos: ctx.referencePhotos,
+    ...extra,
+  };
+}
 
 /** Re-run the Art Director expansion for one page (scene-expansion.txt). */
 async function runSceneExpansionStage(ctx, { experimentId, promptOverride, params = {} }) {
@@ -5784,7 +5840,7 @@ async function runSceneExpansionStage(ctx, { experimentId, promptOverride, param
       ctx.visualBible,
       availableAvatars,
       null,
-      { referencePhotos: ctx.referencePhotos }
+      labSceneExpansionOptions(ctx, storyData)
     );
   } finally {
     PROMPT_TEMPLATES.sceneExpansion = orig;
@@ -5850,7 +5906,7 @@ async function runSceneExpansionAbStage(ctx, { experimentId, promptOverride, par
         ctx.visualBible,
         availableAvatars,
         null,
-        { referencePhotos: ctx.referencePhotos }
+        labSceneExpansionOptions(ctx, storyData)
       );
     } finally {
       PROMPT_TEMPLATES.sceneExpansion = orig;
@@ -5939,7 +5995,7 @@ async function runSceneVariantStage(ctx, { experimentId, promptOverride, params 
       ctx.visualBible,
       availableAvatars,
       null,
-      { artStyleId: ctx.artStyle, referencePhotos: ctx.referencePhotos }
+      labSceneExpansionOptions(ctx, storyData)
     );
   } finally {
     PROMPT_TEMPLATES.sceneExpansion = orig;
@@ -7097,7 +7153,7 @@ async function runEmptySceneAdherenceStage(ctx, { experimentId }) {
     landmarkName: landmark?.name || null,
     pixelCorrelation,
     ...judged,
-    usage: j.usageMetadata ? { input_tokens: j.usageMetadata.promptTokenCount, output_tokens: j.usageMetadata.candidatesTokenCount } : null,
+    usage: j.usageMetadata ? geminiUsage(j.usageMetadata) : null,
   };
 }
 
@@ -7409,24 +7465,6 @@ const STAGE_RUNNERS = {
 
 // Story-level stages: target {storyId} (+ coverType for cover). No page context.
 
-/**
- * SCENE REVIEW REPLAY — the reviewer, and only the reviewer, on frozen input.
- *
- * Production runs the scene review once, inside a generation, over briefs that
- * were just written. That makes a reviewer-prompt change unmeasurable: rerun the
- * pipeline and the briefs differ, so any change in behaviour could be the new
- * briefs rather than the new prompt.
- *
- * This replays the review against a story's STORED briefs. The clothing check is
- * deterministic, so it regenerates byte-identical findings, and the only variable
- * is the prompt (or the model). Built for the question left open by
- * job_1786235099497_ytd5c7eek: three correct faults were handed to deepseek and
- * it rewrote nothing — does a mandatory framing change that, or does the fix path
- * have to stop being a request?
- *
- * params.reviewModel   — override the reviewer (comma-separated fans out)
- * promptOverride       — full replacement template, the usual Lab A/B lever
- */
 // Parse a persisted "--- Page N ---\n<body>" artifact_text back into ordered
 // page blocks, so a stored round's text can be fed as the next round's input
 // (scene briefs and story text both persist in this shape — see the scoreOutput
@@ -7440,221 +7478,6 @@ function parsePageBlocks(text) {
   while ((m = re.exec(String(text || ''))) !== null) out.push({ pageNumber: parseInt(m[1], 10), text: m[2].trim() });
   return out.sort((a, b) => a.pageNumber - b.pageNumber);
 }
-
-async function runSceneReviewReplayStage(target, { params = {}, promptOverride = null }) {
-  const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../services/prompts');
-  await loadPromptTemplates();
-  const { buildSceneReviewPrompt, parseRefinedText, BRIEF_TRAILING_MARKERS, extractSceneMetadata, parseBeats } = require('./storyHelpers');
-  const { checkScenes, renderFindingsBlock } = require('./clothingCheck');
-  const { callTextModelStreaming } = require('./textModels');
-  const { MODEL_DEFAULTS, TEXT_MODELS, calculateTextCost } = require('../config/models');
-
-  const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
-  // BRANCH MODE — "＋ next round": review a SELECTED round's stored briefs
-  // (params.fromText) instead of the story's original ones, and persist as the
-  // next round. Everything downstream (findings, prompt, review, score) is
-  // unchanged; only the input briefs and the persisted round/label differ.
-  const branchScenes = params.fromText
-    ? parsePageBlocks(params.fromText).map(b => ({ pageNumber: b.pageNumber, brief: b.text }))
-    : null;
-  if (params.fromText && (!branchScenes || !branchScenes.length)) throw new Error('fromText has no parseable scene briefs');
-  const fromRound = params.fromText ? (parseInt(params.fromRound, 10) || 1) : null;
-  const scenes = branchScenes || (storyData.sceneImages || [])
-    .filter(s => s.sceneDescription)
-    .map(s => ({ pageNumber: s.pageNumber, brief: s.sceneDescription }));
-  if (scenes.length === 0) throw new Error('story has no stored scene briefs to replay');
-
-  // Findings from the STORED briefs — deterministic, so a rerun compares like
-  // with like.
-  const checkPages = scenes.map(x => {
-    const stored = (storyData.sceneImages || []).find(s => s.pageNumber === x.pageNumber) || {};
-    const meta = stored.sceneMetadata || extractSceneMetadata(x.brief) || {};
-    return {
-      pageNumber: x.pageNumber,
-      prose: require('./sceneMetadata').splitBrief(x.brief).prose,
-      cast: (stored.sceneCharacters || meta.characters || []).map(c => (typeof c === 'string' ? c : c?.name)).filter(Boolean),
-      perCharClothing: stored.perCharClothing
-        || (storyData.pageClothing?.pageClothing || {})[String(x.pageNumber)]
-        || meta.characterClothing || {},
-      // Production's inputs (beatsPipeline): without the rows and the bible,
-      // removal_unstated — the one SENT clothing type — can never fire here.
-      wornItems: meta.wornItems || [],
-    };
-  });
-  const artifacts = (storyData.visualBible || {}).artifacts;
-  const before = checkScenes(checkPages, storyData.clothingRequirements, { artifacts, visualBible: storyData.visualBible });
-  const findingsBlock = renderFindingsBlock(before.byPage);
-
-  // Beats for check 5, recovered from the stored outline's ---BEATS--- section
-  // (the locked, post-review beats — see beatsPipeline rawOutline). Unified
-  // stories have no such section; the builder renders "(no beat data)".
-  const beatsSection = (String(storyData.outline || '')
-    .match(/---\s*BEATS\s*---([\s\S]*?)(?=\n---\s*[A-Z][A-Z ]+---|$)/i) || [])[1] || '';
-  const outlineBeats = parseBeats(beatsSection).pages;
-
-  // BRIEF CONTRADICTIONS — the fourth option production passes, and the last
-  // one this stage was missing (the bible half was closed a day earlier in
-  // e1430bb99; clothing and beats were already here). Deterministic, so a
-  // replay regenerates the same block production computed: prose against the
-  // brief's own metadata, the cast (roster + bible secondaries) and the bible,
-  // with the plan line carrying the element-coverage check. Without it
-  // {BRIEF_FINDINGS} filled empty and the replay could not reproduce a single
-  // cast_unlisted / vb_state_* / vb_page_uncited rewrite the production run
-  // made — the stage measures the reviewer, and it was measuring it on less
-  // than the reviewer is given.
-  let briefFindingsBlock = '';
-  try {
-    const { checkScenes: checkBriefs, renderFindingsBlock: renderBriefBlock } = require('./sceneBriefCheck');
-    const { textZoneRulesActive } = require('../config/runtime');
-    const planLineOf = (pageNumber) => (outlineBeats.find(b => b && b.pageNumber === pageNumber) || {}).planLine || '';
-    // Same cast list as beatsPipeline: the uploaded roster PLUS the bible's
-    // secondaries, or a figure the story invented can never trigger cast_unlisted.
-    const secondaryList = Array.isArray(storyData.visualBible?.secondaryCharacters)
-      ? storyData.visualBible.secondaryCharacters
-      : Object.values(storyData.visualBible?.secondaryCharacters || {});
-    const seenCast = new Set();
-    const castNames = [
-      ...(storyData.characters || []).map(c => c && c.name),
-      ...secondaryList.map(c => c && c.name),
-    ].filter(Boolean).filter((n) => {
-      const k = String(n).trim().toLowerCase();
-      if (!k || seenCast.has(k)) return false;
-      seenCast.add(k);
-      return true;
-    });
-    const briefRes = checkBriefs(
-      scenes.map(x => ({ pageNumber: x.pageNumber, brief: x.brief, planLine: planLineOf(x.pageNumber) })),
-      castNames,
-      storyData.visualBible,
-      { textZoneRules: textZoneRulesActive(storyData) }
-    );
-    briefFindingsBlock = renderBriefBlock(briefRes.byPage);
-  } catch (bcErr) {
-    log.warn(`⚠️ [TESTLAB] scene-review replay: brief check failed (${bcErr.message}) — the replay runs without brief findings, unlike production`);
-  }
-
-  const orig = PROMPT_TEMPLATES.sceneReview;
-  if (promptOverride) PROMPT_TEMPLATES.sceneReview = promptOverride;
-  let prompt;
-  try {
-    // ALL FOUR options production passes (beatsPipeline.js `{ clothingFindings,
-    // briefFindings, beats, visualBible }`). The bible feeds check 9f (a stated
-    // object's state page ranges); omitted, buildSceneReviewPrompt emitted NO
-    // `# VISUAL BIBLE — STATED OBJECTS` block at all, so a replay could never
-    // see a state's page range, never emit a corrected entry, and check 9f
-    // under-reported against the production run it is meant to mirror. The
-    // brief findings are the same shape of gap, closed above.
-    prompt = buildSceneReviewPrompt(storyData, scenes, {
-      clothingFindings: findingsBlock,
-      briefFindings: briefFindingsBlock,
-      beats: outlineBeats,
-      visualBible: storyData.visualBible,
-      clothingRequirements: storyData.clothingRequirements || null,
-    });
-  } finally {
-    PROMPT_TEMPLATES.sceneReview = orig;
-  }
-  if (!prompt) throw new Error('scene-review template unavailable');
-
-  // Mirror production: the scene review has its own model (sceneReviewModel),
-  // it does not follow the beats reviewer.
-  const models = String(params.reviewModel || MODEL_DEFAULTS.sceneReviewModel || MODEL_DEFAULTS.outlineReviewModel)
-    .split(',').map(x => x.trim()).filter(Boolean);
-  for (const m of models) if (!TEXT_MODELS[m]) throw new Error(`Unknown model "${m}"`);
-
-  const runs = [];
-  for (const model of models) {
-    // ONE ARM'S FAILURE MUST NOT DESTROY THE OTHERS. A multi-model fan-out is a
-    // comparison: if a provider returns nothing for arm 3, arms 1-2 are still
-    // valid measurements and arms 4-7 still have to run. Letting the throw
-    // propagate discarded a whole 7-arm run (2026-08-15) over one empty
-    // response, including the faults-in/faults-out numbers already computed.
-    try {
-    const t = Date.now();
-    const res = await callTextModelStreaming(prompt, null, null, model, { usageLabel: 'testlab_scene_review_replay' });
-    // AN EMPTY RESPONSE IS A FAILED CALL, NOT A CLEAN REVIEW. Run #450 came back
-    // after 50s with input_tokens:0, output_tokens:0 on an 80k-char prompt — the
-    // provider returned nothing — and this stage happily reported "0 faults
-    // fixed, 0 pages rewritten", which is indistinguishable from a reviewer that
-    // read everything and declined. Never publish that as a measurement.
-    const outTok = res.usage?.output_tokens ?? null;
-    if (!String(res.text || '').trim() || outTok === 0) {
-      throw new Error(`reviewer ${model} returned an empty response (${outTok} output tokens, ${Math.round((res.usage?.elapsed_ms || 0) / 1000)}s) — provider failure, not a review`);
-    }
-    const parsed = parseRefinedText(res.text || '', scenes.map(x => x.pageNumber), 'SCENES', BRIEF_TRAILING_MARKERS);
-    const byPage = new Map((parsed.pages || []).map(x => [x.pageNumber, x.text]));
-
-    // Merge onto a COPY — the next model in the fan-out must see the same input.
-    // A reviewed brief keeps every worn-state row the stored brief declared —
-    // production's rule (beatsPipeline keepDeclaredWornRows).
-    const merged = scenes.map((x) => {
-      const reviewed = (byPage.get(x.pageNumber) || '').trim();
-      if (!reviewed) return { pageNumber: x.pageNumber, brief: x.brief };
-      const carry = require('./wornItems').carryForwardWornItemsInBrief(reviewed, x.brief);
-      return { pageNumber: x.pageNumber, brief: carry ? carry.brief : reviewed };
-    });
-    const diffs = merged
-      .filter((m, i) => m.brief !== scenes[i].brief)
-      .map(m => ({ pageNumber: m.pageNumber, before: scenes.find(x => x.pageNumber === m.pageNumber).brief, after: m.brief }));
-
-    const afterPages = checkPages.map(cp => {
-      const m = merged.find(x => x.pageNumber === cp.pageNumber);
-      const mMeta = extractSceneMetadata(m.brief) || {};
-      return { ...cp, prose: require('./sceneMetadata').splitBrief(m.brief).prose, wornItems: mMeta.wornItems || [] };
-    });
-    const after = checkScenes(afterPages, storyData.clothingRequirements, { artifacts, visualBible: storyData.visualBible });
-    const REVIEWABLE = new Set(['outfit_misattributed', 'removal_unstated']);
-    const sentBefore = before.findings.filter(f => REVIEWABLE.has(f.type));
-    const leftAfter = after.findings.filter(f => REVIEWABLE.has(f.type));
-
-    // scoreOutput: the ONE evaluator grades this model's reviewed briefs (scene only).
-    let scorecard = null;
-    if (params.scoreOutput === true || params.scoreOutput === 'true') {
-      const sceneText = merged.map(m => `--- Page ${m.pageNumber} ---\n${m.brief}`).join('\n\n');
-      const chain = {
-        reviewModel: model,
-        ...(fromRound != null ? { fromRound } : {}),
-        analysis: String(parsed.analysis || '').slice(0, 15000),
-        rewrites: diffs.map(dd => ({ page: dd.pageNumber, before: String(dd.before).slice(0, 2000), after: String(dd.after).slice(0, 2000) })),
-      };
-      if (sceneText.trim()) scorecard = (await scoreArtifactsWithJudge({ scene: sceneText }, { model: params.judgeModel, evalVersion: params.evalVersion, persist: { storyId: target.storyId, title: storyData.title, language: storyData.language, artStyle: storyData.artStyle, source: 'scene_review_replay', model, ...(fromRound != null ? { round: fromRound + 1, label: `from r${fromRound} · ${model}` } : {}), genCost: res.usage?.direct_cost ?? calculateTextCost(res.modelId || '', res.usage || {}), genMs: Date.now() - t, chain } })).scorecard;
-    }
-
-    runs.push({
-      model,
-      modelId: res.modelId,
-      elapsedMs: Date.now() - t,
-      cost: res.usage?.direct_cost ?? calculateTextCost(res.modelId || '', res.usage || {}),
-      usage: res.usage,
-      analysis: parsed.analysis || '',
-      changedPages: diffs.map(d => d.pageNumber),
-      pages: diffs,
-      scorecard,
-      // The headline: faults in, faults out. Anything but 0 out means the
-      // reviewer was handed a fact and declined to act on it.
-      faultsBefore: sentBefore.length,
-      faultsAfter: leftAfter.length,
-      faultsFixed: sentBefore.length - leftAfter.length,
-      unfixed: leftAfter,
-    });
-    } catch (err) {
-      log.warn(`⚠️ [scene replay] arm ${model} failed: ${err.message}`);
-      runs.push({ model, ok: false, error: err.message });
-    }
-  }
-
-  return {
-    storyId: target.storyId,
-    pageCount: scenes.length,
-    promptChars: prompt.length,
-    prompt,
-    clothingFindings: findingsBlock || null,
-    findingsIn: before.findings,
-    briefsIn: scenes,
-    runs,
-  };
-}
-
 
 /**
  * STORY SCORECARD — an LLM judge rates the four FINAL text artifacts (beats,
@@ -8272,7 +8095,7 @@ async function runWriterCompareStage(target, { params = {} }) {
         if (stage === 'plan') {
           // Production: buildBeatsPrompt(inputData, pageCount, { finalArc: approvedArc, arcHints })
           // — beatsPipeline.js:935. arcHints was missing here.
-          const r = await call(SH.buildBeatsPrompt(storyData, expectedPages, { finalArc: textArgs.arc, arcHints: textArgs.arcHints, centralFigure: textArgs.centralFigure }), model, 'plan');
+          const r = await call(SH.buildBeatsPrompt(storyData, expectedPages, { finalArc: textArgs.arc, arcHints: textArgs.arcHints, storyLogic: textArgs.storyLogic, centralFigure: textArgs.centralFigure }), model, 'plan');
           const parsed = SH.parsePlanResponse(r.text, []);
           arm.stages.plan = { ...WC.scorePlan(parsed.pages || [], expectedPages), cost: r.cost, elapsedMs: r.elapsedMs, outTok: r.usage?.output_tokens };
         } else if (stage === 'bible') {
@@ -8365,9 +8188,11 @@ async function runWriterCompareStage(target, { params = {} }) {
  * production does (parseArcCreate), and scores each committed arc with the
  * same judges arc_rounds uses. Cost and quality land side by side.
  *
- * params: { efforts, model, retellModel, judgeModels, stage, promptFrom, challengesFromStory, baselineFromStory }
+ * params: { efforts, model, retellModel, judgeModels, stage, promptFrom, challengesFromStory, promptFromStory, baselineFromStory }
  *   target: { storyId }
  *
+ * params.stage      'retell' sends the stored round-1 re-tell prompt verbatim
+ *   at each params.retellEfforts on params.retellModel (no create, no panel).
  * params.stage      'create' (default) sweeps params.efforts over the create
  *   call. 'pipeline' runs production's arc machine once: create at
  *   params.createEffort, production's panel on THAT committed arc, then
@@ -8385,6 +8210,11 @@ async function runWriterCompareStage(target, { params = {} }) {
  *   with the story's own stored challenge draw, lifted verbatim from
  *   arcReviewReport.createPrompt — so a new arc format sees the SAME draw the
  *   stored arc did, and the comparison has one variable (2026-09-24).
+ * params.promptFromStory  send the story's stored arcReviewReport.createPrompt
+ *   VERBATIM — the exact prompt production's creator answered, whatever the
+ *   template looked like then — with the stored draw handed to any re-telling.
+ *   The model is then the only variable against baseline-create (2026-10-04,
+ *   Sonnet 5.5 vs Opus 5.5 A/B).
  * params.baselineFromStory  also score the story's stored arcs — the committed
  *   create arc and arcReviewReport.finalArc — with the same judges and the same
  *   judge context, as arms `baseline-create` / `baseline-final` (no model call
@@ -8393,7 +8223,7 @@ async function runWriterCompareStage(target, { params = {} }) {
 async function runArcEffortStage(target, { params = {}, promptOverride = null }) {
   const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../services/prompts');
   await loadPromptTemplates();
-  const { buildArcCreatePrompt, buildArcPanelPrompt, buildArcRetellPrompt, parseArcCreate, parseArcRetell, filterPanelFindings, arcRepairFindings, splitCommittedBlock, arcShapeCounts, drawChallengeIdeas } = require('./storyHelpers');
+  const { buildArcCreatePrompt, buildArcPanelPrompt, buildArcRetellPrompt, parseArcCreate, parseArcRetell, filterPanelFindings, splitCommittedBlock, arcShapeCounts, drawChallengeIdeas } = require('./storyHelpers');
   const { callTextModelStreaming } = require('./textModels');
   const { TEXT_MODELS, MODEL_DEFAULTS, calculateTextCost } = require('../config/models');
   const sc = require('./storyScorecard');
@@ -8424,15 +8254,20 @@ async function runArcEffortStage(target, { params = {}, promptOverride = null })
   // never sends. Drawn ONCE so every effort arm sees the identical prompt —
   // the arms differ in effort and nothing else.
   const stage = params.stage || 'create';
-  if (!['create', 'pipeline'].includes(stage)) throw new Error(`Unknown stage "${stage}" (create | pipeline)`);
+  if (!['create', 'pipeline', 'retell'].includes(stage)) throw new Error(`Unknown stage "${stage}" (create | pipeline | retell)`);
   let prompt;
   let promptSource;
   // The drawn section itself — the pipeline's re-telling must be handed the
   // SAME draw the creator saw (production passes one `challengeIdeas` to both).
   let challengeIdeas;
   const flag = v => v === true || v === 'true';
-  if (params.promptFrom && flag(params.challengesFromStory)) throw new Error('promptFrom and challengesFromStory are exclusive');
-  if (params.promptFrom) {
+  if ([params.promptFrom, flag(params.challengesFromStory), flag(params.promptFromStory)].filter(Boolean).length > 1) {
+    throw new Error('promptFrom, challengesFromStory and promptFromStory are exclusive');
+  }
+  if (flag(params.promptFromStory)) {
+    if (promptOverride) throw new Error('promptFromStory and promptOverride are exclusive');
+    ({ prompt, challengeIdeas, promptSource } = storedCreatePrompt(storyData, target.storyId));
+  } else if (params.promptFrom) {
     if (promptOverride) throw new Error('promptFrom and promptOverride are exclusive');
     const { dbQuery } = require('../services/database');
     const expId = parseInt(params.promptFrom, 10);
@@ -8546,6 +8381,7 @@ async function runArcEffortStage(target, { params = {}, promptOverride = null })
   // The re-tell gate's verdict (pipeline stage only): what it passed, or why
   // no re-telling ran.
   let gate = null;
+  let gateJevCast = null;
   let retellSkipped = null;
   if (flag(params.baselineFromStory)) {
     const report = storyData.arcReviewReport || {};
@@ -8566,6 +8402,16 @@ async function runArcEffortStage(target, { params = {}, promptOverride = null })
   }
   if (stage === 'create') {
     for (const effort of efforts) arms.push((await runArm('create', prompt, effort)).arm);
+  } else if (stage === 'retell') {
+    // RETELL (2026-10-04): the story's stored round-1 re-tell prompt, VERBATIM
+    // — the committed arc, the panel's kept findings and the draw production's
+    // re-teller answered — once per params.retellEfforts on params.retellModel.
+    // Compared against baseline-final, the model and effort are the only
+    // variables.
+    const stored = String(storyData.arcReviewReport?.rounds?.[0]?.retellPrompt || '');
+    if (!stored.trim()) throw new Error(`stage retell: ${target.storyId} stores no arcReviewReport.rounds[0].retellPrompt (no re-telling ran)`);
+    const retellEfforts = String(params.retellEfforts || 'xhigh,high,medium').split(',').map(s => s.trim()).filter(Boolean);
+    for (const effort of retellEfforts) arms.push((await runArm('retell', stored, effort)).arm);
   } else {
     // PIPELINE: one create at params.createEffort, then production's panel on
     // THAT committed arc, then one re-telling per params.retellEfforts — every
@@ -8598,7 +8444,10 @@ async function runArcEffortStage(target, { params = {}, promptOverride = null })
     voices.forEach((p, i) => { p.letter = String.fromCharCode(65 + i); });
     // Production's re-tell gate (beatsPipeline, sibling set arc-retell-gate).
     const { arcBlock, critique } = splitCommittedBlock(created.commit.committed);
-    gate = arcRepairFindings({ critique, reviewedArc: arcBlock, panel: voices });
+    // + the Jev cast check, as production (jevAudit.arcRepairFindingsWithCastCheck).
+    let jevCast = null;
+    ({ gate, jevCast } = await require('./jevAudit').arcRepairFindingsWithCastCheck({ critique, reviewedArc: arcBlock, panel: voices, castNames: require('./castCoverage').commissionedCast(storyData).listed }));
+    gateJevCast = jevCast;
     if (!gate.retell) {
       retellSkipped = gate.skipReason;
     } else {
@@ -8615,7 +8464,7 @@ async function runArcEffortStage(target, { params = {}, promptOverride = null })
     arms,
     panel,
     retellSkipped,
-    gate: gate && { repair: gate.count, duplicates: gate.duplicates, critiqueRepair: gate.critiqueRepair, panelRepair: gate.panelRepair, critiqueDropped: gate.critique.dropped, critiqueMalformed: gate.critique.malformed },
+    gate: gate && { repair: gate.count, duplicates: gate.duplicates, critiqueRepair: gate.critiqueRepair, panelRepair: gate.panelRepair, critiqueDropped: gate.critique.dropped, critiqueMalformed: gate.critique.malformed, jevCast: gateJevCast },
     totalCost: Number((arms.reduce((s, a) => s + (a.cost || 0) + (a.judgeCost || 0), 0) + panelCost).toFixed(4)),
     summary: [
       ...arms.map(a => (a.ok && a.phase.startsWith('baseline')
@@ -8632,6 +8481,34 @@ async function runArcEffortStage(target, { params = {}, promptOverride = null })
     ],
   };
 }
+/**
+ * text_refine params.auditsFromStory: the audit results the stored refine run
+ * merged ({source, ok, raw} per auditor). Throws when none succeeded — an
+ * empty fault list would make the repair a no-op, not a comparison.
+ */
+function storedRefineAudits(storyData, storyId) {
+  const audits = (storyData?.textRefineReport?.audits || []).filter(a => a && a.source);
+  if (!audits.some(a => a.ok && String(a.raw || '').trim())) {
+    throw new Error(`auditsFromStory: ${storyId} stores no successful textRefineReport.audits`);
+  }
+  return audits.map(a => ({ source: a.source, ok: !!a.ok, raw: a.raw || '', modelKey: a.modelKey || null, error: a.error || null }));
+}
+
+/**
+ * params.promptFromStory: the create prompt production's creator answered for
+ * this story, verbatim, plus the stored draw for any re-telling. Throws when
+ * the story stores no prompt — a rebuilt one would be a second variable.
+ */
+function storedCreatePrompt(storyData, storyId) {
+  const prompt = String(storyData?.arcReviewReport?.createPrompt || '');
+  if (!prompt.trim()) throw new Error(`promptFromStory: ${storyId} has no stored arcReviewReport.createPrompt`);
+  return {
+    prompt,
+    challengeIdeas: storedChallengeSection(storyData),
+    promptSource: `stored arcReviewReport.createPrompt of ${storyId}, verbatim`,
+  };
+}
+
 /**
  * The story's own stored challenge draw: the "# CHALLENGE IDEAS" section of
  * arcReviewReport.createPrompt, verbatim up to the next top-level heading.
@@ -9030,6 +8907,10 @@ async function runArcPanelReplayStage(target, { params = {}, promptOverride = nu
   const { MODEL_DEFAULTS, TEXT_MODELS, calculateTextCost } = require('../config/models');
 
   const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
+  // THE RUN'S inputData for the arc prompts: the stored landmark list the
+  // panel and the re-telling read, and the run's model overrides
+  // (beatsReplayInputs.resolveReplayInputData; stored since 2026-09-27).
+  const inputData = resolveReplayInputData(storyData);
   const report = storyData.arcReviewReport || {};
   // The committed block is what production handed the panel, verbatim. Without
   // it there is nothing to replay against and a reconstruction would not be the
@@ -9043,7 +8924,7 @@ async function runArcPanelReplayStage(target, { params = {}, promptOverride = nu
   if (promptOverride) PROMPT_TEMPLATES.arcPanel = promptOverride;
   let prompt;
   try {
-    prompt = H.buildArcPanelPrompt(storyData, committed);
+    prompt = H.buildArcPanelPrompt(inputData, committed);
   } finally {
     PROMPT_TEMPLATES.arcPanel = orig;
   }
@@ -9053,8 +8934,8 @@ async function runArcPanelReplayStage(target, { params = {}, promptOverride = nu
     .split(',').map(x => x.trim()).filter(Boolean);
   if (!models.length) throw new Error('no panel models resolved');
   for (const m of models) if (!TEXT_MODELS[m]) throw new Error(`Unknown model "${m}"`);
-  const tempFor = (model, temp) =>
-    (temp == null || TEXT_MODELS[model]?.provider === 'anthropic') ? {} : { temperature: temp };
+  // The run's temperature rule and creator call (beatsPipeline, shared).
+  const { arcTempFor: tempFor, makeArcCreatorCall } = require('./beatsPipeline');
 
   const runs = [];
   for (const model of models) {
@@ -9106,31 +8987,43 @@ async function runArcPanelReplayStage(target, { params = {}, promptOverride = nu
       // Production's re-tell gate (beatsPipeline, sibling set arc-retell-gate):
       // no quoted MAJOR or CRITICAL finding, no re-telling.
       const { arcBlock, critique } = H.splitCommittedBlock(committed);
-      const gate = H.arcRepairFindings({ critique, reviewedArc: arcBlock, panel });
-      const gateReport = { repair: gate.count, duplicates: gate.duplicates, critiqueRepair: gate.critiqueRepair, panelRepair: gate.panelRepair, critiqueDropped: gate.critique.dropped, critiqueMalformed: gate.critique.malformed };
+      // + the Jev cast check, as production (jevAudit.arcRepairFindingsWithCastCheck).
+      const { gate, jevCast } = await require('./jevAudit').arcRepairFindingsWithCastCheck({ critique, reviewedArc: arcBlock, panel, castNames: require('./castCoverage').commissionedCast(storyData).listed });
+      const gateReport = { repair: gate.count, duplicates: gate.duplicates, critiqueRepair: gate.critiqueRepair, panelRepair: gate.panelRepair, critiqueDropped: gate.critique.dropped, critiqueMalformed: gate.critique.malformed, jevCast };
       if (!gate.retell) {
         retell = { ok: true, skipped: gate.skipReason, gate: gateReport };
       } else {
-        const pageCount = (storyData.sceneImages || []).length || parseInt(storyData.pages, 10) || 14;
-        const retellPrompt = H.buildArcRetellPrompt(storyData, pageCount, arcBlock, gate.text);
+        // The run's page count, and the challenge draw the run offered its
+        // re-telling (stored in the create prompt; storedChallengeSection).
+        const pageCount = parseInt(storyData.pages, 10) || (storyData.sceneImages || []).length || 10;
+        const retellPrompt = H.buildArcRetellPrompt(inputData, pageCount, arcBlock, gate.text, { challengeIdeas: storedChallengeSection(storyData) });
         if (!retellPrompt) throw new Error('arc-retell template unavailable');
         // Production's re-tell model (MODEL_DEFAULTS.arcRetellModel), never the
         // stored story's creator: since 2026-09-25 create and re-tell are
         // separate keys, and the create model is not the one that re-tells.
-        const retellModel = String(params.retellModel || MODEL_DEFAULTS.arcRetellModel);
+        const retellModel = String(params.retellModel || inputData.modelOverrides.arcRetellModel || MODEL_DEFAULTS.arcRetellModel);
         if (!TEXT_MODELS[retellModel]) throw new Error(`Unknown model "${retellModel}"`);
         const t = Date.now();
-        const res = await callTextModelStreaming(retellPrompt, null, null, retellModel, {
-          usageLabel: 'testlab_arc_retell_replay', ...tempFor(retellModel, MODEL_DEFAULTS.arcRetellTemperature),
-          // Production's re-tell effort, so the replay reproduces the shipped call.
-          ...(MODEL_DEFAULTS.arcRetellEffort ? { effort: MODEL_DEFAULTS.arcRetellEffort } : {}),
-        });
-        const parsed = H.parseArcRetell(res.text || '');
+        // The run's creator call (one retry; a truncated reply is a failed
+        // attempt) and its parse retry: one more telling on a parse miss.
+        const retellCalls = [];
+        const creatorCall = makeArcCreatorCall(null, (res) => retellCalls.push(res));
+        let res = null;
+        let parsed = null;
+        for (let attempt = 1; attempt <= 2 && !parsed; attempt++) {
+          res = await creatorCall(retellPrompt, 'testlab_arc_retell_replay', retellModel, MODEL_DEFAULTS.arcRetellTemperature, MODEL_DEFAULTS.arcRetellEffort);
+          try {
+            parsed = H.parseArcRetell(res.text || '');
+          } catch (parseErr) {
+            if (attempt === 2) throw parseErr;
+          }
+        }
         retell = {
           ok: true,
           model: retellModel, modelId: res.modelId,
           elapsedMs: Date.now() - t,
-          cost: res.usage?.direct_cost ?? calculateTextCost(res.modelId || '', res.usage || {}),
+          cost: retellCalls.reduce((a, c) => a + (c.usage?.direct_cost ?? calculateTextCost(c.modelId || '', c.usage || {})), 0),
+          attempts: retellCalls.length,
           fixing: parsed.fixing, keeping: parsed.keeping, used: parsed.used,
           logic: parsed.logic.text,
           finalArc: parsed.finalArc, critique: parsed.critique,
@@ -9150,6 +9043,9 @@ async function runArcPanelReplayStage(target, { params = {}, promptOverride = nu
     title: storyData.title || null,
     creatorModel: report.creatorModel || null,
     productionPanel: report.panelModels || null,
+    // False for a story stored before 2026-09-27: no landmark list was kept,
+    // so the replayed prompts carry no landmark section.
+    replayInputsStored: inputData.replayInputsStored,
     // The frozen input, so a reader can see the panel was handed the same arc.
     committed,
     promptChars: prompt.length,
@@ -9507,17 +9403,17 @@ async function runTrialIdeaVarietyStage(target, { params = {}, promptOverride = 
     categoryContext = `This is a ${storyTheme || 'adventure'} story${storyTopic ? ` about "${storyTopic}"` : ''}. Make it exciting and appropriate for children.`;
   }
 
-  // ── route mirror: landmarks ──
+  // ── route mirror: landmarks ── the route's own helper (jevSelection
+  // .trialIdeaLandmarks); the Lab waits for Jev's ranking, which the route
+  // reads only when a prepare call has made it ready.
   let landmarksText = '';
   const landmarkNames = [];
-  if (params.landmarks !== 'false' && params.landmarks !== false && userLocation?.city && storyCategory !== 'historical') {
+  if (params.landmarks !== 'false' && params.landmarks !== false) {
     try {
-      const { getIndexedLandmarks } = require('./landmarkPhotos');
-      const landmarks = await getIndexedLandmarks(userLocation, 3);
-      if (landmarks.length > 0) {
-        landmarkNames.push(...landmarks.map(l => l.name));
-        landmarksText = 'At least one scene must take place at one of these real local landmarks: ' + landmarkNames.join(', ') + '.';
-      }
+      const idea = await require('./jevSelection').trialIdeaLandmarks(
+        { characters: [mainChar], storyCategory, storyTheme, storyTopic, language, userLocation }, { wait: true });
+      landmarkNames.push(...idea.names);
+      landmarksText = idea.text;
     } catch (err) {
       log.debug(`[TESTLAB] idea-variety landmark lookup failed: ${err.message}`);
     }
@@ -9886,7 +9782,7 @@ function rawObstacleLines(text) {
 function analyzeReplanCompliance({
   replanText = '', checkText = '', standing = [], findings = [],
   castNames = [], aliases = {}, maxCast = 3,
-  focalNames = [], keep = [],
+  focalNames = [], keep = [], castFloor = null,
 } = {}) {
   const { parsePlanResponse, parsePlanChanges, parsePlanCheckObstacles, parsePlanCheckActions, findingPages, replanRank } = require('./promptBuilders');
   const { reviewPlanChanges, castLostByReplan } = require('./planCounters');
@@ -9934,6 +9830,7 @@ function analyzeReplanCompliance({
     protectedPages: new Map((keep || []).map(k => [Number(k.page), k.why])),
     actions: parsePlanCheckActions(String(checkText || '')),
     rankOf: replanRank,
+    castFloor,
   });
   restore(review.refusals.map(r => r.pageNumber));
   const lost = castLostByReplan(standing, merged, castNames, aliases, review.declaredOut);
@@ -10052,186 +9949,517 @@ function analyzeReplanCompliance({
 }
 
 /**
- * ONE plan check + ONE re-plan against a stored story's first division, then
- * the compliance verdict. Text only — no image spend, no story run.
+ * The run's Step 2 on a stored story's first division: the plan check and
+ * the re-plan rounds production runs (up to two, with its review and guards),
+ * then the Lab's compliance reading of round 1. Text only — no image spend,
+ * no story run.
  *
  * params.planModel  — the re-planner (default: production's outline model)
  * params.checkModel — the plan checker (default: production's planCheckModel)
+ *
+ * params.arcFromExperiment (2026-09-25) — the id of an arc_effort experiment on
+ * THIS story. The arc is that experiment's arm (params.arcPhase 'retell' |
+ * 'create', default retell when present; params.arcEffort when the phase has
+ * several arms), not the story's stored one, and the stage PLANS ITS OWN first
+ * division from it with production's planner call — the stored division
+ * answers a different arc. The central figure, the (commissioned) figures and
+ * the invented list come from that arm's STORY LOGIC, as beatsPipeline takes
+ * them from the committed arc; arcHints is null (arc_effort runs no hints
+ * call). Then production's page-plan step: plan check + counters, and the
+ * re-plan rounds when production would re-plan (any finding). The result adds
+ * the first division and a per-character summary (`castSummary`).
+ *
+ * params.plannerMayAddDeeds (Lab only) — the planner, the re-planner and the
+ * plan check read castCoverage.ADDED_DEED_RULE; off is production exactly.
  */
 async function runBeatsReplanStage(target, { params = {} }) {
   const { loadPromptTemplates } = require('../services/prompts');
   await loadPromptTemplates();
   const {
-    buildBeatsPrompt, buildPlanCheckPrompt, parsePlanCheck, parsePlanCheckRoster,
-    parsePlanCheckObstacles, buildReplanSection, getHistoricalLocations, getHistoricalObjects,
-    parsePlanCheckWanted, parsePlanCheckActions, replanKeepPages, replanRoundRegressed,
+    buildBeatsPrompt, parsePlanCheckObstacles, parsePlanCheckActions, replanKeepPages,
+    parseStoryLogic, arcInventedAllowance, pickMainCharacters,
   } = require('./promptBuilders');
+  const { parsePlanCastBlock, commissionedCast } = require('./castCoverage');
   const { parseBeats } = require('./storyHelpers');
-  const { runPlanCounters, collectPlaceNames } = require('./planCounters');
   const { callTextModelStreaming } = require('./textModels');
-  const { MODEL_DEFAULTS, IMAGE_MODELS, TEXT_MODELS, calculateTextCost } = require('../config/models');
+  const { MODEL_DEFAULTS, TEXT_MODELS, calculateTextCost } = require('../config/models');
+  // THE RUN'S OWN STEP 2 (owner 2026-09-27: "The Lab must use 100% identical
+  // code to production"): the plan check and the re-plan rounds are the
+  // functions generateStoryViaBeats calls (beatsPipeline.planCheckInputs,
+  // createPlanCheckRunner, runReplanRounds), on the inputs the run gave them,
+  // rebuilt from the stored story: the planner's stored reply read by the run's
+  // plan reader, its CAST table parsed by the run's parser, and the arc's
+  // invented / commissioned figures and central figure read off its stored
+  // STORY LOGIC. The stage used to rebuild the check, one round and its guard
+  // itself — no CAST table on the re-plan, no invented / commissioned figures,
+  // no PEOPLELESS pick, no review of declared changes, one round only.
+  const { makePlanReader, planCheckInputs, createPlanCheckRunner, runReplanRounds, shippedReplanState, finalizePlanShots } = require('./beatsPipeline');
 
-  const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
+  // The run's inputData: the stored landmark list the planner and the check
+  // read, and the run's model overrides (resolveReplayInputData, 2026-09-27).
+  const storyData = resolveReplayInputData((await loadStoryDataFull(target.storyId, { rehydrate: false })).storyData);
 
-  // ROUND ONE'S DIVISION, FROZEN. `briefsIn` is written from `plan.pages` — the
-  // FIRST division, before any re-plan round touched it — so the findings this
-  // stage raises are findings against the same division the story's own check
-  // saw. `pagePlan` on the report is the SHIPPED division and is deliberately
-  // not used: re-checking the post-re-plan division would measure a different
-  // round from the one the stored findings describe.
-  const briefsIn = storyData?.beatsReviewReport?.briefsIn || [];
-  const standing = briefsIn
-    .filter(b => b && b.pageNumber != null)
-    .map(b => ({ pageNumber: Number(b.pageNumber), planLine: String(b.brief || '').replace(/^\s*PLAN:\s*/i, '').trim() }))
-    .filter(b => b.planLine)
-    .sort((a, b) => a.pageNumber - b.pageNumber);
-  if (standing.length === 0) {
-    throw new Error(`story ${target.storyId} carries no beatsReviewReport.briefsIn plan lines — nothing to re-divide`);
+  // Lab A/B (2026-09-25): the planner may add a deed (castActionRule
+  // `mayAddDeeds`) — the same sentence reaches the plan check.
+  const mayAddDeeds = params.plannerMayAddDeeds === true || params.plannerMayAddDeeds === 'true';
+  const labPromptOptions = mayAddDeeds ? { mayAddDeeds } : {};
+  // modelOverrides are not stored: the run's defaults, as planCheckInputs and
+  // generateStoryViaBeats resolve them. params.planModel / params.checkModel
+  // are the A/B knobs.
+  const planModel = params.planModel || storyData.modelOverrides.outlineModel || MODEL_DEFAULTS.outline;
+
+  const calls = [];
+  const onCall = (res) => calls.push(res);
+  const events = [];
+  const record = (level) => (event, message) => { events.push({ level, event, message }); };
+  const gl = { info: record('info'), warn: record('warn'), error: record('error'), debug: record('debug') };
+
+  let approvedArc, arcHints, centralFigure, storyLogic, pageCount;
+  // What the arc machine hands Step 2: the (commissioned) and (new) figures of
+  // its STORY LOGIC and the invented allowance (generateStoryViaBeats sets all
+  // three when the arc commits).
+  let arcPremiseNames = [];
+  let arcInventedNames = null;
+  let arcInventedLimit = null;
+  let expArc = null;
+  let firstPlan = null;
+  let plannerReply = null;
+  let plan = null;
+  let castTable = null;
+  let castTableNote = null;
+  const planAndCheck = params.planAndCheck === true || params.planAndCheck === 'true';
+  if (params.arcFromExperiment != null && params.arcFromExperiment !== '') {
+    // params.arcFromExperiment (2026-09-25): the arc is that arc_effort
+    // experiment's arm, and the stage plans its own first division from it.
+    const { dbQuery } = require('../services/database');
+    const expId = parseInt(params.arcFromExperiment, 10);
+    if (!Number.isFinite(expId)) throw new Error(`arcFromExperiment must be an experiment id, not "${params.arcFromExperiment}"`);
+    const rows = await dbQuery('SELECT stage, results FROM testlab_experiments WHERE id = $1', [expId]);
+    expArc = resolveArcFromExperiment(rows[0], {
+      expId, storyId: target.storyId, arcPhase: params.arcPhase, arcEffort: params.arcEffort,
+    }, { parseStoryLogic });
+    approvedArc = expArc.arc;
+    arcHints = expArc.arcHints;
+    centralFigure = expArc.centralFigure;
+    storyLogic = expArc.logic.text;
+    arcPremiseNames = expArc.logic.commissioned;
+    arcInventedNames = expArc.logic.invented;
+    arcInventedLimit = arcInventedAllowance(storyData);
+    pageCount = expArc.pageCount || parseInt(storyData.pages, 10) || (storyData.sceneImages || []).length;
+    if (!pageCount) throw new Error(`arcFromExperiment ${expId}: no page count on the experiment or the story`);
+  } else {
+    approvedArc = resolveReplayArc(storyData, { parseBeats });
+    arcHints = resolveReplayArcHints(storyData);
+    centralFigure = resolveReplayCentralFigure(storyData);
+    storyLogic = resolveReplayStoryLogic(storyData);
+    if (storyLogic) {
+      // The stored block is the logic's body; the run parsed it with its heading.
+      const logic = parseStoryLogic(`STORY LOGIC:\n${storyLogic}`);
+      arcPremiseNames = logic.commissioned;
+      arcInventedNames = logic.invented;
+      arcInventedLimit = arcInventedAllowance(storyData);
+    }
+    // The page count the run was ordered (generateStoryViaBeats `pageCount`).
+    pageCount = parseInt(storyData.pages, 10) || (storyData?.beatsReviewReport?.briefsIn || []).length || (storyData.sceneImages || []).length;
+    if (!pageCount) throw new Error(`story ${target.storyId}: no page count`);
   }
-  const pagePlan = standing.map(pg => `Page ${pg.pageNumber}: ${pg.planLine}`).join('\n');
-  const pageCount = standing.length;
-
-  const approvedArc = resolveReplayArc(storyData, { parseBeats });
-  const arcHints = resolveReplayArcHints(storyData);
-  const centralFigure = resolveReplayCentralFigure(storyData);
-
-  const checkModel = params.checkModel || MODEL_DEFAULTS.planCheckModel;
-  const planModel = params.planModel || MODEL_DEFAULTS.outline;
-  for (const m of [checkModel, planModel]) if (!TEXT_MODELS[m]) throw new Error(`Unknown model "${m}"`);
-
-  // Production's counter inputs, as far as a stored story carries them (see the
-  // header: the arc machine's premise figures and invented allowance do not
-  // survive into the row).
-  const commission = require('./castCoverage').commissionedCast(storyData);
-  const commissionedNames = commission.all;
-  const placeNames = collectPlaceNames(storyData, [
-    ...(storyData?.storyCategory === 'historical'
-      ? [...getHistoricalLocations(storyData.storyTopic), ...getHistoricalObjects(storyData.storyTopic)].map(e => e && e.name)
-      : []),
-  ]);
-  const maxCast = IMAGE_MODELS[storyData?.modelOverrides?.imageModel || MODEL_DEFAULTS.pageImage]?.maxCharactersPerScene || 3;
-
-  const costOf = r => r.usage?.direct_cost ?? calculateTextCost(r.modelId || '', r.usage || {});
-
-  // ── the plan check ────────────────────────────────────────────────────────
-  // One helper for the check and the recheck, shaped as beatsPipeline's
-  // runCheck: the model call, its roster, the counters on that roster, and the
-  // findings structured the way the re-plan and the round guard read them.
-  const runCheckOn = async (pages, planText, usageLabel) => {
-    const prompt = buildPlanCheckPrompt(storyData, pages, approvedArc, planText, { arcHints, centralFigure });
-    if (!prompt) throw new Error('plan-check template unavailable');
-    const res = await callTextModelStreaming(prompt, null, null, checkModel, {
-      usageLabel,
-      ...(TEXT_MODELS[checkModel]?.provider === 'anthropic' ? {} : { temperature: 0 }),
-    });
-    if (!String(res.text || '').trim()) throw new Error(`plan checker ${checkModel} returned an empty response — provider failure, not a result`);
-    const modelFindings = parsePlanCheck(res.text || '');
-    const roster = parsePlanCheckRoster(res.text || '');
-    const counters = runPlanCounters({
-      pages, commissionedNames, listedNames: commission.listed, placeNames, maxCharactersPerScene: maxCast, roster, centralFigure,
-    });
-    return {
-      prompt, res, roster, counters,
-      findings: [
-        ...counters.findings.map((f, i) => ({ kind: 'counter', code: f.code, line: counters.lines[i] })),
-        ...modelFindings.map(f => ({ kind: 'check', check: f.check, line: `CHECK[${f.check}]: ${f.text}` })),
-      ],
-    };
+  const expected = Array.from({ length: pageCount }, (_, i) => i + 1);
+  const readPlan = makePlanReader(expected, approvedArc);
+  const readCastTable = (reply) => {
+    if (!(storyData?.characters || []).some(c => c && c.name)) return null;
+    try {
+      return parsePlanCastBlock(reply, { listed: commissionedCast(storyData).listed });
+    } catch (err) {
+      castTableNote = `the planner's CAST block could not be read: ${err.message} — as in the run, no plan line is held to a cast table`;
+      return null;
+    }
   };
-  let t = Date.now();
-  const firstCheck = await runCheckOn(standing, pagePlan, 'testlab_beats_replan_check');
-  const checkMs = Date.now() - t;
-  const { prompt: checkPrompt, res: checkRes, roster, counters, findings } = firstCheck;
-  const obstacles = parsePlanCheckObstacles(checkRes.text || '');
-  if (findings.length === 0) {
-    throw new Error('the plan check raised no finding against this division — there is nothing for a re-plan to answer, so pick a story whose check fires');
+
+  if (expArc || planAndCheck) {
+    // THE FIRST DIVISION, planned afresh with the run's planner call (the
+    // stored one answers a different arc, or the point is a planner change).
+    const planPrompt = buildBeatsPrompt(storyData, pageCount, { finalArc: approvedArc, arcHints, storyLogic, centralFigure, ...labPromptOptions });
+    if (!planPrompt) throw new Error('story-beats template unavailable');
+    const t0 = Date.now();
+    const planRes = await callTextModelStreaming(planPrompt, null, null, planModel, { usageLabel: 'testlab_beats_replan_plan' });
+    onCall(planRes);
+    plannerReply = String(planRes.text || '');
+    if (!plannerReply.trim()) throw new Error(`planner ${planModel} returned an empty response — provider failure, not a result`);
+    plan = readPlan(plannerReply).parsed;
+    castTable = readCastTable(plannerReply);
+    firstPlan = { prompt: planPrompt, rawResponse: plannerReply.slice(0, 40000), missingPages: plan.missing, modelId: planRes.modelId || planModel, elapsedMs: Date.now() - t0 };
+  } else if (storyData?.beatsReviewReport?.plannerReply) {
+    // THE RUN'S FIRST DIVISION: its stored reply, read by the run's reader.
+    plannerReply = String(storyData.beatsReviewReport.plannerReply);
+    plan = readPlan(plannerReply).parsed;
+    castTable = readCastTable(plannerReply);
+  } else {
+    // A story stored before the planner reply was kept (2026-09-23): the first
+    // division survives only as `briefsIn`, and no CAST table.
+    const briefsIn = storyData?.beatsReviewReport?.briefsIn || [];
+    const pages = briefsIn
+      .filter(b => b && b.pageNumber != null)
+      .map(b => ({ pageNumber: Number(b.pageNumber), planLine: String(b.brief || '').replace(/^\s*PLAN:\s*/i, '').trim() }))
+      .filter(b => b.planLine)
+      .sort((a, b) => a.pageNumber - b.pageNumber);
+    if (pages.length === 0) throw new Error(`story ${target.storyId} carries neither a planner reply nor beatsReviewReport.briefsIn — nothing to re-divide`);
+    plan = { pages, missing: [], pagePlan: pages.map(pg => `Page ${pg.pageNumber}: ${pg.planLine}`).join('\n'), arc: approvedArc };
+    castTableNote = 'the stored story predates the stored planner reply; the division is its briefsIn, with no CAST table';
   }
+  if (!plan || plan.pages.length === 0) throw new Error('the first division has no parseable plan lines');
+  const pagePlan = plan.pagePlan;
+  // The focus character, as production passes it (MAIN_UNDER_HALF, 2026-09-25).
+  const mainName = pickMainCharacters(storyData).focus?.name || null;
 
-  // ── the re-plan ───────────────────────────────────────────────────────────
-  const keep = replanKeepPages({
-    pageCount,
-    wanted: parsePlanCheckWanted(checkRes.text || ''),
-    actions: parsePlanCheckActions(checkRes.text || ''),
-    focalPages: (counters.stats && counters.stats.focalPages) || {},
+  const inputs = planCheckInputs(storyData, { arcPremiseNames, modelOverrides: storyData.modelOverrides });
+  const { commission, commissionedNames, maxCast } = inputs;
+  const checkModel = params.checkModel || inputs.planCheckModel;
+  for (const m of [checkModel, planModel]) if (!TEXT_MODELS[m]) throw new Error(`Unknown model "${m}"`);
+  const runCheck = createPlanCheckRunner({
+    inputData: storyData, approvedArc, arcHints, arcStoryLogic: storyLogic, arcCentralFigure: centralFigure, castTable,
+    commission, commissionedNames, placeNames: inputs.placeNames, maxCast, arcInventedNames, arcInventedLimit, mainName,
+    planCheckModel: checkModel, onChunk: null, gl, labPromptOptions, onCall,
   });
-  const coverageRule = require('./castCoverage').castCoverage({ pageCount, castCount: commission.listed.length });
-  const replanSection = buildReplanSection(pagePlan, findings, { pageCount, keep });
-  const replanPrompt = buildBeatsPrompt(storyData, pageCount, { finalArc: approvedArc, arcHints, centralFigure, replan: replanSection });
-  if (!replanPrompt) throw new Error('story-beats template unavailable');
-  t = Date.now();
-  const rpRes = await callTextModelStreaming(replanPrompt, null, null, planModel, { usageLabel: 'testlab_beats_replan' });
-  if (!String(rpRes.text || '').trim()) throw new Error(`planner ${planModel} returned an empty response — provider failure, not a result`);
-  const replanMs = Date.now() - t;
-
-  const verdict = analyzeReplanCompliance({
-    replanText: rpRes.text || '',
-    checkText: checkRes.text || '',
-    standing,
-    findings,
-    castNames: (counters.cast && counters.cast.all) || commissionedNames,
-    aliases: (counters.cast && counters.cast.aliases) || {},
-    maxCast,
-    focalNames: coverageRule && coverageRule.focalEach ? commission.listed : [],
-    keep,
-  });
-
-  // ── the recheck and the round guard, as beatsPipeline runs them ───────────
-  // Production rechecks every round the corruption guards let through and
-  // discards one that raises the cast/focal must-fix count
-  // (`replanRoundRegressed`, round 1 semantics — this stage is one round). A
-  // round the guards already discarded, or one that changed nothing, is never
-  // rechecked there, so it is not rechecked here.
-  let recheck = null;
-  let guard = null;
-  let recheckMs = 0;
-  if (!verdict.discardReason && verdict.changedPagesApplied.length > 0) {
-    const appliedText = verdict.appliedPlan.map(pg => `Page ${pg.pageNumber}: ${pg.planLine}`).join('\n');
-    t = Date.now();
-    recheck = await runCheckOn(verdict.appliedPlan, appliedText, 'testlab_beats_replan_recheck');
-    recheckMs = Date.now() - t;
-    const g = replanRoundRegressed({ findings }, { findings: recheck.findings }, verdict.changedPagesApplied, { round: 1 });
-    guard = {
-      before: g.before, after: g.after, noise: g.noise.map(f => f.line),
-      kept: !g.discard,
-      discardReason: g.discard ? `raised the cast/focal must-fix count (${g.before} → ${g.after})` : null,
-    };
-  }
-
-  const { appliedPlan, ...reportFields } = verdict;
-  const calls = [checkRes, rpRes, ...(recheck ? [recheck.res] : [])];
-
-  return {
-    storyId: target.storyId,
-    pages: pageCount,
-    models: { checkModel, checkModelId: checkRes.modelId || checkModel, planModel, planModelId: rpRes.modelId || planModel },
-    elapsedMs: checkMs + replanMs + recheckMs,
+  const costOf = r => r.usage?.direct_cost ?? calculateTextCost(r.modelId || '', r.usage || {});
+  const tally = () => ({
     cost: calls.reduce((a, r) => a + costOf(r), 0),
     usage: {
       input_tokens: calls.reduce((a, r) => a + (r.usage?.input_tokens || 0), 0),
       output_tokens: calls.reduce((a, r) => a + (r.usage?.output_tokens || 0), 0),
     },
-    note: `${verdict.passed}/${verdict.checks.length} plumbing checks pass — ${verdict.changesParsed} change(s) on ${verdict.changeLines} line(s), ${verdict.formatViolations.length} format violation(s), ${verdict.refusals.length} refusal(s) — ${verdict.noOp ? 'the round WOULD have been a no-op' : `${verdict.changedPagesApplied.length} page(s) survive to the book`}${verdict.discardReason ? ` (round discarded: ${verdict.discardReason})` : ''}${guard ? ` — guard: cast/focal must-fix ${guard.before} → ${guard.after}, round ${guard.kept ? 'KEPT' : 'DISCARDED'}` : ''}`,
+  });
+
+  const t0 = Date.now();
+  const check1 = await runCheck('plan_check', plan.pages, pagePlan);
+  const checkActions = check1.actions || [];
+  // The findings that answer "does each commissioned character get a page",
+  // and the per-character pages on the checker's roster.
+  const castFindings = check1.findings
+    .filter(f => (f.kind === 'counter' && CAST_FINDING_CODES.has(f.code)) || (f.kind === 'check' && f.check === 12))
+    .map(f => f.line);
+  const castSummary = castPageSummary({
+    listed: commission.listed, stats: check1.counters.stats, actions: checkActions,
+    aliases: (check1.counters.cast && check1.counters.cast.aliases) || {},
+  });
+  const variant = {
+    plannerMayAddDeeds: mayAddDeeds, planAndCheck, arcSource: expArc ? expArc.source : 'stored story arc',
+    firstDivision: firstPlan ? 'planned by this stage' : (plannerReply ? 'the run\'s stored planner reply' : 'the stored briefsIn'),
+    castTable, ...(castTableNote ? { castTableNote } : {}),
+    replayInputsStored: storyData.replayInputsStored,
+  };
+  const base = {
+    storyId: target.storyId,
+    pages: pageCount,
+    models: { checkModel, checkModelId: check1.checkModelId || checkModel, planModel },
+    firstPlan,
+    standingPlan: plan.pages.map(pg => ({ pageNumber: Number(pg.pageNumber), planLine: pg.planLine })),
+    findings: check1.lines,
+    counterStats: check1.counters.stats,
+    cast: check1.counters.cast,
+    rosterPages: (check1.rosterLines || []).length,
+    obstaclePages: check1.obstacles ? [...check1.obstacles.keys()].sort((a, b) => a - b) : [],
+    checkPrompt: check1.prompt,
+    checkActions,
+    checkRawResponse: (check1.reply || '').slice(0, 40000),
+    events,
+  };
+  if (check1.lines.length === 0 || planAndCheck) {
+    // Production re-plans on any finding (`check1.lines.length > 0`).
+    // planAndCheck stops here by definition, findings or not.
+    if (!expArc && !planAndCheck && !firstPlan && check1.lines.length === 0) {
+      throw new Error('the plan check raised no finding against this division — there is nothing for a re-plan to answer, so pick a story whose check fires');
+    }
+    return {
+      ...base, ...tally(), elapsedMs: Date.now() - t0,
+      note: check1.lines.length === 0
+        ? `plan check raised no finding — production would not re-plan; the first division ships (${castSummary.map(c => `${c.name}: ${c.actionPage == null ? 'no action page' : `action p${c.actionPage}`}`).join(', ')})`
+        : `planAndCheck: fresh division checked, ${check1.lines.length} finding(s), no re-plan run (group pages ${(check1.counters.stats.groupPages?.pages || []).join(', ') || 'none'} of budget ${check1.counters.stats.groupPages?.budget ?? 'none'})`,
+      report: { ...variant, replan: check1.lines.length === 0 ? 'not run: the plan check raised no finding' : 'not run: planAndCheck', castSummary, castFindings },
+    };
+  }
+
+  // ── the re-plan rounds, as the run runs them ──────────────────────────────
+  const replanRounds = [];
+  // The run's Jev decision report (castCuts per round), as production keeps it.
+  const jevReport = { castCuts: [], shots: null };
+  const shippedDivision = await runReplanRounds({
+    inputData: storyData, pageCount, plan, check1, replanRounds, approvedArc, arcHints, arcStoryLogic: storyLogic,
+    arcCentralFigure: centralFigure, castTable, commission, commissionedNames, maxCast, planModel, readPlan, runCheck,
+    onChunk: null, gl, stage: async () => {}, checkCancellation: async () => {}, labPromptOptions, onCall,
+    beats: plan.pages, pagePlan, jevReport,
+  });
+  const shipped = shippedReplanState(replanRounds);
+  // THE RUN'S STEP 2b (2026-09-27): the shots, by the function production calls.
+  const shot = await finalizePlanShots({ approvedArc, beats: shippedDivision.beats, check: shippedDivision.check, gl });
+  jevReport.shots = shot.report;
+
+  // THE LAB'S COMPLIANCE READING of round 1 (research, no production
+  // counterpart): how the round's reply kept the re-plan contract, read off
+  // the run's own round record.
+  const round1 = replanRounds.find(r => r.round === 1) || null;
+  const coverageRule = require('./castCoverage').castCoverage({ pageCount, castCount: commission.listed.length });
+  const keep = replanKeepPages({
+    pageCount, wanted: check1.wanted, actions: checkActions,
+    focalPages: (check1.counters.stats && check1.counters.stats.focalPages) || {},
+  });
+  const verdict = round1 ? analyzeReplanCompliance({
+    replanText: round1.replanReply || '',
+    checkText: check1.reply || '',
+    standing: plan.pages,
+    findings: check1.findings,
+    castNames: (check1.counters.cast && check1.counters.cast.all) || commissionedNames,
+    aliases: (check1.counters.cast && check1.counters.cast.aliases) || {},
+    maxCast,
+    focalNames: coverageRule && coverageRule.focalEach ? commission.listed : [],
+    keep,
+    castFloor: coverageRule ? { names: commission.listed, min: coverageRule.appearances.min } : null,
+  }) : null;
+  const shippedCheck = shipped.recheck;
+  const recheckCastSummary = shippedCheck ? castPageSummary({
+    listed: commission.listed, stats: shippedCheck.counterStats || {}, actions: shippedCheck.actions || [],
+    aliases: (check1.counters.cast && check1.counters.cast.aliases) || {},
+  }) : null;
+  const { appliedPlan, ...complianceFields } = verdict || {};
+  const roundsOut = replanRounds.map(r => ({
+    round: r.round, kept: r.kept, discardReason: r.discardReason || null, changedPages: r.changedPages,
+    findingsIn: r.findingsIn ?? null, declaredChanges: r.declaredChanges ?? null, changeRefusals: r.changeRefusals || [],
+    recheckFindings: r.recheck ? r.recheck.lines : null,
+  }));
+  return {
+    ...base, ...tally(), elapsedMs: Date.now() - t0,
+    note: `${replanRounds.length} re-plan round(s): ${roundsOut.map(r => `round ${r.round} ${r.kept ? 'KEPT' : `DISCARDED (${r.discardReason})`}, ${r.changedPages.length} page(s) changed`).join('; ')} — ${shipped.changedPages.length} page(s) re-divided in the division that ships${verdict ? ` — round 1: ${verdict.passed}/${verdict.checks.length} plumbing checks pass, ${verdict.changesParsed} change(s), ${verdict.formatViolations.length} format violation(s), ${verdict.refusals.length} refusal(s)` : ''}`,
     // `report` is what the Lab renders for this stage (client TestLab.tsx).
-    // The applied division travels beside it rather than inside: the rendered
-    // block stays the verdict, not a second copy of the page plan.
-    report: { ...reportFields, guard, recheckFindings: recheck ? recheck.findings.map(f => f.line) : null },
-    appliedPlan,
-    standingPlan: standing,
-    findings: findings.map(f => f.line),
-    counterStats: counters.stats,
-    cast: counters.cast,
-    rosterPages: roster ? roster.size : 0,
-    obstaclePages: [...obstacles.keys()].sort((a, b) => a - b),
-    replanSection,
-    checkPrompt,
-    replanPrompt,
-    checkRawResponse: (checkRes.text || '').slice(0, 40000),
-    recheckRawResponse: recheck ? (recheck.res.text || '').slice(0, 40000) : null,
-    replanRawResponse: (rpRes.text || '').slice(0, 40000),
+    report: {
+      ...variant,
+      ...complianceFields,
+      rounds: roundsOut,
+      shippedChangedPages: shipped.changedPages,
+      recheckFindings: shippedCheck ? shippedCheck.lines : null,
+      castSummary, castFindings, recheckCastSummary,
+    },
+    appliedPlan: shot.beats.map(pg => ({ pageNumber: Number(pg.pageNumber), planLine: pg.planLine })),
+    jevDecisions: jevReport,
+    replanPrompt: round1 ? round1.replanPrompt : null,
+    replanRawResponse: round1 ? (round1.replanReply || '').slice(0, 40000) : null,
+    recheckRawResponse: shippedCheck ? (shippedCheck.reply || '').slice(0, 40000) : null,
+  };
+}
+
+// The first check's findings that answer "does every commissioned character
+// get a page": the coverage counters here, and every plan-check Q12 (ACTION)
+// finding by its check number.
+const CAST_FINDING_CODES = new Set(['UNDER_COVERED_CHARACTER', 'NO_FOCAL_PAGE', 'CENTRAL_FIGURE_ABSENT_THIRD', 'NO_COMMISSIONED_ON_PAGE', 'CAST_PROMISE_BROKEN']);
+
+/**
+ * Per commissioned character (the character list), what the plan check's
+ * answer gives them: the pages the roster has them in frame on and their focal
+ * pages (runPlanCounters stats — null when the counters were skipped for an
+ * incomplete roster), and the page whose instant is their own action (the
+ * check's Q12 ACTION line, null for "page none" or no line at all).
+ *
+ * @param {{ listed: string[], stats: Object, actions: Array<{key:string, sentence:number|null, page:number|null}>, aliases?: Object }} args
+ */
+function castPageSummary({ listed = [], stats = {}, actions = [], aliases = {} } = {}) {
+  return listed.map((name) => {
+    const forms = new Set([name, ...(aliases[name] || [])].map(n => String(n).toLowerCase()));
+    const line = (actions || []).find(a => forms.has(String(a.key || '').trim().toLowerCase())) || null;
+    const inFrame = stats?.coveragePages?.[name] ?? null;
+    return {
+      name,
+      inFrame,
+      inFrameCount: inFrame ? inFrame.length : null,
+      focalPages: stats?.focalPages?.[name] ?? null,
+      actionPage: line ? line.page : null,
+      actionSentence: line ? line.sentence : null,
+      actionLine: !!line,
+    };
+  });
+}
+
+/**
+ * JUDGE FIXTURE — replay one regression fixture through the CURRENT production
+ * judge and score the answer against the fixture's expected verdict
+ * (server/lib/judgeFixtures.js; fixtures in tests/judge-fixtures/fixtures.json;
+ * runner scripts/admin/judge-fixtures.js; doc docs/judge-fixtures.md).
+ *
+ * Each judge goes through the Lab stage that already replays it with
+ * production's builders — semantic_eval, quality_eval, the plate QC the
+ * empty_scene / edit_image stages run, entity, book_audit, arc_panel_replay —
+ * so a fixture measures the judge production runs, never a proxy of it. The
+ * image judges are handed the fixture's OWN stored image (params.imageUrl), so
+ * a later repair on the page cannot change what the fixture judges.
+ *
+ * Target {storyId, fixture, pageNumber?, versionIndex?, character?} — the
+ * fixture id rides on the target so two fixtures on one page are two set
+ * members. params {judge, expect, imageUrl?} come from the set member.
+ */
+/**
+ * judge_fixture `sheet_style`: one 2×4 sheet through production's pass-2 style
+ * judge (evaluateAvatarSheet) with the base entry's own face photo, Pass-1 sheet
+ * and art style — under the arm params.arm names (sheetJudgeArms.js; default
+ * `current` = production exactly). params.input: {entryIndex, removedGarments?,
+ * baseImageUrl?} — a sheet with garments taken off is a wardrobe-state variant,
+ * judged by evaluateVariantSheet, and under arm D against its approved styled base.
+ */
+async function runSheetStyleFixture(target, params, sheet) {
+  if (!target.character) throw new Error('judge_fixture sheet_style: target.character required');
+  const input = params.input || {};
+  const removedGarments = Array.isArray(input.removedGarments) ? input.removedGarments : [];
+  const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../services/prompts');
+  await loadPromptTemplates();
+  const armRun = require('./sheetJudgeArms').resolveArm(params.arm || 'current', PROMPT_TEMPLATES.sheet2x4StyleEval, { variant: removedGarments.length > 0 });
+  const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
+  const entry = (storyData.styledAvatarGeneration || [])[Number(input.entryIndex)];
+  if (!entry) throw new Error(`sheet_style: no styledAvatarGeneration[${input.entryIndex}] on ${target.storyId}`);
+  if (String(entry.characterName || '').toLowerCase() !== String(target.character).toLowerCase()) {
+    throw new Error(`sheet_style: styledAvatarGeneration[${input.entryIndex}] is ${entry.characterName}, not ${target.character}`);
+  }
+  const facePhoto = await resolveAvatarSlotBytes(entry.inputs?.facePhoto);
+  if (!facePhoto) throw new Error('sheet_style: the entry stores no face photo');
+  const referenceUrl = armRun.reference === 'styledBase' ? input.baseImageUrl : entry.passes?.pass1?.imageData;
+  const reference = armRun.reference === 'styledBase'
+    ? (input.baseImageUrl ? await resolveAvatarSlotBytes(input.baseImageUrl) : null)
+    : await resolveAvatarSlotBytes(entry.passes?.pass1?.imageData);
+  if (!reference) throw new Error(`sheet_style: arm ${armRun.arm} needs its reference (${armRun.reference === 'styledBase' ? 'input.baseImageUrl' : 'passes.pass1.imageData'}) — not available`);
+  const { character } = await loadCharacterContext(target.storyId, target.character);
+  const usage = { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 };
+  const usageTracker = (_provider, u) => {
+    usage.input_tokens += u?.input_tokens || 0;
+    usage.output_tokens += u?.output_tokens || 0;
+    usage.thinking_tokens += u?.thinking_tokens || 0;
+    usage.calls++;
+  };
+  // A variant (a garment taken off) is production's gate: the style judge plus one
+  // garment-gone check per removed garment. A sheet with nothing off is the style judge alone.
+  const SHEET = require('./character2x4Sheet');
+  const judge = removedGarments.length ? SHEET.evaluateVariantSheet : SHEET._internal.evaluateAvatarSheet;
+  const { verdict, promptUsed } = await judge(sheet, {
+    pass: 2, facePhoto, realisticSheet: reference,
+    artStyle: entry.artStyle || storyData.artStyle || 'watercolor',
+    declaredAge: character.age ?? null, removedGarments, usageTracker,
+    promptOverrides: armRun.template ? { style: armRun.template } : {},
+    imageLabels: armRun.imageLabels,
+  });
+  return {
+    arm: armRun.arm, armApplied: armRun.applied, reference: armRun.reference,
+    referenceUrl: typeof referenceUrl === 'string' && /^https?:\/\//.test(referenceUrl) ? referenceUrl : null,
+    removedGarments, imageLabels: armRun.imageLabels, verdict, usage, promptUsed,
+  };
+}
+
+async function runJudgeFixtureStage(target, { experimentId, params = {} }) {
+  const JF = require('./judgeFixtures');
+  const judge = params.judge;
+  if (!JF.JUDGES.includes(judge)) throw new Error(`judge_fixture: unknown judge "${judge}" (known: ${JF.JUDGES.join(', ')})`);
+  if (!params.expect) throw new Error('judge_fixture: params.expect required');
+
+  const loadPage = async () => {
+    if (target.pageNumber == null) throw new Error(`judge_fixture ${judge}: target.pageNumber required`);
+    const ctx = await loadSceneContext(target.storyId, Number(target.pageNumber));
+    ctx.target = target;
+    // The stored detection belongs to the ACTIVE version's pixels. A fixture
+    // pinned to the active version keeps it (as production had it); any other
+    // version is judged without it rather than against another picture's boxes.
+    const pinned = pinnedVersionIndex(target.versionIndex);
+    const active = Number(target.pageNumber) < 0 ? null
+      : await require('../services/database').getActiveVersion(target.storyId, Number(target.pageNumber));
+    ctx.versionIndex = pinned !== null && pinned === active ? null : pinned;
+    return ctx;
+  };
+  const loadFixtureImage = async () => {
+    if (!params.imageUrl) throw new Error(`judge_fixture ${judge}: params.imageUrl required`);
+    const buf = await require('./r2').bytesFromAnyImage(params.imageUrl);
+    if (!buf || !buf.length) throw new Error(`judge_fixture: fixture image did not load: ${params.imageUrl}`);
+    const mime = buf[0] === 0x89 ? 'image/png' : buf[0] === 0x52 ? 'image/webp' : 'image/jpeg';
+    return `data:${mime};base64,${buf.toString('base64')}`;
+  };
+
+  const t0 = Date.now();
+  let raw;
+  switch (judge) {
+    case 'semantic': {
+      const ctx = await loadPage();
+      ctx.imageDataOverride = await loadFixtureImage();
+      raw = await runSemanticEvalStage(ctx, { experimentId });
+      break;
+    }
+    case 'quality':
+    case 'lettering': {
+      const ctx = await loadPage();
+      ctx.imageDataOverride = await loadFixtureImage();
+      raw = await runQualityEvalStage(ctx, { experimentId, params: {} });
+      break;
+    }
+    case 'plate_qc': {
+      // The QC production runs on this page's plate: the derived-plate option
+      // set when the page's plate was derived, else the per-page set — the same
+      // two sets the Lab's edit_image and empty_scene stages judge with.
+      const ctx = await loadPage();
+      const plate = await loadFixtureImage();
+      const { validateEmptyScene } = require('./images');
+      const derived = !!ctx.scene.plateDerivedFor;
+      let opts, textPos = null;
+      if (derived) {
+        opts = await labDerivedPlateQcOptions(ctx);
+      } else {
+        const { pagePlate, pageShot, shotLine } = labPagePlateText(ctx);
+        const meta = ctx.scene.sceneMetadata || {};
+        const wantsTextZone = ctx.layout?.textInImage !== false && !!ctx.textPosition;
+        textPos = require('./plateQc').plateQcTextPosition(wantsTextZone, ctx.textPosition);
+        opts = labPlateQcOptions(ctx, {
+          sceneDescription: shotLine,
+          framing: pagePlate.text,
+          ...(await labPlateStructureInputs(ctx)),
+          shot: pageShot || meta.setting?.camera || 'wide shot',
+          artStyle: require('./storyHelpers').resolveArtStyle(ctx.artStyle || 'pixar') || '',
+        });
+      }
+      const qcRes = await validateEmptyScene(plate, textPos, `testlab-exp${experimentId}-P${ctx.pageNumber}-fixture`, opts);
+      raw = { qc: { pass: qcRes.pass, issues: qcRes.issues || [], findings: qcRes.findings || [], visionFeedback: qcRes.visionFeedback || null, textPosition: textPos, plateKind: derived ? 'derived' : 'page' } };
+      break;
+    }
+    case 'entity':
+      if (!target.character) throw new Error('judge_fixture entity: target.character required');
+      raw = await runEntityStage({ storyId: target.storyId }, { experimentId, params: { character: target.character } });
+      break;
+    case 'book_audit':
+      raw = await runBookAuditStage({ storyId: target.storyId }, { params: {} });
+      break;
+    case 'arc_panel':
+      raw = await runArcPanelReplayStage({ storyId: target.storyId }, { params: {} });
+      break;
+    case 'sheet_style':
+      raw = await runSheetStyleFixture(target, params, await loadFixtureImage());
+      break;
+    default:
+      throw new Error(`judge_fixture: no replay wired for judge "${judge}"`);
+  }
+
+  const findings = JF.normalizeFindings(judge, raw);
+  // Story-level judges answer for a whole book; the fixture's page scopes them.
+  const expect = (target.pageNumber != null && ['book_audit', 'entity'].includes(judge))
+    ? { page: Number(target.pageNumber), ...params.expect } : params.expect;
+  const verdict = JF.scoreFixture(expect, findings);
+  // The judge's own result, minus the bulk a reader never needs here (the arc
+  // panel's full prompt and committed block, the book audit's raw reply).
+  const { prompt: _p, committed: _c, raw: _r, ...judgeResult } = raw || {};
+  return {
+    stageKind: 'judge_fixture',
+    judge,
+    fixtureId: target.fixture || null,
+    input: { imageUrl: params.imageUrl || null, versionIndex: target.versionIndex ?? null, character: target.character || null },
+    expect,
+    note: params.note || null,
+    verdict,
+    findings,
+    cost: JF.estimateCostUsd(judge, raw),
+    elapsedMs: Date.now() - t0,
+    judgeResult,
   };
 }
 
 const STORY_STAGES = {
+  judge_fixture: runJudgeFixtureStage,
   trial_idea_variety: runTrialIdeaVarietyStage,
   trial_challenge_draw: runTrialChallengeDrawStage,
   vb_element_cell: runVbElementCellStage,
@@ -10249,7 +10477,6 @@ const STORY_STAGES = {
   text_refine: runTextRefineStage,
   beats_scenes: runBeatsScenesStage,
   beats_replan: runBeatsReplanStage,
-  scene_review_replay: runSceneReviewReplayStage,
   story_bible_replay: runStoryBibleReplayStage,
   story_text_replay: runStoryTextReplayStage,
   writer_compare: runWriterCompareStage,
@@ -10259,11 +10486,73 @@ const STORY_STAGES = {
   arc_panel_replay: runArcPanelReplayStage,
 };
 
+/**
+ * WARDROBE-STATE VARIANT, made the way production makes it — so the owner can
+ * see the sheet a `sheet_style` fixture judges. Target {storyId, character};
+ * params.offCategory picks the row when a character takes off more than one
+ * thing. The row is derived from the story's stored briefs exactly as the
+ * pipeline derives it (deriveWardrobeVariantRequirements over the page
+ * descriptions), and the approved base sheet is read the way production reads
+ * it (styledAvatars.approvedBaseSheetFor). NO JUDGE runs here
+ * (skipQualityEval): judging the variant is what the fixtures measure, arm by
+ * arm. Cost: one Grok edit, ~$0.02. The card shows base · variant.
+ */
+async function runAvatarRedressStage(target, { experimentId, params = {} }) {
+  const { loadPromptTemplates } = require('../services/prompts');
+  await loadPromptTemplates();
+  const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
+  const { deriveWardrobeVariantRequirements, parseOffCategory } = require('./wardrobeVariants');
+  const { extractSceneMetadata } = require('./storyHelpers');
+  const scenes = (storyData.sceneImages || []).map(p => ({
+    pageNumber: p.pageNumber,
+    sceneMetadata: extractSceneMetadata(p.sceneDescription || p.description),
+  }));
+  const { requirements } = deriveWardrobeVariantRequirements({
+    visualBible: storyData.visualBible, scenes,
+    clothingRequirements: storyData.clothingRequirements, characters: storyData.characters || [],
+  });
+  const wanted = String(target.character || '').trim().toLowerCase();
+  const rows = requirements.filter(r => String(r.characterNames?.[0] || '').trim().toLowerCase() === wanted
+    && (!params.offCategory || r.clothingCategory === params.offCategory));
+  if (rows.length !== 1) {
+    throw new Error(`avatar_redress: ${rows.length} variant rows for "${target.character}"${params.offCategory ? ` / ${params.offCategory}` : ''} (story has: ${requirements.map(r => `${r.characterNames?.[0]}:${r.clothingCategory}`).join(', ') || 'none'}) — set params.offCategory`);
+  }
+  const row = rows[0];
+  const off = parseOffCategory(row.clothingCategory);
+  const char = (storyData.characters || []).find(c => String(c?.name || '').trim().toLowerCase() === wanted);
+  if (!char) throw new Error(`avatar_redress: "${target.character}" is not in the story's cast`);
+  const artStyle = storyData.artStyle || 'watercolor';
+  const { approvedBaseSheetFor } = require('./styledAvatars');
+  const baseRaw = approvedBaseSheetFor(char, artStyle, off.baseCategory);
+  const baseSheet = await resolveAvatarSlotBytes(baseRaw);
+  if (!baseSheet) throw new Error(`avatar_redress: no approved "${off.baseCategory}" ${artStyle} sheet stored for ${char.name}`);
+  let usd = 0;
+  const usageTracker = (_provider, u) => { usd += Number(u?.cost) || 0; };
+  const out = await require('./character2x4Sheet').redressSheetVariant(baseSheet, {
+    characterName: char.name, characterAge: char.age ?? null,
+    removedItems: row.removedItemNames, authoredWardrobe: row.redressNote,
+    skipQualityEval: true, usageTracker,
+  });
+  if (!out?.imageData) throw new Error(`avatar_redress: the edit returned no image (${JSON.stringify(out?.attempts || [])})`);
+  const [versionIndex, baseVersionIndex] = await Promise.all([
+    saveTestVersion(target.storyId, 'tl_avatar', null, out.imageData, experimentId),
+    saveTestVersion(target.storyId, 'tl_avatar', null, baseSheet, experimentId),
+  ]);
+  return {
+    character: char.name, clothingCategory: row.clothingCategory, baseCategory: off.baseCategory, artStyle,
+    removedItemNames: row.removedItemNames, redressNote: row.redressNote, pages: row.pages,
+    baseSheetUrl: typeof baseRaw === 'string' && /^https?:\/\//.test(baseRaw) ? baseRaw : null,
+    imageType: 'tl_avatar', versionIndex, realisticVersionIndex: baseVersionIndex,
+    promptUsed: out.prompt, cost: { usd, basis: 'measured (redress edit)' },
+  };
+}
+
 // Avatar stages take {storyId, character} targets, not page targets.
 const AVATAR_STAGES = {
   avatar_realistic: runAvatarRealisticStage,
   avatar_style: runAvatarStyleStage,
   avatar_eval: runAvatarEvalStage,
+  avatar_redress: runAvatarRedressStage,
 };
 
 /**
@@ -10398,10 +10687,10 @@ async function checkRuleGenericity(ruleText, storyId) {
 
 module.exports = {
   pinnedVersionIndex,
-  applyReviewerPages,
+  storedCreatePrompt,
+  storedRefineAudits,
   // beats_scenes truncation recovery — exported so the decisions can be pinned
   // without a story, a DB or a paid model (tests/unit/testlab-beats-scenes-recovery.test.ts)
-  collectAllPagesBriefs,
   summarizeSceneExpansions,
   // The two copies of the commission the judge reads — exported so their
   // agreement under a brief override can be pinned without a paid render
@@ -10430,6 +10719,7 @@ module.exports = {
   // the no-op comparison can be pinned on canned responses — no model, no
   // database (tests/unit/testlab-beats-replan.test.ts).
   analyzeReplanCompliance,
+  castPageSummary,
   checkRuleGenericity,
   // The scorecard judge itself. Every stage runner in this file already calls
   // it; exporting it lets a measurement score an arbitrary artifact (the text
@@ -10440,4 +10730,30 @@ module.exports = {
   // The stored challenge draw a create prompt carried, both stored shapes
   // (tests/unit/testlab-stored-challenge-section.test.ts).
   storedChallengeSection,
+  // The plate stages and their QC option set — exported so "the Lab judges
+  // every plate the way the story run does" is pinned by running them with the
+  // network and DB stubbed (tests/unit/lab-plate-qc-always.test.ts).
+  labPlateQcOptions,
+  labPlateStructureInputs,
+  labPagePlateText,
+  labDerivedPlateQcOptions,
+  runQualityEvalStage,
+  runSemanticEvalStage,
+  runEvalVarianceStage,
+  runConsolidateStage,
+  runInpaintStage,
+  runBeatsReplanStage,
+  runArcPanelReplayStage,
+  runBeatsScenesStage,
+  runPickBestStage,
+  runEmptySceneStage,
+  runEditImageStage,
+  // The page render and the char-fix, exported so "with no params the Lab sends
+  // what production sends" is pinned against the shared production builders
+  // with the network and DB stubbed (tests/unit/lab-prod-call-parity.test.ts).
+  runImageStage,
+  runCharRepairStage,
+  // Judge regression fixtures — the dispatch and its scoring, pinned with the
+  // judges stubbed (tests/unit/judge-fixtures.test.ts).
+  runJudgeFixtureStage,
 };

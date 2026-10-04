@@ -137,6 +137,8 @@ const SHAPES = {
     ? { ok: true } : { ok: false, why: 'no 2x4 avatar sheet was generated (saved styled avatars reused)' },
   'needs-composite': (ctx) => pages(ctx).some(p => p.compositeOutcome && p.compositeOutcome.status !== 'disabled')
     ? { ok: true } : { ok: false, why: 'scene composite did not run (disabled)' },
+  // Proved by a Test Lab stage, never by a story run: record it with --mark on the Lab evidence.
+  'lab-stage': () => ({ ok: false, why: 'proved by a Test Lab stage, not a story run — --mark it from the Lab result' }),
 };
 
 /** runShape: array of "name" or "name:arg"; every one must hold. */
@@ -554,6 +556,23 @@ checks.wornOffGrid = (ctx) => {
   return { covered: true, pass: true, detail };
 };
 
+/** wardrobe-variant-judge (2026-10-04) — every page that takes a garment off is drawn from an off sheet. */
+checks.offSheetServed = (ctx) => {
+  const served = []; const missing = [];
+  for (const p of pages(ctx)) {
+    const owners = new Set((brief(p).wornItems || []).filter(w => w?.state === 'off' && w.owner).map(w => String(w.owner).trim().toLowerCase()));
+    if (!owners.size) continue;
+    for (const r of Array.isArray(p.referencePhotos) ? p.referencePhotos : []) {
+      if (!r || !owners.has(String(r.name || '').trim().toLowerCase())) continue;
+      if (r.wornStateFallback) missing.push(`${r.name} p${p.pageNumber} (wanted ${r.wornStateFallback.wanted})`);
+      else if (String(r.clothingCategory || '').includes('--off:')) served.push(`${r.name} p${p.pageNumber}`);
+    }
+  }
+  if (!served.length && !missing.length) return notCovered('no page drew the owner of a garment it takes off');
+  const detail = `off sheet served on ${served.length}${served.length ? ` (${served.join(', ')})` : ''}; missing on ${missing.length}${missing.length ? ` (${missing.join(', ')})` : ''}`;
+  return { covered: true, pass: missing.length === 0, detail };
+};
+
 /** 5a4672c7a — the diff pass is shown the findings; count corrections that invent a sentence. */
 checks.diffPassLedger = (ctx) => {
   const t = ctx.data?.textRefineReport;
@@ -821,6 +840,55 @@ checks.outfitAppearanceOnly = (ctx) => {
   if (!n) return notCovered('no outfit description');
   if (bad.length) return { covered: true, pass: false, detail: `${bad.length}/${n} outfit(s) carry plot text: ${bad.slice(0, 8).join('; ')}` };
   return { covered: true, pass: true, detail: `all ${n} outfit description(s) free of page numbers and other figures' names` };
+};
+
+/**
+ * 2026-10-04 — size is never cut by the prompt shrink. Dragon run 9 (staging
+ * job_1791040103540_atbttop6w) spent "Composition: size" / "DEPTH AND SIZE" on
+ * 13 of its 14 over-cap prompts; a grown dragon then rendered egg-sized.
+ * Pass: no prompt_shrink event drops either, no prompt_fit_failed event, and
+ * every rendered page/cover prompt (one carrying **ART STYLE) still carries
+ * DEPTH AND SIZE.
+ */
+checks.promptShrinkKeepsSize = (ctx) => {
+  const log = Array.isArray(ctx.data?.generationLog) ? ctx.data.generationLog : [];
+  const shrinks = log.filter(e => e?.event === 'prompt_shrink' && e?.details?.branch === 'cut');
+  if (!shrinks.length) return notCovered('no prompt went over the cap (no prompt_shrink cut event)');
+  const SIZE = ['Composition: size', 'DEPTH AND SIZE'];
+  const bad = [];
+  const cutSize = shrinks.filter(e => (e.details.dropped || []).some(d => SIZE.includes(d)));
+  if (cutSize.length) bad.push(`${cutSize.length}/${shrinks.length} shrink event(s) cut a size block: ${cutSize.map(e => trunc(e.message, 90)).join('; ')}`);
+  const fitFails = log.filter(e => e?.event === 'prompt_fit_failed');
+  if (fitFails.length) bad.push(`${fitFails.length} prompt_fit_failed (a render refused, over the cap with size kept): ${fitFails.map(e => trunc(e.message, 90)).join('; ')}`);
+  const sent = [];
+  for (const p of pages(ctx)) versions(p).forEach((v, i) => sent.push({ id: `p${p.pageNumber}v${i}`, prompt: String(v.prompt || '') }));
+  for (const [k, c] of Object.entries(ctx.data?.coverImages || {})) if (c?.prompt) sent.push({ id: k, prompt: String(c.prompt) });
+  const rendered = sent.filter(x => x.prompt.includes('**ART STYLE'));
+  const noDepth = rendered.filter(x => !x.prompt.includes('**DEPTH AND SIZE:**'));
+  if (noDepth.length) bad.push(`sent without DEPTH AND SIZE: ${noDepth.map(x => x.id).join(', ')}`);
+  const dropped = {};
+  shrinks.forEach(e => (e.details.dropped || []).forEach(d => { dropped[d] = (dropped[d] || 0) + 1; }));
+  return {
+    covered: true,
+    pass: bad.length === 0,
+    detail: bad.length ? bad.join(' | ') : `${shrinks.length} shrink(s), none cut size; ${rendered.length} rendered prompts all carry DEPTH AND SIZE; cut instead: ${Object.entries(dropped).map(([k, n]) => `${k} ${n}x`).join(', ')}`,
+  };
+};
+
+/**
+ * The compact fixed blocks (2026-09-27): no page or cover of the run failed the
+ * image model's prompt cap (`prompt_fit_failed`, which ships the page with no
+ * image). Detail reports how many renders still needed the ranked cut.
+ */
+checks.pagePromptsFit = (ctx) => {
+  const log = Array.isArray(ctx.data?.generationLog) ? ctx.data.generationLog : [];
+  const renders = pages(ctx).filter(p => String(p.prompt || '').length > 0);
+  if (!renders.length) return notCovered('no page stored a prompt');
+  const failed = log.filter(e => e?.event === 'prompt_fit_failed');
+  const cut = log.filter(e => e?.event === 'prompt_shrink' && e?.details?.branch === 'cut');
+  const detail = `${failed.length} prompt_fit_failed event(s); ${cut.length} render(s) needed the ranked cut; longest built page prompt ${Math.max(...renders.map(p => String(p.prompt).length))} chars`;
+  if (failed.length) return { covered: true, pass: false, detail: `${detail}: ${failed.slice(0, 4).map(e => trunc(e.message || '', 100)).join(' | ')}` };
+  return { covered: true, pass: true, detail };
 };
 
 module.exports = { checks, SHAPES, evalRunShape, helpers: { pages, brief, versions, shotOf, activeImageUrl, plateUrl, pageFindings, splitSentences, sizeHits } };

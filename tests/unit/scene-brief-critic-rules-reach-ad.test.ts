@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 
 const {
-  buildSceneExpansionAllPrompt,
+  buildSceneBriefsAllPrompt,
   buildSceneExpansionPrompt,
 } = require('../../server/lib/promptBuilders');
 
@@ -16,7 +16,7 @@ describe('the scene-brief critics\' rules reach the Art Director', () => {
 
   beforeAll(async () => {
     await require('../../server/services/prompts').loadPromptTemplates();
-    all = buildSceneExpansionAllPrompt(
+    all = buildSceneBriefsAllPrompt(
       { characters: [{ name: 'Mara', age: 7 }], language: 'de', layout: { textInImage: true } },
       [{ pageNumber: 1, text: 'A page.' }],
     );
@@ -68,7 +68,7 @@ describe('rules the deleted unified writers were the last to carry', () => {
   beforeAll(async () => {
     await require('../../server/services/prompts').loadPromptTemplates();
     const B = require('../../server/lib/promptBuilders');
-    all = B.buildSceneExpansionAllPrompt(
+    all = B.buildSceneBriefsAllPrompt(
       { characters: [{ name: 'Mara', age: 7 }], language: 'de', layout: { textInImage: true } },
       [{ pageNumber: 1, text: 'A page.' }],
     );
@@ -84,7 +84,12 @@ describe('rules the deleted unified writers were the last to carry', () => {
   });
 
   it('a story-given proper name lives in properName and nowhere else', () => {
-    for (const p of [all, trial]) {
+    // A bible rule: the Art Director's Visual Bible call states it (2026-09-28).
+    const bible = require('../../server/lib/promptBuilders').buildVisualBibleCallPrompt(
+      { characters: [{ name: 'Mara', age: 7 }], language: 'de', layout: { textInImage: true } },
+      [{ pageNumber: 1, text: 'A page.' }],
+    );
+    for (const p of [bible, trial]) {
       expect(p).toContain('lives in `properName` and nowhere else');
     }
   });

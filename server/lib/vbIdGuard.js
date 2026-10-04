@@ -239,6 +239,37 @@ function gazeCharacters(meta) {
 }
 
 /**
+ * The page's Visual Bible animals as figures (owner-approved 2026-10-04): each
+ * brief `creatures[]` row (promptBuilders.CREATURE_FIELD_RULE) under the name
+ * the judges' matches and the image prompt call the animal by — its bible
+ * `name` — with its gaze read through gazeTarget like a character's. A row
+ * whose id the bible does not hold as an animal is dropped and logged. Readers:
+ * the image prompt's EXPRESSIONS AND EYES block, the judges' DECLARED
+ * INTERACTIONS gaze lines, and the declared-emotion check.
+ *
+ * @returns {Array<{name, id, depth?, looksAt, expression?, emotion?}>}
+ */
+function gazeCreatures(meta, visualBible) {
+  const rows = Array.isArray(meta?.fullData?.creatures) ? meta.fullData.creatures
+    : (Array.isArray(meta?.creatures) ? meta.creatures : []);
+  if (rows.length === 0) return [];
+  const pageObjects = meta?.objects || meta?.fullData?.objects || [];
+  const animals = Array.isArray(visualBible?.animals) ? visualBible.animals : [];
+  const out = [];
+  for (const r of rows) {
+    const id = String(r?.id || '').trim().toUpperCase();
+    const entry = animals.find(a => String(a?.id || '').trim().toUpperCase() === id);
+    const name = String(entry?.name || '').trim();
+    if (!name) {
+      log.error(`[CREATURES] brief row ${id || '(no id)'} names no Visual Bible animal — dropped`);
+      continue;
+    }
+    out.push({ ...r, id, name, looksAt: gazeTarget(r.looksAt, pageObjects) });
+  }
+  return out;
+}
+
+/**
  * The declared gaze, or '' when it names no target. A character stands IN the
  * place its page is set in, so a `looksAt` naming that place (a LOC id the
  * page's `objects[]` cites) points the eyes nowhere: staging
@@ -344,6 +375,7 @@ module.exports = {
   scrubVbIds,
   formatInteractionsBlock,
   gazeCharacters,
+  gazeCreatures,
   gazeTarget,
   formatElementsBlock,
 };

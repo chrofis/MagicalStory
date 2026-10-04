@@ -6,6 +6,8 @@ export default defineConfig({
     include: ['tests/unit/**/*.test.ts', 'tests/api/**/*.test.ts'],
     // Exclude Playwright E2E tests
     exclude: ['tests/*.spec.ts', 'tests/concurrency/**'],
+    // No unit test reaches the paid Jev API, key set or not (2026-09-27).
+    setupFiles: ['tests/setup/block-jev-network.ts'],
     // Enable globals (describe, it, expect)
     globals: true,
     // Environment for testing

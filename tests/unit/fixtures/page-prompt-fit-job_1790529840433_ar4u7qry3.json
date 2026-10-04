@@ -1,0 +1,1919 @@
+{
+ "source": "staging stories.data job_1790529840433_ar4u7qry3 (4-page smoke story, 2026-09-27): pages 1 and 4 rendered no image (prompt_fit_failed, Grok cap 7900)",
+ "artStyle": "watercolor",
+ "language": "de",
+ "languageLevel": "standard",
+ "layout": {
+  "mode": "square-below",
+  "imageAspect": "1:1",
+  "textInImage": false
+ },
+ "visualBible": {
+  "animals": [
+   {
+    "id": "ANI001",
+    "name": "Pepe",
+    "pages": [
+     -1,
+     4
+    ],
+    "species": "parrot",
+    "coloring": "bright green body, red tail feathers, blue wing tips",
+    "features": "curved black beak",
+    "cellGates": [
+     {
+      "at": "2026-09-27T17:55:09.376Z",
+      "ok": true,
+      "gate": "element_cell",
+      "cellId": "ANI001",
+      "reason": "The watercolor painting of a parrot matches the description of a Pepe with its bright green body, red tail feathers, blue wing tips, and curved black beak, rendered in the specified watercolor style.",
+      "rerendered": false
+     }
+    ],
+    "scaleClass": "melon-sized",
+    "description": "parrot. bright green body, red tail feathers, blue wing tips. curved black beak",
+    "appearsInPages": [
+     -1,
+     4
+    ],
+    "referenceImageUrl": "https://images-staging.magicalstory.ch/stories/job_1790529840433_ar4u7qry3/vb/ANI001.jpg",
+    "referenceImageData": null,
+    "referenceImageGenerated": true
+   }
+  ],
+  "clothing": [
+   {
+    "id": "CLO001",
+    "name": "orange life jacket",
+    "label": "orange life jacket",
+    "pages": [
+     2
+    ],
+    "wornBy": "Emma",
+    "howWorn": "buckled securely around the chest",
+    "scaleClass": null,
+    "description": "a bright orange foam life jacket with black nylon straps and plastic buckles",
+    "appearsInPages": [
+     2
+    ]
+   },
+   {
+    "id": "CLO002",
+    "name": "orange life jacket",
+    "label": "orange life vest",
+    "pages": [
+     2
+    ],
+    "wornBy": "Noah",
+    "howWorn": "buckled securely around the chest",
+    "scaleClass": null,
+    "description": "a bright orange foam life jacket with black nylon straps and plastic buckles",
+    "appearsInPages": [
+     2
+    ]
+   }
+  ],
+  "costumes": {
+   "Emma": "red and white striped cotton long-sleeve undershirt with a round neck; black cotton calf-length trousers with ragged cut-off hems; black cotton Piratentuch — a large flat cloth folded into a wide sash, tied around the waist with square knot, two long tails hanging at the front hip; brown leather ankle boots with a single strap buckle; red cotton bandana folded into a triangle and tied over the head, knot at the nape",
+   "Noah": "NONE"
+  },
+  "vehicles": [
+   {
+    "id": "VEH001",
+    "name": "pirate ship",
+    "label": "pirate ship",
+    "pages": [
+     1,
+     3
+    ],
+    "cellGates": [
+     {
+      "at": "2026-09-27T17:55:10.587Z",
+      "ok": true,
+      "gate": "element_cell",
+      "cellId": "VEH001",
+      "reason": "The image depicts a large wooden sailing ship with a dark brown hull and white sails, matching the description of a pirate ship and adhering to the specified watercolor art style.",
+      "rerendered": false
+     }
+    ],
+    "scaleClass": "house-height",
+    "description": "a large wooden sailing ship, dark brown oak hull, tall central mast with a crow's nest, white square sails. Signature: tall central mast",
+    "appearsInPages": [
+     1,
+     3
+    ],
+    "colorAndDetails": "a large wooden sailing ship, dark brown oak hull, tall central mast with a crow's nest, white square sails",
+    "signatureElement": "tall central mast",
+    "referenceImageUrl": "https://images-staging.magicalstory.ch/stories/job_1790529840433_ar4u7qry3/vb/VEH001.jpg",
+    "referenceImageData": null,
+    "referenceImageGenerated": true
+   },
+   {
+    "id": "VEH002",
+    "name": "wooden boat",
+    "label": "wooden boat",
+    "pages": [
+     2,
+     4
+    ],
+    "cellGates": [
+     {
+      "at": "2026-09-27T17:55:11.859Z",
+      "ok": true,
+      "gate": "element_cell",
+      "cellId": "VEH002",
+      "reason": "The image depicts a small, open wooden rowboat with weathered grey planks and two wooden oars, matching the description and rendered in a watercolor style.",
+      "rerendered": false
+     }
+    ],
+    "scaleClass": "twice-adult-height",
+    "description": "a small open wooden rowboat, weathered grey planks, two wooden oars resting in oarlocks. Signature: two wooden oars",
+    "appearsInPages": [
+     2,
+     4
+    ],
+    "colorAndDetails": "a small open wooden rowboat, weathered grey planks, two wooden oars resting in oarlocks",
+    "signatureElement": "two wooden oars",
+    "referenceImageUrl": "https://images-staging.magicalstory.ch/stories/job_1790529840433_ar4u7qry3/vb/VEH002.jpg",
+    "referenceImageData": null,
+    "referenceImageGenerated": true
+   }
+  ],
+  "artifacts": [
+   {
+    "id": "ART001",
+    "name": "paper kite",
+    "type": "toy",
+    "label": "paper kite",
+    "pages": [
+     1,
+     3
+    ],
+    "states": [
+     {
+      "id": "ART001.1",
+      "name": "unaltered",
+      "delta": "a pristine diamond-shaped paper kite with a thin wooden cross-frame",
+      "pages": [
+       1
+      ],
+      "referenceImageUrl": "https://images-staging.magicalstory.ch/stories/job_1790529840433_ar4u7qry3/vb/ART001_1.jpg",
+      "referenceImageData": null
+     },
+     {
+      "id": "ART001.2",
+      "name": "tied",
+      "delta": "tied fast by its string",
+      "pages": [
+       3
+      ],
+      "referenceImageUrl": "https://images-staging.magicalstory.ch/stories/job_1790529840433_ar4u7qry3/vb/ART001_2.jpg",
+      "referenceImageData": null
+     },
+     {
+      "id": "ART001.3",
+      "name": "torn",
+      "delta": "ripped in two down the middle",
+      "pages": [],
+      "referenceImageUrl": "https://images-staging.magicalstory.ch/stories/job_1790529840433_ar4u7qry3/vb/ART001_3.jpg",
+      "referenceImageData": null
+     }
+    ],
+    "cellGates": [
+     {
+      "at": "2026-09-27T17:56:07.377Z",
+      "ok": true,
+      "gate": "element_cell",
+      "cellId": "ART001.1",
+      "reason": "The image depicts a yellow diamond-shaped kite with a red tail and a wooden cross-frame, matching the description and rendered in a watercolor style.",
+      "recheckOk": true,
+      "rerendered": true,
+      "recheckReason": "The watercolor painting clearly depicts a diamond-shaped kite with a wooden frame, yellow coloring, and a red tail, matching the description and art style."
+     },
+     {
+      "at": "2026-09-27T17:56:07.377Z",
+      "ok": false,
+      "gate": "state_cells",
+      "cellId": "ART001.1",
+      "reason": "The kite's shape changes from diamond to a torn shape in the third image.",
+      "recheckOk": false,
+      "rerendered": true,
+      "recheckReason": "The kite in the third image is torn in half, which is not a state of being tied fast by its string."
+     }
+    ],
+    "scaleClass": "hand-sized",
+    "description": "a diamond-shaped paper kite with a thin wooden cross-frame, bright yellow with a red tail",
+    "appearsInPages": [
+     1,
+     3
+    ],
+    "referenceImageGenerated": true
+   },
+   {
+    "id": "ART002",
+    "name": "kite reel",
+    "type": "hand tool",
+    "label": "kite reel",
+    "pages": [
+     1
+    ],
+    "cellGates": [
+     {
+      "at": "2026-09-27T17:55:19.965Z",
+      "ok": true,
+      "gate": "element_cell",
+      "cellId": "ART002",
+      "reason": "The image depicts a wooden spool with red string, matching the description and rendered in a watercolor style.",
+      "rerendered": false
+     }
+    ],
+    "scaleClass": "palm-sized",
+    "description": "a wooden spool with flat sides and red string wrapped around it",
+    "appearsInPages": [
+     1
+    ],
+    "referenceImageUrl": "https://images-staging.magicalstory.ch/stories/job_1790529840433_ar4u7qry3/vb/ART002.jpg",
+    "referenceImageData": null,
+    "referenceImageGenerated": true
+   },
+   {
+    "id": "ART003",
+    "name": "rope ladder",
+    "type": "tool",
+    "label": "rope ladder",
+    "pages": [
+     4
+    ],
+    "cellGates": [
+     {
+      "at": "2026-09-27T17:55:21.102Z",
+      "ok": true,
+      "gate": "element_cell",
+      "cellId": "ART003",
+      "reason": "The image shows a rope ladder with wooden rungs, matching the description and rendered in a watercolor style.",
+      "rerendered": false
+     }
+    ],
+    "scaleClass": "twice-adult-height",
+    "description": "a long rope ladder with thick hemp ropes and evenly spaced wooden rungs",
+    "appearsInPages": [
+     4
+    ],
+    "referenceImageUrl": "https://images-staging.magicalstory.ch/stories/job_1790529840433_ar4u7qry3/vb/ART003.jpg",
+    "referenceImageData": null,
+    "referenceImageGenerated": true
+   },
+   {
+    "id": "ART004",
+    "name": "black Piratentuch",
+    "type": "accessory",
+    "label": "black Piratentuch",
+    "pages": [
+     4
+    ],
+    "wornAs": "Emma.belt/waist",
+    "scaleClass": "hand-sized",
+    "description": "a large flat black cotton cloth folded into a wide sash",
+    "appearsInPages": [
+     4
+    ],
+    "referenceImageUrl": "https://images-staging.magicalstory.ch/stories/job_1790529840433_ar4u7qry3/vb/ART004.jpg",
+    "referenceImageData": null,
+    "referenceImageGenerated": true
+   }
+  ],
+  "locations": [
+   {
+    "id": "LOC001",
+    "name": "Grossmünster quay",
+    "label": "paved stone quay",
+    "pages": [
+     1,
+     2
+    ],
+    "colors": "grey stone, autumn gold",
+    "setting": "outdoor, riverside",
+    "features": "a wide paved stone quay beside a broad river, twin stone cathedral towers rising in the background over autumn trees",
+    "vantages": [
+     {
+      "id": "LOC001.1",
+      "name": "wide quay view",
+      "shot": "wide",
+      "pages": [
+       1
+      ],
+      "description": "Wide outdoor view of a paved stone river quay beside a broad river. Twin stone cathedral towers rise in the background over autumn trees under the open sky. The flat grey flagstones of the quay continue unbroken across the foreground and midground.",
+      "emptyScenePrompt": "Wide outdoor view of a paved stone river quay beside a broad river. Twin stone cathedral towers rise in the background over autumn trees under the open sky. The flat grey flagstones of the quay continue unbroken across the foreground and midground."
+     },
+     {
+      "id": "LOC001.2",
+      "name": "close quay view",
+      "shot": "close-up",
+      "pages": [
+       2
+      ],
+      "description": "Close-up view of a grey paved stone river quay. The flat grey flagstones fill the ground, lightly scattered with autumn leaves. A thick iron mooring ring sits near the river edge in the background.",
+      "emptyScenePrompt": "Close-up view of a grey paved stone river quay. The flat grey flagstones fill the ground, lightly scattered with autumn leaves. A thick iron mooring ring sits near the river edge in the background."
+     }
+    ],
+    "scaleClass": "landmark",
+    "description": "outdoor, riverside. Colors: grey stone, autumn gold. a wide paved stone quay beside a broad river, twin stone cathedral towers rising in the background over autumn trees. Signature: twin stone cathedral towers",
+    "landmarkQuery": null,
+    "appearsInPages": [
+     1,
+     2
+    ],
+    "isRealLandmark": false,
+    "signatureElement": "twin stone cathedral towers"
+   },
+   {
+    "id": "LOC002",
+    "name": "ship deck",
+    "label": "ship deck",
+    "pages": [
+     3
+    ],
+    "colors": "dark brown wood, white fog",
+    "setting": "outdoor, ship deck",
+    "features": "the wooden planked deck of a sailing ship, a thick wooden mast rising in the center, heavy rope rigging, white fog walls around the rails",
+    "scaleClass": "landmark",
+    "description": "outdoor, ship deck. Colors: dark brown wood, white fog. the wooden planked deck of a sailing ship, a thick wooden mast rising in the center, heavy rope rigging, white fog walls around the rails. Signature: thick wooden mast",
+    "landmarkQuery": null,
+    "appearsInPages": [
+     3
+    ],
+    "isRealLandmark": false,
+    "emptyScenePrompt": "Over-the-shoulder view along the wooden deck of a large sailing ship. The dark brown oak planks run forward toward a tall wooden mast in the midground, surrounded by heavy rope rigging. White fog walls obscure the river beyond the ship's rails.",
+    "signatureElement": "thick wooden mast"
+   },
+   {
+    "id": "LOC003",
+    "name": "Wasserkirche riverside",
+    "label": "Wasserkirche riverside",
+    "pages": [
+     -3,
+     -2,
+     -1,
+     4
+    ],
+    "colors": "grey stone, dark water",
+    "setting": "outdoor, riverside",
+    "features": "a grey stone church standing directly at the water's edge, calm river water, autumn trees in the background, a stone embankment",
+    "scaleClass": "landmark",
+    "description": "outdoor, riverside. Colors: grey stone, dark water. a grey stone church standing directly at the water's edge, calm river water, autumn trees in the background, a stone embankment. Signature: grey stone church",
+    "landmarkQuery": null,
+    "appearsInPages": [
+     -3,
+     -2,
+     -1,
+     4
+    ],
+    "isRealLandmark": false,
+    "emptyScenePrompt": "Wide outdoor view from the water level beside a riverbank, looking toward a grey stone church standing directly at the water's edge. The dark river water fills the foreground, rippling gently. Autumn trees and a stone embankment complete the background under the sky.",
+    "signatureElement": "grey stone church"
+   }
+  ],
+  "genericObjects": [],
+  "mainCharacters": [
+   {
+    "id": 1778709081750,
+    "age": "4",
+    "name": "Emma",
+    "gender": "female",
+    "physical": {
+     "face": "soft jawline, neutral chin, straight nose with rounded tip, medium cheekbones, medium lips",
+     "hair": "brown, wavy, ear-length, ponytail, side part right",
+     "build": "average",
+     "other": "freckles, small stud earrings",
+     "glasses": "none",
+     "eyeColor": "brown",
+     "skinTone": "light",
+     "hairColor": "brown",
+     "facialHair": "none",
+     "apparentAge": "preschooler",
+     "eyeColorHex": "#4D2D1B",
+     "skinToneHex": "#E8BEAC",
+     "hairColorHex": "#4A2F21",
+     "detailedHairAnalysis": {
+      "type": "wavy",
+      "density": "full",
+      "parting": "side part right",
+      "styling": "ponytail",
+      "texture": "medium",
+      "lengthTop": "ear-length",
+      "bangsEndAt": "no bangs",
+      "salonLevel": 4,
+      "lengthSides": "same as top",
+      "baseColorHex": "#5C3A27",
+      "highlightsHex": "none"
+     }
+    },
+    "referenceOutfit": null,
+    "generatedOutfits": {}
+   },
+   {
+    "id": 1778709103399,
+    "age": "7",
+    "name": "Noah",
+    "gender": "male",
+    "physical": {
+     "face": "rounded jawline, neutral chin, straight nose with rounded tip, medium cheekbones, medium lips",
+     "hair": "light blonde, curly, short",
+     "build": "average",
+     "other": "none",
+     "glasses": "none",
+     "eyeColor": "blue",
+     "skinTone": "light",
+     "hairColor": "light blonde",
+     "hairStyle": "wavy",
+     "facialHair": "none",
+     "apparentAge": "young-school-age",
+     "eyeColorHex": "#4A728F",
+     "skinToneHex": "#E8BEAC",
+     "hairColorHex": "#E6D3A3",
+     "_traitCorrection": {
+      "date": "2026-08-23",
+      "reason": "hairColor/eyeColor wrong since 2026-05-13 extraction; 3-vendor consensus (gemini-2.5-flash, qwen2.5-vl-72b, haiku-4.5) unanimous: light blonde, blue eyes; photo confirms",
+      "previous": {
+       "eyeColor": "brown",
+       "hairColor": "dark brown"
+      }
+     },
+     "detailedHairAnalysis": {
+      "type": "curly",
+      "density": "full",
+      "parting": "none",
+      "styling": "natural",
+      "texture": "medium",
+      "lengthTop": "short",
+      "bangsEndAt": "no bangs",
+      "salonLevel": 3,
+      "lengthSides": "short",
+      "baseColorHex": "#3B2314",
+      "highlightsHex": "none"
+     }
+    },
+    "referenceOutfit": null,
+    "generatedOutfits": {}
+   },
+   {
+    "id": 1778709127697,
+    "age": "38",
+    "name": "Daniel",
+    "gender": "male",
+    "physical": {
+     "face": "soft jawline, neutral chin, straight nose with rounded tip, medium cheekbones, medium lips",
+     "hair": "dark brown, wavy, short",
+     "build": "average",
+     "other": "beard, mustache",
+     "glasses": "none",
+     "eyeColor": "brown",
+     "skinTone": "light",
+     "hairColor": "dark brown",
+     "facialHair": "short beard",
+     "apparentAge": "adult",
+     "eyeColorHex": "#4A301D",
+     "skinToneHex": "#C7A189",
+     "hairColorHex": "#3A2B21",
+     "detailedHairAnalysis": {
+      "type": "wavy",
+      "density": "full",
+      "parting": "none",
+      "styling": "natural",
+      "texture": "medium",
+      "lengthTop": "short",
+      "bangsEndAt": "no bangs",
+      "salonLevel": 3,
+      "lengthSides": "short",
+      "baseColorHex": "#3B2314",
+      "highlightsHex": "none"
+     }
+    },
+    "referenceOutfit": null,
+    "generatedOutfits": {}
+   },
+   {
+    "id": 1778709155880,
+    "age": "36",
+    "name": "Sarah",
+    "gender": "female",
+    "physical": {
+     "face": "soft jawline, neutral chin, straight nose with rounded tip, medium cheekbones, medium lips",
+     "hair": "blonde, straight, chin-length, combed, side part left",
+     "build": "average",
+     "other": "none",
+     "glasses": "rectangular dark-framed glasses",
+     "eyeColor": "blue",
+     "skinTone": "light",
+     "hairColor": "blonde",
+     "facialHair": "none",
+     "apparentAge": "adult",
+     "eyeColorHex": "#6B4423",
+     "skinToneHex": "#E8BEAC",
+     "hairColorHex": "#D7C093",
+     "detailedHairAnalysis": {
+      "type": "straight",
+      "density": "full",
+      "parting": "side part left",
+      "styling": "combed",
+      "texture": "medium",
+      "lengthTop": "chin-length",
+      "bangsEndAt": "no bangs",
+      "salonLevel": 8,
+      "lengthSides": "same as top",
+      "baseColorHex": "#E0D2A7",
+      "highlightsHex": "none"
+     }
+    },
+    "referenceOutfit": null,
+    "generatedOutfits": {}
+   },
+   {
+    "id": 1778709187545,
+    "age": "68",
+    "name": "Hans",
+    "gender": "male",
+    "physical": {
+     "face": "rounded jawline, neutral chin, straight nose with rounded tip, medium cheekbones, medium lips",
+     "hair": "white, straight, short, combed",
+     "build": "average",
+     "other": "prominent white mustache",
+     "glasses": "none",
+     "eyeColor": "brown",
+     "skinTone": "fair",
+     "hairColor": "white",
+     "facialHair": "mustache",
+     "apparentAge": "elderly",
+     "eyeColorHex": "#6B4423",
+     "skinToneHex": "#E8BEAC",
+     "hairColorHex": "#E0E0E0",
+     "detailedHairAnalysis": {
+      "type": "straight",
+      "density": "full",
+      "parting": "none",
+      "styling": "combed",
+      "texture": "medium",
+      "lengthTop": "short",
+      "bangsEndAt": "no bangs",
+      "salonLevel": 10,
+      "lengthSides": "short",
+      "baseColorHex": "#FFFFFF",
+      "highlightsHex": "none"
+     }
+    },
+    "referenceOutfit": null,
+    "generatedOutfits": {}
+   }
+  ],
+  "secondaryCharacters": [
+   {
+    "id": "CHR001",
+    "age": 45,
+    "face": "brown eyes, thick red beard, weathered cheeks",
+    "hair": "black, shoulder-length, messy",
+    "name": "Kapitän Rotbart",
+    "peer": "no",
+    "build": "a tall, broad-shouldered man",
+    "pages": [
+     3
+    ],
+    "clothing": "long red velvet pirate coat with gold trim, white ruffled shirt, brown leather trousers, black high boots, wide-brimmed black captain's hat",
+    "cellGates": [
+     {
+      "at": "2026-09-27T17:54:59.387Z",
+      "ok": false,
+      "gate": "character_cell",
+      "cellId": "CHR001",
+      "reason": "The image is a watercolor background with no character present.",
+      "recheckOk": true,
+      "rerendered": true,
+      "recheckReason": "The figure matches the description in terms of coloring, clothing, age, and sex, and is rendered in a watercolor style consistent with the art direction."
+     }
+    ],
+    "scaleClass": "adult-height",
+    "description": "45. a tall, broad-shouldered man. hair: black, shoulder-length, messy. brown eyes, thick red beard, weathered cheeks. Signature: thick red beard. Clothing: long red velvet pirate coat with gold trim, white ruffled shirt, brown leather trousers, black high boots, wide-brimmed black captain's hat",
+    "signatureLook": "thick red beard",
+    "appearsInPages": [
+     3
+    ],
+    "referenceImageUrl": "https://images-staging.magicalstory.ch/stories/job_1790529840433_ar4u7qry3/vb/CHR001.jpg",
+    "referenceImageData": null,
+    "referenceImageGenerated": true
+   }
+  ]
+ },
+ "pages": [
+  {
+   "pageNumber": 1,
+   "storedPromptLength": 11705,
+   "vbRefElementIds": [
+    "ART001",
+    "ART002"
+   ],
+   "sceneDescription": "On a foggy autumn morning along the wide paved stone quay below the Grossmünster, an adult man—Daniel, sporting dark brown wavy short hair, a short beard and mustache, brown eyes, wearing a green waxed-cotton hooded anorak zipped to mid-chest, a white cotton crew-neck underlayer, grey straight-leg denim jeans, and brown leather lace-up sneakers—lunges forward in the left foreground. He extends his right arm straight out, reaching desperately for a palm-sized wooden kite reel wrapped in red string that rises into the air just past his fingertips. Standing a few paces away in the midground, a preschool-age little girl and a young school-age boy watch the reel escape. The girl, Emma, has ear-length wavy brown hair in a right-parted ponytail, brown eyes, freckles, and wears her costumed outfit: a red and white striped cotton long-sleeve undershirt, black cotton calf-length trousers with ragged hems, a black cotton Piratentuch tied around her waist, brown leather ankle boots, and a red cotton bandana over her head. Beside her stands Noah, a young school-age boy with short curly light blonde hair and blue eyes, wearing his light blue top, dark grey trousers, and brown shoes. High in the background above the broad Limmat river, the thick autumn fog partially swallows a house-height wooden pirate ship with a tall central mast, and a pristine yellow paper kite flies up into the white mist toward it. In the far distance, a few small figures stroll along the quay, their coats muted against the grey stones. The wide shot captures the damp grey stones of the quay under the pale morning light, the twin stone cathedral towers looming faintly through the fog behind the autumn trees.\n\n---METADATA---\n{\n  \"sceneIntent\": \"Daniel lunges with one arm extended, reaching for the kite reel rising out of his hand. Emma and Noah stand nearby and watch the reel escape. The paper kite flies up into the thick morning fog toward the distant pirate ship.\",\n  \"characters\": [\n    {\n      \"name\": \"Daniel\",\n      \"clothing\": \"standard\",\n      \"position\": \"left foreground\",\n      \"depth\": \"foreground\",\n      \"looksAt\": \"ART002\",\n      \"expression\": \"brows raised high, eyes wide, mouth open in alarm\",\n      \"emotion\": \"surprised\"\n    },\n    {\n      \"name\": \"Emma\",\n      \"clothing\": \"costumed:pirate\",\n      \"position\": \"center midground\",\n      \"depth\": \"midground\",\n      \"looksAt\": \"ART002\",\n      \"expression\": \"brows pinched, lower lip pouting, eyes tracking upward\",\n      \"emotion\": \"sad\"\n    },\n    {\n      \"name\": \"Noah\",\n      \"clothing\": \"costumed:pirate\",\n      \"position\": \"right midground\",\n      \"depth\": \"midground\",\n      \"looksAt\": \"ART002\",\n      \"expression\": \"eyes wide, brows drawn together, jaw dropped\",\n      \"emotion\": \"sad\"\n    }\n  ],\n  \"shot\": \"wide\",\n  \"population\": \"ambient\",\n  \"era\": \"present day\",\n  \"timeOfDay\": \"morning\",\n  \"weather\": \"fog\",\n  \"objects\": [\n    \"ART001.1\",\n    \"ART002\",\n    \"VEH001\",\n    \"LOC001.1\"\n  ],\n  \"wornItems\": [\n    {\"id\": \"ART004\", \"owner\": \"Emma\", \"state\": \"worn\"},\n    {\"id\": \"CLO001\", \"owner\": \"Emma\", \"state\": \"off\", \"location\": \"in the rowboat\"},\n    {\"id\": \"CLO002\", \"owner\": \"Noah\", \"state\": \"off\", \"location\": \"in the rowboat\"}\n  ],\n  \"interactions\": [\n    {\n      \"character\": \"Daniel\",\n      \"object\": \"ART002\",\n      \"where\": \"reaches desperately for the wooden kite reel\",\n      \"action\": \"reaching\",\n      \"hands\": false,\n      \"storyRelevant\": true,\n      \"priority\": \"essential\"\n    },\n    {\n      \"character\": \"Emma\",\n      \"object\": \"ART002\",\n      \"where\": \"watches the kite reel\",\n      \"action\": \"watching\",\n      \"hands\": false,\n      \"storyRelevant\": false,\n      \"priority\": \"low\"\n    },\n    {\n      \"character\": \"Noah\",\n      \"object\": \"ART002\",\n      \"where\": \"watches the kite reel\",\n      \"action\": \"watching\",\n      \"hands\": false,\n      \"storyRelevant\": false,\n      \"priority\": \"low\"\n    }\n  ]\n}",
+   "sceneMetadata": {
+    "era": "present day",
+    "aboard": null,
+    "objects": [
+     "ART001.1",
+     "ART002",
+     "VEH001",
+     "LOC001.1"
+    ],
+    "setting": null,
+    "weather": "fog",
+    "clothing": null,
+    "fullData": {
+     "shot": "wide",
+     "objects": [
+      "ART001.1",
+      "ART002",
+      "VEH001",
+      "LOC001.1"
+     ],
+     "setting": null,
+     "weather": "fog",
+     "timeOfDay": "morning",
+     "wornItems": [
+      {
+       "id": "ART004",
+       "owner": "Emma",
+       "state": "worn",
+       "wearer": null,
+       "location": null,
+       "redressNote": null
+      },
+      {
+       "id": "CLO001",
+       "owner": "Emma",
+       "state": "off",
+       "wearer": null,
+       "location": "in the rowboat",
+       "redressNote": null
+      },
+      {
+       "id": "CLO002",
+       "owner": "Noah",
+       "state": "off",
+       "wearer": null,
+       "location": "in the rowboat",
+       "redressNote": null
+      }
+     ],
+     "background": null,
+     "characters": [
+      {
+       "name": "Daniel",
+       "depth": "foreground",
+       "emotion": "surprised",
+       "looksAt": "ART002",
+       "clothing": "standard",
+       "position": "left foreground",
+       "expression": "brows raised high, eyes wide, mouth open in alarm"
+      },
+      {
+       "name": "Emma",
+       "depth": "midground",
+       "emotion": "sad",
+       "looksAt": "ART002",
+       "clothing": "costumed:pirate",
+       "position": "center midground",
+       "expression": "brows pinched, lower lip pouting, eyes tracking upward"
+      },
+      {
+       "name": "Noah",
+       "depth": "midground",
+       "emotion": "sad",
+       "looksAt": "ART002",
+       "clothing": "costumed:pirate",
+       "position": "right midground",
+       "expression": "eyes wide, brows drawn together, jaw dropped"
+      }
+     ],
+     "population": "ambient",
+     "sceneIntent": "Daniel lunges with one arm extended, reaching for the kite reel rising out of his hand. Emma and Noah stand nearby and watch the reel escape. The paper kite flies up into the thick morning fog toward the distant pirate ship.",
+     "imageSummary": "On a foggy autumn morning along the wide paved stone quay below the Grossmünster, an adult man—Daniel, sporting dark brown wavy short hair, a short beard and mustache, brown eyes, wearing a green waxed-cotton hooded anorak zipped to mid-chest, a white cotton crew-neck underlayer, grey straight-leg denim jeans, and brown leather lace-up sneakers—lunges forward in the left foreground. He extends his right arm straight out, reaching desperately for a palm-sized wooden kite reel wrapped in red string that rises into the air just past his fingertips. Standing a few paces away in the midground, a preschool-age little girl and a young school-age boy watch the reel escape. The girl, Emma, has ear-length wavy brown hair in a right-parted ponytail, brown eyes, freckles, and wears her costumed outfit: a red and white striped cotton long-sleeve undershirt, black cotton calf-length trousers with ragged hems, a black cotton Piratentuch tied around her waist, brown leather ankle boots, and a red cotton bandana over her head. Beside her stands Noah, a young school-age boy with short curly light blonde hair and blue eyes, wearing his light blue top, dark grey trousers, and brown shoes. High in the background above the broad Limmat river, the thick autumn fog partially swallows a house-height wooden pirate ship with a tall central mast, and a pristine yellow paper kite flies up into the white mist toward it. In the far distance, a few small figures stroll along the quay, their coats muted against the grey stones. The wide shot captures the damp grey stones of the quay under the pale morning light, the twin stone cathedral towers looming faintly through the fog behind the autumn trees.",
+     "interactions": [
+      {
+       "where": "reaches desperately for the wooden kite reel",
+       "action": "reaching",
+       "object": "ART002",
+       "priority": "essential",
+       "character": "Daniel",
+       "storyRelevant": true
+      },
+      {
+       "where": "watches the kite reel",
+       "action": "watching",
+       "object": "ART002",
+       "priority": "low",
+       "character": "Emma",
+       "storyRelevant": false
+      },
+      {
+       "where": "watches the kite reel",
+       "action": "watching",
+       "object": "ART002",
+       "priority": "low",
+       "character": "Noah",
+       "storyRelevant": false
+      }
+     ],
+     "crowdExpected": false
+    },
+    "thinking": null,
+    "timeOfDay": "morning",
+    "wornItems": [
+     {
+      "id": "ART004",
+      "owner": "Emma",
+      "state": "worn",
+      "wearer": null,
+      "location": null,
+      "redressNote": null
+     },
+     {
+      "id": "CLO001",
+      "owner": "Emma",
+      "state": "off",
+      "wearer": null,
+      "location": "in the rowboat",
+      "redressNote": null
+     },
+     {
+      "id": "CLO002",
+      "owner": "Noah",
+      "state": "off",
+      "wearer": null,
+      "location": "in the rowboat",
+      "redressNote": null
+     }
+    ],
+    "background": null,
+    "characters": [
+     "Daniel",
+     "Emma",
+     "Noah"
+    ],
+    "population": "ambient",
+    "sceneIntent": "Daniel lunges with one arm extended, reaching for the kite reel rising out of his hand. Emma and Noah stand nearby and watch the reel escape. The paper kite flies up into the thick morning fog toward the distant pirate ship.",
+    "imageSummary": "On a foggy autumn morning along the wide paved stone quay below the Grossmünster, an adult man—Daniel, sporting dark brown wavy short hair, a short beard and mustache, brown eyes, wearing a green waxed-cotton hooded anorak zipped to mid-chest, a white cotton crew-neck underlayer, grey straight-leg denim jeans, and brown leather lace-up sneakers—lunges forward in the left foreground. He extends his right arm straight out, reaching desperately for a palm-sized wooden kite reel wrapped in red string that rises into the air just past his fingertips. Standing a few paces away in the midground, a preschool-age little girl and a young school-age boy watch the reel escape. The girl, Emma, has ear-length wavy brown hair in a right-parted ponytail, brown eyes, freckles, and wears her costumed outfit: a red and white striped cotton long-sleeve undershirt, black cotton calf-length trousers with ragged hems, a black cotton Piratentuch tied around her waist, brown leather ankle boots, and a red cotton bandana over her head. Beside her stands Noah, a young school-age boy with short curly light blonde hair and blue eyes, wearing his light blue top, dark grey trousers, and brown shoes. High in the background above the broad Limmat river, the thick autumn fog partially swallows a house-height wooden pirate ship with a tall central mast, and a pristine yellow paper kite flies up into the white mist toward it. In the far distance, a few small figures stroll along the quay, their coats muted against the grey stones. The wide shot captures the damp grey stones of the quay under the pale morning light, the twin stone cathedral towers looming faintly through the fog behind the autumn trees.",
+    "interactions": [
+     {
+      "where": "reaches desperately for the wooden kite reel",
+      "action": "reaching",
+      "object": "ART002",
+      "priority": "essential",
+      "character": "Daniel",
+      "storyRelevant": true
+     },
+     {
+      "where": "watches the kite reel",
+      "action": "watching",
+      "object": "ART002",
+      "priority": "low",
+      "character": "Emma",
+      "storyRelevant": false
+     },
+     {
+      "where": "watches the kite reel",
+      "action": "watching",
+      "object": "ART002",
+      "priority": "low",
+      "character": "Noah",
+      "storyRelevant": false
+     }
+    ],
+    "isJsonFormat": true,
+    "textPosition": null,
+    "crowdExpected": false,
+    "isProseFormat": true,
+    "landmarkPhoto": null,
+    "reuseEmptyScene": null,
+    "sceneComplexity": "simple",
+    "emptyScenePrompt": null,
+    "characterClothing": {
+     "Emma": "costumed:pirate",
+     "Noah": "costumed:pirate",
+     "Daniel": "standard"
+    },
+    "translatedSummary": null,
+    "characterPositions": {
+     "Emma": "center midground",
+     "Noah": "right midground",
+     "Daniel": "left foreground"
+    },
+    "textZoneDescription": null,
+    "characterPerspectives": {
+     "Emma": {
+      "depth": "midground"
+     },
+     "Noah": {
+      "depth": "midground"
+     },
+     "Daniel": {
+      "depth": "foreground"
+     }
+    }
+   },
+   "sceneCharacters": [
+    {
+     "id": 1778709081750,
+     "age": "4",
+     "name": "Emma",
+     "gender": "female",
+     "photos": {
+      "bodyBox": {
+       "x": 28.000000000000004,
+       "y": 0.75,
+       "width": 40,
+       "height": 99.25
+      },
+      "faceBox": {
+       "x": 45.5,
+       "y": 14.875,
+       "id": 0,
+       "width": 10.375,
+       "height": 12.625,
+       "confidence": 0.9997319579124451
+      }
+     },
+     "traits": {
+      "flaws": [
+       "Ungeduldig",
+       "Anhänglich"
+      ],
+      "strengths": [
+       "Neugierig",
+       "Fröhlich",
+       "Fantasievoll"
+      ],
+      "challenges": [
+       "Mit anderen teilen",
+       "Angst vor der Dunkelheit"
+      ],
+      "specialDetails": ""
+     },
+     "avatars": {
+      "status": "complete",
+      "clothing": {
+       "summer": "Pink long-sleeved t-shirt with a large blue and orange butterfly graphic on the front, Dark blue skinny jeans, Brown open-toe sandals",
+       "winter": "dark blue puffer jacket with a hood, featuring a large blue and orange butterfly print on the front and smaller butterflies on the sleeves, paired with dark gray knitted gloves, dark blue leggings, dark brown lace-up boots",
+       "costumed": {
+        "pirate": "red and white striped cotton long-sleeve undershirt with a round neck; black cotton calf-length trousers with ragged cut-off hems; black cotton Piratentuch — a large flat cloth folded into a wide sash, tied around the waist with square knot, two long tails hanging at the front hip; brown leather ankle boots with a single strap buckle; red cotton bandana folded into a triangle and tied over the head, knot at the nape"
+       },
+       "standard": "Pink long-sleeve t-shirt with a large blue and orange butterfly print on the front and sleeves, Dark blue skinny jeans, White sneakers with white laces"
+      },
+      "generatedAt": "2026-05-13T21:51:50.038Z",
+      "styledAvatars": {
+       "watercolor": {
+        "costumed": {
+         "default": "https://images-staging.magicalstory.ch/characters/680c30fd-2839-4c23-b00c-b91603352a6d/characters_680c30fd-2839-4c23-b00c-b9160/inline/characters-0-avatars-styledAvatars-watercolor-costumed-default.jpg"
+        }
+       }
+      },
+      "sheet2x4_costumed_pirate": {
+       "imageUrl": "https://images-staging.magicalstory.ch/characters/680c30fd-2839-4c23-b00c-b91603352a6d/1778709081750/avatars/sheet2x4/sheet2x4_costumed_pirate.png",
+       "generatedAt": "2026-05-14T08:43:11.432Z"
+      }
+     },
+     "physical": {
+      "face": "soft jawline, neutral chin, straight nose with rounded tip, medium cheekbones, medium lips",
+      "build": "average",
+      "other": "freckles, small stud earrings",
+      "glasses": "none",
+      "eyeColor": "brown",
+      "skinTone": "light",
+      "hairColor": "brown",
+      "facialHair": "none",
+      "apparentAge": "preschooler",
+      "eyeColorHex": "#4D2D1B",
+      "skinToneHex": "#E8BEAC",
+      "hairColorHex": "#4A2F21",
+      "detailedHairAnalysis": {
+       "type": "wavy",
+       "density": "full",
+       "parting": "side part right",
+       "styling": "ponytail",
+       "texture": "medium",
+       "lengthTop": "ear-length",
+       "bangsEndAt": "no bangs",
+       "salonLevel": 4,
+       "lengthSides": "same as top",
+       "baseColorHex": "#5C3A27",
+       "highlightsHex": "none"
+      }
+     },
+     "ageCategory": "kindergartner",
+     "structuredClothing": {
+      "shoes": "White sneakers with white laces",
+      "fullBody": null,
+      "lowerBody": "Dark blue skinny jeans",
+      "upperBody": "Pink long-sleeve t-shirt with a large blue and orange butterfly print on the front and sleeves"
+     }
+    },
+    {
+     "id": 1778709103399,
+     "age": "7",
+     "name": "Noah",
+     "gender": "male",
+     "photos": {
+      "bodyBox": {
+       "x": 23.5,
+       "y": 2.875,
+       "width": 42.25,
+       "height": 97.125
+      },
+      "faceBox": {
+       "x": 44.125,
+       "y": 15.375,
+       "id": 0,
+       "width": 9,
+       "height": 11,
+       "confidence": 0.9986748695373535
+      }
+     },
+     "traits": {
+      "flaws": [
+       "Stur",
+       "Schlechter Verlierer"
+      ],
+      "strengths": [
+       "Mutig",
+       "Kreativ",
+       "Abenteuerlustig"
+      ],
+      "challenges": [
+       "Regeln befolgen",
+       "Gefühle kontrollieren"
+      ],
+      "specialDetails": ""
+     },
+     "avatars": {
+      "status": "complete",
+      "clothing": {
+       "summer": "navy blue t-shirt with a white rocket and stars graphic, khaki cargo shorts, white sneakers",
+       "winter": "navy blue winter jacket with a white rocket graphic, khaki cargo pants, dark grey winter boots",
+       "costumed": {
+        "pirate": "NONE"
+       },
+       "standard": "navy blue long-sleeve t-shirt with a white rocket and stars graphic, khaki straight-leg pants, white sneakers"
+      },
+      "faceMatch": {
+       "summer": {
+        "lpips": null,
+        "score": 9,
+        "arcface": 0.7627,
+        "details": "Face Shape: 9/10 - Both have a consistent oval face shape.\nForehead/Cheek/Jaw: 9/10 - Forehead height, cheekbone width, and jawline angle are consistent.\nEyes: 9/10 - Eye shape, spacing, and lid type are very similar.\nNose: 9/10 - The nose shape, bridge, and tip are very consistent.\nMouth: 9/10 - Lip thickness, width, and cupid's bow are very similar.\nOverall: 9/10 - The overall facial structure and proportions are a very good match.\nFinal Score: 9/10",
+        "arcfaceCells": {
+         "top-left": 0.7627,
+         "top-right": 0.5625
+        }
+       },
+       "winter": {
+        "lpips": null,
+        "score": 9,
+        "arcface": 0.6648,
+        "details": "Face Shape: 9/10 - Both have a very similar oval face shape.\nForehead/Cheek/Jaw: 9/10 - Forehead height, cheekbone prominence, and jawline shape are consistent.\nEyes: 9/10 - Eye shape, spacing, and lid type are a very good match.\nNose: 9/10 - Nose bridge, tip, and nostril shape are very similar.\nMouth: 9/10 - Lip thickness, width, and cupid's bow are consistent.\nOverall: 9/10 - The overall facial structure and proportions are an excellent match.\nFinal Score: 9/10",
+        "arcfaceCells": {
+         "top-left": 0.6648,
+         "top-right": 0.5996
+        }
+       },
+       "standard": {
+        "lpips": null,
+        "score": 9,
+        "arcface": 0.6993,
+        "details": "Face Shape: 9/10 - Both have a similar oval/roundish face shape.\nForehead/Cheek/Jaw: 9/10 - Forehead height, cheekbone prominence, and jawline shape are consistent.\nEyes: 9/10 - Eye shape, spacing, and lid type are very consistent.\nNose: 9/10 - Nose bridge profile, tip, and nostril shape are very similar.\nMouth: 9/10 - Lip thickness, width, and cupid's bow are consistent.\nOverall: 9/10 - The overall facial structure and proportions are a very good match.\nFinal Score: 9/10",
+        "arcfaceCells": {
+         "top-left": 0.6993,
+         "top-right": 0.5891
+        }
+       }
+      },
+      "generatedAt": "2026-08-22T11:08:18.103Z",
+      "generationLog": {
+       "summer": {
+        "attempts": 1
+       },
+       "winter": {
+        "attempts": 1
+       },
+       "standard": {
+        "attempts": 1
+       }
+      },
+      "styledAvatars": {
+       "watercolor": {
+        "costumed": {
+         "default": "https://images-staging.magicalstory.ch/characters/680c30fd-2839-4c23-b00c-b91603352a6d/characters_680c30fd-2839-4c23-b00c-b9160/inline/characters-1-avatars-styledAvatars-watercolor-costumed-default.jpg"
+        }
+       }
+      },
+      "generationRefs": {
+       "body": "https://images-staging.magicalstory.ch/characters/680c30fd-2839-4c23-b00c-b91603352a6d/1778709103399/avatar-refs/body-mt49yf31.jpg",
+       "face": "https://images-staging.magicalstory.ch/characters/680c30fd-2839-4c23-b00c-b91603352a6d/1778709103399/avatar-refs/face-mt49yf31.jpg"
+      },
+      "extractedTraits": {
+       "face": "rounded jawline, neutral chin, straight nose with rounded tip, medium cheekbones, medium lips",
+       "build": "average",
+       "other": "none",
+       "glasses": "none",
+       "eyeColor": "brown",
+       "skinTone": "light",
+       "hairColor": "dark brown",
+       "facialHair": "none",
+       "apparentAge": "young-school-age",
+       "skinToneHex": "#E8BEAC",
+       "hairColorHex": "#3B2314",
+       "detailedHairAnalysis": {
+        "type": "curly",
+        "density": "full",
+        "parting": "none",
+        "styling": "natural",
+        "texture": "medium",
+        "lengthTop": "short",
+        "bangsEndAt": "no bangs",
+        "salonLevel": 3,
+        "lengthSides": "short",
+        "baseColorHex": "#3B2314",
+        "highlightsHex": "none"
+       }
+      },
+      "structuredClothing": {
+       "summer": {
+        "shoes": "white sneakers",
+        "fullBody": null,
+        "lowerBody": "khaki cargo shorts",
+        "upperBody": "navy blue t-shirt with a white rocket and stars graphic"
+       },
+       "winter": {
+        "shoes": "dark grey winter boots",
+        "fullBody": null,
+        "lowerBody": "khaki cargo pants",
+        "upperBody": "navy blue winter jacket with a white rocket graphic"
+       },
+       "standard": {
+        "shoes": "white sneakers",
+        "fullBody": null,
+        "lowerBody": "khaki straight-leg pants",
+        "upperBody": "navy blue long-sleeve t-shirt with a white rocket and stars graphic"
+       }
+      },
+      "sheet2x4_costumed_pirate": {
+       "imageUrl": "https://images-staging.magicalstory.ch/characters/680c30fd-2839-4c23-b00c-b91603352a6d/1778709103399/avatars/sheet2x4/sheet2x4_costumed_pirate.png",
+       "generatedAt": "2026-05-14T08:42:59.891Z"
+      }
+     },
+     "physical": {
+      "face": "rounded jawline, neutral chin, straight nose with rounded tip, medium cheekbones, medium lips",
+      "build": "average",
+      "other": "none",
+      "glasses": "none",
+      "eyeColor": "blue",
+      "skinTone": "light",
+      "hairColor": "light blonde",
+      "hairStyle": "wavy",
+      "facialHair": "none",
+      "apparentAge": "young-school-age",
+      "eyeColorHex": "#4A728F",
+      "skinToneHex": "#E8BEAC",
+      "hairColorHex": "#E6D3A3",
+      "_traitCorrection": {
+       "date": "2026-08-23",
+       "reason": "hairColor/eyeColor wrong since 2026-05-13 extraction; 3-vendor consensus (gemini-2.5-flash, qwen2.5-vl-72b, haiku-4.5) unanimous: light blonde, blue eyes; photo confirms",
+       "previous": {
+        "eyeColor": "brown",
+        "hairColor": "dark brown"
+       }
+      },
+      "detailedHairAnalysis": {
+       "type": "curly",
+       "density": "full",
+       "parting": "none",
+       "styling": "natural",
+       "texture": "medium",
+       "lengthTop": "short",
+       "bangsEndAt": "no bangs",
+       "salonLevel": 3,
+       "lengthSides": "short",
+       "baseColorHex": "#3B2314",
+       "highlightsHex": "none"
+      }
+     },
+     "ageCategory": "young-school-age",
+     "structuredClothing": {
+      "shoes": "white sneakers",
+      "fullBody": null,
+      "lowerBody": "khaki straight-leg pants",
+      "upperBody": "navy blue long-sleeve t-shirt with a white rocket and stars graphic"
+     },
+     "physicalTraitsSource": {
+      "face": "extracted",
+      "build": "extracted",
+      "other": "extracted",
+      "glasses": "extracted",
+      "eyeColor": "extracted",
+      "skinTone": "extracted",
+      "hairColor": "extracted",
+      "facialHair": "extracted",
+      "apparentAge": "extracted",
+      "skinToneHex": "extracted",
+      "hairColorHex": "extracted"
+     }
+    },
+    {
+     "id": 1778709127697,
+     "age": "38",
+     "name": "Daniel",
+     "gender": "male",
+     "photos": {
+      "bodyBox": {
+       "x": 20.125,
+       "y": 0,
+       "width": 59.375,
+       "height": 100
+      },
+      "faceBox": {
+       "x": 43.125,
+       "y": 11.25,
+       "id": 0,
+       "width": 12.75,
+       "height": 18.125,
+       "confidence": 0.9999059438705444
+      }
+     },
+     "traits": {
+      "flaws": [
+       "Vergesslich",
+       "Zerstreut"
+      ],
+      "strengths": [
+       "Geduldig",
+       "Beschützend",
+       "Lustig"
+      ],
+      "challenges": [
+       "Mit Veränderungen umgehen",
+       "Regeln befolgen"
+      ],
+      "specialDetails": ""
+     },
+     "avatars": {
+      "status": "complete",
+      "clothing": {
+       "summer": "dark blue short-sleeved button-up shirt, light brown shorts, dark brown leather sandals",
+       "winter": "Dark blue padded winter parka with a hood and multiple pockets, Khaki/tan padded winter pants, Black winter boots",
+       "standard": "dark blue long-sleeve button-up shirt, light brown chinos, dark brown leather lace-up shoes"
+      },
+      "generatedAt": "2026-05-13T21:52:34.956Z",
+      "styledAvatars": {
+       "watercolor": {
+        "standard": "https://images-staging.magicalstory.ch/characters/680c30fd-2839-4c23-b00c-b91603352a6d/characters_680c30fd-2839-4c23-b00c-b9160/inline/characters-2-avatars-styledAvatars-watercolor-standard.jpg"
+       }
+      },
+      "sheet2x4_costumed_pirate": {
+       "imageUrl": "https://images-staging.magicalstory.ch/characters/680c30fd-2839-4c23-b00c-b91603352a6d/1778709127697/avatars/sheet2x4/sheet2x4_costumed_pirate.png",
+       "generatedAt": "2026-05-14T08:42:59.815Z"
+      }
+     },
+     "physical": {
+      "face": "soft jawline, neutral chin, straight nose with rounded tip, medium cheekbones, medium lips",
+      "build": "average",
+      "other": "beard, mustache",
+      "glasses": "none",
+      "eyeColor": "brown",
+      "skinTone": "light",
+      "hairColor": "dark brown",
+      "facialHair": "short beard",
+      "apparentAge": "adult",
+      "eyeColorHex": "#4A301D",
+      "skinToneHex": "#C7A189",
+      "hairColorHex": "#3A2B21",
+      "detailedHairAnalysis": {
+       "type": "wavy",
+       "density": "full",
+       "parting": "none",
+       "styling": "natural",
+       "texture": "medium",
+       "lengthTop": "short",
+       "bangsEndAt": "no bangs",
+       "salonLevel": 3,
+       "lengthSides": "short",
+       "baseColorHex": "#3B2314",
+       "highlightsHex": "none"
+      }
+     },
+     "ageCategory": "adult",
+     "structuredClothing": {
+      "shoes": "dark brown leather lace-up shoes",
+      "fullBody": null,
+      "lowerBody": "light brown chinos",
+      "upperBody": "dark blue long-sleeve button-up shirt"
+     }
+    }
+   ],
+   "referencePhotos": [
+    {
+     "id": 1778709081750,
+     "name": "Emma",
+     "cellPose": "threeQuarter",
+     "hasPhoto": true,
+     "cellDepth": "midground",
+     "photoHash": "616248f2",
+     "photoType": "cell-threeQuarter",
+     "cellIncludesFace": false,
+     "clothingCategory": "costumed",
+     "clothingDescription": "red and white striped cotton long-sleeve undershirt with a round neck; black cotton calf-length trousers with ragged cut-off hems; black cotton Piratentuch — a large flat cloth folded into a wide sash, tied around the waist with square knot, two long tails hanging at the front hip; brown leather ankle boots with a single strap buckle; red cotton bandana folded into a triangle and tied over the head, knot at the nape",
+     "requestedClothingCategory": "costumed"
+    },
+    {
+     "id": 1778709103399,
+     "name": "Noah",
+     "cellPose": "threeQuarter",
+     "hasPhoto": true,
+     "cellDepth": "midground",
+     "photoHash": "1ab1ee3e",
+     "photoType": "cell-threeQuarter",
+     "cellIncludesFace": false,
+     "clothingCategory": "costumed",
+     "clothingDescription": "NONE",
+     "requestedClothingCategory": "costumed"
+    },
+    {
+     "id": 1778709127697,
+     "name": "Daniel",
+     "cellPose": "threeQuarter",
+     "hasPhoto": true,
+     "isStyled": true,
+     "cellDepth": "foreground",
+     "photoHash": "4bd1e1ab",
+     "photoType": "cell-threeQuarter-headbody",
+     "cellIncludesFace": true,
+     "clothingCategory": "standard",
+     "originalPhotoUrl": "https://images-staging.magicalstory.ch/stories/job_1790529840433_ar4u7qry3/debug/p1/ref-photo-2-orig.jpg",
+     "clothingDescription": "green waxed-cotton hooded anorak zipped to mid-chest with two front patch pockets; grey straight-leg denim jeans; white cotton crew-neck underlayer visible at the collar; brown leather lace-up sneakers",
+     "requestedClothingCategory": "standard"
+    }
+   ]
+  },
+  {
+   "pageNumber": 4,
+   "storedPromptLength": 11547,
+   "vbRefElementIds": [
+    "ANI001",
+    "ART004"
+   ],
+   "sceneDescription": "From the perspective of the small wooden rowboat bobbing by the stone Wasserkirche, an elderly man—Hans, with short straight white hair, brown eyes, a prominent white mustache, stooped posture, wearing a grey wool flat cap, a yellow oilskin long coat with wide lapels over a white collared shirt, brown wool straight-leg trousers, and black rubber waterproof ankle boots—stands in the foreground gripping the boat's wooden gunwale, one hand wrapped around the worn timber, the other resting on the oar. In the midground, Emma and Noah climb down a long hemp rope ladder draped over the pirate ship's dark hull. Emma, with her brown ponytail and red bandana, red and white striped undershirt, black trousers and brown boots, grips a wooden rung with both hands, her feet resting on the rung below; Pepe, a melon-sized parrot with bright green body feathers, red tail feathers, blue wing tips and a curved black beak, perches on her right shoulder, his small black claws curling around the fabric of her shirt. Noah, with his blonde curls and blue eyes, wearing his orange life jacket over his light blue top and dark grey trousers, climbs beside her, his right hand gripping a rung and his left hand holding the paper kite—now ripped in two down the middle—against the ladder. A few distant figures walk along the embankment behind Hans. High in the background, Emma's black cotton Piratentuch flies from the ship's tall mast top in the last shreds of morning fog, catching the autumn wind as the ship departs.\n\n---METADATA---\n{\n  \"sceneIntent\": \"Emma and Noah climb down the rope ladder toward Hans, who waits in the rowboat below. Pepe rides on Emma's shoulder, and Noah holds the torn kite. Emma's black Piratentuch flies as a flag from the mast high above.\",\n  \"characters\": [\n    {\n      \"name\": \"Hans\",\n      \"clothing\": \"standard\",\n      \"position\": \"center foreground\",\n      \"depth\": \"foreground\",\n      \"looksAt\": \"ART003\",\n      \"expression\": \"eyes attentive, brows slightly raised, gentle closed-mouth smile\",\n      \"emotion\": \"neutral\"\n    },\n    {\n      \"name\": \"Emma\",\n      \"clothing\": \"costumed:pirate\",\n      \"position\": \"left midground\",\n      \"depth\": \"midground\",\n      \"looksAt\": \"ART003\",\n      \"expression\": \"eyes focused on the ladder, lips parted in a slight smile\",\n      \"emotion\": \"happy\"\n    },\n    {\n      \"name\": \"Noah\",\n      \"clothing\": \"costumed:pirate\",\n      \"position\": \"right midground\",\n      \"depth\": \"midground\",\n      \"looksAt\": \"ART003\",\n      \"expression\": \"eyes bright, mouth curving into a relieved grin\",\n      \"emotion\": \"happy\"\n    }\n  ],\n  \"shot\": \"wide\",\n  \"population\": \"ambient\",\n  \"aboard\": \"VEH002\",\n  \"era\": \"present day\",\n  \"timeOfDay\": \"morning\",\n  \"weather\": \"fog\",\n  \"objects\": [\n    \"LOC003.1\",\n    \"ANI001\",\n    \"ART004\",\n    \"ART003\",\n    \"VEH002\"\n  ],\n  \"wornItems\": [\n    {\n      \"id\": \"ART004\",\n      \"owner\": \"Emma\",\n      \"state\": \"off\",\n      \"location\": \"flies from the ship's tall mast top\",\n      \"redressNote\": \"red and white striped undershirt, black trousers, brown boots, red bandana stay; black Piratentuch is off, with nothing in its place; the red and white striped cotton long-sleeve undershirt is now outermost at the waist\"\n    },\n    {\n      \"id\": \"CLO001\",\n      \"owner\": \"Emma\",\n      \"state\": \"worn\"\n    },\n    {\n      \"id\": \"CLO002\",\n      \"owner\": \"Noah\",\n      \"state\": \"worn\"\n    }\n  ],\n  \"interactions\": [\n    {\n      \"character\": \"Emma\",\n      \"object\": \"ART003\",\n      \"where\": \"grips a rung of the ladder with both hands, feet resting on the rung below\",\n      \"action\": \"climbing\",\n      \"hands\": true,\n      \"storyRelevant\": true,\n      \"priority\": \"essential\"\n    },\n    {\n      \"character\": \"Noah\",\n      \"object\": \"ART003\",\n      \"where\": \"climbs beside Emma, one hand gripping a rung\",\n      \"action\": \"climbing\",\n      \"hands\": true,\n      \"storyRelevant\": true,\n      \"priority\": \"essential\"\n    }\n  ]\n}",
+   "sceneMetadata": {
+    "era": "present day",
+    "aboard": "VEH002",
+    "objects": [
+     "LOC003.1",
+     "ANI001",
+     "ART004",
+     "ART003",
+     "VEH002"
+    ],
+    "setting": null,
+    "weather": "fog",
+    "clothing": null,
+    "fullData": {
+     "shot": "wide",
+     "objects": [
+      "LOC003.1",
+      "ANI001",
+      "ART004",
+      "ART003",
+      "VEH002"
+     ],
+     "setting": null,
+     "weather": "fog",
+     "timeOfDay": "morning",
+     "wornItems": [
+      {
+       "id": "ART004",
+       "owner": "Emma",
+       "state": "off",
+       "wearer": null,
+       "location": "flies from the ship's tall mast top",
+       "redressNote": "red and white striped undershirt, black trousers, brown boots, red bandana stay; black Piratentuch is off, with nothing in its place; the red and white striped cotton long-sleeve undershirt is now outermost at the waist"
+      },
+      {
+       "id": "CLO001",
+       "owner": "Emma",
+       "state": "worn",
+       "wearer": null,
+       "location": null,
+       "redressNote": null
+      },
+      {
+       "id": "CLO002",
+       "owner": "Noah",
+       "state": "worn",
+       "wearer": null,
+       "location": null,
+       "redressNote": null
+      }
+     ],
+     "background": null,
+     "characters": [
+      {
+       "name": "Hans",
+       "depth": "foreground",
+       "emotion": "neutral",
+       "looksAt": "ART003",
+       "clothing": "standard",
+       "position": "center foreground",
+       "expression": "eyes attentive, brows slightly raised, gentle closed-mouth smile"
+      },
+      {
+       "name": "Emma",
+       "depth": "midground",
+       "emotion": "happy",
+       "looksAt": "ART003",
+       "clothing": "costumed:pirate",
+       "position": "left midground",
+       "expression": "eyes focused on the ladder, lips parted in a slight smile"
+      },
+      {
+       "name": "Noah",
+       "depth": "midground",
+       "emotion": "happy",
+       "looksAt": "ART003",
+       "clothing": "costumed:pirate",
+       "position": "right midground",
+       "expression": "eyes bright, mouth curving into a relieved grin"
+      }
+     ],
+     "population": "ambient",
+     "sceneIntent": "Emma and Noah climb down the rope ladder toward Hans, who waits in the rowboat below. Pepe rides on Emma's shoulder, and Noah holds the torn kite. Emma's black Piratentuch flies as a flag from the mast high above.",
+     "imageSummary": "From the perspective of the small wooden rowboat bobbing by the stone Wasserkirche, an elderly man—Hans, with short straight white hair, brown eyes, a prominent white mustache, stooped posture, wearing a grey wool flat cap, a yellow oilskin long coat with wide lapels over a white collared shirt, brown wool straight-leg trousers, and black rubber waterproof ankle boots—stands in the foreground gripping the boat's wooden gunwale, one hand wrapped around the worn timber, the other resting on the oar. In the midground, Emma and Noah climb down a long hemp rope ladder draped over the pirate ship's dark hull. Emma, with her brown ponytail and red bandana, red and white striped undershirt, black trousers and brown boots, grips a wooden rung with both hands, her feet resting on the rung below; Pepe, a melon-sized parrot with bright green body feathers, red tail feathers, blue wing tips and a curved black beak, perches on her right shoulder, his small black claws curling around the fabric of her shirt. Noah, with his blonde curls and blue eyes, wearing his orange life jacket over his light blue top and dark grey trousers, climbs beside her, his right hand gripping a rung and his left hand holding the paper kite—now ripped in two down the middle—against the ladder. A few distant figures walk along the embankment behind Hans. High in the background, Emma's black cotton Piratentuch flies from the ship's tall mast top in the last shreds of morning fog, catching the autumn wind as the ship departs.",
+     "interactions": [
+      {
+       "hands": true,
+       "where": "grips a rung of the ladder with both hands, feet resting on the rung below",
+       "action": "climbing",
+       "object": "ART003",
+       "priority": "essential",
+       "character": "Emma",
+       "storyRelevant": true
+      },
+      {
+       "hands": true,
+       "where": "climbs beside Emma, one hand gripping a rung",
+       "action": "climbing",
+       "object": "ART003",
+       "priority": "essential",
+       "character": "Noah",
+       "storyRelevant": true
+      }
+     ],
+     "crowdExpected": false
+    },
+    "thinking": null,
+    "timeOfDay": "morning",
+    "wornItems": [
+     {
+      "id": "ART004",
+      "owner": "Emma",
+      "state": "off",
+      "wearer": null,
+      "location": "flies from the ship's tall mast top",
+      "redressNote": "red and white striped undershirt, black trousers, brown boots, red bandana stay; black Piratentuch is off, with nothing in its place; the red and white striped cotton long-sleeve undershirt is now outermost at the waist"
+     },
+     {
+      "id": "CLO001",
+      "owner": "Emma",
+      "state": "worn",
+      "wearer": null,
+      "location": null,
+      "redressNote": null
+     },
+     {
+      "id": "CLO002",
+      "owner": "Noah",
+      "state": "worn",
+      "wearer": null,
+      "location": null,
+      "redressNote": null
+     }
+    ],
+    "background": null,
+    "characters": [
+     "Hans",
+     "Emma",
+     "Noah"
+    ],
+    "population": "ambient",
+    "sceneIntent": "Emma and Noah climb down the rope ladder toward Hans, who waits in the rowboat below. Pepe rides on Emma's shoulder, and Noah holds the torn kite. Emma's black Piratentuch flies as a flag from the mast high above.",
+    "imageSummary": "From the perspective of the small wooden rowboat bobbing by the stone Wasserkirche, an elderly man—Hans, with short straight white hair, brown eyes, a prominent white mustache, stooped posture, wearing a grey wool flat cap, a yellow oilskin long coat with wide lapels over a white collared shirt, brown wool straight-leg trousers, and black rubber waterproof ankle boots—stands in the foreground gripping the boat's wooden gunwale, one hand wrapped around the worn timber, the other resting on the oar. In the midground, Emma and Noah climb down a long hemp rope ladder draped over the pirate ship's dark hull. Emma, with her brown ponytail and red bandana, red and white striped undershirt, black trousers and brown boots, grips a wooden rung with both hands, her feet resting on the rung below; Pepe, a melon-sized parrot with bright green body feathers, red tail feathers, blue wing tips and a curved black beak, perches on her right shoulder, his small black claws curling around the fabric of her shirt. Noah, with his blonde curls and blue eyes, wearing his orange life jacket over his light blue top and dark grey trousers, climbs beside her, his right hand gripping a rung and his left hand holding the paper kite—now ripped in two down the middle—against the ladder. A few distant figures walk along the embankment behind Hans. High in the background, Emma's black cotton Piratentuch flies from the ship's tall mast top in the last shreds of morning fog, catching the autumn wind as the ship departs.",
+    "interactions": [
+     {
+      "hands": true,
+      "where": "grips a rung of the ladder with both hands, feet resting on the rung below",
+      "action": "climbing",
+      "object": "ART003",
+      "priority": "essential",
+      "character": "Emma",
+      "storyRelevant": true
+     },
+     {
+      "hands": true,
+      "where": "climbs beside Emma, one hand gripping a rung",
+      "action": "climbing",
+      "object": "ART003",
+      "priority": "essential",
+      "character": "Noah",
+      "storyRelevant": true
+     }
+    ],
+    "isJsonFormat": true,
+    "textPosition": null,
+    "crowdExpected": false,
+    "isProseFormat": true,
+    "landmarkPhoto": null,
+    "reuseEmptyScene": null,
+    "sceneComplexity": "simple",
+    "emptyScenePrompt": null,
+    "characterClothing": {
+     "Emma": "costumed:pirate",
+     "Hans": "standard",
+     "Noah": "costumed:pirate"
+    },
+    "translatedSummary": null,
+    "characterPositions": {
+     "Emma": "left midground",
+     "Hans": "center foreground",
+     "Noah": "right midground"
+    },
+    "textZoneDescription": null,
+    "characterPerspectives": {
+     "Emma": {
+      "depth": "midground"
+     },
+     "Hans": {
+      "depth": "foreground"
+     },
+     "Noah": {
+      "depth": "midground"
+     }
+    }
+   },
+   "sceneCharacters": [
+    {
+     "id": 1778709081750,
+     "age": "4",
+     "name": "Emma",
+     "gender": "female",
+     "photos": {
+      "bodyBox": {
+       "x": 28.000000000000004,
+       "y": 0.75,
+       "width": 40,
+       "height": 99.25
+      },
+      "faceBox": {
+       "x": 45.5,
+       "y": 14.875,
+       "id": 0,
+       "width": 10.375,
+       "height": 12.625,
+       "confidence": 0.9997319579124451
+      }
+     },
+     "traits": {
+      "flaws": [
+       "Ungeduldig",
+       "Anhänglich"
+      ],
+      "strengths": [
+       "Neugierig",
+       "Fröhlich",
+       "Fantasievoll"
+      ],
+      "challenges": [
+       "Mit anderen teilen",
+       "Angst vor der Dunkelheit"
+      ],
+      "specialDetails": ""
+     },
+     "avatars": {
+      "status": "complete",
+      "clothing": {
+       "summer": "Pink long-sleeved t-shirt with a large blue and orange butterfly graphic on the front, Dark blue skinny jeans, Brown open-toe sandals",
+       "winter": "dark blue puffer jacket with a hood, featuring a large blue and orange butterfly print on the front and smaller butterflies on the sleeves, paired with dark gray knitted gloves, dark blue leggings, dark brown lace-up boots",
+       "costumed": {
+        "pirate": "red and white striped cotton long-sleeve undershirt with a round neck; black cotton calf-length trousers with ragged cut-off hems; black cotton Piratentuch — a large flat cloth folded into a wide sash, tied around the waist with square knot, two long tails hanging at the front hip; brown leather ankle boots with a single strap buckle; red cotton bandana folded into a triangle and tied over the head, knot at the nape"
+       },
+       "standard": "Pink long-sleeve t-shirt with a large blue and orange butterfly print on the front and sleeves, Dark blue skinny jeans, White sneakers with white laces"
+      },
+      "generatedAt": "2026-05-13T21:51:50.038Z",
+      "styledAvatars": {
+       "watercolor": {
+        "costumed": {
+         "default": "https://images-staging.magicalstory.ch/characters/680c30fd-2839-4c23-b00c-b91603352a6d/characters_680c30fd-2839-4c23-b00c-b9160/inline/characters-0-avatars-styledAvatars-watercolor-costumed-default.jpg"
+        }
+       }
+      },
+      "sheet2x4_costumed_pirate": {
+       "imageUrl": "https://images-staging.magicalstory.ch/characters/680c30fd-2839-4c23-b00c-b91603352a6d/1778709081750/avatars/sheet2x4/sheet2x4_costumed_pirate.png",
+       "generatedAt": "2026-05-14T08:43:11.432Z"
+      }
+     },
+     "physical": {
+      "face": "soft jawline, neutral chin, straight nose with rounded tip, medium cheekbones, medium lips",
+      "build": "average",
+      "other": "freckles, small stud earrings",
+      "glasses": "none",
+      "eyeColor": "brown",
+      "skinTone": "light",
+      "hairColor": "brown",
+      "facialHair": "none",
+      "apparentAge": "preschooler",
+      "eyeColorHex": "#4D2D1B",
+      "skinToneHex": "#E8BEAC",
+      "hairColorHex": "#4A2F21",
+      "detailedHairAnalysis": {
+       "type": "wavy",
+       "density": "full",
+       "parting": "side part right",
+       "styling": "ponytail",
+       "texture": "medium",
+       "lengthTop": "ear-length",
+       "bangsEndAt": "no bangs",
+       "salonLevel": 4,
+       "lengthSides": "same as top",
+       "baseColorHex": "#5C3A27",
+       "highlightsHex": "none"
+      }
+     },
+     "ageCategory": "kindergartner",
+     "structuredClothing": {
+      "shoes": "White sneakers with white laces",
+      "fullBody": null,
+      "lowerBody": "Dark blue skinny jeans",
+      "upperBody": "Pink long-sleeve t-shirt with a large blue and orange butterfly print on the front and sleeves"
+     }
+    },
+    {
+     "id": 1778709103399,
+     "age": "7",
+     "name": "Noah",
+     "gender": "male",
+     "photos": {
+      "bodyBox": {
+       "x": 23.5,
+       "y": 2.875,
+       "width": 42.25,
+       "height": 97.125
+      },
+      "faceBox": {
+       "x": 44.125,
+       "y": 15.375,
+       "id": 0,
+       "width": 9,
+       "height": 11,
+       "confidence": 0.9986748695373535
+      }
+     },
+     "traits": {
+      "flaws": [
+       "Stur",
+       "Schlechter Verlierer"
+      ],
+      "strengths": [
+       "Mutig",
+       "Kreativ",
+       "Abenteuerlustig"
+      ],
+      "challenges": [
+       "Regeln befolgen",
+       "Gefühle kontrollieren"
+      ],
+      "specialDetails": ""
+     },
+     "avatars": {
+      "status": "complete",
+      "clothing": {
+       "summer": "navy blue t-shirt with a white rocket and stars graphic, khaki cargo shorts, white sneakers",
+       "winter": "navy blue winter jacket with a white rocket graphic, khaki cargo pants, dark grey winter boots",
+       "costumed": {
+        "pirate": "NONE"
+       },
+       "standard": "navy blue long-sleeve t-shirt with a white rocket and stars graphic, khaki straight-leg pants, white sneakers"
+      },
+      "faceMatch": {
+       "summer": {
+        "lpips": null,
+        "score": 9,
+        "arcface": 0.7627,
+        "details": "Face Shape: 9/10 - Both have a consistent oval face shape.\nForehead/Cheek/Jaw: 9/10 - Forehead height, cheekbone width, and jawline angle are consistent.\nEyes: 9/10 - Eye shape, spacing, and lid type are very similar.\nNose: 9/10 - The nose shape, bridge, and tip are very consistent.\nMouth: 9/10 - Lip thickness, width, and cupid's bow are very similar.\nOverall: 9/10 - The overall facial structure and proportions are a very good match.\nFinal Score: 9/10",
+        "arcfaceCells": {
+         "top-left": 0.7627,
+         "top-right": 0.5625
+        }
+       },
+       "winter": {
+        "lpips": null,
+        "score": 9,
+        "arcface": 0.6648,
+        "details": "Face Shape: 9/10 - Both have a very similar oval face shape.\nForehead/Cheek/Jaw: 9/10 - Forehead height, cheekbone prominence, and jawline shape are consistent.\nEyes: 9/10 - Eye shape, spacing, and lid type are a very good match.\nNose: 9/10 - Nose bridge, tip, and nostril shape are very similar.\nMouth: 9/10 - Lip thickness, width, and cupid's bow are consistent.\nOverall: 9/10 - The overall facial structure and proportions are an excellent match.\nFinal Score: 9/10",
+        "arcfaceCells": {
+         "top-left": 0.6648,
+         "top-right": 0.5996
+        }
+       },
+       "standard": {
+        "lpips": null,
+        "score": 9,
+        "arcface": 0.6993,
+        "details": "Face Shape: 9/10 - Both have a similar oval/roundish face shape.\nForehead/Cheek/Jaw: 9/10 - Forehead height, cheekbone prominence, and jawline shape are consistent.\nEyes: 9/10 - Eye shape, spacing, and lid type are very consistent.\nNose: 9/10 - Nose bridge profile, tip, and nostril shape are very similar.\nMouth: 9/10 - Lip thickness, width, and cupid's bow are consistent.\nOverall: 9/10 - The overall facial structure and proportions are a very good match.\nFinal Score: 9/10",
+        "arcfaceCells": {
+         "top-left": 0.6993,
+         "top-right": 0.5891
+        }
+       }
+      },
+      "generatedAt": "2026-08-22T11:08:18.103Z",
+      "generationLog": {
+       "summer": {
+        "attempts": 1
+       },
+       "winter": {
+        "attempts": 1
+       },
+       "standard": {
+        "attempts": 1
+       }
+      },
+      "styledAvatars": {
+       "watercolor": {
+        "costumed": {
+         "default": "https://images-staging.magicalstory.ch/characters/680c30fd-2839-4c23-b00c-b91603352a6d/characters_680c30fd-2839-4c23-b00c-b9160/inline/characters-1-avatars-styledAvatars-watercolor-costumed-default.jpg"
+        }
+       }
+      },
+      "generationRefs": {
+       "body": "https://images-staging.magicalstory.ch/characters/680c30fd-2839-4c23-b00c-b91603352a6d/1778709103399/avatar-refs/body-mt49yf31.jpg",
+       "face": "https://images-staging.magicalstory.ch/characters/680c30fd-2839-4c23-b00c-b91603352a6d/1778709103399/avatar-refs/face-mt49yf31.jpg"
+      },
+      "extractedTraits": {
+       "face": "rounded jawline, neutral chin, straight nose with rounded tip, medium cheekbones, medium lips",
+       "build": "average",
+       "other": "none",
+       "glasses": "none",
+       "eyeColor": "brown",
+       "skinTone": "light",
+       "hairColor": "dark brown",
+       "facialHair": "none",
+       "apparentAge": "young-school-age",
+       "skinToneHex": "#E8BEAC",
+       "hairColorHex": "#3B2314",
+       "detailedHairAnalysis": {
+        "type": "curly",
+        "density": "full",
+        "parting": "none",
+        "styling": "natural",
+        "texture": "medium",
+        "lengthTop": "short",
+        "bangsEndAt": "no bangs",
+        "salonLevel": 3,
+        "lengthSides": "short",
+        "baseColorHex": "#3B2314",
+        "highlightsHex": "none"
+       }
+      },
+      "structuredClothing": {
+       "summer": {
+        "shoes": "white sneakers",
+        "fullBody": null,
+        "lowerBody": "khaki cargo shorts",
+        "upperBody": "navy blue t-shirt with a white rocket and stars graphic"
+       },
+       "winter": {
+        "shoes": "dark grey winter boots",
+        "fullBody": null,
+        "lowerBody": "khaki cargo pants",
+        "upperBody": "navy blue winter jacket with a white rocket graphic"
+       },
+       "standard": {
+        "shoes": "white sneakers",
+        "fullBody": null,
+        "lowerBody": "khaki straight-leg pants",
+        "upperBody": "navy blue long-sleeve t-shirt with a white rocket and stars graphic"
+       }
+      },
+      "sheet2x4_costumed_pirate": {
+       "imageUrl": "https://images-staging.magicalstory.ch/characters/680c30fd-2839-4c23-b00c-b91603352a6d/1778709103399/avatars/sheet2x4/sheet2x4_costumed_pirate.png",
+       "generatedAt": "2026-05-14T08:42:59.891Z"
+      }
+     },
+     "physical": {
+      "face": "rounded jawline, neutral chin, straight nose with rounded tip, medium cheekbones, medium lips",
+      "build": "average",
+      "other": "none",
+      "glasses": "none",
+      "eyeColor": "blue",
+      "skinTone": "light",
+      "hairColor": "light blonde",
+      "hairStyle": "wavy",
+      "facialHair": "none",
+      "apparentAge": "young-school-age",
+      "eyeColorHex": "#4A728F",
+      "skinToneHex": "#E8BEAC",
+      "hairColorHex": "#E6D3A3",
+      "_traitCorrection": {
+       "date": "2026-08-23",
+       "reason": "hairColor/eyeColor wrong since 2026-05-13 extraction; 3-vendor consensus (gemini-2.5-flash, qwen2.5-vl-72b, haiku-4.5) unanimous: light blonde, blue eyes; photo confirms",
+       "previous": {
+        "eyeColor": "brown",
+        "hairColor": "dark brown"
+       }
+      },
+      "detailedHairAnalysis": {
+       "type": "curly",
+       "density": "full",
+       "parting": "none",
+       "styling": "natural",
+       "texture": "medium",
+       "lengthTop": "short",
+       "bangsEndAt": "no bangs",
+       "salonLevel": 3,
+       "lengthSides": "short",
+       "baseColorHex": "#3B2314",
+       "highlightsHex": "none"
+      }
+     },
+     "ageCategory": "young-school-age",
+     "structuredClothing": {
+      "shoes": "white sneakers",
+      "fullBody": null,
+      "lowerBody": "khaki straight-leg pants",
+      "upperBody": "navy blue long-sleeve t-shirt with a white rocket and stars graphic"
+     },
+     "physicalTraitsSource": {
+      "face": "extracted",
+      "build": "extracted",
+      "other": "extracted",
+      "glasses": "extracted",
+      "eyeColor": "extracted",
+      "skinTone": "extracted",
+      "hairColor": "extracted",
+      "facialHair": "extracted",
+      "apparentAge": "extracted",
+      "skinToneHex": "extracted",
+      "hairColorHex": "extracted"
+     }
+    },
+    {
+     "id": 1778709187545,
+     "age": "68",
+     "name": "Hans",
+     "gender": "male",
+     "photos": {
+      "bodyBox": {
+       "x": 27.500000000000004,
+       "y": 0,
+       "width": 41.625,
+       "height": 100
+      },
+      "faceBox": {
+       "x": 44.75,
+       "y": 7.000000000000001,
+       "id": 0,
+       "width": 9.25,
+       "height": 11.75,
+       "confidence": 0.9999719858169556
+      }
+     },
+     "traits": {
+      "flaws": [
+       "Stur",
+       "Ungeduldig"
+      ],
+      "strengths": [
+       "Geduldig",
+       "Fröhlich",
+       "Freundlich"
+      ],
+      "challenges": [
+       "Regeln befolgen",
+       "Gefühle kontrollieren"
+      ],
+      "specialDetails": ""
+     },
+     "avatars": {
+      "status": "complete",
+      "clothing": {
+       "summer": "Red and black plaid short-sleeved button-up shirt, brown leather suspenders with an embroidered chest piece., Brown corduroy pants., Brown lace-up shoes.",
+       "winter": "Red and black plaid long-sleeve shirt/jacket, brown leather suspenders with a decorative chest piece, Brown corduroy pants, Dark brown lace-up shoes",
+       "standard": "Red and black plaid long-sleeved button-up shirt, brown leather suspenders with a decorative chest piece, Brown corduroy pants, Brown lace-up shoes"
+      },
+      "generatedAt": "2026-05-13T21:53:35.883Z",
+      "styledAvatars": {
+       "watercolor": {
+        "standard": "https://images-staging.magicalstory.ch/characters/680c30fd-2839-4c23-b00c-b91603352a6d/characters_680c30fd-2839-4c23-b00c-b9160/inline/characters-4-avatars-styledAvatars-watercolor-standard.jpg"
+       }
+      },
+      "sheet2x4_standard": {
+       "imageUrl": "https://images-staging.magicalstory.ch/characters/680c30fd-2839-4c23-b00c-b91603352a6d/1778709187545/avatars/sheet2x4/sheet2x4_standard.png",
+       "generatedAt": "2026-05-14T08:43:12.444Z"
+      }
+     },
+     "physical": {
+      "face": "rounded jawline, neutral chin, straight nose with rounded tip, medium cheekbones, medium lips",
+      "build": "average",
+      "other": "prominent white mustache",
+      "glasses": "none",
+      "eyeColor": "brown",
+      "skinTone": "fair",
+      "hairColor": "white",
+      "facialHair": "mustache",
+      "apparentAge": "elderly",
+      "eyeColorHex": "#6B4423",
+      "skinToneHex": "#E8BEAC",
+      "hairColorHex": "#E0E0E0",
+      "detailedHairAnalysis": {
+       "type": "straight",
+       "density": "full",
+       "parting": "none",
+       "styling": "combed",
+       "texture": "medium",
+       "lengthTop": "short",
+       "bangsEndAt": "no bangs",
+       "salonLevel": 10,
+       "lengthSides": "short",
+       "baseColorHex": "#FFFFFF",
+       "highlightsHex": "none"
+      }
+     },
+     "ageCategory": "senior",
+     "structuredClothing": {
+      "shoes": "Brown lace-up shoes",
+      "fullBody": null,
+      "lowerBody": "Brown corduroy pants",
+      "upperBody": "Red and black plaid long-sleeved button-up shirt, brown leather suspenders with a decorative chest piece"
+     },
+     "physicalTraitsSource": {
+      "face": "extracted",
+      "build": "extracted",
+      "other": "extracted",
+      "glasses": "extracted",
+      "eyeColor": "extracted",
+      "skinTone": "extracted",
+      "hairColor": "extracted",
+      "facialHair": "extracted",
+      "apparentAge": "extracted",
+      "eyeColorHex": "extracted",
+      "skinToneHex": "extracted",
+      "hairColorHex": "extracted"
+     }
+    }
+   ],
+   "referencePhotos": [
+    {
+     "id": 1778709081750,
+     "name": "Emma",
+     "cellPose": "threeQuarter",
+     "hasPhoto": true,
+     "cellDepth": "midground",
+     "photoHash": "616248f2",
+     "photoType": "cell-threeQuarter",
+     "cellIncludesFace": false,
+     "clothingCategory": "costumed",
+     "clothingDescription": "red and white striped cotton long-sleeve undershirt with a round neck; black cotton calf-length trousers with ragged cut-off hems; black cotton Piratentuch — a large flat cloth folded into a wide sash, tied around the waist with square knot, two long tails hanging at the front hip; brown leather ankle boots with a single strap buckle; red cotton bandana folded into a triangle and tied over the head, knot at the nape",
+     "requestedClothingCategory": "costumed"
+    },
+    {
+     "id": 1778709103399,
+     "name": "Noah",
+     "cellPose": "threeQuarter",
+     "hasPhoto": true,
+     "cellDepth": "midground",
+     "photoHash": "1ab1ee3e",
+     "photoType": "cell-threeQuarter",
+     "cellIncludesFace": false,
+     "clothingCategory": "costumed",
+     "clothingDescription": "NONE",
+     "requestedClothingCategory": "costumed"
+    },
+    {
+     "id": 1778709187545,
+     "name": "Hans",
+     "cellPose": "threeQuarter",
+     "hasPhoto": true,
+     "isStyled": true,
+     "cellDepth": "foreground",
+     "photoHash": "e1c595af",
+     "photoType": "cell-threeQuarter-headbody",
+     "cellIncludesFace": true,
+     "clothingCategory": "standard",
+     "originalPhotoUrl": "https://images-staging.magicalstory.ch/stories/job_1790529840433_ar4u7qry3/debug/p4/ref-photo-2-orig.jpg",
+     "clothingDescription": "grey wool flat cap; yellow oilskin long coat with a wide lapel collar and large front buttons; white cotton collared shirt underneath; brown wool straight-leg trousers; black rubber waterproof ankle boots",
+     "requestedClothingCategory": "standard"
+    }
+   ]
+  }
+ ]
+}

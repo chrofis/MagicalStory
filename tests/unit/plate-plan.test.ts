@@ -59,7 +59,7 @@ describe('plateEditForPage', () => {
 });
 
 describe('the vantage derive loop uses it', () => {
-  const src = fs.readFileSync(path.join(__dirname, '..', '..', 'storyJobPipeline.js'), 'utf8');
+  const src = fs.readFileSync(path.join(__dirname, '..', '..', 'server/lib/platePipeline.js'), 'utf8');
   it('skips a page that needs neither a camera move nor a re-light', () => {
     expect(src).toContain('if ((!camera && !relit) || derivedPlates.has(key)) continue;');
     expect(src).toContain("plateEditForPage({ pageShot: shotOfPage(pn), baseShot: vantageShot, pageLight: lightOfPage(pn), baseLight })");

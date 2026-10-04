@@ -120,9 +120,11 @@ describe('the eval call sites thread the story id', () => {
   it('every evaluateImageBatch call in the repair pipeline carries it', () => {
     const src = read('server/lib/repairPipeline.js');
     const calls = src.match(/evaluateImageBatch\(/g) || [];
-    expect(calls.length).toBe(5);
-    expect((src.match(/\.\.\.evalStoryMeta/g) || []).length).toBe(5);
-    expect(src).toMatch(/const evalStoryMeta = \{\s*\n\s*storyId: storyData\?\.id \|\| jobId \|\| null,/);
+    expect(calls.length).toBe(6);
+    expect((src.match(/\.\.\.evalStoryMeta/g) || []).length).toBe(6);
+    // One builder since 2026-09-27, shared with the Test Lab eval stages.
+    expect(src).toContain('const evalStoryMeta = evalStoryMetaOf(storyData, jobId);');
+    expect(src).toMatch(/function evalStoryMetaOf\(storyData, jobId = null\) \{\s*\n\s*return \{\s*\n\s*storyId: storyData\?\.id \|\| jobId \|\| null,/);
   });
 
   it('both cover-iterate evals carry it too — covers run inside the story job', () => {

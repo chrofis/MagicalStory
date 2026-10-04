@@ -8,7 +8,7 @@ const express = require('express');
 const router = express.Router();
 
 const { getPool } = require('../../services/database');
-const { verifyToken } = require('../../middleware/auth');
+const { verifySession } = require('../../middleware/auth');
 const { log } = require('../../utils/logger');
 const {
   indexLandmarksForCities,
@@ -22,7 +22,7 @@ const {
 let swissLandmarkIndexingJob = null;
 
 // Helper to check auth (JWT or secret)
-function checkAuth(req, res, isPost = false) {
+async function checkAuth(req, res, isPost = false) {
   const secret = isPost ? req.body?.secret : req.query?.secret;
 
   if (process.env.ADMIN_SECRET && secret === process.env.ADMIN_SECRET) {
@@ -37,7 +37,7 @@ function checkAuth(req, res, isPost = false) {
 
   try {
     const token = authHeader.split(' ')[1];
-    const decoded = verifyToken(token);
+    const decoded = await verifySession(token);
     if (decoded.role !== 'admin') {
       res.status(403).json({ error: 'Admin access required' });
       return false;
@@ -51,7 +51,7 @@ function checkAuth(req, res, isPost = false) {
 
 // POST /api/admin/swiss-landmarks/index - Trigger indexing
 router.post('/index', async (req, res) => {
-  if (!checkAuth(req, res, true)) return;
+  if (!(await checkAuth(req, res, true))) return;
 
   try {
     // Check if already running
@@ -155,7 +155,7 @@ router.post('/index', async (req, res) => {
 
 // GET /api/admin/swiss-landmarks/index/status - Check indexing progress
 router.get('/index/status', async (req, res) => {
-  if (!checkAuth(req, res, false)) return;
+  if (!(await checkAuth(req, res, false))) return;
 
   if (!swissLandmarkIndexingJob) {
     return res.json({ status: 'not_started', message: 'No indexing job has been started' });
@@ -165,7 +165,7 @@ router.get('/index/status', async (req, res) => {
 
 // POST /api/admin/swiss-landmarks/recalculate-scores - Recalculate all scores based on type
 router.post('/recalculate-scores', async (req, res) => {
-  if (!checkAuth(req, res, true)) return;
+  if (!(await checkAuth(req, res, true))) return;
 
   try {
     const pool = getPool();
@@ -190,7 +190,7 @@ router.post('/recalculate-scores', async (req, res) => {
 
 // POST /api/admin/swiss-landmarks/update-type - Update a landmark's type
 router.post('/update-type', async (req, res) => {
-  if (!checkAuth(req, res, true)) return;
+  if (!(await checkAuth(req, res, true))) return;
 
   try {
     const { id, type } = req.body;
@@ -219,7 +219,7 @@ router.post('/update-type', async (req, res) => {
 
 // GET /api/admin/swiss-landmarks/stats - Get statistics
 router.get('/stats', async (req, res) => {
-  if (!checkAuth(req, res, false)) return;
+  if (!(await checkAuth(req, res, false))) return;
 
   try {
     const stats = await getLandmarkIndexStats();
@@ -232,7 +232,7 @@ router.get('/stats', async (req, res) => {
 
 // GET /api/admin/swiss-landmarks - List landmarks
 router.get('/', async (req, res) => {
-  if (!checkAuth(req, res, false)) return;
+  if (!(await checkAuth(req, res, false))) return;
 
   try {
     const { city, lat, lon, radius = 20, limit = 50, full = false } = req.query;
@@ -293,7 +293,7 @@ router.get('/', async (req, res) => {
 
 // DELETE /api/admin/swiss-landmarks/broken - Delete broken entries (Wikipedia article URLs instead of image URLs)
 router.delete('/broken', async (req, res) => {
-  if (!checkAuth(req, res, false)) return;
+  if (!(await checkAuth(req, res, false))) return;
 
   try {
     const pool = getPool();
@@ -321,7 +321,7 @@ router.delete('/broken', async (req, res) => {
 
 // DELETE /api/admin/swiss-landmarks/by-ids - Delete landmarks by ID
 router.delete('/by-ids', async (req, res) => {
-  if (!checkAuth(req, res, false)) return;
+  if (!(await checkAuth(req, res, false))) return;
 
   try {
     const ids = req.query.ids?.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id));

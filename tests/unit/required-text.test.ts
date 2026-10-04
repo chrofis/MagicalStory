@@ -199,7 +199,7 @@ describe('the authoring rule reaches every site that authors or judges a declara
   });
 
   it('arrives in the BUILT all-pages Art Director prompt (the live beats path)', () => {
-    const built = PB.buildSceneExpansionAllPrompt(STORY, [{ pageNumber: 1, planLine: 'The child walks.' }], {});
+    const built = PB.buildVisualBibleCallPrompt(STORY, [{ pageNumber: 1, planLine: 'The child walks.' }], {});
     expect(built).toBeTruthy();
     expect(built).toContain(rt.REQUIRED_TEXT_AUTHORING_RULE);
     expect(built).not.toContain('{REQUIRED_TEXT_AUTHORING}');
@@ -210,49 +210,17 @@ describe('the authoring rule reaches every site that authors or judges a declara
     expect(built).toContain(rt.REQUIRED_TEXT_AUTHORING_RULE);
     expect(built).not.toContain('{REQUIRED_TEXT_AUTHORING}');
   });
-
-  it('arrives in the BUILT scene review prompt, the critic that can fault a missing declaration', () => {
-    const built = PB.buildSceneReviewPrompt(STORY, [{ pageNumber: 1, brief: 'A child at a signpost.' }], { visualBible: VB });
-    expect(built).toContain(rt.REQUIRED_TEXT_AUTHORING_RULE);
-    expect(built).not.toContain('{REQUIRED_TEXT_AUTHORING}');
-  });
-
-  it('shows the critic what each element declares — a null is visible as a null', () => {
-    const built = PB.buildSceneReviewPrompt(STORY, [{ pageNumber: 1, brief: 'A child at a signpost.' }], { visualBible: VB });
-    expect(built).toContain('VISUAL BIBLE — DECLARED TEXT');
-    expect(built).toMatch(/ART001[^\n]*text: "WXYZ"/);
-    expect(built).toMatch(/ART002[^\n]*text: \(none declared\)/);
-  });
 });
 
-describe('the scene review can correct a declaration', () => {
-  const { applyReviewBibleCorrections } = require('../../server/lib/beatsPipeline');
-
-  const bible = () => ({
-    artifacts: [{ id: 'ART001', name: 'signpost', description: 'a wooden signpost', text: null, states: [] }],
-    animals: [], vehicles: [], clothing: [], locations: [], secondaryCharacters: [],
-  });
-
-  it('adopts a text-only correction on an entry that has no states', () => {
-    const vb = bible();
-    const raw = '---VISUAL BIBLE---\n```json\n{"artifacts":[{"id":"ART001","text":"WXYZ"}]}\n```';
-    const out = applyReviewBibleCorrections(raw, vb, 4);
+describe('the brief re-ask can declare lettering on a cited element', () => {
+  // The scene review's text lane went with the review (2026-09-28); the one
+  // brief re-ask answers required_text_undeclared with its own lane
+  // (briefChecks.applyBibleTextLane, pinned in brief-review-rules-as-checks.test.ts).
+  const { applyBibleTextLane } = require('../../server/lib/briefChecks');
+  it('declares the exact characters on the cited entry', () => {
+    const vb: any = { artifacts: [{ id: 'ART001', name: 'signpost', description: 'a wooden signpost', text: null }] };
+    const out = applyBibleTextLane('---VISUAL BIBLE---\n{"text":[{"id":"ART001","text":"WXYZ"}]}', vb, ['ART001']);
     expect(vb.artifacts[0].text).toBe('WXYZ');
     expect(out.rejected).toEqual([]);
-  });
-
-  it('adopts a withdrawal — an over-declaration is emptied, not left standing', () => {
-    const vb = bible();
-    vb.artifacts[0].text = 'WXYZ';
-    const raw = '---VISUAL BIBLE---\n```json\n{"artifacts":[{"id":"ART001","text":""}]}\n```';
-    applyReviewBibleCorrections(raw, vb, 4);
-    expect(vb.artifacts[0].text).toBe(null);
-  });
-
-  it('still rejects a correction carrying neither states[] nor text', () => {
-    const vb = bible();
-    const raw = '---VISUAL BIBLE---\n```json\n{"artifacts":[{"id":"ART001"}]}\n```';
-    const out = applyReviewBibleCorrections(raw, vb, 4);
-    expect(out.rejected.length).toBe(1);
   });
 });

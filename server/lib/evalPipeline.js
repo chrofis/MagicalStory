@@ -32,6 +32,7 @@ const { PROMPT_TEMPLATES, fillTemplate, promptSections } = require('../services/
 const { assertPromptFilled, guardPromptString } = require('../services/prompts');
 const { MODEL_DEFAULTS, withRetry } = require('./textModels');
 const { TEXT_MODELS, GROK_VISION_FALLBACK } = require('../config/models');
+const { geminiUsage } = require('./providerUsage');
 const r2Lib = require('./r2');
 
 // storyHelpers functions (lazy-loaded to avoid circular dependencies)
@@ -93,7 +94,7 @@ const IMAGE_QUALITY_THRESHOLD = parseFloat(process.env.IMAGE_QUALITY_THRESHOLD) 
  * @param {string} modelId - Gemini model to use
  * @param {string} apiKey - Gemini API key
  * @param {string} pageContext - Page context for logging
- * @returns {Promise<{figures: Array, objectMatches: Array, rendering: Object, inputTokens: number, outputTokens: number}|null>}
+ * @returns {Promise<{figures: Array, objectMatches: Array, rendering: Object, inputTokens: number, outputTokens: number, thinkingTokens: number}|null>}
  */
 async function runVisualInventory(parts, modelId, apiKey, pageContext, opts = {}) {
   try {
@@ -201,9 +202,7 @@ async function runVisualInventory(parts, modelId, apiKey, pageContext, opts = {}
     }
 
     let p1Data = await p1Response.json();
-    let inputTokens = p1Data.usageMetadata?.promptTokenCount || 0;
-    let outputTokens = p1Data.usageMetadata?.candidatesTokenCount || 0;
-    const thinkingTokens = p1Data.usageMetadata?.thoughtsTokenCount || 0;
+    let { input_tokens: inputTokens, output_tokens: outputTokens, thinking_tokens: thinkingTokens } = geminiUsage(p1Data.usageMetadata);
 
     // ALLOW-LIST since 2026-09-18 (imageReplyGuard): a finish reason must MEAN
     // the model finished, or the inventory is treated as blocked and routed to
@@ -232,8 +231,7 @@ async function runVisualInventory(parts, modelId, apiKey, pageContext, opts = {}
               // that answered, not the one that was asked.
               modelId = grokFallbackId;
               modelConfig = grokFallbackModel;
-              inputTokens = p1Data.usageMetadata?.promptTokenCount || 0;
-              outputTokens = p1Data.usageMetadata?.candidatesTokenCount || 0;
+              ({ input_tokens: inputTokens, output_tokens: outputTokens, thinking_tokens: thinkingTokens } = geminiUsage(p1Data.usageMetadata));
               if (p1Data?.candidates?.[0]?.content?.parts?.[0]?.text) {
                 log.info(`✅ [QUALITY P1] ${pageLabel}Grok fallback succeeded`);
               } else {
@@ -278,7 +276,7 @@ async function runVisualInventory(parts, modelId, apiKey, pageContext, opts = {}
     // the documented 2.5-flash fallback served all 10 pages, and the experiment
     // row still said 3.7: an A/B comparing a model with itself, caught only
     // because the token counts came back byte-identical to the 2.5 arm.
-    if (opts.raw) return { rawText: p1Text, inputTokens, outputTokens, servedByModel: modelId };
+    if (opts.raw) return { rawText: p1Text, inputTokens, outputTokens, thinkingTokens, servedByModel: modelId };
 
     let inventoryJson;
     try {
@@ -325,7 +323,8 @@ async function runVisualInventory(parts, modelId, apiKey, pageContext, opts = {}
       sceneSummary: inventoryJson.scene_summary || null,
       mainAction: inventoryJson.main_action || null,
       inputTokens,
-      outputTokens
+      outputTokens,
+      thinkingTokens
     };
   } catch (err) {
     log.warn(`⚠️ [QUALITY P1] Figure check failed: ${err.message}`);
@@ -404,21 +403,90 @@ function largestInteriorUniformFraction(mask, rows, cols) {
 }
 
 /**
+ * THE PLATE'S DETAIL VIEWS (2026-09-26). The judge receives the plate as one
+ * image, which gemini-2.5-flash reads as a single 258-token tile
+ * (mediaResolution HIGH changed nothing, measured): a signature, a paper edge
+ * or a distant walker is a few pixels there. validateEmptyScene attaches these
+ * crops after the plate, each fitted to PLATE_DETAIL_VIEW_PX so every crop is
+ * read at a larger scale than the whole plate. Fractions of the plate's
+ * width/height. The four quarters cover every edge and corner; the centre
+ * covers the quarters' seams; the two bottom corners, enlarged further, are
+ * where a signature sits (staging job_1790446348343_z3fw660ie LOC004.2 retry:
+ * a faint scrawl at the bottom right passed at quarter scale).
+ */
+const PLATE_DETAIL_VIEWS = [
+  { label: 'top-left quarter', left: 0, top: 0, width: 0.5, height: 0.5 },
+  { label: 'top-right quarter', left: 0.5, top: 0, width: 0.5, height: 0.5 },
+  { label: 'bottom-left quarter', left: 0, top: 0.5, width: 0.5, height: 0.5 },
+  { label: 'bottom-right quarter', left: 0.5, top: 0.5, width: 0.5, height: 0.5 },
+  { label: 'centre', left: 0.25, top: 0.25, width: 0.5, height: 0.5 },
+  { label: 'bottom-left corner', left: 0, top: 0.75, width: 0.25, height: 0.25 },
+  { label: 'bottom-right corner', left: 0.75, top: 0.75, width: 0.25, height: 0.25 },
+];
+const PLATE_DETAIL_VIEW_PX = 768;
+
+/**
+ * The detail-view crops of one plate, as Gemini inline parts with their labels.
+ * An image too small to crop returns [] (the plate is judged whole, as before).
+ */
+async function plateDetailViewParts(buf) {
+  const meta = await sharp(buf).metadata();
+  const W = meta.width || 0;
+  const H = meta.height || 0;
+  if (W < 256 || H < 256) return [];
+  const parts = [];
+  for (const v of PLATE_DETAIL_VIEWS) {
+    const region = {
+      left: Math.round(v.left * W), top: Math.round(v.top * H),
+      width: Math.round(v.width * W), height: Math.round(v.height * H),
+    };
+    const crop = await sharp(buf).extract(region)
+      .resize(PLATE_DETAIL_VIEW_PX, PLATE_DETAIL_VIEW_PX, { fit: 'inside' })
+      .jpeg({ quality: 90 }).toBuffer();
+    parts.push({ text: `[Detail view of the plate — ${v.label}, enlarged]:` });
+    parts.push({ inline_data: { mime_type: 'image/jpeg', data: crop.toString('base64') } });
+  }
+  return parts;
+}
+
+/**
  * Build the empty-scene QC prompt (prompts/empty-scene-qc.txt).
  *
  * Extracted from validateEmptyScene 2026-09-15 so the built prompt can be
  * asserted without a paid vision call, and so the plate generator/critic pair
  * names two file paths instead of this module.
  */
-function buildEmptySceneQcPrompt({ sceneDescription = '', storyEra = null, characterPlacements = null, mainScenePrompt = '', artStyle = '', shot = '', landmarkName = '', light = null } = {}) {
-  const sceneCtx = sceneDescription
-    ? `\nEXPECTED SCENE: "${sceneDescription.substring(0, 300)}"`
-    : '';
-  // Era context — explicit period so the vision model doesn't have to
-  // infer it. Caller derives this from storyType + costumed clothing.
-  // "present-day" (or null) disables the anachronism check.
-  const eraBlock = storyEra
-    ? `\n\nSTORY ERA: ${storyEra} — render accordingly. Landmark reference photos are present-day; modern things around the landmark in the photo must NOT appear in the output — the landmark itself stays as the photo shows it.`
+function buildEmptySceneQcPrompt({ sceneDescription = '', era = null, framing = '', characterPlacements = null, mainScenePrompt = '', artStyle = '', shot = '', landmarkName = '', landmarkPhotoText = '', light = null, detailViews = [], structures = '', structureReference = false } = {}) {
+  // EVERY INPUT WHOLE (owner, 2026-09-26, reversing the same day's "EXPECTED
+  // SCENE keeps its 300-char cap"): the judge reads the text the plate's author
+  // was given, uncut. The cut at 300 hid the brief's own towers from the
+  // landmark check (a false `landmark` fail) and left a photograph and a
+  // signature unjudged (replay, decisions.md 2026-09-26 "The plate QC reads its
+  // inputs whole"). EXPECTED SCENE is the author's setting text WITHOUT the
+  // FRAMING paragraph — callers pass the two apart, so nothing is said twice.
+  const sceneText = String(sceneDescription || '').trim();
+  const sceneCtx = sceneText ? `\nEXPECTED SCENE: "${sceneText}"` : '';
+  // THE FRAMING PARAGRAPH, WHOLE (2026-09-26): its own field, and the framing
+  // check reads it.
+  const framingText = String(framing || '').trim();
+  const framingBlock = framingText ? `\n\nFRAMING (what the plate's author was told the frame holds): "${framingText}"` : '';
+  // THE STRUCTURES THE AUTHOR WAS GIVEN (2026-09-26): the same text the plate
+  // prompt's **STRUCTURES:** block carries (prompts.buildPlateStructuresText),
+  // and, when the plate call attached one, the Visual Bible reference render
+  // of those vessels or structures (validateEmptyScene attaches it, labelled).
+  const structuresText = String(structures || '').trim();
+  // THE ERA THE PLATE'S AUTHOR WAS GIVEN (2026-09-26): the brief's `era`,
+  // classified by the one era classifier the author's STORY ERA guard uses
+  // (promptBuilders.buildEraGuard). A present-day or absent era gets no guard
+  // on the author's side, so no era block and no anachronism check here. It
+  // used to be derived from the cast's COSTUMES (plateStoryEra, deleted): a
+  // present-day story whose children dress up as pirates was judged "pirate
+  // era" on every plate (staging job_1790446348343_z3fw660ie — all 19 briefs
+  // say present day), and the false era fail's retry feedback ("remove the
+  // modern cars, streetlights and boat tarps") produced a photo copy.
+  const eraText = require('./promptBuilders').buildEraGuard(era) ? String(era).trim() : null;
+  const eraBlock = eraText
+    ? `\n\nSTORY ERA: ${eraText} — render accordingly. Landmark reference photos are present-day; modern things around the landmark in the photo must NOT appear in the output — the landmark itself stays as the photo shows it.`
     : '';
   // If the outline already declared where each character will land, ask
   // the vision model to verify the empty scene has flat usable space at
@@ -434,6 +502,21 @@ function buildEmptySceneQcPrompt({ sceneDescription = '', storyEra = null, chara
   // Loud, not empty: as a string literal a missing prompt was impossible; as a
   // file it would hand the judge a blank page and every plate would "pass".
   if (!qc.BODY) throw new Error('buildEmptySceneQcPrompt: empty-scene-qc template not loaded');
+  const structuresBlock = structuresText
+    ? `\n\n${fillTemplate(qc.STRUCTURES, { STRUCTURES_TEXT: structuresText })}` : '';
+  const structureRefBlock = structureReference ? `\n\n${qc.STRUCTURE_REFERENCE}` : '';
+  // THE STRUCTURES CHECK (owner, 2026-09-26): a structure the author was told
+  // to match — missing where the scene puts it in view, or another kind or
+  // shape — fails, under the soft `structures` key (plateQc.js). It quotes the
+  // author's own two rules (prompts.PLATE_STRUCTURE_*_RULE), and exists only
+  // when the author was given structures.
+  const { PLATE_STRUCTURE_MATCH_RULE, PLATE_STRUCTURE_PART_RULE } = require('../services/prompts');
+  const structureCheck = structuresText
+    ? `\n${fillTemplate(qc.STRUCTURE_CHECK, {
+      PLATE_STRUCTURE_MATCH_RULE,
+      PLATE_STRUCTURE_PART_RULE,
+      STRUCTURE_REFERENCE_NAME: structureReference ? ' or the STRUCTURE REFERENCE' : '',
+    })}` : '';
   const placementsCheck = placementsBlock ? `\n${qc.PLACEMENTS_CHECK}` : '';
   // Composition geometry fidelity — the main scene will composite
   // characters and aim lines onto this empty scene. If the path
@@ -451,7 +534,9 @@ function buildEmptySceneQcPrompt({ sceneDescription = '', storyEra = null, chara
   // the plate is graded on facts it was given. Adding a check here
   // that is not derivable into that block re-creates the blind grade.
   const mainSceneBlock = mainScenePrompt
-    ? `\n\nMAIN SCENE PROSE (what will be composited onto this empty scene):\n"${mainScenePrompt.substring(0, 800)}"`
+    // The brief's PROSE, whole (2026-09-26: the 800-char cut is gone). Its
+    // metadata JSON is not prose: splitBrief, the one split every reader uses.
+    ? `\n\nMAIN SCENE PROSE (what will be composited onto this empty scene):\n"${require('./sceneMetadata').splitBrief(mainScenePrompt).prose}"`
     : '';
   // The judge's three geometry questions come from the SAME constant
   // that writes the plate author's geometry block
@@ -475,8 +560,13 @@ function buildEmptySceneQcPrompt({ sceneDescription = '', storyEra = null, chara
   // neither, so a photographic plate or a wrong camera passed (staging
   // job_1790100385959_1nitlympp: the p12 aerial derive read as a photograph,
   // the LOC002.4/.5 plates came back eye-level medium-wide).
+  // A photographic book's plate is held to a photograph; every other style's
+  // plate fails one, a photograph made to look painted included (2026-09-26).
+  // The same classifier the repair style guard uses.
+  const styleSection = require('../services/prompts').isPhotographicArtStyle(artStyle)
+    ? qc.STYLE_CHECK_PHOTOGRAPHIC : qc.STYLE_CHECK;
   const styleCheck = String(artStyle || '').trim()
-    ? `\n${fillTemplate(qc.STYLE_CHECK, { ART_STYLE: String(artStyle).trim() })}` : '';
+    ? `\n${fillTemplate(styleSection, { ART_STYLE: String(artStyle).trim() })}` : '';
   // `shot` is a shot id, or the base plate class ('eye-level'): a vantage's
   // base plate is shared by every close-up, medium and wide page on it, so it
   // is held to its height and angle only, never to one page's distance.
@@ -487,10 +577,30 @@ function buildEmptySceneQcPrompt({ sceneDescription = '', storyEra = null, chara
   // The plate's declared light — the same two fields its author's LIGHT line
   // was built from (sceneLight.js), so a plate is judged on the time of day and
   // weather it was told to paint and on nothing read out of prose.
-  const { describeLight } = require('./sceneLight');
-  const lightWords = describeLight(light);
+  // A weather that owns the sky adds the sky phrase the author was given
+  // (describeLightForJudge, 2026-09-26), so a sun in a fog plate is judged.
+  const { describeLightForJudge, weatherOwnsSky, normaliseWeather } = require('./sceneLight');
+  const lightWords = describeLightForJudge(light);
+  // A covered sky has failure cases of its own (2026-09-26): LOC005.1 of
+  // staging job_1790446348343_z3fw660ie declared fog and passed with a sunny
+  // sky and a crisp far bank, because "does its light show that weather" left
+  // the judge to decide what fog looks like. The weather value is read from the
+  // declared field, and the set of sky-owning weathers is sceneLight's own.
+  const weather = normaliseWeather(light?.weather);
+  const coveredSky = lightWords && weatherOwnsSky(weather)
+    ? `\n${fillTemplate(qc.LIGHT_COVERED_SKY, { WEATHER: weather })}` : '';
+  const fogCheck = lightWords && weather === 'fog' ? `\n${qc.LIGHT_FOG}` : '';
   const lightCheck = lightWords
-    ? `\n${fillTemplate(qc.LIGHT_CHECK, { LIGHT: lightWords })}` : '';
+    ? `\n${fillTemplate(qc.LIGHT_CHECK, { LIGHT: lightWords })}${coveredSky}${fogCheck}` : '';
+  // THE FRAMING CHECK (2026-09-26): the plate is held to the structure or view
+  // its FRAMING puts in the frame — the paragraph its author painted from.
+  const framingCheck = framingText ? `\n${qc.FRAMING_CHECK}` : '';
+  // The detail views validateEmptyScene attaches after the plate (enlarged
+  // parts of it): the judge sees the plate as one small tile, where a
+  // signature, a paper edge or a distant walker is a few pixels.
+  const views = Array.isArray(detailViews) ? detailViews.filter(Boolean) : [];
+  const detailBlock = views.length
+    ? `\n\n${fillTemplate(qc.DETAIL_VIEWS, { DETAIL_VIEW_LIST: views.join(', ') })}` : '';
   // THE PHOTO WINS OVER THE WORDS (owner, 2026-09-23). Emitted only when the
   // caller attached the landmark photo as the second image — the check names
   // that image. The authority sentence is the same constant the plate author's
@@ -500,25 +610,43 @@ function buildEmptySceneQcPrompt({ sceneDescription = '', storyEra = null, chara
   const landmarkCheck = landmark
     ? `
 
-${fillTemplate(qc.LANDMARK_CHECK, { LANDMARK_NAME: landmark, LANDMARK_PHOTO_AUTHORITY: require('./promptBuilders').LANDMARK_PHOTO_AUTHORITY })}` : '';
+${fillTemplate(qc.LANDMARK_CHECK, {
+    LANDMARK_NAME: landmark,
+    LANDMARK_PHOTO_AUTHORITY: require('./promptBuilders').LANDMARK_PHOTO_AUTHORITY,
+    // The REFERENCE line the plate author was given, verbatim: the plate shows
+    // the part of the place its camera sees, and is judged on that part.
+    PLATE_LANDMARK_REFERENCE: require('./shotVocabulary').PLATE_LANDMARK_REFERENCE,
+    // What the landmark index records the photograph shows — the SAME line
+    // the Art Director cited it from (promptBuilders.landmarkPhotoText).
+    LANDMARK_PHOTO_RECORD: String(landmarkPhotoText || '').trim()
+      ? ` The landmark index records this photograph as: "${String(landmarkPhotoText).trim()}".` : '',
+  })}` : '';
   return fillTemplate(qc.BODY, {
     // The closed list of checks an issue is filed under (plateQc.js) — what a
     // double QC failure is decided on, so it is one constant, never prose.
     CHECK_KEYS: require('./plateQc').checkKeysForPrompt(),
     SCENE_CTX: sceneCtx,
+    FRAMING_BLOCK: framingBlock,
+    STRUCTURES_BLOCK: structuresBlock,
+    STRUCTURE_REFERENCE: structureRefBlock,
+    DETAIL_VIEWS: detailBlock,
     STYLE_CHECK: styleCheck,
     CAMERA_CHECK: cameraCheck,
+    FRAMING_CHECK: framingCheck,
     LIGHT_CHECK: lightCheck,
     ERA_BLOCK: eraBlock,
     PLACEMENTS_BLOCK: placementsBlock,
     MAIN_SCENE_BLOCK: mainSceneBlock,
-    ERA_CHECK: storyEra ? `\n${qc.ERA_CHECK}` : '',
+    ERA_CHECK: eraText ? `\n${qc.ERA_CHECK}` : '',
     PLACEMENTS_CHECK: placementsCheck,
+    STRUCTURE_CHECK: structureCheck,
     GEOMETRY_CHECK: geometryCheck,
     LANDMARK_CHECK: landmarkCheck,
     // The same lists the plate author's PLATE_EDGE_RULE names.
     PLATE_MARKS: require('./shotVocabulary').PLATE_MARKS,
     PLATE_SURROUNDS: require('./shotVocabulary').PLATE_SURROUNDS,
+    // The list the plate author's PLATE_NO_PEOPLE_RULE forbids (2026-09-26).
+    PLATE_PEOPLE: require('./shotVocabulary').PLATE_PEOPLE,
   });
 }
 
@@ -532,15 +660,19 @@ ${fillTemplate(qc.LANDMARK_CHECK, { LANDMARK_NAME: landmark, LANDMARK_PHOTO_AUTH
  * @param {string} textPosition - e.g. 'top-right'
  * @param {string} pageContext - logging context
  * @param {object} [options]
- * @param {string} [options.sceneDescription] - expected scene description
- * @param {{name: string, photoUrl?: string, photoData?: string}} [options.landmarkPhoto] - the landmark
- *        reference photo the plate was painted from; attached as the judge's second image, and the
+ * @param {string} [options.sceneDescription] - the author's setting text WITHOUT the FRAMING paragraph (uncut)
+ * @param {string} [options.framing] - the FRAMING paragraph the plate's author was given (uncut)
+ * @param {string} [options.structures] - the STRUCTURES text the author was given (prompts.buildPlateStructuresText)
+ * @param {Buffer} [options.structureGrid] - the Visual Bible reference grid the plate call carried (buildEmptySceneVbGrid)
+ * @param {string} [options.era] - the brief's `era` the plate's author was given (buildEraGuard classifies it)
+ * @param {{name: string, photoUrl?: string, photoData?: string, description?: string, judgedView?: string}} [options.landmarkPhoto] - the landmark
+ *        reference photo the plate was painted from; attached as the judge's last image, and the
  *        landmark is judged against it instead of the written description
  * @param {boolean} [options.skipVision=false] - skip the Gemini vision check (pixel only)
  * @returns {{ pass: boolean, issues: string[], calmnessScore: number, visionFeedback: string|null }}
  */
 async function validateEmptyScene(imageData, textPosition, pageContext = '', options = {}) {
-  const { sceneDescription = null, skipVision = false, characterPlacements = null, mainScenePrompt = null, storyEra = null, artStyle = null, shot = null, landmarkPhoto = null, light = null } = options;
+  const { sceneDescription = null, skipVision = false, characterPlacements = null, mainScenePrompt = null, era = null, framing = null, artStyle = null, shot = null, landmarkPhoto = null, light = null, structures = null, structureGrid = null } = options;
   try {
     const base64 = r2Lib.stripDataUriPrefix(imageData);
     const buf = Buffer.from(base64, 'base64');
@@ -674,7 +806,20 @@ async function validateEmptyScene(imageData, textPosition, pageContext = '', opt
             }
             if (!landmarkPart) log.error(`❌ [EMPTY-SCENE-QC] ${pageContext} landmark photo for "${landmarkPhoto.name}" could not be loaded — the plate is judged without it`);
           }
-          const qcPrompt = buildEmptySceneQcPrompt({ sceneDescription, storyEra, characterPlacements, mainScenePrompt, artStyle, shot, landmarkName: landmarkPart ? landmarkPhoto.name : '', light });
+          const { landmarkPhotoText } = require('./promptBuilders');
+          const detailParts = await plateDetailViewParts(buf);
+          // The Visual Bible reference grid the plate call carried
+          // (buildEmptySceneVbGrid: the vessels and large structures the plate
+          // holds; null whenever a landmark photo rode instead).
+          const structurePart = Buffer.isBuffer(structureGrid) && structureGrid.length
+            ? { inline_data: { mime_type: 'image/jpeg', data: structureGrid.toString('base64') } } : null;
+          const qcPrompt = buildEmptySceneQcPrompt({
+            sceneDescription, era, framing, characterPlacements, mainScenePrompt, artStyle, shot, light,
+            structures, structureReference: !!structurePart,
+            landmarkName: landmarkPart ? landmarkPhoto.name : '',
+            landmarkPhotoText: landmarkPart ? landmarkPhotoText(landmarkPhoto) : '',
+            detailViews: detailParts.length ? PLATE_DETAIL_VIEWS.map(v => v.label) : [],
+          });
 
           const visionUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
           const visionResp = await fetch(visionUrl, {
@@ -682,17 +827,20 @@ async function validateEmptyScene(imageData, textPosition, pageContext = '', opt
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               contents: [{ parts: [
-                // With a landmark photo the two images are labelled, as the
-                // plate generator labels its landmark reference.
-                ...(landmarkPart ? [{ text: '[Background plate to judge]:' }] : []),
+                // Every image is labelled, as the plate generator labels its
+                // landmark reference: the plate, its detail views, the photo.
+                { text: '[Background plate to judge]:' },
                 { inline_data: { mime_type: mimeType, data: base64ForVision } },
+                ...detailParts,
+                ...(structurePart ? [{ text: '[Visual Bible reference]:' }, structurePart] : []),
                 ...(landmarkPart ? [{ text: `[Landmark reference photo: ${landmarkPhoto.name}]:` }, landmarkPart] : []),
                 { text: guardPromptString(qcPrompt, 'validateEmptyScene') }
               ]}],
               generationConfig: { temperature: 0.1, responseMimeType: 'application/json' },
               safetySettings: require('./images').GEMINI_SAFETY_SETTINGS
             }),
-            signal: AbortSignal.timeout(15000),
+            // Seven images instead of two since 2026-09-26 (detail views).
+            signal: AbortSignal.timeout(30000),
           });
 
           if (visionResp.ok) {
@@ -869,7 +1017,10 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
     const meta = extractSceneMetadata(sceneHint || imagePrompt);
     const interactions = meta?.interactions
       || (Array.isArray(meta?.fullData?.interactions) ? meta.fullData.interactions : null);
-    interactionsBlock = require('./vbIdGuard').formatInteractionsBlock(interactions, visualBible, require('./vbIdGuard').gazeCharacters(meta));
+    interactionsBlock = require('./vbIdGuard').formatInteractionsBlock(interactions, visualBible, [
+      ...(require('./vbIdGuard').gazeCharacters(meta) || []),
+      ...require('./vbIdGuard').gazeCreatures(meta, visualBible),
+    ]);
   } catch { /* silent */ }
 
   // --- Stage 1: the SHARED blind inventory ---
@@ -881,14 +1032,14 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
   // seven weeks later beside it (568aacce7). Both now come from ONE call whose
   // result is passed in, so the judge and the code read the same observation.
   let visionText = null;
-  let stage1Usage = { input_tokens: 0, output_tokens: 0 };
+  let stage1Usage = { input_tokens: 0, output_tokens: 0, thinking_tokens: 0 };
   try {
     const inventory = inventoryPromise ? await inventoryPromise : null;
     if (!inventory) {
       log.warn(`[THREE-STAGE] ${pageLabel}No shared inventory available, skipping`);
       return null;
     }
-    stage1Usage = { input_tokens: inventory.inputTokens || 0, output_tokens: inventory.outputTokens || 0 };
+    stage1Usage = { input_tokens: inventory.inputTokens || 0, output_tokens: inventory.outputTokens || 0, thinking_tokens: inventory.thinkingTokens || 0 };
     // The judge reads JSON now rather than prose. Its figures carry the same
     // 9-zone vocabulary it always paired on, plus the label it resolves to a
     // real name in STEP 1.
@@ -908,7 +1059,7 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
 
   // --- Stage 2: Prompt compliance with Sonnet (text only, NO image) ---
   let complianceResult = null;
-  let stage2Usage = { input_tokens: 0, output_tokens: 0 };
+  let stage2Usage = { input_tokens: 0, output_tokens: 0, thinking_tokens: 0 };
   try {
     // If quality eval is producing its own figures[] + matches[], wait for those
     // so Stage 2 can pair named figures (quality) with independent descriptions (vision)
@@ -992,7 +1143,8 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
 
     stage2Usage = {
       input_tokens: sonnetResult.usage?.input_tokens || 0,
-      output_tokens: sonnetResult.usage?.output_tokens || 0
+      output_tokens: sonnetResult.usage?.output_tokens || 0,
+      thinking_tokens: sonnetResult.usage?.thinking_tokens || 0
     };
 
     // A reply cut at the ceiling is a truncated finding list, not a verdict:
@@ -1001,7 +1153,7 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
     if (sonnetResult.truncation?.suspected) {
       const reason = require('./textModels').describeTruncation(sonnetResult.truncation);
       log.warn(`[THREE-STAGE] ${pageLabel}Stage 2 evalFailed: compliance reply ${reason}`);
-      return { evalFailed: true, evalError: `compliance reply ${reason}`, notEvaluated: notEvaluated.list(), usage: { threeStage_input_tokens: stage2Usage.input_tokens, threeStage_output_tokens: stage2Usage.output_tokens } };
+      return { evalFailed: true, evalError: `compliance reply ${reason}`, notEvaluated: notEvaluated.list(), usage: { threeStage_input_tokens: stage2Usage.input_tokens, threeStage_output_tokens: stage2Usage.output_tokens, threeStage_thinking_tokens: stage2Usage.thinking_tokens } };
     }
     // Parse JSON from compliance response
     const parsed = getStoryHelpers().extractJsonFromText(sonnetResult.text);
@@ -1119,6 +1271,7 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
     usage: {
       threeStage_input_tokens: stage1Usage.input_tokens + stage2Usage.input_tokens,
       threeStage_output_tokens: stage1Usage.output_tokens + stage2Usage.output_tokens,
+      threeStage_thinking_tokens: stage1Usage.thinking_tokens + stage2Usage.thinking_tokens,
       stage1_input_tokens: stage1Usage.input_tokens,
       stage1_output_tokens: stage1Usage.output_tokens,
       stage2_input_tokens: stage2Usage.input_tokens,
@@ -1324,26 +1477,16 @@ function buildExpectedCastBlock({
     // cites as CHR001). The parsed metadata is passed in where the caller
     // holds it; parsing a hint stays the fallback.
     const sceneMeta = sceneMetadata || sh.extractSceneMetadata(sceneHint || originalPrompt);
-    const { normalisePopulation, resolvePopulation } = require('./sceneMetadata');
+    const { normalisePopulation } = require('./sceneMetadata');
     const rawPop = sceneMeta?.population || sceneMeta?.fullData?.population || null;
     const legacyCrowd = sceneMeta?.crowdExpected === true || sceneMeta?.fullData?.crowdExpected === true;
-    const declaredPop = normalisePopulation(rawPop, legacyCrowd);
-    // THE PLATE IS THE SECOND WITNESS (owner, 2026-09-19). The empty-scene
-    // plate is rendered BEFORE any cast is composited, so the people in it
-    // belong to the setting by construction — evidence, where the Art
-    // Director's `population` is a declaration. Where they disagree the plate
-    // wins, and it can only raise the state (bboxDetection.detectPlatePopulation
-    // → sceneMetadata.resolvePopulation). A page with no plate keeps the
-    // declaration untouched, which is why the genuine uncommissioned-child
-    // page still fires.
-    const platePop = sceneMeta?.platePopulation || sceneMeta?.fullData?.platePopulation || null;
-    const resolved = resolvePopulation(declaredPop, platePop);
-    population = resolved.population;
-    // LOG THE DISAGREEMENT, so how often the Art Director is wrong about its
-    // own setting is a measured number rather than an impression.
-    if (resolved.disagreed) {
-      log.info(`👥 [PLATE-POP] ${pageLabel || 'page'}: brief declared "${declaredPop}", plate shows "${platePop}" — plate wins`);
-    }
+    // THE BRIEF'S FIELD IS THE ONE SOURCE (owner, 2026-09-26). The page render
+    // draws background people from this same field (promptBuilders
+    // buildRequiredCastRule) and the plate holds none, so the judge's answer
+    // and the illustrator's instruction are one value. The plate reading that
+    // could raise it (2026-09-19, detectPlatePopulation) is deleted with the
+    // people it read.
+    population = normalisePopulation(rawPop, legacyCrowd);
     crowdExpected = population === 'crowd';
     for (const e of sh.buildSecondaryExpectedCharacters(visualBible, sceneMeta, [...names], { pageLabel, extraNames, includeAnimals: true })) add(e.name, vbKind(e.name));
     // A SECONDARY THAT DECLARES THIS PAGE IS ON THIS PAGE (2026-09-13). The
@@ -1584,8 +1727,7 @@ async function callAbsenceJudge(parts, modelId, apiKey) {
   const j = await resp.json();
   const text = j?.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('') || '';
   if (!text) throw new Error(`second look returned no text (finishReason ${j?.candidates?.[0]?.finishReason || 'none'})`);
-  const um = j?.usageMetadata || {};
-  return { text, usage: { input_tokens: um.promptTokenCount || 0, output_tokens: um.candidatesTokenCount || 0 } };
+  return { text, usage: geminiUsage(j?.usageMetadata) };
 }
 
 /** The presence types the derivation owns outright once it has spoken. */
@@ -1975,11 +2117,19 @@ function buildEvalClothingContract({
     // returns the outfit UNCHANGED when `visualBible` is falsy, so a caller
     // that omits the bible gets the unstripped story-level outfit and no
     // warning whatsoever.
-    const { resolveGeneratedOutfit } = require('./wornItems');
+    const { resolveGeneratedOutfit, faceAwayNames, SEEN_FROM_BACK } = require('./wornItems');
     const wornMeta = sceneMetadata
       || (() => { try { return getStoryHelpers().extractSceneMetadata(sceneHint || originalPrompt); } catch { return null; } })();
     const wornCtx = { visualBible: visualBible || null, sceneMetadata: wornMeta };
     const asWorn = (name, outfit) => resolveGeneratedOutfit(outfit, name, wornCtx);
+    // DECLARED FACING (2026-10-04). A character the brief draws from behind is
+    // tagged on its contract line, so every judge reads the outfit as a back
+    // view: its front features are not expected, and drawn on the back they
+    // are image-evaluation D-05e `garment_facing`. Same predicate the generator's
+    // worn line uses (wornItems.faceAwayNames → storyAvatars.resolveCellPose).
+    const away = faceAwayNames(sceneCharacters, wornMeta);
+    const who = (name) => (away.some(n => String(n).trim().toLowerCase() === String(name).trim().toLowerCase())
+      ? `${name} (${SEEN_FROM_BACK})` : name);
     const reqs = clothingRequirements || null;
     if (reqs) {
       const { buildClothingDescription } = require('./entityConsistency');
@@ -1988,14 +2138,14 @@ function buildEvalClothingContract({
         const category = reqs[c.name]?._currentClothing;
         if (!category) continue;
         const outfit = asWorn(c.name, buildClothingDescription(c, category, artStyle, reqs));
-        if (outfit && String(outfit).trim()) lines.push(`- ${c.name}: ${String(outfit).trim()}`);
+        if (outfit && String(outfit).trim()) lines.push(`- ${who(c.name)}: ${String(outfit).trim()}`);
       }
     }
     if (lines.length === 0) {
       for (const p of (referenceImages || [])) {
         if (!p?.name || !p?.clothingDescription) continue;
         const outfit = asWorn(p.name, p.clothingDescription);
-        if (outfit && String(outfit).trim()) lines.push(`- ${p.name}: ${String(outfit).trim()}`);
+        if (outfit && String(outfit).trim()) lines.push(`- ${who(p.name)}: ${String(outfit).trim()}`);
       }
     }
     return { block: lines.join('\n'), error: null };
@@ -2034,55 +2184,46 @@ function styleGateEchoedFields(styleGate, artStyleText, templateText = '') {
   });
 }
 
-async function evaluateImageQuality(imageData, originalPrompt = '', referenceImages = [], evaluationType = 'scene', qualityModelOverride = null, pageContext = '', storyText = null, sceneHint = null, sceneCharacters = null, evalOptions = {}) {
-  // evalOptions.evalTemplateOverride / .semanticTemplateOverride: Test Lab A/B
-  // variants — full replacement template strings used instead of the loaded
-  // files for THIS call only (PROMPT_TEMPLATES is never mutated).
-  // Hoisted outside try so the catch/finally below can reference them.
-  // `let` is block-scoped to the try body — without these declarations here,
-  // the finally's `if (qualityFiguresResolve)` throws ReferenceError on every
-  // call, taking down all 10 page evaluations + cover gen with it.
-  let semanticPromise = null;
-  let threeStagePromise = null;
-  let qualityFiguresPromise = null;
-  let qualityFiguresResolve = null;
-  let p1Promise = null;
-  // NOT-EVALUATED RECORD (2026-09-14). Silence from a check that ran clean and
-  // silence from a check that could not run used to be the same signal; this
-  // makes the second one a field on the result. Recording only — no entry here
-  // is ever a deduction, a severity, or a repair trigger. See notEvaluated.js.
-  const notEvaluated = require('./notEvaluated').createNotEvaluatedRecorder({ pageContext });
-  try {
-    // Guard against undefined/invalid imageData
-    if (!imageData || typeof imageData !== 'string') {
-      log.warn(`⚠️ [QUALITY] Invalid imageData passed to evaluateImageQuality: ${typeof imageData}`);
-      return null;
-    }
+/**
+ * The scene text the quality and semantic judges read, from the IMAGE_PROMPT a
+ * caller hands evaluateImageQuality: the same string with a brief's METADATA
+ * block stripped. evaluateImageQuality stamps the result on its return as
+ * `judgedPrompt` (the consolidator reads it); the Lab rebuilds it for a STORED
+ * evaluation through this same function, so the two can never differ.
+ *
+ * @param {string} originalPrompt
+ * @returns {string}
+ */
+function judgedSceneText(originalPrompt) {
+  if (!originalPrompt) return originalPrompt;
+  if (require('./sceneMetadata').splitBrief(originalPrompt).carrier
+      || originalPrompt.includes('"previewMismatches"') || originalPrompt.includes('"checks"')) {
+    const { stripSceneMetadata } = getStoryHelpers();
+    const stripped = stripSceneMetadata(originalPrompt);
+    if (stripped && stripped !== originalPrompt) return stripped;
+  }
+  return originalPrompt;
+}
 
-    // Strip scene description to relevant parts (remove Art Director checks, corrections, preview mismatches)
-    // This reduces prompt size significantly and focuses the model on actual scene content
-    // GATE ON THE DELIMITER, not on two field names that happen to appear in
-    // one metadata dialect. A brief whose METADATA block carried neither
-    // "previewMismatches" nor "checks" skipped the strip entirely and shipped
-    // the whole JSON — `objects: ["LOC006","ART001",...]` included — into the
-    // evaluator prompt.
-    if (originalPrompt && (require('./sceneMetadata').splitBrief(originalPrompt).carrier
-        || originalPrompt.includes('"previewMismatches"') || originalPrompt.includes('"checks"'))) {
-      const { stripSceneMetadata } = getStoryHelpers();
-      const stripped = stripSceneMetadata(originalPrompt);
-      if (stripped && stripped !== originalPrompt) {
-        log.debug(`✂️ [QUALITY] ${pageContext} Stripped scene description: ${originalPrompt.length} → ${stripped.length} chars`);
-        originalPrompt = stripped;
-      }
-    }
-
-    const apiKey = process.env.GEMINI_API_KEY;
-
-    if (!apiKey) {
-      log.verbose('⚠️  [QUALITY] Gemini API key not configured, skipping quality evaluation');
-      return null;
-    }
-
+/**
+ * THE INPUTS EVERY PAGE JUDGE IS GIVEN, built once per evaluation: the cover
+ * text contract, the fidelity reference, the art style, the CLOTHING CONTRACT,
+ * the LANDMARK CONTEXT, REQUIRED OBJECTS / REQUIRED TEXT, the EXPECTED CAST
+ * roster and count, and the reference list with the Visual Bible cells for the
+ * secondaries on it.
+ *
+ * Moved verbatim out of evaluateImageQuality on 2026-09-27 so the Test Lab
+ * `semantic_eval` stage hands the semantic judge the inputs production hands it
+ * (owner: "The Lab must use 100% identical code to production"). The stage had
+ * rebuilt three of them itself and missed the REQUIRED TEXT rules, the cover
+ * fidelity reference and the Visual Bible reference cells.
+ *
+ * @param {object} args - evaluateImageQuality's own arguments (originalPrompt
+ *   already metadata-stripped) plus its not-evaluated recorder.
+ * @returns {object} every value evaluateImageQuality reads further down, and
+ *   `referenceImages` with the Visual Bible cells appended.
+ */
+function prepareEvalJudgeInputs({ originalPrompt, referenceImages, evaluationType, pageContext, storyText, sceneHint, sceneCharacters, evalOptions, notEvaluated }) {
     // Covers get the SAME fidelity checks as pages (semantic, three-stage,
     // visual inventory) — they are not exempt. A page's reference is its story
     // prose; a cover has none, so its reference is the cover brief, which
@@ -2278,11 +2419,6 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         nh.has(canonicalName(name || '')) || isNonHuman(resolveEntity(name, castIdx));
       return countRealFigures(evalOptions.detectedFigures.filter(f => !nonHumanFigure(f?.name)));
     })();
-    // WHO THE EVALUATOR CAN ACTUALLY MATCH AGAINST. Filled by the reference
-    // attach loop below with the names that reached the critique as a labelled
-    // `Reference: <name>` image — not what was requested, what was attached.
-    // The presence derivation gates its identity branch on this.
-    const attachedReferenceNames = [];
     const expectedCast = buildExpectedCastBlock({
       sceneCharacters,
       sceneHint,
@@ -2323,29 +2459,130 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       }
     }
 
+
+  return {
+    isCover, coverEvalNote, coverTextMode, coverExpectedText, coverNotes, coverHasPaintedText, coverTextNote, fidelityRef, runFidelity, artStyleForEval, contract, clothingContractBlock, landmarkProtection, landmarkContextBlock, requiredObjects, requiredObjectsBlock, requiredTextBlock, declaredTexts, requiredTextItems, realFigureCount, castIdx, detectedPeopleCount, expectedCast,
+    referenceImages,
+  };
+}
+
+/**
+ * The options evaluateImageQuality hands the semantic judge — shared with the
+ * Test Lab semantic_eval stage.
+ */
+/**
+ * A semantic judge that errored returns `{score:null, semanticIssues:[], error}`.
+ * Merged as-is that is a clean pass: zero penalty, and repairLogic read the null
+ * score as 100. Record it as NOT EVALUATED, the same contract the compliance
+ * judge follows (review A1, 2026-10-04). Recording only, never a deduction.
+ */
+function recordSemanticJudgeFailure(semanticResult, notEvaluated) {
+  if (semanticResult && semanticResult.error) {
+    notEvaluated.record('semantic_fidelity', 'judge_failed', semanticResult.error);
+  }
+}
+
+function semanticFidelityOptions(judgeInputs, evalOptions) {
+  const { artStyleForEval, clothingContractBlock, expectedCast, landmarkContextBlock, requiredTextBlock } = judgeInputs;
+  return {
+    artStyle: artStyleForEval,
+    clothingContract: clothingContractBlock,
+    // ONE ROSTER for the blind judges too (2026-09-14): the kind labels are
+    // what keep an `(animal)` entry out of the named-character count.
+    expectedCast: expectedCast.block,
+    // THE LANDMARK BLOCK (2026-09-18). This judge had none, and it is the
+    // judge that produced the one landmark removal that reached production.
+    landmarkContext: landmarkContextBlock,
+    // Same REQUIRED TEXT allow-list the other two judges get.
+    textRules: requiredTextBlock,
+    // The bible the PAGE ELEMENTS and DECLARED INTERACTIONS blocks resolve
+    // their ids against — the quality judge's builder gets the same one
+    // (sceneValidator.semanticDeclaredBlocks, 2026-09-26).
+    visualBible: evalOptions.visualBible || null,
+    // Where the call's prompt is recorded (eval_calls).
+    pageNumber: evalOptions.pageNumber ?? null,
+  };
+}
+
+async function evaluateImageQuality(imageData, originalPrompt = '', referenceImages = [], evaluationType = 'scene', qualityModelOverride = null, pageContext = '', storyText = null, sceneHint = null, sceneCharacters = null, evalOptions = {}) {
+  // evalOptions.evalTemplateOverride / .semanticTemplateOverride: Test Lab A/B
+  // variants — full replacement template strings used instead of the loaded
+  // files for THIS call only (PROMPT_TEMPLATES is never mutated).
+  // Hoisted outside try so the catch/finally below can reference them.
+  // `let` is block-scoped to the try body — without these declarations here,
+  // the finally's `if (qualityFiguresResolve)` throws ReferenceError on every
+  // call, taking down all 10 page evaluations + cover gen with it.
+  let semanticPromise = null;
+  let threeStagePromise = null;
+  let qualityFiguresPromise = null;
+  let qualityFiguresResolve = null;
+  let p1Promise = null;
+  // NOT-EVALUATED RECORD (2026-09-14). Silence from a check that ran clean and
+  // silence from a check that could not run used to be the same signal; this
+  // makes the second one a field on the result. Recording only — no entry here
+  // is ever a deduction, a severity, or a repair trigger. See notEvaluated.js.
+  const notEvaluated = require('./notEvaluated').createNotEvaluatedRecorder({ pageContext });
+  try {
+    // Guard against undefined/invalid imageData
+    if (!imageData || typeof imageData !== 'string') {
+      log.warn(`⚠️ [QUALITY] Invalid imageData passed to evaluateImageQuality: ${typeof imageData}`);
+      return null;
+    }
+
+    // Strip scene description to relevant parts (remove Art Director checks, corrections, preview mismatches)
+    // This reduces prompt size significantly and focuses the model on actual scene content
+    // GATE ON THE DELIMITER, not on two field names that happen to appear in
+    // one metadata dialect. A brief whose METADATA block carried neither
+    // "previewMismatches" nor "checks" skipped the strip entirely and shipped
+    // the whole JSON — `objects: ["LOC006","ART001",...]` included — into the
+    // evaluator prompt.
+    {
+      const stripped = judgedSceneText(originalPrompt);
+      if (stripped !== originalPrompt) {
+        log.debug(`✂️ [QUALITY] ${pageContext} Stripped scene description: ${originalPrompt.length} → ${stripped.length} chars`);
+        originalPrompt = stripped;
+      }
+    }
+
+    const apiKey = process.env.GEMINI_API_KEY;
+
+    if (!apiKey) {
+      log.verbose('⚠️  [QUALITY] Gemini API key not configured, skipping quality evaluation');
+      return null;
+    }
+
+    const judgeInputs = prepareEvalJudgeInputs({ originalPrompt, referenceImages, evaluationType, pageContext, storyText, sceneHint, sceneCharacters, evalOptions, notEvaluated });
+    const {
+      isCover, coverEvalNote, coverTextMode, coverExpectedText, coverNotes, coverHasPaintedText, coverTextNote, fidelityRef, runFidelity, artStyleForEval, contract, clothingContractBlock, landmarkProtection, landmarkContextBlock, requiredObjects, requiredObjectsBlock, requiredTextBlock, declaredTexts, requiredTextItems, realFigureCount, castIdx, detectedPeopleCount, expectedCast,
+    } = judgeInputs;
+    referenceImages = judgeInputs.referenceImages;
+    // THE LANDMARK GUARD RUNS WHERE THE FINDINGS ARE MADE (2026-09-26). It used
+    // to run at eval time only inside the compliance judge — which is switched
+    // off — and otherwise only inside the consolidator. The consolidator's copy
+    // protected the SCORE (its deduped list came back empty, the page scored
+    // 100), but the raw semantic list still carried the finding, and every
+    // reader that fell back to the raw lists saw a CRITICAL the score had never
+    // charged: staging job_1790446348343_z3fw660ie p9 was admitted to repair as
+    // critical on a guarded "replace the cityscape" finding, routed to inpaint,
+    // and failed with "no instruction to send". Guarding the record itself means
+    // no reader, present or future, can see the finding as live.
+    //
+    // Same contract as the compliance judge: the kept list replaces the record,
+    // the dropped findings survive as `suppressedIssues` (stamped
+    // `suppressed: 'landmark_protected'`) — the record, never the deduction.
+    const guardLandmarkRecord = (holder, key, label) => require('./landmarkProtection')
+      .guardLandmarkRecord(holder, key, landmarkProtection, { pageNumber: pageContext || null, label });
+    // WHO THE EVALUATOR CAN ACTUALLY MATCH AGAINST. Filled by the reference
+    // attach loop below with the names that reached the critique as a labelled
+    // `Reference: <name>` image — not what was requested, what was attached.
+    // The presence derivation gates its identity branch on this.
+    const attachedReferenceNames = [];
+
     // Start semantic evaluation in parallel when we have a reference (page prose
     // or cover brief).
     if (!runFidelity && (evaluationType === 'scene' || isCover)) {
       notEvaluated.record('semantic_fidelity', 'no_fidelity_reference',
         'Neither page prose nor a cover brief was supplied - semantic fidelity did not run');
-    }
-    if (runFidelity) {
-      const { evaluateSemanticFidelity } = require('./sceneValidator');
-      semanticPromise = evaluateSemanticFidelity(imageData, fidelityRef, originalPrompt, sceneHint, evalOptions.semanticTemplateOverride || null, {
-        artStyle: artStyleForEval,
-        clothingContract: clothingContractBlock,
-        // ONE ROSTER for the blind judges too (2026-09-14): the kind labels are
-        // what keep an `(animal)` entry out of the named-character count.
-        expectedCast: expectedCast.block,
-        // THE LANDMARK BLOCK (2026-09-18). This judge had none, and it is the
-        // judge that produced the one landmark removal that reached production.
-        landmarkContext: landmarkContextBlock,
-        // Same REQUIRED TEXT allow-list the other two judges get.
-        textRules: requiredTextBlock,
-        // Where the call's prompt is recorded (eval_calls).
-        pageNumber: evalOptions.pageNumber ?? null,
-      });
-      log.debug('🔍 [QUALITY] Starting parallel semantic fidelity evaluation');
     }
 
     // DECLARED AGES for the compliance judge. The evaluator used to receive
@@ -2379,92 +2616,6 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     } catch { /* silent — the judge tolerates an empty block */ }
 
 
-    // Start three-stage eval in parallel for scene evaluations.
-    // Stage 2 (compliance) needs the quality eval's named figures[] + matches[] so it
-    // can pair each named character with the blind vision inventory by zone. We expose
-    // those via qualityFiguresResolve, fulfilled once the quality JSON is parsed below.
-    if (evaluationType === 'scene' || isCover) {
-      // ONE blind inventory per page, launched here and consumed twice: by the
-      // compliance judge as Stage 1, and by the figures merge below. It used to
-      // be two calls with two prompts describing the same picture.
-      // The generated image ALONE — no reference photos, no prompt. Identity is
-      // not this call's to decide.
-      if (PROMPT_TEMPLATES.imageInventoryUnified && process.env.GEMINI_API_KEY) {
-        const invB64 = r2Lib.stripDataUriPrefix(imageData);
-        const invMime = imageData.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg';
-        p1Promise = runVisualInventory(
-          [{ inline_data: { mime_type: invMime, data: invB64 } }],
-          // The inventory has its own judge key since 2026-09-07 (runtime.js
-          // `inventoryModel`: Qwen3-VL on staging, 2.5 Flash elsewhere). A
-          // Lab quality-model override still wins so an A/B measures one model.
-          qualityModelOverride || MODEL_DEFAULTS.inventoryModel || MODEL_DEFAULTS.qualityEval || 'gemini-2.5-flash',
-          process.env.GEMINI_API_KEY, pageContext,
-          { pageNumber: evalOptions.pageNumber ?? null }
-        );
-        log.debug(`📊 [EVAL P1] Shared blind inventory launched for ${pageContext || 'scene'}`);
-      }
-      qualityFiguresPromise = new Promise((resolve) => { qualityFiguresResolve = resolve; });
-      // THE BLIND COMPLIANCE JUDGE IS GATED (owner, 2026-09-19). Default OFF —
-      // MODEL_DEFAULTS.promptComplianceJudge, env PROMPT_COMPLIANCE_JUDGE=true
-      // to re-arm without a deploy. OFF means the Stage-2 call is NOT MADE, so
-      // `threeStagePromise` stays null and every `threeStageResult` reader below
-      // sees null — the shape they already handle for "the judge failed".
-      //
-      // Stage 1 (p1Promise, above) deliberately stays OUTSIDE this gate: the
-      // quality eval's own figure merge consumes it further down, and that feeds
-      // the empty-inventory score floor in images.js. Gating stage 1 would move
-      // scores; gating stage 2 does not.
-      //
-      // The absence is RECORDED, not silent. Without the entry below, a page
-      // judged with this off is byte-for-byte a page the judge cleared — the
-      // exact conflation notEvaluated.js exists to remove. Recording only: this
-      // entry is never a deduction and never routes a page to repair.
-      // THE LAB FOLLOWS PRODUCTION BY DEFAULT, and can opt back in explicitly.
-      // This stage is the harness that measured the judge (experiment 1333), so
-      // it must stay able to run it — but always-on here would be the Lab/prod
-      // drift the sibling registry exists to catch, so the knob is explicit:
-      // `complianceJudgeOverride` true forces the judge on, false forces it off,
-      // null/absent follows the production flag.
-      const complianceJudgeOn = evalOptions.complianceJudgeOverride == null
-        ? MODEL_DEFAULTS.promptComplianceJudge
-        : !!evalOptions.complianceJudgeOverride;
-      if (!complianceJudgeOn) {
-        notEvaluated.record(
-          'prompt_compliance',
-          'compliance_judge_disabled',
-          'The blind prompt-compliance judge did not run (promptComplianceJudge is off) — nothing on this page was checked against the prompt by that judge'
-        );
-        log.debug(`📊 [THREE-STAGE] ${pageContext || 'scene'}: compliance judge OFF (promptComplianceJudge=false; set PROMPT_COMPLIANCE_JUDGE=true to re-arm) — Stage 2 not called; Stage 1 inventory still ran`);
-      } else {
-        threeStagePromise = evaluateThreeStage(imageData, originalPrompt, sceneHint, {
-          inventoryPromise: p1Promise,
-          expectedAges: expectedAgesBlock,
-          pageContext,
-          storyText: fidelityRef,
-          qualityFiguresPromise,
-          complianceModelOverride: evalOptions.complianceModelOverride || null,
-          compliancePromptOverride: evalOptions.compliancePromptOverride || null,
-          artStyle: artStyleForEval,
-          clothingContract: clothingContractBlock,
-          // ONE ROSTER (2026-09-14). The compliance judge had no cast list at all.
-          expectedCast: expectedCast.block,
-          // Resolves the VB ids in INTERACTIONS_BLOCK to real names when the
-          // caller has a bible; without one they still become generic nouns.
-          visualBible: evalOptions.visualBible || null,
-          // Era-aware landmark protection inputs (2026-09-05). Callers that know
-          // the page's landmark refs + era pass them; everything else defaults to
-          // no protection, i.e. unchanged behaviour.
-          landmarkPhotos: evalOptions.landmarkPhotos || null,
-          era: evalOptions.era || null,
-          // Same REQUIRED TEXT allow-list the other two judges get. Without it
-          // this judge scores a correctly spelled required string as
-          // unrequested lettering: its own rule counts a string as asked-for
-          // only when the prompt QUOTES it.
-          textRules: requiredTextBlock,
-        });
-        log.debug(`📊 [QUALITY] Starting parallel three-stage evaluation`);
-      }
-    }
 
     // Extract base64 and mime type for generated image
     const base64Data = r2Lib.stripDataUriPrefix(imageData);
@@ -2544,7 +2695,10 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       const interactions = sceneMeta?.interactions
         || (Array.isArray(sceneMeta?.fullData?.interactions) ? sceneMeta.fullData.interactions : null);
       interactionsBlock = require('./vbIdGuard')
-        .formatInteractionsBlock(interactions, evalOptions.visualBible || null, require('./vbIdGuard').gazeCharacters(sceneMeta));
+        .formatInteractionsBlock(interactions, evalOptions.visualBible || null, [
+          ...(require('./vbIdGuard').gazeCharacters(sceneMeta) || []),
+          ...require('./vbIdGuard').gazeCreatures(sceneMeta, evalOptions.visualBible || null),
+        ]);
       const intent = sceneMeta?.sceneIntent || sceneMeta?.fullData?.sceneIntent;
       if (intent && String(intent).trim()) sceneIntentBlock = String(intent).trim();
     } catch { /* silent — evaluator defaults to "(none declared)" */ }
@@ -2559,6 +2713,26 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     // as its own input so the judge compares against the contract, not against
     // its prior of what a pirate looks like. Empty when unknown — the template
     // then tells it not to judge clothing at all, which is the honest default.
+    // ELEMENT SIZES (D-21 objects, D-31 vehicles, D-34 creatures; 2026-09-26).
+    // The size each cited Visual Bible element was given against the figures in
+    // this frame — built by the SAME function that wrote the page prompt's
+    // REQUIRED OBJECTS line (promptBuilders.elementPageScaleNote), over the same
+    // whole figures and the same contact rows, so the judge reads the sentence
+    // the illustrator was given. Empty when the page cites no sized element.
+    let elementSizesBlock = '';
+    try {
+      const sizeMeta = evalOptions.sceneMetadata || declaredSceneMeta;
+      const PB = require('./promptBuilders');
+      elementSizesBlock = PB.buildElementSizesBlock(
+        evalOptions.visualBible || null,
+        Array.isArray(sizeMeta?.objects) ? sizeMeta.objects : [],
+        PB.wholeFiguresInFrame(Array.isArray(sceneCharacters) ? sceneCharacters : [], sizeMeta),
+        sizeMeta?.interactions || sizeMeta?.fullData?.interactions || [],
+      );
+    } catch (err) {
+      log.error(`[EVAL] ${pageContext || 'page'}: element sizes could not be built - ${err.message}`);
+      for (const t of ['scale', 'structure_scale', 'creature_scale']) notEvaluated.record(t, 'element_sizes_build_failed', err.message);
+    }
     const { buildEvaluationPrompt } = require('../services/prompts');
     const evaluationPrompt = evaluationTemplate
       ? buildEvaluationPrompt({
@@ -2568,6 +2742,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
           sceneIntent: sceneIntentBlock,
           clothingContract: clothingContractBlock,
           requiredObjects: requiredObjectsBlock,
+          elementSizes: elementSizesBlock,
           textRules: requiredTextBlock,
           expectedCast: expectedCast.block,
           // THE LANDMARK BLOCK (2026-09-18) — same block the other two judges
@@ -2742,6 +2917,107 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       }, { maxRetries: 2, baseDelay: 2000 });
     };
 
+    // SIDE JUDGES LAUNCH HERE, after the reference-attach check (review A5,
+    // 2026-10-04): the refusal to grade identity-blind returns null above, and
+    // the semantic judge, blind inventory and compliance judge used to be
+    // launched before it, so a refusal left three paid calls running with
+    // their results discarded and the caller's re-eval paid for them again.
+    // They still run in parallel with the primary quality call below; the
+    // `finally` settles whatever is left on the later early returns.
+    if (runFidelity) {
+      const { evaluateSemanticFidelity } = require('./sceneValidator');
+      semanticPromise = evaluateSemanticFidelity(imageData, fidelityRef, originalPrompt, sceneHint, evalOptions.semanticTemplateOverride || null,
+        semanticFidelityOptions(judgeInputs, evalOptions));
+      log.debug('🔍 [QUALITY] Starting parallel semantic fidelity evaluation');
+    }
+
+    // Start three-stage eval in parallel for scene evaluations.
+    // Stage 2 (compliance) needs the quality eval's named figures[] + matches[] so it
+    // can pair each named character with the blind vision inventory by zone. We expose
+    // those via qualityFiguresResolve, fulfilled once the quality JSON is parsed below.
+    if (evaluationType === 'scene' || isCover) {
+      // ONE blind inventory per page, launched here and consumed twice: by the
+      // compliance judge as Stage 1, and by the figures merge below. It used to
+      // be two calls with two prompts describing the same picture.
+      // The generated image ALONE — no reference photos, no prompt. Identity is
+      // not this call's to decide.
+      if (PROMPT_TEMPLATES.imageInventoryUnified && process.env.GEMINI_API_KEY) {
+        const invB64 = r2Lib.stripDataUriPrefix(imageData);
+        const invMime = imageData.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg';
+        p1Promise = runVisualInventory(
+          [{ inline_data: { mime_type: invMime, data: invB64 } }],
+          // The inventory has its own judge key since 2026-09-07 (runtime.js
+          // `inventoryModel`: Qwen3-VL on staging, 2.5 Flash elsewhere). A
+          // Lab quality-model override still wins so an A/B measures one model.
+          qualityModelOverride || MODEL_DEFAULTS.inventoryModel || MODEL_DEFAULTS.qualityEval || 'gemini-2.5-flash',
+          process.env.GEMINI_API_KEY, pageContext,
+          { pageNumber: evalOptions.pageNumber ?? null }
+        );
+        log.debug(`📊 [EVAL P1] Shared blind inventory launched for ${pageContext || 'scene'}`);
+      }
+      qualityFiguresPromise = new Promise((resolve) => { qualityFiguresResolve = resolve; });
+      // THE BLIND COMPLIANCE JUDGE IS GATED (owner, 2026-09-19). Default OFF —
+      // MODEL_DEFAULTS.promptComplianceJudge, env PROMPT_COMPLIANCE_JUDGE=true
+      // to re-arm without a deploy. OFF means the Stage-2 call is NOT MADE, so
+      // `threeStagePromise` stays null and every `threeStageResult` reader below
+      // sees null — the shape they already handle for "the judge failed".
+      //
+      // Stage 1 (p1Promise, above) deliberately stays OUTSIDE this gate: the
+      // quality eval's own figure merge consumes it further down, and that feeds
+      // the empty-inventory score floor in images.js. Gating stage 1 would move
+      // scores; gating stage 2 does not.
+      //
+      // The absence is RECORDED, not silent. Without the entry below, a page
+      // judged with this off is byte-for-byte a page the judge cleared — the
+      // exact conflation notEvaluated.js exists to remove. Recording only: this
+      // entry is never a deduction and never routes a page to repair.
+      // THE LAB FOLLOWS PRODUCTION BY DEFAULT, and can opt back in explicitly.
+      // This stage is the harness that measured the judge (experiment 1333), so
+      // it must stay able to run it — but always-on here would be the Lab/prod
+      // drift the sibling registry exists to catch, so the knob is explicit:
+      // `complianceJudgeOverride` true forces the judge on, false forces it off,
+      // null/absent follows the production flag.
+      const complianceJudgeOn = evalOptions.complianceJudgeOverride == null
+        ? MODEL_DEFAULTS.promptComplianceJudge
+        : !!evalOptions.complianceJudgeOverride;
+      if (!complianceJudgeOn) {
+        notEvaluated.record(
+          'prompt_compliance',
+          'compliance_judge_disabled',
+          'The blind prompt-compliance judge did not run (promptComplianceJudge is off) — nothing on this page was checked against the prompt by that judge'
+        );
+        log.debug(`📊 [THREE-STAGE] ${pageContext || 'scene'}: compliance judge OFF (promptComplianceJudge=false; set PROMPT_COMPLIANCE_JUDGE=true to re-arm) — Stage 2 not called; Stage 1 inventory still ran`);
+      } else {
+        threeStagePromise = evaluateThreeStage(imageData, originalPrompt, sceneHint, {
+          inventoryPromise: p1Promise,
+          expectedAges: expectedAgesBlock,
+          pageContext,
+          storyText: fidelityRef,
+          qualityFiguresPromise,
+          complianceModelOverride: evalOptions.complianceModelOverride || null,
+          compliancePromptOverride: evalOptions.compliancePromptOverride || null,
+          artStyle: artStyleForEval,
+          clothingContract: clothingContractBlock,
+          // ONE ROSTER (2026-09-14). The compliance judge had no cast list at all.
+          expectedCast: expectedCast.block,
+          // Resolves the VB ids in INTERACTIONS_BLOCK to real names when the
+          // caller has a bible; without one they still become generic nouns.
+          visualBible: evalOptions.visualBible || null,
+          // Era-aware landmark protection inputs (2026-09-05). Callers that know
+          // the page's landmark refs + era pass them; everything else defaults to
+          // no protection, i.e. unchanged behaviour.
+          landmarkPhotos: evalOptions.landmarkPhotos || null,
+          era: evalOptions.era || null,
+          // Same REQUIRED TEXT allow-list the other two judges get. Without it
+          // this judge scores a correctly spelled required string as
+          // unrequested lettering: its own rule counts a string as asked-for
+          // only when the prompt QUOTES it.
+          textRules: requiredTextBlock,
+        });
+        log.debug(`📊 [QUALITY] Starting parallel three-stage evaluation`);
+      }
+    }
+
     let response = await callQualityAPI(modelId);
 
     if (!response.ok) {
@@ -2753,9 +3029,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     let data = await response.json();
 
     // Extract and log token usage for quality evaluation
-    const qualityInputTokens = data.usageMetadata?.promptTokenCount || 0;
-    const qualityOutputTokens = data.usageMetadata?.candidatesTokenCount || 0;
-    const qualityThinkingTokens = data.usageMetadata?.thoughtsTokenCount || 0;
+    const { input_tokens: qualityInputTokens, output_tokens: qualityOutputTokens, thinking_tokens: qualityThinkingTokens } = geminiUsage(data.usageMetadata);
     if (qualityInputTokens > 0 || qualityOutputTokens > 0) {
       const thinkingInfo = qualityThinkingTokens > 0 ? `, thinking: ${qualityThinkingTokens.toLocaleString()}` : '';
       log.verbose(`📊 [EVAL] Token usage - input: ${qualityInputTokens.toLocaleString()}, output: ${qualityOutputTokens.toLocaleString()}${thinkingInfo}`);
@@ -2789,6 +3063,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
             sceneIntent: sceneIntentBlock,
             clothingContract: clothingContractBlock,
             requiredObjects: requiredObjectsBlock,
+            elementSizes: elementSizesBlock,
             textRules: requiredTextBlock,
             expectedCast: expectedCast.block,
             template: evalOptions.evalTemplateOverride || undefined,
@@ -2825,6 +3100,10 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
                 if (grokData?.candidates?.[0]?.content?.parts?.[0]?.text) {
                   log.info(`✅ [QUALITY] ${pageLabel}Grok fallback succeeded`);
                   data = grokData;
+                  // Stamp the model that actually produced the verdict, so its tokens
+                  // are booked and priced as that model and the score's provenance is
+                  // true (review A2, 2026-10-04).
+                  modelId = grokFallbackId;
                 } else {
                   log.error(`❌ [QUALITY] ${pageLabel}Grok fallback returned no text`);
                   return null;
@@ -2969,6 +3248,13 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       // Parse fixable_issues from JSON (new two-stage format - no bboxes)
       // These will be enriched with bounding boxes in a separate detection step
       let fixableIssues = parseFixableIssues(parsedJson);
+      // A report with no fixable_issues array is a judge that did not answer the
+      // mandatory field, not a judge that found nothing: record it so the clean
+      // 100 below is not read as a pass (review A4, 2026-10-04). Recording only.
+      if (!Array.isArray(parsedJson.fixable_issues)) {
+        notEvaluated.record('visual_quality', 'fixable_issues_missing',
+          'the quality judge replied without a fixable_issues array - the score below is not a verdict that nothing was wrong');
+      }
       {
         if (fixableIssues.length > 0) {
           const proportionCount = fixableIssues.filter(f => f.type === 'proportion').length;
@@ -3135,7 +3421,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       // multi-judge mode so stats populate even before the jury is enabled.
       try {
         const sm = evalOptions && evalOptions.storyMeta;
-        if (sm && sm.storyId) {
+        if (sm && sm.storyId && sm.recordStats !== false) {
           const { mapIssuesToBuckets } = require('./evalBuckets');
           const db = require('../services/database');
           const vec = mapIssuesToBuckets(fixableIssues);
@@ -3194,42 +3480,6 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
           }));
         if (jsonFixTargets.length > 0) {
           log.info(`📊 [EVAL] Parsed ${jsonFixTargets.length} fix targets from JSON (legacy format)`);
-        }
-      }
-
-      // For covers, classify text issues by severity. The eval prompt's
-      // TEXT RULES block above tells the model:
-      //   - title missing/misspelled          → severity CATASTROPHIC
-      //   - other prominent unrequested text  → severity MAJOR
-      //   - small incidental signage          → not flagged (MINOR if garbled)
-      // (CRITICAL matched too for evals stored before the graded-severity
-      // change.) The buckets need different handling:
-      //   TITLE_ERROR — full regen; no inpaint can paint a missing title.
-      //   STRAY_TEXT  — flows through the normal repair path. Inpaint can
-      //                 paint over the unwanted-text region instead of
-      //                 trashing an otherwise-good cover and retrying.
-      // Before this split, ANY cover text issue forced a full regen, which
-      // wasted a generation every time a character incidentally held
-      // anything written.
-      let textIssue = null;
-      if (evaluationType === 'cover' && Array.isArray(fixableIssues) && fixableIssues.length > 0) {
-        const TEXT_RE = /\b(text|letter|word|sign|caption|label|spell|title|writing|inscription|misspell)/i;
-        const textRelated = fixableIssues.filter(i =>
-          i?.type === 'rendered_text' || TEXT_RE.test(i?.description || '')
-        );
-        if (textRelated.some(i => /catastrophic|critical/i.test(String(i?.severity || '')))) {
-          textIssue = 'TITLE_ERROR';
-        } else if (textRelated.length > 0) {
-          textIssue = 'STRAY_TEXT';
-        }
-      }
-      // Fallback for evaluators that didn't emit structured fixable_issues but
-      // mentioned text in issuesSummary — assume worst case (title error) so
-      // we don't ship a missing-title cover when the eval format drifts.
-      if (textIssue === null && evaluationType === 'cover' && issuesSummary) {
-        const issuesLower = issuesSummary.toLowerCase();
-        if (issuesLower.includes('text') || issuesLower.includes('spell') || issuesLower.includes('letter')) {
-          textIssue = 'TITLE_ERROR';
         }
       }
 
@@ -3332,7 +3582,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
             // is used only where the evaluator named nobody — there is no pair
             // to break, and an honest figure list still beats none.
             if (p1Result.figures?.length && matches.length === 0) figures = p1Result.figures;
-            p1Usage = { inputTokens: p1Result.inputTokens, outputTokens: p1Result.outputTokens };
+            p1Usage = { inputTokens: p1Result.inputTokens, outputTokens: p1Result.outputTokens, thinkingTokens: p1Result.thinkingTokens || 0 };
 
             // DECLARED GAZE vs OBSERVED GAZE. The one thing P1 can settle
             // that the evaluator structurally cannot: it saw the picture
@@ -3354,7 +3604,12 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
             // the rule is what this branch has to obey.
             try {
               const gaze = evaluationType !== 'scene' ? [] : require('./gazeCheck').checkDeclaredGaze({
-                declared: require('./vbIdGuard').gazeCharacters(declaredSceneMeta),
+                // The cast and the page's creatures (CREATURE_FIELD_RULE), each
+                // with the emotion its brief row declares.
+                declared: [
+                  ...(require('./vbIdGuard').gazeCharacters(declaredSceneMeta) || []),
+                  ...require('./vbIdGuard').gazeCreatures(declaredSceneMeta, evalOptions.visualBible || null),
+                ],
                 inventory: p1Result,
                 matches,
                 resolveTarget: (t) => require('./compositeCastBuilder')
@@ -3391,16 +3646,28 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
             // it sees; anything readable the page did not declare is a
             // rendered_text finding. Its old reader, the blind compliance judge,
             // is switched off, and the sighted judge missed a full-width caption
-            // on dragon run 6 p6. Scenes only: covers are judged pre-typography
-            // in appOverlay mode, and a painted cover title is a REQUIRED TEXT
-            // item (declaredTexts) the judges check through D-33.
+            // on dragon run 6 p6.
+            //
+            // COVERS BRIEFED AS PAGES TOO (2026-09-26). The check used to run on
+            // scenes only, so a caption painted on a cover was left to the
+            // sighted judges, who filed it MAJOR at most — below the repair
+            // gate: staging job_1790446348343_z3fw660ie shipped a back cover
+            // captioned "THE FIVE FRIENDS STAND TOGETHER". A full-story cover is
+            // a page (coverBeats.js) and is held to the page's lettering rule.
+            // Its declared strings are the page's: a baked title is a REQUIRED
+            // TEXT item already in declaredTexts. Nothing else is excused: every
+            // cover eval reads the TEXTLESS art (coverEvalLayer.js), so the
+            // app's composited title / dedication / "magicalstory.ch" never
+            // reach this inventory, and lettering that does is the model's.
+            // Trial covers (no `coverIsPage`) are not on this path.
+            const letteringRuns = evaluationType === 'scene' || (isCover && evalOptions.coverIsPage === true);
             try {
-              if (evaluationType === 'scene') {
+              if (letteringRuns) {
                 letteringInventory = require('./letteringCheck').letteringRecord({
                   lettering: p1Result.lettering, declared: declaredTexts,
                 });
               }
-              const lettering = evaluationType !== 'scene' ? [] : require('./letteringCheck').checkUndeclaredLettering({
+              const lettering = !letteringRuns ? [] : require('./letteringCheck').checkUndeclaredLettering({
                 lettering: p1Result.lettering, declared: declaredTexts,
               });
               for (const f of lettering) {
@@ -3440,6 +3707,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       if (semanticPromise) {
         try {
           semanticResult = await semanticPromise;
+          recordSemanticJudgeFailure(semanticResult, notEvaluated);
           // ONE PRESENCE SIGNAL PER PAGE — same rule as the three-stage merge
           // below. The semantic judge's vocabulary includes missing_character
           // and it is scored on its own table, so an unfiltered absence here
@@ -3451,6 +3719,10 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
               semanticResult.semanticIssues = kept;
             }
           }
+          // LANDMARK GUARD ON THE SEMANTIC RECORD (2026-09-26) — see
+          // guardLandmarkRecord. Before the penalty and the summary below, so
+          // neither ever sees a suppressed finding.
+          guardLandmarkRecord(semanticResult, 'semanticIssues', '[EVAL semantic]');
           if (semanticResult && semanticResult.semanticIssues && semanticResult.semanticIssues.length > 0) {
             // Semantic surcharge via the ONE shared table (scoring.js
             // SEMANTIC_ISSUE_PENALTY): the hand-copied chain here billed
@@ -3524,6 +3796,15 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         }
       }
 
+      // LANDMARK GUARD ON THE QUALITY RECORD (2026-09-26). Here, once the
+      // page's merged list is final and before the absence second look and the
+      // score below. The compliance findings merged above were already guarded
+      // inside evaluateThreeStage, so re-running over them drops nothing.
+      const qualityRecord = { fixableIssues };
+      guardLandmarkRecord(qualityRecord, 'fixableIssues', '[EVAL quality]');
+      fixableIssues = qualityRecord.fixableIssues;
+      const suppressedIssues = qualityRecord.suppressedIssues;
+
       // TWO SEVERITY GUARDS ON "IT IS NOT THERE" (owner, 2026-09-23; see
       // absenceCheck.js). Both run before the score below and before the
       // consolidator picks repair slots, and both change a severity only.
@@ -3577,7 +3858,9 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       const totalUsage = {
         input_tokens: qualityInputTokens + (p1Usage?.inputTokens || 0) + (semanticUsage.input_tokens || 0) + (threeStageUsage.threeStage_input_tokens || 0) + (secondLook?.usage?.input_tokens || 0),
         output_tokens: qualityOutputTokens + (p1Usage?.outputTokens || 0) + (semanticUsage.output_tokens || 0) + (threeStageUsage.threeStage_output_tokens || 0) + (secondLook?.usage?.output_tokens || 0),
-        thinking_tokens: qualityThinkingTokens,
+        // Every component's thinking, summed exactly like its output tokens —
+        // this used to carry the quality call's alone.
+        thinking_tokens: qualityThinkingTokens + (p1Usage?.thinkingTokens || 0) + (semanticUsage.thinking_tokens || 0) + (threeStageUsage.threeStage_thinking_tokens || 0) + (secondLook?.usage?.thinking_tokens || 0),
         p1_input_tokens: p1Usage?.inputTokens || 0,
         p1_output_tokens: p1Usage?.outputTokens || 0,
         semantic_input_tokens: semanticUsage.input_tokens || 0,
@@ -3611,8 +3894,12 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         // painted cover title). The consolidator reads it so a repair plan never
         // removes a string the page must show.
         requiredTexts: requiredTextItems,
+        // The scene text the quality and semantic judges were given (after the
+        // metadata strip above): the prompt the image model received, or its
+        // scene block on the batch eval. The consolidator reads THIS string,
+        // so one page is never judged against two contracts (owner, 2026-09-26).
+        judgedPrompt: originalPrompt || null,
         issuesSummary: combinedIssuesSummary,
-        textIssue,
         fixTargets: jsonFixTargets,       // Legacy format with bboxes (backwards compat)
         // PROVENANCE (2026-09-14). ONE stamp, at the point the page's merged
         // list is finalised, so it covers every branch that reached it: the
@@ -3624,6 +3911,11 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         // presence derivation keeps `final_checks`; only the quality judge's
         // own findings are filled in here.
         fixableIssues: stampFindingSource(Array.isArray(fixableIssues) ? fixableIssues : [], FINDING_SOURCES.QUALITY),  // always an array — eliminates downstream null-checks
+        // Landmark-guard casualties from the quality list. Recording only, zero
+        // points — a sibling of fixableIssues, never merged into it. The
+        // semantic judge's live on semanticResult.suppressedIssues, the
+        // compliance judge's on threeStageResult.suppressedIssues.
+        suppressedIssues: stampFindingSource(suppressedIssues || [], FINDING_SOURCES.QUALITY),
         figures,                          // Detected figures with descriptions
         matches,                          // Character name → figure mapping with face_bbox
         coherenceGate,                    // STEP 0 gate {applied, reason} — drives the forced redo above
@@ -3654,7 +3946,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         try {
           const p1Result = await p1Promise;
           if (p1Result) {
-            p1Usage = { inputTokens: p1Result.inputTokens, outputTokens: p1Result.outputTokens };
+            p1Usage = { inputTokens: p1Result.inputTokens, outputTokens: p1Result.outputTokens, thinkingTokens: p1Result.thinkingTokens || 0 };
           }
         } catch (e) { /* already logged */ }
       }
@@ -3662,6 +3954,9 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       if (semanticPromise) {
         try {
           semanticResult = await semanticPromise;
+          recordSemanticJudgeFailure(semanticResult, notEvaluated);
+          // Same landmark guard as the parsed-JSON path (guardLandmarkRecord).
+          guardLandmarkRecord(semanticResult, 'semanticIssues', '[EVAL semantic]');
           if (semanticResult && semanticResult.semanticIssues && semanticResult.semanticIssues.length > 0) {
             // Shared table (scoring.js semanticPenaltyPoints) — same reason as
             // the parsed-JSON chain: the hand-copy billed CATASTROPHIC 10.
@@ -3705,7 +4000,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       const totalUsage = {
         input_tokens: qualityInputTokens + (p1Usage?.inputTokens || 0) + (semanticUsage.input_tokens || 0) + (threeStageUsage.threeStage_input_tokens || 0),
         output_tokens: qualityOutputTokens + (p1Usage?.outputTokens || 0) + (semanticUsage.output_tokens || 0) + (threeStageUsage.threeStage_output_tokens || 0),
-        thinking_tokens: qualityThinkingTokens,
+        thinking_tokens: qualityThinkingTokens + (p1Usage?.thinkingTokens || 0) + (semanticUsage.thinking_tokens || 0) + (threeStageUsage.threeStage_thinking_tokens || 0),
         p1_input_tokens: p1Usage?.inputTokens || 0,
         p1_output_tokens: p1Usage?.outputTokens || 0,
         semantic_input_tokens: semanticUsage.input_tokens || 0,
@@ -3731,6 +4026,11 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         // painted cover title). The consolidator reads it so a repair plan never
         // removes a string the page must show.
         requiredTexts: requiredTextItems,
+        // The scene text the quality and semantic judges were given (after the
+        // metadata strip above): the prompt the image model received, or its
+        // scene block on the batch eval. The consolidator reads THIS string,
+        // so one page is never judged against two contracts (owner, 2026-09-26).
+        judgedPrompt: originalPrompt || null,
         issuesSummary,
         fixTargets,
         semanticResult,
@@ -3781,20 +4081,30 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     // Always release three-stage Stage 2 so it doesn't hang on any early return.
     // Safe to call twice — promises ignore subsequent resolve() calls.
     if (qualityFiguresResolve) qualityFiguresResolve(null);
+    // Settle the side judges on EVERY exit (early `return null` included) so no
+    // paid call is left running unawaited (review A5, 2026-10-04). Each catches
+    // internally; allSettled makes that a guarantee rather than an assumption.
+    await Promise.allSettled([p1Promise, semanticPromise, threeStagePromise].filter(Boolean));
   }
 }
 
 module.exports = {
+  recordSemanticJudgeFailure,
   presenceCounterName,
   runVisualInventory,
   validateEmptyScene,
   buildEmptySceneQcPrompt,
+  plateDetailViewParts,
+  PLATE_DETAIL_VIEWS,
   styleGateEchoedFields,
   largestInteriorUniformFraction,
   capComplianceIdentitySeverity,
   evaluateThreeStage,
   sanitizeForGemini,
   evaluateImageQuality,
+  judgedSceneText,
+  prepareEvalJudgeInputs,
+  semanticFidelityOptions,
   buildEvalClothingContract,
   buildEvalRequiredObjects,
   buildExpectedCastBlock,

@@ -20,4 +20,15 @@ class PromptFitError extends Error {
   }
 }
 
-module.exports = { PromptFitError };
+/**
+ * A prompt's size as the providers measure it: UTF-8 bytes, not JS string
+ * length. xAI counts bytes — 8,500 'ü' (17,000 bytes) is refused by the
+ * 16,000 cap of grok-imagine-image (measured 2026-10-04). Every
+ * `maxPromptLength` comparison goes through this. See decisions.md 2026-10-04
+ * "Grok prompt caps are 16,000 / 64,000 bytes".
+ */
+function promptBytes(text) {
+  return Buffer.byteLength(text || '', 'utf8');
+}
+
+module.exports = { PromptFitError, promptBytes };

@@ -157,3 +157,49 @@ describe('the payoff-keep rule reaches every pass that can drop a sentence', () 
     expect(built.lector).not.toContain(B.PAYOFF_KEEP_RULE);
   });
 });
+
+// Owner, 2026-09-27 (staging job_1790508305061_dka3jpog9): the story's main
+// relationship never closed on the page — no farewell, the book ended on a race
+// home — and the blind audit filed the callback payoff as a recap, which the
+// repair cut. ONE constant for the closing moment, generator and critic; ONE
+// for "a shown callback is not a recap", in the rulebook and both ENDING checks.
+describe('the closing moment and the shown callback reach generator and critic alike', () => {
+  let built: Record<string, string>;
+  beforeAll(async () => {
+    await require('../../server/services/prompts').loadPromptTemplates();
+    built = {
+      arcCreate: B.buildArcCreatePrompt(inputData, 4),
+      arcRetell: B.buildArcRetellPrompt(inputData, 4, 'STORY LOGIC: x\nARC:\n1. Mara pulls the rope.', '1. [MAJOR] a fault'),
+      arcPanel: B.buildArcPanelPrompt(inputData, 'ARC:\n1. Mara pulls the rope.'),
+      writer: B.buildStoryTextFromBeatsPrompt(inputData, [{ pageNumber: 1, planLine: PLAN }], [], 'An arc.'),
+      trialWriter: B.buildTrialStoryPrompt({ trialMode: true, language: 'de', storyTheme: 'realistic', storyDetails: 'a kite caught in a tree', characters: [{ name: 'Mia', age: 6, gender: 'female', isMain: true }] }, 5),
+      repair: B.buildTextRefinePrompt(inputData, PAGES, 'FAULT[ENDING]: p1 — something', 'An arc.'),
+      audit: B.buildTextAuditPrompt(inputData, PAGES, 'An arc.'),
+      blind: B.buildTextAuditBlindPrompt(inputData, PAGES),
+    };
+  });
+
+  for (const pass of ['arcCreate', 'arcRetell', 'arcPanel', 'writer', 'trialWriter', 'repair', 'audit', 'blind']) {
+    it(`${pass}: carries CLOSING_MOMENT_RULE exactly once, no unfilled placeholder`, () => {
+      expect(built[pass].split(B.CLOSING_MOMENT_RULE).length - 1).toBe(1);
+      expect(built[pass]).not.toMatch(/\{(ARC_)?CLOSING_MOMENT(_RULE)?\}|\{SHOWN_CALLBACK\}/);
+    });
+  }
+
+  it('the panel reads it as its own ENDING lens', () => {
+    expect(built.arcPanel).toContain(`- ENDING — the rule: ${B.CLOSING_MOMENT_RULE}`);
+  });
+
+  it('both ENDING questions carry it with the shown-callback clarification', () => {
+    for (const pass of ['audit', 'blind']) {
+      const q = (built[pass].match(/^\d+\. ENDING:[^\n]*/m) || [''])[0];
+      expect(q).toContain(B.CLOSING_MOMENT_RULE);
+      expect(q).toContain(B.SHOWN_CALLBACK_RULE);
+      expect(q).toMatch(/sums up what the story meant/);
+    }
+  });
+
+  it('the rulebook says a shown callback is an act, so every prose pass has it', () => {
+    expect(B.STYLE_RULEBOOK).toContain(B.SHOWN_CALLBACK_RULE);
+  });
+});

@@ -1,0 +1,34 @@
+#! JEV TEXT AUDIT QUESTIONS — v1 (2026-09-27). Read by server/lib/jevAudit.js.
+#! Jev (typesafe/jev-1.13 on OpenRouter) answers each line as a yes-probability
+#! ("noul") or a choice. One line per question: `ID: proposition`. A flag names
+#! the ID that fired, so the repair knows WHICH problem the passage has.
+#! Placeholders: {LANGUAGE} {PAGE} {PLAN} {NAME}. Section headers are `[NAME]`.
+#! The [SLOP] questions moved to server/lib/proseSlop.js (2026-09-27): each sits
+#! beside the writer rule it judges, one source for generator and critic.
+#! Keep every proposition generic: no names, places or plots from a real story.
+#! Changing a line changes a measured score: re-run
+#! scripts/analysis/eval-jev-text-audit.js and append to evals/results/results.jsonl.
+
+[GRAMMAR]
+GRAM_ANY: This {LANGUAGE} text contains at least one grammar or spelling mistake that a careful editor would correct.
+GRAM_ARTICLE_CASE: This {LANGUAGE} text contains an article, adjective ending or preposition with the wrong gender or the wrong case.
+GRAM_AGREEMENT: In this {LANGUAGE} text a verb does not agree with its subject, or a pronoun does not agree with the noun it stands for.
+GRAM_FOREIGN_WORD: This {LANGUAGE} text contains a word from another language that does not belong there.
+GRAM_NONWORD: This {LANGUAGE} text contains a misspelled word or a word that does not exist.
+GRAM_TENSE: The narration of this {LANGUAGE} text switches between past tense and present tense.
+GRAM_CLEAN: Every sentence of this {LANGUAGE} text is grammatically correct and every word is spelled correctly.
+
+[LOGIC]
+LOGIC_APPEAR: On page {PAGE}, a person or animal takes part who is not mentioned on any earlier page, and page {PAGE} does not say where they came from.
+LOGIC_VANISH: On page {PAGE}, a person or animal who was there before is suddenly gone or absent, and no page says why or how they left.
+LOGIC_ANIMAL: On page {PAGE}, an ordinary animal does something its kind cannot do, such as reading, writing, driving or using a phone, and the story has not made it magical.
+LOGIC_OBJECT: Page {PAGE} contradicts an earlier page about where an object is, who holds it, or what state it is in.
+LOGIC_MOTIVE: On page {PAGE}, a character acts against what they want or what they said they would do, and no page gives a reason.
+
+[ARC]
+ARC_PAGE_MATCH: The page text tells the events of this plan line: «{PLAN}»
+ARC_PAGE_CONTRADICT: The events told in the page text contradict the events of this plan line; what a picture shows, frames or leaves out does not count: «{PLAN}»
+ARC_CAST_BEAT: In this story arc, {NAME} does something that changes what happens in the story.
+
+[SHOT]
+SHOT_TYPE: Which camera framing does this illustration brief describe?

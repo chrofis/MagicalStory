@@ -893,6 +893,21 @@ const SCALE_PHRASES = Object.freeze({
  * where the plot turns on one (promptBuilders SIZE_LOOK_RULE), so the author
  * is told to decide the band from what the story has the element do.
  */
+/**
+ * A creature's BODY PARTS, as its own field (owner, 2026-09-28).
+ *
+ * The `animals` schema offered `features: "[collar, markings, accessories]"`
+ * and no slot for the body itself, so a part the story leans on was nobody's
+ * to write down. Staging job_1790539784661_6mjcny1c7: the story has the
+ * creature spread its wings and fly off, its entry named no wings, and every
+ * reference cell drew it wingless. `anatomy` is filled from this one string at
+ * both Visual Bible authoring sites (the all-pages Art Director and the trial
+ * writer), like SCALE_CLASS_SPEC, and `buildAnimalDescription` puts it into
+ * the description the reference cell paints and the cell gates judge. A JSON
+ * string value in those templates: never a double quote.
+ */
+const ANIMAL_ANATOMY_SPEC = "[every body part the story gives this creature or implies, each with its count: a creature that flies has wings; a stated number of heads, horns, legs or tails is that number. Body parts only — colour and pattern belong to coloring]";
+
 const SCALE_CLASS_SPEC = "[the element's scale band, one of: fingertip-sized, palm-sized, hand-sized, melon-sized, forearm-sized, arm-sized, knee-high, waist-high, chest-high, adult-height, twice-adult-height, house-height, landmark. Two questions, two groups — answer one of them, never both. HOW BIG IS IT, for a thing someone could pick up and hold; these bands say nothing about how tall it stands: fingertip-sized — a pea, a ring; palm-sized — an apple, a mouse; hand-sized — a book, a loaf; melon-sized — a football, a lantern, a helmet; forearm-sized — a rolling pin, a small cat; arm-sized — a broom, a shovel. HOW TALL DOES IT STAND, for a thing that rests on the ground and has a height; these bands say nothing about how bulky it is: knee-high — a dog, a stool; waist-high — a young child, a barrel; chest-high — a counter, a pony; adult-height — a doorway, a grown-up standing; twice-adult-height — a market stall with its roof; house-height — a house, a full-grown tree; landmark — a cliff, a mountain, the horizon behind everything. A band never carries the other group's meaning: a head-sized thing is melon-sized, never adult-height. Judge the element's largest dimension, not how the story feels about it. The story states a size only where its plot turns on one, so the band is yours to decide from what the story has the element do — held in one hand, lifted by two, ridden, hidden under a bed. This is the only place the element's size is stated. Never omitted.]";
 
 /** Ascending. The order IS the contract — a reader must be able to tell any two apart. */
@@ -1008,6 +1023,74 @@ function withScaleNote(description, entry) {
   if (!desc) return `Size: ${phrase}`;
   return `${desc.replace(/\.\s*$/, '')}. Size: ${phrase}`;
 }
+
+/**
+ * THE HEIGHT EACH HEIGHT BAND STANDS, AS A FRACTION OF A STANDING ADULT (owner,
+ * 2026-09-26). ONE table: the page prompt turns it into a yardstick against
+ * the people actually in frame (promptBuilders.elementPageScaleNote), the
+ * judges read that same sentence, and so does every repaint.
+ *
+ * knee / hip / chest are the band phrases' own body landmarks, at their
+ * standard anthropometric heights as a fraction of stature (Drillis & Contini
+ * 1966, the segment-length proportions of Winter's Biomechanics and Motor
+ * Control of Human Movement: knee 0.285 H, hip 0.530 H, chest 0.720 H).
+ * `waist-high` renders "stands hip-high", so it is the hip.
+ *
+ * adult-height and twice-adult-height state their multiple outright.
+ * house-height states "several adults high, the size of a house": 3 is the
+ * reading of "several" this table defines (a one-storey house to its ridge) — the
+ * one value in this table the phrase does not spell out.
+ *
+ * No other band has an entry, and none is invented for it: the SIZE bands
+ * answer how big, not how tall (their yardstick is a body part, see
+ * promptBuilders.SIZE_BAND_BODY_PART), forearm-/arm-sized measure a length
+ * against an adult limb, and `landmark` fills the horizon.
+ */
+const SCALE_ADULT_HEIGHT_FRACTION = Object.freeze({
+  'knee-high': 0.285,
+  'waist-high': 0.53,
+  'chest-high': 0.72,
+  'adult-height': 1,
+  'twice-adult-height': 2,
+  'house-height': 3,
+});
+
+function scaleAdultHeightFraction(raw) {
+  const token = resolveScaleClass(raw);
+  return token && Object.prototype.hasOwnProperty.call(SCALE_ADULT_HEIGHT_FRACTION, token)
+    ? SCALE_ADULT_HEIGHT_FRACTION[token]
+    : null;
+}
+
+/**
+ * A CREATURE AT LEAST AS TALL AS A STANDING ADULT IS A GROWN ONE (owner, 2026-09-26).
+ *
+ * Staging job_1790373080139_vnx5l8iy7: the grown dragon (ANI001,
+ * `twice-adult-height`) and its hatchling (ANI002, `melon-sized`) were authored
+ * with one shared feature list, and nothing in the grown one's entry said
+ * "adult". Its reference cell came back with a hatchling's chibi proportions,
+ * and the pages copied the cell's look — including its build — so the dragon
+ * rendered cat-sized on p10 and boy-sized on p18.
+ *
+ * The fix is IDENTITY, never size: the entry states the creature's MATURITY
+ * ("a fully grown adult dragon with adult body proportions"), which a cell can
+ * draw alone. It states no band phrase and measures the creature against
+ * nothing (cells get no size, 2026-09-23; no scale referent in a VB cell,
+ * 2026-09-14; SETTLED 2026-09-19: cell area is an identity dial, not a size
+ * dial). The bands are the four from a standing adult up: a creature that tall
+ * is not a juvenile, and the young one of the same kind sits below them.
+ */
+const GROWN_CREATURE_SCALE_CLASSES = new Set(['adult-height', 'twice-adult-height', 'house-height', 'landmark']);
+
+function isGrownCreatureScaleClass(raw) {
+  const token = resolveScaleClass(raw);
+  return token !== null && GROWN_CREATURE_SCALE_CLASSES.has(token);
+}
+
+// A species field that already states an age keeps it: "a fully grown adult
+// baby giant" would contradict itself. Reads the entry's OWN authored field to
+// avoid writing a second age beside it — never a finding's prose.
+const STATED_AGE_WORDS = /\b(baby|babies|young|juvenile|hatchling|infant|cub|foal|calf|puppy|kitten|chick|fledgling|adult|grown|full-grown|elderly|old)\b/i;
 
 function normaliseScaleClass(raw, id) {
   const who = id ? String(id) : 'entry';
@@ -1273,6 +1356,8 @@ function tryParseVisualBibleJSON(outline) {
         description: `${item.description}. ${item.howWorn}`,
         wornBy: item.wornBy,
         howWorn: item.howWorn,
+        // The garment seen from behind (wornItems.GARMENT_BACK_RULE).
+        back: item.back || null,
         type: 'clothing',
         extractedDescription: null,
         firstAppearanceAnalyzed: false,
@@ -1339,8 +1424,15 @@ function buildCharacterDescription(char) {
  */
 function buildAnimalDescription(animal) {
   const parts = [];
-  if (animal.species) parts.push(animal.species);
+  // A grown creature's MATURITY leads its description (see
+  // GROWN_CREATURE_SCALE_CLASSES): identity the cell can draw, never a size.
+  const species = typeof animal.species === 'string' ? animal.species.trim() : '';
+  const grown = isGrownCreatureScaleClass(animal.scaleClass) && !STATED_AGE_WORDS.test(species);
+  if (grown) parts.push(`a fully grown adult ${species || 'creature'} with adult body proportions`);
+  else if (species) parts.push(species);
   if (animal.coloring) parts.push(animal.coloring);
+  // The body the cell must draw, every part counted (ANIMAL_ANATOMY_SPEC).
+  if (animal.anatomy) parts.push(animal.anatomy);
   // NO SIZE (owner, 2026-09-23: "Cells get no size"). `description` is what a
   // Visual Bible reference cell paints, and a cell shows one element alone —
   // a phrase measuring it against an adult names a figure the cell must not
@@ -1738,7 +1830,7 @@ function significantEntityTokens(text) {
   return new Set(
     String(text || '')
       .toLowerCase()
-      .split(/[^a-zäöüéèêàçñ]+/i)
+      .split(/[^\p{L}]+/u)
       .filter(t => t.length >= 3 && !ENTITY_MATCH_STOPWORDS.has(t))
   );
 }
@@ -2343,6 +2435,8 @@ function tryParseNewEntriesJSON(section) {
         description: `${item.description}. ${item.howWorn || ''}`.trim(),
         wornBy: item.wornBy,
         howWorn: item.howWorn,
+        // The garment seen from behind (wornItems.GARMENT_BACK_RULE).
+        back: item.back || null,
         type: 'clothing',
         pages: item.pages || [],
         source: 'story_text'
@@ -3760,6 +3854,7 @@ module.exports = {
   recordElementCellGate,
   SCALE_CLASSES,
   SCALE_CLASS_SPEC,
+  ANIMAL_ANATOMY_SPEC,
   SCALE_PHRASES,
   LEGACY_SCALE_CLASSES,
   resolveScaleClass,
@@ -3770,6 +3865,10 @@ module.exports = {
   isGenericEntry,
   LARGE_SCALE_CLASSES,
   isLargeScaleClass,
+  SCALE_ADULT_HEIGHT_FRACTION,
+  scaleAdultHeightFraction,
+  GROWN_CREATURE_SCALE_CLASSES,
+  isGrownCreatureScaleClass,
   isPlateBorneElement,
   splitGenericEntries,
   genericCitationTokens,

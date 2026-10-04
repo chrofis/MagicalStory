@@ -17,6 +17,7 @@ const r2 = require('./r2');
 const { withGrok } = require('./aiConcurrency');
 const { frameColorForName } = require('./characterFrames');
 const { guardPromptString } = require('../services/prompts');
+const { PromptFitError, promptBytes } = require('./promptFitError');
 
 const XAI_API_KEY = process.env.XAI_API_KEY;
 const XAI_API_URL = 'https://api.x.ai/v1';
@@ -99,6 +100,7 @@ async function generateWithGrok(prompt, options = {}) {
   log.debug(`🎨 [GROK] Prompt (${prompt.length} chars): ${prompt.substring(0, 120)}...`);
 
   prompt = guardPromptString(prompt, 'grok.generateWithGrok');
+  assertGrokPromptFits(prompt, model, 'grok.generateWithGrok');
   const body = {
     model,
     prompt,
@@ -126,6 +128,7 @@ async function generateWithGrok(prompt, options = {}) {
       warnIfCreditsExhausted(response.status, errorText);
       const err = new Error(`Grok API error (${response.status}): ${errorText.substring(0, 200)}`);
       err.statusCode = response.status;
+      err.moderated = isGrokModerationBody(errorText);
       log.error(`❌ [GROK] API error ${response.status}: ${errorText.substring(0, 300)}`);
       throw err;
     }
@@ -198,6 +201,11 @@ async function generateWithGrok(prompt, options = {}) {
  * Names the exact pixel counts so Grok has unambiguous anchors. Without this
  * prefix the magenta survives into the output as visible bars.
  *
+ * A landmark PLATE never reaches this: packReferences centre-crops its photo
+ * to the page aspect, so no pad and no prefix (decisions.md 2026-09-26). The
+ * callers left are page renders editing onto a plate or a previous image, and
+ * a cast-0 page anchored on its landmark photo.
+ *
  * @param {{top:number,bottom:number,left:number,right:number}} pad
  * @returns {string}
  */
@@ -211,16 +219,51 @@ function buildMagentaExtensionPrefix(pad) {
 }
 
 /**
- * The longest prefix buildMagentaExtensionPrefix can return. Only the shorter
- * axis is padded, so one pair of sides carries numbers; 99999 px bounds every
- * input. A plate prompt is fitted against the cap minus this (images.js
- * _dispatchImageGeneration), because it cannot be refitted once the prefix is
- * known (owner, 2026-09-25).
+ * The prompt budget of the Grok tier `model` names. Derived from the model id —
+ * never a ternary, never a hardcoded number. Unknown id → the registry's
+ * default Grok tier, same as the dispatcher's fallback.
  */
-const MAX_MAGENTA_EXTENSION_PREFIX_LENGTH = Math.max(
-  buildMagentaExtensionPrefix({ top: 99999, bottom: 99999, left: 0, right: 0 }).length,
-  buildMagentaExtensionPrefix({ top: 0, bottom: 0, left: 99999, right: 99999 }).length,
-);
+function grokPromptBudget(model) {
+  const { IMAGE_MODELS, resolveGrokImageModel } = require('../config/models');
+  const tier = Object.values(IMAGE_MODELS).find(m => m.backend === 'grok' && m.modelId === model)
+    || IMAGE_MODELS[resolveGrokImageModel(null).key];
+  return tier.maxPromptLength;
+}
+
+/**
+ * NO PROMPT OVER THE CAP LEAVES THIS MACHINE (2026-09-30). The last line before
+ * every Grok request. The page, cover and plate paths fit their prompts first
+ * (images.js shrinkPromptForModel / fitPlatePrompt), but ~20 other callers
+ * (repair, inpaint, avatars, style edit, composite) sent whatever they built:
+ * Grok answered 400 above its cap (then 8,000) and the caller read that as a provider
+ * failure — `editImageWithPrompt` even retried it as "content moderation" and
+ * fell back to Gemini. Here an over-cap prompt is our bug, raised before any
+ * request as a PromptFitError, which every provider-fallback catch rethrows
+ * (images.js rethrowLocalFault). Never cuts — a caller that can shrink must do
+ * it before calling. Measured in UTF-8 bytes, as xAI measures it (2026-10-04).
+ */
+/**
+ * Grok's moderation verdict is the structured error code `imagine:content-moderated`
+ * in the response body (decisions 2026-09-18). Callers branch on `err.moderated`,
+ * never on a status number or a substring of the message (code review 2026-10 A8).
+ */
+function isGrokModerationBody(errorText) {
+  return /content-moderated/i.test(String(errorText || ''));
+}
+
+function assertGrokPromptFits(prompt, model, logLabel) {
+  const budget = grokPromptBudget(model);
+  const bytes = promptBytes(prompt);
+  if (bytes <= budget) return;
+  const msg = `${logLabel}: prompt is ${bytes} bytes (${prompt.length} chars), over the ${budget}-byte cap of ${model} — not sent`;
+  log.error(`❌ [GROK] ${msg}`);
+  try {
+    const { getCurrentLogger } = require('./generationLogger');
+    getCurrentLogger()?.error('prompt_fit_failed', msg, null,
+      { label: logLabel, provider: 'grok', chars: prompt.length, bytes, cap: budget });
+  } catch { /* logging only */ }
+  throw new PromptFitError(msg);
+}
 
 /**
  * Fit `prefix + body` into the prompt budget of the Grok tier being called.
@@ -251,21 +294,15 @@ const MAX_MAGENTA_EXTENSION_PREFIX_LENGTH = Math.max(
  * @returns {Promise<string>} final prompt, <= the tier's maxPromptLength
  */
 async function fitGrokPromptWithPrefix(prefix, body, model) {
-  const { IMAGE_MODELS, resolveGrokImageModel } = require('../config/models');
-  // Derive the tier from the model id — never a ternary, never a hardcoded
-  // number. Unknown id → the registry's default Grok tier, same as the
-  // dispatcher's fallback.
-  const tier = Object.values(IMAGE_MODELS).find(m => m.backend === 'grok' && m.modelId === model)
-    || IMAGE_MODELS[resolveGrokImageModel(null).key];
-  const budget = tier.maxPromptLength;
-  if (prefix.length + body.length <= budget) return prefix + body;
+  const budget = grokPromptBudget(model);
+  if (promptBytes(prefix + body) <= budget) return prefix + body;
 
   // Lazy require: images.js requires this module, so a top-level import would
   // be circular (same pattern as sceneComposite.js).
   const { shrinkPromptForModel } = require('./images');
-  const fitted = await shrinkPromptForModel(body, budget - prefix.length, 'GROK EDIT', model);
-  log.warn(`✂️ [GROK] Magenta-extension prefix (${prefix.length} chars) pushed the prompt over the ${budget} budget `
-    + `— body refitted ${body.length}→${fitted.length}, final ${prefix.length + fitted.length}`);
+  const fitted = await shrinkPromptForModel(body, budget - promptBytes(prefix), 'GROK EDIT', model);
+  log.warn(`✂️ [GROK] Magenta-extension prefix (${promptBytes(prefix)} bytes) pushed the prompt over the ${budget}-byte budget `
+    + `— body refitted ${promptBytes(body)}→${promptBytes(fitted)} bytes, final ${promptBytes(prefix + fitted)}`);
   return prefix + fitted;
 }
 
@@ -472,6 +509,7 @@ async function editWithGrok(prompt, referenceImages = [], options = {}) {
   log.debug(`🎨 [GROK] Prompt (${prompt.length} chars): ${prompt.substring(0, 120)}...`);
 
   prompt = guardPromptString(prompt, 'grok.editWithGrok');
+  assertGrokPromptFits(prompt, model, 'grok.editWithGrok');
   const body = {
     model,
     prompt,
@@ -503,6 +541,7 @@ async function editWithGrok(prompt, referenceImages = [], options = {}) {
       const errorText = await response.text();
       const err = new Error(`Grok edit API error (${response.status}): ${errorText.substring(0, 200)}`);
       err.statusCode = response.status;
+      err.moderated = isGrokModerationBody(errorText);
       log.error(`❌ [GROK] Edit API error ${response.status}: ${errorText.substring(0, 300)}`);
       warnIfCreditsExhausted(response.status, errorText);
       throw err;
@@ -1173,23 +1212,6 @@ async function extractBottomBody3Columns(buffer) {
 }
 
 /**
- * Public helper retained for backwards compat: extract front views from a
- * 2×2 avatar grid and rearrange them as a horizontal [body|face] strip.
- * Non-grid images are returned unchanged.
- */
-async function cropToFrontColumn(buffer) {
-  try {
-    const parts = await extractFaceAndBody(buffer);
-    if (!parts) return buffer;
-    const composed = await composeBodyFaceHorizontal(parts.face, parts.body);
-    return composed;
-  } catch (err) {
-    log.warn(`⚠️ [GROK] cropToFrontColumn failed: ${err.message}`);
-    return buffer;
-  }
-}
-
-/**
  * Pack reference images into max 3 slots for Grok's edit endpoint.
  *
  * Strategy:
@@ -1237,6 +1259,15 @@ async function packReferences(refs = {}, options = {}) {
     vbColumnFraction = null,
   } = options;
   const tag = pageLabel ? `[GROK P${pageLabel}]` : '[GROK]';
+  // The landmark photo of a PLATE call is centre-cropped to the target aspect
+  // below, never magenta-extended: the extension's "pixel-faithful centre"
+  // made plates trace the photo, strangers and signs included (decisions.md
+  // 2026-09-26, Lab 1485-1487 / 1507-1511).
+  if (landmarkScene === 'plate' && padInputWithExtension) {
+    throw new Error(`${tag} a plate call's landmark photo is centre-cropped, never magenta-extended — padInputWithExtension must be off`);
+  }
+  // Index (in `slots`) of the landmark photo a plate call renders from.
+  let plateSourceSlot = -1;
 
   // Extract character photo buffers as raw data — the layout function decides
   // how to crop/compose based on character count and aspect ratio.
@@ -1264,7 +1295,10 @@ async function packReferences(refs = {}, options = {}) {
         const photoType = typeof photoData === 'object' ? photoData?.photoType : null;
         rawCharData.push({ rawBuffer, photoType, charName });
       } else if (charName) {
-        log.warn(`⚠️ ${tag} Skipped character "${charName}": failed to load photo bytes`);
+        // A reference that exists but cannot be loaded must stop the render: a
+        // picture without this character's reference drifts off-identity and ships
+        // (code review 2026-10 A4; decisions #4 no fallbacks).
+        throw new Error(`${tag} character "${charName}": failed to load the avatar/photo bytes — refusing to render without its reference`);
       }
     } else if (charName) {
       log.warn(`⚠️ ${tag} Skipped character "${charName}": photoUrl is ${photoUrl ? typeof photoUrl : 'null/undefined'}`);
@@ -1349,6 +1383,7 @@ async function packReferences(refs = {}, options = {}) {
         .jpeg({ quality: 92 })
         .toBuffer();
       slots.push(`data:image/jpeg;base64,${resized.toString('base64')}`);
+      if (landmarkScene === 'plate') plateSourceSlot = slots.length - 1;
       log.info(`🎨 ${tag} Slot ${slots.length}: landmark photo (${landmarkScene === 'plate' ? 'plate source' : landmarkScene === 'castless' ? 'cast-0 page scene' : 'composite route'})`);
     }
   }
@@ -1387,10 +1422,9 @@ async function packReferences(refs = {}, options = {}) {
       { skipAspectPad: willAddVb, allCharNames: rawCharData.map(c => c.charName) },
     );
     if (!composed) {
-      // Never silent: this early return is how a whole character group used to
-      // vanish from the references with nothing in the log (the old n > 3 cap).
-      log.warn(`⚠️ ${tag} Character slot produced no image for [${group.map(c => c.charName || '?').join(', ')}] — those characters have NO reference this render`);
-      return;
+      // This used to be a silent early return: a whole character group vanished from
+      // the references with only a log line. It now fails the render.
+      throw new Error(`${tag} character slot produced no image for [${group.map(c => c.charName || '?').join(', ')}] — refusing to render without their references`);
     }
     let slotBuf = composed;
     let vbCount = 0;
@@ -1504,7 +1538,9 @@ async function packReferences(refs = {}, options = {}) {
       slots.push(`data:image/jpeg;base64,${composed.toString('base64')}`);
       log.info(`🎨 ${tag} Slot ${slots.length}: ${cappedVb.length} VB element(s) (own slot, ${cm.width}x${cm.height})`);
     } catch (e) {
-      log.warn(`⚠️ ${tag} VB own-slot compose failed (${e.message}) — elements not sent this render`);
+      // The VB elements are the scene's props/creatures; a render without them is
+      // a different picture. Fail the call (code review 2026-10 A4).
+      throw new Error(`${tag} VB own-slot compose failed: ${e.message}`);
     }
   }
 
@@ -1604,6 +1640,17 @@ async function packReferences(refs = {}, options = {}) {
     if (padInputWithExtension && i === 0) {
       paddedSlots.push(slot);
       log.debug(`🎨 ${tag} Slot 1: native ${w}x${h} kept for editWithGrok magenta-extension`);
+      continue;
+    }
+
+    // A plate's landmark photo: centre-crop the longer axis to the target
+    // aspect. The photo's edges are lost; nothing is padded, nothing extended.
+    if (i === plateSourceSlot) {
+      const cropW = currentRatio > targetRatio ? Math.round(h * targetRatio) : w;
+      const cropH = currentRatio > targetRatio ? h : Math.round(w / targetRatio);
+      const cropped = await sharp(buf).resize(cropW, cropH, { fit: 'cover', position: 'centre' }).jpeg({ quality: 92 }).toBuffer();
+      paddedSlots.push(`data:image/jpeg;base64,${cropped.toString('base64')}`);
+      log.info(`🎨 ${tag} Slot ${i + 1}: plate source centre-cropped ${w}x${h} → ${cropW}x${cropH}`);
       continue;
     }
 
@@ -2087,6 +2134,7 @@ async function stitchImagesHorizontally(buffers, targetHeight = 768, options = {
 }
 
 module.exports = {
+  isGrokModerationBody,
   generateWithGrok,
   editWithGrok,
   isGrokConfigured,
@@ -2101,7 +2149,6 @@ module.exports = {
   // layout arithmetic, and reaching it through packReferences means composing
   // four character cards just to read back two numbers.
   composeCharWithVbRow,
-  cropToFrontColumn,
   extractBottomBody3Columns,
   detectMinVarianceSeparator,
   buildCharacterGroupSlot,
@@ -2114,7 +2161,8 @@ module.exports = {
   // the part that broke in production, and reaching it through editWithGrok
   // would mean a live xAI call.
   fitGrokPromptWithPrefix,
-  MAX_MAGENTA_EXTENSION_PREFIX_LENGTH,
+  assertGrokPromptFits,
+  grokPromptBudget,
   buildMagentaExtensionPrefix,
   GROK_MODELS,
 };

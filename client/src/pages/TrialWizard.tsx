@@ -292,6 +292,33 @@ export default function TrialWizard() {
     }).catch(() => {});
   }, []);
 
+  // Rank the town's landmarks for this story kind the moment it is complete,
+  // so the idea request reads a ready ranking and never waits for one
+  // (server: POST /api/trial/prepare-idea-landmarks). The fields match what
+  // TrialIdeasStep sends; the kind is complete by TrialTopicStep's own rule.
+  const preparedLandmarksKeyRef = useRef('');
+  useEffect(() => {
+    const { storyCategory, storyTopic, storyTheme } = storyInput;
+    const complete = storyCategory === 'adventure' ? !!storyTheme
+      : storyCategory === 'life-challenge' ? !!storyTopic && !!storyTheme
+        : !!storyCategory && !!storyTopic;
+    if (!complete || storyCategory === 'historical' || !characterData.age) return;
+    const data = {
+      storyCategory, storyTopic, storyTheme, language: storyInput.language,
+      characters: [{ age: characterData.age, gender: characterData.gender }],
+      ...(userLocation?.city ? { userLocation } : {}),
+    };
+    const key = JSON.stringify(data);
+    if (key === preparedLandmarksKeyRef.current) return;
+    preparedLandmarksKeyRef.current = key;
+    const apiUrl = import.meta.env.VITE_API_URL || '';
+    fetch(`${apiUrl}/api/trial/prepare-idea-landmarks`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }).catch(() => { /* ranking is optional for the idea request */ });
+  }, [storyInput, characterData.age, characterData.gender, userLocation]);
+
   const isAdmin = user?.role === 'admin';
 
   // Anonymous session state — admins always start fresh (clear stale tokens)
@@ -518,6 +545,7 @@ export default function TrialWizard() {
   // Intro screen — pre-wizard. Single CTA flips showIntro=false and the
   // wizard takes over. No progress bar shown (the wizard hasn't started).
   const intro = introStrings[language] || introStrings.en;
+  const startTrial = () => { trackTrialStep('intro_start'); setShowIntro(false); };
   if (showIntro) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -536,21 +564,46 @@ export default function TrialWizard() {
             <p className="text-lg text-gray-600">{intro.subtitle}</p>
           </div>
 
-          {/* MOBILE — each step stacked: image then its caption (1, 2). The
-              desktop bookend below doesn't stack cleanly, so phones get this
-              simple vertical version instead. */}
-          <div className="md:hidden space-y-8 mb-8">
-            {([
-              { n: 1, img: '/images/try/step1-photo.webp', title: intro.step1Title, desc: intro.step1Desc },
-              { n: 2, img: '/images/try/step2-topics.webp', title: intro.step2Title, desc: intro.step2Desc },
-            ] as const).map((s) => (
-              <div key={s.n} className="text-center">
-                <img src={s.img} alt="" loading="lazy" decoding="async"
-                  className="max-h-72 w-auto mx-auto object-contain rounded-2xl shadow-sm mb-3" />
-                <h2 className="text-2xl font-bold text-gray-800 mb-1">{s.n}. {s.title}</h2>
-                <p className="text-gray-600 text-base max-w-xs mx-auto">{s.desc}</p>
-              </div>
-            ))}
+          {/* MOBILE — the payoff first, then the three steps as one compact list,
+              so the whole screen fits a phone. The start button is pinned to the
+              bottom edge (below), visible from the first moment. Until 2026-09-30
+              phones got two tall step images stacked and the only button ~2.5
+              screens down; 4 of the 5 paid visitors who reached this screen left
+              without a tap. */}
+          <div className="md:hidden mb-28">
+            <img src="/images/try/step3-spread.webp" alt="" decoding="async" fetchPriority="high"
+              className="w-full max-h-60 object-contain rounded-2xl shadow-sm mb-5" />
+            <ol className="space-y-3 max-w-sm mx-auto">
+              {/* Steps 2 and 3 use dedicated 56px thumbnails (owner-approved 2026-10-04, originals in scripts/ads/approved/try-steps/): the desktop images crop badly at thumbnail size; step 1's photo crops fine. */}
+              {([
+                { n: 1, img: '/images/try/step1-photo.webp', title: intro.step1Title, desc: intro.step1Desc },
+                { n: 2, img: '/images/try/step2-thumb.webp', title: intro.step2Title, desc: intro.step2Desc },
+                { n: 3, img: '/images/try/step3-thumb.webp', title: intro.step3Title, desc: intro.step3Desc },
+              ] as const).map((s) => (
+                <li key={s.n} className="flex items-center gap-3 text-left">
+                  <img src={s.img} alt="" decoding="async"
+                    className="w-14 h-14 object-cover rounded-xl shadow-sm flex-shrink-0" />
+                  <div>
+                    <h2 className="text-base font-bold text-gray-800">{s.n}. {s.title}</h2>
+                    <p className="text-sm text-gray-600">{s.desc}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+            <p className="text-xs text-gray-500 text-center mt-5 max-w-sm mx-auto">{intro.freeNote}</p>
+          </div>
+
+          {/* MOBILE — start button pinned to the bottom edge. Same styling as the
+              desktop button, full width. */}
+          <div className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-white/95 border-t border-gray-200 px-4 pt-3"
+            style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}>
+            <button
+              onClick={startTrial}
+              className="w-full inline-flex justify-center items-center gap-2 px-8 py-3 bg-indigo-500 text-white rounded-lg font-semibold text-lg hover:bg-indigo-600 transition-colors"
+            >
+              {intro.cta}
+              <ArrowRight size={20} />
+            </button>
           </div>
 
           {/* DESKTOP — the two tall images at the SAME height, bookending the
@@ -582,10 +635,11 @@ export default function TrialWizard() {
             />
           </div>
 
-          {/* Closing — the finished spread on the left; on the right the
+          {/* DESKTOP closing — the finished spread on the left; on the right the
               "sit back" message plus the free-trial note and the Start button.
-              No step number here: this is the payoff + call to action. */}
-          <div className="flex flex-col md:flex-row items-center gap-6 md:gap-12">
+              No step number here: this is the payoff + call to action. Phones get
+              their own layout above. */}
+          <div className="hidden md:flex md:flex-row items-center gap-6 md:gap-12">
             <img
               src="/images/try/step3-spread.webp"
               alt=""
@@ -597,7 +651,7 @@ export default function TrialWizard() {
               <h2 className="text-2xl md:text-3xl font-bold text-gray-800 mb-2">{intro.step3Title}</h2>
               <p className="text-gray-600 text-base md:text-lg mb-4">{intro.step3Desc}</p>
               <button
-                onClick={() => { trackTrialStep('intro_start'); setShowIntro(false); }}
+                onClick={startTrial}
                 className="inline-flex items-center gap-2 px-8 py-3 bg-indigo-500 text-white rounded-lg font-semibold text-lg hover:bg-indigo-600 transition-colors mb-4"
               >
                 {intro.cta}

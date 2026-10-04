@@ -564,6 +564,38 @@ function resolveWornItemsForPage(visualBible, cast, sceneMetadata, options = {})
       missing: false,
     });
   }
+  // FACING (2026-10-04). Which wearers this page draws from behind — read from
+  // the brief's own `perspective` through the ONE cell-pose resolver
+  // (storyAvatars.resolveCellPose, the same call that hands such a figure the
+  // rear sheet cell). A worn row on a face-away wearer is rendered from its
+  // garment's `back` look, never its description: see garmentLookForRow.
+  const away = faceAwayNames(cast, sceneMetadata);
+  for (const r of out) {
+    r.wearerFacesAway = r.state !== 'off' && away.some(n => sameName(n, r.wearer || r.owner));
+  }
+  return out;
+}
+
+/**
+ * The names a page draws facing away from the camera. Reads the structured
+ * `perspective` (or `pose`) of each brief character — from the brief's
+ * metadata, or from a cast entry that carries it — through
+ * storyAvatars.resolveCellPose; never a second detector.
+ */
+function faceAwayNames(cast, sceneMetadata) {
+  const { resolveCellPose } = require('./storyAvatars');
+  const rows = [
+    ...(Array.isArray(cast) ? cast : []),
+    ...(Array.isArray(sceneMetadata && sceneMetadata.characters) ? sceneMetadata.characters : []),
+    ...(Array.isArray(sceneMetadata && sceneMetadata.fullData && sceneMetadata.fullData.characters)
+      ? sceneMetadata.fullData.characters : []),
+  ];
+  const out = [];
+  for (const c of rows) {
+    if (!c || typeof c !== 'object' || !c.name) continue;
+    if (!c.perspective && !c.pose) continue;
+    if (resolveCellPose(c).pose === 'back') out.push(c.name);
+  }
   return out;
 }
 
@@ -775,6 +807,19 @@ function wornStateById(resolved) {
  */
 function wornItemLook(r) {
   const entry = r && r.entry;
+  // SEEN FROM BEHIND (2026-10-04). The description names the garment's FRONT —
+  // "full-length front zip, two patch pockets at the hip and a stand-up collar"
+  // — and under a header that says these lines win over the references, a
+  // back-view wearer was told to show the front: staging
+  // job_1791040103540_atbttop6w p5 drew Kiaan's zip, pockets and collar on his
+  // back. A face-away wearer gets the entry's authored `back` look (colour,
+  // material, outline — GARMENT_BACK_RULE) and nothing else; an entry without
+  // one gives no look at all (buildWornStateLines logs it). Nothing is cut out
+  // of the description: which feature is a front feature is the author's call.
+  if (r && r.wearerFacesAway) {
+    const back = String((entry && entry.back) || '').trim().replace(/[.\s]+$/, '');
+    return back && !sameName(back, r.name) ? back : '';
+  }
   const raw = String((entry && (entry.extractedDescription || entry.description)) || '').trim();
   if (!raw) return '';
   const first = (raw.split(/(?<=[.!?])\s+/)[0] || raw).trim().replace(/[.\s]+$/, '');
@@ -865,13 +910,62 @@ function carryForwardWornItemsInBrief(newBrief, savedBrief) {
   };
 }
 
+/**
+ * The override is said ONCE, by the header (2026-09-27, owner: "shorten the
+ * fixed blocks"). Each line used to repeat it ("Draw it on X even if the
+ * attached reference shows X without it", "Leave it off X even if the attached
+ * reference shows it worn") — ~75 chars per row in the never-cut part of the
+ * page prompt, where staging job_1790529840433_ar4u7qry3 p1/p4 missed the Grok
+ * cap by 378/222 chars and rendered nothing. A line states the page's fact
+ * (worn / not worn / handed over, and where an off item lies); the header says
+ * that fact wins over every attached reference.
+ */
+/**
+ * The authored `back` look of a worn garment (2026-10-04) — what the worn line
+ * says for a wearer the page draws from behind (wornItemLook). One constant,
+ * filled into both Visual Bible authoring sites as {GARMENT_BACK} (sibling set
+ * vb-authoring-sites). The author knows which of a garment's features are on
+ * its front; code reading the description cannot.
+ */
+const GARMENT_BACK_RULE = "Every worn garment's entry — each `clothing` entry and each entry with `wornAs` — carries `back`: the garment as seen from behind, one short phrase of its colour, material and outline, plus anything that sits on its back (a hood, a back print). Nothing only its front shows: no front fastening, front pockets, collar opening, buttons or front print.";
+
+/** The facing tag both the worn line and the judges' clothing contract carry. */
+const SEEN_FROM_BACK = 'seen from the back';
+
+const WORN_ITEMS_HEADER = '**WORN ITEMS ON THIS PAGE (these win over the attached references):**';
+
+/**
+ * "<name> — <look>", without saying the name twice. A bible description often
+ * OPENS with the item's own name ("A red long-sleeve shirt with a round
+ * neckline" for "red long-sleeve shirt"); the clause keeps the name once and
+ * the look's remainder after it (2026-09-28: staging job_1790539784661_6mjcny1c7's
+ * front cover repeated six garment names in a never-cut block).
+ */
+function wornItemClause(name, look) {
+  if (!look) return name;
+  const esc = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const m = look.match(new RegExp(`^(?:(?:a|an|the)\\s+)?${esc}\\b[\\s,—–-]*`, 'i'));
+  if (!m) return `${name} — ${look}`;
+  const rest = look.slice(m[0].length).trim();
+  return rest ? `${name} — ${rest}` : name;
+}
+
 function buildWornStateLines(resolved) {
   const lines = [];
+  // Plain worn rows of one character share ONE line (2026-09-28): a page that
+  // lists a whole outfit as worn items repeated "<X> IS wearing this on this
+  // page:" per garment. Placed where the character's first row was.
+  const wornLineOf = new Map();
   for (const r of (resolved || [])) {
     const name = String(r.name || '').trim();
     if (!name) continue;
-    const look = wornItemLook(r);
-    const item = look ? `${name} — ${look}` : name;
+    if (r.wearerFacesAway && !String((r.entry && r.entry.back) || '').trim()) {
+      log.error(`[WORN] ${r.id} "${name}" is worn by ${r.wearer || r.owner}, whom this page draws from behind, and its entry carries no \`back\` look — the line names the garment only; its front description is never sent for a back view.`);
+    }
+    const item = wornItemClause(name, wornItemLook(r));
+    // The wearer's facing, said once per line: the look that follows is the
+    // garment's back (see wornItemLook).
+    const seen = r.wearerFacesAway ? `, ${SEEN_FROM_BACK}` : '';
     // OWNER OFF THIS PAGE (2026-09-19). The row survived the cast gate on its
     // WEARER; naming the owner here would put an off-page name into a
     // prompt-facing string and invite the model to draw the absent character —
@@ -879,7 +973,7 @@ function buildWornStateLines(resolved) {
     // needs: this character is wearing it, draw it on them. `=== false` on
     // purpose — a row built without the field keeps the old rendering.
     if (r.ownerInCast === false && r.handedOver) {
-      lines.push(`- ${r.wearer} IS wearing this on this page: ${item}. Draw it on ${r.wearer}.`);
+      lines.push(`- ${r.wearer} IS wearing this on this page${seen}: ${item}.`);
       continue;
     }
     // The item NAME sits at the end of its own clause on purpose: every VB name
@@ -889,14 +983,17 @@ function buildWornStateLines(resolved) {
     // instruction this block exists to deliver.
     if (r.state === 'off') {
       const where = r.location ? ` — ${r.location}.` : ' — it is elsewhere in the scene.';
-      lines.push(`- ${r.owner} is NOT wearing this on this page: ${item}. Leave it off ${r.owner} even if the attached reference shows it worn${where}`);
+      lines.push(`- ${r.owner} is NOT wearing this on this page: ${item}${where}`);
     } else if (r.handedOver) {
       // The item is on the page, on the other character. Both halves are said
       // in one clause: nobody but the wearer carries it.
-      lines.push(`- ${r.wearer} IS wearing this on this page, and ${r.owner} is NOT: ${item}. `
-        + `Draw it on ${r.wearer} only, and leave it off ${r.owner} even if the attached references show the opposite.`);
+      lines.push(`- ${r.wearer} IS wearing this on this page${seen}, and ${r.owner} is NOT: ${item}.`);
+    } else if (wornLineOf.has(r.owner)) {
+      const at = wornLineOf.get(r.owner);
+      lines[at] = `${lines[at].replace(/\.$/, '')}; ${item}.`.replace(' IS wearing this on this page', ' IS wearing these on this page');
     } else {
-      lines.push(`- ${r.owner} IS wearing this on this page: ${item}. Draw it on ${r.owner} even if the attached reference shows ${r.owner} without it.`);
+      wornLineOf.set(r.owner, lines.length);
+      lines.push(`- ${r.owner} IS wearing this on this page${seen}: ${item}.`);
     }
   }
   return lines;
@@ -906,7 +1003,7 @@ function buildWornStateLines(resolved) {
 function buildWornStateBlock(resolved) {
   const lines = buildWornStateLines(resolved);
   if (lines.length === 0) return '';
-  return `\n**WORN ITEMS ON THIS PAGE (the attached references are not authoritative for these):**\n${lines.join('\n')}\n`;
+  return `\n${WORN_ITEMS_HEADER}\n${lines.join('\n')}\n`;
 }
 
 /** Every garment noun in the closed vocabulary, across all slots. */
@@ -1697,24 +1794,24 @@ function wornItemsBibleOf(storyData) {
  * page did, not the way the story-level contract does.
  *
  * Reads the page's brief out of `storyData.sceneImages` and parses it with the
- * same `extractSceneMetadata` the entity grid uses. Unparsable or missing →
- * the outfit comes back untouched, exactly as before.
+ * same `extractSceneMetadata` the entity grid uses. A missing brief → the outfit
+ * comes back untouched; an unexpected error propagates.
  */
 function resolveOutfitForStoryPage(outfitText, characterName, storyData, pageNumber, sceneDescription = null) {
-  try {
-    const sd = (storyData && Array.isArray(storyData.sceneImages) ? storyData.sceneImages : [])
-      .find(s => s && s.pageNumber === pageNumber);
-    const desc = sceneDescription || (sd && (sd.sceneDescription || sd.description)) || null;
-    if (!desc) return String(outfitText || '');
-    const { extractSceneMetadata } = require('./sceneMetadata');
-    return resolveGeneratedOutfit(outfitText, characterName, {
-      visualBible: wornItemsBibleOf(storyData),
-      sceneMetadata: extractSceneMetadata(desc),
-      pageNumber,
-    });
-  } catch {
-    return String(outfitText || '');
-  }
+  const sd = (storyData && Array.isArray(storyData.sceneImages) ? storyData.sceneImages : [])
+    .find(s => s && s.pageNumber === pageNumber);
+  const desc = sceneDescription || (sd && (sd.sceneDescription || sd.description)) || null;
+  if (!desc) return String(outfitText || '');
+  const { extractSceneMetadata } = require('./sceneMetadata');
+  // extractSceneMetadata returns null for an unparsable brief, which
+  // resolveGeneratedOutfit handles. A THROW here is a code bug, so it propagates
+  // (code review 2026-10 A10; decisions #4) — a bare catch used to dress the
+  // character in the story-level outfit and hide it.
+  return resolveGeneratedOutfit(outfitText, characterName, {
+    visualBible: wornItemsBibleOf(storyData),
+    sceneMetadata: extractSceneMetadata(desc),
+    pageNumber,
+  });
 }
 
 module.exports = {
@@ -1744,8 +1841,13 @@ module.exports = {
   carryForwardWornItemsInBrief,
   splitClauses,
   splitClausesDetailed,
+  DEPENDENT_OPENER_RE,
   buildWornStateLines,
   buildWornStateBlock,
+  GARMENT_BACK_RULE,
+  SEEN_FROM_BACK,
+  faceAwayNames,
+  WORN_ITEMS_HEADER,
   removeWornItemFromOutfit,
   stripOffItemsFromOutfit,
   applyWornItemsToOutfit,

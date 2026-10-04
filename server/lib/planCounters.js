@@ -35,7 +35,7 @@ const {
   SHOT_PATTERNS, SHOT_AXIS, POSITION_SHOTS, MID_DISTANCE_SHOTS, SHOT_FLOOR_CODE,
   shotFloors, MAX_MEDIUM_WIDE_SHARE, closeUpBelowWaistVerbs, PEOPLELESS_SHARED_SHOT,
 } = require('./shotVocabulary');
-const { castCoverage } = require('./castCoverage');
+const { castCoverage, groupPageBudget, underCoveredFix, noFocalFix } = require('./castCoverage');
 
 /** Words that look like names but never are, in the who-column's grammar. */
 const NAME_STOPWORDS = new Set([
@@ -568,35 +568,27 @@ function consecutiveRuns(sorted) {
 }
 
 /**
- * The thirds of the book in which no page's roster holds the central figure.
- * Presence is the who column as the check read it — `people`, `things` and
- * `covers` — so an object or an unnamed creature counts too. A name matches a
- * roster entry case-insensitively, whole or as whole words inside it ("egg" is
- * in "golden egg", never the reverse: "dragon" does not match "dragon egg"),
- * after the article is dropped the way the roster drops it.
+ * The thirds of the book in which no page shows the central figure.
+ *
+ * Presence is the plan check's CENTRAL line (parsePlanCheckCentralPages): the
+ * checker is handed the figure's name in Q12 and lists the pages whose picture
+ * shows it, who column or instant. Code never matches the name against the
+ * roster — on job_1790277448294_5herh01j7 (Lab #1488/#1489) the arc named the
+ * figure in the book language ("das Ei") against an English roster, and the
+ * roster's who column carries people, so an egg in the instant was never on it:
+ * three must-fix findings for a figure staged on most pages (2026-09-25).
  *
  * @param {Array<{pageNumber:number}>} rows  the counter rows, in page order
- * @param {Map} roster  parsePlanCheckRoster output
+ * @param {number[]|null} centralPages  the CENTRAL line; null = not answered
  * @param {string[]|null} centralFigure  the arc's names for the figure
- * @returns {Array<{third:string, pages:number[], names:string[]}>}
+ * @returns {{gaps: Array<{third:string, pages:number[], names:string[]}>, unanswered: boolean}}
  */
-function centralFigureAbsentThirds(rows, roster, centralFigure) {
-  const names = (Array.isArray(centralFigure) ? centralFigure : [])
-    .map(n => String(n || '').trim().replace(/^(?:the|a|an)\s+/i, '').toLowerCase())
-    .filter(Boolean);
+function centralFigureAbsentThirds(rows, centralPages, centralFigure) {
+  const names = (Array.isArray(centralFigure) ? centralFigure : []).map(n => String(n || '').trim()).filter(Boolean);
   const n = rows.length;
-  if (!names.length || !roster || n < 3) return [];
-  const escape = t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const matches = (entry) => {
-    const e = String(entry || '').trim().toLowerCase();
-    return names.some(name => e === name
-      || new RegExp(`(^|[^\\p{L}])${escape(name)}([^\\p{L}]|$)`, 'u').test(e));
-  };
-  const present = (pageNumber) => {
-    const r = roster.get(Number(pageNumber));
-    if (!r) return false;
-    return [...(r.people || []), ...(r.things || []), ...(r.covers || [])].some(matches);
-  };
+  if (!names.length || n < 3) return { gaps: [], unanswered: false };
+  if (!Array.isArray(centralPages)) return { gaps: [], unanswered: true };
+  const shown = new Set(centralPages.map(Number));
   const a = Math.round(n / 3);
   const b = Math.round((2 * n) / 3);
   const thirds = [
@@ -604,9 +596,10 @@ function centralFigureAbsentThirds(rows, roster, centralFigure) {
     { third: 'middle', rows: rows.slice(a, b) },
     { third: 'ending', rows: rows.slice(b) },
   ];
-  return thirds
-    .filter(t => t.rows.length && !t.rows.some(r => present(r.pageNumber)))
-    .map(t => ({ third: t.third, pages: t.rows.map(r => r.pageNumber), names: centralFigure }));
+  const gaps = thirds
+    .filter(t => t.rows.length && !t.rows.some(r => shown.has(Number(r.pageNumber))))
+    .map(t => ({ third: t.third, pages: t.rows.map(r => r.pageNumber), names }));
+  return { gaps, unanswered: false };
 }
 
 /**
@@ -627,9 +620,20 @@ function centralFigureAbsentThirds(rows, roster, centralFigure) {
  *   page needs this; without it the counters do not run, because the only alternative was
  *   guessing the cast out of the prose in code, which is what they were doing wrong. `covers`
  *   is the names a page reaches without naming them (`coveredNames`).
+ * @param {string[]|null} [args.centralFigure] the arc's STORY LOGIC names for the central figure
+ * @param {number[]|null} [args.centralPages] the plan check's CENTRAL line
+ *   (`parsePlanCheckCentralPages`); null = the check gave none
  * @returns {{findings: Array, lines: string[], stats: Object, cast: Object|null, skipped?: string}}
  */
-function runPlanCounters({ pages = [], commissionedNames = [], listedNames = null, placeNames = [], maxCharactersPerScene = 3, declaredInvented = null, inventedAllowance = null, roster = null, peoplelessPick = null, centralFigure = null } = {}) {
+// `mainName`: the book's focus character (promptBuilders.pickMainCharacters —
+//   the ONE place that decides it). MAIN_UNDER_HALF runs only when it is given.
+// `castTable`: the CAST block the planner wrote (castCoverage.parsePlanCastBlock);
+//   `actions`: the check's Q12 ACTION lines. CAST_PROMISE_BROKEN runs only
+//   when a table is given.
+// `legacyShots`: the Jev-outage BACKUP (owner exception, 2026-09-27) — the
+//   planner wrote real shot words, so the shot counters that measured them run
+//   again (the pre-Jev block below, one copy). Off on every Jev-authored story.
+function runPlanCounters({ pages = [], commissionedNames = [], listedNames = null, placeNames = [], maxCharactersPerScene = 3, declaredInvented = null, inventedAllowance = null, roster = null, peoplelessPick = null, centralFigure = null, centralPages = null, mainName = null, castTable = null, actions = null, legacyShots = false } = {}) {
   const findings = [];
   const add = (code, pageList, detail) => findings.push({ code, pages: pageList, detail });
 
@@ -682,98 +686,97 @@ function runPlanCounters({ pages = [], commissionedNames = [], listedNames = nul
       'the plan line does not carry all four of shot, who, the instant, and what is true after');
   }
 
-  // 2. Shot distribution, against the tiered table in shotVocabulary: a cap on
-  //    the medium/wide share, a floor per shot, a floor on camera positions
-  //    together, and never only two camera DISTANCES across the book.
-  //
-  //    The `shot` field carries two axes since 1b53f4d0f (2026-09-19) — four
-  //    words for how close the camera is, four for where it stands — and it is
-  //    one-of, so a page declaring `high-angle` has spent its word and states
-  //    no distance. Counting all eight together, as this block did when every
-  //    value was a distance, mis-reads the new ones in BOTH directions:
-  //    medium/wide/aerial would have passed SHOT_VARIETY on two distances, and
-  //    an angled page reads as "not a close-up" against the close-up floor although
-  //    it never had the chance to be one. Each counter is scoped to the axis it
-  //    is actually about, off the vocabulary's own `axis` — never a second list
-  //    of which words are angles.
+  // 2. NO SHOT COUNTER (2026-09-27). The planner writes the placeholder
+  //    shotVocabulary.PLAN_SHOT_PLACEHOLDER; code assigns every page's shot
+  //    after the re-plan (jevDecisions.decideShots), holding the floors, the
+  //    medium/wide cap, the group rule and the consecutive rule by
+  //    construction. SHOT_VARIETY, SHOT_MEDIUM_WIDE_EXCESS, the SHOT_*_COUNT
+  //    floors, SHOT_NO_CAMERA_POSITION, SHOT_CLOSEUP_BELOW_WAIST and
+  //    CONSECUTIVE_SAME_SHOT_CAST cannot fire on a Jev-authored plan. They run ONLY on the
+  //    Jev-outage backup (`legacyShots`, owner exception 2026-09-27), where the
+  //    planner wrote the shots — the pre-Jev block, verbatim.
+  //    see docs/decisions.md 2026-09-27 "Jev decision layer wired".
+
   const shotCounts = rows.reduce((acc, r) => { acc[r.shot] = (acc[r.shot] || 0) + 1; return acc; }, {});
   const usedShots = Object.keys(shotCounts).filter(k => k !== 'other');
   const onAxis = (axis) => rows.filter(r => SHOT_AXIS[r.shot] === axis);
   const distancesUsed = usedShots.filter(k => SHOT_AXIS[k] === 'distance');
   const angledPages = onAxis('position');
-  if (distancesUsed.length <= 2) {
-    add('SHOT_VARIETY', [], `the book uses only ${distancesUsed.length} camera distance(s) (${distancesUsed.join(', ') || 'none recognised'}) across ${pageCount} pages`);
-  }
-
-  // THE FLOORS AND THE CAP COME FROM THE TABLE THE PLANNER WAS GIVEN.
-  // shotVocabulary.SHOT_FLOOR_TIERS is one declaration: shotDistributionPhrase
-  // states it in prompts/story-beats.txt, shotFloors measures it here. Nothing
-  // below re-lists which words are angles or how many of each a book owes.
-  const policy = shotFloors(pageCount);
-
-  // The ratio, not a count — it scales to any book length with no threshold to
-  // maintain. Measured over 11 staging books / 180 pages to 2026-09-20, medium
-  // plus wide was 72% of every page shipped, because the prompt asked for it.
-  // The pages list is empty: any page could be the one that changes, exactly as
-  // SHOT_VARIETY reports.
-  const mediumWide = MID_DISTANCE_SHOTS.reduce((n, id) => n + (shotCounts[id] || 0), 0);
-  if (pageCount > 0 && mediumWide / pageCount > MAX_MEDIUM_WIDE_SHARE) {
-    add('SHOT_MEDIUM_WIDE_EXCESS', [],
-      `${mediumWide}/${pageCount} pages are medium or wide; at most ${policy.maxMediumWide} may be`);
-  }
-
-  // Per-shot floors. `ultra-wide` is a DISTANCE and `aerial` a POSITION — two
-  // different shots on two different axes, each with its own floor and its own
-  // code, so a re-plan is told WHICH shot the book is short of rather than that
-  // it is short of something.
-  for (const [shot, floor] of Object.entries(policy.floors)) {
-    const code = SHOT_FLOOR_CODE[shot];
-    const have = shotCounts[shot] || 0;
-    if (have < floor) {
-      add(code, rows.filter(r => r.shot === shot).map(r => r.pageNumber),
-        `${have} ${shot} page(s); the plan asks for at least ${floor} across ${pageCount} pages`);
+  if (legacyShots) {
+    if (distancesUsed.length <= 2) {
+      add('SHOT_VARIETY', [], `the book uses only ${distancesUsed.length} camera distance(s) (${distancesUsed.join(', ') || 'none recognised'}) across ${pageCount} pages`);
     }
-  }
 
-  // The position axis TAKEN TOGETHER. The per-shot floors above say which
-  // angles; this says how many pages leave eye level at all, which is the
-  // number a long book can satisfy in more than one way. The tier decides:
-  // a short book is asked for none, so a six-page trial never raises this.
-  if (policy.requiredPositions > 0 && angledPages.length < policy.requiredPositions) {
-    add('SHOT_NO_CAMERA_POSITION', angledPages.map(r => r.pageNumber),
-      angledPages.length === 0
-        ? `every page of the book is shot from eye level; ${policy.requiredPositions} page(s) should declare a camera position (${POSITION_SHOTS.join(', ')})`
-        : `${angledPages.length}/${pageCount} pages declare a camera position (${POSITION_SHOTS.join(', ')}); the plan asks for at least ${policy.requiredPositions}`);
-  }
+    // THE FLOORS AND THE CAP COME FROM THE TABLE THE PLANNER WAS GIVEN.
+    // shotVocabulary.SHOT_FLOOR_TIERS is one declaration: shotDistributionPhrase
+    // states it in prompts/story-beats.txt, shotFloors measures it here. Nothing
+    // below re-lists which words are angles or how many of each a book owes.
+    const policy = shotFloors(pageCount);
 
-  // 2b. A close-up page whose SUBJECT is below the frame line. The planner is
-  //     told (prompts/story-beats.txt) that a close-up page is a waist-up
-  //     moment and nothing checked, so the Art Director silently answered the
-  //     contradiction by widening the page to `medium` — the plan asked for the
-  //     close-up, the book shipped without it.
-  //
-  //     NARROWED 2026-09-20 with the rule it enforces (owner: "a child can sit
-  //     in a close up that is fine"). It no longer counts a POSE the frame
-  //     crops away — sitting, kneeling, crouching, stepping — only an action
-  //     whose visible subject lies below the frame line and so cannot be in
-  //     shot at all. Re-measured over the same 24 staging books / 73 planned
-  //     close-ups: 13 plan lines flagged before, 8 after, and the five dropped
-  //     are cropped poses on a read of all 13.
-  //
-  //     The patterns come from shotVocabulary.CLOSEUP_BELOW_WAIST_VERBS, the
-  //     same constant the six brief/planner sites and scene-review check 7b
-  //     state as the rule — never a second list here, and never a reading of
-  //     what the prose means. Advisory ("also noted"): the planner can answer
-  //     it two legitimate ways, by restaging the beat waist-up OR by making the
-  //     page a `medium`, and which one is right is the planner's call.
-  const belowWaist = rows
-    .map(r => ({ page: r.pageNumber, verbs: r.shot === 'close-up' ? closeUpBelowWaistVerbs(r.staging) : [] }))
-    .filter(r => r.verbs.length);
-  if (belowWaist.length) {
-    add('SHOT_CLOSEUP_BELOW_WAIST', belowWaist.map(r => r.page),
-      `${belowWaist.map(r => `page ${r.page} (${[...new Set(r.verbs)].join(', ')})`).join('; ')}: a close-up frame ends at the waist, so a page whose SUBJECT is below that line cannot be drawn as one. `
-      + `A sitting or kneeling pose is fine in a close-up — the legs are simply cropped — so the fix is usually to drop the below-frame detail, not the pose. `
-      + `Either restage the moment waist-up — holding, reaching, reacting — or give the page a wider shot; leaving both as they are means the page is drawn wider and the close-up is lost.`);
+    // The ratio, not a count — it scales to any book length with no threshold to
+    // maintain. Measured over 11 staging books / 180 pages to 2026-09-20, medium
+    // plus wide was 72% of every page shipped, because the prompt asked for it.
+    // The pages list is empty: any page could be the one that changes, exactly as
+    // SHOT_VARIETY reports.
+    const mediumWide = MID_DISTANCE_SHOTS.reduce((n, id) => n + (shotCounts[id] || 0), 0);
+    if (pageCount > 0 && mediumWide / pageCount > MAX_MEDIUM_WIDE_SHARE) {
+      add('SHOT_MEDIUM_WIDE_EXCESS', [],
+        `${mediumWide}/${pageCount} pages are medium or wide; at most ${policy.maxMediumWide} may be`);
+    }
+
+    // Per-shot floors. `ultra-wide` is a DISTANCE and `aerial` a POSITION — two
+    // different shots on two different axes, each with its own floor and its own
+    // code, so a re-plan is told WHICH shot the book is short of rather than that
+    // it is short of something.
+    for (const [shot, floor] of Object.entries(policy.floors)) {
+      const code = SHOT_FLOOR_CODE[shot];
+      const have = shotCounts[shot] || 0;
+      if (have < floor) {
+        add(code, rows.filter(r => r.shot === shot).map(r => r.pageNumber),
+          `${have} ${shot} page(s); the plan asks for at least ${floor} across ${pageCount} pages`);
+      }
+    }
+
+    // The position axis TAKEN TOGETHER. The per-shot floors above say which
+    // angles; this says how many pages leave eye level at all, which is the
+    // number a long book can satisfy in more than one way. The tier decides:
+    // a short book is asked for none, so a six-page trial never raises this.
+    if (policy.requiredPositions > 0 && angledPages.length < policy.requiredPositions) {
+      add('SHOT_NO_CAMERA_POSITION', angledPages.map(r => r.pageNumber),
+        angledPages.length === 0
+          ? `every page of the book is shot from eye level; ${policy.requiredPositions} page(s) should declare a camera position (${POSITION_SHOTS.join(', ')})`
+          : `${angledPages.length}/${pageCount} pages declare a camera position (${POSITION_SHOTS.join(', ')}); the plan asks for at least ${policy.requiredPositions}`);
+    }
+
+    // 2b. A close-up page whose SUBJECT is below the frame line. The planner is
+    //     told (prompts/story-beats.txt) that a close-up page is a waist-up
+    //     moment and nothing checked, so the Art Director silently answered the
+    //     contradiction by widening the page to `medium` — the plan asked for the
+    //     close-up, the book shipped without it.
+    //
+    //     NARROWED 2026-09-20 with the rule it enforces (owner: "a child can sit
+    //     in a close up that is fine"). It no longer counts a POSE the frame
+    //     crops away — sitting, kneeling, crouching, stepping — only an action
+    //     whose visible subject lies below the frame line and so cannot be in
+    //     shot at all. Re-measured over the same 24 staging books / 73 planned
+    //     close-ups: 13 plan lines flagged before, 8 after, and the five dropped
+    //     are cropped poses on a read of all 13.
+    //
+    //     The patterns come from shotVocabulary.CLOSEUP_BELOW_WAIST_VERBS, the
+    //     same constant the six brief/planner sites and scene-review check 7b
+    //     state as the rule — never a second list here, and never a reading of
+    //     what the prose means. Advisory ("also noted"): the planner can answer
+    //     it two legitimate ways, by restaging the beat waist-up OR by making the
+    //     page a `medium`, and which one is right is the planner's call.
+    const belowWaist = rows
+      .map(r => ({ page: r.pageNumber, verbs: r.shot === 'close-up' ? closeUpBelowWaistVerbs(r.staging) : [] }))
+      .filter(r => r.verbs.length);
+    if (belowWaist.length) {
+      add('SHOT_CLOSEUP_BELOW_WAIST', belowWaist.map(r => r.page),
+        `${belowWaist.map(r => `page ${r.page} (${[...new Set(r.verbs)].join(', ')})`).join('; ')}: a close-up frame ends at the waist, so a page whose SUBJECT is below that line cannot be drawn as one. `
+        + `A sitting or kneeling pose is fine in a close-up — the legs are simply cropped — so the fix is usually to drop the below-frame detail, not the pose. `
+        + `Either restage the moment waist-up — holding, reaching, reacting — or give the page a wider shot; leaving both as they are means the page is drawn wider and the close-up is lost.`);
+    }
   }
 
   // 3. Cast per page, against the CONFIGURED ceiling — never a literal.
@@ -831,8 +834,8 @@ function runPlanCounters({ pages = [], commissionedNames = [], listedNames = nul
     const pick = peoplelessPick && Number.isFinite(Number(peoplelessPick.page))
       ? Number(peoplelessPick.page) : null;
     add('NO_PEOPLELESS_PAGE', pick ? [pick] : [],
-      `no page shows only a thing or a place, with no people in frame — ${pick ? `page ${pick}` : 'one page'} gives up its cast (${PEOPLELESS_ANSWER_VERB}), and it is a page whose subject is already a thing or a place seen alone, never a moment between people. `
-      + `That page may be the \`${PEOPLELESS_SHARED_SHOT}\` page the shot floors already ask for: a landscape with nobody in it answers both, and a short book has no page to spare for two`);
+      `no page shows only a thing or a place, with no people in frame — ${pick ? `page ${pick}` : 'one page'} gives up its cast (${PEOPLELESS_ANSWER_VERB}), and it is a page whose subject is already a thing or a place seen alone, never a moment between people.`
+      + (legacyShots ? ` That page may be the \`${PEOPLELESS_SHARED_SHOT}\` page the shot floors already ask for: a landscape with nobody in it answers both, and a short book has no page to spare for two` : ''));
   }
   // 4b. …but the book may not spend that page on its interpersonal drama.
   //     Measured on job_1789420511893_zly5rcdej: the planner put the mandatory
@@ -849,12 +852,17 @@ function runPlanCounters({ pages = [], commissionedNames = [], listedNames = nul
   }
 
   // 5. The main character carries the book: present in at least half the images.
-  const mainName = cast.commissioned[0] || null;
-  if (mainName) {
-    const mainPages = rows.filter(r => r.present.includes(mainName)).map(r => r.pageNumber);
+  //    WHO the main character is comes from the caller (pickMainCharacters),
+  //    never from the order of the character list: until 2026-09-25 this read
+  //    `cast.commissioned[0]`, and on staging job_1789207854566_l43qgl34w —
+  //    whose declared main is the fourth child on the list — it held the first
+  //    child to half the book (Lab #1496: "Sarah is in frame on 3/16 pages").
+  const main = mainName ? (namesIn(mainName, cast.commissioned, cast.aliases)[0] || null) : null;
+  if (main) {
+    const mainPages = rows.filter(r => r.present.includes(main)).map(r => r.pageNumber);
     if (pageCount > 0 && mainPages.length * 2 < pageCount) {
       add('MAIN_UNDER_HALF', mainPages,
-        `${mainName} is in frame on ${mainPages.length}/${pageCount} pages — the main character belongs in at least half`);
+        `${main} is in frame on ${mainPages.length}/${pageCount} pages — the main character belongs in at least half`);
     }
   }
 
@@ -984,12 +992,14 @@ function runPlanCounters({ pages = [], commissionedNames = [], listedNames = nul
   }
 
   // 7. Every commissioned character earns at least one focal page: in frame
-  //    with at most one companion, or named first in a close-up. Solo is not
-  //    required (owner, 2026-09-04) — two people sharing one action carry a
-  //    focal page; the visible-action requirement lives in the prompt.
+  //    with at most one companion. Solo is not required (owner, 2026-09-04) —
+  //    two people sharing one action carry a focal page; the visible-action
+  //    requirement lives in the prompt. The "or named first in a close-up"
+  //    half went with the planner's shot word (2026-09-27): no shot exists
+  //    when the plan is checked.
   const focalOf = (name) => rows
     .filter(r => (r.present.length <= 2 && r.present.includes(name))
-      || (r.shot === 'close-up' && r.present[0] === name))
+      || (legacyShots && r.shot === 'close-up' && r.present[0] === name))
     .map(r => r.pageNumber);
   //
   //    THE NUMBERS ARE THE PLANNER'S (owner, 2026-09-23). Whether every
@@ -1007,7 +1017,7 @@ function runPlanCounters({ pages = [], commissionedNames = [], listedNames = nul
   for (const name of listed) {
     focal[name] = focalOf(name);
     if (coverageRule && coverageRule.focalEach && focal[name].length === 0) {
-      add('NO_FOCAL_PAGE', [], `${name} never has a focal page — never in frame with at most one companion, never the subject of a close-up`);
+      add('NO_FOCAL_PAGE', [], `${name} never has a focal page — never in frame with at most one companion, never the subject of a close-up. ${noFocalFix(name)}`);
     }
   }
 
@@ -1021,20 +1031,51 @@ function runPlanCounters({ pages = [], commissionedNames = [], listedNames = nul
     coverage[name] = rows.filter(r => r.present.includes(name)).map(r => r.pageNumber);
     if (coverage[name].length < floor) {
       add('UNDER_COVERED_CHARACTER', coverage[name],
-        `${name} is in frame on ${coverage[name].length} page(s) — this book puts every commissioned character in frame on at least ${floor}`);
+        `${name} is in frame on ${coverage[name].length} page(s) — this book puts every commissioned character in frame on at least ${floor}. ${underCoveredFix(name, floor)}`);
     }
   }
+
+  // 8c. PAGES THAT HOLD A GROUP, against the budget the planner was told
+  //     (owner, 2026-09-27). The planner is told "Two or three named characters
+  //     carry a page best" beside a ceiling of six, and nothing counted the
+  //     preference: 27 of 241 shipped plan pages over 17 staging books held more
+  //     than three, up to four in one 18-page book, and they score worst.
+  //     castCoverage.groupPageBudget is the ONE number: story-beats.txt states
+  //     it ({GROUP_PAGE_BUDGET}), this counts the same `present` list every cast
+  //     counter here reads (the who column plus the roster's `covers`). The
+  //     finding names every group page. WHICH keep their group and who leaves
+  //     the others is decided by the Jev decision layer, not the re-plan
+  //     (owner, 2026-09-27: jevDecisions.decideGroupCuts in runReplanRounds,
+  //     code writes the who column); this counter only measures the budget.
+  //     Must-fix (promptBuilders REPLAN_MUST_FIX_CODES) and counted by the
+  //     round guard.
+  const groupBudget = groupPageBudget({ pageCount, castCount: listed.length, maxCharactersPerScene });
+  const groupPages = groupBudget ? rows.filter(r => r.present.length > groupBudget.over).map(r => r.pageNumber) : [];
+  if (groupBudget && groupPages.length > groupBudget.max) {
+    add('GROUP_PAGES_OVER_BUDGET', groupPages,
+      `${groupPages.length} pages hold more than ${groupBudget.over} named characters; this book allows at most ${groupBudget.max}. `
+      + 'Keep the group on the pages where the story brings everyone together — an opening gathering, the climax, the ending — and on the others cast out the characters that page\'s instant does not need, '
+      + `never the character whose action the instant works against${floor > 0 ? `, and never one who would fall below ${floor} page${floor === 1 ? '' : 's'} in frame` : ''}.`);
+  }
+
+  // 8a. THE CAST TABLE'S PROMISES (owner, 2026-09-25). The planner wrote, before
+  //     its plan lines, each character's deed page and the pages they are in
+  //     frame on, and the last page's cast (castCoverage.parsePlanCastBlock).
+  //     Each plan line that breaks a promise is a finding naming the page.
+  const castTableResult = castTable ? castTablePromises({ rows, castTable, actions, cast, focalEach: !!(coverageRule && coverageRule.focalEach) }) : null;
+  if (castTableResult) for (const b of castTableResult.broken) add('CAST_PROMISE_BROKEN', [b.page], b.detail);
 
   // 8b. THE CENTRAL FIGURE IN EACH THIRD (owner, 2026-09-24, d4). The arc's
   //     critique used to certify "the central figure acts in every third"
   //     itself; the arc now only NAMES the figure in its STORY LOGIC
-  //     ("Central figure:"), and this counts, on the check's roster, whether
-  //     any page of each third holds it. The names are the arc's own (an egg
-  //     and the creature it hatches into are two names for one figure), read
-  //     as data, never found in the prose. The planner and plan-check Q12 are
-  //     told the same rule (castCoverage.centralFigureActionRule); whether it
-  //     ACTS on those pages is Q12's ACTION line, not arithmetic.
-  const centralAbsent = centralFigureAbsentThirds(rows, roster, centralFigure);
+  //     ("Central figure:"), and this counts, on the check's CENTRAL line (the
+  //     pages the checker, handed that name in Q12, says show it), whether any
+  //     page of each third does. The planner and plan-check Q12 are told the
+  //     same rule (castCoverage.centralFigureActionRule); whether it ACTS on
+  //     those pages is Q12's ACTION line, not arithmetic. A named figure with
+  //     no CENTRAL line files nothing and says so in stats.centralFigure.
+  const central = centralFigureAbsentThirds(rows, centralPages, centralFigure);
+  const centralAbsent = central.gaps;
   for (const gap of centralAbsent) {
     add('CENTRAL_FIGURE_ABSENT_THIRD', gap.pages,
       `the central figure (${gap.names.join(' / ')}) is in frame on no page of the ${gap.third} (pages ${gap.pages[0]}-${gap.pages[gap.pages.length - 1]}); stage it on one of them`);
@@ -1043,7 +1084,9 @@ function runPlanCounters({ pages = [], commissionedNames = [], listedNames = nul
   // 9. Consecutive pages differ: never the same shot AND the same number of
   //    named characters twice in a row. Pairs whose shot did not classify, or
   //    whose plan line is incomplete, are skipped rather than compared.
-  for (let i = 1; i < rows.length; i++) {
+  //    Backup path only (`legacyShots`): on a Jev-authored plan the shot
+  //    assignment holds this rule by construction.
+  for (let i = 1; legacyShots && i < rows.length; i++) {
     const prev = rows[i - 1];
     const cur = rows[i];
     if (!prev.complete || !cur.complete) continue;
@@ -1062,10 +1105,7 @@ function runPlanCounters({ pages = [], commissionedNames = [], listedNames = nul
     cast,
     stats: {
       pageCount,
-      shotCounts,
-      shotTypesUsed: usedShots,
-      distancesUsed,
-      angledPages: angledPages.map(r => r.pageNumber),
+      ...(legacyShots ? { shotCounts, shotTypesUsed: usedShots, distancesUsed, angledPages: angledPages.map(r => r.pageNumber) } : {}),
       soloPages,
       peoplelessPages: emptyPages,
       // `covered` rides along only when the roster declared one, so a stored
@@ -1075,8 +1115,94 @@ function runPlanCounters({ pages = [], commissionedNames = [], listedNames = nul
       focalPages: focal,
       coveragePages: coverage,
       castCoverage: coverageRule,
+      // The pages holding more than three, and the budget they were counted against.
+      groupPages: { pages: groupPages, budget: groupBudget ? groupBudget.max : null },
+      mainCharacter: main,
+      // The table's promises as counted: null when no table was given.
+      castTable: castTableResult ? { kept: castTableResult.kept, broken: castTableResult.broken.length, unanswered: castTableResult.unanswered } : null,
+      // Only when the arc named a central figure: the pages the check said
+      // show it, or `unanswered` when it gave no CENTRAL line.
+      ...(Array.isArray(centralFigure) && centralFigure.length
+        ? { centralFigure: { names: centralFigure, pages: Array.isArray(centralPages) ? centralPages : null, unanswered: central.unanswered } }
+        : {}),
     },
   };
+}
+
+/**
+ * Hold each plan line to the CAST block the planner wrote before it.
+ *
+ *   deed page   the check's ACTION line for the character names that page
+ *               (Q12 reads the plan lines, never the table); and, when the book
+ *               has room for a focal page each, the page holds the character
+ *               alone or with one companion — the planner's own definition.
+ *   also on     the character is in frame on each page the line promises.
+ *   ending      everyone the ending line names, that this book's cast knows,
+ *               is in frame on that page.
+ *
+ * A character with no ACTION line leaves the deed half uncounted and says so
+ * (`unanswered`); it is never read as kept or broken.
+ *
+ * @returns {{broken: Array<{page:number, name:string|null, promise:string, detail:string}>, kept:number, unanswered:string[]}}
+ */
+function castTablePromises({ rows, castTable, actions, cast, focalEach }) {
+  const byPage = new Map(rows.map(r => [Number(r.pageNumber), r]));
+  const acts = Array.isArray(actions) ? actions : [];
+  const broken = [];
+  const unanswered = [];
+  let kept = 0;
+  const canon = n => namesIn(n, cast.all, cast.aliases)[0] || null;
+  const actionOf = (name) => {
+    const forms = new Set([name, ...(cast.aliases[name] || [])].map(f => String(f).toLowerCase()));
+    return acts.find(a => forms.has(String(a.key || '').trim().toLowerCase())) || null;
+  };
+  const whoseAction = (page, except) => acts
+    .filter(a => Number(a.page) === page)
+    .map(a => canon(String(a.key || '')) || String(a.key || '').trim())
+    .filter(n => n && n !== except);
+  for (const entry of castTable.characters || []) {
+    const name = canon(entry.name);
+    if (!name) { unanswered.push(entry.name); continue; }
+    const deed = Number(entry.deedPage);
+    const row = byPage.get(deed);
+    const act = actionOf(name);
+    if (!row) {
+      broken.push({ page: deed, name, promise: 'deed', detail: `the CAST block promises ${name} page ${deed} as their deed page, but the book has no page ${deed}` });
+    } else if (!act) {
+      unanswered.push(name);
+    } else if (Number(act.page) !== deed) {
+      const others = whoseAction(deed, name);
+      const instead = others.length ? `page ${deed}'s instant is ${others.join(' and ')}'s` : `page ${deed}'s instant is not ${name}'s own action`;
+      const where = act.page == null ? 'no page stages it' : `the check finds it on page ${act.page}`;
+      broken.push({ page: deed, name, promise: 'deed', detail: `the CAST block promises ${name} page ${deed} as their deed page, but ${instead} (${where})` });
+    } else if (focalEach && (!row.present.includes(name) || row.present.length > 2)) {
+      broken.push({ page: deed, name, promise: 'focal', detail: `the CAST block promises page ${deed} as ${name}'s deed page, alone or with one companion, but it holds ${row.present.join(', ') || 'nobody'}` });
+    } else {
+      kept++;
+    }
+    for (const p of entry.alsoOn || []) {
+      const r = byPage.get(Number(p));
+      if (r && r.present.includes(name)) { kept++; continue; }
+      broken.push({
+        page: Number(p), name, promise: 'also',
+        detail: r
+          ? `the CAST block promises ${name} on page ${p}, but page ${p}'s who column does not carry ${name}`
+          : `the CAST block promises ${name} on page ${p}, but the book has no page ${p}`,
+      });
+    }
+  }
+  const end = castTable.ending;
+  if (end) {
+    const r = byPage.get(Number(end.page));
+    const wanted = [...new Set((end.names || []).map(canon).filter(Boolean))];
+    const missing = r ? wanted.filter(n => !r.present.includes(n)) : wanted;
+    if (missing.length) {
+      broken.push({ page: Number(end.page), name: null, promise: 'ending', detail: `the CAST block keeps ${wanted.join(', ')} together on page ${end.page}, but page ${end.page}'s who column leaves out ${missing.join(', ')}` });
+    } else if (wanted.length) {
+      kept++;
+    }
+  }
+  return { broken, kept, unanswered };
 }
 
 /** The who-in-frame column of a plan line; the whole line when it has no segments. */
@@ -1206,9 +1332,8 @@ function castLostByReplan(standing, returned, castNames = [], aliases = {}, decl
  * plan-check Q3 — the two findings a removal is the natural answer to — with no
  * answer available at all, and an over-crowded page could only get more crowded.
  *
- * Deliberately absent: `NO_FOCAL_PAGE` (a focal page is at most two in frame OR
- * a close-up, so either direction can answer it), `CONSECUTIVE_SAME_SHOT_CAST`
- * (satisfied by changing the shot, adding or removing), `ARC_INVENTED_OVER_ALLOWANCE`
+ * Deliberately absent: `NO_FOCAL_PAGE` (a page can become focal by losing a
+ * companion or by the character joining a small page), `ARC_INVENTED_OVER_ALLOWANCE`
  * (a finding against the ARC, which names no page and no division edit repairs)
  * and plan-check Q2 (an entrance is a staging question, not a headcount). An
  * unlisted finding leaves the change unreviewed by direction — the span,
@@ -1233,7 +1358,12 @@ const REPLAN_FINDING_DIRECTION = new Map([
   ['INVENTED_DOMINANT_CONSECUTIVE', 'more'],
   // The central figure missing from a third is answered by putting it in frame.
   ['CENTRAL_FIGURE_ABSENT_THIRD', 'more'],
+  // A plan line that breaks the CAST block's promise is answered by casting the
+  // promised character in (2026-09-25).
+  ['CAST_PROMISE_BROKEN', 'more'],
   ['CAST_OVER_CEILING', 'fewer'],
+  // More pages hold a group than the book's budget: answered by casting out.
+  ['GROUP_PAGES_OVER_BUDGET', 'fewer'],
   ['NO_SOLO_PAGE', 'fewer'],
   ['NO_PEOPLELESS_PAGE', 'fewer'],
   // Plan-check questions, by number (prompts/plan-check.txt).
@@ -1272,9 +1402,14 @@ function replanChangeDirection(tag) {
  *             leaves a picture of nothing happening to nobody.
  *   span      a `cast out` that leaves the figure in frame on fewer than two
  *             pages of the returned division while the standing one gave them
- *             two or more. Two pages is the floor `UNDER_COVERED_CHARACTER`
- *             already holds the commissioned cast to; three stories lost an
- *             invented figure from every page (Pfiff, Silberkrabbe, Krümel).
+ *             two or more; three stories lost an invented figure from every
+ *             page (Pfiff, Silberkrabbe, Krümel). A commissioned character on
+ *             the character list is held to the book's own floor instead
+ *             (`castFloor`, castCoverage appearances.min — the number
+ *             UNDER_COVERED_CHARACTER counts against): a `cast out` that
+ *             leaves them below it, and lower than they stood, is refused.
+ *             On Lab #1494 the review let a round take Max 3 -> 2 on an
+ *             18-page book whose floor is 3 (2026-09-25).
  *   direction a `cast out` answering a finding that asks for MORE in frame,
  *             on a page the standing division left under the cast ceiling —
  *             and its mirror, a `cast in` answering a finding that asks for
@@ -1313,10 +1448,12 @@ function replanChangeDirection(tag) {
  * @param {Map<number,string>} [args.protectedPages] page → why it stays
  * @param {Array<{key:string,page:number|null}>} [args.actions] the check's ACTION lines
  * @param {function(Object):string} [args.rankOf] a finding tag → 'must' | 'also'
+ * @param {{names:string[], min:number}|null} [args.castFloor] the character
+ *   list and castCoverage().appearances.min — the commissioned span floor
  * @returns {{refusals: Array<{pageNumber:number, rule:string, detail:string, line:string}>,
  *            declaredOut: Map<number,string[]>, notes: string[]}}
  */
-function reviewPlanChanges({ changes = [], standing = [], returned = [], castNames = [], aliases = {}, maxCast = 3, obstacles = null, focalNames = [], protectedPages = null, actions = [], rankOf = null } = {}) {
+function reviewPlanChanges({ changes = [], standing = [], returned = [], castNames = [], aliases = {}, maxCast = 3, obstacles = null, focalNames = [], protectedPages = null, actions = [], rankOf = null, castFloor = null } = {}) {
   const names = (Array.isArray(castNames) ? castNames : []).map(n => String(n || '').trim()).filter(Boolean);
   const refusals = [];
   const notes = [];
@@ -1339,12 +1476,10 @@ function reviewPlanChanges({ changes = [], standing = [], returned = [], castNam
   const beforeSpan = spanIn(beforeWho);
   const afterSpan = spanIn(afterWho);
   // A focal page, read the way the NO_FOCAL_PAGE counter reads it: at most two
-  // in frame, or first named in a close-up.
+  // in frame (no shot exists while the plan is re-divided, 2026-09-27).
   const focalPagesIn = (pages, who, name) => (pages || []).filter((p) => {
     const w = who.get(Number(p.pageNumber)) || [];
-    if (!w.includes(name)) return false;
-    const shot = classifyShot(planSegments(p.planLine)[0] || '');
-    return w.length <= 2 || (shot === 'close-up' && w[0] === name);
+    return w.includes(name) && w.length <= 2;
   }).map(p => Number(p.pageNumber));
   const focalSet = new Set((Array.isArray(focalNames) ? focalNames : []).flatMap(n => namesIn(String(n || ''), names, aliases)));
   const actionPageOf = new Map();
@@ -1352,6 +1487,11 @@ function reviewPlanChanges({ changes = [], standing = [], returned = [], castNam
     if (!a || a.page == null || !(Number(a.page) > 0)) continue;
     for (const n of namesIn(String(a.key || ''), names, aliases)) actionPageOf.set(n, Number(a.page));
   }
+  // The commissioned span floor: the character list at castCoverage's
+  // appearances.min, never below the two pages every figure keeps.
+  const commissionedFloor = Math.max(2, Number(castFloor && castFloor.min) || 0);
+  const floorSet = new Set(((castFloor && Array.isArray(castFloor.names)) ? castFloor.names : [])
+    .flatMap(n => namesIn(String(n || ''), names, aliases)));
   const isProtected = page => protectedPages instanceof Map && protectedPages.has(Number(page));
   const isMust = tag => !!(tag && typeof rankOf === 'function' && rankOf(tag) === 'must');
   const refuse = (pageNumber, rule, detail, line) => {
@@ -1399,9 +1539,14 @@ function reviewPlanChanges({ changes = [], standing = [], returned = [], castNam
         refuse(page, 'focal', `${lastFocal.join(', ')} would be left with no focal page`, c.line);
         continue;
       }
-      const stranded = hit.filter(n => (beforeSpan.get(n) || 0) >= 2 && (afterSpan.get(n) || 0) < 2);
+      const stranded = hit.filter((n) => {
+        const before = beforeSpan.get(n) || 0;
+        const after = afterSpan.get(n) || 0;
+        if (floorSet.has(n)) return after < commissionedFloor && after < before;
+        return before >= 2 && after < 2;
+      });
       if (stranded.length) {
-        refuse(page, 'span', `${stranded.map(n => `${n} ${beforeSpan.get(n) || 0}→${afterSpan.get(n) || 0} page(s)`).join(', ')} — two pages is the floor`, c.line);
+        refuse(page, 'span', stranded.map(n => `${n} ${beforeSpan.get(n) || 0}→${afterSpan.get(n) || 0} page(s) — ${floorSet.has(n) ? `${commissionedFloor} pages is this book's floor for a commissioned character` : 'two pages is the floor'}`).join('; '), c.line);
         continue;
       }
       if (dir === 'more' && (beforeWho.get(page) || []).length < Number(maxCast)) {

@@ -86,20 +86,6 @@ interface CoverDevMeta {
   imageVersionsMeta?: Array<Record<string, unknown> & { versionIndex: number }>;
 }
 
-interface StoryDraft {
-  storyType: string;
-  artStyle: string;
-  storyDetails: string;
-  characters: Character[];
-  relationships: RelationshipMap;
-  relationshipTexts: RelationshipTextMap;
-  pages: number;
-  languageLevel: LanguageLevel;
-  mainCharacters: number[];
-  dedication: string;
-  language: StoryLanguageCode;
-}
-
 interface StoryListItemServer {
   id: string;
   title: string;
@@ -149,6 +135,7 @@ interface StoryDetailsServer {
   arcReviewReport?: SavedStory['arcReviewReport'];
   beatsReviewReport?: SavedStory['beatsReviewReport'];
   sceneReviewReport?: SavedStory['sceneReviewReport'];
+  briefCheckReport?: SavedStory['briefCheckReport'];
   clothingReviewReport?: SavedStory['clothingReviewReport'];
   id: string;
   title: string;
@@ -197,24 +184,6 @@ interface StoryDetailsServer {
 }
 
 export const storyService = {
-  // Draft management
-  async getDraft(): Promise<StoryDraft | null> {
-    try {
-      const response = await api.get<{ draft: StoryDraft | null }>('/api/story-draft');
-      return response.draft;
-    } catch {
-      return null;
-    }
-  },
-
-  async saveDraft(draft: StoryDraft): Promise<void> {
-    await api.post('/api/story-draft', { draft });
-  },
-
-  async deleteDraft(): Promise<void> {
-    await api.delete('/api/story-draft');
-  },
-
   // Swiss Stories
   async getSwissStories(): Promise<SwissStoriesData> {
     return api.get<SwissStoriesData>('/api/swiss-stories');
@@ -426,6 +395,7 @@ export const storyService = {
       arcReviewReport: s.arcReviewReport,
       beatsReviewReport: s.beatsReviewReport,
       sceneReviewReport: s.sceneReviewReport,
+      briefCheckReport: s.briefCheckReport,
       clothingReviewReport: s.clothingReviewReport,
       story: storyContent,
       storyTextPrompts: s.storyTextPrompts,
@@ -1017,45 +987,6 @@ export const storyService = {
     }
 
     onComplete();
-  },
-
-  async createStory(data: {
-    title: string;
-    storyType: string;
-    artStyle: string;
-    language: StoryLanguageCode;
-    languageLevel: LanguageLevel;
-    pages: number;
-    dedication?: string;
-    characters: Character[];
-    mainCharacters: number[];
-    relationships: RelationshipMap;
-    relationshipTexts: RelationshipTextMap;
-    outline?: string;
-    story?: string;
-    sceneDescriptions?: SceneDescription[];
-    sceneImages?: SceneImage[];
-    coverImages?: CoverImages;
-  }): Promise<{ id: string }> {
-    const response = await api.post<{ id: string; message: string }>('/api/stories', {
-      title: data.title,
-      story_type: data.storyType,
-      art_style: data.artStyle,
-      language: data.language,
-      language_level: data.languageLevel,
-      pages: data.pages,
-      dedication: data.dedication,
-      characters: data.characters,
-      main_characters: data.mainCharacters,
-      relationships: data.relationships,
-      relationship_texts: data.relationshipTexts,
-      outline: data.outline,
-      story: data.story,
-      scene_descriptions: data.sceneDescriptions,
-      scene_images: data.sceneImages,
-      cover_images: data.coverImages,
-    });
-    return { id: response.id };
   },
 
   async deleteStory(id: string): Promise<void> {
@@ -1653,6 +1584,21 @@ export const storyService = {
   }): Promise<{ storyIdeas: string[]; storyIdea: string; prompt?: string; model?: string }> {
     const response = await api.post<{ storyIdeas: string[]; storyIdea: string; prompt?: string; model?: string }>('/api/generate-story-ideas', data);
     return response;
+  },
+
+  // Fired when the story kind is picked: the server ranks the town's landmarks
+  // for this setup in the background, so the idea request reads a ready ranking
+  // instead of waiting for one. Fire-and-forget; a failure only means the idea
+  // request uses the unranked order.
+  prepareIdeaLandmarks(data: {
+    storyCategory?: string;
+    storyTopic?: string;
+    storyTheme?: string;
+    language: StoryLanguageCode;
+    characters: Array<{ age: string; gender: string }>;
+    userLocation?: UserLocation;
+  }): void {
+    api.post('/api/prepare-idea-landmarks', data).catch(() => { /* ranking is optional for the idea request */ });
   },
 
   // Streaming version of generateStoryIdeas - streams stories as they're generated
@@ -2294,6 +2240,12 @@ export const storyService = {
     if (useBalanceCents && useBalanceCents > 0) body.useBalanceCents = useBalanceCents;
     const response = await api.post<{ url: string }>('/api/stripe/create-checkout-session', body);
     return response;
+  },
+
+  // Pre-payment preview: printed page count and blank pages, computed by the
+  // same server function that pads the print PDF.
+  async getBookPageInfo(storyIds: string[], coverType: 'softcover' | 'hardcover', bookFormat: 'square' | 'A4'): Promise<{ contentPages: number; printedPages: number; blankPages: number }> {
+    return api.post('/api/book-page-info', { storyIds, coverType, bookFormat });
   },
 
   // Referral: get current user's referral code + stats

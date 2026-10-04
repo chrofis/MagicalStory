@@ -39,14 +39,14 @@ function metadataKeys(file: string): string[] {
 }
 
 describe('the page brief no longer asks for a plate', () => {
-  for (const file of ['prompts/scene-expansion-all.txt', 'prompts/scene-expansion.txt']) {
+  for (const file of ['prompts/scene-briefs-all.txt', 'prompts/scene-expansion.txt']) {
     it(`${path.basename(file)} declares no per-page emptyScenePrompt`, () => {
       expect(metadataKeys(file)).not.toContain('emptyScenePrompt');
     });
   }
 
-  it('the all-pages template puts the plate on the vantage instead', () => {
-    const t = fs.readFileSync(path.join(ROOT, 'prompts/scene-expansion-all.txt'), 'utf8');
+  it('the Visual Bible call puts the plate on the vantage instead', () => {
+    const t = fs.readFileSync(path.join(ROOT, 'prompts/visual-bible.txt'), 'utf8');
     expect(t).toContain('One backdrop plate is painted per vantage');
     expect(t).toContain('an `emptyScenePrompt` (the plate, rules below)');
     // A location shown from one viewpoint declares no vantages[] and must still
@@ -220,39 +220,5 @@ describe('the degraded-brief record', () => {
     });
     expect(d.emptyInputs).not.toContain('emptyScenePrompt');
     expect(d.emptyInputs).toEqual([]);
-  });
-});
-
-describe('the scene reviewer can still see the plate it grades', () => {
-  let buildSceneReviewBibleBlock: any;
-  beforeAll(async () => {
-    await require('../../server/services/prompts').loadPromptTemplates();
-    ({ buildSceneReviewBibleBlock } = require('../../server/lib/promptBuilders.js'));
-  });
-
-  it('renders one VANTAGE PLATES row per vantage with its pages', () => {
-    const block = buildSceneReviewBibleBlock({
-      locations: [
-        {
-          id: 'LOC001', name: 'Market square', label: 'market square', pages: [1, 2, 3],
-          vantages: [
-            { id: 'LOC001.1', name: 'from the fountain', shot: 'wide', pages: [1, 2], emptyScenePrompt: 'The wide square from the fountain.' },
-            { id: 'LOC001.2', name: 'under the arcade', shot: 'medium', pages: [3], emptyScenePrompt: 'The arcade, columns receding left.' },
-          ],
-        },
-        { id: 'LOC002', name: 'Lane', label: 'narrow lane', pages: [4], emptyScenePrompt: 'A narrow lane climbing away.' },
-      ],
-    });
-    expect(block).toContain('# VANTAGE PLATES');
-    expect(block).toContain('LOC001.1');
-    expect(block).toContain('pages [1,2]: The wide square from the fountain.');
-    expect(block).toContain('LOC001.2');
-    expect(block).toContain('LOC002.1'); // single viewpoint, synthesized id
-    expect(block).toContain('A narrow lane climbing away.');
-  });
-
-  it('emits nothing for a legacy bible that authored no plates', () => {
-    const block = buildSceneReviewBibleBlock({ locations: [{ id: 'LOC001', name: 'Square', pages: [1] }] });
-    expect(block).toBe('');
   });
 });

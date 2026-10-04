@@ -10,8 +10,11 @@ const fs = require('fs');
 const path = require('path');
 const express = require('express');
 const router = express.Router();
-const { authenticateToken } = require('../middleware/auth');
+const { authenticateToken, isAdminActing } = require('../middleware/auth');
+const { avatarGenerationLimiter } = require('../middleware/rateLimit');
+const guards = require('../lib/requestGuards');
 const { log } = require('../utils/logger');
+const { geminiUsage } = require('../lib/providerUsage');
 const { logActivity, dbQuery, withTransaction, saveAvatarToR2, saveAvatarThumbToR2, uploadCharacterPhotosToR2, offloadCharacterImages } = require('../services/database');
 const { PROMPT_TEMPLATES, fillTemplate, assertPromptFilled } = require('../services/prompts');
 const { compressImageToJPEG } = require('../lib/images');
@@ -47,6 +50,41 @@ const ART_STYLE_SAMPLES = {
 };
 
 const styleSampleCache = new Map();
+
+/**
+ * A retry avatar that scored higher replaces the first attempt in `results`.
+ * Persistence is URL-first (onlyIfNoUrl / onlyMissingThumbs), so the winner must
+ * carry its OWN R2 URLs: drop the rejected attempt's URLs, upload the retry under
+ * a fresh version tag, and if an upload fails leave the slot URL-less so the
+ * retry's bytes persist - never the rejected image (review 2026-10 V1).
+ * `uploaders` is injectable for tests.
+ */
+async function adoptRetryAvatar(results, category, { imageData, faceThumbnail, bodyThumbnail, userId, characterId, tag },
+  uploaders = { main: saveAvatarToR2, thumb: saveAvatarThumbToR2 }) {
+  results[category] = imageData;
+  delete results[`${category}Url`];
+  if (results.faceThumbnailsUrl) delete results.faceThumbnailsUrl[category];
+  if (results.bodyThumbnailsUrl) delete results.bodyThumbnailsUrl[category];
+  if (faceThumbnail) {
+    if (!results.faceThumbnails) results.faceThumbnails = {};
+    results.faceThumbnails[category] = faceThumbnail;
+  } else if (results.faceThumbnails) delete results.faceThumbnails[category];
+  if (bodyThumbnail) {
+    if (!results.bodyThumbnails) results.bodyThumbnails = {};
+    results.bodyThumbnails[category] = bodyThumbnail;
+  } else if (results.bodyThumbnails) delete results.bodyThumbnails[category];
+  if (!userId || !characterId) return;
+  const mainUrl = await uploaders.main(userId, characterId, category, imageData, tag);
+  if (mainUrl) results[`${category}Url`] = mainUrl;
+  if (faceThumbnail) {
+    const u = await uploaders.thumb(userId, characterId, 'face', category, faceThumbnail, tag);
+    if (u) { results.faceThumbnailsUrl = results.faceThumbnailsUrl || {}; results.faceThumbnailsUrl[category] = u; }
+  }
+  if (bodyThumbnail) {
+    const u = await uploaders.thumb(userId, characterId, 'body', category, bodyThumbnail, tag);
+    if (u) { results.bodyThumbnailsUrl = results.bodyThumbnailsUrl || {}; results.bodyThumbnailsUrl[category] = u; }
+  }
+}
 
 // URL-only writers (Phase 5). Inline base64 only persists when R2 upload
 // returned no URL — readers expect URL field. Hoisted from two identical
@@ -376,10 +414,9 @@ async function _extractTraitsWithGeminiOnce(imageData, languageInstruction = '')
 
     // Log token usage
     const modelId = 'gemini-2.5-flash';
-    const inputTokens = data.usageMetadata?.promptTokenCount || 0;
-    const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
+    const { input_tokens: inputTokens, output_tokens: outputTokens, thinking_tokens: thinkingTokens } = geminiUsage(data.usageMetadata);
     if (inputTokens > 0 || outputTokens > 0) {
-      console.log(`📊 [CHARACTER ANALYSIS] Token usage - model: ${modelId}, input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}`);
+      console.log(`📊 [CHARACTER ANALYSIS] Token usage - model: ${modelId}, input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}, thinking: ${thinkingTokens.toLocaleString()}`);
     }
 
     if (data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
@@ -604,10 +641,9 @@ async function evaluateAvatarFaceMatch(originalPhoto, generatedAvatar, geminiApi
     const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
 
     // Log token usage
-    const inputTokens = data.usageMetadata?.promptTokenCount || 0;
-    const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
+    const { input_tokens: inputTokens, output_tokens: outputTokens, thinking_tokens: thinkingTokens } = geminiUsage(data.usageMetadata);
     if (inputTokens > 0) {
-      console.log(`📊 [AVATAR EVAL] model: gemini-2.5-flash, input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}`);
+      console.log(`📊 [AVATAR EVAL] model: gemini-2.5-flash, input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}, thinking: ${thinkingTokens.toLocaleString()}`);
     }
 
     log.verbose(`🔍 [AVATAR EVAL] Raw response: ${responseText.replace(/\n\s*/g, ' ').substring(0, 200)}...`);
@@ -672,9 +708,9 @@ async function evaluateAvatarFaceMatch(originalPhoto, generatedAvatar, geminiApi
  * that existed in two places.
  *
  * Returns a result shape that lets the caller decide how to surface errors:
- *   { ok: true,  imageData, inputTokens, outputTokens }
- *   { ok: false, error,                 inputTokens, outputTokens }
- *   { ok: false, blocked: true, blockReason, inputTokens, outputTokens }   // safety filter
+ *   { ok: true,  imageData, inputTokens, outputTokens, thinkingTokens }
+ *   { ok: false, error,                 inputTokens, outputTokens, thinkingTokens }
+ *   { ok: false, blocked: true, blockReason, inputTokens, outputTokens, thinkingTokens }   // safety filter
  *
  * @param {Object} opts
  * @param {string}  opts.geminiApiKey
@@ -732,13 +768,12 @@ async function callGeminiAvatarApi(opts) {
   if (!response.ok) {
     const errorText = await response.text();
     log.error(`❌ ${logTag} HTTP ${response.status}:`, errorText);
-    return { ok: false, error: `API error: ${response.status}`, inputTokens: 0, outputTokens: 0 };
+    return { ok: false, error: `API error: ${response.status}`, inputTokens: 0, outputTokens: 0, thinkingTokens: 0 };
   }
   const data = await response.json();
-  const inputTokens = data.usageMetadata?.promptTokenCount || 0;
-  const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
+  const { input_tokens: inputTokens, output_tokens: outputTokens, thinking_tokens: thinkingTokens } = geminiUsage(data.usageMetadata);
   if (data.promptFeedback?.blockReason) {
-    return { ok: false, blocked: true, blockReason: data.promptFeedback.blockReason, inputTokens, outputTokens };
+    return { ok: false, blocked: true, blockReason: data.promptFeedback.blockReason, inputTokens, outputTokens, thinkingTokens };
   }
   let imageData = null;
   if (data.candidates?.[0]?.content?.parts) {
@@ -749,8 +784,8 @@ async function callGeminiAvatarApi(opts) {
       }
     }
   }
-  if (!imageData) return { ok: false, error: 'No image in response', inputTokens, outputTokens };
-  return { ok: true, imageData, inputTokens, outputTokens };
+  if (!imageData) return { ok: false, error: 'No image in response', inputTokens, outputTokens, thinkingTokens };
+  return { ok: true, imageData, inputTokens, outputTokens, thinkingTokens };
 }
 
 /**
@@ -851,10 +886,9 @@ Set pass=true if:
     const finishReason = data.candidates?.[0]?.finishReason;
 
     // Log token usage
-    const inputTokens = data.usageMetadata?.promptTokenCount || 0;
-    const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
+    const { input_tokens: inputTokens, output_tokens: outputTokens, thinking_tokens: thinkingTokens } = geminiUsage(data.usageMetadata);
     const duration = Date.now() - startTime;
-    console.log(`📊 [COSTUME EVAL] input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}, ${duration}ms`);
+    console.log(`📊 [COSTUME EVAL] input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}, thinking: ${thinkingTokens.toLocaleString()}, ${duration}ms`);
 
     // Check for truncated response
     if (finishReason && finishReason !== 'STOP') {
@@ -1497,9 +1531,11 @@ router.post('/analyze-photo', authenticateToken, async (req, res) => {
         `, [rowId, req.user.id, JSON.stringify(charData), JSON.stringify(metadataObj)]);
         }); // withTransaction: COMMIT on success, ROLLBACK on throw
       } catch (dbErr) {
-        // withTransaction already rolled back; character creation is a
-        // nice-to-have, so log and continue (the avatar job will retry).
-        log.warn(`📸 [PHOTO] Failed to create character in DB (avatar job will retry): ${dbErr.message}`);
+        // withTransaction already rolled back. Returning success here left the
+        // client holding a characterId with no row, and the avatar job could not
+        // find the character (review 2026-10 V6): fail loudly instead.
+        log.error(`📸 [PHOTO] Failed to create character in DB: ${dbErr.message}`);
+        return res.status(500).json({ error: 'Could not save the character. Please try again.' });
       }
 
       // Convert snake_case to camelCase for frontend compatibility
@@ -1567,16 +1603,35 @@ router.get('/avatar-prompt', authenticateToken, async (req, res) => {
 });
 
 /**
+ * Input rules shared by both avatar generation routes (code review 2026-10 V4/V5): a model override is a
+ * developer option (admins only, an ordinary client never sends one), and every photo the server will
+ * load must be inline image data or one of OUR uploads - never an arbitrary URL. Returns an
+ * { status, error } to answer with, or null.
+ */
+function avatarInputError(req, photoFields) {
+  if (req.body.avatarModel != null && !isAdminActing(req.user)) {
+    return { status: 403, error: 'avatarModel is not available' };
+  }
+  for (const [label, value] of photoFields) {
+    const error = guards.userImageSourceError(label, value);
+    if (error) return { status: 400, error };
+  }
+  return null;
+}
+
+/**
  * POST /api/generate-avatar-options
  * Generate 3 avatar options for user to choose from
  */
-router.post('/generate-avatar-options', authenticateToken, async (req, res) => {
+router.post('/generate-avatar-options', authenticateToken, avatarGenerationLimiter, async (req, res) => {
   try {
     const { facePhoto, gender, category = 'standard' } = req.body;
 
     if (!facePhoto) {
       return res.status(400).json({ error: 'Missing facePhoto' });
     }
+    const inputError = avatarInputError(req, [['facePhoto', facePhoto]]);
+    if (inputError) return res.status(inputError.status).json({ error: inputError.error });
 
     const geminiApiKey = process.env.GEMINI_API_KEY;
     if (!geminiApiKey) {
@@ -1752,6 +1807,7 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
       const MAX_RETRIES = 2; // Total attempts = MAX_RETRIES + 1 = 3
       let totalInputTokens = 0;
       let totalOutputTokens = 0;
+      let totalThinkingTokens = 0;
 
       try {
         const promptPart = splitPromptFromCatalogue(PROMPT_TEMPLATES.avatarMainPrompt).task.trim();
@@ -1798,17 +1854,17 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
                 if (attempt > 0) {
                   log.info(`[AVATAR JOB ${jobId}] ✅ ${category} succeeded on Grok retry ${attempt}`);
                 }
-                return { category, imageData: compressedImage, prompt: avatarPrompt, refsSent: grokRefs, attempts: attempt + 1, inputTokens: 0, outputTokens: 0 };
+                return { category, imageData: compressedImage, prompt: avatarPrompt, refsSent: grokRefs, attempts: attempt + 1, inputTokens: 0, outputTokens: 0, thinkingTokens: 0 };
               }
             } catch (grokErr) {
               lastErrorMsg = grokErr.message;
               log.warn(`[AVATAR JOB ${jobId}] Grok ${category} attempt ${attempt + 1} failed: ${grokErr.message}`);
               if (attempt >= MAX_RETRIES) {
-                return { category, imageData: null, prompt: avatarPrompt, refsSent: grokRefs, attempts: attempt + 1, lastError: lastErrorMsg, inputTokens: 0, outputTokens: 0 };
+                return { category, imageData: null, prompt: avatarPrompt, refsSent: grokRefs, attempts: attempt + 1, lastError: lastErrorMsg, inputTokens: 0, outputTokens: 0, thinkingTokens: 0 };
               }
             }
           }
-          return { category, imageData: null, prompt: avatarPrompt, refsSent: grokRefs, attempts: MAX_RETRIES + 1, lastError: lastErrorMsg, inputTokens: 0, outputTokens: 0 };
+          return { category, imageData: null, prompt: avatarPrompt, refsSent: grokRefs, attempts: MAX_RETRIES + 1, lastError: lastErrorMsg, inputTokens: 0, outputTokens: 0, thinkingTokens: 0 };
         }
 
         // Build request body matching the sync CLOTHING AVATARS path
@@ -1871,10 +1927,10 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
           let imageData = null;
 
           // Extract token usage from response
-          const inputTokens = data.usageMetadata?.promptTokenCount || 0;
-          const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
+          const { input_tokens: inputTokens, output_tokens: outputTokens, thinking_tokens: thinkingTokens } = geminiUsage(data.usageMetadata);
           totalInputTokens += inputTokens;
           totalOutputTokens += outputTokens;
+          totalThinkingTokens += thinkingTokens;
 
           // Log API response status for debugging
           if (!response.ok) {
@@ -1888,7 +1944,7 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
               continue; // Go to next attempt in the retry loop
             }
 
-            return { category, imageData: null, prompt: avatarPrompt, inputTokens: totalInputTokens, outputTokens: totalOutputTokens };
+            return { category, imageData: null, prompt: avatarPrompt, inputTokens: totalInputTokens, outputTokens: totalOutputTokens, thinkingTokens: totalThinkingTokens };
           }
 
           if (data.candidates && data.candidates[0]?.content?.parts) {
@@ -1909,7 +1965,7 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
               log.info(`[AVATAR JOB ${jobId}] ✅ ${category} succeeded on retry ${attempt}`);
             }
             const compressedImage = await compressImageToJPEG(imageData);
-            return { category, imageData: compressedImage, prompt: avatarPrompt, inputTokens: totalInputTokens, outputTokens: totalOutputTokens };
+            return { category, imageData: compressedImage, prompt: avatarPrompt, inputTokens: totalInputTokens, outputTokens: totalOutputTokens, thinkingTokens: totalThinkingTokens };
           }
 
           // No image - check if it's IMAGE_OTHER (retryable) or something else
@@ -1930,7 +1986,7 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
             }
             // Log full response for debugging IMAGE_OTHER
             log.warn(`[AVATAR JOB ${jobId}] Full Gemini response: ${JSON.stringify(data).substring(0, 1000)}`);
-            return { category, imageData: null, prompt: avatarPrompt, inputTokens: totalInputTokens, outputTokens: totalOutputTokens };
+            return { category, imageData: null, prompt: avatarPrompt, inputTokens: totalInputTokens, outputTokens: totalOutputTokens, thinkingTokens: totalThinkingTokens };
           }
 
           // IMAGE_OTHER with retries remaining - continue to next iteration
@@ -1938,10 +1994,10 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
         }
 
         // Should not reach here, but just in case
-        return { category, imageData: null, prompt: avatarPrompt, inputTokens: totalInputTokens, outputTokens: totalOutputTokens };
+        return { category, imageData: null, prompt: avatarPrompt, inputTokens: totalInputTokens, outputTokens: totalOutputTokens, thinkingTokens: totalThinkingTokens };
       } catch (err) {
         log.error(`[AVATAR JOB ${jobId}] Generation failed for ${category}:`, err.message);
-        return { category, imageData: null, prompt: null, inputTokens: totalInputTokens, outputTokens: totalOutputTokens };
+        return { category, imageData: null, prompt: null, inputTokens: totalInputTokens, outputTokens: totalOutputTokens, thinkingTokens: totalThinkingTokens };
       }
     };
 
@@ -1989,7 +2045,7 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
 
     // Aggregate token usage + O2 generation metadata (retry trail, refs sent)
     results.generationMeta = {};
-    for (const { category, prompt, refsSent, attempts, lastError, inputTokens, outputTokens } of generatedAvatars) {
+    for (const { category, prompt, refsSent, attempts, lastError, inputTokens, outputTokens, thinkingTokens } of generatedAvatars) {
       if (prompt) results.prompts[category] = prompt;
       if (attempts) results.generationMeta[category] = { attempts, ...(lastError && { lastError }) };
       // Refs are the same body-cutout + face-crop pair for every category —
@@ -1997,10 +2053,11 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
       if (refsSent && !results.avatarRefsSent) results.avatarRefsSent = refsSent;
       if (inputTokens > 0 || outputTokens > 0) {
         if (!results.tokenUsage.byModel[geminiModelId]) {
-          results.tokenUsage.byModel[geminiModelId] = { input_tokens: 0, output_tokens: 0 };
+          results.tokenUsage.byModel[geminiModelId] = { input_tokens: 0, output_tokens: 0, thinking_tokens: 0 };
         }
         results.tokenUsage.byModel[geminiModelId].input_tokens += inputTokens;
         results.tokenUsage.byModel[geminiModelId].output_tokens += outputTokens;
+        results.tokenUsage.byModel[geminiModelId].thinking_tokens += thinkingTokens || 0;
       }
     }
 
@@ -2248,10 +2305,11 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
             // Aggregate retry token usage
             if (retryGen.inputTokens > 0 || retryGen.outputTokens > 0) {
               if (!results.tokenUsage.byModel[geminiModelId]) {
-                results.tokenUsage.byModel[geminiModelId] = { input_tokens: 0, output_tokens: 0 };
+                results.tokenUsage.byModel[geminiModelId] = { input_tokens: 0, output_tokens: 0, thinking_tokens: 0 };
               }
               results.tokenUsage.byModel[geminiModelId].input_tokens += retryGen.inputTokens;
               results.tokenUsage.byModel[geminiModelId].output_tokens += retryGen.outputTokens;
+              results.tokenUsage.byModel[geminiModelId].thinking_tokens += retryGen.thinkingTokens || 0;
             }
 
             // Extract thumbnails from retry result
@@ -2287,16 +2345,10 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
             if (!outcome?.improved) continue;
             const { category, retryGen, retryEval, faceThumbnail, bodyThumbnail } = outcome;
 
-            // Replace image + thumbnails
-            results[category] = retryGen.imageData;
-            if (faceThumbnail) {
-              if (!results.faceThumbnails) results.faceThumbnails = {};
-              results.faceThumbnails[category] = faceThumbnail;
-            }
-            if (bodyThumbnail) {
-              if (!results.bodyThumbnails) results.bodyThumbnails = {};
-              results.bodyThumbnails[category] = bodyThumbnail;
-            }
+            await adoptRetryAvatar(results, category, {
+              imageData: retryGen.imageData, faceThumbnail, bodyThumbnail,
+              userId: job.userId, characterId, tag: `${r2Version}r`
+            });
             if (retryGen.prompt) results.prompts[category] = retryGen.prompt;
 
             // Replace evaluation
@@ -2706,22 +2758,30 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
     try {
       const { characterId } = bodyParams;
       const rowId = `characters_${user.id}`;
-      const rowRes = await dbQuery(`SELECT data FROM characters WHERE id = $1`, [rowId]);
-      if (rowRes.length > 0) {
-        const characters = rowRes[0].data?.characters || [];
-        const charIndex = characters.findIndex(c => String(c.id) === String(characterId));
-        if (charIndex >= 0) {
-          const failedAvatars = { status: 'failed', failedAt: new Date().toISOString(), error: err.message };
-          await dbQuery(
-            `UPDATE characters
-             SET data = jsonb_set(data, $2, COALESCE(data->'characters'->${charIndex}->'avatars', '{}'::jsonb) || $3::jsonb, true),
-                 metadata = jsonb_set(metadata, $2, COALESCE(metadata->'characters'->${charIndex}->'avatars', '{}'::jsonb) || $3::jsonb, true)
-             WHERE id = $1`,
-            [rowId, `{characters,${charIndex},avatars}`, JSON.stringify(failedAvatars)]
-          );
-          log.warn(`[AVATAR JOB ${jobId}] Marked character ${characterId} avatars.status='failed' in DB`);
-        }
-      }
+      const failedAvatars = { status: 'failed', failedAt: new Date().toISOString(), error: err.message };
+      // Read + write in ONE locked transaction with a fresh lookup by id, and a
+      // separate index per array (data.characters / metadata.characters may differ
+      // in order) — review 2026-10 V3.
+      const marked = await withTransaction(async (txClient) => {
+        const rows = (await txClient.query(`SELECT data, metadata FROM characters WHERE id = $1 FOR UPDATE`, [rowId])).rows;
+        if (rows.length === 0) return false;
+        const indexIn = (blob) => (blob?.characters || []).findIndex(c => String(c.id) === String(characterId));
+        const dataIdx = indexIn(rows[0].data);
+        if (dataIdx < 0) return false;
+        const metaIdx = indexIn(rows[0].metadata);
+        const patch = JSON.stringify(failedAvatars);
+        // $2 = data path, $3 = patch, $4 = metadata path (only when metadata has the character)
+        await txClient.query(
+          `UPDATE characters SET data = jsonb_set(data, $2, COALESCE(data->'characters'->${dataIdx}->'avatars', '{}'::jsonb) || $3::jsonb, true)
+             ${metaIdx >= 0 ? `, metadata = jsonb_set(metadata, $4, COALESCE(metadata->'characters'->${metaIdx}->'avatars', '{}'::jsonb) || $3::jsonb, true)` : ''}
+           WHERE id = $1`,
+          metaIdx >= 0
+            ? [rowId, `{characters,${dataIdx},avatars}`, patch, `{characters,${metaIdx},avatars}`]
+            : [rowId, `{characters,${dataIdx},avatars}`, patch]
+        );
+        return true;
+      });
+      if (marked) log.warn(`[AVATAR JOB ${jobId}] Marked character ${characterId} avatars.status='failed' in DB`);
     } catch (persistErr) {
       log.error(`[AVATAR JOB ${jobId}] Failed to persist failed-status to character:`, persistErr.message);
     }
@@ -2738,7 +2798,7 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
  *   - async=true: Return immediately with job ID, poll /api/avatar-jobs/:jobId for result
  *                 This prevents connection blocking and allows parallel requests
  */
-router.post('/generate-clothing-avatars', authenticateToken, async (req, res) => {
+router.post('/generate-clothing-avatars', authenticateToken, avatarGenerationLimiter, async (req, res) => {
   try {
     // `referencePhoto` is the bg-removed body with clothing visible (what Grok edits).
     // `facePhoto` is the high-res face crop, used as a SECOND Grok reference so
@@ -2746,15 +2806,12 @@ router.post('/generate-clothing-avatars', authenticateToken, async (req, res) =>
     // sent the body under the field name `facePhoto`; we still accept that.
     const referencePhoto = req.body.referencePhoto || req.body.facePhoto;
     const { characterId, physicalDescription, name, age, apparentAge, gender, build, physicalTraits, clothing, avatarModel } = req.body;
-    // The new face-crop second-reference. Only set when the client deliberately
-    // sends it via the `facePhoto` field *alongside* `referencePhoto` (so we
-    // don't mistake a legacy single-field call for a multi-ref call).
-    const faceRefPhoto = (req.body.referencePhoto && req.body.facePhoto) ? req.body.facePhoto : null;
-    const asyncMode = req.query.async === 'true' || req.body.async === true;
 
     if (!referencePhoto) {
       return res.status(400).json({ error: 'Missing referencePhoto' });
     }
+    const inputError = avatarInputError(req, [['referencePhoto', req.body.referencePhoto], ['facePhoto', req.body.facePhoto]]);
+    if (inputError) return res.status(inputError.status).json({ error: inputError.error });
 
     // Validate characterId - must be a valid number for DB lookup
     if (!characterId || (typeof characterId !== 'number' && isNaN(parseInt(characterId)))) {
@@ -2768,988 +2825,46 @@ router.post('/generate-clothing-avatars', authenticateToken, async (req, res) =>
     }
 
     // ASYNC MODE: Return immediately with job ID
-    if (asyncMode) {
-      const crypto = require('crypto');
-      const jobId = `avatar_${crypto.randomBytes(8).toString('hex')}`;
+    // Always async: a sync branch (no caller) was a second, stale-index implementation of this job (review 2026-10 V2).
+    const crypto = require('crypto');
+    const jobId = `avatar_${crypto.randomBytes(8).toString('hex')}`;
 
-      // Create job entry with validated characterId
-      avatarJobs.set(jobId, {
-        userId: req.user.id,
-        characterId: validCharacterId,
-        characterName: name,
-        status: 'pending',
-        progress: 0,
-        message: 'Starting avatar generation...',
-        createdAt: Date.now(),
-        result: null,
-        error: null
-      });
-
-      // Return immediately
-      res.json({
-        success: true,
-        async: true,
-        jobId,
-        message: 'Avatar generation started. Poll /api/avatar-jobs/' + jobId + ' for status.'
-      });
-
-      // Update body with validated characterId for background processing.
-      // Normalize the legacy `facePhoto` wire field into `referencePhoto`
-      // so processAvatarJobInBackground sees a single canonical name.
-      const validatedBody = { ...req.body, characterId: validCharacterId, referencePhoto };
-
-      // Continue processing in background (don't await)
-      processAvatarJobInBackground(jobId, validatedBody, req.user, geminiApiKey).catch(err => {
-        log.error(`[AVATAR JOB ${jobId}] Background processing failed:`, err.message);
-        const job = avatarJobs.get(jobId);
-        if (job) {
-          job.status = 'failed';
-          job.error = err.message;
-        }
-      });
-
-      return; // Exit early - background job continues
-    }
-
-    // SYNC MODE: Original blocking behavior (for backwards compatibility)
-
-    // Determine which model to use
-    const selectedModel = avatarModel || MODEL_DEFAULTS.avatar || 'grok-imagine';
-    const modelConfig = IMAGE_MODELS[selectedModel];
-    const useRunware = modelConfig?.backend === 'runware' || selectedModel === 'flux-schnell';
-    const useGrok = modelConfig?.backend === 'grok';
-    const geminiModelId = modelConfig?.modelId || 'gemini-2.5-flash-image';
-
-    log.debug(`👔 [CLOTHING AVATARS] Starting generation for ${name || 'unnamed'} (id: ${characterId}), model: ${selectedModel}, backend: ${useGrok ? 'grok' : useRunware ? 'runware' : 'gemini'}`);
-
-    const isFemale = gender === 'female';
-
-    // Define clothing categories - generate winter, standard, and summer avatars in parallel
-    // Formal avatar is not generated (rarely needed)
-    const clothingCategories = {
-      winter: { emoji: '❄️' },
-      standard: { emoji: '👕' },
-      summer: { emoji: '☀️' }
-    };
-
-    const results = {
-      status: 'generating',
-      generatedAt: null,
-      faceMatch: {},
-      clothing: {},           // Legacy: text clothing per category
-      structuredClothing: {}, // New: structured clothing from evaluation
-      extractedTraits: null,  // Physical traits extracted from generated avatar
-      rawEvaluation: null,    // Full unfiltered API response (for dev mode)
-      prompts: {},
-      tokenUsage: {           // Track Gemini token usage for cost tracking (per model)
-        byModel: {}           // { 'gemini-2.5-flash-image': { input_tokens, output_tokens, calls }, ... }
-      }
-    };
-
-    // SYNC PATH: Resize photos for Gemini to avoid IMAGE_OTHER errors (matches async path logic)
-    const photoSizeKB = Math.round(referencePhoto.length / 1024);
-    const isPNG = referencePhoto.startsWith('data:image/png');
-    log.info(`👔 [CLOTHING AVATARS] 📸 Input reference photo: ${photoSizeKB}KB, format: ${isPNG ? 'PNG' : 'JPEG'}`);
-
-    // Resize reference photo to 768px so the generator gets a consistent input size.
-    // Same URL-vs-base64 fix as the async path above — see avatars.js:1715.
-    const sharp = require('sharp');
-    const r2 = require('../lib/r2');
-    const inputBuffer = await r2.bytesFromAnyImage(referencePhoto);
-    if (!inputBuffer) throw new Error(`Could not load reference photo (got ${typeof referencePhoto}, len=${referencePhoto?.length})`);
-    const resizedBuffer = await sharp(inputBuffer)
-      .resize({ width: 768, height: 768, fit: 'inside', withoutEnlargement: true })
-      .jpeg({ quality: 92 })
-      .toBuffer();
-    const resizedPhoto = `data:image/jpeg;base64,${resizedBuffer.toString('base64')}`;
-    log.info(`👔 [CLOTHING AVATARS] Prepared: ${Math.round(resizedPhoto.length / 1024)}KB (was ${photoSizeKB}KB)`);
-
-    // Prepare base64 data once for all requests
-    const base64Data = stripDataUriPrefix(resizedPhoto);
-    const mimeType = 'image/jpeg'; // Always JPEG after resize
-
-    // Declared trait/clothing corrections - same resolver as the job path and
-    // as the judge, so the generator and the evaluator can never hold
-    // different specs (server/lib/avatarOverrides.js).
-    const overrides = resolveDeclaredAvatarOverrides({
-      physicalTraits,
-      clothing,
-      hairDescription: physicalTraits ? buildHairDescription(physicalTraits) : null,
-      declaredAge: age,
+    // Create job entry with validated characterId
+    avatarJobs.set(jobId, {
+      userId: req.user.id,
+      characterId: validCharacterId,
+      characterName: name,
+      status: 'pending',
+      progress: 0,
+      message: 'Starting avatar generation...',
+      createdAt: Date.now(),
+      result: null,
+      error: null
     });
-    const declaredOverridesFor = (category) => resolveDeclaredAvatarOverrides({
-      physicalTraits,
-      clothing,
-      hairDescription: physicalTraits ? buildHairDescription(physicalTraits) : null,
-      category,
-      declaredAge: age,
-    }).text;
-    // The judge's rendering of the SAME declared age the generator's trait
-    // block carries (overrides.ageLine) — one resolver, two wordings.
-    const declaredAgeText = overrides.ageFact;
 
-    let userClothingSection = '';
-    if (overrides.clothingParts.length > 0) {
-      userClothingSection = `\n\nUSER-SPECIFIED CLOTHING (MUST USE - override default clothing style):\n${overrides.clothingParts.join('\n')}\nIMPORTANT: Use the user-specified clothing above instead of the default clothing style.`;
-      log.debug(`[CLOTHING AVATARS] Using user-specified clothing: ${overrides.clothingParts.join(', ')}`);
-    }
+    // Return immediately
+    res.json({
+      success: true,
+      async: true,
+      jobId,
+      message: 'Avatar generation started. Poll /api/avatar-jobs/' + jobId + ' for status.'
+    });
 
-    let userTraitsSection = '';
-    if (overrides.traitLines.length > 0) {
-      userTraitsSection = `\n\nPHYSICAL TRAIT CORRECTIONS (CRITICAL - MUST APPLY):
-The user has specified the following traits that MUST be applied to the output:
-${overrides.traitLines.join('\n')}
+    // Update body with validated characterId for background processing.
+    // Normalize the legacy `facePhoto` wire field into `referencePhoto`
+    // so processAvatarJobInBackground sees a single canonical name.
+    const validatedBody = { ...req.body, characterId: validCharacterId, referencePhoto };
 
-These corrections OVERRIDE what is visible in the reference photo.
-- If hair color is specified, the output MUST show that exact hair color
-- If eye color is specified, the output MUST show that exact eye color
-- If skin tone is specified, the output MUST show that exact skin tone
-- Apply these traits while preserving the person's facial identity from the reference.`;
-      log.info(`[CLOTHING AVATARS] Using user-specified physical traits: ${overrides.traitLines.join(', ')}`);
-    }
-
-    // Check if using ACE++ model (face-consistent avatar generation)
-    const useACEPlusPlus = selectedModel === 'ace-plus-plus';
-
-    // Helper function to generate avatar using Grok edit (face photo as reference).
-    // Grok is the default avatar backend; Gemini was deprecated because IMAGE_OTHER
-    // safety refusals on adult-face photos left avatars permanently 'pending'.
-    const generateAvatarWithGrok = async (category, avatarPrompt) => {
-      try {
-        const result = await editWithGrok(avatarPrompt, [referencePhoto], {
-          aspectRatio: '9:16',
-          resolution: '1k',
-          model: modelConfig?.modelId || 'grok-imagine-image',
-          padInput: true,  // Avatars: pad to preserve the face/head when the
-                           // bodyNoBg input is a taller-than-9:16 portrait.
-          skipOutputCrop: true, // Same intent on the way out — never slice the figure.
-        });
-        if (result?.imageData) {
-          const compressed = await compressImageToJPEG(result.imageData, 85, 768);
-          return compressed || result.imageData;
-        }
-        return null;
-      } catch (err) {
-        log.error(`❌ [CLOTHING AVATARS] Grok generation failed for ${category}:`, err.message);
-        return null;
+    // Continue processing in background (don't await)
+    processAvatarJobInBackground(jobId, validatedBody, req.user, geminiApiKey).catch(err => {
+      log.error(`[AVATAR JOB ${jobId}] Background processing failed:`, err.message);
+      const job = avatarJobs.get(jobId);
+      if (job) {
+        job.status = 'failed';
+        job.error = err.message;
       }
-    };
+    });
 
-    // Helper function to generate avatar using ACE++ (face-consistent)
-    // Uses optimized shorter prompt - ACE++ gets face from reference image
-    const generateAvatarWithACEPlusPlus = async (category, userTraits) => {
-      try {
-        if (!isRunwareConfigured()) {
-          log.error(`❌ [CLOTHING AVATARS] Runware not configured`);
-          return null;
-        }
-
-        // Build ACE++ prompt from optimized template
-        const aceTemplate = PROMPT_TEMPLATES.avatarAcePrompt || '';
-        const clothingStylePrompt = getClothingStylePromptFromAce(category, isFemale, aceTemplate);
-
-        // Build final prompt: base template + clothing + user traits
-        const basePrompt = splitPromptFromCatalogue(aceTemplate).task.trim();
-        let acePrompt = fillTemplate(basePrompt, { 'CLOTHING_STYLE': clothingStylePrompt });
-
-        // Add user traits (hair color, build, etc.) - ACE++ won't get these from face reference
-        if (userTraits) {
-          acePrompt += '\n\n' + userTraits;
-        }
-
-        log.debug(`🎨 [ACE++] Generating ${category} avatar with face reference`);
-        log.debug(`🎨 [ACE++] Prompt length: ${acePrompt.length} chars`);
-
-        const result = await generateAvatarWithACE(referencePhoto, acePrompt, {
-          width: 768,
-          height: 1024,
-          identityStrength: 0.8
-        });
-
-        if (result?.imageData) {
-          // Compress the result
-          const compressed = await compressImageToJPEG(result.imageData, 85, 768);
-          return compressed || result.imageData;
-        }
-        return null;
-      } catch (err) {
-        log.error(`❌ [CLOTHING AVATARS] ACE++ generation failed for ${category}:`, err.message);
-        return null;
-      }
-    };
-
-    // Helper function to generate a single avatar using Runware (FLUX) - text-to-image only
-    const generateAvatarWithRunwareFLUX = async (category, avatarPrompt) => {
-      try {
-        if (!isRunwareConfigured()) {
-          log.error(`❌ [CLOTHING AVATARS] Runware not configured`);
-          return null;
-        }
-
-        // For FLUX, we need to include the reference image as IP-Adapter input
-        // Build a simpler prompt since FLUX handles things differently
-        const fluxPrompt = `Portrait illustration of a person, full body standing pose, facing forward, ${avatarPrompt}. Children's book illustration style, clean background, high quality.`;
-
-        const result = await generateWithRunware(fluxPrompt, {
-          model: 'runware:5@1',  // FLUX Schnell
-          width: 576,  // 9:16 aspect ratio
-          height: 1024,
-          steps: 4,
-          referenceImages: [referencePhoto]  // Reference body/face photo for IP-Adapter
-        });
-
-        if (result?.imageData) {
-          // Compress the result
-          const compressed = await compressImageToJPEG(result.imageData, 85, 768);
-          return compressed || result.imageData;
-        }
-        return null;
-      } catch (err) {
-        log.error(`❌ [CLOTHING AVATARS] Runware FLUX generation failed for ${category}:`, err.message);
-        return null;
-      }
-    };
-
-    // Helper function to generate a single avatar
-    const generateSingleAvatar = async (category, config) => {
-      try {
-        log.debug(`${config.emoji} [CLOTHING AVATARS] Generating ${category} avatar for ${name || 'unnamed'} (${gender || 'unknown'}), model: ${selectedModel}...`);
-
-        // Build the prompt from template
-        const promptPart = splitPromptFromCatalogue(PROMPT_TEMPLATES.avatarMainPrompt).task.trim();
-        const clothingStylePrompt = getClothingStylePrompt(category, isFemale);
-        log.debug(`   [CLOTHING] Style for ${category}: "${clothingStylePrompt}"`);
-        let avatarPrompt = fillTemplate(promptPart, {
-          'CLOTHING_STYLE': clothingStylePrompt
-        });
-        // Add user-specified clothing ONLY for standard avatar (not winter/summer)
-        // Winter and summer should use their seasonal clothing styles
-        if (userClothingSection && category === 'standard') {
-          avatarPrompt += userClothingSection;
-        }
-
-        // Add user-specified physical traits to ALL avatar categories
-        // Physical traits (hair color, eye color, etc.) should be consistent across all outfits
-        if (userTraitsSection) {
-          avatarPrompt += userTraitsSection;
-        }
-
-        // Grok branch — default. Edit endpoint accepts face photo as reference and
-        // produces a clothing-variant avatar in one call, no IMAGE_OTHER rejections
-        // on adult-face photos.
-        if (useGrok) {
-          const imageData = await generateAvatarWithGrok(category, avatarPrompt);
-          if (imageData) {
-            log.debug(`✅ [CLOTHING AVATARS] ${category} avatar generated via Grok`);
-            return { category, prompt: avatarPrompt, imageData };
-          } else {
-            log.warn(`[CLOTHING AVATARS] Grok generation failed for ${category}`);
-            return { category, prompt: avatarPrompt, imageData: null };
-          }
-        }
-
-        // Use ACE++ for face-consistent avatar generation
-        // Uses optimized shorter prompt from avatar-ace-prompt.txt
-        if (useACEPlusPlus) {
-          const imageData = await generateAvatarWithACEPlusPlus(category, userTraitsSection);
-          if (imageData) {
-            log.debug(`✅ [CLOTHING AVATARS] ${category} avatar generated via ACE++`);
-            return { category, prompt: avatarPrompt, imageData };
-          } else {
-            log.warn(`[CLOTHING AVATARS] ACE++ generation failed for ${category}`);
-            return { category, prompt: avatarPrompt, imageData: null };
-          }
-        }
-
-        // Use Runware for other FLUX models (text-to-image only, no face consistency)
-        if (useRunware && !useACEPlusPlus) {
-          const imageData = await generateAvatarWithRunwareFLUX(category, clothingStylePrompt);
-          if (imageData) {
-            log.debug(`✅ [CLOTHING AVATARS] ${category} avatar generated via Runware FLUX`);
-            return { category, prompt: avatarPrompt, imageData };
-          } else {
-            log.warn(`[CLOTHING AVATARS] Runware FLUX generation failed for ${category}`);
-            return { category, prompt: avatarPrompt, imageData: null };
-          }
-        }
-
-        // Use Grok Imagine for grok models
-        const useGrok = modelConfig?.backend === 'grok' || selectedModel.startsWith('grok-imagine');
-        if (useGrok) {
-          const { generateWithGrok, editWithGrok, isGrokConfigured } = require('../lib/grok');
-          if (isGrokConfigured()) {
-            try {
-              // Same registry-derived tier resolution as the page/cover
-              // dispatcher — the two-way ternary this replaces collapsed
-              // grok-imagine-2 to Standard. Announce a non-tier key before
-              // downgrading, exactly like the images.js dispatch sites.
-              const grokTier = resolveGrokImageModel(selectedModel);
-              if (selectedModel && !grokTier.isExplicit) {
-                log.warn(`⚠️ [CLOTHING AVATARS] Model override "${selectedModel}" is not a Grok tier — using ${grokTier.modelId}`);
-              }
-              const grokModel = grokTier.modelId;
-              // Use the body-clothed reference photo as input — Grok edits it.
-              const refImages = [referencePhoto];
-              const result = await editWithGrok(avatarPrompt, refImages, {
-                model: grokModel,
-                aspectRatio: '9:16',
-                padInput: true,  // Same reason as the generateAvatarWithGrok path.
-                skipOutputCrop: true, // Same intent on the way out — never slice the figure.
-              });
-              if (result.imageData) {
-                log.debug(`✅ [CLOTHING AVATARS] ${category} avatar generated via Grok Imagine`);
-                return { category, prompt: avatarPrompt, imageData: result.imageData, usage: result.usage };
-              }
-            } catch (grokError) {
-              log.error(`❌ [CLOTHING AVATARS] Grok generation failed for ${category}: ${grokError.message}`);
-              // Fall through to Gemini
-            }
-          }
-        }
-
-        // Gemini avatar gen — funnel through the shared callGeminiAvatarApi
-        // helper so request setup / safety threshold / parse / token extract
-        // logic isn't duplicated. Token tracking + safety-filter retry
-        // (with the simplified avatarRetryPrompt) stay route-local because
-        // they fold into `results.tokenUsage` and the per-category retry
-        // policy is route-specific.
-        const callOpts = {
-          geminiApiKey,
-          referenceImageBase64: base64Data,
-          referenceMimeType: mimeType,
-          prompt: avatarPrompt,
-          modelId: geminiModelId,
-          logTag: `[CLOTHING AVATARS] ${category}`,
-        };
-        const trackTokens = (modelId, input, output) => {
-          if (input <= 0 && output <= 0) return;
-          console.log(`📊 [AVATAR GENERATION] ${category} - model: ${modelId}, input: ${input.toLocaleString()}, output: ${output.toLocaleString()}`);
-          if (!results.tokenUsage.byModel[modelId]) {
-            results.tokenUsage.byModel[modelId] = { input_tokens: 0, output_tokens: 0, calls: 0 };
-          }
-          results.tokenUsage.byModel[modelId].input_tokens += input;
-          results.tokenUsage.byModel[modelId].output_tokens += output;
-          results.tokenUsage.byModel[modelId].calls += 1;
-        };
-
-        let geminiResult = await callGeminiAvatarApi(callOpts);
-        trackTokens(selectedModel, geminiResult.inputTokens, geminiResult.outputTokens);
-
-        if (geminiResult.blocked) {
-          log.warn(`[CLOTHING AVATARS] ${category} blocked by safety filters: ${geminiResult.blockReason} — retrying with simplified prompt`);
-          const outfitDescription = category === 'winter' ? 'a winter coat'
-            : category === 'summer' ? 'a casual T-shirt and shorts'
-              : 'casual clothes';
-          // Bare key — fillTemplate adds the braces. '{OUTFIT_DESCRIPTION}'
-          // never matched, so the safety-retry shipped "wearing ." with no outfit.
-          const retryPrompt = fillTemplate(PROMPT_TEMPLATES.avatarRetryPrompt, {
-            OUTFIT_DESCRIPTION: outfitDescription
-          });
-          geminiResult = await callGeminiAvatarApi({ ...callOpts, prompt: retryPrompt, logTag: `[CLOTHING AVATARS] ${category} retry` });
-          trackTokens(selectedModel, geminiResult.inputTokens, geminiResult.outputTokens);
-          if (geminiResult.blocked) {
-            log.warn(`[CLOTHING AVATARS] ${category} retry also blocked: ${geminiResult.blockReason}`);
-            return { category, prompt: avatarPrompt, imageData: null };
-          }
-        }
-
-        if (!geminiResult.ok) {
-          return { category, prompt: avatarPrompt, imageData: null };
-        }
-        const imageData = geminiResult.imageData;
-
-        if (imageData) {
-          // Compress avatar to JPEG
-          try {
-            const originalSize = Math.round(imageData.length / 1024);
-            const compressedImage = await compressImageToJPEG(imageData);
-            const compressedSize = Math.round(compressedImage.length / 1024);
-            log.debug(`✅ [CLOTHING AVATARS] ${category} avatar generated and compressed (${originalSize}KB -> ${compressedSize}KB)`);
-
-            // Extract face + body thumbnails from 2x2 grid for display (original image kept for generation)
-            let faceThumbnail = null;
-            let bodyThumbnail = null;
-            try {
-              const splitResult = await splitGridAndExtractFace(compressedImage);
-              if (splitResult.success) {
-                if (splitResult.faceThumbnail) {
-                  faceThumbnail = splitResult.faceThumbnail;
-                  log.debug(`✅ [CLOTHING AVATARS] ${category} face thumbnail extracted`);
-                }
-                if (splitResult.quadrants?.bodyFront) {
-                  bodyThumbnail = splitResult.quadrants.bodyFront;
-                  log.debug(`✅ [CLOTHING AVATARS] ${category} body thumbnail extracted`);
-                }
-              } else {
-                log.warn(`[CLOTHING AVATARS] Thumbnail extraction failed for ${category}: ${splitResult.error || 'no thumbnail'}`);
-              }
-            } catch (splitErr) {
-              log.warn(`[CLOTHING AVATARS] Split failed for ${category}:`, splitErr.message);
-            }
-
-            // Return original compressed image (unchanged) + optional face/body thumbnails
-            return { category, prompt: avatarPrompt, imageData: compressedImage, faceThumbnail, bodyThumbnail };
-          } catch (compressErr) {
-            log.warn(`[CLOTHING AVATARS] Compression failed for ${category}, using original:`, compressErr.message);
-            return { category, prompt: avatarPrompt, imageData };
-          }
-        } else {
-          log.warn(`[CLOTHING AVATARS] No image in ${category} response`);
-          return { category, prompt: avatarPrompt, imageData: null };
-        }
-      } catch (err) {
-        log.error(`❌ [CLOTHING AVATARS] Error generating ${category}:`, err.message);
-        return { category, prompt: null, imageData: null };
-      }
-    };
-
-    // PHASE 1: Generate all clothing avatars in parallel (winter, standard, summer)
-    const categoryCount = Object.keys(clothingCategories).length;
-    log.debug(`🚀 [CLOTHING AVATARS] Generating ${categoryCount} avatars for ${name || 'unnamed'} in parallel...`);
-    const generationStart = Date.now();
-    const generationPromises = Object.entries(clothingCategories).map(
-      ([category, config]) => generateSingleAvatar(category, config)
-    );
-    const generatedAvatars = await Promise.all(generationPromises);
-    const generationTime = Date.now() - generationStart;
-    log.debug(`⚡ [CLOTHING AVATARS] ${categoryCount} avatars generated in ${generationTime}ms (parallel)`);
-
-    // Upload main avatars + thumbnails to R2 in parallel. R2 misconfig or
-    // upload failure leaves URL undefined; the writer below then persists
-    // inline as the fallback.
-    //
-    // `r2Version` (see comment in the async-job path above) is baked into
-    // every R2 key for this regen so each run produces a fresh URL. Without
-    // it, Cloudflare's edge cache + the browser HTTP cache continued to
-    // serve the previous avatar bytes for hours after a regeneration,
-    // making it look like the save failed.
-    const r2Version = Date.now().toString(36);
-    const r2Uploads = [];
-    if (req.user?.id && validCharacterId) {
-      for (const { category, imageData, faceThumbnail, bodyThumbnail } of generatedAvatars) {
-        if (imageData) {
-          r2Uploads.push(saveAvatarToR2(req.user.id, validCharacterId, category, imageData, r2Version)
-            .then(url => ({ kind: 'main', category, url })));
-        }
-        if (faceThumbnail) {
-          r2Uploads.push(saveAvatarThumbToR2(req.user.id, validCharacterId, 'face', category, faceThumbnail, r2Version)
-            .then(url => ({ kind: 'face', category, url })));
-        }
-        if (bodyThumbnail) {
-          r2Uploads.push(saveAvatarThumbToR2(req.user.id, validCharacterId, 'body', category, bodyThumbnail, r2Version)
-            .then(url => ({ kind: 'body', category, url })));
-        }
-      }
-    }
-    const uploadResults = await Promise.all(r2Uploads);
-    const mainUrls = new Map();
-    const faceUrls = new Map();
-    const bodyUrls = new Map();
-    for (const { kind, category, url } of uploadResults) {
-      if (!url) continue;
-      if (kind === 'main') mainUrls.set(category, url);
-      else if (kind === 'face') faceUrls.set(category, url);
-      else if (kind === 'body') bodyUrls.set(category, url);
-    }
-    if (mainUrls.size + faceUrls.size + bodyUrls.size > 0) {
-      log.info(`☁️  [CLOTHING AVATARS] R2 uploaded ${mainUrls.size} main + ${faceUrls.size} face + ${bodyUrls.size} body thumbs`);
-    }
-
-    // Store prompts, images, face thumbnails, and body thumbnails
-    for (const { category, prompt, imageData, faceThumbnail, bodyThumbnail } of generatedAvatars) {
-      if (prompt) results.prompts[category] = prompt;
-      if (imageData) {
-        // Store original 2x2 grid image (unchanged - used for story generation)
-        results[category] = imageData;
-        const mainUrl = mainUrls.get(category);
-        if (mainUrl) results[`${category}Url`] = mainUrl;
-        log.debug(`📦 [CLOTHING AVATARS] Stored ${category} avatar${mainUrl ? ' (+R2 url)' : ''}`);
-      }
-      // Store face thumbnail separately (for display only)
-      if (faceThumbnail) {
-        if (!results.faceThumbnails) results.faceThumbnails = {};
-        results.faceThumbnails[category] = faceThumbnail;
-        const u = faceUrls.get(category);
-        if (u) {
-          if (!results.faceThumbnailsUrl) results.faceThumbnailsUrl = {};
-          results.faceThumbnailsUrl[category] = u;
-        }
-        log.debug(`📦 [CLOTHING AVATARS] Stored ${category} face thumbnail${u ? ' (+R2 url)' : ''}`);
-      }
-      // Store body thumbnail separately (for display only)
-      if (bodyThumbnail) {
-        if (!results.bodyThumbnails) results.bodyThumbnails = {};
-        results.bodyThumbnails[category] = bodyThumbnail;
-        const u = bodyUrls.get(category);
-        if (u) {
-          if (!results.bodyThumbnailsUrl) results.bodyThumbnailsUrl = {};
-          results.bodyThumbnailsUrl[category] = u;
-        }
-        log.debug(`📦 [CLOTHING AVATARS] Stored ${category} body thumbnail${u ? ' (+R2 url)' : ''}`);
-      }
-    }
-
-    // PHASE 2: Evaluate all generated avatars in parallel (optional, controlled by ENABLE_AVATAR_EVALUATION)
-    if (ENABLE_AVATAR_EVALUATION) {
-    const avatarsToEvaluate = generatedAvatars.filter(a => a.imageData);
-    if (avatarsToEvaluate.length > 0) {
-      log.debug(`🔍 [CLOTHING AVATARS] Starting PARALLEL evaluation of ${avatarsToEvaluate.length} avatars...`);
-      const evalStart = Date.now();
-
-      // Extract traits from ORIGINAL PHOTO (ground truth for face) in parallel with avatar evals
-      const photoTraitsPromise = extractTraitsWithGemini(referencePhoto);
-
-      // Use the dedicated face photo for face matching when available; the
-      // body referencePhoto has too little face signal (see F2 comment in
-      // the async/job path above).
-      const faceRefSync = faceRefPhoto || referencePhoto;
-      const evalPromises = avatarsToEvaluate.map(async ({ category, imageData }) => {
-        const faceMatchResult = await evaluateAvatarFaceMatch(faceRefSync, imageData, geminiApiKey, null, declaredOverridesFor(category), declaredAgeText);
-        return { category, faceMatchResult };
-      });
-
-      // Wait for both photo analysis and avatar evaluations (zero added latency)
-      const [photoTraitsResult, ...evalResults] = await Promise.all([
-        photoTraitsPromise,
-        ...evalPromises
-      ]);
-      const evalTime = Date.now() - evalStart;
-      log.debug(`⚡ [CLOTHING AVATARS] All evaluations completed in ${evalTime}ms (parallel)`);
-
-      // Collect physical traits from ALL avatar evaluations for consensus voting
-      const allAvatarTraits = [];
-
-      // Store evaluation results
-      for (const { category, faceMatchResult } of evalResults) {
-        if (faceMatchResult) {
-          results.faceMatch[category] = {
-            score: faceMatchResult.score,
-            details: faceMatchResult.details,
-            lpips: faceMatchResult.lpips || null  // LPIPS comparison result
-          };
-
-          // Store full raw evaluation for dev mode (only from first result)
-          if (faceMatchResult.raw && !results.rawEvaluation) {
-            results.rawEvaluation = faceMatchResult.raw;
-          }
-
-          // Collect physical traits from ALL categories for consensus voting
-          if (faceMatchResult.physicalTraits) {
-            const traits = { ...faceMatchResult.physicalTraits };
-            if (!traits.apparentAge) {
-              if (traits.apparent_age) { traits.apparentAge = traits.apparent_age; delete traits.apparent_age; }
-              else if (traits.age) { traits.apparentAge = traits.age; delete traits.age; }
-            }
-            allAvatarTraits.push(traits);
-          }
-
-          // Store structured clothing (from generated avatar)
-          if (faceMatchResult.clothing) {
-            // Check if it's structured (object) or legacy (string)
-            if (typeof faceMatchResult.clothing === 'object') {
-              results.structuredClothing[category] = faceMatchResult.clothing;
-              // Also create legacy text version for backwards compatibility
-              const clothingParts = [];
-              if (faceMatchResult.clothing.fullBody) {
-                clothingParts.push(faceMatchResult.clothing.fullBody);
-              } else {
-                if (faceMatchResult.clothing.upperBody) clothingParts.push(faceMatchResult.clothing.upperBody);
-                if (faceMatchResult.clothing.lowerBody) clothingParts.push(faceMatchResult.clothing.lowerBody);
-              }
-              if (faceMatchResult.clothing.shoes) clothingParts.push(faceMatchResult.clothing.shoes);
-              results.clothing[category] = clothingParts.join(', ');
-              log.debug(`👕 [AVATAR EVAL] ${category} structured clothing: ${JSON.stringify(faceMatchResult.clothing)}`);
-            } else {
-              // Legacy string format
-              results.clothing[category] = faceMatchResult.clothing;
-              log.debug(`👕 [AVATAR EVAL] ${category} clothing: ${faceMatchResult.clothing}`);
-            }
-          }
-
-          log.debug(`🔍 [AVATAR EVAL] ${category} score: ${faceMatchResult.score}/10`);
-        }
-      }
-
-      // Apply consensus voting: photo traits (ground truth) + all avatar traits
-      const photoTraits = photoTraitsResult?.traits || {};
-      if (!photoTraits.apparentAge && photoTraits.apparent_age) {
-        photoTraits.apparentAge = photoTraits.apparent_age;
-        delete photoTraits.apparent_age;
-      }
-      if (photoTraits['distinctive markings'] && !photoTraits.other) {
-        photoTraits.other = photoTraits['distinctive markings'];
-      }
-
-      if (allAvatarTraits.length > 0 || Object.keys(photoTraits).length > 0) {
-        const { traits: consensusResult, sources } = consensusTraits(photoTraits, allAvatarTraits);
-        results.extractedTraits = consensusResult;
-        results.traitSources = sources;
-
-        // Use detailedHairAnalysis from photo (ground truth), fall back to avatar
-        results.extractedTraits.detailedHairAnalysis =
-          photoTraitsResult?.detailedHairAnalysis ||
-          photoTraitsResult?.traits?.detailedHairAnalysis ||
-          evalResults.find(r => r.faceMatchResult?.detailedHairAnalysis)?.faceMatchResult.detailedHairAnalysis;
-
-        // Clamp analyzed apparentAge to ±1 group of stated age (see avatar job
-        // path for details). Trusts visual age normally but catches absurd
-        // mis-analyses where the photo got read as the wrong life stage.
-        const photoConfidence = photoTraitsResult?.confidence?.overallConfidence
-          || photoTraitsResult?.traits?.confidence?.overallConfidence
-          || null;
-        const clampResult = clampApparentAge(consensusResult.apparentAge, age, photoConfidence);
-        if (clampResult.clamped) {
-          log.info(`[AGE CLAMP] ${name || characterId}: ${clampResult.reason}`);
-          consensusResult.apparentAge = clampResult.category;
-          sources.apparentAge = `${sources.apparentAge || 'photo'} → clamped`;
-        } else {
-          log.debug(`[AGE CLAMP] ${name || characterId}: ${clampResult.reason}`);
-        }
-
-        for (const [field, source] of Object.entries(sources)) {
-          if (source.includes('photo')) {
-            log.info(`📋 [CONSENSUS] ${field}: "${consensusResult[field]}" (${source})`);
-          }
-        }
-        log.debug(`📋 [CLOTHING AVATARS] Consensus traits: apparentAge=${consensusResult.apparentAge}, build=${consensusResult.build}, hairDensity=${consensusResult.hairDensity || 'N/A'}`);
-      } else {
-        log.warn(`📋 [CLOTHING AVATARS] No traits from photo or avatars — skipping consensus`);
-      }
-
-      // PHASE 2b: Auto-retry categories with low face scores
-      const lowScoreCategories = Object.entries(results.faceMatch)
-        .filter(([, fm]) => fm.score != null && fm.score < MIN_BASE_AVATAR_SCORE)
-        .map(([cat]) => cat);
-
-      if (lowScoreCategories.length > 0) {
-        log.debug(`🔄 [CLOTHING AVATARS] Retrying ${lowScoreCategories.length} low-score categories: ${lowScoreCategories.join(', ')}`);
-        const retryStart = Date.now();
-
-        const retryPromises = lowScoreCategories.map(async (category) => {
-          const config = clothingCategories[category];
-          if (!config) return null;
-
-          const originalScore = results.faceMatch[category].score;
-          log.debug(`🔄 [CLOTHING AVATARS] Retrying ${category} (score ${originalScore}/10 < ${MIN_BASE_AVATAR_SCORE})...`);
-
-          // Regenerate
-          const retryResult = await generateSingleAvatar(category, config);
-          if (!retryResult?.imageData) {
-            log.warn(`🔄 [CLOTHING AVATARS] Retry for ${category} produced no image — keeping original`);
-            return null;
-          }
-
-          // Re-evaluate (use face crop for face match — see F2 comment above)
-          const retryEval = await evaluateAvatarFaceMatch(faceRefSync, retryResult.imageData, geminiApiKey, null, declaredOverridesFor(category), declaredAgeText);
-          const retryScore = retryEval?.score ?? 0;
-          log.debug(`🔄 [CLOTHING AVATARS] Retry ${category}: new score ${retryScore}/10 (was ${originalScore}/10)`);
-
-          if (retryScore > originalScore) {
-            log.debug(`✅ [CLOTHING AVATARS] Retry improved ${category}: ${originalScore} → ${retryScore}`);
-            return { category, retryResult, retryEval, retryScore, improved: true };
-          } else {
-            log.debug(`⏭️ [CLOTHING AVATARS] Retry did NOT improve ${category}: ${originalScore} → ${retryScore}, keeping original`);
-            return null;
-          }
-        });
-
-        const retryOutcomes = await Promise.all(retryPromises);
-
-        for (const outcome of retryOutcomes) {
-          if (!outcome?.improved) continue;
-          const { category, retryResult, retryEval } = outcome;
-
-          // Replace image + thumbnails
-          results[category] = retryResult.imageData;
-          if (retryResult.faceThumbnail) {
-            if (!results.faceThumbnails) results.faceThumbnails = {};
-            results.faceThumbnails[category] = retryResult.faceThumbnail;
-          }
-          if (retryResult.bodyThumbnail) {
-            if (!results.bodyThumbnails) results.bodyThumbnails = {};
-            results.bodyThumbnails[category] = retryResult.bodyThumbnail;
-          }
-          if (retryResult.prompt) results.prompts[category] = retryResult.prompt;
-
-          // Replace evaluation
-          results.faceMatch[category] = {
-            score: retryEval.score,
-            details: retryEval.details,
-            lpips: retryEval.lpips || null
-          };
-
-          // Replace clothing if available
-          if (retryEval.clothing && typeof retryEval.clothing === 'object') {
-            results.structuredClothing[category] = retryEval.clothing;
-            const clothingParts = [];
-            if (retryEval.clothing.fullBody) {
-              clothingParts.push(retryEval.clothing.fullBody);
-            } else {
-              if (retryEval.clothing.upperBody) clothingParts.push(retryEval.clothing.upperBody);
-              if (retryEval.clothing.lowerBody) clothingParts.push(retryEval.clothing.lowerBody);
-            }
-            if (retryEval.clothing.shoes) clothingParts.push(retryEval.clothing.shoes);
-            results.clothing[category] = clothingParts.join(', ');
-          }
-        }
-
-        log.debug(`🔄 [CLOTHING AVATARS] Retry phase completed in ${Date.now() - retryStart}ms`);
-      }
-
-    } // end if (avatarsToEvaluate.length > 0)
-    } else {
-      log.debug(`⏭️ [CLOTHING AVATARS] Skipping avatar evaluation (ENABLE_AVATAR_EVALUATION=false)`);
-    } // end if (ENABLE_AVATAR_EVALUATION)
-
-    log.debug(`✅ [CLOTHING AVATARS] Total time: ${Date.now() - generationStart}ms`)
-
-    // Check if standard avatar was generated
-    if (!results.standard) {
-      return res.status(500).json({ error: 'Failed to generate avatar' });
-    }
-
-    results.status = 'complete';
-    results.generatedAt = new Date().toISOString();
-
-    // Log avatar generation to activity log
-    const avatarsGenerated = Object.keys(clothingCategories).filter(cat => results[cat]).length;
-    const evaluationsRun = Object.keys(results.faceMatch).length;
-    try {
-      await logActivity(req.user.id, req.user.username, 'AVATAR_GENERATED', {
-        characterId,
-        characterName: name,
-        model: selectedModel,
-        backend: useRunware ? 'runware' : 'gemini',
-        avatarsGenerated,
-        evaluationsRun,
-        tokenUsage: results.tokenUsage,
-        // Runware cost: $0.0006 per image
-        estimatedCost: useRunware ? avatarsGenerated * 0.0006 : null
-      }, req.user);
-    } catch (activityErr) {
-      log.warn('Failed to log avatar generation activity:', activityErr.message);
-    }
-
-    // Store token usage and extracted traits in character data
-    const hasTokenUsage = Object.keys(results.tokenUsage?.byModel || {}).length > 0;
-    const hasExtractedData = results.extractedTraits || results.structuredClothing;
-    if (characterId && (hasTokenUsage || hasExtractedData)) {
-      try {
-        // Get current character data and accumulate token usage
-        const charResult = await dbQuery(
-          `SELECT id, data FROM characters WHERE user_id = $1`,
-          [req.user.id]
-        );
-
-        // Note: dbQuery returns rows array directly, not { rows: [...] }
-        if (charResult?.[0]) {
-          const rowId = charResult[0].id;
-          const data = typeof charResult[0].data === 'string'
-            ? JSON.parse(charResult[0].data)
-            : charResult[0].data;
-
-          // Find the character and update its data
-          const characters = data.characters || [];
-          let charIndex = characters.findIndex(c => c.id === characterId || c.id === parseInt(characterId));
-
-          // Fallback: find by name if ID match fails
-          if (charIndex < 0 && name) {
-            const availableIds = characters.map(c => `${c.name}(${c.id})`).join(', ');
-            log.debug(`💾 [CLOTHING AVATARS] Character ID ${characterId} not found, available: [${availableIds}], trying name fallback...`);
-            charIndex = characters.findIndex(c => c.name === name);
-            if (charIndex >= 0) {
-              log.info(`📍 [CLOTHING AVATARS] Found character "${name}" by name fallback at index ${charIndex} (ID mismatch: wanted ${characterId}, found ${characters[charIndex].id})`);
-            }
-          }
-
-          // Warn if character still not found
-          if (charIndex < 0) {
-            const availableChars = characters.map(c => `${c.name}(${c.id})`).join(', ');
-            log.warn(`⚠️ [CLOTHING AVATARS] CHARACTER NOT FOUND! Wanted ID: ${characterId}, name: "${name}". Available: [${availableChars}]. Avatars generated but NOT saved to DB!`);
-          }
-
-          if (charIndex >= 0) {
-            // Use ATOMIC updates to prevent race conditions with concurrent saves
-            // Instead of read-modify-write on entire document, use jsonb_set for each field
-
-            // URL-only writer (Phase 5). Inline base64 only persists when
-            // R2 upload returned no URL — readers expect URL field.
-            // onlyIfNoUrl / onlyMissingThumbs are hoisted to module scope.
-            const fbThumbs = onlyMissingThumbs(results.faceThumbnails, results.faceThumbnailsUrl);
-            const bbThumbs = onlyMissingThumbs(results.bodyThumbnails, results.bodyThumbnailsUrl);
-            alarmInlineAvatarFallback('avatar sync path', characterId, results);
-            const newAvatarData = {
-              status: 'complete',
-              generatedAt: new Date().toISOString(),
-              ...(fbThumbs && { faceThumbnails: fbThumbs }),
-              ...(bbThumbs && { bodyThumbnails: bbThumbs }),
-              ...(onlyIfNoUrl(results.standard, results.standardUrl) && { standard: results.standard }),
-              ...(onlyIfNoUrl(results.winter, results.winterUrl) && { winter: results.winter }),
-              ...(onlyIfNoUrl(results.summer, results.summerUrl) && { summer: results.summer }),
-              ...(results.standardUrl && { standardUrl: results.standardUrl }),
-              ...(results.winterUrl && { winterUrl: results.winterUrl }),
-              ...(results.summerUrl && { summerUrl: results.summerUrl }),
-              ...(results.faceThumbnailsUrl && { faceThumbnailsUrl: results.faceThumbnailsUrl }),
-              ...(results.bodyThumbnailsUrl && { bodyThumbnailsUrl: results.bodyThumbnailsUrl }),
-              ...(results.clothing && { clothing: results.clothing }),
-              // Dev-mode diagnostics persisted (mirrors async-path persistence).
-              ...(results.prompts && Object.keys(results.prompts).length > 0 && { prompts: results.prompts }),
-              ...(results.faceMatch && Object.keys(results.faceMatch).length > 0 && { faceMatch: results.faceMatch }),
-              ...(results.extractedTraits && { extractedTraits: results.extractedTraits }),
-              ...(results.structuredClothing && Object.keys(results.structuredClothing).length > 0 && { structuredClothing: results.structuredClothing }),
-            };
-
-            // Lightweight metadata: prefer URL standard slot, fall back to inline only when missing.
-            const stdFace = results.faceThumbnailsUrl?.standard || results.faceThumbnails?.standard;
-            const stdBody = results.bodyThumbnailsUrl?.standard || results.bodyThumbnails?.standard;
-            const lightAvatarData = {
-              status: 'complete',
-              generatedAt: newAvatarData.generatedAt,
-              hasFullAvatars: true,
-              faceThumbnails: stdFace ? { standard: stdFace } : undefined,
-              bodyThumbnails: stdBody ? { standard: stdBody } : undefined,
-              clothing: results.clothing,
-            };
-
-            // IRON RULE: no image bytes in JSONB. `onlyIfNoUrl` / `onlyMissingThumbs`
-            // deliberately keep the INLINE avatar or thumbnail whenever R2
-            // returned no URL, so the user's avatar is never lost — and those
-            // fallbacks are then written into characters.data AND .metadata by
-            // the jsonb_set chain below, which no offload covered.
-            // alarmInlineAvatarFallback only LOGS it. Sweep both payloads here:
-            // a second R2 attempt usually succeeds, and when it does not the
-            // bytes still persist and the daily sweep is the backstop.
-            await offloadCharacterImages(rowId, req.user.id, newAvatarData);
-            await offloadCharacterImages(rowId, req.user.id, lightAvatarData);
-
-            // Build atomic update SQL with all field updates
-            let dataUpdate = 'data';
-            let metaUpdate = 'metadata';
-            const params = [rowId]; // $1 = rowId
-            let paramIndex = 2;
-
-            // Avatar data - merge with existing at SQL level
-            if (results.standard || results.winter || results.summer) {
-              dataUpdate = `jsonb_set(${dataUpdate}, '{characters,${charIndex},avatars}', COALESCE(data->'characters'->${charIndex}->'avatars', '{}'::jsonb) || $${paramIndex}::jsonb, true)`;
-              metaUpdate = `jsonb_set(${metaUpdate}, '{characters,${charIndex},avatars}', $${paramIndex + 1}::jsonb, true)`;
-              params.push(JSON.stringify(newAvatarData), JSON.stringify(lightAvatarData));
-              paramIndex += 2;
-              log.debug(`💾 [CLOTHING AVATARS] Applied avatar data including faceThumbnails`);
-            }
-
-            // Extracted traits - write to canonical physical.* structure
-            // Respect user-edited fields — don't overwrite them with AI extraction
-            if (results.extractedTraits) {
-              const t = results.extractedTraits;
-              const existingChar = characters[charIndex] || {};
-              const existingSources = existingChar.physicalTraitsSource || {};
-
-              // Build physical object with only non-null values, skipping user-edited fields
-              const physical = {};
-              const traitSources = {};
-
-              const setTrait = (field, value) => {
-                if (value && existingSources[field] !== 'user') {
-                  physical[field] = value;
-                  traitSources[field] = 'extracted';
-                }
-              };
-
-              setTrait('apparentAge', t.apparentAge);
-              setTrait('build', t.build);
-              setTrait('eyeColor', t.eyeColor);
-              setTrait('hairColor', t.hairColor);
-              setTrait('skinTone', t.skinTone);
-              setTrait('skinToneHex', t.skinToneHex);
-              setTrait('facialHair', t.facialHair);
-              setTrait('face', t.face);
-              setTrait('other', t.other);
-              setTrait('glasses', t.glasses);
-              setTrait('eyeColorHex', t.eyeColorHex);
-              setTrait('hairColorHex', t.hairColorHex);
-              // Hair shape — extraction baseline gets refreshed; userHairOverride
-              // stays permanent across regenerations (see same-named comment
-              // in the parallel call site above).
-              if (t.detailedHairAnalysis && existingSources['hairType'] !== 'user') {
-                physical.detailedHairAnalysis = t.detailedHairAnalysis;
-              }
-
-              // Merge with existing physical object
-              dataUpdate = `jsonb_set(${dataUpdate}, '{characters,${charIndex},physical}', COALESCE(data->'characters'->${charIndex}->'physical', '{}'::jsonb) || $${paramIndex}::jsonb, true)`;
-              metaUpdate = `jsonb_set(${metaUpdate}, '{characters,${charIndex},physical}', COALESCE(metadata->'characters'->${charIndex}->'physical', '{}'::jsonb) || $${paramIndex}::jsonb, true)`;
-              params.push(JSON.stringify(physical));
-              paramIndex += 1;
-
-              // Persist trait sources (merge with existing, preserving 'user' entries)
-              if (Object.keys(traitSources).length > 0) {
-                dataUpdate = `jsonb_set(${dataUpdate}, '{characters,${charIndex},physicalTraitsSource}', COALESCE(data->'characters'->${charIndex}->'physicalTraitsSource', '{}'::jsonb) || $${paramIndex}::jsonb, true)`;
-                metaUpdate = `jsonb_set(${metaUpdate}, '{characters,${charIndex},physicalTraitsSource}', COALESCE(metadata->'characters'->${charIndex}->'physicalTraitsSource', '{}'::jsonb) || $${paramIndex}::jsonb, true)`;
-                params.push(JSON.stringify(traitSources));
-                paramIndex += 1;
-              }
-
-              log.debug(`💾 [CLOTHING AVATARS] Applied extracted traits to character.physical: apparentAge=${t.apparentAge}`);
-            }
-
-            // Structured clothing
-            if (results.structuredClothing?.standard) {
-              dataUpdate = `jsonb_set(${dataUpdate}, '{characters,${charIndex},structuredClothing}', $${paramIndex}::jsonb, true)`;
-              metaUpdate = `jsonb_set(${metaUpdate}, '{characters,${charIndex},structuredClothing}', $${paramIndex}::jsonb, true)`;
-              params.push(JSON.stringify(results.structuredClothing.standard));
-              paramIndex += 1;
-              log.debug(`💾 [CLOTHING AVATARS] Applied extracted clothing to character`);
-            }
-
-            // Token usage - merge with existing at SQL level
-            if (hasTokenUsage) {
-              const newUsage = { byModel: {}, lastUpdated: new Date().toISOString() };
-              for (const [modelId, usage] of Object.entries(results.tokenUsage.byModel)) {
-                newUsage.byModel[modelId] = {
-                  input_tokens: usage.input_tokens || 0,
-                  output_tokens: usage.output_tokens || 0,
-                  calls: usage.calls || 0
-                };
-              }
-              dataUpdate = `jsonb_set(${dataUpdate}, '{characters,${charIndex},avatarTokenUsage}', COALESCE(data->'characters'->${charIndex}->'avatarTokenUsage', '{}'::jsonb) || $${paramIndex}::jsonb, true)`;
-              params.push(JSON.stringify(newUsage));
-              paramIndex += 1;
-            }
-
-            // Execute atomic update
-            const updateQuery = `UPDATE characters SET data = ${dataUpdate}, metadata = ${metaUpdate} WHERE id = $1`;
-            await dbQuery(updateQuery, params);
-
-            // Log summary
-            if (hasTokenUsage) {
-              const totalCalls = Object.values(results.tokenUsage.byModel).reduce((sum, u) => sum + u.calls, 0);
-              const models = Object.keys(results.tokenUsage.byModel).join(', ');
-              log.debug(`📊 [AVATAR TOKENS] Stored usage for character ${characterId}: ${totalCalls} calls using ${models}`);
-            }
-            if (results.extractedTraits) {
-              log.debug(`📊 [AVATAR TRAITS] Saved to DB: apparentAge=${results.extractedTraits.apparentAge}, build=${results.extractedTraits.build}`);
-            }
-            results.dbSaveSuccessful = true;
-          }
-        }
-      } catch (dbErr) {
-        log.error(`❌ [CLOTHING AVATARS] Failed to save to database:`, dbErr.message);
-        results.dbSaveSuccessful = false;
-        throw new Error(`Database save failed: ${dbErr.message}`);
-      }
-    }
-
-    // Ensure dbSaveSuccessful is set (true if we got here without error)
-    if (results.dbSaveSuccessful === undefined) results.dbSaveSuccessful = true;
-
-    log.debug(`✅ [CLOTHING AVATARS] Generated standard avatar for ${name || 'unnamed'}`);
-    // Log extracted traits for debugging
-    if (results.extractedTraits) {
-      log.debug(`📋 [CLOTHING AVATARS] Response extractedTraits: ${JSON.stringify(results.extractedTraits).substring(0, 200)}...`);
-      log.debug(`💇 [CLOTHING AVATARS] Response detailedHairAnalysis: ${results.extractedTraits.detailedHairAnalysis ? JSON.stringify(results.extractedTraits.detailedHairAnalysis) : 'NOT PRESENT'}`);
-    } else {
-      log.warn(`⚠️ [CLOTHING AVATARS] No extractedTraits in response!`);
-    }
-    res.json({ success: true, clothingAvatars: results });
 
   } catch (err) {
     log.error('Error generating clothing avatars:', err);
@@ -3814,5 +2929,6 @@ module.exports.clearCostumedAvatarGenerationLog = clearCostumedAvatarGenerationL
 module.exports.evaluateAvatarFaceMatch = evaluateAvatarFaceMatch;
 module.exports.avatarJobs = avatarJobs; // Export for testing
 module.exports.processAvatarJobInBackground = processAvatarJobInBackground;
+module.exports.adoptRetryAvatar = adoptRetryAvatar;
 module.exports.getClothingStylePrompt = getClothingStylePrompt;
 module.exports.extractTraitsWithGemini = extractTraitsWithGemini;

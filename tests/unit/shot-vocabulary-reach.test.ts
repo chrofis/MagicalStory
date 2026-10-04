@@ -27,10 +27,12 @@ const require_ = createRequire(import.meta.url);
 const PB = require_('../../server/lib/promptBuilders');
 const { loadPromptTemplates } = require_('../../server/services/prompts');
 const images = require_('../../server/lib/images');
-const { IMAGE_MODELS, resolveGrokImageModel } = require_('../../server/config/models');
 const { SHOT_TYPES, SHOT_ENUM, SHOT_DEFINITIONS, SHOT_PATTERNS, SHOTS, buildShotDefinitions } = require_('../../server/lib/shotVocabulary');
 
-const CAP: number = IMAGE_MODELS[resolveGrokImageModel(null).key]?.maxPromptLength || 7900;
+// These tests exercise the cut MECHANISM on prompts sized for a 7,900 cap. The
+// real Grok cap was raised to 15,900 bytes on 2026-10-04 (decisions.md "Grok
+// prompt caps are 16,000 / 64,000 bytes"), so the cap is passed explicitly.
+const CAP = 7900;
 
 const CHARACTERS = [
   { id: 'c1', name: 'Mira', age: 8, gender: 'girl', personality: 'stubborn', hairColor: 'brown' },
@@ -95,7 +97,7 @@ describe('one shot vocabulary reaches every stage that uses the word', () => {
   });
 
   it('both Art Director prompts state the same enum, and it names every shot', () => {
-    const all = PB.buildSceneExpansionAllPrompt(inputData, BEATS, {});
+    const all = PB.buildSceneBriefsAllPrompt(inputData, BEATS, {});
     const one = PB.buildSceneExpansionPrompt(1, 'The lamp went out.', CHARACTERS, 'en', VISUAL_BIBLE, '', null, {});
     for (const [label, prompt] of [['all-pages', all], ['per-page', one]] as [string, string][]) {
       expect(prompt, `${label} Art Director lost the shot enum`).toContain(SHOT_ENUM);
@@ -142,7 +144,7 @@ describe('an over-cap prompt keeps the page facts and pays with generic guidance
     const tail = prompt.slice(tailStart);
     // Pad the SCENE PROSE — the part a real page grows — until the whole thing
     // is over the model's cap, as every page of that book was.
-    const filler = Array.from({ length: 26 },
+    const filler = Array.from({ length: 30 },
       (_, i) => `Figure ${i} stands near landmark ${i} wearing garment ${i} in colour ${i}.`).join(' ');
     return `${head}
 ${filler}

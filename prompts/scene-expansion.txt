@@ -18,11 +18,11 @@
 1b. **A setting carries its own detail.** When the hint's location is a fantastical or strongly-themed world (a magical realm, undersea, outer space, an enchanted forest, an ancient ruin, and the like), or a real place the story's premise has transformed into one, fill the SETTING with a lot of that world's characteristic environmental elements even when only the bare place is named. An everyday interior — a kitchen, a living room, a bedroom, a workshop, a classroom, a shop — does the same with its lived-in detail: worn surfaces, crockery and cookware, appliances and fittings, textiles, things standing on shelves and hanging on walls. An unfurnished box room is a fault. This describes the location, it is not added plot: keep it to the environment and background, never add characters and never change the hint's action. Such furnishing stays ambient — unnamed and uncounted, outside rule 12e, which governs the page's named plot-critical props.
 2. **Plain concrete words.** Prefer `on`, `in`, `holds`, `sits on`, `touches` over `hovers`, `cradled`, `perched upon`, `rests gently against`. Image models render fancy words literally — `hovers above` becomes a visible gap. Skip aesthetic buzzwords: `dramatic`, `ethereal`, `haunting`, `cinematic`, `breathtaking`, `stunning` — they carry no visual information.
 3. **Only characters from the hint.** The scene hint's `characters` array and `background` field define who is visible. Do not add characters from the story text that are not in the hint. {PLAN_LINE_CAST} If the hint's `background` field describes unnamed figures (soldiers, villagers, crowd), weave them into the prose with the same size impression, role and placement — they anchor the story moment and must appear. Never give such a group an exact number above three (see the Counting rule); a group that appears again on a later page keeps that same size impression, role and placement. Unnamed figures get an appearance of their own: varied hair colours and lengths, more than one garment shape, several garment colours, and a mix of heights and ages across the group. `anonymous`, `generic` and `unnamed` name a role, never a look — a group given no appearance is drawn as copies of the nearest described character. A group in matching uniform, kit or livery keeps the shared garments and varies hair, height and age instead.
-4. **Staging a group.** Preserve every character the hint lists — don't drop characters silently. When more than three share the frame, keep the group together at one depth in a wider shot, or show them from behind as they move away — never five detailed close foreground faces.
+4. **Staging a group.** Preserve every character the hint lists — don't drop characters silently. {GROUP_STAGING}
 5. **One moment, one focal point.** Stage the given instant as written, without hidden limbs. One main action draws the eye, drawn at its peak of motion — mid-leap, mid-swing, mid-throw — not the static pose that follows.
 5b. **One centre of action.** Never two vehicles or vessels in frame each with a crew doing its own thing — one carries the moment, and a second is distant, partly cut by the frame edge, or empty.
 5c. **One instant, no history.** {ONE_INSTANT}
-5d. **The hint's verb and shot are the default.** Follow the hint's action verb and shot size unless they cannot be staged. A hint naming an in-progress movement — wading, climbing, swimming toward something — is staged mid-effort in that element, never as the arrived or dry state (the no-partial-immersion rule restages the pose, not the moment). A close-up is not widened into an establishing shot without need.
+5d. **The hint's verb and shot are the default.** {PLAN_SHOT_DEFAULT} A hint naming an in-progress movement — wading, climbing, swimming toward something — is staged mid-effort in that element, never as the arrived or dry state (the no-partial-immersion rule restages the pose, not the moment). A close-up is not widened into an establishing shot without need.
 5e. **The hint's stakes set the faces and the effort.** A hint that carries threat, hurry or strain is drawn under it: every `expression` names the strain in brows, eyes and mouth, bodies brace, lean or hurry, and nothing in the frame rests. A calm hint is drawn calm. Mood is shown through faces, bodies, light and weather — never named.
 5f. **The page text is not a checklist.** {TEXT_NOT_A_CHECKLIST}
 5g. **Content, not rendering.** {NO_LENS}
@@ -48,9 +48,9 @@
 8f. **True relative size.** {TRUE_RELATIVE_SIZE}
 8g. **An everyday prop carries a size anchor.** A prop on the ground, at a character's feet, in hand or on a surface gets a familiar-size term whenever its size matters — "a fist-sized apple", "a forearm-length crossbow", "a palm-sized cup". Those terms are for props only: a garment is sized by where it falls on the body ("knee-length", "falls to mid-back"), never by a prop calibration term.
 8h. **One scale per page.** A page is at HUMAN scale, figures large enough to read an expression, or at OBJECT scale, a building, tower or vessel whole in frame — never both. A page that needs an expression shows the structure only in part.
-8l. **A creature in frame has a written face.** {CREATURE_FACE} Write it in the terms of the creature-tone block below.
+8l. **A creature in frame has a written face.** {CREATURE_FACE} Write it in the terms of the creature-tone block below. {CREATURE_FIELD}
 9. **No age collectives.** Never write "the children", "the kids", "the boys", "the girls". Use names or group size ("all three", "the group").
-10. **Prose construction.** Output one continuous paragraph followed by the metadata block — no headers, labels, bullet points, or section breaks. Open with the main subject and main action. Weave each character's physical description on first mention from CHARACTER DETAILS — age look, build, hair, eyes, distinctive features, clothing — as flowing language, not a labeled list. Clothing means the outfit itself; `standard`, `summer`, `winter` and `costumed` are metadata keys and never appear in prose. A character wears the outfit CHARACTER DETAILS gives them; never move a garment onto a character of the other sex, and never give a male character a garment made for girls or women, or the reverse. Name the TOP, the BOTTOM and the FOOTWEAR for every character on every page (a character whose outfit replaces the legs has no footwear — name the tail or fin instead, and never give them feet or shoes) — the image model draws only what the prose names, so a character given a hat and a shirt is drawn in a hat and a shirt and nothing else. Same for recurring Visual Bible elements: name them and interleave their identifying detail naturally.
+10. **Prose construction.** Output one continuous paragraph followed by the metadata block — no headers, labels, bullet points, or section breaks. Open with the main subject and main action. Weave each character's physical description on first mention from CHARACTER DETAILS — age look, build, hair, eyes, distinctive features, clothing — as flowing language, not a labeled list. Clothing means the outfit itself; `standard`, `summer`, `winter` and `costumed` are metadata keys and never appear in prose. A character wears the outfit CHARACTER DETAILS gives them; never move a garment onto a character of the other sex, and never give a male character a garment made for girls or women, or the reverse. Name the TOP, the BOTTOM and the FOOTWEAR for every character on every page by colour and garment noun only — never construction detail, materials or accessories (e.g., "blue coat, brown trousers, black shoes", not "blue quilted linen coat with horn buttons"). A character whose outfit replaces the legs has no footwear — name the tail or fin instead, and never give them feet or shoes. The image model draws only what the prose names, so a character given a hat and a shirt is drawn in a hat and a shirt and nothing else. Same for recurring Visual Bible elements: name them and interleave their identifying detail naturally.
 10b. **Subject page.** When a beat stages the subject alone — a creature, an artifact, a place — describe it at full physical detail and name its size against a familiar object, since no character is there to give scale. Leave `characters[]` empty and name no character in the prose.
 10c. **Traits are copied, not paraphrased.** Copy the `Hair:` value word for word — colour, type, length, styling, parting — and the `Looks:` bucket verbatim (rule 8d). A listed `Facial hair:` negation is part of the description: a clean-shaven character stays clean-shaven on every page, never stubbled, weathered or grizzled. Name `Glasses:` exactly as listed, untranslated, on every page; distinctive marks likewise. When the page's mood pulls toward grizzled, weathered or aged, suppress the pull — mood lives in the action, the light and the setting.
 10d. **A garment the page removes.** {GARMENT_REMOVED}
@@ -68,6 +68,8 @@
 
 12c. **No lettering on any surface.** No words, names or letters anywhere in the image; the only exception is text the Visual Bible explicitly specifies for an element, painted exactly as specified. Applies to `sceneIntent` and every metadata field, not only the prose.
 
+12l. **The mood is shown, not named.** {NO_HEADLINE_PHRASES}
+
 12g. **Build descriptions are visual, not nominal.** Describe an object by its shape and parts ("two-masted with square topsails"), never by a style name ("brigantine-style") — style words are lettering bait the sanitizer can't catch.
 
 12h. **An object out of sight.** {CONCEALED_OBJECT}
@@ -75,6 +77,7 @@
 12j. **A prop the page text puts against a character.** {STAGED_PROP}
 
 12k. **An object several characters touch.** {REACHABLE_CONTACT}
+12m. **A small prop rests against a figure.** {SMALL_PROP_CONTACT} {ELEMENT_SIZE_WORD}
 
 12d. **A held document is read, not displayed.** A map, letter, note or book in a character's hands stays angled toward the character reading it, its face foreshortened or turned away from the camera — the shot shows the characters reading, never the document presented flat to the viewer. This holds even when the page's beat is what the document says: stage the readers' reactions and pointing hands from the reader's side, and never make the document the frame-filling focal object.
  A prop being carried rather than read stays folded, rolled or pocketed.
@@ -146,7 +149,6 @@ Then a single-line JSON object:
   "shot": "medium",
   "population": "cast_only",
   "aboard": "VEH001",
-  "landmarkView": "exterior",
   "era": "present day",
   "timeOfDay": "midday",
   "weather": "none",
@@ -171,7 +173,7 @@ Then a single-line JSON object:
 
 **`sceneIntent`** (required): {SCENE_INTENT_FIELD}
 
-**`timeOfDay` / `weather`** (required): {SCENE_LIGHT_FIELD}
+**`timeOfDay` / `weather`** (required): {SCENE_LIGHT_FIELD} {JEV_FIXED_FIELDS}
 
 **`characters[]`**
 - One entry per main or primary character in the scene. Secondary characters never appear here — they have no avatar, so no clothing category can apply to them.
@@ -182,14 +184,13 @@ Then a single-line JSON object:
 - Only add `perspective` for back view, side profile, or the near figure of an `over-the-shoulder` page (`over-the-shoulder`).
 - `looksAt` on every foreground/midground character: another character's name, a Visual Bible id (`ART001`, `CHR001`), or `away`. Eyes only — see rule 8j. Never the object a character merely holds, and never the viewer — a book cover page excepted (rule 8j).
 - `era` is the story's time period in 2-4 words (medieval, 1920s, present day). It feeds the anachronism guard — omit only if the story has no defined era.
-- `shot` is the page's camera framing: {SHOT_ENUM}. Decide it once — the scene prose and the metadata use this same framing, and it is a framing the plate of the vantage this page cites can hold. Omitting it makes the plate default to a wide shot.
+- `shot` is the page's camera framing: {SHOT_ENUM}. {SHOT_FIELD} Omitting it makes the plate default to a wide shot.
 - `population` says how populated the page's setting is, in one of three values, and it is about the SETTING, not about who matters to the story.
   - `"crowd"` — the page is written around unnamed background people: a market, a busy street, a gathering, a body of troops.
   - `"ambient"` — a public place that simply has people in it: a city square, a park, a promenade, a quay, a playground, a station concourse, a shop. Distant passers-by, someone on a bench, a figure by a wall belong in the picture and are not cast.
   - `"cast_only"` — nobody but the listed figures: a private room, a garden, a forest clearing, an empty night street.
-  Omit it and the page is read as `"cast_only"`. Choose `"ambient"` over `"cast_only"` whenever the location is one the public can walk into; a square with nobody on it reads as abandoned. The prose then must NOT claim the place is empty — never write "no other people are present" about an `ambient` or `crowd` setting. Describe background people the way the setting holds them ("a few distant passers-by cross the far side of the square"), and keep them unnamed, distant and small. The rule runs both ways: prose that puts unnamed figures in the frame — people crossing the square, riders passing, adults at the tables, onlookers — is a setting with people in it, so `population` is `ambient` or `crowd` on that page, never `cast_only`.
-- `landmarkView` is required on every page citing a real landmark — how the page sees it: `exterior` (from outside), `distant` (skyline or backdrop), `close` (a detail of the structure), `interior` (inside it), `view-from` (looking out from it, structure not visible), or `underwater` / `none` when no photograph of the place could show this scene. It selects the reference photo; a view with no matching photo attaches none and your prose carries the place.
-- A `close-up` frame ends at the waist. A pose the frame simply crops — sitting, kneeling, crouching — is fine there: the legs fall below the bottom edge, which is what a close-up IS, and a crouch or a kneel brings the head DOWN to what it is looking at. What a close-up cannot show is an action whose subject lies below the frame line — no {CLOSEUP_BELOW_WAIST}, and nothing placed behind the character. The outfit list still names all garments including footwear. A beat whose point is below the waist is a `medium` shot, not a close-up.
+  Omit it and the page is read as `"cast_only"`. Choose `"ambient"` over `"cast_only"` whenever the location is one the public can walk into; a square with nobody on it reads as abandoned. The prose then must NOT claim the place is empty — never write "no other people are present" about an `ambient` or `crowd` setting. Describe background people the way the setting holds them, in this page's own prose ("a few distant passers-by cross the far side of the square") and never in a plate, which holds no people; keep them unnamed, distant and small. The page render draws them. The rule runs both ways: prose that puts unnamed figures in the frame — people crossing the square, riders passing, adults at the tables, onlookers — is a setting with people in it, so `population` is `ambient` or `crowd` on that page, never `cast_only`.
+- A `close-up` frame ends at the waist. A pose the frame simply crops — sitting, kneeling, crouching — is fine there: the legs fall below the bottom edge, which is what a close-up IS, and a crouch or a kneel brings the head DOWN to what it is looking at. What a close-up cannot show is an action whose subject lies below the frame line — no {CLOSEUP_BELOW_WAIST}, and nothing placed behind the character. The outfit list still names all garments including footwear. {CLOSEUP_WAIST_SHOT}
 
 **`objects[]`**
 - String array of Visual Bible IDs only (`LOC001`, `ART002.2`, `CHR001`).
@@ -198,7 +199,7 @@ Then a single-line JSON object:
 - A NAME IS NOT A PRESENCE. An element named only to say whose it is — a character's bag, a creature's egg — puts THAT element in the scene, not its owner. Cite the owner only on a page where the owner is in the picture. On the page an owner arrives, or a creature comes out of its egg, both are in the picture and both are cited.
 - At most {VB_ELEMENT_BUDGET} Visual Bible elements per page — secondary characters, animals, artifacts and vehicles count; a LOC does not, real or invented. Keep the ones the page is about and leave the rest out of `objects[]` and out of the prose.
 - An object listed with `States:` is cited with the dotted form `ART###.N` — the state whose `pages` include this page. An object with no states keeps the bare `ART###`. An object WITH states is always cited dotted, the pages before its first change included — those pages are its first state. Never two states of one object on one page.
-- Real-landmark LOCs are cited by their bare id (`LOC003`); the page's `landmarkView` decides which reference photo is attached.
+- Real-landmark LOCs are cited by their bare id (`LOC003`); the page's reference photo is the one its vantage cites in `landmarkPhoto`.
 - Invented LOCs (`isRealLandmark: false`) use the bare id `LOC001`, or the dotted form `LOC001.2` when the Visual Bible gives that location `vantages[]` — cite the vantage whose `pages` list contains this page.
 - {PLACE_INSIDE_OUTSIDE}
 
@@ -262,7 +263,7 @@ Distance rule: an action across a gap is framed by rule 11 and its `where` carri
 **Backdrop plate**
 - You do not write one. The page is drawn on the plate of the vantage its LOC cites, already in the Visual Bible. A page whose backdrop that vantage cannot hold cites a different vantage of the same location.
 
-**Landmark accuracy:** Read all photo variant descriptions before writing. Use the most common structural features across variants. If characters are inside an enclosed landmark, describe the scene from inside.
+**Landmark accuracy:** A real landmark's plate cites a photo in its Visual Bible entry (Plate photos). Draw the structures that photo shows the way it shows them; a plate citing none carries the place in words. If characters are inside an enclosed landmark, describe the scene from inside.
 
 **Prop placement vs landmark.** When a separate prop shares a depth band with the landmark, position the prop relative to the landmark (in front of, beside, between camera and landmark) — not by an unanchored frame slot.
 

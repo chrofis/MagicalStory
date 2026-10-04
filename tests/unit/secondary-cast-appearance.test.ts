@@ -1,4 +1,8 @@
 import { describe, it, expect } from 'vitest';
+import { beforeAll } from 'vitest';
+import { createRequire as createRequireForTemplates } from 'node:module';
+// buildImagePrompt has no hardcoded fallback (deleted 2026-10-04, review B4): load the real template.
+beforeAll(async () => { await createRequireForTemplates(import.meta.url)('../../server/services/prompts').loadPromptTemplates(); });
 
 // Prod job_1788698812047_q5b1vuds7 p2. Two defects in one page prompt:
 //

@@ -38,7 +38,7 @@ describe('the worn clause carries the bible description', () => {
     expect(off).toContain('stiff black visor');
     const [over] = worn.buildWornStateLines([{ ...base, owner: 'Sarah', wearer: 'Emma', handedOver: true, state: 'worn' }]);
     expect(over).toContain('stiff black visor');
-    expect(over).toContain('Draw it on Emma only');
+    expect(over).toContain('Emma IS wearing this on this page, and Sarah is NOT');
   });
 
   it('an entry with no description still produces the bare clause', () => {

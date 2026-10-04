@@ -103,6 +103,36 @@ function resolveReplayCentralFigure(storyData) {
 }
 
 /**
+ * The head count production hands the Art Director's decision step
+ * (runArtDirector `present`, 2026-09-28): the shipped division's plan-check
+ * roster, page → names. The canonical recheck when a re-plan shipped, else the
+ * first check — the same check `shippedCheck` is in the run. Read through
+ * beatsPipeline.presentOf's shape; null when the story stored no roster.
+ *
+ * @param {Object} storyData
+ * @returns {Map<number,string[]>|null}
+ */
+function resolveReplayPresent(storyData) {
+  const br = storyData?.beatsReviewReport || {};
+  const stats = (br.recheck && br.recheck.counterStats) || br.counterStats || null;
+  const perPage = stats && stats.castPerPage;
+  return Array.isArray(perPage) && perPage.length ? new Map(perPage.map(r => [Number(r.pageNumber), r.names || []])) : null;
+}
+
+/**
+ * The STORY LOGIC production passes to the planner and the plan check
+ * (`{ storyLogic }`, 2026-09-26): the final arc's logic block body, stored on
+ * arcReviewReport.logic. '' for a story written before the logic-first arc —
+ * production passed nothing then, so nothing is passed.
+ *
+ * @param {Object} storyData
+ * @returns {string}
+ */
+function resolveReplayStoryLogic(storyData) {
+  return String(storyData?.arcReviewReport?.logic || '').trim();
+}
+
+/**
  * The locked scene briefs production hands the text writer (`finalExpansions`).
  *
  * On a stored story the final, post-review brief for a page IS
@@ -146,6 +176,7 @@ function buildReplayTextArgs(storyData, beats, { parseBeats, overrides = {} } = 
     arc: resolveReplayArc(storyData, { parseBeats }),
     arcHints: resolveReplayArcHints(storyData),
     centralFigure: resolveReplayCentralFigure(storyData),
+    storyLogic: resolveReplayStoryLogic(storyData),
   };
   for (const key of Object.keys(overrides)) {
     if (overrides[key] !== undefined) resolved[key] = overrides[key];
@@ -178,10 +209,115 @@ function buildReplaySceneOptions(storyData, { availableAvatars = '', maxCharacte
   return resolved;
 }
 
+/**
+ * AN ARC FROM AN arc_effort EXPERIMENT, in place of the story's stored arc
+ * (2026-09-25). The question it answers: does the page plan still give every
+ * commissioned character its page when the arc was written by a different arc
+ * call (a new effort, a new prompt) than the one the story shipped with?
+ *
+ * Reads the experiment ROW (`{ stage, results }`), never the database, so it is
+ * testable offline. Throws on anything that would make the run measure a
+ * different story or a different arm than the one asked for:
+ *   - the row is not an arc_effort experiment;
+ *   - no result carries the target story (the experiment's storyId must equal
+ *     the target — an arc for another cast is not a replay);
+ *   - no OK arm of the phase (default: `retell` when the result has one, else
+ *     `create`), or several and no `arcEffort` to pick one;
+ *   - the arm stored no arc, or no STORY LOGIC block to read the central figure
+ *     from.
+ *
+ * `arcHints` is null by construction: arc_effort does not run the hints call,
+ * so the Lab arc carries none — the caller records that, it never borrows the
+ * story's own hints (they answer a different arc).
+ *
+ * @param {{stage: string, results: Array}} row
+ * @param {{ expId: number, storyId: string, arcPhase?: string, arcEffort?: string }} want
+ * @param {{ parseStoryLogic: Function }} helpers — promptBuilders.parseStoryLogic, injected
+ */
+function resolveArcFromExperiment(row, { expId, storyId, arcPhase, arcEffort } = {}, { parseStoryLogic } = {}) {
+  const tag = `arcFromExperiment ${expId}`;
+  if (!row) throw new Error(`${tag}: not found`);
+  if (row.stage !== 'arc_effort') throw new Error(`${tag}: stage is ${row.stage}, not arc_effort`);
+  const results = Array.isArray(row.results) ? row.results : [];
+  const out = results.find(r => r && r.storyId === storyId);
+  if (!out) {
+    const others = [...new Set(results.map(r => r && r.storyId).filter(Boolean))];
+    throw new Error(`${tag}: no result for story ${storyId} (the experiment ran on ${others.join(', ') || 'no story'})`);
+  }
+  const arms = (out.arms || []).filter(a => a && a.ok && (a.phase === 'create' || a.phase === 'retell'));
+  const phase = arcPhase || (arms.some(a => a.phase === 'retell') ? 'retell' : 'create');
+  if (phase !== 'create' && phase !== 'retell') throw new Error(`${tag}: arcPhase must be 'retell' or 'create', not "${phase}"`);
+  let pick = arms.filter(a => a.phase === phase);
+  if (arcEffort) pick = pick.filter(a => a.effort === arcEffort);
+  if (pick.length === 0) throw new Error(`${tag}: no successful ${phase} arm${arcEffort ? ` at effort ${arcEffort}` : ''}`);
+  if (pick.length > 1) throw new Error(`${tag}: ${pick.length} ${phase} arms (efforts ${pick.map(a => a.effort).join(', ')}) — pass arcEffort to pick one`);
+  const arm = pick[0];
+  if (arm.parseError) throw new Error(`${tag}: the ${phase} ${arm.effort} arm did not commit (${arm.parseError})`);
+  const arc = String(arm.arc || '').trim();
+  if (!arc) throw new Error(`${tag}: the ${phase} ${arm.effort} arm stored no arc`);
+  if (!String(arm.logic || '').trim()) throw new Error(`${tag}: the ${phase} ${arm.effort} arm stored no STORY LOGIC block`);
+  // `arm.logic` is the block body without its heading (parseStoryLogic().text).
+  const logic = parseStoryLogic(`STORY LOGIC:\n${arm.logic}`);
+  return {
+    arc,
+    arcHints: null,
+    logic,
+    centralFigure: logic.centralFigure,
+    pageCount: Number(out.pageCount) || null,
+    source: { experimentId: Number(expId), phase, effort: arm.effort, model: arm.model || null, arcHints: 'none — arc_effort runs no hints call' },
+  };
+}
+
+/**
+ * The landmark list a run's writer prompts were built with, as it is STORED
+ * for a replay: every text field kept, every image byte string dropped (the
+ * prompt sections read names, types, extracts and photo descriptions — never
+ * pixels; IRON RULE: no images in JSONB).
+ *
+ * @param {Array|undefined} landmarks - inputData.availableLandmarks
+ * @returns {Array|null}
+ */
+function landmarksForReplay(landmarks) {
+  if (!Array.isArray(landmarks) || landmarks.length === 0) return null;
+  const isBytes = (v) => typeof v === 'string'
+    && (v.startsWith('data:') || (v.length > 2000 && /^[A-Za-z0-9+/=\s]+$/.test(v.slice(0, 2000))));
+  return JSON.parse(JSON.stringify(landmarks, (key, value) => (isBytes(value) ? undefined : value)));
+}
+
+/**
+ * THE INPUTS A REPLAY NEEDS THAT THE RUN HELD ONLY IN MEMORY (2026-09-27, Test
+ * Lab parity): the resolved, shuffled landmark list every writer prompt read
+ * (arc create / panel / re-tell, planner, plan check, Art Director) and the
+ * run's model overrides. storyJobPipeline stores them as `replayInputs`; this
+ * returns the story as the run's `inputData` for a replayed prompt. Under its
+ * own key on purpose: post-generation paths hand `stories.data` to the same
+ * prompt builders, and a top-level `availableLandmarks` would change them.
+ *
+ * A story stored before 2026-09-27 has none: the replay runs with no landmark
+ * section and the default models, and `replayInputsStored` says so.
+ *
+ * @param {Object} storyData - stories.data
+ * @returns {Object} storyData with `availableLandmarks` / `modelOverrides` restored
+ */
+function resolveReplayInputData(storyData) {
+  const stored = storyData?.replayInputs || null;
+  return {
+    ...(storyData || {}),
+    availableLandmarks: stored?.availableLandmarks || undefined,
+    modelOverrides: stored?.modelOverrides || {},
+    replayInputsStored: !!stored,
+  };
+}
+
 module.exports = {
+  landmarksForReplay,
+  resolveReplayInputData,
+  resolveArcFromExperiment,
   resolveReplayArc,
   resolveReplayArcHints,
   resolveReplayCentralFigure,
+  resolveReplayPresent,
+  resolveReplayStoryLogic,
   resolveReplayExpansions,
   buildReplayTextArgs,
   buildReplaySceneOptions,

@@ -6,12 +6,13 @@
 
 const express = require('express');
 const router = express.Router();
-const { authenticateToken } = require('../middleware/auth');
+const { authenticateToken, requireAdmin } = require('../middleware/auth');
 const { log } = require('../utils/logger');
 
 // Photo Analyzer Health Check
 // GET /api/photos/status
-router.get('/status', async (req, res) => {
+// Admin only: the response names the internal analyzer URL and raw fetch errors (review S6).
+router.get('/status', authenticateToken, requireAdmin, async (req, res) => {
   const photoAnalyzerUrl = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
 
   try {

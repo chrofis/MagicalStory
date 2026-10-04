@@ -22,7 +22,7 @@ For EACH human figure:
 
 `interactions`: one entry per engaged pair, both referred to by label — who faces, looks at, reaches toward, holds or touches whom, and where the contact is. Facing, gaze, reach and contact only. Empty when no two figures are engaged.
 
-`objects`: each notable object, animal or vehicle — what it is, dominant and secondary colour, what it looks made of, position in frame, whether it is grounded or floating, and its size relative to the figures. For an animal or creature add `complete`: true when it reads as one whole body; false when its head or body is missing where it should be visible. Frame crop or occlusion by scenery is not incomplete.
+`objects`: each notable object, animal or vehicle — what it is, dominant and secondary colour, what it looks made of, position in frame, whether it is grounded or floating, and its size relative to the figures. For an animal or creature add `complete`: true when it reads as one whole body; false when its head or body is missing where it should be visible. Frame crop or occlusion by scenery is not incomplete. Also add its `emotion` by the same rule and list as a figure's, and its `body_bbox` in the same shape.
 
 `setting`: indoor or outdoor, key visual elements, lighting direction and quality, camera angle.
 

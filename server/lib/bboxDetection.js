@@ -37,6 +37,7 @@ const path = require('path');
 const crypto = require('crypto');
 const sharp = require('sharp');
 const { log } = require('../utils/logger');
+const { geminiUsage, sumUsage } = require('./providerUsage');
 const { PROMPT_TEMPLATES, fillTemplate, applyRepairStyleGuard } = require('../services/prompts');
 const { assertPromptFilled, guardPromptString } = require('../services/prompts');
 const { MODEL_DEFAULTS, withRetry } = require('./textModels');
@@ -44,7 +45,7 @@ const { canonicalName } = require('./castResolver');
 const { MODEL_DEFAULTS: CONFIG_DEFAULTS, TEXT_MODELS, GROK_VISION_FALLBACK } = require('../config/models');
 const { getCurrentLogger } = require('./generationLogger');
 const r2Lib = require('./r2');
-const { detectFiguresWithGroundingDino, attachSamMasksToFigures, _shortGarmentPhrase, _gdinoDetect, _collectNmsBoxes, GDINO_PERSON_NMS_IOU } = require('./figureDetection');
+const { detectFiguresWithGroundingDino, attachSamMasksToFigures, _shortGarmentPhrase } = require('./figureDetection');
 
 // bbox-refine-overlay.txt loaded exactly as images.js's LOCAL_PROMPTS did
 // (STR-6 mechanism) — moved here with its only consumer, the 2-pass refine.
@@ -574,8 +575,9 @@ async function _detectAllBoundingBoxesImpl(imageData, options = {}) {
 
     // Route based on provider
     let data;
-    let inputTokens = 0;
-    let outputTokens = 0;
+    // Every provider's reply is Gemini-shaped by the time it lands in `data`
+    // (callGrokVisionAPI and the Claude wrapper below), so one reader serves all.
+    let usage = geminiUsage(null);
     if (modelConfig?.provider === 'anthropic') {
       // Claude vision path — uses callTextModel with images option
       log.info(`🔲 [BBOX-DETECT] ${pageLabel}Using Claude vision: ${modelId}`);
@@ -591,8 +593,7 @@ async function _detectAllBoundingBoxesImpl(imageData, options = {}) {
         candidates: [{ content: { parts: [{ text: claudeResult.text }] } }],
         usageMetadata: { promptTokenCount: claudeResult.usage?.input_tokens || 0, candidatesTokenCount: claudeResult.usage?.output_tokens || 0 }
       };
-      inputTokens = claudeResult.usage?.input_tokens || 0;
-      outputTokens = claudeResult.usage?.output_tokens || 0;
+      usage = geminiUsage(data.usageMetadata);
     } else if (modelConfig?.provider === 'xai') {
       log.info(`🔲 [BBOX-DETECT] ${pageLabel}Using Grok vision: ${modelId}`);
       const { callGrokVisionAPI } = require('./images'); // lazy back-edge into images.js (see module header)
@@ -602,8 +603,7 @@ async function _detectAllBoundingBoxesImpl(imageData, options = {}) {
         log.warn('⚠️  [BBOX-DETECT] Grok returned no text response');
         return dinoUndercountResult || null;
       }
-      inputTokens = data.usageMetadata?.promptTokenCount || data.usage?.prompt_tokens || 0;
-      outputTokens = data.usageMetadata?.candidatesTokenCount || data.usage?.completion_tokens || 0;
+      usage = geminiUsage(data.usageMetadata);
     } else {
       // Gemini path — retry once on empty response (0 output tokens)
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
@@ -654,8 +654,7 @@ async function _detectAllBoundingBoxesImpl(imageData, options = {}) {
               const grokResp = await callGrokVisionAPI(grokFallbackId, grokModel.modelId || grokFallbackId, parts, prompt);
               data = await grokResp.json();
               if (data?.candidates?.[0]?.content?.parts?.[0]?.text) {
-                inputTokens = data.usage?.prompt_tokens || 0;
-                outputTokens = data.usage?.completion_tokens || 0;
+                usage = geminiUsage(data.usageMetadata);
                 log.info(`✅ [BBOX-DETECT] Grok fallback succeeded after API error`);
                 break;
               }
@@ -668,9 +667,8 @@ async function _detectAllBoundingBoxesImpl(imageData, options = {}) {
 
         data = await response.json();
 
-        inputTokens = data.usageMetadata?.promptTokenCount || 0;
-        outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
-        log.debug(`📊 [BBOX-DETECT] Token usage - input: ${inputTokens}, output: ${outputTokens}${bboxAttempt > 1 ? ` (retry ${bboxAttempt})` : ''}`);
+        usage = geminiUsage(data.usageMetadata);
+        log.debug(`📊 [BBOX-DETECT] Token usage - input: ${usage.input_tokens}, output: ${usage.output_tokens}, thinking: ${usage.thinking_tokens}${bboxAttempt > 1 ? ` (retry ${bboxAttempt})` : ''}`);
 
         const finishReason = data.candidates?.[0]?.finishReason;
         if (finishReason && finishReason !== 'STOP') {
@@ -723,9 +721,8 @@ async function _detectAllBoundingBoxesImpl(imageData, options = {}) {
               const grokResponse = await callGrokVisionAPI(grokFallbackId2, grokFallbackModel.modelId || grokFallbackId2, parts, prompt);
               data = await grokResponse.json();
               if (data?.candidates?.[0]?.content?.parts?.[0]?.text) {
-                inputTokens = data.usageMetadata?.promptTokenCount || data.usage?.prompt_tokens || 0;
-                outputTokens = data.usageMetadata?.candidatesTokenCount || data.usage?.completion_tokens || 0;
-                log.info(`✅ [BBOX-DETECT] Grok fallback succeeded (${outputTokens} output tokens)`);
+                usage = geminiUsage(data.usageMetadata);
+                log.info(`✅ [BBOX-DETECT] Grok fallback succeeded (${usage.output_tokens} output tokens)`);
                 break; // Got content from Grok
               }
               log.warn('⚠️  [BBOX-DETECT] Grok fallback also returned no text');
@@ -886,8 +883,7 @@ async function _detectAllBoundingBoxesImpl(imageData, options = {}) {
     let finalFigures = figures;
     let finalObjects = objects;
     let refinementResponse = null;
-    let totalInputTokens = inputTokens;
-    let totalOutputTokens = outputTokens;
+    let totalUsage = usage;
 
     // Only refine if we have identified main characters (skip UNKNOWN-only results)
     const mainCharacters = figures.filter(f => f.name && f.name !== 'UNKNOWN');
@@ -952,8 +948,7 @@ async function _detectAllBoundingBoxesImpl(imageData, options = {}) {
             refineData = await refineResp.json();
           }
 
-          totalInputTokens += refineData?.usageMetadata?.promptTokenCount || 0;
-          totalOutputTokens += refineData?.usageMetadata?.candidatesTokenCount || 0;
+          totalUsage = sumUsage([totalUsage, geminiUsage(refineData?.usageMetadata)]);
 
           const refineText = refineData?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
           if (refineText) {
@@ -1026,7 +1021,7 @@ async function _detectAllBoundingBoxesImpl(imageData, options = {}) {
       foundObjects,
       missingObjects,
       unknownFigures: finalFigures.filter(f => f.name === 'UNKNOWN').length,
-      usage: { input_tokens: totalInputTokens, output_tokens: totalOutputTokens },
+      usage: totalUsage,
       // Include raw prompt and response for dev mode debugging
       rawPrompt: prompt,
       rawResponse: responseText,
@@ -1209,9 +1204,8 @@ async function detectSubRegion(characterCrop, targetElement) {
     const data = await response.json();
 
     // Log token usage
-    const inputTokens = data.usageMetadata?.promptTokenCount || 0;
-    const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
-    log.debug(`📊 [SUB-REGION] Token usage - input: ${inputTokens}, output: ${outputTokens}`);
+    const usage = geminiUsage(data.usageMetadata);
+    log.debug(`📊 [SUB-REGION] Token usage - input: ${usage.input_tokens}, output: ${usage.output_tokens}, thinking: ${usage.thinking_tokens}`);
 
     if (!data.candidates || !data.candidates[0]?.content?.parts?.[0]?.text) {
       log.warn('⚠️  [SUB-REGION] No response from Gemini');
@@ -1254,7 +1248,7 @@ async function detectSubRegion(characterCrop, targetElement) {
       box: normalizedBox,
       confidence: parsedResult.confidence || 'low',
       description: parsedResult.description || '',
-      usage: { input_tokens: inputTokens, output_tokens: outputTokens }
+      usage
     };
 
     if (result.found) {
@@ -2359,104 +2353,6 @@ function countAmbientFigures(figures) {
   return figures.filter(f => !isMicroFigure(f) && isAmbientFigure(f, ceiling)).length;
 }
 
-/**
- * THE PLATE IS EVIDENCE; THE ART DIRECTOR'S DECLARATION IS AN OPINION
- * (owner, 2026-09-19).
- *
- * `population` is currently whatever the Art Director SAYS the setting holds,
- * and that is precisely the input that got it wrong: the brief asserted "No
- * other people or animals are present" about the Lindenhof — a public plaza —
- * and the presence arithmetic held the picture to it.
- *
- * The empty-scene PLATE answers the same question with a picture. It is
- * rendered before any cast is composited, so every person in it belongs to the
- * SETTING by construction. Measured over the stored plates of the three
- * stories the ambient rule was built on:
- *   job_1789759147125_p08djwhbl — one vantage canvas serves p1-p6 and holds
- *       ~8 people (chess players, figures on benches, someone walking); the
- *       brief declared none. The p7 and p8 plates hold none and agree.
- *   job_1789506283204_3kxqshifx — one canvas serves p1/p2/p3/p8/p11/p13 and
- *       holds ~8 people; the brief's own setting prose says "no people".
- *   job_1789420511893_zly5rcdej — the p3/p4 quay plate holds only sub-1%
- *       specks and agrees; p16, the genuine uncommissioned-child page, has NO
- *       stored plate at all, so the plate says nothing and the declaration
- *       stands. That is what keeps the real defect firing.
- *
- * TWO DIRECTIONS, ONE OBSERVED. Every disagreement measured runs the same way:
- * the Art Director UNDER-declares a populated place. So the plate may only
- * RAISE the population, never lower it — an Art Director that wrote `crowd`
- * keeps `crowd` even over an empty-looking plate, and a plate that shows
- * nobody is silence, not a claim of emptiness (a plate can fail to render the
- * passers-by the page is about).
- *
- * GEOMETRY ONLY, like every other rule in this file: this counts boxes and
- * measures their area. It never reads a label, a description or a finding's
- * prose.
- */
-
-/**
- * A plate needs this many real figures before it is read as a CROWD rather
- * than as a populated setting. Deliberately high: a plaza with eight
- * park-goers is ambient, not a crowd, and `crowd` is the state that switches
- * the surplus check OFF entirely. A page genuinely written around a crowd is
- * declared `crowd` by the Art Director and the merge below keeps it.
- */
-const PLATE_CROWD_MIN = 12;
-
-/**
- * What a plate's own person boxes say the setting holds.
- *
- * @param {Array|null} figures normalised-box figures from `detectPlatePopulation`
- * @returns {'ambient'|'crowd'|null} null = the plate makes no claim (no
- *          detection, or nobody in it)
- */
-function platePopulationFromFigures(figures) {
-  if (!Array.isArray(figures)) return null;
-  const real = figures.filter(f => {
-    const area = figureFrameArea(f);
-    return area !== null && area >= MICRO_AREA_FLOOR;
-  }).length;
-  if (real === 0) return null;
-  return real >= PLATE_CROWD_MIN ? 'crowd' : 'ambient';
-}
-
-/**
- * Run the EXISTING GroundingDINO person pass over one empty-scene plate.
- *
- * Reuse, not a new pass: `_gdinoDetect` is the same analyzer endpoint every
- * page render already calls, it costs no vendor money (the Python analyzer is
- * our own service), and one call serves every page sharing that vantage
- * canvas. Failure is silence — a null answer leaves the Art Director's
- * declaration exactly as it was.
- *
- * @returns {Promise<{population: 'ambient'|'crowd'|null, figureCount: number}|null>}
- */
-async function detectPlatePopulation(plateImageData, pageLabel = '') {
-  try {
-    if (!plateImageData || typeof plateImageData !== 'string') return null;
-    const uri = plateImageData.startsWith('data:')
-      ? plateImageData
-      : `data:image/jpeg;base64,${r2Lib.stripDataUriPrefix(plateImageData)}`;
-    const det = await _gdinoDetect(uri, [{ name: 'person', text: 'person' }]);
-    if (!det || !Array.isArray(det.figures)) return null;
-    const W = Number(det.width), H = Number(det.height);
-    if (!Number.isFinite(W) || !Number.isFinite(H) || W <= 0 || H <= 0) return null;
-    // DINO answers in PIXELS; every area rule in this file is normalised.
-    const figures = _collectNmsBoxes(det.figures[0], GDINO_PERSON_NMS_IOU)
-      .map(p => ({ box: [p.box[0] / W, p.box[1] / H, p.box[2] / W, p.box[3] / H] }));
-    const population = platePopulationFromFigures(figures);
-    const figureCount = figures.filter(f => {
-      const a = figureFrameArea(f);
-      return a !== null && a >= MICRO_AREA_FLOOR;
-    }).length;
-    log.info(`👥 [PLATE-POP] ${pageLabel}plate holds ${figureCount} figure(s) → ${population || 'no claim'}`);
-    return { population, figureCount };
-  } catch (e) {
-    log.warn(`⚠️ [PLATE-POP] ${pageLabel}plate population failed: ${e.message}`);
-    return null;
-  }
-}
-
 module.exports = {
   parseVisualBibleObjects,
   resolveExpectedObjectLabels,
@@ -2478,9 +2374,6 @@ module.exports = {
   hasAmbientGeometry,
   countAmbientFigures,
   MICRO_AREA_FLOOR,
-  PLATE_CROWD_MIN,
-  platePopulationFromFigures,
-  detectPlatePopulation,
   vbNonHumanNames,
   // _detectAllBoundingBoxesImpl deliberately NOT exported — the stamping
   // wrapper above is the only entry (sourceImageFp invariant, 2026-07-19).

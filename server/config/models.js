@@ -63,6 +63,17 @@ const TEXT_MODELS = {
     taskBudgetAtEffort: { max: 96000 },
     description: 'Claude Opus 5.5 - ($4/$20 per 1M). Default effort medium. Routed: arc_create at xhigh.'
   },
+  // Claude Sonnet 5.5. Ceiling and effort levels from GET
+  // /v1/models/claude-sonnet-5-5 (read 2026-10-04): max_tokens 128000, effort
+  // low..max all supported (xhigh answered a live call). Default effort is
+  // `high`. Registered for the 2026-10-04 Lab A/B against the Opus arc create /
+  // re-tell and text_refine; no production stage routes here yet.
+  'claude-sonnet-5-5': {
+    provider: 'anthropic',
+    modelId: 'claude-sonnet-5-5',
+    maxOutputTokens: 128000,
+    description: 'Claude Sonnet 5.5 - ($2/$10 per 1M). Default effort high. Lab A/B vs Opus on arc + text_refine.'
+  },
   'claude-haiku': {
     provider: 'anthropic',
     modelId: 'claude-haiku-4-5-20251001',
@@ -416,8 +427,14 @@ const MODEL_DEFAULTS = {
   // was measured on 5.5 as the owner's pick. Was ONE key, arcCreatorModel,
   // read by both calls (and by the ARC_CREATOR_MODEL env var, gone: behaviour
   // is code).
-  arcCreateModel: 'claude-opus-5-5',
-  arcRetellModel: 'claude-opus',
+  //
+  // SONNET 5.5 FOR BOTH (owner, 2026-10-04): same stored prompts, model the
+  // only variable. Create at xhigh: judges 6.53 vs Opus 5.5 6.46 on 5 stories
+  // (Lab #1591), $0.56 vs $0.70. Re-tell at high: 6.61 vs Opus 5 6.62 on 3
+  // stories (Lab #1595), $0.10 vs $0.23; xhigh 6.60 at $0.24, medium 6.50.
+  // docs/decisions.md 2026-10-04 "Sonnet 5.5 writes the arc and repairs the text".
+  arcCreateModel: 'claude-sonnet-5-5',
+  arcRetellModel: 'claude-sonnet-5-5',
   arcPanelModels: (process.env.ARC_PANEL_MODELS || 'grok-4.6,deepseek-v4-pro,gpt-5.6-luna-pro')
     .split(',').map(s => s.trim()).filter(Boolean),
   // Rounds of panel + re-tell. Round k>1 feeds the previous FINAL ARC + its
@@ -473,15 +490,12 @@ const MODEL_DEFAULTS = {
   // (TEXT_MODELS['claude-opus-5-5'].taskBudgetAtEffort). Cost: $0.88 per
   // create vs $0.42-0.75 for Opus 5 at high.
   arcCreateEffort: 'xhigh',
-  arcRetellEffort: 'medium',
-  // The three reviews used to share outlineReviewModel, so switching the BEATS
-  // reviewer silently moved the scene and wardrobe reviews too. They are
-  // separate decisions with separate evidence and now separate keys.
-  // Scene: measured on a stored story (Lab 677/680/681/682, three judges) —
-  // reviewers cannot beat leaving good briefs alone (baseline 8.6/7.8/9.2), and
-  // grok was the WORST arm (8.6 neutral) because it rewrites most. deepseek is
-  // best-or-tied under two judges, and is what produced these briefs.
-  sceneReviewModel: process.env.SCENE_REVIEW_MODEL || 'deepseek-v4-pro',
+  // high on Sonnet 5.5 (2026-10-04, Lab #1595, see arcCreateModel).
+  arcRetellEffort: 'high',
+  // The reviews used to share outlineReviewModel, so switching the BEATS
+  // reviewer silently moved the wardrobe review too; separate keys since.
+  // (sceneReviewModel went with the scene review, 2026-09-28 — docs/decisions.md
+  // "The scene review is deleted".)
   // Wardrobe review: never measured. Pinned to the pre-2026-08-15 model so it
   // does not inherit a reviewer chosen on beats evidence.
   clothingReviewModel: process.env.CLOTHING_REVIEW_MODEL || 'deepseek-v4-pro',
@@ -511,7 +525,15 @@ const MODEL_DEFAULTS = {
   // completed step is published as it finishes, so a deadline can only ever
   // cost the step still running. The old "90s cap" note here described a
   // budget that no longer exists.
-  textRefineModel: process.env.TEXT_REFINE_MODEL || 'claude-opus',
+  //
+  // claude-sonnet-5-5 since 2026-10-04 (owner): both repaired the SAME stored
+  // audit findings (Lab #1592 Sonnet / #1593 Opus 5). Blind per-page ranking
+  // by gpt-5.6-sol over 3 stories, 38 pages (evals/runs/2026-10-04_refine-model-ab):
+  // Opus 1.13 vs Sonnet 1.05 rank points, head to head 21-17 — inside the
+  // 22-16 split between two Opus runs of the same pages — and Sonnet added
+  // fewer new problems per page (1.40 vs 1.74). Repair step $0.25 vs $0.86
+  // per story (8 stories).
+  textRefineModel: process.env.TEXT_REFINE_MODEL || 'claude-sonnet-5-5',
   // Cross-page REPETITION gate after the repair pass (2026-09-10): two pages
   // trip when they share at least this many identical 5-word shingles
   // (lowercased, punctuation stripped). Why 4: a recurring proper noun or a
@@ -566,15 +588,15 @@ const MODEL_DEFAULTS = {
   sceneIteration: process.env.SCENE_ITERATE_MODEL || 'qwen-plus',
   // THE BRIEF CORRECTOR — the one call that answers a brief's mechanical
   // findings, on BOTH paths (owner, 2026-09-17: "All 3 same as pipeline").
-  // The authored path has always answered them with sceneReviewModel and it
-  // works (15 pages changed, 5 unfixed, 3 introduced on the reference story);
+  // The authored path answered them with the scene reviewer's model and it
+  // worked (15 pages changed, 5 unfixed, 3 introduced on the reference story);
   // the rewrite path answered them with `sceneIteration` — the same model that
   // had just failed the contract — and resolved nothing on 11 of 11 stored
-  // rounds. Correcting a brief against a fault list is the scene review's job,
-  // so it is the scene reviewer's model, not the rewriter's. The REWRITE itself
-  // stays on sceneIteration: that is a separate decision with its own evidence
-  // (the 2026-07-12 cost A/B).
-  briefCorrectionModel: process.env.BRIEF_CORRECTION_MODEL || process.env.SCENE_REVIEW_MODEL || 'deepseek-v4-pro',
+  // rounds. So the corrector is that reviewer model, not the rewriter's. The
+  // REWRITE itself stays on sceneIteration: that is a separate decision with
+  // its own evidence (the 2026-07-12 cost A/B). The authored path's brief
+  // re-ask runs on the Art Director's model since 2026-09-28 (owner, Q2).
+  briefCorrectionModel: process.env.BRIEF_CORRECTION_MODEL || 'deepseek-v4-pro',
 
   // Eval/consolidation model — the swappable, cost-sensitive stage (NOT story
   // prose). Changed to Qwen for the cost A/B (2026-07-12). resolveEvalModel()
@@ -685,6 +707,14 @@ const MODEL_DEFAULTS = {
   // one ("reasoning is mandatory", evalPipeline.js:255) and the gate then failed
   // open on every single call.
   repairFaceCheck: 'gemini-2.5-flash',
+  // The Visual Bible STATE-consistency gate (referenceSheets.checkStateCellsConsistency):
+  // one entry's state cells side by side, each state's change named. Moved off
+  // gemini-2.5-flash-lite (owner, 2026-09-28): on staging job_1790539784661_6mjcny1c7's
+  // stored cells lite failed a correct three-state set 6 of 6 times, with the old
+  // prompt and with "each listed change is intended", reading the named colour
+  // change as a fault; gemini-2.5-flash with the same new prompt passed it 3 of 3
+  // and still failed both mismatch controls 6 of 6. The other cell gates stay on lite.
+  vbStateCellGate: 'gemini-2.5-flash',
 
   // IDENTITY ARBITER — the only witness allowed to overrule the figure detector
   // on who-is-who (identityAgreement.arbitrateVeto, 2026-09-21).
@@ -707,6 +737,22 @@ const MODEL_DEFAULTS = {
   // qwen3-vl-32b): the trigger is too rare to have produced a corpus to test
   // on. Env: IDENTITY_ARBITER_MODEL.
   identityArbiter: process.env.IDENTITY_ARBITER_MODEL || 'gpt-5.6-sol',
+
+  // SCENE SHORTENER — the one LLM try inside the image-prompt fit
+  // (sceneShorten.js, called by images.js shrinkPromptForModel). Restored
+  // 2026-09-30 (owner: "They must be shortened. One try. If not cut enough
+  // mechanically cut things till it fits"); retired 2026-09-21 as
+  // `promptCompress`. DeepSeek V4 Pro was the owner's pick on 2026-08-12 after
+  // flash deleted four characters' hats; reasoning must stay OFF (with it on it
+  // spent its whole output budget thinking and returned nothing).
+  promptCompress: process.env.PROMPT_COMPRESS_MODEL || 'deepseek-v4-pro',
+
+  // JEV — the decision model behind every Jev call (jevAudit.callJev): the
+  // decision layer, the challenge / landmark selection, the arc cast check and
+  // the text audit. Not a TEXT_MODELS entry: it is called on OpenRouter's
+  // decisions endpoint (answers noul / choice questions, writes no text).
+  // Lived as a constant in jevAudit.js until 2026-09-30.
+  jevModel: process.env.JEV_MODEL || 'typesafe/jev-1.13',
 
   // Utility models (inspection, visual bible, etc.)
   utility: 'gemini-2.5-flash',         // Fast utility tasks. 2.0-flash RETIRED by Google
@@ -1078,7 +1124,7 @@ const IMAGE_BACKENDS = {
 };
 
 // Image model configurations
-// maxPromptLength: Maximum characters for the prompt (API limit)
+// maxPromptLength: maximum prompt size in UTF-8 BYTES (promptFitError.promptBytes) — xAI counts bytes
 // maxCharactersPerScene: Max characters in scene hints (Grok handles more faces via ref images)
 const IMAGE_MODELS = {
   'gemini-2.5-flash-image': {
@@ -1129,12 +1175,11 @@ const IMAGE_MODELS = {
     modelId: 'grok-imagine-image',
     description: 'Grok Imagine Standard - Good quality ($0.02/image), ref image support',
     backend: 'grok',
-    // Grok's API limit is 8000 chars. The 500-char margin was costing more than
-    // it protected: page 9 of job_1786484554633 built to 7534 — 34 over this
-    // budget, 466 UNDER what Grok accepts — and that 34 triggered an LLM
-    // compression pass that deleted four characters' hats. 100 chars of margin
-    // is enough for the assembly slack; the compressor is the expensive guard.
-    maxPromptLength: 7900,
+    // xAI's cap is 16,000 UTF-8 BYTES (GET /v1/image-generation-models
+    // max_prompt_length, and a 16,001-byte prompt is refused, 2026-10-04 — it
+    // was 8,000 until mid-2026). 100 bytes of margin for assembly slack, as
+    // before. decisions.md 2026-10-04 "Grok prompt caps are 16,000 / 64,000 bytes".
+    maxPromptLength: 15900,
     maxCharactersPerScene: 6
   },
   // Imagine Image 2.0 — xAI's current recommended image model, shipped to the
@@ -1149,19 +1194,19 @@ const IMAGE_MODELS = {
     modelId: 'grok-imagine-image-2.0',
     description: 'Grok Imagine Image 2.0 - typography-aware ($0.04/image), ref image support',
     backend: 'grok',
-    maxPromptLength: 7900,
+    // 64,000 UTF-8 bytes per xAI (same source and date as above).
+    maxPromptLength: 63900,
     maxCharactersPerScene: 6
   },
   'grok-imagine-pro': {
     modelId: 'grok-imagine-image-pro',
     description: 'Grok Imagine Pro - Higher quality ($0.05/image at 1K, $0.07 at 2K), ref image support',
     backend: 'grok',
-    // Grok's API limit is 8000 chars. The 500-char margin was costing more than
-    // it protected: page 9 of job_1786484554633 built to 7534 — 34 over this
-    // budget, 466 UNDER what Grok accepts — and that 34 triggered an LLM
-    // compression pass that deleted four characters' hats. 100 chars of margin
-    // is enough for the assembly slack; the compressor is the expensive guard.
-    maxPromptLength: 7900,
+    // xAI's cap is 16,000 UTF-8 BYTES (GET /v1/image-generation-models
+    // max_prompt_length, and a 16,001-byte prompt is refused, 2026-10-04 — it
+    // was 8,000 until mid-2026). 100 bytes of margin for assembly slack, as
+    // before. decisions.md 2026-10-04 "Grok prompt caps are 16,000 / 64,000 bytes".
+    maxPromptLength: 15900,
     maxCharactersPerScene: 6
   }
 };
@@ -1363,6 +1408,10 @@ const MODEL_PRICING = {
   // MUST stay an exact key: without it calculateTextCost strips the trailing
   // "-5" and prices this model as claude-opus-5 ($5/$25).
   'claude-opus-5-5': { input: 4.00, output: 20.00, thinking: 20.00 },
+  // Sonnet 5.5: same page, fetched 2026-10-04 — $2 input / $10 output.
+  // Exact key for the same reason as Opus 5.5: the "-5" strip would otherwise
+  // land on a claude-sonnet prefix ($3/$15).
+  'claude-sonnet-5-5': { input: 2.00, output: 10.00, thinking: 10.00 },
   'claude-sonnet-4-6': { input: 3.00, output: 15.00, thinking: 15.00 },
   'claude-sonnet-4-5-20250929': { input: 3.00, output: 15.00, thinking: 15.00 },
   'claude-sonnet-4-5': { input: 3.00, output: 15.00, thinking: 15.00 },
@@ -1451,7 +1500,7 @@ const MODEL_PRICING = {
   'qwen/qwen3.8-max': { input: 2.00, output: 6.00 },
   'deepseek/deepseek-chat': { input: 0.32, output: 0.89 },  // was 0.2574/1.0287 (that is the StreamLake endpoint; the default route is DeepInfra)
   // 3.68x UNDER before 2026-09-18 (0.435/0.87), and this is the reviewer on
-  // sceneReviewModel + clothingReviewModel + briefCorrectionModel, so every
+  // clothingReviewModel + briefCorrectionModel (and the scene review), so every
   // per-story figure that included it was low. Confirmed twice: OpenRouter's
   // catalogue says 1.60/3.20, and 4.27M in / 6.38M out billed $27.18 across
   // prod+staging, which 1.60/3.20 predicts to within 0.1%.
@@ -1685,6 +1734,7 @@ function resolveSceneIterationModel() { return guardModel(MODEL_DEFAULTS.sceneIt
 function resolveBriefCorrectionModel() { return guardModel(MODEL_DEFAULTS.briefCorrectionModel, 'BRIEF CORRECTION MODEL'); }
 function resolveSceneValidationModel() { return guardModel(MODEL_DEFAULTS.sceneValidationRepair, 'SCENE VALIDATION MODEL'); }
 function resolveSceneRewriteModel() { return guardModel(MODEL_DEFAULTS.sceneRewrite, 'SCENE REWRITE MODEL'); }
+function resolvePromptCompressModel() { return guardModel(MODEL_DEFAULTS.promptCompress, 'PROMPT COMPRESS MODEL'); }
 
 /**
  * The model's own output ceiling, for the few direct provider calls that
@@ -1715,6 +1765,7 @@ module.exports = {
   resolveBriefCorrectionModel,
   resolveSceneValidationModel,
   resolveSceneRewriteModel,
+  resolvePromptCompressModel,
   IMAGE_MODELS,
   resolveGrokImageModel,
   emptyScenePlateRouting,

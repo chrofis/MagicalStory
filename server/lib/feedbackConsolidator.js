@@ -17,6 +17,7 @@ const { buildCastIndex, lookupByName } = require('./castResolver');
 const { PROMPT_TEMPLATES } = require('../services/prompts');
 const { extractJsonFromText, buildCharacterPhysicalDescription } = require('./storyHelpers');
 const { log } = require('../utils/logger');
+const { getCurrentLogger } = require('./generationLogger');
 const { FINDING_SOURCES, sourcesOf, mergeSources } = require('./findingSources');
 
 /**
@@ -86,6 +87,12 @@ function buildFeedbackInput({
   requiredTexts = [],
 }) {
   const parts = [];
+  // Every finding below is shown with its id (indexFindings) — the handle the
+  // model cites in deduped_issues[].ids and dropped_issues[].ids.
+  const findingIndex = indexFindings({
+    fixableIssues, semanticIssues, complianceIssues, entityIssues, readerFindings, finalCheckIssues,
+  });
+  const idOf = new Map([...findingIndex.values()].map(e => [e.finding, e.id]));
 
   parts.push('## Intended scene description');
   parts.push(sceneDescription || '(not provided)');
@@ -146,7 +153,7 @@ function buildFeedbackInput({
       const type = iss.type || 'general';
       const desc = iss.description || iss.issue || '(no description)';
       const fix = iss.fix ? ` — suggested: ${iss.fix}` : '';
-      parts.push(`- [${sev}] (${type}) ${desc}${fix}`);
+      parts.push(`- ${idOf.get(iss)} [${sev}] (${type}) ${desc}${fix}`);
     }
   }
   parts.push('');
@@ -162,7 +169,7 @@ function buildFeedbackInput({
       const problem = require('./scoring').findingText(iss) || '(no description)';
       const expected = iss.expected ? ` — expected: ${iss.expected}` : '';
       const observed = iss.observed ? ` — observed: ${iss.observed}` : '';
-      parts.push(`- [${sev}] (${type})${item} ${problem}${expected}${observed}`);
+      parts.push(`- ${idOf.get(iss)} [${sev}] (${type})${item} ${problem}${expected}${observed}`);
     }
   }
   parts.push('');
@@ -180,7 +187,7 @@ function buildFeedbackInput({
       const type = iss.type || 'general';
       const desc = iss.description || iss.issue || '(no description)';
       const fix = iss.fix ? ` — suggested: ${iss.fix}` : '';
-      parts.push(`- [${sev}] (${type}) ${desc}${fix}`);
+      parts.push(`- ${idOf.get(iss)} [${sev}] (${type}) ${desc}${fix}`);
     }
   }
   parts.push('');
@@ -190,7 +197,7 @@ function buildFeedbackInput({
     parts.push('(none)');
   } else {
     for (const iss of entityIssues) {
-      parts.push(`- [${shownSeverity(FINDING_SOURCES.ENTITY, iss)}] ${iss.characterName}: ${iss.description}`);
+      parts.push(`- ${idOf.get(iss)} [${shownSeverity(FINDING_SOURCES.ENTITY, iss)}] ${iss.characterName}: ${iss.description}`);
     }
   }
   parts.push('');
@@ -203,11 +210,11 @@ function buildFeedbackInput({
       // Severity is already the shared vocabulary (MINOR/MAJOR/CRITICAL/
       // CATASTROPHIC); MAJOR is the default for pre-severity fault lines.
       const sev = shownSeverity(FINDING_SOURCES.READER, f);
-      const line = String(f?.line || f?.detail || '').trim();
+      const line = readerLine(f);
       // The reader's own type (bookAudit, closed list) — rendered the way every
       // evaluator section renders its type, so it is carried over, not invented.
       const type = typeof f?.type === 'string' && f.type.trim() ? ` (${f.type.trim()})` : '';
-      if (line) parts.push(`- [${sev}]${type} ${line}`);
+      if (line) parts.push(`- ${idOf.get(f)} [${sev}]${type} ${line}`);
     }
     parts.push('');
   }
@@ -215,7 +222,7 @@ function buildFeedbackInput({
   if (finalCheckIssues.length > 0) {
     parts.push('## Final checks issues');
     for (const iss of finalCheckIssues) {
-      parts.push(`- [${shownSeverity(FINDING_SOURCES.FINAL_CHECKS, iss)}] ${iss.description || iss.issue}`);
+      parts.push(`- ${idOf.get(iss)} [${shownSeverity(FINDING_SOURCES.FINAL_CHECKS, iss)}] ${iss.description || iss.issue}`);
     }
     parts.push('');
   }
@@ -287,8 +294,7 @@ function flattenEntityIssues(entityReport, pageNumber = null) {
  * though the quality / semantic / entity evaluators raised neither issue).
  *
  * @param {object} args
- * @param {string} args.sceneDescription - intended scene description
- * @param {object} args.evaluation - quality evaluation { fixableIssues, semanticResult, bboxDetection }
+ * @param {object} args.evaluation - quality evaluation { fixableIssues, semanticResult, bboxDetection, judgedPrompt }
  * @param {object} [args.entityReport] - entity consistency report (whole story) — only entries for this page are used
  * @param {number} [args.pageNumber] - page number (for filtering entity report)
  * @param {Array} [args.characters] - story characters [{ name, physicalDescription }]
@@ -311,7 +317,9 @@ function flattenEntityIssues(entityReport, pageNumber = null) {
  * gap stays auditable.
  *
  * Rule: one vote → that vote. Two → the lower. Three or more → the middle,
- * lower-middle on an even count.
+ * lower-middle on an even count. Since 2026-10-04 the votes are read off the
+ * input findings the entry's ids name (resolveDedupedIssues), never off the
+ * model's transcription.
  *
  * EXCEPT A CRITICAL VOTE, WHICH WINS (owner, 2026-09-11 — an explicit reversal
  * of the 2026-07-30 "pure median for all severities, no lone escalation"
@@ -340,107 +348,239 @@ function medianSeverity(severities) {
 }
 
 /**
- * THE VOTES ARE CLAMPED TO WHAT EACH SOURCE SAID (2026-09-24).
+ * EVERY INPUT FINDING HAS AN ID; CODE READS THE VOTES OFF THE IDS (owner,
+ * 2026-10-04 — replaces the 2026-09-24 vote clamp and the 2026-09-23
+ * type+character drop match; docs/decisions.md).
  *
- * `severities` is the model's TRANSCRIPTION of each evaluator's vote, and the
- * median above trusts it. The transcription is not reliable: prod
- * job_1790107559778_fcmlfa8kn p6 v3 carried a reader MAJOR that came back as a
- * CATASTROPHIC vote, and the median of one vote is that vote. Over the stored
- * consolidator_calls: prod 9 entries escalated above every severity their
- * sources gave, 10 votes higher than anything that source said on the page;
- * staging 39 and 78.
+ * The consolidator used to TRANSCRIBE each evaluator's vote into `sources` /
+ * `severities`, and code had to second-guess the copy. Both repairs of that
+ * copy failed in the stored data:
+ *   - the 2026-09-24 clamp held each vote to what its CLAIMED source showed, so
+ *     a vote credited to the wrong judge was cut to that judge's ceiling
+ *     (staging job_1791040103540_atbttop6w p12: a semantic MAJOR "jacket worn
+ *     that the brief takes off" was credited to quality, whose page maximum
+ *     was MINOR, and billed MINOR);
+ *   - the 2026-09-23 not-a-defect guard removed every deduped entry sharing a
+ *     dropped finding's type+character, so one dropped reader finding deleted
+ *     a semantic MAJOR nobody dropped (same page) — on the last 8 staging
+ *     stories ~10 such deletions, 4 of them CRITICAL.
  *
- * So each vote is clamped to the HIGHEST severity that source actually showed
- * in this page's input (`sourceSeverityCeilings`, read off the same sections
- * buildFeedbackInput renders), then the median runs as before — including the
- * CRITICAL-wins rule, which now fires only on a CRITICAL a source really gave.
- * A vote for a source that flagged nothing on this page is not a vote and is
- * dropped. When no vote survives, the model's pick is held to the page's
- * highest input severity. Code reads severities and source names only — never
- * a finding's text, and never its type.
+ * Now each finding the model is shown carries an id (Q1, S2, C1, E3, R1, F1 —
+ * `indexFindings`, rendered by buildFeedbackInput). A deduped entry and a
+ * rule-2/2a drop name the ids they cover. Code derives `sources` and
+ * `severities` from the INPUT findings those ids point at — each source's vote
+ * is the highest severity it showed among the entry's ids — and removes a drop
+ * by its ids only. An entry or drop naming an unknown id, or none, is logged as
+ * an error and not applied. There is no second matching path.
  */
-function sourceSeverityCeilings({
-  fixableIssues = [], semanticIssues = [], complianceIssues = [],
-  entityIssues = [], readerFindings = [], finalCheckIssues = [],
-} = {}) {
-  const sections = {
-    [FINDING_SOURCES.QUALITY]: fixableIssues,
-    [FINDING_SOURCES.SEMANTIC]: semanticIssues,
-    [FINDING_SOURCES.COMPLIANCE]: complianceIssues,
-    [FINDING_SOURCES.ENTITY]: entityIssues,
-    [FINDING_SOURCES.READER]: readerFindings,
-    [FINDING_SOURCES.FINAL_CHECKS]: finalCheckIssues,
-  };
-  // source → highest shown severity; null when the source showed a finding
-  // with no readable severity (its ceiling is unknown, so it is not clamped).
-  // A source absent from the map showed nothing on this page.
-  const ceilings = {};
-  for (const [source, list] of Object.entries(sections)) {
-    const items = (Array.isArray(list) ? list : []).filter(Boolean);
-    if (items.length === 0) continue;
-    const ranks = items.map(f => SEVERITY_RANK.indexOf(shownSeverity(source, f)));
-    ceilings[source] = ranks.some(r => r < 0) ? null : SEVERITY_RANK[Math.max(...ranks)];
-  }
-  return ceilings;
-}
+const ID_PREFIX = Object.freeze({
+  [FINDING_SOURCES.QUALITY]: 'Q',
+  [FINDING_SOURCES.SEMANTIC]: 'S',
+  [FINDING_SOURCES.COMPLIANCE]: 'C',
+  [FINDING_SOURCES.ENTITY]: 'E',
+  [FINDING_SOURCES.READER]: 'R',
+  [FINDING_SOURCES.FINAL_CHECKS]: 'F',
+});
 
-function clampVotesToSources(severities, ceilings) {
-  if (!severities || typeof severities !== 'object' || !ceilings) return severities || null;
-  const out = {};
-  for (const [source, vote] of Object.entries(severities)) {
-    if (!Object.prototype.hasOwnProperty.call(ceilings, source)) continue;   // flagged nothing here
-    const cap = ceilings[source];
-    const v = String(vote || '').toUpperCase();
-    out[source] = cap && SEVERITY_RANK.indexOf(v) > SEVERITY_RANK.indexOf(cap) ? cap : v;
-  }
-  return out;
-}
-
-/** The severity a deduped entry is scored at: median of the clamped votes. */
-function resolveEntrySeverity(chosen, severities, ceilings) {
-  const pick = String(chosen || 'MODERATE').toUpperCase();
-  if (!ceilings) return medianSeverity(severities) || pick;
-  const fromVotes = medianSeverity(clampVotesToSources(severities, ceilings));
-  if (fromVotes) return fromVotes;
-  const known = Object.values(ceilings).filter(Boolean).map(c => SEVERITY_RANK.indexOf(c));
-  if (known.length === 0 || SEVERITY_RANK.indexOf(pick) < 0) return pick;
-  const pageMax = SEVERITY_RANK[Math.max(...known)];
-  return SEVERITY_RANK.indexOf(pick) > SEVERITY_RANK.indexOf(pageMax) ? pageMax : pick;
+/** The text a reader finding is rendered with; a finding without one is not shown. */
+function readerLine(f) {
+  return String(f?.line || f?.detail || '').trim();
 }
 
 /**
- * A DROP THAT SAYS "NOT A DEFECT" LEAVES THE SCORING LIST TOO (2026-09-23).
- *
- * `dropped_issues` holds two kinds of drop: ones that only keep an issue out of
- * this round's PLAN (capped at 3, needs a char-fix) — the defect is real and
- * stays in `deduped_issues`, which is the scoring source — and ones that say the
- * finding is FALSE (rule 2 `profile_says_trait_is_correct`, rule 2a
- * `finding_contradicts_brief`). The model wrote the second kind and still kept
- * the issue in `deduped_issues` (staging job_1790100385959_1nitlympp p12: the
- * gilet the brief takes off was dropped as a false finding and charged MAJOR in
- * the same plan). The reason CODE is the consolidator's own closed vocabulary;
- * the entry to remove is found by its `type` and `character`, never by text.
+ * The findings the consolidator is shown, each with its id, source and shown
+ * severity. The ONE numbering: buildFeedbackInput renders these ids and
+ * resolveDedupedIssues reads them, so the two can never disagree.
+ * @returns {Map<string, {id:string, source:string, severity:string, finding:object}>}
+ */
+function indexFindings({
+  fixableIssues = [], semanticIssues = [], complianceIssues = [],
+  entityIssues = [], readerFindings = [], finalCheckIssues = [],
+} = {}) {
+  const sections = [
+    [FINDING_SOURCES.QUALITY, fixableIssues],
+    [FINDING_SOURCES.SEMANTIC, semanticIssues],
+    [FINDING_SOURCES.COMPLIANCE, complianceIssues],
+    [FINDING_SOURCES.ENTITY, entityIssues],
+    [FINDING_SOURCES.READER, (Array.isArray(readerFindings) ? readerFindings : []).filter(f => readerLine(f))],
+    [FINDING_SOURCES.FINAL_CHECKS, finalCheckIssues],
+  ];
+  const index = new Map();
+  for (const [source, list] of sections) {
+    (Array.isArray(list) ? list : []).filter(Boolean).forEach((finding, i) => {
+      const id = `${ID_PREFIX[source]}${i + 1}`;
+      index.set(id, { id, source, severity: shownSeverity(source, finding), finding });
+    });
+  }
+  return index;
+}
+
+/** The ids a plan row names, normalised; null when it names none. */
+function rowIds(row) {
+  if (!Array.isArray(row?.ids)) return null;
+  const ids = row.ids.map(x => String(x || '').trim().toUpperCase()).filter(Boolean);
+  return ids.length ? [...new Set(ids)] : null;
+}
+
+/**
+ * The votes behind a set of input ids: per source, the highest severity that
+ * source showed among them. A finding shown without a readable severity casts
+ * no vote.
+ */
+function votesFromIds(ids, index) {
+  const severities = {};
+  const sources = [];
+  for (const id of ids) {
+    const e = index.get(id);
+    if (!sources.includes(e.source)) sources.push(e.source);
+    if (SEVERITY_RANK.indexOf(e.severity) < 0) continue;
+    const prev = severities[e.source];
+    if (!prev || SEVERITY_RANK.indexOf(e.severity) > SEVERITY_RANK.indexOf(prev)) severities[e.source] = e.severity;
+  }
+  return { sources, severities };
+}
+
+/**
+ * A DROP THAT SAYS "NOT A DEFECT" LEAVES THE SCORING LIST TOO (2026-09-23,
+ * matched by id since 2026-10-04). `dropped_issues` holds plan-only drops
+ * (capped at 3, needs a char-fix — the defect is real and stays scored) and
+ * drops that say the finding is FALSE (rule 2 `profile_says_trait_is_correct`,
+ * rule 2a `finding_contradicts_brief`). The reason code is the consolidator's
+ * own closed vocabulary.
  */
 const NOT_A_DEFECT_DROPS = ['profile_says_trait_is_correct', 'finding_contradicts_brief'];
 
-function enforceNotADefectDrops(plan, pageNumber = null) {
-  if (!plan || !Array.isArray(plan.dropped_issues) || !Array.isArray(plan.deduped_issues)) return 0;
-  const key = (v) => (typeof v === 'string' ? v.trim().toLowerCase() : '');
-  let removed = 0;
-  for (const d of plan.dropped_issues) {
-    const reason = String(d?.reason || '').replace(/^["'`\s]+/, '').toLowerCase();
-    if (!NOT_A_DEFECT_DROPS.some(code => reason.startsWith(code))) continue;
-    if (!d.type) {
-      log.warn(`[FEEDBACK-CONSOLIDATOR] page ${pageNumber}: a "${reason.split(/[\s—-]/)[0]}" drop carries no type — cannot remove it from deduped_issues`);
-      continue;
-    }
-    const before = plan.deduped_issues.length;
-    plan.deduped_issues = plan.deduped_issues.filter(i =>
-      !(key(i.type) === key(d.type) && key(i.character) === key(d.character)));
-    removed += before - plan.deduped_issues.length;
+function isNotADefectDrop(d) {
+  const reason = String(d?.reason || '').replace(/^["'`\s]+/, '').toLowerCase();
+  return NOT_A_DEFECT_DROPS.some(code => reason.startsWith(code));
+}
+
+/**
+ * The input finding ids the plan's not-a-defect drops remove. A drop naming no
+ * id or an unknown id removes nothing; `fail` (optional) is told why.
+ */
+function notADefectDroppedIds(plan, index, fail = () => {}) {
+  const dropped = new Set();
+  for (const d of (Array.isArray(plan?.dropped_issues) ? plan.dropped_issues : [])) {
+    if (!isNotADefectDrop(d)) continue;
+    const ids = rowIds(d);
+    if (!ids) { fail(`a "${String(d.reason).split(/[\s—-]/)[0]}" drop names no finding id — not applied`); continue; }
+    const unknown = ids.filter(id => !index.has(id));
+    if (unknown.length) { fail(`a "${String(d.reason).split(/[\s—-]/)[0]}" drop names unknown id(s) ${unknown.join(', ')} — not applied`); continue; }
+    ids.forEach(id => dropped.add(id));
   }
-  if (removed) log.info(`🧠 [FEEDBACK-CONSOLIDATOR] page ${pageNumber}: ${removed} deduped issue(s) removed — dropped as not a defect`);
-  return removed;
+  return dropped;
+}
+
+/**
+ * Turn the model's deduped_issues into the scoring list, by id.
+ *
+ * 1. Every not-a-defect drop removes exactly the input findings it names. A drop
+ *    naming no id or an unknown id is an error and removes nothing.
+ * 2. Every deduped entry must name at least one id and only known ids, or it is
+ *    an error and not applied. Its ids minus the dropped ones decide its
+ *    `sources`, `severities` and `severity` (medianSeverity); an entry whose ids
+ *    were all dropped leaves the list.
+ * The model's type, character and description are carried as written —
+ * classification is the prompt's.
+ *
+ * @returns {{deduped: Array, errors: string[], removedByDrops: number}}
+ */
+function resolveDedupedIssues(plan, index, pageNumber = null) {
+  const errors = [];
+  const fail = (msg) => {
+    errors.push(msg);
+    log.error(`❌ [FEEDBACK-CONSOLIDATOR] page ${pageNumber}: ${msg}`);
+  };
+  const dropped = notADefectDroppedIds(plan, index, fail);
+
+  const deduped = [];
+  let removedByDrops = 0;
+  const covered = new Set(dropped);
+  for (const i of (Array.isArray(plan?.deduped_issues) ? plan.deduped_issues : [])) {
+    if (!i || typeof i !== 'object' || !(i.description || i.problem || i.issue)) continue;
+    const description = require('./scoring').findingText(i);
+    const ids = rowIds(i);
+    if (!ids) { fail(`deduped entry "${description.slice(0, 80)}" names no finding id — not applied`); continue; }
+    const unknown = ids.filter(id => !index.has(id));
+    if (unknown.length) { fail(`deduped entry "${description.slice(0, 80)}" names unknown id(s) ${unknown.join(', ')} — not applied`); continue; }
+    ids.forEach(id => covered.add(id));
+    const live = ids.filter(id => !dropped.has(id));
+    if (live.length === 0) { removedByDrops++; continue; }
+    const { sources, severities } = votesFromIds(live, index);
+    const severity = medianSeverity(severities);
+    if (!severity) { fail(`deduped entry "${description.slice(0, 80)}" (${live.join(', ')}) has no readable severity — not applied`); continue; }
+    deduped.push({
+      description,
+      severity,
+      // The consolidated list IS the scoring source, so dropping `type` here
+      // meant every scored deduction was uncategorised (measured: 73/73 with
+      // no type, 1201 points) and routed to `other`/regen.
+      type: i.type || i.category || null,
+      // The subject the deduction bills against (scoring.js deductionClassKey:
+      // `category|subject`). Carried through, never inferred from the text.
+      character: (typeof i.character === 'string' && i.character.trim()) ? i.character.trim() : null,
+      ids: live,
+      sources,
+      severities,
+    });
+  }
+  if (removedByDrops) log.info(`🧠 [FEEDBACK-CONSOLIDATOR] page ${pageNumber}: ${removedByDrops} deduped issue(s) removed — every finding in them was dropped as not a defect`);
+  const unaccounted = [...index.keys()].filter(id => !covered.has(id));
+  if (unaccounted.length) {
+    // Not an error: rule 2b, spec conflicts and trivial MODERATE/MINOR drops
+    // may legitimately leave a finding out of the score. Logged so a silently
+    // omitted finding is visible.
+    log.info(`🧠 [FEEDBACK-CONSOLIDATOR] page ${pageNumber}: finding(s) ${unaccounted.join(', ')} are in no deduped entry and no not-a-defect drop`);
+  }
+  return { deduped, errors, removedByDrops };
+}
+
+/**
+ * A REPAIR FIX MUST REST ON A SCORED FINDING (2026-10-04). Staging
+ * job_1791040103540_atbttop6w p17 (consolidator_calls 2971): the only finding
+ * was dropped as `finding_contradicts_brief` (so it left the scoring list) while
+ * the plan still carried a CRITICAL scene_fix for it. The page scored 100 and
+ * the fix never ran. Each CRITICAL/MAJOR fix names the finding ids it fixes;
+ * when none of them is in a kept deduped entry, that is logged at ERROR to the
+ * generation log and recorded on the plan (`fix_errors`). CHECK ONLY: nothing is
+ * reclassified, no severity is invented, the score stays what the kept list says.
+ *
+ * @returns {string[]} the errors, also logged
+ */
+function checkFixesRestOnKeptFindings(plan, index, pageNumber = null) {
+  const errors = [];
+  const keptIds = new Set();
+  for (const d of (Array.isArray(plan?.deduped_issues) ? plan.deduped_issues : [])) {
+    for (const id of (Array.isArray(d?.ids) ? d.ids : [])) keptIds.add(id);
+  }
+  const dropped = notADefectDroppedIds(plan, index);
+  const fixes = [];
+  const sf = plan?.scene_fix;
+  if (sf && typeof sf === 'object' && sf.instruction) fixes.push({ label: 'scene_fix', fix: sf, text: sf.instruction });
+  for (const p of (Array.isArray(plan?.per_character_fixes) ? plan.per_character_fixes : [])) {
+    if (p && typeof p === 'object' && p.fix_instruction) fixes.push({ label: `per_character_fix (${p.characterName || 'unnamed'})`, fix: p, text: p.fix_instruction });
+  }
+  for (const { label, fix, text } of fixes) {
+    const severity = String(fix.severity || '').toUpperCase();
+    if (severity !== 'CRITICAL' && severity !== 'MAJOR') continue;
+    const ids = rowIds(fix);
+    let why = null;
+    if (!ids) why = 'names no finding id';
+    else if (ids.some(id => !index.has(id))) why = `names unknown id(s) ${ids.filter(id => !index.has(id)).join(', ')}`;
+    else if (!ids.some(id => keptIds.has(id))) {
+      why = ids.every(id => dropped.has(id))
+        ? `rests only on finding(s) ${ids.join(', ')}, all dropped as not a defect`
+        : `rests only on finding(s) ${ids.join(', ')}, none in a scored entry`;
+    }
+    if (!why) continue;
+    const msg = `${label} ${severity} "${String(text).slice(0, 80)}" ${why} — no scored finding behind it, the page score does not count it`;
+    errors.push(msg);
+    log.error(`❌ [FEEDBACK-CONSOLIDATOR] page ${pageNumber}: ${msg}`);
+    const genLog = getCurrentLogger();
+    if (genLog) genLog.error('consolidator_fix_unbacked', `P${pageNumber}: ${msg}`, null, { pageNumber, fix: label, severity, ids: ids || [] });
+  }
+  return errors;
 }
 
 /**
@@ -481,8 +621,62 @@ function dropCropArtifactFixes(plan, pageNumber = null) {
   return removed;
 }
 
+/**
+ * AN IDENTITY SWAP IS NOT THE CONSOLIDATOR'S TO DROP (owner, 2026-09-27).
+ *
+ * `identity_swap` is the entity judge's finding that a figure's hair AND face
+ * both differ from the reference: it reads as another person. The judge saw the
+ * reference picture beside the cell; the consolidator sees neither, only the
+ * character's written profile. On staging job_1790446348343_z3fw660ie's initial
+ * page it dropped such a finding (then filed as a MAJOR hair_change) with
+ * `profile_says_trait_is_correct` because the profile's hair words matched the
+ * judge's description of the REFERENCE, and the page scored 96 unrepaired.
+ *
+ * So the swap never enters the model's input. It is appended to
+ * `deduped_issues` — the scoring source — exactly as the judge filed it, and its
+ * repair is routed from the entity report (repairLogic gate 2, char-fix). Scoped
+ * to this one type by its declared `type`; every other entity finding goes
+ * through the model as before (the owner did not approve a general change to the
+ * consolidator's drop rules).
+ */
+const IDENTITY_SWAP_TYPE = 'identity_swap';
+
+function isIdentitySwap(e) {
+  return String(e?.type || '').trim().toLowerCase() === IDENTITY_SWAP_TYPE;
+}
+
+/** The deduped_issues rows the page's identity swaps are charged as. */
+function identitySwapEntries(swaps) {
+  return (Array.isArray(swaps) ? swaps : []).filter(isIdentitySwap).map(e => {
+    const severity = String(e.severity || 'CRITICAL').toUpperCase();
+    return {
+      description: e.description || '',
+      severity,
+      severityChosen: severity,
+      type: IDENTITY_SWAP_TYPE,
+      character: e.characterName || e.name || null,
+      sources: mergeSources(sourcesOf(e), [FINDING_SOURCES.ENTITY]),
+      severities: { [FINDING_SOURCES.ENTITY]: severity },
+    };
+  });
+}
+
+/** Append the swaps the model never saw; one row per character. Returns the count added. */
+function appendIdentitySwaps(plan, swaps, pageNumber = null) {
+  if (!plan) return 0;
+  if (!Array.isArray(plan.deduped_issues)) plan.deduped_issues = [];
+  const key = (v) => (typeof v === 'string' ? v.trim().toLowerCase() : '');
+  let added = 0;
+  for (const row of identitySwapEntries(swaps)) {
+    if (plan.deduped_issues.some(i => key(i?.type) === IDENTITY_SWAP_TYPE && key(i?.character) === key(row.character))) continue;
+    plan.deduped_issues.push(row);
+    added++;
+  }
+  if (added) log.info(`🧑‍🤝‍🧑 [FEEDBACK-CONSOLIDATOR] page ${pageNumber}: ${added} identity_swap finding(s) charged as filed — never the consolidator's to drop`);
+  return added;
+}
+
 async function consolidateFeedback({
-  sceneDescription,
   evaluation = {},
   entityReport = null,
   // Pre-flattened per-page entity issues ({ characterName|name, severity,
@@ -527,6 +721,20 @@ async function consolidateFeedback({
     if (!template) {
       return { plan: null, usage: null, error: 'feedbackConsolidator prompt template not loaded' };
     }
+    // THE SCENE THE JUDGES SCORED (owner, 2026-09-26: "The eval should judge
+    // the same thing as image generation"). The consolidator reads the exact
+    // string the quality and semantic judges were given, which
+    // evaluateImageQuality stamps on its result as `judgedPrompt` — the prompt
+    // the image model received (or, on the batch eval, its scene block). It used
+    // to read the page's whole brief, a second contract beside the judges'.
+    // No judged prompt on the evaluation = nothing to consolidate against:
+    // fail, never fall back to another string.
+    const judgedPrompt = typeof evaluation.judgedPrompt === 'string' && evaluation.judgedPrompt.trim()
+      ? evaluation.judgedPrompt : null;
+    if (!judgedPrompt) {
+      log.error(`❌ [FEEDBACK-CONSOLIDATOR] page ${pageNumber}: the evaluation carries no judgedPrompt — the scene the judges scored is unknown, not consolidating`);
+      return { plan: null, usage: null, error: 'evaluation carries no judgedPrompt' };
+    }
 
     // evaluateImageQuality merges the compliance (three-stage) findings into
     // fixableIssues tagged `source: 'three-stage'` — split them back out so
@@ -556,6 +764,9 @@ async function consolidateFeedback({
       entityIssues = entityIssuesInput.map(e => ({
         characterName: e.characterName || e.name || '(unknown)',
         description: e.description || e.issue || '',
+        // The declared type, as flattenEntityIssues carries it — read only to
+        // hold identity swaps out of the model's input (below).
+        type: e.subType || e.type || null,
         severity: e.severity || 'MODERATE',
         // Same drop site as flattenEntityIssues, same rule (2026-09-14).
         sources: mergeSources(sourcesOf(e), [FINDING_SOURCES.ENTITY]),
@@ -563,6 +774,8 @@ async function consolidateFeedback({
     } else {
       entityIssues = flattenEntityIssues(entityReport, pageNumber);
     }
+    const identitySwaps = entityIssues.filter(isIdentitySwap);
+    entityIssues = entityIssues.filter(e => !isIdentitySwap(e));
 
     // Build character descriptions from the character profile (source of truth).
     // Fall back to a pre-built description if provided. The character profile
@@ -598,15 +811,15 @@ async function consolidateFeedback({
       if (desc) characterDescriptions[c.name] = desc;
     }
 
-    // What each source actually said on this page — the ceiling for the
-    // votes the model transcribes (resolveEntrySeverity).
-    const voteCeilings = sourceSeverityCeilings({
+    // The ids the model is shown — the same numbering buildFeedbackInput
+    // renders (indexFindings is pure over these lists).
+    const findingIndex = indexFindings({
       fixableIssues, semanticIssues, complianceIssues, entityIssues,
       readerFindings: Array.isArray(readerFindings) ? readerFindings : [],
     });
 
     const userInput = buildFeedbackInput({
-      sceneDescription,
+      sceneDescription: judgedPrompt,
       fixableIssues,
       semanticIssues,
       complianceIssues,
@@ -715,47 +928,18 @@ async function consolidateFeedback({
       }
     }
 
-    // Full deduplicated issue list — what the UI displays. Not capped at 3.
-    // Falls back to an empty array when the consolidator omits it (older replays).
-    if (!Array.isArray(plan.deduped_issues)) {
-      plan.deduped_issues = [];
-    } else {
-      plan.deduped_issues = plan.deduped_issues
-        .filter(i => i && typeof i === 'object' && (i.description || i.problem || i.issue))
-        .map(i => ({
-          description: require('./scoring').findingText(i),
-          severity: resolveEntrySeverity(i.severity, i.severities, voteCeilings),
-          // What the model picked, kept for audit against the computed value.
-          severityChosen: String(i.severity || 'MODERATE').toUpperCase(),
-          // The consolidated list IS the scoring source, so dropping `type` here
-          // meant every scored deduction was uncategorised (measured: 73/73 with
-          // no type, 1201 points) and routed to `other`/regen — the category work
-          // on the four evaluator prompts never reached the score.
-          type: i.type || i.category || null,
-          // The subject the deduction bills against (scoring.js
-          // deductionClassKey: `category|subject`). Dropping it here collapsed
-          // every same-category defect on a page into ONE charge — two MAJOR
-          // character_identity defects billed 15 points, not 30. Carried
-          // through, never inferred from the description.
-          character: (typeof i.character === 'string' && i.character.trim())
-            ? i.character.trim()
-            : null,
-          sources: Array.isArray(i.sources) ? i.sources.filter(s => typeof s === 'string') : [],
-          // Raw per-evaluator votes, recorded not acted on. `severity` above is
-          // still whatever the consolidator chose; this is the evidence needed to
-          // judge whether a median/consensus rule is worth adopting, and to see
-          // how often the evaluators actually disagree.
-          severities: (i.severities && typeof i.severities === 'object' && !Array.isArray(i.severities))
-            ? Object.fromEntries(Object.entries(i.severities)
-                .filter(([k, v]) => typeof k === 'string' && typeof v === 'string')
-                .map(([k, v]) => [k, v.toUpperCase()]))
-            : null,
-        }));
-    }
+    // Full deduplicated issue list — the scoring source. Not capped at 3.
+    // Sources, votes and severity come from the input findings each entry's
+    // ids name; not-a-defect drops remove exactly their ids (resolveDedupedIssues).
+    const resolved = resolveDedupedIssues(plan, findingIndex, pageNumber);
+    plan.deduped_issues = resolved.deduped;
+    if (resolved.errors.length) plan.id_errors = resolved.errors;
 
-    enforceNotADefectDrops(plan, pageNumber);
     applyRule7SceneFixGuard(plan, pageNumber);
     dropCropArtifactFixes(plan, pageNumber);
+    appendIdentitySwaps(plan, identitySwaps, pageNumber);
+    const fixErrors = checkFixesRestOnKeptFindings(plan, findingIndex, pageNumber);
+    if (fixErrors.length) plan.fix_errors = fixErrors;
 
     // Enforce the 3-fix cap even if the consolidator slipped past the prompt.
     // When Grok is handed more than 3 fixes, it usually executes none of them —
@@ -832,18 +1016,21 @@ function applyRule7SceneFixGuard(plan, pageNumber) {
   // was "Replace the blue duffle coat with a blue hooded anorak…".
   // Routes on the DECLARED `types` array only (SETTLED: classification is
   // the prompt's job) — a scene_fix with no declared types is left alone.
-  const { NOT_INPAINTABLE_TYPES } = require('./repairLogic');
+  const { NOT_INPAINTABLE_TYPES, ITERATE_ROUTED_TYPES } = require('./repairLogic');
   const sceneTypes = Array.isArray(plan.scene_fix.types)
     ? plan.scene_fix.types.map(t => String(t || '').toLowerCase()).filter(Boolean)
     : [];
   if (plan.scene_fix.instruction && sceneTypes.length
       && sceneTypes.every(t => NOT_INPAINTABLE_TYPES.has(t))) {
+    // A creature drawn below its size is a page redo, not a character
+    // repair (repairLogic ITERATE_ROUTED_TYPES) — the reason says which.
+    const redo = sceneTypes.every(t => ITERATE_ROUTED_TYPES.has(t));
     plan.dropped_issues.push({
       issue: plan.scene_fix.instruction,
       severity: plan.scene_fix.severity || null,
-      reason: 'requires_char_fix_not_inpaint',
+      reason: redo ? 'requires_iterate_not_inpaint' : 'requires_char_fix_not_inpaint',
     });
-    log.warn(`[FEEDBACK-CONSOLIDATOR] page ${pageNumber}: scene_fix typed ${sceneTypes.join('/')} is a character repair, not an inpaint — dropped (rule 7)`);
+    log.warn(`[FEEDBACK-CONSOLIDATOR] page ${pageNumber}: scene_fix typed ${sceneTypes.join('/')} is ${redo ? 'a page redo' : 'a character repair'}, not an inpaint — dropped (rule 7)`);
     plan.scene_fix.instruction = '';
     plan.scene_fix.severity = 'NONE';
   }
@@ -950,6 +1137,9 @@ async function consolidateEvaluation({
   entityIssues = [],
   // Page-scoped IMG faults from the previous round's book audit.
   readerFindings = [],
+  // The page's DECLARED brief, read only for its `interactions` list by the
+  // deterministic spec-conflict check below. The scene the consolidator is
+  // shown is the one the judges scored (`evalResult.judgedPrompt`).
   sceneDescription = '',
   characters = [],
   sceneClothing = null,
@@ -984,7 +1174,13 @@ async function consolidateEvaluation({
     || evalResult.threeStageResult?.issues
     || rawFixable.filter(i => i?.source === 'three-stage'));
   const semanticCount = surviving(require('./repairLogic').semanticFindings(evalResult.semanticResult));
-  const entityCount = Array.isArray(entityIssues) ? entityIssues.length : 0;
+  // An identity swap never reaches the model (appendIdentitySwaps), so it does
+  // not by itself justify the call; a page whose only finding is one is charged
+  // it on the skip path below.
+  const entityList = Array.isArray(entityIssues) ? entityIssues : [];
+  const swapInputs = entityList.filter(e => isIdentitySwap({ type: e?.subType || e?.type }))
+    .map(e => ({ ...e, type: IDENTITY_SWAP_TYPE, characterName: e.characterName || e.name }));
+  const entityCount = entityList.length - swapInputs.length;
   // A page the evaluators like but the READER flagged must still reach the
   // model — skipping on the evaluator counts alone would discard the audit.
   const readerCount = Array.isArray(readerFindings) ? readerFindings.length : 0;
@@ -994,14 +1190,13 @@ async function consolidateEvaluation({
       per_character_fixes: [],
       scene_fix: { severity: 'NONE', instruction: '', preserve: [] },
       dropped_issues: [],
-      deduped_issues: [],
+      deduped_issues: identitySwapEntries(swapInputs),
       skipped: true,
     };
-    return { plan, dedupedIssues: [], usage: null, error: null, skipped: true };
+    return { plan, dedupedIssues: plan.deduped_issues, usage: null, error: null, skipped: true };
   }
 
   const { plan, usage, error } = await consolidateFeedback({
-    sceneDescription,
     evaluation: evalResult,
     entityIssues: Array.isArray(entityIssues) ? entityIssues : [],
     readerFindings: Array.isArray(readerFindings) ? readerFindings : [],
@@ -1043,13 +1238,14 @@ async function consolidateEvaluation({
 
 module.exports = {
   applyRule7SceneFixGuard,
-  enforceNotADefectDrops, // exported for testing
+  indexFindings, // exported for testing
+  resolveDedupedIssues, // exported for testing
+  checkFixesRestOnKeptFindings, // exported for testing
+  appendIdentitySwaps, // exported for testing
+  identitySwapEntries, // exported for testing
   dropCropArtifactFixes, // exported for testing
   consolidateFeedback,
   medianSeverity, // exported for testing
-  sourceSeverityCeilings, // exported for testing
-  clampVotesToSources, // exported for testing
-  resolveEntrySeverity, // exported for testing
   consolidateEvaluation,
   buildFeedbackInput, // exported for testing
   flattenEntityIssues, // exported for testing

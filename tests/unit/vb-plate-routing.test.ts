@@ -18,6 +18,10 @@
  * plate of the ship existed and was discarded.
  */
 import { describe, it, expect } from 'vitest';
+import { beforeAll } from 'vitest';
+import { createRequire as createRequireForTemplates } from 'node:module';
+// buildImagePrompt has no hardcoded fallback (deleted 2026-10-04, review B4): load the real template.
+beforeAll(async () => { await createRequireForTemplates(import.meta.url)('../../server/services/prompts').loadPromptTemplates(); });
 
 // @ts-ignore - CommonJS
 const {
@@ -241,9 +245,12 @@ describe('Phase 5a-pre-grid rebuilds the claim from the kept cells', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', '..', 'storyJobPipeline.js'), 'utf8');
 
   it('routes large elements to the plate through the shared predicate', () => {
-    expect(src).toContain('isPlateBorneElement');
+    // The filter lives in the shared page-render builder (pageRenderCall.js,
+    // also the Test Lab's) and the pipeline's 5a-pre-grid calls it.
+    expect(src).toMatch(/keepPageGridElements\(refs, \{ hasPlate, sceneMetadata: pageData\.sceneMetadata \}\)/);
+    const shared = fs.readFileSync(path.join(__dirname, '..', '..', 'server/lib/pageRenderCall.js'), 'utf8');
     // conditional on a plate being sent — the no-plate fallback
-    expect(src).toContain('? refs.filter(e => !isPlateBorneElement(e, pageSceneObjectsForDrop))');
+    expect(shared).toContain('(hasPlate ? (refs || []).filter(e => !isPlateBorneElement(e, sceneObjects)) : (refs || []))');
   });
 
   it('recomputes the prompt from the kept set, not from the selection', () => {

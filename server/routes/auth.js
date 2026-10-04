@@ -10,7 +10,7 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 
 const { dbQuery, isDatabaseMode, logActivity, getPool } = require('../services/database');
-const { authenticateToken, generateToken, verifyToken, signToken } = require('../middleware/auth');
+const { authenticateToken, generateToken, verifyToken, signToken, invalidateAuthState } = require('../middleware/auth');
 const { authLimiter, registerLimiter, passwordResetLimiter } = require('../middleware/rateLimit');
 const { validateBody, schemas, sanitizeString } = require('../middleware/validation');
 const { log } = require('../utils/logger');
@@ -101,7 +101,7 @@ router.post('/register', registerLimiter, validateBody(schemas.register), async 
            CASE WHEN (SELECT COUNT(*) FROM users) = 0 THEN -1 ELSE 2 END,
            0,
            CASE WHEN (SELECT COUNT(*) FROM users) = 0 THEN -1 ELSE $5 END)
-         RETURNING role, story_quota, credits`,
+         RETURNING role, story_quota, credits, token_version`,
         [userId, email, email, hashedPassword, welcomeCredits]
       );
       const role = insertResult[0].role;
@@ -116,14 +116,13 @@ router.post('/register', registerLimiter, validateBody(schemas.register), async 
         );
       }
 
-      newUser = { id: userId, username, email, role, storyQuota, storiesGenerated: 0, credits: initialCredits };
+      newUser = { id: userId, username, email, role, storyQuota, storiesGenerated: 0, credits: initialCredits, token_version: insertResult[0].token_version };
 
-      // Auto-verify admins, regular users will be prompted to verify when they try to generate a story
-      // Also auto-verify @magicalstory.ch demo accounts (showcase orchestrator
-      // creates demo-{family}-{ts}@magicalstory.ch — there's no inbox for these,
-      // so the verification gate would silently block story generation).
-      const isDemoAccount = typeof email === 'string' && /@magicalstory\.ch$/i.test(email);
-      if (role === 'admin' || isDemoAccount) {
+      // Only the very first account (admin) is auto-verified. Every other address, including
+      // @magicalstory.ch demo accounts, verifies through the email link: a domain regex let
+      // anyone claim an inbox-less address and skip the gate (code review V1). Showcase and
+      // demo scripts verify their accounts through POST /api/admin/users/:id/email-verified.
+      if (role === 'admin') {
         await dbQuery('UPDATE users SET email_verified = TRUE WHERE id = $1', [userId]);
       }
       // Note: Verification email is NOT sent on registration - it will be sent when user tries to generate a story
@@ -190,7 +189,8 @@ router.post('/login', authLimiter, async (req, res) => {
         credits: dbUser.credits !== undefined ? dbUser.credits : 500,
         preferredLanguage: dbUser.preferred_language || 'English',
         emailVerified: dbUser.email_verified === true,
-        photoConsentAt: dbUser.photo_consent_at || null
+        photoConsentAt: dbUser.photo_consent_at || null,
+        token_version: dbUser.token_version
       };
     } else {
       return res.status(501).json({ error: 'File storage mode not supported' });
@@ -272,6 +272,46 @@ router.get('/me', authenticateToken, async (req, res) => {
   }
 });
 
+// Upsert the user for a verified Google identity. Shared by POST /google and the OAuth
+// code callback so the merge rule lives in one place.
+//
+// Merge rule (owner decision 2026-10-04, code review S1): when the email already belongs
+// to an account whose email was never verified, that account may have been pre-registered
+// by someone else with a password they chose. Google proves the real owner, so the
+// password is replaced with a random one (has_set_password = FALSE) and token_version is
+// bumped, which signs out every session that predates this sign-in. A verified account
+// keeps its password and its sessions.
+async function upsertGoogleUser({ username, googleEmail }) {
+  const randomPassword = crypto.randomBytes(32).toString('hex');
+  const hashedPassword = await bcrypt.hash(randomPassword, 10);
+  const userId = crypto.randomUUID();
+
+  // Single source of truth for the welcome-credit amount (email signup uses the same).
+  const { CREDIT_CONFIG: _ccfg } = require('../config/credits');
+  const _googleWelcomeCredits = _ccfg.LIMITS.INITIAL_USER;
+
+  const result = await dbQuery(
+    `INSERT INTO users (id, username, email, password, role, story_quota, stories_generated, credits, email_verified)
+     VALUES ($1, $2, $3, $4,
+       CASE WHEN (SELECT COUNT(*) FROM users) = 0 THEN 'admin' ELSE 'user' END,
+       CASE WHEN (SELECT COUNT(*) FROM users) = 0 THEN 999 ELSE 2 END,
+       0,
+       CASE WHEN (SELECT COUNT(*) FROM users) = 0 THEN -1 ELSE $5 END,
+       TRUE)
+     ON CONFLICT (username) DO UPDATE SET
+       last_login = CURRENT_TIMESTAMP,
+       password = CASE WHEN users.email_verified IS TRUE THEN users.password ELSE EXCLUDED.password END,
+       has_set_password = CASE WHEN users.email_verified IS TRUE THEN users.has_set_password ELSE FALSE END,
+       token_version = users.token_version + CASE WHEN users.email_verified IS TRUE THEN 0 ELSE 1 END,
+       email_verified = TRUE
+     RETURNING *, (xmax = 0) AS is_new_user`,
+    [userId, username, googleEmail, hashedPassword, _googleWelcomeCredits]
+  );
+  const user = result[0];
+  invalidateAuthState(user.id);
+  return user;
+}
+
 // POST /api/auth/google — verify Google ID token and upsert user
 router.post('/google', authLimiter, async (req, res) => {
   try {
@@ -293,36 +333,17 @@ router.post('/google', authLimiter, async (req, res) => {
       log.warn(`Google auth: invalid email from token (sub: ${sub}, email: ${googleEmail})`);
       return res.status(400).json({ error: 'Invalid email from Google account' });
     }
+    if (payload.email_verified !== true) {
+      log.warn(`Google auth: email not verified by Google (sub: ${sub})`);
+      return res.status(400).json({ error: 'Google has not verified this email address' });
+    }
     const username = sanitizeString(googleEmail, 254).toLowerCase();
 
     if (!isDatabaseMode()) {
       return res.status(400).json({ error: 'Google auth requires database mode' });
     }
 
-    const randomPassword = crypto.randomBytes(32).toString('hex');
-    const hashedPassword = await bcrypt.hash(randomPassword, 10);
-    const userId = crypto.randomUUID();
-
-    // Use the single source of truth for the welcome-credit amount. Google
-    // paths previously hardcoded 500 while email signup uses
-    // CREDIT_CONFIG.LIMITS.INITIAL_USER (200). Same Google click giving more
-    // credits than email was a give-away inconsistency; unifying on 200.
-    const { CREDIT_CONFIG: _ccfg } = require('../config/credits');
-    const _googleWelcomeCredits = _ccfg.LIMITS.INITIAL_USER;
-
-    const result = await dbQuery(
-      `INSERT INTO users (id, username, email, password, role, story_quota, stories_generated, credits, email_verified)
-       VALUES ($1, $2, $3, $4,
-         CASE WHEN (SELECT COUNT(*) FROM users) = 0 THEN 'admin' ELSE 'user' END,
-         CASE WHEN (SELECT COUNT(*) FROM users) = 0 THEN 999 ELSE 2 END,
-         0,
-         CASE WHEN (SELECT COUNT(*) FROM users) = 0 THEN -1 ELSE $5 END,
-         TRUE)
-       ON CONFLICT (username) DO UPDATE SET last_login = CURRENT_TIMESTAMP, email_verified = TRUE
-       RETURNING *, (xmax = 0) AS is_new_user`,
-      [userId, username, googleEmail, hashedPassword, _googleWelcomeCredits]
-    );
-    const user = result[0];
+    const user = await upsertGoogleUser({ username, googleEmail });
     const isNewUser = user.is_new_user;
 
     if (isNewUser) {
@@ -519,34 +540,11 @@ router.get('/google/callback', authLimiter, async (req, res) => {
     if (!googleEmail || typeof googleEmail !== 'string' || !googleEmail.includes('@') || googleEmail.length > 254) {
       return failRedirect('invalid_email');
     }
+    if (payload.email_verified !== true) return failRedirect('email_not_verified');
     const username = sanitizeString(googleEmail, 254).toLowerCase();
     if (!isDatabaseMode()) return failRedirect('database_required');
 
-    // Same upsert as POST /google
-    const randomPassword = crypto.randomBytes(32).toString('hex');
-    const hashedPassword = await bcrypt.hash(randomPassword, 10);
-    const userId = crypto.randomUUID();
-
-    // Use the single source of truth for the welcome-credit amount. Google
-    // paths previously hardcoded 500 while email signup uses
-    // CREDIT_CONFIG.LIMITS.INITIAL_USER (200). Same Google click giving more
-    // credits than email was a give-away inconsistency; unifying on 200.
-    const { CREDIT_CONFIG: _ccfg } = require('../config/credits');
-    const _googleWelcomeCredits = _ccfg.LIMITS.INITIAL_USER;
-
-    const result = await dbQuery(
-      `INSERT INTO users (id, username, email, password, role, story_quota, stories_generated, credits, email_verified)
-       VALUES ($1, $2, $3, $4,
-         CASE WHEN (SELECT COUNT(*) FROM users) = 0 THEN 'admin' ELSE 'user' END,
-         CASE WHEN (SELECT COUNT(*) FROM users) = 0 THEN 999 ELSE 2 END,
-         0,
-         CASE WHEN (SELECT COUNT(*) FROM users) = 0 THEN -1 ELSE $5 END,
-         TRUE)
-       ON CONFLICT (username) DO UPDATE SET last_login = CURRENT_TIMESTAMP, email_verified = TRUE
-       RETURNING *, (xmax = 0) AS is_new_user`,
-      [userId, username, googleEmail, hashedPassword, _googleWelcomeCredits]
-    );
-    const user = result[0];
+    const user = await upsertGoogleUser({ username, googleEmail });
     const isNewUser = user.is_new_user;
 
     if (isNewUser) {
@@ -716,9 +714,10 @@ router.post('/reset-password/confirm', passwordResetLimiter, validateBody(schema
     const hashedPassword = await bcrypt.hash(password, 10);
 
     await pool.query(
-      'UPDATE users SET password = $1, has_set_password = true, password_reset_token = NULL, password_reset_expires = NULL WHERE id = $2',
+      'UPDATE users SET password = $1, has_set_password = true, password_reset_token = NULL, password_reset_expires = NULL, token_version = token_version + 1 WHERE id = $2',
       [hashedPassword, user.id]
     );
+    invalidateAuthState(user.id);
 
     res.json({ success: true, message: 'Password has been reset successfully' });
   } catch (err) {
@@ -761,9 +760,14 @@ router.post('/change-password', authenticateToken, validateBody(schemas.changePa
     }
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
-    await pool.query('UPDATE users SET password = $1, has_set_password = true WHERE id = $2', [hashedPassword, userId]);
+    // Bump token_version so every other session signs out; this session gets a fresh token.
+    const updated = await pool.query(
+      'UPDATE users SET password = $1, has_set_password = true, token_version = token_version + 1 WHERE id = $2 RETURNING id, username, email, role, email_verified, token_version',
+      [hashedPassword, userId]
+    );
+    invalidateAuthState(userId);
 
-    res.json({ success: true, message: 'Password changed successfully' });
+    res.json({ success: true, message: 'Password changed successfully', token: generateToken(updated.rows[0]) });
   } catch (err) {
     log.error('Password change error:', err);
     res.status(500).json({ error: 'Failed to change password' });
@@ -1023,7 +1027,7 @@ router.get('/verify-email/:token', async (req, res) => {
 
         // Issue JWT so the user is logged in when they land on /stories
         const fullUser = await pool.query(
-          'SELECT id, username, email, role, email_verified FROM users WHERE id = $1',
+          'SELECT id, username, email, role, email_verified, token_version FROM users WHERE id = $1',
           [user.id]
         );
         const token = generateToken(fullUser.rows[0]);
@@ -1147,7 +1151,7 @@ router.post('/refresh', authenticateToken, async (req, res) => {
 
     const pool = getPool();
     const result = await pool.query(
-      'SELECT id, username, email, role, credits, preferred_language, email_verified, photo_consent_at FROM users WHERE id = $1',
+      'SELECT id, username, email, role, credits, preferred_language, email_verified, photo_consent_at, token_version FROM users WHERE id = $1',
       [userId]
     );
 
@@ -1171,7 +1175,7 @@ router.post('/refresh', authenticateToken, async (req, res) => {
           id: user.id,
           username: user.username,
           email: user.email,
-          role: user.role,
+          role: user.role === 'admin' ? 'user' : user.role, // never an admin role from the target
           emailVerified: user.email_verified,
           impersonating: true,
           originalAdminId: req.user.originalAdminId,

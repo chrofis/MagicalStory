@@ -8,7 +8,7 @@ const express = require('express');
 const router = express.Router();
 
 const { dbQuery, isDatabaseMode, logActivity } = require('../services/database');
-const { authenticateToken, verifyToken } = require('../middleware/auth');
+const { authenticateToken, verifySession } = require('../middleware/auth');
 const { validateBody, schemas, FILE_UPLOAD_CONFIG } = require('../middleware/validation');
 
 // POST /api/files - Upload a file
@@ -81,7 +81,7 @@ router.post('/', authenticateToken, validateBody(schemas.uploadFile), async (req
 // Optional auth middleware - doesn't fail if no token
 // Only accepts `Authorization: Bearer <jwt>`. Ignores other schemes (Basic, etc.)
 // so the staging password-gate's Basic credentials don't clobber JWT parsing.
-const optionalAuth = (req, res, next) => {
+const optionalAuth = async (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && /^Bearer\s+/i.test(authHeader)
     ? authHeader.replace(/^Bearer\s+/i, '')
@@ -89,14 +89,12 @@ const optionalAuth = (req, res, next) => {
 
   if (token) {
     try {
-      req.user = verifyToken(token);
+      req.user = await verifySession(token);
     } catch {
-      // Invalid token — continue as anonymous
+      // Invalid or revoked token — continue as anonymous
     }
-    next();
-  } else {
-    next();
   }
+  next();
 };
 
 // GET /api/files/:fileId - Serve a file

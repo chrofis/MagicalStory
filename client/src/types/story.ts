@@ -425,7 +425,6 @@ export interface RetryAttempt {
   score?: number;
   reasoning?: string;
   prompt?: string;  // Input prompt used for generation
-  textIssue?: string | null;
   expectedText?: string | null;
   actualText?: string | null;
   error?: string;
@@ -548,7 +547,7 @@ export interface FinalChecksTextCheck {
 
 // Entity consistency check issue (from entity grid evaluation)
 export type EntityIssueSubType =
-  | 'face_mismatch' | 'face_drift' | 'face_destroyed' | 'hair_change' | 'hair_nuance' | 'skin_tone' | 'age_shift'
+  | 'identity_swap' | 'face_mismatch' | 'face_drift' | 'face_destroyed' | 'hair_change' | 'hair_nuance' | 'skin_tone' | 'age_shift'
   | 'cutout_artifact'
   | 'body_build'
   | 'clothing_inconsistent' | 'garment_colour' | 'color_change' | 'shape_change';
@@ -1168,7 +1167,26 @@ export interface ClothingReviewReport {
   prompt?: string | null;
 }
 
+export interface BriefCheckReport {
+  model?: string | null;
+  durationMs?: number;
+  findingsBefore?: { pageNumber: number; type: string; detail?: string }[];
+  findingsAfter?: { pageNumber: number; type: string; detail?: string }[];
+  withheld?: { pageNumber: number; type: string; detail?: string }[];
+  verdicts?: { pageNumber: number; accepted: boolean; reason: string }[];
+  /** The rewrites that were taken. */
+  pages?: { pageNumber: number; after: string }[];
+  briefsIn?: { pageNumber: number; brief: string }[];
+  reask?: { prompt?: string | null; model?: string | null; failed?: string | null; pages?: number[] } | null;
+  wornUnresolvedPages?: number[];
+}
+
 export interface ReviewDiffReport {
+  /**
+   * Set when the Jev decision layer was unavailable and this story ran the
+   * backup path (owner exception, 2026-09-27): the step where it switched and why.
+   */
+  jevFallback?: { step: string; reason: string; at?: string } | null;
   model?: string | null;
   durationMs?: number;
   changedPages?: number[];
@@ -1254,6 +1272,12 @@ export interface SavedStory {
   beatsReviewReport?: ReviewDiffReport | null;
   /** Per-page before/after from the scene review (beats pipeline, dev-mode diff). */
   sceneReviewReport?: ReviewDiffReport | null;
+  /**
+   * The brief checks and the one Art Director re-ask (beats pipeline, since
+   * 2026-09-28 — the scene review's successor): findings before and after, the
+   * verdict per re-asked page, and the rewrites that were taken.
+   */
+  briefCheckReport?: BriefCheckReport | null;
   /** What the wardrobe review was given and what it rewrote (dev-mode panel). */
   clothingReviewReport?: ClothingReviewReport | null;
   story?: string;

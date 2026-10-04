@@ -187,6 +187,12 @@ function assessTextReply(result, o = {}) {
   // The reason that DECIDES the verdict, whichever field the provider put it in.
   const stop = resolveStopReason(result);
   const stopReason = stop.value;
+  // WHY IT STOPPED, as the provider reported it — carried on EVERY verdict
+  // (the empty check below runs before the stop-reason classes, so without
+  // these an empty reply's message named no reason at all).
+  const choice = result && Array.isArray(result.choices) ? result.choices[0] : null;
+  const candidate = result && Array.isArray(result.candidates) ? result.candidates[0] : null;
+  const firstOf = (...vals) => { for (const v of vals) if (v != null && String(v).trim()) return String(v).trim(); return null; };
   const base = {
     suspected: false,
     reason: null,
@@ -195,6 +201,8 @@ function assessTextReply(result, o = {}) {
     stopReason,
     stopReasonClass: stop.cls,
     stopReasons: stop.all,
+    finishReason: result ? firstOf(result.stop_reason, result.finish_reason, result.finishReason, choice && choice.finish_reason, candidate && candidate.finishReason) : null,
+    nativeFinishReason: result ? firstOf(result.native_finish_reason, choice && choice.native_finish_reason) : null,
     provider: (result && result.provider) || provider || null,
     model: (result && result.modelId) || model || null,
   };
@@ -243,6 +251,20 @@ function assessTextReply(result, o = {}) {
  */
 function describeTruncation(t) {
   if (!t || !t.suspected) return 'not truncated';
+  return `${describeVerdict(t)} [${describeStop(t)}]`;
+}
+
+/**
+ * Why the model stopped and who served it: `finish_reason=…,
+ * native_finish_reason=…, provider=…`. Appended to every verdict message so an
+ * empty or cut reply names the provider's own reason and the upstream.
+ */
+function describeStop(t) {
+  const v = (x) => (x == null || x === '' ? 'none' : x);
+  return `finish_reason=${v(t && t.finishReason)}, native_finish_reason=${v(t && t.nativeFinishReason)}, provider=${(t && t.provider) || 'unknown'}`;
+}
+
+function describeVerdict(t) {
   const tok = t.outputTokens != null ? `${t.outputTokens} output tokens` : '? output tokens';
   const cap = t.capInForce != null ? `cap ${t.capInForce}` : 'cap ?';
   switch (t.reason) {
@@ -266,7 +288,7 @@ function noteTruncation(t, { usageLabel = null, preview = '' } = {}) {
   stats.byReason[t.reason] = (stats.byReason[t.reason] || 0) + 1;
   const label = usageLabel || 'text';
   stats.byLabel[label] = (stats.byLabel[label] || 0) + 1;
-  stats.last = { at: new Date().toISOString(), usageLabel: label, model: t.model, provider: t.provider, reason: t.reason, outputTokens: t.outputTokens, capInForce: t.capInForce, stopReason: t.stopReason, stopReasonClass: t.stopReasonClass || null, preview: String(preview || '').slice(0, 120) };
+  stats.last = { at: new Date().toISOString(), usageLabel: label, model: t.model, provider: t.provider, reason: t.reason, outputTokens: t.outputTokens, capInForce: t.capInForce, stopReason: t.stopReason, stopReasonClass: t.stopReasonClass || null, finishReason: t.finishReason || null, nativeFinishReason: t.nativeFinishReason || null, preview: String(preview || '').slice(0, 120) };
 }
 
 function getTruncationStats() {
@@ -279,7 +301,7 @@ function _resetTruncationStats() {
 }
 
 module.exports = {
-  assessTextReply, describeTruncation, noteTruncation, getTruncationStats, _resetTruncationStats,
+  assessTextReply, describeTruncation, describeStop, noteTruncation, getTruncationStats, _resetTruncationStats,
   classifyStopReason, resolveStopReason, collectStopReasons,
   NATURAL_STOP, TRUNCATING_STOP_REASONS, REFUSING_STOP_REASONS, TRUNCATING_STOP,
 };

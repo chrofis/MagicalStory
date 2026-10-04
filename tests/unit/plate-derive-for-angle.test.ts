@@ -127,7 +127,8 @@ describe('the derived plate is edited from the base, not generated fresh', () =>
 });
 
 describe('the pipeline honours it', () => {
-  const src = SRC('storyJobPipeline.js');
+  // The vantage plates live in platePipeline.js since 2026-09-27 (shared with the Lab).
+  const src = SRC('storyJobPipeline.js') + SRC('server/lib/platePipeline.js');
 
   it('picks a plate-sharing page as the vantage representative', () => {
     // Taking pageNumbers[0] blindly could paint the base from a high-angle page
@@ -149,7 +150,9 @@ describe('the pipeline honours it', () => {
   });
   it('the derive is sent with the plate-derive template, not illustration-edit', () => {
     expect(src).toMatch(/plateImage, instruction, MODEL_DEFAULTS\.emptyScenePlateModel, \[\], inputData\.artStyle \|\| null, layoutAspect, \{ plateDerive: true \}\)/);
-    expect(SRC('server/lib/testlab.js')).toMatch(/MODEL_DEFAULTS\.emptyScenePlateModel, \[\], ctx\.artStyle, null, \{ plateDerive: true \}\)/);
+    // The Lab replays the derive at the run's aspect (the layout's), never null
+    // (2026-09-27; tests/unit/lab-prod-call-parity.test.ts runs it).
+    expect(SRC('server/lib/testlab.js')).toMatch(/MODEL_DEFAULTS\.emptyScenePlateModel, \[\], ctx\.artStyle \|\| null,\s*ctx\.layout\?\.imageAspect \|\| MODEL_DEFAULTS\.pageAspect, \{ plateDerive: true \}\)/);
   });
   it('a derived plate is QC-judged at its own camera', () => {
     expect(src).toMatch(/validateEmptyScene\(derivedImage, null, `vantage-\$\{vantageId\}-\$\{cls\}`, derivedQcOpts\)/);
@@ -180,9 +183,5 @@ describe('the pipeline honours it', () => {
 
   it('a derived plate records the base plate as its one reference', () => {
     expect(src).toContain('grokRefImages: derivedForPage ? [plateImage] : plateRefs');
-  });
-
-  it('reads a derived plate\'s population on its own, not as its base plate', () => {
-    expect(src).toMatch(/bg\.plateDerivedFor \? `:\$\{bg\.plateDerivedFor\}`/);
   });
 });

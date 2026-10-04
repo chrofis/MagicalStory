@@ -118,7 +118,9 @@ describe('every brief-reply parser passes the terminator', () => {
 
   it('names BRIEF_TRAILING_MARKERS at every SCENES call site', () => {
     const seen: string[] = [];
-    for (const rel of ['server/lib/beatsPipeline.js', 'server/lib/testlab.js']) {
+    // The Lab runs the run's own Art Director and re-ask; the parses live in
+    // beatsPipeline.js (the page briefs) and briefChecks.js (the one re-ask).
+    for (const rel of ['server/lib/beatsPipeline.js', 'server/lib/briefChecks.js']) {
       const src = fs.readFileSync(path.join(root, rel), 'utf8');
       // The Lab aliases the import as `parseAll`; both spellings count.
       const calls = src.match(/(?:parseRefinedText|parseAll)\([^;]*?'SCENES'[^;]*?\)/g) || [];
@@ -129,11 +131,13 @@ describe('every brief-reply parser passes the terminator', () => {
       }
     }
     // A call site deleted without replacement would pass the loop above.
-    expect(seen.length).toBeGreaterThanOrEqual(6);
+    // Two since 2026-09-28: the page-brief call and the one re-ask (the scene
+    // review's two parses went with it).
+    expect(seen.length).toBeGreaterThanOrEqual(2);
   });
 
   it('the constant names the block the two brief templates actually emit', () => {
-    for (const tpl of ['scene-review.txt', 'scene-expansion-all.txt']) {
+    for (const tpl of ['brief-reask.txt', 'visual-bible.txt']) {
       const template = fs.readFileSync(path.join(root, 'prompts', tpl), 'utf8');
       for (const name of BRIEF_TRAILING_MARKERS) {
         expect(template, tpl).toContain(`---${name}---`);

@@ -76,7 +76,11 @@ describe('the stored page prompt is the prompt the model received', () => {
     // block drops. If it ever calls a text model again this blows up.
     textModels.callTextModel = async () => { throw new Error('the shrinker made a paid call'); };
 
-    const built = buildPrompt(CAP + 4000);
+    // Over the cap by less than the reference-photo paragraph it carries: the
+    // scene itself is never cut (2026-09-26), only a ranked block.
+    const ranked: string = require_('fs').readFileSync(require_('path').join(process.cwd(), 'prompts', 'image-generation.txt'), 'utf-8')
+      .split(/\n{2,}/).map((x: string) => x.trim()).find((x: string) => x.startsWith('When the FIRST reference photo'));
+    const built = `${buildPrompt(CAP - 400)}\n\n${ranked}`;
     expect(built.length).toBeGreaterThan(CAP);
 
     const res = await images.generateImageOnly(built, [], genOpts);
@@ -100,8 +104,10 @@ describe('the stored page prompt is the prompt the model received', () => {
     // the compression branch fired and the reproduction is wrong.
     textModels.callTextModel = async () => { throw new Error('compressor must not run'); };
 
+    // 40 duplicated bullets when the cap was 7,900 (raised 2026-10-04, decisions.md
+    // "Grok prompt caps are 16,000 / 64,000 bytes"): scaled so the raw prompt stays over the cap.
     const body = `wearing the same verbatim proportion boilerplate ${'x'.repeat(200)}`;
-    const dupes = Array.from({ length: 40 }, (_, i) => `- Name${i}: ${body}`).join('\n');
+    const dupes = Array.from({ length: Math.ceil(CAP / 200) }, (_, i) => `- Name${i}: ${body}`).join('\n');
     const built = `${'Scene prose. '.repeat(400)}\n${dupes}\n\n**REQUIRED OBJECTS**\n- a lantern\n\n**ART STYLE**\nwatercolour.`;
     expect(built.length).toBeGreaterThan(CAP);
 

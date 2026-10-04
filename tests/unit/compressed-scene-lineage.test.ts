@@ -73,7 +73,11 @@ describe('the shrinker records the exact head it sent', () => {
     // No text model: the deterministic section-aware cut is the guarantee
     // branch, and it must record its result like the compression branch does.
     textModels.callTextModel = async () => { throw new Error('offline'); };
-    const built = buildPrompt(CAP + 4000);
+    // Over the cap by less than the reference-photo paragraph it carries: the
+    // scene itself is never cut (2026-09-26), only a ranked block.
+    const ranked: string = fs.readFileSync(path.join(process.cwd(), 'prompts', 'image-generation.txt'), 'utf-8')
+      .split(/\n{2,}/).map(x => x.trim()).find(x => x.startsWith('When the FIRST reference photo'))!;
+    const built = `${buildPrompt(CAP - 400)}\n\n${ranked}`;
     expect(built.length).toBeGreaterThan(CAP);
 
     const meta: any = {};

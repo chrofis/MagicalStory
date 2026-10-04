@@ -290,13 +290,15 @@ function parseClothingCategory(sceneDescription, warnOnInvalid = true) {
       return valueMatch[1].toLowerCase();
     }
 
-    // Found keyword but no valid value - log error and default to standard
+    // Found keyword but no valid value: null, never 'standard'. A default here beat
+    // the callers' `|| primaryClothing` and their "refusing to default to
+    // standard" throws (review 2026-10-04 C3).
     if (warnOnInvalid) {
       const invalidValueMatch = nearbyText.match(/:\s*\*{0,2}(\w+)/i);
       const invalidValue = invalidValueMatch ? invalidValueMatch[1] : '(empty)';
-      log.error(`[CLOTHING] No valid clothing value near keyword (found: "${invalidValue}"), defaulting to standard. Valid values: winter, summer, standard, costumed`);
+      log.error(`[CLOTHING] No valid clothing value near keyword (found: "${invalidValue}"). Valid values: winter, summer, standard, costumed`);
     }
-    return 'standard';
+    return null;
   }
 
   return null;
@@ -387,7 +389,7 @@ function getCharacterPhotoDetails(characters, defaultClothing = null, artStyle =
   // → avatars.clothing[category].
   const resolveClothingDescription = (charName, category, avatars) => {
     if (!category) return null;
-    const charReqs = clothingRequirements?.[charName];
+    const charReqs = resolveCharacterReqs(clothingRequirements, charName);   // RESOLVE: outline spelling may differ from character.name
     if (charReqs && charReqs[category]) {
       const catReq = charReqs[category];
       if (catReq.signature && catReq.signature !== 'none') return catReq.signature;
@@ -492,8 +494,9 @@ function getCharacterPhotoDetails(characters, defaultClothing = null, artStyle =
               }
             }
             // Fallback: get costume description from clothingRequirements
-            if (!clothingDescription && clothingRequirements?.[char.name]?.costumed?.description) {
-              clothingDescription = clothingRequirements[char.name].costumed.description;
+            const reqCostumeDesc = resolveCharacterReqs(clothingRequirements, char.name)?.costumed?.description;
+            if (!clothingDescription && reqCostumeDesc) {
+              clothingDescription = reqCostumeDesc;
               log.debug(`[CLOTHING DESC] ${char.name}: using costumed description from clothingRequirements`);
             }
           }
@@ -509,8 +512,9 @@ function getCharacterPhotoDetails(characters, defaultClothing = null, artStyle =
               log.debug(`[AVATAR LOOKUP] ${char.name}: costumed avatar not ready, using costumed clothing description`);
             }
           }
-          if (!clothingDescription && clothingRequirements?.[char.name]?.costumed?.description) {
-            clothingDescription = clothingRequirements[char.name].costumed.description;
+          const reqCostumeDesc = resolveCharacterReqs(clothingRequirements, char.name)?.costumed?.description;
+          if (!clothingDescription && reqCostumeDesc) {
+            clothingDescription = reqCostumeDesc;
             log.debug(`[AVATAR LOOKUP] ${char.name}: costumed avatar not ready, using description from clothingRequirements`);
           }
         }
@@ -808,8 +812,12 @@ function buildSceneClothingRequirements(sceneCharacters, perCharClothing, clothi
         }
       }
     }
+    // Seed from the entry under ANY spelling of the name: the outline may key
+    // the contract "Luna" for a character named "LUNA", and a stamp on an empty
+    // "LUNA" entry would shadow the real one (costume + description lost).
+    const existing = resolveCharacterReqs(out, char.name);
     out[char.name] = {
-      ...(out[char.name] || {}),
+      ...(existing && typeof existing === 'object' ? existing : {}),
       _currentClothing: charClothing,
     };
   }
@@ -839,7 +847,7 @@ function resolveClothingForPage(char, clothingLabel, clothingRequirements = null
   // stories). Per the 2026-05-22 codebase-audit decision, avatars.clothing
   // is kept as a fallback rather than removed.
   if (isCostumed) {
-    const reqs = clothingRequirements?.[char.name]?.costumed;
+    const reqs = resolveCharacterReqs(clothingRequirements, char.name)?.costumed;
     if (reqs?.signature && reqs.signature !== 'none') return reqs.signature;
     if (reqs?.description) return reqs.description;
     if (avatars?.clothing?.costumed) {
@@ -850,7 +858,7 @@ function resolveClothingForPage(char, clothingLabel, clothingRequirements = null
   }
 
   if (label) {
-    const reqs = clothingRequirements?.[char.name]?.[label];
+    const reqs = resolveCharacterReqs(clothingRequirements, char.name)?.[label];
     if (reqs?.signature && reqs.signature !== 'none') return reqs.signature;
     if (reqs?.description) return reqs.description;
     if (avatars?.clothing?.[label]) {

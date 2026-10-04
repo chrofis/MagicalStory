@@ -195,7 +195,11 @@ export default function TrialIdeasStep({
       const apiUrl = import.meta.env.VITE_API_URL || '';
       const response = await fetch(`${apiUrl}/api/trial/generate-ideas-stream`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        // The server requires the trial session (created, Turnstile-verified, at the character step).
+        headers: {
+          'Content-Type': 'application/json',
+          ...(sessionToken ? { 'Authorization': `Bearer ${sessionToken}` } : {}),
+        },
         body: JSON.stringify({
           storyCategory: storyInput.storyCategory,
           storyTopic: storyInput.storyTopic,
@@ -280,7 +284,7 @@ export default function TrialIdeasStep({
       setError(err.message || 'Failed to generate ideas');
       setIsGenerating(false);
     }
-  }, [characterData, storyInput, userLocation]);
+  }, [characterData, storyInput, userLocation, sessionToken]);
 
   // When both ideas are final, persist to parent
   useEffect(() => {

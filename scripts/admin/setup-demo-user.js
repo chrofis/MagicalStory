@@ -15,6 +15,7 @@
 const fs = require('fs');
 const path = require('path');
 
+const { verifyAccountAsAdmin } = require('../lib/verifyAccountAsAdmin');
 const DEMO_PASSWORD = process.env.DEMO_PASSWORD || 'DemoStory2026!';
 const FAMILIES_PATH = path.join(__dirname, '..', '..', 'tests', 'helpers', 'demo-families.json');
 
@@ -51,6 +52,9 @@ async function setupOneFamily(apiBase, family) {
     } else {
       throw new Error(`Registration failed: ${registerRes.status} ${JSON.stringify(err)}`);
     }
+  } else {
+    // Registration does not auto-verify demo addresses any more (review V1); verify via admin API.
+    await verifyAccountAsAdmin(apiBase, (await registerRes.json()).user.id);
   }
 
   // 2. Login

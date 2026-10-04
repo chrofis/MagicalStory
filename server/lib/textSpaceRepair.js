@@ -33,6 +33,7 @@ const {
   requiredFontPt,
   countWords,
 } = require('../config/textRegion');
+const { MODEL_DEFAULTS } = require('../config/models');
 
 /**
  * Probe the image's pixel dimensions. Throws on bad input — callers must
@@ -90,7 +91,8 @@ async function measureCalmZone(imageData, textPosition, languageLevel, pageNumbe
  *
  * `generateImage` is a caller-supplied async function so this module
  * doesn't import images.js (would be a circular require). It receives the
- * repair prompt and the textAreaMask + previousImage and returns the
+ * repair prompt and { textAreaMask, previousImage, imageModelOverride } (the
+ * page render tier — the caller passes it on unchanged) and returns the
  * generateImageOnly result shape ({ imageData, modelId, grokRefImages,
  * usage }).
  */
@@ -153,9 +155,16 @@ async function ensureCalmZone(opts) {
         });
         // Caller's previous-best is candidates[0].imageData (the original) —
         // the mask + the unchanged scene give the model a clean retry.
+        // THE PAGE RENDER TIER, stated here once for every caller (2026-09-26).
+        // A calm-zone retry is a re-render of the page, so it renders on the
+        // tier the page did. The three callers (storyJobPipeline text-space,
+        // repairPipeline POST-REPAIR-TEXT, the Lab text_zone stage) read
+        // `sceneMetadata.pageImageModel` — a field nothing writes — or passed
+        // nothing, and generateImageOnly's default is the EDIT tier (Standard).
         const result = await generateImage(repairPrompt, {
           previousImage: candidates[0].imageData,
           textAreaMask,
+          imageModelOverride: MODEL_DEFAULTS.pageRenderImage,
         });
         if (!result?.imageData) {
           log.warn(`⚠️ [${label}] P${pageNumber} attempt ${attempt}: no image returned`);

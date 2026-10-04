@@ -18,7 +18,11 @@
  *           brief; no back cover, no commission — corrected 2026-09-23)
  *        b. blind         — grok-4.6, story-text-audit-blind.txt (page text and
  *           nothing else)
- *   2. MERGE + DEDUPE the two fault lists in code (mergeAuditFindings)
+ *        c. jev           — the Jev decision model (jevAudit.runJevTextSource,
+ *           2026-09-27): per-page AI-slop, blatant logic and plan-line
+ *           contradiction flags plus the $0 ß / «» / "suddenly" checks, as
+ *           FAULT lines; a Jev failure = no Jev findings, logged as an error
+ *   2. MERGE + DEDUPE the fault lists in code (mergeAuditFindings)
  *   3. ONE REPAIR PASS over the merged findings (textRefineModel)
  *   4. ONE GRAMMAR CHECK over the pages the repair rewrote — BEFORE/AFTER as
  *      numbered sentences; it may only FIX a sentence or RESTORE a writer
@@ -140,6 +144,32 @@ function wordOverlap(a, b) {
  */
 const DUPLICATE_OVERLAP = 0.4;
 
+/** The sentence a STYLE finding quotes, «…», normalised; '' when it quotes none. */
+function styleQuote(text) {
+  const m = String(text || '').match(/«([^»]+)»/);
+  return m ? m[1].toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim() : '';
+}
+
+/**
+ * Two findings on one page from different sources name the same fault.
+ *
+ * STYLE is the exception to "same category = same fault" (2026-09-26): a STYLE
+ * finding is ONE SENTENCE (the blind audit files one per sentence, and the
+ * one-sentence-paragraph counter does the same), so two STYLE findings are one
+ * fault only when they quote the same sentence. Folding on the tag alone would
+ * drop the counter's p15 finding under a blind finding about another p15
+ * sentence, and the repair would never see it.
+ */
+function sameFault(k, f) {
+  if (k.category === 'STYLE' && f.category === 'STYLE') {
+    const a = styleQuote(k.text);
+    const b = styleQuote(f.text);
+    if (a && b) return a === b;
+    return wordOverlap(k.text, f.text) >= DUPLICATE_OVERLAP;
+  }
+  return k.category === f.category || wordOverlap(k.text, f.text) >= DUPLICATE_OVERLAP;
+}
+
 /**
  * Merge the audits' fault lists into the single list the repair pass answers.
  *
@@ -163,7 +193,7 @@ function mergeAuditFindings(lists = []) {
         k.pageNumber != null && f.pageNumber != null &&
         k.pageNumber === f.pageNumber &&
         !k.sources.includes(source) &&
-        (k.category === f.category || wordOverlap(k.text, f.text) >= DUPLICATE_OVERLAP)
+        sameFault(k, f)
       );
       if (twin) {
         if (!twin.sources.includes(source)) twin.sources.push(source);
@@ -232,7 +262,46 @@ const FINDING_OUTCOME = {
    * the ledger stops claiming it (settleLedgerAfterDiff).
    */
   REWRITE_RESTORED: 'rewrite-restored',
+  /**
+   * The pass's own ledger says the finding STANDS (owner, 2026-10-04). A
+   * declined finding is open, whatever happened to its page: on staging
+   * job_1791040103540_atbttop6w the refine kept p18's text-vs-picture MISMATCH
+   * ("stands: … the ending's own act") and the ledger called it page-rewritten
+   * because other findings on p18 were fixed. Only this direction is read from
+   * the prose: a declared decline OPENS a finding, a claimed fix never closes one.
+   */
+  DECLINED: 'declined',
 };
+
+/** The id the refine is shown a merged audit finding under, and cites in its ledger. */
+function auditFindingId(i) {
+  return `T${i + 1}`;
+}
+
+/** The findings as the refine is shown them: one line each, prefixed with its id. */
+function numberedFindingsText(findings = []) {
+  return (findings || []).map((f, i) => `${auditFindingId(i)} ${f.line}`).join('\n');
+}
+
+/**
+ * The findings the pass declined: ledger lines that START with a finding id and
+ * carry `STANDS:` (text-refine.txt's ledger contract). Returns id → reason. An
+ * id the pass was never given is logged as an error and ignored.
+ */
+function parseDeclinedFindings(analysis, findingCount) {
+  const declined = new Map();
+  for (const raw of String(analysis || '').split(/\r?\n/)) {
+    const m = raw.match(/^\s*(?:[-*]\s*)?\**\s*(T\d+)\b[^\n]*?\bSTANDS:\s*(.*)$/);
+    if (!m) continue;
+    const n = Number(m[1].slice(1));
+    if (!(n >= 1 && n <= findingCount)) {
+      log.error(`❌ [TEXT-REPAIR] ledger declines ${m[1]}, an id the pass was never given — ignored`);
+      continue;
+    }
+    declined.set(m[1], m[2].trim());
+  }
+  return declined;
+}
 
 /**
  * Resolve every finding to exactly one outcome.
@@ -244,13 +313,19 @@ const FINDING_OUTCOME = {
  *        its own structural self-report. Passed, a returned page whose text did
  *        not move is separated from one the pass never answered. Omitted, both
  *        stay `page-unchanged`, which is what every earlier caller meant.
- * @returns {Array<Object>} one entry per finding, each with `outcome` and `reason`
+ * @param {Map<string,string>} [declined]      id → reason, from parseDeclinedFindings;
+ *        the finding at position i has id auditFindingId(i).
+ * @returns {Array<Object>} one entry per finding, each with `id`, `outcome` and `reason`
  */
-function resolveFindingOutcomes(findings = [], pages = [], changedPages = [], returnedPages = null) {
+function resolveFindingOutcomes(findings = [], pages = [], changedPages = [], returnedPages = null, declined = null) {
   const known = new Set((pages || []).map(p => p.pageNumber));
   const changed = new Set(changedPages || []);
   const returned = Array.isArray(returnedPages) ? new Set(returnedPages) : null;
-  return (findings || []).map((f) => {
+  return (findings || []).map((finding, i) => {
+    const f = { ...finding, id: auditFindingId(i) };
+    if (declined && declined.has(f.id)) {
+      return { ...f, outcome: FINDING_OUTCOME.DECLINED, reason: `the pass left it standing: ${declined.get(f.id) || '(no reason given)'}` };
+    }
     if (f.pageNumber == null) {
       return { ...f, outcome: FINDING_OUTCOME.NO_PAGE_NAMED, reason: 'the fault line names no page, so no rewrite can be matched to it' };
     }
@@ -296,7 +371,41 @@ function unresolvedFindings(ledger = []) {
 const GRAMMAR_EDIT_MAX_WORDS = 4;
 
 const DIFF_FIX_RE = /^(?:[-*]\s*)?PAGE\s+(\d+)\s+FIX\s+A(\d+)\s*:\s*(.+)$/i;
-const DIFF_RESTORE_RE = /^(?:[-*]\s*)?PAGE\s+(\d+)\s+RESTORE\s+B(\d+)\s+AFTER\s+A(\d+)\s*\.?\s*$/i;
+/**
+ * A RESTORE NAMES WHAT IT REMOVES (2026-09-27). It used to be `RESTORE B<j>
+ * AFTER A<k>`, a pure insertion, so a writer sentence the rewrite had REPLACED
+ * came back next to its replacement: staging job_1790508305061_dka3jpog9 p2
+ * shipped «Es war eine Schuppe. Julian musste sie mit beiden Händen halten. Es
+ * war eine Schuppe, so gross, …» — the restore put B4 back and left the A4-A5
+ * that had taken its place. Now every restore says which AFTER sentences it
+ * replaces (`REPLACING A<k>` or `A<k>-A<m>`), or `REPLACING NONE AFTER A<k>` for
+ * a sentence the rewrite dropped with nothing in its place. The old bare form
+ * is unreadable, never guessed at.
+ */
+const DIFF_RESTORE_RE = /^(?:[-*]\s*)?PAGE\s+(\d+)\s+RESTORE\s+B(\d+)\s+REPLACING\s+(?:A(\d+)(?:\s*-\s*A(\d+))?|NONE\s+AFTER\s+A(\d+))\s*\.?\s*$/i;
+
+/** Lower-case word tokens, punctuation ignored — the unit every counting guard here uses. */
+function wordTokens(s) {
+  return String(s || '').toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, ' ').split(/\s+/).filter(Boolean);
+}
+
+/** True when `inner`'s words stand, in order and unbroken, inside `outer`'s. */
+function containsWordRun(outer, inner) {
+  const o = wordTokens(outer);
+  const i = wordTokens(inner);
+  if (!i.length || i.length > o.length) return false;
+  for (let s = 0; s + i.length <= o.length; s++) {
+    if (i.every((w, k) => o[s + k] === w)) return true;
+  }
+  return false;
+}
+
+/**
+ * The shortest AFTER sentence the duplicate guard compares. A two-word
+ * sentence («Er nickte.») can stand inside a long one by chance; three words
+ * of the writer's sentence standing again beside it cannot.
+ */
+const RESTORE_DUPLICATE_MIN_WORDS = 3;
 
 /**
  * Parse the grammar check's reply. A line that starts like an edit and fits
@@ -318,7 +427,13 @@ function parseDiffEdits(raw) {
     }
     m = line.match(DIFF_RESTORE_RE);
     if (m) {
-      edits.push({ kind: 'restore', pageNumber: Number(m[1]), beforeIndex: Number(m[2]), afterIndex: Number(m[3]) });
+      edits.push(m[5] !== undefined
+        ? { kind: 'restore', pageNumber: Number(m[1]), beforeIndex: Number(m[2]), replaceFrom: null, replaceTo: null, afterIndex: Number(m[5]) }
+        : { kind: 'restore', pageNumber: Number(m[1]), beforeIndex: Number(m[2]), replaceFrom: Number(m[3]), replaceTo: Number(m[4] ?? m[3]) });
+      continue;
+    }
+    if (/^(?:[-*]\s*)?PAGE\s+\d+\s+RESTORE\b/i.test(line)) {
+      unparsed.push({ line, reason: 'a RESTORE must name what it replaces (REPLACING A<k>, A<k>-A<m>, or NONE AFTER A<k>)' });
       continue;
     }
     if (/^(?:[-*]\s*)?PAGE\s+\d+/i.test(line)) unparsed.push({ line, reason: 'not a FIX or RESTORE line' });
@@ -328,9 +443,8 @@ function parseDiffEdits(raw) {
 
 /** Word-level edit distance, case and punctuation ignored. */
 function wordEditDistance(a, b) {
-  const tok = s => String(s || '').toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, ' ').split(/\s+/).filter(Boolean);
-  const x = tok(a);
-  const y = tok(b);
+  const x = wordTokens(a);
+  const y = wordTokens(b);
   let prev = Array.from({ length: y.length + 1 }, (_, j) => j);
   for (let i = 1; i <= x.length; i++) {
     const cur = [i];
@@ -367,26 +481,51 @@ function applyDiffEdits(pages = [], beforeByPage = new Map(), edits = []) {
     const after = pageSentences(page.text);
     const before = pageSentences(beforeByPage.get(pageNumber) || '');
     const ops = [];
-    const fixed = new Set();
+    // AFTER sentence numbers an applied edit already owns: a fix rewrites one, a
+    // restore removes the ones it replaces. A second edit on any of them is an overlap.
+    const touched = new Set();
     for (const e of list) {
       if (e.kind === 'fix') {
         const target = after[e.afterIndex - 1];
         if (!target) { drop(e, 'no-such-sentence', `A${e.afterIndex}`, e.text); continue; }
-        if (fixed.has(e.afterIndex)) { drop(e, 'overlap', target.text, e.text); continue; }
+        if (touched.has(e.afterIndex)) { drop(e, 'overlap', target.text, e.text); continue; }
         if (e.text === target.text) { drop(e, 'unchanged', target.text, e.text); continue; }
         if (pageSentences(e.text).length !== 1) { drop(e, 'not-one-sentence', target.text, e.text); continue; }
         if (wordEditDistance(target.text, e.text) > GRAMMAR_EDIT_MAX_WORDS) { drop(e, 'rewrites-the-sentence', target.text, e.text); continue; }
-        fixed.add(e.afterIndex);
+        touched.add(e.afterIndex);
         ops.push({ at: target.start, end: target.end, insert: e.text });
         applied.push({ pageNumber, kind: 'fix', quote: target.text, correction: e.text, restored: [] });
       } else {
         const source = before[e.beforeIndex - 1];
         if (!source) { drop(e, 'no-such-sentence', `B${e.beforeIndex}`); continue; }
-        if (e.afterIndex < 0 || e.afterIndex > after.length) { drop(e, 'no-such-sentence', `A${e.afterIndex}`, source.text); continue; }
         if (after.some(a => a.text === source.text)) { drop(e, 'already-present', '', source.text); continue; }
-        const at = e.afterIndex === 0 ? (after[0] ? after[0].start : 0) : after[e.afterIndex - 1].end;
-        ops.push({ at, end: at, insert: e.afterIndex === 0 ? `${source.text} ` : ` ${source.text}` });
-        applied.push({ pageNumber, kind: 'restore', quote: '', correction: source.text, restored: [source.text] });
+        const replacing = e.replaceFrom != null;
+        if (replacing) {
+          if (e.replaceFrom < 1 || e.replaceTo < e.replaceFrom || e.replaceTo > after.length) {
+            drop(e, 'no-such-sentence', `A${e.replaceFrom}-A${e.replaceTo}`, source.text); continue;
+          }
+        } else if (e.afterIndex < 0 || e.afterIndex > after.length) {
+          drop(e, 'no-such-sentence', `A${e.afterIndex}`, source.text); continue;
+        }
+        const removed = replacing
+          ? Array.from({ length: e.replaceTo - e.replaceFrom + 1 }, (_, i) => e.replaceFrom + i)
+          : [];
+        const quote = removed.map(i => after[i - 1].text).join(' ');
+        if (removed.some(i => touched.has(i))) { drop(e, 'overlap', quote, source.text); continue; }
+        // THE PASS CAN NEVER LEAVE BOTH (2026-09-27). Whatever the reply names,
+        // a restore whose sentence would stand beside AFTER text it repeats word
+        // for word is refused: the rewrite's version of it is still on the page.
+        const kept = after.map((a, i) => ({ ...a, n: i + 1 })).filter(a => !removed.includes(a.n));
+        const dup = kept.find(a => wordTokens(a.text).length >= RESTORE_DUPLICATE_MIN_WORDS && containsWordRun(source.text, a.text));
+        if (dup) { drop(e, `duplicates-A${dup.n}`, dup.text, source.text); continue; }
+        for (const i of removed) touched.add(i);
+        if (replacing) {
+          ops.push({ at: after[e.replaceFrom - 1].start, end: after[e.replaceTo - 1].end, insert: source.text });
+        } else {
+          const at = e.afterIndex === 0 ? (after[0] ? after[0].start : 0) : after[e.afterIndex - 1].end;
+          ops.push({ at, end: at, insert: e.afterIndex === 0 ? `${source.text} ` : ` ${source.text}` });
+        }
+        applied.push({ pageNumber, kind: 'restore', quote, correction: source.text, restored: [source.text] });
       }
     }
     let text = page.text;
@@ -526,6 +665,73 @@ function buildWordBudgetFindings(pages = [], languageLevel) {
   return lines.join('\n');
 }
 
+/**
+ * ONE-SENTENCE NARRATION PARAGRAPHS, counted in code (owner, 2026-09-26).
+ *
+ * STYLE_RULEBOOK bans "a one-sentence paragraph for drama", and the writer
+ * breaks it anyway: staging job_1790446348343_z3fw660ie shipped three (p9, p15,
+ * p16), the dragon runs job_1790277448294_5herh01j7 and
+ * job_1790373080139_vnx5l8iy7 four more. The blind audit files one now and
+ * then; the rest reach a page only if something else makes it rewritable. So
+ * the count is code's, like the word budget and the repetition check: no
+ * model reads meaning here, only paragraph and sentence boundaries
+ * (pageSentences, the counter's own splitter).
+ *
+ * What counts: a paragraph of exactly one sentence that carries no quotation
+ * mark, on a page of more than one paragraph. A spoken line standing alone is
+ * dialogue, which the rule does not govern; a page that is a single sentence
+ * is the reading level's shape, not a set-piece.
+ *
+ * @param {Array<{pageNumber:number,text:string}>} pages
+ * @returns {Array<{pageNumber:number, sentence:string}>}
+ */
+const DIALOGUE_MARK_RE = /[«»‹›„“”"]/;
+function findOneSentenceParagraphs(pages = []) {
+  const { pageSentences } = require('./promptBuilders');
+  const hits = [];
+  for (const p of pages) {
+    const sentences = pageSentences(p.text);
+    const byParagraph = new Map();
+    for (const s of sentences) byParagraph.set(s.paragraph, [...(byParagraph.get(s.paragraph) || []), s]);
+    if (byParagraph.size < 2) continue;
+    for (const list of byParagraph.values()) {
+      if (list.length === 1 && !DIALOGUE_MARK_RE.test(list[0].text)) {
+        hits.push({ pageNumber: p.pageNumber, sentence: list[0].text });
+      }
+    }
+  }
+  return hits;
+}
+
+/**
+ * The hits as STYLE findings, one per sentence, in the blind audit's STYLE
+ * shape, so the repair closes each the way text-refine.txt closes a STYLE
+ * finding: that sentence recast or joined into the one beside it.
+ * @returns {string} newline-joined FAULT[STYLE] lines ('' when none)
+ */
+function buildOneSentenceParagraphFindings(pages = []) {
+  return findOneSentenceParagraphs(pages)
+    .map(h => `FAULT[STYLE]: p${h.pageNumber} — «${h.sentence}» stands alone as a one-sentence paragraph; join it into the paragraph beside it.`)
+    .join('\n');
+}
+
+/**
+ * The repair's "ARC FAULT: p<N>: …" ledger lines (MECHANISM_FIX_RULE,
+ * promptBuilders.js): a mechanism the pages cannot make work, left standing
+ * as the arc's fault instead of closed with invented hardware. A fixed marker
+ * the prompt asks for, read verbatim; nothing here interprets meaning.
+ * @param {string} analysis
+ * @returns {string[]}
+ */
+function parseArcFaultLines(analysis) {
+  const out = [];
+  for (const raw of String(analysis || '').split('\n')) {
+    const m = raw.trim().replace(/^[-*]\s*/, '').replace(/^\*\*(ARC FAULT:)\*\*/i, '$1').match(/^ARC FAULT:\s*(.+)$/i);
+    if (m) out.push(m[1].trim());
+  }
+  return out;
+}
+
 // ─────────────── LECTOR: FINDINGS PARSED, CORRECTIONS APPLIED IN CODE ──────────
 
 /**
@@ -575,6 +781,11 @@ function quotedSpan(s) {
   if (!close) return null;
   const end = t.lastIndexOf(close);
   if (end <= 0) return false;
+  // A PAIRED opener («, „, “, ‹, ‘) also starts ordinary text: a bare correction
+  // `«Komm!», sagte er.` is prose, not a quoted span. It is a delimiter only when
+  // its close ends the side (review 2026-10-04 C4). Symmetric quotes (' " `)
+  // keep first-to-last.
+  if (close !== t[0] && end !== t.length - 1) return null;
   return t.slice(1, end);
 }
 
@@ -764,6 +975,76 @@ function applyLectorFindings(pages = [], findings = []) {
   return { pages: next, applied, dropped };
 }
 
+// The lector's call options — one constant for the page lector and the title
+// lector, so the title gets exactly the correction the pages get.
+// null output cap = the model's own limit (owner rule: no output caps). A
+// finding list is a few hundred tokens — the cost of this call is decided by
+// the output CONTRACT, not by the ceiling.
+// temperature 0: the A/B measured this prompt at 0, and a lector must not
+// paraphrase the page it quotes.
+// reasoning effort 'medium': measured 2026-09-06 on job_1788380714660_4p9mr11xszu
+// (de-ch, 16 pages, 4 CORE faults). Default (no key) burned 12,764 reasoning
+// tokens / $0.1621 / 84s; 'medium' 7,135 / $0.0948 / 46s for the same 4/4 CORE
+// catch. 'low' (1,696 / $0.0281) collapsed to 0/4 CORE and 3-4 false positives,
+// so recall is a direct function of reasoning budget — do NOT lower this further.
+const LECTOR_OPTS = { temperature: 0, usageLabel: 'text_lector', reasoning: { effort: 'medium' } };
+
+/**
+ * THE TITLE THROUGH THE LECTOR (2026-10-04). The page text has a lector; the
+ * title never did, and staging job_1791040103540_atbttop6w shipped
+ * "Vier Freunde und ein Drachonei" on its front cover. The title candidates
+ * go through the SAME prompt (buildTextProofreadPrompt — STYLE_RULEBOOK, the
+ * language's spelling rules, de-ch ss), the same model and options, the same
+ * parser and the same quote-checked substitution as the pages — one candidate
+ * per pseudo-page, numbered from 1.
+ *
+ * It cannot ride on the page lector: that runs last in the refine chain, in
+ * parallel with the images, and the front cover bakes the title into its art.
+ * The caller (beatsPipeline, right after the writer's TITLE block is parsed)
+ * runs this before anything renders.
+ *
+ * Throws when the template or model is unavailable, or the reply is empty or
+ * truncated — the caller logs that at error level.
+ *
+ * @param {Object} storyData - language, languageLevel
+ * @param {string[]} candidates - the writer's title candidates, in order
+ * @param {{model?: string}} [opts]
+ * @returns {Promise<{candidates:string[], findings:Array, applied:Array, dropped:Array, unparsed:Array, rawResponse:string, prompt:string, modelId:string, elapsedMs:number}>}
+ */
+async function proofreadTitleCandidates(storyData, candidates, opts = {}) {
+  const { loadPromptTemplates } = require('../services/prompts');
+  await loadPromptTemplates();
+  const { buildTextProofreadPrompt } = require('./storyHelpers');
+  const { callTextModelStreaming, describeTruncation } = require('./textModels');
+  const { TEXT_MODELS, MODEL_DEFAULTS } = require('../config/models');
+  const list = (candidates || []).map(c => String(c || ''));
+  if (!list.length) throw new Error('proofreadTitleCandidates: no title to proofread');
+  const model = opts.model || MODEL_DEFAULTS.textProofreadModel;
+  if (!TEXT_MODELS[model]) throw new Error(`title lector: unknown model "${model}"`);
+  const pages = list.map((text, i) => ({ pageNumber: i + 1, text }));
+  const prompt = buildTextProofreadPrompt(storyData, pages);
+  if (!prompt) throw new Error('title lector: proofread template unavailable');
+  const callOpts = { ...LECTOR_OPTS, usageLabel: 'title_lector' };
+  const t0 = Date.now();
+  let res = await callTextModelStreaming(prompt, null, null, model, callOpts);
+  if (!String(res.text || '').trim()) {
+    log.warn(`⚠️ [TITLE-LECTOR] ${model} returned empty output — retrying once`);
+    res = await callTextModelStreaming(prompt, null, null, model, callOpts);
+  }
+  const rawResponse = String(res.text || '').trim();
+  if (!rawResponse) throw new Error(`title lector: ${model} returned empty output twice`);
+  if (res.truncation?.suspected) throw new Error(`title lector reply ${describeTruncation(res.truncation)} — findings unusable`);
+  const { findings, unparsed } = parseLectorLines(rawResponse);
+  const { pages: next, applied, dropped } = applyLectorFindings(pages, findings);
+  return {
+    candidates: next.map(p => p.text),
+    findings, applied, dropped, unparsed,
+    rawResponse, prompt,
+    modelId: res.modelId || TEXT_MODELS[model].modelId,
+    elapsedMs: Date.now() - t0,
+  };
+}
+
 /** The passes that rewrite whole pages from a finding list (runRepairPass). */
 const WHOLE_PAGE_PASS_KINDS = new Set(['repair', 'repetition_fix', 'length_fix']);
 
@@ -933,7 +1214,9 @@ async function runPostAuditTextRound(storyData, pages, textFaults = [], opts = {
   // The WHOLE book goes into the prompt — a page cannot be judged for what the
   // pages around it established if it is shown alone. What is scoped is the
   // REWRITE, not the reading.
-  const findingsText = `${POST_AUDIT_SCOPE_NOTE}\n\n${lines.join('\n')}`;
+  // Numbered: the refine's ledger cites these ids, and a finding it declines
+  // (`STANDS:`) is recorded open (parseDeclinedFindings).
+  const findingsText = `${POST_AUDIT_SCOPE_NOTE}\n\n${numberedFindingsText(findings)}`;
   const prompt = buildTextRefinePrompt(storyData, pages, findingsText, String(opts.arc || '').trim(), { arcHints: opts.arcHints });
   if (!prompt) {
     log.error('❌ [TEXT-POST-AUDIT] text-refine template unavailable — the TEXT route goes unanswered');
@@ -952,13 +1235,15 @@ async function runPostAuditTextRound(storyData, pages, textFaults = [], opts = {
     const byPage = new Map(parsed.pages.filter(p => scope.includes(p.pageNumber)).map(p => [p.pageNumber, stripTrailingSeparator(p.text)]));
     const next = pages.map(p => ({ ...p, text: byPage.get(p.pageNumber) || p.text }));
     const changedPages = next.filter((p, idx) => p.text !== pages[idx].text).map(p => p.pageNumber);
-    const findingOutcomes = resolveFindingOutcomes(findings, pages, changedPages, returnedPages);
+    const findingOutcomes = resolveFindingOutcomes(findings, pages, changedPages, returnedPages, parseDeclinedFindings(parsed.analysis, findings.length));
     for (const f of unresolvedFindings(findingOutcomes)) {
       log.warn(`⚠️ [TEXT-POST-AUDIT] UNANSWERED p${f.pageNumber ?? '?'} — ${f.reason}: ${f.text}`);
     }
     if (outOfScopePages.length) {
       log.warn(`⚠️ [TEXT-POST-AUDIT] the pass returned page(s) ${outOfScopePages.join(', ')} that no TEXT fault names — dropped, their pictures are final`);
     }
+    const arcFaults = parseArcFaultLines(parsed.analysis);
+    for (const a of arcFaults) log.warn(`⚠️ [TEXT-POST-AUDIT] ARC FAULT left standing (a mechanism the pages cannot make work): ${a}`);
     const elapsedMs = Date.now() - t0;
     log.info(`📖✍️  [TEXT-POST-AUDIT] ${model}: ${lines.length} TEXT fault(s) on page(s) ${scope.join(', ')} → rewrote page(s) ${changedPages.join(', ') || 'none'} in ${(elapsedMs / 1000).toFixed(0)}s`);
     const beforeByPage = new Map(pages.map(p => [p.pageNumber, p.text]));
@@ -977,6 +1262,7 @@ async function runPostAuditTextRound(storyData, pages, textFaults = [], opts = {
         returnedPages,
         outOfScopePages,
         changedPages,
+        arcFaults,
         findingOutcomes,
         unresolvedCount: unresolvedFindings(findingOutcomes).length,
         prompt,
@@ -1068,6 +1354,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
   } = require('./storyHelpers');
   const { callTextModelStreaming, describeTruncation } = require('./textModels');
   const { TEXT_MODELS, MODEL_DEFAULTS, calculateTextCost } = require('../config/models');
+  const { runJevTextSource, JEV_MODEL } = require('./jevAudit');
 
   if (!Array.isArray(pages) || pages.length === 0) {
     throw new Error('refineStoryText: no page text to refine');
@@ -1124,6 +1411,9 @@ async function refineStoryText(storyData, pages, opts = {}) {
   let lectorPromptSent = '';
   let repetition = null;
   let wordBudget = null;
+  // { writer: [{pageNumber, sentence}], shipped: [...] | null } — see
+  // findOneSentenceParagraphs.
+  let oneSentenceParagraphs = null;
 
   // PUBLISH AS WE GO (2026-08-24). This function used to return all-or-nothing,
   // and its caller races it against a join deadline — so finished audits and a
@@ -1153,6 +1443,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
     diffDropped: diffDropped.slice(),
     repetition,
     wordBudget,
+    oneSentenceParagraphs,
     partial: true,
     // IN FLIGHT (2026-09-14). Whether a model step is RUNNING right now.
     // `beginStep()` publishes the state so far with this set; the publish()
@@ -1267,10 +1558,39 @@ async function refineStoryText(storyData, pages, opts = {}) {
     // clearTimeout below is what stops it leaking, and it runs on both branches.
     return Promise.race([p, deadline]).finally(() => clearTimeout(timer));
   };
-  audits = await Promise.all([
-    withDeadline(runAudit('arc-informed', auditModel, buildTextAuditPrompt(storyData, current, arc, { arcHints }), 'text_audit'), 'arc-informed'),
-    withDeadline(runAudit('blind', blindAuditModel, buildTextAuditBlindPrompt(storyData, current), 'text_audit_blind'), 'blind'),
-  ]);
+  // THE JEV SOURCE (owner, 2026-09-27: "slop + logic/arc rewrites") — the
+  // third auditor, in the same Promise.all and under the same deadline. Cheap
+  // per-page yes/no checks (jevAudit.runJevTextSource): the AI-slop types the
+  // writer's STYLE_RULEBOOK names, three blatant logic faults, a page that
+  // contradicts its plan line, and the $0 ß / «» / "suddenly" string checks.
+  // Its FAULT lines join the merge like any auditor's, so the ONE repair pass
+  // below rewrites only the pages they name. A Jev failure logs an ERROR and
+  // the source contributes nothing — the same contract as a failed audit,
+  // recorded in the report as `{source:'jev', ok:false, error}`.
+  // see docs/decisions.md 2026-09-27 "Jev text audit wired"
+  const runJev = async () => {
+    const r = await runJevTextSource(storyData, current, opts.jevOptions || {});
+    const raw = r.raw || '';
+    return {
+      ...r,
+      modelKey: JEV_MODEL,
+      error: r.error || (r.skipped ? `not run: ${r.skipped}` : null),
+      faults: r.ok ? countFaults(raw) : 0,
+      byCategory: r.ok ? faultsByCategory(raw) : {},
+    };
+  };
+  // REPLAYED AUDITS (Lab only, 2026-10-04). `opts.audits` hands in a stored
+  // run's audit results ({source, ok, raw}) instead of calling the auditors,
+  // so a repair-model A/B answers the SAME findings — audits vary run to run,
+  // and fresh ones would make the auditors a second variable. Production never
+  // passes it.
+  audits = Array.isArray(opts.audits)
+    ? opts.audits.map(a => ({ ...a, replayed: true }))
+    : await Promise.all([
+      withDeadline(runAudit('arc-informed', auditModel, buildTextAuditPrompt(storyData, current, arc, { arcHints }), 'text_audit'), 'arc-informed'),
+      withDeadline(runAudit('blind', blindAuditModel, buildTextAuditBlindPrompt(storyData, current), 'text_audit_blind'), 'blind'),
+      withDeadline(runJev(), 'jev'),
+    ]);
   for (const a of audits) {
     if (!a.ok && a.error) log.warn(`⚠️ [TEXT-AUDIT/${a.source}] ${a.error}`);
   }
@@ -1282,9 +1602,18 @@ async function refineStoryText(storyData, pages, opts = {}) {
   if (counterRaw) {
     log.info(`🔢 [TEXT-COUNTER] ${counterRaw.split('\n').length} page(s) outside the '${storyData?.languageLevel || 'standard'}' word budget`);
   }
+  // THE ONE-SENTENCE COUNTER — a fourth finding source, free, on the writer's
+  // text; its STYLE lines fold only into a blind STYLE finding that quotes the
+  // same sentence (sameFault). Counted again on the shipped text below.
+  const oneSentenceRaw = buildOneSentenceParagraphFindings(current);
+  oneSentenceParagraphs = { writer: findOneSentenceParagraphs(current), shipped: null };
+  if (oneSentenceRaw) {
+    log.info(`🔢 [TEXT-COUNTER] ${oneSentenceParagraphs.writer.length} one-sentence narration paragraph(s) on page(s) ${[...new Set(oneSentenceParagraphs.writer.map(h => h.pageNumber))].join(', ')} — STYLE findings for the repair`);
+  }
   const merged = mergeAuditFindings([
     ...audits.filter(a => a.ok).map(a => ({ source: a.source, raw: a.raw })),
     ...(counterRaw ? [{ source: 'counter', raw: counterRaw }] : []),
+    ...(oneSentenceRaw ? [{ source: 'style-counter', raw: oneSentenceRaw }] : []),
   ]);
   mergedFindings = merged.findings;
   mergeStats = { bySource: merged.bySource, duplicates: merged.duplicates.length };
@@ -1302,7 +1631,9 @@ async function refineStoryText(storyData, pages, opts = {}) {
     // own FAULT lines — the same verbatim lines mergeAuditFindings joined. That
     // is what lets the ledger below name each finding's outcome: a pass handed
     // a blob of text can count its lines and nothing else.
-    const findingsText = findings.map(f => f.line).join('\n');
+    // Numbered (T1, T2 …): the ledger cites the ids, and a finding the pass
+    // declines (`STANDS:`) is recorded open (parseDeclinedFindings).
+    const findingsText = numberedFindingsText(findings);
     let prompt = buildTextRefinePrompt(storyData, base, findingsText, arc, { arcHints });
     if (!prompt) throw new Error('text-refine template unavailable');
     if (opts.promptOverride) prompt = opts.promptOverride;
@@ -1331,7 +1662,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
     const next = base.map(p => ({ ...p, text: byPage.get(p.pageNumber) || p.text }));
     const changedPages = next.filter((p, idx) => p.text !== base[idx].text).map(p => p.pageNumber);
     const returnedPages = parsed.pages.map(p => p.pageNumber);
-    const findingOutcomes = resolveFindingOutcomes(findings, base, changedPages, returnedPages);
+    const findingOutcomes = resolveFindingOutcomes(findings, base, changedPages, returnedPages, parseDeclinedFindings(parsed.analysis, findings.length));
     for (const f of unresolvedFindings(findingOutcomes)) {
       log.warn(`⚠️ [TEXT-REPAIR/${kind}] UNANSWERED [${f.category}] p${f.pageNumber ?? '?'} — ${f.reason}: ${f.text}`);
     }
@@ -1352,6 +1683,8 @@ async function refineStoryText(storyData, pages, opts = {}) {
     if (changedUnasked.length) {
       log.info(`✏️ [TEXT-REPAIR/${kind}] also rewrote page(s) ${changedUnasked.join(', ')}, which no finding named`);
     }
+    const arcFaults = parseArcFaultLines(parsed.analysis);
+    for (const a of arcFaults) log.warn(`⚠️ [TEXT-REPAIR/${kind}] ARC FAULT left standing (a mechanism the pages cannot make work): ${a}`);
     return {
       next,
       entry: {
@@ -1378,6 +1711,8 @@ async function refineStoryText(storyData, pages, opts = {}) {
         // The two diff-checked halves of this pass's own report (above).
         returnedIdentical,
         changedUnasked,
+        // Mechanism faults the pass left standing as the arc's (MECHANISM_FIX_RULE).
+        arcFaults,
         // WHAT THIS ROUND APPLIED, in ITS unit.
         //
         // The whole-page passes (repair / repetition_fix / length_fix) rewrite
@@ -1718,17 +2053,6 @@ async function refineStoryText(storyData, pages, opts = {}) {
     if (lectorPrompt && TEXT_MODELS[lectorModel]) {
       beginStep();
       const t0 = Date.now();
-      // null = the model's own limit (owner rule: no output caps). A finding
-      // list is a few hundred tokens — the cost of this call is decided by the
-      // output CONTRACT, not by the ceiling.
-      // temperature 0: the A/B measured this prompt at 0, and a lector must not
-      // paraphrase the page it quotes.
-      // reasoning effort 'medium': measured 2026-09-06 on job_1788380714660_4p9mr11xszu
-      // (de-ch, 16 pages, 4 CORE faults). Default (no key) burned 12,764 reasoning
-      // tokens / $0.1621 / 84s; 'medium' 7,135 / $0.0948 / 46s for the same 4/4 CORE
-      // catch. 'low' (1,696 / $0.0281) collapsed to 0/4 CORE and 3-4 false positives,
-      // so recall is a direct function of reasoning budget — do NOT lower this further.
-      const LECTOR_OPTS = { temperature: 0, usageLabel: 'text_lector', reasoning: { effort: 'medium' } };
       let lr = await callTextModelStreaming(lectorPrompt, null, null, lectorModel, LECTOR_OPTS);
       if (!String(lr.text || '').trim()) {
         log.warn(`⚠️ [LECTOR] ${lectorModel} returned empty output — retrying once`);
@@ -1818,6 +2142,15 @@ async function refineStoryText(storyData, pages, opts = {}) {
       log.warn(`⚠️ [TEXT-COUNTER] SHIPS OUTSIDE the budget after the diff and the lector: ${line}`);
     }
   }
+  // The one-sentence count on the text that ships: a paragraph the repair
+  // kept, or the lector or the diff re-created, is visible here. Measured
+  // only, no further pass.
+  if (oneSentenceParagraphs) {
+    oneSentenceParagraphs.shipped = findOneSentenceParagraphs(current);
+    for (const h of oneSentenceParagraphs.shipped) {
+      log.warn(`⚠️ [TEXT-COUNTER] SHIPS a one-sentence narration paragraph on p${h.pageNumber}: «${h.sentence}»`);
+    }
+  }
 
   const changed = current
     .map((p, idx) => (p.text !== original[idx].text ? p.pageNumber : null))
@@ -1846,7 +2179,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
     audits, mergedFindings, mergeStats, findingLedger,
     proofread, lectorFindings, lectorApplied, lectorDropped,
     diffReview, diffFindings, diffApplied, diffDropped,
-    repetition, wordBudget,
+    repetition, wordBudget, oneSentenceParagraphs,
     partial: false,
   };
 }
@@ -2079,8 +2412,9 @@ function projectTextRefineReport(usable, beforeByPage = new Map()) {
       unparsedCount: r.unparsedCount ?? null,
       unparsedLines: r.unparsedLines || [],
       droppedFindings: r.droppedFindings || [],
+      arcFaults: r.arcFaults || [],
       findingOutcomes: (r.findingOutcomes || []).map(f => ({
-        pageNumber: f.pageNumber, category: f.category, sources: f.sources || [],
+        id: f.id || null, pageNumber: f.pageNumber, category: f.category, sources: f.sources || [],
         text: f.text, outcome: f.outcome, reason: f.reason || null,
       })),
       // THE FINDINGS THIS ROUND PARSED, not only the ones it applied. The
@@ -2129,7 +2463,7 @@ function projectTextRefineReport(usable, beforeByPage = new Map()) {
     })),
     mergeStats: usable.mergeStats || null,
     findingLedger: (usable.findingLedger || []).map(f => ({
-      pageNumber: f.pageNumber, category: f.category, sources: f.sources || [],
+      id: f.id || null, pageNumber: f.pageNumber, category: f.category, sources: f.sources || [],
       text: f.text, outcome: f.outcome, reason: f.reason || null,
     })),
     // Recomputable from the ledger, and recomputed by nobody: the count is the
@@ -2137,6 +2471,7 @@ function projectTextRefineReport(usable, beforeByPage = new Map()) {
     // a second implementation of unresolvedFindings.
     unresolvedCount: unresolvedFindings(usable.findingLedger || []).length,
     wordBudget: usable.wordBudget || null,
+    oneSentenceParagraphs: usable.oneSentenceParagraphs || null,
     proofread: usable.proofread || '',
     lectorFindings: (usable.lectorFindings || []).map(f => ({ pageNumber: f.pageNumber, quote: f.quote, correction: f.correction })),
     lectorApplied: (usable.lectorApplied || []).map(f => ({ pageNumber: f.pageNumber, quote: f.quote, correction: f.correction })),
@@ -2178,6 +2513,8 @@ module.exports = {
   mergeAuditFindings,
   FINDING_OUTCOME,
   resolveFindingOutcomes,
+  parseDeclinedFindings,
+  numberedFindingsText,
   unresolvedFindings,
   GRAMMAR_EDIT_MAX_WORDS,
   parseDiffEdits,
@@ -2192,6 +2529,8 @@ module.exports = {
   classifyLectorLine,
   quotedSpan,
   applyLectorFindings,
+  proofreadTitleCandidates,
+  LECTOR_OPTS,
   locateQuote,
   DUPLICATE_OVERLAP,
   normalizeForShingles,
@@ -2205,4 +2544,7 @@ module.exports = {
   isTotalTextAuditLoss,
   TEXT_REFINE_JOIN_BASE_MS,
   TEXT_REFINE_JOIN_PER_PAGE_MS,
+  findOneSentenceParagraphs,
+  buildOneSentenceParagraphFindings,
+  parseArcFaultLines,
 };

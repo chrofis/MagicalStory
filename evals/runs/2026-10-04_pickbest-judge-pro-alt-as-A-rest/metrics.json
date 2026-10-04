@@ -1,0 +1,61 @@
+{
+ "tag": "pro-alt-as-A-rest",
+ "totalCost": 0.2464,
+ "calls": [
+  {
+   "case": 2,
+   "altPosition": "A",
+   "winner": "alt",
+   "confidence": 0.85,
+   "model": "google/gemini-3.1-pro-preview",
+   "cost": 0.053694,
+   "in": 13383,
+   "out": 2244,
+   "reasoning": 1997
+  },
+  {
+   "case": 4,
+   "altPosition": "A",
+   "winner": "alt",
+   "confidence": 0.85,
+   "model": "google/gemini-3.1-pro-preview",
+   "cost": 0.051968,
+   "in": 13510,
+   "out": 2079,
+   "reasoning": 1715
+  },
+  {
+   "case": 6,
+   "altPosition": "A",
+   "winner": "alt",
+   "confidence": 0.8,
+   "model": "google/gemini-3.1-pro-preview",
+   "cost": 0.046888,
+   "in": 13250,
+   "out": 1699,
+   "reasoning": 1440
+  },
+  {
+   "case": 8,
+   "altPosition": "A",
+   "winner": "shipped",
+   "confidence": 0.9,
+   "model": "google/gemini-3.1-pro-preview",
+   "cost": 0.04591,
+   "in": 11993,
+   "out": 1827,
+   "reasoning": 1518
+  },
+  {
+   "case": 9,
+   "altPosition": "A",
+   "winner": "alt",
+   "confidence": 0.9,
+   "model": "google/gemini-3.1-pro-preview",
+   "cost": 0.047954,
+   "in": 12205,
+   "out": 1962,
+   "reasoning": 1783
+  }
+ ]
+}

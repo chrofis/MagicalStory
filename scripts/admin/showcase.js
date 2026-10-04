@@ -45,6 +45,7 @@ const ROTATION_PATH = path.join(__dirname, '..', '..', 'tests', 'helpers', 'demo
 const STATE_PATH = path.join(__dirname, '..', '..', 'tests', 'demo-rotation-state.json');
 const DEDICATIONS_PATH = path.join(__dirname, '..', '..', 'tests', 'helpers', 'demo-dedications.json');
 const PHOTOS_DIR = path.join(__dirname, '..', '..', 'tests', 'fixtures', 'demo-photos');
+const { verifyAccountAsAdmin } = require('../lib/verifyAccountAsAdmin');
 const DEMO_PASSWORD = process.env.DEMO_PASSWORD || 'DemoStory2026!';
 
 function parseArgs() {
@@ -245,6 +246,8 @@ async function loginOrRegister(apiBase, email, family) {
     const err = await registerRes.json().catch(() => ({}));
     throw new Error(`Registration failed: ${registerRes.status} ${JSON.stringify(err)}`);
   }
+  // Registration does not auto-verify demo addresses any more (review V1); verify via admin API.
+  await verifyAccountAsAdmin(apiBase, (await registerRes.json()).user.id);
   session = await login();
   if (!session) throw new Error(`Registered ${email} but cannot log in`);
   console.log(`   Created — id=${session.user.id}`);
@@ -272,6 +275,9 @@ async function provisionAccount(apiBase, email, family) {
     } else {
       throw new Error(`Registration failed: ${registerRes.status} ${JSON.stringify(err)}`);
     }
+  } else {
+    // Registration does not auto-verify demo addresses any more (review V1); verify via admin API.
+    await verifyAccountAsAdmin(apiBase, (await registerRes.json()).user.id);
   }
 
   console.log('2. Logging in...');

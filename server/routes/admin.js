@@ -12,7 +12,7 @@ const fs = require('fs').promises;
 const path = require('path');
 
 const { getPool, isDatabaseMode, logActivity } = require('../services/database');
-const { authenticateToken, requireAdmin, verifyToken, signToken } = require('../middleware/auth');
+const { authenticateToken, requireAdmin, verifySession, generateToken, signToken } = require('../middleware/auth');
 const { log } = require('../utils/logger');
 
 function getDbPool() { return getPool(); }
@@ -125,7 +125,9 @@ router.post('/impersonate/:userId', authenticateToken, requireAdmin, async (req,
         id: targetUser.id,
         username: targetUser.username,
         email: targetUser.email,
-        role: targetUser.role,
+        // Never copy an admin role from the target: the token's authority is the original
+        // admin's (originalAdminRole, re-checked against the DB on every request).
+        role: targetUser.role === 'admin' ? 'user' : targetUser.role,
         emailVerified: targetUser.email_verified,
         impersonating: true,
         originalAdminId: req.user.id,
@@ -175,7 +177,7 @@ router.post('/stop-impersonate', authenticateToken, async (req, res) => {
     }
 
     const pool = getPool();
-    const result = await pool.query('SELECT id, username, email, role, credits, email_verified FROM users WHERE id = $1', [originalAdminId]);
+    const result = await pool.query('SELECT id, username, email, role, credits, email_verified, token_version FROM users WHERE id = $1', [originalAdminId]);
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Original admin user not found' });
     }
@@ -192,16 +194,7 @@ router.post('/stop-impersonate', authenticateToken, async (req, res) => {
       targetUsername: req.user.username,
     });
 
-    const adminToken = signToken(
-      {
-        id: adminUser.id,
-        username: adminUser.username,
-        email: adminUser.email,
-        role: adminUser.role,
-        emailVerified: adminUser.email_verified
-      },
-      '7d'
-    );
+    const adminToken = generateToken(adminUser);
 
     res.json({
       token: adminToken,
@@ -341,8 +334,8 @@ router.delete('/landmarks-cache', async (req, res) => {
       }
       try {
         const token = authHeader.split(' ')[1];
-        const decoded = verifyToken(token);
-        if (decoded.role !== 'admin') {
+        const session = await verifySession(token);
+        if (session.role !== 'admin') {
           return res.status(403).json({ error: 'Admin access required' });
         }
       } catch (jwtErr) {

@@ -28,6 +28,7 @@ const CHAR_REPAIR_REQUEST_KEYS = Object.freeze([
   'clothingDescription',   // the outfit contract for this character on this page
   'characterDescription',  // face/hair/build prose for the prompt
   'photoType',             // which avatar variant was handed over
+  'referencePose',         // resolveCellPose(...).pose — picks the sheet cell; the spine picks face vs body cell by target (charRepairReference.js)
   'sceneDescription',      // the page's scene prose
   'artStyle',              // the book's medium — empty block without it
   'faceBbox',              // face region (face repair)

@@ -213,3 +213,12 @@ venv-pin-test/
 # Preserved diagnostic artefacts (research assets, never deleted for storage cost;
 # see docs/decisions.md 2026-09-19 "A Visual Bible cell's drawn area..."). Large binaries.
 /diagnostics/
+
+# Jev text-audit eval (2026-09-27): stored story text from prod/staging users stays
+# local — committed history cannot honour a GDPR erasure. Labels, injections,
+# scripts and metrics are committed; rebuild the text with the extract step in
+# scripts/analysis/jev-text-audit-dataset.js.
+evals/datasets/*/stories/
+evals/datasets/*/items.jsonl
+evals/runs/*/*
+!evals/runs/*/metrics.json

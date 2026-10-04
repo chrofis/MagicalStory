@@ -33,21 +33,29 @@
  * salvaged line is re-checked against the figure and cast-name filters.
  */
 
+// Every dimension word starts at a word boundary. Unanchored, the lists matched
+// inside other words — "b-ROAD", "s-LIGHT-ly", "de-LIGHT-ed", "LIT-tle" — and
+// a character's look ("a BROAD orange sash", "a SLIGHTly larger head") entered
+// the plate as a fact of the place (2026-09-26). A compound light word
+// ("candlelight", "moonlit") is named by its prefix, not found by accident.
+const wordStart = (alternatives) => new RegExp(`\\b(?:${alternatives.join('|')})`, 'i');
+
 // (a) perspective / path direction
-const PATH_RE = new RegExp([
+const PATH_RE = wordStart([
   'path|paths|river|stream|road|lane|track|trail|corridor|hallway|tunnel|shoreline|shore|coast|bank|quay',
   'horizon|ridge|slope|incline|stair|stairs|staircase|steps|bridge|pier|jetty|aisle|row of|avenue',
   'perspective|diagonal|recede|recedes|receding|stretches|leads|runs|winds|curves|climbs|descends|rises|falls away',
-].join('|'), 'i');
+]);
 
 // (b) vanishing point / opening
-const OPENING_RE = /vanishing point|opening|archway|arch|doorway|door|gateway|gate|window|mouth of|gap|clearing/i;
+const OPENING_RE = wordStart(['vanishing point|opening|archway|arch|doorway|door|gateway|gate|window|mouth of|gap|clearing']);
 
 // (c) lighting direction
-const LIGHT_RE = new RegExp([
-  'light|lights|lit|sunlight|sunbeam|sunlit|moonlight|lamplight|lantern|torchlight|glow|backlit|shadow|shadows|silhouette',
-  'dawn|dusk|sunset|sunrise|midday|noon|overcast|storm|stormy|fog|mist|twilight|night|daylight',
-].join('|'), 'i');
+const LIGHT_RE = wordStart([
+  '(?:sun|moon|lamp|candle|fire|star|street|torch|day|back|flood|spot)?(?:light|lit\\b)',
+  'sunbeam|lantern|glow|shadow|silhouette',
+  'dawn|dusk|sunset|sunrise|midday|(?:after)?noon|overcast|storm|stormy|fog|mist|twilight|night',
+]);
 
 /**
  * The three graded dimensions, in judge order. `author` is what the plate
@@ -91,7 +99,7 @@ const GARMENT_RE = /\b(wear|wears|wearing|worn|dressed|outfit|outfits|costume|co
 
 // Anything that could put a figure on the plate. Deliberately broad: a false
 // negative costs one geometry fact, a false positive costs a painted character.
-const FIGURE_RE = /\b(character|characters|person|people|figure|figures|crowd|crowds|boy|boys|girl|girls|man|men|woman|women|child|children|kid|kids|baby|adult|adults|villager|villagers|soldier|soldiers|guard|guards|sailor|sailors|crew|rider|riders|dog|dogs|cat|cats|horse|horses|bird|birds|creature|creatures|dragon|he|she|they|him|her|his|hers|their|them)\b/i;
+const FIGURE_RE = /\b(character|characters|person|people|figure|figures|crowd|crowds|boy|boys|girl|girls|man|men|woman|women|child|children|kid|kids|baby|babies|infant|infants|toddler|toddlers|preschooler|preschoolers|teen|teens|teenager|teenagers|adult|adults|villager|villagers|soldier|soldiers|guard|guards|sailor|sailors|crew|rider|riders|dog|dogs|cat|cats|horse|horses|bird|birds|creature|creatures|dragon|he|she|they|him|her|his|hers|their|them)\b/i;
 
 // Where a sentence may be cut so a geometry clause can be kept without the
 // person sharing the sentence with it.
@@ -131,6 +139,55 @@ function namesIn(castNames) {
     .map(n => n.trim().toLowerCase());
 }
 
+// THE CAST DESCRIPTION IS NOT CANDIDATE TEXT (2026-09-26). The Art Director
+// weaves every character's full look into the prose on first mention
+// (scene-expansion rule 10), as an appositive hung on the figure:
+// "Fiona — an adult woman, …, a broad orange sailcloth sash knotted at the left
+// hip, … — stands …", "A young adult man—…, light stubble, …—leans …",
+// "Julian (a toddler, … light blonde hair, …) falls forward". The clause split
+// cuts at those dashes, so every item of the look became a free-standing
+// clause that no longer names anyone — and any item holding a geometry or
+// light word ("broad", "light stubble", "left hip") passed as a fact of the
+// place. Staging job_1790446348343_z3fw660ie painted an orange knotted cloth
+// on an empty wall. Vetoing garment words one by one (the 2026-09-21 gilet fix)
+// cannot close this: the look is open vocabulary. So the whole appositive —
+// from the dash or bracket that follows a figure noun or a cast member's name
+// to its closing mark, or the sentence end — is cut before the sentence is
+// read, and the figure's own clause keeps its subject and is rejected whole.
+const APPOSITIVE_OPEN_RE = /—|–|--|\(/;
+const DASH_RE = /—|–|--/;
+
+function isFigureHead(word, names) {
+  const w = String(word).replace(/['’]s$/i, '');
+  if (FIGURE_RE.test(w)) return true;
+  const lower = w.toLowerCase();
+  return names.some(n => n === lower || n.split(/\s+/).includes(lower));
+}
+
+/** The sentence with every figure-headed descriptive appositive removed. */
+function stripCastAppositives(sentence, names) {
+  let s = String(sentence || '');
+  const open = new RegExp(APPOSITIVE_OPEN_RE.source, 'g');
+  let m;
+  while ((m = open.exec(s))) {
+    const head = (s.slice(0, m.index).match(/([\p{L}'’]+)\s*$/u) || [])[1];
+    if (!head || !isFigureHead(head, names)) continue;
+    const from = m.index + m[0].length;
+    let end;
+    if (m[0] === '(') {
+      const close = s.indexOf(')', from);
+      end = close < 0 ? s.length : close + 1;
+    } else {
+      const rest = s.slice(from);
+      const close = rest.search(DASH_RE);
+      end = close < 0 ? s.length : from + close + rest.slice(close).match(DASH_RE)[0].length;
+    }
+    s = `${s.slice(0, m.index).trimEnd()} ${s.slice(end).trimStart()}`.trim();
+    open.lastIndex = m.index;
+  }
+  return s;
+}
+
 function isClean(text, names) {
   if (FIGURE_RE.test(text)) return false;
   if (GARMENT_RE.test(text)) return false;
@@ -144,7 +201,7 @@ function isClean(text, names) {
  * clauses that carry geometry and no person, and re-checks the join.
  */
 function sanitizeGeometrySentence(sentence, names) {
-  const s = String(sentence || '').replace(VB_ID_RE, '').replace(/\s+/g, ' ').trim();
+  const s = stripCastAppositives(String(sentence || '').replace(VB_ID_RE, ''), names).replace(/\s+/g, ' ').trim();
   if (!s || MACHINE_FIELD_RE.test(s)) return null;
   if (!GEOMETRY_RE.test(s)) return null;
   // A paragraph-long sentence carries more than geometry, so it is never kept

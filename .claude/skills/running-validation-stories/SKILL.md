@@ -57,3 +57,29 @@ Fresh timestamped account, generated family photos, full character creation, all
 - **Never launch unprompted** — showcases and story runs only when the user asked for validation.
 - **Don't push while a run is in flight** — a deploy kills it (the pre-push hook checks, but don't lean on it).
 - **"Orchestrator exited 0" ≠ story done** — check `story_jobs.status='completed'`, then look at EVERY page image and report per-page issues.
+- **Write the verdicts back — every run, no exceptions** (owner, 2026-09-27). The staging server judges
+  every story it completes into `story_verify_reports` by itself; it cannot commit, so once the job is completed:
+  ```bash
+  node scripts/admin/verify-run.js --pull                       # staging: every stored report not yet recorded
+  node scripts/admin/verify-run.js <storyId> --env=prod --write  # a prod run (no server report there)
+  git commit -m "chore(verify): verdicts from <storyId>" -- tasks/verify.json
+  ```
+  CONFIRMED and FAILED are appended as evidence and set the entry's status; HUMAN and NOT COVERED stay
+  pending with `lastChecked` pointing at this run. Every FAILED gets a `tasks/BACKLOG.md` line.
+- **Review every HUMAN entry the run exercises — yourself, then the owner** (owner, 2026-09-27):
+  ```bash
+  node scripts/admin/verify-review.js <storyId> [--env=prod] --out=<scratchpad>/verify-review-<storyId>.html
+  ```
+  The page lists each pending HUMAN entry with its claim, what to look at, the checker's measurement and the
+  images (the URLs the check names plus the entry's `check.images` kinds). Go through EVERY item: download
+  and Read the images (pixels, not metadata), read the prompts/reports it names, and decide confirmed /
+  failed / not decided with a note saying what you saw. Write your verdicts to
+  `<scratchpad>/verify-verdicts-<storyId>.json` (`{storyId, env, verdicts:[{id, verdict, note, by:"claude"}]}`),
+  record them with `node scripts/admin/verify-run.js <storyId> --apply=<that file>`, re-render the page with
+  `--verdicts=<that file>` so your verdicts show pre-filled, commit `tasks/verify.json`, and give the owner the
+  local page path (never a claude.ai artifact link — those 404 for him) with a short list of your verdicts.
+  He can overrule on the page: "Download verdicts" saves `verify-verdicts-<storyId>.json`, which you apply the
+  same way (his entries carry `by: "owner"`). Single verdicts without the page:
+  `--mark=<id>:confirmed|failed --note="what you saw" --by=claude`.
+  The pre-push hook warns (never blocks) while a staging run since 2026-09-24 is unrecorded; list them any
+  time with `node scripts/admin/verify-run.js --unrecorded`.

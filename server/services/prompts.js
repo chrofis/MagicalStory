@@ -223,11 +223,14 @@ async function loadPromptTemplates() {
   // Each line: [key, filename]. Order doesn't matter — failures are isolated.
   const FILES = [
     ['sceneExpansion', 'scene-expansion.txt'],
-    // ALL-pages scene expansion (beats pipeline). One call writes every page's
-    // brief with the others in view, so location, time of day, clothing and
-    // composition cannot drift between neighbours. scene-expansion.txt stays
-    // the per-page variant used by the unified pipeline's fallback.
-    ['sceneExpansionAll', 'scene-expansion-all.txt'],
+    // The beats Art Director, two calls (owner, 2026-09-28, "Jev first"): the
+    // Visual Bible first, then every page's brief with the others in view, so
+    // composition and clothing cannot drift between neighbours.
+    // scene-expansion.txt stays the per-page variant (the call-2 shortfall
+    // fallback and the unified pipeline's).
+    ['visualBible', 'visual-bible.txt'],
+    ['sceneBriefsAll', 'scene-briefs-all.txt'],
+    ['briefReask', 'brief-reask.txt'],
     ['sceneIteration', 'scene-iteration.txt'],
     ['sceneIterationFree', 'scene-iteration-free.txt'],
     ['imageGeneration', 'image-generation.txt'],
@@ -261,6 +264,7 @@ async function loadPromptTemplates() {
     ['avatarRetryPrompt', 'avatar-retry-prompt.txt'],
     ['avatarEvaluation', 'avatar-evaluation.txt'],
     ['sheet2x4StyleEval', 'sheet-2x4-style-eval.txt'],
+    ['sheetGarmentGoneCheck', 'sheet-garment-gone-check.txt'],
     ['sheetRowHeadsEval', 'sheet-row-heads-eval.txt'],
     ['sheetRowBodiesEval', 'sheet-row-bodies-eval.txt'],
     ['sheetRowIdentityEval', 'sheet-row-identity-eval.txt'],
@@ -361,7 +365,6 @@ async function loadPromptTemplates() {
     // Chooses the shipped title from the writer's candidates.
     // One review over ALL scene briefs at once — repetition, visual arc and
     // continuity are only visible across pages, never per-scene.
-    ['sceneReview', 'scene-review.txt'],
     // Lab measurement only: counts render hazards per page across a book's
     // briefs (or its beats' SCENE lines). Report-only — nothing consumes it in
     // the pipeline.
@@ -403,7 +406,6 @@ async function loadPromptTemplates() {
     ['sheetCellIdentification', 'sheet-cell-identification.txt'],
     ['sceneRepair', 'scene-repair.txt'],
     ['entityConsistencyCheck', 'entity-consistency-check.txt'],
-    ['entitySinglePageRepair', 'entity-single-page-repair.txt'],
     ['subRegionDetection', 'sub-region-detection.txt'],
     ['generatedImageAnalysis', 'generated-image-analysis.txt'],
     ['emptyScene', 'empty-scene.txt'],
@@ -678,7 +680,103 @@ function buildEmptyScenePrompt(opts = {}) {
   if (!/\*\*SHOT:\*\*|\*\*CAMERA:\*\*/i.test(description)) {
     description = `**SHOT:** wide\n\n${description}`;
   }
-  // Append the Visual Bible description of every vehicle listed for this page.
+  // The STRUCTURES block. One builder for the plate's author and its QC
+  // (buildPlateStructuresText), so the judge is handed the same text.
+  const structures = buildPlateStructuresText(opts);
+  if (structures) description += `\n\n**STRUCTURES:** ${structures}`;
+
+  // The plate call carries exactly ONE family of visual reference: a landmark
+  // photo when the location is real, otherwise the Visual Bible vehicle /
+  // structure render(s) — never both (owner, 2026-08-29; enforced in
+  // buildEmptySceneVbGrid). This line tells the model what the attached
+  // reference IS, and that it renders the visible part rather than the whole
+  // object. An invented location is never an attached image (owner,
+  // 2026-09-24): it is built from the description above, so the element line
+  // names only the vessel or structure.
+  if (opts.referenceKind === 'landmark') {
+    // The plate QC's landmark check is told this same sentence (shotVocabulary).
+    description += `\n\n**REFERENCE:** ${require('../lib/shotVocabulary').PLATE_LANDMARK_REFERENCE}`;
+  } else if (opts.referenceKind === 'element') {
+    description += `\n\n**REFERENCE:** The vessel or structure in this scene is the one shown in the attached reference image — render the part of it the camera sees, consistent in colour and construction.`;
+  }
+
+  // Geometry only, and only when the caller has the page's scene prose. Always
+  // a declared key below: fillTemplate drops an undeclared placeholder silently.
+  const { extractSceneGeometry } = require('../lib/sceneGeometry');
+  const geometryBlock = opts.sceneGeometry != null
+    ? String(opts.sceneGeometry)
+    : extractSceneGeometry({
+        mainScenePrompt: opts.mainScenePrompt || null,
+        castNames: opts.castNames || [],
+        shot: opts.shot || null,
+      });
+
+  const filled = fillTemplate(opts.template || PROMPT_TEMPLATES.emptyScene, {
+    STYLE_DESCRIPTION: opts.style || '',
+    EMPTY_SCENE_DESCRIPTION: description,
+    CHARACTER_SPACE: opts.characterSpace || '',
+    TEXT_AREA_INSTRUCTION: opts.textAreaInstruction || '',
+    ERA_GUARD: opts.eraGuard || '',
+    // The plate is GRADED on the page's composition geometry (validateEmptyScene
+    // checks path direction, vanishing point and lighting direction against the
+    // scene prose). Derived here — never the raw prose — so the generator sees
+    // the same three facts it is judged on and none of the cast.
+    SCENE_GEOMETRY: geometryBlock,
+    LANDMARK_FIDELITY: opts.landmarkFidelity || '',
+    // Edge to edge, no maker's mark, no mat: the same constant the derive
+    // edit carries and the plate QC's "Wrong text" / "Frame edge" checks read.
+    PLATE_EDGE: require('../lib/shotVocabulary').PLATE_EDGE_RULE,
+    // No people on a plate, however busy the place (2026-09-26): the same
+    // constant the derive edit carries and the plate QC's "Figures" check reads.
+    PLATE_NO_PEOPLE: require('../lib/shotVocabulary').PLATE_NO_PEOPLE_RULE,
+    // The time of day and weather this plate is painted in — the declared
+    // light of the page(s) it serves (sceneLight.js). '' when undeclared.
+    LIGHT_NOTE: opts.light ? require('../lib/sceneLight').buildLightLine(opts.light, { plate: true }) : '',
+  });
+
+  // Resolve VB ids to their English refs before the model sees them. The
+  // description is assembled from Visual Bible prose, and the writer routinely
+  // embeds ids in it ("the carved stone marker ART008 sits at the fork"), so
+  // an unsanitized empty-scene prompt gets the token PAINTED onto the object —
+  // observed on a shipped story: "ART008" lettered twice on a trail stone,
+  // "ART007" on a chest, the VB entity name on a signpost. The empty scene is
+  // the style/layout anchor the populated page is rendered from, so whatever
+  // it paints carries into the final image.
+  //
+  // Sanitizing here rather than at each call site: this builder is the single
+  // gate every empty-scene prompt passes through (page, vantage plate, cover
+  // plate, QC retry, iterate, Test Lab). Lazy require — promptBuilders.js
+  // requires this module at load, so a top-level import would close a cycle.
+  if (!opts.visualBible) return filled;
+  const { sanitizeVbIdsInPrompt } = require('../lib/promptBuilders');
+  const sanitised = sanitizeVbIdsInPrompt(filled, opts.visualBible, opts.pageNumber ?? null);
+  // The early return above means "no bible, no protection" — which is silent.
+  // A caller that forgets to pass the bible now says so in the log instead of
+  // shipping an id to the image model.
+  require('../lib/vbIdGuard').warnIfVbIds(sanitised, 'empty-scene/plate prompt', { kind: 'image' });
+  return sanitised;
+}
+
+/**
+ * THE PLATE'S STRUCTURES TEXT: the Visual Bible description of every vessel,
+ * vehicle and large built structure the plate's author is told the backdrop
+ * holds, or '' when none is staged. One builder for both sides (2026-09-26):
+ * buildEmptyScenePrompt appends it as the **STRUCTURES:** block, and the plate
+ * QC is handed the same string (validateEmptyScene `structures`).
+ *
+ * @param {{visualBible?: object, pageNumber?: number, aboardId?: string|null, sceneObjects?: Array|null}} opts
+ * @returns {string} the block text without its heading; '' when nothing is staged
+ */
+// THE PLATE AUTHOR'S TWO STRUCTURE RULES, one source for the author and its
+// judge (2026-09-26). buildPlateStructuresText wraps the page's structure lines
+// in them; the plate QC's `structures` check (empty-scene-qc.txt STRUCTURE_CHECK)
+// quotes them, so a plate is failed only for a structure its author was told
+// to match, and never for showing the part of it the camera sees.
+const PLATE_STRUCTURE_MATCH_RULE = 'Any vessel, vehicle or built structure in this backdrop is one of those described below — match its colour, construction and named parts, never a generic substitute';
+const PLATE_STRUCTURE_PART_RULE = 'Render only the part of the vessel the camera sees. When the camera stands on board, show the deck, rail and fittings around it — never the vessel seen from outside.';
+
+function buildPlateStructuresText(opts = {}) {
+  // The Visual Bible description of every vehicle listed for this page.
   // The Art Director's plate prose routinely names a vessel generically ("a
   // boat sits tied at the quay") and the plate model invents its own — a
   // shipped story rendered the crew's single-mast sailing boat as a mastless
@@ -739,76 +837,14 @@ function buildEmptyScenePrompt(opts = {}) {
       // ("render it exactly to its description") demanded the full vehicle even
       // when the camera stands on its deck, which shipped duplicate ships, a
       // ship inside a cave, and wheels on dry land (audit 2026-08-29).
-      description += `\n\n**STRUCTURES:** Any vessel, vehicle or built structure in this backdrop is one of those described below — match its colour, construction and named parts, never a generic substitute:\n${lines.join('\n')}\nRender only the part of the vessel the camera sees. When the camera stands on board, show the deck, rail and fittings around it — never the vessel seen from outside.`;
+      const text = `${PLATE_STRUCTURE_MATCH_RULE}:\n${lines.join('\n')}\n${PLATE_STRUCTURE_PART_RULE}`;
+      // VB ids resolved here, not only on the whole plate prompt: the plate QC
+      // reads this string on its own (buildEmptyScenePrompt's own pass over
+      // the filled prompt then finds nothing left to resolve).
+      return require('../lib/promptBuilders').sanitizeVbIdsInPrompt(text, opts.visualBible, opts.pageNumber ?? null);
     }
   }
-
-  // The plate call carries exactly ONE family of visual reference: a landmark
-  // photo when the location is real, otherwise the Visual Bible vehicle /
-  // structure render(s) — never both (owner, 2026-08-29; enforced in
-  // buildEmptySceneVbGrid). This line tells the model what the attached
-  // reference IS, and that it renders the visible part rather than the whole
-  // object. An invented location is never an attached image (owner,
-  // 2026-09-24): it is built from the description above, so the element line
-  // names only the vessel or structure.
-  if (opts.referenceKind === 'landmark') {
-    description += `\n\n**REFERENCE:** The place in this scene is the one shown in the attached reference image — render the part of it the camera sees, consistent in colour and construction.`;
-  } else if (opts.referenceKind === 'element') {
-    description += `\n\n**REFERENCE:** The vessel or structure in this scene is the one shown in the attached reference image — render the part of it the camera sees, consistent in colour and construction.`;
-  }
-
-  // Geometry only, and only when the caller has the page's scene prose. Always
-  // a declared key below: fillTemplate drops an undeclared placeholder silently.
-  const { extractSceneGeometry } = require('../lib/sceneGeometry');
-  const geometryBlock = opts.sceneGeometry != null
-    ? String(opts.sceneGeometry)
-    : extractSceneGeometry({
-        mainScenePrompt: opts.mainScenePrompt || null,
-        castNames: opts.castNames || [],
-        shot: opts.shot || null,
-      });
-
-  const filled = fillTemplate(opts.template || PROMPT_TEMPLATES.emptyScene, {
-    STYLE_DESCRIPTION: opts.style || '',
-    EMPTY_SCENE_DESCRIPTION: description,
-    CHARACTER_SPACE: opts.characterSpace || '',
-    TEXT_AREA_INSTRUCTION: opts.textAreaInstruction || '',
-    ERA_GUARD: opts.eraGuard || '',
-    // The plate is GRADED on the page's composition geometry (validateEmptyScene
-    // checks path direction, vanishing point and lighting direction against the
-    // scene prose). Derived here — never the raw prose — so the generator sees
-    // the same three facts it is judged on and none of the cast.
-    SCENE_GEOMETRY: geometryBlock,
-    LANDMARK_FIDELITY: opts.landmarkFidelity || '',
-    // Edge to edge, no maker's mark, no mat: the same constant the derive
-    // edit carries and the plate QC's "Wrong text" / "Frame edge" checks read.
-    PLATE_EDGE: require('../lib/shotVocabulary').PLATE_EDGE_RULE,
-    // The time of day and weather this plate is painted in — the declared
-    // light of the page(s) it serves (sceneLight.js). '' when undeclared.
-    LIGHT_NOTE: opts.light ? require('../lib/sceneLight').buildLightLine(opts.light, { plate: true }) : '',
-  });
-
-  // Resolve VB ids to their English refs before the model sees them. The
-  // description is assembled from Visual Bible prose, and the writer routinely
-  // embeds ids in it ("the carved stone marker ART008 sits at the fork"), so
-  // an unsanitized empty-scene prompt gets the token PAINTED onto the object —
-  // observed on a shipped story: "ART008" lettered twice on a trail stone,
-  // "ART007" on a chest, the VB entity name on a signpost. The empty scene is
-  // the style/layout anchor the populated page is rendered from, so whatever
-  // it paints carries into the final image.
-  //
-  // Sanitizing here rather than at each call site: this builder is the single
-  // gate every empty-scene prompt passes through (page, vantage plate, cover
-  // plate, QC retry, iterate, Test Lab). Lazy require — promptBuilders.js
-  // requires this module at load, so a top-level import would close a cycle.
-  if (!opts.visualBible) return filled;
-  const { sanitizeVbIdsInPrompt } = require('../lib/promptBuilders');
-  const sanitised = sanitizeVbIdsInPrompt(filled, opts.visualBible, opts.pageNumber ?? null);
-  // The early return above means "no bible, no protection" — which is silent.
-  // A caller that forgets to pass the bible now says so in the log instead of
-  // shipping an id to the image model.
-  require('../lib/vbIdGuard').warnIfVbIds(sanitised, 'empty-scene/plate prompt', { kind: 'image' });
-  return sanitised;
+  return '';
 }
 
 /**
@@ -826,6 +862,7 @@ function buildPlateDerivePrompt(instruction, styleText = '') {
     EDIT_INSTRUCTION: instruction,
     ART_STYLE: styleText || 'Match the source image\'s artistic style.',
     PLATE_EDGE: require('../lib/shotVocabulary').PLATE_EDGE_RULE,
+    PLATE_NO_PEOPLE: require('../lib/shotVocabulary').PLATE_NO_PEOPLE_RULE,
   });
 }
 
@@ -923,6 +960,11 @@ function buildEvaluationPrompt(opts = {}) {
     // rule reading the tail out of it can never fire. Empty when the caller
     // could not resolve the list — D-16b then skips.
     REQUIRED_OBJECTS: opts.requiredObjects || '',
+    // The size each cited Visual Bible creature, object and vehicle was given
+    // against the figures in frame (promptBuilders.buildElementSizesBlock — the
+    // page prompt's own sentence), read by D-21, D-31 and D-34. Empty when the
+    // page cites none.
+    ELEMENT_SIZES: opts.elementSizes || '',
     // The page's real-world landmark block, built by ONE builder shared with
     // the semantic and compliance judges (landmarkProtection.buildLandmarkContextBlock).
     // '(none)' — never an empty hole — when the caller has no landmark: this
@@ -955,6 +997,9 @@ module.exports = {
   fillTemplate,
   promptSections,
   buildEmptyScenePrompt,
+  buildPlateStructuresText,
+  PLATE_STRUCTURE_MATCH_RULE,
+  PLATE_STRUCTURE_PART_RULE,
   buildPlateDerivePrompt,
   buildEvaluationPrompt,
   extractArtStyle,

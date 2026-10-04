@@ -1,0 +1,77 @@
+{
+  "_doc": "Real (un-edited) pages labelled by reading them in full, 2026-09-27. Every page of a listed story is labelled: a page absent from 'pages' is judged CLEAN for grammar, slop and logic. Values are question ids from prompts/jev-text-audit.txt; the note quotes the evidence. 'borderline' ids are excluded from scoring (neither positive nor negative for that id).",
+  "stories": {
+    "job_1790282439176_ppgelxibt": {
+      "pages": {
+        "3": {"ids": ["GRAM_FOREIGN_WORD"], "note": "«Der rote Stein war nicht hers» — English word"},
+        "4": {"ids": ["GRAM_ARTICLE_CASE"], "note": "«ging zur Basteltisch» — der Tisch → zum"},
+        "6": {"ids": ["GRAM_ARTICLE_CASE"], "note": "«auf den Trottoir» — das Trottoir → aufs; «Er kannte jetzt, wo sein Haken war» — wusste"}
+      }
+    },
+    "job_1790496731630_m9pp92go3": {
+      "pages": {
+        "5": {"ids": ["LOGIC_OBJECT"], "note": "the ball is still on the carpet (p3/p4), never put back, yet «Alle Dinge stehen wieder an ihrem Platz»"}
+      }
+    },
+    "job_1790256136168_pbxibjv0r": {
+      "pages": {
+        "2": {"ids": ["GRAM_ARTICLE_CASE"], "note": "«hielt den Löffel ganz still über die Schüssel» — static position → über der Schüssel"},
+        "4": {"ids": [], "borderline": ["LOGIC_APPEAR"], "note": "«Da erschien eine grosse Hand» — an unnamed adult, deliberate toddler-eye view"},
+        "6": {"ids": ["SLOP_RULE_OF_THREE", "SLOP_MORAL_SUMMARY", "SLOP_REPETITIVE_OPENINGS"], "note": "«Der Brei war warm gewesen. Das Rüebli war süss gewesen. Das Brot war weich gewesen.» + «Der Zauber war gelungen. Die Zauberin hatte alles getan, was eine Zauberin tun musste.»"}
+      }
+    },
+    "job_1789292742265_mgxmrkfpd": {
+      "pages": {
+        "3": {"ids": ["SLOP_BODY_CLICHE"], "note": "«spürte, wie sein Bauch sich schwer anfühlte»"},
+        "5": {"ids": ["GRAM_NONWORD"], "note": "«Als Mama loslies» — losliess"},
+        "6": {"ids": ["SLOP_MORAL_SUMMARY", "SLOP_LESSON_EXPLAIN", "SLOP_GENERIC_ENDING"], "note": "«Ein Legionär, der die Wahrheit sagte, war ein guter Legionär. Das wusste er jetzt.» … «stärker als vorher, und genauso kühn»"}
+      }
+    },
+    "job_1785441560733_9xigyv8u6": {
+      "pages": {
+        "1": {"ids": [], "borderline": ["SLOP_SUDDENLY"], "note": "one «Plötzlich blieb sie stehen»"},
+        "2": {"ids": ["SLOP_BODY_CLICHE"], "note": "«Ihr Herz machte einen kleinen Zug»"},
+        "3": {"ids": ["SLOP_BODY_CLICHE"], "note": "«dass es Amiras Herz ganz eng machte»"},
+        "4": {"ids": ["SLOP_MORAL_SUMMARY", "SLOP_PURPLE_SIMILE"], "note": "«Teilen hatte etwas verändert.»; «strahlte wie ein kleiner Stern», «als ob auch das Wasser anfinge zu strahlen», «wie ein leises Glöcklein»"},
+        "5": {"ids": ["SLOP_MORAL_SUMMARY", "SLOP_BODY_CLICHE", "SLOP_GENERIC_ENDING"], "note": "«Gutes Teilen macht den Glitzer doppelt schön»; «In ihrer Brust war ein warmes, rundes Gefühl — genau so gross wie eine geteilte Freude.»"}
+      }
+    },
+    "job_1789975900382_dyc1g7wue": {
+      "pages": {
+        "5": {"ids": ["GRAM_FOREIGN_WORD", "GRAM_TENSE"], "note": "«la corde taut» — English; «Là, Léo l'attendait» in present-tense narration"},
+        "6": {"ids": ["GRAM_TENSE", "LOGIC_OBJECT"], "note": "«Il n'avait pas trouvé … il en avait fabriqué … la lumière brillait» in present narration; both boys walk without laces though only Noam's were used"}
+      }
+    },
+    "job_1789944735873_vmbd0or30": {
+      "pages": {
+        "3": {"ids": ["SLOP_BODY_CLICHE"], "note": "«Serena sent son cœur battre très fort»"},
+        "5": {"ids": ["LOGIC_APPEAR"], "note": "«Perle trottine» — the crab of p4 was never named; a new name acts"},
+        "6": {"ids": ["SLOP_MORAL_SUMMARY", "SLOP_PARALLEL_NEGATION", "SLOP_LESSON_EXPLAIN"], "note": "«C'est ça, le courage: pas l'absence de peur, mais un pas quand même.»"}
+      }
+    },
+    "job_1786918670311_qgrdbmlr8": {
+      "pages": {
+        "1": {"ids": ["SLOP_BODY_CLICHE"], "note": "«something shifted in his chest»"},
+        "3": {"ids": ["SLOP_RULE_OF_THREE"], "note": "«taller than buildings, taller than cranes, taller than the idea of tall»"},
+        "4": {"ids": ["SLOP_PARALLEL_NEGATION"], "note": "«not a sound, really, but a pressure»"},
+        "8": {"ids": ["SLOP_PARALLEL_NEGATION"], "note": "«Not a scream — an alarm.»"},
+        "12": {"ids": [], "borderline": ["LOGIC_OBJECT"], "note": "Rachel (at the Houston console on p9) sits at the viewing area as 'a stranger' — only revealed as a contradiction on p13"},
+        "13": {"ids": ["LOGIC_APPEAR", "LOGIC_OBJECT"], "note": "Lily, on the Moon, stands behind them in her spacesuit on Earth; the stranger at the viewing area is Rachel, who was at the console"},
+        "14": {"ids": ["SLOP_MORAL_SUMMARY"], "note": "«Sometimes the enormous things are best kept between the two people who were there.»"}
+      }
+    }
+  },
+  "writer_errors": {
+    "_doc": "Real writer-stage sentences the lector corrected (mined writerText vs storyText, then judged by reading). Re-inserted into the FINAL page in place of the corrected sentence: a real LLM error in real context.",
+    "items": [
+      {"story": "job_1789227389389_z18dmvnt6", "page": 6, "wrong": "«Ma doudou!»", "right": "«Mon doudou!»", "label": "GRAM_ARTICLE_CASE"},
+      {"story": "job_1789227389389_z18dmvnt6", "page": 6, "wrong": "«Je ne la vois plus,»", "right": "«Je ne le vois plus,»", "label": "GRAM_AGREEMENT"},
+      {"story": "job_1790100385959_1nitlympp", "page": 8, "wrong": "«Du heisst Flämmli», sagte Julian zu dem, das drinnen war.", "right": "«Du heisst Flämmli», sagte Julian zu dem, was drinnen war.", "label": "GRAM_AGREEMENT"},
+      {"story": "job_1790100385959_1nitlympp", "page": 15, "wrong": "«Knieet hin», sagte er.", "right": "«Kniet hin», sagte er.", "label": "GRAM_NONWORD"},
+      {"story": "job_1790446348343_z3fw660ie", "page": 1, "wrong": "An Fionas Hüfte hing eine breite orange Schärpe, die sie aus Segeltuch doppelt gelegt und fest verknotet hatte, und an der Schärpe hingen ihre Nähschere.", "right": "An Fionas Hüfte hing eine breite orange Schärpe, die sie aus Segeltuch doppelt gelegt und fest verknotet hatte, und daran hing ihre Nähschere.", "label": "GRAM_AGREEMENT"},
+      {"story": "job_1790446348343_z3fw660ie", "page": 1, "wrong": "Sarah strich sich die Ärmel glatt und redete dabei schon über die Rüstungen, die sie drin sehen wollten.", "right": "Sarah strich sich die Ärmel glatt und redete schon über die Rüstungen, die sie drinnen sehen wollte.", "label": "GRAM_AGREEMENT"},
+      {"story": "job_1790373080139_vnx5l8iy7", "page": 2, "wrong": "Dann hält er inne.", "right": "Dann hielt er inne.", "label": "GRAM_TENSE"},
+      {"story": "job_1790373080139_vnx5l8iy7", "page": 1, "wrong": "Julian, Max und Kiaan laufen hinterher und lachen.", "right": "Julian, Max und Kiaan liefen hinterher und lachten.", "label": "GRAM_TENSE"}
+    ]
+  }
+}

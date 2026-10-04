@@ -12,6 +12,7 @@
 
 const crypto = require('crypto');
 const { log } = require('./server/lib/serverLog');
+const { settleJobWithRefund, JOB_SAVING_PROGRESS } = require('./server/lib/jobCredits');
 const pLimit = require('p-limit');
 const email = require('./email');
 const { upsertStory, saveStoryImage, rehydrateStoryImages } = require('./server/services/database');
@@ -33,7 +34,7 @@ const {
   getStyledAvatarGenerationLog,
   clearStyledAvatarGenerationLog
 } = require('./server/lib/styledAvatars');
-const { reconcileCoverClothingWithRequirements, reconcilePageClothingWithRequirements } = require('./server/lib/clothingCategories');
+const { reconcileCoverClothingWithRequirements, reconcilePageClothingWithRequirements, resolveCharacterReqs } = require('./server/lib/clothingCategories');
 const {
   getCostumedAvatarGenerationLog,
   clearCostumedAvatarGenerationLog
@@ -399,6 +400,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
   // on. One declaration, both readers. See docs/decisions.md
   // "Unevaluated runs report not-measured, never a clean score".
   const skipQualityEval = inputData.skipQualityEval === true;
+  // The trial's Jev switch (jevDecisions.jevFallBack): its one Jev step is the
+  // landmark selection before the writer call. A beats story keeps its own
+  // report inside generateStoryViaBeats.
+  const trialJev = { probe: null, fallback: null };
 
   // The stories row exists from the FIRST moment (owner, 2026-08-15).
   // story_images.story_id references stories.id, so anything written during
@@ -670,6 +675,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // pre-beats unified writer (buildUnifiedStoryPrompt + story-unified*.txt)
     // was deleted 2026-09-15 — see docs/decisions.md. resolvePipelineMode
     // guarantees a non-trial job is always 'beats', so this stays null there.
+    // The trial writer reads the first 3 landmarks: Jev picks them on the
+    // chosen idea (LB2, 3 at random from the top 5, the premise-named place
+    // pinned first). Probed first, as a beats story is; on the backup the
+    // resolver's order stands (docs/decisions.md 2026-09-27 "Jev selection built").
+    if (inputData.trialMode) {
+      await require('./server/lib/jevSelection').selectStoryLandmarks(inputData, { jevReport: trialJev, gl: genLog, mode: 'trial', probe: true });
+    }
     const unifiedPrompt = inputData.trialMode
       ? buildTrialStoryPrompt(inputData, sceneCount)
       : null;
@@ -1078,6 +1090,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               referencePhotos: expansionPagePhotos,
               // Decides whether the text-zone rule family is asked for at all.
               story: inputData,
+              // This legacy per-page path has no decision layer: nothing is fixed upstream.
+              jevBackup: true,
             }
           );
 
@@ -1109,11 +1123,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 if (validationResult.usage.previewCost) {
                   addUsage('runware', { cost: validationResult.usage.previewCost }, 'scene_validation_preview');
                 }
-                if (validationResult.usage.visionCost || validationResult.usage.comparisonCost) {
-                  addUsage('gemini_text', {
-                    promptTokenCount: (validationResult.usage.visionTokens || 0) + (validationResult.usage.comparisonTokens || 0),
-                    candidatesTokenCount: 0
-                  }, 'scene_validation_analysis');
+                if (validationResult.usage.visionUsage || validationResult.usage.comparisonUsage) {
+                  // Was a Gemini-shaped { promptTokenCount } object, which
+                  // addUsage (reads input_tokens) booked as 0 tokens.
+                  const { sumUsage } = require('./server/lib/providerUsage');
+                  addUsage('gemini_text', sumUsage([validationResult.usage.visionUsage, validationResult.usage.comparisonUsage]), 'scene_validation_analysis', MODEL_DEFAULTS.qualityEval);
                 }
                 if (validationResult.repair?.usage) {
                   addUsage('anthropic', validationResult.repair.usage, 'scene_validation_repair');
@@ -1223,18 +1237,15 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             inputData.characters
           );
 
-          // Build clothing requirements with _currentClothing per character.
-          // Clone the character entry before writing — sharing the nested
-          // object with inputData._trialClothingRequirements lets a per-scene
-          // value pollute the global requirements and leak into later pages.
-          const sceneClothingRequirements = { ...(inputData._trialClothingRequirements || {}) };
-          for (const char of sceneCharacters) {
-            const charClothing = perCharClothing[char.name] || 'standard';
-            sceneClothingRequirements[char.name] = {
-              ...(sceneClothingRequirements[char.name] || {}),
-              _currentClothing: charClothing
-            };
-          }
+          // Build clothing requirements with _currentClothing per character —
+          // the SAME builder full mode uses: name-tolerant (outline "Luna" vs
+          // character "LUNA"), clones the entry so a per-scene value never
+          // pollutes inputData._trialClothingRequirements, and refuses to
+          // default to 'standard'. Hand-rolling this here rendered a whole
+          // trial in the standard avatar (prod job_1790769860433_2bhhj0pyi).
+          const sceneClothingRequirements = buildSceneClothingRequirements(
+            sceneCharacters, perCharClothing, inputData._trialClothingRequirements
+          );
 
           // Get character photos with styled avatars applied
           let pagePhotos = getCharacterPhotoDetails(sceneCharacters, 'standard', inputData.artStyle, sceneClothingRequirements);
@@ -1631,7 +1642,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             // costume (job_1786823576638). Same spread the trial's front-cover
             // path applies.
             coverClothingRequirements[charName] = {
-              ...(inputData._trialClothingRequirements?.[charName] || {}),
+              ...(resolveCharacterReqs(inputData._trialClothingRequirements, charName) || {}),
               _currentClothing: clothing,
             };
           }
@@ -1661,7 +1672,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         if (inputData.trialMode && inputData._trialCostumeType) {
           for (const c of (inputData.characters || [])) {
             mergedClothingRequirements[c.name] = {
-              ...(inputData._trialClothingRequirements?.[c.name] || {}),
+              ...(resolveCharacterReqs(inputData._trialClothingRequirements, c.name) || {}),
               ...(mergedClothingRequirements[c.name] || {}),
               _currentClothing: 'costumed',
             };
@@ -2356,7 +2367,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               for (const sc of coverScene.characters) {
                 if (sc.name && sc.clothing) {
                   coverClothingReqs[sc.name] = {
-                    ...(coverClothingReqs[sc.name] || {}),
+                    ...(resolveCharacterReqs(coverClothingReqs, sc.name) || {}),
                     _currentClothing: sc.clothing
                   };
                 }
@@ -2366,9 +2377,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             // Clone the entry before assigning so we don't pollute inputData._trialClothingRequirements.
             if (inputData._trialCostumeType) {
               for (const char of coverCharacters) {
-                if (!coverClothingReqs[char.name]?._currentClothing) {
+                if (!resolveCharacterReqs(coverClothingReqs, char.name)?._currentClothing) {
                   coverClothingReqs[char.name] = {
-                    ...(coverClothingReqs[char.name] || {}),
+                    ...(resolveCharacterReqs(coverClothingReqs, char.name) || {}),
                     _currentClothing: 'costumed'
                   };
                 }
@@ -3196,8 +3207,18 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     }
 
     // Load photo variant descriptions for Swiss landmarks (descriptions only, no image data)
-    // This enables scene description AI to intelligently select which photo variant to use
+    // — the photos each location's `landmarkPhoto` citation is answered from.
     await loadLandmarkPhotoDescriptions(visualBible);
+    // Every real-landmark plate's citation, checked once for the story (the
+    // trial writer cites per location). A fault is logged and recorded here;
+    // its pages then get no landmark photo (docs/decisions.md 2026-09-26).
+    {
+      const { landmarkPhotoCitationFaults } = require('./server/lib/storyHelpers');
+      for (const f of landmarkPhotoCitationFaults(visualBible)) {
+        log.error(`❌ [LANDMARK] Plate ${f.plateId} ("${f.locName}"): ${f.reason} — its pages get no landmark photo`);
+        genLog.warn('landmark_photo_citation', `${f.plateId} (${f.locName}): ${f.reason}`, null, f);
+      }
+    }
 
     // Start background fetch for landmark reference photos (runs in parallel with avatar generation)
     // NOTE: For Swiss landmarks with photo variants, we'll load photos on-demand during image generation
@@ -3537,27 +3558,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     const { prompts: scenePromptTable, refByPage: scenePromptRefs } =
       rollUpScenePrompts(expandedScenes);
 
-    // Create allSceneDescriptions array for storage compatibility
-    const allSceneDescriptions = expandedScenes.map(scene => {
-      // Extract translatedSummary and imageSummary for edit modal display
-      const sceneMetadata = extractSceneMetadata(scene.sceneDescription);
-      return {
-        pageNumber: scene.pageNumber,
-        description: scene.sceneDescription,
-        characterClothing: scene.characterClothing || {},
-        outlineExtract: scene.outlineExtract || scene.sceneHint || '',
-        // Dev mode: Art Director prompt and model used. The prompt itself is
-        // stored once in sceneExpansionReport.prompts[]; this is the index.
-        // Read it with storyShape.resolveScenePrompt(storyData, pageNumber).
-        scenePromptRef: scenePromptRefs.has(scene.pageNumber)
-          ? scenePromptRefs.get(scene.pageNumber)
-          : null,
-        textModelId: scene.sceneDescriptionModelId,
-        // Pre-extracted summaries for edit modal (avoids JSON parsing on frontend)
-        translatedSummary: sceneMetadata?.translatedSummary || null,
-        imageSummary: sceneMetadata?.imageSummary || null
-      };
-    });
+    // The stored `sceneDescriptions[]` shape (brief under `description`) —
+    // one projection, also used for the repair pipeline's story data below.
+    const { sceneDescriptionRecord } = require('./server/lib/sceneMetadata');
+    const allSceneDescriptions = expandedScenes.map(scene => sceneDescriptionRecord(scene, scenePromptRefs));
 
     // WARDROBE-STATE AVATAR VARIANTS (owner ruling 2026-09-19) and OUTFIT
     // VERSIONS (owner ruling 2026-09-24).
@@ -3774,6 +3778,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // No `rounds`: the chain is fixed at two parallel audits → one repair
           // → one lector (owner ruling 2026-09-03). There is no loop to bound.
           usageLabel: 'text_refine',
+          // A story already on the Jev-outage backup does not ask Jev again.
+          jevOptions: { jevFallback: beatsResult?.jevFallback || null },
           // Latest completed state, so the join below can salvage the audit and
           // any finished round if the chain FAILS partway. (It is no longer a
           // deadline fallback — the join has no deadline.)
@@ -4135,6 +4141,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // captured inside generateStoryViaBeats at each rewrite; null on the
     // unified path, which has no beats or scene review.
     const beatsReviewReport = beatsResult?.beatsReviewReport || null;
+    // The Jev decision layer's report (2026-09-27): cast cuts, shots, light,
+    // VB citations, aboard, population, gaze — every decision per page, so a
+    // run can be replayed. docs/decisions.md "Jev decision layer wired".
+    const jevDecisions = beatsResult?.jevDecisions || null;
+    // Set when the Jev-outage backup ran (owner exception, 2026-09-27): {step, reason, at}.
+    // A trial's only Jev step is its landmark selection (trialJev below).
+    const jevFallback = beatsResult?.jevFallback || trialJev.fallback || null;
     // Drafted arc + the arc reviewer's analysis, so a shipped story can be read
     // back against the arc it promised.
     const arcReviewReport = beatsResult?.arcReviewReport || null;
@@ -4150,7 +4163,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // check's findings (adopt / conflict) — diagnostics, stored with the story.
     const storyBibleReport = beatsResult?.storyBibleReport || null;
     const wardrobeBibleReport = beatsResult?.wardrobeBibleReport || null;
-    const sceneReviewReport = beatsResult?.sceneReviewReport || null;
+    // The brief checks and their one re-ask (2026-09-28) — the scene review's
+    // successor; before/after per re-asked page.
+    const briefCheckReport = beatsResult?.briefCheckReport || null;
     // The prompt that WROTE the briefs, next to the one that reviewed them.
     // Beats contributes the timings and which pages fell back to a per-page
     // call; `prompts[]` is the story-wide prompt table every page references
@@ -4415,11 +4430,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // no code-side enforcement of the budget — it is a prompt rule for the
         // Art Director and a scene-review fault, nothing more). One Grok slot,
         // cell size 1/n, a face below VB_CELL_FLOOR_PX gets replaced by a prior.
-        const { VB_SLOT_MAX_ELEMENTS } = require('./server/lib/grok');
-        // sceneMetadata rides along for the removable-worn-item dedupe: an item
-        // the page declares WORN is already on the avatar reference, so its
-        // standalone plate is dropped from the grid (server/lib/wornItems.js).
-        let elementReferences = getElementReferenceImagesForPage(visualBible, pageNum, VB_SLOT_MAX_ELEMENTS, sceneMetadata?.objects || null, sceneMetadata);
+        // Selection: the page's elements (objects[] + worn-item dedupe) plus the
+        // ids the brief cites — the ONE selector the Test Lab image stage uses
+        // too (server/lib/pageRenderCall.js).
+        let elementReferences = require('./server/lib/pageRenderCall').selectPageElementRefs(visualBible, pageNum, sceneMetadata);
         // NOTE: the plate-aware filter does NOT live here. `sceneBackgrounds` is
         // populated by Phase 5a-pre / 5a-pre-vantage, both of which run AFTER
         // this pageData map (they iterate the pageDataArray it produces), so at
@@ -4429,60 +4443,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // cards despite every page having a plate. Selection happens here;
         // filtering + grid construction happen in Phase 5a-pre-grid below, once
         // we know which pages actually got a plate.
-        // Fallback: also match by IDs found in scene hint (covers page mismatch between VB and scene)
-        if (sceneMetadata?.fullData) {
-          const sceneIds = [];
-          // Extract CHR IDs from characters
-          for (const char of sceneMetadata.fullData.characters || []) {
-            if (char.id && char.id !== 'null') sceneIds.push(char.id);
-          }
-          // Extract ART/OBJ IDs from objects
-          for (const obj of sceneMetadata.fullData.objects || []) {
-            const id = typeof obj === 'string' ? obj.match(/((?:ART|OBJ|CHR|VEH)\d+)/i)?.[1] : obj?.id;
-            if (id && !id.startsWith('LOC')) sceneIds.push(id);
-          }
-          if (sceneIds.length > 0) {
-            const idBasedRefs = getElementReferenceImagesByIds(visualBible, sceneIds, pageNum);
-            const existingIds = new Set(elementReferences.map(r => r.id));
-            const newRefs = idBasedRefs.filter(r => !existingIds.has(r.id));
-            if (newRefs.length > 0) {
-              log.info(`🔗 [VB-MATCH] Page ${pageNum}: Added ${newRefs.length} element(s) by scene hint ID: ${newRefs.map(r => r.id).join(', ')}`);
-              elementReferences = [...elementReferences, ...newRefs].slice(0, 4);
-            }
-          }
-        }
         const secondaryLandmarks = pageLandmarkPhotos.slice(1);
-        // Determine per-page image model based on scene complexity
-        const sceneComplexity = sceneMetadata?.sceneComplexity || 'simple';
-        const sceneRouting = modelOverrides.sceneRouting || 'auto';
-        let pageImageModel, pageImageBackend;
-
-        if (sceneRouting === 'auto') {
-          pageImageModel = sceneComplexity === 'complex'
-            ? MODEL_DEFAULTS.complexPageImage
-            : MODEL_DEFAULTS.simplePageImage;
-          pageImageBackend = IMAGE_MODELS[pageImageModel]?.backend || 'gemini';
-          log.info(`🎯 [ROUTING] Page ${pageNum}: ${sceneComplexity} → ${pageImageModel} (${pageImageBackend})`);
-        } else if (sceneRouting === 'grok') {
-          pageImageModel = MODEL_DEFAULTS.simplePageImage;
-          pageImageBackend = IMAGE_MODELS[pageImageModel]?.backend || 'grok';
-        } else if (sceneRouting === 'gemini') {
-          pageImageModel = MODEL_DEFAULTS.complexPageImage;
-          pageImageBackend = IMAGE_MODELS[pageImageModel]?.backend || 'gemini';
-        } else {
-          pageImageModel = modelOverrides.imageModel;
-          pageImageBackend = modelOverrides.imageBackend;
-        }
-        // The baked front cover renders on the typography-aware model
-        // (runtime coverTitleBakedModel), whatever the page tier is.
-        if (coverOpts?.imageModel) {
-          pageImageModel = coverOpts.imageModel;
-          pageImageBackend = IMAGE_MODELS[pageImageModel]?.backend || pageImageBackend;
-        }
-
-        // Skip Visual Bible text when using Grok (8000 char limit; VB grid sent as reference image)
-        const imageModelConfig = IMAGE_MODELS[pageImageModel];
-        const isGrokImage = imageModelConfig?.backend === 'grok';
+        // The page model tier and the prompt closure — the ONE implementation the
+        // Test Lab image stage calls too (server/lib/pageRenderCall.js).
+        const pageRender = require('./server/lib/pageRenderCall');
+        const { pageImageModel, pageImageBackend, sceneComplexity } = pageRender.pageRenderModel({
+          sceneMetadata, modelOverrides, coverOpts, pageNumber: pageNum,
+        });
         // ORDERING BUG, fixed 2026-09-15. `vbRefElementIds` decides whether the
         // prompt says "the attached reference images include a rough image of
         // <X>" (promptBuilders REQUIRED OBJECTS). It used to be computed HERE,
@@ -4492,27 +4459,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // in 5a-pre-grid from the cells actually sent, which is what the trial
         // path (`trialVbGrid.rawElements`) and the iterate path (images.js)
         // already do.
-        const makeImagePrompt = (vbRefElementIds) => require('./server/lib/promptBuilders').withBakedTitle(buildImagePrompt(
-          scene.sceneDescription, inputData, sceneCharacters, visualBible, pageNum, pagePhotos, {
-            skipVisualBible: isGrokImage,
-            // Elements whose reference render rides with this call: grid cells,
-            // or (for a plate-filtered vehicle in 5a-pre-grid) the plate itself.
-            vbRefElementIds,
-            // A cover's copy space is its beat's (coverRender.js).
-            ...(coverOpts ? { textPositionOverride: coverOpts.textPosition } : {}),
-          }
-        ), coverOpts?.bakeTitle || '');
+        const makeImagePrompt = pageRender.makePageImagePrompt({
+          sceneDescription: scene.sceneDescription, inputData, sceneCharacters, visualBible,
+          pageNumber: pageNum, characterPhotos: pagePhotos, pageImageModel, coverOpts,
+        });
         const imagePrompt = makeImagePrompt(elementReferences.map(r => r.id).filter(Boolean));
         // Extract emptyScenePrompt from outline hint (Sonnet-generated, high quality)
         // Falls back to scene expansion's emptyScenePrompt via sceneMetadata
-        let outlineEmptyScenePrompt = null;
-        try {
-          const hintJson = scene.sceneHint || scene.outlineExtract || '';
-          if (hintJson.includes('{')) {
-            const parsed = JSON.parse(hintJson.replace(/```json\s*/gi, '').replace(/```\s*/gi, '').trim());
-            outlineEmptyScenePrompt = parsed?.emptyScenePrompt || null;
-          }
-        } catch { /* not valid JSON — fine */ }
+        const outlineEmptyScenePrompt = require('./server/lib/platePipeline').outlineEmptyScenePromptOf(scene);
 
         return {
           pageNumber: pageNum,
@@ -4677,418 +4631,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           const { getTextAreaMask } = require('./server/lib/textMasks');
           await Promise.all(realGroups.map(([vantageId, group]) => vLimit(async () => {
             await checkCancellation();
-            const v = group.vantage;
-            // THE REP MUST BE A PLATE-SHARING PAGE (owner, 2026-09-21). The base
-            // plate is what every angled page is derived FROM, so it is painted
-            // at eye level whenever the group holds such a page. Taking
-            // pageNumbers[0] blindly could paint the base from a high-angle page
-            // and hand that horizon to everyone else on the vantage.
-            const { plateClass, PLATE_BASE_CLASS, buildPlateDeriveInstruction } = require('./server/lib/shotVocabulary');
-            const shotOfPage = (pn) => (pageDataArray.find(pd => pd.pageNumber === pn)
-              ?.sceneMetadata?.fullData?.shot || '').trim();
-            // ONE PLATE, ONE LIGHT (owner, 2026-09-24). A page's time of day and
-            // weather are its brief's `timeOfDay` / `weather` (sceneLight.js),
-            // never the plate's. The base plate is painted in the light most of
-            // the vantage's pages declare, and a page declaring another light
-            // gets a plate RE-LIT from the base below — same place, same camera.
-            // Before this every page inherited the representative's light:
-            // prod job_1790107559778_fcmlfa8kn p2/p4/p5/p6 all got p2's rain.
-            const { declaredLight, lightKey, describeLight, relightClause, buildPlateRelightInstruction } = require('./server/lib/sceneLight');
-            const lightOfPage = (pn) => declaredLight(pageDataArray.find(pd => pd.pageNumber === pn)?.sceneMetadata);
-            const lightVotes = new Map();
-            for (const pn of group.pageNumbers) {
-              const k = lightKey(lightOfPage(pn));
-              if (k) lightVotes.set(k, (lightVotes.get(k) || 0) + 1);
-            }
-            const commonLightKey = [...lightVotes.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || '';
-            // Pull a representative page so we can inherit aspect / model / landmark refs:
-            // a plate-sharing page, in the common light when one is declared.
-            const basePages = group.pageNumbers.filter(pn => plateClass(shotOfPage(pn)) === PLATE_BASE_CLASS);
-            const repPageNum = basePages.find(pn => lightKey(lightOfPage(pn)) === commonLightKey)
-              ?? basePages[0]
-              ?? group.pageNumbers[0];
-            const repPageData = pageDataArray.find(pd => pd.pageNumber === repPageNum);
-            if (!repPageData) return;
-            const baseLight = lightOfPage(repPageNum);
-            const baseLightKey = lightKey(baseLight);
-            const artStyleDesc = resolveArtStyle(inputData.artStyle || 'pixar', repPageData.pageImageBackend) || '';
-            const layoutAspect = inputData?.layout?.imageAspect || MODEL_DEFAULTS.pageAspect;
-            // Vantage canvas is GENERIC — no character-space hints (the canvas
-            // serves multiple pages with different cast/positions), no calm-zone
-            // (text overlay zone differs per page via spread rule). The per-page
-            // image render handles those.
-            const eraGuard = buildEraGuard(repPageData.sceneMetadata?.era || null);
-            // HYBRID PLATE (owner-approved 2026-08-29): Art Director prose
-            // decides framing and foreground, and the vantage/LOC prose is
-            // setting context underneath it. Before that the vantage path
-            // DISCARDED the AD prose entirely and built the plate from Visual
-            // Bible prose alone; 25 of 30 audited plates were prompt-wrong.
-            //
-            // The FRAMING paragraph is the VANTAGE's own plate since 2026-09-17
-            // (owner: "we either reuse a plate or create a new one — the AD
-            // decides"). The Art Director writes it once per vantage, so the
-            // plate this canvas renders is the plate its author wrote for these
-            // pages, not the first page's leftover. A stored story authored
-            // per-page plates instead: resolvePagePlate falls back to the
-            // representative page's, which is exactly today's behaviour and the
-            // same page whose model / aspect / landmarks we inherit.
-            const repPlate = resolvePagePlate({
-              pageNumber: repPageNum,
-              sceneMetadata: repPageData.sceneMetadata,
-              visualBible,
-              outlinePlate: repPageData.emptyScenePrompt,
-              vantage: v,
+            const vantagePlates = await require('./server/lib/platePipeline').renderVantagePlates(vantageId, group, {
+              visualBible, inputData, pageDataArray, addUsage, imageGenHeartbeat, genLog,
             });
-            const adEmptyPrompt = repPlate.text;
-            if (repPlate.source === 'missing') {
-              // Never substituted by another vantage's plate or another page's:
-              // the canvas below is built from Visual Bible prose alone, which
-              // is the prompt-wrong case the hybrid plate exists to prevent.
-              log.error(`❌ [VANTAGE] ${vantageId} (${v.locationName} – ${v.name}) has NO plate: the bible authored no \`emptyScenePrompt\` for this vantage and page ${repPageNum} carries none either. Pages ${group.pageNumbers.join(',')} render on a canvas built from bible prose only.`);
-              genLog.warn('vantage_plate_missing', `Vantage ${vantageId} has no emptyScenePrompt — pages ${group.pageNumbers.join(',')} render on bible prose alone`, null, {
-                vantageId, pages: group.pageNumbers, locationName: v.locationName, vantageName: v.name,
-              });
-            } else {
-              log.info(`🏛️ [VANTAGE] ${vantageId}: plate prose from ${repPlate.source}${repPlate.source === 'page' ? ` (page ${repPageNum})` : ''}`);
-            }
-            // Shot follows the same precedence: the AD's page shot wins over
-            // the vantage's generic one.
-            const vantageShot = (repPageData.sceneMetadata?.fullData?.shot || v.shot || '').trim();
-            const shotPrefix = vantageShot ? `**SHOT:** ${vantageShot}\n\n` : '';
-            // English-only empty-scene reference: the bare VB location name is
-            // story-language and carries no visual info — emit it with the
-            // entry's English visual fields inlined (same rule as covers /
-            // sanitizeVbIdsInPrompt; docs/decisions.md 2026-07-31).
-            const { englishLocationRef } = require('./server/lib/visualBible');
-            const locationRef = englishLocationRef(v.location) || v.locationName || '';
-            // The vantage's own plate IS its description since 2026-09-17 (the
-            // Art Director writes one text per vantage), so it went out twice:
-            // here and again as FRAMING — ~500 chars that pushed staging
-            // job_1790277448294_5herh01j7's p1/p11 plates over the Grok cap. A
-            // description the FRAMING paragraph already carries is not repeated.
-            const vantageDescription = String(v.description || '').trim();
-            const emptySceneDesc = [
-              `${shotPrefix}**LOCATION:** ${locationRef}\n**VANTAGE:** ${v.name || ''}`,
-              vantageDescription && vantageDescription !== String(adEmptyPrompt || '').trim() ? vantageDescription : '',
-              adEmptyPrompt
-                ? `**FRAMING:** ${adEmptyPrompt}\n\n${vantageShot ? 'The SHOT line decides the camera: its height, angle and distance. The FRAMING paragraph decides the composition and what fills the foreground; a camera it names gives way to the SHOT line.' : 'The FRAMING paragraph decides the camera, the composition and what fills the foreground.'} The LOCATION and VANTAGE lines are setting context — use them for what the place looks like, not for how it is framed.`
-                : '',
-            ].filter(Boolean).join('\n\n');
-            const characterSpace = `Render this as an empty location backdrop. Foreground, midground and background bands all show the scene's natural ground/floor/water surface continuing unbroken — characters will be composited into them later. No figures, no animals.`;
-            // Pull landmark photos for the LOC if real — used as a strict
-            // visual reference for the Wikimedia-photo case.
-            // NOT resolveLandmarkPhotoForLocation: this is the per-vantage plate
-            // path and the photo is the LOC's own legacy referencePhotoData, not a
-            // variant slot. It therefore carries no `photoType`, and
-            // buildLandmarkFidelityBlock falls to its close/exterior wording —
-            // correct for a single legacy landmark photo, and the reason a wide
-            // curated view must not be routed here.
-            const landmarkPhotos = (v.location?.isRealLandmark && v.location?.referencePhotoData)
-              ? [{ name: v.location.name, photoData: v.location.referencePhotoData, attribution: v.location.photoAttribution, source: v.location.photoSource }]
-              : (repPageData.landmarkPhotos || []);
-            const { buildLandmarkFidelityBlock } = require('./server/lib/storyHelpers');
-            try {
-              // Built BEFORE the prompt: which reference family is attached
-              // decides the REFERENCE line. Exactly one family per plate —
-              // buildEmptySceneVbGrid returns null when a landmark photo is
-              // present (owner, 2026-08-29).
-              const repAboardId = repPageData.sceneMetadata?.aboard || null;
-              // AD objects[] of the SAME rep page whose prose frames the plate —
-              // gates which vehicles enter the plate prompt + grid (AD is the
-              // authority on vehicle presence; VB pages is only the menu).
-              const repSceneObjects = repPageData.sceneMetadata?.objects || null;
-              const emptySceneVbGrid = await buildEmptySceneVbGrid(visualBible, repPageNum, landmarkPhotos, repAboardId, repSceneObjects);
-              const emptySceneVbGridDataUrl = emptySceneVbGrid
-                ? `data:image/jpeg;base64,${Buffer.from(emptySceneVbGrid).toString('base64')}`
-                : null;
-              const emptyPrompt = buildEmptyScenePrompt({
-                style: artStyleDesc,
-                description: emptySceneDesc,
-                characterSpace,
-                eraGuard,
-                // Named fidelity block whenever a landmark photo is attached
-                // below — '' otherwise (was trial-only; paid stories shipped
-                // the generic unnamed plate prompt).
-                landmarkFidelity: buildLandmarkFidelityBlock(landmarkPhotos[0], { era: repPageData.sceneMetadata?.era || null }),
-                referenceKind: landmarkPhotos.length > 0 ? 'landmark' : (emptySceneVbGrid ? 'element' : null),
-                visualBible,
-                pageNumber: repPageData.pageNumber,
-                aboardId: repAboardId,
-                sceneObjects: repSceneObjects,
-                // The SAME prose validateEmptyScene grades this plate's geometry
-                // against, reduced to the geometry facts (no cast, no action).
-                mainScenePrompt: repPageData.scene?.sceneDescription || null,
-                castNames: (repPageData.sceneMetadata?.fullData?.characters || []).map(c => c?.name).filter(Boolean),
-                light: baseLight,
-              });
-              const result = await generateImageOnly(emptyPrompt, [], {
-                aspectRatio: layoutAspect,
-                // Plates stay on the Standard tier regardless of the page tier.
-                ...emptyScenePlateRouting(),
-                landmarkPhotos,
-                visualBibleGrid: emptySceneVbGrid,
-                pageNumber: repPageNum,
-                skipCache: true,
-                pageContext: `vantage-${vantageId}`,
-              });
-              if (result?.usage) {
-                const isRunware = result.modelId?.startsWith('runware:');
-                const isGrok = result.modelId?.startsWith('grok-imagine');
-                const provider = isRunware ? 'runware' : isGrok ? 'grok' : 'gemini_image';
-                addUsage(provider, result.usage, 'page_images', result.modelId);
-              }
-              imageGenHeartbeat();  // per-plate heartbeat — keeps the phase alive
-              if (!result?.imageData) {
-                log.warn(`⚠️ [VANTAGE] ${vantageId} (${v.locationName} – ${v.name}) produced no image`);
-                return;
-              }
-
-              // Empty-scene QC on the vantage path (2026-08-31): the per-page
-              // path below has always run validateEmptyScene + one
-              // retry-with-feedback, but this block never did — on
-              // job_1788123310558 empty-scene QC ran 0 times and the p2 plate
-              // shipped with a blocked foreground and paper margins. Same
-              // validator, same single retry. textPosition is null (a shared
-              // plate serves pages with different text zones, so no calm-zone
-              // grading) and the character placements are the UNION across the
-              // plate's page group.
-              let plateImage = result.imageData;
-              let platePrompt = emptyPrompt;
-              let plateRefs = result.grokRefImages || null;
-              let plateQcRecord = null;
-              // ONE set of QC options for the plate, its retry and every plate
-              // derived from it — the retry was judged on pixels only and the
-              // derived plates not at all (2026-09-23, dragon run 6).
-              let plateQcOpts = { artStyle: artStyleDesc, shot: plateClass(vantageShot), pageNumber: repPageNum, landmarkPhoto: landmarkPhotos[0] || null, light: baseLight };
-              const { validateEmptyScene } = require('./server/lib/images');
-              const { decidePlateAfterRetry, plateQcRecord: buildPlateQcRecord, logPlateOutcome, nullOnPromptFit } = require('./server/lib/plateQc');
-              try {
-                const seenPlacement = new Set();
-                const placements = [];
-                for (const pn of group.pageNumbers) {
-                  const pd = pageDataArray.find(x => x.pageNumber === pn);
-                  for (const c of (pd?.sceneMetadata?.fullData?.characters || [])) {
-                    if (!c?.name || !c?.position) continue;
-                    const key = `${c.name}|${c.position}`;
-                    if (seenPlacement.has(key)) continue;
-                    seenPlacement.add(key);
-                    placements.push({ name: c.name, position: c.position, depth: c.depth });
-                  }
-                }
-                // Same era derivation as the per-page path below.
-                let storyEra = null;
-                const costumedTypes = Object.values(streamingClothingRequirements || {})
-                  .map(r => r?.costumed?.used && r?.costumed?.costume)
-                  .filter(Boolean);
-                if (costumedTypes.length > 0) {
-                  const themeBits = [inputData.storyTheme, inputData.storyTopic, inputData.storyType].filter(Boolean).join(' / ');
-                  storyEra = themeBits ? `${costumedTypes[0]} (${themeBits})` : costumedTypes[0];
-                }
-                plateQcOpts = {
-                  ...plateQcOpts,
-                  sceneDescription: emptySceneDesc,
-                  characterPlacements: placements.length > 0 ? placements : null,
-                  mainScenePrompt: repPageData.scene?.sceneDescription || null,
-                  storyEra,
-                };
-                const qc = await validateEmptyScene(plateImage, null, `vantage-${vantageId}`, plateQcOpts);
-                if (!qc.pass) {
-                  genLog.warn('vantage_plate_qc_failed', `Vantage plate ${vantageId} (${v.locationName} – ${v.name}, pages ${group.pageNumbers.join(',')}) failed QC: ${qc.issues.join(', ')} — retrying with feedback`);
-                  const fixHint = qc.visionFeedback
-                    ? `\n\nIMPORTANT: The previous attempt had this problem: ${qc.visionFeedback}. Fix this in the new version.`
-                    : '';
-                  log.info(`🔄 [VANTAGE] ${vantageId} failed QC (${qc.issues.join(', ')}), retrying with feedback...`);
-                  const retryPrompt = buildEmptyScenePrompt({
-                    style: artStyleDesc,
-                    description: emptySceneDesc + fixHint,
-                    characterSpace,
-                    eraGuard,
-                    landmarkFidelity: buildLandmarkFidelityBlock(landmarkPhotos[0], { era: repPageData.sceneMetadata?.era || null }),
-                    referenceKind: landmarkPhotos.length > 0 ? 'landmark' : (emptySceneVbGrid ? 'element' : null),
-                    visualBible,
-                    pageNumber: repPageData.pageNumber,
-                    aboardId: repAboardId,
-                    sceneObjects: repSceneObjects,
-                    mainScenePrompt: repPageData.scene?.sceneDescription || null,
-                    castNames: (repPageData.sceneMetadata?.fullData?.characters || []).map(c => c?.name).filter(Boolean),
-                    light: baseLight,
-                  });
-                  const retryResult = await generateImageOnly(retryPrompt, [], {
-                    aspectRatio: layoutAspect,
-                    ...emptyScenePlateRouting(),
-                    landmarkPhotos,
-                    visualBibleGrid: emptySceneVbGrid,
-                    pageNumber: repPageNum,
-                    skipCache: true,
-                    pageContext: `vantage-${vantageId}-retry`,
-                  }).catch(nullOnPromptFit);
-                  if (retryResult?.usage) {
-                    const isRunware = retryResult.modelId?.startsWith('runware:');
-                    const isGrok = retryResult.modelId?.startsWith('grok-imagine');
-                    const provider = isRunware ? 'runware' : isGrok ? 'grok' : 'gemini_image';
-                    addUsage(provider, retryResult.usage, 'page_images', retryResult.modelId);
-                  }
-                  imageGenHeartbeat();
-                  // The retry is judged exactly as the first plate was: a
-                  // pixel-only verdict "passed" a retry that fixed nothing the
-                  // vision check had failed. The keeper is picked by SEVERITY
-                  // (plateQc.js); a base plate has no plate behind it, so it
-                  // ships even with a hard defect — visibly.
-                  const retryQc = retryResult?.imageData
-                    ? await validateEmptyScene(retryResult.imageData, null, `vantage-${vantageId}-retry`, plateQcOpts)
-                    : null;
-                  const outcome = decidePlateAfterRetry({ firstQc: qc, retryQc, derived: false });
-                  plateQcRecord = buildPlateQcRecord({ firstImage: plateImage, firstQc: qc, retryImage: retryResult?.imageData, retryQc, retryPrompt, outcome });
-                  if (outcome.keep === 'retry') {
-                    plateImage = retryResult.imageData;
-                    platePrompt = retryPrompt;
-                    plateRefs = retryResult.grokRefImages || null;
-                  }
-                  logPlateOutcome(genLog, { event: 'vantage_plate_qc_retry', label: `Vantage plate ${vantageId}`, pages: group.pageNumbers, outcome, firstQc: qc, retryQc });
-                } else {
-                  genLog.info('vantage_plate_qc', `Vantage plate ${vantageId} (pages ${group.pageNumbers.join(',')}) passed QC`);
-                }
-              } catch (qcErr) {
-                // QC must never cost us a plate — a validator error keeps v1.
-                log.warn(`⚠️ [VANTAGE] ${vantageId} QC errored (${qcErr.message}) — keeping the unvalidated plate`);
-              }
-
-              // AN ANGLED PAGE TAKES A PLATE DERIVED FROM THIS ONE (owner,
-              // 2026-09-21). close-up/medium/wide/over-the-shoulder share the
-              // base plate; high-angle, low-angle, aerial and ultra-wide move
-              // the horizon or grow the coverage and cannot. The derived plate
-              // is EDITED FROM the base rather than generated fresh, so the
-              // buildings, trees and palette stay the same place — a fresh
-              // generation breaks continuity exactly between adjacent pages of
-              // one location, which is what a shared plate exists to prevent.
-              // On failure the page keeps the base plate (owner's call): the
-              // wrong camera on the right place beats no plate at all.
-              //
-              // A PAGE IN ANOTHER LIGHT TAKES A PLATE RE-LIT FROM THIS ONE
-              // (owner, 2026-09-24), by the same edit + QC + one fed-back retry:
-              // a relit derive keeps the place's buildings, trees and palette,
-              // which a fresh generation would not. An angled page in another
-              // light takes ONE edit that moves the camera and re-lights. A page
-              // that declares no light (a brief written before the fields) keeps
-              // the base plate's light.
-              // A page is derived only for what its base plate lacks: a camera
-              // move when its class differs from the class the base was ACTUALLY
-              // painted in (a vantage with no eye-level page paints its base from
-              // its angled page), a re-light when its light differs (platePlan.js).
-              const derivedPlates = new Map();
-              const { plateEditForPage } = require('./server/lib/platePlan');
-              const plateKeyOf = (pn) => ({
-                ...plateEditForPage({ pageShot: shotOfPage(pn), baseShot: vantageShot, pageLight: lightOfPage(pn), baseLight }),
-                light: lightOfPage(pn),
-              });
-              for (const pn of group.pageNumbers) {
-                const { cls, camera, light: pageLight, relit, key } = plateKeyOf(pn);
-                if ((!camera && !relit) || derivedPlates.has(key)) continue;
-                const deriveInstruction = camera
-                  ? buildPlateDeriveInstruction(vantageShot, cls, { relight: relit ? relightClause(pageLight) : '' })
-                  : buildPlateRelightInstruction(pageLight);
-                if (!deriveInstruction) continue;
-                const deriveLabel = `${cls}${relit ? ` (${describeLight(pageLight)})` : ''}`;
-                try {
-                  const { editImageWithPrompt } = require('./server/lib/images');
-                  // The book's art style goes to the edit (it went as null, and
-                  // the p12 aerial derive of dragon run 6 came back reading as a
-                  // photograph), and the derived plate is judged like the base:
-                  // same QC, its own camera, one re-derive with the feedback.
-                  const derive = async (instruction) => {
-                    const r = await editImageWithPrompt(
-                      plateImage, instruction, MODEL_DEFAULTS.emptyScenePlateModel, [], inputData.artStyle || null, layoutAspect, { plateDerive: true });
-                    if (r?.usage) addUsage(String(r.usage.model || '').startsWith('grok-imagine') ? 'grok' : 'gemini_image', r.usage, 'page_images', r.usage.model || MODEL_DEFAULTS.emptyScenePlateModel);
-                    return r?.imageData || null;
-                  };
-                  // Judged on what the derive was told: its camera, the medium,
-                  // the place. Not the base's SHOT line, and not the page's
-                  // geometry facts or placements, which the edit never saw.
-                  const derivedQcOpts = {
-                    sceneDescription: shotPrefix && emptySceneDesc.startsWith(shotPrefix) ? emptySceneDesc.slice(shotPrefix.length) : emptySceneDesc,
-                    storyEra: plateQcOpts.storyEra || null,
-                    artStyle: artStyleDesc,
-                    shot: cls,
-                    // Judged on the light the derive was told to paint.
-                    light: relit ? pageLight : baseLight,
-                    pageNumber: pn,
-                    // The derive keeps the base plate's landmark, which was
-                    // painted from this photo — judged against it, not the words.
-                    landmarkPhoto: plateQcOpts.landmarkPhoto || null,
-                  };
-                  let derivedImage = await derive(deriveInstruction);
-                  let derivedPrompt = deriveInstruction;
-                  let derivedQcRecord = null;
-                  if (derivedImage) {
-                    const dqc = await validateEmptyScene(derivedImage, null, `vantage-${vantageId}-${cls}`, derivedQcOpts);
-                    if (!dqc.pass) {
-                      genLog.warn('vantage_plate_qc_failed', `Derived ${deriveLabel} plate for ${vantageId} failed QC: ${dqc.issues.join(', ')} — re-deriving with feedback`);
-                      const retryInstruction = dqc.visionFeedback
-                        ? `${deriveInstruction} The previous attempt had this problem: ${dqc.visionFeedback}. Fix this in the new version.`
-                        : deriveInstruction;
-                      const retryImage = await derive(retryInstruction);
-                      const rqc = retryImage
-                        ? await validateEmptyScene(retryImage, null, `vantage-${vantageId}-${cls}-retry`, derivedQcOpts)
-                        : null;
-                      // Picked by SEVERITY (plateQc.js). Both attempts broken as
-                      // a picture → the pages keep the base plate: a wrong camera
-                      // on the right place beats a broken plate (owner).
-                      const outcome = decidePlateAfterRetry({ firstQc: dqc, retryQc: rqc, derived: true });
-                      derivedQcRecord = buildPlateQcRecord({ firstImage: derivedImage, firstQc: dqc, retryImage, retryQc: rqc, retryPrompt: retryInstruction, outcome });
-                      logPlateOutcome(genLog, { event: 'vantage_plate_qc_retry', label: `Derived ${deriveLabel} plate for ${vantageId}`, pages: group.pageNumbers.filter(p => plateKeyOf(p).key === key), outcome, firstQc: dqc, retryQc: rqc });
-                      if (outcome.keep === 'retry') {
-                        derivedImage = retryImage;
-                        derivedPrompt = retryInstruction;
-                      } else if (outcome.keep === 'base') {
-                        derivedImage = null;
-                      }
-                    }
-                  }
-                  if (derivedImage) {
-                    derivedPlates.set(key, { imageData: derivedImage, prompt: derivedPrompt, qcRecord: derivedQcRecord, label: deriveLabel, light: relit ? pageLight : baseLight });
-                    log.info(`🏛️ [VANTAGE] ${vantageId}: derived a ${deriveLabel} plate from the ${vantageShot || 'base'}${baseLightKey ? ` ${describeLight(baseLight)}` : ''} one`);
-                  } else {
-                    log.error(`❌ [VANTAGE] ${vantageId}: ${deriveLabel} plate derive ${derivedQcRecord?.keptAttempt === 'base' ? 'failed QC hard twice' : 'returned no image'} — those pages keep the base plate, drawn for a camera or a light that is not theirs`);
-                  }
-                } catch (deriveErr) {
-                  log.error(`❌ [VANTAGE] ${vantageId}: ${deriveLabel} plate derive failed (${deriveErr.message}) — those pages keep the base plate`);
-                }
-                imageGenHeartbeat();
-              }
-
-              // Fan out the canvas to every page in the group — the base plate,
-              // or the derived one where the page's own camera earned it.
-              for (const pn of group.pageNumbers) {
-                if (sceneBackgrounds[pn]) continue; // pre-populated (e.g. trial mode)
-                const derivedForPage = derivedPlates.get(plateKeyOf(pn).key) || null;
-                sceneBackgrounds[pn] = {
-                  imageData: derivedForPage ? derivedForPage.imageData : plateImage,
-                  prompt: derivedForPage ? derivedForPage.prompt : platePrompt,
-                  // The derive's identity — its camera class, plus the light
-                  // when it was re-lit ("eye-level (night, rain)"). Also the
-                  // plate-population key, so each distinct image is read once.
-                  plateDerivedFor: derivedForPage ? derivedForPage.label : null,
-                  // The time of day and weather this plate was painted in.
-                  plateLight: describeLight(derivedForPage ? derivedForPage.light : baseLight) || null,
-                  // Refs packed into the call that produced THIS page's plate.
-                  // The base plate: the refs of its own call (the retry's, when
-                  // the retry won). A derived plate: the base plate itself — the
-                  // one image editImageWithPrompt sends. Same field name every
-                  // other image call stores its packed refs under.
-                  grokRefImages: derivedForPage ? [plateImage] : plateRefs,
-                  textAreaMask: null,
-                  emptySceneVbGrid: emptySceneVbGridDataUrl,
-                  vantageId,
-                  vantageName: v.name,
-                  locationName: v.locationName,
-                  // Same QC-history shape the per-page path stores (dev panel):
-                  // the derived plate's own history when it has one.
-                  ...((derivedForPage ? derivedForPage.qcRecord : plateQcRecord) || {}),
-                };
-              }
-              log.info(`🏛️ [VANTAGE] ${vantageId} ${v.locationName} – ${v.name}: 1 canvas${derivedPlates.size ? ` + ${derivedPlates.size} derived` : ''} → pages [${group.pageNumbers.join(',')}]`);
-            } catch (err) {
-              log.warn(`⚠️ [VANTAGE] ${vantageId} failed: ${err.message}`);
+            // Fan out the canvas to every page in the group — the base plate,
+            // or the derived one where the page's own camera earned it.
+            for (const [pn, plate] of vantagePlates) {
+              if (sceneBackgrounds[pn]) continue; // pre-populated (e.g. trial mode)
+              sceneBackgrounds[pn] = plate;
             }
           })));
           const vElapsed = ((Date.now() - vStart) / 1000).toFixed(1);
@@ -5101,319 +4651,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       // Phase 5a-pre renders every uncovered page with it, and the page-image
       // retry below reuses it for a landmark page whose plate is missing —
       // one plate mechanism for both. Returns null on failure (logged).
-      const renderPagePlate = async (pageData) => {
-            const sceneMetadata = pageData.sceneMetadata;
-            const settingDesc = sceneMetadata?.setting?.description || sceneMetadata?.imageSummary || '';
-            // The page's plate: the outline hint's, then the cited vantage's
-            // (the Art Director writes one per vantage since 2026-09-17), then
-            // the brief's own — which is where every stored story keeps it.
-            // Pages that reach THIS loop are the ones the vantage pass did not
-            // cover, so a page with no LOC at all legitimately resolves
-            // 'missing' and falls through to the setting fields below.
-            const { resolvePagePlate } = require('./server/lib/storyHelpers');
-            const pagePlate = resolvePagePlate({
-              pageNumber: pageData.pageNumber,
-              sceneMetadata,
-              visualBible,
-              outlinePlate: pageData.emptyScenePrompt,
-            });
-            const expandedEmptyPrompt = pagePlate.text;
-            if (!settingDesc && !expandedEmptyPrompt) return null;
-
-            const artStyleDesc = resolveArtStyle(inputData.artStyle || 'pixar', pageData.pageImageBackend) || '';
-            const camera = sceneMetadata?.setting?.camera || 'wide shot';
-            const lighting = sceneMetadata?.setting?.lighting || '';
-            // The page's declared time of day and weather (sceneLight.js) — the
-            // plate's LIGHT line. Replaces the `setting.weather` prose field.
-            const pageLight = require('./server/lib/sceneLight').declaredLight(sceneMetadata);
-
-            // Use rich emptyScenePrompt from scene expansion if available, fallback to metadata fields.
-            // Prepend a **SHOT:** line — the template ends with "Use the exact camera angle and
-            // perspective described above" but Sonnet's emptyScenePrompt prose usually omits shot,
-            // so without this prefix the "above" reference is dead text and Grok picks its own
-            // angle (often disagreeing with the populated-page angle that uses the same background).
-            const shotForCamera = (sceneMetadata?.fullData?.shot || camera || '').trim();
-            const shotPrefix = shotForCamera ? `**SHOT:** ${shotForCamera}\n\n` : '';
-            const emptySceneDesc = shotPrefix + (expandedEmptyPrompt
-              || `**SETTING:** ${settingDesc}\n**CAMERA:** ${camera}${lighting ? `\n**LIGHTING:** ${lighting}` : ''}`);
-
-            // Classify each character by depth AND lateral side so the empty scene leaves
-            // room in the right band. "Leave space for 2 figures in the far background" is
-            // useless when the two figures need to be at opposite edges — Grok will paint
-            // buildings flanking both sides and the characters get jammed together later.
-            const characters = sceneMetadata?.fullData?.characters || [];
-            const buckets = { fgLeft: 0, fgRight: 0, fgCenter: 0, mgLeft: 0, mgRight: 0, mgCenter: 0, bgLeft: 0, bgRight: 0, bgCenter: 0 };
-            for (const char of characters) {
-              const depth = (char.depth || '').toLowerCase();
-              const pos = (char.position || '').toLowerCase();
-              const isBg = depth === 'background' || pos.includes('far background') || pos.includes('tiny figure') || pos.includes('background');
-              const isMg = !isBg && (depth === 'midground' || pos.includes('midground'));
-              const depthKey = isBg ? 'bg' : isMg ? 'mg' : 'fg';
-              // Parse lateral side — normalise "center-left"/"left-center" to just "left" etc.
-              const isLeft = /\bfar[-\s]?left|\bleft\b/.test(pos) && !/right/.test(pos);
-              const isRight = /\bfar[-\s]?right|\bright\b/.test(pos) && !/left/.test(pos);
-              const sideKey = isLeft ? 'Left' : isRight ? 'Right' : 'Center';
-              buckets[depthKey + sideKey]++;
-            }
-            const total = (depth) => buckets[depth + 'Left'] + buckets[depth + 'Right'] + buckets[depth + 'Center'];
-            let characterSpace = '';
-            if (total('fg') + total('mg') + total('bg') > 0) {
-              const parts = [];
-              const describe = (depth, label) => {
-                const L = buckets[depth + 'Left'], R = buckets[depth + 'Right'], C = buckets[depth + 'Center'];
-                const t = L + R + C;
-                if (t === 0) return;
-                const sides = [];
-                if (L > 0) sides.push(`${L} on the left`);
-                if (R > 0) sides.push(`${R} on the right`);
-                if (C > 0) sides.push(`${C} in the center`);
-                parts.push(`${t} character${t > 1 ? 's' : ''} in the ${label}${sides.length > 0 ? ` (${sides.join(', ')})` : ''}`);
-              };
-              describe('fg', 'foreground');
-              describe('mg', 'midground');
-              describe('bg', 'far background');
-              // Frame these bands as scene material that continues unbroken — NOT as
-              // "open space" or "leave room", which Grok reads as render-less and
-              // resolves with blank patches or half-finished building fragments.
-              // The figure will be composited on top later; until then the band must
-              // give it FOOTING. "Natural surface" was the old wording — on a river
-              // panorama the natural surface at a background band is open water, the
-              // plate complied, and the composited figure floated on it.
-              characterSpace = `${parts.join(' and ').replace(/^./, c => c.toUpperCase())} will be composited into this scene later. Each of those bands must give its figures FOOTING — a standable surface at that depth (ground, path, bank, floor, deck, walkway, jetty, the floor of a shaft or pit a figure stands inside — whatever structure the setting offers) rendered continuing through unbroken. Open water, air, or a drop may fill a figure band only when the scene's figures are in the water or airborne. Lighting and surface texture must continue across the bands. They hold no props, signage, vehicles, or extra structures, but they ARE part of the scene — never blank, white, or unfinished patches, never abrupt building cutoffs.`;
-
-              // If any depth band needs both-sides placement, spell it out so Grok doesn't
-              // wall the frame with buildings on left and right.
-              const bothSides = ['fg', 'mg', 'bg'].find(d => buckets[d + 'Left'] > 0 && buckets[d + 'Right'] > 0);
-              if (bothSides) {
-                const label = { fg: 'foreground', mg: 'midground', bg: 'far background' }[bothSides];
-                characterSpace += ` Both the far-left and far-right ${label} render as flat continuous ground — no building walls, props, or barriers between the two sides.`;
-              }
-
-              // For close-up/medium shots, add explicit space guidance so the empty scene
-              // doesn't fill the frame with just furniture (e.g. table surface only)
-              const shotType = (sceneMetadata?.fullData?.shot || camera || '').toLowerCase();
-              if (shotType.includes('close') || shotType.includes('medium')) {
-                characterSpace += ` This is a ${shotType.includes('close') ? 'close-up' : 'medium'} shot — characters will be composited into this scene later. The frame must include enough space for character bodies to be placed naturally.`;
-              }
-            }
-
-            // Build text area instruction from scene metadata (keeps text area calm in empty scene too)
-            // Enforce spread rule: odd pages = left side, even = right side
-            const { enforceSpreadTextPosition, buildTextZoneInstruction, buildEraGuard } = require('./server/lib/storyHelpers');
-            // A cover's copy space is its beat's (coverRender.js), like its render prompt's.
-            const sonnetTextPos = pageData.coverOpts?.textPosition || sceneMetadata?.textPosition || null;
-            const textPos = enforceSpreadTextPosition(sonnetTextPos, pageData.pageNumber);
-            // If spread rule flipped Sonnet's left/right, Sonnet's textZoneDescription
-            // was written for the wrong side — discard it and let the code-generated
-            // fallback (generic saturated-surface wording) drive the instruction.
-            const sideFlipped = sonnetTextPos && textPos && sonnetTextPos !== textPos;
-            const textZoneDesc = sideFlipped ? null : (sceneMetadata?.textZoneDescription || null);
-            if (sideFlipped) {
-              log.warn(`⚠️ [UNIFIED] Page ${pageData.pageNumber}: Sonnet picked ${sonnetTextPos} against spread rule → flipped to ${textPos}, discarding textZoneDescription`);
-            }
-            const langLevel = inputData.languageLevel || 'standard';
-            // textInImage drives whether we ask the model to keep a calm zone for
-            // text overlay AND whether we attach the visual mask reference. When
-            // text is rendered below the image (advanced layout), neither is needed.
-            const layoutTextInImage = pageData.textInImage;
-            const layoutAspect = pageData.renderAspect;
-            // Load pre-built text area mask (black=text zone ~20%, white=scene ~80%).
-            // Sent as a reference slot so the model sees the shape directly.
-            const { getTextAreaMask } = require('./server/lib/textMasks');
-            const textAreaMask = layoutTextInImage ? getTextAreaMask(textPos, langLevel) : null;
-
-            // Calm-zone instruction for the empty-scene generator. Story text is
-            // WHITE and overlaid at textPos, so the zone must render as a saturated,
-            // high-contrast surface. Sonnet picks the corner + surface; the code
-            // owns wording + spread-rule enforcement.
-            const emptyAreaPct = langLevel === '1st-grade' ? '10%' : langLevel === 'advanced' ? '40%' : '30%';
-            const emptyTextAreaInstr = (layoutTextInImage && textPos)
-              ? buildTextZoneInstruction(textPos, textZoneDesc, emptyAreaPct, { isEmptyScene: true })
-              : '';
-
-            const eraGuard = buildEraGuard(sceneMetadata?.era || null);
-            // Named fidelity block whenever this page attaches a landmark
-            // photo — '' otherwise (was trial-only).
-            const { buildLandmarkFidelityBlock } = require('./server/lib/storyHelpers');
-            const pageLandmarkFidelity = buildLandmarkFidelityBlock(pageData.landmarkPhotos?.[0], { era: sceneMetadata?.era || null });
-
-            // Build a FILTERED VB grid for empty-scene generation: vehicles + non-landmark
-            // locations only. Characters, animals, and artifacts are excluded — they should
-            // appear in the populated page, not in the background, and including them caused
-            // doubling (e.g. an artifact rendered both in the empty scene and in the
-            // character's hand on the page). Returns null when a landmark photo is
-            // attached — one reference family per plate (owner, 2026-08-29).
-            const pageAboardId = sceneMetadata?.aboard || null;
-            // AD objects[] gates which vehicles enter the plate prompt + grid
-            // (AD is the authority on vehicle presence; VB pages is only the menu).
-            const pageSceneObjects = sceneMetadata?.objects || null;
-            const emptySceneVbGrid = await buildEmptySceneVbGrid(visualBible, pageData.pageNumber, pageData.landmarkPhotos || [], pageAboardId, pageSceneObjects);
-            // Persist the filtered grid as a data URL so the dev UI can show what
-            // was actually attached to the empty-scene call (main-scene VB grid is
-            // different; before this, the UI was displaying the wrong one).
-            const emptySceneVbGridDataUrl = emptySceneVbGrid
-              ? `data:image/jpeg;base64,${Buffer.from(emptySceneVbGrid).toString('base64')}`
-              : null;
-            const emptySceneRefKind = (pageData.landmarkPhotos || []).length > 0
-              ? 'landmark'
-              : (emptySceneVbGrid ? 'element' : null);
-
-            const emptyPrompt = buildEmptyScenePrompt({
-              style: artStyleDesc,
-              description: emptySceneDesc,
-              characterSpace,
-              textAreaInstruction: emptyTextAreaInstr,
-              eraGuard,
-              landmarkFidelity: pageLandmarkFidelity,
-              referenceKind: emptySceneRefKind,
-              visualBible,
-              pageNumber: pageData.pageNumber,
-              aboardId: pageAboardId,
-              sceneObjects: pageSceneObjects,
-              // The SAME prose validateEmptyScene grades this plate's geometry
-              // against, reduced to the geometry facts (no cast, no action).
-              mainScenePrompt: pageData.scene?.sceneDescription || null,
-              castNames: (sceneMetadata?.fullData?.characters || []).map(c => c?.name).filter(Boolean),
-              light: pageLight,
-            });
-
-            try {
-
-              const result = await generateImageOnly(emptyPrompt, [], {
-                aspectRatio: layoutAspect,
-                // Plates stay on the Standard tier regardless of the page tier.
-                ...emptyScenePlateRouting(),
-                landmarkPhotos: pageData.landmarkPhotos,
-                visualBibleGrid: emptySceneVbGrid,
-                textAreaMask,
-                pageNumber: pageData.pageNumber,
-                skipCache: true
-              });
-              // Track empty scene token usage
-              if (result?.usage) {
-                const isRunware = result.modelId?.startsWith('runware:');
-                const isGrok = result.modelId?.startsWith('grok-imagine');
-                const provider = isRunware ? 'runware' : isGrok ? 'grok' : 'gemini_image';
-                addUsage(provider, result.usage, 'page_images', result.modelId);
-              }
-              imageGenHeartbeat();  // per-page heartbeat — keeps the phase alive
-
-              // Validate the empty scene before using it as a background.
-              // Phase 1: pixel analysis (white boxes, too dark, text area calmness) — <50ms, free
-              // Phase 2: Gemini Flash-lite vision (people, landmark, artifacts) — ~2s, cheap
-              // Skipped entirely when layout has no text-in-image: the calm-zone QC
-              // checks don't apply, and we save the vision call cost on those pages.
-              if (result?.imageData && layoutTextInImage) {
-                const { validateEmptyScene } = require('./server/lib/images');
-                const { decidePlateAfterRetry, plateQcRecord: buildPlateQcRecord, logPlateOutcome, nullOnPromptFit } = require('./server/lib/plateQc');
-                const textPos = enforceSpreadTextPosition(sceneMetadata?.textPosition || null, pageData.pageNumber);
-                // Pass the outline's declared character positions so the vision check
-                // can verify each has usable flat ground in the rendered empty scene.
-                const placements = (sceneMetadata?.fullData?.characters || [])
-                  .filter(c => c?.name && c?.position)
-                  .map(c => ({ name: c.name, position: c.position, depth: c.depth }));
-                // Derive story era for the anachronism check. Any character marked
-                // as costumed with a specific costume type is a strong period signal
-                // (e.g. "mittelalterlich" → medieval, "1920s" → early 20th century).
-                // Fallback to storyTheme/Topic/Type. If nothing indicates an era,
-                // leave null — the vision check will then skip the anachronism gate
-                // rather than false-flag a legitimate present-day scene.
-                let storyEra = null;
-                const costumedTypes = Object.values(streamingClothingRequirements || {})
-                  .map(r => r?.costumed?.used && r?.costumed?.costume)
-                  .filter(Boolean);
-                if (costumedTypes.length > 0) {
-                  const themeBits = [inputData.storyTheme, inputData.storyTopic, inputData.storyType].filter(Boolean).join(' / ');
-                  storyEra = themeBits ? `${costumedTypes[0]} (${themeBits})` : costumedTypes[0];
-                }
-                const pageQcOpts = {
-                  sceneDescription: emptySceneDesc,
-                  characterPlacements: placements.length > 0 ? placements : null,
-                  mainScenePrompt: pageData.scene?.sceneDescription || null,
-                  storyEra,
-                  artStyle: artStyleDesc,
-                  shot: shotForCamera || null,
-                  pageNumber: pageData.pageNumber,
-                  landmarkPhoto: pageData.landmarkPhotos?.[0] || null,
-                  light: pageLight,
-                };
-                const qc = await validateEmptyScene(result.imageData, textPos, `P${pageData.pageNumber}`, pageQcOpts);
-                if (!qc.pass) {
-                  // Retry with Gemini's feedback appended to the description.
-                  // The text-area instruction is rebuilt with the SAME shared
-                  // builder and parameters as the first attempt — only the
-                  // fixHint differs between the two prompts. (An earlier
-                  // comment claimed the retry "softens" the instruction; it
-                  // never did.)
-                  const fixHint = qc.visionFeedback
-                    ? `\n\nIMPORTANT: The previous attempt had this problem: ${qc.visionFeedback}. Fix this in the new version.`
-                    : '';
-                  const retryTextInstr = textPos
-                    ? buildTextZoneInstruction(textPos, textZoneDesc, emptyAreaPct, { isEmptyScene: true })
-                    : '';
-                  log.info(`🔄 [EMPTY SCENE] P${pageData.pageNumber} failed QC (${qc.issues.join(', ')}), retrying with feedback...`);
-                  const retryPrompt = buildEmptyScenePrompt({
-                    style: artStyleDesc,
-                    description: emptySceneDesc + fixHint,
-                    characterSpace,
-                    textAreaInstruction: retryTextInstr,
-                    eraGuard,
-                    landmarkFidelity: pageLandmarkFidelity,
-                    referenceKind: emptySceneRefKind,
-                    visualBible,
-                    pageNumber: pageData.pageNumber,
-                    aboardId: pageAboardId,
-                    sceneObjects: pageSceneObjects,
-                    mainScenePrompt: pageData.scene?.sceneDescription || null,
-                    castNames: (sceneMetadata?.fullData?.characters || []).map(c => c?.name).filter(Boolean),
-                    light: pageLight,
-                  });
-                  const retryResult = await generateImageOnly(retryPrompt, [], {
-                    aspectRatio: layoutAspect,
-                    // Plates stay on the Standard tier regardless of the page tier.
-                    ...emptyScenePlateRouting(),
-                    visualBibleGrid: emptySceneVbGrid,
-                    landmarkPhotos: pageData.landmarkPhotos,
-                    textAreaMask,
-                    pageContext: `empty-P${pageData.pageNumber}-retry`,
-                  }).catch(nullOnPromptFit);
-                  if (retryResult?.usage) {
-                    const isRunware = retryResult.modelId?.startsWith('runware:');
-                    const isGrok = retryResult.modelId?.startsWith('grok-imagine');
-                    addUsage(isRunware ? 'runware' : isGrok ? 'grok' : 'gemini_image', retryResult.usage, 'page_images', retryResult.modelId);
-                  }
-                  // Judged exactly as the first attempt was (vision included),
-                  // and the keeper picked by SEVERITY (plateQc.js) — the same
-                  // rule as the vantage base plate. Both attempts are stored.
-                  const retryQc = retryResult?.imageData
-                    ? await validateEmptyScene(retryResult.imageData, textPos, `P${pageData.pageNumber}-retry`, pageQcOpts)
-                    : null;
-                  const outcome = decidePlateAfterRetry({ firstQc: qc, retryQc, derived: false });
-                  logPlateOutcome(genLog, { event: 'empty_scene_qc_retry', label: `Page ${pageData.pageNumber} plate`, pages: [pageData.pageNumber], outcome, firstQc: qc, retryQc });
-                  const kept = outcome.keep === 'retry'
-                    ? { imageData: retryResult.imageData, prompt: retryPrompt, grokRefImages: retryResult.grokRefImages || null }
-                    : { imageData: result.imageData, prompt: emptyPrompt, grokRefImages: result.grokRefImages || null };
-                  return {
-                    pageNumber: pageData.pageNumber, ...kept, textAreaMask, emptySceneVbGrid: emptySceneVbGridDataUrl,
-                    ...buildPlateQcRecord({ firstImage: result.imageData, firstQc: qc, retryImage: retryResult?.imageData, retryQc, retryPrompt, outcome }),
-                  };
-                }
-              }
-
-              return { pageNumber: pageData.pageNumber, imageData: result?.imageData || null, prompt: emptyPrompt, grokRefImages: result?.grokRefImages || null, textAreaMask, emptySceneVbGrid: emptySceneVbGridDataUrl };
-            } catch (err) {
-              // Loud, and in the STORED log (2026-08-29). A page whose plate
-              // failed still renders — the page path handles a null
-              // sceneBackground — but the failure used to leave nothing behind
-              // except a console warning, so "this page has no empty scene" was
-              // indistinguishable from "empty-scene gen was off"
-              // (job_1787959478282: p1 and p3 were the only two pages without a
-              // plate, and nothing in the story said why).
-              log.warn(`⚠️ [EMPTY SCENE] Page ${pageData.pageNumber} failed: ${err.message}`);
-              genLog.warn('empty_scene_failed', `Page ${pageData.pageNumber} empty-scene generation failed: ${err.message}`);
-              return null;
-            }
-      };
+      const renderPagePlate = (pageData) => require('./server/lib/platePipeline').renderPagePlate(pageData, {
+        visualBible, inputData, addUsage, imageGenHeartbeat, genLog,
+      });
       // Store a rendered plate in the page's slot (same shape for every caller).
       const storePagePlate = (bg) => {
         if (!bg?.imageData) return false;
@@ -5479,51 +4719,6 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         for (const bg of emptyScenes) storePagePlate(bg);
         const bgElapsed = ((Date.now() - bgStartTime) / 1000).toFixed(1);
         log.info(`🎨 [UNIFIED] Phase 5a-pre: ${Object.keys(sceneBackgrounds).length}/${pageDataArray.length} empty scenes in ${bgElapsed}s`);
-      }
-
-      // Phase 5a-pre-pop: READ THE POPULATION OFF THE PLATE, don't take the
-      // Art Director's word for it (owner, 2026-09-19).
-      //
-      // `population` decides whether the presence arithmetic bills an
-      // `extra_character` CRITICAL for background people, and the Art Director
-      // is exactly the input that got it wrong — it wrote "No other people or
-      // animals are present" about the Lindenhof, a public plaza. The plate is
-      // evidence instead of a declaration: it is rendered BEFORE any cast is
-      // composited, so everyone in it belongs to the setting.
-      //
-      // ONE DETECTION PER PLATE, not per page: a vantage canvas serves several
-      // pages and they share its answer. The pass reuses the GroundingDINO
-      // person call every page render already makes (our own analyzer service,
-      // no vendor cost). A plate that shows nobody, or a page with no plate at
-      // all, leaves the declaration untouched — which is why a genuinely
-      // uncommissioned figure on a plateless page still fires.
-      if (!runSinglePassScene) {
-        const { detectPlatePopulation } = require('./server/lib/bboxDetection');
-        const byPlate = new Map();   // plate identity -> [pageNumber]
-        for (const [pn, bg] of Object.entries(sceneBackgrounds)) {
-          const img = bg?.imageData;
-          if (!img || typeof img !== 'string') continue;
-          // A derived plate is a different image from its vantage's base
-          // plate (a wider view can show people the base does not), so it is
-          // read on its own.
-          const key = bg.vantageId ? `${bg.vantageId}${bg.plateDerivedFor ? `:${bg.plateDerivedFor}` : ''}` : `p${pn}`;
-          if (!byPlate.has(key)) byPlate.set(key, { imageData: img, pages: [] });
-          byPlate.get(key).pages.push(Number(pn));
-        }
-        const popStart = Date.now();
-        await Promise.all([...byPlate.entries()].map(async ([key, plate]) => {
-          const got = await detectPlatePopulation(plate.imageData, `${key} `);
-          if (!got?.population) return;
-          for (const pn of plate.pages) {
-            if (sceneBackgrounds[pn]) sceneBackgrounds[pn].platePopulation = got.population;
-            const pd = pageDataArray.find(x => Number(x.pageNumber) === pn);
-            if (pd?.sceneMetadata) pd.sceneMetadata.platePopulation = got.population;
-          }
-        }));
-        const overridden = Object.values(sceneBackgrounds).filter(b => b?.platePopulation).length;
-        if (byPlate.size) {
-          log.info(`👥 [PLATE-POP] ${byPlate.size} plate(s) read in ${((Date.now() - popStart) / 1000).toFixed(1)}s — ${overridden} page(s) carry a plate-derived population`);
-        }
       }
 
       // Phase 5a-pre-grid: build each page's Visual Bible reference grid, NOW
@@ -5592,12 +4787,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // objects[] names it, so the same brief gates the drop. Without this
           // the two gates disagree and the element is rendered with no
           // reference and no STRUCTURES line at all.
-          const pageSceneObjectsForDrop = pageData.sceneMetadata?.objects || null;
-          const { isPlateBorneElement } = require('./server/lib/visualBible');
-          const kept = (hasPlate
-            ? refs.filter(e => !isPlateBorneElement(e, pageSceneObjectsForDrop))
-            : refs
-          ).filter(e => !aboardId || e.id !== aboardId);
+          // One filter, shared with the Test Lab image stage (pageRenderCall.js).
+          const kept = require('./server/lib/pageRenderCall').keepPageGridElements(refs, { hasPlate, sceneMetadata: pageData.sceneMetadata });
           if (kept.length < refs.length) {
             filteredPages++;
             droppedCells += refs.length - kept.length;
@@ -5729,28 +4920,21 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               log.error(`❌ [UNIFIED] Page ${pageData.pageNumber}: landmark "${refApplied.landmarkPhotos[0]?.name || 'unknown'}" has no plate — not rendered on the raw photo`);
               throw new Error(`page ${pageData.pageNumber} has a landmark photo and no plate`);
             }
+            // The render options — one builder, shared with the Test Lab image
+            // stage (server/lib/pageRenderCall.js).
             const genResult = await generateImageOnly(
               pageData.prompt,
               refApplied.characterPhotos,
-              {
-                // THE CAST-0 EXEMPTION: a page with no named cast renders on its
-                // landmark photo (owner ruling 2026-09-02).
-                landmarkScene: pageLandmarkScene(pageData),
-                aspectRatio: pageData.renderAspect,
-                imageModelOverride: pageData.pageImageModel,
-                imageBackendOverride: pageData.pageImageBackend,
-                landmarkPhotos: refApplied.landmarkPhotos,
-                visualBibleGrid: refApplied.visualBibleGrid,
-                pageNumber: pageData.pageNumber,
-                sceneBackground: refApplied.sceneBackground,
-                // Text-zone mask only attached when text is overlaid on image
-                // (textInImage=true; always on a cover). For square+below layout
-                // this is null — the model is free to fill the whole frame.
-                textAreaMask: pageData.textInImage
-                  ? (sceneBackgrounds[pageData.pageNumber]?.textAreaMask || null)
-                  : null,
-                ...(pageData.coverOpts ? { captureLabel: pageData.coverOpts.captureLabel } : {}),
-              }
+              require('./server/lib/pageRenderCall').pageRenderOptions({
+                page: pageData,
+                renderAspect: pageData.renderAspect,
+                pageImageModel: pageData.pageImageModel,
+                pageImageBackend: pageData.pageImageBackend,
+                refApplied,
+                textInImage: pageData.textInImage,
+                plateTextAreaMask: sceneBackgrounds[pageData.pageNumber]?.textAreaMask || null,
+                coverOpts: pageData.coverOpts,
+              })
             );
 
             // Track usage
@@ -6097,6 +5281,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 evaluationType: 'cover',
                 expectedText: pageData.coverOpts.expectedText,
                 textMode: pageData.coverOpts.textMode,
+                // The mark that this cover was briefed as a page — it switches
+                // the undeclared-lettering check on for it (evalPipeline).
+                coverIsPage: true,
                 titleBaked: pageData.coverOpts.titleBaked,
                 referencePhotos: pageData.characterPhotos,
                 excludedCastNames: [],
@@ -6217,6 +5404,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             sceneDescription: raw.sceneDescription,
             sceneMetadata: raw.sceneMetadata || null,
             outlineExtract: raw.scene?.outlineExtract || null,
+            // The cover's decided place (2026-10-04): iteratePageCore re-pins it.
+            jevFixed: raw.scene?.jevFixed || null,
             sceneCharacters: raw.sceneCharacters || null,
             perCharClothing: raw.perCharClothing || null,
             prompt: raw.prompt,
@@ -6417,8 +5606,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 storyId: jobId, pageNumber: img.pageNumber, label: 'CALM-ZONE',
               });
               return generateImageOnly(repairPrompt, img.characterPhotos || [], {
-              imageModelOverride: img.sceneMetadata?.pageImageModel || null,
-              imageBackendOverride: img.sceneMetadata?.pageImageBackend || null,
+              imageModelOverride: opts.imageModelOverride,
               landmarkPhotos: img.landmarkPhotos || [],
               landmarkScene: repairScene.landmarkScene,
               sceneBackground: repairScene.sceneBackground,
@@ -6535,6 +5723,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // no score, no severity and no repair route.
           degradedScene: describeDegradedSceneMetadata(img.sceneMetadata),
           outlineExtract: img.scene?.outlineExtract || img.scene?.sceneHint || '',
+          // The fields the Jev decision layer fixed for this page (2026-09-28):
+          // an iterate rewrite re-pins them (images.js iteratePageCore). null
+          // on a trial, a cover and the Jev-outage backup.
+          jevFixed: img.scene?.jevFixed || null,
           imageData: img.imageData,
           generatedAt: new Date().toISOString(),
           prompt: img.prompt,
@@ -6741,7 +5933,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // skips and Grok receives the full sheet as a reference — the model
           // then tries to recompose all 8 cells into the page.
           characterAvatars: storyCharacterAvatars,
-          sceneDescriptions: expandedScenes,
+          // The stored record shape (brief under `description`), projected NOW
+          // from expandedScenes: a spread-side mirror rewrites a scene's brief
+          // after allSceneDescriptions was built, and iterate must rewrite the
+          // brief the page was rendered from.
+          sceneDescriptions: expandedScenes.map(scene => sceneDescriptionRecord(scene, scenePromptRefs)),
           story: fullStoryText,
           storyText: fullStoryText,
           writerText, // frozen draft — carried on the checkpoint too, or a
@@ -6763,6 +5959,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           createdAt: inputData.createdAt,
           clothingRequirements: clothingRequirements,
           pageClothing: pageClothingData,
+          // A trial (hint-made) cover's cast outfits live on its cover hint; a
+          // cover char-fix resolves them from here (resolveRenderedClothingCategory).
+          coverHints,
           // Preserve per-scene layout fields (imageAspect, textInImage) so any
           // iterate/redo inside the repair pipeline regenerates at the right
           // aspect. Stripping these would silently revert advanced-layout pages
@@ -6965,6 +6164,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // no score, no severity and no repair route.
           degradedScene: describeDegradedSceneMetadata(img.sceneMetadata),
           outlineExtract: img.scene?.outlineExtract || img.scene?.sceneHint || '',
+          // The fields the Jev decision layer fixed for this page (2026-09-28):
+          // an iterate rewrite re-pins them (images.js iteratePageCore). null
+          // on a trial, a cover and the Jev-outage backup.
+          jevFixed: img.scene?.jevFixed || null,
           imageData: img.imageData,
           generatedAt: new Date().toISOString(),
           prompt: img.prompt,
@@ -7661,14 +6864,33 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       generationLog: genLog.getEntries(), // Generation log for dev mode
       textRefineReport, // per-page before/after from the parallel refine pass
       arcReviewReport,   // drafted arc + arc-review analysis (beats mode)
-      // The catalogue ids this book was OFFERED. The next book on this
-      // account excludes them at draw time (loadUsedChallengeIds) — which is
-      // the whole of the cross-story variety rule: no prompt names a previous
-      // story, so nothing can leak one book's cast into another's.
+      // The catalogue ids this book was OFFERED — kept for audit: a repeat can
+      // be read back against the whole menu the arc saw.
       challengeDrawIds,
-      challengeTakenIds, // which of them the arc built on, by catalogue id
-      challengeDraw, // the random catalogue menu the arc plan was offered (beats mode)
+      // The ids of those the shipped arc actually TOOK (a subset). THIS is what
+      // the next book on this account excludes at draw time
+      // (loadUsedChallengeIds; owner, 2026-09-21 / 2026-09-27) — the whole of
+      // the cross-story variety rule: no prompt names a previous story. An empty
+      // list with a non-empty draw raises `arc_challenges_taken_missing`.
+      challengeTakenIds,
+      challengeDraw, // the catalogue menu the arc plan was offered (beats mode)
+      // How that menu was chosen (2026-09-27): Jev's score per eligible id, its
+      // top 20 and the 12 drawn — or the random draw on the Jev backup.
+      challengeSelection: beatsResult?.challengeSelection || null,
+      // How the landmark list was ordered: Jev's LB2 score per place and the
+      // order every writer read (the trial: the 3 it was given) — or today's.
+      landmarkSelection: inputData.landmarkSelection || null,
+      // What a Test Lab replay needs and the run held only in memory
+      // (2026-09-27): the shuffled landmark list every writer prompt read, and
+      // the run's model overrides. Text only. Read by beatsReplayInputs
+      // .resolveReplayInputData, never as a top-level input of a later path.
+      replayInputs: {
+        availableLandmarks: require('./server/lib/beatsReplayInputs').landmarksForReplay(inputData.availableLandmarks),
+        modelOverrides: modelOverrides || null,
+      },
       beatsReviewReport, // per-page before/after from the beats review (beats mode)
+      jevDecisions, // the Jev decision layer's per-page decisions (beats mode)
+      jevFallback, // the Jev-outage backup ran from this step (null = Jev-authored)
       storyBibleReport, // wardrobe contract call: prompt + raw reply (beats mode)
       clothingReviewReport, // per-outfit before/after from the wardrobe review (beats mode)
       wardrobeBibleReport, // wardrobe contract vs Visual Bible: adopt / conflict findings (beats mode)
@@ -7676,7 +6898,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       // pages each produced — so "what was this book's brief actually asked for"
       // is a query, not a worktree rebuild at the run's commit.
       sceneExpansionReport,
-      sceneReviewReport, // per-page before/after from the scene review (beats mode)
+      briefCheckReport, // brief checks + the one Art Director re-ask: findings, verdicts, taken rewrites (beats mode)
       finalChecksReport: finalChecksReport || null, // Final consistency checks report (dev mode)
       analytics: {
         // Cost
@@ -7798,14 +7020,16 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
           // 2. Also save to characters table (for character editor)
           const characterId = `characters_${userId}`;
-          const charResult = await dbPool.query('SELECT data FROM characters WHERE id = $1', [characterId]);
-          if (charResult.rows.length > 0) {
-            // Handle both TEXT and JSONB column types
-            const rawData = charResult.rows[0].data;
-            const charData = typeof rawData === 'string' ? JSON.parse(rawData) : rawData;
-            const chars = charData.characters || [];
-            let updatedCount = 0;
-            for (const dbChar of chars) {
+          // styledAvatars come off the in-memory pipeline as data: URIs — this is the
+          // authenticated-user twin of the trial prewarm leak and the likeliest source
+          // of the base64 rows seen in prod. The slow R2 upload runs BEFORE the row
+          // lock; the locked read-modify-write below only merges (review 2026-10 A4).
+          const { offloadCharacterImages, modifyCharactersRow } = require('./server/services/database');
+          await offloadCharacterImages(characterId, userId, { styledAvatars: [...styledAvatarsMap.values()] });
+          let updatedCount = 0;
+          await modifyCharactersRow(characterId, userId, (charData) => {
+            updatedCount = 0;
+            for (const dbChar of charData.characters || []) {
               // Match by name (trim to handle trailing spaces)
               const styledAvatars = styledAvatarsMap.get(dbChar.name) || styledAvatarsMap.get(dbChar.name?.trim());
               if (styledAvatars) {
@@ -7815,16 +7039,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 updatedCount++;
               }
             }
-            if (updatedCount > 0) {
-              charData.characters = chars;
-              // styledAvatars come off the in-memory pipeline as data: URIs —
-              // this is the authenticated-user twin of the trial prewarm leak
-              // and the likeliest source of the base64 rows seen in prod.
-              const { offloadCharacterImages } = require('./server/services/database');
-              await offloadCharacterImages(characterId, userId, charData);
-              await dbPool.query('UPDATE characters SET data = $1 WHERE id = $2', [JSON.stringify(charData), characterId]);
-              log.debug(`💾 [UNIFIED] Updated ${updatedCount} characters in database with ${artStyle} styled avatars`);
-            }
+            return updatedCount > 0;
+          });
+          if (updatedCount > 0) {
+            log.debug(`💾 [UNIFIED] Updated ${updatedCount} characters in database with ${artStyle} styled avatars`);
           }
         }
       } catch (persistErr) {
@@ -7832,6 +7050,17 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // Non-fatal - story generation continues
       }
     }
+
+    // Saving marker: from here a user cancel is refused (server/routes/jobs.js guards on
+    // progress < JOB_SAVING_PROGRESS), so a story is never both saved and refunded. The
+    // write is guarded on status='processing': if the cancel won the race, abort before
+    // the story row is written instead of saving a story for a refunded job.
+    const savingMark = await dbPool.query(
+      `UPDATE story_jobs SET progress = $2, progress_message = 'Saving story...', updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1 AND status = 'processing' RETURNING id`,
+      [jobId, JOB_SAVING_PROGRESS]
+    );
+    if (savingMark.rowCount === 0) await checkCancellation();
 
     log.debug(`💾 [UNIFIED] Saving story to database... (generationLog has ${storyData.generationLog?.length || 0} entries)`);
     await upsertStory(storyId, userId, storyData, { adminDraft: inputData?.adminDraft === true });
@@ -8104,6 +7333,17 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           log.warn(`⚠️ [METRICS] collector unavailable: ${err.message}`);
         }
       });
+      // Verification registry auto-check (staging only, runtime verifyAutoCheck):
+      // judges this story against tasks/verify.json and stores the verdicts in
+      // story_verify_reports. Same fire-and-forget contract as the metrics above —
+      // runVerifyAutoCheck never throws and logs its own failure.
+      setImmediate(() => {
+        try {
+          require('./server/lib/verifyAutoCheck').runVerifyAutoCheck(storyId, { pool: dbPool });
+        } catch (err) {
+          log.error(`❌ [VERIFY] auto-check unavailable for ${storyId}: ${err.message}`);
+        }
+      });
     }
 
     // Clean up checkpoints ONLY when this run really flipped the job to
@@ -8263,51 +7503,22 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     log.error(`❌ [UNIFIED] Error generating story:`, error.message);
     genLog.error('pipeline_error', error.message, null, { stage: genLog.currentStage, stack: error.stack?.split('\n').slice(0, 3).join(' | ') });
 
-    // Try to refund credits on failure. Atomic-claim pattern: zero out
-    // credits_reserved in one UPDATE-RETURNING so a later refund attempt
-    // (e.g. the outer _processStoryJobImpl catch) reads 0 and short-circuits.
-    // The previous SELECT-then-UPDATE chain could double-refund if the
-    // status update raced or the SET credits_reserved=0 failed after the
-    // user-credits write succeeded.
+    // Fail the job AND refund its reservation in ONE transaction (settleJobWithRefund):
+    // claim, user credit and ledger row commit together. The guard (never overwrite
+    // 'cancelled') is in the same UPDATE: an error that surfaces after a user cancel
+    // must not turn 'cancelled' into 'failed' (review A3); the cancel already refunded.
+    // The outer _processStoryJobImpl catch settles again — idempotent (reservation is 0).
     try {
-      // RETURNING the OLD reserved amount: `RETURNING credits_reserved` after
-      // `SET credits_reserved = 0` returns the post-update value (0), so the
-      // refund guard `refunded > 0` never fired and refunds silently no-op'd
-      // since the atomic-claim refactor. Read the pre-update value via a
-      // self-join subquery (snapshot-stable, single statement, still atomic).
-      const claim = await dbPool.query(
-        `UPDATE story_jobs s
-         SET credits_reserved = 0
-         FROM (SELECT credits_reserved AS prev, user_id AS uid FROM story_jobs WHERE id = $1) old
-         WHERE s.id = $1 AND s.credits_reserved > 0
-         RETURNING old.prev AS refunded, s.user_id`,
-        [jobId]
-      );
-      if (claim.rows.length > 0) {
-        const { refunded, user_id: refundUserId } = claim.rows[0];
-        if (refundUserId && refunded > 0) {
-          const upd = await dbPool.query(
-            'UPDATE users SET credits = credits + $1 WHERE id = $2 AND credits <> -1 RETURNING credits',
-            [refunded, refundUserId]
-          );
-          if (upd.rows.length > 0) {
-            await dbPool.query(
-              `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, reference_id, description)
-               VALUES ($1, $2, $3, $4, $5, $6)`,
-              [refundUserId, refunded, upd.rows[0].credits, 'story_refund', jobId, `Full refund: ${refunded} credits - story generation failed`]
-            );
-            log.info(`💳 [UNIFIED] Refunded ${refunded} credits for failed job ${jobId}`);
-          }
-        }
-      }
+      const settled = await settleJobWithRefund(dbPool, jobId, {
+        status: 'failed',
+        errorMessage: error.message,
+        statusNotIn: ['cancelled'],
+        describe: ({ refunded }) => `Full refund: ${refunded} credits - story generation failed`,
+      });
+      if (settled.refunded > 0) log.info(`💳 [UNIFIED] Refunded ${settled.refunded} credits for failed job ${jobId}`);
     } catch (refundErr) {
-      log.error('❌ [UNIFIED] Failed to refund credits:', refundErr.message);
+      log.error('❌ [UNIFIED] Failed to fail/refund job:', refundErr.message);
     }
-
-    await dbPool.query(
-      `UPDATE story_jobs SET status = 'failed', error_message = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
-      [error.message, jobId]
-    );
 
     throw error;
   }
@@ -8680,8 +7891,11 @@ async function _processStoryJobImpl(jobId) {
 
     // Inject pre-discovered landmarks if available for this user's location.
     // Shared resolver: landmark_index (proximity fallback) -> shared in-memory
-    // cache. No live discovery at job start (would block 15s); shuffled so the
-    // writer doesn't keep reaching for the same top-scored entries.
+    // cache. No live discovery at job start (would block 15s). Shuffled: that
+    // is the order a story on the Jev backup keeps; with Jev live the list is
+    // re-ordered by its fit to the commissioned idea before any writer reads
+    // it (jevSelection.selectStoryLandmarks — beats: generateStoryViaBeats;
+    // trial: before the writer call in processUnifiedStoryJob).
     // Skip for historical stories - they use historically accurate locations, not local landmarks
     if (inputData.userLocation?.city && inputData.storyCategory !== 'historical') {
       const { resolveAvailableLandmarks } = require('./server/lib/landmarkPhotos');
@@ -8690,7 +7904,9 @@ async function _processStoryJobImpl(jobId) {
         // pipeline asked for 30 and the arc prompt then carried 15.5k chars of
         // landmark listing — 41% of everything the arc creator read, most of it
         // guild houses and archives no children's story reaches for.
-        limit: 20, discoverOnMiss: false, language: inputData.language, shuffle: true,
+        // The trial idea route resolves the same list (jevSelection
+        // .resolveTrialIdeaLandmarks), so an idea only names places the story has.
+        limit: require('./server/lib/jevSelection').STORY_LANDMARK_LIMIT, discoverOnMiss: false, language: inputData.language, shuffle: true,
         // A landmark the family names in their idea is pinned first (after the
         // shuffle), so the writer's top-3 opens on it.
         premiseText: [inputData.storyDetails, inputData.title].filter(Boolean).join('\n'),
@@ -8821,6 +8037,26 @@ async function _processStoryJobImpl(jobId) {
 
     log.error(`❌ Job ${jobId} failed:`, error);
 
+    // Full refund if story is not 100% complete, and the failed status, in ONE
+    // transaction (settleJobWithRefund). 'cancelled' is never overwritten (review A3).
+    let failureSettled = null;
+    try {
+      failureSettled = await settleJobWithRefund(dbPool, jobId, {
+        status: 'failed',
+        errorMessage: error.message,
+        statusNotIn: ['cancelled'],
+        refundIfProgressBelow: 100,
+        describe: ({ refunded, progress }) => `Full refund: ${refunded} credits - story generation failed at ${progress}%`,
+      });
+      if (failureSettled.refunded > 0) log.info(`💳 Refunded ${failureSettled.refunded} credits for failed job ${jobId} (failed at ${failureSettled.progress}%)`);
+    } catch (refundErr) {
+      log.error('❌ Failed to fail/refund job:', refundErr.message);
+    }
+    if (failureSettled && !failureSettled.changed) {
+      log.info(`🛑 Job ${jobId} was cancelled by the user before this error surfaced — no failure notification sent`);
+      return;
+    }
+
     // Log all partial data for debugging
     try {
       log.debug('\n' + '='.repeat(80));
@@ -8889,48 +8125,6 @@ async function _processStoryJobImpl(jobId) {
     } catch (dumpErr) {
       log.error('❌ Failed to dump partial data:', dumpErr.message);
     }
-
-    // Full refund if story is not 100% complete. Atomic-claim pattern so a
-    // sibling refund path (the inner processUnifiedStoryJob catch above)
-    // can't double-refund — whoever zeros credits_reserved first wins.
-    try {
-      const claim = await dbPool.query(
-        `UPDATE story_jobs s
-         SET credits_reserved = 0
-         FROM (SELECT credits_reserved AS prev, user_id AS uid FROM story_jobs WHERE id = $1) old
-         WHERE s.id = $1 AND s.credits_reserved > 0 AND COALESCE(s.progress, 0) < 100
-         RETURNING old.prev AS refunded, s.user_id, COALESCE(s.progress, 0) AS progress_percent`,
-        [jobId]
-      );
-      if (claim.rows.length > 0) {
-        const { refunded, user_id: refundUserId, progress_percent: progressPercent } = claim.rows[0];
-        if (refundUserId && refunded > 0) {
-          const upd = await dbPool.query(
-            'UPDATE users SET credits = credits + $1 WHERE id = $2 AND credits <> -1 RETURNING credits',
-            [refunded, refundUserId]
-          );
-          if (upd.rows.length > 0) {
-            const newBalance = upd.rows[0].credits;
-            const description = `Full refund: ${refunded} credits - story generation failed at ${progressPercent}%`;
-            await dbPool.query(
-              `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, reference_id, description)
-               VALUES ($1, $2, $3, $4, $5, $6)`,
-              [refundUserId, refunded, newBalance, 'story_refund', jobId, description]
-            );
-            log.info(`💳 Refunded ${refunded} credits for failed job ${jobId} (failed at ${progressPercent}%)`);
-          }
-        }
-      }
-    } catch (refundErr) {
-      log.error('❌ Failed to refund credits:', refundErr.message);
-    }
-
-    await dbPool.query(
-      `UPDATE story_jobs
-       SET status = $1, error_message = $2, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $3`,
-      ['failed', error.message, jobId]
-    );
 
     // Send failure notifications
     try {

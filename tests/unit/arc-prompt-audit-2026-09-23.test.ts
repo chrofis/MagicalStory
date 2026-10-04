@@ -74,7 +74,7 @@ describe('arc prompts after the 2026-09-23 audit', () => {
     }
   });
 
-  it('every commissioned child acts: the page plan tells and checks it; the arc leaves it to the plan (stage split 2026-09-25)', () => {
+  it('every commissioned child acts: the arc principles state it, the page plan checks it (variant B, 2026-09-25)', () => {
     // Four children, two mains: the two others used to be told "No moment of
     // their own" (owner reversed it 2026-09-23).
     const four = input({
@@ -82,10 +82,10 @@ describe('arc prompts after the 2026-09-23 audit', () => {
       mainCharacters: ['0', '1', '2', '3'],
     });
     const b = build(four);
-    // Stage split (owner, 2026-09-25): every character's scene is the page
-    // plan's; the arc is the plot. The trial writer keeps the rule.
+    // Variant B (owner, 2026-09-25, Lab #1490): the plot gives each child a
+    // deed; the page plan stages it and plan-check Q12 checks it.
     for (const stage of ['create', 'retell'] as const) {
-      expect(b[stage], stage).not.toContain(PB.EVERY_CHILD_ACTS_RULE);
+      expect(b[stage], stage).toContain(PB.EVERY_CHILD_ACTS_RULE);
       expect(b[stage], stage).not.toMatch(/No moment of their own/);
       expect(b[stage], stage).not.toMatch(/at most two carry a book/);
     }

@@ -67,7 +67,7 @@ describe('declared age is ONE source for the generator and the judge', () => {
 describe('both avatar paths pass the user-entered age, and the judge is filled', () => {
   it('every resolver call in the avatar routes declares the age', () => {
     const calls = AVATARS_SRC.match(/resolveDeclaredAvatarOverrides\(\{[\s\S]{0,400}?\}\)/g) || [];
-    expect(calls.length, 'the avatar routes stopped using the shared resolver').toBeGreaterThanOrEqual(4);
+    expect(calls.length, 'the avatar routes stopped using the shared resolver').toBeGreaterThanOrEqual(3); // was 4 before 59f9048e2 deleted the sync /generate-clothing-avatars branch (2 resolver calls); every remaining call still declares the age
     for (const c of calls) {
       expect(c, `a resolver call withholds the declared age:\n${c}`).toMatch(/declaredAge:/);
     }
@@ -75,8 +75,8 @@ describe('both avatar paths pass the user-entered age, and the judge is filled',
 
   it('the judge call sites hand the age text over', () => {
     const judged = AVATARS_SRC.match(/evaluateAvatarFaceMatch\((?:[^()]|\([^()]*\))*\)/g) || [];
-    // The definition line plus every call.
-    expect(judged.length).toBeGreaterThanOrEqual(5);
+    // The definition line plus every call (the sync branch's two calls were deleted in 59f9048e2).
+    expect(judged.length).toBeGreaterThanOrEqual(4); // was 5 before 59f9048e2 deleted the sync branch (2 judge calls); every remaining call still hands the age over
     const calls = judged.filter((c) => !c.startsWith('evaluateAvatarFaceMatch(originalPhoto'));
     for (const c of calls) {
       expect(c, `a judge call withholds the declared age:\n${c}`).toMatch(/ageFact|declaredAgeText/);

@@ -50,10 +50,10 @@
     {
       "id": "art-director-templates",
       "axis": "per-page vs all-pages Art Director",
-      "reason": "scene-expansion.txt is the per-page gap-fill/fallback template for the same Art Director contract scene-expansion-all.txt drives on the live beats path; a rule or metadata field on one and not the other silently reads as absent on whichever path runs.",
+      "reason": "scene-expansion.txt is the per-page gap-fill/fallback template for the same Art Director contract scene-briefs-all.txt drives on the live beats path; a rule or metadata field on one and not the other silently reads as absent on whichever path runs.",
       "members": [
         "prompts/scene-expansion.txt",
-        "prompts/scene-expansion-all.txt"
+        "prompts/scene-briefs-all.txt"
       ],
       "severity": "block",
       "parity": {
@@ -79,7 +79,7 @@
     {
       "id": "text-audit-sighted-vs-blind",
       "axis": "arc-informed audit vs blind audit",
-      "reason": "story-text-audit.txt (arc-informed) and story-text-audit-blind.txt (the blind reader) feed ONE parser and ONE merge (parseFaultLines / mergeAuditFindings, textRefine.js), and that merge dedupes on the CATEGORY TAG: same page + same category + different auditor is folded into one finding. So the FAULT-line output contract and the category vocabulary are shared state — a category name that gains a meaning on one side and not the other either folds two distinct faults into one or splits one fault into two. The question SETS are deliberately different, which is what the Siblings-Checked marker is for; the contract they share is not.",
+      "reason": "story-text-audit.txt (arc-informed) and story-text-audit-blind.txt (the blind reader) feed ONE parser and ONE merge (parseFaultLines / mergeAuditFindings, textRefine.js), and that merge dedupes on the CATEGORY TAG: same page + same category + different auditor is folded into one finding. So the FAULT-line output contract and the category vocabulary are shared state — a category name that gains a meaning on one side and not the other either folds two distinct faults into one or splits one fault into two. The question SETS are deliberately different, which is what the Siblings-Checked marker is for; the contract they share is not. STYLE is the one category that does NOT fold on the tag (2026-09-26, sameFault): a STYLE finding is one quoted sentence, and textRefine's $0 one-sentence-paragraph counter files STYLE lines too (source style-counter), so two STYLE findings are one fault only when they quote the same sentence.",
       "members": [
         "prompts/story-text-audit.txt",
         "prompts/story-text-audit-blind.txt"
@@ -111,7 +111,7 @@
       "axis": "Art Director VB authoring vs writer VB authoring",
       "reason": "the Visual Bible is authored at two LIVE sites — the all-pages Art Director on the beats path (every full story) and the trial writer — and a rule about what a VB entry must state has to exist at both. The two pre-beats unified writers were members until 2026-09-15, when they were deleted as unreachable (docs/decisions.md).",
       "members": [
-        "prompts/scene-expansion-all.txt",
+        "prompts/visual-bible.txt",
         "prompts/story-trial.txt"
       ],
       "severity": "block",
@@ -122,11 +122,12 @@
           "\"properName\"",
           "\"type\"",
           "\"isRealLandmark\"",
+          "\"landmarkPhoto\"",
           "\"scaleClass\"",
           "\"generic\"",
           "\"states\""
         ],
-        "anchorsNote": "the VB entry keys both live authoring sites genuinely declare today. `\"size\"` was anchored until 2026-09-15 and was dropped when the free-text size field was replaced by the `scaleClass` enum as the single source of scale truth; story-trial.txt still declares a PER-PAGE `size` on its scene-hint objects, which is a different field with a different consumer and is deliberately not anchored here. `\"states\"` is anchored since 2026-09-15 — owner ruling, every bible-authoring site declares it. `\"vantages\"` stays deliberately NOT anchored: it is absent from scene-expansion-all.txt, which is a real divergence, not a parity target to assert into existence."
+        "anchorsNote": "the VB entry keys both live authoring sites genuinely declare today. `\"size\"` was anchored until 2026-09-15 and was dropped when the free-text size field was replaced by the `scaleClass` enum as the single source of scale truth; story-trial.txt still declares a PER-PAGE `size` on its scene-hint objects, which is a different field with a different consumer and is deliberately not anchored here. `\"states\"` is anchored since 2026-09-15 — owner ruling, every bible-authoring site declares it. `\"vantages\"` stays deliberately NOT anchored: it is absent from visual-bible.txt, which is a real divergence, not a parity target to assert into existence."
       }
     },
     {
@@ -161,6 +162,31 @@
       "severity": "block"
     },
     {
+      "id": "idea-landmark-paths",
+      "axis": "wizard idea route vs trial idea route",
+      "reason": "both idea routes name real places in their prompt from the town list the story will read, picked by Jev's LB1 ranking when a prepare call made it ready and in today's order otherwise (jevSelection.pickIdeaLandmarks, docs/decisions.md 2026-09-27 \"Jev selection built\"); each route has its own prepare endpoint the client fires when the story kind is picked (StoryWizard.tsx / TrialWizard.tsx). The trial route resolved a DIFFERENT list (getIndexedLandmarks(loc, 3) — the municipality rung) until 2026-09-27 and named places its story never had: a change to how one route picks, resolves or prepares its places belongs on the other.",
+      "members": [
+        "server/routes/storyIdeas.js",
+        "server/routes/trial.js"
+      ],
+      "severity": "block"
+    },
+    {
+      "id": "photo-apparent-age-clamp",
+      "axis": "regular avatar trait write vs trial trait write",
+      "reason": "a photo's apparentAge reaches character.physical at two sites: the regular avatar paths (routes/avatars.js, clampApparentAge on the consensus traits) and the trial (trialAge.js applyTrialPhotoTraits / reclampTrialApparentAge, used by every trial.js writer). extractCharacterVisualProfile trusts apparentAge over the declared age because that clamp bounds it; the trial copied it unclamped from e894b0fe6 until 2026-09-26, and prod trial job_1790282439176_ppgelxibt drew a declared 5-year-old as a middle-aged man.",
+      "members": [
+        "server/routes/avatars.js",
+        "server/lib/trialAge.js"
+      ],
+      "severity": "block",
+      "parity": {
+        "anchors": [
+          "clampApparentAge("
+        ]
+      }
+    },
+    {
       "id": "lab-vs-prod-eval",
       "axis": "Test Lab stage vs production call site",
       "reason": "testlab.js re-implements the call that evalPipeline.js makes in production; when they drift the Lab measures something production never runs (version pinning, cast lists, model ids).",
@@ -168,7 +194,13 @@
         "server/lib/testlab.js",
         "server/lib/evalPipeline.js"
       ],
-      "severity": "block"
+      "severity": "block",
+      "parity": {
+        "anchors": [
+          "prepareEvalJudgeInputs",
+          "semanticFidelityOptions"
+        ]
+      }
     },
     {
       "id": "page-image-generator-vs-critics",
@@ -194,6 +226,26 @@
             "critic": "D-16b `action_interaction`",
             "generator": "{HANDS_HOLD_ONLY_NAMED}",
             "note": "D-16b is MAJOR when a hand holds something the scene never named while a named object is absent. The generator half is HANDS_HOLD_ONLY_NAMED_RULE, same mechanism and same reach test."
+          },
+          {
+            "critic": "D-34 `creature_scale`",
+            "generator": "{REQUIRED_OBJECTS}",
+            "note": "D-34 is MAJOR when a creature is drawn far from the size its page gave it (half or less, twice or more). The generator half is the creature's line in the REQUIRED OBJECTS block, built by promptBuilders.elementPageScaleNote (band phrase + a yardstick against the people in frame, from the one table visualBible.SCALE_ADULT_HEIGHT_FRACTION); the judge reads the SAME sentence through its ELEMENT SIZES input (buildElementSizesBlock), and every repaint through buildElementSizeClauseForRepair. One builder, three readers; pinned in tests/unit/creature-size-{page,eval,repair}.test.ts and element-page-scale.test.ts."
+          },
+          {
+            "critic": "D-21 `scale`",
+            "generator": "{REQUIRED_OBJECTS}",
+            "note": "D-21 measures an object listed in ELEMENT SIZES against the size given there. The generator half is that object's REQUIRED OBJECTS line, the same elementPageScaleNote sentence."
+          },
+          {
+            "critic": "D-31 `structure_scale`",
+            "generator": "{REQUIRED_OBJECTS}",
+            "note": "D-31 measures a vehicle listed in ELEMENT SIZES against the size given there. The generator half is that vehicle's REQUIRED OBJECTS line, the same elementPageScaleNote sentence."
+          },
+          {
+            "critic": "D-05e `garment_facing`",
+            "generator": "{CHARACTER_REFERENCE_LIST}",
+            "note": "D-05e is MAJOR/MINOR when a garment's front features are drawn on a figure seen from behind (or the reverse). The generator half is the WORN ITEMS line in the character reference list (wornItems.buildWornStateLines): for a wearer the brief draws from behind it carries the tag `seen from the back` and the garment's authored `back` look, never its front description. The judges read the same tag on that character's CLOTHING CONTRACT line (evalPipeline.buildEvalClothingContract). Both sides decide facing with wornItems.faceAwayNames -> storyAvatars.resolveCellPose. Pinned in tests/unit/worn-item-facing.test.ts."
           }
         ]
       }
@@ -201,12 +253,28 @@
     {
       "id": "scene-brief-generator-vs-critic",
       "axis": "generator-vs-critic",
-      "reason": "scene-review.txt critiques the briefs scene-expansion-all.txt authors; a check the reviewer applies that the Art Director was never given produces a finding no rewrite can satisfy.",
+      "reason": "The brief checks (sceneBriefCheck.js, and briefChecks.js, which adds the scene review's rules the owner kept as code checks on 2026-09-28: negation_named, element_uncited, character_fields, cast_not_in_plan, required_text_undeclared, clothing_incomplete) critique the briefs scene-briefs-all.txt authors and send them back in the one re-ask; a check the critic applies that the Art Director was never given produces a finding no rewrite can satisfy. The scene review (scene-review.txt) was this set's critic until it was deleted on 2026-09-28.",
       "generators": [
-        "prompts/scene-expansion-all.txt"
+        "prompts/scene-briefs-all.txt"
       ],
       "critics": [
-        "prompts/scene-review.txt"
+        "server/lib/sceneBriefCheck.js",
+        "server/lib/briefChecks.js"
+      ],
+      "severity": "block"
+    },
+    {
+      "id": "group-staging-generator-vs-critic",
+      "axis": "generator-vs-critic",
+      "reason": "A group of more than three characters is staged at one depth in a wider shot, or seen from behind as it moves away, and never lined up facing the viewer (owner, 2026-09-27; docs/decisions.md). The rule is authored by both Art Director templates (rule 4) and both iterate templates, and judged by the brief check (scene-review.txt check 6d [group_staging] until the review was deleted on 2026-09-28); the four templates read ONE constant, shotVocabulary.GROUP_STAGING_RULE, through {GROUP_STAGING}. The brief check sceneBriefCheck.checkGroupStaging measures the same rule from structured fields (GROUP_WIDER_SHOTS, `perspective`, `looksAt`) and sends group_shot_too_close / group_facing_viewer to the one brief re-ask. tests/unit/group-staging.test.ts pins that the constant reaches every built prompt. The planner (story-beats.txt) read it too while it picked the shot; since 2026-09-27 (later the same day) code writes every shot and holds the group rule in the Jev shot assignment (jevDecisions.assign, GROUP_WIDER_SHOTS), so the planner is no longer a generator of this rule.",
+      "generators": [
+        "prompts/scene-briefs-all.txt",
+        "prompts/scene-expansion.txt",
+        "prompts/scene-iteration.txt",
+        "prompts/scene-iteration-free.txt"
+      ],
+      "critics": [
+        "server/lib/sceneBriefCheck.js"
       ],
       "severity": "block"
     },
@@ -241,6 +309,21 @@
       "severity": "block"
     },
     {
+      "id": "prose-slop-generator-vs-critic",
+      "axis": "generator-vs-critic",
+      "reason": "The Jev text audit (jevAudit.js, wired into textRefine.refineStoryText 2026-09-27) flags a page for each AI-slop type in proseSlop.SLOP_TYPES, and the page goes to the one repair pass. Each type carries its writer rule and its Jev question side by side; SLOP_RULES fills STYLE_RULEBOOK, which reaches the beats writer, the trial writer and the text repair through {STYLE_RULEBOOK}. A slop type Jev judges that the writer was never told is a finding no first draft can avoid; a rule the writer gets that Jev does not judge is unmeasured. Change a type in proseSlop.js, never in one template or in the Jev question file.",
+      "generators": [
+        "server/lib/proseSlop.js",
+        "prompts/story-text-from-beats.txt",
+        "prompts/story-trial.txt",
+        "prompts/text-refine.txt"
+      ],
+      "critics": [
+        "server/lib/jevAudit.js"
+      ],
+      "severity": "block"
+    },
+    {
       "id": "avatar-generator-vs-critic",
       "axis": "generator-vs-critic",
       "reason": "avatar-evaluation.txt gates avatars generated from avatar-main-prompt.txt; a criterion the judge rejects on must be an instruction the generator carries, or the retry loop burns paid calls chasing a rule nobody stated.",
@@ -263,14 +346,15 @@
         "prompts/sheet-row-heads-eval.txt",
         "prompts/sheet-row-bodies-eval.txt",
         "prompts/sheet-row-identity-eval.txt",
-        "prompts/sheet-2x4-style-eval.txt"
+        "prompts/sheet-2x4-style-eval.txt",
+        "prompts/sheet-garment-gone-check.txt"
       ],
       "severity": "block"
     },
     {
       "id": "empty-scene-generator-vs-critic",
       "axis": "generator-vs-critic",
-      "reason": "empty-scene-qc.txt is validateEmptyScene's judge of the plate empty-scene.txt paints; a check the judge applies that the plate author was never given is a blind grade, which is exactly how the reserved-corner and geometry findings arose. The shared half stays shared: GEOMETRY_DIMENSIONS (sceneGeometry.js) writes the author's geometry block and the judge's {GEOMETRY_CHECK} from one source. Extracted from evalPipeline.js string literals on 2026-09-15. Since 2026-09-25 plate-derive.txt (the camera-move / re-light edit of a vantage's base plate, prompts.js buildPlateDerivePrompt) is a generator of the same judge, and the edge-to-edge / no signature / no mat rule is one source: shotVocabulary.PLATE_EDGE_RULE fills {PLATE_EDGE} in both generators, and its PLATE_MARKS / PLATE_SURROUNDS fill the judge's Wrong text and Frame edge checks.",
+      "reason": "empty-scene-qc.txt is validateEmptyScene's judge of the plate empty-scene.txt paints; a check the judge applies that the plate author was never given is a blind grade, which is exactly how the reserved-corner and geometry findings arose. The shared half stays shared: GEOMETRY_DIMENSIONS (sceneGeometry.js) writes the author's geometry block and the judge's {GEOMETRY_CHECK} from one source. Extracted from evalPipeline.js string literals on 2026-09-15. Since 2026-09-25 plate-derive.txt (the camera-move / re-light edit of a vantage's base plate, prompts.js buildPlateDerivePrompt) is a generator of the same judge, and the edge-to-edge / no signature / no mat rule is one source: shotVocabulary.PLATE_EDGE_RULE fills {PLATE_EDGE} in both generators, and its PLATE_MARKS / PLATE_SURROUNDS fill the judge's Wrong text and Frame edge checks. Since 2026-09-26 the landmark REFERENCE line is one constant too (shotVocabulary.PLATE_LANDMARK_REFERENCE fills the author's **REFERENCE:** line and the judge's LANDMARK_CHECK), and PLATE_PEOPLE fills both the author's PLATE_NO_PEOPLE_RULE and the judge's Figures check. Since 2026-09-26 the judge's STRUCTURE_CHECK (check key `structures`, soft) quotes the two rules the author's STRUCTURES block is built from (prompts.js PLATE_STRUCTURE_MATCH_RULE, PLATE_STRUCTURE_PART_RULE); that block is written in JS (buildPlateStructuresText), not in empty-scene.txt, so the generator half of this rule lives in server/services/prompts.js.",
       "generators": [
         "prompts/empty-scene.txt",
         "prompts/plate-derive.txt"
@@ -283,7 +367,7 @@
     {
       "id": "scene-light-generator-vs-critic",
       "axis": "generator-vs-critic",
-      "reason": "A page's time of day and weather are its brief's `timeOfDay` / `weather` fields (server/lib/sceneLight.js, owner 2026-09-24). image-generation.txt carries them as the page's LIGHT line and empty-scene.txt as the plate's; image-semantic.txt (DECLARED LIGHT), empty-scene-qc.txt (LIGHT_CHECK) and the visual-flow judge in styleConsistency.js judge the render against the same two fields. A light rule a judge applies that the illustrator was never given — or a judge that goes back to reading the hour out of prose — is the blind grade this pair exists to prevent. The shared half is one module: every line on both sides is built from sceneLight.js.",
+      "reason": "A page's time of day and weather are its brief's `timeOfDay` / `weather` fields (server/lib/sceneLight.js, owner 2026-09-24). image-generation.txt carries them as the page's LIGHT line and empty-scene.txt as the plate's; image-semantic.txt (DECLARED LIGHT), empty-scene-qc.txt (LIGHT_CHECK) and the visual-flow judge in styleConsistency.js judge the render against the same two fields. A light rule a judge applies that the illustrator was never given — or a judge that goes back to reading the hour out of prose — is the blind grade this pair exists to prevent. The shared half is one module: every line on both sides is built from sceneLight.js. Since 2026-09-26 the weather owns the sky: lightParts composes time × weather, a covered weather's phrase names no sun, moon or blue sky (COVERED_SKY_CLAUSE), and the judges read describeLightForJudge — the labels plus that same sky phrase — so a sun in a fog page is judged against the words that forbade it.",
       "generators": [
         "prompts/image-generation.txt",
         "prompts/empty-scene.txt"
@@ -331,7 +415,7 @@
     {
       "id": "wardrobe-bible-vs-clothing-review",
       "axis": "generator-vs-critic",
-      "reason": "clothing-review.txt reviews the wardrobe contract story-bible-from-beats.txt writes (buildClothingReviewPrompt fills {CURRENT_CLOTHING} from the bible's used outfits) and rewrites it before the styled avatars start. A check the reviewer applies must be a rule the bible writer was given, and a bible rule the reviewer never checks is a rule nobody enforces: on 2026-09-23 the audit found the plot-worn-object rule and the base-layer variety under a removed outer layer with no reviewer check, and the reviewer dressing non-cast creatures because nothing told it only the listed characters have a wardrobe (docs/audits/prompt-audit-2026-09-23/03-wardrobe.md F3-F5); checks 9, 11 and 12 now carry them. Both templates also read the same wardrobe-scoped brief and cast (promptBuilders wardrobeStoryBrief / wardrobeCharacterDetails). Garment WORDING is owned by this contract (docs/decisions.md 2026-09-23): the Art Director's scene-expansion-all.txt selects versions and copies words, and clothingCheck.js makes a linked Visual Bible entry adopt the contract's clause.",
+      "reason": "clothing-review.txt reviews the wardrobe contract story-bible-from-beats.txt writes (buildClothingReviewPrompt fills {CURRENT_CLOTHING} from the bible's used outfits) and rewrites it before the styled avatars start. A check the reviewer applies must be a rule the bible writer was given, and a bible rule the reviewer never checks is a rule nobody enforces: on 2026-09-23 the audit found the plot-worn-object rule and the base-layer variety under a removed outer layer with no reviewer check, and the reviewer dressing non-cast creatures because nothing told it only the listed characters have a wardrobe (docs/audits/prompt-audit-2026-09-23/03-wardrobe.md F3-F5); checks 9, 11 and 12 now carry them. Both templates also read the same wardrobe-scoped brief and cast (promptBuilders wardrobeStoryBrief / wardrobeCharacterDetails). Garment WORDING is owned by this contract (docs/decisions.md 2026-09-23): the Art Director's page briefs (scene-briefs-all.txt) select versions and copies words, and clothingCheck.js makes a linked Visual Bible entry adopt the contract's clause. Since 2026-09-26 both read GARMENT_ONE_OUTFIT_RULE (promptBuilders): a garment belongs to the outfit of the character who wears it first, and a plan handoff lives in the plan line and wornItems, never in a second outfit (staging job_1790373080139_vnx5l8iy7: the reviewer's check 12 copied one brother's jacket into the other's outfit).",
       "generators": [
         "prompts/story-bible-from-beats.txt"
       ],
@@ -343,7 +427,7 @@
     {
       "id": "arc-generator-vs-critic",
       "axis": "generator-vs-critic",
-      "reason": "arc-panel.txt walks the committed arc lens by lens and names what the creator missed; arc-create.txt writes the arc and arc-retell.txt rewrites it against the panel. A lens the panel scores by must be a fault-shape the creator and the re-teller were GIVEN — otherwise the arc is corrected after the fact instead of written right, which buys a fault the generator could have avoided at the price of a whole extra round trip. The creator's and re-teller's critique is ONE constant, arcCritiqueSpec() in promptBuilders.js, filled into both as {ARC_CRITIQUE_SPEC}; {TELLING_RULES} and {ARC_LOGIC_SPEC} are the same pattern. The panel's ENTRANCE, ASSUMED, SENSE and PLACE lenses read the SAME strings the creator gets (ARC_ENTRANCE_RULE, ARC_GIVEN_RULE, ARC_SENSE_RULE, ARC_PLACE_RULE). Since 2026-09-24 (logic-first arc, one arc) the panel's FIRST lens is LOGIC, which reads ARC_LOGIC_CHECK — the same constant that defines a fault in the creator's critique — against the STORY LOGIC block the creator writes before its sentences; since 2026-09-25 both write a finding the same way, quoting the conflicting words (ARC_FINDING_RULE, one constant in both), and code drops a panel finding whose quote is not in the arc (filterPanelFindings, beatsPipeline and the Lab mirrors); and since the same day (owner: \"Ask each panel to output the three worst issues. Tagging a sentence is no good; an issue can be spread over many sentences.\") both report their THREE worst issues in ONE line shape (ARC_ISSUE_RULE, arcIssueLine, ARC_ISSUE_MAX), each citing every sentence it concerns, parsed by ONE parser (parseArcIssues) for the panel and the critique; the CAST and ACTION lenses left the same day, because both were counts (the (new) figures are counted in code, each child's action by plan-check Q12). Since 2026-09-25 (arc prompts v3) the creator's principles (arcPrinciples) state ARC_EXCITING_DEF and ARC_MAIN_TURN_RULE, and the critique's second fault family ARC_PART_CHECK (a main character with no turn, an opposition that never acts) is the critic half of the same pair; every commissioned character's scene is the page plan's (stage split), so the arc carries no cast rule and the panel no ACTION lens. A new lens is written the same way: its rule is a constant the creator's TELLING_RULES, ARC_LOGIC_SPEC or STORY SHAPE also carries. arc-hints.txt is a critic too: it reads the settled arc and, since 2026-09-24, its STORY LOGIC ({STORY_LOGIC}), and a CHANGE that contradicts the logic must name the fact it changes, because the hint steers the planner.",
+      "reason": "arc-panel.txt walks the committed arc lens by lens and names what the creator missed; arc-create.txt writes the arc and arc-retell.txt rewrites it against the panel. A lens the panel scores by must be a fault-shape the creator and the re-teller were GIVEN — otherwise the arc is corrected after the fact instead of written right, which buys a fault the generator could have avoided at the price of a whole extra round trip. The creator's and re-teller's critique is ONE constant, arcCritiqueSpec() in promptBuilders.js, filled into both as {ARC_CRITIQUE_SPEC}; {TELLING_RULES} and {ARC_LOGIC_SPEC} are the same pattern. The panel's ENTRANCE, ASSUMED, SENSE and PLACE lenses read the SAME strings the creator gets (ARC_ENTRANCE_RULE, ARC_GIVEN_RULE, ARC_SENSE_RULE, ARC_PLACE_RULE). Since 2026-09-24 (logic-first arc, one arc) the panel's FIRST lens is LOGIC, which reads ARC_LOGIC_CHECK — the same constant that defines a fault in the creator's critique — against the STORY LOGIC block the creator writes before its sentences; since 2026-09-25 both write a finding the same way, quoting the conflicting words (ARC_FINDING_RULE, one constant in both), and code drops a panel finding whose quote is not in the arc (filterPanelFindings, beatsPipeline and the Lab mirrors); and since the same day (owner: \"Ask each panel to output the three worst issues. Tagging a sentence is no good; an issue can be spread over many sentences.\") both report their THREE worst issues in ONE line shape (ARC_ISSUE_RULE, arcIssueLine, ARC_ISSUE_MAX), each citing every sentence it concerns, parsed by ONE parser (parseArcIssues) for the panel and the critique; the CAST and ACTION lenses left the same day, because both were counts (the (new) figures are counted in code, each child's action by plan-check Q12). Since 2026-09-25 (arc prompts v3) the creator's principles (arcPrinciples) state ARC_EXCITING_DEF and ARC_MAIN_TURN_RULE, and the critique's second fault family ARC_PART_CHECK (a main character with no turn, an opposition that never acts) is the critic half of the same pair; every commissioned character's scene is the page plan's (stage split), so the panel has no ACTION lens. Since the same evening (variant B, Lab #1490) arcPrinciples states EVERY_CHILD_ACTS_RULE to the creator and the re-teller as a GENERATOR rule with no arc critic lens, deliberately: the variant measured in #1490 had none, a lens would send a MAJOR finding into the re-telling round the measurement did not include, and the rule's critic is plan-check Q12 (each commissioned character's ACTION line on the pages), whose finding the re-plan must fix. A new lens is written the same way: its rule is a constant the creator's TELLING_RULES, ARC_LOGIC_SPEC or STORY SHAPE also carries. arc-hints.txt is a critic too: it reads the settled arc and, since 2026-09-24, its STORY LOGIC ({STORY_LOGIC}), and a CHANGE that contradicts the logic must name the fact it changes, because the hint steers the planner. Since 2026-09-26 the panel's STAKES lens and the critique's third fault family read arcStakesRules(inputData) — ARC_OPPOSITION_HOLDS_RULE (off the simple bands) and ARC_QUESTIONS_ANSWERED_RULE — the SAME strings {TELLING_RULES} gives the creator and the re-teller (staging job_1790446348343_z3fw660ie: an opponent whose own limit emptied the turn, and a prize whose keeper the ending left open, with no critic of either rule); and ARC_SEVERITY_DEF makes an action at the turn or climax that could not happen at least MAJOR, the critic half of ARC_SENSE_RULE.",
       "generators": [
         "prompts/arc-create.txt",
         "prompts/arc-retell.txt"
@@ -365,6 +449,41 @@
         "prompts/plan-check.txt"
       ],
       "severity": "block"
+    },
+    {
+      "id": "replan-prod-vs-lab",
+      "axis": "Test Lab stage vs production call site",
+      "reason": "The page plan's re-plan round runs in production in beatsPipeline.js (buildReplanSection, replanKeepPages, reviewPlanChanges, the recheck and replanRoundRegressed) and is mirrored by the Lab's beats_replan stage in testlab.js (runBeatsReplanStage, analyzeReplanCompliance). A re-plan argument passed on one side only makes the Lab measure a round production never runs. Found 2026-09-25 while adding the commissioned span floor (castFloor) to both, on Lab #1494. Since 2026-09-27 the Lab no longer mirrors the round: it calls the run's own Step 2 (makePlanReader, planCheckInputs, createPlanCheckRunner, runReplanRounds), and tests/unit/lab-prod-call-parity.test.ts compares the two call sequences.",
+      "members": [
+        "server/lib/beatsPipeline.js",
+        "server/lib/testlab.js"
+      ],
+      "severity": "block",
+      "parity": {
+        "anchors": [
+          "makePlanReader",
+          "planCheckInputs",
+          "createPlanCheckRunner",
+          "runReplanRounds"
+        ]
+      }
+    },
+    {
+      "id": "plan-cast-table-prod-vs-lab",
+      "axis": "Test Lab stage vs production call site",
+      "reason": "The planner's CAST block (owner, 2026-09-25, Lab #1495/#1496) is read off the first division by castCoverage.parsePlanCastBlock and threaded into the plan check, the counters (CAST_PROMISE_BROKEN, with the check's ACTION lines and the focus character from pickMainCharacters) and the re-plan — in production by beatsPipeline.js and in the Lab's beats_replan stage by testlab.js runBeatsReplanStage. A table threaded on one side only makes the Lab measure a round production never runs.",
+      "members": [
+        "server/lib/beatsPipeline.js",
+        "server/lib/testlab.js"
+      ],
+      "severity": "block",
+      "parity": {
+        "anchors": [
+          "parsePlanCastBlock",
+          "castTable",
+          "pickMainCharacters"
+        ]
+      }
     },
     {
       "id": "entity-grid-generator-vs-critic",
@@ -405,7 +524,7 @@
       "reason": "A page brief is authored at FOUR sites: the two Art Director templates that write it the first time, and the two iterate templates that REWRITE it when the render proves it unbuildable. The rewrite replaces the brief wholesale and becomes the page's contract with the image model, so a rule only the first author holds is a rule one repair round deletes. Measured 2026-09-17 over the 11 stored iterate rounds of staging job_1789584708605_rts4wqupm and job_1789506283204_3kxqshifx: 11 of 11 rewrites dropped `shot`, `landmarkView` and every character's `depth` and `looksAt`, and emitted no `wornItems` row at all, where the brief each replaced carried all of them. This set is why that cannot happen silently again: touch an Art Director template and the gate asks what the rewriter gets.",
       "members": [
         "prompts/scene-expansion.txt",
-        "prompts/scene-expansion-all.txt",
+        "prompts/scene-briefs-all.txt",
         "prompts/scene-iteration.txt",
         "prompts/scene-iteration-free.txt"
       ],
@@ -421,20 +540,26 @@
           "{WORN_ITEMS_ROW}",
           "{WORN_ON_OTHER}",
           "{NEVER_NAME_ABSENT}",
+          "{NO_HEADLINE_PHRASES}",
           "{SCENE_INTENT_FIELD}",
           "{SCENE_LIGHT_FIELD}",
           "{CONCEALED_OBJECT}",
           "{CONTACT_VERB}",
           "{EYES_OPEN}",
           "{CREATURE_FACE}",
+          "{CREATURE_FIELD}",
+          "{ELEMENT_SIZE_WORD}",
           "{REACHABLE_CONTACT}",
+          "{SMALL_PROP_CONTACT}",
           "{PLAN_LINE_CAST}",
           "{COUNTING_RULE}",
           "{MULTI_PICTURE_PROP}",
           "{CREATURE_TONE}",
           "{VB_ELEMENT_BUDGET}",
           "{SHOT_ENUM}",
-          "{SEASON}"
+          "{SEASON}",
+          "{SHARED_GRIP}",
+          "{TRUE_RELATIVE_SIZE}"
         ],
         "anchorsNote": "Placeholders, not prose: each is ONE exported constant filled at all four sites, so the anchor proves the rule reaches the template and tests/unit/ad-iterate-parity.test.ts proves the constant reaches the BUILT prompt byte-identically. Three iterate-only placeholders stay deliberately unanchored because they have no Art Director counterpart to keep in step: {OBJECT_ID_STABILITY} (the Art Director MINTS the ids, so it has none to substitute), {DECLARED_TRAIT_VERBATIM} (declared where the drift was measured — see DECLARED_TRAIT_VERBATIM_RULE), and {MAX_CHARACTERS_PER_SCENE} (the image model’s face cap, which the Art Director expresses as its own staging rules). {STAGED_PROP} left the anchors on 2026-09-23: it is a page-TEXT rule, and the all-pages Art Director runs before any page text exists (owner) — the three sites that see the text carry it, pinned by tests/unit/brief-authoring-contracts.test.ts."
       }
@@ -442,7 +567,7 @@
     {
       "id": "arc-retell-gate",
       "axis": "Test Lab stage vs production call site",
-      "reason": "The arc re-telling runs only when a quoted MAJOR or CRITICAL issue survives (the create critique's three worst or a panelist's three worst), and is handed only those issues, duplicates across panelists merged (owner, 2026-09-25; Lab #1459-1467: every re-telling that answered MINOR findings was judged worse). Production (beatsPipeline.js, the arc machine's round loop) and the Lab mirrors (testlab.js arc_effort stage 'pipeline' and arc_panel_replay params.retell) all call the ONE gate, arcRepairFindings with splitCommittedBlock in promptBuilders.js; a mirror that re-tells ungated measures a call production no longer makes.",
+      "reason": "The arc re-telling runs only when a quoted MAJOR or CRITICAL issue survives (the create critique's three worst or a panelist's three worst), and is handed only those issues, duplicates across panelists merged (owner, 2026-09-25; Lab #1459-1467: every re-telling that answered MINOR findings was judged worse). Production (beatsPipeline.js, the arc machine's round loop) and the Lab mirrors (testlab.js arc_effort stage 'pipeline' and arc_panel_replay params.retell) all call the ONE gate, arcRepairFindings with splitCommittedBlock in promptBuilders.js, through jevAudit.arcRepairFindingsWithCastCheck since 2026-09-27 (the gate is decided by the critique and the panel alone; the Jev cast check only adds FEEDBACK lines to an already-open re-telling, owner 2026-09-27); the re-telling's creator call is beatsPipeline.makeArcCreatorCall, which the Lab arc_panel_replay imports (2026-09-27); a mirror that re-tells ungated measures a call production no longer makes.",
       "members": [
         "server/lib/beatsPipeline.js",
         "server/lib/testlab.js"
@@ -450,17 +575,18 @@
       "severity": "block",
       "parity": {
         "anchors": [
-          "arcRepairFindings("
+          "arcRepairFindingsWithCastCheck(",
+          "makeArcCreatorCall"
         ]
       }
     },
     {
       "id": "brief-corrective-loops",
       "axis": "authored-brief correction vs rewritten-brief correction",
-      "reason": "A brief's mechanical findings are answered on two paths — the scene review on the authored path (beatsPipeline.js) and the corrective re-ask on the rewrite path (images.js iteratePageCore) — and the second was a hand-rolled copy of the first that measurably did not work: over the 11 stored iterate rounds of staging job_1789584708605_rts4wqupm and job_1789506283204_3kxqshifx it fired once per page and resolved findings on ZERO of them, because it sent the findings without the text being corrected, accepted on a COUNT (a correction that swaps one fault for another scores equal and is rejected), and re-asked the same model that had just failed the contract. Owner, 2026-09-17: 'All 3 same as pipeline. These should be siblings or even identical code.' The payload contract (assertCorrectorSeesText), the introduced-vs-survived verdict (judgeCorrection) and the model name (MODEL_DEFAULTS.briefCorrectionModel) are now ONE implementation in server/lib/briefCorrection.js; this set is what stops a call site drifting off it again.",
+      "reason": "A brief's mechanical findings are answered on two paths — the one brief re-ask on the authored path (briefChecks.js; the scene review in beatsPipeline.js until 2026-09-28) and the corrective re-ask on the rewrite path (images.js iteratePageCore) — and the second was a hand-rolled copy of the first that measurably did not work: over the 11 stored iterate rounds of staging job_1789584708605_rts4wqupm and job_1789506283204_3kxqshifx it fired once per page and resolved findings on ZERO of them, because it sent the findings without the text being corrected, accepted on a COUNT (a correction that swaps one fault for another scores equal and is rejected), and re-asked the same model that had just failed the contract. Owner, 2026-09-17: 'All 3 same as pipeline. These should be siblings or even identical code.' The payload contract (assertCorrectorSeesText), the introduced-vs-survived verdict (judgeCorrection) and the model name (MODEL_DEFAULTS.briefCorrectionModel) are now ONE implementation in server/lib/briefCorrection.js; this set is what stops a call site drifting off it again.",
       "members": [
         "server/lib/images.js",
-        "server/lib/beatsPipeline.js"
+        "server/lib/briefChecks.js"
       ],
       "severity": "block",
       "parity": {
@@ -510,11 +636,10 @@
     {
       "id": "clothing-findings-producer-vs-consumers",
       "axis": "mechanical clothing findings: producer vs the prompt that fixes them vs the Lab mirror",
-      "reason": "clothingCheck.js decides WHICH clothing faults are sendable (REVIEWABLE) and words each one as its own fix; scene-review.txt check 0 is the only consumer and states what a reviewer may do about them; testlab.js's scene-review replay keeps a THIRD, hand-copied set of the same type list for its faults-in/faults-out measurement. A type added, removed or re-worded in one is silently absent or stale in the others - on 2026-09-18 the deletion of outfit_misattributed left check 0 instructing a garment move that can never be asked for, and left the Lab counting a type the module no longer emits.",
+      "reason": "clothingCheck.js decides WHICH clothing faults are sendable (REVIEWABLE) and words each one as its own fix; briefChecks.js sends them, with REASK_CLOTHING_EXTRA and clothing_incomplete, to the one brief re-ask. A type added, removed or re-worded in one is silently absent or stale in the other - on 2026-09-18 the deletion of outfit_misattributed left the scene review's check 0 instructing a garment move that could never be asked for. The scene review and its Lab replay (a hand-copied type list) were members until both were deleted on 2026-09-28.",
       "members": [
         "server/lib/clothingCheck.js",
-        "prompts/scene-review.txt",
-        "server/lib/testlab.js"
+        "server/lib/briefChecks.js"
       ],
       "severity": "block"
     },
@@ -600,7 +725,7 @@
     {
       "id": "beats-planner-vs-plan-check",
       "axis": "generator-vs-critic",
-      "reason": "story-beats.txt states each page rule as an imperative and plan-check.txt audits the same rule as a question — the generator/critic pair for page division. The FRAMING is deliberately different and is not shared; the DEFINITION inside each was written out twice by hand, and a definition that drifts between the rule and the audit is a generator that cannot satisfy the judge grading it. Four of them are now single constants in promptBuilders.js (DEED_AND_EFFECT_DEF, TWO_HEIGHTS_DEF, NAMING_DEF, ENDING_EVENT_DEF) filled into both templates. WANTED_PICTURE_DEF is the exception: it reaches plan-check.txt only, story-beats.txt hand-states the equivalent as a planning question, and the pair is pinned clause-by-clause by tests/unit/plan-shared-definitions.test.ts. This set stops a further pair being hand-copied instead. Since 2026-09-23 two more are code-built and filled into both: the act spans by arc sentence number (arcActSpans, planner question 6 / checker question 4) and each character's own-action rule (castCoverage.castActionRule, the planner's {CAST_COVERAGE} / checker question 12); the appearance floor reaches the planner and the counters only, never the checker, which read a stated range as a cap. Since 2026-09-24 the over-the-shoulder contact rule (shotVocabulary.OTS_NO_CONTACT_RULE) is filled into both as {OTS_NO_CONTACT} (checker question 14): the planner had it alone and an over-the-shoulder page on a contact beat passed the check (staging job_1790277448294_5herh01j7 p12). Since 2026-09-24 castActionRule also carries the commission's central figure when the arc's STORY LOGIC names one (centralFigureActionRule): the planner's {CAST_COVERAGE} and the checker's question 12 {CAST_ACTION} read the same sentence, and question 12 asks an ACTION line for it.",
+      "reason": "story-beats.txt states each page rule as an imperative and plan-check.txt audits the same rule as a question — the generator/critic pair for page division. The FRAMING is deliberately different and is not shared; the DEFINITION inside each was written out twice by hand, and a definition that drifts between the rule and the audit is a generator that cannot satisfy the judge grading it. Four of them are now single constants in promptBuilders.js (DEED_AND_EFFECT_DEF, TWO_HEIGHTS_DEF, NAMING_DEF, ENDING_EVENT_DEF) filled into both templates. WANTED_PICTURE_DEF is the exception: it reaches plan-check.txt only, story-beats.txt hand-states the equivalent as a planning question, and the pair is pinned clause-by-clause by tests/unit/plan-shared-definitions.test.ts. This set stops a further pair being hand-copied instead. Since 2026-09-23 two more are code-built and filled into both: the act spans by arc sentence number (arcActSpans, planner question 6 / checker question 4) and each character's own-action rule (castCoverage.castActionRule, the planner's {CAST_COVERAGE} / checker question 12); the appearance floor reaches the planner and the counters only, never the checker, which read a stated range as a cap. Since 2026-09-24 the over-the-shoulder contact rule (shotVocabulary.OTS_NO_CONTACT_RULE) is filled into both as {OTS_NO_CONTACT} (checker question 14): the planner had it alone and an over-the-shoulder page on a contact beat passed the check (staging job_1790277448294_5herh01j7 p12). Since 2026-09-24 castActionRule also carries the commission's central figure when the arc's STORY LOGIC names one (centralFigureActionRule): the planner's {CAST_COVERAGE} and the checker's question 12 {CAST_ACTION} read the same sentence, and question 12 asks an ACTION line for it. Since 2026-09-26 the whole-cast page rule is one constant (WHOLE_CAST_DEF) filled into the planner's one-moment list and checker question 17. Since 2026-09-26 the arc's STORY LOGIC reaches both from one builder (buildStoryLogicSection, with STORY_LOGIC_FACT_RULE): the planner's first division and re-plan keep every page to its facts, and checker question 18 names a page that breaks one.",
       "members": [
         "prompts/story-beats.txt",
         "prompts/plan-check.txt"
@@ -616,6 +741,17 @@
         "server/lib/planCounters.js",
         "prompts/story-beats.txt",
         "prompts/plan-check.txt"
+      ],
+      "severity": "block"
+    },
+    {
+      "id": "group-page-budget-rule-vs-counter",
+      "axis": "the group-page budget the planner is told vs the counter that counts it",
+      "reason": "How many pages may hold more than three named characters (owner, 2026-09-27; docs/decisions.md): castCoverage.groupPageBudget is ONE number — one page in six, at least one, raised only when the coverage floor cannot be met on pages of three. story-beats.txt states it ({GROUP_PAGE_BUDGET}, groupPageRule, planner question 3) and planCounters.js counts it (GROUP_PAGES_OVER_BUDGET, direction 'fewer', must-fix since 2026-09-27) on the same `present` list every cast counter reads. A counter holding the book to a number the planner was not told, or a planner told a number nothing counts, is the drift this set exists to catch. tests/unit/planner-group-pages.test.ts.",
+      "members": [
+        "server/lib/castCoverage.js",
+        "server/lib/planCounters.js",
+        "prompts/story-beats.txt"
       ],
       "severity": "block"
     },
@@ -701,6 +837,21 @@
       "severity": "block"
     },
     {
+      "id": "landmark-plate-photo-crop",
+      "axis": "plate photo packing (grok.js) vs plate prompt budget (images.js)",
+      "reason": "A landmark plate's photo is centre-cropped to the plate aspect with no magenta pad and no magenta prefix (owner, 2026-09-26, decisions.md; reverses 2026-06-16 for landmark plates). Two files hold the two halves: grok.js packReferences crops the plate source and refuses a plate call with padInputWithExtension on, and editWithGrok prepends the prefix only to a padded slot 0; images.js _dispatchImageGeneration turns the extension off for landmarkScene 'plate' (slot0IsScenePlate) and fits the plate prompt against the FULL cap because no prefix follows. Turn the extension back on for plates in one file and the other either throws or sends a prefix the plate fit never reserved room for (the 2026-09-25 over-cap bug). Every plate caller (vantage, per-page, trial, cover, iterate, Lab empty_scene) reaches this through generateImageOnly with emptyScenePlateRouting(); the derive/relight edit sends the base plate, not the photo, and is not part of this set.",
+      "members": [
+        "server/lib/grok.js",
+        "server/lib/images.js"
+      ],
+      "severity": "block",
+      "parity": {
+        "anchors": [
+          "landmarkScene === 'plate'"
+        ]
+      }
+    },
+    {
       "id": "page-plate-or-fail-callers",
       "axis": "page first render vs retry vs trial page vs iterate vs regenerate/test-models/style-lab vs calm-zone repair vs Lab mirror",
       "reason": "Plate or fail (owner, 2026-09-24): a landmark page that is not cast-0 renders on its plate or fails, and only the declared roles in server/lib/landmarkScene.js ('plate', 'castless', 'composite') may take the raw photo with no plate. The rule is applied at every page render site - Phase 5a render and retry and the trial page (storyJobPipeline.js), iteratePageCore / ensureStoryPagePlate / the dispatch check (images.js), the calm-zone and regenerate repairs (repairPipeline.js), the page regenerate, test-models and style-lab routes (regeneration.js) and the Lab mirrors (testlab.js). A site that stops passing its plate or its role either fails every landmark page or, worse, is the one that quietly packs the photo again.",
@@ -736,7 +887,7 @@
     {
       "id": "cover-page-render-vs-iterate",
       "axis": "full-story cover first render vs full-story cover iterate",
-      "reason": "A full-story cover is a page (2026-09-24): its first render (storyJobPipeline.js preparePageData / Phase 5a) and its iterate (images.js iteratePageCore, reached from the repair pipeline, the cover routes and the Lab via coverRender.iterateFullStoryCover) must apply the SAME cover-only options — coverRenderOptions (aspect, text always in the image, baked-title model, text contract, usage bucket) and withBakedTitle (the REQUIRED TEXT tail). An option honoured on one side only renders or judges the cover differently the first time and after every repair.",
+      "reason": "A full-story cover is a page (2026-09-24): its first render (storyJobPipeline.js preparePageData / Phase 5a) and its iterate (images.js iteratePageCore, reached from the repair pipeline, the cover routes and the Lab via coverRender.iterateFullStoryCover) must apply the SAME cover-only options — coverRenderOptions (aspect, text always in the image, baked-title model, text contract, usage bucket) and withBakedTitle (the REQUIRED TEXT tail). An option honoured on one side only renders or judges the cover differently the first time and after every repair. Since 2026-09-27 the first render applies withBakedTitle through the shared page-render builder (server/lib/pageRenderCall.js makePageImagePrompt, also the Test Lab image stage) — pinned by the sibling set cover-page-render-baked-title.",
       "members": [
         "storyJobPipeline.js",
         "server/lib/images.js"
@@ -744,15 +895,29 @@
       "severity": "block",
       "parity": {
         "anchors": [
-          "coverRenderOptions",
-          "withBakedTitle"
+          "coverRenderOptions"
+        ]
+      }
+    },
+    {
+      "id": "cover-page-render-baked-title",
+      "axis": "full-story cover first render (shared page-render builder) vs full-story cover iterate",
+      "reason": "The REQUIRED TEXT tail of a baked-title cover (withBakedTitle) is appended by pageRenderCall.makePageImagePrompt on the first render (story run Phase 5a and the Test Lab image stage) and, since 2026-09-28, iteratePageCore (images.js) builds its prompt through that same closure instead of calling buildImagePrompt + withBakedTitle itself — the anchor is the shared call. A cover that gets the tail on one path only renders its title the first time and loses it after a repair, or the reverse.",
+      "members": [
+        "server/lib/pageRenderCall.js",
+        "server/lib/images.js"
+      ],
+      "severity": "block",
+      "parity": {
+        "anchors": [
+          "makePageImagePrompt"
         ]
       }
     },
     {
       "id": "cover-beat-vs-brief-check",
       "axis": "generator-vs-critic",
-      "reason": "coverBeats.js writes a full-story cover's beat — every figure looks at the viewer, the copy space as a textPosition (COVER_TEXT_POSITION) — and sceneBriefCheck.js checkCoverBrief holds the Art Director's brief to exactly those facts (cover_gaze_not_viewer, cover_text_zone_mismatch) before the scene review. One constant feeds both; a cover fact added to the beat and not the check is unenforced, and a check the beat never states is a fault the Art Director was never asked to avoid.",
+      "reason": "coverBeats.js writes a full-story cover's beat — every figure looks at the viewer, the copy space as a textPosition (COVER_TEXT_POSITION) — and sceneBriefCheck.js checkCoverBrief holds the Art Director's brief to exactly those facts (cover_gaze_not_viewer, cover_text_zone_mismatch) before the scene review. One constant feeds both; a cover fact added to the beat and not the check is unenforced, and a check the beat never states is a fault the Art Director was never asked to avoid. Since 2026-10-04 the place has two regimes: on the Jev path code decides each cover's vantage (jevBriefFields.decideCoverPlaces, beat says COVER_DECIDED_PLACE, the brief is pinned) and checkCoverLocations skips a `placeDecided` cover; on the backup the beat carries COVER_OWN_PLACE and cover_location_repeated holds the brief to it. Change the regime on both sides at once. Since 2026-10-04 a cover may also stand at an OFFERED landmark (jevBriefFields.materializeCoverPlaces writes it into the bible as a coverOnly wide vantage); the brief check reads it like any vantage.",
       "generators": [
         "server/lib/coverBeats.js"
       ],
@@ -773,6 +938,145 @@
         "server/routes/storyIdeas.js"
       ],
       "severity": "block"
+    },
+    {
+      "id": "lab-vs-prod-page-render",
+      "axis": "Lab vs prod",
+      "reason": "The Test Lab image stage and the story run page render (storyJobPipeline.js Phase 5a) build the render call through the SAME builders in server/lib/pageRenderCall.js (owner 2026-09-27: the Lab must use 100% identical code to production). A change to how production selects grid cells, filters them, picks the model, builds the prompt, masks the copy space or sets the render options must land in pageRenderCall.js, where both read it; tests/unit/lab-prod-call-parity.test.ts compares the two calls.",
+      "members": [
+        "storyJobPipeline.js",
+        "server/lib/testlab.js"
+      ],
+      "severity": "block",
+      "parity": {
+        "anchors": [
+          "selectPageElementRefs",
+          "keepPageGridElements",
+          "pageRenderModel",
+          "makePageImagePrompt",
+          "pageRenderOptions"
+        ]
+      }
+    },
+    {
+      "id": "lab-vs-prod-page-eval",
+      "axis": "Lab vs prod",
+      "reason": "The Test Lab eval stages (quality_eval, semantic_eval, eval_variance, the image stage's auto-eval) and the repair round's page eval build the batch input with the SAME function, repairPipeline.buildEvalInput, and the batch's per-page call with images.batchEvalQualityCall (owner 2026-09-27: the Lab must use 100% identical code to production). A change to what a page eval is handed lands there, where both read it; tests/unit/lab-prod-call-parity.test.ts compares the two.",
+      "members": [
+        "server/lib/repairPipeline.js",
+        "server/lib/testlab.js"
+      ],
+      "severity": "block",
+      "parity": {
+        "anchors": [
+          "buildEvalInput",
+          "evalStoryMetaOf",
+          "consolidationInputs",
+          "buildInpaintCall"
+        ]
+      }
+    },
+    {
+      "id": "lab-vs-prod-plate",
+      "axis": "Lab vs prod",
+      "reason": "The Test Lab empty_scene stage and the story run's plates (storyJobPipeline.js Phase 5a-pre-vantage and 5a-pre) run the SAME functions in server/lib/platePipeline.js (owner 2026-09-27: the Lab must use 100% identical code to production). A change to how a plate's prompt, mask, references, QC, retry or derive is built must land in platePipeline.js, where both call it; tests/unit/lab-prod-call-parity.test.ts compares the two calls.",
+      "members": [
+        "storyJobPipeline.js",
+        "server/lib/testlab.js"
+      ],
+      "severity": "block",
+      "parity": {
+        "anchors": [
+          "renderPagePlate",
+          "renderVantagePlates"
+        ]
+      }
+    },
+    {
+      "id": "lab-vs-prod-char-fix",
+      "axis": "Lab vs prod",
+      "reason": "The Test Lab char_repair stage and the repair round (repairPipeline.js executeCharFixAction) build the char-fix call with the SAME builder, server/lib/charFixCall.js buildCharFixCall (owner 2026-09-27). Inputs production derives (target box, guards, outfit, wardrobe-state sheet, axes, protection, clothing text) change there, never in one caller.",
+      "members": [
+        "server/lib/repairPipeline.js",
+        "server/lib/testlab.js"
+      ],
+      "severity": "block",
+      "parity": {
+        "anchors": [
+          "buildCharFixCall"
+        ]
+      }
+    },
+    {
+      "id": "page-prompt-one-construction",
+      "axis": "first render (story run) vs cover page vs iterate/repair vs Test Lab image stage",
+      "members": [
+        "storyJobPipeline.js",
+        "server/lib/images.js",
+        "server/lib/testlab.js",
+        "server/lib/pageRenderCall.js"
+      ],
+      "severity": "block",
+      "reason": "Every page and full-story cover image prompt is built by ONE closure, pageRenderCall.makePageImagePrompt (buildImagePrompt + the Grok VB-prose skip + a cover's baked-title tail). The story run (Phase 5a), the Test Lab image stage and, since 2026-09-28, iteratePageCore (every iterate/repair and the cover iterate) call it. The fixed blocks of that prompt are never cut, so a copy of the construction on one path drifts in size as well as wording: staging job_1790539784661_6mjcny1c7 lost its front cover and a p18 repair to prompt_fit_failed after the page compaction (docs/decisions.md 2026-09-28). A path that builds a page prompt another way joins this set or is deleted.",
+      "parity": {
+        "anchors": [
+          "makePageImagePrompt"
+        ]
+      }
+    },
+    {
+      "id": "lab-vs-prod-brief-checks",
+      "axis": "Lab vs prod",
+      "reason": "The Test Lab beats_scenes stage and the beats pipeline (Step 4b) run the SAME brief checks and the one Art Director re-ask, briefChecks.runBriefChecks, after the SAME two-call Art Director, beatsPipeline.runArtDirector (owner 2026-09-27: the Lab must use 100% identical code to production; 2026-09-28: the checks and the re-ask replace the scene review). A change to the checks, the re-ask or its verdict lands in briefChecks.js, where both call it; tests/unit/lab-prod-call-parity.test.ts compares the two calls.",
+      "members": [
+        "server/lib/beatsPipeline.js",
+        "server/lib/testlab.js"
+      ],
+      "severity": "block",
+      "parity": {
+        "anchors": [
+          "runBriefChecks",
+          "runArtDirector"
+        ]
+      }
+    },
+    {
+      "id": "trial-page-vs-full-page-clothing",
+      "axis": "trial page first render vs full-story page render: per-page clothing resolution",
+      "reason": "Both resolve each page's per-character outfit through buildSceneClothingRequirements (clothingResolve.js): name-tolerant and never defaulting to 'standard'. The trial page path hand-rolled an exact-key lookup with a silent 'standard' default, so a hero named LUNA whom the outline keyed Luna rendered every page of prod trial job_1790769860433_2bhhj0pyi in the standard avatar.",
+      "members": [
+        "storyJobPipeline.js",
+        "server/lib/images.js"
+      ],
+      "severity": "block",
+      "parity": {
+        "anchors": [
+          "buildSceneClothingRequirements"
+        ]
+      }
+    },
+    {
+      "id": "wardrobe-variant-sheet-chain",
+      "axis": "standard sheet vs costumed sheet (derive, generate, project, resolve)",
+      "reason": "A page that takes a garment off is drawn from an off-garment sheet: wardrobeVariants.js derives the off-set and its base category, styledAvatars.js redresses the base sheet, storyAvatars.js projects it into characterAvatars and resolveSheetForRef serves it, entityConsistency.getStyledAvatarForClothing serves it to the repair paths, and notEvaluated.js records a page that got none. Until 2026-10-04 every stage handled styled-standard/winter/summer and skipped costumed, so a garment taken off a costumed character was drawn from the costume sheet wearing it with no warning (staging job_1790446348343_z3fw660ie). A key-shape or category change on one stage must reach all of them.",
+      "members": [
+        "server/lib/wardrobeVariants.js",
+        "server/lib/styledAvatars.js",
+        "server/lib/storyAvatars.js",
+        "server/lib/entityConsistency.js",
+        "server/lib/notEvaluated.js"
+      ],
+      "severity": "block"
+    },
+    {
+      "id": "main-character-selection",
+      "axis": "wizard vs prompt builders",
+      "reason": "The wizard's live age line says which mains the server counts and whose age picks the band; client/src/utils/mainCharacters.ts mirrors pickMainCharacters (cap: 1 main for up to 2 characters, 2 for 3 or more; oldest main decides). A change to the cap or sort on one side makes the wizard promise a story the server does not write (2026-10-04: three books for a 2-year-old written for her 4-year-old brother).",
+      "members": [
+        "server/lib/promptBuilders.js",
+        "client/src/utils/mainCharacters.ts"
+      ],
+      "severity": "block"
     }
   ],
   "withinFile": [
@@ -787,6 +1091,20 @@
         "callClaudeAPI"
       ],
       "excludeReason": "callClaudeAPI is a dispatcher over the provider entry points, not one itself — it guards nothing because the callee does.",
+      "severity": "block"
+    },
+    {
+      "id": "textmodel-image-inputs",
+      "axis": "provider entry points (Gemini / Anthropic / xAI / OpenRouter, streaming and not)",
+      "reason": "every provider entry point in textModels.js must either deliver options.images (resolveImageInputs) or refuse them (refuseImageInputs). callGeminiTextAPI dropped them with a warning and the char-fix face gate judged blind for twelve days; xAI and the streaming paths dropped them silently (2026-09-27).",
+      "file": "server/lib/textModels.js",
+      "blockPattern": "(?:async\\s+)?function\\s+(call\\w*API\\w*)\\s*\\(",
+      "mustContain": "ImageInputs(",
+      "exclude": [
+        "callClaudeAPI",
+        "callOpenRouterAPI"
+      ],
+      "excludeReason": "callClaudeAPI dispatches to callTextModel, and callOpenRouterAPI delegates to callOpenRouterAPIStreaming with the same options — the callee resolves the images.",
       "severity": "block"
     },
     {
@@ -816,12 +1134,16 @@
       "severity": "block"
     },
     {
-      "id": "avatar-persist-async-vs-sync",
-      "axis": "async avatar job vs sync clothing-avatars path",
-      "reason": "both paths build the SAME two payloads (newAvatarData, lightAvatarData) with the same onlyIfNoUrl/onlyMissingThumbs INLINE fallbacks, and write them with the same jsonb_set chain into characters.data and .metadata. alarmInlineAvatarFallback only logs; the offload is what keeps the bytes out of JSONB, and a guard on one path guards half the avatars.",
-      "file": "server/routes/avatars.js",
-      "blockPattern": "const lightAvatarData = \\{",
-      "mustContain": "offloadCharacterImages",
+      "id": "cover-record-carries-decided-place",
+      "axis": "the cover scene vs the stored cover record an iterate reads",
+      "reason": "A full-story cover's decided place (jevFixed, 2026-10-04, jevBriefFields.decideCoverPlaces) rides beatsPipeline's coverScenes into storyJobPipeline's coverImages record, which images.js iteratePageCore reads as the cover's savedScene to re-pin the location after a rewrite. A cover record built without jevFixed lets an iterate move the cover back onto any vantage, silently. The block is measured exactly: `briefedAsPage: true,` closes the record.",
+      "file": "storyJobPipeline.js",
+      "blockPattern": "coverImages\\[raw\\.coverKey\\] = \\{|briefedAsPage: true,",
+      "mustContain": "jevFixed:",
+      "exclude": [
+        "briefedAsPage: true,"
+      ],
+      "excludeReason": "briefedAsPage: true, is the terminator that closes the cover record so its body is measured exactly; it is not a record-building site.",
       "severity": "block"
     }
   ]

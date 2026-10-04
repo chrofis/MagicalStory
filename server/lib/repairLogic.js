@@ -96,12 +96,7 @@ function findBadPages(evalPages, options = {}) {
  * char-fix, not inpaint. This path must not become a back door around it.
  */
 function findSafeRepairableFinding(result) {
-  const pools = [
-    ['quality', result?.fixableIssues],
-    ['semantic', semanticFindings(result?.semanticResult)],
-    ['consolidated', result?.consolidatedPlan?.deduped_issues],
-  ];
-  for (const [pool, list] of pools) {
+  for (const [pool, list] of scoredFindingPools(result)) {
     if (!Array.isArray(list)) continue;
     for (const i of list) {
       const severity = String(i?.severity || '').toLowerCase();
@@ -619,6 +614,29 @@ function collectSurvivingCriticals(results, repairRounds, regenThreshold) {
 }
 
 /**
+ * THE FINDING POOLS THE SCORE IS BUILT FROM — the one answer every repair
+ * reader (bad-page gate, critical report, type rescue, method router) uses.
+ *
+ * Mirrors scoring.applyScore/composeDeductions exactly: when the version
+ * carries a consolidated plan whose `deduped_issues` is an array — EMPTY
+ * INCLUDED — that list is the only list, because it is the only list the score
+ * charged. Only a page that was never consolidated falls back to the raw
+ * quality + semantic pools. A reader that consults a pool the scorer did not
+ * charge can call a page critical that scored 100 (2026-09-26, job_1790446348343
+ * p9) or clean that scored a CRITICAL (2026-09-11, e62bec843).
+ *
+ * @returns {Array<[string, Array]>}
+ */
+function scoredFindingPools(result) {
+  const deduped = result?.consolidatedPlan?.deduped_issues;
+  if (Array.isArray(deduped)) return [['consolidated', deduped]];
+  return [
+    ['quality', Array.isArray(result?.fixableIssues) ? result.fixableIssues : []],
+    ['semantic', semanticFindings(result?.semanticResult)],
+  ];
+}
+
+/**
  * Does this eval carry any CRITICAL or CATASTROPHIC finding? Reads the
  * structured severity field on the three finding pools (quality fixableIssues,
  * semantic issues, consolidated deduped_issues) — never the prose.
@@ -644,15 +662,17 @@ function collectCriticalFindings(result) {
   // CRITICAL here and MAJOR there: job_1789147573901_m3uam0nxi p13 and p17 each
   // reported an unrepaired CRITICAL `object_presence` and a finalScore of 85.
   // When the page has been consolidated, that merged list is the only list.
-  const deduped = result?.consolidatedPlan?.deduped_issues;
-  const pools = Array.isArray(deduped) && deduped.length > 0
-    ? [['consolidated', deduped]]
-    : [
-      ['quality', result?.fixableIssues],
-      ['semantic', semanticFindings(result?.semanticResult)],
-    ];
+  //
+  // AN EMPTY MERGED LIST IS A VERDICT, NOT AN ABSENCE (2026-09-26). The `> 0`
+  // that used to sit here read `deduped_issues: []` as "never consolidated" and
+  // fell back to the raw pools — but the scorer reads `[]` as zero deductions
+  // (scoring.applyScore takes any array). Staging job_1790446348343_z3fw660ie
+  // p9: the consolidator's landmark guard had dropped the only finding, the
+  // page scored 100, and this function found the raw semantic CRITICAL,
+  // admitted the page as critical and routed it to an inpaint that had no
+  // instruction to send. See scoredFindingPools.
   const out = [];
-  for (const [pool, list] of pools) {
+  for (const [pool, list] of scoredFindingPools(result)) {
     if (!Array.isArray(list)) continue;
     for (const i of list) {
       if (!/^(critical|catastrophic)$/i.test(String(i?.severity || ''))) continue;
@@ -789,6 +809,44 @@ function selectCharRepairTasks(entityReport, options = {}) {
  *        repeated on the same pixels: the page flips to iterate.
  * @returns {{method: 'skip'|'inpaint'|'iterate'|'char-fix', reason: string, charName?: string, severity?: string, issueTypes?: string[]}}
  */
+/**
+ * The page's entity findings a char-fix can act on, in report order: a
+ * CRITICAL character finding (not a crop artefact, not off by design) whose
+ * type is on the entity judge's closed list and decides a face or a
+ * full-figure repair. decideRepairMethod repairs the first; the Test Lab
+ * char_repair stage reads the same list to reconstruct the run's decision for
+ * a stored page (one filter, so the two cannot disagree about what is fixable).
+ * `{ severities }` widens the severity set for that reconstruction only.
+ */
+function charFixEntityFindings(pageNumber, entityReport, { severities = ['critical'] } = {}) {
+  const out = [];
+  if (!entityReport?.characters) return out;
+  // The page's entity findings through the report's ONE reader
+  // (scoring.entityFindingsForPage) — a finding on several pages reaches
+  // each; one voided by the page's declared wardrobe state reaches none.
+  const { entityFindingsForPage } = require('./scoring');
+  for (const { name: charName, source, issue, offByDesign } of entityFindingsForPage(pageNumber, entityReport)) {
+    if (source !== 'character' || offByDesign) continue;
+    const sev = String(issue.severity || '').toLowerCase();
+    if (!severities.includes(sev) || isCropArtifact(issue, { entity: true })) continue;
+    // The finding's TYPE decides face vs full figure (resolveRepairAxes). A
+    // type the evaluator vocabulary does not know decides nothing, and the
+    // judge's sentence is never read in its place — that finding cannot be
+    // routed, so it is declined here, loudly, and the next one is tried.
+    // An entity finding routes only when its type is on the entity judge's
+    // closed list (evalBuckets.ENTITY_CHECK_TYPES, owner 2026-09-24) — an
+    // off-list type was logged as a parse error and is never repaired.
+    const { repairTargetForTypes } = require('./faceRepair');
+    const { isEntityCheckType } = require('./evalBuckets');
+    if (!isEntityCheckType(issue.subType || issue.type) || !repairTargetForTypes([issue.subType || issue.type])) {
+      log.error(`🚫 [REPAIR-DECIDE] page ${pageNumber}: entity ${sev} on ${charName} has type "${issue.subType || issue.type || ''}", which is off the entity closed list or decides neither a face nor a full-figure repair — no char-fix for it`);
+      continue;
+    }
+    out.push({ severity: sev, charName, issue });
+  }
+  return out;
+}
+
 function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) {
   const evaluator = evaluation || {};
   // Canonical reads via scoreBreakdown (post chunk-2 scoring migration). Each
@@ -817,7 +875,13 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
     log.error(`❌ [REPAIR-DECIDE] page ${pageNumber}: no readable visual score (scoreBreakdown.visual.score / qualityScore / rawQualityScore all absent) — defaulting to 100, so the catastrophic-iterate gate CANNOT fire for this page`);
   }
   const visualScore = visualRead ?? 100;
-  const semanticScore = semanticRead ?? 100;
+  // A missing semantic score means the scene judge did not run or failed
+  // (notEvaluated says which). It is NOT a perfect 100: the gates below skip the
+  // semantic comparison for it instead of reading a pass (review A1, 2026-10-04).
+  const semanticScore = semanticRead;
+  if (semanticRead == null) {
+    log.warn(`⚠️ [REPAIR-DECIDE] page ${pageNumber}: no semantic score (scene judge not evaluated) — the wrong-scene gate cannot fire for this page`);
+  }
 
   // 0. Spec conflict — the consolidator judged the declared requirements
   // mutually unsatisfiable. No render can fix a broken contract: iterate
@@ -840,6 +904,7 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
   // WORSE than the original, with pick-best then discarding the work.
   const iterateVisualFloor = REPAIR_DEFAULTS.qualityThresholdForIterate ?? 20;
   const iterateSemanticFloor = REPAIR_DEFAULTS.semanticThresholdForIterate ?? 30;
+  const semanticTrips = typeof semanticScore === 'number' && semanticScore < iterateSemanticFloor;
 
   // SALVAGE FLOOR. Regenerating is a GAMBLE: the whole image is discarded for a
   // fresh roll, so nothing that was already right carries over. Measured on
@@ -870,10 +935,10 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
   if (visualScore < iterateVisualFloor && !worthSalvaging) {
     return { method: 'iterate', reason: `image visually broken (visual=${visualScore} < ${iterateVisualFloor}, finalScore=${pageFinalScore})` };
   }
-  if (semanticScore < iterateSemanticFloor && !worthSalvaging) {
+  if (semanticTrips && !worthSalvaging) {
     return { method: 'iterate', reason: `wrong scene (semantic=${semanticScore} < ${iterateSemanticFloor}, finalScore=${pageFinalScore})` };
   }
-  if ((visualScore < iterateVisualFloor || semanticScore < iterateSemanticFloor) && worthSalvaging) {
+  if ((visualScore < iterateVisualFloor || semanticTrips) && worthSalvaging) {
     log.info(`🛟 [REPAIR-DECIDE] page ${pageNumber}: numeric gate tripped (visual=${visualScore}, semantic=${semanticScore}) but finalScore=${pageFinalScore} >= ${ITERATE_SALVAGE_FLOOR} — repairing locally instead of regenerating`);
   }
   // Severity-based catastrophic gate: a CATASTROPHIC finding (large wrong
@@ -881,11 +946,10 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
   // the numeric subscores stay above the floors — the eval rubric reserves
   // this severity for defects only a full regen can fix. Same case-insensitive
   // match the round loop's unresolved-issue surfacing uses (images.js).
-  const severityIssues = [
-    ...(evaluator.fixableIssues || []),
-    ...semanticFindings(evaluator.semanticResult),
-    ...(Array.isArray(evaluator.consolidatedPlan?.deduped_issues) ? evaluator.consolidatedPlan.deduped_issues : []),
-  ];
+  // The pools the score charged (scoredFindingPools) — never the raw lists
+  // alongside a consolidated plan, which would route on findings the score and
+  // the consolidator's guards had already set aside (2026-09-26).
+  const severityIssues = scoredFindingPools(evaluator).flatMap(([, list]) => list);
   const catastrophicIssue = severityIssues.find(i => /catastrophic/i.test(String(i?.severity || '')));
   if (catastrophicIssue) {
     const desc = require('./scoring').findingText(catastrophicIssue).slice(0, 80);
@@ -963,34 +1027,34 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
     reason: `${what} — char-fix already failed on this version (no usable image), flipping to iterate`,
   });
 
+  // LETTERING GOES FIRST (2026-09-26). A CRITICAL `rendered_text` — a caption,
+  // a misspelled or misplaced word (letteringCheck.js) — takes the round ahead
+  // of a character CRITICAL: the inpaint paints the text out this round and
+  // the figure repair runs next round, on that version. One method per page
+  // per round is the round loop's contract (one result per page per batch), so
+  // the two are sequenced across rounds, not chained inside one; the text goes
+  // first because its repair is local and its success is re-checked on the
+  // new bytes (scoring.dominatesByCritical keeps the cleared version even if
+  // its re-evaluation files new findings), while a char-fix that fails
+  // produces no version and would hold the text back a round per failure.
+  // Staging job_1790446348343_z3fw660ie back cover: an entity CRITICAL routed
+  // every round to char-fix and the caption shipped. Declared type + severity
+  // only, the same shape as gate 2b's precedence.
+  const letteringFirst = pageNumber !== 0 ? severityIssues.find(i =>
+    String(i?.type || '').toLowerCase() === 'rendered_text'
+    && /^critical$/i.test(String(i?.severity || ''))) : null;
+  let deferredFigure = null;
+
   if (pageNumber !== 0 && entityReport?.characters) {
-    let worst = null; // {severity, charName, issue}
-    // The page's entity findings through the report's ONE reader
-    // (scoring.entityFindingsForPage) — a finding on several pages reaches
-    // each; one voided by the page's declared wardrobe state reaches none.
-    const { entityFindingsForPage } = require('./scoring');
-    for (const { name: charName, source, issue, offByDesign } of entityFindingsForPage(pageNumber, entityReport)) {
-      if (source !== 'character' || offByDesign) continue;
-      const sev = String(issue.severity || '').toLowerCase();
-      if (sev !== 'critical' || isCropArtifact(issue, { entity: true })) continue;
-      // The finding's TYPE decides face vs full figure (resolveRepairAxes). A
-      // type the evaluator vocabulary does not know decides nothing, and the
-      // judge's sentence is never read in its place — that finding cannot be
-      // routed, so it is declined here, loudly, and the next one is tried.
-      // An entity finding routes only when its type is on the entity judge's
-      // closed list (evalBuckets.ENTITY_CHECK_TYPES, owner 2026-09-24) — an
-      // off-list type was logged as a parse error and is never repaired.
-      const { repairTargetForTypes } = require('./faceRepair');
-      const { isEntityCheckType } = require('./evalBuckets');
-      if (!isEntityCheckType(issue.subType || issue.type) || !repairTargetForTypes([issue.subType || issue.type])) {
-        log.error(`🚫 [REPAIR-DECIDE] page ${pageNumber}: entity ${sev} on ${charName} has type "${issue.subType || issue.type || ''}", which is off the entity closed list or decides neither a face nor a full-figure repair — no char-fix for it`);
-        continue;
-      }
-      if (!worst) worst = { severity: sev, charName, issue };
-    }
+    let worst = charFixEntityFindings(pageNumber, entityReport)[0] || null; // {severity, charName, issue}
     const entityGap = worst && charFixImpossible(worst.charName);
     if (entityGap) {
       log.warn(`🚫 [REPAIR-DECIDE] page ${pageNumber}: entity ${worst.severity} on ${worst.charName} cannot take a char fix — ${entityGap.message}`);
+      worst = null;
+    }
+    if (worst && letteringFirst) {
+      deferredFigure = `entity ${worst.severity} on ${worst.charName}`;
+      log.info(`🔠 [REPAIR-DECIDE] page ${pageNumber}: ${deferredFigure} deferred — a CRITICAL rendered_text takes this round`);
       worst = null;
     }
     if (worst && charFixAlreadyFailed) {
@@ -1025,13 +1089,34 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
   // fields: `character` (the missing name) and `figure` (the evaluator's figure
   // id, whose box the repair paints). A name with no roster entry has nothing to
   // paint from and is left to gate 2c.
+  //
+  // WHICH LIST, WHICH FIELD (2026-09-26). The finding must be one the score
+  // charged (severityIssues = scoredFindingPools), but the consolidated entry
+  // carries no `figure` — only the evaluator's own finding does. So the figure
+  // id is joined back from the raw finding of the same type and character:
+  // structured fields only, never prose.
   if (pageNumber !== 0) {
-    const identity = severityIssues.find(i => String(i?.type || '').toLowerCase() === 'character_identity'
-      && /^(critical|catastrophic)$/i.test(String(i?.severity || ''))
-      && Number.isFinite(Number(i?.figure)) && i?.figure !== null
-      && String(i?.character || '').trim()
-      && !charFixImpossible(String(i.character).trim()));
-    if (identity) {
+    const hasFigure = (i) => i?.figure !== null && i?.figure !== undefined && Number.isFinite(Number(i.figure));
+    const rawIdentity = [...(Array.isArray(evaluator.fixableIssues) ? evaluator.fixableIssues : []), ...semanticFindings(evaluator.semanticResult)]
+      .filter(i => String(i?.type || '').toLowerCase() === 'character_identity' && hasFigure(i));
+    const figureFor = (i) => {
+      if (hasFigure(i)) return Number(i.figure);
+      const who = canonName(String(i?.character || ''));
+      const raw = rawIdentity.find(r => canonName(String(r?.character || '')) === who);
+      return raw ? Number(raw.figure) : null;
+    };
+    const identity = severityIssues
+      .filter(i => String(i?.type || '').toLowerCase() === 'character_identity'
+        && /^(critical|catastrophic)$/i.test(String(i?.severity || ''))
+        && String(i?.character || '').trim()
+        && !charFixImpossible(String(i.character).trim()))
+      .map(i => ({ ...i, figure: figureFor(i) }))
+      .find(i => i.figure !== null);
+    if (identity && letteringFirst) {
+      deferredFigure = deferredFigure || `figure ${identity.figure} is ${String(identity.character).trim()} drawn wrong`;
+      log.info(`🔠 [REPAIR-DECIDE] page ${pageNumber}: identity char-fix on figure ${identity.figure} deferred — a CRITICAL rendered_text takes this round`);
+    }
+    if (identity && !letteringFirst) {
       const charName = String(identity.character).trim();
       if (charFixAlreadyFailed) return flippedFromFailedCharFix(`figure ${identity.figure} is ${charName} drawn wrong`);
       const { resolveRepairAxes } = require('./faceRepair');
@@ -1186,20 +1271,71 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
     }
   }
 
+  // 2d. A CREATURE DRAWN FAR BELOW ITS SIZE GOES TO ITERATE (owner, 2026-09-26).
+  //
+  // Staging job_1790373080139_vnx5l8iy7 p16: the grown dragon was drawn a
+  // fraction of its twice-an-adult height; the finding came typed `scale`, the
+  // consolidator dropped it `requires_char_fix_not_inpaint`, and no method ever
+  // took it — char-fix repaints a roster figure from its avatar, and a Visual
+  // Bible creature has none. `creature_scale` (D-34) now names the defect and
+  // routes it here, like the orphan CRITICAL above: iterate rewrites the brief
+  // and re-renders the page with the creature's page-scale note in its
+  // REQUIRED OBJECTS line.
+  //
+  // One narrowing condition: a CRITICAL inpaint can execute (or an untyped
+  // one, counted executable as in 2c) takes this round, and the redo waits for
+  // the next — the same precedence gate 2b gives clothing. A MAJOR or lesser
+  // inpaintable finding does not: the redo re-renders the whole page anyway.
+  // Declared `type` / `severity` fields only.
+  if (pageNumber !== 0) {
+    const creature = severityIssues.find(i =>
+      ITERATE_ROUTED_TYPES.has(String(i?.type || '').toLowerCase())
+      && /^(major|critical)$/i.test(String(i?.severity || '')));
+    if (creature) {
+      const outranking = severityIssues.find((i) => {
+        if (!/^critical$/i.test(String(i?.severity || ''))) return false;
+        const type = String(i?.type || '').toLowerCase();
+        return !type || !NOT_INPAINTABLE_TYPES.has(type);
+      });
+      const what = `${String(creature.type).toLowerCase()} ${String(creature.severity).toLowerCase()}${creature.character ? ` on ${String(creature.character).trim()}` : ''}`;
+      if (outranking) {
+        log.info(`🪃 [REPAIR-DECIDE] page ${pageNumber}: ${what} waits — a CRITICAL ${outranking.type || 'finding'} inpaint can execute takes this round`);
+      } else {
+        const desc = require('./scoring').findingText(creature).slice(0, 80);
+        return {
+          method: 'iterate',
+          reason: `${what} — a creature drawn below its size is a page redo (no reference to char-fix from, not inpaintable): ${desc}`,
+        };
+      }
+    }
+  }
+
   // 3. Inpaint when there's something inpaintable.
   // `deferredClothing` is set when gate 2b stood down this round (severity
   // precedence, above); it is carried into the reason so the round log says
   // WHY the page took the inpaint route.
-  const precedenceNote = deferredClothing
-    ? `CRITICAL ${deferredClothing.type || 'finding'} outranks clothing MAJOR (clothing figure redo deferred to next round)`
-    : null;
+  const precedenceNote = [
+    deferredFigure ? `CRITICAL rendered_text goes first (${deferredFigure} deferred to next round)` : null,
+    deferredClothing ? `CRITICAL ${deferredClothing.type || 'finding'} outranks clothing MAJOR (clothing figure redo deferred to next round)` : null,
+  ].filter(Boolean).join('; ') || null;
   const withPrecedence = (d) => (precedenceNote && d && d.method === 'inpaint'
     ? { ...d, reason: `${precedenceNote}; ${d.reason || ''}`.trim() }
     : d);
   if (typeof options.chooseRepairStrategy === 'function') {
     return withPrecedence(mapStrategyToMethod(options.chooseRepairStrategy(evaluator)));
   }
-  // Inline fallback when chooseRepairStrategy isn't injected (tests).
+  // No strategy injected — the production path (repairPipeline passes none).
+  // A CONSOLIDATED page is inpainted from its plan, so it has something to
+  // inpaint only when the scored list does: an empty `deduped_issues` next to
+  // raw findings the consolidator's guards set aside used to route here and
+  // fail with "no instruction to send" (2026-09-26, job_1790446348343 p9).
+  const deduped = evaluator.consolidatedPlan?.deduped_issues;
+  if (Array.isArray(deduped)) {
+    if (deduped.length > 0) {
+      return withPrecedence({ method: 'inpaint', reason: `${deduped.length} consolidated` });
+    }
+    return { method: 'skip', reason: 'no repair needed — the consolidated list the score charged is empty' };
+  }
   const fixableCount = evaluator.fixableIssues?.length || 0;
   const enrichedCount = evaluator.enrichedFixTargets?.length || 0;
   const fixTargetCount = evaluator.fixTargets?.length || 0;
@@ -1232,9 +1368,11 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
  * Pure function, no I/O: `attempts` are what the round tried, `beforeScores`
  * the finalScore findBadPages ranked on, `afterScores` the finalScore stamped
  * on the new version. A page with either score missing is `unknown`, never
- * silently counted as unchanged.
+ * silently counted as unchanged. `criticalCleared[page]` true marks a repair
+ * that dominates the version it started from (scoring.js dominatesByCritical):
+ * it is `improved` whatever its score delta.
  *
- * @param {{round:number, attempts:Array<{pageNumber:number, method:string|null, ok:boolean, error?:string|null}>, beforeScores:Object<number,number|null>, afterScores:Object<number,number|null>}} args
+ * @param {{round:number, attempts:Array<{pageNumber:number, method:string|null, ok:boolean, error?:string|null}>, beforeScores:Object<number,number|null>, afterScores:Object<number,number|null>, criticalCleared?:Object<number,boolean>}} args
  */
 /**
  * One repair result → one attempt row for summarizeRepairRound.
@@ -1252,6 +1390,26 @@ function repairAttemptFromResult(r) {
     ok: !!r?.imageData,
     error: r?.imageData ? null : (r?.error || 'no result'),
   };
+}
+
+/**
+ * Why a character repair returned no usable image, as the failure's `error`.
+ *
+ * A no-image return from the repair spine (faceRepair.repairCharacterFace) is a
+ * GATE decision: it carries `rejectedReason` (blend_gate, style_drift,
+ * repaired_figure_blurred, repair_unnatural, …) and `gateMessage`. The pipeline
+ * replaced both with the fixed "char-fix produced no usable image", so the log,
+ * retryHistory, failedRepairs and repairRounds could never say which gate
+ * refused (2026-09-26). The manual routes and the Lab stage always carried it.
+ * @param {object|null} r - the repairCharacterMismatch result.
+ * @returns {string}
+ */
+function describeCharFixFailure(r) {
+  const attempts = r?.attempts ? ` after ${r.attempts} attempt(s)` : '';
+  const why = r?.imageData
+    ? `image too small (${r.imageData.length} bytes)`
+    : [r?.rejectedReason, r?.gateMessage || r?.error].filter(Boolean).join(' — ') || 'no reason reported';
+  return `char-fix produced no usable image${attempts}: ${why}`;
 }
 
 /**
@@ -1274,7 +1432,7 @@ function baseRepairMethod(method) {
   return m.replace(/-round-\d+$/i, '') || 'unknown';
 }
 
-function summarizeRepairRound({ round, attempts = [], beforeScores = {}, afterScores = {} }) {
+function summarizeRepairRound({ round, attempts = [], beforeScores = {}, afterScores = {}, criticalCleared = {} }) {
   const byMethod = {};
   const pages = [];
 
@@ -1305,12 +1463,17 @@ function summarizeRepairRound({ round, attempts = [], beforeScores = {}, afterSc
       m.unknown++;
     } else {
       delta = Math.round((after - before) * 10) / 10;
-      outcome = delta > 0 ? 'improved' : (delta < 0 ? 'regressed' : 'unchanged');
+      // Critical-gone wins (scoring.js dominatesByCritical): a repair that
+      // cleared a CRITICAL the page carried in has improved it, whatever the
+      // score says — the picker ships it, so the record must not call it a
+      // regression.
+      outcome = criticalCleared[a.pageNumber] ? 'improved'
+        : delta > 0 ? 'improved' : (delta < 0 ? 'regressed' : 'unchanged');
       m[outcome]++;
       m.totalDelta += delta;
       m.scoredPages++;
     }
-    pages.push({ page: a.pageNumber, method: rawMethod, before: before ?? null, after: after ?? null, delta, outcome });
+    pages.push({ page: a.pageNumber, method: rawMethod, before: before ?? null, after: after ?? null, delta, outcome, ...(criticalCleared[a.pageNumber] ? { criticalCleared: true } : {}) });
   }
 
   for (const m of Object.values(byMethod)) {
@@ -1357,7 +1520,7 @@ function mapStrategyToMethod(s) {
 // reported in full, only its ROUTE is constrained.
 const NOT_INPAINTABLE_TYPES = new Set([
   // identity / face
-  'character_identity', 'face_mismatch', 'face_drift', 'age_shift', 'skin_tone',
+  'character_identity', 'face_mismatch', 'identity_swap', 'face_drift', 'age_shift', 'skin_tone',
   // face_destroyed: inpaint repaints the whole figure and the identity drifts;
   // a featureless face must go to character repair, anchored to the avatar.
   'face_destroyed',
@@ -1368,8 +1531,16 @@ const NOT_INPAINTABLE_TYPES = new Set([
   'body_build',
   // clothing (garment_colour has its own mechanical recolour path)
   'clothing', 'clothing_inconsistent', 'clothing_detail', 'garment_colour', 'garment_color',
+  // garment_facing (D-05e): a garment redrawn from its other side is a
+  // wardrobe repaint, anchored to the reference like every garment finding.
+  'garment_facing',
   // body form
   'scale',
+  // A creature drawn far below its given size (D-34). Not a character repair:
+  // a Visual Bible creature has no avatar or photo to repaint it from. Not an
+  // inpaint: a local edit cannot re-stage a creature at several times its drawn
+  // size. The page redo owns it — see ITERATE_ROUTED_TYPES and gate 2d.
+  'creature_scale',
   // extra_character is NOT here (owner, 2026-09-24, superseding 2026-09-13).
   // Under the three-case presence model an `extra_character` means every cast
   // member is already matched and this figure is surplus, so removing it cannot
@@ -1380,6 +1551,16 @@ const NOT_INPAINTABLE_TYPES = new Set([
   // cutout_artifact: see CROP_ARTIFACT_TYPES — the page has no such defect.
   'cutout_artifact',
 ]);
+
+/**
+ * The subset of NOT_INPAINTABLE_TYPES whose route is the PAGE REDO, not
+ * character repair (2026-09-26). decideRepairMethod gate 2d sends them to
+ * iterate, and a plan that carries one drops it with reason
+ * `requires_iterate_not_inpaint` rather than `requires_char_fix_not_inpaint` —
+ * the p16 drop on staging job_1790373080139_vnx5l8iy7 told the log a
+ * character repair would handle a dragon, and nothing ever did.
+ */
+const ITERATE_ROUTED_TYPES = new Set(['creature_scale']);
 
 /**
  * Types that describe OUR entity-grid crop, not the page: a hard white gap or a
@@ -1714,15 +1895,20 @@ function findVbFigure(visualBible, lowerName) {
   return null;
 }
 
-// Kind + the entry's own look fields. No size: `scaleClass` is never read, and
-// the stored `description` (which may still carry a size phrase on older
+// Kind + the entry's own look fields. No size: `scaleClass` is read only for
+// the creature's MATURITY (a grown creature is "grown", 2026-09-26 — the
+// identity the Visual Bible entry states, so a repair can tell the grown
+// creature from its young when both share a look), never rendered as a size.
+// The stored `description` (which may still carry a size phrase on older
 // bibles) is used only for its FIRST clause, the kind.
 function describeVbFigure(entry, pool) {
-  const { clauseRef } = require('./visualBible');
+  const { clauseRef, isGrownCreatureScaleClass } = require('./visualBible');
   const str = (v) => (typeof v === 'string' ? v.trim().replace(/[.]\s*$/, '') : '');
   const label = str(entry.label);
   if (pool === 'animals') {
-    const kind = label || str(entry.species) || clauseRef(entry.description, { minWords: 1 }) || 'animal';
+    const bare = label || str(entry.species) || clauseRef(entry.description, { minWords: 1 }) || 'animal';
+    const kind = isGrownCreatureScaleClass(entry.scaleClass) && !/\b(grown|adult|baby|young|juvenile|hatchling)\b/i.test(bare)
+      ? `grown ${bare}` : bare;
     const coloring = str(entry.coloring);
     const features = str(entry.features).split(',').map(s => s.trim()).filter(Boolean).slice(0, 2);
     return `the ${kind}${coloring ? ` with ${coloring}` : ''}${features.length ? ` (${features.join(', ')})` : ''}`;
@@ -1818,4 +2004,4 @@ function nameRepairText(text, nameMap, { keep = null, vidByName, ownVisualId = n
 
 module.exports = {
   describeFigureForRepair, buildRepairNameMap, buildPageRepairNameMap, nameRepairText, resolveRepairIds,
-  repairAttemptFromResult, detectionForRetryEntry, findBadPages, applyRoundCap, LAST_ROUND_CRITICAL_MAX, planBookAuditRound, admitPagesFromAudit, attributeReaderFindings, summarizeRepairRound, baseRepairMethod, AUDIT_ADMIT_MAX, AUDIT_ADMIT_SEVERITIES, collectShippedDefective, collectSurvivingCriticals, resolveDeclaredCast, inheritSceneContract, resolveVersionCompressedScene, resolveVersionPrompt, resolveOwnRenderPrompt, SAFE_REPAIRABLE_TYPES, typesAreInpaintable, semanticFindings, findSafeRepairableFinding, selectCharRepairTasks, decideRepairMethod, NOT_INPAINTABLE_TYPES, CROP_ARTIFACT_TYPES, isCropArtifact, hasCriticalSeverityFinding, collectCriticalFindings, buildPreserveClause, PRESERVE_MAX };
+  repairAttemptFromResult, describeCharFixFailure, detectionForRetryEntry, findBadPages, applyRoundCap, LAST_ROUND_CRITICAL_MAX, planBookAuditRound, admitPagesFromAudit, attributeReaderFindings, summarizeRepairRound, baseRepairMethod, AUDIT_ADMIT_MAX, AUDIT_ADMIT_SEVERITIES, collectShippedDefective, collectSurvivingCriticals, resolveDeclaredCast, inheritSceneContract, resolveVersionCompressedScene, resolveVersionPrompt, resolveOwnRenderPrompt, SAFE_REPAIRABLE_TYPES, typesAreInpaintable, semanticFindings, findSafeRepairableFinding, selectCharRepairTasks, decideRepairMethod, charFixEntityFindings, NOT_INPAINTABLE_TYPES, ITERATE_ROUTED_TYPES, CROP_ARTIFACT_TYPES, isCropArtifact, hasCriticalSeverityFinding, collectCriticalFindings, buildPreserveClause, PRESERVE_MAX, scoredFindingPools };

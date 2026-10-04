@@ -201,11 +201,14 @@ describe('the consolidator is told the required lettering', () => {
 });
 
 describe('repair keeps a baked title', () => {
-  const read = (rel: string) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8');
+  const read = (rel: string) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8').replace(/\r\n/g, '\n');
 
   it('the production inpaint dispatch hands inpaintPage the cover text contract', () => {
+    // The call is built by buildInpaintCall since 2026-09-27 (shared with the Test Lab).
     const src = read('../../server/lib/repairPipeline.js');
-    const call = src.slice(src.indexOf('images().inpaintPage(inputImage'), src.indexOf('images().inpaintPage(inputImage') + 3000);
+    expect(src).toContain('images().inpaintPage(inputImage, inpaintEval, inpaintOptions)');
+    const at = src.indexOf('function buildInpaintCall(');
+    const call = src.slice(at, src.indexOf('\n}\n', at));
     expect(call).toMatch(/expectedText:/);
     expect(call).toMatch(/textMode:/);
   });

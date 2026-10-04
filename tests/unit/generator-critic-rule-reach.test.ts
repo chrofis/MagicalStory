@@ -116,8 +116,11 @@ describe('generator-side counterparts of judge rules reach the built image promp
     }));
     for (const built of [page, cover]) {
       expect(built.length, 'the fixture must be over the cap or it proves nothing').toBeGreaterThan(CAP);
-      const sent = String(await shrinkPromptForModel(built, CAP, 'TEST reach', null));
-      expect(sent.length).toBeLessThanOrEqual(CAP);
+      // A cap the ranked drops can reach (the scene itself is never cut since
+      // 2026-09-26; a prompt the drops cannot fit fails loudly instead).
+      const cap = built.length - 400;
+      const sent = String(await shrinkPromptForModel(built, cap, 'TEST reach', null));
+      expect(sent.length).toBeLessThanOrEqual(cap);
       expect(sent).toContain(NO_CHARACTER_MARKING_RULE);
       expect(sent).toContain(HANDS_HOLD_ONLY_NAMED_RULE);
     }

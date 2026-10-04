@@ -195,14 +195,22 @@ router.post('/cleanup-orphaned-jobs', authenticateToken, requireAdmin, async (re
     console.log('🔍 Checking for orphaned story_jobs...');
 
     const pool = getPool();
+    // "Orphaned" = no stories row with the job's id. A stories row is only written at the END
+    // of a run, so a running/pending job always looks orphaned: the filter below limits the
+    // set to TERMINAL jobs that hold no reservation and are old enough that nothing can still
+    // be writing to them (review M1). Preview and DELETE use the same predicate and the same
+    // id list, so the delete removes exactly what the preview showed.
+    const ORPHAN_PREDICATE = `
+      sj.status IN ('failed', 'cancelled')
+      AND COALESCE(sj.credits_reserved, 0) = 0
+      AND sj.updated_at < NOW() - INTERVAL '24 hours'
+      AND NOT EXISTS (SELECT 1 FROM stories s WHERE s.id = sj.id)`;
     const orphanedJobsResult = await pool.query(`
       SELECT sj.id, sj.user_id, sj.status, sj.created_at, sj.updated_at,
              sj.progress, sj.progress_message, u.username
       FROM story_jobs sj
       LEFT JOIN users u ON sj.user_id = u.id
-      WHERE NOT EXISTS (
-        SELECT 1 FROM stories s WHERE s.id = sj.id
-      )
+      WHERE ${ORPHAN_PREDICATE}
       ORDER BY sj.created_at DESC
       LIMIT 100
     `);
@@ -214,12 +222,10 @@ router.post('/cleanup-orphaned-jobs', authenticateToken, requireAdmin, async (re
     if (action === 'delete') {
       console.log('🗑️  Deleting orphaned story_jobs...');
 
-      const deleteResult = await pool.query(`
-        DELETE FROM story_jobs
-        WHERE NOT EXISTS (
-          SELECT 1 FROM stories s WHERE s.id = story_jobs.id
-        )
-      `);
+      const deleteResult = await pool.query(
+        `DELETE FROM story_jobs sj WHERE sj.id = ANY($1::text[]) AND ${ORPHAN_PREDICATE}`,
+        [orphanedJobs.map(j => j.id)]
+      );
 
       console.log(`✓ Deleted ${deleteResult.rowCount} orphaned story_jobs`);
 

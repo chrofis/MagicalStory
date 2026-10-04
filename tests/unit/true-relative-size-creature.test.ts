@@ -8,7 +8,7 @@ const input = () => ({
   pages: 4, season: 'autumn', language: 'de-CH', languageLevel: '1st-grade',
   storyDetails: 'x', characters: chars, mainCharacters: ['a'],
 });
-const allPages = () => pb.buildSceneExpansionAllPrompt(
+const allPages = () => pb.buildSceneBriefsAllPrompt(
   input(), [{ pageNumber: 1, planLine: 'medium — Levin — waits — nothing' }],
   { maxCharactersPerScene: 6, finalArc: '1.' });
 const perPage = () => String(pb.buildSceneExpansionPrompt(
@@ -47,7 +47,9 @@ describe('8f no longer demands the thing the creature bands forbid', () => {
     // (A6) — the creature case was being stated twice.
     expect(r).toContain('a CREATURE by the creature rule above');
     expect(r).toContain('in metres or against a familiar room for a young reader');
-    expect(r).toContain('a ratio against a child is what makes a creature loom over one');
+    // 2026-09-26: the page prompt now states every element's size against the
+    // figures in frame, computed from its band, and that computed size wins.
+    expect(r).toContain('that computed size wins');
     expect((r.match(/creature rule/g) || []).length, 'the creature case is stated once').toBe(1);
   });
 
@@ -77,7 +79,7 @@ describe('one constant, and it reaches both BUILT Art Director prompts', () => {
   beforeAll(async () => { await loadPromptTemplates(); });
 
   it('both templates cite the placeholder rather than spelling the rule', () => {
-    for (const k of ['sceneExpansionAll', 'sceneExpansion']) {
+    for (const k of ['sceneBriefsAll', 'sceneExpansion']) {
       const t = String(PROMPT_TEMPLATES[k] || '');
       expect(t, k).toContain('{TRUE_RELATIVE_SIZE}');
       expect(t, `${k} still hand-copies the rule`).not.toContain('A vessel, building, vehicle or creature holds');

@@ -466,6 +466,25 @@ curl -sX POST https://staging.magicalstory.ch/api/admin/jobs/<newJobId>/judge-te
 
 ---
 
+## Text chain — three auditors, one repair (textRefine.js)
+
+`refineStoryText` (full stories only — trials skip it, decisions.md 2026-08-15) runs three
+auditors in parallel on the writer's text, merges their `FAULT[<CAT>]: p<N> — …` lines
+(`mergeAuditFindings`, plus the $0 word-budget counter) and hands the list to ONE repair pass
+that rewrites only the pages named, then the diff pass and the lector.
+
+| Auditor | What | On failure |
+|---|---|---|
+| arc-informed (`story-text-audit.txt`) | arc + plan + page text + picture spec, 14 questions | missing from the merge |
+| blind (`story-text-audit-blind.txt`) | page text only, 7 questions incl. STYLE vs `STYLE_RULEBOOK` | missing from the merge |
+| jev (`jevAudit.runJevTextSource`, since 2026-09-27) | per page: AI-slop types (`proseSlop.js`), vanish / animal / motive logic, plan-line contradiction; $0 ß, «», "suddenly" | logged ERROR, whole source missing (string checks too) |
+
+The slop types are ONE source for writer and critic: `proseSlop.SLOP_TYPES` holds each rule
+(→ `SLOP_RULES` → `STYLE_RULEBOOK`) and its Jev question. The Jev cast check runs in the ARC
+machine instead: `arcRepairFindingsWithCastCheck` names each character with no act of their own and,
+only when the re-tell gate opens on its own findings, hands them to the re-telling as feedback. Replay the audit+merge stage over stored stories with
+`node scripts/analysis/replay-jev-text-merge.js --env=staging <storyId…>`.
+
 ## Image Model Comparison (Grok vs Gemini)
 
 Also tracked in memory `project_image_model_tests.md` — check there before recommending a vendor.

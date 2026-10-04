@@ -109,9 +109,11 @@ describe('Pass-2 style eval — the outfit axis is gone', () => {
     expect(TEMPLATE).not.toMatch(/COSTUME PRESERVED/);
   });
 
+  // garmentScore (2026-10-04) compares garment HUES with the pass-1 sheet, which
+  // the restyler is told to keep — never garments against a clothing spec.
   it('the axes it does judge are still the style-transfer ones', () => {
     expect(declaredAxes().sort()).toEqual([
-      'ageScore', 'backgroundScore', 'bodyFaceScore', 'cleanScore', 'identityScore',
+      'ageScore', 'backgroundScore', 'bodyFaceScore', 'cleanScore', 'garmentScore', 'identityScore',
       'layoutScore', 'soloScore', 'styleScore',
     ]);
   });
@@ -122,7 +124,7 @@ describe('Pass-2 style eval — the outfit axis is gone', () => {
     expect(fn).not.toMatch(/CLOTHING_DESCRIPTION/);
     // …and nothing forwards one into the pass-2 branch of the single-source evaluator.
     expect(extractFunction(SRC, 'evaluateAvatarSheet')).toMatch(
-      /evaluateStyledSheetWithGemini\([^)]*\{ model: model \|\| undefined, promptOverride: promptOverrides\?\.style \|\| null \}/s
+      /evaluateStyledSheetWithGemini\([^)]*\{ model: model \|\| undefined, promptOverride: promptOverrides\?\.style \|\| null, imageLabels \}/s
     );
   });
 

@@ -31,35 +31,31 @@ const variantLandmark = (over: Record<string, any> = {}) => ({
   ...over,
 });
 
+// Since 2026-09-26 the photo is the one the plate's author CITED
+// (landmarkPhotoCitation); decideLandmarkPhotoSource only checks the citation
+// against the landmark's servable photos.
+const cite = (value: any) => ({ value, source: 'location', vantageId: null, raw: value });
+
 describe('decideLandmarkPhotoSource — variant landmarks', () => {
   it('REGRESSION: decides on variants even though photoFetchStatus is pending_lazy', () => {
-    const d = decideLandmarkPhotoSource(variantLandmark(), { sceneView: null });
-    expect(d).toBeTruthy();
-    expect(d.mode).toBe('variant');
-    expect(d.variantNumber).toBe(1);
+    const d = decideLandmarkPhotoSource(variantLandmark(), { citation: cite(1) });
+    expect(d).toEqual({ mode: 'variant', variantNumber: 1 });
   });
 
   it('still decides on variants when the status is explicitly not success', () => {
-    const d = decideLandmarkPhotoSource(variantLandmark({ photoFetchStatus: 'failed' }), {});
-    expect(d?.mode).toBe('variant');
-  });
-
-  it('picks an interior variant for an interior view', () => {
-    const d = decideLandmarkPhotoSource(variantLandmark(), { sceneView: 'interior' });
+    const d = decideLandmarkPhotoSource(variantLandmark({ photoFetchStatus: 'failed' }), { citation: cite(2) });
     expect(d).toEqual({ mode: 'variant', variantNumber: 2 });
   });
 
-  it('attaches nothing for a view the index has no photo for', () => {
-    // 'underwater' means "no photo matches this vantage" — falling back to an
-    // exterior shot is how a surface photo once anchored underwater scenes.
-    expect(decideLandmarkPhotoSource(variantLandmark(), { sceneView: 'underwater' })).toBeNull();
+  it('a cited "none" attaches nothing, by design', () => {
+    expect(decideLandmarkPhotoSource(variantLandmark(), { citation: cite('none') })).toEqual({ mode: 'none' });
   });
 
-  it('attaches nothing when every variant is marked bad', () => {
+  it('a photo marked bad is not servable, so citing it is an error', () => {
     const loc = variantLandmark({
       photoVariants: [{ url: 'https://x/1.jpg', kind: 'bad', variantNumber: 1 }],
     });
-    expect(decideLandmarkPhotoSource(loc, {})).toBeNull();
+    expect(decideLandmarkPhotoSource(loc, { citation: cite(1) }).mode).toBe('error');
   });
 });
 
@@ -73,24 +69,24 @@ describe('decideLandmarkPhotoSource — legacy single-photo landmarks', () => {
     photoFetchStatus: status,
   });
 
-  it('uses the reference photo once the prefetch has stamped success', () => {
-    expect(decideLandmarkPhotoSource(legacy('success'), {})).toEqual({ mode: 'legacy' });
+  it('photo 1 is the reference photo once the prefetch has stamped success', () => {
+    expect(decideLandmarkPhotoSource(legacy('success'), { citation: cite(1) })).toEqual({ mode: 'legacy' });
   });
 
-  it('attaches nothing while the prefetch has not completed', () => {
+  it('is an error while the prefetch has not completed', () => {
     // For THIS shape the status check is correct — the prefetch does stamp it.
-    expect(decideLandmarkPhotoSource(legacy('pending'), {})).toBeNull();
+    expect(decideLandmarkPhotoSource(legacy('pending'), { citation: cite(1) }).mode).toBe('error');
   });
 
-  it('returns null for a location with no photo at all', () => {
+  it('is an error for a location with no photo at all', () => {
     expect(decideLandmarkPhotoSource({
       id: 'LOC010', name: 'Nowhere', isRealLandmark: true, photoVariants: [],
-    }, {})).toBeNull();
+    }, { citation: cite(1) }).mode).toBe('error');
   });
 
-  it('returns null rather than throwing on a missing location', () => {
-    expect(decideLandmarkPhotoSource(null, {})).toBeNull();
-    expect(decideLandmarkPhotoSource(undefined)).toBeNull();
+  it('is an error rather than a throw on a missing location', () => {
+    expect(decideLandmarkPhotoSource(null, {}).mode).toBe('error');
+    expect(decideLandmarkPhotoSource(undefined).mode).toBe('error');
   });
 });
 
@@ -112,7 +108,7 @@ describe('trialPlateLandmarkPromisesByPage — the plate gets the landmark', () 
   const lateLoadingBible = () => {
     const loc: any = {
       id: 'LOC002', name: 'A Church', isRealLandmark: true, pages: [6],
-      isSwissPreIndexed: true, photoFetchStatus: 'pending_lazy',
+      isSwissPreIndexed: true, photoFetchStatus: 'pending_lazy', landmarkPhoto: 1,
     };
     const vb: any = { locations: [loc] };
     const descriptionsPromise = Promise.resolve().then(() => {

@@ -308,6 +308,7 @@ function provenanceOf(d) {
     writer: d.outlineModelId || null,
     beatsReview: d.beatsReviewReport?.model || null,
     sceneReview: d.sceneReviewReport?.model || null,
+    briefReask: d.briefCheckReport?.reask?.model || null,
     textRefine: d.textRefineReport?.model || null,
   };
 }

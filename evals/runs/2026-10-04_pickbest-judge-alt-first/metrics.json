@@ -1,0 +1,78 @@
+{
+ "order": "alt-first",
+ "clearCasesAltChosen": "3/5",
+ "tossUpAltChosen": "4/5",
+ "errors": 0,
+ "cases": [
+  {
+   "case": 1,
+   "winner": "alt",
+   "confidence": 1,
+   "owner": "alt-clearly-better",
+   "error": null
+  },
+  {
+   "case": 2,
+   "winner": "alt",
+   "confidence": 0.8,
+   "owner": "toss-up",
+   "error": null
+  },
+  {
+   "case": 3,
+   "winner": "shipped",
+   "confidence": 1,
+   "owner": "alt-clearly-better",
+   "error": null
+  },
+  {
+   "case": 4,
+   "winner": "alt",
+   "confidence": 0.9,
+   "owner": "toss-up",
+   "error": null
+  },
+  {
+   "case": 5,
+   "winner": "alt",
+   "confidence": 1,
+   "owner": "alt-clearly-better",
+   "error": null
+  },
+  {
+   "case": 6,
+   "winner": "shipped",
+   "confidence": 0.8,
+   "owner": "toss-up",
+   "error": null
+  },
+  {
+   "case": 7,
+   "winner": "shipped",
+   "confidence": 1,
+   "owner": "alt-clearly-better",
+   "error": null
+  },
+  {
+   "case": 8,
+   "winner": "alt",
+   "confidence": 1,
+   "owner": "toss-up",
+   "error": null
+  },
+  {
+   "case": 9,
+   "winner": "alt",
+   "confidence": 0.9,
+   "owner": "toss-up",
+   "error": null
+  },
+  {
+   "case": 10,
+   "winner": "alt",
+   "confidence": 0.9,
+   "owner": "alt-clearly-better",
+   "error": null
+  }
+ ]
+}

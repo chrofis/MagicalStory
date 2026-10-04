@@ -1,0 +1,1867 @@
+{
+ "run": "2026-09-27_jev-arc-direct",
+ "jevCalls": 543,
+ "jevCostUsd": 0.11515,
+ "jevMsP50": 282,
+ "llm": [
+  {
+   "id": "dka3jpog9",
+   "kind": "actions",
+   "model": "google/gemini-3.7-flash",
+   "cost": 0.01653975,
+   "ms": 19160
+  },
+  {
+   "id": "dka3jpog9",
+   "kind": "map",
+   "model": "google/gemini-3.7-flash",
+   "cost": 0.0101685,
+   "ms": 11328
+  },
+  {
+   "id": "z3fw660ie",
+   "kind": "actions",
+   "model": "google/gemini-3.7-flash",
+   "cost": 0.027312,
+   "ms": 32918
+  },
+  {
+   "id": "z3fw660ie",
+   "kind": "map",
+   "model": "google/gemini-3.7-flash",
+   "cost": 0.0222255,
+   "ms": 34168
+  },
+  {
+   "id": "vnx5l8iy7",
+   "kind": "actions",
+   "model": "google/gemini-3.7-flash",
+   "cost": 0.0278745,
+   "ms": 41904
+  },
+  {
+   "id": "vnx5l8iy7",
+   "kind": "map",
+   "model": "google/gemini-3.7-flash",
+   "cost": 0.0228375,
+   "ms": 36755
+  },
+  {
+   "id": "5herh01j7",
+   "kind": "actions",
+   "model": "google/gemini-3.7-flash",
+   "cost": 0.03292575,
+   "ms": 35415
+  },
+  {
+   "id": "5herh01j7",
+   "kind": "map",
+   "model": "google/gemini-3.7-flash",
+   "cost": 0.01151325,
+   "ms": 12447
+  },
+  {
+   "id": "riqncqg1i",
+   "kind": "actions",
+   "model": "google/gemini-3.7-flash",
+   "cost": 0.0286125,
+   "ms": 36312
+  },
+  {
+   "id": "riqncqg1i",
+   "kind": "map",
+   "model": "google/gemini-3.7-flash",
+   "cost": 0.00766125,
+   "ms": 7694
+  }
+ ],
+ "stories": {
+  "dka3jpog9": {
+   "pages": 18,
+   "actions": 42,
+   "sentences": 18,
+   "actionsPerSentence": 2.33,
+   "planner": {
+    "durationMs": 311954,
+    "plan": {
+     "cost": 0.0442,
+     "calls": 1,
+     "ms": 30554,
+     "models": [
+      "claude-sonnet-4-6"
+     ]
+    },
+    "check": {
+     "cost": 0.0293,
+     "calls": 1,
+     "ms": 101055,
+     "models": [
+      "openai/gpt-5.6-luna-pro"
+     ]
+    },
+    "replan": {
+     "cost": 0.1076,
+     "calls": 2,
+     "ms": 64107,
+     "models": [
+      "claude-sonnet-4-6"
+     ]
+    },
+    "recheck": {
+     "cost": 0.0274,
+     "calls": 1,
+     "ms": 78629,
+     "models": [
+      "openai/gpt-5.6-luna-pro"
+     ]
+    },
+    "recheck2": {
+     "cost": 0.0262,
+     "calls": 1,
+     "ms": 68060,
+     "models": [
+      "openai/gpt-5.6-luna-pro"
+     ]
+    },
+    "rounds": 1,
+    "discarded": 1
+   },
+   "auc": {
+    "PIC_vs_readingPic": 0.746,
+    "OWN_vs_readingPic": 0.78,
+    "VALUE_vs_readingPic": 0.755,
+    "VALUE_vs_must": 0.747
+   },
+   "jevClimax": "A35",
+   "readingClimax": [
+    "A35",
+    "A30"
+   ],
+   "jevClimaxAcceptable": true,
+   "jevClimaxTop3": [
+    "A35",
+    "A36",
+    "A30"
+   ],
+   "readingInPlanner": "19/25",
+   "seq": {
+    "planner": {
+     "mustCovered": "13/14",
+     "picInReading": "17/18",
+     "climaxPage": "16/18",
+     "agreeWithPlanner": "18/18",
+     "focal": {
+      "Levin": 6,
+      "Julian": 6,
+      "Max": 5,
+      "Kiaan": 5,
+      "Sura": 5
+     },
+     "focalShort": [],
+     "maxActionsPerPage": 6
+    },
+    "a": {
+     "mustCovered": "9/14",
+     "picInReading": "12/18",
+     "climaxPage": "15/18",
+     "agreeWithPlanner": "11/18",
+     "focal": {
+      "Levin": 5,
+      "Julian": 4,
+      "Max": 3,
+      "Kiaan": 5,
+      "Sura": 5
+     },
+     "focalShort": [],
+     "maxActionsPerPage": 3
+    },
+    "b": {
+     "mustCovered": "8/14",
+     "picInReading": "12/18",
+     "climaxPage": "missing",
+     "agreeWithPlanner": "14/18",
+     "focal": {
+      "Levin": 4,
+      "Julian": 5,
+      "Max": 3,
+      "Kiaan": 6,
+      "Sura": 5
+     },
+     "focalShort": [],
+     "maxActionsPerPage": 6
+    },
+    "oracle": {
+     "mustCovered": "14/14",
+     "picInReading": "18/18",
+     "climaxPage": "15/18",
+     "agreeWithPlanner": "16/18",
+     "focal": {
+      "Levin": 6,
+      "Julian": 5,
+      "Max": 3,
+      "Kiaan": 3,
+      "Sura": 6
+     },
+     "focalShort": [],
+     "maxActionsPerPage": 6
+    }
+   },
+   "picks": {
+    "planner": [
+     "A1",
+     "A4",
+     "A5",
+     "A8",
+     "A9",
+     "A10",
+     "A11",
+     "A13",
+     "A15",
+     "A21",
+     "A24",
+     "A25",
+     "A30",
+     "A31",
+     "A33",
+     "A35",
+     "A39",
+     "A42"
+    ],
+    "a": [
+     "A2",
+     "A4",
+     "A6",
+     "A8",
+     "A10",
+     "A12",
+     "A14",
+     "A15",
+     "A18",
+     "A21",
+     "A24",
+     "A27",
+     "A30",
+     "A33",
+     "A35",
+     "A37",
+     "A39",
+     "A40"
+    ],
+    "b": [
+     "A1",
+     "A2",
+     "A5",
+     "A6",
+     "A9",
+     "A10",
+     "A11",
+     "A13",
+     "A15",
+     "A21",
+     "A24",
+     "A26",
+     "A27",
+     "A32",
+     "A34",
+     "A36",
+     "A39",
+     "A42"
+    ]
+   },
+   "unmetFocal": [],
+   "loads": [
+    12,
+    14,
+    11,
+    10,
+    17,
+    13,
+    16,
+    13,
+    12,
+    18,
+    19,
+    20,
+    21,
+    22,
+    15,
+    12,
+    14,
+    20
+   ],
+   "pagesA": [
+    {
+     "page": 1,
+     "action": "A2",
+     "shot": "wide",
+     "who": []
+    },
+    {
+     "page": 2,
+     "action": "A4",
+     "shot": "close-up",
+     "who": [
+      "Julian"
+     ]
+    },
+    {
+     "page": 3,
+     "action": "A6",
+     "shot": "wide",
+     "who": [
+      "Kiaan"
+     ]
+    },
+    {
+     "page": 4,
+     "action": "A8",
+     "shot": "over-the-shoulder",
+     "who": [
+      "Max"
+     ]
+    },
+    {
+     "page": 5,
+     "action": "A10",
+     "shot": "wide",
+     "who": []
+    },
+    {
+     "page": 6,
+     "action": "A12",
+     "shot": "medium",
+     "who": [
+      "Kiaan"
+     ]
+    },
+    {
+     "page": 7,
+     "action": "A14",
+     "shot": "wide",
+     "who": [
+      "Sura"
+     ]
+    },
+    {
+     "page": 8,
+     "action": "A15",
+     "shot": "ultra-wide",
+     "who": [
+      "Sura"
+     ]
+    },
+    {
+     "page": 9,
+     "action": "A18",
+     "shot": "high-angle",
+     "who": [
+      "Kiaan"
+     ]
+    },
+    {
+     "page": 10,
+     "action": "A21",
+     "shot": "medium",
+     "who": [
+      "Levin",
+      "Kiaan"
+     ]
+    },
+    {
+     "page": 11,
+     "action": "A24",
+     "shot": "ultra-wide",
+     "who": [
+      "Sura"
+     ]
+    },
+    {
+     "page": 12,
+     "action": "A27",
+     "shot": "close-up",
+     "who": [
+      "Levin",
+      "Kiaan",
+      "Sura"
+     ]
+    },
+    {
+     "page": 13,
+     "action": "A30",
+     "shot": "over-the-shoulder",
+     "who": [
+      "Levin",
+      "Sura"
+     ]
+    },
+    {
+     "page": 14,
+     "action": "A33",
+     "shot": "high-angle",
+     "who": [
+      "Julian",
+      "Sura"
+     ]
+    },
+    {
+     "page": 15,
+     "action": "A35",
+     "shot": "close-up",
+     "who": [
+      "Levin",
+      "Sura"
+     ]
+    },
+    {
+     "page": 16,
+     "action": "A37",
+     "shot": "medium",
+     "who": [
+      "Levin",
+      "Sura"
+     ]
+    },
+    {
+     "page": 17,
+     "action": "A39",
+     "shot": "wide",
+     "who": [
+      "Sura"
+     ]
+    },
+    {
+     "page": 18,
+     "action": "A40",
+     "shot": "wide",
+     "who": []
+    }
+   ],
+   "shotViolations": [],
+   "groupPages": {
+    "used": 0,
+    "budget": 3
+   },
+   "appearances": {
+    "Levin": 5,
+    "Julian": 2,
+    "Max": 1,
+    "Kiaan": 5,
+    "Sura": 9
+   }
+  },
+  "z3fw660ie": {
+   "pages": 16,
+   "actions": 54,
+   "sentences": 15,
+   "actionsPerSentence": 3.6,
+   "planner": {
+    "durationMs": 204101,
+    "plan": {
+     "cost": 0.0398,
+     "calls": 1,
+     "ms": 31570,
+     "models": [
+      "claude-sonnet-4-6"
+     ]
+    },
+    "check": {
+     "cost": 0.0296,
+     "calls": 1,
+     "ms": 86668,
+     "models": [
+      "openai/gpt-5.6-luna-pro"
+     ]
+    },
+    "replan": {
+     "cost": 0.0557,
+     "calls": 1,
+     "ms": 38183,
+     "models": [
+      "claude-sonnet-4-6"
+     ]
+    },
+    "recheck": {
+     "cost": 0.0284,
+     "calls": 1,
+     "ms": 79206,
+     "models": [
+      "openai/gpt-5.6-luna-pro"
+     ]
+    },
+    "recheck2": null,
+    "rounds": 1,
+    "discarded": 0
+   },
+   "auc": {
+    "PIC_vs_readingPic": 0.784,
+    "OWN_vs_readingPic": 0.771,
+    "VALUE_vs_readingPic": 0.688,
+    "VALUE_vs_must": 0.727
+   },
+   "jevClimax": "A45",
+   "readingClimax": [
+    "A45",
+    "A44"
+   ],
+   "jevClimaxAcceptable": true,
+   "jevClimaxTop3": [
+    "A45",
+    "A44",
+    "A46"
+   ],
+   "readingInPlanner": "11/20",
+   "seq": {
+    "planner": {
+     "mustCovered": "8/15",
+     "picInReading": "9/16",
+     "climaxPage": "missing",
+     "agreeWithPlanner": "16/16",
+     "focal": {
+      "Sarah": 2,
+      "Saira": 2,
+      "Facundo": 5,
+      "Fiona": 5,
+      "Lorena": 2
+     },
+     "focalShort": [
+      "Sarah",
+      "Saira",
+      "Lorena"
+     ],
+     "maxActionsPerPage": 6
+    },
+    "a": {
+     "mustCovered": "9/15",
+     "picInReading": "9/16",
+     "climaxPage": "14/16",
+     "agreeWithPlanner": "6/16",
+     "focal": {
+      "Sarah": 3,
+      "Saira": 4,
+      "Facundo": 4,
+      "Fiona": 5,
+      "Lorena": 4
+     },
+     "focalShort": [],
+     "maxActionsPerPage": 5
+    },
+    "b": {
+     "mustCovered": "6/15",
+     "picInReading": "8/16",
+     "climaxPage": "14/16",
+     "agreeWithPlanner": "9/16",
+     "focal": {
+      "Sarah": 1,
+      "Saira": 1,
+      "Facundo": 3,
+      "Fiona": 6,
+      "Lorena": 1
+     },
+     "focalShort": [
+      "Sarah",
+      "Saira",
+      "Lorena"
+     ],
+     "maxActionsPerPage": 8
+    },
+    "oracle": {
+     "mustCovered": "15/15",
+     "picInReading": "16/16",
+     "climaxPage": "14/16",
+     "agreeWithPlanner": "8/16",
+     "focal": {
+      "Sarah": 3,
+      "Saira": 3,
+      "Facundo": 5,
+      "Fiona": 6,
+      "Lorena": 3
+     },
+     "focalShort": [],
+     "maxActionsPerPage": 7
+    }
+   },
+   "picks": {
+    "planner": [
+     "A2",
+     "A3",
+     "A4",
+     "A8",
+     "A12",
+     "A16",
+     "A19",
+     "A23",
+     "A27",
+     "A31",
+     "A33",
+     "A37",
+     "A41",
+     "A46",
+     "A52",
+     "A50"
+    ],
+    "a": [
+     "A2",
+     "A4",
+     "A7",
+     "A9",
+     "A12",
+     "A16",
+     "A21",
+     "A24",
+     "A28",
+     "A30",
+     "A33",
+     "A36",
+     "A41",
+     "A45",
+     "A49",
+     "A51"
+    ],
+    "b": [
+     "A1",
+     "A2",
+     "A3",
+     "A4",
+     "A12",
+     "A16",
+     "A20",
+     "A23",
+     "A26",
+     "A30",
+     "A32",
+     "A36",
+     "A39",
+     "A44",
+     "A49",
+     "A54"
+    ]
+   },
+   "unmetFocal": [],
+   "loads": [
+    10,
+    13,
+    18,
+    15,
+    13,
+    28,
+    32,
+    20,
+    19,
+    18,
+    23,
+    25,
+    27,
+    27,
+    31,
+    28
+   ],
+   "pagesA": [
+    {
+     "page": 1,
+     "action": "A2",
+     "shot": "wide",
+     "who": []
+    },
+    {
+     "page": 2,
+     "action": "A4",
+     "shot": "close-up",
+     "who": [
+      "Fiona",
+      "Kapitän Zollingers Seekarte"
+     ]
+    },
+    {
+     "page": 3,
+     "action": "A7",
+     "shot": "over-the-shoulder",
+     "who": [
+      "Sarah"
+     ]
+    },
+    {
+     "page": 4,
+     "action": "A9",
+     "shot": "medium",
+     "who": []
+    },
+    {
+     "page": 5,
+     "action": "A12",
+     "shot": "wide",
+     "who": []
+    },
+    {
+     "page": 6,
+     "action": "A16",
+     "shot": "medium",
+     "who": [
+      "Sarah",
+      "Facundo"
+     ]
+    },
+    {
+     "page": 7,
+     "action": "A21",
+     "shot": "medium",
+     "who": []
+    },
+    {
+     "page": 8,
+     "action": "A24",
+     "shot": "wide",
+     "who": []
+    },
+    {
+     "page": 9,
+     "action": "A28",
+     "shot": "medium",
+     "who": [
+      "Saira"
+     ]
+    },
+    {
+     "page": 10,
+     "action": "A30",
+     "shot": "ultra-wide",
+     "who": []
+    },
+    {
+     "page": 11,
+     "action": "A33",
+     "shot": "close-up",
+     "who": [
+      "Fiona"
+     ]
+    },
+    {
+     "page": 12,
+     "action": "A36",
+     "shot": "ultra-wide",
+     "who": []
+    },
+    {
+     "page": 13,
+     "action": "A41",
+     "shot": "over-the-shoulder",
+     "who": [
+      "Lorena",
+      "Kapitän Zollingers Seekarte"
+     ]
+    },
+    {
+     "page": 14,
+     "action": "A45",
+     "shot": "low-angle",
+     "who": [
+      "Fiona"
+     ]
+    },
+    {
+     "page": 15,
+     "action": "A49",
+     "shot": "wide",
+     "who": []
+    },
+    {
+     "page": 16,
+     "action": "A51",
+     "shot": "high-angle",
+     "who": []
+    }
+   ],
+   "shotViolations": [],
+   "groupPages": {
+    "used": 0,
+    "budget": 3
+   },
+   "appearances": {
+    "Sarah": 2,
+    "Saira": 1,
+    "Facundo": 1,
+    "Fiona": 3,
+    "Lorena": 1
+   }
+  },
+  "vnx5l8iy7": {
+   "pages": 18,
+   "actions": 53,
+   "sentences": 18,
+   "actionsPerSentence": 2.94,
+   "planner": {
+    "durationMs": 244395,
+    "plan": {
+     "cost": 0.0351,
+     "calls": 1,
+     "ms": 23983,
+     "models": [
+      "claude-sonnet-4-6"
+     ]
+    },
+    "check": {
+     "cost": 0.0285,
+     "calls": 1,
+     "ms": 113681,
+     "models": [
+      "openai/gpt-5.6-luna-pro"
+     ]
+    },
+    "replan": {
+     "cost": 0.0494,
+     "calls": 1,
+     "ms": 34020,
+     "models": [
+      "claude-sonnet-4-6"
+     ]
+    },
+    "recheck": {
+     "cost": 0.0305,
+     "calls": 1,
+     "ms": 96655,
+     "models": [
+      "openai/gpt-5.6-luna-pro"
+     ]
+    },
+    "recheck2": null,
+    "rounds": 1,
+    "discarded": 0
+   },
+   "auc": {
+    "PIC_vs_readingPic": 0.595,
+    "OWN_vs_readingPic": 0.758,
+    "VALUE_vs_readingPic": 0.567,
+    "VALUE_vs_must": 0.675
+   },
+   "jevClimax": "A47",
+   "readingClimax": [
+    "A41",
+    "A46",
+    "A47"
+   ],
+   "jevClimaxAcceptable": true,
+   "jevClimaxTop3": [
+    "A47",
+    "A46",
+    "A45"
+   ],
+   "readingInPlanner": "19/27",
+   "seq": {
+    "planner": {
+     "mustCovered": "8/15",
+     "picInReading": "12/18",
+     "climaxPage": "15/18",
+     "agreeWithPlanner": "18/18",
+     "focal": {
+      "Levin": 6,
+      "Julian": 7,
+      "Max": 5,
+      "Kiaan": 4
+     },
+     "focalShort": [],
+     "maxActionsPerPage": 9
+    },
+    "a": {
+     "mustCovered": "8/15",
+     "picInReading": "13/18",
+     "climaxPage": "13/18",
+     "agreeWithPlanner": "12/18",
+     "focal": {
+      "Levin": 3,
+      "Julian": 6,
+      "Max": 5,
+      "Kiaan": 3
+     },
+     "focalShort": [],
+     "maxActionsPerPage": 4
+    },
+    "b": {
+     "mustCovered": "10/15",
+     "picInReading": "13/18",
+     "climaxPage": "16/18",
+     "agreeWithPlanner": "15/18",
+     "focal": {
+      "Levin": 6,
+      "Julian": 7,
+      "Max": 6,
+      "Kiaan": 4
+     },
+     "focalShort": [],
+     "maxActionsPerPage": 8
+    },
+    "oracle": {
+     "mustCovered": "15/15",
+     "picInReading": "18/18",
+     "climaxPage": "13/18",
+     "agreeWithPlanner": "15/18",
+     "focal": {
+      "Levin": 5,
+      "Julian": 6,
+      "Max": 5,
+      "Kiaan": 3
+     },
+     "focalShort": [],
+     "maxActionsPerPage": 6
+    }
+   },
+   "picks": {
+    "planner": [
+     "A1",
+     "A6",
+     "A7",
+     "A7",
+     "A9",
+     "A14",
+     "A15",
+     "A20",
+     "A21",
+     "A24",
+     "A33",
+     "A34",
+     "A36",
+     "A37",
+     "A41",
+     "A45",
+     "A48",
+     "A53"
+    ],
+    "a": [
+     "A3",
+     "A6",
+     "A8",
+     "A10",
+     "A14",
+     "A16",
+     "A18",
+     "A22",
+     "A25",
+     "A29",
+     "A33",
+     "A37",
+     "A41",
+     "A45",
+     "A46",
+     "A47",
+     "A48",
+     "A52"
+    ],
+    "b": [
+     "A1",
+     "A2",
+     "A3",
+     "A7",
+     "A8",
+     "A14",
+     "A16",
+     "A20",
+     "A21",
+     "A25",
+     "A33",
+     "A34",
+     "A36",
+     "A38",
+     "A40",
+     "A46",
+     "A51",
+     "A53"
+    ]
+   },
+   "unmetFocal": [],
+   "loads": [
+    13,
+    18,
+    14,
+    8,
+    16,
+    11,
+    16,
+    20,
+    13,
+    21,
+    18,
+    24,
+    21,
+    21,
+    14,
+    8,
+    9,
+    20
+   ],
+   "pagesA": [
+    {
+     "page": 1,
+     "action": "A3",
+     "shot": "ultra-wide",
+     "who": []
+    },
+    {
+     "page": 2,
+     "action": "A6",
+     "shot": "medium",
+     "who": [
+      "Julian",
+      "the dragon egg"
+     ]
+    },
+    {
+     "page": 3,
+     "action": "A8",
+     "shot": "wide",
+     "who": []
+    },
+    {
+     "page": 4,
+     "action": "A10",
+     "shot": "over-the-shoulder",
+     "who": []
+    },
+    {
+     "page": 5,
+     "action": "A14",
+     "shot": "wide",
+     "who": []
+    },
+    {
+     "page": 6,
+     "action": "A16",
+     "shot": "medium",
+     "who": []
+    },
+    {
+     "page": 7,
+     "action": "A18",
+     "shot": "low-angle",
+     "who": []
+    },
+    {
+     "page": 8,
+     "action": "A22",
+     "shot": "ultra-wide",
+     "who": []
+    },
+    {
+     "page": 9,
+     "action": "A25",
+     "shot": "over-the-shoulder",
+     "who": [
+      "Max",
+      "the dragon egg"
+     ]
+    },
+    {
+     "page": 10,
+     "action": "A29",
+     "shot": "medium",
+     "who": [
+      "Max",
+      "the dragon egg"
+     ]
+    },
+    {
+     "page": 11,
+     "action": "A33",
+     "shot": "close-up",
+     "who": [
+      "Max",
+      "the dragon egg"
+     ]
+    },
+    {
+     "page": 12,
+     "action": "A37",
+     "shot": "medium",
+     "who": [
+      "Julian",
+      "the dragon egg"
+     ]
+    },
+    {
+     "page": 13,
+     "action": "A41",
+     "shot": "wide",
+     "who": [
+      "Julian",
+      "the dragon egg"
+     ]
+    },
+    {
+     "page": 14,
+     "action": "A45",
+     "shot": "low-angle",
+     "who": [
+      "Julian"
+     ]
+    },
+    {
+     "page": 15,
+     "action": "A46",
+     "shot": "close-up",
+     "who": [
+      "Julian"
+     ]
+    },
+    {
+     "page": 16,
+     "action": "A47",
+     "shot": "medium",
+     "who": [
+      "the dragon egg"
+     ]
+    },
+    {
+     "page": 17,
+     "action": "A48",
+     "shot": "close-up",
+     "who": [
+      "the dragon egg"
+     ]
+    },
+    {
+     "page": 18,
+     "action": "A52",
+     "shot": "medium",
+     "who": [
+      "Julian"
+     ]
+    }
+   ],
+   "shotViolations": [],
+   "groupPages": {
+    "used": 0,
+    "budget": 3
+   },
+   "appearances": {
+    "Levin": 0,
+    "Julian": 6,
+    "Max": 3,
+    "Kiaan": 0
+   }
+  },
+  "5herh01j7": {
+   "pages": 18,
+   "actions": 75,
+   "sentences": 18,
+   "actionsPerSentence": 4.17,
+   "planner": {
+    "durationMs": 434267,
+    "plan": {
+     "cost": 0.0347,
+     "calls": 1,
+     "ms": 25271,
+     "models": [
+      "claude-sonnet-4-6"
+     ]
+    },
+    "check": {
+     "cost": 0.0314,
+     "calls": 1,
+     "ms": 292671,
+     "models": [
+      "openai/gpt-5.6-luna-pro"
+     ]
+    },
+    "replan": {
+     "cost": 0.0444,
+     "calls": 1,
+     "ms": 28839,
+     "models": [
+      "claude-sonnet-4-6"
+     ]
+    },
+    "recheck": {
+     "cost": 0.029,
+     "calls": 1,
+     "ms": 112640,
+     "models": [
+      "openai/gpt-5.6-luna-pro"
+     ]
+    },
+    "recheck2": null,
+    "rounds": 0,
+    "discarded": 1
+   },
+   "auc": {
+    "PIC_vs_readingPic": 0.746,
+    "OWN_vs_readingPic": 0.774,
+    "VALUE_vs_readingPic": 0.759,
+    "VALUE_vs_must": 0.795
+   },
+   "jevClimax": "A68",
+   "readingClimax": [
+    "A62",
+    "A64"
+   ],
+   "jevClimaxAcceptable": false,
+   "jevClimaxTop3": [
+    "A68",
+    "A67",
+    "A65"
+   ],
+   "readingInPlanner": "20/26",
+   "seq": {
+    "planner": {
+     "mustCovered": "12/18",
+     "picInReading": "15/18",
+     "climaxPage": "16/18",
+     "agreeWithPlanner": "18/18",
+     "focal": {
+      "Levin": 4,
+      "Julian": 6,
+      "Max": 1,
+      "Kiaan": 2,
+      "Nia": 0
+     },
+     "focalShort": [
+      "Max",
+      "Kiaan",
+      "Nia"
+     ],
+     "maxActionsPerPage": 9
+    },
+    "a": {
+     "mustCovered": "9/18",
+     "picInReading": "12/18",
+     "climaxPage": "missing",
+     "agreeWithPlanner": "12/18",
+     "focal": {
+      "Levin": 3,
+      "Julian": 6,
+      "Max": 3,
+      "Kiaan": 3,
+      "Nia": 0
+     },
+     "focalShort": [
+      "Nia"
+     ],
+     "maxActionsPerPage": 7
+    },
+    "b": {
+     "mustCovered": "6/18",
+     "picInReading": "9/18",
+     "climaxPage": "16/18",
+     "agreeWithPlanner": "10/18",
+     "focal": {
+      "Levin": 6,
+      "Julian": 6,
+      "Max": 2,
+      "Kiaan": 2,
+      "Nia": 0
+     },
+     "focalShort": [
+      "Max",
+      "Kiaan",
+      "Nia"
+     ],
+     "maxActionsPerPage": 8
+    },
+    "oracle": {
+     "mustCovered": "16/18",
+     "picInReading": "18/18",
+     "climaxPage": "15/18",
+     "agreeWithPlanner": "12/18",
+     "focal": {
+      "Levin": 5,
+      "Julian": 6,
+      "Max": 3,
+      "Kiaan": 4,
+      "Nia": 0
+     },
+     "focalShort": [
+      "Nia"
+     ],
+     "maxActionsPerPage": 7
+    }
+   },
+   "picks": {
+    "planner": [
+     "A1",
+     "A3",
+     "A8",
+     "A11",
+     "A14",
+     "A17",
+     "A20",
+     "A23",
+     "A27",
+     "A35",
+     "A36",
+     "A43",
+     "A46",
+     "A55",
+     "A57",
+     "A62",
+     "A68",
+     "A71"
+    ],
+    "a": [
+     "A4",
+     "A8",
+     "A11",
+     "A14",
+     "A18",
+     "A23",
+     "A27",
+     "A34",
+     "A36",
+     "A39",
+     "A43",
+     "A49",
+     "A52",
+     "A57",
+     "A61",
+     "A68",
+     "A71",
+     "A74"
+    ],
+    "b": [
+     "A1",
+     "A2",
+     "A3",
+     "A8",
+     "A11",
+     "A17",
+     "A20",
+     "A23",
+     "A27",
+     "A35",
+     "A36",
+     "A41",
+     "A49",
+     "A50",
+     "A56",
+     "A64",
+     "A70",
+     "A75"
+    ]
+   },
+   "unmetFocal": [
+    "Nia"
+   ],
+   "loads": [
+    30,
+    25,
+    22,
+    17,
+    28,
+    35,
+    31,
+    39,
+    20,
+    27,
+    22,
+    33,
+    31,
+    30,
+    37,
+    41,
+    25,
+    28
+   ],
+   "pagesA": [
+    {
+     "page": 1,
+     "action": "A4",
+     "shot": "close-up",
+     "who": [
+      "Julian"
+     ]
+    },
+    {
+     "page": 2,
+     "action": "A8",
+     "shot": "wide",
+     "who": []
+    },
+    {
+     "page": 3,
+     "action": "A11",
+     "shot": "high-angle",
+     "who": [
+      "Julian"
+     ]
+    },
+    {
+     "page": 4,
+     "action": "A14",
+     "shot": "close-up",
+     "who": [
+      "Levin"
+     ]
+    },
+    {
+     "page": 5,
+     "action": "A18",
+     "shot": "medium",
+     "who": [
+      "Levin"
+     ]
+    },
+    {
+     "page": 6,
+     "action": "A23",
+     "shot": "wide",
+     "who": []
+    },
+    {
+     "page": 7,
+     "action": "A27",
+     "shot": "medium",
+     "who": [
+      "Julian"
+     ]
+    },
+    {
+     "page": 8,
+     "action": "A34",
+     "shot": "over-the-shoulder",
+     "who": [
+      "Max"
+     ]
+    },
+    {
+     "page": 9,
+     "action": "A36",
+     "shot": "wide",
+     "who": []
+    },
+    {
+     "page": 10,
+     "action": "A39",
+     "shot": "medium",
+     "who": []
+    },
+    {
+     "page": 11,
+     "action": "A43",
+     "shot": "close-up",
+     "who": [
+      "Kiaan"
+     ]
+    },
+    {
+     "page": 12,
+     "action": "A49",
+     "shot": "medium",
+     "who": []
+    },
+    {
+     "page": 13,
+     "action": "A52",
+     "shot": "high-angle",
+     "who": []
+    },
+    {
+     "page": 14,
+     "action": "A57",
+     "shot": "over-the-shoulder",
+     "who": [
+      "Levin"
+     ]
+    },
+    {
+     "page": 15,
+     "action": "A61",
+     "shot": "medium",
+     "who": [
+      "Julian"
+     ]
+    },
+    {
+     "page": 16,
+     "action": "A68",
+     "shot": "close-up",
+     "who": [
+      "Julian"
+     ]
+    },
+    {
+     "page": 17,
+     "action": "A71",
+     "shot": "ultra-wide",
+     "who": []
+    },
+    {
+     "page": 18,
+     "action": "A74",
+     "shot": "medium",
+     "who": [
+      "Julian"
+     ]
+    }
+   ],
+   "shotViolations": [],
+   "groupPages": {
+    "used": 0,
+    "budget": 3
+   },
+   "appearances": {
+    "Levin": 3,
+    "Julian": 6,
+    "Max": 1,
+    "Kiaan": 1,
+    "Nia": 0
+   }
+  },
+  "riqncqg1i": {
+   "pages": 18,
+   "actions": 74,
+   "sentences": 18,
+   "actionsPerSentence": 4.11,
+   "planner": {
+    "durationMs": 325030,
+    "plan": {
+     "cost": 0.0383,
+     "calls": 1,
+     "ms": 25223,
+     "models": [
+      "claude-sonnet-4-6"
+     ]
+    },
+    "check": {
+     "cost": 0.028,
+     "calls": 1,
+     "ms": 66001,
+     "models": [
+      "openai/gpt-5.6-luna-pro"
+     ]
+    },
+    "replan": {
+     "cost": 0.1296,
+     "calls": 2,
+     "ms": 100746,
+     "models": [
+      "claude-sonnet-4-6"
+     ]
+    },
+    "recheck": {
+     "cost": 0.0293,
+     "calls": 1,
+     "ms": 92474,
+     "models": [
+      "openai/gpt-5.6-luna-pro"
+     ]
+    },
+    "recheck2": {
+     "cost": 0.0262,
+     "calls": 1,
+     "ms": 65707,
+     "models": [
+      "openai/gpt-5.6-luna-pro"
+     ]
+    },
+    "rounds": 0,
+    "discarded": 1
+   },
+   "auc": {
+    "PIC_vs_readingPic": 0.689,
+    "OWN_vs_readingPic": 0.743,
+    "VALUE_vs_readingPic": 0.656,
+    "VALUE_vs_must": 0.625
+   },
+   "jevClimax": "A69",
+   "readingClimax": [
+    "A69",
+    "A67"
+   ],
+   "jevClimaxAcceptable": true,
+   "jevClimaxTop3": [
+    "A69",
+    "A67",
+    "A68"
+   ],
+   "readingInPlanner": "19/29",
+   "seq": {
+    "planner": {
+     "mustCovered": "12/21",
+     "picInReading": "13/18",
+     "climaxPage": "17/18",
+     "agreeWithPlanner": "18/18",
+     "focal": {
+      "Levin": 5,
+      "Julian": 6,
+      "Max": 2,
+      "Kiaan": 1
+     },
+     "focalShort": [
+      "Kiaan"
+     ],
+     "maxActionsPerPage": 9
+    },
+    "a": {
+     "mustCovered": "8/21",
+     "picInReading": "10/18",
+     "climaxPage": "18/18",
+     "agreeWithPlanner": "11/18",
+     "focal": {
+      "Levin": 3,
+      "Julian": 2,
+      "Max": 2,
+      "Kiaan": 2
+     },
+     "focalShort": [],
+     "maxActionsPerPage": 7
+    },
+    "b": {
+     "mustCovered": "7/21",
+     "picInReading": "8/18",
+     "climaxPage": "17/18",
+     "agreeWithPlanner": "11/18",
+     "focal": {
+      "Levin": 5,
+      "Julian": 7,
+      "Max": 0,
+      "Kiaan": 0
+     },
+     "focalShort": [
+      "Max",
+      "Kiaan"
+     ],
+     "maxActionsPerPage": 10
+    },
+    "oracle": {
+     "mustCovered": "18/21",
+     "picInReading": "18/18",
+     "climaxPage": "18/18",
+     "agreeWithPlanner": "14/18",
+     "focal": {
+      "Levin": 4,
+      "Julian": 5,
+      "Max": 3,
+      "Kiaan": 1
+     },
+     "focalShort": [
+      "Kiaan"
+     ],
+     "maxActionsPerPage": 8
+    }
+   },
+   "picks": {
+    "planner": [
+     "A1",
+     "A9",
+     "A11",
+     "A14",
+     "A18",
+     "A22",
+     "A26",
+     "A29",
+     "A32",
+     "A41",
+     "A43",
+     "A48",
+     "A57",
+     "A60",
+     "A61",
+     "A67",
+     "A69",
+     "A74"
+    ],
+    "a": [
+     "A7",
+     "A11",
+     "A13",
+     "A14",
+     "A16",
+     "A21",
+     "A24",
+     "A26",
+     "A29",
+     "A33",
+     "A37",
+     "A41",
+     "A45",
+     "A48",
+     "A55",
+     "A62",
+     "A68",
+     "A69"
+    ],
+    "b": [
+     "A1",
+     "A2",
+     "A3",
+     "A10",
+     "A20",
+     "A21",
+     "A23",
+     "A29",
+     "A32",
+     "A41",
+     "A43",
+     "A47",
+     "A48",
+     "A50",
+     "A59",
+     "A60",
+     "A67",
+     "A74"
+    ]
+   },
+   "unmetFocal": [],
+   "loads": [
+    48,
+    25,
+    23,
+    10,
+    20,
+    40,
+    21,
+    32,
+    15,
+    31,
+    30,
+    24,
+    28,
+    30,
+    38,
+    40,
+    37,
+    41
+   ],
+   "pagesA": [
+    {
+     "page": 1,
+     "action": "A7",
+     "shot": "wide",
+     "who": []
+    },
+    {
+     "page": 2,
+     "action": "A11",
+     "shot": "over-the-shoulder",
+     "who": [
+      "Max"
+     ]
+    },
+    {
+     "page": 3,
+     "action": "A13",
+     "shot": "medium",
+     "who": [
+      "Kiaan"
+     ]
+    },
+    {
+     "page": 4,
+     "action": "A14",
+     "shot": "close-up",
+     "who": [
+      "Kiaan"
+     ]
+    },
+    {
+     "page": 5,
+     "action": "A16",
+     "shot": "close-up",
+     "who": [
+      "Levin",
+      "Kiaan"
+     ]
+    },
+    {
+     "page": 6,
+     "action": "A21",
+     "shot": "high-angle",
+     "who": [
+      "Levin"
+     ]
+    },
+    {
+     "page": 7,
+     "action": "A24",
+     "shot": "medium",
+     "who": []
+    },
+    {
+     "page": 8,
+     "action": "A26",
+     "shot": "ultra-wide",
+     "who": []
+    },
+    {
+     "page": 9,
+     "action": "A29",
+     "shot": "medium",
+     "who": [
+      "Levin",
+      "Julian"
+     ]
+    },
+    {
+     "page": 10,
+     "action": "A33",
+     "shot": "medium",
+     "who": []
+    },
+    {
+     "page": 11,
+     "action": "A37",
+     "shot": "medium",
+     "who": [
+      "Max"
+     ]
+    },
+    {
+     "page": 12,
+     "action": "A41",
+     "shot": "close-up",
+     "who": [
+      "Julian"
+     ]
+    },
+    {
+     "page": 13,
+     "action": "A45",
+     "shot": "medium",
+     "who": [
+      "Levin"
+     ]
+    },
+    {
+     "page": 14,
+     "action": "A48",
+     "shot": "medium",
+     "who": []
+    },
+    {
+     "page": 15,
+     "action": "A55",
+     "shot": "high-angle",
+     "who": []
+    },
+    {
+     "page": 16,
+     "action": "A62",
+     "shot": "over-the-shoulder",
+     "who": []
+    },
+    {
+     "page": 17,
+     "action": "A68",
+     "shot": "close-up",
+     "who": [
+      "Julian"
+     ]
+    },
+    {
+     "page": 18,
+     "action": "A69",
+     "shot": "medium",
+     "who": [
+      "Julian"
+     ]
+    }
+   ],
+   "shotViolations": [],
+   "groupPages": {
+    "used": 0,
+    "budget": 3
+   },
+   "appearances": {
+    "Levin": 4,
+    "Julian": 4,
+    "Max": 2,
+    "Kiaan": 3
+   }
+  }
+ }
+}

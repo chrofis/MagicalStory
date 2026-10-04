@@ -18,9 +18,9 @@ const {
 // `pipelineMode` is 'beats' in every environment, so the only story-text call
 // production makes is
 //   buildStoryTextFromBeatsPrompt(inputData, beats, finalExpansions, approvedArc, { arcHints })
-// and the only all-pages Art Director call is
-//   buildSceneExpansionAllPrompt(inputData, beats, { availableAvatars,
-//     maxCharactersPerScene, finalArc, clothingRequirements })
+// and the Art Director's two calls (2026-09-28) are
+//   buildVisualBibleCallPrompt / buildSceneBriefsAllPrompt(inputData, briefBeats,
+//     { availableAvatars, maxCharactersPerScene, finalArc, clothingRequirements, … })
 //
 // Three Lab stages (story_text_replay, writer_compare, beats_scenes) passed
 // THINNER arguments — empty expansions, no arcHints, no finalArc — so every A/B
@@ -167,13 +167,15 @@ describe('wiring — the Lab replay stages call through the resolver', () => {
   });
 
   it('no Lab site calls the all-pages Art Director with an empty options object', () => {
-    const bare = testlabSrc.match(/buildSceneExpansionAllPrompt\([\s\S]{0,120}?,\s*\{\s*\}\s*\)/g) || [];
+    const bare = testlabSrc.match(/build(?:VisualBibleCall|SceneBriefsAll)Prompt\([\s\S]{0,120}?,\s*\{\s*\}\s*\)/g) || [];
     expect(bare).toEqual([]);
   });
 
   it('every Lab call to the all-pages Art Director builds its options through the resolver', () => {
-    const calls = testlabSrc.match(/buildSceneExpansionAllPrompt\([\s\S]{0,1400}?\n\s*\);/g) || [];
-    expect(calls.length).toBeGreaterThan(0);
+    // beats_scenes runs the run's own Art Director (beatsPipeline.runArtDirector)
+    // since 2026-09-27; any other Lab call site must use the resolver.
+    expect(testlabSrc).toMatch(/await runArtDirector\(\{/);
+    const calls = testlabSrc.match(/build(?:VisualBibleCall|SceneBriefsAll)Prompt\([\s\S]{0,1400}?\n\s*\);/g) || [];
     // Inline, or through a local the resolver assigns — the Lab's beats stage
     // hoists one `buildReplaySceneOptions` call and hands it to BOTH the
     // all-pages builder and the per-page `expandOnePage` fallback, which is
@@ -223,17 +225,28 @@ describe('wiring — production still passes what the resolver mirrors', () => {
       'buildStoryTextFromBeatsPrompt(inputData, beats, finalExpansions, approvedArc, { arcHints, visualBible, clothingRequirements })');
   });
 
-  it('production hands the all-pages Art Director the approved arc', () => {
-    // `briefBeats`: the story beats plus the cover pages' beats (coverBeats.js, 2026-09-24).
-    const call = (beatsSrc.match(/buildSceneExpansionAllPrompt\(inputData, briefBeats, \{[\s\S]*?\n  \}\);/) || [])[0] || '';
-    expect(call).toContain('finalArc: approvedArc');
-    expect(call).toContain('clothingRequirements');
-    expect(call).toContain('availableAvatars');
-    expect(call).toContain('maxCharactersPerScene');
+  it('production hands both Art Director calls the approved arc', () => {
+    // `briefBeats`: the story beats plus the cover pages' beats (coverBeats.js,
+    // 2026-09-24). Two calls since 2026-09-28: the Visual Bible, then the briefs.
+    for (const builder of ['buildVisualBibleCallPrompt', 'buildSceneBriefsAllPrompt']) {
+      const call = (beatsSrc.match(new RegExp(builder + '\\(inputData, briefBeats, \\{[\\s\\S]*?\\n  \\}\\);')) || [])[0] || '';
+      expect(call, builder).toContain('finalArc: approvedArc');
+      expect(call, builder).toContain('clothingRequirements');
+      expect(call, builder).toContain('availableAvatars');
+      expect(call, builder).toContain('maxCharactersPerScene');
+    }
   });
 
-  it('production hands the beats planner the approved arc, arcHints and the central figure', () => {
-    expect(beatsSrc).toContain('buildBeatsPrompt(inputData, pageCount, { finalArc: approvedArc, arcHints, centralFigure: arcCentralFigure })');
+  it('production hands the beats planner the approved arc, arcHints, the story logic and the central figure', () => {
+    expect(beatsSrc).toContain('buildBeatsPrompt(inputData, pageCount, { finalArc: approvedArc, arcHints, storyLogic: arcStoryLogic, centralFigure: arcCentralFigure, legacyShots: legacyShotsOf(jevReport) })');
+  });
+
+  it('the replay resolves the story logic the arc stored, and nothing for an older story', () => {
+    const { resolveReplayStoryLogic, buildReplayTextArgs } = require('../../server/lib/beatsReplayInputs');
+    const LOGIC = 'Facts:\n- a fact';
+    expect(resolveReplayStoryLogic({ arcReviewReport: { logic: `  ${LOGIC}  ` } })).toBe(LOGIC);
+    expect(resolveReplayStoryLogic({ arcReviewReport: { finalArc: '1. x' } })).toBe('');
+    expect(buildReplayTextArgs({ arcReviewReport: { logic: LOGIC } }, []).storyLogic).toBe(LOGIC);
   });
 
   it('the replay resolves the central figure the arc stored, and nothing for an older story', () => {

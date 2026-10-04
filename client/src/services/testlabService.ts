@@ -300,6 +300,15 @@ export interface ExperimentResult {
   beatsReview?: BeatsReview | null;
   /** One entry per scene-review arm; all judged the same frozen briefs. */
   sceneReviews?: SceneReviewArm[] | null;
+  /** The run's brief checks and its one Art Director re-ask (2026-09-28). */
+  briefChecks?: {
+    ok: boolean; error?: string | null; elapsedMs?: number; model?: string | null; cost?: number;
+    findingsBefore?: { pageNumber: number; type: string; detail?: string }[];
+    findingsAfter?: { pageNumber: number; type: string; detail?: string }[];
+    withheld?: { pageNumber: number; type: string; detail?: string }[];
+    verdicts?: { pageNumber: number; accepted: boolean; reason: string }[];
+    reaskPrompt?: string | null;
+  } | null;
   finalBeats?: { pageNumber: number; planLine: string }[];
   timeToScenesMs?: number | null;
   // Set when the stage could not produce a brief for every page it was asked
@@ -543,11 +552,13 @@ export const TESTLAB_STAGES = [
   // the plumbing verdict: does the planner emit a parseable ---CHANGES--- block
   // and the checker its OBSTACLES lines? A round whose changes are all
   // undeclared is restored page by page and ships nothing.
-  { id: 'beats_replan', label: 'Beats re-plan (does it declare its changes? would the round be a no-op?)', producesImage: false, overridable: false, storyLevel: true },
+  // params.arcFromExperiment (an arc_effort id on this story; arcPhase, arcEffort)
+  // plans a fresh first division from that arc, then check + one re-plan as
+  // production; params.plannerMayAddDeeds is the Lab-only added-deed variant.
+  { id: 'beats_replan', label: 'Beats re-plan (does it declare its changes? would the round be a no-op?; params arcFromExperiment, arcPhase, arcEffort, plannerMayAddDeeds)', producesImage: false, overridable: false, storyLevel: true },
   // Replays the scene review over a story's STORED briefs, so a reviewer-prompt
   // change is measurable: the clothing findings are deterministic, and the
   // briefs are frozen, so the only variable is the prompt (or the model).
-  { id: 'scene_review_replay', label: 'Scene review replay (frozen briefs → does it fix the faults?)', producesImage: false, overridable: true, storyLevel: true },
   // Re-derives the clothing contract for an existing story and puts the new
   // costume descriptions next to the ones it shipped with — the way to measure a
   // change to the costume/distinguishability rules without generating a book.
@@ -599,6 +610,11 @@ export const TESTLAB_STAGES = [
   // only variable is the prompt (or the models). params.retell also re-tells
   // against the new panel output, answering "does it help" end to end.
   { id: 'arc_panel_replay', label: 'Arc panel replay (frozen arc → what does the panel catch?)', producesImage: false, overridable: true, storyLevel: true },
+  // Judge regression fixtures: one stored input + the verdict a judge must
+  // return, replayed through the current production judge. Run as the
+  // "Judge fixtures · <judge>" sets (scripts/admin/judge-fixtures.js; doc
+  // docs/judge-fixtures.md); each card's `verdict` says TP/FN/TN/FP.
+  { id: 'judge_fixture', label: 'Judge fixture (stored input → expected verdict; run the Judge fixtures sets)', producesImage: false, overridable: false, storyLevel: true },
   // One Visual Bible element's reference cell(s) + the cell gate's verdict.
   // params: elementId (required), gateOnly, text, model, description.
   { id: 'vb_element_cell', label: 'VB element cell (render + cell gate; params.elementId)', producesImage: true, overridable: true, storyLevel: true },
@@ -609,6 +625,9 @@ export const TESTLAB_STAGES = [
   { id: 'avatar_realistic', label: 'Avatar pass 1 (realistic anchor)', producesImage: true, overridable: false, characterLevel: true },
   { id: 'avatar_style', label: 'Avatar pass 2 (style transfer)', producesImage: true, overridable: true, characterLevel: true },
   { id: 'avatar_eval', label: 'Avatar sheet eval', producesImage: false, overridable: true, characterLevel: true },
+  // A garment-off (wardrobe-state) sheet made from the story's approved base the
+  // way production makes it, unjudged — the input the sheet_style fixtures judge.
+  { id: 'avatar_redress', label: 'Avatar garment-off variant (production redress, no judge)', producesImage: true, overridable: false, characterLevel: true },
   // Trial variety: is the idea generator repetitive, and does the random
   // challenge draw (which the trial's one-call writer never receives) help?
   { id: 'trial_idea_variety', label: 'Trial idea variety (N draws of the same pair → repeats)', producesImage: false, overridable: true, storyLevel: true },

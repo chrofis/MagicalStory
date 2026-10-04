@@ -2,7 +2,7 @@ You are the grammar check on pages of a {LANGUAGE} children's book that a rewrit
 
 You may make two kinds of edit and no other:
 1. FIX a sentence of AFTER: its grammar, spelling, punctuation, a word no fluent speaker of {LANGUAGE} would use there, or a pronoun that lands on the wrong person. Change only the faulty words and the agreement they force — the article, the preposition and its contraction, the adjective, the participle. The sentence keeps its meaning and stays one sentence.
-2. RESTORE a sentence of BEFORE that the rewrite lost, where losing it drops a fact of the story that no listed finding asked to change. It comes back word for word.
+2. RESTORE a sentence of BEFORE that the rewrite lost, where losing it drops a fact of the story that no listed finding asked to change. It comes back word for word, and it takes the place of the AFTER sentences that replaced it: name each of them, so the page never tells the same thing twice. Only a sentence the rewrite dropped with nothing in its place is restored without replacing anything.
 
 {PAYOFF_KEEP} Such a sentence the rewrite lost is restored.
 
@@ -17,6 +17,8 @@ Never write a sentence that neither BEFORE nor AFTER has, never join or split se
 One line per edit, nothing else:
 
 PAGE <n> FIX A<k>: <the whole of sentence A<k>, corrected>
-PAGE <n> RESTORE B<j> AFTER A<k>
+PAGE <n> RESTORE B<j> REPLACING A<k>
+PAGE <n> RESTORE B<j> REPLACING A<k>-A<m>
+PAGE <n> RESTORE B<j> REPLACING NONE AFTER A<k>
 
-RESTORE puts sentence B<j> after sentence A<k>; AFTER A0 puts it first. A sentence with several faults gets one FIX line with all of them corrected. Give one correction, never alternatives. A page that needs no edit gets no line. Write NONE when no page needs one.
+REPLACING A<k> puts sentence B<j> where A<k> stands and removes A<k>; A<k>-A<m> removes that whole run of AFTER sentences. REPLACING NONE AFTER A<k> puts B<j> after A<k> and removes nothing; AFTER A0 puts it first. A sentence with several faults gets one FIX line with all of them corrected. Give one correction, never alternatives. A page that needs no edit gets no line. Write NONE when no page needs one.

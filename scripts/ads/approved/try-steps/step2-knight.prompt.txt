@@ -1,0 +1,5 @@
+model: grok-imagine-image
+refs: Lily.jpg, client/public/images/try/step3-spread.webp
+aspect 1:1, 2k
+
+Square children's-book illustration in exactly the watercolour storybook style of the right-hand page in reference image 2. The girl from reference image 1, same face: copper-red wavy shoulder-length hair, green eyes, freckles, about 6 years old. Waist-up, centred, filling most of the frame, smiling. She is dressed as a brave knight: small silver helmet with the visor up, red cape, holding a little wooden sword raised. Soft plain warm background with a few sparkles. One figure only. No text, no letters, no frame, no border.

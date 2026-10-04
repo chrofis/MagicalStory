@@ -95,3 +95,24 @@ describe('parseLectorFindings', () => {
     expect(res.pages[0].text).toBe("Then the boy's lantern went dark like the rest.");
   });
 });
+
+/**
+ * REGRESSION (review 2026-10-04 C4): a BARE correction that itself starts with a
+ * guillemet was read as a quoted span, cut at the last `»`: `«Komm!», sagte er.`
+ * became `Komm!` and applying it stripped the guillemets and ", sagte er.".
+ * A paired quote opener is a delimiter only when its close ends the side.
+ */
+describe('a bare side that starts with a guillemet', () => {
+  it('quotedSpan: the close must be the LAST character of the side', () => {
+    expect(quotedSpan('«Komm!», sagte er.')).toBeNull();
+    expect(quotedSpan('«Komm!»')).toBe('Komm!');
+    expect(quotedSpan('„Komm!“, sagte er.')).toBeNull();
+    expect(quotedSpan('«unclosed')).toBe(false);
+  });
+  it('parseLectorFindings keeps the whole bare correction', () => {
+    const findings = parseLectorFindings("PAGE 3: '«Komm», sagte er.' → «Komm!», sagte er.");
+    expect(findings).toHaveLength(1);
+    expect(findings[0].quote).toBe('«Komm», sagte er.');
+    expect(findings[0].correction).toBe('«Komm!», sagte er.');
+  });
+});

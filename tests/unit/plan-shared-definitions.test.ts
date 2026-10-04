@@ -22,7 +22,7 @@ const checker = () => pb.buildPlanCheckPrompt(
 describe('planner and checker share one definition, not two copies', () => {
   beforeAll(async () => { await loadPromptTemplates(); });
 
-  for (const name of ['DEED_AND_EFFECT_DEF', 'TWO_HEIGHTS_DEF', 'NAMING_DEF', 'ENDING_EVENT_DEF']) {
+  for (const name of ['DEED_AND_EFFECT_DEF', 'TWO_HEIGHTS_DEF', 'WHOLE_CAST_DEF', 'NAMING_DEF', 'ENDING_EVENT_DEF', 'EXCITING_START_DEF', 'HAPPY_ENDING_DEF']) {
     it(`${name} reaches BOTH prompts, verbatim`, () => {
       const def = pb[name];
       expect(def, `${name} is not exported`).toBeTruthy();
@@ -142,7 +142,7 @@ describe('plan-check Q6 nominates the peopleless page, and the planner is told',
     expect(g).toContain('At least one page in the book earns this');
     expect(g).toContain('never a page whose drama is between people');
     // The clause the checker grades and the planner previously lacked.
-    expect(g).toContain('so does every picture question 6 names as most wanted');
+    expect(g).toContain('so does every picture question 5 names as most wanted');
   });
 
   it('the re-plan tells the planner a named page is a candidate it may refuse', () => {
@@ -157,25 +157,72 @@ describe('plan-check Q6 nominates the peopleless page, and the planner is told',
 });
 
 /**
+ * THE RE-PLAN IS THE THIRD READER OF WHOLE_CAST_DEF (2026-09-26, Lab #1537).
+ * A CHECK[17] line reached MUST FIX with no definition beside it, and the round
+ * answered it with one figure's deed while the rest looked on; the recheck filed
+ * Q17 again. The re-plan block now carries the same constant the checker's
+ * question 17 reads, whatever findings it lists — a whole-cast page rewritten
+ * for another finding (p6 there) must keep its shared action too.
+ */
+describe('the re-plan block carries the whole-cast definition the check grades by', () => {
+  beforeAll(async () => { await loadPromptTemplates(); });
+  const plan = 'Page 1: wide — Levin — he runs — he is out';
+
+  it('a whole-cast finding in MUST FIX is answered next to the checker\'s own definition', () => {
+    const section = pb.buildReplanSection(plan,
+      [{ check: 17, line: 'CHECK[17]: page 1 holds the whole commissioned cast, but they only stand.' }],
+      { pageCount: 1 });
+    expect(section).toContain(pb.WHOLE_CAST_DEF);
+    expect(checker()).toContain(pb.WHOLE_CAST_DEF);
+    expect(section.indexOf(pb.WHOLE_CAST_DEF)).toBeLessThan(section.indexOf('## MUST FIX'));
+  });
+
+  it('it is there for a round with no whole-cast finding, which may still rewrite a whole-cast page', () => {
+    const section = pb.buildReplanSection(plan,
+      [{ code: 'CENTRAL_FIGURE_ABSENT_THIRD', pages: [1], line: 'PLAN[CENTRAL_FIGURE_ABSENT_THIRD] page 1: x' }],
+      { pageCount: 1 });
+    expect(section).toContain(pb.WHOLE_CAST_DEF);
+  });
+
+  // Owner ruling 2026-09-27 (Lab #1550): the group watching one thing counts only
+  // seen from behind or over the shoulder. The same condition must reach every
+  // reader — planner, re-plan, checker — through the one constant.
+  it('watching together counts only from behind or over the shoulder, on every side', () => {
+    const clause = 'watching one thing is a shared action only when they are seen from behind or over the shoulder';
+    expect(pb.WHOLE_CAST_DEF).toContain(clause);
+    expect(pb.WHOLE_CAST_DEF).toContain('facing the viewer it never is');
+    expect(pb.WHOLE_CAST_DEF).not.toContain('all turned toward one thing ahead of them');
+    const section = pb.buildReplanSection(plan, [{ check: 17, line: 'CHECK[17]: page 1 x' }], { pageCount: 1 });
+    for (const text of [planner(), checker(), section]) expect(text).toContain(clause);
+  });
+
+  it('it is stated once in the block', () => {
+    const section = pb.buildReplanSection(plan, [{ check: 17, line: 'CHECK[17]: page 1 x' }], { pageCount: 1 });
+    expect(section.split(pb.WHOLE_CAST_DEF).length - 1).toBe(1);
+  });
+});
+
+/**
  * The over-the-shoulder contact rule (shotVocabulary.OTS_NO_CONTACT_RULE) is one
  * constant filled into both sides: the planner's {OTS_NO_CONTACT} and the
  * checker's question 14. Before 2026-09-24 only the planner had it, and an OTS
  * page on a contact beat passed the check (job_1790277448294_5herh01j7 p12).
  */
-describe('the over-the-shoulder contact rule reaches planner and checker from one constant', () => {
+// RETIRED from planner and checker 2026-09-27: no plan line carries a shot while
+// the plan is written and checked; the rule rides in the Jev over-the-shoulder
+// question (jevDecisions.shotFitQuestions) and the Art Director templates.
+describe('the over-the-shoulder contact rule left the planner and the checker with the shot word', () => {
   beforeAll(async () => { await loadPromptTemplates(); });
   const { OTS_NO_CONTACT_RULE } = require('../../server/lib/shotVocabulary');
-  const count = (hay: string, needle: string) => hay.split(needle).length - 1;
 
-  it('the built plan check carries it exactly once, with no unfilled placeholder', () => {
+  it('the built plan check carries it nowhere, with no unfilled placeholder', () => {
     const p = String(checker());
-    expect(count(p, OTS_NO_CONTACT_RULE)).toBe(1);
-    expect(p).not.toContain('{OTS_NO_CONTACT}');
+    expect(p).not.toContain(OTS_NO_CONTACT_RULE);
     expect(p).not.toMatch(/\{[A-Z_]{3,}\}/);
   });
 
-  it('the built planner carries the same constant', () => {
-    expect(String(planner())).toContain(OTS_NO_CONTACT_RULE);
+  it('the built planner carries it nowhere', () => {
+    expect(String(planner())).not.toContain(OTS_NO_CONTACT_RULE);
   });
 });
 

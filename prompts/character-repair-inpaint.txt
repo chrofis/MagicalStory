@@ -1,17 +1,17 @@
 TWO IMAGES ATTACHED.
-- IMAGE 1 = REFERENCE PORTRAIT of {charName}. Use it ONLY to copy face, hair, skin tone, build, and clothing. NEVER return this image. NEVER reproduce its background or composition.
-- IMAGE 2 = THE SCENE TO EDIT. The figure to replace is marked by a magenta crosshatch. Your output MUST be an edited copy of IMAGE 2 — same dimensions, same background, same other characters. Only the crosshatched area is repainted.
+- {REFERENCE_IMAGE} = REFERENCE BODY AND OUTFIT of {charName} (the full figure). Use it ONLY to copy face, hair, skin tone, build, and clothing. NEVER return this image. NEVER reproduce its background or composition.
+- {EDIT_IMAGE} = THE SCENE TO EDIT. The figure to replace is marked by a magenta crosshatch. Your output MUST be an edited copy of {EDIT_IMAGE} — same dimensions, same background, same other characters. Only the crosshatched area is repainted.
 
-If you are tempted to return anything that looks like IMAGE 1, stop — return IMAGE 2 with the crosshatch repainted instead.
+If you are tempted to return anything that looks like {REFERENCE_IMAGE}, stop — return {EDIT_IMAGE} with the crosshatch repainted instead.
 
-Replace the figure under the magenta crosshatch in IMAGE 2 with {charName} from IMAGE 1. The crosshatch traces the exact silhouette — match its shape, size, and pose. Do not paint outside the crosshatch. Do not paint a smaller figure inside it.{actionContext}
+Replace the figure under the magenta crosshatch in {EDIT_IMAGE} with {charName} from {REFERENCE_IMAGE}. The crosshatch traces the exact silhouette — match its shape, size, and pose. Do not paint outside the crosshatch. Do not paint a smaller figure inside it.{actionContext}
 
-Preserve the exact figure count. Do not add, remove, or duplicate any character. Only the figure under the magenta crosshatch is repainted; every other figure in IMAGE 2 is final.
+Preserve the exact figure count. Do not add, remove, or duplicate any character. Only the figure under the magenta crosshatch is repainted; every other figure in {EDIT_IMAGE} is final.
 
-Face: match IMAGE 1 (face shape, eyes, hair, skin tone).{appearanceContext}
+Face: match {REFERENCE_IMAGE} (face shape, eyes, hair, skin tone).{appearanceContext}
 
 {REPAIR_STYLE_GUARD}
 
-Every pixel outside the crosshatch in IMAGE 2 is final — copy IMAGE 2 verbatim there. Do not re-render other characters, the background, lighting, or colours.{artStyleContext}{clothingContext}{issueContext}{textPositionContext}
+Every pixel outside the crosshatch in {EDIT_IMAGE} is final — copy {EDIT_IMAGE} verbatim there. Do not re-render other characters, the background, lighting, or colours.{artStyleContext}{clothingContext}{issueContext}{textPositionContext}
 
 {REPAIR_TEXT_GUARD}

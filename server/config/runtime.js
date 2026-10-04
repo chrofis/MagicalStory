@@ -43,6 +43,17 @@ const SETTINGS = {
   // which is what the Test Lab A/B and one-off reruns use.
   pipelineMode: 'beats',
 
+  // ── Client IP (Express `trust proxy`) ──────────────────────────────────
+  // Production and staging sit behind Railway's edge only (no Cloudflare:
+  // `Server: railway-hikari`, no cf-ray) and the app sees
+  // `X-Forwarded-For: <client>, <railway edge>`. Measured 2026-10-04 on
+  // /api/check-ip: with `trust proxy 1`, req.ip was the EDGE address
+  // (212.102.36.193/.194), so every per-IP limiter shared one bucket across all
+  // visitors. 2 hops makes req.ip the client; the edge overwrites a
+  // client-sent X-Forwarded-For, so it cannot be spoofed. (Local dev has no proxy and
+  // no limiter that matters, so one value serves every environment.)
+  trustProxyHops: 2,
+
   // ── Figure detection ───────────────────────────────────────────────────
   // GroundingDINO everywhere (owner, 2026-08-17). Runs on the analyzer's CPU,
   // so detection costs no API spend; the analyzer loads it lazily (~90s) and
@@ -116,13 +127,23 @@ const SETTINGS = {
   textZoneRules: true,
 
   // ── Repair ─────────────────────────────────────────────────────────────
-  // The ONLY deliberate environment difference left, since `inventoryModel`
+  // One of two deliberate environment differences (with verifyAutoCheck below), since `inventoryModel`
   // was unified on 2026-09-19. A paying customer's book gets
   // every recovery attempt; staging runs a single pass so a showcase finishes
   // in reviewable time — rounds 2 and 3 of the Berger run
   // (job_1786193650012_7baiaeftb) cost ~15 of its 50 minutes, and the owner is
   // watching the result, not the convergence.
   repairMaxPasses: perEnvironment({ default: 3, staging: 1, local: 1 }),
+
+  // ── Verification registry auto-check ───────────────────────────────────
+  // Staging only (owner, 2026-09-27). When a story completes, the server
+  // judges it against tasks/verify.json (server/lib/verifyAutoCheck.js) and
+  // stores the verdicts in story_verify_reports; `verify-run.js --pull` writes
+  // them into the registry. Staging is where changes are proven; production
+  // stories are customers' books, and a production deploy carries the registry
+  // of the build it ships, so its verdicts would add nothing staging lacks.
+  // Runs after completion, off the critical path; it never fails a story.
+  verifyAutoCheck: perEnvironment({ default: false, staging: true }),
 
   // ── Blind inventory judge (eval Stage 1) ───────────────────────────────
   // The vision model that describes a rendered page before any judging. Its

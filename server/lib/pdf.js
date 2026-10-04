@@ -29,7 +29,7 @@ const getCoverImageData = (img) => typeof img === 'string' ? img : img?.imageDat
 /**
  * Resolve any image-data string into a Buffer. Handles:
  *   - data URI base64 ("data:image/png;base64,...")
- *   - https/http URL (fetched, post-R2-migration covers)
+ *   - https/http URL on our R2 bucket (fetched, post-R2-migration covers); any other host throws
  *   - raw base64 string (no prefix)
  *   - empty / null / unrecognised → returns null (caller should skip)
  *
@@ -39,19 +39,17 @@ const getCoverImageData = (img) => typeof img === 'string' ? img : img?.imageDat
  */
 async function resolveImageBuffer(source) {
   if (!source || typeof source !== 'string') return null;
-  // HTTP(S) URL — fetch and return the bytes
+  // HTTP(S) URL — only our own R2 bucket is fetched (review R12: a story blob can carry any
+  // string, and PDF generation must not become a server-side fetch of arbitrary URLs).
+  // r2.fetchImageBytes carries the timeout.
   if (/^https?:\/\//i.test(source)) {
-    try {
-      const res = await fetch(source);
-      if (!res.ok) {
-        log.warn(`⚠️ [PDF] Image fetch failed: ${res.status} ${source.substring(0, 80)}`);
-        return null;
-      }
-      return Buffer.from(await res.arrayBuffer());
-    } catch (err) {
-      log.warn(`⚠️ [PDF] Image fetch error: ${err.message} (${source.substring(0, 80)})`);
-      return null;
+    const r2 = require('./r2');
+    if (!r2.keyFromPublicUrl(source)) {
+      throw new Error(`PDF image URL is not on the R2 bucket: ${source.substring(0, 80)}`);
     }
+    const buf = await r2.fetchImageBytes(source, { retries: 2, timeoutMs: 30000 });
+    if (!buf) log.warn(`⚠️ [PDF] Image fetch failed: ${source.substring(0, 80)}`);
+    return buf;
   }
   // data URI — strip the prefix, decode base64
   const dataMatch = source.match(/^data:[^;]+;base64,(.*)$/);
@@ -1150,6 +1148,7 @@ async function generateViewPdf(storyData, bookFormat = DEFAULT_FORMAT, options =
 }
 
 module.exports = {
+  resolveImageBuffer,
   generatePrintPdf,
   generateViewPdf,
   generateCombinedBookPdf,

@@ -67,10 +67,13 @@ async function normalizeSceneBuffer(imageData) {
   return Buffer.from(r2Lib.stripDataUriPrefix(imageData), 'base64');
 }
 
-async function normalizeAvatar(characterPhoto, opts) {
-  const sharp = require('sharp');
+// The reference by repair target — charRepairReference.buildRepairReference is
+// the ONE decision (face repair: the pose's face cell alone; body repair: the
+// pose's body cell alone; both upscaled). `target` is the FINAL face/body axis,
+// after the geometry guards, so the reference always matches what is repainted.
+async function normalizeAvatar(characterPhoto, opts, target) {
   const r2Lib = require('./r2');
-  const { cropToFrontColumn } = require('./grok');
+  const { buildRepairReference, isSheetPhotoType } = require('./charRepairReference');
   let avatarBuffer;
   if (typeof characterPhoto === 'string' && /^https?:\/\//i.test(characterPhoto)) {
     avatarBuffer = await require('./r2').fetchImageBytes(characterPhoto);
@@ -81,10 +84,11 @@ async function normalizeAvatar(characterPhoto, opts) {
   if (!avatarBuffer || avatarBuffer.length < 1000) {
     throw new Error(`Character reference is empty/invalid (${avatarBuffer?.length || 0} bytes) — refusing to send to the model`);
   }
-  // FAITHFULNESS-CHECK: images.js:11431-11433 (styled-avatar grid → front column).
-  const isAvatarGrid = opts.photoType && (opts.photoType.startsWith('styled-') || opts.photoType.startsWith('costumed-') || opts.photoType.startsWith('clothing-'));
-  const cropped = isAvatarGrid ? await cropToFrontColumn(avatarBuffer) : avatarBuffer;
-  return `data:image/jpeg;base64,${cropped.toString('base64')}`;
+  return buildRepairReference(avatarBuffer, {
+    target,
+    isSheet: isSheetPhotoType(opts.photoType),
+    pose: opts.referencePose || null,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -528,18 +532,68 @@ async function buildBlurTreatment({ cropBuf, crop, bodyBoxInCrop, boxInCrop, fac
 }
 
 // ---------------------------------------------------------------------------
+// IMAGE ORDER — which slot holds the image to edit and which the reference.
+//
+// A repair prompt names its images by number ("IMAGE 1 = …"), so the numbers
+// must be the slots the call actually fills. They were hand-written in every
+// template as "IMAGE 1 = reference, IMAGE 2 = scene" — true for the box path
+// (grokEditSceneExact sends references first, the scene last) and false for
+// callModel, which sends the treated crop first: every face repair and every
+// cutout repair told the model the scene was the reference (Lab 1554,
+// 2026-09-27, Grok log slot 1 = crop). The labels are now BUILT from the
+// constant each send site builds its image array from, so they cannot drift.
+// ---------------------------------------------------------------------------
+const CALL_MODEL_IMAGE_ORDER = Object.freeze(['edit', 'reference']);
+
+function repairImageOrder({ regionSource, model }) {
+  // Box + grok is the one path that sends through grokEditSceneExact; box with
+  // any other model, and every cutout, go through callModel.
+  if (regionSource === 'box' && model === 'grok') return require('./imageCompositing').SCENE_EXACT_IMAGE_ORDER;
+  return CALL_MODEL_IMAGE_ORDER;
+}
+
+const SLOT_ORDINALS = ['first', 'second'];
+function imageSlotLabels(order) {
+  const slot = (role) => {
+    const i = order.indexOf(role);
+    if (i < 0) throw new Error(`imageSlotLabels: no "${role}" slot in [${order.join(', ')}]`);
+    return i;
+  };
+  return {
+    EDIT_IMAGE: `IMAGE ${slot('edit') + 1}`,
+    REFERENCE_IMAGE: `IMAGE ${slot('reference') + 1}`,
+    editOrdinal: SLOT_ORDINALS[slot('edit')],
+    referenceOrdinal: SLOT_ORDINALS[slot('reference')],
+  };
+}
+
+// A character-repair template names its images ONLY through {EDIT_IMAGE} and
+// {REFERENCE_IMAGE}. A hard-coded "IMAGE 1" is exactly the drift this exists
+// to stop, and fillTemplate strips an unfilled placeholder silently — so a
+// template that breaks the contract throws instead of shipping.
+function assertImageSlotTemplate(tpl, key) {
+  const literal = String(tpl).match(/\bIMAGE [0-9]\b/);
+  if (literal) throw new Error(`${key}: hard-coded "${literal[0]}" — name images only through {EDIT_IMAGE} / {REFERENCE_IMAGE}`);
+  for (const ph of ['{EDIT_IMAGE}', '{REFERENCE_IMAGE}']) {
+    if (!String(tpl).includes(ph)) throw new Error(`${key}: missing ${ph} — the prompt would not say which image is which`);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Model dispatch — the ONLY axis-3 difference. Same treated input, same refs.
 // grok edit coerces output to the slot-0 (treated crop / scene) aspect, so the
 // output geometry matches qwen's rw×rh; everything downstream (SAM re-detect,
-// union blend) is shared.
+// union blend) is shared. Slot order: CALL_MODEL_IMAGE_ORDER.
 // ---------------------------------------------------------------------------
 async function callModel({ model, prompt, treatedUri, avatarUri, aspect, cropW, cropH }) {
+  const byRole = { edit: treatedUri, reference: avatarUri };
+  const images = CALL_MODEL_IMAGE_ORDER.map(role => byRole[role]);
   if (model === 'grok') {
     const { editWithGrok } = require('./grok');
     // skipOutputCrop: the output geometry must stay the treated crop's (rw×rh)
     // so the SAM re-detect and union blend below run in the same coordinate
     // space as the input. A drift crop would shift every mask.
-    const r = await editWithGrok(prompt, [treatedUri, avatarUri], { aspectRatio: aspect || '1:1', resolution: '1k', skipOutputCrop: true });
+    const r = await editWithGrok(prompt, images, { aspectRatio: aspect || '1:1', resolution: '1k', skipOutputCrop: true });
     if (!r?.imageData) throw new Error('Grok returned no image');
     return { imageData: r.imageData, usage: r.usage };
   }
@@ -547,7 +601,7 @@ async function callModel({ model, prompt, treatedUri, avatarUri, aspect, cropW, 
     const { editWithQwen } = require('./runware');
     // Runware dims must be multiples of 64 in [512,2048]; render ~2x for detail.
     const snap = v => Math.max(512, Math.min(2048, Math.round(v / 64) * 64));
-    const r = await editWithQwen(prompt, [treatedUri, avatarUri], { width: snap(cropW * 2), height: snap(cropH * 2) });
+    const r = await editWithQwen(prompt, images, { width: snap(cropW * 2), height: snap(cropH * 2) });
     if (!r?.imageData) throw new Error('Qwen returned no image');
     return { imageData: r.imageData, usage: { model: r.modelId, cost: r.cost } };
   }
@@ -649,6 +703,7 @@ const PHRASE_CLOTHING = 'the clothing is wrong — dress the figure as the refer
 const CHAR_FIX_DEFECT_PHRASES = Object.freeze({
   face_mismatch: PHRASE_FACE,
   character_identity: PHRASE_FACE,
+  identity_swap: 'the figure does not read as this character — paint the face and hair from the reference image',
   face_drift: 'the face proportions drift from the reference — match the face shape of the reference image',
   face_destroyed: 'the face is not properly rendered — paint the facial features from the reference image',
   age_shift: 'the apparent age differs from the reference — paint the age shown in the reference image',
@@ -686,8 +741,13 @@ async function buildPrompt(args) {
   return lightLine ? `${core}\n\n${lightLine}` : core;
 }
 
-async function buildPromptCore({ treatment, regionSource, faceOnly, charName, opts, sceneBuffer, faceBbox, sceneW, sceneH }) {
+async function buildPromptCore({ treatment, regionSource, faceOnly, model, charName, opts, sceneBuffer, faceBbox, sceneW, sceneH }) {
   const { PROMPT_TEMPLATES, fillTemplate, repairStyleGuard, isPhotographicArtStyle } = require('../services/prompts');
+  // Which slot is which, from the order THIS call sends them. The model axis
+  // picks the send path, so it is required — a guessed one could name the
+  // images backwards.
+  if (!model) throw new Error('buildPrompt: model is required — it decides the order the images are sent in');
+  const slots = imageSlotLabels(repairImageOrder({ regionSource, model }));
   // IDENTITY vs REGION. Every "paint <name>" / "match <name>'s clothing" line must
   // name the person we WANT (opts.promptName), while scene-state lookups stay keyed
   // on the character who is actually IN the scene (charName). Without this an
@@ -726,12 +786,12 @@ async function buildPromptCore({ treatment, regionSource, faceOnly, charName, op
       const p = await describeHeadPose(`data:image/jpeg;base64,${faceCrop.toString('base64')}`);
       poseText = [p.facing ? `facing ${p.facing}` : null, p.headTilt ? `head ${p.headTilt}` : null, p.gaze ? `gaze ${p.gaze}` : null, p.expression ? `expression: ${p.expression}` : null, p.mouth ? `mouth ${p.mouth}` : null].filter(Boolean).join('; ');
     } catch (e) { log.warn(`[FACE REPAIR] head-pose failed (${e.message}) — omitting pose facts`); }
-    let styleLine = ' Match the visual style and lighting of the first image.';
+    let styleLine = ` Match the visual style and lighting of the ${slots.editOrdinal} image.`;
     try {
       const { ART_STYLES } = require('./storyHelpers');
       const raw = ART_STYLES[opts.artStyle];
       const txt = typeof raw === 'string' ? raw : (raw && raw.default) || '';
-      if (txt) styleLine = ` Match the exact visual style, medium and rendering of the first image: ${txt}`;
+      if (txt) styleLine = ` Match the exact visual style, medium and rendering of the ${slots.editOrdinal} image: ${txt}`;
     } catch { /* generic */ }
     const rich = (typeof opts.characterDescription === 'string' ? opts.characterDescription : opts.richDescription) || '';
     const faceFacts = rich ? ` The person: ${rich.split(/Wearing:/i)[0].replace(/\s+/g, ' ').trim().slice(0, 380)}` : '';
@@ -740,7 +800,7 @@ async function buildPromptCore({ treatment, regionSource, faceOnly, charName, op
     const poseClause = poseText
       ? ` HEAD POSE AND EXPRESSION (from the original scene; directions are from the viewer's perspective): ${poseText}. Paint the head in exactly this pose — never turn it toward the camera unless stated.`
       : '';
-    return `Paint the FACE and head of the person from the second image into the white area of the first image. The white area shows the head's exact position and scale. IDENTITY comes from the second image: exact same facial features, age, hair style and hair color${glassesClause}.${faceFacts}${poseClause} Keep everything outside the white area exactly unchanged: same body, same clothing, same pose, same background, same other people.${styleLine}`;
+    return `Paint the FACE and head of the person from the ${slots.referenceOrdinal} image into the white area of the ${slots.editOrdinal} image. The white area shows the head's exact position and scale. IDENTITY comes from the ${slots.referenceOrdinal} image: exact same facial features, age, hair style and hair color${glassesClause}.${faceFacts}${poseClause} Keep everything outside the white area exactly unchanged: same body, same clothing, same pose, same background, same other people.${styleLine}`;
   }
 
   // Body / crosshatch / blur — use the matching character-repair template.
@@ -774,8 +834,12 @@ async function buildPromptCore({ treatment, regionSource, faceOnly, charName, op
     return `\n\nArt style: ${opts.artStyle}`;
   })();
   if (treatment === 'blur') {
-    const tpl = !faceOnly && PROMPT_TEMPLATES.characterRepairBodyBlended ? PROMPT_TEMPLATES.characterRepairBodyBlended : PROMPT_TEMPLATES.characterRepairBlended;
-    if (tpl) return fillTemplate(tpl, { charName: identityName, identityName, appearanceContext, clothingContext, actionContext, issueContext, textPositionContext, sceneMediumLine, REPAIR_STYLE_GUARD: styleGuard });
+    const key = !faceOnly && PROMPT_TEMPLATES.characterRepairBodyBlended ? 'characterRepairBodyBlended' : 'characterRepairBlended';
+    const tpl = PROMPT_TEMPLATES[key];
+    if (tpl) {
+      assertImageSlotTemplate(tpl, key);
+      return fillTemplate(tpl, { charName: identityName, identityName, appearanceContext, clothingContext, actionContext, issueContext, textPositionContext, sceneMediumLine, REPAIR_STYLE_GUARD: styleGuard, EDIT_IMAGE: slots.EDIT_IMAGE, REFERENCE_IMAGE: slots.REFERENCE_IMAGE });
+    }
   }
   if (treatment === 'crosshatch') {
     // Box mode sends the FULL SCENE, so it needs the scene template: the cutout
@@ -785,10 +849,14 @@ async function buildPromptCore({ treatment, regionSource, faceOnly, charName, op
     // the template the pre-spine fullScene branch used (d68bd8815); the Stage-3
     // refactor collapsed both region sources onto the cutout template and
     // orphaned it.
-    const tpl = (regionSource === 'box' && PROMPT_TEMPLATES.characterRepairInpaint)
-      ? PROMPT_TEMPLATES.characterRepairInpaint
-      : PROMPT_TEMPLATES.characterRepairCutout;
-    if (tpl) return fillTemplate(tpl, { charName: identityName, identityName, appearanceContext, clothingContext, actionContext, issueContext, artStyleContext, textPositionContext, REPAIR_STYLE_GUARD: styleGuard });
+    const key = (regionSource === 'box' && PROMPT_TEMPLATES.characterRepairInpaint)
+      ? 'characterRepairInpaint'
+      : 'characterRepairCutout';
+    const tpl = PROMPT_TEMPLATES[key];
+    if (tpl) {
+      assertImageSlotTemplate(tpl, key);
+      return fillTemplate(tpl, { charName: identityName, identityName, appearanceContext, clothingContext, actionContext, issueContext, artStyleContext, textPositionContext, REPAIR_STYLE_GUARD: styleGuard, EDIT_IMAGE: slots.EDIT_IMAGE, REFERENCE_IMAGE: slots.REFERENCE_IMAGE });
+    }
   }
   // Medium named from the story, not assumed. "This is a children's book
   // illustration" was hardcoded here, so the template-less fallback told the
@@ -797,7 +865,7 @@ async function buildPromptCore({ treatment, regionSource, faceOnly, charName, op
   const mediumLine = isPhotographicArtStyle(opts.artStyle)
     ? 'This is a photograph.'
     : "This is a children's book illustration.";
-  return `${mediumLine} Redraw the marked figure to look like ${identityName} from the reference photo. Match face, hair, skin tone, build and clothing exactly. Preserve the original pose, expression and gaze. Keep art style and background unchanged. ${styleGuard}${clothingContext}${actionContext}${issueContext}${artStyleContext}`;
+  return `${mediumLine} Redraw the marked figure in the ${slots.editOrdinal} image to look like ${identityName} from the reference in the ${slots.referenceOrdinal} image. Match face, hair, skin tone, build and clothing exactly. Preserve the original pose, expression and gaze. Keep art style and background unchanged. ${styleGuard}${clothingContext}${actionContext}${issueContext}${artStyleContext}`;
 }
 
 // ===========================================================================
@@ -995,7 +1063,18 @@ async function _repairCharacterFaceOnce(sceneInput, avatarInput, opts = {}) {
   if (!faceOnly && !bodyBbox) throw new Error(`${descriptor}: body repair needs a bodyBbox`);
 
   const sceneBuffer = await normalizeSceneBuffer(sceneInput);
-  const avatarUri = await normalizeAvatar(avatarInput, opts);
+  const reference = await normalizeAvatar(avatarInput, opts, faceOnly ? 'face' : 'body');
+  // Padded (never cropped) to the aspect of the call it goes out with: Grok
+  // crops any input whose aspect differs, which is what cut the old stacked
+  // reference down to its middle. `avatarUri` records exactly what was sent.
+  let avatarUri = null;
+  const referenceUriFor = async (aspectStr) => {
+    const { fitReferenceToAspect } = require('./charRepairReference');
+    const buf = aspectStr ? await fitReferenceToAspect(reference.buf, aspectStr) : reference.buf;
+    avatarUri = `data:image/jpeg;base64,${buf.toString('base64')}`;
+    log.info(`👤 [FACE REPAIR] ${opts.charName || opts.characterName || 'character'}: reference ${reference.kind} ${reference.width}x${reference.height}${aspectStr ? ` padded to ${aspectStr}` : ''}, ${Math.round(buf.length / 1024)}KB`);
+    return avatarUri;
+  };
   const meta = await sharp(sceneBuffer).metadata();
   const W = meta.width, H = meta.height;
 
@@ -1066,7 +1145,7 @@ async function _repairCharacterFaceOnce(sceneInput, avatarInput, opts = {}) {
   const treatmentInfo = { treatment, regionSource, faceOnly, faceBlur: treated.faceBlur || null, hatchClipped: treated.hatchClipped !== false };
 
   // --- Prompt + model call ---------------------------------------------------
-  const prompt = opts.prompt || await buildPrompt({ treatment, regionSource, faceOnly, charName, opts, sceneBuffer, faceBbox, sceneW: W, sceneH: H });
+  const prompt = opts.prompt || await buildPrompt({ treatment, regionSource, faceOnly, model, charName, opts, sceneBuffer, faceBbox, sceneW: W, sceneH: H });
 
   let candidateCrop;      // model output resized to crop dims (the paste source)
   let usage;
@@ -1084,6 +1163,7 @@ async function _repairCharacterFaceOnce(sceneInput, avatarInput, opts = {}) {
     candidateCrop = regionSource === 'box'
       ? await sharp(buf).resize(W, H, { fit: 'fill' }).extract({ left: crop.x, top: crop.y, width: crop.w, height: crop.h }).png().toBuffer()
       : await sharp(buf).resize(crop.w, crop.h, { fit: 'fill' }).png().toBuffer();
+    await referenceUriFor(aspect);
     log.info(`[FACE REPAIR] reusing a stored model output — no model call (${descriptor})`);
   } else if (regionSource === 'box') {
     // The model edits the WHOLE scene (treatment already painted on the crop
@@ -1097,13 +1177,16 @@ async function _repairCharacterFaceOnce(sceneInput, avatarInput, opts = {}) {
     // full-page raw output made the pair impossible to compare (owner, #307).
     sentToModelUri = treatedSceneUri;
     if (model === 'grok') {
-      const exact = await grokEditSceneExact(prompt, [avatarUri], treatedScene, W, H, { encode: 'png' });
+      // grokEditSceneExact sends the scene at closestGrokAspect(W, H); the
+      // reference goes at that same aspect so it is not cropped.
+      const { closestGrokAspect } = require('./grokAspect');
+      const exact = await grokEditSceneExact(prompt, [await referenceUriFor(closestGrokAspect(W, H))], treatedScene, W, H, { encode: 'png' });
       if (!exact.buffer) throw new Error('Grok returned no image (box mode)');
       usage = exact.grokResult?.usage;
       grokRawResult = exact.grokResult?.imageData;
       candidateCrop = await sharp(exact.buffer).extract({ left: crop.x, top: crop.y, width: crop.w, height: crop.h }).png().toBuffer();
     } else {
-      const r = await callModel({ model, prompt, treatedUri: treatedSceneUri, avatarUri, aspect: null, cropW: W, cropH: H });
+      const r = await callModel({ model, prompt, treatedUri: treatedSceneUri, avatarUri: await referenceUriFor(null), aspect: null, cropW: W, cropH: H });
       usage = r.usage; grokRawResult = r.imageData;
       const outBuf = Buffer.from(r.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
       candidateCrop = await sharp(outBuf).resize(W, H, { fit: 'fill' }).extract({ left: crop.x, top: crop.y, width: crop.w, height: crop.h }).png().toBuffer();
@@ -1111,7 +1194,7 @@ async function _repairCharacterFaceOnce(sceneInput, avatarInput, opts = {}) {
   } else {
     // cutout: the model edits ONLY the crop.
     const treatedUri = `data:image/png;base64,${treatedBuf.toString('base64')}`;
-    const r = await callModel({ model, prompt, treatedUri, avatarUri, aspect, cropW: crop.w, cropH: crop.h });
+    const r = await callModel({ model, prompt, treatedUri, avatarUri: await referenceUriFor(aspect || '1:1'), aspect, cropW: crop.w, cropH: crop.h });
     usage = r.usage; grokRawResult = r.imageData;
     const outBuf = Buffer.from(r.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
     candidateCrop = await sharp(outBuf).resize(crop.w, crop.h, { fit: 'fill' }).png().toBuffer();
@@ -1135,6 +1218,7 @@ async function _repairCharacterFaceOnce(sceneInput, avatarInput, opts = {}) {
           rejectedReason: 'style_drift',
           gateMessage: `${sm.styleB} vs ${sm.styleA}`,
           grokRawResult,
+          croppedAvatar: avatarUri,
           blackoutImage: sentToModelUri || `data:image/png;base64,${treatedBuf.toString('base64')}`,
           promptSent: prompt,
           usage,
@@ -1266,6 +1350,7 @@ async function _repairCharacterFaceOnce(sceneInput, avatarInput, opts = {}) {
     return {
       imageData: null, character: charName, method: legacyMethod, descriptor,
       rejectedReason: 'blend_gate', gateMessage: blendErr.message, usage,
+      croppedAvatar: avatarUri,
       blackoutImage: sentToModelUri || `data:image/png;base64,${treatedBuf.toString('base64')}`,
       grokRawResult,
       promptSent: prompt,
@@ -1300,7 +1385,7 @@ async function _repairCharacterFaceOnce(sceneInput, avatarInput, opts = {}) {
       if (origSharpness >= REPAIR_SHARPNESS_MIN_ORIG && repairedSharpness < origSharpness * REPAIR_SHARPNESS_REJECT_RATIO) {
         log.warn(`🚫 [FACE REPAIR] ${descriptor} for ${charName} REJECTED: repaired figure blurred (${repairedSharpness.toFixed(0)} vs ${origSharpness.toFixed(0)})`);
         require('./runMetrics').forJob(require('./styledAvatars')._cacheContext?.getStore?.()).count('blur_gate_reject');
-        return { imageData: null, character: charName, method: legacyMethod, descriptor, rejectedReason: 'repaired_figure_blurred', sharpness: { original: origSharpness, repaired: repairedSharpness }, usage };
+        return { imageData: null, character: charName, method: legacyMethod, descriptor, rejectedReason: 'repaired_figure_blurred', sharpness: { original: origSharpness, repaired: repairedSharpness }, usage, croppedAvatar: avatarUri };
       }
     } catch (e) { log.warn(`[FACE REPAIR] sharpness gate failed (${e.message}) — accepting unchecked`); }
   }
@@ -1487,6 +1572,10 @@ module.exports = {
   applyGeometryGuards,
   buildActionContext,
   buildPrompt,
+  repairImageOrder,
+  imageSlotLabels,
+  CALL_MODEL_IMAGE_ORDER,
+  callModel,
   CHAR_FIX_DEFECT_PHRASES,
   charFixDefectContext,
 };

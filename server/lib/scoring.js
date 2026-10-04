@@ -191,6 +191,18 @@ const MAX_SEVERITY_TYPES = {
   // does — an evaluator escalating one to CRITICAL must not let a scale defect
   // outrank a missing or wrong character.
   structure_scale: 'major',
+  // creature_scale capped at MAJOR (owner-approved, 2026-09-26): image-evaluation
+  // D-34 defines a creature drawn far below its given size as MAJOR, the same
+  // footing as an undersized structure (D-31). The cap keeps an evaluator's
+  // escalation from outranking a missing or wrong character.
+  creature_scale: 'major',
+  // garment_facing capped at MAJOR (owner-approved, 2026-10-04): image-evaluation
+  // D-05e — a garment's front features drawn on a figure seen from behind (or
+  // the reverse). A full-length zip on a back is plain to a reader, so it may
+  // cost MAJOR; it is still the right garment on the right person, so it must
+  // never outrank a missing or wrong character (staging
+  // job_1791040103540_atbttop6w p5).
+  garment_facing: 'major',
   // duplicate_object capped at MAJOR (owner-approved addition, 2026-09-06):
   // image-evaluation D-32 defines a named prop rendered twice as MAJOR — the
   // owner's footing, "on the level of a missing key object" (D-19, also MAJOR).
@@ -239,9 +251,15 @@ const MAX_SEVERITY_TYPES = {
 // is also what puts the page into character repair under the settled
 // critical-only routing (2026-09-04). Deliberately NOT in ZERO_POINT_TYPES and
 // NOT capped.
+//
+// `identity_swap` (owner, 2026-09-27, reversing the 2026-09-04 critical-only
+// ruling for this one case): hair AND face both differ from the reference, so
+// the figure reads as another person. The entity prompt defines it as always
+// CRITICAL; the floor keeps a MAJOR slip from billing it as a hair change.
 const MIN_SEVERITY_TYPES = {
   composite_seam: 'catastrophic',
   face_destroyed: 'critical',
+  identity_swap: 'critical',
 };
 
 // NO TEXT MATCHING IN SCORING. Owner rule, 2026-08-09: "you can not build this
@@ -530,6 +548,7 @@ const BUCKET_BILLING_CATEGORY = {
   clothing: 'clothing',
   accessory: 'clothing',
   clothing_detail: 'clothing',
+  garment_facing: 'clothing',
   garment_colour: 'clothing',
   // IDENTITY IS ITS OWN CLASS, SEPARATE FROM BUILD (owner, 2026-08-19):
   // "does this figure look like the photo? If not, repair can not work. We can
@@ -636,16 +655,18 @@ function computeMathFinalScore(deductions) {
  * CONSOLIDATED SCORING (Jul 2026): pass `consolidatedPlan` (the feedback
  * consolidator's plan for THIS evaluation) and the math runs over its
  * deduped_issues — one deduction per unique defect — instead of the raw
- * evaluator lists. When absent/failed, fail-soft to math over the raw
- * (undeduped) lists with a WARN so missed consolidation is visible in logs.
+ * evaluator lists. When absent/failed, math runs over the raw (undeduped) lists
+ * with a WARN — EXCEPT with `requireConsolidation` (repair pipeline), where the
+ * version is left unscored (scoreSource 'unevaluated').
  *
  * @param {object} version  mutated in place
  * @param {object} params
  * @param {object} [params.evalResult]     evaluateImageQuality output
  * @param {object} [params.entityResult]   { penalty, issues } from getEntityPenaltyAndIssues
  * @param {object|null} [params.consolidatedPlan]   consolidator plan whose deduped_issues drive the deductions
+ * @param {boolean} [params.requireConsolidation]   no plan => not evaluated instead of scored raw
  */
-function applyScore(version, { evalResult = null, entityResult = null, consolidatedPlan = null } = {}) {
+function applyScore(version, { evalResult = null, entityResult = null, consolidatedPlan = null, requireConsolidation = false } = {}) {
   if (!version || typeof version !== 'object') return;
   const dedupedIssues = Array.isArray(consolidatedPlan?.deduped_issues)
     ? consolidatedPlan.deduped_issues
@@ -673,7 +694,12 @@ function applyScore(version, { evalResult = null, entityResult = null, consolida
       && !evalResult.reasoning
       && bucketCount === 0)
   );
-  if (hollowEval) {
+  // requireConsolidation (repair pipeline, decisions #4 no fallbacks; code review
+  // 2026-10 D3): a pipeline eval is scored on the consolidator's deduplicated issues
+  // or not at all. A failed consolidation used to score the RAW issues, so that
+  // version competed with consolidated ones on a different scale.
+  const consolidationMissing = requireConsolidation === true && !dedupedIssues;
+  if (hollowEval || consolidationMissing) {
     version.deductions = deductions;
     version.finalScore = null;
     version.evalScore = null;
@@ -682,7 +708,11 @@ function applyScore(version, { evalResult = null, entityResult = null, consolida
     version.scoreSource = 'unevaluated';
     version.scoreBreakdown = _buildBreakdownFromEvalResult(evalResult, entityResult);
     const pnHollow = version.pageNumber != null ? `page ${version.pageNumber}` : 'version';
-    log.warn(`[SCORE] ${pnHollow}: eval carries no evidence of judgment (evaluated=${evalResult.evaluated ?? 'n/a'}, no score, no reasoning, no issues) — finalScore left null, NOT defaulted to 100`);
+    if (hollowEval) {
+      log.warn(`[SCORE] ${pnHollow}: eval carries no evidence of judgment (evaluated=${evalResult.evaluated ?? 'n/a'}, no score, no reasoning, no issues) — finalScore left null, NOT defaulted to 100`);
+    } else {
+      log.error(`[SCORE] ${pnHollow}: consolidation produced no plan — version NOT scored on raw issues, finalScore left null (not evaluated)`);
+    }
     return version;
   }
 
@@ -768,10 +798,14 @@ function _buildBreakdownFromEvalResult(evalResult, entityResult) {
     issues: Array.isArray(evalResult.fixableIssues)
       ? evalResult.fixableIssues.filter(i => i?.source !== 'three-stage')
       : [],
-  } : { score: 0, reasoning: null, issues: [] };
+    // Landmark-guard casualties, same sibling-not-member contract as
+    // threeStage.suppressedIssues below (2026-09-26).
+    suppressedIssues: Array.isArray(evalResult.suppressedIssues) ? evalResult.suppressedIssues : [],
+  } : { score: 0, reasoning: null, issues: [], suppressedIssues: [] };
   const semantic = evalResult?.semanticResult ? {
     score: typeof evalResult.semanticResult.score === 'number' ? evalResult.semanticResult.score : 0,
     issues: Array.isArray(evalResult.semanticResult.semanticIssues) ? evalResult.semanticResult.semanticIssues : [],
+    suppressedIssues: Array.isArray(evalResult.semanticResult.suppressedIssues) ? evalResult.semanticResult.suppressedIssues : [],
   } : null;
   const threeStage = evalResult?.threeStageResult ? {
     score: typeof evalResult.threeStageResult.score === 'number' ? evalResult.threeStageResult.score : 0,
@@ -924,10 +958,106 @@ function versionDeductionTotal(version) {
 
 
 
+// ── CRITICAL-GONE WINS (owner, 2026-09-26) ─────────────────────────────────
+// A version whose CRITICAL is confirmed gone never loses to a version that
+// still carries it. Staging job_1790373080139_vnx5l8iy7 p18: the original
+// carried a caption overlay (CRITICAL rendered_text, score 75); inpaint
+// round 1 removed it cleanly (lettering inventory empty, pixels otherwise
+// unchanged), its re-evaluation filed unrelated MAJORs and scored 33, and the
+// score-only pick shipped the caption.
+//
+// Everything here is structural — finding classes and severities as the score
+// charged them, never a finding's prose:
+//   * A version's charged CRITICALs are the entries of its `deductions` (the
+//     record applyScore computed the score from) whose charge, after the type
+//     ceilings and floors, is at least a CRITICAL's. A version without a
+//     `deductions` record has an UNKNOWN set and takes no part in the rule.
+//   * Two CRITICALs are the same defect when deductionClassKey agrees — the
+//     scorer's own class identity (category + subject), so the evaluator pool
+//     that reported it does not matter.
+//   * A lettering CRITICAL is confirmed gone only when the version's own
+//     lettering record re-checks clean (checkUndeclaredLettering on its stored
+//     inventory yields no CRITICAL); no record, no confirmation.
+//   * A dominates B when A's CRITICAL classes are a strict subset of B's and
+//     every class B has and A lacks is confirmed gone in A. Every other pair —
+//     both clean, equal sets, or each carrying a CRITICAL the other lacks (a
+//     child that fixed one CRITICAL but gained a new one of another class) —
+//     is decided by the score, as before.
+//   * The picker first removes every scoreable version another scoreable
+//     version dominates, then ranks the rest by score. Removing (rather than a
+//     pairwise comparator) keeps the pick well-defined: dominance is a strict
+//     partial order, the score a total order on what is left.
+const CRITICAL_CHARGE = SEVERITY_POINTS.critical;
+const LETTERING_TYPE = 'rendered_text';
+
+function criticalClassKey(d) {
+  return deductionClassKey({ ...d, type: d?.subType || d?.type });
+}
+
+/**
+ * The CRITICAL classes the score charged this version for, or null when the
+ * version carries no `deductions` record (unknown — never dominates, never
+ * dominated).
+ * @returns {Set<string>|null}
+ */
+function chargedCriticalKeys(version) {
+  const d = version?.deductions;
+  if (!d || typeof d !== 'object') return null;
+  const keys = new Set();
+  for (const [bucket, list] of Object.entries(d)) {
+    if (!Array.isArray(list)) continue;
+    for (const f of list) {
+      if (deductionPoints(f, { entity: bucket === 'entity' }) >= CRITICAL_CHARGE) keys.add(criticalClassKey(f));
+    }
+  }
+  return keys;
+}
+
+/** The lettering record the check compared, on a stored or an in-pipeline version. */
+function letteringRecordOf(version) {
+  return version?.letteringInventory ?? version?.evaluation?.letteringInventory ?? null;
+}
+
+/**
+ * Is CRITICAL class `key` confirmed gone in `version`? The version's charged
+ * set must be known and lack it; a lettering class additionally needs the
+ * version's own lettering record to re-check without a CRITICAL.
+ */
+function criticalConfirmedGone(version, key, keys = chargedCriticalKeys(version)) {
+  if (!keys || keys.has(key)) return false;
+  if (key !== criticalClassKey({ type: LETTERING_TYPE })) return true;
+  const rec = letteringRecordOf(version);
+  if (!rec || !Array.isArray(rec.items)) return false;
+  const { checkUndeclaredLettering } = require('./letteringCheck');
+  return !checkUndeclaredLettering({ lettering: rec.items, declared: rec.declared })
+    .some(f => String(f.severity).toUpperCase() === 'CRITICAL');
+}
+
+/**
+ * Does version `a` dominate version `b` under critical-gone-wins? See the
+ * block comment above for the rule and its ties.
+ */
+function dominatesByCritical(a, b) {
+  const ka = chargedCriticalKeys(a);
+  const kb = chargedCriticalKeys(b);
+  if (!ka || !kb) return false;
+  for (const k of ka) if (!kb.has(k)) return false;   // a carries a CRITICAL b lacks
+  let cleared = false;
+  for (const k of kb) {
+    if (ka.has(k)) continue;
+    if (!criticalConfirmedGone(a, k, ka)) return false;
+    cleared = true;
+  }
+  return cleared;
+}
+
 /**
  * Pick the best version index out of an `imageVersions[]` array.
  * Tie-break: HIGHER index wins (newer version preferred when scores tie),
  * because newer versions usually incorporate later repair work.
+ *
+ * Critical-gone wins: a version dominated by another scoreable version
+ * (dominatesByCritical) is removed before the score ranks the rest.
  *
  * Returns -1 when no version has a non-null score (e.g. all just-pushed,
  * un-evaluated). Caller should leave activeVersion alone in that case.
@@ -937,9 +1067,7 @@ function versionDeductionTotal(version) {
  */
 function pickBestVersionIndex(versions, { tieBreak = 'latest' } = {}) {
   if (!Array.isArray(versions) || versions.length === 0) return -1;
-  let bestIdx = -1;
-  let bestScore = -Infinity;
-  let bestDeduction = Infinity;
+  const scored = [];
   for (let i = 0; i < versions.length; i++) {
     const s = computeFinalScore(versions[i]);
     // An unscored version used to be SKIPPED silently, which meant a repair
@@ -965,6 +1093,20 @@ function pickBestVersionIndex(versions, { tieBreak = 'latest' } = {}) {
       log.error(`[SCORE] ${versions[i]?.source || 'version'} ${versions[i]?.pageNumber != null ? 'p' + versions[i].pageNumber : ''}: bytes do not match the evaluated fingerprint (${fp}) — score refused, version cannot win`);
       continue;
     }
+    scored.push({ i, s });
+  }
+  // Critical-gone wins: drop every scoreable version another one dominates.
+  const dominated = new Set();
+  for (const a of scored) {
+    for (const b of scored) {
+      if (a !== b && !dominated.has(b.i) && dominatesByCritical(versions[a.i], versions[b.i])) dominated.add(b.i);
+    }
+  }
+  let bestIdx = -1;
+  let bestScore = -Infinity;
+  let bestDeduction = Infinity;
+  for (const { i, s } of scored) {
+    if (dominated.has(i)) continue;
     const ded = versionDeductionTotal(versions[i]);
     // Primary: finalScore (higher better; may be negative since the 0-floor
     // was removed 2026-08-08, so failing versions now rank against each other
@@ -1050,12 +1192,11 @@ async function recomputeAllActiveVersions(storyId, storyData) {
   // user-pinned keys (their pin already lives in image_version_meta, the single
   // source of truth). No blob mirror: the legacy sceneImages[].activeVersion /
   // coverImages[].activeVersion field was deleted; all readers resolve from meta.
-  let versionMeta = {};
-  try {
-    versionMeta = await getActiveVersionMeta(storyId);
-  } catch (err) {
-    // Non-fatal: without meta we recompute everything (pre-pin behaviour).
-  }
+  // No try/catch ON PURPOSE (review B2, 2026-10-04): without the pin map a
+  // recompute would overwrite every user-pinned version with the score-best one.
+  // A failed read fails the whole recompute; the save that called it logs that
+  // and keeps the active versions exactly as they are.
+  const versionMeta = await getActiveVersionMeta(storyId);
 
   if (Array.isArray(storyData.sceneImages)) {
     for (const s of storyData.sceneImages) {
@@ -1307,6 +1448,9 @@ module.exports = {
   PAGE_SCOPED_BUCKETS,
   BUCKET_BILLING_CATEGORY,
   pickBestVersionIndex,
+  chargedCriticalKeys,
+  criticalConfirmedGone,
+  dominatesByCritical,
   recomputeActiveVersion,
   recomputeAllActiveVersions,
   shouldRedo,

@@ -28,6 +28,7 @@
 const sharp = require('sharp');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { log } = require('../utils/logger');
+const { geminiUsage } = require('./providerUsage');
 const { stripDataUriPrefix } = require('./r2');
 const { resolveArtStyle } = require('./storyHelpers');
 const { resolveSeason } = require('./season');
@@ -624,16 +625,12 @@ Use the red corner code as the "page" value: -1 front cover, -2 initial page, -3
       { inlineData: { mimeType: 'image/jpeg', data: gridBuffer.toString('base64') } },
       buildPrompt(batch),
     ]);
-    const usage = result.response.usageMetadata || {};
-    if (usageTracker && (usage.promptTokenCount || usage.candidatesTokenCount)) {
+    const usage = geminiUsage(result.response.usageMetadata);
+    if (usageTracker && (usage.input_tokens || usage.output_tokens)) {
       // 'gemini_quality', not bare 'gemini': the provider rollup only has
       // gemini_text/gemini_image/gemini_quality buckets — a bare 'gemini' tag
       // kept these eval calls out of every provider aggregate.
-      usageTracker('gemini_quality', {
-        input_tokens: usage.promptTokenCount || 0,
-        output_tokens: usage.candidatesTokenCount || 0,
-        thinking_tokens: usage.thoughtsTokenCount || 0,
-      }, 'style_check', modelId);
+      usageTracker('gemini_quality', usage, 'style_check', modelId);
     }
     const raw = result.response.text() || '';
     const s = raw.indexOf('{');

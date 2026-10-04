@@ -68,6 +68,81 @@ function snapToValidPageCount(estimated, product) {
 }
 
 /**
+ * Interior content pages of a book: dedication + every story's pages.
+ * Excludes cover spread, inside front blank and inside back blank (Gelato
+ * does not count those in pageCount). Story 2+ adds title + dedication, plus
+ * back cover (+ separator blank if not last) when the story has a back cover.
+ * Mirrors what generatePrintPdf / generateCombinedBookPdf render.
+ *
+ * @param {Object[]} storyDatas - stories.data objects, in book order
+ * @returns {number}
+ */
+function countBookContentPages(storyDatas) {
+  const { parseStoryPages } = require('./pdf');
+  let storyContentPages = 0;
+  for (let si = 0; si < storyDatas.length; si++) {
+    // Picture-book layout for all reading levels: 1 scene = 1 print page
+    storyContentPages += parseStoryPages(storyDatas[si]).length;
+    if (si > 0) {
+      storyContentPages += 2; // title + dedication page (always)
+      if (storyDatas[si]?.coverImages?.backCover) {
+        storyContentPages += 1; // back cover
+        if (si < storyDatas.length - 1) storyContentPages += 1; // separator blank
+      }
+    }
+  }
+  return 1 + storyContentPages; // + dedication
+}
+
+/**
+ * Single source of truth for "how many pages will this book be printed with,
+ * and how many of them are blank". Used by the order flow (PDF padding) and
+ * by the pre-payment preview in the book builder.
+ *
+ * @param {import('pg').Pool} dbPool
+ * @param {Object[]} storyDatas - stories.data objects, in book order
+ * @param {'softcover'|'hardcover'} coverType
+ * @param {'A4'|'square'} bookFormat
+ * @returns {Promise<{contentPages:number, estimatedPageCount:number,
+ *   printedPages:number, blankPages:number, productUid:string|null, product:Object|null}>}
+ */
+async function computeBookPageInfo(dbPool, storyDatas, coverType, bookFormat) {
+  const contentPages = countBookContentPages(storyDatas);
+  // Gelato requires even page counts for double-sided printing
+  const estimatedPageCount = contentPages % 2 !== 0 ? contentPages + 1 : contentPages;
+  const formatPattern = bookFormat === 'A4' ? '210x280' : '200x200';
+  const productsResult = await dbPool.query(
+    `SELECT product_uid, product_name, min_pages, max_pages, available_page_counts
+       FROM gelato_products
+      WHERE is_active = true
+        AND LOWER(product_uid) LIKE $1
+        AND LOWER(product_uid) LIKE $2
+      ORDER BY max_pages ASC NULLS LAST, min_pages ASC NULLS LAST`,
+    [`%${String(coverType).toLowerCase()}%`, `%${formatPattern}%`]
+  );
+  const product = productsResult.rows.find(p =>
+    estimatedPageCount <= (p.max_pages || 999)
+  ) || productsResult.rows[0] || null; // any active SKU; snap lifts below min
+  if (!product) {
+    return { contentPages, estimatedPageCount, printedPages: estimatedPageCount,
+      blankPages: estimatedPageCount - contentPages, productUid: null, product: null };
+  }
+  let printedPages;
+  try {
+    printedPages = snapToValidPageCount(estimatedPageCount, product);
+  } catch (err) {
+    // Bad/incomplete row data. Fail loud rather than guessing — Gelato
+    // will reject silently otherwise.
+    throw new Error(
+      `Cannot determine page count for product ${product.product_uid}: ${err.message}. ` +
+      `Check the gelato_products row: min_pages, max_pages, and available_page_counts must be populated.`
+    );
+  }
+  return { contentPages, estimatedPageCount, printedPages,
+    blankPages: Math.max(0, printedPages - contentPages), productUid: product.product_uid, product };
+}
+
+/**
  * Get cover dimensions from Gelato API including spine width
  *
  * @param {string} productUid - Gelato product UID
@@ -184,6 +259,9 @@ async function processBookOrder(dbPool, sessionId, userId, storyIds, customerInf
 
   // Determine Gelato order type based on payment mode
   const gelatoOrderType = isTestPayment ? 'draft' : 'order';
+  // Set the moment Gelato accepted the order. From then on the book IS ordered: a failure
+  // after this point must never mark the order failed or tell the customer it failed (P8).
+  let gelatoOrderId = null;
 
   try {
     // Step 1: Update order status to "processing"
@@ -230,62 +308,16 @@ async function processBookOrder(dbPool, sessionId, userId, storyIds, customerInf
       throw new Error('GELATO_API_KEY not configured');
     }
 
-    // Estimate Gelato page count from story data
-    // Gelato pageCount = interior pages only (dedication + story content)
-    // Does NOT count: cover spread, inside front blank, inside back cover blank
-    // For multi-story books: story 2+ adds title + dedication (2 pages)
-    //   plus back cover + separator (2 pages) if back cover exists, otherwise skip both
-    const { parseStoryPages } = require('./pdf');
-    let storyContentPages = 0;
-    for (let si = 0; si < stories.length; si++) {
-      const storyPages = parseStoryPages(stories[si].data);
-      // Picture-book layout for all reading levels: 1 scene = 1 print page
-      storyContentPages += storyPages.length;
-      if (si > 0) {
-        storyContentPages += 2; // title + dedication page (always)
-        const hasBackCover = !!stories[si].data?.coverImages?.backCover;
-        if (hasBackCover) {
-          storyContentPages += 1; // back cover
-          if (si < stories.length - 1) storyContentPages += 1; // separator blank between stories
-        }
-      }
-    }
-    let estimatedPageCount = 1 + storyContentPages; // dedication + content (trailing blank = inside back cover, not counted)
-    // Gelato requires even page counts for double-sided printing
-    if (estimatedPageCount % 2 !== 0) estimatedPageCount++;
-    log.debug(`📊 [BACKGROUND] Estimated Gelato page count: ${estimatedPageCount} (${storyContentPages} story content pages)`);
-
-    // Step 3a: Find an active SKU matching format + coverType, then snap
-    // estimatedPageCount to a count that SKU actually accepts.
-    const formatPattern = bookFormat === 'A4' ? '210x280' : '200x200';
-    let printProductUid = null;
-    let snappedPageCount = estimatedPageCount;
-    const productsResult = await dbPool.query(
-      `SELECT product_uid, product_name, min_pages, max_pages, available_page_counts
-         FROM gelato_products
-        WHERE is_active = true
-          AND LOWER(product_uid) LIKE $1
-          AND LOWER(product_uid) LIKE $2
-        ORDER BY max_pages ASC NULLS LAST, min_pages ASC NULLS LAST`,
-      [`%${coverType.toLowerCase()}%`, `%${formatPattern}%`]
-    );
-    const matchingProduct = productsResult.rows.find(p =>
-      estimatedPageCount <= (p.max_pages || 999)
-    ) || productsResult.rows[0]; // fall back to any active SKU; snap will lift below min
-    if (matchingProduct) {
-      printProductUid = matchingProduct.product_uid;
-      try {
-        snappedPageCount = snapToValidPageCount(estimatedPageCount, matchingProduct);
-      } catch (err) {
-        // Bad/incomplete row data. Fail loud rather than guessing — Gelato
-        // will reject silently otherwise.
-        throw new Error(
-          `Cannot determine page count for product ${matchingProduct.product_uid}: ${err.message}. ` +
-          `Check the gelato_products row: min_pages, max_pages, and available_page_counts must be populated.`
-        );
-      }
+    // Page count + SKU come from computeBookPageInfo — the same function the
+    // checkout preview (POST /api/book-page-info) uses, so the number shown
+    // to the customer before payment is the number the PDF is padded to.
+    const pageInfo = await computeBookPageInfo(dbPool, stories.map(s => s.data), coverType, bookFormat);
+    const { estimatedPageCount, printedPages: snappedPageCount } = pageInfo;
+    log.debug(`📊 [BACKGROUND] Estimated Gelato page count: ${estimatedPageCount} (${pageInfo.contentPages} content pages incl. dedication)`);
+    let printProductUid = pageInfo.productUid;
+    if (pageInfo.product) {
       if (snappedPageCount !== estimatedPageCount) {
-        log.info(`📐 [BACKGROUND] Snapping ${estimatedPageCount} → ${snappedPageCount} pages for ${matchingProduct.product_name}`);
+        log.info(`📐 [BACKGROUND] Snapping ${estimatedPageCount} → ${snappedPageCount} pages for ${pageInfo.product.product_name} (${pageInfo.blankPages} blank of ${snappedPageCount})`);
       }
     } else {
       printProductUid = process.env.GELATO_PHOTOBOOK_UID;
@@ -425,7 +457,7 @@ async function processBookOrder(dbPool, sessionId, userId, storyIds, customerInf
 
     const printOrder = await printResponse.json();
     // Gelato v4 API returns 'id', not 'orderId'
-    const gelatoOrderId = printOrder.id || printOrder.orderId;
+    gelatoOrderId = printOrder.id || printOrder.orderId;
     console.log('✅ [BACKGROUND] Print order created:', gelatoOrderId);
 
     // Step 5: Update order with print order ID and status
@@ -441,6 +473,26 @@ async function processBookOrder(dbPool, sessionId, userId, storyIds, customerInf
     log.debug('🎉 [BACKGROUND] Book order processing completed successfully!');
 
   } catch (error) {
+    if (gelatoOrderId) {
+      // Gelato accepted the order but recording it failed. Marking the order failed here would
+      // email the customer "order failed" for a book that IS being printed, and a later retry
+      // would order it twice. Leave the row as it is and tell the admin the Gelato id.
+      log.error(`❌ [BACKGROUND] CRITICAL: Gelato order ${gelatoOrderId} was created for session ${sessionId} but recording it failed: ${error.message}`);
+      try {
+        await require('../../email.js').sendAdminHealthReport(
+          'Book order placed with Gelato but not recorded',
+          `Stripe session: ${sessionId}
+Gelato order id: ${gelatoOrderId}
+Customer: ${customerInfo.name} <${customerInfo.email}>
+DB error: ${error.message}
+
+The book IS ordered. Write gelato_order_id onto the orders row by hand; do NOT re-run the order.`
+        );
+      } catch (emailError) {
+        log.error('❌ [BACKGROUND] Failed to send Gelato-not-recorded alert:', emailError);
+      }
+      return;
+    }
     log.error('❌ [BACKGROUND] Error processing book order:', error);
 
     // Update order status to failed (both payment_status and gelato_status)
@@ -469,8 +521,147 @@ async function processBookOrder(dbPool, sessionId, userId, storyIds, customerInf
   }
 }
 
+/**
+ * Everything processBookOrder needs, derived from a (retrieved) Stripe Checkout session:
+ * the webhook and the admin retry / stuck-order resume all build their inputs here, so a
+ * re-run orders exactly what the customer paid for (every story, quantity, cover, format).
+ * Throws when the session lacks a user or any valid story - never guesses.
+ */
+async function resolveBookOrderInputs(dbPool, fullSession) {
+  const userId = fullSession.metadata?.userId;
+  if (!userId) throw new Error('Invalid userId in session metadata');
+
+  const customerInfo = {
+    name: fullSession.customer_details?.name || fullSession.shipping?.name || 'N/A',
+    email: fullSession.customer_details?.email || 'N/A',
+    address: fullSession.shipping?.address || fullSession.customer_details?.address || {},
+  };
+  const address = customerInfo.address;
+  const coverType = fullSession.metadata?.coverType || 'softcover';
+  const bookFormat = fullSession.metadata?.bookFormat || 'square';
+  const quantity = parseInt(fullSession.metadata?.quantity) || 1;
+
+  try {
+    const langResult = await dbPool.query('SELECT preferred_language FROM users WHERE id = $1', [userId]);
+    customerInfo.language = langResult.rows[0]?.preferred_language || 'English';
+  } catch (langErr) {
+    log.warn('⚠️ [BOOK ORDER] Failed to look up user language, defaulting to English:', langErr.message);
+    customerInfo.language = 'English';
+  }
+
+  // Support both the storyIds array and the legacy single storyId
+  let allStoryIds = [];
+  if (fullSession.metadata?.storyIds) {
+    try {
+      allStoryIds = JSON.parse(fullSession.metadata.storyIds);
+    } catch (e) {
+      log.error('❌ [BOOK ORDER] Failed to parse storyIds:', e);
+    }
+  }
+  if (allStoryIds.length === 0) {
+    const storyIdRaw = fullSession.metadata?.storyId || fullSession.metadata?.story_id;
+    if (storyIdRaw) allStoryIds = [storyIdRaw];
+  }
+  if (allStoryIds.length === 0) {
+    throw new Error('Missing story IDs in session metadata - cannot process book order');
+  }
+
+  const validatedStoryIds = [];
+  for (const sid of allStoryIds) {
+    const result = await dbPool.query('SELECT id FROM stories WHERE id = $1 AND user_id = $2', [sid, userId]);
+    if (result.rows.length > 0) validatedStoryIds.push(sid);
+    else log.warn(`⚠️ [BOOK ORDER] Story not found: ${sid}, skipping`);
+  }
+  if (validatedStoryIds.length === 0) throw new Error('No valid stories found');
+
+  return { userId, customerInfo, address, coverType, bookFormat, quantity, validatedStoryIds };
+}
+
+/**
+ * Re-run processBookOrder for an existing paid order, from the Stripe session it was paid
+ * with. The Gelato order type follows the ORDER's stripe_mode (a test-mode order is a draft,
+ * a live order is real) - never the caller's role. Refuses when the order already has a
+ * Gelato id (re-running would order the book twice) or the session is not paid.
+ */
+async function resumeBookOrder(dbPool, orderRow, stripe, { run = processBookOrder } = {}) {
+  if (orderRow.gelato_order_id) throw new Error(`Order ${orderRow.id} already has Gelato order ${orderRow.gelato_order_id}`);
+  if (!stripe) throw new Error(`No Stripe client for stripe_mode=${orderRow.stripe_mode || 'live'}`);
+  const session = await stripe.checkout.sessions.retrieve(orderRow.stripe_session_id, { expand: ['customer', 'line_items'] });
+  if (session.payment_status !== 'paid') throw new Error(`Stripe session ${session.id} is ${session.payment_status}, not paid`);
+  const inp = await resolveBookOrderInputs(dbPool, session);
+  const isTestPayment = orderRow.stripe_mode === 'test';
+  return run(dbPool, session.id, inp.userId, inp.validatedStoryIds, inp.customerInfo, inp.address,
+    isTestPayment, inp.coverType, inp.bookFormat, inp.quantity);
+}
+
+const STUCK_ORDER_IDLE_MINUTES = 30;
+
+/**
+ * Boot + periodic check for paid orders whose background fulfilment died with the process
+ * (deploy, OOM, idle shutdown) - review 2026-10-04 P8. Orders with no Gelato id and no
+ * update for STUCK_ORDER_IDLE_MINUTES are:
+ *  - 'paid'       -> processBookOrder never started: safe to resume, claimed atomically first.
+ *  - 'processing' -> died mid-run, possibly AFTER Gelato accepted it: alert only, a re-run could
+ *                    order the book twice. An admin decides (admin retry endpoint).
+ *  - 'failed'     -> already alerted by processBookOrder; not repeated here.
+ * `alerted` dedupes admin emails within one process.
+ *
+ * @returns {Promise<{resumed: string[], alerted: string[]}>}
+ */
+async function sweepStuckBookOrders(dbPool, { getStripeClientForOrder, sendAlert, alerted = new Set(), idleMinutes = STUCK_ORDER_IDLE_MINUTES }) {
+  const stuck = await dbPool.query(
+    `SELECT id, user_id, stripe_session_id, stripe_mode, payment_status, customer_email, updated_at
+       FROM orders
+      WHERE payment_status IN ('paid', 'processing')
+        AND gelato_order_id IS NULL
+        AND updated_at < NOW() - ($1 * INTERVAL '1 minute')
+        AND created_at > NOW() - INTERVAL '30 days'
+      ORDER BY created_at`,
+    [idleMinutes]
+  );
+  const resumed = [];
+  const alertedNow = [];
+  for (const o of stuck.rows) {
+    if (o.payment_status === 'paid') {
+      const claim = await dbPool.query(
+        `UPDATE orders SET updated_at = NOW()
+          WHERE id = $1 AND payment_status = 'paid' AND gelato_order_id IS NULL
+            AND updated_at < NOW() - ($2 * INTERVAL '1 minute')`,
+        [o.id, idleMinutes]
+      );
+      if (claim.rowCount !== 1) continue; // another instance took it
+      log.warn(`🔁 [ORDER-SWEEP] Resuming paid order ${o.id} (session ${o.stripe_session_id}): background processing never started`);
+      resumed.push(o.stripe_session_id);
+      // processBookOrder alerts + marks failed itself when the resume fails.
+      resumeBookOrder(dbPool, o, getStripeClientForOrder(o)).catch(err => {
+        log.error(`❌ [ORDER-SWEEP] Resume of order ${o.id} failed: ${err.message}`);
+        if (!alerted.has(o.stripe_session_id)) {
+          alerted.add(o.stripe_session_id);
+          sendAlert(`Stuck book order could not be resumed (${o.id})`, `Order ${o.id}, session ${o.stripe_session_id}, ${o.customer_email}
+${err.message}`);
+        }
+      });
+    } else if (!alerted.has(o.stripe_session_id)) {
+      alerted.add(o.stripe_session_id);
+      alertedNow.push(o.stripe_session_id);
+      log.error(`🚨 [ORDER-SWEEP] Order ${o.id} (session ${o.stripe_session_id}) stuck in 'processing' since ${o.updated_at}; customer paid, no Gelato order recorded`);
+      sendAlert(
+        `Paid book order stuck in processing (${o.id})`,
+        `Order ${o.id}, Stripe session ${o.stripe_session_id}, customer ${o.customer_email}.
+Status 'processing' with no Gelato order id since ${o.updated_at}. The process likely restarted mid-run. Check Gelato for an order from this session first; if none exists, use POST /api/admin/orders/${o.id}/retry-print-order.`
+      );
+    }
+  }
+  return { resumed, alerted: alertedNow };
+}
+
 module.exports = {
+  resolveBookOrderInputs,
+  resumeBookOrder,
+  sweepStuckBookOrders,
   processBookOrder,
   getCoverDimensions,
   snapToValidPageCount,
+  countBookContentPages,
+  computeBookPageInfo,
 };

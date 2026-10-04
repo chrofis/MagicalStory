@@ -35,6 +35,7 @@ const sharp = require('sharp');
 const fs = require('fs');
 const path = require('path');
 const { log } = require('../utils/logger');
+const { geminiUsage } = require('./providerUsage');
 const { MODEL_DEFAULTS } = require('../config/models');
 const { closestGrokAspect } = require('./grokAspect');
 const { editWithGrok, GROK_MODELS } = require('./grok');
@@ -113,9 +114,8 @@ async function inspectImageForErrors(imageData) {
     const data = await response.json();
 
     // Extract and log token usage
-    const inputTokens = data.usageMetadata?.promptTokenCount || 0;
-    const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
-    log.debug(`📊 [INSPECT] Token usage - input: ${inputTokens}, output: ${outputTokens}, model: ${modelId}`);
+    const { input_tokens: inputTokens, output_tokens: outputTokens, thinking_tokens: thinkingTokens } = geminiUsage(data.usageMetadata);
+    log.debug(`📊 [INSPECT] Token usage - input: ${inputTokens}, output: ${outputTokens}, thinking: ${thinkingTokens}, model: ${modelId}`);
 
     // Extract text response
     if (data.candidates && data.candidates[0]?.content?.parts) {
@@ -142,21 +142,21 @@ async function inspectImageForErrors(imageData) {
               description: result.description,
               boundingBox: result.bounding_box,
               fixPrompt: result.fix_prompt,
-              usage: { inputTokens, outputTokens, model: modelId }
+              usage: { inputTokens, outputTokens, thinkingTokens, model: modelId }
             };
           } else {
             log.info('🔍 [INSPECT] No errors detected');
-            return { errorFound: false, usage: { inputTokens, outputTokens, model: modelId } };
+            return { errorFound: false, usage: { inputTokens, outputTokens, thinkingTokens, model: modelId } };
           }
         } catch (parseError) {
           log.warn('⚠️ [INSPECT] Failed to parse JSON response:', parseError.message);
-          return { errorFound: false, usage: { inputTokens, outputTokens, model: modelId } };
+          return { errorFound: false, usage: { inputTokens, outputTokens, thinkingTokens, model: modelId } };
         }
       }
     }
 
     log.warn('⚠️ [INSPECT] No valid response from inspection');
-    return { errorFound: false, usage: { inputTokens, outputTokens, model: modelId } };
+    return { errorFound: false, usage: { inputTokens, outputTokens, thinkingTokens, model: modelId } };
   } catch (error) {
     log.error('❌ [INSPECT] Error inspecting image:', error);
     throw error;
@@ -479,13 +479,12 @@ Output JSON only:
     const data = await response.json();
 
     // Log token usage
-    const inputTokens = data.usageMetadata?.promptTokenCount || 0;
-    const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
+    const { input_tokens: inputTokens, output_tokens: outputTokens, thinking_tokens: thinkingTokens } = geminiUsage(data.usageMetadata);
     const modelId = MODEL_DEFAULTS.utility;
-    log.debug(`📊 [INPAINT VERIFY] Token usage - input: ${inputTokens}, output: ${outputTokens}, model: ${modelId}`);
+    log.debug(`📊 [INPAINT VERIFY] Token usage - input: ${inputTokens}, output: ${outputTokens}, thinking: ${thinkingTokens}, model: ${modelId}`);
 
     const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
-    const usage = { inputTokens, outputTokens, model: modelId };
+    const usage = { inputTokens, outputTokens, thinkingTokens, model: modelId };
 
     try {
       const result = getStoryHelpers().extractJsonFromText(responseText);
@@ -1203,12 +1202,7 @@ IMPORTANT INSTRUCTIONS:
       const responseParts = data.candidates[0].content.parts;
 
       // Extract token usage from response
-      const usageMetadata = data.usageMetadata || {};
-      const usage = {
-        input_tokens: usageMetadata.promptTokenCount || 0,
-        output_tokens: usageMetadata.candidatesTokenCount || 0,
-        thinking_tokens: usageMetadata.thoughtsTokenCount || 0
-      };
+      const usage = geminiUsage(data.usageMetadata);
 
       // Extract thinking text
       const thinkingText = extractThinkingFromParts(responseParts, 'INPAINT');

@@ -38,12 +38,20 @@ describe('cover critic notes — extraction is a move, not an edit', () => {
   // it excused was lettering the image model painted — a shop sign, a road sign
   // and garbled letters on a cart on staging job_1790100385959_1nitlympp's title
   // page (docs/audits/prompt-audit-2026-09-23/09-covers.md C6). The note now
-  // excuses only the app's own three strings.
-  it('TEXT_NOTE_APP_OVERLAY no longer excuses lettering the image model painted', () => {
+  // excused only the app's own three strings.
+  //
+  // 2026-09-26: no judge sees the app's strings any more — every cover eval
+  // reads the textless art layer (coverEvalLayer.js) — so the note excuses
+  // none of them as PRESENT. It keeps "never flag them missing" (the art is
+  // textless by design), names no app string, and files every lettering the
+  // judge does see as the image model's.
+  it('TEXT_NOTE_APP_OVERLAY excuses no lettering the judge can see', () => {
     expect(sections.TEXT_NOTE_APP_OVERLAY).not.toBe(PRE_TEXT_NOTE);
     expect(sections.TEXT_NOTE_APP_OVERLAY).not.toMatch(/if such text IS present treat it as the intended/);
-    expect(sections.TEXT_NOTE_APP_OVERLAY).toMatch(/magicalstory\.ch/);
-    expect(sections.TEXT_NOTE_APP_OVERLAY).toMatch(/other lettering/i);
+    expect(sections.TEXT_NOTE_APP_OVERLAY).not.toMatch(/magicalstory\.ch/);
+    expect(sections.TEXT_NOTE_APP_OVERLAY).not.toMatch(/never flag them present/i);
+    expect(sections.TEXT_NOTE_APP_OVERLAY).toMatch(/never flag them missing/i);
+    expect(sections.TEXT_NOTE_APP_OVERLAY).toMatch(/any lettering in the image/i);
   });
 
   // TEXT_RULES (the allow-list with {EXPECTED_TEXT}) was replaced by COVER_TEXT on

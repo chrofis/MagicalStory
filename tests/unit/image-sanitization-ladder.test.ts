@@ -60,6 +60,7 @@ const OK_IMAGE = { imageData: 'data:image/jpeg;base64,AAAA', modelId: 'grok-imag
 let sentBodies: string[] = [];
 /** Every prompt string handed to Grok's edit endpoint, in order. */
 let grokEditPrompts: string[] = [];
+let grokEditRefCounts: number[] = [];
 let grokShouldFail = false;
 
 const realFetch = global.fetch;
@@ -87,6 +88,7 @@ beforeAll(async () => { await loadPromptTemplates(); });
 beforeEach(() => {
   sentBodies = [];
   grokEditPrompts = [];
+  grokEditRefCounts = [];
   grokShouldFail = false;
   grokGenerateImpl = async () => {
     if (grokShouldFail) throw new Error('grok refused (test)');
@@ -168,10 +170,18 @@ describe('A — the retry is built from the string level 0 actually sent', () =>
     // Force the fallback: a Grok-backed model whose call throws, so the core
     // shrinks against GROK's cap and then swaps to Gemini for the ladder.
     grokShouldFail = true;
-    const filler = Array.from({ length: 400 },
-      (_, i) => `Figure ${i} stands near the old stone wall ${i} holding lantern ${i} in the evening light.`).join(' ');
-    const prompt = `${scene(filler)}\n\n**ART STYLE**\nwatercolour.`;
+    // Over the cap by less than the reference-photo paragraph, the one ranked
+    // block this fixture carries: the scene itself is never cut (2026-09-26),
+    // so a prompt the drops cannot fit would fail before any request.
+    const ranked: string = require_('fs').readFileSync(require_('path').join(process.cwd(), 'prompts', 'image-generation.txt'), 'utf-8')
+      .split(/\n{2,}/).map((x: string) => x.trim()).find((x: string) => x.startsWith('When the FIRST reference photo'));
+    const withFiller = (n: number) => `${scene(Array.from({ length: n },
+      (_, i) => `Figure ${i} stands near the old stone wall ${i} holding lantern ${i} in the evening light.`).join(' '))}\n\n**ART STYLE**\nwatercolour.\n\n${ranked}`;
+    let n = 1;
+    while (withFiller(n).length <= GROK_CAP + 200) n++;
+    const prompt = withFiller(n);
     expect(prompt.length).toBeGreaterThan(GROK_CAP);
+    expect(prompt.length - ranked.length).toBeLessThan(GROK_CAP);
     // The compressor must not invent a shorter prompt behind the test's back.
     textModels.callTextModel = async (p: string) =>
       (/rewrite|safe/i.test(String(p))
@@ -227,9 +237,11 @@ describe('the Grok moderation table (editImageWithPrompt)', () => {
   /** Block the first Grok edit only, so the retry prompt is observable. */
   function blockFirstGrokEdit() {
     let n = 0;
-    grokEditImpl = async (p: string) => {
+    grokEditImpl = async (p: string, refs?: any[]) => {
       grokEditPrompts.push(p);
-      if (++n === 1) throw new Error(MODERATION_400);
+      grokEditRefCounts.push(Array.isArray(refs) ? refs.length : -1);
+      // editWithGrok tags the structured moderation verdict as err.moderated.
+      if (++n === 1) throw Object.assign(new Error(MODERATION_400), { statusCode: 400, moderated: true });
       return OK_IMAGE;
     };
   }
@@ -271,6 +283,24 @@ describe('the Grok moderation table (editImageWithPrompt)', () => {
     const retry = grokEditPrompts[1];
     expect(retry).toContain('be positioned near the face');
     expect(retry).not.toMatch(/touch the child's chin/);
+  }, 30000);
+
+  it('the sanitized retry keeps the character / VB references of the first attempt (A8)', async () => {
+    blockFirstGrokEdit();
+    await images.editImageWithPrompt('data:image/jpeg;base64,AAAA', 'The ball that hit the wall is missing.', 'grok-imagine',
+      ['data:image/jpeg;base64,BBBB', 'data:image/jpeg;base64,CCCC']);
+    expect(grokEditRefCounts).toEqual([3, 3]);
+  }, 30000);
+
+  it('a plain HTTP 400 that is not a moderation verdict is not retried as one (A8)', async () => {
+    grokEditImpl = async (p: string, refs?: any[]) => {
+      grokEditPrompts.push(p);
+      grokEditRefCounts.push(Array.isArray(refs) ? refs.length : -1);
+      throw Object.assign(new Error('Grok edit API error (400): {"error":"invalid aspect"}'), { statusCode: 400 });
+    };
+    await images.editImageWithPrompt('data:image/jpeg;base64,AAAA', 'The ball that hit the wall is missing.', 'grok-imagine', [])
+      .catch(() => { /* falls through to Gemini */ });
+    expect(grokEditPrompts).toHaveLength(1);
   }, 30000);
 
   it('does not retry at all when the table changes nothing', async () => {

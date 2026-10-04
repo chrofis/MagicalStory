@@ -400,7 +400,38 @@ async function resolveFigureMask(charName, resolved, { storyId, pageNumber } = {
   }
 }
 
+/**
+ * Detect the figures of a STORED page that carries no usable detection for the
+ * character being repaired — the manual repair route's fallback, with the SAME
+ * cast the pipeline builds (buildPageCast). One implementation for that route
+ * and the Test Lab char_repair stage, which both repair from stored data: the
+ * run itself always holds a fresh detection of the bytes it repairs.
+ */
+async function detectPageForRepair({ storyData, sceneImage, imageData, characterName, pageNumber, artStyle, label }) {
+  const expectedCharacters = buildPageCast({
+    storyData,
+    sceneCharacters: sceneImage.sceneCharacters || [],
+    sceneMetadata: sceneImage.sceneMetadata || {},
+    clothingByName: sceneImage.sceneCharacterClothing || null,
+    outlineCharacters: sceneImage.outlineCharacters || [],
+    artStyle,
+    visualBible: storyData.visualBible || null,
+    requiredName: characterName,
+    label: `p${pageNumber} ${label} `,
+  });
+  const detection = await images().detectAllBoundingBoxes(imageData, {
+    expectedCharacters,
+    expectedObjects: Array.isArray(sceneImage.sceneMetadata?.objects)
+      ? sceneImage.sceneMetadata.objects.filter(x => typeof x === 'string') : [],
+    sceneContext: sceneImage.description || sceneImage.sceneDescription || null,
+    pageContext: `PAGE ${pageNumber} ${label}`,
+    artStyle,
+  });
+  return { detection, expectedCharacters };
+}
+
 module.exports = {
+  detectPageForRepair,
   buildPageCast,
   briefNamesForPage,
   findBorrowedLabel,

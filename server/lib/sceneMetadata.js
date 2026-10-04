@@ -189,6 +189,24 @@ function extractJsonFromText(text) {
 const { parseWornItems } = require('./wornItems');
 
 /**
+ * The brief's `creatures[]` rows (promptBuilders.CREATURE_FIELD_RULE): a Visual
+ * Bible animal on the page with its depth, gaze, expression and emotion. Kept
+ * only when `id` is an animal handle (`ANI001`); every other field is copied as
+ * written, trimmed. [] when the brief carries none.
+ */
+function parseCreatures(rows) {
+  return (Array.isArray(rows) ? rows : [])
+    .filter(r => r && typeof r === 'object' && /^ANI\d+$/i.test(String(r.id || '').trim()))
+    .map(r => {
+      const out = { id: String(r.id).trim().toUpperCase() };
+      for (const k of ['depth', 'looksAt', 'expression', 'emotion']) {
+        if (typeof r[k] === 'string' && r[k].trim()) out[k] = r[k].trim();
+      }
+      return out;
+    });
+}
+
+/**
  * HOW POPULATED IS THIS PAGE — THREE STATES, NOT TWO (2026-09-19).
  *
  * `crowdExpected` (2026-09-13) was a boolean: a crowd is required, or the page
@@ -217,34 +235,6 @@ function normalisePopulation(raw, legacyCrowdExpected) {
   const v = String(raw || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
   if (POPULATION_LEVELS.includes(v)) return v;
   return legacyCrowdExpected === true ? 'crowd' : 'cast_only';
-}
-
-
-/**
- * THE PLATE WINS WHERE THEY DISAGREE (owner, 2026-09-19).
- *
- * The Art Director DECLARES a setting's population; the empty-scene plate SHOWS
- * it. Where both speak, take the more populated of the two — the plate can only
- * RAISE the state, never lower it, because the only disagreement direction ever
- * measured is the Art Director under-declaring a public place (it asserted "No
- * other people or animals are present" about the Lindenhof, whose own plate
- * holds eight). A plate showing nobody is silence, not a claim of emptiness:
- * a plate can simply fail to render the passers-by a page is written around,
- * and a declared `crowd` must survive that.
- *
- * Pure, so the disagreement rate is measurable without a detector call.
- *
- * @param {string|null} declared   the Art Director's `population`
- * @param {string|null} fromPlate  `platePopulationFromFigures`'s answer, or null
- * @returns {{population: string, source: 'declared'|'plate', disagreed: boolean}}
- */
-function resolvePopulation(declared, fromPlate) {
-  const d = normalisePopulation(declared, false);
-  const rank = (v) => POPULATION_LEVELS.indexOf(v);
-  if (!fromPlate || !POPULATION_LEVELS.includes(fromPlate) || rank(fromPlate) <= rank(d)) {
-    return { population: d, source: 'declared', disagreed: false };
-  }
-  return { population: fromPlate, source: 'plate', disagreed: true };
 }
 
 
@@ -1043,15 +1033,19 @@ function extractSceneMetadata(sceneDescription) {
         // written before this date) carries none — readers must treat absent
         // as "not declared".
         sceneIntent: metadata.sceneIntent || null,
+        // The page's Visual Bible animals with their face (CREATURE_FIELD_RULE,
+        // 2026-10-04). Rows only, never read from prose; [] when none.
+        creatures: parseCreatures(metadata.creatures),
       },
       thinking: null,
       translatedSummary: metadata.translatedSummary || null,
       // Story era for buildEraGuard (anachronism guard) — restored 2026-08-11;
       // lost in the metadata-format migration like `shot`.
       era: metadata.era || null,
-      // Which view of a cited real landmark this page shows — selects the
-      // reference photo by kind (landmarkPhotos.pickVariantForView).
-      landmarkView: metadata.landmarkView || null,
+      // A page's OWN landmark photo citation — written only by an iterate
+      // rewrite that authors a fresh plate (reuseEmptyScene: false); every
+      // other page takes its vantage's citation (storyHelpers.landmarkPhotoCitation).
+      landmarkPhoto: metadata.landmarkPhoto ?? null,
       imageSummary: prose,
       setting: null, // Setting details are in the prose, not structured
       sceneComplexity,
@@ -1070,9 +1064,10 @@ function extractSceneMetadata(sceneDescription) {
       textPosition: metadata.textPosition || null,
       textZoneDescription: metadata.textZoneDescription || null,
       era: metadata.era || null,
-      // Which view of a cited real landmark this page shows — selects the
-      // reference photo by kind (landmarkPhotos.pickVariantForView).
-      landmarkView: metadata.landmarkView || null,
+      // A page's OWN landmark photo citation — written only by an iterate
+      // rewrite that authors a fresh plate (reuseEmptyScene: false); every
+      // other page takes its vantage's citation (storyHelpers.landmarkPhotoCitation).
+      landmarkPhoto: metadata.landmarkPhoto ?? null,
       sceneIntent: metadata.sceneIntent || null,
       timeOfDay: normaliseTimeOfDay(metadata.timeOfDay),
       weather: normaliseWeather(metadata.weather),
@@ -1148,7 +1143,7 @@ function extractSceneMetadata(sceneDescription) {
 
     // Also extract location from setting.location (e.g., "Kurpark [LOC001]")
     // This ensures landmark photos are passed to image generation. The photo
-    // itself is picked by the scene's `landmarkView` (getLandmarkPhotosForScene).
+    // itself is the one the plate's author cited (storyHelpers.landmarkPhotoCitation).
     if (parsedData.setting?.location) {
       if (/\[LOC\d+(?:\.\d+)?\]/i.test(parsedData.setting.location)) {
         objectIds.push(parsedData.setting.location);
@@ -1179,6 +1174,7 @@ function extractSceneMetadata(sceneDescription) {
     parsedData.interactions = interactionsJson; // mirror into fullData so downstream readers see the sanitized list
     const wornItemsJson = parseWornItems(parsedData.wornItems);
     parsedData.wornItems = wornItemsJson;       // same mirror for the worn-item states
+    parsedData.creatures = parseCreatures(parsedData.creatures);  // and for the creature rows
 
     return {
       characters: characterNames,
@@ -1450,6 +1446,18 @@ function isSameFigureName(a, b) {
 }
 
 /**
+ * ONE whole-name matcher for prose scans: Unicode letter/number lookarounds, so
+ * "Zoé" and "Émile" match where ASCII word boundaries never do ("Ann" still
+ * never matches "Anna"). `apostropheEnds` additionally refuses a trailing ' or ’
+ * (a possessive "Anna's" is not a bare mention). Review 2026-10-04 C8.
+ */
+function wholeNameRegex(name, { apostropheEnds = false } = {}) {
+  const escaped = String(name).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const after = apostropheEnds ? "[\\p{L}\\p{N}'’]" : '[\\p{L}\\p{N}]';
+  return new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?!${after})`, 'u');
+}
+
+/**
  * Cast members the scene PROSE describes but the metadata `characters` list
  * omits. The Art Director emits prose plus a metadata block; the image model
  * renders the prose, while figure naming, the entity grid, clothing validation
@@ -1473,16 +1481,20 @@ function isSameFigureName(a, b) {
  * @param {string} sceneDescription - Prose + ---METADATA--- block
  * @param {string[]} castNames - Story cast names
  * @param {Object|null} [sceneMetadata] - Already-parsed metadata, when the caller has it
+ * @param {string[]} [alsoListed] - names the brief lists by another handle (a VB figure cited by id)
  * @returns {string[]} Cast names described in the prose but not listed (cast order)
  */
-function findCastMissingFromMetadata(sceneDescription, castNames, sceneMetadata = null) {
+function findCastMissingFromMetadata(sceneDescription, castNames, sceneMetadata = null, alsoListed = []) {
   if (!sceneDescription || typeof sceneDescription !== 'string') return [];
   if (!Array.isArray(castNames) || castNames.length === 0) return [];
   const metadata = sceneMetadata || extractSceneMetadata(sceneDescription);
   if (!metadata || !Array.isArray(metadata.characters)) return [];
 
   const prose = splitBrief(sceneDescription).prose;
-  const listed = metadata.characters
+  // `alsoListed`: names the brief carries by another handle — a Visual Bible
+  // figure cited by its id resolves to its authored name (sceneBriefCheck
+  // vbFigureNamesCited, 2026-09-28).
+  const listed = [...metadata.characters, ...(Array.isArray(alsoListed) ? alsoListed : [])]
     .map(c => String(typeof c === 'string' ? c : (c && c.name) || '').trim())
     .filter(Boolean);
 
@@ -1490,9 +1502,7 @@ function findCastMissingFromMetadata(sceneDescription, castNames, sceneMetadata 
   for (const rawName of castNames) {
     const name = String(rawName || '').trim();
     if (!name || listed.some(entry => isSameFigureName(entry, name))) continue;
-    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const bare = new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}'’])`, 'u');
-    if (bare.test(prose)) missing.push(name);
+    if (wholeNameRegex(name, { apostropheEnds: true }).test(prose)) missing.push(name);
   }
   return missing;
 }
@@ -1629,9 +1639,9 @@ function getCharactersInScene(sceneDescription, characters) {
     const nameLower = char.name.toLowerCase();
     const firstName = nameLower.split(' ')[0];
 
-    // Use word boundary regex to match whole words only
-    const nameRegex = new RegExp(`\\b${nameLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`);
-    const firstNameRegex = new RegExp(`\\b${firstName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`);
+    // Whole-word match, Unicode-aware (ASCII word boundaries miss "Zoé" and "Émile")
+    const nameRegex = wholeNameRegex(nameLower);
+    const firstNameRegex = wholeNameRegex(firstName);
 
     return nameRegex.test(sceneLower) || firstNameRegex.test(sceneLower);
   });
@@ -2054,6 +2064,32 @@ function resolvePagePlate({ pageNumber = null, sceneMetadata = null, visualBible
   const fromPage = String(sceneMetadata?.emptyScenePrompt || '').trim();
   if (fromPage) return { text: fromPage, source: 'page', vantageId: v?.vantageId || null };
   return { text: '', source: 'missing', vantageId: v?.vantageId || null };
+}
+
+/**
+ * A vantage plate's SETTING text: the LOCATION and VANTAGE lines and the
+ * vantage's description, which its author gets above the FRAMING paragraph.
+ * The description is left out when it IS the plate text (the Art Director
+ * writes one text per vantage since 2026-09-17, so it would go out twice).
+ * One builder for the vantage plate prompt and its QC's EXPECTED SCENE, which
+ * reads the setting and the FRAMING as two fields (decisions.md 2026-09-26
+ * "The plate QC reads its inputs whole").
+ *
+ * @param {object} v - a getPrimaryVantageForPage result
+ * @param {string} [plateText] - the vantage's FRAMING paragraph
+ * @returns {string}
+ */
+function vantageSettingText(v, plateText = '') {
+  const { englishLocationRef } = require('./visualBible');
+  // English-only: the bare VB location name is story-language and carries no
+  // visual info, so it goes out with the entry's English visual fields
+  // inlined (same rule as covers / sanitizeVbIdsInPrompt; decisions.md 2026-07-31).
+  const locationRef = englishLocationRef(v?.location) || v?.locationName || '';
+  const description = String(v?.description || '').trim();
+  return [
+    `**LOCATION:** ${locationRef}\n**VANTAGE:** ${v?.name || ''}`,
+    description && description !== String(plateText || '').trim() ? description : '',
+  ].filter(Boolean).join('\n\n');
 }
 
 /**
@@ -2742,13 +2778,48 @@ function forbiddenSharedGrips(interactions) {
   return out;
 }
 
+/**
+ * THE `storyData.sceneDescriptions[]` RECORD of one Art Director scene.
+ *
+ * A generation-time scene (`expandedScenes[]`, beats or unified) carries its
+ * brief as `sceneDescription`; every reader of `storyData.sceneDescriptions`
+ * (iteratePageCore, entity consistency, the style check, the Lab, the manual
+ * routes) reads `description`. One projection, used for the stored story AND
+ * for the in-memory story data the in-generation repair pipeline iterates
+ * from — handing it the raw scenes made every in-generation iterate throw
+ * "No scene description found" (staging job_1790277448294_5herh01j7, p7/p14).
+ *
+ * @param {Object} scene - an expandedScenes[] entry
+ * @param {Map<number, number>} [scenePromptRefs] - page -> index into
+ *   sceneExpansionReport.prompts[] (rollUpScenePrompts)
+ */
+function sceneDescriptionRecord(scene, scenePromptRefs = null) {
+  const sceneMetadata = extractSceneMetadata(scene.sceneDescription);
+  return {
+    pageNumber: scene.pageNumber,
+    description: scene.sceneDescription,
+    characterClothing: scene.characterClothing || {},
+    outlineExtract: scene.outlineExtract || scene.sceneHint || '',
+    // Dev mode: the Art Director prompt is stored once in
+    // sceneExpansionReport.prompts[]; this is the index. Read it with
+    // storyShape.resolveScenePrompt(storyData, pageNumber).
+    scenePromptRef: scenePromptRefs && scenePromptRefs.has(scene.pageNumber)
+      ? scenePromptRefs.get(scene.pageNumber)
+      : null,
+    textModelId: scene.sceneDescriptionModelId,
+    // Pre-extracted summaries for the edit modal (no JSON parsing on the client)
+    translatedSummary: sceneMetadata?.translatedSummary || null,
+    imageSummary: sceneMetadata?.imageSummary || null
+  };
+}
+
 module.exports = {
+  parseCreatures,
   SHARED_GRIP_RULE,
   forbiddenSharedGrips,
   handsPerObject,
   POPULATION_LEVELS,
   normalisePopulation,
-  resolvePopulation,
   extractJsonFromText,
   sanitizeInteractions,
   parseProseMetadataFormat,
@@ -2764,6 +2835,7 @@ module.exports = {
   enforceSpreadTextPosition,
   mirrorLeftRight,
   extractSceneMetadata,
+  sceneDescriptionRecord,
   describeDegradedSceneMetadata,
   resolveEvalSceneHint,
   resolveEvalImagePrompt,
@@ -2787,6 +2859,7 @@ module.exports = {
   extractPageClothing,
   getPrimaryVantageForPage,
   resolvePagePlate,
+  vantageSettingText,
   groupPagesByVantage,
   groupTrialPlatePagesByVantage,
   normalizePositionToLCR,

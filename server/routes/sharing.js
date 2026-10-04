@@ -19,7 +19,7 @@ const sharp = require('sharp');
 const { dbQuery, getStoryImage, getActiveVersion, imagesExistByType } = require('../services/database');
 const { log } = require('../utils/logger');
 const { stripDataUriPrefix } = require('../lib/r2');
-const { verifyToken } = require('../middleware/auth');
+const { verifySession } = require('../middleware/auth');
 const { recordStoryView } = require('../lib/storyViews');
 
 // Base URL for OG tags and share links (consistent with stories.js)
@@ -83,10 +83,10 @@ function initSharingRoutes(config) {
  * every same-origin request) are ignored and we fall through to the query
  * token — without this, `<img>` requests on staging carried both Basic
  * auth AND the JWT in the query, optionalAuth grabbed the Basic creds,
- * verifyToken failed silently, req.user stayed empty, and the user got a
+ * session verification failed silently, req.user stayed empty, and the user got a
  * 404 on their own unshared story.
  */
-function optionalAuth(req, res, next) {
+async function optionalAuth(req, res, next) {
   const authHeader = req.headers['authorization'];
   const bearerToken = authHeader && /^Bearer\s+/i.test(authHeader)
     ? authHeader.replace(/^Bearer\s+/i, '')
@@ -94,9 +94,9 @@ function optionalAuth(req, res, next) {
   const token = bearerToken || req.query.token;
   if (token) {
     try {
-      req.user = verifyToken(token);
+      req.user = await verifySession(token);
     } catch {
-      // Invalid token — continue as anonymous
+      // Invalid or revoked token — continue as anonymous
     }
   }
   next();
@@ -108,8 +108,10 @@ function optionalAuth(req, res, next) {
  * that one story without a JWT — covers the iPhone case where the owner
  * opens their own email link on a fresh device they aren't logged in on.
  *
- * Scope: read-only access to the matching shareToken's story. Does NOT
- * grant any account-level access; does NOT bypass other shareTokens.
+ * Scope: the first-paint cover hint only: the HTML handler's cover preload and the
+ * slim /header endpoint (title, page count, cover URL). It does NOT unlock the story
+ * text, pages or images, any account-level access, or other shareTokens; the full story
+ * needs the owner's login or an active public share (decisions.md, share key scope).
  */
 function hasValidSignedShareKey(req, shareToken) {
   if (!shareToken || typeof shareToken !== 'string') return false;
@@ -128,20 +130,20 @@ apiRouter.use('/shared', optionalAuth);
 
 /**
  * Get shared story by token.
- * Access allowed if: is_shared=true (public) OR userId matches owner OR
- *                    signedLinkOk (email-link bearer for this shareToken).
+ * Access allowed if: is_shared=true (public) OR userId matches owner. The email-link
+ * signed ?key= does NOT grant story access (owner decision 2026-10-04, review S2): it
+ * only unlocks the first-paint cover hint, see hasValidSignedShareKey.
  */
-async function getSharedStory(shareToken, userId = null, signedLinkOk = false) {
+async function getSharedStory(shareToken, userId = null) {
   if (!shareToken || shareToken.length !== 64) {
     return null;
   }
-  // signedLinkOk effectively grants the same read access is_shared=true would.
   // NOT admin_draft: a story generated while impersonating gets a share_token
   // at insert like any other, so an unpublished draft already has a working
   // link. It must not resolve for anyone until it is published.
   const rows = await dbQuery(
-    'SELECT id, user_id, is_shared, data FROM stories WHERE share_token = $1 AND NOT admin_draft AND ($3 = true OR is_shared = true OR user_id = $2)',
-    [shareToken, userId, signedLinkOk]
+    'SELECT id, user_id, is_shared, data FROM stories WHERE share_token = $1 AND NOT admin_draft AND (is_shared = true OR user_id = $2)',
+    [shareToken, userId]
   );
   if (rows.length === 0) {
     return null;
@@ -152,15 +154,15 @@ async function getSharedStory(shareToken, userId = null, signedLinkOk = false) {
 
 /**
  * Get shared story ID only (fast path for image endpoints)
- * Access allowed if: is_shared=true (public) OR userId matches owner OR signedLinkOk.
+ * Access allowed if: is_shared=true (public) OR userId matches owner.
  */
-async function getSharedStoryId(shareToken, userId = null, signedLinkOk = false) {
+async function getSharedStoryId(shareToken, userId = null) {
   if (!shareToken || shareToken.length !== 64) {
     return null;
   }
   const rows = await dbQuery(
-    'SELECT id FROM stories WHERE share_token = $1 AND NOT admin_draft AND ($3 = true OR is_shared = true OR user_id = $2)',
-    [shareToken, userId, signedLinkOk]
+    'SELECT id FROM stories WHERE share_token = $1 AND NOT admin_draft AND (is_shared = true OR user_id = $2)',
+    [shareToken, userId]
   );
   return rows.length > 0 ? rows[0].id : null;
 }
@@ -235,6 +237,7 @@ apiRouter.get('/shared/:shareToken/header', async (req, res) => {
               jsonb_array_length(COALESCE(data->'sceneImages', '[]'::jsonb)) AS page_count
          FROM stories
         WHERE share_token = $1
+          AND NOT admin_draft
           AND ($3 = true OR is_shared = true OR user_id = $2)`,
       [shareToken, userId, signedLinkOk]
     );
@@ -286,7 +289,7 @@ apiRouter.get('/shared/:shareToken/header', async (req, res) => {
 apiRouter.get('/shared/:shareToken', async (req, res) => {
   try {
     const { shareToken } = req.params;
-    const story = await getSharedStory(shareToken, req.user?.id, hasValidSignedShareKey(req, shareToken));
+    const story = await getSharedStory(shareToken, req.user?.id);
 
     if (!story) {
       return res.status(404).json({ error: 'Story not found or sharing disabled' });
@@ -425,7 +428,7 @@ apiRouter.get('/shared/:shareToken/image/:pageNumber', async (req, res) => {
     const pageNum = parseInt(pageNumber, 10);
 
     // Fast path: get only story ID, then fetch image from separate table
-    const storyId = await getSharedStoryId(shareToken, req.user?.id, hasValidSignedShareKey(req, shareToken));
+    const storyId = await getSharedStoryId(shareToken, req.user?.id);
     if (!storyId) {
       return res.status(404).json({ error: 'Story not found or sharing disabled' });
     }
@@ -456,7 +459,7 @@ apiRouter.get('/shared/:shareToken/image/:pageNumber', async (req, res) => {
     }
 
     // Fallback: fetch full story data for legacy sceneImages array
-    const story = await getSharedStory(shareToken, req.user?.id, hasValidSignedShareKey(req, shareToken));
+    const story = await getSharedStory(shareToken, req.user?.id);
     if (!story) {
       return res.status(404).json({ error: 'Image not found' });
     }
@@ -483,7 +486,7 @@ apiRouter.post('/shared/:shareToken/text-overlay/:pageNumber', async (req, res) 
     const { shareToken, pageNumber } = req.params;
     const pageNum = parseInt(pageNumber, 10);
 
-    const storyId = await getSharedStoryId(shareToken, req.user?.id, hasValidSignedShareKey(req, shareToken));
+    const storyId = await getSharedStoryId(shareToken, req.user?.id);
     if (!storyId) {
       return res.status(404).json({ error: 'Story not found or sharing disabled' });
     }
@@ -618,7 +621,7 @@ apiRouter.get('/shared/:shareToken/cover-image/:coverType', async (req, res) => 
     const { shareToken, coverType } = req.params;
 
     // Fast path: get only story ID, then fetch cover from separate table
-    const storyId = await getSharedStoryId(shareToken, req.user?.id, hasValidSignedShareKey(req, shareToken));
+    const storyId = await getSharedStoryId(shareToken, req.user?.id);
     if (!storyId) {
       return res.status(404).json({ error: 'Story not found or sharing disabled' });
     }
@@ -640,7 +643,7 @@ apiRouter.get('/shared/:shareToken/cover-image/:coverType', async (req, res) => 
     }
 
     // Fallback: fetch full story data for legacy coverImages
-    const story = await getSharedStory(shareToken, req.user?.id, hasValidSignedShareKey(req, shareToken));
+    const story = await getSharedStory(shareToken, req.user?.id);
     if (!story) {
       return res.status(404).json({ error: 'Cover not found' });
     }
@@ -672,7 +675,7 @@ async function ogImageHandler(req, res) {
     const { shareToken } = req.params;
 
     // Fast path: get only story ID, then fetch cover from separate table
-    const storyId = await getSharedStoryId(shareToken, req.user?.id, hasValidSignedShareKey(req, shareToken));
+    const storyId = await getSharedStoryId(shareToken, req.user?.id);
     if (!storyId) {
       log.warn(`[OG-IMAGE] Story not found for shareToken: ${shareToken.substring(0, 8)}...`);
       return res.status(404).json({ error: 'Story not found or sharing disabled' });
@@ -707,7 +710,7 @@ async function ogImageHandler(req, res) {
 
     // Fallback: fetch full story data for legacy coverImages
     if (!coverImage) {
-      const story = await getSharedStory(shareToken, req.user?.id, hasValidSignedShareKey(req, shareToken));
+      const story = await getSharedStory(shareToken, req.user?.id);
       if (story?.data.coverImages?.frontCover) {
         const fc = story.data.coverImages.frontCover;
         log.debug(`[OG-IMAGE] Legacy frontCover type: ${typeof fc}, keys: ${typeof fc === 'object' ? Object.keys(fc).join(',') : 'N/A'}`);
@@ -773,7 +776,7 @@ htmlRouter.get('/s/:shareToken', async (req, res) => {
   const { shareToken } = req.params;
 
   try {
-    const story = await getSharedStory(shareToken, req.user?.id, hasValidSignedShareKey(req, shareToken));
+    const story = await getSharedStory(shareToken, req.user?.id);
 
     if (story) {
       // Strip markdown bold/heading markers, then HTML-escape for safe meta tags
@@ -845,8 +848,8 @@ htmlRouter.get('/shared/:shareToken', async (req, res) => {
       return res.redirect('/');
     }
 
-    // Story for OG tags — needs public access OR ownership.
-    const story = await getSharedStory(shareToken, req.user?.id, hasValidSignedShareKey(req, shareToken));
+    // Story for OG tags — needs public access OR ownership (the signed key grants neither).
+    const story = await getSharedStory(shareToken, req.user?.id);
 
     // Token-only existence check for the perf hints. Even if OG tags can't
     // be added (private story, anonymous request), we still want to inject

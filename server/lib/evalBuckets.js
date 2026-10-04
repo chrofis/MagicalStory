@@ -46,6 +46,11 @@ const BUCKETS = {
   // 78 wardrobe findings were this, worth 670 points, three of them CRITICAL
   // for a rolled sleeve.
   clothing_detail:      { owner: 'quality',  kind: 'graded', repair: 'grok_blended' },
+  // A garment drawn from the wrong side for its figure's declared facing — the
+  // front zip and pockets on a back view (image-evaluation D-05e, 2026-10-04).
+  // Its own bucket so its MAJOR ceiling binds to it alone; the repair is the
+  // wardrobe repaint every garment finding gets.
+  garment_facing:       { owner: 'quality',  kind: 'graded', repair: 'grok_blended' },
   // An absence the BLIND compliance evaluator inferred from a silent inventory
   // field, having not seen the image. Measured over 154 absence findings across
   // two stories: 55% of compliance's absences were false (the item plainly
@@ -127,6 +132,14 @@ const BUCKETS = {
   // composition_textzone / iterate_placement, which repositions art — it cannot
   // rebuild an undersized structure. Only a full redo can.
   structure_scale:      { owner: 'quality',  kind: 'graded', repair: 'regen' },
+  // A Visual Bible creature drawn far smaller than the size its page gave it
+  // against the figures in frame (image-evaluation D-34, 2026-09-26). Its own
+  // bucket, NOT `scale` (oversized props and figure age) and NOT
+  // `structure_scale` (vessels and buildings): the three are different
+  // defects with different sources. Repair is a page redo — repairLogic
+  // routes it to iterate; inpaint cannot re-stage a creature at several times
+  // its drawn size, and char-fix has no reference to paint a creature from.
+  creature_scale:       { owner: 'quality',  kind: 'graded', repair: 'regen' },
   // One named prop rendered twice when the scene has one of it
   // (image-evaluation D-32) — the eval-side check for the worn-item dedupe the
   // creation side now does. Its own bucket, NOT an alias of `object_presence`:
@@ -207,6 +220,7 @@ const TYPE_TO_BUCKET = {
   composition: 'composition_textzone', position_and_scale: 'composition_textzone',
   scale: 'composition_textzone', position: 'composition_textzone', textzone: 'composition_textzone',
   structure_scale: 'structure_scale', undersized_structure: 'structure_scale',
+  creature_scale: 'creature_scale',
   duplicate_object: 'duplicate_object', duplicated_object: 'duplicate_object',
   duplicate_prop: 'duplicate_object', object_duplication: 'duplicate_object',
   rendered_text: 'rendered_text', text: 'rendered_text',
@@ -224,6 +238,7 @@ const TYPE_TO_BUCKET = {
   // Accessory detail is its own bucket (see BUCKETS.accessory) — it carries a
   // MODERATE ceiling in scoring.js that must NOT apply to main-garment failures.
   clothing_detail: 'clothing_detail', sleeve: 'clothing_detail', collar: 'clothing_detail',
+  garment_facing: 'garment_facing',
   unverified_absence: 'unverified_absence', inferred_absence: 'unverified_absence',
   accessory: 'accessory', glasses: 'accessory', eyewear: 'accessory',
   bandana: 'accessory', jewellery: 'accessory', jewelry: 'accessory',
@@ -272,6 +287,10 @@ const TYPE_TO_BUCKET = {
   // put features back without redrawing the page.
   face_destroyed: 'character_identity',
   face_mismatch: 'character_identity', hair_change: 'character_identity',
+  // identity_swap (owner, 2026-09-27): hair AND face both differ from the
+  // reference, so the figure reads as another person. Always CRITICAL
+  // (scoring.js MIN_SEVERITY_TYPES), so it takes a char-fix.
+  identity_swap: 'character_identity',
   skin_tone: 'character_identity', age_shift: 'character_identity',
   clothing_inconsistent: 'clothing', color_change: 'clothing',
   shape_change: 'object_presence',
@@ -418,11 +437,11 @@ function bucketsToIssues(merged = {}) {
  */
 const CONSOLIDATED_TYPES = Object.freeze([
   'image_coherence', 'character_identity', 'duplicate_character', 'duplicate_identity',
-  'missing_character', 'extra_character', 'clothing', 'clothing_detail', 'clothing_sex',
+  'missing_character', 'extra_character', 'clothing', 'clothing_detail', 'clothing_sex', 'garment_facing',
   'accessory', 'accessory_missing', 'hair', 'hair_nuance', 'face_drift', 'face_destroyed',
   'cutout_artifact', 'nudity', 'anatomy', 'body_build', 'figure_completeness', 'action_interaction',
   'object_presence', 'missing_element', 'object_count', 'duplicate_object', 'scale',
-  'structure_scale', 'setting', 'style_consistency', 'rendered_text', 'required_text',
+  'structure_scale', 'creature_scale', 'setting', 'style_consistency', 'rendered_text', 'required_text',
   'character_marking', 'anachronism', 'garment_colour', 'naturalness', 'emotion',
   'viewer_address', 'physics', 'unverified_absence', 'composite_seam',
 ]);
@@ -434,7 +453,7 @@ const CONSOLIDATED_TYPES = Object.freeze([
 // type is on it. Every value already has its TYPE_TO_BUCKET row — adding one
 // here is a new scored type and needs its bucket row too.
 const ENTITY_CHECK_TYPES = Object.freeze([
-  'face_destroyed', 'face_mismatch', 'face_drift', 'age_shift', 'hair_nuance', 'hair_change',
+  'face_destroyed', 'identity_swap', 'face_mismatch', 'face_drift', 'age_shift', 'hair_nuance', 'hair_change',
   'skin_tone', 'body_build', 'clothing_inconsistent', 'color_change', 'shape_change', 'garment_colour',
   'cutout_artifact',
 ]);

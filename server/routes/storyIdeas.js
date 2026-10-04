@@ -12,7 +12,7 @@ const path = require('path');
 
 // Middleware
 const { authenticateToken } = require('../middleware/auth');
-const { storyIdeasLimiter } = require('../middleware/rateLimit');
+const { storyIdeasLimiter, ideaLandmarksPrepareLimiter } = require('../middleware/rateLimit');
 
 // Services
 const { log } = require('../utils/logger');
@@ -25,6 +25,9 @@ const { pickWorldSeeds, worldSeedInstruction, stripSeedLists, stripAngleList, pi
 // This route once kept a PRIVATE cache here, so landmarks it discovered were
 // invisible to the story pipeline.
 const { resolveAvailableLandmarks } = require('../lib/landmarkPhotos');
+// Which of those places the idea names: Jev's fit ranking, prepared off the
+// idea request (docs/decisions.md 2026-09-27 "Jev selection built").
+const jevSelection = require('../lib/jevSelection');
 
 // The idea funnel: one row per idea generation and one per pick, so "would a
 // parent buy this" is measured from the production click instead of from a
@@ -117,6 +120,58 @@ function buildIdeaLandmarksSection(landmarks) {
     return entry;
   });
   return `**LOCAL LANDMARKS (use one or two)**\n${lines.join('\n')}`;
+}
+
+/**
+ * The town an idea's landmarks come from: the reader's own, except a Swiss
+ * story, which is set in its own city. One copy for both idea endpoints and
+ * the prepare call, so all three rank and read the same list.
+ */
+function ideaLandmarkLocation({ storyCategory, storyTopic, userLocation }) {
+  let effectiveLocation = userLocation;
+  if (storyCategory === 'swiss-stories' && storyTopic) {
+    let storyCity = null;
+    if (!storyTopic.startsWith('sage-')) {
+      const { getSwissCityById } = require('../lib/swissStories');
+      const cityId = storyTopic.replace(/-\d+$/, '');
+      const cityMeta = getSwissCityById(cityId);
+      if (cityMeta) storyCity = cityMeta.name.en;
+    } else {
+      try {
+        const sagen = require('../data/swiss-sagen.json');
+        const sage = sagen.find(s => s.id === storyTopic);
+        if (sage?.city) storyCity = sage.city;
+      } catch (e) { /* ignore */ }
+    }
+    if (storyCity) {
+      if (effectiveLocation?.city && effectiveLocation.city.toLowerCase() !== storyCity.toLowerCase()) {
+        log.info(`[SWISS] Idea generation: overriding location from ${effectiveLocation.city} to ${storyCity}`);
+      }
+      effectiveLocation = { city: storyCity, country: 'Switzerland' };
+    }
+  }
+  return effectiveLocation;
+}
+
+/** The town's list for an idea: the story's resolver and limit, with live discovery on a miss. */
+function resolveIdeaLandmarkList(location, language, onStatus = null) {
+  return resolveAvailableLandmarks(location, {
+    limit: jevSelection.STORY_LANDMARK_LIMIT, discoverOnMiss: true, language,
+    ...(onStatus ? { onStatus } : {}),
+  });
+}
+
+/**
+ * The two places the idea prompt names: Jev's LB1 ranking of the town's list
+ * for this setup, 2 at random from its top 5 — when the ranking the prepare
+ * call started is ready. When it is not, today's order (fame) for this request,
+ * logged: the owner's latency rule, never a wait (jevSelection.pickIdeaLandmarks).
+ */
+function ideaLandmarkRows({ characters, storyCategory, storyTheme, storyTopic, language }, location, landmarks) {
+  const setup = jevSelection.selectionSetup({ characters, storyCategory, storyTheme, storyTopic, userLocation: location });
+  const pick = jevSelection.pickIdeaLandmarks({ setup, language, landmarks, n: jevSelection.IDEA_LANDMARKS.wizard });
+  log.info(`[LANDMARK] idea landmarks (${pick.source}): ${pick.landmarks.map(l => l.name).join(', ')}`);
+  return pick.landmarks;
 }
 
 async function buildIdeasPromptContext({
@@ -683,36 +738,49 @@ function resolveIdeaWorlds({ storyCategory, storyTheme, location, worldMode = 'a
   return [locationWorld(), fantasyWorld()];
 }
 
+// Caps on every free-text field the two paid idea arms read (code review 2026-10 R4; the trial
+// route applies the same limits from server/lib/requestGuards.js).
+function ideaRequestError(body) {
+  const g = require('../lib/requestGuards');
+  const b = body || {};
+  return g.textFieldsError([
+    ['storyType', b.storyType], ['storyTypeName', b.storyTypeName], ['storyCategory', b.storyCategory],
+    ['storyTopic', b.storyTopic], ['storyTheme', b.storyTheme], ['customThemeText', b.customThemeText],
+    ['language', b.language, 20], ['languageLevel', b.languageLevel, 50],
+  ]) || g.characterListError(b.characters) || g.relationshipListError(b.relationships) || g.locationError(b.userLocation);
+}
+
+/**
+ * PREPARE THE IDEA LANDMARKS (2026-09-27). The wizard calls this the moment
+ * the story's kind (category + theme/topic) is picked; it answers 202 at once
+ * and ranks the town's places for this setup in the background (Jev LB1,
+ * ~0.3 s), so the idea request that follows reads a ready ranking instead of
+ * waiting for one. Nothing here is on the idea request's path.
+ */
+router.post('/prepare-idea-landmarks', authenticateToken, ideaLandmarksPrepareLimiter, (req, res) => {
+  res.status(202).json({ ok: true });
+  const { storyCategory, storyTopic, storyTheme, language, characters, userLocation } = req.body || {};
+  const location = ideaLandmarkLocation({ storyCategory, storyTopic, userLocation });
+  if (!location?.city || storyCategory === 'historical' || !Array.isArray(characters) || !characters.length) return;
+  resolveIdeaLandmarkList(location, language)
+    .then(landmarks => {
+      if (!landmarks.length) return;
+      const setup = jevSelection.selectionSetup({ characters, storyCategory, storyTheme, storyTopic, userLocation: location });
+      jevSelection.startIdeaLandmarkRanking({ setup, language, landmarks });
+    })
+    .catch(err => log.error(`🚨 [LANDMARK] prepare-idea-landmarks failed: ${err.message}`));
+});
+
 // Generate story ideas endpoint - FREE, no credits
 router.post('/generate-story-ideas', authenticateToken, storyIdeasLimiter, async (req, res) => {
+  const inputError = ideaRequestError(req.body);
+  if (inputError) return res.status(400).json({ error: inputError });
   try {
     const { storyType, storyTypeName, storyCategory, storyTopic, storyTheme, customThemeText, language, languageLevel, characters, relationships, ideaModel, pages = 10, userLocation, season, worldMode, attempt, regenerate } = req.body;
 
     log.debug(`💡 Generating story ideas for user ${req.user.username}${worldMode && worldMode !== 'auto' ? ` (worldMode: ${worldMode})` : ''}`);
 
-    // For swiss-stories, use the story's city for landmarks (not user's home city)
-    let effectiveLocation = userLocation;
-    if (storyCategory === 'swiss-stories' && storyTopic) {
-      let storyCity = null;
-      if (!storyTopic.startsWith('sage-')) {
-        const { getSwissCityById } = require('../lib/swissStories');
-        const cityId = storyTopic.replace(/-\d+$/, '');
-        const cityMeta = getSwissCityById(cityId);
-        if (cityMeta) storyCity = cityMeta.name.en;
-      } else {
-        try {
-          const sagen = require('../data/swiss-sagen.json');
-          const sage = sagen.find(s => s.id === storyTopic);
-          if (sage?.city) storyCity = sage.city;
-        } catch (e) { /* ignore */ }
-      }
-      if (storyCity) {
-        if (effectiveLocation?.city && effectiveLocation.city.toLowerCase() !== storyCity.toLowerCase()) {
-          log.info(`[SWISS] Idea generation: overriding location from ${effectiveLocation.city} to ${storyCity}`);
-        }
-        effectiveLocation = { city: storyCity, country: 'Switzerland' };
-      }
-    }
+    const effectiveLocation = ideaLandmarkLocation({ storyCategory, storyTopic, userLocation });
 
     // Discover landmarks for story location (await to include in ideas prompt).
     // Skip for historical stories - they use historically accurate locations, not local landmarks.
@@ -720,9 +788,7 @@ router.post('/generate-story-ideas', authenticateToken, storyIdeasLimiter, async
     let availableLandmarks = [];
     if (effectiveLocation?.city && storyCategory !== 'historical') {
       log.debug(`  📍 Story location: ${effectiveLocation.city}, ${effectiveLocation.country || ''}`);
-      availableLandmarks = await resolveAvailableLandmarks(effectiveLocation, {
-        limit: 20, discoverOnMiss: true, language,
-      });
+      availableLandmarks = await resolveIdeaLandmarkList(effectiveLocation, language);
     }
     log.debug(`  Category: ${storyCategory}, Topic: ${storyTopic}, Theme: ${storyTheme || storyTypeName}, Language: ${language}, Pages: ${pages}`);
 
@@ -749,7 +815,7 @@ router.post('/generate-story-ideas', authenticateToken, storyIdeasLimiter, async
     // Build available landmarks section for the prompt
     let availableLandmarksSection = '';
     if (availableLandmarks && availableLandmarks.length > 0 && effectiveCategory_loc !== 'historical') {
-      availableLandmarksSection = buildIdeaLandmarksSection(availableLandmarks);
+      availableLandmarksSection = buildIdeaLandmarksSection(ideaLandmarkRows({ characters, storyCategory, storyTheme, storyTopic, language }, effectiveLocation, availableLandmarks));
       const withDesc = availableLandmarks.filter(l => l.wikipediaExtract || l.photoDescription).length;
       log.info(`[LANDMARK] ✅ Including ${availableLandmarks.length} landmarks in ideas prompt (${withDesc} with descriptions): ${availableLandmarks.slice(0, 3).map(l => l.name).join(', ')}...`);
     } else {
@@ -892,7 +958,7 @@ function parseIdeaFinal(text) {
 // the client's idle timeout alive without carrying any text. No [FINAL]
 // section = no idea: the arm sends an error event, never the raw response.
 // Resolves (never rejects) with what the call produced, for the funnel record.
-function streamIdeaArm({ arm, prompt, res, callStreaming, model }) {
+function streamIdeaArm({ arm, prompt, res, callStreaming, model, signal }) {
   const key = `story${arm + 1}`;
   let fullText = '';
   let lastPing = 0;
@@ -902,7 +968,7 @@ function streamIdeaArm({ arm, prompt, res, callStreaming, model }) {
       res.write(': generating\n\n');
       lastPing = text.length;
     }
-  }, model).then((streamResult) => {
+  }, model, signal ? { signal } : {}).then((streamResult) => {
     const finalContent = parseIdeaFinal(fullText);
     if (finalContent) {
       res.write(`data: ${JSON.stringify({ [key]: finalContent, isFinal: true })}\n\n`);
@@ -921,6 +987,10 @@ function streamIdeaArm({ arm, prompt, res, callStreaming, model }) {
 
 // SSE Streaming endpoint for story ideas - streams each story as it completes
 router.post('/generate-story-ideas-stream', authenticateToken, storyIdeasLimiter, async (req, res) => {
+  const inputError = ideaRequestError(req.body);
+  if (inputError) return res.status(400).json({ error: inputError });
+  // A closed tab stops both paid arms (code review 2026-10 R4).
+  const signal = require('../lib/requestGuards').abortOnClientClose(res);
   // Set up SSE headers. Don't set Connection: keep-alive — it's forbidden in
   // HTTP/2 (RFC 7540 §8.1.2.2) and Cloudflare/Railway hand the response to
   // the browser over HTTP/2, which then drops the frame with
@@ -935,29 +1005,7 @@ router.post('/generate-story-ideas-stream', authenticateToken, storyIdeasLimiter
 
     log.debug(`💡 [STREAM] Generating story ideas for user ${req.user.username}${worldMode && worldMode !== 'auto' ? ` (worldMode: ${worldMode})` : ''}`);
 
-    // For swiss-stories, use the story's city for landmarks (not user's home city)
-    let effectiveLocation = userLocation;
-    if (storyCategory === 'swiss-stories' && storyTopic) {
-      let storyCity = null;
-      if (!storyTopic.startsWith('sage-')) {
-        const { getSwissCityById } = require('../lib/swissStories');
-        const cityId = storyTopic.replace(/-\d+$/, '');
-        const cityMeta = getSwissCityById(cityId);
-        if (cityMeta) storyCity = cityMeta.name.en;
-      } else {
-        try {
-          const sagen = require('../data/swiss-sagen.json');
-          const sage = sagen.find(s => s.id === storyTopic);
-          if (sage?.city) storyCity = sage.city;
-        } catch (e) { /* ignore */ }
-      }
-      if (storyCity) {
-        if (effectiveLocation?.city && effectiveLocation.city.toLowerCase() !== storyCity.toLowerCase()) {
-          log.info(`[SWISS] [STREAM] Idea generation: overriding location from ${effectiveLocation.city} to ${storyCity}`);
-        }
-        effectiveLocation = { city: storyCity, country: 'Switzerland' };
-      }
-    }
+    const effectiveLocation = ideaLandmarkLocation({ storyCategory, storyTopic, userLocation });
 
     // Discover landmarks for story location (await to include in ideas prompt).
     // Skip for historical stories - they use historically accurate locations, not local landmarks.
@@ -965,10 +1013,8 @@ router.post('/generate-story-ideas-stream', authenticateToken, storyIdeasLimiter
     let availableLandmarks = [];
     if (effectiveLocation?.city && storyCategory !== 'historical') {
       log.debug(`  📍 Story location: ${effectiveLocation.city}, ${effectiveLocation.country || ''}`);
-      availableLandmarks = await resolveAvailableLandmarks(effectiveLocation, {
-        limit: 20, discoverOnMiss: true, language,
-        onStatus: (message) => res.write(`data: ${JSON.stringify({ type: 'status', message })}\n\n`),
-      });
+      availableLandmarks = await resolveIdeaLandmarkList(effectiveLocation, language,
+        (message) => res.write(`data: ${JSON.stringify({ type: 'status', message })}\n\n`));
     }
     log.debug(`  Category: ${storyCategory}, Topic: ${storyTopic}, Theme: ${storyTheme || storyTypeName}, Language: ${language}, Pages: ${pages}`);
 
@@ -995,7 +1041,7 @@ router.post('/generate-story-ideas-stream', authenticateToken, storyIdeasLimiter
     // Build available landmarks section for the prompt
     let availableLandmarksSection = '';
     if (availableLandmarks && availableLandmarks.length > 0 && effectiveCategory_loc !== 'historical') {
-      availableLandmarksSection = buildIdeaLandmarksSection(availableLandmarks);
+      availableLandmarksSection = buildIdeaLandmarksSection(ideaLandmarkRows({ characters, storyCategory, storyTheme, storyTopic, language }, effectiveLocation, availableLandmarks));
       const withDesc = availableLandmarks.filter(l => l.wikipediaExtract || l.photoDescription).length;
       log.info(`[LANDMARK] ✅ [STREAM] Including ${availableLandmarks.length} landmarks in ideas prompt (${withDesc} with descriptions): ${availableLandmarks.slice(0, 3).map(l => l.name).join(', ')}...`);
     } else {
@@ -1054,8 +1100,8 @@ router.post('/generate-story-ideas-stream', authenticateToken, storyIdeasLimiter
     log.debug('  Starting parallel story generation...');
     // Two independent calls; the funnel's cost is their sum.
     const [arm1, arm2] = await Promise.all([
-      streamIdeaArm({ arm: 0, prompt: prompt1, res, callStreaming: callTextModelStreaming, model: modelToUse }),
-      streamIdeaArm({ arm: 1, prompt: prompt2, res, callStreaming: callTextModelStreaming, model: modelToUse }),
+      streamIdeaArm({ arm: 0, prompt: prompt1, res, callStreaming: callTextModelStreaming, model: modelToUse, signal }),
+      streamIdeaArm({ arm: 1, prompt: prompt2, res, callStreaming: callTextModelStreaming, model: modelToUse, signal }),
     ]);
     const streamModelId = arm1.modelId || arm2.modelId || null;
 

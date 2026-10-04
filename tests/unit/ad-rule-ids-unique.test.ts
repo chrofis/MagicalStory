@@ -2,7 +2,7 @@ import { describe, it, beforeAll, expect } from 'vitest';
 
 const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../../server/services/prompts');
 
-const AD_TEMPLATES = ['sceneExpansionAll', 'sceneExpansion'] as const;
+const AD_TEMPLATES = ['sceneBriefsAll', 'sceneExpansion'] as const;
 const ruleIds = (t: string) =>
   (t.match(/^[0-9]+[a-z]?\. \*\*/gm) || []).map(s => s.replace(/\. \*\*$/, ''));
 

@@ -89,7 +89,8 @@ function seasonLabel(inputData = {}, opts = {}) {
 function buildSeasonNote(inputData = {}, opts = {}) {
   const label = seasonLabel(inputData, opts);
   if (!label) return '';
-  return `**SEASON:** ${label}. Foliage, ground cover, sky and daylight colour are ${label.toLowerCase()}'s throughout the book — identical from page to page for the same place, and matching ${label.toLowerCase()} even when a reference photo was taken in another season. Indoor frames and the page's own time of day are unaffected.`;
+  // Terse on purpose: never cut from the page prompt (2026-09-27, "shorten the fixed blocks").
+  return `**SEASON:** ${label}. Foliage, ground cover, sky and daylight colour are ${label.toLowerCase()}'s on every page, the same place alike from page to page, even when a reference photo shows another season. Indoor frames and the page's time of day are unaffected.`;
 }
 
 /**

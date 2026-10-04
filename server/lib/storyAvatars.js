@@ -17,6 +17,7 @@
 'use strict';
 
 const { log } = require('../utils/logger');
+const { isOverTheShoulderPerspective } = require('./shotVocabulary');
 
 /**
  * Pull a URL out of whatever shape the legacy code stored.
@@ -99,10 +100,12 @@ function projectStoryCharacterAvatars(characters, artStyle) {
     for (const key of Object.keys(styled)) {
       if (!isOffCategory(key)) continue;
       const parsed = parseOffCategory(key);
-      if (!parsed || !['standard', 'winter', 'summer'].includes(parsed.baseCategory)) continue;
+      if (!parsed || !['standard', 'winter', 'summer', 'costumed'].includes(parsed.baseCategory)) continue;
       const url = extractUrl(styled[key]);
       if (!url) continue;
-      entry[`styled-${key}`] = url;
+      // The costumed slot is bare 'costumed' (one costume per story), so its
+      // off sheet is 'costumed--off:…'; the plain ones take the 'styled-' prefix.
+      entry[parsed.baseCategory === 'costumed' ? key : `styled-${key}`] = url;
     }
 
     if (Object.keys(entry).length > 0) {
@@ -175,7 +178,7 @@ function resolveCellPose(sc) {
     ? sc.pose : null;
   if (!pose && sc?.perspective) {
     const persp = String(sc.perspective).toLowerCase();
-    if (/\bback\b|behind/.test(persp)) pose = 'back';
+    if (isFaceAwayPerspective(persp)) pose = 'back';
     else if (/profile|side/.test(persp)) pose = 'profile';
     else if (/front|camera/.test(persp)) pose = 'front';
   }
@@ -183,6 +186,23 @@ function resolveCellPose(sc) {
   const depth = (sc?.depth && ['foreground', 'midground', 'background'].includes(sc.depth))
     ? sc.depth : 'foreground';
   return { pose, depth, flip: sc?.flip === true };
+}
+
+/**
+ * A perspective that turns the figure's face away from the camera. Such a
+ * figure gets the rear cell (body turned away, back-of-head face card): a
+ * front face card hands the model a face it has no figure to put on, and it
+ * paints it on someone else (staging job_1790373080139_vnx5l8iy7 p7: the
+ * `over-the-shoulder` near figure was sent a threeQuarter head card, and its
+ * hair appeared on another child). Reads the structured `perspective` field
+ * only; the over-the-shoulder word is shotVocabulary's own predicate. The
+ * other words are the face-away perspectives stored on staging pages
+ * ("back view", "rear three-quarter", "three-quarter rear view", "facing away").
+ */
+function isFaceAwayPerspective(perspective) {
+  const persp = String(perspective || '').toLowerCase();
+  if (isOverTheShoulderPerspective(persp)) return true;
+  return /\bback\b|behind|\brear\b|facing away|away from (?:the )?(?:camera|viewer)/.test(persp);
 }
 
 /**
@@ -226,18 +246,21 @@ function resolveSheetForRef(story, ref, opts = {}) {
   const offIds = Array.isArray(ref.wornOffIds) && ref.wornOffIds.length > 0
     ? ref.wornOffIds
     : offIdsForCharacter(ref.name, opts.wornResolved);
-  if (offIds.length > 0 && slotKey.startsWith('styled-')) {
+  // A COSTUMED sheet takes its off variant the same way (owner, 2026-10-04).
+  if (offIds.length > 0 && (slotKey.startsWith('styled-') || slotKey === 'costumed')) {
     const offKey = buildOffSlotKey(slotKey, offIds);
     if (story[offKey]) {
       ref.clothingCategory = `${clothingRaw}${offKey.slice(offKey.indexOf('--off:'))}`;
       ref.wornOffIds = offIds;
       return { uri: story[offKey], slotKey: offKey };
     }
-    // NEVER SILENT — same contract as the costumed fallback below. The page is
-    // about to be sent a picture of the character WEARING something the brief
-    // says is off; the only remaining instruction is the wornItems text line,
-    // and whoever reads this log needs to know that is all there was.
-    log.warn(`👕 [STORY-CELLS] ${ref.name || '?'}: page takes ${offIds.join('+')} off but no "${offKey}" sheet exists (slots: ${Object.keys(story).join(', ')}) — serving the WORN sheet; only the "leave it off" text line carries the instruction`);
+    // A KNOWN DEFECT, RECORDED (owner, 2026-10-04). The page is about to be
+    // sent a picture of the character WEARING something the brief says is off;
+    // the only remaining instruction is the wornItems text line. The page still
+    // renders, but at ERROR, and the marker below becomes the page's
+    // `wardrobe_state_reference / off_sheet_missing` record in
+    // finalChecksReport.notEvaluated (notEvaluated.collectNotEvaluated).
+    log.error(`👕 [STORY-CELLS] ${ref.name || '?'}: page takes ${offIds.join('+')} off but no "${offKey}" sheet exists (slots: ${Object.keys(story).join(', ')}) — rendering from the sheet that WEARS it; recorded as off_sheet_missing`);
     ref.wornStateFallback = { offIds, wanted: offKey };
   }
 
@@ -507,6 +530,7 @@ module.exports = {
   applyStoryCellRefs,
   wornResolvedForPage,
   resolveCellPose,
+  isFaceAwayPerspective,
   resolveSheetForRef,
   appendStoryHistory,
   extractUrl,

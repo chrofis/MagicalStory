@@ -81,6 +81,10 @@ A STYLE finding quotes one sentence that breaks one of these rules. One you acce
 
 A fault that a character acts on a reason the page has not given is closed this way: {MOTIVE_AT_THE_ACT}.
 
+A COUNT fault is closed by the rule it names, recasting only the sentence that counts: {PICTURE_COUNT}.
+
+An ENDING fault is closed by what the ending owes, never by cutting what the ending shows: {CLOSING_MOMENT}
+
 A sentence longer than the reading level allows, a subordinate clause inside another subordinate clause, or a word a child at that level does not already use: recast it for that level.
 
 Judge the text as a reader who has only the pages in front of them. They never see the brief, the character details or the scene outlines — those are given to you so you know what the book is FOR, never as evidence that something works. A motivation, trait or fear that exists only in the character details and never reaches the page is a failure to fix, not a justification. Never resolve a weakness by citing the brief.
@@ -89,9 +93,11 @@ Work in two steps.
 
 Step 1 — write the analysis. Answer every check below for the rewritable pages, naming pages and quoting lines. This is the work: a page is weak because a check found something specific wrong with it, not because it could be phrased differently.
 
-Step 2 — rewrite the rewritable pages your analysis found problems on. Every other page stays exactly as it is. End the analysis with a line per named problem — the problem, then the page(s) the rewrite fixes it on, or the reason it stands. A named problem with neither is a failed review. Every AUDIT FINDING above enters that ledger the same way, and it has three ways to close: fixed on a page, the detail removed, or a stated reason it stands. A fault whose reason exists in the scene outlines is fixed by saying that reason on a page, never by citing the outline. Close a fault about a missing path, arrival or move by showing it happening on one of the pages, or by leaving it to the page turn; never by opening a page with the move already completed. A fault about something the book never established is closed by establishing it on an earlier page or by cutting the claim, never by adding a sentence that asserts both the claim and its opposite. A fault naming an ability or event the pages need but never establish is closed by establishing it earlier, never by describing the moment more vividly.
+Step 2 — rewrite the rewritable pages your analysis found problems on. Every other page stays exactly as it is. End the analysis with a line per named problem — the problem, then the page(s) the rewrite fixes it on, or the reason it stands. A named problem with neither is a failed review. Every AUDIT FINDING above enters that ledger the same way, and it has three ways to close: fixed on a page, the detail removed, or a stated reason it stands. Each AUDIT FINDING starts with its id (T1, T2 …); its ledger line starts with that id, and a finding you leave standing reads `<id> STANDS: <reason>`. A fault whose reason exists in the scene outlines is fixed by saying that reason on a page, never by citing the outline. Close a fault about a missing path, arrival or move by showing it happening on one of the pages, or by leaving it to the page turn; never by opening a page with the move already completed. A fault about something the book never established is closed by establishing it on an earlier page or by cutting the claim, never by adding a sentence that asserts both the claim and its opposite. A fault naming an ability or event the pages need but never establish is closed by establishing it earlier, never by describing the moment more vividly.
 
 Take the second way whenever the detail that caused the fault carries no plot: drop the detail instead of inventing an event to justify it. Never invent an event that makes an established obstacle easier to pass, and never state a clock time or a named part of the day to close a fault — light, shadow and what the characters do carry time instead.
+
+{MECHANISM_FIX}
 
 A sentence naming what a character feels, notices, or almost does is never the sentence you cut to make room. Where a fix needs room, shorten a sentence that names only objects and positions. {PAYOFF_KEEP} End the ledger with one line per rewritten page listing any sentence you removed from it. A MISMATCH closed by a move is recorded as "moved from p<a> to p<b>", and the source page's line lists the sentences that left it.
 

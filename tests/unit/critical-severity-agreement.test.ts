@@ -97,12 +97,16 @@ describe('collectCriticalFindings — one source of truth with the score', () =>
     expect(raw[0].pool).toBe('quality');
   });
 
-  it('an EMPTY consolidated list is not a consolidation — the raw pools still count', () => {
+  // Reversed 2026-09-26: the scorer charges an empty merged list as zero
+  // deductions, so an empty list IS a consolidation and the raw pools it set
+  // aside are not read (job_1790446348343_z3fw660ie p9, see
+  // critical-check-reads-scored-list.test.ts).
+  it('an EMPTY consolidated list is a consolidation — the raw pools are not read', () => {
     const raw = collectCriticalFindings({
       fixableIssues: [{ severity: 'CRITICAL', type: 'anatomy', description: 'a limb is malformed' }],
       consolidatedPlan: { deduped_issues: [] },
     });
-    expect(raw).toHaveLength(1);
+    expect(raw).toEqual([]);
   });
 
   it('the same defect is never counted twice', () => {

@@ -864,7 +864,12 @@ async function iterateCover(coverKey, storyData, options = {}) {
     }
     return stripped;
   };
-  const rawSceneDescription = existingCover.description || 'A beautiful illustrated cover page.';
+  // No stored brief = nothing to iterate from. A generic placeholder would paint an
+  // unrelated cover under the user's name (code review 2026-10 A5; decisions #4).
+  if (!existingCover.description || !String(existingCover.description).trim()) {
+    throw new Error(`[COVER-ITERATE] ${coverKey}: the cover has no stored scene description to iterate from. Refusing to substitute a generic one.`);
+  }
+  const rawSceneDescription = existingCover.description;
   // `let`: the cover NAME invariant below may strip an unsendable entity name.
   let sceneDescription = stripCoverAnnotations(rawSceneDescription);
   log.info(`🔄 [COVER-ITERATE] ${coverKey}: Using stored description (${sceneDescription.length} chars)`);
@@ -927,6 +932,12 @@ async function iterateCover(coverKey, storyData, options = {}) {
     selectedCoverCharacters = mergedCharacters.filter(c =>
       hintCharNames.some(name => canonicalName(name) === canonicalName(c.name))  // COMPARE
     ).slice(0, MAX_COVER_CHARACTERS);
+    // A hint that names nobody on the roster must fail like the page path does
+    // (images.js "Refusing to fall back to the whole roster"), not ship an
+    // empty cast (code review 2026-10 A6).
+    if (selectedCoverCharacters.length === 0) {
+      throw new Error(`[COVER-ITERATE] ${coverKey}: coverHints name ${hintCharNames.join(', ')}, none of whom match the story roster (${mergedCharacters.map(c => c.name).join(', ')}). Refusing to render an empty cast.`);
+    }
     // Merge hint clothing into clothingRequirements for avatar lookup
     const mergedClothing = { ...clothingRequirements };
     for (const [charName, clothing] of Object.entries(hintCharClothing)) {
@@ -1193,37 +1204,21 @@ async function iterateCover(coverKey, storyData, options = {}) {
   deleteFromImageCache(cacheKey);
 
   // --- Build reference images ---
-  // Rehydrate imageData on demand only for the two branches that actually
-  // need the bytes. After R2 migration `existingCover.imageData` is usually
-  // null; the active version's bytes live in story_images. Without this,
-  // blackoutIssueRegions / useOriginalAsReference passed null and downstream
-  // sharp operations threw "Input buffer contains unsupported image format".
+  // The current cover, for the two branches that send it to the model (the
+  // blackout reference and useOriginalAsReference): the TEXTLESS art of its
+  // active version (coverEvalLayer.resolveCoverEvalImage), never the served
+  // bytes with the app's title / dedication / "magicalstory.ch" stamped on —
+  // the model copies lettering it is shown. A stamped cover with no art layer
+  // throws: the iterate does not run on the stamp.
   let previousImage = null;
   const needsImageBytes = blackoutIssues || useOriginalAsReference;
-  let rehydratedCoverBytes = existingCover.imageData;
-  if (needsImageBytes && !rehydratedCoverBytes) {
-    try {
-      const { getActiveVersion, getStoryImage } = require('../services/database');
-      const storyId = storyData.id || storyData.storyId;
-      if (storyId) {
-        const activeIdx = await getActiveVersion(storyId, coverKey);
-        const row = await getStoryImage(storyId, coverKey, null, activeIdx);
-        // R2-1: post-migration rows have image_data NULL and bytes at imageUrl —
-        // resolve from either source (inline first, else fetch the R2 URL).
-        if (row?.imageData) {
-          rehydratedCoverBytes = row.imageData;
-        } else if (row?.imageUrl) {
-          const { bytesFromAnyImage } = require('./r2');
-          const buf = await bytesFromAnyImage(row.imageUrl);
-          if (buf) rehydratedCoverBytes = buf.toString('base64');
-        }
-        if (rehydratedCoverBytes) {
-          log.info(`🔄 [COVER-ITERATE] ${coverKey}: Rehydrated active version bytes from story_images (v${activeIdx})`);
-        }
-      }
-    } catch (rehydrateErr) {
-      log.warn(`🔄 [COVER-ITERATE] ${coverKey}: Rehydrate failed: ${rehydrateErr.message}`);
-    }
+  let rehydratedCoverBytes = null;
+  if (needsImageBytes) {
+    const storyId = storyData.id || storyData.storyId;
+    if (!storyId) throw new Error(`[COVER-ITERATE] ${coverKey}: no story id — cannot resolve the cover's textless art`);
+    const layer = await require('./coverEvalLayer').resolveCoverEvalImage(storyId, coverKey, null);
+    rehydratedCoverBytes = layer.imageData;
+    log.info(`🔄 [COVER-ITERATE] ${coverKey}: reference is v${layer.versionIndex} ${layer.layer === 'art' ? 'textless art layer' : 'unstamped render'}`);
   }
   if (blackoutIssues) {
     const fixTargets = existingCover.fixTargets || [];
@@ -1382,7 +1377,7 @@ async function iterateCover(coverKey, storyData, options = {}) {
     // configured cover aspect (never inferred from an evaluationType).
     const genResult = await generateImageOnly(coverPrompt, coverCharacterPhotos, {
       previousImage,
-      imageModelOverride: titleModeInfo.bakedModel || imageModel || null,
+      imageModelOverride: titleModeInfo.bakedModel || imageModel || MODEL_DEFAULTS.coverImage,
       landmarkPhotos: coverLandmarkPhotos,
       // A rendered cover always carries its plate (use 'render') and an edit
       // carries no photo (use 'edit'); only the composite route, left as it was
@@ -1871,7 +1866,12 @@ async function buildCoverReferences({
     }
   }
 
-  let landmarkPhotos = visualBible ? await getLandmarkPhotosForScene(visualBible, sceneMetadata) : [];
+  // The cover's own (negative) page number: it is not a story page, so the
+  // page gate skips it, and it is how the cover finds the vantage whose `pages`
+  // name it — the photo that vantage cites (landmarkPhotoCitation).
+  let landmarkPhotos = visualBible
+    ? await getLandmarkPhotosForScene(visualBible, sceneMetadata, { pageNumber: COVER_PAGE_NUMBERS[coverKey] ?? -1 })
+    : [];
   // Append curated non-landmark photos so the composite path's landmarkBuf
   // resolves and pass 2 (watercolor + landmark) actually runs. Without this
   // back covers whose outline picked a curated location (e.g. Limmatufer
@@ -1932,7 +1932,7 @@ async function buildCoverReferences({
         // Plate-level variant of the canonical SOLID-GROUND rule (docs/
         // decisions.md) — plates prepare the ground BEFORE figures exist,
         // so this speaks about the frame band, not about feet.
-        characterSpace: 'The bottom fifth of the frame must be solid dry standing ground spanning the full width — sand above the waterline, beach berm, boardwalk, grass, path, stone, or deck — where the characters will stand firmly. Any ocean, river, lake, surf, pool, or open water stays in the mid-ground or higher and never touches the bottom edge of the frame.',
+        characterSpace: 'The bottom fifth of the frame must be solid dry standing ground spanning the full width — sand above the waterline, beach berm, boardwalk, grass, path, stone, or deck. Any ocean, river, lake, surf, pool, or open water stays in the mid-ground or higher and never touches the bottom edge of the frame.',
         description: emptyDesc,
         // Named landmark-fidelity block when a landmark photo is attached
         // below — '' otherwise (was trial-only).
