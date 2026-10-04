@@ -262,7 +262,46 @@ const FINDING_OUTCOME = {
    * the ledger stops claiming it (settleLedgerAfterDiff).
    */
   REWRITE_RESTORED: 'rewrite-restored',
+  /**
+   * The pass's own ledger says the finding STANDS (owner, 2026-10-04). A
+   * declined finding is open, whatever happened to its page: on staging
+   * job_1791040103540_atbttop6w the refine kept p18's text-vs-picture MISMATCH
+   * ("stands: … the ending's own act") and the ledger called it page-rewritten
+   * because other findings on p18 were fixed. Only this direction is read from
+   * the prose: a declared decline OPENS a finding, a claimed fix never closes one.
+   */
+  DECLINED: 'declined',
 };
+
+/** The id the refine is shown a merged audit finding under, and cites in its ledger. */
+function auditFindingId(i) {
+  return `T${i + 1}`;
+}
+
+/** The findings as the refine is shown them: one line each, prefixed with its id. */
+function numberedFindingsText(findings = []) {
+  return (findings || []).map((f, i) => `${auditFindingId(i)} ${f.line}`).join('\n');
+}
+
+/**
+ * The findings the pass declined: ledger lines that START with a finding id and
+ * carry `STANDS:` (text-refine.txt's ledger contract). Returns id → reason. An
+ * id the pass was never given is logged as an error and ignored.
+ */
+function parseDeclinedFindings(analysis, findingCount) {
+  const declined = new Map();
+  for (const raw of String(analysis || '').split(/\r?\n/)) {
+    const m = raw.match(/^\s*(?:[-*]\s*)?\**\s*(T\d+)\b[^\n]*?\bSTANDS:\s*(.*)$/);
+    if (!m) continue;
+    const n = Number(m[1].slice(1));
+    if (!(n >= 1 && n <= findingCount)) {
+      log.error(`❌ [TEXT-REPAIR] ledger declines ${m[1]}, an id the pass was never given — ignored`);
+      continue;
+    }
+    declined.set(m[1], m[2].trim());
+  }
+  return declined;
+}
 
 /**
  * Resolve every finding to exactly one outcome.
@@ -274,13 +313,19 @@ const FINDING_OUTCOME = {
  *        its own structural self-report. Passed, a returned page whose text did
  *        not move is separated from one the pass never answered. Omitted, both
  *        stay `page-unchanged`, which is what every earlier caller meant.
- * @returns {Array<Object>} one entry per finding, each with `outcome` and `reason`
+ * @param {Map<string,string>} [declined]      id → reason, from parseDeclinedFindings;
+ *        the finding at position i has id auditFindingId(i).
+ * @returns {Array<Object>} one entry per finding, each with `id`, `outcome` and `reason`
  */
-function resolveFindingOutcomes(findings = [], pages = [], changedPages = [], returnedPages = null) {
+function resolveFindingOutcomes(findings = [], pages = [], changedPages = [], returnedPages = null, declined = null) {
   const known = new Set((pages || []).map(p => p.pageNumber));
   const changed = new Set(changedPages || []);
   const returned = Array.isArray(returnedPages) ? new Set(returnedPages) : null;
-  return (findings || []).map((f) => {
+  return (findings || []).map((finding, i) => {
+    const f = { ...finding, id: auditFindingId(i) };
+    if (declined && declined.has(f.id)) {
+      return { ...f, outcome: FINDING_OUTCOME.DECLINED, reason: `the pass left it standing: ${declined.get(f.id) || '(no reason given)'}` };
+    }
     if (f.pageNumber == null) {
       return { ...f, outcome: FINDING_OUTCOME.NO_PAGE_NAMED, reason: 'the fault line names no page, so no rewrite can be matched to it' };
     }
@@ -1164,7 +1209,9 @@ async function runPostAuditTextRound(storyData, pages, textFaults = [], opts = {
   // The WHOLE book goes into the prompt — a page cannot be judged for what the
   // pages around it established if it is shown alone. What is scoped is the
   // REWRITE, not the reading.
-  const findingsText = `${POST_AUDIT_SCOPE_NOTE}\n\n${lines.join('\n')}`;
+  // Numbered: the refine's ledger cites these ids, and a finding it declines
+  // (`STANDS:`) is recorded open (parseDeclinedFindings).
+  const findingsText = `${POST_AUDIT_SCOPE_NOTE}\n\n${numberedFindingsText(findings)}`;
   const prompt = buildTextRefinePrompt(storyData, pages, findingsText, String(opts.arc || '').trim(), { arcHints: opts.arcHints });
   if (!prompt) {
     log.error('❌ [TEXT-POST-AUDIT] text-refine template unavailable — the TEXT route goes unanswered');
@@ -1183,7 +1230,7 @@ async function runPostAuditTextRound(storyData, pages, textFaults = [], opts = {
     const byPage = new Map(parsed.pages.filter(p => scope.includes(p.pageNumber)).map(p => [p.pageNumber, stripTrailingSeparator(p.text)]));
     const next = pages.map(p => ({ ...p, text: byPage.get(p.pageNumber) || p.text }));
     const changedPages = next.filter((p, idx) => p.text !== pages[idx].text).map(p => p.pageNumber);
-    const findingOutcomes = resolveFindingOutcomes(findings, pages, changedPages, returnedPages);
+    const findingOutcomes = resolveFindingOutcomes(findings, pages, changedPages, returnedPages, parseDeclinedFindings(parsed.analysis, findings.length));
     for (const f of unresolvedFindings(findingOutcomes)) {
       log.warn(`⚠️ [TEXT-POST-AUDIT] UNANSWERED p${f.pageNumber ?? '?'} — ${f.reason}: ${f.text}`);
     }
@@ -1572,7 +1619,9 @@ async function refineStoryText(storyData, pages, opts = {}) {
     // own FAULT lines — the same verbatim lines mergeAuditFindings joined. That
     // is what lets the ledger below name each finding's outcome: a pass handed
     // a blob of text can count its lines and nothing else.
-    const findingsText = findings.map(f => f.line).join('\n');
+    // Numbered (T1, T2 …): the ledger cites the ids, and a finding the pass
+    // declines (`STANDS:`) is recorded open (parseDeclinedFindings).
+    const findingsText = numberedFindingsText(findings);
     let prompt = buildTextRefinePrompt(storyData, base, findingsText, arc, { arcHints });
     if (!prompt) throw new Error('text-refine template unavailable');
     if (opts.promptOverride) prompt = opts.promptOverride;
@@ -1601,7 +1650,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
     const next = base.map(p => ({ ...p, text: byPage.get(p.pageNumber) || p.text }));
     const changedPages = next.filter((p, idx) => p.text !== base[idx].text).map(p => p.pageNumber);
     const returnedPages = parsed.pages.map(p => p.pageNumber);
-    const findingOutcomes = resolveFindingOutcomes(findings, base, changedPages, returnedPages);
+    const findingOutcomes = resolveFindingOutcomes(findings, base, changedPages, returnedPages, parseDeclinedFindings(parsed.analysis, findings.length));
     for (const f of unresolvedFindings(findingOutcomes)) {
       log.warn(`⚠️ [TEXT-REPAIR/${kind}] UNANSWERED [${f.category}] p${f.pageNumber ?? '?'} — ${f.reason}: ${f.text}`);
     }
@@ -2353,7 +2402,7 @@ function projectTextRefineReport(usable, beforeByPage = new Map()) {
       droppedFindings: r.droppedFindings || [],
       arcFaults: r.arcFaults || [],
       findingOutcomes: (r.findingOutcomes || []).map(f => ({
-        pageNumber: f.pageNumber, category: f.category, sources: f.sources || [],
+        id: f.id || null, pageNumber: f.pageNumber, category: f.category, sources: f.sources || [],
         text: f.text, outcome: f.outcome, reason: f.reason || null,
       })),
       // THE FINDINGS THIS ROUND PARSED, not only the ones it applied. The
@@ -2402,7 +2451,7 @@ function projectTextRefineReport(usable, beforeByPage = new Map()) {
     })),
     mergeStats: usable.mergeStats || null,
     findingLedger: (usable.findingLedger || []).map(f => ({
-      pageNumber: f.pageNumber, category: f.category, sources: f.sources || [],
+      id: f.id || null, pageNumber: f.pageNumber, category: f.category, sources: f.sources || [],
       text: f.text, outcome: f.outcome, reason: f.reason || null,
     })),
     // Recomputable from the ledger, and recomputed by nobody: the count is the
@@ -2452,6 +2501,8 @@ module.exports = {
   mergeAuditFindings,
   FINDING_OUTCOME,
   resolveFindingOutcomes,
+  parseDeclinedFindings,
+  numberedFindingsText,
   unresolvedFindings,
   GRAMMAR_EDIT_MAX_WORDS,
   parseDiffEdits,

@@ -21,6 +21,55 @@ superseded and link forward.
 
 ---
 
+## 2026-10-04 — The consolidator cites findings by id and code reads the votes off the ids; a finding the text refine leaves standing stays open
+
+**Context:** Staging `job_1791040103540_atbttop6w` («Vier Freunde und ein Drachonei»), two owner-selected faults.
+
+(A) p12 shipped at 83, unrepaired, with Kiaan wearing the jacket the brief takes off and the egg not wrapped in it. Stored `consolidator_calls` 2983/2996 show two code mechanisms:
+1. The model credited the semantic MAJOR "Kiaan is wearing the jacket" to `quality` (`sources:["quality"], severities:{quality:"MAJOR"}`). The 2026-09-24 clamp ("Consolidator votes are clamped to what each source actually said") held it to quality's page maximum, MINOR. That entry recorded this as its known cost. Over the 8 latest staging stories (209 calls, 702 deduped entries), 3 votes were cut below a severity another source really gave.
+2. The model dropped the reader finding "Kiaan is shown standing" as `finding_contradicts_brief`. `enforceNotADefectDrops` (2026-09-23 "Absence findings …", item 3) then removed EVERY deduped entry with the same type+character, which also took the semantic MAJOR "egg not wrapped" that nothing dropped. Over the same 8 stories, 23 of 130 typed not-a-defect drops matched 2+ entries. About 10 findings no drop named were deleted, 4 of them CRITICAL (1790508305061 p13 r0 and r1 semantic, 1790446348343 p16 entity, 1790373080139 p12 quality). This is bug `consolidator-not-a-defect-mass-delete`.
+
+(B) The arc-informed audit filed "MISMATCH p18" (the text has Rubina climb down; the picture has her in the nest). The refine's prose ledger answered "stands: this is the ending's own act" and left the text. `findingLedger` still recorded the finding `page-rewritten`, because other findings on p18 were fixed. Across the 10 latest refined staging stories, the refine ledgers carry 9 decline lines ("stands"/"steht"/"declined"), and 6 of them sit on findings the ledger recorded `page-rewritten`.
+
+The grammar check's 4-word cap (2026-09-23, owner) is NOT changed. Of the 6 diff fixes it dropped over the last 9 stories, none is a clean grammar fix. The p18 ones are content rewrites of the declined MISMATCH, and p16's replaced a dialogue line with an unrelated sentence.
+
+**Decision (owner, 2026-10-04):**
+
+- **A, "numbered findings".**
+  - **Ids in the input.** `buildFeedbackInput` shows every finding with an id: Q quality, S semantic, C compliance, E entity, R reader, F final checks, numbered per section. `indexFindings` is the one numbering, used by both the renderer and the reader.
+  - **Prompt.** `feedback-consolidator.txt` asks for `ids` on every `deduped_issues` and `dropped_issues` entry. It no longer asks for `severity`, `sources` or `severities` on deduped entries.
+  - **Votes from ids.** `resolveDedupedIssues` derives `sources` and `severities` from the INPUT findings the ids name. Each source's vote is the highest severity it showed among the entry's ids. The severity is then `medianSeverity`, with CRITICAL-wins kept from 2026-09-11.
+  - **Drops by id.** A rule-2/2a drop removes exactly its ids. An entry whose ids were all dropped leaves the list; one that keeps a live id is recomputed without the dropped ones.
+  - **Bad ids.** An entry or drop with no id or an unknown id is logged at ERROR, recorded in `plan.id_errors`, and NOT applied. There is no fallback to transcribed votes or to type+character matching.
+  - **Deleted.** `sourceSeverityCeilings`, `clampVotesToSources`, `resolveEntrySeverity`, `enforceNotADefectDrops` and the `severityChosen` field.
+  - **Unaccounted findings.** Input findings in no entry and no not-a-defect drop are logged at info. Rule 2b, spec conflicts and trivial drops may legitimately leave them out.
+- **B, option 3.**
+  - **Numbered findings.** The refine is shown each merged finding as `T<n> FAULT[…]` (`numberedFindingsText`). Its ledger contract gains one sentence: a finding left standing reads `<id> STANDS: <reason>`.
+  - **Declines are read.** `parseDeclinedFindings` reads only id-led `STANDS:` lines. `resolveFindingOutcomes` records those findings `declined` (a new `FINDING_OUTCOME`), and `unresolvedFindings` counts them whatever happened to the page.
+  - **One direction only.** A declared decline OPENS a finding; a claimed fix never closes one. The 2026-09-17 rule "a self-report is not an outcome" stands for fixes.
+  - **Both callers.** The repair pass (`runRepairPass`, which also serves repetition_fix and length_fix) and the post-audit round both apply it. The post-audit round now renders the PARSED fault lines with ids, instead of the raw lines.
+  - **Stored rows.** Ledger rows carry `id`.
+  - **Unchanged.** The 4-word cap and the refine's MISMATCH rule.
+
+**Rationale:** Both A mechanisms existed only to second-guess a model transcription: votes copied by hand, and findings re-identified by class. With ids, code reads what the judges actually said and removes exactly what the model dropped. Classification (type, character, what to drop) stays the prompt's. Code reads ids and severities only, never finding text.
+
+**Evidence:**
+- **Rung 1 (code).** The real `consolidateFeedback`, `refineStoryText` and `runPostAuditTextRound` were run with stubbed models, in `consolidator-finding-ids.test.ts` and `text-refine-declined-ledger.test.ts`. On the p12 shape, HEAD gives `["clothing/Kiaan/MINOR"]` and the fix gives `["clothing/Kiaan/MAJOR","action_interaction/Kiaan/MAJOR"]`.
+- **Rung 2 (model).** The new template was re-run on 22 stored consolidator inputs, with ids injected into the stored input (qwen-plus, the shipped eval model, $0.041 total). Result: 0 id errors and 0 entries rejected.
+  - **Old collateral deletions.** Every finding the old guard deleted as collateral survives, unless the model now dropped it itself by id. Survivors: p12 r1 egg S2 MAJOR; 1791040103540 p1 Kiaan MAJOR; 1790277448294 p18 Nebla MAJOR; 1790508305061 p6 Kiaan MAJOR; p13 r0/r1 semantic CRITICAL; 1790446348343 p16 entity CRITICAL.
+  - **The fourth lost CRITICAL** (1790373080139 p12, quality identity) was dropped by the model, by id, as `profile_says_trait_is_correct`. Entity's CRITICAL on the same figure survives.
+  - **p12 r1 re-scores 61 (was 83).** Charged: jacket S1 MAJOR, egg S2 MAJOR and reader R1 MAJOR. Julian is charged MODERATE, the severity the semantic judge gave; the stored plan billed MAJOR from the model's own escalated copy. The two MINOR emotion findings are kept. 61 sits just above the redo gate of 60, so on this re-run the page would still ship unrepaired.
+  - **p12 round 0 re-run.** The model dropped the jacket finding itself as `finding_contradicts_brief`, a rule-2a misreading. That is a classification error in the model's output, not something ids change, and it is open in the backlog.
+- **Model variance in the re-run, not code.** 1790508305061 p7 r0 and p10 r0 kept findings the old run had dropped, and 1790277448294 p2 r1 dropped a CRITICAL the old run kept.
+
+**Supersedes:** 2026-09-24 "Consolidator votes are clamped …" (the clamp is deleted), and item 3 of 2026-09-23 "Absence findings …" (type+character match replaced by id match). **Amends:** 2026-09-17 "Every merged audit finding ends in an outcome …" (a declared decline is read).
+
+**Touched:** `server/lib/feedbackConsolidator.js`, `prompts/feedback-consolidator.txt`, `server/lib/textRefine.js`, `prompts/text-refine.txt`, `tests/unit/consolidator-finding-ids.test.ts` (was `consolidator-vote-clamp.test.ts`), `tests/unit/text-refine-declined-ledger.test.ts`, `tests/unit/absence-severity-guards.test.ts`, `tests/unit/identity-swap-critical.test.ts`, `tests/unit/repair-reference-and-finding-ledger.test.ts`, `tasks/bugs.json`, `tasks/verify.json`.
+
+**Status:** ✅ active (staging)
+
+---
+
 ## 2026-09-27 — Cross-story challenge variety excludes what earlier books TOOK, not what they were OFFERED; the created arc reports its taken challenges too
 
 **Context.** Since 2026-09-19 challenge variety has been a SELECTION rule: `loadUsedChallengeIds`
@@ -2779,6 +2828,8 @@ the kind noun.
 
 ## 2026-09-24 — Consolidator votes are clamped to what each source actually said (keeps 09-11 CRITICAL-wins)
 
+> 🗄 **Superseded 2026-10-04** (owner, numbered findings): votes are read off the input findings each entry cites by id; the clamp is deleted. See "The consolidator cites findings by id …".
+
 **Context:** The severity of a consolidated finding is computed in code from the model's transcribed
 `severities` (2026-08-09 median in code; 2026-09-11 owner reversal: a CRITICAL vote wins). The
 transcription is not reliable: prod `job_1790107559778_fcmlfa8kn` p6 v3 carried a reader MAJOR that
@@ -3805,6 +3856,8 @@ does it once for all four judges.
 ---
 
 ## 2026-09-23 — Absence findings: a duplicate needs the detector's room for it, a CRITICAL/MAJOR "missing" needs a second look, a false-finding drop is never charged
+
+> 🗄 **Item 3 superseded 2026-10-04**: a not-a-defect drop removes the findings it names by id, never every entry of the same type+character. See "The consolidator cites findings by id …".
 
 **Context:** Staging `job_1790100385959_1nitlympp` p12 v0. The quality judge listed a figure on empty
 ground (box x .29-.49, y .38-.62), matched it to Max and filed `duplicate_character` CRITICAL; it filed
@@ -10075,6 +10128,8 @@ own.
 `p14-CONTROL-exp1281.jpg`, `p14-CANDIDATE-exp1282.jpg`.
 
 ## 2026-09-17 — Every merged audit finding ends in an outcome, and a reversed decision is a rule on both sides
+
+> **Amended 2026-10-04**: a finding the refine's ledger declares `<id> STANDS:` is recorded `declined` (open). A claimed fix is still never read. See "The consolidator cites findings by id …".
 
 **Context.** Staging `job_1789584708605_rts4wqupm` (18 pages, de-ch). The blind auditor produced
 exactly ONE fault and it was correct — a consumable the story had already used up spilling into a
@@ -65867,6 +65922,8 @@ Resolution quality held (all 3 sent pages taken, none introduced) at lower cost,
 **Rationale.** Which features of a garment sit on its front cannot be read structurally from prose — stripping "zip"/"pocket"/"collar" by pattern would be the rejected text-matching approach (a hood or a back print belongs on the back; a side zip does not care). The bible author knows the garment, so the author writes the back view once, and code only chooses which authored string a page gets. Not chosen: deriving colour + noun from the closed colour/slot vocabularies (loses material and outline, and a second path). MAJOR cap: a full-length zip on a back is plain to a reader, but the garment and the person are still right, so it must never outrank a missing or wrong character.
 
 **Touched:** `server/lib/wornItems.js` (faceAwayNames, wornItemLook, buildWornStateLines, GARMENT_BACK_RULE, SEEN_FROM_BACK), `server/lib/promptBuilders.js` ({GARMENT_BACK}), `prompts/visual-bible.txt`, `prompts/story-trial.txt`, `server/lib/visualBible.js` (legacy parsers keep `back`), `server/lib/clothingCheck.js` (adopt), `server/lib/evalPipeline.js` (contract tag), `prompts/image-evaluation.txt` (D-05e), `server/lib/scoring.js`, `server/lib/evalBuckets.js`, `prompts/feedback-consolidator.txt`, `server/lib/repairLogic.js`, `scripts/admin/sibling-registry.json` (rule anchor), `tests/unit/worn-item-facing.test.ts`. Commit ed5c57184. **Status:** ✅ active (staging).
+
+
 
 ## 2026-10-04 — The covers' places are decided: Jev ranks the wide vantages, code makes them distinct (owner)
 

@@ -2513,6 +2513,18 @@
       "fix": "beatsPipeline.applyTitleProofread runs every title candidate through textRefine.proofreadTitleCandidates — the page lector's prompt (buildTextProofreadPrompt, STYLE_RULEBOOK, de-ch rules), model (textProofreadModel), options (LECTOR_OPTS, now one shared constant) and quote-checked substitution — right after the TITLE block is parsed, before any cover renders. The pick is kept by index. Each changed candidate logs title_proofread_corrected (before/after); a failed call logs title_proofread_failed at error. One real call on the stored candidates: gemini-3.1-pro corrected Drachonei -> Drachenei, left the other two alone ($0.0128, 7.8s). Tests: tests/unit/title-proofread.test.ts. Verify: title-proofread."
     },
     {
+      "id": "consolidator-not-a-defect-mass-delete",
+      "title": "A consolidator rule-2/2a drop deletes EVERY deduped finding of the same type+character, including other judges' real findings the model never dropped",
+      "reportedAt": "2026-10-04",
+      "source": "Stored evidence, staging job_1791040103540_atbttop6w p12 round 1 (consolidator_calls id 2996): the model dropped the reader finding \"Kiaan is shown standing\" (action_interaction/Kiaan) as finding_contradicts_brief; enforceNotADefectDrops also removed the semantic MAJOR \"egg not wrapped in the jacket\" (action_interaction/Kiaan), which nothing dropped. Replay over the 8 latest staging stories (209 stored consolidator calls): 23 of 130 typed not-a-defect drops matched 2+ deduped entries; about 10 findings no drop named were deleted, 4 of them CRITICAL (job_1790508305061 p13 r0+r1 semantic CRITICAL, job_1790446348343 p16 entity CRITICAL, job_1790373080139 p12 quality CRITICAL).",
+      "rootCause": "server/lib/feedbackConsolidator.js enforceNotADefectDrops matched drops to deduped_issues by (type, character) and filtered out every match. A drop names one finding; type+character names a class.",
+      "impact": "Real defects (up to CRITICAL) were removed from the scoring list, so pages scored high and were never repaired (p12 shipped at 83 with the jacket worn and the egg unwrapped).",
+      "status": "fixed",
+      "fixedAt": "2026-10-04",
+      "fixedIn": "385d58966",
+      "fix": "Numbered findings (owner, 2026-10-04): buildFeedbackInput shows every finding with an id (indexFindings); the consolidator cites ids on deduped entries and drops; resolveDedupedIssues derives sources/votes from the cited input findings and a not-a-defect drop removes exactly its ids; an unknown or missing id is an ERROR and not applied. enforceNotADefectDrops and the vote clamp are deleted. Tests: tests/unit/consolidator-finding-ids.test.ts (p12 regression: HEAD keeps only clothing/Kiaan/MINOR, the fix keeps clothing/Kiaan/MAJOR + the egg MAJOR). Model re-run on 22 stored inputs (qwen-plus, $0.041): 0 id errors; every collateral deletion the model did not itself drop by id survives, incl. the 1790508305061 p13 and 1790446348343 p16 CRITICALs. Verify: consolidator-finding-ids."
+    },
+    {
       "id": "avatar-sheet-pass2-garment-recolour",
       "title": "Pass 2 of the avatar sheet (style transfer) recoloured a garment, and no judge compared garment colours",
       "reportedAt": "2026-10-04",
