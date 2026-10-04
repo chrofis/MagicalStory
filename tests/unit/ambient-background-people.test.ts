@@ -222,3 +222,24 @@ describe('the BUILT prompt tells the judge what the Art Director declared', () =
     expect(build({ population: 'crowd' }).crowdExpected).toBe(true);
   });
 });
+
+// Owner, 2026-10-04: never ask the image model to blur a face. "faces
+// indistinct" in the passers-by tail was the likely cause of a named
+// background character shipping with a smeared face (staging
+// job_1791040103540_atbttop6w p12).
+describe('REQUIRED CAST background tail never asks for blurred faces', () => {
+  const { buildRequiredCastRule } = require('../../server/lib/promptBuilders');
+  for (const population of ['ambient', 'crowd', 'cast_only']) {
+    it(`${population}: no indistinct/blurred face wording`, () => {
+      const line = buildRequiredCastRule(population);
+      expect(line).not.toMatch(/indistinct|blurr|featureless|faceless/i);
+    });
+  }
+  it('ambient and crowd still keep extras unconfusable with the cast and ask for drawn faces', () => {
+    for (const population of ['ambient', 'crowd']) {
+      const line = buildRequiredCastRule(population);
+      expect(line).toMatch(/none sharing a listed character's hair, build or outfit/);
+      expect(line).toMatch(/every face fully drawn/);
+    }
+  });
+});
