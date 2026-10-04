@@ -1068,7 +1068,7 @@
     {
       "id": "main-character-selection",
       "axis": "wizard vs prompt builders",
-      "reason": "The wizard's live age line says which mains the server counts and whose age picks the band; client/src/utils/mainCharacters.ts mirrors pickMainCharacters (cap = min(2, floor(n/2)), oldest main decides). A change to the cap or sort on one side makes the wizard promise a story the server does not write (2026-10-04: three books for a 2-year-old written for her 4-year-old brother).",
+      "reason": "The wizard's live age line says which mains the server counts and whose age picks the band; client/src/utils/mainCharacters.ts mirrors pickMainCharacters (cap: 1 main for up to 2 characters, 2 for 3 or more; oldest main decides). A change to the cap or sort on one side makes the wizard promise a story the server does not write (2026-10-04: three books for a 2-year-old written for her 4-year-old brother).",
       "members": [
         "server/lib/promptBuilders.js",
         "client/src/utils/mainCharacters.ts"
