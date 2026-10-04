@@ -1031,21 +1031,15 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
     // prevents driving the balance negative and gives us the true post-balance.
     let newCredits = hasInfiniteCredits ? -1 : userCredits - creditCost;
     if (!hasInfiniteCredits) {
-      const deduct = await getDbPool().query(
-        'UPDATE users SET credits = credits - $1 WHERE id = $2 AND credits >= $1 RETURNING credits',
-        [creditCost, req.user.id]
-      );
-      if (deduct.rows.length === 0) {
+      const charge = await chargeCredits(getDbPool(), {
+        userId: req.user.id, cost: creditCost, transactionType: 'image_regeneration',
+        description: `Regenerate image for page ${pageNumber}`,
+      });
+      if (!charge.charged) {
         newCredits = userCredits - creditCost;
         log.warn(`⚠️ [BILL-1] Image regen for user ${req.user.id} completed but credits not charged (balance raced below ${creditCost})`);
       } else {
-        newCredits = deduct.rows[0].credits;
-        // Log credit transaction with the real post-deduction balance
-        await getDbPool().query(
-          `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, description)
-           VALUES ($1, $2, $3, 'image_regeneration', $4)`,
-          [req.user.id, -creditCost, newCredits, `Regenerate image for page ${pageNumber}`]
-        );
+        newCredits = charge.credits;
         log.info(`✅ Image regenerated for story ${id}, page ${pageNumber} (quality: ${imageResult.score}, cost: ${creditCost} credits, remaining: ${newCredits})`);
       }
     } else if (isImpersonating) {
@@ -3428,20 +3422,15 @@ router.post('/:id/regenerate/cover/:coverType', authenticateToken, imageRegenera
     // concurrent purchase/deduction. Decrement relatively and use the real balance.
     let newCredits = hasInfiniteCredits ? -1 : userCredits - requiredCredits;
     if (!hasInfiniteCredits) {
-      const deduct = await getDbPool().query(
-        'UPDATE users SET credits = credits - $1 WHERE id = $2 AND credits >= $1 RETURNING credits',
-        [requiredCredits, req.user.id]
-      );
-      if (deduct.rows.length === 0) {
+      const charge = await chargeCredits(getDbPool(), {
+        userId: req.user.id, cost: requiredCredits, transactionType: 'cover_regeneration',
+        description: `Regenerated ${normalizedCoverType} cover for story ${id}`,
+      });
+      if (!charge.charged) {
         newCredits = userCredits - requiredCredits;
         log.warn(`⚠️ [BILL-2] Cover regen for user ${req.user.id} completed but credits not charged (balance raced below ${requiredCredits})`);
       } else {
-        newCredits = deduct.rows[0].credits;
-        await getDbPool().query(
-          `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, description)
-           VALUES ($1, $2, $3, $4, $5)`,
-          [req.user.id, -requiredCredits, newCredits, 'cover_regeneration', `Regenerated ${normalizedCoverType} cover for story ${id}`]
-        );
+        newCredits = charge.credits;
         log.info(`✅ ${normalizedCoverType} cover regenerated for story ${id} (score: ${coverResult.score}, credits: ${requiredCredits} used, ${newCredits} remaining)`);
       }
     } else if (isImpersonating) {
@@ -3669,20 +3658,12 @@ router.post('/:id/edit/image/:pageNum', authenticateToken, imageRegenerationLimi
     // the regenerate route (BILL-1): the pre-check ran before a long AI call.
     let newCredits = hasInfiniteCredits ? -1 : userCredits - creditCost;
     if (!hasInfiniteCredits) {
-      const deduct = await getDbPool().query(
-        'UPDATE users SET credits = credits - $1 WHERE id = $2 AND credits >= $1 RETURNING credits',
-        [creditCost, req.user.id]
-      );
-      if (deduct.rows.length === 0) {
-        log.warn(`⚠️ [BILL-1] Image edit for user ${req.user.id} completed but credits not charged (balance raced below ${creditCost})`);
-      } else {
-        newCredits = deduct.rows[0].credits;
-        await getDbPool().query(
-          `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, description)
-           VALUES ($1, $2, $3, 'image_regeneration', $4)`,
-          [req.user.id, -creditCost, newCredits, `Edit image for page ${pageNumber}`]
-        );
-      }
+      const charge = await chargeCredits(getDbPool(), {
+        userId: req.user.id, cost: creditCost, transactionType: 'image_regeneration',
+        description: `Edit image for page ${pageNumber}`,
+      });
+      if (charge.charged) newCredits = charge.credits;
+      else log.warn(`⚠️ [BILL-1] Image edit for user ${req.user.id} completed but credits not charged (balance raced below ${creditCost})`);
     }
 
     log.info(`✅ Image edited for story ${id}, page ${pageNumber} (new score: ${qualityScore}, cost: ${creditCost} credits)`);
@@ -6939,20 +6920,12 @@ router.post('/:id/edit/cover/:coverType', authenticateToken, async (req, res) =>
 
     let newCredits = hasInfiniteCredits ? -1 : userCredits - creditCost;
     if (!hasInfiniteCredits) {
-      const deduct = await getDbPool().query(
-        'UPDATE users SET credits = credits - $1 WHERE id = $2 AND credits >= $1 RETURNING credits',
-        [creditCost, req.user.id]
-      );
-      if (deduct.rows.length === 0) {
-        log.warn(`⚠️ [BILL-1] Cover edit for user ${req.user.id} completed but credits not charged (balance raced below ${creditCost})`);
-      } else {
-        newCredits = deduct.rows[0].credits;
-        await getDbPool().query(
-          `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, description)
-           VALUES ($1, $2, $3, 'image_regeneration', $4)`,
-          [req.user.id, -creditCost, newCredits, `Edit ${normalizedCoverType} cover`]
-        );
-      }
+      const charge = await chargeCredits(getDbPool(), {
+        userId: req.user.id, cost: creditCost, transactionType: 'image_regeneration',
+        description: `Edit ${normalizedCoverType} cover`,
+      });
+      if (charge.charged) newCredits = charge.credits;
+      else log.warn(`⚠️ [BILL-1] Cover edit for user ${req.user.id} completed but credits not charged (balance raced below ${creditCost})`);
     }
 
     log.info(`✅ Cover edited for story ${id}, type: ${normalizedCoverType} (new score: ${qualityScore}, cost: ${creditCost} credits)`);
