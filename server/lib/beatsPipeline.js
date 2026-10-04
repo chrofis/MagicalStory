@@ -3749,10 +3749,15 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   // read it identically — the Lab replay extracted no title at all until
   // 2026-09-20 and reported `title: null` on every run.
   const { parseTitleBlock } = require('./promptBuilders');
-  const { title, titleCandidates, titleJudge, outOfRange } = parseTitleBlock(textRaw);
+  const parsedTitle = parseTitleBlock(textRaw);
+  const { outOfRange } = parsedTitle;
   if (outOfRange) {
     log.warn(`⚠️ [BEATS] TITLE_PICK out of range (${outOfRange}) — falling back to the hash pick`);
   }
+  // THE TITLE GOES THROUGH THE LECTOR (2026-10-04) before anything renders it —
+  // the front cover bakes it into the art. See applyTitleProofread.
+  const { title, titleCandidates, titleJudge, titleProofread } = await applyTitleProofread(inputData, parsedTitle, gl);
+  meta.titleProofread = titleProofread;
 
   gl.info('beats_story_text', `Page text by ${textModelId}: ${parsedText.pages.length} page(s)${title ? ` — "${title}"` : ''}${titleCandidates.length ? ` (from ${titleCandidates.length} candidates${titleJudge ? ', writer-picked' : ''})` : ''} (${(meta.timings.storyTextMs / 1000).toFixed(1)}s)`, null, {
     pages: parsedText.pages.length, title, titleCandidates, titlePick: titleJudge?.pick ?? null, titleReason: titleJudge?.reason || null, model: textModelId,
@@ -4050,4 +4055,70 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   return { title, titleJudge, beats, pages, scenes, coverScenes, rawOutline, visualBible, meta, challengeDrawIds, challengeTakenIds, challengeDraw, arcReviewReport, beatsReviewReport, storyBibleReport, clothingReviewReport, wardrobeBibleReport, sceneExpansionReport, sceneReviewReport };
 }
 
-module.exports = { generateStoryViaBeats, runArtDirector, arcTempFor, makeArcCreatorCall, runSceneReview, makePlanReader, planCheckInputs, createPlanCheckRunner, recheckRecord, runReplanRounds, applyReviewBibleCorrections, runVisualBibleLabelRound, resolvePipelineMode, PIPELINE_MODES, loadUsedChallengeIds, syncVisualBibleSection, bibleCorrectionsMissingFromTranscript, replaceClothingSection, extractBibleSections, shippedReplanState, BIBLE_MARKERS, CLOTHING_MARKERS, AD_BIBLE_MARKERS };
+/**
+ * The writer's title block, proofread (2026-10-04). Every candidate goes
+ * through the page lector's prompt, model and substitution
+ * (textRefine.proofreadTitleCandidates) in ONE call, before anything renders
+ * the title: the front cover bakes it into its art, and the cover, the story
+ * record, the PDF, the viewer and the emails all read the title chosen here.
+ *
+ * All candidates, not only the pick: the pick is made by the writer in the
+ * same call that wrote them, so nothing can be corrected before it; correcting
+ * the whole list costs the same one call and keeps `titleCandidates`,
+ * `titleJudge.candidates` and `title` the same strings everywhere they are
+ * stored. The pick is kept by INDEX — the hash fallback (stableCandidateIndex)
+ * hashes the text, so it is never recomputed over corrected strings.
+ *
+ * Every changed candidate is logged (`title_proofread_corrected`). A failed
+ * call is logged at ERROR (`title_proofread_failed`) and the writer's title
+ * ships uncorrected, the way a failed page lector ships the page text.
+ *
+ * @param {Object} inputData - language, languageLevel
+ * @param {{title:string|null, titleCandidates:string[], titleJudge:Object|null}} parsed - parseTitleBlock's result
+ * @param {Object} gl - generation log
+ * @param {{proofread?: Function}} [deps] - test seam; defaults to textRefine.proofreadTitleCandidates
+ * @returns {Promise<{title:string|null, titleCandidates:string[], titleJudge:Object|null, titleProofread:Object|null}>}
+ */
+async function applyTitleProofread(inputData, parsed, gl, deps = {}) {
+  const { title, titleCandidates, titleJudge } = parsed;
+  // No candidate list: the writer's single TITLE line is the one candidate.
+  const list = titleCandidates.length ? titleCandidates : (title ? [title] : []);
+  if (!list.length) return { title, titleCandidates, titleJudge, titleProofread: null };
+  const pickIdx = list.indexOf(title);
+  const proofread = deps.proofread || require('./textRefine').proofreadTitleCandidates;
+  let pr;
+  try {
+    pr = await proofread(inputData, list);
+  } catch (err) {
+    log.error(`❌ [TITLE-LECTOR] failed (${err.message}) — the title ships unproofread: "${title}"`);
+    gl.error('title_proofread_failed', `Title proofread failed (${err.message}) — the writer's title ships unchecked for spelling and grammar: "${title}"`, null, { title, candidates: list, error: err.message });
+    return { title, titleCandidates, titleJudge, titleProofread: { ok: false, error: err.message } };
+  }
+  const corrected = pr.candidates;
+  const changes = list
+    .map((before, i) => ({ index: i, before, after: corrected[i] }))
+    .filter(c => c.after !== c.before);
+  for (const c of changes) {
+    const picked = c.index === pickIdx;
+    log.info(`✍️  [TITLE-LECTOR] candidate ${c.index + 1}${picked ? ' (the shipped title)' : ''}: "${c.before}" → "${c.after}"`);
+    gl.info('title_proofread_corrected', `Title candidate ${c.index + 1}${picked ? ' (the shipped title)' : ''} corrected: "${c.before}" → "${c.after}"`, null, { ...c, picked, modelId: pr.modelId });
+  }
+  for (const d of pr.dropped || []) {
+    log.warn(`⚠️ [TITLE-LECTOR] dropped "${d.quote}" (${d.reason})`);
+  }
+  for (const u of pr.unparsed || []) {
+    log.warn(`⚠️ [TITLE-LECTOR] unreadable finding line — ${u.reason}: ${u.line}`);
+  }
+  if (!changes.length) log.info(`✍️  [TITLE-LECTOR] ${pr.modelId}: no fault in ${list.length} title candidate(s) (${(pr.elapsedMs / 1000).toFixed(1)}s)`);
+  return {
+    title: pickIdx >= 0 ? corrected[pickIdx] : title,
+    titleCandidates: titleCandidates.length ? corrected : titleCandidates,
+    titleJudge: titleJudge ? { ...titleJudge, candidates: corrected } : null,
+    titleProofread: {
+      ok: true, modelId: pr.modelId, elapsedMs: pr.elapsedMs, changes,
+      rawResponse: pr.rawResponse, droppedCount: (pr.dropped || []).length,
+    },
+  };
+}
+
+module.exports = { generateStoryViaBeats, applyTitleProofread,runArtDirector, arcTempFor, makeArcCreatorCall, runSceneReview, makePlanReader, planCheckInputs, createPlanCheckRunner, recheckRecord, runReplanRounds, applyReviewBibleCorrections, runVisualBibleLabelRound, resolvePipelineMode, PIPELINE_MODES, loadUsedChallengeIds, syncVisualBibleSection, bibleCorrectionsMissingFromTranscript, replaceClothingSection, extractBibleSections, shippedReplanState, BIBLE_MARKERS, CLOTHING_MARKERS, AD_BIBLE_MARKERS };

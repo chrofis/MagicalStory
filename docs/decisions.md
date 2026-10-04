@@ -63462,3 +63462,38 @@ the gate.
 
 **Touched:** server/lib/jevAudit.js (jevCastBeatVoice, arcRepairFindingsWithCastCheck,
 CAST_FEEDBACK_HEADING), server/lib/beatsPipeline.js (log lines), tests/unit/jev-text-chain-wiring.test.ts.
+
+## 2026-10-04 — The title goes through the lector: every candidate, right after the writer's TITLE block, before any cover renders
+
+**Context.** Staging `job_1791040103540_atbttop6w` (dragon run 9, de-ch) shipped "Vier Freunde und ein
+Drachonei" (correct: Drachenei) on its front cover. The beats page-text call writes three candidates and picks
+one (`parseTitleBlock`); the only spelling/grammar pass, the lector, runs last in the text-refine chain over
+page text only — no step ever read the title. The chain also runs in parallel with the images, so even a title
+fed to it would arrive after the front cover had baked the title into its art.
+
+**Decision.** `beatsPipeline.applyTitleProofread` runs right after the TITLE block is parsed and sends ALL
+candidates through `textRefine.proofreadTitleCandidates`: the page lector's own prompt
+(`buildTextProofreadPrompt` → story-text-proofread.txt with STYLE_RULEBOOK and the language's spelling rules,
+de-ch ss), model (`textProofreadModel`), options (`LECTOR_OPTS`, hoisted to one constant both calls use),
+parser and quote-checked substitution — one candidate per pseudo-page. All candidates rather than the pick
+alone: the writer picks in the same call that wrote them, so nothing can be corrected before the pick, and
+correcting the list costs the same single call while keeping `titleCandidates`, `titleJudge.candidates` and
+`title` the same strings in every store. The pick is kept by index (the hash fallback hashes text, so it is
+never recomputed over corrected strings). Every changed candidate logs `title_proofread_corrected`
+{index, before, after, picked}; a failed call logs `title_proofread_failed` at error and the writer's title
+ships, exactly as a failed page lector ships the page text. Every reader takes the corrected string: the cover
+render (`coverRenderOptions` ← `title` in storyJobPipeline ← `titleJudge.candidates[pick]`), the checkpoints,
+`data.title` (PDF, viewer, share page, emails) and the restamp/repaint paths (`storyData.title`).
+
+**Not covered by design.** Trials: they skip the whole text-refine chain, lector included, for speed (owner
+2026-08-15), and their cover streams before the pick; the title follows the page text there. The non-trial
+unified path no longer exists (resolvePipelineMode).
+
+**Cost / latency (rung: one real call on the stored candidates).** gemini-3.1-pro, 1,085 in / 888 out (862
+reasoning), $0.0128, 7.8s on the critical path before covers render; reply
+`PAGE 3: 'Vier Freunde und ein Drachonei' → 'Vier Freunde und ein Drachenei'`, the other two untouched.
+
+**Touched.** server/lib/textRefine.js, server/lib/beatsPipeline.js, tests/unit/title-proofread.test.ts,
+tasks/bugs.json (`title-never-proofread`), tasks/verify.json (`title-proofread`).
+
+**Status:** ✅ active

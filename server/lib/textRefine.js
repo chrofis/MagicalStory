@@ -861,6 +861,76 @@ function applyLectorFindings(pages = [], findings = []) {
   return { pages: next, applied, dropped };
 }
 
+// The lector's call options — one constant for the page lector and the title
+// lector, so the title gets exactly the correction the pages get.
+// null output cap = the model's own limit (owner rule: no output caps). A
+// finding list is a few hundred tokens — the cost of this call is decided by
+// the output CONTRACT, not by the ceiling.
+// temperature 0: the A/B measured this prompt at 0, and a lector must not
+// paraphrase the page it quotes.
+// reasoning effort 'medium': measured 2026-09-06 on job_1788380714660_4p9mr11xszu
+// (de-ch, 16 pages, 4 CORE faults). Default (no key) burned 12,764 reasoning
+// tokens / $0.1621 / 84s; 'medium' 7,135 / $0.0948 / 46s for the same 4/4 CORE
+// catch. 'low' (1,696 / $0.0281) collapsed to 0/4 CORE and 3-4 false positives,
+// so recall is a direct function of reasoning budget — do NOT lower this further.
+const LECTOR_OPTS = { temperature: 0, usageLabel: 'text_lector', reasoning: { effort: 'medium' } };
+
+/**
+ * THE TITLE THROUGH THE LECTOR (2026-10-04). The page text has a lector; the
+ * title never did, and staging job_1791040103540_atbttop6w shipped
+ * "Vier Freunde und ein Drachonei" on its front cover. The title candidates
+ * go through the SAME prompt (buildTextProofreadPrompt — STYLE_RULEBOOK, the
+ * language's spelling rules, de-ch ss), the same model and options, the same
+ * parser and the same quote-checked substitution as the pages — one candidate
+ * per pseudo-page, numbered from 1.
+ *
+ * It cannot ride on the page lector: that runs last in the refine chain, in
+ * parallel with the images, and the front cover bakes the title into its art.
+ * The caller (beatsPipeline, right after the writer's TITLE block is parsed)
+ * runs this before anything renders.
+ *
+ * Throws when the template or model is unavailable, or the reply is empty or
+ * truncated — the caller logs that at error level.
+ *
+ * @param {Object} storyData - language, languageLevel
+ * @param {string[]} candidates - the writer's title candidates, in order
+ * @param {{model?: string}} [opts]
+ * @returns {Promise<{candidates:string[], findings:Array, applied:Array, dropped:Array, unparsed:Array, rawResponse:string, prompt:string, modelId:string, elapsedMs:number}>}
+ */
+async function proofreadTitleCandidates(storyData, candidates, opts = {}) {
+  const { loadPromptTemplates } = require('../services/prompts');
+  await loadPromptTemplates();
+  const { buildTextProofreadPrompt } = require('./storyHelpers');
+  const { callTextModelStreaming, describeTruncation } = require('./textModels');
+  const { TEXT_MODELS, MODEL_DEFAULTS } = require('../config/models');
+  const list = (candidates || []).map(c => String(c || ''));
+  if (!list.length) throw new Error('proofreadTitleCandidates: no title to proofread');
+  const model = opts.model || MODEL_DEFAULTS.textProofreadModel;
+  if (!TEXT_MODELS[model]) throw new Error(`title lector: unknown model "${model}"`);
+  const pages = list.map((text, i) => ({ pageNumber: i + 1, text }));
+  const prompt = buildTextProofreadPrompt(storyData, pages);
+  if (!prompt) throw new Error('title lector: proofread template unavailable');
+  const callOpts = { ...LECTOR_OPTS, usageLabel: 'title_lector' };
+  const t0 = Date.now();
+  let res = await callTextModelStreaming(prompt, null, null, model, callOpts);
+  if (!String(res.text || '').trim()) {
+    log.warn(`⚠️ [TITLE-LECTOR] ${model} returned empty output — retrying once`);
+    res = await callTextModelStreaming(prompt, null, null, model, callOpts);
+  }
+  const rawResponse = String(res.text || '').trim();
+  if (!rawResponse) throw new Error(`title lector: ${model} returned empty output twice`);
+  if (res.truncation?.suspected) throw new Error(`title lector reply ${describeTruncation(res.truncation)} — findings unusable`);
+  const { findings, unparsed } = parseLectorLines(rawResponse);
+  const { pages: next, applied, dropped } = applyLectorFindings(pages, findings);
+  return {
+    candidates: next.map(p => p.text),
+    findings, applied, dropped, unparsed,
+    rawResponse, prompt,
+    modelId: res.modelId || TEXT_MODELS[model].modelId,
+    elapsedMs: Date.now() - t0,
+  };
+}
+
 /** The passes that rewrite whole pages from a finding list (runRepairPass). */
 const WHOLE_PAGE_PASS_KINDS = new Set(['repair', 'repetition_fix', 'length_fix']);
 
@@ -1858,17 +1928,6 @@ async function refineStoryText(storyData, pages, opts = {}) {
     if (lectorPrompt && TEXT_MODELS[lectorModel]) {
       beginStep();
       const t0 = Date.now();
-      // null = the model's own limit (owner rule: no output caps). A finding
-      // list is a few hundred tokens — the cost of this call is decided by the
-      // output CONTRACT, not by the ceiling.
-      // temperature 0: the A/B measured this prompt at 0, and a lector must not
-      // paraphrase the page it quotes.
-      // reasoning effort 'medium': measured 2026-09-06 on job_1788380714660_4p9mr11xszu
-      // (de-ch, 16 pages, 4 CORE faults). Default (no key) burned 12,764 reasoning
-      // tokens / $0.1621 / 84s; 'medium' 7,135 / $0.0948 / 46s for the same 4/4 CORE
-      // catch. 'low' (1,696 / $0.0281) collapsed to 0/4 CORE and 3-4 false positives,
-      // so recall is a direct function of reasoning budget — do NOT lower this further.
-      const LECTOR_OPTS = { temperature: 0, usageLabel: 'text_lector', reasoning: { effort: 'medium' } };
       let lr = await callTextModelStreaming(lectorPrompt, null, null, lectorModel, LECTOR_OPTS);
       if (!String(lr.text || '').trim()) {
         log.warn(`⚠️ [LECTOR] ${lectorModel} returned empty output — retrying once`);
@@ -2343,6 +2402,8 @@ module.exports = {
   classifyLectorLine,
   quotedSpan,
   applyLectorFindings,
+  proofreadTitleCandidates,
+  LECTOR_OPTS,
   locateQuote,
   DUPLICATE_OVERLAP,
   normalizeForShingles,

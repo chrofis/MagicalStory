@@ -2391,6 +2391,18 @@
       "fixedAt": "2026-09-27",
       "fixedIn": "b5bc1866c",
       "fix": "syncVisualBibleSection projects landmarkPhoto (location + each vantage by id), text (set or withdrawn) and states whenever the parsed copy has them. The review site verifies the write-back by RE-PARSING the transcript (bibleCorrectionsMissingFromTranscript) and logs an ERROR (gl.error beats_vb_sync_failed) naming each correction the transcript lacks; report.bibleCorrections.unsynced records them. A throw in the correction step is an error, not a warn. The citation compare goes through parseLandmarkPhotoCitation. Test: tests/unit/review-bible-writeback.test.ts. Replay over stored z3fw660ie transcript + Lab 1574 corrections: 3 corrections missing before, 0 after."
+    },
+    {
+      "id": "title-never-proofread",
+      "title": "The book title never went through the lector: staging run 9 shipped \"Vier Freunde und ein Drachonei\" (Drachenei) on its front cover",
+      "reportedAt": "2026-10-04",
+      "source": "Stored evidence, staging job_1791040103540_atbttop6w (dragon run 9, de-ch): data.titleCandidates = [\"Das Ei im Laub\",\"Rubinas Ei\",\"Vier Freunde und ein Drachonei\"], data.titleJudge.pick = 2, data.title = \"Vier Freunde und ein Drachonei\"; the front cover bakes data.title into its art.",
+      "rootCause": "The title is written and picked inside the beats page-text call (parseTitleBlock, beatsPipeline step 6). The only spelling/grammar pass, the lector, runs at the end of the text-refine chain over page text only, in parallel with the images — no step ever read the title.",
+      "impact": "Any spelling or grammar fault the writer put in the title shipped on the front cover, the story record, the PDF, the viewer and the emails.",
+      "status": "fixed",
+      "fixedAt": "2026-10-04",
+      "fixedIn": "(this commit; hash recorded in the follow-up commit)",
+      "fix": "beatsPipeline.applyTitleProofread runs every title candidate through textRefine.proofreadTitleCandidates — the page lector's prompt (buildTextProofreadPrompt, STYLE_RULEBOOK, de-ch rules), model (textProofreadModel), options (LECTOR_OPTS, now one shared constant) and quote-checked substitution — right after the TITLE block is parsed, before any cover renders. The pick is kept by index. Each changed candidate logs title_proofread_corrected (before/after); a failed call logs title_proofread_failed at error. One real call on the stored candidates: gemini-3.1-pro corrected Drachonei -> Drachenei, left the other two alone ($0.0128, 7.8s). Tests: tests/unit/title-proofread.test.ts. Verify: title-proofread."
     }
   ]
 }

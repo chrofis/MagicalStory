@@ -3655,6 +3655,25 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "title-proofread",
+      "title": "The title candidates go through the lector before the cover renders; a corrected title is what ships everywhere",
+      "commits": [],
+      "addedAt": "2026-10-04",
+      "claim": "On the next full staging story: the usage record carries one title_lector call; the generation log carries title_proofread_corrected for each changed candidate (or none) and no title_proofread_failed; data.title equals data.titleJudge.candidates[pick] and the title baked on the front cover reads the same string.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "generationLog title_proofread_* events and title_lector usage; compare data.title with titleJudge.candidates[pick] and with the front cover text",
+        "images": [
+          "covers"
+        ]
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [
