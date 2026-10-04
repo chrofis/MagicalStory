@@ -4554,7 +4554,9 @@
     {
       "id": "cover-places-decided",
       "title": "Each full-story cover is placed on its own wide vantage by Jev + code, pinned as its FIXED location",
-      "commits": [],
+      "commits": [
+        "8aca73e2b"
+      ],
       "addedAt": "2026-10-04",
       "claim": "On the next full staging story on the Jev path: data.jevDecisions.coverPlaces lists one cover per rendered cover, each on a wide/ultra-wide vantage of a location story pages stand on, distinct while the candidates last; each cover brief (coverImages[k].sceneDescription) cites that vantage first in objects[] and keeps its central figure; coverImages[k].jevFixed carries it; briefCheckReport has no cover_location_repeated; the three cover images show visibly different viewpoints.",
       "runShape": [
