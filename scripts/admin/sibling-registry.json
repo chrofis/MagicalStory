@@ -1121,15 +1121,6 @@
       ],
       "excludeReason": "briefedAsPage: true, is the terminator that closes the cover record so its body is measured exactly; it is not a record-building site.",
       "severity": "block"
-    },
-    {
-      "id": "avatar-persist-async-vs-sync",
-      "axis": "async avatar job vs sync clothing-avatars path",
-      "reason": "both paths build the SAME two payloads (newAvatarData, lightAvatarData) with the same onlyIfNoUrl/onlyMissingThumbs INLINE fallbacks, and write them with the same jsonb_set chain into characters.data and .metadata. alarmInlineAvatarFallback only logs; the offload is what keeps the bytes out of JSONB, and a guard on one path guards half the avatars.",
-      "file": "server/routes/avatars.js",
-      "blockPattern": "const lightAvatarData = \\{",
-      "mustContain": "offloadCharacterImages",
-      "severity": "block"
     }
   ]
 }
