@@ -467,6 +467,34 @@ async function _pairFacesGlobally(persons, faces, W, H, pageLabel = '', imageDat
   return { method: 'global-once', faces: faces.length, persons: persons.length, paired: takenFaces.size, recovered, redetected };
 }
 
+// Depth order for the joint mask pass: negative = `a` is NEARER the camera (resolved
+// first). a and b are INDICES into boxesPx / faces / fromFaceFlags.
+function _compareDepthFrontFirst(a, b, boxesPx, faces, fromFaceFlags) {
+  // A figure RECOVERED FROM A FACE has no ground cue: its box is synthesised
+  // as faceBottom + 6.5 face-heights, which overshoots and clamps to the page
+  // edge, so "lower bottom = nearer" would rank it in FRONT of everyone. That
+  // is backwards — DINO failed to detect it as a person precisely because it
+  // is heavily occluded. Measured on exp #711: Daniel's clamped bottom of 1222
+  // beat Noah's 1184 and Emma's 1180, and he took 3,087 px off Emma.
+  // So: real person boxes first, recovered ones behind them, tie-broken among
+  // themselves by face height in frame (higher up = further away).
+  const fa = fromFaceFlags?.[a] ? 1 : 0, fb = fromFaceFlags?.[b] ? 1 : 0;
+  if (fa !== fb) return fa - fb;
+  if (fa && fb) {
+    const ya = faces[a] ? (faces[a][1] + faces[a][3]) / 2 : 0;
+    const yb = faces[b] ? (faces[b][1] + faces[b][3]) / 2 : 0;
+    return yb - ya;
+  }
+  const ba = boxesPx[a][3], bb = boxesPx[b][3];
+  if (Math.abs(ba - bb) > SAM_GROUND_TIE_PX) return bb - ba;      // lower bottom first
+  // Same height: the box CONTAINED by the other is the one in front.
+  const aInB = _boxContainment(boxesPx[a], boxesPx[b]);
+  const bInA = _boxContainment(boxesPx[b], boxesPx[a]);
+  if (aInB >= SAM_FRONT_CONTAINMENT && aInB > bInA) return -1;
+  if (bInA >= SAM_FRONT_CONTAINMENT && bInA > aInB) return 1;
+  return _boxAreaPx(boxesPx[a]) - _boxAreaPx(boxesPx[b]);
+}
+
 /**
  * Box -> silhouette for a WHOLE PAGE, as one joint assignment.
  *
@@ -642,31 +670,7 @@ async function _maskBoxesFrontFirst(imageDataUri, boxesPx, W, H, pageLabel = '',
   // --- 2. depth order: lower box bottom = nearer the camera ------------------
   const depth = [];
   for (let i = 0; i < n; i++) if (raw[i]) depth.push(i);
-  depth.sort((a, b) => {
-    // A figure RECOVERED FROM A FACE has no ground cue: its box is synthesised
-    // as faceBottom + 6.5 face-heights, which overshoots and clamps to the page
-    // edge, so "lower bottom = nearer" would rank it in FRONT of everyone. That
-    // is backwards — DINO failed to detect it as a person precisely because it
-    // is heavily occluded. Measured on exp #711: Daniel's clamped bottom of 1222
-    // beat Noah's 1184 and Emma's 1180, and he took 3,087 px off Emma.
-    // So: real person boxes first, recovered ones behind them, tie-broken among
-    // themselves by face height in frame (higher up = further away).
-    const fa = fromFaceFlags?.[a] ? 1 : 0, fb = fromFaceFlags?.[b] ? 1 : 0;
-    if (fa !== fb) return fa - fb;
-    if (fa && fb) {
-      const ya = faces[a] ? (faces[a][1] + faces[a][3]) / 2 : 0;
-      const yb = faces[b] ? (faces[b][1] + faces[b][3]) / 2 : 0;
-      return yb - ya;
-    }
-    const ba = boxesPx[a][3], bb = boxesPx[b][3];
-    if (Math.abs(ba - bb) > SAM_GROUND_TIE_PX) return bb - ba;      // lower bottom first
-    // Same height: the box CONTAINED by the other is the one in front.
-    const aInB = _boxContainment(boxesPx[a], boxesPx[b]);
-    const bInA = _boxContainment(boxesPx[b], boxesPx[a]);
-    if (aInB >= SAM_FRONT_CONTAINMENT && aInB > bInA) return -1;
-    if (bInA >= SAM_FRONT_CONTAINMENT && bInA > aInB) return 1;
-    return _boxAreaPx(a) - _boxAreaPx(b);
-  });
+  depth.sort((a, b) => _compareDepthFrontFirst(a, b, boxesPx, faces, fromFaceFlags));
 
   // --- 3. winner-take-all: a pixel belongs to the FRONTMOST claimant ---------
   // This replaces pairwise dilated subtraction. Nothing is dilated, so no seam
@@ -1760,6 +1764,22 @@ function _assignFiguresByLayout(chars, dets) {
   return { map: best || [], cost: bestCost, margin: second - bestCost };
 }
 
+// Removes dets whose mask is the same figure as an earlier det, in place. Stamps
+// droppedDuplicateOf on diag.persons (original person index). Survivors keep
+// their `personIdx`, so name/occluder lookups never depend on array position.
+function _dropDuplicateFigureDets(dets, diag) {
+  for (let i = dets.length - 1; i >= 1; i--) {
+    for (let j = 0; j < i; j++) {
+      if (_maskOverlapFrac(dets[i].mask, dets[j].mask) >= GDINO_SAME_FIGURE) {
+        if (diag?.persons?.[dets[i].personIdx]) diag.persons[dets[i].personIdx].droppedDuplicateOf = dets[j].personIdx;
+        dets.splice(i, 1);
+        break;
+      }
+    }
+  }
+  return dets;
+}
+
 async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opts = {}) {
   const { pageLabel = '', expectedObjects = [], objectGroundingHints = null, nonHumanNames = [] } = opts;
   // Names in the cast that a "person" prompt can NEVER match — the story's
@@ -1952,6 +1972,7 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
     persons.map(p => (p.face ? p.face.box : null)), descByPerson,
     persons.map(p => !!p.fromFace)))
     .map((m, i) => ({
+      personIdx: i,
       box: persons[i].box,
       score: persons[i].score,
       mask: m.mask,
@@ -1991,16 +2012,10 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
       `${pageLabel}MobileSAM returned no segmentation for ${noMask.length}/${dets.length} figures — mask service unavailable or overloaded (used DINO boxes)`,
       null, { pageLabel });
   }
-  // Two masks ≈ the same figure → keep the higher-score one.
-  for (let i = dets.length - 1; i >= 1; i--) {
-    for (let j = 0; j < i; j++) {
-      if (_maskOverlapFrac(dets[i].mask, dets[j].mask) >= GDINO_SAME_FIGURE) {
-        diag.persons[i].droppedDuplicateOf = j;
-        dets.splice(i, 1);
-        break;
-      }
-    }
-  }
+  // Two masks ≈ the same figure → keep the higher-score one. Each det keeps its
+  // ORIGINAL person index (`personIdx`): nameByDet and occludedByIdx are keyed by
+  // it, and the splice shifts array positions (code review 2026-10 C1).
+  _dropDuplicateFigureDets(dets, diag);
   // The occlusion carve-out that used to live here is GONE: _maskBoxesFrontFirst
   // now settles every contested pixel in one winner-take-all pass ordered by
   // depth. The old rule gave shared pixels to the SMALLER mask, which is
@@ -2071,7 +2086,7 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
       .map((o, oi) => ({ oi, hits: hitsIn(o, d.face) }))
       .filter(x => x.hits > 0 && x.oi !== i)
       .sort((a2, b2) => b2.hits - a2.hits)[0];
-    disputed.push({ det: i, name: (nameByDet && nameByDet.get(i)) || null, faceSitsInDet: better ? better.oi : null });
+    disputed.push({ det: i, name: (nameByDet && nameByDet.get(d.personIdx)) || null, faceSitsInDet: better ? better.oi : null });
   });
   diag.pairingCheck = { agree, disputed };
   if (disputed.length) {
@@ -2110,11 +2125,11 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
     }));
     const asg = _assignFiguresByLayout(chars, geo);
     nameByDet = new Map();
-    chars.forEach((c, i) => { if (asg.map[i] != null) nameByDet.set(eligible[asg.map[i]], c.name); });
+    chars.forEach((c, i) => { if (asg.map[i] != null) nameByDet.set(dets[eligible[asg.map[i]]].personIdx, c.name); });
     // Keep whatever the SoM stage recorded about WHY it is running — this line
     // used to overwrite it, so a fallback page said only "layout-fallback".
     diag.identity = { method: 'layout-fallback', ...(diag.identity?.method === 'layout-fallback' ? diag.identity : {}) };
-    diag.assignment = chars.map((c, i) => ({ name: c.name, boxIdx: asg.map[i] != null ? eligible[asg.map[i]] : null, xTarget: c.xTarget, depthRank: c.depthRank, isChild: c.isChild, eligibleCount: eligible.length }));
+    diag.assignment = chars.map((c, i) => ({ name: c.name, boxIdx: asg.map[i] != null ? dets[eligible[asg.map[i]]].personIdx : null, xTarget: c.xTarget, depthRank: c.depthRank, isChild: c.isChild, eligibleCount: eligible.length }));
     diag.assignmentCost = Number.isFinite(asg.cost) ? +asg.cost.toFixed(3) : null;
     diag.assignmentMargin = Number.isFinite(asg.margin) ? +asg.margin.toFixed(3) : null;
   }
@@ -2127,7 +2142,7 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
   const figures = [];
   const masks = [];
   dets.forEach((d, j) => {
-    const name = nameByDet.get(j) || 'UNKNOWN';
+    const name = nameByDet.get(d.personIdx) || 'UNKNOWN';
     const ec = name !== 'UNKNOWN' ? expectedCharacters.find(c => c.name === name) : null;
     figures.push({
       name,
@@ -2288,6 +2303,8 @@ async function attachSamMasksToFigures(imageData, figures, { pageLabel = '' } = 
 
 module.exports = {
   _shortGarmentPhrase,
+  _dropDuplicateFigureDets,
+  _compareDepthFrontFirst,
   detectFiguresWithGroundingDino,
   // The SoM chain, asked a second time from a later tier — who-is-who on a page
   // the evaluator and the detector name differently (identityAgreement.js).
