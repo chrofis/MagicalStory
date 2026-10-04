@@ -3541,9 +3541,9 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
   }
 
   if (!PROMPT_TEMPLATES.sceneExpansion) {
-    log.warn('[SCENE EXPANSION] Template not loaded, falling back to iteration prompt');
-    // Fall back to the iteration prompt (same as old behavior)
-    return buildSceneDescriptionPrompt(pageNumber, pageContent, characters, '', language, visualBible, [], {}, '', availableAvatars, rawOutlineContext, null);
+    // NO FALLBACKS (owner decision #4, 2026-10-04): the iteration prompt this used
+    // to return is a different task (rewrite a render), not a degraded expansion.
+    throw new Error('buildSceneExpansionPrompt: scene-expansion template not loaded');
   }
 
   // Compute text-zone overrides by SHIFTING every character one zone away from the
@@ -3955,7 +3955,7 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
   // extraRule: Test-Lab rule experiments append to the template here (no
   // global PROMPT_TEMPLATES swap â€” safe under concurrency).
   const baseTemplate = freeIterate
-    ? (PROMPT_TEMPLATES.sceneIterationFree || PROMPT_TEMPLATES.sceneDescriptions)
+    ? PROMPT_TEMPLATES.sceneIterationFree
     : PROMPT_TEMPLATES.sceneDescriptions;
   const activeTemplate = baseTemplate && extraRule ? `${baseTemplate}\n${extraRule}` : baseTemplate;
   if (activeTemplate) {
@@ -4235,35 +4235,7 @@ ${options.wornState}
     return filled;
   }
 
-  // Fallback to hardcoded prompt if template not loaded
-  return `**ROLE:**
-You are an expert Art Director creating an illustration brief for a children's book.
-
-${previousScenesText}**CURRENT SCENE (Page ${pageNumber}) - YOUR FOCUS:**
-${shortSceneDesc ? `Scene Summary: ${shortSceneDesc}\n\n` : ''}Story Text:
-${pageContent}
-
-**AVAILABLE CHARACTERS & VISUAL REFERENCES:**
-${characterDetails}
-${recurringElements}
-**TASK:**
-Create a detailed visual description of ONE key moment from the scene context provided.
-
-Focus on essential characters only (1-2 maximum unless the story specifically requires more). Choose the most impactful visual moment that captures the essence of the scene.
-
-**OUTPUT FORMAT:**
-1. **Setting & Atmosphere:** Describe the background, time of day, lighting, and mood.
-2. **Composition:** Describe the camera angle (e.g., low angle, wide shot) and framing.
-3. **Characters:**
-   * **[Character Name]:** Exact action, body language, facial expression, and location in the frame.
-   (Repeat for each character present in this specific scene)
-
-**CONSTRAINTS:**
-- Do not include dialogue or speech
-- Focus purely on visual elements
-- Use simple, clear language
-- Only include characters essential to this scene
-- If recurring elements appear, describe them consistently as specified above`;
+  throw new Error(`buildSceneDescriptionPrompt: ${freeIterate ? 'scene-iteration-free' : 'scene-iteration'} template not loaded`);
 }
 
 /**
@@ -5354,7 +5326,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
   // was deleted 2026-09-23 (decisions.md).
   if (options.characterReferenceListOverride) characterReferenceList = options.characterReferenceListOverride;
 
-  const template = options.promptTemplateOverride || PROMPT_TEMPLATES.imageGeneration || null;
+  const template = options.promptTemplateOverride || PROMPT_TEMPLATES.imageGeneration || null; // missing: thrown at the end of this function
 
   // Build an EXACT POSES block from the scene's declared interactions. Image
   // models (Grok Aurora especially) weight the end of the prompt heavily, and
@@ -5415,7 +5387,6 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
   // instead of letting the orphan id reach Grok as paintable text.
   const finalize = (s) => sanitizeVbIdsInPrompt(s, visualBible, pageNumber);
 
-  // Use template if available, otherwise fall back to hardcoded prompt
   if (template) {
     log.debug(`[IMAGE PROMPT] Using image-generation template for language: ${language} (proseFormat=${isProseFormat})`);
 
@@ -5488,20 +5459,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
     })));
   }
 
-  // Fallback to hardcoded prompt
-  const fallback = `Create a cinematic scene in ${styleDescription}.
-
-${characterReferenceList}
-Scene Description: ${cleanSceneDescription}
-${requiredObjectsSection}
-${visualBibleSection}
-Important:
-- Match characters to the reference photos provided
-- Show appropriate emotions on faces (happy, sad, surprised, worried, excited)
-- Maintain consistent character appearance across ALL pages
-- Clean, clear composition
-- Age-appropriate for ${inputData.ageFrom || 3}-${inputData.ageTo || 8} years old`;
-  return finalize(appendExactPoses(fallback));
+  throw new Error('buildImagePrompt: image-generation template not loaded');
 }
 
 // Verbs and nouns that declare a mark as SURFACE TEXT rather than as prose.
@@ -6531,7 +6489,8 @@ function pickMainCharacters(inputData = {}) {
     .sort((a, b) => (parseInt(b.age, 10) || 0) - (parseInt(a.age, 10) || 0))
     .slice(0, cap);
   const focus = mains[0] || chars[0] || null;
-  return { mains, focus, others: chars.filter(c => !mains.includes(c)) };
+  // `focus` may be chars[0] when nobody is declared main; it must not also be "everyone else".
+  return { mains, focus, others: chars.filter(c => !mains.includes(c) && c !== focus) };
 }
 
 /**
@@ -12347,11 +12306,7 @@ The story takes place in ${inputData.userLocation.city}. Use real place names â€
     });
   }
 
-  // Fallback
-  return `Create a ${pageCount}-page children's story in ${getLanguageNameEnglish(language)}.
-Character: ${characterDesc}
-Story: <user_input>${inputData.storyDetails || 'A fun adventure'}</user_input>
-Output: Title, then each page with story text and a scene hint for illustration.`;
+  throw new Error('buildTrialStoryPrompt: story-trial template not loaded');
 }
 
 // ============================================================================
