@@ -1482,6 +1482,12 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
     log.info(`🎨 [${logLabel}] Backend: ${imageBackend}`);
   }
 
+  // Set when a PRIMARY provider call has already failed. The model-routed branches
+  // below resolve to the same provider for the same model, so without this a failed
+  // primary call was repeated (a second paid Grok call with reduced packing) before
+  // Gemini ran (code review 2026-10 A1).
+  let primaryProviderFailed = null;
+
   // ── Primary Runware (cheap FLUX Schnell) ──────────────────────────────────
   if (imageBackend === 'runware' && isRunwareConfigured()) {
     log.info(`🎨 [${logLabel}] Using Runware FLUX Schnell backend${verbose ? ' (cheap testing mode)' : ''}`);
@@ -1505,6 +1511,7 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
         ? `❌ [RUNWARE] Generation failed, falling back to Gemini: ${runwareError.message}`
         : `❌ [${logLabel}] Runware failed, falling back to Gemini: ${runwareError.message}`);
       upstreamErrors.push(recordProviderFallback({ logLabel, provider: 'runware', route: 'primary', model: RUNWARE_MODELS.FLUX_SCHNELL, pageLabel, error: runwareError }));
+      primaryProviderFailed = 'runware';
       // Fall through to Gemini
     }
   }
@@ -1551,6 +1558,7 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
         ? `❌ [GROK] Generation failed, falling back to Gemini: ${grokError.message}`
         : `❌ [${logLabel}] Grok failed, falling back to Gemini: ${grokError.message}`);
       upstreamErrors.push(recordProviderFallback({ logLabel, provider: 'grok', route: 'primary', model: grokModel, pageLabel, error: grokError }));
+      primaryProviderFailed = 'grok';
       // Fall through to Gemini
     }
   }
@@ -1731,7 +1739,7 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
   }
 
   // ── Model-routed Runware (model config says backend='runware') ────────────
-  if (modelConfig?.backend === 'runware' && isRunwareConfigured()) {
+  if (modelConfig?.backend === 'runware' && isRunwareConfigured() && primaryProviderFailed !== 'runware') {
     log.info(verbose
       ? `🎨 [${logLabel}] Model ${modelId} uses Runware backend - routing to Runware`
       : `🎨 [${logLabel}] Model ${modelId} uses Runware backend`);
@@ -1757,7 +1765,7 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
   }
 
   // ── Model-routed Grok (model config says backend='grok') ──────────────────
-  if (modelConfig?.backend === 'grok' && isGrokConfigured()) {
+  if (modelConfig?.backend === 'grok' && isGrokConfigured() && primaryProviderFailed !== 'grok') {
     log.info(verbose
       ? `🎨 [${logLabel}] Model ${modelId} uses Grok backend - routing to Grok`
       : `🎨 [${logLabel}] Model ${modelId} uses Grok backend`);

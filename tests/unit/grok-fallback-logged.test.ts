@@ -68,10 +68,11 @@ describe('Grok→Gemini fallback records the Grok error', () => {
       });
     } catch (e) { thrown = e; }
 
-    // The default page model is itself a Grok tier, so the ladder tries Grok
-    // twice (primary, then model-routed) before Gemini — both are recorded.
+    // The default page model is itself a Grok tier. A failed primary Grok call goes
+    // straight to Gemini: it must NOT repeat the call on the model-routed Grok
+    // branch (code review 2026-10 A1) — exactly one Grok attempt is recorded.
     const events = fallbackEvents();
-    expect(events.map((e: any) => e.details.route)).toEqual(['primary', 'model-routed']);
+    expect(events.map((e: any) => e.details.route)).toEqual(['primary']);
     expect(events[0].level).toBe('warn');
     expect(events[0].message).toContain(GROK_ERROR);
     expect(events[0].message).toContain('page 3');
