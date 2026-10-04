@@ -1629,6 +1629,121 @@ router.post('/create-story', verifySessionToken, async (req, res) => {
   }
 });
 
+// ─── Story preview gate (waiting page) ──────────────────────────────────────
+
+// Pages a visitor may read before leaving contact details. The ONLY place this
+// number lives — the client learns the lock state from each page's `locked`.
+const TRIAL_FREE_PAGES = 3;
+
+/**
+ * Pure gate: merge nothing, decide only. `records` = [{ pageNumber, text?, imageData? }].
+ * Returns [{ pageNumber, imageData?, text?, locked }] sorted by page. A page past
+ * `freePages` for a visitor who is not `unlocked` has `locked: true` and NO `text`
+ * key at all (the text must never reach the client). Images are never withheld.
+ */
+function buildTrialStoryPages(records, { unlocked, freePages }) {
+  return [...(records || [])]
+    .sort((a, b) => a.pageNumber - b.pageNumber)
+    .map(rec => {
+      const locked = !unlocked && rec.pageNumber > freePages;
+      const page = { pageNumber: rec.pageNumber, locked };
+      if (rec.imageData) page.imageData = rec.imageData;
+      if (!locked && typeof rec.text === 'string' && rec.text.length > 0) page.text = rec.text;
+      return page;
+    });
+}
+
+/**
+ * Pure: union of page numbers from a text map and image list into records.
+ * @param {Object<string,string>} pageTexts  { "1": "text", ... }
+ * @param {Array<{pageNumber:number,imageData?:string}>} images
+ */
+function mergeTrialPageRecords(pageTexts, images) {
+  const byPage = new Map();
+  const rec = n => {
+    if (!byPage.has(n)) byPage.set(n, { pageNumber: n });
+    return byPage.get(n);
+  };
+  for (const [n, text] of Object.entries(pageTexts || {})) {
+    const num = Number(n);
+    if (Number.isInteger(num) && num > 0) rec(num).text = text;
+  }
+  for (const img of images || []) {
+    if (img && img.imageData) rec(img.pageNumber).imageData = img.imageData;
+  }
+  return [...byPage.values()];
+}
+
+/**
+ * Unlocked = the trial user left contact details: an email was submitted
+ * (verified or not) or Google was linked. Both replace the placeholder
+ * `anon_<id>@anonymous` address written at account creation.
+ */
+function isTrialContactEmail(email) {
+  return typeof email === 'string' && email.length > 0 && !email.endsWith('@anonymous');
+}
+
+async function isTrialUserUnlocked(pool, userId) {
+  const r = await pool.query('SELECT email FROM users WHERE id = $1', [userId]);
+  return isTrialContactEmail(r.rows[0]?.email);
+}
+
+function trialImageSrc(row) {
+  if (row.image_url) return row.image_url;
+  const d = row.image_data;
+  if (!d) return null;
+  if (d.startsWith('data:image/')) return d;
+  return `${d.startsWith('iVBORw0KGgo') ? 'data:image/png' : 'data:image/jpeg'};base64,${d}`;
+}
+
+/**
+ * { title, totalPages, records } for a trial job, or null when no story text
+ * exists yet. Running job: `story_text` + `partial_page` checkpoints.
+ * Completed job: checkpoints are deleted on completion, so the stored story
+ * row (id = job id) is the source: data.title, data.sceneImages[].text and the
+ * active scene image rows.
+ */
+async function loadTrialStorySource(pool, jobId, userId, jobStatus) {
+  if (jobStatus === 'completed') {
+    const storyRes = await pool.query(
+      `SELECT data::jsonb->>'title' AS title,
+              COALESCE((SELECT jsonb_agg(jsonb_build_object('pageNumber', s->'pageNumber', 'text', s->'text'))
+                        FROM jsonb_array_elements(data::jsonb->'sceneImages') s), '[]'::jsonb) AS pages
+       FROM stories WHERE id = $1 AND user_id = $2`,
+      [jobId, userId]
+    );
+    if (storyRes.rows.length === 0) return null;
+    const { getActiveStoryImages } = require('../services/database');
+    const imageRows = await getActiveStoryImages(jobId);
+    const pageTexts = {};
+    for (const p of storyRes.rows[0].pages || []) {
+      if (p && p.pageNumber != null && typeof p.text === 'string') pageTexts[p.pageNumber] = p.text;
+    }
+    const images = imageRows
+      .filter(r => r.image_type === 'scene')
+      .map(r => ({ pageNumber: r.page_number, imageData: trialImageSrc(r) }));
+    const records = mergeTrialPageRecords(pageTexts, images);
+    return { title: storyRes.rows[0].title || '', totalPages: records.length, records };
+  }
+
+  const textRes = await pool.query(
+    `SELECT step_data FROM story_job_checkpoints WHERE job_id = $1 AND step_name = 'story_text' LIMIT 1`,
+    [jobId]
+  );
+  if (textRes.rows.length === 0) return null;
+  const st = textRes.rows[0].step_data || {};
+  const pageRes = await pool.query(
+    `SELECT step_index, step_data FROM story_job_checkpoints
+     WHERE job_id = $1 AND step_name = 'partial_page' ORDER BY step_index ASC`,
+    [jobId]
+  );
+  const images = pageRes.rows
+    .filter(r => r.step_data?.imageData)
+    .map(r => ({ pageNumber: r.step_index, imageData: r.step_data.imageData }));
+  const records = mergeTrialPageRecords(st.pageTexts, images);
+  return { title: st.title || '', totalPages: st.totalScenes || records.length, records };
+}
+
 /**
  * GET /api/trial/job-status/:jobId
  *
@@ -1676,25 +1791,21 @@ router.get('/job-status/:jobId', jobStatusLimiter, verifySessionToken, async (re
       response.errorMessage = 'Story generation failed';
     }
 
-    // Fetch page images from checkpoints (progressive display during generation)
+    // Story title + page texts + page images, one shape from both sources
+    // (checkpoints while the job runs, the stored story row once it completed).
+    // The free-pages gate is applied HERE — a locked page never carries text.
     if (job.status !== 'failed') {
       try {
-        const pageResult = await pool.query(
-          `SELECT step_index, step_data FROM story_job_checkpoints
-           WHERE job_id = $1 AND step_name = 'partial_page'
-           ORDER BY step_index ASC`,
-          [jobId]
-        );
-        if (pageResult.rows.length > 0) {
-          response.pageImages = pageResult.rows
-            .filter(row => row.step_data?.imageData)
-            .map(row => ({
-              pageNumber: row.step_index,
-              imageData: row.step_data.imageData
-            }));
+        const unlocked = await isTrialUserUnlocked(pool, userId);
+        const story = await loadTrialStorySource(pool, jobId, userId, job.status);
+        if (story) {
+          response.storyTitle = story.title;
+          response.totalPages = story.totalPages;
+          response.pages = buildTrialStoryPages(story.records, { unlocked, freePages: TRIAL_FREE_PAGES });
+          response.unlocked = unlocked;
         }
       } catch (err) {
-        log.debug(`[TRIAL] Page images checkpoint query failed: ${err.message}`);
+        log.error(`[TRIAL] Story pages query failed: ${err.message}`);
       }
     }
 
@@ -3305,3 +3416,7 @@ module.exports.loadTrialCountersFromDb = loadTrialCountersFromDb;
 module.exports.checkAndIncrementTrialCap = checkAndIncrementTrialCap;
 module.exports.resetTrialRateLimits = resetTrialRateLimits;
 module.exports.triggerAvatarGenerationForUser = triggerAvatarGenerationForUser;
+module.exports.TRIAL_FREE_PAGES = TRIAL_FREE_PAGES;
+module.exports.buildTrialStoryPages = buildTrialStoryPages;
+module.exports.mergeTrialPageRecords = mergeTrialPageRecords;
+module.exports.isTrialContactEmail = isTrialContactEmail;
