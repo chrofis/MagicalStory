@@ -43,7 +43,7 @@ export function CharacterList({
   const roleLabels = {
     out: language === 'de' ? 'Nicht dabei' : language === 'fr' ? 'Absent' : language === 'it' ? 'Assente' : 'Out',
     in: language === 'de' ? 'Dabei' : language === 'fr' ? 'Présent' : language === 'it' ? 'Presente' : 'In',
-    main: language === 'de' ? 'Hauptrolle' : language === 'fr' ? 'Principal' : language === 'it' ? 'Principale' : 'Main',
+    main: language === 'de' ? 'Hauptrolle' : language === 'fr' ? 'Principal' : language === 'it' ? 'Protagonista' : 'Main',
   };
 
   const pick = (de: string, fr: string, it: string, en: string) =>
