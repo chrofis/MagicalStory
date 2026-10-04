@@ -2605,7 +2605,7 @@
       "impact": "Measured over consolidator_calls since 2026-09-20 (scripts/analysis/measure-consolidator-orphan-fixes.js): staging 208 calls, 316 CRITICAL/MAJOR fixes, 10 CRITICAL fixes with no kept CRITICAL, 10 with no kept CRITICAL/MAJOR at all, 26 whose type has only not-a-defect drops behind it (7 stories); prod 178 calls, 279 fixes, 0 / 2 / 0 (the 2 are model-emitted fixes on a dropped hair/eye finding).",
       "status": "fixed",
       "fixedAt": "2026-10-04",
-      "fixedIn": "073cdc449",
+      "fixedIn": "b6abd1656",
       "fix": "Prompt: rule 2a says a finding that the picture lacks what the brief asks for is a defect; new rule 7d - every fix carries ids, none in a rule 2/2a drop, one in a deduped entry. Code: feedbackConsolidator.checkFixesRestOnKeptFindings - a CRITICAL/MAJOR fix with no ids, unknown ids, or no id in a kept entry is logged at ERROR to the generation log (consolidator_fix_unbacked) and recorded on plan.fix_errors; nothing is reclassified. Test: tests/unit/consolidator-fix-ids.test.ts."
     }
   ]
