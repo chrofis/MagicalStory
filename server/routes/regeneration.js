@@ -2412,6 +2412,10 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       const freshCharData = freshCharResult.rows[0]?.data || {};
       const freshCharacters = freshCharData.characters || [];
 
+      // COVER tier, not the page/edit tier (code review 2026-10 A2): a trial back
+      // cover used to reach generateImageOnly with no model and fall to
+      // MODEL_DEFAULTS.pageImage. Passed to the render AND used for the booking.
+      const coverImageModelId = imageModel || MODEL_DEFAULTS.coverImage;
       let imageResult;
       if (coverPath === 'page') {
         // Same avatar re-hydration the page branch does below.
@@ -2429,7 +2433,7 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       } else {
         const { iterateCover } = require('../lib/coverIterate');
         imageResult = await iterateCover(coverKey, storyData, {
-          imageModel: imageModel || null,
+          imageModel: coverImageModelId,
           evaluationFeedback,
           useOriginalAsReference: !!useOriginalAsReference,
           blackoutIssues: !!blackoutIssues,
@@ -2443,7 +2447,7 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       // cover record carry the rewrite, exactly as a page's do.
       const sceneDescription = coverPath === 'page'
         ? imageResult.newScene
-        : (existingCover.description || 'A beautiful illustrated cover page.');
+        : existingCover.description; // iterateCover throws when it is missing (A5)
 
       const previousImageData = imageResult.previousImage;
       const previousScore = imageResult.previousScore;
@@ -2451,7 +2455,6 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       const coverLandmarkPhotos = []; // Covers don't use landmark photos
       const coverVbGrid = null; // No VB grid for covers
       const coverPrompt = imageResult.prompt;
-      const coverImageModelId = imageModel || MODEL_DEFAULTS.coverImage;
 
       log.info(`🔄 [ITERATE] Cover ${coverKey}: New image generated (score: ${imageResult.score}, attempts: ${imageResult.totalAttempts})`);
 
@@ -2648,7 +2651,7 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       }));
 
       // Persist repair cost in background (fire before return so it's not skipped)
-      const coverIterateCost = calculateImageCost(coverImageModelId, imageResult.totalAttempts || 1);
+      const coverIterateCost = calculateImageCost(imageResult.modelId || coverImageModelId, imageResult.totalAttempts || 1);
       addRepairCost(id, coverIterateCost, `Iterate cover ${coverKey}`).catch(err => log.error('Failed to save cover iterate cost:', err.message));
 
       return res.json({

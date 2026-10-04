@@ -864,7 +864,12 @@ async function iterateCover(coverKey, storyData, options = {}) {
     }
     return stripped;
   };
-  const rawSceneDescription = existingCover.description || 'A beautiful illustrated cover page.';
+  // No stored brief = nothing to iterate from. A generic placeholder would paint an
+  // unrelated cover under the user's name (code review 2026-10 A5; decisions #4).
+  if (!existingCover.description || !String(existingCover.description).trim()) {
+    throw new Error(`[COVER-ITERATE] ${coverKey}: the cover has no stored scene description to iterate from. Refusing to substitute a generic one.`);
+  }
+  const rawSceneDescription = existingCover.description;
   // `let`: the cover NAME invariant below may strip an unsendable entity name.
   let sceneDescription = stripCoverAnnotations(rawSceneDescription);
   log.info(`🔄 [COVER-ITERATE] ${coverKey}: Using stored description (${sceneDescription.length} chars)`);
@@ -927,6 +932,12 @@ async function iterateCover(coverKey, storyData, options = {}) {
     selectedCoverCharacters = mergedCharacters.filter(c =>
       hintCharNames.some(name => canonicalName(name) === canonicalName(c.name))  // COMPARE
     ).slice(0, MAX_COVER_CHARACTERS);
+    // A hint that names nobody on the roster must fail like the page path does
+    // (images.js "Refusing to fall back to the whole roster"), not ship an
+    // empty cast (code review 2026-10 A6).
+    if (selectedCoverCharacters.length === 0) {
+      throw new Error(`[COVER-ITERATE] ${coverKey}: coverHints name ${hintCharNames.join(', ')}, none of whom match the story roster (${mergedCharacters.map(c => c.name).join(', ')}). Refusing to render an empty cast.`);
+    }
     // Merge hint clothing into clothingRequirements for avatar lookup
     const mergedClothing = { ...clothingRequirements };
     for (const [charName, clothing] of Object.entries(hintCharClothing)) {
@@ -1366,7 +1377,7 @@ async function iterateCover(coverKey, storyData, options = {}) {
     // configured cover aspect (never inferred from an evaluationType).
     const genResult = await generateImageOnly(coverPrompt, coverCharacterPhotos, {
       previousImage,
-      imageModelOverride: titleModeInfo.bakedModel || imageModel || null,
+      imageModelOverride: titleModeInfo.bakedModel || imageModel || MODEL_DEFAULTS.coverImage,
       landmarkPhotos: coverLandmarkPhotos,
       // A rendered cover always carries its plate (use 'render') and an edit
       // carries no photo (use 'edit'); only the composite route, left as it was
