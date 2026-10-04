@@ -1524,6 +1524,9 @@ const NOT_INPAINTABLE_TYPES = new Set([
   'body_build',
   // clothing (garment_colour has its own mechanical recolour path)
   'clothing', 'clothing_inconsistent', 'clothing_detail', 'garment_colour', 'garment_color',
+  // garment_facing (D-05e): a garment redrawn from its other side is a
+  // wardrobe repaint, anchored to the reference like every garment finding.
+  'garment_facing',
   // body form
   'scale',
   // A creature drawn far below its given size (D-34). Not a character repair:

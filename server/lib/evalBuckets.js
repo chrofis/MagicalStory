@@ -46,6 +46,11 @@ const BUCKETS = {
   // 78 wardrobe findings were this, worth 670 points, three of them CRITICAL
   // for a rolled sleeve.
   clothing_detail:      { owner: 'quality',  kind: 'graded', repair: 'grok_blended' },
+  // A garment drawn from the wrong side for its figure's declared facing — the
+  // front zip and pockets on a back view (image-evaluation D-05e, 2026-10-04).
+  // Its own bucket so its MAJOR ceiling binds to it alone; the repair is the
+  // wardrobe repaint every garment finding gets.
+  garment_facing:       { owner: 'quality',  kind: 'graded', repair: 'grok_blended' },
   // An absence the BLIND compliance evaluator inferred from a silent inventory
   // field, having not seen the image. Measured over 154 absence findings across
   // two stories: 55% of compliance's absences were false (the item plainly
@@ -233,6 +238,7 @@ const TYPE_TO_BUCKET = {
   // Accessory detail is its own bucket (see BUCKETS.accessory) — it carries a
   // MODERATE ceiling in scoring.js that must NOT apply to main-garment failures.
   clothing_detail: 'clothing_detail', sleeve: 'clothing_detail', collar: 'clothing_detail',
+  garment_facing: 'garment_facing',
   unverified_absence: 'unverified_absence', inferred_absence: 'unverified_absence',
   accessory: 'accessory', glasses: 'accessory', eyewear: 'accessory',
   bandana: 'accessory', jewellery: 'accessory', jewelry: 'accessory',
@@ -431,7 +437,7 @@ function bucketsToIssues(merged = {}) {
  */
 const CONSOLIDATED_TYPES = Object.freeze([
   'image_coherence', 'character_identity', 'duplicate_character', 'duplicate_identity',
-  'missing_character', 'extra_character', 'clothing', 'clothing_detail', 'clothing_sex',
+  'missing_character', 'extra_character', 'clothing', 'clothing_detail', 'clothing_sex', 'garment_facing',
   'accessory', 'accessory_missing', 'hair', 'hair_nuance', 'face_drift', 'face_destroyed',
   'cutout_artifact', 'nudity', 'anatomy', 'body_build', 'figure_completeness', 'action_interaction',
   'object_presence', 'missing_element', 'object_count', 'duplicate_object', 'scale',

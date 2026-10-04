@@ -1356,6 +1356,8 @@ function tryParseVisualBibleJSON(outline) {
         description: `${item.description}. ${item.howWorn}`,
         wornBy: item.wornBy,
         howWorn: item.howWorn,
+        // The garment seen from behind (wornItems.GARMENT_BACK_RULE).
+        back: item.back || null,
         type: 'clothing',
         extractedDescription: null,
         firstAppearanceAnalyzed: false,
@@ -2433,6 +2435,8 @@ function tryParseNewEntriesJSON(section) {
         description: `${item.description}. ${item.howWorn || ''}`.trim(),
         wornBy: item.wornBy,
         howWorn: item.howWorn,
+        // The garment seen from behind (wornItems.GARMENT_BACK_RULE).
+        back: item.back || null,
         type: 'clothing',
         pages: item.pages || [],
         source: 'story_text'

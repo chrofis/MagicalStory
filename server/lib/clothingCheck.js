@@ -792,6 +792,14 @@ function applyWardrobeBibleCorrections(clothingRequirements, visualBible, opts =
       for (const key of ['name', 'label']) {
         if (el[key] && [...colourSet(el[key])].some(c => !contractColours.has(c))) el[key] = f.contractText;
       }
+      // The authored back look (wornItems.GARMENT_BACK_RULE) was written to the
+      // bible's OLD words. One that states a colour the contract does not is
+      // dropped, never replaced by the contract's words — those name the
+      // garment's front, which a back view must not be told.
+      if (el.back && [...colourSet(el.back)].some(c => !contractColours.has(c))) {
+        logger.error(`🧥 [WARDROBE-BIBLE] ${f.character}/${f.slot}: ${f.elementId || 'the bible'} back look "${el.back}" contradicts the contract's colours — dropped; a back view of this garment is named without a look`);
+        delete el.back;
+      }
       applied.push(f);
       logger.warn(`🧥 [WARDROBE-BIBLE] ${f.character}/${f.slot}: ${f.elementId || 'the bible'} "${f.elementLabel}" is declared worn in this slot — its description now carries the contract's words "${f.contractText}" (was "${f.elementText}")`);
       continue;

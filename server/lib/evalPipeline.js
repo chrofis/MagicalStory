@@ -2114,11 +2114,19 @@ function buildEvalClothingContract({
     // returns the outfit UNCHANGED when `visualBible` is falsy, so a caller
     // that omits the bible gets the unstripped story-level outfit and no
     // warning whatsoever.
-    const { resolveGeneratedOutfit } = require('./wornItems');
+    const { resolveGeneratedOutfit, faceAwayNames, SEEN_FROM_BACK } = require('./wornItems');
     const wornMeta = sceneMetadata
       || (() => { try { return getStoryHelpers().extractSceneMetadata(sceneHint || originalPrompt); } catch { return null; } })();
     const wornCtx = { visualBible: visualBible || null, sceneMetadata: wornMeta };
     const asWorn = (name, outfit) => resolveGeneratedOutfit(outfit, name, wornCtx);
+    // DECLARED FACING (2026-10-04). A character the brief draws from behind is
+    // tagged on its contract line, so every judge reads the outfit as a back
+    // view: its front features are not expected, and drawn on the back they
+    // are image-evaluation D-05e `garment_facing`. Same predicate the generator's
+    // worn line uses (wornItems.faceAwayNames → storyAvatars.resolveCellPose).
+    const away = faceAwayNames(sceneCharacters, wornMeta);
+    const who = (name) => (away.some(n => String(n).trim().toLowerCase() === String(name).trim().toLowerCase())
+      ? `${name} (${SEEN_FROM_BACK})` : name);
     const reqs = clothingRequirements || null;
     if (reqs) {
       const { buildClothingDescription } = require('./entityConsistency');
@@ -2127,14 +2135,14 @@ function buildEvalClothingContract({
         const category = reqs[c.name]?._currentClothing;
         if (!category) continue;
         const outfit = asWorn(c.name, buildClothingDescription(c, category, artStyle, reqs));
-        if (outfit && String(outfit).trim()) lines.push(`- ${c.name}: ${String(outfit).trim()}`);
+        if (outfit && String(outfit).trim()) lines.push(`- ${who(c.name)}: ${String(outfit).trim()}`);
       }
     }
     if (lines.length === 0) {
       for (const p of (referenceImages || [])) {
         if (!p?.name || !p?.clothingDescription) continue;
         const outfit = asWorn(p.name, p.clothingDescription);
-        if (outfit && String(outfit).trim()) lines.push(`- ${p.name}: ${String(outfit).trim()}`);
+        if (outfit && String(outfit).trim()) lines.push(`- ${who(p.name)}: ${String(outfit).trim()}`);
       }
     }
     return { block: lines.join('\n'), error: null };

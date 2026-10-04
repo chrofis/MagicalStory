@@ -17,6 +17,7 @@ const { commissionedChildBand, buildChildAgeBandNote, secondaryAgeCues } = requi
 // this module was the prose worn-vs-held matcher deleted 2026-09-18. It stays
 // exported from visualBible.js for coverIterate.js, which still uses it.
 const { REQUIRED_TEXT_AUTHORING_RULE } = require('./requiredText');
+const { GARMENT_BACK_RULE } = require('./wornItems');
 const { SCALE_CLASS_SPEC, ANIMAL_ANATOMY_SPEC, GROWN_CREATURE_SCALE_CLASSES, buildVisualBiblePrompt, englishEntityRef, englishLocationRef, clauseRef, objectStates, resolveObjectState, elementScaleNote, withScaleNote } = require('./visualBible');
 const { SHOT_ENUM, SHOT_POSITIONS, DISTANCE_SHOTS, SHOT_DEFINITIONS, CLOSEUP_BELOW_WAIST_PHRASE, CLOSEUP_KEPT_RULE, CLOSEUP_KEPT_FIXED_SHOT_RULE, PLAN_SHOT_PLACEHOLDER, shotDistributionPhrase, buildShotDefinitions, OTS_NEAR_FIGURE_CROP, OTS_NEAR_FIGURE_RULE, OTS_NO_CONTACT_RULE, isOverTheShoulderPerspective, VANTAGE_SHOT_RULE, GROUP_STAGING_RULE, GROUP_STAGING_FIXED_SHOT_RULE } = require('./shotVocabulary');
 const { labelOf } = require('./vbLabel');
@@ -3226,6 +3227,9 @@ function artDirectorFills(inputData, beats = [], options = {}) {
     // ONE entry-page contract for the same two bible-authoring sites — see
     // ELEMENT_ENTRY_PAGE_RULE.
     ELEMENT_ENTRY_PAGE: ELEMENT_ENTRY_PAGE_RULE,
+    // ONE back-view garment look for both bible-authoring sites — see
+    // wornItems.GARMENT_BACK_RULE.
+    GARMENT_BACK: GARMENT_BACK_RULE,
     TRUE_RELATIVE_SIZE: TRUE_RELATIVE_SIZE_RULE,
     // ONE shot vocabulary for every stage that writes or reads a `shot` — the
     // beats planner produces it, planCounters counts it, and the image prompt
@@ -12290,6 +12294,8 @@ The story takes place in ${inputData.userLocation.city}. Use real place names �
     REQUIRED_TEXT_AUTHORING: REQUIRED_TEXT_AUTHORING_RULE,
       // ...and the same entry-page contract, for the same reason.
       ELEMENT_ENTRY_PAGE: ELEMENT_ENTRY_PAGE_RULE,
+      // ...and the same back-view garment look (wornItems.GARMENT_BACK_RULE).
+      GARMENT_BACK: GARMENT_BACK_RULE,
       TRUE_RELATIVE_SIZE: TRUE_RELATIVE_SIZE_RULE,
     });
   }

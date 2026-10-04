@@ -196,6 +196,13 @@ const MAX_SEVERITY_TYPES = {
   // footing as an undersized structure (D-31). The cap keeps an evaluator's
   // escalation from outranking a missing or wrong character.
   creature_scale: 'major',
+  // garment_facing capped at MAJOR (owner-approved, 2026-10-04): image-evaluation
+  // D-05e — a garment's front features drawn on a figure seen from behind (or
+  // the reverse). A full-length zip on a back is plain to a reader, so it may
+  // cost MAJOR; it is still the right garment on the right person, so it must
+  // never outrank a missing or wrong character (staging
+  // job_1791040103540_atbttop6w p5).
+  garment_facing: 'major',
   // duplicate_object capped at MAJOR (owner-approved addition, 2026-09-06):
   // image-evaluation D-32 defines a named prop rendered twice as MAJOR — the
   // owner's footing, "on the level of a missing key object" (D-19, also MAJOR).
@@ -541,6 +548,7 @@ const BUCKET_BILLING_CATEGORY = {
   clothing: 'clothing',
   accessory: 'clothing',
   clothing_detail: 'clothing',
+  garment_facing: 'clothing',
   garment_colour: 'clothing',
   // IDENTITY IS ITS OWN CLASS, SEPARATE FROM BUILD (owner, 2026-08-19):
   // "does this figure look like the photo? If not, repair can not work. We can

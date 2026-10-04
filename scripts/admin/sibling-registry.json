@@ -241,6 +241,11 @@
             "critic": "D-31 `structure_scale`",
             "generator": "{REQUIRED_OBJECTS}",
             "note": "D-31 measures a vehicle listed in ELEMENT SIZES against the size given there. The generator half is that vehicle's REQUIRED OBJECTS line, the same elementPageScaleNote sentence."
+          },
+          {
+            "critic": "D-05e `garment_facing`",
+            "generator": "{CHARACTER_REFERENCE_LIST}",
+            "note": "D-05e is MAJOR/MINOR when a garment's front features are drawn on a figure seen from behind (or the reverse). The generator half is the WORN ITEMS line in the character reference list (wornItems.buildWornStateLines): for a wearer the brief draws from behind it carries the tag `seen from the back` and the garment's authored `back` look, never its front description. The judges read the same tag on that character's CLOTHING CONTRACT line (evalPipeline.buildEvalClothingContract). Both sides decide facing with wornItems.faceAwayNames -> storyAvatars.resolveCellPose. Pinned in tests/unit/worn-item-facing.test.ts."
           }
         ]
       }
