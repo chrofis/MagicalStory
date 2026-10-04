@@ -3660,7 +3660,7 @@
       "id": "title-proofread",
       "title": "The title candidates go through the lector before the cover renders; a corrected title is what ships everywhere",
       "commits": [
-        "09bf2d495"
+        "4fc70bb54"
       ],
       "addedAt": "2026-10-04",
       "claim": "On the next full staging story: the usage record carries one title_lector call; the generation log carries title_proofread_corrected for each changed candidate (or none) and no title_proofread_failed; data.title equals data.titleJudge.candidates[pick] and the title baked on the front cover reads the same string.",
