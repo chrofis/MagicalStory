@@ -147,8 +147,9 @@ export default function BookBuilder() {
       orderBook: 'Order Book',
       tooManyPages: 'Too many pages',
       tooManyPagesDesc: 'Maximum is 100 pages. Please remove some stories.',
-      tooFewPages: 'Few pages selected',
-      tooFewPagesDesc: (pages: number) => `You have selected stories with only ${pages} pages. The minimum book length is 30 pages, so there will be empty pages. Consider adding another story to your book.`,
+      blankPagesTitle: 'Blank pages in your book',
+      blankPagesDesc: (printed: number, content: number, blank: number) => `Your book has ${printed} pages. Your story fills ${content} of them – ${blank} ${blank === 1 ? 'page' : 'pages'} will be blank.`,
+      blankPagesHint: 'Consider a longer story, or combine several stories into one book.',
       processing: 'Processing...',
       printPdf: 'Print PDF (Test)',
       generatingPdf: 'Generating PDF...',
@@ -196,8 +197,9 @@ export default function BookBuilder() {
       orderBook: 'Buch bestellen',
       tooManyPages: 'Zu viele Seiten',
       tooManyPagesDesc: 'Maximal 100 Seiten erlaubt. Bitte entferne einige Geschichten.',
-      tooFewPages: 'Wenige Seiten ausgewählt',
-      tooFewPagesDesc: (pages: number) => `Du hast Geschichten mit nur ${pages} Seiten ausgewählt. Die Mindestbuchlänge beträgt 30 Seiten, es wird also leere Seiten geben. Erwäge, eine weitere Geschichte hinzuzufügen.`,
+      blankPagesTitle: 'Leere Seiten in deinem Buch',
+      blankPagesDesc: (printed: number, content: number, blank: number) => `Dein Buch hat ${printed} Seiten. Deine Geschichte füllt ${content} davon – ${blank} ${blank === 1 ? 'Seite' : 'Seiten'} bleiben leer.`,
+      blankPagesHint: 'Erwäge eine längere Geschichte oder kombiniere mehrere Geschichten zu einem Buch.',
       processing: 'Wird verarbeitet...',
       printPdf: 'Druck-PDF (Test)',
       generatingPdf: 'PDF wird erstellt...',
@@ -245,8 +247,9 @@ export default function BookBuilder() {
       orderBook: 'Commander le livre',
       tooManyPages: 'Trop de pages',
       tooManyPagesDesc: 'Maximum 100 pages. Veuillez retirer quelques histoires.',
-      tooFewPages: 'Peu de pages sélectionnées',
-      tooFewPagesDesc: (pages: number) => `Vous avez sélectionné des histoires avec seulement ${pages} pages. La longueur minimale du livre est de 30 pages, il y aura donc des pages vides. Pensez à ajouter une autre histoire.`,
+      blankPagesTitle: 'Pages vierges dans votre livre',
+      blankPagesDesc: (printed: number, content: number, blank: number) => `Votre livre compte ${printed} pages. Votre histoire en remplit ${content} – ${blank} ${blank === 1 ? 'page' : 'pages'} resteront vierges.`,
+      blankPagesHint: 'Pensez à une histoire plus longue ou combinez plusieurs histoires dans un seul livre.',
       processing: 'Traitement en cours...',
       printPdf: 'PDF impression (Test)',
       generatingPdf: 'Génération du PDF...',
@@ -294,8 +297,9 @@ export default function BookBuilder() {
       orderBook: 'Ordina il libro',
       tooManyPages: 'Troppe pagine',
       tooManyPagesDesc: 'Massimo 100 pagine. Rimuovi alcune storie.',
-      tooFewPages: 'Poche pagine selezionate',
-      tooFewPagesDesc: (pages: number) => `Hai selezionato storie con solo ${pages} pagine. La lunghezza minima del libro è di 30 pagine, quindi ci saranno pagine vuote. Valuta di aggiungere un'altra storia al tuo libro.`,
+      blankPagesTitle: 'Pagine vuote nel tuo libro',
+      blankPagesDesc: (printed: number, content: number, blank: number) => `Il tuo libro ha ${printed} pagine. La tua storia ne riempie ${content} – ${blank} ${blank === 1 ? 'pagina' : 'pagine'} resteranno vuote.`,
+      blankPagesHint: 'Valuta una storia più lunga oppure combina più storie in un unico libro.',
       processing: 'Elaborazione...',
       printPdf: 'Stampa PDF (Test)',
       generatingPdf: 'Generazione PDF...',
@@ -345,8 +349,22 @@ export default function BookBuilder() {
   }, [totalPages, coverType, pricingTiers]);
 
   const isOverLimit = totalPages > MAX_BOOK_PAGES;
-  const MIN_BOOK_PAGES = 30;
-  const isUnderMinimum = totalPages > 0 && totalPages < MIN_BOOK_PAGES;
+
+  // Printed page count / blank pages for the selected cover type, from the
+  // server (same computation that pads the print PDF).
+  const [pageInfo, setPageInfo] = useState<{ contentPages: number; printedPages: number; blankPages: number } | null>(null);
+  const storyIdsKey = stories.map(s => s.id).join(',');
+  useEffect(() => {
+    if (!storyIdsKey || isOverLimit) { setPageInfo(null); return; }
+    let cancelled = false;
+    setPageInfo(null);
+    storyService.getBookPageInfo(storyIdsKey.split(','), coverType, bookFormat)
+      .then(info => { if (!cancelled) setPageInfo(info); })
+      .catch(err => log.error('Failed to fetch book page info:', err));
+    return () => { cancelled = true; };
+  }, [storyIdsKey, coverType, bookFormat, isOverLimit]);
+  // From this many blank pages on, also suggest a longer story / combining stories.
+  const BLANK_PAGES_SUGGEST_FROM = 4;
 
   // Move story up/down
   const moveStory = (index: number, direction: 'up' | 'down') => {
@@ -589,13 +607,16 @@ export default function BookBuilder() {
                   <span className="text-sm">{t.tooManyPagesDesc}</span>
                 </div>
               )}
-              {isUnderMinimum && !isOverLimit && (
+              {pageInfo && pageInfo.blankPages > 0 && !isOverLimit && (
                 <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
                   <div className="flex items-start gap-2 text-amber-700">
                     <Info size={18} className="flex-shrink-0 mt-0.5" />
                     <div>
-                      <div className="font-semibold text-sm">{t.tooFewPages}</div>
-                      <span className="text-sm">{t.tooFewPagesDesc(totalPages)}</span>
+                      <div className="font-semibold text-sm">{t.blankPagesTitle}</div>
+                      <span className="text-sm">{t.blankPagesDesc(pageInfo.printedPages, pageInfo.contentPages, pageInfo.blankPages)}</span>
+                      {pageInfo.blankPages >= BLANK_PAGES_SUGGEST_FROM && (
+                        <span className="text-sm block mt-1">{t.blankPagesHint}</span>
+                      )}
                     </div>
                   </div>
                 </div>

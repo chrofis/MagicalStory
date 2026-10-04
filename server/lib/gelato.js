@@ -68,6 +68,81 @@ function snapToValidPageCount(estimated, product) {
 }
 
 /**
+ * Interior content pages of a book: dedication + every story's pages.
+ * Excludes cover spread, inside front blank and inside back blank (Gelato
+ * does not count those in pageCount). Story 2+ adds title + dedication, plus
+ * back cover (+ separator blank if not last) when the story has a back cover.
+ * Mirrors what generatePrintPdf / generateCombinedBookPdf render.
+ *
+ * @param {Object[]} storyDatas - stories.data objects, in book order
+ * @returns {number}
+ */
+function countBookContentPages(storyDatas) {
+  const { parseStoryPages } = require('./pdf');
+  let storyContentPages = 0;
+  for (let si = 0; si < storyDatas.length; si++) {
+    // Picture-book layout for all reading levels: 1 scene = 1 print page
+    storyContentPages += parseStoryPages(storyDatas[si]).length;
+    if (si > 0) {
+      storyContentPages += 2; // title + dedication page (always)
+      if (storyDatas[si]?.coverImages?.backCover) {
+        storyContentPages += 1; // back cover
+        if (si < storyDatas.length - 1) storyContentPages += 1; // separator blank
+      }
+    }
+  }
+  return 1 + storyContentPages; // + dedication
+}
+
+/**
+ * Single source of truth for "how many pages will this book be printed with,
+ * and how many of them are blank". Used by the order flow (PDF padding) and
+ * by the pre-payment preview in the book builder.
+ *
+ * @param {import('pg').Pool} dbPool
+ * @param {Object[]} storyDatas - stories.data objects, in book order
+ * @param {'softcover'|'hardcover'} coverType
+ * @param {'A4'|'square'} bookFormat
+ * @returns {Promise<{contentPages:number, estimatedPageCount:number,
+ *   printedPages:number, blankPages:number, productUid:string|null, product:Object|null}>}
+ */
+async function computeBookPageInfo(dbPool, storyDatas, coverType, bookFormat) {
+  const contentPages = countBookContentPages(storyDatas);
+  // Gelato requires even page counts for double-sided printing
+  const estimatedPageCount = contentPages % 2 !== 0 ? contentPages + 1 : contentPages;
+  const formatPattern = bookFormat === 'A4' ? '210x280' : '200x200';
+  const productsResult = await dbPool.query(
+    `SELECT product_uid, product_name, min_pages, max_pages, available_page_counts
+       FROM gelato_products
+      WHERE is_active = true
+        AND LOWER(product_uid) LIKE $1
+        AND LOWER(product_uid) LIKE $2
+      ORDER BY max_pages ASC NULLS LAST, min_pages ASC NULLS LAST`,
+    [`%${String(coverType).toLowerCase()}%`, `%${formatPattern}%`]
+  );
+  const product = productsResult.rows.find(p =>
+    estimatedPageCount <= (p.max_pages || 999)
+  ) || productsResult.rows[0] || null; // any active SKU; snap lifts below min
+  if (!product) {
+    return { contentPages, estimatedPageCount, printedPages: estimatedPageCount,
+      blankPages: estimatedPageCount - contentPages, productUid: null, product: null };
+  }
+  let printedPages;
+  try {
+    printedPages = snapToValidPageCount(estimatedPageCount, product);
+  } catch (err) {
+    // Bad/incomplete row data. Fail loud rather than guessing — Gelato
+    // will reject silently otherwise.
+    throw new Error(
+      `Cannot determine page count for product ${product.product_uid}: ${err.message}. ` +
+      `Check the gelato_products row: min_pages, max_pages, and available_page_counts must be populated.`
+    );
+  }
+  return { contentPages, estimatedPageCount, printedPages,
+    blankPages: Math.max(0, printedPages - contentPages), productUid: product.product_uid, product };
+}
+
+/**
  * Get cover dimensions from Gelato API including spine width
  *
  * @param {string} productUid - Gelato product UID
@@ -230,62 +305,16 @@ async function processBookOrder(dbPool, sessionId, userId, storyIds, customerInf
       throw new Error('GELATO_API_KEY not configured');
     }
 
-    // Estimate Gelato page count from story data
-    // Gelato pageCount = interior pages only (dedication + story content)
-    // Does NOT count: cover spread, inside front blank, inside back cover blank
-    // For multi-story books: story 2+ adds title + dedication (2 pages)
-    //   plus back cover + separator (2 pages) if back cover exists, otherwise skip both
-    const { parseStoryPages } = require('./pdf');
-    let storyContentPages = 0;
-    for (let si = 0; si < stories.length; si++) {
-      const storyPages = parseStoryPages(stories[si].data);
-      // Picture-book layout for all reading levels: 1 scene = 1 print page
-      storyContentPages += storyPages.length;
-      if (si > 0) {
-        storyContentPages += 2; // title + dedication page (always)
-        const hasBackCover = !!stories[si].data?.coverImages?.backCover;
-        if (hasBackCover) {
-          storyContentPages += 1; // back cover
-          if (si < stories.length - 1) storyContentPages += 1; // separator blank between stories
-        }
-      }
-    }
-    let estimatedPageCount = 1 + storyContentPages; // dedication + content (trailing blank = inside back cover, not counted)
-    // Gelato requires even page counts for double-sided printing
-    if (estimatedPageCount % 2 !== 0) estimatedPageCount++;
-    log.debug(`📊 [BACKGROUND] Estimated Gelato page count: ${estimatedPageCount} (${storyContentPages} story content pages)`);
-
-    // Step 3a: Find an active SKU matching format + coverType, then snap
-    // estimatedPageCount to a count that SKU actually accepts.
-    const formatPattern = bookFormat === 'A4' ? '210x280' : '200x200';
-    let printProductUid = null;
-    let snappedPageCount = estimatedPageCount;
-    const productsResult = await dbPool.query(
-      `SELECT product_uid, product_name, min_pages, max_pages, available_page_counts
-         FROM gelato_products
-        WHERE is_active = true
-          AND LOWER(product_uid) LIKE $1
-          AND LOWER(product_uid) LIKE $2
-        ORDER BY max_pages ASC NULLS LAST, min_pages ASC NULLS LAST`,
-      [`%${coverType.toLowerCase()}%`, `%${formatPattern}%`]
-    );
-    const matchingProduct = productsResult.rows.find(p =>
-      estimatedPageCount <= (p.max_pages || 999)
-    ) || productsResult.rows[0]; // fall back to any active SKU; snap will lift below min
-    if (matchingProduct) {
-      printProductUid = matchingProduct.product_uid;
-      try {
-        snappedPageCount = snapToValidPageCount(estimatedPageCount, matchingProduct);
-      } catch (err) {
-        // Bad/incomplete row data. Fail loud rather than guessing — Gelato
-        // will reject silently otherwise.
-        throw new Error(
-          `Cannot determine page count for product ${matchingProduct.product_uid}: ${err.message}. ` +
-          `Check the gelato_products row: min_pages, max_pages, and available_page_counts must be populated.`
-        );
-      }
+    // Page count + SKU come from computeBookPageInfo — the same function the
+    // checkout preview (POST /api/book-page-info) uses, so the number shown
+    // to the customer before payment is the number the PDF is padded to.
+    const pageInfo = await computeBookPageInfo(dbPool, stories.map(s => s.data), coverType, bookFormat);
+    const { estimatedPageCount, printedPages: snappedPageCount } = pageInfo;
+    log.debug(`📊 [BACKGROUND] Estimated Gelato page count: ${estimatedPageCount} (${pageInfo.contentPages} content pages incl. dedication)`);
+    let printProductUid = pageInfo.productUid;
+    if (pageInfo.product) {
       if (snappedPageCount !== estimatedPageCount) {
-        log.info(`📐 [BACKGROUND] Snapping ${estimatedPageCount} → ${snappedPageCount} pages for ${matchingProduct.product_name}`);
+        log.info(`📐 [BACKGROUND] Snapping ${estimatedPageCount} → ${snappedPageCount} pages for ${pageInfo.product.product_name} (${pageInfo.blankPages} blank of ${snappedPageCount})`);
       }
     } else {
       printProductUid = process.env.GELATO_PHOTOBOOK_UID;
@@ -473,4 +502,6 @@ module.exports = {
   processBookOrder,
   getCoverDimensions,
   snapToValidPageCount,
+  countBookContentPages,
+  computeBookPageInfo,
 };

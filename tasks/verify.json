@@ -4763,6 +4763,24 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "book-blank-pages-warning",
+      "title": "Book builder warns before payment how many printed pages are blank, from the same server computation that pads the print PDF",
+      "commits": [
+        "(this push)"
+      ],
+      "addedAt": "2026-10-04",
+      "claim": "In the book builder, for a story shorter than the SKU minimum (e.g. 10 pages, A4), the amber box shows 'Dein Buch hat 30 Seiten. Deine Geschichte füllt 11 davon – 19 Seiten bleiben leer.' (printed/blank from POST /api/book-page-info), updates when switching softcover/hardcover or adding a story, and a book that exactly fits shows no box. The printed count in the box equals the page count in the generated print PDF / Gelato order for the same selection.",
+      "runShape": [
+        "any"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Open /book-builder with a short story on staging, read the box for both cover types, then compare with 'Snapping X -> Y pages' in the order log or the PDF page count of a test order."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [

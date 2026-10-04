@@ -2313,6 +2313,12 @@ export const storyService = {
     return response;
   },
 
+  // Pre-payment preview: printed page count and blank pages, computed by the
+  // same server function that pads the print PDF.
+  async getBookPageInfo(storyIds: string[], coverType: 'softcover' | 'hardcover', bookFormat: 'square' | 'A4'): Promise<{ contentPages: number; printedPages: number; blankPages: number }> {
+    return api.post('/api/book-page-info', { storyIds, coverType, bookFormat });
+  },
+
   // Referral: get current user's referral code + stats
   async getMyReferralCode(): Promise<{ code: string; credits: number; referredBy: string | null; referrals: number; creditsEarned: number }> {
     return api.get('/api/referral/my-code');

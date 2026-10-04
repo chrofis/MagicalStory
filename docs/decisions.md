@@ -66045,3 +66045,13 @@ The pin on atbttop6w's stored front-cover brief moves `LOC001.1` → `LOC001.5` 
 Jev has no temperature: a repeat run swapped Grossmünster and Wasserkirche between -2 and -3 on atbttop6w; both runs passed.
 
 **Touched:** `server/lib/jevBriefFields.js`, `server/lib/beatsPipeline.js` (casts, offered list + town, materialize), `tests/unit/cover-places.test.ts`, `scripts/admin/sibling-registry.json`, `tasks/verify.json`. **Status:** ✅ active (staging).
+
+## 2026-10-04 — Print books below the SKU minimum are allowed, with a pre-payment blank-page warning
+
+**Context:** Prod order 99 (10-page story, hardcover A4) was padded by `generatePrintPdf` (`targetGelatoPageCount`, 516e7f4e6) to Gelato's 30-page minimum: 11 content pages, 19 blank. The customer saw no warning. The only existing hint was a client-side `MIN_BOOK_PAGES = 30` box that counted the client's own page numbers, never said how many pages were blank, and did not know the real SKU minimum.
+
+**Decision (owner: "Warn at checkout"):** the order is still allowed and nothing is changed automatically. The book builder shows printed pages, content pages and blank pages before payment, plus (from 4 blanks) a text-only suggestion to write a longer story or combine stories. The numbers come from `computeBookPageInfo` in `server/lib/gelato.js`, the same function `processBookOrder` uses to pick the SKU and snap the page count the PDF is padded to; `POST /api/book-page-info` exposes it. `create-checkout-session` pricing now uses `countBookContentPages` too (previously `sceneImages.length`; identical for order 99's story, 10 = 10).
+
+**Rationale:** one computation, so the number the customer sees cannot drift from the book that is printed. The client no longer hardcodes 30.
+
+**Touched files:** `server/lib/gelato.js`, `server/routes/print.js`, `client/src/pages/BookBuilder.tsx`, `client/src/services/storyService.ts`, `server/lib/gelato.test.js`.

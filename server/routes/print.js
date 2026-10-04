@@ -22,7 +22,7 @@ const { getPool, rehydrateStoryImages, logActivity } = require('../services/data
 
 // Lib modules
 const { generatePrintPdf, generateViewPdf, generateCombinedBookPdf, parseStoryPages } = require('../lib/pdf');
-const { processBookOrder, getCoverDimensions } = require('../lib/gelato');
+const { processBookOrder, getCoverDimensions, countBookContentPages, computeBookPageInfo } = require('../lib/gelato');
 const { stripDataUriPrefix } = require('../lib/r2');
 const email = require('../../email');
 
@@ -1736,6 +1736,36 @@ router.post('/referral/cash-out', authenticateToken, async (req, res) => {
   }
 });
 
+// Pre-payment preview for the book builder: how many pages the printed book
+// will have and how many of them are blank. Same computeBookPageInfo the order
+// flow pads the PDF with — see DECISIONS / commit message.
+router.post('/book-page-info', authenticateToken, async (req, res) => {
+  try {
+    const { storyIds, coverType = 'softcover', bookFormat = 'A4' } = req.body;
+    if (!Array.isArray(storyIds) || storyIds.length === 0) {
+      return res.status(400).json({ error: 'Missing or invalid storyIds array' });
+    }
+    if (!['softcover', 'hardcover'].includes(coverType) || !['A4', 'square'].includes(bookFormat)) {
+      return res.status(400).json({ error: 'Invalid coverType or bookFormat' });
+    }
+    const storyDatas = [];
+    for (const sid of storyIds) {
+      const r = await getDbPool().query('SELECT data FROM stories WHERE id = $1 AND user_id = $2', [sid, req.user.id]);
+      if (r.rows.length === 0) return res.status(404).json({ error: `Story not found: ${sid}` });
+      storyDatas.push(typeof r.rows[0].data === 'string' ? JSON.parse(r.rows[0].data) : r.rows[0].data);
+    }
+    const info = await computeBookPageInfo(getDbPool(), storyDatas, coverType, bookFormat);
+    res.json({
+      contentPages: info.contentPages,
+      printedPages: info.printedPages,
+      blankPages: info.blankPages,
+    });
+  } catch (err) {
+    log.error('Error computing book page info:', err);
+    res.status(500).json({ error: 'Failed to compute book page info' });
+  }
+});
+
 // Create Stripe checkout session for book purchase
 router.post('/stripe/create-checkout-session', authenticateToken, async (req, res) => {
   try {
@@ -1766,7 +1796,6 @@ router.post('/stripe/create-checkout-session', authenticateToken, async (req, re
 
     // Fetch all stories and calculate total pages
     const stories = [];
-    let totalPages = 0;
     for (const sid of allStoryIds) {
       const storyResult = await getDbPool().query('SELECT data FROM stories WHERE id = $1 AND user_id = $2', [sid, userId]);
       if (storyResult.rows.length === 0) {
@@ -1776,23 +1805,10 @@ router.post('/stripe/create-checkout-session', authenticateToken, async (req, re
         ? JSON.parse(storyResult.rows[0].data)
         : storyResult.rows[0].data;
       stories.push({ id: sid, data: storyData });
-
-      // Picture-book layout for all reading levels: 1 scene = 1 print page
-      const sceneCount = storyData.sceneImages?.length || storyData.pages || 5;
-      totalPages += sceneCount;
     }
-
-    // Story 1: 1 page (dedication, blank if trial)
-    // Story 2+: 2 pages (title + dedication) + back cover + separator if applicable
-    totalPages += 1; // dedication for first story
-    for (let si = 1; si < stories.length; si++) {
-      totalPages += 2; // title + dedication page
-      const hasBackCover = !!stories[si].data?.coverImages?.backCover;
-      if (hasBackCover) {
-        totalPages += 1; // back cover
-        if (si < stories.length - 1) totalPages += 1; // separator
-      }
-    }
+    // Same counter the print PDF and the book-builder preview use
+    // (dedication + story pages + per-extra-story title/dedication/back cover).
+    const totalPages = countBookContentPages(stories.map(s => s.data));
 
     // Calculate price based on pages and cover type (using database pricing)
     // Pricing tiers store the BOOK price only — shipping is added once per order.

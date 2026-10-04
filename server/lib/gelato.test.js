@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert');
-const { snapToValidPageCount } = require('./gelato');
+const { snapToValidPageCount, countBookContentPages, computeBookPageInfo } = require('./gelato');
 
 // Discrete page-count list takes priority. Smallest entry >= estimated.
 test('discrete list: snaps up to next entry', () => {
@@ -134,4 +134,73 @@ test('discrete list with non-numeric entries filters them', () => {
     max_pages: 40,
   };
   assert.strictEqual(snapToValidPageCount(26, product), 30);
+});
+
+// --- Book page info: content pages -> orderable pages -> blank count ---------
+// One source of truth for the pre-payment warning and the PDF padding.
+
+const storyOf = (n, { backCover = false } = {}) => ({
+  storyText: Array.from({ length: n }, (_, i) => `--- Page ${i + 1} ---\nText ${i + 1}`).join('\n'),
+  ...(backCover ? { coverImages: { backCover: { imageData: 'x' } } } : {}),
+});
+const poolWith = (rows) => ({ query: async () => ({ rows }) });
+const HARDCOVER_A4 = {
+  product_uid: 'photobooks-hardcover_pf_210x280-mm-portrait_pt_170-gsm',
+  product_name: 'Hardcover A4',
+  min_pages: 30,
+  max_pages: 200,
+  available_page_counts: null,
+};
+
+test('countBookContentPages: dedication + story pages; story 2+ adds title/dedication/back cover/separator', () => {
+  assert.strictEqual(countBookContentPages([storyOf(10)]), 11);
+  assert.strictEqual(countBookContentPages([storyOf(10), storyOf(10)]), 1 + 10 + 2 + 10);
+  assert.strictEqual(countBookContentPages([storyOf(10), storyOf(10, { backCover: true }), storyOf(10)]),
+    1 + 10 + (2 + 10 + 1 + 1) + (2 + 10)); // back cover + separator (not last)
+  assert.strictEqual(countBookContentPages([storyOf(10), storyOf(10), storyOf(10, { backCover: true })]),
+    1 + 10 + (2 + 10) + (2 + 10 + 1)); // last story: back cover, no separator
+});
+
+test('computeBookPageInfo: 10-page story on a 30-page minimum hardcover is mostly blank', async () => {
+  const info = await computeBookPageInfo(poolWith([HARDCOVER_A4]), [storyOf(10)], 'hardcover', 'A4');
+  assert.strictEqual(info.contentPages, 11);
+  assert.strictEqual(info.printedPages, 30);
+  assert.strictEqual(info.blankPages, 19);
+});
+
+test('computeBookPageInfo: a book that exactly fills an orderable count has no blanks', async () => {
+  const info = await computeBookPageInfo(poolWith([HARDCOVER_A4]), [storyOf(29)], 'hardcover', 'A4');
+  assert.strictEqual(info.contentPages, 30);
+  assert.strictEqual(info.printedPages, 30);
+  assert.strictEqual(info.blankPages, 0);
+});
+
+test('computeBookPageInfo: odd content count is padded to even and reported as blank', async () => {
+  const info = await computeBookPageInfo(poolWith([HARDCOVER_A4]), [storyOf(30)], 'hardcover', 'A4');
+  assert.strictEqual(info.contentPages, 31);
+  assert.strictEqual(info.printedPages, 32);
+  assert.strictEqual(info.blankPages, 1);
+});
+
+test('computeBookPageInfo: combined multi-story book is counted with the extra pages', async () => {
+  const info = await computeBookPageInfo(poolWith([HARDCOVER_A4]),
+    [storyOf(10), storyOf(10, { backCover: true }), storyOf(10)], 'hardcover', 'A4');
+  assert.strictEqual(info.contentPages, 37);
+  assert.strictEqual(info.printedPages, 38);
+  assert.strictEqual(info.blankPages, 1);
+});
+
+test('computeBookPageInfo: discrete page-count list snaps up to the next entry', async () => {
+  const sku = { ...HARDCOVER_A4, available_page_counts: [24, 30, 40, 50] };
+  const info = await computeBookPageInfo(poolWith([sku]), [storyOf(34)], 'hardcover', 'A4');
+  assert.strictEqual(info.contentPages, 35);
+  assert.strictEqual(info.printedPages, 40);
+  assert.strictEqual(info.blankPages, 5);
+});
+
+test('computeBookPageInfo: no matching SKU reports only the parity blank', async () => {
+  const info = await computeBookPageInfo(poolWith([]), [storyOf(10)], 'hardcover', 'A4');
+  assert.strictEqual(info.product, null);
+  assert.strictEqual(info.printedPages, 12);
+  assert.strictEqual(info.blankPages, 1);
 });
