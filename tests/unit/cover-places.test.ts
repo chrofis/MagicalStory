@@ -53,6 +53,12 @@ describe('assignment: distinct vantages first, then the highest summed probabili
     // front and back both prefer candidate 0; the best distinct split wins.
     expect(JBF.assignCoverPlaces(keys, [[0.7, 0.2, 0.1], [0.6, 0.1, 0.3], [0.7, 0.25, 0.05]])).toEqual([0, 2, 1]);
   });
+  it('the front cover always takes its top-rated vantage; the others never push it off', () => {
+    // A max-sum rule would hand the front its 0.00 vantage here (the stored replay's shape).
+    expect(JBF.assignCoverPlaces(keys, [[0.53, 0.47, 0], [0.8, 0.2, 0], [0.38, 0.62, 0]])).toEqual([0, 2, 1]);
+    // Without a front cover, the distinct max-sum rule alone.
+    expect(JBF.assignCoverPlaces(['initialPage', 'backCover'], [[0.8, 0.2], [0.7, 0.3]])).toEqual([0, 1]);
+  });
   it('a vantage is shared only when the candidates run out — each used once first', () => {
     const pick = JBF.assignCoverPlaces(keys, [[0.9, 0.1], [0.8, 0.2], [0.9, 0.1]]);
     expect(new Set(pick).size).toBe(2);
