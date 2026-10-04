@@ -2811,6 +2811,126 @@
       "fixedAt": "2026-10-04",
       "fixedIn": "1394fe35c",
       "fix": "requireAdmin. Test: tests/unit/story-route-guards.test.ts"
+    },
+    {
+      "id": "review-t1-trial-ideas-unbounded",
+      "title": "Unauthenticated trial ideas route and trial stores put unbounded text into paid prompts",
+      "reportedAt": "2026-10-04",
+      "source": "Code review 2026-10-04 (tasks/code-review-2026-10/4-5-payments-auth-trial.md), confirmed against current code",
+      "rootCause": "No session, Turnstile or length check on /generate-ideas-stream; create-story stored unvalidated text resent on every writer call.",
+      "impact": "Cost amplification by an outside caller.",
+      "status": "fixed",
+      "fixedAt": "2026-10-04",
+      "fixedIn": "e5323f57a",
+      "fix": "Session required, per-session limiter, field caps (requestGuards). Test: tests/unit/trial-spend-limits.test.ts"
+    },
+    {
+      "id": "review-t2-link-email-unlimited",
+      "title": "/api/trial/link-email mailed any address without limit and claimed success on a failed send",
+      "reportedAt": "2026-10-04",
+      "source": "Code review 2026-10-04 (tasks/code-review-2026-10/4-5-payments-auth-trial.md), confirmed against current code",
+      "rootCause": "Only the global api limiter; sender result ignored.",
+      "impact": "Email reputation damage; false success.",
+      "status": "fixed",
+      "fixedAt": "2026-10-04",
+      "fixedIn": "e5323f57a",
+      "fix": "3 per session / 5 per address per day; 502 when not sent. Test: tests/unit/trial-spend-limits.test.ts"
+    },
+    {
+      "id": "review-t3-prepare-title-repeat",
+      "title": "prepare-title regenerated a styled sheet on every call and after the trial was used",
+      "reportedAt": "2026-10-04",
+      "source": "Code review 2026-10-04 (tasks/code-review-2026-10/4-5-payments-auth-trial.md), confirmed against current code",
+      "rootCause": "No trial-used or stored-sheet check.",
+      "impact": "Repeated paid Grok sheets from one session.",
+      "status": "fixed",
+      "fixedAt": "2026-10-04",
+      "fixedIn": "e5323f57a",
+      "fix": "Once per trial: 409 after use, stored sheets returned for the same costume. Test: tests/unit/trial-spend-limits.test.ts"
+    },
+    {
+      "id": "review-t4-turnstile-fails-open",
+      "title": "Turnstile verification passed when unconfigured or unreachable",
+      "reportedAt": "2026-10-04",
+      "source": "Code review 2026-10-04 (tasks/code-review-2026-10/4-5-payments-auth-trial.md), confirmed against current code",
+      "rootCause": "verifyTurnstile returned true on missing secret and on siteverify errors.",
+      "impact": "Bot protection silently off.",
+      "status": "fixed",
+      "fixedAt": "2026-10-04",
+      "fixedIn": "e5323f57a",
+      "fix": "Throws TurnstileUnavailableError, 503 retryable, log.error. Test: tests/unit/trial-spend-limits.test.ts"
+    },
+    {
+      "id": "review-trial-session-survives-google-merge",
+      "title": "Trial session token still valid after a Google sign-in merged onto its account",
+      "reportedAt": "2026-10-04",
+      "source": "Code review 2026-10-04 (tasks/code-review-2026-10/4-5-payments-auth-trial.md (S1 chain)), confirmed against current code",
+      "rootCause": "Trial session JWT carried no token_version.",
+      "impact": "A holder could call claim-session on the merged, verified account for up to 24 h.",
+      "status": "fixed",
+      "fixedAt": "2026-10-04",
+      "fixedIn": "e5323f57a",
+      "fix": "Trial session carries tv, checked against users.token_version. Test: tests/unit/trial-spend-limits.test.ts"
+    },
+    {
+      "id": "review-r4-story-ideas-unbounded",
+      "title": "Authenticated story-ideas routes took unbounded text and kept paying after disconnect",
+      "reportedAt": "2026-10-04",
+      "source": "Code review 2026-10-04 (tasks/code-review-2026-10/6-other-routes.md), confirmed against current code",
+      "rootCause": "Authenticated story-ideas routes took unbounded text and kept paying after disconnect",
+      "impact": "Cost amplification by any account.",
+      "status": "fixed",
+      "fixedAt": "2026-10-04",
+      "fixedIn": "c3fc0278b",
+      "fix": "Field caps and abort signal on both arms. Test: tests/unit/avatar-and-idea-spend-limits.test.ts"
+    },
+    {
+      "id": "review-v4-avatar-no-cap",
+      "title": "Avatar generation had no per-user cap and a client-chosen model",
+      "reportedAt": "2026-10-04",
+      "source": "Code review 2026-10-04 (tasks/code-review-2026-10/6-other-routes.md), confirmed against current code",
+      "rootCause": "Avatar generation had no per-user cap and a client-chosen model",
+      "impact": "Any account could queue unlimited paid avatar jobs.",
+      "status": "fixed",
+      "fixedAt": "2026-10-04",
+      "fixedIn": "c3fc0278b",
+      "fix": "30 per user per day (admins exempt), avatarModel admin-only. Test: tests/unit/avatar-and-idea-spend-limits.test.ts"
+    },
+    {
+      "id": "review-v5-avatar-blind-ssrf",
+      "title": "Avatar routes fetched any http(s) reference photo URL",
+      "reportedAt": "2026-10-04",
+      "source": "Code review 2026-10-04 (tasks/code-review-2026-10/6-other-routes.md), confirmed against current code",
+      "rootCause": "Avatar routes fetched any http(s) reference photo URL",
+      "impact": "Blind server-side fetch of arbitrary or internal hosts.",
+      "status": "fixed",
+      "fixedAt": "2026-10-04",
+      "fixedIn": "c3fc0278b",
+      "fix": "Only data URIs, raw base64 and own R2 URLs. Test: tests/unit/avatar-and-idea-spend-limits.test.ts"
+    },
+    {
+      "id": "review-v2-limiters-keyed-on-railway-edge",
+      "title": "Per-IP limiters keyed on Railway's edge address, shared by all visitors",
+      "reportedAt": "2026-10-04",
+      "source": "Code review 2026-10-04 (tasks/code-review-2026-10/4-5-payments-auth-trial.md), confirmed against current code",
+      "rootCause": "Per-IP limiters keyed on Railway's edge address, shared by all visitors",
+      "impact": "trust proxy 1 made req.ip the edge (212.102.36.193/.194) on prod and staging.",
+      "status": "fixed",
+      "fixedAt": "2026-10-04",
+      "fixedIn": "c3fc0278b",
+      "fix": "trustProxyHops 2. Test: tests/unit/avatar-and-idea-spend-limits.test.ts"
+    },
+    {
+      "id": "review-ratelimit-admin-peek-ignores-revocation",
+      "title": "apiLimiter admin skip verified only the JWT signature",
+      "reportedAt": "2026-10-04",
+      "source": "Code review 2026-10-04 (tasks/code-review-2026-10/batch 3 leftover), confirmed against current code",
+      "rootCause": "apiLimiter admin skip verified only the JWT signature",
+      "impact": "A revoked or demoted admin token skipped the 100/min cap.",
+      "status": "fixed",
+      "fixedAt": "2026-10-04",
+      "fixedIn": "c3fc0278b",
+      "fix": "Uses verifySession + isAdminActing. Test: tests/unit/avatar-and-idea-spend-limits.test.ts"
     }
   ]
 }
