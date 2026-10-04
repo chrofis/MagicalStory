@@ -2643,6 +2643,54 @@
       "fixedAt": "2026-10-04",
       "fixedIn": "e70eb94e1",
       "fix": "Only failed/cancelled jobs with no reservation, idle 24h; DELETE targets exactly the previewed ids. Test: tests/unit/job-credits.test.ts."
+    },
+    {
+      "id": "referral-cashout-refund-before-debit",
+      "title": "Referral cash-out issued the Stripe refund before debiting the balance, ignored a refused debit, no idempotency key (double cash-out)",
+      "reportedAt": "2026-10-04",
+      "source": "Code review 2026-10-04 (tasks/code-review-2026-10/4-5-payments-auth-trial.md), confirmed against current code",
+      "rootCause": "See review finding.",
+      "impact": "Latent: no production referral balances/users affected as of the review.",
+      "status": "fixed",
+      "fixedAt": "2026-10-04",
+      "fixedIn": "3effe601a",
+      "fix": "Debit first, refund with idempotency key, restore on failure. Test: tests/unit/referral-cashout.test.ts."
+    },
+    {
+      "id": "order-status-leaks-order-row",
+      "title": "Unauthenticated GET /api/stripe/order-status/:sessionId returned SELECT * FROM orders (name, address, email)",
+      "reportedAt": "2026-10-04",
+      "source": "Code review 2026-10-04 (tasks/code-review-2026-10/4-5-payments-auth-trial.md), confirmed against current code",
+      "rootCause": "See review finding.",
+      "impact": "Latent: no production referral balances/users affected as of the review.",
+      "status": "fixed",
+      "fixedAt": "2026-10-04",
+      "fixedIn": "6de97de14",
+      "fix": "Anonymous: amount/currency/tokens only; owner gets recipient details. Test: tests/unit/order-status-view.test.ts."
+    },
+    {
+      "id": "self-referral-same-inbox",
+      "title": "Self-referral check compared user ids only; a second account of the same inbox earned the discount and cashback",
+      "reportedAt": "2026-10-04",
+      "source": "Code review 2026-10-04 (tasks/code-review-2026-10/4-5-payments-auth-trial.md), confirmed against current code",
+      "rootCause": "See review finding.",
+      "impact": "Latent: no production referral balances/users affected as of the review.",
+      "status": "fixed",
+      "fixedAt": "2026-10-04",
+      "fixedIn": "6de97de14",
+      "fix": "Normalised email comparison. Test: tests/unit/referral-self-email.test.ts."
+    },
+    {
+      "id": "paid-book-orders-stuck-and-unpaid-grants",
+      "title": "Paid book orders stuck in processing after a restart with no alert; completed webhook granted without payment_status paid; referred_by never released; post-payment referral failures dropped; admin retry-print-order dead/wrong",
+      "reportedAt": "2026-10-04",
+      "source": "Code review 2026-10-04 (tasks/code-review-2026-10/4-5-payments-auth-trial.md), confirmed against current code",
+      "rootCause": "See review finding.",
+      "impact": "Latent: no production referral balances/users affected as of the review.",
+      "status": "fixed",
+      "fixedAt": "2026-10-04",
+      "fixedIn": "262c58788",
+      "fix": "paid-only gate + async events, stuck-order sweep, has_issue widened, durable stripe_webhook_retry rows, referral claim release, retry rebuilt on processBookOrder. Test: tests/unit/stripe-post-payment.test.ts."
     }
   ]
 }
