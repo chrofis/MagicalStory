@@ -15,9 +15,9 @@ import type { Character } from '@/types/character';
 
 const ageOf = (c: Character): number => parseInt(c.age, 10) || 0;
 
-/** How many mains the server counts for a cast of this size (excluded characters not counted). */
+/** How many mains the server counts for a cast of this size (excluded characters not counted): 1 for up to 2 characters, 2 for 3 or more (owner 2026-10-04). */
 export function mainLimit(inStoryCount: number): number {
-  return Math.max(1, Math.min(2, Math.floor(inStoryCount / 2) || 1));
+  return inStoryCount <= 2 ? 1 : 2;
 }
 
 export interface MainSelection {

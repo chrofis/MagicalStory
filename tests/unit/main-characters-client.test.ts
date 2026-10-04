@@ -7,8 +7,8 @@ const Lio = ch(1790699593024, 'Lio', '4');
 const Noam = ch(1790606665421, 'Noam', '2');
 
 describe('mainLimit', () => {
-  it('1 for 1-3 characters, 2 for 4+', () => {
-    expect([1, 2, 3, 4, 5, 7].map(mainLimit)).toEqual([1, 1, 1, 2, 2, 2]);
+  it('1 for 1-2 characters, 2 for 3+', () => {
+    expect([1, 2, 3, 4, 5, 7].map(mainLimit)).toEqual([1, 1, 2, 2, 2, 2]);
   });
 });
 
@@ -45,8 +45,8 @@ describe('pickMainCharacters (client mirror)', () => {
 
 describe('addMainCharacter', () => {
   it('limit 1: radio swap, previous main is dropped', () => {
+    expect(addMainCharacter(1, [Noam.id], Lio.id)).toEqual([Lio.id]);
     expect(addMainCharacter(2, [Noam.id], Lio.id)).toEqual([Lio.id]);
-    expect(addMainCharacter(3, [Noam.id], Lio.id)).toEqual([Lio.id]);
   });
   it('limit 2: second main appends, third is refused (button disabled)', () => {
     expect(addMainCharacter(4, [1], 2)).toEqual([1, 2]);
@@ -61,16 +61,30 @@ describe('addMainCharacter', () => {
 });
 
 describe('trimMainCharacters', () => {
-  it('cast shrinks 4 -> 3: keeps the first-selected main only', () => {
-    expect(trimMainCharacters([1, 2, 3], [2, 1])).toEqual([2]);
+  it('cast shrinks 3 -> 2: keeps the first-selected main only', () => {
+    expect(trimMainCharacters([1, 2], [2, 1])).toEqual([2]);
   });
   it('stored roles above the limit on load are trimmed', () => {
     expect(trimMainCharacters([Noam.id, Lio.id], [Noam.id, Lio.id])).toEqual([Noam.id]);
     expect(trimMainCharacters([1, 2, 3, 4, 5], [1, 2, 3])).toEqual([1, 2]);
+    expect(trimMainCharacters([1, 2, 3], [1, 2])).toEqual([1, 2]);
   });
   it('drops mains that are no longer in the story, within-limit mains untouched', () => {
     expect(trimMainCharacters([1, 2, 3, 4], [9, 2])).toEqual([2]);
     expect(trimMainCharacters([1, 2, 3, 4], [1, 2])).toEqual([1, 2]);
+  });
+});
+
+describe('server pickMainCharacters cap', () => {
+  it('1 / 2 / 3 / 5 characters -> 1 / 1 / 2 / 2 mains, oldest first, all declared', () => {
+    const mod: any = serverPicker;
+    const mk = (n: number) => Array.from({ length: n }, (_, i) => ch(i + 1, 'C' + i, String(2 + i * 3)));
+    for (const [n, want] of [[1, 1], [2, 1], [3, 2], [5, 2]] as const) {
+      const chars = mk(n);
+      const r = mod.pickMainCharacters({ characters: chars, mainCharacters: chars.map(c => c.id) });
+      expect(r.mains).toHaveLength(want);
+      expect(r.mains[0].id).toBe(chars[n - 1].id);
+    }
   });
 });
 

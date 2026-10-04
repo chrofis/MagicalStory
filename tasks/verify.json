@@ -4789,7 +4789,7 @@
         "(this push)"
       ],
       "addedAt": "2026-10-04",
-      "claim": "On staging /create step 2: the info text above the cards explains Hauptrolle and the limit; a new account with 2 children gets only the first-created child as Hauptrolle; with 2-3 characters, clicking Hauptrolle on another moves it (previous becomes Dabei); with 4+ characters a third Hauptrolle button is disabled with a tooltip; setting a main to Nicht dabei so the cast drops below 4 leaves only the first-selected main; the blue line under the grid reads 'Geschrieben für N-Jährige (Name, ...)' with the oldest main's age, matching the age band of the generated story. Reloading keeps the roles.",
+      "claim": "On staging /create step 2: the info text above the cards explains Hauptrolle and the limit; a new account with 2 children gets only the first-created child as Hauptrolle; with 1-2 characters, clicking Hauptrolle on another moves it (previous becomes Dabei); with 3+ characters a third Hauptrolle button is disabled with a tooltip; setting a main to Nicht dabei so the cast drops to 2 leaves only the first-selected main; the blue line under the grid reads 'Geschrieben für N-Jährige (Name, ...)' with the oldest main's age, matching the age band of the generated story. Reloading keeps the roles. Server: a 3-character story with 2 declared mains is written for the oldest of the two (check the age band in the story's prompt or log); a 2-character story with one main is written for that main.",
       "runShape": [
         "any"
       ],
