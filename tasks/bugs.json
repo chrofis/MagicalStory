@@ -2583,6 +2583,66 @@
       "fixedAt": "2026-10-04",
       "fixedIn": "5933f5926",
       "fix": "POST /api/trial/create-story answers TRIAL_USED with the visitor's newest trial job (jobId + status, buildTrialUsedResponse); TrialGenerationPage adopts it, stores it and resumes polling; the bare-form branch is deleted. Test: tests/unit/trial-reload-and-art-style.test.ts. Real reload re-verified on staging after push."
+    },
+    {
+      "id": "credit-debits-skip-returning",
+      "title": "Cover/page iterate, character repair and repaint-title debit credits without RETURNING and log a ledger row even when nothing was charged; character repair pre-checks one page but charges per page",
+      "reportedAt": "2026-10-04",
+      "source": "Code review 2026-10-04 (tasks/code-review-2026-10/), confirmed against current code",
+      "rootCause": "regeneration.js (3 sites) and stories.js repaint-title ran UPDATE ... credits >= $1 and ignored the row count; repaint-title read the balance before the paid call.",
+      "impact": "Free renders under concurrency or multi-page repair; ledger rows with false balances.",
+      "status": "fixed",
+      "fixedAt": "2026-10-04",
+      "fixedIn": "e70eb94e1",
+      "fix": "All use chargeCredits (atomic, ledger only on success); repaint-title reserves before the call and refunds when not painted; character-repair pre-check covers the requested page count. Test: tests/unit/job-credits.test.ts."
+    },
+    {
+      "id": "paid-regen-edit-versions-unpinned",
+      "title": "Paid scene regenerate/image and edit/image versions are not pinned, so reloads/PDF/print can show the old picture",
+      "reportedAt": "2026-10-04",
+      "source": "Code review 2026-10-04 (tasks/code-review-2026-10/), confirmed against current code",
+      "rootCause": "Both routes left the active version to recomputeActiveVersion (best score wins).",
+      "impact": "User is charged and the book keeps the old image.",
+      "status": "fixed",
+      "fixedAt": "2026-10-04",
+      "fixedIn": "e70eb94e1",
+      "fix": "Both pin the new version with setActiveVersion(..., { pinned: true }). Test: tests/unit/job-credits.test.ts."
+    },
+    {
+      "id": "job-refund-not-transactional-and-unguarded",
+      "title": "Failure/stale/zombie refunds claim credits_reserved and credit the user in separate statements; cancel can refund a saving job and flip completed to cancelled; an error after a cancel overwrites cancelled with failed and sends failure emails",
+      "reportedAt": "2026-10-04",
+      "source": "Code review 2026-10-04 (tasks/code-review-2026-10/), confirmed against current code",
+      "rootCause": "Claim, credit and ledger were separate pool queries; cancel's claim and status write had no status/progress guard; failure writes had no status <> 'cancelled' guard.",
+      "impact": "Lost reservations on a crash; free story on a late cancel; wrong status and emails for cancelled jobs.",
+      "status": "fixed",
+      "fixedAt": "2026-10-04",
+      "fixedIn": "e70eb94e1",
+      "fix": "settleJobWithRefund does status flip + claim + credit + ledger in one transaction with guards; pipeline writes a saving marker (progress 99) that cancel refuses; outer catch skips partial save and emails for cancelled jobs. Test: tests/unit/job-credits.test.ts."
+    },
+    {
+      "id": "create-story-one-job-check-not-atomic",
+      "title": "The one-job-at-a-time check in create-story is SELECT then a later INSERT, so concurrent requests with different idempotency keys both run",
+      "reportedAt": "2026-10-04",
+      "source": "Code review 2026-10-04 (tasks/code-review-2026-10/), confirmed against current code",
+      "rootCause": "No lock or constraint between the check and the INSERT.",
+      "impact": "Two paid jobs for one user at once.",
+      "status": "fixed",
+      "fixedAt": "2026-10-04",
+      "fixedIn": "e70eb94e1",
+      "fix": "Per-user advisory transaction lock plus an in-transaction re-check inside the reserve transaction (409 on conflict). Test: tests/unit/job-credits.test.ts."
+    },
+    {
+      "id": "cleanup-orphaned-jobs-deletes-running-jobs",
+      "title": "Admin cleanup-orphaned-jobs deletes every pending/processing job (their stories row does not exist yet) and its reservation; DELETE is not limited to the previewed 100",
+      "reportedAt": "2026-10-04",
+      "source": "Code review 2026-10-04 (tasks/code-review-2026-10/), confirmed against current code",
+      "rootCause": "Orphan = no stories row; a stories row is only written at the end of a run.",
+      "impact": "Live jobs and their credits destroyed.",
+      "status": "fixed",
+      "fixedAt": "2026-10-04",
+      "fixedIn": "e70eb94e1",
+      "fix": "Only failed/cancelled jobs with no reservation, idle 24h; DELETE targets exactly the previewed ids. Test: tests/unit/job-credits.test.ts."
     }
   ]
 }
