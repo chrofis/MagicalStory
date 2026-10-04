@@ -2571,6 +2571,15 @@
       "fixedAt": "2026-10-04",
       "fixedIn": "4d8cce94e",
       "fix": "Trial page path calls buildSceneClothingRequirements (name-tolerant, no standard default); cover paths and clothingResolve readers use resolveCharacterReqs. Replay of stored LUNA: p1-p5 costumed, p6 standard. Tests: tests/unit/trial-page-clothing-name-spelling.test.ts. Verify: trial-page-clothing-name-spelling."
+    },
+    {
+      "id": "gelato-shipped-email-needs-shipped-status",
+      "title": "Customer never gets the tracking email when Gelato reports the parcel on 'printed' and never sends 'shipped'",
+      "reportedAt": "2026-10-04",
+      "source": "Prod order 99 (gelato f1feedfd-30de-4c79-b3a2-c013435494a0): Railway webhook log shows only four order_status_updated events (uploading, processing, printing, printed 2026-10-01 06:14 UTC); DB has tracking_number 996008154400058714 but gelato_status=printed, shipped_at NULL; Gelato API still says printed with shipment.packages[0].trackingCode set.",
+      "rootCause": "server.js Gelato webhook sent the shipped email (and set shipped_at) only when fulfillmentStatus === 'shipped'. The tracking code arrives on the 'printed' event, so it was stored without any email or shipped_at.",
+      "impact": "Customer of order 99 got no shipping notification. Order 98 and earlier were unaffected (Gelato sent 'shipped'); order 99 is the only order in this state.",
+      "status": "open"
     }
   ]
 }
