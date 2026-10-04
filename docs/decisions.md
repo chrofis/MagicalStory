@@ -43,7 +43,34 @@ superseded and link forward.
 
 **Touched:** server/lib/sheetJudgeArms.js, server/lib/character2x4Sheet.js (`imageLabels`), server/lib/judgeFixtures.js, server/lib/testlab.js (`sheet_style` fixture replay, `avatar_redress`), server/lib/styledAvatars.js (`approvedBaseSheetFor`), scripts/admin/judge-fixtures.js (`--params`, member note), client/src/pages/TestLab.tsx, client/src/services/testlabService.ts, tests/judge-fixtures/fixtures.json, docs/judge-fixtures.md, tests/unit/sheet-judge-arms.test.ts
 
-**Status:** 🟡 built. The measurement waits on the staging deploy of this branch, which carries the wardrobe-variant fix (TASK 10) it depends on. Results and the recommended arm will be added here.
+**Measured 2026-10-04** on staging build f5b9d0b3. 14 fixtures (8 flag, 6 pass), each arm run twice, so 16 flag runs and 12 pass runs per arm.
+- Two Lab variants were added after Lab #1596 (`avatar_redress`, $0.04):
+  - Kiaan jacket-off: pass. It faithfully matches its base.
+  - Fiona coat-off: flag on `layout`. Head cell 4 lost its rear turn, and the head framing widened.
+- Per-arm reports are in `tests/judge-fixtures/baselines/2026-10-04-sheet-style-<arm>.json`.
+
+| arm | Lab | recall | false alarm | flips | ghost figures | garment still on | photographic base | captions | variant layout | good sheets | cost |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| current | #1597 #1598 | 7/16 (44%) | 0/12 | 1/14 | 6/6 | 1/4 | 0/2 | 0/2 | 0/2 | 12/12 | $0.090 |
+| A | #1599 #1600 | 8/16 (50%) | 0/12 | 0/14 | 6/6 | 2/4 | 0/2 | 0/2 | 0/2 | 12/12 | $0.091 |
+| AB | #1603 #1604 | 7/16 (44%) | 0/12 | 1/14 | 6/6 | 1/4 | 0/2 | 0/2 | 0/2 | 12/12 | $0.091 |
+| ABC | #1605 #1606 | 6/16 (38%) | 0/12 | 0/14 | 6/6 | 0/4 | 0/2 | 0/2 | 0/2 | 12/12 | $0.093 |
+| D | #1607 #1608 | 6/16 (38%) | 0/12 | 0/14 | 6/6 | 0/4 | 0/2 | 0/2 | 0/2 | 12/12 | $0.096 |
+
+AB was first fired as #1601/#1602 ($0.06). Another session's staging deploy killed both runs at 9/14 ("reaped by the idle probe"), so they are not scored.
+
+**Verdict: no arm adopted.** Production stays `current`.
+- B, C and D buy nothing: no extra catch on the photographic base, the captions or the variant's layout. ABC and D lose the one garment control A caught. A gains one fixture-repeat over `current`, which is within noise at n=14.
+- The judge's own words (Lab cards) show why: it is not failing to look, it is excusing what it sees, or reciting.
+  - **Captions.** Arm A names them ("'FRONT', 'THREE-QUARTER', 'PROFILE', 'REAR TURN' are present as captions, matching Image 2"), then scores background 9; arm D calls them "part of the sheet template". The Pass-1 sheet carries the same captions, and "matches Image 2" overrides TASK 8.
+  - **Garment still on.** `current` says "No garments were requested to be taken off"; arm A quotes TASK 10's own clause "Image 2 still wears it; TASK 9 does not score it" as its reason for 9. That clause, shipped today in a1bb22596, is read as an exemption. Arm D instead reports "a light blue shirt is outermost" on a sheet showing the jacket.
+  - **Medium and framing.** These stay recitals: "paint washes" in all 8 cells of the near-photographic base, and "rear turn, chest vs Image 2 rear turn, chest" for a cell that is a plain back view.
+
+**Open:**
+- The TASK 10 wording lets the variant gate pass a sheet that still wears the garment (1 of 4 control runs caught on `current`). It needs a reworded task, and that eval-prompt change is the owner's call.
+- The next candidates to measure on these same fixtures: a separate single-question check per removed garment; making "matches Image 2" no excuse for TASK 8 and TASK 10; more pixels per cell (judging the rows separately).
+
+**Status:** 🟡 measured, not adopted. Total spend $0.56, against a CHF 1.00 cap.
 
 ---
 

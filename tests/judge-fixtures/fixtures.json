@@ -1329,6 +1329,49 @@
         "verdict": "pass"
       },
       "source": "Julian standard base, styledAvatarGeneration[3] pass-2 output. Viewed in full 2026-10-04: watercolor in all 8 cells, consistent dungarees and jumper, one figure, plain paper."
+    },
+    {
+      "id": "sheet-z3fw660ie-fiona-coat-off-lab1596",
+      "judge": "sheet_style",
+      "target": {
+        "storyId": "job_1790446348343_z3fw660ie",
+        "character": "Fiona"
+      },
+      "input": {
+        "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790446348343_z3fw660ie/tl_avatar/cover/v0.jpg",
+        "entryIndex": 0,
+        "removedGarments": [
+          "dark grey wool pirate coat"
+        ],
+        "baseImageUrl": "https://images-staging.magicalstory.ch/characters/680c30fd-2839-4c23-b00c-b91603352a6d/characters_680c30fd-2839-4c23-b00c-b9160/inline/characters-8-avatars-styledAvatars-watercolor-costumed-default.jpg"
+      },
+      "expect": {
+        "verdict": "flag",
+        "types": [
+          "layout"
+        ]
+      },
+      "source": "Coat-off variant made by Lab #1596 (avatar_redress, production redress). Viewed 2026-10-04 next to its base: the coat is gone in all 8 cells, but head cell 4 lost the rear turn (back of the head only, where the base shows her face over the shoulder), and the head cells are framed to the hips instead of mid-torso. Its near-photographic look is inherited from the base, so style is not the defect of this variant; layout is."
+    },
+    {
+      "id": "sheet-atbttop6w-kiaan-jacket-off-lab1596",
+      "judge": "sheet_style",
+      "target": {
+        "storyId": "job_1791040103540_atbttop6w",
+        "character": "Kiaan"
+      },
+      "input": {
+        "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1791040103540_atbttop6w/tl_avatar/cover/v0.jpg",
+        "entryIndex": 2,
+        "removedGarments": [
+          "autumn jacket"
+        ],
+        "baseImageUrl": "https://images-staging.magicalstory.ch/characters/680c30fd-2839-4c23-b00c-b91603352a6d/characters_680c30fd-2839-4c23-b00c-b9160/inline/characters-14-avatars-styledAvatars-watercolor-standard.jpg"
+      },
+      "expect": {
+        "verdict": "pass"
+      },
+      "source": "Jacket-off variant made by Lab #1596 (avatar_redress, production redress). Viewed 2026-10-04 next to its base: the jacket is gone in all 8 cells, a dark grey long-sleeved top is outermost, and face, hair, trousers, boots, medium, framing and the rear turn all match the approved base. Its head row is framed to the thighs, as the approved base is; a variant judged against its base should pass."
     }
   ]
 }

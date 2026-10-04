@@ -1,0 +1,343 @@
+{
+  "base": "https://staging.magicalstory.ch",
+  "experiments": [
+    1597,
+    1598
+  ],
+  "repeats": 2,
+  "params": {
+    "arm": "current"
+  },
+  "ranAt": "2026-10-04T19:11:14.061Z",
+  "costUsd": 0.0897,
+  "summary": {
+    "judges": {
+      "sheet_style": {
+        "fixtures": 14,
+        "runs": 28,
+        "tp": 7,
+        "fn": 9,
+        "tn": 12,
+        "fp": 0,
+        "errors": 0,
+        "flipped": 1,
+        "repeated": 14,
+        "recall": 0.4375,
+        "precision": 1,
+        "falseAlarmRate": 0,
+        "flipRate": 0.07142857142857142
+      }
+    },
+    "overall": {
+      "fixtures": 14,
+      "runs": 28,
+      "tp": 7,
+      "fn": 9,
+      "tn": 12,
+      "fp": 0,
+      "errors": 0,
+      "flipped": 1,
+      "repeated": 14,
+      "recall": 0.4375,
+      "precision": 1,
+      "falseAlarmRate": 0,
+      "flipRate": 0.07142857142857142
+    }
+  },
+  "entries": [
+    {
+      "fixtureId": "sheet-z3fw660ie-fiona-base-photographic",
+      "judge": "sheet_style",
+      "experimentId": 1597,
+      "outcome": "FN",
+      "expected": "flag",
+      "said": [],
+      "costUsd": 0.0031067,
+      "costBasis": "measured (input + output + thinking, every call incl. a re-ask)"
+    },
+    {
+      "fixtureId": "sheet-atbttop6w-max-base-caption-lettering",
+      "judge": "sheet_style",
+      "experimentId": 1597,
+      "outcome": "FN",
+      "expected": "flag",
+      "said": [],
+      "costUsd": 0.0032539,
+      "costBasis": "measured (input + output + thinking, every call incl. a re-ask)"
+    },
+    {
+      "fixtureId": "sheet-cwyvu3y8p-mia-attempt-ghost-figures",
+      "judge": "sheet_style",
+      "experimentId": 1597,
+      "outcome": "TP",
+      "expected": "flag",
+      "said": [
+        "[-|solo] There are additional faint, ghosted figures in the background of Image 3, particularly in the top right and bottom right cells, which are not present in Image 2. This includes an older woman's face and an older man's face in the top row, and other faint figures in the bottom row."
+      ],
+      "costUsd": 0.0033914,
+      "costBasis": "measured (input + output + thinking, every call incl. a re-ask)"
+    },
+    {
+      "fixtureId": "sheet-5herh01j7-julian-attempt-ghost-figures",
+      "judge": "sheet_style",
+      "experimentId": 1597,
+      "outcome": "TP",
+      "expected": "flag",
+      "said": [
+        "[-|solo] There are multiple additional people (adults and a child) in the background of the full-body cells (cells 5-8), which is a significant deviation from the single subject requirement."
+      ],
+      "costUsd": 0.0035064000000000002,
+      "costBasis": "measured (input + output + thinking, every call incl. a re-ask)"
+    },
+    {
+      "fixtureId": "sheet-n9wrh5u0j-sarah-attempt-ghost-figures",
+      "judge": "sheet_style",
+      "experimentId": 1597,
+      "outcome": "TP",
+      "expected": "flag",
+      "said": [
+        "[-|solo] Multiple additional figures are present in the background of Image 3, including a child in the bottom left, an older woman in the top middle, and an older man in the top right. These figures are not present in Image 2."
+      ],
+      "costUsd": 0.0033192,
+      "costBasis": "measured (input + output + thinking, every call incl. a re-ask)"
+    },
+    {
+      "fixtureId": "sheet-atbttop6w-kiaan-jacket-still-on",
+      "judge": "sheet_style",
+      "experimentId": 1597,
+      "outcome": "FN",
+      "expected": "flag",
+      "said": [],
+      "costUsd": 0.0031518999999999996,
+      "costBasis": "measured (input + output + thinking, every call incl. a re-ask)"
+    },
+    {
+      "fixtureId": "sheet-z3fw660ie-fiona-coat-still-on",
+      "judge": "sheet_style",
+      "experimentId": 1597,
+      "outcome": "FN",
+      "expected": "flag",
+      "said": [],
+      "costUsd": 0.0030805999999999997,
+      "costBasis": "measured (input + output + thinking, every call incl. a re-ask)"
+    },
+    {
+      "fixtureId": "sheet-qfrcuuf2m-mia-base-clean",
+      "judge": "sheet_style",
+      "experimentId": 1597,
+      "outcome": "TN",
+      "expected": "pass",
+      "said": [],
+      "costUsd": 0.0031239,
+      "costBasis": "measured (input + output + thinking, every call incl. a re-ask)"
+    },
+    {
+      "fixtureId": "sheet-ar4u7qry3-emma-base-clean",
+      "judge": "sheet_style",
+      "experimentId": 1597,
+      "outcome": "TN",
+      "expected": "pass",
+      "said": [],
+      "costUsd": 0.0030789000000000003,
+      "costBasis": "measured (input + output + thinking, every call incl. a re-ask)"
+    },
+    {
+      "fixtureId": "sheet-dka3jpog9-levin-base-clean",
+      "judge": "sheet_style",
+      "experimentId": 1597,
+      "outcome": "TN",
+      "expected": "pass",
+      "said": [],
+      "costUsd": 0.0031514,
+      "costBasis": "measured (input + output + thinking, every call incl. a re-ask)"
+    },
+    {
+      "fixtureId": "sheet-dka3jpog9-kiaan-base-clean",
+      "judge": "sheet_style",
+      "experimentId": 1597,
+      "outcome": "TN",
+      "expected": "pass",
+      "said": [],
+      "costUsd": 0.0030664,
+      "costBasis": "measured (input + output + thinking, every call incl. a re-ask)"
+    },
+    {
+      "fixtureId": "sheet-dka3jpog9-julian-base-clean",
+      "judge": "sheet_style",
+      "experimentId": 1597,
+      "outcome": "TN",
+      "expected": "pass",
+      "said": [],
+      "costUsd": 0.0030964,
+      "costBasis": "measured (input + output + thinking, every call incl. a re-ask)"
+    },
+    {
+      "fixtureId": "sheet-z3fw660ie-fiona-coat-off-lab1596",
+      "judge": "sheet_style",
+      "experimentId": 1597,
+      "outcome": "FN",
+      "expected": "flag",
+      "said": [],
+      "costUsd": 0.0030506,
+      "costBasis": "measured (input + output + thinking, every call incl. a re-ask)"
+    },
+    {
+      "fixtureId": "sheet-atbttop6w-kiaan-jacket-off-lab1596",
+      "judge": "sheet_style",
+      "experimentId": 1597,
+      "outcome": "TN",
+      "expected": "pass",
+      "said": [],
+      "costUsd": 0.0032543999999999997,
+      "costBasis": "measured (input + output + thinking, every call incl. a re-ask)"
+    },
+    {
+      "fixtureId": "sheet-z3fw660ie-fiona-base-photographic",
+      "judge": "sheet_style",
+      "experimentId": 1598,
+      "outcome": "FN",
+      "expected": "flag",
+      "said": [],
+      "costUsd": 0.0031441999999999998,
+      "costBasis": "measured (input + output + thinking, every call incl. a re-ask)"
+    },
+    {
+      "fixtureId": "sheet-atbttop6w-max-base-caption-lettering",
+      "judge": "sheet_style",
+      "experimentId": 1598,
+      "outcome": "FN",
+      "expected": "flag",
+      "said": [],
+      "costUsd": 0.0032664,
+      "costBasis": "measured (input + output + thinking, every call incl. a re-ask)"
+    },
+    {
+      "fixtureId": "sheet-cwyvu3y8p-mia-attempt-ghost-figures",
+      "judge": "sheet_style",
+      "experimentId": 1598,
+      "outcome": "TP",
+      "expected": "flag",
+      "said": [
+        "[-|solo] There are additional faint, ghosted figures in the background of Image 3, particularly in the top row and bottom row, which are not present in Image 2. These include adult figures and partial figures."
+      ],
+      "costUsd": 0.0033364,
+      "costBasis": "measured (input + output + thinking, every call incl. a re-ask)"
+    },
+    {
+      "fixtureId": "sheet-5herh01j7-julian-attempt-ghost-figures",
+      "judge": "sheet_style",
+      "experimentId": 1598,
+      "outcome": "TP",
+      "expected": "flag",
+      "said": [
+        "[-|solo] There are multiple additional people (adults and a child) in the background of the full-body cells (cells 5-8), which is a significant deviation from the single subject requirement."
+      ],
+      "costUsd": 0.0035064000000000002,
+      "costBasis": "measured (input + output + thinking, every call incl. a re-ask)"
+    },
+    {
+      "fixtureId": "sheet-n9wrh5u0j-sarah-attempt-ghost-figures",
+      "judge": "sheet_style",
+      "experimentId": 1598,
+      "outcome": "TP",
+      "expected": "flag",
+      "said": [
+        "[-|solo] Multiple additional figures are present in the background of Image 3, including a child in the bottom left, an older woman in the top middle, and an older man in the top right. These figures are not present in Image 2."
+      ],
+      "costUsd": 0.0033192,
+      "costBasis": "measured (input + output + thinking, every call incl. a re-ask)"
+    },
+    {
+      "fixtureId": "sheet-atbttop6w-kiaan-jacket-still-on",
+      "judge": "sheet_style",
+      "experimentId": 1598,
+      "outcome": "FN",
+      "expected": "flag",
+      "said": [],
+      "costUsd": 0.0033269,
+      "costBasis": "measured (input + output + thinking, every call incl. a re-ask)"
+    },
+    {
+      "fixtureId": "sheet-z3fw660ie-fiona-coat-still-on",
+      "judge": "sheet_style",
+      "experimentId": 1598,
+      "outcome": "TP",
+      "expected": "flag",
+      "said": [
+        "[-|removed] dark grey wool pirate coat is visible in all 8 cells. It was not removed. The outermost garment is the dark grey wool pirate coat."
+      ],
+      "costUsd": 0.0032431,
+      "costBasis": "measured (input + output + thinking, every call incl. a re-ask)"
+    },
+    {
+      "fixtureId": "sheet-qfrcuuf2m-mia-base-clean",
+      "judge": "sheet_style",
+      "experimentId": 1598,
+      "outcome": "TN",
+      "expected": "pass",
+      "said": [],
+      "costUsd": 0.0031239,
+      "costBasis": "measured (input + output + thinking, every call incl. a re-ask)"
+    },
+    {
+      "fixtureId": "sheet-ar4u7qry3-emma-base-clean",
+      "judge": "sheet_style",
+      "experimentId": 1598,
+      "outcome": "TN",
+      "expected": "pass",
+      "said": [],
+      "costUsd": 0.0032514,
+      "costBasis": "measured (input + output + thinking, every call incl. a re-ask)"
+    },
+    {
+      "fixtureId": "sheet-dka3jpog9-levin-base-clean",
+      "judge": "sheet_style",
+      "experimentId": 1598,
+      "outcome": "TN",
+      "expected": "pass",
+      "said": [],
+      "costUsd": 0.0031289,
+      "costBasis": "measured (input + output + thinking, every call incl. a re-ask)"
+    },
+    {
+      "fixtureId": "sheet-dka3jpog9-kiaan-base-clean",
+      "judge": "sheet_style",
+      "experimentId": 1598,
+      "outcome": "TN",
+      "expected": "pass",
+      "said": [],
+      "costUsd": 0.0030289,
+      "costBasis": "measured (input + output + thinking, every call incl. a re-ask)"
+    },
+    {
+      "fixtureId": "sheet-dka3jpog9-julian-base-clean",
+      "judge": "sheet_style",
+      "experimentId": 1598,
+      "outcome": "TN",
+      "expected": "pass",
+      "said": [],
+      "costUsd": 0.0030964,
+      "costBasis": "measured (input + output + thinking, every call incl. a re-ask)"
+    },
+    {
+      "fixtureId": "sheet-z3fw660ie-fiona-coat-off-lab1596",
+      "judge": "sheet_style",
+      "experimentId": 1598,
+      "outcome": "FN",
+      "expected": "flag",
+      "said": [],
+      "costUsd": 0.0030506,
+      "costBasis": "measured (input + output + thinking, every call incl. a re-ask)"
+    },
+    {
+      "fixtureId": "sheet-atbttop6w-kiaan-jacket-off-lab1596",
+      "judge": "sheet_style",
+      "experimentId": 1598,
+      "outcome": "TN",
+      "expected": "pass",
+      "said": [],
+      "costUsd": 0.0032543999999999997,
+      "costBasis": "measured (input + output + thinking, every call incl. a re-ask)"
+    }
+  ]
+}
