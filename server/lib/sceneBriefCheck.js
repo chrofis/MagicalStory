@@ -256,7 +256,9 @@ function checkPlanCastCited(page, metadata, visualBible) {
 function checkCoverLocations(pages = [], visualBible = null) {
   const { isCoverPage } = require('./coverBeats');
   const covers = (pages || [])
-    .filter(p => p && isCoverPage(p.pageNumber))
+    // A cover whose place code decided (`placeDecided`, the Jev path) is held
+    // to that decision by the pin, never to this rule — it is not compared.
+    .filter(p => p && isCoverPage(p.pageNumber) && !p.placeDecided)
     .sort((a, b) => b.pageNumber - a.pageNumber) // -1, -2, -3
     .map((p) => {
       const meta = p.metadata || extractSceneMetadata(String(p.brief || ''));

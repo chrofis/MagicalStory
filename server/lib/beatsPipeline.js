@@ -1669,7 +1669,11 @@ async function runArtDirector({ inputData, modelOverrides, clothingRequirements,
   // text writer or the plan counters — `beats` stays the story.
   const { buildCoverBeats } = require('./coverBeats');
   const { coverTypesFor } = require('./coverKeys');
-  const coverBeats = buildCoverBeats(inputData, { coverTypes: coverTypesFor(inputData), clothingRequirements, centralFigure: arcCentralFigure });
+  // On the Jev path code decides each cover's place after the Visual Bible
+  // (decideCoverPlaces below), so the beat names none; a cover left undecided
+  // gets the Art Director's own-place rule back before the page-brief call.
+  const coverBeatOpts = { coverTypes: coverTypesFor(inputData), clothingRequirements, centralFigure: arcCentralFigure };
+  const coverBeats = buildCoverBeats(inputData, { ...coverBeatOpts, placeDecided: jevActive(jevReport) });
   const briefBeats = [...beats, ...coverBeats];
   const beatPageNumbers = briefBeats.map(b => b.pageNumber);
   // The head count each story page's brief checks read (cast_not_in_plan): the
@@ -1841,6 +1845,46 @@ ${bibleBody}` : bibleBody;
     // field itself. No brief exists yet, so only the records are cleared.
     for (const b of beats) delete b.jevFixed;
     jevFallBack(jevReport, 'brief_fields', err, gl);
+  }
+
+  // ── The covers' places (Jev ranks, code makes them distinct) ─────────────
+  // Owner, 2026-10-04: each cover gets a wide / ultra-wide vantage of a place
+  // the story's pages stand on, a different one per cover while they last.
+  // The result is the cover beat's location-only FIXED field (pinned like a
+  // story page's location) and the covers' pages in the bible's tables.
+  if (jevActive(jevReport) && coverBeats.length) try {
+    const { decideCoverPlaces, applyCoverPlacePages } = require('./jevBriefFields');
+    const places = await decideCoverPlaces({ arc: approvedArc, pages: beats, visualBible, coverKeys: coverBeats.map(cb => cb.coverKey) });
+    if (jevReport) jevReport.coverPlaces = places;
+    if (!places.covers.length) {
+      log.error(`🚨 [BEATS] No cover place decided: ${places.reason} — the covers keep the Art Director's own-place rule`);
+      gl.error('beats_cover_place_unassigned', `No cover place decided: ${places.reason} — the Art Director picks each cover's place under the own-place rule`, null, { reason: places.reason });
+    }
+    const citeByPage = new Map();
+    for (const c of places.covers) {
+      const cb = coverBeats.find(b => b.coverKey === c.coverKey);
+      cb.jevFixed = { coverPlace: true, location: c.cite, labels: { [c.cite]: c.label } };
+      citeByPage.set(Number(cb.pageNumber), c.cite);
+    }
+    if (visualBible && applyCoverPlacePages(visualBible, citeByPage) && bibleSections) {
+      const synced = syncVisualBibleSection(bibleSections, visualBible);
+      if (synced === bibleSections) gl.warn('beats_vb_sync_failed', 'The covers\' decided places could not be written back into the transcript');
+      else bibleSections = synced;
+    }
+    gl.info('beats_jev_cover_places', `Cover places by Jev + code: ${places.covers.map(c => `p${coverBeats.find(b => b.coverKey === c.coverKey).pageNumber} ${c.cite} (${c.p}${c.shared ? ', shared' : ''})`).join(', ') || 'none'} over ${places.candidates.length} wide vantage(s)`, null, { covers: places.covers, candidates: places.candidates, stats: places.stats });
+  } catch (err) {
+    if (!(err instanceof JevDecisionError) || !jevReport) throw err;
+    for (const cb of coverBeats) delete cb.jevFixed;
+    jevFallBack(jevReport, 'cover_places', err, gl);
+  }
+  // A cover whose place code did not decide (the backup, or no candidate)
+  // carries the Art Director's own-place rule into the page-brief call.
+  if (coverBeats.some(cb => !(cb.jevFixed && cb.jevFixed.location))) {
+    const ownRule = buildCoverBeats(inputData, { ...coverBeatOpts, placeDecided: false });
+    for (const cb of coverBeats) {
+      if (cb.jevFixed && cb.jevFixed.location) continue;
+      cb.planLine = ownRule.find(o => o.coverKey === cb.coverKey).planLine;
+    }
   }
 
   // ── Call 2: every page's brief ───────────────────────────────────────────
@@ -3257,6 +3301,8 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       outlineCharacters: sm?.characters || [],
       outlineExtract: `PLAN: ${cb.planLine || ''}`,
       wornStateUnresolved: exp.wornStateUnresolved || false,
+      // The cover's decided place (2026-10-04), stored so an iterate rewrite re-pins it.
+      ...(cb.jevFixed ? { jevFixed: cb.jevFixed } : {}),
       ...(vbOverflowByPage.has(exp.pageNumber) ? { vbElementOverflow: vbOverflowByPage.get(exp.pageNumber) } : {}),
     };
   });

@@ -912,7 +912,7 @@
     {
       "id": "cover-beat-vs-brief-check",
       "axis": "generator-vs-critic",
-      "reason": "coverBeats.js writes a full-story cover's beat — every figure looks at the viewer, the copy space as a textPosition (COVER_TEXT_POSITION) — and sceneBriefCheck.js checkCoverBrief holds the Art Director's brief to exactly those facts (cover_gaze_not_viewer, cover_text_zone_mismatch) before the scene review. One constant feeds both; a cover fact added to the beat and not the check is unenforced, and a check the beat never states is a fault the Art Director was never asked to avoid.",
+      "reason": "coverBeats.js writes a full-story cover's beat — every figure looks at the viewer, the copy space as a textPosition (COVER_TEXT_POSITION) — and sceneBriefCheck.js checkCoverBrief holds the Art Director's brief to exactly those facts (cover_gaze_not_viewer, cover_text_zone_mismatch) before the scene review. One constant feeds both; a cover fact added to the beat and not the check is unenforced, and a check the beat never states is a fault the Art Director was never asked to avoid. Since 2026-10-04 the place has two regimes: on the Jev path code decides each cover's vantage (jevBriefFields.decideCoverPlaces, beat says COVER_DECIDED_PLACE, the brief is pinned) and checkCoverLocations skips a `placeDecided` cover; on the backup the beat carries COVER_OWN_PLACE and cover_location_repeated holds the brief to it. Change the regime on both sides at once.",
       "generators": [
         "server/lib/coverBeats.js"
       ],
@@ -1088,6 +1088,19 @@
         "evaluationType: 'cover'"
       ],
       "excludeReason": "evaluationType: 'cover' is the terminator that closes the push block so its body is measured exactly; it is not a record-building site.",
+      "severity": "block"
+    },
+    {
+      "id": "cover-record-carries-decided-place",
+      "axis": "the cover scene vs the stored cover record an iterate reads",
+      "reason": "A full-story cover's decided place (jevFixed, 2026-10-04, jevBriefFields.decideCoverPlaces) rides beatsPipeline's coverScenes into storyJobPipeline's coverImages record, which images.js iteratePageCore reads as the cover's savedScene to re-pin the location after a rewrite. A cover record built without jevFixed lets an iterate move the cover back onto any vantage, silently. The block is measured exactly: `briefedAsPage: true,` closes the record.",
+      "file": "storyJobPipeline.js",
+      "blockPattern": "coverImages\\[raw\\.coverKey\\] = \\{|briefedAsPage: true,",
+      "mustContain": "jevFixed:",
+      "exclude": [
+        "briefedAsPage: true,"
+      ],
+      "excludeReason": "briefedAsPage: true, is the terminator that closes the cover record so its body is measured exactly; it is not a record-building site.",
       "severity": "block"
     },
     {

@@ -5404,6 +5404,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             sceneDescription: raw.sceneDescription,
             sceneMetadata: raw.sceneMetadata || null,
             outlineExtract: raw.scene?.outlineExtract || null,
+            // The cover's decided place (2026-10-04): iteratePageCore re-pins it.
+            jevFixed: raw.scene?.jevFixed || null,
             sceneCharacters: raw.sceneCharacters || null,
             perCharClothing: raw.perCharClothing || null,
             prompt: raw.prompt,

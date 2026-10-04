@@ -205,4 +205,173 @@ function visualBibleJsonOf(bibleSections) {
   return json ? json[1].trim() : '';
 }
 
-module.exports = { decideBriefFields, pinDecidedFields, pageLocations, visualBibleJsonOf };
+// ───────────────────────── THE COVERS' PLACES ─────────────────────────
+
+/**
+ * THE PLACE OF EACH COVER (owner, 2026-10-04: "Jev ranks the cover places,
+ * code makes them distinct"). Q8 (2026-09-28) gave every story page a location
+ * read off the Visual Bible's page tables; the covers kept the Art Director's
+ * own pick under COVER_OWN_PLACE, and the Visual Bible call put all three on
+ * one vantage (staging job_1791040103540_atbttop6w LOC001.1,
+ * job_1790277448294_5herh01j7 LOC001.2). Now, between the Art Director's two
+ * calls:
+ *   candidates  the `wide` / `ultra-wide` vantages of every location a story
+ *               page stands on (pageLocations) — never a close vantage, never a
+ *               place only seen in the distance;
+ *   Jev         one choice call per cover over the candidates, on the arc and
+ *               the page plan (the state of the 2026-10-04 replay);
+ *   code        the assignment: distinct vantages, highest summed probability;
+ *               two covers share one only when the candidates run out.
+ * The result is the cover beat's location-only `jevFixed`, pinned like a story
+ * page's location (jevDecisions.pinBrief), and the covers' pages in the
+ * bible's location / vantage tables.
+ */
+const COVER_PLACE_SHOTS = new Set(['wide', 'ultra-wide']);
+
+const COVER_PLACE_Q = Object.freeze({
+  frontCover: 'The front cover, under the book title: the place and viewpoint that best stands for the whole story — its key place, where the cast can stand together.',
+  initialPage: 'The title page inside the book, the opening picture before page 1: the place and viewpoint where the story begins, where the cast can stand together.',
+  backCover: 'The back cover, a calm closing picture after the adventure: the place and viewpoint where the story ends at rest, where the cast can stand together.',
+});
+
+/**
+ * The vantages a cover may take: `wide` / `ultra-wide` vantages of the
+ * locations story pages stand on. Pure.
+ * @returns {Array<{id:string, base:string, name:string, label:string, shot:string}>}
+ */
+function coverPlaceCandidates(visualBible, storyPageNumbers) {
+  const { resolveShotId } = require('./shotVocabulary');
+  const located = pageLocations(visualBible, storyPageNumbers);
+  const bases = new Set([...located.byPage.values()].map(r => r.base));
+  const out = [];
+  for (const l of (visualBible && Array.isArray(visualBible.locations) ? visualBible.locations : [])) {
+    if (!l || !l.id) continue;
+    const base = String(l.id).trim().toUpperCase().split('.')[0];
+    if (!bases.has(base)) continue;
+    for (const v of (Array.isArray(l.vantages) ? l.vantages : [])) {
+      if (!v || !v.id) continue;
+      const shot = resolveShotId(v.shot);
+      if (!COVER_PLACE_SHOTS.has(shot)) continue;
+      const desc = String(v.description || '').replace(/\s+/g, ' ').trim().slice(0, 120);
+      const name = `${l.name}, ${v.name}`;
+      out.push({ id: String(v.id).trim().toUpperCase(), base, shot, name, label: `${name} (${shot} view)${desc ? `: ${desc}` : ''}` });
+    }
+  }
+  return out;
+}
+
+/**
+ * Distinct vantages first, then the highest summed probability; a vantage is
+ * shared only when there are fewer candidates than covers (every candidate is
+ * then used once before any is used twice). Ties keep the earlier candidate.
+ * Pure.
+ *
+ * @param {string[]} coverKeys
+ * @param {number[][]} probs - probs[i][j]: cover i, candidate j
+ * @returns {number[]} candidate index per cover
+ */
+function assignCoverPlaces(coverKeys, probs) {
+  const n = coverKeys.length;
+  const m = probs.length ? probs[0].length : 0;
+  if (!n) return [];
+  if (!m) throw new Error('assignCoverPlaces: no candidate vantage');
+  let best = null;
+  const pick = new Array(n);
+  const walk = (i) => {
+    if (i === n) {
+      const distinct = new Set(pick).size;
+      const sum = pick.reduce((s, j, k) => s + probs[k][j], 0);
+      if (!best || distinct > best.distinct || (distinct === best.distinct && sum > best.sum + 1e-12)) best = { distinct, sum, pick: [...pick] };
+      return;
+    }
+    for (let j = 0; j < m; j++) { pick[i] = j; walk(i + 1); }
+  };
+  walk(0);
+  return best.pick;
+}
+
+/** The cover question's state: the arc and the whole page plan (shot stripped). */
+function coverPlaceState(arc, pages) {
+  const plan = pages.map(p => `Page ${p.pageNumber}: ${jevDecisions.stripPlanShot(p.planLine)}`).join('\n');
+  return `THE STORY, beat by beat:\n${String(arc || '').trim() || '(no arc stored)'}\n\n${jevDecisions.PLAN_HEAD}\n${plan}\n\nTHE BOOK'S COVERS each show the cast standing together, whole in frame, on solid ground at a place of this story, seen wide.`;
+}
+
+/**
+ * Jev ranks, code assigns. Returns no covers (and `reason`) when the bible has
+ * no candidate vantage; the caller logs that loudly. A Jev failure throws
+ * JevDecisionError (the outage wait already ran).
+ *
+ * @param {{arc:string, pages:Array, visualBible:Object, coverKeys:string[]}} input
+ * @returns {Promise<{covers:Array<{coverKey:string, cite:string, label:string, p:number, shared:boolean, candidates:Object}>, candidates:string[], reason?:string, stats:Object}>}
+ */
+async function decideCoverPlaces({ arc, pages, visualBible, coverKeys }, opts = {}) {
+  const stats = jevDecisions.newStats();
+  const keys = (coverKeys || []).filter(k => COVER_PLACE_Q[k]);
+  const cands = coverPlaceCandidates(visualBible, pages.map(p => Number(p.pageNumber)));
+  if (!keys.length) return { covers: [], candidates: [], stats: jevDecisions.summarise(stats) };
+  if (!cands.length) return { covers: [], candidates: [], reason: 'no wide or ultra-wide vantage of a location a story page stands on', stats: jevDecisions.summarise(stats) };
+  const state = coverPlaceState(arc, pages);
+  const criteria = Object.fromEntries(cands.map((c, j) => [`v${j}`, c.label]));
+  const reqs = keys.map(k => ({ key: `cover:${k}`, state, questions: { PLACE: { type: 'choice', instructions: COVER_PLACE_Q[k], criteria } } }));
+  const ans = await jevDecisions.runJevRequests(reqs, { ...opts, usageLabel: 'jev_decisions_cover_place', stats });
+  const probs = keys.map((k) => {
+    const a = ans.get(`cover:${k}`) || [];
+    return cands.map((_, j) => {
+      const vals = a.map((x) => {
+        const q = x && x.PLACE;
+        if (!q || !q.probabilities) throw new JevDecisionError(`Jev cover place answer for ${k} carries no probabilities`);
+        return Number(q.probabilities[`v${j}`] || 0);
+      });
+      return vals.length ? vals.reduce((s, v) => s + v, 0) / vals.length : 0;
+    });
+  });
+  const pick = assignCoverPlaces(keys, probs);
+  const covers = keys.map((k, i) => ({
+    coverKey: k,
+    cite: cands[pick[i]].id,
+    label: cands[pick[i]].name,
+    p: +probs[i][pick[i]].toFixed(3),
+    shared: pick.filter(j => j === pick[i]).length > 1,
+    candidates: Object.fromEntries(cands.map((c, j) => [c.id, +probs[i][j].toFixed(3)])),
+  }));
+  log.info(`🖼️ [JEV/cover-place] ${covers.map(c => `${c.coverKey} ${c.cite} ${c.p}${c.shared ? ' (shared)' : ''}`).join(', ')} over ${cands.length} wide vantage(s) (${stats.calls} calls)`);
+  return { covers, candidates: cands.map(c => c.id), stats: jevDecisions.summarise(stats) };
+}
+
+/**
+ * The covers' pages in the bible's location and vantage tables follow the
+ * decided places: every cover page leaves every table, then each cover joins
+ * its vantage and that vantage's location. Covers without a decided place keep
+ * the bible's own claim. Mutates; returns the number of entries changed.
+ *
+ * @param {Object} visualBible
+ * @param {Map<number,string>} citeByPage - cover page number → vantage id
+ */
+function applyCoverPlacePages(visualBible, citeByPage) {
+  if (!citeByPage.size) return 0;
+  const covers = new Set([...citeByPage.keys()].map(Number));
+  let changed = 0;
+  const rewrite = (obj, field, add) => {
+    const before = Array.isArray(obj[field]) ? obj[field].map(Number) : [];
+    const uniq = [...new Set([...before.filter(n => !covers.has(n)), ...add])];
+    if (JSON.stringify(uniq) !== JSON.stringify(before)) { obj[field] = uniq; changed++; }
+  };
+  for (const l of (visualBible && Array.isArray(visualBible.locations) ? visualBible.locations : [])) {
+    if (!l || !l.id) continue;
+    const base = String(l.id).trim().toUpperCase().split('.')[0];
+    const vantages = Array.isArray(l.vantages) ? l.vantages : [];
+    for (const v of vantages) {
+      if (!v || !v.id) continue;
+      const id = String(v.id).trim().toUpperCase();
+      rewrite(v, 'pages', [...citeByPage].filter(([, c]) => c === id).map(([n]) => Number(n)));
+    }
+    const field = Array.isArray(l.appearsInPages) || !Array.isArray(l.pages) ? 'appearsInPages' : 'pages';
+    rewrite(l, field, [...citeByPage].filter(([, c]) => c.split('.')[0] === base).map(([n]) => Number(n)));
+  }
+  return changed;
+}
+
+module.exports = {
+  decideBriefFields, pinDecidedFields, pageLocations, visualBibleJsonOf,
+  COVER_PLACE_SHOTS, COVER_PLACE_Q, coverPlaceCandidates, assignCoverPlaces, coverPlaceState, decideCoverPlaces, applyCoverPlacePages,
+};

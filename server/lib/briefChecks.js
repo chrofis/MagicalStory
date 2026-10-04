@@ -85,11 +85,29 @@ const REASK_CLOTHING_EXTRA = new Set(['outfit_missing']);
  * checks). A cover-only finding ships flagged rather than triggering the
  * re-ask — the 2026-09-28 Jev-first replay (job_1790618717512_n9wrh5u0j) sent
  * a `cover_location_repeated` finding to the re-ask and the rewrite it
- * produced was refused as "resolves nothing": a cover's location is a decided
- * field the re-ask cannot move, so sending it there bought nothing but the
- * call's cost. A page with both cover and non-cover findings still sends its
- * non-cover findings (only covers are pages -1/-2/-3, so this never collides
- * with a story page).
+ * produced was refused as "resolves nothing", at the call's full cost.
+ *
+ * CORRECTED 2026-10-04: the reason first given here — "a cover's location is a
+ * decided field the re-ask cannot move" — was false when written. Nothing
+ * decided a cover's place then: the Art Director picked it (the Visual Bible
+ * call put every cover on one vantage, the briefs copied it), and no pin would
+ * have undone a re-ask move. The refusals came from the recheck, which reads
+ * each rewritten page against the OTHER covers' original briefs, so a repeat
+ * between two covers cannot clear by moving one at a time
+ * (staging job_1791040103540_atbttop6w: −2 taken, −3 refused).
+ *
+ * Since 2026-10-04 (jevBriefFields.decideCoverPlaces):
+ *   - Jev path: each cover's location IS decided (Jev ranks the wide vantages,
+ *     code makes them distinct) and pinned — after the page-brief call, after
+ *     this re-ask, after an iterate rewrite. `cover_location_repeated` does not
+ *     compare a decided cover, so it never fires there. The re-ask may rewrite
+ *     a cover only for its non-cover findings, and code restores the location.
+ *   - Backup path (Jev outage, or no candidate vantage): the Art Director picks
+ *     the place under COVER_OWN_PLACE; `cover_location_repeated` fires and the
+ *     finding ships flagged, never re-asked, for the recheck reason above.
+ * A page with both cover and non-cover findings still sends its non-cover
+ * findings (only covers are pages -1/-2/-3, so this never collides with a
+ * story page).
  */
 const COVER_ONLY_TYPES = new Set(['cover_cast_dropped', 'cover_location_repeated', 'cover_gaze_not_viewer', 'cover_text_zone_mismatch']);
 
@@ -131,14 +149,16 @@ function collectBriefFindings(expansions, ctx) {
   const findings = [];
   const withheld = [];
   const briefRes = checkBriefs(
-    expansions.map(x => ({ pageNumber: x.pageNumber, brief: x.brief, planLine: beatOf(x.pageNumber).planLine || '' })),
+    expansions.map(x => ({ pageNumber: x.pageNumber, brief: x.brief, planLine: beatOf(x.pageNumber).planLine || '', placeDecided: !!(beatOf(x.pageNumber).jevFixed && beatOf(x.pageNumber).jevFixed.coverPlace) })),
     briefCastNames(ctx.inputData, ctx.visualBible),
     ctx.visualBible,
     { textZoneRules: textZoneRulesActive(ctx.inputData) },
   );
   for (const f of briefRes.findings) {
     if (!f || !REVIEWABLE.has(f.type) || f.pageNumber === 0) continue;
-    if (beatOf(f.pageNumber).jevFixed && JEV_OWNED.has(f.type)) withheld.push(f);
+    // A cover's jevFixed holds its place alone (coverPlace): the story-page fields JEV_OWNED names are not decided there.
+    const fx = beatOf(f.pageNumber).jevFixed;
+    if (fx && !fx.coverPlace && JEV_OWNED.has(f.type)) withheld.push(f);
     else findings.push(f);
   }
   const clothingRes = checkClothing(expansions.map((x) => {
