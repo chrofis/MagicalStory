@@ -66198,3 +66198,13 @@ prepare-title keeps building only the costumed sheet; the story run builds the s
 **Rationale:** each of these returned a normal-looking result for work that never ran; a whole-blob save from a minutes-old snapshot reverts anything saved in between.
 **Revisit if:** semantic judge failures become frequent (then add an explicit retry, not a default score); the owner wants the Gemini→Grok quality-judge swap removed.
 **Touched files:** `server/lib/evalPipeline.js`, `server/lib/entityConsistency.js`, `server/lib/repairLogic.js`, `server/lib/repairPipeline.js`, `server/lib/scoring.js`, `server/lib/images.js`, `server/routes/regeneration.js`, `server/routes/stories.js`, `server/services/database.js`, `server/services/prompts.js`, `client/src/types/story.ts`, `docs/prompt-inventory.md`, tests.
+
+## 2026-10-04 — Sonnet 5.5 is measured against Opus on the arc and text_refine by exact replay, not by fresh runs (owner)
+
+**Context.** A staging page costs ~$0.36 (16-18 page books, since 2026-09-25) to $0.44 (all books); the owner wants ~$0.30. The two Opus text stages are ~$2 of a ~$6.5 story: arc create on Opus 5.5 xhigh ~$0.79, arc re-tell on Opus 5 ~$0.23, text_refine on Opus 5 ~$0.77. Sonnet 5.5 is $2/$10 (Opus 5.5 $4/$20, Opus 5 $5/$25). Earlier arc comparisons were n=1 per arm and rebuilt prompts from the current template; text_refine's audits are re-run on every Lab replay and vary run to run.
+
+**Decision.** `claude-sonnet-5-5` is registered (TEXT_MODELS + MODEL_PRICING, unused by production). Two Lab-only replay options make the model the only variable: arc_effort `promptFromStory` sends the story's stored `arcReviewReport.createPrompt` verbatim (the prompt Opus 5.5 answered), and text_refine `auditsFromStory` (with `fromWriterText`) hands the stored audit results to `refineStoryText` (`opts.audits`), so both repair models answer the identical fault list. Run on the 8 staging stories with a stored Opus 5.5 create (2026-09-25..10-03).
+
+**Rationale.** A fresh prompt or fresh audits add a second variable larger than the model gap the earlier sweeps measured (judge spread up to 1.29 on one arc). Replays of stored inputs are the cheapest way to compare against arcs and repairs that already exist.
+
+**Touched:** `server/config/models.js`, `server/lib/testlab.js` (`storedCreatePrompt`, `storedRefineAudits`), `server/lib/textRefine.js` (`opts.audits`), `tests/unit/testlab-stored-challenge-section.test.ts`, `tests/unit/text-refine-replayed-audits.test.ts`. **Status:** 🟡 measuring — the result and any routing change get their own entry.
