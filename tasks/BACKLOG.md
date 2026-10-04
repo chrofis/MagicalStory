@@ -41,6 +41,7 @@ Last full sweep: **2026-09-06**.
 
 ## In flight
 
+- [ ] Whole-codebase code review, area by area (report only; owner picks fixes) → `tasks/code-review-2026-10-04.md`
 - [ ] Run the landmark-photo R2 backfill to completion on prod — ~19,374 slots at 2 s ≈ 11 h in the
       background: `node scripts/admin/backfill-landmark-photos-to-r2.js` (resumable; re-run until
       "0 slot(s) still without an R2 copy"), then sync to staging → `docs/landmark-database.md` §11 Photo storage
