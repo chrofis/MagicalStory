@@ -1691,35 +1691,25 @@ router.post('/referral/cash-out', authenticateToken, async (req, res) => {
         failed.push({ orderId: order.orderId, error: 'No Stripe client for mode ' + order.stripeMode });
         continue;
       }
-      try {
-        const refund = await stripe.refunds.create({
-          payment_intent: order.paymentIntentId,
-          amount: refundAmount,
-          reason: 'requested_by_customer',
-          metadata: { type: 'referral_cashout', user_id: userId, order_session_id: order.sessionId },
-        });
-        await referralBalance.spendForRefund({
-          userId,
-          amountCents: refundAmount,
-          refundId: refund.id,
-          sessionId: order.sessionId,
-        });
-        succeeded.push({ orderId: order.orderId, refundId: refund.id, amountCents: refundAmount });
-        remaining -= refundAmount;
-        log.info(`💸 [REFERRAL CASHOUT] Refunded CHF ${(refundAmount / 100).toFixed(2)} to ${userId} via ${refund.id} (PI ${order.paymentIntentId})`);
-        await logActivity(userId, req.user.username, 'REFERRAL_CASHOUT_REFUND', {
-          orderId: order.orderId,
-          sessionId: order.sessionId,
-          paymentIntentId: order.paymentIntentId,
-          refundId: refund.id,
-          amountCents: refundAmount,
-          stripeMode: order.stripeMode,
-        }, req.user);
-      } catch (stripeErr) {
-        failed.push({ orderId: order.orderId, error: stripeErr.message, code: stripeErr.code });
-        log.warn(`⚠️ [REFERRAL CASHOUT] Refund failed for order ${order.orderId} (PI ${order.paymentIntentId}): ${stripeErr.message}`);
-        // Continue to next order — Stripe has no "un-refund"
+      // Debit first, refund with an idempotency key, restore on failure (P1).
+      const leg = await referralBalance.cashOutToCard({ userId, order, amountCents: refundAmount, stripe });
+      if (!leg.ok) {
+        failed.push({ orderId: order.orderId, error: leg.error, code: leg.code });
+        log.warn(`⚠️ [REFERRAL CASHOUT] Cash-out leg failed for order ${order.orderId} (PI ${order.paymentIntentId}): ${leg.error}`);
+        if (leg.code === 'insufficient_available') break; // balance gone (concurrent cash-out): stop, don't try other orders
+        continue;
       }
+      succeeded.push({ orderId: order.orderId, refundId: leg.refundId, amountCents: refundAmount });
+      remaining -= refundAmount;
+      log.info(`💸 [REFERRAL CASHOUT] Refunded CHF ${(refundAmount / 100).toFixed(2)} to ${userId} via ${leg.refundId} (PI ${order.paymentIntentId})`);
+      await logActivity(userId, req.user.username, 'REFERRAL_CASHOUT_REFUND', {
+        orderId: order.orderId,
+        sessionId: order.sessionId,
+        paymentIntentId: order.paymentIntentId,
+        refundId: leg.refundId,
+        amountCents: refundAmount,
+        stripeMode: order.stripeMode,
+      }, req.user);
     }
 
     const after = await referralBalance.getBalance(userId);

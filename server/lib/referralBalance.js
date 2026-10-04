@@ -56,11 +56,12 @@ async function withTransaction(existingClient, fn) {
 }
 
 async function insertLedger(client, row) {
-  await client.query(
+  const res = await client.query(
     `INSERT INTO referral_payouts
        (user_id, amount_cents, type, balance_after_cents, pending_after_cents,
         order_stripe_session_id, stripe_refund_id, source_user_id, description)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+     RETURNING id`,
     [
       row.userId,
       row.amountCents,
@@ -73,6 +74,7 @@ async function insertLedger(client, row) {
       row.description || null,
     ]
   );
+  return res.rows[0].id;
 }
 
 /**
@@ -339,15 +341,20 @@ async function spendForCredits({ userId, amountCents, creditsPerChf, description
 }
 
 /**
- * Spend balance via a successful Stripe refund. Caller is responsible for
- * having already issued the refund via stripe.refunds.create() — this just
- * records the spend + ledger row.
+ * Cash-out step 1 of 3 (review 2026-10-04 P1): debit the balance BEFORE the Stripe
+ * refund is issued. The conditional UPDATE is the double-spend guard - two concurrent
+ * cash-outs cannot both debit the same balance, so only the one that debits may refund.
+ * `{ok:false}` means nothing was debited and NO refund may be issued.
+ *
+ * Step 2 (caller): stripe.refunds.create with an idempotency key derived from the
+ * returned ledgerId. Step 3: attachRefundId on success, restoreRefundSpend on failure.
+ *
+ * @returns {Promise<{ok: true, ledgerId: number} | {ok: false, reason: string}>}
  */
-async function spendForRefund({ userId, amountCents, refundId, sessionId, description }, dbClient = null) {
+async function spendForRefund({ userId, amountCents, sessionId, description }, dbClient = null) {
   if (!Number.isInteger(amountCents) || amountCents <= 0) {
     throw new Error(`spendForRefund: invalid amountCents=${amountCents}`);
   }
-  if (!refundId) throw new Error('spendForRefund: refundId required');
   return withTransaction(dbClient, async (client) => {
     const updated = await client.query(
       `UPDATE users
@@ -360,18 +367,102 @@ async function spendForRefund({ userId, amountCents, refundId, sessionId, descri
     if (updated.rows.length === 0) {
       return { ok: false, reason: 'insufficient_available' };
     }
-    await insertLedger(client, {
+    const ledgerId = await insertLedger(client, {
       userId,
       amountCents: -amountCents,
       type: LEDGER_TYPES.SPENT_REFUND,
       balanceAfter: updated.rows[0].referral_balance_cents,
       pendingAfter: updated.rows[0].referral_pending_cents,
       sessionId: sessionId || null,
-      refundId,
-      description: description || `Cashed out CHF ${(amountCents / 100).toFixed(2)} via Stripe refund ${refundId}`,
+      description: description || `Cash-out of CHF ${(amountCents / 100).toFixed(2)} (Stripe refund pending)`,
+    });
+    return { ok: true, ledgerId };
+  });
+}
+
+/** Cash-out step 3a: the Stripe refund succeeded - record its id on the debit row. */
+async function attachRefundId({ ledgerId, refundId }) {
+  if (!ledgerId || !refundId) throw new Error('attachRefundId: ledgerId and refundId required');
+  await getPool().query(
+    `UPDATE referral_payouts
+        SET stripe_refund_id = $2,
+            description = $3
+      WHERE id = $1 AND type = $4`,
+    [ledgerId, refundId, `Cashed out via Stripe refund ${refundId}`, LEDGER_TYPES.SPENT_REFUND]
+  );
+}
+
+/**
+ * Cash-out step 3b: the Stripe refund failed - give the debited amount back. Writes a
+ * `restored` row WITHOUT a session id so the confirm/release idempotency lookups (which
+ * key on the checkout session) never mistake it for a resolved checkout hold.
+ */
+async function restoreRefundSpend({ userId, amountCents, ledgerId, reason }, dbClient = null) {
+  if (!Number.isInteger(amountCents) || amountCents <= 0) {
+    throw new Error(`restoreRefundSpend: invalid amountCents=${amountCents}`);
+  }
+  return withTransaction(dbClient, async (client) => {
+    const updated = await client.query(
+      `UPDATE users
+          SET referral_balance_cents = referral_balance_cents + $1
+        WHERE id = $2
+        RETURNING referral_balance_cents, referral_pending_cents`,
+      [amountCents, userId]
+    );
+    if (updated.rows.length === 0) throw new Error(`restoreRefundSpend: user ${userId} not found`);
+    await insertLedger(client, {
+      userId,
+      amountCents,
+      type: LEDGER_TYPES.RESTORED,
+      balanceAfter: updated.rows[0].referral_balance_cents,
+      pendingAfter: updated.rows[0].referral_pending_cents,
+      description: reason || `Cash-out refund failed - balance restored (debit row ${ledgerId})`,
     });
     return { ok: true };
   });
+}
+
+/**
+ * One cash-out leg: debit first, then refund with an idempotency key, restore on failure.
+ * `order` is an entry of getRefundableAmount().orders; `stripe` the client for that order's mode.
+ *
+ * @returns {Promise<{ok:true, refundId:string} | {ok:false, error:string, code?:string, restoreFailed?:boolean}>}
+ */
+async function cashOutToCard({ userId, order, amountCents, stripe }) {
+  const debit = await spendForRefund({ userId, amountCents, sessionId: order.sessionId });
+  if (!debit.ok) return { ok: false, error: `Balance debit refused: ${debit.reason}`, code: debit.reason };
+
+  let refund;
+  try {
+    refund = await stripe.refunds.create(
+      {
+        payment_intent: order.paymentIntentId,
+        amount: amountCents,
+        reason: 'requested_by_customer',
+        metadata: { type: 'referral_cashout', user_id: userId, order_session_id: order.sessionId, ledger_id: String(debit.ledgerId) },
+      },
+      { idempotencyKey: `referral-cashout-${debit.ledgerId}` }
+    );
+  } catch (stripeErr) {
+    try {
+      await restoreRefundSpend({
+        userId, amountCents, ledgerId: debit.ledgerId,
+        reason: `Cash-out refund failed (${stripeErr.message}) - balance restored (debit row ${debit.ledgerId})`,
+      });
+    } catch (restoreErr) {
+      log.error(`CRITICAL [referralBalance] cash-out refund failed AND balance restore failed for user ${userId}, ledger row ${debit.ledgerId}, CHF ${(amountCents / 100).toFixed(2)}: ${restoreErr.message}`);
+      return { ok: false, error: stripeErr.message, code: stripeErr.code, restoreFailed: true };
+    }
+    return { ok: false, error: stripeErr.message, code: stripeErr.code };
+  }
+
+  try {
+    await attachRefundId({ ledgerId: debit.ledgerId, refundId: refund.id });
+  } catch (attachErr) {
+    // Money moved and the balance is debited; only the audit link is missing.
+    log.error(`[referralBalance] cash-out refund ${refund.id} succeeded but ledger row ${debit.ledgerId} could not be annotated: ${attachErr.message}`);
+  }
+  return { ok: true, refundId: refund.id };
 }
 
 /**
@@ -467,6 +558,9 @@ module.exports = {
   releasePending,
   spendForCredits,
   spendForRefund,
+  attachRefundId,
+  restoreRefundSpend,
+  cashOutToCard,
   getPayoutHistory,
   getRefundableAmount,
 };
