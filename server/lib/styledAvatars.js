@@ -1030,7 +1030,7 @@ const STYLED_AVATAR_BUCKETS = ['costumed', 'standard', 'winter', 'summer'];
  *      character2x4Sheet.js).
  *   2. Here, any required character with no styled avatar in ANY bucket gets
  *      the best available raw reference seeded into the cache at 'standard'
- *      (same seam as _seedStandardFromPreview): standard clothing avatar
+ *      (same cache seam): standard clothing avatar
  *      (realistic anchor) → bg-removed body photo → face photo.
  *   3. The failure is surfaced: log.error + a generationLogger entry (dev
  *      panel generationLog) + a styled-avatar log entry (dev panel avatar
@@ -1898,19 +1898,6 @@ function clearStyledAvatarGenerationLog() {
 }
 
 /**
- * Trial-only escape hatch: seed the styled-avatar cache at the 'standard'
- * key with a pre-built image (the preview avatar). Lets trial skip the
- * full 2×4 standard sheet generation when the preview is "good enough"
- * for the rare standard-clothing scenes. See docs/decisions.md for the
- * "trial uses costumed-only" decision.
- */
-function _seedStandardFromPreview(characterName, artStyle, previewAvatarDataUrl) {
-  if (!characterName || !previewAvatarDataUrl) return;
-  const cacheKey = getAvatarCacheKey(characterName, 'standard', artStyle);
-  styledAvatarCache.set(cacheKey, previewAvatarDataUrl);
-}
-
-/**
  * WARDROBE-STATE VARIANT SHEETS — one extra sheet per derived requirement row.
  *
  * Deliberately NOT a branch inside prepareStyledAvatars. That function resolves
@@ -2037,7 +2024,6 @@ module.exports = {
   clearStyledAvatarGenerationLog,
 
   // Trial-only escape hatch (see docs/decisions.md)
-  _seedStandardFromPreview,
 
   // Internal: AsyncLocalStorage used by avatars.js to scope its own per-story
   // generation log to the same scope as styled avatars (DRY — one source of
