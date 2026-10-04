@@ -158,18 +158,7 @@ Which file does a new item go in?
 
 ## Showcase command
 
-When the user says **"run a new showcase story"** (or any short variant: "run a showcase", "showcase the Bergers", "showcase entry 7"):
-
-1. The command is the orchestrator at `scripts/admin/showcase.js` (`npm run showcase`).
-2. It picks a rotation entry (default = next from `tests/demo-rotation-state.json`; override via `--entry=N`), creates a **fresh timestamped account** (`demo-{family}-{YYYYMMDD-HHmm}@magicalstory.ch`), uploads characters + the curated photos from `tests/fixtures/demo-photos/{family}/`, and triggers the Playwright spec → server starts story generation.
-3. Each run is fully isolated. Old stories stay accessible on their original accounts.
-4. If the user says "for the Bergers" / "with Miller" / "in French", look up the matching rotation index in `tests/helpers/demo-rotation.json` and pass `--entry=N`.
-5. If photos for the family don't exist yet on disk, run `node scripts/admin/generate-demo-photos.js --family=<id> --save-to=true --no-upload` first, let the user inspect, then proceed.
-6. Default backend is **production**. For local: `npm run showcase:local`. Always confirm environment with the user before launching.
-
-Rotation config: `tests/helpers/demo-rotation.json`; state: `tests/demo-rotation-state.json`; orchestrator source is the doc (`scripts/admin/showcase.js`).
-
-**A showcase is the LAST resort for validation, not the first.** For validating a change, use the running-validation-stories skill's ladder: stored evidence → single-page rerun → cheap 4-page run on the existing smoke account (`demo-b-hnecf@magicalstory.ch`, no character recreation) → full-story rerun on that same account (identical wizard start point; vary one knob like art style or location) → full showcase only after long/structural changes or character-pipeline changes.
+"Run a (new) showcase story" and its variants → the `running-showcases` skill. A showcase is the LAST resort for validation (running-validation-stories ladder first); never run one unprompted.
 
 ## Folder Organization Rules
 
@@ -231,22 +220,6 @@ The `photo_analyzer.py` Flask service handles:
 
 **Must be running on port 5000 for photo upload to work locally.**
 
-## Testing Commands
-
-```bash
-# Run E2E tests against localhost (start dev servers first!)
-npm run test:local
-
-# Run E2E tests against production
-npm run test:prod
-
-# Run tests with visible browser (for debugging)
-npm run test:headed
-
-# Run all test files
-npm run test:all
-```
-
 ### Pre-deployment Testing Workflow
 
 When user says **"run tests"** or **"test before deploy"**:
@@ -259,14 +232,6 @@ When user says **"run tests"** or **"test before deploy"**:
 Tests check: homepage images, character photos, API health, auth, no JS errors, no 404s, wizard navigation.
 
 ## Architecture Overview
-
-### Full-Stack Structure
-- **Frontend**: React 19 + Vite + TypeScript + Tailwind (`/client`)
-- **Backend**: Express.js monolith (`server.js` + `/server`)
-- **Database**: PostgreSQL on Railway
-- **Hosting**: Railway (auto-deploys from `master`)
-- **SSR**: Pre-rendered static HTML for all SEO routes (~999 files, build-time)
-- **Python**: Flask service for face detection + background removal (port 5000)
 
 ### AI Service Providers
 | Service | Provider | Purpose |
@@ -326,51 +291,7 @@ paid background indexing. Location→story flow (IP, Nominatim, VB injection) st
 `docs/landmarks.html`.
 
 ### Key Backend Files
-- `server.js` - Main Express app bootstrap, routes wiring, Stripe webhook, boot/stall recovery
-- `storyJobPipeline.js` - Story-generation pipeline (processStoryJob, processUnifiedStoryJob, checkpoints). Root-level on purpose: its inline `require('./server/lib/...')` paths must stay verbatim-valid
-- `server/config/models.js` - AI model configuration, aspect ratios, repair defaults
-- `server/config/credits.js` - Credit costs, packages, referral config
-- `server/lib/images.js` - Image generation, quality eval, cutout repair, VB grid
-<!-- ASSERT models.figureDetectionBackend === 'grounding-dino' -->
-- `server/lib/figureDetection.js` - GroundingDINO → MobileSAM figure detection (DEFAULT everywhere incl. prod since 2026-08-17): global face↔body pairing, SoM identity, per-figure SAM prompts, joint occlusion by depth
-- `server/lib/bboxDetection.js` - Bbox detection cluster (VB-object grounding, bbox cache, fingerprint pairing, overlay, enrichment) — moved verbatim from images.js, which re-exports every name (facade)
-- `server/lib/evalPipeline.js` - Image evaluation cluster (visual inventory P1, empty-scene QC, three-stage compliance, evaluateImageQuality core, sanitizeForGemini) — moved verbatim from images.js, which re-exports every name (facade)
-- `server/lib/textRegion.js` - Text region detection + white wash compositing
-- `server/lib/entityConsistency.js` - Entity consistency, cascade face merge, object canonicalization
-- `server/lib/referral.js` - Referral code generation
-- `server/lib/storyHelpers.js` - Re-export facade over the three modules below (all old imports keep working) + landmark photo loaders
-- `server/lib/promptBuilders.js` - Story/scene/image prompt builders + support data (guides, art styles, language levels, character descriptions)
-- `server/lib/sceneMetadata.js` - Scene/page metadata parsers, position handling, page-text helpers
-- `server/lib/clothingResolve.js` - Clothing/avatar category resolution + character photo assembly
-- `server/lib/runware.js` - Runware API (FLUX, ACE++, inpainting)
-- `server/lib/textModels.js` - Claude/Gemini text generation
-- `server/lib/visualBible.js` - Visual Bible entity tracking
-- `server/lib/grok.js` - Grok Imagine API (edit, generate, pack references)
-- `server/lib/pdf.js` - PDF generation (A4/square, text overlay, print-ready)
-- `server/lib/coverIterate.js` - Cover generation and iteration
-- `server/routes/avatars.js` - Avatar generation endpoints
-- `server/routes/stories.js` - Story CRUD and regeneration
-- `server/routes/regeneration.js` - Repair workflow + image regeneration endpoints
-- `server/routes/print.js` - Stripe checkout, referral endpoints, pricing, Gelato orders
-- `server/routes/trial.js` - Trial story flow, admin bypass
-- `server/routes/sharing.js` - Share tokens, public viewer API
-- `server/services/prompts.js` - Prompt template loader
-- `prompts/` - All AI prompt templates (editable without code changes)
-
-### Key Frontend Files
-- `client/src/pages/StoryWizard.tsx` - Main story creation wizard
-- `client/src/pages/TrialWizard.tsx` - Trial story wizard (anonymous users)
-- `client/src/pages/SharedStoryViewer.tsx` - Public story viewer (book spread)
-- `client/src/pages/AccountPage.tsx` - Account info, referral code, credits
-- `client/src/pages/BookBuilder.tsx` - Book checkout with promo code input
-- `client/src/hooks/useRepairWorkflow.ts` - Repair workflow orchestration hook
-- `client/src/hooks/useDeveloperMode.ts` - Dev mode model overrides
-- `client/src/utils/textOverlay.ts` - Text overlay positioning (6 positions + explicit override)
-- `client/src/types/story.ts` - Story/SceneImage types (includes textPosition, textRect)
-- `client/src/types/character.ts` - Character type definitions
-- `client/src/components/generation/StoryDisplay.tsx` - Story display with text overlay toggle
-- `client/src/components/generation/` - Story generation UI components
-- `client/src/components/common/UserMenu.tsx` - Nav dropdown (includes My Account link)
+- `storyJobPipeline.js` is root-level on purpose: its inline `require('./server/lib/...')` paths must stay verbatim-valid.
 
 ## Model Configuration
 
@@ -401,24 +322,6 @@ All prompts are in `/prompts/*.txt` and loaded via `server/services/prompts.js`.
 
 **Note**: `image-generation.txt` is the single image-prompt template. Legacy `image-generation-storybook.txt` was merged into it, and the per-language (`-de`, `-fr`) plus `-sequential` variants were deleted along with the `isStorybook` / `isSequential` flags on `buildImagePrompt()` — unified mode is the only generation pipeline.
 
-## Database
-
-PostgreSQL with tables: `users`, `characters`, `stories`, `story_jobs`, `orders`, `config`, `credit_transactions`, `referral_events`, `activity_log`, `pricing_tiers`, `gelato_products`, `story_images`
-
-**Key columns (recent additions):**
-- `users.referral_code` (VARCHAR 20 UNIQUE) - personal promo code (MagicName123 format)
-- `users.referred_by` (VARCHAR 20) - which code this user used (permanent, one per user ever)
-- `orders.referral_code_used`, `orders.discount_cents` - referral tracking on orders
-- `referral_events` table - referrer/buyer/session/credits log with unique constraint
-- `story_images` table - versioned image storage (pageNumber, version_index, image_data)
-
-**Story data** stored as JSONB in `stories.data`:
-- `sceneImages[]` — per-page: imageData, textPosition, textRect, sceneDescription, bboxDetection, retryHistory, imageVersions
-- `coverImages` — frontCover, initialPage, backCover (each with imageData, versions)
-- `characters[]`, `relationships`, physical traits, clothing, avatars
-
-Character data stored as JSONB in `characters.data` column.
-
 ## Admin API auth (for scripts, agents, Test Lab, smoke stories)
 
 Any script or agent that needs an admin Bearer token — Test Lab runs, `/api/admin/*`, 4-page smoke/validation stories — gets it ONE way:
@@ -433,22 +336,9 @@ It logs in as the admin smoke-test account (`demo-b-hnecf@magicalstory.ch`; over
 
 ## Log Analysis
 
-When user asks to **"analyze log"**, **"check the log"**, **"analyze story run"**, or similar:
+"Analyze log" / "check the log" / "analyze story run" → the `analyzing-story-logs` skill.
 
-```bash
-node scripts/analyze-story-log.js                           # Latest log in ~/Downloads
-node scripts/analyze-story-log.js ~/Downloads/logs.XXX.log  # Specific log file
-```
-
-The script analyzes Railway logs and shows:
-- **Story info**: title, language, characters, pages
-- **Timing**: total duration, per-stage timing
-- **Costs**: breakdown by provider (Anthropic, Gemini) and function
-- **Issues**: errors (especially TEXT CHECK, CONSISTENCY failures), warnings, fallbacks, low quality scores
-
-Log files are downloaded from Railway and stored in `~/Downloads/logs.*.log`
-
-### Timezone — Swiss local ONLY, via `scripts/lib/chTime.js` (settled 2026-08-09)
+## Timezone — Swiss local ONLY, via `scripts/lib/chTime.js` (settled 2026-08-09)
 
 **Every timestamp shown to the user — in scripts and in replies — is Swiss local time, marked `CH`. UTC is never shown, and no timezone arithmetic is ever done by hand.** Format via the helper: `ch(d)` → `2026-07-30 22:01:15 CH`, `chTime(d)` → `22:01:15 CH`. `Intl`/`Europe/Zurich` handles DST. (This supersedes the May-2026 UTC-only rule, which superseded dual-labeling — see docs/SETTLED.md; a third reversal needs the full protocol.)
 
