@@ -2579,7 +2579,10 @@
       "source": "Prod order 99 (gelato f1feedfd-30de-4c79-b3a2-c013435494a0): Railway webhook log shows only four order_status_updated events (uploading, processing, printing, printed 2026-10-01 06:14 UTC); DB has tracking_number 996008154400058714 but gelato_status=printed, shipped_at NULL; Gelato API still says printed with shipment.packages[0].trackingCode set.",
       "rootCause": "server.js Gelato webhook sent the shipped email (and set shipped_at) only when fulfillmentStatus === 'shipped'. The tracking code arrives on the 'printed' event, so it was stored without any email or shipped_at.",
       "impact": "Customer of order 99 got no shipping notification. Order 98 and earlier were unaffected (Gelato sent 'shipped'); order 99 is the only order in this state.",
-      "status": "open"
+      "status": "fixed",
+      "fixedAt": "2026-10-04",
+      "fixedIn": "0dc11c444",
+      "fix": "Shipped email triggered by tracking code on printed/shipped (server/lib/gelatoShipment.js), claimed atomically via orders.shipped_email_sent (migration 044, owner must run on prod). Tests: tests/unit/gelato-shipped-email-trigger.test.ts."
     }
   ]
 }
