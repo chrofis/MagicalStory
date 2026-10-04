@@ -3231,7 +3231,7 @@
       "impact": "A redress that left the garment on is stored as the off sheet, so pages that take the garment off are drawn from a reference wearing it.",
       "status": "fixed",
       "fixedAt": "2026-10-04",
-      "fixedIn": "PENDING",
+      "fixedIn": "4d4e4426e",
       "fix": "TASK 10 deleted; one garment-gone check per removed garment on the variant image alone (checkGarmentGone, evaluateVariantSheet). Lab #1609/#1610: controls caught 4/4, good variant passes 2/2."
     },
     {
