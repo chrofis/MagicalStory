@@ -4671,6 +4671,27 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "trial-page-clothing-name-spelling",
+      "title": "A trial whose outline spells the hero's name differently from the character still renders the costume on every costumed page",
+      "commits": [
+        "PENDING"
+      ],
+      "addedAt": "2026-10-04",
+      "claim": "On the next trial story (staging or prod) where stories.data.pageClothing keys a character under a different spelling than characters[].name (e.g. \"Luna\" vs \"LUNA\"; check pageClothing against characters), every page the outline marks costumed has sceneImages[].referencePhotos[0].requestedClothingCategory = \"costumed\", the page's debug grok-ref image shows the costume avatar, and the render wears the costume; pages marked standard stay standard. A trial with matching spellings is unchanged.",
+      "runShape": [
+        "trial"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "stories.data.pageClothing vs characters[].name spelling; sceneImages[].referencePhotos[].requestedClothingCategory per page; pixels of the page and its debug ref. Baseline: prod job_1790769860433_2bhhj0pyi (all pages standard, LUNA vs Luna). Replay evidence 2026-10-04: new path resolves costumed p1-p5, standard p6 on that story; Enaya and Neva unchanged.",
+        "images": [
+          "pages"
+        ]
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [

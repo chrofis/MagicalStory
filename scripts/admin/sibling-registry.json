@@ -1034,6 +1034,21 @@
           "runArtDirector"
         ]
       }
+    },
+    {
+      "id": "trial-page-vs-full-page-clothing",
+      "axis": "trial page first render vs full-story page render: per-page clothing resolution",
+      "reason": "Both resolve each page's per-character outfit through buildSceneClothingRequirements (clothingResolve.js): name-tolerant and never defaulting to 'standard'. The trial page path hand-rolled an exact-key lookup with a silent 'standard' default, so a hero named LUNA whom the outline keyed Luna rendered every page of prod trial job_1790769860433_2bhhj0pyi in the standard avatar.",
+      "members": [
+        "storyJobPipeline.js",
+        "server/lib/images.js"
+      ],
+      "severity": "block",
+      "parity": {
+        "anchors": [
+          "buildSceneClothingRequirements"
+        ]
+      }
     }
   ],
   "withinFile": [

@@ -33,7 +33,7 @@ const {
   getStyledAvatarGenerationLog,
   clearStyledAvatarGenerationLog
 } = require('./server/lib/styledAvatars');
-const { reconcileCoverClothingWithRequirements, reconcilePageClothingWithRequirements } = require('./server/lib/clothingCategories');
+const { reconcileCoverClothingWithRequirements, reconcilePageClothingWithRequirements, resolveCharacterReqs } = require('./server/lib/clothingCategories');
 const {
   getCostumedAvatarGenerationLog,
   clearCostumedAvatarGenerationLog
@@ -1234,18 +1234,15 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             inputData.characters
           );
 
-          // Build clothing requirements with _currentClothing per character.
-          // Clone the character entry before writing — sharing the nested
-          // object with inputData._trialClothingRequirements lets a per-scene
-          // value pollute the global requirements and leak into later pages.
-          const sceneClothingRequirements = { ...(inputData._trialClothingRequirements || {}) };
-          for (const char of sceneCharacters) {
-            const charClothing = perCharClothing[char.name] || 'standard';
-            sceneClothingRequirements[char.name] = {
-              ...(sceneClothingRequirements[char.name] || {}),
-              _currentClothing: charClothing
-            };
-          }
+          // Build clothing requirements with _currentClothing per character —
+          // the SAME builder full mode uses: name-tolerant (outline "Luna" vs
+          // character "LUNA"), clones the entry so a per-scene value never
+          // pollutes inputData._trialClothingRequirements, and refuses to
+          // default to 'standard'. Hand-rolling this here rendered a whole
+          // trial in the standard avatar (prod job_1790769860433_2bhhj0pyi).
+          const sceneClothingRequirements = buildSceneClothingRequirements(
+            sceneCharacters, perCharClothing, inputData._trialClothingRequirements
+          );
 
           // Get character photos with styled avatars applied
           let pagePhotos = getCharacterPhotoDetails(sceneCharacters, 'standard', inputData.artStyle, sceneClothingRequirements);
@@ -1642,7 +1639,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             // costume (job_1786823576638). Same spread the trial's front-cover
             // path applies.
             coverClothingRequirements[charName] = {
-              ...(inputData._trialClothingRequirements?.[charName] || {}),
+              ...(resolveCharacterReqs(inputData._trialClothingRequirements, charName) || {}),
               _currentClothing: clothing,
             };
           }
@@ -1672,7 +1669,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         if (inputData.trialMode && inputData._trialCostumeType) {
           for (const c of (inputData.characters || [])) {
             mergedClothingRequirements[c.name] = {
-              ...(inputData._trialClothingRequirements?.[c.name] || {}),
+              ...(resolveCharacterReqs(inputData._trialClothingRequirements, c.name) || {}),
               ...(mergedClothingRequirements[c.name] || {}),
               _currentClothing: 'costumed',
             };
@@ -2367,7 +2364,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               for (const sc of coverScene.characters) {
                 if (sc.name && sc.clothing) {
                   coverClothingReqs[sc.name] = {
-                    ...(coverClothingReqs[sc.name] || {}),
+                    ...(resolveCharacterReqs(coverClothingReqs, sc.name) || {}),
                     _currentClothing: sc.clothing
                   };
                 }
@@ -2377,9 +2374,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             // Clone the entry before assigning so we don't pollute inputData._trialClothingRequirements.
             if (inputData._trialCostumeType) {
               for (const char of coverCharacters) {
-                if (!coverClothingReqs[char.name]?._currentClothing) {
+                if (!resolveCharacterReqs(coverClothingReqs, char.name)?._currentClothing) {
                   coverClothingReqs[char.name] = {
-                    ...(coverClothingReqs[char.name] || {}),
+                    ...(resolveCharacterReqs(coverClothingReqs, char.name) || {}),
                     _currentClothing: 'costumed'
                   };
                 }

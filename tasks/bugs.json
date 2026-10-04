@@ -2559,6 +2559,15 @@
       "fixedAt": "2026-10-04",
       "fixedIn": "ed5c57184",
       "fix": "The resolver marks a worn row whose wearer faces away (wornItems.faceAwayNames -> storyAvatars.resolveCellPose); its line is tagged \"seen from the back\" and carries only the entry's authored `back` look (GARMENT_BACK_RULE, authored at both Visual Bible sites), never the description; an entry without one names the garment only and logs an error. Judges get the facing as a CLOTHING CONTRACT tag and a new D-05e garment_facing finding (capped MAJOR). Replay of stored p5/p18: line now \"Kiaan IS wearing this on this page, seen from the back: autumn jacket.\" Tests: tests/unit/worn-item-facing.test.ts. Verify: worn-item-facing."
+    },
+    {
+      "id": "trial-page-clothing-exact-name-standard-default",
+      "title": "A trial whose outline spells the hero's name differently from the wizard character rendered every page in the STANDARD avatar - the costume never appeared",
+      "reportedAt": "2026-10-04",
+      "source": "Owner-approved fix task 2026-10-04 (\"Use shared builder\"). Prod trial job_1790769860433_2bhhj0pyi (\"LUNA et la Tour des Vents\"): the character is \"LUNA\", the outline's per-page clothing map is {\"Luna\":\"costumed\"} on p1-p5 (stories.data.pageClothing). Stored referencePhotos[0].requestedClothingCategory = \"standard\" on every page; debug ref stories/job_1790769860433_2bhhj0pyi/debug/p2/v0/grok-ref-1.jpg is the beige-sweater standard avatar.",
+      "rootCause": "storyJobPipeline.js trial page path hand-rolled its per-scene clothing requirements: `perCharClothing[char.name] || 'standard'` - an exact-key lookup (\"LUNA\" != \"Luna\") with a silent 'standard' default. Full mode calls buildSceneClothingRequirements (clothingResolve.js), which resolves names through lookupByName and refuses to default to 'standard'. The trial cover paths and four clothingResolve readers also read clothing maps by exact key.",
+      "impact": "Any trial whose outline keyed a character's clothing under a different case/diacritic spelling lost the costume on every page (the trial's whole selling point), silently.",
+      "status": "open"
     }
   ]
 }
