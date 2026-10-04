@@ -118,3 +118,37 @@ describe('critical-gone wins — repair round decisions', () => {
     expect(s.pages[0].criticalCleared).toBe(true);
   });
 });
+
+describe('repair-round regression detectors read the picker\'s score (D2)', () => {
+  it('lastRepairRegressed ranks by finalScore, not the raw evaluator score', () => {
+    // Raw evaluator score says the repair improved (80 > 70); the entity penalty
+    // folded into finalScore says it regressed (40 < 70) — the picker would ship v0.
+    const v0: any = { source: 'original', finalScore: 70, evaluation: { score: 70 } };
+    const repaired: any = { source: 'inpaint-round-1', finalScore: 40, evaluation: { score: 80 } };
+    expect(lastRepairRegressed([v0, repaired])).toBe('iterate');
+  });
+});
+
+describe('applyScore requireConsolidation (D3)', () => {
+  const { applyScore, computeFinalScore } = require('../../server/lib/scoring.js');
+  const ev: any = { evaluated: true, score: 80, reasoning: 'fine', fixableIssues: [{ type: 'object_presence', severity: 'MAJOR', description: 'x' }] };
+  it('a missing consolidation plan leaves the version unscored instead of scoring raw issues', () => {
+    const v: any = { source: 'iterate-round-1', pageNumber: 3 };
+    applyScore(v, { evalResult: ev, entityResult: { issues: [], penalty: 0 }, consolidatedPlan: null, requireConsolidation: true });
+    expect(v.finalScore).toBeNull();
+    expect(v.scoreSource).toBe('unevaluated');
+    expect(computeFinalScore(v)).toBeNull();
+  });
+  it('without the flag the legacy raw scoring is unchanged (non-pipeline callers)', () => {
+    const v: any = { source: 'x', pageNumber: 3 };
+    applyScore(v, { evalResult: ev, entityResult: { issues: [], penalty: 0 }, consolidatedPlan: null });
+    expect(typeof v.finalScore).toBe('number');
+    expect(v.scoreSource).toBe('raw');
+  });
+  it('an empty-but-present plan scores normally', () => {
+    const v: any = { source: 'x', pageNumber: 3 };
+    applyScore(v, { evalResult: ev, entityResult: { issues: [], penalty: 0 }, consolidatedPlan: { deduped_issues: [] }, requireConsolidation: true });
+    expect(v.scoreSource).toBe('consolidated');
+    expect(typeof v.finalScore).toBe('number');
+  });
+});

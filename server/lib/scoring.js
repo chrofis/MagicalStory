@@ -655,16 +655,18 @@ function computeMathFinalScore(deductions) {
  * CONSOLIDATED SCORING (Jul 2026): pass `consolidatedPlan` (the feedback
  * consolidator's plan for THIS evaluation) and the math runs over its
  * deduped_issues — one deduction per unique defect — instead of the raw
- * evaluator lists. When absent/failed, fail-soft to math over the raw
- * (undeduped) lists with a WARN so missed consolidation is visible in logs.
+ * evaluator lists. When absent/failed, math runs over the raw (undeduped) lists
+ * with a WARN — EXCEPT with `requireConsolidation` (repair pipeline), where the
+ * version is left unscored (scoreSource 'unevaluated').
  *
  * @param {object} version  mutated in place
  * @param {object} params
  * @param {object} [params.evalResult]     evaluateImageQuality output
  * @param {object} [params.entityResult]   { penalty, issues } from getEntityPenaltyAndIssues
  * @param {object|null} [params.consolidatedPlan]   consolidator plan whose deduped_issues drive the deductions
+ * @param {boolean} [params.requireConsolidation]   no plan => not evaluated instead of scored raw
  */
-function applyScore(version, { evalResult = null, entityResult = null, consolidatedPlan = null } = {}) {
+function applyScore(version, { evalResult = null, entityResult = null, consolidatedPlan = null, requireConsolidation = false } = {}) {
   if (!version || typeof version !== 'object') return;
   const dedupedIssues = Array.isArray(consolidatedPlan?.deduped_issues)
     ? consolidatedPlan.deduped_issues
@@ -692,7 +694,12 @@ function applyScore(version, { evalResult = null, entityResult = null, consolida
       && !evalResult.reasoning
       && bucketCount === 0)
   );
-  if (hollowEval) {
+  // requireConsolidation (repair pipeline, decisions #4 no fallbacks; code review
+  // 2026-10 D3): a pipeline eval is scored on the consolidator's deduplicated issues
+  // or not at all. A failed consolidation used to score the RAW issues, so that
+  // version competed with consolidated ones on a different scale.
+  const consolidationMissing = requireConsolidation === true && !dedupedIssues;
+  if (hollowEval || consolidationMissing) {
     version.deductions = deductions;
     version.finalScore = null;
     version.evalScore = null;
@@ -701,7 +708,11 @@ function applyScore(version, { evalResult = null, entityResult = null, consolida
     version.scoreSource = 'unevaluated';
     version.scoreBreakdown = _buildBreakdownFromEvalResult(evalResult, entityResult);
     const pnHollow = version.pageNumber != null ? `page ${version.pageNumber}` : 'version';
-    log.warn(`[SCORE] ${pnHollow}: eval carries no evidence of judgment (evaluated=${evalResult.evaluated ?? 'n/a'}, no score, no reasoning, no issues) — finalScore left null, NOT defaulted to 100`);
+    if (hollowEval) {
+      log.warn(`[SCORE] ${pnHollow}: eval carries no evidence of judgment (evaluated=${evalResult.evaluated ?? 'n/a'}, no score, no reasoning, no issues) — finalScore left null, NOT defaulted to 100`);
+    } else {
+      log.error(`[SCORE] ${pnHollow}: consolidation produced no plan — version NOT scored on raw issues, finalScore left null (not evaluated)`);
+    }
     return version;
   }
 

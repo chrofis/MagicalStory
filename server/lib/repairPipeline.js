@@ -175,7 +175,7 @@ function forcedStrategyAfterFailures(versions) {
  */
 function lastRepairRegressed(versions) {
   if (!Array.isArray(versions) || versions.length < 2) return null;
-  const scoreOf = (v) => v?.evaluation?.score ?? v?.score ?? v?.qualityScore ?? null;
+  const scoreOf = computeFinalScore; // the picker's number (entity penalty + consolidation), not the raw evaluator score (code review 2026-10 D2)
   // Find the most recent repair version and its index.
   let lastIdx = -1;
   for (let i = versions.length - 1; i >= 0; i--) {
@@ -210,7 +210,7 @@ function lastRepairRegressed(versions) {
  */
 function bothStrategiesTriedAndRegressed(versions) {
   if (!Array.isArray(versions) || versions.length < 3) return false;
-  const scoreOf = (v) => v?.evaluation?.score ?? v?.score ?? v?.qualityScore ?? null;
+  const scoreOf = computeFinalScore; // the picker's number (entity penalty + consolidation), not the raw evaluator score (code review 2026-10 D2)
   let hasInpaint = false;
   let hasIterate = false;
   let repairBest = -Infinity;
@@ -1002,11 +1002,11 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         usageTracker('anthropic', res.usage, 'eval_consolidation', 'claude-sonnet');
       }
       if (res.error) {
-        log.warn(`🧠 [EVAL-CONSOLIDATION] P${pageNumber}: failed (${res.error}) — scoring falls back to raw issues`);
+        log.warn(`🧠 [EVAL-CONSOLIDATION] P${pageNumber}: failed (${res.error}) — the version will be left unevaluated (never scored on raw issues)`);
       }
       return res.plan || null;
     } catch (err) {
-      log.warn(`🧠 [EVAL-CONSOLIDATION] P${pageNumber}: threw (${err.message}) — scoring falls back to raw issues`);
+      log.warn(`🧠 [EVAL-CONSOLIDATION] P${pageNumber}: threw (${err.message}) — the version will be left unevaluated (never scored on raw issues)`);
       return null;
     }
   };
@@ -1231,6 +1231,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           // the drift: originals scored RAW at creation, CONSOLIDATED at save,
           // and the pick sat between the two states (p9 −77/−65, task #15/16).
           consolidatedPlan: v.consolidatedPlan || null,
+          requireConsolidation: true, // a failed consolidation = not evaluated, never raw (D3)
         });
       }
     }
@@ -1903,7 +1904,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     version.readerFindings = findings;
     version.readerFindingsRound = round;
     version.pageNumber = pageNumber;
-    applyScore(version, { evalResult: ev, entityResult, consolidatedPlan: plan });
+    applyScore(version, { evalResult: ev, entityResult, consolidatedPlan: plan, requireConsolidation: true });
     log.info(`📖 [BOOK-AUDIT] Round ${round} p${pageNumber}: ${findings.length} reader finding(s) charged to ${version.source || '?'} (the version read) — finalScore ${before} → ${version.finalScore}`);
   };
 
@@ -2422,6 +2423,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
               evalResult: ev,
               entityResult: evEntityResult,
               consolidatedPlan: recolourConsolidated.get(ev.pageNumber) || null,
+              requireConsolidation: true,
             });
             // Creation-time integrity tripwire: the bytes this version stores
             // must be the bytes its eval graded (job_1786571353564 p4 shipped
@@ -2724,6 +2726,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         images().evaluateImageBatch(roundEvalInputs, { concurrency: evalConcurrency, qualityModelOverride, visualBible, clothingRequirements: storyData?.clothingRequirements || null, storyData, artStyle, ...evalStoryMeta }),
       ]);
 
+      const roundEntityOk = freshEntityResult.status === 'fulfilled';
       if (freshEntityResult.status === 'fulfilled') {
         const freshEntity = freshEntityResult.value;
         if (freshEntity?.tokenUsage && usageTracker) {
@@ -2754,14 +2757,32 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       if (evalsResult.status === 'fulfilled') {
         roundEvals = evalsResult.value;
       } else {
-        log.warn(`⚠️ [UNIFIED PIPELINE] Round ${round}: Quality eval failed: ${evalsResult.reason?.message || evalsResult.reason}`);
+        log.error(`❌ [UNIFIED PIPELINE] Round ${round}: Quality eval failed: ${evalsResult.reason?.message || evalsResult.reason} — the round's ${roundSuccess.length} paid repair(s) are kept as NOT-EVALUATED versions`);
         roundEvals = [];
+      }
+      // A page the batch returned nothing for (a rejected batch, or a missing row)
+      // still has a paid repair result. It used to vanish without a trace, so the
+      // next round could pay for the same method again (code review 2026-10 D4).
+      // It becomes a version marked not-evaluated: the picker ignores it, the
+      // dev panel shows it, and the parent records the failed method.
+      const evaluatedPages = new Set(roundEvals.map(e => e.pageNumber));
+      for (const r of roundSuccess) {
+        if (evaluatedPages.has(r.pageNumber)) continue;
+        roundEvals.push({
+          pageNumber: r.pageNumber, evaluated: false, score: null,
+          evalError: `round ${round} quality eval returned no result for this page`,
+        });
+        const parent = roundParent.get(r.pageNumber);
+        if (parent) {
+          const { baseRepairMethod } = require('./repairLogic');
+          parent.failedRepairs = [...(parent.failedRepairs || []), { method: baseRepairMethod(r.method), round, error: 'round quality eval returned no result — repair result stored unscored' }];
+        }
       }
 
       // Consolidate each round evaluation before scoring — same dedupe step
       // as the initial pass (one Sonnet call per repaired page, parallel).
       const roundConsolidated = new Map();
-      await Promise.all(roundEvals.map(ev => consolidateLimit(async () => {
+      await Promise.all(roundEvals.filter(ev => ev.evaluated !== false).map(ev => consolidateLimit(async () => {
         const entityResult = getEntityPenaltyAndIssues(ev.pageNumber, currentEntityReport);
         // Consolidate against the round entry's OWN scene contract when the
         // repair rewrote it (iterate) — the original description would
@@ -2786,7 +2807,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         const repairResult = roundSuccess.find(r => r.pageNumber === ev.pageNumber);
         if (versions && repairResult) {
           const evScore = ev.score ?? ev.qualityScore ?? null;
-          const evEntityResult = getEntityPenaltyAndIssues(ev.pageNumber, currentEntityReport);
+          const evEntityResult = roundEntityOk
+            ? getEntityPenaltyAndIssues(ev.pageNumber, currentEntityReport)
+            : { issues: [], penalty: 0 }; // never the previous image's report (D4)
           const { applyScore } = require('./scoring');
           const newVersion = {
             imageData: repairResult.imageData,
@@ -2864,12 +2887,17 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           // the saved activeVersion could disagree.
           newVersion.pageNumber = ev.pageNumber;
           applyScore(newVersion, {
-            evalResult: ev,
+            // A rejected entity check leaves currentEntityReport describing the
+            // PREVIOUS image of this page; charging it to the new bytes would score
+            // them on someone else's evidence, so the version is not evaluated
+            // instead (code review 2026-10 D4).
+            evalResult: roundEntityOk ? ev : { ...ev, evaluated: false, evalError: `round ${round} entity check failed` },
             entityResult: evEntityResult,
             // Deduped issue list drives the math score; also persisted on
             // the version (consolidatedPlan) for the dev panel + finalize
             // re-stamp.
             consolidatedPlan: roundConsolidated.get(ev.pageNumber) || null,
+            requireConsolidation: true, // failed consolidation = not evaluated (D3)
           });
           versions.push(newVersion);
         }
@@ -3033,7 +3061,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         // version with its own rewritten description is consolidated against
         // THAT, not the original.
         const rescuePlan = await consolidatePageEval(ev, entityResult.issues, ev.pageNumber, null, entry.version?.description || null);
-        rescueApplyScore(entry.version, { evalResult: ev, entityResult, consolidatedPlan: rescuePlan });
+        rescueApplyScore(entry.version, { evalResult: ev, entityResult, consolidatedPlan: rescuePlan, requireConsolidation: true });
         const repicked = selectBestVersion(pageVersions.get(ev.pageNumber));
         const prevBest = finalBestPerPage.get(ev.pageNumber);
         finalBestPerPage.set(ev.pageNumber, repicked);
@@ -3077,6 +3105,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       log.info(`📝 [POST-REPAIR-TEXT] Re-checking calm zone on ${postRepairTextPages.length} repaired pages`);
     }
 
+    const textSpaceCandidates = [];
     await Promise.all(postRepairTextPages.map(async (img) => {
       const pageNumber = img.pageNumber;
       const versions = pageVersions.get(pageNumber);
@@ -3141,15 +3170,18 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       }
 
       // If the winner is the original (no improvement), just refresh the
-      // report. Otherwise push the recovery winner as a new version and
-      // re-point finalBestPerPage so the build-final-results loop sees it.
+      // report. Otherwise the recovery winner becomes a CANDIDATE: it is scored
+      // on its OWN bytes below and only then competes (code review 2026-10 D1).
+      // It used to copy the predecessor's evaluation, whose evalImageFp describes
+      // different pixels, so pickBestVersionIndex refused the score every time
+      // and the paid re-render could never win.
       if (result.winnerIndex > 0) {
         const w = result.winnerCandidate;
         const newVersion = {
           imageData: w.imageData,
-          score: best.score,
+          score: null,
           source: 'post-repair-text-space',
-          evaluation: best.evaluation || null,
+          evaluation: null,
           modelId: w.modelId || best.modelId,
           grokRefImages: w.grokRefImages,
           entityIssues: best.entityIssues || [],
@@ -3157,30 +3189,39 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           prompt: w.prompt,
           pageNumber,
         };
-        // Canonical stamp (inherits the pre-recovery best's evaluation).
-        // Previously this copied finalScore inline WITHOUT an .evaluation-aware
-        // stamp, so the (since-deleted) persist-time re-stamp nulled its finalScore and the
-        // chosen text-space winner could never win pickBestVersionIndex —
-        // activeVersion then pointed at a different version than the flattened
-        // root imageData.
-        const { applyScore: stampTextSpace } = require('./scoring');
         // Lineage: recomposed from the picked best — its contract, its brief.
         inheritSceneContract(newVersion, best);
-        newVersion.consolidatedPlan = best.consolidatedPlan || null;
-        stampTextSpace(newVersion, {
-          evalResult: newVersion.evaluation,
-          entityResult: { issues: newVersion.entityIssues, penalty: best.entityPenaltyRaw ?? best.entityPenalty ?? 0 },
-          consolidatedPlan: newVersion.consolidatedPlan,
-        });
-        versions.push(newVersion);
-        // COMPETE, DO NOT APPOINT (owner, 2026-08-09). This used to force
-        // itself in as the best version regardless of score, so a repair that
-        // scored WORSE than what it replaced still shipped. One image, one
-        // score, highest wins — no exceptions and no side doors.
-        finalBestPerPage.set(pageNumber, selectBestVersion(versions));
+        textSpaceCandidates.push({ pageNumber, best, newVersion, versions });
       }
       img.textCoverageReport = { ...result.report, postRepairChecked: true };
     }));
+
+    // Score every recovery candidate on its own bytes (the same evaluateImageBatch
+    // + consolidation + applyScore every other writer uses), then let it COMPETE,
+    // DO NOT APPOINT (owner, 2026-08-09): one image, one score, highest wins.
+    if (textSpaceCandidates.length > 0) {
+      const tsEntries = textSpaceCandidates.map(c => ({ pageNumber: c.pageNumber, imageData: c.newVersion.imageData, ...c.newVersion }));
+      const tsEvals = await images().evaluateImageBatch(buildEvalInputs(tsEntries), { concurrency: evalConcurrency, qualityModelOverride, visualBible, clothingRequirements: storyData?.clothingRequirements || null, storyData, artStyle, ...evalStoryMeta });
+      for (const c of textSpaceCandidates) {
+        const ev = tsEvals.find(e => e.pageNumber === c.pageNumber);
+        if (ev?.usage && usageTracker) usageTracker('gemini_quality', ev.usage, 'post_repair_text_quality', ev.modelId);
+        if (!ev || ev.evaluated === false) {
+          log.error(`❌ [POST-REPAIR-TEXT] P${c.pageNumber}: the re-rendered image could not be evaluated (${ev?.evalError || ev?.error || 'no result'}) — it cannot compete, keeping the current best`);
+          continue;
+        }
+        // The re-render edits the picked best (same scene, same figures), so the
+        // entity evidence stays the best's own stamp; the eval and the
+        // consolidation are fresh, on the new bytes.
+        const entityResult = { issues: c.best.entityIssues || [], penalty: c.best.entityPenaltyRaw ?? c.best.entityPenalty ?? 0 };
+        const plan = await consolidatePageEval(ev, entityResult.issues, c.pageNumber, null, c.newVersion.description || null);
+        c.newVersion.evaluation = ev;
+        c.newVersion.score = ev.score ?? ev.qualityScore ?? null;
+        c.newVersion.consolidatedPlan = plan;
+        applyScore(c.newVersion, { evalResult: ev, entityResult, consolidatedPlan: plan, requireConsolidation: true });
+        c.versions.push(c.newVersion);
+        finalBestPerPage.set(c.pageNumber, selectBestVersion(c.versions));
+      }
+    }
   } catch (postRepairErr) {
     log.warn(`⚠️ [POST-REPAIR-TEXT] Recovery phase failed: ${postRepairErr.message} — keeping pre-recovery best versions`);
   }
