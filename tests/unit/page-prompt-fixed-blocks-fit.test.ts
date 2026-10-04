@@ -35,6 +35,12 @@ const { PROMPT_TEMPLATES } = require('../../server/services/prompts.js');
 // @ts-expect-error - JS module without types
 import { shrinkPromptForModel, promptFloor, dedupeIdenticalBullets, PROMPT_CUT_ORDER, PROMPT_NEVER_CUT } from '../../server/lib/images.js';
 
+// The cut MECHANISM is tested against the cap these stored fixtures were sized
+// for. Grok's real cap was raised to 16,000 bytes (config 15,900) on 2026-10-04
+// (decisions.md "Grok prompt caps are 16,000 / 64,000 bytes"), which these
+// prompts now fit under, so the cap is passed to the shrink explicitly.
+const MECHANISM_CAP = 7900;
+
 /**
  * Scene-prose room the fixed blocks must leave under the cap once every
  * allowed drop has run (measured 2026-10-04 with size never cut: p1 1,156,
@@ -74,7 +80,7 @@ function build(page: any) {
     visualBible: FX.visualBible, pageNumber: page.pageNumber, characterPhotos: page.referencePhotos,
     pageImageModel: tier.pageImageModel,
   });
-  return { prompt: String(make(page.vbRefElementIds)), cap: IMAGE_MODELS[tier.pageImageModel].maxPromptLength, model: tier.pageImageModel };
+  return { prompt: String(make(page.vbRefElementIds)), cap: MECHANISM_CAP, model: tier.pageImageModel };
 }
 
 /** The prompt's size once EVERY allowed cut has run (the shrink reports it when told to fit into 1 char). */

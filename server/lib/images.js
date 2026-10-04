@@ -16,7 +16,7 @@ const { MODEL_DEFAULTS, withRetry } = require('./textModels');
 const { buildCastIndex, resolveEntity } = require('./castResolver');
 const { generateWithRunware, isRunwareConfigured, RUNWARE_MODELS } = require('./runware');
 const { generateWithGrok, editWithGrok, isGrokConfigured, packReferences } = require('./grok');
-const { PromptFitError } = require('./promptFitError');
+const { PromptFitError, promptBytes } = require('./promptFitError');
 const { MODEL_PRICING } = require('../config/models');
 const { geminiUsage, xaiUsage, openRouterUsage } = require('./providerUsage');
 const { getCurrentLogger } = require('./generationLogger');
@@ -1145,7 +1145,24 @@ function sceneHeadOf(prompt) {
  *   prompt.
  */
 async function shrinkPromptForModel(prompt, maxPromptLength, logLabel, modelName = null, meta = null) {
-  if (!prompt || prompt.length <= maxPromptLength) return prompt;
+  if (!prompt || promptBytes(prompt) <= maxPromptLength) return prompt;
+  // The cap is UTF-8 bytes (xAI counts bytes, 2026-10-04); every shrink step
+  // below counts chars. Shrink to a char budget, measure the bytes, tighten
+  // the budget by the overshoot. An ASCII prompt fits on the first pass.
+  let charBudget = maxPromptLength;
+  for (let pass = 0; pass < 4; pass++) {
+    const out = await shrinkToCharBudget(prompt, charBudget, logLabel, modelName, meta);
+    const over = promptBytes(out) - maxPromptLength;
+    if (over <= 0) return out;
+    // From what came back, not what was asked: sentence and block cuts land
+    // under the budget, and lowering the budget alone can return the same text.
+    charBudget = Math.min(charBudget, out.length) - over;
+  }
+  throw new PromptFitError(`prompt-shrink [${logLabel}]: still over the ${maxPromptLength}-byte cap after 4 byte-tightening passes`);
+}
+
+async function shrinkToCharBudget(prompt, maxPromptLength, logLabel, modelName, meta) {
+  if (prompt.length <= maxPromptLength) return prompt;
 
   // 1. Deterministic: merge duplicated bullet bodies, collapse blank runs.
   let out = dedupeIdenticalBullets(prompt);
@@ -1237,16 +1254,16 @@ const PLATE_CUT_ORDER = [
 ];
 
 /**
- * Fit a plate prompt into `maxLen`, dropping only PLATE_CUT_ORDER steps.
+ * Fit a plate prompt into `maxLen` UTF-8 bytes, dropping only PLATE_CUT_ORDER steps.
  * Throws PromptFitError when it still does not fit — never cuts anything else.
  */
 function fitPlatePrompt(prompt, maxLen, logLabel, modelName = null) {
-  if (!prompt || prompt.length <= maxLen) return prompt;
+  if (!prompt || promptBytes(prompt) <= maxLen) return prompt;
   let out = prompt;
   const dropped = [];
   const droppedSteps = [];
   PLATE_CUT_ORDER.forEach((step, i) => {
-    if (out.length <= maxLen || !step.applies(out)) return;
+    if (promptBytes(out) <= maxLen || !step.applies(out)) return;
     const text = step.piece(out);
     if (!text) return;
     const before = out.length;
@@ -1254,8 +1271,8 @@ function fitPlatePrompt(prompt, maxLen, logLabel, modelName = null) {
     dropped.push(step.label);
     droppedSteps.push({ step: i + 1, label: step.label, chars: before - out.length });
   });
-  if (out.length > maxLen) {
-    throw new PromptFitError(`plate-fit [${logLabel}]: ${out.length} chars after every allowed cut${dropped.length ? ` (${dropped.join(', ')})` : ''}, cap ${maxLen}; the rest of a plate prompt must stay — refusing to cut it`);
+  if (promptBytes(out) > maxLen) {
+    throw new PromptFitError(`plate-fit [${logLabel}]: ${promptBytes(out)} bytes after every allowed cut${dropped.length ? ` (${dropped.join(', ')})` : ''}, cap ${maxLen}; the rest of a plate prompt must stay — refusing to cut it`);
   }
   log.warn(`✂️ [${logLabel}] Plate prompt ${prompt.length}→${out.length} chars (cap ${maxLen}), cut in order: ${describeCutSteps(droppedSteps)}`);
   recordPromptShrink({ logLabel, modelName, branch: 'plate-cut', before: prompt.length, after: out.length,

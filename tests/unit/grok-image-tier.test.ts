@@ -62,8 +62,16 @@ describe('resolveGrokImageModel', () => {
   it('returns a key whose registry row carries the Grok prompt budget', () => {
     // The dispatcher looks up maxPromptLength by the returned key; a key that
     // is not in the registry would silently fall back to a 7500 default.
-    for (const override of [null, 'grok-imagine-2', 'grok-imagine-pro', 'bogus']) {
-      expect(IMAGE_MODELS[resolveGrokImageModel(override).key].maxPromptLength).toBe(7900);
+    // Caps are UTF-8 bytes; xAI raised them 2026-10-04 (decisions.md "Grok
+    // prompt caps are 16,000 / 64,000 bytes"): 16,000 / 64,000 less 100 margin.
+    const expected: Record<string, number> = { 'grok-imagine': 15900, 'grok-imagine-pro': 15900, 'grok-imagine-2': 63900 };
+    const cases: Array<[string | null, string]> = [
+      [null, 'grok-imagine'], ['grok-imagine-2', 'grok-imagine-2'], ['grok-imagine-pro', 'grok-imagine-pro'], ['bogus', 'grok-imagine'],
+    ];
+    for (const [override, key] of cases) {
+      const resolved = resolveGrokImageModel(override).key;
+      expect(resolved).toBe(key);
+      expect(IMAGE_MODELS[resolved].maxPromptLength).toBe(expected[key]);
     }
   });
 

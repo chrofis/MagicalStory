@@ -5323,7 +5323,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
   }
 
   // FALLBACK: Only add full Visual Bible if scene description didn't specify required objects
-  // AND the image backend is not Grok (Grok has 8000 char limit, VB grid is sent as reference image)
+  // (Grok also gets the VB grid as a reference image)
   // This handles storybook mode where there's no separate scene description step
   let visualBibleSection = '';
   const skipVisualBible = options?.skipVisualBible === true;

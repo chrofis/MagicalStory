@@ -17,7 +17,7 @@ const r2 = require('./r2');
 const { withGrok } = require('./aiConcurrency');
 const { frameColorForName } = require('./characterFrames');
 const { guardPromptString } = require('../services/prompts');
-const { PromptFitError } = require('./promptFitError');
+const { PromptFitError, promptBytes } = require('./promptFitError');
 
 const XAI_API_KEY = process.env.XAI_API_KEY;
 const XAI_API_URL = 'https://api.x.ai/v1';
@@ -234,22 +234,23 @@ function grokPromptBudget(model) {
  * every Grok request. The page, cover and plate paths fit their prompts first
  * (images.js shrinkPromptForModel / fitPlatePrompt), but ~20 other callers
  * (repair, inpaint, avatars, style edit, composite) sent whatever they built:
- * Grok answered 400 above 8,000 chars and the caller read that as a provider
+ * Grok answered 400 above its cap (then 8,000) and the caller read that as a provider
  * failure — `editImageWithPrompt` even retried it as "content moderation" and
  * fell back to Gemini. Here an over-cap prompt is our bug, raised before any
  * request as a PromptFitError, which every provider-fallback catch rethrows
  * (images.js rethrowLocalFault). Never cuts — a caller that can shrink must do
- * it before calling.
+ * it before calling. Measured in UTF-8 bytes, as xAI measures it (2026-10-04).
  */
 function assertGrokPromptFits(prompt, model, logLabel) {
   const budget = grokPromptBudget(model);
-  if (prompt.length <= budget) return;
-  const msg = `${logLabel}: prompt is ${prompt.length} chars, over the ${budget} cap of ${model} — not sent`;
+  const bytes = promptBytes(prompt);
+  if (bytes <= budget) return;
+  const msg = `${logLabel}: prompt is ${bytes} bytes (${prompt.length} chars), over the ${budget}-byte cap of ${model} — not sent`;
   log.error(`❌ [GROK] ${msg}`);
   try {
     const { getCurrentLogger } = require('./generationLogger');
     getCurrentLogger()?.error('prompt_fit_failed', msg, null,
-      { label: logLabel, provider: 'grok', chars: prompt.length, cap: budget });
+      { label: logLabel, provider: 'grok', chars: prompt.length, bytes, cap: budget });
   } catch { /* logging only */ }
   throw new PromptFitError(msg);
 }
@@ -284,14 +285,14 @@ function assertGrokPromptFits(prompt, model, logLabel) {
  */
 async function fitGrokPromptWithPrefix(prefix, body, model) {
   const budget = grokPromptBudget(model);
-  if (prefix.length + body.length <= budget) return prefix + body;
+  if (promptBytes(prefix + body) <= budget) return prefix + body;
 
   // Lazy require: images.js requires this module, so a top-level import would
   // be circular (same pattern as sceneComposite.js).
   const { shrinkPromptForModel } = require('./images');
-  const fitted = await shrinkPromptForModel(body, budget - prefix.length, 'GROK EDIT', model);
-  log.warn(`✂️ [GROK] Magenta-extension prefix (${prefix.length} chars) pushed the prompt over the ${budget} budget `
-    + `— body refitted ${body.length}→${fitted.length}, final ${prefix.length + fitted.length}`);
+  const fitted = await shrinkPromptForModel(body, budget - promptBytes(prefix), 'GROK EDIT', model);
+  log.warn(`✂️ [GROK] Magenta-extension prefix (${promptBytes(prefix)} bytes) pushed the prompt over the ${budget}-byte budget `
+    + `— body refitted ${promptBytes(body)}→${promptBytes(fitted)} bytes, final ${promptBytes(prefix + fitted)}`);
   return prefix + fitted;
 }
 
@@ -2145,6 +2146,7 @@ module.exports = {
   // would mean a live xAI call.
   fitGrokPromptWithPrefix,
   assertGrokPromptFits,
+  grokPromptBudget,
   buildMagentaExtensionPrefix,
   GROK_MODELS,
 };

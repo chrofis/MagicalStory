@@ -36,7 +36,7 @@ const neverCutLead = neverCut => `Never cut, and neither are the labelled blocks
 function renderHtml({ steps, neverCut, grokCaps }) {
   return [
     BEGIN,
-    `<p>Grok image cap: <strong>${grokCaps.map(fmt).join(' / ')} characters</strong> (<code>server/config/models.js</code> <code>maxPromptLength</code>). A built prompt over the cap first has duplicated bullet bodies merged; if it still does not fit, <code>shrinkPromptForModel</code> removes these blocks, <strong>in this order</strong>, stopping as soon as it fits. The generation log names each block it removed, with its step number and size.</p>`,
+    `<p>Grok image cap: <strong>${grokCaps.map(fmt).join(' / ')} UTF-8 bytes</strong> (<code>server/config/models.js</code> <code>maxPromptLength</code>). A built prompt over the cap first has duplicated bullet bodies merged; if it still does not fit, <code>shrinkPromptForModel</code> removes these blocks, <strong>in this order</strong>, stopping as soon as it fits. The generation log names each block it removed, with its step number and size.</p>`,
     '<ol>',
     ...steps.map(s => `  <li><strong>${esc(s.label)}</strong> (~${fmt(s.approxChars)} chars) — ${esc(s.what)}. <em>Why here:</em> ${esc(s.why)}.</li>`),
     '</ol>',
@@ -51,7 +51,7 @@ function renderHtml({ steps, neverCut, grokCaps }) {
 function renderMarkdown({ steps, neverCut, grokCaps }) {
   return [
     BEGIN,
-    `Grok image cap: **${grokCaps.map(fmt).join(' / ')} characters** (\`server/config/models.js\` \`maxPromptLength\`). Over the cap, duplicated bullet bodies are merged first; then \`shrinkPromptForModel\` removes these blocks **in this order**, stopping as soon as the prompt fits. The generation log names each removed block with its step number and size.`,
+    `Grok image cap: **${grokCaps.map(fmt).join(' / ')} UTF-8 bytes** (\`server/config/models.js\` \`maxPromptLength\`). Over the cap, duplicated bullet bodies are merged first; then \`shrinkPromptForModel\` removes these blocks **in this order**, stopping as soon as the prompt fits. The generation log names each removed block with its step number and size.`,
     '',
     ...steps.map((s, i) => `${i + 1}. **${s.label}** (~${fmt(s.approxChars)} chars) — ${s.what}. *Why here:* ${s.why}.`),
     '',

@@ -4692,6 +4692,22 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "grok-prompt-cap-16k-bytes",
+      "title": "Grok prompts use xAI's real caps (16,000 / 64,000 UTF-8 bytes) instead of 7,900 chars",
+      "commits": [],
+      "addedAt": "2026-10-04",
+      "claim": "On the next full staging story rendered on Grok: no prompt_fit_failed event and no Grok 400 'Prompt length exceeds'; pages whose built prompt is 7,900-15,900 bytes are sent whole (no prompt-shrink event for them, where before they were cut); composite cover/blend prompts carry their full brief; page and cover images are no worse than the previous run.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Search the generation log for prompt_fit_failed, prompt-shrink events and 'Prompt length exceeds'; compare sent prompt sizes against the previous run; look at pages whose prompts were previously shrunk for regressions in adherence."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [

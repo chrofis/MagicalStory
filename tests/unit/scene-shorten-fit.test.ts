@@ -20,10 +20,15 @@ import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 const FX = require('./fixtures/page-prompt-fit-job_1790529840433_ar4u7qry3.json');
 const pageRender = require('../../server/lib/pageRenderCall.js');
-const { IMAGE_MODELS } = require('../../server/config/models.js');
 const { loadPromptTemplates } = require('../../server/services/prompts.js');
 const images = require('../../server/lib/images.js');
 const shorten = require('../../server/lib/sceneShorten.js');
+
+// The shrink MECHANISM is tested against the cap these stored pages were
+// sized for. Grok's real cap was raised to 16,000 bytes (config 15,900) on
+// 2026-10-04 (decisions.md "Grok prompt caps are 16,000 / 64,000 bytes"), which
+// these fixtures now fit under, so the cap is passed explicitly.
+const MECHANISM_CAP = 7900;
 
 const ORIGINAL_TRY = shorten.shortenSceneOnce;
 let calls: Array<{ prose: string; target: number }> = [];
@@ -47,7 +52,7 @@ function build(sceneChars: number) {
     sceneDescription, inputData, sceneCharacters: page.sceneCharacters, visualBible: FX.visualBible,
     pageNumber: page.pageNumber, characterPhotos: page.referencePhotos, pageImageModel: tier.pageImageModel,
   })(page.vbRefElementIds));
-  return { prompt, cap: IMAGE_MODELS[tier.pageImageModel].maxPromptLength, model: tier.pageImageModel };
+  return { prompt, cap: MECHANISM_CAP, model: tier.pageImageModel };
 }
 
 /** Every labelled paragraph of the head and the whole protected tail, as the

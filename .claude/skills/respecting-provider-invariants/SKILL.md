@@ -16,7 +16,7 @@ Model IDs and numeric limits below can drift as providers update: `server/config
 | Provider | Invariant |
 |---|---|
 | Grok edit | Output aspect is coerced to **input** aspect. Never feed raw-aspect inputs; use the existing preset-aligned/pad pathways (`computePresetAlignedExtract`, magenta-pad). Pad-vs-crop was flip-flopped 4× — the current strategy is deliberate, check `docs/decisions.md` before changing it. |
-| Grok | **8,000-char hard prompt limit** (`maxPromptLength` in config). Any feature concatenating prose into a Grok prompt must budget against it — do not discover it via a 400. |
+| Grok | **Hard prompt limit in UTF-8 BYTES: 16,000 (Standard, Pro) / 64,000 (2.0)** — was 8,000 until mid-2026 (`maxPromptLength` in config, 100 under; measure with `promptBytes`, never `.length`). Any feature concatenating prose into a Grok prompt must budget against it — do not discover it via a 400. Source of truth: `GET /v1/image-generation-models` `max_prompt_length`. |
 | Grok | Character names / VB ids in prompts get **painted onto the image as text**. Every prompt path must run `sanitizeVbIdsInPrompt`; covers once bypassed it ("VEH001" on a truck). |
 | Gemini | Safety-blocks (`PROHIBITED_CONTENT`, `IMAGE_OTHER`) on age/gender/adult-face terms. Use `sanitizeForGemini(text, level)` — never write a new inline sanitizer (the 6 re-implementations were consolidated once already). |
 | Gemini | `gemini-2.5-flash` required for quality eval / bounding boxes; `gemini-2.0-flash` cannot return bboxes. |

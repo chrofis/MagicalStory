@@ -30,11 +30,16 @@ grok.editWithGrok = async (p: string) => editImpl(p);
 
 const images = require_('../../server/lib/images');
 const { PromptFitError } = require_('../../server/lib/promptFitError');
-const { emptyScenePlateRouting } = require_('../../server/config/models');
+const { emptyScenePlateRouting, IMAGE_MODELS } = require_('../../server/config/models');
 const { loadPromptTemplates, buildEmptyScenePrompt } = require_('../../server/services/prompts');
 const { GenerationLogger, setCurrentLogger, clearCurrentLogger } = require_('../../server/lib/generationLogger');
 
-const CAP = 7900;
+// The Grok cap in UTF-8 bytes. Read from config: xAI raised it 7,900 -> 15,900
+// on 2026-10-04 (decisions.md "Grok prompt caps are 16,000 / 64,000 bytes"), and
+// every size below is scaled from it so the plates stay just over / under it.
+const CAP: number = IMAGE_MODELS['grok-imagine'].maxPromptLength;
+// A plate whose must-keep text alone is over the cap (9,000 chars when the cap was 7,900).
+const UNFITTABLE = CAP + 1100;
 // The magenta-extension prefix a padded plate used to carry (616 chars).
 const OLD_PREFIX = 616;
 const realFetch = global.fetch;
@@ -110,7 +115,7 @@ describe('fitPlatePrompt', () => {
   });
 
   it('throws PromptFitError, never a blunt cut, when the must-keep text alone is over', () => {
-    const p = platePrompt(9000);
+    const p = platePrompt(UNFITTABLE);
     expect(() => images.fitPlatePrompt(p, CAP, 'T')).toThrow(PromptFitError);
   });
 });
@@ -141,7 +146,7 @@ describe('the dispatcher fits a plate against the full cap', () => {
 describe('a prompt that does not fit fails loudly and never reaches Gemini', () => {
   it('plate: PromptFitError, a prompt_fit_failed error, no provider fallback, no Gemini call', async () => {
     let thrown: any;
-    try { await renderPlate(platePrompt(9000)); } catch (e) { thrown = e; }
+    try { await renderPlate(platePrompt(UNFITTABLE)); } catch (e) { thrown = e; }
     expect(thrown).toBeInstanceOf(PromptFitError);
     expect(sentPrompts).toHaveLength(0);
     expect(fetchCalls).toBe(0);

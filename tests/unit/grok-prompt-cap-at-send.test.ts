@@ -4,8 +4,8 @@ import { describe, it, expect, beforeAll, afterEach, vi } from 'vitest';
 //
 // The page, cover and plate paths fit their prompts before calling Grok, but
 // ~20 other callers (face/character repair, inpaint, avatars, style edit, the
-// composite blend) sent whatever they built. Grok answered 400 above 8,000
-// chars and the caller read it as a provider failure — editImageWithPrompt
+// composite blend) sent whatever they built. Grok answered 400 above its cap (8,000
+// chars then; 16,000 / 64,000 bytes since 2026-10-04) and the caller read it as a provider failure — editImageWithPrompt
 // retried it as "content moderation" and fell back to Gemini. The send points
 // themselves now refuse an over-cap prompt with a PromptFitError, before any
 // request is made.
@@ -65,6 +65,19 @@ describe('Grok send points refuse an over-cap prompt', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it('coverComposite.callGrokEdit: one char over the cap throws PromptFitError and sends nothing', async () => {
+    const fetchMock = mockGrok();
+    // @ts-expect-error - JS module without types
+    const { callGrokEdit } = await import('../../server/lib/coverComposite.js');
+    const model = grok.GROK_MODELS.STANDARD;
+    const img = Buffer.from((await jpeg()).split(',')[1], 'base64');
+    await expect(callGrokEdit('x'.repeat(capOf(model) + 1), img, { model }))
+      .rejects.toMatchObject({ name: 'PromptFitError' });
+    expect(fetchMock).not.toHaveBeenCalled();
+    await callGrokEdit('x'.repeat(capOf(model)), img, { model });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it('a prompt exactly at the cap is sent, for every Grok tier', async () => {
     for (const model of [grok.GROK_MODELS.STANDARD, grok.GROK_MODELS.IMAGE_2, grok.GROK_MODELS.PRO]) {
       const fetchMock = mockGrok();
@@ -75,9 +88,34 @@ describe('Grok send points refuse an over-cap prompt', () => {
     }
   });
 
-  it('the cap is under Grok\'s real 8,000-char API limit for every tier', () => {
-    for (const m of Object.values(IMAGE_MODELS) as any[]) {
-      if (m.backend === 'grok') expect(m.maxPromptLength, m.modelId).toBeLessThanOrEqual(8000);
+  // xAI's real max_prompt_length per model, UTF-8 bytes (verified live
+  // 2026-10-04; it was 8,000 for all of them until mid-2026).
+  const XAI_LIMITS: Record<string, number> = {
+    'grok-imagine-image': 16000,
+    'grok-imagine-image-pro': 16000,
+    'grok-imagine-image-2.0': 64000,
+  };
+
+  it("the cap is under xAI's real API limit for every tier", () => {
+    const grokTiers = (Object.values(IMAGE_MODELS) as any[]).filter(m => m.backend === 'grok');
+    expect(grokTiers.length).toBeGreaterThan(0);
+    for (const m of grokTiers) {
+      expect(XAI_LIMITS[m.modelId], `${m.modelId} has a known xAI limit`).toBeTypeOf('number');
+      expect(m.maxPromptLength, m.modelId).toBeLessThanOrEqual(XAI_LIMITS[m.modelId]);
     }
+  });
+
+  it('the cap counts UTF-8 bytes: under the cap in chars but over in bytes throws PromptFitError and sends nothing', async () => {
+    const fetchMock = mockGrok();
+    const model = grok.GROK_MODELS.STANDARD;
+    const prompt = 'ü'.repeat(Math.floor(capOf(model) / 2) + 1); // 2 bytes each: over in bytes, under in chars
+    expect(prompt.length).toBeLessThanOrEqual(capOf(model));
+    expect(Buffer.byteLength(prompt, 'utf8')).toBeGreaterThan(capOf(model));
+    await expect(grok.generateWithGrok(prompt, { model }))
+      .rejects.toMatchObject({ name: 'PromptFitError' });
+    expect(fetchMock).not.toHaveBeenCalled();
+    // Exactly at the cap in bytes is sent.
+    await grok.generateWithGrok('ü'.repeat(Math.floor(capOf(model) / 2)), { model });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });

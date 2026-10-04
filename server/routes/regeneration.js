@@ -1450,8 +1450,9 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
           // Strip scene prose from the brief (same logic as server.js).
           const rawBrief = pageData.prompt || '';
           const headerIdx = rawBrief.search(/\*\*(THIS IMAGE DEPICTS|Clothing|HEIGHT ORDER|REQUIRED OBJECTS|ERFORDERLICHE OBJEKTE|OBJETS REQUIS)/i);
-          let compositeBrief = headerIdx >= 0 ? rawBrief.slice(headerIdx).trim() : rawBrief;
-          if (compositeBrief.length > 5500) compositeBrief = compositeBrief.slice(0, 5500).trim();
+          // No pre-slice: the composite prompt builder trims the brief to the
+          // Grok cap itself (a blind 5,500-char cut here dated from the 8,000 cap).
+          const compositeBrief = headerIdx >= 0 ? rawBrief.slice(headerIdx).trim() : rawBrief;
           // VB grid normalisation — buildVisualBibleGrid returns Buffer here.
           const vbGridUri = Buffer.isBuffer(visualBibleGrid)
             ? `data:image/jpeg;base64,${visualBibleGrid.toString('base64')}`
@@ -1593,10 +1594,10 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
           const vbGridUri = Buffer.isBuffer(refs.visualBibleGrid)
             ? `data:image/jpeg;base64,${refs.visualBibleGrid.toString('base64')}`
             : (typeof refs.visualBibleGrid === 'string' && refs.visualBibleGrid ? refs.visualBibleGrid : null);
-          // Composite brief: use cover prompt if available; trimmed to
-          // BLEND_PROMPT_HARD_CAP room (the prompt builder trims again).
+          // Composite brief: the cover prompt, untrimmed — the composite prompt
+          // builder trims it to the Grok cap.
           const coverPrompt = storyData.coverImages?.[coverType]?.prompt || '';
-          const compositeBrief = coverPrompt.length > 5500 ? coverPrompt.slice(0, 5500).trim() : coverPrompt;
+          const compositeBrief = coverPrompt;
           const compResult = await generateSceneComposite({
             cleanBackgroundPrompt: refs.sceneMetadata?.emptyScenePrompt
               || storyData.coverImages?.[coverType]?.description

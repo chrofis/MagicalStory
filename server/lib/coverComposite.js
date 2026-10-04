@@ -425,6 +425,10 @@ async function callGrokEdit(promptOrImgs, imgBuf, { aspectRatio = MODEL_DEFAULTS
   const apiKey = process.env.XAI_API_KEY;
   if (!apiKey) throw new Error('XAI_API_KEY not set');
   const prompt = promptOrImgs;
+  // Same send-time cap as grok.js generateWithGrok/editWithGrok — this direct
+  // /images/edits call was missed by the 2026-09-30 send-point guard.
+  // Lazy require: grok.js → images.js → coverComposite.js would be circular.
+  require('./grok').assertGrokPromptFits(prompt, model, 'coverComposite.callGrokEdit');
   const buffers = Array.isArray(imgBuf) ? imgBuf.filter(Boolean).slice(0, 3) : [imgBuf];
   if (buffers.length === 0) throw new Error('callGrokEdit requires at least one input image');
   const t0 = Date.now();
@@ -1151,4 +1155,5 @@ module.exports = {
   arrangeCenterOut,
   parseExplicitSequence,
   visualIdentifier,
+  callGrokEdit,
 };

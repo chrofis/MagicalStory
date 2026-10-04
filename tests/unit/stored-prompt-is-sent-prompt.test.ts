@@ -104,8 +104,10 @@ describe('the stored page prompt is the prompt the model received', () => {
     // the compression branch fired and the reproduction is wrong.
     textModels.callTextModel = async () => { throw new Error('compressor must not run'); };
 
+    // 40 duplicated bullets when the cap was 7,900 (raised 2026-10-04, decisions.md
+    // "Grok prompt caps are 16,000 / 64,000 bytes"): scaled so the raw prompt stays over the cap.
     const body = `wearing the same verbatim proportion boilerplate ${'x'.repeat(200)}`;
-    const dupes = Array.from({ length: 40 }, (_, i) => `- Name${i}: ${body}`).join('\n');
+    const dupes = Array.from({ length: Math.ceil(CAP / 200) }, (_, i) => `- Name${i}: ${body}`).join('\n');
     const built = `${'Scene prose. '.repeat(400)}\n${dupes}\n\n**REQUIRED OBJECTS**\n- a lantern\n\n**ART STYLE**\nwatercolour.`;
     expect(built.length).toBeGreaterThan(CAP);
 

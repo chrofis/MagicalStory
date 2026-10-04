@@ -1098,7 +1098,7 @@ const IMAGE_BACKENDS = {
 };
 
 // Image model configurations
-// maxPromptLength: Maximum characters for the prompt (API limit)
+// maxPromptLength: maximum prompt size in UTF-8 BYTES (promptFitError.promptBytes) — xAI counts bytes
 // maxCharactersPerScene: Max characters in scene hints (Grok handles more faces via ref images)
 const IMAGE_MODELS = {
   'gemini-2.5-flash-image': {
@@ -1149,12 +1149,11 @@ const IMAGE_MODELS = {
     modelId: 'grok-imagine-image',
     description: 'Grok Imagine Standard - Good quality ($0.02/image), ref image support',
     backend: 'grok',
-    // Grok's API limit is 8000 chars. The 500-char margin was costing more than
-    // it protected: page 9 of job_1786484554633 built to 7534 — 34 over this
-    // budget, 466 UNDER what Grok accepts — and that 34 triggered an LLM
-    // compression pass that deleted four characters' hats. 100 chars of margin
-    // is enough for the assembly slack; the compressor is the expensive guard.
-    maxPromptLength: 7900,
+    // xAI's cap is 16,000 UTF-8 BYTES (GET /v1/image-generation-models
+    // max_prompt_length, and a 16,001-byte prompt is refused, 2026-10-04 — it
+    // was 8,000 until mid-2026). 100 bytes of margin for assembly slack, as
+    // before. decisions.md 2026-10-04 "Grok prompt caps are 16,000 / 64,000 bytes".
+    maxPromptLength: 15900,
     maxCharactersPerScene: 6
   },
   // Imagine Image 2.0 — xAI's current recommended image model, shipped to the
@@ -1169,19 +1168,19 @@ const IMAGE_MODELS = {
     modelId: 'grok-imagine-image-2.0',
     description: 'Grok Imagine Image 2.0 - typography-aware ($0.04/image), ref image support',
     backend: 'grok',
-    maxPromptLength: 7900,
+    // 64,000 UTF-8 bytes per xAI (same source and date as above).
+    maxPromptLength: 63900,
     maxCharactersPerScene: 6
   },
   'grok-imagine-pro': {
     modelId: 'grok-imagine-image-pro',
     description: 'Grok Imagine Pro - Higher quality ($0.05/image at 1K, $0.07 at 2K), ref image support',
     backend: 'grok',
-    // Grok's API limit is 8000 chars. The 500-char margin was costing more than
-    // it protected: page 9 of job_1786484554633 built to 7534 — 34 over this
-    // budget, 466 UNDER what Grok accepts — and that 34 triggered an LLM
-    // compression pass that deleted four characters' hats. 100 chars of margin
-    // is enough for the assembly slack; the compressor is the expensive guard.
-    maxPromptLength: 7900,
+    // xAI's cap is 16,000 UTF-8 BYTES (GET /v1/image-generation-models
+    // max_prompt_length, and a 16,001-byte prompt is refused, 2026-10-04 — it
+    // was 8,000 until mid-2026). 100 bytes of margin for assembly slack, as
+    // before. decisions.md 2026-10-04 "Grok prompt caps are 16,000 / 64,000 bytes".
+    maxPromptLength: 15900,
     maxCharactersPerScene: 6
   }
 };
