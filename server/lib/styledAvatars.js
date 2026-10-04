@@ -1911,6 +1911,23 @@ function clearStyledAvatarGenerationLog() {
 }
 
 /**
+ * The approved styled sheet a wardrobe-state variant is redressed from (an R2
+ * URL or a data URI, as stored), or null. A costumed base is stored per costume
+ * (styled.costumed[<costume>]); one costume per character per story, picked the
+ * way the story projection picks it (storyAvatars: first key, sorted). One
+ * reader for production (prepareWardrobeVariantAvatars) and the Test Lab's
+ * avatar_redress stage, so the Lab redresses the sheet production would.
+ */
+function approvedBaseSheetFor(char, artStyle, baseCategory) {
+  const styledForStyle = char?.avatars?.styledAvatars?.[artStyle] || {};
+  if (baseCategory === 'costumed') {
+    const c = styledForStyle.costumed;
+    return c && typeof c === 'object' ? c[Object.keys(c).sort()[0]] || null : c || null;
+  }
+  return styledForStyle[baseCategory] || null;
+}
+
+/**
  * WARDROBE-STATE VARIANT SHEETS — one extra sheet per derived requirement row.
  *
  * Deliberately NOT a branch inside prepareStyledAvatars. That function resolves
@@ -1958,16 +1975,7 @@ async function prepareWardrobeVariantAvatars(characters, artStyle, variantRequir
     // THE APPROVED SHEET IS THE INPUT — never the photos (owner, 2026-09-19).
     // No base sheet means no variant: falling back to a photo→sheet build here
     // would produce a second, independently-drawn character.
-    // A costumed base is stored per costume (styled.costumed[<costume>]); one
-    // costume per character per story, picked the way the story projection
-    // picks it (storyAvatars: first key, sorted).
-    const styledForStyle = char.avatars?.styledAvatars?.[artStyle] || {};
-    const baseSheetRaw = off.baseCategory === 'costumed'
-      ? (styledForStyle.costumed && typeof styledForStyle.costumed === 'object'
-        ? styledForStyle.costumed[Object.keys(styledForStyle.costumed).sort()[0]] || null
-        : styledForStyle.costumed || null)
-      : styledForStyle[off.baseCategory] || null;
-    const baseSheet = await photoAsDataUri(baseSheetRaw, `${charName} ${off.baseCategory} sheet`);
+    const baseSheet = await photoAsDataUri(approvedBaseSheetFor(char, artStyle, off.baseCategory), `${charName} ${off.baseCategory} sheet`);
     if (!baseSheet) {
       log.warn(`👕 [WARDROBE-VARIANT] ${charName}: no approved "${off.baseCategory}" sheet to redress — no variant (the page keeps the worn sheet + the "leave it off" line)`);
       continue;
@@ -2023,6 +2031,7 @@ module.exports = {
   getOrCreateStyledAvatar,
   prepareStyledAvatars,
   prepareWardrobeVariantAvatars,
+  approvedBaseSheetFor,
   convertAvatarToStyle,
 
   // Apply styled avatars to photo arrays

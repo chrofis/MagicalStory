@@ -975,6 +975,7 @@ Nothing below should be coded until it is answered.
 
 ## Experiments proposed, none run
 
+- [ ] Sheet style judge arms: deploy branch lab/sheet-style-judge-arms (it carries the wardrobe-variant fix), make garment-off variants with avatar_redress, add them as sheet_style fixtures, run the 5 arms x2 (cap CHF 1.00), record results and the recommendation → docs/decisions.md:24
 Seeded 2026-07-21. None of these is committed work — they are candidates.
 
 - [ ] ~~Rewrite self-critique into per-page failure-mode verdicts~~ — **SUPERSEDED, retire.** It

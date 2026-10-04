@@ -985,7 +985,10 @@ async function evaluateStyledSheetWithGemini(sourcePhoto, realisticSheet, styled
   // (garmentColourRule), so the judge scores exactly that, against Image 2.
   // removedGarments: the garments a wardrobe-state variant takes off (redressSheetVariant);
   // empty on an ordinary pass 2, where the task scores 10.
-  const { model = 'gemini-2.5-flash', promptOverride = null, removedGarments = [] } = opts;
+  // imageLabels: Test Lab A/B only (sheetJudgeArms.js) — three caption strings
+  // sent as text parts before Image 1/2/3. Production passes none: the images
+  // go first, unlabelled, then the prompt.
+  const { model = 'gemini-2.5-flash', promptOverride = null, removedGarments = [], imageLabels = null } = opts;
   const styleLabel = resolveStyleLineForSheet(artStyle);
 
   let prompt = promptOverride || PROMPT_TEMPLATES.sheet2x4StyleEval;
@@ -1004,10 +1007,12 @@ async function evaluateStyledSheetWithGemini(sourcePhoto, realisticSheet, styled
 
   // No output cap (owner rule): a 2500 cap once truncated this JSON mid-string
   // when the TASK-5 colour enumeration made the model think longer.
+  const images = [sourcePhoto, realisticSheet, styledSheet].map(toInlinePart);
+  if (imageLabels != null && (!Array.isArray(imageLabels) || imageLabels.length !== 3)) {
+    throw new Error('evaluateStyledSheetWithGemini: imageLabels must be three strings (Image 1, 2, 3)');
+  }
   const parts = [
-    toInlinePart(sourcePhoto),
-    toInlinePart(realisticSheet),
-    toInlinePart(styledSheet),
+    ...(imageLabels ? images.flatMap((img, i) => [{ text: String(imageLabels[i]) }, img]) : images),
     { text: prompt },
   ];
   const report = await askSheetJudge({ model, parts, prompt, label: 'style-eval', usageTracker, usageFn: 'character_2x4_style_eval', apiKey: geminiApiKey });
@@ -1398,6 +1403,7 @@ async function evaluateAvatarSheet(sheet, opts = {}) {
     pass, facePhoto = null, standardAvatar = null, realisticSheet = null,
     costumeDescription = 'standard outfit', costumeName = null, artStyle = 'watercolor',
     declaredAge = null, model = null, promptOverrides = {}, usageTracker = null, removedGarments = [],
+    imageLabels = null,
   } = opts;
   // promptOverrides (Test Lab only) name the ONE judge template each replaces:
   // heads / bodies / identity on pass 1, style on pass 2. An override for a
@@ -1414,7 +1420,7 @@ async function evaluateAvatarSheet(sheet, opts = {}) {
   }
   const styled = await evaluateStyledSheetWithGemini(
     facePhoto, realisticSheet, sheet, artStyle, process.env.GEMINI_API_KEY,
-    usageTracker, declaredAge, { model: model || undefined, promptOverride: promptOverrides?.style || null, removedGarments }
+    usageTracker, declaredAge, { model: model || undefined, promptOverride: promptOverrides?.style || null, removedGarments, imageLabels }
   );
   return { verdict: styled.report, split: null, promptUsed: styled.promptUsed };
 }

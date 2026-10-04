@@ -21,6 +21,32 @@ superseded and link forward.
 
 ---
 
+## 2026-10-04 — Sheet style judge arms are Lab-only until measured; production keeps `current`
+
+**Context:** Diagnosis 2026-10-04 of the Pass-2 sheet style judge (`evaluateStyledSheetWithGemini`, `prompts/sheet-2x4-style-eval.txt`). It passed a garment-off variant whose head row was flat line art, cropped wider than its reference.
+- The images are sent unlabelled, so it read Image 2's garments into Image 3.
+- Its style reason repeats the requested-style text: all 36 approvals in 8 days scored exactly 9, including a base that is close to a photograph.
+- No axis owns a medium change between cells, or a framing change.
+- For a variant, the judge never sees the styled base that the generator edited.
+- Five fix shapes were proposed. The owner chose to measure them before picking.
+
+**Decision:** The shapes are Test Lab arms, never production code paths.
+- `server/lib/sheetJudgeArms.js` builds each arm from the CURRENT template by replacing whole TASK blocks, and throws when a block is missing.
+- `evaluateStyledSheetWithGemini` gained one Lab-only option, `imageLabels`. Production passes none, so production's parts are unchanged (pinned in `tests/unit/sheet-judge-arms.test.ts`).
+- The arms are measured on a new judge-fixture judge, `sheet_style`, in `tests/judge-fixtures/fixtures.json`.
+  - 12 fixtures, every one viewed at full size. 7 flag: a base close to a photograph, a base with printed captions, three rejected attempts with ghosted extra figures, and two "garment still on" controls. 5 pass: clean bases.
+  - Each arm runs twice: `judge-fixtures.js run --judge=sheet_style --params='{"arm":…}' --repeats=2`.
+- Garment-off variants were never stored, so they are made in the Lab by `avatar_redress`. That stage runs the production redress without a judge, and reads the base through the one shared reader `styledAvatars.approvedBaseSheetFor`.
+- Hans (n9wrh5u0j) is not a fixture: at full size it is a realistic but painted watercolor, so its expected verdict is not unambiguous.
+
+**Rationale:** A judge change is adopted on measured recall and false-alarm rates over viewed fixtures, not on one page. Lab-only arms keep production exactly as it is until the owner picks.
+
+**Touched:** server/lib/sheetJudgeArms.js, server/lib/character2x4Sheet.js (`imageLabels`), server/lib/judgeFixtures.js, server/lib/testlab.js (`sheet_style` fixture replay, `avatar_redress`), server/lib/styledAvatars.js (`approvedBaseSheetFor`), scripts/admin/judge-fixtures.js (`--params`, member note), client/src/pages/TestLab.tsx, client/src/services/testlabService.ts, tests/judge-fixtures/fixtures.json, docs/judge-fixtures.md, tests/unit/sheet-judge-arms.test.ts
+
+**Status:** 🟡 built. The measurement waits on the staging deploy of this branch, which carries the wardrobe-variant fix (TASK 10) it depends on. Results and the recommended arm will be added here.
+
+---
+
 ## 2026-10-04 — An off-garment sheet is judged by the judge that approved its base; costumed sheets get off variants; a missing one is a recorded defect
 
 **Context:** Staging job_1791040103540_atbttop6w. Kiaan's jacket-off sheet (`styled-standard--off:CLO001`) was redressed twice and rejected twice at 1/10, so p11, p12 and p16 were drawn from the sheet that wears the jacket.

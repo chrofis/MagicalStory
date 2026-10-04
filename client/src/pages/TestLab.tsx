@@ -2191,6 +2191,55 @@ function StepsStrip({ steps, images, onOpen }: {
   );
 }
 
+/** judge_fixture card: the outcome against the expectation, the judged image
+ *  (and, for a sheet, its reference), and the judge's findings in its own words. */
+interface JudgeFixtureView {
+  judge?: string;
+  fixtureId?: string | null;
+  input?: { imageUrl?: string | null };
+  expect?: { verdict?: string; types?: string[] };
+  note?: string | null;
+  verdict?: { outcome?: string; expected?: string; flagged?: boolean };
+  findings?: Array<{ type?: string | null; text?: string; fields?: Record<string, unknown> }>;
+  cost?: { usd?: number; basis?: string };
+  judgeResult?: { arm?: string; armApplied?: string; reference?: string; referenceUrl?: string | null; removedGarments?: string[]; promptUsed?: string; verdict?: Record<string, unknown> };
+}
+function JudgeFixtureSummary({ result }: { result: ExperimentResult }) {
+  const r = result as unknown as JudgeFixtureView;
+  const outcome = r.verdict?.outcome || '?';
+  const good = outcome === 'TP' || outcome === 'TN';
+  const jr = r.judgeResult;
+  return (
+    <div className="text-xs space-y-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className={`px-2 py-0.5 rounded font-semibold ${good ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{outcome}</span>
+        <span>expected <b>{r.expect?.verdict}</b>{r.expect?.types?.length ? ` (${r.expect.types.join(', ')})` : ''}</span>
+        {jr?.arm && <span className="text-gray-600">arm <b>{jr.arm}</b>{jr.armApplied && jr.armApplied !== jr.arm ? ` (ran as ${jr.armApplied})` : ''} · reference: {jr.reference}</span>}
+        {jr?.removedGarments?.length ? <span className="text-gray-600">taken off: {jr.removedGarments.join(', ')}</span> : null}
+        {r.cost?.usd != null && <span className="text-gray-500">${r.cost.usd.toFixed(4)}</span>}
+      </div>
+      {r.note && <div className="text-gray-600"><b>Why:</b> {r.note}</div>}
+      {(r.input?.imageUrl || jr?.referenceUrl) && (
+        <div className="grid grid-cols-2 gap-2">
+          {r.input?.imageUrl && <figure><img src={r.input.imageUrl} alt="judged" className="w-full rounded border" /><figcaption className="text-gray-500">judged</figcaption></figure>}
+          {jr?.referenceUrl && <figure><img src={jr.referenceUrl} alt="reference" className="w-full rounded border" /><figcaption className="text-gray-500">reference (Image 2)</figcaption></figure>}
+        </div>
+      )}
+      {(r.findings || []).length === 0
+        ? <div className="text-gray-500">No findings.</div>
+        : <ul className="list-disc pl-4">{(r.findings || []).map((f, i) => <li key={i}><b>{f.type}</b>{f.fields?.score != null ? ` ${String(f.fields.score)}/10` : ''}: {f.text}</li>)}</ul>}
+      {jr?.verdict && (
+        <details><summary className="cursor-pointer text-indigo-600">Full verdict</summary>
+          <pre className="bg-gray-50 rounded-lg p-2 overflow-x-auto max-h-64">{JSON.stringify(jr.verdict, null, 2)}</pre></details>
+      )}
+      {jr?.promptUsed && (
+        <details><summary className="cursor-pointer text-indigo-600">Prompt sent ({jr.promptUsed.length.toLocaleString()} chars)</summary>
+          <pre className="bg-gray-50 rounded-lg p-2 overflow-x-auto max-h-64 whitespace-pre-wrap">{jr.promptUsed}</pre></details>
+      )}
+    </div>
+  );
+}
+
 function ResultCard({ result, stage, onRedo, redoing, onReplayBlend, isRedo, superseded, onEditPrompt }: { result: ExperimentResult; stage: string; onRedo?: () => void; redoing?: boolean; onReplayBlend?: () => void; isRedo?: boolean; superseded?: boolean; onEditPrompt?: (text: string) => void }) {
   const [baseline, setBaseline] = useState<string | null>(null);
   const [variant, setVariant] = useState<string | null>(null);
@@ -2838,6 +2887,7 @@ function ResultCard({ result, stage, onRedo, redoing, onReplayBlend, isRedo, sup
                   {(stage === 'entity' || stage === 'style_check' || stage === 'avatar_eval' || stage === 'repair_verify' || stage === 'beats_replan') && result.report != null && (
                     <pre className="text-xs bg-gray-50 rounded-lg p-3 overflow-x-auto max-h-64">{JSON.stringify(result.report, null, 2)}</pre>
                   )}
+                  {stage === 'judge_fixture' && <JudgeFixtureSummary result={result} />}
                   {result.comparedVersions && (
                     <div className="text-xs text-gray-600"><b>Compared:</b> original v{String(result.comparedVersions.original)} vs repaired v{String(result.comparedVersions.repaired)}</div>
                   )}

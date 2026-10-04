@@ -124,7 +124,7 @@ describe('Pass-2 style eval — the outfit axis is gone', () => {
     expect(fn).not.toMatch(/CLOTHING_DESCRIPTION/);
     // …and nothing forwards one into the pass-2 branch of the single-source evaluator.
     expect(extractFunction(SRC, 'evaluateAvatarSheet')).toMatch(
-      /evaluateStyledSheetWithGemini\([^)]*\{ model: model \|\| undefined, promptOverride: promptOverrides\?\.style \|\| null, removedGarments \}/s
+      /evaluateStyledSheetWithGemini\([^)]*\{ model: model \|\| undefined, promptOverride: promptOverrides\?\.style \|\| null, removedGarments, imageLabels \}/s
     );
   });
 
