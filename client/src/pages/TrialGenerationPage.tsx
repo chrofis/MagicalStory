@@ -62,7 +62,7 @@ const translations = {
     and: 'and',
     privacyLink: 'Privacy Policy',
     emailSent: 'Almost there — check your email!',
-    emailSentDesc: 'Click the link in your email to finish setting up your account and access your story.',
+    emailSentDesc: 'Click the link in your email to finish setting up your account and keep your story.',
     emailSentNote: 'Didn\'t get it? Check your spam folder.',
     emailSentWarning: 'Without verification your story will be lost.',
     differentEmail: 'Use a different email',
@@ -109,7 +109,7 @@ const translations = {
     and: 'und',
     privacyLink: 'Datenschutzrichtlinien',
     emailSent: 'Fast geschafft — prüfe deine E-Mails!',
-    emailSentDesc: 'Klicke auf den Link in deiner E-Mail, um dein Konto einzurichten und deine Geschichte zu lesen.',
+    emailSentDesc: 'Klicke auf den Link in deiner E-Mail, um dein Konto einzurichten und deine Geschichte zu behalten.',
     emailSentNote: 'Nicht erhalten? Prüfe deinen Spam-Ordner.',
     emailSentWarning: 'Ohne Bestätigung geht deine Geschichte verloren.',
     differentEmail: 'Andere E-Mail verwenden',
@@ -156,7 +156,7 @@ const translations = {
     and: 'et',
     privacyLink: 'Politique de confidentialité',
     emailSent: 'Presque terminé — vérifiez vos e-mails !',
-    emailSentDesc: 'Cliquez sur le lien dans votre e-mail pour finaliser votre compte et accéder à votre histoire.',
+    emailSentDesc: 'Cliquez sur le lien dans votre e-mail pour finaliser votre compte et garder votre histoire.',
     emailSentNote: 'Pas reçu ? Vérifiez votre dossier spam.',
     emailSentWarning: 'Sans vérification, votre histoire sera perdue.',
     differentEmail: 'Utiliser une autre adresse',
@@ -203,7 +203,7 @@ const translations = {
     and: 'e',
     privacyLink: 'Informativa sulla privacy',
     emailSent: 'Ci siamo quasi — controlla la tua e-mail!',
-    emailSentDesc: 'Clicca sul link nell\'e-mail per completare il tuo account e accedere alla tua storia.',
+    emailSentDesc: 'Clicca sul link nell\'e-mail per completare il tuo account e conservare la tua storia.',
     emailSentNote: 'Non l\'hai ricevuta? Controlla la cartella spam.',
     emailSentWarning: 'Senza conferma la tua storia andrà persa.',
     differentEmail: 'Usa un\'altra e-mail',
@@ -992,7 +992,9 @@ export default function TrialGenerationPage() {
   const storyPreview = (
     <div className="mb-4">
       <div className="text-center mb-4">
-        <p className="text-sm text-indigo-600 font-medium mb-1">{t.storyReadyKicker}</p>
+        {pageState !== 'completed' && (
+          <p className="text-sm text-indigo-600 font-medium mb-1">{t.storyReadyKicker}</p>
+        )}
         <h1 className="text-2xl font-bold text-gray-800">{storyTitle}</h1>
       </div>
       <div className="mb-6">
