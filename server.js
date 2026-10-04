@@ -93,7 +93,6 @@ const { authLimiter, registerLimiter, apiLimiter, aiProxyLimiter, storyGeneratio
 const { PROMPT_TEMPLATES, loadPromptTemplates, fillTemplate, buildEmptyScenePrompt } = require('./server/services/prompts');
 const { generatePrintPdf, generateViewPdf, generateCombinedBookPdf } = require('./server/lib/pdf');
 const { processBookOrder, getCoverDimensions } = require('./server/lib/gelato');
-const { extractTracking, shouldSendShippedEmail } = require('./server/lib/gelatoShipment');
 const { resendWebhookHandler } = require('./server/lib/resendWebhook');
 const {
   hashImageData,
@@ -1183,10 +1182,17 @@ app.post('/api/gelato/webhook', express.json(), async (req, res) => {
 
       const newStatus = statusMap[fulfillmentStatus] || fulfillmentStatus;
 
-      // Tracking can arrive on 'printed' (order 99) — see server/lib/gelatoShipment.js
-      const { trackingNumber, trackingUrl } = extractTracking(items);
-      log.debug('   Tracking:', trackingNumber);
-      log.debug('   Tracking URL:', trackingUrl);
+      // Extract tracking info if shipped
+      let trackingNumber = null;
+      let trackingUrl = null;
+
+      if (items && items.length > 0 && items[0].fulfillments && items[0].fulfillments.length > 0) {
+        const fulfillment = items[0].fulfillments[0];
+        trackingNumber = fulfillment.trackingCode || null;
+        trackingUrl = fulfillment.trackingUrl || null;
+        log.debug('   Tracking:', trackingNumber);
+        log.debug('   Tracking URL:', trackingUrl);
+      }
 
       // Update order status in database
       // Note: Cast $1 to text in CASE comparisons to avoid PostgreSQL type inference error (42P08)
@@ -1281,50 +1287,34 @@ app.post('/api/gelato/webhook', express.json(), async (req, res) => {
         }
       }
 
-      // Shipped email: triggered by the tracking code, not the status name (Gelato
-      // never sent 'shipped' for order 99). Claim-then-send keeps it exactly-once.
-      if (shouldSendShippedEmail({ fulfillmentStatus, trackingNumber }) && order.customer_email) {
+      // Send email notification for shipped orders
+      if (fulfillmentStatus === 'shipped' && order.customer_email) {
         try {
-          const claim = await dbPool.query(
-            `UPDATE orders SET shipped_email_sent = TRUE, shipped_at = COALESCE(shipped_at, NOW())
-             WHERE id = $1 AND shipped_email_sent IS NOT TRUE RETURNING id`,
-            [order.id]
-          );
-          if (claim.rows.length > 0) {
-            try {
-              // Get user's preferred language
-              let language = 'English';
-              if (order.user_id) {
-                const userResult = await dbPool.query(
-                  'SELECT preferred_language FROM users WHERE id = $1',
-                  [order.user_id]
-                );
-                if (userResult.rows.length > 0 && userResult.rows[0].preferred_language) {
-                  language = userResult.rows[0].preferred_language;
-                }
-              }
-
-              await email.sendOrderShippedEmail(
-                order.customer_email,
-                order.customer_name,
-                {
-                  orderId: orderId.substring(0, 8).toUpperCase(),
-                  trackingNumber,
-                  trackingUrl,
-                  // Lets email.js render the cover thumbnail on the email.
-                  storyId: order.story_id
-                },
-                language
-              );
-              log.info('📧 [GELATO WEBHOOK] Shipped notification sent to:', order.customer_email);
-            } catch (sendErr) {
-              // Release the claim so Gelato's next event retries the send.
-              await dbPool.query('UPDATE orders SET shipped_email_sent = FALSE WHERE id = $1', [order.id]);
-              throw sendErr;
+          // Get user's preferred language
+          let language = 'English';
+          if (order.user_id) {
+            const userResult = await dbPool.query(
+              'SELECT preferred_language FROM users WHERE id = $1',
+              [order.user_id]
+            );
+            if (userResult.rows.length > 0 && userResult.rows[0].preferred_language) {
+              language = userResult.rows[0].preferred_language;
             }
-          } else {
-            log.debug('📧 [GELATO WEBHOOK] Shipped email already sent for order:', order.id);
           }
+
+          await email.sendOrderShippedEmail(
+            order.customer_email,
+            order.customer_name,
+            {
+              orderId: orderId.substring(0, 8).toUpperCase(),
+              trackingNumber,
+              trackingUrl,
+              // Lets email.js render the cover thumbnail on the email.
+              storyId: order.story_id
+            },
+            language
+          );
+          log.info('📧 [GELATO WEBHOOK] Shipped notification sent to:', order.customer_email);
         } catch (emailErr) {
           log.error('❌ [GELATO WEBHOOK] Failed to send shipped email:', emailErr.message);
         }
