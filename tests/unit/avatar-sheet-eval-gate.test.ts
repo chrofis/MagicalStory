@@ -156,6 +156,13 @@ describe('avatar sheet gate — body-row solo axis is scored', () => {
     expect(bodies.valid).toBe(false);
   });
 
+  it('a lettered row (cell names printed: backgroundScore 2) fails the recomputed gate', () => {
+    const gate = loadPoseHeadGate();
+    const bodies = gate(bodiesVerdict({ background: { backgroundScore: 2, reason: 'FRONT / PROFILE printed above and below the figures' } }), POSE_ALL_HEADS);
+    expect(bodies.finalScore).toBe(2);
+    expect(bodies.valid).toBe(false);
+  });
+
   it('a clean row still passes', () => {
     const gate = loadPoseHeadGate();
     const bodies = gate(bodiesVerdict(), POSE_ALL_HEADS);

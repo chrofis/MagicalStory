@@ -131,6 +131,16 @@ const SHEET_GROUND_RULE = "The ground stays plain white paper and the thin cell 
 // Until 2026-10-04 the restyler protected only hair and skin and the judge was
 // told the outfit is not scored: staging job_1791040103540_atbttop6w drew a
 // purple jacket on pass 1 and pass 2 repainted it navy, unchecked.
+// Lettering on the sheet, ONE definition: every sheet generator states it and
+// every sheet judge that checks marks scores it ({SHEET_LETTERING}). Staging
+// job_1791040103540_atbttop6w: Max's body row printed the cell names from the
+// prompt ("FRONT / THREE-QUARTER / PROFILE / REAR TURN") above and below every
+// figure; pass 2 kept them; no judge looked for text off the character's head.
+const SHEET_NO_LETTERING_RULE = 'The sheet is pictures only: the paper around every figure stays blank, with no caption, word, letter or number in or between the cells.';
+// Row generators name the cells (front, three-quarter, …); those names are
+// what the model printed. Generator-only: judges never see the cell names.
+const CELL_NAMES_NOT_DRAWN = 'The cell names here say which way each figure faces; they are never written on the sheet.';
+
 const garmentColourRule = (sheet) => `Every garment keeps the colour ${sheet} shows it in: the same hue, with only the new medium's shading on it.`;
 
 const ASSETS_DIR = path.resolve(__dirname, '..', 'assets');
@@ -342,7 +352,7 @@ Output a 1×4 grid: ONE row, four cells side by side, thin black vertical divide
 Each cell shows the SAME PERSON as Image 3 rendered as a COMPLETE FULL BODY from the very top of the head to the figure's lowest point, wearing the costume. Cell 1 front, cell 2 three-quarter, cell 3 profile, cell 4 is a REAR TURN: ${REAR_TURN_POSE}. Cell 4 is never a profile and never a flat back view with no face showing — Image 1's cell 4 is a plain reference silhouette only, ignore its exact head angle. Normally that lowest point is both feet with shoes, and the whole figure — head, hair, face, torso, legs, feet — sits inside its cell. When the costume replaces the legs (a tail, a fin, a single fused lower body), the figure has NO legs, NO feet and NO footwear: it ends at the tip of that form, which is then the lowest point. Never crop the head and never crop the lowest point; if the figure does not fit, scale it down until the whole figure is inside the cell, with white margin above and below. ${proportionsRule}
 ${buildFootwearRule(redress, seasonOutfit?.footwear)}
 ${buildGarmentRule()}
-The outfit is identical in all four cells, layers included. ${buildUnnamedTrimRule(redress)} When the costume has an outer layer — vest, jacket, cardigan, coat, or overshirt — it stays on in the profile and back cells. Seen edge-on in the profile, its front opening runs as a vertical band down the side of the torso, with the shoulder seam, armhole, and the back panel visible behind the arm. No text, numbers, labels, arrows, or symbols anywhere.`;
+The outfit is identical in all four cells, layers included. ${buildUnnamedTrimRule(redress)} When the costume has an outer layer — vest, jacket, cardigan, coat, or overshirt — it stays on in the profile and back cells. Seen edge-on in the profile, its front opening runs as a vertical band down the side of the torso, with the shoulder seam, armhole, and the back panel visible behind the arm. No arrows or symbols anywhere. ${SHEET_NO_LETTERING_RULE} ${CELL_NAMES_NOT_DRAWN}`;
 }
 
 // Head-row prompt (call 2): one row of 4 head-shots that match the body sheet.
@@ -362,7 +372,7 @@ Image 3 is the character's full-body reference sheet — match the SAME face, ha
 ${buildGarmentRule()} Where the neckline shows, it is the one Image 3 wears. ${buildUnnamedTrimRule(redress)}${hairBlock}
 Output a 1×4 grid: ONE row, four cells side by side, thin black vertical dividers, pure white background. Each cell is framed like a passport photo of the SAME PERSON: head, neck and the top of the shoulders wearing the costume, cut off at the upper chest, with plain white above the hair and filling the rest of the cell; no bare skin below the neck. No waist, hands or lower body in any cell. Never crop the top of the head. Cell 1 front, cell 2 three-quarter, cell 3 profile.
 Cell 4 is a REAR TURN, distinct from cell 3's profile: ${REAR_TURN_POSE}. Cell 4 is never a second profile and never a flat back of the head with no face showing — Image 1's cell 4 is a plain placeholder silhouette, ignore its exact head angle entirely.
-Photographic / lifelike; identity from Image 2; hair, skin tone, and costume consistent with Image 3.${declaredAgeBlock(character)} No text, numbers, labels, arrows, or symbols.`;
+Photographic / lifelike; identity from Image 2; hair, skin tone, and costume consistent with Image 3.${declaredAgeBlock(character)} No arrows or symbols. ${SHEET_NO_LETTERING_RULE} ${CELL_NAMES_NOT_DRAWN}`;
 }
 
 // Composite the head row (top) over the body row (bottom) into one 2×4 sheet,
@@ -928,7 +938,7 @@ function buildStyleTransferPrompt(artStyle, { hasAnchor = false } = {}) {
   return `Change the art style of Image 1 — a 2×4 character reference sheet (8 cells) — to: ${styleLine}
 Render all 8 cells uniformly in this style — no cell left photographic.
 
-Keep the content of Image 1 unchanged; only the art style changes. Every cell shows the same single character as Image 1, alone — no other person or figure anywhere on the sheet. Hair colour and skin tone stay as Image 1 shows them, with no colour patch on the face that Image 1 does not have. ${garmentColourRule('Image 1')} ${SHEET_GROUND_RULE}${anchorLine}`;
+Keep the content of Image 1 unchanged; only the art style changes. Every cell shows the same single character as Image 1, alone — no other person or figure anywhere on the sheet. Hair colour and skin tone stay as Image 1 shows them, with no colour patch on the face that Image 1 does not have. ${garmentColourRule('Image 1')} ${SHEET_GROUND_RULE} ${SHEET_NO_LETTERING_RULE}${anchorLine}`;
 }
 
 // Optional per-art-style STYLE ANCHOR asset (server/assets/style-anchor-<style>.jpg|png)
@@ -964,7 +974,7 @@ async function evaluateStyledSheetWithGemini(sourcePhoto, realisticSheet, styled
 
   let prompt = promptOverride || PROMPT_TEMPLATES.sheet2x4StyleEval;
   if (!prompt) throw new Error('sheet2x4StyleEval prompt template not loaded');
-  prompt = fillTemplate(prompt, { REAR_TURN: REAR_TURN_POSE, SHEET_GROUND: SHEET_GROUND_RULE, GARMENT_COLOUR: garmentColourRule('Image 2') });
+  prompt = fillTemplate(prompt, { REAR_TURN: REAR_TURN_POSE, SHEET_GROUND: SHEET_GROUND_RULE, SHEET_LETTERING: SHEET_NO_LETTERING_RULE, GARMENT_COLOUR: garmentColourRule('Image 2') });
   prompt = prompt.replace(/REQUESTED_STYLE/g, `REQUESTED_STYLE: ${styleLabel}`);
   // TASK 6 age gate — style transfer is where kids drift younger (the art
   // style's cute prior). Unknown age disables the task (prompt scores it 10).
@@ -1246,6 +1256,7 @@ async function evaluateSheetRow(rowImageData, which, opts = {}) {
   const ageNum = parseInt(declaredAge, 10);
   prompt = fillTemplate(prompt, {
     REAR_TURN: REAR_TURN_POSE,
+    SHEET_LETTERING: SHEET_NO_LETTERING_RULE,
     REQUESTED_OUTFIT: costumeDescription ? `REQUESTED_OUTFIT: ${costumeDescription}` : '',
     ...(which === 'bodies'
       ? {
@@ -1975,5 +1986,5 @@ module.exports = {
   resolveFacePhoto,
   buildStyleTransferPrompt,
   // exposed for tests
-  _internal: { parseJudgeJson, buildBodyRowPrompt, buildHeadRowPrompt, buildFootwearRule, buildGarmentRule, buildSeasonOutfitBlock, buildStyleTransferPrompt, resolveFacePhoto, resolveStandardAvatar, quickLayoutCheck, evaluateStyledSheetWithGemini, runStyleTransferPass, splitSheetRows, evaluateSheetRow, evaluateIdentity, evaluateSheetSplit, evaluateAvatarSheet, isEchoedJudgeVerdict, REAR_TURN_POSE, SHEET_GROUND_RULE, garmentColourRule, buildUnnamedTrimRule, scoreHeadsReport, scoreStyleReport, scoreIdentityReport },
+  _internal: { parseJudgeJson, buildBodyRowPrompt, buildHeadRowPrompt, buildFootwearRule, buildGarmentRule, buildSeasonOutfitBlock, buildStyleTransferPrompt, resolveFacePhoto, resolveStandardAvatar, quickLayoutCheck, evaluateStyledSheetWithGemini, runStyleTransferPass, splitSheetRows, evaluateSheetRow, evaluateIdentity, evaluateSheetSplit, evaluateAvatarSheet, isEchoedJudgeVerdict, REAR_TURN_POSE, SHEET_GROUND_RULE, SHEET_NO_LETTERING_RULE, CELL_NAMES_NOT_DRAWN, garmentColourRule, buildUnnamedTrimRule, scoreHeadsReport, scoreStyleReport, scoreIdentityReport },
 };

@@ -57,7 +57,8 @@ TASK 7: SINGLE SUBJECT — NO OTHER PEOPLE
 
 TASK 8: PLAIN GROUND
 - {SHEET_GROUND}
-- Score 1-10. Plain paper and the dividers in every cell = 9-10. A faint shadow under the feet only = 7-8. A painted wash, shape or scenery behind a figure, or the dividers gone = 3-5.
+- {SHEET_LETTERING} Read the paper above, below and beside every figure and between the cells, and quote in `background.reason` any word, letter or number written there.
+- Score 1-10. Plain paper and the dividers in every cell = 9-10. A faint shadow under the feet only = 7-8. A painted wash, shape or scenery behind a figure, or the dividers gone = 3-5. Any written caption, word, letter or number anywhere on the sheet = 1-2.
 - `backgroundScore` is the score.
 
 TASK 9: GARMENT COLOURS PRESERVED
@@ -79,7 +80,7 @@ Return EXACTLY this JSON shape. Every score and reason must come from what you s
   "bodyFace":  {"score": <1-10>, "reason": "<what you observed in cells 5-8>"},
   "age":      {"score": <1-10>, "reason": "<what you observed>"},
   "solo":     {"score": <1-10>, "reason": "<what you observed — name any extra figure and where>"},
-  "background": {"score": <1-10>, "reason": "<what is behind the figures, and whether the dividers are there>"},
+  "background": {"score": <1-10>, "reason": "<what is behind and around the figures, any lettering quoted, and whether the dividers are there>"},
   "garment":  {"score": <1-10>, "reason": "<each garment: hue in Image 2, hue in Image 3>"},
   "layoutScore": <1-10>,
   "identityScore": <1-10>,
