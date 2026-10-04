@@ -2571,6 +2571,18 @@
       "fixedAt": "2026-10-04",
       "fixedIn": "4d8cce94e",
       "fix": "Trial page path calls buildSceneClothingRequirements (name-tolerant, no standard default); cover paths and clothingResolve readers use resolveCharacterReqs. Replay of stored LUNA: p1-p5 costumed, p6 standard. Tests: tests/unit/trial-page-clothing-name-spelling.test.ts. Verify: trial-page-clothing-name-spelling."
+    },
+    {
+      "id": "trial-waiting-page-reload-loses-story",
+      "title": "Reloading the trial waiting page loses the story: it asks for a NEW story, gets TRIAL_USED and shows only the sign-up form",
+      "reportedAt": "2026-10-04",
+      "source": "Reproduced on staging 2026-10-04 by the gate verification run (job_1791114188734_cwyvu3y8p, user a7076085-a8ee-4b4f-a4af-c75fba85d4f4): after a reload the page showed the generation-time sign-in screen with no title and no pages, although the story was complete and unlocked server-side. No second job was created (one-trial cap held).",
+      "rootCause": "client/src/pages/TrialGenerationPage.tsx: browsers keep history.state across a reload, so location.state is present again; the page treats that as a fresh arrival, removes trial_gen_job_id from storage and starts jobId = null, then POSTs /api/trial/create-story. The server answers TRIAL_USED (one trial per visitor) and the client sets pageState=completed with NO jobId, so nothing is polled and the story, the unlock state and the check-email note never render.",
+      "impact": "With the story preview on the waiting page (86a328998 / ed1f27c07), a reload drops the visitor from reading their story back to a bare form - at the exact point where the page is supposed to convert. Previously the reload showed the same claim form, so production is not regressed by the gate, but the gate cannot ship like this.",
+      "status": "fixed",
+      "fixedAt": "2026-10-04",
+      "fixedIn": "5933f5926",
+      "fix": "POST /api/trial/create-story answers TRIAL_USED with the visitor's newest trial job (jobId + status, buildTrialUsedResponse); TrialGenerationPage adopts it, stores it and resumes polling; the bare-form branch is deleted. Test: tests/unit/trial-reload-and-art-style.test.ts. Real reload re-verified on staging after push."
     }
   ]
 }
