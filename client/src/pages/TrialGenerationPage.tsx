@@ -9,6 +9,7 @@ import { INITIAL_USER_CREDITS } from '@/constants/credits';
 import { trackEmailLead, trackTrialStoryCompleted } from '@/utils/gtagConversion';
 import { trackEvent } from '@/utils/analytics';
 import { trackTrialStep } from '@/utils/trialFunnel';
+import { Navigation } from '@/components/common';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 
@@ -1034,18 +1035,11 @@ export default function TrialGenerationPage() {
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-gray-50 overflow-x-hidden">
+    <div className="min-h-screen bg-gray-50 overflow-x-clip">
       {/* Navigation bar — sticky during trial generation so the user can
           always see where they are even after scrolling down to read the
           benefits / funny messages further down the page. */}
-      <nav className="bg-black text-white px-3 py-3 sticky top-[var(--impersonation-banner-h,0px)] z-40 shadow-md">
-        <div className="flex justify-between items-center">
-          <span className="text-sm md:text-base font-bold whitespace-nowrap flex items-center gap-1.5">
-            <img src="/images/logo-book.webp" alt="" width="88" height="88" fetchPriority="high" className="h-10 md:h-11 -my-2 w-auto" />
-            {t.brand}
-          </span>
-        </div>
-      </nav>
+      <Navigation minimal brandLink={false} />
 
       {/* Content */}
       <div className="px-3 md:px-8 py-4 md:py-8">
