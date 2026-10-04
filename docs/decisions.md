@@ -66198,3 +66198,26 @@ prepare-title keeps building only the costumed sheet; the story run builds the s
 **Rationale:** each of these returned a normal-looking result for work that never ran; a whole-blob save from a minutes-old snapshot reverts anything saved in between.
 **Revisit if:** semantic judge failures become frequent (then add an explicit retry, not a default score); the owner wants the Gemini→Grok quality-judge swap removed.
 **Touched files:** `server/lib/evalPipeline.js`, `server/lib/entityConsistency.js`, `server/lib/repairLogic.js`, `server/lib/repairPipeline.js`, `server/lib/scoring.js`, `server/lib/images.js`, `server/routes/regeneration.js`, `server/routes/stories.js`, `server/services/database.js`, `server/services/prompts.js`, `client/src/types/story.ts`, `docs/prompt-inventory.md`, tests.
+
+
+## 2026-10-04 — Homepage hero: no trust row; one text style
+
+**Context:** commit 5d7d8b93f (2026-09-09, ads landing-page audit item A3) put a trust row under the hero
+CTA — "Sichere Zahlung mit Stripe · Gedruckt und versandt in der Schweiz · Impressum · Datenschutz" — to lift
+Google's Landing Page Experience rating. Measured 2026-09-27, weeks later: Search-Deutschschweiz-v1 still rated
+the homepage landing page BELOW_AVERAGE on all 5 keywords. Owner (2026-10-04): "why is that needed on the start
+of the home page?" — it talks about payment directly under a FREE-story button and costs first-screen space on
+phones. A computed-style audit of the live page also showed the hero paragraphs were the only body text in
+Libre Baskerville/black (every other section intro is Inter/stone-600), sentence dashes mixed " - " and "—",
+and the two "Gratis Geschichte erstellen" buttons rendered at weights 500 vs 700.
+
+**Decision:** remove the trust row from the hero on all screen sizes (the facts stay where buyers need them:
+Footer Impressum/Datenschutz, CreditsModal "secure payment with Stripe", the homepage shipping bullet). Hero
+paragraphs use Inter/stone-600 like the other section intros (H1 stays Cinzel; Libre Baskerville stays for the
+story reading text, `.story-text`). Homepage sentence dashes are the spaced en dash " – " in all four
+languages. Both CTA buttons resolve to `font-medium`.
+
+**Replaces:** the hero trust row of 5d7d8b93f (A3). Revisit if a measured landing-page rating or conversion
+change is attributable to trust signals near the CTA.
+
+**Touched files:** `client/src/pages/LandingPage.tsx`, `tests/unit/trial-intro-phone.test.ts`.

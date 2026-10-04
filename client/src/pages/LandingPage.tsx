@@ -8,16 +8,11 @@ import { storyService } from '@/services';
 
 const sectionTranslations = {
   en: {
-    // Hero trust row (ads landing: only claims the site already makes elsewhere)
-    trustPayment: 'Secure payment with Stripe',
-    trustSwiss: 'Printed and shipped in Switzerland',
-    trustImprint: 'Imprint',
-    trustPrivacy: 'Privacy Policy',
     // Section 1: Characters
     step1: 'Step 1',
     createCharacters: 'Create Your Characters',
     createCharactersDesc: 'Upload photos of your family and watch them appear as illustrated characters throughout the story. Each character keeps their unique look on every page.',
-    addFamily: 'Add your whole family - children, parents, grandparents, or friends',
+    addFamily: 'Add your whole family – children, parents, grandparents, or friends',
     defineNames: 'Define names, ages, and relationships between characters',
     consistentCharacters: 'Characters appear consistently throughout your entire story',
     // Section 2: Story
@@ -25,32 +20,32 @@ const sectionTranslations = {
     tellStory: 'Tell Your Story',
     tellStoryDescBefore: 'Choose from ',
     tellStoryDescLink: '170+ themes',
-    tellStoryDescAfter: " or describe your own adventure — from pirates to the first day of school. You're in full control: edit any text and shape every illustration exactly the way you want it.",
+    tellStoryDescAfter: " or describe your own adventure – from pirates to the first day of school. You're in full control: edit any text and shape every illustration exactly the way you want it.",
     selectThemes: 'Adventure, fantasy, birthday, bedtime stories, life challenges, and more',
-    customElements: 'Edit text freely — every page, every word',
-    readingLevel: 'Shape images to your vision — change scenes, adjust style, refine details',
+    customElements: 'Edit text freely – every page, every word',
+    readingLevel: 'Shape images to your vision – change scenes, adjust style, refine details',
     // Section 3: Style
     step3: 'Step 3',
     chooseStyle: 'Choose Your Style',
-    chooseStyleDesc: 'Pick the illustration style that fits your story. Watercolor, 3D animation, comic, anime — each style is applied consistently across all pages.',
+    chooseStyleDesc: 'Pick the illustration style that fits your story. Watercolor, 3D animation, comic, anime – each style is applied consistently across all pages.',
     artStyles: '8+ unique art styles: Pixar-style 3D, Watercolor, Comic, Anime, and more',
     consistentStyle: 'Consistent style across all pages and characters',
-    bookLength: 'Choose your preferred book length - from short stories to longer adventures',
+    bookLength: 'Choose your preferred book length – from short stories to longer adventures',
     // Section 4: Print
     step4: 'Step 4',
     printShare: 'Print & Share',
     printShareDesc: 'Your story is ready! Download it instantly as a PDF or order a beautifully printed book delivered to your door.',
-    pdfDownload: 'Instant PDF download - perfect for reading on tablets or printing at home',
-    printOptions: 'Hardcover or softcover printing - 20x20cm, professional quality',
-    shipping: 'Printed and shipped in Switzerland — the perfect gift for any occasion',
+    pdfDownload: 'Instant PDF download – perfect for reading on tablets or printing at home',
+    printOptions: 'Hardcover or softcover printing – 20x20cm, professional quality',
+    shipping: 'Printed and shipped in Switzerland – the perfect gift for any occasion',
     giftGuideLink: 'Browse gift ideas by age & occasion',
     // Why It Works
     whyTitle: 'A story does more than a thousand words.',
     whyDesc: "You can't hand your child confidence. But a story where they're the one who tries, stumbles, and succeeds? That stays with them long after the last page.",
     localTitle: 'From William Tell to your own village',
-    localDesc: 'Be the hero of Swiss history — or of an adventure set right in your home town.',
+    localDesc: 'Be the hero of Swiss history – or of an adventure set right in your home town.',
     localCta: 'Explore city stories',
-    localBullet1: 'Set in your own town — real streets and landmarks',
+    localBullet1: 'Set in your own town – real streets and landmarks',
     localBullet2: 'Or relive history as the hero',
     step5: 'Step 5',
     whyLink: 'Learn why it works',
@@ -61,9 +56,9 @@ const sectionTranslations = {
     discoverTitle: 'Discover more',
     discoverDesc: 'Find inspiration, gift ideas and stories from your region.',
     discoverThemes: '170+ Themes',
-    discoverThemesDesc: 'From pirates to first day of school — every adventure imaginable.',
+    discoverThemesDesc: 'From pirates to first day of school – every adventure imaginable.',
     discoverOccasions: 'Gift Ideas',
-    discoverOccasionsDesc: 'Birthday, baptism, school start — the perfect book for every occasion.',
+    discoverOccasionsDesc: 'Birthday, baptism, school start – the perfect book for every occasion.',
     discoverGiftHub: 'Gift Guide',
     discoverGiftHubDesc: 'Help finding the right gift by age and interest.',
     discoverSwiss: 'Swiss Stories',
@@ -74,16 +69,11 @@ const sectionTranslations = {
     discoverScienceDesc: 'The research behind personalized stories and child development.',
   },
   de: {
-    // Hero trust row
-    trustPayment: 'Sichere Zahlung mit Stripe',
-    trustSwiss: 'Gedruckt und versandt in der Schweiz',
-    trustImprint: 'Impressum',
-    trustPrivacy: 'Datenschutz',
     // Section 1: Characters
     step1: 'Schritt 1',
     createCharacters: 'Erstelle deine Charaktere',
     createCharactersDesc: 'Lade Fotos deiner Familie hoch und sieh sie als illustrierte Figuren in der ganzen Geschichte. Jede Figur behält ihr einzigartiges Aussehen auf jeder Seite.',
-    addFamily: 'Füge deine ganze Familie hinzu - Kinder, Eltern, Grosseltern oder Freunde',
+    addFamily: 'Füge deine ganze Familie hinzu – Kinder, Eltern, Grosseltern oder Freunde',
     defineNames: 'Definiere Namen, Alter und Beziehungen zwischen den Charakteren',
     consistentCharacters: 'Charaktere erscheinen einheitlich in der gesamten Geschichte',
     // Section 2: Story
@@ -91,32 +81,32 @@ const sectionTranslations = {
     tellStory: 'Erzähle deine Geschichte',
     tellStoryDescBefore: 'Wähle aus ',
     tellStoryDescLink: '170+ Themen',
-    tellStoryDescAfter: ' oder beschreibe dein eigenes Abenteuer — von Piraten bis zum ersten Schultag. Du hast die volle Kontrolle: Passe jeden Text an und gestalte jedes Bild genau so, wie du es dir vorstellst.',
+    tellStoryDescAfter: ' oder beschreibe dein eigenes Abenteuer – von Piraten bis zum ersten Schultag. Du hast die volle Kontrolle: Passe jeden Text an und gestalte jedes Bild genau so, wie du es dir vorstellst.',
     selectThemes: 'Abenteuer, Fantasy, Geburtstag, Gute-Nacht-Geschichten, Herausforderungen und mehr',
-    customElements: 'Texte frei bearbeiten — jede Seite, jedes Wort',
-    readingLevel: 'Bilder anpassen — Szene verändern, Stil wechseln, Details verfeinern',
+    customElements: 'Texte frei bearbeiten – jede Seite, jedes Wort',
+    readingLevel: 'Bilder anpassen – Szene verändern, Stil wechseln, Details verfeinern',
     // Section 3: Style
     step3: 'Schritt 3',
     chooseStyle: 'Wähle deinen Stil',
-    chooseStyleDesc: 'Wähle den Illustrationsstil, der zu deiner Geschichte passt. Aquarell, 3D-Animation, Comic, Anime — jeder Stil wird einheitlich auf allen Seiten angewendet.',
+    chooseStyleDesc: 'Wähle den Illustrationsstil, der zu deiner Geschichte passt. Aquarell, 3D-Animation, Comic, Anime – jeder Stil wird einheitlich auf allen Seiten angewendet.',
     artStyles: '8+ einzigartige Kunststile: Pixar-ähnliches 3D, Aquarell, Comic, Anime und mehr',
     consistentStyle: 'Einheitlicher Stil auf allen Seiten und bei allen Charakteren',
-    bookLength: 'Wähle deine bevorzugte Buchlänge - von kurzen Geschichten bis zu längeren Abenteuern',
+    bookLength: 'Wähle deine bevorzugte Buchlänge – von kurzen Geschichten bis zu längeren Abenteuern',
     // Section 4: Print
     step4: 'Schritt 4',
     printShare: 'Drucken & Teilen',
     printShareDesc: 'Deine Geschichte ist fertig! Lade sie sofort als PDF herunter oder bestelle ein wunderschön gedrucktes Buch direkt zu dir nach Hause.',
-    pdfDownload: 'Sofortiger PDF-Download - perfekt zum Lesen auf Tablets oder zum Ausdrucken zu Hause',
-    printOptions: 'Hardcover oder Softcover Druck - 20x20cm, professionelle Qualität',
-    shipping: 'Gedruckt und versandt in der Schweiz — das perfekte Geschenk für jeden Anlass',
+    pdfDownload: 'Sofortiger PDF-Download – perfekt zum Lesen auf Tablets oder zum Ausdrucken zu Hause',
+    printOptions: 'Hardcover oder Softcover Druck – 20x20cm, professionelle Qualität',
+    shipping: 'Gedruckt und versandt in der Schweiz – das perfekte Geschenk für jeden Anlass',
     giftGuideLink: 'Geschenkideen nach Alter & Anlass entdecken',
     // Why It Works
     whyTitle: 'Eine Geschichte bewirkt mehr als tausend Worte.',
-    whyDesc: 'Selbstvertrauen kann man seinem Kind nicht einfach geben. Aber eine Geschichte, in der es selbst probiert, stolpert und es schafft? Die bleibt — lange nach der letzten Seite.',
+    whyDesc: 'Selbstvertrauen kann man seinem Kind nicht einfach geben. Aber eine Geschichte, in der es selbst probiert, stolpert und es schafft? Die bleibt – lange nach der letzten Seite.',
     localTitle: 'Von Wilhelm Tell bis zu deinem Dorf',
-    localDesc: 'Erlebe Schweizer Geschichte als Held — oder ein Abenteuer, das genau in deiner Stadt spielt.',
+    localDesc: 'Erlebe Schweizer Geschichte als Held – oder ein Abenteuer, das genau in deiner Stadt spielt.',
     localCta: 'Stadtgeschichten entdecken',
-    localBullet1: 'Spielt in deiner Stadt — echte Orte und Wahrzeichen',
+    localBullet1: 'Spielt in deiner Stadt – echte Orte und Wahrzeichen',
     localBullet2: 'Oder erlebe historische Helden hautnah',
     step5: 'Schritt 5',
     whyLink: 'Erfahre warum es wirkt',
@@ -127,9 +117,9 @@ const sectionTranslations = {
     discoverTitle: 'Entdecke mehr',
     discoverDesc: 'Finde Inspiration, Geschenkideen und Geschichten aus deiner Region.',
     discoverThemes: '170+ Themen',
-    discoverThemesDesc: 'Von Piraten bis zum ersten Schultag — jedes Abenteuer, das du dir vorstellen kannst.',
+    discoverThemesDesc: 'Von Piraten bis zum ersten Schultag – jedes Abenteuer, das du dir vorstellen kannst.',
     discoverOccasions: 'Geschenkideen',
-    discoverOccasionsDesc: 'Geburtstag, Taufe, Schulanfang — das perfekte Buch für jeden Anlass.',
+    discoverOccasionsDesc: 'Geburtstag, Taufe, Schulanfang – das perfekte Buch für jeden Anlass.',
     discoverGiftHub: 'Geschenkratgeber',
     discoverGiftHubDesc: 'Hilfe beim richtigen Geschenk nach Alter und Interesse.',
     discoverSwiss: 'Schweizer Sagen',
@@ -140,16 +130,11 @@ const sectionTranslations = {
     discoverScienceDesc: 'Die Forschung hinter personalisierten Geschichten und Kindesentwicklung.',
   },
   fr: {
-    // Hero trust row
-    trustPayment: 'Paiement sécurisé avec Stripe',
-    trustSwiss: 'Imprimé et expédié en Suisse',
-    trustImprint: 'Mentions légales',
-    trustPrivacy: 'Confidentialité',
     // Section 1: Characters
     step1: 'Étape 1',
     createCharacters: 'Créez vos personnages',
     createCharactersDesc: "Téléchargez des photos de votre famille et retrouvez-les comme personnages illustrés tout au long de l'histoire. Chaque personnage garde son apparence unique sur chaque page.",
-    addFamily: 'Ajoutez toute votre famille - les enfants, parents, grands-parents ou amis',
+    addFamily: 'Ajoutez toute votre famille – les enfants, parents, grands-parents ou amis',
     defineNames: 'Définissez les noms, âges et relations entre les personnages',
     consistentCharacters: 'Les personnages apparaissent de manière cohérente tout au long de votre histoire',
     // Section 2: Story
@@ -157,32 +142,32 @@ const sectionTranslations = {
     tellStory: 'Racontez votre histoire',
     tellStoryDescBefore: 'Choisissez parmi ',
     tellStoryDescLink: '170+ thèmes',
-    tellStoryDescAfter: " ou décrivez votre propre aventure — des pirates au premier jour d'école. Vous avez le contrôle total : modifiez chaque texte et façonnez chaque illustration exactement comme vous le souhaitez.",
+    tellStoryDescAfter: " ou décrivez votre propre aventure – des pirates au premier jour d'école. Vous avez le contrôle total : modifiez chaque texte et façonnez chaque illustration exactement comme vous le souhaitez.",
     selectThemes: 'Aventure, fantasy, anniversaire, histoires du soir, défis de la vie, et plus',
-    customElements: 'Modifiez les textes librement — chaque page, chaque mot',
-    readingLevel: 'Façonnez les images — changez la scène, ajustez le style, affinez les détails',
+    customElements: 'Modifiez les textes librement – chaque page, chaque mot',
+    readingLevel: 'Façonnez les images – changez la scène, ajustez le style, affinez les détails',
     // Section 3: Style
     step3: 'Étape 3',
     chooseStyle: 'Choisissez votre style',
-    chooseStyleDesc: "Choisissez le style d'illustration qui correspond à votre histoire. Aquarelle, animation 3D, bande dessinée, anime — chaque style est appliqué de manière cohérente sur toutes les pages.",
+    chooseStyleDesc: "Choisissez le style d'illustration qui correspond à votre histoire. Aquarelle, animation 3D, bande dessinée, anime – chaque style est appliqué de manière cohérente sur toutes les pages.",
     artStyles: "8+ styles artistiques uniques : 3D style Pixar, aquarelle, bande dessinée, anime, et plus",
     consistentStyle: 'Style cohérent sur toutes les pages et personnages',
-    bookLength: 'Choisissez la longueur de livre souhaitée - des histoires courtes aux aventures plus longues',
+    bookLength: 'Choisissez la longueur de livre souhaitée – des histoires courtes aux aventures plus longues',
     // Section 4: Print
     step4: 'Étape 4',
     printShare: 'Imprimez & Partagez',
     printShareDesc: "Votre histoire est prête ! Téléchargez-la instantanément en PDF ou commandez un beau livre imprimé livré à votre porte.",
-    pdfDownload: "Téléchargement PDF instantané - parfait pour lire sur tablette ou imprimer à la maison",
-    printOptions: 'Impression reliée ou brochée - 20x20cm, qualité professionnelle',
-    shipping: 'Imprimé et expédié en Suisse — le cadeau parfait pour toute occasion',
+    pdfDownload: "Téléchargement PDF instantané – parfait pour lire sur tablette ou imprimer à la maison",
+    printOptions: 'Impression reliée ou brochée – 20x20cm, qualité professionnelle',
+    shipping: 'Imprimé et expédié en Suisse – le cadeau parfait pour toute occasion',
     giftGuideLink: 'Idées cadeaux par âge et occasion',
     // Why It Works
     whyTitle: 'Une histoire vaut plus que mille mots.',
     whyDesc: "On ne peut pas offrir la confiance à son enfant. Mais une histoire où c'est lui qui essaie, trébuche et réussit ? Elle reste, bien après la dernière page.",
     localTitle: 'De Guillaume Tell à ton village',
-    localDesc: "Sois le héros de l'histoire suisse — ou d'une aventure qui se déroule dans ta propre ville.",
+    localDesc: "Sois le héros de l'histoire suisse – ou d'une aventure qui se déroule dans ta propre ville.",
     localCta: 'Découvrir les histoires de villes',
-    localBullet1: 'Se déroule dans ta ville — lieux et monuments réels',
+    localBullet1: 'Se déroule dans ta ville – lieux et monuments réels',
     localBullet2: "Ou revis l'histoire en héros",
     step5: 'Étape 5',
     whyLink: 'Découvrez pourquoi ça marche',
@@ -193,9 +178,9 @@ const sectionTranslations = {
     discoverTitle: 'Découvrir plus',
     discoverDesc: 'Trouvez de l\'inspiration, des idées cadeaux et des histoires de votre région.',
     discoverThemes: '170+ thèmes',
-    discoverThemesDesc: 'Des pirates au premier jour d\'école — toutes les aventures imaginables.',
+    discoverThemesDesc: 'Des pirates au premier jour d\'école – toutes les aventures imaginables.',
     discoverOccasions: 'Idées cadeaux',
-    discoverOccasionsDesc: 'Anniversaire, baptême, rentrée — le livre parfait pour chaque occasion.',
+    discoverOccasionsDesc: 'Anniversaire, baptême, rentrée – le livre parfait pour chaque occasion.',
     discoverGiftHub: 'Guide cadeaux',
     discoverGiftHubDesc: 'Aide pour trouver le bon cadeau selon l\'âge et les centres d\'intérêt.',
     discoverSwiss: 'Histoires suisses',
@@ -206,16 +191,11 @@ const sectionTranslations = {
     discoverScienceDesc: 'La recherche derrière les histoires personnalisées et le développement de l\'enfant.',
   },
   it: {
-    // Hero trust row
-    trustPayment: 'Pagamento sicuro con Stripe',
-    trustSwiss: 'Stampato e spedito in Svizzera',
-    trustImprint: 'Impressum',
-    trustPrivacy: 'Privacy',
     // Section 1: Characters
     step1: 'Passo 1',
     createCharacters: 'Crea i tuoi personaggi',
     createCharactersDesc: 'Carica le foto della tua famiglia e ritrovali come personaggi illustrati per tutta la storia. Ogni personaggio mantiene il suo aspetto unico in ogni pagina.',
-    addFamily: 'Aggiungi tutta la famiglia - bambini, genitori, nonni o amici',
+    addFamily: 'Aggiungi tutta la famiglia – bambini, genitori, nonni o amici',
     defineNames: 'Definisci nomi, età e relazioni tra i personaggi',
     consistentCharacters: 'I personaggi appaiono in modo coerente in tutta la storia',
     // Section 2: Story
@@ -223,32 +203,32 @@ const sectionTranslations = {
     tellStory: 'Racconta la tua storia',
     tellStoryDescBefore: 'Scegli tra ',
     tellStoryDescLink: '170+ temi',
-    tellStoryDescAfter: ' o descrivi la tua avventura — dai pirati al primo giorno di scuola. Lei ha il pieno controllo: modifichi ogni testo e dia forma a ogni illustrazione esattamente come la vuole.',
+    tellStoryDescAfter: ' o descrivi la tua avventura – dai pirati al primo giorno di scuola. Lei ha il pieno controllo: modifichi ogni testo e dia forma a ogni illustrazione esattamente come la vuole.',
     selectThemes: 'Avventura, fantasy, compleanno, storie della buonanotte, sfide di vita e altro',
-    customElements: 'Modifica i testi liberamente — ogni pagina, ogni parola',
-    readingLevel: 'Modella le immagini — cambia la scena, regola lo stile, rifinisci i dettagli',
+    customElements: 'Modifica i testi liberamente – ogni pagina, ogni parola',
+    readingLevel: 'Modella le immagini – cambia la scena, regola lo stile, rifinisci i dettagli',
     // Section 3: Style
     step3: 'Passo 3',
     chooseStyle: 'Scegli il tuo stile',
-    chooseStyleDesc: 'Scegli lo stile di illustrazione che si adatta alla tua storia. Acquerello, animazione 3D, fumetto, anime — ogni stile è applicato in modo coerente in tutte le pagine.',
+    chooseStyleDesc: 'Scegli lo stile di illustrazione che si adatta alla tua storia. Acquerello, animazione 3D, fumetto, anime – ogni stile è applicato in modo coerente in tutte le pagine.',
     artStyles: '8+ stili artistici unici: 3D in stile Pixar, acquerello, fumetto, anime e altri',
     consistentStyle: 'Stile coerente in tutte le pagine e per tutti i personaggi',
-    bookLength: 'Scegli la lunghezza preferita del libro - da storie brevi ad avventure più lunghe',
+    bookLength: 'Scegli la lunghezza preferita del libro – da storie brevi ad avventure più lunghe',
     // Section 4: Print
     step4: 'Passo 4',
     printShare: 'Stampa e condividi',
     printShareDesc: 'La tua storia è pronta! Scaricala subito in PDF o ordina un bellissimo libro stampato consegnato a casa tua.',
-    pdfDownload: 'Download PDF immediato - perfetto da leggere su tablet o stampare a casa',
-    printOptions: 'Stampa con copertina rigida o morbida - 20x20cm, qualità professionale',
-    shipping: 'Stampato e spedito in Svizzera — il regalo perfetto per ogni occasione',
+    pdfDownload: 'Download PDF immediato – perfetto da leggere su tablet o stampare a casa',
+    printOptions: 'Stampa con copertina rigida o morbida – 20x20cm, qualità professionale',
+    shipping: 'Stampato e spedito in Svizzera – il regalo perfetto per ogni occasione',
     giftGuideLink: 'Scopri idee regalo per età e occasione',
     // Why It Works
     whyTitle: 'Una storia vale più di mille parole.',
     whyDesc: 'La sicurezza in sé non si può regalare a un figlio. Ma una storia in cui è lui a provare, inciampare e farcela? Resta, molto dopo l\'ultima pagina.',
     localTitle: 'Da Guglielmo Tell al tuo paese',
-    localDesc: 'Sii l\'eroe della storia svizzera — o di un\'avventura ambientata nella tua città.',
+    localDesc: 'Sii l\'eroe della storia svizzera – o di un\'avventura ambientata nella tua città.',
     localCta: 'Scopri le storie delle città',
-    localBullet1: 'Ambientata nella tua città — luoghi e monumenti reali',
+    localBullet1: 'Ambientata nella tua città – luoghi e monumenti reali',
     localBullet2: 'O rivivi la storia da eroe',
     step5: 'Passo 5',
     whyLink: 'Scopri perché funziona',
@@ -259,9 +239,9 @@ const sectionTranslations = {
     discoverTitle: 'Scopri di più',
     discoverDesc: 'Trova ispirazione, idee regalo e storie della tua regione.',
     discoverThemes: '170+ temi',
-    discoverThemesDesc: 'Dai pirati al primo giorno di scuola — ogni avventura immaginabile.',
+    discoverThemesDesc: 'Dai pirati al primo giorno di scuola – ogni avventura immaginabile.',
     discoverOccasions: 'Idee regalo',
-    discoverOccasionsDesc: 'Compleanno, battesimo, inizio della scuola — il libro perfetto per ogni occasione.',
+    discoverOccasionsDesc: 'Compleanno, battesimo, inizio della scuola – il libro perfetto per ogni occasione.',
     discoverGiftHub: 'Guida ai regali',
     discoverGiftHubDesc: 'Aiuto per trovare il regalo giusto in base a età e interessi.',
     discoverSwiss: 'Storie svizzere',
@@ -440,10 +420,10 @@ export default function LandingPage() {
               <h1 className="text-3xl lg:text-6xl font-title text-black mb-3 lg:mb-6 leading-tight">
                 {t.heroTitle}
               </h1>
-              <p className="text-base lg:text-2xl font-body text-black mb-2 lg:mb-4">
+              <p className="text-base lg:text-2xl text-stone-600 mb-2 lg:mb-4">
                 {t.heroDescription}
               </p>
-              <p className="text-base lg:text-2xl font-body text-black mb-4 lg:mb-8">
+              <p className="text-base lg:text-2xl text-stone-600 mb-4 lg:mb-8">
                 {t.bookText}
               </p>
 
@@ -452,7 +432,6 @@ export default function LandingPage() {
                 onClick={handleStartJourney}
                 size="xl"
                 icon={Sparkles}
-                className="font-bold"
               >
                 {t.startJourney}
                 <ArrowRight size={24} />
@@ -467,21 +446,6 @@ export default function LandingPage() {
                   {t.alreadyHaveAccount || 'Already have an account? Log in'}
                 </button>
               </div>
-              {/* Trust row: claims already made elsewhere on the site (CreditsModal,
-                  step 4) + the legal pages, surfaced next to the CTA. On phones only the
-                  two claims show (2026-10-03, owner): the two legal links, with their
-                  44px tap targets, wrapped to three lines and pushed the photo -> book
-                  example off an iPhone's first screen. They stay in the footer on every
-                  page, and next to the CTA from lg up. */}
-              <p className="text-xs lg:text-sm text-stone-600 flex flex-wrap items-center gap-x-2">
-                <span>{st.trustPayment}</span>
-                <span aria-hidden="true">·</span>
-                <span>{st.trustSwiss}</span>
-                <span aria-hidden="true" className="hidden lg:inline">·</span>
-                <Link to="/impressum" className="hidden lg:inline-flex items-center min-h-[44px] underline hover:text-stone-900">{st.trustImprint}</Link>
-                <span aria-hidden="true" className="hidden lg:inline">·</span>
-                <Link to="/privacy" className="hidden lg:inline-flex items-center min-h-[44px] underline hover:text-stone-900">{st.trustPrivacy}</Link>
-              </p>
             </div>
           </div>
 
@@ -889,7 +853,7 @@ export default function LandingPage() {
           </p>
           <button
             onClick={handleStartJourney}
-            className="inline-flex items-center justify-center gap-2 rounded-lg font-bold transition-all duration-200 transform hover:scale-[1.02] px-8 py-4 text-lg lg:px-10 lg:py-5 lg:text-xl bg-white hover:bg-stone-100 text-indigo-500 shadow-lg hover:shadow-xl"
+            className="inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-all duration-200 transform hover:scale-[1.02] px-8 py-4 text-lg lg:px-10 lg:py-5 lg:text-xl bg-white hover:bg-stone-100 text-indigo-500 shadow-lg hover:shadow-xl"
           >
             <Sparkles size={24} />
             {t.startJourney}
