@@ -50,12 +50,15 @@ const ART_STYLE_LABELS: Record<DemoLanguage, Record<string, string>> = {
 };
 
 // Category & topic patterns — multilingual regex per id (matches whichever UI is shown).
+// Category patterns match the tile's TITLE element exactly: each tile also shows a subtitle,
+// and the German "Lernen" subtitle ("Lustige Geschichten, …") matched an unanchored
+// /geschichte/ ahead of the real "Geschichte" tile (2026-10-04 Wilhelm Tell run).
 const CATEGORY_PATTERNS: Record<string, RegExp> = {
-  'adventure': /adventure|abenteuer|aventure/i,
-  'life-challenge': /life skills|lebenskompetenzen|compétences de vie/i,
-  'educational': /learning|lernen|apprendre|éducation|apprentissage/i,
-  'historical': /history|geschichte|histoire/i,
-  'custom': /create your own|eigenes thema|créer/i,
+  'adventure': /^(adventure|abenteuer|aventure)$/i,
+  'life-challenge': /^(life skills|lebenskompetenzen|compétences de vie)$/i,
+  'educational': /^(learning|lernen|apprentissage)$/i,
+  'historical': /^(history|geschichte|histoire)$/i,
+  'custom': /^(custom|eigenes thema|personnalisé)$/i,
 };
 
 const TOPIC_PATTERNS: Record<string, RegExp> = {
@@ -1102,7 +1105,7 @@ test.describe('Demo Story Generation', () => {
 
     // ── Step 3: Story Type ──
     console.log(`Step 3: Selecting ${entry.storyCategory} → ${entry.storyTopic}...`);
-    const categoryBtn = page.locator('button').filter({ hasText: categoryPattern }).first();
+    const categoryBtn = page.locator('button').filter({ has: page.getByText(categoryPattern) }).first();
     await expect(categoryBtn).toBeVisible({ timeout: 5000 });
     await categoryBtn.click();
     await page.waitForTimeout(1000);
