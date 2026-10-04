@@ -4932,6 +4932,24 @@
         "result": "HUMAN",
         "note": "human check | LOOK: Read tokenUsage.byFunction models + costs for arc_create/arc_retell/text_refine; owner reads arcReviewReport.finalArc for followability (watch overloaded page sentences on short books) and skims the refined pages vs textRefineReport.pages[].before."
       }
+    },
+    {
+      "id": "consolidator-fix-rests-on-scored-finding",
+      "title": "Every CRITICAL/MAJOR consolidator fix cites kept finding ids; a fix resting only on dropped findings is a loud ERROR",
+      "commits": [
+        "b6abd1656"
+      ],
+      "addedAt": "2026-10-04",
+      "claim": "On the next staging full story: every scene_fix / char-fix in consolidatedPlan carries ids, each id belongs to a finding still in deduped_issues; no page keeps a CRITICAL fix while all of its findings were dropped (the dragon p17 shape). Any such case shows as a consolidator_fix_unbacked ERROR in the generation log and in plan.fix_errors.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "consolidator_calls for the story: plan fixes[].ids vs plan.deduped_issues[].ids; count plan.fix_errors and consolidator_fix_unbacked log events; any page with a CRITICAL fix and score 100. Baseline: job_1791040103540_atbttop6w p17 (finding dropped as finding_contradicts_brief, CRITICAL scene_fix kept, never repaired). Entry added late: commit b6abd1656 named it in its Verify trailer but never wrote it."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [
