@@ -3183,6 +3183,42 @@
       "source": "Code review 2026-10-04 (tasks/code-review-2026-10/2-images-repair.md B4/B5), confirmed against current code",
       "status": "fixed",
       "fixedAt": "2026-10-04"
+    },
+    {
+      "id": "semantic-judge-failure-scored-clean",
+      "title": "A failed semantic judge counted as a clean pass",
+      "rootCause": "sceneValidator returns {score:null,error}; evalPipeline merged it as zero penalty and repairLogic read null as 100",
+      "impact": "Wrong-scene page skipped the iterate route and shipped unrepaired (2/507 prod pages)",
+      "fixedIn": "3afb7b596",
+      "fix": "notEvaluated judge_failed recorded; repairLogic keeps null. Test: tests/unit/eval-scoring-batch8.test.ts",
+      "reportedAt": "2026-10-04",
+      "source": "Code review 2026-10-04 (tasks/code-review-2026-10/3-eval-scoring.md A1), confirmed against current code",
+      "status": "fixed",
+      "fixedAt": "2026-10-04"
+    },
+    {
+      "id": "entity-check-failopen",
+      "title": "Entity check crash, grid failure and wrong-shape judge reply read as consistent",
+      "rootCause": "top-level catch returned overallConsistent:true; evalFailed dropped at byClothing/merges; missing consistent defaulted true",
+      "impact": "Book reported verified-consistent without being checked; caller fail-closed handler unreachable",
+      "fixedIn": "3afb7b596",
+      "fix": "reject on crash, retry+evalFailed on wrong shape, carry evalFailed through merges. Test: tests/unit/eval-scoring-batch8.test.ts",
+      "reportedAt": "2026-10-04",
+      "source": "Code review 2026-10-04 (tasks/code-review-2026-10/3-eval-scoring.md B1/B3/B4/B5), confirmed against current code",
+      "status": "fixed",
+      "fixedAt": "2026-10-04"
+    },
+    {
+      "id": "recompute-overwrites-pins-on-meta-error",
+      "title": "A failed meta read let recompute overwrite every user pin",
+      "rootCause": "recomputeAllActiveVersions swallowed getActiveVersionMeta errors and proceeded with empty meta",
+      "impact": "User manual version picks silently reverted",
+      "fixedIn": "3afb7b596",
+      "fix": "error propagates; save logs and skips. Test: tests/unit/active-version-recompute.test.ts",
+      "reportedAt": "2026-10-04",
+      "source": "Code review 2026-10-04 (tasks/code-review-2026-10/3-eval-scoring.md B2), confirmed against current code",
+      "status": "fixed",
+      "fixedAt": "2026-10-04"
     }
   ]
 }
