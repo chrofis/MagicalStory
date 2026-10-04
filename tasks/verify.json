@@ -3676,6 +3676,24 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "prompt-shrink-keeps-size",
+      "title": "The prompt shrink never cuts the size blocks (Composition: size, DEPTH AND SIZE); over-cap prompts pay with lower-ranked blocks or fail loudly",
+      "commits": [
+        "09bf2d495"
+      ],
+      "addedAt": "2026-10-04",
+      "claim": "On the next full staging story with any over-cap page: no prompt_shrink event lists Composition: size or DEPTH AND SIZE among its drops, no prompt_fit_failed event appears, and every rendered page/cover prompt (carrying **ART STYLE) still carries DEPTH AND SIZE; a large element with a stated size (a grown creature, a vessel) is drawn at that size against the cast.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "auto",
+        "fn": "promptShrinkKeepsSize"
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [

@@ -2393,6 +2393,18 @@
       "fix": "syncVisualBibleSection projects landmarkPhoto (location + each vantage by id), text (set or withdrawn) and states whenever the parsed copy has them. The review site verifies the write-back by RE-PARSING the transcript (bibleCorrectionsMissingFromTranscript) and logs an ERROR (gl.error beats_vb_sync_failed) naming each correction the transcript lacks; report.bibleCorrections.unsynced records them. A throw in the correction step is an error, not a warn. The citation compare goes through parseLandmarkPhotoCitation. Test: tests/unit/review-bible-writeback.test.ts. Replay over stored z3fw660ie transcript + Lab 1574 corrections: 3 corrections missing before, 0 after."
     },
     {
+      "id": "prompt-shrink-cuts-size-first",
+      "title": "The prompt shrink spent the size blocks (Composition: size, DEPTH AND SIZE) first; a grown dragon rendered egg-sized",
+      "reportedAt": "2026-10-04",
+      "source": "Stored evidence, staging job_1791040103540_atbttop6w (dragon run 9, build a7fbbb7b): 14 prompt_shrink events, 13 cut Composition: size (step #2) and 8 also DEPTH AND SIZE (step #4), e.g. p18 10842 -> 7843 via COUNTS, size, facing, DEPTH AND SIZE, ground. Rubina (an adult-height dragon) rendered egg-sized on p17/p18.",
+      "rootCause": "server/lib/images.js PROMPT_CUT_ORDER ranked the size bullet #2 and DEPTH AND SIZE #4 (2026-09-23 rank: \"the scale riders carry it\"), so every over-cap page lost the rule that a stated size wins over depth before any lower-value block.",
+      "impact": "Every over-cap page and cover (multi-character prompts) was sent without its size rules; large elements could render at depth-driven or arbitrary scale.",
+      "status": "fixed",
+      "fixedAt": "2026-10-04",
+      "fixedIn": "09bf2d495",
+      "fix": "Composition: size and DEPTH AND SIZE leave PROMPT_CUT_ORDER and join PROMPT_NEVER_CUT (exact-text, checked by cutBlocks at load), same pattern as REQUIRED CAST 2026-09-25; the REQUIRED OBJECTS scale riders were already in the protected tail. Over the cap after every allowed drop -> PromptFitError / prompt_fit_failed, never a silent drop. Replay of all 14 run-9 prompts (rebuilt from sent prompt + logged drops): 14/14 fit, size kept in all. Tests: prompt-shrink-rank, prompt-says-each-thing-once, prompt-cut-protects-the-page. Verify: prompt-shrink-keeps-size."
+    },
+    {
       "id": "title-never-proofread",
       "title": "The book title never went through the lector: staging run 9 shipped \"Vier Freunde und ein Drachonei\" (Drachenei) on its front cover",
       "reportedAt": "2026-10-04",

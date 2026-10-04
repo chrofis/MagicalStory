@@ -63463,6 +63463,45 @@ the gate.
 **Touched:** server/lib/jevAudit.js (jevCastBeatVoice, arcRepairFindingsWithCastCheck,
 CAST_FEEDBACK_HEADING), server/lib/beatsPipeline.js (log lines), tests/unit/jev-text-chain-wiring.test.ts.
 
+## 2026-10-04 — Size is never cut by the prompt shrink (Composition: size and DEPTH AND SIZE join REQUIRED CAST on the never-cut list)
+
+**Context.** Staging `job_1791040103540_atbttop6w` (dragon run 9, build a7fbbb7b) logged 14 `prompt_shrink`
+events against Grok's 7,900 cap; 13 of them cut `Composition: size` (step #2) and 8 also cut `DEPTH AND SIZE`
+(step #4), e.g. p18 10,842 → 7,843: COUNTS, size, facing, DEPTH AND SIZE, ground. Those two blocks, with the
+per-element scale riders on REQUIRED OBJECTS (incl. the people yardstick, 9020a56bb), are the prompt's whole
+statement of size, and the grown dragon Rubina rendered egg-sized on p17/p18. The 2026-09-23 rank put size
+early on the argument that the riders carry it; with the riders as the only survivor, a big element had no
+rule saying a stated size wins over depth.
+
+**Decision.** Same pattern as "REQUIRED CAST is never cut" (2026-09-25): both leave `PROMPT_CUT_ORDER` and
+join `PROMPT_NEVER_CUT` as exact-text entries (`COMPOSITION_SIZE_BULLET`, the template's DEPTH AND SIZE
+paragraph); `cutBlocks()` throws at load if any step would remove them. The REQUIRED OBJECTS scale riders were
+already protected (they sit in the tail from `**REQUIRED OBJECTS`). The order is now COUNTS, facing, ground,
+then the page facts (HEIGHT ORDER, AGE & PROPORTIONS, reference-photo rule, single-illustration rule). The
+Composition header stays with the size bullet, so it is never sent empty. A prompt that still does not fit
+after every allowed drop fails loudly (`PromptFitError` → `prompt_fit_failed`), as before; nothing protected is
+dropped. The scene prose stays uncut (2026-09-26). One list, so every shrink site gets it: page render,
+iterate, covers (all through `_dispatchImageGeneration`), the Grok edit body refit (`fitGrokPromptWithPrefix`)
+and the Lab stages (they render through `generateImageOnly`). Not affected: the plate fit (own list, no size
+blocks) and the scene-composite blend (no section markers; killed).
+
+**Evidence (rung 1, free).** All 14 pre-cut prompts rebuilt from the SENT prompts plus the logged dropped
+blocks (real constants; every rebuild matches the logged post-dedupe length exactly) and refitted at 7,900
+by the new shrinker: **14/14 fit, 0 throw**; size bullet, DEPTH AND SIZE and the REQUIRED OBJECTS block survive
+in all 14. Spent: COUNTS (12), facing (11), ground (9), HEIGHT ORDER (7), AGE & PROPORTIONS (4),
+reference-photo rule (3: p1, p18, front cover), single-illustration rule (1: p18). p17: 8,209 → 7,608, cut
+COUNTS + facing (was COUNTS + size). p18: 9,995 → 7,505, cut COUNTS, facing, ground, HEIGHT ORDER, AGE,
+reference-photo rule, single-illustration rule (was COUNTS, size, facing, DEPTH, ground). The cost is real:
+the most over-cap pages now spend page facts and, on p18, the frame rule. Shortening the prompt itself is the
+lever for that, not the cut order.
+
+**Touched.** server/lib/images.js, docs/image-generation-methods.html, docs/prompt-inventory.md (generated),
+scripts/admin/verify-checks.js (`promptShrinkKeepsSize`), tests/unit/prompt-shrink-rank.test.ts,
+prompt-says-each-thing-once.test.ts, prompt-cut-protects-the-page.test.ts (+4 fixtures that used DEPTH AND SIZE
+as their droppable block now use the reference-photo rule), tasks/bugs.json, tasks/verify.json.
+
+**Status:** ✅ active
+
 ## 2026-10-04 — The title goes through the lector: every candidate, right after the writer's TITLE block, before any cover renders
 
 **Context.** Staging `job_1791040103540_atbttop6w` (dragon run 9, de-ch) shipped "Vier Freunde und ein
