@@ -1446,6 +1446,18 @@ function isSameFigureName(a, b) {
 }
 
 /**
+ * ONE whole-name matcher for prose scans: Unicode letter/number lookarounds, so
+ * "Zoé" and "Émile" match where ASCII word boundaries never do ("Ann" still
+ * never matches "Anna"). `apostropheEnds` additionally refuses a trailing ' or ’
+ * (a possessive "Anna's" is not a bare mention). Review 2026-10-04 C8.
+ */
+function wholeNameRegex(name, { apostropheEnds = false } = {}) {
+  const escaped = String(name).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const after = apostropheEnds ? "[\\p{L}\\p{N}'’]" : '[\\p{L}\\p{N}]';
+  return new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?!${after})`, 'u');
+}
+
+/**
  * Cast members the scene PROSE describes but the metadata `characters` list
  * omits. The Art Director emits prose plus a metadata block; the image model
  * renders the prose, while figure naming, the entity grid, clothing validation
@@ -1490,9 +1502,7 @@ function findCastMissingFromMetadata(sceneDescription, castNames, sceneMetadata 
   for (const rawName of castNames) {
     const name = String(rawName || '').trim();
     if (!name || listed.some(entry => isSameFigureName(entry, name))) continue;
-    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const bare = new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}'’])`, 'u');
-    if (bare.test(prose)) missing.push(name);
+    if (wholeNameRegex(name, { apostropheEnds: true }).test(prose)) missing.push(name);
   }
   return missing;
 }
@@ -1629,9 +1639,9 @@ function getCharactersInScene(sceneDescription, characters) {
     const nameLower = char.name.toLowerCase();
     const firstName = nameLower.split(' ')[0];
 
-    // Use word boundary regex to match whole words only
-    const nameRegex = new RegExp(`\\b${nameLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`);
-    const firstNameRegex = new RegExp(`\\b${firstName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`);
+    // Whole-word match, Unicode-aware (ASCII word boundaries miss "Zoé" and "Émile")
+    const nameRegex = wholeNameRegex(nameLower);
+    const firstNameRegex = wholeNameRegex(firstName);
 
     return nameRegex.test(sceneLower) || firstNameRegex.test(sceneLower);
   });

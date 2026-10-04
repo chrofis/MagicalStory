@@ -290,13 +290,15 @@ function parseClothingCategory(sceneDescription, warnOnInvalid = true) {
       return valueMatch[1].toLowerCase();
     }
 
-    // Found keyword but no valid value - log error and default to standard
+    // Found keyword but no valid value: null, never 'standard'. A default here beat
+    // the callers' `|| primaryClothing` and their "refusing to default to
+    // standard" throws (review 2026-10-04 C3).
     if (warnOnInvalid) {
       const invalidValueMatch = nearbyText.match(/:\s*\*{0,2}(\w+)/i);
       const invalidValue = invalidValueMatch ? invalidValueMatch[1] : '(empty)';
-      log.error(`[CLOTHING] No valid clothing value near keyword (found: "${invalidValue}"), defaulting to standard. Valid values: winter, summer, standard, costumed`);
+      log.error(`[CLOTHING] No valid clothing value near keyword (found: "${invalidValue}"). Valid values: winter, summer, standard, costumed`);
     }
-    return 'standard';
+    return null;
   }
 
   return null;

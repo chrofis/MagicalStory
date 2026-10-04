@@ -1830,7 +1830,7 @@ function significantEntityTokens(text) {
   return new Set(
     String(text || '')
       .toLowerCase()
-      .split(/[^a-zäöüéèêàçñ]+/i)
+      .split(/[^\p{L}]+/u)
       .filter(t => t.length >= 3 && !ENTITY_MATCH_STOPWORDS.has(t))
   );
 }
