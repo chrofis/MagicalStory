@@ -2535,6 +2535,18 @@
       "fixedAt": "2026-10-04",
       "fixedIn": "21b9671ec",
       "fix": "One rule SHEET_NO_LETTERING_RULE stated positively to body row, head row and pass-2 restyle (row prompts add CELL_NAMES_NOT_DRAWN), filled as {SHEET_LETTERING} into heads (clean), bodies (background) and style (plain ground) judges; existing axes -> existing retry. Bodies judge on Max's stored row: background 2 quoting all four captions; restyle of the labelled pass-1 sheet came back without lettering. Style judge detection unvalidated (passed the old sheet on two tries). Tests: avatar-sheet-no-lettering, avatar-sheet-eval-gate. Verify: avatar-sheet-no-lettering."
+    },
+    {
+      "id": "worn-item-front-on-back",
+      "title": "A back-view figure was told its garment's FRONT: staging run 9 p5 drew Kiaan's full-length zip, patch pockets and stand-up collar on his back",
+      "reportedAt": "2026-10-04",
+      "source": "Stored evidence, staging job_1791040103540_atbttop6w (dragon run 9) p5: sceneMetadata Kiaan perspective \"back view\" (rear sheet cell sent), page prompt line \"Kiaan IS wearing this on this page: autumn jacket — A purple quilted autumn jacket with a full-length front zip, two patch pockets at the hip and a stand-up collar.\" under \"WORN ITEMS ON THIS PAGE (these win over the attached references)\"; the render shows all three front features on his back. p18 (same line, back view): pockets on the back.",
+      "rootCause": "server/lib/wornItems.js buildWornStateLines appended the garment's Visual Bible description verbatim (wornItemLook) with no regard to the wearer's facing, under a header that says the line overrides the references.",
+      "impact": "Any garment with front features (zip, placket, pockets, collar, print) worn by a figure drawn from behind could be painted with its front on its back, against the correct rear reference cell.",
+      "status": "fixed",
+      "fixedAt": "2026-10-04",
+      "fixedIn": "ed5c57184",
+      "fix": "The resolver marks a worn row whose wearer faces away (wornItems.faceAwayNames -> storyAvatars.resolveCellPose); its line is tagged \"seen from the back\" and carries only the entry's authored `back` look (GARMENT_BACK_RULE, authored at both Visual Bible sites), never the description; an entry without one names the garment only and logs an error. Judges get the facing as a CLOTHING CONTRACT tag and a new D-05e garment_facing finding (capped MAJOR). Replay of stored p5/p18: line now \"Kiaan IS wearing this on this page, seen from the back: autumn jacket.\" Tests: tests/unit/worn-item-facing.test.ts. Verify: worn-item-facing."
     }
   ]
 }

@@ -4594,6 +4594,27 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "worn-item-facing",
+      "title": "A back-view wearer's worn line carries only the garment's back look; D-05e garment_facing judges front-on-back",
+      "commits": [
+        "ed5c57184"
+      ],
+      "addedAt": "2026-10-04",
+      "claim": "On the next staging story where a figure declared back view / facing away wears a worn item: the Visual Bible clothing (and wornAs) entries carry a `back` look; that page's prompt line reads \"<name> IS wearing this on this page, seen from the back: <garment> — <back look>\" with no front feature; the CLOTHING CONTRACT the judges got tags that character \"(seen from the back)\"; the render shows no front fastening/pockets/collar on the back, and a quality garment_facing finding (never above MAJOR) appears only where it does.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "visualBible.clothing[].back; sceneImages[].prompt WORN ITEMS lines for back-view wearers; qualityRawOutput CLOTHING CONTRACT tag; pixels of each back-view wearer; fixableIssues type garment_facing. Baseline: job_1791040103540_atbttop6w p5 (zip, pockets, collar on Kiaan's back) and p18 (pockets on the back).",
+        "images": [
+          "pages"
+        ]
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [
