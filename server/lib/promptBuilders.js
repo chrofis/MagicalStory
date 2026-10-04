@@ -4138,6 +4138,11 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
       // Eyes open and the creature face, the same constants both Art Director
       // templates and scene-review check 6 carry (2026-09-23).
       EYES_OPEN: EYES_OPEN_RULE,
+      // One pair of hands per object, and a vessel/building/vehicle's real size: the
+      // rules the Art Director templates carry and the brief checker enforces on a
+      // rewrite (review 2026-10-04 B1).
+      SHARED_GRIP: SHARED_GRIP_RULE,
+      TRUE_RELATIVE_SIZE: TRUE_RELATIVE_SIZE_RULE,
       CREATURE_FACE: CREATURE_FACE_RULE,
       CREATURE_FIELD: CREATURE_FIELD_RULE,
       ELEMENT_SIZE_WORD: ELEMENT_SIZE_WORD_RULE,
@@ -13015,6 +13020,9 @@ module.exports = {
   ABSENT_THING_RULE,
   HEADLINE_PHRASE_RULE,
   SCENE_INTENT_FIELD_RULE,
+  // Re-exported from sceneMetadata.js, like SCENE_LIGHT_FIELD_RULE below: the parity
+  // test reads every brief-authoring rule off this module.
+  SHARED_GRIP_RULE,
   // Re-exported from sceneLight.js: the parity tests read every brief-authoring
   // rule off this module.
   SCENE_LIGHT_FIELD_RULE,
