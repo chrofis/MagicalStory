@@ -3087,6 +3087,102 @@
       "source": "Code review 2026-10-04 (tasks/code-review-2026-10/1-story-pipeline.md B4), confirmed against current code",
       "status": "fixed",
       "fixedAt": "2026-10-04"
+    },
+    {
+      "id": "figure-dup-mask-shifts-names",
+      "title": "Removing a duplicate figure mask shifted later figures onto the wrong character name",
+      "rootCause": "splice(i,1) on dets while nameByDet/occludedByIdx were keyed by original person index",
+      "impact": "Silent identity error: repair, entity check and crops worked on the wrong person",
+      "fixedIn": "1986c0961",
+      "fix": "dets carry personIdx; lookups key by it. Test: tests/unit/figure-duplicate-mask-naming.test.ts",
+      "reportedAt": "2026-10-04",
+      "source": "Code review 2026-10-04 (tasks/code-review-2026-10/2-images-repair.md C1), confirmed against current code",
+      "status": "fixed",
+      "fixedAt": "2026-10-04"
+    },
+    {
+      "id": "mask-depth-tiebreak-nan",
+      "title": "Mask depth-order tie-break computed the area of an index (NaN)",
+      "rootCause": "_boxAreaPx(a) with a an index, not boxesPx[a]",
+      "impact": "Smaller-in-front rule never applied for same-height boxes",
+      "fixedIn": "1986c0961",
+      "fix": "comparator extracted (_compareDepthFrontFirst) and fixed. Test: tests/unit/figure-duplicate-mask-naming.test.ts",
+      "reportedAt": "2026-10-04",
+      "source": "Code review 2026-10-04 (tasks/code-review-2026-10/2-images-repair.md C4), confirmed against current code",
+      "status": "fixed",
+      "fixedAt": "2026-10-04"
+    },
+    {
+      "id": "sheet-split-failure-cached",
+      "title": "One analyzer failure pinned a sheet to the fixed-grid crop until LRU eviction",
+      "rootCause": "cropSheetCell cached null after a rejected split call",
+      "impact": "Every later crop of that sheet used the fixed grid",
+      "fixedIn": "e6648744b",
+      "fix": "failure no longer cached. Test: tests/unit/sheet-split-transient-failure.test.ts",
+      "reportedAt": "2026-10-04",
+      "source": "Code review 2026-10-04 (tasks/code-review-2026-10/2-images-repair.md C5), confirmed against current code",
+      "status": "fixed",
+      "fixedAt": "2026-10-04"
+    },
+    {
+      "id": "trial-back-cover-edit-tier",
+      "title": "Iterating a trial back cover rendered on the page/edit tier but was booked as the cover tier",
+      "rootCause": "iterateCover got imageModel||null and generateImageOnly defaulted to pageImage",
+      "impact": "Wrong render model and cost attribution on trial back covers",
+      "fixedIn": "46e754ff7",
+      "fix": "route and iterateCover default to MODEL_DEFAULTS.coverImage; cost uses the rendering model",
+      "reportedAt": "2026-10-04",
+      "source": "Code review 2026-10-04 (tasks/code-review-2026-10/2-images-repair.md A2), confirmed against current code",
+      "status": "fixed",
+      "fixedAt": "2026-10-04"
+    },
+    {
+      "id": "grok-primary-failure-double-call",
+      "title": "A failed primary Grok call made a second paid Grok call before Gemini",
+      "rootCause": "model-routed Grok branch matched the same model after the primary failed",
+      "impact": "Double cost, and Lab arms lost maxRefSlots/vbColumnFraction on the retry",
+      "fixedIn": "b3e2455c4",
+      "fix": "model-routed branches skip the provider whose primary just failed. Test: tests/unit/grok-fallback-logged.test.ts",
+      "reportedAt": "2026-10-04",
+      "source": "Code review 2026-10-04 (tasks/code-review-2026-10/2-images-repair.md A1), confirmed against current code",
+      "status": "fixed",
+      "fixedAt": "2026-10-04"
+    },
+    {
+      "id": "image-cache-key-omits-route",
+      "title": "Image cache key omitted model, backend and aspect",
+      "rootCause": "generateImageCacheKey covered prompt/photos/seq/page/bg only",
+      "impact": "A Lab A/B arm got the other arm's cached image",
+      "fixedIn": "08244377c",
+      "fix": "imageRouteCacheMarkers added to both call sites. Test: tests/unit/image-cache-key-route.test.ts",
+      "reportedAt": "2026-10-04",
+      "source": "Code review 2026-10-04 (tasks/code-review-2026-10/2-images-repair.md A11), confirmed against current code",
+      "status": "fixed",
+      "fixedAt": "2026-10-04"
+    },
+    {
+      "id": "post-repair-text-render-cannot-win",
+      "title": "The post-repair calm-zone re-render could never win",
+      "rootCause": "new version copied its predecessor's evaluation and evalImageFp, so the picker refused the score",
+      "impact": "A paid render discarded every time",
+      "fixedIn": "fe2cc4be5",
+      "fix": "candidate is evaluated on its own bytes before competing. Test: tests/unit/critical-gone-wins.test.ts (scoring) ; flow not unit-reproducible",
+      "reportedAt": "2026-10-04",
+      "source": "Code review 2026-10-04 (tasks/code-review-2026-10/2-images-repair.md D1), confirmed against current code",
+      "status": "fixed",
+      "fixedAt": "2026-10-04"
+    },
+    {
+      "id": "reevaluate-unbounded-and-clobbering",
+      "title": "re-evaluate accepted duplicate unbounded page lists, had no limiter, and wrote a stale whole-story blob",
+      "rootCause": "no dedupe/cap/limiter; saveStoryData from the request-start snapshot",
+      "impact": "Duplicate paid Gemini evals; repairs saved meanwhile reverted",
+      "fixedIn": "3bdca37ee",
+      "fix": "dedupe, cap, imageRegenerationLimiter, per-page atomic save. Test: tests/unit/reevaluate-bounded-and-atomic.test.ts",
+      "reportedAt": "2026-10-04",
+      "source": "Code review 2026-10-04 (tasks/code-review-2026-10/2-images-repair.md B4/B5), confirmed against current code",
+      "status": "fixed",
+      "fixedAt": "2026-10-04"
     }
   ]
 }

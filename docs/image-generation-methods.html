@@ -149,7 +149,7 @@
   <td><code>_dispatchImageGeneration(prompt, charPhotos, opts)</code> <strong>SHARED CORE</strong></td>
   <td><code>server/lib/images.js</code></td>
   <td><strong>Provider-dispatch ladder</strong> → Grok / Gemini / Runware</td>
-  <td>The single Grok→Gemini→Runware selection ladder both entry functions above delegate to: backend resolution, primary Runware, primary Grok, Gemini <code>parts</code> build, model-id resolution + prompt truncation, model-routed Runware, model-routed Grok, non-Gemini→Gemini swap, reference packing (both Grok branches), aspect, <code>onImageReady</code>. Every place the two callers differed is a documented <code>opts</code> field.</td>
+  <td>The single Grok→Gemini→Runware selection ladder both entry functions above delegate to: backend resolution, primary Runware, primary Grok, Gemini <code>parts</code> build, model-id resolution + prompt truncation, model-routed Runware, model-routed Grok (each skipped when the primary call of the same provider just failed — one Grok attempt, then Gemini, 2026-10), non-Gemini→Gemini swap, reference packing (both Grok branches), aspect, <code>onImageReady</code>. Every place the two callers differed is a documented <code>opts</code> field.</td>
   <td>No quality eval, no caching (those stay in the wrappers). Returns a provider-tagged RAW result <code>{ provider, imageData, modelId, usage, packedRefs, promptSent }</code>, or a Gemini-fallback sentinel <code>{ provider:'gemini', parts, modelId, effectivePrompt }</code> the wrapper finishes. See <code>docs/decisions.md</code> "One shared provider-dispatch core".</td>
 </tr>
 
