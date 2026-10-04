@@ -2521,7 +2521,7 @@
       "impact": "Real defects (up to CRITICAL) were removed from the scoring list, so pages scored high and were never repaired (p12 shipped at 83 with the jacket worn and the egg unwrapped).",
       "status": "fixed",
       "fixedAt": "2026-10-04",
-      "fixedIn": "(this commit)",
+      "fixedIn": "385d58966",
       "fix": "Numbered findings (owner, 2026-10-04): buildFeedbackInput shows every finding with an id (indexFindings); the consolidator cites ids on deduped entries and drops; resolveDedupedIssues derives sources/votes from the cited input findings and a not-a-defect drop removes exactly its ids; an unknown or missing id is an ERROR and not applied. enforceNotADefectDrops and the vote clamp are deleted. Tests: tests/unit/consolidator-finding-ids.test.ts (p12 regression: HEAD keeps only clothing/Kiaan/MINOR, the fix keeps clothing/Kiaan/MAJOR + the egg MAJOR). Model re-run on 22 stored inputs (qwen-plus, $0.041): 0 id errors; every collateral deletion the model did not itself drop by id survives, incl. the 1790508305061 p13 and 1790446348343 p16 CRITICALs. Verify: consolidator-finding-ids."
     },
     {
