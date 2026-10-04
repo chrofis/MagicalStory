@@ -79,3 +79,19 @@ on each page or show only the text of the first pages? Think it through."
 
 **Validation:** unit tests for the gate function; staging check with a real trial run on the smoke/admin path
 (cost ≈ one trial story) to see the phases, the gate, unlock-on-email and email change; phone screenshots to owner.
+
+## Verification on staging (real trial runs, iPhone 14 viewport)
+
+- **Run 1** (job_1791114188734_cwyvu3y8p, build ed1f27c07): every phase and the gate passed — 14 status
+  payloads while locked, **none carried page 4–6 text**; pages 1–3 always had text; email unlocked all 6 at once;
+  email change re-linked + re-issued the token. **FAILED: reload** → page lost the story (bare sign-in form).
+  Root cause + fix: bug `trial-waiting-page-reload-loses-story` (tasks/bugs.json), fixed in 5933f5926.
+  (Run 1's own "pages still unlocked after reload" check passed falsely — it read a pre-reload payload; harness fixed.)
+- **Run 2** (job_1791130829297_qfrcuuf2m, build b36317c6e): **all checks pass**, incl. reload (a new job-status
+  after reload, all 6 pages unlocked with text, title on screen, no sign-in form, check-email note shown).
+  Timeline on staging: title + first picture at ~190 s, complete at ~218 s — on staging the "text before
+  pictures" window was ~2 s (prod logs showed text at ~120 s, pictures ~135–155 s).
+- Open copy nits: (1) the check-email body still says "…und deine Geschichte zu lesen" although the visitor has
+  read it — should say "behalten"; (2) "Deine Geschichte ist fertig!" + "Deine Geschichte ist bereit zum Lesen"
+  say the same thing twice at the top.
+- Not on production. Production push needs the owner's explicit OK.
