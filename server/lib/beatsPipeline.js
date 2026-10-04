@@ -2595,10 +2595,21 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     // arc inline exactly as it did before this stage existed.
     log.warn(`🚨 [BEATS] Arc machine failed (${err.message}) — planning beats without an arc`);
     gl.warn('beats_arc_failed', `Arc machine failed: ${err.message} — beats planned without an arc`);
+    // EVERY arc-derived variable goes together (review 2026-10-04 A1): the arc
+    // stage can throw after the create set the central figure, the invented-figure
+    // list and limit, the premise names and the challenge tags, and a half-reset
+    // left the planner, the counters, the Art Director and the next book's
+    // challenge memory reading an arc nobody sees.
     approvedArc = '';
     arcWeakPoints = '';
     arcHints = '';
     arcStoryLogic = '';
+    arcCentralFigure = null;
+    arcInventedNames = null;
+    arcInventedLimit = null;
+    arcPremiseNames = [];
+    challengeTakenIds = [];
+    challengeTakenTagged = 0;
   }
 
   // ── Step 1: beats plan ────────────────────────────────────────────────────
@@ -2637,8 +2648,11 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   if (pagePlan) log.info(`📐 [BEATS] page plan: ${pagePlan.split('\n').filter(Boolean).length} line(s)`);
   if (plan.pages.length === 0) throw new Error('Beats planner returned no parseable plan lines');
   if (plan.missing.length > 0) {
-    log.warn(`⚠️ [BEATS] Planner omitted page(s) ${plan.missing.join(', ')} — story will be ${plan.pages.length} pages`);
-    gl.warn('beats_plan_incomplete', `Planner omitted page(s) ${plan.missing.join(', ')}`);
+    // Fail loudly (review 2026-10-04 A2): a book planned short ships short at the
+    // full price. Throwing fails the job, and the outer catch refunds the credits.
+    log.error(`❌ [BEATS] Planner omitted page(s) ${plan.missing.join(', ')} — refusing to write a ${plan.pages.length}-page book that was ordered at ${pageCount}`);
+    gl.error('beats_plan_incomplete', `Planner omitted page(s) ${plan.missing.join(', ')}`);
+    throw new Error(`Beats planner omitted page(s) ${plan.missing.join(', ')} of ${pageCount}`);
   }
   gl.info('beats_plan', `Page plan: ${plan.pages.length}/${pageCount} pages by ${planRes.modelId || planModel} (${(meta.timings.planMs / 1000).toFixed(1)}s)`, null, {
     pages: plan.pages.length, model: planRes.modelId || planModel,
@@ -3126,10 +3140,6 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   const textResult = await runStoryText(expansions);
   const { textRaw, textModelId, parsedText, textPromptSent, textUsage } = textResult;
 
-  if (parsedText.missing.length > 0) {
-    log.warn(`⚠️ [BEATS] Text writer omitted page(s) ${parsedText.missing.join(', ')} after retry — those pages are dropped`);
-    gl.warn('beats_text_incomplete', `Text writer omitted page(s) ${parsedText.missing.join(', ')}`);
-  }
   // The title: nothing else in a beats run produces one. The writer emits three
   // candidates AND names the one to ship (TITLE_PICK) — it is the only call in a
   // beats run that has the candidates, the brief and the finished pages in one
@@ -3213,6 +3223,13 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         if (candidate.pages.length === 0 || candidate.missing.length > 0) {
           log.warn(`⚠️ [BEATS] Text attempt ${attempt}: ${candidate.pages.length} page(s) parsed, missing ${candidate.missing.join(', ') || 'none'}`);
           if (attempt < 2) continue;
+          // Second attempt still short: fail loudly (review 2026-10-04 A2). The
+          // page and its paid brief used to be dropped and the book shipped short
+          // at full price; the throw fails the job and the outer catch refunds.
+          if (candidate.missing.length > 0) {
+            gl.error('beats_text_incomplete', `Text writer omitted page(s) ${candidate.missing.join(', ')} on both attempts`);
+            throw new Error(`Beats text writer omitted page(s) ${candidate.missing.join(', ')} on both attempts`);
+          }
         }
         raw = res.text || '';
         modelId = res.modelId || textModel;
@@ -3247,8 +3264,10 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     // ships under the illustration (job_1789348171785_9oxos7dwv p1/p2/p8).
     const text = stripTrailingSeparator((textByPage.get(b.pageNumber) || '').trim());
     if (!text) {
-      log.warn(`⚠️ [BEATS] Page ${b.pageNumber} has no text — dropped`);
-      continue;
+      // Fail loudly (review 2026-10-04 A2): a page with a brief and no text is a
+      // short book, never a dropped page.
+      gl.error('beats_text_incomplete', `Page ${b.pageNumber} has no text`);
+      throw new Error(`Beats page ${b.pageNumber} has no text`);
     }
     const exp = briefByPage.get(b.pageNumber);
     const sceneDescription = exp?.brief || '';
