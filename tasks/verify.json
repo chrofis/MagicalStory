@@ -4833,6 +4833,24 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "main-role-limit-and-age-line",
+      "title": "Wizard step 2 explains Hauptrolle, limits mains to what the server counts (1 for 2-3 characters, 2 for 4+), defaults to one main, and shows the age the book is written for",
+      "commits": [
+        "(this push)"
+      ],
+      "addedAt": "2026-10-04",
+      "claim": "On staging /create step 2: the info text above the cards explains Hauptrolle and the limit; a new account with 2 children gets only the first-created child as Hauptrolle; with 2-3 characters, clicking Hauptrolle on another moves it (previous becomes Dabei); with 4+ characters a third Hauptrolle button is disabled with a tooltip; setting a main to Nicht dabei so the cast drops below 4 leaves only the first-selected main; the blue line under the grid reads 'Geschrieben für N-Jährige (Name, ...)' with the oldest main's age, matching the age band of the generated story. Reloading keeps the roles.",
+      "runShape": [
+        "any"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Open the wizard step 2 on staging with demo-agebands (14 chars) and a 2-child account; exercise radio swap, disabled button, shrink-trim, reload; compare the age line with the story's age band."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [
