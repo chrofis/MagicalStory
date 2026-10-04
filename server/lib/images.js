@@ -5987,7 +5987,9 @@ async function editImageWithPrompt(imageData, editInstruction, model, referenceI
   if (backend === 'grok') {
     // Grok edit path — uses /images/edits endpoint with reference images
     // Include the current image + any additional character/VB references
-    const allRefs = [imageData, ...referenceImages].slice(0, 3); // Grok max 3 refs
+    // editWithGrok applies the tier's own reference cap; the sanitized retry below
+    // sends this SAME list so it does not lose the character / VB references.
+    const allRefs = [imageData, ...referenceImages];
     try {
       const grokResult = await editWithGrok(editPrompt, allRefs, { model: modelConfig.modelId, aspectRatio });
       log.info(`✅ [IMAGE EDIT] Successfully edited image via Grok`);
@@ -6001,7 +6003,8 @@ async function editImageWithPrompt(imageData, editInstruction, model, referenceI
     } catch (grokErr) {
       rethrowLocalFault(grokErr, { logLabel: 'IMAGE EDIT', provider: 'grok' });
       // Content moderation block — sanitize prompt and retry, then fall back to Gemini
-      if (grokErr.message?.includes('content moderation') || grokErr.message?.includes('400')) {
+      // Only Grok's structured moderation verdict (err.moderated) — not any 400.
+      if (grokErr.moderated === true) {
         log.warn(`⚠️ [IMAGE EDIT] Grok blocked by content moderation, sanitizing prompt and retrying...`);
         // Soften violent/weapon language for retry.
         //
@@ -6030,7 +6033,7 @@ async function editImageWithPrompt(imageData, editInstruction, model, referenceI
         if (sanitized !== editPrompt) {
           log.info(`🔄 [IMAGE EDIT] Retrying with sanitized prompt: "${sanitized.substring(0, 120)}..."`);
           try {
-            const retryResult = await editWithGrok(sanitized, [imageData], { model: modelConfig.modelId, aspectRatio });
+            const retryResult = await editWithGrok(sanitized, allRefs, { model: modelConfig.modelId, aspectRatio });
             log.info(`✅ [IMAGE EDIT] Sanitized retry succeeded via Grok`);
             return {
               imageData: retryResult.imageData,

@@ -128,6 +128,7 @@ async function generateWithGrok(prompt, options = {}) {
       warnIfCreditsExhausted(response.status, errorText);
       const err = new Error(`Grok API error (${response.status}): ${errorText.substring(0, 200)}`);
       err.statusCode = response.status;
+      err.moderated = isGrokModerationBody(errorText);
       log.error(`❌ [GROK] API error ${response.status}: ${errorText.substring(0, 300)}`);
       throw err;
     }
@@ -241,6 +242,15 @@ function grokPromptBudget(model) {
  * (images.js rethrowLocalFault). Never cuts — a caller that can shrink must do
  * it before calling. Measured in UTF-8 bytes, as xAI measures it (2026-10-04).
  */
+/**
+ * Grok's moderation verdict is the structured error code `imagine:content-moderated`
+ * in the response body (decisions 2026-09-18). Callers branch on `err.moderated`,
+ * never on a status number or a substring of the message (code review 2026-10 A8).
+ */
+function isGrokModerationBody(errorText) {
+  return /content-moderated/i.test(String(errorText || ''));
+}
+
 function assertGrokPromptFits(prompt, model, logLabel) {
   const budget = grokPromptBudget(model);
   const bytes = promptBytes(prompt);
@@ -531,6 +541,7 @@ async function editWithGrok(prompt, referenceImages = [], options = {}) {
       const errorText = await response.text();
       const err = new Error(`Grok edit API error (${response.status}): ${errorText.substring(0, 200)}`);
       err.statusCode = response.status;
+      err.moderated = isGrokModerationBody(errorText);
       log.error(`❌ [GROK] Edit API error ${response.status}: ${errorText.substring(0, 300)}`);
       warnIfCreditsExhausted(response.status, errorText);
       throw err;
@@ -2123,6 +2134,7 @@ async function stitchImagesHorizontally(buffers, targetHeight = 768, options = {
 }
 
 module.exports = {
+  isGrokModerationBody,
   generateWithGrok,
   editWithGrok,
   isGrokConfigured,
