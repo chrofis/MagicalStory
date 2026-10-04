@@ -1794,24 +1794,24 @@ function wornItemsBibleOf(storyData) {
  * page did, not the way the story-level contract does.
  *
  * Reads the page's brief out of `storyData.sceneImages` and parses it with the
- * same `extractSceneMetadata` the entity grid uses. Unparsable or missing →
- * the outfit comes back untouched, exactly as before.
+ * same `extractSceneMetadata` the entity grid uses. A missing brief → the outfit
+ * comes back untouched; an unexpected error propagates.
  */
 function resolveOutfitForStoryPage(outfitText, characterName, storyData, pageNumber, sceneDescription = null) {
-  try {
-    const sd = (storyData && Array.isArray(storyData.sceneImages) ? storyData.sceneImages : [])
-      .find(s => s && s.pageNumber === pageNumber);
-    const desc = sceneDescription || (sd && (sd.sceneDescription || sd.description)) || null;
-    if (!desc) return String(outfitText || '');
-    const { extractSceneMetadata } = require('./sceneMetadata');
-    return resolveGeneratedOutfit(outfitText, characterName, {
-      visualBible: wornItemsBibleOf(storyData),
-      sceneMetadata: extractSceneMetadata(desc),
-      pageNumber,
-    });
-  } catch {
-    return String(outfitText || '');
-  }
+  const sd = (storyData && Array.isArray(storyData.sceneImages) ? storyData.sceneImages : [])
+    .find(s => s && s.pageNumber === pageNumber);
+  const desc = sceneDescription || (sd && (sd.sceneDescription || sd.description)) || null;
+  if (!desc) return String(outfitText || '');
+  const { extractSceneMetadata } = require('./sceneMetadata');
+  // extractSceneMetadata returns null for an unparsable brief, which
+  // resolveGeneratedOutfit handles. A THROW here is a code bug, so it propagates
+  // (code review 2026-10 A10; decisions #4) — a bare catch used to dress the
+  // character in the story-level outfit and hide it.
+  return resolveGeneratedOutfit(outfitText, characterName, {
+    visualBible: wornItemsBibleOf(storyData),
+    sceneMetadata: extractSceneMetadata(desc),
+    pageNumber,
+  });
 }
 
 module.exports = {
