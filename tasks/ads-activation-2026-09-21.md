@@ -152,8 +152,10 @@ serves immediately; the three new campaigns ramp as Google reviews their ads (~2
       prints it). Until then NO ads numbers can be read (report, search terms, bids all fail loudly).
 - [ ] **Production push of the phone pages: waiting for owner's OK after reviewing staging on a phone.** Ship ONLY
       the phone-page commits, by cherry-pick onto origin/master in a scratch worktree (staging is hundreds of
-      commits ahead; never merge staging->master for this): 6ab466467 (phone intro + homepage hero) and 911ff7dcf
-      (skip removed + trust row). Re-run tsc + the 6 funnel test files on the merged state before pushing.
+      commits ahead; never merge staging->master for this): 6ab466467 (phone intro + homepage hero), 911ff7dcf
+      (skip removed + trust row) and 406758938 (2026-10-04: dedicated step-2/3 phone thumbnails - owner-approved
+      knight + reading art, originals in scripts/ads/approved/try-steps/). Re-run tsc + the funnel test files on
+      the merged state before pushing.
 - [ ] **Also staging-only, owner said "not yet" (2026-09-24):** ad-visit tracking site_arrival/site_exit
       (fbb75e248). Decide with the phone-pages push.
 - [ ] After production: resume Search-Deutschschweiz-v1 (`activate-week.js`: its ARMS status -> ENABLED, --apply)
