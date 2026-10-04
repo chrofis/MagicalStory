@@ -2567,7 +2567,10 @@
       "source": "Owner-approved fix task 2026-10-04 (\"Use shared builder\"). Prod trial job_1790769860433_2bhhj0pyi (\"LUNA et la Tour des Vents\"): the character is \"LUNA\", the outline's per-page clothing map is {\"Luna\":\"costumed\"} on p1-p5 (stories.data.pageClothing). Stored referencePhotos[0].requestedClothingCategory = \"standard\" on every page; debug ref stories/job_1790769860433_2bhhj0pyi/debug/p2/v0/grok-ref-1.jpg is the beige-sweater standard avatar.",
       "rootCause": "storyJobPipeline.js trial page path hand-rolled its per-scene clothing requirements: `perCharClothing[char.name] || 'standard'` - an exact-key lookup (\"LUNA\" != \"Luna\") with a silent 'standard' default. Full mode calls buildSceneClothingRequirements (clothingResolve.js), which resolves names through lookupByName and refuses to default to 'standard'. The trial cover paths and four clothingResolve readers also read clothing maps by exact key.",
       "impact": "Any trial whose outline keyed a character's clothing under a different case/diacritic spelling lost the costume on every page (the trial's whole selling point), silently.",
-      "status": "open"
+      "status": "fixed",
+      "fixedAt": "2026-10-04",
+      "fixedIn": "4d8cce94e",
+      "fix": "Trial page path calls buildSceneClothingRequirements (name-tolerant, no standard default); cover paths and clothingResolve readers use resolveCharacterReqs. Replay of stored LUNA: p1-p5 costumed, p6 standard. Tests: tests/unit/trial-page-clothing-name-spelling.test.ts. Verify: trial-page-clothing-name-spelling."
     }
   ]
 }
