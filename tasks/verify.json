@@ -4615,6 +4615,40 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "consolidator-finding-ids",
+      "title": "The consolidator cites every finding by id; votes come from the cited input findings, and a not-a-defect drop removes only its own ids",
+      "commits": [],
+      "addedAt": "2026-10-04",
+      "claim": "On the next staging story with repairs: every consolidator_calls.full_prompt shows each finding as \"- Q1 [SEV] …\" / S / C / E / R ids; every stored plan.deduped_issues entry carries ids, and its sources/severities equal the sections and shown severities of those ids (no entry billed above or below what its cited findings said); no plan.id_errors, or each one is logged at ERROR and its entry absent; a finding_contradicts_brief / profile_says_trait_is_correct drop never removes a deduped entry whose ids it does not name (no repeat of p12's egg finding vanishing with the reader drop).",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "consolidator_calls (full_prompt ids, raw_response ids, plan.deduped_issues[].ids/sources/severities, plan.id_errors) for every page round; compare each entry's severities with the [SEV] tags of its ids in full_prompt; for each rule-2/2a drop, confirm the removed ids are exactly the drop's ids. Baseline: job_1791040103540_atbttop6w p12 (calls 2983/2996): jacket billed MINOR via mis-credited source, egg finding deleted with the reader drop.",
+        "images": []
+      },
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "refine-declined-ledger",
+      "title": "A finding the text refine leaves standing is recorded declined (open), not page-rewritten",
+      "commits": [],
+      "addedAt": "2026-10-04",
+      "claim": "On the next staging story whose text refine leaves a finding standing: the refine prompt shows findings as \"T<n> FAULT[…]\"; its analysis ledger has \"T<n> … STANDS: <reason>\" lines; textRefineReport.findingLedger records those findings outcome \"declined\" with the reason and counts them in unresolvedCount; a finding with a fixed ledger line and a changed page stays page-rewritten.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "textRefineReport.rounds[repair].prompt (T ids), .analysis (STANDS lines), textRefineReport.findingLedger[].id/outcome/reason, unresolvedCount; also the post_audit round entry if the book audit routed TEXT faults. Baseline: job_1791040103540_atbttop6w MISMATCH p18 (\"stands: … the ending's own act\") recorded page-rewritten.",
+        "images": []
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [

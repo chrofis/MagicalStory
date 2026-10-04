@@ -227,7 +227,7 @@ describe('resolveFindingOutcomes separates a refuted claim from an unanswered fi
     const src = read('server/lib/textRefine.js');
     expect(src).toMatch(/const returnedIdentical = returnedPages\.filter\(n => !changedPages\.includes\(n\)\)/);
     expect(src).toMatch(/const changedUnasked = changedPages\.filter\(n => !askedPages\.has\(n\)\)/);
-    expect(src).toMatch(/resolveFindingOutcomes\(findings, base, changedPages, returnedPages\)/);
+    expect(src).toMatch(/resolveFindingOutcomes\(findings, base, changedPages, returnedPages, parseDeclinedFindings\(parsed\.analysis, findings\.length\)\)/);
     expect(read('server/lib/textRefine.js')).toMatch(/returnedIdentical: r\.returnedIdentical \|\| \[\]/);
   });
 });
