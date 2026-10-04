@@ -428,10 +428,13 @@ export default function TrialGenerationPage() {
         const data = await response.json();
 
         if (!response.ok) {
-          if (data.code === 'TRIAL_USED') {
-            // Story already exists — show the claim UI so user can sign up to view it
-            setPageState('completed');
-            setProgress(100);
+          if (data.code === 'TRIAL_USED' && data.jobId) {
+            // The visitor already has a trial job (reload / return visit):
+            // adopt it. Polling resolves the real state; never a bare form.
+            setJobId(data.jobId);
+            storage.setItem('trial_gen_job_id', data.jobId);
+            setPageState(data.status === 'failed' ? 'failed' : data.status === 'completed' ? 'completed' : 'generating');
+            if (data.status === 'completed') setProgress(100);
             return;
           }
           setPageState('failed');

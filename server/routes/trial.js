@@ -1497,6 +1497,23 @@ router.post('/claim-session', verifySessionToken, async (req, res) => {
   }
 });
 
+/** The one art style every trial story uses (avatars, export, job input). */
+const TRIAL_ART_STYLE = 'watercolor';
+
+/**
+ * Body of the 409 TRIAL_USED answer. Carries the visitor's existing trial job
+ * so the waiting page can resume it after a reload. No job row means the
+ * cap fired with nothing to resume: jobId is omitted and the client fails loudly.
+ */
+function buildTrialUsedResponse(jobRow) {
+  const body = { error: 'Trial story already used', code: 'TRIAL_USED' };
+  if (jobRow && jobRow.id) {
+    body.jobId = jobRow.id;
+    body.status = jobRow.status;
+  }
+  return { status: 409, body };
+}
+
 /**
  * POST /api/trial/create-story
  *
@@ -1532,7 +1549,17 @@ router.post('/create-story', verifySessionToken, async (req, res) => {
       if (exists.rows.length === 0) {
         return res.status(404).json({ error: 'Account not found' });
       }
-      return res.status(409).json({ error: 'Trial story already used', code: 'TRIAL_USED' });
+      // Return the visitor's existing trial job so a reload / return visit
+      // resumes it instead of landing on a bare "used" state.
+      const jobRow = await pool.query(
+        'SELECT id, status FROM story_jobs WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1',
+        [userId]
+      );
+      const used = buildTrialUsedResponse(jobRow.rows[0]);
+      if (!used.body.jobId) {
+        log.error(`[TRIAL] TRIAL_USED for user ${userId} but no story_jobs row found`);
+      }
+      return res.status(used.status).json(used.body);
     }
 
     // If a prepare-title call is still in flight for this user, wait for it
@@ -2645,13 +2672,9 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
     };
 
     // Build avatar requirements for prepareStyledAvatars.
-    // Trial decision (logged in docs/decisions.md): skip the 2×4 standard
-    // sheet. The character is in `costumed` for nearly every page; the
-    // standard look only shows on the rare non-costumed scene. The
-    // preview avatar (9:16 full-body watercolor portrait, generated cheaply
-    // during the wizard) is good enough as the standard reference. Saves
-    // ~30-40s on every trial. If no costume is configured we still need a
-    // standard sheet so the character can render at all.
+    // The preview avatar is NOT the standard reference: the 2026-08-15 "preview
+    // IS the standard" policy was reversed 2026-08-16 (docs/decisions.md). Only
+    // the costumed sheet is built here; with no costume the standard sheet is.
     const avatarRequirements = [];
     if (costume) {
       avatarRequirements.push({
@@ -2681,22 +2704,6 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
     // Trial is 1-per-user enforced, so the userId-keyed scope is unique to
     // this trial run end-to-end.
     await runInCacheScope(`trial-${userId}`, async () => {
-      // Pre-populate the cache with the preview avatar at the 'standard'
-      // key so applyStyledAvatars finds it on standard-clothing pages
-      // without us having to generate a separate 2×4 sheet for standard.
-      // Only the costumed sheet will actually be generated below.
-      if (costume && mainChar.previewAvatar && typeof mainChar.previewAvatar === 'string') {
-        try {
-          const { _seedStandardFromPreview } = require('../lib/styledAvatars');
-          if (typeof _seedStandardFromPreview === 'function') {
-            _seedStandardFromPreview(character.name, 'watercolor', mainChar.previewAvatar);
-            log.info(`[TRIAL AVATARS] Seeded standard cache from preview avatar for "${character.name}" (skipping standard 2×4 sheet)`);
-          }
-        } catch (seedErr) {
-          log.warn(`[TRIAL AVATARS] Failed to seed standard cache: ${seedErr.message}`);
-        }
-      }
-
       // Prepare styled avatars (costumed only for trial — see decision above).
       //
       // The season rides along for the same reason the premise takes one at
@@ -2708,11 +2715,11 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
       // it (the costume is the outfit).
       const { seasonOutfitGuidance } = require('../lib/season');
       const seasonOutfit = seasonOutfitGuidance({ storyCategory });
-      await prepareStyledAvatars(characters, 'watercolor', avatarRequirements, avatarClothingRequirements, null, null, { seasonOutfit });
+      await prepareStyledAvatars(characters, TRIAL_ART_STYLE, avatarRequirements, avatarClothingRequirements, null, null, { seasonOutfit });
       log.info(`[TRIAL AVATARS] Avatar styling complete for "${character.name}"`);
 
       // Export styled avatars so the pipeline can reuse them (avoid regenerating)
-      const styledAvatarExport = exportStyledAvatarsForPersistence(characters, 'watercolor');
+      const styledAvatarExport = exportStyledAvatarsForPersistence(characters, TRIAL_ART_STYLE);
       const styledAvatarsData = {};
       for (const [charName, avatars] of styledAvatarExport) {
         styledAvatarsData[charName] = avatars;
@@ -2953,7 +2960,7 @@ async function createTrialStoryJob(pool, userId, characterId, characterData, sto
     pages,
     language: storyInput.language || 'en',
     languageLevel: 'standard',
-    artStyle: 'watercolor',
+    artStyle: TRIAL_ART_STYLE,
     storyCategory: storyInput.storyCategory || '',
     storyTopic: storyInput.storyTopic || '',
     storyTheme: storyInput.storyTheme || '',
@@ -3417,6 +3424,8 @@ module.exports.checkAndIncrementTrialCap = checkAndIncrementTrialCap;
 module.exports.resetTrialRateLimits = resetTrialRateLimits;
 module.exports.triggerAvatarGenerationForUser = triggerAvatarGenerationForUser;
 module.exports.TRIAL_FREE_PAGES = TRIAL_FREE_PAGES;
+module.exports.TRIAL_ART_STYLE = TRIAL_ART_STYLE;
+module.exports.buildTrialUsedResponse = buildTrialUsedResponse;
 module.exports.buildTrialStoryPages = buildTrialStoryPages;
 module.exports.mergeTrialPageRecords = mergeTrialPageRecords;
 module.exports.isTrialContactEmail = isTrialContactEmail;

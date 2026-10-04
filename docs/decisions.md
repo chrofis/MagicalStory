@@ -66055,3 +66055,24 @@ Jev has no temperature: a repeat run swapped Grossmünster and Wasserkirche betw
 **Rationale:** one computation, so the number the customer sees cannot drift from the book that is printed. The client no longer hardcodes 30.
 
 **Touched files:** `server/lib/gelato.js`, `server/routes/print.js`, `client/src/pages/BookBuilder.tsx`, `client/src/services/storyService.ts`, `server/lib/gelato.test.js`.
+
+
+## 2026-10-04 — Trial: last code remnant of the reversed "preview IS the standard reference" policy removed; one trial art style
+
+**Context:** the 2026-08-15 entry "Trial: the preview avatar IS the standard reference" was reversed on
+2026-08-16 ("no trial-only avatar path; the trial builds both sheets" — the raw preview is a Pass-1
+realistic anchor, so pages rendered from it look like painted photographs). The story run follows the
+reversal, but `/api/trial/prepare-title` still called `_seedStandardFromPreview`, putting the raw preview
+into the `standard` styled-avatar cache slot of its scope. It did not reach production stories (the
+persisted export held only the costumed sheet), but it was one export change away from reintroducing the
+rejected behaviour. Separately, the trial art style was the literal `'watercolor'` in four places.
+(An attempt the same day to make prepare-title build the STANDARD sheet instead of the costume was
+dropped before commit: its evidence — "the story used no costume" on two prod trials — was produced by
+the name-spelling bug fixed in 4d8cce94e; with names resolving, the story uses the prewarmed costume.)
+
+**Decision:** delete the `_seedStandardFromPreview` call and the function itself (no other caller).
+prepare-title keeps building only the costumed sheet; the story run builds the standard sheet, as the
+2026-08-16 reversal says. The trial art style is one constant, `TRIAL_ART_STYLE` (server/routes/trial.js).
+
+**Touched files:** `server/routes/trial.js`, `server/lib/styledAvatars.js`,
+`tests/unit/trial-reload-and-art-style.test.ts`.
