@@ -1,0 +1,5 @@
+model: grok-imagine-image
+refs: Lily.jpg, scripts/ads/drafts/try-steps/step2-knight.png
+aspect 1:1, 2k
+
+Square children's-book illustration in exactly the watercolour storybook style of reference image 2. The girl from reference image 1: a SCHOOL-AGE 6-YEAR-OLD girl (not a toddler) with the same face - copper-red wavy shoulder-length hair, green eyes, freckles - drawn exactly as she appears in reference image 2. She is curled up in a cosy armchair, smiling happily, holding a large open picture book on her lap and reading it. Warm soft lamp light, plain cosy background. The girl and the book fill most of the frame. One figure only. No text, no letters, no writing anywhere.

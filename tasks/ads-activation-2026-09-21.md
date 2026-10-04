@@ -137,11 +137,33 @@ serves immediately; the three new campaigns ramp as Google reviews their ads (~2
       (visible on the first screen on iPhone 14 / Pixel 7 / iPhone SE); homepage hero smaller on phones.
 - [x] **Owner review on a phone (2026-10-03): the homepage->step-1 skip REMOVED** — it landed visitors on the
       consent boxes without ever seeing the finished book; with the intro on one screen it saved only a tap.
-      Phone trust row: legal links lg-only (footer keeps them) so the example reaches the first screen. 6afc9d444,
-      push to staging WAITING for an in-flight staging story job to finish (pre-push idle gate).
-- [ ] Staging screenshots of 6afc9d444 to owner; then production only on the owner's explicit OK (cherry-pick
-      onto origin/master — staging is hundreds of commits ahead). Then resume Deutschschweiz
-      (`activate-week.js`: set its status back to ENABLED, --apply) and measure.
+      Phone trust row: legal links lg-only (footer keeps them) so the example reaches the first screen.
+- [x] **On STAGING 2026-10-04 as 911ff7dcf** (local commit 6afc9d444). Verified on staging, iPhone 14 / Pixel 7 /
+      iPhone SE: homepage button -> explanation shown on all three; /try start button visible without scrolling;
+      homepage example starts at 581/664 px (iPhone 14), 565/839 (Pixel 7), still just below on iPhone SE (670/568).
+      Screenshots sent to owner.
+
+## OPEN — state at session end 2026-10-04 (owner restarting the session)
+
+- [ ] **Google Ads OAuth token expires every 7 days** (re-authorised 09-21, dead again by 10-04 -> `invalid_grant`).
+      Cause: the Google Cloud OAuth consent screen is in *Testing*, whose refresh tokens expire after 7 days.
+      Owner action: Google Cloud Console -> APIs & Services -> OAuth consent screen -> publish to *In production*,
+      then `node scripts/ads/authorize.js` once and paste the token into scripts/ads/config.json (the script only
+      prints it). Until then NO ads numbers can be read (report, search terms, bids all fail loudly).
+- [ ] **Production push of the phone pages: waiting for owner's OK after reviewing staging on a phone.** Ship ONLY
+      the phone-page commits, by cherry-pick onto origin/master in a scratch worktree (staging is hundreds of
+      commits ahead; never merge staging->master for this): 6ab466467 (phone intro + homepage hero) and 911ff7dcf
+      (skip removed + trust row). Re-run tsc + the 6 funnel test files on the merged state before pushing.
+- [ ] **Also staging-only, owner said "not yet" (2026-09-24):** ad-visit tracking site_arrival/site_exit
+      (fbb75e248). Decide with the phone-pages push.
+- [ ] After production: resume Search-Deutschschweiz-v1 (`activate-week.js`: its ARMS status -> ENABLED, --apply)
+      and measure whether paid phone visitors now get past /try's first screen (`attribution-report.js`, and the
+      per-step trail query for paid visits).
+- [ ] Daily while broad match runs: `node scripts/ads/search-terms.js` (needs the token).
+- [ ] Re-run `set-keyword-bids.js --ceiling=0.50` once the broad keywords have first-page estimates.
+- Live ads state at session end: Deutschschweiz PAUSED; Cheap-Age (PHRASE, 87 kw), Cheap-Occasion (BROAD, 43),
+  LifeChallenge (BROAD, 70) ENABLED, CPC default 0.20, 9 Age keywords raised to 0.29-0.47.
+  Spend 21-28 Sept ~CHF 22, 1 paid trial (09-24, kinderbuch selbst gestalten).
 
 - [ ] Owner to choose the phone-page fixes (proposed 2026-09-28). No code yet.
 
