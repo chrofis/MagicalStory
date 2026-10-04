@@ -4740,7 +4740,7 @@
         "kind": "human",
         "what": "Compare stories.data.characters[].name, the title and the cover pixels for a hero typed in caps. Replay 2026-10-04 over prod characters: 4 of 104 distinct names change (LUNA, ELIAN, sophie, katara), 0 mixed-case names altered.",
         "images": [
-          "cover"
+          "covers"
         ]
       },
       "status": "pending",
