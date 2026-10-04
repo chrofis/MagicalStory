@@ -16,6 +16,7 @@ const sharp = require('sharp');
 const { log } = require('../utils/logger');
 const { stripDataUriPrefix } = require('../lib/r2');
 const { lookupIpLocation } = require('../lib/ipLocation');
+const { normalizeCharacterName } = require('../lib/characterName');
 const { trialSourceWhereClause } = require('../lib/trialSource');
 // Every full-blob characters.data write in this file goes through this —
 // image bytes belong in R2, the row holds URLs. Never throws; on an R2
@@ -1177,7 +1178,7 @@ router.post('/create-anonymous-account', trialAvatarLimiter, async (req, res) =>
       return res.status(400).json({ error: parsedAge.error });
     }
 
-    const safeName = name.replace(/[\r\n]/g, '');
+    const safeName = normalizeCharacterName(name.replace(/[\r\n]/g, ''));
     const adminBypass = isAdminRequest(req);
 
     // Layer 1: Verify Turnstile (skipped for admin testing)
@@ -1374,7 +1375,7 @@ router.patch('/update-character-details', verifySessionToken, async (req, res) =
     };
 
     const c = charData.characters[0];
-    c.name = name.replace(/[\r\n]/g, '').trim();
+    c.name = normalizeCharacterName(name.replace(/[\r\n]/g, '').trim());
     // An omitted age leaves the stored one intact; a supplied one is the
     // normalised whole-year value parsed above.
     if (patchedAge !== null) {

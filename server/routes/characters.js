@@ -9,6 +9,7 @@ const router = express.Router();
 
 const { dbQuery, withTransaction, isDatabaseMode, logActivity, uploadCharacterPhotosToR2, offloadCharacterImages } = require('../services/database');
 const { authenticateToken } = require('../middleware/auth');
+const { normalizeCharacterName } = require('../lib/characterName');
 const { normalizePhotos, stripLegacyPhotoFields, normalizeAvatarsForResponse, normalizeCharacterAvatars } = require('../lib/characterPhotos');
 const { normalizePhysical, stripLegacyPhysicalFields, expandUserHairOverrideForDisplay } = require('../lib/characterPhysical');
 const { normalizeTraits, stripLegacyTraitFields } = require('../lib/characterTraits');
@@ -445,6 +446,7 @@ router.post('/', authenticateToken, async (req, res) => {
     const { stripExifFromPhotos } = require('../lib/imageMetadata');
     const charactersWithoutAvatars = await Promise.all((characters || []).map(async char => {
       const { avatars, ...charWithoutAvatars } = char;
+      charWithoutAvatars.name = normalizeCharacterName(charWithoutAvatars.name);
       if (avatars) {
         console.log(`[Characters] POST - Stripping frontend avatars for ${char.name}`);
       }

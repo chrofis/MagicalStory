@@ -21,6 +21,7 @@ const crypto = require('crypto');
 const { log } = require('../utils/logger');
 const { getPool, withTransaction, offloadJsonbImages, inlineOffloadPrefix } = require('../services/database');
 const email = require('../../email');
+const { normalizeCharacterName } = require('../lib/characterName');
 
 function getDbPool() { return getPool(); }
 
@@ -148,6 +149,12 @@ router.post('/create-story', authenticateToken, storyGenerationLimiter, validate
       storyDetails: sanitizeString(req.body.storyDetails || '', 10000),
       dedication: sanitizeString(req.body.dedication || '', 500)
     };
+    // The wizard sends whole character objects from client state, which can
+    // still hold the raw "LUNA" the user typed; normalise here so the title,
+    // avatar maps and clothing lookups all see one spelling.
+    if (Array.isArray(inputData.characters)) {
+      inputData.characters = inputData.characters.map(c => (c && typeof c.name === 'string' ? { ...c, name: normalizeCharacterName(c.name) } : c));
+    }
     // Remove idempotencyKey from input_data as it's stored separately
     delete inputData.idempotencyKey;
 

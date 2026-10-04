@@ -65958,3 +65958,13 @@ Each built call-2 prompt carries one FIXED location line per cover and no own-pl
 **Revisit if** xAI changes `max_prompt_length` (check `GET /v1/image-generation-models`), or a scored A/B shows longer prompts hurt adherence — the cap is then a quality choice, not an API limit, and belongs in its own config key.
 
 **Touched:** `server/config/models.js`, `server/lib/promptFitError.js` (`promptBytes`), `server/lib/grok.js`, `server/lib/images.js`, `server/lib/sceneComposite.js`, `server/lib/coverComposite.js`, `server/routes/regeneration.js`, `docs/image-generation-methods.html`, `.claude/skills/respecting-provider-invariants/SKILL.md`, tests under `tests/unit/` (grok-prompt-cap-at-send, grok-prompt-budget and the fit tests rescaled to the config cap). **Status:** ✅ active (staging).
+
+## 2026-10-04 — Character names are normalised at input (ALL CAPS / all lowercase to title case)
+
+**Context:** Prod trial `job_1790769860433_2bhhj0pyi`: the user typed "LUNA"; the writer wrote "Luna" in the text, the title stayed "LUNA et la Tour des Vents" (painted on the cover), and the Luna/LUNA mismatch had already broken clothing lookup (4d8cce94e).
+
+**Decision:** `normalizeCharacterName` (`server/lib/characterName.js`) title-cases a name whose letters are all upper or all lower, per part split on space/hyphen/apostrophe, Unicode-aware. Any case mix (McKenzie, DeShawn, LéA) and names of 2 letters or fewer (JJ, AJ, likely initials) are untouched. Applied server-side where a name is first accepted: trial `create-anonymous-account` and `update-character-details`, wizard `POST /api/characters`, and `POST /api/jobs/create-story` (the wizard sends client-state characters, which can still hold the raw spelling). Trial `create-story` reads the stored character, so it needs nothing. The trial preview avatar uses the name only in logs.
+
+**Rationale:** One spelling from one source; every name-keyed artefact (styled avatar maps, clothing, title, cover) is written after these choke points. Existing stored characters are not migrated.
+
+**Touched files:** `server/lib/characterName.js`, `server/routes/trial.js`, `server/routes/characters.js`, `server/routes/jobs.js`, `tests/unit/character-name-normalize.test.ts`.
