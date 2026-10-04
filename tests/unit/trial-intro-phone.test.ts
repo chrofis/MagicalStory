@@ -69,13 +69,14 @@ describe('the phone step list thumbnails', () => {
   });
 });
 
-describe('homepage trust row on phones', () => {
-  it('Impressum and Datenschutz next to the CTA are desktop-only', () => {
-    expect(LANDING).toMatch(/<Link to="\/impressum" className="hidden lg:inline-flex/);
-    expect(LANDING).toMatch(/<Link to="\/privacy" className="hidden lg:inline-flex/);
+describe('homepage hero has no trust row', () => {
+  it('no payment/Swiss claims and no Impressum or Datenschutz link next to the CTA (owner, 2026-10-04)', () => {
+    expect(LANDING).not.toMatch(/trustPayment|trustSwiss|trustImprint|trustPrivacy/);
+    expect(LANDING).not.toMatch(/to="\/impressum"/);
+    expect(LANDING).not.toMatch(/to="\/privacy"/);
   });
 
-  it('...and phones still reach both through the footer the homepage renders', () => {
+  it('...the legal pages stay reachable through the footer the homepage renders', () => {
     expect(LANDING).toMatch(/<Footer \/>/);
     expect(FOOTER).toMatch(/to=\{to\('\/impressum'\)\}/);
     expect(FOOTER).toMatch(/to=\{to\('\/privacy'\)\}/);
