@@ -574,10 +574,11 @@ export default function TrialWizard() {
             <img src="/images/try/step3-spread.webp" alt="" decoding="async" fetchPriority="high"
               className="w-full max-h-60 object-contain rounded-2xl shadow-sm mb-5" />
             <ol className="space-y-3 max-w-sm mx-auto">
+              {/* Steps 2 and 3 use dedicated 56px thumbnails (owner-approved 2026-10-04, originals in scripts/ads/approved/try-steps/): the desktop images crop badly at thumbnail size; step 1's photo crops fine. */}
               {([
                 { n: 1, img: '/images/try/step1-photo.webp', title: intro.step1Title, desc: intro.step1Desc },
-                { n: 2, img: '/images/try/step2-topics.webp', title: intro.step2Title, desc: intro.step2Desc },
-                { n: 3, img: '/images/try/step3-spread.webp', title: intro.step3Title, desc: intro.step3Desc },
+                { n: 2, img: '/images/try/step2-thumb.webp', title: intro.step2Title, desc: intro.step2Desc },
+                { n: 3, img: '/images/try/step3-thumb.webp', title: intro.step3Title, desc: intro.step3Desc },
               ] as const).map((s) => (
                 <li key={s.n} className="flex items-center gap-3 text-left">
                   <img src={s.img} alt="" decoding="async"

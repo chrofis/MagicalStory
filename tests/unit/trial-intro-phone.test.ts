@@ -54,6 +54,21 @@ describe('the intro start buttons', () => {
   });
 });
 
+describe('the phone step list thumbnails', () => {
+  it('every step image exists under client/public, and steps 2 and 3 are the dedicated -thumb.webp files', () => {
+    const at = WIZARD.indexOf('{([\n                { n: 1,');
+    expect(at).toBeGreaterThan(-1);
+    const list = WIZARD.slice(at, WIZARD.indexOf('] as const)', at));
+    const imgs = [...list.matchAll(/\{ n: (\d), img: '([^']+)'/g)].map((m) => ({ n: Number(m[1]), img: m[2] }));
+    expect(imgs.map((i) => i.n)).toEqual([1, 2, 3]);
+    for (const { img } of imgs) {
+      expect(fs.existsSync(path.join(__dirname, '..', '..', 'client', 'public', img)), img).toBe(true);
+    }
+    expect(imgs[1].img).toBe('/images/try/step2-thumb.webp');
+    expect(imgs[2].img).toBe('/images/try/step3-thumb.webp');
+  });
+});
+
 describe('homepage trust row on phones', () => {
   it('Impressum and Datenschutz next to the CTA are desktop-only', () => {
     expect(LANDING).toMatch(/<Link to="\/impressum" className="hidden lg:inline-flex/);
