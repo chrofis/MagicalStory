@@ -36,6 +36,12 @@ async function loadAuthState(userId) {
   return state;
 }
 
+/** The user's current token_version (cached like verifySession), or null when the user is gone. */
+async function currentTokenVersion(userId) {
+  const state = await loadAuthState(userId);
+  return state ? state.tokenVersion : null;
+}
+
 function invalidateAuthState(userId) {
   authStateCache.delete(String(userId));
 }
@@ -158,6 +164,7 @@ module.exports = {
   verifySession,
   SessionError,
   invalidateAuthState,
+  currentTokenVersion,
   generateToken,
   verifyToken,
   signToken

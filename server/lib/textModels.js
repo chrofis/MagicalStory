@@ -86,6 +86,14 @@ const activeTextModel = TEXT_MODELS[TEXT_MODEL] || TEXT_MODELS['claude-sonnet'];
  * @param {Object} options - { maxRetries: 2, baseDelay: 2000, maxDelay: 30000 }
  * @returns {Promise} - Result of fn() or throws after all retries exhausted
  */
+// Streaming calls take an optional options.signal (a client disconnect, requestGuards.abortOnClientClose):
+// it aborts the provider request and withRetry does not retry it (error.clientAborted).
+function linkExternalAbort(controller, signal) {
+  if (!signal) return;
+  if (signal.aborted) return controller.abort(signal.reason);
+  signal.addEventListener('abort', () => controller.abort(signal.reason), { once: true });
+}
+
 async function withRetry(fn, options = {}) {
   const { maxRetries = 2, baseDelay = 2000, maxDelay = 30000 } = options;
   let lastError;
@@ -95,6 +103,9 @@ async function withRetry(fn, options = {}) {
       return await fn();
     } catch (error) {
       lastError = error;
+
+      // The caller walked away (options.signal on the streaming calls): retrying would only spend.
+      if (error.clientAborted) throw error;
 
       // Record rate-limit / overload hits (Anthropic 429/529 etc.) so they
       // surface in the daily summary. Best-effort, never blocks the retry.
@@ -388,6 +399,7 @@ async function callAnthropicAPIStreaming(prompt, maxTokens, modelId, onChunk, op
     const timeoutMs = Math.max(1500000, 900000 + Math.ceil(maxTokens / 1000) * 15000);
     const INACTIVITY_TIMEOUT_MS = 120000; // 120s with no data → abort
     const controller = new AbortController();
+    linkExternalAbort(controller, options.signal);
     const maxTimer = setTimeout(() => controller.abort(new Error(`streaming timeout after ${Math.round(timeoutMs / 1000)}s`)), timeoutMs);
     let inactivityTimer;
     const resetInactivity = () => {
@@ -546,6 +558,7 @@ async function callGeminiTextAPIStreaming(prompt, maxTokens, modelId, onChunk, o
     const timeoutMs = Math.max(1500000, 900000 + Math.ceil(maxTokens / 1000) * 15000);
     const INACTIVITY_TIMEOUT_MS = 120000; // 120s with no data → abort
     const controller = new AbortController();
+    linkExternalAbort(controller, options.signal);
     const maxTimer = setTimeout(() => controller.abort(new Error(`streaming timeout after ${Math.round(timeoutMs / 1000)}s`)), timeoutMs);
     let inactivityTimer;
     const resetInactivity = () => {
@@ -903,6 +916,7 @@ async function callXaiAPIStreaming(prompt, maxTokens, modelId, onChunk, options 
     const timeoutMs = Math.max(1500000, 900000 + Math.ceil(maxTokens / 1000) * 15000);
     const INACTIVITY_TIMEOUT_MS = 120000;
     const controller = new AbortController();
+    linkExternalAbort(controller, options.signal);
     const maxTimer = setTimeout(() => controller.abort(new Error(`streaming timeout after ${Math.round(timeoutMs / 1000)}s`)), timeoutMs);
     let inactivityTimer;
     const resetInactivity = () => {
@@ -1080,6 +1094,7 @@ async function callOpenRouterAPIStreaming(prompt, maxTokens, modelId, onChunk, o
     const timeoutMs = Math.max(1500000, 900000 + Math.ceil(maxTokens / 1000) * 15000);
     const INACTIVITY_TIMEOUT_MS = 120000;
     const controller = new AbortController();
+    linkExternalAbort(controller, options.signal);
     const maxTimer = setTimeout(() => controller.abort(new Error(`streaming timeout after ${Math.round(timeoutMs / 1000)}s`)), timeoutMs);
     let inactivityTimer;
     const resetInactivity = () => {

@@ -119,15 +119,41 @@ const trialPhotoLimiter = rateLimit({
   skip: isAdminRequest,
 });
 
+// Idea generation needs a trial session (so a Turnstile-verified account creation stands behind
+// it) and is capped PER SESSION, not per IP: it runs after verifySessionToken.
 const trialIdeasStore = new MemoryStore();
 const trialIdeasLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 10,
   store: trialIdeasStore,
+  keyGenerator: (req) => `session:${req.sessionUser.userId}`,
   message: { error: 'Too many idea generations. Please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
   skip: isAdminRequest,
+});
+
+// /link-email sends a real verification email: 3 sends per session and 5 per address per day.
+const LINK_EMAIL_WINDOW_MS = 24 * 60 * 60 * 1000;
+const linkEmailSessionStore = new MemoryStore();
+const linkEmailSessionLimiter = rateLimit({
+  windowMs: LINK_EMAIL_WINDOW_MS,
+  max: 3,
+  store: linkEmailSessionStore,
+  keyGenerator: (req) => `session:${req.sessionUser.userId}`,
+  message: { error: 'Too many verification emails for this session. Please try again tomorrow.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+const linkEmailAddressStore = new MemoryStore();
+const linkEmailAddressLimiter = rateLimit({
+  windowMs: LINK_EMAIL_WINDOW_MS,
+  max: 5,
+  store: linkEmailAddressStore,
+  keyGenerator: (req) => `address:${String(req.body?.email || '').toLowerCase().trim().slice(0, 320)}`,
+  message: { error: 'Too many verification emails for this address. Please try again tomorrow.' },
+  standardHeaders: true,
+  legacyHeaders: false,
 });
 
 const titlePageStore = new MemoryStore();
@@ -761,15 +787,19 @@ async function getTrialStepFunnel(range = '30d', source = 'all') {
   }
 }
 
+/** Turnstile could not be consulted (secret missing, siteverify down): a retryable 503, never a pass. */
+class TurnstileUnavailableError extends Error {}
+
 /**
  * Verify Cloudflare Turnstile token server-side.
- * Returns true if valid, false if invalid or Turnstile unavailable (graceful fallback).
+ * Returns true if valid, false if the visitor failed or sent no token. THROWS TurnstileUnavailableError
+ * when the check itself cannot run: it fails closed (docs/decisions.md "Trial Turnstile fails closed").
  */
 async function verifyTurnstile(token, remoteip) {
   const secret = process.env.TURNSTILE_SECRET_KEY;
   if (!secret) {
-    log.warn('[TURNSTILE] No TURNSTILE_SECRET_KEY configured, skipping verification');
-    return true; // Graceful fallback — don't block if not configured
+    log.error('[TURNSTILE] TURNSTILE_SECRET_KEY is not configured - refusing trial start');
+    throw new TurnstileUnavailableError('TURNSTILE_SECRET_KEY not configured');
   }
   if (!token) {
     log.warn('[TURNSTILE] No token provided');
@@ -787,8 +817,8 @@ async function verifyTurnstile(token, remoteip) {
     }
     return data.success === true;
   } catch (err) {
-    log.warn(`[TURNSTILE] Verification error: ${err.message}`);
-    return true; // Graceful fallback — don't block if Turnstile is down
+    log.error(`[TURNSTILE] Verification error - refusing trial start: ${err.message}`);
+    throw new TurnstileUnavailableError(err.message);
   }
 }
 
@@ -837,7 +867,8 @@ setInterval(() => {
   if (cleaned > 0) log.debug(`[FINGERPRINT] Cleaned ${cleaned} stale entries`);
 }, 60 * 60 * 1000).unref();
 
-const { verifyToken, signToken } = require('../middleware/auth');
+const { verifyToken, signToken, currentTokenVersion } = require('../middleware/auth');
+const guards = require('../lib/requestGuards');
 
 // ─── Session Token for Anonymous Trial Users ─────────────────────────────────
 
@@ -846,7 +877,7 @@ const { verifyToken, signToken } = require('../middleware/auth');
  * Session tokens have payload: { userId, anonymous: true }
  * They grant limited permissions: create story, poll status, view own story, link email.
  */
-function verifySessionToken(req, res, next) {
+async function verifySessionToken(req, res, next) {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1]; // Bearer <token>
 
@@ -854,16 +885,30 @@ function verifySessionToken(req, res, next) {
     return res.status(401).json({ error: 'Session token required' });
   }
 
+  let decoded;
   try {
-    const decoded = verifyToken(token);
-    if (!decoded.anonymous) {
-      return res.status(403).json({ error: 'Invalid session token' });
-    }
-    req.sessionUser = { userId: decoded.userId, anonymous: true };
-    next();
+    decoded = verifyToken(token);
   } catch (err) {
     return res.status(403).json({ error: 'Session expired. Please start over.' });
   }
+  if (!decoded.anonymous) {
+    return res.status(403).json({ error: 'Invalid session token' });
+  }
+  // The session carries the account's token_version like a login JWT: a Google sign-in onto
+  // this account (upsertGoogleUser) bumps it, which ends a trial session somebody else may
+  // still hold. Tokens minted before the field existed count as version 0.
+  let currentVersion;
+  try {
+    currentVersion = await currentTokenVersion(decoded.userId);
+  } catch (err) {
+    log.error(`[TRIAL] session lookup failed: ${err.message}`);
+    return res.status(503).json({ error: 'Temporarily unavailable. Please try again.' });
+  }
+  if (currentVersion === null || (decoded.tv || 0) !== currentVersion) {
+    return res.status(403).json({ error: 'Session expired. Please start over.' });
+  }
+  req.sessionUser = { userId: decoded.userId, anonymous: true };
+  next();
 }
 
 /**
@@ -872,7 +917,7 @@ function verifySessionToken(req, res, next) {
  */
 function generateSessionToken(userId) {
   return signToken(
-    { userId, anonymous: true },
+    { userId, anonymous: true, tv: 0 }, // a new trial account starts at token_version 0 (migration 044 default)
     '24h'
   );
 }
@@ -1168,6 +1213,9 @@ router.post('/create-anonymous-account', trialAvatarLimiter, async (req, res) =>
     if (gender && !['male', 'female'].includes(gender)) {
       return res.status(400).json({ error: 'Invalid gender' });
     }
+    // Traits and custom text are stored and later sent to paid prompts (code review 2026-10 T1).
+    const traitsErr = guards.characterTraitsError(traits) || guards.textError('customTraits', customTraits);
+    if (traitsErr) return res.status(400).json({ error: traitsErr });
     // Age is required, not merely valid-if-present: the declared age is the
     // single source the avatar generator builds the body from and the avatar
     // judge scores against (resolveDeclaredAvatarOverrides, de8753cc1), and it
@@ -1183,7 +1231,13 @@ router.post('/create-anonymous-account', trialAvatarLimiter, async (req, res) =>
 
     // Layer 1: Verify Turnstile (skipped for admin testing)
     if (!adminBypass) {
-      const turnstileValid = await verifyTurnstile(turnstileToken, req.ip);
+      let turnstileValid;
+      try {
+        turnstileValid = await verifyTurnstile(turnstileToken, req.ip);
+      } catch (err) {
+        if (!(err instanceof TurnstileUnavailableError)) throw err;
+        return res.status(503).json({ error: 'Verification is temporarily unavailable. Please try again in a moment.', retryable: true });
+      }
       if (!turnstileValid) {
         return res.status(403).json({ error: 'Verification failed. Please try again.' });
       }
@@ -1348,6 +1402,8 @@ router.patch('/update-character-details', verifySessionToken, async (req, res) =
     if (traits && !Array.isArray(traits)) {
       return res.status(400).json({ error: 'Invalid traits' });
     }
+    const traitsErr = guards.characterTraitsError(traits) || guards.textError('customTraits', customTraits);
+    if (traitsErr) return res.status(400).json({ error: traitsErr });
 
     const { getPool } = require('../services/database');
     const pool = getPool();
@@ -1528,6 +1584,12 @@ router.post('/create-story', verifySessionToken, async (req, res) => {
     if (!storyCategory && !storyTopic) {
       return res.status(400).json({ error: 'Story topic is required' });
     }
+    // storyDetails/storyTopic are stored and resent on every writer call (code review 2026-10 T1).
+    const inputErr = guards.textFieldsError([
+      ['storyCategory', storyCategory], ['storyTopic', storyTopic], ['storyTheme', storyTheme],
+      ['storyDetails', storyDetails, guards.IDEA_TEXT_MAX_CHARS], ['language', language, 20], ['ideaKind', ideaKind, 20],
+    ]) || guards.locationError(userLocation);
+    if (inputErr) return res.status(400).json({ error: inputErr });
 
     const { getPool } = require('../services/database');
     const pool = getPool();
@@ -1884,12 +1946,12 @@ router.get('/job-status/:jobId', jobStatusLimiter, verifySessionToken, async (re
  * Link an email to an anonymous trial account.
  * Sends verification email. Account transitions from anonymous to email-linked.
  */
-router.post('/link-email', verifySessionToken, async (req, res) => {
+router.post('/link-email', verifySessionToken, linkEmailSessionLimiter, linkEmailAddressLimiter, async (req, res) => {
   try {
     const { userId } = req.sessionUser;
     const { email } = req.body;
 
-    if (!email) {
+    if (!email || typeof email !== 'string' || email.length > 320) {
       return res.status(400).json({ error: 'Email is required' });
     }
 
@@ -1967,7 +2029,12 @@ router.post('/link-email', verifySessionToken, async (req, res) => {
     const language = parsedTrial?.storyInput?.language || 'en';
 
     const verifyUrl = `${process.env.FRONTEND_URL || process.env.BASE_URL || 'https://www.magicalstory.ch'}/api/auth/verify-email/${verificationToken}`;
-    await emailService.sendEmailVerificationEmail(normalizedEmail, displayName, verifyUrl, language);
+    // The sender reports failure in its result instead of throwing: success is only claimed when it sent.
+    const sent = await emailService.sendEmailVerificationEmail(normalizedEmail, displayName, verifyUrl, language);
+    if (!sent?.success) {
+      log.error(`[TRIAL] link-email: verification email NOT sent for ${userId}: ${sent?.error?.code || 'unknown'} ${sent?.error?.message || ''}`);
+      return res.status(502).json({ error: 'We could not send the verification email. Please try again.', retryable: true });
+    }
 
     log.info(`[TRIAL] Email linked for anonymous user ${userId}: ${normalizedEmail}`);
     res.json({ success: true, message: 'Verification email sent' });
@@ -2367,8 +2434,11 @@ router.post('/analyze-photo', trialPhotoLimiter, async (req, res) => {
  * source as the idea request: the client's, else the IP lookup.
  */
 router.post('/prepare-idea-landmarks', ideaLandmarksPrepareLimiter, (req, res) => {
-  res.status(202).json({ ok: true });
   const { storyCategory, storyTopic, storyTheme, language, characters, userLocation: clientLocation } = req.body || {};
+  const inputError = guards.textFieldsError([['storyCategory', storyCategory], ['storyTopic', storyTopic], ['storyTheme', storyTheme], ['language', language, 20]])
+    || guards.characterListError(characters) || guards.locationError(clientLocation);
+  if (inputError) return res.status(400).json({ error: inputError });
+  res.status(202).json({ ok: true });
   (async () => {
     let userLocation = clientLocation || null;
     if (!userLocation?.city) userLocation = await lookupIpLocation(req, 'TRIAL');
@@ -2376,7 +2446,14 @@ router.post('/prepare-idea-landmarks', ideaLandmarksPrepareLimiter, (req, res) =
   })().catch(err => log.error(`🚨 [TRIAL] prepare-idea-landmarks failed: ${err.message}`));
 });
 
-router.post('/generate-ideas-stream', trialIdeasLimiter, async (req, res) => {
+router.post('/generate-ideas-stream', verifySessionToken, trialIdeasLimiter, async (req, res) => {
+  // Free text goes into two paid Sonnet prompts: cap it before the stream opens (code review 2026-10 T1).
+  const { storyCategory: _c, storyTopic: _t, storyTheme: _th, language: _l, characters: _ch, userLocation: _u } = req.body || {};
+  const inputError = guards.textFieldsError([['storyCategory', _c], ['storyTopic', _t], ['storyTheme', _th], ['language', _l, 20]])
+    || guards.characterListError(_ch) || guards.locationError(_u);
+  if (inputError) return res.status(400).json({ error: inputError });
+  // A closed tab stops both paid arms.
+  const signal = guards.abortOnClientClose(res);
   // Set up SSE headers. Connection: keep-alive is forbidden in HTTP/2 — see
   // storyIdeas.js for the same fix.
   res.setHeader('Content-Type', 'text/event-stream');
@@ -2537,13 +2614,13 @@ router.post('/generate-ideas-stream', trialIdeasLimiter, async (req, res) => {
           if (!started) { log.debug(`  ${slot} streaming started`); started = true; }
         }
       };
-      return callTextModelStreaming(basePrompt, null, onDelta, modelToUse).then(async () => {
+      return callTextModelStreaming(basePrompt, null, onDelta, modelToUse, { signal }).then(async () => {
         // Throws on a malformed block — an unparseable card is a broken
         // contract, not a passing card. No fallback to shipping it unchecked.
         let parsed = parseIdeaSelfCheck(full);
         if (!parsed.ok) {
           log.warn(`  ${slot} failed its own check (${parsed.failure}) — one rerun`);
-          const rerun = await callTextModelStreaming(buildIdeaRerunPrompt(basePrompt, parsed), null, null, modelToUse);
+          const rerun = await callTextModelStreaming(buildIdeaRerunPrompt(basePrompt, parsed), null, null, modelToUse, { signal });
           // Exactly ONE rerun: whatever comes back is the final answer.
           const reparsed = parseIdeaSelfCheck(String(rerun.text || ''));
           log.info(`  ${slot} rerun ${reparsed.ok ? 'passed' : `still failing (${reparsed.failure})`}`);
@@ -2616,6 +2693,18 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
     if (!storyCategory || (!storyTopic && !storyTheme)) {
       return res.status(400).json({ error: 'storyCategory and storyTopic or storyTheme are required' });
     }
+    const inputErr = guards.textFieldsError([['storyCategory', storyCategory], ['storyTopic', storyTopic], ['storyTheme', storyTheme]]);
+    if (inputErr) return res.status(400).json({ error: inputErr });
+
+    // Once the trial story is taken there is nothing left to prepare (code review 2026-10 T3).
+    {
+      const { getPool: getUsedPool } = require('../services/database');
+      const used = await getUsedPool().query('SELECT stories_generated FROM users WHERE id = $1 AND is_trial = true', [userId]);
+      if (used.rows.length === 0) return res.status(404).json({ error: 'Account not found' });
+      if (used.rows[0].stories_generated >= 1) {
+        return res.status(409).json({ error: 'Trial already used', code: 'TRIAL_USED' });
+      }
+    }
 
     // Resolve which topic/category to look up costumes from (trialCostumes.js
     // owns the mapping — see resolveTrialCostumeLookup).
@@ -2663,6 +2752,19 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
 
     // Determine clothing requirements
     const costumeType = costume ? costume.costumeType : null;
+
+    // ONE sheet generation per trial (code review 2026-10 T3, docs/decisions.md): a repeat call for
+    // the same costume returns what is stored; a call for a DIFFERENT costume generates nothing -
+    // the story job builds whichever category is missing from the stored set itself.
+    if (mainChar.preGeneratedStyledAvatars) {
+      const storedCostume = mainChar.preGeneratedCostumeType ?? null;
+      if (storedCostume === costumeType) {
+        log.info(`[TRIAL AVATARS] prepare-title repeat for user ${userId}: returning the stored sheets (no regeneration)`);
+        return res.json({ costumeType: storedCostume, avatarSlides: mainChar.preGeneratedAvatarSlides || [] });
+      }
+      log.info(`[TRIAL AVATARS] prepare-title for user ${userId}: sheets already prepared for "${storedCostume}", not generating "${costumeType}" (the story job builds it)`);
+      return res.json({ costumeType: null, avatarSlides: [] });
+    }
 
     // Format for prepareStyledAvatars (needs standard/costumed config for on-demand generation)
     const avatarClothingRequirements = {
@@ -3397,6 +3499,8 @@ function resetTrialRateLimits() {
   trialPhotoStore.resetAll();
   trialIdeasStore.resetAll();
   titlePageStore.resetAll();
+  linkEmailSessionStore.resetAll();
+  linkEmailAddressStore.resetAll();
 
   // Reset fingerprint tracker
   const fpCount = fingerprintTracker.size;
@@ -3437,3 +3541,5 @@ module.exports.buildTrialUsedResponse = buildTrialUsedResponse;
 module.exports.buildTrialStoryPages = buildTrialStoryPages;
 module.exports.mergeTrialPageRecords = mergeTrialPageRecords;
 module.exports.isTrialContactEmail = isTrialContactEmail;
+module.exports.verifyTurnstile = verifyTurnstile;
+module.exports.TurnstileUnavailableError = TurnstileUnavailableError;
