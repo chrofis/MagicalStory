@@ -1473,7 +1473,7 @@ router.post('/claim-session', verifySessionToken, async (req, res) => {
     const pool = getPool();
 
     const result = await pool.query(
-      'SELECT id, username, email, role, email_verified FROM users WHERE id = $1',
+      'SELECT id, username, email, role, email_verified, token_version FROM users WHERE id = $1',
       [userId]
     );
 
@@ -2008,6 +2008,9 @@ router.post('/link-google', verifySessionToken, async (req, res) => {
 
     if (!googleEmail) {
       return res.status(400).json({ error: 'Could not get email from Google account' });
+    }
+    if (decodedToken.email_verified !== true) {
+      return res.status(400).json({ error: 'Google has not verified this email address' });
     }
 
     const normalizedEmail = googleEmail.toLowerCase().trim();
@@ -3206,7 +3209,7 @@ router.post('/claim/:token', trialClaimLimiter, async (req, res) => {
 
     // Look up user by claim token (must not be expired)
     const result = await pool.query(
-      'SELECT id, email, username, role, credits, story_quota, stories_generated FROM users WHERE claim_token = $1 AND claim_token_expires > NOW()',
+      'SELECT id, email, username, role, credits, story_quota, stories_generated, token_version FROM users WHERE claim_token = $1 AND claim_token_expires > NOW()',
       [token]
     );
 
@@ -3246,6 +3249,7 @@ router.post('/claim/:token', trialClaimLimiter, async (req, res) => {
       email: user.email,
       role: user.role,
       email_verified: true, // Trial users verified their email already
+      token_version: user.token_version,
     });
 
     log.info(`[TRIAL] Account claimed via password: ${user.email}`);
@@ -3302,6 +3306,9 @@ router.post('/claim-google', trialClaimLimiter, async (req, res) => {
     if (!googleEmail) {
       return res.status(400).json({ error: 'Google account must have an email address' });
     }
+    if (decodedToken.email_verified !== true) {
+      return res.status(400).json({ error: 'Google has not verified this email address' });
+    }
 
     const { getPool } = require('../services/database');
     const { generateToken } = require('../middleware/auth');
@@ -3309,7 +3316,7 @@ router.post('/claim-google', trialClaimLimiter, async (req, res) => {
 
     // Look up user by claim token (must not be expired)
     const result = await pool.query(
-      'SELECT id, email, username, role, credits, story_quota, stories_generated FROM users WHERE claim_token = $1 AND claim_token_expires > NOW()',
+      'SELECT id, email, username, role, credits, story_quota, stories_generated, token_version FROM users WHERE claim_token = $1 AND claim_token_expires > NOW()',
       [claimToken]
     );
 
@@ -3353,6 +3360,7 @@ router.post('/claim-google', trialClaimLimiter, async (req, res) => {
       email: user.email,
       role: user.role,
       email_verified: true,
+      token_version: user.token_version,
     });
 
     log.info(`[TRIAL] Account claimed via Google: ${user.email}`);

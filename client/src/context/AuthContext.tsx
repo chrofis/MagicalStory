@@ -378,6 +378,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error(error.error || 'Password change failed');
     }
 
+    // The server revokes every session on a password change and returns a fresh token for
+    // this one; without storing it this tab would be signed out on its next request.
+    const data = await response.json();
+    if (data.token) storage.setItem(STORAGE_KEYS.AUTH_TOKEN, data.token);
+
     logger.success('Password changed successfully');
   }, []);
 

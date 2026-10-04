@@ -11,7 +11,7 @@ const fs = require('fs').promises;
 const path = require('path');
 
 // Middleware
-const { authenticateToken, verifyToken } = require('../middleware/auth');
+const { authenticateToken, verifySession } = require('../middleware/auth');
 
 // Config
 const { CREDIT_CONFIG } = require('../config/credits');
@@ -1888,7 +1888,7 @@ router.get('/stripe/order-status/:sessionId', async (req, res) => {
     let viewerUserId = null;
     try {
       const bearer = (req.headers['authorization'] || '').split(' ')[1];
-      if (bearer) viewerUserId = verifyToken(bearer).id || null;
+      if (bearer) viewerUserId = (await verifySession(bearer)).id || null;
     } catch { /* anonymous viewer */ }
 
     // Check database for order with retries (webhook might still be processing)

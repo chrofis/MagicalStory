@@ -11,7 +11,9 @@ const crypto = require('crypto');
 // `${shareToken}:${expiryMs}`).
 //
 // Threat model: a leaked key gives the bearer ONE benefit only — the HTML
-// response includes a preload <link> for the front cover image. The
+// response includes a preload <link> for the front cover image, and the slim
+// /api/shared/<token>/header answers (title, page count, cover URL). Enforced in
+// server/routes/sharing.js: every other shared endpoint ignores the key. The
 // underlying R2 URL the link points to is publicly fetchable anyway once
 // known (R2 URLs aren't signed in this project). So the marginal leak
 // here is "the bearer can see the front cover bytes if they capture the

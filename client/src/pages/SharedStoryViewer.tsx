@@ -236,11 +236,10 @@ export default function SharedStoryViewer() {
   // The fullscreen viewer receives URLs that already have ?token=... from BookViewer,
   // so don't double-append. Only use this where we build URLs from scratch.
   const authToken = localStorage.getItem('auth_token');
-  // Email-link signed key from the current URL. When present, it grants
-  // read-only access to this one shareToken — required when the recipient
-  // is not logged in (e.g. owner opening their own email link on iPhone).
-  // Forward to every API/image fetch so the backend's signedLink-OK gate
-  // matches and the story loads instead of 404'ing to login.
+  // Email-link signed key from the current URL. The server honours it for the slim
+  // /header only (title + cover for first paint). The full story needs the owner's
+  // login or an active public share, so a signed-out owner opening the email link
+  // sees the cover and is then sent to login by handle404 below.
   const signedKey = (() => {
     try { return new URLSearchParams(window.location.search).get('key') || ''; }
     catch { return ''; }
@@ -248,7 +247,6 @@ export default function SharedStoryViewer() {
   const tokenParam = (() => {
     const parts: string[] = [];
     if (authToken) parts.push(`token=${encodeURIComponent(authToken)}`);
-    if (signedKey) parts.push(`key=${encodeURIComponent(signedKey)}`);
     return parts.length ? `?${parts.join('&')}` : '';
   })();
 
@@ -285,9 +283,7 @@ export default function SharedStoryViewer() {
       setLoading(false);
     };
 
-    // Forward email-link ?key= to the API so signed-link-only access (e.g.
-    // owner opening their own email on iPhone, not logged in) loads the
-    // story instead of 404'ing.
+    // Only /header honours the email-link ?key= (cover preview for a signed-out owner).
     const apiQuery = signedKey ? `?key=${encodeURIComponent(signedKey)}` : '';
 
     // Phase 1
@@ -309,9 +305,11 @@ export default function SharedStoryViewer() {
         const headerUsesOverlay = h.layout?.textInImage !== false
           && h.languageLevel !== 'advanced'
           && h.languageLevel !== 'standard';
-        if (headerUsesOverlay) {
+        // A signed-out owner arriving by email link only gets the header; the overlay
+        // endpoints would 404 until they log in.
+        if (headerUsesOverlay && (isAuthenticated || h.isShared)) {
           for (let p = 1; p <= h.pageCount; p++) {
-            fetch(`/api/shared/${shareToken}/text-overlay/${p}${apiQuery}`, {
+            fetch(`/api/shared/${shareToken}/text-overlay/${p}`, {
               method: 'POST',
               headers: { ...headers, 'Content-Type': 'application/json' },
             }).catch(() => { /* best-effort */ });
@@ -321,7 +319,7 @@ export default function SharedStoryViewer() {
       .catch(() => { /* fall through to full fetch error handling */ });
 
     // Phase 2 — fat request in parallel with the header.
-    fetch(`/api/shared/${shareToken}${apiQuery}`, { headers })
+    fetch(`/api/shared/${shareToken}`, { headers })
       .then(async r => {
         if (cancelled) return;
         if (!r.ok) { handle404(r.status); return; }

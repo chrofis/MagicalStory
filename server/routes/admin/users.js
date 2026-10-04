@@ -8,7 +8,7 @@ const express = require('express');
 const router = express.Router();
 
 const { dbQuery, getPool, isDatabaseMode, logActivity } = require('../../services/database');
-const { authenticateToken } = require('../../middleware/auth');
+const { authenticateToken, invalidateAuthState } = require('../../middleware/auth');
 const { log } = require('../../utils/logger');
 const { sentinelExclusion } = require('../../lib/gdprSentinel');
 
@@ -242,7 +242,10 @@ router.post('/:userId/role', authenticateToken, requireAdmin, async (req, res) =
     const user = rows[0];
     const previousRole = user.role;
 
-    await dbQuery('UPDATE users SET role = $1 WHERE id = $2', [role, userId]);
+    // token_version bump revokes the user's existing sessions, so a demoted admin loses
+    // access at once instead of when the 7-day JWT expires (decisions.md, token_version).
+    await dbQuery('UPDATE users SET role = $1, token_version = token_version + 1 WHERE id = $2', [role, userId]);
+    invalidateAuthState(userId);
 
     log.info(`[ADMIN] Role for user ${user.username} changed: ${previousRole} -> ${role} (by ${req.user.username})`);
     await logActivity(req.user.id, req.user.username, 'ADMIN_USER_ROLE_CHANGED', {

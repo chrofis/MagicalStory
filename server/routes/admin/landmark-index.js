@@ -9,7 +9,7 @@ const express = require('express');
 const router = express.Router();
 
 const { getPool } = require('../../services/database');
-const { verifyToken } = require('../../middleware/auth');
+const { verifySession } = require('../../middleware/auth');
 const { log } = require('../../utils/logger');
 const {
   indexLandmarksForCities,
@@ -24,7 +24,7 @@ const {
 let landmarkIndexingJob = null;
 
 // Helper to check auth (JWT or secret)
-function checkAuth(req, res, isPost = false) {
+async function checkAuth(req, res, isPost = false) {
   const secret = isPost ? req.body?.secret : req.query?.secret;
 
   if (process.env.ADMIN_SECRET && secret === process.env.ADMIN_SECRET) {
@@ -39,7 +39,7 @@ function checkAuth(req, res, isPost = false) {
 
   try {
     const token = authHeader.split(' ')[1];
-    const decoded = verifyToken(token);
+    const decoded = await verifySession(token);
     if (decoded.role !== 'admin') {
       res.status(403).json({ error: 'Admin access required' });
       return false;
@@ -53,7 +53,7 @@ function checkAuth(req, res, isPost = false) {
 
 // POST /api/admin/landmark-index/index - Trigger indexing for cities
 router.post('/index', async (req, res) => {
-  if (!checkAuth(req, res, true)) return;
+  if (!(await checkAuth(req, res, true))) return;
 
   try {
     // Check if already running
@@ -162,7 +162,7 @@ router.post('/index', async (req, res) => {
 
 // POST /api/admin/landmark-index/index-city - Index a single city on-demand
 router.post('/index-city', async (req, res) => {
-  if (!checkAuth(req, res, true)) return;
+  if (!(await checkAuth(req, res, true))) return;
 
   try {
     const { city, country, analyzePhotos = true, maxLandmarks = 30 } = req.body;
@@ -197,7 +197,7 @@ router.post('/index-city', async (req, res) => {
 
 // GET /api/admin/landmark-index/index/status - Check indexing progress
 router.get('/index/status', async (req, res) => {
-  if (!checkAuth(req, res, false)) return;
+  if (!(await checkAuth(req, res, false))) return;
 
   if (!landmarkIndexingJob) {
     return res.json({ status: 'not_started', message: 'No indexing job has been started' });
@@ -207,7 +207,7 @@ router.get('/index/status', async (req, res) => {
 
 // POST /api/admin/landmark-index/recalculate-scores - Recalculate all scores based on type
 router.post('/recalculate-scores', async (req, res) => {
-  if (!checkAuth(req, res, true)) return;
+  if (!(await checkAuth(req, res, true))) return;
 
   try {
     const pool = getPool();
@@ -232,7 +232,7 @@ router.post('/recalculate-scores', async (req, res) => {
 
 // POST /api/admin/landmark-index/update-type - Update a landmark's type
 router.post('/update-type', async (req, res) => {
-  if (!checkAuth(req, res, true)) return;
+  if (!(await checkAuth(req, res, true))) return;
 
   try {
     const { id, type } = req.body;
@@ -261,7 +261,7 @@ router.post('/update-type', async (req, res) => {
 
 // GET /api/admin/landmark-index/stats - Get statistics
 router.get('/stats', async (req, res) => {
-  if (!checkAuth(req, res, false)) return;
+  if (!(await checkAuth(req, res, false))) return;
 
   try {
     const stats = await getLandmarkIndexStats();
@@ -285,7 +285,7 @@ router.get('/stats', async (req, res) => {
 
 // GET /api/admin/landmark-index - List landmarks
 router.get('/', async (req, res) => {
-  if (!checkAuth(req, res, false)) return;
+  if (!(await checkAuth(req, res, false))) return;
 
   try {
     const { city, country, lat, lon, radius = 20, limit = 50, full = false } = req.query;
@@ -357,7 +357,7 @@ router.get('/', async (req, res) => {
 
 // DELETE /api/admin/landmark-index/broken - Delete broken entries (Wikipedia article URLs instead of image URLs)
 router.delete('/broken', async (req, res) => {
-  if (!checkAuth(req, res, false)) return;
+  if (!(await checkAuth(req, res, false))) return;
 
   try {
     const pool = getPool();
