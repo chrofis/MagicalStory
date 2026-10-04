@@ -63,6 +63,17 @@ const TEXT_MODELS = {
     taskBudgetAtEffort: { max: 96000 },
     description: 'Claude Opus 5.5 - ($4/$20 per 1M). Default effort medium. Routed: arc_create at xhigh.'
   },
+  // Claude Sonnet 5.5. Ceiling and effort levels from GET
+  // /v1/models/claude-sonnet-5-5 (read 2026-10-04): max_tokens 128000, effort
+  // low..max all supported (xhigh answered a live call). Default effort is
+  // `high`. Registered for the 2026-10-04 Lab A/B against the Opus arc create /
+  // re-tell and text_refine; no production stage routes here yet.
+  'claude-sonnet-5-5': {
+    provider: 'anthropic',
+    modelId: 'claude-sonnet-5-5',
+    maxOutputTokens: 128000,
+    description: 'Claude Sonnet 5.5 - ($2/$10 per 1M). Default effort high. Lab A/B vs Opus on arc + text_refine.'
+  },
   'claude-haiku': {
     provider: 'anthropic',
     modelId: 'claude-haiku-4-5-20251001',
@@ -1382,6 +1393,10 @@ const MODEL_PRICING = {
   // MUST stay an exact key: without it calculateTextCost strips the trailing
   // "-5" and prices this model as claude-opus-5 ($5/$25).
   'claude-opus-5-5': { input: 4.00, output: 20.00, thinking: 20.00 },
+  // Sonnet 5.5: same page, fetched 2026-10-04 — $2 input / $10 output.
+  // Exact key for the same reason as Opus 5.5: the "-5" strip would otherwise
+  // land on a claude-sonnet prefix ($3/$15).
+  'claude-sonnet-5-5': { input: 2.00, output: 10.00, thinking: 10.00 },
   'claude-sonnet-4-6': { input: 3.00, output: 15.00, thinking: 15.00 },
   'claude-sonnet-4-5-20250929': { input: 3.00, output: 15.00, thinking: 15.00 },
   'claude-sonnet-4-5': { input: 3.00, output: 15.00, thinking: 15.00 },

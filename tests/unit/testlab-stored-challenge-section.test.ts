@@ -30,3 +30,22 @@ describe('storedChallengeSection', () => {
     expect(() => storedChallengeSection(story('# CHALLENGE IDEAS\nnothing listed'))).toThrow(/lists no challenge entries/);
   });
 });
+
+// arc_effort `promptFromStory` (2026-10-04, Sonnet 5.5 vs Opus 5.5): the stored
+// create prompt goes out byte-for-byte, so the model is the only variable.
+describe('storedCreatePrompt', () => {
+  const { storedCreatePrompt } = require('../../server/lib/testlab');
+
+  it('returns the stored create prompt verbatim with the stored draw for the re-telling', () => {
+    const s = story('# CHALLENGE IDEAS (old heading)\n\n- [C012] A door is too small');
+    const out = storedCreatePrompt(s, 'job_x');
+    expect(out.prompt).toBe(s.arcReviewReport.createPrompt);
+    expect(out.challengeIdeas).toBe(storedChallengeSection(s));
+    expect(out.promptSource).toMatch(/job_x, verbatim/);
+  });
+
+  it('fails loudly when the story stores no create prompt', () => {
+    expect(() => storedCreatePrompt({ arcReviewReport: {} }, 'job_x')).toThrow(/job_x has no stored arcReviewReport.createPrompt/);
+    expect(() => storedCreatePrompt({}, 'job_x')).toThrow(/no stored/);
+  });
+});

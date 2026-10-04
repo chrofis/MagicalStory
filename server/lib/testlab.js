@@ -4605,7 +4605,19 @@ async function runTextRefineStage(target, { params = {}, promptOverride = null }
     log.info(`[TESTLAB] text_refine exact replay: ${moved}/${pages.length} page(s) restored to the writer's text (report lists ${before.size})`);
   }
 
+  // params.auditsFromStory (2026-10-04): replay the stored audit findings so
+  // a repair-model A/B (params.model) answers the identical fault list. Only
+  // meaningful on the writer's text, so it requires fromWriterText.
+  let audits;
+  if (params.auditsFromStory === true || params.auditsFromStory === 'true') {
+    if (!(params.fromWriterText === true || params.fromWriterText === 'true')) {
+      throw new Error('auditsFromStory needs fromWriterText — the stored audits were run on the writer text');
+    }
+    audits = storedRefineAudits(storyData, target.storyId);
+  }
+
   const res = await refineStoryText(storyData, pages, {
+    audits,
     arc: storyData.arcReviewReport?.finalArc || storyData.beatsReviewReport?.arc || '',
     arcHints: resolveReplayArcHints(storyData),
     model: params.model,
@@ -8152,7 +8164,7 @@ async function runWriterCompareStage(target, { params = {} }) {
  * production does (parseArcCreate), and scores each committed arc with the
  * same judges arc_rounds uses. Cost and quality land side by side.
  *
- * params: { efforts, model, retellModel, judgeModels, stage, promptFrom, challengesFromStory, baselineFromStory }
+ * params: { efforts, model, retellModel, judgeModels, stage, promptFrom, challengesFromStory, promptFromStory, baselineFromStory }
  *   target: { storyId }
  *
  * params.stage      'create' (default) sweeps params.efforts over the create
@@ -8172,6 +8184,11 @@ async function runWriterCompareStage(target, { params = {} }) {
  *   with the story's own stored challenge draw, lifted verbatim from
  *   arcReviewReport.createPrompt — so a new arc format sees the SAME draw the
  *   stored arc did, and the comparison has one variable (2026-09-24).
+ * params.promptFromStory  send the story's stored arcReviewReport.createPrompt
+ *   VERBATIM — the exact prompt production's creator answered, whatever the
+ *   template looked like then — with the stored draw handed to any re-telling.
+ *   The model is then the only variable against baseline-create (2026-10-04,
+ *   Sonnet 5.5 vs Opus 5.5 A/B).
  * params.baselineFromStory  also score the story's stored arcs — the committed
  *   create arc and arcReviewReport.finalArc — with the same judges and the same
  *   judge context, as arms `baseline-create` / `baseline-final` (no model call
@@ -8218,8 +8235,13 @@ async function runArcEffortStage(target, { params = {}, promptOverride = null })
   // SAME draw the creator saw (production passes one `challengeIdeas` to both).
   let challengeIdeas;
   const flag = v => v === true || v === 'true';
-  if (params.promptFrom && flag(params.challengesFromStory)) throw new Error('promptFrom and challengesFromStory are exclusive');
-  if (params.promptFrom) {
+  if ([params.promptFrom, flag(params.challengesFromStory), flag(params.promptFromStory)].filter(Boolean).length > 1) {
+    throw new Error('promptFrom, challengesFromStory and promptFromStory are exclusive');
+  }
+  if (flag(params.promptFromStory)) {
+    if (promptOverride) throw new Error('promptFromStory and promptOverride are exclusive');
+    ({ prompt, challengeIdeas, promptSource } = storedCreatePrompt(storyData, target.storyId));
+  } else if (params.promptFrom) {
     if (promptOverride) throw new Error('promptFrom and promptOverride are exclusive');
     const { dbQuery } = require('../services/database');
     const expId = parseInt(params.promptFrom, 10);
@@ -8423,6 +8445,34 @@ async function runArcEffortStage(target, { params = {}, promptOverride = null })
     ],
   };
 }
+/**
+ * text_refine params.auditsFromStory: the audit results the stored refine run
+ * merged ({source, ok, raw} per auditor). Throws when none succeeded — an
+ * empty fault list would make the repair a no-op, not a comparison.
+ */
+function storedRefineAudits(storyData, storyId) {
+  const audits = (storyData?.textRefineReport?.audits || []).filter(a => a && a.source);
+  if (!audits.some(a => a.ok && String(a.raw || '').trim())) {
+    throw new Error(`auditsFromStory: ${storyId} stores no successful textRefineReport.audits`);
+  }
+  return audits.map(a => ({ source: a.source, ok: !!a.ok, raw: a.raw || '', modelKey: a.modelKey || null, error: a.error || null }));
+}
+
+/**
+ * params.promptFromStory: the create prompt production's creator answered for
+ * this story, verbatim, plus the stored draw for any re-telling. Throws when
+ * the story stores no prompt — a rebuilt one would be a second variable.
+ */
+function storedCreatePrompt(storyData, storyId) {
+  const prompt = String(storyData?.arcReviewReport?.createPrompt || '');
+  if (!prompt.trim()) throw new Error(`promptFromStory: ${storyId} has no stored arcReviewReport.createPrompt`);
+  return {
+    prompt,
+    challengeIdeas: storedChallengeSection(storyData),
+    promptSource: `stored arcReviewReport.createPrompt of ${storyId}, verbatim`,
+  };
+}
+
 /**
  * The story's own stored challenge draw: the "# CHALLENGE IDEAS" section of
  * arcReviewReport.createPrompt, verbatim up to the next top-level heading.
@@ -10481,6 +10531,8 @@ async function checkRuleGenericity(ruleText, storyId) {
 
 module.exports = {
   pinnedVersionIndex,
+  storedCreatePrompt,
+  storedRefineAudits,
   // beats_scenes truncation recovery — exported so the decisions can be pinned
   // without a story, a DB or a paid model (tests/unit/testlab-beats-scenes-recovery.test.ts)
   summarizeSceneExpansions,
