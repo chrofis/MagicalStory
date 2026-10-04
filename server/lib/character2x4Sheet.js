@@ -145,18 +145,12 @@ const garmentColourRule = (sheet) => `Every garment keeps the colour ${sheet} sh
 
 /**
  * A GARMENT TAKEN OFF IS GONE FROM EVERY CELL (2026-10-04). One rule for the
- * redress generator (buildRedressPrompt) and its judge (the style judge's
- * {GARMENTS_REMOVED} task): the off-garment sheet exists so a page that takes
- * a garment off is drawn from a reference without it, and until this rule the
- * judge never asked whether it was gone.
+ * redress generator (buildRedressPrompt) and its judge (checkGarmentGone fills
+ * GARMENT_PARTS into its own question): the off-garment sheet exists so a page
+ * that takes a garment off is drawn from a reference without it.
  */
 const GARMENT_PARTS = 'sleeve, collar, hem, hood, zip or strap';
 const GARMENT_OFF_SHEET_RULE = `No cell shows any part of a garment taken off — no ${GARMENT_PARTS} of it, worn or held; the garment it leaves outermost is drawn in its place.`;
-function garmentsRemovedTask(removedGarments) {
-  const names = (Array.isArray(removedGarments) ? removedGarments : []).map(s => String(s || '').trim()).filter(Boolean);
-  if (names.length === 0) return 'No garment is taken off on this sheet: score 10.';
-  return `Taken off on this sheet, on purpose: ${names.join('; ')}. ${GARMENT_OFF_SHEET_RULE} Image 2 still wears ${names.length > 1 ? 'them' : 'it'}; TASK 9 does not score ${names.length > 1 ? 'them' : 'it'}. In \`removed.reason\`, say per cell whether any part of ${names.length > 1 ? 'them' : 'it'} is visible and what is outermost instead. Score 1-10: gone from all 8 cells = 9-10; any visible part of ${names.length > 1 ? 'one' : 'it'} in any cell = 1-3.`;
-}
 
 const ASSETS_DIR = path.resolve(__dirname, '..', 'assets');
 // The -axes variants overlay a 3-axis RGB gizmo (red X / green Y / blue Z)
@@ -984,17 +978,15 @@ async function evaluateStyledSheetWithGemini(sourcePhoto, realisticSheet, styled
   // ask. The outfit is decided and scored on pass 1 — no costume input here.
   // What pass 2 IS told is to keep each garment's colour from the pass-1 sheet
   // (garmentColourRule), so the judge scores exactly that, against Image 2.
-  // removedGarments: the garments a wardrobe-state variant takes off (redressSheetVariant);
-  // empty on an ordinary pass 2, where the task scores 10.
   // imageLabels: Test Lab A/B only (sheetJudgeArms.js) — three caption strings
   // sent as text parts before Image 1/2/3. Production passes none: the images
   // go first, unlabelled, then the prompt.
-  const { model = 'gemini-2.5-flash', promptOverride = null, removedGarments = [], imageLabels = null } = opts;
+  const { model = 'gemini-2.5-flash', promptOverride = null, imageLabels = null } = opts;
   const styleLabel = resolveStyleLineForSheet(artStyle);
 
   let prompt = promptOverride || PROMPT_TEMPLATES.sheet2x4StyleEval;
   if (!prompt) throw new Error('sheet2x4StyleEval prompt template not loaded');
-  prompt = fillTemplate(prompt, { REAR_TURN: REAR_TURN_POSE, SHEET_GROUND: SHEET_GROUND_RULE, SHEET_LETTERING: SHEET_NO_LETTERING_RULE, GARMENT_COLOUR: garmentColourRule('Image 2'), GARMENTS_REMOVED: garmentsRemovedTask(removedGarments) });
+  prompt = fillTemplate(prompt, { REAR_TURN: REAR_TURN_POSE, SHEET_GROUND: SHEET_GROUND_RULE, SHEET_LETTERING: SHEET_NO_LETTERING_RULE, GARMENT_COLOUR: garmentColourRule('Image 2') });
   prompt = prompt.replace(/REQUESTED_STYLE/g, `REQUESTED_STYLE: ${styleLabel}`);
   // TASK 6 age gate — style transfer is where kids drift younger (the art
   // style's cute prior). Unknown age disables the task (prompt scores it 10).
@@ -1052,7 +1044,7 @@ async function checkGarmentGone(sheet, garment, opts = {}) {
  * removed garment. It passes only when the style judge passes and every check
  * says not visible. The checks ride on the style verdict as `garmentChecks`;
  * a visible garment sets removedScore 1 and `removed.reason`, so the
- * finding/axis plumbing that read TASK 10 reads this unchanged.
+ * finding/axis plumbing reads it as an axis.
  */
 async function evaluateVariantSheet(sheet, opts = {}) {
   const { removedGarments = [], usageTracker = null, ...styleOpts } = opts;
@@ -1122,7 +1114,7 @@ function scoreHeadsReport(report) {
   return stampVerdict(report, lowestAxis(report, HEADS_AXES, 'row eval (heads)'));
 }
 
-const STYLE_AXES = ['layout', 'identity', 'style', 'clean', 'bodyFace', 'age', 'solo', 'background', 'garment', 'removed']
+const STYLE_AXES = ['layout', 'identity', 'style', 'clean', 'bodyFace', 'age', 'solo', 'background', 'garment']
   .map(n => [n, r => r[`${n}Score`] ?? r[n]?.score]);
 // The style-judge axes a styled sheet may NOT fail and still ship: a different
 // person (identity) or extra people in the sheet (solo). Every other axis ships
@@ -1455,7 +1447,7 @@ async function evaluateAvatarSheet(sheet, opts = {}) {
   const {
     pass, facePhoto = null, standardAvatar = null, realisticSheet = null,
     costumeDescription = 'standard outfit', costumeName = null, artStyle = 'watercolor',
-    declaredAge = null, model = null, promptOverrides = {}, usageTracker = null, removedGarments = [],
+    declaredAge = null, model = null, promptOverrides = {}, usageTracker = null,
     imageLabels = null,
   } = opts;
   // promptOverrides (Test Lab only) name the ONE judge template each replaces:
@@ -1473,7 +1465,7 @@ async function evaluateAvatarSheet(sheet, opts = {}) {
   }
   const styled = await evaluateStyledSheetWithGemini(
     facePhoto, realisticSheet, sheet, artStyle, process.env.GEMINI_API_KEY,
-    usageTracker, declaredAge, { model: model || undefined, promptOverride: promptOverrides?.style || null, removedGarments, imageLabels }
+    usageTracker, declaredAge, { model: model || undefined, promptOverride: promptOverrides?.style || null, imageLabels }
   );
   return { verdict: styled.report, split: null, promptUsed: styled.promptUsed };
 }
@@ -1907,8 +1899,9 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
  *
  * THE GATE IS THE JUDGE THAT APPROVED THE BASE SHEET (owner, 2026-10-04): the
  * Pass-2 style judge, shown the base's own Pass-1 realistic sheet as Image 2 —
- * exactly the inputs that approved the base — plus its TASK 10, the garments
- * taken off (GARMENT_OFF_SHEET_RULE, also stated to the generator). It used to
+ * exactly the inputs that approved the base — plus one garment-gone check per
+ * garment taken off (evaluateVariantSheet; GARMENT_OFF_SHEET_RULE is also
+ * stated to the generator). It used to
  * be evaluateSheetSplit, the Pass-1 row judges: absolute crop and outfit scores
  * the approved base itself fails (staging job_1791040103540_atbttop6w, Kiaan's
  * base sheet 1/10 on crop, outfit and "costumeReads"), so every redress, which
@@ -2031,12 +2024,12 @@ async function redressSheetVariant(baseSheetImageData, opts = {}) {
 
     let verdict = null;
     try {
-      ({ verdict } = await evaluateAvatarSheet(result.imageData, {
-        pass: 2, facePhoto, realisticSheet, artStyle, declaredAge: characterAge, usageTracker,
+      ({ verdict } = await evaluateVariantSheet(result.imageData, {
+        facePhoto, realisticSheet, artStyle, declaredAge: characterAge, usageTracker,
         removedGarments: items,
       }));
     } catch (err) {
-      log.warn(`[WARDROBE-VARIANT] ${characterName} redress eval threw: ${err.message} — attempt unscored`);
+      log.error(`[WARDROBE-VARIANT] ${characterName} redress eval threw: ${err.message} — attempt rejected, never shipped unchecked`);
       attempts.push({ attempt, stage: 'eval-error', score: null, reason: err.message });
       continue;
     }
@@ -2045,7 +2038,7 @@ async function redressSheetVariant(baseSheetImageData, opts = {}) {
       best = { imageData: result.imageData, verdict, score: verdict.finalScore };
     }
     if (verdict.valid) {
-      log.info(`[WARDROBE-VARIANT] ${characterName} redress accepted (score=${verdict.finalScore}/10, removed=${verdict.removedScore ?? '-'}/10)`);
+      log.info(`[WARDROBE-VARIANT] ${characterName} redress accepted (score=${verdict.finalScore}/10, removed=${verdict.removedScore}/10)`);
       return { imageData: result.imageData, verdict, attempts, prompt };
     }
   }
@@ -2060,7 +2053,6 @@ module.exports = {
   redressSheetVariant,
   buildRedressPrompt,
   GARMENT_OFF_SHEET_RULE,
-  garmentsRemovedTask,
   checkGarmentGone,
   evaluateVariantSheet,
   // Exported for tests: the declared-age proportion block must reach the prompt.

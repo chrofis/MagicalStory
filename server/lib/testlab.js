@@ -10299,7 +10299,7 @@ function castPageSummary({ listed = [], stats = {}, actions = [], aliases = {} }
  * and art style — under the arm params.arm names (sheetJudgeArms.js; default
  * `current` = production exactly). params.input: {entryIndex, removedGarments?,
  * baseImageUrl?} — a sheet with garments taken off is a wardrobe-state variant,
- * judged with TASK 10, and under arm D against its approved styled base.
+ * judged by evaluateVariantSheet, and under arm D against its approved styled base.
  */
 async function runSheetStyleFixture(target, params, sheet) {
   if (!target.character) throw new Error('judge_fixture sheet_style: target.character required');
@@ -10329,10 +10329,10 @@ async function runSheetStyleFixture(target, params, sheet) {
     usage.thinking_tokens += u?.thinking_tokens || 0;
     usage.calls++;
   };
-  // Arm G: a variant is the style judge plus one garment-gone check per removed
-  // garment; a sheet with nothing taken off has no check to run and is just the style judge.
+  // A variant (a garment taken off) is production's gate: the style judge plus one
+  // garment-gone check per removed garment. A sheet with nothing off is the style judge alone.
   const SHEET = require('./character2x4Sheet');
-  const judge = armRun.garmentChecks && removedGarments.length ? SHEET.evaluateVariantSheet : SHEET._internal.evaluateAvatarSheet;
+  const judge = removedGarments.length ? SHEET.evaluateVariantSheet : SHEET._internal.evaluateAvatarSheet;
   const { verdict, promptUsed } = await judge(sheet, {
     pass: 2, facePhoto, realisticSheet: reference,
     artStyle: entry.artStyle || storyData.artStyle || 'watercolor',

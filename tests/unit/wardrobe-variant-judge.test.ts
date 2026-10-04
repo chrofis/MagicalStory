@@ -7,8 +7,10 @@
  * judges, which the approved base sheet itself fails (crop, outfit). No off
  * sheet was stored and p11/p12/p16 were drawn from the jacket-wearing sheet.
  * Pinned:
- *   1  the variant gate is the Pass-2 style judge (evaluateAvatarSheet pass 2,
- *      the base's own Pass-1 sheet as Image 2) plus a garment-gone task;
+ *   1  the variant gate is the Pass-2 style judge (the base's own Pass-1 sheet as
+ *      Image 2) plus one garment-gone check per removed garment
+ *      (evaluateVariantSheet; the TASK 10 it first shipped with was read as an
+ *      exemption and is gone);
  *      evaluateSheetSplit is gone from the variant path;
  *   2  generator and critic state one rule, GARMENT_OFF_SHEET_RULE;
  *   3  costumed sheets get variants: derivation, projection, both resolvers;
@@ -36,9 +38,9 @@ const fnText = (name: string) => {
 describe('1 — the variant is judged by the pass-2 style judge plus a garment-gone task', () => {
   beforeAll(async () => { await loadPromptTemplates(); });
 
-  it('redressSheetVariant calls evaluateAvatarSheet pass 2 with the base Pass-1 sheet and the removed garments, never the row judges', () => {
+  it('redressSheetVariant calls evaluateVariantSheet (style judge pass 2 + per-garment checks) with the base Pass-1 sheet and the removed garments, never the row judges', () => {
     const body = fnText('redressSheetVariant');
-    expect(body).toMatch(/evaluateAvatarSheet\(result\.imageData, \{\s*pass: 2, facePhoto, realisticSheet, artStyle/);
+    expect(body).toMatch(/evaluateVariantSheet\(result\.imageData, \{\s*facePhoto, realisticSheet, artStyle/);
     expect(body).toMatch(/removedGarments: items/);
     expect(body).not.toMatch(/evaluateSheetSplit/);
   });
@@ -57,13 +59,13 @@ describe('1 — the variant is judged by the pass-2 style judge plus a garment-g
     }
   });
 
-  it('the style judge carries TASK 10 and scores it into the final', () => {
+  it('the style judge carries no garment-off task; each removed garment is its own one-question check', () => {
     const t = String(PROMPT_TEMPLATES.sheet2x4StyleEval);
-    expect(t).toContain('{GARMENTS_REMOVED}');
-    expect(t).toMatch(/LOWEST of [^\n]*removedScore/);
-    expect(SHEET.garmentsRemovedTask([])).toMatch(/score 10/);
-    expect(SHEET.garmentsRemovedTask(['autumn jacket'])).toContain('autumn jacket');
-    expect(SHEET.garmentsRemovedTask(['autumn jacket'])).toContain(SHEET.GARMENT_OFF_SHEET_RULE);
+    expect(t).not.toMatch(/TASK 10|removedScore|GARMENTS_REMOVED/);
+    expect(SHEET.garmentsRemovedTask).toBeUndefined();
+    const c = String(PROMPT_TEMPLATES.sheetGarmentGoneCheck);
+    expect(c).toContain('is {GARMENT} visible');
+    expect(c).toContain('{PARTS}');
   });
 
   it('the generator states the same rule (generator ↔ critic)', () => {

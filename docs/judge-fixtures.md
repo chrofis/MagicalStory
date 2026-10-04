@@ -99,7 +99,7 @@ replays it with production's inputs:
 | `entity` | `entity` | one character's grid over the story |
 | `book_audit` | `book_audit` | the whole book; the fixture's page scopes the verdict |
 | `arc_panel` | `arc_panel_replay` | the stored `arcReviewReport.committed` block |
-| `sheet_style` | `evaluateAvatarSheet` pass 2, inside `judge_fixture` | the fixture sheet plus its `styledAvatarGeneration[input.entryIndex]` face photo, Pass-1 sheet and art style, and the character's age; `input.removedGarments` makes it a garment-off variant (TASK 10) |
+| `sheet_style` | `evaluateAvatarSheet` pass 2 (`evaluateVariantSheet` for a variant), inside `judge_fixture` | the fixture sheet plus its `styledAvatarGeneration[input.entryIndex]` face photo, Pass-1 sheet and art style, and the character's age; `input.removedGarments` makes it a garment-off variant, judged by `evaluateVariantSheet` (the style judge plus one garment-gone check per removed garment) |
 
 A fixture pinned to the page's **active** version keeps the stored figure detection, as
 production had it. A fixture pinned to any other version is judged without that detection.

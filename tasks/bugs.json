@@ -3223,6 +3223,18 @@
       "fix": "Variant judged by the Pass-2 style judge (base Pass-1 sheet as Image 2) plus TASK 10 removedScore; evaluateSheetSplit deleted from the variant path; costumed off variants; missing off sheet logged at ERROR and recorded as notEvaluated off_sheet_missing. Kiaan reproduction accepted 9/10, jacket gone (viewed)."
     },
     {
+      "id": "variant-gate-passes-garment-still-on",
+      "title": "The garment-off variant gate passes a sheet that still wears the removed garment: the style judge reads TASK 10 as an exemption",
+      "reportedAt": "2026-10-04",
+      "source": "Test Lab #1597/#1598 (judge-fixture set #80, arm current): the two garment-still-on controls (Kiaan autumn jacket, Fiona pirate coat) were flagged in 1 of 4 runs. Reasons: 'No garments were requested to be taken off'; 'Image 2 still wears it; TASK 9 does not score it'.",
+      "rootCause": "prompts/sheet-2x4-style-eval.txt TASK 10 asked the question inside the style judge, next to a reference (Image 2) that still wears the garment and a sentence that TASK 9 does not score it; the judge reads that as permission to ignore the garment.",
+      "impact": "A redress that left the garment on is stored as the off sheet, so pages that take the garment off are drawn from a reference wearing it.",
+      "status": "fixed",
+      "fixedAt": "2026-10-04",
+      "fixedIn": "PENDING",
+      "fix": "TASK 10 deleted; one garment-gone check per removed garment on the variant image alone (checkGarmentGone, evaluateVariantSheet). Lab #1609/#1610: controls caught 4/4, good variant passes 2/2."
+    },
+    {
       "id": "consolidator-fix-without-scored-finding",
       "title": "The feedback consolidator dropped a page's only finding as not-a-defect (so the page scored 100) while still emitting a CRITICAL scene_fix for it: the page was never repaired",
       "reportedAt": "2026-10-04",

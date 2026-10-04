@@ -14,10 +14,6 @@
  *   D        ABC, but a wardrobe-state variant is judged against the approved
  *            STYLED base it was edited from (not the realistic Pass-1 sheet).
  *            A sheet with no garment taken off has no styled base: D runs ABC.
- *   G        the owner's 2026-10-04 fix: TASK 10 / removedScore are gone from the
- *            style judge, and each removed garment gets its own one-question
- *            check on the variant image alone (character2x4Sheet.evaluateVariantSheet).
- *            Lab-only until measured; when adopted it IS production and this arm goes.
  *
  * Every transform replaces a whole TASK block found by its heading and fails
  * loudly when the block is not there, so a template edit can never turn an arm
@@ -25,7 +21,7 @@
  */
 'use strict';
 
-const SHEET_JUDGE_ARMS = Object.freeze(['current', 'A', 'AB', 'ABC', 'D', 'G']);
+const SHEET_JUDGE_ARMS = Object.freeze(['current', 'A', 'AB', 'ABC', 'D']);
 
 const LABELS_PASS1 = Object.freeze([
   'Image 1 — the source face photo:',
@@ -77,15 +73,6 @@ function replaceLine(template, startsWith, line) {
   if (!re.test(template)) throw new Error(`sheetJudgeArms: JSON shape line "${startsWith}" not found in the style-eval template`);
   return template.replace(re, () => `  ${line}`);
 }
-/** Arm G: the style judge without TASK 10 — its block, its axis in the final, its JSON lines. */
-function stripRemovedTask(template) {
-  let t = replaceTask(template, 'TASK 10: GARMENTS TAKEN OFF', 'removedScore', '').replace(/\n{3,}/g, '\n\n');
-  t = t.replace(/, removedScore\./, '.')
-    .replace(/^[ \t]*"removed":.*\n/m, '')
-    .replace(/^[ \t]*"removedScore":.*\n/m, '');
-  if (/removed|taken off|GARMENTS_REMOVED/i.test(t)) throw new Error('sheetJudgeArms: TASK 10 traces remain after stripping (template changed?)');
-  return t;
-}
 function replaceHeader(template) {
   const re = /  - Image 2: the REALISTIC[^\n]*\n  - Image 3: the STYLED[^\n]*\n\nImage 2 and Image 3 should match[^\n]*/;
   if (!re.test(template)) throw new Error('sheetJudgeArms: the image header (Image 2 / Image 3 lines) not found in the style-eval template');
@@ -102,10 +89,6 @@ function replaceHeader(template) {
  */
 function resolveArm(arm, template, { variant = false } = {}) {
   if (!SHEET_JUDGE_ARMS.includes(arm)) throw new Error(`sheetJudgeArms: unknown arm "${arm}" (known: ${SHEET_JUDGE_ARMS.join(', ')})`);
-  if (arm === 'G') {
-    if (!template) throw new Error('sheetJudgeArms: style-eval template not loaded');
-    return { arm, applied: 'G', reference: 'pass1', template: stripRemovedTask(template), imageLabels: null, garmentChecks: true };
-  }
   if (arm === 'current') return { arm, applied: 'current', reference: 'pass1', template: null, imageLabels: null };
   if (!template) throw new Error('sheetJudgeArms: style-eval template not loaded');
   const applied = arm === 'D' && !variant ? 'ABC' : arm;

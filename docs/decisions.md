@@ -21,6 +21,31 @@ superseded and link forward.
 
 ---
 
+## 2026-10-04 — The variant gate asks one garment-gone question per removed garment; TASK 10 is deleted from the style judge
+
+**Context:** `a1bb22596` judged a garment-off variant with the Pass-2 style judge plus a "TASK 10 removedScore". The Lab (entry below, Lab #1597/#1598) showed the judge reads TASK 10 as an exemption. On the `current` arm it passed a sheet that still wears the garment in 3 of 4 control runs, saying "No garments were requested to be taken off" or "Image 2 still wears it; TASK 9 does not score it". Bug: `tasks/bugs.json` → `variant-gate-passes-garment-still-on`.
+
+**Decision (owner, 2026-10-04):**
+- TASK 10 / `removedScore` / `{GARMENTS_REMOVED}` / `garmentsRemovedTask` are deleted from the style judge prompt and code. Nothing keeps them as a fallback.
+- Each removed garment gets its own check, `checkGarmentGone` (`prompts/sheet-garment-gone-check.txt`): "Is <garment> visible on the figure in any cell of this image?", asked about the variant image alone, so there is no reference to excuse it. Gemini Flash via `askSheetJudge`, the same provider and echo guard as the style judge.
+- `evaluateVariantSheet` is the variant gate: the style judge passes AND every check says not visible. A visible garment sets `removedScore` 1 and invalidates the verdict. A check that cannot be answered throws; `redressSheetVariant` logs an error and rejects that attempt, so an unchecked variant never ships.
+- `GARMENT_PARTS` (sleeve, collar, hem, hood, zip, strap) is the one wording source for `GARMENT_OFF_SHEET_RULE` (what the generator gets) and the check's question. The check prompt is a critic in sibling set `avatar-sheet-generator-vs-critic`.
+
+**Measured** on staging build f802b5b1 (Lab-only arm G, then adopted): `judge-fixtures.js run --judge=sheet_style --params='{"arm":"G"}' --repeats=2`, set #80, Lab #1609 and #1610, $0.087. Report `tests/judge-fixtures/baselines/2026-10-04-sheet-style-G.json`; run appended to `evals/results/results.jsonl`.
+
+| arm | Lab | recall | false alarm | flips | garment still on (Kiaan jacket, Fiona coat) | Kiaan jacket-off (good) | ghost figures |
+|---|---|---|---|---|---|---|---|
+| current (TASK 10) | #1597 #1598 | 7/16 | 0/12 | 1/14 | 1/4 | pass | 6/6 |
+| G (per-garment check) | #1609 #1610 | 10/16 (63%) | 0/12 | 0/14 | 4/4 | pass 2/2 | 6/6 |
+
+Bar (both controls 4/4, good variant 2/2): met. Still not caught, unchanged from every arm: the photographic base, the captioned base, and Fiona coat-off's widened head framing (the style judge, not this check).
+
+**Touched:** prompts/sheet-garment-gone-check.txt, prompts/sheet-2x4-style-eval.txt, server/services/prompts.js, server/lib/character2x4Sheet.js, server/lib/sheetJudgeArms.js (arm G added for the measurement, deleted on adoption), server/lib/testlab.js, scripts/admin/sibling-registry.json, docs/prompt-inventory.md, docs/judge-fixtures.md, tests/unit/{sheet-judge-arms,wardrobe-variant-judge,avatar-sheet-style-eval-no-outfit-axis}.test.ts
+
+**Status:** ✅ active. Closes the "Open" TASK 10 item of the entry below; replaces its TASK 10 wording (`a1bb22596`).
+
+---
+
 ## 2026-10-04 — Sheet style judge arms are Lab-only until measured; production keeps `current`
 
 **Context:** Diagnosis 2026-10-04 of the Pass-2 sheet style judge (`evaluateStyledSheetWithGemini`, `prompts/sheet-2x4-style-eval.txt`). It passed a garment-off variant whose head row was flat line art, cropped wider than its reference.

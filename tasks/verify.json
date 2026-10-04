@@ -4784,7 +4784,7 @@
     },
     {
       "id": "wardrobe-variant-judge",
-      "title": "An off-garment sheet is judged by the style judge that approved its base, plus a garment-gone task; costumed sheets get off variants too; a missing one is recorded",
+      "title": "An off-garment sheet is judged by the style judge that approved its base, plus one garment-gone check per removed garment (owner 2026-10-04: replaced TASK 10); costumed sheets get off variants too; a missing one is recorded",
       "commits": [
         "(this push)"
       ],

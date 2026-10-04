@@ -85,14 +85,12 @@ describe('the candidate arms', () => {
       for (const variant of [false, true]) {
         const r = ARMS.resolveArm(arm, template, { variant });
         const t = r.template ?? template;
-        // Arm G has no TASK 10: the removed-garment question is its own call.
-        const phs = ['{REAR_TURN}', '{SHEET_GROUND}', '{SHEET_LETTERING}', '{GARMENT_COLOUR}', 'REQUESTED_STYLE', 'CHARACTER_AGE', ...(arm === 'G' ? [] : ['{GARMENTS_REMOVED}'])];
-        for (const ph of phs) expect(t, `${arm}/${variant}: ${ph}`).toContain(ph);
-        expect(t).toMatch(arm === 'G'
-          ? /LOWEST of layoutScore, identityScore, styleScore, cleanScore, bodyFaceScore, ageScore, soloScore, backgroundScore, garmentScore\./
-          : /LOWEST of layoutScore, identityScore, styleScore, cleanScore, bodyFaceScore, ageScore, soloScore, backgroundScore, garmentScore, removedScore\./);
+        for (const ph of ['{REAR_TURN}', '{SHEET_GROUND}', '{SHEET_LETTERING}', '{GARMENT_COLOUR}', 'REQUESTED_STYLE', 'CHARACTER_AGE']) {
+          expect(t, `${arm}/${variant}: ${ph}`).toContain(ph);
+        }
+        expect(t).toMatch(/LOWEST of layoutScore, identityScore, styleScore, cleanScore, bodyFaceScore, ageScore, soloScore, backgroundScore, garmentScore\./);
         // The real builder fills it and the parts guard accepts it.
-        const parts = await sentParts({ promptOverride: r.template, imageLabels: r.imageLabels, removedGarments: variant ? ['a coat'] : [] });
+        const parts = await sentParts({ promptOverride: r.template, imageLabels: r.imageLabels, });
         const prompt = parts[parts.length - 1].text || '';
         expect(prompt).not.toMatch(/\{[A-Z_]+\}/);
         expect(prompt).toContain('REQUESTED_STYLE: ');
@@ -140,7 +138,7 @@ describe('the sheet_style judge fixture', () => {
 });
 
 
-describe('arm G and the per-garment check (owner decision 2026-10-04)', () => {
+describe('the per-garment check (owner decision 2026-10-04)', () => {
   const sheetReply = (extra: Record<string, unknown> = {}) => ({
     ...Object.fromEntries(['layout', 'identity', 'style', 'clean', 'bodyFace', 'age', 'solo', 'background', 'garment'].map(a => [`${a}Score`, 9])), ...extra,
   });
@@ -166,13 +164,6 @@ describe('arm G and the per-garment check (owner decision 2026-10-04)', () => {
   const run = (removed: string[]) => SHEET.evaluateVariantSheet(IMG('SHEET'), { facePhoto: IMG('FACE'), realisticSheet: IMG('REF'), artStyle: 'watercolor', declaredAge: 7, removedGarments: removed });
   const prev = process.env.GEMINI_API_KEY;
   beforeAll(() => { process.env.GEMINI_API_KEY = prev || 'k'; });
-
-  it('G drops TASK 10 and every trace of removedScore from the style judge', () => {
-    const r = ARMS.resolveArm('G', template, { variant: true });
-    expect(r.garmentChecks).toBe(true);
-    expect(r.template).not.toMatch(/TASK 10|removed|GARMENTS_REMOVED/);
-    expect(() => ARMS.resolveArm('G', template.replace('TASK 10: GARMENTS TAKEN OFF', 'TASK 10: OTHER'))).toThrow(/TASK 10/);
-  });
 
   it('one question per garment, asked about the variant image alone', async () => {
     const asked = stubJudges({ 'autumn jacket': false, 'wool scarf': false });
