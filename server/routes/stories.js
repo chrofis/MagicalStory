@@ -10,8 +10,9 @@ const express = require('express');
 const { canonicalName } = require('../lib/castResolver');
 const router = express.Router();
 
-const { dbQuery, isDatabaseMode, logActivity, getPool, getStoryImage, getStoryImageWithVersions, hasStorySeparateImages, saveStoryData, updateStoryDataOnly, getActiveVersion, setActiveVersion, getAllActiveVersions, getAllStoryImages, getActiveStoryImages, getRetryHistoryImages, rehydrateStoryImages, buildStoryMetadata, imgBytesAsync, stripInlineImagesFromStoryData } = require('../services/database');
-const { authenticateToken } = require('../middleware/auth');
+const { dbQuery, isDatabaseMode, logActivity, getPool, getStoryImage, getStoryImageWithVersions, hasStorySeparateImages, saveStoryData, updateStoryDataOnly, getActiveVersion, setActiveVersion, getNextVersionIndex, saveStoryImage, getAllActiveVersions, getAllStoryImages, getActiveStoryImages, getRetryHistoryImages, rehydrateStoryImages, buildStoryMetadata, imgBytesAsync, stripInlineImagesFromStoryData } = require('../services/database');
+const { authenticateToken, requireAdmin, requireAdminActing } = require('../middleware/auth');
+const { hideAdminDraftFromOwner } = require('../middleware/storyAccess');
 const { chargeCredits, refundCharge } = require('../lib/jobCredits');
 const { log } = require('../utils/logger');
 const { getEventForStory, getAllEvents, EVENT_CATEGORIES } = require('../lib/historicalEvents');
@@ -234,11 +235,8 @@ router.get('/', authenticateToken, async (req, res) => {
 });
 
 // GET /api/stories/debug/:id/images - Debug endpoint to check story images (admin only)
-router.get('/debug/:id/images', authenticateToken, async (req, res) => {
+router.get('/debug/:id/images', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    if (!req.user.isAdmin) {
-      return res.status(403).json({ error: 'Admin access required' });
-    }
     const { id } = req.params;
     const images = await dbQuery(
       'SELECT image_type, page_number, version_index, LENGTH(image_data) as len FROM story_images WHERE story_id = $1 ORDER BY image_type, page_number, version_index',
@@ -257,11 +255,8 @@ router.get('/debug/:id/images', authenticateToken, async (req, res) => {
 });
 
 // GET /api/stories/debug/:id - Debug endpoint to check story existence (admin only)
-router.get('/debug/:id', authenticateToken, async (req, res) => {
+router.get('/debug/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    if (!req.user.isAdmin) {
-      return res.status(403).json({ error: 'Admin access required' });
-    }
     const { id } = req.params;
     const rows = await dbQuery(
       'SELECT id, user_id, created_at, (metadata::jsonb->>\'title\') as title FROM stories WHERE id = $1',
@@ -285,6 +280,12 @@ router.get('/debug/:id', authenticateToken, async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// Every route below is /:id/... — one guard hides an unpublished admin draft from its owner
+// (review R7). authenticateToken runs first because it is what sets req.user. server.js mounts
+// regeneration.js on the same /api/stories prefix AFTER this router, so its /:id routes pass
+// through this guard too.
+router.use('/:id', authenticateToken, hideAdminDraftFromOwner);
 
 // GET /api/stories/:id/quick-metadata - Ultra-fast endpoint for initial render (< 100ms)
 // Returns minimal data needed to display title + cover immediately
@@ -825,7 +826,7 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
 
 // GET /api/stories/:id/dev-metadata - Get developer-only metadata (prompts, quality reasoning, retry history)
 // This is loaded separately to keep the main metadata endpoint fast for normal users
-router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
+router.get('/:id/dev-metadata', authenticateToken, requireAdminActing, async (req, res) => {
   try {
     const { id } = req.params;
     console.log(`🔧 GET /api/stories/${id}/dev-metadata - User: ${req.user.username}${req.user.impersonating ? ' (IMPERSONATED by admin)' : ''}`);
@@ -1427,7 +1428,7 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
 
 // GET /api/stories/:id/evaluation-data - Get evaluation fields from scene images
 // Used by Repair Workflow to populate Collect Feedback without loading full story blob
-router.get('/:id/evaluation-data', authenticateToken, async (req, res) => {
+router.get('/:id/evaluation-data', authenticateToken, requireAdminActing, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -1537,7 +1538,7 @@ router.get('/:id/evaluation-data', authenticateToken, async (req, res) => {
 // Query params:
 //   entityName: character name (required)
 //   OR gridIndex: index of grid in entity.grids array (required)
-router.get('/:id/entity-grid-image', authenticateToken, async (req, res) => {
+router.get('/:id/entity-grid-image', authenticateToken, requireAdminActing, async (req, res) => {
   try {
     const { id } = req.params;
     const { entityName, gridIndex, clothingCategory, runIndex } = req.query;
@@ -1613,7 +1614,7 @@ router.get('/:id/entity-grid-image', authenticateToken, async (req, res) => {
 //   type: 'original' | 'retry' | 'repair' | 'reference' | 'landmark' | 'consistency'
 //   index: index in array (for retry/repair history)
 //   field: specific field like 'imageData', 'originalImage', 'bboxOverlay'
-router.get('/:id/dev-image', authenticateToken, async (req, res) => {
+router.get('/:id/dev-image', authenticateToken, requireAdminActing, async (req, res) => {
   try {
     const { id } = req.params;
     const { page, cover, type, index, field } = req.query;
@@ -1975,7 +1976,7 @@ router.get('/:id/dev-image', authenticateToken, async (req, res) => {
 //   type: 'styled' | 'costumed'
 //   index: index in the array
 //   field: 'facePhoto' | 'originalAvatar' | 'styleSample' | 'standardAvatar' | 'output'
-router.get('/:id/avatar-generation-image', authenticateToken, async (req, res) => {
+router.get('/:id/avatar-generation-image', authenticateToken, requireAdminActing, async (req, res) => {
   try {
     const { id } = req.params;
     const { type, index, field } = req.query;
@@ -2062,7 +2063,7 @@ router.get('/:id/avatar-generation-image', authenticateToken, async (req, res) =
 
 // GET /api/stories/:id/retry-images/:pageNumber - Get retry history images for a page (dev mode)
 // Lazy-loads retry attempt images, bbox overlays, and grid repair images
-router.get('/:id/retry-images/:pageNumber', authenticateToken, async (req, res) => {
+router.get('/:id/retry-images/:pageNumber', authenticateToken, requireAdminActing, async (req, res) => {
   try {
     const { id, pageNumber } = req.params;
     const pageNum = parseInt(pageNumber, 10);
@@ -2110,7 +2111,7 @@ router.get('/:id/retry-images/:pageNumber', authenticateToken, async (req, res) 
 //
 // `garment_before` is deliberately NOT the `scene` type, so these never enter
 // the user-facing version cycle; only this route surfaces them.
-router.get('/:id/garment-colour/:pageNumber', authenticateToken, async (req, res) => {
+router.get('/:id/garment-colour/:pageNumber', authenticateToken, requireAdminActing, async (req, res) => {
   try {
     const { id } = req.params;
     const pageNum = parseInt(req.params.pageNumber, 10);
@@ -2168,7 +2169,7 @@ router.get('/:id/garment-colour/:pageNumber', authenticateToken, async (req, res
 // scene-composite pipeline intermediates for a page (clean BG → blocking →
 // composited → final). Returns null fields for stages not persisted (pre-
 // migration stories or pages that fell back to the direct path).
-router.get('/:id/composite-stages/:pageNumber', authenticateToken, async (req, res) => {
+router.get('/:id/composite-stages/:pageNumber', authenticateToken, requireAdminActing, async (req, res) => {
   try {
     const { id, pageNumber } = req.params;
     const pageNum = parseInt(pageNumber, 10);
@@ -2342,7 +2343,7 @@ router.get('/:id/composite-stages/:pageNumber', authenticateToken, async (req, r
 // GET /api/stories/:id/reference-sheet-sources - Dev-only: fetch reference sheet
 // source grids that were used to generate VB element images. Lets developers
 // inspect what got cut and verify the splitter is finding cell boundaries correctly.
-router.get('/:id/reference-sheet-sources', authenticateToken, async (req, res) => {
+router.get('/:id/reference-sheet-sources', authenticateToken, requireAdminActing, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -3314,52 +3315,6 @@ router.get('/:id/cover', authenticateToken, async (req, res) => {
   }
 });
 
-// POST /api/stories - Save or update a story
-router.post('/', authenticateToken, async (req, res) => {
-  try {
-    const { story } = req.body;
-
-    // Add timestamp and ID if not present
-    if (!story.id) {
-      story.id = Date.now().toString();
-    }
-    story.createdAt = story.createdAt || new Date().toISOString();
-    story.updatedAt = new Date().toISOString();
-
-    let isNewStory;
-
-    if (isDatabaseMode()) {
-      // Ownership guard (SEC-1): a story id is client-supplied, so check whether
-      // it already belongs to a DIFFERENT user before upserting. upsertStory does
-      // ON CONFLICT(id) DO UPDATE SET user_id=EXCLUDED.user_id with no user filter,
-      // so without this guard any user could hijack/overwrite another user's story.
-      const owner = await dbQuery('SELECT user_id FROM stories WHERE id = $1', [story.id]);
-      if (owner.length > 0 && String(owner[0].user_id) !== String(req.user.id)) {
-        console.warn(`⛔ [SEC] User ${req.user.id} attempted to overwrite story ${story.id} owned by ${owner[0].user_id}`);
-        return res.status(403).json({ error: 'You do not have permission to modify this story' });
-      }
-      isNewStory = owner.length === 0;
-
-      // Save story (automatically extracts images to story_images table)
-      // Use upsertStory which handles both insert and update
-      const { upsertStory } = require('../services/database');
-      await upsertStory(story.id, req.user.id, story);
-    } else {
-      return res.status(501).json({ error: 'File storage mode not supported' });
-    }
-
-    await logActivity(req.user.id, req.user.username, 'STORY_SAVED', {
-      storyId: story.id,
-      isNew: isNewStory
-    }, req.user);
-
-    res.json({ message: 'Story saved successfully', id: story.id });
-  } catch (err) {
-    console.error('Error saving story:', err);
-    res.status(500).json({ error: 'Failed to save story' });
-  }
-});
-
 // DELETE /api/stories/:id - Delete a story
 router.delete('/:id', authenticateToken, async (req, res) => {
   try {
@@ -3516,10 +3471,26 @@ router.patch('/:id/page/:pageNum', authenticateToken, async (req, res) => {
       if (imageIndex < 0) {
         return res.status(404).json({ error: `No image found for page ${pageNumber}` });
       }
-      sceneImages[imageIndex].imageData = imageData;
-      sceneImages[imageIndex].wasAutoRepaired = false; // mark as reverted
+      // Write a NEW version into story_images and pin it active: the image table, not the
+      // blob's imageData, is what every reader serves, so a blob-only write never showed
+      // (review R10). Same shape as the scale-repair route in regeneration.js.
+      const scene = sceneImages[imageIndex];
+      const createdAt = new Date().toISOString();
+      const newVersionIndex = await getNextVersionIndex(id, 'scene', pageNumber);
+      await saveStoryImage(id, 'scene', pageNumber, imageData, { generatedAt: createdAt, versionIndex: newVersionIndex });
+      scene.imageVersions = scene.imageVersions || [];
+      scene.imageVersions.push({
+        imageData,
+        type: 'manual-replace',
+        createdAt,
+        dbVersionIndex: newVersionIndex,
+        _alreadySaved: true,
+      });
+      scene.imageData = imageData;
+      scene.wasAutoRepaired = false; // mark as reverted
       storyData.sceneImages = sceneImages;
-      console.log(`🔄 [REVERT] Image reverted for page ${pageNumber} of story ${id}`);
+      await setActiveVersion(id, `${pageNumber}`, newVersionIndex, { pinned: true });
+      console.log(`🔄 [REVERT] Page ${pageNumber} of story ${id} replaced by new version ${newVersionIndex}`);
     }
 
     // Save updated story with metadata (extracts images to story_images table)

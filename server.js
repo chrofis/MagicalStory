@@ -263,7 +263,6 @@ const healthRoutes = require('./server/routes/health');
 const authRoutes = require('./server/routes/auth');
 const userRoutes = require('./server/routes/user');
 const characterRoutes = require('./server/routes/characters');
-const storyDraftRoutes = require('./server/routes/storyDraft');
 const storiesRoutes = require('./server/routes/stories');
 const filesRoutes = require('./server/routes/files');
 const { adminRoutes, initAdminRoutes } = require('./server/routes/admin');
@@ -1482,7 +1481,6 @@ app.use('/api', healthRoutes);  // /api/health, /api/check-ip, /api/log-error
 app.use('/api/auth', authRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/characters', express.json({ limit: '50mb' }), characterRoutes);
-app.use('/api/story-draft', storyDraftRoutes);
 app.use('/api/stories', express.json({ limit: '50mb' }), storiesRoutes);
 app.use('/api/stories', express.json({ limit: '50mb' }), regenerationRoutes);  // Image/scene/cover regeneration & repair
 app.use('/api/files', filesRoutes);
@@ -1512,7 +1510,7 @@ app.use('/api/trial', express.json({ limit: '50mb' }), trialRoutes);  // Anonymo
 app.use('/api', sharingApiRoutes);  // /api/shared/* (public story data, images, OG image)
 app.use('/', sharingHtmlRoutes);  // /s/:shareToken, /shared/:shareToken (HTML)
 
-log.info('📦 Modular routes loaded: config, health, auth, user, characters, story-draft, stories, files, admin, photos, sharing');
+log.info('📦 Modular routes loaded: config, health, auth, user, characters, stories, files, admin, photos, sharing');
 
 // SPA fallback - serve index.html for client-side routing (only if dist exists)
 // Must be placed AFTER API routes are defined

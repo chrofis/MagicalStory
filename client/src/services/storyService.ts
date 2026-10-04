@@ -86,20 +86,6 @@ interface CoverDevMeta {
   imageVersionsMeta?: Array<Record<string, unknown> & { versionIndex: number }>;
 }
 
-interface StoryDraft {
-  storyType: string;
-  artStyle: string;
-  storyDetails: string;
-  characters: Character[];
-  relationships: RelationshipMap;
-  relationshipTexts: RelationshipTextMap;
-  pages: number;
-  languageLevel: LanguageLevel;
-  mainCharacters: number[];
-  dedication: string;
-  language: StoryLanguageCode;
-}
-
 interface StoryListItemServer {
   id: string;
   title: string;
@@ -198,24 +184,6 @@ interface StoryDetailsServer {
 }
 
 export const storyService = {
-  // Draft management
-  async getDraft(): Promise<StoryDraft | null> {
-    try {
-      const response = await api.get<{ draft: StoryDraft | null }>('/api/story-draft');
-      return response.draft;
-    } catch {
-      return null;
-    }
-  },
-
-  async saveDraft(draft: StoryDraft): Promise<void> {
-    await api.post('/api/story-draft', { draft });
-  },
-
-  async deleteDraft(): Promise<void> {
-    await api.delete('/api/story-draft');
-  },
-
   // Swiss Stories
   async getSwissStories(): Promise<SwissStoriesData> {
     return api.get<SwissStoriesData>('/api/swiss-stories');
@@ -1019,45 +987,6 @@ export const storyService = {
     }
 
     onComplete();
-  },
-
-  async createStory(data: {
-    title: string;
-    storyType: string;
-    artStyle: string;
-    language: StoryLanguageCode;
-    languageLevel: LanguageLevel;
-    pages: number;
-    dedication?: string;
-    characters: Character[];
-    mainCharacters: number[];
-    relationships: RelationshipMap;
-    relationshipTexts: RelationshipTextMap;
-    outline?: string;
-    story?: string;
-    sceneDescriptions?: SceneDescription[];
-    sceneImages?: SceneImage[];
-    coverImages?: CoverImages;
-  }): Promise<{ id: string }> {
-    const response = await api.post<{ id: string; message: string }>('/api/stories', {
-      title: data.title,
-      story_type: data.storyType,
-      art_style: data.artStyle,
-      language: data.language,
-      language_level: data.languageLevel,
-      pages: data.pages,
-      dedication: data.dedication,
-      characters: data.characters,
-      main_characters: data.mainCharacters,
-      relationships: data.relationships,
-      relationship_texts: data.relationshipTexts,
-      outline: data.outline,
-      story: data.story,
-      scene_descriptions: data.sceneDescriptions,
-      scene_images: data.sceneImages,
-      cover_images: data.coverImages,
-    });
-    return { id: response.id };
   },
 
   async deleteStory(id: string): Promise<void> {

@@ -79,7 +79,7 @@ Auth: most endpoints require a JWT (<code>Authorization: Bearer &lt;token&gt;</c
 
 <h2 id="stories">3. Stories &amp; jobs</h2>
 
-<p>Files: <code>server/routes/stories.js</code>, <code>server/routes/storyDraft.js</code>, <code>server/routes/jobs.js</code>, <code>server/routes/storyIdeas.js</code>.</p>
+<p>Files: <code>server/routes/stories.js</code>, <code>server/routes/jobs.js</code>, <code>server/routes/storyIdeas.js</code>.</p>
 
 <table>
 <thead><tr><th>Method</th><th>Path</th><th>Notes</th></tr></thead>
@@ -91,7 +91,6 @@ Auth: most endpoints require a JWT (<code>Authorization: Bearer &lt;token&gt;</c
 <tr><td>POST</td><td><code>/api/jobs/create-story</code></td><td>Kick off the unified pipeline. Returns <code>jobId</code>.</td></tr>
 <tr><td>GET</td><td><code>/api/jobs/:id/status</code></td><td>Poll progress; payload includes partial result.</td></tr>
 <tr><td>POST</td><td><code>/api/jobs/:id/cancel</code></td><td>Cancel an in-flight job.</td></tr>
-<tr><td>POST</td><td><code>/api/story-draft</code></td><td>Save / merge in-progress wizard input.</td></tr>
 <tr><td>POST</td><td><code>/api/story-ideas</code></td><td>Seed a story from a prompt or theme.</td></tr>
 <tr><td>POST</td><td><code>/api/landmarks/discover</code></td><td>Background landmark discovery for a city.</td></tr>
 </tbody>
