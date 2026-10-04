@@ -16,6 +16,15 @@ const API_URL = import.meta.env.VITE_API_URL || '';
 
 type PageState = 'starting' | 'generating' | 'completed' | 'failed';
 
+// One page of the story preview, as job-status returns it. `text` is absent on
+// a locked page: the server withholds it, the client never hides it.
+interface PreviewPage {
+  pageNumber: number;
+  imageData?: string;
+  text?: string;
+  locked: boolean;
+}
+
 interface LocationState {
   sessionToken: string;
   characterId: string | null;
@@ -77,6 +86,11 @@ const translations = {
       'Order as a printed book',
     ],
     rotationTrialIntro: 'This is a trial story — it should be ready in about two to three minutes. Trial stories are short. A full story takes a bit longer but gives you many more pages and richer scenes.',
+    storyReadyKicker: 'Your story is ready to read',
+    imagePending: 'The picture is still being drawn...',
+    gateTitle: 'What happens next?',
+    gateDesc: 'Leave your email or sign in with Google and read on right away.',
+    keepStoryNote: 'Check your email to keep your story',
     rotationEmailHint: 'Add your email after the story finishes so we can send you the PDF. Set a password too and you get free credits for a full-length story.',
   },
   de: {
@@ -119,6 +133,11 @@ const translations = {
       'Als gedrucktes Buch bestellen',
     ],
     rotationTrialIntro: 'Das ist eine Probegeschichte — sie sollte in etwa zwei bis drei Minuten fertig sein. Probegeschichten sind kurz. Eine vollständige Geschichte dauert etwas länger, hat dafür viel mehr Seiten und reichhaltigere Szenen.',
+    storyReadyKicker: 'Deine Geschichte ist bereit zum Lesen',
+    imagePending: 'Das Bild wird noch gezeichnet...',
+    gateTitle: 'Wie geht es weiter?',
+    gateDesc: 'Gib deine E-Mail-Adresse an oder melde dich mit Google an und lies sofort weiter.',
+    keepStoryNote: 'Prüfe deine E-Mails, um deine Geschichte zu behalten',
     rotationEmailHint: 'Gib am Ende deine E-Mail an, damit wir dir die Geschichte als PDF schicken können. Setze auch ein Passwort, dann bekommst du Gratis-Credits für eine richtige Geschichte in voller Länge.',
   },
   fr: {
@@ -161,6 +180,11 @@ const translations = {
       'Commander en livre imprimé',
     ],
     rotationTrialIntro: 'Ceci est une histoire d\'essai — elle devrait être prête en deux à trois minutes environ. Les histoires d\'essai sont courtes. Une histoire complète prend un peu plus de temps mais offre beaucoup plus de pages et des scènes plus riches.',
+    storyReadyKicker: 'Votre histoire est prête à être lue',
+    imagePending: 'L\'illustration est encore en cours de dessin...',
+    gateTitle: 'Que se passe-t-il ensuite ?',
+    gateDesc: 'Indiquez votre e-mail ou connectez-vous avec Google et lisez la suite tout de suite.',
+    keepStoryNote: 'Vérifiez vos e-mails pour garder votre histoire',
     rotationEmailHint: 'Saisis ton e-mail à la fin pour que nous puissions t\'envoyer le PDF de l\'histoire. Définis aussi un mot de passe et tu reçois des crédits gratuits pour une histoire complète.',
   },
   it: {
@@ -203,6 +227,11 @@ const translations = {
       'Ordinala come libro stampato',
     ],
     rotationTrialIntro: 'Questa è una storia di prova — dovrebbe essere pronta in circa due o tre minuti. Le storie di prova sono brevi. Una storia completa richiede un po\' più di tempo, ma offre molte più pagine e scene più ricche.',
+    storyReadyKicker: 'La tua storia è pronta da leggere',
+    imagePending: 'L\'immagine è ancora in disegno...',
+    gateTitle: 'Come continua?',
+    gateDesc: 'Inserisci la tua e-mail o accedi con Google e continua subito a leggere.',
+    keepStoryNote: 'Controlla la tua e-mail per conservare la tua storia',
     rotationEmailHint: 'Inserisci la tua e-mail al termine, così possiamo inviarti la storia in PDF. Imposta anche una password e ricevi crediti gratuiti per una storia completa.',
   },
 };
@@ -303,8 +332,14 @@ export default function TrialGenerationPage() {
   const [titlePageImage, setTitlePageImage] = useState<string | null>(null);
 
 
-  // Slideshow of page images as they arrive during generation
-  const [pageImages, setPageImages] = useState<Array<{ pageNumber: number; imageData: string }>>([]);
+  // Story preview (title + pages) once the writer step has finished. Until
+  // then the page shows the avatar rotation.
+  const [storyTitle, setStoryTitle] = useState<string | null>(null);
+  const [pages, setPages] = useState<PreviewPage[]>([]);
+  const storyReady = !!storyTitle && pages.length > 0;
+  // Where the sign-in block sits: before the first locked page. Remembered, so
+  // it does not jump to the bottom once an unlock removes the locked pages.
+  const gateIndexRef = useRef<number | null>(null);
   const [avatarSlides, setAvatarSlides] = useState<string[]>(state?.titlePageData?.avatarSlides || []);
   const [slideshowIndex, setSlideshowIndex] = useState(0);
 
@@ -312,10 +347,16 @@ export default function TrialGenerationPage() {
   const [email, setEmail] = useState('');
   const [authError, setAuthError] = useState('');
   const [isAuthLoading, setIsAuthLoading] = useState(false);
-  const [emailLinked, setEmailLinked] = useState(false);
+  const [emailSubmitted, setEmailSubmitted] = useState(false);
+  // The server's own record (job-status `unlocked`): a contact was left, possibly
+  // before a reload. `editingEmail` overrides it after "use a different email"
+  // until the new address is submitted.
+  const [serverUnlocked, setServerUnlocked] = useState(false);
+  const [editingEmail, setEditingEmail] = useState(false);
   const [googleLinked, setGoogleLinked] = useState(false);
   const [isVerified, setIsVerified] = useState(false);
 
+  const emailLinked = emailSubmitted || (serverUnlocked && !editingEmail && !googleLinked);
   const isLinked = emailLinked || googleLinked;
 
   // Poll for email verification after email is linked — auto-redirect when verified
@@ -438,9 +479,12 @@ export default function TrialGenerationPage() {
         if (data.avatarSlides?.length) setAvatarSlides(data.avatarSlides);
       }
 
-      // Collect page images as they arrive
-      if (data.pageImages && data.pageImages.length > 0) {
-        setPageImages(data.pageImages);
+      setServerUnlocked(data.unlocked === true);
+
+      // Story title + pages (text only where the server unlocked it)
+      if (data.storyTitle && Array.isArray(data.pages) && data.pages.length > 0) {
+        setStoryTitle(data.storyTitle);
+        setPages(data.pages);
       }
 
       if (data.status === 'completed') {
@@ -556,7 +600,10 @@ export default function TrialGenerationPage() {
         return;
       }
 
-      setEmailLinked(true);
+      setEmailSubmitted(true);
+      setEditingEmail(false);
+      // Unlock is decided server-side: fetch the pages again right away.
+      if (jobId) void pollJobStatus(jobId, state.sessionToken, needTitlePageRef.current);
       trackEmailLead();
       trackEvent('trial_email_lead');
       // NOT account_created: POST /api/trial/link-email stores the address and a
@@ -611,6 +658,7 @@ export default function TrialGenerationPage() {
 
     setGoogleLinked(true);
     setIsVerified(true);
+    if (jobId) void pollJobStatus(jobId, sessionToken, needTitlePageRef.current);
 
     // The terminal funnel step. Fired after the token swap above on purpose:
     // trackTrialStep falls back to `auth_token`, so the event is authenticated
@@ -671,29 +719,6 @@ export default function TrialGenerationPage() {
     const lang = (state?.storyInput?.language || 'de').split('-')[0] as 'en' | 'de' | 'fr' | 'it';
     const characterName = state?.characterName || 'Your hero';
 
-    // Once any real story image has arrived (cover OR a story page), the
-    // rotation shifts entirely to those — they're what the user actually
-    // wants to see. Intro slides (avatar + tip / funny) are only for the
-    // pre-content wait. This also prevents the rotation from wrapping back
-    // through "Lukas is choosing the perfect outfit..." messages after the
-    // cover is already on screen.
-    const hasStoryContent = !!titlePageImage || pageImages.length > 0;
-    if (hasStoryContent) {
-      if (titlePageImage) {
-        items.push({ imageSrc: titlePageImage, emphasis: 'title', label: 'Cover', caption: { kind: 'none' } });
-      }
-      for (let i = 0; i < pageImages.length; i++) {
-        const img = pageImages[i];
-        items.push({
-          imageSrc: img.imageData,
-          emphasis: 'page',
-          label: `Page ${img.pageNumber}`,
-          caption: { kind: 'none' },
-        });
-      }
-      return items;
-    }
-
     // Intro phase — no story images yet. Rotate avatar + benefits/funny
     // captions while the pipeline warms up.
     const avatarPool: { src: string; label: string }[] = [];
@@ -738,7 +763,7 @@ export default function TrialGenerationPage() {
     return items;
   // funnyMessages is a module-scope const (declared above the component); safe to omit from deps
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state?.previewAvatar, state?.characterName, state?.storyInput?.language, avatarSlides, titlePageImage, pageImages, t]);
+  }, [state?.previewAvatar, state?.characterName, state?.storyInput?.language, avatarSlides, t]);
 
   // Rotate slideshow — info messages stay up longer so they're readable;
   // funny + image-only slides tick faster. The interval re-fires on every
@@ -790,147 +815,18 @@ export default function TrialGenerationPage() {
   // story content. The user may have scrolled down to read the upsell
   // panel below; when the title page first arrives we want them looking
   // at THE TITLE, not at the email-claim form.
-  const hasStoryContent = !!titlePageImage || pageImages.length > 0;
   const prevHadStoryContent = useRef(false);
   useEffect(() => {
-    if (hasStoryContent && !prevHadStoryContent.current) {
+    if (storyReady && !prevHadStoryContent.current) {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
-    prevHadStoryContent.current = hasStoryContent;
-  }, [hasStoryContent]);
+    prevHadStoryContent.current = storyReady;
+  }, [storyReady]);
 
   // Don't render if no state (will redirect)
   if (!state?.sessionToken) return null;
 
-  // ── Render ──────────────────────────────────────────────────────────────────
-
-  return (
-    <div className="min-h-screen bg-gray-50 overflow-x-hidden">
-      {/* Navigation bar — sticky during trial generation so the user can
-          always see where they are even after scrolling down to read the
-          benefits / funny messages further down the page. */}
-      <nav className="bg-black text-white px-3 py-3 sticky top-[var(--impersonation-banner-h,0px)] z-40 shadow-md">
-        <div className="flex justify-between items-center">
-          <span className="text-sm md:text-base font-bold whitespace-nowrap flex items-center gap-1.5">
-            <img src="/images/logo-book.webp" alt="" width="88" height="88" fetchPriority="high" className="h-10 md:h-11 -my-2 w-auto" />
-            {t.brand}
-          </span>
-        </div>
-      </nav>
-
-      {/* Content */}
-      <div className="px-3 md:px-8 py-4 md:py-8">
-        <div className="max-w-lg mx-auto bg-white rounded-2xl shadow-xl p-5 md:p-8">
-
-          {/* ── Progress / Status (compact, on top) ────────────────── */}
-          <div className="flex flex-col items-center text-center mb-3">
-            {/* Progress: spinner + text + bar */}
-            {(pageState === 'starting' || pageState === 'generating') && (
-              <div className="w-full flex items-center gap-3 mb-2">
-                <Loader2 className="w-4 h-4 text-indigo-500 animate-spin flex-shrink-0" />
-                <span className="text-sm text-gray-600">{t.creatingStory}</span>
-                <span className="text-xs text-gray-400 ml-auto">{Math.round(displayProgress)}%</span>
-              </div>
-            )}
-            {(pageState === 'starting' || pageState === 'generating') && (
-              <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden mb-2">
-                <div
-                  className="bg-indigo-500 h-1.5 rounded-full transition-all duration-500 ease-out"
-                  style={{ width: `${Math.max(displayProgress, 3)}%` }}
-                />
-              </div>
-            )}
-
-            {/* Completed */}
-            {pageState === 'completed' && (
-              <div className="flex items-center gap-2 text-green-600 mb-2">
-                <CheckCircle className="w-4 h-4" />
-                <span className="text-sm font-medium">{t.storyComplete}</span>
-              </div>
-            )}
-
-            {/* Failed state */}
-            {pageState === 'failed' && (
-              <div className="text-center">
-                <div className="w-14 h-14 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <AlertTriangle className="w-7 h-7 text-red-600" />
-                </div>
-                <h2 className="text-lg font-bold text-gray-800 mb-1">{t.failedTitle}</h2>
-                <p className="text-gray-500 text-sm mb-4">{t.failedDesc}</p>
-                <button
-                  onClick={() => navigate('/try', { replace: true })}
-                  className="text-indigo-500 hover:text-indigo-800 font-medium text-sm"
-                >
-                  {t.tryAgain}
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* ── Rotating slot — image + caption together. Fixed-aspect image
-                area on top, fixed-min-height caption area below. Both kinds
-                of caption (info messages + funny lines) use the same
-                indigo brand colours so the page doesn't change palette
-                between slides. */}
-          {pageState !== 'failed' && (
-            <div className="flex flex-col items-center mb-4">
-              {slideshowItems.length > 0 ? (() => {
-                const item = slideshowItems[slideshowIndex % slideshowItems.length];
-                const isAvatarLike = item.emphasis === 'avatar';
-                return (
-                  <>
-                    {/* Image area — fixed aspect-square frame keeps the slot
-                        stable when avatars/title/pages of different aspect
-                        ratios rotate through. object-contain prevents
-                        cropping; items-start TOP-ALIGNS so portrait
-                        images (avatar 9:16 with face at top, title 3:4
-                        with title text at top) don't get their top half
-                        pushed off-screen by vertical centering. */}
-                    <div
-                      className={`relative w-full ${isAvatarLike ? 'max-w-xs' : 'max-w-sm'} aspect-square flex items-start justify-center rounded-xl overflow-hidden bg-indigo-50 ${isAvatarLike ? 'border-4 border-indigo-100' : 'shadow-lg'} transition-opacity duration-300`}
-                    >
-                      <img
-                        src={item.imageSrc}
-                        alt={item.label}
-                        className="max-w-full max-h-full object-contain"
-                      />
-                    </div>
-
-                    {/* Caption area — fixed min-height so the rest of the
-                        page doesn't bounce when a one-line funny is replaced
-                        by a multi-line info message, or by no caption at all
-                        once real story images take over. */}
-                    {pageState !== 'completed' && (
-                      <div className="mt-3 min-h-[80px] w-full max-w-md flex items-center justify-center px-3 transition-opacity duration-300">
-                        {item.caption.kind === 'message' && (
-                          <p className="text-sm text-indigo-700 font-medium text-center leading-relaxed">
-                            {item.caption.text}
-                          </p>
-                        )}
-                        {item.caption.kind === 'funny' && (
-                          <p className="text-sm text-indigo-600 font-medium text-center italic">
-                            {item.caption.text}
-                          </p>
-                        )}
-                        {/* caption.kind === 'none' renders the empty
-                            min-height block — keeps the layout stable. */}
-                      </div>
-                    )}
-                  </>
-                );
-              })() : (
-                <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center">
-                  <BookOpen className="w-8 h-8 text-indigo-500" />
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ── Divider ──────────────────────────────────────────────── */}
-          {pageState !== 'failed' && <div className="h-px bg-gray-200 mb-6" />}
-
-          {/* ── Sign-in section (hidden on failure) */}
-          {pageState !== 'failed' && (
+  const signInBlock = (
             <>
               {/* Linked success states */}
               {googleLinked && (
@@ -958,12 +854,12 @@ export default function TrialGenerationPage() {
                   <div className="w-14 h-14 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-3">
                     <Mail className="w-7 h-7 text-amber-600" />
                   </div>
-                  <h2 className="text-lg font-bold text-gray-800 mb-1">{t.emailSent}</h2>
+                  <h2 className="text-lg font-bold text-gray-800 mb-1">{storyReady ? t.keepStoryNote : t.emailSent}</h2>
                   <p className="text-gray-600 text-sm mb-2">{t.emailSentDesc}</p>
                   <p className="text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs font-medium mb-3">{t.emailSentWarning}</p>
                   <p className="text-xs text-gray-400 mb-3">{t.emailSentNote}</p>
                   <button
-                    onClick={() => { setEmailLinked(false); setEmail(''); setAuthError(''); }}
+                    onClick={() => { setEmailSubmitted(false); setEditingEmail(true); setEmail(''); setAuthError(''); }}
                     className="text-indigo-500 text-sm font-medium hover:text-indigo-800 underline underline-offset-2"
                   >
                     {t.differentEmail}
@@ -989,8 +885,8 @@ export default function TrialGenerationPage() {
               {!isLinked && (
                 <>
                   <div className="text-center mb-5">
-                    <h2 className="text-xl font-bold text-gray-800 mb-2">{t.signInToSee}</h2>
-                    <p className="text-gray-600 text-sm">{t.signInDesc}</p>
+                    <h2 className="text-xl font-bold text-gray-800 mb-2">{storyReady ? t.gateTitle : t.signInToSee}</h2>
+                    <p className="text-gray-600 text-sm">{storyReady ? t.gateDesc : t.signInDesc}</p>
                   </div>
 
                   {/* Error */}
@@ -1073,7 +969,193 @@ export default function TrialGenerationPage() {
                 </>
               )}
             </>
+  );
+
+  // Story preview: title moment, then the pages. Text is rendered as plain
+  // paragraphs; locked pages arrive without text and show the image only.
+  const renderParagraphs = (text: string) =>
+    text.split(/\n+/).filter(line => line.trim().length > 0).map((line, i) => (
+      <p key={i} className="text-base text-gray-800 leading-relaxed mb-2">{line}</p>
+    ));
+  const firstLockedIdx = pages.findIndex(p => p.locked);
+  if (firstLockedIdx >= 0 && gateIndexRef.current === null) gateIndexRef.current = firstLockedIdx;
+  const gateIdx = firstLockedIdx >= 0 ? firstLockedIdx : (gateIndexRef.current ?? pages.length);
+  const imagePlaceholder = (
+    <div className="w-full aspect-square flex flex-col items-center justify-center gap-2 rounded-xl bg-indigo-50 text-indigo-400 text-sm">
+      <Loader2 className="w-5 h-5 animate-spin" />
+      {t.imagePending}
+    </div>
+  );
+  const storyPreview = (
+    <div className="mb-4">
+      <div className="text-center mb-4">
+        <p className="text-sm text-indigo-600 font-medium mb-1">{t.storyReadyKicker}</p>
+        <h1 className="text-2xl font-bold text-gray-800">{storyTitle}</h1>
+      </div>
+      <div className="mb-6">
+        {titlePageImage ? (
+          <img src={titlePageImage} alt={storyTitle || ''} className="w-full rounded-xl shadow-lg" />
+        ) : imagePlaceholder}
+      </div>
+      {pages.map((page, idx) => (
+        <div key={page.pageNumber}>
+          {idx === gateIdx && (
+            <>
+              <div className="h-px bg-gray-200 my-6" />
+              {signInBlock}
+              <div className="h-px bg-gray-200 my-6" />
+            </>
           )}
+          <div className="mb-6">
+            {page.imageData ? (
+              <img src={page.imageData} alt={`${page.pageNumber}`} className="w-full rounded-xl shadow-lg mb-3" />
+            ) : (
+              <div className="mb-3">{imagePlaceholder}</div>
+            )}
+            {!page.locked && page.text && renderParagraphs(page.text)}
+          </div>
+        </div>
+      ))}
+      {gateIdx >= pages.length && (
+        <>
+          <div className="h-px bg-gray-200 my-6" />
+          {signInBlock}
+        </>
+      )}
+    </div>
+  );
+
+
+  // ── Render ──────────────────────────────────────────────────────────────────
+
+  return (
+    <div className="min-h-screen bg-gray-50 overflow-x-hidden">
+      {/* Navigation bar — sticky during trial generation so the user can
+          always see where they are even after scrolling down to read the
+          benefits / funny messages further down the page. */}
+      <nav className="bg-black text-white px-3 py-3 sticky top-[var(--impersonation-banner-h,0px)] z-40 shadow-md">
+        <div className="flex justify-between items-center">
+          <span className="text-sm md:text-base font-bold whitespace-nowrap flex items-center gap-1.5">
+            <img src="/images/logo-book.webp" alt="" width="88" height="88" fetchPriority="high" className="h-10 md:h-11 -my-2 w-auto" />
+            {t.brand}
+          </span>
+        </div>
+      </nav>
+
+      {/* Content */}
+      <div className="px-3 md:px-8 py-4 md:py-8">
+        <div className="max-w-lg mx-auto bg-white rounded-2xl shadow-xl p-5 md:p-8">
+
+          {/* ── Progress / Status (compact, on top) ────────────────── */}
+          <div className="flex flex-col items-center text-center mb-3">
+            {/* Progress: spinner + text + bar */}
+            {(pageState === 'starting' || pageState === 'generating') && (
+              <div className="w-full flex items-center gap-3 mb-2">
+                <Loader2 className="w-4 h-4 text-indigo-500 animate-spin flex-shrink-0" />
+                <span className="text-sm text-gray-600">{t.creatingStory}</span>
+                <span className="text-xs text-gray-400 ml-auto">{Math.round(displayProgress)}%</span>
+              </div>
+            )}
+            {(pageState === 'starting' || pageState === 'generating') && (
+              <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden mb-2">
+                <div
+                  className="bg-indigo-500 h-1.5 rounded-full transition-all duration-500 ease-out"
+                  style={{ width: `${Math.max(displayProgress, 3)}%` }}
+                />
+              </div>
+            )}
+
+            {/* Completed */}
+            {pageState === 'completed' && (
+              <div className="flex items-center gap-2 text-green-600 mb-2">
+                <CheckCircle className="w-4 h-4" />
+                <span className="text-sm font-medium">{t.storyComplete}</span>
+              </div>
+            )}
+
+            {/* Failed state */}
+            {pageState === 'failed' && (
+              <div className="text-center">
+                <div className="w-14 h-14 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <AlertTriangle className="w-7 h-7 text-red-600" />
+                </div>
+                <h2 className="text-lg font-bold text-gray-800 mb-1">{t.failedTitle}</h2>
+                <p className="text-gray-500 text-sm mb-4">{t.failedDesc}</p>
+                <button
+                  onClick={() => navigate('/try', { replace: true })}
+                  className="text-indigo-500 hover:text-indigo-800 font-medium text-sm"
+                >
+                  {t.tryAgain}
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* ── Rotating slot — image + caption together. Fixed-aspect image
+                area on top, fixed-min-height caption area below. Both kinds
+                of caption (info messages + funny lines) use the same
+                indigo brand colours so the page doesn't change palette
+                between slides. */}
+          {storyReady && pageState !== 'failed' && storyPreview}
+          {!storyReady && pageState !== 'failed' && (
+            <div className="flex flex-col items-center mb-4">
+              {slideshowItems.length > 0 ? (() => {
+                const item = slideshowItems[slideshowIndex % slideshowItems.length];
+                const isAvatarLike = item.emphasis === 'avatar';
+                return (
+                  <>
+                    {/* Image area — fixed aspect-square frame keeps the slot
+                        stable when avatars/title/pages of different aspect
+                        ratios rotate through. object-contain prevents
+                        cropping; items-start TOP-ALIGNS so portrait
+                        images (avatar 9:16 with face at top, title 3:4
+                        with title text at top) don't get their top half
+                        pushed off-screen by vertical centering. */}
+                    <div
+                      className={`relative w-full ${isAvatarLike ? 'max-w-xs' : 'max-w-sm'} aspect-square flex items-start justify-center rounded-xl overflow-hidden bg-indigo-50 ${isAvatarLike ? 'border-4 border-indigo-100' : 'shadow-lg'} transition-opacity duration-300`}
+                    >
+                      <img
+                        src={item.imageSrc}
+                        alt={item.label}
+                        className="max-w-full max-h-full object-contain"
+                      />
+                    </div>
+
+                    {/* Caption area — fixed min-height so the rest of the
+                        page doesn't bounce when a one-line funny is replaced
+                        by a multi-line info message, or by no caption at all
+                        once real story images take over. */}
+                    {pageState !== 'completed' && (
+                      <div className="mt-3 min-h-[80px] w-full max-w-md flex items-center justify-center px-3 transition-opacity duration-300">
+                        {item.caption.kind === 'message' && (
+                          <p className="text-sm text-indigo-700 font-medium text-center leading-relaxed">
+                            {item.caption.text}
+                          </p>
+                        )}
+                        {item.caption.kind === 'funny' && (
+                          <p className="text-sm text-indigo-600 font-medium text-center italic">
+                            {item.caption.text}
+                          </p>
+                        )}
+                        {/* caption.kind === 'none' renders the empty
+                            min-height block — keeps the layout stable. */}
+                      </div>
+                    )}
+                  </>
+                );
+              })() : (
+                <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center">
+                  <BookOpen className="w-8 h-8 text-indigo-500" />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Divider ──────────────────────────────────────────────── */}
+          {!storyReady && pageState !== 'failed' && <div className="h-px bg-gray-200 mb-6" />}
+
+          {/* Sign-in section: phase 1 here; in the story preview it sits at the gate */}
+          {!storyReady && pageState !== 'failed' && signInBlock}
         </div>
       </div>
     </div>
