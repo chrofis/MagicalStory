@@ -570,6 +570,20 @@ function generateImageCacheKey(prompt, characterPhotos = [], sequentialMarker = 
 }
 
 /**
+ * The route-defining inputs of an image call, as cache-key markers. Two calls with
+ * the same prompt and photos but a different model, backend, aspect or Lab packing
+ * knob render different pictures, so they must not share a cached image (code
+ * review 2026-10 A11: the second arm of a Lab A/B got the first arm's image).
+ */
+function imageRouteCacheMarkers({ model = null, backend = null, aspect = null, maxRefSlots = null, vbColumnFraction = null } = {}) {
+  return [
+    `model:${model || ''}`, `backend:${backend || ''}`, `aspect:${aspect || ''}`,
+    maxRefSlots ? `slots:${maxRefSlots}` : null,
+    vbColumnFraction ? `vbcol:${vbColumnFraction}` : null,
+  ];
+}
+
+/**
  * Crop image to change aspect ratio for sequential mode
  * Used in sequential mode to prevent AI from copying too much from the reference image
  * Crops 15% from top and 15% from bottom to force regeneration while preserving central context
@@ -1843,7 +1857,8 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
   const pageNumber = pageMatch ? parseInt(pageMatch[1], 10) : null;
 
   // Check cache first (include previousImage presence and page number in cache key)
-  const cacheKey = generateImageCacheKey(prompt, characterPhotos, previousImage ? 'seq' : null, pageNumber);
+  const cacheKey = generateImageCacheKey(prompt, characterPhotos, previousImage ? 'seq' : null, pageNumber,
+    ...imageRouteCacheMarkers({ model: imageModelOverride, backend: imageBackendOverride, aspect: aspectRatioOverride }));
 
   if (imageCache.has(cacheKey)) {
     log.debug(`💾 [IMAGE CACHE] HIT (${imageCache.size} cached)`);
@@ -2309,7 +2324,8 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
   }
 
   // Check cache first (include previousImage presence and page number in cache key)
-  const cacheKey = generateImageCacheKey(prompt, characterPhotos, previousImage ? 'seq' : null, pageNumber, sceneBackground ? 'bg' : null);
+  const cacheKey = generateImageCacheKey(prompt, characterPhotos, previousImage ? 'seq' : null, pageNumber, sceneBackground ? 'bg' : null,
+    ...imageRouteCacheMarkers({ model: imageModelOverride, backend: imageBackendOverride, aspect: aspectRatio, maxRefSlots, vbColumnFraction }));
 
   // For generateImageOnly, we use a separate cache namespace to avoid conflicts with evaluated images
   const genOnlyCacheKey = `genonly_${cacheKey}`;
@@ -6404,6 +6420,7 @@ module.exports = {
   // Utility functions
   hashImageData,
   generateImageCacheKey,
+  imageRouteCacheMarkers,
   cropImageForSequential,
   compressImageToJPEG,
   // Live shared ref-compression LRU — single instance; evalPipeline.js reaches
