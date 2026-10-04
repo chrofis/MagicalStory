@@ -21,25 +21,17 @@ const registerLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-// Decode the Bearer JWT (best-effort) without throwing. Used by skip() in
-// the general apiLimiter so admins (and impersonation tokens, which carry
-// the same admin role) can bypass the 100/min cap. We don't verify here
-// because the underlying route already runs authenticateToken — this is a
-// soft signal to skip rate limiting, not an auth decision.
-function _peekAdminFromToken(req) {
+// Admin peek for the general apiLimiter's skip(): admins (and admins acting as another user via
+// an impersonation token) bypass the 100/min cap. It goes through verifySession, the same check
+// authenticateToken makes, so a revoked session (token_version bump) or a demoted admin no longer
+// skips the cap. A token that fails verification, or a DB error, is simply "not admin".
+async function _peekAdminFromToken(req) {
   try {
-    const jwt = require('jsonwebtoken');
     const h = req.headers['authorization'] || '';
     const t = h.startsWith('Bearer ') ? h.slice(7) : null;
-    if (!t || !process.env.JWT_SECRET) return false;
-    // MUST verify the signature, not just decode: this limiter also fronts
-    // unauthenticated routes, so a decode-only check let anyone forge an
-    // unsigned {"role":"admin"} token and remove the global 100/min cap.
-    const decoded = jwt.verify(t, process.env.JWT_SECRET);
-    // Admin or admin-acting-as-someone-else (impersonation token) both
-    // carry role=admin OR an explicit `impersonating` flag with original
-    // admin id; either should skip the cap.
-    return !!decoded && (decoded.role === 'admin' || decoded.impersonating === true);
+    if (!t) return false;
+    const { verifySession, isAdminActing } = require('./auth');
+    return isAdminActing(await verifySession(t));
   } catch {
     return false;
   }
@@ -144,6 +136,19 @@ const storyIdeasLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// Avatar generation (code review 2026-10 V4): each request is several paid image calls plus evals and
+// retries, charged to no credit balance. 30 per user per day; admins and admins acting as a user are
+// exempt (they run Lab/QA batches). Keyed by user id, so it must run AFTER authenticateToken.
+const avatarGenerationLimiter = rateLimit({
+  windowMs: 24 * 60 * 60 * 1000,
+  max: 30,
+  keyGenerator: (req) => `user:${req.user.id}`,
+  skip: (req) => require('./auth').isAdminActing(req.user),
+  message: { error: 'Daily avatar generation limit reached. Please try again tomorrow.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // Trial funnel event limiter. One real trial run emits ~16 events, and a
 // visitor who reloads or navigates back mints them again, so the cap has to
 // leave honest usage untouched while bounding a script that tries to forge a
@@ -188,6 +193,8 @@ module.exports = {
   trialAvatarLimiter,
   trialEventLimiter,
   storyIdeasLimiter,
+  avatarGenerationLimiter,
   ideaLandmarksPrepareLimiter,
   resetTrialMiddlewareStores,
+  _peekAdminFromToken,
 };

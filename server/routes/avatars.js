@@ -10,7 +10,9 @@ const fs = require('fs');
 const path = require('path');
 const express = require('express');
 const router = express.Router();
-const { authenticateToken } = require('../middleware/auth');
+const { authenticateToken, isAdminActing } = require('../middleware/auth');
+const { avatarGenerationLimiter } = require('../middleware/rateLimit');
+const guards = require('../lib/requestGuards');
 const { log } = require('../utils/logger');
 const { geminiUsage } = require('../lib/providerUsage');
 const { logActivity, dbQuery, withTransaction, saveAvatarToR2, saveAvatarThumbToR2, uploadCharacterPhotosToR2, offloadCharacterImages } = require('../services/database');
@@ -1564,16 +1566,35 @@ router.get('/avatar-prompt', authenticateToken, async (req, res) => {
 });
 
 /**
+ * Input rules shared by both avatar generation routes (code review 2026-10 V4/V5): a model override is a
+ * developer option (admins only, an ordinary client never sends one), and every photo the server will
+ * load must be inline image data or one of OUR uploads - never an arbitrary URL. Returns an
+ * { status, error } to answer with, or null.
+ */
+function avatarInputError(req, photoFields) {
+  if (req.body.avatarModel != null && !isAdminActing(req.user)) {
+    return { status: 403, error: 'avatarModel is not available' };
+  }
+  for (const [label, value] of photoFields) {
+    const error = guards.userImageSourceError(label, value);
+    if (error) return { status: 400, error };
+  }
+  return null;
+}
+
+/**
  * POST /api/generate-avatar-options
  * Generate 3 avatar options for user to choose from
  */
-router.post('/generate-avatar-options', authenticateToken, async (req, res) => {
+router.post('/generate-avatar-options', authenticateToken, avatarGenerationLimiter, async (req, res) => {
   try {
     const { facePhoto, gender, category = 'standard' } = req.body;
 
     if (!facePhoto) {
       return res.status(400).json({ error: 'Missing facePhoto' });
     }
+    const inputError = avatarInputError(req, [['facePhoto', facePhoto]]);
+    if (inputError) return res.status(inputError.status).json({ error: inputError.error });
 
     const geminiApiKey = process.env.GEMINI_API_KEY;
     if (!geminiApiKey) {
@@ -2738,7 +2759,7 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
  *   - async=true: Return immediately with job ID, poll /api/avatar-jobs/:jobId for result
  *                 This prevents connection blocking and allows parallel requests
  */
-router.post('/generate-clothing-avatars', authenticateToken, async (req, res) => {
+router.post('/generate-clothing-avatars', authenticateToken, avatarGenerationLimiter, async (req, res) => {
   try {
     // `referencePhoto` is the bg-removed body with clothing visible (what Grok edits).
     // `facePhoto` is the high-res face crop, used as a SECOND Grok reference so
@@ -2755,6 +2776,8 @@ router.post('/generate-clothing-avatars', authenticateToken, async (req, res) =>
     if (!referencePhoto) {
       return res.status(400).json({ error: 'Missing referencePhoto' });
     }
+    const inputError = avatarInputError(req, [['referencePhoto', req.body.referencePhoto], ['facePhoto', req.body.facePhoto]]);
+    if (inputError) return res.status(inputError.status).json({ error: inputError.error });
 
     // Validate characterId - must be a valid number for DB lookup
     if (!characterId || (typeof characterId !== 'number' && isNaN(parseInt(characterId)))) {

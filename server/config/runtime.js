@@ -43,6 +43,17 @@ const SETTINGS = {
   // which is what the Test Lab A/B and one-off reruns use.
   pipelineMode: 'beats',
 
+  // ── Client IP (Express `trust proxy`) ──────────────────────────────────
+  // Production and staging sit behind Railway's edge only (no Cloudflare:
+  // `Server: railway-hikari`, no cf-ray) and the app sees
+  // `X-Forwarded-For: <client>, <railway edge>`. Measured 2026-10-04 on
+  // /api/check-ip: with `trust proxy 1`, req.ip was the EDGE address
+  // (212.102.36.193/.194), so every per-IP limiter shared one bucket across all
+  // visitors. 2 hops makes req.ip the client; the edge overwrites a
+  // client-sent X-Forwarded-For, so it cannot be spoofed. (Local dev has no proxy and
+  // no limiter that matters, so one value serves every environment.)
+  trustProxyHops: 2,
+
   // ── Figure detection ───────────────────────────────────────────────────
   // GroundingDINO everywhere (owner, 2026-08-17). Runs on the analyzer's CPU,
   // so detection costs no API spend; the analyzer loads it lazily (~90s) and

@@ -337,9 +337,9 @@ log.info(`📊 Log level: ${LOG_LEVEL.toUpperCase()}`);
 
 const app = express();
 
-// Trust first proxy (Railway, Heroku, etc.) - required for rate limiting to work correctly
-// This allows Express to trust X-Forwarded-For headers for client IP detection
-app.set('trust proxy', 1);
+// Client IP behind Railway's edge: hop count and the measurement behind it live in
+// server/config/runtime.js (trustProxyHops). docs/decisions.md "Client IP: trust proxy 2".
+app.set('trust proxy', require('./server/config/runtime').runtime('trustProxyHops'));
 
 const PORT = process.env.PORT || 3000;
 

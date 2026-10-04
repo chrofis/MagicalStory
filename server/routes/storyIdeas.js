@@ -738,7 +738,18 @@ function resolveIdeaWorlds({ storyCategory, storyTheme, location, worldMode = 'a
   return [locationWorld(), fantasyWorld()];
 }
 
-// Generate story ideas endpoint - FREE, no credits
+// Caps on every free-text field the two paid idea arms read (code review 2026-10 R4; the trial
+// route applies the same limits from server/lib/requestGuards.js).
+function ideaRequestError(body) {
+  const g = require('../lib/requestGuards');
+  const b = body || {};
+  return g.textFieldsError([
+    ['storyType', b.storyType], ['storyTypeName', b.storyTypeName], ['storyCategory', b.storyCategory],
+    ['storyTopic', b.storyTopic], ['storyTheme', b.storyTheme], ['customThemeText', b.customThemeText],
+    ['language', b.language, 20], ['languageLevel', b.languageLevel, 50],
+  ]) || g.characterListError(b.characters) || g.relationshipListError(b.relationships) || g.locationError(b.userLocation);
+}
+
 /**
  * PREPARE THE IDEA LANDMARKS (2026-09-27). The wizard calls this the moment
  * the story's kind (category + theme/topic) is picked; it answers 202 at once
@@ -760,7 +771,10 @@ router.post('/prepare-idea-landmarks', authenticateToken, ideaLandmarksPrepareLi
     .catch(err => log.error(`🚨 [LANDMARK] prepare-idea-landmarks failed: ${err.message}`));
 });
 
+// Generate story ideas endpoint - FREE, no credits
 router.post('/generate-story-ideas', authenticateToken, storyIdeasLimiter, async (req, res) => {
+  const inputError = ideaRequestError(req.body);
+  if (inputError) return res.status(400).json({ error: inputError });
   try {
     const { storyType, storyTypeName, storyCategory, storyTopic, storyTheme, customThemeText, language, languageLevel, characters, relationships, ideaModel, pages = 10, userLocation, season, worldMode, attempt, regenerate } = req.body;
 
@@ -944,7 +958,7 @@ function parseIdeaFinal(text) {
 // the client's idle timeout alive without carrying any text. No [FINAL]
 // section = no idea: the arm sends an error event, never the raw response.
 // Resolves (never rejects) with what the call produced, for the funnel record.
-function streamIdeaArm({ arm, prompt, res, callStreaming, model }) {
+function streamIdeaArm({ arm, prompt, res, callStreaming, model, signal }) {
   const key = `story${arm + 1}`;
   let fullText = '';
   let lastPing = 0;
@@ -954,7 +968,7 @@ function streamIdeaArm({ arm, prompt, res, callStreaming, model }) {
       res.write(': generating\n\n');
       lastPing = text.length;
     }
-  }, model).then((streamResult) => {
+  }, model, signal ? { signal } : {}).then((streamResult) => {
     const finalContent = parseIdeaFinal(fullText);
     if (finalContent) {
       res.write(`data: ${JSON.stringify({ [key]: finalContent, isFinal: true })}\n\n`);
@@ -973,6 +987,10 @@ function streamIdeaArm({ arm, prompt, res, callStreaming, model }) {
 
 // SSE Streaming endpoint for story ideas - streams each story as it completes
 router.post('/generate-story-ideas-stream', authenticateToken, storyIdeasLimiter, async (req, res) => {
+  const inputError = ideaRequestError(req.body);
+  if (inputError) return res.status(400).json({ error: inputError });
+  // A closed tab stops both paid arms (code review 2026-10 R4).
+  const signal = require('../lib/requestGuards').abortOnClientClose(res);
   // Set up SSE headers. Don't set Connection: keep-alive — it's forbidden in
   // HTTP/2 (RFC 7540 §8.1.2.2) and Cloudflare/Railway hand the response to
   // the browser over HTTP/2, which then drops the frame with
@@ -1082,8 +1100,8 @@ router.post('/generate-story-ideas-stream', authenticateToken, storyIdeasLimiter
     log.debug('  Starting parallel story generation...');
     // Two independent calls; the funnel's cost is their sum.
     const [arm1, arm2] = await Promise.all([
-      streamIdeaArm({ arm: 0, prompt: prompt1, res, callStreaming: callTextModelStreaming, model: modelToUse }),
-      streamIdeaArm({ arm: 1, prompt: prompt2, res, callStreaming: callTextModelStreaming, model: modelToUse }),
+      streamIdeaArm({ arm: 0, prompt: prompt1, res, callStreaming: callTextModelStreaming, model: modelToUse, signal }),
+      streamIdeaArm({ arm: 1, prompt: prompt2, res, callStreaming: callTextModelStreaming, model: modelToUse, signal }),
     ]);
     const streamModelId = arm1.modelId || arm2.modelId || null;
 
