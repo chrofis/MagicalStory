@@ -12,6 +12,7 @@
 
 const crypto = require('crypto');
 const { log } = require('./server/lib/serverLog');
+const { settleJobWithRefund, JOB_SAVING_PROGRESS } = require('./server/lib/jobCredits');
 const pLimit = require('p-limit');
 const email = require('./email');
 const { upsertStory, saveStoryImage, rehydrateStoryImages } = require('./server/services/database');
@@ -7052,6 +7053,17 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       }
     }
 
+    // Saving marker: from here a user cancel is refused (server/routes/jobs.js guards on
+    // progress < JOB_SAVING_PROGRESS), so a story is never both saved and refunded. The
+    // write is guarded on status='processing': if the cancel won the race, abort before
+    // the story row is written instead of saving a story for a refunded job.
+    const savingMark = await dbPool.query(
+      `UPDATE story_jobs SET progress = $2, progress_message = 'Saving story...', updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1 AND status = 'processing' RETURNING id`,
+      [jobId, JOB_SAVING_PROGRESS]
+    );
+    if (savingMark.rowCount === 0) await checkCancellation();
+
     log.debug(`💾 [UNIFIED] Saving story to database... (generationLog has ${storyData.generationLog?.length || 0} entries)`);
     await upsertStory(storyId, userId, storyData, { adminDraft: inputData?.adminDraft === true });
     log.debug(`📚 [UNIFIED] Story ${storyId} saved to stories table`);
@@ -7493,51 +7505,22 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     log.error(`❌ [UNIFIED] Error generating story:`, error.message);
     genLog.error('pipeline_error', error.message, null, { stage: genLog.currentStage, stack: error.stack?.split('\n').slice(0, 3).join(' | ') });
 
-    // Try to refund credits on failure. Atomic-claim pattern: zero out
-    // credits_reserved in one UPDATE-RETURNING so a later refund attempt
-    // (e.g. the outer _processStoryJobImpl catch) reads 0 and short-circuits.
-    // The previous SELECT-then-UPDATE chain could double-refund if the
-    // status update raced or the SET credits_reserved=0 failed after the
-    // user-credits write succeeded.
+    // Fail the job AND refund its reservation in ONE transaction (settleJobWithRefund):
+    // claim, user credit and ledger row commit together. The guard (never overwrite
+    // 'cancelled') is in the same UPDATE: an error that surfaces after a user cancel
+    // must not turn 'cancelled' into 'failed' (review A3); the cancel already refunded.
+    // The outer _processStoryJobImpl catch settles again — idempotent (reservation is 0).
     try {
-      // RETURNING the OLD reserved amount: `RETURNING credits_reserved` after
-      // `SET credits_reserved = 0` returns the post-update value (0), so the
-      // refund guard `refunded > 0` never fired and refunds silently no-op'd
-      // since the atomic-claim refactor. Read the pre-update value via a
-      // self-join subquery (snapshot-stable, single statement, still atomic).
-      const claim = await dbPool.query(
-        `UPDATE story_jobs s
-         SET credits_reserved = 0
-         FROM (SELECT credits_reserved AS prev, user_id AS uid FROM story_jobs WHERE id = $1) old
-         WHERE s.id = $1 AND s.credits_reserved > 0
-         RETURNING old.prev AS refunded, s.user_id`,
-        [jobId]
-      );
-      if (claim.rows.length > 0) {
-        const { refunded, user_id: refundUserId } = claim.rows[0];
-        if (refundUserId && refunded > 0) {
-          const upd = await dbPool.query(
-            'UPDATE users SET credits = credits + $1 WHERE id = $2 AND credits <> -1 RETURNING credits',
-            [refunded, refundUserId]
-          );
-          if (upd.rows.length > 0) {
-            await dbPool.query(
-              `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, reference_id, description)
-               VALUES ($1, $2, $3, $4, $5, $6)`,
-              [refundUserId, refunded, upd.rows[0].credits, 'story_refund', jobId, `Full refund: ${refunded} credits - story generation failed`]
-            );
-            log.info(`💳 [UNIFIED] Refunded ${refunded} credits for failed job ${jobId}`);
-          }
-        }
-      }
+      const settled = await settleJobWithRefund(dbPool, jobId, {
+        status: 'failed',
+        errorMessage: error.message,
+        statusNotIn: ['cancelled'],
+        describe: ({ refunded }) => `Full refund: ${refunded} credits - story generation failed`,
+      });
+      if (settled.refunded > 0) log.info(`💳 [UNIFIED] Refunded ${settled.refunded} credits for failed job ${jobId}`);
     } catch (refundErr) {
-      log.error('❌ [UNIFIED] Failed to refund credits:', refundErr.message);
+      log.error('❌ [UNIFIED] Failed to fail/refund job:', refundErr.message);
     }
-
-    await dbPool.query(
-      `UPDATE story_jobs SET status = 'failed', error_message = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
-      [error.message, jobId]
-    );
 
     throw error;
   }
@@ -8056,6 +8039,26 @@ async function _processStoryJobImpl(jobId) {
 
     log.error(`❌ Job ${jobId} failed:`, error);
 
+    // Full refund if story is not 100% complete, and the failed status, in ONE
+    // transaction (settleJobWithRefund). 'cancelled' is never overwritten (review A3).
+    let failureSettled = null;
+    try {
+      failureSettled = await settleJobWithRefund(dbPool, jobId, {
+        status: 'failed',
+        errorMessage: error.message,
+        statusNotIn: ['cancelled'],
+        refundIfProgressBelow: 100,
+        describe: ({ refunded, progress }) => `Full refund: ${refunded} credits - story generation failed at ${progress}%`,
+      });
+      if (failureSettled.refunded > 0) log.info(`💳 Refunded ${failureSettled.refunded} credits for failed job ${jobId} (failed at ${failureSettled.progress}%)`);
+    } catch (refundErr) {
+      log.error('❌ Failed to fail/refund job:', refundErr.message);
+    }
+    if (failureSettled && !failureSettled.changed) {
+      log.info(`🛑 Job ${jobId} was cancelled by the user before this error surfaced — no failure notification sent`);
+      return;
+    }
+
     // Log all partial data for debugging
     try {
       log.debug('\n' + '='.repeat(80));
@@ -8124,48 +8127,6 @@ async function _processStoryJobImpl(jobId) {
     } catch (dumpErr) {
       log.error('❌ Failed to dump partial data:', dumpErr.message);
     }
-
-    // Full refund if story is not 100% complete. Atomic-claim pattern so a
-    // sibling refund path (the inner processUnifiedStoryJob catch above)
-    // can't double-refund — whoever zeros credits_reserved first wins.
-    try {
-      const claim = await dbPool.query(
-        `UPDATE story_jobs s
-         SET credits_reserved = 0
-         FROM (SELECT credits_reserved AS prev, user_id AS uid FROM story_jobs WHERE id = $1) old
-         WHERE s.id = $1 AND s.credits_reserved > 0 AND COALESCE(s.progress, 0) < 100
-         RETURNING old.prev AS refunded, s.user_id, COALESCE(s.progress, 0) AS progress_percent`,
-        [jobId]
-      );
-      if (claim.rows.length > 0) {
-        const { refunded, user_id: refundUserId, progress_percent: progressPercent } = claim.rows[0];
-        if (refundUserId && refunded > 0) {
-          const upd = await dbPool.query(
-            'UPDATE users SET credits = credits + $1 WHERE id = $2 AND credits <> -1 RETURNING credits',
-            [refunded, refundUserId]
-          );
-          if (upd.rows.length > 0) {
-            const newBalance = upd.rows[0].credits;
-            const description = `Full refund: ${refunded} credits - story generation failed at ${progressPercent}%`;
-            await dbPool.query(
-              `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, reference_id, description)
-               VALUES ($1, $2, $3, $4, $5, $6)`,
-              [refundUserId, refunded, newBalance, 'story_refund', jobId, description]
-            );
-            log.info(`💳 Refunded ${refunded} credits for failed job ${jobId} (failed at ${progressPercent}%)`);
-          }
-        }
-      }
-    } catch (refundErr) {
-      log.error('❌ Failed to refund credits:', refundErr.message);
-    }
-
-    await dbPool.query(
-      `UPDATE story_jobs
-       SET status = $1, error_message = $2, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $3`,
-      ['failed', error.message, jobId]
-    );
 
     // Send failure notifications
     try {

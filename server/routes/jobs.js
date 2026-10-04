@@ -22,6 +22,7 @@ const { log } = require('../utils/logger');
 const { getPool, withTransaction, offloadJsonbImages, inlineOffloadPrefix } = require('../services/database');
 const email = require('../../email');
 const { normalizeCharacterName } = require('../lib/characterName');
+const { settleJobWithRefund, JOB_SAVING_PROGRESS } = require('../lib/jobCredits');
 
 function getDbPool() { return getPool(); }
 
@@ -332,65 +333,23 @@ router.post('/create-story', authenticateToken, storyGenerationLimiter, validate
           const reason = minutesSinceUpdate > HEARTBEAT_TIMEOUT_MINUTES ? 'no progress' : 'timeout';
           log.info(`🧹 Auto-cancelling stale job ${activeJob.id} (${reason}, age: ${Math.round(jobAgeMinutes)}min, last update: ${Math.round(minutesSinceUpdate)}min ago)`);
 
-          // Refund reserved credits for stale job (atomic to prevent double-refund)
-          try {
-            const pool = getDbPool();
-            const client = await pool.connect();
-            try {
-              await client.query('BEGIN');
-              // Atomically claim the credits_reserved (prevents double-refund if cancel runs concurrently)
-              // RETURNING the OLD reserved amount — `RETURNING credits_reserved`
-              // after SET=0 returns 0, which silently broke this refund. Read
-              // the pre-update value via a self-join subquery.
-              const claimResult = await client.query(
-                `UPDATE story_jobs s SET credits_reserved = 0
-                 FROM (SELECT credits_reserved AS prev, progress AS prog FROM story_jobs WHERE id = $1) old
-                 WHERE s.id = $1 AND s.credits_reserved > 0
-                 RETURNING old.prev AS refund_amount, old.prog AS progress`,
-                [activeJob.id]
-              );
-              if (claimResult.rows.length > 0) {
-                const creditsToRefund = claimResult.rows[0].refund_amount;
-                const progressPercent = claimResult.rows[0].progress || 0;
-                // Atomic credit add
-                const refundResult = await client.query(
-                  `UPDATE users SET credits = credits + $1 WHERE id = $2 AND credits != -1 RETURNING credits`,
-                  [creditsToRefund, userId]
-                );
-                if (refundResult.rows.length > 0) {
-                  await client.query(
-                    `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, reference_id, description)
-                     VALUES ($1, $2, $3, $4, $5, $6)`,
-                    [userId, creditsToRefund, refundResult.rows[0].credits, 'story_refund', activeJob.id,
-                     `Auto-refund: stale job timed out after ${Math.round(jobAgeMinutes)} min (progress: ${progressPercent}%)`]
-                  );
-                  log.info(`💳 Auto-refunded ${creditsToRefund} credits for stale job ${activeJob.id}`);
-                }
-              }
-              await client.query('COMMIT');
-            } catch (txErr) {
-              await client.query('ROLLBACK');
-              throw txErr;
-            } finally {
-              client.release();
-            }
-          } catch (refundErr) {
-            log.error(`❌ Failed to refund credits for stale job ${activeJob.id}:`, refundErr.message);
-          }
-
+          // Fail + refund in one transaction (settleJobWithRefund): the refund and the
+          // status flip commit together, and a job that finished meanwhile is untouched.
           // Mark as failed with appropriate message based on failure reason
           const errorMessage = minutesSinceUpdate > HEARTBEAT_TIMEOUT_MINUTES
             ? `Job stopped responding (no progress for ${Math.round(minutesSinceUpdate)} minutes)`
             : `Job timed out after ${Math.round(jobAgeMinutes)} minutes`;
-
-          await getDbPool().query(
-            `UPDATE story_jobs
-             SET status = 'failed',
-                 error_message = $2,
-                 updated_at = NOW()
-             WHERE id = $1`,
-            [activeJob.id, errorMessage]
-          );
+          try {
+            const settled = await settleJobWithRefund(getDbPool(), activeJob.id, {
+              status: 'failed',
+              errorMessage,
+              statusIn: ['pending', 'processing'],
+              describe: ({ progress }) => `Auto-refund: stale job timed out after ${Math.round(jobAgeMinutes)} min (progress: ${progress}%)`,
+            });
+            if (settled.refunded > 0) log.info(`💳 Auto-refunded ${settled.refunded} credits for stale job ${activeJob.id}`);
+          } catch (refundErr) {
+            log.error(`❌ Failed to fail/refund stale job ${activeJob.id}:`, refundErr.message);
+          }
           // Continue with creating new job
         } else {
           log.warn(`User ${req.user.username} already has active job ${activeJob.id} (status: ${activeJob.status}, age: ${Math.round(jobAgeMinutes)} min)`);
@@ -471,8 +430,23 @@ router.post('/create-story', authenticateToken, storyGenerationLimiter, validate
         `story_jobs.input_data/${jobId}`, inputData);
 
       let insufficientRace = false;
+      let activeJobRace = null;
       try {
         await withTransaction(async (txClient) => {
+          // One-job-at-a-time, atomically (review 2026-10-04 R3): the SELECT above and
+          // this INSERT were separate statements, so two requests with different
+          // idempotency keys both passed. A per-user advisory lock serialises them and
+          // the re-check below sees the winner's committed row. (A partial unique index
+          // was rejected: admin reruns legitimately run several jobs on one account.)
+          await txClient.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`story_job_create:${userId}`]);
+          const raced = await txClient.query(
+            `SELECT id, status FROM story_jobs WHERE user_id = $1 AND status IN ('pending', 'processing') LIMIT 1`,
+            [userId]
+          );
+          if (raced.rows.length > 0) {
+            activeJobRace = raced.rows[0];
+            throw new Error('ACTIVE_JOB_RACE');
+          }
           if (userCredits !== -1 && req.user.role !== 'admin' && !isAdminDraft) {
             // The UPDATE only succeeds if credits >= creditsNeeded (no overdraw)
             const updateResult = await txClient.query(
@@ -499,6 +473,15 @@ router.post('/create-story', authenticateToken, storyGenerationLimiter, validate
           );
         });
       } catch (txErr) {
+        if (activeJobRace) {
+          log.warn(`User ${req.user.username} raced a second create-story past the active-job check (active: ${activeJobRace.id})`);
+          return res.status(409).json({
+            error: 'Story generation already in progress',
+            activeJobId: activeJobRace.id,
+            activeJobStatus: activeJobRace.status,
+            message: 'Please wait for your current story to finish before starting a new one.'
+          });
+        }
         if (insufficientRace) {
           return res.status(402).json({
             error: 'Insufficient credits',
@@ -613,10 +596,15 @@ router.get('/:jobId/status', jobStatusLimiter, authenticateToken, async (req, re
         }
 
         if (errorMessage) {
-          await getDbPool().query(
-            `UPDATE story_jobs SET status = 'failed', error_message = $2, updated_at = NOW() WHERE id = $1`,
-            [jobId, errorMessage]
-          );
+          // Same fail+refund transaction as every other failure path (was a bare status
+          // write: the reservation stayed on the row and was deleted with it).
+          const settled = await settleJobWithRefund(getDbPool(), jobId, {
+            status: 'failed',
+            errorMessage,
+            statusIn: ['pending', 'processing'],
+            describe: ({ progress }) => `Auto-refund: job timed out (progress: ${progress}%)`,
+          });
+          if (settled.refunded > 0) log.info(`💳 [STATUS] Auto-refunded ${settled.refunded} credits for timed-out job ${jobId}`);
 
           // Rescue whatever finished. Every OTHER path that declares a job dead
           // (worker throw, zombie recovery, stall sweeper) saves a [PARTIAL]
@@ -745,6 +733,10 @@ router.post('/:jobId/cancel', authenticateToken, async (req, res) => {
 
     const job = result.rows[0];
 
+    if (job.status === 'cancelled') {
+      return res.json({ success: true, message: 'Job already cancelled', jobId, creditsRefunded: 0 });
+    }
+
     if (job.status === 'completed' || job.status === 'failed') {
       return res.status(400).json({
         error: 'Job already finished',
@@ -753,70 +745,26 @@ router.post('/:jobId/cancel', authenticateToken, async (req, res) => {
       });
     }
 
-    // Refund reserved credits before cancelling (atomic to prevent double-refund)
-    let creditsRefunded = 0;
-    try {
-      const pool = getDbPool();
-      const client = await pool.connect();
-      try {
-        await client.query('BEGIN');
-        // Atomically claim the credits_reserved (prevents double-refund if stale cleanup runs concurrently)
-        // RETURNING the OLD reserved amount — `RETURNING credits_reserved`
-        // after SET=0 returns 0, which silently broke this refund since the
-        // atomic-claim refactor. Read the pre-update value via a self-join
-        // subquery (snapshot-stable, atomic).
-        const claimResult = await client.query(
-          `UPDATE story_jobs s SET credits_reserved = 0
-           FROM (SELECT credits_reserved AS prev, progress AS prog FROM story_jobs WHERE id = $1) old
-           WHERE s.id = $1 AND s.credits_reserved > 0
-           RETURNING old.prev AS refund_amount, old.prog AS progress`,
-          [jobId]
-        );
-        if (claimResult.rows.length > 0) {
-          const creditsToRefund = claimResult.rows[0].refund_amount;
-          const progressPercent = claimResult.rows[0].progress || 0;
-          // Atomic credit add
-          const refundResult = await client.query(
-            `UPDATE users SET credits = credits + $1 WHERE id = $2 AND credits != -1 RETURNING credits`,
-            [creditsToRefund, userId]
-          );
-          if (refundResult.rows.length > 0) {
-            await client.query(
-              `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, reference_id, description)
-               VALUES ($1, $2, $3, $4, $5, $6)`,
-              [userId, creditsToRefund, refundResult.rows[0].credits, 'story_refund', jobId,
-               `Refund: job cancelled by user (progress: ${progressPercent}%)`]
-            );
-            creditsRefunded = creditsToRefund;
-            log.info(`💳 Refunded ${creditsToRefund} credits for cancelled job ${jobId}`);
-          }
-        }
-        await client.query('COMMIT');
-      } catch (txErr) {
-        await client.query('ROLLBACK');
-        throw txErr;
-      } finally {
-        client.release();
-      }
-    } catch (refundErr) {
-      log.error(`❌ Failed to refund credits for cancelled job ${jobId}:`, refundErr.message);
+    // Cancel + refund in ONE transaction, guarded on the job still running: a job that
+    // finished (or is already saving its story: progress >= 99, see the saving marker in
+    // processUnifiedStoryJob) is neither refunded nor flipped from 'completed' to
+    // 'cancelled'. 'cancelled' is a distinct status so the pipeline's
+    // checkCancellation() can tell a user cancel from a transient 'failed'.
+    const settled = await settleJobWithRefund(getDbPool(), jobId, {
+      status: 'cancelled',
+      errorMessage: 'Cancelled by user',
+      statusIn: ['pending', 'processing'],
+      progressBelow: JOB_SAVING_PROGRESS,
+      describe: ({ progress }) => `Refund: job cancelled by user (progress: ${progress}%)`,
+    });
+    if (!settled.changed) {
+      return res.status(409).json({
+        error: 'Job already finished',
+        message: 'This story is already being saved or has finished and can no longer be cancelled'
+      });
     }
-
-    // Mark job as cancelled (NOT failed). Using a distinct status lets the
-    // pipeline's checkCancellation() detect user-driven cancel without
-    // false-positive firing on every transient 'failed' transition (e.g.
-    // a pipeline error sets status='failed' in another path → all in-flight
-    // pLimit slots would throw JobCancelledError and shadow the real
-    // error). The status column is VARCHAR(50) with no CHECK constraint,
-    // so adding the new value is a runtime-only change — no migration.
-    await getDbPool().query(
-      `UPDATE story_jobs
-       SET status = 'cancelled',
-           error_message = 'Cancelled by user',
-           updated_at = NOW()
-       WHERE id = $1`,
-      [jobId]
-    );
+    const creditsRefunded = settled.refunded;
+    if (creditsRefunded > 0) log.info(`💳 Refunded ${creditsRefunded} credits for cancelled job ${jobId}`);
 
     log.debug(`🛑 Job ${jobId} cancelled by user ${req.user.username}`);
 
@@ -849,14 +797,28 @@ router.get('/my-jobs', authenticateToken, async (req, res) => {
       // within minutes instead of the old 2-hour created_at window (which left
       // OOM-killed jobs spinning for hours). See sweepStaleJobs() for the proactive
       // server-side sweep — this per-request pass is the backstop.
-      await pool.query(
-        `UPDATE story_jobs
-         SET status = 'failed', error_message = 'Job stalled — no progress for 15 min (worker died: OOM/crash/restart)', updated_at = NOW()
+      const staleJobs = await pool.query(
+        `SELECT id FROM story_jobs
          WHERE user_id = $1
            AND status IN ('pending', 'processing')
            AND updated_at < NOW() - INTERVAL '15 minutes'`,
         [userId]
       );
+      for (const stale of staleJobs.rows) {
+        try {
+          // Fail + refund in one transaction; the idle guard re-checks staleness on the
+          // locked row so a job that just wrote progress is left alone.
+          await settleJobWithRefund(pool, stale.id, {
+            status: 'failed',
+            errorMessage: 'Job stalled — no progress for 15 min (worker died: OOM/crash/restart)',
+            statusIn: ['pending', 'processing'],
+            idleForMinutes: 15,
+            describe: ({ progress }) => `Auto-refund: stale job (progress ${progress}%)`,
+          });
+        } catch (staleErr) {
+          log.error(`[MY-JOBS] stale-job settle failed for ${stale.id}: ${staleErr.message}`);
+        }
+      }
 
       const result = await pool.query(
         `SELECT id, status, progress, progress_message, created_at, completed_at

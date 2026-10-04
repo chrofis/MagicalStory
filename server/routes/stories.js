@@ -12,6 +12,7 @@ const router = express.Router();
 
 const { dbQuery, isDatabaseMode, logActivity, getPool, getStoryImage, getStoryImageWithVersions, hasStorySeparateImages, saveStoryData, updateStoryDataOnly, getActiveVersion, setActiveVersion, getAllActiveVersions, getAllStoryImages, getActiveStoryImages, getRetryHistoryImages, rehydrateStoryImages, buildStoryMetadata, imgBytesAsync, stripInlineImagesFromStoryData } = require('../services/database');
 const { authenticateToken } = require('../middleware/auth');
+const { chargeCredits, refundCharge } = require('../lib/jobCredits');
 const { log } = require('../utils/logger');
 const { getEventForStory, getAllEvents, EVENT_CATEGORIES } = require('../lib/historicalEvents');
 const { dbIndexFor, arrayIndexForDb } = require('../lib/versionManager');
@@ -3772,24 +3773,49 @@ router.post('/:id/repaint-title', authenticateToken, async (req, res) => {
     const storyData = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
     if (!storyData.coverImages?.frontCover) return res.status(404).json({ error: 'Story has no front cover' });
 
+    // BILL-1: reserve BEFORE the paid call (atomic, balance floor, ledger row on success),
+    // refund when nothing was painted. A balance read before the call is only a hint —
+    // parallel requests all passed it and every repaint was free.
+    let newCredits = userCredits;
+    if (!hasInfiniteCredits) {
+      const charge = await chargeCredits(getPool(), {
+        userId: req.user.id, cost: creditCost, transactionType: 'title_repaint',
+        description: `Repaint cover title for story ${id}`,
+      });
+      if (!charge.charged) {
+        return res.status(402).json({ error: 'Insufficient credits', required: creditCost });
+      }
+      newCredits = charge.credits;
+    }
+    const refundReservation = async (why) => {
+      if (hasInfiniteCredits) return;
+      try {
+        newCredits = (await refundCharge(getPool(), {
+          userId: req.user.id, amount: creditCost, description: `Refund: title repaint ${why}`,
+        })) ?? newCredits;
+      } catch (refundErr) {
+        log.error(`❌ [BILL-1] Title-repaint refund failed for user ${req.user.id} (${creditCost} credits): ${refundErr.message}`);
+      }
+    };
+
     const { paintServedCoverTitle } = require('../lib/coverTypography');
-    const result = await paintServedCoverTitle(id, storyData, { coverKey: 'frontCover' });
+    let result;
+    try {
+      result = await paintServedCoverTitle(id, storyData, { coverKey: 'frontCover' });
+      if (result.painted) {
+        storyData.updatedAt = new Date().toISOString();
+        await saveStoryData(id, storyData);
+      }
+    } catch (paintErr) {
+      await refundReservation('failed');
+      throw paintErr;
+    }
     if (!result.painted) {
+      await refundReservation('not painted');
       return res.status(422).json({
         error: 'Could not repaint the title — the original title was kept.',
         reason: result.reason, charged: 0,
       });
-    }
-
-    storyData.updatedAt = new Date().toISOString();
-    await saveStoryData(id, storyData);
-
-    let newCredits = userCredits;
-    if (!hasInfiniteCredits) {
-      const deduct = await dbQuery(
-        'UPDATE users SET credits = credits - $1 WHERE id = $2 AND credits >= $1 RETURNING credits',
-        [creditCost, req.user.id]);
-      newCredits = deduct.length ? deduct[0].credits : userCredits - creditCost;
     }
     await logActivity(req.user.id, req.user.username, 'COVER_TITLE_REPAINTED', { storyId: id, cost: creditCost }, req.user);
 

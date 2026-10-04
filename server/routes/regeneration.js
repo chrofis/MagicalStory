@@ -24,6 +24,7 @@ const { sumUsage } = require('../lib/providerUsage');
 const { log } = require('../utils/logger');
 const { saveStoryData, saveScenePageData, saveCoverData, rehydrateStoryImages, saveStoryImage, getStoryImage, getActiveVersion, setActiveVersion, getNextVersionIndex, getPool, dbQuery, saveStyleLabImage, getStyleLabThumbnails, getStyleLabRunImages } = require('../services/database');
 const { PROMPT_TEMPLATES, fillTemplate, assertPromptFilled } = require('../services/prompts');
+const { chargeCredits } = require('../lib/jobCredits');
 
 // Shared repair logic
 const { findBadPages, selectCharRepairTasks } = require('../lib/repairLogic');
@@ -1018,9 +1019,11 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
       [id, [String(pageNumber)], JSON.stringify(imagePrompt)]
     );
 
-    // Active version is picked by recomputeAllActiveVersions inside
-    // saveScenePageData/saveStoryData (best score wins) — no explicit
-    // setActiveVersion needed here.
+    // The user paid for THIS render: pin it. Left to recomputeAllActiveVersions
+    // (best score wins) a lower-scoring new render would lose to an older version and
+    // reloads, PDF and print would show the old picture (decisions.md: every
+    // interactive flow PINS its choice). Newest row = MAX(version_index) after the save.
+    await setActiveVersion(id, `${pageNumber}`, (await getNextVersionIndex(id, 'scene', pageNumber)) - 1, { pinned: true });
 
     // Deduct credits after successful generation (skip for infinite credits or impersonating admin)
     // Atomic deduct with a balance floor (BILL-1): the pre-check ran before the long
@@ -2606,17 +2609,15 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       await setActiveVersion(id, coverKey, newVersionIndex, { pinned: true });
 
       // Deduct credits if not unlimited
+      // BILL-1: atomic debit, ledger row only when the debit matched a row.
       let newCredits = hasInfiniteCredits ? -1 : userCredits - creditCost;
       if (!hasInfiniteCredits) {
-        await getDbPool().query(
-          'UPDATE users SET credits = credits - $1 WHERE id = $2 AND credits >= $1',
-          [creditCost, req.user.id]
-        );
-        await getDbPool().query(
-          `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, description)
-           VALUES ($1, $2, $3, 'image_iteration', $4)`,
-          [req.user.id, -creditCost, newCredits, `Iterate cover ${coverKey}`]
-        );
+        const charge = await chargeCredits(getDbPool(), {
+          userId: req.user.id, cost: creditCost, transactionType: 'image_iteration',
+          description: `Iterate cover ${coverKey}`,
+        });
+        if (charge.charged) newCredits = charge.credits;
+        else log.warn(`⚠️ [BILL-1] Cover iterate for user ${req.user.id} completed but credits not charged (balance raced below ${creditCost})`);
       }
 
       log.info(`✅ [ITERATE] Cover ${coverKey}: Iteration complete (score: ${imageResult.score})`);
@@ -2971,17 +2972,15 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
     await setActiveVersion(id, `${pageNumber}`, iterateNewVersionIndex, { pinned: true });
 
     // Deduct credits if not unlimited
+    // BILL-1: atomic debit, ledger row only when the debit matched a row.
     let newCredits = hasInfiniteCredits ? -1 : userCredits - creditCost;
     if (!hasInfiniteCredits) {
-      await getDbPool().query(
-        'UPDATE users SET credits = credits - $1 WHERE id = $2 AND credits >= $1',
-        [creditCost, req.user.id]
-      );
-      await getDbPool().query(
-        `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, description)
-         VALUES ($1, $2, $3, 'image_iteration', $4)`,
-        [req.user.id, -creditCost, newCredits, `Iterate image for page ${pageNumber}`]
-      );
+      const charge = await chargeCredits(getDbPool(), {
+        userId: req.user.id, cost: creditCost, transactionType: 'image_iteration',
+        description: `Iterate image for page ${pageNumber}`,
+      });
+      if (charge.charged) newCredits = charge.credits;
+      else log.warn(`⚠️ [BILL-1] Page iterate for user ${req.user.id} completed but credits not charged (balance raced below ${creditCost})`);
     }
 
     log.info(`✅ [ITERATE] Page ${pageNumber}: Iteration complete (${previewMismatches.length} mismatches addressed, score: ${iterResult.score})`);
@@ -3661,6 +3660,9 @@ router.post('/:id/edit/image/:pageNum', authenticateToken, imageRegenerationLimi
       if (!savedAtomically) {
         await saveStoryData(id, storyData);
       }
+      // Paid edit: pin the new version (same contract as the sibling cover edit/regen
+      // routes) — an unpinned lower-scoring edit loses to an older version on reload.
+      await setActiveVersion(id, `${pageNumber}`, (await getNextVersionIndex(id, 'scene', pageNumber)) - 1, { pinned: true });
     }
 
     // Deduct after a successful edit only — same atomic-with-floor pattern as
@@ -5552,6 +5554,17 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
       }
     }
 
+    // The charge is per repaired page, so the pre-check must cover every requested page
+    // (a one-page pre-check let a multi-page / autoSelect call repair for free).
+    const requestedRepairPages = repairs.reduce((n, r) => n + (Array.isArray(r.pages) ? r.pages.length : 0), 0);
+    if (!hasInfiniteCredits && userCredits < requestedRepairPages * creditCost) {
+      return res.status(402).json({
+        error: 'Insufficient credits',
+        required: requestedRepairPages * creditCost,
+        available: userCredits
+      });
+    }
+
     const repairMethod = useGeminiRepair ? 'Gemini' : grokRepairMode ? `Grok ${grokRepairMode}` : useMagicApiRepair ? 'MagicAPI' : isGrokConfigured() ? 'Grok blended' : 'Gemini';
     log.info(`👤 [REPAIR-WORKFLOW] Starting character repair for story ${id} using ${repairMethod}`);
 
@@ -6554,14 +6567,17 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
     const totalCreditCost = totalPagesRepaired * creditCost;
     let creditsRemaining = hasInfiniteCredits ? -1 : userCredits;
     if (totalPagesRepaired > 0 && !hasInfiniteCredits) {
-      await getDbPool().query('UPDATE users SET credits = credits - $1 WHERE id = $2 AND credits >= $1', [totalCreditCost, req.user.id]);
-      creditsRemaining = userCredits - totalCreditCost;
-      await getDbPool().query(
-        `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, description)
-         VALUES ($1, $2, $3, 'character_repair', $4)`,
-        [req.user.id, -totalCreditCost, creditsRemaining, `Character repair: ${totalPagesRepaired} page(s)`]
-      );
-      log.info(`💰 [REPAIR-WORKFLOW] Deducted ${totalCreditCost} credits for ${totalPagesRepaired} page(s) repaired (remaining: ${creditsRemaining})`);
+      const charge = await chargeCredits(getDbPool(), {
+        userId: req.user.id, cost: totalCreditCost, transactionType: 'character_repair',
+        description: `Character repair: ${totalPagesRepaired} page(s)`,
+      });
+      if (charge.charged) {
+        creditsRemaining = charge.credits;
+        log.info(`💰 [REPAIR-WORKFLOW] Deducted ${totalCreditCost} credits for ${totalPagesRepaired} page(s) repaired (remaining: ${creditsRemaining})`);
+      } else {
+        creditsRemaining = userCredits;
+        log.warn(`⚠️ [BILL-1] Character repair for user ${req.user.id} completed but credits not charged (balance raced below ${totalCreditCost})`);
+      }
     }
 
     log.info(`✅ [REPAIR-WORKFLOW] Character repair complete`);
