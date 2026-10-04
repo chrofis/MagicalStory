@@ -333,6 +333,8 @@ describe('elementScaleNote — the enum renders, the token never does', () => {
 });
 
 describe('the built page prompt carries the PHRASE and never the token', () => {
+  // buildImagePrompt has no hardcoded fallback (deleted 2026-10-04, review B4).
+  beforeAll(async () => { await loadPromptTemplates(); });
   const brief = (objects: string[]) =>
     'The main character stands on the quay holding a roasted chestnut.'
     + '\n\n---METADATA---\n' + JSON.stringify({
@@ -475,6 +477,7 @@ describe('scaleClass — the parser the pipeline actually runs', () => {
  * with no other test failure and no log line.
  */
 describe('the stored-`size` fallback is permanent — real pre-enum bibles', () => {
+  beforeAll(async () => { await loadPromptTemplates(); });
   // verbatim from stories.data->visualBible on staging (read-only pull)
   const STORED_ARTIFACT = {
     id: 'ART004',

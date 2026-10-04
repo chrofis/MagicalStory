@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import { createRequire } from 'node:module';
 
 // COVERS SHOW AN OBJECT AS THE STORY LEAVES IT (2026-09-23).
@@ -23,6 +23,11 @@ const { COVER_PAGE_NUMBERS } = require_('../../server/lib/coverKeys');
 const { enrichCoverHintWithArtifacts } = require_('../../server/lib/coverIterate');
 // @ts-expect-error - JS module without types
 import { buildImagePrompt } from '../../server/lib/promptBuilders.js';
+
+// buildImagePrompt has no hardcoded fallback (deleted 2026-10-04, review B4): the
+// real templates must be loaded, so these assert against the shipped prompt.
+beforeAll(async () => { await require_('../../server/services/prompts').loadPromptTemplates(); });
+
 
 // Archetypal fixture: a thing the hero makes over the story.
 const MADE = () => ({

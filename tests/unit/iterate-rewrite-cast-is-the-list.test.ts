@@ -14,7 +14,7 @@
  *
  * Owner decision 2026-09-23: "Trust the rewrite's list."
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import { createRequire } from 'module';
 import fs from 'fs';
 import path from 'path';
@@ -23,6 +23,11 @@ const require_ = createRequire(import.meta.url);
 const { castOfRewrittenBrief, getCharactersInScene, extractSceneMetadata } = require_('../../server/lib/sceneMetadata');
 const { carryParentObjects } = require_('../../server/lib/iterateBeat');
 const { buildImagePrompt } = require_('../../server/lib/promptBuilders');
+
+// buildImagePrompt has no hardcoded fallback (deleted 2026-10-04, review B4): the
+// real templates must be loaded, so these assert against the shipped prompt.
+beforeAll(async () => { await require_('../../server/services/prompts').loadPromptTemplates(); });
+
 
 const read = (p: string) => fs.readFileSync(path.join(process.cwd(), p), 'utf8');
 
