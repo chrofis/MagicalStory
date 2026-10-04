@@ -125,6 +125,14 @@ const REAR_TURN_POSE = 'shoulders and body fully away from camera, head rotated 
 // A wash rides into each page as part of the character's reference cell.
 const SHEET_GROUND_RULE = "The ground stays plain white paper and the thin cell dividers stay: nothing is painted behind or around a figure — no wash, shape, scenery or cast shadow.";
 
+// Garment colours across the style transfer, ONE definition: the pass-2 prompt
+// states it about Image 1 (the pass-1 sheet) and the pass-2 style judge scores
+// it about Image 2 (the same sheet, filled into its template as {GARMENT_COLOUR}).
+// Until 2026-10-04 the restyler protected only hair and skin and the judge was
+// told the outfit is not scored: staging job_1791040103540_atbttop6w drew a
+// purple jacket on pass 1 and pass 2 repainted it navy, unchecked.
+const garmentColourRule = (sheet) => `Every garment keeps the colour ${sheet} shows it in: the same hue, with only the new medium's shading on it.`;
+
 const ASSETS_DIR = path.resolve(__dirname, '..', 'assets');
 // The -axes variants overlay a 3-axis RGB gizmo (red X / green Y / blue Z)
 // on the face region of every cell instead of the original eye-dots + mouth
@@ -915,12 +923,12 @@ function buildStyleTransferPrompt(artStyle, { hasAnchor = false } = {}) {
   // swatch, and state the single-subject rule as a property of the OUTPUT
   // ("alone in every cell") rather than a negation about Image 2.
   const anchorLine = hasAnchor
-    ? '\nImage 2 is a swatch of the painting technique, palette, and paper texture only. Take nothing else from it: no figure, face, garment, or composition — every painted element in the output comes from Image 1. Where Image 2 and the style text above disagree, the style text wins.'
+    ? '\nImage 2 is a swatch of the painting technique, brushwork and paper texture only. Take nothing else from it: no figure, face, garment, garment colour, or composition — every painted element and every garment colour in the output comes from Image 1. Where Image 2 and the style text above disagree, the style text wins.'
     : '';
   return `Change the art style of Image 1 — a 2×4 character reference sheet (8 cells) — to: ${styleLine}
 Render all 8 cells uniformly in this style — no cell left photographic.
 
-Keep the content of Image 1 unchanged; only the art style changes. Every cell shows the same single character as Image 1, alone — no other person or figure anywhere on the sheet. Hair colour and skin tone stay as Image 1 shows them, with no colour patch on the face that Image 1 does not have. ${SHEET_GROUND_RULE}${anchorLine}`;
+Keep the content of Image 1 unchanged; only the art style changes. Every cell shows the same single character as Image 1, alone — no other person or figure anywhere on the sheet. Hair colour and skin tone stay as Image 1 shows them, with no colour patch on the face that Image 1 does not have. ${garmentColourRule('Image 1')} ${SHEET_GROUND_RULE}${anchorLine}`;
 }
 
 // Optional per-art-style STYLE ANCHOR asset (server/assets/style-anchor-<style>.jpg|png)
@@ -949,12 +957,14 @@ async function evaluateStyledSheetWithGemini(sourcePhoto, realisticSheet, styled
   // Pass 2 is a STYLE TRANSFER: the restyler is never told which garments to
   // produce (buildStyleTransferPrompt takes no costume), so the judge must not
   // ask. The outfit is decided and scored on pass 1 — no costume input here.
+  // What pass 2 IS told is to keep each garment's colour from the pass-1 sheet
+  // (garmentColourRule), so the judge scores exactly that, against Image 2.
   const { model = 'gemini-2.5-flash', promptOverride = null } = opts;
   const styleLabel = resolveStyleLineForSheet(artStyle);
 
   let prompt = promptOverride || PROMPT_TEMPLATES.sheet2x4StyleEval;
   if (!prompt) throw new Error('sheet2x4StyleEval prompt template not loaded');
-  prompt = fillTemplate(prompt, { REAR_TURN: REAR_TURN_POSE, SHEET_GROUND: SHEET_GROUND_RULE });
+  prompt = fillTemplate(prompt, { REAR_TURN: REAR_TURN_POSE, SHEET_GROUND: SHEET_GROUND_RULE, GARMENT_COLOUR: garmentColourRule('Image 2') });
   prompt = prompt.replace(/REQUESTED_STYLE/g, `REQUESTED_STYLE: ${styleLabel}`);
   // TASK 6 age gate — style transfer is where kids drift younger (the art
   // style's cute prior). Unknown age disables the task (prompt scores it 10).
@@ -1028,7 +1038,7 @@ function scoreHeadsReport(report) {
   return stampVerdict(report, lowestAxis(report, HEADS_AXES, 'row eval (heads)'));
 }
 
-const STYLE_AXES = ['layout', 'identity', 'style', 'clean', 'bodyFace', 'age', 'solo', 'background']
+const STYLE_AXES = ['layout', 'identity', 'style', 'clean', 'bodyFace', 'age', 'solo', 'background', 'garment']
   .map(n => [n, r => r[`${n}Score`] ?? r[n]?.score]);
 // The style-judge axes a styled sheet may NOT fail and still ship: a different
 // person (identity) or extra people in the sheet (solo). Every other axis ships
@@ -1695,7 +1705,7 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
       ({ verdict, promptUsed: judgePrompt } = await evaluateAvatarSheet(result.imageData, {
         pass: 2, facePhoto, realisticSheet: pass1ImageData, artStyle, declaredAge: characterAge, usageTracker,
       }));
-      log.info(`[CHARACTER 2×4]   Pass 2 eval: layout=${verdict.layoutScore} identity=${verdict.identityScore} style=${verdict.styleScore} clean=${verdict.cleanScore} bodyFace=${verdict.bodyFaceScore} age=${verdict.ageScore ?? '-'} background=${verdict.backgroundScore ?? '-'} final=${verdict.finalScore} valid=${verdict.valid}`);
+      log.info(`[CHARACTER 2×4]   Pass 2 eval: layout=${verdict.layoutScore} identity=${verdict.identityScore} style=${verdict.styleScore} clean=${verdict.cleanScore} bodyFace=${verdict.bodyFaceScore} age=${verdict.ageScore ?? '-'} background=${verdict.backgroundScore ?? '-'} garment=${verdict.garmentScore ?? '-'} final=${verdict.finalScore} valid=${verdict.valid}`);
     } catch (err) {
       // A Gemini eval failure must NOT lock in this attempt and break the retry
       // loop. It is UNSCORED (null), so it ranks below every judged attempt: a
@@ -1728,6 +1738,7 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
       ageScore: verdict.ageScore,
       soloScore: verdict.soloScore,
       backgroundScore: verdict.backgroundScore,
+      garmentScore: verdict.garmentScore,
       reasons: verdict.failureReasons || [],
       imageData: result.imageData,
       sentToGrok: result.sentToGrok || null,
@@ -1964,5 +1975,5 @@ module.exports = {
   resolveFacePhoto,
   buildStyleTransferPrompt,
   // exposed for tests
-  _internal: { parseJudgeJson, buildBodyRowPrompt, buildHeadRowPrompt, buildFootwearRule, buildGarmentRule, buildSeasonOutfitBlock, buildStyleTransferPrompt, resolveFacePhoto, resolveStandardAvatar, quickLayoutCheck, evaluateStyledSheetWithGemini, runStyleTransferPass, splitSheetRows, evaluateSheetRow, evaluateIdentity, evaluateSheetSplit, evaluateAvatarSheet, isEchoedJudgeVerdict, REAR_TURN_POSE, SHEET_GROUND_RULE, buildUnnamedTrimRule, scoreHeadsReport, scoreStyleReport, scoreIdentityReport },
+  _internal: { parseJudgeJson, buildBodyRowPrompt, buildHeadRowPrompt, buildFootwearRule, buildGarmentRule, buildSeasonOutfitBlock, buildStyleTransferPrompt, resolveFacePhoto, resolveStandardAvatar, quickLayoutCheck, evaluateStyledSheetWithGemini, runStyleTransferPass, splitSheetRows, evaluateSheetRow, evaluateIdentity, evaluateSheetSplit, evaluateAvatarSheet, isEchoedJudgeVerdict, REAR_TURN_POSE, SHEET_GROUND_RULE, garmentColourRule, buildUnnamedTrimRule, scoreHeadsReport, scoreStyleReport, scoreIdentityReport },
 };

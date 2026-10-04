@@ -65831,3 +65831,17 @@ tests/unit/outfit-short-form.test.ts (new; verifies the check accepts short pros
 Resolution quality held (all 3 sent pages taken, none introduced) at lower cost, lower latency and fewer wasted cover-page calls. Cap used: $0.161 of the $0.50 authorized for this task; one replay call, no retry needed.
 
 **Touched:** `server/lib/briefChecks.js` (`COVER_ONLY_TYPES`, reasoning option, `coverOnlyShipped` report field), `tests/unit/brief-checks-reask.test.ts` (new `describe` blocks for both). **Status:** ✅ active.
+
+## 2026-10-04 — Avatar sheet pass 2 keeps garment colours from pass 1, and its style judge scores them
+
+**Context.** Staging `job_1791040103540_atbttop6w` (dragon run 9): Kiaan's outfit was "a purple quilted autumn jacket". Pass 1 (realistic redress) drew a muted blue-violet purple and its judges saw purple. Pass 2 (Grok watercolour style transfer, `buildStyleTransferPrompt`) repainted the jacket clearly navy. The pass-2 prompt protected only hair and skin, and offered the style swatch (a blue/brown wash) as a source of "palette"; the pass-2 style judge was told "the outfit is not scored here" (2026-08 owner ruling that removed the outfit-vs-spec axis). Nothing compared the final sheet's garment colours with anything.
+
+**Decision (owner-approved 2026-10-04).**
+1. One rule, `garmentColourRule(sheet)` in `character2x4Sheet.js`: "Every garment keeps the colour <sheet> shows it in: the same hue, with only the new medium's shading on it." The restyler gets it about Image 1 (the pass-1 sheet), next to the hair/skin line; the style judge gets it about Image 2 (the same sheet) via `{GARMENT_COLOUR}`.
+2. The swatch line drops "palette": the swatch gives painting technique, brushwork and paper texture; every garment colour comes from Image 1.
+3. The style judge gains TASK 9 / `garmentScore` (hue per garment, Image 2 vs Image 3; a different colour name scores 1-4). It is in `STYLE_AXES`, so a recolour fails the verdict and takes the existing retry. It is NOT in `STYLED_IDENTITY_AXES`: on the final strike it ships with a warning like the other quality axes. This does not reverse the 2026-08 ruling — garments are still never scored against the clothing spec on pass 2, only against the pass-1 sheet the restyler was told to keep.
+4. Pass-1 bodies judge (TASK 3): a colour is wrong when the drawn hue has a different colour name from the requested one; the reason names the hue seen. One sentence; the heads judge already demanded "in that colour".
+
+**Measured.** One local run of the real `runStyleTransferPass` on Kiaan's stored pass-1 sheet and face (watercolour, anchor on): stored pass 2 = navy jacket; new pass 2 = purple jacket on all 8 cells, judge `garment=9` ("Jacket: purple in Image 2, purple in Image 3"), valid on attempt 1. Cost ≈ $0.03 (one Grok edit + one Gemini Flash judge).
+
+**Touched:** `server/lib/character2x4Sheet.js`, `prompts/sheet-2x4-style-eval.txt`, `prompts/sheet-row-bodies-eval.txt`, `tests/unit/avatar-sheet-garment-colour.test.ts` (new), `tests/unit/avatar-sheet-style-eval-no-outfit-axis.test.ts`. **Status:** ✅ active (staging).
