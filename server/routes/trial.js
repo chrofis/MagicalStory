@@ -1437,7 +1437,7 @@ router.patch('/update-character-details', verifySessionToken, async (req, res) =
       return res.status(404).json({ error: missing || 'Character not found' });
     }
     log.debug(`[TRIAL] Character details updated for ${userId}: ${saved.characters[0].name}`);
-    res.json({ success: true, characterId, charId });    res.json({ success: true, characterId, charId: c.id });
+    res.json({ success: true, characterId, charId });
   } catch (err) {
     log.error(`[TRIAL] update-character-details error: ${err.message}`);
     res.status(500).json({ error: 'Failed to update character. Please try again.' });
