@@ -186,6 +186,66 @@ function checkCoverCast(page, metadata, visualBible) {
 }
 
 /**
+ * A STORY PAGE CITES THE BIBLE FIGURES ITS WHO COLUMN NAMES (2026-09-27) — the
+ * story-page half of checkCoverCast's figure rule. Structured only, like it:
+ * the plan line's who column (second field, `planSegments`) split on commas,
+ * each item compared WHOLE and case-insensitively against a Visual Bible
+ * figure's authored `name` or `label` — an identity match between two authored
+ * strings, never a word looked for in prose (the removed `element_uncited`
+ * matched head nouns anywhere in the line and was 75% false). A match whose id
+ * `objects[]` does not cite is a page built without that figure's reference
+ * image and size line. A figure on `characters[]` counts as present.
+ *
+ * MEASURED over 59 stored staging stories (887 story pages): 0 of the Art
+ * Director's briefs, 1 final brief (job_1790446348343_z3fw660ie p12, a later
+ * rewrite that dropped the dog its who column names). It guards the contract;
+ * the measured miss is the next paragraph.
+ *
+ * What it does NOT see: a figure the planner left out of the who column while
+ * the instant stages it — staging job_1790508305061_dka3jpog9 p11, the
+ * creature's wing across the path. Matching the creature's name anywhere in
+ * the line would, and over 59 stored staging stories that match named 67
+ * uncited pages: 5 real, 5 unclear, 57 false — 32 of them an egg the story calls by
+ * the creature's name, most of the rest a possessive of a figure off the page. That
+ * shape is closed where classification belongs — FIGURE_PART_IN_FRAME_RULE
+ * puts a figure shown in part into the who column (planner) and into the cast
+ * (Art Director, iterate, scene review 5a) — and this check then holds the
+ * brief to it.
+ */
+function checkPlanCastCited(page, metadata, visualBible) {
+  const n = Number(page && page.pageNumber);
+  if (!Number.isFinite(n) || n <= 0) return [];
+  const castField = planSegments(String((page && page.planLine) || '').replace(/^\s*PLAN:\s*/i, ''))[1] || '';
+  const named = castField.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+  if (named.length === 0) return [];
+  const vb = visualBible || {};
+  const cited = citedBaseIds(metadata);
+  // A figure on the roster is in the frame already, as in checkBiblePageTable.
+  const onCast = ((metadata && Array.isArray(metadata.characters)) ? metadata.characters : [])
+    .map(c => String(typeof c === 'string' ? c : (c && c.name) || '').trim()).filter(Boolean);
+  const missing = [];
+  for (const key of ['animals', 'secondaryCharacters']) {
+    const list = Array.isArray(vb[key]) ? vb[key] : Object.values(vb[key] || {});
+    for (const e of list) {
+      if (!e || !e.id) continue;
+      const id = String(e.id).trim().toUpperCase().split('.')[0];
+      const handles = [e.name, e.label].map(s => String(s || '').trim().toLowerCase()).filter(Boolean);
+      if (!handles.some(h => named.includes(h)) || cited.has(id)) continue;
+      if (onCast.some(name => isSameFigureName(name, e.name))) continue;
+      missing.push(`${e.name || e.label} (${id})`);
+    }
+  }
+  if (missing.length === 0) return [];
+  return [{
+    pageNumber: n,
+    type: 'plan_cast_uncited',
+    detail: `The plan line's who column names ${missing.join(' and ')}, and this page's objects[] does not cite ${missing.length > 1 ? 'them' : 'it'}. `
+      + `A Visual Bible figure in the picture is cited by its id — the id is what gives the page its reference image and its size. `
+      + `Cite ${missing.length > 1 ? 'each' : 'it'} and stage ${missing.length > 1 ? 'them' : 'it'} in the prose, even when only part of ${missing.length > 1 ? 'them is' : 'it is'} in the frame.`,
+  }];
+}
+
+/**
  * EACH COVER ITS OWN PLACE (2026-09-25; coverBeats.COVER_OWN_PLACE is the rule
  * the beat states). Structured only: the first location id each cover brief
  * cites in `objects[]`. A cover repeats a place when an EARLIER cover cites the
@@ -735,6 +795,31 @@ function bibleEntries(visualBible) {
  * in the third. Every 6-page story in the corpus is written that way, and
  * reading them anchored flagged every element on every page.
  */
+/**
+ * The authored names (and labels) of the Visual Bible figures — secondary
+ * characters and animals — a brief cites by id, in `objects[]` or as a
+ * `characters[]` row. An identity lookup between the brief's ids and the
+ * bible's entries; no prose is read.
+ */
+function vbFigureNamesCited(metadata, visualBible) {
+  if (!visualBible) return [];
+  const { findVbIds, baseVbId } = require('./vbIdGuard');
+  const ids = new Set(citedBaseIds(metadata).keys());
+  for (const c of ((metadata && Array.isArray(metadata.characters)) ? metadata.characters : [])) {
+    const row = String(typeof c === 'string' ? c : (c && c.name) || '');
+    for (const hit of findVbIds(row)) { const base = baseVbId(hit); if (base) ids.add(base); }
+  }
+  const out = [];
+  for (const key of ['secondaryCharacters', 'animals']) {
+    const list = Array.isArray(visualBible[key]) ? visualBible[key] : Object.values(visualBible[key] || {});
+    for (const e of list) {
+      if (!e || !e.id || !ids.has(String(e.id).trim().toUpperCase().split('.')[0])) continue;
+      for (const h of [e.name, e.label]) if (h && String(h).trim()) out.push(String(h).trim());
+    }
+  }
+  return out;
+}
+
 function citedBaseIds(metadata) {
   const objects = (metadata && Array.isArray(metadata.objects)) ? metadata.objects : [];
   const { findVbIds, baseVbId } = require('./vbIdGuard');
@@ -845,6 +930,223 @@ function checkBiblePageTable(page, metadata, visualBible) {
  * @param {boolean} [opts.textZoneRules] run the text-zone geometry check
  * @returns {Array<{pageNumber, type, detail, names?, ids?}>}
  */
+/**
+ * vb_id_label_mismatch (owner, 2026-09-28, "Jev first" — one of the two kinds
+ * the scene review really caught): the prose writes a Visual Bible id with a
+ * label beside it — `ART002 (black sash)` or `black sash (ART002)` — and the
+ * label names a DIFFERENT entry. Staging job_1790529840433_ar4u7qry3, covers
+ * -1/-2/-3: "ART002 (black Piratentuch)" while the Piratentuch is ART004.
+ * The label is tied to an entry by the one row matcher
+ * (visualBible.entryNamedByRow: a token no other entry carries); an ambiguous
+ * or unmatched label yields nothing, never a guess.
+ */
+const ID_THEN_LABEL = /\b([A-Z]{3}\d{3}(?:\.\d+)?)\s*\(([^()]{2,80})\)/g;
+const LABEL_THEN_ID = /([^()—–.;:,]{2,80}?)\s*\(\s*([A-Z]{3}\d{3}(?:\.\d+)?)\s*\)/g;
+function checkIdLabelMismatch(page, visualBible) {
+  if (!visualBible) return [];
+  const { entryNamedByRow } = require('./visualBible');
+  const { baseVbId } = require('./vbIdGuard');
+  const prose = String((page && page.brief) || '').split('---METADATA---')[0];
+  const cands = [];
+  for (const key of ['secondaryCharacters', 'animals', 'artifacts', 'vehicles', 'locations', 'clothing']) {
+    const list = Array.isArray(visualBible[key]) ? visualBible[key] : Object.values(visualBible[key] || {});
+    for (const e of list) if (e && e.id) cands.push(e);
+  }
+  if (!cands.length) return [];
+  const pairs = [];
+  let m;
+  ID_THEN_LABEL.lastIndex = 0;
+  while ((m = ID_THEN_LABEL.exec(prose)) !== null) pairs.push({ id: m[1], label: m[2].trim() });
+  LABEL_THEN_ID.lastIndex = 0;
+  while ((m = LABEL_THEN_ID.exec(prose)) !== null) pairs.push({ id: m[2], label: m[1].trim().split(/\s+/).slice(-6).join(' ') });
+  const out = [];
+  const seen = new Set();
+  for (const { id, label } of pairs) {
+    if (/[A-Z]{3}\d{3}/.test(label)) continue;
+    const named = entryNamedByRow(label, cands);
+    if (!named || baseVbId(named.id) === baseVbId(id)) continue;
+    const key = `${id}|${named.id}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const own = cands.find(c => baseVbId(c.id) === baseVbId(id));
+    out.push({
+      pageNumber: page.pageNumber,
+      type: 'vb_id_label_mismatch',
+      id, named: named.id,
+      detail: `The prose writes ${id} as "${label}", which is ${named.id} (${named.label || named.name}), not ${id}${own ? ` (${own.label || own.name})` : ''}. `
+        + 'Name each element in the prose by its own label, and keep ids out of the prose.',
+    });
+  }
+  return out;
+}
+
+// ── THE REVIEW'S RULES, AS CODE CHECKS (owner, 2026-09-28, Q9) ─────────────
+// The scene review no longer runs (docs/decisions.md 2026-09-28 "Jev first,
+// then no scene review"). The owner kept five of its checks as code checks
+// that feed the one brief re-ask, plus a check for required in-image text.
+// Each reads the brief's own fields or a fixed word list; each was replayed
+// over stored staging briefs before it was wired (numbers in decisions.md
+// 2026-09-28 "The scene review is deleted …").
+
+const esc = s => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+/** Every string value in a metadata object, ids and enum words included. */
+function metadataStrings(m, out = []) {
+  if (typeof m === 'string') out.push(m);
+  else if (Array.isArray(m)) m.forEach(x => metadataStrings(x, out));
+  else if (m && typeof m === 'object') Object.values(m).forEach(x => metadataStrings(x, out));
+  return out;
+}
+
+/**
+ * negation_named — naming a thing that must be absent paints it (the review's
+ * check 9, the Art Director's rule 12b). The review's own word list: "no …",
+ * "without …", "does not …", "empty of …", and the n't forms of the same verbs.
+ * `bare …` is not on it: measured, it names a surface (bare branches, bare
+ * feet), not an absent thing.
+ */
+const NEGATION_RE = /\b(?:no\s+(?!one\b|longer\b|more\b|matter\b|doubt\b|sooner\b)[a-z][a-z-]*|without\s+(?:a\s+|an\s+|the\s+|any\s+)?[a-z][a-z-]*|empty of\s+[a-z][a-z-]*|(?:does|do|did|is|are|was|were|has|have)\s+not\s+[a-z][a-z-]*|(?:doesn't|don't|didn't|isn't|aren't|wasn't|weren't|hasn't|haven't)\s+[a-z][a-z-]*)/gi;
+function checkNegationNamed(page, metadata) {
+  const brief = String((page && page.brief) || '');
+  const prose = brief.split('---METADATA---')[0];
+  const texts = [prose, ...metadataStrings(metadata && (metadata.fullData || metadata))];
+  const hits = [];
+  for (const t of texts) {
+    NEGATION_RE.lastIndex = 0;
+    let m;
+    while ((m = NEGATION_RE.exec(t)) !== null) if (!hits.includes(m[0])) hits.push(m[0]);
+  }
+  if (!hits.length) return [];
+  return [{
+    pageNumber: page.pageNumber, type: 'negation_named', phrases: hits,
+    detail: `The brief names what must be absent: ${hits.slice(0, 4).map(h => `"${h}"`).join(', ')}. A named absence is painted. Rewrite each as what does occupy that space, in the prose and in every metadata field.`,
+  }];
+}
+
+/**
+ * element_uncited — the prose stages a Visual Bible element by its authored
+ * `label`, its proper name or (a creature or a figure) its given name, while
+ * the brief cites no id for it (the review's check 9d). NOT the head-noun check
+ * deleted 2026-09-18 (75% false): only the entry's whole authored name counts,
+ * and a possessive occurrence ("<name>'s egg") names the thing owned, not the
+ * owner. On a Jev page the cites are decided, so the fix is the prose.
+ */
+function checkElementUncited(page, metadata, visualBible, castNames = []) {
+  if (!visualBible) return [];
+  const prose = String((page && page.brief) || '').split('---METADATA---')[0];
+  const cited = new Set(citedBaseIds(metadata).keys());
+  const { findVbIds, baseVbId } = require('./vbIdGuard');
+  for (const c of ((metadata && Array.isArray(metadata.characters)) ? metadata.characters : [])) {
+    for (const hit of findVbIds(String(typeof c === 'string' ? c : (c && c.name) || ''))) cited.add(baseVbId(hit));
+  }
+  const commissioned = new Set(castNames.map(n => String(n).trim().toLowerCase()));
+  // A worn garment is carried by `wornItems`, never by objects[] (2026-09-23,
+  // "A worn garment is not a budget element"): measured, 17 of 29 fires were one.
+  for (const w of ((metadata && Array.isArray(metadata.wornItems)) ? metadata.wornItems : [])) if (w && w.id) cited.add(baseVbId(w.id));
+  const out = [];
+  for (const key of ['animals', 'artifacts', 'vehicles', 'secondaryCharacters']) {
+    const list = Array.isArray(visualBible[key]) ? visualBible[key] : Object.values(visualBible[key] || {});
+    for (const e of list) {
+      if (!e || !e.id || e.generic === true || e.wornAs) continue;
+      const base = baseVbId(e.id);
+      if (cited.has(base)) continue;
+      const names = [e.label, e.properName, ...(key === 'animals' || key === 'secondaryCharacters' ? [e.name] : [])]
+        .map(n => String(n || '').trim()).filter(n => n.length >= 3 && !commissioned.has(n.toLowerCase()));
+      const hit = names.find(n => new RegExp(`(?<![\\p{L}])${esc(n)}(?!['’]s\\b)(?![\\p{L}])`, 'iu').test(prose));
+      if (!hit) continue;
+      out.push({
+        pageNumber: page.pageNumber, type: 'element_uncited', id: base, name: hit,
+        detail: `The prose stages ${hit}, and objects[] cites no ${base}. Cite ${base} if the page shows it; if this page's objects[] is fixed, take ${hit} out of the prose instead.`,
+      });
+    }
+  }
+  return out;
+}
+
+/**
+ * character_fields — every character row carries `depth` and an `expression`
+ * that names brows, eyes or mouth, never a bare mood word (the review's check 6,
+ * the field rules 8k and "depth, expression and emotion — required").
+ */
+const FACE_PART_RE = /\b(?:brows?|eyebrows?|eyes?|\w+-eyed|eyelids?|gaze|star(?:e|es|ing)|squint\w*|mouth|lips?|jaw|teeth|smil\w*|grin\w*|frown\w*|pout\w*)\b/i;
+// Where no face can be read the field rules ask for body language instead (a
+// wide frame, a plain back view, the over-the-shoulder near crop), so the face
+// half is not asked for there. Read from the structured `shot` / `perspective`.
+const FACELESS_SHOTS = new Set(['wide', 'ultra-wide', 'aerial']);
+function faceHidden(row, shot) {
+  if (FACELESS_SHOTS.has(classifyShot(shot || ''))) return true;
+  const p = String(row.perspective || '').toLowerCase();
+  return /back view|over-the-shoulder/.test(p) && !/head turned|glanc/.test(p);
+}
+function checkCharacterFields(page, metadata) {
+  const rows = (metadata && Array.isArray(metadata.characters)) ? metadata.characters : [];
+  const out = [];
+  for (const c of rows) {
+    if (!c || typeof c !== 'object' || !c.name) continue;
+    const missing = [];
+    if (!String(c.depth || '').trim()) missing.push('`depth`');
+    const expr = String(c.expression || '').trim();
+    if (!expr) missing.push('`expression`');
+    else if (!FACE_PART_RE.test(expr) && !faceHidden(c, metadata.shot)) missing.push(`an \`expression\` that names brows, eyes or mouth (it reads "${expr}")`);
+    if (missing.length) {
+      out.push({
+        pageNumber: page.pageNumber, type: 'character_fields', character: c.name,
+        detail: `${c.name}'s characters[] row lacks ${missing.join(' and ')}. Every character carries its depth and a drawable expression naming brows, eyes or mouth; the one mood word goes in \`emotion\`.`,
+      });
+    }
+  }
+  return out;
+}
+
+/**
+ * cast_not_in_plan — `characters[]` lists a commissioned character the page's
+ * plan line does not put in frame (the review's check 5a, rule 3). "In frame"
+ * is the shipped plan check's head count for the page (`page.inFrame`, the
+ * same `present` the shots and the gaze roster read), which also resolves a
+ * collective who column ("all four children"). A page without a head count is
+ * not checked. Covers are checked by cover_cast_dropped.
+ */
+function checkCastNotInPlan(page, metadata, commissionedNames = []) {
+  if (!(Number(page && page.pageNumber) > 0) || !Array.isArray(page.inFrame)) return [];
+  const rows = (metadata && Array.isArray(metadata.characters)) ? metadata.characters : [];
+  const listed = rows.map(c => String(typeof c === 'string' ? c : (c && c.name) || '').trim()).filter(Boolean);
+  const extra = listed.filter(n => commissionedNames.some(c => isSameFigureName(c, n)))
+    .filter(n => !page.inFrame.some(x => isSameFigureName(x, n)));
+  if (!extra.length) return [];
+  const who = planSegments(String(page.planLine || '').replace(/^\s*PLAN:\s*/i, ''))[1] || '';
+  return [{
+    pageNumber: page.pageNumber, type: 'cast_not_in_plan', names: extra,
+    detail: `characters[] lists ${extra.join(' and ')}, whom the plan line does not put in frame${who ? ` ("${who}")` : ''}. Take them out of characters[] and out of the prose; the plan line decides who is in the picture.`,
+  }];
+}
+
+/**
+ * required_text_undeclared — the page has the reader read lettering in the
+ * picture (`page.readsText`: the decision layer's READ noul,
+ * jevDecisions.READ_TEXT_Q), and no element the brief cites declares `text`
+ * (the review's check 9g; requiredText.REQUIRED_TEXT_AUTHORING_RULE). Without
+ * a declared string the page prompt carries no REQUIRED TEXT block and the
+ * illustrator invents the letters. Plan lines never quote the string (0 of 7
+ * reading pages in 674 stored plan lines), so the page is found by the
+ * question and the string is the Art Director's to write. Not checked on the
+ * Jev-outage backup: no page carries `readsText` there.
+ */
+function checkRequiredTextUndeclared(page, metadata, visualBible) {
+  if (!page || page.readsText !== true) return [];
+  const { declaredText } = require('./requiredText');
+  const cited = [...citedBaseIds(metadata).keys()];
+  for (const base of cited) {
+    for (const key of ['artifacts', 'vehicles', 'locations', 'animals', 'secondaryCharacters']) {
+      const list = visualBible && (Array.isArray(visualBible[key]) ? visualBible[key] : Object.values(visualBible[key] || {}));
+      const e = (list || []).find(x => x && String(x.id || '').toUpperCase().split('.')[0] === base);
+      if (e && declaredText(e)) return [];
+    }
+  }
+  return [{
+    pageNumber: page.pageNumber, type: 'required_text_undeclared', cited,
+    detail: `Someone on this page reads, spells out or points at lettering the reader must be able to read, and no element the page cites (${cited.join(', ') || 'none'}) declares it in \`text\`. Write the exact characters, in the order they must read, into the \`text\` of the cited element that carries them — in a ---VISUAL BIBLE--- block after the last page — and have the prose show them on it.`,
+  }];
+}
+
 function checkPage(page, castNames = [], visualBible = null, opts = {}) {
   const findings = [];
   const brief = String((page && page.brief) || '');
@@ -852,12 +1154,21 @@ function checkPage(page, castNames = [], visualBible = null, opts = {}) {
   const metadata = (page && page.metadata) || extractSceneMetadata(brief);
   findings.push(...checkCoverBrief(page, metadata));
   findings.push(...checkCoverCast(page, metadata, visualBible));
+  findings.push(...checkPlanCastCited(page, metadata, visualBible));
 
   // A — cast the prose describes, `characters[]` omits. Possessive-aware by
   // construction: `Hans's attic` and `Daniel's phone torch` name a place and a
   // prop, not a person in the frame, and counting them produced 4 false
   // positives out of 5 across three stories.
-  const missing = findCastMissingFromMetadata(brief, castNames, metadata);
+  // A Visual Bible figure cited by its id — in `objects[]`, or as a
+  // `characters[]` row reading `CHR001` — is listed under its authored name
+  // (2026-09-28). Matching names only, the check read every id-cited secondary
+  // as unlisted: all 4 hits over the three Jev stories to 2026-09-28 were this
+  // false positive (staging job_1790539784661_6mjcny1c7 p2 / p7 "The prose names
+  // Mama; characters[] lists Julian, Max, Kiaan" while objects[] cited CHR001),
+  // and on p2 and p7 the scene review answered it by removing Mama, whom both
+  // who columns name.
+  const missing = findCastMissingFromMetadata(brief, castNames, metadata, vbFigureNamesCited(metadata, visualBible));
   if (missing.length > 0) {
     const listed = (metadata && Array.isArray(metadata.characters) ? metadata.characters : [])
       .map(c => String(typeof c === 'string' ? c : (c && c.name) || '').trim())
@@ -871,6 +1182,8 @@ function checkPage(page, castNames = [], visualBible = null, opts = {}) {
         + `A figure added this way takes the action the page already has, or "watching" — never a second one.`,
     });
   }
+
+  findings.push(...checkIdLabelMismatch(page, visualBible));
 
   // B — ids in `objects[]` that resolve to nothing.
   const known = knownIds(visualBible);
@@ -1009,10 +1322,10 @@ function checkPage(page, castNames = [], visualBible = null, opts = {}) {
   // whose plan line is a pure waist-up holding beat.
   //
   // A widening the PLAN caused is legitimate here and is not reported: the
-  // planner is the one that has to answer it, and planCounters raises
-  // SHOT_CLOSEUP_BELOW_WAIST against the same verb list for exactly that case.
-  // Reporting it twice would have the Art Director rewrite around a fault it
-  // did not author.
+  // plan line's own words put the subject below the frame line, which
+  // CLOSEUP_KEPT_RULE lets the Art Director answer with `medium` (the shot is
+  // code's since 2026-09-27, and the Jev close-up question carries the same
+  // waist rule).
   const planLine = String((page && page.planLine) || '');
   if (planLine) {
     const planSegs = planSegments(planLine);
@@ -1317,7 +1630,7 @@ function checkScenes(pages, castNames = [], visualBible = null, opts = {}) {
 //     never produces it, so the iterate path cannot see it.
 //   - the `textzone_*` family is not run there: `opts.textZoneRules` is off on
 //     that call, and a repaired page usually has its text position locked.
-const REVIEWABLE = new Set(['cover_cast_dropped', 'cover_location_repeated', 'cast_unlisted', 'cast_id_unresolved', 'interaction_multiple_actions', 'interaction_object_shared_hands', 'interaction_actor_unknown',
+const REVIEWABLE = new Set(['vb_id_label_mismatch', 'cover_cast_dropped', 'plan_cast_uncited', 'cover_location_repeated', 'cast_unlisted', 'cast_id_unresolved', 'interaction_multiple_actions', 'interaction_object_shared_hands', 'interaction_actor_unknown',
   'vb_element_overflow', 'vb_state_contradicted', 'vb_state_no_base',
   'vb_page_uncited', 'vb_cite_offpage',
   // The scene review already has the brief and the plan line in front of it and
@@ -1381,8 +1694,15 @@ module.exports = {
   checkPage, checkScenes, renderFindingsBlock, knownIds, REVIEWABLE,
   checkObjectStateContradiction, checkObjectStateBase, statedEntries,
   checkBiblePageTable, bibleEntries, citedBaseIds, CITABLE_POOLS,
-  checkTextZoneDistribution, checkTextZoneCollision, parseTextPosition, checkCoverBrief, checkCoverCast, checkCoverLocations,
+  checkTextZoneDistribution, checkTextZoneCollision, parseTextPosition, checkCoverBrief, checkCoverCast, checkCoverLocations, checkPlanCastCited,
   checkPopulationContradiction,
+  checkIdLabelMismatch,
+  vbFigureNamesCited,
+  checkNegationNamed,
+  checkElementUncited,
+  checkCharacterFields,
+  checkCastNotInPlan,
+  checkRequiredTextUndeclared,
   checkShotOffPlate,
   checkLightDeclared,
   checkGroupStaging,

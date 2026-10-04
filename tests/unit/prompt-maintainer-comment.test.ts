@@ -33,7 +33,7 @@ describe('stripMaintainerComment', () => {
   });
 
   it('keeps the maintainer notes out of the scene-expansion templates', () => {
-    for (const file of ['scene-expansion-all.txt', 'scene-expansion.txt']) {
+    for (const file of ['visual-bible.txt', 'scene-briefs-all.txt', 'scene-expansion.txt']) {
       const raw = fs.readFileSync(path.join(PROMPTS_DIR, file), 'utf-8');
       expect(raw.startsWith('#!')).toBe(true);
       const sent = stripMaintainerComment(raw);

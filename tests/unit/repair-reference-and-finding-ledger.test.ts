@@ -120,35 +120,15 @@ describe('every char-repair entry point reports the same reason', () => {
 
 // ── 2. THE LAB REPLAY IS GIVEN WHAT PRODUCTION IS GIVEN ──────────────────────
 
-describe('the scene-review replay passes all four options production passes', () => {
-  const testlab = read('server/lib/testlab.js');
-
-  it('the replay stage passes brief findings alongside clothing, beats and the bible', () => {
-    // Since 2026-09-27 the replay runs the run's own review, which builds all four.
-    expect(testlab).toMatch(/await runSceneReview\(\{/);
-    const beats = read('server/lib/beatsPipeline.js');
-    expect(beats).toMatch(/\{ clothingFindings, briefFindings, beats: briefBeats, visualBible, clothingRequirements, \.\.\.labPromptOptions \}/);
-  });
-
-  it('it computes them from the same check production runs, with the bible secondaries in the cast', () => {
+describe('the brief checks count the bible secondaries in the cast', () => {
+  it('computes the findings from the same check production runs, with the bible secondaries in the cast', () => {
     // A figure the story invents can never trigger cast_unlisted unless the
-    // bible's secondaries are in the name list — the same reason beatsPipeline
-    // builds it that way.
-    const beats = read('server/lib/beatsPipeline.js');
-    const review = beats.slice(beats.indexOf('async function runSceneReview('), beats.indexOf('return { sceneReviewReport, sceneReviewAnalysis'));
-    expect(review).toMatch(/require\('\.\/sceneBriefCheck'\)/);
-    expect(review).toMatch(/visualBible\?\.secondaryCharacters/);
-  });
-
-  it('the block only reaches the reviewer when the option is passed', async () => {
-    const { loadPromptTemplates } = require_('../../server/services/prompts');
-    await loadPromptTemplates();
-    const PB = require_('../../server/lib/promptBuilders');
-    const inputData = { characters: [{ name: 'Mila' }], language: 'de', pages: 1 };
-    const scenes = [{ pageNumber: 1, brief: 'A hallway.' }];
-    const block = '# BRIEF FAULTS\n\n- Page 1:\n  - [cast_unlisted] the prose names a second figure';
-    expect(PB.buildSceneReviewPrompt(inputData, scenes, {})).not.toContain('# BRIEF FAULTS');
-    expect(PB.buildSceneReviewPrompt(inputData, scenes, { briefFindings: block })).toContain('# BRIEF FAULTS');
+    // bible's secondaries are in the name list. The scene review built it that
+    // way until its deletion (2026-09-28); the one re-ask's checks do now, in the
+    // Lab's beats_scenes and in production alike (both call runBriefChecks).
+    const checks = read('server/lib/briefChecks.js');
+    expect(checks).toMatch(/require\('\.\/sceneBriefCheck'\)/);
+    expect(checks).toMatch(/visualBible\?\.secondaryCharacters/);
   });
 });
 

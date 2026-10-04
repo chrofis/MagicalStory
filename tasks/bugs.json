@@ -2,6 +2,30 @@
   "_readme": "CLEAR-BUG REGISTRY. A bug the owner reported, or one confirmed from stored evidence, goes here the moment it is confirmed - and the pre-push gate (scripts/admin/check-open-bugs.js) BLOCKS every push while any entry is open. That is the point: a reported bug is fixed immediately, not backlogged. Only CLEAR bugs belong here (reproduced, or owner-reported with evidence); design questions and improvements go to the task list instead. Close an entry by setting status to 'fixed' with the commit hash IN THE SAME COMMIT as the fix. Emergency escape: PUSH_WITH_OPEN_BUGS=1 git push (documented, visible, deliberate).",
   "bugs": [
     {
+      "id": "creature-staged-in-part-uncited",
+      "title": "A Visual Bible creature staged only in part (a wing across the path) was written into the brief without its id: no reference image, no size line, no creature drawn",
+      "reportedAt": "2026-09-27",
+      "source": "Owner-approved fix task 2026-09-27. Staging job_1790508305061_dka3jpog9 (48c00fdff) p11: plan line 'wide — Levin, Julian, Max, Kiaan — the four stand at the summit before Sura's great wing stretched across the path like a wall …'; the AD brief's prose describes 'a great grey scaled wing … like a solid wall', objects[] = [LOC004.3, ART001]; the page prompt has no REQUIRED OBJECTS line for Sura and no Sura reference; v0 has no dragon. p15 the same at the Art Director (the review then cited ANI001.2). p13 and p16, also in the report, DO cite ANI001.1/.3 and carry the size line and the reference in their page prompts — not this bug.",
+      "rootCause": "server/lib/promptBuilders.js PLAN_LINE_CAST_RULE told every reader of the plan line that a figure named outside the who column is context, and to 'stage what such a clause makes visible … without the person' — the Art Director drew the wing and left the creature uncited, exactly as instructed. The planner's PLAN_LINE_FIELD_CONTRACT covered only a 'person' the instant stages, so it never put the creature into the who column. The existing code checks could not see it: vb_page_uncited reads the bible's page table (ANI001 did not claim p11 or p15), and plan-check's UNLISTED counted names 'on their hand, face or clothing' only.",
+      "impact": "The page renders the creature from nothing (p11 v0: no dragon; the iterate v1 drew one and scored 31). Scope: over 59 stored staging stories a bible figure named in the plan line outside the who column and uncited is 67 pages, of which 5 are this shape (dka3jpog9 p11/p15, kc2joi4ax p18, i9ah2221i p7/p15) — the rest are names without a body.",
+      "status": "fixed",
+      "fixedAt": "2026-09-27",
+      "fixedIn": "3a65d887e",
+      "fix": "FIGURE_PART_IN_FRAME_RULE ('a figure the picture shows only in part … is in that picture exactly as if it were shown whole; only a name without a body is context') inside PLAN_LINE_FIELD_CONTRACT (planner) and PLAN_LINE_CAST_RULE (both AD templates, both iterate templates, scene-review 5a); plan-check UNLISTED names parts beyond hand/face. Code: sceneBriefCheck.checkPlanCastCited → plan_cast_uncited (who column comma list vs authored name/label, never the instant), sent to the scene review and caught on an iterate rewrite. The plan-line name match the task proposed is NOT built: measured 57 false of 67 (docs/decisions.md 2026-09-27). Test: tests/unit/figure-part-in-frame.test.ts."
+    },
+    {
+      "id": "review-bible-correction-rejects-cover-pages",
+      "title": "A scene-review Visual Bible correction whose states carry a cover page (-1/-2/-3) was rejected whole as 'pages outside the book'",
+      "reportedAt": "2026-09-27",
+      "source": "Owner-approved fix task 2026-09-27. Staging job_1790508305061_dka3jpog9 (48c00fdff): generationLog beats_scene_review_bible_rejected ANI001 'state \"unaltered\" has pages outside the book'. The bible the review saw carried ANI001.1 = [5,9,12,13,14,-1] and ANI001.2 (missing scale) = []; the review's analysis ([vb_state_range]) moved page 15 to ANI001.2 and copied the -1 back.",
+      "rootCause": "server/lib/beatsPipeline.js applyReviewBibleCorrections (line 446 at 48c00fdff) accepted a state page only when 1 <= n <= pageCount. Since covers became pages (2026-09-24) the bible's own state tables carry the cover numbers (coverKeys.COVER_PAGE_NUMBERS), so any correction that kept them was refused. The other page-range readers (syncVisualBibleSection pageList, visualBible state parsing, vbElementBudget.applyBriefUsage, sceneReviewGuard, extractBibleSections) already accept negative numbers; checkObjectStateBase / checkBiblePageTable skip covers by design (a cover takes the final state, resolveObjectState rule 0).",
+      "impact": "The whole entry's correction was dropped: on dka3jpog9 the 'missing scale' state kept no pages at the review, so p15 (the page the gap is pointed at) had no state of its own until the later usage rebuild. In the 30 days to 2026-09-27, 2 of 57 staging stories with a scene review logged this rejection reason (dka3jpog9 confirmed a cover page; 3kxqshifx predates covers-as-pages, raw correction not stored).",
+      "status": "fixed",
+      "fixedAt": "2026-09-27",
+      "fixedIn": "edbd4b4a5",
+      "fix": "A state page is valid when it is a cover page (coverBeats.isCoverPage) or 1..pageCount. Test: tests/unit/review-bible-writeback.test.ts (dka3jpog9 shape: applied, written back, re-parsed, p15 resolves to ANI001.2; 0 / pageCount+1 / -4 still rejected). Replay of the stored dka3jpog9 transcript + review-time ANI001 through applyReviewBibleCorrections + syncVisualBibleSection + re-parse: applied, 0 missing from the transcript, p14/p15/p16 -> ANI001.1/.2/.3."
+    },
+    {
       "id": "char-repair-image-labels-reversed",
       "title": "Character-repair prompts named the images in the wrong order on every cutout / face repair: 'IMAGE 1 = REFERENCE' while the scene crop was sent first",
       "reportedAt": "2026-09-27",
@@ -2391,6 +2415,78 @@
       "fixedAt": "2026-09-27",
       "fixedIn": "b5bc1866c",
       "fix": "syncVisualBibleSection projects landmarkPhoto (location + each vantage by id), text (set or withdrawn) and states whenever the parsed copy has them. The review site verifies the write-back by RE-PARSING the transcript (bibleCorrectionsMissingFromTranscript) and logs an ERROR (gl.error beats_vb_sync_failed) naming each correction the transcript lacks; report.bibleCorrections.unsynced records them. A throw in the correction step is an error, not a warn. The citation compare goes through parseLandmarkPhotoCitation. Test: tests/unit/review-bible-writeback.test.ts. Replay over stored z3fw660ie transcript + Lab 1574 corrections: 3 corrections missing before, 0 after."
+    },
+    {
+      "id": "diff-restore-leaves-replacement-beside-writer-sentence",
+      "title": "The grammar check's RESTORE put a writer sentence back next to the rewrite sentence that had replaced it, shipping the same fact twice",
+      "reportedAt": "2026-09-27",
+      "source": "Owner-approved fix task 2026-09-27. Staging job_1790508305061_dka3jpog9 textRefineReport: the repair replaced p2 B4 «Es war eine Schuppe, so gross, dass sie genau in seine beiden Handflächen passte.» with A4-A5 «Es war eine Schuppe. Julian musste sie mit beiden Händen halten.»; the diff pass answered «PAGE 2 RESTORE B4 AFTER A5» and the page shipped «Es war eine Schuppe. Julian musste sie mit beiden Händen halten. Es war eine Schuppe, so gross, …». Ledger: rewrite-restored. Scan of every stored diff RESTORE (staging 3 stories / 5 applied restores; production 0): 1 duplicate (this one).",
+      "rootCause": "server/lib/textRefine.js applyDiffEdits (restore branch, was lines 413-419) and the RESTORE contract in prompts/story-text-diff.txt: `RESTORE B<j> AFTER A<k>` was a pure insertion (ops.push({at, end: at, ...})). Nothing in the contract or the applier named or removed the AFTER sentences that had taken the restored sentence's place, and the only guard (`already-present`) matched the writer sentence verbatim, which a paraphrase never does.",
+      "impact": "A restored page reads the same fact twice to the child. Any page the repair REWORDED (rather than dropped a sentence from) and the grammar check then restored was exposed.",
+      "status": "fixed",
+      "fixedAt": "2026-09-27",
+      "fixedIn": "99e91d68b",
+      "fix": "A RESTORE names what it removes: `RESTORE B<j> REPLACING A<k>` / `A<k>-A<m>` replaces that run of AFTER sentences; `REPLACING NONE AFTER A<k>` is the insertion, only for a sentence dropped with nothing in its place. The old bare form is unparsed (loud). The applier also refuses any restore that would stand beside a kept AFTER sentence (>= 3 words) whose words stand unbroken inside it (`duplicates-A<k>`), whatever the reply named, and a restore whose run overlaps another edit (`overlap`). Tests: tests/unit/text-stage-counter-and-specs.test.ts (p2 replay), text-chain-hints-and-ledger.test.ts. Replay: the stored p2 edit as an insertion is now dropped `duplicates-A4`."
+    },
+    {
+      "id": "trial-idea-landmarks-outside-story-list",
+      "title": "The trial idea prompt named real places the trial story's own landmark list does not contain (a lake, a river), so the chosen idea promised a place the story could not stage",
+      "reportedAt": "2026-09-27",
+      "source": "Observation in aa903083f (docs/decisions.md 2026-09-27 \"Jev picks the challenges and landmarks that fit\"), owner-approved fix 2026-09-27. Eval run evals/runs/2026-09-27_jev-selection metrics: 9 of 11 staging setups had a trial-idea landmark outside the story's 20 (label '?'). Reproduced against the staging DB 2026-09-27: getIndexedLandmarks(loc, 3) gives Zürich [Zürichsee, Grossmünster, Zoo] (Zürichsee not in the story's 20), Baden [Reuss (Fluss), …], Luzern [… Vierwaldstättersee]. Two live staging /try idea requests (Zürich, pirate) both built the idea on 'am Zürichsee'.",
+      "rootCause": "server/routes/trial.js POST /generate-ideas-stream (was :2286) called getIndexedLandmarks(userLocation, 3): a limit of 3 is below landmarkPhotos MIN_OWN_LOCALITY_ROWS = 5, so rung 1a (own locality) never passes and the query widens to the whole municipality, where lakes and rivers rank first. The trial story resolves its list through resolveAvailableLandmarks(loc, {limit: 20}) — a different list. The Lab's idea stage (testlab.js route mirror) copied the same call.",
+      "impact": "Every /try own-town idea in a town whose municipality rung holds a feature the locality list lacks: the idea card promises e.g. the lake, the story's writer is offered three other places, and the book either drops the promised place or invents it without a reference photo.",
+      "status": "fixed",
+      "fixedAt": "2026-09-27",
+      "fixedIn": "2f2a0d881",
+      "fix": "Both the route and the Lab mirror call jevSelection.trialIdeaLandmarks, which resolves the story's own list (resolveTrialIdeaLandmarks = resolveAvailableLandmarks with the story's STORY_LANDMARK_LIMIT) and names 3 of it (Jev's top 5 when ready). Replayed against the staging DB: the new list equals the story's list for Zürich, Baden, Lausanne, Luzern, Dübendorf, Turgi. Test: tests/unit/jev-selection.test.ts."
+    },
+    {
+      "id": "age-proportions-cut-removes-heading-only",
+      "title": "The shrink's AGE & PROPORTIONS step removed only the block heading, logged it as a cut, and shipped the per-character age bullets headless",
+      "reportedAt": "2026-09-27",
+      "source": "Found in the fixed-blocks work (Lab 1580, staging job_1790529840433_ar4u7qry3): every cut page logged \"#7 AGE & PROPORTIONS (-97)\" while the sent prompt still carried the age bullets without their heading. Owner decision 2026-09-27: keep the lines, stop cutting.",
+      "rootCause": "server/lib/images.js PROMPT_CUT_ORDER unit regexUnit(/^AGE & PROPORTIONS[\\s\\S]*?(?=\\n\\n|$)/m): under the m flag `$` matches the heading line's own end, so the lazy match stops after the heading.",
+      "impact": "Every over-cap page that reached step 7: the log and the prompt_shrink event reported a block dropped that was still (headless) in the prompt; the age bullets lost the \"render each character at their real age\" instruction.",
+      "status": "fixed",
+      "fixedAt": "2026-09-27",
+      "fixedIn": "f1d7c57a8",
+      "fix": "AGE & PROPORTIONS left PROMPT_CUT_ORDER and joined PROMPT_NEVER_CUT: heading and bullets always ship whole. Replay of 226 staging pages: all fit, worst floor 7,559 (margin 341). Test: tests/unit/page-prompt-fixed-blocks-fit.test.ts."
+    },
+    {
+      "id": "front-cover-over-grok-cap-after-compaction",
+      "title": "A full-story front cover shipped with no image: its prompt was over Grok's cap after every allowed cut (the page compaction did not cover the cover-only blocks)",
+      "reportedAt": "2026-09-28",
+      "source": "Owner-approved clear bug 2026-09-28: staging dragon run job_1790539784661_6mjcny1c7 (build 15489e69, which contains the page compaction 9c897bc16 / f1d7c57a8) — generationLog prompt_fit_failed twice for page -1: 8,378 chars after every allowed drop (scene 3,620 + must-keep 4,758), cap 7,900; missingCovers [\"frontCover\"]. Rebuilt byte-exact from sceneReviewReport.pages[-1].after with the production builder.",
+      "rootCause": "The cover renders through the page builder, so the compacted blocks did reach it; it overshot on blocks a page does not carry or rarely fills: the baked-title REQUIRED TEXT line (564), the copy-space COMPOSITION — OPEN AREA (448), and a WORN ITEMS block (1,344) listing whole outfits — one \"X IS wearing this on this page:\" prefix per garment and six garment names repeated by their own descriptions. The iterate/repair path also built its prompt with its own buildImagePrompt + withBakedTitle call instead of the shared closure.",
+      "impact": "Any full-story front cover (baked title) with a group cast and declared outfits: no front cover at all (it is never retried with a shorter prompt). Same class on text-in-image pages with long worn lists.",
+      "status": "fixed",
+      "fixedAt": "2026-09-28",
+      "fixedIn": "4677059d0",
+      "fix": "Worn rows of one character share one line and a description no longer repeats the item name; the baked-title line, the OPEN AREA, the WORN / EXPRESSIONS / REQUIRED OBJECTS headers and the split-state rule say the same in fewer words. iteratePageCore builds through pageRenderCall.makePageImagePrompt (sibling set page-prompt-one-construction). Dragon front cover floor 8,378 → 7,685 (margin 215). Test: tests/unit/cover-prompt-fixed-blocks-fit.test.ts. NOT covered: the p18 repair of the same run (rewrite brief not stored; estimated still over) — BACKLOG."
+    },
+    {
+      "id": "scene-review-removes-who-column-cast",
+      "title": "The scene review removed a character the page's who column names (as \"context\"), and the page was drawn with that figure from no reference",
+      "reportedAt": "2026-09-28",
+      "source": "Owner decision 6, 2026-09-28: staging dragon run job_1790539784661_6mjcny1c7 — sceneReviewReport.castRemovals \"page 7 = CHR001: plan line names Mama in a clause that places her as context\" and \"page 2 = CHR001: plan line names only Mama but not as a character\"; both who columns name Mama (VB secondary CHR001). briefFindings carried [cast_unlisted] \"The prose names Mama; characters[] lists Julian, Max, Kiaan\" on p2 and p7. Read-only measurement: all 4 cast_unlisted hits over the three Jev stories were this false positive (ar4u7qry3 p3, ruynosw80 p2, 6mjcny1c7 p2, p7); the replay finds a 5th on vnx5l8iy7 p1.",
+      "rootCause": "sceneBriefCheck cast_unlisted (findCastMissingFromMetadata) matched characters[] NAMES only, so a Visual Bible secondary cited by its id (objects[] CHR001) read as unlisted, and the finding told the review \"whoever is only mentioned should not read as present\". PLAN_LINE_CAST_RULE (scene-review 5a) then gave the review a reading under which a who-column name placed by a clause is \"context\". Nothing in code refused a declared removal of a who-column name.",
+      "impact": "Any page whose who column names a Visual Bible secondary cited by id: a false cast_unlisted, and the review may un-name and un-cite the figure; the page then renders a person with no reference image (p7: \"a raised hand\").",
+      "status": "fixed",
+      "fixedAt": "2026-09-28",
+      "fixedIn": "98fcc2ff2",
+      "fix": "cast_unlisted resolves ids cited in objects[] or characters[] to their bible name/label (sceneBriefCheck.vbFigureNamesCited; replay: 5 of 5 stored hits cleared, 0 new). PLAN_LINE_CAST_RULE: every second-field name is in the picture whatever the line says about them, and no rewrite removes one; only a person absent from the second field is context. Code: sceneReviewGuard.whoColumnRemovals refuses a declared removal of a who-column name and the page ships its pre-review brief (gl.error beats_scene_review_who_removal_refused; replay refuses exactly dragon p2 and p7, none of the 3 other stored declarations). Test: tests/unit/scene-review-who-column-cast.test.ts (p7 inputs)."
+    },
+    {
+      "id": "clothing-review-none-body-erases-outfit",
+      "title": "The wardrobe review answered NONE under a character heading and the merge wrote \"NONE\" as that character's outfit",
+      "reportedAt": "2026-09-28",
+      "source": "Stored evidence, staging job_1790529840433_ar4u7qry3: clothingReviewReport.rawResponse ends \"## Noah / costumed (costume: pirate)\nNONE\"; clothingReviewReport.changed records Noah costumed:pirate before = a full pirate outfit (blue linen shirt, brown canvas trousers, belt, socks, boots), after = \"NONE\"; stories.data.clothingRequirements.Noah.costumed.description = \"NONE\". The Art Director read \"Noah … Wearing: NONE\" and wrote \"Noah … wearing no clothing\" on three pages; the scene review had to catch it.",
+      "rootCause": "promptBuilders.parseClothingReview treats NONE as \"no rewrites\" only when it is the whole ---CLOTHING--- body; a heading followed by NONE parsed as an entry whose description is the word NONE, and the beats merge wrote it over the outfit.",
+      "impact": "Any story whose wardrobe reviewer writes a heading and then NONE for a character it did not rewrite: that character loses their outfit in the contract, the avatar costume, the Art Director cast block and every page.",
+      "status": "fixed",
+      "fixedAt": "2026-09-28",
+      "fixedIn": "d1ed5efca",
+      "fix": "parseClothingReview skips a heading whose body is only the no-change marker (CLOTHING_NO_CHANGE_RE); beatsPipeline logs beats_outfit_absent (error) when a commissioned character leaves the wardrobe with no outfit (clothingCheck.outfitAbsent). Replay over the 7 stored staging replies: only this story carries a heading+NONE body. Test: tests/unit/clothing-review-none-body.test.ts (the stored reply)."
     },
     {
       "id": "prompt-shrink-cuts-size-first",

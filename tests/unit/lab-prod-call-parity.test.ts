@@ -27,6 +27,7 @@ import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
 import { createRequire } from 'node:module';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { makeJevStub } from '../helpers/jev-stub';
 
 const req = createRequire(import.meta.url);
 const ROOT = path.join(__dirname, '..', '..');
@@ -711,17 +712,29 @@ describe('beats_replan: no params = the run\'s plan check and re-plan rounds', (
     'ROSTER 4: people=Mira, Tobias',
   ].join('\n');
   let modelCalls: any[] = [];
+  let jevCalls: any[] = [];
   let savedStream: any;
+  let savedJev: any;
+  const jevAuditMod = req('../../server/lib/jevAudit');
   beforeEach(() => {
     modelCalls = [];
+    jevCalls = [];
     savedStream = textModelsMod.callTextModelStreaming;
     textModelsMod.callTextModelStreaming = async (prompt: string, _s: any, _c: any, model: string, opts: any) => {
       modelCalls.push({ prompt, model, label: opts?.usageLabel });
       const text = /replan/.test(opts?.usageLabel || '') && !/recheck/.test(opts?.usageLabel || '') ? REPLY : CHECK_REPLY;
       return { text, modelId: model, usage: { input_tokens: 1, output_tokens: 1 } };
     };
+    // The Jev decision layer (Step 2b, the shots): stubbed at the one client.
+    savedJev = jevAuditMod.callJev;
+    jevAuditMod.callJev = async ({ state, questions }: any) => {
+      jevCalls.push({ state, questions });
+      const answers: any = {};
+      Object.keys(questions).forEach((id, k) => { answers[id] = { noul: ((k * 37) % 10) / 10 }; });
+      return { answers, cost: 0, model: 'stub', usage: {} };
+    };
   });
-  afterEach(() => { textModelsMod.callTextModelStreaming = savedStream; });
+  afterEach(() => { textModelsMod.callTextModelStreaming = savedStream; jevAuditMod.callJev = savedJev; });
 
   it('sends the calls generateStoryViaBeats sends, with the CAST table and the arc\'s figures', async () => {
     STORY = STORED();
@@ -741,17 +754,23 @@ describe('beats_replan: no params = the run\'s plan check and re-plan rounds', (
     const check1 = await runCheck('plan_check', plan.pages, plan.pagePlan);
     expect(check1.lines.length).toBeGreaterThan(0);
     const rounds: any[] = [];
-    await BP.runReplanRounds({
+    const shipped = await BP.runReplanRounds({
       inputData: STORY, pageCount: 4, plan, check1, replanRounds: rounds, approvedArc: ARC, arcHints: '', arcStoryLogic: LOGIC,
       arcCentralFigure: ['Mira'], castTable, commission: inputs.commission, commissionedNames: inputs.commissionedNames, maxCast: inputs.maxCast,
       planModel: MODEL_DEFAULTS.outline, readPlan, runCheck, onChunk: null, gl, stage: async () => {}, checkCancellation: async () => {},
-      beats: plan.pages, pagePlan: plan.pagePlan,
+      beats: plan.pages, pagePlan: plan.pagePlan, jevReport: { castCuts: [] },
     });
+    const prodShots = await BP.finalizePlanShots({ approvedArc: ARC, beats: shipped.beats, check: shipped.check, gl });
     const prodCalls = modelCalls.splice(0);
+    const prodJev = jevCalls.splice(0);
+    expect(prodJev.length).toBe(4);                                            // one A1 call per page
     expect(prodCalls.length).toBeGreaterThanOrEqual(3);                        // check, re-plan, recheck
     // THE LAB, no params.
     const r = await testlab.runBeatsReplanStage({ storyId: 'job_parity' }, { params: {} });
     expect(modelCalls.map(c => [c.label, c.model, c.prompt])).toEqual(prodCalls.map(c => [c.label, c.model, c.prompt]));
+    // …and the same Jev questions over the same states, and the same shots written.
+    expect(jevCalls).toEqual(prodJev);
+    expect(r.appliedPlan.map((p: any) => p.planLine)).toEqual(prodShots.beats.map((p: any) => p.planLine));
     expect(r.report.castTable).toEqual(castTable);                             // pre-fix: dropped
     expect(r.report.rounds.length).toBe(rounds.length);
     expect(modelCalls[0].prompt).toContain('lifts the lantern out of the net'); // the table reaches the check
@@ -762,58 +781,16 @@ describe('beats_replan: no params = the run\'s plan check and re-plan rounds', (
     expect(src).toContain('const readPlan = makePlanReader(expected, approvedArc);');
     expect(src).toMatch(/planCheckInputs\(inputData, \{ arcPremiseNames, modelOverrides \}\)/);
     expect(src).toMatch(/const runCheck = createPlanCheckRunner\(\{/);
-    expect(src).toMatch(/\(\{ beats, pagePlan \} = await runReplanRounds\(\{/);
+    expect(src).toMatch(/\(\{ beats, pagePlan, check: shippedCheck \} = await runReplanRounds\(\{/);
+    expect(src).toMatch(/await finalizePlanShots\(\{ approvedArc, beats, check: shippedCheck, gl, jevReport \}\)/);
   });
 });
 
-// ── scene_review_replay: the run's scene review on the briefs as sent ────────
-describe('scene_review_replay: no params = the run\'s review of the briefs it was sent', () => {
-  const COVER_BRIEF = 'Mira and Tobias stand on the quay holding the lantern between them, facing the viewer.';
-  const SENT = [{ pageNumber: 1, brief: BRIEF }, { pageNumber: -1, brief: COVER_BRIEF }];
-  const STORED_REVIEW = () => ({
-    ...storyFor(storedScene({ pageNumber: 1, sceneDescription: `${BRIEF}\n(the brief as it shipped, after the review)` }), { textInImage: false }),
-    pages: 1,
-    arcReviewReport: { centralFigure: ['Mira'] },
-    beatsReviewReport: { pagePlan: 'Page 1: medium — Mira, Tobias — Mira holds the lantern up — the way is lit' },
-    sceneReviewReport: { briefsIn: SENT },
-  });
-  let modelCalls: any[] = [];
-  let savedStream: any;
-  beforeEach(() => {
-    modelCalls = [];
-    savedStream = textModelsMod.callTextModelStreaming;
-    textModelsMod.callTextModelStreaming = async (prompt: string, _s: any, _c: any, model: string, opts: any) => {
-      modelCalls.push({ prompt, model, label: opts?.usageLabel });
-      return { text: 'ANALYSIS:\nFAULTED PAGES: none\n', modelId: model, usage: { input_tokens: 1, output_tokens: 1 } };
-    };
-  });
-  afterEach(() => { textModelsMod.callTextModelStreaming = savedStream; });
-
-  it('reviews briefsIn (covers included) with the beats and cover beats the run held', async () => {
-    STORY = STORED_REVIEW();
-    const { buildCoverBeats } = req('../../server/lib/coverBeats');
-    const { coverTypesFor } = req('../../server/lib/coverKeys');
-    const beats = BP.makePlanReader([1], '')(STORY.beatsReviewReport.pagePlan).parsed.pages;
-    const briefBeats = [...beats, ...buildCoverBeats(STORY, { coverTypes: coverTypesFor(STORY), clothingRequirements: STORY.clothingRequirements, centralFigure: ['Mira'] })];
-    const gl = { info() {}, warn() {}, error() {}, debug() {} };
-    await BP.runSceneReview({
-      inputData: STORY, expansions: SENT.map(x => ({ ...x })), clothingRequirements: STORY.clothingRequirements,
-      visualBible: JSON.parse(JSON.stringify(VISUAL_BIBLE)), briefBeats, beats, bibleSections: '', meta: { timings: {}, labelRound: null },
-      sceneReviewModel: MODEL_DEFAULTS.sceneReviewModel || MODEL_DEFAULTS.outlineReviewModel, stage: async () => {}, onChunk: null, gl,
-    });
-    const prodCalls = modelCalls.splice(0);
-    expect(prodCalls).toHaveLength(1);
-    const r = await testlab.runSceneReviewReplayStage({ storyId: 'job_parity' }, { params: {} });
-    expect(modelCalls.map(c => [c.label, c.model, c.prompt])).toEqual(prodCalls.map(c => [c.label, c.model, c.prompt]));
-    expect(modelCalls[0].model).toBe(MODEL_DEFAULTS.sceneReviewModel || MODEL_DEFAULTS.outlineReviewModel);
-    // The briefs as SENT, the cover among them — never the shipped ones.
-    expect(modelCalls[0].prompt).toContain(COVER_BRIEF);
-    expect(modelCalls[0].prompt).not.toContain('(the brief as it shipped, after the review)');
-    expect(r.briefsIn.map((b: any) => b.pageNumber)).toEqual([1, -1]);
-  });
-
-  it('the run reviews through runSceneReview (source scan)', () => {
-    expect(read('server/lib/beatsPipeline.js')).toMatch(/const reviewOut = await runSceneReview\(\{/);
+// ── the scene review: deleted, with its Lab replay stage ─────────────────────
+describe('the scene review is gone from both paths (2026-09-28)', () => {
+  it('neither the run nor the Lab calls it, and the Lab has no replay stage for it', () => {
+    expect(read('server/lib/beatsPipeline.js')).not.toMatch(/runSceneReview/);
+    expect(read('server/lib/testlab.js')).not.toMatch(/runSceneReview|scene_review_replay/);
   });
 });
 
@@ -887,37 +864,50 @@ describe('arc_panel_replay: no params = the run\'s panel and re-telling calls', 
   });
 });
 
-// ── beats_scenes: the run's Art Director and scene review ────────────────────
-describe('beats_scenes (stored plan lines): the run\'s Art Director and review calls', () => {
+// ── beats_scenes: the run's Art Director and brief checks ────────────────────
+describe('beats_scenes (stored plan lines): the run\'s Art Director and brief-check calls', () => {
   const PLAN_1 = 'medium — Mira, Tobias — Mira holds the lantern up — the way is lit';
-  const AD_REPLY = [
+  const VB_REPLY = [
     '---VISUAL BIBLE---', '```json',
     JSON.stringify({ locations: [{ id: 'LOC001', name: 'the harbour wall', label: 'harbour wall', description: 'a low granite sea wall', appearsInPages: [1] }] }, null, 2),
     '```', '',
+  ].join('\n');
+  const AD_REPLY = [
     '## Page 1', 'Mira stands on the harbour wall holding the lantern while Tobias crouches beside her.', '', '---METADATA---',
     JSON.stringify({ sceneIntent: 'Mira lights the way', characters: [{ name: 'Mira' }, { name: 'Tobias' }], objects: ['LOC001'], shot: 'medium' }), '',
     '## Page -1', 'Mira and Tobias stand on the quay facing the viewer.', '', '---METADATA---',
     JSON.stringify({ sceneIntent: 'the cover', characters: [{ name: 'Mira' }, { name: 'Tobias' }], objects: ['LOC001'], shot: 'medium' }), '',
   ].join('\n');
   let modelCalls: any[] = []; let savedStream: any;
+  const jevAuditMod2 = req('../../server/lib/jevAudit');
+  let jevStub: any; let savedJev2: any;
   beforeEach(() => {
     modelCalls = [];
     savedStream = textModelsMod.callTextModelStreaming;
     textModelsMod.callTextModelStreaming = async (prompt: string, _s: any, _c: any, model: string, opts: any) => {
       modelCalls.push({ prompt, model, label: opts?.usageLabel });
-      const text = /scene_expansion/.test(opts?.usageLabel || '') ? AD_REPLY : 'ANALYSIS:\nFAULTED PAGES: none\n';
+      const label = opts?.usageLabel || '';
+      const text = label === 'beats_visual_bible' ? VB_REPLY : /scene_expansion|brief_reask/.test(label) ? AD_REPLY : 'ANALYSIS:\nFAULTED PAGES: none\n';
       return { text, modelId: model, usage: { input_tokens: 1, output_tokens: 5 } };
     };
+    // The Jev decision layer runs inside runArtDirector (light before the AD,
+    // elements / aboard / population / gaze after it): stubbed at the one client.
+    savedJev2 = jevAuditMod2.callJev;
+    jevStub = makeJevStub();
+    jevAuditMod2.callJev = jevStub.impl;
   });
-  afterEach(() => { textModelsMod.callTextModelStreaming = savedStream; });
+  afterEach(() => { textModelsMod.callTextModelStreaming = savedStream; jevAuditMod2.callJev = savedJev2; });
 
-  it('briefs and reviews as the run does: the run\'s Art Director call, then the SCENE reviewer', async () => {
+  it('briefs and checks as the run does: the Visual Bible call, the page-brief call, then the one re-ask on the AD model', async () => {
     STORY = {
       ...storyFor(storedScene({ pageNumber: 1, outlineExtract: `PLAN: ${PLAN_1}` }), { textInImage: false }), pages: 1,
       coverTypes: ['frontCover'], arcReviewReport: { finalArc: 'Mira lights the way home.', centralFigure: ['Mira'] },
+      // The shipped division's head count — the gaze roster the run hands the decision step.
+      beatsReviewReport: { counterStats: { castPerPage: [{ pageNumber: 1, names: ['Mira', 'Tobias'] }] } },
     };
     const r = await testlab.runBeatsScenesStage({ storyId: 'job_parity' }, { params: { plainStoredBeats: true } });
     const labCalls = modelCalls.splice(0);
+    const labJev = jevStub.calls.splice(0);
     // PRODUCTION, on the inputs generateStoryViaBeats holds at that point.
     const gl = { info() {}, warn() {}, error() {}, debug() {} };
     const inputData = { ...STORY, availableLandmarks: undefined, modelOverrides: {}, replayInputsStored: false, pageClothing: null };
@@ -925,16 +915,25 @@ describe('beats_scenes (stored plan lines): the run\'s Art Director and review c
       inputData, modelOverrides: {}, clothingRequirements: STORY.clothingRequirements, visualBible: null, bibleSections: null,
       sceneModel: MODEL_DEFAULTS.sceneDescription, onChunk: null, gl, meta: { timings: {} }, stage: async () => {},
       beats: [{ pageNumber: 1, planLine: PLAN_1 }], arcCentralFigure: ['Mira'], approvedArc: 'Mira lights the way home.',
+      present: new Map([[1, ['Mira', 'Tobias']]]),
     });
-    await BP.runSceneReview({
-      inputData, expansions: ad.expansions.map((x: any) => ({ pageNumber: x.pageNumber, brief: x.brief })), clothingRequirements: STORY.clothingRequirements,
-      visualBible: ad.visualBible, briefBeats: ad.briefBeats, beats: [{ pageNumber: 1, planLine: PLAN_1 }], bibleSections: ad.bibleSections,
-      meta: { timings: {} }, sceneReviewModel: MODEL_DEFAULTS.sceneReviewModel, stage: async () => {}, onChunk: null, gl,
+    const { runBriefChecks } = req('../../server/lib/briefChecks');
+    await runBriefChecks({
+      inputData, expansions: ad.expansions.map((x: any) => ({ pageNumber: x.pageNumber, brief: x.brief })), briefBeats: ad.briefBeats,
+      visualBible: ad.visualBible, clothingRequirements: STORY.clothingRequirements,
+      visualBibleJson: ad.visualBibleJson, availableAvatars: ad.availableAvatars, maxCharactersPerScene: ad.maxCharactersPerScene,
+      model: MODEL_DEFAULTS.sceneDescription, gl,
     });
     const prodCalls = modelCalls.splice(0);
     expect(labCalls.map(c => [c.label, c.model, c.prompt])).toEqual(prodCalls.map(c => [c.label, c.model, c.prompt]));
-    const review = labCalls.find(c => c.label === 'beats_scene_review');
-    expect(review.model).toBe(MODEL_DEFAULTS.sceneReviewModel);                 // pre-fix: the beats reviewer's model
+    // The same Jev questions over the same states, and the Lab reports them.
+    expect(labJev.length).toBeGreaterThan(0);
+    expect(labJev).toEqual(jevStub.calls);
+    expect(r.jevDecisions && r.jevDecisions.light).toBeTruthy();
+    expect(labCalls.map(c => c.label).slice(0, 2)).toEqual(['beats_visual_bible', 'beats_scene_expansion']);
+    expect(labCalls.some(c => c.label === 'beats_scene_review'), 'the scene review no longer runs').toBe(false);
+    const reask = labCalls.find(c => c.label === 'beats_brief_reask');
+    if (reask) expect(reask.model).toBe(MODEL_DEFAULTS.sceneDescription);        // the Art Director's model (owner, Q2)
     expect(r.sceneExpansions.map((x: any) => x.pageNumber)).toEqual([1, -1]);
   });
 

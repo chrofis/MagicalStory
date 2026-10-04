@@ -97,7 +97,7 @@ describe('auditVisualBibleContract — character sex and apparent age', () => {
     expect(found).toHaveLength(0);
   });
 
-  // The authoring prompt (prompts/scene-expansion-all.txt) mandates `age` as a
+  // The authoring prompt (prompts/visual-bible.txt) mandates `age` as a
   // NUMBER of years and a `build` opening with the sex. Before 2026-09-14 the
   // check dropped every non-string field before matching AND its age regex
   // needed a "years"/"aged" token, so an entry obeying the prompt EXACTLY was
@@ -281,7 +281,7 @@ describe('story-bible-from-beats.txt — authoring rules the audit backs', () =>
     // the commissioned children is comparable (I11, 2026-09-06 — the other
     // three emitters keep the prose form, asserted below). The sex requirement
     // is unchanged; it moved from `age` to the opening of `build`.
-    const t = templates['sceneExpansionAll'];
+    const t = templates['visualBible'];
     expect(t).toBeTruthy();
     expect(t).toMatch(/`age` as a NUMBER of years/);
     expect(t).toMatch(/opens `build` with the character's sex/);
@@ -289,13 +289,13 @@ describe('story-bible-from-beats.txt — authoring rules the audit backs', () =>
   });
 
   it('requires an earned appearsInPages range', () => {
-    expect(templates['sceneExpansionAll']).toMatch(/`pages` is earned/);
-    expect(templates['sceneExpansionAll']).toMatch(/never a blanket 1-\{PAGE_COUNT\} range/i);
+    expect(templates['visualBible']).toMatch(/`pages` is earned/);
+    expect(templates['visualBible']).toMatch(/never a blanket 1-\{PAGE_COUNT\} range/i);
   });
 
   it('requires an entry for every named vehicle or vessel', () => {
-    expect(templates['sceneExpansionAll']).toMatch(/vehicles\b/i);
-    expect(templates['sceneExpansionAll']).toMatch(/its own `?vehicles`? entry/i);
+    expect(templates['visualBible']).toMatch(/vehicles\b/i);
+    expect(templates['visualBible']).toMatch(/its own `?vehicles`? entry/i);
   });
 
   // Regression: staging job_1789147573901_m3uam0nxi, Lab experiments 1189/1190.
@@ -304,7 +304,7 @@ describe('story-bible-from-beats.txt — authoring rules the audit backs', () =>
   // The schema asked for exactly that ("described by shape and parts"), with no
   // recognisability requirement to hold it in place.
   it('requires the description to read as the named thing, not as its geometry', () => {
-    const t = templates['sceneExpansionAll'];
+    const t = templates['visualBible'];
     expect(t).toMatch(/It must read as that thing at a glance/);
     // 2026-09-24: the naming noun is the label's, never the `type` family —
     // prod ART002 "brass nutcracker" was described as "a heavy hand tool…"
@@ -319,7 +319,7 @@ describe('story-bible-from-beats.txt — authoring rules the audit backs', () =>
   // 1191/1192 (staging job_1789147573901_m3uam0nxi): naming what the object
   // attaches to is what makes it recognisable, and drew the mounting as well.
   it('says the attachment named for recognition is never drawn', () => {
-    expect(templates['sceneExpansionAll'])
+    expect(templates['visualBible'])
       .toMatch(/Naming that thing identifies the object and never puts it in the picture/);
   });
 
@@ -330,7 +330,7 @@ describe('story-bible-from-beats.txt — authoring rules the audit backs', () =>
   // its own reference cell and that cell is the only way a glowing look
   // reaches the page. All three templates now carry the same split.
   it.each([
-    ['sceneExpansionAll'],
+    ['visualBible'],
     ['storyTrial'],
   ])("%s excludes the WORLD light from the state test, keeps the object own light in", (key) => {
     expect(templates[key]).toBeTruthy();
@@ -342,7 +342,7 @@ describe('story-bible-from-beats.txt — authoring rules the audit backs', () =>
   });
 
   it('keeps the rest of the state test intact', () => {
-    const t = templates['sceneExpansionAll'];
+    const t = templates['visualBible'];
     expect(t).toMatch(/Held, set down, carried, pressed against something/);
     expect(t).toMatch(/when a face prop turns its other side to us/);
     expect(t).toMatch(/cannot be drawn without that element and drags it into the cell/);
@@ -350,11 +350,11 @@ describe('story-bible-from-beats.txt — authoring rules the audit backs', () =>
   });
 
   it("sceneExpansionAll states schema: the object's own light may be a delta, the scene's light never", () => {
-    expect(templates['sceneExpansionAll']).toMatch(/the object's own light belongs here when the story turns it on or off, how the scene lights it never does/);
+    expect(templates['visualBible']).toMatch(/the object's own light belongs here when the story turns it on or off, how the scene lights it never does/);
   });
 
   it('carries the recognisability requirement into the artifact schema field', () => {
-    const t = templates['sceneExpansionAll'];
+    const t = templates['visualBible'];
     expect(t).toMatch(/"description": "\[what it is, named with the word that names it/);
     // The style-name ban predates this and stays (a prop once described as
     // "<style>-style" instead of described at all).
@@ -363,7 +363,7 @@ describe('story-bible-from-beats.txt — authoring rules the audit backs', () =>
 
   it('keeps the settled lettering gate intact', () => {
     // docs/SETTLED.md: no lettering unless the entry names the exact words.
-    expect(templates['sceneExpansionAll']).toMatch(/No lettering unless this entry names the exact words/);
+    expect(templates['visualBible']).toMatch(/No lettering unless this entry names the exact words/);
   });
 
   it('the wardrobe stage no longer authors the bible or the covers', () => {
@@ -431,7 +431,7 @@ describe('the authored `label` — one English name per element', () => {
   it('is authored by both bible-emitting templates', async () => {
     await cjs('../../server/services/prompts.js').loadPromptTemplates();
     const templates = cjs('../../server/services/prompts.js').PROMPT_TEMPLATES;
-    for (const key of ['storyTrial', 'sceneExpansionAll']) {
+    for (const key of ['storyTrial', 'visualBible']) {
       expect(templates[key], key).toBeTruthy();
       // The schema slot, or (all-pages Art Director, 2026-09-23) one rule its
       // four schema slots point at.

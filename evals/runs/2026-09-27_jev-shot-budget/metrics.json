@@ -1,0 +1,976 @@
+{
+  "run": "2026-09-27_jev-shot-budget",
+  "calls": 3273,
+  "costUsd": 0.37537,
+  "methods": {
+    "planner": {
+      "pages": 291,
+      "acceptable": 0.856,
+      "best": 0.55,
+      "readingGroupPagesNotWider": "14/53",
+      "ruleViolations": 72,
+      "ruleViolationKinds": {
+        "floor:over-the-shoulder": 11,
+        "floor:positions": 11,
+        "cap:medium+wide": 12,
+        "consecutive": 25,
+        "group": 10,
+        "floor:ultra-wide": 3
+      },
+      "booksMeetingAllRules": "0/17",
+      "distinctShotsPerBook": 4.8,
+      "shotMix": {
+        "medium": 117,
+        "wide": 65,
+        "ultra-wide": 21,
+        "close-up": 62,
+        "high-angle": 6,
+        "low-angle": 5,
+        "over-the-shoulder": 12,
+        "aerial": 3
+      }
+    },
+    "artDirector": {
+      "pages": 152,
+      "note": "pages whose final plan line equals the first only",
+      "acceptable": 0.842,
+      "best": 0.507
+    },
+    "A1": {
+      "mean3": {
+        "assigned": {
+          "pages": 291,
+          "acceptable": 0.918,
+          "best": 0.615,
+          "readingGroupPagesNotWider": "8/53",
+          "ruleViolations": 0,
+          "ruleViolationKinds": {},
+          "booksMeetingAllRules": "17/17",
+          "distinctShotsPerBook": 5.9,
+          "shotMix": {
+            "medium": 81,
+            "over-the-shoulder": 35,
+            "close-up": 83,
+            "wide": 57,
+            "ultra-wide": 17,
+            "high-angle": 15,
+            "low-angle": 3
+          },
+          "booksWithUnmetHardRule": 0
+        },
+        "rawArgmax": {
+          "acceptable": 0.911,
+          "best": 0.601,
+          "readingGroupPagesNotWider": 15
+        }
+      },
+      "oneCall": {
+        "assigned": {
+          "pages": 291,
+          "acceptable": 0.921,
+          "best": 0.605,
+          "readingGroupPagesNotWider": "8/53",
+          "ruleViolations": 0,
+          "ruleViolationKinds": {},
+          "booksMeetingAllRules": "17/17",
+          "distinctShotsPerBook": 5.9,
+          "shotMix": {
+            "medium": 80,
+            "over-the-shoulder": 35,
+            "close-up": 81,
+            "wide": 60,
+            "ultra-wide": 17,
+            "high-angle": 15,
+            "low-angle": 3
+          },
+          "booksWithUnmetHardRule": 0
+        },
+        "rawArgmax": {
+          "acceptable": 0.914,
+          "best": 0.605,
+          "readingGroupPagesNotWider": 15
+        }
+      },
+      "aucAcceptable": 0.893,
+      "aucBest": 0.913,
+      "aucPerShot": {
+        "close-up": 0.952,
+        "medium": 0.741,
+        "wide": 0.944,
+        "ultra-wide": 0.945,
+        "over-the-shoulder": 0.814,
+        "high-angle": 0.74,
+        "low-angle": 0.858,
+        "aerial": 0.875
+      },
+      "flipRate": {
+        "assigned": 0.12,
+        "rawArgmax": 0.082,
+        "pages": 291
+      },
+      "vsPlanner": {
+        "disagreements": 146,
+        "onlyJevAcceptable": 33,
+        "onlyPlannerAcceptable": 15,
+        "bothAcceptable": 92,
+        "neither": 6
+      },
+      "currentVocabularyBooks": {
+        "books": "zly5rcdej,1nitlympp,fcmlfa8kn,5herh01j7,vnx5l8iy7,z3fw660ie,dka3jpog9",
+        "jev": {
+          "acceptable": 0.904,
+          "ruleViolations": 0
+        },
+        "planner": {
+          "acceptable": 0.798,
+          "ruleViolations": 24,
+          "kinds": {
+            "floor:over-the-shoulder": 1,
+            "floor:positions": 1,
+            "cap:medium+wide": 2,
+            "consecutive": 12,
+            "group": 8
+          }
+        }
+      },
+      "perStoryOneRep": {
+        "calls": 17.1,
+        "usd": 0.00206,
+        "p50ms": 276,
+        "p90ms": 324
+      }
+    },
+    "A2": {
+      "mean3": {
+        "assigned": {
+          "pages": 291,
+          "acceptable": 0.849,
+          "best": 0.56,
+          "readingGroupPagesNotWider": "9/53",
+          "ruleViolations": 0,
+          "ruleViolationKinds": {},
+          "booksMeetingAllRules": "17/17",
+          "distinctShotsPerBook": 6,
+          "shotMix": {
+            "close-up": 70,
+            "medium": 102,
+            "high-angle": 27,
+            "wide": 24,
+            "over-the-shoulder": 39,
+            "ultra-wide": 25,
+            "low-angle": 3,
+            "aerial": 1
+          },
+          "booksWithUnmetHardRule": 1
+        },
+        "rawArgmax": {
+          "acceptable": 0.759,
+          "best": 0.471,
+          "readingGroupPagesNotWider": 25
+        }
+      },
+      "oneCall": {
+        "assigned": {
+          "pages": 291,
+          "acceptable": 0.856,
+          "best": 0.557,
+          "readingGroupPagesNotWider": "9/53",
+          "ruleViolations": 0,
+          "ruleViolationKinds": {},
+          "booksMeetingAllRules": "17/17",
+          "distinctShotsPerBook": 6,
+          "shotMix": {
+            "close-up": 68,
+            "medium": 102,
+            "high-angle": 27,
+            "over-the-shoulder": 39,
+            "wide": 26,
+            "ultra-wide": 25,
+            "low-angle": 3,
+            "aerial": 1
+          },
+          "booksWithUnmetHardRule": 1
+        },
+        "rawArgmax": {
+          "acceptable": 0.749,
+          "best": 0.45,
+          "readingGroupPagesNotWider": 25
+        }
+      },
+      "aucAcceptable": 0.739,
+      "aucBest": 0.758,
+      "aucPerShot": {
+        "close-up": 0.792,
+        "medium": 0.598,
+        "wide": 0.721,
+        "ultra-wide": 0.832,
+        "over-the-shoulder": 0.764,
+        "high-angle": 0.751,
+        "low-angle": 0.825,
+        "aerial": 0.868
+      },
+      "flipRate": {
+        "assigned": 0.148,
+        "rawArgmax": 0.131,
+        "pages": 291
+      },
+      "vsPlanner": {
+        "disagreements": 168,
+        "onlyJevAcceptable": 30,
+        "onlyPlannerAcceptable": 32,
+        "bothAcceptable": 95,
+        "neither": 11
+      },
+      "currentVocabularyBooks": {
+        "books": "zly5rcdej,1nitlympp,fcmlfa8kn,5herh01j7,vnx5l8iy7,z3fw660ie,dka3jpog9",
+        "jev": {
+          "acceptable": 0.842,
+          "ruleViolations": 0
+        },
+        "planner": {
+          "acceptable": 0.798,
+          "ruleViolations": 24,
+          "kinds": {
+            "floor:over-the-shoulder": 1,
+            "floor:positions": 1,
+            "cap:medium+wide": 2,
+            "consecutive": 12,
+            "group": 8
+          }
+        }
+      },
+      "perStoryOneRep": {
+        "calls": 8,
+        "usd": 0.00106,
+        "p50ms": 275,
+        "p90ms": 326
+      }
+    },
+    "A3": {
+      "mean3": {
+        "assigned": {
+          "pages": 291,
+          "acceptable": 0.849,
+          "best": 0.553,
+          "readingGroupPagesNotWider": "6/53",
+          "ruleViolations": 0,
+          "ruleViolationKinds": {},
+          "booksMeetingAllRules": "17/17",
+          "distinctShotsPerBook": 5.9,
+          "shotMix": {
+            "close-up": 84,
+            "medium": 94,
+            "over-the-shoulder": 34,
+            "wide": 45,
+            "low-angle": 3,
+            "ultra-wide": 17,
+            "aerial": 1,
+            "high-angle": 13
+          },
+          "booksWithUnmetHardRule": 0
+        },
+        "rawArgmax": {
+          "acceptable": 0.907,
+          "best": 0.615,
+          "readingGroupPagesNotWider": 15
+        }
+      },
+      "oneCall": {
+        "assigned": {
+          "pages": 291,
+          "acceptable": 0.863,
+          "best": 0.56,
+          "readingGroupPagesNotWider": "5/53",
+          "ruleViolations": 0,
+          "ruleViolationKinds": {},
+          "booksMeetingAllRules": "17/17",
+          "distinctShotsPerBook": 5.9,
+          "shotMix": {
+            "close-up": 84,
+            "medium": 94,
+            "wide": 45,
+            "over-the-shoulder": 34,
+            "low-angle": 3,
+            "ultra-wide": 17,
+            "aerial": 1,
+            "high-angle": 13
+          },
+          "booksWithUnmetHardRule": 0
+        },
+        "rawArgmax": {
+          "acceptable": 0.907,
+          "best": 0.598,
+          "readingGroupPagesNotWider": 15
+        }
+      },
+      "aucAcceptable": 0.86,
+      "aucBest": 0.926,
+      "aucPerShot": {
+        "close-up": 0.956,
+        "medium": 0.776,
+        "wide": 0.941,
+        "ultra-wide": 0.789,
+        "over-the-shoulder": 0.852,
+        "high-angle": 0.747,
+        "low-angle": 0.881,
+        "aerial": 0.602
+      },
+      "flipRate": {
+        "assigned": 0.062,
+        "rawArgmax": 0.045,
+        "pages": 291
+      },
+      "vsPlanner": {
+        "disagreements": 154,
+        "onlyJevAcceptable": 30,
+        "onlyPlannerAcceptable": 32,
+        "bothAcceptable": 87,
+        "neither": 5
+      },
+      "currentVocabularyBooks": {
+        "books": "zly5rcdej,1nitlympp,fcmlfa8kn,5herh01j7,vnx5l8iy7,z3fw660ie,dka3jpog9",
+        "jev": {
+          "acceptable": 0.842,
+          "ruleViolations": 0
+        },
+        "planner": {
+          "acceptable": 0.798,
+          "ruleViolations": 24,
+          "kinds": {
+            "floor:over-the-shoulder": 1,
+            "floor:positions": 1,
+            "cap:medium+wide": 2,
+            "consecutive": 12,
+            "group": 8
+          }
+        }
+      },
+      "perStoryOneRep": {
+        "calls": 17.1,
+        "usd": 0.00183,
+        "p50ms": 275,
+        "p90ms": 326
+      }
+    },
+    "A4": {
+      "mean3": {
+        "assigned": {
+          "pages": 291,
+          "acceptable": 0.78,
+          "best": 0.478,
+          "readingGroupPagesNotWider": "12/53",
+          "ruleViolations": 0,
+          "ruleViolationKinds": {},
+          "booksMeetingAllRules": "17/17",
+          "distinctShotsPerBook": 6,
+          "shotMix": {
+            "close-up": 86,
+            "ultra-wide": 31,
+            "high-angle": 28,
+            "over-the-shoulder": 36,
+            "medium": 63,
+            "wide": 44,
+            "low-angle": 3
+          },
+          "booksWithUnmetHardRule": 0
+        },
+        "rawArgmax": {
+          "acceptable": 0.677,
+          "best": 0.361,
+          "readingGroupPagesNotWider": 36
+        }
+      },
+      "oneCall": {
+        "assigned": {
+          "pages": 291,
+          "acceptable": 0.784,
+          "best": 0.481,
+          "readingGroupPagesNotWider": "12/53",
+          "ruleViolations": 0,
+          "ruleViolationKinds": {},
+          "booksMeetingAllRules": "17/17",
+          "distinctShotsPerBook": 6,
+          "shotMix": {
+            "close-up": 86,
+            "ultra-wide": 32,
+            "high-angle": 28,
+            "over-the-shoulder": 36,
+            "medium": 62,
+            "wide": 44,
+            "low-angle": 3
+          },
+          "booksWithUnmetHardRule": 0
+        },
+        "rawArgmax": {
+          "acceptable": 0.68,
+          "best": 0.361,
+          "readingGroupPagesNotWider": 36
+        }
+      },
+      "aucAcceptable": 0.774,
+      "aucBest": 0.784,
+      "aucPerShot": {
+        "close-up": 0.896,
+        "medium": 0.421,
+        "wide": 0.804,
+        "ultra-wide": 0.779,
+        "over-the-shoulder": 0.879,
+        "high-angle": 0.657,
+        "low-angle": 0.799,
+        "aerial": 0.813
+      },
+      "flipRate": {
+        "assigned": 0.062,
+        "rawArgmax": 0.055,
+        "pages": 291
+      },
+      "vsPlanner": {
+        "disagreements": 195,
+        "onlyJevAcceptable": 30,
+        "onlyPlannerAcceptable": 52,
+        "bothAcceptable": 102,
+        "neither": 11
+      },
+      "currentVocabularyBooks": {
+        "books": "zly5rcdej,1nitlympp,fcmlfa8kn,5herh01j7,vnx5l8iy7,z3fw660ie,dka3jpog9",
+        "jev": {
+          "acceptable": 0.781,
+          "ruleViolations": 0
+        },
+        "planner": {
+          "acceptable": 0.798,
+          "ruleViolations": 24,
+          "kinds": {
+            "floor:over-the-shoulder": 1,
+            "floor:positions": 1,
+            "cap:medium+wide": 2,
+            "consecutive": 12,
+            "group": 8
+          }
+        }
+      },
+      "perStoryOneRep": {
+        "calls": 17.1,
+        "usd": 0.00182,
+        "p50ms": 272,
+        "p90ms": 319
+      }
+    },
+    "A1+A3": {
+      "mean3": {
+        "assigned": {
+          "pages": 291,
+          "acceptable": 0.89,
+          "best": 0.564,
+          "readingGroupPagesNotWider": "6/53",
+          "ruleViolations": 0,
+          "ruleViolationKinds": {},
+          "booksMeetingAllRules": "17/17",
+          "distinctShotsPerBook": 5.9,
+          "shotMix": {
+            "close-up": 84,
+            "medium": 94,
+            "wide": 44,
+            "low-angle": 4,
+            "over-the-shoulder": 35,
+            "ultra-wide": 18,
+            "high-angle": 12
+          },
+          "booksWithUnmetHardRule": 0
+        },
+        "rawArgmax": {
+          "acceptable": 0.911,
+          "best": 0.629,
+          "readingGroupPagesNotWider": 15
+        }
+      },
+      "oneCall": {
+        "assigned": {
+          "pages": 291,
+          "acceptable": 0.88,
+          "best": 0.564,
+          "readingGroupPagesNotWider": "6/53",
+          "ruleViolations": 0,
+          "ruleViolationKinds": {},
+          "booksMeetingAllRules": "17/17",
+          "distinctShotsPerBook": 5.9,
+          "shotMix": {
+            "close-up": 84,
+            "medium": 95,
+            "wide": 43,
+            "low-angle": 4,
+            "over-the-shoulder": 34,
+            "ultra-wide": 18,
+            "high-angle": 13
+          },
+          "booksWithUnmetHardRule": 0
+        },
+        "rawArgmax": {
+          "acceptable": 0.911,
+          "best": 0.615,
+          "readingGroupPagesNotWider": 15
+        }
+      },
+      "aucAcceptable": 0.896,
+      "aucBest": 0.928,
+      "aucPerShot": {
+        "close-up": 0.961,
+        "medium": 0.793,
+        "wide": 0.95,
+        "ultra-wide": 0.946,
+        "over-the-shoulder": 0.836,
+        "high-angle": 0.746,
+        "low-angle": 0.892,
+        "aerial": 0.874
+      },
+      "flipRate": {
+        "assigned": 0.096,
+        "rawArgmax": 0.031,
+        "pages": 291
+      },
+      "vsPlanner": {
+        "disagreements": 151,
+        "onlyJevAcceptable": 30,
+        "onlyPlannerAcceptable": 20,
+        "bothAcceptable": 94,
+        "neither": 7
+      },
+      "currentVocabularyBooks": {
+        "books": "zly5rcdej,1nitlympp,fcmlfa8kn,5herh01j7,vnx5l8iy7,z3fw660ie,dka3jpog9",
+        "jev": {
+          "acceptable": 0.886,
+          "ruleViolations": 0
+        },
+        "planner": {
+          "acceptable": 0.798,
+          "ruleViolations": 24,
+          "kinds": {
+            "floor:over-the-shoulder": 1,
+            "floor:positions": 1,
+            "cap:medium+wide": 2,
+            "consecutive": 12,
+            "group": 8
+          }
+        }
+      },
+      "perStoryOneRep": {
+        "calls": 34.2,
+        "usd": 0.00388,
+        "p50ms": 275,
+        "p90ms": 325
+      }
+    },
+    "CODE": {
+      "assigned": {
+        "pages": 291,
+        "acceptable": 0.694,
+        "best": 0.426,
+        "readingGroupPagesNotWider": "11/53",
+        "ruleViolations": 0,
+        "ruleViolationKinds": {},
+        "booksMeetingAllRules": "17/17",
+        "distinctShotsPerBook": 5,
+        "shotMix": {
+          "wide": 56,
+          "over-the-shoulder": 50,
+          "medium": 80,
+          "close-up": 82,
+          "ultra-wide": 23
+        },
+        "booksWithUnmetHardRule": 0
+      },
+      "rawArgmax": {
+        "acceptable": 0.79,
+        "best": 0.495,
+        "readingGroupPagesNotWider": 11
+      }
+    }
+  },
+  "labels": {
+    "pages": 291,
+    "meanAcceptable": 2.69,
+    "groupPages": 53,
+    "chanceAcceptable": 0.336,
+    "bestMix": {
+      "wide": 80,
+      "medium": 98,
+      "close-up": 61,
+      "high-angle": 21,
+      "aerial": 1,
+      "over-the-shoulder": 19,
+      "low-angle": 2,
+      "ultra-wide": 9
+    }
+  },
+  "fields": {
+    "looksAt": {
+      "n": 139,
+      "agreeAd": 0.612,
+      "flips": 9,
+      "reading": {
+        "n": 136,
+        "jevRight": 118,
+        "adRight": 126
+      },
+      "disagreements": {
+        "ad:away→jev:Levin": 1,
+        "ad:thing→jev:away": 18,
+        "ad:away→jev:thing": 11,
+        "ad:thing→jev:Julian": 3,
+        "ad:thing→jev:Levin": 3,
+        "ad:Levin→jev:thing": 1,
+        "ad:thing→jev:Max": 2,
+        "ad:thing→jev:Rubina": 1,
+        "ad:thing→jev:Lorena": 1,
+        "ad:thing→jev:Herr Brunner": 2,
+        "ad:Sarah→jev:away": 2,
+        "ad:away→jev:Saira": 1,
+        "ad:Herr Brunner→jev:thing": 1,
+        "ad:Fiona→jev:away": 1,
+        "ad:thing→jev:Fiona": 1,
+        "ad:Max→jev:away": 1,
+        "ad:Levin→jev:away": 2,
+        "ad:Julian→jev:away": 1,
+        "ad:Max→jev:thing": 1
+      }
+    },
+    "depth": {
+      "n": 139,
+      "agreeAd": 0.59,
+      "flips": 11,
+      "reading": {
+        "n": 17,
+        "jevRight": 16,
+        "adRight": 17
+      },
+      "disagreements": {
+        "ad:midground→jev:foreground": 13,
+        "ad:foreground→jev:midground": 31,
+        "ad:midground→jev:background": 3,
+        "ad:background→jev:midground": 7,
+        "ad:foreground→jev:background": 3
+      }
+    },
+    "storyRelevant": {
+      "n": 81,
+      "agreeAd": 0.778,
+      "flips": 4,
+      "reading": {
+        "n": 73,
+        "jevRight": 60,
+        "adRight": 70
+      },
+      "disagreements": {
+        "ad:false→jev:true": 10,
+        "ad:true→jev:false": 8
+      },
+      "aucVsReading": 0.712
+    },
+    "aboard": {
+      "n": 16,
+      "agreeAd": 0.5,
+      "flips": 0,
+      "reading": {
+        "n": 10,
+        "jevRight": 9,
+        "adRight": 4
+      },
+      "disagreements": {
+        "ad:false→jev:true": 8
+      }
+    },
+    "populationPerLocation": {
+      "n": 13,
+      "choiceRight": 5,
+      "mappedRight": 13,
+      "adModalRight": 9,
+      "adPagesRight": "48/72",
+      "choiceFlips": 0,
+      "rows": [
+        {
+          "id": "5herh01j7#LOC001",
+          "read": [
+            "ambient"
+          ],
+          "choice": "cast_only",
+          "choiceFlip": false,
+          "mapped": "ambient",
+          "publicP": 0.96,
+          "crowdP": 0.03,
+          "adModal": "ambient",
+          "adPagesDisagreeing": 0,
+          "adPages": 14,
+          "adValues": [
+            "ambient",
+            "ambient",
+            "ambient",
+            "ambient",
+            "ambient",
+            "ambient",
+            "ambient",
+            "ambient",
+            "ambient",
+            "ambient",
+            "ambient",
+            "ambient",
+            "ambient",
+            "ambient"
+          ]
+        },
+        {
+          "id": "5herh01j7#LOC002",
+          "read": [
+            "ambient"
+          ],
+          "choice": "cast_only",
+          "choiceFlip": false,
+          "mapped": "ambient",
+          "publicP": 0.96,
+          "crowdP": 0.03,
+          "adModal": "ambient",
+          "adPagesDisagreeing": 0,
+          "adPages": 4,
+          "adValues": [
+            "ambient",
+            "ambient",
+            "ambient",
+            "ambient"
+          ]
+        },
+        {
+          "id": "vnx5l8iy7#LOC001",
+          "read": [
+            "ambient"
+          ],
+          "choice": "cast_only",
+          "choiceFlip": false,
+          "mapped": "ambient",
+          "publicP": 0.96,
+          "crowdP": 0.02,
+          "adModal": "cast_only",
+          "adPagesDisagreeing": 1,
+          "adPages": 18,
+          "adValues": [
+            "ambient",
+            "cast_only",
+            "cast_only",
+            "cast_only",
+            "cast_only",
+            "cast_only",
+            "cast_only",
+            "cast_only",
+            "cast_only",
+            "cast_only",
+            "cast_only",
+            "cast_only",
+            "cast_only",
+            "cast_only",
+            "cast_only",
+            "cast_only",
+            "cast_only",
+            "cast_only"
+          ]
+        },
+        {
+          "id": "vnx5l8iy7#LOC002",
+          "read": [
+            "cast_only",
+            "ambient"
+          ],
+          "choice": "cast_only",
+          "choiceFlip": false,
+          "mapped": "ambient",
+          "publicP": 0.82,
+          "crowdP": 0.03,
+          "adModal": "cast_only",
+          "adPagesDisagreeing": 0,
+          "adPages": 1,
+          "adValues": [
+            "cast_only"
+          ]
+        },
+        {
+          "id": "z3fw660ie#LOC001",
+          "read": [
+            "ambient"
+          ],
+          "choice": "ambient",
+          "choiceFlip": false,
+          "mapped": "ambient",
+          "publicP": 0.93,
+          "crowdP": 0.03,
+          "adModal": "cast_only",
+          "adPagesDisagreeing": 0,
+          "adPages": 1,
+          "adValues": [
+            "cast_only"
+          ]
+        },
+        {
+          "id": "z3fw660ie#LOC002",
+          "read": [
+            "ambient"
+          ],
+          "choice": "cast_only",
+          "choiceFlip": false,
+          "mapped": "ambient",
+          "publicP": 0.95,
+          "crowdP": 0.03,
+          "adModal": "cast_only",
+          "adPagesDisagreeing": 0,
+          "adPages": 3,
+          "adValues": [
+            "cast_only",
+            "cast_only",
+            "cast_only"
+          ]
+        },
+        {
+          "id": "z3fw660ie#LOC003",
+          "read": [
+            "ambient"
+          ],
+          "choice": "cast_only",
+          "choiceFlip": false,
+          "mapped": "ambient",
+          "publicP": 0.68,
+          "crowdP": 0.03,
+          "adModal": "cast_only",
+          "adPagesDisagreeing": 1,
+          "adPages": 2,
+          "adValues": [
+            "cast_only",
+            "ambient"
+          ]
+        },
+        {
+          "id": "z3fw660ie#LOC004",
+          "read": [
+            "ambient",
+            "cast_only"
+          ],
+          "choice": "cast_only",
+          "choiceFlip": false,
+          "mapped": "ambient",
+          "publicP": 0.84,
+          "crowdP": 0.03,
+          "adModal": "cast_only",
+          "adPagesDisagreeing": 0,
+          "adPages": 7,
+          "adValues": [
+            "cast_only",
+            "cast_only",
+            "cast_only",
+            "cast_only",
+            "cast_only",
+            "cast_only",
+            "cast_only"
+          ]
+        },
+        {
+          "id": "z3fw660ie#LOC005",
+          "read": [
+            "cast_only",
+            "ambient"
+          ],
+          "choice": "cast_only",
+          "choiceFlip": false,
+          "mapped": "ambient",
+          "publicP": 0.87,
+          "crowdP": 0.03,
+          "adModal": "cast_only",
+          "adPagesDisagreeing": 0,
+          "adPages": 2,
+          "adValues": [
+            "cast_only",
+            "cast_only"
+          ]
+        },
+        {
+          "id": "dka3jpog9#LOC001",
+          "read": [
+            "ambient"
+          ],
+          "choice": "cast_only",
+          "choiceFlip": false,
+          "mapped": "ambient",
+          "publicP": 0.68,
+          "crowdP": 0.02,
+          "adModal": "ambient",
+          "adPagesDisagreeing": 2,
+          "adPages": 4,
+          "adValues": [
+            "ambient",
+            "cast_only",
+            "cast_only",
+            "ambient"
+          ]
+        },
+        {
+          "id": "dka3jpog9#LOC002",
+          "read": [
+            "ambient"
+          ],
+          "choice": "cast_only",
+          "choiceFlip": false,
+          "mapped": "ambient",
+          "publicP": 0.55,
+          "crowdP": 0.02,
+          "adModal": "ambient",
+          "adPagesDisagreeing": 0,
+          "adPages": 1,
+          "adValues": [
+            "ambient"
+          ]
+        },
+        {
+          "id": "dka3jpog9#LOC003",
+          "read": [
+            "ambient"
+          ],
+          "choice": "cast_only",
+          "choiceFlip": false,
+          "mapped": "ambient",
+          "publicP": 0.93,
+          "crowdP": 0.02,
+          "adModal": "ambient",
+          "adPagesDisagreeing": 0,
+          "adPages": 1,
+          "adValues": [
+            "ambient"
+          ]
+        },
+        {
+          "id": "dka3jpog9#LOC004",
+          "read": [
+            "cast_only"
+          ],
+          "choice": "cast_only",
+          "choiceFlip": false,
+          "mapped": "cast_only",
+          "publicP": 0.23,
+          "crowdP": 0.02,
+          "adModal": "cast_only",
+          "adPagesDisagreeing": 0,
+          "adPages": 14,
+          "adValues": [
+            "cast_only",
+            "cast_only",
+            "cast_only",
+            "cast_only",
+            "cast_only",
+            "cast_only",
+            "cast_only",
+            "cast_only",
+            "cast_only",
+            "cast_only",
+            "cast_only",
+            "cast_only",
+            "cast_only",
+            "cast_only"
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -96,7 +96,7 @@ describe('built prompts', () => {
   it('the arc-informed audit asks whether each hint was applied, only when there are hints', () => {
     const withHints = PB.buildTextAuditPrompt({ language: 'en' }, pages, 'An arc.', { arcHints: 'ISSUE: x → CHANGE: y' });
     const without = PB.buildTextAuditPrompt({ language: 'en' }, pages, 'An arc.');
-    expect(withHints).toMatch(/^15\. HINT:/m);
+    expect(withHints).toMatch(/^16\. HINT:/m);
     expect(without).not.toMatch(/HINT:/);
   });
 });
@@ -128,12 +128,53 @@ describe('the grammar check edits numbered sentences only', () => {
   const before = new Map([[1, 'Der Hund bellt. Die Katze schläft am Fenster.']]);
   const pages = [{ pageNumber: 1, text: 'Der Hund bellte laut. Die Katze schlaeft.' }];
 
-  it('fixes a sentence within a few words and restores a writer sentence word for word', () => {
-    const { edits } = TR.parseDiffEdits('PAGE 1 FIX A2: Die Katze schläft.\nPAGE 1 RESTORE B1 AFTER A0\nNONE');
+  it('fixes a sentence within a few words and restores a writer sentence word for word in place of its replacement', () => {
+    const { edits } = TR.parseDiffEdits('PAGE 1 FIX A2: Die Katze schläft.\nPAGE 1 RESTORE B1 REPLACING A1\nNONE');
     const r = TR.applyDiffEdits(pages, before, edits);
-    expect(r.pages[0].text).toBe('Der Hund bellt. Der Hund bellte laut. Die Katze schläft.');
+    expect(r.pages[0].text).toBe('Der Hund bellt. Die Katze schläft.');
     expect(r.applied.map((a: any) => a.kind)).toEqual(['fix', 'restore']);
     expect(r.applied[1].restored).toEqual(['Der Hund bellt.']);
+    expect(r.applied[1].quote).toBe('Der Hund bellte laut.');
+  });
+
+  it('inserts a sentence the rewrite dropped with nothing in its place only when told REPLACING NONE', () => {
+    const { edits } = TR.parseDiffEdits('PAGE 1 RESTORE B2 REPLACING NONE AFTER A1');
+    const r = TR.applyDiffEdits([{ pageNumber: 1, text: 'Der Hund bellt.' }], before, edits);
+    expect(r.pages[0].text).toBe('Der Hund bellt. Die Katze schläft am Fenster.');
+  });
+
+  it('refuses the old bare RESTORE … AFTER form as unreadable — it never named what it removes', () => {
+    const { edits, unparsed } = TR.parseDiffEdits('PAGE 1 RESTORE B1 AFTER A0');
+    expect(edits).toHaveLength(0);
+    expect(unparsed[0].reason).toMatch(/must name what it replaces/);
+  });
+
+  // Replay of staging job_1790508305061_dka3jpog9 p2 (2026-09-27): the repair
+  // replaced B4 with A4+A5, the pass answered RESTORE B4 AFTER A5, and the page
+  // shipped the writer's sentence beside its replacement.
+  describe('a restore never leaves the writer sentence beside its replacement', () => {
+    const b = new Map([[2, 'Julian lief hin. Er bückte sich nach dem Ball, und da sah er etwas am Stein. Es war eine Schuppe, so gross, dass sie genau in seine beiden Handflächen passte. Sie war warm.']]);
+    const a = [{ pageNumber: 2, text: 'Julian lief hin. Er bückte sich, und da sah er etwas am Stein.\n\nEs war eine Schuppe. Julian musste sie mit beiden Händen halten. Sie war warm.' }];
+
+    it('replaces the named run of rewrite sentences', () => {
+      const { edits } = TR.parseDiffEdits('PAGE 2 RESTORE B3 REPLACING A3-A4');
+      const r = TR.applyDiffEdits(a, b, edits);
+      expect(r.pages[0].text).toBe('Julian lief hin. Er bückte sich, und da sah er etwas am Stein.\n\nEs war eine Schuppe, so gross, dass sie genau in seine beiden Handflächen passte. Sie war warm.');
+      expect(r.applied[0].quote).toBe('Es war eine Schuppe. Julian musste sie mit beiden Händen halten.');
+    });
+
+    it('drops a restore that would stand beside text it repeats, whatever the reply named', () => {
+      for (const line of ['PAGE 2 RESTORE B3 REPLACING NONE AFTER A4', 'PAGE 2 RESTORE B3 REPLACING A4']) {
+        const r = TR.applyDiffEdits(a, b, TR.parseDiffEdits(line).edits);
+        expect(r.pages[0].text).toBe(a[0].text);
+        expect(r.dropped[0].reason).toBe('duplicates-A3');
+      }
+    });
+
+    it('refuses a restore whose run overlaps a sentence another edit owns', () => {
+      const r = TR.applyDiffEdits(a, b, TR.parseDiffEdits('PAGE 2 FIX A4: Julian musste sie mit beiden Händen tragen.\nPAGE 2 RESTORE B3 REPLACING A3-A4').edits);
+      expect(r.dropped[0].reason).toBe('overlap');
+    });
   });
 
   it('never ships a sentence neither version had', () => {
@@ -144,7 +185,7 @@ describe('the grammar check edits numbered sentences only', () => {
   });
 
   it('refuses a sentence number that does not exist, and reports a free-text line as unreadable', () => {
-    const { edits, unparsed } = TR.parseDiffEdits("PAGE 1 RESTORE B9 AFTER A1\nPAGE 1: 'x' -> 'y'");
+    const { edits, unparsed } = TR.parseDiffEdits("PAGE 1 RESTORE B9 REPLACING A1\nPAGE 1: 'x' -> 'y'");
     const r = TR.applyDiffEdits(pages, before, edits);
     expect(r.dropped[0].reason).toBe('no-such-sentence');
     expect(unparsed).toHaveLength(1);

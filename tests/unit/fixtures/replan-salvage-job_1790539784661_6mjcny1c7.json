@@ -1,0 +1,323 @@
+{
+ "_source": "staging job_1790539784661_6mjcny1c7 (stories.data), trimmed 2026-09-28 for tests/unit/replan-salvage.test.ts",
+ "id": "job_1790539784661_6mjcny1c7",
+ "pages": 18,
+ "language": "de-ch",
+ "storyCategory": "adventure",
+ "storyTopic": "",
+ "storyTheme": "dragon",
+ "mainCharacters": [
+  1786902471660,
+  1786902747333,
+  1786904058132,
+  1786904387136
+ ],
+ "userLocation": {
+  "city": "Zurich",
+  "region": "Zurich",
+  "country": "Switzerland",
+  "latitude": 47.4016,
+  "longitude": 8.5261
+ },
+ "characters": [
+  {
+   "id": 1786902471660,
+   "name": "Levin",
+   "age": "5",
+   "gender": "male"
+  },
+  {
+   "id": 1786902747333,
+   "name": "Julian",
+   "age": "3",
+   "gender": "male"
+  },
+  {
+   "id": 1786904058132,
+   "name": "Max",
+   "age": "3",
+   "gender": "male"
+  },
+  {
+   "id": 1786904387136,
+   "name": "Kiaan",
+   "age": "3",
+   "gender": "male"
+  }
+ ],
+ "replayInputs": {
+  "availableLandmarks": [
+   {
+    "name": "Grossmünster"
+   },
+   {
+    "name": "Zürich Zoologischer Garten"
+   },
+   {
+    "name": "Lindenhof (Zürcher Hügelzug)"
+   },
+   {
+    "name": "Wasserkirche"
+   },
+   {
+    "name": "Rathausbrücke (Zürich)"
+   },
+   {
+    "name": "Bahnhofplatz (Zürich)"
+   },
+   {
+    "name": "Schweizerisches Nationalmuseum"
+   },
+   {
+    "name": "Liebfrauenkirche"
+   },
+   {
+    "name": "Rathaus (Zürich)"
+   },
+   {
+    "name": "Kloster Oetenbach"
+   },
+   {
+    "name": "Kunsthaus Zürich"
+   },
+   {
+    "name": "Bahnhofstrasse (Zürich)"
+   },
+   {
+    "name": "Haus zum Rüden"
+   },
+   {
+    "name": "Conditorei Schober"
+   },
+   {
+    "name": "Fernsehturm Uetliberg"
+   },
+   {
+    "name": "Zürich Hauptbahnhof"
+   },
+   {
+    "name": "Predigerkirche"
+   },
+   {
+    "name": "Giacometti-Halle"
+   },
+   {
+    "name": "Zurich James Joyce Foundation"
+   },
+   {
+    "name": "FIFA Museum"
+   }
+  ],
+  "modelOverrides": {
+   "bboxModel": "gemini-2.5-flash",
+   "textModel": "claude-sonnet",
+   "imageModel": "grok-imagine-2",
+   "imageBackend": "grok",
+   "outlineModel": "claude-sonnet",
+   "qualityModel": "gemini-2.5-flash",
+   "sceneRouting": null,
+   "coverImageModel": "grok-imagine-2",
+   "storyAvatarModel": null,
+   "generateEmptyScenes": true,
+   "sceneIterationModel": "qwen-plus",
+   "sceneDescriptionModel": "gemini-3.1-pro"
+  }
+ },
+ "arcReviewReport": {
+  "finalArc": "1. Every autumn Saturday, Mama waits over by the Wasserkirche while Levin, Julian, Max and Kiaan visit the old dragon Funkenherz, who sleeps in the quiet corner beside the Grossmünster and flies off from any grown-up who comes near.\n2. She lets them warm their cold hands at the golden scale over her heart, because her fire lives in it, and it must never go cold, she says.\n3. But this Saturday that scale, as big as Levin's hand, lies on the autumn pavement, still warm, and Funkenherz beside the church wall is grey instead of red.\n4. Levin wants to warn her that her fire has fallen out, but his voice comes out so small that Funkenherz, pretending all is well, flies off to the wooded hill by the zoo, where she goes when she wants to be alone among animals.\n5. Because the scale is getting cooler in his hand, Levin asks Mama to take them to the zoo, and Mama rides the tram up the hill with all four.\n6. On the tram the scale grows cooler still, so Julian, who remembers how Funkenherz warmed his cold hands, tucks it under his jacket against his warm tummy and will not give it back or let Levin go looking without him.\n7. At the zoo, Mama waits on the bench by the flamingo pond, as she always waits by the Wasserkirche, and warns: \"Stay away from the water, and stay together!\"\n8. So Kiaan, looking hard at the ground, spots huge claw prints in the wet leaves along the pond's edge.\n9. But as they follow the prints, Julian slips, the scale slides out of his jacket toward the cold water, and Max leaps and catches it just in time, though it is colder now.\n10. The prints lead away from the path into the fog between the trees, where a big grey rock opens one golden eye, and for the first time the children see that no warm steam rises from Funkenherz's back.\n11. \"I am only resting, go back to your Mama,\" she says with her face turned away, and because all four talk at once and Levin's voice stays small, she never hears about the scale.\n12. Instead she flies slowly over the high zoo fence into the foggy wood, where no child can climb after her.\n13. Now Funkenherz is gone in the fog, and under Julian's jacket only one tiny warm spot is left on the scale.\n14. Twice Levin's small voice came too late, so he stretches out both arms and calls with his whole voice: \"Funkenherz! Your heart-scale is here! Your fire is not gone!\"\n15. The big voice carries through the fog, and Funkenherz, who thought her fire was simply burning out with age, turns, glides back over the fence and lowers her chest to the children.\n16. Julian's knees shake in front of the huge dragon, but he steps forward and presses the scale into the empty place over her heart.\n17. The last spark jumps into her, her scales glow red again, and warm steam rises from her back.\n18. Funkenherz curls her warm tail around all four, breathes warm air over their cold hands and says, \"Thank you, Levin, for your big voice, and thank you, Julian, for keeping my fire warm,\" and Levin feels brave.\n\nChallenges taken:\n1. Funkenherz does not know her fire has fallen out.\n2. She refuses the help the children bring.\n3. Finding the hidden dragon among the zoo's trees and animals.\n4. Small, slow Julian is not left behind.\n5. Levin calls out loud although his voice is shy.",
+  "arcHints": "ISSUE (s5): The scale is on the pavement in s3 yet already cooling in Levin's hand in s5 with no pickup shown. → CHANGE: Open s5 with Levin lifting the still-warm scale from the stones before he asks Mama for the tram.\nISSUE (s9): Max catches the sliding scale but nothing gives it back, yet s13 has it under Julian's jacket again. → CHANGE: After the catch, Max pushes the colder scale straight back under Julian's jacket.\nISSUE (s18): Funkenherz thanks only Levin and Julian, so Max's catch and Kiaan's tracking go unacknowledged. → CHANGE: She also thanks Max for the catch and Kiaan for the prints as her tail curls around all four.",
+  "centralFigure": [
+   "Funkenherz"
+  ],
+  "logic": "Want and stakes: Levin wants to get Funkenherz's fallen heart-scale back onto her while it is still warm; if it goes cold first, her fire is gone forever and she can never fly or warm anyone again. The deadline is the scale itself, which cools a little more with every hour.\nOpposition: Funkenherz herself — sure her fire is simply burning out with age and ashamed to be seen grey and cold, she flies off, hides and turns the children away.\nFacts:\n- Levin (commissioned) — knows the golden scale over Funkenherz's heart is where her fire lives; his voice goes small just when it matters.\n- Julian (commissioned) — stubborn, he holds on to what he carries and will not stay behind; he is small and clumsy on wet leaves.\n- Max (commissioned) — fast enough to catch a falling thing; he talks loudly and all at once.\n- Kiaan (commissioned) — attentive, he notices small marks on the ground.\n- Funkenherz (commissioned) — can still fly while any spark is left in her; she has not seen that her heart-scale fell off while she slept.\n- Mama (new) — takes the children by tram and waits apart, since Funkenherz flies from grown-ups.\n- Rule of the world: Funkenherz's fire lives in the golden scale over her heart, as big as Levin's hand. Pressed back while warm, it relights her fire; once cold, her fire is gone forever. A warm dragon's back steams in the cold; a cold one does not.\n- Rule of the world: any grown-up who comes near makes Funkenherz fly away, so she sleeps in the quiet corner beside the Grossmünster where only children come to her, and in the zoo she stays deep in the foggy trees, far from the paths where grown-ups walk.\nMotives:\n- Levin: loves the dragon friend who warms his hands every Saturday → follows her and in the end calls her with his whole voice.\n- Julian: will not let his big brother go without him and wants to help; he remembers Funkenherz warming their cold hands on her scale and thinks his warm tummy can do the same for the scale → tucks it under his jacket, comes along and presses it back.\n- Max: quick and brave, he loves an adventure → leaps and catches the sliding scale.\n- Kiaan: wants to find Funkenherz and looks carefully → spots her claw prints.\n- Funkenherz: ashamed to be seen cold and believing her fire is ending anyway → flies to the wooded hill by the zoo, where she goes when she wants to be alone among animals, hides there and sends the children away. When she hears her fire is found, she wants it back more than anything → she returns.\n- Mama: trusts the children and knows Funkenherz flees grown-ups → takes them to the zoo, waits on a bench by the flamingo pond and warns them about the water.\nCentral figure: Funkenherz\nEvents: 5\nChain:\n- Because the warm golden scale lies on the autumn pavement beside the Grossmünster, and grey Funkenherz flies off to her quiet hill before shy Levin's small voice reaches her, Levin sets out to bring her fire back. It costs him the one chance to tell her right there.\n- Because the scale cools on the way, Julian, who remembers her warming his hands, tucks it against his warm tummy and refuses to stay behind. The scale cools more slowly now, but the smallest child carries it.\n- But at the zoo, as they follow Kiaan's claw prints along the pond, Julian slips and the scale slides toward the cold water. Max catches it just in time, but it is colder now.\n- But when the prints lead into the trees to Funkenherz in the fog, with no warmth rising from her back, she turns her face away and sends them off. Because all four talk at once and Levin's voice stays small, she never hears about the scale and flies over the high zoo fence. This is the low point: she is gone, the fence cannot be climbed, and one warm spot is left on the scale.\n- Because Levin's small voice has come too late twice, he now calls with his whole voice the one thing she never heard, that her scale is here. It carries over the fence where no child can follow, and she comes back because she wants her fire. The scale still relights her fire when Julian presses it on, because he kept its last spark warm."
+ },
+ "beatsReviewReport": {
+  "arc": "1. Every autumn Saturday, Mama waits over by the Wasserkirche while Levin, Julian, Max and Kiaan visit the old dragon Funkenherz, who sleeps in the quiet corner beside the Grossmünster and flies off from any grown-up who comes near.\n2. She lets them warm their cold hands at the golden scale over her heart, because her fire lives in it, and it must never go cold, she says.\n3. But this Saturday that scale, as big as Levin's hand, lies on the autumn pavement, still warm, and Funkenherz beside the church wall is grey instead of red.\n4. Levin wants to warn her that her fire has fallen out, but his voice comes out so small that Funkenherz, pretending all is well, flies off to the wooded hill by the zoo, where she goes when she wants to be alone among animals.\n5. Because the scale is getting cooler in his hand, Levin asks Mama to take them to the zoo, and Mama rides the tram up the hill with all four.\n6. On the tram the scale grows cooler still, so Julian, who remembers how Funkenherz warmed his cold hands, tucks it under his jacket against his warm tummy and will not give it back or let Levin go looking without him.\n7. At the zoo, Mama waits on the bench by the flamingo pond, as she always waits by the Wasserkirche, and warns: \"Stay away from the water, and stay together!\"\n8. So Kiaan, looking hard at the ground, spots huge claw prints in the wet leaves along the pond's edge.\n9. But as they follow the prints, Julian slips, the scale slides out of his jacket toward the cold water, and Max leaps and catches it just in time, though it is colder now.\n10. The prints lead away from the path into the fog between the trees, where a big grey rock opens one golden eye, and for the first time the children see that no warm steam rises from Funkenherz's back.\n11. \"I am only resting, go back to your Mama,\" she says with her face turned away, and because all four talk at once and Levin's voice stays small, she never hears about the scale.\n12. Instead she flies slowly over the high zoo fence into the foggy wood, where no child can climb after her.\n13. Now Funkenherz is gone in the fog, and under Julian's jacket only one tiny warm spot is left on the scale.\n14. Twice Levin's small voice came too late, so he stretches out both arms and calls with his whole voice: \"Funkenherz! Your heart-scale is here! Your fire is not gone!\"\n15. The big voice carries through the fog, and Funkenherz, who thought her fire was simply burning out with age, turns, glides back over the fence and lowers her chest to the children.\n16. Julian's knees shake in front of the huge dragon, but he steps forward and presses the scale into the empty place over her heart.\n17. The last spark jumps into her, her scales glow red again, and warm steam rises from her back.\n18. Funkenherz curls her warm tail around all four, breathes warm air over their cold hands and says, \"Thank you, Levin, for your big voice, and thank you, Julian, for keeping my fire warm,\" and Levin feels brave.\n\nChallenges taken:\n1. Funkenherz does not know her fire has fallen out.\n2. She refuses the help the children bring.\n3. Finding the hidden dragon among the zoo's trees and animals.\n4. Small, slow Julian is not left behind.\n5. Levin calls out loud although his voice is shy.",
+  "plannerReply": "---CAST---\nLevin — deed page 14: calls with his whole voice into the fog, alone — also on pages 3, 16\nJulian — deed page 16: presses the scale into the empty place on Funkenherz's chest, with Funkenherz — also on pages 6, 9\nMax — deed page 9: leaps and catches the sliding scale before it hits the water, with Julian — also on pages 10, 17\nKiaan — deed page 8: crouches and spots huge claw prints in the wet leaves, alone — also on pages 5, 10\nEnding page 18: Levin, Julian, Max, Kiaan, Funkenherz\n---PAGE PLAN---\nPage 1: SHOT — Levin, Julian, Max, Kiaan, Funkenherz — the four boys warm their cold hands at the glowing golden scale on Funkenherz's red chest beside the Grossmünster — the Saturday ritual and Funkenherz's fire-scale are established\nPage 2: SHOT — Mama — Mama stands waiting by the Wasserkirche spire while the boys are away with the dragon — Mama's role as the one who waits apart is established\nPage 3: SHOT — Levin — Levin stares down at the golden scale lying on the autumn pavement beside the Grossmünster wall — the scale has fallen and Funkenherz beside the wall is grey instead of red\nPage 4: SHOT — Funkenherz — grey Funkenherz lifts off from the church wall into the sky, face turned away, as Levin's mouth opens in a small silent call below — Funkenherz is gone before Levin's warning reaches her\nPage 5: SHOT — Levin, Kiaan — Levin lifts the still-warm scale from the stones with both hands, Kiaan beside him watching — the scale is now in Levin's hands and the boys know they must follow Funkenherz\nPage 6: SHOT — Julian — Julian tucks the scale under his jacket against his tummy on the tram, chin down, arms crossed over it — Julian holds the scale and will not give it back; the scale is now kept warm against his body\nPage 7: SHOT — Mama, Julian, Max, Kiaan — Mama sits on the bench by the flamingo pond and raises one finger in warning as the three boys face her — Mama's warning is given; the boys are on their own from here\nPage 8: SHOT — Kiaan — Kiaan crouches close to the wet leaves at the pond's edge, one finger just above a huge claw print — Funkenherz's trail is found\nPage 9: SHOT — Max, Julian — Max's hands close around the scale in mid-air as Julian slips on the wet leaves, arms out — the scale is caught and does not reach the cold water\nPage 10: SHOT — Max, Julian, Kiaan — Max pushes the colder scale back under Julian's jacket as Kiaan watches — the scale is back under Julian's jacket and the group follows the prints into the fog\nPage 11: SHOT — Funkenherz — a large grey rock between the foggy trees opens one golden eye; no steam rises from Funkenherz's back — Funkenherz is found, and it is clear her back is cold\nPage 12: SHOT — Levin, Funkenherz — Funkenherz turns her face away from Levin, whose mouth is open and voice too small, as fog curls between them — Funkenherz has not heard about the scale and refuses to stay\nPage 13: SHOT — Funkenherz — Funkenherz rises slowly over the high zoo fence into the white fog and is gone — Funkenherz is beyond reach; no child can climb after her\nPage 14: SHOT — Levin — Levin stands alone at the fence, both arms stretched wide, mouth open in a full shout into the fog — Levin's big voice has gone over the fence for the first time\nPage 15: SHOT — Funkenherz — Funkenherz glides back over the fence toward the children, chest lowered, golden eye bright — Funkenherz has turned and is returning; the last chance is alive\nPage 16: SHOT — Julian, Funkenherz — Julian's shaking hands press the warm scale into the hollow on Funkenherz's chest — the scale is back in place\nPage 17: SHOT — Funkenherz — Funkenherz glows red again, warm steam rising from her back, tail curling outward — her fire is restored; the deadline is beaten\nPage 18: SHOT — Levin, Julian, Max, Kiaan, Funkenherz — Funkenherz's warm tail curls around all four boys as she breathes warm air over their hands and Levin stands tall — all are safe together and Levin feels brave",
+  "checkReply": "ROSTER 1: people = Levin, Julian, Max, Kiaan, Funkenherz; things = none; covers = none; unlisted = none  \nROSTER 2: people = Mama; things = none; covers = none; unlisted = none  \nROSTER 3: people = Levin; things = none; covers = none; unlisted = Funkenherz  \nROSTER 4: people = Funkenherz; things = none; covers = none; unlisted = Levin  \nROSTER 5: people = Levin, Kiaan; things = none; covers = none; unlisted = none  \nROSTER 6: people = Julian; things = none; covers = none; unlisted = none  \nROSTER 7: people = Mama, Julian, Max, Kiaan; things = none; covers = none; unlisted = none  \nROSTER 8: people = Kiaan; things = none; covers = none; unlisted = none  \nROSTER 9: people = Max, Julian; things = none; covers = none; unlisted = none  \nROSTER 10: people = Max, Julian, Kiaan; things = none; covers = none; unlisted = none  \nROSTER 11: people = Funkenherz; things = none; covers = none; unlisted = none  \nROSTER 12: people = Levin, Funkenherz; things = none; covers = none; unlisted = none  \nROSTER 13: people = Funkenherz; things = none; covers = none; unlisted = none  \nROSTER 14: people = Levin; things = none; covers = none; unlisted = none  \nROSTER 15: people = Funkenherz; things = none; covers = none; unlisted = none  \nROSTER 16: people = Julian, Funkenherz; things = none; covers = none; unlisted = none  \nROSTER 17: people = Funkenherz; things = none; covers = none; unlisted = none  \nROSTER 18: people = Levin, Julian, Max, Kiaan, Funkenherz; things = none; covers = none; unlisted = none  \n\nOBSTACLES 4: Levin  \nOBSTACLES 6: Levin  \nOBSTACLES 7: Levin, Julian, Max, Kiaan  \nOBSTACLES 9: Julian  \nOBSTACLES 12: Levin  \nOBSTACLES 13: Levin, Julian, Max, Kiaan  \nOBSTACLES 16: Julian  \n\nPEOPLELESS 8: the wet leaves and claw prints  \n\nWANTED setup: sentence 3 — page 3  \nWANTED middle: sentence 10 — page 11  \nWANTED ending: sentence 15 — page 15  \n\nACTION Levin: sentence 14 — page 14  \nACTION Julian: sentence 16 — page 16  \nACTION Max: sentence 9 — page 9  \nACTION Kiaan: sentence 8 — page 8  \nACTION Funkenherz: sentences 4, 12 and 15 — pages 4, 13 and 15  \n\nCENTRAL: pages 1, 3, 4, 11, 12, 13, 15, 16, 17, 18  \n\n1. Page 4 stages Funkenherz turning away in shame and Levin making a small call; it is not one person’s felt moment.  \n1. Page 12 stages Funkenherz turning away and Levin’s voice staying small; it is not one person’s felt moment.  \n1. Page 16 stages Julian’s fear through his shaking knees while the pressing action also occurs with Funkenherz present; it is not one person’s felt moment.  \n1. Page 18 stages Funkenherz’s thanks and Levin’s bravery while the reunion and warming action occur; it is not one person’s felt moment.  \n3. Page 10 has three named characters, but Kiaan is only said to watch; the plan line does not justify his inclusion.  \n5. Page 2’s instant only stages Mama waiting.  \n5. Page 8’s instant only stages Kiaan’s crouched position and hand position.  \n6. Page 8 is people-free only as a proposed cast-free picture, but its subject is not one of the most wanted pictures.  \n9. Page 3’s what-is-true-after merely repeats that the scale has fallen and Funkenherz is grey, both already shown in the instant.  \n9. Page 6’s what-is-true-after merely repeats that Julian holds the scale against his body and will not give it back, already shown in the instant.  \n10. Page 4 places Funkenherz in the sky and Levin below.  \n10. Page 16 places Julian at Funkenherz’s chest at a different height.  \n11. Page 6 works against Levin, but Levin is not named in the plan line.  \n11. Page 13 works against Levin, Julian, Max and Kiaan through the fence, but none of them is named in the plan line.  \n15. Page 1 introduces Funkenherz without showing her doing an action of her own.  \n18. Page 7 shows only Julian, Max and Kiaan facing Mama, although the story has all four boys travelling with Mama.",
+  "counterFindings": [
+   "PLAN[NO_PEOPLELESS_PAGE] page 8: no page shows only a thing or a place, with no people in frame — page 8 gives up its cast (cast out <name>), and it is a page whose subject is already a thing or a place seen alone, never a moment between people.",
+   "PLAN[MAIN_UNDER_HALF] page 1, 3, 5, 12, 14, 18: Levin is in frame on 6/18 pages — the main character belongs in at least half",
+   "PLAN[CAST_NOT_IN_WHO_COLUMN] page 4: the instant names a character the who column does not carry (page 4: Levin) — write them into the who column, or take them out of the instant",
+   "PLAN[NO_COMMISSIONED_ON_PAGE] page 2: a peopled page with none of the commissioned characters in frame",
+   "PLAN[CAST_PROMISE_BROKEN] page 16: the CAST block promises Levin on page 16, but page 16's who column does not carry Levin",
+   "PLAN[CAST_PROMISE_BROKEN] page 17: the CAST block promises Max on page 17, but page 17's who column does not carry Max"
+  ],
+  "modelFindings": [
+   {
+    "text": "Page 4 stages Funkenherz turning away in shame and Levin making a small call; it is not one person’s felt moment.",
+    "check": 1
+   },
+   {
+    "text": "Page 12 stages Funkenherz turning away and Levin’s voice staying small; it is not one person’s felt moment.",
+    "check": 1
+   },
+   {
+    "text": "Page 16 stages Julian’s fear through his shaking knees while the pressing action also occurs with Funkenherz present; it is not one person’s felt moment.",
+    "check": 1
+   },
+   {
+    "text": "Page 18 stages Funkenherz’s thanks and Levin’s bravery while the reunion and warming action occur; it is not one person’s felt moment.",
+    "check": 1
+   },
+   {
+    "text": "Page 10 has three named characters, but Kiaan is only said to watch; the plan line does not justify his inclusion.",
+    "check": 3
+   },
+   {
+    "text": "Page 2’s instant only stages Mama waiting.",
+    "check": 5
+   },
+   {
+    "text": "Page 8’s instant only stages Kiaan’s crouched position and hand position.",
+    "check": 5
+   },
+   {
+    "text": "Page 8 is people-free only as a proposed cast-free picture, but its subject is not one of the most wanted pictures.",
+    "check": 6
+   },
+   {
+    "text": "Page 3’s what-is-true-after merely repeats that the scale has fallen and Funkenherz is grey, both already shown in the instant.",
+    "check": 9
+   },
+   {
+    "text": "Page 6’s what-is-true-after merely repeats that Julian holds the scale against his body and will not give it back, already shown in the instant.",
+    "check": 9
+   },
+   {
+    "text": "Page 4 places Funkenherz in the sky and Levin below.",
+    "check": 10
+   },
+   {
+    "text": "Page 16 places Julian at Funkenherz’s chest at a different height.",
+    "check": 10
+   },
+   {
+    "text": "Page 6 works against Levin, but Levin is not named in the plan line.",
+    "check": 11
+   },
+   {
+    "text": "Page 13 works against Levin, Julian, Max and Kiaan through the fence, but none of them is named in the plan line.",
+    "check": 11
+   },
+   {
+    "text": "Page 1 introduces Funkenherz without showing her doing an action of her own.",
+    "check": 15
+   },
+   {
+    "text": "Page 7 shows only Julian, Max and Kiaan facing Mama, although the story has all four boys travelling with Mama.",
+    "check": 18
+   }
+  ],
+  "discardedRounds": [
+   {
+    "round": 1,
+    "reason": "raised the cast/focal must-fix count (cast/focal must-fix 6 → 8 (8 must-fix in total, 0 of them shot-distribution, which do not count toward convergence))",
+    "changedPages": [
+     1,
+     3,
+     4,
+     5,
+     6,
+     7,
+     10,
+     12,
+     13,
+     14,
+     16,
+     17,
+     18
+    ],
+    "replanReply": "---PAGE PLAN---\nPage 1: SHOT — Levin, Julian, Max, Kiaan, Funkenherz — the four boys and Funkenherz walk together away from the Grossmünster, all of them moving off in the same direction — the Saturday ritual and Funkenherz are established\nPage 2: SHOT — Levin, Funkenherz — Funkenherz holds the golden scale over her heart toward Levin's cold hands as he reaches up to warm them — the fire-scale is established and Funkenherz's stake is spoken aloud: her fire lives in it and must never go cold\nPage 3: SHOT — Levin — Levin kneels and stares at the golden scale lying on the autumn pavement beside the Grossmünster wall — the scale has fallen; something must be done before it goes cold\nPage 4: SHOT — Levin, Funkenherz — grey Funkenherz lifts off from the church wall while Levin below stretches his arms up, mouth open in a small silent call — Funkenherz is gone before Levin's warning reaches her\nPage 5: SHOT — Levin, Kiaan — Levin lifts the still-warm scale from the stones with both hands as Kiaan stands beside him — the scale is now in Levin's hands; the boys know they must follow Funkenherz\nPage 6: SHOT — Julian, Levin — Julian tucks the scale under his jacket against his tummy, chin down, arms crossed over it, while Levin watches — Julian holds the scale and will not give it back; the scale is now kept warm against Julian's body\nPage 7: SHOT — Levin, Julian, Max, Kiaan, Mama — Mama sits on the bench by the flamingo pond and raises one finger in warning as all four boys face away from her toward the pond's edge — Mama's warning is given; the boys are on their own from here\nPage 8: SHOT — the wet leaves at the pond's edge, a row of huge claw prints pressed into them — Funkenherz's trail is found; the dragon came this way\nPage 9: SHOT — Max, Julian — Max's hands close around the scale in mid-air as Julian slips on the wet leaves, arms out — the scale is caught and does not reach the cold water\nPage 10: SHOT — Max, Julian — Max pushes the colder scale back under Julian's jacket as Julian steadies himself — the scale is back under Julian's jacket; the group can follow the prints into the fog\nPage 11: SHOT — Funkenherz — a large grey shape between the foggy trees opens one golden eye; no steam rises from her back — Funkenherz is found and her cold back is plain to see\nPage 12: SHOT — Levin, Julian, Max, Kiaan, Funkenherz — Funkenherz turns her face away from the four boys as all of them call up at her at once — Funkenherz has not heard about the scale and refuses to stay\nPage 13: SHOT — Funkenherz — Funkenherz rises slowly over the high zoo fence into the white fog and is gone — Funkenherz is beyond the fence; no child can climb after her; only one warm spot is left on the scale\nPage 14: SHOT — Levin — Levin stands at the fence, both arms stretched wide, mouth open in a full shout into the fog — Levin's big voice goes over the fence for the first time\nPage 15: SHOT — Funkenherz — Funkenherz glides back over the fence, chest lowered, golden eye bright — Funkenherz has turned and is returning; the last chance is alive\nPage 16: SHOT — Levin, Julian, Funkenherz — Julian's hands press the warm scale into the hollow on Funkenherz's chest as Levin stands close beside him — the scale is back in place\nPage 17: SHOT — Max, Funkenherz — Funkenherz glows red again, warm steam rising from her back, as Max watches from beside her flank — her fire is restored; the deadline is beaten\nPage 18: SHOT — Levin, Julian, Max, Kiaan, Funkenherz — Funkenherz's warm tail curls around all four boys as they all lean into her warmth together — all are safe and together; Levin feels brave; Funkenherz thanks each child by name\n\n---CHANGES---\nPage 1: action to page 2 the four boys walk away from the Grossmünster together — PLAN[MAIN_UNDER_HALF] — page 1 gives its fire-scale instant to page 2 so the scale's stake can be spoken there, freeing page 1 to introduce all cast in one shared action\nPage 1: material from page 2 — PLAN[MAIN_UNDER_HALF] — the opening ritual moves here as the shared departure action\nPage 2: action in Funkenherz holds the golden scale toward Levin's cold hands as he reaches up to warm them, and she speaks the stake — PLAN[NO_COMMISSIONED_ON_PAGE] — casting Levin in fixes the commissioned-character absence and the fire-scale stake is spoken here as required; Mama's waiting role moves to page 7 where she acts\nPage 2: cast in Levin — PLAN[NO_COMMISSIONED_ON_PAGE] — page 2 was the only peopled page with no commissioned character\nPage 2: material to page 1 the four boys and Funkenherz move off together — CHECK[5] — page 2's waiting instant had no story weight; the fire-scale introduction carries the weight instead\nPage 4: cast in Levin — PLAN[CAST_NOT_IN_WHO_COLUMN] — Levin was named in the instant but absent from the who column\nPage 6: cast in Levin — CHECK[11] — page 6 works against Levin who holds the scale first; he must be in frame for the refusal to have a target\nPage 7: cast in Levin — CHECK[18] — the story has all four boys travel with Mama; Levin belongs in this gathering\nPage 8: cast out Kiaan — PLAN[NO_PEOPLELESS_PAGE] — page 8 is the best candidate for the people-free page: its subject is already a thing the story has been driving toward, the claw prints, and Kiaan's focal deed is already covered by the cast block staging him on page 8; removing him here empties the page of people while the prints alone carry the discovery\nPage 8: action in the wet leaves at the pond's edge showing a row of huge claw prints — PLAN[NO_PEOPLELESS_PAGE] — the prints are the sought thing; the page's drama is a discovery, not a moment between people\nPage 9: cast out Kiaan — CHECK[3] — Kiaan on page 10 was only watching; removing him from page 10 and keeping Max and Julian keeps the two-person rule and fixes the unjustified third figure\nPage 10: cast out Kiaan — CHECK[3] — Kiaan was only watching on page 10 and his presence was not justified by any action the page stages\nPage 12: cast in Levin — PLAN[MAIN_UNDER_HALF] — Levin is the main character and must be present at the refusal scene; adding him here brings his page count toward the required half\nPage 12: cast in Julian — PLAN[MAIN_UNDER_HALF] — the story has all four talk at once; staging the full group here is demanded by the story sentence and justified by the climax requirement\nPage 12: cast in Max — PLAN[MAIN_UNDER_HALF] — all four talk at once per story sentence; Max belongs here\nPage 12: cast in Kiaan — PLAN[MAIN_UNDER_HALF] — all four talk at once per story sentence; Kiaan belongs here\nPage 16: cast in Levin — PLAN[CAST_PROMISE_BROKEN] — the cast block promises Levin on page 16; adding him fulfils that promise\nPage 17: cast in Max — PLAN[CAST_PROMISE_BROKEN] — the cast block promises Max on page 17; adding him fulfils that promise\nChanges: 18",
+    "recheck": {
+     "reply": "ROSTER 1: people = Levin, Julian, Max, Kiaan, Funkenherz; things = none; covers = none; unlisted = none  \nROSTER 2: people = Mama; things = none; covers = none; unlisted = none  \nROSTER 3: people = Levin; things = none; covers = none; unlisted = none  \nROSTER 4: people = Levin, Funkenherz; things = none; covers = none; unlisted = none  \nROSTER 5: people = Levin, Kiaan; things = none; covers = none; unlisted = none  \nROSTER 6: people = Julian, Levin; things = none; covers = none; unlisted = none  \nROSTER 7: people = Levin, Julian, Max, Kiaan, Mama; things = none; covers = none; unlisted = none  \nROSTER 8: people = Kiaan; things = none; covers = none; unlisted = none  \nROSTER 9: people = Max, Julian; things = none; covers = none; unlisted = none  \nROSTER 10: people = Max, Julian; things = none; covers = none; unlisted = none  \nROSTER 11: people = Funkenherz; things = none; covers = none; unlisted = none  \nROSTER 12: people = Levin, Julian, Max, Kiaan, Funkenherz; things = none; covers = none; unlisted = none  \nROSTER 13: people = Funkenherz; things = none; covers = none; unlisted = none  \nROSTER 14: people = Levin; things = none; covers = none; unlisted = none  \nROSTER 15: people = Funkenherz; things = none; covers = none; unlisted = none  \nROSTER 16: people = Levin, Julian, Funkenherz; things = none; covers = none; unlisted = none  \nROSTER 17: people = Max, Funkenherz; things = none; covers = none; unlisted = none  \nROSTER 18: people = Levin, Julian, Max, Kiaan, Funkenherz; things = none; covers = none; unlisted = none  \n\nOBSTACLES 4: Levin  \nOBSTACLES 6: Levin  \nOBSTACLES 9: Julian  \nOBSTACLES 12: Levin, Julian, Max, Kiaan  \nOBSTACLES 13: Levin, Julian, Max, Kiaan  \n\nPEOPLELESS 8: the huge claw prints in the wet leaves  \n\nWANTED setup: sentence 3 — page 3  \nWANTED middle: sentence 10 — page 11  \nWANTED ending: sentence 18 — page 18  \n\nACTION Levin: sentence 14 — page 14  \nACTION Julian: sentence 16 — page 16  \nACTION Max: sentence 9 — page 9  \nACTION Kiaan: sentence 8 — page 8  \nACTION Funkenherz: sentences 4, 12, 15 — pages 4, 13, 15  \n\nCENTRAL: pages 1, 4, 11, 12, 13, 15, 16, 17, 18  \n\n1: Pages 4, 6, 12, 16 and 18 stage feelings, but none is truly one person's felt moment: page 4 also stages Funkenherz flying; page 6 also holds Levin; page 12 holds the four children and their calls; page 16 also stages the pressing action with Funkenherz; page 18 holds the whole group and the ending event.  \n2: Page 2: Mama first appears merely waiting, without an arrival or naming by someone present.  \n3: Page 1: five named characters are in frame, but the plan line only has them walking together and does not justify the third character's presence.  \n5: Page 2: the instant only shows Mama standing and waiting.  \n9: Page 5: “the scale is now in Levin’s hands” repeats the lifting already shown.  \n9: Page 7: “Mama’s warning is given” repeats the raised-finger warning already shown.  \n9: Page 8: “Funkenherz’s trail is found” repeats the visible claw print already shown.  \n9: Page 9: “the scale is caught” repeats Max’s hands closing around it in the instant.  \n9: Page 10: “the scale is back under Julian’s jacket” repeats the push shown in the instant.  \n9: Page 11: “Funkenherz is found” and that her back is cold repeat the eye opening and lack of steam already shown.  \n9: Page 13: Funkenherz being beyond the fence and gone repeats her rise into the fog already shown.  \n9: Page 15: Funkenherz’s return repeats her gliding back over the fence already shown.  \n9: Page 16: “the scale is back in place” repeats the pressing shown in the instant.  \n9: Page 17: “her fire is restored” repeats the red glow and rising steam already shown.  \n10: Page 4 puts Funkenherz in the air and Levin below in the same picture instead of staging the event from one level or splitting the levels.  \n11: Page 13: the fence keeps the children from following Funkenherz, but the plan line names only Funkenherz, not the obstructed children.  \n17: Page 7: the whole commissioned cast is not present, so no whole-cast page is staged there.  \n17: Page 12: the whole commissioned cast is present, but the children call while Funkenherz turns away; they do not share one action.  \n17: Page 18: the whole commissioned cast is present, but the boys lean while Funkenherz curls her tail; the instant gives different actions rather than one shared action.",
+     "counterFindings": [
+      "PLAN[NO_PEOPLELESS_PAGE] page 8: no page shows only a thing or a place, with no people in frame — page 8 gives up its cast (cast out <name>), and it is a page whose subject is already a thing or a place seen alone, never a moment between people.",
+      "PLAN[NO_COMMISSIONED_ON_PAGE] page 2: a peopled page with none of the commissioned characters in frame",
+      "PLAN[GROUP_PAGES_OVER_BUDGET] page 1, 7, 12, 18: 4 pages hold more than 3 named characters; this book allows at most 3. Keep the group on the pages where the story brings everyone together — an opening gathering, the climax, the ending — and on the others cast out the characters that page's instant does not need, never the character whose action the instant works against, and never one who would fall below 3 pages in frame.",
+      "PLAN[CAST_PROMISE_BROKEN] page 16: the CAST block promises page 16 as Julian's deed page, alone or with one companion, but it holds Levin, Julian, Funkenherz",
+      "PLAN[CAST_PROMISE_BROKEN] page 10: the CAST block promises Kiaan on page 10, but page 10's who column does not carry Kiaan"
+     ],
+     "modelFindings": [
+      {
+       "text": "Pages 4, 6, 12, 16 and 18 stage feelings, but none is truly one person's felt moment: page 4 also stages Funkenherz flying; page 6 also holds Levin; page 12 holds the four children and their calls; page 16 also stages the pressing action with Funkenherz; page 18 holds the whole group and the ending event.",
+       "check": 1
+      },
+      {
+       "text": "Page 2: Mama first appears merely waiting, without an arrival or naming by someone present.",
+       "check": 2
+      },
+      {
+       "text": "Page 1: five named characters are in frame, but the plan line only has them walking together and does not justify the third character's presence.",
+       "check": 3
+      },
+      {
+       "text": "Page 2: the instant only shows Mama standing and waiting.",
+       "check": 5
+      },
+      {
+       "text": "Page 5: “the scale is now in Levin’s hands” repeats the lifting already shown.",
+       "check": 9
+      },
+      {
+       "text": "Page 7: “Mama’s warning is given” repeats the raised-finger warning already shown.",
+       "check": 9
+      },
+      {
+       "text": "Page 8: “Funkenherz’s trail is found” repeats the visible claw print already shown.",
+       "check": 9
+      },
+      {
+       "text": "Page 9: “the scale is caught” repeats Max’s hands closing around it in the instant.",
+       "check": 9
+      },
+      {
+       "text": "Page 10: “the scale is back under Julian’s jacket” repeats the push shown in the instant.",
+       "check": 9
+      },
+      {
+       "text": "Page 11: “Funkenherz is found” and that her back is cold repeat the eye opening and lack of steam already shown.",
+       "check": 9
+      },
+      {
+       "text": "Page 13: Funkenherz being beyond the fence and gone repeats her rise into the fog already shown.",
+       "check": 9
+      },
+      {
+       "text": "Page 15: Funkenherz’s return repeats her gliding back over the fence already shown.",
+       "check": 9
+      },
+      {
+       "text": "Page 16: “the scale is back in place” repeats the pressing shown in the instant.",
+       "check": 9
+      },
+      {
+       "text": "Page 17: “her fire is restored” repeats the red glow and rising steam already shown.",
+       "check": 9
+      },
+      {
+       "text": "Page 4 puts Funkenherz in the air and Levin below in the same picture instead of staging the event from one level or splitting the levels.",
+       "check": 10
+      },
+      {
+       "text": "Page 13: the fence keeps the children from following Funkenherz, but the plan line names only Funkenherz, not the obstructed children.",
+       "check": 11
+      },
+      {
+       "text": "Page 7: the whole commissioned cast is not present, so no whole-cast page is staged there.",
+       "check": 17
+      },
+      {
+       "text": "Page 12: the whole commissioned cast is present, but the children call while Funkenherz turns away; they do not share one action.",
+       "check": 17
+      },
+      {
+       "text": "Page 18: the whole commissioned cast is present, but the boys lean while Funkenherz curls her tail; the instant gives different actions rather than one shared action.",
+       "check": 17
+      }
+     ]
+    }
+   }
+  ]
+ }
+}

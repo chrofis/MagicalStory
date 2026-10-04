@@ -12,8 +12,8 @@
  *
  * This module is PURE and free — no API call, no image. It compares the
  * canonical `clothingRequirements` text against the prose and returns findings
- * for the scene review to fix (owner decision 2026-08-08: findings go to the
- * scene review, and nowhere else).
+ * for the one brief re-ask to fix (briefChecks.js; the scene review until its
+ * deletion on 2026-09-28).
  *
  * Four findings, in the order they matter:
  *   outfit_missing       the prose never names this character's outfit
@@ -27,9 +27,10 @@
  * A fifth, `outfit_misattributed`, lived here from 2026-08-08 to 2026-09-18 and
  * is DELETED — see the block above REVIEWABLE. It decided from prose that one
  * character had been put in another's clothes, which is a language judgement;
- * the rule now lives in prompts/scene-review.txt as `[clothing_owner]`.
+ * the rule then lived in prompts/scene-review.txt as `[clothing_owner]`, deleted
+ * with the review on 2026-09-28 (a lost critic, tasks/BACKLOG.md).
  *
- * Deliberately NOT a fixer. It reports; the review rewrites; the caller re-runs
+ * Deliberately NOT a fixer. It reports; the re-ask rewrites; the caller re-runs
  * it afterwards and logs whatever survived rather than shipping it silently.
  */
 
@@ -816,7 +817,91 @@ function applyWardrobeBibleCorrections(clothingRequirements, visualBible, opts =
   return { findings, applied, versions, unresolved };
 }
 
+/**
+ * clothing_incomplete (owner, 2026-09-28, Q9 — the scene review's check 3b as
+ * a code check): a character the prose dresses at all, whose own stretch of
+ * prose (characterWindow) leaves out the outfit's top, bottom or footwear. The
+ * slot comes from the outfit's own label, or from the garment noun
+ * (wornItems.deriveSlotFromName) on an unlabelled clause; a clause of no
+ * required slot is never asked for, and an outfit with a tail or fin asks for
+ * no bottom and no footwear. A close-up ends at the waist (shotVocabulary's
+ * own definition), so it asks for the top only. A character dressed in
+ * nothing named is `outfit_missing`, not this.
+ */
+const REQUIRED_SLOTS = ['top', 'bottom', 'footwear'];
+function checkClothingIncomplete(page, clothingRequirements) {
+  const { deriveSlotFromName } = require('./wornItems');
+  const { resolveShotId } = require('./shotVocabulary');
+  const prose = String(page?.prose || '');
+  const cast = (page.cast || []).map(c => (typeof c === 'string' ? c : c?.name)).filter(Boolean);
+  const perChar = page.perCharClothing || {};
+  const out = [];
+  for (const name of cast) {
+    const category = (lookupByName(perChar, name, null) || {}).value || null;
+    if (!category) continue;
+    const reqs = resolveCharacterReqs(clothingRequirements, name);
+    const entry = reqs && (reqs[category] || (String(category).startsWith('costumed') ? reqs.costumed : null));
+    const text = entry && (entry.signature && entry.signature !== 'none' ? entry.signature : entry.description);
+    if (!text || /^NONE\.?$/i.test(String(text).trim())) continue;
+    const window = characterWindow(prose, name, cast);
+    const own = tokens(window);
+    if (own.size === 0) continue;
+    // A slot is dressed when the window names ANY garment of that slot ("in
+    // boots", "his pullover" for a contract "jumper"): each window word, and its
+    // plural, through wornItems' slot nouns. The contract clause's own words
+    // (slotStated) count too, for garments no slot noun lists.
+    const windowSlots = new Set(String(window).toLowerCase().split(/[^a-z-]+/).filter(Boolean)
+      .flatMap(w => [deriveSlotFromName(w), deriveSlotFromName(`${w}s`)]).filter(Boolean));
+    const named = (clause) => (clause.slot && windowSlots.has(clause.slot)) || slotStated(clause.text, own);
+    const parts = splitSlots(text);
+    const clauses = parts.some(p => p.slot)
+      ? parts.map(p => ({ slot: p.slot, text: p.text }))
+      : String(text).split(/\s*;\s*/).filter(Boolean).map(c => ({ slot: deriveSlotFromName(c), text: c }));
+    const legless = /\b(tail|fins?)\b/i.test(text);
+    const waistUp = resolveShotId(page.shot) === 'close-up';
+    const stated = clauses.filter(c => named(c));
+    if (stated.length === 0) continue;                                     // outfit_missing's case
+    // A slot is missing only when NO clause of it is stated: a shirt under a
+    // named pullover is still a dressed top.
+    const missing = REQUIRED_SLOTS
+      .filter(slot => !((legless || waistUp) && slot !== 'top'))
+      .map(slot => clauses.filter(c => c.slot === slot))
+      .filter(of => of.length && !of.some(c => named(c)))
+      .map(of => of[0]);
+    if (!missing.length) continue;
+    out.push({
+      pageNumber: page.pageNumber, type: 'clothing_incomplete', character: name, slots: missing.map(c => c.slot),
+      detail: `The prose dresses ${name} without the ${missing.map(c => `${c.slot} (${c.text.split(/\s+/).slice(0, 6).join(' ')})`).join(', ')}. Name the top, the bottom and the footwear of every character on every page — the image model draws only what the prose names.`,
+    });
+  }
+  return out;
+}
+
+/**
+ * THE OUTFIT GUARD (owner, 2026-09-28). Which of `names` has no outfit to be
+ * drawn in: no contract entry, no `used` category, or a used category whose
+ * description is empty or the review template's no-change marker. Every brief
+ * author reads the contract's text, so a character listed here is described
+ * "wearing no clothing" (staging job_1790529840433_ar4u7qry3, bug
+ * clothing-review-none-body-erases-outfit). Reports; never invents a garment.
+ */
+function outfitAbsent(clothingRequirements, names = []) {
+  const absent = [];
+  for (const name of names || []) {
+    const reqs = resolveCharacterReqs(clothingRequirements, name);
+    const used = reqs && typeof reqs === 'object'
+      ? Object.values(reqs).filter(v => v && v.used === true)
+      : [];
+    const dressed = used.some(v => {
+      const d = String(v.description || '').trim();
+      return d && !/^NONE\.?$/i.test(d);
+    });
+    if (!dressed) absent.push(name);
+  }
+  return absent;
+}
+
 // slotStated + missingGarments are exported so the image-prompt clothing check
 // (storyHelpers buildImagePrompt) uses THIS definition of "is this garment in
 // the prose" rather than growing a second one.
-module.exports = { REVIEWABLE, GARMENT_NOUNS, checkPage, checkWardrobeAgainstBible, applyWardrobeBibleCorrections, outfitClauses, checkScenes, renderFindingsBlock, splitSlots, slotStated, missingGarments, characterProse, characterWindow, tokens, contractPairs, colourBefore };
+module.exports = { REVIEWABLE, GARMENT_NOUNS, outfitAbsent, checkClothingIncomplete, checkPage, checkWardrobeAgainstBible, applyWardrobeBibleCorrections, outfitClauses, checkScenes, renderFindingsBlock, splitSlots, slotStated, missingGarments, characterProse, characterWindow, tokens, contractPairs, colourBefore };

@@ -865,13 +865,44 @@ function carryForwardWornItemsInBrief(newBrief, savedBrief) {
   };
 }
 
+/**
+ * The override is said ONCE, by the header (2026-09-27, owner: "shorten the
+ * fixed blocks"). Each line used to repeat it ("Draw it on X even if the
+ * attached reference shows X without it", "Leave it off X even if the attached
+ * reference shows it worn") — ~75 chars per row in the never-cut part of the
+ * page prompt, where staging job_1790529840433_ar4u7qry3 p1/p4 missed the Grok
+ * cap by 378/222 chars and rendered nothing. A line states the page's fact
+ * (worn / not worn / handed over, and where an off item lies); the header says
+ * that fact wins over every attached reference.
+ */
+const WORN_ITEMS_HEADER = '**WORN ITEMS ON THIS PAGE (these win over the attached references):**';
+
+/**
+ * "<name> — <look>", without saying the name twice. A bible description often
+ * OPENS with the item's own name ("A red long-sleeve shirt with a round
+ * neckline" for "red long-sleeve shirt"); the clause keeps the name once and
+ * the look's remainder after it (2026-09-28: staging job_1790539784661_6mjcny1c7's
+ * front cover repeated six garment names in a never-cut block).
+ */
+function wornItemClause(name, look) {
+  if (!look) return name;
+  const esc = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const m = look.match(new RegExp(`^(?:(?:a|an|the)\\s+)?${esc}\\b[\\s,—–-]*`, 'i'));
+  if (!m) return `${name} — ${look}`;
+  const rest = look.slice(m[0].length).trim();
+  return rest ? `${name} — ${rest}` : name;
+}
+
 function buildWornStateLines(resolved) {
   const lines = [];
+  // Plain worn rows of one character share ONE line (2026-09-28): a page that
+  // lists a whole outfit as worn items repeated "<X> IS wearing this on this
+  // page:" per garment. Placed where the character's first row was.
+  const wornLineOf = new Map();
   for (const r of (resolved || [])) {
     const name = String(r.name || '').trim();
     if (!name) continue;
-    const look = wornItemLook(r);
-    const item = look ? `${name} — ${look}` : name;
+    const item = wornItemClause(name, wornItemLook(r));
     // OWNER OFF THIS PAGE (2026-09-19). The row survived the cast gate on its
     // WEARER; naming the owner here would put an off-page name into a
     // prompt-facing string and invite the model to draw the absent character —
@@ -879,7 +910,7 @@ function buildWornStateLines(resolved) {
     // needs: this character is wearing it, draw it on them. `=== false` on
     // purpose — a row built without the field keeps the old rendering.
     if (r.ownerInCast === false && r.handedOver) {
-      lines.push(`- ${r.wearer} IS wearing this on this page: ${item}. Draw it on ${r.wearer}.`);
+      lines.push(`- ${r.wearer} IS wearing this on this page: ${item}.`);
       continue;
     }
     // The item NAME sits at the end of its own clause on purpose: every VB name
@@ -889,14 +920,17 @@ function buildWornStateLines(resolved) {
     // instruction this block exists to deliver.
     if (r.state === 'off') {
       const where = r.location ? ` — ${r.location}.` : ' — it is elsewhere in the scene.';
-      lines.push(`- ${r.owner} is NOT wearing this on this page: ${item}. Leave it off ${r.owner} even if the attached reference shows it worn${where}`);
+      lines.push(`- ${r.owner} is NOT wearing this on this page: ${item}${where}`);
     } else if (r.handedOver) {
       // The item is on the page, on the other character. Both halves are said
       // in one clause: nobody but the wearer carries it.
-      lines.push(`- ${r.wearer} IS wearing this on this page, and ${r.owner} is NOT: ${item}. `
-        + `Draw it on ${r.wearer} only, and leave it off ${r.owner} even if the attached references show the opposite.`);
+      lines.push(`- ${r.wearer} IS wearing this on this page, and ${r.owner} is NOT: ${item}.`);
+    } else if (wornLineOf.has(r.owner)) {
+      const at = wornLineOf.get(r.owner);
+      lines[at] = `${lines[at].replace(/\.$/, '')}; ${item}.`.replace(' IS wearing this on this page:', ' IS wearing these on this page:');
     } else {
-      lines.push(`- ${r.owner} IS wearing this on this page: ${item}. Draw it on ${r.owner} even if the attached reference shows ${r.owner} without it.`);
+      wornLineOf.set(r.owner, lines.length);
+      lines.push(`- ${r.owner} IS wearing this on this page: ${item}.`);
     }
   }
   return lines;
@@ -906,7 +940,7 @@ function buildWornStateLines(resolved) {
 function buildWornStateBlock(resolved) {
   const lines = buildWornStateLines(resolved);
   if (lines.length === 0) return '';
-  return `\n**WORN ITEMS ON THIS PAGE (the attached references are not authoritative for these):**\n${lines.join('\n')}\n`;
+  return `\n${WORN_ITEMS_HEADER}\n${lines.join('\n')}\n`;
 }
 
 /** Every garment noun in the closed vocabulary, across all slots. */
@@ -1747,6 +1781,7 @@ module.exports = {
   DEPENDENT_OPENER_RE,
   buildWornStateLines,
   buildWornStateBlock,
+  WORN_ITEMS_HEADER,
   removeWornItemFromOutfit,
   stripOffItemsFromOutfit,
   applyWornItemsToOutfit,

@@ -168,19 +168,19 @@ describe('reference-cell dedupe', () => {
 });
 
 describe('prompt lines — both directions, explicit', () => {
-  it('worn: draw it even if the reference lacks it', () => {
+  it('worn: the line states the fact, the header carries the override', () => {
     const r = worn.resolveWornItemsForPage(VB, ['Lily'], P3_META);
     const [line] = worn.buildWornStateLines(r);
     expect(line).toBe(
-      "- Lily IS wearing this on this page: Lily's red woollen hat — A small hat knitted from chunky red wool, dome-shaped at the crown with a wide turned-back brim of two finger-widths. Draw it on Lily even if the attached reference shows Lily without it.",
+      "- Lily IS wearing this on this page: Lily's red woollen hat — A small hat knitted from chunky red wool, dome-shaped at the crown with a wide turned-back brim of two finger-widths.",
     );
   });
 
-  it('off: leave it off even if the reference wears it, plus where it lies', () => {
+  it('off: the line states the fact and where it lies', () => {
     const r = worn.resolveWornItemsForPage(VB, ['Lily'], P8_META);
     const [line] = worn.buildWornStateLines(r);
     expect(line).toBe(
-      "- Lily is NOT wearing this on this page: Lily's red woollen hat — A small hat knitted from chunky red wool, dome-shaped at the crown with a wide turned-back brim of two finger-widths. Leave it off Lily even if the attached reference shows it worn — lies on the cobbles beside the log pile.",
+      "- Lily is NOT wearing this on this page: Lily's red woollen hat — A small hat knitted from chunky red wool, dome-shaped at the crown with a wide turned-back brim of two finger-widths — lies on the cobbles beside the log pile.",
     );
   });
 

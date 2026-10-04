@@ -44,7 +44,7 @@ describe('the ratio rule asks only for what a ratio is for', () => {
   });
 
   it('the three size rules stay disjoint — each names a different form', () => {
-    const t = String(PROMPT_TEMPLATES.sceneExpansionAll);
+    const t = String(PROMPT_TEMPLATES.sceneBriefsAll);
     // 8g keeps props and garments, in its own form
     expect(t).toContain('a familiar-size term');
     expect(t).toContain('"a fist-sized apple"');

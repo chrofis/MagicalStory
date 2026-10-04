@@ -241,33 +241,3 @@ describe('renderFindingsBlock no longer sends the type to the reviewer', () => {
     expect(block).not.toMatch(/rightful owner/);
   });
 });
-
-describe('the reviewer carries the replacement check', () => {
-  beforeAll(async () => { await loadPromptTemplates(); });
-
-  // Only the TAG is pinned. The template's OUTPUT FORMAT requires one tagged
-  // line per check ("Open each answer with that tag"), so a tag is part of the
-  // response contract the parser and the reviewer share — not prose styling.
-  it('the built scene-review prompt asks for a [clothing_owner] answer', () => {
-    const prompt = PB.buildSceneReviewPrompt(
-      { title: 'A Story', language: 'de', characters: [{ id: 1, name: 'A' }], mainCharacters: [1] },
-      [{ pageNumber: 1, brief: 'A character stands at a rail.' }],
-      { beats: [{ pageNumber: 1, planLine: 'wide — a character at a rail — she looks out — the rail is established' }] },
-    );
-    expect(prompt).toBeTruthy();
-    expect(prompt).toContain('[clothing_owner]');
-    expect(prompt).not.toMatch(/\{[A-Z_]+\}/);   // no placeholder survived
-  });
-
-  it('the mechanical-faults check no longer promises a garment move', () => {
-    const prompt = PB.buildSceneReviewPrompt(
-      { title: 'A Story', language: 'de', characters: [{ id: 1, name: 'A' }], mainCharacters: [1] },
-      [{ pageNumber: 1, brief: 'A character stands at a rail.' }],
-      // Check 0 is sent only with the section it is about (2026-09-23).
-      { clothingFindings: '# MECHANICAL CLOTHING FAULTS\n- Page 1: a fault' },
-    );
-    const check0 = String(prompt).split('[page_repetition]')[0];
-    expect(check0).toContain('[clothing_mechanical]');
-    expect(check0).not.toMatch(/rightful owner/);
-  });
-});

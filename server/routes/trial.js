@@ -167,7 +167,7 @@ router.get('/admin-bypass-token', authenticateToken, (req, res) => {
 
 // ─── Abuse Prevention: Turnstile + Fingerprint + Daily Cap ──────────────────
 
-const { trialAvatarLimiter, jobStatusLimiter, trialEventLimiter } = require('../middleware/rateLimit');
+const { trialAvatarLimiter, jobStatusLimiter, trialEventLimiter, ideaLandmarksPrepareLimiter } = require('../middleware/rateLimit');
 
 // Global daily trial counter — in-memory cache backed by DB persistence
 // In-memory for fast cap checks, synced to DB for history across deploys
@@ -2217,6 +2217,23 @@ router.post('/analyze-photo', trialPhotoLimiter, async (req, res) => {
  * in storyIdeas.js but with simplified params (no location, no landmarks,
  * languageLevel='standard') and no auth required.
  */
+/**
+ * PREPARE THE IDEA LANDMARKS (2026-09-27): fired by /try the moment the story
+ * kind is picked. Answers 202 at once; resolves the story's landmark list and
+ * starts Jev's LB1 ranking in the background, so the idea request can read it
+ * without waiting (jevSelection.prepareTrialIdeaLandmarks). Same location
+ * source as the idea request: the client's, else the IP lookup.
+ */
+router.post('/prepare-idea-landmarks', ideaLandmarksPrepareLimiter, (req, res) => {
+  res.status(202).json({ ok: true });
+  const { storyCategory, storyTopic, storyTheme, language, characters, userLocation: clientLocation } = req.body || {};
+  (async () => {
+    let userLocation = clientLocation || null;
+    if (!userLocation?.city) userLocation = await lookupIpLocation(req, 'TRIAL');
+    await require('../lib/jevSelection').prepareTrialIdeaLandmarks({ characters: characters || [], storyCategory, storyTheme, storyTopic, language, userLocation });
+  })().catch(err => log.error(`🚨 [TRIAL] prepare-idea-landmarks failed: ${err.message}`));
+});
+
 router.post('/generate-ideas-stream', trialIdeasLimiter, async (req, res) => {
   // Set up SSE headers. Connection: keep-alive is forbidden in HTTP/2 — see
   // storyIdeas.js for the same fix.
@@ -2279,19 +2296,17 @@ router.post('/generate-ideas-stream', trialIdeasLimiter, async (req, res) => {
 
     const langInstruction = getLanguageInstruction(language);
 
-    // Look up landmarks if user location is available (best-effort, top 3)
+    // The own-town idea's landmarks: 3 from the SAME list the trial story will
+    // read (the story's resolver and limit — it was getIndexedLandmarks(loc, 3),
+    // which named places outside that list), Jev's pick when the ranking the
+    // prepare call started is ready, today's order otherwise (never a wait).
     let landmarksText = '';
-    if (userLocation?.city && storyCategory !== 'historical') {
-      try {
-        const { getIndexedLandmarks } = require('../lib/landmarkPhotos');
-        const landmarks = await getIndexedLandmarks(userLocation, 3);
-        if (landmarks.length > 0) {
-          landmarksText = 'At least one scene must take place at one of these real local landmarks: ' + landmarks.map(l => l.name).join(', ') + '.';
-          log.debug(`  [LANDMARK] Including ${landmarks.length} landmarks: ${landmarks.map(l => l.name).join(', ')}`);
-        }
-      } catch (err) {
-        log.debug(`  [LANDMARK] Lookup failed: ${err.message}`);
-      }
+    try {
+      const idea = await require('../lib/jevSelection').trialIdeaLandmarks({ characters, storyCategory, storyTheme, storyTopic, language, userLocation });
+      landmarksText = idea.text;
+      if (idea.names.length) log.debug(`  [LANDMARK] Including ${idea.names.length} landmarks (${idea.source}): ${idea.names.join(', ')}`);
+    } catch (err) {
+      log.debug(`  [LANDMARK] Lookup failed: ${err.message}`);
     }
 
     // Look up pre-defined title for this topic

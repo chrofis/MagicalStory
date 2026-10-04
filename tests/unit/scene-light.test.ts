@@ -111,12 +111,11 @@ describe('the plate prompt and its judge read the same two fields', () => {
   });
 });
 
-describe('one rule for every brief author and the scene review', () => {
-  it('reaches the all-pages AD, the review and the trial writer, filled', () => {
+describe('one rule for every brief author', () => {
+  it('reaches the all-pages AD and the trial writer, filled', () => {
     const beats = [{ pageNumber: 1, planLine: 'wide — Mira — she lifts the lantern — it glows' }];
     const built = [
-      String(PB.buildSceneExpansionAllPrompt(inputData, beats, {})),
-      String(PB.buildSceneReviewPrompt(inputData, [{ pageNumber: 1, brief: brief('A pier.') }], { beats })),
+      String(PB.buildSceneBriefsAllPrompt(inputData, beats, {})),
       String(PB.buildTrialStoryPrompt(inputData, 4)),
     ];
     for (const text of built) {
@@ -125,7 +124,8 @@ describe('one rule for every brief author and the scene review', () => {
     }
   });
   it('the AD no longer splits a vantage for light — the plate is re-lit instead', () => {
-    const ad = String(PB.buildSceneExpansionAllPrompt(inputData, [{ pageNumber: 1, planLine: 'wide — Mira — x — y' }], {}));
+    // Vantages are authored in the Art Director's Visual Bible call (2026-09-28).
+    const ad = String(PB.buildVisualBibleCallPrompt(inputData, [{ pageNumber: 1, planLine: 'wide — Mira — x — y' }], {}));
     expect(ad).not.toContain('Split it too when its pages differ in time of day or weather');
     expect(ad).toContain('Never split for a different cast, time of day or weather');
   });

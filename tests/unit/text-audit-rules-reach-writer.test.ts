@@ -162,7 +162,8 @@ describe('a reversed decision is a rule on both sides', () => {
   it('the arc-informed auditor asks it under CAUSE, not under a new type', () => {
     const p = sighted();
     expect(p).toContain('takes back, demands or acts on a thing they had refused, given up or discarded');
-    expect(p.match(/^\d+\. [A-Z]+:/gm)).toHaveLength(14);
+    // 15 since 2026-09-28: COUNT, the writers' own PICTURE_COUNT_RULE.
+    expect(p.match(/^\d+\. [A-Z]+:/gm)).toHaveLength(15);
   });
 
   it('the blind auditor asks it under CONTRADICTION, not under a new type', () => {
@@ -176,8 +177,11 @@ describe('a reversed decision is a rule on both sides', () => {
     expect(types(sighted())).toEqual([
       'ASSUMED', 'UNFORCED', 'DEVICE', 'TRANSITION', 'CAUSE', 'ENTRANCE',
       'LANGUAGE', 'LIMIT', 'PAYOFF', 'PULL', 'INFERRED', 'LOADBEARING',
-      'CONTRADICTION', 'ENDING',
+      'CONTRADICTION', 'ENDING', 'COUNT',
     ]);
+    // COUNT is the writers' own rule, one constant (2026-09-28).
+    expect(beats()).toContain(B.PICTURE_COUNT_RULE);
+    expect(trial()).toContain(B.PICTURE_COUNT_RULE);
     // ENDING is the writer's own rule too: the rulebook's last-page line (2026-09-23).
     expect(beats()).toContain('The last page ends on the concrete act or spoken line the story ends with');
     // STYLE (2026-09-23) checks the writer's own STYLE_RULEBOOK, injected verbatim.

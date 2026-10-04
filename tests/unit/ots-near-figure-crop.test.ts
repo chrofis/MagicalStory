@@ -22,7 +22,7 @@ const PB = require_('../../server/lib/promptBuilders');
 const { loadPromptTemplates } = require_('../../server/services/prompts');
 const { log } = require_('../../server/utils/logger');
 const {
-  OTS_NEAR_FIGURE_CROP, OTS_NO_CONTACT_RULE, OTS_NEAR_FIGURE_RULE, SHOTS, isOverTheShoulderPerspective,
+  OTS_NEAR_FIGURE_CROP, OTS_NO_CONTACT_RULE, OTS_NEAR_FIGURE_RULE, OTS_NEAR_FIGURE_FACING, SHOTS, isOverTheShoulderPerspective,
 } = require_('../../server/lib/shotVocabulary');
 
 const CAST = [
@@ -132,14 +132,19 @@ describe('the over-the-shoulder near figure is drawn as a crop', () => {
 });
 
 describe('one rule reaches the planner and every brief-authoring template', () => {
-  it('story-beats carries the no-contact rule, filled', () => {
+  // The planner no longer picks a shot (2026-09-27): the rule rides in the Jev
+  // over-the-shoulder question that chooses the shot, and leaves the planner.
+  it('the Jev shot question carries the no-contact rule; the planner no longer does', () => {
+    const qs = require('../../server/lib/jevDecisions').shotFitQuestions();
+    const ots = Object.values(qs).find((q: any) => /over-the-shoulder shot, better/.test(q.instructions)) as any;
+    expect(ots.instructions).toContain(OTS_NO_CONTACT_RULE);
     const beats = String(PB.buildBeatsPrompt(inputData, 12, { finalArc: 'An arc.' }));
-    expect(beats).toContain(OTS_NO_CONTACT_RULE);
+    expect(beats).not.toContain(OTS_NO_CONTACT_RULE);
     expect(beats).not.toContain('{OTS_NO_CONTACT}');
   });
 
   it('both Art Director templates carry the near-figure rule, filled', () => {
-    const all = String(PB.buildSceneExpansionAllPrompt(inputData, [{ pageNumber: 1, planLine: 'medium — Levin — he waves — he is seen' }], {}));
+    const all = String(PB.buildSceneBriefsAllPrompt(inputData, [{ pageNumber: 1, planLine: 'medium — Levin — he waves — he is seen' }], {}));
     const one = String(PB.buildSceneExpansionPrompt(1, 'He waved.', CAST, 'en', VISUAL_BIBLE, '', null, {}));
     for (const [label, p] of [['all-pages', all], ['per-page', one]] as [string, string][]) {
       expect(p, `${label} lost the rule`).toContain(OTS_NEAR_FIGURE_RULE);
@@ -171,5 +176,33 @@ describe('the camera is BEHIND the near figure, not beside it (Lab 1419 rendered
   it('the subject is placed far off, not beside the near figure', () => {
     const ots = SHOTS.find((s: { id: string }) => s.id === 'over-the-shoulder');
     expect(ots.definition).toMatch(/far across the frame/);
+  });
+});
+
+// OWNER 2026-09-28 (staging job_1790539784661_6mjcny1c7 p12): the brief made
+// the figure turning AWAY from the other the near crop. One sentence says which
+// figure stands nearest the camera, in the definition (illustrator + the Jev fit
+// question), the Art Director / iterate rule and the built prompts.
+describe('the near figure is the one looking toward the far figure', () => {
+  it('one sentence rides in the shot definition, the Jev question and the Art Director rule', () => {
+    const ots = SHOTS.find((s: { id: string }) => s.id === 'over-the-shoulder');
+    expect(ots.definition).toContain(OTS_NEAR_FIGURE_FACING);
+    expect(OTS_NEAR_FIGURE_RULE).toContain(OTS_NEAR_FIGURE_FACING);
+    const qs = require('../../server/lib/jevDecisions').shotFitQuestions();
+    const q = Object.values(qs).find((x: any) => /over-the-shoulder shot, better/.test(x.instructions)) as any;
+    expect(q.instructions).toContain(OTS_NEAR_FIGURE_FACING);
+    expect(OTS_NEAR_FIGURE_FACING).toMatch(/never a figure turning away/);
+  });
+
+  it('reaches both Art Director templates and both iterate templates, built', () => {
+    const all = String(PB.buildSceneBriefsAllPrompt(inputData, [{ pageNumber: 1, planLine: 'medium — Levin — he waves — he is seen' }], {}));
+    const one = String(PB.buildSceneExpansionPrompt(1, 'He waved.', CAST, 'en', VISUAL_BIBLE, '', null, {}));
+    expect(all).toContain(OTS_NEAR_FIGURE_FACING);
+    expect(one).toContain(OTS_NEAR_FIGURE_FACING);
+    for (const freeIterate of [false, true]) {
+      const p = String(PB.buildSceneDescriptionPrompt(
+        1, 'He waved.', CAST, 'draft', 'en', VISUAL_BIBLE, [], {}, '', '', null, null, { freeIterate }));
+      expect(p).toContain(OTS_NEAR_FIGURE_FACING);
+    }
   });
 });

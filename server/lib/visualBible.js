@@ -893,6 +893,21 @@ const SCALE_PHRASES = Object.freeze({
  * where the plot turns on one (promptBuilders SIZE_LOOK_RULE), so the author
  * is told to decide the band from what the story has the element do.
  */
+/**
+ * A creature's BODY PARTS, as its own field (owner, 2026-09-28).
+ *
+ * The `animals` schema offered `features: "[collar, markings, accessories]"`
+ * and no slot for the body itself, so a part the story leans on was nobody's
+ * to write down. Staging job_1790539784661_6mjcny1c7: the story has the
+ * creature spread its wings and fly off, its entry named no wings, and every
+ * reference cell drew it wingless. `anatomy` is filled from this one string at
+ * both Visual Bible authoring sites (the all-pages Art Director and the trial
+ * writer), like SCALE_CLASS_SPEC, and `buildAnimalDescription` puts it into
+ * the description the reference cell paints and the cell gates judge. A JSON
+ * string value in those templates: never a double quote.
+ */
+const ANIMAL_ANATOMY_SPEC = "[every body part the story gives this creature or implies, each with its count: a creature that flies has wings; a stated number of heads, horns, legs or tails is that number. Body parts only — colour and pattern belong to coloring]";
+
 const SCALE_CLASS_SPEC = "[the element's scale band, one of: fingertip-sized, palm-sized, hand-sized, melon-sized, forearm-sized, arm-sized, knee-high, waist-high, chest-high, adult-height, twice-adult-height, house-height, landmark. Two questions, two groups — answer one of them, never both. HOW BIG IS IT, for a thing someone could pick up and hold; these bands say nothing about how tall it stands: fingertip-sized — a pea, a ring; palm-sized — an apple, a mouse; hand-sized — a book, a loaf; melon-sized — a football, a lantern, a helmet; forearm-sized — a rolling pin, a small cat; arm-sized — a broom, a shovel. HOW TALL DOES IT STAND, for a thing that rests on the ground and has a height; these bands say nothing about how bulky it is: knee-high — a dog, a stool; waist-high — a young child, a barrel; chest-high — a counter, a pony; adult-height — a doorway, a grown-up standing; twice-adult-height — a market stall with its roof; house-height — a house, a full-grown tree; landmark — a cliff, a mountain, the horizon behind everything. A band never carries the other group's meaning: a head-sized thing is melon-sized, never adult-height. Judge the element's largest dimension, not how the story feels about it. The story states a size only where its plot turns on one, so the band is yours to decide from what the story has the element do — held in one hand, lifted by two, ridden, hidden under a bed. This is the only place the element's size is stated. Never omitted.]";
 
 /** Ascending. The order IS the contract — a reader must be able to tell any two apart. */
@@ -1414,6 +1429,8 @@ function buildAnimalDescription(animal) {
   if (grown) parts.push(`a fully grown adult ${species || 'creature'} with adult body proportions`);
   else if (species) parts.push(species);
   if (animal.coloring) parts.push(animal.coloring);
+  // The body the cell must draw, every part counted (ANIMAL_ANATOMY_SPEC).
+  if (animal.anatomy) parts.push(animal.anatomy);
   // NO SIZE (owner, 2026-09-23: "Cells get no size"). `description` is what a
   // Visual Bible reference cell paints, and a cell shows one element alone —
   // a phrase measuring it against an adult names a figure the cell must not
@@ -3833,6 +3850,7 @@ module.exports = {
   recordElementCellGate,
   SCALE_CLASSES,
   SCALE_CLASS_SPEC,
+  ANIMAL_ANATOMY_SPEC,
   SCALE_PHRASES,
   LEGACY_SCALE_CLASSES,
   resolveScaleClass,

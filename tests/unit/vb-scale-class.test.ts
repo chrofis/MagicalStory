@@ -543,7 +543,7 @@ describe('the authoring templates offer exactly the code enum', () => {
   const fs = require('fs');
   const path = require('path');
   const ROOT = path.resolve(__dirname, '../..');
-  const SITES = ['prompts/scene-expansion-all.txt', 'prompts/story-trial.txt'];
+  const SITES = ['prompts/visual-bible.txt', 'prompts/story-trial.txt'];
 
   const trialInput = {
     language: 'en',
@@ -578,7 +578,7 @@ describe('the authoring templates offer exactly the code enum', () => {
   beforeAll(async () => {
     await loadPromptTemplates();
     built = {
-      all: String(PB.buildSceneExpansionAllPrompt(allInput, BEATS, {})),
+      all: String(PB.buildVisualBibleCallPrompt(allInput, BEATS, {})),
       trial: String(PB.buildTrialStoryPrompt(trialInput, 5)),
     };
   });

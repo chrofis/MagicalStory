@@ -56,7 +56,7 @@ describe('Art Director: what counts as one location', () => {
   beforeAll(async () => { await loadPromptTemplates(); });
 
   it('the all-pages Art Director, the only location author, gets both halves', () => {
-    const ad = String(PB.buildSceneExpansionAllPrompt(input, BEATS, {}));
+    const ad = String(PB.buildVisualBibleCallPrompt(input, BEATS, {}));
     expect(ad).toContain(PB.PLACE_SEPARATE_RULE);
     expect(ad).toContain(PB.PLACE_INSIDE_OUTSIDE_RULE);
     expect(unfilled(ad)).not.toContain('{PLACE_SEPARATE}');

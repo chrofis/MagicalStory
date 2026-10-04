@@ -33,6 +33,8 @@ Write ONE arc: its story logic first, then the arc told from it, then its critiq
 
 {ARC_LOGIC_SPEC}
 
+{CHALLENGES_TAKEN}
+
 Then "ARC:" and {ARC_LENGTH} numbered sentences told from the story logic, each following from the one before — therefore, or but, never "and then".
 
 Then "CRITIQUE:", built exactly like this:

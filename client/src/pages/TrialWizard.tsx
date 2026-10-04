@@ -292,6 +292,33 @@ export default function TrialWizard() {
     }).catch(() => {});
   }, []);
 
+  // Rank the town's landmarks for this story kind the moment it is complete,
+  // so the idea request reads a ready ranking and never waits for one
+  // (server: POST /api/trial/prepare-idea-landmarks). The fields match what
+  // TrialIdeasStep sends; the kind is complete by TrialTopicStep's own rule.
+  const preparedLandmarksKeyRef = useRef('');
+  useEffect(() => {
+    const { storyCategory, storyTopic, storyTheme } = storyInput;
+    const complete = storyCategory === 'adventure' ? !!storyTheme
+      : storyCategory === 'life-challenge' ? !!storyTopic && !!storyTheme
+        : !!storyCategory && !!storyTopic;
+    if (!complete || storyCategory === 'historical' || !characterData.age) return;
+    const data = {
+      storyCategory, storyTopic, storyTheme, language: storyInput.language,
+      characters: [{ age: characterData.age, gender: characterData.gender }],
+      ...(userLocation?.city ? { userLocation } : {}),
+    };
+    const key = JSON.stringify(data);
+    if (key === preparedLandmarksKeyRef.current) return;
+    preparedLandmarksKeyRef.current = key;
+    const apiUrl = import.meta.env.VITE_API_URL || '';
+    fetch(`${apiUrl}/api/trial/prepare-idea-landmarks`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }).catch(() => { /* ranking is optional for the idea request */ });
+  }, [storyInput, characterData.age, characterData.gender, userLocation]);
+
   const isAdmin = user?.role === 'admin';
 
   // Anonymous session state — admins always start fresh (clear stale tokens)

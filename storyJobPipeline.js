@@ -399,6 +399,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
   // on. One declaration, both readers. See docs/decisions.md
   // "Unevaluated runs report not-measured, never a clean score".
   const skipQualityEval = inputData.skipQualityEval === true;
+  // The trial's Jev switch (jevDecisions.jevFallBack): its one Jev step is the
+  // landmark selection before the writer call. A beats story keeps its own
+  // report inside generateStoryViaBeats.
+  const trialJev = { probe: null, fallback: null };
 
   // The stories row exists from the FIRST moment (owner, 2026-08-15).
   // story_images.story_id references stories.id, so anything written during
@@ -670,6 +674,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // pre-beats unified writer (buildUnifiedStoryPrompt + story-unified*.txt)
     // was deleted 2026-09-15 — see docs/decisions.md. resolvePipelineMode
     // guarantees a non-trial job is always 'beats', so this stays null there.
+    // The trial writer reads the first 3 landmarks: Jev picks them on the
+    // chosen idea (LB2, 3 at random from the top 5, the premise-named place
+    // pinned first). Probed first, as a beats story is; on the backup the
+    // resolver's order stands (docs/decisions.md 2026-09-27 "Jev selection built").
+    if (inputData.trialMode) {
+      await require('./server/lib/jevSelection').selectStoryLandmarks(inputData, { jevReport: trialJev, gl: genLog, mode: 'trial', probe: true });
+    }
     const unifiedPrompt = inputData.trialMode
       ? buildTrialStoryPrompt(inputData, sceneCount)
       : null;
@@ -3767,6 +3778,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // No `rounds`: the chain is fixed at two parallel audits → one repair
           // → one lector (owner ruling 2026-09-03). There is no loop to bound.
           usageLabel: 'text_refine',
+          // A story already on the Jev-outage backup does not ask Jev again.
+          jevOptions: { jevFallback: beatsResult?.jevFallback || null },
           // Latest completed state, so the join below can salvage the audit and
           // any finished round if the chain FAILS partway. (It is no longer a
           // deadline fallback — the join has no deadline.)
@@ -4128,6 +4141,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // captured inside generateStoryViaBeats at each rewrite; null on the
     // unified path, which has no beats or scene review.
     const beatsReviewReport = beatsResult?.beatsReviewReport || null;
+    // The Jev decision layer's report (2026-09-27): cast cuts, shots, light,
+    // VB citations, aboard, population, gaze — every decision per page, so a
+    // run can be replayed. docs/decisions.md "Jev decision layer wired".
+    const jevDecisions = beatsResult?.jevDecisions || null;
+    // Set when the Jev-outage backup ran (owner exception, 2026-09-27): {step, reason, at}.
+    // A trial's only Jev step is its landmark selection (trialJev below).
+    const jevFallback = beatsResult?.jevFallback || trialJev.fallback || null;
     // Drafted arc + the arc reviewer's analysis, so a shipped story can be read
     // back against the arc it promised.
     const arcReviewReport = beatsResult?.arcReviewReport || null;
@@ -4143,7 +4163,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // check's findings (adopt / conflict) — diagnostics, stored with the story.
     const storyBibleReport = beatsResult?.storyBibleReport || null;
     const wardrobeBibleReport = beatsResult?.wardrobeBibleReport || null;
-    const sceneReviewReport = beatsResult?.sceneReviewReport || null;
+    // The brief checks and their one re-ask (2026-09-28) — the scene review's
+    // successor; before/after per re-asked page.
+    const briefCheckReport = beatsResult?.briefCheckReport || null;
     // The prompt that WROTE the briefs, next to the one that reviewed them.
     // Beats contributes the timings and which pages fell back to a per-page
     // call; `prompts[]` is the story-wide prompt table every page references
@@ -5699,6 +5721,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // no score, no severity and no repair route.
           degradedScene: describeDegradedSceneMetadata(img.sceneMetadata),
           outlineExtract: img.scene?.outlineExtract || img.scene?.sceneHint || '',
+          // The fields the Jev decision layer fixed for this page (2026-09-28):
+          // an iterate rewrite re-pins them (images.js iteratePageCore). null
+          // on a trial, a cover and the Jev-outage backup.
+          jevFixed: img.scene?.jevFixed || null,
           imageData: img.imageData,
           generatedAt: new Date().toISOString(),
           prompt: img.prompt,
@@ -6136,6 +6162,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // no score, no severity and no repair route.
           degradedScene: describeDegradedSceneMetadata(img.sceneMetadata),
           outlineExtract: img.scene?.outlineExtract || img.scene?.sceneHint || '',
+          // The fields the Jev decision layer fixed for this page (2026-09-28):
+          // an iterate rewrite re-pins them (images.js iteratePageCore). null
+          // on a trial, a cover and the Jev-outage backup.
+          jevFixed: img.scene?.jevFixed || null,
           imageData: img.imageData,
           generatedAt: new Date().toISOString(),
           prompt: img.prompt,
@@ -6832,13 +6862,22 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       generationLog: genLog.getEntries(), // Generation log for dev mode
       textRefineReport, // per-page before/after from the parallel refine pass
       arcReviewReport,   // drafted arc + arc-review analysis (beats mode)
-      // The catalogue ids this book was OFFERED. The next book on this
-      // account excludes them at draw time (loadUsedChallengeIds) — which is
-      // the whole of the cross-story variety rule: no prompt names a previous
-      // story, so nothing can leak one book's cast into another's.
+      // The catalogue ids this book was OFFERED — kept for audit: a repeat can
+      // be read back against the whole menu the arc saw.
       challengeDrawIds,
-      challengeTakenIds, // which of them the arc built on, by catalogue id
-      challengeDraw, // the random catalogue menu the arc plan was offered (beats mode)
+      // The ids of those the shipped arc actually TOOK (a subset). THIS is what
+      // the next book on this account excludes at draw time
+      // (loadUsedChallengeIds; owner, 2026-09-21 / 2026-09-27) — the whole of
+      // the cross-story variety rule: no prompt names a previous story. An empty
+      // list with a non-empty draw raises `arc_challenges_taken_missing`.
+      challengeTakenIds,
+      challengeDraw, // the catalogue menu the arc plan was offered (beats mode)
+      // How that menu was chosen (2026-09-27): Jev's score per eligible id, its
+      // top 20 and the 12 drawn — or the random draw on the Jev backup.
+      challengeSelection: beatsResult?.challengeSelection || null,
+      // How the landmark list was ordered: Jev's LB2 score per place and the
+      // order every writer read (the trial: the 3 it was given) — or today's.
+      landmarkSelection: inputData.landmarkSelection || null,
       // What a Test Lab replay needs and the run held only in memory
       // (2026-09-27): the shuffled landmark list every writer prompt read, and
       // the run's model overrides. Text only. Read by beatsReplayInputs
@@ -6848,6 +6887,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         modelOverrides: modelOverrides || null,
       },
       beatsReviewReport, // per-page before/after from the beats review (beats mode)
+      jevDecisions, // the Jev decision layer's per-page decisions (beats mode)
+      jevFallback, // the Jev-outage backup ran from this step (null = Jev-authored)
       storyBibleReport, // wardrobe contract call: prompt + raw reply (beats mode)
       clothingReviewReport, // per-outfit before/after from the wardrobe review (beats mode)
       wardrobeBibleReport, // wardrobe contract vs Visual Bible: adopt / conflict findings (beats mode)
@@ -6855,7 +6896,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       // pages each produced — so "what was this book's brief actually asked for"
       // is a query, not a worktree rebuild at the run's commit.
       sceneExpansionReport,
-      sceneReviewReport, // per-page before/after from the scene review (beats mode)
+      briefCheckReport, // brief checks + the one Art Director re-ask: findings, verdicts, taken rewrites (beats mode)
       finalChecksReport: finalChecksReport || null, // Final consistency checks report (dev mode)
       analytics: {
         // Cost
@@ -7870,8 +7911,11 @@ async function _processStoryJobImpl(jobId) {
 
     // Inject pre-discovered landmarks if available for this user's location.
     // Shared resolver: landmark_index (proximity fallback) -> shared in-memory
-    // cache. No live discovery at job start (would block 15s); shuffled so the
-    // writer doesn't keep reaching for the same top-scored entries.
+    // cache. No live discovery at job start (would block 15s). Shuffled: that
+    // is the order a story on the Jev backup keeps; with Jev live the list is
+    // re-ordered by its fit to the commissioned idea before any writer reads
+    // it (jevSelection.selectStoryLandmarks — beats: generateStoryViaBeats;
+    // trial: before the writer call in processUnifiedStoryJob).
     // Skip for historical stories - they use historically accurate locations, not local landmarks
     if (inputData.userLocation?.city && inputData.storyCategory !== 'historical') {
       const { resolveAvailableLandmarks } = require('./server/lib/landmarkPhotos');
@@ -7880,7 +7924,9 @@ async function _processStoryJobImpl(jobId) {
         // pipeline asked for 30 and the arc prompt then carried 15.5k chars of
         // landmark listing — 41% of everything the arc creator read, most of it
         // guild houses and archives no children's story reaches for.
-        limit: 20, discoverOnMiss: false, language: inputData.language, shuffle: true,
+        // The trial idea route resolves the same list (jevSelection
+        // .resolveTrialIdeaLandmarks), so an idea only names places the story has.
+        limit: require('./server/lib/jevSelection').STORY_LANDMARK_LIMIT, discoverOnMiss: false, language: inputData.language, shuffle: true,
         // A landmark the family names in their idea is pinned first (after the
         // shuffle), so the writer's top-3 opens on it.
         premiseText: [inputData.storyDetails, inputData.title].filter(Boolean).join('\n'),

@@ -3,7 +3,7 @@
  *
  * WHY THIS EXISTS — owner directive, 2026-09-17. A page brief is authored at
  * FOUR sites: the two Art Director templates that write it the first time
- * (scene-expansion.txt, scene-expansion-all.txt) and the two iterate templates
+ * (scene-expansion.txt, scene-briefs-all.txt) and the two iterate templates
  * that REWRITE it when the render proves it unbuildable (scene-iteration.txt,
  * scene-iteration-free.txt). The rewrite replaces the brief wholesale and
  * becomes the page's contract with the image model, so a rule only the first
@@ -84,7 +84,7 @@ const BEATS = [
 
 const PAGE_TEXT = 'The lamp guttered twice and then went out, and nobody said a word.';
 
-const buildAdAll = () => PB.buildSceneExpansionAllPrompt(inputData, BEATS, {});
+const buildAdAll = () => PB.buildSceneBriefsAllPrompt(inputData, BEATS, {});
 const buildAdOne = () => PB.buildSceneExpansionPrompt(
   1, PAGE_TEXT, CHARACTERS, 'en', VISUAL_BIBLE, '', null, { story: inputData });
 const buildIterate = (freeIterate: boolean) => PB.buildSceneDescriptionPrompt(
@@ -130,7 +130,7 @@ describe('the four page-brief authoring sites', () => {
   it('builds all four prompts', async () => {
     await loadPromptTemplates();
     BUILT = [
-      { name: 'scene-expansion-all.txt (Art Director, all pages)', text: buildAdAll() },
+      { name: 'scene-briefs-all.txt (Art Director, all pages)', text: buildAdAll() },
       { name: 'scene-expansion.txt (Art Director, per page)', text: buildAdOne() },
       { name: 'scene-iteration.txt (rewrite, strict)', text: buildIterate(false) },
       { name: 'scene-iteration-free.txt (rewrite, free)', text: buildIterate(true) },
@@ -141,7 +141,7 @@ describe('the four page-brief authoring sites', () => {
   it('the registry set names all four, and every anchor is resolvable here', () => {
     expect(SET, 'sibling set art-director-vs-iterate is gone from the registry').toBeTruthy();
     expect(SET.members.slice().sort()).toEqual([
-      'prompts/scene-expansion-all.txt',
+      'prompts/scene-briefs-all.txt',
       'prompts/scene-expansion.txt',
       'prompts/scene-iteration-free.txt',
       'prompts/scene-iteration.txt',

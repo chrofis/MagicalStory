@@ -1,6 +1,6 @@
 ---
 name: review-scene
-description: Use when reviewing scene descriptions from generated stories, debugging scene prompt issues, or adding new checks to the scene prompts (scene-expansion.txt / scene-review.txt)
+description: Use when reviewing scene descriptions from generated stories, debugging scene prompt issues, or adding new checks to the scene prompts (scene-briefs-all.txt / the brief checks in sceneBriefCheck.js)
 ---
 
 # Review Scene
@@ -34,7 +34,7 @@ Wait for the user: wrong location, characters too close/far, missing elements, p
 The relevant files (which one is live depends on `PIPELINE_MODE` — beats vs unified; check before editing):
 
 - `prompts/scene-expansion.txt` (and `scene-expansion-all.txt`) — Art Director authoring rules
-- `prompts/scene-review.txt` — cross-page critique checks
+- `prompts/scene-review.txt` — DELETED 2026-09-28; its kept checks are code checks in `server/lib/sceneBriefCheck.js` / `clothingCheck.js`, sent to `prompts/brief-reask.txt`
 - `prompts/scene-iteration.txt` / `scene-repair.txt` — downstream siblings; check them for the same rule (fixing-sibling-paths)
 
 Follow the validating-prompt-changes skill before editing: terse rules, archetypal examples only, validate against ≥3 stored pages, and grep for duplicate instruction sites.

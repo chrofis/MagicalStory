@@ -53,7 +53,7 @@ describe('baked cover title: trim-safe margin', () => {
     const p = frontPrompt(TITLES[0]);
     expect(p).toContain('upper third of the canvas');
     expect(p).toContain('three-dimensional letters');
-    expect(p).toContain('never a standard computer font');
+    expect(p).toContain('never a computer font');
     expect(p).toContain('only text in the image');
     expect(p).toContain('never in a band, strip or caption area');
   });
@@ -65,7 +65,7 @@ describe('baked cover title: trim-safe margin', () => {
       expect(idx, t).toBeGreaterThan(-1);
       // Nothing may follow the title block — the margin clause is its last
       // sentence, so it is the tail of the whole prompt.
-      expect(p.endsWith('rather than reaching that margin.'), t).toBe(true);
+      expect(p.endsWith('breaks onto more lines instead.'), t).toBe(true);
       // And the quoted title itself is inside that trailing block.
       expect(p.slice(idx), t).toContain(`"${t}"`);
     }

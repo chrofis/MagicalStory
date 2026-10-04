@@ -3540,15 +3540,13 @@ async function blendPastedCanvas({
   // generation uses: it holds the REQUIRED OBJECTS + ART STYLE tail back and
   // reattaches it verbatim. A blind cut is not an option — one measured at 7.5k
   // dropped the whole ART STYLE block and rendered photographic 3 times out of 3.
+  // A shrink that cannot fit throws PromptFitError — it is never "sent as built"
+  // (editWithGrok would refuse it anyway, 2026-09-30).
   if (blendPrompt.length > BLEND_PROMPT_HARD_CAP) {
-    try {
-      const { shrinkPromptForModel } = require('./images');
-      const before = blendPrompt.length;
-      blendPrompt = await shrinkPromptForModel(blendPrompt, BLEND_PROMPT_HARD_CAP, 'SCENE COMPOSITE BLEND', GROK_MODELS.STANDARD);
-      log.info(`[SCENE COMPOSITE]   blend prompt ${before} → ${blendPrompt.length} chars (budget ${BLEND_PROMPT_HARD_CAP})`);
-    } catch (err) {
-      log.warn(`[SCENE COMPOSITE] blend prompt shrink failed (${err.message}) — sending as built at ${blendPrompt.length} chars`);
-    }
+    const { shrinkPromptForModel } = require('./images');
+    const before = blendPrompt.length;
+    blendPrompt = await shrinkPromptForModel(blendPrompt, BLEND_PROMPT_HARD_CAP, 'SCENE COMPOSITE BLEND', GROK_MODELS.STANDARD);
+    log.info(`[SCENE COMPOSITE]   blend prompt ${before} → ${blendPrompt.length} chars (budget ${BLEND_PROMPT_HARD_CAP})`);
   }
   debug.blendPrompt = blendPrompt;
   // VB grid as Image 2 — labelled portrait grid serves as the authoritative face /

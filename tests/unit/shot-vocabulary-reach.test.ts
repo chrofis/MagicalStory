@@ -95,7 +95,7 @@ describe('one shot vocabulary reaches every stage that uses the word', () => {
   });
 
   it('both Art Director prompts state the same enum, and it names every shot', () => {
-    const all = PB.buildSceneExpansionAllPrompt(inputData, BEATS, {});
+    const all = PB.buildSceneBriefsAllPrompt(inputData, BEATS, {});
     const one = PB.buildSceneExpansionPrompt(1, 'The lamp went out.', CHARACTERS, 'en', VISUAL_BIBLE, '', null, {});
     for (const [label, prompt] of [['all-pages', all], ['per-page', one]] as [string, string][]) {
       expect(prompt, `${label} Art Director lost the shot enum`).toContain(SHOT_ENUM);

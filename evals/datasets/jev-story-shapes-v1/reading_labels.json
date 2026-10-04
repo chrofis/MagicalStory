@@ -1,0 +1,22 @@
+{
+ "_note": "Reading labels, written 2026-09-27 from the setup + premise BEFORE any Jev call. G = the premise is naturally told this way; N = workable; B = the shape fights the commission or the reader's age. Shapes per band: scripts/analysis/eval-jev-story-shapes.js BAND_SETS.",
+ "S1": { "hero-journey": "G", "man-in-a-hole": "N", "home-away-home": "G", "rule-of-three": "G", "overcoming-the-monster": "B", "cinderella": "B", "comedy": "B", "rebirth": "G" },
+ "S4": { "hero-journey": "N", "man-in-a-hole": "G", "home-away-home": "B", "rule-of-three": "G", "overcoming-the-monster": "B", "cinderella": "B", "comedy": "B", "rebirth": "B" },
+ "S5": { "hero-journey": "N", "man-in-a-hole": "G", "home-away-home": "B", "rule-of-three": "G", "overcoming-the-monster": "B", "cinderella": "B", "comedy": "N", "rebirth": "B" },
+ "S2": { "hero-journey": "N", "man-in-a-hole": "N", "home-away-home": "B", "quest": "G", "rule-of-three": "N", "overcoming-the-monster": "N", "cinderella": "B", "comedy": "N", "rebirth": "B", "kishotenketsu": "B" },
+ "S3": { "hero-journey": "N", "man-in-a-hole": "N", "home-away-home": "B", "quest": "N", "rule-of-three": "G", "overcoming-the-monster": "B", "cinderella": "N", "comedy": "N", "rebirth": "G", "kishotenketsu": "B" },
+ "S6": { "hero-journey": "N", "man-in-a-hole": "N", "home-away-home": "G", "quest": "N", "rule-of-three": "N", "overcoming-the-monster": "B", "cinderella": "B", "comedy": "B", "rebirth": "N", "kishotenketsu": "G" },
+ "S7": { "hero-journey": "B", "man-in-a-hole": "G", "home-away-home": "B", "quest": "B", "rule-of-three": "N", "overcoming-the-monster": "B", "cinderella": "B", "comedy": "B", "rebirth": "G", "kishotenketsu": "B" },
+ "S8": { "hero-journey": "N", "man-in-a-hole": "G", "home-away-home": "B", "quest": "N", "rule-of-three": "G", "overcoming-the-monster": "B", "cinderella": "N", "comedy": "N", "rebirth": "B", "kishotenketsu": "N" },
+ "S9": { "hero-journey": "N", "man-in-a-hole": "N", "home-away-home": "B", "quest": "B", "rule-of-three": "N", "overcoming-the-monster": "B", "cinderella": "G", "comedy": "N", "rebirth": "G", "kishotenketsu": "B" },
+ "S10": { "hero-journey": "G", "man-in-a-hole": "N", "home-away-home": "G", "quest": "G", "rule-of-three": "N", "overcoming-the-monster": "B", "cinderella": "B", "comedy": "B", "rebirth": "B", "kishotenketsu": "B" },
+ "S11": { "routine-day": "G", "circular": "G", "chain": "N" },
+ "Y4": { "routine-day": "G", "circular": "G", "chain": "N" },
+ "Y1": { "fear-choice": "G", "man-in-a-hole": "N", "home-away-home": "N", "three-tries": "N", "cumulative": "N" },
+ "Y2": { "three-tries": "G", "cumulative": "B", "circular": "N", "home-away-home": "B", "kishotenketsu": "B" },
+ "Y3": { "search-quest": "N", "cumulative": "N", "chain": "N", "circular": "N" },
+ "O1": { "hero-journey": "B", "man-in-a-hole": "G", "home-away-home": "B", "quest": "B", "rule-of-three": "N", "overcoming-the-monster": "G", "cinderella": "N", "comedy": "B", "rebirth": "B", "kishotenketsu": "B" },
+ "O2": { "hero-journey": "N", "man-in-a-hole": "N", "home-away-home": "B", "quest": "B", "rule-of-three": "N", "overcoming-the-monster": "G", "cinderella": "B", "comedy": "B", "rebirth": "B", "kishotenketsu": "B" },
+ "O3": { "hero-journey": "B", "man-in-a-hole": "N", "home-away-home": "B", "quest": "N", "rule-of-three": "B", "overcoming-the-monster": "B", "cinderella": "B", "comedy": "N", "rebirth": "N", "kishotenketsu": "G" },
+ "O4": { "hero-journey": "N", "man-in-a-hole": "N", "home-away-home": "G", "quest": "N", "rule-of-three": "N", "overcoming-the-monster": "B", "cinderella": "B", "comedy": "N", "rebirth": "B", "kishotenketsu": "N" }
+}

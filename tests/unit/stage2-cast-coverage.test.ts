@@ -106,17 +106,17 @@ describe('a cast finding says how it is answered', () => {
 
 describe('the re-plan section', () => {
   const findings = [
-    { kind: 'counter', code: 'SHOT_MEDIUM_WIDE_EXCESS', line: 'PLAN[SHOT_MEDIUM_WIDE_EXCESS]: 10/18' },
+    { kind: 'counter', code: 'CAST_NOT_IN_WHO_COLUMN', line: 'PLAN[CAST_NOT_IN_WHO_COLUMN] page 4: the instant names a character the who column does not carry' },
     { kind: 'counter', code: 'UNDER_COVERED_CHARACTER', line: 'PLAN[UNDER_COVERED_CHARACTER] page 1, 12: Kiaan' },
     { kind: 'check', check: 9, line: 'CHECK[9]: page 5' },
   ];
   const plan = Array.from({ length: 18 }, (_, i) => `Page ${i + 1}: medium — Levin — x — y`).join('\n');
   const keep = [{ page: 18, why: "the last page, the ending's event" }];
 
-  it('puts the cast finding before the shot count under MUST FIX', () => {
+  it('puts the cast finding before the cheap relabel under MUST FIX', () => {
     const s = PB.buildReplanSection(plan, findings, { pageCount: 18, keep, castFloor: 3 });
     const must = s.split('## MUST FIX')[1].split('## ALSO NOTED')[0];
-    expect(must.indexOf('UNDER_COVERED_CHARACTER')).toBeLessThan(must.indexOf('SHOT_MEDIUM_WIDE_EXCESS'));
+    expect(must.indexOf('UNDER_COVERED_CHARACTER')).toBeLessThan(must.indexOf('CAST_NOT_IN_WHO_COLUMN'));
     expect(s.split('## ALSO NOTED')[1]).toContain('CHECK[9]');
   });
 

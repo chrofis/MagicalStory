@@ -111,7 +111,9 @@ function pageRenderModel({ sceneMetadata, modelOverrides = {}, coverOpts = null,
  * The page prompt, as a function of the element ids whose reference render
  * rides with the call (the prompt must never promise an image the call does not
  * carry — production rebuilds it once the grid is final). `extraOptions` is the
- * Lab's explicit A/B surface (pageScaleScope); production passes none.
+ * Lab's explicit A/B surface (pageScaleScope) and the iterate repair's locked
+ * text position and render backend (images.js iteratePageCore, 2026-09-28 —
+ * the repair builds its prompt here too); the first render passes none.
  */
 function makePageImagePrompt({ sceneDescription, inputData, sceneCharacters, visualBible, pageNumber, characterPhotos, pageImageModel, coverOpts = null, extraOptions = null }) {
   const { IMAGE_MODELS } = require('../config/models');

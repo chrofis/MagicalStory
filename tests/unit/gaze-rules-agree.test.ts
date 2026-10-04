@@ -4,7 +4,7 @@ const pb = require('../../server/lib/promptBuilders');
 const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../../server/services/prompts');
 
 const chars = [{ id: 'a', name: 'Levin', age: 5 }];
-const built = () => pb.buildSceneExpansionAllPrompt(
+const built = () => pb.buildSceneBriefsAllPrompt(
   { pages: 4, season: 'autumn', language: 'de-CH', languageLevel: '1st-grade', storyDetails: 'x', characters: chars, mainCharacters: ['a'] },
   [{ pageNumber: 1, planLine: 'medium — Levin — waits — nothing' }],
   { maxCharactersPerScene: 6, finalArc: '1.' });
@@ -38,7 +38,7 @@ describe('the gaze rules agree about the viewer', () => {
   });
 
   it('the value list is gone from the templates too — it was a third copy', () => {
-    for (const k of ['sceneExpansionAll', 'sceneExpansion']) {
+    for (const k of ['sceneBriefsAll', 'sceneExpansion']) {
       const t = String(PROMPT_TEMPLATES[k] || '');
       expect(t, `${k} still offers \`camera\``).not.toMatch(/`camera`/);
       expect(t, `${k} lost the looksAt field line`).toMatch(/`looksAt` on every foreground\/midground character/);

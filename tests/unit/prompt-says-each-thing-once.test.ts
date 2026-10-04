@@ -136,9 +136,10 @@ describe('the cut order is ONE list, and the log names each step it cut', () => 
   it('PROMPT_CUT_ORDER is the order the shrinker spends', () => {
     expect(PROMPT_CUT_ORDER.map((s: any) => s.label)).toEqual([
       'COUNTS', 'Composition: facing', 'Composition: ground',
-      // REQUIRED CAST is never cut since 2026-09-25 (owner); Composition: size and
-      // DEPTH AND SIZE since 2026-10-04 (dragon run 9) — PROMPT_NEVER_CUT.
-      'HEIGHT ORDER', 'AGE & PROPORTIONS', 'reference-photo rule', 'single-illustration rule',
+      // REQUIRED CAST is never cut since 2026-09-25 (owner) — PROMPT_NEVER_CUT.
+      // AGE & PROPORTIONS is never cut since 2026-09-27 (owner).
+      // Composition: size and DEPTH AND SIZE since 2026-10-04 (dragon run 9).
+      'HEIGHT ORDER', 'reference-photo rule', 'single-illustration rule',
     ]);
     for (const s of PROMPT_CUT_ORDER) {
       expect(s.what && s.why && s.approxChars > 0, s.label).toBeTruthy();

@@ -4,12 +4,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const require = createRequire(import.meta.url);
-const { assessSceneReview, assertReviewedArtifactUsable, pickReviewedBrief } = require('../../server/lib/sceneReviewGuard.js');
+const { assertReviewedArtifactUsable, pickReviewedBrief } = require('../../server/lib/sceneReviewGuard.js');
 
 // Builds a stored beats_scenes result in the shape the stage writes (the first
 // reviewer on `reviewedBrief`, further ones under `reviewedBriefs[model]`) — the
 // shape pickReviewedBrief reads. Since 2026-09-27 the stage fills it from the
-// run's own review (beatsPipeline.runSceneReview).
+// run's own review (beatsPipeline.runSceneReview, deleted 2026-09-28; stored
+// experiments keep this shape).
 function applyReviewerPages(sceneExpansions: any[], sceneReviews: any[]) {
   sceneReviews.forEach((r, i) => {
     if (!r || r.ok === false || !Array.isArray(r._pages)) return;
@@ -23,40 +24,6 @@ function applyReviewerPages(sceneExpansions: any[], sceneReviews: any[]) {
   });
   for (const r of sceneReviews) if (r) delete r._pages;
 }
-
-const goodText = 'ANALYSIS\n' + 'x'.repeat(3000) + '\n---SCENES---\nPAGE 1\nrewritten';
-
-describe('assessSceneReview — truncation guard', () => {
-  it('marks an empty response FAILED (exp 1109/1121: 0 chars at out=16000; #920: 0 chars, no cap hit)', () => {
-    expect(assessSceneReview({ text: '', outputTokens: 16000, capInForce: 16000, parsedPageCount: 0 }))
-      .toMatchObject({ ok: false, error: expect.stringMatching(/EMPTY/) });
-    expect(assessSceneReview({ text: '   \n', outputTokens: 3899, capInForce: 64000, parsedPageCount: 0 }).ok).toBe(false);
-  });
-
-  it('marks a cap hit FAILED even when text and pages came back (exp 1122/1124: cut mid-output at the cap)', () => {
-    const v = assessSceneReview({ text: goodText, outputTokens: 16000, capInForce: 16000, parsedPageCount: 5 });
-    expect(v.ok).toBe(false);
-    expect(v.error).toMatch(/TRUNCATED/);
-    expect(v.error).toMatch(/16000/);
-  });
-
-  it('uses the provider finish reason when exposed', () => {
-    const v = assessSceneReview({ text: goodText, outputTokens: 9000, stopReason: 'max_tokens', capInForce: 64000, parsedPageCount: 5 });
-    expect(v.ok).toBe(false);
-    expect(v.error).toMatch(/stop_reason=max_tokens/);
-  });
-
-  it('passes a completed review under the cap (exp 1110: 9391 tokens; 1123: 13809)', () => {
-    expect(assessSceneReview({ text: goodText, outputTokens: 9391, stopReason: 'end_turn', capInForce: 64000, parsedPageCount: 17 }))
-      .toEqual({ ok: true, error: null });
-    expect(assessSceneReview({ text: goodText, outputTokens: 13809, capInForce: 64000, parsedPageCount: 14 }).ok).toBe(true);
-  });
-
-  it('marks a long response with zero parsed pages FAILED (format failure), but not a short "no faults" verdict', () => {
-    expect(assessSceneReview({ text: 'A'.repeat(5000), outputTokens: 2000, capInForce: 64000, parsedPageCount: 0 }).ok).toBe(false);
-    expect(assessSceneReview({ text: 'All pages pass. No changes.', outputTokens: 20, capInForce: 64000, parsedPageCount: 0 }).ok).toBe(true);
-  });
-});
 
 describe('assertReviewedArtifactUsable — hazard count refuses a failed review', () => {
   it('throws with the stored reason when sceneReview.ok === false', () => {
@@ -134,13 +101,12 @@ describe('testlab.js source — no hard numeric output caps, guard wired', () =>
     const calls = src.match(/call(?:Stream|TextModelStreaming)\([^;]*?,\s*(\d+)\s*,\s*(?:null|\(\)|\w)/g) || [];
     expect(calls).toEqual([]);
   });
-  it('scene review call is uncapped and runs the guard; hazard count uses the selector', () => {
-    // The review is the run's own (runSceneReview: uncapped, its own truncation guard).
-    expect(src).toMatch(/await runSceneReview\(\{/);
+  it('the hazard count reads a stored review artifact through the guards', () => {
     expect(src).toMatch(/assertReviewedArtifactUsable\(out, expId\)/);
     expect(src).toMatch(/pickReviewedBrief\(x, out, reviewer, expId\)/);
   });
-  it('beats_scenes stores each reviewer\'s briefs in the shape pickReviewedBrief reads', () => {
-    expect(src).toContain('if (i === 0) { x.reviewedBrief = reviewed.brief; x.reviewRewrote = true; } else { (x.reviewedBriefs = x.reviewedBriefs || {})[r.modelKey] = reviewed.brief; }');
+  it('beats_scenes stores a re-asked page\'s taken brief in the shape the page view reads', () => {
+    // The run's brief re-ask replaced the review arms in beats_scenes (2026-09-28).
+    expect(src).toContain("if (taken) { x.reviewedBrief = taken.after; x.reviewRewrote = true; x.rewrittenBy = 'brief re-ask'; }");
   });
 });

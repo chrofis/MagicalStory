@@ -103,6 +103,23 @@ function resolveReplayCentralFigure(storyData) {
 }
 
 /**
+ * The head count production hands the Art Director's decision step
+ * (runArtDirector `present`, 2026-09-28): the shipped division's plan-check
+ * roster, page → names. The canonical recheck when a re-plan shipped, else the
+ * first check — the same check `shippedCheck` is in the run. Read through
+ * beatsPipeline.presentOf's shape; null when the story stored no roster.
+ *
+ * @param {Object} storyData
+ * @returns {Map<number,string[]>|null}
+ */
+function resolveReplayPresent(storyData) {
+  const br = storyData?.beatsReviewReport || {};
+  const stats = (br.recheck && br.recheck.counterStats) || br.counterStats || null;
+  const perPage = stats && stats.castPerPage;
+  return Array.isArray(perPage) && perPage.length ? new Map(perPage.map(r => [Number(r.pageNumber), r.names || []])) : null;
+}
+
+/**
  * The STORY LOGIC production passes to the planner and the plan check
  * (`{ storyLogic }`, 2026-09-26): the final arc's logic block body, stored on
  * arcReviewReport.logic. '' for a story written before the logic-first arc —
@@ -299,6 +316,7 @@ module.exports = {
   resolveReplayArc,
   resolveReplayArcHints,
   resolveReplayCentralFigure,
+  resolveReplayPresent,
   resolveReplayStoryLogic,
   resolveReplayExpansions,
   buildReplayTextArgs,

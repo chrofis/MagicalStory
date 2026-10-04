@@ -223,11 +223,14 @@ async function loadPromptTemplates() {
   // Each line: [key, filename]. Order doesn't matter — failures are isolated.
   const FILES = [
     ['sceneExpansion', 'scene-expansion.txt'],
-    // ALL-pages scene expansion (beats pipeline). One call writes every page's
-    // brief with the others in view, so location, time of day, clothing and
-    // composition cannot drift between neighbours. scene-expansion.txt stays
-    // the per-page variant used by the unified pipeline's fallback.
-    ['sceneExpansionAll', 'scene-expansion-all.txt'],
+    // The beats Art Director, two calls (owner, 2026-09-28, "Jev first"): the
+    // Visual Bible first, then every page's brief with the others in view, so
+    // composition and clothing cannot drift between neighbours.
+    // scene-expansion.txt stays the per-page variant (the call-2 shortfall
+    // fallback and the unified pipeline's).
+    ['visualBible', 'visual-bible.txt'],
+    ['sceneBriefsAll', 'scene-briefs-all.txt'],
+    ['briefReask', 'brief-reask.txt'],
     ['sceneIteration', 'scene-iteration.txt'],
     ['sceneIterationFree', 'scene-iteration-free.txt'],
     ['imageGeneration', 'image-generation.txt'],
@@ -361,7 +364,6 @@ async function loadPromptTemplates() {
     // Chooses the shipped title from the writer's candidates.
     // One review over ALL scene briefs at once — repetition, visual arc and
     // continuity are only visible across pages, never per-scene.
-    ['sceneReview', 'scene-review.txt'],
     // Lab measurement only: counts render hazards per page across a book's
     // briefs (or its beats' SCENE lines). Report-only — nothing consumes it in
     // the pipeline.

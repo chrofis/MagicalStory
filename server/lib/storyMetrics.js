@@ -280,7 +280,7 @@ function computeMetrics(data, jobRow) {
     if (cmp) textChurnPct = round2((cmp.changedPages / cmp.pageCount) * 100);
   }
   const sceneChurnPct = isBeats
-    ? churnFromReport(data.sceneReviewReport, pageCount)
+    ? churnFromReport(data.briefCheckReport || data.sceneReviewReport, pageCount)
     : sceneChurnUnified(data.sceneDescriptions, pageCount);
   // beats_churn_pct: beats-mode outline delta; unified stories have no beats.
   const beatsChurnPct = isBeats ? churnFromReport(data.beatsReviewReport, pageCount) : null;

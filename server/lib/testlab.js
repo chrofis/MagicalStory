@@ -24,7 +24,7 @@ const { assertReviewedArtifactUsable, pickReviewedBrief } = require('./sceneRevi
 // Production's arguments for the beats writer/Art-Director calls, resolved from
 // a stored story. Every replay stage builds its inputs through these so a
 // divergent, thinner expression cannot be written a fourth time.
-const { buildReplayTextArgs, buildReplaySceneOptions, resolveReplayArc, resolveReplayArcHints, resolveReplayCentralFigure, resolveReplayStoryLogic, resolveArcFromExperiment, resolveReplayInputData } = require('./beatsReplayInputs');
+const { buildReplayTextArgs, buildReplaySceneOptions, resolveReplayArc, resolveReplayArcHints, resolveReplayCentralFigure, resolveReplayPresent, resolveReplayStoryLogic, resolveArcFromExperiment, resolveReplayInputData } = require('./beatsReplayInputs');
 // Production's evalOptions for evaluateImageQuality, resolved from a stored
 // story. Same rule as above: every eval stage builds its options through this
 // so a thinner, silently-check-disabling expression cannot be written again.
@@ -4062,7 +4062,7 @@ async function runAuditReplayStage(target, { params = {}, promptOverride = null 
  * and after a scene-expansion prompt change to see whether the hazard count
  * actually moved.
  *
- * params.models : comma list of TEXT_MODELS keys (default sceneReviewModel)
+ * params.models : comma list of TEXT_MODELS keys (default briefCorrectionModel, the brief critic)
  * params.source : 'briefs' (default, data.sceneImages[].sceneDescription)
  *                 | 'beats' (PLAN lines from the stored outline's ---BEATS---; legacy SCENE lines parse the same)
  */
@@ -4077,7 +4077,7 @@ async function runSceneHazardCountStage(target, { params = {}, promptOverride = 
 
   const source = String(params.source || 'briefs').toLowerCase();
   if (!['briefs', 'beats'].includes(source)) throw new Error(`params.source must be briefs | beats, got "${params.source}"`);
-  const models = String(params.models || params.model || MODEL_DEFAULTS.sceneReviewModel || MODEL_DEFAULTS.outlineReviewModel)
+  const models = String(params.models || params.model || MODEL_DEFAULTS.briefCorrectionModel)
     .split(',').map(x => x.trim()).filter(Boolean);
   for (const m of models) if (!TEXT_MODELS[m]) throw new Error(`Unknown model "${m}"`);
 
@@ -4206,7 +4206,7 @@ async function runSceneHazardCountStage(target, { params = {}, promptOverride = 
  * "not beatsMode, not trialMode, splitOutlineReviewEnabled", and runtime.js sets
  * pipelineMode:'beats' in every environment — so production never makes either
  * call. The stage measured a configuration that cannot ship, and its beats
- * analogues are their own stages (arc_review, text_refine, scene_review).
+ * analogues are their own stages (arc_review, text_refine).
  *
  * Stored experiments keep rendering: the result renderer keys off
  * result.stageKind === 'outline_review', which is untouched.
@@ -4329,6 +4329,14 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
     plainStoredBeats = stored;
   }
 
+  // A FRESH PLAN HAS NO SHOTS (2026-09-27). Field 0 is the placeholder until
+  // the plan check's roster exists and the Jev shot assignment writes it
+  // (beatsPipeline.finalizePlanShots, run by beats_replan). The Art Director
+  // is never handed a placeholder in production, so it is not handed one here.
+  if (!plainStoredBeats && params.expandScenes !== false) {
+    throw new Error('beats_scenes: a fresh plan carries no shot (field 0 is the placeholder until the plan check and the Jev shot assignment run) — run beats_scenes with plainStoredBeats, or beats_replan for the plan');
+  }
+
   // ── Step 1: plan ────────────────────────────────────────────────────────
   // plainStoredBeats skips planning and review — the beats are the frozen input.
   let plannerPrompt = null;
@@ -4389,24 +4397,23 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
   // description the real pipeline produced for the same page, so "good enough to
   // draw from" is a judgement about two visible artefacts rather than a guess.
   let sceneExpansions = null;
-  let sceneReview = null;
-  let sceneReviews = null;
+  let briefChecks = null;
   let authoredBible = null;
   let timeToScenesMs = null;
   let allPagesCost = null;
   let allPagesModelId = null;
   let landmarkPhotoCitations = null;
+  let labJevReport = null;
   const events = [];
   if (params.expandScenes !== false) {
-    // THE RUN'S OWN ART DIRECTOR AND SCENE REVIEW (owner 2026-09-27: "The Lab
+    // THE RUN'S OWN ART DIRECTOR AND BRIEF CHECKS (owner 2026-09-27: "The Lab
     // must use 100% identical code to production"): beatsPipeline.runArtDirector
-    // (the all-pages call with its retry, the bible's adoption — label round,
-    // age clamp, transcript sync — the landmark link, the wardrobe-vs-bible
-    // corrections and the per-page fallback) and beatsPipeline.runSceneReview,
-    // on the inputs the run held. The stage used to re-implement the batch
-    // retry, the recovery, the bible adoption and the review merge, and it
-    // reviewed on the beats reviewer's model with no clothing findings.
-    const { runArtDirector, runSceneReview } = require('./beatsPipeline');
+    // (the Visual Bible call and its adoption — label round, age clamp,
+    // transcript sync, landmark link, wardrobe-vs-bible corrections — the Jev
+    // decisions before the briefs, the page-brief call with its retry and the
+    // per-page fallback, the pin) and briefChecks.runBriefChecks (2026-09-28),
+    // on the inputs the run held.
+    const { runArtDirector } = require('./beatsPipeline');
     const { calculateTextCost: textCost } = require('../config/models');
     const record = (level) => (event, message) => { events.push({ level, event, message }); };
     const gl = { info: record('info'), warn: record('warn'), error: record('error'), debug: record('debug') };
@@ -4427,6 +4434,7 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
     if (params.landmarks === false) storyData.availableLandmarks = undefined;
     const sceneModel = params.sceneModel || storyData.modelOverrides.sceneDescriptionModel || MODEL_DEFAULTS.sceneDescription;
     const adCalls = [];
+    labJevReport = { light: null, vb: null, population: null, gaze: null, fixedChanges: null };
     const expStart = Date.now();
     const meta = { timings: {}, labelRound: null };
     const ad = await runArtDirector({
@@ -4435,9 +4443,14 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
       sceneModel, onChunk: null, gl, meta, stage: async () => {}, beats: beatsIn,
       arcCentralFigure: Array.isArray(params.centralFigure) ? params.centralFigure : resolveReplayCentralFigure(storyData),
       approvedArc: resolveReplayArc(storyData, { parseBeats }), onVisualBible: null, wardrobeBibleReport: null,
+      // The run's gaze roster: the shipped division's head count, as stored.
+      present: resolveReplayPresent(storyData),
       labCallOptions: params.sceneNoReasoning ? { reasoning: { enabled: false } } : {},
       labForcePerPage: params.perPageExpansion === true,
       onCall: (res) => adCalls.push(res),
+      // The run's Jev decision report (light before the AD; elements, aboard,
+      // population and gaze after it) — the same function, the same fields.
+      jevReport: labJevReport,
     });
     const costOfCall = (r) => r.usage?.direct_cost ?? textCost(r.modelId || '', r.usage || {});
     allPagesCost = adCalls.reduce((a, r) => a + costOfCall(r), 0);
@@ -4478,67 +4491,41 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
       }
     }
 
-    // ── the run's scene review ────────────────────────────────────────────
-    // A comma-separated params.sceneReviewModel fans out over ONE frozen set
-    // of briefs; each arm reviews its own copy of the briefs and the bible, as
-    // the run would.
-    if (params.reviewScenes !== false && ad.expansions.length > 0) {
-      const mo = storyData.modelOverrides;
-      const srModels = String(params.sceneReviewModel || mo.sceneReviewModel || MODEL_DEFAULTS.sceneReviewModel || mo.outlineReviewModel || MODEL_DEFAULTS.outlineReviewModel)
-        .split(',').map(x => x.trim()).filter(Boolean);
-      for (const m of srModels) if (!TEXT_MODELS[m]) throw new Error('Unknown model "' + m + '"');
-      sceneReviews = [];
-      for (const srModel of srModels) {
-        const t2 = Date.now();
-        try {
-          const srCalls = [];
-          const armEvents = [];
-          const rec = (level) => (event, message) => { armEvents.push({ level, event, message }); };
-          const expansions = ad.expansions.map(x => ({ pageNumber: x.pageNumber, brief: x.brief }));
-          const out = await runSceneReview({
-            inputData: storyData, expansions, clothingRequirements: storyData.clothingRequirements || null,
-            visualBible: ad.visualBible ? JSON.parse(JSON.stringify(ad.visualBible)) : null, briefBeats: ad.briefBeats, beats: beatsIn,
-            bibleSections: ad.bibleSections, meta: { timings: {}, labelRound: meta.labelRound || null }, sceneReviewModel: srModel,
-            stage: async () => {}, onChunk: null, gl: { info: rec('info'), warn: rec('warn'), error: rec('error'), debug: rec('debug') },
-            onCall: (res) => srCalls.push(res),
-          });
-          const report = out.sceneReviewReport;
-          const failed = report?.failed || armEvents.find(e => e.event === 'beats_scene_review_empty' || e.event === 'beats_scene_review_failed')?.message || null;
-          sceneReviews.push({
-            modelKey: srModel,
-            modelId: report?.model || null,
-            ok: !!report && !failed,
-            error: failed,
-            elapsedMs: Date.now() - t2,
-            usage: srCalls[0]?.usage || null,
-            cost: srCalls.reduce((a, r) => a + costOfCall(r), 0),
-            promptChars: String(report?.prompt || '').length,
-            prompt: report?.prompt || null,
-            analysis: String(out.sceneReviewAnalysis || '').slice(0, 40000),
-            rewrotePages: report ? report.changedPages : [],
-            clothingUnfixed: report?.clothingUnfixed || [],
-            briefUnfixed: report?.briefUnfixed || [],
-            briefIntroduced: report?.briefIntroduced || [],
-            wornRound: report?.wornRound || null,
-            events: armEvents,
-            _reviewed: expansions,
-          });
-        } catch (err) {
-          sceneReviews.push({ modelKey: srModel, ok: false, elapsedMs: Date.now() - t2, error: err.message });
-        }
-      }
-      // Each page's reviewed brief, as the run's review merged it (the first
-      // arm on `reviewedBrief`, further arms under `reviewedBriefs[model]`).
-      sceneReviews.forEach((r, i) => {
-        if (!r._reviewed) return;
+    // ── the run's brief checks and its one re-ask (2026-09-28) ─────────────
+    // beatsPipeline's own step (briefChecks.runBriefChecks), on the briefs and
+    // the bible this run's Art Director wrote — the step that replaced the
+    // scene review. A taken rewrite lands on `reviewedBrief` with
+    // `rewrittenBy: 'brief re-ask'`, so the page view shows it beside the brief.
+    if (params.checkBriefs !== false && ad.expansions.length > 0) {
+      const { runBriefChecks } = require('./briefChecks');
+      const reaskCalls = [];
+      const armEvents = [];
+      const rec = (level) => (event, message) => { armEvents.push({ level, event, message }); };
+      const expansions = ad.expansions.map(x => ({ pageNumber: x.pageNumber, brief: x.brief }));
+      const t2 = Date.now();
+      try {
+        const report = await runBriefChecks({
+          inputData: storyData, expansions, briefBeats: ad.briefBeats, visualBible: ad.visualBible,
+          clothingRequirements: storyData.clothingRequirements || null,
+          visualBibleJson: ad.visualBibleJson, availableAvatars: ad.availableAvatars, maxCharactersPerScene: ad.maxCharactersPerScene,
+          model: sceneModel, gl: { info: rec('info'), warn: rec('warn'), error: rec('error'), debug: rec('debug') },
+          onCall: (res) => reaskCalls.push(res),
+          labCallOptions: params.sceneNoReasoning ? { reasoning: { enabled: false } } : {},
+        });
         for (const x of sceneExpansions) {
-          const reviewed = r._reviewed.find(e => e.pageNumber === x.pageNumber);
-          if (!reviewed || reviewed.brief === x.fromBeats || !(r.rewrotePages || []).includes(x.pageNumber)) continue;
-          if (i === 0) { x.reviewedBrief = reviewed.brief; x.reviewRewrote = true; } else { (x.reviewedBriefs = x.reviewedBriefs || {})[r.modelKey] = reviewed.brief; }
+          const taken = report.pages.find(p => p.pageNumber === x.pageNumber);
+          if (taken) { x.reviewedBrief = taken.after; x.reviewRewrote = true; x.rewrittenBy = 'brief re-ask'; }
         }
-        delete r._reviewed;
-      });
-      sceneReview = sceneReviews[0] || null;
+        briefChecks = {
+          ok: !report.reask?.failed, error: report.reask?.failed || null, elapsedMs: Date.now() - t2,
+          model: report.reask?.model || null, cost: reaskCalls.reduce((acc, r) => acc + costOfCall(r), 0), usage: reaskCalls[0]?.usage || null,
+          findingsBefore: report.findingsBefore, withheld: report.withheld, verdicts: report.verdicts,
+          findingsAfter: report.findingsAfter, introduced: report.introduced, survived: report.survived,
+          wornUnresolvedPages: report.wornUnresolvedPages, bibleText: report.bibleText, reaskPrompt: report.reask?.prompt || null, events: armEvents,
+        };
+      } catch (err) {
+        briefChecks = { ok: false, error: err.message, elapsedMs: Date.now() - t2, events: armEvents };
+      }
     }
     timeToScenesMs = timeToLockMs + (Date.now() - expStart);
   }
@@ -4556,13 +4543,13 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
   return {
     stageKind: 'beats_scenes',
     sceneExpansions,
+    jevDecisions: labJevReport,
     events,
     replayInputsStored: storyData.replayInputsStored,
     sceneExpansionIncomplete,
     allPagesCost,
     allPagesModelId,
-    sceneReview,
-    sceneReviews,
+    briefChecks,
     authoredBible,
     landmarkPhotoCitations,
     timeToScenesMs,
@@ -7441,24 +7428,6 @@ const STAGE_RUNNERS = {
 
 // Story-level stages: target {storyId} (+ coverType for cover). No page context.
 
-/**
- * SCENE REVIEW REPLAY — the reviewer, and only the reviewer, on frozen input.
- *
- * Production runs the scene review once, inside a generation, over briefs that
- * were just written. That makes a reviewer-prompt change unmeasurable: rerun the
- * pipeline and the briefs differ, so any change in behaviour could be the new
- * briefs rather than the new prompt.
- *
- * This replays the review against a story's STORED briefs. The clothing check is
- * deterministic, so it regenerates byte-identical findings, and the only variable
- * is the prompt (or the model). Built for the question left open by
- * job_1786235099497_ytd5c7eek: three correct faults were handed to deepseek and
- * it rewrote nothing — does a mandatory framing change that, or does the fix path
- * have to stop being a request?
- *
- * params.reviewModel   — override the reviewer (comma-separated fans out)
- * promptOverride       — full replacement template, the usual Lab A/B lever
- */
 // Parse a persisted "--- Page N ---\n<body>" artifact_text back into ordered
 // page blocks, so a stored round's text can be fed as the next round's input
 // (scene briefs and story text both persist in this shape — see the scoreOutput
@@ -7471,170 +7440,6 @@ function parsePageBlocks(text) {
   let m;
   while ((m = re.exec(String(text || ''))) !== null) out.push({ pageNumber: parseInt(m[1], 10), text: m[2].trim() });
   return out.sort((a, b) => a.pageNumber - b.pageNumber);
-}
-
-async function runSceneReviewReplayStage(target, { params = {}, promptOverride = null }) {
-  const { loadPromptTemplates } = require('../services/prompts');
-  await loadPromptTemplates();
-  const { parseBeats } = require('./storyHelpers');
-  const { MODEL_DEFAULTS, TEXT_MODELS, calculateTextCost } = require('../config/models');
-  // THE RUN'S OWN SCENE REVIEW (owner 2026-09-27: "The Lab must use 100%
-  // identical code to production"): beatsPipeline.runSceneReview — the
-  // clothing and brief checks, the review, the worn-state round and every
-  // post-review guard (declared-light and worn-row carry-forward, the
-  // truncation guard, cast-removal restore, bible corrections) — on the input
-  // the run gave it, rebuilt from the stored story: the briefs as SENT
-  // (sceneReviewReport.briefsIn, covers included), the locked beats plus the
-  // cover beats, and the bible the reviewer was handed. The stage used to
-  // rebuild the prompt itself over the FINAL briefs, without covers, the
-  // carry-forward rules or the truncation guard.
-  const { runSceneReview, makePlanReader } = require('./beatsPipeline');
-  const { buildCoverBeats } = require('./coverBeats');
-  const { coverTypesFor } = require('./coverKeys');
-
-  // The run's inputData (the stored landmark list and model overrides; 2026-09-27).
-  const storyData = resolveReplayInputData((await loadStoryDataFull(target.storyId, { rehydrate: false })).storyData);
-  const storedReport = storyData.sceneReviewReport || {};
-  const notes = [];
-  // BRANCH MODE — "＋ next round": review a SELECTED round's stored briefs
-  // (params.fromText) instead of the story's, and persist as the next round.
-  const branchScenes = params.fromText
-    ? parsePageBlocks(params.fromText).map(b => ({ pageNumber: b.pageNumber, brief: b.text }))
-    : null;
-  if (params.fromText && (!branchScenes || !branchScenes.length)) throw new Error('fromText has no parseable scene briefs');
-  const fromRound = params.fromText ? (parseInt(params.fromRound, 10) || 1) : null;
-  let scenes = branchScenes;
-  if (!scenes && Array.isArray(storedReport.briefsIn) && storedReport.briefsIn.length) {
-    scenes = storedReport.briefsIn.map(b => ({ pageNumber: Number(b.pageNumber), brief: String(b.brief || '') })).filter(b => b.brief);
-  }
-  if (!scenes) {
-    // A story stored before briefsIn was kept: its final briefs are all there is.
-    scenes = (storyData.sceneImages || []).filter(s => s.sceneDescription).map(s => ({ pageNumber: s.pageNumber, brief: s.sceneDescription }));
-    notes.push('the stored story carries no sceneReviewReport.briefsIn — the replay reviews its FINAL briefs, without covers');
-  }
-  if (scenes.length === 0) throw new Error('story has no stored scene briefs to replay');
-
-  // The run's locked beats: the shipped division (beatsReviewReport.pagePlan,
-  // read by the run's plan reader), then the cover beats the run briefed the
-  // covers from.
-  const storyPages = scenes.filter(x => x.pageNumber > 0).map(x => x.pageNumber);
-  let beats;
-  if (storyData?.beatsReviewReport?.pagePlan) {
-    beats = makePlanReader(storyPages, '')(storyData.beatsReviewReport.pagePlan).parsed.pages;
-  } else {
-    const beatsSection = (String(storyData.outline || '').match(/---\s*BEATS\s*---([\s\S]*?)(?=\n---\s*[A-Z][A-Z ]+---|$)/i) || [])[1] || '';
-    beats = parseBeats(beatsSection).pages;
-    notes.push('the stored story carries no shipped pagePlan — the beats come from the outline BEATS section');
-  }
-  const coverBeats = buildCoverBeats(storyData, {
-    coverTypes: coverTypesFor(storyData), clothingRequirements: storyData.clothingRequirements || null,
-    centralFigure: resolveReplayCentralFigure(storyData),
-  });
-  const briefBeats = [...beats, ...coverBeats];
-  // The bible the reviewer was handed: stored since 2026-09-27 whenever the
-  // review corrected it; otherwise the stored bible IS that bible.
-  const bibleIn = storedReport.visualBibleIn || storyData.visualBible || null;
-  if (!storedReport.visualBibleIn && (storedReport.bibleCorrections?.applied || []).length > 0) {
-    notes.push(`the review corrected ${storedReport.bibleCorrections.applied.length} stated object(s) and the pre-review bible predates its storage — the replay reviews against the corrected bible`);
-  }
-
-  const mo = storyData.modelOverrides;
-  const models = String(params.reviewModel || mo.sceneReviewModel || MODEL_DEFAULTS.sceneReviewModel || mo.outlineReviewModel || MODEL_DEFAULTS.outlineReviewModel)
-    .split(',').map(x => x.trim()).filter(Boolean);
-  for (const m of models) if (!TEXT_MODELS[m]) throw new Error(`Unknown model "${m}"`);
-  const labPromptOptions = promptOverride ? { template: promptOverride } : {};
-
-  const runs = [];
-  let firstReport = null;
-  let findingsIn = null;
-  for (const model of models) {
-    // ONE ARM'S FAILURE MUST NOT DESTROY THE OTHERS (a fan-out is a comparison).
-    try {
-      const t = Date.now();
-      const calls = [];
-      const events = [];
-      const record = (level) => (event, message) => { events.push({ level, event, message }); };
-      const gl = { info: record('info'), warn: record('warn'), error: record('error'), debug: record('debug') };
-      // Each arm reviews its own copy: runSceneReview rewrites the briefs and
-      // the bible in place, as the run does.
-      const expansions = scenes.map(x => ({ pageNumber: x.pageNumber, brief: x.brief }));
-      const out = await runSceneReview({
-        inputData: storyData, expansions, clothingRequirements: storyData.clothingRequirements || null,
-        visualBible: bibleIn ? JSON.parse(JSON.stringify(bibleIn)) : null, briefBeats, beats, bibleSections: '',
-        meta: { timings: {}, labelRound: storedReport.labelRound || null }, sceneReviewModel: model,
-        stage: async () => {}, onChunk: null, gl, labPromptOptions, onCall: (res) => calls.push(res),
-      });
-      const report = out.sceneReviewReport;
-      if (!report) throw new Error(events.map(e => e.message).join('; ') || 'the review did not run');
-      // AN EMPTY RESPONSE IS A FAILED CALL, NOT A CLEAN REVIEW (Lab #450).
-      const empty = events.find(e => e.event === 'beats_scene_review_empty');
-      if (empty) throw new Error(empty.message);
-      if (!firstReport) { firstReport = report; findingsIn = out.clothingBefore; }
-      // The faults the reviewer was SENT: the ones renderFindingsBlock puts in its
-      // block (clothingCheck.REVIEWABLE); the ones left are the run's own re-check.
-      const { REVIEWABLE } = require('./clothingCheck');
-      const sentBefore = (out.clothingBefore || []).filter(f => REVIEWABLE.has(f.type));
-      const leftAfter = report.clothingUnfixed || [];
-      const diffs = (report.pages || []).map(p => ({
-        ...p, before: (scenes.find(x => x.pageNumber === p.pageNumber) || {}).brief || '',
-      }));
-      const cost = calls.reduce((a, r) => a + (r.usage?.direct_cost ?? calculateTextCost(r.modelId || '', r.usage || {})), 0);
-
-      // scoreOutput: the ONE evaluator grades this model's reviewed briefs (scene only).
-      let scorecard = null;
-      if (params.scoreOutput === true || params.scoreOutput === 'true') {
-        const sceneText = expansions.map(m => `--- Page ${m.pageNumber} ---\n${m.brief}`).join('\n\n');
-        const chain = {
-          reviewModel: model,
-          ...(fromRound != null ? { fromRound } : {}),
-          analysis: String(out.sceneReviewAnalysis || '').slice(0, 15000),
-          rewrites: diffs.map(dd => ({ page: dd.pageNumber, before: String(dd.before).slice(0, 2000), after: String(dd.after).slice(0, 2000) })),
-        };
-        if (sceneText.trim()) scorecard = (await scoreArtifactsWithJudge({ scene: sceneText }, { model: params.judgeModel, evalVersion: params.evalVersion, persist: { storyId: target.storyId, title: storyData.title, language: storyData.language, artStyle: storyData.artStyle, source: 'scene_review_replay', model, ...(fromRound != null ? { round: fromRound + 1, label: `from r${fromRound} · ${model}` } : {}), genCost: cost, genMs: Date.now() - t, chain } })).scorecard;
-      }
-
-      runs.push({
-        model,
-        modelId: report.model,
-        elapsedMs: Date.now() - t,
-        cost,
-        usage: calls[0]?.usage || null,
-        analysis: out.sceneReviewAnalysis || '',
-        failed: report.failed || null,
-        changedPages: report.changedPages,
-        pages: diffs,
-        scorecard,
-        // The headline: faults in, faults out. Anything but 0 out means the
-        // reviewer was handed a fact and declined to act on it.
-        faultsBefore: sentBefore.length,
-        faultsAfter: leftAfter.length,
-        faultsFixed: sentBefore.length - leftAfter.length,
-        unfixed: leftAfter,
-        wornRound: report.wornRound || null,
-        briefUnfixed: report.briefUnfixed || [],
-        briefIntroduced: report.briefIntroduced || [],
-        bibleCorrections: report.bibleCorrections || null,
-        castRemovalAudit: report.castRemovalAudit || [],
-        events,
-      });
-    } catch (err) {
-      log.warn(`⚠️ [scene replay] arm ${model} failed: ${err.message}`);
-      runs.push({ model, ok: false, error: err.message });
-    }
-  }
-
-  return {
-    storyId: target.storyId,
-    pageCount: scenes.length,
-    promptChars: firstReport ? String(firstReport.prompt || '').length : null,
-    prompt: firstReport ? firstReport.prompt : null,
-    clothingFindings: firstReport ? (firstReport.clothingFindings || null) : null,
-    briefFindings: firstReport ? (firstReport.briefFindings || null) : null,
-    findingsIn,
-    briefsIn: scenes,
-    notes,
-    runs,
-  };
 }
 
 /**
@@ -9511,17 +9316,17 @@ async function runTrialIdeaVarietyStage(target, { params = {}, promptOverride = 
     categoryContext = `This is a ${storyTheme || 'adventure'} story${storyTopic ? ` about "${storyTopic}"` : ''}. Make it exciting and appropriate for children.`;
   }
 
-  // ── route mirror: landmarks ──
+  // ── route mirror: landmarks ── the route's own helper (jevSelection
+  // .trialIdeaLandmarks); the Lab waits for Jev's ranking, which the route
+  // reads only when a prepare call has made it ready.
   let landmarksText = '';
   const landmarkNames = [];
-  if (params.landmarks !== 'false' && params.landmarks !== false && userLocation?.city && storyCategory !== 'historical') {
+  if (params.landmarks !== 'false' && params.landmarks !== false) {
     try {
-      const { getIndexedLandmarks } = require('./landmarkPhotos');
-      const landmarks = await getIndexedLandmarks(userLocation, 3);
-      if (landmarks.length > 0) {
-        landmarkNames.push(...landmarks.map(l => l.name));
-        landmarksText = 'At least one scene must take place at one of these real local landmarks: ' + landmarkNames.join(', ') + '.';
-      }
+      const idea = await require('./jevSelection').trialIdeaLandmarks(
+        { characters: [mainChar], storyCategory, storyTheme, storyTopic, language, userLocation }, { wait: true });
+      landmarkNames.push(...idea.names);
+      landmarksText = idea.text;
     } catch (err) {
       log.debug(`[TESTLAB] idea-variety landmark lookup failed: ${err.message}`);
     }
@@ -10101,7 +9906,7 @@ async function runBeatsReplanStage(target, { params = {} }) {
   // STORY LOGIC. The stage used to rebuild the check, one round and its guard
   // itself — no CAST table on the re-plan, no invented / commissioned figures,
   // no PEOPLELESS pick, no review of declared changes, one round only.
-  const { makePlanReader, planCheckInputs, createPlanCheckRunner, runReplanRounds, shippedReplanState } = require('./beatsPipeline');
+  const { makePlanReader, planCheckInputs, createPlanCheckRunner, runReplanRounds, shippedReplanState, finalizePlanShots } = require('./beatsPipeline');
 
   // The run's inputData: the stored landmark list the planner and the check
   // read, and the run's model overrides (resolveReplayInputData, 2026-09-27).
@@ -10288,13 +10093,18 @@ async function runBeatsReplanStage(target, { params = {} }) {
 
   // ── the re-plan rounds, as the run runs them ──────────────────────────────
   const replanRounds = [];
+  // The run's Jev decision report (castCuts per round), as production keeps it.
+  const jevReport = { castCuts: [], shots: null };
   const shippedDivision = await runReplanRounds({
     inputData: storyData, pageCount, plan, check1, replanRounds, approvedArc, arcHints, arcStoryLogic: storyLogic,
     arcCentralFigure: centralFigure, castTable, commission, commissionedNames, maxCast, planModel, readPlan, runCheck,
     onChunk: null, gl, stage: async () => {}, checkCancellation: async () => {}, labPromptOptions, onCall,
-    beats: plan.pages, pagePlan,
+    beats: plan.pages, pagePlan, jevReport,
   });
   const shipped = shippedReplanState(replanRounds);
+  // THE RUN'S STEP 2b (2026-09-27): the shots, by the function production calls.
+  const shot = await finalizePlanShots({ approvedArc, beats: shippedDivision.beats, check: shippedDivision.check, gl });
+  jevReport.shots = shot.report;
 
   // THE LAB'S COMPLIANCE READING of round 1 (research, no production
   // counterpart): how the round's reply kept the re-plan contract, read off
@@ -10340,7 +10150,8 @@ async function runBeatsReplanStage(target, { params = {} }) {
       recheckFindings: shippedCheck ? shippedCheck.lines : null,
       castSummary, castFindings, recheckCastSummary,
     },
-    appliedPlan: shippedDivision.beats.map(pg => ({ pageNumber: Number(pg.pageNumber), planLine: pg.planLine })),
+    appliedPlan: shot.beats.map(pg => ({ pageNumber: Number(pg.pageNumber), planLine: pg.planLine })),
+    jevDecisions: jevReport,
     replanPrompt: round1 ? round1.replanPrompt : null,
     replanRawResponse: round1 ? (round1.replanReply || '').slice(0, 40000) : null,
     recheckRawResponse: shippedCheck ? (shippedCheck.reply || '').slice(0, 40000) : null,
@@ -10521,7 +10332,6 @@ const STORY_STAGES = {
   text_refine: runTextRefineStage,
   beats_scenes: runBeatsScenesStage,
   beats_replan: runBeatsReplanStage,
-  scene_review_replay: runSceneReviewReplayStage,
   story_bible_replay: runStoryBibleReplayStage,
   story_text_replay: runStoryTextReplayStage,
   writer_compare: runWriterCompareStage,
@@ -10724,7 +10534,6 @@ module.exports = {
   runConsolidateStage,
   runInpaintStage,
   runBeatsReplanStage,
-  runSceneReviewReplayStage,
   runArcPanelReplayStage,
   runBeatsScenesStage,
   runPickBestStage,

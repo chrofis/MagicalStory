@@ -64,7 +64,7 @@ describe('refineStoryText — ledger and counter after the diff, hints to the si
       else if (label.startsWith('text_refine')) text = ['---ANALYSIS---', 'fixed', '---STORY TEXT---', '## Page 1', 'Die Karte ist alt. Beim Auspacken riss der Rand ein.'].join('\n');
       // The grammar check restores the writer's sentence (a numbered RESTORE)
       // and tries a free rewrite, which is dropped (owner 2026-09-23).
-      else if (label === 'text_diff') text = 'PAGE 1 RESTORE B2 AFTER A1\nPAGE 1 FIX A2: Der Hund lief weg und niemand sah ihn je wieder im Wald.';
+      else if (label === 'text_diff') text = 'PAGE 1 RESTORE B2 REPLACING A2\nPAGE 1 FIX A1: Der Hund lief weg und niemand sah ihn je wieder im Wald.';
       else if (label === 'text_lector') text = 'NONE';
       return { text, modelId: `stub-${model}`, usage: { input_tokens: 10, output_tokens: 20, direct_cost: 0 } };
     };
@@ -73,8 +73,9 @@ describe('refineStoryText — ledger and counter after the diff, hints to the si
 
   it('re-settles the ledger, counts the shipped text, and hands the hints to the audit and the repair only', async () => {
     const res = await TR.refineStoryText(STORY, PAGES, { arc: '1. A map tears.', arcHints: HINTS });
-    // The writer's sentence is back on the shipped page, and the ledger says so.
-    expect(res.pages[0].text).toBe('Die Karte ist alt. Der Rand ist eingerissen. Beim Auspacken riss der Rand ein.');
+    // The writer's sentence is back on the shipped page in place of the one
+    // that replaced it — never beside it — and the ledger says so.
+    expect(res.pages[0].text).toBe('Die Karte ist alt. Der Rand ist eingerissen.');
     // A sentence neither version had never ships.
     expect(res.pages[0].text).not.toContain('Hund lief weg');
     expect(res.diffDropped[0].reason).toBe('rewrites-the-sentence');
@@ -84,7 +85,7 @@ describe('refineStoryText — ledger and counter after the diff, hints to the si
     expect(TR.projectTextRefineReport(res).diffApplied[0].restored).toEqual(['Der Rand ist eingerissen.']);
     // The shipped text is counted.
     expect(res.wordBudget.shipped.counts).toEqual([
-      { pageNumber: 1, words: 14, sentences: 3, paragraphs: 1 },
+      { pageNumber: 1, words: 8, sentences: 2, paragraphs: 1 },
       { pageNumber: 2, words: 5, sentences: 1, paragraphs: 1 },
     ]);
     // Hints: both sighted critics, with the writer's arc-outranks-hint rule; never the blind audit.

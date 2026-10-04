@@ -10,7 +10,7 @@ Read the pages once, in order, the way a listener hears them, and answer seven q
 3. IDLE: does anyone do something that changes nothing — an action, a plan, a warning or a promise no later page acts on?
 4. TRANSITION: is anyone suddenly in another place, holding something new, or in among people who were strangers a page ago, with no page telling how? A page turn carries ordinary travel and time, so fault a move only where the jump is unexplained; joining strangers is not travel, and a page tells how they got in.
 5. PAYOFF: does the book raise something — a question, a closed container, a secret, a threat — and never show the answer?
-6. ENDING: on the last page only, does it say plainly how things end and how the characters feel, and is every claim it makes true of the pages? A closing sentence that sums up what the story meant or what the characters have become is a fault.
+6. ENDING: does the last page say plainly how things end and how the characters feel, and is every claim it makes true of the pages? A closing sentence that sums up what the story meant or what the characters have become is a fault. {SHOWN_CALLBACK} Over the last pages: {CLOSING_MOMENT} A book without that moment, or whose last page ends on getting somewhere, is a fault filed on the last page.
 7. STYLE: check every sentence of every page against these rules the book was written to:
 {STYLE_RULEBOOK}
    File one fault per sentence that breaks a rule, quoting the sentence whole: "FAULT[STYLE]: p<N> — «<the sentence>» <the rule it breaks, in a few words>". A sentence that breaks two rules is one fault; a sentence another question already filed is not filed again.

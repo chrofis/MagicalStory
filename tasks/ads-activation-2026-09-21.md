@@ -143,6 +143,8 @@ serves immediately; the three new campaigns ramp as Google reviews their ads (~2
       onto origin/master — staging is hundreds of commits ahead). Then resume Deutschschweiz
       (`activate-week.js`: set its status back to ENABLED, --apply) and measure.
 
+- [ ] Owner to choose the phone-page fixes (proposed 2026-09-28). No code yet.
+
 ## Expectation stated to the owner up front
 
 CHF 10/day × 7 = ~CHF 70. At measured CPCs that is ~100–200 clicks; the historical click→trial rate is

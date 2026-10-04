@@ -1,0 +1,3313 @@
+{
+ "generatedAt": "2026-09-27T18:23:04.197Z",
+ "drawPolicy": {
+  "top": 3,
+  "floor": 0.5,
+  "margin": 0.1
+ },
+ "variants": {
+  "F1": {
+   "setups": 19,
+   "pooledAucGvsB": 0.933,
+   "pooledAucGvsNB": 0.826,
+   "meanWithinSetupAucGvsB": 0.956,
+   "withinSetups": 15,
+   "meanP": {
+    "G": 0.472,
+    "N": 0.345,
+    "B": 0.182
+   },
+   "top1": {
+    "G": 15,
+    "N": 3,
+    "B": 1
+   },
+   "todayShape": {
+    "G": 6,
+    "N": 10,
+    "B": 3
+   },
+   "drawExpected": {
+    "P1": {
+     "G": 11.534,
+     "N": 5.466,
+     "B": 2
+    },
+    "P2": {
+     "G": 13.212,
+     "N": 5.413,
+     "B": 0.375
+    }
+   },
+   "spreadAge5plus": {
+    "setups": 14,
+    "distinctTop1": 8,
+    "top1Counts": {
+     "overcoming-the-monster": 1,
+     "quest": 1,
+     "hero-journey": 1,
+     "man-in-a-hole": 4,
+     "kishotenketsu": 2,
+     "rebirth": 2,
+     "rule-of-three": 1,
+     "home-away-home": 2
+    },
+    "top1EntropyBits": 2.807,
+    "P1": {
+     "drawMass": {
+      "man-in-a-hole": 4.514,
+      "hero-journey": 2.831,
+      "home-away-home": 1.563,
+      "rebirth": 1.275,
+      "overcoming-the-monster": 1,
+      "quest": 1,
+      "kishotenketsu": 1,
+      "rule-of-three": 0.503,
+      "cinderella": 0.314
+     },
+     "drawEntropyBits": 2.772,
+     "heroJourneyShareOfDraws": 0.202
+    },
+    "P2": {
+     "drawMass": {
+      "man-in-a-hole": 3.077,
+      "rebirth": 2.653,
+      "kishotenketsu": 2.001,
+      "home-away-home": 1.999,
+      "hero-journey": 1.912,
+      "quest": 1,
+      "overcoming-the-monster": 0.731,
+      "rule-of-three": 0.354,
+      "cinderella": 0.273
+     },
+     "drawEntropyBits": 2.869,
+     "heroJourneyShareOfDraws": 0.137
+    },
+    "today": "hero-journey on every book (0 bits)"
+   },
+   "flip": {
+    "top1FlipRateBetweenSingleCalls": 0.07,
+    "meanAbsDeltaP": 0.011,
+    "p90AbsDeltaP": 0.02
+   },
+   "cost": {
+    "calls": 57,
+    "usd": 0.00296,
+    "usdPerCall": 0.000052,
+    "p50ms": 281,
+    "p90ms": 351
+   },
+   "perSetup": [
+    {
+     "setup": "S1",
+     "band": "journey5",
+     "today": "hero-journey",
+     "todayLabel": "G",
+     "ranked": [
+      {
+       "id": "overcoming-the-monster",
+       "p": 0.5,
+       "label": "B"
+      },
+      {
+       "id": "rebirth",
+       "p": 0.427,
+       "label": "G"
+      },
+      {
+       "id": "hero-journey",
+       "p": 0.407,
+       "label": "G"
+      },
+      {
+       "id": "man-in-a-hole",
+       "p": 0.34,
+       "label": "N"
+      },
+      {
+       "id": "rule-of-three",
+       "p": 0.247,
+       "label": "G"
+      },
+      {
+       "id": "home-away-home",
+       "p": 0.217,
+       "label": "G"
+      },
+      {
+       "id": "cinderella",
+       "p": 0.157,
+       "label": "B"
+      },
+      {
+       "id": "comedy",
+       "p": 0.047,
+       "label": "B"
+      }
+     ],
+     "top1": "overcoming-the-monster",
+     "top1Label": "B",
+     "singleTopAgree": 1,
+     "withinAuc": 0.667,
+     "draw": {
+      "P1": {
+       "overcoming-the-monster": 1
+      },
+      "P2": {
+       "overcoming-the-monster": 0.375,
+       "rebirth": 0.32,
+       "hero-journey": 0.305
+      }
+     },
+     "drawLabel": {
+      "P1": {
+       "G": 0,
+       "N": 0,
+       "B": 1
+      },
+      "P2": {
+       "G": 0.625,
+       "N": 0,
+       "B": 0.375
+      }
+     }
+    },
+    {
+     "setup": "S2",
+     "band": "journey6",
+     "today": "hero-journey",
+     "todayLabel": "N",
+     "ranked": [
+      {
+       "id": "quest",
+       "p": 0.557,
+       "label": "G"
+      },
+      {
+       "id": "hero-journey",
+       "p": 0.43,
+       "label": "N"
+      },
+      {
+       "id": "man-in-a-hole",
+       "p": 0.43,
+       "label": "N"
+      },
+      {
+       "id": "overcoming-the-monster",
+       "p": 0.38,
+       "label": "N"
+      },
+      {
+       "id": "rule-of-three",
+       "p": 0.317,
+       "label": "N"
+      },
+      {
+       "id": "home-away-home",
+       "p": 0.307,
+       "label": "B"
+      },
+      {
+       "id": "kishotenketsu",
+       "p": 0.21,
+       "label": "B"
+      },
+      {
+       "id": "cinderella",
+       "p": 0.17,
+       "label": "B"
+      },
+      {
+       "id": "comedy",
+       "p": 0.147,
+       "label": "N"
+      },
+      {
+       "id": "rebirth",
+       "p": 0.087,
+       "label": "B"
+      }
+     ],
+     "top1": "quest",
+     "top1Label": "G",
+     "singleTopAgree": 1,
+     "withinAuc": 1,
+     "draw": {
+      "P1": {
+       "quest": 1
+      },
+      "P2": {
+       "quest": 1
+      }
+     },
+     "drawLabel": {
+      "P1": {
+       "G": 1,
+       "N": 0,
+       "B": 0
+      },
+      "P2": {
+       "G": 1,
+       "N": 0,
+       "B": 0
+      }
+     }
+    },
+    {
+     "setup": "S3",
+     "band": "journey6",
+     "today": "hero-journey",
+     "todayLabel": "N",
+     "ranked": [
+      {
+       "id": "hero-journey",
+       "p": 0.647,
+       "label": "N"
+      },
+      {
+       "id": "rebirth",
+       "p": 0.63,
+       "label": "G"
+      },
+      {
+       "id": "man-in-a-hole",
+       "p": 0.613,
+       "label": "N"
+      },
+      {
+       "id": "quest",
+       "p": 0.493,
+       "label": "N"
+      },
+      {
+       "id": "cinderella",
+       "p": 0.467,
+       "label": "N"
+      },
+      {
+       "id": "rule-of-three",
+       "p": 0.447,
+       "label": "G"
+      },
+      {
+       "id": "kishotenketsu",
+       "p": 0.34,
+       "label": "B"
+      },
+      {
+       "id": "overcoming-the-monster",
+       "p": 0.25,
+       "label": "B"
+      },
+      {
+       "id": "comedy",
+       "p": 0.237,
+       "label": "N"
+      },
+      {
+       "id": "home-away-home",
+       "p": 0.223,
+       "label": "B"
+      }
+     ],
+     "top1": "hero-journey",
+     "top1Label": "N",
+     "singleTopAgree": 1,
+     "withinAuc": 1,
+     "draw": {
+      "P1": {
+       "hero-journey": 0.342,
+       "rebirth": 0.333,
+       "man-in-a-hole": 0.325
+      },
+      "P2": {
+       "hero-journey": 0.342,
+       "rebirth": 0.333,
+       "man-in-a-hole": 0.325
+      }
+     },
+     "drawLabel": {
+      "P1": {
+       "G": 0.333,
+       "N": 0.667,
+       "B": 0
+      },
+      "P2": {
+       "G": 0.333,
+       "N": 0.667,
+       "B": 0
+      }
+     }
+    },
+    {
+     "setup": "S4",
+     "band": "journey5",
+     "today": "hero-journey",
+     "todayLabel": "N",
+     "ranked": [
+      {
+       "id": "man-in-a-hole",
+       "p": 0.557,
+       "label": "G"
+      },
+      {
+       "id": "hero-journey",
+       "p": 0.533,
+       "label": "N"
+      },
+      {
+       "id": "rule-of-three",
+       "p": 0.31,
+       "label": "G"
+      },
+      {
+       "id": "home-away-home",
+       "p": 0.273,
+       "label": "B"
+      },
+      {
+       "id": "overcoming-the-monster",
+       "p": 0.203,
+       "label": "B"
+      },
+      {
+       "id": "rebirth",
+       "p": 0.187,
+       "label": "B"
+      },
+      {
+       "id": "cinderella",
+       "p": 0.183,
+       "label": "B"
+      },
+      {
+       "id": "comedy",
+       "p": 0.123,
+       "label": "B"
+      }
+     ],
+     "top1": "man-in-a-hole",
+     "top1Label": "G",
+     "singleTopAgree": 1,
+     "withinAuc": 1,
+     "draw": {
+      "P1": {
+       "man-in-a-hole": 0.511,
+       "hero-journey": 0.489
+      },
+      "P2": {
+       "man-in-a-hole": 0.511,
+       "hero-journey": 0.489
+      }
+     },
+     "drawLabel": {
+      "P1": {
+       "G": 0.511,
+       "N": 0.489,
+       "B": 0
+      },
+      "P2": {
+       "G": 0.511,
+       "N": 0.489,
+       "B": 0
+      }
+     }
+    },
+    {
+     "setup": "S5",
+     "band": "journey5",
+     "today": "hero-journey",
+     "todayLabel": "N",
+     "ranked": [
+      {
+       "id": "man-in-a-hole",
+       "p": 0.503,
+       "label": "G"
+      },
+      {
+       "id": "hero-journey",
+       "p": 0.463,
+       "label": "N"
+      },
+      {
+       "id": "rule-of-three",
+       "p": 0.347,
+       "label": "G"
+      },
+      {
+       "id": "comedy",
+       "p": 0.233,
+       "label": "N"
+      },
+      {
+       "id": "home-away-home",
+       "p": 0.227,
+       "label": "B"
+      },
+      {
+       "id": "overcoming-the-monster",
+       "p": 0.223,
+       "label": "B"
+      },
+      {
+       "id": "cinderella",
+       "p": 0.213,
+       "label": "B"
+      },
+      {
+       "id": "rebirth",
+       "p": 0.193,
+       "label": "B"
+      }
+     ],
+     "top1": "man-in-a-hole",
+     "top1Label": "G",
+     "singleTopAgree": 1,
+     "withinAuc": 1,
+     "draw": {
+      "P1": {
+       "man-in-a-hole": 1
+      },
+      "P2": {
+       "man-in-a-hole": 0.521,
+       "hero-journey": 0.479
+      }
+     },
+     "drawLabel": {
+      "P1": {
+       "G": 1,
+       "N": 0,
+       "B": 0
+      },
+      "P2": {
+       "G": 0.521,
+       "N": 0.479,
+       "B": 0
+      }
+     }
+    },
+    {
+     "setup": "S6",
+     "band": "journey6",
+     "today": "hero-journey",
+     "todayLabel": "N",
+     "ranked": [
+      {
+       "id": "kishotenketsu",
+       "p": 0.487,
+       "label": "G"
+      },
+      {
+       "id": "home-away-home",
+       "p": 0.457,
+       "label": "G"
+      },
+      {
+       "id": "hero-journey",
+       "p": 0.313,
+       "label": "N"
+      },
+      {
+       "id": "man-in-a-hole",
+       "p": 0.263,
+       "label": "N"
+      },
+      {
+       "id": "rule-of-three",
+       "p": 0.253,
+       "label": "N"
+      },
+      {
+       "id": "quest",
+       "p": 0.237,
+       "label": "N"
+      },
+      {
+       "id": "rebirth",
+       "p": 0.217,
+       "label": "N"
+      },
+      {
+       "id": "cinderella",
+       "p": 0.133,
+       "label": "B"
+      },
+      {
+       "id": "overcoming-the-monster",
+       "p": 0.13,
+       "label": "B"
+      },
+      {
+       "id": "comedy",
+       "p": 0.087,
+       "label": "B"
+      }
+     ],
+     "top1": "kishotenketsu",
+     "top1Label": "G",
+     "singleTopAgree": 1,
+     "withinAuc": 1,
+     "draw": {
+      "P1": {
+       "hero-journey": 1
+      },
+      "P2": {
+       "kishotenketsu": 0.516,
+       "home-away-home": 0.484
+      }
+     },
+     "drawLabel": {
+      "P1": {
+       "G": 0,
+       "N": 1,
+       "B": 0
+      },
+      "P2": {
+       "G": 1,
+       "N": 0,
+       "B": 0
+      }
+     }
+    },
+    {
+     "setup": "S7",
+     "band": "journey6",
+     "today": "hero-journey",
+     "todayLabel": "B",
+     "ranked": [
+      {
+       "id": "rebirth",
+       "p": 0.78,
+       "label": "G"
+      },
+      {
+       "id": "man-in-a-hole",
+       "p": 0.63,
+       "label": "G"
+      },
+      {
+       "id": "rule-of-three",
+       "p": 0.377,
+       "label": "N"
+      },
+      {
+       "id": "home-away-home",
+       "p": 0.367,
+       "label": "B"
+      },
+      {
+       "id": "hero-journey",
+       "p": 0.357,
+       "label": "B"
+      },
+      {
+       "id": "cinderella",
+       "p": 0.273,
+       "label": "B"
+      },
+      {
+       "id": "kishotenketsu",
+       "p": 0.24,
+       "label": "B"
+      },
+      {
+       "id": "overcoming-the-monster",
+       "p": 0.19,
+       "label": "B"
+      },
+      {
+       "id": "comedy",
+       "p": 0.133,
+       "label": "B"
+      },
+      {
+       "id": "quest",
+       "p": 0.047,
+       "label": "B"
+      }
+     ],
+     "top1": "rebirth",
+     "top1Label": "G",
+     "singleTopAgree": 1,
+     "withinAuc": 1,
+     "draw": {
+      "P1": {
+       "rebirth": 0.553,
+       "man-in-a-hole": 0.447
+      },
+      "P2": {
+       "rebirth": 1
+      }
+     },
+     "drawLabel": {
+      "P1": {
+       "G": 1,
+       "N": 0,
+       "B": 0
+      },
+      "P2": {
+       "G": 1,
+       "N": 0,
+       "B": 0
+      }
+     }
+    },
+    {
+     "setup": "S8",
+     "band": "journey6",
+     "today": "hero-journey",
+     "todayLabel": "N",
+     "ranked": [
+      {
+       "id": "rule-of-three",
+       "p": 0.563,
+       "label": "G"
+      },
+      {
+       "id": "man-in-a-hole",
+       "p": 0.557,
+       "label": "G"
+      },
+      {
+       "id": "hero-journey",
+       "p": 0.473,
+       "label": "N"
+      },
+      {
+       "id": "kishotenketsu",
+       "p": 0.443,
+       "label": "N"
+      },
+      {
+       "id": "rebirth",
+       "p": 0.33,
+       "label": "B"
+      },
+      {
+       "id": "quest",
+       "p": 0.297,
+       "label": "N"
+      },
+      {
+       "id": "cinderella",
+       "p": 0.243,
+       "label": "N"
+      },
+      {
+       "id": "overcoming-the-monster",
+       "p": 0.11,
+       "label": "B"
+      },
+      {
+       "id": "home-away-home",
+       "p": 0.093,
+       "label": "B"
+      },
+      {
+       "id": "comedy",
+       "p": 0.06,
+       "label": "N"
+      }
+     ],
+     "top1": "rule-of-three",
+     "top1Label": "G",
+     "singleTopAgree": 0.667,
+     "withinAuc": 1,
+     "draw": {
+      "P1": {
+       "rule-of-three": 0.503,
+       "man-in-a-hole": 0.497
+      },
+      "P2": {
+       "rule-of-three": 0.354,
+       "man-in-a-hole": 0.349,
+       "hero-journey": 0.297
+      }
+     },
+     "drawLabel": {
+      "P1": {
+       "G": 1,
+       "N": 0,
+       "B": 0
+      },
+      "P2": {
+       "G": 0.703,
+       "N": 0.297,
+       "B": 0
+      }
+     }
+    },
+    {
+     "setup": "S9",
+     "band": "journey6",
+     "today": "hero-journey",
+     "todayLabel": "N",
+     "ranked": [
+      {
+       "id": "rebirth",
+       "p": 0.707,
+       "label": "G"
+      },
+      {
+       "id": "cinderella",
+       "p": 0.57,
+       "label": "G"
+      },
+      {
+       "id": "man-in-a-hole",
+       "p": 0.54,
+       "label": "N"
+      },
+      {
+       "id": "hero-journey",
+       "p": 0.447,
+       "label": "N"
+      },
+      {
+       "id": "rule-of-three",
+       "p": 0.39,
+       "label": "N"
+      },
+      {
+       "id": "kishotenketsu",
+       "p": 0.283,
+       "label": "B"
+      },
+      {
+       "id": "overcoming-the-monster",
+       "p": 0.197,
+       "label": "B"
+      },
+      {
+       "id": "home-away-home",
+       "p": 0.16,
+       "label": "B"
+      },
+      {
+       "id": "comedy",
+       "p": 0.15,
+       "label": "N"
+      },
+      {
+       "id": "quest",
+       "p": 0.127,
+       "label": "B"
+      }
+     ],
+     "top1": "rebirth",
+     "top1Label": "G",
+     "singleTopAgree": 1,
+     "withinAuc": 1,
+     "draw": {
+      "P1": {
+       "rebirth": 0.389,
+       "cinderella": 0.314,
+       "man-in-a-hole": 0.297
+      },
+      "P2": {
+       "rebirth": 1
+      }
+     },
+     "drawLabel": {
+      "P1": {
+       "G": 0.703,
+       "N": 0.297,
+       "B": 0
+      },
+      "P2": {
+       "G": 1,
+       "N": 0,
+       "B": 0
+      }
+     }
+    },
+    {
+     "setup": "S10",
+     "band": "journey6",
+     "today": "hero-journey",
+     "todayLabel": "G",
+     "ranked": [
+      {
+       "id": "home-away-home",
+       "p": 0.74,
+       "label": "G"
+      },
+      {
+       "id": "man-in-a-hole",
+       "p": 0.573,
+       "label": "N"
+      },
+      {
+       "id": "quest",
+       "p": 0.497,
+       "label": "G"
+      },
+      {
+       "id": "hero-journey",
+       "p": 0.453,
+       "label": "G"
+      },
+      {
+       "id": "kishotenketsu",
+       "p": 0.323,
+       "label": "B"
+      },
+      {
+       "id": "overcoming-the-monster",
+       "p": 0.177,
+       "label": "B"
+      },
+      {
+       "id": "cinderella",
+       "p": 0.177,
+       "label": "B"
+      },
+      {
+       "id": "rebirth",
+       "p": 0.17,
+       "label": "B"
+      },
+      {
+       "id": "rule-of-three",
+       "p": 0.127,
+       "label": "N"
+      },
+      {
+       "id": "comedy",
+       "p": 0.1,
+       "label": "B"
+      }
+     ],
+     "top1": "home-away-home",
+     "top1Label": "G",
+     "singleTopAgree": 1,
+     "withinAuc": 1,
+     "draw": {
+      "P1": {
+       "home-away-home": 0.563,
+       "man-in-a-hole": 0.437
+      },
+      "P2": {
+       "home-away-home": 1
+      }
+     },
+     "drawLabel": {
+      "P1": {
+       "G": 0.563,
+       "N": 0.437,
+       "B": 0
+      },
+      "P2": {
+       "G": 1,
+       "N": 0,
+       "B": 0
+      }
+     }
+    },
+    {
+     "setup": "S11",
+     "band": "routine",
+     "today": "routine-day",
+     "todayLabel": "G",
+     "ranked": [
+      {
+       "id": "circular",
+       "p": 0.277,
+       "label": "G"
+      },
+      {
+       "id": "routine-day",
+       "p": 0.223,
+       "label": "G"
+      },
+      {
+       "id": "chain",
+       "p": 0.213,
+       "label": "N"
+      }
+     ],
+     "top1": "circular",
+     "top1Label": "G",
+     "singleTopAgree": 1,
+     "withinAuc": null,
+     "draw": {
+      "P1": {
+       "routine-day": 1
+      },
+      "P2": {
+       "circular": 0.388,
+       "routine-day": 0.313,
+       "chain": 0.299
+      }
+     },
+     "drawLabel": {
+      "P1": {
+       "G": 1,
+       "N": 0,
+       "B": 0
+      },
+      "P2": {
+       "G": 0.701,
+       "N": 0.299,
+       "B": 0
+      }
+     }
+    },
+    {
+     "setup": "Y1",
+     "band": "fear-choice",
+     "today": "fear-choice",
+     "todayLabel": "G",
+     "ranked": [
+      {
+       "id": "fear-choice",
+       "p": 0.793,
+       "label": "G"
+      },
+      {
+       "id": "man-in-a-hole",
+       "p": 0.55,
+       "label": "N"
+      },
+      {
+       "id": "three-tries",
+       "p": 0.527,
+       "label": "N"
+      },
+      {
+       "id": "cumulative",
+       "p": 0.333,
+       "label": "N"
+      },
+      {
+       "id": "home-away-home",
+       "p": 0.293,
+       "label": "N"
+      }
+     ],
+     "top1": "fear-choice",
+     "top1Label": "G",
+     "singleTopAgree": 1,
+     "withinAuc": null,
+     "draw": {
+      "P1": {
+       "fear-choice": 0.424,
+       "man-in-a-hole": 0.294,
+       "three-tries": 0.282
+      },
+      "P2": {
+       "fear-choice": 1
+      }
+     },
+     "drawLabel": {
+      "P1": {
+       "G": 0.424,
+       "N": 0.576,
+       "B": 0
+      },
+      "P2": {
+       "G": 1,
+       "N": 0,
+       "B": 0
+      }
+     }
+    },
+    {
+     "setup": "Y2",
+     "band": "tries",
+     "today": "three-tries",
+     "todayLabel": "G",
+     "ranked": [
+      {
+       "id": "three-tries",
+       "p": 0.82,
+       "label": "G"
+      },
+      {
+       "id": "circular",
+       "p": 0.323,
+       "label": "N"
+      },
+      {
+       "id": "kishotenketsu",
+       "p": 0.303,
+       "label": "B"
+      },
+      {
+       "id": "home-away-home",
+       "p": 0.1,
+       "label": "B"
+      },
+      {
+       "id": "cumulative",
+       "p": 0.07,
+       "label": "B"
+      }
+     ],
+     "top1": "three-tries",
+     "top1Label": "G",
+     "singleTopAgree": 1,
+     "withinAuc": 1,
+     "draw": {
+      "P1": {
+       "three-tries": 1
+      },
+      "P2": {
+       "three-tries": 1
+      }
+     },
+     "drawLabel": {
+      "P1": {
+       "G": 1,
+       "N": 0,
+       "B": 0
+      },
+      "P2": {
+       "G": 1,
+       "N": 0,
+       "B": 0
+      }
+     }
+    },
+    {
+     "setup": "Y3",
+     "band": "quest",
+     "today": "search-quest",
+     "todayLabel": "N",
+     "ranked": [
+      {
+       "id": "circular",
+       "p": 0.417,
+       "label": "N"
+      },
+      {
+       "id": "cumulative",
+       "p": 0.373,
+       "label": "N"
+      },
+      {
+       "id": "search-quest",
+       "p": 0.37,
+       "label": "N"
+      },
+      {
+       "id": "chain",
+       "p": 0.287,
+       "label": "N"
+      }
+     ],
+     "top1": "circular",
+     "top1Label": "N",
+     "singleTopAgree": 1,
+     "withinAuc": null,
+     "draw": {
+      "P1": {
+       "search-quest": 1
+      },
+      "P2": {
+       "circular": 0.359,
+       "cumulative": 0.322,
+       "search-quest": 0.319
+      }
+     },
+     "drawLabel": {
+      "P1": {
+       "G": 0,
+       "N": 1,
+       "B": 0
+      },
+      "P2": {
+       "G": 0,
+       "N": 1,
+       "B": 0
+      }
+     }
+    },
+    {
+     "setup": "Y4",
+     "band": "routine",
+     "today": "routine-day",
+     "todayLabel": "G",
+     "ranked": [
+      {
+       "id": "circular",
+       "p": 0.317,
+       "label": "G"
+      },
+      {
+       "id": "chain",
+       "p": 0.233,
+       "label": "N"
+      },
+      {
+       "id": "routine-day",
+       "p": 0.187,
+       "label": "G"
+      }
+     ],
+     "top1": "circular",
+     "top1Label": "G",
+     "singleTopAgree": 1,
+     "withinAuc": null,
+     "draw": {
+      "P1": {
+       "routine-day": 1
+      },
+      "P2": {
+       "circular": 0.576,
+       "chain": 0.424
+      }
+     },
+     "drawLabel": {
+      "P1": {
+       "G": 1,
+       "N": 0,
+       "B": 0
+      },
+      "P2": {
+       "G": 0.576,
+       "N": 0.424,
+       "B": 0
+      }
+     }
+    },
+    {
+     "setup": "O1",
+     "band": "journey6",
+     "today": "hero-journey",
+     "todayLabel": "B",
+     "ranked": [
+      {
+       "id": "man-in-a-hole",
+       "p": 0.327,
+       "label": "G"
+      },
+      {
+       "id": "overcoming-the-monster",
+       "p": 0.313,
+       "label": "G"
+      },
+      {
+       "id": "cinderella",
+       "p": 0.24,
+       "label": "N"
+      },
+      {
+       "id": "kishotenketsu",
+       "p": 0.217,
+       "label": "B"
+      },
+      {
+       "id": "home-away-home",
+       "p": 0.16,
+       "label": "B"
+      },
+      {
+       "id": "hero-journey",
+       "p": 0.157,
+       "label": "B"
+      },
+      {
+       "id": "rebirth",
+       "p": 0.14,
+       "label": "B"
+      },
+      {
+       "id": "rule-of-three",
+       "p": 0.09,
+       "label": "N"
+      },
+      {
+       "id": "quest",
+       "p": 0.057,
+       "label": "B"
+      },
+      {
+       "id": "comedy",
+       "p": 0.033,
+       "label": "B"
+      }
+     ],
+     "top1": "man-in-a-hole",
+     "top1Label": "G",
+     "singleTopAgree": 0.667,
+     "withinAuc": 1,
+     "draw": {
+      "P1": {
+       "hero-journey": 1
+      },
+      "P2": {
+       "man-in-a-hole": 0.371,
+       "overcoming-the-monster": 0.356,
+       "cinderella": 0.273
+      }
+     },
+     "drawLabel": {
+      "P1": {
+       "G": 0,
+       "N": 0,
+       "B": 1
+      },
+      "P2": {
+       "G": 0.727,
+       "N": 0.273,
+       "B": 0
+      }
+     }
+    },
+    {
+     "setup": "O2",
+     "band": "journey6",
+     "today": "hero-journey",
+     "todayLabel": "N",
+     "ranked": [
+      {
+       "id": "man-in-a-hole",
+       "p": 0.703,
+       "label": "N"
+      },
+      {
+       "id": "hero-journey",
+       "p": 0.423,
+       "label": "N"
+      },
+      {
+       "id": "rebirth",
+       "p": 0.397,
+       "label": "B"
+      },
+      {
+       "id": "cinderella",
+       "p": 0.28,
+       "label": "B"
+      },
+      {
+       "id": "rule-of-three",
+       "p": 0.277,
+       "label": "N"
+      },
+      {
+       "id": "overcoming-the-monster",
+       "p": 0.243,
+       "label": "G"
+      },
+      {
+       "id": "quest",
+       "p": 0.233,
+       "label": "B"
+      },
+      {
+       "id": "home-away-home",
+       "p": 0.107,
+       "label": "B"
+      },
+      {
+       "id": "kishotenketsu",
+       "p": 0.087,
+       "label": "B"
+      },
+      {
+       "id": "comedy",
+       "p": 0.013,
+       "label": "B"
+      }
+     ],
+     "top1": "man-in-a-hole",
+     "top1Label": "N",
+     "singleTopAgree": 1,
+     "withinAuc": 0.667,
+     "draw": {
+      "P1": {
+       "man-in-a-hole": 1
+      },
+      "P2": {
+       "man-in-a-hole": 1
+      }
+     },
+     "drawLabel": {
+      "P1": {
+       "G": 0,
+       "N": 1,
+       "B": 0
+      },
+      "P2": {
+       "G": 0,
+       "N": 1,
+       "B": 0
+      }
+     }
+    },
+    {
+     "setup": "O3",
+     "band": "journey6",
+     "today": "hero-journey",
+     "todayLabel": "B",
+     "ranked": [
+      {
+       "id": "kishotenketsu",
+       "p": 0.503,
+       "label": "G"
+      },
+      {
+       "id": "man-in-a-hole",
+       "p": 0.353,
+       "label": "N"
+      },
+      {
+       "id": "rebirth",
+       "p": 0.257,
+       "label": "N"
+      },
+      {
+       "id": "rule-of-three",
+       "p": 0.177,
+       "label": "B"
+      },
+      {
+       "id": "comedy",
+       "p": 0.177,
+       "label": "N"
+      },
+      {
+       "id": "quest",
+       "p": 0.147,
+       "label": "N"
+      },
+      {
+       "id": "hero-journey",
+       "p": 0.127,
+       "label": "B"
+      },
+      {
+       "id": "home-away-home",
+       "p": 0.083,
+       "label": "B"
+      },
+      {
+       "id": "cinderella",
+       "p": 0.083,
+       "label": "B"
+      },
+      {
+       "id": "overcoming-the-monster",
+       "p": 0.067,
+       "label": "B"
+      }
+     ],
+     "top1": "kishotenketsu",
+     "top1Label": "G",
+     "singleTopAgree": 1,
+     "withinAuc": 1,
+     "draw": {
+      "P1": {
+       "kishotenketsu": 1
+      },
+      "P2": {
+       "kishotenketsu": 1
+      }
+     },
+     "drawLabel": {
+      "P1": {
+       "G": 1,
+       "N": 0,
+       "B": 0
+      },
+      "P2": {
+       "G": 1,
+       "N": 0,
+       "B": 0
+      }
+     }
+    },
+    {
+     "setup": "O4",
+     "band": "journey6",
+     "today": "hero-journey",
+     "todayLabel": "N",
+     "ranked": [
+      {
+       "id": "home-away-home",
+       "p": 0.5,
+       "label": "G"
+      },
+      {
+       "id": "kishotenketsu",
+       "p": 0.47,
+       "label": "N"
+      },
+      {
+       "id": "hero-journey",
+       "p": 0.357,
+       "label": "N"
+      },
+      {
+       "id": "man-in-a-hole",
+       "p": 0.357,
+       "label": "N"
+      },
+      {
+       "id": "rule-of-three",
+       "p": 0.283,
+       "label": "N"
+      },
+      {
+       "id": "quest",
+       "p": 0.263,
+       "label": "N"
+      },
+      {
+       "id": "comedy",
+       "p": 0.203,
+       "label": "N"
+      },
+      {
+       "id": "overcoming-the-monster",
+       "p": 0.17,
+       "label": "B"
+      },
+      {
+       "id": "cinderella",
+       "p": 0.137,
+       "label": "B"
+      },
+      {
+       "id": "rebirth",
+       "p": 0.137,
+       "label": "B"
+      }
+     ],
+     "top1": "home-away-home",
+     "top1Label": "G",
+     "singleTopAgree": 1,
+     "withinAuc": 1,
+     "draw": {
+      "P1": {
+       "home-away-home": 1
+      },
+      "P2": {
+       "home-away-home": 0.515,
+       "kishotenketsu": 0.485
+      }
+     },
+     "drawLabel": {
+      "P1": {
+       "G": 1,
+       "N": 0,
+       "B": 0
+      },
+      "P2": {
+       "G": 0.515,
+       "N": 0.485,
+       "B": 0
+      }
+     }
+    }
+   ]
+  },
+  "F2": {
+   "setups": 19,
+   "pooledAucGvsB": 0.965,
+   "pooledAucGvsNB": 0.852,
+   "meanWithinSetupAucGvsB": 0.961,
+   "withinSetups": 15,
+   "meanP": {
+    "G": 0.474,
+    "N": 0.339,
+    "B": 0.174
+   },
+   "top1": {
+    "G": 14,
+    "N": 5,
+    "B": 0
+   },
+   "todayShape": {
+    "G": 6,
+    "N": 10,
+    "B": 3
+   },
+   "drawExpected": {
+    "P1": {
+     "G": 9.329,
+     "N": 7.671,
+     "B": 2
+    },
+    "P2": {
+     "G": 13.433,
+     "N": 5.229,
+     "B": 0.338
+    }
+   },
+   "spreadAge5plus": {
+    "setups": 14,
+    "distinctTop1": 7,
+    "top1Counts": {
+     "hero-journey": 4,
+     "quest": 1,
+     "home-away-home": 3,
+     "rebirth": 2,
+     "rule-of-three": 1,
+     "man-in-a-hole": 2,
+     "kishotenketsu": 1
+    },
+    "top1EntropyBits": 2.611,
+    "P1": {
+     "drawMass": {
+      "hero-journey": 7.363,
+      "man-in-a-hole": 2.831,
+      "quest": 1.306,
+      "rebirth": 1.262,
+      "rule-of-three": 0.53,
+      "home-away-home": 0.386,
+      "cinderella": 0.323
+     },
+     "drawEntropyBits": 2.033,
+     "heroJourneyShareOfDraws": 0.526
+    },
+    "P2": {
+     "drawMass": {
+      "man-in-a-hole": 3.011,
+      "rebirth": 2.63,
+      "home-away-home": 1.883,
+      "hero-journey": 1.882,
+      "kishotenketsu": 1.808,
+      "quest": 1,
+      "rule-of-three": 0.834,
+      "overcoming-the-monster": 0.674,
+      "cinderella": 0.276
+     },
+     "drawEntropyBits": 2.927,
+     "heroJourneyShareOfDraws": 0.134
+    },
+    "today": "hero-journey on every book (0 bits)"
+   },
+   "flip": {
+    "top1FlipRateBetweenSingleCalls": 0.105,
+    "meanAbsDeltaP": 0.01,
+    "p90AbsDeltaP": 0.02
+   },
+   "cost": {
+    "calls": 57,
+    "usd": 0.00316,
+    "usdPerCall": 0.000055,
+    "p50ms": 261,
+    "p90ms": 329
+   },
+   "perSetup": [
+    {
+     "setup": "S1",
+     "band": "journey5",
+     "today": "hero-journey",
+     "todayLabel": "G",
+     "ranked": [
+      {
+       "id": "hero-journey",
+       "p": 0.457,
+       "label": "G"
+      },
+      {
+       "id": "overcoming-the-monster",
+       "p": 0.45,
+       "label": "B"
+      },
+      {
+       "id": "rebirth",
+       "p": 0.423,
+       "label": "G"
+      },
+      {
+       "id": "rule-of-three",
+       "p": 0.31,
+       "label": "G"
+      },
+      {
+       "id": "man-in-a-hole",
+       "p": 0.29,
+       "label": "N"
+      },
+      {
+       "id": "home-away-home",
+       "p": 0.23,
+       "label": "G"
+      },
+      {
+       "id": "cinderella",
+       "p": 0.187,
+       "label": "B"
+      },
+      {
+       "id": "comedy",
+       "p": 0.07,
+       "label": "B"
+      }
+     ],
+     "top1": "hero-journey",
+     "top1Label": "G",
+     "singleTopAgree": 0.667,
+     "withinAuc": 0.75,
+     "draw": {
+      "P1": {
+       "hero-journey": 1
+      },
+      "P2": {
+       "hero-journey": 0.343,
+       "overcoming-the-monster": 0.338,
+       "rebirth": 0.318
+      }
+     },
+     "drawLabel": {
+      "P1": {
+       "G": 1,
+       "N": 0,
+       "B": 0
+      },
+      "P2": {
+       "G": 0.662,
+       "N": 0,
+       "B": 0.338
+      }
+     }
+    },
+    {
+     "setup": "S2",
+     "band": "journey6",
+     "today": "hero-journey",
+     "todayLabel": "N",
+     "ranked": [
+      {
+       "id": "quest",
+       "p": 0.67,
+       "label": "G"
+      },
+      {
+       "id": "hero-journey",
+       "p": 0.42,
+       "label": "N"
+      },
+      {
+       "id": "rule-of-three",
+       "p": 0.367,
+       "label": "N"
+      },
+      {
+       "id": "man-in-a-hole",
+       "p": 0.363,
+       "label": "N"
+      },
+      {
+       "id": "overcoming-the-monster",
+       "p": 0.357,
+       "label": "N"
+      },
+      {
+       "id": "home-away-home",
+       "p": 0.24,
+       "label": "B"
+      },
+      {
+       "id": "kishotenketsu",
+       "p": 0.217,
+       "label": "B"
+      },
+      {
+       "id": "cinderella",
+       "p": 0.177,
+       "label": "B"
+      },
+      {
+       "id": "comedy",
+       "p": 0.14,
+       "label": "N"
+      },
+      {
+       "id": "rebirth",
+       "p": 0.09,
+       "label": "B"
+      }
+     ],
+     "top1": "quest",
+     "top1Label": "G",
+     "singleTopAgree": 1,
+     "withinAuc": 1,
+     "draw": {
+      "P1": {
+       "quest": 1
+      },
+      "P2": {
+       "quest": 1
+      }
+     },
+     "drawLabel": {
+      "P1": {
+       "G": 1,
+       "N": 0,
+       "B": 0
+      },
+      "P2": {
+       "G": 1,
+       "N": 0,
+       "B": 0
+      }
+     }
+    },
+    {
+     "setup": "S3",
+     "band": "journey6",
+     "today": "hero-journey",
+     "todayLabel": "N",
+     "ranked": [
+      {
+       "id": "hero-journey",
+       "p": 0.66,
+       "label": "N"
+      },
+      {
+       "id": "man-in-a-hole",
+       "p": 0.59,
+       "label": "N"
+      },
+      {
+       "id": "rebirth",
+       "p": 0.567,
+       "label": "G"
+      },
+      {
+       "id": "quest",
+       "p": 0.56,
+       "label": "N"
+      },
+      {
+       "id": "cinderella",
+       "p": 0.457,
+       "label": "N"
+      },
+      {
+       "id": "rule-of-three",
+       "p": 0.447,
+       "label": "G"
+      },
+      {
+       "id": "kishotenketsu",
+       "p": 0.31,
+       "label": "B"
+      },
+      {
+       "id": "comedy",
+       "p": 0.237,
+       "label": "N"
+      },
+      {
+       "id": "home-away-home",
+       "p": 0.21,
+       "label": "B"
+      },
+      {
+       "id": "overcoming-the-monster",
+       "p": 0.207,
+       "label": "B"
+      }
+     ],
+     "top1": "hero-journey",
+     "top1Label": "N",
+     "singleTopAgree": 1,
+     "withinAuc": 1,
+     "draw": {
+      "P1": {
+       "hero-journey": 0.363,
+       "man-in-a-hole": 0.325,
+       "rebirth": 0.312
+      },
+      "P2": {
+       "hero-journey": 0.363,
+       "man-in-a-hole": 0.325,
+       "rebirth": 0.312
+      }
+     },
+     "drawLabel": {
+      "P1": {
+       "G": 0.312,
+       "N": 0.688,
+       "B": 0
+      },
+      "P2": {
+       "G": 0.312,
+       "N": 0.688,
+       "B": 0
+      }
+     }
+    },
+    {
+     "setup": "S4",
+     "band": "journey5",
+     "today": "hero-journey",
+     "todayLabel": "N",
+     "ranked": [
+      {
+       "id": "hero-journey",
+       "p": 0.493,
+       "label": "N"
+      },
+      {
+       "id": "man-in-a-hole",
+       "p": 0.473,
+       "label": "G"
+      },
+      {
+       "id": "rule-of-three",
+       "p": 0.33,
+       "label": "G"
+      },
+      {
+       "id": "home-away-home",
+       "p": 0.253,
+       "label": "B"
+      },
+      {
+       "id": "overcoming-the-monster",
+       "p": 0.193,
+       "label": "B"
+      },
+      {
+       "id": "cinderella",
+       "p": 0.187,
+       "label": "B"
+      },
+      {
+       "id": "rebirth",
+       "p": 0.173,
+       "label": "B"
+      },
+      {
+       "id": "comedy",
+       "p": 0.13,
+       "label": "B"
+      }
+     ],
+     "top1": "hero-journey",
+     "top1Label": "N",
+     "singleTopAgree": 0.667,
+     "withinAuc": 1,
+     "draw": {
+      "P1": {
+       "hero-journey": 1
+      },
+      "P2": {
+       "hero-journey": 0.51,
+       "man-in-a-hole": 0.49
+      }
+     },
+     "drawLabel": {
+      "P1": {
+       "G": 0,
+       "N": 1,
+       "B": 0
+      },
+      "P2": {
+       "G": 0.49,
+       "N": 0.51,
+       "B": 0
+      }
+     }
+    },
+    {
+     "setup": "S5",
+     "band": "journey5",
+     "today": "hero-journey",
+     "todayLabel": "N",
+     "ranked": [
+      {
+       "id": "hero-journey",
+       "p": 0.417,
+       "label": "N"
+      },
+      {
+       "id": "man-in-a-hole",
+       "p": 0.393,
+       "label": "G"
+      },
+      {
+       "id": "rule-of-three",
+       "p": 0.353,
+       "label": "G"
+      },
+      {
+       "id": "comedy",
+       "p": 0.24,
+       "label": "N"
+      },
+      {
+       "id": "home-away-home",
+       "p": 0.213,
+       "label": "B"
+      },
+      {
+       "id": "cinderella",
+       "p": 0.2,
+       "label": "B"
+      },
+      {
+       "id": "overcoming-the-monster",
+       "p": 0.18,
+       "label": "B"
+      },
+      {
+       "id": "rebirth",
+       "p": 0.18,
+       "label": "B"
+      }
+     ],
+     "top1": "hero-journey",
+     "top1Label": "N",
+     "singleTopAgree": 1,
+     "withinAuc": 1,
+     "draw": {
+      "P1": {
+       "hero-journey": 1
+      },
+      "P2": {
+       "hero-journey": 0.358,
+       "man-in-a-hole": 0.338,
+       "rule-of-three": 0.304
+      }
+     },
+     "drawLabel": {
+      "P1": {
+       "G": 0,
+       "N": 1,
+       "B": 0
+      },
+      "P2": {
+       "G": 0.642,
+       "N": 0.358,
+       "B": 0
+      }
+     }
+    },
+    {
+     "setup": "S6",
+     "band": "journey6",
+     "today": "hero-journey",
+     "todayLabel": "N",
+     "ranked": [
+      {
+       "id": "home-away-home",
+       "p": 0.46,
+       "label": "G"
+      },
+      {
+       "id": "kishotenketsu",
+       "p": 0.46,
+       "label": "G"
+      },
+      {
+       "id": "hero-journey",
+       "p": 0.327,
+       "label": "N"
+      },
+      {
+       "id": "quest",
+       "p": 0.29,
+       "label": "N"
+      },
+      {
+       "id": "man-in-a-hole",
+       "p": 0.283,
+       "label": "N"
+      },
+      {
+       "id": "rule-of-three",
+       "p": 0.283,
+       "label": "N"
+      },
+      {
+       "id": "rebirth",
+       "p": 0.2,
+       "label": "N"
+      },
+      {
+       "id": "cinderella",
+       "p": 0.167,
+       "label": "B"
+      },
+      {
+       "id": "overcoming-the-monster",
+       "p": 0.137,
+       "label": "B"
+      },
+      {
+       "id": "comedy",
+       "p": 0.107,
+       "label": "B"
+      }
+     ],
+     "top1": "home-away-home",
+     "top1Label": "G",
+     "singleTopAgree": 0.333,
+     "withinAuc": 1,
+     "draw": {
+      "P1": {
+       "hero-journey": 1
+      },
+      "P2": {
+       "home-away-home": 0.5,
+       "kishotenketsu": 0.5
+      }
+     },
+     "drawLabel": {
+      "P1": {
+       "G": 0,
+       "N": 1,
+       "B": 0
+      },
+      "P2": {
+       "G": 1,
+       "N": 0,
+       "B": 0
+      }
+     }
+    },
+    {
+     "setup": "S7",
+     "band": "journey6",
+     "today": "hero-journey",
+     "todayLabel": "B",
+     "ranked": [
+      {
+       "id": "rebirth",
+       "p": 0.777,
+       "label": "G"
+      },
+      {
+       "id": "man-in-a-hole",
+       "p": 0.613,
+       "label": "G"
+      },
+      {
+       "id": "rule-of-three",
+       "p": 0.367,
+       "label": "N"
+      },
+      {
+       "id": "home-away-home",
+       "p": 0.323,
+       "label": "B"
+      },
+      {
+       "id": "hero-journey",
+       "p": 0.263,
+       "label": "B"
+      },
+      {
+       "id": "cinderella",
+       "p": 0.25,
+       "label": "B"
+      },
+      {
+       "id": "kishotenketsu",
+       "p": 0.223,
+       "label": "B"
+      },
+      {
+       "id": "comedy",
+       "p": 0.153,
+       "label": "B"
+      },
+      {
+       "id": "overcoming-the-monster",
+       "p": 0.15,
+       "label": "B"
+      },
+      {
+       "id": "quest",
+       "p": 0.06,
+       "label": "B"
+      }
+     ],
+     "top1": "rebirth",
+     "top1Label": "G",
+     "singleTopAgree": 1,
+     "withinAuc": 1,
+     "draw": {
+      "P1": {
+       "rebirth": 0.559,
+       "man-in-a-hole": 0.441
+      },
+      "P2": {
+       "rebirth": 1
+      }
+     },
+     "drawLabel": {
+      "P1": {
+       "G": 1,
+       "N": 0,
+       "B": 0
+      },
+      "P2": {
+       "G": 1,
+       "N": 0,
+       "B": 0
+      }
+     }
+    },
+    {
+     "setup": "S8",
+     "band": "journey6",
+     "today": "hero-journey",
+     "todayLabel": "N",
+     "ranked": [
+      {
+       "id": "rule-of-three",
+       "p": 0.617,
+       "label": "G"
+      },
+      {
+       "id": "man-in-a-hole",
+       "p": 0.547,
+       "label": "G"
+      },
+      {
+       "id": "hero-journey",
+       "p": 0.413,
+       "label": "N"
+      },
+      {
+       "id": "kishotenketsu",
+       "p": 0.387,
+       "label": "N"
+      },
+      {
+       "id": "rebirth",
+       "p": 0.323,
+       "label": "B"
+      },
+      {
+       "id": "quest",
+       "p": 0.263,
+       "label": "N"
+      },
+      {
+       "id": "cinderella",
+       "p": 0.253,
+       "label": "N"
+      },
+      {
+       "id": "overcoming-the-monster",
+       "p": 0.103,
+       "label": "B"
+      },
+      {
+       "id": "home-away-home",
+       "p": 0.097,
+       "label": "B"
+      },
+      {
+       "id": "comedy",
+       "p": 0.08,
+       "label": "N"
+      }
+     ],
+     "top1": "rule-of-three",
+     "top1Label": "G",
+     "singleTopAgree": 1,
+     "withinAuc": 1,
+     "draw": {
+      "P1": {
+       "rule-of-three": 0.53,
+       "man-in-a-hole": 0.47
+      },
+      "P2": {
+       "rule-of-three": 0.53,
+       "man-in-a-hole": 0.47
+      }
+     },
+     "drawLabel": {
+      "P1": {
+       "G": 1,
+       "N": 0,
+       "B": 0
+      },
+      "P2": {
+       "G": 1,
+       "N": 0,
+       "B": 0
+      }
+     }
+    },
+    {
+     "setup": "S9",
+     "band": "journey6",
+     "today": "hero-journey",
+     "todayLabel": "N",
+     "ranked": [
+      {
+       "id": "rebirth",
+       "p": 0.687,
+       "label": "G"
+      },
+      {
+       "id": "cinderella",
+       "p": 0.567,
+       "label": "G"
+      },
+      {
+       "id": "man-in-a-hole",
+       "p": 0.503,
+       "label": "N"
+      },
+      {
+       "id": "hero-journey",
+       "p": 0.367,
+       "label": "N"
+      },
+      {
+       "id": "rule-of-three",
+       "p": 0.353,
+       "label": "N"
+      },
+      {
+       "id": "kishotenketsu",
+       "p": 0.28,
+       "label": "B"
+      },
+      {
+       "id": "overcoming-the-monster",
+       "p": 0.163,
+       "label": "B"
+      },
+      {
+       "id": "comedy",
+       "p": 0.163,
+       "label": "N"
+      },
+      {
+       "id": "home-away-home",
+       "p": 0.157,
+       "label": "B"
+      },
+      {
+       "id": "quest",
+       "p": 0.12,
+       "label": "B"
+      }
+     ],
+     "top1": "rebirth",
+     "top1Label": "G",
+     "singleTopAgree": 1,
+     "withinAuc": 1,
+     "draw": {
+      "P1": {
+       "rebirth": 0.391,
+       "cinderella": 0.323,
+       "man-in-a-hole": 0.287
+      },
+      "P2": {
+       "rebirth": 1
+      }
+     },
+     "drawLabel": {
+      "P1": {
+       "G": 0.713,
+       "N": 0.287,
+       "B": 0
+      },
+      "P2": {
+       "G": 1,
+       "N": 0,
+       "B": 0
+      }
+     }
+    },
+    {
+     "setup": "S10",
+     "band": "journey6",
+     "today": "hero-journey",
+     "todayLabel": "G",
+     "ranked": [
+      {
+       "id": "home-away-home",
+       "p": 0.723,
+       "label": "G"
+      },
+      {
+       "id": "man-in-a-hole",
+       "p": 0.577,
+       "label": "N"
+      },
+      {
+       "id": "quest",
+       "p": 0.573,
+       "label": "G"
+      },
+      {
+       "id": "hero-journey",
+       "p": 0.467,
+       "label": "G"
+      },
+      {
+       "id": "kishotenketsu",
+       "p": 0.277,
+       "label": "B"
+      },
+      {
+       "id": "cinderella",
+       "p": 0.21,
+       "label": "B"
+      },
+      {
+       "id": "rebirth",
+       "p": 0.173,
+       "label": "B"
+      },
+      {
+       "id": "rule-of-three",
+       "p": 0.16,
+       "label": "N"
+      },
+      {
+       "id": "overcoming-the-monster",
+       "p": 0.157,
+       "label": "B"
+      },
+      {
+       "id": "comedy",
+       "p": 0.107,
+       "label": "B"
+      }
+     ],
+     "top1": "home-away-home",
+     "top1Label": "G",
+     "singleTopAgree": 1,
+     "withinAuc": 1,
+     "draw": {
+      "P1": {
+       "home-away-home": 0.386,
+       "man-in-a-hole": 0.308,
+       "quest": 0.306
+      },
+      "P2": {
+       "home-away-home": 1
+      }
+     },
+     "drawLabel": {
+      "P1": {
+       "G": 0.692,
+       "N": 0.308,
+       "B": 0
+      },
+      "P2": {
+       "G": 1,
+       "N": 0,
+       "B": 0
+      }
+     }
+    },
+    {
+     "setup": "S11",
+     "band": "routine",
+     "today": "routine-day",
+     "todayLabel": "G",
+     "ranked": [
+      {
+       "id": "circular",
+       "p": 0.3,
+       "label": "G"
+      },
+      {
+       "id": "routine-day",
+       "p": 0.277,
+       "label": "G"
+      },
+      {
+       "id": "chain",
+       "p": 0.267,
+       "label": "N"
+      }
+     ],
+     "top1": "circular",
+     "top1Label": "G",
+     "singleTopAgree": 1,
+     "withinAuc": null,
+     "draw": {
+      "P1": {
+       "routine-day": 1
+      },
+      "P2": {
+       "circular": 0.356,
+       "routine-day": 0.328,
+       "chain": 0.316
+      }
+     },
+     "drawLabel": {
+      "P1": {
+       "G": 1,
+       "N": 0,
+       "B": 0
+      },
+      "P2": {
+       "G": 0.684,
+       "N": 0.316,
+       "B": 0
+      }
+     }
+    },
+    {
+     "setup": "Y1",
+     "band": "fear-choice",
+     "today": "fear-choice",
+     "todayLabel": "G",
+     "ranked": [
+      {
+       "id": "fear-choice",
+       "p": 0.813,
+       "label": "G"
+      },
+      {
+       "id": "three-tries",
+       "p": 0.517,
+       "label": "N"
+      },
+      {
+       "id": "man-in-a-hole",
+       "p": 0.483,
+       "label": "N"
+      },
+      {
+       "id": "cumulative",
+       "p": 0.35,
+       "label": "N"
+      },
+      {
+       "id": "home-away-home",
+       "p": 0.29,
+       "label": "N"
+      }
+     ],
+     "top1": "fear-choice",
+     "top1Label": "G",
+     "singleTopAgree": 1,
+     "withinAuc": null,
+     "draw": {
+      "P1": {
+       "fear-choice": 0.612,
+       "three-tries": 0.388
+      },
+      "P2": {
+       "fear-choice": 1
+      }
+     },
+     "drawLabel": {
+      "P1": {
+       "G": 0.612,
+       "N": 0.388,
+       "B": 0
+      },
+      "P2": {
+       "G": 1,
+       "N": 0,
+       "B": 0
+      }
+     }
+    },
+    {
+     "setup": "Y2",
+     "band": "tries",
+     "today": "three-tries",
+     "todayLabel": "G",
+     "ranked": [
+      {
+       "id": "three-tries",
+       "p": 0.76,
+       "label": "G"
+      },
+      {
+       "id": "circular",
+       "p": 0.307,
+       "label": "N"
+      },
+      {
+       "id": "kishotenketsu",
+       "p": 0.273,
+       "label": "B"
+      },
+      {
+       "id": "home-away-home",
+       "p": 0.11,
+       "label": "B"
+      },
+      {
+       "id": "cumulative",
+       "p": 0.09,
+       "label": "B"
+      }
+     ],
+     "top1": "three-tries",
+     "top1Label": "G",
+     "singleTopAgree": 1,
+     "withinAuc": 1,
+     "draw": {
+      "P1": {
+       "three-tries": 1
+      },
+      "P2": {
+       "three-tries": 1
+      }
+     },
+     "drawLabel": {
+      "P1": {
+       "G": 1,
+       "N": 0,
+       "B": 0
+      },
+      "P2": {
+       "G": 1,
+       "N": 0,
+       "B": 0
+      }
+     }
+    },
+    {
+     "setup": "Y3",
+     "band": "quest",
+     "today": "search-quest",
+     "todayLabel": "N",
+     "ranked": [
+      {
+       "id": "search-quest",
+       "p": 0.45,
+       "label": "N"
+      },
+      {
+       "id": "circular",
+       "p": 0.413,
+       "label": "N"
+      },
+      {
+       "id": "cumulative",
+       "p": 0.393,
+       "label": "N"
+      },
+      {
+       "id": "chain",
+       "p": 0.33,
+       "label": "N"
+      }
+     ],
+     "top1": "search-quest",
+     "top1Label": "N",
+     "singleTopAgree": 1,
+     "withinAuc": null,
+     "draw": {
+      "P1": {
+       "search-quest": 1
+      },
+      "P2": {
+       "search-quest": 0.358,
+       "circular": 0.329,
+       "cumulative": 0.313
+      }
+     },
+     "drawLabel": {
+      "P1": {
+       "G": 0,
+       "N": 1,
+       "B": 0
+      },
+      "P2": {
+       "G": 0,
+       "N": 1,
+       "B": 0
+      }
+     }
+    },
+    {
+     "setup": "Y4",
+     "band": "routine",
+     "today": "routine-day",
+     "todayLabel": "G",
+     "ranked": [
+      {
+       "id": "circular",
+       "p": 0.323,
+       "label": "G"
+      },
+      {
+       "id": "chain",
+       "p": 0.28,
+       "label": "N"
+      },
+      {
+       "id": "routine-day",
+       "p": 0.217,
+       "label": "G"
+      }
+     ],
+     "top1": "circular",
+     "top1Label": "G",
+     "singleTopAgree": 1,
+     "withinAuc": null,
+     "draw": {
+      "P1": {
+       "routine-day": 1
+      },
+      "P2": {
+       "circular": 0.536,
+       "chain": 0.464
+      }
+     },
+     "drawLabel": {
+      "P1": {
+       "G": 1,
+       "N": 0,
+       "B": 0
+      },
+      "P2": {
+       "G": 0.536,
+       "N": 0.464,
+       "B": 0
+      }
+     }
+    },
+    {
+     "setup": "O1",
+     "band": "journey6",
+     "today": "hero-journey",
+     "todayLabel": "B",
+     "ranked": [
+      {
+       "id": "man-in-a-hole",
+       "p": 0.323,
+       "label": "G"
+      },
+      {
+       "id": "overcoming-the-monster",
+       "p": 0.28,
+       "label": "G"
+      },
+      {
+       "id": "cinderella",
+       "p": 0.23,
+       "label": "N"
+      },
+      {
+       "id": "kishotenketsu",
+       "p": 0.207,
+       "label": "B"
+      },
+      {
+       "id": "home-away-home",
+       "p": 0.163,
+       "label": "B"
+      },
+      {
+       "id": "hero-journey",
+       "p": 0.153,
+       "label": "B"
+      },
+      {
+       "id": "rebirth",
+       "p": 0.14,
+       "label": "B"
+      },
+      {
+       "id": "rule-of-three",
+       "p": 0.12,
+       "label": "N"
+      },
+      {
+       "id": "quest",
+       "p": 0.06,
+       "label": "B"
+      },
+      {
+       "id": "comedy",
+       "p": 0.05,
+       "label": "B"
+      }
+     ],
+     "top1": "man-in-a-hole",
+     "top1Label": "G",
+     "singleTopAgree": 1,
+     "withinAuc": 1,
+     "draw": {
+      "P1": {
+       "hero-journey": 1
+      },
+      "P2": {
+       "man-in-a-hole": 0.388,
+       "overcoming-the-monster": 0.336,
+       "cinderella": 0.276
+      }
+     },
+     "drawLabel": {
+      "P1": {
+       "G": 0,
+       "N": 0,
+       "B": 1
+      },
+      "P2": {
+       "G": 0.724,
+       "N": 0.276,
+       "B": 0
+      }
+     }
+    },
+    {
+     "setup": "O2",
+     "band": "journey6",
+     "today": "hero-journey",
+     "todayLabel": "N",
+     "ranked": [
+      {
+       "id": "man-in-a-hole",
+       "p": 0.587,
+       "label": "N"
+      },
+      {
+       "id": "hero-journey",
+       "p": 0.383,
+       "label": "N"
+      },
+      {
+       "id": "rebirth",
+       "p": 0.353,
+       "label": "B"
+      },
+      {
+       "id": "cinderella",
+       "p": 0.287,
+       "label": "B"
+      },
+      {
+       "id": "overcoming-the-monster",
+       "p": 0.26,
+       "label": "G"
+      },
+      {
+       "id": "rule-of-three",
+       "p": 0.253,
+       "label": "N"
+      },
+      {
+       "id": "quest",
+       "p": 0.16,
+       "label": "B"
+      },
+      {
+       "id": "home-away-home",
+       "p": 0.11,
+       "label": "B"
+      },
+      {
+       "id": "kishotenketsu",
+       "p": 0.09,
+       "label": "B"
+      },
+      {
+       "id": "comedy",
+       "p": 0.027,
+       "label": "B"
+      }
+     ],
+     "top1": "man-in-a-hole",
+     "top1Label": "N",
+     "singleTopAgree": 1,
+     "withinAuc": 0.667,
+     "draw": {
+      "P1": {
+       "man-in-a-hole": 1
+      },
+      "P2": {
+       "man-in-a-hole": 1
+      }
+     },
+     "drawLabel": {
+      "P1": {
+       "G": 0,
+       "N": 1,
+       "B": 0
+      },
+      "P2": {
+       "G": 0,
+       "N": 1,
+       "B": 0
+      }
+     }
+    },
+    {
+     "setup": "O3",
+     "band": "journey6",
+     "today": "hero-journey",
+     "todayLabel": "B",
+     "ranked": [
+      {
+       "id": "kishotenketsu",
+       "p": 0.45,
+       "label": "G"
+      },
+      {
+       "id": "man-in-a-hole",
+       "p": 0.3,
+       "label": "N"
+      },
+      {
+       "id": "rebirth",
+       "p": 0.247,
+       "label": "N"
+      },
+      {
+       "id": "comedy",
+       "p": 0.18,
+       "label": "N"
+      },
+      {
+       "id": "rule-of-three",
+       "p": 0.163,
+       "label": "B"
+      },
+      {
+       "id": "quest",
+       "p": 0.133,
+       "label": "N"
+      },
+      {
+       "id": "hero-journey",
+       "p": 0.117,
+       "label": "B"
+      },
+      {
+       "id": "home-away-home",
+       "p": 0.11,
+       "label": "B"
+      },
+      {
+       "id": "cinderella",
+       "p": 0.103,
+       "label": "B"
+      },
+      {
+       "id": "overcoming-the-monster",
+       "p": 0.06,
+       "label": "B"
+      }
+     ],
+     "top1": "kishotenketsu",
+     "top1Label": "G",
+     "singleTopAgree": 1,
+     "withinAuc": 1,
+     "draw": {
+      "P1": {
+       "hero-journey": 1
+      },
+      "P2": {
+       "kishotenketsu": 1
+      }
+     },
+     "drawLabel": {
+      "P1": {
+       "G": 0,
+       "N": 0,
+       "B": 1
+      },
+      "P2": {
+       "G": 1,
+       "N": 0,
+       "B": 0
+      }
+     }
+    },
+    {
+     "setup": "O4",
+     "band": "journey6",
+     "today": "hero-journey",
+     "todayLabel": "N",
+     "ranked": [
+      {
+       "id": "home-away-home",
+       "p": 0.497,
+       "label": "G"
+      },
+      {
+       "id": "hero-journey",
+       "p": 0.4,
+       "label": "N"
+      },
+      {
+       "id": "kishotenketsu",
+       "p": 0.4,
+       "label": "N"
+      },
+      {
+       "id": "man-in-a-hole",
+       "p": 0.35,
+       "label": "N"
+      },
+      {
+       "id": "quest",
+       "p": 0.31,
+       "label": "N"
+      },
+      {
+       "id": "rule-of-three",
+       "p": 0.297,
+       "label": "N"
+      },
+      {
+       "id": "comedy",
+       "p": 0.217,
+       "label": "N"
+      },
+      {
+       "id": "cinderella",
+       "p": 0.167,
+       "label": "B"
+      },
+      {
+       "id": "overcoming-the-monster",
+       "p": 0.16,
+       "label": "B"
+      },
+      {
+       "id": "rebirth",
+       "p": 0.14,
+       "label": "B"
+      }
+     ],
+     "top1": "home-away-home",
+     "top1Label": "G",
+     "singleTopAgree": 1,
+     "withinAuc": 1,
+     "draw": {
+      "P1": {
+       "hero-journey": 1
+      },
+      "P2": {
+       "home-away-home": 0.383,
+       "hero-journey": 0.308,
+       "kishotenketsu": 0.308
+      }
+     },
+     "drawLabel": {
+      "P1": {
+       "G": 0,
+       "N": 1,
+       "B": 0
+      },
+      "P2": {
+       "G": 0.383,
+       "N": 0.617,
+       "B": 0
+      }
+     }
+    }
+   ]
+  }
+ },
+ "arcJudge": {
+  "S6": {
+   "kishotenketsu": {
+    "shape": "home-away-home",
+    "runnerUp": "overcoming-the-monster",
+    "follows": "partly",
+    "heroJourneyFit": 3,
+    "quality": 7,
+    "why": "Faithful to the idea (four coloured fairies, Liz manages her fear through them) with a clear away-and-back; the undertow is a random mid-story hazard and there is little delight in the underwater world before the trouble."
+   },
+   "baseline": {
+    "shape": "overcoming-the-monster",
+    "runnerUp": "home-away-home",
+    "follows": "partly",
+    "heroJourneyFit": 2,
+    "quality": 5,
+    "why": "A tidy retrieval with a clever distraction, but the fairies from the idea are gone, Liz's emotional arc is one line, and the 'whistle with a bright beam' is a logic slip."
+   },
+   "better": "kishotenketsu"
+  },
+  "S9": {
+   "rebirth": {
+    "shape": "rebirth",
+    "runnerUp": "man-in-a-hole",
+    "follows": "yes",
+    "heroJourneyFit": 2,
+    "quality": 6,
+    "why": "The secret-to-confession arc works and Emma is a real partner, but the tower errand shifts focus to fixing the clasp, Hans is passive, and awarding the ribbon right after breaking a rule undercuts the trust theme."
+   },
+   "baseline": {
+    "shape": "rebirth",
+    "runnerUp": "cinderella",
+    "follows": "yes",
+    "heroJourneyFit": 2,
+    "quality": 8,
+    "why": "Keeps its focus on the lie and its weight, uses Emma and Hans exactly as the idea asks, and ends on an honest, warm consequence about earning trust back."
+   },
+   "better": "baseline"
+  },
+  "S8": {
+   "baseline": {
+    "shape": "man-in-a-hole",
+    "runnerUp": "cinderella",
+    "follows": "yes",
+    "heroJourneyFit": 2,
+    "quality": 7,
+    "why": "Both siblings earn a friend through their own kindness and craft (Lily with Sophie, Ethan with Noah); a warm ending that answers the idea, though the chestnut-shell lantern is a stretch."
+   },
+   "rule-of-three": {
+    "shape": "rule-of-three",
+    "runnerUp": "man-in-a-hole",
+    "follows": "yes",
+    "heroJourneyFit": 2,
+    "quality": 6,
+    "why": "A clear three-trial pattern broken by helping instead of proving, but Lily barely acts, she gains no friend of her own, and friendship is framed as being admitted by a gatekeeper."
+   },
+   "better": "baseline"
+  },
+  "S4": {
+   "man-in-a-hole": {
+    "shape": "overcoming-the-monster",
+    "runnerUp": "quest",
+    "follows": "yes",
+    "heroJourneyFit": 3,
+    "quality": 7,
+    "why": "The frightening dragon turns out to be a worried mother, every friend contributes, and Levin's gentle brave act resolves it; a fitting story for a five-year-old, if a little repetitive in the middle."
+   },
+   "baseline": {
+    "shape": "overcoming-the-monster",
+    "runnerUp": "quest",
+    "follows": "partly",
+    "heroJourneyFit": 3,
+    "quality": 5,
+    "why": "An invented villainous park keeper adds chase without meaning, the keeper is never understood or befriended, and a five-year-old reader's hero climbing onto a parapet over a dizzying drop is poor modelling."
+   },
+   "better": "man-in-a-hole"
+  },
+  "S1": {
+   "baseline": {
+    "shape": "hero-journey",
+    "runnerUp": "quest",
+    "follows": "yes",
+    "heroJourneyFit": 4,
+    "quality": 8,
+    "why": "An escalating journey where each friend matters, a real all-seems-lost moment and a tender turn from little Julian; the only weakness is that the hero's own turn passes to his brother."
+   },
+   "rebirth": {
+    "shape": "quest",
+    "runnerUp": "hero-journey",
+    "follows": "partly",
+    "heroJourneyFit": 3,
+    "quality": 6,
+    "why": "It follows the idea beat by beat, but the trials are flat, there is no real low point, and Sura's rescue happens too easily to feel earned."
+   },
+   "better": "baseline"
+  },
+  "S2": {
+   "quest": {
+    "shape": "quest",
+    "runnerUp": "overcoming-the-monster",
+    "follows": "yes",
+    "heroJourneyFit": 3,
+    "quality": 6,
+    "why": "Brisk and every crew member gets a job, but the pirate captain appears from nowhere, the treasure goes to him, and a lockpick finale is a thin climax for the chase."
+   },
+   "baseline": {
+    "shape": "quest",
+    "runnerUp": "overcoming-the-monster",
+    "follows": "yes",
+    "heroJourneyFit": 3,
+    "quality": 6,
+    "why": "A richer final ordeal (the sundial fails, then Fiona's insight solves it) with a clear sunset deadline, but it is crowded, and the 'undead crew' and river police feel bolted on."
+   },
+   "better": "baseline"
+  },
+  "summary": {
+   "books": 6,
+   "shapeArmIdentifiedAsIntended": 3,
+   "shapeArmIntendedInTop2": 3,
+   "shapeArmFollows": {
+    "yes": 3,
+    "partly": 0,
+    "no": 0
+   },
+   "baselineIdentifiedAsHeroJourney": 1,
+   "baselineShapes": [
+    "overcoming-the-monster",
+    "rebirth",
+    "man-in-a-hole",
+    "overcoming-the-monster",
+    "hero-journey",
+    "quest"
+   ],
+   "shapeArmShapes": [
+    "kishotenketsu → home-away-home",
+    "rebirth → rebirth",
+    "rule-of-three → rule-of-three",
+    "man-in-a-hole → overcoming-the-monster",
+    "rebirth → quest",
+    "quest → quest"
+   ],
+   "heroJourneyFit": {
+    "baseline": 2.667,
+    "shape": 2.667
+   },
+   "quality": {
+    "baseline": 6.5,
+    "shape": 6.333
+   },
+   "better": {
+    "baseline": 4,
+    "shape": 2,
+    "tie": 0
+   },
+   "distinctSkeletons": {
+    "baseline": 6,
+    "shape": 6
+   },
+   "skeletonGroups": [
+    [
+     "S6:kishotenketsu",
+     "S6:baseline"
+    ],
+    [
+     "S9:rebirth",
+     "S9:baseline"
+    ],
+    [
+     "S8:baseline",
+     "S8:rule-of-three"
+    ],
+    [
+     "S4:man-in-a-hole",
+     "S4:baseline"
+    ],
+    [
+     "S1:baseline",
+     "S1:rebirth"
+    ],
+    [
+     "S2:quest",
+     "S2:baseline"
+    ]
+   ]
+  }
+ },
+ "arcGeneration": [
+  {
+   "setup": "S6",
+   "arm": "baseline",
+   "model": "google/gemini-3.7-flash",
+   "cost": 0.009756,
+   "ms": 12781,
+   "promptChars": 22405,
+   "parseError": null,
+   "sentences": 15
+  },
+  {
+   "setup": "S9",
+   "arm": "rebirth",
+   "model": "google/gemini-3.7-flash",
+   "cost": 0.00899925,
+   "ms": 13129,
+   "promptChars": 21289,
+   "parseError": null,
+   "sentences": 10
+  },
+  {
+   "setup": "S8",
+   "arm": "rule-of-three",
+   "model": "google/gemini-3.7-flash",
+   "cost": 0.009045,
+   "ms": 13876,
+   "promptChars": 22333,
+   "parseError": null,
+   "sentences": 12
+  },
+  {
+   "setup": "S4",
+   "arm": "man-in-a-hole",
+   "model": "google/gemini-3.7-flash",
+   "cost": 0.0117585,
+   "ms": 16881,
+   "promptChars": 23818,
+   "parseError": null,
+   "sentences": 18
+  },
+  {
+   "setup": "S4",
+   "arm": "baseline",
+   "model": "google/gemini-3.7-flash",
+   "cost": 0.01449525,
+   "ms": 24065,
+   "promptChars": 23652,
+   "parseError": null,
+   "sentences": 18
+  },
+  {
+   "setup": "S9",
+   "arm": "baseline",
+   "model": "google/gemini-3.7-flash",
+   "cost": 0.01649325,
+   "ms": 26985,
+   "promptChars": 21079,
+   "parseError": null,
+   "sentences": 10
+  },
+  {
+   "setup": "S8",
+   "arm": "baseline",
+   "model": "google/gemini-3.7-flash",
+   "cost": 0.0178035,
+   "ms": 27547,
+   "promptChars": 22174,
+   "parseError": null,
+   "sentences": 13
+  },
+  {
+   "setup": "S6",
+   "arm": "kishotenketsu",
+   "model": "google/gemini-3.7-flash",
+   "cost": 0.018495,
+   "ms": 28984,
+   "promptChars": 22588,
+   "parseError": null,
+   "sentences": 15
+  },
+  {
+   "setup": "S1",
+   "arm": "rebirth",
+   "model": "google/gemini-3.7-flash",
+   "cost": 0.00940425,
+   "ms": 12112,
+   "promptChars": 23860,
+   "parseError": null,
+   "sentences": 18
+  },
+  {
+   "setup": "S2",
+   "arm": "baseline",
+   "model": "google/gemini-3.7-flash",
+   "cost": 0.0133905,
+   "ms": 20065,
+   "promptChars": 23017,
+   "parseError": null,
+   "sentences": 16
+  },
+  {
+   "setup": "S2",
+   "arm": "quest",
+   "model": "google/gemini-3.7-flash",
+   "cost": 0.01714575,
+   "ms": 25003,
+   "promptChars": 23216,
+   "parseError": null,
+   "sentences": 15
+  },
+  {
+   "setup": "S1",
+   "arm": "baseline",
+   "model": "google/gemini-3.7-flash",
+   "cost": 0.01767075,
+   "ms": 28374,
+   "promptChars": 23651,
+   "parseError": null,
+   "sentences": 18
+  }
+ ]
+}

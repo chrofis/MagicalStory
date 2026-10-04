@@ -66,7 +66,6 @@ describe('a handed-over worn item in the BUILT image prompt', () => {
     const prompt = buildImagePrompt(sceneDescription, inputData, sceneCharacters, visualBible, 14, referencePhotos, {});
     // The two-direction instruction, on the character who wears it this page.
     expect(prompt).toMatch(/Finder IS wearing this on this page, and Owner is NOT/);
-    expect(prompt).toMatch(/Draw it on Finder only/);
     // The owner's outfit text is stripped of the cap before it is rendered
     // (the strip itself is pinned in worn-item-handover.test.ts); what must
     // hold HERE is that no built line puts the cap back on the owner.
@@ -80,7 +79,7 @@ describe('a handed-over worn item in the BUILT image prompt', () => {
     const plain = sceneDescription.replace('"wearer":"Finder"', '"wearer":""');
     const prompt = buildImagePrompt(plain, inputData, sceneCharacters, visualBible, 14, referencePhotos, {});
     expect(prompt).toMatch(/Owner IS wearing this on this page/);
-    expect(prompt).not.toMatch(/Draw it on Finder only/);
+    expect(prompt).not.toMatch(/Finder IS wearing this/);
   });
 });
 
@@ -94,7 +93,7 @@ describe('the wornAs-is-required rule reaches every VB authoring site', () => {
   // is the source of the set; a template deleted by a pipeline change drops out
   // of it here rather than failing as a missing file.
   const SITES = [
-    'prompts/scene-expansion-all.txt',
+    'prompts/visual-bible.txt',
     'prompts/scene-expansion.txt',
     'prompts/story-unified.txt',
     'prompts/story-unified-imagefirst.txt',
@@ -114,7 +113,7 @@ describe('the wornAs-is-required rule reaches every VB authoring site', () => {
   }
 
   it('the per-page wearer field is documented on both Art Director templates', () => {
-    for (const rel of ['prompts/scene-expansion-all.txt', 'prompts/scene-expansion.txt']) {
+    for (const rel of ['prompts/scene-briefs-all.txt', 'prompts/scene-expansion.txt']) {
       expect(/`wearer`/.test(read(rel)), path.basename(rel)).toBe(true);
     }
   });

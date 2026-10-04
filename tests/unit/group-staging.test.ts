@@ -110,7 +110,7 @@ describe('covers', () => {
   });
 });
 
-describe('the findings reach the scene review, and the rewrite only where it can answer', () => {
+describe('the findings reach the brief re-ask, and the rewrite only where it can answer', () => {
   it('both types are REVIEWABLE and rendered into BRIEF FAULTS', () => {
     expect(REVIEWABLE.has('group_shot_too_close')).toBe(true);
     expect(REVIEWABLE.has('group_facing_viewer')).toBe(true);
@@ -141,13 +141,12 @@ describe('one constant reaches every site that authors or reviews a brief', () =
   beforeAll(async () => {
     await loadPromptTemplates();
     built = {
-      'AD all-pages': String(PB.buildSceneExpansionAllPrompt(inputData, BEATS, {})),
+      'AD all-pages': String(PB.buildSceneBriefsAllPrompt(inputData, BEATS, {})),
       'AD per-page': String(PB.buildSceneExpansionPrompt(1, 'page text', inputData.characters, 'en', VB, '', null, {})),
       'iterate strict': String(PB.buildSceneDescriptionPrompt(1, 'page text', inputData.characters, '', 'en', VB, [], 'standard', '', '',
         { planLine: BEATS[0].planLine }, { fixIssues: ['x'] }, { freeIterate: false })),
       'iterate free': String(PB.buildSceneDescriptionPrompt(1, 'page text', inputData.characters, '', 'en', VB, [], 'standard', '', '',
         { planLine: BEATS[0].planLine }, { fixIssues: ['x'] }, { freeIterate: true })),
-      'scene review': String(PB.buildSceneReviewPrompt(inputData, [{ pageNumber: 1, brief: brief({ shot: 'medium', characters: NAMES.map(n => row(n)) }) }], { beats: BEATS })),
     };
   });
 
@@ -156,10 +155,6 @@ describe('one constant reaches every site that authors or reviews a brief', () =
       expect(prompt.includes(GROUP_STAGING_RULE), `${site} lacks the group rule`).toBe(true);
       expect(prompt.includes('{GROUP_STAGING}'), `${site} ships the placeholder`).toBe(false);
     }
-  });
-
-  it('the scene review carries check [group_staging]', () => {
-    expect(built['scene review']).toContain('[group_staging]');
   });
 
   it('the rule names exactly the wider shots the code check accepts', () => {

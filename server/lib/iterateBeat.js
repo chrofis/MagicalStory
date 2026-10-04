@@ -514,6 +514,9 @@ const REINSTATE_TYPES = new Set(['cast_unlisted']);
  * state it resolves to.
  */
 const INTRODUCED_TYPES = new Set([
+  // A rewrite that writes an element's id with another element's label
+  // (2026-09-28, the authored path's `vb_id_label_mismatch`) — same check, both paths.
+  'vb_id_label_mismatch',
   'cast_id_unresolved', 'interaction_multiple_actions', 'interaction_object_shared_hands',
   'interaction_actor_unknown', 'vb_element_overflow', 'vb_state_contradicted',
   // A rewrite INHERITS `population` (images.js carries the field forward, since
@@ -527,6 +530,9 @@ const INTRODUCED_TYPES = new Set([
   'cover_gaze_not_viewer',
   // …and stages the cast its plan line names (the cover beat).
   'cover_cast_dropped',
+  // …and a story page's rewrite cites the Visual Bible figures its plan line's
+  // who column names (checkPlanCastCited, 2026-09-27).
+  'plan_cast_uncited',
   // A rewrite writes its own `looksAt`, so it can turn a group of more than
   // three to the viewer (GROUP_STAGING_RULE, 2026-09-27). Its sibling
   // `group_shot_too_close` stays out: `shot` is carried from the parent in code.

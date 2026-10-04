@@ -158,6 +158,18 @@ const trialEventLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// The idea-landmark prepare calls (wizard + trial, 2026-09-27): fired each
+// time a story kind is picked, so a visitor clicking through themes sends a
+// handful. Its OWN store — sharing an idea limiter would spend the idea
+// requests' quota on prepares. Each call is at most one ~USD 0.0001 Jev call.
+const ideaLandmarksPrepareLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 40,
+  message: { error: 'Too many requests. Please slow down.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 /** Reset trial-related stores from this module */
 function resetTrialMiddlewareStores() {
   trialAvatarStore.resetAll();
@@ -176,5 +188,6 @@ module.exports = {
   trialAvatarLimiter,
   trialEventLimiter,
   storyIdeasLimiter,
+  ideaLandmarksPrepareLimiter,
   resetTrialMiddlewareStores,
 };
