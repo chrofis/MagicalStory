@@ -3373,6 +3373,7 @@ router.post('/:id/regenerate/cover/:coverType', authenticateToken, imageRegenera
         sceneCharacters: iterResult.newSceneCharacters || existingCover.sceneCharacters || null,
         compressedScene: iterResult.compressedScene || null,
         outlineExtract: existingCover.outlineExtract || null,
+        jevFixed: existingCover.jevFixed || null,
         perCharClothing: existingCover.perCharClothing || null,
         titleBaked: existingCover.titleBaked === true,
         emptySceneImage: existingCover.emptySceneImage || null,

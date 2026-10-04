@@ -1062,7 +1062,7 @@ async function decideGaze({ arc, pages, perPage }, opts = {}) {
  * a close-up widened for below-waist staging, a gap action reframed, a group
  * pulled wider — applies to the staging inside it, never to the field.
  */
-const JEV_FIXED_FIELDS_RULE = 'A story page\'s FIXED block holds the fields decided before you write: its `shot`, `timeOfDay` and indoors, the Visual Bible ids its `objects[]` cites — its location or vantage, and for an element with looks the dotted id of the look it shows — its `aboard`, its `population` and each listed character\'s `looksAt`. Copy each into the page\'s METADATA exactly and write the prose so the picture shows it: every cited element staged, even where only part of it is in frame, and no Visual Bible element staged that `objects[]` leaves out. No other rule changes a fixed field; a rule that would change one applies to the staging inside it. `weather` stays yours — `none` when the page is indoors, never `none` outdoors.';
+const JEV_FIXED_FIELDS_RULE = 'A story page\'s FIXED block holds the fields decided before you write: its `shot`, `timeOfDay` and indoors, the Visual Bible ids its `objects[]` cites — its location or vantage, and for an element with looks the dotted id of the look it shows — its `aboard`, its `population` and each listed character\'s `looksAt`. Copy each into the page\'s METADATA exactly and write the prose so the picture shows it: every cited element staged, even where only part of it is in frame, and no Visual Bible element staged that `objects[]` leaves out. No other rule changes a fixed field; a rule that would change one applies to the staging inside it. `weather` stays yours — `none` when the page is indoors, never `none` outdoors. A cover\'s FIXED block holds only its location: the vantage it is staged from, first in `objects[]`, seen as that vantage shows it.';
 
 /**
  * Which shot a vantage holds, as the Visual Bible call is told it (owner,
@@ -1102,6 +1102,14 @@ function fixedBlock(page) {
   const f = page && page.jevFixed;
   if (!f) return fixedLine(page && page.fixed);
   const label = id => (f.labels && f.labels[id] ? `${id} (${f.labels[id]})` : id);
+  // A COVER'S FIXED BLOCK IS ITS PLACE ALONE (2026-10-04): code decided the
+  // vantage and nothing else, so the block never lists `objects` — that line
+  // reads as the page's whole element list, and the cover would lose its
+  // central figure and the elements its beat asks for.
+  if (f.coverPlace) {
+    return ['FIXED — copy into METADATA exactly; the prose shows it:',
+      `- location: ${label(f.location)} — the first id in objects[]; the cover's other ids follow its beat`].join('\n');
+  }
   const lines = ['FIXED — copy each into METADATA exactly; the prose shows each:'];
   if (f.shot) lines.push(`- shot: ${f.shot}`);
   if (f.timeOfDay) lines.push(`- timeOfDay: ${f.timeOfDay}; ${f.indoor ? 'indoors (weather none)' : 'outdoors'}`);
