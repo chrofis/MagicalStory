@@ -3,6 +3,7 @@ import { Edit2, Trash2, Check, AlertTriangle, Star, Plus } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import type { Character } from '@/types/character';
 import { getDisplayPhoto } from '@/utils/characterPhotos';
+import { pickMainCharacters, mainLimit } from '@/utils/mainCharacters';
 
 // Character role in story: 'out' = not in story, 'in' = side character, 'main' = main character
 type CharacterRole = 'out' | 'in' | 'main';
@@ -45,6 +46,25 @@ export function CharacterList({
     main: language === 'de' ? 'Hauptrolle' : language === 'fr' ? 'Principal' : language === 'it' ? 'Principale' : 'Main',
   };
 
+  const pick = (de: string, fr: string, it: string, en: string) =>
+    language === 'de' ? de : language === 'fr' ? fr : language === 'it' ? it : en;
+
+  // What the server will do with the current selection (mirror of pickMainCharacters)
+  const inStory = characters.filter(c => !excludedCharacters.includes(c.id));
+  const sel = pickMainCharacters(inStory, mainCharacters);
+  const declaredCount = sel.counted.length;
+  const ageLine = (() => {
+    if (!sel.focus || sel.focusAge === null) return null;
+    const n = sel.focusAge;
+    const who = declaredCount > 1
+      ? pick('älteste Hauptrolle', 'rôle principal le plus âgé', 'protagonista più grande', 'oldest main character')
+      : pick('Hauptrolle', 'rôle principal', 'protagonista', 'main character');
+    const name = sel.focus.name;
+    return n < 1
+      ? pick(`Geschrieben für Babys (${name}, ${who}).`, `Écrit pour des bébés (${name}, ${who}).`, `Scritto per neonati (${name}, ${who}).`, `Written for babies (${name}, ${who}).`)
+      : pick(`Geschrieben für ${n}-Jährige (${name}, ${who}).`, `Écrit pour des enfants de ${n} ans (${name}, ${who}).`, `Scritto per bambini di ${n} anni (${name}, ${who}).`, `Written for ${n}-year-olds (${name}, ${who}).`);
+  })();
+
   const handleDeleteClick = (char: Character) => {
     setDeleteConfirm({ id: char.id, name: char.name });
   };
@@ -86,6 +106,17 @@ export function CharacterList({
         </div>
       )}
 
+      {onCharacterRoleChange && (
+        <p className="text-sm text-gray-600">
+          {pick(
+            '⭐ Hauptrolle: Um diese Figur dreht sich die Geschichte – sie ist auf den meisten Seiten, und ihr Alter bestimmt, wie einfach oder anspruchsvoll die Geschichte wird. Höchstens 2 Hauptrollen, bei 2–3 Figuren eine. Tipp: Ist das Buch ein Geschenk für ein Kind, z. B. zum Geburtstag, wähle nur dieses Kind als Hauptrolle – Geschwister bleiben «Dabei» und kommen trotzdem vor.',
+            '⭐ Rôle principal : l\'histoire tourne autour de ce personnage, qui apparaît sur la plupart des pages, et son âge détermine si l\'histoire est simple ou exigeante. Au maximum 2 rôles principaux, un seul avec 2–3 personnages. Astuce : si le livre est un cadeau pour un enfant, par ex. pour son anniversaire, choisissez uniquement cet enfant – ses frères et sœurs restent « Présent » et apparaissent quand même.',
+            '⭐ Protagonista: la storia ruota attorno a questo personaggio, presente nella maggior parte delle pagine, e la sua età decide quanto la storia è semplice o impegnativa. Al massimo 2 protagonisti, uno solo con 2–3 personaggi. Consiglio: se il libro è un regalo per un bambino, ad es. per il compleanno, scegli solo quel bambino – i fratelli restano «Presente» e compaiono comunque.',
+            '⭐ Main: the story revolves around this character, who is on most pages, and their age decides how simple or demanding the story is. At most 2 main characters, only one with 2–3 characters. Tip: if the book is a gift for one child, e.g. a birthday, make only that child the main character – siblings stay "In" and still appear.',
+          )}
+        </p>
+      )}
+
       {/* Existing characters */}
       <div className="grid md:grid-cols-2 gap-2">
           {characters.map((char) => {
@@ -97,6 +128,9 @@ export function CharacterList({
             const charactersInStory = characters.filter(c => !excludedCharacters.includes(c.id));
             // Prevent removing the last character from the story
             const isLastInStory = !isOut && charactersInStory.length === 1;
+            // Main limit for the cast as it would be with this character in the story
+            const limitWithChar = mainLimit(charactersInStory.length + (isOut ? 1 : 0));
+            const mainFull = !isMain && limitWithChar >= 2 && sel.counted.length >= limitWithChar;
 
             return (
               <div
@@ -196,8 +230,12 @@ export function CharacterList({
                         </button>
                         <button
                           onClick={() => onCharacterRoleChange(char.id, 'main')}
+                          disabled={mainFull}
+                          title={mainFull ? pick('Höchstens 2 Hauptrollen', 'Au maximum 2 rôles principaux', 'Al massimo 2 protagonisti', 'At most 2 main characters') : undefined}
                           className={`flex-1 px-1.5 py-1 font-medium transition-colors flex items-center justify-center gap-0.5 ${
-                            isMain
+                            mainFull
+                              ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                              : isMain
                               ? 'bg-indigo-500 text-white'
                               : isOut
                               ? 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'
@@ -234,6 +272,12 @@ export function CharacterList({
             </span>
           </button>
       </div>
+
+      {onCharacterRoleChange && ageLine && (
+        <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3 text-sm text-indigo-900 space-y-1">
+          {ageLine && <p className="font-medium">📖 {ageLine}</p>}
+        </div>
+      )}
 
       {/* Delete confirmation modal */}
       {deleteConfirm && (
