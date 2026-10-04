@@ -4550,6 +4550,50 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "avatar-sheet-garment-colour",
+      "title": "Styled avatar sheets keep each garment's pass-1 colour; a recolour is caught by the style judge",
+      "commits": [
+        "50b5b856c"
+      ],
+      "addedAt": "2026-10-04",
+      "claim": "On the next full staging story with a non-realistic style: every character's styled sheet shows each garment in the same colour as its pass-1 sheet; styledAvatarGeneration pass-2 attempts carry garmentScore, and any attempt with garmentScore < 6 was retried.",
+      "runShape": [
+        "full-story",
+        "needs-fresh-avatar-sheet"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "styledAvatarGeneration[].passes.pass1 vs pass2 images per character (garment hues), and attempts[].garmentScore",
+        "images": [
+          "sheets"
+        ]
+      },
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "avatar-sheet-no-lettering",
+      "title": "Avatar sheets carry no lettering; a lettered row fails its judge",
+      "commits": [
+        "21b9671ec"
+      ],
+      "addedAt": "2026-10-04",
+      "claim": "On the next full staging story: no pass-1 or styled sheet shows a caption, word, letter or number; any pass-1 body row with lettering scored backgroundScore <= 2 and was retried; style-judge lettering detection observed at least once if a lettered styled sheet occurs.",
+      "runShape": [
+        "full-story",
+        "needs-fresh-avatar-sheet"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "every styledAvatarGeneration pass-1 and pass-2 sheet image; bodies background reasons and pass-2 background reasons",
+        "images": [
+          "sheets"
+        ]
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [

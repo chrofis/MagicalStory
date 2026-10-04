@@ -2511,6 +2511,30 @@
       "fixedAt": "2026-10-04",
       "fixedIn": "4fc70bb54",
       "fix": "beatsPipeline.applyTitleProofread runs every title candidate through textRefine.proofreadTitleCandidates — the page lector's prompt (buildTextProofreadPrompt, STYLE_RULEBOOK, de-ch rules), model (textProofreadModel), options (LECTOR_OPTS, now one shared constant) and quote-checked substitution — right after the TITLE block is parsed, before any cover renders. The pick is kept by index. Each changed candidate logs title_proofread_corrected (before/after); a failed call logs title_proofread_failed at error. One real call on the stored candidates: gemini-3.1-pro corrected Drachonei -> Drachenei, left the other two alone ($0.0128, 7.8s). Tests: tests/unit/title-proofread.test.ts. Verify: title-proofread."
+    },
+    {
+      "id": "avatar-sheet-pass2-garment-recolour",
+      "title": "Pass 2 of the avatar sheet (style transfer) recoloured a garment, and no judge compared garment colours",
+      "reportedAt": "2026-10-04",
+      "source": "Stored evidence, staging job_1791040103540_atbttop6w (dragon run 9): Kiaan's outfit \"A purple quilted autumn jacket\"; pass-1 sheet drew it purple (bodies/heads judges: purple seen, outfitScore 10); the shipped watercolour pass-2 sheet shows it navy in all 8 cells.",
+      "rootCause": "buildStyleTransferPrompt protected only hair colour and skin tone and described the style swatch (a blue/brown wash) as a palette source; prompts/sheet-2x4-style-eval.txt said \"The outfit is not scored here\", so nothing checked the final sheet's garment colours.",
+      "impact": "A character's outfit colour on every page could differ from the outfit the story names and pass 1 drew.",
+      "status": "fixed",
+      "fixedAt": "2026-10-04",
+      "fixedIn": "50b5b856c",
+      "fix": "One rule garmentColourRule(sheet) stated to the restyler about Image 1 and filled into the style judge ({GARMENT_COLOUR}) about Image 2 (the same pass-1 sheet); swatch supplies technique/brushwork/texture only; new style-judge axis garmentScore in STYLE_AXES (not an identity axis) -> existing retry, ships with a warning on the final strike. Pass-1 bodies judge: a different colour name is a wrong colour. Real runStyleTransferPass on Kiaan's stored pass-1 sheet: navy before, purple after, garment=9. Tests: avatar-sheet-garment-colour, avatar-sheet-style-eval-no-outfit-axis. Verify: avatar-sheet-garment-colour."
+    },
+    {
+      "id": "avatar-sheet-printed-cell-labels",
+      "title": "Avatar 2x4 sheets printed the cell names (FRONT / THREE-QUARTER / PROFILE / REAR TURN) and every sheet judge passed them",
+      "reportedAt": "2026-10-04",
+      "source": "Stored evidence, staging job_1791040103540_atbttop6w: Max's pass-1 body row and the shipped pass-2 sheet carry the four cell names above and below every body figure; heads clean 10, style clean 9, bodies has no text check.",
+      "rootCause": "The row prompts name the cells (\"Cell 1 front, ... cell 4 is a REAR TURN\") and closed on a bare negation; the heads judge looked for letters only on a head, the bodies judge had no lettering check, the style judge only \"on the character\"; pass 2 is told to keep Image 1's content, so it copied the labels.",
+      "impact": "Lettered reference cells ride into page generation as part of the character reference.",
+      "status": "fixed",
+      "fixedAt": "2026-10-04",
+      "fixedIn": "21b9671ec",
+      "fix": "One rule SHEET_NO_LETTERING_RULE stated positively to body row, head row and pass-2 restyle (row prompts add CELL_NAMES_NOT_DRAWN), filled as {SHEET_LETTERING} into heads (clean), bodies (background) and style (plain ground) judges; existing axes -> existing retry. Bodies judge on Max's stored row: background 2 quoting all four captions; restyle of the labelled pass-1 sheet came back without lettering. Style judge detection unvalidated (passed the old sheet on two tries). Tests: avatar-sheet-no-lettering, avatar-sheet-eval-gate. Verify: avatar-sheet-no-lettering."
     }
   ]
 }
