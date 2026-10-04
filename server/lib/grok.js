@@ -1284,7 +1284,10 @@ async function packReferences(refs = {}, options = {}) {
         const photoType = typeof photoData === 'object' ? photoData?.photoType : null;
         rawCharData.push({ rawBuffer, photoType, charName });
       } else if (charName) {
-        log.warn(`⚠️ ${tag} Skipped character "${charName}": failed to load photo bytes`);
+        // A reference that exists but cannot be loaded must stop the render: a
+        // picture without this character's reference drifts off-identity and ships
+        // (code review 2026-10 A4; decisions #4 no fallbacks).
+        throw new Error(`${tag} character "${charName}": failed to load the avatar/photo bytes — refusing to render without its reference`);
       }
     } else if (charName) {
       log.warn(`⚠️ ${tag} Skipped character "${charName}": photoUrl is ${photoUrl ? typeof photoUrl : 'null/undefined'}`);
@@ -1408,10 +1411,9 @@ async function packReferences(refs = {}, options = {}) {
       { skipAspectPad: willAddVb, allCharNames: rawCharData.map(c => c.charName) },
     );
     if (!composed) {
-      // Never silent: this early return is how a whole character group used to
-      // vanish from the references with nothing in the log (the old n > 3 cap).
-      log.warn(`⚠️ ${tag} Character slot produced no image for [${group.map(c => c.charName || '?').join(', ')}] — those characters have NO reference this render`);
-      return;
+      // This used to be a silent early return: a whole character group vanished from
+      // the references with only a log line. It now fails the render.
+      throw new Error(`${tag} character slot produced no image for [${group.map(c => c.charName || '?').join(', ')}] — refusing to render without their references`);
     }
     let slotBuf = composed;
     let vbCount = 0;
@@ -1525,7 +1527,9 @@ async function packReferences(refs = {}, options = {}) {
       slots.push(`data:image/jpeg;base64,${composed.toString('base64')}`);
       log.info(`🎨 ${tag} Slot ${slots.length}: ${cappedVb.length} VB element(s) (own slot, ${cm.width}x${cm.height})`);
     } catch (e) {
-      log.warn(`⚠️ ${tag} VB own-slot compose failed (${e.message}) — elements not sent this render`);
+      // The VB elements are the scene's props/creatures; a render without them is
+      // a different picture. Fail the call (code review 2026-10 A4).
+      throw new Error(`${tag} VB own-slot compose failed: ${e.message}`);
     }
   }
 
