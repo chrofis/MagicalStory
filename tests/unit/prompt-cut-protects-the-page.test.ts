@@ -123,6 +123,13 @@ describe('shrinkPromptForModel — an over-cap page keeps its own facts', () => 
       // The commissioned elements and the style are never spent either.
       expect(out).toContain('**REQUIRED OBJECTS');
       expect(out).toContain('**ART STYLE:**');
+
+      // Size is never spent (2026-10-04, staging job_1791040103540_atbttop6w:
+      // a grown dragon rendered egg-sized once size and DEPTH AND SIZE went
+      // first): the element's scale rider, DEPTH AND SIZE and the size bullet.
+      expect(out).toContain('about as long as an adult\'s whole arm');
+      expect(out).toContain(templateParagraph('**DEPTH AND SIZE:**'));
+      expect(out).toContain(buildCompositionBlock().split('\n').pop());
     });
   }
 
@@ -130,7 +137,7 @@ describe('shrinkPromptForModel — an over-cap page keeps its own facts', () => 
     const out: string = await shrinkPromptForModel(
       PROMPT, TRIAL_EDIT_BUDGET, 'TEST drop order', null
     );
-    const droppable = ['**COUNTS:**', '**DEPTH AND SIZE:**', '**REQUIRED CAST:**', '**Composition:**'];
+    const droppable = ['**COUNTS:**', '- Each character does a specific action', '- A standing character stands'];
     const spent = droppable.filter((d) => !out.includes(d));
     expect(spent.length).toBeGreaterThan(0);
   });

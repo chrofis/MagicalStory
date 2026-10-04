@@ -135,8 +135,9 @@ describe('each rule is said once', () => {
 describe('the cut order is ONE list, and the log names each step it cut', () => {
   it('PROMPT_CUT_ORDER is the order the shrinker spends', () => {
     expect(PROMPT_CUT_ORDER.map((s: any) => s.label)).toEqual([
-      'COUNTS', 'Composition: size', 'Composition: facing', 'DEPTH AND SIZE', 'Composition: ground',
-      // REQUIRED CAST is never cut since 2026-09-25 (owner) — PROMPT_NEVER_CUT.
+      'COUNTS', 'Composition: facing', 'Composition: ground',
+      // REQUIRED CAST is never cut since 2026-09-25 (owner); Composition: size and
+      // DEPTH AND SIZE since 2026-10-04 (dragon run 9) — PROMPT_NEVER_CUT.
       'HEIGHT ORDER', 'AGE & PROPORTIONS', 'reference-photo rule', 'single-illustration rule',
     ]);
     for (const s of PROMPT_CUT_ORDER) {
@@ -147,7 +148,6 @@ describe('the cut order is ONE list, and the log names each step it cut', () => 
   it('each exact-text step states its size within 10%', () => {
     const exact: Record<string, number> = {
       COUNTS: PB.COUNTS_RULE.length,
-      'Composition: size': PB.COMPOSITION_SIZE_BULLET.length,
       'Composition: facing': PB.COMPOSITION_FACING_BULLET.length,
       'Composition: ground': PB.COMPOSITION_GROUND_BULLET.length,
     };
@@ -159,7 +159,7 @@ describe('the cut order is ONE list, and the log names each step it cut', () => 
 
   it('the never-cut list names the parity anchors and the title', () => {
     const labels = PROMPT_NEVER_CUT.map((k: any) => k.label);
-    for (const l of ['NO MARKS', 'HANDS', 'REQUIRED TEXT']) expect(labels).toContain(l);
+    for (const l of ['NO MARKS', 'HANDS', 'REQUIRED TEXT', 'Composition: size', 'DEPTH AND SIZE']) expect(labels).toContain(l);
   });
 
   it('the shrink log names every cut block in order, with its step and size', async () => {
@@ -173,7 +173,8 @@ describe('the cut order is ONE list, and the log names each step it cut', () => 
       expect(out).toContain(PB.HANDS_HOLD_ONLY_NAMED_RULE);
       const ev = events.find(e => e.d && e.d.branch === 'cut');
       expect(ev.d.droppedSteps.map((s: any) => s.step)).toEqual([1, 2, 3]);
-      expect(ev.msg).toMatch(/cut in order: #1 COUNTS \(-\d+\) > #2 Composition: size \(-\d+\) > #3 Composition: facing \(-\d+\)/);
+      expect(ev.msg).toMatch(/cut in order: #1 COUNTS \(-\d+\) > #2 Composition: facing \(-\d+\) > #3 Composition: ground \(-\d+\)/);
+      expect(out).toContain(PB.COMPOSITION_SIZE_BULLET);
     } finally {
       GL.clearCurrentLogger();
     }

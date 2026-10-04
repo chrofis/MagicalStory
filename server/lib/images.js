@@ -917,6 +917,14 @@ function compositionBulletUnit(bullet) {
  * reference-photo binding, the frame rule — go last, as the 2026-09-21 ranking
  * set them. `approxChars` is the block's size on a typical page (staging
  * job_1790100385959_1nitlympp, measured 2026-09-24).
+ *
+ * SIZE IS NEVER CUT (2026-10-04). `Composition: size` and `DEPTH AND SIZE` were
+ * steps #2 and #4, so the size information went first: staging
+ * job_1791040103540_atbttop6w (dragon run 9) spent one or both on 13 of its 14
+ * over-cap prompts, and the grown dragon rendered egg-sized on p17/p18. Both
+ * are on PROMPT_NEVER_CUT now, beside the REQUIRED OBJECTS scale riders the
+ * protected tail already holds. The size bullet is the Composition block's last
+ * bullet and is never removed, so the header always stays with it.
  */
 const PROMPT_CUT_ORDER = [
   {
@@ -927,13 +935,6 @@ const PROMPT_CUT_ORDER = [
     unit: () => exactTextUnit(COUNTS_RULE),
   },
   {
-    label: 'Composition: size',
-    what: 'the vessel / building / vehicle true-size bullet',
-    why: 'the REQUIRED OBJECTS scale riders and DEPTH AND SIZE ("a size stated for an element always wins") state it per element',
-    approxChars: 305,
-    unit: () => compositionBulletUnit(COMPOSITION_SIZE_BULLET),
-  },
-  {
     label: 'Composition: facing',
     what: 'the "faces the target, not the camera" bullet',
     why: 'yields to every declared facing, and EXACT POSES / EXPRESSIONS AND EYES declare one per figure; never built on a cover',
@@ -941,15 +942,8 @@ const PROMPT_CUT_ORDER = [
     unit: () => compositionBulletUnit(COMPOSITION_FACING_BULLET),
   },
   {
-    label: 'DEPTH AND SIZE',
-    what: 'the foreground / midground / background definitions',
-    why: 'defines the brief\'s depth words; the prose still places every figure',
-    approxChars: 647,
-    unit: () => exactTextUnit(templateParagraph('**DEPTH AND SIZE:**')),
-  },
-  {
     label: 'Composition: ground',
-    what: 'the feet-on-the-ground bullet (the header goes with it)',
+    what: 'the feet-on-the-ground bullet',
     why: 'the one feet-on-the-ground rule for pages and covers; kept longer than the generic rules above',
     approxChars: 600,
     unit: () => compositionBulletUnit(COMPOSITION_GROUND_BULLET),
@@ -1004,7 +998,13 @@ const PROMPT_NEVER_CUT = [
   // that should have lain on the heap. It sits after ART STYLE, inside the
   // protected tail.
   { label: 'REQUIRED CAST', why: 'the generator half of D-03 / D-04b: every named character in frame, exactly one of each, nobody added', text: () => '**REQUIRED CAST:**' },
-  { label: 'REQUIRED OBJECTS', why: 'the commissioned elements of the page', marker: '**REQUIRED OBJECTS' },
+  // Size left the cut order on 2026-10-04: staging job_1791040103540_atbttop6w
+  // spent one or both on 13 of its 14 over-cap prompts and the grown dragon came
+  // out egg-sized on p17/p18. With the per-element scale riders on REQUIRED
+  // OBJECTS (the tail, below) they are the prompt's whole statement of size.
+  { label: 'Composition: size', why: 'a vessel, building or vehicle and a held object keep their true size against the figures', text: () => COMPOSITION_SIZE_BULLET },
+  { label: 'DEPTH AND SIZE', why: 'a size stated for an element wins over its depth; a genuinely large element dominates the foreground', text: () => templateParagraph('**DEPTH AND SIZE:**') },
+  { label: 'REQUIRED OBJECTS', why: 'the commissioned elements of the page, each with its size against the cast (the scale riders)', marker: '**REQUIRED OBJECTS' },
   { label: 'SEASON', why: 'the book-wide season, even against a reference photo from another season', marker: '**SEASON:**' },
   { label: 'LIGHT', why: "the page's declared time of day and weather, which wins over the plate's light (sceneLight.js)", marker: '**LIGHT:**' },
   { label: 'COMPOSITION GUIDELINES', why: 'a cover\'s own composition: title-safe top third, group, bottom margin', marker: '**COMPOSITION GUIDELINES:**' },

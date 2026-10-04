@@ -625,10 +625,8 @@ page took is auditable from the run log.</p>
 <p>Grok image cap: <strong>7,900 characters</strong> (<code>server/config/models.js</code> <code>maxPromptLength</code>). A built prompt over the cap first has duplicated bullet bodies merged; if it still does not fit, <code>shrinkPromptForModel</code> removes these blocks, <strong>in this order</strong>, stopping as soon as it fits. The generation log names each block it removed, with its step number and size.</p>
 <ol>
   <li><strong>COUNTS</strong> (~235 chars) — the "three or fewer" counting rule. <em>Why here:</em> binds only a page whose prose states a number of like things; never built on a cover.</li>
-  <li><strong>Composition: size</strong> (~305 chars) — the vessel / building / vehicle true-size bullet. <em>Why here:</em> the REQUIRED OBJECTS scale riders and DEPTH AND SIZE ("a size stated for an element always wins") state it per element.</li>
   <li><strong>Composition: facing</strong> (~367 chars) — the "faces the target, not the camera" bullet. <em>Why here:</em> yields to every declared facing, and EXACT POSES / EXPRESSIONS AND EYES declare one per figure; never built on a cover.</li>
-  <li><strong>DEPTH AND SIZE</strong> (~647 chars) — the foreground / midground / background definitions. <em>Why here:</em> defines the brief's depth words; the prose still places every figure.</li>
-  <li><strong>Composition: ground</strong> (~600 chars) — the feet-on-the-ground bullet (the header goes with it). <em>Why here:</em> the one feet-on-the-ground rule for pages and covers; kept longer than the generic rules above.</li>
+  <li><strong>Composition: ground</strong> (~600 chars) — the feet-on-the-ground bullet. <em>Why here:</em> the one feet-on-the-ground rule for pages and covers; kept longer than the generic rules above.</li>
   <li><strong>HEIGHT ORDER</strong> (~140 chars) — the shortest-to-tallest line. <em>Why here:</em> a page fact: the relative size the height judge compares.</li>
   <li><strong>AGE &amp; PROPORTIONS</strong> (~485 chars) — the per-age head-count proportions. <em>Why here:</em> a page fact: without it an infant is drawn as a preschooler.</li>
   <li><strong>reference-photo rule</strong> (~512 chars) — which attached photo is a place and which is a person. <em>Why here:</em> a page fact: the plate-vs-identity binding of the attached images.</li>
@@ -640,7 +638,9 @@ page took is auditable from the run log.</p>
   <li><strong>HANDS</strong> — generator half of D-16b (same parity anchor set)</li>
   <li><strong>REQUIRED TEXT</strong> — the baked cover title and any lettering a Visual Bible element must carry (SETTLED: baked title)</li>
   <li><strong>REQUIRED CAST</strong> — the generator half of D-03 / D-04b: every named character in frame, exactly one of each, nobody added</li>
-  <li><strong>REQUIRED OBJECTS</strong> — the commissioned elements of the page</li>
+  <li><strong>Composition: size</strong> — a vessel, building or vehicle and a held object keep their true size against the figures</li>
+  <li><strong>DEPTH AND SIZE</strong> — a size stated for an element wins over its depth; a genuinely large element dominates the foreground</li>
+  <li><strong>REQUIRED OBJECTS</strong> — the commissioned elements of the page, each with its size against the cast (the scale riders)</li>
   <li><strong>SEASON</strong> — the book-wide season, even against a reference photo from another season</li>
   <li><strong>LIGHT</strong> — the page's declared time of day and weather, which wins over the plate's light (sceneLight.js)</li>
   <li><strong>COMPOSITION GUIDELINES</strong> — a cover's own composition: title-safe top third, group, bottom margin</li>

@@ -164,11 +164,11 @@ describe('a render’s recorded prose is a slice of the string that render was s
     // that guarantees the containment the diagnosis relied on.
     textModels.callTextModel = async () => { throw new Error('offline'); };
     const meta: any = {};
-    // Over the cap by less than the DEPTH AND SIZE paragraph it carries: the
+    // Over the cap by less than the reference-photo paragraph it carries: the
     // scene itself is never cut (2026-09-26), only a ranked block.
-    const depth: string = require_('fs').readFileSync(require_('path').join(process.cwd(), 'prompts', 'image-generation.txt'), 'utf-8')
-      .split(/\n{2,}/).map((x: string) => x.trim()).find((x: string) => x.startsWith('**DEPTH AND SIZE:**'));
-    const built = `${buildPrompt(CAP - 400)}\n\n${depth}`;
+    const ranked: string = require_('fs').readFileSync(require_('path').join(process.cwd(), 'prompts', 'image-generation.txt'), 'utf-8')
+      .split(/\n{2,}/).map((x: string) => x.trim()).find((x: string) => x.startsWith('When the FIRST reference photo'));
+    const built = `${buildPrompt(CAP - 400)}\n\n${ranked}`;
     expect(built.length).toBeGreaterThan(CAP);
     const sent = await images.shrinkPromptForModel(built, CAP, 'TEST', null, meta);
     expect(typeof meta.compressedScene).toBe('string');

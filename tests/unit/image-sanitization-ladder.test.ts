@@ -168,18 +168,18 @@ describe('A — the retry is built from the string level 0 actually sent', () =>
     // Force the fallback: a Grok-backed model whose call throws, so the core
     // shrinks against GROK's cap and then swaps to Gemini for the ladder.
     grokShouldFail = true;
-    // Over the cap by less than the DEPTH AND SIZE paragraph, the one ranked
+    // Over the cap by less than the reference-photo paragraph, the one ranked
     // block this fixture carries: the scene itself is never cut (2026-09-26),
     // so a prompt the drops cannot fit would fail before any request.
-    const depth: string = require_('fs').readFileSync(require_('path').join(process.cwd(), 'prompts', 'image-generation.txt'), 'utf-8')
-      .split(/\n{2,}/).map((x: string) => x.trim()).find((x: string) => x.startsWith('**DEPTH AND SIZE:**'));
+    const ranked: string = require_('fs').readFileSync(require_('path').join(process.cwd(), 'prompts', 'image-generation.txt'), 'utf-8')
+      .split(/\n{2,}/).map((x: string) => x.trim()).find((x: string) => x.startsWith('When the FIRST reference photo'));
     const withFiller = (n: number) => `${scene(Array.from({ length: n },
-      (_, i) => `Figure ${i} stands near the old stone wall ${i} holding lantern ${i} in the evening light.`).join(' '))}\n\n**ART STYLE**\nwatercolour.\n\n${depth}`;
+      (_, i) => `Figure ${i} stands near the old stone wall ${i} holding lantern ${i} in the evening light.`).join(' '))}\n\n**ART STYLE**\nwatercolour.\n\n${ranked}`;
     let n = 1;
     while (withFiller(n).length <= GROK_CAP + 200) n++;
     const prompt = withFiller(n);
     expect(prompt.length).toBeGreaterThan(GROK_CAP);
-    expect(prompt.length - depth.length).toBeLessThan(GROK_CAP);
+    expect(prompt.length - ranked.length).toBeLessThan(GROK_CAP);
     // The compressor must not invent a shorter prompt behind the test's back.
     textModels.callTextModel = async (p: string) =>
       (/rewrite|safe/i.test(String(p))

@@ -116,14 +116,12 @@ Rendered from `PROMPT_CUT_ORDER` / `PROMPT_NEVER_CUT` in `server/lib/images.js`;
 Grok image cap: **7,900 characters** (`server/config/models.js` `maxPromptLength`). Over the cap, duplicated bullet bodies are merged first; then `shrinkPromptForModel` removes these blocks **in this order**, stopping as soon as the prompt fits. The generation log names each removed block with its step number and size.
 
 1. **COUNTS** (~235 chars) — the "three or fewer" counting rule. *Why here:* binds only a page whose prose states a number of like things; never built on a cover.
-2. **Composition: size** (~305 chars) — the vessel / building / vehicle true-size bullet. *Why here:* the REQUIRED OBJECTS scale riders and DEPTH AND SIZE ("a size stated for an element always wins") state it per element.
-3. **Composition: facing** (~367 chars) — the "faces the target, not the camera" bullet. *Why here:* yields to every declared facing, and EXACT POSES / EXPRESSIONS AND EYES declare one per figure; never built on a cover.
-4. **DEPTH AND SIZE** (~647 chars) — the foreground / midground / background definitions. *Why here:* defines the brief's depth words; the prose still places every figure.
-5. **Composition: ground** (~600 chars) — the feet-on-the-ground bullet (the header goes with it). *Why here:* the one feet-on-the-ground rule for pages and covers; kept longer than the generic rules above.
-6. **HEIGHT ORDER** (~140 chars) — the shortest-to-tallest line. *Why here:* a page fact: the relative size the height judge compares.
-7. **AGE & PROPORTIONS** (~485 chars) — the per-age head-count proportions. *Why here:* a page fact: without it an infant is drawn as a preschooler.
-8. **reference-photo rule** (~512 chars) — which attached photo is a place and which is a person. *Why here:* a page fact: the plate-vs-identity binding of the attached images.
-9. **single-illustration rule** (~503 chars) — one full-bleed picture, no lettering, ids are not painted. *Why here:* the frame rule; the very last block the cut may spend.
+2. **Composition: facing** (~367 chars) — the "faces the target, not the camera" bullet. *Why here:* yields to every declared facing, and EXACT POSES / EXPRESSIONS AND EYES declare one per figure; never built on a cover.
+3. **Composition: ground** (~600 chars) — the feet-on-the-ground bullet. *Why here:* the one feet-on-the-ground rule for pages and covers; kept longer than the generic rules above.
+4. **HEIGHT ORDER** (~140 chars) — the shortest-to-tallest line. *Why here:* a page fact: the relative size the height judge compares.
+5. **AGE & PROPORTIONS** (~485 chars) — the per-age head-count proportions. *Why here:* a page fact: without it an infant is drawn as a preschooler.
+6. **reference-photo rule** (~512 chars) — which attached photo is a place and which is a person. *Why here:* a page fact: the plate-vs-identity binding of the attached images.
+7. **single-illustration rule** (~503 chars) — one full-bleed picture, no lettering, ids are not painted. *Why here:* the frame rule; the very last block the cut may spend.
 
 **Never cut, and neither is the page's scene before the protected tail (from the first of REQUIRED OBJECTS / SEASON / LIGHT / COMPOSITION GUIDELINES / ART STYLE): THIS IMAGE DEPICTS, the cast lines and the brief's prose. If the prompt still does not fit once every step has run, the render fails loudly.**
 
@@ -131,7 +129,9 @@ Grok image cap: **7,900 characters** (`server/config/models.js` `maxPromptLength
 - **HANDS** — generator half of D-16b (same parity anchor set)
 - **REQUIRED TEXT** — the baked cover title and any lettering a Visual Bible element must carry (SETTLED: baked title)
 - **REQUIRED CAST** — the generator half of D-03 / D-04b: every named character in frame, exactly one of each, nobody added
-- **REQUIRED OBJECTS** — the commissioned elements of the page
+- **Composition: size** — a vessel, building or vehicle and a held object keep their true size against the figures
+- **DEPTH AND SIZE** — a size stated for an element wins over its depth; a genuinely large element dominates the foreground
+- **REQUIRED OBJECTS** — the commissioned elements of the page, each with its size against the cast (the scale riders)
 - **SEASON** — the book-wide season, even against a reference photo from another season
 - **LIGHT** — the page's declared time of day and weather, which wins over the plate's light (sceneLight.js)
 - **COMPOSITION GUIDELINES** — a cover's own composition: title-safe top third, group, bottom margin

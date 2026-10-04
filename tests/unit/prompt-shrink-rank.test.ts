@@ -100,28 +100,38 @@ describe('the cut spends Composition one bullet at a time, in rank order', () =>
     expect(size).toMatch(/^- A vessel, building or vehicle/);
   });
 
-  it('a small overshoot costs the size bullet only, and the header stays', async () => {
+  it('a small overshoot costs the facing bullet only; size and the header stay', async () => {
     const p = prompt(40);
     const out = String(await shrinkPromptForModel(p, p.length - 50, 'TEST rank', null));
-    expect(out).not.toContain(size);
-    expect(out).toContain(facing);
+    expect(out).not.toContain(facing);
     expect(out).toContain(ground);
+    expect(out).toContain(size);
     expect(out).toContain(header);
   });
 
-  it('the ground bullet outlives the facing bullet', async () => {
+  it('the ground bullet goes after the facing bullet', async () => {
     const p = prompt(40);
-    const out = String(await shrinkPromptForModel(p, p.length - size.length - 60, 'TEST rank', null));
+    const out = String(await shrinkPromptForModel(p, p.length - facing.length - 60, 'TEST rank', null));
     expect(out).not.toContain(facing);
-    expect(out).toContain(ground);
+    expect(out).not.toContain(ground);
+    expect(out).toContain(size);
   });
 
-  it('the header goes with the last bullet — no empty heading is sent', async () => {
+  // SIZE IS NEVER CUT (2026-10-04, staging job_1791040103540_atbttop6w: the
+  // grown dragon rendered egg-sized on p17/p18 after the size bullet and
+  // DEPTH AND SIZE were cut first). The header stays with the size bullet.
+  it('every droppable bullet gone, the size bullet and its header are still sent', async () => {
     const p = prompt(40);
-    const out = String(await shrinkPromptForModel(p, p.length - (facing.length + ground.length + size.length) + 5, 'TEST rank', null));
-    for (const b of [facing, ground, size]) expect(out).not.toContain(b);
-    expect(out).not.toContain(header);
+    const out = String(await shrinkPromptForModel(p, p.length - (facing.length + ground.length) + 5, 'TEST rank', null));
+    for (const b of [facing, ground]) expect(out).not.toContain(b);
+    expect(out).toContain(`${header}\n${size}`);
     expect(out).toContain(PB.NO_CHARACTER_MARKING_RULE);
     expect(out).toContain(PB.HANDS_HOLD_ONLY_NAMED_RULE);
+  });
+
+  it('a prompt that only fits by cutting size fails loudly instead', async () => {
+    const p = prompt(40);
+    await expect(shrinkPromptForModel(p, p.length - (facing.length + ground.length + size.length) + 5, 'TEST rank', null))
+      .rejects.toThrow(/refusing to cut|after every allowed drop/);
   });
 });

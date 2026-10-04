@@ -825,4 +825,37 @@ checks.outfitAppearanceOnly = (ctx) => {
   return { covered: true, pass: true, detail: `all ${n} outfit description(s) free of page numbers and other figures' names` };
 };
 
+/**
+ * 2026-10-04 — size is never cut by the prompt shrink. Dragon run 9 (staging
+ * job_1791040103540_atbttop6w) spent "Composition: size" / "DEPTH AND SIZE" on
+ * 13 of its 14 over-cap prompts; a grown dragon then rendered egg-sized.
+ * Pass: no prompt_shrink event drops either, no prompt_fit_failed event, and
+ * every rendered page/cover prompt (one carrying **ART STYLE) still carries
+ * DEPTH AND SIZE.
+ */
+checks.promptShrinkKeepsSize = (ctx) => {
+  const log = Array.isArray(ctx.data?.generationLog) ? ctx.data.generationLog : [];
+  const shrinks = log.filter(e => e?.event === 'prompt_shrink' && e?.details?.branch === 'cut');
+  if (!shrinks.length) return notCovered('no prompt went over the cap (no prompt_shrink cut event)');
+  const SIZE = ['Composition: size', 'DEPTH AND SIZE'];
+  const bad = [];
+  const cutSize = shrinks.filter(e => (e.details.dropped || []).some(d => SIZE.includes(d)));
+  if (cutSize.length) bad.push(`${cutSize.length}/${shrinks.length} shrink event(s) cut a size block: ${cutSize.map(e => trunc(e.message, 90)).join('; ')}`);
+  const fitFails = log.filter(e => e?.event === 'prompt_fit_failed');
+  if (fitFails.length) bad.push(`${fitFails.length} prompt_fit_failed (a render refused, over the cap with size kept): ${fitFails.map(e => trunc(e.message, 90)).join('; ')}`);
+  const sent = [];
+  for (const p of pages(ctx)) versions(p).forEach((v, i) => sent.push({ id: `p${p.pageNumber}v${i}`, prompt: String(v.prompt || '') }));
+  for (const [k, c] of Object.entries(ctx.data?.coverImages || {})) if (c?.prompt) sent.push({ id: k, prompt: String(c.prompt) });
+  const rendered = sent.filter(x => x.prompt.includes('**ART STYLE'));
+  const noDepth = rendered.filter(x => !x.prompt.includes('**DEPTH AND SIZE:**'));
+  if (noDepth.length) bad.push(`sent without DEPTH AND SIZE: ${noDepth.map(x => x.id).join(', ')}`);
+  const dropped = {};
+  shrinks.forEach(e => (e.details.dropped || []).forEach(d => { dropped[d] = (dropped[d] || 0) + 1; }));
+  return {
+    covered: true,
+    pass: bad.length === 0,
+    detail: bad.length ? bad.join(' | ') : `${shrinks.length} shrink(s), none cut size; ${rendered.length} rendered prompts all carry DEPTH AND SIZE; cut instead: ${Object.entries(dropped).map(([k, n]) => `${k} ${n}x`).join(', ')}`,
+  };
+};
+
 module.exports = { checks, SHAPES, evalRunShape, helpers: { pages, brief, versions, shotOf, activeImageUrl, plateUrl, pageFindings, splitSentences, sizeHits } };
