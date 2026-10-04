@@ -105,7 +105,7 @@ describe('one close-up rule for the Art Director and shot_widened', () => {
   it('the Art Director keeps a planned close-up', async () => {
     await loadPromptTemplates();
     const inputData = { language: 'en', pages: 1, characters: [{ id: 1, name: 'Mira' }], mainCharacters: [1] };
-    const ad = String(PB.buildSceneBriefsAllPrompt(inputData, [{ pageNumber: 1, planLine: 'close-up — Mira — x — y' }], {}));
+    const ad = String(PB.buildSceneBriefsAllPrompt(inputData, [{ pageNumber: 1, planLine: 'close-up — Mira — x — y' }], { jevBackup: true }));
     expect(ad).toContain(CLOSEUP_KEPT_RULE);
     expect(ad).not.toContain('{CLOSEUP_KEPT}');
     expect(ad).not.toContain('or make the page a `medium` shot');
