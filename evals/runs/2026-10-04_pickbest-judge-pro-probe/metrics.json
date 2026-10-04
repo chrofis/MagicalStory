@@ -1,0 +1,19 @@
+{
+ "tag": "pro-probe",
+ "totalCost": 0.0546,
+ "calls": [
+  {
+   "case": 3,
+   "rep": 0,
+   "altPosition": "A",
+   "winner": "alt",
+   "confidence": 0.85,
+   "model": "google/gemini-3.1-pro-preview",
+   "cost": 0.054572,
+   "in": 13582,
+   "out": 2284,
+   "reasoning": 2026,
+   "error": null
+  }
+ ]
+}

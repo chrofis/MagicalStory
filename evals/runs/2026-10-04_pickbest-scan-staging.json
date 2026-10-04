@@ -1,0 +1,191 @@
+{
+ "summary": {
+  "env": "staging",
+  "since": "2026-09-26",
+  "stories": 9,
+  "storiesWithMultiVersionPages": 4,
+  "pagesAndCovers": 115,
+  "multiVersion": 22,
+  "scoreableMulti": 22,
+  "hitsTodayShipsCriticalWhileAnotherCleanExists": 0,
+  "triggerFires": 6,
+  "recordedActiveMismatchesUnpinned": 0
+ },
+ "hits": [],
+ "triggers": [
+  {
+   "story": "job_1790446348343_z3fw660ie",
+   "created": "2026-09-26T16:12:28.765Z",
+   "page": 7,
+   "type": "scene",
+   "versions": 2,
+   "today": 1,
+   "recorded": 1,
+   "pinned": false,
+   "trigger": {
+    "top": 1,
+    "partner": 0
+   },
+   "topFindings": [
+    "[critical] age Facundo: Appears visibly younger — late teen/early 20s vs late 20s/early 30s"
+   ],
+   "partnerFindings": [
+    "[critical] action_interaction Facundo: Facundo is not leaning forward with one open hand stretched urgently toward Fiona's orange sash; instead, he is holding an unrequested piece",
+    "[critical] action_interaction Fiona: Fiona's right hand is not pulling the heavy orange sailcloth sash firmly back and away from Facundo's reaching fingers; instead, it is holdi"
+   ],
+   "scores": [
+    56,
+    33
+   ],
+   "sources": [
+    "original",
+    "iterate-round-1"
+   ]
+  },
+  {
+   "story": "job_1790446348343_z3fw660ie",
+   "created": "2026-09-26T16:12:28.765Z",
+   "page": "frontCover",
+   "type": "frontCover",
+   "versions": 2,
+   "today": 0,
+   "recorded": 0,
+   "pinned": false,
+   "trigger": {
+    "top": 0,
+    "partner": 1
+   },
+   "topFindings": [
+    "[critical] character_marking Lorena: Lorena's vitiligo patches on forehead and around mouth are absent"
+   ],
+   "partnerFindings": [
+    "[critical] age Facundo: Facundo appears visibly younger (late teen/early 20s vs late 20s/early 30s)"
+   ],
+   "scores": [
+    60,
+    44
+   ],
+   "sources": [
+    "original",
+    "char-fix-round-1"
+   ]
+  },
+  {
+   "story": "job_1790508305061_dka3jpog9",
+   "created": "2026-09-27T09:25:05.451Z",
+   "page": 10,
+   "type": "scene",
+   "versions": 2,
+   "today": 1,
+   "recorded": 1,
+   "pinned": false,
+   "trigger": {
+    "top": 1,
+    "partner": 0
+   },
+   "topFindings": [
+    "[critical] action_interaction Levin: Levin's right hand is not gripping Kiaan's left wrist as declared. He is shown gripping Max with both hands, rather than gripping Max's righ"
+   ],
+   "partnerFindings": [
+    "[critical] missing_character Levin: Levin is not in the frame and no figure in it could be Levin",
+    "[critical] character_identity Levin: Levin is missing from the scene",
+    "[critical] setting: A visible sun/moon disc is present in the background, contradicting 'no sun disc, no moon and no blue sky anywhere in the picture'",
+    "[critical] action_interaction: The main action of the three boys forming a rescue chain, with Levin hauling Max and Kiaan upward by their forearms, is incomplete due to Le"
+   ],
+   "scores": [
+    68,
+    -15
+   ],
+   "sources": [
+    "original",
+    "iterate-round-1"
+   ]
+  },
+  {
+   "story": "job_1790508305061_dka3jpog9",
+   "created": "2026-09-27T09:25:05.451Z",
+   "page": 11,
+   "type": "scene",
+   "versions": 2,
+   "today": 0,
+   "recorded": 0,
+   "pinned": false,
+   "trigger": {
+    "top": 0,
+    "partner": 1
+   },
+   "topFindings": [
+    "[critical] action_interaction: Missing massive grey scaled wing barrier stretching across the rocky path, blocking the boys' way"
+   ],
+   "partnerFindings": [
+    "[critical] action_interaction Kiaan: Kiaan is not seen entirely from behind and body facing forward as required; he is turned towards the viewer and not aligned in the row",
+    "[critical] setting: The image shows the entire dragon on a distant hill instead of Sura's single massive grey scaled wing stretched across the path like a solid"
+   ],
+   "scores": [
+    56,
+    31
+   ],
+   "sources": [
+    "original",
+    "iterate-round-1"
+   ]
+  },
+  {
+   "story": "job_1790539784661_6mjcny1c7",
+   "created": "2026-09-27T18:09:45.029Z",
+   "page": 10,
+   "type": "scene",
+   "versions": 2,
+   "today": 0,
+   "recorded": 0,
+   "pinned": false,
+   "trigger": {
+    "top": 0,
+    "partner": 1
+   },
+   "topFindings": [
+    "[critical] action_interaction: Max is shown giving/offering the golden scale to Julian, who is receiving/holding it; the prompt requires Max to push the scale back under J"
+   ],
+   "partnerFindings": [
+    "[critical] action_interaction Max: Max is presenting the golden scale instead of pushing it back under Julian's jacket; uses both hands instead of only right hand"
+   ],
+   "scores": [
+    75,
+    73
+   ],
+   "sources": [
+    "original",
+    "inpaint-round-1"
+   ]
+  },
+  {
+   "story": "job_1791040103540_atbttop6w",
+   "created": "2026-10-03T13:08:24.036Z",
+   "page": 9,
+   "type": "scene",
+   "versions": 2,
+   "today": 1,
+   "recorded": 1,
+   "pinned": false,
+   "trigger": {
+    "top": 1,
+    "partner": 0
+   },
+   "topFindings": [
+    "[critical] action_interaction the dragon egg: Dragon egg is stationary instead of wobbling out from linden roots and rolling rapidly down the gravel path"
+   ],
+   "partnerFindings": [
+    "[critical] setting: The scene is missing the 'steep stone staircase that descends out of view' at the end of the sloping path."
+   ],
+   "scores": [
+    75,
+    58
+   ],
+   "sources": [
+    "original",
+    "inpaint-round-1"
+   ]
+  }
+ ],
+ "mismatches": []
+}

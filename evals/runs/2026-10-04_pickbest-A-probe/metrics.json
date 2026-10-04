@@ -1,0 +1,116 @@
+{
+ "tag": "A-probe",
+ "cost": 0.201,
+ "cases": [
+  {
+   "case": 7,
+   "owner": "alt-clearly-better",
+   "decisions": {
+    "pro": [
+     {
+      "rep": 0,
+      "confirmed": {
+       "shipped": true,
+       "alt": true
+      },
+      "winner": "alt",
+      "byRule": "score"
+     }
+    ],
+    "opus": [
+     {
+      "rep": 0,
+      "confirmed": {
+       "shipped": true,
+       "alt": true
+      },
+      "winner": "alt",
+      "byRule": "score"
+     }
+    ]
+   },
+   "calls": [
+    {
+     "f": "action_interaction|max",
+     "role": "shipped",
+     "model": "pro",
+     "rep": 0,
+     "refs": 1,
+     "visible": true,
+     "conf": 0.85,
+     "cost": 0.01318
+    },
+    {
+     "f": "action_interaction|max",
+     "role": "shipped",
+     "model": "opus",
+     "rep": 0,
+     "refs": 1,
+     "visible": true,
+     "conf": 0.75,
+     "cost": 0.03435
+    },
+    {
+     "f": "action_interaction|max",
+     "role": "alt",
+     "model": "pro",
+     "rep": 0,
+     "refs": 1,
+     "visible": true,
+     "conf": 0.9,
+     "cost": 0.01693
+    },
+    {
+     "f": "action_interaction|max",
+     "role": "alt",
+     "model": "opus",
+     "rep": 0,
+     "refs": 1,
+     "visible": true,
+     "conf": 0.62,
+     "cost": 0.03599
+    },
+    {
+     "f": "action_interaction|kiaan",
+     "role": "shipped",
+     "model": "pro",
+     "rep": 0,
+     "refs": 1,
+     "visible": true,
+     "conf": 0.8,
+     "cost": 0.01863
+    },
+    {
+     "f": "action_interaction|kiaan",
+     "role": "shipped",
+     "model": "opus",
+     "rep": 0,
+     "refs": 1,
+     "visible": false,
+     "conf": 0.8,
+     "cost": 0.03498
+    },
+    {
+     "f": "action_interaction|kiaan",
+     "role": "alt",
+     "model": "pro",
+     "rep": 0,
+     "refs": 1,
+     "visible": false,
+     "conf": 0.9,
+     "cost": 0.01287
+    },
+    {
+     "f": "action_interaction|kiaan",
+     "role": "alt",
+     "model": "opus",
+     "rep": 0,
+     "refs": 1,
+     "visible": false,
+     "conf": 0.85,
+     "cost": 0.03444
+    }
+   ]
+  }
+ ]
+}

@@ -66086,3 +66086,23 @@ prepare-title keeps building only the costumed sheet; the story run builds the s
 **Rationale.** A fresh prompt or fresh audits add a second variable larger than the model gap the earlier sweeps measured (judge spread up to 1.29 on one arc). Replays of stored inputs are the cheapest way to compare against arcs and repairs that already exist.
 
 **Touched:** `server/config/models.js`, `server/lib/testlab.js` (`storedCreatePrompt`, `storedRefineAudits`), `server/lib/textRefine.js` (`opts.audits`), `tests/unit/testlab-stored-challenge-section.test.ts`, `tests/unit/text-refine-replayed-audits.test.ts`. **Status:** 🟡 measuring — the result and any routing change get their own entry.
+
+## 2026-10-04 — Pick-best stays score + critical-gone-wins; no side-by-side judge
+
+**Context.** The owner reviewed ten staging pages where the shipped version carried a CRITICAL and another version had none, and asked for a judge at the final pick that sees both images and chooses. It was built and measured on branch `feat/pickbest-judge` (head `2748cebff`, unpushed research branch: `sideBySideJudge.js`, `prompts/side-by-side-judge.txt`, scoring/repairPipeline/regeneration changes, replay scripts). None of it reaches staging.
+
+**Decision.** `pickBestVersionIndex` stays as it is: finalScore ranking after critical-gone-wins (`dominatesByCritical`, 2026-09-26). No side-by-side judge, no pair re-check.
+
+**Rationale (evidence).** Raw: `evals/results/results.jsonl` (2026-10-04 lines, dataset `evals/datasets/pickbest-critical-v1`), `evals/runs/2026-10-04_pickbest-*/metrics.json`, scan `evals/runs/2026-10-04_pickbest-scan-{staging,prod}.json` via `scripts/analysis/scan-pickbest-hits.js`.
+1. The ten owner-reviewed cases all predate 2026-09-26; today's rule picks the alternative on 10/10 and `sideBySideTrigger` fires on none. The problem they showed is already fixed by critical-gone-wins.
+2. Scan of every story created since 2026-09-26 (staging 9, prod 8; 115 + 98 scenes and covers, 46 pages with 2+ scoreable versions): 0 pages where today's pick carries a CRITICAL while another version has none; the trigger fired 8 times, every time two versions each carrying a DIFFERENT CRITICAL.
+3. Open side-by-side judge, gemini-2.5-flash: order-biased (case 7 always picks IMAGE_B; case 3 mostly; 3/5 clear cases with the alternative always IMAGE_A, 5/5 in alternating order). gemini-3.1-pro: 2/5 clear cases agree with the owner, 3/10 cases flip winner with position, USD 0.057 per call.
+4. Targeted cross-check (is this specific CRITICAL visible, per version, labelled overlay + references; pro 2 repeats, opus-5-5 1 repeat): 🟡 stable-ish, but decisive on few cases because the fallback to today's score already gives the answer; case 7 confirmed Max gripping the crate on both versions, as the owner said.
+5. Same-round re-eval of both candidates through the production evaluator, then today's picker: ❌ 3/5 on the clear cases, about 10 points of score noise between two runs of one version.
+Total spend about USD 4.5 (flash and pro judge runs 1.6 incl. one unmetered flash pass, cross-check and re-eval 2.9).
+
+**Considered.** Judge at every `recomputeActiveVersion` save (rejected by the owner: latency and cost); judging both orders and requiring agreement (not built: pro already flips, and the trigger rate does not justify it).
+
+**Revisit if:** the 8 both-CRITICAL pairs (staging `z3fw660ie` p7 + frontCover, `dka3jpog9` p10 + p11, `6mjcny1c7` p10, `atbttop6w` p9; prod `9n47zi342` p10, `j905g63bx` p7) prove, on viewing, to ship the worse image.
+
+**Touched files:** none in production. Added measurements and `scripts/analysis/scan-pickbest-hits.js` (read-only scan).
