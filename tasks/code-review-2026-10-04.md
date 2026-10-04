@@ -15,9 +15,9 @@ tasks/writer-prompt-audit-2026-09-20.md, docs/review-2026-07-25-full-code-review
 - [x] 4 Payments/credits/print + 5 combined (17 confirmed, 3 plausible, 3 rejected → code-review-2026-10/4-5-payments-auth-trial.md) — routes/print, config/credits, referral, Stripe webhook (server.js)
 - [x] 5 Auth / trial / sharing (see 4) — routes/trial, routes/sharing, auth middleware
 - [x] 6 Other routes (15 confirmed, 3 plausible, 3 rejected → code-review-2026-10/6-other-routes.md)
-- [ ] 7 Client (wizard, story display, repair hook)
-- [ ] 8 Test Lab (server/lib/testlab.js + client service)
-- [ ] 9 Prompts — generator↔critic consistency
+- [x] 7 Client (14 confirmed, 3 plausible, 2 rejected → code-review-2026-10/7-client.md) — A: StoryWizard, CharacterForm, characterService, trial pages; B: StoryDisplay, RepairWorkflowPanel, useRepairWorkflow, storyService, SharedStoryViewer, BookBuilder, MyStories
+- [x] 8 Test Lab (+9a prompt fit: 10 confirmed, 1 dup → code-review-2026-10/8-9a-testlab-promptfit.md) — server/lib/testlab.js, routes/admin/testlab.js, client TestLab.tsx + testlabService
+- [x] 9 Prompts (9b: 7 confirmed, 3 rejected → code-review-2026-10/9b-generator-critic.md) generator↔critic + images.js 1-1280 prompt-shrink code (unread by areas 1-6)
 
 ## Fixes (owner: "fix all the issues", 2026-10-04)
 Owner decisions: auth merge-safe + token-version revoke; share key = cover preview only; caps + length
