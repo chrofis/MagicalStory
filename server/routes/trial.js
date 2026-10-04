@@ -21,7 +21,7 @@ const { trialSourceWhereClause } = require('../lib/trialSource');
 // Every full-blob characters.data write in this file goes through this —
 // image bytes belong in R2, the row holds URLs. Never throws; on an R2
 // failure it alarms and lets the write proceed (see its JSDoc).
-const { offloadCharacterImages, offloadJsonbImages, inlineOffloadPrefix } = require('../services/database');
+const { offloadCharacterImages, modifyCharactersRow, offloadJsonbImages, inlineOffloadPrefix } = require('../services/database');
 const { assertPromptFilled } = require('../services/prompts');
 // The trial's declared age is MANDATORY (owner, 2026-09-15) — one parser for
 // every entry point below. See server/lib/trialAge.js for the range and why
@@ -1149,33 +1149,26 @@ OUTPUT: A single character illustration. No text, no borders, no additional elem
       try {
         const decoded = verifyToken(sessionTokenStr);
         if (decoded.anonymous && decoded.userId) {
-          const { getPool } = require('../services/database');
-          const pool = getPool();
-          const charResult = await pool.query(
-            'SELECT data FROM characters WHERE id = $1 AND user_id = $2',
-            [req.body.characterId, decoded.userId]
-          );
-          if (charResult.rows.length > 0) {
-            const charData = typeof charResult.rows[0].data === 'string'
-              ? JSON.parse(charResult.rows[0].data)
-              : charResult.rows[0].data;
-            if (charData.characters && charData.characters[0]) {
-              charData.characters[0].previewAvatar = finalImage;
+          // Slow work (R2 upload of the avatar bytes) first; then a short locked
+          // merge of only the fields this route owns (review 2026-10 T5). A trial
+          // user's row id is always characters_<userId>, which is the ownership check.
+          const rowId = req.body.characterId;
+          if (rowId === `characters_${decoded.userId}`) {
+            const fragment = { previewAvatar: finalImage };
+            await offloadCharacterImages(rowId, decoded.userId, fragment);
+            const saved = await modifyCharactersRow(rowId, decoded.userId, (charData) => {
+              if (!charData.characters?.[0]) return false;
+              charData.characters[0].previewAvatar = fragment.previewAvatar;
               // Save extracted physical traits for story generation pipeline
               if (extractedTraits) {
                 const physical = charData.characters[0].physical || {};
                 // apparentAge is clamped against the age on the row (applyTrialPhotoTraits).
                 const { clamp } = applyTrialPhotoTraits(physical, extractedTraits, charData.characters[0].age);
-                if (clamp?.clamped) log.info(`[AGE CLAMP] trial ${req.body.characterId}: ${clamp.reason}`);
+                if (clamp?.clamped) log.info(`[AGE CLAMP] trial ${rowId}: ${clamp.reason}`);
                 charData.characters[0].physical = physical;
               }
-              await offloadCharacterImages(req.body.characterId, decoded.userId, charData);
-              await pool.query(
-                'UPDATE characters SET data = $1 WHERE id = $2',
-                [JSON.stringify(charData), req.body.characterId]
-              );
-              log.debug(`[TRIAL AVATAR] Saved avatar${extractedTraits ? ' + physical traits' : ''} to character ${req.body.characterId}`);
-            }
+            });
+            if (saved) log.debug(`[TRIAL AVATAR] Saved avatar${extractedTraits ? ' + physical traits' : ''} to character ${rowId}`);
           }
         }
       } catch (saveErr) {
@@ -1334,21 +1327,19 @@ router.post('/create-anonymous-account', trialAvatarLimiter, async (req, res) =>
         const photoDataUri = facePhoto.startsWith('data:') ? facePhoto : `data:image/jpeg;base64,${facePhoto}`;
         const t = await extractTraitsShared(facePhoto, photoDataUri, extractTraitsWithGemini);
         if (!t) return;
-        const charResult = await pool.query('SELECT data FROM characters WHERE id = $1', [characterId]);
-        if (charResult.rows.length === 0) return;
-        const charData = typeof charResult.rows[0].data === 'string'
-          ? JSON.parse(charResult.rows[0].data) : charResult.rows[0].data;
-        if (!charData.characters?.[0]) return;
-        const physical = charData.characters[0].physical || {};
-        // Clamp against the age on the row NOW — a PATCH may have changed it
-        // while the extraction ran.
-        const { clamp } = applyTrialPhotoTraits(physical, t, charData.characters[0].age);
-        if (clamp?.clamped) log.info(`[AGE CLAMP] trial ${characterId}: ${clamp.reason}`);
-        charData.characters[0].physical = physical;
-        // Whole-blob rewrite: without the sweep this re-persists any bytes an
-        // earlier path left inline. No-op when the row is already clean.
-        await offloadCharacterImages(characterId, userId, charData);
-        await pool.query('UPDATE characters SET data = $1 WHERE id = $2', [JSON.stringify(charData), characterId]);
+        // The extraction ran for seconds: merge only `physical` into the CURRENT row
+        // under a lock, so a PATCH that landed meanwhile is not reverted (review 2026-10 T5).
+        const saved = await modifyCharactersRow(characterId, userId, (charData) => {
+          if (!charData.characters?.[0]) return false;
+          const physical = charData.characters[0].physical || {};
+          // Clamp against the age on the row NOW — a PATCH may have changed it
+          // while the extraction ran.
+          const { clamp } = applyTrialPhotoTraits(physical, t, charData.characters[0].age);
+          if (clamp?.clamped) log.info(`[AGE CLAMP] trial ${characterId}: ${clamp.reason}`);
+          charData.characters[0].physical = physical;
+        });
+        if (!saved) return;
+        const physical = saved.characters[0].physical;
         log.debug(`[TRIAL] Background traits saved for ${characterId}: hair=${physical.hairColor}, eyes=${physical.eyeColor}, skin=${physical.skinTone}`);
       } catch (err) {
         log.debug(`[TRIAL] Background trait save failed (non-critical): ${err.message}`);
@@ -1410,17 +1401,6 @@ router.patch('/update-character-details', verifySessionToken, async (req, res) =
 
     // characters.id for trial users is deterministic: `characters_${userId}`
     const characterId = `characters_${userId}`;
-    const charResult = await pool.query('SELECT data FROM characters WHERE id = $1', [characterId]);
-    if (charResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Character not found' });
-    }
-
-    const charData = typeof charResult.rows[0].data === 'string'
-      ? JSON.parse(charResult.rows[0].data) : charResult.rows[0].data;
-    if (!charData?.characters?.[0]) {
-      return res.status(404).json({ error: 'Character entry missing' });
-    }
-
     // Mirror the wizard's structuredTraits shape (matches saveTrialCharacter).
     const rawTraits = traits || [];
     const structuredTraits = {
@@ -1430,27 +1410,34 @@ router.patch('/update-character-details', verifySessionToken, async (req, res) =
       ...(customTraits ? { specialDetails: customTraits } : {}),
     };
 
-    const c = charData.characters[0];
-    c.name = normalizeCharacterName(name.replace(/[\r\n]/g, '').trim());
-    // An omitted age leaves the stored one intact; a supplied one is the
-    // normalised whole-year value parsed above.
-    if (patchedAge !== null) {
-      c.age = patchedAge;
-      // The stored photo apparentAge was clamped against the age the prewarm
-      // sent; keep it within one group of the age now declared.
-      const clamp = reclampTrialApparentAge(c.physical, patchedAge);
-      if (clamp?.clamped) log.info(`[AGE CLAMP] trial ${characterId}: ${clamp.reason}`);
+    // One locked read-modify-write (review 2026-10 T5): merges only the fields
+    // this route owns into the CURRENT row, so a concurrent prepare-title /
+    // preview-avatar write is neither reverted nor reverting.
+    let charId = null;
+    let missing = null;
+    const saved = await modifyCharactersRow(characterId, userId, (charData) => {
+      const c = charData?.characters?.[0];
+      if (!c) { missing = 'Character entry missing'; return false; }
+      c.name = normalizeCharacterName(name.replace(/[\r\n]/g, '').trim());
+      // An omitted age leaves the stored one intact; a supplied one is the
+      // normalised whole-year value parsed above.
+      if (patchedAge !== null) {
+        c.age = patchedAge;
+        // The stored photo apparentAge was clamped against the age the prewarm
+        // sent; keep it within one group of the age now declared.
+        const clamp = reclampTrialApparentAge(c.physical, patchedAge);
+        if (clamp?.clamped) log.info(`[AGE CLAMP] trial ${characterId}: ${clamp.reason}`);
+      }
+      c.gender = gender || '';
+      c.traits = structuredTraits;
+      if (customTraits != null) c.customTraits = customTraits;
+      charId = c.id;
+    });
+    if (!saved) {
+      return res.status(404).json({ error: missing || 'Character not found' });
     }
-    c.gender = gender || '';
-    c.traits = structuredTraits;
-    if (customTraits != null) c.customTraits = customTraits;
-
-    // Text-only edit, but it rewrites the WHOLE blob — so any bytes a prior
-    // path left inline would be re-persisted here. Cheap no-op when clean.
-    await offloadCharacterImages(characterId, userId, charData);
-    await pool.query('UPDATE characters SET data = $1 WHERE id = $2', [JSON.stringify(charData), characterId]);
-    log.debug(`[TRIAL] Character details updated for ${userId}: ${c.name}`);
-    res.json({ success: true, characterId, charId: c.id });
+    log.debug(`[TRIAL] Character details updated for ${userId}: ${saved.characters[0].name}`);
+    res.json({ success: true, characterId, charId });    res.json({ success: true, characterId, charId: c.id });
   } catch (err) {
     log.error(`[TRIAL] update-character-details error: ${err.message}`);
     res.status(500).json({ error: 'Failed to update character. Please try again.' });
@@ -2901,16 +2888,19 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
 
       // Store avatar data on character in DB
       try {
-        charData.characters[0].preGeneratedCostumeType = costumeType;
-        charData.characters[0].preGeneratedStyledAvatars = styledAvatarsData;
-        if (avatarSlides.length > 0) charData.characters[0].preGeneratedAvatarSlides = avatarSlides;
         // The sheets and the sliced slides above are built as data: URIs in
-        // memory; nothing uploaded them. Sweep before the write.
-        await offloadCharacterImages(characterId, userId, charData);
-        await pool.query(
-          'UPDATE characters SET data = $1 WHERE id = $2',
-          [JSON.stringify(charData), characterId]
-        );
+        // memory; nothing uploaded them. Sweep the fragment BEFORE the row lock,
+        // then merge only these three fields into the CURRENT row (review 2026-10 T5:
+        // this route reads the row up to ~100 s before it writes).
+        const fragment = { preGeneratedStyledAvatars: styledAvatarsData, ...(avatarSlides.length > 0 ? { preGeneratedAvatarSlides: avatarSlides } : {}) };
+        await offloadCharacterImages(characterId, userId, fragment);
+        await modifyCharactersRow(characterId, userId, (fresh) => {
+          const c = fresh.characters?.[0];
+          if (!c) return false;
+          c.preGeneratedCostumeType = costumeType;
+          c.preGeneratedStyledAvatars = fragment.preGeneratedStyledAvatars;
+          if (fragment.preGeneratedAvatarSlides) c.preGeneratedAvatarSlides = fragment.preGeneratedAvatarSlides;
+        });
         log.debug(`[TRIAL AVATARS] Saved styled avatars to character ${characterId}`);
       } catch (dbErr) {
         log.warn(`[TRIAL AVATARS] Failed to save avatars to DB: ${dbErr.message}`);

@@ -7018,14 +7018,16 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
           // 2. Also save to characters table (for character editor)
           const characterId = `characters_${userId}`;
-          const charResult = await dbPool.query('SELECT data FROM characters WHERE id = $1', [characterId]);
-          if (charResult.rows.length > 0) {
-            // Handle both TEXT and JSONB column types
-            const rawData = charResult.rows[0].data;
-            const charData = typeof rawData === 'string' ? JSON.parse(rawData) : rawData;
-            const chars = charData.characters || [];
-            let updatedCount = 0;
-            for (const dbChar of chars) {
+          // styledAvatars come off the in-memory pipeline as data: URIs — this is the
+          // authenticated-user twin of the trial prewarm leak and the likeliest source
+          // of the base64 rows seen in prod. The slow R2 upload runs BEFORE the row
+          // lock; the locked read-modify-write below only merges (review 2026-10 A4).
+          const { offloadCharacterImages, modifyCharactersRow } = require('./server/services/database');
+          await offloadCharacterImages(characterId, userId, { styledAvatars: [...styledAvatarsMap.values()] });
+          let updatedCount = 0;
+          await modifyCharactersRow(characterId, userId, (charData) => {
+            updatedCount = 0;
+            for (const dbChar of charData.characters || []) {
               // Match by name (trim to handle trailing spaces)
               const styledAvatars = styledAvatarsMap.get(dbChar.name) || styledAvatarsMap.get(dbChar.name?.trim());
               if (styledAvatars) {
@@ -7035,16 +7037,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 updatedCount++;
               }
             }
-            if (updatedCount > 0) {
-              charData.characters = chars;
-              // styledAvatars come off the in-memory pipeline as data: URIs —
-              // this is the authenticated-user twin of the trial prewarm leak
-              // and the likeliest source of the base64 rows seen in prod.
-              const { offloadCharacterImages } = require('./server/services/database');
-              await offloadCharacterImages(characterId, userId, charData);
-              await dbPool.query('UPDATE characters SET data = $1 WHERE id = $2', [JSON.stringify(charData), characterId]);
-              log.debug(`💾 [UNIFIED] Updated ${updatedCount} characters in database with ${artStyle} styled avatars`);
-            }
+            return updatedCount > 0;
+          });
+          if (updatedCount > 0) {
+            log.debug(`💾 [UNIFIED] Updated ${updatedCount} characters in database with ${artStyle} styled avatars`);
           }
         }
       } catch (persistErr) {

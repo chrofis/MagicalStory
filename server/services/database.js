@@ -1117,6 +1117,38 @@ async function offloadCharacterImages(rowId, userId, data, logger = log) {
 }
 
 /**
+ * The ONE way to rewrite part of a user's `characters` row: a short, locked
+ * read-modify-write (review 2026-10 A4 / T5 / V3). Do the slow work (Gemini,
+ * R2 uploads of the new bytes) BEFORE calling this, then merge only the fields
+ * your route owns inside `mutate(charData)`. Reading the blob early and writing
+ * it back whole after seconds of work silently reverts every edit another
+ * request made in between.
+ *
+ * `mutate` receives the parsed blob (edit in place), may be async, and may
+ * return `false` to skip the write. Resolves to the persisted blob, or `null`
+ * when the row does not exist or `mutate` declined.
+ *
+ * The whole-blob offload sweep runs inside the lock; it is a cheap no-op when
+ * the row holds no inline bytes (offloadJsonbImages pre-check).
+ *
+ * @param {string} rowId   characters.id
+ * @param {string} userId  owner id (R2 key for any bytes the sweep moves)
+ * @param {(charData: Object) => (boolean|void|Promise<boolean|void>)} mutate
+ */
+async function modifyCharactersRow(rowId, userId, mutate) {
+  return withTransaction(async (tx) => {
+    const res = await tx.query('SELECT data FROM characters WHERE id = $1 FOR UPDATE', [rowId]);
+    if (res.rows.length === 0) return null;
+    const raw = res.rows[0].data;
+    const charData = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    if ((await mutate(charData)) === false) return null;
+    await offloadCharacterImages(rowId, userId, charData);
+    await tx.query('UPDATE characters SET data = $1 WHERE id = $2', [JSON.stringify(charData), rowId]);
+    return charData;
+  });
+}
+
+/**
  * The guard EVERY json/jsonb write with a user-supplied payload goes through.
  *
  * Same contract as offloadCharacterImages, which is now one line of this: move
@@ -3999,6 +4031,7 @@ module.exports = {
   offloadJsonbImages,
   inlineOffloadPrefix,
   offloadCharacterImages,
+  modifyCharactersRow,
   measureInlineImageBytes,
   upsertStory,
   ensureStoryRow,
