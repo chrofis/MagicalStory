@@ -2691,6 +2691,126 @@
       "fixedAt": "2026-10-04",
       "fixedIn": "262c58788",
       "fix": "paid-only gate + async events, stuck-order sweep, has_issue widened, durable stripe_webhook_retry rows, referral claim release, retry rebuilt on processBookOrder. Test: tests/unit/stripe-post-payment.test.ts."
+    },
+    {
+      "id": "review-s1-google-merge-prehijack",
+      "title": "A password account registered on someone else's email is merged into that person's later Google sign-in, keeping the registrant's password",
+      "reportedAt": "2026-10-04",
+      "source": "Code review 2026-10-04 (tasks/code-review-2026-10/4-5-payments-auth-trial.md), confirmed against current code",
+      "rootCause": "Google upsert ON CONFLICT kept the existing row's password and set email_verified; register never verifies the address.",
+      "impact": "Privacy: the pre-registrant reads the real owner's children's photos and stories.",
+      "status": "fixed",
+      "fixedAt": "2026-10-04",
+      "fixedIn": "3d740b9d5",
+      "fix": "Google merge onto an unverified account replaces the password and bumps users.token_version; Google email_verified claim required. Test: tests/unit/auth-routes-session-revocation.test.ts"
+    },
+    {
+      "id": "review-s5-sessions-survive-reset",
+      "title": "Sessions survive a password reset, a password change and a role demotion",
+      "reportedAt": "2026-10-04",
+      "source": "Code review 2026-10-04 (tasks/code-review-2026-10/4-5-payments-auth-trial.md), confirmed against current code",
+      "rootCause": "7-day JWT with the role inside; nothing server-side to revoke it.",
+      "impact": "A demoted admin keeps admin until expiry; an attacker's session survives the victim's reset.",
+      "status": "fixed",
+      "fixedAt": "2026-10-04",
+      "fixedIn": "3d740b9d5",
+      "fix": "users.token_version (migration 044) in the JWT, checked per request with the role read fresh; bumped on reset, change, role change, Google merge. Test: tests/unit/session-token-version.test.ts, auth-routes-session-revocation.test.ts"
+    },
+    {
+      "id": "review-v1-domain-auto-verify",
+      "title": "Any @magicalstory.ch registration is auto-verified",
+      "reportedAt": "2026-10-04",
+      "source": "Code review 2026-10-04 (tasks/code-review-2026-10/4-5-payments-auth-trial.md), confirmed against current code",
+      "rootCause": "isDemoAccount domain regex in register.",
+      "impact": "Inbox-less accounts skip the email gate.",
+      "status": "fixed",
+      "fixedAt": "2026-10-04",
+      "fixedIn": "3d740b9d5",
+      "fix": "Only the first (admin) account is auto-verified; demo scripts verify via the admin endpoint. Test: tests/unit/auth-routes-session-revocation.test.ts"
+    },
+    {
+      "id": "review-s2-share-key-full-access",
+      "title": "The email-link ?key= granted full private-story access for 60 days and survived unsharing",
+      "reportedAt": "2026-10-04",
+      "source": "Code review 2026-10-04 (tasks/code-review-2026-10/4-5-payments-auth-trial.md), confirmed against current code",
+      "rootCause": "sharing.js passed hasValidSignedShareKey into every getSharedStory call, contradicting shareLinkSig.js's documented scope.",
+      "impact": "A forwarded story-ready email keeps access to the full story.",
+      "status": "fixed",
+      "fixedAt": "2026-10-04",
+      "fixedIn": "3d740b9d5",
+      "fix": "Key unlocks only /header and the HTML cover preload (owner decision 2026-10-04). Test: tests/unit/share-key-scope.test.ts"
+    },
+    {
+      "id": "review-s4-header-admin-draft",
+      "title": "/api/shared/:token/header lacked NOT admin_draft",
+      "reportedAt": "2026-10-04",
+      "source": "Code review 2026-10-04 (tasks/code-review-2026-10/4-5-payments-auth-trial.md), confirmed against current code",
+      "rootCause": "Header query written without the filter its siblings have.",
+      "impact": "Title, page count and cover of an unpublished admin draft served to its owner or a key holder.",
+      "status": "fixed",
+      "fixedAt": "2026-10-04",
+      "fixedIn": "3d740b9d5",
+      "fix": "AND NOT admin_draft added. Test: tests/unit/share-key-scope.test.ts"
+    },
+    {
+      "id": "review-s6-photos-status-public",
+      "title": "Unauthenticated GET /api/photos/status exposed the analyzer URL and error text",
+      "reportedAt": "2026-10-04",
+      "source": "Code review 2026-10-04 (tasks/code-review-2026-10/4-5-payments-auth-trial.md), confirmed against current code",
+      "rootCause": "No auth on the health route.",
+      "impact": "Internal URL disclosure and an upstream call per hit.",
+      "status": "fixed",
+      "fixedAt": "2026-10-04",
+      "fixedIn": "1394fe35c",
+      "fix": "authenticateToken + requireAdmin. Test: tests/unit/story-route-guards.test.ts"
+    },
+    {
+      "id": "review-r7-owner-routes-skip-admin-draft",
+      "title": "Owner-side story routes skip the admin_draft filter",
+      "reportedAt": "2026-10-04",
+      "source": "Code review 2026-10-04 (tasks/code-review-2026-10/6-other-routes.md), confirmed against current code",
+      "rootCause": "Only the list and GET /:id filtered; metadata, images, share and edit routes did not.",
+      "impact": "The owner of an unpublished admin draft could read it and share it by id.",
+      "status": "fixed",
+      "fixedAt": "2026-10-04",
+      "fixedIn": "1394fe35c",
+      "fix": "One guard (hideAdminDraftFromOwner) on the /:id router; regeneration shares the prefix. Test: tests/unit/story-route-guards.test.ts"
+    },
+    {
+      "id": "review-r8-dev-endpoints-open",
+      "title": "Developer/eval endpoints open to every story owner",
+      "reportedAt": "2026-10-04",
+      "source": "Code review 2026-10-04 (tasks/code-review-2026-10/6-other-routes.md), confirmed against current code",
+      "rootCause": "authenticateToken plus owner check only.",
+      "impact": "Internal prompts and eval output exposed to ordinary owners.",
+      "status": "fixed",
+      "fixedAt": "2026-10-04",
+      "fixedIn": "1394fe35c",
+      "fix": "requireAdminActing on the nine routes. Test: tests/unit/story-route-guards.test.ts"
+    },
+    {
+      "id": "review-r10-page-image-revert-blob-only",
+      "title": "Admin page-image replace wrote only the blob, not story_images",
+      "reportedAt": "2026-10-04",
+      "source": "Code review 2026-10-04 (tasks/code-review-2026-10/6-other-routes.md), confirmed against current code",
+      "rootCause": "PATCH /:id/page/:n set sceneImages[].imageData; readers serve the image table.",
+      "impact": "The admin 'use this test-model image' action did not show.",
+      "status": "fixed",
+      "fixedAt": "2026-10-04",
+      "fixedIn": "1394fe35c",
+      "fix": "Writes a new story_images version and pins it active. Test: tests/unit/story-route-guards.test.ts"
+    },
+    {
+      "id": "review-x1-debug-routes-unreachable",
+      "title": "/api/stories/debug routes check req.user.isAdmin, which no token carries",
+      "reportedAt": "2026-10-04",
+      "source": "Code review 2026-10-04 (tasks/code-review-2026-10/6-other-routes.md), confirmed against current code",
+      "rootCause": "generateToken sets role, never isAdmin.",
+      "impact": "Dead admin routes (fail closed).",
+      "status": "fixed",
+      "fixedAt": "2026-10-04",
+      "fixedIn": "1394fe35c",
+      "fix": "requireAdmin. Test: tests/unit/story-route-guards.test.ts"
     }
   ]
 }
