@@ -1053,6 +1053,29 @@
           "buildSceneClothingRequirements"
         ]
       }
+    },
+    {
+      "id": "wardrobe-variant-sheet-chain",
+      "axis": "standard sheet vs costumed sheet (derive, generate, project, resolve)",
+      "reason": "A page that takes a garment off is drawn from an off-garment sheet: wardrobeVariants.js derives the off-set and its base category, styledAvatars.js redresses the base sheet, storyAvatars.js projects it into characterAvatars and resolveSheetForRef serves it, entityConsistency.getStyledAvatarForClothing serves it to the repair paths, and notEvaluated.js records a page that got none. Until 2026-10-04 every stage handled styled-standard/winter/summer and skipped costumed, so a garment taken off a costumed character was drawn from the costume sheet wearing it with no warning (staging job_1790446348343_z3fw660ie). A key-shape or category change on one stage must reach all of them.",
+      "members": [
+        "server/lib/wardrobeVariants.js",
+        "server/lib/styledAvatars.js",
+        "server/lib/storyAvatars.js",
+        "server/lib/entityConsistency.js",
+        "server/lib/notEvaluated.js"
+      ],
+      "severity": "block"
+    },
+    {
+      "id": "main-character-selection",
+      "axis": "wizard vs prompt builders",
+      "reason": "The wizard's live age line says which mains the server counts and whose age picks the band; client/src/utils/mainCharacters.ts mirrors pickMainCharacters (cap: 1 main for up to 2 characters, 2 for 3 or more; oldest main decides). A change to the cap or sort on one side makes the wizard promise a story the server does not write (2026-10-04: three books for a 2-year-old written for her 4-year-old brother).",
+      "members": [
+        "server/lib/promptBuilders.js",
+        "client/src/utils/mainCharacters.ts"
+      ],
+      "severity": "block"
     }
   ],
   "withinFile": [

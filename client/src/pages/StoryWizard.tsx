@@ -1,3 +1,4 @@
+import { defaultMainCharacterId, addMainCharacter, trimMainCharacters } from '@/utils/mainCharacters';
 import { useState, useEffect, useRef, lazy, Suspense, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useLanguage } from '@/context/LanguageContext';
@@ -1653,31 +1654,12 @@ export default function StoryWizard() {
     }
   }, [searchParams, setSearchParams]);
 
-  // Auto-select main characters based on age
+  // Auto-select ONE main character: the first-created child (see defaultMainCharacterId)
   const autoSelectMainCharacters = (charactersList: Character[]) => {
-    if (charactersList.length === 0) return;
-
-    // Find characters aged 1-10
-    const youngCharacters = charactersList.filter(char => {
-      const age = parseInt(char.age);
-      return age >= 1 && age <= 10;
-    });
-
-    if (youngCharacters.length > 0) {
-      // Select all characters aged 1-10 as main characters
-      const mainCharIds = youngCharacters.map(char => char.id);
-      setMainCharacters(mainCharIds);
-      log.info(`Auto-selected ${youngCharacters.length} main character(s) aged 1-10`);
-    } else {
-      // No characters aged 1-10, select the youngest one
-      const youngest = charactersList.reduce((min, char) => {
-        const age = parseInt(char.age) || 999;
-        const minAge = parseInt(min.age) || 999;
-        return age < minAge ? char : min;
-      });
-      setMainCharacters([youngest.id]);
-      log.info(`Auto-selected youngest character as main: ${youngest.name} (age ${youngest.age})`);
-    }
+    const mainId = defaultMainCharacterId(charactersList);
+    if (mainId === null) return;
+    setMainCharacters([mainId]);
+    log.info(`Auto-selected main character: ${charactersList.find(c => c.id === mainId)?.name}`);
   };
 
   // Load characters and relationships on mount
@@ -3646,14 +3628,34 @@ export default function StoryWizard() {
       setExcludedCharacters(prev => prev.filter(id => id !== charId));
       setMainCharacters(prev => prev.filter(id => id !== charId));
     } else if (role === 'main') {
-      // Remove from excluded, add to main
+      // Remove from excluded, add to main (limit 1 = radio swap; see utils/mainCharacters)
+      const stillIn = characters.filter(c => c.id === charId || !excludedCharacters.includes(c.id));
+      const nextMain = addMainCharacter(stillIn.length, mainCharacters, charId);
+      const dropped = mainCharacters.filter(id => !nextMain.includes(id));
       setExcludedCharacters(prev => prev.filter(id => id !== charId));
-      setMainCharacters(prev => prev.includes(charId) ? prev : [...prev, charId]);
+      setMainCharacters(nextMain);
+      if (dropped.length > 0) {
+        setCharacters(prev => prev.map(c => dropped.includes(c.id) ? { ...c, storyRole: 'in' } : c));
+      }
     }
     rolesDirty.current = true; // Mark as modified
     // Also update storyRole on the character object so it's sent with saveAllCharacterData
     setCharacters(prev => prev.map(c => c.id === charId ? { ...c, storyRole: role } : c));
   };
+
+  // Keep the mains within the server's limit for the cast now in the story: covers a
+  // character set to "out", a deleted one, and stored roles that exceed it on load.
+  // Keeps the first-selected mains; the rest become "in" and are persisted like any role change.
+  useEffect(() => {
+    if (!initialCharacterLoadDone) return;
+    const inStoryIds = characters.filter(c => !excludedCharacters.includes(c.id)).map(c => c.id);
+    const trimmed = trimMainCharacters(inStoryIds, mainCharacters);
+    if (trimmed.length === mainCharacters.length) return;
+    const dropped = mainCharacters.filter(id => !trimmed.includes(id));
+    setMainCharacters(trimmed);
+    setCharacters(prev => prev.map(c => dropped.includes(c.id) && !excludedCharacters.includes(c.id) ? { ...c, storyRole: 'in' } : c));
+    rolesDirty.current = true;
+  }, [characters, excludedCharacters, mainCharacters, initialCharacterLoadDone]);
 
   // Save character roles to database
   const saveCharacterRoles = async () => {

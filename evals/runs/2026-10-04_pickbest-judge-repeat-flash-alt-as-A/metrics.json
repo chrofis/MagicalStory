@@ -1,0 +1,84 @@
+{
+ "tag": "repeat-flash-alt-as-A",
+ "totalCost": 0.0714,
+ "calls": [
+  {
+   "case": 3,
+   "rep": 0,
+   "altPosition": "A",
+   "winner": "shipped",
+   "confidence": 1,
+   "model": "gemini-2.5-flash",
+   "cost": 0.0112788,
+   "in": 11921,
+   "out": 207,
+   "reasoning": null,
+   "error": null
+  },
+  {
+   "case": 3,
+   "rep": 1,
+   "altPosition": "A",
+   "winner": "shipped",
+   "confidence": 0.9,
+   "model": "gemini-2.5-flash",
+   "cost": 0.0134938,
+   "in": 11921,
+   "out": 404,
+   "reasoning": null,
+   "error": null
+  },
+  {
+   "case": 3,
+   "rep": 2,
+   "altPosition": "A",
+   "winner": "shipped",
+   "confidence": 0.9,
+   "model": "gemini-2.5-flash",
+   "cost": 0.0134938,
+   "in": 11921,
+   "out": 404,
+   "reasoning": null,
+   "error": null
+  },
+  {
+   "case": 7,
+   "rep": 0,
+   "altPosition": "A",
+   "winner": "shipped",
+   "confidence": 1,
+   "model": "gemini-2.5-flash",
+   "cost": 0.01104,
+   "in": 10825,
+   "out": 168,
+   "reasoning": null,
+   "error": null
+  },
+  {
+   "case": 7,
+   "rep": 1,
+   "altPosition": "A",
+   "winner": "shipped",
+   "confidence": 1,
+   "model": "gemini-2.5-flash",
+   "cost": 0.01104,
+   "in": 10825,
+   "out": 168,
+   "reasoning": null,
+   "error": null
+  },
+  {
+   "case": 7,
+   "rep": 2,
+   "altPosition": "A",
+   "winner": "shipped",
+   "confidence": 1,
+   "model": "gemini-2.5-flash",
+   "cost": 0.01104,
+   "in": 10825,
+   "out": 168,
+   "reasoning": null,
+   "error": null
+  }
+ ]
+}

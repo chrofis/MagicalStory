@@ -4781,6 +4781,76 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "wardrobe-variant-judge",
+      "title": "An off-garment sheet is judged by the style judge that approved its base, plus a garment-gone task; costumed sheets get off variants too; a missing one is recorded",
+      "commits": [
+        "(this push)"
+      ],
+      "addedAt": "2026-10-04",
+      "claim": "In a story where a character takes a garment off (plain or costumed outfit), every page that draws that character is sent its --off: sheet (referencePhotos[].clothingCategory contains --off:, no wornStateFallback), and the stored off sheet shows no part of the removed garment with the face unchanged.",
+      "runShape": [
+        "needs-worn-off"
+      ],
+      "check": {
+        "kind": "auto",
+        "fn": "offSheetServed"
+      },
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "consolidator-fix-rests-on-scored-finding",
+      "title": "Every CRITICAL/MAJOR consolidator fix names finding ids and one of them is in a kept (scored) entry; otherwise the run log carries an ERROR",
+      "commits": [
+        "b6abd1656"
+      ],
+      "addedAt": "2026-10-04",
+      "claim": "On a story run, every consolidator_calls plan has ids on scene_fix and per_character_fixes[]; no page carries a CRITICAL/MAJOR fix whose ids are all in rule-2/2a drops (a page whose finding says the picture lacks what the brief asks for is scored and repaired, not dropped); any page where that still happens has a consolidator_fix_unbacked ERROR in generationLog and plan.fix_errors.",
+      "runShape": [
+        "any"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "After a staging run: SELECT page_number, plan->'fix_errors' FROM consolidator_calls WHERE story_id=<id>, and grep generationLog for consolidator_fix_unbacked; run node scripts/analysis/measure-consolidator-orphan-fixes.js --env=staging --since=<run date> and expect 0 flagged fixes, or each flagged one to have a matching ERROR."
+      },
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "sonnet55-arc-and-refine",
+      "title": "Arc create (xhigh), arc re-tell (high) and text_refine run on Sonnet 5.5",
+      "commits": [],
+      "addedAt": "2026-10-04",
+      "claim": "On the next full staging story: tokenUsage.byFunction.arc_create, arc_retell and text_refine list model claude-sonnet-5-5; arc_create cost ~$0.5-0.7, arc_retell ~$0.1, text_refine repair ~$0.25; the arc reads followable (owner) and the shipped pages show no new invented facts; story cost per page lower than the ~$0.36 baseline.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Read tokenUsage.byFunction models + costs for arc_create/arc_retell/text_refine; owner reads arcReviewReport.finalArc for followability (watch overloaded page sentences on short books) and skims the refined pages vs textRefineReport.pages[].before."
+      },
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "main-role-limit-and-age-line",
+      "title": "Wizard step 2 explains Hauptrolle, limits mains to what the server counts (1 for 2-3 characters, 2 for 4+), defaults to one main, and shows the age the book is written for",
+      "commits": [
+        "(this push)"
+      ],
+      "addedAt": "2026-10-04",
+      "claim": "On staging /create step 2: the info text above the cards explains Hauptrolle and the limit; a new account with 2 children gets only the first-created child as Hauptrolle; with 1-2 characters, clicking Hauptrolle on another moves it (previous becomes Dabei); with 3+ characters a third Hauptrolle button is disabled with a tooltip; setting a main to Nicht dabei so the cast drops to 2 leaves only the first-selected main; the blue line under the grid reads 'Geschrieben für N-Jährige (Name, ...)' with the oldest main's age, matching the age band of the generated story. Reloading keeps the roles. Server: a 3-character story with 2 declared mains is written for the oldest of the two (check the age band in the story's prompt or log); a 2-character story with one main is written for that main.",
+      "runShape": [
+        "any"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Open the wizard step 2 on staging with demo-agebands (14 chars) and a 2-child account; exercise radio swap, disabled button, shrink-trim, reload; compare the age line with the story's age band."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [

@@ -1108,6 +1108,270 @@
         ]
       },
       "source": "Negative control for identity_swap. Back cover (-3), head grid cell A viewed 2026-09-27: the curls read golden blond against the reference's light-brown curls, the face is the same boy. The run filed hair_change MAJOR. Single-trait hair drift; it must not be filed as identity_swap."
+    },
+    {
+      "id": "sheet-z3fw660ie-fiona-base-photographic",
+      "judge": "sheet_style",
+      "target": {
+        "storyId": "job_1790446348343_z3fw660ie",
+        "character": "Fiona"
+      },
+      "input": {
+        "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790446348343_z3fw660ie/debug/styled-avatar/styledAvatarGeneration-0/output.jpg",
+        "entryIndex": 0
+      },
+      "expect": {
+        "verdict": "flag",
+        "types": [
+          "style"
+        ]
+      },
+      "source": "Fiona costumed base, styledAvatarGeneration[0] pass-2 output (approved 9/10). Viewed at full size 2026-10-04: the head cells are a photograph with a light texture (photographic skin, hair and lighting; brush texture only on the jacket). The style line itself says a photograph with a painterly filter is still a photograph."
+    },
+    {
+      "id": "sheet-atbttop6w-max-base-caption-lettering",
+      "judge": "sheet_style",
+      "target": {
+        "storyId": "job_1791040103540_atbttop6w",
+        "character": "Max"
+      },
+      "input": {
+        "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1791040103540_atbttop6w/debug/p1/ref-photo-2-orig.jpg",
+        "entryIndex": 1
+      },
+      "expect": {
+        "verdict": "flag",
+        "types": [
+          "background"
+        ]
+      },
+      "source": "Max standard base, styledAvatarGeneration[1] pass-2 output (approved 9/10). Viewed 2026-10-04: printed captions FRONT / THREE-QUARTER / PROFILE / REAR TURN under the head row. TASK 8: any written word on the sheet = 1-2."
+    },
+    {
+      "id": "sheet-cwyvu3y8p-mia-attempt-ghost-figures",
+      "judge": "sheet_style",
+      "target": {
+        "storyId": "job_1791114188734_cwyvu3y8p",
+        "character": "Mia"
+      },
+      "input": {
+        "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1791114188734_cwyvu3y8p/aux/styledAvatarGeneration-0-innerAttemptHistory-0-imageData.jpg",
+        "entryIndex": 0
+      },
+      "expect": {
+        "verdict": "flag",
+        "types": [
+          "solo"
+        ]
+      },
+      "source": "Mia pass-2 attempt 1 (innerAttemptHistory-0), rejected by production. Viewed 2026-10-04: ghosted adult figures painted across both rows behind the character. TASK 7: any extra person = 1-3."
+    },
+    {
+      "id": "sheet-5herh01j7-julian-attempt-ghost-figures",
+      "judge": "sheet_style",
+      "target": {
+        "storyId": "job_1790277448294_5herh01j7",
+        "character": "Julian"
+      },
+      "input": {
+        "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790277448294_5herh01j7/aux/styledAvatarGeneration-3-innerAttemptHistory-0-imageData.jpg",
+        "entryIndex": 3
+      },
+      "expect": {
+        "verdict": "flag",
+        "types": [
+          "solo"
+        ]
+      },
+      "source": "Julian pass-2 attempt 1 (innerAttemptHistory-0), rejected by production. Viewed 2026-10-04: two ghosted adults and a boy painted into the cells. TASK 7: any extra person = 1-3."
+    },
+    {
+      "id": "sheet-n9wrh5u0j-sarah-attempt-ghost-figures",
+      "judge": "sheet_style",
+      "target": {
+        "storyId": "job_1790618717512_n9wrh5u0j",
+        "character": "Sarah"
+      },
+      "input": {
+        "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790618717512_n9wrh5u0j/aux/styledAvatarGeneration-4-innerAttemptHistory-0-imageData.jpg",
+        "entryIndex": 4
+      },
+      "expect": {
+        "verdict": "flag",
+        "types": [
+          "solo"
+        ]
+      },
+      "source": "Sarah pass-2 attempt 1 (innerAttemptHistory-0), rejected by production. Viewed 2026-10-04: ghosted adults and a boy painted across the cells. TASK 7: any extra person = 1-3."
+    },
+    {
+      "id": "sheet-atbttop6w-kiaan-jacket-still-on",
+      "judge": "sheet_style",
+      "target": {
+        "storyId": "job_1791040103540_atbttop6w",
+        "character": "Kiaan"
+      },
+      "input": {
+        "imageUrl": "https://images-staging.magicalstory.ch/characters/680c30fd-2839-4c23-b00c-b91603352a6d/characters_680c30fd-2839-4c23-b00c-b9160/inline/characters-14-avatars-styledAvatars-watercolor-standard.jpg",
+        "entryIndex": 2,
+        "removedGarments": [
+          "autumn jacket"
+        ],
+        "baseImageUrl": "https://images-staging.magicalstory.ch/characters/680c30fd-2839-4c23-b00c-b91603352a6d/characters_680c30fd-2839-4c23-b00c-b9160/inline/characters-14-avatars-styledAvatars-watercolor-standard.jpg"
+      },
+      "expect": {
+        "verdict": "flag",
+        "types": [
+          "removed"
+        ]
+      },
+      "source": "Control: the approved standard base sheet, which WEARS the quilted autumn jacket in all 8 cells, judged as the jacket-off variant. TASK 10: any visible part of a garment taken off = 1-3."
+    },
+    {
+      "id": "sheet-z3fw660ie-fiona-coat-still-on",
+      "judge": "sheet_style",
+      "target": {
+        "storyId": "job_1790446348343_z3fw660ie",
+        "character": "Fiona"
+      },
+      "input": {
+        "imageUrl": "https://images-staging.magicalstory.ch/characters/680c30fd-2839-4c23-b00c-b91603352a6d/characters_680c30fd-2839-4c23-b00c-b9160/inline/characters-8-avatars-styledAvatars-watercolor-costumed-default.jpg",
+        "entryIndex": 0,
+        "removedGarments": [
+          "dark grey wool pirate coat"
+        ],
+        "baseImageUrl": "https://images-staging.magicalstory.ch/characters/680c30fd-2839-4c23-b00c-b91603352a6d/characters_680c30fd-2839-4c23-b00c-b9160/inline/characters-8-avatars-styledAvatars-watercolor-costumed-default.jpg"
+      },
+      "expect": {
+        "verdict": "flag",
+        "types": [
+          "removed"
+        ]
+      },
+      "source": "Control: the approved costumed base sheet, which WEARS the dark grey wool pirate coat in all 8 cells, judged as the coat-off variant. TASK 10: any visible part of a garment taken off = 1-3."
+    },
+    {
+      "id": "sheet-qfrcuuf2m-mia-base-clean",
+      "judge": "sheet_style",
+      "target": {
+        "storyId": "job_1791130829297_qfrcuuf2m",
+        "character": "Mia"
+      },
+      "input": {
+        "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1791130829297_qfrcuuf2m/debug/frontCover/ref-photo-0.jpg",
+        "entryIndex": 0
+      },
+      "expect": {
+        "verdict": "pass"
+      },
+      "source": "Mia costumed base, styledAvatarGeneration[0] pass-2 output. Viewed in full 2026-10-04: one watercolor medium in all 8 cells, framing as its Pass-1 sheet, one figure, plain paper, no lettering."
+    },
+    {
+      "id": "sheet-ar4u7qry3-emma-base-clean",
+      "judge": "sheet_style",
+      "target": {
+        "storyId": "job_1790529840433_ar4u7qry3",
+        "character": "Emma"
+      },
+      "input": {
+        "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790529840433_ar4u7qry3/debug/styled-avatar/styledAvatarGeneration-1/output.jpg",
+        "entryIndex": 1
+      },
+      "expect": {
+        "verdict": "pass"
+      },
+      "source": "Emma costumed base, styledAvatarGeneration[1] pass-2 output. Viewed in full 2026-10-04 with its Pass-1 sheet: painted in every cell; the head row is framed to the hips in BOTH sheets, so the framing matches Image 2. One figure, plain paper."
+    },
+    {
+      "id": "sheet-dka3jpog9-levin-base-clean",
+      "judge": "sheet_style",
+      "target": {
+        "storyId": "job_1790508305061_dka3jpog9",
+        "character": "Levin"
+      },
+      "input": {
+        "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790508305061_dka3jpog9/debug/p1/ref-photo-0-orig.jpg",
+        "entryIndex": 0
+      },
+      "expect": {
+        "verdict": "pass"
+      },
+      "source": "Levin standard base, styledAvatarGeneration[0] pass-2 output. Viewed in full 2026-10-04: watercolor in all 8 cells, consistent garments, one figure, plain paper."
+    },
+    {
+      "id": "sheet-dka3jpog9-kiaan-base-clean",
+      "judge": "sheet_style",
+      "target": {
+        "storyId": "job_1790508305061_dka3jpog9",
+        "character": "Kiaan"
+      },
+      "input": {
+        "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790508305061_dka3jpog9/debug/p1/ref-photo-3-orig.jpg",
+        "entryIndex": 2
+      },
+      "expect": {
+        "verdict": "pass"
+      },
+      "source": "Kiaan standard base, styledAvatarGeneration[2] pass-2 output. Viewed in full 2026-10-04 with its Pass-1 sheet: watercolor in all 8 cells, framing matches Pass-1, shirt a lighter shade of the same green, one figure."
+    },
+    {
+      "id": "sheet-dka3jpog9-julian-base-clean",
+      "judge": "sheet_style",
+      "target": {
+        "storyId": "job_1790508305061_dka3jpog9",
+        "character": "Julian"
+      },
+      "input": {
+        "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790508305061_dka3jpog9/debug/p1/ref-photo-1-orig.jpg",
+        "entryIndex": 3
+      },
+      "expect": {
+        "verdict": "pass"
+      },
+      "source": "Julian standard base, styledAvatarGeneration[3] pass-2 output. Viewed in full 2026-10-04: watercolor in all 8 cells, consistent dungarees and jumper, one figure, plain paper."
+    },
+    {
+      "id": "sheet-z3fw660ie-fiona-coat-off-lab1596",
+      "judge": "sheet_style",
+      "target": {
+        "storyId": "job_1790446348343_z3fw660ie",
+        "character": "Fiona"
+      },
+      "input": {
+        "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790446348343_z3fw660ie/tl_avatar/cover/v0.jpg",
+        "entryIndex": 0,
+        "removedGarments": [
+          "dark grey wool pirate coat"
+        ],
+        "baseImageUrl": "https://images-staging.magicalstory.ch/characters/680c30fd-2839-4c23-b00c-b91603352a6d/characters_680c30fd-2839-4c23-b00c-b9160/inline/characters-8-avatars-styledAvatars-watercolor-costumed-default.jpg"
+      },
+      "expect": {
+        "verdict": "flag",
+        "types": [
+          "layout"
+        ]
+      },
+      "source": "Coat-off variant made by Lab #1596 (avatar_redress, production redress). Viewed 2026-10-04 next to its base: the coat is gone in all 8 cells, but head cell 4 lost the rear turn (back of the head only, where the base shows her face over the shoulder), and the head cells are framed to the hips instead of mid-torso. Its near-photographic look is inherited from the base, so style is not the defect of this variant; layout is."
+    },
+    {
+      "id": "sheet-atbttop6w-kiaan-jacket-off-lab1596",
+      "judge": "sheet_style",
+      "target": {
+        "storyId": "job_1791040103540_atbttop6w",
+        "character": "Kiaan"
+      },
+      "input": {
+        "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1791040103540_atbttop6w/tl_avatar/cover/v0.jpg",
+        "entryIndex": 2,
+        "removedGarments": [
+          "autumn jacket"
+        ],
+        "baseImageUrl": "https://images-staging.magicalstory.ch/characters/680c30fd-2839-4c23-b00c-b91603352a6d/characters_680c30fd-2839-4c23-b00c-b9160/inline/characters-14-avatars-styledAvatars-watercolor-standard.jpg"
+      },
+      "expect": {
+        "verdict": "pass"
+      },
+      "source": "Jacket-off variant made by Lab #1596 (avatar_redress, production redress). Viewed 2026-10-04 next to its base: the jacket is gone in all 8 cells, a dark grey long-sleeved top is outermost, and face, hair, trousers, boots, medium, framing and the rear turn all match the approved base. Its head row is framed to the thighs, as the approved base is; a variant judged against its base should pass."
     }
   ]
 }

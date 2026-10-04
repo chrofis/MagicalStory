@@ -153,6 +153,12 @@ function loadStyleSampleImage(artStyle) {
 // Value: base64 image data (downsized)
 const styledAvatarCache = new Map();
 
+// The Pass-1 realistic sheet each styled sheet in the cache was approved
+// against, same keys. A wardrobe-state variant is judged by the style judge
+// that approved its base (owner, 2026-10-04), and that judge's Image 2 is this
+// sheet — kept for the length of the job, cleared with the cache.
+const styledPass1Sheets = new Map();
+
 // AsyncLocalStorage for per-job cache scoping (supports concurrent jobs)
 const { AsyncLocalStorage } = require('async_hooks');
 const cacheContext = new AsyncLocalStorage();
@@ -360,6 +366,9 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
       throw new Error(`[STYLED AVATAR] 2×4 produced no image for ${characterName}/${clothingCategory}/${artStyle}`);
     }
     const downsizedSheet = await compressImageToJPEG(result.imageData, 85, 1024);
+    if (result.realisticImageData) {
+      styledPass1Sheets.set(getAvatarCacheKey(characterName, clothingCategory, artStyle), await compressImageToJPEG(result.realisticImageData, 85, 1024));
+    }
 
     const usedPhantom = result.refs?.phantom || null;
     const usedStandard = result.refs?.standardAvatar || originalAvatar;
@@ -1358,6 +1367,9 @@ function clearScopeEntries(scopeId, reason = 'clear') {
   for (const key of [...guaranteeSeededKeys]) {
     if (key.startsWith(prefix)) guaranteeSeededKeys.delete(key);
   }
+  for (const key of [...styledPass1Sheets.keys()]) {
+    if (key.startsWith(prefix)) styledPass1Sheets.delete(key);
+  }
   log.debug(`[STYLED AVATARS] Cleared ${cleared} entries for scope ${scopeId} (${reason}) (${styledAvatarCache.size} remain)`);
   return cleared;
 }
@@ -1412,6 +1424,7 @@ function clearStyledAvatarCache() {
     styledAvatarCache.clear();
     conversionInProgress.clear();
     guaranteeSeededKeys.clear();
+    styledPass1Sheets.clear();
     log.debug(`🗑️ [STYLED AVATARS] Cache cleared (${size} entries)`);
   }
 }
@@ -1898,6 +1911,23 @@ function clearStyledAvatarGenerationLog() {
 }
 
 /**
+ * The approved styled sheet a wardrobe-state variant is redressed from (an R2
+ * URL or a data URI, as stored), or null. A costumed base is stored per costume
+ * (styled.costumed[<costume>]); one costume per character per story, picked the
+ * way the story projection picks it (storyAvatars: first key, sorted). One
+ * reader for production (prepareWardrobeVariantAvatars) and the Test Lab's
+ * avatar_redress stage, so the Lab redresses the sheet production would.
+ */
+function approvedBaseSheetFor(char, artStyle, baseCategory) {
+  const styledForStyle = char?.avatars?.styledAvatars?.[artStyle] || {};
+  if (baseCategory === 'costumed') {
+    const c = styledForStyle.costumed;
+    return c && typeof c === 'object' ? c[Object.keys(c).sort()[0]] || null : c || null;
+  }
+  return styledForStyle[baseCategory] || null;
+}
+
+/**
  * WARDROBE-STATE VARIANT SHEETS — one extra sheet per derived requirement row.
  *
  * Deliberately NOT a branch inside prepareStyledAvatars. That function resolves
@@ -1945,14 +1975,15 @@ async function prepareWardrobeVariantAvatars(characters, artStyle, variantRequir
     // THE APPROVED SHEET IS THE INPUT — never the photos (owner, 2026-09-19).
     // No base sheet means no variant: falling back to a photo→sheet build here
     // would produce a second, independently-drawn character.
-    const baseSheetRaw = char.avatars?.styledAvatars?.[artStyle]?.[off.baseCategory] || null;
-    const baseSheet = await photoAsDataUri(baseSheetRaw, `${charName} ${off.baseCategory} sheet`);
+    const baseSheet = await photoAsDataUri(approvedBaseSheetFor(char, artStyle, off.baseCategory), `${charName} ${off.baseCategory} sheet`);
     if (!baseSheet) {
       log.warn(`👕 [WARDROBE-VARIANT] ${charName}: no approved "${off.baseCategory}" sheet to redress — no variant (the page keeps the worn sheet + the "leave it off" line)`);
       continue;
     }
     const facePhoto = await photoAsDataUri(getFacePhoto(char), `${charName} face photo`);
-    jobs.push({ charName, char, row, off, cacheKey, baseSheet, facePhoto });
+    // The Pass-1 sheet the base was approved against (the style judge's Image 2).
+    const realisticSheet = styledPass1Sheets.get(getAvatarCacheKey(charName, off.baseCategory, artStyle)) || null;
+    jobs.push({ charName, char, row, off, cacheKey, baseSheet, facePhoto, realisticSheet });
   }
 
   if (jobs.length === 0) return 0;
@@ -1969,6 +2000,8 @@ async function prepareWardrobeVariantAvatars(characters, artStyle, variantRequir
         // source: no authored text, no variant sheet — the derivation refuses
         // the row before it ever reaches here.
         authoredWardrobe: j.row.redressNote,
+        realisticSheet: j.realisticSheet,
+        artStyle,
         usageTracker: addUsage,
         skipQualityEval,
         backendOverride,
@@ -1998,6 +2031,7 @@ module.exports = {
   getOrCreateStyledAvatar,
   prepareStyledAvatars,
   prepareWardrobeVariantAvatars,
+  approvedBaseSheetFor,
   convertAvatarToStyle,
 
   // Apply styled avatars to photo arrays

@@ -21,6 +21,102 @@ superseded and link forward.
 
 ---
 
+## 2026-10-04 — Sheet style judge arms are Lab-only until measured; production keeps `current`
+
+**Context:** Diagnosis 2026-10-04 of the Pass-2 sheet style judge (`evaluateStyledSheetWithGemini`, `prompts/sheet-2x4-style-eval.txt`). It passed a garment-off variant whose head row was flat line art, cropped wider than its reference.
+- The images are sent unlabelled, so it read Image 2's garments into Image 3.
+- Its style reason repeats the requested-style text: all 36 approvals in 8 days scored exactly 9, including a base that is close to a photograph.
+- No axis owns a medium change between cells, or a framing change.
+- For a variant, the judge never sees the styled base that the generator edited.
+- Five fix shapes were proposed. The owner chose to measure them before picking.
+
+**Decision:** The shapes are Test Lab arms, never production code paths.
+- `server/lib/sheetJudgeArms.js` builds each arm from the CURRENT template by replacing whole TASK blocks, and throws when a block is missing.
+- `evaluateStyledSheetWithGemini` gained one Lab-only option, `imageLabels`. Production passes none, so production's parts are unchanged (pinned in `tests/unit/sheet-judge-arms.test.ts`).
+- The arms are measured on a new judge-fixture judge, `sheet_style`, in `tests/judge-fixtures/fixtures.json`.
+  - 12 fixtures, every one viewed at full size. 7 flag: a base close to a photograph, a base with printed captions, three rejected attempts with ghosted extra figures, and two "garment still on" controls. 5 pass: clean bases.
+  - Each arm runs twice: `judge-fixtures.js run --judge=sheet_style --params='{"arm":…}' --repeats=2`.
+- Garment-off variants were never stored, so they are made in the Lab by `avatar_redress`. That stage runs the production redress without a judge, and reads the base through the one shared reader `styledAvatars.approvedBaseSheetFor`.
+- Hans (n9wrh5u0j) is not a fixture: at full size it is a realistic but painted watercolor, so its expected verdict is not unambiguous.
+
+**Rationale:** A judge change is adopted on measured recall and false-alarm rates over viewed fixtures, not on one page. Lab-only arms keep production exactly as it is until the owner picks.
+
+**Touched:** server/lib/sheetJudgeArms.js, server/lib/character2x4Sheet.js (`imageLabels`), server/lib/judgeFixtures.js, server/lib/testlab.js (`sheet_style` fixture replay, `avatar_redress`), server/lib/styledAvatars.js (`approvedBaseSheetFor`), scripts/admin/judge-fixtures.js (`--params`, member note), client/src/pages/TestLab.tsx, client/src/services/testlabService.ts, tests/judge-fixtures/fixtures.json, docs/judge-fixtures.md, tests/unit/sheet-judge-arms.test.ts
+
+**Measured 2026-10-04** on staging build f5b9d0b3. 14 fixtures (8 flag, 6 pass), each arm run twice, so 16 flag runs and 12 pass runs per arm.
+- Two Lab variants were added after Lab #1596 (`avatar_redress`, $0.04):
+  - Kiaan jacket-off: pass. It faithfully matches its base.
+  - Fiona coat-off: flag on `layout`. Head cell 4 lost its rear turn, and the head framing widened.
+- Per-arm reports are in `tests/judge-fixtures/baselines/2026-10-04-sheet-style-<arm>.json`.
+
+| arm | Lab | recall | false alarm | flips | ghost figures | garment still on | photographic base | captions | variant layout | good sheets | cost |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| current | #1597 #1598 | 7/16 (44%) | 0/12 | 1/14 | 6/6 | 1/4 | 0/2 | 0/2 | 0/2 | 12/12 | $0.090 |
+| A | #1599 #1600 | 8/16 (50%) | 0/12 | 0/14 | 6/6 | 2/4 | 0/2 | 0/2 | 0/2 | 12/12 | $0.091 |
+| AB | #1603 #1604 | 7/16 (44%) | 0/12 | 1/14 | 6/6 | 1/4 | 0/2 | 0/2 | 0/2 | 12/12 | $0.091 |
+| ABC | #1605 #1606 | 6/16 (38%) | 0/12 | 0/14 | 6/6 | 0/4 | 0/2 | 0/2 | 0/2 | 12/12 | $0.093 |
+| D | #1607 #1608 | 6/16 (38%) | 0/12 | 0/14 | 6/6 | 0/4 | 0/2 | 0/2 | 0/2 | 12/12 | $0.096 |
+
+AB was first fired as #1601/#1602 ($0.06). Another session's staging deploy killed both runs at 9/14 ("reaped by the idle probe"), so they are not scored.
+
+**Verdict: no arm adopted.** Production stays `current`.
+- B, C and D buy nothing: no extra catch on the photographic base, the captions or the variant's layout. ABC and D lose the one garment control A caught. A gains one fixture-repeat over `current`, which is within noise at n=14.
+- The judge's own words (Lab cards) show why: it is not failing to look, it is excusing what it sees, or reciting.
+  - **Captions.** Arm A names them ("'FRONT', 'THREE-QUARTER', 'PROFILE', 'REAR TURN' are present as captions, matching Image 2"), then scores background 9; arm D calls them "part of the sheet template". The Pass-1 sheet carries the same captions, and "matches Image 2" overrides TASK 8.
+  - **Garment still on.** `current` says "No garments were requested to be taken off"; arm A quotes TASK 10's own clause "Image 2 still wears it; TASK 9 does not score it" as its reason for 9. That clause, shipped today in a1bb22596, is read as an exemption. Arm D instead reports "a light blue shirt is outermost" on a sheet showing the jacket.
+  - **Medium and framing.** These stay recitals: "paint washes" in all 8 cells of the near-photographic base, and "rear turn, chest vs Image 2 rear turn, chest" for a cell that is a plain back view.
+
+**Open:**
+- The TASK 10 wording lets the variant gate pass a sheet that still wears the garment (1 of 4 control runs caught on `current`). It needs a reworded task, and that eval-prompt change is the owner's call.
+- The next candidates to measure on these same fixtures: a separate single-question check per removed garment; making "matches Image 2" no excuse for TASK 8 and TASK 10; more pixels per cell (judging the rows separately).
+
+**Status:** 🟡 measured, not adopted. Total spend $0.56, against a CHF 1.00 cap.
+
+---
+
+## 2026-10-04 — An off-garment sheet is judged by the judge that approved its base; costumed sheets get off variants; a missing one is a recorded defect
+
+**Context:** Staging job_1791040103540_atbttop6w. Kiaan's jacket-off sheet (`styled-standard--off:CLO001`) was redressed twice and rejected twice at 1/10, so p11, p12 and p16 were drawn from the sheet that wears the jacket.
+- The variant gate was `evaluateSheetSplit`, the Pass-1 row judges. They score an absolute crop and an outfit against a spec.
+- Kiaan's APPROVED base sheet fails those same judges (head-row crop 1/10, because the Pass-1 attempts that the style pass later approved were already scored 1 there).
+- A redress that only removes a garment inherits the base's crop, so it could never pass.
+- Staging, 15 days: 7 stories with an off garment and 47 off pages. 20 got an off sheet, 12 the worn-sheet fallback, and 6 costumed pages had no marker at all.
+  - Costumed characters were out of scope (`baseCategoryFor` returned null), and that was logged only at info.
+- Prod: 3 stories, 7 off pages, none recorded.
+- Bug: `tasks/bugs.json` → `wardrobe-variant-judged-by-row-judges`.
+
+**Decision (owner, 2026-10-04):**
+1. **The variant is judged by the Pass-2 style judge** that approved its base, `evaluateAvatarSheet({ pass: 2 })`.
+   - Image 1 is the face photo, Image 2 is the base's own Pass-1 sheet (kept per story in `styledPass1Sheets`, keyed like the styled cache), and Image 3 is the variant.
+   - It adds one task, TASK 10 `removedScore`, which checks that the removed garment is gone from all 8 cells. `removedScore` joins the lowest-axis final score.
+   - `evaluateSheetSplit` is DELETED from the variant path, not kept as a second gate.
+   - If the Pass-1 sheet or the face photo is missing, there is no variant: `redressSheetVariant` logs at ERROR and returns null before any paid edit.
+2. **Generator and critic share one rule.** `GARMENT_OFF_SHEET_RULE` (character2x4Sheet.js) goes into the redress prompt (`buildRedressPrompt`, with the garment names) and into the judge's TASK 10 (`garmentsRemovedTask`).
+3. **Costumed sheets get off variants**, built the same way as plain ones.
+   - Derivation reads the page's own declared clothing first (`pageCategoryFor`), then the story's category. A costumed character gets `costumed--off:<ids>`.
+   - The projection stores it under that bare key; there is no `styled-` prefix, because the costumed slot itself is bare `costumed`.
+   - `resolveSheetForRef` and `getStyledAvatarForClothing` both serve it.
+4. **A missing off sheet still renders, but as a recorded defect.**
+   - `resolveSheetForRef` logs at ERROR and stamps `wornStateFallback` on the reference.
+   - `collectNotEvaluated` turns that into a per-page `wardrobe_state_reference / off_sheet_missing` entry in `finalChecksReport.notEvaluated`.
+   - A character with no declared category is refused at ERROR (`no-sheet-category`).
+   - The 2026-09-19 entry below is amended to match.
+
+**Rationale:**
+- A variant differs from its base by one garment, so the base's judge plus a "garment gone" task is the matching gate.
+- Absolute Pass-1 crop and outfit scores rejected the approved base itself.
+- Validation (direct calls on stored inputs, about $0.02 each, both accepted on the first roll):
+  - Kiaan `standard--off:CLO001`: 9/10, removed 9. Viewed: the jacket is gone from all 8 cells, the grey long-sleeved shirt is outermost, and face, trousers and boots are unchanged.
+  - Fiona `costumed--off:CLO001` (job_1790446348343_z3fw660ie): 9/10, removed 10. Viewed: the coat is gone, the blouse and sash are outermost, and the face is unchanged. But the head row changed to flat line art and widened to waist-up, and the style judge still gave style 9.
+    - Its reasons cite a "dark grey vest" and "no hard outlines" that are not in the image. It reads Image 2.
+    - This is the same judge that approves every base sheet, so the gap predates this change. It is open for the owner (BACKLOG).
+
+**Touched:** server/lib/character2x4Sheet.js, prompts/sheet-2x4-style-eval.txt, server/lib/styledAvatars.js, server/lib/wardrobeVariants.js, server/lib/storyAvatars.js, server/lib/entityConsistency.js, server/lib/notEvaluated.js, scripts/admin/sibling-registry.json (`wardrobe-variant-sheet-chain`), scripts/admin/verify-checks.js (`offSheetServed`), tests/unit/wardrobe-variant-judge.test.ts
+
+**Status:** ✅ active (staging)
+
+---
+
 ## 2026-10-04 — A creature's face and action are brief fields; an animal's features are anatomy, never a feeling; an element's size has one source
 
 **Context:** Staging job_1791040103540_atbttop6w (dragon run 9).
@@ -52826,9 +52922,9 @@ character's garments off at once). Never the power set — only sets a page actu
    build and base-layer shade, so a jacket coming off would read as the CHARACTER changing — a worse failure
    than the one being fixed. Identity is fixed by construction; only wardrobe varies. Same shape as the
    costumed-vs-standard sheet swap already shipping. No base sheet ⇒ no variant, never a photo fallback.
-   Its gate is `evaluateSheetSplit` (layout + identity vs the base sheet's own head row + outfit vs the
-   stripped contract), not the Pass-2 style judge, which would answer "style not applied" for an input that
-   is already styled and reject every redress.
+   ~~Its gate is `evaluateSheetSplit`~~ — superseded 2026-10-04 ("A wardrobe-state sheet is judged by the
+   judge that approved its base"): the gate is the Pass-2 style judge with the base's own Pass-1 sheet as
+   Image 2, plus a garment-gone task; `evaluateSheetSplit` rejected every redress.
 3. **The off-sheet's outfit is the canonical contract with the clause structurally deleted** by the existing
    `resolveOutfitForPage` / `removeWornItemFromOutfit` stripper. No layer is invented and nothing is
    re-prompted. A strip the stripper cannot make unambiguously produces NO variant.
@@ -52842,9 +52938,10 @@ character's garments off at once). Never the power set — only sets a page actu
 5. **Resolution is a SUBSTITUTION, never an extra reference.** `resolveSheetForRef` crops the character's
    cell from the `--off:` sheet instead of the base one, so the model's reference cap is untouched. All
    three cell-crop sites and all three repair entry points route through it (or, for the character-row
-   lookup, through `getStyledAvatarForClothing`, made state-aware the same way). A missing variant falls
-   back to the worn sheet LOUDLY and stamps `ref.wornStateFallback` — the same honesty contract the costumed
-   fallback carries; it is never silent.
+   lookup, through `getStyledAvatarForClothing`, made state-aware the same way). A missing variant renders
+   from the worn sheet, logs at ERROR and stamps `ref.wornStateFallback`, which becomes the page's
+   `wardrobe_state_reference / off_sheet_missing` record in `finalChecksReport.notEvaluated` (updated
+   2026-10-04; costumed sheets get variants too).
 6. **The text line stays.** `buildWornStateLines`' "leave it off even if the attached reference shows it
    worn" is the only instruction on the fallback path, which is live on every story that gets no variant.
 7. **COVERS ALWAYS TAKE THE WORN (BASE) SHEET.** `compositeCastBuilder` resolves a cover cast by the page's
@@ -66208,3 +66305,77 @@ prepare-title keeps building only the costumed sheet; the story run builds the s
 **Rationale.** A fresh prompt or fresh audits add a second variable larger than the model gap the earlier sweeps measured (judge spread up to 1.29 on one arc). Replays of stored inputs are the cheapest way to compare against arcs and repairs that already exist.
 
 **Touched:** `server/config/models.js`, `server/lib/testlab.js` (`storedCreatePrompt`, `storedRefineAudits`), `server/lib/textRefine.js` (`opts.audits`), `tests/unit/testlab-stored-challenge-section.test.ts`, `tests/unit/text-refine-replayed-audits.test.ts`. **Status:** 🟡 measuring — the result and any routing change get their own entry.
+
+## 2026-10-04 — Pick-best stays score + critical-gone-wins; no side-by-side judge
+
+**Context.** The owner reviewed ten staging pages where the shipped version carried a CRITICAL and another version had none, and asked for a judge at the final pick that sees both images and chooses. It was built and measured on branch `feat/pickbest-judge` (head `2748cebff`, unpushed research branch: `sideBySideJudge.js`, `prompts/side-by-side-judge.txt`, scoring/repairPipeline/regeneration changes, replay scripts). None of it reaches staging.
+
+**Decision.** `pickBestVersionIndex` stays as it is: finalScore ranking after critical-gone-wins (`dominatesByCritical`, 2026-09-26). No side-by-side judge, no pair re-check.
+
+**Rationale (evidence).** Raw: `evals/results/results.jsonl` (2026-10-04 lines, dataset `evals/datasets/pickbest-critical-v1`), `evals/runs/2026-10-04_pickbest-*/metrics.json`, scan `evals/runs/2026-10-04_pickbest-scan-{staging,prod}.json` via `scripts/analysis/scan-pickbest-hits.js`.
+1. The ten owner-reviewed cases all predate 2026-09-26; today's rule picks the alternative on 10/10 and `sideBySideTrigger` fires on none. The problem they showed is already fixed by critical-gone-wins.
+2. Scan of every story created since 2026-09-26 (staging 9, prod 8; 115 + 98 scenes and covers, 46 pages with 2+ scoreable versions): 0 pages where today's pick carries a CRITICAL while another version has none; the trigger fired 8 times, every time two versions each carrying a DIFFERENT CRITICAL.
+3. Open side-by-side judge, gemini-2.5-flash: order-biased (case 7 always picks IMAGE_B; case 3 mostly; 3/5 clear cases with the alternative always IMAGE_A, 5/5 in alternating order). gemini-3.1-pro: 2/5 clear cases agree with the owner, 3/10 cases flip winner with position, USD 0.057 per call.
+4. Targeted cross-check (is this specific CRITICAL visible, per version, labelled overlay + references; pro 2 repeats, opus-5-5 1 repeat): 🟡 stable-ish, but decisive on few cases because the fallback to today's score already gives the answer; case 7 confirmed Max gripping the crate on both versions, as the owner said.
+5. Same-round re-eval of both candidates through the production evaluator, then today's picker: ❌ 3/5 on the clear cases, about 10 points of score noise between two runs of one version.
+Total spend about USD 4.5 (flash and pro judge runs 1.6 incl. one unmetered flash pass, cross-check and re-eval 2.9).
+
+**Considered.** Judge at every `recomputeActiveVersion` save (rejected by the owner: latency and cost); judging both orders and requiring agreement (not built: pro already flips, and the trigger rate does not justify it).
+
+**Revisit if:** the 8 both-CRITICAL pairs (staging `z3fw660ie` p7 + frontCover, `dka3jpog9` p10 + p11, `6mjcny1c7` p10, `atbttop6w` p9; prod `9n47zi342` p10, `j905g63bx` p7) prove, on viewing, to ship the worse image.
+
+**Touched files:** none in production. Added measurements and `scripts/analysis/scan-pickbest-hits.js` (read-only scan).
+
+## 2026-10-04 — A consolidator fix must name the findings it fixes, and one must be scored; a fix with none is a loud ERROR
+
+**Context.** Staging job_1791040103540_atbttop6w round 1 p17 (consolidator_calls 2971): the page's only finding (semantic CRITICAL, the creature stays inside the canopy instead of rising out) was dropped as `finding_contradicts_brief`, so it left `deduped_issues` (the score), while the plan still carried a CRITICAL `scene_fix` for it. `finalScore=100`, the page was never repaired. Fixes carried no ids, so nothing linked a fix to a scored finding. Measured over `consolidator_calls` since 2026-09-20 (`scripts/analysis/measure-consolidator-orphan-fixes.js`): staging 208 calls / 316 CRITICAL-MAJOR fixes, 10 CRITICAL fixes with no kept CRITICAL, 10 with no kept CRITICAL/MAJOR at all, 26 whose type has only not-a-defect drops behind it (7 stories); prod 178 / 279, 0 / 2 / 0. The examples are mostly rule 2a misapplied to findings that agree with the brief (the picture lacks what the brief asks for).
+
+**Decision (owner, 2026-10-04).** Prompt: rule 2a says a finding that the picture lacks what the brief asks for is a defect, never a 2a drop; rule 7d - every `scene_fix` / `per_character_fixes[]` entry carries `ids`, none in a rule 2/2a drop, one in a `deduped_issues` entry. Code (`feedbackConsolidator.checkFixesRestOnKeptFindings`, consistency only): a CRITICAL/MAJOR fix with no ids, an unknown id, or no id in a kept entry is logged at ERROR, written to the generation log (`consolidator_fix_unbacked`) and recorded on `plan.fix_errors`. Nothing is reclassified, no severity is invented, and the page score stays what the kept list says: the flag makes a CRITICAL fix with a 100 score visible in the run, it does not repair or rescore the page.
+
+**Rationale.** Classification (is this finding a defect) belongs to the prompt; code only checks that the plan agrees with itself. A second code path that "rescues" a dropped finding would be a fallback that hides the prompt's failure. The ERROR is the signal to fix the prompt.
+
+**Revisit if.** `fix_errors` still appears on staging runs after this prompt: then decide with the owner whether a page with `fix_errors` should be re-consolidated or held for review.
+
+**Touched files:** `prompts/feedback-consolidator.txt`, `server/lib/feedbackConsolidator.js`, `tests/unit/consolidator-fix-ids.test.ts`, `scripts/analysis/measure-consolidator-orphan-fixes.js`, `scripts/analysis/replay-consolidator-call.js`, `docs/prompt-inventory.md`, `tasks/bugs.json`, `tasks/verify.json`.
+
+## 2026-10-04 — Sonnet 5.5 writes the arc and repairs the text (create xhigh, re-tell high, text_refine) (owner)
+
+**Context.** Page cost ~$0.36 on full books, target ~$0.30. The arc create (Opus 5.5 xhigh), arc re-tell (Opus 5 medium) and text_refine repair (Opus 5) were ~$1.8 of a ~$6.5 story. Measured by exact replay (previous entry: stored create prompts, stored re-tell prompts, stored refine audits), so the model was the only variable.
+
+**Evidence.**
+- Create, Lab #1591 (5 stories, judges claude-sonnet/grok-4.6/gpt-5.6-sol): Sonnet 5.5 xhigh 6.53 vs stored Opus 5.5 6.46 (non-Anthropic judges 6.31 vs 6.38); $0.56 vs $0.70 per create (Sonnet spends 47-67k output tokens at xhigh). Sonnet at high (#1594, 8 stories) 6.42 overall but 6.14 vs 6.46 on the shared 5 and one weak arc (4.72) — not chosen.
+- Re-tell, Lab #1595 (3 stories, stored Opus 5 re-tell prompt verbatim): Opus 5 6.62; Sonnet xhigh 6.60 ($0.24), high 6.61 ($0.10), medium 6.50 ($0.06). Judge noise on the identical stored arc between runs: 0.33.
+- text_refine, Lab #1592 (Sonnet) / #1593 (Opus 5) on the stored audits, blind per-page 3-way ranking by gpt-5.6-sol (prompts/eval-refine-rank-v1.txt, 3 stories, 38 pages, evals/runs/2026-10-04_refine-model-ab): rank points Opus fresh 1.13, Sonnet 1.05, Opus stored 0.82; head to head Opus-Sonnet 21-17, inside the 22-16 split between two Opus runs; new problems per page Sonnet 1.40 vs Opus 1.74; repair step $0.25 vs $0.86 per story (8 stories).
+
+**Decision.** `arcCreateModel` and `arcRetellModel` = `claude-sonnet-5-5`, `arcCreateEffort` stays xhigh, `arcRetellEffort` high; `textRefineModel` = `claude-sonnet-5-5`. Expected saving ~$0.88 per story (~5 cents per page on 18 pages).
+
+**Rationale.** No measurable quality loss at any of the three stages, ~$0.88 per story saved. Owner observation from reading the arcs: on 4-page books Sonnet crams many elements into each page sentence — watch for it in the verification story.
+
+**Revisit if** the owner's reading of Sonnet arcs on new stories finds them less followable, or page-text judges/owners flag repaired pages; the Opus settings are in git history before this commit.
+
+**Replaces** the 2026-09-25 arc create on Opus 5.5 and the 2026-09-03 text_refine on Opus 5 (repair bake-off) for production routing.
+
+**Touched:** `server/config/models.js`, `tests/unit/arc-creator-effort.test.ts`, `server/lib/testlab.js` (arc_effort stage `retell`), `scripts/analysis/eval-refine-model-ab.js`, `prompts/eval-refine-rank-v1.txt`, `evals/`. **Status:** 🟡 staging, pending a verification story.
+
+
+## 2026-10-04 — Homepage hero: no trust row; one text style
+
+**Context:** commit 5d7d8b93f (2026-09-09, ads landing-page audit item A3) put a trust row under the hero
+CTA — "Sichere Zahlung mit Stripe · Gedruckt und versandt in der Schweiz · Impressum · Datenschutz" — to lift
+Google's Landing Page Experience rating. Measured 2026-09-27, weeks later: Search-Deutschschweiz-v1 still rated
+the homepage landing page BELOW_AVERAGE on all 5 keywords. Owner (2026-10-04): "why is that needed on the start
+of the home page?" — it talks about payment directly under a FREE-story button and costs first-screen space on
+phones. A computed-style audit of the live page also showed the hero paragraphs were the only body text in
+Libre Baskerville/black (every other section intro is Inter/stone-600), sentence dashes mixed " - " and "—",
+and the two "Gratis Geschichte erstellen" buttons rendered at weights 500 vs 700.
+
+**Decision:** remove the trust row from the hero on all screen sizes (the facts stay where buyers need them:
+Footer Impressum/Datenschutz, CreditsModal "secure payment with Stripe", the homepage shipping bullet). Hero
+paragraphs use Inter/stone-600 like the other section intros (H1 stays Cinzel; Libre Baskerville stays for the
+story reading text, `.story-text`). Homepage sentence dashes are the spaced en dash " – " in all four
+languages. Both CTA buttons resolve to `font-medium`.
+
+**Replaces:** the hero trust row of 5d7d8b93f (A3). Revisit if a measured landing-page rating or conversion
+change is attributable to trust signals near the CTA.
+
+**Touched files:** `client/src/pages/LandingPage.tsx`, `tests/unit/trial-intro-phone.test.ts`.

@@ -625,6 +625,9 @@ export const TESTLAB_STAGES = [
   { id: 'avatar_realistic', label: 'Avatar pass 1 (realistic anchor)', producesImage: true, overridable: false, characterLevel: true },
   { id: 'avatar_style', label: 'Avatar pass 2 (style transfer)', producesImage: true, overridable: true, characterLevel: true },
   { id: 'avatar_eval', label: 'Avatar sheet eval', producesImage: false, overridable: true, characterLevel: true },
+  // A garment-off (wardrobe-state) sheet made from the story's approved base the
+  // way production makes it, unjudged — the input the sheet_style fixtures judge.
+  { id: 'avatar_redress', label: 'Avatar garment-off variant (production redress, no judge)', producesImage: true, overridable: false, characterLevel: true },
   // Trial variety: is the idea generator repetitive, and does the random
   // challenge draw (which the trial's one-call writer never receives) help?
   { id: 'trial_idea_variety', label: 'Trial idea variety (N draws of the same pair → repeats)', producesImage: false, overridable: true, storyLevel: true },

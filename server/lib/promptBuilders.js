@@ -6486,7 +6486,7 @@ function parseRefinedText(raw, expectedPages = [], markerName = 'STORY TEXT', tr
 /**
  * The main characters of a story, oldest first, plus the one the book follows.
  *
- * At most 2, or half the cast when the cast is small. Older first: a 3-year-old
+ * At most 2 (1 when the cast is 1-2 characters; owner rule 2026-10-04, replaces the half-the-cast cap of 2026-08-21). Older first: a 3-year-old
  * carries a moment, not a book.
  *
  * Mains arrive in three shapes. The story pipeline passes `mainCharacters` as an
@@ -6504,7 +6504,7 @@ function pickMainCharacters(inputData = {}) {
   const declared = declaredMain.length
     ? chars.filter(c => declaredMain.includes(c.id))
     : chars.filter(c => c.isMain || c.isMainCharacter);
-  const cap = Math.max(1, Math.min(2, Math.floor(chars.length / 2) || 1));
+  const cap = chars.length <= 2 ? 1 : 2;
   const mains = declared
     .slice()
     .sort((a, b) => (parseInt(b.age, 10) || 0) - (parseInt(a.age, 10) || 0))
@@ -6989,8 +6989,8 @@ function challengeCatalogueBands(inputData = {}) {
  * days, but only the idea generator ever received it — the beats planner got the
  * page count as a bare label and treated a 5-page board book like a 25-page one.
  *
- * Owner rules (2026-08-21): at most two main characters (or half the cast,
- * whichever is smaller); difficulty follows the reading level, lowered when the
+ * Owner rules (2026-08-21): at most two main characters (since 2026-10-04: one
+ * when the cast is 1-2 characters, two from 3 up); difficulty follows the reading level, lowered when the
  * focus character is very young; the simplest level is always simple.
  */
 // `arc: true` returns the lean arc-stage variant (owner, 2026-08-31: "here a

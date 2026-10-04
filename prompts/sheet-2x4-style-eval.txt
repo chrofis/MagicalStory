@@ -67,7 +67,11 @@ TASK 9: GARMENT COLOURS PRESERVED
 - Score 1-10. Every garment the same hue, lighter or darker shading only = 9-10. A garment slightly warmer or cooler but the same colour name = 7-8. Any garment turned into a different colour (purple to navy, red to orange, green to teal) = 1-4.
 - `garmentScore` is the score.
 
-`finalScore` MUST equal the LOWEST of layoutScore, identityScore, styleScore, cleanScore, bodyFaceScore, ageScore, soloScore, backgroundScore, garmentScore.
+TASK 10: GARMENTS TAKEN OFF
+- {GARMENTS_REMOVED}
+- `removedScore` is the score.
+
+`finalScore` MUST equal the LOWEST of layoutScore, identityScore, styleScore, cleanScore, bodyFaceScore, ageScore, soloScore, backgroundScore, garmentScore, removedScore.
 `valid` is `true` only when finalScore ≥ 6.
 
 Return EXACTLY this JSON shape. Every score and reason must come from what you see in Image 3 — never return this template's placeholders:
@@ -82,6 +86,7 @@ Return EXACTLY this JSON shape. Every score and reason must come from what you s
   "solo":     {"score": <1-10>, "reason": "<what you observed — name any extra figure and where>"},
   "background": {"score": <1-10>, "reason": "<what is behind and around the figures, any lettering quoted, and whether the dividers are there>"},
   "garment":  {"score": <1-10>, "reason": "<each garment: hue in Image 2, hue in Image 3>"},
+  "removed":  {"score": <1-10>, "reason": "<per cell: any part of a garment taken off, and what is outermost instead>"},
   "layoutScore": <1-10>,
   "identityScore": <1-10>,
   "styleScore": <1-10>,
@@ -91,6 +96,7 @@ Return EXACTLY this JSON shape. Every score and reason must come from what you s
   "soloScore": <1-10>,
   "backgroundScore": <1-10>,
   "garmentScore": <1-10>,
+  "removedScore": <1-10>,
   "finalScore": <1-10>,
   "valid": <true|false>,
   "failureReasons": []

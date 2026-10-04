@@ -123,7 +123,7 @@ describe('resolvePacingBand', () => {
 
 describe('pickMainCharacters', () => {
   it('sorts mains oldest first, so the focus IS the oldest main', () => {
-    // A two-character cast caps mains at one (half the cast), so the younger
+    // A two-character cast caps mains at one, so the younger
     // main drops out entirely and the older one is the focus.
     const { mains, focus } = pickMainCharacters({
       characters: [char(1, 'A', 1, true), char(2, 'B', 5, true)],

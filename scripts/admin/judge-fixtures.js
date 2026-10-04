@@ -10,9 +10,13 @@
  *
  *   node scripts/admin/judge-fixtures.js validate                 # $0, no network
  *   node scripts/admin/judge-fixtures.js sync                     # $0, file → Lab sets
- *   node scripts/admin/judge-fixtures.js run [--judge=semantic,plate_qc] [--repeats=2] [--save=<file>]
+ *   node scripts/admin/judge-fixtures.js run [--judge=semantic,plate_qc] [--repeats=2] [--save=<file>] [--params='{"arm":"AB"}']
  *   node scripts/admin/judge-fixtures.js score --experiments=1601,1602 [--save=<file>]   # $0, re-score stored runs
  *   [--base=https://staging.magicalstory.ch]  [--list]  (list = print the fixtures and exit)
+ *
+ * `--params` (JSON) rides on every member of the run — a Lab-only variant of
+ * the judge such as the sheet_style arms (server/lib/sheetJudgeArms.js); the
+ * label carries it, so the Sets tab says which variant each run measured.
  *
  * `run` syncs first. `score` re-reads finished experiments and scores their
  * stored findings against the CURRENT fixture file, so an expectation edited
@@ -65,8 +69,11 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 function memberFor(f) {
   const target = { storyId: f.target.storyId, fixture: f.id };
   for (const k of ['pageNumber', 'versionIndex', 'character']) if (f.target[k] != null) target[k] = f.target[k];
-  const params = { judge: f.judge, expect: f.expect };
-  if (f.input?.imageUrl) params.imageUrl = f.input.imageUrl;
+  // note: why the expected verdict is what it is — shown on the Lab card.
+  const params = { judge: f.judge, expect: f.expect, note: f.source };
+  const { imageUrl, ...more } = f.input || {};
+  if (imageUrl) params.imageUrl = imageUrl;
+  if (Object.keys(more).length) params.input = more;
   return { target, params, label: f.id };
 }
 
@@ -91,9 +98,9 @@ async function sync(fixtures, judges) {
   return out;
 }
 
-async function runSet(setId, label) {
+async function runSet(setId, label, params) {
   for (let attempt = 0; ; attempt++) {
-    try { return (await api('POST', `/sets/${setId}/run`, { label })).id; }
+    try { return (await api('POST', `/sets/${setId}/run`, { label, ...(params ? { params } : {}) })).id; }
     catch (e) {
       if (e.status !== 409 || attempt >= 30) throw e;
       console.log(`  Lab at capacity — waiting 20 s (${label})`);
@@ -182,11 +189,16 @@ function printReport(entries, meta) {
   }
   if (cmd === 'run') {
     const repeats = Math.max(1, Math.min(5, parseInt(arg('repeats', '1'), 10) || 1));
+    let runParams = null;
+    if (arg('params')) {
+      try { runParams = JSON.parse(arg('params')); } catch (e) { console.error(`--params is not JSON: ${e.message}`); process.exit(1); }
+    }
+    const tag = runParams ? ` · ${Object.entries(runParams).map(([k, v]) => `${k}=${v}`).join(' ')}` : '';
     const sets = await sync(fixtures, judges);
     const stamp = new Date().toISOString().slice(0, 16).replace('T', ' ');
     const jobs = [];
     for (const [judge, s] of Object.entries(sets)) {
-      for (let r = 1; r <= repeats; r++) jobs.push({ judge, setId: s.setId, label: `Judge fixtures · ${judge} · r${r}/${repeats} · ${stamp}` });
+      for (let r = 1; r <= repeats; r++) jobs.push({ judge, setId: s.setId, label: `Judge fixtures · ${judge}${tag} · r${r}/${repeats} · ${stamp}` });
     }
     // At most two experiments in flight: the Lab's slots are shared with every
     // other agent's work, and a fixture run is never urgent.
@@ -195,7 +207,7 @@ function printReport(entries, meta) {
     const worker = async () => {
       while (queue.length) {
         const job = queue.shift();
-        const id = await runSet(job.setId, job.label);
+        const id = await runSet(job.setId, job.label, runParams);
         console.log(`started Lab #${id}: ${job.label}`);
         const exp = await waitFor(id);
         console.log(`finished Lab #${id} (${exp.status}, ${(exp.results || []).length} result(s))`);
@@ -205,7 +217,7 @@ function printReport(entries, meta) {
     await Promise.all([worker(), worker()]);
     const entries = [];
     for (const id of expIds.sort((a, b) => a - b)) entries.push(...scoreExperiment(await waitFor(id), byId));
-    printReport(entries, { base: BASE, experiments: expIds, repeats, ranAt: new Date().toISOString() });
+    printReport(entries, { base: BASE, experiments: expIds, repeats, params: runParams, ranAt: new Date().toISOString() });
     return;
   }
   console.error('usage: judge-fixtures.js validate | sync | run [--judge=a,b] [--repeats=N] [--save=f] | score --experiments=a,b [--save=f]');

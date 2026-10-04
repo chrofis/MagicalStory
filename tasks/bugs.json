@@ -277,13 +277,12 @@
     },
     {
       "id": "lab-unpinned-loads-v0",
-      "title": "Unpinned Lab bbox run loads scene v0 although image_version_meta says activeVersion=2",
-      "reportedAt": "2026-08-19",
-      "source": "Lab exps #9 (unpinned -> v0 content) vs #10 (pinned v2 -> byte-exact match with production)",
+      "title": "Number(null)=0: unpinned Lab loads pinned themselves to v0 (never the active version) + loadedFrom always unrecorded",
+      "reportedAt": "2026-08-21",
+      "source": "task #26 + local repro (getStoryImage called with version 0, no getActiveVersion; exps 45-50 all loadedFrom=unrecorded)",
       "status": "fixed",
-      "task": 23,
-      "fixedIn": "4268015a8",
-      "note": "load is now observable: ask/got logged, v0 fallback WARNs, payload carries loadedFrom. Root cause still to be caught in the act — instrumentation makes the next occurrence data."
+      "fixedIn": "fix(testlab) 2026-08-21 (same commit)",
+      "note": "loadActivePageImage pinned-parse and runBboxStage loadedFrom reader now treat null/undefined/empty as \"active\", not v0. Root cause of the 2026-08-19 detected-on-v0 mystery."
     },
     {
       "id": "experiments-route-strips-target-params",
@@ -379,15 +378,6 @@
       "status": "fixed",
       "fixedIn": "fix(sam-seeds) 2026-08-21 (same commit)",
       "note": "_colourSeedPoints returns blob interior point (max chamfer) instead of centroid; 3-pass SAM prompt build adds cross-figure garment negatives."
-    },
-    {
-      "id": "lab-unpinned-loads-v0",
-      "title": "Number(null)=0: unpinned Lab loads pinned themselves to v0 (never the active version) + loadedFrom always unrecorded",
-      "reportedAt": "2026-08-21",
-      "source": "task #26 + local repro (getStoryImage called with version 0, no getActiveVersion; exps 45-50 all loadedFrom=unrecorded)",
-      "status": "fixed",
-      "fixedIn": "fix(testlab) 2026-08-21 (same commit)",
-      "note": "loadActivePageImage pinned-parse and runBboxStage loadedFrom reader now treat null/undefined/empty as \"active\", not v0. Root cause of the 2026-08-19 detected-on-v0 mystery."
     },
     {
       "id": "cover-save-clobbers-scene-page",
@@ -3219,6 +3209,30 @@
       "source": "Code review 2026-10-04 (tasks/code-review-2026-10/3-eval-scoring.md B2), confirmed against current code",
       "status": "fixed",
       "fixedAt": "2026-10-04"
+    },
+    {
+      "id": "wardrobe-variant-judged-by-row-judges",
+      "title": "Every jacket-off (wardrobe-state) sheet was rejected: the variant was judged by the pass-1 row judges its own approved base sheet fails, so no off sheet was stored and off pages got the garment-wearing sheet",
+      "reportedAt": "2026-10-04",
+      "source": "Staging job_1791040103540_atbttop6w: character_2x4_wardrobe_variant billed 2 calls for Kiaan standard--off:CLO001, characterAvatars holds no off key, p11/p12/p16 refs carry wornStateFallback and the render kept the jacket (p12). Reproduced locally: redressSheetVariant on the stored base sheet + the stored redressNote -> 2 attempts, both REJECTED best=1/10 (crop: cells 1-4 show the waistband). evaluateSheetSplit on the approved base sheet itself scores 1/10 (crop, outfit, costumeReads). Staging 15 days: 0 off sheets served since 09-25, 12 pages on wornStateFallback; 6 costumed off pages with no marker at all.",
+      "rootCause": "server/lib/character2x4Sheet.js redressSheetVariant judged the redressed sheet with evaluateSheetSplit (the pass-1 heads/bodies/identity row judges, absolute crop and outfit scores, the wardrobe text fed as a costume). The base sheet it edits was approved by the pass-2 style judge and never had to pass those row judges; a redress inherits the base layout, so it cannot pass them. The judge never asked whether the removed garment is gone.",
+      "impact": "No page that takes a garment off has received an off-garment reference since ~2026-09-26; the image model gets a picture of the character wearing it plus a text line, and draws it on (p12 jacket). Costumed characters never got an off variant and no warning.",
+      "status": "fixed",
+      "fixedAt": "2026-10-04",
+      "fixedIn": "a1bb22596",
+      "fix": "Variant judged by the Pass-2 style judge (base Pass-1 sheet as Image 2) plus TASK 10 removedScore; evaluateSheetSplit deleted from the variant path; costumed off variants; missing off sheet logged at ERROR and recorded as notEvaluated off_sheet_missing. Kiaan reproduction accepted 9/10, jacket gone (viewed)."
+    },
+    {
+      "id": "consolidator-fix-without-scored-finding",
+      "title": "The feedback consolidator dropped a page's only finding as not-a-defect (so the page scored 100) while still emitting a CRITICAL scene_fix for it: the page was never repaired",
+      "reportedAt": "2026-10-04",
+      "source": "Railway log of staging deployment af727aea, job_1791040103540_atbttop6w round 1 p17 (consolidator_calls 2971): semantic finding 'the creature is still within the canopy instead of rising out' dropped as finding_contradicts_brief; scene_fix CRITICAL 'Move Rubina above the autumn canopy' requires_regeneration true; '[SCORE] page 17: math model (consolidated) -> finalScore=100'. The page text/brief states she flies out of the canopy.",
+      "rootCause": "Two parts. (1) prompts/feedback-consolidator.txt rule 2a (finding_contradicts_brief) is applied to findings that AGREE with the brief (a finding saying the picture lacks what the brief asks for) - the dominant shape in the measured staging examples (p17, p4, p3, p2, p1 of this job). (2) A plan fix names no finding ids, so nothing links a fix to a scored finding: a drop removes the finding from deduped_issues (the score) and nothing notices the fix still rests on it.",
+      "impact": "Measured over consolidator_calls since 2026-09-20 (scripts/analysis/measure-consolidator-orphan-fixes.js): staging 208 calls, 316 CRITICAL/MAJOR fixes, 10 CRITICAL fixes with no kept CRITICAL, 10 with no kept CRITICAL/MAJOR at all, 26 whose type has only not-a-defect drops behind it (7 stories); prod 178 calls, 279 fixes, 0 / 2 / 0 (the 2 are model-emitted fixes on a dropped hair/eye finding).",
+      "status": "fixed",
+      "fixedAt": "2026-10-04",
+      "fixedIn": "b6abd1656",
+      "fix": "Prompt: rule 2a says a finding that the picture lacks what the brief asks for is a defect; new rule 7d - every fix carries ids, none in a rule 2/2a drop, one in a deduped entry. Code: feedbackConsolidator.checkFixesRestOnKeptFindings - a CRITICAL/MAJOR fix with no ids, unknown ids, or no id in a kept entry is logged at ERROR to the generation log (consolidator_fix_unbacked) and recorded on plan.fix_errors; nothing is reclassified. Test: tests/unit/consolidator-fix-ids.test.ts."
     }
   ]
 }

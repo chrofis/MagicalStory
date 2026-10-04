@@ -1,0 +1,966 @@
+{
+ "tag": "A-pro",
+ "cost": 1.108,
+ "cases": [
+  {
+   "case": 1,
+   "owner": "alt-clearly-better",
+   "decisions": {
+    "pro": [
+     {
+      "rep": 0,
+      "confirmed": {
+       "shipped": true,
+       "alt": false
+      },
+      "winner": "alt",
+      "byRule": "cross-check"
+     },
+     {
+      "rep": 1,
+      "confirmed": {
+       "shipped": true,
+       "alt": false
+      },
+      "winner": "alt",
+      "byRule": "cross-check"
+     }
+    ]
+   },
+   "calls": [
+    {
+     "f": "page:rendered_text",
+     "role": "shipped",
+     "model": "pro",
+     "rep": 0,
+     "refs": 4,
+     "visible": true,
+     "conf": 0.8,
+     "cost": 0.01928
+    },
+    {
+     "f": "page:rendered_text",
+     "role": "shipped",
+     "model": "pro",
+     "rep": 1,
+     "refs": 4,
+     "visible": true,
+     "conf": 0.85,
+     "cost": 0.00771
+    },
+    {
+     "f": "page:rendered_text",
+     "role": "alt",
+     "model": "pro",
+     "rep": 0,
+     "refs": 4,
+     "visible": false,
+     "conf": 0.8,
+     "cost": 0.01655
+    },
+    {
+     "f": "page:rendered_text",
+     "role": "alt",
+     "model": "pro",
+     "rep": 1,
+     "refs": 4,
+     "visible": false,
+     "conf": 0.8,
+     "cost": 0.01593
+    }
+   ]
+  },
+  {
+   "case": 2,
+   "owner": "toss-up",
+   "decisions": {
+    "pro": [
+     {
+      "rep": 0,
+      "confirmed": {
+       "shipped": true,
+       "alt": false
+      },
+      "winner": "alt",
+      "byRule": "cross-check"
+     },
+     {
+      "rep": 1,
+      "confirmed": {
+       "shipped": true,
+       "alt": false
+      },
+      "winner": "alt",
+      "byRule": "cross-check"
+     }
+    ]
+   },
+   "calls": [
+    {
+     "f": "character_presence",
+     "role": "shipped",
+     "model": "pro",
+     "rep": 0,
+     "refs": 4,
+     "visible": true,
+     "conf": 0.9,
+     "cost": 0.02275
+    },
+    {
+     "f": "character_presence",
+     "role": "shipped",
+     "model": "pro",
+     "rep": 1,
+     "refs": 4,
+     "visible": true,
+     "conf": 0.8,
+     "cost": 0.01017
+    },
+    {
+     "f": "character_presence",
+     "role": "alt",
+     "model": "pro",
+     "rep": 0,
+     "refs": 4,
+     "visible": false,
+     "conf": 0.8,
+     "cost": 0.021
+    },
+    {
+     "f": "character_presence",
+     "role": "alt",
+     "model": "pro",
+     "rep": 1,
+     "refs": 4,
+     "visible": false,
+     "conf": 0.9,
+     "cost": 0.01401
+    }
+   ]
+  },
+  {
+   "case": 3,
+   "owner": "alt-clearly-better",
+   "decisions": {
+    "pro": [
+     {
+      "rep": 0,
+      "confirmed": {
+       "shipped": true,
+       "alt": true
+      },
+      "winner": "alt",
+      "byRule": "score"
+     },
+     {
+      "rep": 1,
+      "confirmed": {
+       "shipped": true,
+       "alt": false
+      },
+      "winner": "alt",
+      "byRule": "cross-check"
+     }
+    ]
+   },
+   "calls": [
+    {
+     "f": "clothing|levin",
+     "role": "shipped",
+     "model": "pro",
+     "rep": 0,
+     "refs": 1,
+     "visible": true,
+     "conf": 0.8,
+     "cost": 0.01376
+    },
+    {
+     "f": "clothing|levin",
+     "role": "shipped",
+     "model": "pro",
+     "rep": 1,
+     "refs": 1,
+     "visible": true,
+     "conf": 0.8,
+     "cost": 0.01549
+    },
+    {
+     "f": "clothing|levin",
+     "role": "alt",
+     "model": "pro",
+     "rep": 0,
+     "refs": 1,
+     "visible": false,
+     "conf": 0.85,
+     "cost": 0.02162
+    },
+    {
+     "f": "clothing|levin",
+     "role": "alt",
+     "model": "pro",
+     "rep": 1,
+     "refs": 1,
+     "visible": false,
+     "conf": 0.8,
+     "cost": 0.02126
+    },
+    {
+     "f": "emotion|kiaan",
+     "role": "shipped",
+     "model": "pro",
+     "rep": 0,
+     "refs": 1,
+     "visible": true,
+     "conf": 0.99,
+     "cost": 0.01782
+    },
+    {
+     "f": "emotion|kiaan",
+     "role": "shipped",
+     "model": "pro",
+     "rep": 1,
+     "refs": 1,
+     "visible": true,
+     "conf": 1,
+     "cost": 0.01769
+    },
+    {
+     "f": "emotion|kiaan",
+     "role": "alt",
+     "model": "pro",
+     "rep": 0,
+     "refs": 1,
+     "visible": true,
+     "conf": 0.6,
+     "cost": 0.02543
+    },
+    {
+     "f": "emotion|kiaan",
+     "role": "alt",
+     "model": "pro",
+     "rep": 1,
+     "refs": 1,
+     "visible": false,
+     "conf": 0.8,
+     "cost": 0.02226
+    },
+    {
+     "f": "page:object_presence",
+     "role": "shipped",
+     "model": "pro",
+     "rep": 0,
+     "refs": 0,
+     "visible": true,
+     "conf": 0.9,
+     "cost": 0.0111
+    },
+    {
+     "f": "page:object_presence",
+     "role": "shipped",
+     "model": "pro",
+     "rep": 1,
+     "refs": 0,
+     "visible": true,
+     "conf": 0.9,
+     "cost": 0.01222
+    },
+    {
+     "f": "page:object_presence",
+     "role": "alt",
+     "model": "pro",
+     "rep": 0,
+     "refs": 0,
+     "visible": false,
+     "conf": 0.7,
+     "cost": 0.02301
+    },
+    {
+     "f": "page:object_presence",
+     "role": "alt",
+     "model": "pro",
+     "rep": 1,
+     "refs": 0,
+     "visible": false,
+     "conf": 0.7,
+     "cost": 0.03192
+    }
+   ]
+  },
+  {
+   "case": 4,
+   "owner": "toss-up",
+   "decisions": {
+    "pro": [
+     {
+      "rep": 0,
+      "confirmed": {
+       "shipped": true,
+       "alt": false
+      },
+      "winner": "alt",
+      "byRule": "cross-check"
+     },
+     {
+      "rep": 1,
+      "confirmed": {
+       "shipped": true,
+       "alt": false
+      },
+      "winner": "alt",
+      "byRule": "cross-check"
+     }
+    ]
+   },
+   "calls": [
+    {
+     "f": "clothing|levin",
+     "role": "shipped",
+     "model": "pro",
+     "rep": 0,
+     "refs": 1,
+     "visible": true,
+     "conf": 0.85,
+     "cost": 0.01486
+    },
+    {
+     "f": "clothing|levin",
+     "role": "shipped",
+     "model": "pro",
+     "rep": 1,
+     "refs": 1,
+     "visible": true,
+     "conf": 0.85,
+     "cost": 0.01498
+    },
+    {
+     "f": "clothing|levin",
+     "role": "alt",
+     "model": "pro",
+     "rep": 0,
+     "refs": 1,
+     "visible": false,
+     "conf": 0.9,
+     "cost": 0.01635
+    },
+    {
+     "f": "clothing|levin",
+     "role": "alt",
+     "model": "pro",
+     "rep": 1,
+     "refs": 1,
+     "visible": false,
+     "conf": 0.99,
+     "cost": 0.01455
+    },
+    {
+     "f": "action_interaction|green fleece",
+     "role": "shipped",
+     "model": "pro",
+     "rep": 0,
+     "refs": 0,
+     "visible": true,
+     "conf": 0.9,
+     "cost": 0.0181
+    },
+    {
+     "f": "action_interaction|green fleece",
+     "role": "shipped",
+     "model": "pro",
+     "rep": 1,
+     "refs": 0,
+     "visible": true,
+     "conf": 0.8,
+     "cost": 0.02372
+    },
+    {
+     "f": "action_interaction|green fleece",
+     "role": "alt",
+     "model": "pro",
+     "rep": 0,
+     "refs": 0,
+     "visible": false,
+     "conf": 0.8,
+     "cost": 0.02374
+    },
+    {
+     "f": "action_interaction|green fleece",
+     "role": "alt",
+     "model": "pro",
+     "rep": 1,
+     "refs": 0,
+     "visible": false,
+     "conf": 0.9,
+     "cost": 0.01991
+    }
+   ]
+  },
+  {
+   "case": 5,
+   "owner": "alt-clearly-better",
+   "decisions": {
+    "pro": [
+     {
+      "rep": 0,
+      "confirmed": {
+       "shipped": true,
+       "alt": false
+      },
+      "winner": "alt",
+      "byRule": "cross-check"
+     },
+     {
+      "rep": 1,
+      "confirmed": {
+       "shipped": true,
+       "alt": false
+      },
+      "winner": "alt",
+      "byRule": "cross-check"
+     }
+    ]
+   },
+   "calls": [
+    {
+     "f": "character_presence",
+     "role": "shipped",
+     "model": "pro",
+     "rep": 0,
+     "refs": 4,
+     "visible": true,
+     "conf": 0.8,
+     "cost": 0.02499
+    },
+    {
+     "f": "character_presence",
+     "role": "shipped",
+     "model": "pro",
+     "rep": 1,
+     "refs": 4,
+     "visible": true,
+     "conf": 0.8,
+     "cost": 0.01188
+    },
+    {
+     "f": "character_presence",
+     "role": "alt",
+     "model": "pro",
+     "rep": 0,
+     "refs": 4,
+     "visible": false,
+     "conf": 0.8,
+     "cost": 0.02115
+    },
+    {
+     "f": "character_presence",
+     "role": "alt",
+     "model": "pro",
+     "rep": 1,
+     "refs": 4,
+     "visible": false,
+     "conf": 0.8,
+     "cost": 0.01287
+    },
+    {
+     "f": "page:object_presence",
+     "role": "shipped",
+     "model": "pro",
+     "rep": 0,
+     "refs": 0,
+     "visible": false,
+     "conf": 0.9,
+     "cost": 0.01201
+    },
+    {
+     "f": "page:object_presence",
+     "role": "shipped",
+     "model": "pro",
+     "rep": 1,
+     "refs": 0,
+     "visible": false,
+     "conf": 0.9,
+     "cost": 0.01394
+    },
+    {
+     "f": "page:object_presence",
+     "role": "alt",
+     "model": "pro",
+     "rep": 0,
+     "refs": 0,
+     "visible": false,
+     "conf": 0.75,
+     "cost": 0.02014
+    },
+    {
+     "f": "page:object_presence",
+     "role": "alt",
+     "model": "pro",
+     "rep": 1,
+     "refs": 0,
+     "visible": false,
+     "conf": 0.75,
+     "cost": 0.02119
+    }
+   ]
+  },
+  {
+   "case": 6,
+   "owner": "toss-up",
+   "decisions": {
+    "pro": [
+     {
+      "rep": 0,
+      "confirmed": {
+       "shipped": true,
+       "alt": true
+      },
+      "winner": "alt",
+      "byRule": "score"
+     },
+     {
+      "rep": 1,
+      "confirmed": {
+       "shipped": true,
+       "alt": true
+      },
+      "winner": "alt",
+      "byRule": "score"
+     }
+    ]
+   },
+   "calls": [
+    {
+     "f": "action_interaction|mother dragon",
+     "role": "shipped",
+     "model": "pro",
+     "rep": 0,
+     "refs": 0,
+     "visible": true,
+     "conf": 0.8,
+     "cost": 0.01172
+    },
+    {
+     "f": "action_interaction|mother dragon",
+     "role": "shipped",
+     "model": "pro",
+     "rep": 1,
+     "refs": 0,
+     "visible": true,
+     "conf": 0.8,
+     "cost": 0.00956
+    },
+    {
+     "f": "action_interaction|mother dragon",
+     "role": "alt",
+     "model": "pro",
+     "rep": 0,
+     "refs": 0,
+     "visible": true,
+     "conf": 0.8,
+     "cost": 0.01652
+    },
+    {
+     "f": "action_interaction|mother dragon",
+     "role": "alt",
+     "model": "pro",
+     "rep": 1,
+     "refs": 0,
+     "visible": true,
+     "conf": 0.8,
+     "cost": 0.01272
+    },
+    {
+     "f": "page:setting",
+     "role": "shipped",
+     "model": "pro",
+     "rep": 0,
+     "refs": 4,
+     "visible": true,
+     "conf": 0.8,
+     "cost": 0.0182
+    },
+    {
+     "f": "page:setting",
+     "role": "shipped",
+     "model": "pro",
+     "rep": 1,
+     "refs": 4,
+     "visible": true,
+     "conf": 0.8,
+     "cost": 0.02082
+    },
+    {
+     "f": "page:setting",
+     "role": "alt",
+     "model": "pro",
+     "rep": 0,
+     "refs": 4,
+     "visible": true,
+     "conf": 0.75,
+     "cost": 0.03372
+    },
+    {
+     "f": "page:setting",
+     "role": "alt",
+     "model": "pro",
+     "rep": 1,
+     "refs": 4,
+     "visible": false,
+     "conf": 0.8,
+     "cost": 0.02421
+    }
+   ]
+  },
+  {
+   "case": 7,
+   "owner": "alt-clearly-better",
+   "decisions": {
+    "pro": [
+     {
+      "rep": 0,
+      "confirmed": {
+       "shipped": true,
+       "alt": true
+      },
+      "winner": "alt",
+      "byRule": "score"
+     },
+     {
+      "rep": 1,
+      "confirmed": {
+       "shipped": true,
+       "alt": true
+      },
+      "winner": "alt",
+      "byRule": "score"
+     }
+    ]
+   },
+   "calls": [
+    {
+     "f": "action_interaction|max",
+     "role": "shipped",
+     "model": "pro",
+     "rep": 0,
+     "refs": 1,
+     "visible": true,
+     "conf": 0.85,
+     "cost": 0.0135
+    },
+    {
+     "f": "action_interaction|max",
+     "role": "shipped",
+     "model": "pro",
+     "rep": 1,
+     "refs": 1,
+     "visible": true,
+     "conf": 0.85,
+     "cost": 0.01275
+    },
+    {
+     "f": "action_interaction|max",
+     "role": "alt",
+     "model": "pro",
+     "rep": 0,
+     "refs": 1,
+     "visible": true,
+     "conf": 0.9,
+     "cost": 0.01217
+    },
+    {
+     "f": "action_interaction|max",
+     "role": "alt",
+     "model": "pro",
+     "rep": 1,
+     "refs": 1,
+     "visible": true,
+     "conf": 0.9,
+     "cost": 0.01387
+    },
+    {
+     "f": "action_interaction|kiaan",
+     "role": "shipped",
+     "model": "pro",
+     "rep": 0,
+     "refs": 1,
+     "visible": true,
+     "conf": 0.9,
+     "cost": 0.01509
+    },
+    {
+     "f": "action_interaction|kiaan",
+     "role": "shipped",
+     "model": "pro",
+     "rep": 1,
+     "refs": 1,
+     "visible": false,
+     "conf": 0.8,
+     "cost": 0.01669
+    },
+    {
+     "f": "action_interaction|kiaan",
+     "role": "alt",
+     "model": "pro",
+     "rep": 0,
+     "refs": 1,
+     "visible": false,
+     "conf": 0.9,
+     "cost": 0.01342
+    },
+    {
+     "f": "action_interaction|kiaan",
+     "role": "alt",
+     "model": "pro",
+     "rep": 1,
+     "refs": 1,
+     "visible": false,
+     "conf": 0.99,
+     "cost": 0.01273
+    }
+   ]
+  },
+  {
+   "case": 8,
+   "owner": "toss-up",
+   "decisions": {
+    "pro": [
+     {
+      "rep": 0,
+      "confirmed": {
+       "shipped": true,
+       "alt": true
+      },
+      "winner": "alt",
+      "byRule": "score"
+     },
+     {
+      "rep": 1,
+      "confirmed": {
+       "shipped": true,
+       "alt": true
+      },
+      "winner": "alt",
+      "byRule": "score"
+     }
+    ]
+   },
+   "calls": [
+    {
+     "f": "action_interaction|levin",
+     "role": "shipped",
+     "model": "pro",
+     "rep": 0,
+     "refs": 1,
+     "visible": true,
+     "conf": 0.99,
+     "cost": 0.01261
+    },
+    {
+     "f": "action_interaction|levin",
+     "role": "shipped",
+     "model": "pro",
+     "rep": 1,
+     "refs": 1,
+     "visible": true,
+     "conf": 0.99,
+     "cost": 0.01192
+    },
+    {
+     "f": "action_interaction|levin",
+     "role": "alt",
+     "model": "pro",
+     "rep": 0,
+     "refs": 1,
+     "visible": true,
+     "conf": 0.95,
+     "cost": 0.01143
+    },
+    {
+     "f": "action_interaction|levin",
+     "role": "alt",
+     "model": "pro",
+     "rep": 1,
+     "refs": 1,
+     "visible": true,
+     "conf": 0.99,
+     "cost": 0.01344
+    }
+   ]
+  },
+  {
+   "case": 9,
+   "owner": "toss-up",
+   "decisions": {
+    "pro": [
+     {
+      "rep": 0,
+      "confirmed": {
+       "shipped": false,
+       "alt": false
+      },
+      "winner": "alt",
+      "byRule": "score"
+     },
+     {
+      "rep": 1,
+      "confirmed": {
+       "shipped": true,
+       "alt": true
+      },
+      "winner": "alt",
+      "byRule": "score"
+     }
+    ]
+   },
+   "calls": [
+    {
+     "f": "page:object_presence",
+     "role": "shipped",
+     "model": "pro",
+     "rep": 0,
+     "refs": 0,
+     "visible": false,
+     "conf": 0.9,
+     "cost": 0.01621
+    },
+    {
+     "f": "page:object_presence",
+     "role": "shipped",
+     "model": "pro",
+     "rep": 1,
+     "refs": 0,
+     "visible": true,
+     "conf": 0.8,
+     "cost": 0.01376
+    },
+    {
+     "f": "page:object_presence",
+     "role": "alt",
+     "model": "pro",
+     "rep": 0,
+     "refs": 0,
+     "visible": false,
+     "conf": 1,
+     "cost": 0.01443
+    },
+    {
+     "f": "page:object_presence",
+     "role": "alt",
+     "model": "pro",
+     "rep": 1,
+     "refs": 0,
+     "visible": true,
+     "conf": 0.99,
+     "cost": 0.01733
+    }
+   ]
+  },
+  {
+   "case": 10,
+   "owner": "alt-clearly-better",
+   "decisions": {
+    "pro": [
+     {
+      "rep": 0,
+      "confirmed": {
+       "shipped": true,
+       "alt": true
+      },
+      "winner": "alt",
+      "byRule": "score"
+     },
+     {
+      "rep": 1,
+      "confirmed": {
+       "shipped": true,
+       "alt": true
+      },
+      "winner": "alt",
+      "byRule": "score"
+     }
+    ]
+   },
+   "calls": [
+    {
+     "f": "page:object_presence",
+     "role": "shipped",
+     "model": "pro",
+     "rep": 0,
+     "refs": 0,
+     "visible": true,
+     "conf": 0.99,
+     "cost": 0.00977
+    },
+    {
+     "f": "page:object_presence",
+     "role": "shipped",
+     "model": "pro",
+     "rep": 1,
+     "refs": 0,
+     "visible": true,
+     "conf": 0.99,
+     "cost": 0.01011
+    },
+    {
+     "f": "page:object_presence",
+     "role": "alt",
+     "model": "pro",
+     "rep": 0,
+     "refs": 0,
+     "visible": false,
+     "conf": 0.9,
+     "cost": 0.01512
+    },
+    {
+     "f": "page:object_presence",
+     "role": "alt",
+     "model": "pro",
+     "rep": 1,
+     "refs": 0,
+     "visible": false,
+     "conf": 0.9,
+     "cost": 0.01154
+    },
+    {
+     "f": "character_presence|crayfish",
+     "role": "shipped",
+     "model": "pro",
+     "rep": 0,
+     "refs": 0,
+     "visible": true,
+     "conf": 0.9,
+     "cost": 0.01213
+    },
+    {
+     "f": "character_presence|crayfish",
+     "role": "shipped",
+     "model": "pro",
+     "rep": 1,
+     "refs": 0,
+     "visible": true,
+     "conf": 0.9,
+     "cost": 0.01166
+    },
+    {
+     "f": "character_presence|crayfish",
+     "role": "alt",
+     "model": "pro",
+     "rep": 0,
+     "refs": 0,
+     "visible": true,
+     "conf": 0.99,
+     "cost": 0.01289
+    },
+    {
+     "f": "character_presence|crayfish",
+     "role": "alt",
+     "model": "pro",
+     "rep": 1,
+     "refs": 0,
+     "visible": true,
+     "conf": 0.9,
+     "cost": 0.01058
+    }
+   ]
+  }
+ ]
+}

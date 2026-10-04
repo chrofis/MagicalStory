@@ -96,11 +96,27 @@ function createNotEvaluatedRecorder({ pageContext = '', genLog = null } = {}) {
  * @param {Array<{pageNumber?: number, notEvaluated?: Array<object>}>} pages
  * @returns {{recordedAt: string, entryCount: number, dimensions: string[], pages: Array}|null}
  */
+/**
+ * A page drawn from a reference sheet that still WEARS a garment the page
+ * takes off (storyAvatars.resolveSheetForRef stamps `wornStateFallback` on the
+ * reference photo when no off-garment sheet exists). The page renders; this is
+ * its record (owner, 2026-10-04), one entry per reference.
+ */
+const OFF_SHEET_MISSING = Object.freeze({ dimension: 'wardrobe_state_reference', reason: 'off_sheet_missing' });
+function offSheetMissingEntries(page) {
+  return (Array.isArray(page?.referencePhotos) ? page.referencePhotos : [])
+    .filter(r => r && r.wornStateFallback)
+    .map(r => ({
+      ...OFF_SHEET_MISSING,
+      detail: `${r.name || 'a character'} takes ${(r.wornStateFallback.offIds || []).join('+')} off on this page, but no "${r.wornStateFallback.wanted}" sheet exists — drawn from the sheet that wears it`,
+    }));
+}
+
 function collectNotEvaluated(pages) {
   const rows = [];
   const dimensions = new Set();
   for (const p of (Array.isArray(pages) ? pages : [])) {
-    const list = Array.isArray(p?.notEvaluated) ? p.notEvaluated : [];
+    const list = [...(Array.isArray(p?.notEvaluated) ? p.notEvaluated : []), ...offSheetMissingEntries(p)];
     if (!list.length) continue;
     for (const e of list) if (e?.dimension) dimensions.add(String(e.dimension));
     rows.push({
@@ -121,4 +137,4 @@ function collectNotEvaluated(pages) {
   };
 }
 
-module.exports = { createNotEvaluatedRecorder, collectNotEvaluated };
+module.exports = { createNotEvaluatedRecorder, collectNotEvaluated, offSheetMissingEntries, OFF_SHEET_MISSING };
