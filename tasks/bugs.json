@@ -2401,7 +2401,7 @@
       "impact": "Any spelling or grammar fault the writer put in the title shipped on the front cover, the story record, the PDF, the viewer and the emails.",
       "status": "fixed",
       "fixedAt": "2026-10-04",
-      "fixedIn": "(this commit; hash recorded in the follow-up commit)",
+      "fixedIn": "09bf2d495",
       "fix": "beatsPipeline.applyTitleProofread runs every title candidate through textRefine.proofreadTitleCandidates — the page lector's prompt (buildTextProofreadPrompt, STYLE_RULEBOOK, de-ch rules), model (textProofreadModel), options (LECTOR_OPTS, now one shared constant) and quote-checked substitution — right after the TITLE block is parsed, before any cover renders. The pick is kept by index. Each changed candidate logs title_proofread_corrected (before/after); a failed call logs title_proofread_failed at error. One real call on the stored candidates: gemini-3.1-pro corrected Drachonei -> Drachenei, left the other two alone ($0.0128, 7.8s). Tests: tests/unit/title-proofread.test.ts. Verify: title-proofread."
     }
   ]
