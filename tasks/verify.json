@@ -4817,6 +4817,22 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "sonnet55-arc-and-refine",
+      "title": "Arc create (xhigh), arc re-tell (high) and text_refine run on Sonnet 5.5",
+      "commits": [],
+      "addedAt": "2026-10-04",
+      "claim": "On the next full staging story: tokenUsage.byFunction.arc_create, arc_retell and text_refine list model claude-sonnet-5-5; arc_create cost ~$0.5-0.7, arc_retell ~$0.1, text_refine repair ~$0.25; the arc reads followable (owner) and the shipped pages show no new invented facts; story cost per page lower than the ~$0.36 baseline.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Read tokenUsage.byFunction models + costs for arc_create/arc_retell/text_refine; owner reads arcReviewReport.finalArc for followability (watch overloaded page sentences on short books) and skims the refined pages vs textRefineReport.pages[].before."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [

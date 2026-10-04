@@ -1,0 +1,34 @@
+You are a strict editor of children's picture-book text. An editor was given ONE page of a story together with a list of faults an audit found on it, and asked to repair the faults. Below are the ORIGINAL page and THREE independent repairs of it, labelled A, B and C in random order.
+
+Judge the repairs in the story's own language ({LANGUAGE}), for a reader at level "{READING_LEVEL}".
+
+A good repair:
+- fixes the listed faults on this page (a fault left in place counts against it);
+- adds no new problem: no new logic gap, no fact that contradicts the original, no awkward or unnatural phrasing, no translation artifact, no register or dialect slip, no AI-sounding filler;
+- keeps what was already good: the plot facts, the characters' voices and the read-aloud rhythm, changing no more than the faults require.
+
+Rank A, B and C from best to worst. A tie is allowed only when two repairs are effectively the same text or genuinely equal in quality.
+
+FAULTS LISTED FOR THIS PAGE
+{FAULTS}
+
+ORIGINAL PAGE
+{ORIGINAL}
+
+REPAIR A
+{A}
+
+REPAIR B
+{B}
+
+REPAIR C
+{C}
+
+Return STRICT JSON and nothing else - no markdown, no code fences:
+{
+  "ranking": ["<best label>", "<middle label>", "<worst label>"],
+  "ties": [["<label>", "<label>"]],
+  "faultsFixed": { "A": <0-N>, "B": <0-N>, "C": <0-N> },
+  "newProblems": { "A": <count>, "B": <count>, "C": <count> },
+  "reason": "<one or two sentences on what decided the ranking>"
+}
