@@ -2664,6 +2664,32 @@ async function saveCoverData(storyId, coverType, coverData) {
 }
 
 /**
+ * Atomic save of `data.finalChecksReport` alone (code review 2026-10, batch 8).
+ * The consistency-check route used to rewrite the WHOLE story document from the
+ * snapshot it read before a multi-minute check, reverting any page saved in
+ * between. Same R2 offload + strip as the full save (grids are images, which may
+ * never ride in the JSONB), then jsonb_set on the one key.
+ * Returns false when the story row does not exist (caller logs; no fallback).
+ */
+async function saveFinalChecksReport(storyId, finalChecksReport) {
+  if (!isDatabaseMode()) {
+    throw new Error('Database mode required');
+  }
+  const wrapped = { finalChecksReport: JSON.parse(JSON.stringify(finalChecksReport)) };
+  await extractInlineImagesToR2(storyId, wrapped);
+  stripInlineImagesFromStoryData(wrapped);
+  const result = await dbQuery(
+    `UPDATE stories SET data = jsonb_set(data, '{finalChecksReport}', $2::jsonb, true) WHERE id = $1`,
+    [storyId, JSON.stringify(wrapped.finalChecksReport)]
+  );
+  if ((result.rowCount ?? 0) === 0) {
+    console.warn(`⚠️ [SAVE-FINAL-CHECKS] story ${storyId} not found, report not saved`);
+    return false;
+  }
+  return true;
+}
+
+/**
  * Create the stories row EARLY, before any image is written (owner, 2026-08-15).
  *
  * story_images.story_id references stories.id, and the row used to appear only
@@ -4024,6 +4050,7 @@ module.exports = {
   saveStoryData,
   saveScenePageData,
   saveCoverData,
+  saveFinalChecksReport,
   stripInlineImagesFromStoryData,
   extractInlineImagesToR2,
   extractCharacterInlineImagesToR2,

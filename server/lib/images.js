@@ -2184,7 +2184,6 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
           // Extract score, reasoning, and text error info from quality result
           const score = qualityResult ? qualityResult.score : null;
           const reasoning = qualityResult ? qualityResult.reasoning : null;
-          const textIssue = qualityResult ? qualityResult.textIssue : null;
           const textErrorOnly = qualityResult ? qualityResult.textErrorOnly : false;
           const expectedText = qualityResult ? qualityResult.expectedText : null;
           const actualText = qualityResult ? qualityResult.actualText : null;
@@ -2201,7 +2200,6 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
             imageData: compressedImageData,
             score,
             reasoning,
-            textIssue,
             textErrorOnly,
             expectedText,
             actualText,
@@ -3352,7 +3350,6 @@ async function evaluateImageBatch(images, options = {}) {
         // this — only the score + issuesSummary survived.
         ...carryEvalEvidence(qualityResult),
         // Text error info for covers
-        textIssue: qualityResult?.textIssue || null,
         expectedText: qualityResult?.expectedText || null,
         actualText: qualityResult?.actualText || null
       };

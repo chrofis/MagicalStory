@@ -425,7 +425,6 @@ export interface RetryAttempt {
   score?: number;
   reasoning?: string;
   prompt?: string;  // Input prompt used for generation
-  textIssue?: string | null;
   expectedText?: string | null;
   actualText?: string | null;
   error?: string;

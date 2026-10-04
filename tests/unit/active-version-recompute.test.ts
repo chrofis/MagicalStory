@@ -108,6 +108,17 @@ describe('recomputeAllActiveVersions — meta persistence, no blob mirror', () =
     expect(storyData.sceneImages[0].activeVersion).toBeUndefined();
   });
 
+  it('REGRESSION B2: a failed meta read fails the recompute and overwrites no pin', async () => {
+    getActiveVersionMeta.mockRejectedValue(new Error('db down'));
+    const storyData: any = {
+      sceneImages: [
+        { pageNumber: 1, imageVersions: [{ finalScore: 4 }, { finalScore: 8 }] },
+      ],
+    };
+    await expect(recomputeAllActiveVersions('story1', storyData)).rejects.toThrow('db down');
+    expect(setActiveVersion).not.toHaveBeenCalled();
+  });
+
   it('persists a lazy-migrated version through its dbVersionIndex stamp', async () => {
     const storyData: any = {
       sceneImages: [

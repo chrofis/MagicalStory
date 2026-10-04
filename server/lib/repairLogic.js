@@ -875,7 +875,13 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
     log.error(`❌ [REPAIR-DECIDE] page ${pageNumber}: no readable visual score (scoreBreakdown.visual.score / qualityScore / rawQualityScore all absent) — defaulting to 100, so the catastrophic-iterate gate CANNOT fire for this page`);
   }
   const visualScore = visualRead ?? 100;
-  const semanticScore = semanticRead ?? 100;
+  // A missing semantic score means the scene judge did not run or failed
+  // (notEvaluated says which). It is NOT a perfect 100: the gates below skip the
+  // semantic comparison for it instead of reading a pass (review A1, 2026-10-04).
+  const semanticScore = semanticRead;
+  if (semanticRead == null) {
+    log.warn(`⚠️ [REPAIR-DECIDE] page ${pageNumber}: no semantic score (scene judge not evaluated) — the wrong-scene gate cannot fire for this page`);
+  }
 
   // 0. Spec conflict — the consolidator judged the declared requirements
   // mutually unsatisfiable. No render can fix a broken contract: iterate
@@ -898,6 +904,7 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
   // WORSE than the original, with pick-best then discarding the work.
   const iterateVisualFloor = REPAIR_DEFAULTS.qualityThresholdForIterate ?? 20;
   const iterateSemanticFloor = REPAIR_DEFAULTS.semanticThresholdForIterate ?? 30;
+  const semanticTrips = typeof semanticScore === 'number' && semanticScore < iterateSemanticFloor;
 
   // SALVAGE FLOOR. Regenerating is a GAMBLE: the whole image is discarded for a
   // fresh roll, so nothing that was already right carries over. Measured on
@@ -928,10 +935,10 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
   if (visualScore < iterateVisualFloor && !worthSalvaging) {
     return { method: 'iterate', reason: `image visually broken (visual=${visualScore} < ${iterateVisualFloor}, finalScore=${pageFinalScore})` };
   }
-  if (semanticScore < iterateSemanticFloor && !worthSalvaging) {
+  if (semanticTrips && !worthSalvaging) {
     return { method: 'iterate', reason: `wrong scene (semantic=${semanticScore} < ${iterateSemanticFloor}, finalScore=${pageFinalScore})` };
   }
-  if ((visualScore < iterateVisualFloor || semanticScore < iterateSemanticFloor) && worthSalvaging) {
+  if ((visualScore < iterateVisualFloor || semanticTrips) && worthSalvaging) {
     log.info(`🛟 [REPAIR-DECIDE] page ${pageNumber}: numeric gate tripped (visual=${visualScore}, semantic=${semanticScore}) but finalScore=${pageFinalScore} >= ${ITERATE_SALVAGE_FLOOR} — repairing locally instead of regenerating`);
   }
   // Severity-based catastrophic gate: a CATASTROPHIC finding (large wrong

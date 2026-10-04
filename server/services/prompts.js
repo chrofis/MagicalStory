@@ -405,7 +405,6 @@ async function loadPromptTemplates() {
     ['sheetCellIdentification', 'sheet-cell-identification.txt'],
     ['sceneRepair', 'scene-repair.txt'],
     ['entityConsistencyCheck', 'entity-consistency-check.txt'],
-    ['entitySinglePageRepair', 'entity-single-page-repair.txt'],
     ['subRegionDetection', 'sub-region-detection.txt'],
     ['generatedImageAnalysis', 'generated-image-analysis.txt'],
     ['emptyScene', 'empty-scene.txt'],

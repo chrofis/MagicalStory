@@ -282,14 +282,19 @@ function mergeEntityIssues(base, fresh, repairedPages) {
     const declaredOffByPage = { ...(b.declaredOffByPage || {}) };
     for (const p of pages) delete declaredOffByPage[p];
     Object.assign(declaredOffByPage, f?.declaredOffByPage || {});
-    merged.characters[name] = { ...b, issues, declaredOffByPage, totalIssues: issues.length, overallConsistent: issues.length === 0 };
+    // A character whose check failed to run (base or fresh) is not verified by a
+    // merge that finds zero issues (review B3, 2026-10-04).
+    const charEvalFailed = !!b.evalFailed || !!f?.evalFailed;
+    merged.characters[name] = { ...b, issues, declaredOffByPage, totalIssues: issues.length, overallConsistent: issues.length === 0 && !charEvalFailed,
+      ...(charEvalFailed ? { evalFailed: true } : {}) };
     total += issues.length;
   }
   merged.totalIssues = total;
   // evalFailed sticky across merges (same rule as entityConsistency.js's
   // per-character aggregation): a round re-check of a few repaired pages must
   // not launder a base report whose check FAILED to run into a clean pass.
-  merged.evalFailed = !!base.evalFailed || !!fresh.evalFailed;
+  merged.evalFailed = !!base.evalFailed || !!fresh.evalFailed
+    || Object.values(merged.characters).some(c => c && c.evalFailed);
   merged.overallConsistent = total === 0 && !merged.evalFailed;
   merged.summary = `${names.size} entities checked: ${total} consistency issue(s) (merged after round update)`;
   return merged;

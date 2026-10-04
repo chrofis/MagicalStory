@@ -1108,8 +1108,12 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
 
           const crops = await extractEntityCrops(groupAppearances);
           if (crops.length < minRequired) {
+            // Groups below minRequired appearances were filtered when the tasks
+            // were built, so reaching here means crop extraction failed. Report
+            // it as a failed check; returning null made the character vanish
+            // from the report (review B4, 2026-10-04).
             log.warn(`⚠️  [ENTITY-CHECK] ${charName} (${clothingCategory}): only ${crops.length} valid crops`);
-            return null;
+            return { charName, clothingCategory, error: `crop extraction failed (${crops.length}/${groupAppearances.length} usable, ${minRequired} required)` };
           }
 
           // A secondary is judged against its VISUAL BIBLE entry: the generated
@@ -1307,6 +1311,8 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
               issues: allIssues,
               score: worstScore,
               consistent: overallConsistent,
+              // OR across the grids: one failed grid leaves the group unverified.
+              evalFailed: gridResults.some(g => g.evalResult.evalFailed),
               summary: gridResults.map((g, i) =>
                 batches.length > 1 ? `Grid ${i + 1}: ${g.evalResult.summary}` : g.evalResult.summary
               ).join(' | ')
@@ -1382,6 +1388,7 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
           gridImages: allGridImages.length > 1 ? allGridImages : undefined,  // Only set if multi-grid
           consistent: evalResult.consistent,
           score: evalResult.score,
+          ...(evalResult.evalFailed && { evalFailed: true }),
           issues: evalResult.issues || [],
           summary: evalResult.summary,
           cellCount: crops.length,
@@ -1400,6 +1407,9 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
           report.characters[charName].overallConsistent = false;
           report.overallConsistent = false;
         }
+        // Carry a judge failure up to the character: the summary's failedCount,
+        // the Lab's evalFailures and mergeEntityIssues all read it there (B3).
+        if (evalResult.evalFailed) report.characters[charName].evalFailed = true;
         const issueCount = evalResult.issues?.length || 0;
         report.characters[charName].totalIssues += issueCount;
         report.totalIssues += issueCount;
@@ -1754,7 +1764,11 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
   } catch (error) {
     log.error(`❌ [ENTITY-CHECK] Error running checks: ${error.message}`);
     if (error.stack) log.error(`[ENTITY-CHECK] Stack: ${error.stack.split('\n').slice(0, 5).join(' | ')}`);
-    report.error = error.message;
+    // REJECT, never return the half-built report: it still carried
+    // overallConsistent:true, so a crash of the whole check read as a clean
+    // pass and the callers' fail-closed handlers (repairPipeline.js .catch /
+    // allSettled) were unreachable (review B1, 2026-10-04).
+    throw error;
   }
 
   return report;
@@ -1941,7 +1955,12 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
     // Fallback: run on-the-fly bbox detection for pages with missing or unusable data.
     // Triggers when: no detection at all, empty figures array, or all figures are UNKNOWN.
     const identifiedCount = figures.filter(f => f.name && f.name !== 'UNKNOWN').length;
-    const needsFallbackDetection = !bboxDetection || figures.length === 0 || identifiedCount === 0;
+    // A detection this fallback already produced on these bytes is final, even
+    // when nobody got a name: without the mark, a page whose expected figures
+    // never resolve paid for detection again on every entity pass (review B6,
+    // 2026-10-04).
+    const needsFallbackDetection = !bboxDetection
+      || (!bboxDetection.entityFallbackRan && (figures.length === 0 || identifiedCount === 0));
 
     if (needsFallbackDetection && storyCharacters) {
       // Determine which characters are expected on this page
@@ -2074,6 +2093,7 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
         try {
           const detection = await detectAllBoundingBoxes(imageData, { expectedCharacters: expectedChars, sceneContext, artStyle });
           if (detection) {
+            detection.entityFallbackRan = true;
             bboxDetection = detection;
             figures = detection.figures || [];
             // Mark figures as from fallback detection (for overlay coloring)
@@ -3126,7 +3146,11 @@ async function evaluateEntityConsistency(gridBuffer, manifest, entityInfo, headG
       // Parse JSON response — extractJsonFromText handles fenced blocks, raw
       // JSON, and balanced-brace extraction.
       const parsed = extractJsonFromText(text);
-      if (!parsed) {
+      // A reply that parses but is not a verdict (an array, `{}`, an error
+      // object) is as unusable as one that does not parse: with no boolean
+      // `consistent` it used to default to a clean pass and was never retried
+      // (review B5, 2026-10-04). Same retry, then the same fail-closed result.
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed) || typeof parsed.consistent !== 'boolean') {
         log.warn(`⚠️  [ENTITY-CHECK] Failed to parse response for ${entityName} (attempt ${attempt}/${MAX_ATTEMPTS})`);
         log.debug(`[ENTITY-CHECK] Raw response: ${text.substring(0, 200)}...`);
         lastErr = new Error('unparseable evaluation response');
@@ -3215,7 +3239,7 @@ async function evaluateEntityConsistency(gridBuffer, manifest, entityInfo, headG
       }
 
       return {
-        consistent: parsed.consistent ?? true,
+        consistent: parsed.consistent,
         score: parsed.score ?? 10,
         issues,
         garmentColourMismatches,
@@ -3591,13 +3615,6 @@ async function repairSinglePage(storyData, character, pageNumber, options = {}) 
     // Prepare the target image for repair (dynamic upscale + pad)
     const preparedTarget = await prepareForGeminiRepair(targetCrop.buffer);
 
-    // Build physical traits description
-    const physicalTraits = buildPhysicalTraitsDescription(character);
-    const hairColor = character.physical?.hairColor || 'as shown in reference';
-    // Derive the hair-style slot from detailedHairAnalysis (styling + length/texture).
-    const builtHair = buildHairDescription(character.physical || {}, character.physicalTraitsSource);
-    const hairStyle = builtHair || 'as shown in reference';
-
     // Build clothing description for this scene — pass clothingRequirements
     // so the current-story signature wins over stale avatars.clothing, then
     // resolve THIS PAGE's worn state on top of it (2026-09-15). A repaint is a
@@ -3621,64 +3638,7 @@ async function repairSinglePage(storyData, character, pageNumber, options = {}) 
       }
     );
 
-    // Format issues found for this page (if provided in options)
-    let issuesFoundText = '';
-    if (options.issues && options.issues.length > 0) {
-      const pageIssues = options.issues.filter(issue =>
-        require('./scoring').entityFindingPages(issue).includes(pageNumber)
-      );
-      if (pageIssues.length > 0) {
-        issuesFoundText = '\n## Issues to Fix\n\nThe consistency check found these specific problems on this page:\n';
-        for (const issue of pageIssues) {
-          issuesFoundText += `\n**${issue.type}** (${issue.severity}):\n`;
-
-          // Use canonicalVersion and fixInstruction which don't have cell references
-          // The description often has cell references which won't make sense here
-          if (issue.canonicalVersion) {
-            issuesFoundText += `- Correct appearance (match IMAGE 1): ${issue.canonicalVersion}\n`;
-          }
-          if (issue.fix || issue.fixInstruction) {
-            // Clean up fix instructions - replace cell references with IMAGE 1
-            let fix = issue.fixInstruction;
-            fix = fix.replace(/cell [A-Z]/gi, 'IMAGE 1');
-            fix = fix.replace(/to match cell [A-Z]/gi, 'to match IMAGE 1');
-            issuesFoundText += `- Required fix: ${fix}\n`;
-          }
-          // Add details if available (shows what's wrong vs what's correct)
-          if (issue.details) {
-            if (issue.details.cellA) {
-              issuesFoundText += `- What it should look like: ${issue.details.cellA}\n`;
-            }
-            if (issue.details.cellB) {
-              issuesFoundText += `- What's wrong on this page: ${issue.details.cellB}\n`;
-            }
-          }
-        }
-        issuesFoundText += '\n';
-        log.info(`🔧 [SINGLE-PAGE-REPAIR] Including ${pageIssues.length} specific issues in prompt`);
-      }
-    }
-
-    log.info(`🔧 [SINGLE-PAGE-REPAIR] Physical traits: ${physicalTraits.substring(0, 100)}...`);
     log.info(`🔧 [SINGLE-PAGE-REPAIR] Clothing: ${clothingDescription}`);
-
-    // Load the single-page repair prompt
-    const promptTemplate = PROMPT_TEMPLATES.entitySinglePageRepair;
-    if (!promptTemplate) {
-      log.warn('⚠️  [SINGLE-PAGE-REPAIR] Using fallback prompt (entity-single-page-repair.txt not found)');
-    }
-
-    const prompt = promptTemplate
-      ? promptTemplate
-          .replace(/\{ENTITY_NAME\}/g, charName)
-          .replace(/\{PAGE_NUMBER\}/g, pageNumber.toString())
-          .replace(/\{CLOTHING_CATEGORY\}/g, clothingCategory)
-          .replace(/\{PHYSICAL_TRAITS\}/g, physicalTraits)
-          .replace(/\{HAIR_COLOR\}/g, hairColor)
-          .replace(/\{HAIR_STYLE\}/g, hairStyle)
-          .replace(/\{CLOTHING_DESCRIPTION\}/g, clothingDescription)
-          .replace(/\{ISSUES_FOUND\}/g, issuesFoundText)
-      : buildFallbackSinglePagePrompt(charName, pageNumber, clothingCategory, physicalTraits, clothingDescription);
 
     // Use Grok blended repair (same as character repair button) — blurs the character,
     // sends to Grok with avatar reference, feathered blend back onto scene.
@@ -3823,70 +3783,6 @@ async function repairSinglePage(storyData, character, pageNumber, options = {}) 
     log.error(`❌ [SINGLE-PAGE-REPAIR] Error repairing ${charName} page ${pageNumber}: ${err.message}`);
     return { success: false, error: err.message };
   }
-}
-
-/**
- * Fallback prompt for single-page repair if template file doesn't exist
- */
-function buildFallbackSinglePagePrompt(entityName, pageNumber, clothingCategory, physicalTraits, clothingDescription) {
-  return `# Single Page Entity Repair
-
-You are repairing character consistency in a children's picture book illustration.
-
-## Input Images
-
-**IMAGE 1 - CHARACTER REFERENCE:**
-Shows the correct appearance of "${entityName}" in the art style of this book.
-This is the ONLY source of truth for how the character should look.
-
-**IMAGE 2 - PAGE TO REPAIR:**
-The illustration from page ${pageNumber} where "${entityName}" needs to be fixed.
-
-## Character Details
-
-**Physical Traits:**
-${physicalTraits || 'See reference image'}
-
-**Clothing for this scene:**
-${clothingDescription || 'As shown in reference image'}
-
-## Your Task
-
-Regenerate IMAGE 2 with "${entityName}" corrected to match IMAGE 1.
-
-### MUST MATCH from IMAGE 1 (reference):
-- FACE - exact facial features, eye shape, nose, mouth, face shape as shown
-- HAIR - exact color, style, length, texture
-- SKIN TONE - exact complexion as shown
-- CLOTHING - match the outfit shown in IMAGE 1
-- BODY PROPORTIONS - size, build, posture style
-
-### PIXEL-PERFECT PRESERVATION (CRITICAL):
-Everything EXCEPT "${entityName}" must be IDENTICAL to IMAGE 2:
-- BACKGROUND - every single pixel of scenery, sky, ground, walls, furniture
-- OTHER CHARACTERS - do not change any other person or creature
-- OBJECTS - every item, prop, and detail stays exactly the same
-- LIGHTING - same light direction, shadows, highlights
-- COLORS - same color palette for everything except the target character
-- COMPOSITION - exact same framing, no cropping, no shifting
-- ART STYLE - maintain the exact illustration style
-
-Think of it as: surgically replacing ONLY "${entityName}" while the rest of the image is a protected layer that cannot be modified.
-
-## Output
-
-Generate the repaired version of IMAGE 2:
-- EXACT same dimensions as IMAGE 2
-- EXACT same aspect ratio as IMAGE 2
-- Single image (not a grid or collage)
-- The ONLY difference should be "${entityName}" now matching IMAGE 1
-
-## Quality Standards
-
-- Sharp, clean edges on the character
-- No blur, smearing, or artifacts
-- Character blends naturally with preserved background
-- Vibrant colors consistent with the art style`;
 }
 
 module.exports = {

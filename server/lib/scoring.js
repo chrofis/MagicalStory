@@ -1192,12 +1192,11 @@ async function recomputeAllActiveVersions(storyId, storyData) {
   // user-pinned keys (their pin already lives in image_version_meta, the single
   // source of truth). No blob mirror: the legacy sceneImages[].activeVersion /
   // coverImages[].activeVersion field was deleted; all readers resolve from meta.
-  let versionMeta = {};
-  try {
-    versionMeta = await getActiveVersionMeta(storyId);
-  } catch (err) {
-    // Non-fatal: without meta we recompute everything (pre-pin behaviour).
-  }
+  // No try/catch ON PURPOSE (review B2, 2026-10-04): without the pin map a
+  // recompute would overwrite every user-pinned version with the score-best one.
+  // A failed read fails the whole recompute; the save that called it logs that
+  // and keeps the active versions exactly as they are.
+  const versionMeta = await getActiveVersionMeta(storyId);
 
   if (Array.isArray(storyData.sceneImages)) {
     for (const s of storyData.sceneImages) {

@@ -20,9 +20,10 @@ describe('every P1 inventory fallback reports the model that answered', () => {
     expect(SRC).toMatch(/falling back to gemini-2\.5-flash[\s\S]{0,400}modelId = 'gemini-2\.5-flash';/);
   });
 
-  it('both Grok vision fallbacks reassign modelId', () => {
+  it('both Grok vision fallbacks reassign modelId, and so does the quality eval (review A2)', () => {
     const assignments = SRC.match(/modelId = grokFallbackId;/g) || [];
-    expect(assignments).toHaveLength(2);
+    // two P1 inventory fallbacks + the quality verdict's safety-block fallback
+    expect(assignments).toHaveLength(3);
   });
 
   it('each Grok fallback also carries its modelConfig, so a later branch sees the real provider', () => {

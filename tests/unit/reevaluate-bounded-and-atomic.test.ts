@@ -21,7 +21,17 @@ describe('re-evaluate route', () => {
   });
   it('saves evaluated pages atomically instead of rewriting the whole story blob (B5)', () => {
     expect(handler).not.toMatch(/saveStoryData\(/);
-    expect(handler).toMatch(/saveScenePageData\(/);
-    expect(handler).toMatch(/saveCoverData\(/);
+    expect(handler).toMatch(/savePagesAtomically\(/);
+    const helper = src.slice(src.indexOf('async function savePagesAtomically'), src.indexOf('function isCoverPage') + 4000);
+    expect(helper).toMatch(/saveScenePageData\(/);
+    expect(helper).toMatch(/saveCoverData\(/);
+  });
+  it('consistency-check and pick-best also save per page / per key, never the whole blob (batch 8)', () => {
+    const cc = src.slice(src.indexOf("router.post('/:id/repair-workflow/consistency-check'"), src.indexOf("router.post('/:id/repair-workflow/pick-best-versions'"));
+    const pb = src.slice(src.indexOf("router.post('/:id/repair-workflow/pick-best-versions'"), src.indexOf('// Step 7: Repair characters using repairSinglePage'));
+    for (const h of [cc, pb]) expect(h).not.toMatch(/saveStoryData\(/);
+    expect(cc).toMatch(/saveFinalChecksReport\(/);
+    expect(cc).toMatch(/savePagesAtomically\(/);
+    expect(pb).toMatch(/savePagesAtomically\(/);
   });
 });

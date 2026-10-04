@@ -2470,6 +2470,18 @@ function prepareEvalJudgeInputs({ originalPrompt, referenceImages, evaluationTyp
  * The options evaluateImageQuality hands the semantic judge — shared with the
  * Test Lab semantic_eval stage.
  */
+/**
+ * A semantic judge that errored returns `{score:null, semanticIssues:[], error}`.
+ * Merged as-is that is a clean pass: zero penalty, and repairLogic read the null
+ * score as 100. Record it as NOT EVALUATED, the same contract the compliance
+ * judge follows (review A1, 2026-10-04). Recording only, never a deduction.
+ */
+function recordSemanticJudgeFailure(semanticResult, notEvaluated) {
+  if (semanticResult && semanticResult.error) {
+    notEvaluated.record('semantic_fidelity', 'judge_failed', semanticResult.error);
+  }
+}
+
 function semanticFidelityOptions(judgeInputs, evalOptions) {
   const { artStyleForEval, clothingContractBlock, expectedCast, landmarkContextBlock, requiredTextBlock } = judgeInputs;
   return {
@@ -2572,12 +2584,6 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       notEvaluated.record('semantic_fidelity', 'no_fidelity_reference',
         'Neither page prose nor a cover brief was supplied - semantic fidelity did not run');
     }
-    if (runFidelity) {
-      const { evaluateSemanticFidelity } = require('./sceneValidator');
-      semanticPromise = evaluateSemanticFidelity(imageData, fidelityRef, originalPrompt, sceneHint, evalOptions.semanticTemplateOverride || null,
-        semanticFidelityOptions(judgeInputs, evalOptions));
-      log.debug('🔍 [QUALITY] Starting parallel semantic fidelity evaluation');
-    }
 
     // DECLARED AGES for the compliance judge. The evaluator used to receive
     // head-to-body ratios ("- Daniel: 1:8") and check them itself. That failed
@@ -2610,92 +2616,6 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     } catch { /* silent — the judge tolerates an empty block */ }
 
 
-    // Start three-stage eval in parallel for scene evaluations.
-    // Stage 2 (compliance) needs the quality eval's named figures[] + matches[] so it
-    // can pair each named character with the blind vision inventory by zone. We expose
-    // those via qualityFiguresResolve, fulfilled once the quality JSON is parsed below.
-    if (evaluationType === 'scene' || isCover) {
-      // ONE blind inventory per page, launched here and consumed twice: by the
-      // compliance judge as Stage 1, and by the figures merge below. It used to
-      // be two calls with two prompts describing the same picture.
-      // The generated image ALONE — no reference photos, no prompt. Identity is
-      // not this call's to decide.
-      if (PROMPT_TEMPLATES.imageInventoryUnified && process.env.GEMINI_API_KEY) {
-        const invB64 = r2Lib.stripDataUriPrefix(imageData);
-        const invMime = imageData.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg';
-        p1Promise = runVisualInventory(
-          [{ inline_data: { mime_type: invMime, data: invB64 } }],
-          // The inventory has its own judge key since 2026-09-07 (runtime.js
-          // `inventoryModel`: Qwen3-VL on staging, 2.5 Flash elsewhere). A
-          // Lab quality-model override still wins so an A/B measures one model.
-          qualityModelOverride || MODEL_DEFAULTS.inventoryModel || MODEL_DEFAULTS.qualityEval || 'gemini-2.5-flash',
-          process.env.GEMINI_API_KEY, pageContext,
-          { pageNumber: evalOptions.pageNumber ?? null }
-        );
-        log.debug(`📊 [EVAL P1] Shared blind inventory launched for ${pageContext || 'scene'}`);
-      }
-      qualityFiguresPromise = new Promise((resolve) => { qualityFiguresResolve = resolve; });
-      // THE BLIND COMPLIANCE JUDGE IS GATED (owner, 2026-09-19). Default OFF —
-      // MODEL_DEFAULTS.promptComplianceJudge, env PROMPT_COMPLIANCE_JUDGE=true
-      // to re-arm without a deploy. OFF means the Stage-2 call is NOT MADE, so
-      // `threeStagePromise` stays null and every `threeStageResult` reader below
-      // sees null — the shape they already handle for "the judge failed".
-      //
-      // Stage 1 (p1Promise, above) deliberately stays OUTSIDE this gate: the
-      // quality eval's own figure merge consumes it further down, and that feeds
-      // the empty-inventory score floor in images.js. Gating stage 1 would move
-      // scores; gating stage 2 does not.
-      //
-      // The absence is RECORDED, not silent. Without the entry below, a page
-      // judged with this off is byte-for-byte a page the judge cleared — the
-      // exact conflation notEvaluated.js exists to remove. Recording only: this
-      // entry is never a deduction and never routes a page to repair.
-      // THE LAB FOLLOWS PRODUCTION BY DEFAULT, and can opt back in explicitly.
-      // This stage is the harness that measured the judge (experiment 1333), so
-      // it must stay able to run it — but always-on here would be the Lab/prod
-      // drift the sibling registry exists to catch, so the knob is explicit:
-      // `complianceJudgeOverride` true forces the judge on, false forces it off,
-      // null/absent follows the production flag.
-      const complianceJudgeOn = evalOptions.complianceJudgeOverride == null
-        ? MODEL_DEFAULTS.promptComplianceJudge
-        : !!evalOptions.complianceJudgeOverride;
-      if (!complianceJudgeOn) {
-        notEvaluated.record(
-          'prompt_compliance',
-          'compliance_judge_disabled',
-          'The blind prompt-compliance judge did not run (promptComplianceJudge is off) — nothing on this page was checked against the prompt by that judge'
-        );
-        log.debug(`📊 [THREE-STAGE] ${pageContext || 'scene'}: compliance judge OFF (promptComplianceJudge=false; set PROMPT_COMPLIANCE_JUDGE=true to re-arm) — Stage 2 not called; Stage 1 inventory still ran`);
-      } else {
-        threeStagePromise = evaluateThreeStage(imageData, originalPrompt, sceneHint, {
-          inventoryPromise: p1Promise,
-          expectedAges: expectedAgesBlock,
-          pageContext,
-          storyText: fidelityRef,
-          qualityFiguresPromise,
-          complianceModelOverride: evalOptions.complianceModelOverride || null,
-          compliancePromptOverride: evalOptions.compliancePromptOverride || null,
-          artStyle: artStyleForEval,
-          clothingContract: clothingContractBlock,
-          // ONE ROSTER (2026-09-14). The compliance judge had no cast list at all.
-          expectedCast: expectedCast.block,
-          // Resolves the VB ids in INTERACTIONS_BLOCK to real names when the
-          // caller has a bible; without one they still become generic nouns.
-          visualBible: evalOptions.visualBible || null,
-          // Era-aware landmark protection inputs (2026-09-05). Callers that know
-          // the page's landmark refs + era pass them; everything else defaults to
-          // no protection, i.e. unchanged behaviour.
-          landmarkPhotos: evalOptions.landmarkPhotos || null,
-          era: evalOptions.era || null,
-          // Same REQUIRED TEXT allow-list the other two judges get. Without it
-          // this judge scores a correctly spelled required string as
-          // unrequested lettering: its own rule counts a string as asked-for
-          // only when the prompt QUOTES it.
-          textRules: requiredTextBlock,
-        });
-        log.debug(`📊 [QUALITY] Starting parallel three-stage evaluation`);
-      }
-    }
 
     // Extract base64 and mime type for generated image
     const base64Data = r2Lib.stripDataUriPrefix(imageData);
@@ -2997,6 +2917,107 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       }, { maxRetries: 2, baseDelay: 2000 });
     };
 
+    // SIDE JUDGES LAUNCH HERE, after the reference-attach check (review A5,
+    // 2026-10-04): the refusal to grade identity-blind returns null above, and
+    // the semantic judge, blind inventory and compliance judge used to be
+    // launched before it, so a refusal left three paid calls running with
+    // their results discarded and the caller's re-eval paid for them again.
+    // They still run in parallel with the primary quality call below; the
+    // `finally` settles whatever is left on the later early returns.
+    if (runFidelity) {
+      const { evaluateSemanticFidelity } = require('./sceneValidator');
+      semanticPromise = evaluateSemanticFidelity(imageData, fidelityRef, originalPrompt, sceneHint, evalOptions.semanticTemplateOverride || null,
+        semanticFidelityOptions(judgeInputs, evalOptions));
+      log.debug('🔍 [QUALITY] Starting parallel semantic fidelity evaluation');
+    }
+
+    // Start three-stage eval in parallel for scene evaluations.
+    // Stage 2 (compliance) needs the quality eval's named figures[] + matches[] so it
+    // can pair each named character with the blind vision inventory by zone. We expose
+    // those via qualityFiguresResolve, fulfilled once the quality JSON is parsed below.
+    if (evaluationType === 'scene' || isCover) {
+      // ONE blind inventory per page, launched here and consumed twice: by the
+      // compliance judge as Stage 1, and by the figures merge below. It used to
+      // be two calls with two prompts describing the same picture.
+      // The generated image ALONE — no reference photos, no prompt. Identity is
+      // not this call's to decide.
+      if (PROMPT_TEMPLATES.imageInventoryUnified && process.env.GEMINI_API_KEY) {
+        const invB64 = r2Lib.stripDataUriPrefix(imageData);
+        const invMime = imageData.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg';
+        p1Promise = runVisualInventory(
+          [{ inline_data: { mime_type: invMime, data: invB64 } }],
+          // The inventory has its own judge key since 2026-09-07 (runtime.js
+          // `inventoryModel`: Qwen3-VL on staging, 2.5 Flash elsewhere). A
+          // Lab quality-model override still wins so an A/B measures one model.
+          qualityModelOverride || MODEL_DEFAULTS.inventoryModel || MODEL_DEFAULTS.qualityEval || 'gemini-2.5-flash',
+          process.env.GEMINI_API_KEY, pageContext,
+          { pageNumber: evalOptions.pageNumber ?? null }
+        );
+        log.debug(`📊 [EVAL P1] Shared blind inventory launched for ${pageContext || 'scene'}`);
+      }
+      qualityFiguresPromise = new Promise((resolve) => { qualityFiguresResolve = resolve; });
+      // THE BLIND COMPLIANCE JUDGE IS GATED (owner, 2026-09-19). Default OFF —
+      // MODEL_DEFAULTS.promptComplianceJudge, env PROMPT_COMPLIANCE_JUDGE=true
+      // to re-arm without a deploy. OFF means the Stage-2 call is NOT MADE, so
+      // `threeStagePromise` stays null and every `threeStageResult` reader below
+      // sees null — the shape they already handle for "the judge failed".
+      //
+      // Stage 1 (p1Promise, above) deliberately stays OUTSIDE this gate: the
+      // quality eval's own figure merge consumes it further down, and that feeds
+      // the empty-inventory score floor in images.js. Gating stage 1 would move
+      // scores; gating stage 2 does not.
+      //
+      // The absence is RECORDED, not silent. Without the entry below, a page
+      // judged with this off is byte-for-byte a page the judge cleared — the
+      // exact conflation notEvaluated.js exists to remove. Recording only: this
+      // entry is never a deduction and never routes a page to repair.
+      // THE LAB FOLLOWS PRODUCTION BY DEFAULT, and can opt back in explicitly.
+      // This stage is the harness that measured the judge (experiment 1333), so
+      // it must stay able to run it — but always-on here would be the Lab/prod
+      // drift the sibling registry exists to catch, so the knob is explicit:
+      // `complianceJudgeOverride` true forces the judge on, false forces it off,
+      // null/absent follows the production flag.
+      const complianceJudgeOn = evalOptions.complianceJudgeOverride == null
+        ? MODEL_DEFAULTS.promptComplianceJudge
+        : !!evalOptions.complianceJudgeOverride;
+      if (!complianceJudgeOn) {
+        notEvaluated.record(
+          'prompt_compliance',
+          'compliance_judge_disabled',
+          'The blind prompt-compliance judge did not run (promptComplianceJudge is off) — nothing on this page was checked against the prompt by that judge'
+        );
+        log.debug(`📊 [THREE-STAGE] ${pageContext || 'scene'}: compliance judge OFF (promptComplianceJudge=false; set PROMPT_COMPLIANCE_JUDGE=true to re-arm) — Stage 2 not called; Stage 1 inventory still ran`);
+      } else {
+        threeStagePromise = evaluateThreeStage(imageData, originalPrompt, sceneHint, {
+          inventoryPromise: p1Promise,
+          expectedAges: expectedAgesBlock,
+          pageContext,
+          storyText: fidelityRef,
+          qualityFiguresPromise,
+          complianceModelOverride: evalOptions.complianceModelOverride || null,
+          compliancePromptOverride: evalOptions.compliancePromptOverride || null,
+          artStyle: artStyleForEval,
+          clothingContract: clothingContractBlock,
+          // ONE ROSTER (2026-09-14). The compliance judge had no cast list at all.
+          expectedCast: expectedCast.block,
+          // Resolves the VB ids in INTERACTIONS_BLOCK to real names when the
+          // caller has a bible; without one they still become generic nouns.
+          visualBible: evalOptions.visualBible || null,
+          // Era-aware landmark protection inputs (2026-09-05). Callers that know
+          // the page's landmark refs + era pass them; everything else defaults to
+          // no protection, i.e. unchanged behaviour.
+          landmarkPhotos: evalOptions.landmarkPhotos || null,
+          era: evalOptions.era || null,
+          // Same REQUIRED TEXT allow-list the other two judges get. Without it
+          // this judge scores a correctly spelled required string as
+          // unrequested lettering: its own rule counts a string as asked-for
+          // only when the prompt QUOTES it.
+          textRules: requiredTextBlock,
+        });
+        log.debug(`📊 [QUALITY] Starting parallel three-stage evaluation`);
+      }
+    }
+
     let response = await callQualityAPI(modelId);
 
     if (!response.ok) {
@@ -3079,6 +3100,10 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
                 if (grokData?.candidates?.[0]?.content?.parts?.[0]?.text) {
                   log.info(`✅ [QUALITY] ${pageLabel}Grok fallback succeeded`);
                   data = grokData;
+                  // Stamp the model that actually produced the verdict, so its tokens
+                  // are booked and priced as that model and the score's provenance is
+                  // true (review A2, 2026-10-04).
+                  modelId = grokFallbackId;
                 } else {
                   log.error(`❌ [QUALITY] ${pageLabel}Grok fallback returned no text`);
                   return null;
@@ -3223,6 +3248,13 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       // Parse fixable_issues from JSON (new two-stage format - no bboxes)
       // These will be enriched with bounding boxes in a separate detection step
       let fixableIssues = parseFixableIssues(parsedJson);
+      // A report with no fixable_issues array is a judge that did not answer the
+      // mandatory field, not a judge that found nothing: record it so the clean
+      // 100 below is not read as a pass (review A4, 2026-10-04). Recording only.
+      if (!Array.isArray(parsedJson.fixable_issues)) {
+        notEvaluated.record('visual_quality', 'fixable_issues_missing',
+          'the quality judge replied without a fixable_issues array - the score below is not a verdict that nothing was wrong');
+      }
       {
         if (fixableIssues.length > 0) {
           const proportionCount = fixableIssues.filter(f => f.type === 'proportion').length;
@@ -3451,42 +3483,6 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         }
       }
 
-      // For covers, classify text issues by severity. The eval prompt's
-      // TEXT RULES block above tells the model:
-      //   - title missing/misspelled          → severity CATASTROPHIC
-      //   - other prominent unrequested text  → severity MAJOR
-      //   - small incidental signage          → not flagged (MINOR if garbled)
-      // (CRITICAL matched too for evals stored before the graded-severity
-      // change.) The buckets need different handling:
-      //   TITLE_ERROR — full regen; no inpaint can paint a missing title.
-      //   STRAY_TEXT  — flows through the normal repair path. Inpaint can
-      //                 paint over the unwanted-text region instead of
-      //                 trashing an otherwise-good cover and retrying.
-      // Before this split, ANY cover text issue forced a full regen, which
-      // wasted a generation every time a character incidentally held
-      // anything written.
-      let textIssue = null;
-      if (evaluationType === 'cover' && Array.isArray(fixableIssues) && fixableIssues.length > 0) {
-        const TEXT_RE = /\b(text|letter|word|sign|caption|label|spell|title|writing|inscription|misspell)/i;
-        const textRelated = fixableIssues.filter(i =>
-          i?.type === 'rendered_text' || TEXT_RE.test(i?.description || '')
-        );
-        if (textRelated.some(i => /catastrophic|critical/i.test(String(i?.severity || '')))) {
-          textIssue = 'TITLE_ERROR';
-        } else if (textRelated.length > 0) {
-          textIssue = 'STRAY_TEXT';
-        }
-      }
-      // Fallback for evaluators that didn't emit structured fixable_issues but
-      // mentioned text in issuesSummary — assume worst case (title error) so
-      // we don't ship a missing-title cover when the eval format drifts.
-      if (textIssue === null && evaluationType === 'cover' && issuesSummary) {
-        const issuesLower = issuesSummary.toLowerCase();
-        if (issuesLower.includes('text') || issuesLower.includes('spell') || issuesLower.includes('letter')) {
-          textIssue = 'TITLE_ERROR';
-        }
-      }
-
       // Store the FULL analysis JSON as reasoning (for dev mode display)
       // This includes subject_mapping, identity_sync, rendering_integrity, scene_check
       const reasoning = JSON.stringify(parsedJson, null, 2);
@@ -3711,6 +3707,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       if (semanticPromise) {
         try {
           semanticResult = await semanticPromise;
+          recordSemanticJudgeFailure(semanticResult, notEvaluated);
           // ONE PRESENCE SIGNAL PER PAGE — same rule as the three-stage merge
           // below. The semantic judge's vocabulary includes missing_character
           // and it is scored on its own table, so an unfiltered absence here
@@ -3903,7 +3900,6 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         // so one page is never judged against two contracts (owner, 2026-09-26).
         judgedPrompt: originalPrompt || null,
         issuesSummary: combinedIssuesSummary,
-        textIssue,
         fixTargets: jsonFixTargets,       // Legacy format with bboxes (backwards compat)
         // PROVENANCE (2026-09-14). ONE stamp, at the point the page's merged
         // list is finalised, so it covers every branch that reached it: the
@@ -3958,6 +3954,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       if (semanticPromise) {
         try {
           semanticResult = await semanticPromise;
+          recordSemanticJudgeFailure(semanticResult, notEvaluated);
           // Same landmark guard as the parsed-JSON path (guardLandmarkRecord).
           guardLandmarkRecord(semanticResult, 'semanticIssues', '[EVAL semantic]');
           if (semanticResult && semanticResult.semanticIssues && semanticResult.semanticIssues.length > 0) {
@@ -4084,10 +4081,15 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     // Always release three-stage Stage 2 so it doesn't hang on any early return.
     // Safe to call twice — promises ignore subsequent resolve() calls.
     if (qualityFiguresResolve) qualityFiguresResolve(null);
+    // Settle the side judges on EVERY exit (early `return null` included) so no
+    // paid call is left running unawaited (review A5, 2026-10-04). Each catches
+    // internally; allSettled makes that a guarantee rather than an assumption.
+    await Promise.allSettled([p1Promise, semanticPromise, threeStagePromise].filter(Boolean));
   }
 }
 
 module.exports = {
+  recordSemanticJudgeFailure,
   presenceCounterName,
   runVisualInventory,
   validateEmptyScene,

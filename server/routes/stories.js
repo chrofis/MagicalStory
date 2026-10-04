@@ -934,7 +934,6 @@ router.get('/:id/dev-metadata', authenticateToken, requireAdminActing, async (re
           modelId: r.modelId,
           reasoning: r.reasoning,
           thinkingText: r.thinkingText || null,
-          textIssue: r.textIssue,
           timestamp: r.timestamp,
           evalSkipped: r.evalSkipped,
           autoRepairEnabled: r.autoRepairEnabled,

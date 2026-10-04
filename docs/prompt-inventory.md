@@ -223,7 +223,6 @@ Sizes measured 2026-08-09.
 | Template | Consumer | Stage |
 |---|---|---|
 | entity-consistency-check.txt | entityConsistency.js `evaluateEntityConsistency` | Cross-page entity consistency eval |
-| entity-single-page-repair.txt | entityConsistency.js `repairSinglePage` | Single-page entity repair. Its physical-traits face comes from `buildFaceDescription`, the page/cover face builder (2026-09-24) |
 | incremental-consistency-check.txt | images.js `evaluateIncrementalConsistency` | Incremental consistency |
 | ~~final-consistency-check.txt~~ | — | **DELETED 2026-07-26** — `runFinalConsistencyChecks`/`evaluateSingleBatch` chain was dead (imported, never called); removed in the Pt 10 cleanup (decisions.md) |
 | visual-bible-analysis.txt | visualBible.js `analyzeVisualBibleElements` | VB element analysis |

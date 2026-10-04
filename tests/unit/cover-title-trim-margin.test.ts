@@ -1,4 +1,8 @@
 import { describe, it, expect } from 'vitest';
+import { beforeAll } from 'vitest';
+import { createRequire as createRequireForTemplates } from 'node:module';
+// buildImagePrompt has no hardcoded fallback (deleted 2026-10-04, review B4): load the real template.
+beforeAll(async () => { await createRequireForTemplates(import.meta.url)('../../server/services/prompts').loadPromptTemplates(); });
 
 // Two staging trials baked the front-cover title to the very last pixel column
 // of the canvas (job_1788763045123_z8so79ngb: ink 19→863 of 864, right margin

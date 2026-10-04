@@ -22,7 +22,7 @@ const { sumUsage } = require('../lib/providerUsage');
 
 // Services
 const { log } = require('../utils/logger');
-const { saveStoryData, saveScenePageData, saveCoverData, rehydrateStoryImages, saveStoryImage, getStoryImage, getActiveVersion, setActiveVersion, getNextVersionIndex, getPool, dbQuery, saveStyleLabImage, getStyleLabThumbnails, getStyleLabRunImages } = require('../services/database');
+const { saveStoryData, saveScenePageData, saveCoverData, saveFinalChecksReport, rehydrateStoryImages, saveStoryImage, getStoryImage, getActiveVersion, setActiveVersion, getNextVersionIndex, getPool, dbQuery, saveStyleLabImage, getStyleLabThumbnails, getStyleLabRunImages } = require('../services/database');
 const { PROMPT_TEMPLATES, fillTemplate, assertPromptFilled } = require('../services/prompts');
 const { chargeCredits } = require('../lib/jobCredits');
 
@@ -178,6 +178,28 @@ const COVER_TYPE_TO_PAGE = { frontCover: -1, initialPage: -2, backCover: -3 };
 function isCoverPage(pageNumber) { return pageNumber < 0; }
 function getCoverType(pageNumber) { return COVER_PAGE_MAP[String(pageNumber)]; }
 function getCoverData(storyData, coverType) { return storyData.coverImages?.[coverType]; }
+
+/**
+ * Persist ONLY the named pages/covers, each atomically (saveScenePageData /
+ * saveCoverData = jsonb_set on that one entry). The repair-workflow routes read
+ * the story at request start and then run for minutes; a whole-blob
+ * saveStoryData from that snapshot wrote every OTHER page back as it was then,
+ * reverting any repair saved in between (code review 2026-10 B5; same class as
+ * bug cover-save-clobbers-scene-page). A page that is not in the stored story
+ * is logged as an error, never rescued by a whole-blob save.
+ */
+async function savePagesAtomically(id, storyData, pageNumbers, tag) {
+  for (const pageNumber of pageNumbers) {
+    try {
+      const ok = isCoverPage(pageNumber)
+        ? await saveCoverData(id, getCoverType(pageNumber), getCoverData(storyData, getCoverType(pageNumber)))
+        : await saveScenePageData(id, pageNumber, storyData.sceneImages.find(sc => sc.pageNumber === pageNumber));
+      if (!ok) log.error(`❌ [${tag}] ${id} page ${pageNumber}: not found in the stored story, change not saved`);
+    } catch (saveErr) {
+      log.error(`❌ [${tag}] ${id} page ${pageNumber}: failed to save: ${saveErr.message}`);
+    }
+  }
+}
 
 // Look up a scene image or cover image by page number
 function findSceneOrCover(sData, pageNum) {
@@ -4390,20 +4412,9 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, imageRegenera
     // read at request start wrote every OTHER page back as it was then, reverting
     // any repair saved in between (code review 2026-10 B5; same class as bug
     // cover-save-clobbers-scene-page). Only pages that were actually re-scored are written.
-    (async () => {
-      for (const [pn, result] of Object.entries(pages)) {
-        if (!result || result.error) continue;
-        const pageNumber = Number(pn);
-        try {
-          const ok = isCoverPage(pageNumber)
-            ? await saveCoverData(id, getCoverType(pageNumber), getCoverData(storyData, getCoverType(pageNumber)))
-            : await saveScenePageData(id, pageNumber, storyData.sceneImages.find(sc => sc.pageNumber === pageNumber));
-          if (!ok) log.error(`❌ [RE-EVALUATE] ${id} page ${pageNumber}: not found in the stored story, evaluation not saved`);
-        } catch (saveErr) {
-          log.error(`❌ [RE-EVALUATE] ${id} page ${pageNumber}: failed to save evaluation: ${saveErr.message}`);
-        }
-      }
-    })();
+    savePagesAtomically(id, storyData,
+      Object.entries(pages).filter(([, result]) => result && !result.error).map(([pn]) => Number(pn)),
+      'RE-EVALUATE');
     addRepairCost(id, apiCost, 'Re-evaluate').catch(err => log.error('Failed to save re-eval cost:', err.message));
   } catch (err) {
     log.error('❌ [RE-EVALUATE] Failed to re-evaluate pages:', err);
@@ -5322,8 +5333,14 @@ router.post('/:id/repair-workflow/consistency-check', authenticateToken, imageRe
     log.info(`✅ [REPAIR-WORKFLOW] Consistency check complete: ${report.totalIssues} issues found`);
     res.json({ report, apiCost });
 
-    // Save to DB in background (don't block the response)
-    saveStoryData(id, storyData).catch(err => log.error('Failed to save entity report:', err.message));
+    // Save to DB in background (don't block the response). The check runs for
+    // minutes, so the whole-blob save is out: the report goes through its own
+    // jsonb_set and only the pages whose fresh bbox detection was cached are
+    // written, each atomically (batch 8, B5 class).
+    saveFinalChecksReport(id, storyData.finalChecksReport)
+      .then(ok => { if (!ok) log.error(`❌ [CONSISTENCY-CHECK] ${id}: story not found, entity report not saved`); })
+      .catch(err => log.error('Failed to save entity report:', err.message));
+    if (report.pagesWithNewBbox?.length > 0) savePagesAtomically(id, storyData, report.pagesWithNewBbox, 'CONSISTENCY-CHECK');
     addRepairCost(id, apiCost, 'Consistency check').catch(err => log.error('Failed to save repair cost:', err.message));
   } catch (err) {
     log.error('Error in consistency check:', err);
@@ -5438,8 +5455,12 @@ router.post('/:id/repair-workflow/pick-best-versions', authenticateToken, async 
     log.info(`✅ [REPAIR-WORKFLOW] Pick-best complete: ${Object.values(results).filter(r => r.switched).length} pages switched`);
     res.json({ results });
 
-    // Save to DB in background (don't block the response)
-    saveStoryData(id, storyData).catch(err => log.error('Failed to save pick-best:', err.message));
+    // Save to DB in background (don't block the response). Only the pages whose
+    // active version switched were changed (syncVersionToRoot), so only those are
+    // written, each atomically.
+    savePagesAtomically(id, storyData,
+      Object.entries(results).filter(([, r]) => r.switched).map(([pn]) => Number(pn)),
+      'PICK-BEST');
   } catch (err) {
     log.error('❌ [REPAIR-WORKFLOW] Failed to pick best versions:', err);
     const isAdmin = req.user?.role === 'admin' || req.user?.impersonating;
