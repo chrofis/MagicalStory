@@ -1574,11 +1574,18 @@ async function refineStoryText(storyData, pages, opts = {}) {
       byCategory: r.ok ? faultsByCategory(raw) : {},
     };
   };
-  audits = await Promise.all([
-    withDeadline(runAudit('arc-informed', auditModel, buildTextAuditPrompt(storyData, current, arc, { arcHints }), 'text_audit'), 'arc-informed'),
-    withDeadline(runAudit('blind', blindAuditModel, buildTextAuditBlindPrompt(storyData, current), 'text_audit_blind'), 'blind'),
-    withDeadline(runJev(), 'jev'),
-  ]);
+  // REPLAYED AUDITS (Lab only, 2026-10-04). `opts.audits` hands in a stored
+  // run's audit results ({source, ok, raw}) instead of calling the auditors,
+  // so a repair-model A/B answers the SAME findings — audits vary run to run,
+  // and fresh ones would make the auditors a second variable. Production never
+  // passes it.
+  audits = Array.isArray(opts.audits)
+    ? opts.audits.map(a => ({ ...a, replayed: true }))
+    : await Promise.all([
+      withDeadline(runAudit('arc-informed', auditModel, buildTextAuditPrompt(storyData, current, arc, { arcHints }), 'text_audit'), 'arc-informed'),
+      withDeadline(runAudit('blind', blindAuditModel, buildTextAuditBlindPrompt(storyData, current), 'text_audit_blind'), 'blind'),
+      withDeadline(runJev(), 'jev'),
+    ]);
   for (const a of audits) {
     if (!a.ok && a.error) log.warn(`⚠️ [TEXT-AUDIT/${a.source}] ${a.error}`);
   }
