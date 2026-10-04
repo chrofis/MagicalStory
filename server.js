@@ -92,7 +92,8 @@ const { authenticateToken } = require('./server/middleware/auth');
 const { authLimiter, registerLimiter, apiLimiter, aiProxyLimiter, storyGenerationLimiter, imageRegenerationLimiter } = require('./server/middleware/rateLimit');
 const { PROMPT_TEMPLATES, loadPromptTemplates, fillTemplate, buildEmptyScenePrompt } = require('./server/services/prompts');
 const { generatePrintPdf, generateViewPdf, generateCombinedBookPdf } = require('./server/lib/pdf');
-const { processBookOrder, getCoverDimensions } = require('./server/lib/gelato');
+const { processBookOrder, resolveBookOrderInputs, sweepStuckBookOrders, getCoverDimensions } = require('./server/lib/gelato');
+const { bufferWebhookEvent, recordPostPaymentFailure } = require('./server/lib/stripeWebhookRetry');
 const { resendWebhookHandler } = require('./server/lib/resendWebhook');
 const {
   hashImageData,
@@ -577,8 +578,11 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
     log.debug('💳 [STRIPE WEBHOOK] Received verified event:', event.type);
     log.debug(`   Payment type: ${isTestPayment ? 'TEST (admin/developer)' : 'LIVE (real payment)'}`);
 
-    // Handle the checkout.session.completed event
-    if (event.type === 'checkout.session.completed') {
+    // checkout.session.completed fires when the customer finishes the Stripe page; for a delayed
+    // payment method (SEPA, bank transfer) the money has NOT arrived yet and payment_status is
+    // 'unpaid' - grant nothing then, and run the same code when async_payment_succeeded fires
+    // (review 2026-10-04 P4).
+    if (event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded') {
       const session = event.data.object;
 
       log.info('✅ [STRIPE WEBHOOK] Payment successful!');
@@ -591,6 +595,12 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
         const fullSession = await stripeClient.checkout.sessions.retrieve(session.id, {
           expand: ['customer', 'line_items']
         });
+
+        if (fullSession.payment_status !== 'paid') {
+          log.warn(`⏳ [STRIPE WEBHOOK] Session ${fullSession.id} payment_status=${fullSession.payment_status} - nothing granted; waiting for async_payment_succeeded`);
+          res.json({ received: true, awaitingPayment: true });
+          return;
+        }
 
         // Extract customer information
         const customerInfo = {
@@ -708,67 +718,14 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
 
         // Store order in database (book purchase)
         if (STORAGE_MODE === 'database') {
-          const userId = fullSession.metadata?.userId;
-          const address = fullSession.shipping?.address || fullSession.customer_details?.address || {};
-          const orderCoverType = fullSession.metadata?.coverType || 'softcover';
-          const orderBookFormat = fullSession.metadata?.bookFormat || 'square';
-          const orderQuantity = parseInt(fullSession.metadata?.quantity) || 1;
-
-          // Validate required metadata
-          if (!userId) {
-            log.error('❌ [STRIPE WEBHOOK] Invalid or missing userId in metadata:', fullSession.metadata);
-            throw new Error('Invalid userId in session metadata');
-          }
-
-          // Look up user's preferred language for emails
-          try {
-            const langResult = await dbPool.query('SELECT preferred_language FROM users WHERE id = $1', [userId]);
-            customerInfo.language = langResult.rows[0]?.preferred_language || 'English';
-          } catch (langErr) {
-            log.warn('⚠️ [STRIPE WEBHOOK] Failed to look up user language, defaulting to English:', langErr.message);
-            customerInfo.language = 'English';
-          }
-
-          // Parse story IDs - support both new storyIds array and legacy storyId
-          let allStoryIds = [];
-          if (fullSession.metadata?.storyIds) {
-            try {
-              allStoryIds = JSON.parse(fullSession.metadata.storyIds);
-            } catch (e) {
-              log.error('❌ [STRIPE WEBHOOK] Failed to parse storyIds:', e);
-            }
-          }
-          // Fallback to legacy single storyId
-          if (allStoryIds.length === 0) {
-            const storyIdRaw = fullSession.metadata?.storyId || fullSession.metadata?.story_id;
-            if (storyIdRaw) {
-              allStoryIds = [storyIdRaw];
-            }
-          }
-
-          if (allStoryIds.length === 0) {
-            log.error('❌ [STRIPE WEBHOOK] No story IDs in metadata:', fullSession.metadata);
-            throw new Error('Missing story IDs in session metadata - cannot process book order');
-          }
-
-          log.debug(`📚 [STRIPE WEBHOOK] Processing order with ${allStoryIds.length} stories:`, allStoryIds);
-
-          // Validate all stories exist
-          const validatedStoryIds = [];
-          for (const sid of allStoryIds) {
-            const result = await dbPool.query('SELECT id FROM stories WHERE id = $1 AND user_id = $2', [sid, userId]);
-            if (result.rows.length > 0) {
-              validatedStoryIds.push(sid);
-            } else {
-              log.warn(`⚠️ [STRIPE WEBHOOK] Story not found: ${sid}, skipping`);
-            }
-          }
-
-          if (validatedStoryIds.length === 0) {
-            log.error('❌ [STRIPE WEBHOOK] No valid stories found for IDs:', allStoryIds);
-            log.error('❌ [STRIPE WEBHOOK] User ID:', userId);
-            throw new Error('No valid stories found');
-          }
+          // userId, cover/format/quantity, preferred language and the validated story ids come
+          // from ONE function shared with the admin retry and the stuck-order resume (P2/P8).
+          const {
+            userId, address, validatedStoryIds,
+            coverType: orderCoverType, bookFormat: orderBookFormat, quantity: orderQuantity,
+            customerInfo: resolvedCustomer,
+          } = await resolveBookOrderInputs(dbPool, fullSession);
+          customerInfo.language = resolvedCustomer.language;
 
           // Use first story ID as the primary for orders table (for backwards compatibility)
           const primaryStoryId = validatedStoryIds[0];
@@ -951,7 +908,12 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
             } catch (refErr) {
               await client.query('ROLLBACK').catch(() => {});
               log.error('❌ [STRIPE WEBHOOK] Referral cashback failed (rolled back):', refErr.message);
-              // Don't throw — the order itself is already saved outside this block
+              // Don't throw — the order itself is already saved outside this block. Record it
+              // durably + alert, or the referrer's cashback is silently lost (P7).
+              await recordPostPaymentFailure(dbPool, {
+                event, step: 'referral_cashback', sessionId: fullSession.id, error: refErr,
+                sendAlert: email.sendAdminHealthReport,
+              });
             } finally {
               client.release();
             }
@@ -972,7 +934,12 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
               }
             } catch (confirmErr) {
               log.error(`❌ [STRIPE WEBHOOK] confirmPending failed for session ${fullSession.id}:`, confirmErr.message);
-              // Don't throw — order is saved, this is a balance bookkeeping issue
+              // Don't throw — order is saved, this is a balance bookkeeping issue. Record it
+              // durably + alert: the pending hold would stay locked forever (P7).
+              await recordPostPaymentFailure(dbPool, {
+                event, step: 'confirm_pending_balance', sessionId: fullSession.id, error: confirmErr,
+                sendAlert: email.sendAdminHealthReport,
+              });
             }
           }
 
@@ -1031,11 +998,27 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
       }
     }
 
-    // ── checkout.session.expired: release any referral balance hold so the
-    // user gets their pending CHF back. Stripe expires unfinished sessions
-    // after ~24h. Idempotent.
-    if (event.type === 'checkout.session.expired') {
+    // ── checkout.session.expired / async_payment_failed: the checkout will never be paid.
+    // Release any referral balance hold so the user gets their pending CHF back, and release the
+    // referral-code claim print.js made at session creation (P3) so an abandoned checkout does
+    // not lock the buyer out of every promo code. Stripe expires unfinished sessions after ~24h.
+    // Idempotent.
+    if (event.type === 'checkout.session.expired' || event.type === 'checkout.session.async_payment_failed') {
       const session = event.data.object;
+      if (event.type === 'checkout.session.async_payment_failed') {
+        log.error(`❌ [STRIPE WEBHOOK] Delayed payment FAILED for session ${session.id} - nothing was granted`);
+      }
+      if (session.metadata?.referralCode && session.metadata?.userId) {
+        try {
+          const { releaseReferralClaim } = require('./server/lib/referral');
+          if (await releaseReferralClaim(dbPool, { userId: session.metadata.userId, code: session.metadata.referralCode, sessionId: session.id })) {
+            log.info(`🎁 [STRIPE WEBHOOK] Released referral-code claim ${session.metadata.referralCode} for ${session.metadata.userId} (unpaid session ${session.id})`);
+          }
+        } catch (claimErr) {
+          log.error(`❌ [STRIPE WEBHOOK] releaseReferralClaim failed for session ${session.id}:`, claimErr.message);
+          await bufferWebhookEvent(dbPool, { eventId: `${event.id}:release_referral_claim`, eventType: 'release_referral_claim_failed', payload: event, error: claimErr });
+        }
+      }
       const useBalanceCents = parseInt(session.metadata?.useBalanceCents) || 0;
       const buyerUserId = session.metadata?.userId;
       if (useBalanceCents > 0 && buyerUserId) {
@@ -1070,17 +1053,8 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
     log.error('   Stack:', err.stack);
 
     if (event) {
-      try {
-        await dbPool.query(
-          `INSERT INTO stripe_webhook_retry (event_id, event_type, payload, error_message, error_stack)
-           VALUES ($1, $2, $3, $4, $5)
-           ON CONFLICT (event_id) DO NOTHING`,
-          [event.id, event.type, JSON.stringify(event), err.message, err.stack]
-        );
+      if (await bufferWebhookEvent(dbPool, { eventId: event.id, eventType: event.type, payload: event, error: err })) {
         log.warn(`💾 [STRIPE WEBHOOK] Buffered event ${event.id} (${event.type}) to stripe_webhook_retry for replay`);
-      } catch (bufferErr) {
-        log.error('❌ [STRIPE WEBHOOK] CRITICAL: failed to buffer event for retry:', bufferErr.message);
-        log.error('   Event payload was:', JSON.stringify(event));
       }
     }
 
@@ -2728,6 +2702,21 @@ initialize().then(() => {
     };
     setTimeout(checkStripeRetryBuffer, 30 * 1000);          // first check 30s after boot
     setInterval(checkStripeRetryBuffer, 5 * 60 * 1000);     // then every 5 min
+
+    // Paid book orders whose background fulfilment died with the process (deploy / OOM / idle
+    // shutdown) would otherwise sit in 'paid' / 'processing' forever (review 2026-10-04 P8):
+    // resume the ones that never started, alert the admin about the rest. Railway only - a dev
+    // machine pointed at a real database must not place Gelato orders.
+    if (process.env.RAILWAY_ENVIRONMENT) {
+      const alertedOrders = new Set();
+      const runOrderSweep = () => sweepStuckBookOrders(dbPool, {
+        getStripeClientForOrder,
+        sendAlert: (subject, body) => email.sendAdminHealthReport(subject, body),
+        alerted: alertedOrders,
+      }).catch(err => log.error(`[ORDER-SWEEP] sweep failed: ${err.message}`));
+      setTimeout(runOrderSweep, 2 * 60 * 1000);             // boot sweep, after the stale-job recovery
+      setInterval(runOrderSweep, 15 * 60 * 1000);
+    }
 
     // Database housekeeping — daily 03:30 CH, weekly reclaim Sundays 03:30 CH.
     // Each Railway service already has DATABASE_URL for ITS OWN database, so

@@ -22,7 +22,7 @@ const { getPool, rehydrateStoryImages, logActivity } = require('../services/data
 
 // Lib modules
 const { generatePrintPdf, generateViewPdf, generateCombinedBookPdf, parseStoryPages } = require('../lib/pdf');
-const { processBookOrder, getCoverDimensions, countBookContentPages, computeBookPageInfo } = require('../lib/gelato');
+const { processBookOrder, resumeBookOrder, getCoverDimensions, countBookContentPages, computeBookPageInfo } = require('../lib/gelato');
 const { stripDataUriPrefix } = require('../lib/r2');
 const email = require('../../email');
 
@@ -1224,171 +1224,37 @@ router.post('/generate-book-pdf', authenticateToken, async (req, res) => {
     res.status(500).json({ error: 'Failed to generate book PDF', details: err.message });
   }
 });
-// Admin - Retry failed print provider order
+// Admin - Retry a paid order that has no print provider order yet (review 2026-10-04 P2).
+// Runs the SAME function the Stripe webhook uses (processBookOrder, via resumeBookOrder) from the
+// Stripe session the customer paid with, so every story, the quantity, cover type and format are
+// the paid ones. The Gelato order type follows the ORDER's stripe_mode, not the admin's role.
 router.post('/admin/orders/:orderId/retry-print-order', authenticateToken, async (req, res) => {
   try {
     if (req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Admin access required' });
     }
-
     const { orderId } = req.params;
-    log.debug(`🔄 [ADMIN] Retrying print order for order ID: ${orderId}`);
-
-    // Get order details
-    const orderResult = await getDbPool().query(`
-      SELECT * FROM orders WHERE id = $1
-    `, [orderId]);
-
+    const orderResult = await getDbPool().query('SELECT * FROM orders WHERE id = $1', [orderId]);
     if (orderResult.rows.length === 0) {
       return res.status(404).json({ error: 'Order not found' });
     }
-
     const order = orderResult.rows[0];
-
-    // Check if order already has a print order
     if (order.gelato_order_id) {
       return res.status(400).json({ error: 'Order already has a print order ID', printOrderId: order.gelato_order_id });
     }
-
-    // Find the PDF file for this story
-    const pdfResult = await getDbPool().query(`
-      SELECT id FROM files WHERE story_id = $1 AND file_type = 'story_pdf' ORDER BY created_at DESC LIMIT 1
-    `, [order.story_id]);
-
-    if (pdfResult.rows.length === 0) {
-      return res.status(400).json({ error: 'No PDF found for this story. PDF needs to be regenerated.' });
+    const { getStripeClientForOrder } = req.app.locals;
+    const stripe = typeof getStripeClientForOrder === 'function' ? getStripeClientForOrder(order) : null;
+    if (!stripe) {
+      return res.status(500).json({ error: `No Stripe client for stripe_mode=${order.stripe_mode || 'live'}` });
     }
 
-    const pdfFileId = pdfResult.rows[0].id;
-    const baseUrl = process.env.BASE_URL || 'https://www.magicalstory.ch';
-    const pdfUrl = `${baseUrl}/api/files/${pdfFileId}`;
-
-    // Get story data to determine page count
-    const storyResult = await getDbPool().query(`SELECT data FROM stories WHERE id = $1`, [order.story_id]);
-    if (storyResult.rows.length === 0) {
-      return res.status(400).json({ error: 'Story not found' });
-    }
-
-    const storyData = JSON.parse(storyResult.rows[0].data);
-    const storyScenes = storyData.pages || storyData.sceneImages?.length || 15;
-
-    // Calculate total PDF pages (cover spread + blank + dedication + story pages)
-    // Picture-book layout for all reading levels: 1 scene = 1 print page
-    const frontMatterPages = 2; // blank left page + dedication right page
-    let interiorPages = frontMatterPages + storyScenes;
-    if (interiorPages % 2 !== 0) interiorPages += 1; // Pad to even
-    const printPageCount = 1 + interiorPages; // +1 for cover spread
-    log.debug(`📄 [ADMIN RETRY] Story has ${storyScenes} scenes, interior=${interiorPages}, total=${printPageCount}`);
-
-    // Get print product UID - prefer softcover for retry (can be changed in admin UI)
-    const productsResult = await getDbPool().query(
-      'SELECT product_uid, product_name, cover_type, min_pages, max_pages FROM gelato_products WHERE is_active = true ORDER BY cover_type ASC'
-    );
-
-    let printProductUid = null;
-    if (productsResult.rows.length > 0) {
-      // Find product matching the page count (prefer softcover)
-      const matchingProduct = productsResult.rows.find(p =>
-        printPageCount >= (p.min_pages || 0) && printPageCount <= (p.max_pages || 999)
-      );
-      if (matchingProduct) {
-        printProductUid = matchingProduct.product_uid;
-        log.debug(`📦 [ADMIN RETRY] Using product: ${matchingProduct.product_name} (${matchingProduct.cover_type})`);
-      } else {
-        // Use first product if no page count match
-        printProductUid = productsResult.rows[0].product_uid;
-        log.warn(`📦 [ADMIN RETRY] No product matches page count ${printPageCount}, using first: ${productsResult.rows[0].product_name}`);
-      }
-    }
-
-    if (!printProductUid) {
-      printProductUid = process.env.GELATO_PHOTOBOOK_UID;
-      if (!printProductUid) {
-        return res.status(500).json({ error: 'No active products configured. Please add products in admin dashboard.' });
-      }
-    }
-
-    const printApiKey = process.env.GELATO_API_KEY;
-    if (!printApiKey) {
-      return res.status(500).json({ error: 'GELATO_API_KEY not configured' });
-    }
-
-    // Admin retry: Use user role to determine Gelato order type
-    // Admins get draft for testing, but can force real order if needed
-    const orderType = isUserTestMode(req.user) ? 'draft' : 'order';
-    log.debug(`📦 [GELATO] Retry: Creating ${orderType} (user role: ${req.user.role})`);
-
-    const printOrderPayload = {
-      orderType: orderType,
-      orderReferenceId: `retry-${order.story_id}-${Date.now()}`,
-      customerReferenceId: order.user_id,
-      currency: 'CHF',
-      items: [{
-        itemReferenceId: `item-retry-${order.story_id}-${Date.now()}`,
-        productUid: printProductUid,
-        pageCount: printPageCount,
-        files: [{
-          type: 'default',
-          url: pdfUrl
-        }],
-        quantity: 1
-      }],
-      shipmentMethodUid: 'standard',
-      shippingAddress: {
-        firstName: (order.shipping_name || order.customer_name || '').split(' ')[0] || 'Customer',
-        lastName: (order.shipping_name || order.customer_name || '').split(' ').slice(1).join(' ') || '',
-        addressLine1: order.shipping_address_line1 || '',
-        addressLine2: order.shipping_address_line2 || '',
-        city: order.shipping_city || '',
-        postCode: order.shipping_postal_code || '',
-        state: order.shipping_state || '',
-        country: order.shipping_country || 'CH',
-        email: order.customer_email,
-        phone: ''
-      }
-    };
-
-    log.debug(`📦 [ADMIN] Retry print order payload: productUid=${printProductUid}, pageCount=${printPageCount}, pdfUrl=${pdfUrl}`);
-
-    const printResponse = await fetch('https://order.gelatoapis.com/v4/orders', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-API-KEY': printApiKey
-      },
-      body: JSON.stringify(printOrderPayload)
+    log.info(`🔄 [ADMIN] Retrying print order for order ${orderId} (session ${order.stripe_session_id}, stripe_mode=${order.stripe_mode || 'live'})`);
+    // PDF generation takes minutes: run in the background like the webhook does. processBookOrder
+    // marks the order failed and alerts the admin itself if the retry fails.
+    resumeBookOrder(getDbPool(), order, stripe).catch(err => {
+      log.error(`❌ [ADMIN] Retry of print order ${orderId} failed: ${err.message}`);
     });
-
-    if (!printResponse.ok) {
-      const errorText = await printResponse.text();
-      log.error(`❌ [ADMIN] Print provider API error: ${printResponse.status} - ${errorText}`);
-      return res.status(printResponse.status).json({
-        error: 'Print provider order failed',
-        details: errorText
-      });
-    }
-
-    const printOrder = await printResponse.json();
-    // Gelato v4 API returns 'id', not 'orderId'
-    const gelatoOrderId = printOrder.id || printOrder.orderId;
-    console.log('✅ [ADMIN] Print order created:', gelatoOrderId);
-
-    // Update order with print order ID
-    await getDbPool().query(`
-      UPDATE orders
-      SET gelato_order_id = $1,
-          gelato_status = 'submitted',
-          payment_status = 'completed',
-          updated_at = CURRENT_TIMESTAMP
-      WHERE id = $2
-    `, [gelatoOrderId, orderId]);
-
-    res.json({
-      success: true,
-      message: 'Print order created successfully',
-      printOrderId: gelatoOrderId
-    });
-
+    res.status(202).json({ success: true, message: 'Print order retry started', orderId: order.id });
   } catch (err) {
     log.error('❌ [ADMIN] Error retrying print order:', err);
     res.status(500).json({ error: err.message });

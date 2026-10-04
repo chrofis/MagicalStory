@@ -66087,3 +66087,22 @@ prepare-title keeps building only the costumed sheet; the story run builds the s
 **Rationale:** a refund must commit with the status change that justifies it, or not at all; the review's nine sites were copies of one pattern that had already drifted. Four older BILL-1 sites in regeneration.js keep their inline (correct) code; they can move to `chargeCredits` when next touched.
 
 **Touched files:** `server/lib/jobCredits.js`, `server/routes/jobs.js`, `server/routes/regeneration.js`, `server/routes/stories.js`, `server/routes/admin/database.js`, `server.js`, `storyJobPipeline.js`, `tests/unit/job-credits.test.ts`.
+
+
+## 2026-10-04 — Payments: debit before refund, paid-only grants, durable post-payment failures, stuck-order sweep
+
+**Context:** code review 2026-10-04, area 4-5 (payments / referral / print orders). Latent today (prod has no referral balances), but each was a money-loss or silent-failure path.
+
+**Decision:**
+- *Referral cash-out (P1):* `referralBalance.cashOutToCard` debits the balance first (`spendForRefund`, the conditional UPDATE is the double-spend guard; a refused debit means no refund), then calls Stripe with idempotency key `referral-cashout-<ledger id>`, then annotates the ledger row; a failed refund restores the balance with a `restored` row that carries NO session id (confirm/release idempotency keys on session id and must not read it as a resolved checkout hold).
+- *Paid-only grants (P4):* the webhook grants credits / creates the order only when the retrieved session has `payment_status === 'paid'`. `checkout.session.async_payment_succeeded` runs the same code path as `completed`; `async_payment_failed` is handled with `expired` (log + release hold + release referral claim, nothing granted). `no_payment_required` is deliberately not accepted: checkout always charges at least CHF 1.
+- *Referral claim (P3):* kept the claim at checkout creation (it is the TOCTOU lock) and release it on expired / async-failed via `releaseReferralClaim`, guarded by "no order for this session and no referral event for the buyer". Claiming only on completion was rejected: it would remove the lock. Not covered: a Stripe `sessions.create` that throws after the claim (the claim then stays until the user retries; unchanged).
+- *Post-payment failures (P7):* referral cashback and confirm-pending failures are written to `stripe_webhook_retry` under `<event id>:<step>` and e-mailed to the admin (`sendAdminHealthReport`); the existing 5-minute monitor keeps logging them. No automatic replay: both steps are idempotent but replaying a money movement unattended was not asked for.
+- *Stuck orders (P8):* `sweepStuckBookOrders` runs 2 min after boot and every 15 min (Railway only). An order with no Gelato id idle for 30 min is auto-resumed ONLY when still `paid` (processBookOrder never started, so nothing can have reached Gelato); `processing` is alert-only because the process may have died after Gelato accepted the order and a re-run would print the book twice. A failed DB write after Gelato accepted the order no longer marks the order failed or e-mails the customer: it alerts the admin with the Gelato id. `has_issue` now covers paid/processing/failed without a Gelato id.
+- *Admin retry (P2):* kept and rebuilt on `resumeBookOrder` -> `processBookOrder` (the webhook's function) from the Stripe session, so all paid stories, quantity, cover and format are used and the Gelato order type follows the ORDER's `stripe_mode`. The webhook, retry and sweep all build inputs in `resolveBookOrderInputs`.
+- *Self-referral (P9):* the buyer's email normalised (lowercase, +tag, gmail dots) must differ from the referrer's. Payment-fingerprint / address matching (the review's alternative) was not built.
+- *order-status (P10):* anonymous callers get amount/currency/tokens only; recipient details only when a valid login token belongs to the order's user.
+
+**Rationale:** each fix puts the irreversible step (Stripe refund, Gelato order) after the durable, atomic one, and makes every failure after payment leave a row an operator can see.
+
+**Touched files:** `server/lib/referralBalance.js`, `server/lib/referral.js`, `server/lib/orders.js`, `server/lib/gelato.js`, `server/lib/stripeWebhookRetry.js`, `server/routes/print.js`, `server/routes/admin/orders.js`, `server.js`, `server/routes/regeneration.js` (four inline debit sites moved onto `chargeCredits`), tests `referral-cashout`, `referral-self-email`, `order-status-view`, `stripe-post-payment`.

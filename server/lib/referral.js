@@ -37,4 +37,24 @@ function normalizeEmailForSelfReferral(email) {
   return `${local}@${domain}`;
 }
 
-module.exports = { generateReferralCode, normalizeEmailForSelfReferral };
+/**
+ * Give back the buyer's one-referral-code claim when the checkout that claimed it never paid
+ * (review 2026-10-04 P3). print.js claims users.referred_by when the Stripe session is created
+ * (TOCTOU lock); without this an abandoned checkout locks the buyer out of every promo code.
+ * Released only if THIS session produced no order and no referral event exists for the buyer.
+ *
+ * @returns {Promise<boolean>} true when a claim was released
+ */
+async function releaseReferralClaim(pool, { userId, code, sessionId }) {
+  if (!userId || !code || !sessionId) return false;
+  const res = await pool.query(
+    `UPDATE users SET referred_by = NULL
+      WHERE id = $1 AND referred_by = $2
+        AND NOT EXISTS (SELECT 1 FROM orders WHERE stripe_session_id = $3)
+        AND NOT EXISTS (SELECT 1 FROM referral_events WHERE buyer_user_id = $1)`,
+    [userId, code, sessionId]
+  );
+  return res.rowCount === 1;
+}
+
+module.exports = { generateReferralCode, normalizeEmailForSelfReferral, releaseReferralClaim };
