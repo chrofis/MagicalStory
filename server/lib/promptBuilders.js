@@ -3080,6 +3080,20 @@ function buildRecurringElementsText(visualBible, filterIds = new Set()) {
  * @returns {string|null} null when the template is unavailable
  */
 /**
+ * Whether the Jev decision layer is OFF for this brief author (the outage
+ * backup). ONE reading of `options.jevBackup` for every rule that branches on
+ * it (shotRuleFills, fixedFieldsRule, vantageShotRule): only an explicit `true`
+ * is the backup. It used to be read as `=== false` by shotRuleFills and as a
+ * `= false` default by fixedFieldsRule, so an omitted flag gave free-shot rules
+ * and the fixed-fields rule in the same prompt (review 2026-10-04 B2). A caller
+ * that decided nothing upstream, such as a Test Lab single-page expansion,
+ * passes true.
+ */
+function isJevBackup(options) {
+  return !!options && options.jevBackup === true;
+}
+
+/**
  * The CAST BLOCK the Art Director writes from and the scene review judges
  * against — one numbered physical + clothing line per character.
  *
@@ -3110,6 +3124,7 @@ function buildExpansionCastBlock(characters, clothingReqs, primaryCategory = nul
 }
 
 function artDirectorFills(inputData, beats = [], options = {}) {
+  const jevBackup = isJevBackup(options);
   const characters = inputData.characters || [];
   // Clothing TEXT per character, not the category key. Passing null here left
   // the all-pages Art Director with no outfit at all, so it wrote the key into
@@ -3212,7 +3227,7 @@ function artDirectorFills(inputData, beats = [], options = {}) {
     SCENE_LIGHT_FIELD: SCENE_LIGHT_FIELD_RULE,
     // The Jev decision layer's fixed fields (2026-09-27) — one constant for the
     // brief authors and the scene review (jevDecisions.JEV_FIXED_FIELDS_RULE).
-    JEV_FIXED_FIELDS: require('./jevDecisions').fixedFieldsRule(options.jevBackup),
+    JEV_FIXED_FIELDS: require('./jevDecisions').fixedFieldsRule(jevBackup),
     // No TEXT_NOT_A_CHECKLIST: the page text is written AFTER these briefs, so
     // this call never sees it and a rule about it cannot apply (owner,
     // 2026-09-23). The per-page Art Director and both iterate templates see
@@ -3261,9 +3276,9 @@ function artDirectorFills(inputData, beats = [], options = {}) {
     PLACE_INSIDE_OUTSIDE: PLACE_INSIDE_OUTSIDE_RULE,
     // The shot rules per path: on the Jev path a story page's shot is fixed
     // (owner, 2026-09-28) and no rule sets or widens it.
-    ...shotRuleFills({ fixedShot: options.jevBackup === false }),
+    ...shotRuleFills({ fixedShot: !jevBackup }),
     // Which shots a vantage holds: the pages' fixed shots on the Jev path.
-    VANTAGE_PAGE_SHOTS: require('./jevDecisions').vantageShotRule(options.jevBackup),
+    VANTAGE_PAGE_SHOTS: require('./jevDecisions').vantageShotRule(jevBackup),
   };
 }
 
@@ -3427,6 +3442,7 @@ function applyTextZoneGate(text, active) {
  * @param {Object} rawOutlineContext - Raw outline blocks {previousPages: string, currentPage: string}
  */
 function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language = 'en', visualBible = null, availableAvatars = '', rawOutlineContext = null, options = {}) {
+  const jevBackup = isJevBackup(options);
   // Build character names list ONLY (legacy placeholder for backwards-compat)
   const characterDetails = characters.map(c => `* **${c.name}**`).join('\n');
 
@@ -3664,7 +3680,7 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     SMALL_PROP_CONTACT: SMALL_PROP_CONTACT_RULE,
     // Rules 4, 5d, 11 and 11c and the `shot` field, per path (shotRuleFills):
     // a story page whose shot the decision layer fixed stages inside it.
-    ...shotRuleFills({ fixedShot: options.jevBackup === false }),
+    ...shotRuleFills({ fixedShot: !jevBackup }),
     // Rules 6d / 8l, shared with scene-review.txt check 6.
     EYES_OPEN: EYES_OPEN_RULE,
     SHARED_GRIP: SHARED_GRIP_RULE,
@@ -3690,7 +3706,7 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     SCENE_LIGHT_FIELD: SCENE_LIGHT_FIELD_RULE,
     // The Jev decision layer's fixed fields (2026-09-27) — one constant for the
     // brief authors and the scene review (jevDecisions.JEV_FIXED_FIELDS_RULE).
-    JEV_FIXED_FIELDS: require('./jevDecisions').fixedFieldsRule(options.jevBackup),
+    JEV_FIXED_FIELDS: require('./jevDecisions').fixedFieldsRule(jevBackup),
     // ONE rule for every template that authors or judges a page against its
     // text — see TEXT_NOT_A_CHECKLIST_RULE. The brief author's half is the
     // PERMISSION: the page text may name more than the frame stages.

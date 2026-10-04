@@ -1090,6 +1090,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               referencePhotos: expansionPagePhotos,
               // Decides whether the text-zone rule family is asked for at all.
               story: inputData,
+              // This legacy per-page path has no decision layer: nothing is fixed upstream.
+              jevBackup: true,
             }
           );
 

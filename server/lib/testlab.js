@@ -5788,6 +5788,30 @@ async function runPickBestStage(ctx, { experimentId }) {
 // Text-side stages (LLM only)
 // ─────────────────────────────────────────────────────────────────────
 
+/**
+ * The options production passes buildSceneExpansionPrompt (beatsPipeline.js
+ * expandOnePage), rebuilt from the stored story, so a Lab expansion measures the
+ * prompt production sends: the story (season, text-zone family), art style and
+ * image backend, character cap and clothing contract.
+ * `jevBackup: true`: a Lab single-page expansion runs with no decision layer, so
+ * no FIXED block exists and nothing is fixed upstream; the shot and fixed-field
+ * rules must say the same (review 2026-10-04 B2).
+ */
+function labSceneExpansionOptions(ctx, storyData, extra = {}) {
+  const { MODEL_DEFAULTS, IMAGE_MODELS } = require('../config/models');
+  const imgModelConfig = IMAGE_MODELS[storyData.modelOverrides?.imageModel || MODEL_DEFAULTS.pageRenderImage];
+  return {
+    maxCharactersPerScene: imgModelConfig?.maxCharactersPerScene || 3,
+    artStyleId: ctx.artStyle,
+    imageBackend: imgModelConfig?.backend,
+    clothingRequirements: storyData.clothingRequirements || null,
+    story: storyData,
+    jevBackup: true,
+    referencePhotos: ctx.referencePhotos,
+    ...extra,
+  };
+}
+
 /** Re-run the Art Director expansion for one page (scene-expansion.txt). */
 async function runSceneExpansionStage(ctx, { experimentId, promptOverride, params = {} }) {
   const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../services/prompts');
@@ -5816,7 +5840,7 @@ async function runSceneExpansionStage(ctx, { experimentId, promptOverride, param
       ctx.visualBible,
       availableAvatars,
       null,
-      { referencePhotos: ctx.referencePhotos }
+      labSceneExpansionOptions(ctx, storyData)
     );
   } finally {
     PROMPT_TEMPLATES.sceneExpansion = orig;
@@ -5882,7 +5906,7 @@ async function runSceneExpansionAbStage(ctx, { experimentId, promptOverride, par
         ctx.visualBible,
         availableAvatars,
         null,
-        { referencePhotos: ctx.referencePhotos }
+        labSceneExpansionOptions(ctx, storyData)
       );
     } finally {
       PROMPT_TEMPLATES.sceneExpansion = orig;
@@ -5971,7 +5995,7 @@ async function runSceneVariantStage(ctx, { experimentId, promptOverride, params 
       ctx.visualBible,
       availableAvatars,
       null,
-      { artStyleId: ctx.artStyle, referencePhotos: ctx.referencePhotos }
+      labSceneExpansionOptions(ctx, storyData)
     );
   } finally {
     PROMPT_TEMPLATES.sceneExpansion = orig;
