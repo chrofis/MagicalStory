@@ -85,10 +85,12 @@ describe('the candidate arms', () => {
       for (const variant of [false, true]) {
         const r = ARMS.resolveArm(arm, template, { variant });
         const t = r.template ?? template;
-        for (const ph of ['{REAR_TURN}', '{SHEET_GROUND}', '{SHEET_LETTERING}', '{GARMENT_COLOUR}', '{GARMENTS_REMOVED}', 'REQUESTED_STYLE', 'CHARACTER_AGE']) {
-          expect(t, `${arm}/${variant}: ${ph}`).toContain(ph);
-        }
-        expect(t).toMatch(/LOWEST of layoutScore, identityScore, styleScore, cleanScore, bodyFaceScore, ageScore, soloScore, backgroundScore, garmentScore, removedScore\./);
+        // Arm G has no TASK 10: the removed-garment question is its own call.
+        const phs = ['{REAR_TURN}', '{SHEET_GROUND}', '{SHEET_LETTERING}', '{GARMENT_COLOUR}', 'REQUESTED_STYLE', 'CHARACTER_AGE', ...(arm === 'G' ? [] : ['{GARMENTS_REMOVED}'])];
+        for (const ph of phs) expect(t, `${arm}/${variant}: ${ph}`).toContain(ph);
+        expect(t).toMatch(arm === 'G'
+          ? /LOWEST of layoutScore, identityScore, styleScore, cleanScore, bodyFaceScore, ageScore, soloScore, backgroundScore, garmentScore\./
+          : /LOWEST of layoutScore, identityScore, styleScore, cleanScore, bodyFaceScore, ageScore, soloScore, backgroundScore, garmentScore, removedScore\./);
         // The real builder fills it and the parts guard accepts it.
         const parts = await sentParts({ promptOverride: r.template, imageLabels: r.imageLabels, removedGarments: variant ? ['a coat'] : [] });
         const prompt = parts[parts.length - 1].text || '';
@@ -134,5 +136,71 @@ describe('the sheet_style judge fixture', () => {
 
   it('cost is measured from the usage the stage adds up', () => {
     expect(JF.estimateCostUsd('sheet_style', { usage: { input_tokens: 1e6, output_tokens: 0, thinking_tokens: 0 } })).toEqual({ usd: 0.3, basis: 'measured (input + output + thinking, every call incl. a re-ask)' });
+  });
+});
+
+
+describe('arm G and the per-garment check (owner decision 2026-10-04)', () => {
+  const sheetReply = (extra: Record<string, unknown> = {}) => ({
+    ...Object.fromEntries(['layout', 'identity', 'style', 'clean', 'bodyFace', 'age', 'solo', 'background', 'garment'].map(a => [`${a}Score`, 9])), ...extra,
+  });
+  /** Style judge calls carry 3 images; the garment check carries 1. */
+  function stubJudges(visibleByGarment: Record<string, boolean | 'throw'>) {
+    const asked: string[] = [];
+    globalThis.fetch = (async (_url: string, init: any) => {
+      const parts = JSON.parse(init.body).contents[0].parts;
+      const imgs = parts.filter((p: any) => p.inline_data).length;
+      let out: any;
+      if (imgs === 3) out = sheetReply();
+      else {
+        const prompt = parts[parts.length - 1].text;
+        const g = Object.keys(visibleByGarment).find(k => prompt.includes(`is ${k} visible`))!;
+        asked.push(g);
+        if (visibleByGarment[g] === 'throw') return { ok: false, status: 500 };
+        out = { cells: 'cell1: shirt; cell2: shirt', visible: visibleByGarment[g], reason: visibleByGarment[g] ? 'cell 3 shows the sleeve' : 'no cell shows it' };
+      }
+      return { ok: true, json: async () => ({ candidates: [{ finishReason: 'STOP', content: { parts: [{ text: JSON.stringify(out) }] } }] }) };
+    }) as any;
+    return asked;
+  }
+  const run = (removed: string[]) => SHEET.evaluateVariantSheet(IMG('SHEET'), { facePhoto: IMG('FACE'), realisticSheet: IMG('REF'), artStyle: 'watercolor', declaredAge: 7, removedGarments: removed });
+  const prev = process.env.GEMINI_API_KEY;
+  beforeAll(() => { process.env.GEMINI_API_KEY = prev || 'k'; });
+
+  it('G drops TASK 10 and every trace of removedScore from the style judge', () => {
+    const r = ARMS.resolveArm('G', template, { variant: true });
+    expect(r.garmentChecks).toBe(true);
+    expect(r.template).not.toMatch(/TASK 10|removed|GARMENTS_REMOVED/);
+    expect(() => ARMS.resolveArm('G', template.replace('TASK 10: GARMENTS TAKEN OFF', 'TASK 10: OTHER'))).toThrow(/TASK 10/);
+  });
+
+  it('one question per garment, asked about the variant image alone', async () => {
+    const asked = stubJudges({ 'autumn jacket': false, 'wool scarf': false });
+    const seen: number[] = [];
+    const f = globalThis.fetch;
+    globalThis.fetch = (async (u: string, init: any) => { seen.push(JSON.parse(init.body).contents[0].parts.filter((p: any) => p.inline_data).length); return (f as any)(u, init); }) as any;
+    const out = await run(['autumn jacket', 'wool scarf']);
+    expect(asked.sort()).toEqual(['autumn jacket', 'wool scarf']);
+    expect(seen.filter(n => n === 1)).toHaveLength(2);
+    expect(out.verdict.valid).toBe(true);
+  });
+
+  it('passes only when the style judge passes AND no removed garment is visible', async () => {
+    stubJudges({ 'autumn jacket': true });
+    const bad = await run(['autumn jacket']);
+    expect(bad.verdict.valid).toBe(false);
+    expect(bad.verdict.removedScore).toBe(1);
+    expect(bad.verdict.failureReasons.join(' ')).toMatch(/autumn jacket is still visible/);
+    expect(JF.normalizeFindings('sheet_style', { verdict: bad.verdict }).map((f: any) => f.type)).toEqual(['removed']);
+  });
+
+  it('a check that cannot be answered throws, so the variant is rejected, never shipped unchecked', async () => {
+    stubJudges({ 'autumn jacket': 'throw' });
+    await expect(run(['autumn jacket'])).rejects.toThrow(/Gemini eval HTTP 500/);
+  });
+
+  it('the check prompt carries the generators own garment wording', () => {
+    expect(String(PROMPT_TEMPLATES.sheetGarmentGoneCheck)).toContain('{PARTS}');
+    expect(SHEET.GARMENT_OFF_SHEET_RULE).toContain('sleeve, collar, hem, hood, zip or strap');
   });
 });

@@ -10329,7 +10329,11 @@ async function runSheetStyleFixture(target, params, sheet) {
     usage.thinking_tokens += u?.thinking_tokens || 0;
     usage.calls++;
   };
-  const { verdict, promptUsed } = await require('./character2x4Sheet')._internal.evaluateAvatarSheet(sheet, {
+  // Arm G: a variant is the style judge plus one garment-gone check per removed
+  // garment; a sheet with nothing taken off has no check to run and is just the style judge.
+  const SHEET = require('./character2x4Sheet');
+  const judge = armRun.garmentChecks && removedGarments.length ? SHEET.evaluateVariantSheet : SHEET._internal.evaluateAvatarSheet;
+  const { verdict, promptUsed } = await judge(sheet, {
     pass: 2, facePhoto, realisticSheet: reference,
     artStyle: entry.artStyle || storyData.artStyle || 'watercolor',
     declaredAge: character.age ?? null, removedGarments, usageTracker,

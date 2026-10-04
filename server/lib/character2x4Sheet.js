@@ -150,7 +150,8 @@ const garmentColourRule = (sheet) => `Every garment keeps the colour ${sheet} sh
  * a garment off is drawn from a reference without it, and until this rule the
  * judge never asked whether it was gone.
  */
-const GARMENT_OFF_SHEET_RULE = 'No cell shows any part of a garment taken off — no sleeve, collar, hem, hood, zip or strap of it, worn or held; the garment it leaves outermost is drawn in its place.';
+const GARMENT_PARTS = 'sleeve, collar, hem, hood, zip or strap';
+const GARMENT_OFF_SHEET_RULE = `No cell shows any part of a garment taken off — no ${GARMENT_PARTS} of it, worn or held; the garment it leaves outermost is drawn in its place.`;
 function garmentsRemovedTask(removedGarments) {
   const names = (Array.isArray(removedGarments) ? removedGarments : []).map(s => String(s || '').trim()).filter(Boolean);
   if (names.length === 0) return 'No garment is taken off on this sheet: score 10.';
@@ -1017,6 +1018,58 @@ async function evaluateStyledSheetWithGemini(sourcePhoto, realisticSheet, styled
   ];
   const report = await askSheetJudge({ model, parts, prompt, label: 'style-eval', usageTracker, usageFn: 'character_2x4_style_eval', apiKey: geminiApiKey });
   return { report: scoreStyleReport(report), promptUsed: prompt };
+}
+
+/**
+ * IS ONE TAKEN-OFF GARMENT STILL ON THE SHEET? One question, one garment, the
+ * variant image ALONE (owner, 2026-10-04). Inside the style judge the same
+ * question was read as an exemption: Image 2 still wears the garment, so "TASK 9
+ * does not score it" and "no garments were requested to be taken off" passed
+ * sheets that still wore it (Lab #1597/#1598: 3 of 4 control runs). With no
+ * reference image there is nothing to excuse it. Same provider and model as the
+ * style judge (askSheetJudge: Gemini Flash, temperature 0, echo guard).
+ * A failed call throws — the caller rejects the variant, never ships it unchecked.
+ *
+ * @returns {Promise<{garment: string, visible: boolean, cells: string, reason: string}>}
+ */
+async function checkGarmentGone(sheet, garment, opts = {}) {
+  const { model = 'gemini-2.5-flash', usageTracker = null } = opts;
+  const name = String(garment || '').trim();
+  if (!name) throw new Error('checkGarmentGone: no garment named');
+  const template = PROMPT_TEMPLATES.sheetGarmentGoneCheck;
+  if (!template) throw new Error('sheetGarmentGoneCheck prompt template not loaded');
+  const prompt = fillTemplate(template, { GARMENT: name, PARTS: `${GARMENT_PARTS} of it, worn or held` });
+  const report = await askSheetJudge({
+    model, parts: [inlinePartOf(sheet), { text: prompt }], prompt,
+    label: `garment-gone check (${name})`, usageTracker, usageFn: 'character_2x4_garment_gone_check', apiKey: process.env.GEMINI_API_KEY,
+  });
+  if (typeof report?.visible !== 'boolean') throw new Error(`garment-gone check (${name}) returned no visible true/false`);
+  return { garment: name, visible: report.visible, cells: String(report.cells ?? ''), reason: String(report.reason ?? '') };
+}
+
+/**
+ * THE VARIANT GATE: the pass-2 style judge AND one garment-gone check per
+ * removed garment. It passes only when the style judge passes and every check
+ * says not visible. The checks ride on the style verdict as `garmentChecks`;
+ * a visible garment sets removedScore 1 and `removed.reason`, so the
+ * finding/axis plumbing that read TASK 10 reads this unchanged.
+ */
+async function evaluateVariantSheet(sheet, opts = {}) {
+  const { removedGarments = [], usageTracker = null, ...styleOpts } = opts;
+  const names = (Array.isArray(removedGarments) ? removedGarments : []).map(s => String(s || '').trim()).filter(Boolean);
+  const styled = await evaluateAvatarSheet(sheet, { ...styleOpts, pass: 2, usageTracker });
+  const checks = await Promise.all(names.map(g => checkGarmentGone(sheet, g, { usageTracker })));
+  const verdict = styled.verdict;
+  verdict.garmentChecks = checks;
+  const still = checks.filter(c => c.visible);
+  verdict.removedScore = still.length ? 1 : 10;
+  verdict.removed = { score: verdict.removedScore, reason: still.length ? still.map(c => `${c.garment} is still visible: ${c.reason}`).join('; ') : 'no taken-off garment is visible in any cell' };
+  if (still.length) {
+    verdict.finalScore = Math.min(verdict.finalScore, verdict.removedScore);
+    verdict.valid = false;
+    verdict.failureReasons = [...(verdict.failureReasons || []), ...still.map(c => `removed: ${c.garment} is still visible — ${c.reason}`)];
+  }
+  return { ...styled, verdict };
 }
 
 // ── Every sheet judge's final score is computed HERE ─────────────────────────
@@ -2008,6 +2061,8 @@ module.exports = {
   buildRedressPrompt,
   GARMENT_OFF_SHEET_RULE,
   garmentsRemovedTask,
+  checkGarmentGone,
+  evaluateVariantSheet,
   // Exported for tests: the declared-age proportion block must reach the prompt.
   declaredAgeBlock,
   buildBodyRowPrompt,

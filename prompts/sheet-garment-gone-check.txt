@@ -1,0 +1,16 @@
+You see ONE image: a 2×4 character reference sheet, 8 cells (4 head cells on top, 4 full-body cells below), each showing the same character.
+
+Question: is {GARMENT} visible on the figure in any cell of this image?
+
+- Look at every one of the 8 cells, the turned-away cells included.
+- Any part of it counts: a {PARTS} of it, worn or held.
+- In `cells`, name the outermost garment you see in each cell, 1 to 8 (colour and kind).
+- `visible` is true when {GARMENT} appears in any cell, false when it appears in none.
+
+Return EXACTLY this JSON shape. Every value must come from what you see in the image — never return this template's placeholders:
+
+{
+  "cells": "cell1: <outermost garment>; cell2: <outermost garment>; and so on to cell8",
+  "visible": <true|false>,
+  "reason": "<the cells where any part of it is visible and which part, or that no cell shows it>"
+}

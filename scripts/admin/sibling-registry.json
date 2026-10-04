@@ -346,7 +346,8 @@
         "prompts/sheet-row-heads-eval.txt",
         "prompts/sheet-row-bodies-eval.txt",
         "prompts/sheet-row-identity-eval.txt",
-        "prompts/sheet-2x4-style-eval.txt"
+        "prompts/sheet-2x4-style-eval.txt",
+        "prompts/sheet-garment-gone-check.txt"
       ],
       "severity": "block"
     },
