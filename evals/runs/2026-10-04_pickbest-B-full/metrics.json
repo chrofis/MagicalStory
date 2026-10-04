@@ -1,0 +1,204 @@
+{
+ "tag": "B-full",
+ "cost": 0.483,
+ "cases": [
+  {
+   "case": 1,
+   "owner": "alt-clearly-better",
+   "winner": "shipped",
+   "freshScore": {
+    "shipped": 40,
+    "alt": 18
+   },
+   "storedScore": {
+    "shipped": 75,
+    "alt": 33
+   },
+   "freshCritical": {
+    "shipped": [
+     "page:rendered_text"
+    ],
+    "alt": []
+   },
+   "cost": 0.0575
+  },
+  {
+   "case": 2,
+   "owner": "toss-up",
+   "winner": "alt",
+   "freshScore": {
+    "shipped": 20,
+    "alt": 40
+   },
+   "storedScore": {
+    "shipped": -17,
+    "alt": -20
+   },
+   "freshCritical": {
+    "shipped": [
+     "character_presence|unknown",
+     "page:object_presence"
+    ],
+    "alt": []
+   },
+   "cost": 0.0491
+  },
+  {
+   "case": 3,
+   "owner": "alt-clearly-better",
+   "winner": "alt",
+   "freshScore": {
+    "shipped": 65,
+    "alt": 85
+   },
+   "storedScore": {
+    "shipped": 25,
+    "alt": 25
+   },
+   "freshCritical": {
+    "shipped": [],
+    "alt": []
+   },
+   "cost": 0.0469
+  },
+  {
+   "case": 4,
+   "owner": "toss-up",
+   "winner": "shipped",
+   "freshScore": {
+    "shipped": 55,
+    "alt": 3
+   },
+   "storedScore": {
+    "shipped": 10,
+    "alt": -85
+   },
+   "freshCritical": {
+    "shipped": [],
+    "alt": []
+   },
+   "cost": 0.0579
+  },
+  {
+   "case": 5,
+   "owner": "alt-clearly-better",
+   "winner": "alt",
+   "freshScore": {
+    "shipped": 25,
+    "alt": 100
+   },
+   "storedScore": {
+    "shipped": 46,
+    "alt": 40
+   },
+   "freshCritical": {
+    "shipped": [
+     "character_presence|unknown"
+    ],
+    "alt": []
+   },
+   "cost": 0.0483
+  },
+  {
+   "case": 6,
+   "owner": "toss-up",
+   "winner": "shipped",
+   "freshScore": {
+    "shipped": 40,
+    "alt": 35
+   },
+   "storedScore": {
+    "shipped": 13,
+    "alt": -37
+   },
+   "freshCritical": {
+    "shipped": [],
+    "alt": [
+     "character_identity|mother dragon",
+     "action_interaction|mother dragon"
+    ]
+   },
+   "cost": 0.0519
+  },
+  {
+   "case": 7,
+   "owner": "alt-clearly-better",
+   "winner": "alt",
+   "freshScore": {
+    "shipped": -10,
+    "alt": 55
+   },
+   "storedScore": {
+    "shipped": -10,
+    "alt": -35
+   },
+   "freshCritical": {
+    "shipped": [
+     "action_interaction|max",
+     "action_interaction|kiaan"
+    ],
+    "alt": []
+   },
+   "cost": 0.0467
+  },
+  {
+   "case": 8,
+   "owner": "toss-up",
+   "winner": "alt",
+   "freshScore": {
+    "shipped": 40,
+    "alt": 85
+   },
+   "storedScore": {
+    "shipped": 41,
+    "alt": 15
+   },
+   "freshCritical": {
+    "shipped": [],
+    "alt": []
+   },
+   "cost": 0.0416
+  },
+  {
+   "case": 9,
+   "owner": "toss-up",
+   "winner": "shipped",
+   "freshScore": {
+    "shipped": 81,
+    "alt": 60
+   },
+   "storedScore": {
+    "shipped": 43,
+    "alt": 30
+   },
+   "freshCritical": {
+    "shipped": [],
+    "alt": []
+   },
+   "cost": 0.0387
+  },
+  {
+   "case": 10,
+   "owner": "alt-clearly-better",
+   "winner": "shipped",
+   "freshScore": {
+    "shipped": 30,
+    "alt": 50
+   },
+   "storedScore": {
+    "shipped": 20,
+    "alt": 2
+   },
+   "freshCritical": {
+    "shipped": [
+     "character_presence|stuffed mouse"
+    ],
+    "alt": [
+     "character_presence|stuffed mouse",
+     "page:object_presence"
+    ]
+   },
+   "cost": 0.0446
+  }
+ ]
+}

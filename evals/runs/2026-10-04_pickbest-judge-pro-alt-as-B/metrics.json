@@ -1,0 +1,32 @@
+{
+ "tag": "pro-alt-as-B",
+ "totalCost": 0.1171,
+ "calls": [
+  {
+   "case": 3,
+   "rep": 0,
+   "altPosition": "B",
+   "winner": "alt",
+   "confidence": 0.85,
+   "model": "google/gemini-3.1-pro-preview",
+   "cost": 0.058484,
+   "in": 13582,
+   "out": 2610,
+   "reasoning": 2321,
+   "error": null
+  },
+  {
+   "case": 7,
+   "rep": 0,
+   "altPosition": "B",
+   "winner": "shipped",
+   "confidence": 0.85,
+   "model": "google/gemini-3.1-pro-preview",
+   "cost": 0.058572,
+   "in": 12486,
+   "out": 2800,
+   "reasoning": 2509,
+   "error": null
+  }
+ ]
+}
