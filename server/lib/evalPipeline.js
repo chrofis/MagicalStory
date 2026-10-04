@@ -1017,7 +1017,10 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
     const meta = extractSceneMetadata(sceneHint || imagePrompt);
     const interactions = meta?.interactions
       || (Array.isArray(meta?.fullData?.interactions) ? meta.fullData.interactions : null);
-    interactionsBlock = require('./vbIdGuard').formatInteractionsBlock(interactions, visualBible, require('./vbIdGuard').gazeCharacters(meta));
+    interactionsBlock = require('./vbIdGuard').formatInteractionsBlock(interactions, visualBible, [
+      ...(require('./vbIdGuard').gazeCharacters(meta) || []),
+      ...require('./vbIdGuard').gazeCreatures(meta, visualBible),
+    ]);
   } catch { /* silent */ }
 
   // --- Stage 1: the SHARED blind inventory ---
@@ -2772,7 +2775,10 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       const interactions = sceneMeta?.interactions
         || (Array.isArray(sceneMeta?.fullData?.interactions) ? sceneMeta.fullData.interactions : null);
       interactionsBlock = require('./vbIdGuard')
-        .formatInteractionsBlock(interactions, evalOptions.visualBible || null, require('./vbIdGuard').gazeCharacters(sceneMeta));
+        .formatInteractionsBlock(interactions, evalOptions.visualBible || null, [
+          ...(require('./vbIdGuard').gazeCharacters(sceneMeta) || []),
+          ...require('./vbIdGuard').gazeCreatures(sceneMeta, evalOptions.visualBible || null),
+        ]);
       const intent = sceneMeta?.sceneIntent || sceneMeta?.fullData?.sceneIntent;
       if (intent && String(intent).trim()) sceneIntentBlock = String(intent).trim();
     } catch { /* silent — evaluator defaults to "(none declared)" */ }
@@ -3602,7 +3608,12 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
             // the rule is what this branch has to obey.
             try {
               const gaze = evaluationType !== 'scene' ? [] : require('./gazeCheck').checkDeclaredGaze({
-                declared: require('./vbIdGuard').gazeCharacters(declaredSceneMeta),
+                // The cast and the page's creatures (CREATURE_FIELD_RULE), each
+                // with the emotion its brief row declares.
+                declared: [
+                  ...(require('./vbIdGuard').gazeCharacters(declaredSceneMeta) || []),
+                  ...require('./vbIdGuard').gazeCreatures(declaredSceneMeta, evalOptions.visualBible || null),
+                ],
                 inventory: p1Result,
                 matches,
                 resolveTarget: (t) => require('./compositeCastBuilder')

@@ -3191,6 +3191,8 @@ function artDirectorFills(inputData, beats = [], options = {}) {
     EYES_OPEN: EYES_OPEN_RULE,
     SHARED_GRIP: SHARED_GRIP_RULE,
     CREATURE_FACE: CREATURE_FACE_RULE,
+    CREATURE_FIELD: CREATURE_FIELD_RULE,
+    ELEMENT_SIZE_WORD: ELEMENT_SIZE_WORD_RULE,
     // SEVEN page-brief contracts, one constant each, filled at all FOUR sites
     // that author a page brief — see ONE_INSTANT_RULE and the block around it.
     // Registered as sibling set art-director-vs-iterate.
@@ -3230,6 +3232,7 @@ function artDirectorFills(inputData, beats = [], options = {}) {
     // ONE back-view garment look for both bible-authoring sites — see
     // wornItems.GARMENT_BACK_RULE.
     GARMENT_BACK: GARMENT_BACK_RULE,
+    CREATURE_FEATURES: CREATURE_FEATURES_RULE,
     TRUE_RELATIVE_SIZE: TRUE_RELATIVE_SIZE_RULE,
     // ONE shot vocabulary for every stage that writes or reads a `shot` — the
     // beats planner produces it, planCounters counts it, and the image prompt
@@ -3666,6 +3669,8 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     EYES_OPEN: EYES_OPEN_RULE,
     SHARED_GRIP: SHARED_GRIP_RULE,
     CREATURE_FACE: CREATURE_FACE_RULE,
+    CREATURE_FIELD: CREATURE_FIELD_RULE,
+    ELEMENT_SIZE_WORD: ELEMENT_SIZE_WORD_RULE,
     // SEVEN page-brief contracts, one constant each, filled at all FOUR sites
     // that author a page brief — see ONE_INSTANT_RULE and the block around it.
     // Registered as sibling set art-director-vs-iterate.
@@ -4134,6 +4139,8 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
       // templates and scene-review check 6 carry (2026-09-23).
       EYES_OPEN: EYES_OPEN_RULE,
       CREATURE_FACE: CREATURE_FACE_RULE,
+      CREATURE_FIELD: CREATURE_FIELD_RULE,
+      ELEMENT_SIZE_WORD: ELEMENT_SIZE_WORD_RULE,
     // The shot rules per path (shotRuleFills): a strict iterate of a page whose
     // shot the decision layer fixed stages inside it (owner, 2026-09-28).
     ...shotRuleFills({ fixedShot: options.fixedShot === true }),
@@ -5363,10 +5370,14 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
   // a looksAt naming the place the page is set in is no gaze target.
   const { gazeTarget } = require('./vbIdGuard');
   const pageObjects = metadata?.objects || metadata?.fullData?.objects || [];
-  const metaCharacters = (Array.isArray(metadata?.fullData?.characters) && metadata.fullData.characters.length > 0
-    ? metadata.fullData.characters
-    : (Array.isArray(metadata?.characters) ? metadata.characters : []))
-    .map(c => (c && typeof c === 'object' ? { ...c, looksAt: gazeTarget(c.looksAt, pageObjects) } : c));
+  const metaCharacters = [
+    ...(Array.isArray(metadata?.fullData?.characters) && metadata.fullData.characters.length > 0
+      ? metadata.fullData.characters
+      : (Array.isArray(metadata?.characters) ? metadata.characters : []))
+      .map(c => (c && typeof c === 'object' ? { ...c, looksAt: gazeTarget(c.looksAt, pageObjects) } : c)),
+    // A creature's face rides the same EXPRESSIONS AND EYES block (CREATURE_FIELD_RULE).
+    ...require('./vbIdGuard').gazeCreatures(metadata, visualBible),
+  ];
   const exactPosesBlock = buildExactPosesBlock(metadata?.interactions, metaCharacters, visualBible, { language: inputData?.language });
   const eraGuard = buildEraGuard(metadata?.era);
   // The page draws ONE shot: emit that one word's definition, not the table.
@@ -6915,7 +6926,7 @@ function buildTopicWindowSection(inputData = {}) {
 // the tone governs its face and expression only. decisions.md 2026-09-28.
 const GROWN_BANDS_TEXT = [...GROWN_CREATURE_SCALE_CLASSES].join(', ');
 const CREATURE_TONE_LEVELS = {
-  cute: `Animals, creatures and non-human characters are drawn cute: soft faces, large round friendly eyes, a calm closed-mouth smile, soft relaxed paws, an open upright posture, warm colours. A horned, spined or crested one carries a single pair at most, short and blunt-tipped — never a crown of horns around the head or rows of spikes down it. A non-human character reads as a playmate. A creature smaller than a grown-up is cute in body too: rounded forms throughout, and for size lean toward one near the child's own size — a scale a child could stand beside or hug — going bigger only where the story needs it: a being that is ridden, carries characters or fills a doorway is that size. A grown creature — one the story makes as tall as a grown-up or taller (scaleClass ${GROWN_BANDS_TEXT}) — keeps a grown adult's build, body proportions and full size: the cute tone governs its face and expression only — a soft closed-mouth smile, friendly eyes — never its body or its size. A being may be large — state its size in metres or against a familiar room, never as a multiple of a child. A being the story makes large is drawn at that full size and may tower gently over a child: calm and soft-faced, its head lowered toward them, never looming, lunging or menacing.`,
+  cute: `Animals, creatures and non-human characters are drawn cute: soft faces, large round eyes, a rounded mouth with no visible teeth, soft relaxed paws, an open upright posture, warm colours. A horned, spined or crested one carries a single pair at most, short and blunt-tipped — never a crown of horns around the head or rows of spikes down it. A non-human character reads as a playmate. A creature smaller than a grown-up is cute in body too: rounded forms throughout, and for size lean toward one near the child's own size — a scale a child could stand beside or hug — going bigger only where the story needs it: a being that is ridden, carries characters or fills a doorway is that size. A grown creature — one the story makes as tall as a grown-up or taller (scaleClass ${GROWN_BANDS_TEXT}) — keeps a grown adult's build, body proportions and full size: the cute tone governs its face only — soft features, large round eyes, no visible teeth — never its body or its size. A being may be large — state its size in metres or against a familiar room, never as a multiple of a child. A being the story makes large is drawn at that full size and may tower gently over a child: calm and soft-faced, its head lowered toward them, never looming, lunging or menacing.`,
   'not-menacing': "Animals, creatures and non-human characters carry an open friendly face and clearly kind eyes: a level brow rather than a heavy or overhanging one, open rather than deep-set eyes, a neutral or gentle mouth with the lips over the teeth, open or smiling included. Any claws stay folded and relaxed at rest. A horned, spined or crested one carries a single pair at most, kept short and smooth-tipped — never a crown of horns around the head or rows of spikes down it. For size, a creature may be clearly bigger than a child; prefer one that still fits in frame beside them and reads as approachable over an overwhelming one, unless the story needs otherwise — a being that is ridden, carries characters or blocks a way is that size. A being may be large — state its size in metres, not as a multiple of a child. The camera stays at the child's eye level; a being the story makes large stands at its full size beside them, calm and upright, never looming over them.",
   formidable: "A creature the story gives a powerful, wild or formidable nature is drawn as one: claws and teeth visible rather than hidden, real physical weight and presence, weathered or rugged hide, scale, fur or feather where they suit it. No rounded, toy-like or plush softening of such a creature. It may loom, and its size may be stated against a child. A creature the story means as gentle — a pet, a domestic animal, a comic one — stays gentle and friendly-looking; the story's own nature for each creature decides which of the two it gets. Size may be whatever the story wants; a genuinely huge creature is welcome.",
 };
@@ -9637,6 +9648,15 @@ const REACHABLE_CONTACT_RULE = "An object more than one character touches: ask f
  */
 const TRUE_RELATIVE_SIZE_RULE = "A vessel, building, vehicle or creature holds its real size against the figures near it — a person reaches about to a boat's rail, a doorway lintel or a wheel hub, never eye-level with a masthead, a rooftop or a chimney. Every page that cites one of THOSE — a vessel, a building, a vehicle — and holds a figure too names its size as a ratio against a figure in the prose: \"the mast rises five times her height\", \"the door stands twice as tall as the person in front of it\". Nothing else takes a ratio. An everyday prop is sized by its own rule below, a garment by where it falls on the body, and a CREATURE by the creature rule above — in metres or against a familiar room for a young reader, against a figure only where that rule allows it. Every element states its size once already, in its `scaleClass`, and the image prompt turns that band into a size against the figures in frame; where your prose disagrees, that computed size wins, so a ratio you write follows the band — about as tall as a grown-up for `adult-height`, twice that for `twice-adult-height`, several grown-ups high for `house-height`. An adjective is not a ratio — massive, tiny, huge, enormous carry no scale into the picture. Two entries of one kind that differ in size each carry their own ratio on a page holding both. A creature or a secondary character keeps the size its entry’s `scaleClass` band states on every page it appears on, whatever the shot, and is measured against nothing at all on a page where it is alone. When an entry states its height against another named figure, write that relation into the prose on every page the two share.";
 
+/**
+ * AN ELEMENT'S SIZE HAS ONE SOURCE (owner-approved 2026-10-04). Staging job_1791040103540_atbttop6w p3 wrote "a massive, perfect
+ * smooth oval dragon egg. The melon-sized egg …" — the intensifier copied from
+ * a bible description the schema had asked to carry a size — and p12/p16 wrote
+ * "the massive earth-toned dragon egg" beside a REQUIRED OBJECTS line giving
+ * it a head's size. One constant for all four page-brief authoring sites.
+ */
+const ELEMENT_SIZE_WORD_RULE = 'A Visual Bible element is sized in the prose by its scale band\'s own words or a familiar-size term that agrees with the band, never by an intensifier that disagrees with it — massive, huge, giant, enormous, tiny. The image prompt states the computed size, and that size wins.';
+
 const ELEMENT_ENTRY_PAGE_RULE = "An element's `pages` always includes the page the story first brings it in \u2014 handed over, found, taken out, put on \u2014 even when that page's plan line is about something else. That is the page the reader learns what it looks like on.";
 
 /**
@@ -9699,6 +9719,32 @@ const DECLARED_TRAIT_VERBATIM_RULE = "A trait CHARACTER DETAILS states — hair 
  */
 const EYES_OPEN_RULE = 'No closed eyes and no eyes shut on any rendered figure — write "eyes narrowed", "a focused gaze", "looking down at the work".';
 const CREATURE_FACE_RULE = 'Every page holding a creature states its brow, eyes and mouth in the prose — including a creature acting hard, diving, chasing, calling or lifting, and at any distance the face can be read at.';
+
+/**
+ * A CREATURE'S FACE AND ACTION ARE FIELDS TOO (owner-approved 2026-10-04).
+ * `characters[]` is the human cast, so a Visual Bible animal
+ * acting on a page had its face only in prose: no EXPRESSIONS line, no
+ * emotion check, and — when the brief gave it no interaction row — no EXACT
+ * POSES line either. Staging job_1791040103540_atbttop6w p6: the brief had the
+ * creature press its wings over its ears with a tense face; the render spread
+ * the wings and smiled, and only the semantic judge saw it. One constant,
+ * filled into all four page-brief authoring templates beside CREATURE_FACE.
+ */
+const CREATURE_FIELD_RULE = 'Every Visual Bible animal the page cites in `objects[]` and draws in frame also gets a `creatures[]` row: `{"id": "ANI001", "depth": "midground", "looksAt": "CharacterA", "expression": "brows pulled down, eyes wide, mouth clamped", "emotion": "afraid"}` — `depth`, `looksAt`, `expression` and `emotion` by the same rules as a character\'s. When it does anything, its action is an `interactions[]` row with its id as the actor. Its face on this page is this page\'s, never its Visual Bible entry\'s.';
+
+/**
+ * An animal's Visual Bible `features` are its identity on every page: ANATOMY,
+ * never a face's feeling (owner-approved 2026-10-04). The same staging run's
+ * creature carried "soft friendly face with a calm closed-mouth smile" in
+ * `features` — the `cute` creature tone's positive way of saying "no teeth",
+ * which also fixed an emotion: its reference cell smiled, every page's
+ * REQUIRED OBJECTS description said so, and the p6 repair quoted it while
+ * asking for a tense face. Mouth and teeth anatomy belongs here (no visible
+ * teeth, a soft rounded snout); the smile does not. Filled into both Visual
+ * Bible authoring sites (sibling set vb-authoring-sites), and the tone levels
+ * (CREATURE_TONE_LEVELS) now state the same anatomy instead of a smile.
+ */
+const CREATURE_FEATURES_RULE = 'An animal\'s `features` are its anatomy on every page — eye colour and shape, markings, horns, snout, the mouth and its teeth ("no visible teeth", "a soft rounded snout"), collar. Never an expression, an emotion or a smile: a face\'s feeling changes page by page and each page brief writes it.';
 
 // A brief describes what the frame holds, never how it renders. The medium is
 // the art style's, sent to the illustrator as its own block; an iterate rewrite
@@ -12296,6 +12342,7 @@ The story takes place in ${inputData.userLocation.city}. Use real place names �
       ELEMENT_ENTRY_PAGE: ELEMENT_ENTRY_PAGE_RULE,
       // ...and the same back-view garment look (wornItems.GARMENT_BACK_RULE).
       GARMENT_BACK: GARMENT_BACK_RULE,
+      CREATURE_FEATURES: CREATURE_FEATURES_RULE,
       TRUE_RELATIVE_SIZE: TRUE_RELATIVE_SIZE_RULE,
     });
   }
@@ -13004,6 +13051,9 @@ module.exports = {
   LOOKS_AT_FIELD_RULE,
   COVER_GAZE_EXCEPTION,
   EXPRESSION_FIELD_RULE,
+  CREATURE_FIELD_RULE,
+  CREATURE_FEATURES_RULE,
+  ELEMENT_SIZE_WORD_RULE,
   GARMENT_REMOVED_RULE,
   WORN_ITEMS_ROW_RULE,
   WORN_ON_OTHER_RULE,

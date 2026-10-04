@@ -189,6 +189,24 @@ function extractJsonFromText(text) {
 const { parseWornItems } = require('./wornItems');
 
 /**
+ * The brief's `creatures[]` rows (promptBuilders.CREATURE_FIELD_RULE): a Visual
+ * Bible animal on the page with its depth, gaze, expression and emotion. Kept
+ * only when `id` is an animal handle (`ANI001`); every other field is copied as
+ * written, trimmed. [] when the brief carries none.
+ */
+function parseCreatures(rows) {
+  return (Array.isArray(rows) ? rows : [])
+    .filter(r => r && typeof r === 'object' && /^ANI\d+$/i.test(String(r.id || '').trim()))
+    .map(r => {
+      const out = { id: String(r.id).trim().toUpperCase() };
+      for (const k of ['depth', 'looksAt', 'expression', 'emotion']) {
+        if (typeof r[k] === 'string' && r[k].trim()) out[k] = r[k].trim();
+      }
+      return out;
+    });
+}
+
+/**
  * HOW POPULATED IS THIS PAGE — THREE STATES, NOT TWO (2026-09-19).
  *
  * `crowdExpected` (2026-09-13) was a boolean: a crowd is required, or the page
@@ -1015,6 +1033,9 @@ function extractSceneMetadata(sceneDescription) {
         // written before this date) carries none — readers must treat absent
         // as "not declared".
         sceneIntent: metadata.sceneIntent || null,
+        // The page's Visual Bible animals with their face (CREATURE_FIELD_RULE,
+        // 2026-10-04). Rows only, never read from prose; [] when none.
+        creatures: parseCreatures(metadata.creatures),
       },
       thinking: null,
       translatedSummary: metadata.translatedSummary || null,
@@ -1153,6 +1174,7 @@ function extractSceneMetadata(sceneDescription) {
     parsedData.interactions = interactionsJson; // mirror into fullData so downstream readers see the sanitized list
     const wornItemsJson = parseWornItems(parsedData.wornItems);
     parsedData.wornItems = wornItemsJson;       // same mirror for the worn-item states
+    parsedData.creatures = parseCreatures(parsedData.creatures);  // and for the creature rows
 
     return {
       characters: characterNames,
@@ -2782,6 +2804,7 @@ function sceneDescriptionRecord(scene, scenePromptRefs = null) {
 }
 
 module.exports = {
+  parseCreatures,
   SHARED_GRIP_RULE,
   forbiddenSharedGrips,
   handsPerObject,

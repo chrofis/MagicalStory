@@ -111,7 +111,7 @@ describe('4 — cute tone: a grown creature keeps its adult body; the tone is it
   it('names the grown bands from the code set that also gives the entry its maturity', () => {
     const t = cute();
     for (const band of VB.GROWN_CREATURE_SCALE_CLASSES) expect(t).toContain(band);
-    expect(t).toMatch(/face and expression only/);
+    expect(t).toMatch(/the cute tone governs its face only/);
     expect(t).toMatch(/keeps a grown adult's build, body proportions and full size/);
   });
   it('keeps the rounded body and the child-sized lean for creatures smaller than a grown-up only', () => {

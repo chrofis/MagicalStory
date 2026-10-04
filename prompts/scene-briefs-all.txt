@@ -51,7 +51,7 @@
 8f. **True relative size.** {TRUE_RELATIVE_SIZE}
 8g. **An everyday prop carries a size anchor.** A prop on the ground, at a character's feet, in hand or on a surface gets a familiar-size term whenever its size matters — "a fist-sized apple", "a forearm-length crossbow", "a palm-sized cup". Those terms are for props only: a garment is sized by where it falls on the body ("knee-length", "falls to mid-back"), never by a prop calibration term.
 8h. **One scale per page.** A page is at HUMAN scale, figures large enough to read an expression, or at OBJECT scale, a building, tower or vessel whole in frame — never both. A page that needs an expression shows the structure only in part.
-8l. **A creature in frame has a written face.** {CREATURE_FACE} Write it in the terms of the creature-tone block below.
+8l. **A creature in frame has a written face.** {CREATURE_FACE} Write it in the terms of the creature-tone block below. {CREATURE_FIELD}
 {CREATURE_TONE}
 9. **No age collectives.** Never write "the children", "the kids", "the boys", "the girls". Use names or group size ("all three", "the group").
 10. **Prose construction.** Each page is one continuous paragraph followed by its metadata block — no headers, labels, bullet points, or section breaks inside a page. Open with the main subject and main action. Weave each character's physical description on first mention from CHARACTER DETAILS — age look, build, hair, eyes, distinctive features, clothing — as flowing language, not a labeled list. Clothing means the outfit itself; `standard`, `summer`, `winter` and `costumed` are metadata keys and never appear in prose. A character wears the outfit CHARACTER DETAILS gives them; never move a garment onto a character of the other sex, and never give a male character a garment made for girls or women, or the reverse. Name the TOP, the BOTTOM and the FOOTWEAR for every character on every page by colour and garment noun only — never construction detail, materials or accessories (e.g., "blue coat, brown trousers, black shoes", not "blue quilted linen coat with horn buttons"). A character whose outfit replaces the legs has no footwear — name the tail or fin instead, and never give them feet or shoes. The image model draws only what the prose names, so a character given a hat and a shirt is drawn in a hat and a shirt and nothing else. Every page repeats the full physical description: each brief is read on its own by the image model. Same for recurring Visual Bible elements: name them and interleave their identifying detail naturally.
@@ -80,7 +80,7 @@
 12h. **An object out of sight.** {CONCEALED_OBJECT}
 
 12k. **An object several characters touch.** {REACHABLE_CONTACT}
-12m. **A small prop rests against a figure.** {SMALL_PROP_CONTACT}
+12m. **A small prop rests against a figure.** {SMALL_PROP_CONTACT} {ELEMENT_SIZE_WORD}
 
 12d. **A held document is read, not displayed.** A map, letter, note or book in a character's hands stays angled toward the character reading it, its face foreshortened or turned away from the camera — the shot shows the characters reading, never the document presented flat to the viewer. This holds even when the page's plan line is what the document says: stage the readers' reactions and pointing hands from the reader's side, and never make the document the frame-filling focal object.
  A prop being carried rather than read stays folded, rolled or pocketed.
