@@ -47,29 +47,43 @@ describe('candidates: wide vantages of the places story pages stand on', () => {
   });
 });
 
-describe('assignment: distinct vantages first, then the highest summed probability', () => {
+describe('assignment: the front picks first; the covers must be distinct', () => {
   const keys = ['frontCover', 'initialPage', 'backCover'];
-  it('two covers that rank the same vantage top do not both get it', () => {
-    // front and back both prefer candidate 0; the best distinct split wins.
-    expect(JBF.assignCoverPlaces(keys, [[0.7, 0.2, 0.1], [0.6, 0.1, 0.3], [0.7, 0.25, 0.05]])).toEqual([0, 2, 1]);
-  });
+  const pickOf = (probs: number[][], o: any = {}) => JBF.assignCoverPlaces(keys, probs, o).pick;
   it('the front cover always takes its top-rated vantage; the others never push it off', () => {
-    // A max-sum rule would hand the front its 0.00 vantage here (the stored replay's shape).
-    expect(JBF.assignCoverPlaces(keys, [[0.53, 0.47, 0], [0.8, 0.2, 0], [0.38, 0.62, 0]])).toEqual([0, 2, 1]);
-    // Without a front cover, the distinct max-sum rule alone.
-    expect(JBF.assignCoverPlaces(['initialPage', 'backCover'], [[0.8, 0.2], [0.7, 0.3]])).toEqual([0, 1]);
+    expect(pickOf([[0.53, 0.47, 0], [0.8, 0.2, 0], [0.38, 0.62, 0]])).toEqual([0, 2, 1]);
+    expect(JBF.assignCoverPlaces(['initialPage', 'backCover'], [[0.8, 0.2], [0.7, 0.3]]).pick).toEqual([0, 1]);
   });
-  it('a vantage is shared only when the candidates run out — each used once first', () => {
-    const pick = JBF.assignCoverPlaces(keys, [[0.9, 0.1], [0.8, 0.2], [0.9, 0.1]]);
-    expect(new Set(pick).size).toBe(2);
-    expect(JBF.assignCoverPlaces(keys, [[1], [1], [1]])).toEqual([0, 0, 0]);
+  // Two landmarks: A (vantages 0, 1) and B (vantage 2).
+  const cands = [{ id: 'A.1', base: 'A' }, { id: 'A.2', base: 'A' }, { id: 'B.1', base: 'B' }];
+  const front = ['K1', 'K2', 'Creature'];
+  const group = ['K1', 'K2'];
+  it('same landmark is distinct only with a different viewpoint AND a different cast', () => {
+    // front on A.1 (top); the title page and back share the cast, so one of them moves to landmark B.
+    const r = JBF.assignCoverPlaces(keys, [[0.6, 0.3, 0.1], [0.5, 0.3, 0.2], [0.3, 0.5, 0.2]], { cands, casts: [front, group, group] });
+    expect(r.unmet).toEqual([]);
+    const bases = r.pick.map((j: number) => cands[j].base);
+    expect(bases[1] === bases[2]).toBe(false);
+  });
+  it('a near-zero leftover is never a pick when a distinct option above the floor exists', () => {
+    const r = JBF.assignCoverPlaces(keys, [[0.6, 0.3, 0.1], [0.5, 0.45, 0.05], [0.3, 0.6, 0.1]], { cands, casts: [front, ['K1'], group] });
+    expect(r.unmet).toEqual([]);
+    expect(r.pick).toEqual([0, 0, 1].map((_, i) => r.pick[i]));
+    for (const i of [1, 2]) expect([[0.5, 0.45, 0.05], [0.3, 0.6, 0.1]][i - 1][r.pick[i]]).toBeGreaterThanOrEqual(JBF.COVER_PLACE_FLOOR);
+  });
+  it('no assignment meets the rule: the best one, with what failed', () => {
+    const r = JBF.assignCoverPlaces(keys, [[0.6, 0.39, 0.01], [0.6, 0.39, 0.01], [0.6, 0.39, 0.01]], { cands, casts: [group, group, group] });
+    expect(r.unmet.length).toBeGreaterThan(0);
   });
 });
 
 describe('decideCoverPlaces: one Jev choice per cover, code assigns', () => {
   it('asks once per cover over the candidates and returns distinct vantages', async () => {
-    const stub = makeJevStub(); // every choice peaks on its first option
-    const d = await JBF.decideCoverPlaces({ arc: 'an arc', pages, visualBible: VB(), coverKeys: ['frontCover', 'initialPage', 'backCover'] }, { callImpl: stub.impl });
+    const calls: any[] = [];
+    const stub = { calls, impl: async ({ state, questions }: any) => { calls.push({ state, questions }); return { answers: { PLACE: { choice: 'v0', probabilities: { v0: 0.4, v1: 0.35, v2: 0.25 } } }, cost: 0, model: 'stub', usage: {} }; } };
+    const casts = { frontCover: ['Child1', 'Creature'], initialPage: ['Child1'], backCover: ['Child1', 'Child2'] };
+    const d = await JBF.decideCoverPlaces({ arc: 'an arc', pages, visualBible: VB(), coverKeys: ['frontCover', 'initialPage', 'backCover'], casts }, { callImpl: stub.impl });
+    expect(d.unmet).toEqual([]);
     expect(stub.calls).toHaveLength(3);
     for (const c of stub.calls) expect(Object.keys(c.questions.PLACE.criteria)).toHaveLength(3);
     expect(new Set(d.covers.map((c: any) => c.cite)).size).toBe(3);
@@ -122,6 +136,59 @@ describe('the own-place rule and its check stay for the backup only', () => {
   });
 });
 
+
+// Offered landmarks (archetypal): two with a good exterior photo, one interior-only, one weak.
+const photo = (n: number, kind: string, framing: string, score: number, d: string) => ({ variantNumber: n, kind, framing, photoScore: score, url: `https://example.invalid/${n}.jpg`, description: `[whole, green, day] ${d}` });
+const OFFERED = [
+  { name: 'The Old Cathedral', type: 'Church', isIndexed: true, landmarkIndexId: 11, photoVariants: [photo(1, 'exterior', 'medium', 60, 'A tall stone cathedral front.'), photo(2, 'exterior', 'wide', 85, 'The cathedral above a broad square.'), photo(3, 'interior', 'interior', 90, 'A nave.')] },
+  { name: 'The River Bridge', type: 'Bridge', isIndexed: true, landmarkIndexId: 12, photoVariants: [photo(1, 'exterior', 'medium', 70, 'A stone bridge over a river.')] },
+  { name: 'The Museum Hall', type: 'Museum', photoVariants: [photo(1, 'interior', 'interior', 90, 'A hall.')] },
+  { name: 'The Weak Tower', type: 'Tower', photoVariants: [photo(1, 'exterior', 'medium', 30, 'A blurry tower.')] },
+  { name: 'the town square', type: 'Square', photoVariants: [photo(1, 'exterior', 'wide', 80, 'A square.')] },
+];
+
+describe('offered landmarks: candidates, their own question, and their place in the bible', () => {
+  it('an offered landmark no page stands on, with an exterior wide/medium photo >= 40, is a candidate on its best such photo', () => {
+    const c = JBF.coverPlaceCandidates(VB(), [1, 2, 3, 4], OFFERED);
+    const off = c.filter((x: any) => x.offered);
+    expect(off.map((x: any) => [x.name, x.offered.photo.variantNumber])).toEqual([['The Old Cathedral', 2], ['The River Bridge', 1]]);
+  });
+  it('is rated by its own yes/no per cover, never inside the visited choice', async () => {
+    const stub = makeJevStub();
+    const casts = { frontCover: ['Child1'], initialPage: ['Child1'], backCover: ['Child1'] };
+    const d = await JBF.decideCoverPlaces({ arc: 'a', pages, visualBible: VB(), coverKeys: ['frontCover', 'initialPage', 'backCover'], casts, availableLandmarks: OFFERED, town: 'the town' }, { callImpl: stub.impl });
+    const choices = stub.calls.filter((c: any) => c.questions.PLACE);
+    const nouls = stub.calls.filter((c: any) => !c.questions.PLACE);
+    expect(choices).toHaveLength(3);
+    expect(nouls).toHaveLength(3);
+    for (const c of choices) expect(Object.values(c.questions.PLACE.criteria).join(' ')).not.toContain('Cathedral');
+    for (const c of nouls) expect(Object.values(c.questions).every((q: any) => q.type === 'noul')).toBe(true);
+    // One landmark visited with one cast: the other covers go to distinct offered landmarks.
+    expect(d.unmet).toEqual([]);
+    expect(d.covers.filter((c: any) => c.offered).map((c: any) => c.label).sort()).toEqual(['The Old Cathedral', 'The River Bridge']);
+  });
+  it('a picked offered landmark becomes a linked bible place with a wide vantage citing its photo', () => {
+    const vb: any = VB();
+    const lm = OFFERED[0];
+    const cites = JBF.materializeCoverPlaces(vb, [{ coverKey: 'initialPage', offered: { landmark: lm, photo: lm.photoVariants[1], locId: null } }, { coverKey: 'backCover', cite: 'LOC001.4' }]);
+    expect(cites).toEqual({ initialPage: 'LOC003.1', backCover: 'LOC001.4' });
+    const loc = vb.locations.find((l: any) => l.id === 'LOC003');
+    expect(loc).toMatchObject({ name: 'The Old Cathedral', isRealLandmark: true, landmarkQuery: 'The Old Cathedral', label: 'church' });
+    expect(loc.photoVariants).toHaveLength(3);
+    expect(loc.vantages[0]).toMatchObject({ id: 'LOC003.1', shot: 'wide', landmarkPhoto: '2' });
+    expect(loc.vantages[0].emptyScenePrompt).toContain('The cathedral above a broad square.');
+  });
+  it('an offered landmark already in the bible (seen, never stood on) gets a new vantage, not a second place', () => {
+    const vb: any = VB();
+    vb.locations[1] = { id: 'LOC002', name: 'The Old Cathedral', isRealLandmark: true, landmarkQuery: 'The Old Cathedral', appearsInPages: [] };
+    const c = JBF.coverPlaceCandidates(vb, [1, 2, 3, 4], OFFERED).find((x: any) => x.name === 'The Old Cathedral');
+    expect(c.offered.locId).toBe('LOC002');
+    const cites = JBF.materializeCoverPlaces(vb, [{ coverKey: 'backCover', offered: c.offered }]);
+    expect(cites.backCover).toBe('LOC002.1');
+    expect(vb.locations.filter((l: any) => l.name === 'The Old Cathedral')).toHaveLength(1);
+  });
+});
+
 // ── runArtDirector end to end (scripted model replies, Jev stubbed) ─────────
 const BIBLE = ['---VISUAL BIBLE---', '```json', JSON.stringify(VB(), null, 2), '```', ''].join('\n');
 const wholeBrief = (n: number) => [`## Page ${n}`, 'The child stands in the square.', '', '---METADATA---',
@@ -133,7 +200,7 @@ beforeAll(async () => { await loadPromptTemplates(); });
 afterEach(() => { textModels.callTextModelStreaming = savedText; jevAudit.callJev = savedJev; JD.JEV_OUTAGE.waitMs = savedWait; });
 afterAll(() => { textModels.callTextModelStreaming = savedText; jevAudit.callJev = savedJev; });
 
-async function run(jevImpl: any) {
+async function run(jevImpl: any, extra: any = {}) {
   jevAudit.callJev = jevImpl;
   const prompts: Record<string, string> = {};
   textModels.callTextModelStreaming = async (prompt: string, _s: any, _c: any, model: string, opts: any) => {
@@ -144,7 +211,7 @@ async function run(jevImpl: any) {
   const jevReport: any = {};
   const gl = { info() {}, warn() {}, error() {}, debug() {} };
   const out = await runArtDirector({
-    inputData: { language: 'en', characters: [{ id: 1, name: 'Mila', age: 6, gender: 'female', isMainCharacter: true }], artStyle: 'watercolor', title: 'T' },
+    inputData: { language: 'en', characters: [{ id: 1, name: 'Mila', age: 6, gender: 'female', isMainCharacter: true }], artStyle: 'watercolor', title: 'T', ...extra },
     modelOverrides: {}, clothingRequirements: null, visualBible: null, bibleSections: null, sceneModel: 'claude-sonnet',
     onChunk: null, gl, meta: { timings: {} }, stage: async () => {},
     beats: pages.map(p => ({ ...p, planLine: p.planLine.replace('Child1', 'Mila') })),
@@ -154,11 +221,13 @@ async function run(jevImpl: any) {
 }
 
 describe('runArtDirector: the covers\' places between the two calls', () => {
-  it('Jev path: each cover carries a distinct wide vantage as FIXED, pinned and in the bible', async () => {
+  it('Jev path: each cover carries a wide vantage as FIXED, pinned and in the bible; one landmark + one cast is flagged not distinct', async () => {
     const { out, prompts, jevReport } = await run(makeJevStub().impl);
     const covers = out.coverBeats;
     const cites = covers.map((c: any) => c.jevFixed && c.jevFixed.location);
-    expect(new Set(cites).size).toBe(3);
+    expect(cites.every(Boolean)).toBe(true);
+    // Every cover shows the same one character on the one landmark: no assignment is distinct.
+    expect(jevReport.coverPlaces.unmet.some((u: string) => u.startsWith('distinct:'))).toBe(true);
     for (const c of covers) expect(c.planLine).not.toContain(CB.COVER_OWN_PLACE);
     for (const cite of cites) expect(prompts.beats_scene_expansion).toContain(cite);
     for (const c of covers) {
@@ -169,6 +238,22 @@ describe('runArtDirector: the covers\' places between the two calls', () => {
     expect(new Map(tables)).toEqual(new Map(covers.map((c: any) => [c.pageNumber, c.jevFixed.location])));
     expect(jevReport.coverPlaces.covers).toHaveLength(3);
     expect(jevReport.fallback).toBeFalsy();
+  });
+  it('Jev path with offered landmarks: three distinct covers, the offered places in the bible and in the call-2 prompt', async () => {
+    const { out, prompts, jevReport } = await run(makeJevStub().impl, { availableLandmarks: OFFERED, userLocation: { city: 'the town' } });
+    expect(jevReport.coverPlaces.unmet).toEqual([]);
+    const cites = out.coverBeats.map((c: any) => c.jevFixed.location);
+    expect(new Set(cites.map((x: string) => x.split('.')[0])).size).toBe(3);
+    for (const cite of cites) {
+      expect(prompts.beats_scene_expansion).toContain(cite);
+      const base = cite.split('.')[0];
+      const loc = out.visualBible.locations.find((l: any) => l.id === base);
+      expect(loc.vantages.find((v: any) => v.id === cite)).toBeTruthy();
+    }
+    for (const c of out.coverBeats) {
+      const x = out.expansions.find((e: any) => e.pageNumber === c.pageNumber);
+      expect(objectsOf(x.brief)[0]).toBe(c.jevFixed.location);
+    }
   });
   it('a Jev failure on the cover step: the backup path, the own-place rule back, nothing decided', async () => {
     JD.JEV_OUTAGE.waitMs = 0;
