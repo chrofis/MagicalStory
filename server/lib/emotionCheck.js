@@ -30,7 +30,15 @@ const norm = (s) => String(s == null ? '' : s).trim().toLowerCase();
  */
 function checkDeclaredEmotion({ declared, inventory, matches } = {}) {
   const chars = Array.isArray(declared) ? declared : [];
-  const figures = Array.isArray(inventory?.figures) ? inventory.figures : [];
+  // Human figures, plus every animal the inventory boxed with a face read
+  // (image-inventory-unified: an animal object carries `emotion` and
+  // `body_bbox`, 2026-10-04) — so a creature the brief declares a feeling for
+  // (`creatures[]`) is paired and compared the same way. Its label is the
+  // inventory's own `what`.
+  const animalFigures = (Array.isArray(inventory?.objects) ? inventory.objects : [])
+    .filter(o => o && o.body_bbox && o.emotion && String(o.what || '').trim())
+    .map(o => ({ ...o, label: String(o.what).trim() }));
+  const figures = [...(Array.isArray(inventory?.figures) ? inventory.figures : []), ...animalFigures];
   if (!chars.length || !figures.length) return [];
 
   // character name -> the inventory figure standing where that character stands

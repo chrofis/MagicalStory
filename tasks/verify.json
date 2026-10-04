@@ -4745,6 +4745,24 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "creature-rows",
+      "title": "The Art Director writes a creatures[] row (and an actor interaction row) for every cited animal in frame; animal features carry anatomy, never a smile",
+      "commits": [
+        "(this push)"
+      ],
+      "addedAt": "2026-10-04",
+      "claim": "On the next full staging story with a Visual Bible animal: every page brief that cites an ANI id and draws it carries a creatures[] row with expression and emotion; a page where the animal acts carries an interactions[] row with the ANI id as actor; that page prompt's EXPRESSIONS AND EYES block has a line for the animal; visualBible.animals[].features contain no smile or mood word (mouth anatomy such as no visible teeth allowed).",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "For each page citing an ANI id: read sceneMetadata.fullData.creatures and interactions; grep the page prompt for the animal name under EXPRESSIONS AND EYES; read visualBible.animals[].features."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [

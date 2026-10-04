@@ -546,6 +546,8 @@
           "{CONTACT_VERB}",
           "{EYES_OPEN}",
           "{CREATURE_FACE}",
+          "{CREATURE_FIELD}",
+          "{ELEMENT_SIZE_WORD}",
           "{REACHABLE_CONTACT}",
           "{SMALL_PROP_CONTACT}",
           "{PLAN_LINE_CAST}",

@@ -21,6 +21,41 @@ superseded and link forward.
 
 ---
 
+## 2026-10-04 — A creature's face and action are brief fields; an animal's features are anatomy, never a feeling; an element's size has one source
+
+**Context:** Staging job_1791040103540_atbttop6w (dragon run 9).
+- p6: the brief had the dragon press its wings over its ears with a tense face. The render spread the wings and smiled.
+  - `characters[]` is the human cast, so the creature had no EXPRESSIONS line, no emotion check, and no EXACT POSES line (no interaction row named it as the actor).
+  - Its Visual Bible `features` read "soft friendly face with a calm closed-mouth smile". The reference cell smiled, every page's description carried it, and the p6 repair quoted it while asking for a tense face.
+  - The smile came from the `cute` creature tone (CREATURE_TONE_LEVELS), which said "a calm closed-mouth smile" twice. Owner: that was a positive way of saying "no teeth", and it introduced an emotion.
+- p3, p12 and p16 wrote "a massive … egg" beside a REQUIRED OBJECTS line that gave it a head's size. visual-bible.txt asked for "size" in an object's `description` (one rule line, two schema placeholders), while its own scaleClass rule says no entry gives a size.
+
+**Decision (owner-approved 2026-10-04):**
+1. **`CREATURE_FIELD_RULE`**, one constant in all four page-brief templates: every cited Visual Bible animal drawn in frame gets a `creatures[]` row (id, depth, looksAt, expression, emotion). When it acts, it gets an `interactions[]` row with its id as the actor.
+   - The parser keeps `creatures[]` (both branches, `parseCreatures`).
+   - `vbIdGuard.gazeCreatures` puts the rows into the image prompt's EXPRESSIONS AND EYES block, the judges' DECLARED INTERACTIONS gaze lines, and the declared-emotion check.
+   - The unified inventory reads an animal's `emotion` and `body_bbox`, and `emotionCheck` pairs animals like figures.
+2. **`CREATURE_FEATURES_RULE`** at both Visual Bible authoring sites: `features` are anatomy, including the mouth and teeth ("no visible teeth", "a soft rounded snout"), never an expression, an emotion or a smile.
+   - The `cute` tone now states "a rounded mouth with no visible teeth" and, for a grown creature, "soft features, large round eyes, no visible teeth" instead of a smile.
+   - The repair text (`describeVbFigure`) keeps quoting features.
+3. **`ELEMENT_SIZE_WORD_RULE`** in all four page-brief templates: an element is sized by its band's words, never by an intensifier that disagrees with it.
+   - visual-bible.txt no longer asks for a size in a description.
+   - The fixed-referent yardstick idea was dropped (owner); the 2026-09-26 yardstick stays.
+
+**Rationale:** one constant per rule, injected at every authoring site (parity test plus registry anchors), so the brief writer, the image prompt and the judges read the same fields. A face's feeling is per page; identity is per book.
+
+**Validation:**
+- Free replay of p6 with a creature row: EXACT POSES gains "- Rubina: presses both folded wings hard and flat over its ears"; EXPRESSIONS gains Rubina's tense face; the emotion check returns CRITICAL for afraid declared against happy read.
+- Paid, about $0.26 in total: the Visual Bible call (visual-bible.txt, gemini-3.1-pro, $0.197) rebuilt from stored inputs gives both dragons features "… a very soft rounded snout with no visible teeth", with no smile.
+- The per-page Art Director (scene-expansion.txt, default model) on p6 left the dragon out of the page, so the creature row is NOT yet seen in a live brief (verify entry `creature-rows`).
+- Stored stories are not migrated. Their features keep any expression they carry: 14 prod and 20 staging entries have a mood word inside the two features the repair text quotes (word scan, with some false positives). Each such repair still quotes it.
+
+**Touched:** server/lib/promptBuilders.js, server/lib/sceneMetadata.js, server/lib/vbIdGuard.js, server/lib/evalPipeline.js, server/lib/emotionCheck.js, prompts/scene-briefs-all.txt, prompts/scene-expansion.txt, prompts/scene-iteration.txt, prompts/scene-iteration-free.txt, prompts/visual-bible.txt, prompts/story-trial.txt, prompts/image-inventory-unified.txt, scripts/admin/sibling-registry.json, tests/unit/creature-face-fields.test.ts, tests/unit/ad-iterate-parity.test.ts, tests/unit/creature-tone-youngest-main.test.ts
+
+**Status:** ✅ active on staging
+
+---
+
 ## 2026-10-04 — The consolidator cites findings by id and code reads the votes off the ids; a finding the text refine leaves standing stays open
 
 **Context:** Staging `job_1791040103540_atbttop6w` («Vier Freunde und ein Drachonei»), two owner-selected faults.

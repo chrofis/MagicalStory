@@ -53,13 +53,14 @@ Work from the plan lines: an element a plan line only implies still needs an ent
 - English `name` and `description` for artifacts, locations, vehicles and clothing, even for a non-English story; those strings are copied into English image prompts. Characters and animals keep their given names.
 - Every item in exactly one category. A worn garment belongs to `clothing` only, never also to `artifacts`. Exception: a prop the story turns into costume (a hat found in a chest, a cloak handed over) is ONE `artifacts` entry with `wornAs`: `"<CharacterName>.<slot>"`. Every garment a listed character wears is one their outfits in AVAILABLE CLOTHING PER CHARACTER name, and its entry's `description` repeats the outfit's words for it. Never dress a listed character in a garment their outfits do not name, and never reword one; a page without a garment says so in a `wornItems` row. The slot is one of `headwear`, `top`, `bottom`, `footwear`, `belt/waist`, `outer layer`, `accessories` and never another word; neckwear, handwear and eyewear are `accessories`. `wornAs` is REQUIRED on any entry whose `type` is an outfit slot or whose item an outfit above also describes; without it no page can say who wears it. `wornAs` names where the item lives and never changes — which character wears it on a given page is that page's `wornItems` row.
 - {GARMENT_BACK}
+- {CREATURE_FEATURES}
 - A change to an object, an animal or an invented figure is a state, not a second entry. One physical thing is ONE entry however the story alters it — broken, mended, opened, filled; a wing broken then whole; a coat lost then found. Almost every entry has no states at all: the field exists for the rare thing the story itself changes, and an entry without one is the normal case. `description` holds how it is BUILT — the material, shape and size that survive every state. `states[]` lists every look it wears, each with its own `pages`, because each state is drawn as its own reference cell and there is no separate cell for the object at rest. The FIRST state is therefore not optional and not implied by `description`: it is the object before the story changes anything, and it carries every page up to the first change. Leave it out and those pages are drawn in the first CHANGE instead — an object already broken, muddied or emptied on the page it is found. Two entries for one object give it two canonical descriptions and two reference renders that disagree on how it is built.
 - The bible shows the OBJECT and nothing else. The test for a state: take away everything that is not the object — the hands, the hole, the wing, the shelf — and if what is left looks the same, it is not a state. Held, set down, carried, pressed against something, standing in front of something: always the same object, no state. How the WORLD lights it is not a state — a lamp falling on it, a shadow crossing it, dusk: the scene decides that, page by page. Its OWN light is a state: a thing that glows and goes dark, lights up and goes out, changes what it gives off. Then the emission lives in the states, never in `description`, which carries only what holds on every page. A state is only when the thing itself changes — a flower wilts, a bottle breaks, a canvas gets painted, a lid is torn off, a jar is filled — or when a face prop turns its other side to us. A state's cell draws the object alone; a state defined by contact with another element cannot be drawn without that element and drags it into the cell.
 - A `delta` describes the object's own look and nothing else: no place, no figure, no body part, no other element. On the first state it is how the object looks before anything happens to it; on every later state it is what changed.
 - A state describes the object's OWN look — never what arrives at it from elsewhere on that page (water jetting in, a shadow falling on it, a thing thrown toward it). The arrival is the action's result and belongs with the characters in that page's prose.
 - A part added to an object — a filling, an insert, a fitting, a lid, a cover — is a state of it. It earns its own entry only when BOTH hold: some page stages it on its own, away from the thing it belongs to, and it has a look worth specifying once separated.
 - **A two-sided prop.** A map, letter, note, chart, book, page, sign, board or plaque is one entry with a state per side, turned away and face to camera. {MULTI_PICTURE_PROP} It lists the side away from the viewer first (the back of the sheet, the closed cover, the outer face of the roll), then `"face to camera"`, each with its own `pages`. Its `description` gives material, edge wear and dominant colour and says nothing about what is drawn or written on the face; words the reader must be able to read go in `text`.
-- An object's `description` is drawn literally. Material, colour, size and shape in plain terms, the colour named with a plain colour word and a material-colour compound only where no plain word fits; never compare its SHAPE to another object ("curved like a shallow bowl") and never say who holds, carries or wears it.
+- An object's `description` is drawn literally. Material, colour and shape in plain terms — never its size, which `scaleClass` alone states, the colour named with a plain colour word and a material-colour compound only where no plain word fits; never compare its SHAPE to another object ("curved like a shallow bowl") and never say who holds, carries or wears it.
 - A creature's entry is written in the terms of the creature-tone block below: its face, and for a creature smaller than a grown-up its body too.
 {CREATURE_TONE}
 - As many entries as the story needs, no more. Include an element even if it appears once.
@@ -191,7 +192,7 @@ Exactly this, nothing before the marker and nothing after the closing fence:
       "pages": [1],
       "scaleClass": "[one band from the scaleClass rule]",
       "generic": "[OMIT unless generic — see the generic rule]",
-      "colorAndDetails": "[appearance: shape, colour, material, size, distinctive features]",
+      "colorAndDetails": "[appearance: shape, colour, material, distinctive features — no size]",
       "signatureElement": "[one unique detail]"
     }
   ],
@@ -203,7 +204,7 @@ Exactly this, nothing before the marker and nothing after the closing fence:
       "properName": "[OMIT unless the story names it]",
       "pages": [1],
       "wornBy": "[character name]",
-      "description": "[appearance: shape, colour, material, size, distinctive features]",
+      "description": "[appearance: shape, colour, material, distinctive features — no size]",
       "back": "[see the back rule]",
       "howWorn": "[how it sits on the wearer]"
     }
