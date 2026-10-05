@@ -1,3 +1,4 @@
+import { titleRepaintFailedMessage } from '@/utils/imageVersions';
 import { useState, useEffect, useMemo } from 'react';
 import { BookOpen, FileText, ShoppingCart, Plus, Download, RefreshCw, Edit3, Save, X, Images, RotateCcw, Wrench, Loader, Loader2, ChevronDown, Users, Pencil, Wand2, Eye, Palette } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
@@ -511,12 +512,21 @@ export function StoryDisplay({
   const handleTitleSave = async () => {
     if (repaintingTitle) return;
     setRepaintingTitle(true);
+    let titleSaved = false;
     try {
       const next = titleDraft.trim();
       if (next && next !== (title || '') && onSaveTitleChange) await onSaveTitleChange(next);
+      titleSaved = true;
       if (onRepaintCoverTitle) await onRepaintCoverTitle();
       setTitleModalOpen(false);
     } catch (e) {
+      if (titleSaved) {
+        // The text change is already stored: say so, the failed part is only the repaint.
+        console.error('Cover title repaint failed:', e);
+        alert(titleRepaintFailedMessage(language));
+        setTitleModalOpen(false);
+        return;
+      }
       const msg = e instanceof Error ? e.message : String(e);
       alert(language === 'de' ? `Titel konnte nicht geändert werden: ${msg}`
         : language === 'fr' ? `Impossible de modifier le titre : ${msg}`

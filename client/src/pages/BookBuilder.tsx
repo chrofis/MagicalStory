@@ -47,6 +47,12 @@ export default function BookBuilder() {
   // Format is locked to A4 portrait (square is hidden in UI but still works in code)
   const [bookFormat] = useState<'square' | 'A4'>('A4');
   const [isCheckingOut, setIsCheckingOut] = useState(false);
+  // Back button from Stripe restores this page from the bfcache with the button still disabled.
+  useEffect(() => {
+    const onShow = (e: PageTransitionEvent) => { if (e.persisted) setIsCheckingOut(false); };
+    window.addEventListener('pageshow', onShow);
+    return () => window.removeEventListener('pageshow', onShow);
+  }, []);
   const [isPrintingPdf, setIsPrintingPdf] = useState(false);
   const [quantity, setQuantity] = useState(1);
   const [pricingTiers, setPricingTiers] = useState<PricingTier[] | undefined>(undefined);
@@ -392,8 +398,11 @@ export default function BookBuilder() {
         promoValid ? promoCode.trim() : undefined,
         balanceSpend,
       );
+      // Stay disabled while the browser navigates to Stripe: re-enabling here let a
+      // second click create a second checkout session. Only a failure re-enables.
       window.location.href = url;
     } catch (error) {
+      setIsCheckingOut(false);
       log.error('Checkout failed:', error);
       showToast({
         message: language === 'de'
@@ -405,8 +414,6 @@ export default function BookBuilder() {
           : 'Checkout failed. Please try again.',
         variant: 'error'
       });
-    } finally {
-      setIsCheckingOut(false);
     }
   };
 

@@ -1013,6 +1013,7 @@ export const storyService = {
     versionCount?: number;
     creditsUsed?: number;
     creditsRemaining?: number;
+    activeVersion?: number;
     imageVersions?: ImageVersion[];
     // Scene editing info for dev mode
     originalDescription?: string;
@@ -1036,6 +1037,7 @@ export const storyService = {
       versionCount?: number;
       creditsUsed?: number;
       creditsRemaining?: number;
+      activeVersion?: number;
       imageVersions?: ImageVersion[];
       originalDescription?: string;
       newDescription?: string;
@@ -1071,6 +1073,7 @@ export const storyService = {
     creditsRemaining?: number;
     // Version tracking (for cover version history)
     versionIndex?: number;
+    activeVersion?: number;
     imageVersions?: ImageVersion[];
   }> {
     const body: { editedScene?: string; characterIds?: number[]; editedTitle?: string; editedDedication?: string } = {};
@@ -1098,6 +1101,7 @@ export const storyService = {
       creditsUsed?: number;
       creditsRemaining?: number;
       versionIndex?: number;
+      activeVersion?: number;
       imageVersions?: ImageVersion[];
     }>(
       `/api/stories/${storyId}/regenerate/cover/${coverType}`,
@@ -1126,6 +1130,7 @@ export const storyService = {
   // Edit image with user prompt
   async editImage(storyId: string, pageNumber: number, editPrompt: string): Promise<{
     imageData: string;
+    creditsRemaining?: number;
     qualityScore?: number;
     qualityReasoning?: string;
     originalImage?: string;
@@ -1134,6 +1139,7 @@ export const storyService = {
   }> {
     const response = await api.post<{
       imageData: string;
+      creditsRemaining?: number;
       qualityScore?: number;
       qualityReasoning?: string;
       originalImage?: string;
@@ -1149,6 +1155,8 @@ export const storyService = {
   // Edit cover with user prompt
   async editCover(storyId: string, coverType: 'front' | 'back' | 'initial', editPrompt: string): Promise<{
     imageData: string;
+    /** Server's canonical pointer to the new version (the response carries no credit balance). */
+    activeVersion?: number;
     qualityScore?: number;
     qualityReasoning?: string;
     originalImage?: string;
@@ -1157,6 +1165,7 @@ export const storyService = {
   }> {
     const response = await api.post<{
       imageData: string;
+      activeVersion?: number;
       qualityScore?: number;
       qualityReasoning?: string;
       originalImage?: string;
@@ -1257,6 +1266,7 @@ export const storyService = {
     blackoutImage?: string;
     // Image versions for history
     imageVersions?: Array<{
+      versionIndex?: number;
       description?: string;
       prompt?: string;
       modelId?: string;
@@ -1301,6 +1311,7 @@ export const storyService = {
       previousScore?: number;
       blackoutImage?: string;
       imageVersions?: Array<{
+        versionIndex?: number;
         description?: string;
         prompt?: string;
         modelId?: string;
