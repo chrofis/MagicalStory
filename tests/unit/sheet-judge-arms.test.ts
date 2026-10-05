@@ -161,7 +161,7 @@ describe('the per-garment check (owner decision 2026-10-04)', () => {
     }) as any;
     return asked;
   }
-  const run = (removed: string[]) => SHEET.evaluateVariantSheet(IMG('SHEET'), { facePhoto: IMG('FACE'), realisticSheet: IMG('REF'), artStyle: 'watercolor', declaredAge: 7, removedGarments: removed });
+  const run = (removed: string[]) => SHEET.evaluateVariantSheet(IMG('SHEET'), { facePhoto: IMG('FACE'), realisticSheet: IMG('REF'), artStyle: 'watercolor', declaredAge: 7, removedGarments: removed, keptCheckSkipped: 'test: kept check is pinned in variant-gate-record' });
   const prev = process.env.GEMINI_API_KEY;
   beforeAll(() => { process.env.GEMINI_API_KEY = prev || 'k'; });
 

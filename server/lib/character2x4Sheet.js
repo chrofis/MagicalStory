@@ -1079,14 +1079,23 @@ async function checkKeptGarment(sheet, garment, opts = {}) {
  * finding/axis plumbing reads it as an axis.
  */
 async function evaluateVariantSheet(sheet, opts = {}) {
-  const { removedGarments = [], usageTracker = null, ...styleOpts } = opts;
+  const { removedGarments = [], keptGarments = null, keptCheckSkipped = null, usageTracker = null, ...styleOpts } = opts;
   const names = (Array.isArray(removedGarments) ? removedGarments : []).map(s => String(s || '').trim()).filter(Boolean);
   const styled = await evaluateAvatarSheet(sheet, { ...styleOpts, pass: 2, usageTracker });
-  const checks = await Promise.all(names.map(g => checkGarmentGone(sheet, g, { usageTracker })));
+  // The kept list is required unless the caller says why no kept check runs
+  // (an outfit version authors none): a variant is never gated on half the question.
+  const kept = Array.isArray(keptGarments) ? keptGarments : [];
+  if (!kept.length && !keptCheckSkipped) throw new Error('evaluateVariantSheet: no keptGarments and no keptCheckSkipped reason');
+  const [checks, keptChecks] = await Promise.all([
+    Promise.all(names.map(g => checkGarmentGone(sheet, g, { usageTracker }))),
+    Promise.all(kept.map(g => checkKeptGarment(sheet, g, { usageTracker }))),
+  ]);
   const verdict = styled.verdict;
   // The style judge's own answer, before a visible garment lowers the final.
   verdict.styleGate = { finalScore: verdict.finalScore, valid: verdict.valid, failureReasons: [...(verdict.failureReasons || [])] };
   verdict.garmentChecks = checks;
+  verdict.keptChecks = keptChecks;
+  verdict.keptCheckSkipped = kept.length ? null : keptCheckSkipped;
   const still = checks.filter(c => c.visible);
   verdict.removedScore = still.length ? 1 : 10;
   verdict.removed = { score: verdict.removedScore, reason: still.length ? still.map(c => `${c.garment} is still visible: ${c.reason}`).join('; ') : 'no taken-off garment is visible in any cell' };
@@ -1094,6 +1103,13 @@ async function evaluateVariantSheet(sheet, opts = {}) {
     verdict.finalScore = Math.min(verdict.finalScore, verdict.removedScore);
     verdict.valid = false;
     verdict.failureReasons = [...(verdict.failureReasons || []), ...still.map(c => `removed: ${c.garment} is still visible — ${c.reason}`)];
+  }
+  const missing = keptChecks.filter(c => !c.visible);
+  verdict.keptScore = missing.length ? 1 : (kept.length ? 10 : null);
+  if (missing.length) {
+    verdict.finalScore = Math.min(verdict.finalScore, 1);
+    verdict.valid = false;
+    verdict.failureReasons = [...(verdict.failureReasons || []), ...missing.map(c => `kept: ${c.garment} is missing from the body cells — ${c.reason}`)];
   }
   return { ...styled, verdict };
 }
@@ -2016,6 +2032,12 @@ function gateRecordOf(verdict) {
       garment: c.garment, question: c.question || null, visible: c.visible, cells: c.cells || '', reason: c.reason || '',
     })),
     removedScore: verdict?.removedScore ?? null,
+    // The garments that must stay: each question and answer, or why none ran.
+    keptChecks: (verdict?.keptChecks || []).map(c => ({
+      garment: c.garment, question: c.question || null, visible: c.visible, cells: c.cells || '', reason: c.reason || '',
+    })),
+    keptCheckSkipped: verdict?.keptCheckSkipped || null,
+    keptScore: verdict?.keptScore ?? null,
     finalScore: verdict?.finalScore ?? null,
     valid: verdict?.valid ?? null,
   };
@@ -2026,6 +2048,7 @@ async function redressSheetVariant(baseSheetImageData, opts = {}) {
     characterName = 'character', characterAge = null, facePhoto = null,
     removedItems = [], usageTracker = null, skipQualityEval = false,
     backendOverride = null, authoredWardrobe = null, realisticSheet = null, artStyle = null,
+    keptGarments = null, keptCheckSkipped = null,
   } = opts;
   if (!baseSheetImageData) return null;
 
@@ -2038,6 +2061,10 @@ async function redressSheetVariant(baseSheetImageData, opts = {}) {
   const judged = !skipQualityEval && !!process.env.GEMINI_API_KEY;
   if (judged && (!realisticSheet || !facePhoto)) {
     log.error(`[WARDROBE-VARIANT] ${characterName}: the base sheet's ${!realisticSheet ? 'Pass-1 realistic sheet' : 'face photo'} is not available — the style judge that approved the base cannot judge the variant. NO variant sheet.`);
+    return null;
+  }
+  if (judged && !(Array.isArray(keptGarments) && keptGarments.length) && !keptCheckSkipped) {
+    log.error(`[WARDROBE-VARIANT] ${characterName}: no kept-garment list and no reason for skipping the kept check — NO variant sheet (checked before any paid edit).`);
     return null;
   }
   const prompt = buildRedressPrompt(wardrobeHalf, items);
@@ -2080,7 +2107,7 @@ async function redressSheetVariant(baseSheetImageData, opts = {}) {
     try {
       ({ verdict } = await evaluateVariantSheet(result.imageData, {
         facePhoto, realisticSheet, artStyle, declaredAge: characterAge, usageTracker,
-        removedGarments: items,
+        removedGarments: items, keptGarments, keptCheckSkipped,
       }));
     } catch (err) {
       log.error(`[WARDROBE-VARIANT] ${characterName} redress eval threw: ${err.message} — attempt rejected, never shipped unchecked`);

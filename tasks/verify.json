@@ -5305,6 +5305,25 @@
         "result": "NOT COVERED",
         "note": "build 82c7a7012 lacks b49d4f967 | undecided — human check | LOOK: Open the front cover versions of the run: the active version has the title, spelled correctly, as a painted cover title; if a repair round ran on the cover, its inpaintInstruction/prompt carries the Cover title clause and no version that lost the title outranks one that has it."
       }
+    },
+    {
+      "id": "kept-garment-gate",
+      "title": "A variant sheet that drops a garment which should stay is rejected by the kept-garment check, and the answer is stored",
+      "commits": [],
+      "addedAt": "2026-10-05",
+      "claim": "In a story with a worn-off garment, the Art Director authors keptGarments ({type, colour, details}) on every off row; each variant attempt records keptChecks (one question per kept garment, body cells 5-8) in styledAvatarGeneration[].variant.attempts[].gate; a sheet missing a kept garment is rejected and retried, an accepted one shows every kept garment in cells 5-8.",
+      "runShape": [
+        "needs-worn-off"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Open the dev panel Styled Avatars section for the run: each --off entry lists a Variant gate with kept-garment answers; view the stored off sheet next to its base and confirm every kept garment is drawn in the four body cells. No off row may be refused with reason no-kept-list in the server log.",
+        "images": [
+          "sheets"
+        ]
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [

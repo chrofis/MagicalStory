@@ -23,11 +23,19 @@ const realFetch = globalThis.fetch;
 let editCalls = 0;
 
 // garmentAnswers[i] = what the i-th garment-gone question answers (visible?)
-function stubJudges(garmentAnswers: boolean[]) {
+// keptAnswers[i] = what the i-th kept-garment question answers (visible in body cells 5-8?)
+const sentQuestions: string[] = [];
+function stubJudges(garmentAnswers: boolean[], keptAnswers: boolean[] = [true, true, true, true]) {
   let q = 0;
+  let k = 0;
+  sentQuestions.length = 0;
   globalThis.fetch = (async (_u: any, init: any) => {
     const text = JSON.parse(init.body).contents[0].parts.map((p: any) => p.text || '').join('\n');
-    const verdict = /is .+ visible on the figure/.test(text)
+    if (/is .+ visible on the figure in cells 5 to 8/.test(text)) sentQuestions.push(text);
+    const keptAns = /is .+ visible on the figure in cells 5 to 8/.test(text) ? keptAnswers[k++] : null;
+    const verdict = keptAns !== null
+      ? { cells: 'cell5: yes; cell6: yes; cell7: yes; cell8: yes', visible: keptAns, reason: keptAns ? 'all four show it' : 'cells 5-8 show no strap' }
+      : /is .+ visible on the figure/.test(text)
       ? { cells: 'cell1: red coat; cell2: red coat', visible: garmentAnswers[q++], reason: garmentAnswers[q - 1] ? 'cell 3 shows a mitten' : 'no cell shows it' }
       : STYLE_OK;
     return { ok: true, status: 200, json: async () => ({ candidates: [{ content: { parts: [{ text: JSON.stringify(verdict) }] }, finishReason: 'STOP' }], usageMetadata: {} }), text: async () => '' };
@@ -48,6 +56,7 @@ afterEach(() => { globalThis.fetch = realFetch; editCalls = 0; });
 const OPTS = {
   characterName: 'Daniel', authoredWardrobe: 'The bolt is off; the tunic stays.', removedItems: ['bolt'],
   facePhoto: PIXEL, realisticSheet: PIXEL, artStyle: 'watercolor', characterAge: 8,
+  keptGarments: [{ type: 'baldric', colour: 'brown', details: 'leather, wide' }, { type: 'tunic', colour: 'grey', details: 'wool' }],
 };
 
 describe('redressSheetVariant stores the gate answer', () => {
@@ -68,6 +77,43 @@ describe('redressSheetVariant stores the gate answer', () => {
     expect(a2.accepted).toBe(true);
     expect(a2.gate.garmentChecks[0].visible).toBe(false);
     expect(a2.gate.removedScore).toBe(10);
+    // the kept questions ride in the same record
+    expect(a2.gate.keptChecks.map((c: any) => [c.garment, c.visible])).toEqual([['brown baldric', true], ['grey tunic', true]]);
+    expect(a2.gate.keptScore).toBe(10);
+  });
+
+  it('a kept garment missing from the body cells rejects the attempt and says which; details never reach the question', async () => {
+    process.env.GEMINI_API_KEY ||= 'test-key';
+    stubJudges([false, false], [false, true, true, true]); // attempt 1: baldric absent; attempt 2: all present
+    const out = await SHEET.redressSheetVariant(PIXEL, OPTS);
+    expect(out.accepted).toBe(true);
+    const [a1, a2] = out.attempts;
+    expect(a1.accepted).toBe(false);
+    expect(a1.gate.keptScore).toBe(1);
+    expect(a1.gate.keptChecks[0]).toMatchObject({ garment: 'brown baldric', visible: false });
+    expect(a1.reason).toMatch(/kept: brown baldric is missing from the body cells/);
+    expect(a2.accepted).toBe(true);
+    const asked = sentQuestions.join(String.fromCharCode(10));
+    expect(asked).toContain('brown baldric');
+    expect(asked).not.toMatch(/leather|wool|wide/);
+  });
+
+  it('no kept list and no stated reason: no variant, before any paid edit', async () => {
+    process.env.GEMINI_API_KEY ||= 'test-key';
+    stubJudges([false]);
+    const { keptGarments: _k, ...noKept } = OPTS as any;
+    expect(await SHEET.redressSheetVariant(PIXEL, noKept)).toBeNull();
+    expect(editCalls).toBe(0);
+  });
+
+  it('an outfit version records that no kept check ran', async () => {
+    process.env.GEMINI_API_KEY ||= 'test-key';
+    stubJudges([false]);
+    const { keptGarments: _k, ...noKept } = OPTS as any;
+    const out = await SHEET.redressSheetVariant(PIXEL, { ...noKept, keptCheckSkipped: 'outfit version: no authored kept list' });
+    expect(out.accepted).toBe(true);
+    expect(out.attempts[0].gate.keptChecks).toEqual([]);
+    expect(out.attempts[0].gate.keptCheckSkipped).toBe('outfit version: no authored kept list');
   });
 
   it('every attempt rejected: no image, but the record is returned (it used to be null)', async () => {

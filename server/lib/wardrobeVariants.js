@@ -196,6 +196,21 @@ function authoredNoteFrom(rows) {
   return null;
 }
 
+/**
+ * The garments that stay on, as the Art Director's structured entries
+ * {type, colour, details} (2026-10-05): the first non-empty list among the
+ * rows. Only entries with both a type and a colour are usable; the check is
+ * sent colour + type, never `details`.
+ */
+function keptGarmentsFrom(rows) {
+  for (const r of (rows || [])) {
+    const list = Array.isArray(r && r.keptGarments) ? r.keptGarments : null;
+    if (list && list.length) return list;
+  }
+  return null;
+}
+const keptEntryUsable = (g) => !!(g && String(g.type || '').trim() && String(g.colour || '').trim());
+
 /** Whitespace-, case- and punctuation-insensitive — two wordings or one? */
 function noteFingerprint(note) {
   return String(note || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
@@ -214,10 +229,11 @@ function noteFingerprint(note) {
  * gets built is one sheet, and which page's words built it is exactly what the
  * owner needs to see when the pages do not say the same thing.
  */
+const rankPage = (p) => (Number.isFinite(Number(p)) ? Number(p) : Number.MAX_SAFE_INTEGER);
 function pickAuthoredNote(notes, where) {
   const list = (notes || []).filter(n => n && String(n.note || '').trim());
   if (list.length === 0) return null;
-  const rank = (p) => (Number.isFinite(Number(p)) ? Number(p) : Number.MAX_SAFE_INTEGER);
+  const rank = rankPage;
   const sorted = list
     .map((n, i) => ({ ...n, i }))
     .sort((a, b) => (rank(a.pageNumber) - rank(b.pageNumber)) || (a.i - b.i));
@@ -287,10 +303,11 @@ function deriveWardrobeVariantRequirements({ visualBible, scenes, clothingRequir
       // worded seven slightly different ways. Collect them all here; the pick
       // is made once, deterministically, below.
       const note = authoredNoteFrom(rows);
+      const kept = keptGarmentsFrom(rows);
       const existing = observed.get(key);
       if (existing) {
         existing.pages.push(pageNumber);
-        if (note) existing.notes.push({ pageNumber, note });
+        if (note) existing.notes.push({ pageNumber, note, kept });
         continue;
       }
       observed.set(key, {
@@ -301,7 +318,7 @@ function deriveWardrobeVariantRequirements({ visualBible, scenes, clothingRequir
         // what the stripper needs, and nothing more.
         rows,
         pages: [pageNumber],
-        notes: note ? [{ pageNumber, note }] : [],
+        notes: note ? [{ pageNumber, note, kept }] : [],
       });
     }
   }
@@ -337,6 +354,10 @@ function deriveWardrobeVariantRequirements({ visualBible, scenes, clothingRequir
         baseCategory: baseCat,
         removedItemNames: versions.map(v => v.replaces),
         redressNote: versionRedressNote(versions),
+        // No Art Director writes a kept list for a version sheet: the gate
+        // records that no kept check ran, rather than guessing a list.
+        keptGarments: null,
+        keptCheckSkipped: 'outfit version: no authored kept list',
         outfitVersion: true,
         pages,
       });
@@ -359,10 +380,26 @@ function deriveWardrobeVariantRequirements({ visualBible, scenes, clothingRequir
     // text line. Every story stored before the field existed lands here, by
     // design and on the record.
     const redressNote = pickAuthoredNote(notes, where);
+    // The kept list rides with the note it was authored beside: the chosen
+    // note's own entry (lowest page number that authored one).
+    const chosen = (notes || []).filter(n => n && String(n.note || '').trim())
+      .map((n, i) => ({ ...n, i }))
+      .sort((a, b) => (rankPage(a.pageNumber) - rankPage(b.pageNumber)) || (a.i - b.i))[0];
+    const keptGarments = chosen ? chosen.kept : null;
     if (!redressNote) {
       log.error(`👕 [WARDROBE-VARIANT] ${where}: the Art Director authored no \`redressNote\` for this off-set — NO variant sheet. `
         + `The page keeps the worn sheet + the "is NOT wearing" line. Nothing else writes this instruction.`);
       refusals.push({ name, offIds, pages, reason: 'no-authored-instruction' });
+      continue;
+    }
+
+    // THE KEPT LIST IS AUTHORED TOO (owner, 2026-10-05): the variant gate asks
+    // one question per garment that must stay, and nothing else writes that
+    // list. A missing or unusable list builds NO variant, like a missing note.
+    if (!Array.isArray(keptGarments) || keptGarments.length === 0 || !keptGarments.every(keptEntryUsable)) {
+      log.error(`👕 [WARDROBE-VARIANT] ${where}: the Art Director authored no usable \`keptGarments\` ({type, colour, details} per garment that stays) — NO variant sheet. `
+        + `The page keeps the worn sheet + the "is NOT wearing" line.`);
+      refusals.push({ name, offIds, pages, reason: 'no-kept-list' });
       continue;
     }
 
@@ -372,6 +409,7 @@ function deriveWardrobeVariantRequirements({ visualBible, scenes, clothingRequir
       characterNames: [name],
       offIds,
       baseCategory,
+      keptGarments,
       // The garments' own declared NAMES — for the logs, and nothing is
       // invented: these are the Visual Bible entries' own names.
       removedItemNames: rows.map(r => String(r.name || r.id)),

@@ -21,6 +21,25 @@ superseded and link forward.
 
 ---
 
+## 2026-10-05 — Kept-garment gate shipped: AD-authored structured keptGarments, one check per garment on body cells 5-8
+
+**Context:** Daniel's bolt-off sheet (staging job_1791145238223_50osg2osm) lost the baldric from the body row and nothing flagged it. Entries above: the check flagged a correct sheet on a fabric word (Lab #1614-#1620) until the kept list was structured.
+
+**Measured** (Lab #1621, #1622, set #82, $0.010; `tests/judge-fixtures/baselines/2026-10-05-sheet-kept-d.json`): with `{type, colour, details}` entries and only colour + type sent to the judge, all four fixtures were right 2/2: Daniel flagged (baldric), Fiona passed, Kiaan passed on the original list ("corduroy" in `details`) and on the colour+noun list. Flips 0/4. Bar met.
+
+**Decision (owner, 2026-10-05):**
+- Every `off` wornItems row carries `keptGarments: [{type, colour, details}]`, authored by the Art Director beside `redressNote` (scene-briefs-all, scene-expansion, scene-iteration, scene-iteration-free via `WORN_ITEMS_ROW_RULE` and `GARMENT_REMOVED_RULE`). Code picks fields; it never parses the note. It flows through `parseWornItems`, the resolved rows, the carry-forward merge (a restated row inherits the saved list), `deriveWardrobeVariantRequirements` (requirement row `keptGarments`) and `prepareWardrobeVariantAvatars`.
+- `evaluateVariantSheet` runs `checkKeptGarment` per kept garment (colour + type only, body cells 5-8) next to the garment-gone checks. Any kept garment absent: attempt invalid, `keptScore` 1, final score 1. Every question and answer is on the attempt's `gate.keptChecks`.
+- An off row with no usable list builds NO variant (`no-kept-list` refusal, logged at ERROR), the same rule as a missing `redressNote`; stories stored before the field land there by design. A redress with neither a list nor a stated reason returns null before any paid edit.
+- Outfit-version rows author no kept list: the requirement carries `keptCheckSkipped: 'outfit version: no authored kept list'` and the gate record says so, rather than inventing a list.
+- The Lab `sheet_style` fixtures that use `evaluateVariantSheet` state their own skip reason: the kept check is measured by `sheet_kept`.
+
+**Considered:** a code-side strip of fabric words (rejected: text pattern-matching in code), a fabric-ignore instruction in the check prompt (Lab #1619/#1620: ignored by the judge, and removed), batching all kept garments into one question (grid-judge collapse hazard).
+**Revisit if:** the first real AD-authored lists produce false rejects (a kept garment drawn but flagged), or the refusal rate of `no-kept-list` is not near zero on new stories.
+
+**Touched files:** `prompts/scene-briefs-all.txt`, `prompts/scene-expansion.txt`, `prompts/scene-iteration.txt`, `prompts/scene-iteration-free.txt`, `server/lib/promptBuilders.js`, `server/lib/wornItems.js`, `server/lib/wardrobeVariants.js`, `server/lib/styledAvatars.js`, `server/lib/character2x4Sheet.js`, `server/lib/testlab.js`, `client/src/components/generation/StoryDisplay.tsx`, `tasks/verify.json`.
+
+
 ## 2026-10-05 — Kept garments are structured {type, colour, details}; the check is sent colour + type only
 
 **Context:** Lab #1614-#1620: the check flagged a correct Kiaan sheet 8/8 on "black corduroy trousers", with or without an instruction to ignore fabric words.

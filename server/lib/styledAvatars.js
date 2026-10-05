@@ -2028,6 +2028,8 @@ async function prepareWardrobeVariantAvatars(characters, artStyle, variantRequir
         // source: no authored text, no variant sheet — the derivation refuses
         // the row before it ever reaches here.
         authoredWardrobe: j.row.redressNote,
+        keptGarments: j.row.keptGarments || null,
+        keptCheckSkipped: j.row.keptCheckSkipped || null,
         realisticSheet: j.realisticSheet,
         artStyle,
         usageTracker: addUsage,

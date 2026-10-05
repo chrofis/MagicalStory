@@ -146,10 +146,22 @@ function parseWornItems(raw) {
     // off, what becomes visible under it. Absent on every row written before
     // the field existed, and then the mechanical builder derives it instead.
     const redressNote = String(row.redressNote || '').trim();
+    // `keptGarments` (2026-10-05) — the garments that stay on, as the Art
+    // Director's structured entries {type, colour, details}. Fields are picked,
+    // never parsed out of text; an absent or non-array value is null. Whether
+    // each entry is usable is judged where the variant is derived.
+    const keptGarments = Array.isArray(row.keptGarments)
+      ? row.keptGarments.map(g => ({
+        type: String((g && g.type) || '').trim(),
+        colour: String((g && g.colour) || '').trim(),
+        details: String((g && g.details) || '').trim(),
+      }))
+      : null;
     out.push({
       id, owner: String(row.owner || '').trim(), state,
       location: location || null, wearer: wearer || null,
       redressNote: redressNote || null,
+      keptGarments,
     });
   }
   return out;
@@ -495,6 +507,7 @@ function resolveWornItemsForPage(visualBible, cast, sceneMetadata, options = {})
       defaulted: !stateDeclared,
       missing,
       redressNote: (d && d.redressNote) || null,
+      keptGarments: (d && d.keptGarments) || null,
       outfitVersion: version,
     });
   }
@@ -558,6 +571,7 @@ function resolveWornItemsForPage(visualBible, cast, sceneMetadata, options = {})
       declared: true,
       defaulted: false,
       redressNote: d.redressNote || null,
+      keptGarments: d.keptGarments || null,
       // Declared rows are outside the writer-linked set the `removal_unstated`
       // check governs; flagging them would invent findings on a path that has
       // never produced one.
@@ -863,11 +877,25 @@ function carryForwardWornItems(newSceneMetadata, savedSceneMetadata) {
     const note = String((r && r.redressNote) || '').trim();
     if (id && note) savedNotes.set(id, note);
   }
-  const merged = savedNotes.size === 0 ? fresh.slice() : fresh.map((r) => {
+  // The kept-garment list is the same kind of authored text: a restated row that
+  // drops `keptGarments` inherits the saved one (2026-10-05).
+  const savedKept = new Map();
+  for (const r of savedRows) {
+    const id = idOf(r);
+    if (id && Array.isArray(r && r.keptGarments) && r.keptGarments.length) savedKept.set(id, r.keptGarments);
+  }
+  const merged = (savedNotes.size === 0 && savedKept.size === 0) ? fresh.slice() : fresh.map((r) => {
     if (!r || typeof r !== 'object') return r;
-    if (String(r.redressNote || '').trim()) return r;
-    const note = savedNotes.get(idOf(r));
-    return note ? { ...r, redressNote: note } : r;
+    let out = r;
+    if (!String(r.redressNote || '').trim()) {
+      const note = savedNotes.get(idOf(r));
+      if (note) out = { ...out, redressNote: note };
+    }
+    if (!(Array.isArray(r.keptGarments) && r.keptGarments.length)) {
+      const kept = savedKept.get(idOf(r));
+      if (kept) out = { ...out, keptGarments: kept };
+    }
+    return out;
   });
   // PER ID, NOT PER ARRAY (2026-09-23). A rewrite changes a state by
   // RESTATING the row; omitting it is not a declaration. A saved row the

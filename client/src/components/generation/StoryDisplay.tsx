@@ -63,6 +63,8 @@ interface StyledAvatarGenerationEntry {
       gate?: {
         style: { score: number | null; valid: boolean | null; reasons: string[] };
         garmentChecks: Array<{ garment: string; question: string | null; visible: boolean; cells: string; reason: string }>;
+        keptChecks?: Array<{ garment: string; question: string | null; visible: boolean; cells: string; reason: string }>;
+        keptCheckSkipped?: string | null; keptScore?: number | null;
         removedScore: number | null; finalScore: number | null; valid: boolean | null;
       };
     }>;
@@ -4169,6 +4171,13 @@ export function StoryDisplay({
                                       <pre className="mt-1 whitespace-pre-wrap break-words text-[10px] text-gray-600">{c.question}</pre>
                                     </details>
                                   ))}
+                                  {(a.gate.keptChecks || []).map((c, i) => (
+                                    <details key={'k' + i}>
+                                      <summary className="cursor-pointer"><span className={c.visible ? 'text-green-700' : 'text-red-700 font-bold'}>kept {c.garment}: {c.visible ? 'present in cells 5-8' : 'MISSING from cells 5-8'}</span>{c.cells ? ` (${c.cells})` : ''} - {c.reason}</summary>
+                                      <pre className="mt-1 whitespace-pre-wrap break-words text-[10px] text-gray-600">{c.question}</pre>
+                                    </details>
+                                  ))}
+                                  {a.gate.keptCheckSkipped && <div className="text-gray-500">No kept check: {a.gate.keptCheckSkipped}</div>}
                                 </div>
                               ) : (a.reason && <div className="mt-1 text-[10px] text-gray-600">{a.reason}</div>)}
                             </div>

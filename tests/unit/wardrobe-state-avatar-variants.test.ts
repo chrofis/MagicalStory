@@ -43,7 +43,7 @@ const page = (pageNumber: number, characters: string[], wornItems: any[]) =>
 const NOTE = (id: string) => `The character keeps everything else exactly as the sheet draws it. `
   + `${id} is off, with nothing in its place. The long-sleeved white cotton shirt is the outer garment on the torso.`;
 const off = (id: string, owner: string, location = 'on the ground', redressNote: any = NOTE(id)) =>
-  ({ id, owner, state: 'off', wearer: null, location, redressNote });
+  ({ id, owner, state: 'off', wearer: null, location, redressNote, keptGarments: [{ type: 'shirt', colour: 'white', details: 'linen' }] });
 const worn = (id: string, owner: string) => ({ id, owner, state: 'worn', wearer: null, location: null });
 
 describe('the key algebra is order-independent and reversible', () => {
@@ -261,5 +261,24 @@ describe('held artifacts stay out of scope', () => {
 describe('the slot key and the clothing category share one algebra', () => {
   it('buildOffSlotKey is buildOffCategory applied to a slot key', () => {
     expect(buildOffSlotKey('styled-standard', ['CLO002'])).toBe('styled-standard--off:CLO002');
+  });
+});
+
+describe('derivation — the Art Director\'s keptGarments list (2026-10-05)', () => {
+  const derive = (rows: any[]) => deriveWardrobeVariantRequirements({
+    visualBible: VB, scenes: [page(6, ['Levin'], rows)], clothingRequirements: REQS, characters: CAST,
+  });
+
+  it('the variant row carries the authored list', () => {
+    const { requirements } = derive([off('CLO002', 'Levin')]);
+    expect(requirements[0].keptGarments).toEqual([{ type: 'shirt', colour: 'white', details: 'linen' }]);
+  });
+
+  it('an off row with no list, or an entry without a colour or type, builds NO variant and says so', () => {
+    for (const bad of [undefined, [], [{ type: 'shirt', colour: '', details: 'linen' }], [{ type: '', colour: 'white', details: '' }]]) {
+      const { requirements, refusals } = derive([{ ...off('CLO002', 'Levin'), keptGarments: bad }]);
+      expect(requirements).toEqual([]);
+      expect(refusals.map((r: any) => r.reason)).toEqual(['no-kept-list']);
+    }
   });
 });

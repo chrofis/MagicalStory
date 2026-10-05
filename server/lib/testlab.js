@@ -10341,6 +10341,8 @@ async function runSheetStyleFixture(target, params, sheet) {
     pass: 2, facePhoto, realisticSheet: reference,
     artStyle: entry.artStyle || storyData.artStyle || 'watercolor',
     declaredAge: character.age ?? null, removedGarments, usageTracker,
+    // The kept check is its own Lab judge (sheet_kept); this fixture measures the style judge + garment-gone.
+    keptCheckSkipped: 'Lab sheet_style fixture: the kept check is measured by sheet_kept',
     promptOverrides: armRun.template ? { style: armRun.template } : {},
     imageLabels: armRun.imageLabels,
   });
