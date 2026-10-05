@@ -772,6 +772,19 @@
       "severity": "block"
     },
     {
+      "id": "typed-plan-targets-vs-counters-vs-jev",
+      "axis": "generator-vs-critic",
+      "reason": "The typed page plan (Lab experiment, 2026-10-05; docs/decisions.md 'Typed page plan'): castCoverage.typedPlanTargets is ONE object — the planner is told it up front (typedTargetsRule, filled into story-beats.txt as {TYPED_TARGETS} by promptBuilders.plannerTypedFills), planCounters.countPlanTargets counts against it, and typedPlan.js's per-page Jev questions quote the same one-moment definitions the planner is given (DEED_AND_EFFECT_DEF, TWO_HEIGHTS_DEF, WHOLE_CAST_DEF) and the targeted re-plan section restates the failed target. A target counted but not told, or told but not counted, or a Jev question whose definition drifted from the planner's, is the generator/critic drift this set exists to catch. shotVocabulary.PLAN_TYPES is the one type table both the counters (figure counts) and the shot assignment (shots per type) read. tests/unit/typed-plan.test.ts pins the parity.",
+      "members": [
+        "server/lib/castCoverage.js",
+        "server/lib/planCounters.js",
+        "server/lib/typedPlan.js",
+        "server/lib/promptBuilders.js",
+        "prompts/story-beats.txt"
+      ],
+      "severity": "block"
+    },
+    {
       "id": "story-idea-templates",
       "axis": "single-idea idea prompt vs two-idea idea prompt",
       "reason": "generate-story-idea-single.txt (one call per world, the live full-wizard path) and generate-story-ideas.txt (both ideas in one call) carry the SAME back-cover premise contract and the same [REVIEW] checklist; a rule or self-check added to one reads as absent on whichever template the request routes to.",

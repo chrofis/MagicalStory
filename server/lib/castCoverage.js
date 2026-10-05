@@ -129,6 +129,53 @@ function groupPageRule(budget) {
 }
 
 /**
+ * THE TYPED PAGE PLAN'S BOOK TARGETS (Lab experiment, 2026-10-05; docs/decisions.md
+ * "Typed page plan"). The numbers the planner is told up front
+ * (`typedTargetsRule`) and the counters measure (planCounters.countPlanTargets)
+ * are this ONE object, built from the constants above: the old shot quotas became
+ * these targets, so a quota the planner was never told cannot be counted.
+ *
+ * @param {{pageCount:number, listed?:string[], maxCharactersPerScene:number}} args
+ */
+const TYPED_FACE_MIN = 1;
+const TYPED_SCENERY_MIN = 1;
+const TYPED_NO_COMMISSIONED_MAX = 1;
+function typedPlanTargets({ pageCount, listed = [], maxCharactersPerScene } = {}) {
+  const P = Math.floor(Number(pageCount));
+  const C = listed.length;
+  const cov = castCoverage({ pageCount: P, castCount: C });
+  const group = groupPageBudget({ pageCount: P, castCount: C, maxCharactersPerScene });
+  return {
+    pageCount: P,
+    faceMin: TYPED_FACE_MIN,
+    sceneryMin: TYPED_SCENERY_MIN,
+    noCommissionedMax: TYPED_NO_COMMISSIONED_MAX,
+    appearancesMin: cov && C > 1 ? cov.appearances.min : 0,
+    focalEach: !!(cov && C > 1 && cov.focalEach),
+    mainMin: Math.ceil(P / 2),
+    groupMax: group ? group.max : 0,
+    cast: cov,
+    group,
+  };
+}
+
+/** The targets as the planner is told them, before it plans a page. */
+function typedTargetsRule(t, { mainName = null } = {}) {
+  const lines = [
+    `- At least ${pagesWord(t.faceMin)} of type face.`,
+    `- At least ${pagesWord(t.sceneryMin)} of type landscape or object; two are fine, ideally one of each.`,
+    '- No two neighbouring pages share both their type and their characters.',
+  ];
+  if (t.appearancesMin > 0) {
+    lines.push(`- Every listed character is in frame on at least ${pagesWord(t.appearancesMin)}${t.focalEach ? ', one of them a page with that character alone or with one companion' : ''}.`);
+  }
+  if (t.mainMin > 0) lines.push(`- ${mainName ? mainName : 'The main character'} is in frame on at least ${pagesWord(t.mainMin)}.`);
+  lines.push(`- At most ${pagesWord(t.groupMax)} of type group.`);
+  lines.push(`- At most ${pagesWord(t.noCommissionedMax)} with no listed character in frame.`);
+  return ["THE BOOK'S TARGETS — every one is counted in code on the finished plan:", ...lines].join('\n');
+}
+
+/**
  * The ACTION half of the page plan's cast rule — the link to the arc's own rule
  * (every child does something of their own, owner 2026-09-23): the planner is
  * told each character's action is a page's instant, and the plan check (Q12)
@@ -374,6 +421,8 @@ module.exports = {
   parsePlanCastBlock,
   commissionedCast,
   castCoverage,
+  typedPlanTargets,
+  typedTargetsRule,
   groupPageBudget,
   groupPageRule,
   castActionRule,

@@ -354,8 +354,14 @@ function hungarian(cost) {
   return res;
 }
 
-/** The book's quotas: the shotVocabulary floors, plus the caps this assignment adds. */
-function budgetOf(P) {
+/**
+ * The book's quotas: the shotVocabulary floors, plus the caps this assignment adds.
+ * `quotas: false` is the typed page plan's budget (Lab experiment, 2026-10-05):
+ * the floors became the planner's targets, so the assignment holds none of them
+ * and only picks the best-fitting shot per page inside its type.
+ */
+function budgetOf(P, quotas = true) {
+  if (!quotas) return { floors: {}, requiredPositions: 0, maxMediumWide: P, caps: {}, positionsCap: P, positionPool: 0 };
   const f = SV.shotFloors(P);
   const positionFloors = SV.POSITION_SHOTS.reduce((n, id) => n + (f.floors[id] || 0), 0);
   return {
@@ -377,16 +383,19 @@ const groupAllows = (p, s) => !isGroup(p) || SV.GROUP_WIDER_SHOTS.includes(s);
 // never takes it, so a floor slot moves to an eligible page — or stays empty
 // and is reported unmet (violations → `unmet`), never forced onto a lone figure.
 const otsAllows = (p, s) => s !== 'over-the-shoulder' || p.roster.length >= SV.OTS_MIN_IN_FRAME;
-const allowedShot = (p, s) => groupAllows(p, s) && otsAllows(p, s);
+// A typed page (`allow`: the shots its picture type lists, shotVocabulary.PLAN_TYPES) takes only those.
+const typeAllows = (p, s) => !p.allow || p.allow.includes(s);
+const allowedShot = (p, s) => typeAllows(p, s) && groupAllows(p, s) && otsAllows(p, s);
 
 /** The shot rules an assignment must hold; returns the broken ones. */
-function violations(pages, shots) {
-  const b = budgetOf(pages.length); const out = [];
+function violations(pages, shots, quotas = true) {
+  const b = budgetOf(pages.length, quotas); const out = [];
   const count = s => shots.filter(x => x === s).length;
   for (const [s, n] of Object.entries(b.floors)) if (count(s) < n) out.push(`floor:${s}`);
   if (shots.filter(s => SV.POSITION_SHOTS.includes(s)).length < b.requiredPositions) out.push('floor:positions');
   if (count('medium') + count('wide') > b.maxMediumWide) out.push('cap:medium+wide');
   pages.forEach((p, i) => {
+    if (!typeAllows(p, shots[i])) out.push(`type:p${p.page}`);
     if (!groupAllows(p, shots[i])) out.push(`group:p${p.page}`);
     if (!otsAllows(p, shots[i])) out.push(`ots:p${p.page}`);
   });
@@ -396,7 +405,8 @@ function violations(pages, shots) {
   return out;
 }
 /** The caps the assignment itself keeps. */
-function capBreaks(pages, shots) {
+function capBreaks(pages, shots, quotas = true) {
+  if (!quotas) return [];
   const b = budgetOf(pages.length); const out = [];
   for (const [s, n] of Object.entries(b.caps)) if (shots.filter(x => x === s).length > n) out.push(`cap:${s}`);
   if (shots.filter(s => SV.POSITION_SHOTS.includes(s)).length > b.positionsCap) out.push('cap:positions');
@@ -421,23 +431,28 @@ function capBreaks(pages, shots) {
  * @param {Array<{page:number, roster:string[]}>} pages
  * @param {Array<Object<string,number>>} S  S[i][shot] = fit score
  */
-function assign(pages, S) {
-  const P = pages.length; const b = budgetOf(P); const BIG = 10;
+function assign(pages, S, { quotas = true } = {}) {
+  const P = pages.length; const b = budgetOf(P, quotas); const BIG = 10;
   const slots = [];
   const add = (n, types, mandatory) => { for (let i = 0; i < n; i++) slots.push({ types, mandatory }); };
-  for (const [s, n] of Object.entries(b.floors)) add(n, [s], true);
-  add(b.positionPool, SV.POSITION_SHOTS, true);
-  add(b.maxMediumWide, ['medium', 'wide'], false);
-  add(Math.max(0, b.caps['close-up'] - (b.floors['close-up'] || 0)), ['close-up'], false);
-  add(Math.max(0, b.caps['ultra-wide'] - (b.floors['ultra-wide'] || 0)), ['ultra-wide'], false);
-  add(Math.max(0, b.positionsCap - b.requiredPositions), SV.POSITION_SHOTS, false);
+  if (!quotas) {
+    // One free slot per page: each page takes its best allowed shot.
+    add(P, IDS, false);
+  } else {
+    for (const [s, n] of Object.entries(b.floors)) add(n, [s], true);
+    add(b.positionPool, SV.POSITION_SHOTS, true);
+    add(b.maxMediumWide, ['medium', 'wide'], false);
+    add(Math.max(0, b.caps['close-up'] - (b.floors['close-up'] || 0)), ['close-up'], false);
+    add(Math.max(0, b.caps['ultra-wide'] - (b.floors['ultra-wide'] || 0)), ['ultra-wide'], false);
+    add(Math.max(0, b.positionsCap - b.requiredPositions), SV.POSITION_SHOTS, false);
+  }
   if (slots.length < P) throw new Error(`assign: ${slots.length} slots for ${P} pages`);
   const pick = (i, sl) => { let best = null; for (const s of sl.types) if (allowedShot(pages[i], s) && (best == null || S[i][s] > S[i][best])) best = s; return best; };
   const cost = pages.map((_, i) => slots.map(sl => { const s = pick(i, sl); return s == null ? 1e6 : -(S[i][s] + (sl.mandatory ? BIG : 0)); }));
   let shots = hungarian(cost).map((j, i) => pick(i, slots[j]));
   const total = sh => sh.reduce((n, s, i) => n + S[i][s], 0);
-  const hard = sh => violations(pages, sh).filter(v => !v.startsWith('consecutive')).length + capBreaks(pages, sh).length;
-  const soft = sh => violations(pages, sh).filter(v => v.startsWith('consecutive')).length + capBreaks(pages, sh).length;
+  const hard = sh => violations(pages, sh, quotas).filter(v => !v.startsWith('consecutive')).length + capBreaks(pages, sh, quotas).length;
+  const soft = sh => violations(pages, sh, quotas).filter(v => v.startsWith('consecutive')).length + capBreaks(pages, sh, quotas).length;
   for (let guard = 0; guard < 3 * P; guard++) {
     const now = soft(shots);
     if (!now) break;
@@ -446,11 +461,11 @@ function assign(pages, S) {
       for (const s of IDS) if (s !== shots[j]) { const t = shots.slice(); t[j] = s; cands.push(t); }
       for (let k = j + 1; k < P; k++) if (shots[k] !== shots[j]) { const t = shots.slice(); [t[j], t[k]] = [t[k], t[j]]; cands.push(t); }
     }
-    const better = cands.filter(t => !violations(pages, t).some(v => !v.startsWith('consecutive')) && soft(t) < now).sort((a, c) => total(c) - total(a));
+    const better = cands.filter(t => !violations(pages, t, quotas).some(v => !v.startsWith('consecutive')) && soft(t) < now).sort((a, c) => total(c) - total(a));
     if (!better.length) break;
     shots = better[0];
   }
-  if (hard(shots)) shots.unmet = violations(pages, shots);
+  if (hard(shots)) shots.unmet = violations(pages, shots, quotas);
   return shots;
 }
 

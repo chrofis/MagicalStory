@@ -831,7 +831,30 @@ const GROUP_STAGING_RULE = `When more than three characters share the frame, kee
 /** The same rule on a page whose shot is fixed: the shot assignment already holds GROUP_WIDER_SHOTS (jevDecisions.assign). */
 const GROUP_STAGING_FIXED_SHOT_RULE = `When more than three characters share the frame, keep the whole group together at one depth, or show them from behind (\`perspective: back view\`) as they move away; ${GROUP_STAGING_TAIL}`;
 
+
+/**
+ * THE PICTURE TYPES of the typed page plan (Lab experiment, 2026-10-05; see
+ * docs/decisions.md "Typed page plan"). A plan line's first field names what
+ * the picture IS; the Jev shot assignment then picks the camera WITHIN the
+ * type, from the list below. Each type fixes how many figures stand in frame
+ * (`min`..`max`); the shot lists are the owner-approved ones, and the group
+ * list is GROUP_WIDER_SHOTS (the one source of the wider-shot rule).
+ */
+const PLAN_TYPES = {
+  landscape: { min: 0, max: 0, shots: ['ultra-wide', 'aerial', 'wide', 'high-angle'] },
+  object: { min: 0, max: 1, shots: ['close-up', 'high-angle'] },
+  face: { min: 1, max: 1, shots: ['close-up'] },
+  medium: { min: 1, max: GROUP_STAGING_MAX, shots: ['medium', 'over-the-shoulder', 'low-angle', 'high-angle'] },
+  group: { min: GROUP_STAGING_MAX + 1, max: Infinity, shots: GROUP_WIDER_SHOTS },
+};
+for (const [type, def] of Object.entries(PLAN_TYPES)) {
+  if (def.shots.some(id => !SHOT_TYPES.includes(id))) throw new Error(`shotVocabulary: PLAN_TYPES.${type} names a shot that does not exist`);
+}
+const PLAN_TYPE_IDS = Object.keys(PLAN_TYPES);
+
 module.exports = {
+  PLAN_TYPES,
+  PLAN_TYPE_IDS,
   GROUP_STAGING_MAX,
   GROUP_WIDER_SHOTS,
   GROUP_STAGING_RULE,

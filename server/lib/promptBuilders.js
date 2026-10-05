@@ -22,7 +22,8 @@ const { SCALE_CLASS_SPEC, ANIMAL_ANATOMY_SPEC, GROWN_CREATURE_SCALE_CLASSES, bui
 const { SHOT_ENUM, SHOT_POSITIONS, DISTANCE_SHOTS, SHOT_DEFINITIONS, CLOSEUP_BELOW_WAIST_PHRASE, CLOSEUP_KEPT_RULE, CLOSEUP_KEPT_FIXED_SHOT_RULE, PLAN_SHOT_PLACEHOLDER, shotDistributionPhrase, buildShotDefinitions, OTS_NEAR_FIGURE_CROP, OTS_NEAR_FIGURE_RULE, OTS_NO_CONTACT_RULE, isOverTheShoulderPerspective, VANTAGE_SHOT_RULE, GROUP_STAGING_RULE, GROUP_STAGING_FIXED_SHOT_RULE } = require('./shotVocabulary');
 const { labelOf } = require('./vbLabel');
 const { SLOP_RULES } = require('./proseSlop');
-const { castCoverage, castCoverageRule, castActionRule, castTableSpec, castTableFormat, castTableBlock, groupPageBudget, groupPageRule } = require('./castCoverage');
+const { castCoverage, castCoverageRule, castActionRule, castTableSpec, castTableFormat, castTableBlock, groupPageBudget, groupPageRule, typedPlanTargets, typedTargetsRule } = require('./castCoverage');
+const { PLAN_TYPE_IDS } = require('./shotVocabulary');
 // REQUIRED IN-IMAGE TEXT: one source for the generator block, the repair
 // clause and the judges' TEXT RULES block. Safe as a top-level require --
 // requiredText.js requires promptBuilders LAZILY.
@@ -8701,6 +8702,34 @@ function plannerShotFills(pageCount, legacyShots = false) {
   };
 }
 
+/**
+ * THE TYPED PAGE PLAN's fills (Lab experiment, 2026-10-05; docs/decisions.md
+ * "Typed page plan"): field 0 of every plan line is the picture TYPE
+ * (shotVocabulary.PLAN_TYPES) instead of the shot placeholder, the book's
+ * targets stand at the head of the PAGE PLAN section, and the who column is
+ * names only. Everything else in story-beats.txt is the production template.
+ */
+const TYPED_PLAN_TYPES_RULE = [
+  'Each page has a type, and the type fixes who is in frame:',
+  '- landscape: nobody. A place, the weather, a vessel or a distant sight.',
+  '- object: nobody, or one character\'s hand. One object.',
+  '- face: exactly one character, a close-up of their face.',
+  '- medium: one to three characters.',
+  '- group: four or more characters, all sharing one simple action.',
+  'The who column holds names only, or the word nobody: never a count, a group word or a description. The moment is simple to illustrate: one action, in one place, drawable in a single picture.',
+].join('\n');
+
+function plannerTypedFills(targets, mainName) {
+  return {
+    TYPED_TARGETS: `${typedTargetsRule(targets, { mainName })}\n\n${TYPED_PLAN_TYPES_RULE}\n\n`,
+    SHOT_PLANNING: '',
+    PLAN_SHOT_FIELD: 'type',
+    PLAN_SHOT_FORMAT: '<type>',
+    PLAN_SHOT_NOTE: ` The first field is the page's type: ${PLAN_TYPE_IDS.join(', ')}. Camera shots are chosen after the plan is final, never here.`,
+    PLANNER_GROUP_STAGING: '',
+  };
+}
+
 function checkerShotFills(legacyShots = false) {
   return legacyShots ? {
     PLAN_LINE_HEAD: 'One line per page: shot — who is in frame — the instant the picture shows — what is true after this page that was not before.',
@@ -8713,7 +8742,7 @@ function checkerShotFills(legacyShots = false) {
   };
 }
 
-function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', storyLogic = '', replan = '', centralFigure = null, mayAddDeeds = false, castTable = null, legacyShots = false } = {}) {
+function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', storyLogic = '', replan = '', centralFigure = null, mayAddDeeds = false, castTable = null, legacyShots = false, typedPlan = false } = {}) {
   const template = PROMPT_TEMPLATES.storyBeats;
   if (!template) {
     log.error('[PROMPT] storyBeats template not loaded — beats planning unavailable');
@@ -8752,7 +8781,12 @@ function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', 
     // (owner, 2026-09-27; jevDecisions.decideShots). The planner's shot rules
     // (SHOT_DISTRIBUTION, SHOT_POSITIONS, OTS_NO_CONTACT, the close-up waist
     // sentence) went with the authorship.
-    ...plannerShotFills(pageCount, legacyShots),
+    ...(typedPlan
+      ? plannerTypedFills(
+        typedPlanTargets({ pageCount, listed: (inputData?.characters || []).map(c => c && String(c.name || '').trim()).filter(Boolean), maxCharactersPerScene: ctx.MAX_CHARACTERS_PER_SCENE }),
+        pickMainCharacters(inputData).focus?.name || null,
+      )
+      : { TYPED_TARGETS: '', ...plannerShotFills(pageCount, legacyShots) }),
     PAGE_COUNT: pageCount,
     // HOW MUCH OF THE BOOK EACH COMMISSIONED CHARACTER GETS (owner,
     // 2026-09-23): a focal page each when the book has room, 3-4 pages in
@@ -8778,10 +8812,12 @@ function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', 
     // that stands, and a change the CHANGES block declares is what carries a
     // page the findings did not name into that scope.
     OUTPUT_SCOPE: String(replan || '').trim()
-      ? 'One line for each page you change under RE-DIVIDE, and for no other page, then the changes block.'
+      ? (typedPlan
+        ? 'One line for each page you rewrite under RE-DIVIDE, and for no other page. No changes block.'
+        : 'One line for each page you change under RE-DIVIDE, and for no other page, then the changes block.')
       : `${(inputData?.characters || []).some(c => c && c.name) ? 'The CAST block, then one' : 'One'} line per page, through page ${pageCount}.`,
     // Only a re-plan declares changes; a first division has nothing to declare.
-    CHANGES_FORMAT: String(replan || '').trim() ? REPLAN_CHANGES_FORMAT : '',
+    CHANGES_FORMAT: String(replan || '').trim() && !typedPlan ? REPLAN_CHANGES_FORMAT : '',
     READER_LINE: readerLine,
     DEED_AND_EFFECT_DEF,
     TWO_HEIGHTS_DEF,
@@ -12981,6 +13017,7 @@ module.exports = {
   CHARACTER_DETAILS_USE,
   buildRelationshipLines,
   buildBeatsPrompt,
+  TYPED_PLAN_TYPES_RULE,
   buildChallengeIdeasSection,
   drawChallengeIdeas,
   challengePool,

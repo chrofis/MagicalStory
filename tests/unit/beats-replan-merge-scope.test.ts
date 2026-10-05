@@ -4,6 +4,8 @@ import path from 'path';
 
 const ROOT = path.resolve(__dirname, '../..');
 const SRC = fs.readFileSync(path.join(ROOT, 'server/lib/beatsPipeline.js'), 'utf8');
+// The merge itself moved to planGuards.js (typed-plan experiment, 2026-10-05) so the typed re-plan shares it.
+const GUARDS = fs.readFileSync(path.join(ROOT, 'server/lib/planGuards.js'), 'utf8');
 
 /**
  * The re-plan merge restores every page no finding named from the division that
@@ -22,7 +24,8 @@ describe('beats re-plan merge scope', () => {
   });
 
   it('with no named page every returned page is accepted', () => {
-    expect(SRC).toMatch(/if \(scopeAll \|\| inScope\(pg\.pageNumber\)/);
+    expect(GUARDS).toMatch(/if \(scopeAll \|\| inScope\(pg\.pageNumber\)/);
+    expect(SRC).toMatch(/mergeReplanPages\(second\.parsed\.pages, beats, \{ inScope, scopeAll \}\)/);
   });
 
   // 2026-09-18: the scope is the pages a finding named PLUS the pages the
@@ -36,10 +39,10 @@ describe('beats re-plan merge scope', () => {
   });
 
   it('a page the return omits is still filled from the standing division', () => {
-    expect(SRC).toMatch(/for \(const \[num, pg\] of standing\) if \(!kept\.some/);
+    expect(GUARDS).toMatch(/for \(const \[num, pg\] of standing\) if \(!kept\.some/);
   });
 
   it('the unnamed-page warning is not raised when the whole book was in scope', () => {
-    expect(SRC).toMatch(/const overridden = scopeAll \? 0 :/);
+    expect(GUARDS).toMatch(/const overridden = scopeAll \? 0 :/);
   });
 });

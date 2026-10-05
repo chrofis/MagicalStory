@@ -1591,8 +1591,225 @@ function reviewPlanChanges({ changes = [], standing = [], returned = [], castNam
 }
 
 
+// ───────────────────────── THE TYPED PAGE PLAN'S COUNTERS ─────────────────────────
+// Lab experiment, 2026-10-05 (docs/decisions.md "Typed page plan"). A typed plan
+// line is "<type> — <who> — <moment> — <after>": the type is one of
+// shotVocabulary.PLAN_TYPES and the who column is NAMES ONLY (or "nobody"), so
+// the head count is read in code with no roster call. Two functions:
+//   typedPlanCounters  reads the lines (type, who) and counts everything below
+//   countPlanTargets   counts the book's targets over rows {pageNumber, type,
+//                      names, shot} — the same function for the stored plan and
+//                      today's plan (their type derived by deriveRowType), so
+//                      every arm is measured by one counter.
+
+const { PLAN_TYPES, PLAN_TYPE_IDS, GROUP_STAGING_MAX } = require('./shotVocabulary');
+const { typedPlanTargets } = require('./castCoverage');
+
+const WHO_NOBODY = /^(?:nobody|no one|no-one|none)$/i;
+const WHO_SPLIT = /\s*,\s*(?:and\s+)?|\s+and\s+|\s*&\s*|\s*\+\s*/i;
+// A who entry that is a count, a group word or a description, never a name.
+const WHO_COLLECTIVE = /\b(?:both|all|every(?:one|body)|whole|together|group|cast|children|kids|siblings|friends|family|others|rest|them|they|pair|trio|team|crowd|one|two|three|four|five|six|seven|eight|nine|ten)\b|\d/i;
+
+/**
+ * Split a typed plan line. The moment may itself carry an em-dash, so it is
+ * everything between the who column and the last segment.
+ * @returns {{type:string|null, typeWord:string, who:string, moment:string, after:string, complete:boolean}}
+ */
+function parseTypedLine(planLine) {
+  const segs = planSegments(planLine);
+  const typeWord = (segs[0] || '').toLowerCase().replace(/[^a-z-]/g, '');
+  const type = PLAN_TYPE_IDS.includes(typeWord) ? typeWord : null;
+  return {
+    type,
+    typeWord: segs[0] || '',
+    who: segs[1] || '',
+    moment: segs.length >= 4 ? segs.slice(2, -1).join(' — ') : (segs[2] || ''),
+    after: segs.length >= 4 ? segs[segs.length - 1] : '',
+    complete: segs.length >= 4,
+  };
+}
+
+/**
+ * The who column of a typed line, read in code. A collective ("the four boys",
+ * "everyone"), a count or a description is REJECTED, never guessed at: the
+ * caller reports it loudly and the page has no figures counted.
+ * A name is canonical when it is a commissioned name, or its first name, or it
+ * extends one; any other capitalised name of up to three words is an invented
+ * named figure (kept as written).
+ *
+ * @returns {{nobody:boolean, names:string[], rejected:Array<{entry:string, why:string}>}}
+ */
+function parseTypedWho(whoRaw, commissionedNames = []) {
+  const raw = String(whoRaw || '').trim().replace(/[.;]+$/, '');
+  if (!raw || WHO_NOBODY.test(raw)) return { nobody: true, names: [], rejected: [] };
+  const names = [];
+  const rejected = [];
+  for (const piece of raw.split(WHO_SPLIT)) {
+    const entry = piece.trim();
+    if (!entry) continue;
+    if (WHO_NOBODY.test(entry)) { rejected.push({ entry, why: 'nobody beside names' }); continue; }
+    if (!isNamedFigure(entry)) { rejected.push({ entry, why: 'a description, not a name' }); continue; }
+    if (PERSON_WORDS.test(entry) || WHO_COLLECTIVE.test(entry)) { rejected.push({ entry, why: 'a count or a group word, not a name' }); continue; }
+    if (entry.split(/\s+/).length > 3 || /[()]/.test(entry)) { rejected.push({ entry, why: 'more than a name' }); continue; }
+    const lc = entry.toLowerCase();
+    const known = commissionedNames.find(c => {
+      const cl = String(c).toLowerCase();
+      return cl === lc || cl.split(/\s+/)[0] === lc || lc.split(/\s+/)[0] === cl;
+    });
+    const name = known || entry;
+    if (!names.includes(name)) names.push(name);
+  }
+  return { nobody: false, names, rejected };
+}
+
+/**
+ * The type of a plan line that carries none (the stored plan, today's plan),
+ * from what the line shows: nobody → scenery (landscape/object are not told
+ * apart), one figure in a close-up → face, one to three → medium, more → group.
+ * A plan that declares its types never calls this.
+ */
+function deriveRowType(figureCount, shot) {
+  if (figureCount === 0) return 'scenery';
+  if (figureCount > GROUP_STAGING_MAX) return 'group';
+  if (figureCount === 1 && shot === 'close-up') return 'face';
+  return 'medium';
+}
+
+const isScenery = t => t === 'landscape' || t === 'object' || t === 'scenery';
+
+/**
+ * Every target of the typed plan, counted over rows.
+ *
+ * @param {Object} args
+ * @param {Array<{pageNumber:number, type:string, names:string[], shot?:string|null}>} args.rows
+ * @param {string[]} args.listedNames the commission's character list
+ * @param {string[]} [args.commissionedNames] every commissioned name (listed + supplied)
+ * @param {string|null} [args.mainName]
+ * @param {number} args.maxCharactersPerScene
+ * @returns {{findings:Array, lines:string[], stats:Object}}
+ */
+function countPlanTargets({ rows, listedNames = [], commissionedNames = null, mainName = null, maxCharactersPerScene = 3 } = {}) {
+  const findings = [];
+  const add = (code, pages, detail) => findings.push({ code, pages, detail });
+  const P = rows.length;
+  const targets = typedPlanTargets({ pageCount: P, listed: listedNames, maxCharactersPerScene });
+  const commissioned = (commissionedNames || listedNames).map(n => String(n).toLowerCase());
+  const lcOf = n => String(n).toLowerCase();
+  const has = (r, name) => r.names.some(n => lcOf(n) === lcOf(name));
+
+  const typeCounts = {};
+  const shotCounts = {};
+  for (const r of rows) {
+    typeCounts[r.type] = (typeCounts[r.type] || 0) + 1;
+    if (r.shot) shotCounts[r.shot] = (shotCounts[r.shot] || 0) + 1;
+  }
+  const facePages = rows.filter(r => r.type === 'face').map(r => r.pageNumber);
+  const sceneryPages = rows.filter(r => isScenery(r.type)).map(r => r.pageNumber);
+  const closeUpMulti = rows.filter(r => r.shot === 'close-up' && r.names.length > 1).map(r => r.pageNumber);
+  const groupPages = rows.filter(r => r.names.length > GROUP_STAGING_MAX).map(r => r.pageNumber);
+  const noCommissioned = rows.filter(r => !r.names.some(n => commissioned.includes(lcOf(n)))).map(r => r.pageNumber);
+
+  if (facePages.length < targets.faceMin) add('TYPED_NO_FACE_PAGE', [], `${facePages.length} face page(s), target ${targets.faceMin}`);
+  if (sceneryPages.length < targets.sceneryMin) add('TYPED_NO_SCENERY_PAGE', [], `${sceneryPages.length} landscape or object page(s), target ${targets.sceneryMin}`);
+
+  const neighbourType = [];
+  const neighbourShot = [];
+  for (let i = 1; i < P; i++) {
+    const a = rows[i - 1]; const b = rows[i];
+    const sameCast = a.names.length === b.names.length && a.names.every(n => has(b, n));
+    if (a.type === b.type && sameCast) neighbourType.push([a.pageNumber, b.pageNumber]);
+    if (a.shot && a.shot === b.shot && a.names.length === b.names.length) neighbourShot.push([a.pageNumber, b.pageNumber]);
+  }
+  for (const pair of neighbourType) add('CONSECUTIVE_SAME_TYPE_CAST', pair, `both pages are ${rows.find(r => r.pageNumber === pair[0]).type} with the same characters`);
+
+  const coverage = {};
+  const focal = {};
+  if (targets.appearancesMin > 0) {
+    for (const name of listedNames) {
+      coverage[name] = rows.filter(r => has(r, name)).map(r => r.pageNumber);
+      focal[name] = rows.filter(r => has(r, name) && r.names.length <= 2 && !isScenery(r.type)).map(r => r.pageNumber);
+      if (coverage[name].length < targets.appearancesMin) {
+        add('UNDER_COVERED_CHARACTER', coverage[name], `${name} is in frame on ${coverage[name].length} page(s), target ${targets.appearancesMin}. ${underCoveredFix(name, targets.appearancesMin)}`);
+      }
+      if (targets.focalEach && focal[name].length === 0) add('NO_FOCAL_PAGE', [], `${name} never has a focal page. ${noFocalFix(name)}`);
+    }
+  }
+  let main = null;
+  if (mainName) {
+    const pages = rows.filter(r => has(r, mainName)).map(r => r.pageNumber);
+    main = { name: mainName, pages, target: targets.mainMin };
+    if (pages.length < targets.mainMin) add('MAIN_UNDER_HALF', pages, `${mainName} is in frame on ${pages.length} of ${P} page(s), target ${targets.mainMin}`);
+  }
+  if (groupPages.length > targets.groupMax) add('GROUP_PAGES_OVER_BUDGET', groupPages, `${groupPages.length} page(s) hold more than ${GROUP_STAGING_MAX} characters, budget ${targets.groupMax}`);
+  if (noCommissioned.length > targets.noCommissionedMax) add('TYPED_NO_COMMISSIONED_OVER', noCommissioned, `${noCommissioned.length} page(s) have no commissioned character in frame, target at most ${targets.noCommissionedMax}`);
+
+  const lines = findings.map(f => `PLAN[${f.code}]${f.pages && f.pages.length ? ` page ${f.pages.join(', ')}` : ''}: ${f.detail}`);
+  return {
+    findings,
+    lines,
+    stats: {
+      pageCount: P,
+      targets: { faceMin: targets.faceMin, sceneryMin: targets.sceneryMin, noCommissionedMax: targets.noCommissionedMax, appearancesMin: targets.appearancesMin, focalEach: targets.focalEach, mainMin: targets.mainMin, groupMax: targets.groupMax },
+      typeCounts, shotCounts, facePages, sceneryPages, closeUpOnMultiFigurePages: closeUpMulti,
+      groupPages, groupBudget: targets.groupMax, noCommissionedPages: noCommissioned,
+      neighbourSameTypeCast: neighbourType, neighbourSameShotCount: neighbourShot,
+      coveragePages: coverage, focalPages: focal, mainCharacter: main,
+      sceneryMixed: rows.some(r => r.type === 'landscape') && rows.some(r => r.type === 'object'),
+      castPerPage: rows.map(r => ({ pageNumber: r.pageNumber, names: r.names })),
+    },
+  };
+}
+
+/**
+ * The typed plan's counters: read the lines, then count the targets.
+ * A line that cannot be read, a type its cast breaks, a collective who column
+ * are findings (reported loudly), never silently corrected; a page whose who
+ * column was rejected is counted with the names that did parse.
+ *
+ * @param {Object} args
+ * @param {Array<{pageNumber:number, planLine:string}>} args.pages
+ * @param {string[]} args.listedNames
+ * @param {string[]} [args.commissionedNames]
+ * @param {string|null} [args.mainName]
+ * @param {number} [args.maxCharactersPerScene]
+ */
+function typedPlanCounters({ pages = [], listedNames = [], commissionedNames = null, mainName = null, maxCharactersPerScene = 3 } = {}) {
+  const pre = [];
+  const addPre = (code, pageList, detail) => pre.push({ code, pages: pageList, detail });
+  const known = commissionedNames || listedNames;
+  const rows = pages.map((p) => {
+    const t = parseTypedLine(p.planLine);
+    const who = parseTypedWho(t.who, known);
+    const n = Number(p.pageNumber);
+    if (!t.complete) addPre('PLAN_LINE_INCOMPLETE', [n], 'the typed plan line has fewer than four fields (type — who — moment — after)');
+    if (!t.type) addPre('TYPED_TYPE_UNKNOWN', [n], `the first field "${t.typeWord.slice(0, 40)}" is not one of ${PLAN_TYPE_IDS.join(', ')}`);
+    for (const rj of who.rejected) addPre('TYPED_WHO_COLLECTIVE', [n], `the who column carries "${rj.entry}", ${rj.why}: names only, or nobody`);
+    if (t.type) {
+      const def = PLAN_TYPES[t.type];
+      const count = who.names.length;
+      if (count < def.min || count > def.max) {
+        addPre('TYPE_CAST_MISMATCH', [n], `type ${t.type} holds ${def.max === Infinity ? `${def.min} or more` : def.min === def.max ? def.min : `${def.min} to ${def.max}`} figure(s) and the who column names ${count}`);
+      }
+    }
+    return { pageNumber: n, type: t.type || 'unknown', names: who.names, shot: null, moment: t.moment, after: t.after, planLine: p.planLine };
+  });
+  const counted = countPlanTargets({ rows, listedNames, commissionedNames, mainName, maxCharactersPerScene });
+  const findings = [...pre, ...counted.findings];
+  return {
+    findings,
+    lines: findings.map(f => `PLAN[${f.code}]${f.pages && f.pages.length ? ` page ${f.pages.join(', ')}` : ''}: ${f.detail}`),
+    stats: counted.stats,
+    rows,
+  };
+}
+
 module.exports = {
   runPlanCounters,
+  typedPlanCounters,
+  countPlanTargets,
+  parseTypedLine,
+  parseTypedWho,
+  deriveRowType,
   collectPlaceNames,
   collectCalendarNames,
   calendarNamesForLocale,

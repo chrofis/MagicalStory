@@ -1,5 +1,6 @@
 
 
+const { mergeReplanPages, duplicatePlanLine, pageCountHolds } = require('./planGuards');
 const { runPlanCounters, collectPlaceNames, castLostByReplan, reviewPlanChanges, refreshPlanShot, namesIn } = require('./planCounters');
 const { commissionedCast, castCoverage, parsePlanCastBlock } = require('./castCoverage');
 const { arcRepairFindingsWithCastCheck } = require('./jevAudit');
@@ -1143,16 +1144,8 @@ async function runReplanRounds({ inputData, pageCount, plan, check1, replanRound
       // below and having the round discarded without a word.
       const scopeAll = namedPages.size === 0;
       {
-        const standing = new Map(beats.map(b => [b.pageNumber, b]));
-        const kept = [];
         const inScope = n => namedPages.has(Number(n)) || declaredPages.has(Number(n));
-        for (const pg of second.parsed.pages) {
-          if (scopeAll || inScope(pg.pageNumber) || !standing.has(pg.pageNumber)) kept.push(pg);
-          else kept.push(standing.get(pg.pageNumber));
-        }
-        for (const [num, pg] of standing) if (!kept.some(k => k.pageNumber === num)) kept.push(pg);
-        kept.sort((a, b) => a.pageNumber - b.pageNumber);
-        const overridden = scopeAll ? 0 : second.parsed.pages.filter(pg => !inScope(pg.pageNumber) && standing.has(pg.pageNumber)).length;
+        const { pages: kept, overridden } = mergeReplanPages(second.parsed.pages, beats, { inScope, scopeAll });
         if (overridden > 0) {
           log.warn(`[BEATS] Round ${round}: the re-plan returned ${overridden} page(s) no finding named and no change declared - restored from the standing division`);
           gl.warn('beats_replan_unnamed_pages', `Round ${round}: the re-plan rewrote ${overridden} page(s) that no finding named and no change declared; those pages were restored from the division that stands`, null, { round, overridden, named: [...namedPages].sort((a, b) => a - b), declared: [...declaredPages].sort((a, b) => a - b) });
@@ -1287,8 +1280,7 @@ async function runReplanRounds({ inputData, pageCount, plan, check1, replanRound
       // Two pages with the same instant is corruption, so the round is
       // discarded and the division that stands is kept.
       {
-        const instants = second.parsed.pages.map(pg => String(pg.planLine || '').toLowerCase().replace(/\s+/g, ' ').trim());
-        const dupe = instants.find((t, k) => t && instants.indexOf(t) !== k);
+        const dupe = duplicatePlanLine(second.parsed.pages);
         if (dupe) {
           log.warn(`[BEATS] Round ${round} returned two pages with the same line - discarding it, the previous division stands`);
           gl.warn('beats_replan_duplicate', `Round ${round} produced two pages with an identical plan line; the round was discarded and the previous division stands`, null, { round, line: dupe.slice(0, 160) });
@@ -1305,7 +1297,7 @@ async function runReplanRounds({ inputData, pageCount, plan, check1, replanRound
       // lines, passed both guards above (no duplicate, nothing omitted), and
       // shipped as a 19-page book. Same remedy as the duplicate guard: the
       // round is discarded and the previous division stands.
-      if (second.parsed.pages.length !== beats.length) {
+      if (!pageCountHolds(second.parsed.pages, beats.length)) {
         log.warn(`[BEATS] Round ${round} returned ${second.parsed.pages.length} page(s) for a ${beats.length}-page book - discarding it, the previous division stands`);
         gl.warn('beats_replan_page_count', `Round ${round} returned ${second.parsed.pages.length} page(s) for a ${beats.length}-page book; the round was discarded and the previous division stands`, null, { round, returned: second.parsed.pages.length, expected: beats.length });
         replanRounds.push({ round, changedPages: [], recheck: null, kept: false, replanPrompt, replanReply: String(rpRes.text || ''), discardReason: `returned ${second.parsed.pages.length} page(s) for a ${beats.length}-page book` });

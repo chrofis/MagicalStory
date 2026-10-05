@@ -24,6 +24,7 @@ Last full sweep: **2026-09-06**.
 
 ## P0 — gating the production promotion
 
+- [ ] Typed page plan Lab experiment (type per page, code targets, per-page Jev, one targeted replan; arms stored/today/typed on 4-5 stories, cap CHF 1.00; Lab only) → tasks/typed-plan-2026-10-05.md:1
 - [ ] Pipeline review 2026-09-20 on the last staging story: 15 quality, 9 recompute, 2 sequencing, 8 storage findings; owner triage pending → tasks/pipeline-review-2026-09-20.md:1
 - [ ] Verify on staging before promoting to master — **207 commits ahead as of 2026-09-11**
       (`git rev-list --count origin/master..origin/staging`, measured 2026-09-11; the owner's
