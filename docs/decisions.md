@@ -66720,3 +66720,39 @@ texts, `emails-src/i18n.ts`, `server/lib/seoMeta.js`.
 **Revisit if:** the Lab run shows briefs getting worse where the Art Director no longer states its own `objects[]` / `looksAt` (prose that disagrees with the decisions: brief checks `vb_*` or `plan_cast_uncited` rising), or Jev's roster is extended to every figure in `characters[]`, which would let the name list be code's too.
 
 **Touched files:** `prompts/scene-briefs-all.txt`, `prompts/scene-expansion.txt`, `server/lib/jevDecisions.js` (rule, FIXED block wording, `pinBrief` object order), `server/lib/jevBriefFields.js` (`assembleBriefs`), `server/lib/beatsPipeline.js`, `server/lib/briefChecks.js`, `server/lib/promptBuilders.js` (`applyJevGate`, fills), `server/lib/sceneLight.js` (`SCENE_WEATHER_FIELD_RULE`), `server/lib/testlab.js`, `scripts/analysis/replay-ad-assembly.js`, `tests/unit/ad-assembly.test.ts`.
+
+
+## 2026-10-05 · Art Director model bake-off, cheaper models (measured, no change made)
+
+**Context.** The AD (`runArtDirector`: VB call, all-pages briefs call, brief re-ask) runs on gemini-3.1-pro at $0.5-0.8 per story, 68% of output billed as reasoning. Earlier bake-offs (2026-08-29, Lab 893-944; 2026-09-10, Lab 1107-1134) compared only sonnet / gpt-5.6-sol / gemini / opus. This run adds cheaper candidates. Lab-only params added to `beats_scenes`: `sceneReasoningEffort`, `visualBibleModel` (absent = production call); `scene_hazard_count` got `fromExperimentIndex`. All runs: `plainStoredBeats`, all pages, `checkBriefs` on, staging stories `job_1791040103540_atbttop6w` (A, 18 pages) and `job_1791145238223_50osg2osm` (B, 10 pages), build before 3fe5ed797 (AD still wrote decided fields). Stored modelId confirmed per arm (all three calls ran the named model).
+
+**Measured (A / B; cost = AD+re-ask, USD; before -> survived/introduced = brief-check findings; hazard = scene_hazard_count on the re-asked briefs, gemini judge):**
+
+| arm (Lab id) | cost | wall s | before | survived | introduced | hazard | jevDisobeyed |
+|---|---|---|---|---|---|---|---|
+| 1a gemini-3.1-pro (1623) | .67 / .60 | 308 / 270 | 15 / 20 | 3 / 1 | 1 / 0 | 14 / 19 | 1 / 1 |
+| 1b gemini-3.1-pro repeat (1624) | .77 / .51 | 382 / 260 | 10 / 8 | 1 / 0 | 0 / 0 | 10 / 25 | 2 / 0 |
+| 2 gemini-3.1-pro, reasoning medium (1625) | .58 / .43 | 286 / 204 | 12 / 9 | 1 / 0 | 0 / 0 | 31 / 22 | 7 / 2 |
+| 3 deepseek-v4-pro (1626) | .17 / .22 | 372 / 686 | 18 / 16 | 5 / 3 | 1 / 1 | 15 / 29 | 1 / 0 |
+| 4 gpt-5.6-luna-pro (1627) | .14 / .11 | 201 / 226 | 20 / 10 | 6 / 3 | 0 / 5 | 19 / 22 | 0 / 0 |
+| 5 gemini-3.7-flash (1628) | .14 / .14 | 89 / 80 | 9 / 7 | 2 / 1 | 0 / 0 | 18 / 19 | 0 / 2 |
+| 6 split VB=3.1-pro, briefs=3.7-flash (1629 A; B in 1630, 1629 B reaped by a staging deploy) | .31 / .35 | 173 / 238 | 4 / 20 | 2 / 2 | 2 / 0 | 19 / 16 | 0 / 0 |
+
+Hazard Lab ids: 1631 1632 1633 1634 1639 1637 1638 (A), 1640-1645 and 1646 (B). All arms: VB parsed (no failure events), no per-page fallback pages, no missing/incomplete briefs, label round 0 findings, landmark citation faults 0. Wardrobe/bible conflicts: only arm 6 A reported one (jacket adopted, corrected); CLOTHING-CHECK warnings: A 9-16 on every arm, B 0.
+
+**Noise band (arm 1a vs 1b):** cost +-15% (A .67-.77, B .51-.60), wall +-25%, findings before 10-15 (A) and 8-20 (B), survived 1-3 / 0-1, hazard 10-14 (A) / 19-25 (B). The hazard judge itself is a noisy instrument; a difference under ~8 hazards is not a signal.
+
+**Verdicts.**
+- gemini-3.7-flash: 5x cheaper, 3.5x faster, brief-check findings and survivors inside the baseline band, zero introduced, hazard inside the band on B and +4 above it on A. Cleanest cheap arm; ties the baseline on measured stage metrics. NOT yet judged on images (not run; owner called time).
+- split (arm 6): cost .31-.35, no quality gain over plain flash on the metrics; no case for the split.
+- reasoning medium on 3.1-pro: -20% cost, wall about the same, A hazard 31 (outside band, baseline 10-14) and 7 Jev fields restored. Not adopted.
+- deepseek-v4-pro: cheap but slowest (686 s on B), survived 5/3, introduced on both; briefs read worse (drops a character's under-layer garment, "bare-armed" on A p18; jacket-off handled wrongly on p11). Rejected.
+- gpt-5.6-luna-pro: cheapest, but survived 6/3 and introduced 5 on B (element_uncited), 8 findings left after re-ask. Rejected.
+
+**Decision.** No production change. gemini-3.7-flash is the only candidate worth the image check (creature, over-the-shoulder, garment-off, cover pages on baseline vs flash briefs). It failed earlier as the SCENE REVIEWER (0 output tokens); that does not carry over to the AD calls here (all three calls returned and parsed on both stories) but it is a reason to run the image phase and a second pair of stories before adopting.
+
+**Caveats.** n=2 stories, one run per cheap arm; the hazard judge is a single gemini call per arm. Runs predate 3fe5ed797 (AD no longer writes Jev-decided fields), so new Lab runs are not comparable to these. The reasoning-effort parameter is passed as `{reasoning:{effort}}` through the same `labCallOptions` the re-ask already uses.
+
+**Revisit if:** the owner wants the cost cut ($0.6 -> $0.14 per story) and the image phase confirms flash briefs paint as well; then repeat on 3+ stories with the new templates.
+
+**Touched files:** `server/lib/testlab.js`, `server/lib/beatsPipeline.js` (`visualBibleModel`), `tests/unit/testlab-ad-model-params.test.ts`.
