@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import { localizedApiError, KNOWN_API_ERROR_CODES } from '../../client/src/utils/apiErrors';
+import { uiLabel, type UiLabelKey } from '../../client/src/utils/uiLabels';
 import { resolveVisitorLanguage } from '../../client/src/utils/languagePreference';
 
 const LANGS = ['en', 'de', 'fr', 'it'];
@@ -82,5 +83,18 @@ describe('L-3 language precedence after load (decision #12)', () => {
   });
   it('ignores unsupported values', () => {
     expect(resolveVisitorLanguage('es', 'xx')).toBeNull();
+  });
+});
+
+describe('G-5 uiLabel', () => {
+  const keys: UiLabelKey[] = ['close', 'dismiss', 'fullscreen', 'zoomIn', 'zoomOut', 'resetZoom', 'page', 'noImage', 'dedication', 'backCover', 'character', 'faceCrop', 'exampleFullBody', 'menu'];
+  it('every accessible name exists in all four languages', () => {
+    for (const k of keys) for (const l of LANGS) expect(uiLabel(k, l).length, `${k}/${l}`).toBeGreaterThan(1);
+  });
+  it('is not English for de/fr/it where the word differs', () => {
+    expect(uiLabel('close', 'de')).toBe('Schliessen');
+    expect(uiLabel('close', 'fr')).toBe('Fermer');
+    expect(uiLabel('close', 'it')).toBe('Chiudi');
+    expect(uiLabel('close', 'xx')).toBe('Close');
   });
 });

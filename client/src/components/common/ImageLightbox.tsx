@@ -1,5 +1,7 @@
 import { useEffect, useCallback, useState, useRef } from 'react';
 import { X, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
+import { uiLabel } from '@/utils/uiLabels';
+import { useLanguage } from '@/context/LanguageContext';
 
 interface ImageLightboxProps {
   src: string | null;
@@ -15,6 +17,7 @@ interface ImageLightboxProps {
  * - Press Escape or click background to close
  */
 export function ImageLightbox({ src, alt, onClose }: ImageLightboxProps) {
+  const { language } = useLanguage();
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -125,7 +128,7 @@ export function ImageLightbox({ src, alt, onClose }: ImageLightboxProps) {
         onClick={onClose}
         className="absolute right-3 p-3 rounded-full bg-black/60 hover:bg-black/80 text-white transition-colors z-10"
         style={{ top: 'max(0.75rem, env(safe-area-inset-top))' }}
-        aria-label="Close"
+        aria-label={uiLabel('close', language)}
       >
         <X size={28} />
       </button>
@@ -135,7 +138,7 @@ export function ImageLightbox({ src, alt, onClose }: ImageLightboxProps) {
         <button
           onClick={zoomOut}
           className="p-2 rounded-full bg-black/50 hover:bg-black/70 text-white transition-colors"
-          aria-label="Zoom out"
+          aria-label={uiLabel('zoomOut', language)}
         >
           <ZoomOut size={20} />
         </button>
@@ -145,14 +148,14 @@ export function ImageLightbox({ src, alt, onClose }: ImageLightboxProps) {
         <button
           onClick={zoomIn}
           className="p-2 rounded-full bg-black/50 hover:bg-black/70 text-white transition-colors"
-          aria-label="Zoom in"
+          aria-label={uiLabel('zoomIn', language)}
         >
           <ZoomIn size={20} />
         </button>
         <button
           onClick={resetZoom}
           className="p-2 rounded-full bg-black/50 hover:bg-black/70 text-white transition-colors"
-          aria-label="Reset zoom"
+          aria-label={uiLabel('resetZoom', language)}
         >
           <RotateCcw size={20} />
         </button>

@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Maximize2 } from 'lucide-react';
+import { uiLabel } from '@/utils/uiLabels';
+import { useLanguage } from '@/context/LanguageContext';
 
 interface BookStoryPageProps {
   imageUrl: string | null;
@@ -21,6 +23,7 @@ interface BookStoryPageProps {
  */
 const BookStoryPage = React.forwardRef<HTMLDivElement, BookStoryPageProps>(
   ({ imageUrl, text, pageNumber, showTextOverlay, textOnSidePage, textBelowImage, overlayImage, onImageClick }, ref) => {
+    const { language } = useLanguage();
     const trimmedText = text.trim();
 
     // Mobile read mode: image at top, scrollable text panel below. Extracted
@@ -42,13 +45,13 @@ const BookStoryPage = React.forwardRef<HTMLDivElement, BookStoryPageProps>(
         {imageUrl ? (
           <img
             src={imageUrl}
-            alt={`Page ${pageNumber}`}
+            alt={`${uiLabel('page', language)} ${pageNumber}`}
             className="w-full h-full object-contain"
             draggable={false}
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-indigo-50 to-purple-50 text-indigo-300 text-sm font-medium">
-            No image
+            {uiLabel('noImage', language)}
           </div>
         )}
 
@@ -82,7 +85,7 @@ const BookStoryPage = React.forwardRef<HTMLDivElement, BookStoryPageProps>(
             onTouchStart={(e) => e.stopPropagation()}
             onClick={(e) => { e.stopPropagation(); onImageClick(imageUrl); }}
             className="absolute top-2 left-1/2 -translate-x-1/2 p-1.5 rounded-full bg-black/30 text-white/80 hover:bg-black/50 hover:text-white transition-opacity opacity-0 group-hover:opacity-100 z-10"
-            aria-label="Fullscreen"
+            aria-label={uiLabel('fullscreen', language)}
           >
             <Maximize2 size={14} />
           </button>
@@ -113,6 +116,7 @@ interface TextBelowPageProps {
 }
 
 const TextBelowImagePage: React.FC<TextBelowPageProps> = ({ imageUrl, trimmedText, pageNumber, onImageClick, forwardedRef }) => {
+  const { language } = useLanguage();
   const scrollEl = useRef<HTMLDivElement | null>(null);
 
   // Phone in landscape: stacking image over text leaves the image a sliver.
@@ -177,13 +181,13 @@ const TextBelowImagePage: React.FC<TextBelowPageProps> = ({ imageUrl, trimmedTex
         {imageUrl ? (
           <img
             src={imageUrl}
-            alt={`Page ${pageNumber}`}
+            alt={`${uiLabel('page', language)} ${pageNumber}`}
             className="w-full h-full object-contain"
             draggable={false}
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-indigo-50 to-purple-50 text-indigo-300 text-sm font-medium">
-            No image
+            {uiLabel('noImage', language)}
           </div>
         )}
         {onImageClick && imageUrl && (
@@ -192,7 +196,7 @@ const TextBelowImagePage: React.FC<TextBelowPageProps> = ({ imageUrl, trimmedTex
             onTouchStart={(e) => e.stopPropagation()}
             onClick={(e) => { e.stopPropagation(); onImageClick(imageUrl); }}
             className="absolute top-2 left-1/2 -translate-x-1/2 p-1.5 rounded-full bg-black/30 text-white/80 hover:bg-black/50 hover:text-white transition-opacity opacity-0 group-hover:opacity-100 z-10"
-            aria-label="Fullscreen"
+            aria-label={uiLabel('fullscreen', language)}
           >
             <Maximize2 size={14} />
           </button>

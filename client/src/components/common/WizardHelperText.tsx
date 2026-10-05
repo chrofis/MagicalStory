@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
+import { uiLabel } from '@/utils/uiLabels';
+import { useLanguage } from '@/context/LanguageContext';
 
 interface WizardHelperTextProps {
   step: number;
@@ -12,6 +14,7 @@ interface WizardHelperTextProps {
  * Remembers dismissal per step in localStorage.
  */
 export function WizardHelperText({ step, text }: WizardHelperTextProps) {
+  const { language } = useLanguage();
   const storageKey = `wizard_helper_dismissed_${step}`;
   const [isDismissed, setIsDismissed] = useState(() => {
     return localStorage.getItem(storageKey) === 'true';
@@ -40,7 +43,7 @@ export function WizardHelperText({ step, text }: WizardHelperTextProps) {
       <button
         onClick={handleDismiss}
         className="text-indigo-400 hover:text-indigo-500 transition-colors flex-shrink-0 p-0.5"
-        aria-label="Dismiss"
+        aria-label={uiLabel('dismiss', language)}
       >
         <X size={16} />
       </button>

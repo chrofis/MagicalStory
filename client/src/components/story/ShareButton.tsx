@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Share2, Copy, Check, Loader2, Link2, Link2Off } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
+import { shareFailedMessage } from '@/utils/imageVersions';
 
 interface ShareButtonProps {
   storyId: string;
@@ -88,7 +89,7 @@ export function ShareButton({ storyId, onShareStatusChange, variant = 'compact' 
 
       onShareStatusChange?.(data.isShared);
     } catch (err) {
-      setError('Failed to update sharing');
+      setError(shareFailedMessage(language));
     } finally {
       setLoading(false);
     }
@@ -150,7 +151,7 @@ export function ShareButton({ storyId, onShareStatusChange, variant = 'compact' 
       onShareStatusChange?.(data.isShared);
       return status;
     } catch {
-      setError('Failed to update sharing');
+      setError(shareFailedMessage(language));
       return null;
     } finally {
       setLoading(false);

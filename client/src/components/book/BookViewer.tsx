@@ -5,6 +5,8 @@ import BookStoryPage from './BookStoryPage';
 import BookTextPage from './BookTextPage';
 import BookEndPage from './BookEndPage';
 import storyService from '@/services/storyService';
+import { uiLabel } from '@/utils/uiLabels';
+import { useLanguage } from '@/context/LanguageContext';
 
 // react-pageflip registers window-level touchmove / wheel listeners that
 // call e.preventDefault(). Modern browsers default those listeners to
@@ -108,6 +110,7 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
     // that predate the layout field.
     const forceTextBelow =
       story.layout?.textInImage === false || story.languageLevel === 'advanced';
+    const { language } = useLanguage();
     const bookRef = useRef<any>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const [dimensions, setDimensions] = useState({ width: 400, height: 533 });
@@ -288,7 +291,7 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
             <BookCoverPage
               key="initial-page"
               imageUrl={coverImageUrl('initialPage')}
-              alt="Dedication"
+              alt={uiLabel('dedication', language)}
               onImageClick={onImageClick}
             />
           );
@@ -351,7 +354,7 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
             <BookCoverPage
               key="back-cover"
               imageUrl={coverImageUrl('backCover')}
-              alt="Back cover"
+              alt={uiLabel('backCover', language)}
               onImageClick={onImageClick}
             />
           );

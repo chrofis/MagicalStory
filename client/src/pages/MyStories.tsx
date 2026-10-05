@@ -244,14 +244,15 @@ const StoryCard = memo(function StoryCard({
             <Pencil size={16} />
           </button>
 
-          {/* Add/Remove button for book selection - same style as View button */}
+          {/* Add/Remove button for book selection. Same geometry and indigo family as the
+              Read sibling (CLAUDE.md button-row rule); the selected state is the outlined variant. */}
           {!story.isPartial && (
             <button
               onClick={(e) => { e.stopPropagation(); onToggleSelect(); }}
-              className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
+              className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg ${
                 isSelected
-                  ? 'bg-red-600 text-white hover:bg-red-700'
-                  : 'bg-green-600 text-white hover:bg-green-700'
+                  ? 'bg-white text-indigo-500 border border-indigo-500 hover:bg-indigo-50'
+                  : 'bg-indigo-500 text-white hover:bg-indigo-600'
               }`}
             >
               {isSelected ? t.remove : t.add}
@@ -548,6 +549,22 @@ export default function MyStories() {
       loadAll: 'Tout charger',
       nextStoryLine: 'Chaque enfant mérite sa propre aventure',
       nextStoryButton: 'Créer la prochaine histoire',
+    },
+    it: {
+      myStories: 'Le mie storie',
+      createStory: 'Crea una storia',
+      noStories: 'Nessuna storia creata finora',
+      seePricing: 'Vedi i prezzi',
+      selectHint: 'Seleziona le storie per creare un libro',
+      selected: 'selezionate',
+      pages: 'pagine',
+      createBook: 'Crea il libro',
+      tooManyPages: 'Troppe pagine (max. 100)',
+      add: 'Aggiungi',
+      remove: 'Rimuovi',
+      loadAll: 'Carica tutto',
+      nextStoryLine: 'Ogni bambino merita la sua avventura',
+      nextStoryButton: 'Crea la prossima storia',
     },
   };
 

@@ -30,6 +30,7 @@ const texts = {
     email: 'Email',
     verified: 'Verified',
     notVerified: 'Not verified',
+    status: 'Status',
     myOrders: 'Orders & Credits',
     viewOrders: 'View order history',
     // Modals
@@ -65,13 +66,14 @@ const texts = {
     cashoutBtn: 'Auf Karte auszahlen',
     historyTitle: 'Letzte Aktivität',
     historyEmpty: 'Noch keine Aktivität — teile deinen Code, um zu starten.',
-    credits: 'Story Credits',
+    credits: 'Story-Credits',
     buyMore: 'Mehr Credits kaufen',
     accountInfo: 'Kontoinformationen',
     username: 'Benutzername',
     email: 'E-Mail',
     verified: 'Verifiziert',
     notVerified: 'Nicht verifiziert',
+    status: 'Status',
     myOrders: 'Bestellungen & Guthaben',
     viewOrders: 'Bestellverlauf anzeigen',
     convertTitle: 'Guthaben in Credits umwandeln',
@@ -113,6 +115,7 @@ const texts = {
     email: 'E-mail',
     verified: 'Vérifié',
     notVerified: 'Non vérifié',
+    status: 'Statut',
     myOrders: 'Commandes & crédits',
     viewOrders: "Voir l'historique des commandes",
     convertTitle: 'Convertir le solde en crédits',
@@ -154,6 +157,7 @@ const texts = {
     email: 'E-mail',
     verified: 'Verificato',
     notVerified: 'Non verificato',
+    status: 'Stato',
     myOrders: 'Ordini & crediti',
     viewOrders: 'Visualizza cronologia ordini',
     convertTitle: 'Converti saldo in crediti',
@@ -288,12 +292,12 @@ export default function AccountPage() {
             <div className="mb-4">
               <label className="text-xs text-gray-500 uppercase tracking-wide">{t.yourCode}</label>
               <div className="flex items-center gap-2 mt-1">
-                <div className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 font-mono text-xl font-bold text-indigo-700 tracking-widest text-center select-all">
+                <div className="flex-1 min-w-0 bg-gray-50 border border-gray-200 rounded-lg px-3 sm:px-4 py-3 font-mono text-base sm:text-xl font-bold text-indigo-700 tracking-wide sm:tracking-widest text-center select-all break-all">
                   {referralData.code}
                 </div>
                 <button
                   onClick={handleCopy}
-                  className="px-4 py-3 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors flex items-center gap-1.5"
+                  className="shrink-0 px-3 sm:px-4 py-3 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors flex items-center gap-1.5"
                 >
                   {copied ? <Check size={18} /> : <Copy size={18} />}
                   <span className="text-sm font-medium">{copied ? t.copied : t.copy}</span>
@@ -405,18 +409,18 @@ export default function AccountPage() {
             <h2 className="text-xl font-bold text-gray-800">{t.accountInfo}</h2>
           </div>
           <div className="space-y-3 text-sm">
-            <div className="flex justify-between">
-              <span className="text-gray-500">{t.username}</span>
-              <span className="font-medium text-gray-800">{user.username}</span>
+            <div className="flex justify-between gap-4">
+              <span className="text-gray-500 shrink-0">{t.username}</span>
+              <span className="font-medium text-gray-800 min-w-0 text-right [overflow-wrap:anywhere]">{user.username}</span>
             </div>
             {user.email && (
-              <div className="flex justify-between items-center">
-                <span className="text-gray-500 flex items-center gap-1"><Mail size={14} /> {t.email}</span>
-                <span className="font-medium text-gray-800">{user.email}</span>
+              <div className="flex justify-between items-center gap-4">
+                <span className="text-gray-500 flex items-center gap-1 shrink-0"><Mail size={14} /> {t.email}</span>
+                <span className="font-medium text-gray-800 min-w-0 text-right [overflow-wrap:anywhere]">{user.email}</span>
               </div>
             )}
             <div className="flex justify-between items-center">
-              <span className="text-gray-500 flex items-center gap-1"><ShieldCheck size={14} /> Status</span>
+              <span className="text-gray-500 flex items-center gap-1"><ShieldCheck size={14} /> {t.status}</span>
               <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${user.emailVerified ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
                 {user.emailVerified ? t.verified : t.notVerified}
               </span>

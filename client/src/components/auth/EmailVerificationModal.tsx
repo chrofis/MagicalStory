@@ -7,6 +7,7 @@ import { Input } from '@/components/common/Input';
 import { Alert } from '@/components/common/Alert';
 import { api } from '@/services/api';
 import { localizedApiError } from '@/utils/apiErrors';
+import { uiLabel } from '@/utils/uiLabels';
 
 interface EmailVerificationModalProps {
   isOpen: boolean;
@@ -258,7 +259,7 @@ export function EmailVerificationModal({ isOpen, onClose, onVerified }: EmailVer
         <button
           onClick={onClose}
           className="absolute top-4 right-4 p-2 rounded-full hover:bg-gray-100 transition-colors"
-          aria-label="Close"
+          aria-label={uiLabel('close', language)}
         >
           <X size={20} />
         </button>

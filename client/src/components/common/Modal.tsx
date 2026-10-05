@@ -1,5 +1,7 @@
 import { ReactNode, useEffect, useCallback } from 'react';
 import { X } from 'lucide-react';
+import { uiLabel } from '@/utils/uiLabels';
+import { useLanguage } from '@/context/LanguageContext';
 
 interface ModalProps {
   isOpen: boolean;
@@ -30,6 +32,7 @@ export function Modal({
   closeOnOverlayClick = true,
   closeOnEscape = true,
 }: ModalProps) {
+  const { language } = useLanguage();
   const handleEscape = useCallback(
     (e: KeyboardEvent) => {
       if (e.key === 'Escape' && closeOnEscape) {
@@ -79,7 +82,7 @@ export function Modal({
               <button
                 onClick={onClose}
                 className="p-2 rounded-full hover:bg-gray-100 transition-colors"
-                aria-label="Close"
+                aria-label={uiLabel('close', language)}
               >
                 <X size={20} />
               </button>
