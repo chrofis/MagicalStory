@@ -50,7 +50,7 @@ interface LocationState {
 
 const translations = {
   en: {
-    brand: 'MagicalStory',
+    brand: 'Magical Story',
     creatingStory: 'Creating your story...',
     storyComplete: 'Your story is ready!',
     signInToSee: 'Sign in to read your story',
@@ -98,7 +98,7 @@ const translations = {
     rotationEmailHint: 'Add your email after the story finishes so we can send you the PDF. Set a password too and you get free credits for a full-length story.',
   },
   de: {
-    brand: 'MagicalStory',
+    brand: 'Magical Story',
     creatingStory: 'Deine Geschichte wird erstellt...',
     storyComplete: 'Deine Geschichte ist fertig!',
     signInToSee: 'Melde dich an, um deine Geschichte zu lesen',
@@ -146,7 +146,7 @@ const translations = {
     rotationEmailHint: 'Gib am Ende deine E-Mail an, damit wir dir die Geschichte als PDF schicken können. Setze auch ein Passwort, dann bekommst du Gratis-Credits für eine richtige Geschichte in voller Länge.',
   },
   fr: {
-    brand: 'MagicalStory',
+    brand: 'Magical Story',
     creatingStory: 'Votre histoire est en cours de création…',
     storyComplete: 'Votre histoire est prête !',
     signInToSee: 'Connectez-vous pour lire votre histoire',
@@ -194,7 +194,7 @@ const translations = {
     rotationEmailHint: 'Saisissez votre e-mail à la fin pour que nous puissions vous envoyer le PDF de l\'histoire. Définissez aussi un mot de passe et vous recevez des crédits gratuits pour une histoire complète.',
   },
   it: {
-    brand: 'MagicalStory',
+    brand: 'Magical Story',
     creatingStory: 'La tua storia sta per nascere...',
     storyComplete: 'La tua storia è pronta!',
     signInToSee: 'Accedi per leggere la tua storia',

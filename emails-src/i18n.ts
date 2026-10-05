@@ -33,10 +33,10 @@ export const langMarkers: Record<Lang, string> = {
 //   1. tagline
 //   2. magicalstory.ch · info@magicalstory.ch · {country}   (built by Footer)
 export const footer: Record<Lang, { tagline: string; country: string }> = {
-  en: { tagline: 'MagicalStory - Creating Magical Moments, One Story at a Time', country: 'Switzerland' },
-  de: { tagline: 'MagicalStory – Magische Momente schaffen, eine Geschichte nach der anderen', country: 'Schweiz' },
-  fr: { tagline: 'MagicalStory - Des moments magiques, une histoire à la fois', country: 'Suisse' },
-  it: { tagline: 'MagicalStory - Momenti magici, una storia alla volta', country: 'Svizzera' },
+  en: { tagline: 'Magical Story - Creating Magical Moments, One Story at a Time', country: 'Switzerland' },
+  de: { tagline: 'Magical Story – Magische Momente schaffen, eine Geschichte nach der anderen', country: 'Schweiz' },
+  fr: { tagline: 'Magical Story - Des moments magiques, une histoire à la fois', country: 'Suisse' },
+  it: { tagline: 'Magical Story - Momenti magici, una storia alla volta', country: 'Svizzera' },
 };
 
 // ─── story-complete ──────────────────────────────────────────────────────────
@@ -60,7 +60,7 @@ export const storyComplete: Record<Lang, {
       'Order a printed book',
       'Download as PDF',
     ],
-    signoff: 'Thank you for using MagicalStory!',
+    signoff: 'Thank you for using Magical Story!',
   },
   de: {
     subject: 'Deine magische Geschichte «{title}» ist fertig!',
@@ -77,7 +77,7 @@ export const storyComplete: Record<Lang, {
       'Ein gedrucktes Buch bestellen',
       'Als PDF herunterladen',
     ],
-    signoff: 'Vielen Dank, dass du MagicalStory nutzt!',
+    signoff: 'Vielen Dank, dass du Magical Story nutzt!',
   },
   fr: {
     subject: 'Votre histoire magique « {title} » est prête !',
@@ -94,7 +94,7 @@ export const storyComplete: Record<Lang, {
       'Commander un livre imprimé',
       'Télécharger en PDF',
     ],
-    signoff: "Merci d'utiliser MagicalStory !",
+    signoff: "Merci d'utiliser Magical Story !",
   },
   it: {
     subject: 'La tua storia magica "{title}" è pronta!',
@@ -111,7 +111,7 @@ export const storyComplete: Record<Lang, {
       'Ordinarla come libro stampato',
       'Scaricarla in PDF',
     ],
-    signoff: 'Grazie per aver usato MagicalStory!',
+    signoff: 'Grazie per aver usato Magical Story!',
   },
 };
 
@@ -130,7 +130,7 @@ export const storyFailed: Record<Lang, {
     warnLine: 'No credits were spent on this attempt.',
     cta: 'Try again',
     apology: 'We apologize for any inconvenience.',
-    signoff: 'Best regards,\nThe MagicalStory Team',
+    signoff: 'Best regards,\nThe Magical Story Team',
   },
   de: {
     subject: 'Bei deiner Geschichte ist ein Problem aufgetreten',
@@ -141,7 +141,7 @@ export const storyFailed: Record<Lang, {
     warnLine: 'Für diesen Versuch wurden keine Credits abgezogen.',
     cta: 'Nochmal versuchen',
     apology: 'Wir entschuldigen uns für die Unannehmlichkeiten.',
-    signoff: 'Herzliche Grüsse,\nDein MagicalStory-Team',
+    signoff: 'Herzliche Grüsse,\nDein Magical-Story-Team',
   },
   fr: {
     subject: 'Un problème est survenu avec votre histoire',
@@ -152,7 +152,7 @@ export const storyFailed: Record<Lang, {
     warnLine: "Aucun crédit n'a été utilisé pour cette tentative.",
     cta: 'Réessayer',
     apology: 'Nous nous excusons pour la gêne occasionnée.',
-    signoff: "Cordialement,\nL'équipe MagicalStory",
+    signoff: "Cordialement,\nL'équipe Magical Story",
   },
   it: {
     subject: "C'è stato un problema con la tua storia",
@@ -163,7 +163,7 @@ export const storyFailed: Record<Lang, {
     warnLine: 'Nessun credito è stato utilizzato per questo tentativo.',
     cta: 'Riprova',
     apology: 'Ci scusiamo per il disagio.',
-    signoff: 'Cordiali saluti,\nIl team di MagicalStory',
+    signoff: 'Cordiali saluti,\nIl team di Magical Story',
   },
 };
 
@@ -192,7 +192,7 @@ export const trialStoryComplete: Record<Lang, {
       'Higher image quality and title page',
       'Available as a printed book',
     ],
-    signoff: 'Thank you for trying MagicalStory!',
+    signoff: 'Thank you for trying Magical Story!',
   },
   de: {
     subject: 'Deine magische Geschichte «{title}» ist fertig!',
@@ -211,7 +211,7 @@ export const trialStoryComplete: Record<Lang, {
       'Höhere Bildqualität und Titelseite',
       'Bestellbar als gedrucktes Buch',
     ],
-    signoff: 'Vielen Dank, dass du MagicalStory ausprobiert hast!',
+    signoff: 'Vielen Dank, dass du Magical Story ausprobiert hast!',
   },
   fr: {
     subject: 'Votre histoire magique « {title} » est prête !',
@@ -230,7 +230,7 @@ export const trialStoryComplete: Record<Lang, {
       "Qualité d'image supérieure et page de titre",
       'Disponible en livre imprimé',
     ],
-    signoff: "Merci d'avoir essayé MagicalStory !",
+    signoff: "Merci d'avoir essayé Magical Story !",
   },
   it: {
     subject: 'La tua storia magica "{title}" è pronta!',
@@ -249,7 +249,7 @@ export const trialStoryComplete: Record<Lang, {
       "Qualità d'immagine superiore e copertina con titolo",
       'Disponibile come libro stampato',
     ],
-    signoff: 'Grazie per aver provato MagicalStory!',
+    signoff: 'Grazie per aver provato Magical Story!',
   },
 };
 
@@ -272,7 +272,7 @@ export const trialReminder: Record<Lang, {
       'Higher image quality and title page',
       'Available as a printed book',
     ],
-    signoff: 'Thank you for trying MagicalStory!',
+    signoff: 'Thank you for trying Magical Story!',
   },
   de: {
     preview: 'Deine Gratis-Credits warten noch — aktiviere dein Konto, um sie zu sichern.',
@@ -284,7 +284,7 @@ export const trialReminder: Record<Lang, {
       'Höhere Bildqualität und Titelseite',
       'Bestellbar als gedrucktes Buch',
     ],
-    signoff: 'Vielen Dank, dass du MagicalStory ausprobiert hast!',
+    signoff: 'Vielen Dank, dass du Magical Story ausprobiert hast!',
   },
   fr: {
     preview: 'Vos crédits gratuits vous attendent toujours — activez votre compte pour les conserver.',
@@ -296,7 +296,7 @@ export const trialReminder: Record<Lang, {
       "Qualité d'image supérieure et page de titre",
       'Disponible en livre imprimé',
     ],
-    signoff: "Merci d'avoir essayé MagicalStory !",
+    signoff: "Merci d'avoir essayé Magical Story !",
   },
   it: {
     preview: 'I tuoi crediti gratuiti ti aspettano ancora — attiva il tuo account per conservarli.',
@@ -308,7 +308,7 @@ export const trialReminder: Record<Lang, {
       "Qualità d'immagine superiore e copertina con titolo",
       'Disponibile come libro stampato',
     ],
-    signoff: 'Grazie per aver provato MagicalStory!',
+    signoff: 'Grazie per aver provato Magical Story!',
   },
 };
 
@@ -321,7 +321,7 @@ export const orderConfirmation: Record<Lang, {
   labelShipping: string; labelDelivery: string; followUp: string; signoff: string;
 }> = {
   en: {
-    subject: 'Order confirmed — your MagicalStory book is being printed!',
+    subject: 'Order confirmed — your Magical Story book is being printed!',
     preview: 'Your order is confirmed. We\'ll email you again when it ships.',
     headline: 'Your book is being printed',
     greeting: 'Hello{greeting},',
@@ -332,10 +332,10 @@ export const orderConfirmation: Record<Lang, {
     labelShipping: 'Shipping to',
     labelDelivery: 'Estimated delivery',
     followUp: "You'll receive another email when your book ships with tracking information.",
-    signoff: 'Thank you for choosing MagicalStory!',
+    signoff: 'Thank you for choosing Magical Story!',
   },
   de: {
-    subject: 'Bestellung bestätigt — dein MagicalStory Buch wird gedruckt!',
+    subject: 'Bestellung bestätigt — dein Magical Story Buch wird gedruckt!',
     preview: 'Deine Bestellung ist bestätigt. Wir melden uns wieder, sobald sie versandt wird.',
     headline: 'Dein Buch wird gedruckt',
     greeting: 'Hallo{greeting},',
@@ -346,10 +346,10 @@ export const orderConfirmation: Record<Lang, {
     labelShipping: 'Lieferadresse',
     labelDelivery: 'Voraussichtliche Lieferung',
     followUp: 'Du erhältst eine weitere E-Mail mit Tracking-Informationen, sobald dein Buch versandt wird.',
-    signoff: 'Vielen Dank, dass du MagicalStory gewählt hast!',
+    signoff: 'Vielen Dank, dass du Magical Story gewählt hast!',
   },
   fr: {
-    subject: 'Commande confirmée — votre livre MagicalStory est en cours d\'impression !',
+    subject: 'Commande confirmée — votre livre Magical Story est en cours d\'impression !',
     preview: 'Votre commande est confirmée. Nous vous écrirons à nouveau lors de l\'expédition.',
     headline: 'Votre livre est en cours d\'impression',
     greeting: 'Bonjour{greeting},',
@@ -360,10 +360,10 @@ export const orderConfirmation: Record<Lang, {
     labelShipping: 'Adresse de livraison',
     labelDelivery: 'Délai de livraison estimé',
     followUp: 'Vous recevrez un autre e-mail avec les informations de suivi lorsque votre livre sera expédié.',
-    signoff: "Merci d'avoir choisi MagicalStory !",
+    signoff: "Merci d'avoir choisi Magical Story !",
   },
   it: {
-    subject: 'Ordine confermato — il tuo libro MagicalStory è in stampa!',
+    subject: 'Ordine confermato — il tuo libro Magical Story è in stampa!',
     preview: 'Il tuo ordine è confermato. Ti scriveremo di nuovo al momento della spedizione.',
     headline: 'Il tuo libro è in stampa',
     greeting: 'Ciao{greeting},',
@@ -374,7 +374,7 @@ export const orderConfirmation: Record<Lang, {
     labelShipping: 'Indirizzo di consegna',
     labelDelivery: 'Tempo di consegna stimato',
     followUp: "Riceverai un'altra e-mail con le informazioni di tracciamento quando il libro sarà spedito.",
-    signoff: 'Grazie per aver scelto MagicalStory!',
+    signoff: 'Grazie per aver scelto Magical Story!',
   },
 };
 
@@ -388,7 +388,7 @@ export const orderShipped: Record<Lang, {
   reviewPrompt: string; signoff: string;
 }> = {
   en: {
-    subject: 'Your MagicalStory book has shipped!',
+    subject: 'Your Magical Story book has shipped!',
     preview: 'Your personalized storybook is on its way — track it here.',
     headline: 'Your book is on its way',
     greeting: 'Hello{greeting},',
@@ -399,10 +399,10 @@ export const orderShipped: Record<Lang, {
     cta: 'Track your package',
     closing: 'Your book should arrive within the next few days. We hope you love it!',
     reviewPrompt: "How was your experience? We'd love to hear from you.",
-    signoff: 'Thank you for choosing MagicalStory!',
+    signoff: 'Thank you for choosing Magical Story!',
   },
   de: {
-    subject: 'Dein MagicalStory Buch ist unterwegs!',
+    subject: 'Dein Magical Story Buch ist unterwegs!',
     preview: 'Dein personalisiertes Geschichtenbuch ist auf dem Weg — Sendung verfolgen.',
     headline: 'Dein Buch ist unterwegs',
     greeting: 'Hallo{greeting},',
@@ -413,10 +413,10 @@ export const orderShipped: Record<Lang, {
     cta: 'Sendung verfolgen',
     closing: 'Dein Buch sollte in den nächsten Tagen ankommen. Wir hoffen, es gefällt dir!',
     reviewPrompt: 'Wie war dein Erlebnis? Wir freuen uns über dein Feedback.',
-    signoff: 'Vielen Dank, dass du MagicalStory gewählt hast!',
+    signoff: 'Vielen Dank, dass du Magical Story gewählt hast!',
   },
   fr: {
-    subject: 'Votre livre MagicalStory est en route !',
+    subject: 'Votre livre Magical Story est en route !',
     preview: 'Votre livre personnalisé est en route — suivez son acheminement.',
     headline: 'Votre livre est en route',
     greeting: 'Bonjour{greeting},',
@@ -427,10 +427,10 @@ export const orderShipped: Record<Lang, {
     cta: 'Suivre votre colis',
     closing: 'Votre livre devrait arriver dans les prochains jours. Nous espérons qu\'il vous plaira !',
     reviewPrompt: "Comment était votre expérience ? Nous serions ravis d'avoir votre avis.",
-    signoff: "Merci d'avoir choisi MagicalStory !",
+    signoff: "Merci d'avoir choisi Magical Story !",
   },
   it: {
-    subject: 'Il tuo libro MagicalStory è in viaggio!',
+    subject: 'Il tuo libro Magical Story è in viaggio!',
     preview: 'Il tuo libro personalizzato è in viaggio — seguilo qui.',
     headline: 'Il tuo libro è in viaggio',
     greeting: 'Ciao{greeting},',
@@ -441,7 +441,7 @@ export const orderShipped: Record<Lang, {
     cta: 'Segui il tuo pacco',
     closing: 'Il tuo libro dovrebbe arrivare nei prossimi giorni. Speriamo ti piaccia!',
     reviewPrompt: "Com'è stata la tua esperienza? Ci piacerebbe sapere cosa ne pensi.",
-    signoff: 'Grazie per aver scelto MagicalStory!',
+    signoff: 'Grazie per aver scelto Magical Story!',
   },
 };
 
@@ -459,7 +459,7 @@ export const orderFailed: Record<Lang, {
     body: 'Unfortunately, a technical issue occurred while processing your book order. Our team has been automatically notified and is working on a resolution.',
     reassurance: "No action is needed from you — we'll reach out once the issue is resolved. If a refund is necessary, we will process it for you.",
     questions: 'For questions: info@magicalstory.ch',
-    signoff: 'MagicalStory Team',
+    signoff: 'Magical Story Team',
   },
   de: {
     subject: 'Bestellproblem — wir kümmern uns darum',
@@ -469,7 +469,7 @@ export const orderFailed: Record<Lang, {
     body: 'Bei der Verarbeitung deiner Buchbestellung ist leider ein technisches Problem aufgetreten. Unser Team wurde automatisch benachrichtigt und kümmert sich um die Lösung.',
     reassurance: 'Du musst nichts weiter tun — wir melden uns bei dir, sobald das Problem behoben ist. Sollte eine Rückerstattung nötig sein, werden wir diese veranlassen.',
     questions: 'Bei Fragen: info@magicalstory.ch',
-    signoff: 'MagicalStory Team',
+    signoff: 'Magical Story Team',
   },
   fr: {
     subject: 'Problème de commande — nous nous en occupons',
@@ -479,7 +479,7 @@ export const orderFailed: Record<Lang, {
     body: "Malheureusement, un problème technique est survenu lors du traitement de votre commande de livre. Notre équipe a été automatiquement informée et travaille à la résolution du problème.",
     reassurance: "Aucune action n'est requise de votre part — nous vous contacterons dès que le problème sera résolu. Si un remboursement est nécessaire, nous le traiterons pour vous.",
     questions: 'Pour toute question : info@magicalstory.ch',
-    signoff: "L'équipe MagicalStory",
+    signoff: "L'équipe Magical Story",
   },
   it: {
     subject: 'Problema con il tuo ordine — ce ne stiamo occupando',
@@ -489,7 +489,7 @@ export const orderFailed: Record<Lang, {
     body: "Purtroppo si è verificato un problema tecnico durante l'elaborazione del tuo ordine. Il nostro team è stato avvisato automaticamente e sta lavorando per risolverlo.",
     reassurance: 'Non devi fare nulla — ti contatteremo non appena il problema sarà risolto. Se sarà necessario un rimborso, lo elaboreremo per te.',
     questions: 'Per qualsiasi domanda: info@magicalstory.ch',
-    signoff: 'Il team di MagicalStory',
+    signoff: 'Il team di Magical Story',
   },
 };
 
@@ -500,40 +500,40 @@ export const emailVerification: Record<Lang, {
   cta: string; expires: string; ignoreLine: string;
 }> = {
   en: {
-    subject: 'Verify your MagicalStory email address',
-    preview: 'Confirm your email address to finish creating your MagicalStory account.',
+    subject: 'Verify your Magical Story email address',
+    preview: 'Confirm your email address to finish creating your Magical Story account.',
     headline: 'Verify your email',
     body: 'Please verify your email address by clicking the button below.',
     cta: 'Verify email address',
     expires: 'This link expires in 24 hours.',
-    ignoreLine: "If you didn't create a MagicalStory account, you can safely ignore this email.",
+    ignoreLine: "If you didn't create a Magical Story account, you can safely ignore this email.",
   },
   de: {
-    subject: 'Bestätige deine MagicalStory E-Mail-Adresse',
+    subject: 'Bestätige deine Magical Story E-Mail-Adresse',
     preview: 'Bestätige deine E-Mail-Adresse, um die Einrichtung deines Kontos abzuschliessen.',
     headline: 'Bestätige deine E-Mail-Adresse',
     body: 'Bitte bestätige deine E-Mail-Adresse, indem du auf den Button unten klickst.',
     cta: 'E-Mail-Adresse bestätigen',
     expires: 'Dieser Link ist 24 Stunden gültig.',
-    ignoreLine: 'Falls du kein MagicalStory-Konto erstellt hast, kannst du diese E-Mail ignorieren.',
+    ignoreLine: 'Falls du kein Magical-Story-Konto erstellt hast, kannst du diese E-Mail ignorieren.',
   },
   fr: {
-    subject: 'Vérifiez votre adresse e-mail MagicalStory',
+    subject: 'Vérifiez votre adresse e-mail Magical Story',
     preview: 'Confirmez votre adresse e-mail pour finaliser la création de votre compte.',
     headline: 'Vérifiez votre adresse e-mail',
     body: 'Veuillez vérifier votre adresse e-mail en cliquant sur le bouton ci-dessous.',
     cta: 'Vérifier mon adresse e-mail',
     expires: 'Ce lien expire dans 24 heures.',
-    ignoreLine: "Si vous n'avez pas créé de compte MagicalStory, vous pouvez ignorer cet e-mail.",
+    ignoreLine: "Si vous n'avez pas créé de compte Magical Story, vous pouvez ignorer cet e-mail.",
   },
   it: {
-    subject: 'Verifica il tuo indirizzo e-mail MagicalStory',
+    subject: 'Verifica il tuo indirizzo e-mail Magical Story',
     preview: 'Conferma il tuo indirizzo e-mail per completare la creazione del tuo account.',
     headline: 'Verifica il tuo indirizzo e-mail',
     body: 'Verifica il tuo indirizzo e-mail cliccando sul pulsante qui sotto.',
     cta: "Verifica l'indirizzo e-mail",
     expires: 'Questo link scade dopo 24 ore.',
-    ignoreLine: 'Se non hai creato un account MagicalStory, puoi ignorare questa e-mail.',
+    ignoreLine: 'Se non hai creato un account Magical Story, puoi ignorare questa e-mail.',
   },
 };
 
@@ -544,8 +544,8 @@ export const passwordReset: Record<Lang, {
   cta: string; expires: string; ignoreLine: string;
 }> = {
   en: {
-    subject: 'Reset your MagicalStory password',
-    preview: 'Set a new password for your MagicalStory account.',
+    subject: 'Reset your Magical Story password',
+    preview: 'Set a new password for your Magical Story account.',
     headline: 'Reset your password',
     body: 'You requested to reset your password. Click the button below to set a new one.',
     cta: 'Reset password',
@@ -553,8 +553,8 @@ export const passwordReset: Record<Lang, {
     ignoreLine: "If you didn't request a password reset, you can safely ignore this email. Your password will not be changed.",
   },
   de: {
-    subject: 'Setze dein MagicalStory-Passwort zurück',
-    preview: 'Lege ein neues Passwort für dein MagicalStory-Konto fest.',
+    subject: 'Setze dein Magical-Story-Passwort zurück',
+    preview: 'Lege ein neues Passwort für dein Magical-Story-Konto fest.',
     headline: 'Passwort zurücksetzen',
     body: 'Du hast eine Passwortzurücksetzung angefordert. Klicke auf den Button unten, um ein neues Passwort festzulegen.',
     cta: 'Passwort zurücksetzen',
@@ -562,8 +562,8 @@ export const passwordReset: Record<Lang, {
     ignoreLine: 'Falls du keine Passwortzurücksetzung angefordert hast, kannst du diese E-Mail ignorieren. Dein Passwort wird nicht geändert.',
   },
   fr: {
-    subject: 'Réinitialiser votre mot de passe MagicalStory',
-    preview: 'Définissez un nouveau mot de passe pour votre compte MagicalStory.',
+    subject: 'Réinitialiser votre mot de passe Magical Story',
+    preview: 'Définissez un nouveau mot de passe pour votre compte Magical Story.',
     headline: 'Réinitialiser votre mot de passe',
     body: 'Vous avez demandé la réinitialisation de votre mot de passe. Cliquez sur le bouton ci-dessous pour en définir un nouveau.',
     cta: 'Réinitialiser le mot de passe',
@@ -571,8 +571,8 @@ export const passwordReset: Record<Lang, {
     ignoreLine: "Si vous n'avez pas demandé de réinitialisation de mot de passe, vous pouvez ignorer cet e-mail. Votre mot de passe ne sera pas modifié.",
   },
   it: {
-    subject: 'Reimposta la tua password MagicalStory',
-    preview: 'Imposta una nuova password per il tuo account MagicalStory.',
+    subject: 'Reimposta la tua password Magical Story',
+    preview: 'Imposta una nuova password per il tuo account Magical Story.',
     headline: 'Reimposta la tua password',
     body: 'Hai richiesto la reimpostazione della tua password. Clicca sul pulsante qui sotto per impostarne una nuova.',
     cta: 'Reimposta password',

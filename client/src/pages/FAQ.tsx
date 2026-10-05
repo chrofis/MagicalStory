@@ -97,7 +97,7 @@ const faqContent: Record<string, {
         items: [
           {
             question: 'How is the book printed?',
-            answer: 'Books are professionally printed on high-quality paper in 20x20cm format. You can choose between hardcover and softcover binding. Print quality is comparable to professionally published children\'s books.',
+            answer: 'Books are professionally printed on high-quality paper in A4 format. You can choose between hardcover and softcover binding. Print quality is comparable to professionally published children\'s books.',
           },
           {
             question: 'Can I download my story as a PDF?',
@@ -114,7 +114,7 @@ const faqContent: Record<string, {
         items: [
           {
             question: 'Where do you ship?',
-            answer: 'We currently ship printed books within Switzerland. International shipping is available at additional cost. You can also download your story as a PDF to read on any device.',
+            answer: 'We currently ship printed books within Switzerland. You can also download your story as a PDF to read on any device.',
           },
         ],
       },
@@ -214,7 +214,7 @@ const faqContent: Record<string, {
         items: [
           {
             question: 'Wie wird das Buch gedruckt?',
-            answer: 'Bücher werden professionell auf hochwertigem Papier im Format 20x20cm gedruckt. Du kannst zwischen Hardcover und Softcover wählen. Die Druckqualität ist vergleichbar mit professionell veröffentlichten Kinderbüchern.',
+            answer: 'Bücher werden professionell auf hochwertigem Papier im A4-Format gedruckt. Du kannst zwischen Hardcover und Softcover wählen. Die Druckqualität ist vergleichbar mit professionell veröffentlichten Kinderbüchern.',
           },
           {
             question: 'Kann ich die Geschichte als PDF herunterladen?',
@@ -231,7 +231,7 @@ const faqContent: Record<string, {
         items: [
           {
             question: 'Wohin wird geliefert?',
-            answer: 'Wir liefern gedruckte Bücher derzeit innerhalb der Schweiz. Internationaler Versand ist gegen Aufpreis möglich. Du kannst deine Geschichte auch als PDF herunterladen und auf jedem Gerät lesen.',
+            answer: 'Wir liefern gedruckte Bücher derzeit innerhalb der Schweiz. Du kannst deine Geschichte auch als PDF herunterladen und auf jedem Gerät lesen.',
           },
         ],
       },
@@ -348,7 +348,7 @@ const faqContent: Record<string, {
         items: [
           {
             question: 'Où livrez-vous ?',
-            answer: 'Nous livrons actuellement les livres imprimés en Suisse. La livraison internationale est disponible à un coût supplémentaire. Vous pouvez aussi télécharger votre histoire en PDF pour la lire sur n\'importe quel appareil.',
+            answer: 'Nous livrons actuellement les livres imprimés en Suisse. Vous pouvez aussi télécharger votre histoire en PDF pour la lire sur n\'importe quel appareil.',
           },
         ],
       },
@@ -448,7 +448,7 @@ const faqContent: Record<string, {
         items: [
           {
             question: 'Come viene stampato il libro?',
-            answer: 'I libri sono stampati professionalmente su carta di alta qualità nel formato 20x20cm. Puoi scegliere tra copertina rigida e copertina morbida. La qualità di stampa è paragonabile a quella dei libri per bambini pubblicati professionalmente.',
+            answer: 'I libri sono stampati professionalmente su carta di alta qualità nel formato A4. Puoi scegliere tra copertina rigida e copertina morbida. La qualità di stampa è paragonabile a quella dei libri per bambini pubblicati professionalmente.',
           },
           {
             question: 'Posso scaricare la mia storia in PDF?',
@@ -465,7 +465,7 @@ const faqContent: Record<string, {
         items: [
           {
             question: 'Dove spedite?',
-            answer: 'Al momento spediamo libri stampati all\'interno della Svizzera. La spedizione internazionale è disponibile con un costo aggiuntivo. Puoi anche scaricare la tua storia in PDF per leggerla su qualsiasi dispositivo.',
+            answer: 'Al momento spediamo libri stampati all\'interno della Svizzera. Puoi anche scaricare la tua storia in PDF per leggerla su qualsiasi dispositivo.',
           },
         ],
       },

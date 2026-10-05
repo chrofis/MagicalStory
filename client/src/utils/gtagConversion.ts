@@ -1,6 +1,6 @@
 // Google Ads conversion-event helpers.
 //
-// Three events defined in the MagicalStory Google Ads account:
+// Three events defined in the Magical Story Google Ads account:
 //   1. Page view                 — fires on /try landing (high volume; now
 //                                  demoted to secondary — counted but not
 //                                  used for bidding. See docs/decisions.md

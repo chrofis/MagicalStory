@@ -7,8 +7,9 @@ const FIELD_MAX_CHARS = 2000; // every free-text field (topic, theme, custom tex
 const IDEA_TEXT_MAX_CHARS = 4000; // the chosen story idea text (a two-paragraph back cover, any language)
 const TRAITS_MAX_ITEMS = 20;
 const TRAIT_MAX_CHARS = 100;
-const CHARACTERS_MAX = 20;
-const RELATIONSHIPS_MAX = 400; // a full 20x20 matrix
+const CHARACTERS_MAX = 10; // characters IN one story (owner 2026-10-05); client mirror: MAX_CHARACTERS_PER_STORY in client/src/utils/mainCharacters.ts
+const TOO_MANY_CHARACTERS = 'TOO_MANY_CHARACTERS'; // stable `code` for the 400 (mapped in client/src/utils/apiErrors.ts)
+const RELATIONSHIPS_MAX = 400; // 20 x 20 pairs, far above the 10-character cap
 
 function textError(label, value, max = FIELD_MAX_CHARS) {
   if (value === undefined || value === null) return null;
@@ -122,7 +123,7 @@ function abortOnClientClose(res) {
 }
 
 module.exports = {
-  FIELD_MAX_CHARS, IDEA_TEXT_MAX_CHARS, TRAITS_MAX_ITEMS, TRAIT_MAX_CHARS, CHARACTERS_MAX, RELATIONSHIPS_MAX,
+  FIELD_MAX_CHARS, IDEA_TEXT_MAX_CHARS, TRAITS_MAX_ITEMS, TRAIT_MAX_CHARS, CHARACTERS_MAX, TOO_MANY_CHARACTERS, RELATIONSHIPS_MAX,
   textError, textFieldsError, traitListError, characterTraitsError, characterListError,
   relationshipListError, locationError, userImageSourceError, abortOnClientClose,
 };

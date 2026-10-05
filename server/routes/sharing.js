@@ -803,7 +803,7 @@ htmlRouter.get('/s/:shareToken', async (req, res) => {
   <meta property="og:image:type" content="image/jpeg">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
-  <meta property="og:site_name" content="MagicalStory">
+  <meta property="og:site_name" content="Magical Story">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="${title}">
   <meta name="twitter:image" content="${ogImageUrl}">
@@ -933,12 +933,12 @@ htmlRouter.get('/shared/:shareToken', async (req, res) => {
   <meta property="og:image:type" content="image/jpeg">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
-  <meta property="og:site_name" content="MagicalStory">
+  <meta property="og:site_name" content="Magical Story">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="${title}">
   <meta name="twitter:description" content="${description}">
   <meta name="twitter:image" content="${ogImageUrl}">
-  <title>${title} - MagicalStory</title>`;
+  <title>${title} - Magical Story</title>`;
 
       html = html.replace(/<meta property="og:[^>]*>\s*/g, '');
       html = html.replace(/<meta name="twitter:[^>]*>\s*/g, '');

@@ -82,7 +82,7 @@ export const occasions: OccasionData[] = [
       },
       {
         q: { en: 'Can I add more than one child to the story?', de: 'Kann ich mehr als ein Kind zur Geschichte hinzufügen?', fr: 'Puis-je ajouter plus d\'un enfant à l\'histoire ?', it: 'Posso aggiungere più di un bambino alla storia?' },
-        a: { en: 'Yes! You can add up to 3 characters. Perfect for siblings or best friends celebrating together.', de: 'Ja! Du kannst bis zu 3 Charaktere hinzufügen. Perfekt für Geschwister oder beste Freunde, die zusammen feiern.', fr: 'Oui ! Vous pouvez ajouter jusqu\'à 3 personnages. Parfait pour les frères et sœurs ou les meilleurs amis.', it: 'Sì! Puoi aggiungere fino a 3 personaggi. Perfetto per fratelli, sorelle o migliori amici che festeggiano insieme.' },
+        a: { en: 'Yes! You can add up to 10 characters (up to 2 of them main characters). Perfect for siblings or best friends celebrating together.', de: 'Ja! Du kannst bis zu 10 Figuren (davon bis zu 2 Hauptfiguren) hinzufügen. Perfekt für Geschwister oder beste Freunde, die zusammen feiern.', fr: 'Oui ! Vous pouvez ajouter jusqu\'à 10 personnages (dont 2 rôles principaux au maximum). Parfait pour les frères et sœurs ou les meilleurs amis.', it: 'Sì! Puoi aggiungere fino a 10 personaggi (di cui al massimo 2 protagonisti). Perfetto per fratelli, sorelle o migliori amici che festeggiano insieme.' },
       },
       {
         q: { en: 'What age range is this suitable for?', de: 'Für welches Alter ist das geeignet?', fr: 'Pour quelle tranche d\'âge est-ce adapté ?', it: 'Per quale fascia d\'età è adatto?' },
@@ -458,7 +458,7 @@ export const occasions: OccasionData[] = [
       },
       {
         q: { en: 'Can both siblings be in the story?', de: 'Können beide Geschwister in der Geschichte vorkommen?', fr: 'Les deux enfants peuvent-ils être dans l\'histoire ?', it: 'Possono comparire entrambi i fratelli nella storia?' },
-        a: { en: 'Yes! You can add multiple characters. The older child is the main hero, with the baby as a supporting character.', de: 'Ja! Du kannst mehrere Charaktere hinzufügen. Das ältere Kind ist der Hauptheld, das Baby die Nebenfigur.', fr: 'Oui ! Vous pouvez ajouter plusieurs personnages. L\'aîné est le héros principal, le bébé un personnage secondaire.', it: 'Sì! Puoi aggiungere più personaggi. Il figlio maggiore è l\'eroe principale, con il bebè come personaggio secondario.' },
+        a: { en: 'Yes! You can add up to 10 characters (up to 2 of them main characters). The older child is the main hero, with the baby as a supporting character.', de: 'Ja! Du kannst bis zu 10 Figuren (davon bis zu 2 Hauptfiguren) hinzufügen. Das ältere Kind ist der Hauptheld, das Baby die Nebenfigur.', fr: 'Oui ! Vous pouvez ajouter jusqu\'à 10 personnages (dont 2 rôles principaux au maximum). L\'aîné est le héros principal, le bébé un personnage secondaire.', it: 'Sì! Puoi aggiungere fino a 10 personaggi (di cui al massimo 2 protagonisti). Il figlio maggiore è l\'eroe principale, con il bebè come personaggio secondario.' },
       },
     ],
   },

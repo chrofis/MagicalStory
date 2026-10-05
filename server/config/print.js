@@ -38,6 +38,10 @@ const BOOK_FORMATS = {
 // used for orders that explicitly request it via bookFormat: 'square'.
 const DEFAULT_FORMAT = 'A4';
 
+// Countries a printed book may ship to (Stripe checkout allowed_countries).
+// Switzerland only until the tax position abroad is clear (docs/decisions.md, 2026-10-05).
+const PRINT_SHIPPING_COUNTRIES = ['CH'];
+
 /**
  * Height in PDF points of a printed interior page INCLUDING bleed — i.e. the
  * box the page illustration is scaled to fill. This is the denominator that
@@ -57,5 +61,6 @@ module.exports = {
   mmToPoints,
   BOOK_FORMATS,
   DEFAULT_FORMAT,
+  PRINT_SHIPPING_COUNTRIES,
   interiorPageHeightPt,
 };

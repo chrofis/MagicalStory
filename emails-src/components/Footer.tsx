@@ -4,7 +4,7 @@ import { colors, fonts } from '../theme';
 
 interface FooterProps {
   tagline: string;
-  // Single country/legal line, e.g. "MagicalStory, Schweiz"
+  // Single country/legal line, e.g. "Magical Story, Schweiz"
   country: string;
 }
 
@@ -43,7 +43,7 @@ export function Footer({ tagline, country }: FooterProps) {
           <Link href="https://magicalstory.ch" style={{ textDecoration: 'none' }}>
             <Img
               src="https://magicalstory.ch/images/email-logo.png"
-              alt="MagicalStory"
+              alt="Magical Story"
               width="80"
               height="80"
               style={{ width: '80px', height: 'auto', display: 'block' }}

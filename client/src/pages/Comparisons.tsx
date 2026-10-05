@@ -16,8 +16,8 @@ const pageTexts: Record<string, {
   ctaButton: string;
 }> = {
   en: {
-    heroTitle: 'MagicalStory Compared',
-    heroSubtitle: 'Honest comparisons of MagicalStory with other personalized children\'s book platforms. We acknowledge competitor strengths — choose what fits your family best.',
+    heroTitle: 'Magical Story Compared',
+    heroSubtitle: 'Honest comparisons of Magical Story with other personalized children\'s book platforms. We acknowledge competitor strengths — choose what fits your family best.',
     comparisonsTitle: '1-on-1 Comparisons',
     listiclesTitle: 'Roundup Rankings',
     viewComparison: 'View comparison',
@@ -27,8 +27,8 @@ const pageTexts: Record<string, {
     ctaButton: 'Create Your Free Story',
   },
   de: {
-    heroTitle: 'MagicalStory im Vergleich',
-    heroSubtitle: 'Ehrliche Vergleiche von MagicalStory mit anderen personalisierten Kinderbuch-Plattformen. Wir erkennen die Stärken der Mitbewerber an — wähle, was am besten zu deiner Familie passt.',
+    heroTitle: 'Magical Story im Vergleich',
+    heroSubtitle: 'Ehrliche Vergleiche von Magical Story mit anderen personalisierten Kinderbuch-Plattformen. Wir erkennen die Stärken der Mitbewerber an — wähle, was am besten zu deiner Familie passt.',
     comparisonsTitle: '1-gegen-1 Vergleiche',
     listiclesTitle: 'Ranking-Übersichten',
     viewComparison: 'Vergleich ansehen',
@@ -38,8 +38,8 @@ const pageTexts: Record<string, {
     ctaButton: 'Gratis-Geschichte erstellen',
   },
   fr: {
-    heroTitle: 'MagicalStory en comparaison',
-    heroSubtitle: 'Comparaisons honnêtes de MagicalStory avec d\'autres plateformes de livres pour enfants personnalisés. Nous reconnaissons les forces des concurrents — choisissez ce qui convient le mieux à votre famille.',
+    heroTitle: 'Magical Story en comparaison',
+    heroSubtitle: 'Comparaisons honnêtes de Magical Story avec d\'autres plateformes de livres pour enfants personnalisés. Nous reconnaissons les forces des concurrents — choisissez ce qui convient le mieux à votre famille.',
     comparisonsTitle: 'Comparaisons 1 contre 1',
     listiclesTitle: 'Classements',
     viewComparison: 'Voir la comparaison',
@@ -49,8 +49,8 @@ const pageTexts: Record<string, {
     ctaButton: 'Créer votre histoire gratuite',
   },
   it: {
-    heroTitle: 'MagicalStory a confronto',
-    heroSubtitle: 'Confronti onesti tra MagicalStory e altre piattaforme di libri personalizzati per bambini. Riconosciamo i punti di forza dei concorrenti — scegli ciò che si adatta meglio alla tua famiglia.',
+    heroTitle: 'Magical Story a confronto',
+    heroSubtitle: 'Confronti onesti tra Magical Story e altre piattaforme di libri personalizzati per bambini. Riconosciamo i punti di forza dei concorrenti — scegli ciò che si adatta meglio alla tua famiglia.',
     comparisonsTitle: 'Confronti 1 contro 1',
     listiclesTitle: 'Classifiche',
     viewComparison: 'Vedi il confronto',

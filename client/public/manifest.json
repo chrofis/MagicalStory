@@ -1,6 +1,6 @@
 {
   "name": "Magical Story",
-  "short_name": "MagicalStory",
+  "short_name": "Magical Story",
   "description": "Dein Kind wird zum Helden seiner eigenen Geschichte",
   "start_url": "/",
   "display": "standalone",

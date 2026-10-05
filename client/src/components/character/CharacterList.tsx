@@ -3,7 +3,7 @@ import { Edit2, Trash2, Check, AlertTriangle, Star, Plus } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import type { Character } from '@/types/character';
 import { getDisplayPhoto } from '@/utils/characterPhotos';
-import { pickMainCharacters, mainLimit } from '@/utils/mainCharacters';
+import { pickMainCharacters, mainLimit, MAX_CHARACTERS_PER_STORY } from '@/utils/mainCharacters';
 
 // Character role in story: 'out' = not in story, 'in' = side character, 'main' = main character
 type CharacterRole = 'out' | 'in' | 'main';
@@ -53,6 +53,13 @@ export function CharacterList({
   const inStory = characters.filter(c => !excludedCharacters.includes(c.id));
   const sel = pickMainCharacters(inStory, mainCharacters);
   const declaredCount = sel.counted.length;
+  const storyFull = inStory.length >= MAX_CHARACTERS_PER_STORY;
+  const tooManyHint = pick(
+    `Höchstens ${MAX_CHARACTERS_PER_STORY} Figuren pro Geschichte, davon höchstens 2 Hauptrollen.`,
+    `Au maximum ${MAX_CHARACTERS_PER_STORY} personnages par histoire, dont au maximum 2 rôles principaux.`,
+    `Al massimo ${MAX_CHARACTERS_PER_STORY} personaggi per storia, di cui al massimo 2 protagonisti.`,
+    `Up to ${MAX_CHARACTERS_PER_STORY} characters per story, up to 2 of them main characters.`,
+  );
   const ageLine = (() => {
     if (!sel.focus || sel.focusAge === null) return null;
     const n = sel.focusAge;
@@ -106,6 +113,17 @@ export function CharacterList({
         </div>
       )}
 
+      {onCharacterRoleChange && inStory.length > MAX_CHARACTERS_PER_STORY && (
+        <p className="text-sm text-red-600 font-medium">
+          {tooManyHint} {pick(
+            `Aktuell dabei: ${inStory.length}. Setze Figuren auf «Nicht dabei».`,
+            `Actuellement présents : ${inStory.length}. Mettez des personnages sur « Absent ».`,
+            `Attualmente presenti: ${inStory.length}. Imposta alcuni personaggi su «Assente».`,
+            `Currently in the story: ${inStory.length}. Set some characters to "Out".`,
+          )}
+        </p>
+      )}
+
       {onCharacterRoleChange && (
         <p className="text-sm text-gray-600">
           {pick(
@@ -131,6 +149,8 @@ export function CharacterList({
             // Main limit for the cast as it would be with this character in the story
             const limitWithChar = mainLimit(charactersInStory.length + (isOut ? 1 : 0));
             const mainFull = !isMain && limitWithChar >= 2 && sel.counted.length >= limitWithChar;
+            // An absent character cannot join a story that already has the maximum
+            const joinBlocked = isOut && storyFull;
 
             return (
               <div
@@ -218,8 +238,12 @@ export function CharacterList({
                         </button>
                         <button
                           onClick={() => onCharacterRoleChange(char.id, 'in')}
+                          disabled={joinBlocked}
+                          title={joinBlocked ? tooManyHint : undefined}
                           className={`flex-1 px-1.5 py-1 font-medium transition-colors border-l border-r border-gray-300 ${
-                            isIn
+                            joinBlocked
+                              ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                              : isIn
                               ? 'bg-indigo-500 text-white'
                               : isOut
                               ? 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'
@@ -230,10 +254,10 @@ export function CharacterList({
                         </button>
                         <button
                           onClick={() => onCharacterRoleChange(char.id, 'main')}
-                          disabled={mainFull}
-                          title={mainFull ? pick('Höchstens 2 Hauptrollen', 'Au maximum 2 rôles principaux', 'Al massimo 2 protagonisti', 'At most 2 main characters') : undefined}
+                          disabled={mainFull || joinBlocked}
+                          title={joinBlocked ? tooManyHint : mainFull ? pick('Höchstens 2 Hauptrollen', 'Au maximum 2 rôles principaux', 'Al massimo 2 protagonisti', 'At most 2 main characters') : undefined}
                           className={`flex-1 px-1.5 py-1 font-medium transition-colors flex items-center justify-center gap-0.5 ${
-                            mainFull
+                            mainFull || joinBlocked
                               ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                               : isMain
                               ? 'bg-indigo-500 text-white'

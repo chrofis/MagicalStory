@@ -15,6 +15,7 @@ const { authenticateToken, verifySession } = require('../middleware/auth');
 
 // Config
 const { CREDIT_CONFIG } = require('../config/credits');
+const { PRINT_SHIPPING_COUNTRIES } = require('../config/print');
 
 // Services
 const { log } = require('../utils/logger');
@@ -1769,7 +1770,7 @@ router.post('/stripe/create-checkout-session', authenticateToken, async (req, re
         }),
       },
       shipping_address_collection: {
-        allowed_countries: ['DE', 'AT', 'CH', 'FR', 'IT', 'NL', 'BE', 'LU']
+        allowed_countries: PRINT_SHIPPING_COUNTRIES
       },
     });
 
@@ -1851,7 +1852,7 @@ router.post('/stripe/create-credits-checkout', authenticateToken, async (req, re
           currency: 'chf',
           product_data: {
             name: `${pkg.credits} Story Credits`,
-            description: `${pkg.credits} credits for creating personalized stories on MagicalStory`,
+            description: `${pkg.credits} credits for creating personalized stories on Magical Story`,
           },
           unit_amount: pkg.amountCents,
         },

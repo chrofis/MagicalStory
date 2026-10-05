@@ -223,10 +223,10 @@ const THEMES = {
 const STATIC_ROUTES = {
   '/': {
     title: {
-      en: 'MagicalStory – Your Child as the Hero of Their Own Book',
-      de: 'MagicalStory – Dein Kind als Held seiner eigenen Geschichte',
-      fr: 'MagicalStory – Votre enfant héros de son propre livre',
-      it: 'MagicalStory – Il tuo bambino protagonista della sua storia',
+      en: 'Magical Story – Your Child as the Hero of Their Own Book',
+      de: 'Magical Story – Dein Kind als Held seiner eigenen Geschichte',
+      fr: 'Magical Story – Votre enfant héros de son propre livre',
+      it: 'Magical Story – Il tuo bambino protagonista della sua storia',
     },
     description: {
       en: 'A personalized children\'s book where your child is the hero. Upload a photo, pick a theme, create your first story free.',
@@ -237,38 +237,38 @@ const STATIC_ROUTES = {
   },
   '/pricing': {
     title: {
-      en: 'Pricing – MagicalStory',
-      de: 'Preise – MagicalStory',
-      fr: 'Tarifs – MagicalStory',
-      it: 'Prezzi – MagicalStory',
+      en: 'Pricing – Magical Story',
+      de: 'Preise – Magical Story',
+      fr: 'Tarifs – Magical Story',
+      it: 'Prezzi – Magical Story',
     },
     description: {
-      en: 'Your first story is free. Printed books start at CHF 29. View all pricing plans for MagicalStory.',
-      de: 'Deine erste Geschichte ist gratis. Gedruckte Bücher ab CHF 29. Alle Preise für MagicalStory.',
-      fr: 'Votre première histoire est gratuite. Livres imprimés dès CHF 29. Tous les tarifs de MagicalStory.',
-      it: 'La tua prima storia è gratis. Libri stampati da CHF 29. Tutti i prezzi di MagicalStory.',
+      en: 'Your first story is free. Printed books start at CHF 29. View all pricing plans for Magical Story.',
+      de: 'Deine erste Geschichte ist gratis. Gedruckte Bücher ab CHF 29. Alle Preise für Magical Story.',
+      fr: 'Votre première histoire est gratuite. Livres imprimés dès CHF 29. Tous les tarifs de Magical Story.',
+      it: 'La tua prima storia è gratis. Libri stampati da CHF 29. Tutti i prezzi di Magical Story.',
     },
   },
   '/faq': {
     title: {
-      en: 'FAQ – MagicalStory',
-      de: 'Häufige Fragen – MagicalStory',
-      fr: 'FAQ – MagicalStory',
-      it: 'FAQ – MagicalStory',
+      en: 'FAQ – Magical Story',
+      de: 'Häufige Fragen – Magical Story',
+      fr: 'FAQ – Magical Story',
+      it: 'FAQ – Magical Story',
     },
     description: {
-      en: 'Frequently asked questions about MagicalStory. Learn how personalized children\'s books work, pricing, and more.',
-      de: 'Häufig gestellte Fragen zu MagicalStory. Erfahre, wie personalisierte Kinderbücher funktionieren, Preise und mehr.',
-      fr: 'Questions fréquemment posées sur MagicalStory. Découvrez comment fonctionnent les livres personnalisés pour enfants.',
-      it: 'Domande frequenti su MagicalStory. Scopri come funzionano i libri personalizzati per bambini, i prezzi e altro.',
+      en: 'Frequently asked questions about Magical Story. Learn how personalized children\'s books work, pricing, and more.',
+      de: 'Häufig gestellte Fragen zu Magical Story. Erfahre, wie personalisierte Kinderbücher funktionieren, Preise und mehr.',
+      fr: 'Questions fréquemment posées sur Magical Story. Découvrez comment fonctionnent les livres personnalisés pour enfants.',
+      it: 'Domande frequenti su Magical Story. Scopri come funzionano i libri personalizzati per bambini, i prezzi e altro.',
     },
   },
   '/ratgeber': {
     title: {
-      en: 'Guides — Making and Choosing Children\'s Books | MagicalStory',
-      de: 'Ratgeber — Kinderbücher erstellen und Anbieter wählen | MagicalStory',
-      fr: 'Guides — Créer un livre pour enfant et choisir un service | MagicalStory',
-      it: 'Guide — Creare e scegliere un libro per bambini | MagicalStory',
+      en: 'Guides — Making and Choosing Children\'s Books | Magical Story',
+      de: 'Ratgeber — Kinderbücher erstellen und Anbieter wählen | Magical Story',
+      fr: 'Guides — Créer un livre pour enfant et choisir un service | Magical Story',
+      it: 'Guide — Creare e scegliere un libro per bambini | Magical Story',
     },
     description: {
       en: 'Practical guides on creating a children\'s book with AI, keeping characters consistent, writing for a child\'s reading level, and choosing between personalized book services.',
@@ -279,10 +279,10 @@ const STATIC_ROUTES = {
   },
   '/kinderbuch-erstellen': {
     title: {
-      en: 'Create a Children\'s Book with AI – Your Own Story | MagicalStory',
-      de: 'Kinderbuch erstellen mit KI – deine eigene Geschichte | MagicalStory',
-      fr: 'Créer un livre pour enfant avec l\'IA – votre propre histoire | MagicalStory',
-      it: 'Crea un libro per bambini con l\'IA – la tua storia | MagicalStory',
+      en: 'Create a Children\'s Book with AI – Your Own Story | Magical Story',
+      de: 'Kinderbuch erstellen mit KI – deine eigene Geschichte | Magical Story',
+      fr: 'Créer un livre pour enfant avec l\'IA – votre propre histoire | Magical Story',
+      it: 'Crea un libro per bambini con l\'IA – la tua storia | Magical Story',
     },
     description: {
       en: 'Create your own children\'s book: upload a photo, describe the story you want, and AI writes and illustrates it. Not a template with the name swapped — an original story. Edit every word and regenerate any page. First story free.',
@@ -293,38 +293,38 @@ const STATIC_ROUTES = {
   },
   '/about': {
     title: {
-      en: 'About – MagicalStory',
-      de: 'Über uns – MagicalStory',
-      fr: 'À propos – MagicalStory',
-      it: 'Chi siamo – MagicalStory',
+      en: 'About – Magical Story',
+      de: 'Über uns – Magical Story',
+      fr: 'À propos – Magical Story',
+      it: 'Chi siamo – Magical Story',
     },
     description: {
-      en: 'MagicalStory is made in Switzerland. We believe every child deserves to see themselves as the hero of their own story.',
-      de: 'MagicalStory kommt aus der Schweiz. Wir glauben, dass jedes Kind verdient, der Held seiner eigenen Geschichte zu sein.',
-      fr: 'MagicalStory est conçu en Suisse. Nous croyons que chaque enfant mérite d\'être le héros de sa propre histoire.',
-      it: 'MagicalStory nasce in Svizzera. Crediamo che ogni bambino meriti di essere il protagonista della propria storia.',
+      en: 'Magical Story is made in Switzerland. We believe every child deserves to see themselves as the hero of their own story.',
+      de: 'Magical Story kommt aus der Schweiz. Wir glauben, dass jedes Kind verdient, der Held seiner eigenen Geschichte zu sein.',
+      fr: 'Magical Story est conçu en Suisse. Nous croyons que chaque enfant mérite d\'être le héros de sa propre histoire.',
+      it: 'Magical Story nasce in Svizzera. Crediamo che ogni bambino meriti di essere il protagonista della propria storia.',
     },
   },
   '/contact': {
     title: {
-      en: 'Contact – MagicalStory',
-      de: 'Kontakt – MagicalStory',
-      fr: 'Contact – MagicalStory',
-      it: 'Contatto – MagicalStory',
+      en: 'Contact – Magical Story',
+      de: 'Kontakt – Magical Story',
+      fr: 'Contact – Magical Story',
+      it: 'Contatto – Magical Story',
     },
     description: {
-      en: 'Get in touch with the MagicalStory team. We\'re here to help with your personalized children\'s books.',
-      de: 'Kontaktiere das MagicalStory Team. Wir helfen dir gerne bei deinen personalisierten Kinderbüchern.',
-      fr: 'Contactez l\'équipe MagicalStory. Nous sommes là pour vous aider avec vos livres personnalisés.',
-      it: 'Contatta il team di MagicalStory. Siamo qui per aiutarti con i tuoi libri personalizzati per bambini.',
+      en: 'Get in touch with the Magical Story team. We\'re here to help with your personalized children\'s books.',
+      de: 'Kontaktiere das Magical Story Team. Wir helfen dir gerne bei deinen personalisierten Kinderbüchern.',
+      fr: 'Contactez l\'équipe Magical Story. Nous sommes là pour vous aider avec vos livres personnalisés.',
+      it: 'Contatta il team di Magical Story. Siamo qui per aiutarti con i tuoi libri personalizzati per bambini.',
     },
   },
   '/try': {
     title: {
-      en: 'Create Your Free Story – MagicalStory',
-      de: 'Gratis Geschichte erstellen – MagicalStory',
-      fr: 'Créez votre histoire gratuite – MagicalStory',
-      it: 'Crea la tua storia gratis – MagicalStory',
+      en: 'Create Your Free Story – Magical Story',
+      de: 'Gratis Geschichte erstellen – Magical Story',
+      fr: 'Créez votre histoire gratuite – Magical Story',
+      it: 'Crea la tua storia gratis – Magical Story',
     },
     description: {
       en: 'Create your first personalized children\'s story for free. Upload a photo and choose a theme to get started.',
@@ -335,52 +335,52 @@ const STATIC_ROUTES = {
   },
   '/terms': {
     title: {
-      en: 'Terms of Service – MagicalStory',
-      de: 'Nutzungsbedingungen – MagicalStory',
-      fr: 'Conditions d\'utilisation – MagicalStory',
-      it: 'Termini di servizio – MagicalStory',
+      en: 'Terms of Service – Magical Story',
+      de: 'Nutzungsbedingungen – Magical Story',
+      fr: 'Conditions d\'utilisation – Magical Story',
+      it: 'Termini di servizio – Magical Story',
     },
     description: {
-      en: 'Terms of service for MagicalStory personalized children\'s books.',
-      de: 'Nutzungsbedingungen für MagicalStory personalisierte Kinderbücher.',
-      fr: 'Conditions d\'utilisation de MagicalStory, livres personnalisés pour enfants.',
-      it: 'Termini di servizio per i libri personalizzati per bambini di MagicalStory.',
+      en: 'Terms of service for Magical Story personalized children\'s books.',
+      de: 'Nutzungsbedingungen für Magical Story personalisierte Kinderbücher.',
+      fr: 'Conditions d\'utilisation de Magical Story, livres personnalisés pour enfants.',
+      it: 'Termini di servizio per i libri personalizzati per bambini di Magical Story.',
     },
   },
   '/privacy': {
     title: {
-      en: 'Privacy Policy – MagicalStory',
-      de: 'Datenschutz – MagicalStory',
-      fr: 'Politique de confidentialité – MagicalStory',
-      it: 'Informativa sulla privacy – MagicalStory',
+      en: 'Privacy Policy – Magical Story',
+      de: 'Datenschutz – Magical Story',
+      fr: 'Politique de confidentialité – Magical Story',
+      it: 'Informativa sulla privacy – Magical Story',
     },
     description: {
-      en: 'Privacy policy for MagicalStory. Learn how we protect your data and photos.',
-      de: 'Datenschutzerklärung für MagicalStory. Erfahre, wie wir deine Daten und Fotos schützen.',
-      fr: 'Politique de confidentialité de MagicalStory. Découvrez comment nous protégeons vos données et photos.',
-      it: 'Informativa sulla privacy di MagicalStory. Scopri come proteggiamo i tuoi dati e le tue foto.',
+      en: 'Privacy policy for Magical Story. Learn how we protect your data and photos.',
+      de: 'Datenschutzerklärung für Magical Story. Erfahre, wie wir deine Daten und Fotos schützen.',
+      fr: 'Politique de confidentialité de Magical Story. Découvrez comment nous protégeons vos données et photos.',
+      it: 'Informativa sulla privacy di Magical Story. Scopri come proteggiamo i tuoi dati e le tue foto.',
     },
   },
   '/impressum': {
     title: {
-      en: 'Impressum – MagicalStory',
-      de: 'Impressum – MagicalStory',
-      fr: 'Mentions légales – MagicalStory',
-      it: 'Impressum – MagicalStory',
+      en: 'Impressum – Magical Story',
+      de: 'Impressum – Magical Story',
+      fr: 'Mentions légales – Magical Story',
+      it: 'Impressum – Magical Story',
     },
     description: {
-      en: 'Legal notice and imprint for MagicalStory.',
-      de: 'Impressum und rechtliche Hinweise für MagicalStory.',
-      fr: 'Mentions légales de MagicalStory.',
-      it: 'Note legali e impressum di MagicalStory.',
+      en: 'Legal notice and imprint for Magical Story.',
+      de: 'Impressum und rechtliche Hinweise für Magical Story.',
+      fr: 'Mentions légales de Magical Story.',
+      it: 'Note legali e impressum di Magical Story.',
     },
   },
   '/science': {
     title: {
-      en: 'Why Personalized Books Work – The Science | MagicalStory',
-      de: 'Warum personalisierte Kinderbücher wirken | MagicalStory',
-      fr: 'Pourquoi les livres personnalisés fonctionnent | MagicalStory',
-      it: 'Perché i libri personalizzati funzionano | MagicalStory',
+      en: 'Why Personalized Books Work – The Science | Magical Story',
+      de: 'Warum personalisierte Kinderbücher wirken | Magical Story',
+      fr: 'Pourquoi les livres personnalisés fonctionnent | Magical Story',
+      it: 'Perché i libri personalizzati funzionano | Magical Story',
     },
     description: {
       en: 'Children remember more, engage more deeply, and build confidence when they see themselves as the hero. The perfect personalized gift for birthdays and special occasions.',
@@ -391,10 +391,10 @@ const STATIC_ROUTES = {
   },
   '/themes': {
     title: {
-      en: 'Story Themes – MagicalStory',
-      de: 'Geschichten-Themen – MagicalStory',
-      fr: 'Thèmes d\'histoires – MagicalStory',
-      it: 'Temi delle storie – MagicalStory',
+      en: 'Story Themes – Magical Story',
+      de: 'Geschichten-Themen – Magical Story',
+      fr: 'Thèmes d\'histoires – Magical Story',
+      it: 'Temi delle storie – Magical Story',
     },
     description: {
       en: 'Browse all story themes: adventure, life challenges, educational, and historical. Create a personalized book for your child.',
@@ -405,10 +405,10 @@ const STATIC_ROUTES = {
   },
   '/geschichten-aus': {
     title: {
-      de: 'Kindergeschichten aus der Schweiz | MagicalStory',
-      en: 'Children\'s Stories from Switzerland | MagicalStory',
-      fr: 'Histoires pour enfants de Suisse | MagicalStory',
-      it: 'Storie per bambini dalla Svizzera | MagicalStory',
+      de: 'Kindergeschichten aus der Schweiz | Magical Story',
+      en: 'Children\'s Stories from Switzerland | Magical Story',
+      fr: 'Histoires pour enfants de Suisse | Magical Story',
+      it: 'Storie per bambini dalla Svizzera | Magical Story',
     },
     description: {
       de: 'Personalisierte Kindergeschichten aus 100 Schweizer Städten. Dein Kind erlebt Abenteuer in Zürich, Bern, Basel und mehr.',
@@ -419,10 +419,10 @@ const STATIC_ROUTES = {
   },
   '/stadt': {
     title: {
-      de: 'Kindergeschichten aus der Schweiz — Alle Städte | MagicalStory',
-      en: 'Children\'s Stories from Switzerland — All Cities | MagicalStory',
-      fr: 'Histoires pour enfants de Suisse — Toutes les villes | MagicalStory',
-      it: 'Storie per bambini dalla Svizzera — Tutte le città | MagicalStory',
+      de: 'Kindergeschichten aus der Schweiz — Alle Städte | Magical Story',
+      en: 'Children\'s Stories from Switzerland — All Cities | Magical Story',
+      fr: 'Histoires pour enfants de Suisse — Toutes les villes | Magical Story',
+      it: 'Storie per bambini dalla Svizzera — Tutte le città | Magical Story',
     },
     description: {
       de: 'Personalisierte Kindergeschichten aus 100 Schweizer Städten. Entdecke Geschichte und Sagen aus deiner Stadt — dein Kind wird zum Helden.',
@@ -433,24 +433,24 @@ const STATIC_ROUTES = {
   },
   '/vergleich': {
     title: {
-      de: 'MagicalStory im Vergleich | Personalisierte Kinderbücher',
-      en: 'MagicalStory Compared | Personalized Children\'s Books',
-      fr: 'MagicalStory en comparaison | Livres personnalisés pour enfants',
-      it: 'MagicalStory a confronto | Libri personalizzati per bambini',
+      de: 'Magical Story im Vergleich | Personalisierte Kinderbücher',
+      en: 'Magical Story Compared | Personalized Children\'s Books',
+      fr: 'Magical Story en comparaison | Livres personnalisés pour enfants',
+      it: 'Magical Story a confronto | Libri personalizzati per bambini',
     },
     description: {
-      de: 'Ehrlicher Vergleich von MagicalStory mit Wonderbly, Hooray Heroes, Librio und anderen personalisierten Kinderbuch-Anbietern.',
-      en: 'Honest comparison of MagicalStory with Wonderbly, Hooray Heroes, Librio, and other personalized children\'s book providers.',
-      fr: 'Comparaison honnête de MagicalStory avec Wonderbly, Hooray Heroes, Librio et d\'autres fournisseurs de livres personnalisés.',
-      it: 'Confronto onesto di MagicalStory con Wonderbly, Hooray Heroes, Librio e altri fornitori di libri personalizzati per bambini.',
+      de: 'Ehrlicher Vergleich von Magical Story mit Wonderbly, Hooray Heroes, Librio und anderen personalisierten Kinderbuch-Anbietern.',
+      en: 'Honest comparison of Magical Story with Wonderbly, Hooray Heroes, Librio, and other personalized children\'s book providers.',
+      fr: 'Comparaison honnête de Magical Story avec Wonderbly, Hooray Heroes, Librio et d\'autres fournisseurs de livres personnalisés.',
+      it: 'Confronto onesto di Magical Story con Wonderbly, Hooray Heroes, Librio e altri fornitori di libri personalizzati per bambini.',
     },
   },
   '/anlass': {
     title: {
-      de: 'Das perfekte Geschenk für jeden Anlass | MagicalStory',
-      en: 'The Perfect Gift for Every Occasion | MagicalStory',
-      fr: 'Le cadeau parfait pour chaque occasion | MagicalStory',
-      it: 'Il regalo perfetto per ogni occasione | MagicalStory',
+      de: 'Das perfekte Geschenk für jeden Anlass | Magical Story',
+      en: 'The Perfect Gift for Every Occasion | Magical Story',
+      fr: 'Le cadeau parfait pour chaque occasion | Magical Story',
+      it: 'Il regalo perfetto per ogni occasione | Magical Story',
     },
     description: {
       de: 'Personalisierte Kinderbücher als Geschenk: Geburtstag, Weihnachten, Taufe, Einschulung und mehr. Erste Geschichte gratis.',
@@ -461,10 +461,10 @@ const STATIC_ROUTES = {
   },
   '/geschenk': {
     title: {
-      de: 'Geschenkideen für Kinder | Personalisierte Kinderbücher | MagicalStory',
-      en: 'Gift Ideas for Kids | Personalized Children\'s Books | MagicalStory',
-      fr: 'Idées cadeaux pour enfants | Livres personnalisés | MagicalStory',
-      it: 'Idee regalo per bambini | Libri personalizzati | MagicalStory',
+      de: 'Geschenkideen für Kinder | Personalisierte Kinderbücher | Magical Story',
+      en: 'Gift Ideas for Kids | Personalized Children\'s Books | Magical Story',
+      fr: 'Idées cadeaux pour enfants | Livres personnalisés | Magical Story',
+      it: 'Idee regalo per bambini | Libri personalizzati | Magical Story',
     },
     description: {
       de: 'Finde das perfekte Geschenk für Kinder: einzigartige, personalisierte Kinderbücher mit dem Foto deines Kindes. Für Enkel, Patenkinder, zu Weihnachten, Ostern & mehr.',
@@ -539,15 +539,15 @@ const TOWNS = {
 // ─── Comparison Data (for meta tags) ──────────────────────────────────────────
 
 const COMPARISONS = {
-  wonderbly: { name: 'Wonderbly', de: 'MagicalStory vs Wonderbly', en: 'MagicalStory vs Wonderbly', fr: 'MagicalStory vs Wonderbly', it: 'MagicalStory vs Wonderbly' },
-  'hooray-heroes': { name: 'Hooray Heroes', de: 'MagicalStory vs Hooray Heroes', en: 'MagicalStory vs Hooray Heroes', fr: 'MagicalStory vs Hooray Heroes', it: 'MagicalStory vs Hooray Heroes' },
-  librio: { name: 'Librio', de: 'MagicalStory vs Librio', en: 'MagicalStory vs Librio', fr: 'MagicalStory vs Librio', it: 'MagicalStory vs Librio' },
-  framily: { name: 'Framily', de: 'MagicalStory vs Framily', en: 'MagicalStory vs Framily', fr: 'MagicalStory vs Framily', it: 'MagicalStory vs Framily' },
-  'lullaby-ink': { name: 'Lullaby.ink', de: 'MagicalStory vs Lullaby.ink', en: 'MagicalStory vs Lullaby.ink', fr: 'MagicalStory vs Lullaby.ink', it: 'MagicalStory vs Lullaby.ink' },
-  lovetoread: { name: 'LoveToRead', de: 'MagicalStory vs LoveToRead', en: 'MagicalStory vs LoveToRead', fr: 'MagicalStory vs LoveToRead', it: 'MagicalStory vs LoveToRead' },
-  buchheldenwelt: { name: 'BuchHeldenWelt', de: 'MagicalStory vs BuchHeldenWelt', en: 'MagicalStory vs BuchHeldenWelt', fr: 'MagicalStory vs BuchHeldenWelt', it: 'MagicalStory vs BuchHeldenWelt' },
+  wonderbly: { name: 'Wonderbly', de: 'Magical Story vs Wonderbly', en: 'Magical Story vs Wonderbly', fr: 'Magical Story vs Wonderbly', it: 'Magical Story vs Wonderbly' },
+  'hooray-heroes': { name: 'Hooray Heroes', de: 'Magical Story vs Hooray Heroes', en: 'Magical Story vs Hooray Heroes', fr: 'Magical Story vs Hooray Heroes', it: 'Magical Story vs Hooray Heroes' },
+  librio: { name: 'Librio', de: 'Magical Story vs Librio', en: 'Magical Story vs Librio', fr: 'Magical Story vs Librio', it: 'Magical Story vs Librio' },
+  framily: { name: 'Framily', de: 'Magical Story vs Framily', en: 'Magical Story vs Framily', fr: 'Magical Story vs Framily', it: 'Magical Story vs Framily' },
+  'lullaby-ink': { name: 'Lullaby.ink', de: 'Magical Story vs Lullaby.ink', en: 'Magical Story vs Lullaby.ink', fr: 'Magical Story vs Lullaby.ink', it: 'Magical Story vs Lullaby.ink' },
+  lovetoread: { name: 'LoveToRead', de: 'Magical Story vs LoveToRead', en: 'Magical Story vs LoveToRead', fr: 'Magical Story vs LoveToRead', it: 'Magical Story vs LoveToRead' },
+  buchheldenwelt: { name: 'BuchHeldenWelt', de: 'Magical Story vs BuchHeldenWelt', en: 'Magical Story vs BuchHeldenWelt', fr: 'Magical Story vs BuchHeldenWelt', it: 'Magical Story vs BuchHeldenWelt' },
   // NOTE: mirrors client/src/constants/comparisonData.ts — both must be edited.
-  'magisches-kinderbuch': { name: 'Magisches Kinderbuch', de: 'MagicalStory vs Magisches Kinderbuch', en: 'MagicalStory vs Magisches Kinderbuch', fr: 'MagicalStory vs Magisches Kinderbuch', it: 'MagicalStory vs Magisches Kinderbuch' },
+  'magisches-kinderbuch': { name: 'Magisches Kinderbuch', de: 'Magical Story vs Magisches Kinderbuch', en: 'Magical Story vs Magisches Kinderbuch', fr: 'Magical Story vs Magisches Kinderbuch', it: 'Magical Story vs Magisches Kinderbuch' },
   'beste-personalisierte-kinderbuecher': { name: 'Beste Kinderbücher', de: 'Beste personalisierte Kinderbücher Schweiz 2026', en: 'Best Personalized Children\'s Books Switzerland 2026', fr: 'Meilleurs livres personnalisés pour enfants Suisse 2026', it: 'Migliori libri personalizzati per bambini Svizzera 2026' },
   'beste-ki-kinderbuch-generatoren': { name: 'Beste KI-Generatoren', de: 'Beste KI-Kinderbuch-Generatoren 2026', en: 'Best AI Children\'s Book Generators 2026', fr: 'Meilleurs générateurs de livres IA pour enfants 2026', it: 'Migliori generatori IA di libri per bambini 2026' },
 };
@@ -677,7 +677,7 @@ const GIFT_PAGES = {
 const ORGANIZATION_JSON_LD = {
   '@context': 'https://schema.org',
   '@type': 'Organization',
-  name: 'MagicalStory',
+  name: 'Magical Story',
   url: BASE_URL,
   logo: `${BASE_URL}/images/logo.png`,
   description: 'AI-powered personalized children\'s storybooks made in Switzerland. 170+ themes, 8 art styles, 3 languages.',
@@ -720,7 +720,7 @@ function buildProductJsonLd(lang) {
     '@type': 'Product',
     name: copy.name,
     description: copy.description,
-    brand: { '@type': 'Brand', name: 'MagicalStory' },
+    brand: { '@type': 'Brand', name: 'Magical Story' },
     offers: {
       '@type': 'AggregateOffer',
       lowPrice: '0',
@@ -737,7 +737,7 @@ const FAQ_BY_LANG = {
     "de": [
       {
         "@type": "Question",
-        "name": "Wie funktioniert MagicalStory?",
+        "name": "Wie funktioniert Magical Story?",
         "acceptedAnswer": {
           "@type": "Answer",
           "text": "Lade ein Foto deines Kindes hoch, wähle ein Geschichten-Thema, und erhalte in wenigen Minuten eine vollständig illustrierte, personalisierte Geschichte. Dein Kind erscheint als Hauptfigur auf jeder Seite."
@@ -753,7 +753,7 @@ const FAQ_BY_LANG = {
       },
       {
         "@type": "Question",
-        "name": "Für welches Alter ist MagicalStory geeignet?",
+        "name": "Für welches Alter ist Magical Story geeignet?",
         "acceptedAnswer": {
           "@type": "Answer",
           "text": "Geschichten können für Kinder jeden Alters erstellt werden. Inhalt und Komplexität werden an das angegebene Alter angepasst."
@@ -769,7 +769,7 @@ const FAQ_BY_LANG = {
       },
       {
         "@type": "Question",
-        "name": "Was kostet MagicalStory?",
+        "name": "Was kostet Magical Story?",
         "acceptedAnswer": {
           "@type": "Answer",
           "text": "Deine erste Geschichte ist komplett gratis. Danach werden Geschichten mit Credits erstellt. Gedruckte Bücher gibt es ab CHF 37 als hochwertiges Hardcover."
@@ -787,7 +787,7 @@ const FAQ_BY_LANG = {
     "en": [
       {
         "@type": "Question",
-        "name": "How does MagicalStory work?",
+        "name": "How does Magical Story work?",
         "acceptedAnswer": {
           "@type": "Answer",
           "text": "Upload a photo of your child, choose a story theme, and get a fully illustrated, personalized story in just a few minutes. Your child appears as the main character on every page."
@@ -803,7 +803,7 @@ const FAQ_BY_LANG = {
       },
       {
         "@type": "Question",
-        "name": "What age is MagicalStory suitable for?",
+        "name": "What age is Magical Story suitable for?",
         "acceptedAnswer": {
           "@type": "Answer",
           "text": "Stories can be created for children of any age. Content and complexity are adapted to the age you specify."
@@ -819,7 +819,7 @@ const FAQ_BY_LANG = {
       },
       {
         "@type": "Question",
-        "name": "What does MagicalStory cost?",
+        "name": "What does Magical Story cost?",
         "acceptedAnswer": {
           "@type": "Answer",
           "text": "Your first story is completely free. After that, stories are created using credits. Printed books start at CHF 37 as a high-quality hardcover."
@@ -837,7 +837,7 @@ const FAQ_BY_LANG = {
     "fr": [
       {
         "@type": "Question",
-        "name": "Comment fonctionne MagicalStory ?",
+        "name": "Comment fonctionne Magical Story ?",
         "acceptedAnswer": {
           "@type": "Answer",
           "text": "Importez une photo de votre enfant, choisissez un thème d'histoire et obtenez en quelques minutes une histoire personnalisée entièrement illustrée. Votre enfant apparaît comme personnage principal sur chaque page."
@@ -853,7 +853,7 @@ const FAQ_BY_LANG = {
       },
       {
         "@type": "Question",
-        "name": "Pour quel âge MagicalStory convient-il ?",
+        "name": "Pour quel âge Magical Story convient-il ?",
         "acceptedAnswer": {
           "@type": "Answer",
           "text": "Les histoires peuvent être créées pour des enfants de tout âge. Le contenu et la complexité sont adaptés à l'âge indiqué."
@@ -869,7 +869,7 @@ const FAQ_BY_LANG = {
       },
       {
         "@type": "Question",
-        "name": "Combien coûte MagicalStory ?",
+        "name": "Combien coûte Magical Story ?",
         "acceptedAnswer": {
           "@type": "Answer",
           "text": "Votre première histoire est entièrement gratuite. Ensuite, les histoires sont créées avec des crédits. Les livres imprimés sont disponibles à partir de CHF 37 en couverture rigide de haute qualité."
@@ -887,7 +887,7 @@ const FAQ_BY_LANG = {
     "it": [
       {
         "@type": "Question",
-        "name": "Come funziona MagicalStory?",
+        "name": "Come funziona Magical Story?",
         "acceptedAnswer": {
           "@type": "Answer",
           "text": "Carica una foto di tuo figlio, scegli un tema per la storia e ottieni in pochi minuti una storia personalizzata completamente illustrata. Tuo figlio appare come protagonista in ogni pagina."
@@ -903,7 +903,7 @@ const FAQ_BY_LANG = {
       },
       {
         "@type": "Question",
-        "name": "Per quale età è adatto MagicalStory?",
+        "name": "Per quale età è adatto Magical Story?",
         "acceptedAnswer": {
           "@type": "Answer",
           "text": "Le storie possono essere create per bambini di qualsiasi età. Contenuto e complessità vengono adattati all'età indicata."
@@ -919,7 +919,7 @@ const FAQ_BY_LANG = {
       },
       {
         "@type": "Question",
-        "name": "Quanto costa MagicalStory?",
+        "name": "Quanto costa Magical Story?",
         "acceptedAnswer": {
           "@type": "Answer",
           "text": "La tua prima storia è completamente gratuita. Dopodiché, le storie vengono create usando crediti. I libri stampati partono da CHF 37 in copertina rigida di alta qualità."
@@ -991,7 +991,7 @@ function buildProductJsonLdForTheme(themeName, category, themeId, lang) {
     '@type': 'Product',
     name: copy.name,
     description: copy.description,
-    brand: { '@type': 'Brand', name: 'MagicalStory' },
+    brand: { '@type': 'Brand', name: 'Magical Story' },
     url: `${BASE_URL}/themes/${category}/${themeId}`,
     offers: {
       '@type': 'Offer',
@@ -1162,7 +1162,7 @@ function getMetaForRoute(routePath, lang) {
     } else {
       // Other static pages get breadcrumb only
       const pageName = pickLang(staticMeta.title, lang);
-      meta.jsonLd = [buildBreadcrumbJsonLd([{ name: 'Home', url: '/' }, { name: pageName.replace(/ – MagicalStory$/, '') }])];
+      meta.jsonLd = [buildBreadcrumbJsonLd([{ name: 'Home', url: '/' }, { name: pageName.replace(/ – Magical Story$/, '') }])];
     }
 
     return meta;
@@ -1176,7 +1176,7 @@ function getMetaForRoute(routePath, lang) {
     if (category) {
       const catName = pickLang(category, lang);
       return {
-        title: `${catName} – MagicalStory`,
+        title: `${catName} – Magical Story`,
         description: buildCategoryDescription(catName, lang),
         canonical: canonicalUrl,
         path: cleanPath,
@@ -1202,12 +1202,12 @@ function getMetaForRoute(routePath, lang) {
       const themeName = pickLang(found.theme, lang);
       const catName = pickLang(THEME_CATEGORIES[categoryId], lang) || categoryId;
       const titleTemplate = lang === 'de'
-        ? `Personalisiertes ${themeName}-Kinderbuch | MagicalStory`
+        ? `Personalisiertes ${themeName}-Kinderbuch | Magical Story`
         : lang === 'fr'
-          ? `Livre personnalisé ${themeName} | MagicalStory`
+          ? `Livre personnalisé ${themeName} | Magical Story`
           : lang === 'it'
-            ? `Libro personalizzato ${themeName} | MagicalStory`
-            : `Personalized ${themeName} Story | MagicalStory`;
+            ? `Libro personalizzato ${themeName} | Magical Story`
+            : `Personalized ${themeName} Story | Magical Story`;
       return {
         title: titleTemplate,
         description: buildThemeDescription(themeName, lang),
@@ -1236,7 +1236,7 @@ function getMetaForRoute(routePath, lang) {
     if (town) {
       const title = pickLang(town, lang);
       return {
-        title: `${title} | MagicalStory`,
+        title: `${title} | Magical Story`,
         description: buildTownDescription(town.name, lang),
         canonical: canonicalUrl,
         path: cleanPath,
@@ -1262,12 +1262,12 @@ function getMetaForRoute(routePath, lang) {
       const title = pickLang(comp, lang);
       return {
         title: lang === 'it'
-          ? `${title} — Confronto onesto | MagicalStory`
+          ? `${title} — Confronto onesto | Magical Story`
           : lang === 'fr'
-            ? `${title} — comparaison honnête | MagicalStory`
+            ? `${title} — comparaison honnête | Magical Story`
             : lang === 'en'
-              ? `${title} — an honest comparison | MagicalStory`
-              : `${title} — Ehrlicher Vergleich | MagicalStory`,
+              ? `${title} — an honest comparison | Magical Story`
+              : `${title} — Ehrlicher Vergleich | Magical Story`,
         description: buildComparisonDescription(comp.name, lang),
         canonical: canonicalUrl,
         path: cleanPath,
@@ -1291,7 +1291,7 @@ function getMetaForRoute(routePath, lang) {
     if (guide) {
       const title = pickLang(guide.title, lang);
       return {
-        title: `${title} | MagicalStory`,
+        title: `${title} | Magical Story`,
         description: pickLang(guide.description, lang),
         canonical: canonicalUrl,
         path: cleanPath,
@@ -1304,8 +1304,8 @@ function getMetaForRoute(routePath, lang) {
             headline: title,
             description: pickLang(guide.description, lang),
             inLanguage: lang,
-            author: { '@type': 'Organization', name: 'MagicalStory' },
-            publisher: { '@type': 'Organization', name: 'MagicalStory' },
+            author: { '@type': 'Organization', name: 'Magical Story' },
+            publisher: { '@type': 'Organization', name: 'Magical Story' },
             mainEntityOfPage: { '@type': 'WebPage', '@id': canonicalUrl },
           },
           buildBreadcrumbJsonLd([
@@ -1326,7 +1326,7 @@ function getMetaForRoute(routePath, lang) {
     if (occasion) {
       const title = pickLang(occasion, lang);
       return {
-        title: `${title} | MagicalStory`,
+        title: `${title} | Magical Story`,
         description: buildOccasionDescription(occasionSlug, lang),
         canonical: canonicalUrl,
         path: cleanPath,
@@ -1352,7 +1352,7 @@ function getMetaForRoute(routePath, lang) {
     if (giftPage) {
       const title = pickLang(giftPage, lang);
       return {
-        title: `${title} | MagicalStory`,
+        title: `${title} | Magical Story`,
         description: buildGiftDescription(giftSlug, lang),
         canonical: canonicalUrl,
         path: cleanPath,
@@ -1379,12 +1379,12 @@ function getMetaForRoute(routePath, lang) {
       const cityName = pickLang(cityData.name, lang);
       const canton = cityData.canton;
       const titleTpl = lang === 'de'
-        ? `Personalisiertes Kinderbuch ${cityName} (${canton}) | MagicalStory`
+        ? `Personalisiertes Kinderbuch ${cityName} (${canton}) | Magical Story`
         : lang === 'fr'
-          ? `Livre personnalisé pour enfants ${cityName} (${canton}) | MagicalStory`
+          ? `Livre personnalisé pour enfants ${cityName} (${canton}) | Magical Story`
           : lang === 'it'
-            ? `Libro personalizzato per bambini ${cityName} (${canton}) | MagicalStory`
-            : `Personalized Children's Book ${cityName} (${canton}) | MagicalStory`;
+            ? `Libro personalizzato per bambini ${cityName} (${canton}) | Magical Story`
+            : `Personalized Children's Book ${cityName} (${canton}) | Magical Story`;
       return {
         title: titleTpl,
         description: buildCityDescription(cityName, lang),
@@ -1406,7 +1406,7 @@ function getMetaForRoute(routePath, lang) {
   // 9. Noindex route (auth/app pages)
   if (isNoindex) {
     return {
-      title: 'MagicalStory',
+      title: 'Magical Story',
       description: '',
       canonical: canonicalUrl,
       path: cleanPath,
@@ -1418,12 +1418,12 @@ function getMetaForRoute(routePath, lang) {
   // 10. Fallback — unknown route
   return {
     title: lang === 'it'
-      ? 'MagicalStory – Il tuo bambino protagonista della sua storia'
+      ? 'Magical Story – Il tuo bambino protagonista della sua storia'
       : lang === 'fr'
-        ? 'MagicalStory – Votre enfant, héros de sa propre histoire'
+        ? 'Magical Story – Votre enfant, héros de sa propre histoire'
         : lang === 'en'
-          ? 'MagicalStory – Your Child as the Hero of Their Own Story'
-          : 'MagicalStory – Dein Kind als Held seiner eigenen Geschichte',
+          ? 'Magical Story – Your Child as the Hero of Their Own Story'
+          : 'Magical Story – Dein Kind als Held seiner eigenen Geschichte',
     description: lang === 'it'
       ? 'Rendi il tuo bambino il protagonista della sua storia. Carica una foto, scegli un tema, crea gratis la prima storia.'
       : lang === 'fr'
@@ -1456,10 +1456,10 @@ function buildHreflang(routePath) {
 
 function buildCategoryDescription(catName, lang) {
   const templates = {
-    en: `Browse ${catName} for your child. Create a personalized illustrated book in minutes with MagicalStory.`,
-    de: `Entdecke ${catName} für dein Kind. Erstelle in Minuten ein personalisiertes illustriertes Buch mit MagicalStory.`,
-    fr: `Découvrez les ${catName} pour votre enfant. Créez un livre illustré personnalisé en quelques minutes avec MagicalStory.`,
-    it: `Scopri ${catName} per il tuo bambino. Crea in pochi minuti un libro illustrato personalizzato con MagicalStory.`,
+    en: `Browse ${catName} for your child. Create a personalized illustrated book in minutes with Magical Story.`,
+    de: `Entdecke ${catName} für dein Kind. Erstelle in Minuten ein personalisiertes illustriertes Buch mit Magical Story.`,
+    fr: `Découvrez les ${catName} pour votre enfant. Créez un livre illustré personnalisé en quelques minutes avec Magical Story.`,
+    it: `Scopri ${catName} per il tuo bambino. Crea in pochi minuti un libro illustrato personalizzato con Magical Story.`,
   };
   return pickLang(templates, lang);
 }
@@ -1496,10 +1496,10 @@ function buildCityDescription(cityName, lang) {
 
 function buildComparisonDescription(competitorName, lang) {
   const templates = {
-    de: `Ehrlicher Vergleich: MagicalStory vs ${competitorName}. Features, Preise, Vor- und Nachteile. Finde das beste personalisierte Kinderbuch.`,
-    en: `Honest comparison: MagicalStory vs ${competitorName}. Features, pricing, pros and cons. Find the best personalized children's book.`,
-    fr: `Comparaison honnête : MagicalStory vs ${competitorName}. Fonctionnalités, prix, avantages et inconvénients. Trouvez le meilleur livre personnalisé.`,
-    it: `Confronto onesto: MagicalStory vs ${competitorName}. Funzioni, prezzi, pro e contro. Trova il miglior libro personalizzato per bambini.`,
+    de: `Ehrlicher Vergleich: Magical Story vs ${competitorName}. Features, Preise, Vor- und Nachteile. Finde das beste personalisierte Kinderbuch.`,
+    en: `Honest comparison: Magical Story vs ${competitorName}. Features, pricing, pros and cons. Find the best personalized children's book.`,
+    fr: `Comparaison honnête : Magical Story vs ${competitorName}. Fonctionnalités, prix, avantages et inconvénients. Trouvez le meilleur livre personnalisé.`,
+    it: `Confronto onesto: Magical Story vs ${competitorName}. Funzioni, prezzi, pro e contro. Trova il miglior libro personalizzato per bambini.`,
   };
   return pickLang(templates, lang);
 }
@@ -1940,7 +1940,7 @@ function generateSitemap() {
       if (p.path === '/' && lang === 'de') {
         entry += `\n    <video:video>` +
           `\n      <video:thumbnail_loc>${BASE_URL}/images/video-poster.jpg</video:thumbnail_loc>` +
-          `\n      <video:title>MagicalStory – Personalisierte Kinderbücher mit KI</video:title>` +
+          `\n      <video:title>Magical Story – Personalisierte Kinderbücher mit KI</video:title>` +
           `\n      <video:description>So wird das Foto deines Kindes zum personalisierten, illustrierten Bilderbuch. Foto hochladen, Thema wählen und staunen.</video:description>` +
           `\n      <video:content_loc>${BASE_URL}/images/Boy%20to%20pirat%20to%20book.mp4</video:content_loc>` +
           `\n      <video:family_friendly>yes</video:family_friendly>` +

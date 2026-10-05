@@ -12,7 +12,7 @@ import {
 
 const translations = {
   en: {
-    welcome: 'Welcome to MagicalStory!',
+    welcome: 'Welcome to Magical Story!',
     subtitle: "Let's create your personalized storybook. Here's how it works:",
 
     step1Title: 'Create Characters',
@@ -35,7 +35,7 @@ const translations = {
     step: 'Step',
   },
   de: {
-    welcome: 'Willkommen bei MagicalStory!',
+    welcome: 'Willkommen bei Magical Story!',
     subtitle: 'Erstellen wir dein personalisiertes Geschichtenbuch. So funktioniert es:',
 
     step1Title: 'Charaktere erstellen',
@@ -58,7 +58,7 @@ const translations = {
     step: 'Schritt',
   },
   fr: {
-    welcome: 'Bienvenue sur MagicalStory !',
+    welcome: 'Bienvenue sur Magical Story !',
     subtitle: "Créons votre livre d'histoires personnalisé. Voici comment ça marche :",
 
     step1Title: 'Créer des personnages',
@@ -81,7 +81,7 @@ const translations = {
     step: 'Étape',
   },
   it: {
-    welcome: 'Benvenuto su MagicalStory!',
+    welcome: 'Benvenuto su Magical Story!',
     subtitle: 'Creiamo il tuo libro di storie personalizzato. Ecco come funziona:',
 
     step1Title: 'Crea i personaggi',
