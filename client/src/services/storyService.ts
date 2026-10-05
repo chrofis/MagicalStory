@@ -1670,6 +1670,7 @@ export const storyService = {
       resetTimeout(); // Start initial timeout
       const streamStartTime = Date.now();
       let streamCompleted = false; // Track if we received the done event
+      let streamErrored = false; // an error event already reached onError
       try {
         const response = await fetch('/api/generate-story-ideas-stream', {
           method: 'POST',
@@ -1728,6 +1729,7 @@ export const storyService = {
                   callbacks.onStory2?.(eventData.story2);
                 }
                 if (eventData.error) {
+                  streamErrored = true;
                   callbacks.onError?.(eventData.error);
                 }
                 if (eventData.done) {
@@ -1741,6 +1743,10 @@ export const storyService = {
               }
             }
           }
+        }
+        // Stream closed cleanly without done/error (backend died mid-stream): fail loudly, never leave the spinner
+        if (!streamCompleted && !streamErrored) {
+          callbacks.onError?.('Stream ended without a result');
         }
       } catch (err) {
         if (timeoutId) clearTimeout(timeoutId);
