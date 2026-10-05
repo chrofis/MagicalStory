@@ -819,12 +819,16 @@ htmlRouter.get('/s/:shareToken', async (req, res) => {
       res.set('Cross-Origin-Resource-Policy', 'cross-origin');
       res.type('text/html').send(html);
     } else {
-      // Story not found - redirect to home
-      res.redirect('/');
+      // No public story for this token. A private story is still openable by its
+      // owner (browser navigation carries no Authorization header here, so the OG
+      // lookup cannot see them) and an unknown token gets the viewer's own
+      // "not found" state. Hand both to the SPA instead of dumping the visitor on
+      // the landing page.
+      res.redirect(/^[0-9a-f]{64}$/i.test(shareToken) ? `/shared/${shareToken}` : '/');
     }
   } catch (err) {
     log.error('Error serving shared story OG page:', err);
-    res.redirect('/');
+    res.redirect(/^[0-9a-f]{64}$/i.test(shareToken) ? `/shared/${shareToken}` : '/');
   }
 });
 

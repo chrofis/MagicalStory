@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Book, BookOpen, Check, Coins, Gift, Loader2, Sparkles } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
+import { useAuth } from '@/context/AuthContext';
 import { Navigation } from '@/components/common';
 import { storyService } from '@/services';
 
@@ -57,6 +58,7 @@ export const MAX_BOOK_PAGES = 100;
 export default function Pricing() {
   const navigate = useNavigate();
   const { language } = useLanguage();
+  const { isAuthenticated } = useAuth();
   const [pricingTiers, setPricingTiers] = useState<PricingTier[]>(fallbackPricingTiers);
   const [creditPackages, setCreditPackages] = useState<CreditPackage[]>(fallbackCreditPackages);
   const [creditsPerPage, setCreditsPerPage] = useState<number>(FALLBACK_CREDITS_PER_PAGE);
@@ -244,14 +246,16 @@ export default function Pricing() {
       <Navigation currentStep={0} />
 
       <div className="px-4 md:px-8 py-8 max-w-5xl mx-auto">
-        {/* Back button */}
-        <button
-          onClick={() => navigate('/stories')}
-          className="flex items-center gap-2 text-gray-600 hover:text-indigo-500 mb-6 transition-colors"
-        >
-          <ArrowLeft size={20} />
-          {t.backToStories}
-        </button>
+        {/* Back button — "My Stories" only exists for signed-in visitors */}
+        {isAuthenticated && (
+          <button
+            onClick={() => navigate('/stories')}
+            className="flex items-center gap-2 text-gray-600 hover:text-indigo-500 mb-6 transition-colors"
+          >
+            <ArrowLeft size={20} />
+            {t.backToStories}
+          </button>
+        )}
 
         {/* Page title (no card — conventional page header) */}
         <div className="text-center mb-8">

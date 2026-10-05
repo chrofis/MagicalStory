@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useRef, type ReactNode } from 'react';
 import type { Language } from '@/types/story';
 import { translations, type TranslationStrings } from '@/constants/translations';
 
@@ -59,12 +59,25 @@ function detectBrowserLanguage(): Language | null {
   return null;
 }
 
+/**
+ * Language precedence AFTER load (decision #12): an explicit ?lang= wins, then
+ * the visitor's stored choice. A pre-rendered page's language is only the first
+ * paint (so hydration matches the server HTML) — it never overrides a visitor
+ * who picked a language. Returns null when the visitor expressed no preference,
+ * in which case the current (prerender) language stays.
+ */
+export function resolveVisitorLanguage(urlLang: unknown, storedLang: unknown): Language | null {
+  if (isLanguage(urlLang)) return urlLang;
+  if (isLanguage(storedLang)) return storedLang;
+  return null;
+}
+
 interface LanguageProviderProps {
   children: ReactNode;
   /**
    * Initial language injected at SSR time. When present (pre-rendered routes),
-   * this is the source of truth — overrides URL/localStorage detection so the
-   * server HTML and client hydration agree.
+   * it is only the FIRST PAINT so hydration matches the server HTML; the
+   * visitor's ?lang= / stored language replaces it right after mount.
    */
   initialLanguage?: Language;
 }
@@ -79,8 +92,21 @@ export function LanguageProvider({ children, initialLanguage }: LanguageProvider
     return detectUrlLanguage() || detectStoredLanguage() || detectBrowserLanguage() || 'de';
   });
 
+  // Pre-rendered first paint: adopt the visitor's own choice once hydrated.
+  // `settled` keeps the persistence effect below from writing the prerender
+  // language over the stored preference before this has read it.
+  const settled = useRef(!initialLanguage);
   useEffect(() => {
-    if (!isBrowser) return;
+    if (settled.current) return;
+    settled.current = true;
+    const preferred = resolveVisitorLanguage(detectUrlLanguage(), detectStoredLanguage());
+    if (preferred && preferred !== language) setLanguageState(preferred);
+    else document.documentElement.lang = HTML_LANG[language];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!isBrowser || !settled.current) return;
     try {
       localStorage.setItem(STORAGE_KEY, language);
     } catch { /* ignore quota errors */ }
