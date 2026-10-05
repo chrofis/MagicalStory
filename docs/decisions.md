@@ -66199,6 +66199,25 @@ prepare-title keeps building only the costumed sheet; the story run builds the s
 **Revisit if:** semantic judge failures become frequent (then add an explicit retry, not a default score); the owner wants the Gemini→Grok quality-judge swap removed.
 **Touched files:** `server/lib/evalPipeline.js`, `server/lib/entityConsistency.js`, `server/lib/repairLogic.js`, `server/lib/repairPipeline.js`, `server/lib/scoring.js`, `server/lib/images.js`, `server/routes/regeneration.js`, `server/routes/stories.js`, `server/services/database.js`, `server/services/prompts.js`, `client/src/types/story.ts`, `docs/prompt-inventory.md`, tests.
 
+## 2026-10-04 — Sonnet 5.5 writes the arc and repairs the text (create xhigh, re-tell high, text_refine) (owner)
+
+**Context.** Page cost ~$0.36 on full books, target ~$0.30. The arc create (Opus 5.5 xhigh), arc re-tell (Opus 5 medium) and text_refine repair (Opus 5) were ~$1.8 of a ~$6.5 story. Measured by exact replay (previous entry: stored create prompts, stored re-tell prompts, stored refine audits), so the model was the only variable.
+
+**Evidence.**
+- Create, Lab #1591 (5 stories, judges claude-sonnet/grok-4.6/gpt-5.6-sol): Sonnet 5.5 xhigh 6.53 vs stored Opus 5.5 6.46 (non-Anthropic judges 6.31 vs 6.38); $0.56 vs $0.70 per create (Sonnet spends 47-67k output tokens at xhigh). Sonnet at high (#1594, 8 stories) 6.42 overall but 6.14 vs 6.46 on the shared 5 and one weak arc (4.72) — not chosen.
+- Re-tell, Lab #1595 (3 stories, stored Opus 5 re-tell prompt verbatim): Opus 5 6.62; Sonnet xhigh 6.60 ($0.24), high 6.61 ($0.10), medium 6.50 ($0.06). Judge noise on the identical stored arc between runs: 0.33.
+- text_refine, Lab #1592 (Sonnet) / #1593 (Opus 5) on the stored audits, blind per-page 3-way ranking by gpt-5.6-sol (prompts/eval-refine-rank-v1.txt, 3 stories, 38 pages, evals/runs/2026-10-04_refine-model-ab): rank points Opus fresh 1.13, Sonnet 1.05, Opus stored 0.82; head to head Opus-Sonnet 21-17, inside the 22-16 split between two Opus runs; new problems per page Sonnet 1.40 vs Opus 1.74; repair step $0.25 vs $0.86 per story (8 stories).
+
+**Decision.** `arcCreateModel` and `arcRetellModel` = `claude-sonnet-5-5`, `arcCreateEffort` stays xhigh, `arcRetellEffort` high; `textRefineModel` = `claude-sonnet-5-5`. Expected saving ~$0.88 per story (~5 cents per page on 18 pages).
+
+**Rationale.** No measurable quality loss at any of the three stages, ~$0.88 per story saved. Owner observation from reading the arcs: on 4-page books Sonnet crams many elements into each page sentence — watch for it in the verification story.
+
+**Revisit if** the owner's reading of Sonnet arcs on new stories finds them less followable, or page-text judges/owners flag repaired pages; the Opus settings are in git history before this commit.
+
+**Replaces** the 2026-09-25 arc create on Opus 5.5 and the 2026-09-03 text_refine on Opus 5 (repair bake-off) for production routing.
+
+**Touched:** `server/config/models.js`, `tests/unit/arc-creator-effort.test.ts`, `server/lib/testlab.js` (arc_effort stage `retell`), `scripts/analysis/eval-refine-model-ab.js`, `prompts/eval-refine-rank-v1.txt`, `evals/`. **Status:** 🟡 staging, pending a verification story.
+
 
 ## 2026-10-04 — Homepage hero: no trust row; one text style
 

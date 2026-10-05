@@ -30,7 +30,10 @@
  * scripts/admin/score-landmarks-for-stories.js before trusting the ranking —
  * an undiscovered photo can be a construction site.
  *
- *   node scripts/admin/discover-missing-city-landmarks.js [--limit=N] [--dry-run]
+ *   node scripts/admin/discover-missing-city-landmarks.js [--limit=N] [--dry-run] [--all] [--city=X]
+ *
+ *   --city=X  discover one town only (e.g. a valley with nothing within 20 km),
+ *             regardless of whether it already has landmarks.
  */
 'use strict';
 
@@ -43,6 +46,8 @@ const args = process.argv.slice(2);
 const DRY = args.includes('--dry-run');
 const limitArg = args.find(a => a.startsWith('--limit='));
 const LIMIT = limitArg ? parseInt(limitArg.split('=')[1], 10) : null;
+const cityArg = args.find(a => a.startsWith('--city='));
+const CITY = cityArg ? cityArg.split('=').slice(1).join('=').trim() : null;
 
 const BACKDROP = ['Cathedral', 'Church', 'Abbey', 'Monastery', 'Castle', 'Palace', 'Museum',
   'Bridge', 'Tower', 'Fountain', 'Square', 'Theatre', 'Park', 'Monument', 'Library'];
@@ -57,7 +62,9 @@ const BACKDROP = ['Cathedral', 'Church', 'Abbey', 'Monastery', 'Castle', 'Palace
   // A town is "missing" when nothing in it can host a scene — the `(Stadt)`
   // aerial does not count, which is the whole point.
   let missing;
-  if (args.includes('--all')) {
+  if (CITY) {
+    missing = [CITY];
+  } else if (args.includes('--all')) {
     missing = (await pool.query(
       `SELECT nearest_city FROM landmark_index
         WHERE (country ILIKE '%switzerland%' OR country ILIKE '%schweiz%' OR country = 'CH')
@@ -111,7 +118,7 @@ const BACKDROP = ['Cathedral', 'Church', 'Abbey', 'Monastery', 'Castle', 'Palace
 
   // Free, and it is what stops a newly discovered neighbour being offered as local.
   try {
-    execFileSync('node', [path.join(__dirname, 'backfill-landmark-municipality.js')],
+    execFileSync('node', [path.join(__dirname, 'backfill-landmark-municipality.js'), ...(CITY ? [`--city=${CITY}`] : [])],
       { stdio: 'inherit', timeout: 30 * 60 * 1000 });
   } catch (e) {
     console.log(`municipality backfill did not finish: ${e.message} — re-run it directly`);

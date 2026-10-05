@@ -101,15 +101,15 @@ async function runArc(panelReply: string) {
 }
 
 describe('arc machine — create and retell effort', () => {
-  it('pins the owner decision (2026-09-25): create on Opus 5.5 at xhigh, retell on Opus 5 at medium', () => {
-    expect(MODEL_DEFAULTS.arcCreateModel).toBe('claude-opus-5-5');
+  it('pins the owner decision (2026-10-04): create and retell on Sonnet 5.5, xhigh and high', () => {
+    expect(MODEL_DEFAULTS.arcCreateModel).toBe('claude-sonnet-5-5');
     expect(MODEL_DEFAULTS.arcCreateEffort).toBe('xhigh');
-    expect(MODEL_DEFAULTS.arcRetellModel).toBe('claude-opus');
-    expect(MODEL_DEFAULTS.arcRetellEffort).toBe('medium');
+    expect(MODEL_DEFAULTS.arcRetellModel).toBe('claude-sonnet-5-5');
+    expect(MODEL_DEFAULTS.arcRetellEffort).toBe('high');
     expect(MODEL_DEFAULTS.arcCreatorModel).toBeUndefined();
   });
 
-  it('xhigh on Opus 5.5 carries no task budget; the empty-text guard covers the create', () => {
+  it('xhigh on the create model carries no task budget; the empty-text guard covers the create', () => {
     const { TEXT_MODELS } = require('../../server/config/models.js');
     const m = TEXT_MODELS[MODEL_DEFAULTS.arcCreateModel];
     expect(m.provider).toBe('anthropic');

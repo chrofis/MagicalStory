@@ -8191,6 +8191,8 @@ async function runWriterCompareStage(target, { params = {} }) {
  * params: { efforts, model, retellModel, judgeModels, stage, promptFrom, challengesFromStory, promptFromStory, baselineFromStory }
  *   target: { storyId }
  *
+ * params.stage      'retell' sends the stored round-1 re-tell prompt verbatim
+ *   at each params.retellEfforts on params.retellModel (no create, no panel).
  * params.stage      'create' (default) sweeps params.efforts over the create
  *   call. 'pipeline' runs production's arc machine once: create at
  *   params.createEffort, production's panel on THAT committed arc, then
@@ -8252,7 +8254,7 @@ async function runArcEffortStage(target, { params = {}, promptOverride = null })
   // never sends. Drawn ONCE so every effort arm sees the identical prompt —
   // the arms differ in effort and nothing else.
   const stage = params.stage || 'create';
-  if (!['create', 'pipeline'].includes(stage)) throw new Error(`Unknown stage "${stage}" (create | pipeline)`);
+  if (!['create', 'pipeline', 'retell'].includes(stage)) throw new Error(`Unknown stage "${stage}" (create | pipeline | retell)`);
   let prompt;
   let promptSource;
   // The drawn section itself — the pipeline's re-telling must be handed the
@@ -8400,6 +8402,16 @@ async function runArcEffortStage(target, { params = {}, promptOverride = null })
   }
   if (stage === 'create') {
     for (const effort of efforts) arms.push((await runArm('create', prompt, effort)).arm);
+  } else if (stage === 'retell') {
+    // RETELL (2026-10-04): the story's stored round-1 re-tell prompt, VERBATIM
+    // — the committed arc, the panel's kept findings and the draw production's
+    // re-teller answered — once per params.retellEfforts on params.retellModel.
+    // Compared against baseline-final, the model and effort are the only
+    // variables.
+    const stored = String(storyData.arcReviewReport?.rounds?.[0]?.retellPrompt || '');
+    if (!stored.trim()) throw new Error(`stage retell: ${target.storyId} stores no arcReviewReport.rounds[0].retellPrompt (no re-telling ran)`);
+    const retellEfforts = String(params.retellEfforts || 'xhigh,high,medium').split(',').map(s => s.trim()).filter(Boolean);
+    for (const effort of retellEfforts) arms.push((await runArm('retell', stored, effort)).arm);
   } else {
     // PIPELINE: one create at params.createEffort, then production's panel on
     // THAT committed arc, then one re-telling per params.retellEfforts — every

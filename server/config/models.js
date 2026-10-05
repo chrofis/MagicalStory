@@ -427,8 +427,14 @@ const MODEL_DEFAULTS = {
   // was measured on 5.5 as the owner's pick. Was ONE key, arcCreatorModel,
   // read by both calls (and by the ARC_CREATOR_MODEL env var, gone: behaviour
   // is code).
-  arcCreateModel: 'claude-opus-5-5',
-  arcRetellModel: 'claude-opus',
+  //
+  // SONNET 5.5 FOR BOTH (owner, 2026-10-04): same stored prompts, model the
+  // only variable. Create at xhigh: judges 6.53 vs Opus 5.5 6.46 on 5 stories
+  // (Lab #1591), $0.56 vs $0.70. Re-tell at high: 6.61 vs Opus 5 6.62 on 3
+  // stories (Lab #1595), $0.10 vs $0.23; xhigh 6.60 at $0.24, medium 6.50.
+  // docs/decisions.md 2026-10-04 "Sonnet 5.5 writes the arc and repairs the text".
+  arcCreateModel: 'claude-sonnet-5-5',
+  arcRetellModel: 'claude-sonnet-5-5',
   arcPanelModels: (process.env.ARC_PANEL_MODELS || 'grok-4.6,deepseek-v4-pro,gpt-5.6-luna-pro')
     .split(',').map(s => s.trim()).filter(Boolean),
   // Rounds of panel + re-tell. Round k>1 feeds the previous FINAL ARC + its
@@ -484,7 +490,8 @@ const MODEL_DEFAULTS = {
   // (TEXT_MODELS['claude-opus-5-5'].taskBudgetAtEffort). Cost: $0.88 per
   // create vs $0.42-0.75 for Opus 5 at high.
   arcCreateEffort: 'xhigh',
-  arcRetellEffort: 'medium',
+  // high on Sonnet 5.5 (2026-10-04, Lab #1595, see arcCreateModel).
+  arcRetellEffort: 'high',
   // The reviews used to share outlineReviewModel, so switching the BEATS
   // reviewer silently moved the wardrobe review too; separate keys since.
   // (sceneReviewModel went with the scene review, 2026-09-28 — docs/decisions.md
@@ -518,7 +525,15 @@ const MODEL_DEFAULTS = {
   // completed step is published as it finishes, so a deadline can only ever
   // cost the step still running. The old "90s cap" note here described a
   // budget that no longer exists.
-  textRefineModel: process.env.TEXT_REFINE_MODEL || 'claude-opus',
+  //
+  // claude-sonnet-5-5 since 2026-10-04 (owner): both repaired the SAME stored
+  // audit findings (Lab #1592 Sonnet / #1593 Opus 5). Blind per-page ranking
+  // by gpt-5.6-sol over 3 stories, 38 pages (evals/runs/2026-10-04_refine-model-ab):
+  // Opus 1.13 vs Sonnet 1.05 rank points, head to head 21-17 — inside the
+  // 22-16 split between two Opus runs of the same pages — and Sonnet added
+  // fewer new problems per page (1.40 vs 1.74). Repair step $0.25 vs $0.86
+  // per story (8 stories).
+  textRefineModel: process.env.TEXT_REFINE_MODEL || 'claude-sonnet-5-5',
   // Cross-page REPETITION gate after the repair pass (2026-09-10): two pages
   // trip when they share at least this many identical 5-word shingles
   // (lowercased, punctuation stripped). Why 4: a recurring proper noun or a
