@@ -459,16 +459,16 @@ export default function MyStories() {
           };
           const messages = {
             en: tokensCredited > 0
-              ? `Your book has been sent to print. You earned ${tokensCredited} tokens!`
+              ? `Your book has been sent to print. You earned ${tokensCredited} credits!`
               : 'Your book has been sent to print.',
             de: tokensCredited > 0
-              ? `Dein Buch wurde zum Druck geschickt. Du hast ${tokensCredited} Tokens erhalten!`
+              ? `Dein Buch wurde zum Druck geschickt. Du hast ${tokensCredited} Credits erhalten!`
               : 'Dein Buch wurde zum Druck geschickt.',
             fr: tokensCredited > 0
               ? `Votre livre a été envoyé à l’impression. Vous avez gagné ${tokensCredited} crédits !`
               : 'Votre livre a été envoyé à l’impression.',
             it: tokensCredited > 0
-              ? `Il tuo libro è stato inviato in stampa. Hai guadagnato ${tokensCredited} token!`
+              ? `Il tuo libro è stato inviato in stampa. Hai guadagnato ${tokensCredited} crediti!`
               : 'Il tuo libro è stato inviato in stampa.',
           };
           const details = buildOrderDetailLines(finalData.order, language, tokensCredited);
