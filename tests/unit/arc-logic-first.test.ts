@@ -609,3 +609,17 @@ describe('the arc prompts v3 (owner, 2026-09-25): a logical AND exciting plot, c
     }
   });
 });
+
+describe('the central-figure line: a cast member plays a role under their own name', () => {
+  beforeAll(async () => { await loadPromptTemplates(); });
+  const committed = PB.parseArcCreate(CREATE).committed;
+  const data = { characters: [{ id: 1, name: 'Child1' }], mainCharacters: [1], languageLevel: 'standard', language: 'en' };
+  it.each([
+    ['arc-create', () => PB.buildArcCreatePrompt(data, 18)],
+    ['arc-retell', () => PB.buildArcRetellPrompt(data, 18, committed, '## PANELIST A\nSOLUTION: one')],
+  ])('%s: " / " is only a change of the figure itself; a character who plays it keeps their own name', (_n, make) => {
+    const line = (make() as string).split('\n').find(l => l.includes('by the name the story calls it')) || '';
+    expect(line).toMatch(/only where the figure itself changes name/);
+    expect(line).toMatch(/never by the role they play/);
+  });
+});

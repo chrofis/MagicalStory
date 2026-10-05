@@ -3341,6 +3341,18 @@
       "source": "Code review 2026-10-04 (tasks/code-review-2026-10/7-client.md)",
       "status": "fixed",
       "fixedAt": "2026-10-05"
+    },
+    {
+      "id": "central-figure-role-twin",
+      "title": "A user character who plays the title figure ('Daniel / Wilhelm Tell') was drawn twice: the front cover cast named the role as a second figure and the Visual Bible created a Daniel-look secondary character",
+      "reportedAt": "2026-10-05",
+      "source": "Staging job_1791145238223_50osg2osm (build 82c7a7012): arcReviewReport.centralFigure = [\"Daniel\",\"Wilhelm Tell\"]; cover plan line 'wide — Emma, Wilhelm Tell — …'; VB created CHR002 with Daniel's look, Jev cited it on 5 pages; a Daniel twin on the front cover and p10, CRITICAL extra_character on p5.",
+      "rootCause": "The arc's central-figure format defined ' / ' only as a name change, so the arc used it for 'cast member / role'. coverBeats.buildCoverBeats took the LAST name of the list and appended it to the front-cover cast without checking whether another name in the list was a cast member (feature origin 93f90dfdd, decisions.md 2026-09-25).",
+      "impact": "One of 1 stored historical stories where a commissioned character plays the title figure; the cover and the Visual Bible duplicate the character.",
+      "status": "open",
+      "fixedAt": "2026-10-05",
+      "fixedIn": "PENDING",
+      "fix": "coverBeats: a name in the list that is a cast member's name is the central figure, nothing is appended; arc spec: a cast member who plays the figure is named by their own name, ' / ' only for a real name change. Tests: tests/unit/covers-as-pages.test.ts, tests/unit/arc-logic-first.test.ts."
     }
   ]
 }

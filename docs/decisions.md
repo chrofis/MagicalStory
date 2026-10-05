@@ -66526,3 +66526,13 @@ error and keeps the previous state instead of silently adopting the original pho
 
 **Touched files:** `server/routes/regeneration.js`, `client/src/pages/StoryWizard.tsx`,
 `client/src/services/characterService.ts`, `tests/unit/iterate-open-to-customers.test.ts`.
+
+## 2026-10-05 — Central figure: a cast member who plays it is named by their own name; the cover never adds the role as a second figure
+
+**Context:** decisions.md 2026-09-25 / commit 93f90dfdd put the arc's "Central figure:" name on the front-cover cast (coverBeats took the LAST name of a " / " list, the state the story ends in). The format defined " / " only as a name change (an egg that hatches). Staging job_1791145238223_50osg2osm (a historical story where the user's character Daniel plays the title figure) stored arcReviewReport.centralFigure = ["Daniel","Wilhelm Tell"]; the cover plan line became `wide — Emma, Wilhelm Tell — …`, the Visual Bible created a separate secondary character with Daniel's look (CHR002), Jev cited it on 5 pages, and a Daniel twin appeared on the front cover and p10 plus a CRITICAL extra_character on p5. Replay of buildCoverBeats on the stored data: before `wide — Emma, Wilhelm Tell — …`, after `wide — Emma, Daniel — …`.
+
+**Decision (owner):** (1) in coverBeats, if any name in the central figure list is a cast member's name (case-insensitive), that member is the central figure and nothing else is appended; otherwise the last name still wins. (2) The arc's central-figure format (promptBuilders `arcLogicSpec`, carried by arc-create and arc-retell via {ARC_LOGIC_SPEC}) says " / " is only for the figure itself changing name, and a commissioned character who plays the figure is named by their own name alone, never by the role they play.
+
+**Rationale:** the other readers of the list (planCounters presence per third, jevDecisions isCentral, castActionRule) match any name in it, so they already treat the cast member correctly; only the cover appended. Prompt rule covers the cause, the code rule covers a list the arc still writes in the old shape.
+
+**Touched files:** `server/lib/coverBeats.js`, `server/lib/promptBuilders.js`, `tests/unit/covers-as-pages.test.ts`, `tests/unit/arc-logic-first.test.ts`, `tasks/bugs.json`, `tasks/verify.json`.
