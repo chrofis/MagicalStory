@@ -66643,3 +66643,23 @@ relationship/trait labels keyed by French text, homepage hero image text.
 **Touched files:** `client/src/constants/*`, `client/src/pages/*`, `client/src/context/LanguageContext.tsx`,
 `client/src/utils/{apiErrors,languagePreference,uiLabels}.ts`, `server/lib/seoMeta.js`, `server/routes/{auth,trial,user,print,sharing}.js`,
 `emails-src/i18n.ts`, `email.js`, `server/config/trialTitles.js`.
+
+## 2026-10-05 — Print size A4, CH-only shipping, 10-character cap, two-word brand (owner)
+
+**Context:** customer texts still said 20x20cm; checkout allowed 8 countries; character counts said "up to 3",
+"up to 10" or "multiple"; the round-3 German batch had written the brand as one word.
+
+**Decision (owner, 2026-10-05):**
+1. The printed book is A4 portrait (210×280 mm, `server/config/print.js`); the square format stays as legacy code only.
+2. Printed books ship to Switzerland only until the tax position abroad is clear: `PRINT_SHIPPING_COUNTRIES = ['CH']`
+   drives Stripe `allowed_countries`; no international-shipping claims.
+3. A story has at most 10 characters, up to 2 of them main: `CHARACTERS_MAX` (`server/lib/requestGuards.js`) mirrored
+   by `MAX_CHARACTERS_PER_STORY` (`client/src/utils/mainCharacters.ts`); create-story returns 400 `TOO_MANY_CHARACTERS`
+   before credits are reserved; the wizard blocks an 11th.
+4. The visible brand is "Magical Story" (two words); the domain, addresses, user agents and code identifiers stay one word.
+
+**Revisit if:** shipping abroad opens (tax clarified), or the character cap changes.
+
+**Touched files:** `server/config/print.js`, `server/routes/print.js`, `server/routes/jobs.js`, `server/lib/requestGuards.js`,
+`client/src/components/character/CharacterList.tsx`, `client/src/pages/StoryWizard.tsx`, `client/src/utils/{apiErrors,mainCharacters}.ts`,
+texts, `emails-src/i18n.ts`, `server/lib/seoMeta.js`.
