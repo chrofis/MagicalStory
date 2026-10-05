@@ -5013,6 +5013,24 @@
         "result": "NOT COVERED",
         "note": "cannot resolve (this push) or build 82c7a7012 locally (git fetch?)"
       }
+    },
+    {
+      "id": "central-figure-cast-member-plays-role",
+      "title": "A commissioned character who plays the title figure is named by their own name in the central figure line, and the cover cast does not add the role as a second figure",
+      "commits": [
+        "4086d5014"
+      ],
+      "addedAt": "2026-10-05",
+      "claim": "On the next historical story where a user character plays the title figure: the arc's 'Central figure:' line names the character alone (no 'Name / Role'); the Visual Bible has no secondary character named after the role; the front-cover plan line names the cast member once; no twin of the character appears on the cover or in the pages.",
+      "runShape": [
+        "any"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Read arcReviewReport.centralFigure, the VB character list and the front-cover plan line of the run; view the front cover."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [
