@@ -1036,7 +1036,8 @@ async function checkGarmentGone(sheet, garment, opts = {}) {
     label: `garment-gone check (${name})`, usageTracker, usageFn: 'character_2x4_garment_gone_check', apiKey: process.env.GEMINI_API_KEY,
   });
   if (typeof report?.visible !== 'boolean') throw new Error(`garment-gone check (${name}) returned no visible true/false`);
-  return { garment: name, visible: report.visible, cells: String(report.cells ?? ''), reason: String(report.reason ?? '') };
+  // `question` is the exact text asked: the stored verdict must be readable on its own.
+  return { garment: name, question: prompt, visible: report.visible, cells: String(report.cells ?? ''), reason: String(report.reason ?? '') };
 }
 
 /**
@@ -1052,6 +1053,8 @@ async function evaluateVariantSheet(sheet, opts = {}) {
   const styled = await evaluateAvatarSheet(sheet, { ...styleOpts, pass: 2, usageTracker });
   const checks = await Promise.all(names.map(g => checkGarmentGone(sheet, g, { usageTracker })));
   const verdict = styled.verdict;
+  // The style judge's own answer, before a visible garment lowers the final.
+  verdict.styleGate = { finalScore: verdict.finalScore, valid: verdict.valid, failureReasons: [...(verdict.failureReasons || [])] };
   verdict.garmentChecks = checks;
   const still = checks.filter(c => c.visible);
   verdict.removedScore = still.length ? 1 : 10;
@@ -1913,7 +1916,9 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
  * No Pass-1 sheet or no face photo for the base = nothing to judge against:
  * NO variant, logged as an error (the page then records the missing sheet).
  *
- * Returns null when every attempt is rejected. The caller then stores no
+ * Returns null before any paid edit when an input is missing. When every
+ * attempt is rejected it returns {imageData: null, accepted: false, attempts}
+ * so the gate's answers are recorded. The caller then stores no
  * variant; the page renders with the worn sheet and records a shipped defect.
  *
  * @param {string} baseSheetImageData - the approved styled 2×4 sheet
@@ -1965,6 +1970,24 @@ ${wardrobeHalf}
 ${removed.length ? `Taken off: ${removed.join('; ')}. ${GARMENT_OFF_SHEET_RULE}\n` : ''}Image 1 is the only authority for how anything the character keeps on looks — its colour, cut, fabric and weave: copy them, do not redraw them from words.
 Draw every garment right round the body: in a cell facing the viewer its front, in a cell turned away its back — which this sheet has never shown, so draw it rather than uncover it.
 Change nothing else. Same character, same face, same hair, same body, same poses, same cell layout, same art style.`;
+}
+
+/**
+ * One attempt's gate answer, in the shape stored on the variant's log entry
+ * (styledAvatarGeneration): the style verdict, then every per-garment question
+ * with its answer. Text and numbers only, never an image.
+ */
+function gateRecordOf(verdict) {
+  const style = verdict?.styleGate || { finalScore: verdict?.finalScore ?? null, valid: verdict?.valid ?? null, failureReasons: verdict?.failureReasons || [] };
+  return {
+    style: { score: style.finalScore ?? null, valid: style.valid ?? null, reasons: style.failureReasons || [] },
+    garmentChecks: (verdict?.garmentChecks || []).map(c => ({
+      garment: c.garment, question: c.question || null, visible: c.visible, cells: c.cells || '', reason: c.reason || '',
+    })),
+    removedScore: verdict?.removedScore ?? null,
+    finalScore: verdict?.finalScore ?? null,
+    valid: verdict?.valid ?? null,
+  };
 }
 
 async function redressSheetVariant(baseSheetImageData, opts = {}) {
@@ -2019,7 +2042,7 @@ async function redressSheetVariant(baseSheetImageData, opts = {}) {
     if (!judged) {
       // Nothing can judge it; one roll, shipped, and said so.
       log.warn(`[WARDROBE-VARIANT] ${characterName} redress shipped UNSCORED (${skipQualityEval ? 'eval skipped by caller' : 'no GEMINI_API_KEY'})`);
-      return { imageData: result.imageData, verdict: null, attempts, prompt };
+      return { imageData: result.imageData, accepted: true, verdict: null, attempts, prompt };
     }
 
     let verdict = null;
@@ -2033,24 +2056,27 @@ async function redressSheetVariant(baseSheetImageData, opts = {}) {
       attempts.push({ attempt, stage: 'eval-error', score: null, reason: err.message });
       continue;
     }
-    attempts.push({ attempt, stage: 'judged', score: verdict.finalScore, valid: verdict.valid, reason: (verdict.failureReasons || []).join('; ') || null });
+    attempts.push({ attempt, stage: 'judged', score: verdict.finalScore, valid: verdict.valid, accepted: verdict.valid === true, reason: (verdict.failureReasons || []).join('; ') || null, gate: gateRecordOf(verdict) });
     if (!best || rank(verdict.finalScore) > rank(best.score)) {
       best = { imageData: result.imageData, verdict, score: verdict.finalScore };
     }
     if (verdict.valid) {
       log.info(`[WARDROBE-VARIANT] ${characterName} redress accepted (score=${verdict.finalScore}/10, removed=${verdict.removedScore}/10)`);
-      return { imageData: result.imageData, verdict, attempts, prompt };
+      return { imageData: result.imageData, accepted: true, verdict, attempts, prompt };
     }
   }
 
   const why = (best?.verdict?.failureReasons || []).join('; ') || 'no attempt produced a usable sheet';
   log.error(`[WARDROBE-VARIANT] ${characterName} redress REJECTED after ${attempts.length} attempt(s) (best=${best?.score ?? 'unscored'}/10: ${why}) — no variant stored; every page that takes ${items.join(', ')} off records a missing off sheet`);
-  return null;
+  // No image: the caller stores no variant. The record is returned so the gate's
+  // answers reach the story's diagnostics instead of dying in the log.
+  return { imageData: null, accepted: false, verdict: best?.verdict || null, attempts, prompt };
 }
 
 module.exports = {
   generateCharacter2x4Sheet,
   redressSheetVariant,
+  gateRecordOf,
   buildRedressPrompt,
   GARMENT_OFF_SHEET_RULE,
   checkGarmentGone,

@@ -50,6 +50,22 @@ interface StyledAvatarGenerationEntry {
   innerOutfitScore?: number | null;
   innerFinalScore?: number | null;
   combinedScore?: number | null;
+  // Off-garment variant sheets: the gate's answer per attempt (text only).
+  variant?: {
+    offIds: string[];
+    removedItems: string[];
+    accepted: boolean;
+    shippedUnscored: boolean;
+    finalAttempt: number | null;
+    attempts: Array<{
+      attempt: number; stage: string; score?: number | null; valid?: boolean; accepted?: boolean; reason?: string | null;
+      gate?: {
+        style: { score: number | null; valid: boolean | null; reasons: string[] };
+        garmentChecks: Array<{ garment: string; question: string | null; visible: boolean; cells: string; reason: string }>;
+        removedScore: number | null; finalScore: number | null; valid: boolean | null;
+      };
+    }>;
+  } | null;
   // Guarantee-path warning entries carry only { warning, success:false } — no inputs.
   warning?: string;
   inputs?: {
@@ -4124,6 +4140,32 @@ export function StoryDisplay({
                           {entry.warning}
                         </div>
                       )}
+                      {/* Off-garment variant: the gate's answer per attempt */}
+                      {entry.variant && (
+                        <div className="bg-amber-50 border border-amber-200 p-2 rounded text-xs space-y-2">
+                          <div className="font-semibold text-amber-800">
+                            Variant gate - off: {entry.variant.removedItems.join(', ')} - {entry.variant.accepted ? `accepted (attempt #${entry.variant.finalAttempt})` : 'REJECTED'}
+                            {entry.variant.shippedUnscored && ' (shipped unscored)'}
+                          </div>
+                          {entry.variant.attempts.map(a => (
+                            <div key={a.attempt} className={`border rounded p-2 ${a.accepted ? 'border-emerald-300 bg-emerald-50' : 'border-gray-200 bg-white'}`}>
+                              <div className="font-bold text-gray-700">#{a.attempt} {a.stage}{a.score != null ? ` - ${a.score}/10` : ''} {a.accepted ? 'accepted' : 'rejected'}</div>
+                              {a.gate ? (
+                                <div className="mt-1 space-y-1 text-[10px] text-gray-700">
+                                  <div>Style: {a.gate.style.score ?? '?'}/10 {a.gate.style.valid ? 'valid' : 'invalid'}{a.gate.style.reasons.length > 0 && ` - ${a.gate.style.reasons.join('; ')}`}</div>
+                                  {a.gate.garmentChecks.map((c, i) => (
+                                    <details key={i}>
+                                      <summary className="cursor-pointer"><span className={c.visible ? 'text-red-700 font-bold' : 'text-green-700'}>{c.garment}: {c.visible ? 'STILL VISIBLE' : 'gone'}</span>{c.cells ? ` (${c.cells})` : ''} - {c.reason}</summary>
+                                      <pre className="mt-1 whitespace-pre-wrap break-words text-[10px] text-gray-600">{c.question}</pre>
+                                    </details>
+                                  ))}
+                                </div>
+                              ) : (a.reason && <div className="mt-1 text-[10px] text-gray-600">{a.reason}</div>)}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
                       {/* Inputs */}
                       {entry.inputs && (
                       <div className="bg-blue-50 p-2 rounded text-xs">

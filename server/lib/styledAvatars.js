@@ -192,6 +192,20 @@ const styledAvatarGenerationLogs = new Map();
 const MAX_GENERATION_LOG_ENTRIES = 50;
 const _STYLED_LOG_UNSCOPED = '__unscoped__';
 
+// Append one entry to this scope's generation log (capped).
+function pushStyledAvatarLog(entry) {
+  const scope = cacheContext.getStore() || _STYLED_LOG_UNSCOPED;
+  let bucket = styledAvatarGenerationLogs.get(scope);
+  if (!bucket) { bucket = []; styledAvatarGenerationLogs.set(scope, bucket); }
+  bucket.push(entry);
+  if (bucket.length > MAX_GENERATION_LOG_ENTRIES) {
+    bucket.splice(0, bucket.length - MAX_GENERATION_LOG_ENTRIES);
+  }
+  if (scope === _STYLED_LOG_UNSCOPED) {
+    log.warn(`⚠️ [STYLED-AVATAR LOG] Entry pushed outside cache scope — entry will be invisible to dev panels (code path escaped runInCacheScope)`);
+  }
+}
+
 // Load art style prompts from prompts/art-styles.txt
 function loadArtStylePrompts() {
   const promptsPath = path.join(__dirname, '../../prompts/art-styles.txt');
@@ -442,18 +456,7 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
         ? `style judge rejected every attempt — shipped the best styled attempt at ${innerFinal}/10 (${styleJudgeReasons})`
         : `face=${faceMatchScore}/10, clothing=${clothingMatchScore}/10, inner=${innerFinal}/10` }),
     };
-    {
-      const scope = cacheContext.getStore() || _STYLED_LOG_UNSCOPED;
-      let bucket = styledAvatarGenerationLogs.get(scope);
-      if (!bucket) { bucket = []; styledAvatarGenerationLogs.set(scope, bucket); }
-      bucket.push(logEntry);
-      if (bucket.length > MAX_GENERATION_LOG_ENTRIES) {
-        bucket.splice(0, bucket.length - MAX_GENERATION_LOG_ENTRIES);
-      }
-      if (scope === _STYLED_LOG_UNSCOPED) {
-        log.warn(`⚠️ [STYLED-AVATAR LOG] Entry pushed outside cache scope — entry will be invisible to dev panels (code path escaped runInCacheScope)`);
-      }
-    }
+    pushStyledAvatarLog(logEntry);
 
     if (evalSkipped) {
       log.warn(`⚠️ [STYLED AVATAR] ${characterName}/${artStyle}/${clothingCategory} shipped UNSCORED — quality eval skipped (${evalSkipped}); no axis was judged`);
@@ -473,22 +476,14 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
     // trace in the dev panel at all (a costumed sheet failed twice on Grok
     // content moderation and the only evidence was a Railway log line; the
     // audit showed a puzzling 'standard' fallback with no failed attempt).
-    {
-      const scope = cacheContext.getStore() || _STYLED_LOG_UNSCOPED;
-      let bucket = styledAvatarGenerationLogs.get(scope);
-      if (!bucket) { bucket = []; styledAvatarGenerationLogs.set(scope, bucket); }
-      bucket.push({
-        timestamp: new Date().toISOString(),
-        characterName, artStyle, clothingCategory,
-        durationMs: Date.now() - startTime,
-        success: false,
-        error: err.message,
-        warning: `generation threw: ${err.message}`,
-      });
-      if (bucket.length > MAX_GENERATION_LOG_ENTRIES) {
-        bucket.splice(0, bucket.length - MAX_GENERATION_LOG_ENTRIES);
-      }
-    }
+    pushStyledAvatarLog({
+      timestamp: new Date().toISOString(),
+      characterName, artStyle, clothingCategory,
+      durationMs: Date.now() - startTime,
+      success: false,
+      error: err.message,
+      warning: `generation threw: ${err.message}`,
+    });
     throw err;
   }
 }
@@ -1928,6 +1923,38 @@ function approvedBaseSheetFor(char, artStyle, baseCategory) {
 }
 
 /**
+ * The generation-log entry for one variant redress, whatever its outcome: every
+ * attempt's gate answer (style verdict + each per-garment question and answer)
+ * rides on `variant.attempts[].gate`. No image data: the shipped sheet is stored
+ * through the normal avatar path, this entry is the verdict only. `out` is null
+ * when redressSheetVariant refused before any edit.
+ */
+function variantLogEntry(j, artStyle, out, durationMs) {
+  const accepted = !!out?.imageData;
+  const attempts = out?.attempts || [];
+  const last = attempts[attempts.length - 1];
+  const why = out?.accepted === false
+    ? `every attempt rejected: ${attempts.map(a => `#${a.attempt} ${a.stage}${a.reason ? ` (${a.reason})` : ''}`).join(' | ')}`
+    : (!out ? 'redress refused before any edit — see server log' : null);
+  return {
+    timestamp: new Date().toISOString(),
+    characterName: j.charName, artStyle, clothingCategory: j.row.clothingCategory,
+    durationMs, success: accepted, sheetFormat: '2x4',
+    attempt: attempts.length || 1,
+    prompt: out?.prompt || null,
+    variant: {
+      offIds: j.off.offIds,
+      removedItems: j.row.removedItemNames || j.off.offIds,
+      accepted,
+      shippedUnscored: accepted && !out.verdict,
+      finalAttempt: last?.attempt ?? null,
+      attempts,
+    },
+    ...(accepted ? {} : { warning: why }),
+  };
+}
+
+/**
  * WARDROBE-STATE VARIANT SHEETS — one extra sheet per derived requirement row.
  *
  * Deliberately NOT a branch inside prepareStyledAvatars. That function resolves
@@ -1990,6 +2017,7 @@ async function prepareWardrobeVariantAvatars(characters, artStyle, variantRequir
   log.info(`👕 [WARDROBE-VARIANT] redressing ${jobs.length} approved sheet(s) in PARALLEL: ${jobs.map(j => `${j.charName}/${j.row.clothingCategory}`).join(', ')}`);
 
   const results = await Promise.all(jobs.map(async (j) => {
+    const startedAt = Date.now();
     try {
       const out = await redressSheetVariant(j.baseSheet, {
         characterName: j.charName,
@@ -2006,9 +2034,15 @@ async function prepareWardrobeVariantAvatars(characters, artStyle, variantRequir
         skipQualityEval,
         backendOverride,
       });
+      pushStyledAvatarLog(variantLogEntry(j, artStyle, out, Date.now() - startedAt));
       return { j, out };
     } catch (err) {
       log.error(`👕 [WARDROBE-VARIANT] ${j.charName}/${j.row.clothingCategory} threw: ${err.message} — no variant stored`);
+      pushStyledAvatarLog({
+        timestamp: new Date().toISOString(), characterName: j.charName, artStyle, clothingCategory: j.row.clothingCategory,
+        durationMs: Date.now() - startedAt, success: false, sheetFormat: '2x4', error: err.message,
+        warning: `variant redress threw: ${err.message}`,
+      });
       return { j, out: null };
     }
   }));
@@ -2031,6 +2065,7 @@ module.exports = {
   getOrCreateStyledAvatar,
   prepareStyledAvatars,
   prepareWardrobeVariantAvatars,
+  variantLogEntry,
   approvedBaseSheetFor,
   convertAvatarToStyle,
 
