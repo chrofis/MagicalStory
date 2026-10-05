@@ -5359,7 +5359,7 @@
       ],
       "check": {
         "kind": "human",
-        "what": "Run Lab beats_scenes on job_1791040103540_atbttop6w with gemini-3.1-pro; compare output tokens, cost, brief faults (briefCheckReport.findingsBefore) and fields left out against Lab #1623/#1624. In the stored reply look for the decided keys; in the assembled briefs check they equal the FIXED lines of the prompt."
+        "what": "Run Lab beats_scenes on job_1791040103540_atbttop6w with gemini-3.1-pro; compare output tokens, cost, brief faults (briefCheckReport.findingsBefore) and fields left out against Lab #1623/#1624. In the stored reply look for the decided keys; in the assembled briefs check they equal the FIXED lines of the prompt. First run Lab #1636 (342ab13c) FAILED: reply cut, retry PROHIBITED_CONTENT, per-page briefs lacked weather (light_undeclared 21/21); weather made the author's on every page in the follow-up commit; re-run pending the owner's go-ahead for the spend."
       },
       "status": "pending",
       "evidence": []

@@ -56,13 +56,15 @@ describe('the assembled brief equals what the run pinned before the Art Director
     const today = metaOf(JD.pinBrief(brief(WRITTEN_BY_TODAY_AD), fixed).brief);
     const stripped = stripDecided(brief(WRITTEN_BY_TODAY_AD), fixed);
     expect(assessSceneBrief(stripped.text).usable).toBe(true);
-    for (const k of ['shot', 'population', 'aboard', 'timeOfDay', 'weather']) expect(stripped.metadata[k], k).toBeUndefined();
+    for (const k of ['shot', 'population', 'aboard', 'timeOfDay']) expect(stripped.metadata[k], k).toBeUndefined();
     expect(stripped.metadata.characters.every((c: any) => c.looksAt === undefined)).toBe(true);
     expect(stripped.metadata.objects).toEqual(['CLO001']);                       // only what the FIXED block does not list
     const assembled = metaOf(JD.pinBrief(stripped.text, fixed).brief);
     expect(assembled).toEqual(today);
     expect(assembled.objects).toEqual(['LOC001.2', 'ANI001', 'CLO001']);         // location, decided cites, then the author's own ids
-    expect(assembled.weather).toBe('none');                                      // indoors: code writes it
+    expect(assembled.weather).toBe('none');                                      // indoors: the author's `none`, and code pins it too
+    const forgot = metaOf(JD.pinBrief(brief({ ...stripped.metadata, weather: undefined }), fixed).brief);
+    expect(forgot.weather).toBe('none');                                         // an indoor page whose author forgot it still gets `none`
   });
 
   it('the decided fields always come from the decisions, whatever the author wrote', () => {
@@ -126,7 +128,7 @@ describe('the two path gates of the Art Director templates', () => {
       expect(ex).toContain('"weather": "clear"');
       expect(ex).toContain('"objects": ["CLO001"]');
       expect(p).toContain(JD.JEV_FIXED_FIELDS_RULE);
-      expect(p).toContain(req('../../server/lib/sceneLight.js').SCENE_WEATHER_FIELD_RULE);   // the clock is code's: only the outdoor weather is asked for
+      expect(p).toContain(req('../../server/lib/sceneLight.js').SCENE_WEATHER_FIELD_RULE);   // the clock is code's, the weather stays the author's on every page
       expect(p).not.toContain(req('../../server/lib/sceneLight.js').SCENE_LIGHT_FIELD_RULE);
       expect(p).not.toMatch(/JEV_(BACKUP|FIXED)_(BEGIN|END)/);
     });

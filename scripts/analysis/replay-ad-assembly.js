@@ -68,8 +68,8 @@ function coverFixedOfBlock(block) {
 /**
  * The brief as the new template asks the Art Director to write it: the decided
  * fields left out. Story page: shot, timeOfDay, population, aboard, every
- * character's looksAt (the roster the FIXED block lists), `weather` when
- * indoors, and the objects the block lists (decided ids and locations).
+ * character's looksAt (the roster the FIXED block lists), and the objects the
+ * block lists (decided ids and locations). `weather` stays the author's.
  * Cover: the location only.
  */
 function stripDecided(brief, fixed) {
@@ -82,7 +82,6 @@ function stripDecided(brief, fixed) {
     m.objects = (m.objects || []).filter(o => !isLoc(o));
   } else {
     for (const k of ['shot', 'timeOfDay', 'population', 'aboard']) delete m[k];
-    if (fixed.indoor === true) delete m.weather;
     m.objects = (m.objects || []).filter(o => !isLoc(o) && !decided.has(baseId(o)));
     if (fixed.looksAt && Array.isArray(m.characters)) {
       m.characters = m.characters.map((c) => {
