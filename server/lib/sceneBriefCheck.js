@@ -341,7 +341,7 @@ function checkCoverBrief(page, metadata) {
  * R1 — the distribution floors, tallied across the finished book. Verbatim from
  * the old unified chain (the since-deleted story-unified.txt "Distribution
  * requirements across the full story" + outline-analysis check 20; the live
- * statement of the rule is prompts/scene-expansion-all.txt): full-width between 30% and 50% of
+ * statement of the rule is prompts/scene-briefs-all.txt): full-width between 30% and 50% of
  * pages, at least 30% top-*, at least 30% bottom-*, never more than 3
  * consecutive pages in the same half. Parity is NOT re-checked here — it
  * survived into the Art Director's own rule set.
@@ -742,7 +742,7 @@ function checkObjectStateBase(pages = [], visualBible = null) {
 
 // ── Bible page tables vs brief citations ─────────────────────────────
 // The Art Director is told, verbatim: "An entry's `pages` and the `objects[]` of
-// the page briefs below say the same thing" (prompts/scene-expansion-all.txt,
+// the page briefs below say the same thing" (prompts/scene-briefs-all.txt,
 // the `pages` is earned rule). Both halves are written in one call and nothing
 // compared them, so the two tables were free to drift — and every consumer
 // downstream reads ONE of them. `pages` drives the reference-cell pick, the
@@ -1542,7 +1542,7 @@ function checkScenes(pages, castNames = [], visualBible = null, opts = {}) {
 //     state was a change claiming 12 pages and the first six rendered altered.
 //     SENT.
 //   vb_page_uncited / vb_cite_offpage  the bible's authored page table and the
-//     briefs' citations disagree (2026-09-17). scene-expansion-all.txt states
+//     briefs' citations disagree (2026-09-17). scene-briefs-all.txt states
 //     the contract verbatim — "An entry's `pages` and the `objects[]` of the
 //     page briefs below say the same thing" — and nothing verified it.
 //     MEASURED over every staging story whose bible was authored under that
@@ -1598,7 +1598,7 @@ function checkScenes(pages, castNames = [], visualBible = null, opts = {}) {
 //     18, one true and one false.
 //     THE RULE ITSELF STAYS, stated where classification belongs:
 //     `prompts/scene-review.txt:72` check 9d for the critic, and
-//     `prompts/scene-expansion-all.txt:157` for the Art Director ("An entry's
+//     `prompts/scene-briefs-all.txt` for the Art Director ("An entry's
 //     `pages` and the `objects[]` of the page briefs below say the same
 //     thing"). Over the same briefs 9d named 4 pages this code structurally
 //     could not see — one where the plan line says "shell" while the code's

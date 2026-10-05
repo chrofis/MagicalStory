@@ -182,6 +182,8 @@ const TYPE_TO_BUCKET = {
   duplicate_identity: 'character_presence', cloned_extras: 'character_presence',
   character_identity: 'character_identity', identity: 'character_identity', reference: 'character_identity',
   clothing: 'clothing', color: 'clothing', garment: 'clothing',
+  // clothing_sex (image-evaluation D-05c): registered explicitly, not via the compound splitter's first token.
+  clothing_sex: 'clothing',
   // hair is NOT clothing: typing it so put ponytail/parting complaints in the
   // clothing bucket, where the repair repaints a garment and cannot fix hair.
   hair: 'character_identity',
