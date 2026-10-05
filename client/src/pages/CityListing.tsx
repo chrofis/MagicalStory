@@ -61,7 +61,7 @@ const texts: Record<string, {
 
 export default function CityListing() {
   const { language } = useLanguage();
-  const t = texts[language] || texts.de;
+  const t = texts[language] || texts.en;
   const { data } = useSwissStories();
   const [openCantons, setOpenCantons] = useState<Set<string>>(new Set());
 

@@ -285,7 +285,7 @@ export default function Pricing() {
             ))}
           </div>
           <p className="text-sm text-gray-500 flex items-center gap-1.5 mt-4">
-            <Sparkles size={14} className={sectionIcon} />
+            <Sparkles size={18} className={`${sectionIcon} shrink-0`} />
             {t.creditsNote}
           </p>
         </section>
@@ -308,14 +308,14 @@ export default function Pricing() {
               <div className={tableCell}>{t.pages}</div>
               <div className={`${tableCell} text-center border-l border-indigo-400`}>
                 <div className="flex flex-col items-center gap-0.5">
-                  <Book size={18} />
+                  <Book size={18} className="shrink-0" />
                   <span>{t.softcover}</span>
                   <span className="text-xs font-normal text-indigo-100">{t.softcoverSize}</span>
                 </div>
               </div>
               <div className={`${tableCell} text-center border-l border-indigo-400`}>
                 <div className="flex flex-col items-center gap-0.5">
-                  <BookOpen size={18} />
+                  <BookOpen size={18} className="shrink-0" />
                   <span>{t.hardcover}</span>
                   <span className="text-xs font-normal text-indigo-100">{t.hardcoverSize}</span>
                 </div>
@@ -327,7 +327,7 @@ export default function Pricing() {
                 <div className={`${tableCell} text-center border-l border-gray-100 font-semibold text-gray-800`}>
                   CHF {tier.softcover}.-
                 </div>
-                <div className={`${tableCell} text-center border-l border-gray-100 font-semibold text-indigo-700`}>
+                <div className={`${tableCell} text-center border-l border-gray-100 font-semibold text-gray-800`}>
                   CHF {tier.hardcover}.-
                 </div>
               </div>

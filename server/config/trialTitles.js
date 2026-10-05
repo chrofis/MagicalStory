@@ -14,14 +14,14 @@ const TRIAL_TITLES = {
         de: "Das grosse Abenteuer des kleinen Piraten",
         gsw: "S grosse Abentüür vom chline Pirat",
         fr: "La grande aventure du petit pirate",
-        it: "La Grande Avventura del Piccolo Pirata"
+        it: "La grande avventura del piccolo pirata"
       },
       female: {
         en: "The Little Pirate's Great Adventure",
         de: "Das grosse Abenteuer der kleinen Piratin",
         gsw: "S grosse Abentüür vo de chline Piratin",
         fr: "La grande aventure de la petite pirate",
-        it: "La Grande Avventura della Piccola Pirata"
+        it: "La grande avventura della piccola pirata"
       }
     },
     knight: {
@@ -30,14 +30,14 @@ const TRIAL_TITLES = {
         de: "Der tapfere Ritter und das geheime Königreich",
         gsw: "De tapfer Ritter und s gheime Chönigriich",
         fr: "Le brave chevalier et le royaume secret",
-        it: "Il Coraggioso Cavaliere e il Regno Segreto"
+        it: "Il coraggioso cavaliere e il regno segreto"
       },
       female: {
         en: "The Brave Knight and the Secret Kingdom",
         de: "Die tapfere Ritterin und das geheime Königreich",
         gsw: "Die tapferi Ritterin und s gheime Chönigriich",
         fr: "La brave chevalière et le royaume secret",
-        it: "La Coraggiosa Cavaliera e il Regno Segreto"
+        it: "La coraggiosa cavaliera e il regno segreto"
       }
     },
     cowboy: {
@@ -46,14 +46,14 @@ const TRIAL_TITLES = {
         de: "Ritt in den Sonnenuntergang — Ein Wilder-Westen-Abenteuer",
         gsw: "Ritt in de Sunneundergang — Es Wilde-Weste-Abentüür",
         fr: "Chevauchée vers le couchant — Un conte du Far West",
-        it: "Cavalcata nel Tramonto — Un'Avventura nel Selvaggio West"
+        it: "Cavalcata nel tramonto — un'avventura nel Selvaggio West"
       },
       female: {
         en: "Ride into the Sunset — A Wild West Tale",
         de: "Ritt in den Sonnenuntergang — Ein Wilder-Westen-Abenteuer",
         gsw: "Ritt in de Sunneundergang — Es Wilde-Weste-Abentüür",
         fr: "Chevauchée vers le couchant — Un conte du Far West",
-        it: "Cavalcata nel Tramonto — Un'Avventura nel Selvaggio West"
+        it: "Cavalcata nel tramonto — un'avventura nel Selvaggio West"
       }
     },
     ninja: {
@@ -62,14 +62,14 @@ const TRIAL_TITLES = {
         de: "Der Schatten des kleinen Ninja",
         gsw: "De Schatte vom chline Ninja",
         fr: "L'ombre du petit ninja",
-        it: "L'Ombra del Piccolo Ninja"
+        it: "L'ombra del piccolo ninja"
       },
       female: {
         en: "Shadow of the Little Ninja",
         de: "Der Schatten der kleinen Ninja",
         gsw: "De Schatte vo de chline Ninja",
         fr: "L'ombre de la petite ninja",
-        it: "L'Ombra della Piccola Ninja"
+        it: "L'ombra della piccola ninja"
       }
     },
     viking: {
@@ -78,14 +78,14 @@ const TRIAL_TITLES = {
         de: "Die Reise des furchtlosen Wikingers",
         gsw: "D Reis vom furchtlose Wikinger",
         fr: "Le voyage du viking intrépide",
-        it: "Il Viaggio del Vichingo Intrepido"
+        it: "Il viaggio del vichingo intrepido"
       },
       female: {
         en: "Voyage of the Fearless Viking",
         de: "Die Reise der furchtlosen Wikingerin",
         gsw: "D Reis vo de furchtlose Wikingerin",
         fr: "Le voyage de la viking intrépide",
-        it: "Il Viaggio della Vichinga Intrepida"
+        it: "Il viaggio della vichinga intrepida"
       }
     },
     roman: {
@@ -94,14 +94,14 @@ const TRIAL_TITLES = {
         de: "Ein Tag im alten Rom",
         gsw: "En Tag im alte Rom",
         fr: "Une journée dans la Rome antique",
-        it: "Un Giorno nell'Antica Roma"
+        it: "Un giorno nell'antica Roma"
       },
       female: {
         en: "A Day in Ancient Rome",
         de: "Ein Tag im alten Rom",
         gsw: "En Tag im alte Rom",
         fr: "Une journée dans la Rome antique",
-        it: "Un Giorno nell'Antica Roma"
+        it: "Un giorno nell'antica Roma"
       }
     },
     egyptian: {
@@ -110,14 +110,14 @@ const TRIAL_TITLES = {
         de: "Das Geheimnis der goldenen Pyramide",
         gsw: "S Gheimnis vo de goldige Pyramide",
         fr: "Le secret de la pyramide dorée",
-        it: "Il Segreto della Piramide Dorata"
+        it: "Il segreto della piramide dorata"
       },
       female: {
         en: "The Secret of the Golden Pyramid",
         de: "Das Geheimnis der goldenen Pyramide",
         gsw: "S Gheimnis vo de goldige Pyramide",
         fr: "Le secret de la pyramide dorée",
-        it: "Il Segreto della Piramide Dorata"
+        it: "Il segreto della piramide dorata"
       }
     },
     greek: {
@@ -126,14 +126,14 @@ const TRIAL_TITLES = {
         de: "Der kleine Held vom Olymp",
         gsw: "De chli Held vom Olymp",
         fr: "Le petit héros de l'Olympe",
-        it: "Il Piccolo Eroe dell'Olimpo"
+        it: "Il piccolo eroe dell'Olimpo"
       },
       female: {
         en: "The Little Heroine of Mount Olympus",
         de: "Die kleine Heldin vom Olymp",
         gsw: "Die chli Heldin vom Olymp",
         fr: "La petite héroïne de l'Olympe",
-        it: "La Piccola Eroina dell'Olimpo"
+        it: "La piccola eroina dell'Olimpo"
       }
     },
     caveman: {
@@ -142,14 +142,14 @@ const TRIAL_TITLES = {
         de: "Der Entdecker aus der Steinzeit",
         gsw: "De Entdecker us de Steizit",
         fr: "L'explorateur de l'âge de pierre",
-        it: "L'Esploratore dell'Età della Pietra"
+        it: "L'esploratore dell'età della pietra"
       },
       female: {
         en: "The Stone Age Explorer",
         de: "Die Entdeckerin aus der Steinzeit",
         gsw: "D Entdeckerin us de Steizit",
         fr: "L'exploratrice de l'âge de pierre",
-        it: "L'Esploratrice dell'Età della Pietra"
+        it: "L'esploratrice dell'età della pietra"
       }
     },
     samurai: {
@@ -158,14 +158,14 @@ const TRIAL_TITLES = {
         de: "Der Weg des kleinen Samurai",
         gsw: "De Wäg vom chline Samurai",
         fr: "La voie du petit samouraï",
-        it: "La Via del Piccolo Samurai"
+        it: "La via del piccolo samurai"
       },
       female: {
         en: "The Way of the Little Samurai",
         de: "Der Weg der kleinen Samurai",
         gsw: "De Wäg vo de chline Samurai",
         fr: "La voie de la petite samouraï",
-        it: "La Via della Piccola Samurai"
+        it: "La via della piccola samurai"
       }
     },
     wizard: {
@@ -174,14 +174,14 @@ const TRIAL_TITLES = {
         de: "Der kleine Zauberer und der verzauberte Spruch",
         gsw: "De chli Zauberer und de verzauberti Spruch",
         fr: "Le petit sorcier et le sortilège enchanté",
-        it: "Il Piccolo Mago e l'Incantesimo Fatato"
+        it: "Il piccolo mago e l'incantesimo fatato"
       },
       female: {
         en: "The Little Witch and the Enchanted Spell",
         de: "Die kleine Zauberin und der verzauberte Spruch",
         gsw: "Die chli Zauberin und de verzauberti Spruch",
         fr: "La petite sorcière et le sortilège enchanté",
-        it: "La Piccola Maga e l'Incantesimo Fatato"
+        it: "La piccola maga e l'incantesimo fatato"
       }
     },
     dragon: {
@@ -190,14 +190,14 @@ const TRIAL_TITLES = {
         de: "Der Junge, der einen Drachen zähmte",
         gsw: "De Bueb, wo en Drache zähmt het",
         fr: "Le garçon qui apprivoisa un dragon",
-        it: "Il Ragazzo che Addomesticò un Drago"
+        it: "Il ragazzo che addomesticò un drago"
       },
       female: {
         en: "The Girl Who Befriended a Dragon",
         de: "Das Mädchen, das einen Drachen zähmte",
         gsw: "S Meitli, wo en Drache zähmt het",
         fr: "La fille qui apprivoisa un dragon",
-        it: "La Ragazza che Addomesticò un Drago"
+        it: "La ragazza che addomesticò un drago"
       }
     },
     superhero: {
@@ -206,14 +206,14 @@ const TRIAL_TITLES = {
         de: "Der kleinste Superheld der Welt",
         gsw: "De chlinst Superheld vo de Wält",
         fr: "Le plus petit super-héros du monde",
-        it: "Il Più Piccolo Supereroe del Mondo"
+        it: "Il più piccolo supereroe del mondo"
       },
       female: {
         en: "The World's Smallest Superheroine",
         de: "Die kleinste Superheldin der Welt",
         gsw: "Die chlinst Superheldin vo de Wält",
         fr: "La plus petite super-héroïne du monde",
-        it: "La Più Piccola Supereroina del Mondo"
+        it: "La più piccola supereroina del mondo"
       }
     },
     detective: {
@@ -222,14 +222,14 @@ const TRIAL_TITLES = {
         de: "Der Fall des verschwundenen Schatzes",
         gsw: "De Fall vom verschwundne Schatz",
         fr: "L'affaire du trésor disparu",
-        it: "Il Caso del Tesoro Scomparso"
+        it: "Il caso del tesoro scomparso"
       },
       female: {
         en: "The Case of the Missing Treasure",
         de: "Der Fall des verschwundenen Schatzes",
         gsw: "De Fall vom verschwundne Schatz",
         fr: "L'affaire du trésor disparu",
-        it: "Il Caso del Tesoro Scomparso"
+        it: "Il caso del tesoro scomparso"
       }
     },
     unicorn: {
@@ -238,14 +238,14 @@ const TRIAL_TITLES = {
         de: "Die magische Reise des Regenbogen-Einhorns",
         gsw: "Die magischi Reis vom Rägeboge-Eihorn",
         fr: "Le voyage magique de la licorne arc-en-ciel",
-        it: "Il Viaggio Magico dell'Unicorno Arcobaleno"
+        it: "Il viaggio magico dell'unicorno arcobaleno"
       },
       female: {
         en: "The Rainbow Unicorn's Magical Journey",
         de: "Die magische Reise des Regenbogen-Einhorns",
         gsw: "Die magischi Reis vom Rägeboge-Eihorn",
         fr: "Le voyage magique de la licorne arc-en-ciel",
-        it: "Il Viaggio Magico dell'Unicorno Arcobaleno"
+        it: "Il viaggio magico dell'unicorno arcobaleno"
       }
     },
     mermaid: {
@@ -254,14 +254,14 @@ const TRIAL_TITLES = {
         de: "Geheimnisse unter den Wellen",
         gsw: "Gheimnisse under de Wälle",
         fr: "Secrets sous les vagues",
-        it: "Segreti sotto le Onde"
+        it: "Segreti sotto le onde"
       },
       female: {
         en: "Secrets Beneath the Waves",
         de: "Geheimnisse unter den Wellen",
         gsw: "Gheimnisse under de Wälle",
         fr: "Secrets sous les vagues",
-        it: "Segreti sotto le Onde"
+        it: "Segreti sotto le onde"
       }
     },
     dinosaur: {
@@ -270,14 +270,14 @@ const TRIAL_TITLES = {
         de: "Das Land, das die Zeit vergass",
         gsw: "S Land, wo d Zit vergässe het",
         fr: "Le pays que le temps a oublié",
-        it: "La Terra che il Tempo ha Dimenticato"
+        it: "La terra che il tempo ha dimenticato"
       },
       female: {
         en: "The Land Before Time Forgot",
         de: "Das Land, das die Zeit vergass",
         gsw: "S Land, wo d Zit vergässe het",
         fr: "Le pays que le temps a oublié",
-        it: "La Terra che il Tempo ha Dimenticato"
+        it: "La terra che il tempo ha dimenticato"
       }
     },
     space: {
@@ -286,14 +286,14 @@ const TRIAL_TITLES = {
         de: "Mission zu den Sternen",
         gsw: "Mission zu de Stärne",
         fr: "Mission vers les étoiles",
-        it: "Missione verso le Stelle"
+        it: "Missione verso le stelle"
       },
       female: {
         en: "Mission to the Stars",
         de: "Mission zu den Sternen",
         gsw: "Mission zu de Stärne",
         fr: "Mission vers les étoiles",
-        it: "Missione verso le Stelle"
+        it: "Missione verso le stelle"
       }
     },
     ocean: {
@@ -302,14 +302,14 @@ const TRIAL_TITLES = {
         de: "Abenteuer in der Tiefsee",
         gsw: "Abentüür in de Tüüfsee",
         fr: "L'aventure des profondeurs marines",
-        it: "L'Avventura negli Abissi Marini"
+        it: "L'avventura negli abissi marini"
       },
       female: {
         en: "The Deep Blue Sea Adventure",
         de: "Abenteuer in der Tiefsee",
         gsw: "Abentüür in de Tüüfsee",
         fr: "L'aventure des profondeurs marines",
-        it: "L'Avventura negli Abissi Marini"
+        it: "L'avventura negli abissi marini"
       }
     },
     jungle: {
@@ -318,14 +318,14 @@ const TRIAL_TITLES = {
         de: "Durch den wilden Dschungel",
         gsw: "Dur de wild Dschungel",
         fr: "À travers la jungle sauvage",
-        it: "Attraverso la Giungla Selvaggia"
+        it: "Attraverso la giungla selvaggia"
       },
       female: {
         en: "Through the Wild Jungle",
         de: "Durch den wilden Dschungel",
         gsw: "Dur de wild Dschungel",
         fr: "À travers la jungle sauvage",
-        it: "Attraverso la Giungla Selvaggia"
+        it: "Attraverso la giungla selvaggia"
       }
     },
     farm: {
@@ -334,14 +334,14 @@ const TRIAL_TITLES = {
         de: "Ein wunderbarer Tag auf dem Bauernhof",
         gsw: "En wunderbari Tag uf em Burehof",
         fr: "Une journée merveilleuse à la ferme",
-        it: "Una Giornata Meravigliosa alla Fattoria"
+        it: "Una giornata meravigliosa alla fattoria"
       },
       female: {
         en: "A Wonderful Day on the Farm",
         de: "Ein wunderbarer Tag auf dem Bauernhof",
         gsw: "En wunderbari Tag uf em Burehof",
         fr: "Une journée merveilleuse à la ferme",
-        it: "Una Giornata Meravigliosa alla Fattoria"
+        it: "Una giornata meravigliosa alla fattoria"
       }
     },
     forest: {
@@ -350,14 +350,14 @@ const TRIAL_TITLES = {
         de: "Die Suche im verzauberten Wald",
         gsw: "D Suechi im verzauberte Wald",
         fr: "La quête de la forêt enchantée",
-        it: "La Ricerca nella Foresta Incantata"
+        it: "La ricerca nella foresta incantata"
       },
       female: {
         en: "The Enchanted Forest Quest",
         de: "Die Suche im verzauberten Wald",
         gsw: "D Suechi im verzauberte Wald",
         fr: "La quête de la forêt enchantée",
-        it: "La Ricerca nella Foresta Incantata"
+        it: "La ricerca nella foresta incantata"
       }
     },
     fireman: {
@@ -366,14 +366,14 @@ const TRIAL_TITLES = {
         de: "Der mutige kleine Feuerwehrmann",
         gsw: "De muetig chli Füürwehrma",
         fr: "Le petit pompier courageux",
-        it: "Il Piccolo Pompiere Coraggioso"
+        it: "Il piccolo pompiere coraggioso"
       },
       female: {
         en: "The Brave Little Firefighter",
         de: "Die mutige kleine Feuerwehrfrau",
         gsw: "Die muetig chli Füürwehrfrau",
         fr: "La petite pompière courageuse",
-        it: "La Piccola Pompiera Coraggiosa"
+        it: "La piccola pompiera coraggiosa"
       }
     },
     doctor: {
@@ -382,14 +382,14 @@ const TRIAL_TITLES = {
         de: "Der grosse Tag des kleinen Doktors",
         gsw: "De gross Tag vom chline Dokter",
         fr: "La grande journée du petit docteur",
-        it: "Il Grande Giorno del Piccolo Dottore"
+        it: "Il grande giorno del piccolo dottore"
       },
       female: {
         en: "The Little Doctor's Big Day",
         de: "Der grosse Tag der kleinen Doktorin",
         gsw: "De gross Tag vo de chline Doktorin",
         fr: "La grande journée de la petite docteure",
-        it: "Il Grande Giorno della Piccola Dottoressa"
+        it: "Il grande giorno della piccola dottoressa"
       }
     },
     police: {
@@ -398,14 +398,14 @@ const TRIAL_TITLES = {
         de: "Auf Streife — Ein Polizei-Abenteuer",
         gsw: "Uf Streifi — Es Polizei-Abentüür",
         fr: "En patrouille — Une aventure de police",
-        it: "In Pattuglia — Un'Avventura della Polizia"
+        it: "In pattuglia — un'avventura della polizia"
       },
       female: {
         en: "On Patrol — A Police Adventure",
         de: "Auf Streife — Ein Polizei-Abenteuer",
         gsw: "Uf Streifi — Es Polizei-Abentüür",
         fr: "En patrouille — Une aventure de police",
-        it: "In Pattuglia — Un'Avventura della Polizia"
+        it: "In pattuglia — un'avventura della polizia"
       }
     },
     christmas: {
@@ -414,14 +414,14 @@ const TRIAL_TITLES = {
         de: "Der zauberhafteste Heiligabend",
         gsw: "De zauberhaftist Heiligabe",
         fr: "Le réveillon de Noël le plus magique",
-        it: "La Vigilia di Natale Più Magica"
+        it: "La vigilia di Natale più magica"
       },
       female: {
         en: "The Most Magical Christmas Eve",
         de: "Der zauberhafteste Heiligabend",
         gsw: "De zauberhaftist Heiligabe",
         fr: "Le réveillon de Noël le plus magique",
-        it: "La Vigilia di Natale Più Magica"
+        it: "La vigilia di Natale più magica"
       }
     },
     newyear: {
@@ -430,14 +430,14 @@ const TRIAL_TITLES = {
         de: "Die Mitternachts-Überraschung an Silvester",
         gsw: "D Mitternachts-Überraschig a Silveschter",
         fr: "La surprise de minuit du nouvel an",
-        it: "La Sorpresa di Mezzanotte di Capodanno"
+        it: "La sorpresa di mezzanotte di Capodanno"
       },
       female: {
         en: "The Midnight New Year's Surprise",
         de: "Die Mitternachts-Überraschung an Silvester",
         gsw: "D Mitternachts-Überraschig a Silveschter",
         fr: "La surprise de minuit du nouvel an",
-        it: "La Sorpresa di Mezzanotte di Capodanno"
+        it: "La sorpresa di mezzanotte di Capodanno"
       }
     },
     easter: {
@@ -446,14 +446,14 @@ const TRIAL_TITLES = {
         de: "Die grosse Ostereier-Suche",
         gsw: "Die gross Oschtereier-Suechi",
         fr: "La grande chasse aux œufs de Pâques",
-        it: "La Grande Caccia alle Uova di Pasqua"
+        it: "La grande caccia alle uova di Pasqua"
       },
       female: {
         en: "The Great Easter Egg Hunt",
         de: "Die grosse Ostereier-Suche",
         gsw: "Die gross Oschtereier-Suechi",
         fr: "La grande chasse aux œufs de Pâques",
-        it: "La Grande Caccia alle Uova di Pasqua"
+        it: "La grande caccia alle uova di Pasqua"
       }
     },
     halloween: {
@@ -462,14 +462,14 @@ const TRIAL_TITLES = {
         de: "Die gruselige Halloween-Nacht",
         gsw: "Die grusigi Halloween-Nacht",
         fr: "La nuit d'Halloween frissonnante",
-        it: "La Notte di Halloween da Brivido"
+        it: "La notte di Halloween da brivido"
       },
       female: {
         en: "The Spooky Halloween Night",
         de: "Die gruselige Halloween-Nacht",
         gsw: "Die grusigi Halloween-Nacht",
         fr: "La nuit d'Halloween frissonnante",
-        it: "La Notte di Halloween da Brivido"
+        it: "La notte di Halloween da brivido"
       }
     }
   },
@@ -485,14 +485,14 @@ const TRIAL_TITLES = {
         de: "Das Geheimnis der Schweizer Berge",
         gsw: "S Gheimnis vo de Schwizer Bärge",
         fr: "Le secret des montagnes suisses",
-        it: "Il Segreto delle Montagne Svizzere"
+        it: "Il segreto delle montagne svizzere"
       },
       female: {
         en: "The Secret of the Swiss Mountains",
         de: "Das Geheimnis der Schweizer Berge",
         gsw: "S Gheimnis vo de Schwizer Bärge",
         fr: "Le secret des montagnes suisses",
-        it: "Il Segreto delle Montagne Svizzere"
+        it: "Il segreto delle montagne svizzere"
       }
     },
     'wilhelm-tell': {
@@ -501,14 +501,14 @@ const TRIAL_TITLES = {
         de: "Der Junge, der nie daneben schoss",
         gsw: "De Bueb, wo nie dänäbe gschosse het",
         fr: "Le garçon qui ne manquait jamais",
-        it: "Il Ragazzo Che Non Mancava Mai"
+        it: "Il ragazzo che non mancava mai"
       },
       female: {
         en: "The Girl Who Never Missed",
         de: "Das Mädchen, das nie daneben schoss",
         gsw: "S Meitli, wo nie dänäbe gschosse het",
         fr: "La fille qui ne manquait jamais",
-        it: "La Ragazza Che Non Mancava Mai"
+        it: "La ragazza che non mancava mai"
       }
     },
     'battle-morgarten': {
@@ -517,14 +517,14 @@ const TRIAL_TITLES = {
         de: "Donner am Bergpass",
         gsw: "Donner am Bärgpass",
         fr: "Tonnerre sur le col de montagne",
-        it: "Tuono sul Passo di Montagna"
+        it: "Tuono sul passo di montagna"
       },
       female: {
         en: "Thunder on the Mountain Pass",
         de: "Donner am Bergpass",
         gsw: "Donner am Bärgpass",
         fr: "Tonnerre sur le col de montagne",
-        it: "Tuono sul Passo di Montagna"
+        it: "Tuono sul passo di montagna"
       }
     },
     'battle-sempach': {
@@ -533,14 +533,14 @@ const TRIAL_TITLES = {
         de: "Die tapferen Herzen von Sempach",
         gsw: "Die tapfere Härze vo Sempach",
         fr: "Les cœurs vaillants de Sempach",
-        it: "I Cuori Coraggiosi di Sempach"
+        it: "I cuori coraggiosi di Sempach"
       },
       female: {
         en: "The Brave Hearts of Sempach",
         de: "Die tapferen Herzen von Sempach",
         gsw: "Die tapfere Härze vo Sempach",
         fr: "Les cœurs vaillants de Sempach",
-        it: "I Cuori Coraggiosi di Sempach"
+        it: "I cuori coraggiosi di Sempach"
       }
     },
     'swiss-reformation': {
@@ -549,14 +549,14 @@ const TRIAL_TITLES = {
         de: "Der Junge mit dem verbotenen Buch",
         gsw: "De Bueb mit em verbotene Buech",
         fr: "Le garçon au livre interdit",
-        it: "Il Ragazzo con il Libro Proibito"
+        it: "Il ragazzo con il libro proibito"
       },
       female: {
         en: "The Girl with the Forbidden Book",
         de: "Das Mädchen mit dem verbotenen Buch",
         gsw: "S Meitli mit em verbotene Buech",
         fr: "La fille au livre interdit",
-        it: "La Ragazza con il Libro Proibito"
+        it: "La ragazza con il libro proibito"
       }
     },
     'red-cross-founding': {
@@ -565,14 +565,14 @@ const TRIAL_TITLES = {
         de: "Der kleine Helfer von Solferino",
         gsw: "De chli Hälfer vo Solferino",
         fr: "Le petit secouriste de Solférino",
-        it: "Il Piccolo Soccorritore di Solferino"
+        it: "Il piccolo soccorritore di Solferino"
       },
       female: {
         en: "The Little Helper of Solferino",
         de: "Die kleine Helferin von Solferino",
         gsw: "S chli Hälferi vo Solferino",
         fr: "La petite secouriste de Solférino",
-        it: "La Piccola Soccorritrice di Solferino"
+        it: "La piccola soccorritrice di Solferino"
       }
     },
     'general-dufour': {
@@ -581,14 +581,14 @@ const TRIAL_TITLES = {
         de: "Das grosse Abenteuer des Kartografen",
         gsw: "S grosse Abentüür vom Chartograf",
         fr: "La grande aventure du cartographe",
-        it: "La Grande Avventura del Cartografo"
+        it: "La grande avventura del cartografo"
       },
       female: {
         en: "The Mapmaker's Great Adventure",
         de: "Das grosse Abenteuer der Kartografin",
         gsw: "S grosse Abentüür vo de Chartografin",
         fr: "La grande aventure de la cartographe",
-        it: "La Grande Avventura della Cartografa"
+        it: "La grande avventura della cartografa"
       }
     },
     'sonderbund-war': {
@@ -597,14 +597,14 @@ const TRIAL_TITLES = {
         de: "Der Junge, der ein Land vereinte",
         gsw: "De Bueb, wo es Land vereint het",
         fr: "Le garçon qui unifia un pays",
-        it: "Il Ragazzo Che Unì una Nazione"
+        it: "Il ragazzo che unì una nazione"
       },
       female: {
         en: "The Girl Who United a Nation",
         de: "Das Mädchen, das ein Land vereinte",
         gsw: "S Meitli, wo es Land vereint het",
         fr: "La fille qui unifia un pays",
-        it: "La Ragazza Che Unì una Nazione"
+        it: "La ragazza che unì una nazione"
       }
     },
     'swiss-constitution': {
@@ -613,14 +613,14 @@ const TRIAL_TITLES = {
         de: "Das Versprechen auf dem Pergament",
         gsw: "S Verspräche uf em Pergamänt",
         fr: "La promesse du parchemin",
-        it: "La Promessa della Pergamena"
+        it: "La promessa della pergamena"
       },
       female: {
         en: "The Promise of the Parchment",
         de: "Das Versprechen auf dem Pergament",
         gsw: "S Verspräche uf em Pergamänt",
         fr: "La promesse du parchemin",
-        it: "La Promessa della Pergamena"
+        it: "La promessa della pergamena"
       }
     },
     'gotthard-tunnel': {
@@ -629,14 +629,14 @@ const TRIAL_TITLES = {
         de: "Der Tunnel durch den Berg",
         gsw: "De Tunnel dure Berg",
         fr: "Le tunnel à travers la montagne",
-        it: "Il Tunnel Attraverso la Montagna"
+        it: "Il tunnel attraverso la montagna"
       },
       female: {
         en: "Digging Through the Mountain",
         de: "Der Tunnel durch den Berg",
         gsw: "De Tunnel dure Berg",
         fr: "Le tunnel à travers la montagne",
-        it: "Il Tunnel Attraverso la Montagna"
+        it: "Il tunnel attraverso la montagna"
       }
     },
     'swiss-ww1-neutrality': {
@@ -645,14 +645,14 @@ const TRIAL_TITLES = {
         de: "Der Leuchtturm zwischen den Stürmen",
         gsw: "De Lüüchtturm zwüsche de Stürm",
         fr: "Le phare entre les tempêtes",
-        it: "Il Faro Tra le Tempeste"
+        it: "Il faro tra le tempeste"
       },
       female: {
         en: "The Lighthouse Between the Storms",
         de: "Der Leuchtturm zwischen den Stürmen",
         gsw: "De Lüüchtturm zwüsche de Stürm",
         fr: "Le phare entre les tempêtes",
-        it: "Il Faro Tra le Tempeste"
+        it: "Il faro tra le tempeste"
       }
     },
     'general-guisan': {
@@ -661,14 +661,14 @@ const TRIAL_TITLES = {
         de: "Der Wächter der Alpen",
         gsw: "De Wächter vo de Alpe",
         fr: "Le gardien des Alpes",
-        it: "Il Guardiano delle Alpi"
+        it: "Il guardiano delle Alpi"
       },
       female: {
         en: "The Guardian of the Alps",
         de: "Die Wächterin der Alpen",
         gsw: "D Wächterin vo de Alpe",
         fr: "La gardienne des Alpes",
-        it: "La Guardiana delle Alpi"
+        it: "La guardiana delle Alpi"
       }
     },
     'swiss-ww2-neutrality': {
@@ -677,14 +677,14 @@ const TRIAL_TITLES = {
         de: "Das mutige kleine Land",
         gsw: "S muetige chline Land",
         fr: "Le petit pays courageux",
-        it: "Il Piccolo Paese Coraggioso"
+        it: "Il piccolo paese coraggioso"
       },
       female: {
         en: "The Brave Little Country",
         de: "Das mutige kleine Land",
         gsw: "S muetige chline Land",
         fr: "Le petit pays courageux",
-        it: "Il Piccolo Paese Coraggioso"
+        it: "Il piccolo paese coraggioso"
       }
     },
     'swiss-womens-vote': {
@@ -693,14 +693,14 @@ const TRIAL_TITLES = {
         de: "Der Tag, an dem jede Stimme zählte",
         gsw: "De Tag, wo jedi Stimm zellt het",
         fr: "Le jour où chaque voix a compté",
-        it: "Il Giorno in Cui Ogni Voce Contò"
+        it: "Il giorno in cui ogni voce contò"
       },
       female: {
         en: "The Day Every Voice Counted",
         de: "Der Tag, an dem jede Stimme zählte",
         gsw: "De Tag, wo jedi Stimm zellt het",
         fr: "Le jour où chaque voix a compté",
-        it: "Il Giorno in Cui Ogni Voce Contò"
+        it: "Il giorno in cui ogni voce contò"
       }
     },
 
@@ -711,14 +711,14 @@ const TRIAL_TITLES = {
         de: "Ein kleiner Schritt für einen grossen Traum",
         gsw: "Es chlises Schrittli für en grosse Traum",
         fr: "Un petit pas pour un grand rêve",
-        it: "Un Piccolo Passo per un Grande Sogno"
+        it: "Un piccolo passo per un grande sogno"
       },
       female: {
         en: "One Small Step for a Big Dream",
         de: "Ein kleiner Schritt für einen grossen Traum",
         gsw: "Es chlises Schrittli für en grosse Traum",
         fr: "Un petit pas pour un grand rêve",
-        it: "Un Piccolo Passo per un Grande Sogno"
+        it: "Un piccolo passo per un grande sogno"
       }
     },
     'columbus-voyage': {
@@ -727,14 +727,14 @@ const TRIAL_TITLES = {
         de: "Segeln über den Rand der Welt",
         gsw: "Segle über de Rand vo de Wält",
         fr: "Naviguer au-delà du bout du monde",
-        it: "Navigare Oltre il Confine del Mondo"
+        it: "Navigare oltre il confine del mondo"
       },
       female: {
         en: "Sailing Beyond the Edge of the World",
         de: "Segeln über den Rand der Welt",
         gsw: "Segle über de Rand vo de Wält",
         fr: "Naviguer au-delà du bout du monde",
-        it: "Navigare Oltre il Confine del Mondo"
+        it: "Navigare oltre il confine del mondo"
       }
     },
     'wright-brothers': {
@@ -743,14 +743,14 @@ const TRIAL_TITLES = {
         de: "Der Junge, der fliegen lernte",
         gsw: "De Bueb, wo flüge glehrt het",
         fr: "Le garçon qui apprit à voler",
-        it: "Il Ragazzo Che Imparò a Volare"
+        it: "Il ragazzo che imparò a volare"
       },
       female: {
         en: "The Girl Who Learned to Fly",
         de: "Das Mädchen, das fliegen lernte",
         gsw: "S Meitli, wo flüge glehrt het",
         fr: "La fille qui apprit à voler",
-        it: "La Ragazza Che Imparò a Volare"
+        it: "La ragazza che imparò a volare"
       }
     },
     'lindbergh-flight': {
@@ -759,14 +759,14 @@ const TRIAL_TITLES = {
         de: "Allein über dem Ozean",
         gsw: "Elei über em Ozean",
         fr: "Seul au-dessus de l'océan",
-        it: "Solo Sopra l'Oceano"
+        it: "Solo sopra l'oceano"
       },
       female: {
         en: "Alone Above the Ocean",
         de: "Allein über dem Ozean",
         gsw: "Elei über em Ozean",
         fr: "Seule au-dessus de l'océan",
-        it: "Sola Sopra l'Oceano"
+        it: "Sola sopra l'oceano"
       }
     },
     'everest-summit': {
@@ -775,14 +775,14 @@ const TRIAL_TITLES = {
         de: "Auf dem Dach der Welt",
         gsw: "Uf em Dach vo de Wält",
         fr: "Le sommet du monde",
-        it: "La Cima del Mondo"
+        it: "La cima del mondo"
       },
       female: {
         en: "The Top of the World",
         de: "Auf dem Dach der Welt",
         gsw: "Uf em Dach vo de Wält",
         fr: "Le sommet du monde",
-        it: "La Cima del Mondo"
+        it: "La cima del mondo"
       }
     },
     'south-pole': {
@@ -791,14 +791,14 @@ const TRIAL_TITLES = {
         de: "Wettlauf zum gefrorenen Ende der Welt",
         gsw: "Wettlouf zum gfrorene Ändi vo de Wält",
         fr: "La course vers le bout gelé du monde",
-        it: "La Corsa Verso la Fine Ghiacciata del Mondo"
+        it: "La corsa verso la fine ghiacciata del mondo"
       },
       female: {
         en: "Race to the Frozen End of the Earth",
         de: "Wettlauf zum gefrorenen Ende der Welt",
         gsw: "Wettlouf zum gfrorene Ändi vo de Wält",
         fr: "La course vers le bout gelé du monde",
-        it: "La Corsa Verso la Fine Ghiacciata del Mondo"
+        it: "La corsa verso la fine ghiacciata del mondo"
       }
     },
     'magellan-circumnavigation': {
@@ -807,14 +807,14 @@ const TRIAL_TITLES = {
         de: "Einmal um die ganze Welt",
         gsw: "Einisch um die ganzi Wält",
         fr: "Le tour du monde entier",
-        it: "Il Giro di Tutto il Mondo"
+        it: "Il giro di tutto il mondo"
       },
       female: {
         en: "All the Way Around the World",
         de: "Einmal um die ganze Welt",
         gsw: "Einisch um die ganzi Wält",
         fr: "Le tour du monde entier",
-        it: "Il Giro di Tutto il Mondo"
+        it: "Il giro di tutto il mondo"
       }
     },
     'mariana-trench': {
@@ -823,14 +823,14 @@ const TRIAL_TITLES = {
         de: "Reise in die tiefste Tiefe",
         gsw: "Reis i die tüüfschti Tüüfi",
         fr: "Voyage au plus profond des abysses",
-        it: "Viaggio nel Più Profondo degli Abissi"
+        it: "Viaggio nel più profondo degli abissi"
       },
       female: {
         en: "Journey to the Deepest Deep",
         de: "Reise in die tiefste Tiefe",
         gsw: "Reis i die tüüfschti Tüüfi",
         fr: "Voyage au plus profond des abysses",
-        it: "Viaggio nel Più Profondo degli Abissi"
+        it: "Viaggio nel più profondo degli abissi"
       }
     },
 
@@ -841,14 +841,14 @@ const TRIAL_TITLES = {
         de: "Der Junge, der den Blitz fing",
         gsw: "De Bueb, wo de Blitz gfange het",
         fr: "Le garçon qui attrapa la foudre",
-        it: "Il Ragazzo Che Catturò il Fulmine"
+        it: "Il ragazzo che catturò il fulmine"
       },
       female: {
         en: "The Girl Who Caught Lightning",
         de: "Das Mädchen, das den Blitz fing",
         gsw: "S Meitli, wo de Blitz gfange het",
         fr: "La fille qui attrapa la foudre",
-        it: "La Ragazza Che Catturò il Fulmine"
+        it: "La ragazza che catturò il fulmine"
       }
     },
     'penicillin': {
@@ -857,14 +857,14 @@ const TRIAL_TITLES = {
         de: "Der wunderbare Schimmelpilz",
         gsw: "De wunderbar Schimmelpilz",
         fr: "La moisissure magique",
-        it: "La Muffa Magica"
+        it: "La muffa magica"
       },
       female: {
         en: "The Magical Mould",
         de: "Der wunderbare Schimmelpilz",
         gsw: "De wunderbar Schimmelpilz",
         fr: "La moisissure magique",
-        it: "La Muffa Magica"
+        it: "La muffa magica"
       }
     },
     'vaccine-discovery': {
@@ -873,14 +873,14 @@ const TRIAL_TITLES = {
         de: "Der Arzt und das Geheimnis der Magd",
         gsw: "De Dokter und s Gheimnis vo de Magd",
         fr: "Le médecin et le secret de la laitière",
-        it: "Il Dottore e il Segreto della Lattaia"
+        it: "Il dottore e il segreto della lattaia"
       },
       female: {
         en: "The Doctor and the Milkmaid's Secret",
         de: "Die Ärztin und das Geheimnis der Magd",
         gsw: "D Dokterin und s Gheimnis vo de Magd",
         fr: "La médecin et le secret de la laitière",
-        it: "La Dottoressa e il Segreto della Lattaia"
+        it: "La dottoressa e il segreto della lattaia"
       }
     },
     'dna-discovery': {
@@ -889,14 +889,14 @@ const TRIAL_TITLES = {
         de: "Der unsichtbare Code des Lebens",
         gsw: "De unsichtbar Code vom Läbe",
         fr: "Le code invisible de la vie",
-        it: "Il Codice Invisibile della Vita"
+        it: "Il codice invisibile della vita"
       },
       female: {
         en: "The Invisible Code of Life",
         de: "Der unsichtbare Code des Lebens",
         gsw: "De unsichtbar Code vom Läbe",
         fr: "Le code invisible de la vie",
-        it: "Il Codice Invisibile della Vita"
+        it: "Il codice invisibile della vita"
       }
     },
     'dinosaur-discovery': {
@@ -905,14 +905,14 @@ const TRIAL_TITLES = {
         de: "Der Junge, der die Drachenknochen fand",
         gsw: "De Bueb, wo d Drachechnoche gfunde het",
         fr: "Le garçon qui trouva les os du dragon",
-        it: "Il Ragazzo Che Trovò le Ossa del Drago"
+        it: "Il ragazzo che trovò le ossa del drago"
       },
       female: {
         en: "The Girl Who Found the Dragon Bones",
         de: "Das Mädchen, das die Drachenknochen fand",
         gsw: "S Meitli, wo d Drachechnoche gfunde het",
         fr: "La fille qui trouva les os du dragon",
-        it: "La Ragazza Che Trovò le Ossa del Drago"
+        it: "La ragazza che trovò le ossa del drago"
       }
     },
     'einstein-relativity': {
@@ -921,14 +921,14 @@ const TRIAL_TITLES = {
         de: "Der Junge, der mit dem Licht um die Wette lief",
         gsw: "De Bueb, wo mit em Liecht um d Wett grannt isch",
         fr: "Le garçon qui fit la course avec la lumière",
-        it: "Il Ragazzo Che Gareggiò con un Raggio di Luce"
+        it: "Il ragazzo che gareggiò con un raggio di luce"
       },
       female: {
         en: "The Girl Who Raced a Beam of Light",
         de: "Das Mädchen, das mit dem Licht um die Wette lief",
         gsw: "S Meitli, wo mit em Liecht um d Wett grannt isch",
         fr: "La fille qui fit la course avec la lumière",
-        it: "La Ragazza Che Gareggiò con un Raggio di Luce"
+        it: "La ragazza che gareggiò con un raggio di luce"
       }
     },
     'galapagos-darwin': {
@@ -937,14 +937,14 @@ const TRIAL_TITLES = {
         de: "Die Insel der wundersamen Tiere",
         gsw: "D Insle vo de wundersame Tier",
         fr: "L'île des animaux extraordinaires",
-        it: "L'Isola degli Animali Straordinari"
+        it: "L'isola degli animali straordinari"
       },
       female: {
         en: "The Island of Extraordinary Animals",
         de: "Die Insel der wundersamen Tiere",
         gsw: "D Insle vo de wundersame Tier",
         fr: "L'île des animaux extraordinaires",
-        it: "L'Isola degli Animali Straordinari"
+        it: "L'isola degli animali straordinari"
       }
     },
     'first-heart-transplant': {
@@ -953,14 +953,14 @@ const TRIAL_TITLES = {
         de: "Der Arzt mit den mutigsten Händen",
         gsw: "De Dokter mit de muetigste Händ",
         fr: "Le médecin aux mains les plus courageuses",
-        it: "Il Dottore con le Mani Più Coraggiose"
+        it: "Il dottore con le mani più coraggiose"
       },
       female: {
         en: "The Doctor with the Bravest Hands",
         de: "Die Ärztin mit den mutigsten Händen",
         gsw: "D Dokterin mit de muetigste Händ",
         fr: "La médecin aux mains les plus courageuses",
-        it: "La Dottoressa con le Mani Più Coraggiose"
+        it: "La dottoressa con le mani più coraggiose"
       }
     },
     'human-genome': {
@@ -969,14 +969,14 @@ const TRIAL_TITLES = {
         de: "Die Schatzkarte in dir",
         gsw: "D Schatzchart i dir",
         fr: "La carte au trésor cachée en vous",
-        it: "La Mappa del Tesoro Dentro di Te"
+        it: "La mappa del tesoro dentro di te"
       },
       female: {
         en: "The Treasure Map Inside You",
         de: "Die Schatzkarte in dir",
         gsw: "D Schatzchart i dir",
         fr: "La carte au trésor cachée en vous",
-        it: "La Mappa del Tesoro Dentro di Te"
+        it: "La mappa del tesoro dentro di te"
       }
     },
     'hubble-launch': {
@@ -985,14 +985,14 @@ const TRIAL_TITLES = {
         de: "Das Auge, das bis in die Unendlichkeit sieht",
         gsw: "S Aug, wo bis i d Unändlichkeit gseht",
         fr: "L'œil qui voit l'infini",
-        it: "L'Occhio Che Vede l'Infinito"
+        it: "L'occhio che vede l'infinito"
       },
       female: {
         en: "The Eye That Sees Forever",
         de: "Das Auge, das bis in die Unendlichkeit sieht",
         gsw: "S Aug, wo bis i d Unändlichkeit gseht",
         fr: "L'œil qui voit l'infini",
-        it: "L'Occhio Che Vede l'Infinito"
+        it: "L'occhio che vede l'infinito"
       }
     },
 
@@ -1003,14 +1003,14 @@ const TRIAL_TITLES = {
         de: "Der Draht, der flüstern konnte",
         gsw: "De Draht, wo het chöne flüstere",
         fr: "Le fil qui savait chuchoter",
-        it: "Il Filo Che Sapeva Sussurrare"
+        it: "Il filo che sapeva sussurrare"
       },
       female: {
         en: "The Wire That Could Whisper",
         de: "Der Draht, der flüstern konnte",
         gsw: "De Draht, wo het chöne flüstere",
         fr: "Le fil qui savait chuchoter",
-        it: "Il Filo Che Sapeva Sussurrare"
+        it: "Il filo che sapeva sussurrare"
       }
     },
     'light-bulb': {
@@ -1019,14 +1019,14 @@ const TRIAL_TITLES = {
         de: "Der Junge, der die Nacht erleuchtete",
         gsw: "De Bueb, wo d Nacht erlüchtet het",
         fr: "Le garçon qui illumina la nuit",
-        it: "Il Ragazzo Che Illuminò la Notte"
+        it: "Il ragazzo che illuminò la notte"
       },
       female: {
         en: "The Girl Who Lit Up the Night",
         de: "Das Mädchen, das die Nacht erleuchtete",
         gsw: "S Meitli, wo d Nacht erlüchtet het",
         fr: "La fille qui illumina la nuit",
-        it: "La Ragazza Che Illuminò la Notte"
+        it: "La ragazza che illuminò la notte"
       }
     },
     'printing-press': {
@@ -1035,14 +1035,14 @@ const TRIAL_TITLES = {
         de: "Die Maschine, die Wörter fliegen liess",
         gsw: "D Maschine, wo d Wörter het la flüge",
         fr: "La machine qui faisait voler les mots",
-        it: "La Macchina Che Faceva Volare le Parole"
+        it: "La macchina che faceva volare le parole"
       },
       female: {
         en: "The Machine That Made Words Fly",
         de: "Die Maschine, die Wörter fliegen liess",
         gsw: "D Maschine, wo d Wörter het la flüge",
         fr: "La machine qui faisait voler les mots",
-        it: "La Macchina Che Faceva Volare le Parole"
+        it: "La macchina che faceva volare le parole"
       }
     },
     'internet-creation': {
@@ -1051,14 +1051,14 @@ const TRIAL_TITLES = {
         de: "Das unsichtbare Netz, das die Welt verband",
         gsw: "S unsichtbare Netz, wo d Wält verbunde het",
         fr: "La toile invisible qui relia le monde",
-        it: "La Rete Invisibile Che Collegò il Mondo"
+        it: "La rete invisibile che collegò il mondo"
       },
       female: {
         en: "The Invisible Web That Connected the World",
         de: "Das unsichtbare Netz, das die Welt verband",
         gsw: "S unsichtbare Netz, wo d Wält verbunde het",
         fr: "La toile invisible qui relia le monde",
-        it: "La Rete Invisibile Che Collegò il Mondo"
+        it: "La rete invisibile che collegò il mondo"
       }
     },
 
@@ -1069,14 +1069,14 @@ const TRIAL_TITLES = {
         de: "Der Tag, an dem die Ketten brachen",
         gsw: "De Tag, wo d Chette broche sind",
         fr: "Le jour où les chaînes se brisèrent",
-        it: "Il Giorno in Cui le Catene si Spezzarono"
+        it: "Il giorno in cui le catene si spezzarono"
       },
       female: {
         en: "The Day the Chains Broke",
         de: "Der Tag, an dem die Ketten brachen",
         gsw: "De Tag, wo d Chette broche sind",
         fr: "Le jour où les chaînes se brisèrent",
-        it: "Il Giorno in Cui le Catene si Spezzarono"
+        it: "Il giorno in cui le catene si spezzarono"
       }
     },
     'womens-suffrage': {
@@ -1085,14 +1085,14 @@ const TRIAL_TITLES = {
         de: "Der Marsch für eine Million Stimmen",
         gsw: "De Marsch für e Million Stimme",
         fr: "La marche pour un million de voix",
-        it: "La Marcia per un Milione di Voci"
+        it: "La marcia per un milione di voci"
       },
       female: {
         en: "The March for a Million Voices",
         de: "Der Marsch für eine Million Stimmen",
         gsw: "De Marsch für e Million Stimme",
         fr: "La marche pour un million de voix",
-        it: "La Marcia per un Milione di Voci"
+        it: "La marcia per un milione di voci"
       }
     },
     'rosa-parks': {
@@ -1101,14 +1101,14 @@ const TRIAL_TITLES = {
         de: "Der Sitzplatz, der die Welt veränderte",
         gsw: "De Sitzplatz, wo d Wält veränderet het",
         fr: "Le siège qui changea le monde",
-        it: "Il Posto Che Cambiò il Mondo"
+        it: "Il posto che cambiò il mondo"
       },
       female: {
         en: "The Seat That Changed the World",
         de: "Der Sitzplatz, der die Welt veränderte",
         gsw: "De Sitzplatz, wo d Wält veränderet het",
         fr: "Le siège qui changea le monde",
-        it: "Il Posto Che Cambiò il Mondo"
+        it: "Il posto che cambiò il mondo"
       }
     },
     'berlin-wall-fall': {
@@ -1117,14 +1117,14 @@ const TRIAL_TITLES = {
         de: "Die Nacht, als die Mauer fiel",
         gsw: "D Nacht, wo d Muur gfalle isch",
         fr: "La nuit où le mur est tombé",
-        it: "La Notte in Cui il Muro Cadde"
+        it: "La notte in cui il muro cadde"
       },
       female: {
         en: "The Night the Wall Came Down",
         de: "Die Nacht, als die Mauer fiel",
         gsw: "D Nacht, wo d Muur gfalle isch",
         fr: "La nuit où le mur est tombé",
-        it: "La Notte in Cui il Muro Cadde"
+        it: "La notte in cui il muro cadde"
       }
     },
     'mandela-freedom': {
@@ -1133,14 +1133,14 @@ const TRIAL_TITLES = {
         de: "Der lange Weg zur Freiheit",
         gsw: "De lang Wäg zur Freiheit",
         fr: "La longue marche vers la liberté",
-        it: "La Lunga Strada Verso la Libertà"
+        it: "La lunga strada verso la libertà"
       },
       female: {
         en: "The Long Walk to Freedom",
         de: "Der lange Weg zur Freiheit",
         gsw: "De lang Wäg zur Freiheit",
         fr: "La longue marche vers la liberté",
-        it: "La Lunga Strada Verso la Libertà"
+        it: "La lunga strada verso la libertà"
       }
     },
 
@@ -1151,14 +1151,14 @@ const TRIAL_TITLES = {
         de: "Der Junge, der mit Steinen den Himmel berührte",
         gsw: "De Bueb, wo mit Stei de Himmel berüehrt het",
         fr: "Le garçon qui toucha le ciel avec des pierres",
-        it: "Il Ragazzo Che Toccò il Cielo con le Pietre"
+        it: "Il ragazzo che toccò il cielo con le pietre"
       },
       female: {
         en: "The Girl Who Touched the Sky with Stones",
         de: "Das Mädchen, das mit Steinen den Himmel berührte",
         gsw: "S Meitli, wo mit Stei de Himmel berüehrt het",
         fr: "La fille qui toucha le ciel avec des pierres",
-        it: "La Ragazza Che Toccò il Cielo con le Pietre"
+        it: "La ragazza che toccò il cielo con le pietre"
       }
     },
     'eiffel-tower': {
@@ -1167,14 +1167,14 @@ const TRIAL_TITLES = {
         de: "Der Eisenriese von Paris",
         gsw: "De Iiseriis vo Paris",
         fr: "Le géant de fer de Paris",
-        it: "Il Gigante di Ferro di Parigi"
+        it: "Il gigante di ferro di Parigi"
       },
       female: {
         en: "The Iron Giant of Paris",
         de: "Der Eisenriese von Paris",
         gsw: "De Iiseriis vo Paris",
         fr: "Le géant de fer de Paris",
-        it: "Il Gigante di Ferro di Parigi"
+        it: "Il gigante di ferro di Parigi"
       }
     },
     'panama-canal': {
@@ -1183,14 +1183,14 @@ const TRIAL_TITLES = {
         de: "Der Fluss zwischen zwei Ozeanen",
         gsw: "De Fluss zwüsche zwöi Ozeane",
         fr: "La rivière entre deux océans",
-        it: "Il Fiume Tra Due Oceani"
+        it: "Il fiume tra due oceani"
       },
       female: {
         en: "The River Between Two Oceans",
         de: "Der Fluss zwischen zwei Ozeanen",
         gsw: "De Fluss zwüsche zwöi Ozeane",
         fr: "La rivière entre deux océans",
-        it: "Il Fiume Tra Due Oceani"
+        it: "Il fiume tra due oceani"
       }
     },
     'golden-gate': {
@@ -1199,14 +1199,14 @@ const TRIAL_TITLES = {
         de: "Die Brücke über dem Nebel",
         gsw: "D Brugg über em Näbel",
         fr: "Le pont au-dessus du brouillard",
-        it: "Il Ponte Sopra la Nebbia"
+        it: "Il ponte sopra la nebbia"
       },
       female: {
         en: "The Bridge Above the Fog",
         de: "Die Brücke über dem Nebel",
         gsw: "D Brugg über em Näbel",
         fr: "Le pont au-dessus du brouillard",
-        it: "Il Ponte Sopra la Nebbia"
+        it: "Il ponte sopra la nebbia"
       }
     },
     'channel-tunnel': {
@@ -1215,14 +1215,14 @@ const TRIAL_TITLES = {
         de: "Der Tunnel unter dem Meer",
         gsw: "De Tunnel unterm Meer",
         fr: "Le tunnel sous la mer",
-        it: "Il Tunnel Sotto il Mare"
+        it: "Il tunnel sotto il mare"
       },
       female: {
         en: "The Tunnel Under the Sea",
         de: "Der Tunnel unter dem Meer",
         gsw: "De Tunnel unterm Meer",
         fr: "Le tunnel sous la mer",
-        it: "Il Tunnel Sotto il Mare"
+        it: "Il tunnel sotto il mare"
       }
     },
 
@@ -1233,14 +1233,14 @@ const TRIAL_TITLES = {
         de: "Der schnellste Junge im alten Griechenland",
         gsw: "De schnällscht Bueb im alte Griecheland",
         fr: "Le garçon le plus rapide de la Grèce antique",
-        it: "Il Ragazzo Più Veloce dell'Antica Grecia"
+        it: "Il ragazzo più veloce dell'antica Grecia"
       },
       female: {
         en: "The Fastest Girl in Ancient Greece",
         de: "Das schnellste Mädchen im alten Griechenland",
         gsw: "S schnällschte Meitli im alte Griecheland",
         fr: "La fille la plus rapide de la Grèce antique",
-        it: "La Ragazza Più Veloce dell'Antica Grecia"
+        it: "La ragazza più veloce dell'antica Grecia"
       }
     },
     'disneyland-opening': {
@@ -1249,14 +1249,14 @@ const TRIAL_TITLES = {
         de: "Der Tag, als der Traumpark öffnete",
         gsw: "De Tag, wo de Traumpark ufgmacht het",
         fr: "Le jour où le parc des rêves a ouvert",
-        it: "Il Giorno in Cui il Parco dei Sogni Aprì"
+        it: "Il giorno in cui il parco dei sogni aprì"
       },
       female: {
         en: "The Day the Dream Park Opened",
         de: "Der Tag, als der Traumpark öffnete",
         gsw: "De Tag, wo de Traumpark ufgmacht het",
         fr: "Le jour où le parc des rêves a ouvert",
-        it: "Il Giorno in Cui il Parco dei Sogni Aprì"
+        it: "Il giorno in cui il parco dei sogni aprì"
       }
     },
     'first-movie': {
@@ -1265,14 +1265,14 @@ const TRIAL_TITLES = {
         de: "Die Nacht, in der die Bilder lebendig wurden",
         gsw: "D Nacht, wo d Bilder läbendig worde sind",
         fr: "La nuit où les images prirent vie",
-        it: "La Notte in Cui le Immagini Presero Vita"
+        it: "La notte in cui le immagini presero vita"
       },
       female: {
         en: "The Night the Pictures Came Alive",
         de: "Die Nacht, in der die Bilder lebendig wurden",
         gsw: "D Nacht, wo d Bilder läbendig worde sind",
         fr: "La nuit où les images prirent vie",
-        it: "La Notte in Cui le Immagini Presero Vita"
+        it: "La notte in cui le immagini presero vita"
       }
     },
     'first-zoo': {
@@ -1281,14 +1281,14 @@ const TRIAL_TITLES = {
         de: "Der Garten der tausend Tiere",
         gsw: "De Garte vo de tuusig Tier",
         fr: "Le jardin aux mille animaux",
-        it: "Il Giardino dei Mille Animali"
+        it: "Il giardino dei mille animali"
       },
       female: {
         en: "The Garden of a Thousand Animals",
         de: "Der Garten der tausend Tiere",
         gsw: "De Garte vo de tuusig Tier",
         fr: "Le jardin aux mille animaux",
-        it: "Il Giardino dei Mille Animali"
+        it: "Il giardino dei mille animali"
       }
     },
     'natural-history-museum': {
@@ -1297,14 +1297,14 @@ const TRIAL_TITLES = {
         de: "Der Palast der Wunder",
         gsw: "De Palascht vo de Wunder",
         fr: "Le palais des merveilles",
-        it: "Il Palazzo delle Meraviglie"
+        it: "Il palazzo delle meraviglie"
       },
       female: {
         en: "The Palace of Wonders",
         de: "Der Palast der Wunder",
         gsw: "De Palascht vo de Wunder",
         fr: "Le palais des merveilles",
-        it: "Il Palazzo delle Meraviglie"
+        it: "Il palazzo delle meraviglie"
       }
     },
 
@@ -1315,14 +1315,14 @@ const TRIAL_TITLES = {
         de: "Der verborgene Schatz des jungen Königs",
         gsw: "De verborgeni Schatz vom junge König",
         fr: "Le trésor caché du roi enfant",
-        it: "Il Tesoro Nascosto del Re Bambino"
+        it: "Il tesoro nascosto del re bambino"
       },
       female: {
         en: "The Boy King's Hidden Treasure",
         de: "Der verborgene Schatz des jungen Königs",
         gsw: "De verborgeni Schatz vom junge König",
         fr: "Le trésor caché du roi enfant",
-        it: "Il Tesoro Nascosto del Re Bambino"
+        it: "Il tesoro nascosto del re bambino"
       }
     },
     'pompeii-discovery': {
@@ -1331,14 +1331,14 @@ const TRIAL_TITLES = {
         de: "Die Stadt, die in der Zeit erstarrte",
         gsw: "D Stadt, wo i de Zyt erstarrt isch",
         fr: "La cité figée dans le temps",
-        it: "La Città Cristallizzata nel Tempo"
+        it: "La città cristallizzata nel tempo"
       },
       female: {
         en: "The City Frozen in Time",
         de: "Die Stadt, die in der Zeit erstarrte",
         gsw: "D Stadt, wo i de Zyt erstarrt isch",
         fr: "La cité figée dans le temps",
-        it: "La Città Cristallizzata nel Tempo"
+        it: "La città cristallizzata nel tempo"
       }
     },
     'terracotta-army': {
@@ -1347,14 +1347,14 @@ const TRIAL_TITLES = {
         de: "Die steinernen Soldaten des Kaisers",
         gsw: "D steinige Soldate vom Kaiser",
         fr: "Les soldats de pierre de l'empereur",
-        it: "I Soldati di Pietra dell'Imperatore"
+        it: "I soldati di pietra dell'imperatore"
       },
       female: {
         en: "The Emperor's Stone Soldiers",
         de: "Die steinernen Soldaten des Kaisers",
         gsw: "D steinige Soldate vom Kaiser",
         fr: "Les soldats de pierre de l'empereur",
-        it: "I Soldati di Pietra dell'Imperatore"
+        it: "I soldati di pietra dell'imperatore"
       }
     }
   }

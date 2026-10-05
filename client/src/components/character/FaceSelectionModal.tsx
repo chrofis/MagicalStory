@@ -21,7 +21,7 @@ const translations = {
   },
   de: {
     title: 'Mehrere Gesichter erkannt',
-    description: 'Wir haben mehrere Personen in Ihrem Foto erkannt. Bitte wählen Sie aus, welches Gesicht zu dem Charakter gehört, den Sie erstellen möchten.',
+    description: 'Wir haben mehrere Personen in deinem Foto erkannt. Bitte wähle aus, welches Gesicht zu dem Charakter gehört, den du erstellen möchtest.',
     selectFace: 'Gesicht auswählen',
     uploadDifferent: 'Anderes Foto hochladen',
     confidence: 'Konfidenz',

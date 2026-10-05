@@ -224,7 +224,7 @@ export function CoverTextStylePanel({ kind, language, currentStyle, disabled, on
                 value={colorSel !== 'auto' ? colorSel : '#e63946'}
                 onChange={e => setColorSel(e.target.value)}
                 className="w-9 h-8 p-0.5 border border-gray-300 rounded cursor-pointer"
-                title={t('Eigene Farbe', 'Couleur personnalisée', 'Custom colour', 'Colore personalizzato')}
+                title={t('Eigene Farbe', 'Couleur personnalisée', 'Custom color', 'Colore personalizzato')}
               />
             </div>
           </div>

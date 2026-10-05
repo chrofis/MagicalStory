@@ -96,7 +96,7 @@ export function SceneEditModal({
              `Edit Scene - Page ${pageNumber}`}
           </h3>
           <p className="text-sm text-gray-500 mt-1">
-            {language === 'de' ? 'Bearbeiten Sie die Szenenbeschreibung und wählen Sie die Charaktere aus.' :
+            {language === 'de' ? 'Bearbeite die Szenenbeschreibung und wähle die Charaktere aus.' :
              language === 'fr' ? 'Modifiez la description de la scène et sélectionnez les personnages.' :
              language === 'it' ? 'Modifica la descrizione della scena e seleziona i personaggi.' :
              'Edit the scene description and select the characters.'}
@@ -137,7 +137,7 @@ export function SceneEditModal({
                 })}
               </div>
               <p className="text-xs text-gray-400 mt-2">
-                {language === 'de' ? 'Wählen Sie die Charaktere aus, die im Bild erscheinen sollen.' :
+                {language === 'de' ? 'Wähle die Charaktere aus, die im Bild erscheinen sollen.' :
                  language === 'fr' ? 'Sélectionnez les personnages qui doivent apparaître dans l\'image.' :
                  language === 'it' ? 'Seleziona i personaggi che devono apparire nell\'immagine.' :
                  'Select the characters that should appear in the image.'}
@@ -295,13 +295,13 @@ export function SceneEditModal({
               value={scene}
               onChange={(e) => onSceneChange(e.target.value)}
               className="w-full h-40 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-y"
-              placeholder={language === 'de' ? 'Beschreiben Sie die Szene...' :
+              placeholder={language === 'de' ? 'Beschreibe die Szene...' :
                           language === 'fr' ? 'Décrivez la scène…' :
                           language === 'it' ? 'Descrivi la scena...' :
                           'Describe the scene...'}
             />
             <p className="text-xs text-gray-400 mt-2">
-              {language === 'de' ? 'Tipp: Beschreiben Sie die Aktionen und die Umgebung. Die ausgewählten Charaktere werden automatisch hinzugefügt.' :
+              {language === 'de' ? 'Tipp: Beschreibe die Aktionen und die Umgebung. Die ausgewählten Charaktere werden automatisch hinzugefügt.' :
                language === 'fr' ? 'Conseil : Décrivez les actions et l\'environnement. Les personnages sélectionnés seront ajoutés automatiquement.' :
                language === 'it' ? 'Suggerimento: descrivi le azioni e l\'ambiente. I personaggi selezionati verranno aggiunti automaticamente.' :
                'Tip: Describe the actions and the environment. Selected characters will be added automatically.'}

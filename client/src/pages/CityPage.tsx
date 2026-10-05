@@ -271,7 +271,7 @@ function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): nu
 export default function CityPage() {
   const { cityId } = useParams<{ cityId: string }>();
   const { language } = useLanguage();
-  const t = pageTexts[language] || pageTexts.de;
+  const t = pageTexts[language] || pageTexts.en;
   const { data } = useSwissStories();
   const [openContext, setOpenContext] = useState<string | null>(null);
 

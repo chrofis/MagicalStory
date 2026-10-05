@@ -149,6 +149,19 @@ function FAQItem({ q, a }: { q: string; a: string }) {
   );
 }
 
+/** A comparison cell in the page language. No English fallback: a missing translation is a data bug
+ *  (a test pins that every cell has all four languages), so it fails loudly in dev. */
+function cell(c: ComparisonFeature['us'], lang: 'en' | 'de' | 'fr' | 'it', side: 'us' | 'them'): string {
+  const v = c[lang];
+  if (typeof v !== 'string' || v === '') {
+    const msg = `Comparison cell (${side}) has no "${lang}" text`;
+    if (import.meta.env.DEV) throw new Error(msg);
+    console.error(msg);
+    return '';
+  }
+  return v;
+}
+
 function ComparisonTable({
   features,
   competitorName,
@@ -171,11 +184,11 @@ function ComparisonTable({
             <div className="text-sm font-semibold text-stone-700 mb-2">{feature.label[lang] || feature.label.en}</div>
             <div className="flex items-start gap-2 text-sm text-stone-600 mb-1.5">
               <span className="mt-0.5 flex-shrink-0"><WinnerIcon winner={feature.winner} /></span>
-              <span className="min-w-0"><span className="block text-xs font-semibold text-indigo-500">{t.magicalStory}</span>{feature.us}</span>
+              <span className="min-w-0"><span className="block text-xs font-semibold text-indigo-500">{t.magicalStory}</span>{cell(feature.us, lang, 'us')}</span>
             </div>
             <div className="flex items-start gap-2 text-sm text-stone-600">
               <span className="mt-0.5 flex-shrink-0"><WinnerIconThem winner={feature.winner} /></span>
-              <span className="min-w-0"><span className="block text-xs font-semibold text-stone-500">{competitorName}</span>{feature.them}</span>
+              <span className="min-w-0"><span className="block text-xs font-semibold text-stone-500">{competitorName}</span>{cell(feature.them, lang, 'them')}</span>
             </div>
           </li>
         ))}
@@ -207,13 +220,13 @@ function ComparisonTable({
               <td className="py-3 px-4 text-sm text-stone-600">
                 <div className="flex items-center gap-2">
                   <WinnerIcon winner={feature.winner} />
-                  <span>{feature.us}</span>
+                  <span>{cell(feature.us, lang, 'us')}</span>
                 </div>
               </td>
               <td className="py-3 px-4 text-sm text-stone-600">
                 <div className="flex items-center gap-2">
                   <WinnerIconThem winner={feature.winner} />
-                  <span>{feature.them}</span>
+                  <span>{cell(feature.them, lang, 'them')}</span>
                 </div>
               </td>
             </tr>

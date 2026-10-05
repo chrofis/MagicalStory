@@ -246,7 +246,7 @@ export function WizardStep3BookSettings({
   const seasonLabels: Record<string, Record<string, string>> = {
     spring: { de: 'Frühling', fr: 'Printemps', it: 'Primavera', en: 'Spring' },
     summer: { de: 'Sommer', fr: 'Été', it: 'Estate', en: 'Summer' },
-    autumn: { de: 'Herbst', fr: 'Automne', it: 'Autunno', en: 'Autumn' },
+    autumn: { de: 'Herbst', fr: 'Automne', it: 'Autunno', en: 'Fall' },
     winter: { de: 'Winter', fr: 'Hiver', it: 'Inverno', en: 'Winter' },
   };
 

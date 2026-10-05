@@ -51,7 +51,7 @@ const sectionTranslations = {
     whyLink: 'Learn why it works',
     // CTA
     readyToCreate: 'Ready to create your book?',
-    ctaDesc: 'Upload a photo, pick an adventure, and your personalized story is ready in under 3 minutes.',
+    ctaDesc: 'Upload a photo, pick an adventure, and your personalized story is ready in a few minutes.',
     // Discover more (pre-footer grid)
     discoverTitle: 'Discover more',
     discoverDesc: 'Find inspiration, gift ideas and stories from your region.',
@@ -112,7 +112,7 @@ const sectionTranslations = {
     whyLink: 'Erfahre warum es wirkt',
     // CTA
     readyToCreate: 'Bereit für dein eigenes Buch?',
-    ctaDesc: 'Lade ein Foto hoch, wähle ein Abenteuer und deine personalisierte Geschichte ist in unter 3 Minuten fertig.',
+    ctaDesc: 'Lade ein Foto hoch, wähle ein Abenteuer und deine personalisierte Geschichte ist in wenigen Minuten fertig.',
     // Discover more (pre-footer grid)
     discoverTitle: 'Entdecke mehr',
     discoverDesc: 'Finde Inspiration, Geschenkideen und Geschichten aus deiner Region.',
@@ -173,7 +173,7 @@ const sectionTranslations = {
     whyLink: 'Découvrez pourquoi ça marche',
     // CTA
     readyToCreate: 'Prêt à créer votre livre ?',
-    ctaDesc: "Importez une photo, choisissez une aventure et votre histoire personnalisée est prête en moins de 3 minutes.",
+    ctaDesc: "Importez une photo, choisissez une aventure et votre histoire personnalisée est prête en quelques minutes.",
     // Discover more (pre-footer grid)
     discoverTitle: 'Découvrir plus',
     discoverDesc: 'Trouvez de l\'inspiration, des idées cadeaux et des histoires de votre région.',
@@ -203,7 +203,7 @@ const sectionTranslations = {
     tellStory: 'Racconta la tua storia',
     tellStoryDescBefore: 'Scegli tra ',
     tellStoryDescLink: '170+ temi',
-    tellStoryDescAfter: ' o descrivi la tua avventura – dai pirati al primo giorno di scuola. Lei ha il pieno controllo: modifichi ogni testo e dia forma a ogni illustrazione esattamente come la vuole.',
+    tellStoryDescAfter: ' o descrivi la tua avventura – dai pirati al primo giorno di scuola. Hai il pieno controllo: modifica ogni testo e dai forma a ogni illustrazione esattamente come vuoi.',
     selectThemes: 'Avventura, fantasy, compleanno, storie della buonanotte, sfide di vita e altro',
     customElements: 'Modifica i testi liberamente – ogni pagina, ogni parola',
     readingLevel: 'Modella le immagini – cambia la scena, regola lo stile, rifinisci i dettagli',
@@ -234,7 +234,7 @@ const sectionTranslations = {
     whyLink: 'Scopri perché funziona',
     // CTA
     readyToCreate: 'Pronto a creare il tuo libro?',
-    ctaDesc: 'Carica una foto, scegli un\'avventura e la tua storia personalizzata sarà pronta in meno di 3 minuti.',
+    ctaDesc: 'Carica una foto, scegli un\'avventura e la tua storia personalizzata sarà pronta in pochi minuti.',
     // Discover more (pre-footer grid)
     discoverTitle: 'Scopri di più',
     discoverDesc: 'Trova ispirazione, idee regalo e storie della tua regione.',
@@ -744,10 +744,6 @@ export default function LandingPage() {
                   <Palette className="w-5 h-5 text-indigo-500 mt-1 flex-shrink-0" />
                   <span className="text-stone-600">{st.consistentStyle}</span>
                 </li>
-                <li className="flex items-start gap-3">
-                  <Palette className="w-5 h-5 text-indigo-500 mt-1 flex-shrink-0" />
-                  <span className="text-stone-600">{st.bookLength}</span>
-                </li>
               </ul>
             </div>
             {/* Image - Second on mobile, peeks from below */}
@@ -788,6 +784,10 @@ export default function LandingPage() {
                 <li className="flex items-start gap-3">
                   <Download className="w-5 h-5 text-indigo-500 mt-1 flex-shrink-0" />
                   <span className="text-stone-600">{st.pdfDownload}</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <Printer className="w-5 h-5 text-indigo-500 mt-1 flex-shrink-0" />
+                  <span className="text-stone-600">{st.bookLength}</span>
                 </li>
                 <li className="flex items-start gap-3">
                   <Printer className="w-5 h-5 text-indigo-500 mt-1 flex-shrink-0" />

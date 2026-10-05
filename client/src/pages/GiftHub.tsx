@@ -72,7 +72,7 @@ const categoryOrder: Category[] = ['recipient', 'occasion', 'attribute', 'age'];
 
 export default function GiftHub() {
   const { language } = useLanguage();
-  const t = texts[language] || texts.de;
+  const t = texts[language] || texts.en;
 
   const grouped = categoryOrder.map(cat => ({
     category: cat,

@@ -104,7 +104,7 @@ export const guides: GuideArticle[] = [
         body: {
           en: [
             'This is the single biggest quality gap between a book made with a general image generator and one made with a dedicated service, and it is worth understanding before you spend an evening on it.',
-            'Image models generate each picture independently. Ask for "a seven-year-old girl with brown curls" twelve times and you get twelve different girls — different face shape, different hair length, different eye colour. A child notices this immediately, and it breaks the illusion that the book is about them.',
+            'Image models generate each picture independently. Ask for "a seven-year-old girl with brown curls" twelve times and you get twelve different girls — different face shape, different hair length, different eye color. A child notices this immediately, and it breaks the illusion that the book is about them.',
             'The fix is a reference: the same character description, and ideally the same reference image, fed into every page, plus a check afterwards that compares each rendered figure against the reference and re-renders the ones that drifted. If you are doing it yourself, expect to regenerate a lot of pages. If you are choosing a service, this is the capability to ask about — it is what separates the good ones from the cheap ones.',
           ],
           de: [
@@ -198,7 +198,7 @@ export const guides: GuideArticle[] = [
           it: 'Serve una foto per creare un libro per bambini con l\'IA?',
         },
         a: {
-          en: 'No. A written description — age, hair, eye colour, a favourite jacket — is enough to keep a character consistent, and some parents prefer not to upload a child\'s photo at all. A photo mainly helps when you want the character to be recognisably your child rather than simply a child who matches the description.',
+          en: 'No. A written description — age, hair, eye color, a favorite jacket — is enough to keep a character consistent, and some parents prefer not to upload a child\'s photo at all. A photo mainly helps when you want the character to be recognizably your child rather than simply a child who matches the description.',
           de: 'Nein. Eine schriftliche Beschreibung — Alter, Haare, Augenfarbe, eine Lieblingsjacke — reicht, um eine Figur konsistent zu halten, und manche Eltern laden bewusst kein Kinderfoto hoch. Ein Foto hilft vor allem dann, wenn die Figur erkennbar dein Kind sein soll und nicht einfach ein Kind, das zur Beschreibung passt.',
           fr: 'Non. Une description écrite — âge, cheveux, couleur des yeux, une veste préférée — suffit à garder un personnage cohérent, et certains parents préfèrent ne pas téléverser de photo. La photo sert surtout à ce que le personnage soit reconnaissable comme votre enfant.',
           it: 'No. Una descrizione scritta — età, capelli, colore degli occhi, una giacca preferita — basta a mantenere un personaggio coerente, e alcuni genitori preferiscono non caricare affatto la foto del figlio. Una foto aiuta soprattutto quando vuoi che il personaggio sia riconoscibile come tuo figlio, e non semplicemente un bambino che corrisponde alla descrizione.',
@@ -268,7 +268,7 @@ export const guides: GuideArticle[] = [
         },
         body: {
           en: [
-            'Look at what the order form asks you for. If it only collects facts that can be slotted into blanks — name, age, hair colour, skin tone, one of six occasions — it is a template. Nothing you enter can change what happens in the story.',
+            'Look at what the order form asks you for. If it only collects facts that can be slotted into blanks — name, age, hair color, skin tone, one of six occasions — it is a template. Nothing you enter can change what happens in the story.',
             'If it asks you to describe something in your own words, in a free text field, it can write to that description. That single field is the difference.',
             'A second check: if the site shows you the same sample story on every product page with different names in it, you are looking at a template. If it shows different plots, ask whether you can preview yours before paying.',
           ],
@@ -329,7 +329,7 @@ export const guides: GuideArticle[] = [
         body: {
           en: [
             'The moment you want the book to be about something, a template cannot help you. A grandmother who died in March. A move to another country. A hospital stay next week. A sibling arriving in a family that already has three children and a particular dynamic between them.',
-            'These are the books children keep, and they are all specific. No catalogue contains them, because no catalogue can contain your family.',
+            'These are the books children keep, and they are all specific. No catalog contains them, because no catalog can contain your family.',
             'This is also where the therapeutic use sits — a story that lets a child rehearse the dentist, the first day at a new school, or the night the parents separated. The value there is entirely in the specificity, and a swapped name does nothing for it.',
           ],
           de: [
@@ -429,7 +429,7 @@ export const guides: GuideArticle[] = [
           en: [
             'Two children argue over a red cup when there are four identical red cups in the cupboard. That is the clue. What is scarce in the room is not the cup — it is you, and the certainty of having a place nobody can take.',
             'Siblings are, from a child\'s point of view, the people who arrived to divide up a finite supply of parental attention. Much of what looks like squabbling is a test of that supply: does she get more, does he get away with more, what happens if I push.',
-            'This is why fairness arithmetic fails. The moment you start measuring minutes and biscuits, you confirm that attention is a quantity being rationed, and both children begin auditing you. What lowers the temperature is unmeasured, unearned attention arriving when nothing is wrong — the opposite of how attention usually gets distributed, since it flows to whoever is loudest.',
+            'This is why fairness arithmetic fails. The moment you start measuring minutes and cookies, you confirm that attention is a quantity being rationed, and both children begin auditing you. What lowers the temperature is unmeasured, unearned attention arriving when nothing is wrong — the opposite of how attention usually gets distributed, since it flows to whoever is loudest.',
           ],
           de: [
             'Zwei Kinder streiten um den roten Becher, obwohl vier identische rote Becher im Schrank stehen. Das ist der Hinweis. Knapp ist nicht der Becher — knapp bist du, und die Gewissheit, einen Platz zu haben, den niemand wegnehmen kann.',
@@ -444,7 +444,7 @@ export const guides: GuideArticle[] = [
           it: [
             'Due bambini litigano per una tazza rossa mentre ce ne sono quattro identiche nella credenza. Ecco l\'indizio. Ciò che scarseggia nella stanza non è la tazza — sei tu, e la certezza di avere un posto che nessuno può portare via.',
             'Dal punto di vista di un bambino, i fratelli sono le persone arrivate per dividersi una riserva limitata di attenzione dei genitori. Gran parte di ciò che sembra bisticcio è un test di quella riserva: lei ne riceve di più, lui la fa franca più spesso, cosa succede se spingo.',
-            'Ecco perché l\'aritmetica dell\'equità fallisce. Nel momento in cui inizi a misurare minuti e biscotti, confermi che l\'attenzione è una quantità razionata, e entrambi i bambini iniziano a controllarti. Ciò che abbassa la temperatura è l\'attenzione non misurata e non guadagnata che arriva quando non c\'è nulla che non va — l\'opposto di come l\'attenzione viene solitamente distribuita, dato che di norma va a chi grida più forte.',
+            'Ecco perché l\'aritmetica dell\'equità fallisce. Nel momento in cui inizi a misurare minuti e biscotti, confermi che l\'attenzione è una quantità razionata, ed entrambi i bambini iniziano a controllarti. Ciò che abbassa la temperatura è l\'attenzione non misurata e non guadagnata che arriva quando non c\'è nulla che non va — l\'opposto di come l\'attenzione viene solitamente distribuita, dato che di norma va a chi grida più forte.',
           ],
         },
       },
@@ -459,7 +459,7 @@ export const guides: GuideArticle[] = [
           en: [
             'The instinct is to establish what happened and rule on it. It rarely works, for a structural reason: you did not see the start, both accounts are sincere and incompatible, and whatever you decide teaches the loser that the way to win next time is a better story told faster.',
             'Judging also makes you the prize. If a verdict from you is what conflict produces, then producing conflict is how to reach you.',
-            'The alternative is to describe instead of decide. «Zwei Kinder, ein Trottinett, und ihr seid beide wütend.» You have said nothing about who is right, but you have shown that you saw it — which is most of what the shouting was for. Then hand the problem back: tell me when you have worked out what to do. Small children need more scaffolding than that, but the direction is the same: narrate the situation, name both feelings, leave ownership of the solution with them.',
+            'The alternative is to describe instead of decide. “Two kids, one scooter, and you are both furious.” You have said nothing about who is right, but you have shown that you saw it — which is most of what the shouting was for. Then hand the problem back: tell me when you have worked out what to do. Small children need more scaffolding than that, but the direction is the same: narrate the situation, name both feelings, leave ownership of the solution with them.',
           ],
           de: [
             'Der Reflex ist, festzustellen was passiert ist, und darüber zu urteilen. Das funktioniert selten, aus einem strukturellen Grund: Du hast den Anfang nicht gesehen, beide Darstellungen sind ehrlich gemeint und unvereinbar, und was immer du entscheidest, lehrt den Verlierer, dass man das nächste Mal mit der besseren, schneller erzählten Geschichte gewinnt.',
@@ -549,7 +549,7 @@ export const guides: GuideArticle[] = [
           en: [
             'Ordinary sibling conflict is loud, frequent, roughly reciprocal, and over quickly. Children who fight like this usually play together again within the hour.',
             'Some patterns are worth taking more seriously: when it runs one direction only and the same child is always on the receiving end; when the aim seems to be humiliation rather than winning; when one child becomes fearful, withdrawn, or stops using shared rooms; when the fighting arrives suddenly alongside changes in sleep, appetite or school.',
-            'None of that means something is wrong with your family, and none of it is a diagnosis. It means the situation is worth describing to someone who can assess it properly — your paediatrician, the school psychological service, or a family counselling centre. This article is general information written for the ordinary case, not advice about a specific child.',
+            'None of that means something is wrong with your family, and none of it is a diagnosis. It means the situation is worth describing to someone who can assess it properly — your pediatrician, the school psychological service, or a family counseling center. This article is general information written for the ordinary case, not advice about a specific child.',
           ],
           de: [
             'Normaler Geschwisterstreit ist laut, häufig, ungefähr wechselseitig und schnell vorbei. Kinder, die so streiten, spielen meist innerhalb einer Stunde wieder zusammen.',
@@ -572,7 +572,7 @@ export const guides: GuideArticle[] = [
     faq: [
       {
         q: {
-          en: 'Should I make them apologise?',
+          en: 'Should I make them apologize?',
           de: 'Soll ich sie zur Entschuldigung auffordern?',
           fr: 'Dois-je les forcer à s\'excuser ?',
           it: 'Devo obbligarli a scusarsi?',
@@ -652,7 +652,7 @@ export const guides: GuideArticle[] = [
         body: {
           en: [
             'Parents reach for the new house: a bigger room, a garden, stairs, a shorter journey to work. The child is unmoved, and it looks like ingratitude. It is not — you are answering a question they did not ask.',
-            'What a move threatens is predictability and belonging: knowing which cupboard the cups live in, which route leads to the shop, who says hello in the stairwell, where you sit at lunch and who sits next to you. That accumulated knowledge is how a child feels competent in the world, and a move deletes all of it at once.',
+            'What a move threatens is predictability and belonging: knowing which cupboard the cups live in, which route leads to the store, who says hello in the stairwell, where you sit at lunch and who sits next to you. That accumulated knowledge is how a child feels competent in the world, and a move deletes all of it at once.',
             'That is why "you will make new friends" reassures nobody. It is a promise about a future they cannot picture, offered in exchange for a present they can. Something concrete works better: naming who will still be reachable, what will still happen on Saturdays, which things will be in the new room, and which of their own routines will not change.',
           ],
           de: [
@@ -677,12 +677,12 @@ export const guides: GuideArticle[] = [
           en: 'Tell them early, and tell them plainly',
           de: 'Sag es früh, und sag es klar',
           fr: 'Dites-le tôt, et dites-le clairement',
-          it: 'Diteglielo presto, e diteglielo chiaramente',
+          it: 'Diglielo presto, e diglielo chiaramente',
         },
         body: {
           en: [
-            'The instinct to delay is protective and usually backfires. Children register tension long before they are told what it is about — packing, viewings, half-finished conversations that stop when they enter the room. What they do with unexplained tension is invent an explanation, and the invented one is often worse than the truth.',
-            'Say it once it is certain, in plain words, with whatever concrete detail exists: we are moving, in about two months, to a flat in this town, you will have your own room, you will change school. Vagueness is what frightens; specifics are what a child can hold on to.',
+            'The instinct to delay is protective and usually backfires. Children register tension long before they are told what it is about — packing, house showings, half-finished conversations that stop when they enter the room. What they do with unexplained tension is invent an explanation, and the invented one is often worse than the truth.',
+            'Say it once it is certain, in plain words, with whatever concrete detail exists: we are moving, in about two months, to an apartment in this town, you will have your own room, you will change school. Vagueness is what frightens; specifics are what a child can hold on to.',
             'Then expect the reaction to arrive late. Many children say "okay" and go back to playing, and the real response surfaces days later as tears about something unrelated, or as a sudden refusal to sleep alone. That delay is normal and is not manipulation.',
           ],
           de: [
@@ -697,8 +697,8 @@ export const guides: GuideArticle[] = [
           ],
           it: [
             'L\'istinto di rimandare è protettivo e di solito si ritorce contro. I bambini percepiscono la tensione molto prima di sapere di cosa si tratta — scatoloni, visite, conversazioni a metà che si interrompono quando entrano nella stanza. Ciò che fanno con una tensione inspiegata è inventare una spiegazione, e quella inventata è spesso peggiore della verità.',
-            'Ditelo appena è certo, con parole semplici, con qualunque dettaglio concreto esista: traslochiamo, tra circa due mesi, in un appartamento in questa città, avrai la tua camera, cambierai scuola. È la vaghezza che spaventa; il concreto è ciò a cui un bambino può aggrapparsi.',
-            'Poi aspettatevi che la reazione arrivi in ritardo. Molti bambini dicono «va bene» e tornano a giocare, e la vera risposta emerge giorni dopo sotto forma di lacrime per qualcosa di apparentemente non collegato, o come un rifiuto improvviso di dormire da soli. Questo ritardo è normale e non è manipolazione.',
+            'Dillo appena è certo, con parole semplici, con qualunque dettaglio concreto esista: traslochiamo, tra circa due mesi, in un appartamento in questa città, avrai la tua camera, cambierai scuola. È la vaghezza che spaventa; il concreto è ciò a cui un bambino può aggrapparsi.',
+            'Poi aspettati che la reazione arrivi in ritardo. Molti bambini dicono «va bene» e tornano a giocare, e la vera risposta emerge giorni dopo sotto forma di lacrime per qualcosa di apparentemente non collegato, o come un rifiuto improvviso di dormire da soli. Questo ritardo è normale e non è manipolazione.',
           ],
         },
       },
@@ -707,7 +707,7 @@ export const guides: GuideArticle[] = [
           en: 'Give them authority over something small and real',
           de: 'Gib ihm echte Macht über etwas Kleines',
           fr: 'Donnez-lui un pouvoir réel sur quelque chose de petit',
-          it: 'Dategli potere reale su qualcosa di piccolo',
+          it: 'Dagli potere reale su qualcosa di piccolo',
         },
         body: {
           en: [
@@ -727,7 +727,7 @@ export const guides: GuideArticle[] = [
           ],
           it: [
             'Un trasloco è qualcosa che capita a un bambino. Quasi nulla è affar suo da decidere, e questa impotenza è gran parte del disagio. Il rimedio non è una scelta finta — i bambini le riconoscono all\'istante — ma una vera, per quanto piccola.',
-            'Contro quale parete va il letto. In quale scatola viaggiano le sue cose, imballata da lui e aperta per prima. Quali due amici vengono per un pomeriggio di addio. Se le vecchie tende vengono portate con sé. La decisione deve essere reale, cioè la rispetterete davvero anche se avreste scelto diversamente.',
+            'Contro quale parete va il letto. In quale scatola viaggiano le sue cose, imballata da lui e aperta per prima. Quali due amici vengono per un pomeriggio di addio. Se le vecchie tende vengono portate con sé. La decisione deve essere reale, cioè la rispetterai davvero anche se avresti scelto diversamente.',
             'Una scatola imballata dal bambino e disfatta la prima sera vale più di una camera decorata perfettamente in anticipo. Gli oggetti familiari in una stanza estranea sono ciò che la trasforma da un posto dove alloggia in un posto che è suo.',
           ],
         },
@@ -742,7 +742,7 @@ export const guides: GuideArticle[] = [
         body: {
           en: [
             'Most of the effort goes into the arrival — the new room, the new school, the welcome. The departure gets treated as the sad part to move through quickly. That is backwards.',
-            'A child who has properly finished with the old place arrives able to start. One who was hurried past it arrives still holding it. Give the ending its own shape: a last walk to the places that mattered, photographing the empty room, saying goodbye out loud to the flat, a small farewell with the two or three people who count. Naming a loss makes it smaller, not bigger.',
+            'A child who has properly finished with the old place arrives able to start. One who was hurried past it arrives still holding it. Give the ending its own shape: a last walk to the places that mattered, photographing the empty room, saying goodbye out loud to the apartment, a small farewell with the two or three people who count. Naming a loss makes it smaller, not bigger.',
             'Be careful with promises about staying in touch. Keep them few and keep them yours to guarantee — one video call with a named friend on a named day beats an open-ended assurance that everything will stay the same, which will not survive contact with the following month.',
           ],
           de: [
@@ -757,8 +757,8 @@ export const guides: GuideArticle[] = [
           ],
           it: [
             'Gran parte dello sforzo va nell\'arrivo — la nuova camera, la nuova scuola, il benvenuto. La partenza viene trattata come la parte triste da attraversare in fretta. È esattamente il contrario.',
-            'Un bambino che ha davvero chiuso con il vecchio posto arriva pronto a cominciare. Uno che è stato spinto oltre in fretta arriva ancora aggrappato ad esso. Date alla fine una sua forma: un ultimo giro nei luoghi che contavano, fotografare la stanza vuota, dire addio ad alta voce all\'appartamento, un piccolo saluto con le due o tre persone che contano. Nominare una perdita la rende più piccola, non più grande.',
-            'Fate attenzione alle promesse di rimanere in contatto. Poche, e solo quelle che potete garantire davvero — una videochiamata con un amico specifico in un giorno specifico vale più di una rassicurazione vaga che tutto resterà uguale, che non sopravvivrà al mese successivo.',
+            'Un bambino che ha davvero chiuso con il vecchio posto arriva pronto a cominciare. Uno che è stato spinto oltre in fretta arriva ancora aggrappato ad esso. Dai alla fine una sua forma: un ultimo giro nei luoghi che contavano, fotografare la stanza vuota, dire addio ad alta voce all\'appartamento, un piccolo saluto con le due o tre persone che contano. Nominare una perdita la rende più piccola, non più grande.',
+            'Fai attenzione alle promesse di rimanere in contatto. Poche, e solo quelle che puoi garantire davvero — una videochiamata con un amico specifico in un giorno specifico vale più di una rassicurazione vaga che tutto resterà uguale, che non sopravvivrà al mese successivo.',
           ],
         },
       },
@@ -771,9 +771,9 @@ export const guides: GuideArticle[] = [
         },
         body: {
           en: [
-            'The weeks before a move are busy, and busyness carries children too. The dip usually arrives afterwards, once the flat is arranged and the adults have relaxed — which is precisely when everyone expects it to be over.',
+            'The weeks before a move are busy, and busyness carries children too. The dip usually arrives afterwards, once the apartment is arranged and the adults have relaxed — which is precisely when everyone expects it to be over.',
             'Expect some regression: broken sleep, clinginess, accidents in children who were dry, a return of a dropped comfort object, refusal to go to school. These are not setbacks and generally do not need correcting; they need the routines they belong to, and time. Reinstating the familiar bedtime sequence in the new room does more than any conversation about how nice the new place is.',
-            'If, after roughly two to three months, a child is still not sleeping, still not willing to go to school, has made no connections at all, or has become persistently withdrawn or hopeless, that is the point to speak to your paediatrician or the school psychological service. That is not a failed move. It is the ordinary threshold at which a professional is more use than an article.',
+            'If, after roughly two to three months, a child is still not sleeping, still not willing to go to school, has made no connections at all, or has become persistently withdrawn or hopeless, that is the point to speak to your pediatrician or the school psychological service. That is not a failed move. It is the ordinary threshold at which a professional is more useful than an article.',
           ],
           de: [
             'Die Wochen vor dem Umzug sind voll, und Betriebsamkeit trägt Kinder mit. Der Einbruch kommt meist danach, wenn die Wohnung eingerichtet ist und die Erwachsenen sich entspannt haben — also genau dann, wenn alle denken, es sei überstanden.',
@@ -787,7 +787,7 @@ export const guides: GuideArticle[] = [
           ],
           it: [
             'Le settimane prima di un trasloco sono impegnate, e questa frenesia sostiene anche i bambini. Il calo di solito arriva dopo, una volta sistemato l\'appartamento e rilassati gli adulti — proprio quando tutti si aspettano che sia finita.',
-            'Aspettatevi qualche regressione: sonno disturbato, bisogno di stare attaccati, incidenti in bambini che erano già asciutti, il ritorno di un oggetto di conforto abbandonato, rifiuto di andare a scuola. Non sono passi indietro e in genere non serve correggerli; servono le routine a cui appartengono, e tempo. Ripristinare la sequenza familiare della nanna nella nuova stanza fa più di qualsiasi discorso su quanto sia bello il nuovo posto.',
+            'Aspettati qualche regressione: sonno disturbato, bisogno di stare attaccati, incidenti in bambini che erano già asciutti, il ritorno di un oggetto di conforto abbandonato, rifiuto di andare a scuola. Non sono passi indietro e in genere non serve correggerli; servono le routine a cui appartengono, e tempo. Ripristinare la sequenza familiare della nanna nella nuova stanza fa più di qualsiasi discorso su quanto sia bello il nuovo posto.',
             'Se dopo circa due o tre mesi un bambino continua a non dormire, continua a non voler andare a scuola, non ha fatto alcun legame, o è diventato persistentemente chiuso o sfiduciato, è il momento di parlarne con il pediatra o con il servizio psicologico scolastico. Non è un trasloco fallito. È la soglia ordinaria oltre la quale un professionista è più utile di un articolo.',
           ],
         },
@@ -819,7 +819,7 @@ export const guides: GuideArticle[] = [
           en: 'Keep the objects and the routines; do not try to reproduce the layout. The same bedding, the same lamp and the same order of events at bedtime carry the familiarity. An exact copy of a room that no longer exists tends to invite comparison rather than settle it.',
           de: 'Behaltet die Gegenstände und die Abläufe; versucht nicht, die Anordnung zu kopieren. Dieselbe Bettwäsche, dieselbe Lampe und dieselbe Reihenfolge beim Zubettgehen tragen das Vertraute. Eine exakte Kopie eines Zimmers, das es nicht mehr gibt, lädt eher zum Vergleichen ein, als dass sie beruhigt.',
           fr: 'Gardez les objets et les routines ; n\'essayez pas de reproduire la disposition. La même parure de lit, la même lampe et le même ordre du coucher portent la familiarité. Une copie exacte d\'une chambre qui n\'existe plus invite à la comparaison plutôt qu\'elle n\'apaise.',
-          it: 'Conservate gli oggetti e le routine; non cercate di riprodurre la disposizione. La stessa biancheria da letto, la stessa lampada e lo stesso ordine di eventi prima di dormire portano familiarità. Una copia esatta di una stanza che non esiste più tende a invitare al confronto piuttosto che a placarlo.',
+          it: 'Conserva gli oggetti e le routine; non cercare di riprodurre la disposizione. La stessa biancheria da letto, la stessa lampada e lo stesso ordine di eventi prima di dormire portano familiarità. Una copia esatta di una stanza che non esiste più tende a invitare al confronto piuttosto che a placarlo.',
         },
       },
       {
@@ -833,7 +833,7 @@ export const guides: GuideArticle[] = [
           en: 'Refusing the goodbye is usually a way of refusing the move, and forcing it rarely helps. Offer a smaller version — a drawing left behind, a photo taken, a message recorded — and leave the door open. Some children do it a week later, from the new place, once it feels safe enough to look back.',
           de: 'Den Abschied zu verweigern ist meist eine Art, den Umzug zu verweigern, und Erzwingen hilft selten. Biete eine kleinere Form an — eine zurückgelassene Zeichnung, ein Foto, eine aufgenommene Nachricht — und lass die Tür offen. Manche Kinder holen es eine Woche später vom neuen Ort aus nach, wenn es sicher genug ist zurückzuschauen.',
           fr: 'Refuser l\'au revoir est souvent une manière de refuser le départ, et forcer aide rarement. Proposez une version plus petite — un dessin laissé, une photo, un message enregistré — et laissez la porte ouverte. Certains enfants le font une semaine plus tard, depuis le nouveau lieu.',
-          it: 'Rifiutare l\'addio è di solito un modo di rifiutare il trasloco, e forzarlo raramente aiuta. Offrite una versione più piccola — un disegno lasciato, una foto scattata, un messaggio registrato — e lasciate la porta aperta. Alcuni bambini lo fanno una settimana dopo, dal nuovo posto, una volta che si sentono abbastanza sicuri da guardare indietro.',
+          it: 'Rifiutare l\'addio è di solito un modo di rifiutare il trasloco, e forzarlo raramente aiuta. Offri una versione più piccola — un disegno lasciato, una foto scattata, un messaggio registrato — e lascia la porta aperta. Alcuni bambini lo fanno una settimana dopo, dal nuovo posto, una volta che si sentono abbastanza sicuri da guardare indietro.',
         },
       },
     ],
@@ -861,7 +861,7 @@ export const guides: GuideArticle[] = [
       it: 'Perché la regressione è normale, perché promettere un compagno di gioco si ritorce contro, cosa proteggere, e quali frasi ben intenzionate causano più guai.',
     },
     intro: {
-      en: 'From the older child\'s side, a new baby is not an addition to the family. It is a renegotiation of their position in it, decided by other people, with no vote. Most of what follows — the clinginess, the regression, the sudden fury over nothing — makes sense once you read it as a response to that, rather than as bad behaviour.',
+      en: 'From the older child\'s side, a new baby is not an addition to the family. It is a renegotiation of their position in it, decided by other people, with no vote. Most of what follows — the clinginess, the regression, the sudden fury over nothing — makes sense once you read it as a response to that, rather than as bad behavior.',
       de: 'Aus Sicht des älteren Kindes ist ein Baby keine Ergänzung der Familie. Es ist eine Neuverhandlung seines Platzes darin, entschieden von anderen, ohne Stimmrecht. Das meiste, was folgt — die Anhänglichkeit, die Rückschritte, die plötzliche Wut über nichts — ergibt Sinn, sobald man es als Antwort darauf liest und nicht als schlechtes Benehmen.',
       fr: 'Du point de vue de l\'aîné, un bébé n\'est pas un ajout à la famille. C\'est une renégociation de sa place, décidée par d\'autres, sans droit de vote. L\'essentiel de ce qui suit — l\'attachement, la régression, la colère soudaine pour rien — prend sens dès qu\'on le lit comme une réponse à cela.',
       it: 'Dal punto di vista del figlio maggiore, un nuovo bebè non è un\'aggiunta alla famiglia. È una rinegoziazione della sua posizione al suo interno, decisa da altre persone, senza diritto di voto. Gran parte di ciò che segue — l\'attaccamento, la regressione, la rabbia improvvisa per niente — ha senso una volta letto come risposta a questo, e non come cattivo comportamento.',
@@ -908,7 +908,7 @@ export const guides: GuideArticle[] = [
           en: [
             'A child who has been dry for a year starts wetting again. A child who talks in full sentences reverts to baby talk. Someone who fell asleep alone now needs a hand held. This is extremely common and it is not a plot.',
             'The logic is visible once stated: a very small creature arrived and is receiving enormous quantities of care. Being small looks, from the outside, like a highly effective strategy. Testing it is a reasonable experiment.',
-            'The response that shortens it is to grant the underlying request rather than fight the behaviour. Being fed a spoonful, being carried up the stairs, being rocked — briefly, willingly, without commentary about being big. What extends regression is resistance, because it turns a request for closeness into a battle worth continuing. Most of it fades within weeks once the child establishes that closeness is still available without having to become a baby to get it.',
+            'The response that shortens it is to grant the underlying request rather than fight the behavior. Being fed a spoonful, being carried up the stairs, being rocked — briefly, willingly, without commentary about being big. What extends regression is resistance, because it turns a request for closeness into a battle worth continuing. Most of it fades within weeks once the child establishes that closeness is still available without having to become a baby to get it.',
           ],
           de: [
             'Ein Kind, das seit einem Jahr trocken ist, nässt wieder ein. Eines, das in ganzen Sätzen spricht, fällt in Babysprache zurück. Wer allein eingeschlafen ist, braucht plötzlich eine Hand. Das ist ausgesprochen häufig und kein Komplott.',
@@ -952,7 +952,7 @@ export const guides: GuideArticle[] = [
           ],
           it: [
             'Quasi tutto diventa condiviso: le tue ginocchia, la tua attenzione, il salotto, prima o poi i giocattoli e forse la camera. Un bambino che vive l\'arrivo come pura sottrazione ha buoni motivi per avercela con la causa.',
-            'Il contrappeso è qualcosa di affidabilmente esente. Uno scaffale a cui il bebè non potrà mai arrivare. Un peluche particolare che non è comune. Venti minuti dopo che il bebè va a nanna che appartengono solo a lui, a un\'ora prevedibile, facendo qualcosa che sceglie lui, con il telefono in un\'altra stanza. Breve e affidabile batte lungo e occasionale.',
+            'Il contrappeso è qualcosa di affidabilmente esente. Uno scaffale a cui il bebè non potrà mai arrivare. Un peluche particolare che non si condivide. Venti minuti dopo che il bebè va a nanna che appartengono solo a lui, a un\'ora prevedibile, facendo qualcosa che sceglie lui, con il telefono in un\'altra stanza. Breve e affidabile batte lungo e occasionale.',
             'Difendilo davanti a lui, visibilmente. Dire che il bebè non ha il permesso di toccare quello scaffale, a portata d\'orecchio del figlio maggiore, fa più di un\'ora a spiegare che gli vuoi bene allo stesso modo.',
           ],
         },
@@ -998,7 +998,7 @@ export const guides: GuideArticle[] = [
           en: [
             'Jealousy, regression, rough handling and periods of ignoring the baby entirely are all within the ordinary range, and most of it settles over the first months.',
             'Worth raising with someone: deliberate, repeated hurting that continues after consistent responses; a child who becomes persistently flat, withdrawn or joyless rather than angry; a marked and lasting change in eating or sleeping; or your own sense that you cannot manage, which matters just as much and is far more common than people admit.',
-            'Your paediatrician and the local mother-and-child advisory service are the ordinary first places to ask. This article is general information for the usual case, not advice about a particular child.',
+            'Your pediatrician and the local mother-and-child advisory service are the ordinary first places to ask. This article is general information for the usual case, not advice about a particular child.',
           ],
           de: [
             'Eifersucht, Rückschritte, grober Umgang und Phasen, in denen das Baby völlig ignoriert wird, liegen alle im normalen Bereich, und das meiste legt sich über die ersten Monate.',
@@ -1041,7 +1041,7 @@ export const guides: GuideArticle[] = [
           it: 'Picchia il bebè. Cosa faccio?',
         },
         a: {
-          en: 'Stop it physically and calmly, every time, without a lecture, and then attend to the baby. Afterwards, once things are quiet, name what you think was underneath it — that it is hard when someone else is being held. The behaviour needs a firm boundary; the feeling behind it needs somewhere else to go, and supplying that is what actually reduces the hitting.',
+          en: 'Stop it physically and calmly, every time, without a lecture, and then attend to the baby. Afterwards, once things are quiet, name what you think was underneath it — that it is hard when someone else is being held. The behavior needs a firm boundary; the feeling behind it needs somewhere else to go, and supplying that is what actually reduces the hitting.',
           de: 'Halte es jedes Mal körperlich und ruhig auf, ohne Predigt, und kümmere dich dann um das Baby. Später, wenn Ruhe ist, benenne, was du dahinter vermutest — dass es schwer ist, wenn jemand anderes gehalten wird. Das Verhalten braucht eine klare Grenze; das Gefühl dahinter braucht einen anderen Weg, und den zu geben ist das, was das Schlagen tatsächlich reduziert.',
           fr: 'Arrêtez-le physiquement et calmement, chaque fois, sans sermon, puis occupez-vous du bébé. Plus tard, au calme, nommez ce qu\'il y avait dessous — que c\'est dur quand quelqu\'un d\'autre est dans les bras. Le comportement a besoin d\'une limite ferme ; le sentiment a besoin d\'une autre issue.',
           it: 'Fermalo fisicamente e con calma, ogni volta, senza fare una predica, e poi occupati del bebè. Dopo, quando le cose sono tranquille, nomina quello che pensi ci sia sotto — che è difficile quando qualcun altro viene tenuto in braccio. Il comportamento ha bisogno di un limite fermo; il sentimento dietro ha bisogno di un\'altra via d\'uscita, e fornirla è ciò che riduce davvero il colpire.',

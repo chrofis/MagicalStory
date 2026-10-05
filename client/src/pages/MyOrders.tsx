@@ -30,7 +30,7 @@ const TX_LABELS: Record<string, { de: string; fr: string; it: string; en: string
   cover_regeneration: { de: 'Cover neu generiert', fr: 'Couverture régénérée', it: 'Copertina rigenerata', en: 'Cover regenerated' },
   character_repair: { de: 'Charakter korrigiert', fr: 'Personnage corrigé', it: 'Personaggio corretto', en: 'Character repaired' },
   book_purchase_reward: { de: 'Bonus für Buchbestellung', fr: 'Bonus commande de livre', it: 'Bonus per ordine libro', en: 'Book order bonus' },
-  referral_conversion: { de: 'Empfehlungs-Guthaben umgewandelt', fr: 'Solde de parrainage converti', it: 'Saldo referral convertito', en: 'Referral balance converted' },
+  referral_conversion: { de: 'Empfehlungs-Guthaben umgewandelt', fr: 'Solde de parrainage converti', it: 'Credito da inviti convertito', en: 'Referral balance converted' },
   admin_add: { de: 'Anpassung durch Support', fr: 'Ajustement par le support', it: 'Rettifica del supporto', en: 'Support adjustment' },
   admin_deduct: { de: 'Anpassung durch Support', fr: 'Ajustement par le support', it: 'Rettifica del supporto', en: 'Support adjustment' },
 };

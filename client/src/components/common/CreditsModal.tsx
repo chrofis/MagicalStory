@@ -30,7 +30,7 @@ export function CreditsModal({ isOpen, onClose }: CreditsModalProps) {
     } catch (error) {
       console.error('Failed to create checkout:', error);
       showError(language === 'de'
-        ? 'Fehler beim Erstellen der Zahlung. Bitte versuchen Sie es erneut.'
+        ? 'Fehler beim Erstellen der Zahlung. Bitte versuche es erneut.'
         : language === 'fr'
         ? 'Erreur lors de la création du paiement. Veuillez réessayer.'
         : language === 'it'

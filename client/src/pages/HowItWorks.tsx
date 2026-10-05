@@ -160,7 +160,7 @@ const translations = {
   },
   it: {
     title: 'Crea un libro per bambini con l\'IA',
-    subtitle: 'Una storia tutta vostra — non un modello con il nome cambiato.',
+    subtitle: 'Una storia tutta tua — non un modello con il nome cambiato.',
     heroDesc: 'Quasi tutti i libri personalizzati sono una storia già scritta in cui viene inserito il nome del bambino. MagicalStory scrive invece una storia originale: carica una foto, descrivi cosa deve succedere e l\'IA scrive e illustra un libro che prima non esisteva. Poi puoi modificare ogni parola e rigenerare ogni pagina finché è esattamente come l\'avevi immaginata.',
     stepsTitle: 'Come creare il tuo libro per bambini',
     step1Title: 'Carica una foto',
@@ -179,7 +179,7 @@ const translations = {
     faq3Q: 'Quanto tempo ci vuole per creare un libro?',
     faq3A: 'La prima versione è pronta in pochi minuti. Modificare e rigenerare le pagine richiede tutto il tempo che vuoi dedicarci.',
     faq4Q: 'Quanto costa?',
-    faq4A: 'La prima storia è gratuita e non serve un account. Dopo, il libro digitale costa CHF 9.90 e il cartonato stampato da CHF 29 a 48.',
+    faq4A: 'La prima storia è gratuita e non serve un account. Dopo, il libro digitale costa CHF 9.90 e il libro stampato con copertina rigida da CHF 37.',
     exploreTitle: 'Prima di iniziare',
     exploreThemes: 'Sfoglia tutti gli oltre 170 temi',
     exploreCompare: 'Confronta i generatori di libri per bambini con IA',
@@ -230,7 +230,7 @@ const colorMap: Record<string, { bg: string; border: string; icon: string; bulle
 
 export default function HowItWorks() {
   const { language } = useLanguage();
-  const t = translations[language as keyof typeof translations] || translations.de;
+  const t = translations[language as keyof typeof translations] || translations.en;
 
   return (
     <div className="min-h-screen bg-white">

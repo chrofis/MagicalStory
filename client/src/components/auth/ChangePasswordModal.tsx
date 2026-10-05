@@ -29,7 +29,7 @@ const translations = {
   },
   de: {
     title: 'Passwort ändern',
-    description: 'Geben Sie Ihr aktuelles Passwort ein und wählen Sie ein neues.',
+    description: 'Gib dein aktuelles Passwort ein und wähle ein neues.',
     currentPassword: 'Aktuelles Passwort',
     newPassword: 'Neues Passwort',
     confirmPassword: 'Neues Passwort bestätigen',
@@ -37,7 +37,7 @@ const translations = {
     passwordsMatch: 'Passwörter müssen übereinstimmen',
     passwordTooShort: 'Passwort muss mindestens 8 Zeichen lang sein',
     success: 'Passwort erfolgreich geändert!',
-    successDesc: 'Ihr Passwort wurde aktualisiert.',
+    successDesc: 'Dein Passwort wurde aktualisiert.',
     close: 'Schliessen',
   },
   fr: {

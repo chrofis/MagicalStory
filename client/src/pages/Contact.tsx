@@ -30,7 +30,7 @@ const contactContent: Record<string, {
     faqText: 'Many common questions are already answered. You might find your answer faster there.',
     faqButton: 'Browse FAQ',
     trialTitle: 'Not sure yet?',
-    trialText: 'Try it for free — your first story takes under 3 minutes, no account needed.',
+    trialText: 'Try it for free — your first story takes just a few minutes, no account needed.',
     trialButton: 'Create a Free Story',
   },
   de: {
@@ -45,7 +45,7 @@ const contactContent: Record<string, {
     faqText: 'Viele Fragen sind dort bereits beantwortet. Vielleicht findest du schneller eine Antwort.',
     faqButton: 'FAQ ansehen',
     trialTitle: 'Noch unsicher?',
-    trialText: 'Probier es gratis aus — deine erste Geschichte in unter 3 Minuten, ohne Konto.',
+    trialText: 'Probier es gratis aus — deine erste Geschichte in wenigen Minuten, ohne Konto.',
     trialButton: 'Gratis Geschichte erstellen',
   },
   fr: {
@@ -60,7 +60,7 @@ const contactContent: Record<string, {
     faqText: 'De nombreuses questions courantes y trouvent déjà réponse. Vous y trouverez peut-être plus vite.',
     faqButton: 'Voir la FAQ',
     trialTitle: 'Pas encore sûr ?',
-    trialText: 'Essayez gratuitement — votre première histoire en moins de 3 minutes, sans compte.',
+    trialText: 'Essayez gratuitement — votre première histoire en quelques minutes, sans compte.',
     trialButton: 'Créer une histoire gratuite',
   },
   it: {
@@ -75,7 +75,7 @@ const contactContent: Record<string, {
     faqText: 'Molte domande comuni trovano già risposta lì. Potresti trovare la tua risposta più velocemente.',
     faqButton: 'Vai alle FAQ',
     trialTitle: 'Non sei ancora sicuro?',
-    trialText: 'Provalo gratis — la tua prima storia in meno di 3 minuti, senza account.',
+    trialText: 'Provalo gratis — la tua prima storia in pochi minuti, senza account.',
     trialButton: 'Crea una storia gratuita',
   },
 };

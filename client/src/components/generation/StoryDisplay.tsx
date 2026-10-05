@@ -2412,7 +2412,7 @@ export function StoryDisplay({
               }`}
             >
               <FileText size={16} />
-              {language === 'de' ? 'PDF herunterladen' : language === 'fr' ? 'Télécharger PDF' : language === 'it' ? 'Scarica PDF' : 'Download PDF'}
+              PDF
               <ChevronDown size={14} className={`transition-transform ${showPdfFormatDropdown ? 'rotate-180' : ''}`} />
             </button>
             {showPdfFormatDropdown && (
@@ -2473,7 +2473,7 @@ export function StoryDisplay({
             className="bg-indigo-500 text-white px-3 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-1.5 hover:bg-indigo-600"
           >
             <BookOpen size={16} />
-            {language === 'de' ? 'Geschichte ansehen' : language === 'fr' ? 'Voir l\'histoire' : language === 'it' ? 'Vedi la storia' : 'View Story'}
+            {language === 'de' ? 'Ansehen' : language === 'fr' ? 'Voir' : language === 'it' ? 'Vedi' : 'View'}
           </a>
         )}
 
@@ -7285,7 +7285,7 @@ export function StoryDisplay({
                   }`}
                 >
                   <FileText size={16} />
-                  {language === 'de' ? 'PDF herunterladen' : language === 'fr' ? 'Télécharger PDF' : language === 'it' ? 'Scarica PDF' : 'Download PDF'}
+                  PDF
                   <ChevronDown size={14} className={`transition-transform ${showPdfFormatDropdown ? 'rotate-180' : ''}`} />
                 </button>
                 {showPdfFormatDropdown && (
@@ -7346,7 +7346,7 @@ export function StoryDisplay({
                 className="bg-indigo-500 text-white px-3 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-1.5 hover:bg-indigo-600"
               >
                 <BookOpen size={16} />
-                {language === 'de' ? 'Geschichte ansehen' : language === 'fr' ? 'Voir l\'histoire' : language === 'it' ? 'Vedi la storia' : 'View Story'}
+                {language === 'de' ? 'Ansehen' : language === 'fr' ? 'Voir' : language === 'it' ? 'Vedi' : 'View'}
               </a>
             )}
 

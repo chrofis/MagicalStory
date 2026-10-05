@@ -112,7 +112,7 @@ function getThemeInfo(themeId: string, category: CategorySlug): { name: Localize
 export default function GiftPage() {
   const { giftSlug } = useParams<{ giftSlug: string }>();
   const { language } = useLanguage();
-  const t = pageTexts[language] || pageTexts.de;
+  const t = pageTexts[language] || pageTexts.en;
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
   const gift = useMemo(() => {

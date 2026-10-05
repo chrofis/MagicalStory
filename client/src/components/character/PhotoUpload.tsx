@@ -27,7 +27,7 @@ const consentTexts = {
     and: 'und der',
     privacyLink: 'Datenschutzrichtlinie',
     period: ' zu, einschliesslich der Verarbeitung dieser Fotos durch KI zur Erstellung illustrierter Avatare.',
-    pleaseAccept: 'Bitte akzeptieren Sie die obigen Bedingungen, um ein Foto hochzuladen',
+    pleaseAccept: 'Bitte akzeptiere die obigen Bedingungen, um ein Foto hochzuladen',
   },
   fr: {
     consent1: 'Je confirme que j\'ai le droit d\'utiliser les photos importées et, pour les photos de mineurs, je suis le parent/tuteur ou j\'ai obtenu leur consentement.',
