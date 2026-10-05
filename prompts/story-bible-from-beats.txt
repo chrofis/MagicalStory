@@ -46,7 +46,8 @@ Determine which clothing variants each character needs, based on the page plan.
 - No headwear, helmets, crowns or masks that cover the face.
 - **The costume must read as that costume at a glance.** Every garment is one that costume is known for, named with the word that names it there. A garment that only hints at the theme does not count, and neither does one borrowed from a different costume.
 - **Every garment matches the character's sex.** A male character wears garments made for boys or men, a female character garments made for girls or women. When a costume has a male and a female form, each character wears the form matching theirs.
-- **A child's swimwear or costume top is a modest full-coverage garment** (`swim shirt`, `swim top`, a one-piece) — never `bikini`, a bare chest, or a bare midriff.
+- **A child's swimwear or costume always has a covering top** — a long-sleeve or short-sleeve `swim shirt` (rash-guard) over the whole torso, shoulders to waist. Never `bikini`, a bare chest, a bare midriff, or a one-piece (a skirt or tail below it leaves the torso reading bare).
+- **A costume that replaces the legs (a tail, a fin) is one tail from the waist down, written as replacing the legs** — never a skirt over legs, and no feet, bare feet or footwear.
 - **Characters are told apart by colour.** A different dominant colour per character, on their largest garment.
   - Every colour is one of these words, alone: red, blue, green, yellow, orange, purple, brown, black, white, grey. No shade name, no modifier (dark, light, pale) and no compound.
   - Never distinguish by a print, badge, pin, brooch, embroidery, trim, buckle, laces, feather, earring, watch or buttons, or anything small.

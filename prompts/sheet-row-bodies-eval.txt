@@ -5,7 +5,7 @@ You receive ONE image: the body row — 4 cells left to right: front, three-quar
 TASK 1: HEAD AND FEET
 For each cell report two things:
 - head: yes if the top of the head is drawn; no if the figure begins at the collar or shoulders with nothing above them.
-- feet: yes if both feet with shoes are fully visible; no if cut at thigh, knee, or ankle.
+- feet: yes if both feet with shoes are fully visible; no if cut at thigh, knee, or ankle. When REQUESTED_OUTFIT replaces the legs (a tail, a fin), feet: yes only if the whole tail is visible to its tip and no leg, foot or toe shows below the waist; any foot or leg showing is no.
 headScore = lowest cell for head (8-10 = every cell has a head; 1-2 = any head missing). feetScore = lowest cell for feet (same scale). fullBodyScore = lower of headScore and feetScore. In the reason, report per cell like "cellN: head=<yes|no>, feet=<yes|no>".
 
 TASK 2: FACING ANGLES

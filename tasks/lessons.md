@@ -966,3 +966,6 @@ my options. I took the pick as a go and launched the showcase; owner had to stop
 till I tell you so"). Killed before the wizard submitted — staging stayed idle, no job created.
 **Rule:** once the owner says "don't start until I say", a selection answers only the question asked.
 Launch a paid run only on an explicit start word ("go", "start it", "run it") given after the plan.
+
+## 2026-10-05 - A fixed defect came back twice because nothing pinned it
+The no-nudity guard (30e105463) and "a tail has no feet" (2ea328b04) were both fixed in prompts, with no test, and a later reviewer rewrite plus an unmatched judge silently undid them (mermaid showcase job_1791222889407_ypl33vk8u). **Rule:** every owner-visible fix ships with a behaviour test that fails if it disappears, and a fix to a generator rule is not done until the judge that scores the same thing is checked for the opposite demand (the body-row judge still required feet).

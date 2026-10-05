@@ -3470,6 +3470,18 @@
       "impact": "A historical event lost its real danger and the invention rendered as a wooden tube.",
       "status": "fixed",
       "fixedIn": "1970b9a8e"
+    },
+    {
+      "id": "costume-sheet-lost-to-429-and-uncovered-mermaid",
+      "title": "A child's mermaid costume shipped bare-chested with feet: Emma's costumed sheet died on one Grok 429/moderation and every page then invented the outfit",
+      "reportedAt": "2026-10-05",
+      "source": "staging showcase job_1791222889407_ypl33vk8u (back cover viewed by the owner; styledAvatarGeneration + generationLog read from stories.data)",
+      "rootCause": "(1) grok.js counted a 429 'service is temporarily at capacity' as a failed attempt after one try (only 500 had a retry), so the costumed sheet's two tries burned in seconds. (2) The wardrobe reviewer's check 11 (variety) rewrote Emma's covered 'long-sleeve swim shirt + tail skirt' into 'a one-piece swimsuit with short sleeves ... and bare feet' and check 10 whitelisted 'a one-piece'; the first sheet attempt was moderation-refused on it. (3) sheet-row-bodies-eval.txt demanded 'both feet with shoes' for every body row, so the critic rewarded feet under a tail (the 2ea328b04 'tail has no feet' fix changed the generator and the wardrobe prompts, never this judge). (4) The no-bikini guard (30e105463) and tail rule were never pinned by a test.",
+      "impact": "Bare-chested child on the back cover; feet under mermaid tails; a required costumed sheet silently substituted by the standard sheet.",
+      "fix": "Shared fetchGrokWithRetry (grok.js): 429/503 wait with doubling backoff up to 10 min, moderation and credit errors never retried. Wardrobe writer + reviewer: a child's costume always has a long/short-sleeve swim shirt, never a one-piece or bikini; a leg-replacing costume is one tail, no feet; review check 11 may not give those up. Trial mermaid costume and the body-row judge aligned. Tests: tests/unit/grok-capacity-retry.test.ts, tests/unit/mermaid-costume-covered-tail.test.ts.",
+      "status": "fixed",
+      "fixedAt": "2026-10-05",
+      "fixedIn": "see git log (costume-cover commit)"
     }
   ]
 }

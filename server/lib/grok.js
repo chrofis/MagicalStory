@@ -136,19 +136,7 @@ async function generateWithGrok(prompt, options = {}) {
   });
 
   try {
-    let response;
-    try {
-      response = await doFetch();
-    } catch (firstError) {
-      // Retry once on 500 (Grok internal error) after a short delay
-      if (firstError.statusCode === 500) {
-        log.warn(`⚠️ [GROK] Got 500, retrying generation once after 2s delay...`);
-        await new Promise(r => setTimeout(r, 2000));
-        response = await doFetch();
-      } else {
-        throw firstError;
-      }
-    }
+    const response = await fetchGrokWithRetry(doFetch, 'generation');
 
     const data = await response.json();
     const elapsed = Date.now() - startTime;
@@ -247,6 +235,43 @@ function grokPromptBudget(model) {
  * in the response body (decisions 2026-09-18). Callers branch on `err.moderated`,
  * never on a status number or a substring of the message (code review 2026-10 A8).
  */
+// Transient provider errors are waited out, never counted as a failed attempt
+// (staging job_1791222889407_ypl33vk8u: a 429 "service is temporarily at
+// capacity" killed Emma's costumed sheet after one try, and every page then
+// invented her costume from text). One implementation for every Grok caller
+// (generate + edit; sheets, pages, covers, repair). A refusal (400 moderation,
+// 403 credits) is NOT transient and is never retried here. 500 keeps its single
+// quick retry. See DECISIONS.md "Grok capacity errors wait and retry".
+const GROK_CAPACITY_WAIT = { baseMs: 5000, maxBackoffMs: 120000, totalMs: 600000 };
+
+function isGrokCapacityError(err) {
+  if (!err || err.moderated) return false;
+  if (err.statusCode !== 429 && err.statusCode !== 503) return false;
+  return !/credits|spending limit/i.test(String(err.message || ''));
+}
+
+async function fetchGrokWithRetry(doFetch, label, { sleep = (ms) => new Promise(r => setTimeout(r, ms)), wait = GROK_CAPACITY_WAIT } = {}) {
+  let waited = 0;
+  let retried500 = false;
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await doFetch();
+    } catch (err) {
+      if (err.statusCode === 500 && !retried500) {
+        retried500 = true;
+        log.warn(`⚠️ [GROK] Got 500 on ${label}, retrying once after 2s delay...`);
+        await sleep(2000);
+        continue;
+      }
+      if (!isGrokCapacityError(err) || waited >= wait.totalMs) throw err;
+      const delay = Math.min(wait.baseMs * 2 ** (attempt - 1), wait.maxBackoffMs, wait.totalMs - waited);
+      log.warn(`⏳ [GROK] ${label} hit ${err.statusCode} (capacity/rate limit) — waiting ${Math.round(delay / 1000)}s then retrying (waited ${Math.round(waited / 1000)}s of ${Math.round(wait.totalMs / 1000)}s)`);
+      await sleep(delay);
+      waited += delay;
+    }
+  }
+}
+
 function isGrokModerationBody(errorText) {
   return /content-moderated/i.test(String(errorText || ''));
 }
@@ -550,19 +575,7 @@ async function editWithGrok(prompt, referenceImages = [], options = {}) {
   });
 
   try {
-    let response;
-    try {
-      response = await doFetch();
-    } catch (firstError) {
-      // Retry once on 500 (Grok internal error) after a short delay
-      if (firstError.statusCode === 500) {
-        log.warn(`⚠️ [GROK] Got 500 on edit, retrying once after 2s delay...`);
-        await new Promise(r => setTimeout(r, 2000));
-        response = await doFetch();
-      } else {
-        throw firstError;
-      }
-    }
+    const response = await fetchGrokWithRetry(doFetch, 'edit');
 
     const data = await response.json();
     const elapsed = Date.now() - startTime;
@@ -2134,6 +2147,8 @@ async function stitchImagesHorizontally(buffers, targetHeight = 768, options = {
 }
 
 module.exports = {
+  fetchGrokWithRetry,
+  isGrokCapacityError,
   isGrokModerationBody,
   generateWithGrok,
   editWithGrok,

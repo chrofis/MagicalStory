@@ -73,8 +73,8 @@ const TRIAL_COSTUMES = {
       female: "Shimmering white dress with rainbow ribbons, silver shoes, crystal tiara, star-dusted cape"
     },
     mermaid: {
-      male: "Shimmering scale-pattern vest in sea green, loose trousers, shell necklace, coral arm band",
-      female: "Shimmering scale-pattern top in sea green, flowing skirt with fin-like hem, shell necklace, coral tiara"
+      male: "Long-sleeve scale-pattern swim shirt in sea green over the whole torso, one merman tail replacing the legs from the waist down, no feet, shell necklace, coral arm band",
+      female: "Long-sleeve scale-pattern swim shirt in sea green over the whole torso, one mermaid tail replacing the legs from the waist down, no feet, shell necklace, coral tiara"
     },
     dinosaur: {
       male: "Khaki explorer shorts, safari vest with many pockets, hiking boots, adventurer's belt",
