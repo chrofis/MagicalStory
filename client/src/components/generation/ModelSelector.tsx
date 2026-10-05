@@ -5,9 +5,9 @@ import { useLanguage } from '@/context/LanguageContext';
 export const TEXT_MODELS = {
   'claude-sonnet': {
     provider: 'anthropic',
-    description: 'Claude Sonnet 4.6 - Best narrative quality',
-    descriptionDe: 'Claude Sonnet 4.6 - Beste Erzählqualität',
-    descriptionFr: 'Claude Sonnet 4.6 - Meilleure qualité narrative'
+    description: 'Claude Sonnet 5.5 - Best narrative quality',
+    descriptionDe: 'Claude Sonnet 5.5 - Beste Erzählqualität',
+    descriptionFr: 'Claude Sonnet 5.5 - Meilleure qualité narrative'
   },
   'claude-haiku': {
     provider: 'anthropic',

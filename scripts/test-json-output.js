@@ -31,7 +31,7 @@ const args = Object.fromEntries(
   })
 );
 
-const SONNET_MODEL = 'claude-sonnet-4-6';
+const SONNET_MODEL = 'claude-sonnet-5-5';
 const MAX_TOKENS = parseInt(args['max-tokens'] || '32000', 10);
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
 if (!ANTHROPIC_KEY) {

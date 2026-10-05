@@ -66776,3 +66776,18 @@ Hazard Lab ids: 1631 1632 1633 1634 1639 1637 1638 (A), 1640-1645 and 1646 (B). 
 **Rationale.** Same as 2026-10-05 for pages: a field code can decide is not asked of the model, and a check on a pinned field is dead code. Iterate/regeneration re-pin through the stored `jevFixed` (images.js), so a cover rewrite keeps them. SETTLED "cover gaze is code-owned" is unchanged in outcome, only its mechanism moved (line updated).
 **Replay (free, stored rows, 2 staging stories).** atbttop6w: the Art Director wrote afternoon on all three covers; code gives front afternoon, title page afternoon (p1), back cover dusk (p18, the book ends at dusk). 50osg2osm: the Art Director wrote evening/dusk/evening; code gives dusk on all three (the book is dusk throughout), population crowd on all three where the Art Director wrote cast_only on two, weather clear on two and none on the third (guarded above). Gaze and shot already agreed (all viewer, wide; one stored ultra-wide back cover becomes wide). Era agreed with the story pages' era on both. Lab #1648 covers were not available offline.
 **Touched files:** `server/lib/jevBriefFields.js`, `jevDecisions.js`, `beatsPipeline.js`, `briefChecks.js`, `sceneBriefCheck.js`, `iterateBeat.js`, `coverBeats.js`, `sceneLight.js`, `prompts/scene-briefs-all.txt`, `scene-expansion.txt`, `visual-bible.txt`, `tests/unit/cover-code-fields.test.ts` (new) and the cover tests.
+
+
+## 2026-10-05 — Sonnet 4.6 retired: the `claude-sonnet` alias runs Sonnet 5.5 (owner directive)
+
+**Context.** `TEXT_MODELS['claude-sonnet']` pointed at `claude-sonnet-4-6` ($3/$15). Sonnet 5.5 ($2/$10) was registered on 2026-10-04 and already routes arc create/re-tell and text_refine (see "Sonnet 5.5 writes the arc and repairs the text"). Owner: do not use Sonnet 4.6 anywhere. No line in SETTLED.md pins Sonnet 4.6 for a stage; decisions.md mentions 4.6 only as the model measurements were taken on (history, not a pin).
+
+**Decision.** `'claude-sonnet'` and `'claude-sonnet-5-5'` are the same object (`CLAUDE_SONNET` in `server/config/models.js`): one model id, the second key kept because stored Lab params and the arc/text_refine defaults name it. Stages moved from 4.6 to 5.5: idea, outline, storyText, childCriticModel, scorecardJudge, the beats planner / re-plan / story bible / story text, the `guardModel()` fallback, trial `modelToUse`, the Lab `claude-sonnet` defaults. `MODEL_PRICING['claude-sonnet']` is now $2/$10 (was $3/$15); the `claude-sonnet-4-6` price row stays for historical cost lookups. Admin ping fallback, `scripts/test-models.js`, `scripts/test-json-output.js` and the client labels were changed to 5.5.
+
+**Call-site compatibility.** `callAnthropicAPI`/`Streaming` send no temperature (it is only sent to xAI/OpenRouter/Gemini), no beta header unless a task budget is set (only Opus 5.5 at max), and `output_config.effort` only when a caller passes it; max_tokens is the model's 128000 ceiling, same as 4.6. Probe 2026-10-05: Sonnet 5.5 with no effort and no thinking param returned a text block only, 0 thinking tokens. Nothing needed changing.
+
+**Rationale.** Owner directive; also ~33% cheaper per token. Quality of the idea/outline/beats stages on 5.5 is not A/B-measured: those stages had no Lab bake-off, only arc and text_refine did.
+
+**Not touched.** `server/routes/ai-proxy.js` calls `claude-sonnet-4-5-20250929` directly (4.5, not 4.6) — left as is, flagged to the owner.
+
+**Touched files.** server/config/models.js, server/routes/admin/diagnostics.js, server/lib/testlab.js (comment), scripts/test-models.js, scripts/test-json-output.js, client ModelSelector.tsx + StoryDisplay.tsx labels, tests/unit/sonnet-alias.test.ts.

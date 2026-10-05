@@ -61,7 +61,7 @@ router.get('/', authenticateToken, requireAdmin, async (req, res) => {
   if (req.query.ping !== '0') {
     try {
       const { TEXT_MODELS, MODEL_DEFAULTS } = require('../../config/models');
-      const modelId = TEXT_MODELS[MODEL_DEFAULTS.idea]?.modelId || 'claude-sonnet-4-6';
+      const modelId = TEXT_MODELS[MODEL_DEFAULTS.idea]?.modelId || TEXT_MODELS['claude-sonnet'].modelId;
       const r = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {

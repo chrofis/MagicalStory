@@ -12,7 +12,7 @@ const { callTextModel } = require('../server/lib/textModels');
 const { TEXT_MODELS } = require('../server/config/models');
 
 const TEST_MODELS = {
-  'claude-sonnet': { provider: 'anthropic', modelId: 'claude-sonnet-4-6' },
+  'claude-sonnet': { provider: 'anthropic', modelId: 'claude-sonnet-5-5' },
   'claude-haiku': { provider: 'anthropic', modelId: 'claude-haiku-4-5-20251001' },
   'grok-4-fast': { provider: 'xai', modelId: 'grok-4-1-fast-non-reasoning' },
   'grok-4': { provider: 'xai', modelId: 'grok-4' },
