@@ -57,7 +57,7 @@ const aboutContent: Record<string, {
     swissTitle: 'Made in Switzerland',
     swissText: 'Designed and operated in Switzerland. We care about doing things right — quality, privacy, and reliability.',
     ctaTitle: 'Try it free',
-    ctaText: 'Create your first personalized story in under 3 minutes. No account needed.',
+    ctaText: 'Create your first personalized story in just a few minutes. No account needed.',
     ctaButton: 'Create a Free Story',
   },
   de: {
@@ -97,7 +97,7 @@ const aboutContent: Record<string, {
     swissTitle: 'Made in Switzerland',
     swissText: 'Entwickelt und betrieben in der Schweiz. Qualität, Datenschutz und Zuverlässigkeit sind uns wichtig.',
     ctaTitle: 'Gratis ausprobieren',
-    ctaText: 'Erstelle deine erste personalisierte Geschichte in unter 3 Minuten. Ohne Konto.',
+    ctaText: 'Erstelle deine erste personalisierte Geschichte in wenigen Minuten. Ohne Konto.',
     ctaButton: 'Gratis Geschichte erstellen',
   },
   fr: {
@@ -137,7 +137,7 @@ const aboutContent: Record<string, {
     swissTitle: 'Made in Switzerland',
     swissText: 'Conçu et exploité en Suisse. La qualité, la confidentialité et la fiabilité nous tiennent à cœur.',
     ctaTitle: 'Essayez gratuitement',
-    ctaText: 'Créez votre première histoire personnalisée en moins de 3 minutes. Sans compte.',
+    ctaText: 'Créez votre première histoire personnalisée en quelques minutes. Sans compte.',
     ctaButton: 'Créer une histoire gratuite',
   },
   it: {
@@ -177,7 +177,7 @@ const aboutContent: Record<string, {
     swissTitle: 'Made in Switzerland',
     swissText: 'Ideato e gestito in Svizzera. Ci teniamo a fare le cose per bene — qualità, privacy e affidabilità.',
     ctaTitle: 'Prova gratis',
-    ctaText: 'Crea la tua prima storia personalizzata in meno di 3 minuti. Nessun account necessario.',
+    ctaText: 'Crea la tua prima storia personalizzata in pochi minuti. Nessun account necessario.',
     ctaButton: 'Crea una storia gratuita',
   },
 };

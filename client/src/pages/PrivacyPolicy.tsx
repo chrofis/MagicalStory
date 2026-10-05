@@ -148,7 +148,7 @@ To exercise these rights, contact us at privacy@magicalstory.ch or use the accou
 • Payment records: 10 years (Swiss Code of Obligations art. 958f)
 • Server logs: 90 days
 
-To delete your account and all associated data, contact us at privacy@magicalstory.ch. We will confirm your identity and complete the deletion within one month. Payment records are anonymised rather than deleted, and kept for the period stated above as the law requires.`
+To delete your account and all associated data, contact us at privacy@magicalstory.ch. We will confirm your identity and complete the deletion within one month. Payment records are anonymized rather than deleted, and kept for the period stated above as the law requires.`
       },
       {
         title: '12. Cookies and Tracking',

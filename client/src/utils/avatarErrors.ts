@@ -22,7 +22,7 @@ const AVATAR_DAILY_LIMIT: Record<string, string> = {
 };
 
 const PHOTO_ANALYSIS_FAILED: Record<string, string> = {
-  en: 'The photo could not be analysed. Please try again.',
+  en: 'The photo could not be analyzed. Please try again.',
   de: 'Das Foto konnte nicht analysiert werden. Bitte versuche es erneut.',
   fr: 'La photo n\'a pas pu être analysée. Veuillez réessayer.',
   it: 'Non è stato possibile analizzare la foto. Riprova.',

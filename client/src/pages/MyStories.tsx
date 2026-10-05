@@ -390,7 +390,7 @@ export default function MyStories() {
         };
         const processingMessages = {
           en: 'We received your payment and are processing your book order. You will get an email confirmation as soon as it is sent to print.',
-          de: 'Wir haben Ihre Zahlung erhalten und bearbeiten Ihre Buchbestellung. Sobald sie in den Druck geht, erhalten Sie eine Bestätigung per E-Mail.',
+          de: 'Wir haben deine Zahlung erhalten und bearbeiten deine Buchbestellung. Sobald sie in den Druck geht, erhältst du eine Bestätigung per E-Mail.',
           fr: 'Nous avons reçu votre paiement et traitons votre commande de livre. Vous recevrez un e-mail de confirmation dès qu’elle sera envoyée à l’impression.',
           it: 'Abbiamo ricevuto il tuo pagamento e stiamo elaborando il tuo ordine del libro. Riceverai una conferma via e-mail non appena sarà inviato in stampa.',
         };
@@ -441,7 +441,7 @@ export default function MyStories() {
           };
           const failedMessages = {
             en: 'Your payment went through but we could not finalize the print order. Our team has been alerted and will refund or retry on your behalf — you will receive an email shortly. If you do not hear from us within a day, reply to your payment receipt.',
-            de: 'Ihre Zahlung ging durch, aber wir konnten den Druckauftrag nicht abschliessen. Unser Team wurde benachrichtigt und wird Ihnen das Geld zurückerstatten oder es erneut versuchen — Sie erhalten in Kürze eine E-Mail. Falls Sie innerhalb eines Tages nichts von uns hören, antworten Sie bitte auf Ihre Zahlungsquittung.',
+            de: 'Deine Zahlung ging durch, aber wir konnten den Druckauftrag nicht abschliessen. Unser Team wurde benachrichtigt und wird dir das Geld zurückerstatten oder es erneut versuchen — du erhältst in Kürze eine E-Mail. Falls du innerhalb eines Tages nichts von uns hörst, antworte bitte auf deine Zahlungsquittung.',
             fr: 'Votre paiement a abouti mais nous n’avons pas pu finaliser la commande d’impression. Notre équipe a été alertée et procédera à un remboursement ou réessayera — vous recevrez un e-mail sous peu. Si vous n’avez pas de nouvelles dans la journée, répondez à votre reçu de paiement.',
             it: 'Il tuo pagamento è andato a buon fine ma non siamo riusciti a finalizzare l’ordine di stampa. Il nostro team è stato avvisato e ti rimborserà o riproverà per tuo conto — riceverai un’e-mail a breve. Se non hai nostre notizie entro un giorno, rispondi alla ricevuta del pagamento.',
           };
@@ -462,8 +462,8 @@ export default function MyStories() {
               ? `Your book has been sent to print. You earned ${tokensCredited} tokens!`
               : 'Your book has been sent to print.',
             de: tokensCredited > 0
-              ? `Ihr Buch wurde zum Druck geschickt. Sie haben ${tokensCredited} Tokens erhalten!`
-              : 'Ihr Buch wurde zum Druck geschickt.',
+              ? `Dein Buch wurde zum Druck geschickt. Du hast ${tokensCredited} Tokens erhalten!`
+              : 'Dein Buch wurde zum Druck geschickt.',
             fr: tokensCredited > 0
               ? `Votre livre a été envoyé à l’impression. Vous avez gagné ${tokensCredited} crédits !`
               : 'Votre livre a été envoyé à l’impression.',
@@ -482,7 +482,7 @@ export default function MyStories() {
         log.info('Payment cancelled by user');
         const messages = {
           en: 'Payment was cancelled. You can try again when ready.',
-          de: 'Zahlung wurde abgebrochen. Sie können es erneut versuchen.',
+          de: 'Zahlung wurde abgebrochen. Du kannst es erneut versuchen.',
           fr: 'Paiement annulé. Vous pouvez réessayer quand vous êtes prêt.',
           it: 'Il pagamento è stato annullato. Puoi riprovare quando sei pronto.',
         };

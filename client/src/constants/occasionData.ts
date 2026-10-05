@@ -40,7 +40,7 @@ export const occasions: OccasionData[] = [
         'Choose a theme that matches your child\'s current passion (dinosaurs, unicorns, space...)',
         'Order the printed book version for a gift that feels truly special to unwrap',
         'Add siblings or friends as secondary characters for extra fun',
-        'Create the story a week before the party — you can read it together on the big day',
+        'Create the story two weeks before the party — you can read it together on the big day',
       ],
       de: [
         'Wähle ein Thema, das zur aktuellen Leidenschaft deines Kindes passt (Dinosaurier, Einhörner, Weltraum...)',
@@ -58,7 +58,7 @@ export const occasions: OccasionData[] = [
         'Scegli un tema che rispecchi la passione del momento di tuo figlio (dinosauri, unicorni, spazio...)',
         'Ordina la versione stampata per un regalo che sembri davvero speciale da scartare',
         'Aggiungi fratelli, sorelle o amici come personaggi secondari per più divertimento',
-        'Crea la storia una settimana prima della festa — potrete leggerla insieme nel grande giorno',
+        'Crea la storia una settimana prima della festa — potrai leggerla insieme nel grande giorno',
       ],
     },
     recommendedThemes: [
@@ -137,7 +137,7 @@ export const occasions: OccasionData[] = [
         'Scegli il tema Natale per una storia stagionale, oppure un\'avventura qualsiasi con un tocco festivo',
         'Ordina entro il 15 dicembre per garantire la consegna prima della Vigilia',
         'Ottimo come regalo dai nonni — basta condividere la foto e i dettagli del bambino',
-        'Leggetela insieme la Vigilia di Natale come nuova tradizione di famiglia',
+        'Leggila insieme la Vigilia di Natale come nuova tradizione di famiglia',
       ],
     },
     recommendedThemes: [
@@ -326,7 +326,7 @@ export const occasions: OccasionData[] = [
       it: 'Libro personalizzato per bambini per il primo giorno di scuola',
     },
     description: {
-      en: 'Make the first day of school unforgettable with a story where your child bravely starts their school adventure. The perfect Schultüte filling!',
+      en: 'Make the first day of school unforgettable with a story where your child bravely starts their school adventure. The perfect school cone (Schultüte) filling!',
       de: 'Mache den ersten Schultag unvergesslich mit einer Geschichte, in der dein Kind mutig sein Schulabenteuer startet. Die perfekte Füllung für die Schultüte!',
       fr: 'Rendez le premier jour d\'école inoubliable avec une histoire où votre enfant commence courageusement son aventure scolaire.',
       it: 'Rendi indimenticabile il primo giorno di scuola con una storia in cui tuo figlio inizia coraggiosamente la sua avventura scolastica. Il regalo perfetto per il primo giorno!',
@@ -358,7 +358,7 @@ export const occasions: OccasionData[] = [
       ],
       it: [
         'Metti il libro nello Schultüte (cono di dolci) insieme alle golosità',
-        'Leggete la storia insieme la sera prima del grande giorno',
+        'Leggi la storia insieme la sera prima del grande giorno',
         'Scegli il tema "Primo giorno di scuola" per una storia che affronta l\'ansia scolastica',
         'Anche i temi educativi "Alfabeto" o "Numeri" sono ottimi regali per l\'inizio della scuola',
       ],
@@ -372,14 +372,14 @@ export const occasions: OccasionData[] = [
       { id: 'detective', category: 'adventure' },
     ],
     deliveryNote: {
-      en: 'Order 1-2 weeks before the first day of school. The Schultüte surprise is worth the planning!',
+      en: 'Order 1-2 weeks before the first day of school. The school cone (Schultüte) surprise is worth the planning!',
       de: 'Bestelle 1-2 Wochen vor dem ersten Schultag. Die Schultüten-Überraschung ist die Planung wert!',
       fr: 'Commandez 1 à 2 semaines avant la rentrée. La surprise en vaut la planification !',
       it: 'Ordina 1-2 settimane prima del primo giorno di scuola. La sorpresa dello Schultüte vale la pianificazione!',
     },
     faq: [
       {
-        q: { en: 'What age is Einschulung typically?', de: 'In welchem Alter ist die Einschulung?', fr: 'À quel âge a lieu la rentrée scolaire ?', it: 'A che età si inizia tipicamente la scuola?' },
+        q: { en: 'At what age do children typically start school?', de: 'In welchem Alter ist die Einschulung?', fr: 'À quel âge a lieu la rentrée scolaire ?', it: 'A che età si inizia tipicamente la scuola?' },
         a: { en: 'In Switzerland, children typically start school (Kindergarten or 1st grade) at age 4-6. Our stories adapt the language to the child\'s age.', de: 'In der Schweiz kommen Kinder typischerweise mit 4-6 Jahren in den Kindergarten oder die 1. Klasse. Unsere Geschichten passen die Sprache an das Alter des Kindes an.', fr: 'En Suisse, les enfants commencent généralement l\'école (jardin d\'enfants ou 1ère année) à 4-6 ans. Nos histoires adaptent le langage à l\'âge de l\'enfant.', it: 'In Svizzera, i bambini iniziano tipicamente la scuola (scuola dell\'infanzia o prima elementare) tra i 4 e i 6 anni. Le nostre storie adattano il linguaggio all\'età del bambino.' },
       },
       {
@@ -509,7 +509,7 @@ export const occasions: OccasionData[] = [
         'Papà o i nonni possono aiutare il bambino a creare la storia come sorpresa',
         'Includi la mamma come personaggio nella storia per una magia in più',
         'Scegli un tema d\'avventura che il bambino associa alla mamma (es. oceano, se la mamma ama il mare)',
-        'Leggete la storia ad alta voce alla mamma la mattina della sua festa — un momento impagabile',
+        'Leggi la storia ad alta voce alla mamma la mattina della sua festa — un momento impagabile',
       ],
     },
     recommendedThemes: [
@@ -639,7 +639,7 @@ export const occasions: OccasionData[] = [
     },
     tips: {
       en: [
-        'Put the book alongside nuts and tangerines in the Nikolaus bag',
+        'Put the book alongside nuts and tangerines in the Samichlaus bag',
         'Choose the Christmas theme or a winter adventure',
         'Read the story on the evening of December 5 before the Samichlaus visits',
         'A perfect pre-Christmas gift that builds anticipation for the holidays',
@@ -659,7 +659,7 @@ export const occasions: OccasionData[] = [
       it: [
         'Metti il libro insieme a noci e mandarini nel sacco di San Nicolao',
         'Scegli il tema Natale o un\'avventura invernale',
-        'Leggete la storia la sera del 5 dicembre prima della visita del Samichlaus',
+        'Leggi la storia la sera del 5 dicembre prima della visita del Samichlaus',
         'Un regalo pre-natalizio perfetto che aumenta l\'attesa per le feste',
       ],
     },
@@ -679,7 +679,7 @@ export const occasions: OccasionData[] = [
     faq: [
       {
         q: { en: 'Is St. Nicholas the same as Santa?', de: 'Ist der Nikolaus dasselbe wie der Weihnachtsmann?', fr: 'Saint-Nicolas est-il le même que le Père Noël ?', it: 'San Nicolao è lo stesso di Babbo Natale?' },
-        a: { en: 'In Swiss tradition, the Samichlaus (St. Nicholas) visits on December 6 and is distinct from the Christkind or Weihnachtsmann on December 24/25.', de: 'In der Schweizer Tradition besucht der Samichlaus die Kinder am 6. Dezember und ist verschieden vom Christkind oder Weihnachtsmann am 24./25. Dezember.', fr: 'Dans la tradition suisse, le Saint-Nicolas rend visite le 6 décembre et est distinct du Père Noël du 24/25 décembre.', it: 'Nella tradizione svizzera, il Samichlaus (San Nicolao) visita i bambini il 6 dicembre ed è una figura distinta da Gesù Bambino o Babbo Natale del 24/25 dicembre.' },
+        a: { en: 'In Swiss tradition, the Samichlaus (St. Nicholas) visits on December 6 and is distinct from the Christkind (Christ Child) or Santa Claus on December 24/25.', de: 'In der Schweizer Tradition besucht der Samichlaus die Kinder am 6. Dezember und ist verschieden vom Christkind oder Weihnachtsmann am 24./25. Dezember.', fr: 'Dans la tradition suisse, le Saint-Nicolas rend visite le 6 décembre et est distinct du Père Noël du 24/25 décembre.', it: 'Nella tradizione svizzera, il Samichlaus (San Nicolao) visita i bambini il 6 dicembre ed è una figura distinta da Gesù Bambino o Babbo Natale del 24/25 dicembre.' },
       },
       {
         q: { en: 'Can the story include Samichlaus and Schmutzli?', de: 'Kann die Geschichte Samichlaus und Schmutzli enthalten?', fr: 'L\'histoire peut-elle inclure Saint-Nicolas et le Père Fouettard ?', it: 'La storia può includere Samichlaus e Schmutzli?' },
@@ -709,7 +709,7 @@ export const occasions: OccasionData[] = [
       en: 'The Advent season is all about anticipation, cozy evenings, and the magic of counting down to Christmas. A personalized story book is a perfect companion for this special time. Use it as the highlight gift in a DIY Advent calendar, or read one chapter each evening in the weeks before Christmas. It turns December into a month of storytelling magic for your family.',
       de: 'Die Adventszeit dreht sich um Vorfreude, gemütliche Abende und den Zauber des Countdowns bis Weihnachten. Ein personalisiertes Geschichtenbuch ist der perfekte Begleiter für diese besondere Zeit. Nutze es als Highlight-Geschenk im DIY-Adventskalender oder lest jeden Abend ein Kapitel in den Wochen vor Weihnachten. So wird der Dezember zu einem Monat voller Geschichten-Magie für die ganze Familie.',
       fr: 'La période de l\'Avent est synonyme d\'anticipation, de soirées cosy et de la magie du compte à rebours jusqu\'à Noël. Un livre personnalisé est le compagnon parfait pour cette période spéciale. Utilisez-le comme cadeau phare dans un calendrier de l\'Avent fait maison ou lisez un chapitre chaque soir.',
-      it: 'Il periodo dell\'Avvento è fatto di attesa, serate accoglienti e la magia del conto alla rovescia verso Natale. Un libro di storie personalizzato è il compagno perfetto per questo momento speciale. Usalo come regalo clou in un calendario dell\'Avvento fai-da-te, oppure leggete un capitolo ogni sera nelle settimane prima di Natale. Trasforma dicembre in un mese di magia narrativa per tutta la famiglia.',
+      it: 'Il periodo dell\'Avvento è fatto di attesa, serate accoglienti e la magia del conto alla rovescia verso Natale. Un libro di storie personalizzato è il compagno perfetto per questo momento speciale. Usalo come regalo clou in un calendario dell\'Avvento fai-da-te, oppure leggi un capitolo ogni sera nelle settimane prima di Natale. Trasforma dicembre in un mese di magia narrativa per tutta la famiglia.',
     },
     tips: {
       en: [
@@ -732,7 +732,7 @@ export const occasions: OccasionData[] = [
       ],
       it: [
         'Usa il libro come casella speciale in un calendario dell\'Avvento fai-da-te (es. casella 24)',
-        'Leggete una pagina ogni sera durante l\'Avvento come rituale serale',
+        'Leggi una pagina ogni sera durante l\'Avvento come rituale serale',
         'Abbinalo al tema Natale per il massimo spirito festivo',
         'Perfetto come regalo di inizio dicembre per dare il via alla stagione delle feste',
       ],
@@ -807,7 +807,7 @@ export const occasions: OccasionData[] = [
       it: [
         'Crea la storia prima del trasloco per facilitare la transizione',
         'Scegli il tema di vita quotidiana "Trasloco" per una storia che affronta direttamente le paure del cambiamento',
-        'Leggetela insieme nella nuova casa la prima notte — un rituale confortante',
+        'Leggila insieme nella nuova casa la prima notte — un rituale confortante',
         'Includi dettagli sulla nuova casa o città per creare entusiasmo',
       ],
     },
@@ -881,7 +881,7 @@ export const occasions: OccasionData[] = [
       it: [
         'Inizia a leggere la storia 2-3 settimane prima dell\'inizio della scuola dell\'infanzia',
         'Scegli il tema "Primo giorno alla scuola dell\'infanzia" per una storia che affronta l\'ansia da separazione',
-        'Parlate insieme della storia — chiedi a tuo figlio cosa lo entusiasma di più',
+        'Parla insieme della storia — chiedi a tuo figlio cosa lo entusiasma di più',
         'Anche il tema "Fare amicizia" è perfetto per prepararsi alla scuola dell\'infanzia',
       ],
     },

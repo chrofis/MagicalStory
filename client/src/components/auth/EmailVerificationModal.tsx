@@ -34,18 +34,18 @@ const translations = {
   },
   de: {
     title: 'E-Mail prüfen',
-    description: 'Wir haben Ihnen einen Bestätigungslink gesendet. Ihre Geschichte wird automatisch erstellt, sobald Sie Ihre E-Mail bestätigen!',
+    description: 'Wir haben dir einen Bestätigungslink gesendet. Deine Geschichte wird automatisch erstellt, sobald du deine E-Mail bestätigst!',
     currentEmail: 'Bestätigung gesendet an',
     sendVerification: 'Bestätigungs-E-Mail senden',
     resendVerification: 'Bestätigungs-E-Mail erneut senden',
-    emailSent: 'Bestätigungs-E-Mail gesendet! Bitte prüfen Sie Ihren Posteingang.',
+    emailSent: 'Bestätigungs-E-Mail gesendet! Bitte prüfe deinen Posteingang.',
     changeEmail: 'Falsche E-Mail? Ändern',
     newEmail: 'Neue E-Mail-Adresse',
     currentPassword: 'Aktuelles Passwort',
     confirmChange: 'Ändern & Bestätigen',
     cancel: 'Abbrechen',
-    emailChanged: 'E-Mail geändert! Bitte prüfen Sie Ihren neuen Posteingang für die Bestätigung.',
-    checkSpam: 'Nicht gefunden? Prüfen Sie Ihren Spam-Ordner.',
+    emailChanged: 'E-Mail geändert! Bitte prüfe deinen neuen Posteingang für die Bestätigung.',
+    checkSpam: 'Nicht gefunden? Prüfe deinen Spam-Ordner.',
     fillAllFields: 'Bitte alle Felder ausfüllen',
   },
   fr: {
@@ -219,7 +219,7 @@ export function EmailVerificationModal({ isOpen, onClose, onVerified }: EmailVer
       if (error.retryAfter) {
         setCooldownSeconds(error.retryAfter);
         setError(
-          language === 'de' ? `Bitte warten Sie ${error.retryAfter} Sekunden` :
+          language === 'de' ? `Bitte warte ${error.retryAfter} Sekunden` :
           language === 'fr' ? `Veuillez patienter ${error.retryAfter} secondes` :
           language === 'it' ? `Attendi ${error.retryAfter} secondi` :
           `Please wait ${error.retryAfter} seconds`

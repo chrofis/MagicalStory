@@ -98,7 +98,7 @@ export function GenerationSettingsPanel({ settings, language }: GenerationSettin
         noData: 'Not specified',
         spring: 'Spring',
         summer: 'Summer',
-        autumn: 'Autumn',
+        autumn: 'Fall',
         winter: 'Winter',
       },
       de: {

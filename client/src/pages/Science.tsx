@@ -127,7 +127,7 @@ const scienceContent: Record<string, {
       },
       {
         icon: 'heart',
-        title: 'Leggete insieme',
+        title: 'Leggere insieme',
         text: 'I genitori e i bambini che leggono libri personalizzati insieme ridono di più, parlano di più e si legano più in profondità. Trasforma il momento della lettura in qualcosa che entrambi aspettate con gioia.',
       },
     ],

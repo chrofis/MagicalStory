@@ -2564,7 +2564,7 @@ export function CharacterForm({
                 }}
                 disabled={isRegeneratingAvatarsWithTraits || character.avatars?.status === 'generating' || (!developerMode && !isImpersonating && !canRegenerate)}
                 className="flex-1 px-4 py-3 text-sm font-medium bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors"
-                title={!developerMode && !isImpersonating && !canRegenerate ? (language === 'de' ? `Warten Sie ${waitSeconds}s` : language === 'fr' ? `Patientez ${waitSeconds} s` : language === 'it' ? `Attendi ${waitSeconds}s` : `Wait ${waitSeconds}s`) : undefined}
+                title={!developerMode && !isImpersonating && !canRegenerate ? (language === 'de' ? `Warte ${waitSeconds}s` : language === 'fr' ? `Patientez ${waitSeconds} s` : language === 'it' ? `Attendi ${waitSeconds}s` : `Wait ${waitSeconds}s`) : undefined}
               >
                 {isRegeneratingAvatarsWithTraits ? (
                   <>
@@ -2597,7 +2597,7 @@ export function CharacterForm({
             </h3>
             <p className="text-gray-600 mb-6">
               {language === 'de'
-                ? 'Möchten Sie die aktuelle Kleidung beibehalten oder die Kleidung aus dem neuen Foto verwenden?'
+                ? 'Möchtest du die aktuelle Kleidung beibehalten oder die Kleidung aus dem neuen Foto verwenden?'
                 : language === 'fr'
                   ? 'Voulez-vous garder les vêtements actuels ou utiliser ceux de la nouvelle photo ?'
                   : language === 'it'
