@@ -576,7 +576,7 @@ export default function TrialWizard() {
               phones got two tall step images stacked and the only button ~2.5
               screens down; 4 of the 5 paid visitors who reached this screen left
               without a tap. */}
-          <div className="md:hidden mb-28">
+          <div className="lg:hidden mb-28">
             <img src="/images/try/step3-spread.webp" alt="" decoding="async" fetchPriority="high"
               className="w-full max-h-60 object-contain rounded-2xl shadow-sm mb-5" />
             <ol className="space-y-3 max-w-sm mx-auto">
@@ -601,7 +601,7 @@ export default function TrialWizard() {
 
           {/* MOBILE — start button pinned to the bottom edge. Same styling as the
               desktop button, full width. */}
-          <div className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-white/95 border-t border-gray-200 px-4 pt-3"
+          <div className="lg:hidden fixed bottom-0 inset-x-0 z-30 bg-white/95 border-t border-gray-200 px-4 pt-3"
             style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}>
             <button
               onClick={startTrial}
@@ -612,9 +612,11 @@ export default function TrialWizard() {
             </button>
           </div>
 
+          {/* Layout switch is lg (1024), not md: at tablet width (768) the two 384px-tall images plus
+              captions measured 920px wide and overflowed the viewport. Tablets get the phone layout. */}
           {/* DESKTOP — the two tall images at the SAME height, bookending the
               row; numbered captions stacked in the centre between them. */}
-          <div className="hidden md:flex md:items-stretch justify-between gap-10 mb-12">
+          <div className="hidden lg:flex lg:items-stretch justify-between gap-10 mb-12">
             <img
               src="/images/try/step1-photo.webp"
               alt=""
@@ -645,7 +647,7 @@ export default function TrialWizard() {
               "sit back" message plus the free-trial note and the Start button.
               No step number here: this is the payoff + call to action. Phones get
               their own layout above. */}
-          <div className="hidden md:flex md:flex-row items-center gap-6 md:gap-12">
+          <div className="hidden lg:flex lg:flex-row items-center gap-6 lg:gap-12">
             <img
               src="/images/try/step3-spread.webp"
               alt=""

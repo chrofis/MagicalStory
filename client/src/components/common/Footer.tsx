@@ -187,14 +187,14 @@ export function Footer() {
         <p className="mt-8 text-stone-500 max-w-2xl">{texts.tagline}</p>
 
         <div className="mt-4 pt-4 border-t border-stone-200 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <div className="flex items-center gap-4 flex-wrap">
+          {/* Separators are borders on the links (sm and up only): a "|" glyph between wrapped links
+              dangled at the end of a line on phones and left Impressum alone. Phones centre the row. */}
+          <div className="flex items-center justify-center sm:justify-start gap-x-4 gap-y-1 flex-wrap">
             <Link to={to('/terms')} className={linkClass}>{texts.terms}</Link>
-            <span className="text-stone-300">|</span>
-            <Link to={to('/privacy')} className={linkClass}>{texts.privacy}</Link>
-            <span className="text-stone-300">|</span>
-            <Link to={to('/impressum')} className={linkClass}>{texts.imprint}</Link>
+            <Link to={to('/privacy')} className={`${linkClass} sm:border-l sm:border-stone-300 sm:pl-4`}>{texts.privacy}</Link>
+            <Link to={to('/impressum')} className={`${linkClass} sm:border-l sm:border-stone-300 sm:pl-4`}>{texts.imprint}</Link>
           </div>
-          <div>
+          <div className="text-center sm:text-left">
             © {currentYear} {texts.copyright}
           </div>
         </div>

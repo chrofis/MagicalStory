@@ -91,6 +91,13 @@ export function Navigation({ currentStep = 0, onStepClick, canAccessStep, develo
     };
   }, [showMenu]);
 
+  // Phone header budget (390px): logo + 5-step indicator + credits/menu cluster overflowed, pushing the
+  // DEV badge off-screen and squeezing the steps against the logo. While the steps are shown the brand
+  // text yields below sm; the logo stays.
+  const hasStepIndicator =
+    (!hideSteps && currentStep > 0 && !!onStepClick && !!canAccessStep && !customSteps) ||
+    (!!customSteps && customSteps.length > 0 && !!onStepClick);
+
   if (minimal) {
     const brand = (
       <>
@@ -100,7 +107,7 @@ export function Navigation({ currentStep = 0, onStepClick, canAccessStep, develo
     );
     const brandClass = 'text-sm md:text-base font-bold whitespace-nowrap flex items-center gap-1.5';
     return (
-      <nav className={`bg-black text-white px-3 py-3 shadow-md ${NAV_STICKY}`}>
+      <nav className={`bg-gray-900 text-white px-3 py-3 shadow-md ${NAV_STICKY}`}>
         <div className="flex justify-between items-center">
           {brandLink ? (
             <button onClick={() => navigate('/')} className={`${brandClass} hover:opacity-80`}>{brand}</button>
@@ -114,12 +121,12 @@ export function Navigation({ currentStep = 0, onStepClick, canAccessStep, develo
 
   return (
     <nav className={`bg-gray-900 text-white px-3 py-3 ${NAV_STICKY}`}>
-      <div className="flex justify-between items-center min-w-0">
+      <div className="flex justify-between items-center min-w-0 gap-2">
         {/* Left: Title */}
         <div className="flex-shrink-0">
           <button onClick={() => navigate('/')} className="text-sm md:text-base font-bold whitespace-nowrap hover:opacity-80 flex items-center gap-1.5">
             <img src="/images/logo-book.webp" alt="" width="88" height="88" fetchPriority="high" className="h-10 md:h-11 -my-2 w-auto" />
-            <span className={isGenerationInProgress ? 'hidden sm:inline' : ''}>{t.title}</span>
+            <span className={isGenerationInProgress || hasStepIndicator ? 'hidden sm:inline' : ''}>{t.title}</span>
           </button>
         </div>
 
@@ -200,7 +207,7 @@ export function Navigation({ currentStep = 0, onStepClick, canAccessStep, develo
         )}
 
         {/* Right side: DEV toggle + Menu */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 md:gap-3 flex-shrink-0">
           {/* DEV indicator (small badge, no toggle — toggle is in menu) */}
           {developerMode && (
             <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-yellow-500 text-black">DEV</span>
