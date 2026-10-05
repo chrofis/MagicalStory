@@ -10351,6 +10351,29 @@ async function runSheetStyleFixture(target, params, sheet) {
   };
 }
 
+/**
+ * judge_fixture `sheet_kept`: one off-garment sheet through production's
+ * kept-garment check (character2x4Sheet.checkKeptGarment), one call per garment
+ * in params.input.keptGarments, in parallel. No face photo or reference sheet:
+ * the question is asked of the variant image alone.
+ */
+async function runSheetKeptFixture(target, params, sheet) {
+  const kept = Array.isArray(params.input?.keptGarments) ? params.input.keptGarments : [];
+  if (!kept.length) throw new Error('judge_fixture sheet_kept: params.input.keptGarments required');
+  const { loadPromptTemplates } = require('../services/prompts');
+  await loadPromptTemplates();
+  const usage = { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 };
+  const usageTracker = (_provider, u) => {
+    usage.input_tokens += u?.input_tokens || 0;
+    usage.output_tokens += u?.output_tokens || 0;
+    usage.thinking_tokens += u?.thinking_tokens || 0;
+    usage.calls++;
+  };
+  const SHEET = require('./character2x4Sheet');
+  const checks = await Promise.all(kept.map(g => SHEET.checkKeptGarment(sheet, g, { usageTracker })));
+  return { keptGarments: kept, checks, usage };
+}
+
 async function runJudgeFixtureStage(target, { experimentId, params = {} }) {
   const JF = require('./judgeFixtures');
   const judge = params.judge;
@@ -10434,6 +10457,9 @@ async function runJudgeFixtureStage(target, { experimentId, params = {} }) {
       break;
     case 'sheet_style':
       raw = await runSheetStyleFixture(target, params, await loadFixtureImage());
+      break;
+    case 'sheet_kept':
+      raw = await runSheetKeptFixture(target, params, await loadFixtureImage());
       break;
     default:
       throw new Error(`judge_fixture: no replay wired for judge "${judge}"`);

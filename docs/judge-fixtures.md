@@ -100,6 +100,7 @@ replays it with production's inputs:
 | `book_audit` | `book_audit` | the whole book; the fixture's page scopes the verdict |
 | `arc_panel` | `arc_panel_replay` | the stored `arcReviewReport.committed` block |
 | `sheet_style` | `evaluateAvatarSheet` pass 2 (`evaluateVariantSheet` for a variant), inside `judge_fixture` | the fixture sheet plus its `styledAvatarGeneration[input.entryIndex]` face photo, Pass-1 sheet and art style, and the character's age; `input.removedGarments` makes it a garment-off variant, judged by `evaluateVariantSheet` (the style judge plus one garment-gone check per removed garment) |
+| `sheet_kept` | `checkKeptGarment` (character2x4Sheet.js), one call per garment, inside `judge_fixture` | the fixture off sheet alone and `input.keptGarments` (the garments that must stay); a finding (type `kept`) for each garment not visible in all of body cells 5-8; Lab-only until the bar in docs/decisions.md 2026-10-05 is met |
 
 A fixture pinned to the page's **active** version keeps the stored figure detection, as
 production had it. A fixture pinned to any other version is judged without that detection.

@@ -1041,6 +1041,32 @@ async function checkGarmentGone(sheet, garment, opts = {}) {
 }
 
 /**
+ * IS ONE GARMENT THAT SHOULD STAY STILL ON THE SHEET'S BODY ROW? The mirror of
+ * checkGarmentGone, and not a copy of its question: asked of any cell, a kept
+ * baldric drawn only in the four head cells passed (staging
+ * job_1791145238223_50osg2osm, Daniel: baldric gone from the body row, still in
+ * the head row), and asked of all 8 cells, a belt is "missing" from every head
+ * cell, which are cropped above the waist. So: one garment, body cells 5-8, the
+ * variant image alone. A failed call throws, like checkGarmentGone.
+ *
+ * @returns {Promise<{garment: string, question: string, visible: boolean, cells: string, reason: string}>}
+ */
+async function checkKeptGarment(sheet, garment, opts = {}) {
+  const { model = 'gemini-2.5-flash', usageTracker = null } = opts;
+  const name = String(garment || '').trim();
+  if (!name) throw new Error('checkKeptGarment: no garment named');
+  const template = PROMPT_TEMPLATES.sheetKeptGarmentCheck;
+  if (!template) throw new Error('sheetKeptGarmentCheck prompt template not loaded');
+  const prompt = fillTemplate(template, { GARMENT: name });
+  const report = await askSheetJudge({
+    model, parts: [inlinePartOf(sheet), { text: prompt }], prompt,
+    label: `kept-garment check (${name})`, usageTracker, usageFn: 'character_2x4_kept_garment_check', apiKey: process.env.GEMINI_API_KEY,
+  });
+  if (typeof report?.visible !== 'boolean') throw new Error(`kept-garment check (${name}) returned no visible true/false`);
+  return { garment: name, question: prompt, visible: report.visible, cells: String(report.cells ?? ''), reason: String(report.reason ?? '') };
+}
+
+/**
  * THE VARIANT GATE: the pass-2 style judge AND one garment-gone check per
  * removed garment. It passes only when the style judge passes and every check
  * says not visible. The checks ride on the style verdict as `garmentChecks`;
@@ -2080,6 +2106,7 @@ module.exports = {
   buildRedressPrompt,
   GARMENT_OFF_SHEET_RULE,
   checkGarmentGone,
+  checkKeptGarment,
   evaluateVariantSheet,
   // Exported for tests: the declared-age proportion block must reach the prompt.
   declaredAgeBlock,

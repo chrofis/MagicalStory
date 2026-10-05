@@ -206,3 +206,23 @@ describe('judge_fixture stage dispatch (judges stubbed)', () => {
     await expect(runJudgeFixtureStage({ storyId: 's' }, { params: { judge: 'semantic' } })).rejects.toThrow(/expect/);
   });
 });
+
+describe('sheet_kept (Lab-only kept-garment check, 2026-10-05)', () => {
+  const checks = [
+    { garment: 'brown leather baldric', visible: false, reason: 'cells 5-8 show no strap' },
+    { garment: 'wide brown leather belt', visible: true, reason: 'all four' },
+  ];
+  it('a kept garment that is not visible is one finding of type kept; visible ones are none', () => {
+    const found = JF.normalizeFindings('sheet_kept', { checks });
+    expect(found).toHaveLength(1);
+    expect(found[0]).toMatchObject({ type: 'kept', fields: { garment: 'brown leather baldric' } });
+    expect(JF.scoreFixture({ verdict: 'flag', types: ['kept'], about: ['baldric'] }, found).outcome).toBe('TP');
+    expect(JF.scoreFixture({ verdict: 'pass' }, JF.normalizeFindings('sheet_kept', { checks: [checks[1]] })).outcome).toBe('TN');
+  });
+  it('a fixture without a kept list or an image URL is invalid', () => {
+    const base = { id: 'k-x', judge: 'sheet_kept', target: { storyId: 's' }, expect: { verdict: 'pass' }, source: 'x' };
+    expect(JF.validateFixtures([{ ...base, input: { imageUrl: 'https://a/b.jpg', keptGarments: ['red tunic'] } }])).toEqual([]);
+    expect(JF.validateFixtures([{ ...base, input: { imageUrl: 'https://a/b.jpg' } }]).join()).toMatch(/keptGarments/);
+    expect(JF.validateFixtures([{ ...base, input: { keptGarments: ['red tunic'] } }]).join()).toMatch(/imageUrl/);
+  });
+});

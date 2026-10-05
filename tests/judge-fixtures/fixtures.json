@@ -1372,6 +1372,75 @@
         "verdict": "pass"
       },
       "source": "Jacket-off variant made by Lab #1596 (avatar_redress, production redress). Viewed 2026-10-04 next to its base: the jacket is gone in all 8 cells, a dark grey long-sleeved top is outermost, and face, hair, trousers, boots, medium, framing and the rear turn all match the approved base. Its head row is framed to the thighs, as the approved base is; a variant judged against its base should pass."
+    },
+    {
+      "id": "kept-50osg2osm-daniel-baldric-lost",
+      "judge": "sheet_kept",
+      "target": {
+        "storyId": "job_1791145238223_50osg2osm",
+        "character": "Daniel"
+      },
+      "input": {
+        "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1791145238223_50osg2osm/aux/characterAvatars-Daniel-costumed--off_ART004.jpg",
+        "keptGarments": [
+          "grey wool tunic",
+          "wide brown leather belt",
+          "brown wool hose",
+          "brown leather baldric",
+          "brown leather mid-calf boots"
+        ]
+      },
+      "expect": {
+        "verdict": "flag",
+        "types": [
+          "kept"
+        ],
+        "about": [
+          "baldric"
+        ]
+      },
+      "source": "Daniel costumed bolt-off variant of staging job_1791145238223_50osg2osm (Emma und der Loewenatem), served as characterAvatars.Daniel.costumed--off:ART004. Viewed in full 2026-10-05: the brown leather baldric and the bolt holder are gone from all 4 body cells (5-8) but the baldric is still drawn in all 4 head cells. keptGarments is the Art Director's own redressNote \"grey wool tunic, wide brown leather belt, brown wool hose, brown leather baldric, brown leather mid-calf boots stay\" split on commas by hand."
+    },
+    {
+      "id": "kept-z3fw660ie-fiona-coat-off-clean",
+      "judge": "sheet_kept",
+      "target": {
+        "storyId": "job_1790446348343_z3fw660ie",
+        "character": "Fiona"
+      },
+      "input": {
+        "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1790446348343_z3fw660ie/tl_avatar/cover/v0.jpg",
+        "keptGarments": [
+          "white blouse",
+          "black skirt",
+          "orange sash",
+          "black boots"
+        ]
+      },
+      "expect": {
+        "verdict": "pass"
+      },
+      "source": "Fiona coat-off variant made by Lab #1596 (same image as sheet-z3fw660ie-fiona-coat-off-lab1596, which is flagged for head-row framing, not for garments). Viewed 2026-10-05: blouse, skirt, sash and boots are all drawn in body cells 5-8. keptGarments is the stored Art Director redressNote of job_1790446348343_z3fw660ie \"white blouse, black skirt, orange sash, black boots; weathered dark grey wool pirate coat is off\", split by hand."
+    },
+    {
+      "id": "kept-atbttop6w-kiaan-jacket-off-clean",
+      "judge": "sheet_kept",
+      "target": {
+        "storyId": "job_1791040103540_atbttop6w",
+        "character": "Kiaan"
+      },
+      "input": {
+        "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1791040103540_atbttop6w/tl_avatar/cover/v0.jpg",
+        "keptGarments": [
+          "black corduroy trousers",
+          "brown ankle boots",
+          "dark grey long-sleeved t-shirt"
+        ]
+      },
+      "expect": {
+        "verdict": "pass"
+      },
+      "source": "Kiaan jacket-off variant made by Lab #1596 (same image as sheet-atbttop6w-kiaan-jacket-off-lab1596). Viewed 2026-10-05: trousers, boots and the dark grey long-sleeved top are drawn in body cells 5-8. keptGarments is the stored Art Director redressNote of job_1791040103540_atbttop6w \"black corduroy trousers and brown ankle boots stay; jacket is off with nothing taking its place; a dark grey long-sleeved t-shirt now outermost\", split by hand (the t-shirt is the garment the removal leaves outermost)."
     }
   ]
 }

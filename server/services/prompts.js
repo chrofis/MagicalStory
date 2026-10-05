@@ -265,6 +265,7 @@ async function loadPromptTemplates() {
     ['avatarEvaluation', 'avatar-evaluation.txt'],
     ['sheet2x4StyleEval', 'sheet-2x4-style-eval.txt'],
     ['sheetGarmentGoneCheck', 'sheet-garment-gone-check.txt'],
+    ['sheetKeptGarmentCheck', 'sheet-kept-garment-check.txt'],
     ['sheetRowHeadsEval', 'sheet-row-heads-eval.txt'],
     ['sheetRowBodiesEval', 'sheet-row-bodies-eval.txt'],
     ['sheetRowIdentityEval', 'sheet-row-identity-eval.txt'],
