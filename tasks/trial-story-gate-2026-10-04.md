@@ -95,3 +95,32 @@ on each page or show only the text of the first pages? Think it through."
   read it — should say "behalten"; (2) "Deine Geschichte ist fertig!" + "Deine Geschichte ist bereit zum Lesen"
   say the same thing twice at the top.
 - Not on production. Production push needs the owner's explicit OK.
+
+## HANDOVER — session end 2026-10-05 (everything below is on STAGING; nothing on production)
+
+On staging (all verified on staging, iPhone/Android screenshots sent to the owner):
+- /try phone intro: finished book first, compact steps with owner-approved thumbnails (Lily: knight / reading,
+  originals scripts/ads/approved/try-steps/), start button pinned — 6ab466467, 911ff7dcf, 406758938.
+- Waiting page: title moment, pages 1–3 readable, pages 4–6 locked SERVER-side (TRIAL_FREE_PAGES = 3), unlock on
+  email, email changeable, reload resumes the story (bug trial-waiting-page-reload-loses-story fixed) —
+  ed1f27c07, b36317c6e (5933f5926), copy fix d64153ba1. Two real staging trial runs; run 2 passed every check.
+- TRIAL_ART_STYLE constant; preview-as-standard remnant removed (decisions.md 2026-10-04).
+- Homepage: hero trust row removed, hero text Inter/stone-600, en-dash " – " everywhere, both CTAs font-medium —
+  ccdc22205 (decisions.md 2026-10-04 "Homepage hero: no trust row").
+- Top bar fixed on every page: Navigation `minimal` variant replaces 5 hand-built bars; overflow-x-clip on
+  StoryWizard + TrialGenerationPage roots — 8e4cca4f2 (645cb5082). Re-measured: /create and /try bars stay.
+
+OPEN (owner):
+- [ ] Owner phone test on staging, then explicit OK for production. Production = cherry-pick ONLY these commits
+      onto origin/master in a scratch worktree (staging is hundreds of commits ahead; master is far behind in
+      trial.js — expect adaptation; re-run tsc + tests/unit/{trial-story-gate,trial-reload-and-art-style,
+      trial-intro-phone,navigation-always-sticky,trial-funnel-*}.test.ts on the merged state first).
+- [ ] Decide: ad-visit tracking (site_arrival/site_exit, fbb75e248) with that push or not.
+- [ ] Google Ads OAuth consent screen Testing -> In production, then scripts/ads/authorize.js (token dies every 7 days).
+- [ ] After production: resume Search-Deutschschweiz-v1 (activate-week.js ARMS status -> ENABLED, --apply), measure.
+- [ ] Footer tagline still uses "—" (site-wide footer, outside the homepage fix) — owner to decide.
+- [ ] Wilhelm Tell staging run job_1791145238223_50osg2osm findings reported to owner, NOT investigated/fixed
+      (another session's verification run): covers initialPage ≈ backCover (logged "not distinct", shipped);
+      repairs on dismissed findings (consolidator_fix_unbacked p5, p7); p7 73→55 and p10 60→55 with the
+      lower-scoring repair shown (check the picker's critical-gone rule before calling it a bug); outline 31/55 min.
+- Known gap: trial users never set a password (return from another device = "forgot password").
