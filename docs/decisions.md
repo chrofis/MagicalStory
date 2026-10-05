@@ -66233,3 +66233,21 @@ change is attributable to trust signals near the CTA.
 **Revisit if** sibling books keep landing in the elder child's band after the explanation ships, or parents ask for co-equal mains in 2-character stories.
 
 **Touched:** `server/lib/promptBuilders.js`, `client/src/utils/mainCharacters.ts`, `client/src/components/character/CharacterList.tsx`, `client/src/pages/StoryWizard.tsx`, `tests/unit/main-characters-client.test.ts`, `scripts/admin/sibling-registry.json` (staging 272ec4777, 774b0a502, 0240812b9).
+
+## 2026-10-05 — Admin-tools OAuth project was back in "Testing" (Ads token died every 7 days)
+
+**Context:** the 2026-09-06 entry "Admin-script OAuth lives in its own Google Cloud project" records
+`magicalstory-admin-tools` as published so its refresh tokens do not expire. On 2026-10-05 the owner found its
+Publishing status was **Testing**; the Ads refresh token had died after ~7 days twice (re-authorised 2026-09-21,
+`invalid_grant` by 2026-10-04), which is exactly Testing's 7-day token lifetime. Cause of the reversion unknown
+(not recorded anywhere; the console's Auth Platform migration has reset settings before).
+
+**Decision:** owner re-published it (In production, External, unverified — the "requires verification" banner and
+the Verification Center's branding/data-access notices are expected for a sensitive-scope admin app and need no
+action; do NOT submit it for verification). A new refresh token was issued after publishing (tokens issued while in
+Testing keep the 7-day lifetime). Verified: `node scripts/ads/whoami.js` answers.
+
+**Revisit if:** `invalid_grant` comes back — first check Google Auth Platform → Audience → Publishing status of
+`magicalstory-admin-tools` before anything else.
+
+**Touched files:** `scripts/ads/config.json` (gitignored, local token only).
