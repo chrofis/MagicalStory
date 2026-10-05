@@ -3449,6 +3449,15 @@
       "source": "Code review 2026-10-04 (tasks/code-review-2026-10/10-texts-layout.md, French texts)",
       "status": "fixed",
       "fixedAt": "2026-10-05"
+    },
+    {
+      "id": "historical-peril-exception-missing-on-arc-and-text",
+      "title": "The arc, told to keep nothing deadly, invented a blunt rubber-tipped bolt for a historical crossbow shot",
+      "reportedAt": "2026-10-05",
+      "source": "staging job_1791145238223_50osg2osm (historical Wilhelm Tell, youngest main age 5): stories.data.arcReviewReport.createLogic, outline, text 'der stumpfe Bolzen', visualBible",
+      "rootCause": "4804fe357 added 'a historical event keeps the danger it really had' only to the two idea templates. The same 'could lead to death' ceiling, hand-copied without the exception into the arc telling rules, story-arc-review, story-text-from-beats and text-refine, made the arc creator invent a safe bolt to comply; it spread to text, costume and Visual Bible.",
+      "impact": "A historical event lost its real danger and the invention rendered as a wooden tube.",
+      "status": "open"
     }
   ]
 }

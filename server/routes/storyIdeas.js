@@ -363,7 +363,7 @@ ${adventureGuideContent}` : '',
     topicPromiseSection,
   ].filter(Boolean).join('\n\n');
 
-  const { buildAgeModeSection } = require('../lib/promptBuilders');
+  const { buildAgeModeSection, PERIL_CEILING_RULE } = require('../lib/promptBuilders');
   // The contract switches on the YOUNGEST main character's age — the same person
   // the templates' existing "aged two or under" rules key off — not on
   // resolveAgeBand, which keys off the OLDEST main. Decided HERE, above the
@@ -471,6 +471,8 @@ ${adventureGuideContent}` : '',
     AVAILABLE_LANDMARKS: availableLandmarksSection,
     STORY_SCOPE: storyScope,
     AGE_MODE: ageModeSection,
+    // The peril ceiling + historical exception, one constant for every stage (decisions.md 2026-10-05).
+    PERIL_CEILING: PERIL_CEILING_RULE,
     LANGUAGE_INSTRUCTION: languageInstruction,
     // One premise shape per idea arm, picked in code (pickPremiseShapes). The
     // single-idea template takes {PREMISE_SHAPE} (overridden per arm by the

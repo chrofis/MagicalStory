@@ -5326,6 +5326,22 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "historical-keeps-real-danger",
+      "title": "A historical story keeps the event's real danger, told at a child's level, with no invented safety device",
+      "commits": [],
+      "addedAt": "2026-10-05",
+      "claim": "On a historical story with a danger at its centre (a shot, a crossing, a fire), the arc's STORY LOGIC and arc keep the real hazard (a real bolt, a real current) told at a child's level; no padded, blunt, rubber, toy or otherwise safe stand-in for the weapon or hazard appears in the logic, outline, text or Visual Bible.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Read arcReviewReport.createLogic and the Visual Bible of the run: the event's weapon or hazard is the real one, and nothing in logic, outline, text or bible makes it blunt, padded, rubber or toy-like."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [
