@@ -632,7 +632,7 @@ async function setRelationshipsForCharacter(page: Page, char: DemoCharacter, fam
       'Grandparent of': ['Grandparent of', 'Grosselternteil von', 'Grand-parent de'],
       'Grandchild of': ['Grandchild of', 'Enkelkind von', 'Petit-enfant de'],
       'Parent-in-law of': ['Parent-in-law of', 'Schwiegerelternteil von', 'Beau-parent de'],
-      'Child-in-law of': ['Child-in-law of', 'Schwiegerkind von', 'Bel-enfant de'],
+      'Child-in-law of': ['Child-in-law of', 'Schwiegerkind von', 'Gendre/Belle-fille de'],
       'Older Sibling of': ['Older Sibling of', 'Älteres Geschwister von', 'Frère/Sœur aîné(e) de'],
       'Younger Sibling of': ['Younger Sibling of', 'Jüngeres Geschwister von', 'Frère/Sœur cadet(te) de'],
       'Married to': ['Married to', 'Verheiratet mit', 'Marié(e) à'],
