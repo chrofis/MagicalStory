@@ -8,6 +8,7 @@ import { defaultStrengths } from '@/constants/traits';
 import { MAX_STRENGTHS } from '@/constants/traitLimits';
 import type { Language } from '@/types/story';
 import { trackTrialStep } from '@/utils/trialFunnel';
+import { classifyAccountCreateFailure } from '@/utils/trialSession';
 
 const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY || '';
 
@@ -52,6 +53,8 @@ const strings: Record<string, {
   avatarReward: string;
   avatarRewardChild: string;
   avatarCreating: string;
+  accountFailed: string;
+  verificationFailed: string;
 }> = {
   en: {
     title: 'Create Your Hero',
@@ -87,6 +90,8 @@ const strings: Record<string, {
     noFaceDetected: 'No face detected. Please try a different photo.',
     multipleFaces: 'Multiple faces detected. Please select the correct one.',
     photoError: 'Failed to analyze photo. Please try again.',
+    accountFailed: 'Account creation failed. Please try again.',
+    verificationFailed: 'The security check did not go through. Please try again in a moment.',
     photoUploaded: 'Photo uploaded',
     traitsOptional: 'optional — skip if you like',
     avatarReward: "Here's {name} as a character!",
@@ -127,6 +132,8 @@ const strings: Record<string, {
     noFaceDetected: 'Kein Gesicht erkannt. Bitte versuche ein anderes Foto.',
     multipleFaces: 'Mehrere Gesichter erkannt. Bitte wähle das richtige aus.',
     photoError: 'Foto konnte nicht analysiert werden. Bitte versuche es erneut.',
+    accountFailed: 'Das Konto konnte nicht erstellt werden. Bitte versuche es erneut.',
+    verificationFailed: 'Die Sicherheitsprüfung hat nicht geklappt. Bitte versuche es gleich noch einmal.',
     photoUploaded: 'Foto hochgeladen',
     traitsOptional: 'optional — kannst du überspringen',
     avatarReward: 'Hier ist {name} als Figur!',
@@ -167,6 +174,8 @@ const strings: Record<string, {
     noFaceDetected: 'Aucun visage détecté. Veuillez essayer une autre photo.',
     multipleFaces: 'Plusieurs visages détectés. Veuillez sélectionner le bon.',
     photoError: "Échec de l'analyse de la photo. Veuillez réessayer.",
+    accountFailed: 'La création du compte a échoué. Veuillez réessayer.',
+    verificationFailed: "La vérification de sécurité n'a pas abouti. Veuillez réessayer dans un instant.",
     photoUploaded: 'Photo téléchargée',
     traitsOptional: 'optionnel — tu peux passer',
     avatarReward: 'Voici {name} en personnage !',
@@ -207,6 +216,8 @@ const strings: Record<string, {
     noFaceDetected: 'Nessun viso rilevato. Prova con un\'altra foto.',
     multipleFaces: 'Rilevati più visi. Seleziona quello corretto.',
     photoError: 'Impossibile analizzare la foto. Riprova.',
+    accountFailed: "Creazione dell'account non riuscita. Riprova.",
+    verificationFailed: 'Il controllo di sicurezza non è andato a buon fine. Riprova tra un momento.',
     photoUploaded: 'Foto caricata',
     traitsOptional: 'opzionale — puoi saltare',
     avatarReward: 'Ecco {name} come personaggio!',
@@ -340,6 +351,11 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
   const facePhotoKey = characterData.photos.face ? characterData.photos.face.slice(-40) : '';
   // Initialize with current facePhotoKey if avatar already exists (survives component remount)
   const avatarPhotoKeyRef = useRef<string>(previewAvatar ? facePhotoKey : '');
+  // Latest photo key (read by the in-flight generation when it lands) and the key a generation was
+  // last started for (stops a failed generation from re-triggering itself in a loop).
+  const currentPhotoKeyRef = useRef<string>(facePhotoKey);
+  currentPhotoKeyRef.current = facePhotoKey;
+  const avatarAttemptKeyRef = useRef<string>('');
 
   // Start avatar generation in the background as soon as photo is ready
   // Re-triggers when photo changes (different face photo = different key)
@@ -348,6 +364,9 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
     if (!characterData.photos.face) return;
     // Skip if avatar was already generated for this exact photo
     if (previewAvatar && avatarPhotoKeyRef.current === facePhotoKey) return;
+    // Already tried for this exact photo (a failed attempt must not loop)
+    if (avatarAttemptKeyRef.current === facePhotoKey) return;
+    avatarAttemptKeyRef.current = facePhotoKey;
 
     // Clear stale avatar from previous photo
     if (previewAvatar && avatarPhotoKeyRef.current !== facePhotoKey) {
@@ -375,7 +394,9 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
         });
 
         const result = await response.json();
-        if (response.ok && result.avatarImage) {
+        // The visitor may have swapped photos while this was generating: a result for a photo
+        // that is no longer current is dropped, the effect re-runs for the new one when we finish.
+        if (response.ok && result.avatarImage && currentPhotoKeyRef.current === facePhotoKey) {
           avatarPhotoKeyRef.current = facePhotoKey;
           trackTrialStep('avatar_ready');
           onAvatarGenerated?.(result.avatarImage);
@@ -390,7 +411,7 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
     generateAvatar();
   // Trigger when photo changes (facePhotoKey changes when different photo uploaded)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasPhoto, facePhotoKey]);
+  }, [hasPhoto, facePhotoKey, isGeneratingAvatar]);
 
   // Shared account creation logic — invoked either by the background prewarm
   // effect (the moment the form first becomes valid) or by handleNext as a
@@ -410,6 +431,11 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
         if (token) break;
       }
     }
+
+    // A Turnstile token is single-use: whatever this attempt's outcome, it is spent. Drop it and
+    // reset the widget so the next attempt (retry, or the prewarm) gets a fresh one.
+    setTurnstileToken(null);
+    turnstileRef.current?.reset?.();
 
     // Snapshot the user-facing fields we're sending so the dirty-check on
     // Next knows whether a PATCH is needed.
@@ -551,11 +577,13 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
       }
     } catch (err) {
       const status = (err as { status?: number })?.status;
-      if (status && status >= 400 && status < 500) {
+      const failure = classifyAccountCreateFailure(status);
+      if (failure === 'signup') {
+        // Fingerprint/quota refusal: this visitor cannot have a trial
         navigate('/?signup=true');
         return;
       }
-      setAvatarError('Account creation failed. Please try again.');
+      setAvatarError(failure === 'verification' ? t.verificationFailed : t.accountFailed);
       setIsCreatingAccount(false);
       accountCreationPromiseRef.current = null; // allow retry
       return;

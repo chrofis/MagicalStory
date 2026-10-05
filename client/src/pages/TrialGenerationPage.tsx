@@ -9,6 +9,7 @@ import { INITIAL_USER_CREDITS } from '@/constants/credits';
 import { trackEmailLead, trackTrialStoryCompleted } from '@/utils/gtagConversion';
 import { trackEvent } from '@/utils/analytics';
 import { trackTrialStep } from '@/utils/trialFunnel';
+import { classifyJobStatusHttp, MAX_TRANSIENT_POLL_ERRORS, pollBackoffMs } from '@/utils/trialPoll';
 import { Navigation } from '@/components/common';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
@@ -65,6 +66,7 @@ const translations = {
     emailSent: 'Almost there — check your email!',
     emailSentDesc: 'Click the link in your email to finish setting up your account and keep your story.',
     emailSentNote: 'Didn\'t get it? Check your spam folder.',
+    claimFailed: 'Your email is confirmed, but we could not sign you in automatically yet. We keep retrying. If this stays, log in with your email address.',
     emailSentWarning: 'Without verification your story will be lost.',
     differentEmail: 'Use a different email',
     linkedSuccess: 'Account linked successfully!',
@@ -112,6 +114,7 @@ const translations = {
     emailSent: 'Fast geschafft — prüfe deine E-Mails!',
     emailSentDesc: 'Klicke auf den Link in deiner E-Mail, um dein Konto einzurichten und deine Geschichte zu behalten.',
     emailSentNote: 'Nicht erhalten? Prüfe deinen Spam-Ordner.',
+    claimFailed: 'Deine E-Mail ist bestätigt, aber wir konnten dich noch nicht automatisch anmelden. Wir versuchen es weiter. Falls es so bleibt, melde dich mit deiner E-Mail-Adresse an.',
     emailSentWarning: 'Ohne Bestätigung geht deine Geschichte verloren.',
     differentEmail: 'Andere E-Mail verwenden',
     linkedSuccess: 'Konto erfolgreich verknüpft!',
@@ -159,6 +162,7 @@ const translations = {
     emailSent: 'Presque terminé — vérifiez vos e-mails !',
     emailSentDesc: 'Cliquez sur le lien dans votre e-mail pour finaliser votre compte et garder votre histoire.',
     emailSentNote: 'Pas reçu ? Vérifiez votre dossier spam.',
+    claimFailed: 'Votre e-mail est confirmé, mais nous n\'avons pas encore pu vous connecter automatiquement. Nous réessayons. Si cela persiste, connectez-vous avec votre adresse e-mail.',
     emailSentWarning: 'Sans vérification, votre histoire sera perdue.',
     differentEmail: 'Utiliser une autre adresse',
     linkedSuccess: 'Compte lié avec succès !',
@@ -206,6 +210,7 @@ const translations = {
     emailSent: 'Ci siamo quasi — controlla la tua e-mail!',
     emailSentDesc: 'Clicca sul link nell\'e-mail per completare il tuo account e conservare la tua storia.',
     emailSentNote: 'Non l\'hai ricevuta? Controlla la cartella spam.',
+    claimFailed: 'La tua e-mail è confermata, ma non siamo ancora riusciti ad accedere automaticamente. Continuiamo a riprovare. Se non cambia, accedi con il tuo indirizzo e-mail.',
     emailSentWarning: 'Senza conferma la tua storia andrà persa.',
     differentEmail: 'Usa un\'altra e-mail',
     linkedSuccess: 'Account collegato con successo!',
@@ -328,6 +333,9 @@ export default function TrialGenerationPage() {
   const hasStartedRef = useRef(false);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollStartRef = useRef<number>(0);
+  // Transient (5xx/429) job-status failures: bounded, with backoff (utils/trialPoll.ts)
+  const pollErrorsRef = useRef(0);
+  const pollNotBeforeRef = useRef(0);
 
   // Title page image — always arrives via polling from the story generation pipeline
   const [titlePageImage, setTitlePageImage] = useState<string | null>(null);
@@ -356,6 +364,7 @@ export default function TrialGenerationPage() {
   const [editingEmail, setEditingEmail] = useState(false);
   const [googleLinked, setGoogleLinked] = useState(false);
   const [isVerified, setIsVerified] = useState(false);
+  const [claimFailed, setClaimFailed] = useState(false);
 
   const emailLinked = emailSubmitted || (serverUnlocked && !editingEmail && !googleLinked);
   const isLinked = emailLinked || googleLinked;
@@ -382,18 +391,30 @@ export default function TrialGenerationPage() {
         const statusData = await statusRes.json();
 
         if (statusData.emailVerified) {
-          clearInterval(interval);
-          // Exchange session token for a full JWT
-          const claimRes = await fetch(`${API_URL}/api/trial/claim-session`, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${state.sessionToken}` },
-          });
-          if (claimRes.ok) {
-            const { token } = await claimRes.json();
-            storage.setItem('auth_token', token);
-            storage.removeItem('trial_session_token');
+          // Exchange session token for a full JWT. Verified is only true once this succeeded;
+          // a failed claim keeps polling (= retry) and tells the visitor.
+          let claimed = false;
+          try {
+            const claimRes = await fetch(`${API_URL}/api/trial/claim-session`, {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${state.sessionToken}` },
+            });
+            if (claimRes.ok) {
+              const { token } = await claimRes.json();
+              storage.setItem('auth_token', token);
+              storage.removeItem('trial_session_token');
+              claimed = true;
+            }
+          } catch {
+            // network error: treated like a failed claim, retried on the next tick
           }
-          setIsVerified(true);
+          if (claimed) {
+            clearInterval(interval);
+            setClaimFailed(false);
+            setIsVerified(true);
+          } else {
+            setClaimFailed(true);
+          }
         }
       } catch {
         // Ignore polling errors
@@ -466,12 +487,24 @@ export default function TrialGenerationPage() {
         },
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        setPageState('failed');
-        return true; // stop polling
+      const outcome = classifyJobStatusHttp(response.status);
+      if (outcome === 'retry') {
+        pollErrorsRef.current++;
+        if (pollErrorsRef.current >= MAX_TRANSIENT_POLL_ERRORS) {
+          setPageState('failed');
+          return true; // stop polling: the server has been failing for minutes
+        }
+        pollNotBeforeRef.current = Date.now() + pollBackoffMs(pollErrorsRef.current);
+        return false; // keep polling, the story is still generating
       }
+      if (outcome === 'failed') {
+        setPageState('failed');
+        return true; // definitive: session/job gone
+      }
+      pollErrorsRef.current = 0;
+      pollNotBeforeRef.current = 0;
+
+      const data = await response.json();
 
       if (data.progress !== undefined) setProgress(data.progress);
 
@@ -529,6 +562,7 @@ export default function TrialGenerationPage() {
         setPageState('failed');
         return;
       }
+      if (Date.now() < pollNotBeforeRef.current) return; // backing off after a transient error
       const shouldStop = await pollJobStatus(jobId, state.sessionToken, needTitlePageRef.current);
       if (shouldStop && pollIntervalRef.current) {
         clearInterval(pollIntervalRef.current);
@@ -862,6 +896,9 @@ export default function TrialGenerationPage() {
                   <p className="text-gray-600 text-sm mb-2">{t.emailSentDesc}</p>
                   <p className="text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs font-medium mb-3">{t.emailSentWarning}</p>
                   <p className="text-xs text-gray-400 mb-3">{t.emailSentNote}</p>
+                  {claimFailed && (
+                    <p className="text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs font-medium mb-3">{t.claimFailed}</p>
+                  )}
                   <button
                     onClick={() => { setEmailSubmitted(false); setEditingEmail(true); setEmail(''); setAuthError(''); }}
                     className="text-indigo-500 text-sm font-medium hover:text-indigo-800 underline underline-offset-2"

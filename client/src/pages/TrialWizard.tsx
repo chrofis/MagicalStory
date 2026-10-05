@@ -10,6 +10,7 @@ import TrialIdeasStep from './trial/TrialIdeasStep';
 import { trackTrialPageVisit } from '@/utils/gtagConversion';
 import { trackEvent } from '@/utils/analytics';
 import { trackTrialStep } from '@/utils/trialFunnel';
+import { isTrialSessionDead } from '@/utils/trialSession';
 import { useAnalyzerPresence } from '@/hooks/useAnalyzerPresence';
 import { parseChildAge } from '@/constants/storyTypes';
 
@@ -154,6 +155,14 @@ const introStrings: Record<string, {
     freeNote: 'Questa prima storia è una prova gratuita veloce — pronta in ~3 minuti. Registrati per storie complete di alta qualità (un po\' più lente) — la prima è gratis.',
     cta: 'Iniziamo',
   },
+};
+
+// Shown on the character step after the server stopped accepting the trial session
+const sessionExpiredStrings: Record<string, string> = {
+  en: 'Your session has expired. Please set up your character again to continue.',
+  de: 'Deine Sitzung ist abgelaufen. Bitte richte deine Figur noch einmal ein, um weiterzumachen.',
+  fr: 'Votre session a expiré. Veuillez configurer à nouveau votre personnage pour continuer.',
+  it: 'La tua sessione è scaduta. Configura di nuovo il tuo personaggio per continuare.',
 };
 
 const loggedInStrings: Record<string, { title: string; desc: string; goToCreate: string }> = {
@@ -328,6 +337,7 @@ export default function TrialWizard() {
   const [characterId, setCharacterId] = useState<string | null>(null);
   const [trialUsed, setTrialUsed] = useState(false);
   const [trialStoryId, setTrialStoryId] = useState<string | null>(null);
+  const [sessionExpired, setSessionExpired] = useState(false);
   const [adminBypassToken, setAdminBypassToken] = useState<string | null>(null);
 
   // Fetch a short-lived bypass token for admin trial testing (not the full JWT)
@@ -349,9 +359,13 @@ export default function TrialWizard() {
     })
       .then(r => {
         if (!r.ok) {
-          // Token expired/invalid — clear stale session so fresh account gets created
-          setSessionToken(null);
-          localStorage.removeItem('trial_session_token');
+          // Only a definitive 401/403/404 drops the session (fresh account gets created).
+          // A transient 5xx/429 keeps it: losing it forces a new anonymous account, which the
+          // fingerprint limit can refuse.
+          if (isTrialSessionDead(r.status)) {
+            setSessionToken(null);
+            localStorage.removeItem('trial_session_token');
+          }
           return null;
         }
         return r.json();
@@ -367,11 +381,19 @@ export default function TrialWizard() {
         }
       })
       .catch(() => {
-        // Network error — clear stale token to be safe
-        setSessionToken(null);
-        localStorage.removeItem('trial_session_token');
+        // Network error: the session may be perfectly valid, keep it
       });
   }, [sessionToken]);
+
+  // The server rejected the session mid-flow: back to account creation with an explanation
+  const handleSessionExpired = useCallback(() => {
+    setSessionToken(null);
+    setCharacterId(null);
+    localStorage.removeItem('trial_session_token');
+    setSessionExpired(true);
+    setCurrentStep('character');
+    window.scrollTo(0, 0);
+  }, []);
 
   const handleAccountCreated = useCallback((token: string, charId: string) => {
     setSessionToken(token);
@@ -432,7 +454,12 @@ export default function TrialWizard() {
   }, []);
 
   const handleCreate = useCallback(() => {
-    if (selectedIdeaIndex === null || !sessionToken || !characterId) return;
+    if (selectedIdeaIndex === null) return;
+    // No session / character to create under: say so and restart account creation, never a silent no-op
+    if (!sessionToken || !characterId) {
+      handleSessionExpired();
+      return;
+    }
     trackTrialStep('create_clicked');
     const selectedIdea = generatedIdeas[selectedIdeaIndex];
     const finalStoryInput = {
@@ -453,7 +480,7 @@ export default function TrialWizard() {
         titlePageData,
       },
     });
-  }, [selectedIdeaIndex, generatedIdeas, sessionToken, characterId, storyInput, characterData.name, previewAvatar, titlePageData, navigate]);
+  }, [selectedIdeaIndex, generatedIdeas, sessionToken, characterId, storyInput, characterData.name, previewAvatar, titlePageData, navigate, handleSessionExpired]);
 
   // ─── Logged-in user redirect ────────────────────────────────────────────────
 
@@ -658,6 +685,11 @@ export default function TrialWizard() {
         <div className="md:bg-white md:rounded-2xl md:shadow-xl md:p-8">
           {/* Step content */}
           <div className="max-w-4xl mx-auto pb-12">
+            {sessionExpired && currentStep === 'character' && (
+              <p className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+                {sessionExpiredStrings[language] || sessionExpiredStrings.en}
+              </p>
+            )}
             {currentStep === 'character' && (
               <TrialCharacterStep
                 characterData={characterData}
@@ -693,6 +725,7 @@ export default function TrialWizard() {
                 onSelectIdea={handleSelectIdea}
                 onBack={goBack}
                 onCreate={handleCreate}
+                onSessionExpired={handleSessionExpired}
                 sessionToken={sessionToken}
                 onTitlePageReady={setTitlePageData}
                 userLocation={userLocation}
