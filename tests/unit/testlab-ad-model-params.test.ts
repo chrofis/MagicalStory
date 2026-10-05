@@ -71,3 +71,18 @@ describe('runArtDirector visualBibleModel', () => {
     expect(seen.beats_scene_expansion.opts.reasoning).toEqual({ effort: 'medium' });
   });
 });
+
+describe('runArtDirector labAdoptBibleFrom (reuseStoredBible)', () => {
+  it('absent: the bible call runs', async () => {
+    const seen = await run({});
+    expect(seen.beats_visual_bible).toBeDefined();
+  });
+  it('set: no bible call is paid, the briefs call still runs and cites the adopted bible', async () => {
+    const seen = await run({ labAdoptBibleFrom: BIBLE });
+    expect(seen.beats_visual_bible).toBeUndefined();
+    expect(seen.beats_scene_expansion).toBeDefined();
+  });
+  it('set to a transcript with no bible fails loudly', async () => {
+    await expect(run({ labAdoptBibleFrom: 'no bible here' })).rejects.toThrow(/labAdoptBibleFrom/);
+  });
+});

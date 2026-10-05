@@ -1582,7 +1582,7 @@ async function finalizePlanShotsJev({ approvedArc, beats, check, gl, callImpl })
  * @param {Map<number,string[]>} present - the shipped plan check's head count per page (the gaze roster)
  * @returns {Promise<{expansions: Array, visualBible: object|null, bibleSections: string|null, wardrobeBibleReport: object|null, sceneExpansionReport: object, briefBeats: Array, coverBeats: Array, briefsPrompt: string|null}>}
  */
-async function runArtDirector({ inputData, modelOverrides, clothingRequirements, visualBible, bibleSections, sceneModel, onChunk, gl, meta, stage, beats, arcCentralFigure, approvedArc, present = null, onVisualBible = null, wardrobeBibleReport = null, labCallOptions = {}, labForcePerPage = false, onCall = null, jevReport = null, visualBibleModel = null }) {
+async function runArtDirector({ inputData, modelOverrides, clothingRequirements, visualBible, bibleSections, sceneModel, onChunk, gl, meta, stage, beats, arcCentralFigure, approvedArc, present = null, onVisualBible = null, wardrobeBibleReport = null, labCallOptions = {}, labForcePerPage = false, onCall = null, jevReport = null, visualBibleModel = null, labAdoptBibleFrom = null }) {
   const lang = inputData.language || 'en';
   const imgModelConfig = IMAGE_MODELS[modelOverrides.imageModel || inputData.modelOverrides?.imageModel || MODEL_DEFAULTS.pageRenderImage];
   const availableAvatars = buildAvailableAvatarsForPrompt(inputData.characters || [], clothingRequirements);
@@ -1692,6 +1692,14 @@ async function runArtDirector({ inputData, modelOverrides, clothingRequirements,
   if (!vbPrompt) {
     log.error('🚨 [BEATS] visual-bible template unavailable — the story ships with an empty bible');
     gl.warn('beats_visual_bible_missing', 'The Visual Bible template is unavailable — story ships with an empty bible');
+  } else if (labAdoptBibleFrom) {
+    // Test Lab only (AD slimming 2026-10-05): adopt the bible a stored run wrote
+    // instead of writing one, so arms that differ only in call 2 cite the SAME
+    // ids and their briefs can be rendered with the story's own element plates.
+    const sections = extractBibleSections(labAdoptBibleFrom, AD_BIBLE_MARKERS);
+    const parsedVb = sections ? new UnifiedStoryParser(sections.body).extractVisualBible() : null;
+    if (!parsedVb) throw new Error('labAdoptBibleFrom: the stored transcript carries no parseable ---VISUAL BIBLE--- section');
+    adBible = { body: sections.body, visualBible: parsedVb, found: sections.found, modelId: 'stored bible (Lab)' };
   } else {
     await stage(30, 'Writing the visual bible...', { next: 36, ms: 90000 });
     for (let attempt = 1; attempt <= 2 && !adBible; attempt++) {

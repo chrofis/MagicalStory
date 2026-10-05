@@ -4465,6 +4465,9 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
       present: resolveReplayPresent(storyData),
       labCallOptions: sceneCallOptions(params),
       visualBibleModel: params.visualBibleModel || null,
+      // reuseStoredBible (AD slimming 2026-10-05): adopt the story's own bible so the
+      // arms differ only in call 2 and cite ids the story's element plates carry.
+      labAdoptBibleFrom: params.reuseStoredBible === true ? String(storyData.outline || '') : null,
       labForcePerPage: params.perPageExpansion === true,
       onCall: (res) => adCalls.push(res),
       // The run's Jev decision report (light before the AD; elements, aboard,
@@ -4528,7 +4531,7 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
           inputData: storyData, expansions, briefBeats: ad.briefBeats, visualBible: ad.visualBible,
           clothingRequirements: storyData.clothingRequirements || null,
           visualBibleJson: ad.visualBibleJson, availableAvatars: ad.availableAvatars, maxCharactersPerScene: ad.maxCharactersPerScene,
-          model: sceneModel, gl: { info: rec('info'), warn: rec('warn'), error: rec('error'), debug: rec('debug') },
+          model: params.reaskModel || sceneModel, gl: { info: rec('info'), warn: rec('warn'), error: rec('error'), debug: rec('debug') },
           onCall: (res) => reaskCalls.push(res),
           labCallOptions: sceneCallOptions(params),
         });
