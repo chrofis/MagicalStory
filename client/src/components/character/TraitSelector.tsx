@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Plus, ChevronDown, ChevronRight } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
+import { RENAMED_TRAITS_FR } from '@/constants/traits';
 
 interface TraitSelectorProps {
   label: string;
@@ -30,7 +31,7 @@ interface TraitSelectorProps {
 export function TraitSelector({
   label,
   traits,
-  selectedTraits,
+  selectedTraits: storedTraits,
   onSelect,
   minRequired = 0,
   maxAllowed,
@@ -38,6 +39,11 @@ export function TraitSelector({
   defaultExpanded = false,
 }: TraitSelectorProps) {
   const { t, language } = useLanguage();
+  // A French character saved before the 2026-10-05 rename keeps the old label; show it as the
+  // new one so its chip stays selected (the next toggle saves the new label).
+  const selectedTraits = language === 'fr'
+    ? [...new Set(storedTraits.map(tr => RENAMED_TRAITS_FR[tr] ?? tr))]
+    : storedTraits;
   const [customTrait, setCustomTrait] = useState('');
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 

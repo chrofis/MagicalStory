@@ -3,14 +3,14 @@ import type { Language } from '@/types/story';
 export const defaultStrengths: Record<Language, string[]> = {
   en: ['Cheerful', 'Kind', 'Caring', 'Funny', 'Forgiving', 'Protective', 'Loyal', 'Generous', 'Fair-minded', 'Honest', 'Confident', 'Brave', 'Trustworthy', 'Determined', 'Hardworking', 'Leader', 'Patient', 'Curious', 'Imaginative', 'Smart', 'Creative', 'Observant', 'Resourceful', 'Energetic', 'Fast', 'Strong', 'Adventurous'],
   de: ['Fröhlich', 'Freundlich', 'Hilfsbereit', 'Lustig', 'Nachsichtig', 'Beschützend', 'Treu', 'Grosszügig', 'Gerecht', 'Ehrlich', 'Selbstbewusst', 'Mutig', 'Vertrauenswürdig', 'Entschlossen', 'Fleissig', 'Anführer', 'Geduldig', 'Neugierig', 'Fantasievoll', 'Klug', 'Kreativ', 'Aufmerksam', 'Einfallsreich', 'Energiegeladen', 'Schnell', 'Stark', 'Abenteuerlustig'],
-  fr: ['Joyeux', 'Gentil', 'Attentionné', 'Drôle', 'Indulgent', 'Protecteur', 'Loyal', 'Généreux', 'Équitable', 'Honnête', 'Confiant', 'Courageux', 'Digne de confiance', 'Déterminé', 'Travailleur', 'Leader', 'Patient', 'Curieux', 'Imaginatif', 'Intelligent', 'Créatif', 'Observateur', 'Débrouillard', 'Énergique', 'Rapide', 'Fort', 'Aventureux'],
+  fr: ['Joyeux(se)', 'Gentil(le)', 'Attentionné(e)', 'Drôle', 'Indulgent(e)', 'Protecteur(trice)', 'Loyal(e)', 'Généreux(se)', 'Équitable', 'Honnête', 'Confiant(e)', 'Courageux(se)', 'Digne de confiance', 'Déterminé(e)', 'Travailleur(se)', 'Meneur(se)', 'Patient(e)', 'Curieux(se)', 'Imaginatif(ve)', 'Intelligent(e)', 'Créatif(ve)', 'Observateur(trice)', 'Débrouillard(e)', 'Énergique', 'Rapide', 'Fort(e)', 'Aventureux(se)'],
   it: ['Allegro', 'Gentile', 'Premuroso', 'Divertente', 'Indulgente', 'Protettivo', 'Leale', 'Generoso', 'Giusto', 'Onesto', 'Sicuro di sé', 'Coraggioso', 'Affidabile', 'Determinato', 'Diligente', 'Leader', 'Paziente', 'Curioso', 'Fantasioso', 'Intelligente', 'Creativo', 'Attento', 'Pieno di risorse', 'Energico', 'Veloce', 'Forte', 'Avventuroso'],
 };
 
 export const defaultFlaws: Record<Language, string[]> = {
   en: ['Impatient', 'Distracted', 'Talkative', 'Whiny', 'Messy', 'Forgetful', 'Tattletale', 'Sore Loser', 'Stubborn', 'Dishonest', 'Bossy', 'Gullible', 'Jealous', 'Easily scared', 'Clingy', 'Quick-tempered', 'Selfish', 'Sneaky', 'Reckless', 'Shy', 'Clumsy', 'Lazy', 'Boastful', 'Indecisive', 'Perfectionist'],
   de: ['Ungeduldig', 'Zerstreut', 'Gesprächig', 'Weinerlich', 'Unordentlich', 'Vergesslich', 'Petze', 'Schlechter Verlierer', 'Stur', 'Lügnerisch', 'Rechthaberisch', 'Leichtgläubig', 'Eifersüchtig', 'Ängstlich', 'Anhänglich', 'Jähzornig', 'Egoistisch', 'Hinterlistig', 'Leichtsinnig', 'Schüchtern', 'Tollpatschig', 'Faul', 'Prahlerisch', 'Unentschlossen', 'Perfektionist'],
-  fr: ['Impatient', 'Distrait', 'Bavard', 'Pleurnicheur', 'Désordonné', 'Oublieux', 'Rapporteur', 'Mauvais perdant', 'Têtu', 'Menteur', 'Autoritaire', 'Crédule', 'Jaloux', 'Facilement effrayé', 'Collant', 'Colérique', 'Égoïste', 'Sournois', 'Imprudent', 'Timide', 'Maladroit', 'Paresseux', 'Vantard', 'Indécis', 'Perfectionniste'],
+  fr: ['Impatient(e)', 'Distrait(e)', 'Bavard(e)', 'Pleurnicheur(se)', 'Désordonné(e)', 'Oublieux(se)', 'Rapporteur(se)', 'Mauvais(e) perdant(e)', 'Têtu(e)', 'Menteur(se)', 'Autoritaire', 'Crédule', 'Jaloux(se)', 'Facilement effrayé(e)', 'Collant(e)', 'Colérique', 'Égoïste', 'Sournois(e)', 'Imprudent(e)', 'Timide', 'Maladroit(e)', 'Paresseux(se)', 'Vantard(e)', 'Indécis(e)', 'Perfectionniste'],
   it: ['Impaziente', 'Distratto', 'Chiacchierone', 'Piagnucolone', 'Disordinato', 'Smemorato', 'Spione', 'Cattivo perdente', 'Testardo', 'Bugiardo', 'Prepotente', 'Credulone', 'Geloso', 'Pauroso', 'Appiccicoso', 'Irascibile', 'Egoista', 'Sornione', 'Imprudente', 'Timido', 'Goffo', 'Pigro', 'Vanaglorioso', 'Indeciso', 'Perfezionista'],
 };
 
@@ -117,3 +117,52 @@ export const challenges = defaultChallenges;
 // Legacy aliases (for backward compatibility)
 export const weaknesses = defaultFlaws;
 export const fears = defaultChallenges;
+
+
+/**
+ * French trait labels renamed 2026-10-05 (French only — several old words are also English traits) (they were masculine-only, and "Leader" was English).
+ * Characters saved before keep the old string; TraitSelector shows it as the new label so the
+ * chip stays selected, and the next save stores the new label.
+ */
+export const RENAMED_TRAITS_FR: Record<string, string> = {
+  'Joyeux': 'Joyeux(se)',
+  'Gentil': 'Gentil(le)',
+  'Attentionné': 'Attentionné(e)',
+  'Indulgent': 'Indulgent(e)',
+  'Protecteur': 'Protecteur(trice)',
+  'Loyal': 'Loyal(e)',
+  'Généreux': 'Généreux(se)',
+  'Confiant': 'Confiant(e)',
+  'Courageux': 'Courageux(se)',
+  'Déterminé': 'Déterminé(e)',
+  'Travailleur': 'Travailleur(se)',
+  'Leader': 'Meneur(se)',
+  'Patient': 'Patient(e)',
+  'Curieux': 'Curieux(se)',
+  'Imaginatif': 'Imaginatif(ve)',
+  'Intelligent': 'Intelligent(e)',
+  'Créatif': 'Créatif(ve)',
+  'Observateur': 'Observateur(trice)',
+  'Débrouillard': 'Débrouillard(e)',
+  'Fort': 'Fort(e)',
+  'Aventureux': 'Aventureux(se)',
+  'Impatient': 'Impatient(e)',
+  'Distrait': 'Distrait(e)',
+  'Bavard': 'Bavard(e)',
+  'Pleurnicheur': 'Pleurnicheur(se)',
+  'Désordonné': 'Désordonné(e)',
+  'Oublieux': 'Oublieux(se)',
+  'Rapporteur': 'Rapporteur(se)',
+  'Mauvais perdant': 'Mauvais(e) perdant(e)',
+  'Têtu': 'Têtu(e)',
+  'Menteur': 'Menteur(se)',
+  'Jaloux': 'Jaloux(se)',
+  'Facilement effrayé': 'Facilement effrayé(e)',
+  'Collant': 'Collant(e)',
+  'Sournois': 'Sournois(e)',
+  'Imprudent': 'Imprudent(e)',
+  'Maladroit': 'Maladroit(e)',
+  'Paresseux': 'Paresseux(se)',
+  'Vantard': 'Vantard(e)',
+  'Indécis': 'Indécis(e)'
+};
