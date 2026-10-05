@@ -1083,6 +1083,15 @@
   ],
   "withinFile": [
     {
+      "id": "textmodel-stream-completion",
+      "axis": "streaming provider entry points (Anthropic / Gemini / xAI / OpenRouter)",
+      "reason": "every streaming entry point in textModels.js must throw streamCutError when its body ends without that provider's completion signal; the OpenRouter path accepted two cut page-brief streams as successes (staging job_1791145238223_50osg2osm, 7 of the last 40 staging beats stories). docs/decisions.md 2026-10-05.",
+      "file": "server/lib/textModels.js",
+      "blockPattern": "(?:async\\s+)?function\\s+(call\\w*APIStreaming)\\s*\\(",
+      "mustContain": "streamCutError(",
+      "severity": "block"
+    },
+    {
       "id": "textmodel-prompt-guard",
       "axis": "streaming vs non-streaming provider entry points",
       "reason": "every provider entry point in textModels.js must guard its prompt string; callOpenRouterAPI shipped without it while all seven siblings had it.",

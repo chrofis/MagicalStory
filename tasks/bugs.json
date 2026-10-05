@@ -3353,6 +3353,18 @@
       "fixedAt": "2026-10-05",
       "fixedIn": "4086d5014",
       "fix": "coverBeats: a name in the list that is a cast member's name is the central figure, nothing is appended; arc spec: a cast member who plays the figure is named by their own name, ' / ' only for a real name change. Tests: tests/unit/covers-as-pages.test.ts, tests/unit/arc-logic-first.test.ts."
+    },
+    {
+      "id": "text-stream-cut-accepted-as-success",
+      "title": "A text stream cut mid-reply is accepted as a successful reply (OpenRouter, xAI, direct Gemini)",
+      "reportedAt": "2026-10-05",
+      "source": "Staging job_1791145238223_50osg2osm: two all-pages page-brief streams (Gemini 3.1 Pro via OpenRouter) cut after ~105 s (replies 21,988 and 9,543 chars, tokenUsage 0/0). 7 of the last 40 staging beats stories had a cut first attempt.",
+      "rootCause": "callOpenRouterAPIStreaming (and the xAI and Gemini stream paths) treat end-of-body as success: no check that [DONE], a finish_reason, or usage arrived, and OpenRouter's mid-stream event.error is ignored.",
+      "impact": "A cut reply spends the batch retry, then the per-page fallback (page 10,-1,-2,-3 cost $0.63 on this job).",
+      "status": "fixed",
+      "fixedAt": "2026-10-05",
+      "fixedIn": "COMMITHASH",
+      "fix": "textModels.streamCutError thrown (retryable) on every streaming path when the completion signal is missing or an SSE error arrives; per-attempt diagnostics in sceneExpansionReport.replies. Test: tests/unit/text-stream-completion.test.ts. docs/decisions.md 2026-10-05."
     }
   ]
 }

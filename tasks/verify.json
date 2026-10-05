@@ -5031,6 +5031,24 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "text-stream-cut-retried",
+      "title": "A cut text stream is retried by the transport; page-brief attempts carry finish reason and tokens",
+      "commits": [
+        "(this push)"
+      ],
+      "addedAt": "2026-10-05",
+      "claim": "On staging, a text stream that ends without its completion signal is retried by the transport (ERROR log 'STREAM] CUT' with provider/model/chars/elapsedMs, then a re-send); sceneExpansionReport.replies[] attempts carry stopReason, nativeFinishReason, inputTokens, outputTokens, provider, elapsedMs and cut; no reply with 0 output tokens is accepted as a page-brief reply.",
+      "runShape": [
+        "any"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Open a staging beats story's stored sceneExpansionReport.replies: each row has stopReason/outputTokens > 0/provider/elapsedMs; grep the Railway log for 'STREAM] CUT' followed by a successful re-send when a cut occurred."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [

@@ -116,6 +116,30 @@ function linkExternalAbort(controller, signal) {
   signal.addEventListener('abort', () => controller.abort(signal.reason), { once: true });
 }
 
+/**
+ * A text stream that did not finish is a failed call, never a short reply
+ * (staging job_1791145238223_50osg2osm: two Gemini 3.1 Pro page-brief streams
+ * were cut after ~105 s, 21,988 and 9,543 chars, no finish reason, no usage; the
+ * transport accepted both; see docs/decisions.md 2026-10-05). Every streaming
+ * path calls this when its body ends or an error event arrives. The error
+ * carries streamCut so withRetry re-sends it.
+ * @param {{provider:string, modelId:string, chars:number, startTime:number, why:string}} p
+ */
+function streamCutError({ provider, modelId, chars, startTime, why }) {
+  const elapsedMs = Date.now() - startTime;
+  const err = new Error(`${provider} stream cut (${why}) on ${modelId} after ${chars} chars, ${elapsedMs}ms`);
+  err.streamCut = true;
+  log.error(`🚨 [${provider.toUpperCase()} STREAM] CUT: ${why} — provider=${provider} model=${modelId} chars=${chars} elapsedMs=${elapsedMs}`);
+  return err;
+}
+
+// Mid-stream error payload of an OpenAI-compatible or Gemini SSE event, or null.
+function sseErrorOf(event) {
+  if (event && event.error) return typeof event.error === 'string' ? event.error : JSON.stringify(event.error);
+  if (event && event.choices?.[0]?.finish_reason === 'error') return `finish_reason=error ${JSON.stringify(event.choices[0].error || event.error || '')}`;
+  return null;
+}
+
 async function withRetry(fn, options = {}) {
   const { maxRetries = 2, baseDelay = 2000, maxDelay = 30000 } = options;
   let lastError;
@@ -138,6 +162,7 @@ async function withRetry(fn, options = {}) {
       // other than 429 (rate limit) wastes quota on errors that won't fix
       // themselves (400 bad request, 401/403 auth, 422 validation).
       const isRetryable =
+        error.streamCut === true ||
         error.code === 'UND_ERR_SOCKET' ||
         error.code === 'UND_ERR_HEADERS_TIMEOUT' ||
         error.code === 'ECONNRESET' ||
@@ -468,6 +493,7 @@ IMPORTANT: Start your response EXACTLY with: ${options.prefill}`
     let inputTokens = 0;
     let outputTokens = 0;
     let stopReason = null;
+    let sawMessageStop = false;
     let firstChunkTime = null;
     resetInactivity(); // Start inactivity timer after connection established
 
@@ -521,6 +547,8 @@ IMPORTANT: Start your response EXACTLY with: ${options.prefill}`
             } else if (event.type === 'message_start' && event.message?.usage) {
               // Initial message with input token count
               inputTokens = event.message.usage.input_tokens || 0;
+            } else if (event.type === 'message_stop') {
+              sawMessageStop = true;
             } else if (event.type === 'error') {
               // Mid-stream error event — fail loudly instead of silently skipping it
               const streamErr = new Error(`Anthropic streaming mid-stream error: ${JSON.stringify(event.error || event)}`);
@@ -535,6 +563,11 @@ IMPORTANT: Start your response EXACTLY with: ${options.prefill}`
       }
     } finally {
       reader.releaseLock();
+    }
+
+    // Anthropic ends every message with message_delta(stop_reason) then message_stop.
+    if (!sawMessageStop && !stopReason) {
+      throw streamCutError({ provider: 'anthropic', modelId, chars: fullText.length, startTime, why: 'body ended without message_stop or stop_reason' });
     }
 
     // Always log token usage for debugging, even if 0
@@ -630,6 +663,7 @@ async function callGeminiTextAPIStreaming(prompt, maxTokens, modelId, onChunk, o
     let buffer = '';
     let usage = geminiUsage(null);
     let finishReason = null;
+    let promptBlocked = false;
     let firstChunkTime = null;
     resetInactivity(); // Start inactivity timer after connection established
 
@@ -665,6 +699,14 @@ async function callGeminiTextAPIStreaming(prompt, maxTokens, modelId, onChunk, o
 
           try {
             const event = JSON.parse(data);
+            const evErr = sseErrorOf(event);
+            if (evErr) {
+              const streamErr = streamCutError({ provider: 'gemini', modelId, chars: fullText.length, startTime, why: `SSE error event ${evErr}` });
+              streamErr.isStreamError = true;
+              throw streamErr;
+            }
+            // A blocked prompt ends the stream with promptFeedback and no candidates.
+            if (event.promptFeedback?.blockReason) promptBlocked = true;
 
             // Extract text from candidates
             if (event.candidates?.[0]?.content?.parts?.[0]?.text) {
@@ -681,13 +723,20 @@ async function callGeminiTextAPIStreaming(prompt, maxTokens, modelId, onChunk, o
             // Extract usage metadata (usually in the last chunk)
             // Each event carries the cumulative totals; the last one wins.
             if (event.usageMetadata) usage = geminiUsage(event.usageMetadata);
-          } catch {
+          } catch (e) {
+            if (e && e.isStreamError) throw e;
             // Skip malformed JSON
           }
         }
       }
     } finally {
       reader.releaseLock();
+    }
+
+    // The last candidate chunk carries finishReason (STOP, MAX_TOKENS, SAFETY, ...).
+    // usageMetadata rides on every chunk, so it proves nothing about completion.
+    if (!finishReason && !promptBlocked) {
+      throw streamCutError({ provider: 'gemini', modelId, chars: fullText.length, startTime, why: 'body ended without a finishReason' });
     }
 
     // Always log token usage for debugging, even if 0
@@ -957,6 +1006,8 @@ async function callXaiAPIStreaming(prompt, maxTokens, modelId, onChunk, options 
       let usage = xaiUsage(null);
       let firstChunkTime = null;
       let finishReason = null;
+      let sawDone = false;
+      let sawUsage = false;
 
       resetInactivity();
 
@@ -984,10 +1035,16 @@ async function callXaiAPIStreaming(prompt, maxTokens, modelId, onChunk, options 
             if (!line.startsWith('data: ')) continue;
 
             const data = line.slice(6);
-            if (data === '[DONE]') continue;
+            if (data === '[DONE]') { sawDone = true; continue; }
 
             try {
               const event = JSON.parse(data);
+              const evErr = sseErrorOf(event);
+              if (evErr) {
+                const streamErr = streamCutError({ provider: 'xai', modelId, chars: fullText.length, startTime, why: `SSE error event ${evErr}` });
+                streamErr.isStreamError = true;
+                throw streamErr;
+              }
 
               // OpenAI-compatible streaming format
               if (event.choices?.[0]?.delta?.content) {
@@ -1002,14 +1059,20 @@ async function callXaiAPIStreaming(prompt, maxTokens, modelId, onChunk, options 
               if (event.choices?.[0]?.finish_reason) finishReason = event.choices[0].finish_reason;
 
               // Usage info (may come in the final chunk)
-              if (event.usage) usage = xaiUsage(event.usage);
-            } catch {
+              if (event.usage) { usage = xaiUsage(event.usage); sawUsage = true; }
+            } catch (e) {
+              if (e && e.isStreamError) throw e;
               // Skip malformed JSON
             }
           }
         }
       } finally {
         reader.releaseLock();
+      }
+
+      // OpenAI-compatible end of stream: [DONE], a finish_reason, or the usage chunk.
+      if (!sawDone && !finishReason && !sawUsage) {
+        throw streamCutError({ provider: 'xai', modelId, chars: fullText.length, startTime, why: 'body ended without [DONE], finish_reason or usage' });
       }
 
       log.debug(`📊 [XAI STREAM] Token usage - input: ${usage.input_tokens.toLocaleString()}, output: ${usage.output_tokens.toLocaleString()}, reasoning: ${usage.thinking_tokens.toLocaleString()}, finish_reason=${finishReason || 'none'}`);
@@ -1166,6 +1229,7 @@ async function callOpenRouterAPIStreaming(prompt, maxTokens, modelId, onChunk, o
       let totalTokens = 0;
       let rawUsage = null;
       let usageEvents = 0;
+      let sawDone = false;
       let finishReason = null;  // 'stop' | 'length' (cut at max_tokens) | null when the upstream omits it
       // The UPSTREAM's own reason, unnormalised. OpenRouter is how DeepSeek,
       // Qwen and OpenAI reach this codebase, and its normalised enum is
@@ -1200,10 +1264,18 @@ async function callOpenRouterAPIStreaming(prompt, maxTokens, modelId, onChunk, o
           for (const line of lines) {
             if (!line.startsWith('data: ')) continue;
             const data = line.slice(6);
-            if (data === '[DONE]') continue;
+            if (data === '[DONE]') { sawDone = true; continue; }
 
             try {
               const event = JSON.parse(data);
+              // OpenRouter reports an upstream failure mid-stream as an event
+              // with a top-level `error` and finish_reason 'error'.
+              const evErr = sseErrorOf(event);
+              if (evErr) {
+                const streamErr = streamCutError({ provider: 'openrouter', modelId, chars: fullText.length, startTime, why: `SSE error event ${evErr}` });
+                streamErr.isStreamError = true;
+                throw streamErr;
+              }
               // Only `content` is the answer. Reasoning models also stream
               // `delta.reasoning`, which the non-streaming path never returned
               // either — including it here would corrupt every parsed response.
@@ -1230,13 +1302,21 @@ async function callOpenRouterAPIStreaming(prompt, maxTokens, modelId, onChunk, o
                 totalTokens = event.usage.total_tokens || totalTokens;
                 if (typeof event.usage.cost === 'number') actualCost = event.usage.cost;
               }
-            } catch {
+            } catch (e) {
+              if (e && e.isStreamError) throw e;
               // Skip malformed JSON
             }
           }
         }
       } finally {
         reader.releaseLock();
+      }
+
+      // [DONE], a finish_reason or a usage event proves the upstream finished.
+      // None of them = the body just ended (the cut that shipped two truncated
+      // page-brief replies as successes).
+      if (!sawDone && !finishReason && usageEvents === 0) {
+        throw streamCutError({ provider: 'openrouter', modelId, chars: fullText.length, startTime, why: 'body ended without [DONE], finish_reason or usage' });
       }
 
       // Throughput is the diagnostic: the same model on a different upstream has
@@ -1491,6 +1571,7 @@ module.exports = {
 
   // Utility
   withRetry,
+  streamCutError,
   taskBudgetFor,
   anthropicOutputConfig,
   anthropicHeaders,

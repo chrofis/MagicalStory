@@ -1930,13 +1930,27 @@ ${bibleBody}` : bibleBody;
     await stage(36, 'Writing the scene briefs...', { next: 42, ms: 140000 });
     for (let attempt = 1; attempt <= 2; attempt++) {
       let allRaw = '';
+      const attemptStart = Date.now();
       try {
         const res = await textModels.callTextModelStreaming(allPrompt, null, onChunk, sceneModel, { usageLabel: 'beats_scene_expansion', ...labCallOptions });
         if (onCall) onCall(res);
         allRaw = res?.text || '';
         allModelId = res?.modelId || sceneModel;
-        adReplies.push({ attempt, modelId: allModelId, text: allRaw });
+        // Per-attempt diagnostics (2026-10-05): why the stream ended, so a cut is
+        // diagnosable from the stored report without Railway logs. Small scalars only.
+        adReplies.push({
+          attempt, modelId: allModelId, text: allRaw,
+          stopReason: res?.stop_reason ?? null,
+          nativeFinishReason: res?.native_finish_reason ?? null,
+          inputTokens: res?.usage?.input_tokens ?? null,
+          outputTokens: res?.usage?.output_tokens ?? null,
+          provider: res?.provider ?? null,
+          elapsedMs: Date.now() - attemptStart,
+          cut: false,
+        });
       } catch (err) {
+        // The transport already retried; a stream that never finished arrives here as streamCut.
+        adReplies.push({ attempt, modelId: sceneModel, text: '', error: String(err.message).slice(0, 300), elapsedMs: Date.now() - attemptStart, cut: err.streamCut === true });
         log.error(`🚨 [BEATS] All-pages scene briefs attempt ${attempt} failed (${err.message}) — falling back to per-page expansion`);
         gl.warn('beats_scene_expansion_failed', `All-pages call failed on attempt ${attempt}: ${err.message} — falling back to per-page expansion`);
         break;
