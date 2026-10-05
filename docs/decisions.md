@@ -66756,3 +66756,10 @@ Hazard Lab ids: 1631 1632 1633 1634 1639 1637 1638 (A), 1640-1645 and 1646 (B). 
 **Revisit if:** the owner wants the cost cut ($0.6 -> $0.14 per story) and the image phase confirms flash briefs paint as well; then repeat on 3+ stories with the new templates.
 
 **Touched files:** `server/lib/testlab.js`, `server/lib/beatsPipeline.js` (`visualBibleModel`), `tests/unit/testlab-ad-model-params.test.ts`.
+
+## 2026-10-05 · SSE responses bypass the gzip middleware
+
+**Context.** Full-wizard step 5 idea cards never appeared on staging. A timed call showed the first SSE event arriving only when the response ended (65 s without a location, 112 s for a home town), past the client's 2-minute idle timeout. `app.use(compression())` buffers `text/event-stream` (compressible) until zlib emits a block; the idea stream's small events and `: generating` pings never filled it. It worked before 2026-09-24 only because the stream carried the model's draft text (e472d3e02 cut that to the final idea plus pings).
+**Decision.** `server/lib/compressionFilter.js` skips compression for `text/event-stream`; server.js uses it. One filter covers every SSE route, including `/api/trial/generate-ideas-stream` (same pattern, same bug).
+**Rationale.** Raising the client timeout would hide it; per-route `res.flush()` would leave the next SSE route to rediscover it.
+**Touched files:** `server.js`, `server/lib/compressionFilter.js`, `tests/unit/sse-not-compressed.test.ts`.

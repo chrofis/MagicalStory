@@ -510,7 +510,7 @@ if (STAGING_AUTH_PASSWORD) {
 }
 
 // Gzip compression for all responses (reduces 33MB avatar data to ~5MB)
-app.use(compression());
+app.use(compression({ filter: require("./server/lib/compressionFilter").compressionFilter })); // SSE is never buffered, see the filter
 
 // Security headers with helmet
 app.use(helmet({
