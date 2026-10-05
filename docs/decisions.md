@@ -21,6 +21,16 @@ superseded and link forward.
 
 ---
 
+## 2026-10-05 — Kept-garment check with a fabric-blind instruction: bar NOT met again; production gate not shipped
+
+**Measured** (Lab #1619, #1620, set #82, $0.010; report `tests/judge-fixtures/baselines/2026-10-05-sheet-kept-c.json`): Daniel flagged 2/2, Fiona passed 2/2, Kiaan with the colour+noun list passed 2/2, Kiaan with the ORIGINAL list ("black corduroy trousers") flagged 2/2 ("dark trousers, but not corduroy").
+
+**Decision:** the owner's bar (original-list Kiaan passes) is not met. The instruction to judge by type and colour is in the prompt and the judge still reads the fabric word. Two paid attempts at the same thing have failed (burn-loop stop), so no third prompt retry. The AD `keptGarments` field and the `evaluateVariantSheet` rejection are NOT built. `checkKeptGarment` and the `sheet_kept` Lab judge stay Lab-only.
+
+**Considered:** a code-side strip of fabric words from kept names (rejected: pattern-matching description text in code, CLAUDE.md eval rule); a third rewording (stopped by the burn-loop rule, needs the owner's call); making the AD template enforce colour+noun for `keptGarments` (it already requires that form for `redressNote` and the judge passes such lists 4/4).
+**Revisit if:** the owner picks one of those, or a real AD-authored list passes on several stories.
+
+
 ## 2026-10-05 — The kept-garment check judges a garment by type and colour only
 
 **Context:** Lab #1614-#1617 (entry above): the check flagged a correct Kiaan sheet 4/4 because the kept name said "corduroy" and the sheet draws plain dark trousers.
