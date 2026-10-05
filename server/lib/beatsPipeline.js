@@ -1581,7 +1581,7 @@ async function finalizePlanShotsJev({ approvedArc, beats, check, gl, callImpl })
  * @param {Map<number,string[]>} present - the shipped plan check's head count per page (the gaze roster)
  * @returns {Promise<{expansions: Array, visualBible: object|null, bibleSections: string|null, wardrobeBibleReport: object|null, sceneExpansionReport: object, briefBeats: Array, coverBeats: Array, briefsPrompt: string|null}>}
  */
-async function runArtDirector({ inputData, modelOverrides, clothingRequirements, visualBible, bibleSections, sceneModel, onChunk, gl, meta, stage, beats, arcCentralFigure, approvedArc, present = null, onVisualBible = null, wardrobeBibleReport = null, labCallOptions = {}, labForcePerPage = false, onCall = null, jevReport = null }) {
+async function runArtDirector({ inputData, modelOverrides, clothingRequirements, visualBible, bibleSections, sceneModel, onChunk, gl, meta, stage, beats, arcCentralFigure, approvedArc, present = null, onVisualBible = null, wardrobeBibleReport = null, labCallOptions = {}, labForcePerPage = false, onCall = null, jevReport = null, visualBibleModel = null }) {
   const lang = inputData.language || 'en';
   const imgModelConfig = IMAGE_MODELS[modelOverrides.imageModel || inputData.modelOverrides?.imageModel || MODEL_DEFAULTS.pageRenderImage];
   const availableAvatars = buildAvailableAvatarsForPrompt(inputData.characters || [], clothingRequirements);
@@ -1695,13 +1695,13 @@ async function runArtDirector({ inputData, modelOverrides, clothingRequirements,
     await stage(30, 'Writing the visual bible...', { next: 36, ms: 90000 });
     for (let attempt = 1; attempt <= 2 && !adBible; attempt++) {
       try {
-        const res = await textModels.callTextModelStreaming(vbPrompt, null, onChunk, sceneModel, { usageLabel: 'beats_visual_bible', ...labCallOptions });
+        const res = await textModels.callTextModelStreaming(vbPrompt, null, onChunk, visualBibleModel || sceneModel, { usageLabel: 'beats_visual_bible', ...labCallOptions });
         if (onCall) onCall(res);
         const raw = res?.text || '';
-        vbReplies.push({ attempt, modelId: res?.modelId || sceneModel, text: raw });
+        vbReplies.push({ attempt, modelId: res?.modelId || visualBibleModel || sceneModel, text: raw });
         const sections = extractBibleSections(raw, AD_BIBLE_MARKERS);
         const parsedVb = sections ? new UnifiedStoryParser(sections.body).extractVisualBible() : null;
-        if (sections && parsedVb) adBible = { body: sections.body, visualBible: parsedVb, found: sections.found, modelId: res?.modelId || sceneModel };
+        if (sections && parsedVb) adBible = { body: sections.body, visualBible: parsedVb, found: sections.found, modelId: res?.modelId || visualBibleModel || sceneModel };
         else log.error(`🚨 [BEATS] Visual Bible attempt ${attempt}: ${sections ? `---VISUAL BIBLE--- present but its JSON did not parse (${sections.body.length} chars)` : `no ---VISUAL BIBLE--- section (${raw.length} chars)`}`);
       } catch (err) {
         log.error(`🚨 [BEATS] Visual Bible attempt ${attempt} failed: ${err.message}`);

@@ -4278,6 +4278,21 @@ function summarizeSceneExpansions(sceneExpansions) {
   };
 }
 
+/**
+ * The Lab-only reasoning control of the Art Director calls (bible, briefs,
+ * per-page fallback, brief re-ask). `sceneReasoningEffort` ("low"|"medium"|
+ * "high") asks OpenRouter for that effort; `sceneNoReasoning` switches
+ * reasoning off. Absent both: {} = the production call, unchanged.
+ * AD cheaper-model experiment, docs/decisions.md 2026-10-05.
+ */
+function sceneCallOptions(params) {
+  if (params.sceneReasoningEffort) {
+    if (!['low', 'medium', 'high'].includes(params.sceneReasoningEffort)) throw new Error(`sceneReasoningEffort must be low, medium or high (got "${params.sceneReasoningEffort}")`);
+    return { reasoning: { effort: params.sceneReasoningEffort } };
+  }
+  return params.sceneNoReasoning ? { reasoning: { enabled: false } } : {};
+}
+
 async function runBeatsScenesStage(target, { params = {}, promptOverride = null }) {
   const { loadPromptTemplates } = require('../services/prompts');
   await loadPromptTemplates();
@@ -4448,7 +4463,8 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
       approvedArc: resolveReplayArc(storyData, { parseBeats }), onVisualBible: null, wardrobeBibleReport: null,
       // The run's gaze roster: the shipped division's head count, as stored.
       present: resolveReplayPresent(storyData),
-      labCallOptions: params.sceneNoReasoning ? { reasoning: { enabled: false } } : {},
+      labCallOptions: sceneCallOptions(params),
+      visualBibleModel: params.visualBibleModel || null,
       labForcePerPage: params.perPageExpansion === true,
       onCall: (res) => adCalls.push(res),
       // The run's Jev decision report (light before the AD; elements, aboard,
@@ -4514,7 +4530,7 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
           visualBibleJson: ad.visualBibleJson, availableAvatars: ad.availableAvatars, maxCharactersPerScene: ad.maxCharactersPerScene,
           model: sceneModel, gl: { info: rec('info'), warn: rec('warn'), error: rec('error'), debug: rec('debug') },
           onCall: (res) => reaskCalls.push(res),
-          labCallOptions: params.sceneNoReasoning ? { reasoning: { enabled: false } } : {},
+          labCallOptions: sceneCallOptions(params),
         });
         for (const x of sceneExpansions) {
           const taken = report.pages.find(p => p.pageNumber === x.pageNumber);
@@ -10728,6 +10744,7 @@ module.exports = {
   // beats_scenes truncation recovery — exported so the decisions can be pinned
   // without a story, a DB or a paid model (tests/unit/testlab-beats-scenes-recovery.test.ts)
   summarizeSceneExpansions,
+  sceneCallOptions,
   // The two copies of the commission the judge reads — exported so their
   // agreement under a brief override can be pinned without a paid render
   // (tests/unit/testlab-brief-override-reaches-judge.test.ts).
