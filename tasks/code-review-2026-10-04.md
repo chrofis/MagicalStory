@@ -30,3 +30,8 @@ limits; NO FALLBACKS everywhere (Turnstile fails closed). One Sonnet agent at a 
 - [x] F6 Story pipeline (ee60dea83..e37033ec7) — A1, A2, C1, C2, C3, C4, C6, C8, C9, B1, B2, B3, B4 (area 1)
 - [x] F7 Images + repair (1986c0961..d558a57bc) — A1, A2, A4-A6, A8, A10, A11, C1, C3, C4, C5, D1-D4, B4, B5 (area 2)
 - [x] F8 Eval + scoring (702a3bfdd, 3afb7b596, 313cae148) — A1-A5, B1-B7 (area 3)
+
+## Fixes round 2 (areas 7-9; owner 2026-10-05: open Nochmal to customers, SEVERITIES list wins, fix all)
+- [x] F9 Client wizard + trial (12ad105e4, 9d24efe71; decisions entry for W5 photo-fallback removal still owed) — W1-W10, D7
+- [x] F10 Client display + Nochmal for customers (client commit + server gate commit) — D1 (server gate + client), D2, D3, D4, D5, D6
+- [x] F11 Server (L4, L6 still open: testlab.js had foreign edits) — S1-S4 (regenerate via makePageImagePrompt), L1, L2, L4-L7, G1, G2, G7, G8, G10
