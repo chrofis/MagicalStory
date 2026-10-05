@@ -92,7 +92,13 @@ function checkUndeclaredLettering({ lettering, declared } = {}) {
       character: null,
       source: 'lettering-check',
       description,
-      fix: `Paint over the lettering${l?.surface ? ` on ${l.surface}` : ''} as continuous scene material — no readable writing.`,
+      // When the page declares lettering, the repair that paints this one over
+      // must not take it with it: the inventory can misread a declared string
+      // (staging job_1791145238223_50osg2osm read the painted title
+      // "Löwenatem" as "Lövenatem", so the title was charged as a caption and
+      // the repair erased it). The sentence is structural, not a text match:
+      // declared lettering is excluded whatever this finding quotes.
+      fix: `Paint over the lettering${l?.surface ? ` on ${l.surface}` : ''} as continuous scene material — no readable writing.${declaredSquashed.length ? ' The required lettering stated in the repair instructions is not this lettering and is left exactly as it is.' : ''}`,
     });
   }
   return findings;

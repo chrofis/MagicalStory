@@ -2572,6 +2572,14 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     // `suppressed: 'landmark_protected'`) — the record, never the deduction.
     const guardLandmarkRecord = (holder, key, label) => require('./landmarkProtection')
       .guardLandmarkRecord(holder, key, landmarkProtection, { pageNumber: pageContext || null, label });
+    // A baked cover title that is missing or moved is CRITICAL whatever the judge
+    // tagged (owner, 2026-10-05; requiredText.floorCoverTitleSeverity). Run on
+    // every record a `required_text` finding can arrive in, right after the
+    // landmark guard, so the score, the consolidator and the pick-best all see
+    // the raised severity.
+    const floorCoverTitle = (holder, key) => {
+      if (holder && Array.isArray(holder[key])) require('./requiredText').floorCoverTitleSeverity(holder[key], requiredTextItems);
+    };
     // WHO THE EVALUATOR CAN ACTUALLY MATCH AGAINST. Filled by the reference
     // attach loop below with the names that reached the critique as a labelled
     // `Reference: <name>` image — not what was requested, what was attached.
@@ -3723,6 +3731,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
           // guardLandmarkRecord. Before the penalty and the summary below, so
           // neither ever sees a suppressed finding.
           guardLandmarkRecord(semanticResult, 'semanticIssues', '[EVAL semantic]');
+          floorCoverTitle(semanticResult, 'semanticIssues');
           if (semanticResult && semanticResult.semanticIssues && semanticResult.semanticIssues.length > 0) {
             // Semantic surcharge via the ONE shared table (scoring.js
             // SEMANTIC_ISSUE_PENALTY): the hand-copied chain here billed
@@ -3802,6 +3811,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       // inside evaluateThreeStage, so re-running over them drops nothing.
       const qualityRecord = { fixableIssues };
       guardLandmarkRecord(qualityRecord, 'fixableIssues', '[EVAL quality]');
+      floorCoverTitle(qualityRecord, 'fixableIssues');
       fixableIssues = qualityRecord.fixableIssues;
       const suppressedIssues = qualityRecord.suppressedIssues;
 
@@ -3957,6 +3967,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
           recordSemanticJudgeFailure(semanticResult, notEvaluated);
           // Same landmark guard as the parsed-JSON path (guardLandmarkRecord).
           guardLandmarkRecord(semanticResult, 'semanticIssues', '[EVAL semantic]');
+          floorCoverTitle(semanticResult, 'semanticIssues');
           if (semanticResult && semanticResult.semanticIssues && semanticResult.semanticIssues.length > 0) {
             // Shared table (scoring.js semanticPenaltyPoints) — same reason as
             // the parsed-JSON chain: the hand-copy billed CATASTROPHIC 10.

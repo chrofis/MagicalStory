@@ -12896,6 +12896,7 @@ module.exports = {
   buildReferenceCardColours,
   buildCoverPrompt,
   withBakedTitle,
+  bakedTitleLine,
   buildBasePrompt,
   buildRecurringElementsText,
   buildVisualBibleCallPrompt,

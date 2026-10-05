@@ -153,7 +153,10 @@ function collectRequiredTexts({ entries = null, objectIds = null, visualBible = 
 function coverRequiredTexts({ expectedText = null, textMode = null } = {}) {
   if (textMode === 'appOverlay') return [];
   const text = typeof expectedText === 'string' ? expectedText.trim() : '';
-  return text ? [{ id: null, label: 'cover', text }] : [];
+  // `coverTitle` marks the item for the two consumers that treat the title
+  // differently from a prop's sign: the repair clause (paint it back where the
+  // cover places it) and floorCoverTitleSeverity. Not used by the judge blocks.
+  return text ? [{ id: null, label: 'cover', text, coverTitle: true }] : [];
 }
 
 /**
@@ -209,7 +212,45 @@ function buildRequiredTextRulesBlock(items) {
  */
 function buildRequiredTextRepairClause(items) {
   if (!Array.isArray(items) || items.length === 0) return '';
-  return `\n\nRequired text in this illustration:\n${itemLines(items)}\n${REQUIRED_TEXT_RULE}`;
+  const title = items.filter(i => i.coverTitle);
+  const rest = items.filter(i => !i.coverTitle);
+  const parts = [];
+  if (rest.length) parts.push(`Required text in this illustration:\n${itemLines(rest)}\n${REQUIRED_TEXT_RULE}`);
+  // The cover title is never painted over, and a repaint that finds it missing
+  // or on another surface puts it back where the cover places it (decisions.md
+  // 2026-10-05). Placement comes from the generator's own title line, so the
+  // repair asks for exactly what the first render was asked for.
+  if (title.length) {
+    const { bakedTitleLine } = require('./promptBuilders');
+    for (const t of title) {
+      parts.push(`Cover title: ${bakedTitleLine(t.text)} The title is never painted over or removed by this edit. If it is missing, misspelled or painted on any other surface, paint it as the cover title here, reading exactly as written.`);
+    }
+  }
+  return `\n\n${parts.join('\n\n')}`;
+}
+
+const SEVERITY_RANK = { MINOR: 1, MODERATE: 2, MAJOR: 3, CRITICAL: 4, CATASTROPHIC: 5 };
+
+/**
+ * A missing or misplaced baked cover title can never rank beside a version that
+ * has it (owner, 2026-10-05; decisions.md 2026-10-05). The judges classify
+ * (`required_text`, COVER_TEXT in cover-evaluation-notes.txt); this raises the
+ * SEVERITY only, by type, and only on a cover that paints a title. Mutates the
+ * findings; returns how many it raised.
+ * @param {Array} issues evaluator findings ({type, severity})
+ * @param {Array} items  the image's required-text items (coverRequiredTexts marks the title)
+ */
+function floorCoverTitleSeverity(issues, items) {
+  if (!Array.isArray(issues) || !Array.isArray(items) || !items.some(i => i && i.coverTitle)) return 0;
+  let raised = 0;
+  for (const f of issues) {
+    if (String(f?.type || '').toLowerCase() !== 'required_text') continue;
+    if ((SEVERITY_RANK[String(f.severity || '').toUpperCase()] || 0) >= SEVERITY_RANK.CRITICAL) continue;
+    log.info(`🔤 [COVER TITLE] required_text ${f.severity || '(none)'} raised to CRITICAL: a cover that lost or moved its title cannot outrank one that has it`);
+    f.severity = 'CRITICAL';
+    raised++;
+  }
+  return raised;
 }
 
 /** Log line so a page's declared strings are traceable from the job log. */
@@ -228,5 +269,6 @@ module.exports = {
   buildRequiredTextBlock,
   buildRequiredTextRulesBlock,
   buildRequiredTextRepairClause,
+  floorCoverTitleSeverity,
   logRequiredTexts,
 };

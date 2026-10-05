@@ -41,6 +41,8 @@ You do NOT see the page image. Your job is to consolidate the evaluator findings
 
 7d. **Every fix carries `ids`** — the ids of the findings it fixes, on each `per_character_fixes[]` entry and on `scene_fix`. A finding you fix is a defect: none of a fix's ids appears in a rule 2 or 2a drop, and at least one is in a `deduped_issues` entry. A finding you drop under rule 2 or 2a gets no fix.
 
+7e. **A caption that is the required lettering misread is the required lettering.** When the input lists "Required lettering" and a finding calls some other lettering an unrequested caption, compare their words: if the caption's words are the required string with one or two letters read differently, it IS the required string, and the finding is not a caption to remove. Never write a fix that paints it over; the fix is to repaint the required string exactly as written in its required place, and the severity stays as filed.
+
 ## Drop policy
 
 - Never drop a CRITICAL or MAJOR severity issue except for these reasons: capped at 3 (rule 8), profile says trait is correct (rule 2), finding contradicts the brief (rule 2a), requires char-fix not inpaint (rule 7), or duplicated across evaluators (rule 1).
