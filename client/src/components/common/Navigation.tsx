@@ -8,6 +8,7 @@ import { ChangePasswordModal } from '@/components/auth/ChangePasswordModal';
 import { CreditsModal } from './CreditsModal';
 import { UserMenu } from './UserMenu';
 import { checkpointToPercent } from '@/components/generation/GenerationProgress';
+import { uiLabel } from '@/utils/uiLabels';
 
 interface CustomStep {
   key: string;
@@ -262,7 +263,7 @@ export function Navigation({ currentStep = 0, onStepClick, canAccessStep, develo
               className="bg-gray-800 text-white px-3 py-1.5 rounded text-xs font-semibold hover:bg-gray-700 flex items-center gap-2"
             >
               <Menu size={16} />
-              <span className="hidden md:inline">Menu</span>
+              <span className="hidden md:inline">{uiLabel('menu', language)}</span>
             </button>
 
             {showMenu && (

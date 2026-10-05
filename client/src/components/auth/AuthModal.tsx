@@ -6,6 +6,7 @@ import LoginForm from './LoginForm';
 import RegisterForm from './RegisterForm';
 import PasswordResetForm from './PasswordResetForm';
 import { localizedApiError } from '@/utils/apiErrors';
+import { uiLabel } from '@/utils/uiLabels';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -136,7 +137,7 @@ export function AuthModal({ isOpen, onClose, onSuccess, redirectUrl }: AuthModal
         <button
           onClick={onClose}
           className="absolute top-4 right-4 p-2 rounded-full hover:bg-gray-100 transition-colors"
-          aria-label="Close"
+          aria-label={uiLabel('close', language)}
         >
           <X size={20} />
         </button>

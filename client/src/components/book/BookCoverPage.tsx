@@ -1,5 +1,7 @@
 import React from 'react';
 import { Maximize2 } from 'lucide-react';
+import { uiLabel } from '@/utils/uiLabels';
+import { useLanguage } from '@/context/LanguageContext';
 
 interface BookCoverPageProps {
   imageUrl: string;
@@ -18,7 +20,9 @@ interface BookCoverPageProps {
  * react-pageflip requires forwardRef — the ref attaches to the outer div.
  */
 const BookCoverPage = React.forwardRef<HTMLDivElement, BookCoverPageProps>(
-  ({ imageUrl, alt, onImageClick, priority }, ref) => (
+  ({ imageUrl, alt, onImageClick, priority }, ref) => {
+    const { language } = useLanguage();
+    return (
     <div ref={ref} className="w-full h-full relative bg-white group">
       <img
         src={imageUrl}
@@ -33,13 +37,14 @@ const BookCoverPage = React.forwardRef<HTMLDivElement, BookCoverPageProps>(
           onTouchStart={(e) => e.stopPropagation()}
           onClick={(e) => { e.stopPropagation(); onImageClick(imageUrl); }}
           className="absolute top-2 left-1/2 -translate-x-1/2 p-1.5 rounded-full bg-black/30 text-white/80 hover:bg-black/50 hover:text-white transition-opacity opacity-0 group-hover:opacity-100 z-10"
-          aria-label="Fullscreen"
+          aria-label={uiLabel('fullscreen', language)}
         >
           <Maximize2 size={14} />
         </button>
       )}
     </div>
-  )
+    );
+  }
 );
 
 BookCoverPage.displayName = 'BookCoverPage';

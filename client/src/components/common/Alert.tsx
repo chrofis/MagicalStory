@@ -1,5 +1,7 @@
 import { ReactNode } from 'react';
 import { AlertCircle, CheckCircle, Info, AlertTriangle, X } from 'lucide-react';
+import { uiLabel } from '@/utils/uiLabels';
+import { useLanguage } from '@/context/LanguageContext';
 
 interface AlertProps {
   children: ReactNode;
@@ -39,6 +41,7 @@ export function Alert({
   onClose,
   className = '',
 }: AlertProps) {
+  const { language } = useLanguage();
   const config = variantConfig[variant];
   const IconComponent = config.icon;
 
@@ -60,7 +63,7 @@ export function Alert({
         <button
           onClick={onClose}
           className="shrink-0 p-1 rounded hover:bg-black/10 transition-colors"
-          aria-label="Dismiss"
+          aria-label={uiLabel('dismiss', language)}
         >
           <X size={16} />
         </button>

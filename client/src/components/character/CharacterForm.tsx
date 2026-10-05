@@ -13,6 +13,7 @@ import { getAgeCategory, characterService } from '@/services/characterService';
 import type { Character, PhysicalTraits, PhysicalTraitsSource, AgeCategory, ChangedTraits, RelationshipMap, RelationshipTextMap } from '@/types/character';
 import { getDisplayPhoto, getFaceThumb, getStandardAvatar, getAvatarInputPhoto } from '@/utils/characterPhotos';
 import type { CustomRelationshipPair } from '@/constants/relationships';
+import { uiLabel } from '@/utils/uiLabels';
 
 // Age category options for the dropdown (no age numbers - we already have real age field)
 const AGE_CATEGORY_OPTIONS: { value: AgeCategory; label: string; labelDe: string; labelFr: string; labelIt: string }[] = [
@@ -232,7 +233,7 @@ function PhysicalTraitsGrid({ character, language, updatePhysical, updateApparen
       <InlineEditField
         label={language === 'de' ? 'Augenfarbe' : language === 'fr' ? 'Couleur des yeux' : language === 'it' ? 'Colore degli occhi' : 'Eye Color'}
         value={character.physical?.eyeColor || ''}
-        placeholder={language === 'de' ? 'z.B. blau' : language === 'it' ? 'es. blu' : 'e.g. blue'}
+        placeholder={language === 'de' ? 'z.B. blau' : language === 'fr' ? 'p. ex. bleu' : language === 'it' ? 'es. blu' : 'e.g. blue'}
         onChange={(v) => updatePhysical('eyeColor', v)}
         isAiExtracted={isAiExtracted}
         isChanged={changedTraits?.eyeColor}
@@ -346,7 +347,7 @@ function PhysicalTraitsGrid({ character, language, updatePhysical, updateApparen
         <input
           type="text"
           value={character.physical?.skinTone || ''}
-          placeholder={language === 'de' ? 'z.B. hell, mittel' : language === 'it' ? 'es. chiaro, medio' : 'e.g. fair, medium'}
+          placeholder={language === 'de' ? 'z.B. hell, mittel' : language === 'fr' ? 'p. ex. clair, moyen' : language === 'it' ? 'es. chiaro, medio' : 'e.g. fair, medium'}
           onChange={(e) => updatePhysical('skinTone', e.target.value)}
           className={`flex-1 min-w-0 px-2 py-1 text-sm border rounded focus:outline-none focus:border-indigo-400 hover:border-gray-300 ${
             isUserEdited('skinTone')
@@ -385,7 +386,7 @@ function PhysicalTraitsGrid({ character, language, updatePhysical, updateApparen
         <InlineEditField
           label={language === 'de' ? 'Sonstiges' : language === 'fr' ? 'Autre' : language === 'it' ? 'Altro' : 'Other'}
           value={character.physical?.other || ''}
-          placeholder={language === 'de' ? 'z.B. Narben, Muttermale' : language === 'it' ? 'es. cicatrici, nei' : 'e.g. scars, birthmarks'}
+          placeholder={language === 'de' ? 'z.B. Narben, Muttermale' : language === 'fr' ? 'p. ex. cicatrices, grains de beauté' : language === 'it' ? 'es. cicatrici, nei' : 'e.g. scars, birthmarks'}
           onChange={(v) => updatePhysical('other', v)}
           isAiExtracted={isAiExtracted}
           isChanged={changedTraits?.other}
@@ -400,7 +401,7 @@ function PhysicalTraitsGrid({ character, language, updatePhysical, updateApparen
           <InlineEditField
             label={language === 'de' ? 'Brille' : language === 'fr' ? 'Lunettes' : language === 'it' ? 'Occhiali' : 'Glasses'}
             value={character.physical?.glasses || ''}
-            placeholder={language === 'de' ? 'z.B. runde schwarze Brille' : language === 'it' ? 'es. montatura nera rotonda' : 'e.g. round black-framed'}
+            placeholder={language === 'de' ? 'z.B. runde schwarze Brille' : language === 'fr' ? 'p. ex. monture ronde noire' : language === 'it' ? 'es. montatura nera rotonda' : 'e.g. round black-framed'}
             onChange={(v) => updatePhysical('glasses', v)}
             isAiExtracted={isAiExtracted}
             isChanged={false}
@@ -410,7 +411,7 @@ function PhysicalTraitsGrid({ character, language, updatePhysical, updateApparen
           <InlineEditField
             label={language === 'de' ? 'Sonstiges' : language === 'fr' ? 'Autre' : language === 'it' ? 'Altro' : 'Other'}
             value={character.physical?.other || ''}
-            placeholder={language === 'de' ? 'z.B. Narben, Muttermale' : language === 'it' ? 'es. cicatrici, nei' : 'e.g. scars, birthmarks'}
+            placeholder={language === 'de' ? 'z.B. Narben, Muttermale' : language === 'fr' ? 'p. ex. cicatrices, grains de beauté' : language === 'it' ? 'es. cicatrici, nei' : 'e.g. scars, birthmarks'}
             onChange={(v) => updatePhysical('other', v)}
             isAiExtracted={isAiExtracted}
             isChanged={changedTraits?.other}
@@ -426,7 +427,7 @@ function PhysicalTraitsGrid({ character, language, updatePhysical, updateApparen
           <InlineEditField
             label={language === 'de' ? 'Brille' : language === 'fr' ? 'Lunettes' : language === 'it' ? 'Occhiali' : 'Glasses'}
             value={character.physical?.glasses || ''}
-            placeholder={language === 'de' ? 'z.B. runde schwarze Brille' : language === 'it' ? 'es. montatura nera rotonda' : 'e.g. round black-framed'}
+            placeholder={language === 'de' ? 'z.B. runde schwarze Brille' : language === 'fr' ? 'p. ex. monture ronde noire' : language === 'it' ? 'es. montatura nera rotonda' : 'e.g. round black-framed'}
             onChange={(v) => updatePhysical('glasses', v)}
             isAiExtracted={isAiExtracted}
             isChanged={false}
@@ -732,10 +733,10 @@ export function CharacterForm({
                   <img
                     draggable={false}
                     src={displayPhoto}
-                    alt="Character"
+                    alt={uiLabel('character', language)}
                     className="w-24 h-24 rounded-full object-cover object-top border-4 border-indigo-400 shadow-lg cursor-pointer hover:opacity-80 transition-opacity"
                     onClick={() => setLightboxImage(displayPhoto)}
-                    title={language === 'de' ? 'Klicken zum Vergrössern' : language === 'it' ? 'Clicca per ingrandire' : 'Click to enlarge'}
+                    title={language === 'de' ? 'Klicken zum Vergrössern' : language === 'fr' ? 'Cliquer pour agrandir' : language === 'it' ? 'Clicca per ingrandire' : 'Click to enlarge'}
                   />
                 ) : (
                   <div className="w-24 h-24 rounded-full bg-gray-200 border-4 border-gray-300 flex items-center justify-center">
@@ -757,10 +758,10 @@ export function CharacterForm({
                 {character.photos?.face && (
                   <img
                     src={character.photos.face}
-                    alt="Face crop"
+                    alt={uiLabel('faceCrop', language)}
                     className="w-10 h-10 rounded object-cover border border-gray-300 cursor-pointer hover:opacity-80 transition-opacity"
                     onClick={() => setLightboxImage(character.photos!.face!)}
-                    title={language === 'de' ? 'Original-Gesichtsfoto' : language === 'it' ? 'Foto originale del viso' : 'Original face photo'}
+                    title={language === 'de' ? 'Original-Gesichtsfoto' : language === 'fr' ? 'Photo d’origine du visage' : language === 'it' ? 'Foto originale del viso' : 'Original face photo'}
                   />
                 )}
               </div>
@@ -883,9 +884,9 @@ export function CharacterForm({
           <div>
             <h3 className="text-2xl font-bold text-gray-800">{character.name}</h3>
             <p className="text-sm text-gray-500">
-              {character.gender === 'male' ? (language === 'de' ? 'Männlich' : language === 'it' ? 'Maschio' : 'Male') :
-               character.gender === 'female' ? (language === 'de' ? 'Weiblich' : language === 'it' ? 'Femmina' : 'Female') :
-               (language === 'de' ? 'Andere' : language === 'it' ? 'Altro' : 'Other')}, {character.age} {language === 'de' ? 'Jahre' : language === 'it' ? 'anni' : 'years'}
+              {character.gender === 'male' ? (language === 'de' ? 'Männlich' : language === 'fr' ? 'Masculin' : language === 'it' ? 'Maschio' : 'Male') :
+               character.gender === 'female' ? (language === 'de' ? 'Weiblich' : language === 'fr' ? 'Féminin' : language === 'it' ? 'Femmina' : 'Female') :
+               (language === 'de' ? 'Andere' : language === 'fr' ? 'Autre' : language === 'it' ? 'Altro' : 'Other')}, {character.age} {language === 'de' ? 'Jahre' : language === 'fr' ? 'ans' : language === 'it' ? 'anni' : 'years'}
             </p>
           </div>
         </div>
@@ -972,9 +973,9 @@ export function CharacterForm({
           <div>
             <h3 className="text-2xl font-bold text-gray-800">{character.name}</h3>
             <p className="text-sm text-gray-500">
-              {character.gender === 'male' ? (language === 'de' ? 'Männlich' : language === 'it' ? 'Maschio' : 'Male') :
-               character.gender === 'female' ? (language === 'de' ? 'Weiblich' : language === 'it' ? 'Femmina' : 'Female') :
-               (language === 'de' ? 'Andere' : language === 'it' ? 'Altro' : 'Other')}, {character.age} {language === 'de' ? 'Jahre' : language === 'it' ? 'anni' : 'years'}
+              {character.gender === 'male' ? (language === 'de' ? 'Männlich' : language === 'fr' ? 'Masculin' : language === 'it' ? 'Maschio' : 'Male') :
+               character.gender === 'female' ? (language === 'de' ? 'Weiblich' : language === 'fr' ? 'Féminin' : language === 'it' ? 'Femmina' : 'Female') :
+               (language === 'de' ? 'Andere' : language === 'fr' ? 'Autre' : language === 'it' ? 'Altro' : 'Other')}, {character.age} {language === 'de' ? 'Jahre' : language === 'fr' ? 'ans' : language === 'it' ? 'anni' : 'years'}
             </p>
           </div>
         </div>
@@ -1041,9 +1042,9 @@ export function CharacterForm({
           <div>
             <h3 className="text-2xl font-bold text-gray-800">{character.name}</h3>
             <p className="text-sm text-gray-500">
-              {character.gender === 'male' ? (language === 'de' ? 'Männlich' : language === 'it' ? 'Maschio' : 'Male') :
-               character.gender === 'female' ? (language === 'de' ? 'Weiblich' : language === 'it' ? 'Femmina' : 'Female') :
-               (language === 'de' ? 'Andere' : language === 'it' ? 'Altro' : 'Other')}, {character.age} {language === 'de' ? 'Jahre' : language === 'it' ? 'anni' : 'years'}
+              {character.gender === 'male' ? (language === 'de' ? 'Männlich' : language === 'fr' ? 'Masculin' : language === 'it' ? 'Maschio' : 'Male') :
+               character.gender === 'female' ? (language === 'de' ? 'Weiblich' : language === 'fr' ? 'Féminin' : language === 'it' ? 'Femmina' : 'Female') :
+               (language === 'de' ? 'Andere' : language === 'fr' ? 'Autre' : language === 'it' ? 'Altro' : 'Other')}, {character.age} {language === 'de' ? 'Jahre' : language === 'fr' ? 'ans' : language === 'it' ? 'anni' : 'years'}
             </p>
           </div>
         </div>
@@ -1150,7 +1151,7 @@ export function CharacterForm({
                 {language === 'de'
                   ? `So wird ${character.name} in deiner Geschichte aussehen`
                   : language === 'fr'
-                  ? `Voici comment ${character.name} apparaîtra dans ton histoire`
+                  ? `Voici comment ${character.name} apparaîtra dans votre histoire`
                   : language === 'it'
                   ? `Ecco come apparirà ${character.name} nella tua storia`
                   : `This is how ${character.name} will look in your story`
@@ -1161,7 +1162,7 @@ export function CharacterForm({
                 {language === 'de'
                   ? 'Du kannst warten oder direkt weiterfahren'
                   : language === 'fr'
-                  ? 'Tu peux attendre ou continuer'
+                  ? 'Vous pouvez attendre ou continuer'
                   : language === 'it'
                   ? 'Puoi aspettare o continuare'
                   : 'You can wait or continue'
@@ -1204,7 +1205,7 @@ export function CharacterForm({
                 {language === 'de'
                   ? 'Du kannst das Aussehen später jederzeit anpassen'
                   : language === 'fr'
-                  ? 'Tu peux modifier l\'apparence plus tard'
+                  ? 'Vous pouvez modifier l’apparence plus tard'
                   : language === 'it'
                   ? 'Puoi modificare l\'aspetto in qualsiasi momento'
                   : 'You can modify the look later anytime'}
@@ -1311,15 +1312,15 @@ export function CharacterForm({
                     alt={character.name}
                     className="w-14 h-14 rounded-full object-cover object-top border-2 border-indigo-400 cursor-pointer hover:opacity-80 transition-opacity"
                     onClick={() => setLightboxImage(character.avatars?.standard || displayPhoto)}
-                    title={language === 'de' ? 'Klicken zum Vergrössern' : language === 'it' ? 'Clicca per ingrandire' : 'Click to enlarge'}
+                    title={language === 'de' ? 'Klicken zum Vergrössern' : language === 'fr' ? 'Cliquer pour agrandir' : language === 'it' ? 'Clicca per ingrandire' : 'Click to enlarge'}
                   />
                   {character.photos?.face && (
                     <img
                       src={character.photos.face}
-                      alt="Face crop"
+                      alt={uiLabel('faceCrop', language)}
                       className="w-10 h-10 rounded object-cover border border-gray-300 cursor-pointer hover:opacity-80 transition-opacity"
                       onClick={() => setLightboxImage(character.photos!.face!)}
-                      title={language === 'de' ? 'Original-Gesichtsfoto' : language === 'it' ? 'Foto originale del viso' : 'Original face photo'}
+                      title={language === 'de' ? 'Original-Gesichtsfoto' : language === 'fr' ? 'Photo d’origine du visage' : language === 'it' ? 'Foto originale del viso' : 'Original face photo'}
                     />
                   )}
                 </div>
@@ -1348,7 +1349,7 @@ export function CharacterForm({
                 <h3
                   className="text-xl font-bold text-gray-800 cursor-pointer hover:text-indigo-500 flex items-center gap-1 group"
                   onClick={() => setIsEditingName(true)}
-                  title={language === 'de' ? 'Klicken zum Bearbeiten' : language === 'it' ? 'Clicca per modificare' : 'Click to edit'}
+                  title={language === 'de' ? 'Klicken zum Bearbeiten' : language === 'fr' ? 'Cliquer pour modifier' : language === 'it' ? 'Clicca per modificare' : 'Click to edit'}
                 >
                   {character.name}
                   <Pencil size={14} className="text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -1418,7 +1419,7 @@ export function CharacterForm({
                       alt={`${character.name} avatar`}
                       className={`w-full max-w-[180px] lg:max-w-full aspect-[3/4] object-contain rounded-lg bg-white cursor-pointer hover:opacity-90 transition-opacity ${character.avatars?.stale ? 'opacity-80' : ''}`}
                       onClick={() => setLightboxImage(avatarToShow)}
-                      title={language === 'de' ? 'Klicken zum Vergrössern' : language === 'it' ? 'Clicca per ingrandire' : 'Click to enlarge'}
+                      title={language === 'de' ? 'Klicken zum Vergrössern' : language === 'fr' ? 'Cliquer pour agrandir' : language === 'it' ? 'Clicca per ingrandire' : 'Click to enlarge'}
                     />
                     {isGenerating && (
                       <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-40 rounded-lg">
@@ -1435,12 +1436,12 @@ export function CharacterForm({
                     <div className="flex flex-col items-center gap-2">
                       <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
                       <span className="text-xs text-indigo-500 font-medium px-2 text-center">
-                        {language === 'de' ? (isLoadingFullAvatar ? 'Lädt...' : 'Wird erstellt...') : language === 'it' ? (isLoadingFullAvatar ? 'Caricamento...' : 'Creazione...') : (isLoadingFullAvatar ? 'Loading...' : 'Creating...')}
+                        {language === 'de' ? (isLoadingFullAvatar ? 'Lädt...' : 'Wird erstellt...') : language === 'fr' ? (isLoadingFullAvatar ? 'Chargement…' : 'Création…') : language === 'it' ? (isLoadingFullAvatar ? 'Caricamento...' : 'Creazione...') : (isLoadingFullAvatar ? 'Loading...' : 'Creating...')}
                       </span>
                     </div>
                   ) : (
                     <span className="text-[10px] text-gray-400 text-center px-2">
-                      {language === 'de' ? 'Kein Bild' : language === 'it' ? 'Nessuna immagine' : 'No image'}
+                      {language === 'de' ? 'Kein Bild' : language === 'fr' ? 'Aucune image' : language === 'it' ? 'Nessuna immagine' : 'No image'}
                     </span>
                   )}
                 </div>
@@ -2388,7 +2389,7 @@ export function CharacterForm({
                   ) : (
                     <div className="w-48 h-64 rounded-lg border-2 border-dashed border-gray-300 bg-gray-100 flex items-center justify-center">
                       <span className="text-gray-400 text-sm">
-                        {language === 'de' ? 'Kein Bild' : language === 'it' ? 'Nessuna immagine' : 'No image'}
+                        {language === 'de' ? 'Kein Bild' : language === 'fr' ? 'Aucune image' : language === 'it' ? 'Nessuna immagine' : 'No image'}
                       </span>
                     </div>
                   )}
@@ -2563,17 +2564,17 @@ export function CharacterForm({
                 }}
                 disabled={isRegeneratingAvatarsWithTraits || character.avatars?.status === 'generating' || (!developerMode && !isImpersonating && !canRegenerate)}
                 className="flex-1 px-4 py-3 text-sm font-medium bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors"
-                title={!developerMode && !isImpersonating && !canRegenerate ? (language === 'de' ? `Warten Sie ${waitSeconds}s` : language === 'it' ? `Attendi ${waitSeconds}s` : `Wait ${waitSeconds}s`) : undefined}
+                title={!developerMode && !isImpersonating && !canRegenerate ? (language === 'de' ? `Warten Sie ${waitSeconds}s` : language === 'fr' ? `Patientez ${waitSeconds} s` : language === 'it' ? `Attendi ${waitSeconds}s` : `Wait ${waitSeconds}s`) : undefined}
               >
                 {isRegeneratingAvatarsWithTraits ? (
                   <>
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    {language === 'de' ? 'Generiere...' : language === 'it' ? 'Generazione...' : 'Generating...'}
+                    {language === 'de' ? 'Generiere...' : language === 'fr' ? 'Génération…' : language === 'it' ? 'Generazione...' : 'Generating...'}
                   </>
                 ) : !developerMode && !isImpersonating && !canRegenerate ? (
                   <>
                     <Save size={16} />
-                    {language === 'de' ? `Warten (${waitSeconds}s)` : language === 'it' ? `Attendi (${waitSeconds}s)` : `Wait (${waitSeconds}s)`}
+                    {language === 'de' ? `Warten (${waitSeconds}s)` : language === 'fr' ? `Patienter (${waitSeconds} s)` : language === 'it' ? `Attendi (${waitSeconds}s)` : `Wait (${waitSeconds}s)`}
                   </>
                 ) : (
                   <>
@@ -2598,7 +2599,7 @@ export function CharacterForm({
               {language === 'de'
                 ? 'Möchten Sie die aktuelle Kleidung beibehalten oder die Kleidung aus dem neuen Foto verwenden?'
                 : language === 'fr'
-                  ? 'Voulez-vous garder les vêtements actuels ou utiliser ceux de la nouvelle photo?'
+                  ? 'Voulez-vous garder les vêtements actuels ou utiliser ceux de la nouvelle photo ?'
                   : language === 'it'
                     ? 'Vuoi mantenere l\'abbigliamento attuale o usare quello della nuova foto?'
                     : 'Do you want to keep the current clothing or use the clothing from the new photo?'}
@@ -2612,16 +2613,16 @@ export function CharacterForm({
                 </div>
                 <div className="text-gray-600 space-y-0.5">
                   {character.clothing.structured.upperBody && (
-                    <div>{language === 'de' ? 'Oberteil' : language === 'it' ? 'Sopra' : 'Top'}: {character.clothing.structured.upperBody}</div>
+                    <div>{language === 'de' ? 'Oberteil' : language === 'fr' ? 'Haut' : language === 'it' ? 'Sopra' : 'Top'}{language === 'fr' ? ' ' : ''}: {character.clothing.structured.upperBody}</div>
                   )}
                   {character.clothing.structured.lowerBody && (
-                    <div>{language === 'de' ? 'Unterteil' : language === 'it' ? 'Sotto' : 'Bottom'}: {character.clothing.structured.lowerBody}</div>
+                    <div>{language === 'de' ? 'Unterteil' : language === 'fr' ? 'Bas' : language === 'it' ? 'Sotto' : 'Bottom'}{language === 'fr' ? ' ' : ''}: {character.clothing.structured.lowerBody}</div>
                   )}
                   {character.clothing.structured.shoes && (
-                    <div>{language === 'de' ? 'Schuhe' : language === 'it' ? 'Scarpe' : 'Shoes'}: {character.clothing.structured.shoes}</div>
+                    <div>{language === 'de' ? 'Schuhe' : language === 'fr' ? 'Chaussures' : language === 'it' ? 'Scarpe' : 'Shoes'}{language === 'fr' ? ' ' : ''}: {character.clothing.structured.shoes}</div>
                   )}
                   {character.clothing.structured.fullBody && (
-                    <div>{language === 'de' ? 'Ganzkörper' : language === 'it' ? 'Completo' : 'Full outfit'}: {character.clothing.structured.fullBody}</div>
+                    <div>{language === 'de' ? 'Ganzkörper' : language === 'fr' ? 'Tenue complète' : language === 'it' ? 'Completo' : 'Full outfit'}{language === 'fr' ? ' ' : ''}: {character.clothing.structured.fullBody}</div>
                   )}
                 </div>
               </div>
@@ -2673,7 +2674,7 @@ export function CharacterForm({
               {language === 'de'
                 ? 'Klicke auf das Bild, das dir am besten gefällt'
                 : language === 'fr'
-                ? 'Clique sur l\'image que tu préfères'
+                ? 'Cliquez sur l’image que vous préférez'
                 : language === 'it'
                 ? 'Clicca sull\'immagine che preferisci'
                 : 'Click on the image you like best'}

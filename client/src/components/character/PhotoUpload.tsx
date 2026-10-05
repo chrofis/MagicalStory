@@ -3,6 +3,7 @@ import { Upload, CheckSquare, Square } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
+import { uiLabel } from '@/utils/uiLabels';
 
 interface PhotoUploadProps {
   onPhotoSelect: (file: File) => void;
@@ -190,7 +191,7 @@ export function PhotoUpload({ onPhotoSelect, showExamples = true }: PhotoUploadP
               <img
                     draggable={false}
                 src="/images/Full body.jpg"
-                alt="Full body example"
+                alt={uiLabel('exampleFullBody', language)}
                 className="w-full md:max-h-32 object-contain rounded border-2 border-green-400 mb-1"
               />
               <span className="text-xs text-green-600 font-medium">
@@ -202,7 +203,7 @@ export function PhotoUpload({ onPhotoSelect, showExamples = true }: PhotoUploadP
               <img
                     draggable={false}
                 src="/images/Upper body.jpg"
-                alt="Upper body example"
+                alt={uiLabel('exampleUpperBody', language)}
                 className="w-full md:max-h-32 object-contain rounded border-2 border-green-400 mb-1"
               />
               <span className="text-xs text-green-600 font-medium">
@@ -214,7 +215,7 @@ export function PhotoUpload({ onPhotoSelect, showExamples = true }: PhotoUploadP
               <img
                     draggable={false}
                 src="/images/No zoomed in close up.jpg"
-                alt="Too close example"
+                alt={uiLabel('exampleTooClose', language)}
                 className="w-full md:max-h-32 object-contain rounded border-2 border-red-400 mb-1"
               />
               <span className="text-xs text-red-600 font-medium">
@@ -226,7 +227,7 @@ export function PhotoUpload({ onPhotoSelect, showExamples = true }: PhotoUploadP
               <img
                     draggable={false}
                 src="/images/No sunglasses, hat or helmets.jpg"
-                alt="No accessories example"
+                alt={uiLabel('exampleNoAccessories', language)}
                 className="w-full md:max-h-32 object-contain rounded border-2 border-red-400 mb-1"
               />
               <span className="text-xs text-red-600 font-medium">
@@ -238,7 +239,7 @@ export function PhotoUpload({ onPhotoSelect, showExamples = true }: PhotoUploadP
               <img
                     draggable={false}
                 src="/images/One person not many.jpg"
-                alt="One person only example"
+                alt={uiLabel('exampleOnePerson', language)}
                 className="w-full md:max-h-32 object-contain rounded border-2 border-red-400 mb-1"
               />
               <span className="text-xs text-red-600 font-medium">

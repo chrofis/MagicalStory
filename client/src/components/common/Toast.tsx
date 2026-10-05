@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { CheckCircle, AlertCircle, Info, AlertTriangle, X } from 'lucide-react';
+import { uiLabel } from '@/utils/uiLabels';
+import { useLanguage } from '@/context/LanguageContext';
 
 export interface ToastProps {
   id: string;
@@ -43,6 +45,7 @@ export function Toast({
   onClose,
   details,
 }: ToastProps) {
+  const { language } = useLanguage();
   const [isVisible, setIsVisible] = useState(false);
   const [isLeaving, setIsLeaving] = useState(false);
 
@@ -97,7 +100,7 @@ export function Toast({
           <button
             onClick={handleClose}
             className="shrink-0 p-1 rounded hover:bg-white/20 transition-colors"
-            aria-label="Dismiss"
+            aria-label={uiLabel('dismiss', language)}
           >
             <X size={18} />
           </button>

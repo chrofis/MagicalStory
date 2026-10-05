@@ -6,6 +6,7 @@ import { Button } from '@/components/common/Button';
 import { Input } from '@/components/common/Input';
 import { Alert } from '@/components/common/Alert';
 import { localizedApiError } from '@/utils/apiErrors';
+import { uiLabel } from '@/utils/uiLabels';
 
 interface ChangePasswordModalProps {
   isOpen: boolean;
@@ -121,7 +122,7 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
         <button
           onClick={handleClose}
           className="absolute top-4 right-4 p-2 rounded-full hover:bg-gray-100 transition-colors"
-          aria-label="Close"
+          aria-label={uiLabel('close', language)}
         >
           <X size={20} />
         </button>
