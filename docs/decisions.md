@@ -21,6 +21,22 @@ superseded and link forward.
 
 ---
 
+## 2026-10-05 — Kept-garment check (option A) measured in the Lab: bar NOT met on the original lists; not shipped
+
+**Context:** Daniel's bolt-off sheet (staging job_1791145238223_50osg2osm) lost the baldric from body cells 5-8 and nothing flagged it. The owner chose option A with a Lab bench first: one question per kept garment about body cells 5-8, `checkKeptGarment` + `prompts/sheet-kept-garment-check.txt`, Lab judge `sheet_kept` (set #82). Bar: Daniel flagged 2/2, each good sheet passed 2/2.
+
+**Measured** (Lab #1614, #1615 on 3 fixtures; #1616, #1617 on 4; $0.018 total; reports `tests/judge-fixtures/baselines/2026-10-05-sheet-kept.json` and `-b.json`):
+- Daniel (baldric lost): flagged 4/4 runs, reason "not visible in any of cells 5 to 8; a belt is drawn instead".
+- Fiona coat-off (blouse, skirt, sash, boots): passed 4/4.
+- Kiaan jacket-off with the hand-written list "black corduroy trousers, brown ankle boots, dark grey long-sleeved t-shirt": FLAGGED 4/4. The check read "corduroy" literally ("plain dark trousers, not corduroy"). The list came from the stored Art Director note, which broke its own colour-plus-noun rule.
+- Same Kiaan sheet with "black trousers, brown ankle boots, dark grey long-sleeved t-shirt" (new fixture `kept-atbttop6w-kiaan-jacket-off-colour-noun`): passed 2/2.
+- Flips 0/4 fixtures.
+
+**Decision:** the stated bar is not met, so the production gate (AD `keptGarments` field and the `evaluateVariantSheet` rejection) is NOT built. `checkKeptGarment`, the template and the `sheet_kept` Lab judge stay, Lab-only.
+
+**Considered:** shipping with colour+noun lists only. It would pass the bench, but that bench list is a post-hoc edit of a fixture, so it needs the owner's call. The AD template already requires colour+noun only for `redressNote`, and a structured `keptGarments` field would carry that rule, but a model that slips a fabric word in still costs a false reject per variant attempt.
+**Revisit if:** the owner accepts the colour+noun framing, or a real AD-authored list over several stories passes.
+
 ## 2026-10-05 — The variant gate's answer is stored on the variant's styledAvatarGeneration entry
 
 **Context:** staging job_1791145238223_50osg2osm. Two off-garment variants were made and served, `character_2x4_garment_gone_check` was billed twice, and the answer lived only in a function return that `prepareWardrobeVariantAvatars` dropped. A rejected redress returned null, so even a rejection left nothing. Daniel's sheet lost a garment that should have stayed and nothing could be read back to see what the gate had been asked.

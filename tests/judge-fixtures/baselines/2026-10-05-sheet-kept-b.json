@@ -1,0 +1,135 @@
+{
+  "base": "https://staging.magicalstory.ch",
+  "experiments": [
+    1616,
+    1617
+  ],
+  "repeats": 2,
+  "params": null,
+  "ranAt": "2026-10-05T10:06:44.263Z",
+  "costUsd": 0.01,
+  "summary": {
+    "judges": {
+      "sheet_kept": {
+        "fixtures": 4,
+        "runs": 8,
+        "tp": 2,
+        "fn": 0,
+        "tn": 4,
+        "fp": 2,
+        "errors": 0,
+        "flipped": 0,
+        "repeated": 4,
+        "recall": 1,
+        "precision": 0.5,
+        "falseAlarmRate": 0.3333333333333333,
+        "flipRate": 0
+      }
+    },
+    "overall": {
+      "fixtures": 4,
+      "runs": 8,
+      "tp": 2,
+      "fn": 0,
+      "tn": 4,
+      "fp": 2,
+      "errors": 0,
+      "flipped": 0,
+      "repeated": 4,
+      "recall": 1,
+      "precision": 0.5,
+      "falseAlarmRate": 0.3333333333333333,
+      "flipRate": 0
+    }
+  },
+  "entries": [
+    {
+      "fixtureId": "kept-50osg2osm-daniel-baldric-lost",
+      "judge": "sheet_kept",
+      "experimentId": 1616,
+      "outcome": "TP",
+      "expected": "flag",
+      "said": [
+        "[-|kept] brown leather baldric: The brown leather baldric is not visible in any of the cells 5 to 8. Instead, a brown leather belt is visible around the waist in all four cells."
+      ],
+      "costUsd": 0.001693,
+      "costBasis": "measured (input + output + thinking, every garment call)"
+    },
+    {
+      "fixtureId": "kept-z3fw660ie-fiona-coat-off-clean",
+      "judge": "sheet_kept",
+      "experimentId": 1616,
+      "outcome": "TN",
+      "expected": "pass",
+      "said": [],
+      "costUsd": 0.0013126999999999998,
+      "costBasis": "measured (input + output + thinking, every garment call)"
+    },
+    {
+      "fixtureId": "kept-atbttop6w-kiaan-jacket-off-clean",
+      "judge": "sheet_kept",
+      "experimentId": 1616,
+      "outcome": "FP",
+      "expected": "pass",
+      "said": [
+        "[-|kept] black corduroy trousers: The figure in cells 5 to 8 is wearing plain dark trousers, not corduroy. There are no visible ridges or texture characteristic of corduroy fabric."
+      ],
+      "costUsd": 0.0010179,
+      "costBasis": "measured (input + output + thinking, every garment call)"
+    },
+    {
+      "fixtureId": "kept-atbttop6w-kiaan-jacket-off-colour-noun",
+      "judge": "sheet_kept",
+      "experimentId": 1616,
+      "outcome": "TN",
+      "expected": "pass",
+      "said": [],
+      "costUsd": 0.0009935999999999999,
+      "costBasis": "measured (input + output + thinking, every garment call)"
+    },
+    {
+      "fixtureId": "kept-50osg2osm-daniel-baldric-lost",
+      "judge": "sheet_kept",
+      "experimentId": 1617,
+      "outcome": "TP",
+      "expected": "flag",
+      "said": [
+        "[-|kept] brown leather baldric: The brown leather baldric is not visible in any of the cells 5 to 8. Instead, a brown leather belt is visible around the waist in all four cells."
+      ],
+      "costUsd": 0.0016905,
+      "costBasis": "measured (input + output + thinking, every garment call)"
+    },
+    {
+      "fixtureId": "kept-z3fw660ie-fiona-coat-off-clean",
+      "judge": "sheet_kept",
+      "experimentId": 1617,
+      "outcome": "TN",
+      "expected": "pass",
+      "said": [],
+      "costUsd": 0.0012827,
+      "costBasis": "measured (input + output + thinking, every garment call)"
+    },
+    {
+      "fixtureId": "kept-atbttop6w-kiaan-jacket-off-clean",
+      "judge": "sheet_kept",
+      "experimentId": 1617,
+      "outcome": "FP",
+      "expected": "pass",
+      "said": [
+        "[-|kept] black corduroy trousers: The figure in cells 5 to 8 is wearing plain dark trousers, not corduroy. There are no visible ridges or texture characteristic of corduroy fabric."
+      ],
+      "costUsd": 0.0010179,
+      "costBasis": "measured (input + output + thinking, every garment call)"
+    },
+    {
+      "fixtureId": "kept-atbttop6w-kiaan-jacket-off-colour-noun",
+      "judge": "sheet_kept",
+      "experimentId": 1617,
+      "outcome": "TN",
+      "expected": "pass",
+      "said": [],
+      "costUsd": 0.0009935999999999999,
+      "costBasis": "measured (input + output + thinking, every garment call)"
+    }
+  ]
+}

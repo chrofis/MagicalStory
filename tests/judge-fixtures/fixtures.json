@@ -1441,6 +1441,26 @@
         "verdict": "pass"
       },
       "source": "Kiaan jacket-off variant made by Lab #1596 (same image as sheet-atbttop6w-kiaan-jacket-off-lab1596). Viewed 2026-10-05: trousers, boots and the dark grey long-sleeved top are drawn in body cells 5-8. keptGarments is the stored Art Director redressNote of job_1791040103540_atbttop6w \"black corduroy trousers and brown ankle boots stay; jacket is off with nothing taking its place; a dark grey long-sleeved t-shirt now outermost\", split by hand (the t-shirt is the garment the removal leaves outermost)."
+    },
+    {
+      "id": "kept-atbttop6w-kiaan-jacket-off-colour-noun",
+      "judge": "sheet_kept",
+      "target": {
+        "storyId": "job_1791040103540_atbttop6w",
+        "character": "Kiaan"
+      },
+      "input": {
+        "imageUrl": "https://images-staging.magicalstory.ch/stories/job_1791040103540_atbttop6w/tl_avatar/cover/v0.jpg",
+        "keptGarments": [
+          "black trousers",
+          "brown ankle boots",
+          "dark grey long-sleeved t-shirt"
+        ]
+      },
+      "expect": {
+        "verdict": "pass"
+      },
+      "source": "Same sheet as kept-atbttop6w-kiaan-jacket-off-clean, kept list restated in colour plus garment noun only (the form the Art Director template requires). Added 2026-10-05 after Lab #1614/#1615 flagged \"black corduroy trousers\" 2/2: the sheet draws plain dark trousers and the check read the fabric word literally."
     }
   ]
 }
