@@ -36,6 +36,18 @@ const LP = {
   emotions: '/themes/life-challenges/managing-emotions',   // "Grosse Gefühle bewältigen"
   pacifier: '/themes/life-challenges/no-pacifier',         // "Ohne Schnuller"
   anxiety: '/themes/life-challenges/anxiety-worrying',     // "Sorgen & Ängste"
+  // Added 2026-10-05, each checked HTTP 200 with its own German title on production (an unknown id also returns 200 but with the
+  // generic homepage title, so the title is the real check).
+  potty: '/themes/life-challenges/potty-training',         // "Töpfchen-Training"
+  newSibling: '/themes/life-challenges/new-sibling',       // "Neues Geschwisterchen"
+  siblingFight: '/themes/life-challenges/sibling-fighting', // "Geschwisterstreit"
+  jealousy: '/themes/life-challenges/jealousy',            // "Mit Eifersucht umgehen"
+  kindergarten: '/themes/life-challenges/first-kindergarten', // "Erster Kindergartentag"
+  moving: '/themes/life-challenges/moving-house',          // "Umzug"
+  split: '/themes/life-challenges/parents-splitting',      // "Eltern leben getrennt"
+  teeth: '/themes/life-challenges/brushing-teeth',         // "Zähne putzen"
+  truth: '/themes/life-challenges/telling-truth',          // "Die Wahrheit sagen"
+  friends: '/themes/life-challenges/making-friends',       // "Echte Freunde finden"
 };
 
 // Shared closing copy - identical wording across groups on purpose (one claim, one phrasing).
@@ -113,6 +125,161 @@ const AD_GROUPS = [
       'angst im dunkeln schlafen', 'angst im dunkeln zu schlafen', 'angst im dunkeln was tun', 'angst im dunkeln überwinden',
       'kinderängste', 'kinderangst', 'kinderängste verstehen', 'kinderängste mit 5 jahren', 'trennungsangst'],
   },
+
+  // Added 2026-10-05 (owner: extend with more topics, bid stays CHF 0.20). Keywords: Keyword Planner CH/DE 2026-10-05
+  // (raw rows in tasks/ads-keywords-2026-10-05/), volume floor 10/mo. Topics checked and left out: going to bed / sleeping (planner
+  // returns only adult "einschlafen" terms), eating vegetables (only picture-book/cookbook intent), death of a pet or grandparent
+  // (volume is generic "tod kinderbuch" and has no matching landing page), bullying ("kinderbuch mobbing" is school/teen intent).
+  {
+    name: 'Toepfchen', lp: LP.potty, path: ['Kinderbuch', 'Toepfchen'],
+    copy: {
+      headlines: ['Kinderbuch Töpfchentraining', 'Windeln abgewöhnen mit Buch', 'Auf das Töpfchen gehen', 'Trocken werden mit Geschichte',
+        'Töpfchen ohne Druck', 'Abschied von der Windel', 'Für 2- bis 6-Jährige', ...CLOSE],
+      descriptions: [
+        'Ein Kinderbuch, in dem dein Kind aufs Töpfchen geht und stolz auf sich ist. Mit Foto.',
+        'Windeln abgewöhnen ohne Drama: eine Geschichte nur über dein Kind.',
+        TESTEN,
+        'Personalisiert mit Namen und Foto. In 3 Minuten erstellt, für 2 bis 6 Jahre.',
+      ],
+    },
+    keywords: ['töpfchentraining', 'töpfchentraining ab wann', 'ab wann töpfchentraining', 'windel abgewöhnen', 'kinderbuch töpfchen', 'bilderbuch töpfchen',
+      'bilderbuch töpfchen gehen', 'kinderbuch aufs töpfchen gehen', 'kinderbücher töpfchen gehen', 'kinderbuch toilettentraining', 'buch windel abgewöhnen',
+      'bücher töpfchentraining', 'töpfchentraining 3 jahre', 'windel abgewöhnen 3 jahre'],
+  },
+  {
+    name: 'Geschwisterchen', lp: LP.newSibling, path: ['Kinderbuch', 'Geschwisterchen'],
+    copy: {
+      headlines: ['Buch für neues Geschwisterchen', 'Ich werde grosse Schwester', 'Wenn ein Baby kommt', 'Eifersucht aufs Baby',
+        'Grosse Geschwister werden', 'Freude aufs Geschwisterchen', 'Für 2- bis 6-Jährige', ...CLOSE],
+      descriptions: [
+        'Ein Kinderbuch, in dem dein Kind sich aufs Geschwisterchen freut. Mit Namen und Foto.',
+        'Ein Baby kommt und Eifersucht ist da: eine Geschichte nur über dein Kind.',
+        TESTEN,
+        'Personalisiert mit Namen und Foto. In 3 Minuten erstellt, für 2 bis 6 Jahre.',
+      ],
+    },
+    keywords: ['kinderbuch geschwisterchen', 'kinderbuch ich bekomme ein geschwisterchen', 'bilderbuch geschwisterchen', 'kinderbuch geschwisterchen bekommen',
+      'kinderbuch neues geschwisterchen', 'kinderbücher ich bekomme ein geschwisterchen', 'neues geschwisterchen eifersucht'],
+  },
+  {
+    name: 'Geschwisterstreit', lp: LP.siblingFight, path: ['Kinderbuch', 'Geschwister'],
+    copy: {
+      headlines: ['Buch bei Geschwisterstreit', 'Wenn Geschwister streiten', 'Streit unter Geschwistern', 'Friedlich miteinander spielen',
+        'Geschichte über Geschwister', 'Streit verstehen und lösen', 'Für 3- bis 8-Jährige', ...CLOSE],
+      descriptions: [
+        'Ein Kinderbuch, in dem dein Kind lernt, mit Geschwisterstreit umzugehen. Mit Foto.',
+        'Geschwister streiten ständig? Eine Geschichte, in der dein Kind die Hauptfigur ist.',
+        TESTEN,
+        'Personalisiert mit Namen und Foto. In 3 Minuten erstellt, für 3 bis 8 Jahre.',
+      ],
+    },
+    keywords: ['geschwisterstreit', 'streit geschwister', 'geschwisterstreit kleinkinder', 'geschwister streiten immer', 'wenn geschwister streiten',
+      'geschwisterstreit lösen', 'geschwisterstreit schlichten', 'ständiger geschwisterstreit'],
+  },
+  {
+    name: 'Eifersucht', lp: LP.jealousy, path: ['Kinderbuch', 'Eifersucht'],
+    copy: {
+      headlines: ['Kinderbuch über Eifersucht', 'Eifersucht unter Geschwistern', 'Mit Eifersucht umgehen', 'Kind ist eifersüchtig',
+        'Eifersucht verstehen lernen', 'Geschichte über Gefühle', 'Für 3- bis 8-Jährige', ...CLOSE],
+      descriptions: [
+        'Ein Kinderbuch, in dem dein Kind lernt, mit Eifersucht umzugehen. Mit Namen und Foto.',
+        'Eifersucht auf Geschwister: eine Geschichte nur über dein Kind.',
+        TESTEN,
+        'Personalisiert mit Namen und Foto. In 3 Minuten erstellt, für 3 bis 8 Jahre.',
+      ],
+    },
+    keywords: ['kinderbuch eifersucht', 'kinderbuch eifersucht geschwister', 'kinderbuch geschwister eifersucht', 'bilderbuch geschwister eifersucht',
+      'buch eifersucht geschwister', 'buch geschwister eifersucht', 'eifersucht geschwister buch'],
+  },
+  {
+    name: 'Kindergartenstart', lp: LP.kindergarten, path: ['Kinderbuch', 'Kindergarten'],
+    copy: {
+      headlines: ['Buch zum Kindergartenstart', 'Erster Kindergartentag', 'Mut für den Kindergarten', 'Dein Kind im Kindergarten',
+        'Aufregung vor dem Start', 'Geschichte zum Start', 'Für 2- bis 6-Jährige', ...CLOSE],
+      descriptions: [
+        'Ein Kinderbuch, in dem dein Kind den ersten Kindergartentag als Held erlebt. Mit Foto.',
+        'Aufregung vor dem Start: eine Mutgeschichte nur über dein Kind.',
+        TESTEN,
+        'Personalisiert mit Namen und Foto. In 3 Minuten erstellt, für 2 bis 6 Jahre.',
+      ],
+    },
+    keywords: ['erster kindergartentag', 'erste kindergartentag', 'erste kindergarten tag', 'bilderbuch kindergartenstart', 'der erste kindergartentag'],
+  },
+  {
+    name: 'Umzug', lp: LP.moving, path: ['Kinderbuch', 'Umzug'],
+    copy: {
+      headlines: ['Kinderbuch zum Umzug', 'Wir ziehen um', 'Neues Zuhause, neuer Mut', 'Abschied vom alten Zuhause',
+        'Umziehen mit Kindern', 'Neue Wohnung, neue Freunde', 'Für 3- bis 8-Jährige', ...CLOSE],
+      descriptions: [
+        'Ein Kinderbuch, in dem dein Kind sich auf das neue Zuhause freut. Mit Namen und Foto.',
+        'Umzug und Abschied: eine Geschichte, in der dein Kind die Hauptfigur ist.',
+        TESTEN,
+        'Personalisiert mit Namen und Foto. In 3 Minuten erstellt, für 3 bis 8 Jahre.',
+      ],
+    },
+    keywords: ['umzug kinderbuch', 'kinderbuch umzug', 'kinderbücher umzug', 'bilderbuch umzug', 'kinderbuch über umzug', 'kinderbuch zum thema umzug',
+      'kinderbuch abschied umzug', 'kinderbuch umzug neuer kindergarten'],
+  },
+  {
+    name: 'Trennung', lp: LP.split, path: ['Kinderbuch', 'Trennung'],
+    copy: {
+      headlines: ['Kinderbuch bei Trennung', 'Wenn Eltern sich trennen', 'Kinderbuch über Scheidung', 'Trennung kindgerecht erklärt',
+        'Zwei Zuhause für dein Kind', 'Geborgenheit im Buch', 'Für 3- bis 8-Jährige', ...CLOSE],
+      descriptions: [
+        'Ein Kinderbuch für Kinder getrennter Eltern, in dem dein Kind die Hauptfigur ist.',
+        'Trennung und Veränderung: eine behutsame Geschichte nur über dein Kind.',
+        TESTEN,
+        'Personalisiert mit Namen und Foto. In 3 Minuten erstellt, für 3 bis 8 Jahre.',
+      ],
+    },
+    keywords: ['kinderbuch trennung eltern', 'kinderbücher trennung eltern', 'kinderbuch über trennung der eltern', 'kinderbuch trennung der eltern',
+      'scheidung kinderbuch', 'bilderbuch trennung eltern', 'kinderbuch scheidung', 'bilderbuch scheidung', 'kinderbuch scheidung der eltern',
+      'kinderbuch trennung scheidung', 'kinderbücher zum thema scheidung', 'kinderbücher über scheidung'],
+  },
+  {
+    name: 'Zaehneputzen', lp: LP.teeth, path: ['Kinderbuch', 'Zaehneputzen'],
+    copy: {
+      headlines: ['Kinderbuch Zähneputzen', 'Zähne putzen mit Freude', 'Zähneputzen ohne Streit', 'Kind will nicht Zähne putzen',
+        'Geschichte zum Zähneputzen', 'Dein Kind als Zahnputz-Held', 'Für 2- bis 6-Jährige', ...CLOSE],
+      descriptions: [
+        'Ein Kinderbuch, in dem dein Kind gerne die Zähne putzt. Mit Namen und Foto.',
+        'Zähneputzen ohne Drama: eine Geschichte nur über dein Kind.',
+        TESTEN,
+        'Personalisiert mit Namen und Foto. In 3 Minuten erstellt, für 2 bis 6 Jahre.',
+      ],
+    },
+    keywords: ['zähneputzen kinderbuch', 'kinderbuch zähneputzen', 'bilderbuch zähne putzen', 'kinderbuch über zähneputzen', 'kinderbücher zähne putzen',
+      'zähne putzen kinderbuch'],
+  },
+  {
+    name: 'Luegen', lp: LP.truth, path: ['Kinderbuch', 'Wahrheit'],
+    copy: {
+      headlines: ['Kinderbuch über Lügen', 'Die Wahrheit sagen lernen', 'Wenn dein Kind lügt', 'Ehrlich sein im Buch',
+        'Geschichte über Wahrheit', 'Mut zur Wahrheit', 'Für 3- bis 8-Jährige', ...CLOSE],
+      descriptions: [
+        'Ein Kinderbuch, in dem dein Kind lernt, die Wahrheit zu sagen. Mit Namen und Foto.',
+        'Lügen und Ausreden: eine Geschichte, in der dein Kind die Hauptfigur ist.',
+        TESTEN,
+        'Personalisiert mit Namen und Foto. In 3 Minuten erstellt, für 3 bis 8 Jahre.',
+      ],
+    },
+    keywords: ['kinderbuch lügen', 'lügen kinderbuch', 'kinderbuch über lügen', 'kinderbuch thema lügen', 'kinderbücher über lügen', 'bilderbuch lügen',
+      'bilderbuch über lügen', 'kinderbuch wahrheit sagen', 'kinderbücher zum thema lügen'],
+  },
+  {
+    name: 'Freunde-finden', lp: LP.friends, path: ['Kinderbuch', 'Freunde'],
+    copy: {
+      headlines: ['Kinderbuch Freunde finden', 'Echte Freunde finden', 'Wenn dein Kind Anschluss sucht', 'Freundschaft im Buch',
+        'Mut, auf andere zuzugehen', 'Geschichte über Freundschaft', 'Für 3- bis 8-Jährige', ...CLOSE],
+      descriptions: [
+        'Ein Kinderbuch, in dem dein Kind Freunde findet. Mit Namen und Foto.',
+        'Neue Kinder kennenlernen: eine Geschichte nur über dein Kind.',
+        TESTEN,
+        'Personalisiert mit Namen und Foto. In 3 Minuten erstellt, für 3 bis 8 Jahre.',
+      ],
+    },
+    keywords: ['kinderbuch freunde finden', 'bilderbuch freunde finden', 'freunde finden kinderbuch', 'kinderbücher freunde finden'],
+  },
 ];
 
 const NEGATIVES = [
@@ -131,6 +298,8 @@ const NEGATIVES = [
   'schnullerkette', 'nuggikette', 'schnullerbaum', 'spielzeug', 'kinderspielzeug', 'zahnpasta', 'zahnspange', 'nachtlicht', 'kuscheltier',
   // institutional buyers
   'krippe', 'grundschule', 'kita team', 'kindergarten team',
+  // 2026-10-05 additions, each seen in the raw planner rows of the new topics: teen intent, potty tools, kindergarten portfolios, DDR history
+  'pubertät', 'jugendbuch', 'trainerhosen', 'belohnungstafel', 'portfolio', 'ddr',
 ];
 
 const SPEC = {
