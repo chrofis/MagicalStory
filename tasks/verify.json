@@ -5414,6 +5414,23 @@
         "kind": "human",
         "what": "Read the stored cover briefs of the next beats story (or Lab beats_scenes on a stored story) and compare with the light of pages 1, last and the dominant outdoor time of day; confirm visualBible.era exists."
       }
+    },
+    {
+      "id": "child-mermaid-costume-covered-tail",
+      "title": "A child's mermaid/swim costume has a covering swim shirt and one tail with no feet; a Grok 429 waits instead of failing the sheet",
+      "commits": [
+        "722a0a15f"
+      ],
+      "addedAt": "2026-10-05",
+      "claim": "On the next story with a child costumed:mermaid, clothingRequirements[child].costumed.description names a long/short-sleeve swim shirt and a tail replacing the legs with no feet/bare feet/one-piece; the costumed sheet is generated (no avatar_category_missing in generationLog); the cover and page images show a covered torso and no feet under the tail.",
+      "runShape": [
+        "full-story",
+        "testlab-stage"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Read stories.data.clothingRequirements for the costumed child, grep generationLog for avatar_category_missing, and view the back cover and two mermaid pages."
+      }
     }
   ],
   "runs": [
