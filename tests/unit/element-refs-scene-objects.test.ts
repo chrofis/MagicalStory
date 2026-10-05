@@ -13,7 +13,10 @@ const ROOT = path.resolve(__dirname, '../..');
  */
 describe('element reference selection is fed the page\'s own objects', () => {
   it('no regeneration call site passes a literal null for sceneObjectIds', () => {
-    const src = fs.readFileSync(path.join(ROOT, 'server/routes/regeneration.js'), 'utf8');
+    // The regeneration routes select their cells through pageRenderCall (2026-10-05,
+    // code review S1), so the selector there is the call site that must pass objects[].
+    const src = ['server/routes/regeneration.js', 'server/lib/pageRenderCall.js']
+      .map((f) => fs.readFileSync(path.join(ROOT, f), 'utf8')).join(' ');
     const calls = src.match(/getElementReferenceImagesForPage\([^)]*\)/g) || [];
     expect(calls.length).toBeGreaterThan(0);
     for (const call of calls) {

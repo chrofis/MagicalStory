@@ -119,7 +119,6 @@ const {
   buildCharacterDescriptionsForBbox,
   buildCharacterReferenceList,
   getCharactersInScene,
-  buildImagePrompt,
   buildSceneDescriptionPrompt,
   buildPreviousScenesContext,
   buildAvailableAvatarsForPrompt,
@@ -156,11 +155,10 @@ const {
   ensureStoryPagePlate
 } = require('../lib/images');
 const { pageNeedsPlate, pageLandmarkScene } = require('../lib/landmarkScene');
-const { buildVisualBibleGrid, buildEmptySceneVbGrid } = require('../lib/referenceSheets');
+const { buildEmptySceneVbGrid } = require('../lib/referenceSheets');
 const { callClaudeAPI } = require('../lib/textModels');
 const {
   getVisualBibleEntriesForPage,
-  getElementReferenceImagesForPage,
 } = require('../lib/visualBible');
 const { applyStyledAvatars } = require('../lib/styledAvatars');
 const { runEntityConsistencyChecks, repairSinglePage, getStyledAvatarForClothing, collectEntityAppearances, buildClothingDescription } = require('../lib/entityConsistency');
@@ -750,46 +748,6 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
       log.debug(`🌍 [REGEN] Page ${pageNumber} has ${pageLandmarkPhotos.length} landmark(s): ${pageLandmarkPhotos.map(l => l.name).join(', ')}`);
     }
 
-    // Build Visual Bible grid (combines VB elements + secondary landmarks into single image)
-    let visualBibleGrid = null;
-    if (visualBible) {
-      const elementReferences = getElementReferenceImagesForPage(visualBible, pageNumber, 6);
-      const secondaryLandmarks = pageLandmarkPhotos.slice(1); // 2nd+ landmarks go in grid
-      if (elementReferences.length > 0 || secondaryLandmarks.length > 0) {
-        visualBibleGrid = await buildVisualBibleGrid(elementReferences, secondaryLandmarks);
-        log.debug(`🔲 [REGEN] Page ${pageNumber} VB grid: ${elementReferences.length} elements + ${secondaryLandmarks.length} secondary landmarks`);
-      }
-    }
-
-    // Build image prompt with scene-specific characters and visual bible.
-    // Note: We don't build originalPrompt separately to avoid duplicate logging - originalDescription is stored for comparison
-    let imagePrompt = customPrompt || buildImagePrompt(expandedDescription, storyData, sceneCharacters, visualBible, pageNumber, referencePhotos);
-
-    // If user selected specific characters, add explicit restriction to prompt
-    if (characterIds && Array.isArray(characterIds) && characterIds.length > 0) {
-      const selectedNames = sceneCharacters.map(c => c.name);
-      const allNames = (storyData.characters || []).map(c => c.name);
-      const excludedNames = allNames.filter(n => !selectedNames.includes(n));
-
-      if (excludedNames.length > 0) {
-        const { buildCharacterRestriction } = require('../lib/storyHelpers');
-        imagePrompt += buildCharacterRestriction(selectedNames, excludedNames);
-        log.debug(`📸 [REGEN] Added character restriction: show ${selectedNames.join(', ')}, exclude ${excludedNames.join(', ')}`);
-      }
-    }
-
-    // Log prompt changes for debugging
-    if (sceneWasEdited) {
-      log.debug(`📝 [REGEN] PROMPT BUILT for page ${pageNumber}:`);
-      log.debug(`   Prompt length: ${imagePrompt.length} chars`);
-    }
-
-    // Clear the image cache for this prompt to force a new generation
-    const cacheKey = generateImageCacheKey(imagePrompt, referencePhotos.map(p => p.photoUrl), null);
-    if (deleteFromImageCache(cacheKey)) {
-      log.debug(`[REGEN] Cleared cache for page ${pageNumber} to force new generation`);
-    }
-
     // Get the current image before regenerating (to store as previous version)
     let sceneImages = storyData.sceneImages || [];
     const currentImage = sceneImages.find(img => img.pageNumber === pageNumber);
@@ -824,6 +782,48 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
       aspectRatio: sceneAspect || MODEL_DEFAULTS.pageAspect,
       save: (pn, plate) => saveStoryImage(id, 'empty_scene', pn, plate), logTag: 'REGEN',
     });
+    // The grid and the prompt go through pageRenderCall — the ONE construction the
+    // story run and the Test Lab use (skipVisualBible for Grok, the REQUIRED
+    // OBJECTS claim built from the cells actually sent, no landmark photo in the
+    // grid, the cells the SENT plate carries dropped). The plate comes first
+    // because the grid filter needs to know whether one is sent.
+    const pageRender = require('../lib/pageRenderCall');
+    const { kept: gridElements, visualBibleGrid } = await pageRender.buildPageVbGrid({
+      visualBible, pageNumber, sceneMetadata, hasPlate: !!regenScene.sceneBackground,
+    });
+    if (gridElements.length > 0) log.debug(`🔲 [REGEN] Page ${pageNumber} VB grid: ${gridElements.length} element cell(s)`);
+
+    // Note: We don't build originalPrompt separately to avoid duplicate logging - originalDescription is stored for comparison
+    let imagePrompt = customPrompt || pageRender.makePageImagePrompt({
+      sceneDescription: expandedDescription, inputData: storyData, sceneCharacters, visualBible, pageNumber,
+      characterPhotos: referencePhotos, pageImageModel: imageModelId,
+    })(gridElements.map(e => e.id).filter(Boolean));
+
+    // If user selected specific characters, add explicit restriction to prompt
+    if (characterIds && Array.isArray(characterIds) && characterIds.length > 0) {
+      const selectedNames = sceneCharacters.map(c => c.name);
+      const allNames = (storyData.characters || []).map(c => c.name);
+      const excludedNames = allNames.filter(n => !selectedNames.includes(n));
+
+      if (excludedNames.length > 0) {
+        const { buildCharacterRestriction } = require('../lib/storyHelpers');
+        imagePrompt += buildCharacterRestriction(selectedNames, excludedNames);
+        log.debug(`📸 [REGEN] Added character restriction: show ${selectedNames.join(', ')}, exclude ${excludedNames.join(', ')}`);
+      }
+    }
+
+    // Log prompt changes for debugging
+    if (sceneWasEdited) {
+      log.debug(`📝 [REGEN] PROMPT BUILT for page ${pageNumber}:`);
+      log.debug(`   Prompt length: ${imagePrompt.length} chars`);
+    }
+
+    // Clear the image cache for this prompt to force a new generation
+    const cacheKey = generateImageCacheKey(imagePrompt, referencePhotos.map(p => p.photoUrl), null);
+    if (deleteFromImageCache(cacheKey)) {
+      log.debug(`[REGEN] Cleared cache for page ${pageNumber} to force new generation`);
+    }
+
     const genResult = await generateImageOnly(imagePrompt, referencePhotos, {
       imageModelOverride: imageModelId,
       landmarkPhotos: pageLandmarkPhotos,
@@ -1208,7 +1208,10 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
       const coverClothing = parseClothingCategory(cover.description || '') || storyData.pageClothing?.primaryClothing;
       if (!coverClothing) return res.status(422).json({ error: `Cover ${coverType} has no clothing category — refusing to build reference photos from a guessed outfit` });
       characterPhotos = getCharacterPhotoDetails(chars, coverClothing, artStyle, clothingReqs);
-      prompt = cover.prompt || buildImagePrompt(cover.description || '', storyData, chars, visualBible, pageNumber, characterPhotos);
+      prompt = cover.prompt || require('../lib/pageRenderCall').makePageImagePrompt({
+        sceneDescription: cover.description || '', inputData: storyData, sceneCharacters: chars, visualBible, pageNumber,
+        characterPhotos, pageImageModel: models?.[0] || MODEL_DEFAULTS.pageRenderImage,
+      })([]);
     } else {
       const savedSceneImage = (storyData.sceneImages || []).find(s => s.pageNumber === pageNumber);
       if (!savedSceneImage) return res.status(400).json({ error: `No scene image found for page ${pageNumber}` });
@@ -1221,19 +1224,6 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
       if (!clothing.startsWith('costumed')) characterPhotos = applyStyledAvatars(characterPhotos, artStyle);
       sceneMetadata = extractSceneMetadata(desc);
       landmarkPhotos = visualBible ? await getLandmarkPhotosForScene(visualBible, sceneMetadata, { pageNumber }) : [];
-      if (visualBible) {
-        // Keep the grid in step with what the page prompt describes: the prompt is
-        // built from the scene brief's objects[], so a prop named there must bring its
-        // reference even if the Visual Bible filed it under other pages. Passing null
-        // here selected references from appearsInPages alone (referenceSheets.js:1567
-        // passes the page's ids).
-        const elRefs = getElementReferenceImagesForPage(visualBible, pageNumber, 6, sceneMetadata?.objects || sceneMetadata?.fullData?.objects || null, sceneMetadata);
-        const secLm = landmarkPhotos.slice(1);
-        if (elRefs.length > 0 || secLm.length > 0) visualBibleGrid = await buildVisualBibleGrid(elRefs, secLm);
-      }
-      // Reuse the saved prompt verbatim — Test Models tests image models against
-      // a fixed prompt, not against a re-expanded scene.
-      prompt = savedSceneImage.prompt || buildImagePrompt(desc, storyData, chars, visualBible, pageNumber, characterPhotos);
       // Reuse the original empty-scene plate so two-pass renders use the same
       // background. If absent (older stories), the per-model render still works
       // — generateImageOnly just won't have a sceneBackground to anchor on.
@@ -1246,6 +1236,19 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
       } catch (e) {
         log.debug(`🧪 [TEST-MODELS] Page ${pageNumber}: no saved empty-scene plate (${e.message})`);
       }
+      // The grid, built the way the run builds it (pageRenderCall) once the plate
+      // is known: the cells a sent plate carries are dropped, no landmark photo
+      // enters it.
+      const pageRenderTm = require('../lib/pageRenderCall');
+      const tmGrid = await pageRenderTm.buildPageVbGrid({ visualBible, pageNumber, sceneMetadata, hasPlate: !!savedSceneBackground });
+      visualBibleGrid = tmGrid.visualBibleGrid;
+      // Reuse the saved prompt verbatim — Test Models tests image models against
+      // a fixed prompt, not against a re-expanded scene. A page with none stored
+      // is rebuilt through the run's own construction.
+      prompt = savedSceneImage.prompt || pageRenderTm.makePageImagePrompt({
+        sceneDescription: desc, inputData: storyData, sceneCharacters: chars, visualBible, pageNumber, characterPhotos,
+        pageImageModel: models?.[0] || MODEL_DEFAULTS.pageRenderImage,
+      })(tmGrid.kept.map(e => e.id).filter(Boolean));
     }
     // Resolve dev flag effective values (per-page Test Models override)
     const { applyReferenceMode, MODEL_DEFAULTS: DEFAULTS } = (() => {
@@ -2089,16 +2092,6 @@ router.post('/:id/style-lab/:pageNum', authenticateToken, async (req, res) => {
         });
       }
       landmarkPhotos = visualBible ? await getLandmarkPhotosForScene(visualBible, sceneMetadata, { pageNumber }) : [];
-      if (visualBible) {
-        // Keep the grid in step with what the page prompt describes: the prompt is
-        // built from the scene brief's objects[], so a prop named there must bring its
-        // reference even if the Visual Bible filed it under other pages. Passing null
-        // here selected references from appearsInPages alone (referenceSheets.js:1567
-        // passes the page's ids).
-        const elRefs = getElementReferenceImagesForPage(visualBible, pageNumber, 6, sceneMetadata?.objects || sceneMetadata?.fullData?.objects || null, sceneMetadata);
-        const secLm = landmarkPhotos.slice(1);
-        if (elRefs.length > 0 || secLm.length > 0) visualBibleGrid = await buildVisualBibleGrid(elRefs, secLm);
-      }
     }
 
     const runId = existingRunId || crypto.randomUUID();
@@ -2108,6 +2101,14 @@ router.post('/:id/style-lab/:pageNum', authenticateToken, async (req, res) => {
     const styleLabScene = pageNumber > 0
       ? await ensureStoryPagePlate({ storyId: id, storyData, visualBible, pageNumber, sceneMetadata: styleLabSceneMetadata, landmarkPhotos, logTag: 'STYLE-LAB' })
       : { sceneBackground: null, landmarkScene: null };
+    // The grid, built the way the run builds it (pageRenderCall) once the plate is
+    // known; its cell ids are what every model's prompt claims references for.
+    const styleLabGrid = pageNumber > 0
+      ? await require('../lib/pageRenderCall').buildPageVbGrid({
+        visualBible, pageNumber, sceneMetadata: styleLabSceneMetadata, hasPlate: !!styleLabScene.sceneBackground,
+      })
+      : { kept: [], visualBibleGrid: null };
+    visualBibleGrid = styleLabGrid.visualBibleGrid;
 
     // Build per-model prompts and generate in parallel
     const results = {};
@@ -2119,9 +2120,13 @@ router.post('/:id/style-lab/:pageNum', authenticateToken, async (req, res) => {
         ? (getCoverData(storyData, getCoverType(pageNumber))?.description || '')
         : ((storyData.sceneDescriptions || []).find(s => s.pageNumber === pageNumber)?.description || '');
       const chars = getCharactersInScene(sceneDesc, storyData.characters || []);
-      const prompt = buildImagePrompt(sceneDesc, storyData, chars, visualBible, pageNumber, characterPhotos, {
-        customStyleDescription: effectiveStyle
-      });
+      // The run's own prompt construction (skipVisualBible for a Grok model,
+      // the reference claim from the cells actually in the grid); only the style
+      // text is this lab's variable.
+      const prompt = String(require('../lib/pageRenderCall').makePageImagePrompt({
+        sceneDescription: sceneDesc, inputData: storyData, sceneCharacters: chars, visualBible, pageNumber,
+        characterPhotos, pageImageModel: model, extraOptions: { customStyleDescription: effectiveStyle },
+      })(styleLabGrid.kept.map(e => e.id).filter(Boolean)));
 
       const start = Date.now();
       const result = await generateImageOnly(prompt, characterPhotos, {
