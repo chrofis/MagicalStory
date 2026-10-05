@@ -1301,7 +1301,10 @@ async function runQualityEvalStage(ctx, { promptOverride, experimentId, params =
     identityAgreement: result.identityAgreement || null,
     // What RAN, not what was asked: the judge key and the per-stage token
     // counts (a model's input-token signature is how a swap is verified).
-    modelId: params.model || require('../config/models').MODEL_DEFAULTS.qualityEval,
+    // The batch result carries the judge that served (a Gemini safety block swaps to
+    // Grok); the asked model is kept beside it so a swap is visible, never hidden.
+    modelId: result.modelId || null,
+    requestedModelId: params.model || require('../config/models').MODEL_DEFAULTS.qualityEval,
     usage: { ...(result.threeStageResult?.usage || {}), quality_input_tokens: result.usage?.input_tokens ?? null, quality_output_tokens: result.usage?.output_tokens ?? null },
     // The whole call's aggregate (quality + P1 + three-stage), as the pipeline
     // records it — what the judge_fixture stage prices a replay from.
@@ -4091,7 +4094,7 @@ async function runSceneHazardCountStage(target, { params = {}, promptOverride = 
     // dbQuery returns the rows array itself (database.js).
     const rows = await dbQuery('SELECT results FROM testlab_experiments WHERE id = $1', [expId]);
     if (!rows.length) throw new Error(`fromExperiment ${expId}: not found`);
-    const out = (rows[0].results || [])[0] || {};
+    const out = (rows[0].results || [])[parseInt(params.fromExperimentIndex, 10) || 0] || {};
     storyTitle = out.title || null;
     if (source === 'beats') {
       pages = (out.finalBeats || [])
@@ -4275,6 +4278,21 @@ function summarizeSceneExpansions(sceneExpansions) {
   };
 }
 
+/**
+ * The Lab-only reasoning control of the Art Director calls (bible, briefs,
+ * per-page fallback, brief re-ask). `sceneReasoningEffort` ("low"|"medium"|
+ * "high") asks OpenRouter for that effort; `sceneNoReasoning` switches
+ * reasoning off. Absent both: {} = the production call, unchanged.
+ * AD cheaper-model experiment, docs/decisions.md 2026-10-05.
+ */
+function sceneCallOptions(params) {
+  if (params.sceneReasoningEffort) {
+    if (!['low', 'medium', 'high'].includes(params.sceneReasoningEffort)) throw new Error(`sceneReasoningEffort must be low, medium or high (got "${params.sceneReasoningEffort}")`);
+    return { reasoning: { effort: params.sceneReasoningEffort } };
+  }
+  return params.sceneNoReasoning ? { reasoning: { enabled: false } } : {};
+}
+
 async function runBeatsScenesStage(target, { params = {}, promptOverride = null }) {
   const { loadPromptTemplates } = require('../services/prompts');
   await loadPromptTemplates();
@@ -4434,7 +4452,7 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
     if (params.landmarks === false) storyData.availableLandmarks = undefined;
     const sceneModel = params.sceneModel || storyData.modelOverrides.sceneDescriptionModel || MODEL_DEFAULTS.sceneDescription;
     const adCalls = [];
-    labJevReport = { light: null, vb: null, population: null, gaze: null, coverPlaces: null, fixedChanges: null };
+    labJevReport = { light: null, vb: null, population: null, gaze: null, coverPlaces: null };
     const expStart = Date.now();
     const meta = { timings: {}, labelRound: null };
     const ad = await runArtDirector({
@@ -4445,7 +4463,8 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
       approvedArc: resolveReplayArc(storyData, { parseBeats }), onVisualBible: null, wardrobeBibleReport: null,
       // The run's gaze roster: the shipped division's head count, as stored.
       present: resolveReplayPresent(storyData),
-      labCallOptions: params.sceneNoReasoning ? { reasoning: { enabled: false } } : {},
+      labCallOptions: sceneCallOptions(params),
+      visualBibleModel: params.visualBibleModel || null,
       labForcePerPage: params.perPageExpansion === true,
       onCall: (res) => adCalls.push(res),
       // The run's Jev decision report (light before the AD; elements, aboard,
@@ -4511,7 +4530,7 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
           visualBibleJson: ad.visualBibleJson, availableAvatars: ad.availableAvatars, maxCharactersPerScene: ad.maxCharactersPerScene,
           model: sceneModel, gl: { info: rec('info'), warn: rec('warn'), error: rec('error'), debug: rec('debug') },
           onCall: (res) => reaskCalls.push(res),
-          labCallOptions: params.sceneNoReasoning ? { reasoning: { enabled: false } } : {},
+          labCallOptions: sceneCallOptions(params),
         });
         for (const x of sceneExpansions) {
           const taken = report.pages.find(p => p.pageNumber === x.pageNumber);
@@ -6990,7 +7009,8 @@ async function runAvatarEvalStage(target, { experimentId, promptOverride, params
   const wanted = (target.character || '').toLowerCase();
   const matches = entries
     .map((e, i) => ({ e, i }))
-    .filter(({ e }) => (e.characterName || '').toLowerCase() === wanted);
+    // A variant entry is the off-garment gate's verdict: it holds no sheet to evaluate.
+    .filter(({ e }) => !e.variant && (e.characterName || '').toLowerCase() === wanted);
   if (!matches.length) {
     const names = [...new Set(entries.map(e => e.characterName).filter(Boolean))];
     throw new Error(`No styledAvatarGeneration entry for "${target.character}" (have: ${names.join(', ') || 'none'})`);
@@ -10293,6 +10313,85 @@ function castPageSummary({ listed = [], stats = {}, actions = [], aliases = {} }
  * fixture id rides on the target so two fixtures on one page are two set
  * members. params {judge, expect, imageUrl?} come from the set member.
  */
+/**
+ * judge_fixture `sheet_style`: one 2×4 sheet through production's pass-2 style
+ * judge (evaluateAvatarSheet) with the base entry's own face photo, Pass-1 sheet
+ * and art style — under the arm params.arm names (sheetJudgeArms.js; default
+ * `current` = production exactly). params.input: {entryIndex, removedGarments?,
+ * baseImageUrl?} — a sheet with garments taken off is a wardrobe-state variant,
+ * judged by evaluateVariantSheet, and under arm D against its approved styled base.
+ */
+async function runSheetStyleFixture(target, params, sheet) {
+  if (!target.character) throw new Error('judge_fixture sheet_style: target.character required');
+  const input = params.input || {};
+  const removedGarments = Array.isArray(input.removedGarments) ? input.removedGarments : [];
+  const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../services/prompts');
+  await loadPromptTemplates();
+  const armRun = require('./sheetJudgeArms').resolveArm(params.arm || 'current', PROMPT_TEMPLATES.sheet2x4StyleEval, { variant: removedGarments.length > 0 });
+  const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
+  const entry = (storyData.styledAvatarGeneration || [])[Number(input.entryIndex)];
+  if (!entry) throw new Error(`sheet_style: no styledAvatarGeneration[${input.entryIndex}] on ${target.storyId}`);
+  if (String(entry.characterName || '').toLowerCase() !== String(target.character).toLowerCase()) {
+    throw new Error(`sheet_style: styledAvatarGeneration[${input.entryIndex}] is ${entry.characterName}, not ${target.character}`);
+  }
+  const facePhoto = await resolveAvatarSlotBytes(entry.inputs?.facePhoto);
+  if (!facePhoto) throw new Error('sheet_style: the entry stores no face photo');
+  const referenceUrl = armRun.reference === 'styledBase' ? input.baseImageUrl : entry.passes?.pass1?.imageData;
+  const reference = armRun.reference === 'styledBase'
+    ? (input.baseImageUrl ? await resolveAvatarSlotBytes(input.baseImageUrl) : null)
+    : await resolveAvatarSlotBytes(entry.passes?.pass1?.imageData);
+  if (!reference) throw new Error(`sheet_style: arm ${armRun.arm} needs its reference (${armRun.reference === 'styledBase' ? 'input.baseImageUrl' : 'passes.pass1.imageData'}) — not available`);
+  const { character } = await loadCharacterContext(target.storyId, target.character);
+  const usage = { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 };
+  const usageTracker = (_provider, u) => {
+    usage.input_tokens += u?.input_tokens || 0;
+    usage.output_tokens += u?.output_tokens || 0;
+    usage.thinking_tokens += u?.thinking_tokens || 0;
+    usage.calls++;
+  };
+  // A variant (a garment taken off) is production's gate: the style judge plus one
+  // garment-gone check per removed garment. A sheet with nothing off is the style judge alone.
+  const SHEET = require('./character2x4Sheet');
+  const judge = removedGarments.length ? SHEET.evaluateVariantSheet : SHEET._internal.evaluateAvatarSheet;
+  const { verdict, promptUsed } = await judge(sheet, {
+    pass: 2, facePhoto, realisticSheet: reference,
+    artStyle: entry.artStyle || storyData.artStyle || 'watercolor',
+    declaredAge: character.age ?? null, removedGarments, usageTracker,
+    // The kept check is its own Lab judge (sheet_kept); this fixture measures the style judge + garment-gone.
+    keptCheckSkipped: 'Lab sheet_style fixture: the kept check is measured by sheet_kept',
+    promptOverrides: armRun.template ? { style: armRun.template } : {},
+    imageLabels: armRun.imageLabels,
+  });
+  return {
+    arm: armRun.arm, armApplied: armRun.applied, reference: armRun.reference,
+    referenceUrl: typeof referenceUrl === 'string' && /^https?:\/\//.test(referenceUrl) ? referenceUrl : null,
+    removedGarments, imageLabels: armRun.imageLabels, verdict, usage, promptUsed,
+  };
+}
+
+/**
+ * judge_fixture `sheet_kept`: one off-garment sheet through production's
+ * kept-garment check (character2x4Sheet.checkKeptGarment), one call per garment
+ * in params.input.keptGarments, in parallel. No face photo or reference sheet:
+ * the question is asked of the variant image alone.
+ */
+async function runSheetKeptFixture(target, params, sheet) {
+  const kept = Array.isArray(params.input?.keptGarments) ? params.input.keptGarments : [];
+  if (!kept.length) throw new Error('judge_fixture sheet_kept: params.input.keptGarments required');
+  const { loadPromptTemplates } = require('../services/prompts');
+  await loadPromptTemplates();
+  const usage = { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 };
+  const usageTracker = (_provider, u) => {
+    usage.input_tokens += u?.input_tokens || 0;
+    usage.output_tokens += u?.output_tokens || 0;
+    usage.thinking_tokens += u?.thinking_tokens || 0;
+    usage.calls++;
+  };
+  const SHEET = require('./character2x4Sheet');
+  const checks = await Promise.all(kept.map(g => SHEET.checkKeptGarment(sheet, g, { usageTracker })));
+  return { keptGarments: kept, checks, usage };
+}
+
 async function runJudgeFixtureStage(target, { experimentId, params = {} }) {
   const JF = require('./judgeFixtures');
   const judge = params.judge;
@@ -10374,6 +10473,12 @@ async function runJudgeFixtureStage(target, { experimentId, params = {} }) {
     case 'arc_panel':
       raw = await runArcPanelReplayStage({ storyId: target.storyId }, { params: {} });
       break;
+    case 'sheet_style':
+      raw = await runSheetStyleFixture(target, params, await loadFixtureImage());
+      break;
+    case 'sheet_kept':
+      raw = await runSheetKeptFixture(target, params, await loadFixtureImage());
+      break;
     default:
       throw new Error(`judge_fixture: no replay wired for judge "${judge}"`);
   }
@@ -10392,6 +10497,7 @@ async function runJudgeFixtureStage(target, { experimentId, params = {} }) {
     fixtureId: target.fixture || null,
     input: { imageUrl: params.imageUrl || null, versionIndex: target.versionIndex ?? null, character: target.character || null },
     expect,
+    note: params.note || null,
     verdict,
     findings,
     cost: JF.estimateCostUsd(judge, raw),
@@ -10428,11 +10534,73 @@ const STORY_STAGES = {
   arc_panel_replay: runArcPanelReplayStage,
 };
 
+/**
+ * WARDROBE-STATE VARIANT, made the way production makes it — so the owner can
+ * see the sheet a `sheet_style` fixture judges. Target {storyId, character};
+ * params.offCategory picks the row when a character takes off more than one
+ * thing. The row is derived from the story's stored briefs exactly as the
+ * pipeline derives it (deriveWardrobeVariantRequirements over the page
+ * descriptions), and the approved base sheet is read the way production reads
+ * it (styledAvatars.approvedBaseSheetFor). NO JUDGE runs here
+ * (skipQualityEval): judging the variant is what the fixtures measure, arm by
+ * arm. Cost: one Grok edit, ~$0.02. The card shows base · variant.
+ */
+async function runAvatarRedressStage(target, { experimentId, params = {} }) {
+  const { loadPromptTemplates } = require('../services/prompts');
+  await loadPromptTemplates();
+  const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
+  const { deriveWardrobeVariantRequirements, parseOffCategory } = require('./wardrobeVariants');
+  const { extractSceneMetadata } = require('./storyHelpers');
+  const scenes = (storyData.sceneImages || []).map(p => ({
+    pageNumber: p.pageNumber,
+    sceneMetadata: extractSceneMetadata(p.sceneDescription || p.description),
+  }));
+  const { requirements } = deriveWardrobeVariantRequirements({
+    visualBible: storyData.visualBible, scenes,
+    clothingRequirements: storyData.clothingRequirements, characters: storyData.characters || [],
+  });
+  const wanted = String(target.character || '').trim().toLowerCase();
+  const rows = requirements.filter(r => String(r.characterNames?.[0] || '').trim().toLowerCase() === wanted
+    && (!params.offCategory || r.clothingCategory === params.offCategory));
+  if (rows.length !== 1) {
+    throw new Error(`avatar_redress: ${rows.length} variant rows for "${target.character}"${params.offCategory ? ` / ${params.offCategory}` : ''} (story has: ${requirements.map(r => `${r.characterNames?.[0]}:${r.clothingCategory}`).join(', ') || 'none'}) — set params.offCategory`);
+  }
+  const row = rows[0];
+  const off = parseOffCategory(row.clothingCategory);
+  const char = (storyData.characters || []).find(c => String(c?.name || '').trim().toLowerCase() === wanted);
+  if (!char) throw new Error(`avatar_redress: "${target.character}" is not in the story's cast`);
+  const artStyle = storyData.artStyle || 'watercolor';
+  const { approvedBaseSheetFor } = require('./styledAvatars');
+  const baseRaw = approvedBaseSheetFor(char, artStyle, off.baseCategory);
+  const baseSheet = await resolveAvatarSlotBytes(baseRaw);
+  if (!baseSheet) throw new Error(`avatar_redress: no approved "${off.baseCategory}" ${artStyle} sheet stored for ${char.name}`);
+  let usd = 0;
+  const usageTracker = (_provider, u) => { usd += Number(u?.cost) || 0; };
+  const out = await require('./character2x4Sheet').redressSheetVariant(baseSheet, {
+    characterName: char.name, characterAge: char.age ?? null,
+    removedItems: row.removedItemNames, authoredWardrobe: row.redressNote,
+    skipQualityEval: true, usageTracker,
+  });
+  if (!out?.imageData) throw new Error(`avatar_redress: the edit returned no image (${JSON.stringify(out?.attempts || [])})`);
+  const [versionIndex, baseVersionIndex] = await Promise.all([
+    saveTestVersion(target.storyId, 'tl_avatar', null, out.imageData, experimentId),
+    saveTestVersion(target.storyId, 'tl_avatar', null, baseSheet, experimentId),
+  ]);
+  return {
+    character: char.name, clothingCategory: row.clothingCategory, baseCategory: off.baseCategory, artStyle,
+    removedItemNames: row.removedItemNames, redressNote: row.redressNote, pages: row.pages,
+    baseSheetUrl: typeof baseRaw === 'string' && /^https?:\/\//.test(baseRaw) ? baseRaw : null,
+    imageType: 'tl_avatar', versionIndex, realisticVersionIndex: baseVersionIndex,
+    promptUsed: out.prompt, cost: { usd, basis: 'measured (redress edit)' },
+  };
+}
+
 // Avatar stages take {storyId, character} targets, not page targets.
 const AVATAR_STAGES = {
   avatar_realistic: runAvatarRealisticStage,
   avatar_style: runAvatarStyleStage,
   avatar_eval: runAvatarEvalStage,
+  avatar_redress: runAvatarRedressStage,
 };
 
 /**
@@ -10449,8 +10617,12 @@ async function runStageOnTarget(stage, target, opts) {
   // acceptable for a debugging aid. warn/error stored in full, info capped.
   const { addLogListener, removeLogListener } = require('../utils/logger');
   const captured = [];
+  let infoCaptured = 0;
   const listener = (level, line) => {
-    if (captured.length >= 400) return;
+    // warn/error are kept in full; only info/debug lines are capped, so a long
+    // stage's late failures still reach buildStageLog.
+    const isProblem = level === 'warn' || level === 'error';
+    if (!isProblem) { if (infoCaptured >= 400) return; infoCaptured++; }
     captured.push({ level, line: line.slice(0, 400) });
   };
   addLogListener(listener);
@@ -10572,6 +10744,7 @@ module.exports = {
   // beats_scenes truncation recovery — exported so the decisions can be pinned
   // without a story, a DB or a paid model (tests/unit/testlab-beats-scenes-recovery.test.ts)
   summarizeSceneExpansions,
+  sceneCallOptions,
   // The two copies of the commission the judge reads — exported so their
   // agreement under a brief override can be pinned without a paid render
   // (tests/unit/testlab-brief-override-reaches-judge.test.ts).

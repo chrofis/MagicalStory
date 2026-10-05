@@ -206,3 +206,18 @@ describe('(C) no internal cover label in the plan line', () => {
     expect(PB.LOOKS_AT_FIELD_RULE).toContain(PB.COVER_GAZE_EXCEPTION);
   });
 });
+
+describe('(D) a missing or misplaced baked cover title is CRITICAL (2026-10-05)', () => {
+  const titleMisplaced = { description: 'The title is painted on a wall sign, not as the cover title', severity: 'MAJOR', type: 'required_text', fix: 'Repaint the title in the sky' };
+
+  it('the real evaluator raises a MAJOR required_text on a baked front cover', async () => {
+    const front = resolveCoverTextContract('frontCover', { titleBaked: true, title: 'Fiona and the Captain' });
+    const r = await runEval('cover', { ...front, coverIsPage: true }, { qualityIssues: [titleMisplaced] });
+    expect(r.fixableIssues.find((f: any) => f.type === 'required_text')?.severity).toBe('CRITICAL');
+  });
+
+  it('a page keeps the severity the judge filed', async () => {
+    const r = await runEval('scene', {}, { qualityIssues: [titleMisplaced] });
+    expect(r.fixableIssues.find((f: any) => f.type === 'required_text')?.severity).toBe('MAJOR');
+  });
+});

@@ -150,7 +150,7 @@ After the prose, emit exactly `---METADATA---` on its own line, then a single JS
     {"character": "CharacterA", "object": "tower", "where": "gazes up at the clock tower", "action": "watching", "storyRelevant": true, "priority": "essential"}
   ],
   "wornItems": [
-    {"id": "ART003", "owner": "CharacterA", "state": "off", "location": "lies folded on the bench beside her", "redressNote": "<which garments stay, named by colour + noun only; which item is off, with nothing in its place; and the garment the removal leaves outermost, described in full>"}
+    {"id": "ART003", "owner": "CharacterA", "state": "off", "location": "lies folded on the bench beside her", "redressNote": "<which garments stay, named by colour + noun only; which item is off, with nothing in its place; and the garment the removal leaves outermost, described in full>", "keptGarments": [{"type": "<garment noun>", "colour": "<its colour>", "details": "<fabric, cut; may be empty>"}]}
   ],
   "reuseEmptyScene": true,
   "emptyScenePrompt": "A snow-covered town plaza with a cobblestone square, light falling from the left. The ancient clock tower rises in the background, its blue face set in pale stone. Medium wide shot, slightly low angle. Open foreground space for composited characters.",

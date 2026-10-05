@@ -381,15 +381,6 @@
       "note": "_colourSeedPoints returns blob interior point (max chamfer) instead of centroid; 3-pass SAM prompt build adds cross-figure garment negatives."
     },
     {
-      "id": "lab-unpinned-loads-v0",
-      "title": "Number(null)=0: unpinned Lab loads pinned themselves to v0 (never the active version) + loadedFrom always unrecorded",
-      "reportedAt": "2026-08-21",
-      "source": "task #26 + local repro (getStoryImage called with version 0, no getActiveVersion; exps 45-50 all loadedFrom=unrecorded)",
-      "status": "fixed",
-      "fixedIn": "fix(testlab) 2026-08-21 (same commit)",
-      "note": "loadActivePageImage pinned-parse and runBboxStage loadedFrom reader now treat null/undefined/empty as \"active\", not v0. Root cause of the 2026-08-19 detected-on-v0 mystery."
-    },
-    {
       "id": "cover-save-clobbers-scene-page",
       "title": "refresh-bbox cover branch saved the WHOLE story doc, clobbering the preceding scene page in-flight save",
       "reportedAt": "2026-08-21",
@@ -3221,6 +3212,42 @@
       "fixedAt": "2026-10-04"
     },
     {
+      "id": "wardrobe-variant-judged-by-row-judges",
+      "title": "Every jacket-off (wardrobe-state) sheet was rejected: the variant was judged by the pass-1 row judges its own approved base sheet fails, so no off sheet was stored and off pages got the garment-wearing sheet",
+      "reportedAt": "2026-10-04",
+      "source": "Staging job_1791040103540_atbttop6w: character_2x4_wardrobe_variant billed 2 calls for Kiaan standard--off:CLO001, characterAvatars holds no off key, p11/p12/p16 refs carry wornStateFallback and the render kept the jacket (p12). Reproduced locally: redressSheetVariant on the stored base sheet + the stored redressNote -> 2 attempts, both REJECTED best=1/10 (crop: cells 1-4 show the waistband). evaluateSheetSplit on the approved base sheet itself scores 1/10 (crop, outfit, costumeReads). Staging 15 days: 0 off sheets served since 09-25, 12 pages on wornStateFallback; 6 costumed off pages with no marker at all.",
+      "rootCause": "server/lib/character2x4Sheet.js redressSheetVariant judged the redressed sheet with evaluateSheetSplit (the pass-1 heads/bodies/identity row judges, absolute crop and outfit scores, the wardrobe text fed as a costume). The base sheet it edits was approved by the pass-2 style judge and never had to pass those row judges; a redress inherits the base layout, so it cannot pass them. The judge never asked whether the removed garment is gone.",
+      "impact": "No page that takes a garment off has received an off-garment reference since ~2026-09-26; the image model gets a picture of the character wearing it plus a text line, and draws it on (p12 jacket). Costumed characters never got an off variant and no warning.",
+      "status": "fixed",
+      "fixedAt": "2026-10-04",
+      "fixedIn": "a1bb22596",
+      "fix": "Variant judged by the Pass-2 style judge (base Pass-1 sheet as Image 2) plus TASK 10 removedScore; evaluateSheetSplit deleted from the variant path; costumed off variants; missing off sheet logged at ERROR and recorded as notEvaluated off_sheet_missing. Kiaan reproduction accepted 9/10, jacket gone (viewed)."
+    },
+    {
+      "id": "variant-gate-passes-garment-still-on",
+      "title": "The garment-off variant gate passes a sheet that still wears the removed garment: the style judge reads TASK 10 as an exemption",
+      "reportedAt": "2026-10-04",
+      "source": "Test Lab #1597/#1598 (judge-fixture set #80, arm current): the two garment-still-on controls (Kiaan autumn jacket, Fiona pirate coat) were flagged in 1 of 4 runs. Reasons: 'No garments were requested to be taken off'; 'Image 2 still wears it; TASK 9 does not score it'.",
+      "rootCause": "prompts/sheet-2x4-style-eval.txt TASK 10 asked the question inside the style judge, next to a reference (Image 2) that still wears the garment and a sentence that TASK 9 does not score it; the judge reads that as permission to ignore the garment.",
+      "impact": "A redress that left the garment on is stored as the off sheet, so pages that take the garment off are drawn from a reference wearing it.",
+      "status": "fixed",
+      "fixedAt": "2026-10-04",
+      "fixedIn": "3410487f7",
+      "fix": "TASK 10 deleted; one garment-gone check per removed garment on the variant image alone (checkGarmentGone, evaluateVariantSheet). Lab #1609/#1610: controls caught 4/4, good variant passes 2/2."
+    },
+    {
+      "id": "consolidator-fix-without-scored-finding",
+      "title": "The feedback consolidator dropped a page's only finding as not-a-defect (so the page scored 100) while still emitting a CRITICAL scene_fix for it: the page was never repaired",
+      "reportedAt": "2026-10-04",
+      "source": "Railway log of staging deployment af727aea, job_1791040103540_atbttop6w round 1 p17 (consolidator_calls 2971): semantic finding 'the creature is still within the canopy instead of rising out' dropped as finding_contradicts_brief; scene_fix CRITICAL 'Move Rubina above the autumn canopy' requires_regeneration true; '[SCORE] page 17: math model (consolidated) -> finalScore=100'. The page text/brief states she flies out of the canopy.",
+      "rootCause": "Two parts. (1) prompts/feedback-consolidator.txt rule 2a (finding_contradicts_brief) is applied to findings that AGREE with the brief (a finding saying the picture lacks what the brief asks for) - the dominant shape in the measured staging examples (p17, p4, p3, p2, p1 of this job). (2) A plan fix names no finding ids, so nothing links a fix to a scored finding: a drop removes the finding from deduped_issues (the score) and nothing notices the fix still rests on it.",
+      "impact": "Measured over consolidator_calls since 2026-09-20 (scripts/analysis/measure-consolidator-orphan-fixes.js): staging 208 calls, 316 CRITICAL/MAJOR fixes, 10 CRITICAL fixes with no kept CRITICAL, 10 with no kept CRITICAL/MAJOR at all, 26 whose type has only not-a-defect drops behind it (7 stories); prod 178 calls, 279 fixes, 0 / 2 / 0 (the 2 are model-emitted fixes on a dropped hair/eye finding).",
+      "status": "fixed",
+      "fixedAt": "2026-10-04",
+      "fixedIn": "b6abd1656",
+      "fix": "Prompt: rule 2a says a finding that the picture lacks what the brief asks for is a defect; new rule 7d - every fix carries ids, none in a rule 2/2a drop, one in a deduped entry. Code: feedbackConsolidator.checkFixesRestOnKeptFindings - a CRITICAL/MAJOR fix with no ids, unknown ids, or no id in a kept entry is logged at ERROR to the generation log (consolidator_fix_unbacked) and recorded on plan.fix_errors; nothing is reclassified. Test: tests/unit/consolidator-fix-ids.test.ts."
+    },
+    {
       "id": "wizard-poll-outlives-view",
       "title": "Story poll loop outlived the progress view and later navigated the user to the reader",
       "rootCause": "pollCancelledRef was set only by the cancel button; no unmount/minimize/new-story cleanup",
@@ -3317,6 +3344,42 @@
       "fixedAt": "2026-10-05"
     },
     {
+      "id": "central-figure-role-twin",
+      "title": "A user character who plays the title figure ('Daniel / Wilhelm Tell') was drawn twice: the front cover cast named the role as a second figure and the Visual Bible created a Daniel-look secondary character",
+      "reportedAt": "2026-10-05",
+      "source": "Staging job_1791145238223_50osg2osm (build 82c7a7012): arcReviewReport.centralFigure = [\"Daniel\",\"Wilhelm Tell\"]; cover plan line 'wide — Emma, Wilhelm Tell — …'; VB created CHR002 with Daniel's look, Jev cited it on 5 pages; a Daniel twin on the front cover and p10, CRITICAL extra_character on p5.",
+      "rootCause": "The arc's central-figure format defined ' / ' only as a name change, so the arc used it for 'cast member / role'. coverBeats.buildCoverBeats took the LAST name of the list and appended it to the front-cover cast without checking whether another name in the list was a cast member (feature origin 93f90dfdd, decisions.md 2026-09-25).",
+      "impact": "One of 1 stored historical stories where a commissioned character plays the title figure; the cover and the Visual Bible duplicate the character.",
+      "status": "fixed",
+      "fixedAt": "2026-10-05",
+      "fixedIn": "3acae0693",
+      "fix": "coverBeats: a name in the list that is a cast member's name is the central figure, nothing is appended; arc spec: a cast member who plays the figure is named by their own name, ' / ' only for a real name change. Tests: tests/unit/covers-as-pages.test.ts, tests/unit/arc-logic-first.test.ts."
+    },
+    {
+      "id": "text-stream-cut-accepted-as-success",
+      "title": "A text stream cut mid-reply is accepted as a successful reply (OpenRouter, xAI, direct Gemini)",
+      "reportedAt": "2026-10-05",
+      "source": "Staging job_1791145238223_50osg2osm: two all-pages page-brief streams (Gemini 3.1 Pro via OpenRouter) cut after ~105 s (replies 21,988 and 9,543 chars, tokenUsage 0/0). 7 of the last 40 staging beats stories had a cut first attempt.",
+      "rootCause": "callOpenRouterAPIStreaming (and the xAI and Gemini stream paths) treat end-of-body as success: no check that [DONE], a finish_reason, or usage arrived, and OpenRouter's mid-stream event.error is ignored.",
+      "impact": "A cut reply spends the batch retry, then the per-page fallback (page 10,-1,-2,-3 cost $0.63 on this job).",
+      "status": "fixed",
+      "fixedAt": "2026-10-05",
+      "fixedIn": "30a064a61",
+      "fix": "textModels.streamCutError thrown (retryable) on every streaming path when the completion signal is missing or an SSE error arrives; per-attempt diagnostics in sceneExpansionReport.replies. Test: tests/unit/text-stream-completion.test.ts. docs/decisions.md 2026-10-05."
+    },
+    {
+      "id": "cover-title-erased-by-repair",
+      "title": "A front cover that painted its title correctly was repaired into a titleless cover and shipped: the title was misread as a caption, the repair erased it, and the titleless version cleared the CRITICAL",
+      "reportedAt": "2026-10-05",
+      "source": "staging job_1791145238223_50osg2osm front cover: v0 73 (title in sky) -> v1 55 (title on a wall sign); consolidator_calls 3018, 3038; stories.data.coverImages.frontCover.imageVersions",
+      "rootCause": "Three parts. (1) the inventory misread \"Löwenatem\" as \"Lövenatem\" once, so isDeclared (exact squashed match) charged the title as an overlay caption CRITICAL with fix \"Paint over the lettering\". (2) the same repair prompt demanded the title as REQUIRED TEXT, the caption fix and the title clause contradicted, Grok erased it. (3) a title on a wall sign is required_text MAJOR (D-33 level), which let critical-gone-wins ship the titleless v1.",
+      "impact": "The front cover shipped without a readable title (nothing in the client or PDF overlays it).",
+      "status": "fixed",
+      "fixedAt": "2026-10-05",
+      "fixedIn": "21b391064",
+      "fix": "requiredText.floorCoverTitleSeverity raises required_text on a titled cover to CRITICAL; the cover repair clause paints the title in its required place and never over it; the caption fix leaves declared lettering alone; consolidator rule 7e; COVER_TEXT covers the title-on-an-object case. Test: tests/unit/cover-title-survives-repair.test.ts. Re-run on the stored v0 and v1 images: title present and correct (decisions.md 2026-10-05)."
+    },
+    {
       "id": "seo-occasion-preposition",
       "title": "Occasion meta description said 'zum Taufe/Einschulung/Weihnachten/Ostern' and 'for birthday'",
       "rootCause": "`zum ${occ.de}` glued a fixed preposition to a bare noun",
@@ -3387,6 +3450,16 @@
       "source": "Code review 2026-10-04 (tasks/code-review-2026-10/10-texts-layout.md, French texts)",
       "status": "fixed",
       "fixedAt": "2026-10-05"
+    },
+    {
+      "id": "historical-peril-exception-missing-on-arc-and-text",
+      "title": "The arc, told to keep nothing deadly, invented a blunt rubber-tipped bolt for a historical crossbow shot",
+      "reportedAt": "2026-10-05",
+      "source": "staging job_1791145238223_50osg2osm (historical Wilhelm Tell, youngest main age 5): stories.data.arcReviewReport.createLogic, outline, text 'der stumpfe Bolzen', visualBible",
+      "rootCause": "4804fe357 added 'a historical event keeps the danger it really had' only to the two idea templates. The same 'could lead to death' ceiling, hand-copied without the exception into the arc telling rules, story-arc-review, story-text-from-beats and text-refine, made the arc creator invent a safe bolt to comply; it spread to text, costume and Visual Bible.",
+      "impact": "A historical event lost its real danger and the invention rendered as a wooden tube.",
+      "status": "fixed",
+      "fixedIn": "1970b9a8e"
     }
   ]
 }

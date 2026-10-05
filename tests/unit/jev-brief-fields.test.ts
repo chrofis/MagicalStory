@@ -164,7 +164,7 @@ describe('pinBrief: code writes the decided fields; the review is told what chan
     const m = metaOf(p.brief);
     expect(m.timeOfDay).toBe('dusk');
     expect(m.weather).toBe('none');
-    expect(m.objects).toEqual(['LOC001', 'CLO001', 'ANI001']);
+    expect(m.objects).toEqual(['LOC001', 'ANI001', 'CLO001']);
     expect(m.population).toBe('ambient');
     expect(m.aboard).toBeUndefined();
     expect(m.characters[0].looksAt).toBe('ANI001');
@@ -208,8 +208,8 @@ describe('the shot is a pinned Jev field', () => {
     expect(JD.JEV_FIXED_FIELDS_RULE).toMatch(/FIXED block holds the fields decided before you write: its `shot`/);
     expect(JD.JEV_FIXED_FIELDS_RULE).toMatch(/No other rule changes a fixed field/);
   });
-  it('the page-brief step pins every decided field and logs what it restored (the shot among them)', () => {
-    const { pinDecidedFields } = req('../../server/lib/jevBriefFields');
+  it('the page-brief step assembles every decided field into the metadata the Art Director wrote, and reports no disobedience (the shot among them)', () => {
+    const { assembleBriefs } = req('../../server/lib/jevBriefFields');
     const events: any[] = [];
     const gl = { info: () => {}, warn: (k: string, _m: string, _x: any, d: any) => events.push([k, d]), error: (k: string) => events.push([k]) };
     const briefBeats = [
@@ -217,12 +217,10 @@ describe('the shot is a pinned Jev field', () => {
       { pageNumber: 16, planLine: 'SHOT — Ana — she waits — she is alone' },
     ];
     const expansions = [{ pageNumber: 15, brief: adBrief }, { pageNumber: 16, brief: brief({ shot: 'wide', characters: [{ name: 'Ana', looksAt: 'away' }], objects: ['LOC001'] }) }];
-    const restored = pinDecidedFields(expansions, briefBeats, gl);
+    assembleBriefs(expansions, briefBeats, gl);
     expect(metaOf(expansions[0].brief).shot).toBe('over-the-shoulder');
     expect(metaOf(expansions[1].brief).shot).toBe('wide');                 // no decided field, nothing pinned
-    expect(restored.map((r: any) => [r.pageNumber, r.fields])).toEqual([[15, ['shot']]]);
-    const w = events.find(e => e[0] === 'beats_jev_field_disobeyed');
-    expect(w && w[1]).toMatchObject({ pageNumber: 15, fields: ['shot'], pass: 'page briefs' });
+    expect(events).toEqual([]);                                            // a merge, not a restore: nothing is logged
   });
 });
 

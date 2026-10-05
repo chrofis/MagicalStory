@@ -391,12 +391,8 @@ async function runBriefChecks({ inputData, expansions, briefBeats, visualBible, 
       }
       let candidate = keepDeclaredLight(n, keepDeclaredWornRows(n, raw, prior, 'brief re-ask', gl), prior, 'brief re-ask', gl);
       const fixed = beatOf(n).jevFixed;
-      let restored = [];
-      if (fixed) {
-        const pinned = pinBrief(candidate, fixed);
-        restored = [...new Set(pinned.changes.filter(c => !c.problem).map(c => c.field))];
-        candidate = pinned.brief;
-      }
+      // The re-ask writes no decided field either: code merges them back in.
+      if (fixed) candidate = pinBrief(candidate, fixed).brief;
       const guard = assessSceneBrief(candidate);
       const recheck = (text) => collectBriefFindings(expansions.map(e => (e.pageNumber === n ? { pageNumber: n, brief: text } : e)), ctx)
         .findings.filter(f => f.pageNumber === n);
@@ -425,8 +421,7 @@ async function runBriefChecks({ inputData, expansions, briefBeats, visualBible, 
         }
       }
       if (accepted) { x.brief = candidate; report.pages.push({ pageNumber: n, after: candidate }); }
-      if (restored.length) gl.warn('beats_jev_field_disobeyed', `Page ${n}: the re-ask rewrite changed decided field(s) ${restored.join(', ')} — code restored them`, null, { pageNumber: n, fields: restored, pass: 'brief re-ask' });
-      report.verdicts.push({ pageNumber: n, accepted, reason, resolved: verdict.resolved?.map(f => f.type) || [], survived: verdict.survived?.map(f => f.type) || [], introduced: verdict.introduced?.map(f => f.type) || [], restoredFields: restored });
+      report.verdicts.push({ pageNumber: n, accepted, reason, resolved: verdict.resolved?.map(f => f.type) || [], survived: verdict.survived?.map(f => f.type) || [], introduced: verdict.introduced?.map(f => f.type) || [] });
       gl.info('beats_brief_reask_verdict', `Page ${n}: ${reason}`, null, { pageNumber: n, accepted });
     }
   }

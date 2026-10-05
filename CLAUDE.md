@@ -115,7 +115,9 @@ Which file does a new item go in?
 - **Pushes are gated on the target environment being idle.** `.githooks/pre-push` asks
   `GET /api/health/busy` (staging for `staging`, production for `master`) and refuses the
   push while a story generation or Test Lab experiment is running — a deploy restarts the
-  container and kills it. **Enabled automatically by `npm install`** (`prepare` →
+  container and kills it. When it lets a push through, it first flags the environment
+  "deploy pending" (`POST /api/admin/deploy-pending`) so the Test Lab refuses new runs
+  until the new commit boots — a failure to set the flag blocks the push. **Enabled automatically by `npm install`** (`prepare` →
   `scripts/admin/setup-git-hooks.js`); run that script directly if you skipped install.
   It sets `core.hooksPath` to an ABSOLUTE path deliberately — a relative one is resolved
   per working tree, so an agent worktree on a branch older than the hook has no

@@ -38,7 +38,7 @@ const { getSwissStoryResearch, getSwissCityById } = require('./swissStories');
 const { parseProseMetadataFormat, stripSceneMetadata, extractSceneMetadata, collectSceneCharacterNames, enforceSpreadTextPosition, parseSceneHintMetadata, resolveTextStagePictureSpec, buildTextStagePictureSpecs, SHARED_GRIP_RULE, normalisePopulation } = require('./sceneMetadata');
 const { resolveClothingForPage, buildUsedClothingText, buildAvailableAvatarsForPrompt } = require('./clothingResolve');
 const { seasonLabel, buildSeasonNote, buildSeasonInstruction } = require('./season');
-const { SCENE_LIGHT_FIELD_RULE, buildLightLine, declaredLight, TIME_OF_DAY_ENUM, WEATHER_ENUM } = require('./sceneLight');
+const { SCENE_LIGHT_FIELD_RULE, SCENE_WEATHER_FIELD_RULE, buildLightLine, declaredLight, TIME_OF_DAY_ENUM, WEATHER_ENUM } = require('./sceneLight');
 const { isNotSetRelationship, isStrangersRelationship } = require('./relationships');
 const { VB_ELEMENT_BUDGET } = require('./vbElementBudget');
 
@@ -3225,6 +3225,7 @@ function artDirectorFills(inputData, beats = [], options = {}) {
     // The page's declared light (sceneLight.js) — one rule for every brief author
     // and the scene review's check (sibling set scene-light-generator-vs-critic).
     SCENE_LIGHT_FIELD: SCENE_LIGHT_FIELD_RULE,
+    SCENE_WEATHER_FIELD: SCENE_WEATHER_FIELD_RULE,
     // The Jev decision layer's fixed fields (2026-09-27) — one constant for the
     // brief authors and the scene review (jevDecisions.JEV_FIXED_FIELDS_RULE).
     JEV_FIXED_FIELDS: require('./jevDecisions').fixedFieldsRule(jevBackup),
@@ -3321,7 +3322,7 @@ function buildSceneBriefsAllPrompt(inputData, beats = [], options = {}) {
     ...artDirectorFills(inputData, beats, options),
     VISUAL_BIBLE: vb ? '```json\n' + vb + '\n```' : '(the Visual Bible call returned no bible — cite no Visual Bible id)',
   });
-  return applyTextZoneGate(filled, textZoneRulesActive(inputData));
+  return applyJevGate(applyTextZoneGate(filled, textZoneRulesActive(inputData)), isJevBackup(options));
 }
 
 /**
@@ -3348,7 +3349,7 @@ function buildBriefReaskPrompt({ contextPrompt, pages = [], jevBackup = false })
   ].join('\n')).join('\n\n');
   return fillTemplate(template, {
     ART_DIRECTOR_PROMPT: String(contextPrompt || '').trim(),
-    FIXED_FIELDS_KEPT: jevBackup ? '' : 'every field of its FIXED block, ',
+    FIXED_FIELDS_KEPT: jevBackup ? '' : 'the staging of every field of its FIXED block (the page below shows them as code assembled it: write none of them), ',
     FLAGGED_PAGES: flagged,
   });
 }
@@ -3413,7 +3414,7 @@ function buildBriefReaskContext(inputData, briefBeats = [], flaggedPageNumbers =
   ].join('\n');
   const spliced = template.slice(0, inputStart) + slimInput + template.slice(outputStart);
   const filled = fillTemplate(spliced, fills);
-  return applyTextZoneGate(filled, textZoneRulesActive(inputData));
+  return applyJevGate(applyTextZoneGate(filled, textZoneRulesActive(inputData)), isJevBackup(options));
 }
 
 /**
@@ -3428,6 +3429,31 @@ function applyTextZoneGate(text, active) {
   return active
     ? s.replace(/<!-- TEXT_OVERLAY_(BEGIN|END) -->\n?/g, '')
     : s.replace(/<!-- TEXT_OVERLAY_BEGIN -->[\s\S]*?<!-- TEXT_OVERLAY_END -->\n?/g, '');
+}
+
+/**
+ * The two path gates of the Art Director's metadata contract (owner,
+ * 2026-10-05). On the Jev path the decision layer fixed a story page's shot,
+ * light, objects, aboard, population and gaze and the Art Director does not
+ * write them (code merges them: jevBriefFields.assembleBriefs); on the outage
+ * backup, and in the legacy per-page path, nothing is fixed and it writes every
+ * field. Both variants live in one template, so the two can never drift on what a
+ * valid brief IS:
+ *   `<!-- JEV_BACKUP_BEGIN --> … <!-- JEV_BACKUP_END -->`  kept on the backup only
+ *   `<!-- JEV_FIXED_BEGIN --> … <!-- JEV_FIXED_END -->`    kept on the Jev path only
+ * Markers on their own line take the line with them; inline markers take
+ * nothing but themselves.
+ */
+function applyJevGate(text, jevBackup) {
+  let s = String(text || '').replace(/\r\n/g, '\n');
+  for (const [kind, keep] of [['BACKUP', jevBackup], ['FIXED', !jevBackup]]) {
+    const open = `<!-- JEV_${kind}_BEGIN -->`;
+    const close = `<!-- JEV_${kind}_END -->`;
+    s = keep
+      ? s.replace(new RegExp(`^(${open}|${close})\n`, 'gm'), '').split(open).join('').split(close).join('')
+      : s.replace(new RegExp(`^${open}\n.*?^${close}\n`, 'gms'), '').replace(new RegExp(`${open}.*?${close}`, 'gs'), '');
+  }
+  return s;
 }
 
 /**
@@ -3704,6 +3730,7 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     // The page's declared light (sceneLight.js) — one rule for every brief author
     // and the scene review's check (sibling set scene-light-generator-vs-critic).
     SCENE_LIGHT_FIELD: SCENE_LIGHT_FIELD_RULE,
+    SCENE_WEATHER_FIELD: SCENE_WEATHER_FIELD_RULE,
     // The Jev decision layer's fixed fields (2026-09-27) — one constant for the
     // brief authors and the scene review (jevDecisions.JEV_FIXED_FIELDS_RULE).
     JEV_FIXED_FIELDS: require('./jevDecisions').fixedFieldsRule(jevBackup),
@@ -3746,7 +3773,7 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     typeof options.textZoneRules === 'boolean' ? options.textZoneRules
       : options.story ? textZoneRulesActive(options.story)
         : true);
-  return applyTextZoneGate(filledPage, zoneActive);
+  return applyJevGate(applyTextZoneGate(filledPage, zoneActive), jevBackup);
 }
 
 /**
@@ -6332,6 +6359,7 @@ function buildTextRefinePrompt(inputData, pages = [], auditFindings = '', arc = 
     MOTIVE_AT_THE_ACT: MOTIVE_AT_THE_ACT_RULE,
     PICTURE_COUNT: PICTURE_COUNT_RULE,
     CLOSING_MOMENT: CLOSING_MOMENT_RULE,
+    PERIL_CEILING: PERIL_CEILING_RULE,
     PAYOFF_KEEP: PAYOFF_KEEP_RULE,
     MECHANISM_FIX: MECHANISM_FIX_RULE,
   });
@@ -9800,7 +9828,7 @@ const EXPRESSION_FIELD_RULE = "Every foreground or midground character carries `
  * by default", which documented the silent default as if it were a feature and
  * gave the author a reason to leave rows out.
  */
-const WORN_ITEMS_ROW_RULE = "one row for every Visual Bible element that is a garment of a character on this page, whether or not the page mentions it: any element with a `wornAs` link, and any `clothing` or `artifacts` element whose `wornBy` names a character or whose `type` is an outfit slot. `{id, owner, state, location, wearer, redressNote}`: `owner` is the `wornAs` owner or the `wornBy` character, `state` is `\"worn\"` or `\"off\"`, and `off` requires both `location`, a short phrase naming where it now lies or who holds it, and `redressNote`, the wardrobe instruction of the garment-removal rule. `wearer` is set only when another character on this page wears the item instead of its owner, and then `state` is `\"worn\"`. The prose must agree with the row. A garment given a row on one page and left out on another has no state on that page, and that is reported back as a fault.";
+const WORN_ITEMS_ROW_RULE = "one row for every Visual Bible element that is a garment of a character on this page, whether or not the page mentions it: any element with a `wornAs` link, and any `clothing` or `artifacts` element whose `wornBy` names a character or whose `type` is an outfit slot. `{id, owner, state, location, wearer, redressNote}`: `owner` is the `wornAs` owner or the `wornBy` character, `state` is `\"worn\"` or `\"off\"`, and `off` requires both `location`, a short phrase naming where it now lies or who holds it, and `redressNote`, the wardrobe instruction of the garment-removal rule, and `keptGarments`, the list of garments that stay on, as that rule describes. `wearer` is set only when another character on this page wears the item instead of its owner, and then `state` is `\"worn\"`. The prose must agree with the row. A garment given a row on one page and left out on another has no state on that page, and that is reported back as a fault.";
 
 /**
  * SAY WHAT IS THERE, NOT WHAT IS GONE (2026-09-19).
@@ -9824,7 +9852,7 @@ const WORN_ITEMS_ROW_RULE = "one row for every Visual Bible element that is a ga
  * CONTRACTS is unchanged: the absence is stated, its new place is named, and the
  * row carries `state: "off"` with a `location`.
  */
-const GARMENT_REMOVED_RULE = "When the page takes a normally-worn item off — coat off, cape down, hat in hand — the prose and `sceneIntent` both show the character without it by describing what is there instead (the bare head, the uncovered hair, the shirt now outermost) — never by naming the missing item, which paints it back into the picture — and name where it now lies or is held, and the item gets an `interactions[]` entry for that place plus a `wornItems` row with `state: \"off\"` and that place as its `location`. The avatar reference wears the full outfit, so without that statement the item is painted on the character and on the ground at once. An `off` row also carries `redressNote`, the wardrobe instruction for redrawing that character's reference sheet without the item: name the garments that stay by colour plus garment noun only — never the outfit contract's own words for their fabric, cut or weave, which make a renderer repaint a garment it was told to leave alone; state which item is off and that nothing takes its place; and describe in full whatever the removal leaves outermost there, because that one has to be drawn. Wardrobe only — no cells, no layout, no art style, no reference image. The same item off the same character reads the same on every page.";
+const GARMENT_REMOVED_RULE = "When the page takes a normally-worn item off — coat off, cape down, hat in hand — the prose and `sceneIntent` both show the character without it by describing what is there instead (the bare head, the uncovered hair, the shirt now outermost) — never by naming the missing item, which paints it back into the picture — and name where it now lies or is held, and the item gets an `interactions[]` entry for that place plus a `wornItems` row with `state: \"off\"` and that place as its `location`. The avatar reference wears the full outfit, so without that statement the item is painted on the character and on the ground at once. An `off` row also carries `redressNote`, the wardrobe instruction for redrawing that character's reference sheet without the item: name the garments that stay by colour plus garment noun only — never the outfit contract's own words for their fabric, cut or weave, which make a renderer repaint a garment it was told to leave alone; state which item is off and that nothing takes its place; and describe in full whatever the removal leaves outermost there, because that one has to be drawn. An `off` row also carries `keptGarments`: one entry `{type, colour, details}` for every garment that stays on that character, the one the removal leaves outermost included; `type` is the garment noun, `colour` its colour, `details` its fabric and cut (the sheet check is sent only colour and type). Wardrobe only — no cells, no layout, no art style, no reference image. The same item off the same character reads the same on every page.";
 
 const WORN_ON_OTHER_RULE = "When the page has a character other than the item's owner wearing it, the row is `state: \"worn\"` plus `wearer` naming that character — not `off`. The prose puts the item on the wearer and on nobody else; the owner's description does not mention it.";
 
@@ -9927,6 +9955,22 @@ const TEXT_NOT_A_CHECKLIST_RULE = textNotAChecklistRule({ role: 'judge' });
  * and a meal follow in the same sentence, and no rule in the system objected.
  */
 const ANIMAL_FATE_RULE = "An animal or creature a character cares about is never still, hurt, dead or eaten; it is alive and moving when the story leaves it. No meal follows a creature in the same breath.";
+
+/**
+ * THE PERIL CEILING, one string for every stage that writes or judges story
+ * content (owner, 2026-10-05): the arc creator and re-teller ({TELLING_RULES}),
+ * the arc reviewer, the beats text writer, the text repair, and both
+ * story-idea templates ({PERIL_CEILING}). The ceiling (nothing that could lead
+ * to death) used to be hand-copied into each; the historical exception ("a
+ * historical event keeps the danger it really had") reached only the two idea
+ * templates, so the arc, told to stay under the ceiling, invented a blunt
+ * rubber-tipped bolt for a historical crossbow shot and the invention spread
+ * to the text and the Visual Bible (staging job_1791145238223_50osg2osm;
+ * decisions.md 2026-10-05, after 4804fe357). Phrased as a conditional on the
+ * event, so it is harmless for a story that is not a historical event. Registry
+ * set `peril-ceiling-everywhere`.
+ */
+const PERIL_CEILING_RULE = "Nothing in the story or its pictures is dangerous enough that it could lead to death — for anyone. Frightening is the right level. A historical event keeps the danger it really had: tell it at a child's level, never remove it and never invent a safeguard or a harmless version of its weapon or hazard.";
 
 const RISK_FRAMING_RULE = '- Where a child does something with real physical risk, the risk is present in the telling: someone is careful, names it aloud, or the child feels it — and the close does not treat it as nothing. An adult who permits it still says what to watch for.';
 
@@ -10322,7 +10366,7 @@ function buildTellingRulesSection(inputData = {}) {
       : `- The opposition presses on the story to the end and stands in the scene at the turning point. ${ARC_OPPOSITION_HOLDS_RULE} A rival's thread ends with the rival present — arriving too late, seeing what they lost, paying.`,
     '- Reasons come from who someone is, what a place is for, or what someone needs; a sign, an inscription or a rule stated once to license a turn is not a reason.',
     '- An obstacle comes from the story\'s own world — weather, distance, a rival, a broken or missing or guarded thing, a character\'s own flaw — and exists for its own reasons: never shaped around a thing a character carries, never a puzzle door, riddle or test set by no one unless the commission sets it.',
-    '- Nothing in the story or its pictures is dangerous enough that it could lead to death — for anyone. Frightening is the right level; a refusal, a loss, a delay or a broken promise carries the peril instead. Nobody looks monstrous, no familiar character turns frightening, and anyone separated or lost is reunited.',
+    `- ${PERIL_CEILING_RULE} Where the story invents its own peril, a refusal, a loss, a delay or a broken promise can carry it. Nobody looks monstrous, no familiar character turns frightening, and anyone separated or lost is reunited.`,
     RISK_FRAMING_RULE,
     `- ${ANIMAL_FATE_RULE}`,
     '- The story ends with the children safe and together, one of them feeling something a child can name. A container or reveal the story promises opens before the end, and a story that enters through a doorway, portal or frame returns through it.',
@@ -10433,7 +10477,7 @@ function arcLogicSpec(inputData = {}, pageCount = 10) {
     'Opposition: one line — the one force that stands in the way and the motive that drives it.',
     `Facts: one dash line per named figure the plot runs on, "- <name> (commissioned) — <the one ability or limit the plot uses>" or "- <name> (new) — …", at most one ability and one limit each. Commissioned is ${COMMISSIONED_CAST_DEF}. New is every other named figure — a person, an animal or a creature, including one on a single page, one who never speaks, and an adult who sets a rule, waits or permits. Not listed: places, vehicles and objects, a group named collectively, and ${UNNAMED_FIGURE_EXEMPT}. A figure the story needs stays listed; taking its name away does not take it off. This book has room for ${arcInventedAllowance(inputData)} new named figures. Then at most two dash lines for the rules of the world the plot runs on — what keeps a thing alive, open, warm or hidden — with a size or a look only where the plot turns on it, stated as that fact.`,
     'Motives: one dash line per figure that acts, "- <figure>: <motive> → <the act it causes>".',
-    `Central figure: ${CENTRAL_FIGURE_DEF}, by the name the story calls it — two names separated by " / " where it changes name (an egg that hatches into a named creature) — or "none" where the idea is about the main character.`,
+    `Central figure: ${CENTRAL_FIGURE_DEF}, by the name the story calls it — two names separated by " / " only where the figure itself changes name (an egg that hatches into a named creature) — a commissioned character who plays the figure is named by their own name alone, never by the role they play — or "none" where the idea is about the main character.`,
     `Events: the number of happenings, ${links}.`,
     `Chain: one dash line per happening, from the call to the ending, each opening with "because" or "but", never "and then". ${shape}${readAloud} The last link says why the solution works now and did not before.`,
   ].join('\n');
@@ -11673,6 +11717,7 @@ function buildArcReviewPrompt(inputData, arc, auditFindings = '') {
     AUDIT_FINDINGS: String(auditFindings || '').trim() || '(no audit ran)',
     // Check 11 reads the creator's own inside/outside rule.
     ARC_PLACE_RULE,
+    PERIL_CEILING: PERIL_CEILING_RULE,
   });
 }
 
@@ -12026,6 +12071,7 @@ function buildStoryTextFromBeatsPrompt(inputData, beats = [], expansions = [], a
     MOTIVE_AT_THE_ACT: MOTIVE_AT_THE_ACT_RULE,
     PICTURE_COUNT: PICTURE_COUNT_RULE,
     CLOSING_MOMENT: CLOSING_MOMENT_RULE,
+    PERIL_CEILING: PERIL_CEILING_RULE,
   });
 }
 
@@ -12896,10 +12942,12 @@ module.exports = {
   buildReferenceCardColours,
   buildCoverPrompt,
   withBakedTitle,
+  bakedTitleLine,
   buildBasePrompt,
   buildRecurringElementsText,
   buildVisualBibleCallPrompt,
   buildSceneBriefsAllPrompt,
+  applyJevGate,
   buildBriefReaskPrompt,
   buildBriefReaskContext,
   shotRuleFills,
@@ -12989,6 +13037,7 @@ module.exports = {
   stripGuidePromise,
   buildTopicPromiseSection,
   RISK_FRAMING_RULE,
+  PERIL_CEILING_RULE,
   ANIMAL_FATE_RULE,
   COUNTING_RULE,
   PLAN_LINE_CAST_RULE,

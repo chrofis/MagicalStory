@@ -159,7 +159,7 @@ describe('Jev lost half-way: what was decided stays, the rest goes to the backup
     // The arc is offered Jev's draw: 12 catalogue lines.
     expect((r.prompts.arc_create.match(/^- \[C\d+\]/gm) || []).length).toBe(12);
     // Every decided field reaches the page-brief call BEFORE it writes (2026-09-28).
-    expect(r.prompts.beats_scene_expansion).toContain('FIXED — copy each into METADATA exactly');
+    expect(r.prompts.beats_scene_expansion).toContain('FIXED — code writes each into METADATA (write none of them)');
     expect(r.prompts.beats_scene_expansion).toContain('- timeOfDay: ');
     expect(r.prompts.beats_scene_expansion).toContain('- objects: LOC001');
     expect(r.prompts.beats_scene_expansion).toContain(JD.JEV_FIXED_FIELDS_RULE);

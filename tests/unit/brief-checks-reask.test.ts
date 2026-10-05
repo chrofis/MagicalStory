@@ -96,16 +96,16 @@ describe('the brief checks and the one re-ask', () => {
     expect(events.some(e => e[0] === 'error' && e[1] === 'beats_brief_reask_who_dropped')).toBe(true);
   });
 
-  it('a decided field the rewrite moved is restored and logged', async () => {
+  it('the re-ask writes no decided field: code merges the FIXED shot into the accepted rewrite, and a stray one is overwritten', async () => {
     stubModel(() => `## Page 1\n${brief({ weather: 'clear', shot: 'wide' })}`);
     const x = { pageNumber: 1, brief: brief({ weather: 'none' }) };
     events.length = 0;
     const report = await runOn([x], [{ pageNumber: 1, planLine: PLAN, jevFixed: fixed }]);
     expect(report.verdicts[0].accepted).toBe(true);
-    expect(report.verdicts[0].restoredFields).toContain('shot');
     const m = extractSceneMetadata(x.brief) || {};
     expect((m.fullData || m).shot).toBe('medium');
-    expect(events.some(e => e[1] === 'beats_jev_field_disobeyed')).toBe(true);
+    // Nothing is "disobeyed" any more: the merge is the assembly (decisions.md 2026-10-05).
+    expect(events.some(e => e[1] === 'beats_jev_field_disobeyed')).toBe(false);
   });
 
   it('a failed re-ask ships the briefs as written, flagged — never a failed story, never a second call', async () => {

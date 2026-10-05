@@ -1285,6 +1285,9 @@ router.get('/:id/dev-metadata', authenticateToken, requireAdminActing, async (re
         innerOutfitScore: entry.innerOutfitScore ?? null,
         innerFinalScore: entry.innerFinalScore ?? null,
         combinedScore: entry.combinedScore ?? null,
+        warning: entry.warning ?? null,
+        // Off-garment variant sheets: every attempt's gate answer (text only).
+        variant: entry.variant || null,
         inputs: entry.inputs ? {
           facePhoto: entry.inputs.facePhoto ? { identifier: entry.inputs.facePhoto.identifier, sizeKB: entry.inputs.facePhoto.sizeKB } : null,
           originalAvatar: entry.inputs.originalAvatar ? { identifier: entry.inputs.originalAvatar.identifier, sizeKB: entry.inputs.originalAvatar.sizeKB } : null,

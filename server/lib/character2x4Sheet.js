@@ -143,6 +143,15 @@ const CELL_NAMES_NOT_DRAWN = 'The cell names here say which way each figure face
 
 const garmentColourRule = (sheet) => `Every garment keeps the colour ${sheet} shows it in: the same hue, with only the new medium's shading on it.`;
 
+/**
+ * A GARMENT TAKEN OFF IS GONE FROM EVERY CELL (2026-10-04). One rule for the
+ * redress generator (buildRedressPrompt) and its judge (checkGarmentGone fills
+ * GARMENT_PARTS into its own question): the off-garment sheet exists so a page
+ * that takes a garment off is drawn from a reference without it.
+ */
+const GARMENT_PARTS = 'sleeve, collar, hem, hood, zip or strap';
+const GARMENT_OFF_SHEET_RULE = `No cell shows any part of a garment taken off — no ${GARMENT_PARTS} of it, worn or held; the garment it leaves outermost is drawn in its place.`;
+
 const ASSETS_DIR = path.resolve(__dirname, '..', 'assets');
 // The -axes variants overlay a 3-axis RGB gizmo (red X / green Y / blue Z)
 // on the face region of every cell instead of the original eye-dots + mouth
@@ -969,7 +978,10 @@ async function evaluateStyledSheetWithGemini(sourcePhoto, realisticSheet, styled
   // ask. The outfit is decided and scored on pass 1 — no costume input here.
   // What pass 2 IS told is to keep each garment's colour from the pass-1 sheet
   // (garmentColourRule), so the judge scores exactly that, against Image 2.
-  const { model = 'gemini-2.5-flash', promptOverride = null } = opts;
+  // imageLabels: Test Lab A/B only (sheetJudgeArms.js) — three caption strings
+  // sent as text parts before Image 1/2/3. Production passes none: the images
+  // go first, unlabelled, then the prompt.
+  const { model = 'gemini-2.5-flash', promptOverride = null, imageLabels = null } = opts;
   const styleLabel = resolveStyleLineForSheet(artStyle);
 
   let prompt = promptOverride || PROMPT_TEMPLATES.sheet2x4StyleEval;
@@ -988,14 +1000,118 @@ async function evaluateStyledSheetWithGemini(sourcePhoto, realisticSheet, styled
 
   // No output cap (owner rule): a 2500 cap once truncated this JSON mid-string
   // when the TASK-5 colour enumeration made the model think longer.
+  const images = [sourcePhoto, realisticSheet, styledSheet].map(toInlinePart);
+  if (imageLabels != null && (!Array.isArray(imageLabels) || imageLabels.length !== 3)) {
+    throw new Error('evaluateStyledSheetWithGemini: imageLabels must be three strings (Image 1, 2, 3)');
+  }
   const parts = [
-    toInlinePart(sourcePhoto),
-    toInlinePart(realisticSheet),
-    toInlinePart(styledSheet),
+    ...(imageLabels ? images.flatMap((img, i) => [{ text: String(imageLabels[i]) }, img]) : images),
     { text: prompt },
   ];
   const report = await askSheetJudge({ model, parts, prompt, label: 'style-eval', usageTracker, usageFn: 'character_2x4_style_eval', apiKey: geminiApiKey });
   return { report: scoreStyleReport(report), promptUsed: prompt };
+}
+
+/**
+ * IS ONE TAKEN-OFF GARMENT STILL ON THE SHEET? One question, one garment, the
+ * variant image ALONE (owner, 2026-10-04). Inside the style judge the same
+ * question was read as an exemption: Image 2 still wears the garment, so "TASK 9
+ * does not score it" and "no garments were requested to be taken off" passed
+ * sheets that still wore it (Lab #1597/#1598: 3 of 4 control runs). With no
+ * reference image there is nothing to excuse it. Same provider and model as the
+ * style judge (askSheetJudge: Gemini Flash, temperature 0, echo guard).
+ * A failed call throws — the caller rejects the variant, never ships it unchecked.
+ *
+ * @returns {Promise<{garment: string, visible: boolean, cells: string, reason: string}>}
+ */
+async function checkGarmentGone(sheet, garment, opts = {}) {
+  const { model = 'gemini-2.5-flash', usageTracker = null } = opts;
+  const name = String(garment || '').trim();
+  if (!name) throw new Error('checkGarmentGone: no garment named');
+  const template = PROMPT_TEMPLATES.sheetGarmentGoneCheck;
+  if (!template) throw new Error('sheetGarmentGoneCheck prompt template not loaded');
+  const prompt = fillTemplate(template, { GARMENT: name, PARTS: `${GARMENT_PARTS} of it, worn or held` });
+  const report = await askSheetJudge({
+    model, parts: [inlinePartOf(sheet), { text: prompt }], prompt,
+    label: `garment-gone check (${name})`, usageTracker, usageFn: 'character_2x4_garment_gone_check', apiKey: process.env.GEMINI_API_KEY,
+  });
+  if (typeof report?.visible !== 'boolean') throw new Error(`garment-gone check (${name}) returned no visible true/false`);
+  // `question` is the exact text asked: the stored verdict must be readable on its own.
+  return { garment: name, question: prompt, visible: report.visible, cells: String(report.cells ?? ''), reason: String(report.reason ?? '') };
+}
+
+/**
+ * IS ONE GARMENT THAT SHOULD STAY STILL ON THE SHEET'S BODY ROW? The mirror of
+ * checkGarmentGone, and not a copy of its question: asked of any cell, a kept
+ * baldric drawn only in the four head cells passed (staging
+ * job_1791145238223_50osg2osm, Daniel: baldric gone from the body row, still in
+ * the head row), and asked of all 8 cells, a belt is "missing" from every head
+ * cell, which are cropped above the waist. So: one garment, body cells 5-8, the
+ * variant image alone. A failed call throws, like checkGarmentGone.
+ *
+ * @returns {Promise<{garment: string, question: string, visible: boolean, cells: string, reason: string}>}
+ */
+async function checkKeptGarment(sheet, garment, opts = {}) {
+  const { model = 'gemini-2.5-flash', usageTracker = null } = opts;
+  // The Art Director's structured entry {type, colour, details}: only colour and
+  // type reach the question. `details` (fabric, cut) is never sent: a judge reads
+  // a fabric word literally (Lab #1614-#1620: "corduroy" flagged a correct sheet 8/8).
+  const type = String(garment?.type || '').trim();
+  const colour = String(garment?.colour || '').trim();
+  if (!type || !colour) throw new Error('checkKeptGarment: a kept garment needs a type and a colour');
+  const name = `${colour} ${type}`;
+  const template = PROMPT_TEMPLATES.sheetKeptGarmentCheck;
+  if (!template) throw new Error('sheetKeptGarmentCheck prompt template not loaded');
+  const prompt = fillTemplate(template, { GARMENT: name });
+  const report = await askSheetJudge({
+    model, parts: [inlinePartOf(sheet), { text: prompt }], prompt,
+    label: `kept-garment check (${name})`, usageTracker, usageFn: 'character_2x4_kept_garment_check', apiKey: process.env.GEMINI_API_KEY,
+  });
+  if (typeof report?.visible !== 'boolean') throw new Error(`kept-garment check (${name}) returned no visible true/false`);
+  return { garment: name, type, colour, question: prompt, visible: report.visible, cells: String(report.cells ?? ''), reason: String(report.reason ?? '') };
+}
+
+/**
+ * THE VARIANT GATE: the pass-2 style judge AND one garment-gone check per
+ * removed garment. It passes only when the style judge passes and every check
+ * says not visible. The checks ride on the style verdict as `garmentChecks`;
+ * a visible garment sets removedScore 1 and `removed.reason`, so the
+ * finding/axis plumbing reads it as an axis.
+ */
+async function evaluateVariantSheet(sheet, opts = {}) {
+  const { removedGarments = [], keptGarments = null, keptCheckSkipped = null, usageTracker = null, ...styleOpts } = opts;
+  const names = (Array.isArray(removedGarments) ? removedGarments : []).map(s => String(s || '').trim()).filter(Boolean);
+  const styled = await evaluateAvatarSheet(sheet, { ...styleOpts, pass: 2, usageTracker });
+  // The kept list is required unless the caller says why no kept check runs
+  // (an outfit version authors none): a variant is never gated on half the question.
+  const kept = Array.isArray(keptGarments) ? keptGarments : [];
+  if (!kept.length && !keptCheckSkipped) throw new Error('evaluateVariantSheet: no keptGarments and no keptCheckSkipped reason');
+  const [checks, keptChecks] = await Promise.all([
+    Promise.all(names.map(g => checkGarmentGone(sheet, g, { usageTracker }))),
+    Promise.all(kept.map(g => checkKeptGarment(sheet, g, { usageTracker }))),
+  ]);
+  const verdict = styled.verdict;
+  // The style judge's own answer, before a visible garment lowers the final.
+  verdict.styleGate = { finalScore: verdict.finalScore, valid: verdict.valid, failureReasons: [...(verdict.failureReasons || [])] };
+  verdict.garmentChecks = checks;
+  verdict.keptChecks = keptChecks;
+  verdict.keptCheckSkipped = kept.length ? null : keptCheckSkipped;
+  const still = checks.filter(c => c.visible);
+  verdict.removedScore = still.length ? 1 : 10;
+  verdict.removed = { score: verdict.removedScore, reason: still.length ? still.map(c => `${c.garment} is still visible: ${c.reason}`).join('; ') : 'no taken-off garment is visible in any cell' };
+  if (still.length) {
+    verdict.finalScore = Math.min(verdict.finalScore, verdict.removedScore);
+    verdict.valid = false;
+    verdict.failureReasons = [...(verdict.failureReasons || []), ...still.map(c => `removed: ${c.garment} is still visible — ${c.reason}`)];
+  }
+  const missing = keptChecks.filter(c => !c.visible);
+  verdict.keptScore = missing.length ? 1 : (kept.length ? 10 : null);
+  if (missing.length) {
+    verdict.finalScore = Math.min(verdict.finalScore, 1);
+    verdict.valid = false;
+    verdict.failureReasons = [...(verdict.failureReasons || []), ...missing.map(c => `kept: ${c.garment} is missing from the body cells — ${c.reason}`)];
+  }
+  return { ...styled, verdict };
 }
 
 // ── Every sheet judge's final score is computed HERE ─────────────────────────
@@ -1382,6 +1498,7 @@ async function evaluateAvatarSheet(sheet, opts = {}) {
     pass, facePhoto = null, standardAvatar = null, realisticSheet = null,
     costumeDescription = 'standard outfit', costumeName = null, artStyle = 'watercolor',
     declaredAge = null, model = null, promptOverrides = {}, usageTracker = null,
+    imageLabels = null,
   } = opts;
   // promptOverrides (Test Lab only) name the ONE judge template each replaces:
   // heads / bodies / identity on pass 1, style on pass 2. An override for a
@@ -1398,7 +1515,7 @@ async function evaluateAvatarSheet(sheet, opts = {}) {
   }
   const styled = await evaluateStyledSheetWithGemini(
     facePhoto, realisticSheet, sheet, artStyle, process.env.GEMINI_API_KEY,
-    usageTracker, declaredAge, { model: model || undefined, promptOverride: promptOverrides?.style || null }
+    usageTracker, declaredAge, { model: model || undefined, promptOverride: promptOverrides?.style || null, imageLabels }
   );
   return { verdict: styled.report, split: null, promptUsed: styled.promptUsed };
 }
@@ -1830,22 +1947,35 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
  * attached: the input is already in the story's style, and the anchor's own
  * figures are a known contaminant.
  *
- * The gate is evaluateSheetSplit, not the Pass-2 style judge: a style judge
- * asked whether an already-styled sheet "had the style applied" answers with an
- * echo verdict and rejects every redress. What actually matters here is that
- * the layout survived, the face is still the same person, and the outfit now
- * matches the stripped contract — which is exactly what the split evaluator
- * scores, with the base sheet's own head row as the identity reference.
+ * THE GATE IS THE JUDGE THAT APPROVED THE BASE SHEET (owner, 2026-10-04): the
+ * Pass-2 style judge, shown the base's own Pass-1 realistic sheet as Image 2 —
+ * exactly the inputs that approved the base — plus one garment-gone check per
+ * garment taken off (evaluateVariantSheet; GARMENT_OFF_SHEET_RULE is also
+ * stated to the generator). It used to
+ * be evaluateSheetSplit, the Pass-1 row judges: absolute crop and outfit scores
+ * the approved base itself fails (staging job_1791040103540_atbttop6w, Kiaan's
+ * base sheet 1/10 on crop, outfit and "costumeReads"), so every redress, which
+ * inherits the base layout, was rejected and no off-garment sheet was stored
+ * after ~2026-09-26. The earlier worry that a style judge "rejects every
+ * redress" held for a styled base as Image 2 (style applied? no change), not
+ * for the realistic Pass-1 sheet it is given here.
  *
- * Returns null when every attempt is rejected. The caller then stores no
- * variant, and the page falls back to the worn sheet plus the "leave it off"
- * text line — today's behaviour, never worse.
+ * No Pass-1 sheet or no face photo for the base = nothing to judge against:
+ * NO variant, logged as an error (the page then records the missing sheet).
+ *
+ * Returns null before any paid edit when an input is missing. When every
+ * attempt is rejected it returns {imageData: null, accepted: false, attempts}
+ * so the gate's answers are recorded. The caller then stores no
+ * variant; the page renders with the worn sheet and records a shipped defect.
  *
  * @param {string} baseSheetImageData - the approved styled 2×4 sheet
  * @param {Object} opts
  * @param {string} opts.characterName
  * @param {Array<string>} opts.removedItems - the garment names being taken off (logging only)
  * @param {string} opts.authoredWardrobe - the Art Director's wardrobe instruction; required
+ * @param {string} opts.realisticSheet - the base sheet's own Pass-1 realistic sheet (the style judge's Image 2); required
+ * @param {string} opts.facePhoto - the source face photo (the style judge's Image 1); required
+ * @param {string} opts.artStyle - the story's art style
  * @returns {Promise<{imageData, verdict, attempts, prompt}|null>}
  */
 /**
@@ -1876,23 +2006,49 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
  * keeps the pre-feature behaviour (the worn sheet plus the "is NOT wearing"
  * text line). An absent sheet is not a fallback implementation.
  */
-function buildRedressPrompt(authoredWardrobe) {
+function buildRedressPrompt(authoredWardrobe, removedGarments = []) {
   const wardrobeHalf = String(authoredWardrobe || '').trim();
+  const removed = (Array.isArray(removedGarments) ? removedGarments : []).map(s => String(s || '').trim()).filter(Boolean);
   if (!wardrobeHalf) {
     throw new Error('[WARDROBE-VARIANT] no authored wardrobe instruction — nothing else writes one');
   }
   return `Edit Image 1 — a 2×4 character reference sheet (8 cells).
 ${wardrobeHalf}
-Image 1 is the only authority for how anything the character keeps on looks — its colour, cut, fabric and weave: copy them, do not redraw them from words.
+${removed.length ? `Taken off: ${removed.join('; ')}. ${GARMENT_OFF_SHEET_RULE}\n` : ''}Image 1 is the only authority for how anything the character keeps on looks — its colour, cut, fabric and weave: copy them, do not redraw them from words.
 Draw every garment right round the body: in a cell facing the viewer its front, in a cell turned away its back — which this sheet has never shown, so draw it rather than uncover it.
 Change nothing else. Same character, same face, same hair, same body, same poses, same cell layout, same art style.`;
+}
+
+/**
+ * One attempt's gate answer, in the shape stored on the variant's log entry
+ * (styledAvatarGeneration): the style verdict, then every per-garment question
+ * with its answer. Text and numbers only, never an image.
+ */
+function gateRecordOf(verdict) {
+  const style = verdict?.styleGate || { finalScore: verdict?.finalScore ?? null, valid: verdict?.valid ?? null, failureReasons: verdict?.failureReasons || [] };
+  return {
+    style: { score: style.finalScore ?? null, valid: style.valid ?? null, reasons: style.failureReasons || [] },
+    garmentChecks: (verdict?.garmentChecks || []).map(c => ({
+      garment: c.garment, question: c.question || null, visible: c.visible, cells: c.cells || '', reason: c.reason || '',
+    })),
+    removedScore: verdict?.removedScore ?? null,
+    // The garments that must stay: each question and answer, or why none ran.
+    keptChecks: (verdict?.keptChecks || []).map(c => ({
+      garment: c.garment, question: c.question || null, visible: c.visible, cells: c.cells || '', reason: c.reason || '',
+    })),
+    keptCheckSkipped: verdict?.keptCheckSkipped || null,
+    keptScore: verdict?.keptScore ?? null,
+    finalScore: verdict?.finalScore ?? null,
+    valid: verdict?.valid ?? null,
+  };
 }
 
 async function redressSheetVariant(baseSheetImageData, opts = {}) {
   const {
     characterName = 'character', characterAge = null, facePhoto = null,
     removedItems = [], usageTracker = null, skipQualityEval = false,
-    backendOverride = null, authoredWardrobe = null,
+    backendOverride = null, authoredWardrobe = null, realisticSheet = null, artStyle = null,
+    keptGarments = null, keptCheckSkipped = null,
   } = opts;
   if (!baseSheetImageData) return null;
 
@@ -1902,7 +2058,16 @@ async function redressSheetVariant(baseSheetImageData, opts = {}) {
     log.error(`[WARDROBE-VARIANT] ${characterName}: no authored wardrobe instruction (off: ${items.join(', ') || 'unknown'}) — NO variant sheet. Nothing else writes this instruction.`);
     return null;
   }
-  const prompt = buildRedressPrompt(wardrobeHalf);
+  const judged = !skipQualityEval && !!process.env.GEMINI_API_KEY;
+  if (judged && (!realisticSheet || !facePhoto)) {
+    log.error(`[WARDROBE-VARIANT] ${characterName}: the base sheet's ${!realisticSheet ? 'Pass-1 realistic sheet' : 'face photo'} is not available — the style judge that approved the base cannot judge the variant. NO variant sheet.`);
+    return null;
+  }
+  if (judged && !(Array.isArray(keptGarments) && keptGarments.length) && !keptCheckSkipped) {
+    log.error(`[WARDROBE-VARIANT] ${characterName}: no kept-garment list and no reason for skipping the kept check — NO variant sheet (checked before any paid edit).`);
+    return null;
+  }
+  const prompt = buildRedressPrompt(wardrobeHalf, items);
 
   const totalAttempts = 1 + MAX_SHEET_RETRIES;
   const attempts = [];
@@ -1932,49 +2097,49 @@ async function redressSheetVariant(baseSheetImageData, opts = {}) {
       continue;
     }
 
-    if (skipQualityEval || !process.env.GEMINI_API_KEY) {
+    if (!judged) {
       // Nothing can judge it; one roll, shipped, and said so.
       log.warn(`[WARDROBE-VARIANT] ${characterName} redress shipped UNSCORED (${skipQualityEval ? 'eval skipped by caller' : 'no GEMINI_API_KEY'})`);
-      return { imageData: result.imageData, verdict: null, attempts, prompt };
+      return { imageData: result.imageData, accepted: true, verdict: null, attempts, prompt };
     }
 
     let verdict = null;
     try {
-      const split = await evaluateSheetSplit(result.imageData, {
-        facePhoto,
-        // The base sheet IS the identity reference — the variant must match the
-        // sheet it was redressed from, not a photo taken years earlier.
-        standardAvatar: baseSheetImageData,
-        costumeDescription: wardrobeHalf,
-        usageTracker,
-        declaredAge: characterAge,
-      });
-      verdict = split.verdict;
+      ({ verdict } = await evaluateVariantSheet(result.imageData, {
+        facePhoto, realisticSheet, artStyle, declaredAge: characterAge, usageTracker,
+        removedGarments: items, keptGarments, keptCheckSkipped,
+      }));
     } catch (err) {
-      log.warn(`[WARDROBE-VARIANT] ${characterName} redress eval threw: ${err.message} — attempt kept but unscored`);
-      attempts.push({ attempt, stage: 'eval-error', score: null, reason: err.message, imageData: result.imageData });
-      if (!best) best = { imageData: result.imageData, verdict: null, score: null };
+      log.error(`[WARDROBE-VARIANT] ${characterName} redress eval threw: ${err.message} — attempt rejected, never shipped unchecked`);
+      attempts.push({ attempt, stage: 'eval-error', score: null, reason: err.message });
       continue;
     }
-    attempts.push({ attempt, stage: 'judged', score: verdict.finalScore, valid: verdict.valid, reason: (verdict.failureReasons || []).join('; ') || null });
+    attempts.push({ attempt, stage: 'judged', score: verdict.finalScore, valid: verdict.valid, accepted: verdict.valid === true, reason: (verdict.failureReasons || []).join('; ') || null, gate: gateRecordOf(verdict) });
     if (!best || rank(verdict.finalScore) > rank(best.score)) {
       best = { imageData: result.imageData, verdict, score: verdict.finalScore };
     }
     if (verdict.valid) {
-      log.info(`[WARDROBE-VARIANT] ${characterName} redress accepted (score=${verdict.finalScore}/10)`);
-      return { imageData: result.imageData, verdict, attempts, prompt };
+      log.info(`[WARDROBE-VARIANT] ${characterName} redress accepted (score=${verdict.finalScore}/10, removed=${verdict.removedScore}/10)`);
+      return { imageData: result.imageData, accepted: true, verdict, attempts, prompt };
     }
   }
 
   const why = (best?.verdict?.failureReasons || []).join('; ') || 'no attempt produced a usable sheet';
-  log.error(`[WARDROBE-VARIANT] ${characterName} redress REJECTED after ${attempts.length} attempt(s) (best=${best?.score ?? 'unscored'}/10: ${why}) — no variant stored; the page keeps the worn sheet + the "leave it off" line`);
-  return null;
+  log.error(`[WARDROBE-VARIANT] ${characterName} redress REJECTED after ${attempts.length} attempt(s) (best=${best?.score ?? 'unscored'}/10: ${why}) — no variant stored; every page that takes ${items.join(', ')} off records a missing off sheet`);
+  // No image: the caller stores no variant. The record is returned so the gate's
+  // answers reach the story's diagnostics instead of dying in the log.
+  return { imageData: null, accepted: false, verdict: best?.verdict || null, attempts, prompt };
 }
 
 module.exports = {
   generateCharacter2x4Sheet,
   redressSheetVariant,
+  gateRecordOf,
   buildRedressPrompt,
+  GARMENT_OFF_SHEET_RULE,
+  checkGarmentGone,
+  checkKeptGarment,
+  evaluateVariantSheet,
   // Exported for tests: the declared-age proportion block must reach the prompt.
   declaredAgeBlock,
   buildBodyRowPrompt,

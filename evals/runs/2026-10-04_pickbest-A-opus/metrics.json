@@ -1,0 +1,477 @@
+{
+ "tag": "A-opus",
+ "cost": 1.097,
+ "cases": [
+  {
+   "case": 1,
+   "owner": "alt-clearly-better",
+   "decisions": {
+    "opus": [
+     {
+      "rep": 0,
+      "confirmed": {
+       "shipped": true,
+       "alt": false
+      },
+      "winner": "alt",
+      "byRule": "cross-check"
+     }
+    ]
+   },
+   "calls": [
+    {
+     "f": "page:rendered_text",
+     "role": "shipped",
+     "model": "opus",
+     "rep": 0,
+     "refs": 4,
+     "visible": true,
+     "conf": 0.98,
+     "cost": 0.0475
+    },
+    {
+     "f": "page:rendered_text",
+     "role": "alt",
+     "model": "opus",
+     "rep": 0,
+     "refs": 4,
+     "visible": false,
+     "conf": 0.93,
+     "cost": 0.03715
+    }
+   ]
+  },
+  {
+   "case": 2,
+   "owner": "toss-up",
+   "decisions": {
+    "opus": [
+     {
+      "rep": 0,
+      "confirmed": {
+       "shipped": true,
+       "alt": false
+      },
+      "winner": "alt",
+      "byRule": "cross-check"
+     }
+    ]
+   },
+   "calls": [
+    {
+     "f": "character_presence",
+     "role": "shipped",
+     "model": "opus",
+     "rep": 0,
+     "refs": 4,
+     "visible": true,
+     "conf": 0.9,
+     "cost": 0.05013
+    },
+    {
+     "f": "character_presence",
+     "role": "alt",
+     "model": "opus",
+     "rep": 0,
+     "refs": 4,
+     "visible": false,
+     "conf": 0.95,
+     "cost": 0.05213
+    }
+   ]
+  },
+  {
+   "case": 3,
+   "owner": "alt-clearly-better",
+   "decisions": {
+    "opus": [
+     {
+      "rep": 0,
+      "confirmed": {
+       "shipped": true,
+       "alt": false
+      },
+      "winner": "alt",
+      "byRule": "cross-check"
+     }
+    ]
+   },
+   "calls": [
+    {
+     "f": "clothing|levin",
+     "role": "shipped",
+     "model": "opus",
+     "rep": 0,
+     "refs": 1,
+     "visible": true,
+     "conf": 0.9,
+     "cost": 0.03363
+    },
+    {
+     "f": "clothing|levin",
+     "role": "alt",
+     "model": "opus",
+     "rep": 0,
+     "refs": 1,
+     "visible": false,
+     "conf": 0.85,
+     "cost": 0.03909
+    },
+    {
+     "f": "emotion|kiaan",
+     "role": "shipped",
+     "model": "opus",
+     "rep": 0,
+     "refs": 1,
+     "visible": true,
+     "conf": 0.93,
+     "cost": 0.03092
+    },
+    {
+     "f": "emotion|kiaan",
+     "role": "alt",
+     "model": "opus",
+     "rep": 0,
+     "refs": 1,
+     "visible": false,
+     "conf": 0.85,
+     "cost": 0.03687
+    },
+    {
+     "f": "page:object_presence",
+     "role": "shipped",
+     "model": "opus",
+     "rep": 0,
+     "refs": 0,
+     "visible": false,
+     "conf": 0.68,
+     "cost": 0.02936
+    },
+    {
+     "f": "page:object_presence",
+     "role": "alt",
+     "model": "opus",
+     "rep": 0,
+     "refs": 0,
+     "visible": false,
+     "conf": 0.8,
+     "cost": 0.03193
+    }
+   ]
+  },
+  {
+   "case": 4,
+   "owner": "toss-up",
+   "decisions": {
+    "opus": [
+     {
+      "rep": 0,
+      "confirmed": {
+       "shipped": true,
+       "alt": true
+      },
+      "winner": "alt",
+      "byRule": "score"
+     }
+    ]
+   },
+   "calls": [
+    {
+     "f": "clothing|levin",
+     "role": "shipped",
+     "model": "opus",
+     "rep": 0,
+     "refs": 1,
+     "visible": true,
+     "conf": 0.9,
+     "cost": 0.03366
+    },
+    {
+     "f": "clothing|levin",
+     "role": "alt",
+     "model": "opus",
+     "rep": 0,
+     "refs": 1,
+     "visible": false,
+     "conf": 0.93,
+     "cost": 0.03728
+    },
+    {
+     "f": "action_interaction|green fleece",
+     "role": "shipped",
+     "model": "opus",
+     "rep": 0,
+     "refs": 0,
+     "visible": true,
+     "conf": 0.8,
+     "cost": 0.03466
+    },
+    {
+     "f": "action_interaction|green fleece",
+     "role": "alt",
+     "model": "opus",
+     "rep": 0,
+     "refs": 0,
+     "visible": true,
+     "conf": 0.6,
+     "cost": 0.04114
+    }
+   ]
+  },
+  {
+   "case": 5,
+   "owner": "alt-clearly-better",
+   "decisions": {
+    "opus": [
+     {
+      "rep": 0,
+      "confirmed": {
+       "shipped": true,
+       "alt": false
+      },
+      "winner": "alt",
+      "byRule": "cross-check"
+     }
+    ]
+   },
+   "calls": [
+    {
+     "f": "character_presence",
+     "role": "shipped",
+     "model": "opus",
+     "rep": 0,
+     "refs": 4,
+     "visible": true,
+     "conf": 0.9,
+     "cost": 0.05027
+    },
+    {
+     "f": "character_presence",
+     "role": "alt",
+     "model": "opus",
+     "rep": 0,
+     "refs": 4,
+     "visible": false,
+     "conf": 0.95,
+     "cost": 0.0487
+    },
+    {
+     "f": "page:object_presence",
+     "role": "shipped",
+     "model": "opus",
+     "rep": 0,
+     "refs": 0,
+     "visible": false,
+     "conf": 0.72,
+     "cost": 0.02925
+    },
+    {
+     "f": "page:object_presence",
+     "role": "alt",
+     "model": "opus",
+     "rep": 0,
+     "refs": 0,
+     "visible": false,
+     "conf": 0.85,
+     "cost": 0.02903
+    }
+   ]
+  },
+  {
+   "case": 6,
+   "owner": "toss-up",
+   "decisions": {
+    "opus": [
+     {
+      "rep": 0,
+      "confirmed": {
+       "shipped": true,
+       "alt": true
+      },
+      "winner": "alt",
+      "byRule": "score"
+     }
+    ]
+   },
+   "calls": [
+    {
+     "f": "action_interaction|mother dragon",
+     "role": "shipped",
+     "model": "opus",
+     "rep": 0,
+     "refs": 0,
+     "visible": true,
+     "conf": 0.85,
+     "cost": 0.0286
+    },
+    {
+     "f": "action_interaction|mother dragon",
+     "role": "alt",
+     "model": "opus",
+     "rep": 0,
+     "refs": 0,
+     "visible": false,
+     "conf": 0.65,
+     "cost": 0.03293
+    },
+    {
+     "f": "page:setting",
+     "role": "shipped",
+     "model": "opus",
+     "rep": 0,
+     "refs": 4,
+     "visible": true,
+     "conf": 0.72,
+     "cost": 0.05458
+    },
+    {
+     "f": "page:setting",
+     "role": "alt",
+     "model": "opus",
+     "rep": 0,
+     "refs": 4,
+     "visible": true,
+     "conf": 0.6,
+     "cost": 0.06128
+    }
+   ]
+  },
+  {
+   "case": 8,
+   "owner": "toss-up",
+   "decisions": {
+    "opus": [
+     {
+      "rep": 0,
+      "confirmed": {
+       "shipped": true,
+       "alt": true
+      },
+      "winner": "alt",
+      "byRule": "score"
+     }
+    ]
+   },
+   "calls": [
+    {
+     "f": "action_interaction|levin",
+     "role": "shipped",
+     "model": "opus",
+     "rep": 0,
+     "refs": 1,
+     "visible": true,
+     "conf": 0.82,
+     "cost": 0.03061
+    },
+    {
+     "f": "action_interaction|levin",
+     "role": "alt",
+     "model": "opus",
+     "rep": 0,
+     "refs": 1,
+     "visible": true,
+     "conf": 0.85,
+     "cost": 0.03049
+    }
+   ]
+  },
+  {
+   "case": 9,
+   "owner": "toss-up",
+   "decisions": {
+    "opus": [
+     {
+      "rep": 0,
+      "confirmed": {
+       "shipped": false,
+       "alt": false
+      },
+      "winner": "alt",
+      "byRule": "score"
+     }
+    ]
+   },
+   "calls": [
+    {
+     "f": "page:object_presence",
+     "role": "shipped",
+     "model": "opus",
+     "rep": 0,
+     "refs": 0,
+     "visible": false,
+     "conf": 0.7,
+     "cost": 0.02967
+    },
+    {
+     "f": "page:object_presence",
+     "role": "alt",
+     "model": "opus",
+     "rep": 0,
+     "refs": 0,
+     "visible": false,
+     "conf": 0.7,
+     "cost": 0.03143
+    }
+   ]
+  },
+  {
+   "case": 10,
+   "owner": "alt-clearly-better",
+   "decisions": {
+    "opus": [
+     {
+      "rep": 0,
+      "confirmed": {
+       "shipped": true,
+       "alt": true
+      },
+      "winner": "alt",
+      "byRule": "score"
+     }
+    ]
+   },
+   "calls": [
+    {
+     "f": "page:object_presence",
+     "role": "shipped",
+     "model": "opus",
+     "rep": 0,
+     "refs": 0,
+     "visible": true,
+     "conf": 0.88,
+     "cost": 0.02437
+    },
+    {
+     "f": "page:object_presence",
+     "role": "alt",
+     "model": "opus",
+     "rep": 0,
+     "refs": 0,
+     "visible": false,
+     "conf": 0.85,
+     "cost": 0.0257
+    },
+    {
+     "f": "character_presence|crayfish",
+     "role": "shipped",
+     "model": "opus",
+     "rep": 0,
+     "refs": 0,
+     "visible": false,
+     "conf": 0.62,
+     "cost": 0.02961
+    },
+    {
+     "f": "character_presence|crayfish",
+     "role": "alt",
+     "model": "opus",
+     "rep": 0,
+     "refs": 0,
+     "visible": true,
+     "conf": 0.9,
+     "cost": 0.02457
+    }
+   ]
+  }
+ ]
+}

@@ -90,6 +90,15 @@ describe('the front cover names the central figure; each cover its own place (20
     expect(CB.buildCoverBeats(cast(2, [1]), { centralFigure: null })[0].planLine).toMatch(/^wide — Child1 — /);
     for (const b of beats) expect(b.planLine).toContain(CB.COVER_OWN_PLACE);
   });
+  it('a cast member named in the central figure list is the figure: a role name beside it adds no second figure', () => {
+    // staging job_1791145238223_50osg2osm: "Daniel / Wilhelm Tell" (a cast member plays the title figure)
+    // put "Wilhelm Tell" on the front cover beside Daniel, and a second Daniel-looking figure was drawn.
+    const input = cast(2, [1, 2]);
+    expect(CB.buildCoverBeats(input, { centralFigure: ['Child2', 'Role Name'] })[0].planLine).toMatch(/^wide — Child1, Child2 — /);
+    expect(CB.buildCoverBeats(input, { centralFigure: ['Role Name', 'child2'] })[0].planLine).toMatch(/^wide — Child1, Child2 — /);
+    // a cast member outside the main cover cast still joins the front cover once, under their own name
+    expect(CB.buildCoverBeats(cast(2, [1]), { centralFigure: ['Child2', 'Role Name'] })[0].planLine).toMatch(/^wide — Child1, Child2 — /);
+  });
   it('a named figure the cover brief does not cite is cover_cast_dropped; cited is clean', () => {
     const planLine = CB.buildCoverBeats(cast(1, [1]), { centralFigure: ['Creature1'] })[0].planLine;
     const bad = SBC.checkCoverCast({ pageNumber: -1, planLine }, require_('../../server/lib/sceneMetadata').extractSceneMetadata(brief(['LOC001'])), vb);

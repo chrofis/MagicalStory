@@ -21,6 +21,198 @@ superseded and link forward.
 
 ---
 
+## 2026-10-05 — Kept-garment gate shipped: AD-authored structured keptGarments, one check per garment on body cells 5-8
+
+**Context:** Daniel's bolt-off sheet (staging job_1791145238223_50osg2osm) lost the baldric from the body row and nothing flagged it. Entries above: the check flagged a correct sheet on a fabric word (Lab #1614-#1620) until the kept list was structured.
+
+**Measured** (Lab #1621, #1622, set #82, $0.010; `tests/judge-fixtures/baselines/2026-10-05-sheet-kept-d.json`): with `{type, colour, details}` entries and only colour + type sent to the judge, all four fixtures were right 2/2: Daniel flagged (baldric), Fiona passed, Kiaan passed on the original list ("corduroy" in `details`) and on the colour+noun list. Flips 0/4. Bar met.
+
+**Decision (owner, 2026-10-05):**
+- Every `off` wornItems row carries `keptGarments: [{type, colour, details}]`, authored by the Art Director beside `redressNote` (scene-briefs-all, scene-expansion, scene-iteration, scene-iteration-free via `WORN_ITEMS_ROW_RULE` and `GARMENT_REMOVED_RULE`). Code picks fields; it never parses the note. It flows through `parseWornItems`, the resolved rows, the carry-forward merge (a restated row inherits the saved list), `deriveWardrobeVariantRequirements` (requirement row `keptGarments`) and `prepareWardrobeVariantAvatars`.
+- `evaluateVariantSheet` runs `checkKeptGarment` per kept garment (colour + type only, body cells 5-8) next to the garment-gone checks. Any kept garment absent: attempt invalid, `keptScore` 1, final score 1. Every question and answer is on the attempt's `gate.keptChecks`.
+- An off row with no usable list builds NO variant (`no-kept-list` refusal, logged at ERROR), the same rule as a missing `redressNote`; stories stored before the field land there by design. A redress with neither a list nor a stated reason returns null before any paid edit.
+- Outfit-version rows author no kept list: the requirement carries `keptCheckSkipped: 'outfit version: no authored kept list'` and the gate record says so, rather than inventing a list.
+- The Lab `sheet_style` fixtures that use `evaluateVariantSheet` state their own skip reason: the kept check is measured by `sheet_kept`.
+
+**Considered:** a code-side strip of fabric words (rejected: text pattern-matching in code), a fabric-ignore instruction in the check prompt (Lab #1619/#1620: ignored by the judge, and removed), batching all kept garments into one question (grid-judge collapse hazard).
+**Revisit if:** the first real AD-authored lists produce false rejects (a kept garment drawn but flagged), or the refusal rate of `no-kept-list` is not near zero on new stories.
+
+**Touched files:** `prompts/scene-briefs-all.txt`, `prompts/scene-expansion.txt`, `prompts/scene-iteration.txt`, `prompts/scene-iteration-free.txt`, `server/lib/promptBuilders.js`, `server/lib/wornItems.js`, `server/lib/wardrobeVariants.js`, `server/lib/styledAvatars.js`, `server/lib/character2x4Sheet.js`, `server/lib/testlab.js`, `client/src/components/generation/StoryDisplay.tsx`, `tasks/verify.json`.
+
+
+## 2026-10-05 — Kept garments are structured {type, colour, details}; the check is sent colour + type only
+
+**Context:** Lab #1614-#1620: the check flagged a correct Kiaan sheet 8/8 on "black corduroy trousers", with or without an instruction to ignore fabric words.
+
+**Decision (owner, 2026-10-05):** the kept list is structured, `{ type, colour, details }` (details = fabric, cut). `checkKeptGarment` takes that entry and sends the judge only `colour + type`; `details` is never sent, and code picks fields, never parses text. The fabric-ignore line in `prompts/sheet-kept-garment-check.txt` is removed as redundant. The four `sheet_kept` fixtures are restated in the structured form; the next entry records the Lab round.
+
+**Touched files:** `server/lib/character2x4Sheet.js`, `prompts/sheet-kept-garment-check.txt`, `server/lib/judgeFixtures.js`, `tests/judge-fixtures/fixtures.json`.
+
+
+## 2026-10-05 — Kept-garment check with a fabric-blind instruction: bar NOT met again; production gate not shipped
+
+**Measured** (Lab #1619, #1620, set #82, $0.010; report `tests/judge-fixtures/baselines/2026-10-05-sheet-kept-c.json`): Daniel flagged 2/2, Fiona passed 2/2, Kiaan with the colour+noun list passed 2/2, Kiaan with the ORIGINAL list ("black corduroy trousers") flagged 2/2 ("dark trousers, but not corduroy").
+
+**Decision:** the owner's bar (original-list Kiaan passes) is not met. The instruction to judge by type and colour is in the prompt and the judge still reads the fabric word. Two paid attempts at the same thing have failed (burn-loop stop), so no third prompt retry. The AD `keptGarments` field and the `evaluateVariantSheet` rejection are NOT built. `checkKeptGarment` and the `sheet_kept` Lab judge stay Lab-only.
+
+**Considered:** a code-side strip of fabric words from kept names (rejected: pattern-matching description text in code, CLAUDE.md eval rule); a third rewording (stopped by the burn-loop rule, needs the owner's call); making the AD template enforce colour+noun for `keptGarments` (it already requires that form for `redressNote` and the judge passes such lists 4/4).
+**Revisit if:** the owner picks one of those, or a real AD-authored list passes on several stories.
+
+
+## 2026-10-05 — The kept-garment check judges a garment by type and colour only
+
+**Context:** Lab #1614-#1617 (entry above): the check flagged a correct Kiaan sheet 4/4 because the kept name said "corduroy" and the sheet draws plain dark trousers.
+
+**Decision (owner, 2026-10-05):** `prompts/sheet-kept-garment-check.txt` tells the judge to ignore fabric, texture, material, weave and cut words in the garment name and decide by garment type and colour. Re-measured on set #82 before anything ships; the result is recorded in the entry that follows it.
+
+**Touched files:** `prompts/sheet-kept-garment-check.txt`.
+
+
+## 2026-10-05 — Kept-garment check (option A) measured in the Lab: bar NOT met on the original lists; not shipped
+
+**Context:** Daniel's bolt-off sheet (staging job_1791145238223_50osg2osm) lost the baldric from body cells 5-8 and nothing flagged it. The owner chose option A with a Lab bench first: one question per kept garment about body cells 5-8, `checkKeptGarment` + `prompts/sheet-kept-garment-check.txt`, Lab judge `sheet_kept` (set #82). Bar: Daniel flagged 2/2, each good sheet passed 2/2.
+
+**Measured** (Lab #1614, #1615 on 3 fixtures; #1616, #1617 on 4; $0.018 total; reports `tests/judge-fixtures/baselines/2026-10-05-sheet-kept.json` and `-b.json`):
+- Daniel (baldric lost): flagged 4/4 runs, reason "not visible in any of cells 5 to 8; a belt is drawn instead".
+- Fiona coat-off (blouse, skirt, sash, boots): passed 4/4.
+- Kiaan jacket-off with the hand-written list "black corduroy trousers, brown ankle boots, dark grey long-sleeved t-shirt": FLAGGED 4/4. The check read "corduroy" literally ("plain dark trousers, not corduroy"). The list came from the stored Art Director note, which broke its own colour-plus-noun rule.
+- Same Kiaan sheet with "black trousers, brown ankle boots, dark grey long-sleeved t-shirt" (new fixture `kept-atbttop6w-kiaan-jacket-off-colour-noun`): passed 2/2.
+- Flips 0/4 fixtures.
+
+**Decision:** the stated bar is not met, so the production gate (AD `keptGarments` field and the `evaluateVariantSheet` rejection) is NOT built. `checkKeptGarment`, the template and the `sheet_kept` Lab judge stay, Lab-only.
+
+**Considered:** shipping with colour+noun lists only. It would pass the bench, but that bench list is a post-hoc edit of a fixture, so it needs the owner's call. The AD template already requires colour+noun only for `redressNote`, and a structured `keptGarments` field would carry that rule, but a model that slips a fabric word in still costs a false reject per variant attempt.
+**Revisit if:** the owner accepts the colour+noun framing, or a real AD-authored list over several stories passes.
+
+## 2026-10-05 — The variant gate's answer is stored on the variant's styledAvatarGeneration entry
+
+**Context:** staging job_1791145238223_50osg2osm. Two off-garment variants were made and served, `character_2x4_garment_gone_check` was billed twice, and the answer lived only in a function return that `prepareWardrobeVariantAvatars` dropped. A rejected redress returned null, so even a rejection left nothing. Daniel's sheet lost a garment that should have stayed and nothing could be read back to see what the gate had been asked.
+
+**Decision:** every variant redress, accepted or not, appends one entry to `styledAvatarGeneration` (the dev-panel avatar log): `variant: { offIds, removedItems, accepted, shippedUnscored, finalAttempt, attempts[] }`, each attempt carrying `gate: { style, garmentChecks[{garment, question, visible, cells, reason}], removedScore, finalScore, valid }`. `redressSheetVariant` returns `{imageData: null, accepted: false, attempts}` on full rejection instead of null (null stays for the pre-edit refusals). Text only; the sheet itself is stored by the normal avatar path. The Test Lab `avatar_eval` stage skips `variant` entries when it picks the latest entry for a character.
+
+**Touched files:** `server/lib/character2x4Sheet.js`, `server/lib/styledAvatars.js`, `server/routes/stories.js`, `server/lib/testlab.js`, `client/src/components/generation/StoryDisplay.tsx`, `tests/unit/variant-gate-record.test.ts`.
+
+## 2026-10-04 — The variant gate asks one garment-gone question per removed garment; TASK 10 is deleted from the style judge
+
+**Context:** `a1bb22596` judged a garment-off variant with the Pass-2 style judge plus a "TASK 10 removedScore". The Lab (entry below, Lab #1597/#1598) showed the judge reads TASK 10 as an exemption. On the `current` arm it passed a sheet that still wears the garment in 3 of 4 control runs, saying "No garments were requested to be taken off" or "Image 2 still wears it; TASK 9 does not score it". Bug: `tasks/bugs.json` → `variant-gate-passes-garment-still-on`.
+
+**Decision (owner, 2026-10-04):**
+- TASK 10 / `removedScore` / `{GARMENTS_REMOVED}` / `garmentsRemovedTask` are deleted from the style judge prompt and code. Nothing keeps them as a fallback.
+- Each removed garment gets its own check, `checkGarmentGone` (`prompts/sheet-garment-gone-check.txt`): "Is <garment> visible on the figure in any cell of this image?", asked about the variant image alone, so there is no reference to excuse it. Gemini Flash via `askSheetJudge`, the same provider and echo guard as the style judge.
+- `evaluateVariantSheet` is the variant gate: the style judge passes AND every check says not visible. A visible garment sets `removedScore` 1 and invalidates the verdict. A check that cannot be answered throws; `redressSheetVariant` logs an error and rejects that attempt, so an unchecked variant never ships.
+- `GARMENT_PARTS` (sleeve, collar, hem, hood, zip, strap) is the one wording source for `GARMENT_OFF_SHEET_RULE` (what the generator gets) and the check's question. The check prompt is a critic in sibling set `avatar-sheet-generator-vs-critic`.
+
+**Measured** on staging build f802b5b1 (Lab-only arm G, then adopted): `judge-fixtures.js run --judge=sheet_style --params='{"arm":"G"}' --repeats=2`, set #80, Lab #1609 and #1610, $0.087. Report `tests/judge-fixtures/baselines/2026-10-04-sheet-style-G.json`; run appended to `evals/results/results.jsonl`.
+
+| arm | Lab | recall | false alarm | flips | garment still on (Kiaan jacket, Fiona coat) | Kiaan jacket-off (good) | ghost figures |
+|---|---|---|---|---|---|---|---|
+| current (TASK 10) | #1597 #1598 | 7/16 | 0/12 | 1/14 | 1/4 | pass | 6/6 |
+| G (per-garment check) | #1609 #1610 | 10/16 (63%) | 0/12 | 0/14 | 4/4 | pass 2/2 | 6/6 |
+
+Bar (both controls 4/4, good variant 2/2): met. Still not caught, unchanged from every arm: the photographic base, the captioned base, and Fiona coat-off's widened head framing (the style judge, not this check).
+
+**Touched:** prompts/sheet-garment-gone-check.txt, prompts/sheet-2x4-style-eval.txt, server/services/prompts.js, server/lib/character2x4Sheet.js, server/lib/sheetJudgeArms.js (arm G added for the measurement, deleted on adoption), server/lib/testlab.js, scripts/admin/sibling-registry.json, docs/prompt-inventory.md, docs/judge-fixtures.md, tests/unit/{sheet-judge-arms,wardrobe-variant-judge,avatar-sheet-style-eval-no-outfit-axis}.test.ts
+
+**Status:** ✅ active. Closes the "Open" TASK 10 item of the entry below; replaces its TASK 10 wording (`a1bb22596`).
+
+---
+
+## 2026-10-04 — Sheet style judge arms are Lab-only until measured; production keeps `current`
+
+**Context:** Diagnosis 2026-10-04 of the Pass-2 sheet style judge (`evaluateStyledSheetWithGemini`, `prompts/sheet-2x4-style-eval.txt`). It passed a garment-off variant whose head row was flat line art, cropped wider than its reference.
+- The images are sent unlabelled, so it read Image 2's garments into Image 3.
+- Its style reason repeats the requested-style text: all 36 approvals in 8 days scored exactly 9, including a base that is close to a photograph.
+- No axis owns a medium change between cells, or a framing change.
+- For a variant, the judge never sees the styled base that the generator edited.
+- Five fix shapes were proposed. The owner chose to measure them before picking.
+
+**Decision:** The shapes are Test Lab arms, never production code paths.
+- `server/lib/sheetJudgeArms.js` builds each arm from the CURRENT template by replacing whole TASK blocks, and throws when a block is missing.
+- `evaluateStyledSheetWithGemini` gained one Lab-only option, `imageLabels`. Production passes none, so production's parts are unchanged (pinned in `tests/unit/sheet-judge-arms.test.ts`).
+- The arms are measured on a new judge-fixture judge, `sheet_style`, in `tests/judge-fixtures/fixtures.json`.
+  - 12 fixtures, every one viewed at full size. 7 flag: a base close to a photograph, a base with printed captions, three rejected attempts with ghosted extra figures, and two "garment still on" controls. 5 pass: clean bases.
+  - Each arm runs twice: `judge-fixtures.js run --judge=sheet_style --params='{"arm":…}' --repeats=2`.
+- Garment-off variants were never stored, so they are made in the Lab by `avatar_redress`. That stage runs the production redress without a judge, and reads the base through the one shared reader `styledAvatars.approvedBaseSheetFor`.
+- Hans (n9wrh5u0j) is not a fixture: at full size it is a realistic but painted watercolor, so its expected verdict is not unambiguous.
+
+**Rationale:** A judge change is adopted on measured recall and false-alarm rates over viewed fixtures, not on one page. Lab-only arms keep production exactly as it is until the owner picks.
+
+**Touched:** server/lib/sheetJudgeArms.js, server/lib/character2x4Sheet.js (`imageLabels`), server/lib/judgeFixtures.js, server/lib/testlab.js (`sheet_style` fixture replay, `avatar_redress`), server/lib/styledAvatars.js (`approvedBaseSheetFor`), scripts/admin/judge-fixtures.js (`--params`, member note), client/src/pages/TestLab.tsx, client/src/services/testlabService.ts, tests/judge-fixtures/fixtures.json, docs/judge-fixtures.md, tests/unit/sheet-judge-arms.test.ts
+
+**Measured 2026-10-04** on staging build f5b9d0b3. 14 fixtures (8 flag, 6 pass), each arm run twice, so 16 flag runs and 12 pass runs per arm.
+- Two Lab variants were added after Lab #1596 (`avatar_redress`, $0.04):
+  - Kiaan jacket-off: pass. It faithfully matches its base.
+  - Fiona coat-off: flag on `layout`. Head cell 4 lost its rear turn, and the head framing widened.
+- Per-arm reports are in `tests/judge-fixtures/baselines/2026-10-04-sheet-style-<arm>.json`.
+
+| arm | Lab | recall | false alarm | flips | ghost figures | garment still on | photographic base | captions | variant layout | good sheets | cost |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| current | #1597 #1598 | 7/16 (44%) | 0/12 | 1/14 | 6/6 | 1/4 | 0/2 | 0/2 | 0/2 | 12/12 | $0.090 |
+| A | #1599 #1600 | 8/16 (50%) | 0/12 | 0/14 | 6/6 | 2/4 | 0/2 | 0/2 | 0/2 | 12/12 | $0.091 |
+| AB | #1603 #1604 | 7/16 (44%) | 0/12 | 1/14 | 6/6 | 1/4 | 0/2 | 0/2 | 0/2 | 12/12 | $0.091 |
+| ABC | #1605 #1606 | 6/16 (38%) | 0/12 | 0/14 | 6/6 | 0/4 | 0/2 | 0/2 | 0/2 | 12/12 | $0.093 |
+| D | #1607 #1608 | 6/16 (38%) | 0/12 | 0/14 | 6/6 | 0/4 | 0/2 | 0/2 | 0/2 | 12/12 | $0.096 |
+
+AB was first fired as #1601/#1602 ($0.06). Another session's staging deploy killed both runs at 9/14 ("reaped by the idle probe"), so they are not scored.
+
+**Verdict: no arm adopted.** Production stays `current`.
+- B, C and D buy nothing: no extra catch on the photographic base, the captions or the variant's layout. ABC and D lose the one garment control A caught. A gains one fixture-repeat over `current`, which is within noise at n=14.
+- The judge's own words (Lab cards) show why: it is not failing to look, it is excusing what it sees, or reciting.
+  - **Captions.** Arm A names them ("'FRONT', 'THREE-QUARTER', 'PROFILE', 'REAR TURN' are present as captions, matching Image 2"), then scores background 9; arm D calls them "part of the sheet template". The Pass-1 sheet carries the same captions, and "matches Image 2" overrides TASK 8.
+  - **Garment still on.** `current` says "No garments were requested to be taken off"; arm A quotes TASK 10's own clause "Image 2 still wears it; TASK 9 does not score it" as its reason for 9. That clause, shipped today in a1bb22596, is read as an exemption. Arm D instead reports "a light blue shirt is outermost" on a sheet showing the jacket.
+  - **Medium and framing.** These stay recitals: "paint washes" in all 8 cells of the near-photographic base, and "rear turn, chest vs Image 2 rear turn, chest" for a cell that is a plain back view.
+
+**Open:**
+- The TASK 10 wording lets the variant gate pass a sheet that still wears the garment (1 of 4 control runs caught on `current`). It needs a reworded task, and that eval-prompt change is the owner's call.
+- The next candidates to measure on these same fixtures: a separate single-question check per removed garment; making "matches Image 2" no excuse for TASK 8 and TASK 10; more pixels per cell (judging the rows separately).
+
+**Status:** 🟡 measured, not adopted. Total spend $0.56, against a CHF 1.00 cap.
+
+---
+
+## 2026-10-04 — An off-garment sheet is judged by the judge that approved its base; costumed sheets get off variants; a missing one is a recorded defect
+
+**Context:** Staging job_1791040103540_atbttop6w. Kiaan's jacket-off sheet (`styled-standard--off:CLO001`) was redressed twice and rejected twice at 1/10, so p11, p12 and p16 were drawn from the sheet that wears the jacket.
+- The variant gate was `evaluateSheetSplit`, the Pass-1 row judges. They score an absolute crop and an outfit against a spec.
+- Kiaan's APPROVED base sheet fails those same judges (head-row crop 1/10, because the Pass-1 attempts that the style pass later approved were already scored 1 there).
+- A redress that only removes a garment inherits the base's crop, so it could never pass.
+- Staging, 15 days: 7 stories with an off garment and 47 off pages. 20 got an off sheet, 12 the worn-sheet fallback, and 6 costumed pages had no marker at all.
+  - Costumed characters were out of scope (`baseCategoryFor` returned null), and that was logged only at info.
+- Prod: 3 stories, 7 off pages, none recorded.
+- Bug: `tasks/bugs.json` → `wardrobe-variant-judged-by-row-judges`.
+
+**Decision (owner, 2026-10-04):**
+1. **The variant is judged by the Pass-2 style judge** that approved its base, `evaluateAvatarSheet({ pass: 2 })`.
+   - Image 1 is the face photo, Image 2 is the base's own Pass-1 sheet (kept per story in `styledPass1Sheets`, keyed like the styled cache), and Image 3 is the variant.
+   - It adds one task, TASK 10 `removedScore`, which checks that the removed garment is gone from all 8 cells. `removedScore` joins the lowest-axis final score.
+   - `evaluateSheetSplit` is DELETED from the variant path, not kept as a second gate.
+   - If the Pass-1 sheet or the face photo is missing, there is no variant: `redressSheetVariant` logs at ERROR and returns null before any paid edit.
+2. **Generator and critic share one rule.** `GARMENT_OFF_SHEET_RULE` (character2x4Sheet.js) goes into the redress prompt (`buildRedressPrompt`, with the garment names) and into the judge's TASK 10 (`garmentsRemovedTask`).
+3. **Costumed sheets get off variants**, built the same way as plain ones.
+   - Derivation reads the page's own declared clothing first (`pageCategoryFor`), then the story's category. A costumed character gets `costumed--off:<ids>`.
+   - The projection stores it under that bare key; there is no `styled-` prefix, because the costumed slot itself is bare `costumed`.
+   - `resolveSheetForRef` and `getStyledAvatarForClothing` both serve it.
+4. **A missing off sheet still renders, but as a recorded defect.**
+   - `resolveSheetForRef` logs at ERROR and stamps `wornStateFallback` on the reference.
+   - `collectNotEvaluated` turns that into a per-page `wardrobe_state_reference / off_sheet_missing` entry in `finalChecksReport.notEvaluated`.
+   - A character with no declared category is refused at ERROR (`no-sheet-category`).
+   - The 2026-09-19 entry below is amended to match.
+
+**Rationale:**
+- A variant differs from its base by one garment, so the base's judge plus a "garment gone" task is the matching gate.
+- Absolute Pass-1 crop and outfit scores rejected the approved base itself.
+- Validation (direct calls on stored inputs, about $0.02 each, both accepted on the first roll):
+  - Kiaan `standard--off:CLO001`: 9/10, removed 9. Viewed: the jacket is gone from all 8 cells, the grey long-sleeved shirt is outermost, and face, trousers and boots are unchanged.
+  - Fiona `costumed--off:CLO001` (job_1790446348343_z3fw660ie): 9/10, removed 10. Viewed: the coat is gone, the blouse and sash are outermost, and the face is unchanged. But the head row changed to flat line art and widened to waist-up, and the style judge still gave style 9.
+    - Its reasons cite a "dark grey vest" and "no hard outlines" that are not in the image. It reads Image 2.
+    - This is the same judge that approves every base sheet, so the gap predates this change. It is open for the owner (BACKLOG).
+
+**Touched:** server/lib/character2x4Sheet.js, prompts/sheet-2x4-style-eval.txt, server/lib/styledAvatars.js, server/lib/wardrobeVariants.js, server/lib/storyAvatars.js, server/lib/entityConsistency.js, server/lib/notEvaluated.js, scripts/admin/sibling-registry.json (`wardrobe-variant-sheet-chain`), scripts/admin/verify-checks.js (`offSheetServed`), tests/unit/wardrobe-variant-judge.test.ts
+
+**Status:** ✅ active (staging)
+
+---
+
 ## 2026-10-04 — A creature's face and action are brief fields; an animal's features are anatomy, never a feeling; an element's size has one source
 
 **Context:** Staging job_1791040103540_atbttop6w (dragon run 9).
@@ -16154,6 +16346,47 @@ self-shutdown could never actually fire, and the feature was silently saving not
 (`ensureDefaultProbes` + `busyReport` + testlab probe + the rows fix), `server.js`
 (`/api/health/busy`), `CLAUDE.md`.
 **Status:** ✅ kept.
+
+### Addendum 2026-09-25 — the build window: a deploy-pending flag
+
+**Context:** the gate checks ONE instant, the moment before the push. Railway then
+needs 2-3 minutes to build and cut over, and the old container keeps accepting work the
+whole time. On 2026-09-25 two staging pushes (a5a1fba6 at 16:03:17 CH, 166d0330 at
+16:38:22 CH) passed the gate correctly — nothing was running — and Test Lab experiments
+1472 and 1477 were started 35 s and 4 s after those pushes landed. Their last heartbeats
+(16:05:22, 16:40:56) put the cutover 2m05s-3m04s after each push. Every worktree's
+`core.hooksPath` was the absolute main-clone path, and the busy probe counts a new
+experiment from its first INSERT, so it was neither a bypass nor a probe blind spot.
+
+**Decision:** after an idle verdict the hook sets a "deploy pending" flag on each LIVE
+target (`POST /api/admin/deploy-pending`, token from `get-admin-token.js --base`). The
+flag is one `config` row (`deploy_pending`, JSON with the target commit and an ISO
+expiry, TTL 10 min). The Test Lab START routes (`POST /experiments`,
+`POST /sets/:id/run`) refuse with 409 while it is set. It ends when a container boots on
+the FLAGGED commit, or at the TTL.
+
+- **Cleared on the target commit, not on "any other commit".** Push A then push B
+  overwrites the flag with B; A's container booting must not reopen the window while B's
+  deploy is still coming.
+- **Setting it can fail the push.** A missing token, a 404 or a 500 from the endpoint
+  blocks: a push that goes ahead unflagged is exactly the race this closes. A STOPPED
+  container (502/503/refused) is skipped — nothing is serving, so nothing can accept a
+  run. Constraint: the first push to an environment that does not have the endpoint yet
+  (production, until this reaches `master`) is refused and needs `--no-verify` once.
+- **`/api/health/busy` reports the flag, it does not block on it.** A second push inside
+  the window kills nothing the first would not, and it re-points the flag at its own
+  commit; blocking it would stall every back-to-back push for a deploy's length.
+- **Story creation is NOT refused (yet).** Boot recovery does not resume jobs — it marks
+  every `pending`/`processing` job failed and refunds it — so a story accepted in the
+  window is lost. Refusing a paying user is the owner's call; open.
+- **Residual:** the new container clears the flag at boot, a few seconds before Railway
+  stops routing to the old one; a flag set but whose push then fails blocks Lab starts
+  until its TTL.
+
+**Touched:** `server/lib/deployPending.js` (new), `server/routes/admin/deploy.js` (new),
+`server/routes/admin/index.js`, `server/routes/admin/testlab.js`, `server.js` (boot
+clear, busy field), `scripts/admin/check-push-idle.js`, `tests/unit/deploy-pending.test.ts`
+(new), `tests/unit/push-idle-gate-agreement.test.ts`, `CLAUDE.md`.
 
 ---
 
@@ -52826,9 +53059,9 @@ character's garments off at once). Never the power set — only sets a page actu
    build and base-layer shade, so a jacket coming off would read as the CHARACTER changing — a worse failure
    than the one being fixed. Identity is fixed by construction; only wardrobe varies. Same shape as the
    costumed-vs-standard sheet swap already shipping. No base sheet ⇒ no variant, never a photo fallback.
-   Its gate is `evaluateSheetSplit` (layout + identity vs the base sheet's own head row + outfit vs the
-   stripped contract), not the Pass-2 style judge, which would answer "style not applied" for an input that
-   is already styled and reject every redress.
+   ~~Its gate is `evaluateSheetSplit`~~ — superseded 2026-10-04 ("A wardrobe-state sheet is judged by the
+   judge that approved its base"): the gate is the Pass-2 style judge with the base's own Pass-1 sheet as
+   Image 2, plus a garment-gone task; `evaluateSheetSplit` rejected every redress.
 3. **The off-sheet's outfit is the canonical contract with the clause structurally deleted** by the existing
    `resolveOutfitForPage` / `removeWornItemFromOutfit` stripper. No layer is invented and nothing is
    re-prompted. A strip the stripper cannot make unambiguously produces NO variant.
@@ -52842,9 +53075,10 @@ character's garments off at once). Never the power set — only sets a page actu
 5. **Resolution is a SUBSTITUTION, never an extra reference.** `resolveSheetForRef` crops the character's
    cell from the `--off:` sheet instead of the base one, so the model's reference cap is untouched. All
    three cell-crop sites and all three repair entry points route through it (or, for the character-row
-   lookup, through `getStyledAvatarForClothing`, made state-aware the same way). A missing variant falls
-   back to the worn sheet LOUDLY and stamps `ref.wornStateFallback` — the same honesty contract the costumed
-   fallback carries; it is never silent.
+   lookup, through `getStyledAvatarForClothing`, made state-aware the same way). A missing variant renders
+   from the worn sheet, logs at ERROR and stamps `ref.wornStateFallback`, which becomes the page's
+   `wardrobe_state_reference / off_sheet_missing` record in `finalChecksReport.notEvaluated` (updated
+   2026-10-04; costumed sheets get variants too).
 6. **The text line stays.** `buildWornStateLines`' "leave it off even if the attached reference shows it
    worn" is the only instruction on the fallback path, which is live on every story that gets no variant.
 7. **COVERS ALWAYS TAKE THE WORN (BASE) SHEET.** `compositeCastBuilder` resolves a cover cast by the page's
@@ -66199,6 +66433,48 @@ prepare-title keeps building only the costumed sheet; the story run builds the s
 **Revisit if:** semantic judge failures become frequent (then add an explicit retry, not a default score); the owner wants the Gemini→Grok quality-judge swap removed.
 **Touched files:** `server/lib/evalPipeline.js`, `server/lib/entityConsistency.js`, `server/lib/repairLogic.js`, `server/lib/repairPipeline.js`, `server/lib/scoring.js`, `server/lib/images.js`, `server/routes/regeneration.js`, `server/routes/stories.js`, `server/services/database.js`, `server/services/prompts.js`, `client/src/types/story.ts`, `docs/prompt-inventory.md`, tests.
 
+## 2026-10-04 — Sonnet 5.5 is measured against Opus on the arc and text_refine by exact replay, not by fresh runs (owner)
+
+**Context.** A staging page costs ~$0.36 (16-18 page books, since 2026-09-25) to $0.44 (all books); the owner wants ~$0.30. The two Opus text stages are ~$2 of a ~$6.5 story: arc create on Opus 5.5 xhigh ~$0.79, arc re-tell on Opus 5 ~$0.23, text_refine on Opus 5 ~$0.77. Sonnet 5.5 is $2/$10 (Opus 5.5 $4/$20, Opus 5 $5/$25). Earlier arc comparisons were n=1 per arm and rebuilt prompts from the current template; text_refine's audits are re-run on every Lab replay and vary run to run.
+
+**Decision.** `claude-sonnet-5-5` is registered (TEXT_MODELS + MODEL_PRICING, unused by production). Two Lab-only replay options make the model the only variable: arc_effort `promptFromStory` sends the story's stored `arcReviewReport.createPrompt` verbatim (the prompt Opus 5.5 answered), and text_refine `auditsFromStory` (with `fromWriterText`) hands the stored audit results to `refineStoryText` (`opts.audits`), so both repair models answer the identical fault list. Run on the 8 staging stories with a stored Opus 5.5 create (2026-09-25..10-03).
+
+**Rationale.** A fresh prompt or fresh audits add a second variable larger than the model gap the earlier sweeps measured (judge spread up to 1.29 on one arc). Replays of stored inputs are the cheapest way to compare against arcs and repairs that already exist.
+
+**Touched:** `server/config/models.js`, `server/lib/testlab.js` (`storedCreatePrompt`, `storedRefineAudits`), `server/lib/textRefine.js` (`opts.audits`), `tests/unit/testlab-stored-challenge-section.test.ts`, `tests/unit/text-refine-replayed-audits.test.ts`. **Status:** 🟡 measuring — the result and any routing change get their own entry.
+
+## 2026-10-04 — Pick-best stays score + critical-gone-wins; no side-by-side judge
+
+**Context.** The owner reviewed ten staging pages where the shipped version carried a CRITICAL and another version had none, and asked for a judge at the final pick that sees both images and chooses. It was built and measured on branch `feat/pickbest-judge` (head `2748cebff`, unpushed research branch: `sideBySideJudge.js`, `prompts/side-by-side-judge.txt`, scoring/repairPipeline/regeneration changes, replay scripts). None of it reaches staging.
+
+**Decision.** `pickBestVersionIndex` stays as it is: finalScore ranking after critical-gone-wins (`dominatesByCritical`, 2026-09-26). No side-by-side judge, no pair re-check.
+
+**Rationale (evidence).** Raw: `evals/results/results.jsonl` (2026-10-04 lines, dataset `evals/datasets/pickbest-critical-v1`), `evals/runs/2026-10-04_pickbest-*/metrics.json`, scan `evals/runs/2026-10-04_pickbest-scan-{staging,prod}.json` via `scripts/analysis/scan-pickbest-hits.js`.
+1. The ten owner-reviewed cases all predate 2026-09-26; today's rule picks the alternative on 10/10 and `sideBySideTrigger` fires on none. The problem they showed is already fixed by critical-gone-wins.
+2. Scan of every story created since 2026-09-26 (staging 9, prod 8; 115 + 98 scenes and covers, 46 pages with 2+ scoreable versions): 0 pages where today's pick carries a CRITICAL while another version has none; the trigger fired 8 times, every time two versions each carrying a DIFFERENT CRITICAL.
+3. Open side-by-side judge, gemini-2.5-flash: order-biased (case 7 always picks IMAGE_B; case 3 mostly; 3/5 clear cases with the alternative always IMAGE_A, 5/5 in alternating order). gemini-3.1-pro: 2/5 clear cases agree with the owner, 3/10 cases flip winner with position, USD 0.057 per call.
+4. Targeted cross-check (is this specific CRITICAL visible, per version, labelled overlay + references; pro 2 repeats, opus-5-5 1 repeat): 🟡 stable-ish, but decisive on few cases because the fallback to today's score already gives the answer; case 7 confirmed Max gripping the crate on both versions, as the owner said.
+5. Same-round re-eval of both candidates through the production evaluator, then today's picker: ❌ 3/5 on the clear cases, about 10 points of score noise between two runs of one version.
+Total spend about USD 4.5 (flash and pro judge runs 1.6 incl. one unmetered flash pass, cross-check and re-eval 2.9).
+
+**Considered.** Judge at every `recomputeActiveVersion` save (rejected by the owner: latency and cost); judging both orders and requiring agreement (not built: pro already flips, and the trigger rate does not justify it).
+
+**Revisit if:** the 8 both-CRITICAL pairs (staging `z3fw660ie` p7 + frontCover, `dka3jpog9` p10 + p11, `6mjcny1c7` p10, `atbttop6w` p9; prod `9n47zi342` p10, `j905g63bx` p7) prove, on viewing, to ship the worse image.
+
+**Touched files:** none in production. Added measurements and `scripts/analysis/scan-pickbest-hits.js` (read-only scan).
+
+## 2026-10-04 — A consolidator fix must name the findings it fixes, and one must be scored; a fix with none is a loud ERROR
+
+**Context.** Staging job_1791040103540_atbttop6w round 1 p17 (consolidator_calls 2971): the page's only finding (semantic CRITICAL, the creature stays inside the canopy instead of rising out) was dropped as `finding_contradicts_brief`, so it left `deduped_issues` (the score), while the plan still carried a CRITICAL `scene_fix` for it. `finalScore=100`, the page was never repaired. Fixes carried no ids, so nothing linked a fix to a scored finding. Measured over `consolidator_calls` since 2026-09-20 (`scripts/analysis/measure-consolidator-orphan-fixes.js`): staging 208 calls / 316 CRITICAL-MAJOR fixes, 10 CRITICAL fixes with no kept CRITICAL, 10 with no kept CRITICAL/MAJOR at all, 26 whose type has only not-a-defect drops behind it (7 stories); prod 178 / 279, 0 / 2 / 0. The examples are mostly rule 2a misapplied to findings that agree with the brief (the picture lacks what the brief asks for).
+
+**Decision (owner, 2026-10-04).** Prompt: rule 2a says a finding that the picture lacks what the brief asks for is a defect, never a 2a drop; rule 7d - every `scene_fix` / `per_character_fixes[]` entry carries `ids`, none in a rule 2/2a drop, one in a `deduped_issues` entry. Code (`feedbackConsolidator.checkFixesRestOnKeptFindings`, consistency only): a CRITICAL/MAJOR fix with no ids, an unknown id, or no id in a kept entry is logged at ERROR, written to the generation log (`consolidator_fix_unbacked`) and recorded on `plan.fix_errors`. Nothing is reclassified, no severity is invented, and the page score stays what the kept list says: the flag makes a CRITICAL fix with a 100 score visible in the run, it does not repair or rescore the page.
+
+**Rationale.** Classification (is this finding a defect) belongs to the prompt; code only checks that the plan agrees with itself. A second code path that "rescues" a dropped finding would be a fallback that hides the prompt's failure. The ERROR is the signal to fix the prompt.
+
+**Revisit if.** `fix_errors` still appears on staging runs after this prompt: then decide with the owner whether a page with `fix_errors` should be re-consolidated or held for review.
+
+**Touched files:** `prompts/feedback-consolidator.txt`, `server/lib/feedbackConsolidator.js`, `tests/unit/consolidator-fix-ids.test.ts`, `scripts/analysis/measure-consolidator-orphan-fixes.js`, `scripts/analysis/replay-consolidator-call.js`, `docs/prompt-inventory.md`, `tasks/bugs.json`, `tasks/verify.json`.
+
 ## 2026-10-04 — Sonnet 5.5 writes the arc and repairs the text (create xhigh, re-tell high, text_refine) (owner)
 
 **Context.** Page cost ~$0.36 on full books, target ~$0.30. The arc create (Opus 5.5 xhigh), arc re-tell (Opus 5 medium) and text_refine repair (Opus 5) were ~$1.8 of a ~$6.5 story. Measured by exact replay (previous entry: stored create prompts, stored re-tell prompts, stored refine audits), so the model was the only variable.
@@ -66270,3 +66546,177 @@ Testing keep the 7-day lifetime). Verified: `node scripts/ads/whoami.js` answers
 `magicalstory-admin-tools` before anything else.
 
 **Touched files:** `scripts/ads/config.json` (gitignored, local token only).
+## 2026-10-05 — Semantic judge: one severity per defect (the SEVERITIES list wins); no spec_conflict type (owner)
+
+**Context:** code review 2026-10-04 area 9b G1/G2. `prompts/image-semantic.txt` stated the same defect at two
+severities (STEP 3 tags vs the SEVERITIES list), and the judge split ~50/50: staging 45 days
+`action_interaction` 187 CRITICAL vs 227 MAJOR, prod 49 vs 62. CRITICAL decides the paid critical-repair queue.
+STEP 3 also told the judge to emit `wrong_interaction` and `spec_conflict`, which its own closed type list omits.
+
+**Decision (owner, 2026-10-05):** the SEVERITIES list wins — wrong main action MAJOR, wrong setting MAJOR, wrong
+clothing type MODERATE, a declared interaction drawn as a genuinely different category CRITICAL (matching quality
+judge D-16). The `spec_conflict` instruction is dropped (the consolidator already detects spec conflicts and
+drops those findings); `wrong_interaction` is `action_interaction`. The false "unlisted types are discarded"
+sentence is gone. `clothing_sex` gets its own TYPE_TO_BUCKET row, and `tests/unit/finding-types-closed-list.test.ts`
+now pins that every judge type list has bucket rows.
+
+**Revisit if:** a Lab `image_semantic` run over ≥3 stored stories shows wrong-scene pages no longer reaching repair.
+
+**Touched files:** `prompts/image-semantic.txt`, `server/lib/evalBuckets.js`, `tests/unit/finding-types-closed-list.test.ts`.
+
+## 2026-10-05 — Every page-render route builds its prompt through pageRenderCall; one byte-aware LLM shorten
+
+**Context:** code review area 9a S1-S4. The user-facing page regenerate, the Test Models / Style Lab routes and
+the trial streaming path built page prompts with a bare `buildImagePrompt` (no Grok VB-prose skip, no
+`vbRefElementIds`, a different grid). `shrinkPromptForModel` could call the LLM scene shorten up to four times
+because it measured characters while the cap is UTF-8 bytes (de/fr overshoot ~50 bytes).
+
+**Decision:** those routes call `pageRenderCall.makePageImagePrompt`, with the grid from the new
+`pageRenderCall.buildPageVbGrid`; `regeneration.js` joins the `page-prompt-one-construction` sibling set. The
+scene shorten works in bytes, so an over-cap page costs one LLM call (owner rule "one try", 2026-09-30); a model
+with no cap, or an unknown model key, throws `PromptFitError` instead of a silent `|| 7500` / `|| 30000` default.
+
+**Touched files:** `server/routes/regeneration.js`, `server/lib/pageRenderCall.js`, `server/lib/images.js`,
+`storyJobPipeline.js`, `scripts/admin/sibling-registry.json`.
+
+## 2026-10-05 — Writer gets the "obvious doer" half of the audit's UNFORCED rule
+
+**Context:** code review area 9b G8. The text audit faults a page where the one who needs the thing, or is
+plainly most able to fetch it, stays behind unexplained; `CAUSAL_COHERENCE_RULE` gave the writer only the
+barrier half, so the audit could fault a draft for a rule its writer was never given.
+
+**Decision:** the sentence is appended to `CAUSAL_COHERENCE_RULE` (generator side of an existing judge rule).
+
+**Touched files:** `server/lib/promptBuilders.js`, `tests/unit/causal-rule-obvious-doer.test.ts`.
+
+## 2026-10-05 — "Nochmal" (iterate) is open to customers; developer knobs stay admin-only (owner)
+
+**Context:** code review area 7 D1. The paid retry button was shown to every owner but the iterate route
+answered 403 to non-admins; prod had 54 non-admin story owners and zero successful retries.
+
+**Decision (owner, 2026-10-05):** customers may iterate a page or cover for the standard 2 credits (rate limit,
+ownership check and `chargeCredits` unchanged). For non-admin callers every developer knob (render model,
+custom prompt, free iterate, blackout, reference mode, …) is cleared before use. The client shows localised
+402/429 errors and refreshes the balance after a charge. A failed photo analysis or character save now shows an
+error and keeps the previous state instead of silently adopting the original photo (NO FALLBACKS).
+
+**Touched files:** `server/routes/regeneration.js`, `client/src/pages/StoryWizard.tsx`,
+`client/src/services/characterService.ts`, `tests/unit/iterate-open-to-customers.test.ts`.
+
+## 2026-10-05 — Central figure: a cast member who plays it is named by their own name; the cover never adds the role as a second figure
+
+**Context:** decisions.md 2026-09-25 / commit 93f90dfdd put the arc's "Central figure:" name on the front-cover cast (coverBeats took the LAST name of a " / " list, the state the story ends in). The format defined " / " only as a name change (an egg that hatches). Staging job_1791145238223_50osg2osm (a historical story where the user's character Daniel plays the title figure) stored arcReviewReport.centralFigure = ["Daniel","Wilhelm Tell"]; the cover plan line became `wide — Emma, Wilhelm Tell — …`, the Visual Bible created a separate secondary character with Daniel's look (CHR002), Jev cited it on 5 pages, and a Daniel twin appeared on the front cover and p10 plus a CRITICAL extra_character on p5. Replay of buildCoverBeats on the stored data: before `wide — Emma, Wilhelm Tell — …`, after `wide — Emma, Daniel — …`.
+
+**Decision (owner):** (1) in coverBeats, if any name in the central figure list is a cast member's name (case-insensitive), that member is the central figure and nothing else is appended; otherwise the last name still wins. (2) The arc's central-figure format (promptBuilders `arcLogicSpec`, carried by arc-create and arc-retell via {ARC_LOGIC_SPEC}) says " / " is only for the figure itself changing name, and a commissioned character who plays the figure is named by their own name alone, never by the role they play.
+
+**Rationale:** the other readers of the list (planCounters presence per third, jevDecisions isCentral, castActionRule) match any name in it, so they already treat the cast member correctly; only the cover appended. Prompt rule covers the cause, the code rule covers a list the arc still writes in the old shape.
+
+**Touched files:** `server/lib/coverBeats.js`, `server/lib/promptBuilders.js`, `tests/unit/covers-as-pages.test.ts`, `tests/unit/arc-logic-first.test.ts`, `tasks/bugs.json`, `tasks/verify.json`.
+## 2026-10-05 — A text stream that ends without its completion signal is a failed call the transport retries; page-brief attempts store why they ended
+
+**Context:** Staging `job_1791145238223_50osg2osm`: the all-pages page-brief call (Gemini 3.1 Pro via OpenRouter, streaming) was cut mid-reply twice after ~105 s. `sceneExpansionReport.replies[0]` was 21,988 chars ending mid-word in page 10, `replies[1]` 9,543 chars ending inside the metadata JSON; `tokenUsage.byFunction.beats_scene_expansion` showed 2 calls with 0 input and 0 output tokens (no usage chunk, no finish reason arrived). `callOpenRouterAPIStreaming` treated end-of-body as success (it skipped `[DONE]` and ignored a mid-stream `event.error`), and `assessTextReply` passes a non-empty reply with no stop reason. Only the brief-format check caught it, so the per-page fallback ran for pages 10, -1, -2, -3 ($0.63). Frequency: 7 of the last 40 staging beats stories had a cut first attempt. The xAI and direct Gemini stream paths had the same pattern; only the Anthropic path threw on an error event.
+
+**Decision (owner):**
+1. Every streaming entry point in `server/lib/textModels.js` throws `streamCutError` (retryable: `error.streamCut`, picked up by `withRetry`) when the body ends without that provider's completion signal, or on an SSE error event / `finish_reason: 'error'`. Signals: OpenRouter and xAI (OpenAI-compatible): `[DONE]`, a `finish_reason`, or a usage event. Gemini: `candidates[0].finishReason` on the last candidate chunk (`usageMetadata` rides on every chunk so it proves nothing; a `promptFeedback.blockReason` stream is accepted as terminal). Anthropic: `message_stop` or a `stop_reason`. The cut is logged at ERROR with provider, model, chars received, elapsed ms. Registered as sibling set `textmodel-stream-completion` (block).
+2. Each page-brief attempt in `sceneExpansionReport.replies` now carries `stopReason`, `nativeFinishReason`, `inputTokens`, `outputTokens`, `provider`, `elapsedMs`, `cut`; a transport failure after the retries is recorded as a row with `error`, `elapsedMs`, `cut`.
+
+**Rationale:** A reply that stopped for an unknown reason is not a reply. Re-sending at the transport costs one call; the per-page fallback costs one call per missing page. `assessTextReply` is deliberately unchanged: with the transport guarantee a reply reaching it has a completion signal.
+
+**Relation to earlier entries:** the 2026-08-31 batch retry (all-pages call tried twice, first attempt wins the merge) and the per-page fallback for missing pages (see 2026-08-31 "Four mechanism repairs", and 2026-09-14's partition of a cut brief to "the batch retry and the per-page fallback") stay exactly as they are. They remain the recovery for a reply that DID finish but is incomplete; this entry removes the case where a transport cut was mistaken for a finished reply and spent the batch retry or the fallback.
+
+**Touched files:** `server/lib/textModels.js`, `server/lib/beatsPipeline.js`, `scripts/admin/sibling-registry.json`, `tests/unit/text-stream-completion.test.ts`, `tests/unit/text-model-request-bodies.test.ts` (its xAI streaming fixture served a non-stream JSON body that only passed because a signal-less stream was accepted).
+
+## 2026-10-05 — A baked cover title that is missing or misplaced is CRITICAL, and a repair paints it back, never over
+
+**Context:** Staging `job_1791145238223_50osg2osm` front cover. v0 (73) had the title "Emma und der Löwenatem" painted across the top sky. The blind inventory (Qwen3-VL, `inventoryModel`) read it as "Lövenatem" in that run, and so did the quality judge, so `letteringCheck.isDeclared` (exact squashed-substring match against the declared title) did not recognise it: it was charged as an overlay caption, CRITICAL, with the fix "Paint over the lettering on sky above the scene". The repair prompt also carried the title as REQUIRED TEXT ("on the **cover**: …"), so Grok erased the sky title and put it on a cropped wall sign (v1, 55). The semantic judge filed that as `required_text` MAJOR (image-evaluation D-33 level; COVER_TEXT only named an absent or misspelled title), which cleared v0's CRITICAL, so `dominatesByCritical` (critical-gone-wins) shipped the titleless v1. Evidence: `stories.data.coverImages.frontCover.imageVersions[0..1]` (`letteringInventory`, `deductions`, `inpaintInstruction`), `consolidator_calls` 3018 and 3038 (the consolidator was told "Required lettering — PRESENT BY DESIGN" and still wrote "Paint over the caption"). Nothing in the client or the PDF overlays the title (SETTLED: model-baked everywhere).
+Measured: the stored v0 image re-run through the exact inventory call (qwen3-vl, `runVisualInventory`) 6 times read "Emma und der Löwenatem" 6 of 6; the misread was a one-in-seven event, not a systematic one, so no near-match tolerance was built (see Revisit).
+
+**Decision:** (owner, 2026-10-05)
+1. Severity. `cover-evaluation-notes.txt` COVER_TEXT now also classifies "the string present but only on an object inside the scene" as `required_text` CRITICAL (absent or misspelled stays CATASTROPHIC). Code raises, by type, to CRITICAL any `required_text` finding on an image whose required-text items include the cover title (`requiredText.floorCoverTitleSeverity`, called in `evalPipeline` next to the landmark guard on the quality record and both semantic records). The floor is scoped to covers by the title item (`coverRequiredTexts` marks it `coverTitle`), not by a new type, so a page's D-33 `required_text` stays MAJOR and the five-site type registration is not needed. Severity only; no finding text is read.
+2. Repair. `buildRequiredTextRepairClause` renders the cover title as the generator's own title line (`promptBuilders.bakedTitleLine`, now exported) plus "never painted over or removed; if missing or on another surface, paint it as the cover title here", instead of the ambiguous "on the **cover**" line. The lettering check's `fix` adds, when the page declares lettering, that the required lettering in the repair instructions is not this lettering and stays. `feedback-consolidator.txt` rule 7e: a caption that is the required string misread is the required string, never painted over (classification stays with the prompt).
+Siblings checked: cover-generator-vs-critic (generator title line reused, judges' COVER_TEXT and the consolidator widened together), required-text clause consumers (inpaintPage is the only one that builds it).
+
+**Rationale:** A version that lost its title must never beat one that has it, whatever a judge calls it. A misread of a declared string must not turn into an instruction to erase it. Re-run on the stored images (staging, Grok edit, not written to the story): v0 with the misread caption finding, instruction now carries the title clause, came back with the title repainted and correctly spelled in the sky ($0.04); v1 (titleless, title on a wall sign), with the title finding CRITICAL, plan "Repaint … in the upper third", came back with the title painted large and correct in the sky ($0.04). The wall sign stayed in v1's repair output (owner: leave it). Why v1 put the title on a sign at all: the old clause said the title is "painted on the element named" with the element "cover", which is no element in the picture, while the caption fix forbade writing in the sky, so Grok chose a surface itself. The clause now repeats the generator's own title line (`bakedTitleLine`: upper third, the only text in the image), so the repair names the place. Three more re-runs of the original v0 situation (misread caption + "Paint over the lettering on sky"): 3/3 title correct in the sky, no lettering on any other surface ($0.12; images in the cover-title worktree's .scratch).
+
+**Revisit if:** the inventory misreads a declared string on more than ~1 in 5 runs on a larger sample (then propose a near-match rule for `isDeclared`; not built because the owner chose severity plus repair and a text-similarity rule is pattern matching), or a page needs a MAJOR `required_text` on a cover prop (the floor would over-charge it).
+
+**Touched files:** `server/lib/requiredText.js`, `server/lib/evalPipeline.js`, `server/lib/letteringCheck.js`, `server/lib/promptBuilders.js`, `prompts/cover-evaluation-notes.txt`, `prompts/feedback-consolidator.txt`, `tests/unit/cover-title-survives-repair.test.ts`, `tests/unit/cover-lettering-check.test.ts`.
+
+## 2026-10-05 — Customer-facing texts: one set of facts and one style per language (owner)
+
+**Context:** code review 2026-10-04 round 3 (texts in all four languages, `tasks/code-review-2026-10/10-texts-layout.md`).
+About 60 places stated book prices the database does not charge ("Hardcover from CHF 33", "CHF 28/43"); story
+creation time was stated five ways; the controller address differed between Impressum and Privacy; cities (50 vs
+100), languages (3 vs 4) and delivery times disagreed; each language mixed registers and typography.
+
+**Decision (owner, 2026-10-05):**
+- Facts follow the production `pricing_tiers` table (up to 30 pages Softcover CHF 29 / Hardcover CHF 37; digital
+  CHF 9.90; shipping CHF 10). Free trial story "in a few minutes", full illustrated book "about an hour". Controller
+  address Ennetbaden (court venue stays Zurich). 100 Swiss cities, four languages, delivery "5–7 business days".
+- German: "du" everywhere except Privacy/Terms ("Sie"); Swiss ss, tight «…». French: "vous" everywhere; narrow
+  no-break space (U+202F) before ? ! : ; and inside « … »; "importer" for uploads; sentence case; œ. Italian: "tu"
+  except quoted speech. English: US spelling.
+- Pre-rendered pages: the visitor's stored language / `?lang=` wins after hydration; the prerender language is only
+  the first paint (`client/src/utils/languagePreference.ts`).
+- Server errors keep their English `error` for logs and add a stable `code`; the client maps code → status →
+  localised message (`client/src/utils/apiErrors.ts`) and never shows raw English to a customer.
+- Comparison-table cells are per language (`ComparisonFeature.us/.them` = `{en,de,fr,it}`), no English fallback.
+- The en-dash rule stays homepage-only; dashes elsewhere were not bulk-converted.
+
+**Revisit if:** the pricing tiers change (Pricing.tsx fallback tiers and `tests/unit/texts-facts-batch12.test.ts`
+pin them), or a legal Italian page is added (it would keep Lei/voi).
+
+**Open owner calls (BACKLOG):** print size (20×20 legacy vs A4), shipping countries, max characters per story,
+relationship/trait labels keyed by French text, homepage hero image text.
+
+**Touched files:** `client/src/constants/*`, `client/src/pages/*`, `client/src/context/LanguageContext.tsx`,
+`client/src/utils/{apiErrors,languagePreference,uiLabels}.ts`, `server/lib/seoMeta.js`, `server/routes/{auth,trial,user,print,sharing}.js`,
+`emails-src/i18n.ts`, `email.js`, `server/config/trialTitles.js`.
+
+## 2026-10-05 — Print size A4, CH-only shipping, 10-character cap, two-word brand (owner)
+
+**Context:** customer texts still said 20x20cm; checkout allowed 8 countries; character counts said "up to 3",
+"up to 10" or "multiple"; the round-3 German batch had written the brand as one word.
+
+**Decision (owner, 2026-10-05):**
+1. The printed book is A4 portrait (210×280 mm, `server/config/print.js`); the square format stays as legacy code only.
+2. Printed books ship to Switzerland only until the tax position abroad is clear: `PRINT_SHIPPING_COUNTRIES = ['CH']`
+   drives Stripe `allowed_countries`; no international-shipping claims.
+3. A story has at most 10 characters, up to 2 of them main: `CHARACTERS_MAX` (`server/lib/requestGuards.js`) mirrored
+   by `MAX_CHARACTERS_PER_STORY` (`client/src/utils/mainCharacters.ts`); create-story returns 400 `TOO_MANY_CHARACTERS`
+   before credits are reserved; the wizard blocks an 11th.
+4. The visible brand is "Magical Story" (two words); the domain, addresses, user agents and code identifiers stay one word.
+
+**Revisit if:** shipping abroad opens (tax clarified), or the character cap changes.
+
+**Touched files:** `server/config/print.js`, `server/routes/print.js`, `server/routes/jobs.js`, `server/lib/requestGuards.js`,
+`client/src/components/character/CharacterList.tsx`, `client/src/pages/StoryWizard.tsx`, `client/src/utils/{apiErrors,mainCharacters}.ts`,
+texts, `emails-src/i18n.ts`, `server/lib/seoMeta.js`.
+
+## 2026-10-05 — The peril ceiling is one constant, and its historical exception reaches every stage
+
+**Context:** Staging `job_1791145238223_50osg2osm` (historical Wilhelm Tell, youngest main age 5). The arc's telling rules said "Nothing in the story or its pictures is dangerous enough that it could lead to death", with no exception. 4804fe357 (2026-09-21, "a historical event keeps its real danger") had put the owner's exception ("A historical event keeps the danger it really had: tell it at a child's level, never remove it") only into `generate-story-ideas.txt` and `generate-story-idea-single.txt`. To obey the unqualified ceiling the arc creator invented, in its STORY LOGIC, "The village crossbow's bolt has a blunt rubber tip and only knocks the apple off" (no input asked for it). It spread to the outline, the text ("der stumpfe Bolzen"), the costume and the Visual Bible ("blunt wooden bolt with a flat cylindrical iron tip in place of a point"), which rendered as a wooden tube. The ceiling sentence was hand-copied into five more places (arc TELLING_RULES, `story-arc-review.txt`, `story-text-from-beats.txt`, `text-refine.txt`, and the two idea templates), so the exception could not reach them by editing one.
+
+**Decision (owner, 2026-10-05):** One constant, `PERIL_CEILING_RULE` in `server/lib/promptBuilders.js`, holds the ceiling plus the exception ("... A historical event keeps the danger it really had: tell it at a child's level, never remove it and never invent a safeguard or a harmless version of its weapon or hazard."). It is injected as `{PERIL_CEILING}` into `story-arc-review.txt`, `story-text-from-beats.txt`, `text-refine.txt` and both idea templates (filled in `server/routes/storyIdeas.js`), and interpolated into the arc creator/re-teller rules (`buildTellingRulesSection`). Site tails stay local: the arc rules keep "Nobody looks monstrous ... anyone separated or lost is reunited" and now say a refusal, loss, delay or broken promise CAN carry the peril of a story's own invention (was "carries the peril instead", which read as a replacement for the historical danger); the text repair keeps "A fault is never fixed by putting a person in danger"; the arc reviewer (the critic) also names an invented safeguard that removes a historical event's real danger. The sentence is a conditional on the event, so it is harmless for a story that is not historical. Sibling set `peril-ceiling-everywhere` in `scripts/admin/sibling-registry.json`.
+
+**Rationale:** A ceiling stated without its exception is read literally by the generator, which then edits history to comply; the critics inherit the same ceiling and cannot catch it. One string for generator and critics cannot drift. This restores what 4804fe357 intended and extends it to the stages that actually write the arc and the text.
+
+**Evidence:** Replay of the stored arc-create prompt (stored challenge draw, current builder, `claude-sonnet-5-5` at the pipeline's `arcCreateEffort` xhigh, one call, 8,590 in / 51,573 out, about USD 0.53 at the model's $2/$10 per 1M): the STORY LOGIC and arc keep a real crossbow and bolt told at a child's level ("a rope keeps the crowd back from the open ground where the bolt will fly", "Daniel, who took two bolts ... lowers the crossbow because he will not shoot at a shaking apple", "the bolt takes the apple off Noah's head in two halves"); no blunt, rubber or padded bolt. n=1 replay, so the real check is the verify entry `historical-keeps-real-danger`.
+
+**Touched files:** `server/lib/promptBuilders.js`, `server/routes/storyIdeas.js`, `prompts/story-arc-review.txt`, `prompts/story-text-from-beats.txt`, `prompts/text-refine.txt`, `prompts/generate-story-ideas.txt`, `prompts/generate-story-idea-single.txt`, `scripts/admin/sibling-registry.json`, `tests/unit/peril-ceiling-everywhere.test.ts`, `tasks/bugs.json`, `tasks/verify.json`.
+
+## 2026-10-05 — The Art Director stops writing the fields code decides; code assembles the brief (owner)
+
+**Context:** Owner: "Why ask Gemini to output the same fields code decides?" decisions.md 2026-09-27 point 5 kept the Art Director's `objects[]`, `population`, `aboard` and `looksAt` as a STAGING DRAFT ("what tells code which pages' prose must change; never what ships"). That rationale assumed the decision layer ran after the Art Director. Since 2026-09-28 ("Jev first") it runs before call 2: `runArtDirector` is decideLight, buildCoverBeats, Visual Bible call, landmark linking, `decideBriefFields`, then the page-brief call (which receives every decided field as the page's FIXED block), pin, brief checks and the one re-ask. Nothing is decided after call 2, and nothing reads the draft any more (the `jev_fixed_field` line this entry mentions no longer exists in code). The page-brief call was still asked to copy every FIXED line into its METADATA, and code overwrote any miss (`jevFieldsDisobeyed`).
+
+**Decision (owner, 2026-10-05):** On the Jev path the Art Director sees every FIXED field as input and writes none of them. A story page's METADATA carries no `shot`, `timeOfDay`, `population`, `aboard` or `looksAt`; `weather` on every page (`none` indoors; code also pins `none` indoors; first shipped as "outdoors only", corrected the same day, see Evidence); `objects[]` only the ids its FIXED line does not list (a garment, a generic element). A cover's FIXED block is its location alone: the Art Director writes the rest, code puts the location first in `objects[]`. A field the FIXED block does not list is the Art Director's (an unlocated page's location and population, a `looksAt` for a figure outside the head-count roster, a cover without a decided place). Characters stay keyed by `name` in the Art Director's own list, because the roster Jev decides gaze for is the commissioned characters in frame and the Art Director's list also holds characters outside it (stored staging `job_1791145238223_50osg2osm` p6 and p9: Gessler). `pinBrief` is the merge; `jevBriefFields.assembleBriefs` runs it over the page-brief call's output (the re-ask's rewrite goes through the same merge). Deleted: `pinDecidedFields`, `jevFieldsDisobeyed` (report field), `jevDecisions.fixedChanges`, the `beats_jev_field_disobeyed` warnings and `restoredFields` in the page-brief step and the re-ask. Kept: `pinBrief` on the iterate rewrite and its `moved decided field` log (the iterate templates still ask for the whole object, so a moved field is real disobedience there), the `weather_none_outdoors` check, `carryForwardLightInBrief`. The two Art Director templates carry both variants behind `JEV_BACKUP` / `JEV_FIXED` gates (`promptBuilders.applyJevGate`): the Jev-outage backup and the legacy per-page path (`jevBackup: true`) render byte-identical to the template as it was.
+
+**Rationale:** A field both decided in code and asked of the model is paid for twice and can only be lost, never improved: the model has no better information than the decision it is shown. Two consequences of the old design were measured: `jevFieldsDisobeyed` counted 1-7 pages per story on Lab #1623-1625 (code restored them every time), and about a quarter of the briefs output was copied fixed data (owner's measure). On the two stored stories replayed below the stripped metadata is 10.4% and 8.7% of the reply's characters (the prose dominates by characters; the copied fields are id- and quote-heavy, which is why the token share is higher).
+
+**Evidence:** Rung 1, $0: `scripts/analysis/replay-ad-assembly.js` over the stored call-2 replies of staging `job_1791040103540_atbttop6w` (18 story pages replayed, the 3 covers have no FIXED block there) and `job_1791145238223_50osg2osm` (9 replayed, 1 cut reply skipped): each reply stripped of the decided fields, then merged, equals the metadata the run pinned, 27 of 27 pages (object order made equal on purpose: location, decided cites in FIXED order, then the author's own ids). Rung 2, first run, Lab #1636 (`beats_scenes`, atbttop6w, gemini-3.1-pro, build 342ab13c): FAILED. The first all-pages reply parsed 1 of 21 briefs (987 characters, no metadata block), the retry ended `PROHIBITED_CONTENT` (neither seen on #1623/#1624; Google-side, not attributed to the change), and the 20 pages written per-page all lacked `weather`: 21 of 21 briefs `light_undeclared`, 17 `weather_none_outdoors` (#1623: 14 findings in all, #1624: 9), 51 findings and a 21-page re-ask (+$0.24) against 14 / 9 findings and 10 / 7 pages. Cause: the rule said weather was written outdoors only and left out indoors, and the model left it out everywhere. Fix: `weather` is the Art Director's on every page, `none` indoors (`SCENE_WEATHER_FIELD_RULE`). Not re-run yet: a second run needs the owner's go-ahead for the spend. Output tokens and cost of the all-pages call are not comparable from #1636 (its first attempt was cut); `jevFieldsDisobeyed` and the stored `modelId` (google/gemini-3.1-pro-preview) were as expected, and the final briefs carry every decided field. Evidence is recorded in `tasks/verify.json`, entry `ad-stops-writing-decided-fields`.
+
+**Replaces:** decisions.md 2026-09-27, "Jev decision layer wired, Parts 3-5", point 5 (the Art Director's staging draft). Everything else in that entry stands.
+
+**Revisit if:** the Lab run shows briefs getting worse where the Art Director no longer states its own `objects[]` / `looksAt` (prose that disagrees with the decisions: brief checks `vb_*` or `plan_cast_uncited` rising), or Jev's roster is extended to every figure in `characters[]`, which would let the name list be code's too.
+
+**Touched files:** `prompts/scene-briefs-all.txt`, `prompts/scene-expansion.txt`, `server/lib/jevDecisions.js` (rule, FIXED block wording, `pinBrief` object order), `server/lib/jevBriefFields.js` (`assembleBriefs`), `server/lib/beatsPipeline.js`, `server/lib/briefChecks.js`, `server/lib/promptBuilders.js` (`applyJevGate`, fills), `server/lib/sceneLight.js` (`SCENE_WEATHER_FIELD_RULE`), `server/lib/testlab.js`, `scripts/analysis/replay-ad-assembly.js`, `tests/unit/ad-assembly.test.ts`.

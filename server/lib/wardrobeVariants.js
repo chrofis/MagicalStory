@@ -17,9 +17,12 @@
  * the garment, the slot and the exact off-combination writes it (owner,
  * 2026-09-19: "The AD should create the full prompt that is needed to strip the
  * avatar later"). There is NO second, code-side way to word one. An off-set the
- * Art Director left unwritten produces NO variant and says so loudly; the page
- * then keeps the pre-feature behaviour — the worn sheet plus the existing "is
- * NOT wearing" text line — which is an absence, not a fallback implementation.
+ * Art Director left unwritten produces NO variant and says so loudly. A page
+ * with no off sheet — none authored, or the redress rejected — still renders
+ * from the sheet that WEARS the garment, plus the "is NOT wearing" line; that
+ * is a known defect (owner, 2026-10-04): logged at ERROR and recorded on the
+ * page as wardrobe_state_reference / off_sheet_missing in
+ * finalChecksReport.notEvaluated. Costumed sheets get variants the same way.
  *
  * ONE VARIANT PER OBSERVED DISTINCT OFF-SET, never the power set. A page with
  * two of a character's garments off at once keys the UNION.
@@ -143,18 +146,35 @@ function versionRedressNote(versions) {
 }
 
 /**
- * The non-costumed category a character's story actually uses.
+ * The sheet category a character's off-garment sheet is redressed from.
  *
- * Costumed characters get no off-variant: the costume IS the outfit, it is
- * generated rather than converted, and nothing in this story's data says which
- * clause of a costume a removable garment occupies. Out of scope, and silent
- * about it would be wrong — the caller logs the skip.
+ * THE PAGE'S OWN DECLARED CLOTHING FIRST (characters[].clothing in its brief),
+ * else the one category the story uses for that character. A COSTUMED sheet is
+ * redressed the same way as a plain one (owner, 2026-10-04): it used to be out
+ * of scope, and a garment taken off a costumed character was drawn from the
+ * costume sheet wearing it with no warning at all (staging
+ * job_1790446348343_z3fw660ie, four pages). One costume per character per
+ * story, so 'costumed' names the sheet.
  */
+const SHEET_BASE_CATEGORIES = ['standard', 'winter', 'summer', 'costumed'];
+function sheetCategoryOf(raw) {
+  const c = String(raw || '').trim().toLowerCase();
+  if (c.startsWith('costumed')) return 'costumed';
+  return SHEET_BASE_CATEGORIES.includes(c) ? c : null;
+}
+function pageCategoryFor(meta, characterName) {
+  const direct = meta?.characterClothing && Object.entries(meta.characterClothing)
+    .find(([n]) => sameName(n, characterName));
+  if (direct) return sheetCategoryOf(direct[1]);
+  const row = (Array.isArray(meta?.fullData?.characters) ? meta.fullData.characters : [])
+    .find(c => c && typeof c === 'object' && sameName(c.name, characterName));
+  return row ? sheetCategoryOf(row.clothing) : null;
+}
 function baseCategoryFor(clothingRequirements, characterName) {
   const { resolveCharacterReqs } = require('./clothingCategories');
   const charReqs = resolveCharacterReqs(clothingRequirements, characterName);
   if (!charReqs) return null;
-  if (charReqs.costumed?.used === true) return null;
+  if (charReqs.costumed?.used === true) return 'costumed';
   for (const cat of ['standard', 'winter', 'summer']) {
     if (charReqs[cat]?.used === true) return cat;
   }
@@ -176,6 +196,21 @@ function authoredNoteFrom(rows) {
   return null;
 }
 
+/**
+ * The garments that stay on, as the Art Director's structured entries
+ * {type, colour, details} (2026-10-05): the first non-empty list among the
+ * rows. Only entries with both a type and a colour are usable; the check is
+ * sent colour + type, never `details`.
+ */
+function keptGarmentsFrom(rows) {
+  for (const r of (rows || [])) {
+    const list = Array.isArray(r && r.keptGarments) ? r.keptGarments : null;
+    if (list && list.length) return list;
+  }
+  return null;
+}
+const keptEntryUsable = (g) => !!(g && String(g.type || '').trim() && String(g.colour || '').trim());
+
 /** Whitespace-, case- and punctuation-insensitive — two wordings or one? */
 function noteFingerprint(note) {
   return String(note || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
@@ -194,10 +229,11 @@ function noteFingerprint(note) {
  * gets built is one sheet, and which page's words built it is exactly what the
  * owner needs to see when the pages do not say the same thing.
  */
+const rankPage = (p) => (Number.isFinite(Number(p)) ? Number(p) : Number.MAX_SAFE_INTEGER);
 function pickAuthoredNote(notes, where) {
   const list = (notes || []).filter(n => n && String(n.note || '').trim());
   if (list.length === 0) return null;
-  const rank = (p) => (Number.isFinite(Number(p)) ? Number(p) : Number.MAX_SAFE_INTEGER);
+  const rank = rankPage;
   const sorted = list
     .map((n, i) => ({ ...n, i }))
     .sort((a, b) => (rank(a.pageNumber) - rank(b.pageNumber)) || (a.i - b.i));
@@ -258,7 +294,8 @@ function deriveWardrobeVariantRequirements({ visualBible, scenes, clothingRequir
       if (castFilter && !castFilter.some(n => sameName(n, name))) continue;
       const offIds = offIdsForCharacter(name, resolved);
       if (offIds.length === 0) continue;
-      const key = `${String(name).trim().toLowerCase()}|${offIds.join('+')}`;
+      const category = pageCategoryFor(meta, name) || baseCategoryFor(clothingRequirements, name);
+      const key = `${String(name).trim().toLowerCase()}|${category || '?'}|${offIds.join('+')}`;
       const rows = resolved.filter(r => offIds.includes(String(r.id).toUpperCase())
         && (outfitVersionOf(r.entry) ? r.state === 'worn' : isOffForCharacter(r, name)));
       // The Art Director authors the wardrobe half of the redress instruction
@@ -266,25 +303,27 @@ function deriveWardrobeVariantRequirements({ visualBible, scenes, clothingRequir
       // worded seven slightly different ways. Collect them all here; the pick
       // is made once, deterministically, below.
       const note = authoredNoteFrom(rows);
+      const kept = keptGarmentsFrom(rows);
       const existing = observed.get(key);
       if (existing) {
         existing.pages.push(pageNumber);
-        if (note) existing.notes.push({ pageNumber, note });
+        if (note) existing.notes.push({ pageNumber, note, kept });
         continue;
       }
       observed.set(key, {
         name,
         offIds,
+        category,
         // The resolved rows for exactly these ids, as this page stated them —
         // what the stripper needs, and nothing more.
         rows,
         pages: [pageNumber],
-        notes: note ? [{ pageNumber, note }] : [],
+        notes: note ? [{ pageNumber, note, kept }] : [],
       });
     }
   }
 
-  for (const { name, offIds, rows, pages, notes } of observed.values()) {
+  for (const { name, offIds, category, rows, pages, notes } of observed.values()) {
     const where = `${name} off:${offIds.join('+')} (page${pages.length > 1 ? 's' : ''} ${pages.join(', ')})`;
     // OUTFIT VERSION (2026-09-24): the set holds a garment the Visual Bible put
     // in place of a contract garment. Its sheet is the approved base sheet of
@@ -315,16 +354,20 @@ function deriveWardrobeVariantRequirements({ visualBible, scenes, clothingRequir
         baseCategory: baseCat,
         removedItemNames: versions.map(v => v.replaces),
         redressNote: versionRedressNote(versions),
+        // No Art Director writes a kept list for a version sheet: the gate
+        // records that no kept check ran, rather than guessing a list.
+        keptGarments: null,
+        keptCheckSkipped: 'outfit version: no authored kept list',
         outfitVersion: true,
         pages,
       });
       log.info(`👕 [WARDROBE-VARIANT] ${where}: outfit version requested as "${buildOffCategory(baseCat, offIds)}"`);
       continue;
     }
-    const baseCategory = baseCategoryFor(clothingRequirements, name);
+    const baseCategory = category;
     if (!baseCategory) {
-      log.info(`👕 [WARDROBE-VARIANT] ${where}: no plain clothing category in use (costumed, or nothing declared) — no variant; the page keeps the base sheet + the "leave it off" line`);
-      refusals.push({ name, offIds, pages, reason: 'no-plain-category' });
+      log.error(`👕 [WARDROBE-VARIANT] ${where}: no clothing category declared for this character — no variant; every such page records a missing off sheet`);
+      refusals.push({ name, offIds, pages, reason: 'no-sheet-category' });
       continue;
     }
     // THE AUTHORED INSTRUCTION IS THE ONLY SOURCE (owner, 2026-09-19). There is
@@ -337,10 +380,26 @@ function deriveWardrobeVariantRequirements({ visualBible, scenes, clothingRequir
     // text line. Every story stored before the field existed lands here, by
     // design and on the record.
     const redressNote = pickAuthoredNote(notes, where);
+    // The kept list rides with the note it was authored beside: the chosen
+    // note's own entry (lowest page number that authored one).
+    const chosen = (notes || []).filter(n => n && String(n.note || '').trim())
+      .map((n, i) => ({ ...n, i }))
+      .sort((a, b) => (rankPage(a.pageNumber) - rankPage(b.pageNumber)) || (a.i - b.i))[0];
+    const keptGarments = chosen ? chosen.kept : null;
     if (!redressNote) {
       log.error(`👕 [WARDROBE-VARIANT] ${where}: the Art Director authored no \`redressNote\` for this off-set — NO variant sheet. `
         + `The page keeps the worn sheet + the "is NOT wearing" line. Nothing else writes this instruction.`);
       refusals.push({ name, offIds, pages, reason: 'no-authored-instruction' });
+      continue;
+    }
+
+    // THE KEPT LIST IS AUTHORED TOO (owner, 2026-10-05): the variant gate asks
+    // one question per garment that must stay, and nothing else writes that
+    // list. A missing or unusable list builds NO variant, like a missing note.
+    if (!Array.isArray(keptGarments) || keptGarments.length === 0 || !keptGarments.every(keptEntryUsable)) {
+      log.error(`👕 [WARDROBE-VARIANT] ${where}: the Art Director authored no usable \`keptGarments\` ({type, colour, details} per garment that stays) — NO variant sheet. `
+        + `The page keeps the worn sheet + the "is NOT wearing" line.`);
+      refusals.push({ name, offIds, pages, reason: 'no-kept-list' });
       continue;
     }
 
@@ -350,6 +409,7 @@ function deriveWardrobeVariantRequirements({ visualBible, scenes, clothingRequir
       characterNames: [name],
       offIds,
       baseCategory,
+      keptGarments,
       // The garments' own declared NAMES — for the logs, and nothing is
       // invented: these are the Visual Bible entries' own names.
       removedItemNames: rows.map(r => String(r.name || r.id)),

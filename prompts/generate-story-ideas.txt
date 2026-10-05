@@ -136,7 +136,7 @@ The reader already chose the town and the season. Do not open with an address. T
 - The last sentence is the main character in the act, the picture a parent can see. The last sentence is what the child does now. It does not begin with a condition and it does not say what happens if. The last sentence is a movement of the child's body toward the want: a reach, a climb, a step, a call. It is not the child holding, knowing or having the thing that decides the outcome.
 - The final holds the idea text only: no notes, no headings, no second version, no commentary.
 - Never write how it ends, and never write the middle: no naming the object, gate, figure or trick that decides the outcome, no test the characters will have to pass, and no pairing of a character's trait with the obstacle it will meet. Say who they are, not what each of them will do about it.
-- Nothing in the story or its pictures is dangerous enough that it could lead to death — for anyone. Frightening is the right level. A historical event keeps the danger it really had: tell it at a child's level, never remove it.
+- {PERIL_CEILING}
 
 **LENGTH:** the sentence count the scope names, no more and no less, in the paragraph shape it names. No sentence runs past about 30 words. A sentence that needs a dash to hold two clauses together is two sentences.
 

@@ -100,10 +100,12 @@ function projectStoryCharacterAvatars(characters, artStyle) {
     for (const key of Object.keys(styled)) {
       if (!isOffCategory(key)) continue;
       const parsed = parseOffCategory(key);
-      if (!parsed || !['standard', 'winter', 'summer'].includes(parsed.baseCategory)) continue;
+      if (!parsed || !['standard', 'winter', 'summer', 'costumed'].includes(parsed.baseCategory)) continue;
       const url = extractUrl(styled[key]);
       if (!url) continue;
-      entry[`styled-${key}`] = url;
+      // The costumed slot is bare 'costumed' (one costume per story), so its
+      // off sheet is 'costumed--off:…'; the plain ones take the 'styled-' prefix.
+      entry[parsed.baseCategory === 'costumed' ? key : `styled-${key}`] = url;
     }
 
     if (Object.keys(entry).length > 0) {
@@ -244,18 +246,21 @@ function resolveSheetForRef(story, ref, opts = {}) {
   const offIds = Array.isArray(ref.wornOffIds) && ref.wornOffIds.length > 0
     ? ref.wornOffIds
     : offIdsForCharacter(ref.name, opts.wornResolved);
-  if (offIds.length > 0 && slotKey.startsWith('styled-')) {
+  // A COSTUMED sheet takes its off variant the same way (owner, 2026-10-04).
+  if (offIds.length > 0 && (slotKey.startsWith('styled-') || slotKey === 'costumed')) {
     const offKey = buildOffSlotKey(slotKey, offIds);
     if (story[offKey]) {
       ref.clothingCategory = `${clothingRaw}${offKey.slice(offKey.indexOf('--off:'))}`;
       ref.wornOffIds = offIds;
       return { uri: story[offKey], slotKey: offKey };
     }
-    // NEVER SILENT — same contract as the costumed fallback below. The page is
-    // about to be sent a picture of the character WEARING something the brief
-    // says is off; the only remaining instruction is the wornItems text line,
-    // and whoever reads this log needs to know that is all there was.
-    log.warn(`👕 [STORY-CELLS] ${ref.name || '?'}: page takes ${offIds.join('+')} off but no "${offKey}" sheet exists (slots: ${Object.keys(story).join(', ')}) — serving the WORN sheet; only the "leave it off" text line carries the instruction`);
+    // A KNOWN DEFECT, RECORDED (owner, 2026-10-04). The page is about to be
+    // sent a picture of the character WEARING something the brief says is off;
+    // the only remaining instruction is the wornItems text line. The page still
+    // renders, but at ERROR, and the marker below becomes the page's
+    // `wardrobe_state_reference / off_sheet_missing` record in
+    // finalChecksReport.notEvaluated (notEvaluated.collectNotEvaluated).
+    log.error(`👕 [STORY-CELLS] ${ref.name || '?'}: page takes ${offIds.join('+')} off but no "${offKey}" sheet exists (slots: ${Object.keys(story).join(', ')}) — rendering from the sheet that WEARS it; recorded as off_sheet_missing`);
     ref.wornStateFallback = { offIds, wanted: offKey };
   }
 

@@ -57,7 +57,7 @@ No phrase is repeated from a neighbouring sentence.
 The text gives each page its feeling and its suspense, and fills what the summary leaves out: feelings, dialogue, and the ordinary business between the story's turns — going somewhere and arriving, waiting, approaching people, asking, being answered, a greeting, names given and heard, a thing tried and let go. That is filler, and the text invents it freely wherever the story jumps.
 Event is not filler, and what is fixed is what the story is made of: invent no character, creature, object, place or turn of the plot the story does not carry, and nothing that changes what happens, to whom, or what it costs. The moves between the story's states — a climb, a crossing, a getting there — are told plainly as they happen, never already finished when a page opens. A change of place, of what someone holds, or of the company they are among carries its path on the page.
 The final page gets the same care as the first sentence. {CLOSING_MOMENT}
-Nothing in the story or its pictures is dangerous enough that it could lead to death — for anyone.
+{PERIL_CEILING}
 No onomatopoeia or sound-effect words (clang-clang, whoosh, boom) and no baby-talk. The register follows the reading level, never a character's age: a story about a toddler is not written in toddler speech.
 Every word must be one a child at the reading level above already uses. Name a thing plainly instead of reaching for a rare compound or an unusual colour or material word, and keep a sentence to one idea when the word count is tight.
 No abbreviation or acronym reaches the page, even when the story uses one: write the thing the way a child says it — the little train up the mountain, not its initials.

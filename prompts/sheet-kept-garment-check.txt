@@ -1,0 +1,16 @@
+You see ONE image: a 2×4 character reference sheet, 8 cells (4 head cells on top, 4 full-body cells below), each showing the same character.
+
+Question: is {GARMENT} visible on the figure in cells 5 to 8, the four full-body cells on the bottom row?
+
+- Look at cells 5, 6, 7 and 8 one by one, the turned-away cell included. Ignore the head cells on top: they are cropped and show only part of an outfit.
+- Any part of it counts.
+- In `cells`, for each of cells 5 to 8 say "yes" or "no": is {GARMENT} visible there.
+- `visible` is true when {GARMENT} appears in all four of cells 5 to 8, false when it is missing from any of them.
+
+Return EXACTLY this JSON shape. Every value must come from what you see in the image — never return this template's placeholders:
+
+{
+  "cells": "cell5: <yes|no>; cell6: <yes|no>; cell7: <yes|no>; cell8: <yes|no>",
+  "visible": <true|false>,
+  "reason": "<the cells where it is missing and what is drawn there instead, or that all four show it>"
+}

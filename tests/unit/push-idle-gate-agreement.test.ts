@@ -226,7 +226,8 @@ describe('WIRING GUARD: the divergence cannot come back', () => {
   });
 
   it('main() folds the results through the one shared resolver, not its own loop', () => {
-    expect(source).toMatch(/const \{ blocked, lines \} = await evaluateTargets\(targets, \{ manual \}\)/);
+    // `results` feeds the deploy-pending flag (set only AFTER an unblocked verdict).
+    expect(source).toMatch(/const \{ blocked, lines, results \} = await evaluateTargets\(targets, \{ manual \}\)/);
   });
 
   it('the hook still forwards git\'s arguments, so hook mode is detectable at all', () => {

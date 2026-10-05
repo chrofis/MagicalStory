@@ -49,8 +49,10 @@ describe('the intro start buttons', () => {
     expect(intro).not.toMatch(/trackTrialStep\('intro_start'\)/); // no second, inline recording path
   });
 
-  it('phones get a start button pinned to the bottom edge', () => {
-    expect(WIZARD).toMatch(/md:hidden fixed bottom-0/);
+  // The phone layout runs up to lg since a1cda3d4a (tablets overflowed the md desktop intro), so the pinned
+  // start button hides at lg, not md.
+  it('phones and tablets get a start button pinned to the bottom edge', () => {
+    expect(WIZARD).toMatch(/lg:hidden fixed bottom-0/);
   });
 });
 

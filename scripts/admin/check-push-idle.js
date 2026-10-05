@@ -88,14 +88,14 @@ async function probe(base) {
     const codes = [err?.cause?.code, ...(err?.cause?.errors || []).map(e => e?.code)].filter(Boolean);
     const down = codes.find(c => DEPLOYMENT_DOWN.includes(c));
     if (down) {
-      return { verdict: 'idle', reasons: [], detail: `container is down (${down}) — nothing can be running` };
+      return { verdict: 'idle', down: true, reasons: [], detail: `container is down (${down}) — nothing can be running` };
     }
     const why = codes[0] || err?.cause?.message || err.message;
     return { verdict: 'unknown', reasons: [], detail: `could not reach ${base} (${why})` };
   }
 
   if (res.status === 502 || res.status === 503) {
-    return { verdict: 'idle', reasons: [], detail: `container is stopped (HTTP ${res.status}) — nothing can be running` };
+    return { verdict: 'idle', down: true, reasons: [], detail: `container is stopped (HTTP ${res.status}) — nothing can be running` };
   }
 
   // 404 BLOCKS (2026-09-15). It used to return an 'ungated' verdict that let the
@@ -123,6 +123,7 @@ async function probe(base) {
     verdict: body.busy ? 'busy' : 'idle',
     reasons: body.reasons || [],
     detail: `commit ${body.commit || '?'}`,
+    deployPending: body.deployPending || null,
   };
 }
 
@@ -229,13 +230,69 @@ function isHookInvocation(argv = process.argv) {
 async function evaluateTargets(targets, { manual = false } = {}, probeFn = probe) {
   let blocked = false;
   const lines = [];
+  const results = [];
   for (const target of targets) {
     const result = await probeFn(target.base);
     const rendered = renderVerdict(target, result, { manual });
     if (rendered.blocked) blocked = true;
     lines.push(...rendered.lines);
+    if (result.deployPending && result.deployPending.targetCommit) {
+      lines.push(['log', `  (a deploy of ${String(result.deployPending.targetCommit).slice(0, 8)} is already pending on ${target.name}; a push moves the flag onto its own commit)`]);
+    }
+    results.push({ target, result });
   }
-  return { blocked, lines };
+  return { blocked, lines, results };
+}
+
+/**
+ * CLOSE THE BUILD WINDOW (2026-09-25). The idle verdict is true for one instant;
+ * Railway then needs 2-3 minutes to build and restart, and the old container
+ * accepts new work the whole time. Test Lab experiments 1472 and 1477 were
+ * started 35 s and 4 s after their pushes landed and died at the cutover. So once
+ * the environment is idle, tell it a deploy is coming: its Test Lab start routes
+ * refuse until a container boots on `commit` (server/lib/deployPending.js).
+ *
+ * A stopped container is skipped: nothing is serving, so nothing can accept a
+ * run. Anything else that fails THROWS — the push must not go ahead unflagged.
+ *
+ * @param deps injectable for tests: getToken(base) → token, fetchFn
+ */
+async function markDeployPending(target, commit, deps = {}) {
+  const getToken = deps.getToken || (base => require('child_process').execFileSync(
+    process.execPath, [require('path').join(__dirname, 'get-admin-token.js'), `--base=${base}`],
+    { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 30000 }
+  ).trim());
+  const fetchFn = deps.fetchFn || fetch;
+  let token;
+  try {
+    token = getToken(target.base);
+  } catch (err) {
+    const why = (err.stderr ? String(err.stderr) : err.message).trim().split('\n')[0];
+    throw new Error(`could not get an admin token for ${target.name}: ${why}`);
+  }
+  if (!token) throw new Error(`the admin token helper returned nothing for ${target.name}`);
+  const res = await fetchFn(`${target.base}/api/admin/deploy-pending`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ commit, setBy: `push gate (${require('os').hostname()})` }),
+    signal: AbortSignal.timeout(15000),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`POST /api/admin/deploy-pending on ${target.name} → HTTP ${res.status} ${body.slice(0, 200)}`);
+  }
+  return res.json();
+}
+
+/** The commit each gated environment is about to deploy, by environment name. */
+function targetCommits(refs) {
+  const out = {};
+  for (const r of refs) {
+    if (ZERO_SHA.test(r.localSha)) continue;
+    const env = ENVIRONMENTS[r.remoteRef];
+    if (env) out[env.name] = r.localSha;
+  }
+  return out;
 }
 
 async function main() {
@@ -250,8 +307,27 @@ async function main() {
 
   if (manual) console.log('Checking whether each environment is idle (a deploy restarts the container)…');
 
-  const { blocked, lines } = await evaluateTargets(targets, { manual });
+  const { blocked, lines, results } = await evaluateTargets(targets, { manual });
   for (const [stream, text] of lines) console[stream](text);
+
+  // Idle, and the push is going ahead: flag every live target before it does.
+  if (hook && !blocked) {
+    const commits = targetCommits(refs);
+    for (const { target, result } of results) {
+      if (result.down) continue;
+      try {
+        const out = await markDeployPending(target, commits[target.name]);
+        console.log(`✓ ${target.name}: deploy of ${commits[target.name].slice(0, 8)} flagged — Test Lab starts refused until it boots (expires ${out?.deployPending?.expiresAt || '?'})`);
+      } catch (err) {
+        console.error(`\n✗ PUSH BLOCKED — could not flag the pending deploy on ${target.name}`);
+        console.error(`  • ${err.message}`);
+        console.error('\nWithout the flag the Test Lab keeps starting runs that this deploy would kill.');
+        console.error('Fix the cause, or override with: git push --no-verify\n');
+        process.exitCode = 1;
+        return;
+      }
+    }
+  }
 
   // exitCode, not process.exit(): let stdio flush before the process ends.
   // NO `manual` TERM HERE — that is the divergence this file was fixed for.
@@ -272,4 +348,5 @@ if (require.main === module) {
 // whether every push in this repo is allowed, so it gets exercised directly.
 module.exports = {
   probe, parseRefs, ENVIRONMENTS, renderVerdict, resolveTargets, isHookInvocation, evaluateTargets,
+  markDeployPending, targetCommits,
 };

@@ -43,7 +43,7 @@ These outlines name clothing and faces as well as events. None of that is the pr
 
 That duty covers appearance, not only events. Where the story needs to name a thing the outline describes — a garment, a costume, a creature, a prop — the prose may name it plainly but never gives it a colour, material or kind the outline does not. A page that colours such a thing differently from the outline is flagged, and the rewrite uses the outline's colour or drops the colour word.
 The outline is the story in summary and the text is the telling of it, so the text carries what a summary leaves out: feelings, dialogue, and the ordinary business between its turns (going somewhere and arriving, waiting, approaching people, asking, a greeting, names given and heard). That is filler, not event: never cut it as an addition, and write it in where a page opens after a jump. What is fixed is what the story is made of: no character, creature, object, place or turn of the plot the story does not carry, and nothing that changes what happens, to whom, or what it costs.
-Nothing in the story or its pictures is dangerous enough that it could lead to death — for anyone. A fault is never fixed by putting a person in danger.
+{PERIL_CEILING} A fault is never fixed by putting a person in danger.
 
 {SCENE_OUTLINES}
 

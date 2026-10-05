@@ -140,3 +140,30 @@ describe('the assembled prompt = scaffold + wardrobe half', () => {
     expect(worn.headIsUnderLayer).toBeUndefined();
   });
 });
+
+describe('keptGarments — the Art Director\'s structured list of garments that stay (2026-10-05)', () => {
+  const KEPT = [{ type: 'trousers', colour: 'navy', details: 'corduroy, straight cut' }, { type: 'boots', colour: 'brown', details: '' }];
+
+  it('parses {type, colour, details} fields off a declared row; absent is null, never guessed from the note', () => {
+    const [row] = parseWornItems([{ id: 'CLO002', owner: 'A', state: 'off', location: 'on a hook', redressNote: NOTE, keptGarments: KEPT }]);
+    expect(row.keptGarments).toEqual(KEPT);
+    const [bare] = parseWornItems([{ id: 'CLO002', owner: 'A', state: 'off', location: 'on a hook', redressNote: NOTE }]);
+    expect(bare.keptGarments).toBeNull();
+  });
+
+  it('reaches the resolved row the variant derivation reads', () => {
+    const vb = { clothing: [{ id: 'CLO002', name: 'green jacket', type: 'outer layer', wornAs: 'A.outer layer', wornBy: 'A' }] };
+    const meta = { characters: ['A'], wornItems: [{ id: 'CLO002', owner: 'A', state: 'off', location: 'on a hook', redressNote: NOTE, keptGarments: KEPT }] };
+    const r = resolveWornItemsForPage(vb, ['A'], meta, { pageNumber: 6 }).find((x: any) => x.id === 'CLO002');
+    expect(r.keptGarments).toEqual(KEPT);
+  });
+
+  it('survives an iterate rewrite that re-states the row without it; a rewrite that authors its own replaces it', () => {
+    const saved = { wornItems: [{ id: 'CLO002', owner: 'A', state: 'off', location: 'on a hook', redressNote: NOTE, keptGarments: KEPT }] };
+    const restated = { wornItems: [{ id: 'CLO002', owner: 'A', state: 'off', location: 'over a chair', redressNote: NOTE }] };
+    expect(carryForwardWornItems(restated, saved)[0].keptGarments).toEqual(KEPT);
+    const own = [{ type: 'skirt', colour: 'red', details: '' }];
+    const rewritten = { wornItems: [{ id: 'CLO002', owner: 'A', state: 'off', redressNote: NOTE, keptGarments: own }] };
+    expect(carryForwardWornItems(rewritten, saved)[0].keptGarments).toEqual(own);
+  });
+});

@@ -346,7 +346,9 @@
         "prompts/sheet-row-heads-eval.txt",
         "prompts/sheet-row-bodies-eval.txt",
         "prompts/sheet-row-identity-eval.txt",
-        "prompts/sheet-2x4-style-eval.txt"
+        "prompts/sheet-2x4-style-eval.txt",
+        "prompts/sheet-garment-gone-check.txt",
+        "prompts/sheet-kept-garment-check.txt"
       ],
       "severity": "block"
     },
@@ -680,6 +682,21 @@
         ],
         "anchorsNote": "The three keys of the shared table, which every member must read: the JSON declares them, and each predicate module resolves all three (legacyNotSet folds into the unanswered set - a pre-split save is not distinguishable from the default retroactively, so it emits nothing). A fourth sentinel added to the table and read by only one runtime is exactly the drift this set exists to catch. The predicates themselves are named identically on both sides - isNotSetRelationship and isStrangersRelationship - so a call site cannot silently get the question it did not mean; that the two agree on every label in every UI language is asserted in tests/unit/beats-brief-relationships.test.ts, which imports the client module and the server module into one test, because an anchor cannot check agreement."
       }
+    },
+    {
+      "id": "peril-ceiling-everywhere",
+      "axis": "the peril ceiling and its historical exception, at every stage that states or judges it",
+      "reason": "The ceiling (nothing that could lead to death) is ONE constant, PERIL_CEILING_RULE in promptBuilders.js, filled as {PERIL_CEILING} into the arc creator and re-teller (via TELLING_RULES), the arc reviewer, the beats text writer, the text repair and both story-idea templates. It carries the owner's historical exception (4804fe357: a historical event keeps the danger it really had, told at a child's level, never removed). The exception once reached only the two idea templates; the arc, told to stay under the ceiling, invented a blunt rubber-tipped bolt for a historical crossbow shot and it spread to the outline, text, costume and Visual Bible (staging job_1791145238223_50osg2osm, 2026-10-05). A new stage that states the ceiling takes the placeholder; it never hand-copies the sentence.",
+      "members": [
+        "server/lib/promptBuilders.js",
+        "server/routes/storyIdeas.js",
+        "prompts/story-arc-review.txt",
+        "prompts/story-text-from-beats.txt",
+        "prompts/text-refine.txt",
+        "prompts/generate-story-ideas.txt",
+        "prompts/generate-story-idea-single.txt"
+      ],
+      "severity": "block"
     },
     {
       "id": "character-source-claim",
@@ -1056,9 +1073,22 @@
       }
     },
     {
+      "id": "wardrobe-variant-sheet-chain",
+      "axis": "standard sheet vs costumed sheet (derive, generate, project, resolve)",
+      "reason": "A page that takes a garment off is drawn from an off-garment sheet: wardrobeVariants.js derives the off-set and its base category, styledAvatars.js redresses the base sheet, storyAvatars.js projects it into characterAvatars and resolveSheetForRef serves it, entityConsistency.getStyledAvatarForClothing serves it to the repair paths, and notEvaluated.js records a page that got none. Until 2026-10-04 every stage handled styled-standard/winter/summer and skipped costumed, so a garment taken off a costumed character was drawn from the costume sheet wearing it with no warning (staging job_1790446348343_z3fw660ie). A key-shape or category change on one stage must reach all of them.",
+      "members": [
+        "server/lib/wardrobeVariants.js",
+        "server/lib/styledAvatars.js",
+        "server/lib/storyAvatars.js",
+        "server/lib/entityConsistency.js",
+        "server/lib/notEvaluated.js"
+      ],
+      "severity": "block"
+    },
+    {
       "id": "main-character-selection",
       "axis": "wizard vs prompt builders",
-      "reason": "The wizard's live age line says which mains the server counts and whose age picks the band; client/src/utils/mainCharacters.ts mirrors pickMainCharacters (cap = min(2, floor(n/2)), oldest main decides). A change to the cap or sort on one side makes the wizard promise a story the server does not write (2026-10-04: three books for a 2-year-old written for her 4-year-old brother).",
+      "reason": "The wizard's live age line says which mains the server counts and whose age picks the band; client/src/utils/mainCharacters.ts mirrors pickMainCharacters (cap: 1 main for up to 2 characters, 2 for 3 or more; oldest main decides). A change to the cap or sort on one side makes the wizard promise a story the server does not write (2026-10-04: three books for a 2-year-old written for her 4-year-old brother).",
       "members": [
         "server/lib/promptBuilders.js",
         "client/src/utils/mainCharacters.ts"
@@ -1067,6 +1097,15 @@
     }
   ],
   "withinFile": [
+    {
+      "id": "textmodel-stream-completion",
+      "axis": "streaming provider entry points (Anthropic / Gemini / xAI / OpenRouter)",
+      "reason": "every streaming entry point in textModels.js must throw streamCutError when its body ends without that provider's completion signal; the OpenRouter path accepted two cut page-brief streams as successes (staging job_1791145238223_50osg2osm, 7 of the last 40 staging beats stories). docs/decisions.md 2026-10-05.",
+      "file": "server/lib/textModels.js",
+      "blockPattern": "(?:async\\s+)?function\\s+(call\\w*APIStreaming)\\s*\\(",
+      "mustContain": "streamCutError(",
+      "severity": "block"
+    },
     {
       "id": "textmodel-prompt-guard",
       "axis": "streaming vs non-streaming provider entry points",

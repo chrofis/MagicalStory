@@ -1,0 +1,131 @@
+{
+  "base": "https://staging.magicalstory.ch",
+  "experiments": [
+    1621,
+    1622
+  ],
+  "repeats": 2,
+  "params": null,
+  "ranAt": "2026-10-05T12:05:45.590Z",
+  "costUsd": 0.0099,
+  "summary": {
+    "judges": {
+      "sheet_kept": {
+        "fixtures": 4,
+        "runs": 8,
+        "tp": 2,
+        "fn": 0,
+        "tn": 6,
+        "fp": 0,
+        "errors": 0,
+        "flipped": 0,
+        "repeated": 4,
+        "recall": 1,
+        "precision": 1,
+        "falseAlarmRate": 0,
+        "flipRate": 0
+      }
+    },
+    "overall": {
+      "fixtures": 4,
+      "runs": 8,
+      "tp": 2,
+      "fn": 0,
+      "tn": 6,
+      "fp": 0,
+      "errors": 0,
+      "flipped": 0,
+      "repeated": 4,
+      "recall": 1,
+      "precision": 1,
+      "falseAlarmRate": 0,
+      "flipRate": 0
+    }
+  },
+  "entries": [
+    {
+      "fixtureId": "kept-50osg2osm-daniel-baldric-lost",
+      "judge": "sheet_kept",
+      "experimentId": 1621,
+      "outcome": "TP",
+      "expected": "flag",
+      "said": [
+        "[-|kept] brown baldric: The brown baldric is missing from all four cells (5, 6, 7, and 8). Instead, the character is wearing a brown belt around his waist in these cells."
+      ],
+      "costUsd": 0.0016624,
+      "costBasis": "measured (input + output + thinking, every garment call)"
+    },
+    {
+      "fixtureId": "kept-z3fw660ie-fiona-coat-off-clean",
+      "judge": "sheet_kept",
+      "experimentId": 1621,
+      "outcome": "TN",
+      "expected": "pass",
+      "said": [],
+      "costUsd": 0.0012901999999999998,
+      "costBasis": "measured (input + output + thinking, every garment call)"
+    },
+    {
+      "fixtureId": "kept-atbttop6w-kiaan-jacket-off-clean",
+      "judge": "sheet_kept",
+      "experimentId": 1621,
+      "outcome": "TN",
+      "expected": "pass",
+      "said": [],
+      "costUsd": 0.0009915999999999998,
+      "costBasis": "measured (input + output + thinking, every garment call)"
+    },
+    {
+      "fixtureId": "kept-atbttop6w-kiaan-jacket-off-colour-noun",
+      "judge": "sheet_kept",
+      "experimentId": 1621,
+      "outcome": "TN",
+      "expected": "pass",
+      "said": [],
+      "costUsd": 0.0009915999999999998,
+      "costBasis": "measured (input + output + thinking, every garment call)"
+    },
+    {
+      "fixtureId": "kept-50osg2osm-daniel-baldric-lost",
+      "judge": "sheet_kept",
+      "experimentId": 1622,
+      "outcome": "TP",
+      "expected": "flag",
+      "said": [
+        "[-|kept] brown baldric: The brown baldric is missing from all four cells (5, 6, 7, and 8). Instead, the character is wearing a brown belt around his waist in these cells."
+      ],
+      "costUsd": 0.0016624,
+      "costBasis": "measured (input + output + thinking, every garment call)"
+    },
+    {
+      "fixtureId": "kept-z3fw660ie-fiona-coat-off-clean",
+      "judge": "sheet_kept",
+      "experimentId": 1622,
+      "outcome": "TN",
+      "expected": "pass",
+      "said": [],
+      "costUsd": 0.0012901999999999998,
+      "costBasis": "measured (input + output + thinking, every garment call)"
+    },
+    {
+      "fixtureId": "kept-atbttop6w-kiaan-jacket-off-clean",
+      "judge": "sheet_kept",
+      "experimentId": 1622,
+      "outcome": "TN",
+      "expected": "pass",
+      "said": [],
+      "costUsd": 0.0009915999999999998,
+      "costBasis": "measured (input + output + thinking, every garment call)"
+    },
+    {
+      "fixtureId": "kept-atbttop6w-kiaan-jacket-off-colour-noun",
+      "judge": "sheet_kept",
+      "experimentId": 1622,
+      "outcome": "TN",
+      "expected": "pass",
+      "said": [],
+      "costUsd": 0.0009915999999999998,
+      "costBasis": "measured (input + output + thinking, every garment call)"
+    }
+  ]
+}

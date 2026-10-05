@@ -78,10 +78,12 @@ describe('text-model request bodies', () => {
     process.env.OPENROUTER_API_KEY = 'test';
     process.env.OPENROUTER_PROVIDER_SORT = 'off';
     const opts = { cachePrefix: 'RULES|' };
-    const calls = stubFetch((url) => url.includes('streamGenerateContent') ? geminiSse('ok')
+    // The xAI streaming call gets a stream body (it used to get the non-stream
+    // JSON, which only passed because a stream that ended with no signal was accepted).
+    const calls = stubFetch((url, body) => url.includes('streamGenerateContent') ? geminiSse('ok')
       : url.includes('generativelanguage') ? geminiReply('ok')
       : url.includes('openrouter') ? sse('ok')
-      : (url.includes('api.x.ai') ? xaiReply() : sse('ok')));
+      : (url.includes('api.x.ai') ? (body?.stream ? sse('ok') : xaiReply()) : sse('ok')));
     await TM.callGeminiTextAPI('INPUT', 100, 'gemini-2.5-flash', opts);
     await TM.callGeminiTextAPIStreaming('INPUT', 100, 'gemini-2.5-flash', null, opts);
     await TM.callXaiAPI('INPUT', 100, 'grok-4.3', opts);

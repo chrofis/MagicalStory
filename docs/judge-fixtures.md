@@ -99,9 +99,31 @@ replays it with production's inputs:
 | `entity` | `entity` | one character's grid over the story |
 | `book_audit` | `book_audit` | the whole book; the fixture's page scopes the verdict |
 | `arc_panel` | `arc_panel_replay` | the stored `arcReviewReport.committed` block |
+| `sheet_style` | `evaluateAvatarSheet` pass 2 (`evaluateVariantSheet` for a variant), inside `judge_fixture` | the fixture sheet plus its `styledAvatarGeneration[input.entryIndex]` face photo, Pass-1 sheet and art style, and the character's age; `input.removedGarments` makes it a garment-off variant, judged by `evaluateVariantSheet` (the style judge plus one garment-gone check per removed garment) |
+| `sheet_kept` | `checkKeptGarment` (character2x4Sheet.js), one call per garment, inside `judge_fixture` | the fixture off sheet alone and `input.keptGarments` (the garments that must stay); a finding (type `kept`) for each garment not visible in all of body cells 5-8; Lab-only until the bar in docs/decisions.md 2026-10-05 is met |
 
 A fixture pinned to the page's **active** version keeps the stored figure detection, as
 production had it. A fixture pinned to any other version is judged without that detection.
+
+## Sheet style judge arms (Lab only)
+
+The `sheet_style` fixtures can run under a candidate shape of the judge:
+`node scripts/admin/judge-fixtures.js run --judge=sheet_style --params='{"arm":"AB"}'`.
+Production always runs `current`. The arms live in `server/lib/sheetJudgeArms.js` and reach
+the judge only through the Lab.
+
+| arm | what changes |
+|---|---|
+| `current` | nothing: production |
+| `A` | a text label before each image ("Image 2 — …") |
+| `AB` | A, and TASK 3 names the medium of every cell, with one medium for all 8 |
+| `ABC` | AB, and TASK 1 scores each cell's framing against Image 2's same cell |
+| `D` | ABC, but a garment-off variant is judged against its approved styled base (`input.baseImageUrl`); a sheet with nothing off runs ABC |
+
+A fixture's sheet must be stored where the Lab can read it. A garment-off variant that
+production never kept is made in the Lab with stage `avatar_redress` (the production redress,
+no judge, about $0.02). Its card shows base and variant, and the variant's
+`story_images.image_url` becomes the fixture's `input.imageUrl`.
 
 ## Expectation fields
 

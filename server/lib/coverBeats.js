@@ -116,9 +116,15 @@ function buildCoverBeats(inputData = {}, { coverTypes = ['frontCover', 'initialP
   // held the four children and no dragon). The figure comes from the arc's
   // structured "Central figure:" line; where it changes name (an egg that
   // hatches into a named creature) the cover shows the last one, the state the
-  // story ends in. "none" (null) → the cast alone.
+  // story ends in. "none" (null) → the cast alone. A name in the list that IS a
+  // cast member's name makes that member the figure (a user's character who
+  // plays the title figure: "Daniel / Wilhelm Tell" is the cast member, not a
+  // name change) — it is never appended as a second figure (decisions.md
+  // 2026-10-05, staging job_1791145238223_50osg2osm).
   const centralNames = (Array.isArray(centralFigure) ? centralFigure : []).map(n => String(n || '').trim()).filter(Boolean);
-  const central = centralNames.length ? centralNames[centralNames.length - 1] : null;
+  const castByName = new Map((Array.isArray(inputData.characters) ? inputData.characters : []).filter(c => c && c.name).map(c => [String(c.name).trim().toLowerCase(), c.name]));
+  const castName = centralNames.map(n => castByName.get(n.toLowerCase())).find(Boolean);
+  const central = castName || (centralNames.length ? centralNames[centralNames.length - 1] : null);
   const beats = [];
   for (const coverKey of ['frontCover', 'initialPage', 'backCover']) {
     if (!coverTypes.includes(coverKey)) continue;

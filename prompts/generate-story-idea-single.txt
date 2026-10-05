@@ -73,7 +73,7 @@ RULES:
 - No sentence runs past about 30 words. A sentence that needs a dash to hold two clauses together is two sentences.
 - The last sentence is the main character in the act, the picture a parent can see. The last sentence is what the child does now. It does not begin with a condition and it does not say what happens if. The last sentence is a movement of the child's body toward the want: a reach, a climb, a step, a call. It is not the child holding, knowing or having the thing that decides the outcome.
 - [FINAL] holds the idea text only: no notes, no headings, no second version, no commentary.
-- Nothing in the story or its pictures is dangerous enough that it could lead to death — for anyone. Frightening is the right level. A historical event keeps the danger it really had: tell it at a child's level, never remove it.
+- {PERIL_CEILING}
 - The idea centres on the main characters
 - All the characters must be mentioned
 - A character is in the idea through what they want or what they are answerable for, never through a list of who came along.

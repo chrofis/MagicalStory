@@ -84,9 +84,14 @@ const BEATS = [
 
 const PAGE_TEXT = 'The lamp guttered twice and then went out, and nobody said a word.';
 
-const buildAdAll = () => PB.buildSceneBriefsAllPrompt(inputData, BEATS, {});
+// The Art Director sites are built on the BACKUP path here: that is the template that
+// authors every field, as the two rewrite templates do. On the Jev path the Art Director
+// is told the decided fields (shot, light, objects, aboard, population, gaze) are
+// written by code (decisions.md 2026-10-05), so it carries SCENE_WEATHER_FIELD, not
+// SCENE_LIGHT_FIELD — pinned in ad-assembly.test.ts.
+const buildAdAll = () => PB.buildSceneBriefsAllPrompt(inputData, BEATS, { jevBackup: true });
 const buildAdOne = () => PB.buildSceneExpansionPrompt(
-  1, PAGE_TEXT, CHARACTERS, 'en', VISUAL_BIBLE, '', null, { story: inputData });
+  1, PAGE_TEXT, CHARACTERS, 'en', VISUAL_BIBLE, '', null, { story: inputData, jevBackup: true });
 const buildIterate = (freeIterate: boolean) => PB.buildSceneDescriptionPrompt(
   1, PAGE_TEXT, CHARACTERS, '', 'en', VISUAL_BIBLE, [], {}, '', '',
   { planLine: BEATS[0].planLine }, { composition: 'a render', fixIssues: ['the lantern is missing'], previousScore: -20 },
