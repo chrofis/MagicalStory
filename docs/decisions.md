@@ -21,6 +21,15 @@ superseded and link forward.
 
 ---
 
+## 2026-10-05 — Kept garments are structured {type, colour, details}; the check is sent colour + type only
+
+**Context:** Lab #1614-#1620: the check flagged a correct Kiaan sheet 8/8 on "black corduroy trousers", with or without an instruction to ignore fabric words.
+
+**Decision (owner, 2026-10-05):** the kept list is structured, `{ type, colour, details }` (details = fabric, cut). `checkKeptGarment` takes that entry and sends the judge only `colour + type`; `details` is never sent, and code picks fields, never parses text. The fabric-ignore line in `prompts/sheet-kept-garment-check.txt` is removed as redundant. The four `sheet_kept` fixtures are restated in the structured form; the next entry records the Lab round.
+
+**Touched files:** `server/lib/character2x4Sheet.js`, `prompts/sheet-kept-garment-check.txt`, `server/lib/judgeFixtures.js`, `tests/judge-fixtures/fixtures.json`.
+
+
 ## 2026-10-05 — Kept-garment check with a fabric-blind instruction: bar NOT met again; production gate not shipped
 
 **Measured** (Lab #1619, #1620, set #82, $0.010; report `tests/judge-fixtures/baselines/2026-10-05-sheet-kept-c.json`): Daniel flagged 2/2, Fiona passed 2/2, Kiaan with the colour+noun list passed 2/2, Kiaan with the ORIGINAL list ("black corduroy trousers") flagged 2/2 ("dark trousers, but not corduroy").

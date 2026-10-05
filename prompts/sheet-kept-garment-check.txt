@@ -3,7 +3,6 @@ You see ONE image: a 2×4 character reference sheet, 8 cells (4 head cells on to
 Question: is {GARMENT} visible on the figure in cells 5 to 8, the four full-body cells on the bottom row?
 
 - Look at cells 5, 6, 7 and 8 one by one, the turned-away cell included. Ignore the head cells on top: they are cropped and show only part of an outfit.
-- Judge the garment by its type and colour only. Ignore any fabric, texture, material, weave or cut words in its name: a garment of that type and colour counts however it is drawn.
 - Any part of it counts.
 - In `cells`, for each of cells 5 to 8 say "yes" or "no": is {GARMENT} visible there.
 - `visible` is true when {GARMENT} appears in all four of cells 5 to 8, false when it is missing from any of them.

@@ -221,8 +221,8 @@ describe('sheet_kept (Lab-only kept-garment check, 2026-10-05)', () => {
   });
   it('a fixture without a kept list or an image URL is invalid', () => {
     const base = { id: 'k-x', judge: 'sheet_kept', target: { storyId: 's' }, expect: { verdict: 'pass' }, source: 'x' };
-    expect(JF.validateFixtures([{ ...base, input: { imageUrl: 'https://a/b.jpg', keptGarments: ['red tunic'] } }])).toEqual([]);
+    expect(JF.validateFixtures([{ ...base, input: { imageUrl: 'https://a/b.jpg', keptGarments: [{ type: 'tunic', colour: 'red', details: 'wool' }] } }])).toEqual([]);
     expect(JF.validateFixtures([{ ...base, input: { imageUrl: 'https://a/b.jpg' } }]).join()).toMatch(/keptGarments/);
-    expect(JF.validateFixtures([{ ...base, input: { keptGarments: ['red tunic'] } }]).join()).toMatch(/imageUrl/);
+    expect(JF.validateFixtures([{ ...base, input: { keptGarments: [{ type: 'tunic', colour: 'red', details: 'wool' }] } }]).join()).toMatch(/imageUrl/);
   });
 });

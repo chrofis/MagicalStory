@@ -1053,8 +1053,13 @@ async function checkGarmentGone(sheet, garment, opts = {}) {
  */
 async function checkKeptGarment(sheet, garment, opts = {}) {
   const { model = 'gemini-2.5-flash', usageTracker = null } = opts;
-  const name = String(garment || '').trim();
-  if (!name) throw new Error('checkKeptGarment: no garment named');
+  // The Art Director's structured entry {type, colour, details}: only colour and
+  // type reach the question. `details` (fabric, cut) is never sent: a judge reads
+  // a fabric word literally (Lab #1614-#1620: "corduroy" flagged a correct sheet 8/8).
+  const type = String(garment?.type || '').trim();
+  const colour = String(garment?.colour || '').trim();
+  if (!type || !colour) throw new Error('checkKeptGarment: a kept garment needs a type and a colour');
+  const name = `${colour} ${type}`;
   const template = PROMPT_TEMPLATES.sheetKeptGarmentCheck;
   if (!template) throw new Error('sheetKeptGarmentCheck prompt template not loaded');
   const prompt = fillTemplate(template, { GARMENT: name });
@@ -1063,7 +1068,7 @@ async function checkKeptGarment(sheet, garment, opts = {}) {
     label: `kept-garment check (${name})`, usageTracker, usageFn: 'character_2x4_kept_garment_check', apiKey: process.env.GEMINI_API_KEY,
   });
   if (typeof report?.visible !== 'boolean') throw new Error(`kept-garment check (${name}) returned no visible true/false`);
-  return { garment: name, question: prompt, visible: report.visible, cells: String(report.cells ?? ''), reason: String(report.reason ?? '') };
+  return { garment: name, type, colour, question: prompt, visible: report.visible, cells: String(report.cells ?? ''), reason: String(report.reason ?? '') };
 }
 
 /**

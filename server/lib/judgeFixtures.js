@@ -262,7 +262,7 @@ function validateFixtures(fixtures) {
     if (f?.judge === 'sheet_kept') {
       if (!/^https:\/\//.test(String(f?.input?.imageUrl || ''))) problems.push(`${at}: input.imageUrl (the judged off sheet, by R2 URL) required for sheet_kept`);
       const kept = f?.input?.keptGarments;
-      if (!Array.isArray(kept) || kept.length === 0 || kept.some(g => !String(g || '').trim())) problems.push(`${at}: input.keptGarments (the garments that stay, one name each) required for sheet_kept`);
+      if (!Array.isArray(kept) || kept.length === 0 || kept.some(g => !String(g?.type || '').trim() || !String(g?.colour || '').trim())) problems.push(`${at}: input.keptGarments (the garments that stay, each {type, colour, details}) required for sheet_kept`);
       if (f?.expect?.minSeverity != null) problems.push(`${at}: sheet_kept findings carry no severity — drop minSeverity`);
     }
     if (f?.expect?.verdict !== 'flag' && f?.expect?.verdict !== 'pass') problems.push(`${at}: expect.verdict must be flag|pass`);
