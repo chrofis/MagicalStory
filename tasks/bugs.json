@@ -3351,6 +3351,42 @@
       "source": "Code review 2026-10-04 (tasks/code-review-2026-10/10-texts-layout.md)",
       "status": "fixed",
       "fixedAt": "2026-10-05"
+    },
+    {
+      "id": "fr-upload-says-telecharger",
+      "title": "French UI told users to \"télécharger une photo\" for uploading (~70 strings)",
+      "rootCause": "Anglicism: télécharger means download in French; upload is importer / téléverser",
+      "impact": "Confusing primary call to action on landing, wizard, trial, FAQ, legal consent and SEO texts",
+      "fix": "importer everywhere a photo/file is uploaded; downloads (PDF, TXT) keep télécharger. Test: tests/unit/french-texts-batch13.test.ts",
+      "fixedIn": "1eca0e3ab",
+      "reportedAt": "2026-10-05",
+      "source": "Code review 2026-10-04 (tasks/code-review-2026-10/10-texts-layout.md, French texts)",
+      "status": "fixed",
+      "fixedAt": "2026-10-05"
+    },
+    {
+      "id": "fr-typography-and-accents",
+      "title": "French strings without narrow no-break space, with straight quotes, Title Case, missing accents and oe ligature",
+      "rootCause": "French copy written without a typography convention; ResetPassword/ChangePasswordModal/CreditsModal/admin blocks written without accents",
+      "impact": "1,300+ strings with wrong punctuation spacing, unaccented visible texts (Reinitialiser, credits, deja), coeur/soeur/oeuf",
+      "fix": "Script over the French string slots only (diff-checked): U+202F before ? ! : ; and inside guillemets, sentence case, oe, accents. Test: tests/unit/french-texts-batch13.test.ts",
+      "fixedIn": "1eca0e3ab",
+      "reportedAt": "2026-10-05",
+      "source": "Code review 2026-10-04 (tasks/code-review-2026-10/10-texts-layout.md, French texts)",
+      "status": "fixed",
+      "fixedAt": "2026-10-05"
+    },
+    {
+      "id": "fr-tu-in-vous-ui",
+      "title": "French UI mixed tu and vous (trial wizard, wizard summary, theme cards, landing)",
+      "rootCause": "Strings written separately per screen, no register rule",
+      "impact": "Inconsistent address of the reader across the French product",
+      "fix": "vous everywhere (quoted speech to children keeps tu). Test: tests/unit/french-texts-batch13.test.ts",
+      "fixedIn": "1eca0e3ab",
+      "reportedAt": "2026-10-05",
+      "source": "Code review 2026-10-04 (tasks/code-review-2026-10/10-texts-layout.md, French texts)",
+      "status": "fixed",
+      "fixedAt": "2026-10-05"
     }
   ]
 }
