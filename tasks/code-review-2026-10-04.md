@@ -43,3 +43,9 @@ limits; NO FALLBACKS everywhere (Turnstile fails closed). One Sonnet agent at a 
 - [x] T-it Italian texts (+ English source texts)
 - [x] L-layout staging screenshots at 390 / 768 / 1440 px of the main routes
   → findings in tasks/code-review-2026-10/10-texts-layout.md; owner decisions pending before fixes
+
+## Fixes round 3 (owner 2026-10-05: trial minutes / book ~1 h; address Ennetbaden; visitor language wins; legal Sie, rest du; defaults US English, French vous + standard typography, DB prices)
+- [x] F12 Facts (all languages) + German texts (eb758f398, f1bbff744; Sie left in 7 modals → F14; owner: print size, shipping countries, max characters)
+- [x] F15 Layout + translation gaps + localised error codes (87ea09f6c + 4; leftovers: L-4 comparisonData per-language us/them, L-11, L-14, L-15, G-7, L-12 hero image = owner)
+- [x] F13 French texts (1eca0e3ab, 14a13f259; owner/migration: relationship + trait labels keyed by French text)
+- [x] F14 Italian + English texts + leftovers (edceddf41, bb47d65c6)
