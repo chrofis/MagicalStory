@@ -177,7 +177,9 @@ describe('the pipeline honours it', () => {
   // generation refs, so the derive could not be seen after the run.
   it('persists plateDerivedFor through every page whitelist', () => {
     expect(src.match(/plateDerivedFor: img\.plateDerivedFor \|\| sceneBackgrounds\[img\.pageNumber\]\?\.plateDerivedFor/g)).toHaveLength(2);
-    expect(src).toContain('plateDerivedFor: emptySceneData?.plateDerivedFor');
+    // The first-render record and the missing-image retry share ONE plate record (plateQc.pagePlateFields).
+    expect(src).toContain('pagePlateFields(emptySceneData)');
+    expect(Object.keys(require('../../server/lib/plateQc').pagePlateFields({ plateDerivedFor: 'ultra-wide' }))).toContain('plateDerivedFor');
     expect(src).toContain('plateDerivedFor: sceneBackgrounds[pageData.pageNumber]?.plateDerivedFor');
   });
 

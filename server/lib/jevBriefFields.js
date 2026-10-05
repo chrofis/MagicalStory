@@ -372,6 +372,30 @@ function materializeCoverPlaces(visualBible, covers) {
   return out;
 }
 
+/**
+ * The label a cover's FIXED location line carries (`LOC003.1 (<label>)`). A
+ * visited vantage is already in the bible text the Art Director reads, so its
+ * name is enough. An OFFERED landmark is materialized into the in-memory bible
+ * AFTER that text was written and never reaches it — the Art Director saw only
+ * "Fislisbach (Stadt), in front of it" and invented a paved town square for a
+ * plate that shows a meadow and a distant town (staging
+ * job_1791222889407_ypl33vk8u, the opening page). So the label carries what the
+ * plate is painted from: the vantage's description, from the chosen photo.
+ * @param {Object} visualBible
+ * @param {{cite:string, label:string, offered?:Object}} cover
+ */
+function coverPlaceLabel(visualBible, cover) {
+  if (!cover.offered) return cover.label;
+  const id = String(cover.cite || '').toUpperCase();
+  const vantage = (visualBible && Array.isArray(visualBible.locations) ? visualBible.locations : [])
+    .flatMap(l => (Array.isArray(l && l.vantages) ? l.vantages : []))
+    .find(v => v && String(v.id).toUpperCase() === id);
+  const text = String((vantage && vantage.description) || '').trim();
+  return text
+    ? `${cover.label}, in front of it — the place as its photo shows it: ${text}`
+    : `${cover.label}, in front of it`;
+}
+
 /** A cover's own Jev rating below this is a leftover, not a pick (owner: "never a near-zero leftover"). */
 const COVER_PLACE_FLOOR = 0.1;
 
@@ -628,5 +652,5 @@ function coverFacts({ coverKey, storyBeats, location = null, population = null, 
 module.exports = {
   coverLight, coverFacts, COVER_SHOT, COVER_GAZE,
   decideBriefFields, assembleBriefs, pageLocations, visualBibleJsonOf,
-  COVER_PLACE_SHOTS, COVER_PLACE_Q, COVER_OFFERED_Q, COVER_PLACE_FLOOR, COVER_PHOTO_MIN_SCORE, coverPhotoOf, bibleLocationOf, materializeCoverPlaces, coverPlaceCandidates, assignCoverPlaces, coverPlaceState, decideCoverPlaces, applyCoverPlacePages,
+  COVER_PLACE_SHOTS, COVER_PLACE_Q, COVER_OFFERED_Q, COVER_PLACE_FLOOR, COVER_PHOTO_MIN_SCORE, coverPhotoOf, bibleLocationOf, materializeCoverPlaces, coverPlaceLabel, coverPlaceCandidates, assignCoverPlaces, coverPlaceState, decideCoverPlaces, applyCoverPlacePages,
 };

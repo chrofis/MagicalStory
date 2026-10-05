@@ -263,6 +263,7 @@ After the prose, emit exactly `---METADATA---` on its own line, then a single JS
   "timeOfDay": "afternoon",
   "weather": "snow",
   "objects": ["LOC001"],
+  "creatures": [{"id": "ANI001", "depth": "midground", "looksAt": "CharacterB", "expression": "brows level, eyes wide, mouth closed", "emotion": "curious"}],
   "interactions": [
     {"character": "CharacterA", "object": "tower", "where": "gazes up at the clock tower", "action": "watching", "storyRelevant": true}
   ],

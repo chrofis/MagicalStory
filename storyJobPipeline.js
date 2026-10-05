@@ -5250,20 +5250,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               landmarkPhotos: pageData.landmarkPhotos,
               visualBibleGrid: pageData.visualBibleGrid,
               grokRefImages: genResult.grokRefImages || null,
-              emptySceneImage: emptySceneData?.imageData || null,
-              emptyScenePrompt: emptySceneData?.prompt || null,
-              emptySceneGrokRefImages: emptySceneData?.grokRefImages || null,
-              // Which vantage group this page's plate came from. Persisted so
-              // plate-group membership is directly auditable instead of being
-              // reconstructable only by comparing image hashes across pages.
-              vantageId: emptySceneData?.vantageId || null,
-              // Which angled shot this page's plate was DERIVED for (null = the
-              // vantage's base plate). Without it a derived plate cannot be told
-              // from the base one after the run.
-              plateDerivedFor: emptySceneData?.plateDerivedFor || null,
-              textAreaMask: emptySceneData?.textAreaMask || null,
-              emptySceneVbGrid: emptySceneData?.emptySceneVbGrid || null,
-              emptySceneQc: require('./server/lib/plateQc').emptySceneQcOf(emptySceneData),
+              ...require('./server/lib/plateQc').pagePlateFields(emptySceneData),
               sceneDescription: pageData.scene.sceneDescription,
               text: pageData.scene.text,
               sceneCharacters: pageData.sceneCharacters,
@@ -5332,9 +5319,6 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               log.error(`❌ [UNIFIED] Page ${raw.pageNumber}: plate could not be rendered — page not rendered on the raw photo`);
               throw new Error(`page ${raw.pageNumber} has a landmark photo and its plate could not be rendered`);
             }
-            raw.emptySceneImage = sceneBackgrounds[pageData.pageNumber].imageData;
-            raw.emptyScenePrompt = sceneBackgrounds[pageData.pageNumber].prompt || null;
-            raw.emptySceneGrokRefImages = sceneBackgrounds[pageData.pageNumber].grokRefImages || null;
           }
           const retryResult = await generateImageOnly(
             pageData.prompt,
@@ -5367,6 +5351,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             raw.prompt = retryResult.prompt || raw.prompt;
             raw.compressedScene = retryResult.compressedScene || null;
             raw.error = null;
+            // The plate the retry rendered on (rendered above or already stored).
+            Object.assign(raw, require('./server/lib/plateQc').pagePlateFields(sceneBackgrounds[pageData.pageNumber]));
             if (retryResult.usage) {
               const m = retryResult.modelId || '';
               const provider = m.startsWith('runware:') ? 'runware' : m.startsWith('grok-imagine') ? 'grok' : 'gemini_image';

@@ -42,17 +42,31 @@ describe('1 — the rules reach every authoring site', () => {
     for (const k of ['sceneBriefsAll', 'sceneExpansion', 'sceneIteration', 'sceneIterationFree']) {
       const t = String((PROMPT_TEMPLATES as any)[k] || '');
       if (t) expect(t, k).toContain('{CREATURE_FIELD}');
+      // The output example is what the model copies: a rule in prose alone was ignored (8 briefs, staging ypl33).
+      if (t) expect(t, `${k} example`).toMatch(/"creatures": \[\{"id": "ANI001"/);
     }
     expect(PB.CREATURE_FIELD_RULE).toContain('`creatures[]`');
-    expect(PB.CREATURE_FEATURES_RULE).toMatch(/Never an expression, an emotion or a smile/);
-    expect(PB.CREATURE_FEATURES_RULE).toMatch(/no visible teeth/);
+    expect(PB.CREATURE_FEATURES_RULE).toMatch(/Never an expression, an emotion, a smile or a mood word/);
+    expect(PB.CREATURE_FEATURES_RULE).toMatch(/closed, rounded mouth/);
+    expect(PB.CREATURE_FEATURES_RULE).toMatch(/mood word/);
+    // A named absence leaks into page prose and paints the thing (negation_named).
+    expect(PB.CREATURE_FEATURES_RULE).not.toMatch(/no visible teeth/);
   });
   it('the cute tone level states mouth anatomy, never a smile', () => {
     for (const age of [0, 3, 4]) {
       const tone = PB.buildCreatureToneSection({ characters: [{ id: 1, name: 'A', age }], mainCharacters: [1] });
       expect(tone, `age ${age}`).not.toMatch(/smil/i);
     }
-    expect(PB.buildCreatureToneSection({ characters: [{ id: 1, name: 'A', age: 3 }], mainCharacters: [1] })).toMatch(/no visible teeth/);
+    expect(PB.buildCreatureToneSection({ characters: [{ id: 1, name: 'A', age: 3 }], mainCharacters: [1] })).toMatch(/closed, rounded mouth/);
+  });
+  it('no tone level hands the Visual Bible a mood word or a named absence to copy into `features`', () => {
+    // staging job_1791222889407_ypl33vk8u: the not-menacing tone said "open friendly
+    // face" and the bible copied it into features; "no visible teeth" then reached
+    // page prose as a named negation.
+    for (const age of [3, 6, 9]) {
+      const tone = PB.buildCreatureToneSection({ characters: [{ id: 1, name: 'A', age }], mainCharacters: [1] });
+      expect(tone, `age ${age}`).not.toMatch(/open friendly face|no visible teeth|open or smiling/i);
+    }
   });
 });
 

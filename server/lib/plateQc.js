@@ -154,6 +154,29 @@ function emptySceneQcOf(src) {
 }
 
 /**
+ * The plate fields a page record carries, from the page's sceneBackgrounds slot.
+ * ONE copy for the first-render record and the missing-image retry: the retry
+ * used to set the image only when it had to render the plate, so a page whose
+ * plate already existed came back from the retry without it (no
+ * `emptySceneImage`, hence no `hasEmptySceneImage` flag — staging
+ * job_1791222889407_ypl33vk8u p9 and p14). A null slot yields all-null fields.
+ */
+function pagePlateFields(slot) {
+  return {
+    emptySceneImage: slot?.imageData || null,
+    emptyScenePrompt: slot?.prompt || null,
+    emptySceneGrokRefImages: slot?.grokRefImages || null,
+    // Which vantage group the plate came from, and which angled shot a derived
+    // plate was made for (null = the vantage base plate): auditable after the run.
+    vantageId: slot?.vantageId || null,
+    plateDerivedFor: slot?.plateDerivedFor || null,
+    textAreaMask: slot?.textAreaMask || null,
+    emptySceneVbGrid: slot?.emptySceneVbGrid || null,
+    emptySceneQc: emptySceneQcOf(slot),
+  };
+}
+
+/**
  * A retry whose prompt cannot fit is not sent twice into the same wall: the
  * dispatcher already logged the PromptFitError (prompt_fit_failed), so the
  * retry counts as "no image" and the first attempt is judged alone.
@@ -211,4 +234,5 @@ module.exports = {
   decidePlateAfterRetry,
   plateQcRecord,
   emptySceneQcOf,
+  pagePlateFields,
 };

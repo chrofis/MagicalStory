@@ -1084,6 +1084,31 @@ function checkCharacterFields(page, metadata) {
 }
 
 /**
+ * creature_row_missing — the brief cites a Visual Bible animal in `objects[]`
+ * and gives it no `creatures[]` row (promptBuilders.CREATURE_FIELD_RULE). The
+ * row is what carries the creature's depth, gaze, expression and emotion into
+ * the page prompt's EXPRESSIONS AND EYES block; without it the creature is
+ * drawn with whatever face the model picks. Structural: a cited animal id
+ * against the row ids, no prose read. Staging job_1791222889407_ypl33vk8u: 9
+ * briefs cited ANI001 / ANI002 with no row although the rule was in the prompt.
+ * Covers carry no creatures[] contract, so only story pages are checked.
+ */
+function checkCreatureRows(page, metadata, visualBible) {
+  if (!(page && page.pageNumber > 0) || !visualBible) return [];
+  const animals = new Set((Array.isArray(visualBible.animals) ? visualBible.animals : [])
+    .map(a => String((a && a.id) || '').trim().toUpperCase()).filter(Boolean));
+  if (!animals.size) return [];
+  const rows = new Set(((metadata && Array.isArray(metadata.creatures)) ? metadata.creatures : [])
+    .map(r => String((r && r.id) || '').trim().toUpperCase()));
+  const missing = [...citedBaseIds(metadata).keys()].filter(id => animals.has(id) && !rows.has(id));
+  if (!missing.length) return [];
+  return [{
+    pageNumber: page.pageNumber, type: 'creature_row_missing', ids: missing,
+    detail: `objects[] cites ${missing.join(', ')} and creatures[] has no row for ${missing.length > 1 ? 'them' : 'it'}. Add one row per cited animal drawn in frame: {"id", "depth", "looksAt", "expression", "emotion"}, the expression naming brows, eyes or mouth.`,
+  }];
+}
+
+/**
  * cast_not_in_plan — `characters[]` lists a commissioned character the page's
  * plan line does not put in frame (the review's check 5a, rule 3). "In frame"
  * is the shipped plan check's head count for the page (`page.inFrame`, the
@@ -1687,6 +1712,7 @@ module.exports = {
   checkNegationNamed,
   checkElementUncited,
   checkCharacterFields,
+  checkCreatureRows,
   checkCastNotInPlan,
   checkRequiredTextUndeclared,
   checkShotOffPlate,

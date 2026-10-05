@@ -64,6 +64,29 @@ describe('character_fields: depth and a drawable expression on every row', () =>
   });
 });
 
+describe('creature_row_missing: a cited animal carries a creatures[] row', () => {
+  const VB = { animals: [{ id: 'ANI001', name: 'Pip' }, { id: 'ANI002', name: 'Bo' }], artifacts: [{ id: 'ART001', name: 'kite' }] };
+  it('fires for each cited animal without a row, and not for an artifact', () => {
+    const b = brief('x', { shot: 'medium', characters: [row('Ana')], objects: ['ANI001', 'ANI002', 'ART001'], creatures: [{ id: 'ANI002', depth: 'midground', expression: 'brows level' }] });
+    const f = SBC.checkCreatureRows({ pageNumber: 3 }, full(b), VB);
+    expect(f).toHaveLength(1);
+    expect(f[0].ids).toEqual(['ANI001']);
+  });
+  it('passes when every cited animal has its row, and on a cover or a page citing none', () => {
+    const ok = brief('x', { shot: 'medium', characters: [row('Ana')], objects: ['ANI001'], creatures: [{ id: 'ANI001' }] });
+    const none = brief('x', { shot: 'medium', characters: [row('Ana')], objects: ['ART001'] });
+    expect(SBC.checkCreatureRows({ pageNumber: 3 }, full(ok), VB)).toEqual([]);
+    expect(SBC.checkCreatureRows({ pageNumber: 3 }, full(none), VB)).toEqual([]);
+    expect(SBC.checkCreatureRows({ pageNumber: -1 }, full(brief('x', { objects: ['ANI001'] })), VB)).toEqual([]);
+  });
+  it('reaches the re-ask: collectBriefFindings reports it', () => {
+    const b = brief('Ana waves at Pip.', { shot: 'medium', characters: [row('Ana')], objects: ['ANI001'] });
+    const ctx = { inputData: { characters: [{ name: 'Ana' }] }, clothingRequirements: null, visualBible: VB, briefBeats: [] };
+    const { findings } = BC.collectBriefFindings([{ pageNumber: 3, brief: b }], ctx);
+    expect(findings.map((f: any) => f.type)).toContain('creature_row_missing');
+  });
+});
+
 describe('cast_not_in_plan: the head count decides who is in the picture', () => {
   const b = brief('x', { shot: 'medium', characters: [row('Ana'), row('Ben')] });
   it('fires on a commissioned character outside the page\'s head count', () => {

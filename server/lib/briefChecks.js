@@ -139,7 +139,7 @@ function briefCastNames(inputData, visualBible) {
 function collectBriefFindings(expansions, ctx) {
   const {
     checkScenes: checkBriefs, REVIEWABLE,
-    checkNegationNamed, checkElementUncited, checkCharacterFields, checkCastNotInPlan, checkRequiredTextUndeclared,
+    checkNegationNamed, checkElementUncited, checkCharacterFields, checkCreatureRows, checkCastNotInPlan, checkRequiredTextUndeclared,
   } = require('./sceneBriefCheck');
   const { checkScenes: checkClothing, REVIEWABLE: CLOTHING_SENDABLE, checkClothingIncomplete } = require('./clothingCheck');
   const { extractSceneMetadata, splitBrief } = require('./sceneMetadata');
@@ -185,6 +185,7 @@ function collectBriefFindings(expansions, ctx) {
       ...checkNegationNamed(page, meta),
       ...checkElementUncited(page, full, ctx.visualBible, commissioned),
       ...checkCharacterFields(page, full),
+      ...checkCreatureRows(page, full, ctx.visualBible),
       ...checkCastNotInPlan(page, full, commissioned),
       ...checkRequiredTextUndeclared(page, full, ctx.visualBible),
       ...checkClothingIncomplete({

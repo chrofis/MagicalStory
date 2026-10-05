@@ -70,10 +70,10 @@ describe('Art Director composition rules reach the trial scene hints', () => {
 describe('creature tone is banded by the main character age', () => {
   it('0-4 gets cute, 5-6 not-menacing, 7+ formidable', () => {
     expect(prompts[3]).toMatch(/drawn cute/);
-    expect(prompts[6]).toMatch(/open friendly face/);
+    expect(prompts[6]).toMatch(/kind eyes and a soft face/);
     expect(prompts[6]).not.toMatch(/drawn cute/);
     expect(prompts[9]).toMatch(/powerful, wild or formidable/);
-    expect(prompts[9]).not.toMatch(/open friendly face/);
+    expect(prompts[9]).not.toMatch(/kind eyes and a soft face/);
   });
 
   it('comes from the shared resolver, not a trial-local copy of the level text', () => {
@@ -86,7 +86,7 @@ describe('creature tone is banded by the main character age', () => {
 
   it('omits the section entirely when no age is known', () => {
     const noAge = buildTrialStoryPrompt({ ...trialInput(6), characters: [{ name: 'Mia', isMain: true }] }, 5);
-    expect(noAge).not.toMatch(/drawn cute|open friendly face|powerful, wild or formidable/);
+    expect(noAge).not.toMatch(/drawn cute|kind eyes and a soft face|powerful, wild or formidable/);
   });
 });
 

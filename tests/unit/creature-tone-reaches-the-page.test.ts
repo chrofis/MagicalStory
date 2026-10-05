@@ -49,7 +49,7 @@ describe('the creature-tone block', () => {
 
   it('keeps the age boundaries', () => {
     expect(buildCreatureToneSection(child('4'))).toMatch(/drawn cute/);
-    expect(buildCreatureToneSection(child('6'))).toMatch(/open friendly face/);
+    expect(buildCreatureToneSection(child('6'))).toMatch(/kind eyes and a soft face/);
     expect(buildCreatureToneSection(child('7'))).toMatch(/powerful, wild or formidable/);
   });
 });

@@ -17,7 +17,7 @@ import path from 'node:path';
 
 const require_ = createRequire(import.meta.url);
 const plateQc = require_('../../server/lib/plateQc');
-const { decidePlateAfterRetry, normaliseJudgeIssue, plateQcRecord, emptySceneQcOf, PLATE_QC_CHECKS, UNCLASSIFIED, nullOnPromptFit, logPlateOutcome } = plateQc;
+const { decidePlateAfterRetry, normaliseJudgeIssue, plateQcRecord, emptySceneQcOf, pagePlateFields, PLATE_QC_CHECKS, UNCLASSIFIED, nullOnPromptFit, logPlateOutcome } = plateQc;
 const { PromptFitError } = require_('../../server/lib/promptFitError');
 
 const qc = (...findings: Array<[string, string]>) => ({
@@ -123,6 +123,18 @@ describe('both attempts are stored', () => {
   });
 });
 
+describe('pagePlateFields — one plate record for the first render and the missing-image retry', () => {
+  it('carries the plate image and its provenance; a null slot is all-null', () => {
+    const f = pagePlateFields({ imageData: 'IMG', prompt: 'P', vantageId: 'LOC001.5', plateDerivedFor: null });
+    expect(f).toMatchObject({ emptySceneImage: 'IMG', emptyScenePrompt: 'P', vantageId: 'LOC001.5', emptySceneQc: null });
+    expect(Object.values(pagePlateFields(undefined)).every(v => v === null)).toBe(true);
+  });
+  it('the retry stamps the stored plate on the record even when it did not render one', () => {
+    const src = fs.readFileSync(path.join(__dirname, '..', '..', 'storyJobPipeline.js'), 'utf8');
+    expect(src).toMatch(/Object\.assign\(raw, require\('\.\/server\/lib\/plateQc'\)\.pagePlateFields\(/);
+  });
+});
+
 describe('logging and the deterministic-failure guard', () => {
   it('a hard defect that ships raises plate_shipped_failed_qc with the defect', () => {
     const events: any[] = [];
@@ -144,6 +156,6 @@ describe('logging and the deterministic-failure guard', () => {
     expect(src).not.toMatch(/issues\.length < (qc|dqc)\.issues\.length/);
     expect(src.match(/decidePlateAfterRetry\(\{/g)).toHaveLength(3);
     expect(src.match(/\.catch\(nullOnPromptFit\)/g)).toHaveLength(2);
-    expect(src.match(/emptySceneQcOf\(/g)).toHaveLength(4);
+    expect(src.match(/emptySceneQcOf\(/g)).toHaveLength(3);
   });
 });

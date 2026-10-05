@@ -1870,7 +1870,7 @@ ${bibleBody}` : bibleBody;
   // The result is the cover beat's location-only FIXED field (pinned like a
   // story page's location) and the covers' pages in the bible's tables.
   if (jevActive(jevReport) && coverBeats.length) try {
-    const { decideCoverPlaces, applyCoverPlacePages, materializeCoverPlaces } = require('./jevBriefFields');
+    const { decideCoverPlaces, applyCoverPlacePages, materializeCoverPlaces, coverPlaceLabel } = require('./jevBriefFields');
     // Each cover's cast is its beat's who column (coverBeats): two covers on one
     // landmark must differ in viewpoint AND cast (owner, 2026-10-04).
     const casts = Object.fromEntries(coverBeats.map(cb => [cb.coverKey, String(jevDecisions.planParts(cb.planLine)[1] || '').split(/,\s*/).map(x => x.trim()).filter(Boolean)]));
@@ -1897,7 +1897,7 @@ ${bibleBody}` : bibleBody;
       const cb = coverBeats.find(b => b.coverKey === c.coverKey);
       const cite = cites[c.coverKey] || c.cite;
       c.cite = cite;
-      cb.jevFixed = { coverPlace: true, location: cite, labels: { [cite]: c.offered ? `${c.label}, in front of it` : c.label } };
+      cb.jevFixed = { coverPlace: true, location: cite, labels: { [cite]: coverPlaceLabel(visualBible, c) } };
       citeByPage.set(Number(cb.pageNumber), cite);
     }
     if (visualBible && applyCoverPlacePages(visualBible, citeByPage) && bibleSections) {

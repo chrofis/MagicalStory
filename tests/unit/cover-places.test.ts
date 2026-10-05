@@ -178,6 +178,16 @@ describe('offered landmarks: candidates, their own question, and their place in 
     expect(loc.vantages[0]).toMatchObject({ id: 'LOC003.1', shot: 'wide', landmarkPhoto: '2' });
     expect(loc.vantages[0].emptyScenePrompt).toContain('The cathedral above a broad square.');
   });
+  it('a cover FIXED label carries the photo the plate is painted from — the bible text the Art Director reads never held the materialized place', () => {
+    const vb: any = VB();
+    const lm = OFFERED[0];
+    const cites = JBF.materializeCoverPlaces(vb, [{ coverKey: 'initialPage', offered: { landmark: lm, photo: lm.photoVariants[1], locId: null } }]);
+    const offered = JBF.coverPlaceLabel(vb, { cite: cites.initialPage, label: lm.name, offered: {} });
+    expect(offered).toContain('The cathedral above a broad square.');
+    expect(offered).toContain(lm.name);
+    // A visited vantage is in the bible text already: its label is untouched.
+    expect(JBF.coverPlaceLabel(vb, { cite: 'LOC001.4', label: 'the town square' })).toBe('the town square');
+  });
   it('an offered landmark already in the bible (seen, never stood on) gets a new vantage, not a second place', () => {
     const vb: any = VB();
     vb.locations[1] = { id: 'LOC002', name: 'The Old Cathedral', isRealLandmark: true, landmarkQuery: 'The Old Cathedral', appearsInPages: [] };
