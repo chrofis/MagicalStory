@@ -2139,7 +2139,7 @@ export function StoryDisplay({
               <option value="claude-haiku">Haiku 4.5 ($0.028)</option>
               <option value="grok-3">Grok 3 ($0.038)</option>
               <option value="gemini-2.5-pro">Gemini 2.5 Pro ($0.046)</option>
-              <option value="claude-sonnet">Sonnet 4.6 ($0.083)</option>
+              <option value="claude-sonnet">Sonnet 5.5</option>
             </select>
             <select value={improveImageModel} onChange={e => setImproveImageModel(e.target.value)} className="flex-1 rounded border-gray-300 text-xs p-1">
               <option value="">Image: Default</option>

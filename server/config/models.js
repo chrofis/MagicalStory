@@ -15,6 +15,20 @@ const IMAGE_ASPECTS = {
   AVATAR: '9:16',     // tall portrait for character reference sheets
 };
 
+// Claude Sonnet 5.5. Ceiling and effort levels from GET /v1/models/claude-sonnet-5-5
+// (read 2026-10-04): max_tokens 128000, effort low..max all supported (xhigh
+// answered a live call). Default effort is `high`. This is THE Sonnet: the
+// 'claude-sonnet' alias (idea, outline, storyText, beats planner/replan/bible/
+// text, judges, guardModel fallback) resolves here since 2026-10-05 (owner: no
+// Sonnet 4.6 anywhere), as do arc create/retell and text_refine.
+// docs/decisions.md 2026-10-05 "Sonnet 4.6 retired".
+const CLAUDE_SONNET = {
+  provider: 'anthropic',
+  modelId: 'claude-sonnet-5-5',
+  maxOutputTokens: 128000,
+  description: 'Claude Sonnet 5.5 - ($2/$10 per 1M). Default effort high. The Sonnet alias.'
+};
+
 // Available text models
 const TEXT_MODELS = {
   // Ceilings below were read from the vendor on 2026-09-11: OpenRouter
@@ -24,12 +38,7 @@ const TEXT_MODELS = {
   // 2026-09-11 no-caps change these numbers ARE the ceiling every call runs
   // at AND what textReplyGuard measures against, so an understated one both
   // truncated real replies and reported a false cap_hit.
-  'claude-sonnet': {
-    provider: 'anthropic',
-    modelId: 'claude-sonnet-4-6',
-    maxOutputTokens: 128000,
-    description: 'Claude Sonnet 4.6 - Best narrative quality'
-  },
+  'claude-sonnet': CLAUDE_SONNET,
   'claude-opus': {
     provider: 'anthropic',
     modelId: 'claude-opus-5',
@@ -63,17 +72,8 @@ const TEXT_MODELS = {
     taskBudgetAtEffort: { max: 96000 },
     description: 'Claude Opus 5.5 - ($4/$20 per 1M). Default effort medium. Routed: arc_create at xhigh.'
   },
-  // Claude Sonnet 5.5. Ceiling and effort levels from GET
-  // /v1/models/claude-sonnet-5-5 (read 2026-10-04): max_tokens 128000, effort
-  // low..max all supported (xhigh answered a live call). Default effort is
-  // `high`. Registered for the 2026-10-04 Lab A/B against the Opus arc create /
-  // re-tell and text_refine; no production stage routes here yet.
-  'claude-sonnet-5-5': {
-    provider: 'anthropic',
-    modelId: 'claude-sonnet-5-5',
-    maxOutputTokens: 128000,
-    description: 'Claude Sonnet 5.5 - ($2/$10 per 1M). Default effort high. Lab A/B vs Opus on arc + text_refine.'
-  },
+  // Sonnet 5.5 under its own id (see CLAUDE_SONNET above).
+  'claude-sonnet-5-5': CLAUDE_SONNET, // same object as 'claude-sonnet': one model id, two keys kept for stored Lab params
   'claude-haiku': {
     provider: 'anthropic',
     modelId: 'claude-haiku-4-5-20251001',
@@ -1412,10 +1412,11 @@ const MODEL_PRICING = {
   // Exact key for the same reason as Opus 5.5: the "-5" strip would otherwise
   // land on a claude-sonnet prefix ($3/$15).
   'claude-sonnet-5-5': { input: 2.00, output: 10.00, thinking: 10.00 },
+  // Historical cost lookups only: no stage routes to 4.6 since 2026-10-05.
   'claude-sonnet-4-6': { input: 3.00, output: 15.00, thinking: 15.00 },
   'claude-sonnet-4-5-20250929': { input: 3.00, output: 15.00, thinking: 15.00 },
   'claude-sonnet-4-5': { input: 3.00, output: 15.00, thinking: 15.00 },
-  'claude-sonnet': { input: 3.00, output: 15.00, thinking: 15.00 },
+  'claude-sonnet': { input: 2.00, output: 10.00, thinking: 10.00 }, // = Sonnet 5.5, the alias's model
   'claude-haiku-4-5-20251001': { input: 1.00, output: 5.00, thinking: 5.00 },
   'claude-haiku-4-5': { input: 1.00, output: 5.00, thinking: 5.00 },
   'claude-3-5-haiku-20241022': { input: 0.80, output: 4.00, thinking: 4.00 },

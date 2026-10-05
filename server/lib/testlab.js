@@ -8610,7 +8610,7 @@ async function runArcAmendStage(target, { params = {}, promptOverride = null }) 
   if (!arc) throw new Error('story has no stored arc to amend');
 
   // TEXT_MODELS keys, not model ids: 'claude-sonnet' is the key,
-  // 'claude-sonnet-4-6' is what it resolves to and is not addressable here.
+  // 'claude-sonnet-5-5' is what it resolves to and is not addressable here.
   const models = String(params.models || 'grok-4.6,deepseek-v4-pro,gpt-5.6-luna-pro,claude-sonnet')
     .split(',').map(s => s.trim()).filter(Boolean);
   const judgeModel = params.judgeModel || 'claude-sonnet';

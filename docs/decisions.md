@@ -66763,3 +66763,18 @@ Hazard Lab ids: 1631 1632 1633 1634 1639 1637 1638 (A), 1640-1645 and 1646 (B). 
 **Decision.** `server/lib/compressionFilter.js` skips compression for `text/event-stream`; server.js uses it. One filter covers every SSE route, including `/api/trial/generate-ideas-stream` (same pattern, same bug).
 **Rationale.** Raising the client timeout would hide it; per-route `res.flush()` would leave the next SSE route to rediscover it.
 **Touched files:** `server.js`, `server/lib/compressionFilter.js`, `tests/unit/sse-not-compressed.test.ts`.
+
+
+## 2026-10-05 — Sonnet 4.6 retired: the `claude-sonnet` alias runs Sonnet 5.5 (owner directive)
+
+**Context.** `TEXT_MODELS['claude-sonnet']` pointed at `claude-sonnet-4-6` ($3/$15). Sonnet 5.5 ($2/$10) was registered on 2026-10-04 and already routes arc create/re-tell and text_refine (see "Sonnet 5.5 writes the arc and repairs the text"). Owner: do not use Sonnet 4.6 anywhere. No line in SETTLED.md pins Sonnet 4.6 for a stage; decisions.md mentions 4.6 only as the model measurements were taken on (history, not a pin).
+
+**Decision.** `'claude-sonnet'` and `'claude-sonnet-5-5'` are the same object (`CLAUDE_SONNET` in `server/config/models.js`): one model id, the second key kept because stored Lab params and the arc/text_refine defaults name it. Stages moved from 4.6 to 5.5: idea, outline, storyText, childCriticModel, scorecardJudge, the beats planner / re-plan / story bible / story text, the `guardModel()` fallback, trial `modelToUse`, the Lab `claude-sonnet` defaults. `MODEL_PRICING['claude-sonnet']` is now $2/$10 (was $3/$15); the `claude-sonnet-4-6` price row stays for historical cost lookups. Admin ping fallback, `scripts/test-models.js`, `scripts/test-json-output.js` and the client labels were changed to 5.5.
+
+**Call-site compatibility.** `callAnthropicAPI`/`Streaming` send no temperature (it is only sent to xAI/OpenRouter/Gemini), no beta header unless a task budget is set (only Opus 5.5 at max), and `output_config.effort` only when a caller passes it; max_tokens is the model's 128000 ceiling, same as 4.6. Probe 2026-10-05: Sonnet 5.5 with no effort and no thinking param returned a text block only, 0 thinking tokens. Nothing needed changing.
+
+**Rationale.** Owner directive; also ~33% cheaper per token. Quality of the idea/outline/beats stages on 5.5 is not A/B-measured: those stages had no Lab bake-off, only arc and text_refine did.
+
+**Not touched.** `server/routes/ai-proxy.js` calls `claude-sonnet-4-5-20250929` directly (4.5, not 4.6) — left as is, flagged to the owner.
+
+**Touched files.** server/config/models.js, server/routes/admin/diagnostics.js, server/lib/testlab.js (comment), scripts/test-models.js, scripts/test-json-output.js, client ModelSelector.tsx + StoryDisplay.tsx labels, tests/unit/sonnet-alias.test.ts.
