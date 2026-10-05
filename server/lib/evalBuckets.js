@@ -85,6 +85,9 @@ const BUCKETS = {
   // correctly-specified story it should never fire, so a non-zero count is a
   // signal that the CLOTHING contract failed upstream, not just a page defect.
   nudity:               { owner: 'quality',  kind: 'binary', repair: 'regen' },
+  // A child shown with an uncovered torso (owner, 2026-10-05): a wardrobe repaint,
+  // anchored to the avatar like every garment finding. CRITICAL via MIN_SEVERITY_TYPES.
+  child_torso_uncovered: { owner: 'quality', kind: 'graded', repair: 'grok_blended' },
   // The beat's feeling contradicted. Previously aliased into `naturalness`, so
   // "how much of our tax is emotion?" was unanswerable and the per-character
   // billing could not separate it from every other catch-all finding. This adds
@@ -281,6 +284,7 @@ const TYPE_TO_BUCKET = {
   // cross-page consistency findings route like everything else.
   garment_colour: 'garment_colour', garment_color: 'garment_colour',
   nudity: 'nudity', undressed: 'nudity', nude: 'nudity',
+  child_torso_uncovered: 'child_torso_uncovered',
   implausible_placement: 'action_interaction', placement: 'action_interaction',
   // face_destroyed (2026-09-12): a face rendered featureless or smeared IN THE
   // PAGE, as opposed to cut away by our crop (cutout_artifact, which stays
@@ -441,7 +445,7 @@ const CONSOLIDATED_TYPES = Object.freeze([
   'image_coherence', 'character_identity', 'duplicate_character', 'duplicate_identity',
   'missing_character', 'extra_character', 'clothing', 'clothing_detail', 'clothing_sex', 'garment_facing',
   'accessory', 'accessory_missing', 'hair', 'hair_nuance', 'face_drift', 'face_destroyed',
-  'cutout_artifact', 'nudity', 'anatomy', 'body_build', 'figure_completeness', 'action_interaction',
+  'cutout_artifact', 'nudity', 'child_torso_uncovered', 'anatomy', 'body_build', 'figure_completeness', 'action_interaction',
   'object_presence', 'missing_element', 'object_count', 'duplicate_object', 'scale',
   'structure_scale', 'creature_scale', 'setting', 'style_consistency', 'rendered_text', 'required_text',
   'character_marking', 'anachronism', 'garment_colour', 'naturalness', 'emotion',

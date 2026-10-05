@@ -260,6 +260,10 @@ const MIN_SEVERITY_TYPES = {
   composite_seam: 'catastrophic',
   face_destroyed: 'critical',
   identity_swap: 'critical',
+  // A child with an uncovered torso (owner, 2026-10-05, reversing 'nudity only when
+  // fully nude' for children): the evaluator types it, the floor keeps a MAJOR slip
+  // from billing it as a clothing note. See decisions.md 2026-10-05.
+  child_torso_uncovered: 'critical',
 };
 
 // NO TEXT MATCHING IN SCORING. Owner rule, 2026-08-09: "you can not build this
@@ -549,6 +553,7 @@ const BUCKET_BILLING_CATEGORY = {
   accessory: 'clothing',
   clothing_detail: 'clothing',
   garment_facing: 'clothing',
+  child_torso_uncovered: 'clothing',
   garment_colour: 'clothing',
   // IDENTITY IS ITS OWN CLASS, SEPARATE FROM BUILD (owner, 2026-08-19):
   // "does this figure look like the photo? If not, repair can not work. We can

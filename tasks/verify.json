@@ -5422,7 +5422,7 @@
         "722a0a15f"
       ],
       "addedAt": "2026-10-05",
-      "claim": "On the next story with a child costumed:mermaid, clothingRequirements[child].costumed.description names a long/short-sleeve swim shirt and a tail replacing the legs with no feet/bare feet/one-piece; the costumed sheet is generated (no avatar_category_missing in generationLog); the cover and page images show a covered torso and no feet under the tail.",
+      "claim": "On the next story with a child costumed:mermaid, clothingRequirements[child].costumed.description names a long/short-sleeve swim shirt and a tail replacing the legs with no feet/bare feet/one-piece; the costumed sheet is generated (no avatar_category_missing in generationLog); the cover and page images show a covered torso and no feet under the tail. A required costumed sheet that cannot be generated fails the job (error names the character, credits refunded); a child shown with an uncovered torso is typed child_torso_uncovered CRITICAL in the page/cover eval.",
       "runShape": [
         "full-story",
         "testlab-stage"
@@ -5430,7 +5430,8 @@
       "check": {
         "kind": "human",
         "what": "Read stories.data.clothingRequirements for the costumed child, grep generationLog for avatar_category_missing, and view the back cover and two mermaid pages."
-      }
+      },
+      "status": "pending"
     }
   ],
   "runs": [

@@ -1534,6 +1534,8 @@ const NOT_INPAINTABLE_TYPES = new Set([
   // garment_facing (D-05e): a garment redrawn from its other side is a
   // wardrobe repaint, anchored to the reference like every garment finding.
   'garment_facing',
+  // child_torso_uncovered: a wardrobe repaint of the figure, never a local paint-over.
+  'child_torso_uncovered',
   // body form
   'scale',
   // A creature drawn far below its given size (D-34). Not a character repair:

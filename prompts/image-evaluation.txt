@@ -127,7 +127,7 @@ Always output `coherence_gate: {applied, reason}`. When applied, also emit one `
 Fires ONLY when a figure is genuinely unclothed: NO garment on the lower body AND none on the torso. That is the whole test.
 
 It is NOT nudity — do not report it — when the figure wears ANY of these, however brief or however wrong for the scene:
-- shorts, briefs, bloomers, underwear, swim trunks, a swimsuit, a skirt, trousers, or anything else covering the lower body. A bare chest above any lower garment is never nudity.
+- shorts, briefs, bloomers, underwear, swim trunks, a swimsuit, a skirt, trousers, or anything else covering the lower body. A bare chest above any lower garment is never nudity (on a child it is D-05f instead).
 - a top, shirt, dress or coat with the legs bare.
 - bare arms, bare legs, bare feet, or a swimming/bathing scene.
 
@@ -135,6 +135,7 @@ A garment hidden by occlusion, cropping, water or a blanket is not nudity either
 
 If the brief named a garment and the figure is wearing something else, or too little for the scene, that is **D-05 `clothing`**, not this. This code exists for one case: the clothing spec produced no garment at all and the model drew a naked figure. When in doubt it is not nudity. Report ONE entry per figure. `fix`: "Regenerate the figure fully dressed in the outfit named in CLOTHING."
 
+**D-05f `child_torso_uncovered` → CRITICAL. ONE entry per figure.** A figure that is a child (the brief or `Looks:` says baby, toddler, kindergartner, child or school-age) rendered with a bare chest, a bare midriff or a bikini-style top: no shirt, swim shirt, rash-guard, dress or other garment covers the torso from shoulders to waist. A long- or short-sleeve swim shirt, a one-piece that covers the torso, or any shirt is covered. An adult's bare torso is not this code. Judge only what is rendered; a torso hidden by occlusion, cropping or water is not this. `fix`: "Redraw the child with a covering top over the whole torso, in the outfit named in CLOTHING."
 **D-05 `clothing` → MAJOR.** Wrong garment TYPE (dress rendered as trousers). Reserve this code for WHICH garment it is. The right type in the wrong colour is D-05d; how the garment is cut or worn is D-05b.
 **D-05d `garment_colour` → MAJOR.** A garment of the right TYPE whose MAIN colour contradicts the contract (navy shorts rendered purple). Never `clothing` — the two are repaired differently, and a colour error never justifies redrawing the figure.
 **D-05b `clothing_detail` → MODERATE. ONE entry per figure, never more.** The right garment, tailored or worn differently: sleeve length (long where short was named, or the reverse), sleeves rolled or unrolled, collar shape, cuff, hem length, a button or pocket, fabric weight. The reader sees the character in the outfit the brief named; a rolled sleeve does not break the page. Collect every such deviation for one figure into a SINGLE entry naming that figure. Never MAJOR.

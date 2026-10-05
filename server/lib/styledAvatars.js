@@ -1020,6 +1020,21 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
 const STYLED_AVATAR_BUCKETS = ['costumed', 'standard', 'winter', 'summer'];
 
 /**
+ * A required costumed sheet could not be generated. "No costume, no book"
+ * (owner, 2026-10-05, docs/decisions.md): the book is failed (and refunded by
+ * the job's failure path) instead of rendering the costume from text over
+ * another bucket's sheet. Staging job_1791222889407_ypl33vk8u shipped a
+ * bare-chested child that way.
+ */
+class MissingRequiredCostumeSheetError extends Error {
+  constructor(characterNames) {
+    super(`The costume sheet for ${characterNames.join(', ')} could not be created, so the story cannot be illustrated. No credits are charged for a failed story; please try again.`);
+    this.name = 'MissingRequiredCostumeSheetError';
+    this.characterNames = characterNames;
+  }
+}
+
+/**
  * HARD GUARANTEE: after styled-avatar generation, every character the story
  * requires must have SOME identity reference — a character ending up with
  * zero styled avatars is an ERROR state, never a silent shrug.
@@ -1087,6 +1102,7 @@ async function ensureStyledAvatarCoverage(characters, artStyle, pageRequirements
     return bytes ? `data:image/jpeg;base64,${bytes.toString('base64')}` : null;
   };
 
+  const missingCostumeFor = [];
   for (const char of characters) {
     const nameKey = String(char?.name || '').trim().toLowerCase();
     const required = requiredCategories.get(nameKey);
@@ -1119,15 +1135,24 @@ async function ensureStyledAvatarCoverage(characters, artStyle, pageRequirements
           artStyle,
           clothingCategory: missing.join(', '),
           success: false,
-          warning: `required categor${missing.length === 1 ? 'y' : 'ies'} never generated — another bucket's sheet substitutes as reference`,
+          warning: `required categor${missing.length === 1 ? 'y' : 'ies'} never generated`,
         });
         if (bucket.length > MAX_GENERATION_LOG_ENTRIES) {
           bucket.splice(0, bucket.length - MAX_GENERATION_LOG_ENTRIES);
         }
+        // A missing COSTUMED sheet fails the book (see MissingRequiredCostumeSheetError).
+        if (missing.includes('costumed')) missingCostumeFor.push(char.name);
       }
       continue;
     }
 
+    // No avatar at all AND a costume is required: nothing may stand in for it.
+    if (required.has('costumed')) {
+      log.error(`[AVATAR] ❌ ${char.name} has no styled avatar and the story requires a costume — failing the story`);
+      getCurrentLogger()?.error('avatar_category_missing', 'Required costumed sheet missing and no avatar of any bucket exists', char.name, { artStyle, missing: ['costumed'] });
+      missingCostumeFor.push(char.name);
+      continue;
+    }
     const avatars = char.avatars || char.clothingAvatars;
     const { imageData, source, warnings } = await resolveGuaranteedReference({
       characterName: char.name,
@@ -1179,6 +1204,7 @@ async function ensureStyledAvatarCoverage(characters, artStyle, pageRequirements
       }
     }
   }
+  if (missingCostumeFor.length > 0) throw new MissingRequiredCostumeSheetError(missingCostumeFor);
 }
 
 /**
@@ -1213,6 +1239,13 @@ function getStyledAvatar(characterName, clothingCategory, artStyle) {
   // because it's the strongest signal for "this is the only outfit this
   // character has in this story").
   const requestedCanonical = normalizeClothingCategory(clothingCategory);
+  // A costume is never stood in for by another bucket's sheet (owner, 2026-10-05,
+  // "no costume, no book"): a story that requires one fails in
+  // ensureStyledAvatarCoverage before any page asks, so a miss here is a bug.
+  if (requestedCanonical === 'costumed') {
+    log.error(`❌ [STYLED-AVATAR] COSTUMED CACHE MISS: ${cacheKey} — no other bucket substitutes for a costume`);
+    return null;
+  }
   const fallbackOrder = ['costumed', 'standard', 'winter', 'summer'];
   for (const bucket of fallbackOrder) {
     if (bucket === requestedCanonical) continue;
@@ -2066,6 +2099,8 @@ module.exports = {
   // Core functions
   getOrCreateStyledAvatar,
   prepareStyledAvatars,
+  MissingRequiredCostumeSheetError,
+  ensureStyledAvatarCoverage,
   prepareWardrobeVariantAvatars,
   variantLogEntry,
   approvedBaseSheetFor,
