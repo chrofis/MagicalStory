@@ -3363,7 +3363,7 @@
       "impact": "A cut reply spends the batch retry, then the per-page fallback (page 10,-1,-2,-3 cost $0.63 on this job).",
       "status": "fixed",
       "fixedAt": "2026-10-05",
-      "fixedIn": "COMMITHASH",
+      "fixedIn": "8ae493641",
       "fix": "textModels.streamCutError thrown (retryable) on every streaming path when the completion signal is missing or an SSE error arrives; per-attempt diagnostics in sceneExpansionReport.replies. Test: tests/unit/text-stream-completion.test.ts. docs/decisions.md 2026-10-05."
     }
   ]
