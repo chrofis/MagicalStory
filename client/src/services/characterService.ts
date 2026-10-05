@@ -2,6 +2,7 @@ import api from './api';
 import type { Character, CharacterAvatars, GeneratedOutfit, AgeCategory, StructuredClothing, PhysicalTraitsSource } from '@/types/character';
 import { createLogger } from './logger';
 import { getAvatarInputPhoto } from '@/utils/characterPhotos';
+import { errorStatusOf } from '@/utils/avatarErrors';
 
 const log = createLogger('CharacterService');
 
@@ -343,6 +344,7 @@ export interface AvatarGenerationResult {
   extractedTraits?: ExtractedTraits;      // Physical traits extracted from reference photo
   extractedClothing?: ExtractedClothing;   // Clothing extracted from generated avatar
   error?: string;
+  errorStatus?: number;                    // HTTP status of the failing call (429 = daily avatar cap)
   skipped?: boolean;
   skipReason?: string;
 }
@@ -514,6 +516,7 @@ export const characterService = {
     extractedTraits?: ExtractedTraits;
     extractedClothing?: ExtractedClothing;
     error?: string;
+    errorStatus?: number;
   }> {
     try {
       // Auto-load full character data if photos are missing (list view strips photos).
@@ -669,7 +672,7 @@ export const characterService = {
       }
     } catch (error) {
       log.error('Clothing avatar generation failed:', error);
-      return { success: false, error: String(error) };
+      return { success: false, error: String(error), errorStatus: errorStatusOf(error) };
     }
   },
 
@@ -684,6 +687,7 @@ export const characterService = {
     extractedTraits?: ExtractedTraits;
     extractedClothing?: ExtractedClothing;
     error?: string;
+    errorStatus?: number;
   }> {
     try {
       // Auto-load full character data if photos are missing (list view strips photos).
@@ -911,7 +915,7 @@ export const characterService = {
       }
     } catch (error) {
       log.error('Clothing avatar generation with traits failed:', error);
-      return { success: false, error: String(error) };
+      return { success: false, error: String(error), errorStatus: errorStatusOf(error) };
     }
   },
 
@@ -1062,8 +1066,9 @@ export const characterService = {
         _debug: response._debug,
       };
     } catch (error) {
+      // The raw server text (e.g. "Could not save the character") is logged; the wizard shows a localised message
       log.error('Photo analysis failed:', error);
-      return { success: false, error: 'unknown_error' };
+      return { success: false, error: 'analysis_failed' };
     }
   },
 
@@ -1133,6 +1138,7 @@ export const characterService = {
 
       if (!genResult.success || !genResult.avatars) {
         result.error = genResult.error || 'Avatar generation failed';
+        result.errorStatus = genResult.errorStatus;
         onProgress?.('error', result.error);
         return result;
       }
@@ -1213,6 +1219,7 @@ export const characterService = {
 
     } catch (error) {
       result.error = String(error);
+      result.errorStatus = errorStatusOf(error);
       onProgress?.('error', result.error);
       log.error(`Failed to generate/save avatars for ${character.name}:`, error);
       return result;

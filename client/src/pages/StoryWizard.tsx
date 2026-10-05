@@ -1,4 +1,6 @@
 import { defaultMainCharacterId, addMainCharacter, trimMainCharacters } from '@/utils/mainCharacters';
+import { buildOrderDetailLines } from '@/utils/orderDetails';
+import { avatarFailureMessage, photoAnalysisFailureMessage, errorStatusOf } from '@/utils/avatarErrors';
 import { useState, useEffect, useRef, lazy, Suspense, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useLanguage } from '@/context/LanguageContext';
@@ -376,6 +378,10 @@ export default function StoryWizard() {
   } | null>(null);
   const streamAbortRef = useRef<{ abort: () => void } | null>(null);
   const pollCancelledRef = useRef(false);
+  // Run id of the live story poll loop. Bumped when the loop must stop WITHOUT touching state
+  // (wizard unmount, minimize, a new story starting): a stale loop must never setState/navigate.
+  const pollRunRef = useRef(0);
+  useEffect(() => () => { pollRunRef.current++; }, []);
   // User's location from IP (for story setting personalization)
   const [userLocation, setUserLocation] = useState<{ city: string | null; region: string | null; country: string | null; latitude?: number | null; longitude?: number | null } | null>(null);
   // Season for story setting (auto-calculated from current date, user can override)
@@ -1515,7 +1521,6 @@ export default function StoryWizard() {
           log.info('Order Status:', data);
 
           if (data.order) {
-            const amount = `CHF ${(data.order.amount_total / 100).toFixed(2)}`;
             const titles = {
               en: 'Payment Successful!',
               de: 'Zahlung erfolgreich!',
@@ -1528,15 +1533,7 @@ export default function StoryWizard() {
               fr: 'Votre commande de livre a été reçue et sera bientôt imprimée.',
               it: 'Il tuo ordine del libro è stato ricevuto e sarà presto stampato.',
             };
-            const details = [
-              `${language === 'de' ? 'Kunde' : language === 'fr' ? 'Client' : language === 'it' ? 'Cliente' : 'Customer'}: ${data.order.customer_name}`,
-              `Email: ${data.order.customer_email}`,
-              `${language === 'de' ? 'Betrag' : language === 'fr' ? 'Montant' : language === 'it' ? 'Importo' : 'Amount'}: ${amount}`,
-              `${language === 'de' ? 'Versand an' : language === 'fr' ? 'Expédié à' : language === 'it' ? 'Spedizione a' : 'Shipping to'}: ${data.order.shipping_name}`,
-              `${data.order.shipping_address_line1}`,
-              `${data.order.shipping_postal_code} ${data.order.shipping_city}`,
-              `${data.order.shipping_country}`,
-            ];
+            const details = buildOrderDetailLines(data.order, language);
             showSuccess(
               messages[language as keyof typeof messages] || messages.en,
               titles[language as keyof typeof titles] || titles.en,
@@ -2720,6 +2717,7 @@ export default function StoryWizard() {
                   log.success(`✅ Avatar generated and traits extracted for ${charForGeneration!.name}`);
                 } else {
                   log.error(`❌ Avatar generation failed: ${result.error}`);
+                showError(avatarFailureMessage(language, result.errorStatus));
                   // Update both currentCharacter AND characters array on failure
                   setCurrentCharacter(prev => prev && prev.id === charId ? { ...prev, avatars: { status: 'failed' } } : prev);
                   setCharacters(prev => prev.map(c =>
@@ -2729,6 +2727,7 @@ export default function StoryWizard() {
               })
               .catch(error => {
                 log.error(`❌ Avatar generation error:`, error);
+                showError(avatarFailureMessage(language, errorStatusOf(error)));
                 // Update both currentCharacter AND characters array on error
                 setCurrentCharacter(prev => prev && prev.id === charId ? { ...prev, avatars: { status: 'failed' } } : prev);
                 setCharacters(prev => prev.map(c =>
@@ -2755,23 +2754,17 @@ export default function StoryWizard() {
             showError(t.noFaceDetected);
             // Don't set the photo - user needs to upload a different one
           } else {
-            log.warn('Photo analysis returned no data, using original photo');
-            // Fallback to original photo - clear avatars (new photo means new face)
-            setCurrentCharacter(prev => prev ? {
-              ...prev,
-              photos: { original: originalPhotoUrl },
-              avatars: undefined,
-            } : null);
+            // Analysis failed (analyser down, character save failed): fail loudly. The photo is NOT
+            // adopted: no face box / body crop / server record exists for it.
+            log.error(`Photo analysis failed: ${analysis.error}`);
+            showError(photoAnalysisFailureMessage(language));
+            if (!currentCharacter?.name || currentCharacter.name.trim().length < 2) setCharacterStep('photo');
           }
         }
       } catch (error) {
         log.error('Photo analysis error:', error);
-        // Fallback to original photo on error - clear avatars (new photo means new face)
-        setCurrentCharacter(prev => prev ? {
-          ...prev,
-          photos: { original: originalPhotoUrl },
-          avatars: undefined,
-        } : null);
+        showError(photoAnalysisFailureMessage(language));
+        if (!currentCharacter?.name || currentCharacter.name.trim().length < 2) setCharacterStep('photo');
       } finally {
         setIsAnalyzingPhoto(false);
       }
@@ -2988,6 +2981,7 @@ export default function StoryWizard() {
                 log.success(`✅ Avatar generated for ${charForGeneration!.name} (face selection)`);
               } else {
                 log.error(`❌ Avatar generation failed: ${result.error}`);
+                showError(avatarFailureMessage(language, result.errorStatus));
                 setCurrentCharacter(prev => prev && prev.id === charId ? { ...prev, avatars: { status: 'failed' } } : prev);
                 setCharacters(prev => prev.map(c =>
                   c.id === charId ? { ...c, avatars: { status: 'failed' } } : c
@@ -2996,6 +2990,7 @@ export default function StoryWizard() {
             })
             .catch(error => {
               log.error(`❌ Avatar generation error:`, error);
+                showError(avatarFailureMessage(language, errorStatusOf(error)));
               setCurrentCharacter(prev => prev && prev.id === charId ? { ...prev, avatars: { status: 'failed' } } : prev);
               setCharacters(prev => prev.map(c =>
                 c.id === charId ? { ...c, avatars: { status: 'failed' } } : c
@@ -3015,7 +3010,7 @@ export default function StoryWizard() {
       }
     } catch (error) {
       log.error('Photo analysis error after face selection:', error);
-      showError('Failed to analyze photo. Please try again.');
+      showError(photoAnalysisFailureMessage(language));
     } finally {
       setIsAnalyzingPhoto(false);
       // Clear pending data
@@ -3080,12 +3075,12 @@ export default function StoryWizard() {
       } else {
         log.error(`❌ Failed to regenerate avatars: ${result.error}`);
         setCurrentCharacter(prev => prev ? { ...prev, avatars: originalAvatars } : prev);
-        showError(`Failed to regenerate avatars: ${result.error || 'Unknown error'}`);
+        showError(avatarFailureMessage(language, result.errorStatus));
       }
     } catch (error) {
       log.error(`❌ Failed to regenerate avatars for ${currentCharacter.name}:`, error);
       setCurrentCharacter(prev => prev ? { ...prev, avatars: originalAvatars } : prev);
-      showError(`Failed to regenerate avatars: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      showError(avatarFailureMessage(language, errorStatusOf(error)));
     } finally {
       setIsRegeneratingAvatars(false);
     }
@@ -3168,13 +3163,13 @@ export default function StoryWizard() {
         log.error(`❌ Failed to regenerate avatars with traits: ${result.error}`);
         // Restore original avatars so UI doesn't show empty
         setCurrentCharacter(prev => prev ? { ...prev, avatars: originalAvatars } : prev);
-        showError(`Failed to regenerate avatars: ${result.error || 'Unknown error'}`);
+        showError(avatarFailureMessage(language, result.errorStatus));
       }
     } catch (error) {
       log.error(`❌ Failed to regenerate avatars with traits for ${currentCharacter.name}:`, error);
       // Restore original avatars so UI doesn't show empty
       setCurrentCharacter(prev => prev ? { ...prev, avatars: originalAvatars } : prev);
-      showError(`Failed to regenerate avatars: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      showError(avatarFailureMessage(language, errorStatusOf(error)));
     } finally {
       setIsRegeneratingAvatarsWithTraits(false);
     }
@@ -3284,11 +3279,11 @@ export default function StoryWizard() {
         showSuccess(language === 'de' ? 'Charakter gespeichert und Avatar regeneriert' : language === 'fr' ? 'Personnage enregistré et avatar régénéré' : language === 'it' ? 'Personaggio salvato e avatar rigenerato' : 'Character saved and avatar regenerated');
       } else {
         log.error(`❌ Failed to regenerate avatars: ${result.error}`);
-        showError(`Failed to regenerate avatars: ${result.error || 'Unknown error'}`);
+        showError(avatarFailureMessage(language, result.errorStatus));
       }
     } catch (error) {
       log.error(`❌ Failed to save and regenerate:`, error);
-      showError(`Failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      showError(avatarFailureMessage(language, errorStatusOf(error)));
     } finally {
       setIsRegeneratingAvatarsWithTraits(false);
     }
@@ -3360,7 +3355,7 @@ export default function StoryWizard() {
         log.success(`✅ Avatar generated for ${currentCharacter.name} (id: ${charId})`);
       } else {
         log.error(`❌ Failed to generate avatar: ${result.error}`);
-        showError(`Failed to generate avatar: ${result.error || 'Unknown error'}`);
+        showError(avatarFailureMessage(language, result.errorStatus));
         // Mark as failed in characters array
         setCharacters(prev => prev.map(c =>
           c.id === charId ? { ...c, avatars: { status: 'failed' } } : c
@@ -3370,7 +3365,7 @@ export default function StoryWizard() {
       }
     } catch (error) {
       log.error(`❌ Avatar generation failed:`, error);
-      showError(`Avatar generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      showError(avatarFailureMessage(language, errorStatusOf(error)));
       // Mark as failed in characters array
       setCharacters(prev => prev.map(c =>
         c.id === charId ? { ...c, avatars: { status: 'failed' } } : c
@@ -3482,12 +3477,14 @@ export default function StoryWizard() {
             log.success(`✅ Avatars and traits saved for ${savedChar.name}`);
           } else if (!result.skipped) {
             log.warn(`Avatar generation failed for ${savedChar.name}: ${result.error}`);
+            showError(avatarFailureMessage(language, result.errorStatus));
             setCharacters(prev => prev.map(c =>
               c.id === savedChar.id ? { ...c, avatars: { status: 'failed' } } : c
             ));
           }
         }).catch(error => {
           log.error(`❌ Background avatar generation error for ${savedChar.name}:`, error);
+          showError(avatarFailureMessage(language, errorStatusOf(error)));
           setCharacters(prev => prev.map(c =>
             c.id === savedChar.id ? { ...c, avatars: { status: 'failed' } } : c
           ));
@@ -3983,6 +3980,10 @@ export default function StoryWizard() {
     console.log('[generateStory] user:', user?.email, 'emailVerified:', user?.emailVerified, 'isImpersonating:', isImpersonating);
 
     pollCancelledRef.current = false;
+    const pollRunId = ++pollRunRef.current;
+    const pollIsStale = () => pollRunRef.current !== pollRunId;
+    let pollAbandoned = false;
+    let cancelledElsewhere = false;
 
     // Ensure any pending saves complete before generating
     if (pendingSavePromise.current) {
@@ -4233,6 +4234,12 @@ export default function StoryWizard() {
           log.info('Polling stopped: job cancelled by user');
           break;
         }
+        // Wizard left / minimized / new story started: GenerationContext owns the job now
+        if (pollIsStale()) {
+          log.info('Polling stopped: wizard poll superseded');
+          pollAbandoned = true;
+          break;
+        }
 
         let status;
         try {
@@ -4246,6 +4253,7 @@ export default function StoryWizard() {
           if (networkErrors >= 5) throw networkErr;
           continue; // Retry after 2s
         }
+        if (pollIsStale()) { pollAbandoned = true; break; }
 
         if (status.progress) {
           // Only log when progress changes
@@ -4491,7 +4499,23 @@ export default function StoryWizard() {
           }
         } else if (status.status === 'failed') {
           throw new Error(status.error || 'Story generation failed');
+        } else if (status.status === 'cancelled') {
+          // Cancelled elsewhere (other tab, admin): same terminal handling as GenerationContext
+          cancelledElsewhere = true;
+          break;
         }
+      }
+
+      if (pollAbandoned) return;
+      if (cancelledElsewhere) {
+        setJobId(null);
+        setGenerationProgress({ current: 0, total: 0, message: '' });
+        showInfo(language === 'de'
+          ? 'Generierung abgebrochen'
+          : language === 'fr'
+          ? 'Génération annulée'
+          : language === 'it' ? 'Generazione annullata' : 'Generation cancelled');
+        return;
       }
 
       setGenerationProgress({
@@ -4500,6 +4524,7 @@ export default function StoryWizard() {
         message: language === 'de' ? 'Fertig!' : language === 'fr' ? 'Terminé!' : language === 'it' ? 'Fatto!' : 'Complete!'
       });
     } catch (error) {
+      if (pollAbandoned || pollIsStale()) { log.warn('Abandoned poll errored, ignored:', error); return; }
       log.error('Generation failed:', error);
       const errorMessage = error instanceof Error ? error.message : String(error);
 
@@ -4571,8 +4596,11 @@ export default function StoryWizard() {
         showError(generationFailedText(language) + (isAdminViewer ? ` (${errorMessage})` : ''));
       }
     } finally {
-      stopTracking(); // Ensure global tracking is stopped
-      setTimeout(() => setIsGenerating(false), 500);
+      // An abandoned loop must not stop GenerationContext tracking or flip state it no longer owns
+      if (!pollAbandoned) {
+        stopTracking(); // Ensure global tracking is stopped
+        setTimeout(() => setIsGenerating(false), 500);
+      }
     }
   };
 
@@ -6256,6 +6284,7 @@ export default function StoryWizard() {
             <div className="space-y-3">
               <button
                 onClick={() => {
+                  pollRunRef.current++; // stop this wizard's poll; GenerationContext keeps the job
                   setIsProgressMinimized(true);
                   setShowMinimizeDialog(false);
                   navigate('/create?new=true');
@@ -6268,6 +6297,7 @@ export default function StoryWizard() {
               {userHasStories && (
                 <button
                   onClick={() => {
+                    pollRunRef.current++;
                     setIsProgressMinimized(true);
                     setShowMinimizeDialog(false);
                     navigate('/stories');

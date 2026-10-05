@@ -11,6 +11,7 @@ import { checkpointToPercent } from '@/components/generation/GenerationProgress'
 import { MAX_BOOK_PAGES } from './Pricing';
 import { INITIAL_USER_CREDITS } from '@/constants/credits';
 import { createLogger } from '@/services/logger';
+import { buildOrderDetailLines } from '@/utils/orderDetails';
 
 const log = createLogger('MyStories');
 
@@ -450,7 +451,6 @@ export default function MyStories() {
         }
 
         if (status === 'completed' && finalData.order) {
-          const amount = `CHF ${(finalData.order.amount_total / 100).toFixed(2)}`;
           const tokensCredited = finalData.order.tokens_credited || 0;
           const titles = {
             en: 'Order confirmed!', de: 'Bestellung bestätigt!', fr: 'Commande confirmée!', it: 'Ordine confermato!',
@@ -469,16 +469,7 @@ export default function MyStories() {
               ? `Il tuo libro è stato inviato in stampa. Hai guadagnato ${tokensCredited} token!`
               : 'Il tuo libro è stato inviato in stampa.',
           };
-          const details = [
-            `${language === 'de' ? 'Kunde' : language === 'fr' ? 'Client' : language === 'it' ? 'Cliente' : 'Customer'}: ${finalData.order.customer_name}`,
-            `Email: ${finalData.order.customer_email}`,
-            `${language === 'de' ? 'Betrag' : language === 'fr' ? 'Montant' : language === 'it' ? 'Importo' : 'Amount'}: ${amount}`,
-            ...(tokensCredited > 0 ? [`${language === 'de' ? 'Tokens erhalten' : language === 'fr' ? 'Jetons gagnés' : language === 'it' ? 'Token ricevuti' : 'Tokens earned'}: ${tokensCredited}`] : []),
-            `${language === 'de' ? 'Versand an' : language === 'fr' ? 'Expédié à' : language === 'it' ? 'Spedizione a' : 'Shipping to'}: ${finalData.order.shipping_name}`,
-            `${finalData.order.shipping_address_line1}`,
-            `${finalData.order.shipping_postal_code} ${finalData.order.shipping_city}`,
-            `${finalData.order.shipping_country}`,
-          ];
+          const details = buildOrderDetailLines(finalData.order, language, tokensCredited);
           showSuccess(
             messages[language as keyof typeof messages] || messages.en,
             titles[language as keyof typeof titles] || titles.en,

@@ -61,7 +61,8 @@ class ApiClient {
         errorMessage += `|ACTIVE_JOB:${errorData.activeJobId}`;
       }
       // Create error with additional fields preserved (e.g., retryAfter for rate limiting)
-      const error = new Error(errorMessage) as Error & { retryAfter?: number; code?: string };
+      const error = new Error(errorMessage) as Error & { retryAfter?: number; code?: string; status?: number };
+      error.status = response.status; // lets callers map 429 etc. to a localised message
       if (errorData.retryAfter) error.retryAfter = errorData.retryAfter;
       if (errorData.code) error.code = errorData.code;
       throw error;

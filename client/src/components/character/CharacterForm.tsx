@@ -1712,26 +1712,26 @@ export function CharacterForm({
       {(developerMode || isImpersonating) && (
         <div className="bg-teal-50 border border-teal-300 rounded-lg p-4">
           <h4 className="text-sm font-semibold text-teal-700 mb-3 flex items-center gap-2">
-            {language === 'de' ? 'Kleidungs-Avatare' : language === 'fr' ? 'Avatars vestimentaires' : 'Clothing Avatars'}
+            {language === 'de' ? 'Kleidungs-Avatare' : language === 'fr' ? 'Avatars vestimentaires' : language === 'it' ? 'Avatar con abbigliamento' : 'Clothing Avatars'}
             {character.avatars?.status === 'generating' && (
               <span className="text-xs font-normal text-teal-500 flex items-center gap-1">
                 <div className="w-3 h-3 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
-                {language === 'de' ? 'Generierung läuft...' : 'Generating...'}
+                {language === 'de' ? 'Generierung läuft...' : language === 'fr' ? 'Génération en cours...' : language === 'it' ? 'Generazione in corso...' : 'Generating...'}
               </span>
             )}
             {character.avatars?.status === 'complete' && !character.avatars?.stale && (
               <span className="text-xs font-normal text-green-600">
-                {language === 'de' ? 'Fertig' : language === 'fr' ? 'Terminé' : 'Complete'}
+                {language === 'de' ? 'Fertig' : language === 'fr' ? 'Terminé' : language === 'it' ? 'Completato' : 'Complete'}
               </span>
             )}
             {character.avatars?.stale && (
               <span className="text-xs font-normal text-amber-600">
-                ⚠️ {language === 'de' ? 'Von altem Foto' : language === 'fr' ? 'De l\'ancienne photo' : 'From previous photo'}
+                ⚠️ {language === 'de' ? 'Von altem Foto' : language === 'fr' ? 'De l\'ancienne photo' : language === 'it' ? 'Dalla foto precedente' : 'From previous photo'}
               </span>
             )}
             {character.avatars?.status === 'failed' && (
               <span className="text-xs font-normal text-red-600">
-                {language === 'de' ? 'Fehlgeschlagen' : language === 'fr' ? 'Échoué' : 'Failed'}
+                {language === 'de' ? 'Fehlgeschlagen' : language === 'fr' ? 'Échoué' : language === 'it' ? 'Non riuscito' : 'Failed'}
               </span>
             )}
           </h4>
