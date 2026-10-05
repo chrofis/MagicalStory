@@ -6990,7 +6990,8 @@ async function runAvatarEvalStage(target, { experimentId, promptOverride, params
   const wanted = (target.character || '').toLowerCase();
   const matches = entries
     .map((e, i) => ({ e, i }))
-    .filter(({ e }) => (e.characterName || '').toLowerCase() === wanted);
+    // A variant entry is the off-garment gate's verdict: it holds no sheet to evaluate.
+    .filter(({ e }) => !e.variant && (e.characterName || '').toLowerCase() === wanted);
   if (!matches.length) {
     const names = [...new Set(entries.map(e => e.characterName).filter(Boolean))];
     throw new Error(`No styledAvatarGeneration entry for "${target.character}" (have: ${names.join(', ') || 'none'})`);

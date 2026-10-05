@@ -21,6 +21,14 @@ superseded and link forward.
 
 ---
 
+## 2026-10-05 — The variant gate's answer is stored on the variant's styledAvatarGeneration entry
+
+**Context:** staging job_1791145238223_50osg2osm. Two off-garment variants were made and served, `character_2x4_garment_gone_check` was billed twice, and the answer lived only in a function return that `prepareWardrobeVariantAvatars` dropped. A rejected redress returned null, so even a rejection left nothing. Daniel's sheet lost a garment that should have stayed and nothing could be read back to see what the gate had been asked.
+
+**Decision:** every variant redress, accepted or not, appends one entry to `styledAvatarGeneration` (the dev-panel avatar log): `variant: { offIds, removedItems, accepted, shippedUnscored, finalAttempt, attempts[] }`, each attempt carrying `gate: { style, garmentChecks[{garment, question, visible, cells, reason}], removedScore, finalScore, valid }`. `redressSheetVariant` returns `{imageData: null, accepted: false, attempts}` on full rejection instead of null (null stays for the pre-edit refusals). Text only; the sheet itself is stored by the normal avatar path. The Test Lab `avatar_eval` stage skips `variant` entries when it picks the latest entry for a character.
+
+**Touched files:** `server/lib/character2x4Sheet.js`, `server/lib/styledAvatars.js`, `server/routes/stories.js`, `server/lib/testlab.js`, `client/src/components/generation/StoryDisplay.tsx`, `tests/unit/variant-gate-record.test.ts`.
+
 ## 2026-10-04 — The variant gate asks one garment-gone question per removed garment; TASK 10 is deleted from the style judge
 
 **Context:** `a1bb22596` judged a garment-off variant with the Pass-2 style judge plus a "TASK 10 removedScore". The Lab (entry below, Lab #1597/#1598) showed the judge reads TASK 10 as an exemption. On the `current` arm it passed a sheet that still wears the garment in 3 of 4 control runs, saying "No garments were requested to be taken off" or "Image 2 still wears it; TASK 9 does not score it". Bug: `tasks/bugs.json` → `variant-gate-passes-garment-still-on`.
