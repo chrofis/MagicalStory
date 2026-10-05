@@ -185,22 +185,23 @@ test.describe('Trial → full-account end-to-end', () => {
     console.log('✅ [P1] /try loaded');
 
     // ─── Intro screen ───────────────────────────────────────────────────
-    // The trial flow now opens with a pre-wizard intro (TrialWizard.tsx:460,
-    // showIntro state). We anchor on the title text in any supported locale,
-    // then click the single indigo CTA inside the intro container. If the
-    // intro is ever skipped (returning user, A/B test), the waitFor times
-    // out fast and the rest of the test runs unchanged.
-    try {
-      const introTitle = page.getByText(
-        /create your free story|erstelle deine gratis|cr[ée]ez votre histoire|crea la tua/i
-      ).first();
-      await introTitle.waitFor({ state: 'visible', timeout: 10000 });
-      const introCta = page.locator('button.bg-indigo-500').first();
+    // /try opens with a pre-wizard intro (TrialWizard.tsx, showIntro). It has
+    // TWO start buttons (phone-only sticky bar + desktop), both bg-indigo-500,
+    // so we click the one that is actually visible. Only when the intro title
+    // is absent (returning user, A/B variant) may the test proceed without
+    // clicking; if the title is visible, a failing click must fail the test.
+    const introTitle = page.getByText(
+      /create your free story|erstelle deine gratis|cr[ée]ez votre histoire|crea la tua/i
+    ).first();
+    const introShown = await introTitle.waitFor({ state: 'visible', timeout: 10000 })
+      .then(() => true, () => false);
+    if (introShown) {
+      const introCta = page.locator('button.bg-indigo-500:visible').first();
       await introCta.waitFor({ state: 'visible', timeout: 5000 });
       await introCta.scrollIntoViewIfNeeded();
       await introCta.click();
       console.log('✅ [P1] Intro screen dismissed');
-    } catch {
+    } else {
       console.log('   No intro screen (skipped or A/B variant)');
     }
 
