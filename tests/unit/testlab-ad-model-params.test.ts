@@ -86,3 +86,15 @@ describe('runArtDirector labAdoptBibleFrom (reuseStoredBible)', () => {
     await expect(run({ labAdoptBibleFrom: 'no bible here' })).rejects.toThrow(/labAdoptBibleFrom/);
   });
 });
+
+describe('runArtDirector page-brief reasoning effort (runtime adBriefsReasoningEffort)', () => {
+  it('production: the page-brief call asks low effort, the bible call keeps the model default', async () => {
+    const seen = await run({});
+    expect(seen.beats_scene_expansion.opts.reasoning).toEqual({ effort: 'low' });
+    expect(seen.beats_visual_bible.opts.reasoning).toBeUndefined();
+  });
+  it('the Lab override wins over the runtime setting', async () => {
+    const seen = await run({ labCallOptions: sceneCallOptions({ sceneReasoningEffort: 'high' }) });
+    expect(seen.beats_scene_expansion.opts.reasoning).toEqual({ effort: 'high' });
+  });
+});

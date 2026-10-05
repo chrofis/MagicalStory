@@ -66828,3 +66828,24 @@ Replaces: the 2026-09 "nudity only when completely nude, never on a swimsuit or 
 **Revisit if** the next fresh staging story still shows narrator "because" clauses or an explanatory character line next to a repair-added sentence: then the rule needs the "deshalb/darum" case named, or the arc-informed audit's ENTRANCE / CAUSE questions need the same carry-as-act wording.
 
 **Open, arc side (not changed):** an unhooked quoted line in the arc ("nobody has time to play"), a world rule the arc's own sequence breaks (hand on the shell = breathing, yet Emma drifts alone), parents passive at the dive. **Touched:** `docs/decisions.md`, `evals/`. **Status:** 🟡 staging.
+
+
+## 2026-10-05 - The Art Director's page-brief call runs at reasoning effort low
+
+**Context.** Owner goal: a cheaper Art Director that is at least as good (budget CHF 3). The AD cost $0.73-0.82 per story on gemini-3.1-pro (Lab #1650, current field-reduced templates): bible call $0.23, page-brief call $0.28-0.55, brief re-ask $0.18-0.27. Reasoning tokens are most of the output (68%).
+
+**Measured (Lab #1650-1657, staging, 2 stories: atbttop6w 18p, ypl33vk8u mermaid 14p).**
+- Baseline gemini-3.1-pro (#1650): $0.727 / $0.822, 376 s / 404 s, findings before re-ask 7 / 25, survived 4 / 0. Mermaid hazard 35 (#1656).
+- Arm A gemini-3.7-flash on all calls (#1651): atbttop6w $0.154 but 24 findings before re-ask (baseline 7: removal_unstated 6, element_uncited 7), 5 survived. Mermaid: the page-brief call was REFUSED by the provider (finish_reason=content_filter, PROHIBITED_CONTENT, 0 output tokens) on 5 of 17 call attempts incl. both all-pages attempts and the re-ask (child in a mermaid costume), 1/17 briefs returned, 16 pages fell to the per-page fallback, 19 findings left, cost $0.402. Pro on the same story: no refusal. Flash is rejected for the AD: not robust, and the refusal cannot be fixed without a fallback model (NO FALLBACKS).
+- Arm L (new Lab params `reuseStoredBible` + `sceneReasoningEffort: low` on the page-brief call and the re-ask; bible adopted from the story so the arms differ only in call 2; #1652): $0.293 / $0.367 for call 2 + re-ask, 137 s / 161 s, findings before 9 / 16, survived 0 / 0, introduced 0. Control with the same stored bible and default effort (#1653, mermaid): $0.491, 246 s, 14 before, 0 survived. Call 2 alone: $0.301 (default) vs $0.194 (low), -35%. Mermaid hazard 21 (#1657) vs 35 for the baseline (noise band ~8: not worse).
+- Images (#1655, Grok, 4 mermaid pages rendered from arm L's briefs on the story's own plates, compared with the stored production renders): p13 better (covered top, full tail, hands on the shell), p6 covered top and tail where production showed a bare midriff but the close-up framing came out as a full-figure shot, p3 drew the tail skirt missing, p12 drew Emma with blond hair and glasses (a Sarah-like identity drift in a 4-figure page; production's p12 showed a bikini top). One draw per page: no systematic difference seen, defects on both sides.
+
+**Decision.** `runtime('adBriefsReasoningEffort') = 'low'` for the all-pages brief call and its per-page fallback (server/config/runtime.js, beatsPipeline.adBriefsCallOptions; Lab `labCallOptions` still overrides). The bible call keeps the model default and the re-ask keeps `medium` (lector verdict, 2026-09-30): the re-ask was run at low in arm L, and medium is the control's value, so the shipped combination is the conservative one. Expected saving about $0.10-0.11 per story (call 2 only, ~15%); not the 5x the flash bake-off hoped for.
+
+**Considered and not done.** Flash anywhere in the page-brief call: the refusal above. Flash for the bible only ($0.04 vs $0.23): the bible call worked on both stories, but a changed bible cannot be image-checked in the Lab without regenerating the plates (not run, over budget); open. `expression` from a code table keyed by `emotion`: image_generation builds the face from `expression` alone (promptBuilders.js, EXPRESSION_FIELD) so a table would flatten faces; not tested. Dropping `sceneIntent` (replacing it with the plan instant): ~60 output tokens per page against ~16k, no cost case; the field has 8+ consumers (eval, text spec, consistency check); not tested.
+
+**Caveats.** n=2 stories; one draw per arm; hazard judge noisy (+-8); images 4 pages, one story, one draw. The earlier "reasoning medium on 3.1-pro not adopted" (2026-10-05 bake-off) applied the effort to the bible call as well and predated the field removal.
+
+**Revisit if:** a story shows page briefs thinner than before on prod (check `beats_scene_expansion` output tokens vs reasoning), or a 3+ story rerun at the default finds more survivors.
+
+**Touched files:** `server/config/runtime.js`, `server/lib/beatsPipeline.js` (`adBriefsCallOptions`, `labAdoptBibleFrom`), `server/lib/testlab.js` (`reuseStoredBible`, `reaskModel`), `tests/unit/testlab-ad-model-params.test.ts`.

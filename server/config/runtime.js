@@ -43,6 +43,17 @@ const SETTINGS = {
   // which is what the Test Lab A/B and one-off reruns use.
   pipelineMode: 'beats',
 
+  // ── Art Director page-brief call ───────────────────────────────────────
+  // Reasoning effort of the all-pages brief call (and its per-page fallback);
+  // null = the model's default. 'low' (owner goal 2026-10-05, "a cheaper AD",
+  // Lab #1650-1657, docs/decisions.md): on the same stored bible the briefs call
+  // cost 35-40% less and ran ~2x faster, brief-check findings and survivors did
+  // not rise (survivors 0 of 9 and 0 of 16 vs 0 of 14 at the default), and four
+  // pages rendered from the 'low' briefs read as well as the production renders.
+  // The Visual Bible call and the brief re-ask (medium, lector verdict) keep
+  // their own settings: effort 'low' on the VB was not measured.
+  adBriefsReasoningEffort: 'low',
+
   // ── Client IP (Express `trust proxy`) ──────────────────────────────────
   // Production and staging sit behind Railway's edge only (no Cloudflare:
   // `Server: railway-hikari`, no cf-ray) and the app sees

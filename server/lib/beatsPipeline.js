@@ -1556,6 +1556,16 @@ async function finalizePlanShotsJev({ approvedArc, beats, check, gl, callImpl })
 }
 
 /**
+ * The reasoning option of the Art Director's page-brief calls (all-pages call and
+ * its per-page fallback): runtime `adBriefsReasoningEffort`, null = the model's
+ * default. The Lab's `labCallOptions` spreads after it and wins.
+ */
+function adBriefsCallOptions() {
+  const effort = require('../config/runtime').runtime('adBriefsReasoningEffort');
+  return effort ? { reasoning: { effort } } : {};
+}
+
+/**
  * STEP 4 OF THE BEATS PIPELINE — the Art Director, in two calls with the
  * decision layer between them (owner, 2026-09-28: "Jev first, then remove the
  * scene review"):
@@ -1619,7 +1629,7 @@ async function runArtDirector({ inputData, modelOverrides, clothingRequirements,
     let salvage = null;
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
-        const res = await textModels.callTextModelStreaming(prompt, null, onChunk, sceneModel, { usageLabel: 'beats_scene_expansion_fallback', ...labCallOptions });
+        const res = await textModels.callTextModelStreaming(prompt, null, onChunk, sceneModel, { usageLabel: 'beats_scene_expansion_fallback', ...adBriefsCallOptions(), ...labCallOptions });
         if (onCall) onCall(res);
         if (!res || !res.text || !res.text.trim()) throw new Error('empty scene brief');
         const { assessSceneBrief, describeSceneBrief } = require('./iterateBriefGuard');
@@ -1958,7 +1968,7 @@ ${bibleBody}` : bibleBody;
       let allRaw = '';
       const attemptStart = Date.now();
       try {
-        const res = await textModels.callTextModelStreaming(allPrompt, null, onChunk, sceneModel, { usageLabel: 'beats_scene_expansion', ...labCallOptions });
+        const res = await textModels.callTextModelStreaming(allPrompt, null, onChunk, sceneModel, { usageLabel: 'beats_scene_expansion', ...adBriefsCallOptions(), ...labCallOptions });
         if (onCall) onCall(res);
         allRaw = res?.text || '';
         allModelId = res?.modelId || sceneModel;
