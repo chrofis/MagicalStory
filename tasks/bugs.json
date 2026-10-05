@@ -3315,6 +3315,42 @@
       "source": "Code review 2026-10-04 (tasks/code-review-2026-10/7-client.md)",
       "status": "fixed",
       "fixedAt": "2026-10-05"
+    },
+    {
+      "id": "seo-occasion-preposition",
+      "title": "Occasion meta description said 'zum Taufe/Einschulung/Weihnachten/Ostern' and 'for birthday'",
+      "rootCause": "`zum ${occ.de}` glued a fixed preposition to a bare noun",
+      "impact": "Ungrammatical live search snippets on the occasion pages",
+      "fixedIn": "eb758f398",
+      "fix": "Occasion map stores the full phrase per language. Test: tests/unit/texts-facts-batch12.test.ts",
+      "reportedAt": "2026-10-05",
+      "source": "Code review 2026-10-04 (tasks/code-review-2026-10/10-texts-layout.md)",
+      "status": "fixed",
+      "fixedAt": "2026-10-05"
+    },
+    {
+      "id": "city-possessive-german",
+      "title": "City page headings read 'Davoss Geschichte' for the ~21 city names ending in s",
+      "rootCause": "'{city}s' possessive in de (and {city}'s in en)",
+      "impact": "Wrong German on 21 of 100 city pages",
+      "fixedIn": "eb758f398",
+      "fix": "Copy uses 'von {city}' / 'of {city}'. Test: tests/unit/texts-facts-batch12.test.ts",
+      "reportedAt": "2026-10-05",
+      "source": "Code review 2026-10-04 (tasks/code-review-2026-10/10-texts-layout.md)",
+      "status": "fixed",
+      "fixedAt": "2026-10-05"
+    },
+    {
+      "id": "book-price-facts",
+      "title": "Pages stated book prices CHF 28/33/43, 33-48, 30-53 instead of the production tiers",
+      "rootCause": "Hand-typed copies of the price drifted from pricing_tiers",
+      "impact": "Customers shown a wrong price floor in four languages; Pricing.tsx fallback tiers also stale",
+      "fixedIn": "eb758f398",
+      "fix": "All strings follow pricing_tiers (29/37 from); fallback tiers equal the seed. Test: tests/unit/texts-facts-batch12.test.ts",
+      "reportedAt": "2026-10-05",
+      "source": "Code review 2026-10-04 (tasks/code-review-2026-10/10-texts-layout.md)",
+      "status": "fixed",
+      "fixedAt": "2026-10-05"
     }
   ]
 }
