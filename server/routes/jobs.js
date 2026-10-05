@@ -22,6 +22,7 @@ const { log } = require('../utils/logger');
 const { getPool, withTransaction, offloadJsonbImages, inlineOffloadPrefix } = require('../services/database');
 const email = require('../../email');
 const { normalizeCharacterName } = require('../lib/characterName');
+const { CHARACTERS_MAX, TOO_MANY_CHARACTERS } = require('../lib/requestGuards');
 const { settleJobWithRefund, JOB_SAVING_PROGRESS } = require('../lib/jobCredits');
 
 function getDbPool() { return getPool(); }
@@ -155,6 +156,16 @@ router.post('/create-story', authenticateToken, storyGenerationLimiter, validate
     // avatar maps and clothing lookups all see one spelling.
     if (Array.isArray(inputData.characters)) {
       inputData.characters = inputData.characters.map(c => (c && typeof c.name === 'string' ? { ...c, name: normalizeCharacterName(c.name) } : c));
+    }
+    // At most CHARACTERS_MAX characters IN the story (the wizard sends only included ones).
+    // Refused before credits are reserved; the cast, the avatar sheets and every scene brief scale with it.
+    if (Array.isArray(inputData.characters) && inputData.characters.length > CHARACTERS_MAX) {
+      log.warn(`🚫 [CREATE-STORY] ${req.user.username} sent ${inputData.characters.length} characters (max ${CHARACTERS_MAX})`);
+      return res.status(400).json({
+        error: `A story can have at most ${CHARACTERS_MAX} characters`,
+        code: TOO_MANY_CHARACTERS,
+        max: CHARACTERS_MAX,
+      });
     }
     // Remove idempotencyKey from input_data as it's stored separately
     delete inputData.idempotencyKey;

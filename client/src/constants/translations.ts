@@ -176,7 +176,7 @@ export interface TranslationStrings {
 
 export const translations: Record<'en' | 'de' | 'fr' | 'it', TranslationStrings> = {
   en: {
-    title: 'MagicalStory',
+    title: 'Magical Story',
     subtitle: 'Personalize your story to create magic',
     heroTitle: 'Your child as the hero of their own story',
     heroSubtitle: '',
@@ -351,7 +351,7 @@ export const translations: Record<'en' | 'de' | 'fr' | 'it', TranslationStrings>
     cancelGeneration: 'Cancel',
   },
   de: {
-    title: 'MagicalStory',
+    title: 'Magical Story',
     subtitle: 'Personalisiere deine Geschichte für Magie',
     heroTitle: 'Dein Kind als Held seiner eigenen Geschichte',
     heroSubtitle: '',
@@ -526,7 +526,7 @@ export const translations: Record<'en' | 'de' | 'fr' | 'it', TranslationStrings>
     cancelGeneration: 'Abbrechen',
   },
   fr: {
-    title: 'MagicalStory',
+    title: 'Magical Story',
     subtitle: 'Personnalisez votre histoire pour créer la magie',
     heroTitle: 'Votre enfant, héros de sa propre histoire',
     heroSubtitle: '',
@@ -701,7 +701,7 @@ export const translations: Record<'en' | 'de' | 'fr' | 'it', TranslationStrings>
     cancelGeneration: 'Annuler',
   },
   it: {
-    title: 'MagicalStory',
+    title: 'Magical Story',
     subtitle: 'Personalizza la tua storia per creare la magia',
     heroTitle: 'Il tuo bambino, eroe della sua storia',
     heroSubtitle: '',

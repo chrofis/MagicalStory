@@ -1,4 +1,4 @@
-import { defaultMainCharacterId, addMainCharacter, trimMainCharacters } from '@/utils/mainCharacters';
+import { defaultMainCharacterId, addMainCharacter, trimMainCharacters, MAX_CHARACTERS_PER_STORY } from '@/utils/mainCharacters';
 import { buildOrderDetailLines } from '@/utils/orderDetails';
 import { avatarFailureMessage, photoAnalysisFailureMessage, errorStatusOf } from '@/utils/avatarErrors';
 import { findVersionByIndex, iterateErrorMessage } from '@/utils/imageVersions';
@@ -3746,7 +3746,8 @@ export default function StoryWizard() {
     if (step === 1) {
       // Step 1: Characters - must have at least one character and one main character
       // Relationships default to "not known to" which is acceptable (warning shown)
-      return characters.length > 0 && mainCharacters.length > 0;
+      return characters.length > 0 && mainCharacters.length > 0
+        && characters.filter(c => !excludedCharacters.includes(c.id)).length <= MAX_CHARACTERS_PER_STORY;
     }
     if (step === 2) {
       // Step 2: Book Settings - always can proceed (languageLevel has default)
@@ -3767,7 +3768,7 @@ export default function StoryWizard() {
     if (step === 5) {
       // Step 5: Summary - must have main character and story details
       const charactersInStory = characters.filter(c => !excludedCharacters.includes(c.id));
-      return charactersInStory.length > 0 && mainCharacters.length > 0 && storyDetails.trim().length > 0;
+      return charactersInStory.length > 0 && charactersInStory.length <= MAX_CHARACTERS_PER_STORY && mainCharacters.length > 0 && storyDetails.trim().length > 0;
     }
     return false;
   };

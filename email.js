@@ -1,4 +1,4 @@
-// email.js - Email utility module for MagicalStory
+// email.js - Email utility module for Magical Story
 
 const { Resend } = require('resend');
 const fs = require('fs');
@@ -13,7 +13,7 @@ const resend = process.env.RESEND_API_KEY
   ? new Resend(process.env.RESEND_API_KEY)
   : null;
 
-const EMAIL_FROM = process.env.EMAIL_FROM || 'MagicalStory <noreply@magicalstory.ch>';
+const EMAIL_FROM = process.env.EMAIL_FROM || 'Magical Story <noreply@magicalstory.ch>';
 const EMAIL_REPLY_TO = process.env.EMAIL_REPLY_TO || 'info@magicalstory.ch';
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@magicalstory.ch';
 
@@ -385,28 +385,28 @@ const TRIAL_REMINDER_COPY = {
     ENGLISH: {
       subject: 'You still have {credits} free credits waiting',
       headline: 'Your {credits} free credits are still waiting.',
-      body: 'You tried MagicalStory a few days ago — your free credits are still on your account, enough to create one more full story, completely free. Set your password to claim them.',
+      body: 'You tried Magical Story a few days ago — your free credits are still on your account, enough to create one more full story, completely free. Set your password to claim them.',
       ctaLabel: 'Claim my free story',
       perksIntro: 'With a full account you also unlock:',
     },
     GERMAN: {
       subject: 'Deine {credits} Gratis-Credits warten noch auf dich',
       headline: 'Deine {credits} Gratis-Credits warten noch.',
-      body: 'Du hast MagicalStory vor ein paar Tagen ausprobiert — deine Gratis-Credits liegen weiterhin auf deinem Konto, genug für eine weitere komplette Geschichte, vollständig gratis. Setze dein Passwort, um sie zu sichern.',
+      body: 'Du hast Magical Story vor ein paar Tagen ausprobiert — deine Gratis-Credits liegen weiterhin auf deinem Konto, genug für eine weitere komplette Geschichte, vollständig gratis. Setze dein Passwort, um sie zu sichern.',
       ctaLabel: 'Gratis-Geschichte holen',
       perksIntro: 'Mit einem vollständigen Konto erhältst du ausserdem:',
     },
     FRENCH: {
       subject: 'Vos {credits} crédits gratuits vous attendent toujours',
       headline: 'Vos {credits} crédits gratuits vous attendent toujours.',
-      body: 'Vous avez essayé MagicalStory il y a quelques jours — vos crédits gratuits sont toujours sur votre compte, de quoi créer une histoire complète de plus, entièrement gratuite. Définissez votre mot de passe pour les récupérer.',
+      body: 'Vous avez essayé Magical Story il y a quelques jours — vos crédits gratuits sont toujours sur votre compte, de quoi créer une histoire complète de plus, entièrement gratuite. Définissez votre mot de passe pour les récupérer.',
       ctaLabel: 'Récupérer mon histoire gratuite',
       perksIntro: 'Avec un compte complet, vous débloquez aussi :',
     },
     ITALIAN: {
       subject: 'I tuoi {credits} crediti gratuiti ti aspettano ancora',
       headline: 'I tuoi {credits} crediti gratuiti ti aspettano ancora.',
-      body: 'Hai provato MagicalStory qualche giorno fa — i tuoi crediti gratuiti sono ancora sul tuo conto, abbastanza per creare un\'altra storia completa, del tutto gratis. Imposta la tua password per riscattarli.',
+      body: 'Hai provato Magical Story qualche giorno fa — i tuoi crediti gratuiti sono ancora sul tuo conto, abbastanza per creare un\'altra storia completa, del tutto gratis. Imposta la tua password per riscattarli.',
       ctaLabel: 'Ottieni la mia storia gratuita',
       perksIntro: 'Con un conto completo ottieni inoltre:',
     },
@@ -929,7 +929,7 @@ async function sendAdminStoryFailureAlert(jobId, userId, userName, userEmail, er
     const { data, error } = await sendTracked(resend, 'admin-story-failure-alert', {
       from: EMAIL_FROM,
       to: ADMIN_EMAIL,
-      subject: `[MagicalStory] Story Generation Failed - Job ${jobId}`,
+      subject: `[Magical Story] Story Generation Failed - Job ${jobId}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h1 style="color: #ef4444;">Story Generation Failed</h1>
@@ -1130,10 +1130,10 @@ async function sendAdminDailySummary(feed, dateLabel) {
     const { data, error } = await sendTracked(resend, 'admin-daily-summary', {
       from: EMAIL_FROM,
       to: ADMIN_EMAIL,
-      subject: `[MagicalStory] Tagesbericht ${dateLabel} — ${s.stories + (s.trialStories || 0) || 0} Stories, ${s.newUsers || 0} Signups${s.failedJobs ? `, ${s.failedJobs} FAILED` : ''}${limitHits ? `, ⚠️${limitHits} API-Limits` : ''}${failures?.totals.customer ? `, ${failures.totals.customer} Kundenfehler` : ''}${subjectRevenue}`,
+      subject: `[Magical Story] Tagesbericht ${dateLabel} — ${s.stories + (s.trialStories || 0) || 0} Stories, ${s.newUsers || 0} Signups${s.failedJobs ? `, ${s.failedJobs} FAILED` : ''}${limitHits ? `, ⚠️${limitHits} API-Limits` : ''}${failures?.totals.customer ? `, ${failures.totals.customer} Kundenfehler` : ''}${subjectRevenue}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 720px; margin: 0 auto;">
-          <h2 style="color:#4f46e5;">MagicalStory Tagesbericht — ${dateLabel}</h2>
+          <h2 style="color:#4f46e5;">Magical Story Tagesbericht — ${dateLabel}</h2>
           <table style="border-collapse:separate; border-spacing:6px; width:100%;"><tr>
             ${stat('Signups', s.newUsers || 0)}
             ${stat('Trials', s.trialsStarted || 0)}
@@ -1262,7 +1262,7 @@ async function sendAdminWeeklyCostReport(report) {
     const { data, error } = await sendTracked(resend, 'admin-weekly-cost-report', {
       from: EMAIL_FROM,
       to: ADMIN_EMAIL,
-      subject: `[MagicalStory] ${days}-Tage-Kosten — ${usd(grandTotal)} total (Railway ${usd(current.totals.total)}${api ? ` + API ${usd(api.totals.total)}` : ''}), Hochrechnung ${usd(report.projectedMonthly + (api ? api.projectedMonthly : 0))}/Monat`,
+      subject: `[Magical Story] ${days}-Tage-Kosten — ${usd(grandTotal)} total (Railway ${usd(current.totals.total)}${api ? ` + API ${usd(api.totals.total)}` : ''}), Hochrechnung ${usd(report.projectedMonthly + (api ? api.projectedMonthly : 0))}/Monat`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 720px; margin: 0 auto;">
           <h2 style="color:#4f46e5;">Railway Kosten — letzte ${days} Tage</h2>
@@ -1338,7 +1338,7 @@ async function sendAdminHealthReport(subject, reportText) {
     const { data, error } = await sendTracked(resend, 'admin-health-report', {
       from: EMAIL_FROM,
       to: ADMIN_EMAIL,
-      subject: `[MagicalStory] ${subject}`,
+      subject: `[Magical Story] ${subject}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 760px; margin: 0 auto;">
           <h2 style="color:#4f46e5;">${esc(subject)}</h2>

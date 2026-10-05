@@ -687,7 +687,7 @@ export default function SharedStoryViewer() {
           <div className="max-w-7xl mx-auto px-4 py-3 short:py-1 flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 flex-shrink-0">
               <BookOpen className="w-6 h-6 text-amber-700" />
-              <span className="font-bold text-amber-900 hidden md:inline">MagicalStory</span>
+              <span className="font-bold text-amber-900 hidden md:inline">Magical Story</span>
             </div>
             {readingModeToggle}
             <Link

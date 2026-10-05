@@ -13,6 +13,9 @@ import type { Character } from '@/types/character';
  * that is the list the wizard sends the server.
  */
 
+/** Most characters IN one story (excluded ones not counted). Server mirror: CHARACTERS_MAX in server/lib/requestGuards.js (owner 2026-10-05: up to 10 characters, up to 2 of them main). */
+export const MAX_CHARACTERS_PER_STORY = 10;
+
 const ageOf = (c: Character): number => parseInt(c.age, 10) || 0;
 
 /** How many mains the server counts for a cast of this size (excluded characters not counted): 1 for up to 2 characters, 2 for 3 or more (owner 2026-10-04). */

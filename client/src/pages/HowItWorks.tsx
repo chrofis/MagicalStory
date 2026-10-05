@@ -7,7 +7,7 @@ const translations = {
   en: {
     title: 'Create a Children\'s Book with AI',
     subtitle: 'Your own story — not a template with the name swapped in.',
-    heroDesc: 'Most personalized books are one pre-written story with your child\'s name dropped into it. MagicalStory writes an original story instead: upload a photo, describe what should happen, and the AI writes and illustrates a book that has never existed before. Then you edit every word and regenerate any page until it is exactly how you imagined it.',
+    heroDesc: 'Most personalized books are one pre-written story with your child\'s name dropped into it. Magical Story writes an original story instead: upload a photo, describe what should happen, and the AI writes and illustrates a book that has never existed before. Then you edit every word and regenerate any page until it is exactly how you imagined it.',
     stepsTitle: 'How to create your children\'s book',
     step1Title: 'Upload a photo',
     step1Desc: 'One clear photo per character. Your child, siblings, grandparents — up to 10 people, each recognizable on every page.',
@@ -59,7 +59,7 @@ const translations = {
   de: {
     title: 'Kinderbuch erstellen mit KI',
     subtitle: 'Deine eigene Geschichte — keine Vorlage mit ausgetauschtem Namen.',
-    heroDesc: 'Die meisten personalisierten Bücher sind eine fertig geschriebene Geschichte, in die nur der Name deines Kindes eingesetzt wird. MagicalStory schreibt stattdessen eine eigene Geschichte: Foto hochladen, beschreiben, was passieren soll — die KI schreibt und illustriert ein Buch, das es vorher nicht gab. Danach bearbeitest du jedes Wort und generierst jede Seite neu, bis alles genau so ist, wie du es dir vorgestellt hast.',
+    heroDesc: 'Die meisten personalisierten Bücher sind eine fertig geschriebene Geschichte, in die nur der Name deines Kindes eingesetzt wird. Magical Story schreibt stattdessen eine eigene Geschichte: Foto hochladen, beschreiben, was passieren soll — die KI schreibt und illustriert ein Buch, das es vorher nicht gab. Danach bearbeitest du jedes Wort und generierst jede Seite neu, bis alles genau so ist, wie du es dir vorgestellt hast.',
     stepsTitle: 'So erstellst du dein Kinderbuch',
     step1Title: 'Foto hochladen',
     step1Desc: 'Ein klares Foto pro Figur. Dein Kind, Geschwister, Grosseltern — bis zu 10 Personen, auf jeder Seite wiedererkennbar.',
@@ -110,7 +110,7 @@ const translations = {
   fr: {
     title: 'Créer un livre pour enfant avec l\'IA',
     subtitle: 'Votre propre histoire — pas un modèle avec le prénom remplacé.',
-    heroDesc: 'La plupart des livres personnalisés sont une histoire déjà écrite dans laquelle on insère le prénom de votre enfant. MagicalStory écrit une histoire originale : importez une photo, décrivez ce qui doit se passer, et l\'IA écrit et illustre un livre qui n\'existait pas avant. Ensuite vous modifiez chaque mot et régénérez chaque page jusqu\'à ce que tout soit exactement comme vous l\'imaginiez.',
+    heroDesc: 'La plupart des livres personnalisés sont une histoire déjà écrite dans laquelle on insère le prénom de votre enfant. Magical Story écrit une histoire originale : importez une photo, décrivez ce qui doit se passer, et l\'IA écrit et illustre un livre qui n\'existait pas avant. Ensuite vous modifiez chaque mot et régénérez chaque page jusqu\'à ce que tout soit exactement comme vous l\'imaginiez.',
     stepsTitle: 'Comment créer votre livre pour enfant',
     step1Title: 'Importez une photo',
     step1Desc: 'Une photo nette par personnage. Votre enfant, ses frères et sœurs, ses grands-parents — jusqu\'à 10 personnes, reconnaissables sur chaque page.',
@@ -161,7 +161,7 @@ const translations = {
   it: {
     title: 'Crea un libro per bambini con l\'IA',
     subtitle: 'Una storia tutta tua — non un modello con il nome cambiato.',
-    heroDesc: 'Quasi tutti i libri personalizzati sono una storia già scritta in cui viene inserito il nome del bambino. MagicalStory scrive invece una storia originale: carica una foto, descrivi cosa deve succedere e l\'IA scrive e illustra un libro che prima non esisteva. Poi puoi modificare ogni parola e rigenerare ogni pagina finché è esattamente come l\'avevi immaginata.',
+    heroDesc: 'Quasi tutti i libri personalizzati sono una storia già scritta in cui viene inserito il nome del bambino. Magical Story scrive invece una storia originale: carica una foto, descrivi cosa deve succedere e l\'IA scrive e illustra un libro che prima non esisteva. Poi puoi modificare ogni parola e rigenerare ogni pagina finché è esattamente come l\'avevi immaginata.',
     stepsTitle: 'Come creare il tuo libro per bambini',
     step1Title: 'Carica una foto',
     step1Desc: 'Una foto nitida per personaggio. Tuo figlio, fratelli e sorelle, nonni — fino a 10 persone, tutte riconoscibili su ogni pagina.',

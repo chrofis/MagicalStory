@@ -1,5 +1,5 @@
 /**
- * Shared design tokens for MagicalStory emails.
+ * Shared design tokens for Magical Story emails.
  *
  * Style direction: warm storybook — cream parchment background, white card,
  * serif headline, sans body, indigo CTA, gold accent. Designed for the
