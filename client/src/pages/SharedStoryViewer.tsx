@@ -1,7 +1,9 @@
+import { setSharingOnServer, shareFailedMessage } from '@/utils/imageVersions';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { BookOpen, Loader2, AlertCircle, Sparkles, ChevronLeft, ChevronRight, ChevronsLeft, Pencil, Globe, Lock, Share2, Menu, Eye, X } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/context/ToastContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { UserMenu } from '@/components/common/UserMenu';
 import { ChangePasswordModal } from '@/components/auth/ChangePasswordModal';
@@ -87,6 +89,7 @@ export default function SharedStoryViewer() {
   const navigate = useNavigate();
   const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
   const { language, t } = useLanguage();
+  const { showError } = useToast();
   // Reader chrome strings. The header, toggle and page buttons were English in
   // every language (owner report 2026-09-24).
   const sv = ({
@@ -338,23 +341,21 @@ export default function SharedStoryViewer() {
     return () => { cancelled = true; };
   }, [shareToken, isAuthLoading, isAuthenticated, navigate]);
 
-  // Toggle sharing on/off (owner only)
+  // Toggle sharing on/off (owner only). The UI state only changes when the server confirmed it.
+  const sharingHeaders = (): Record<string, string> => {
+    const authToken = localStorage.getItem('auth_token');
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+    return headers;
+  };
+
   const toggleSharing = async () => {
     if (!story?.isOwner) return;
     setSharingLoading(true);
     try {
-      const authToken = localStorage.getItem('auth_token');
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
-      if (sharingEnabled) {
-        await fetch(`/api/stories/${story.id}/share`, { method: 'DELETE', headers });
-        setSharingEnabled(false);
-      } else {
-        await fetch(`/api/stories/${story.id}/share`, { method: 'POST', headers });
-        setSharingEnabled(true);
-      }
-    } catch (err) {
-      // Silently fail
+      const next = await setSharingOnServer(fetch, story.id, !sharingEnabled, sharingHeaders());
+      if (next === null) showError(shareFailedMessage(language));
+      else setSharingEnabled(next);
     } finally {
       setSharingLoading(false);
     }
@@ -363,17 +364,15 @@ export default function SharedStoryViewer() {
   // Share link via native share or clipboard
   const handleShare = async () => {
     if (!sharingEnabled) {
-      // Auto-enable sharing before sharing
+      // Auto-enable sharing before sharing; never hand out a link whose POST failed.
       setSharingLoading(true);
       try {
-        const authToken = localStorage.getItem('auth_token');
-        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-        if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
-        await fetch(`/api/stories/${story!.id}/share`, { method: 'POST', headers });
+        const next = await setSharingOnServer(fetch, story!.id, true, sharingHeaders());
+        if (next === null) {
+          showError(shareFailedMessage(language));
+          return;
+        }
         setSharingEnabled(true);
-      } catch {
-        setSharingLoading(false);
-        return;
       } finally {
         setSharingLoading(false);
       }

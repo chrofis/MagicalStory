@@ -1,6 +1,7 @@
 import { defaultMainCharacterId, addMainCharacter, trimMainCharacters } from '@/utils/mainCharacters';
 import { buildOrderDetailLines } from '@/utils/orderDetails';
 import { avatarFailureMessage, photoAnalysisFailureMessage, errorStatusOf } from '@/utils/avatarErrors';
+import { findVersionByIndex, iterateErrorMessage } from '@/utils/imageVersions';
 import { useState, useEffect, useRef, lazy, Suspense, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useLanguage } from '@/context/LanguageContext';
@@ -5050,6 +5051,8 @@ export default function StoryWizard() {
                         if (img.pageNumber !== pageNumber) return img;
                         const existingVersions = img.imageVersions || [];
                         const updatedVersions = result.imageVersions?.map((v, idx) => ({
+                          // Keep the DB versionIndex: the history modal looks versions up by it.
+                          versionIndex: v.versionIndex ?? existingVersions[idx]?.versionIndex,
                           imageData: v.imageData || existingVersions[idx]?.imageData || '',
                           description: v.description, prompt: v.prompt, modelId: v.modelId,
                           createdAt: v.createdAt || new Date().toISOString(),
@@ -5062,11 +5065,16 @@ export default function StoryWizard() {
                         return { ...img, imageData: result.imageData, qualityScore: result.qualityScore, qualityReasoning: result.qualityReasoning, imageVersions: updatedVersions || img.imageVersions, activeVersion: newActiveVersion };
                       }));
                     }
+                    // Customers pay credits for Nochmal: show the new balance.
+                    if (result.creditsRemaining !== undefined && updateCredits) {
+                      updateCredits(result.creditsRemaining);
+                    }
                     log.info('Image improved successfully, score:', result.qualityScore);
                   }
                 } catch (error) {
+                  // 402 / 429 / anything else: tell the user instead of a silent spinner stop.
                   log.error('Image improvement failed:', error);
-                  throw error;
+                  showError(iterateErrorMessage(language, errorStatusOf(error)));
                 }
               } : undefined}
               onRegenerateImage={storyId ? async (pageNumber: number, editedScene?: string, characterIds?: number[]) => {
@@ -5094,6 +5102,8 @@ export default function StoryWizard() {
                       originalScore: result.originalScore,
                       originalReasoning: result.originalReasoning,
                       imageVersions: result.imageVersions || img.imageVersions,
+                      // Server pins the new version; adopt its pointer (not the stale local one).
+                      activeVersion: result.activeVersion ?? img.activeVersion,
                       // Update reference images used for this regeneration (for dev mode display)
                       referencePhotos: result.referencePhotos || img.referencePhotos,
                       landmarkPhotos: result.landmarkPhotos || img.landmarkPhotos,
@@ -5337,6 +5347,7 @@ export default function StoryWizard() {
                       modelId: result.modelId,
                       // Include imageVersions for version history feature
                       imageVersions: result.imageVersions,
+                      activeVersion: result.activeVersion ?? prev[key]?.activeVersion,
                     } };
                   });
                   // Update user credits if we got the new balance
@@ -5688,6 +5699,7 @@ export default function StoryWizard() {
               } : undefined}
               onRepaintCoverTitle={storyId ? async () => {
                 const result = await storyService.repaintCoverTitle(storyId);
+                if (typeof result.credits === 'number') updateCredits(result.credits);
                 setCoverImages(prev => {
                   const cover = prev?.frontCover;
                   if (!cover) return prev;
@@ -5713,10 +5725,10 @@ export default function StoryWizard() {
                   log.info('Selecting image version:', { pageNumber, versionIndex });
                   const result = await storyService.setActiveImage(storyId, pageNumber, versionIndex);
                   // Update local state with the active version's image data
-                  // Use array index directly — version objects don't have a reliable versionIndex property
+                  // The modal passes the DB versionIndex; imageVersions can be sparse, so look it up by field.
                   setSceneImages(prev => prev.map(img => {
                     if (img.pageNumber === pageNumber && img.imageVersions) {
-                      const activeVersion = img.imageVersions[versionIndex];
+                      const activeVersion = findVersionByIndex(img.imageVersions, versionIndex, msg => log.warn(`page ${pageNumber}: ${msg}`));
                       if (!activeVersion?.imageData) {
                         log.error(`Version ${versionIndex} has no imageData for page ${pageNumber}`);
                         return img;
@@ -5764,8 +5776,8 @@ export default function StoryWizard() {
                     if (!cover) return prev;
                     const coverObj = cover;
                     if (!coverObj.imageVersions) return prev;
-                    // Use array index directly — version objects don't have a reliable versionIndex property
-                    const activeVersion = coverObj.imageVersions[versionIndex];
+                    // Look up by DB versionIndex (array can be sparse).
+                    const activeVersion = findVersionByIndex(coverObj.imageVersions, versionIndex, msg => log.warn(`${coverType}: ${msg}`));
                     if (!activeVersion?.imageData) {
                       log.error(`Version ${versionIndex} has no imageData for ${coverType}`);
                       return prev;
@@ -6410,6 +6422,7 @@ export default function StoryWizard() {
                     try {
                       if (target.type === 'image' && target.pageNumber) {
                         const result = await storyService.editImage(storyId, target.pageNumber, prompt);
+                        if (result.creditsRemaining !== undefined) updateCredits(result.creditsRemaining);
                         log.info('Edit result:', { hasImageData: !!result?.imageData, score: result?.qualityScore });
                         if (!result?.imageData) {
                           log.error('No imageData in edit response!', result);
@@ -6447,6 +6460,8 @@ export default function StoryWizard() {
                         log.info('Image edited successfully, updated state with quality info');
                       } else if (target.type === 'cover' && target.coverType) {
                         const result = await storyService.editCover(storyId, target.coverType, prompt);
+                        // The cover-edit response carries no balance: refetch it (the edit charged credits).
+                        refreshUser().catch(err => log.warn('Credit refresh after cover edit failed:', err));
                         setCoverImages(prev => {
                           if (!prev) return prev;
                           const key = target.coverType === 'front' ? 'frontCover'
@@ -6461,6 +6476,7 @@ export default function StoryWizard() {
                             ...existingVersions,
                             {
                               imageData: result.imageData,
+                              versionIndex: result.activeVersion,
                               createdAt: new Date().toISOString(),
                               type: 'edit' as ImageVersion['type'],
                               qualityScore: result.qualityScore,
@@ -6476,8 +6492,8 @@ export default function StoryWizard() {
                             originalScore: result.originalScore,
                             originalReasoning: result.originalReasoning,
                             imageVersions: updatedVersions,
-                            // cover-edit endpoint returns canonical versionIndex (added 2026-05-17).
-                            activeVersion: (result as any).versionIndex ?? updatedVersions.length - 1,
+                            // cover-edit endpoint returns the canonical pointer as activeVersion.
+                            activeVersion: result.activeVersion ?? updatedVersions.length - 1,
                           };
                           return { ...prev, [key]: updatedCover };
                         });
