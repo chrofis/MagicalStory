@@ -115,7 +115,7 @@ describe('one rule for every brief author', () => {
   it('reaches the all-pages AD and the trial writer, filled', () => {
     const beats = [{ pageNumber: 1, planLine: 'wide — Mira — she lifts the lantern — it glows' }];
     const built = [
-      String(PB.buildSceneBriefsAllPrompt(inputData, beats, {})),
+      String(PB.buildSceneBriefsAllPrompt(inputData, beats, { jevBackup: true })),
       String(PB.buildTrialStoryPrompt(inputData, 4)),
     ];
     for (const text of built) {

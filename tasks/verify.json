@@ -5344,6 +5344,23 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "ad-stops-writing-decided-fields",
+      "title": "The Art Director writes no field the decision layer decided; code assembles the final brief metadata",
+      "commits": [],
+      "addedAt": "2026-10-05",
+      "claim": "On a beats story, the page-brief reply (sceneExpansionReport.replies[].text) carries no `shot`, `timeOfDay`, `population` or `aboard`, no `looksAt` on a character the FIXED block lists, and an `objects` that holds only ids the FIXED line does not list, while every stored brief (sceneDescriptions) carries all of them equal to the FIXED block; the generation log has no beats_jev_field_disobeyed line and sceneExpansionReport has no jevFieldsDisobeyed; the output tokens of call 2 fall against Lab #1623/#1624.",
+      "runShape": [
+        "full-story",
+        "testlab-stage"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Run Lab beats_scenes on job_1791040103540_atbttop6w with gemini-3.1-pro; compare output tokens, cost, brief faults (briefCheckReport.findingsBefore) and fields left out against Lab #1623/#1624. In the stored reply look for the decided keys; in the assembled briefs check they equal the FIXED lines of the prompt."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [

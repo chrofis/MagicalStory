@@ -8,7 +8,7 @@ const { resolveShotId } = require('./shotVocabulary');
 const { salvageReplanRound } = require('./replanSalvage');
 // The decided fields of every story page (Jev first, 2026-09-28): a leaf module,
 // so a replay or a test can load them without the pipeline's provider graph.
-const { decideBriefFields, pinDecidedFields, pageLocations, visualBibleJsonOf } = require('./jevBriefFields');
+const { decideBriefFields, assembleBriefs, pageLocations, visualBibleJsonOf } = require('./jevBriefFields');
 const { JevDecisionError } = jevDecisions;
 const jevSelection = require('./jevSelection');
 const { lookupByName } = require('./castResolver');
@@ -1570,7 +1570,8 @@ async function finalizePlanShotsJev({ approvedArc, beats, check, gl, callImpl })
  *   call 2    every page's brief, the covers included (scene-briefs-all.txt;
  *             two attempts), each story page with its FIXED block; the
  *             per-page fallback for pages it still owes;
- *   pin       code writes the decided fields (pinDecidedFields).
+ *   assemble  code merges the decided fields into the metadata the Art Director
+ *             wrote (assembleBriefs) — the Art Director never writes them.
  * The briefs are then checked and re-asked once by the caller
  * (briefChecks.runBriefChecks). On the Jev-outage backup (path A) nothing is
  * fixed and call 2 authors every field itself.
@@ -1833,11 +1834,9 @@ ${bibleBody}` : bibleBody;
   if (onVisualBible && visualBible) await onVisualBible(visualBible);
 
   // ── The decided fields of every story page (Jev first) ───────────────────
-  let fieldsReport = null;
   if (jevActive(jevReport)) try {
     const decided = await decideBriefFields({ beats, visualBible, bibleSections, approvedArc, inputData, present, gl });
     bibleSections = decided.bibleSections;
-    fieldsReport = decided.report;
     if (jevReport) Object.assign(jevReport, { vb: decided.report.vb, population: decided.report.population, gaze: decided.report.gaze, locations: decided.report.locations });
   } catch (err) {
     if (!(err instanceof JevDecisionError) || !jevReport) throw err;
@@ -1996,9 +1995,8 @@ ${bibleBody}` : bibleBody;
   const briefsMs = Date.now() - t;
   meta.timings.sceneExpansionMs = vbMs + briefsMs;
 
-  // ── Pin: code writes the decided fields ───────────────────────────────────
-  const disobeyed = pinDecidedFields(expansions, briefBeats, gl);
-  if (jevReport && fieldsReport) jevReport.fixedChanges = disobeyed;
+  // ── Assemble: code merges the decided fields into the Art Director's metadata ──
+  assembleBriefs(expansions, briefBeats, gl);
   // Jev's weather is an ADVICE: a disagreement with the Art Director's own
   // weather is logged, never written.
   const disagree = beats.filter(b => b.fixed && b.fixed.weatherAdvice).map((b) => {
@@ -2018,10 +2016,9 @@ ${bibleBody}` : bibleBody;
     visualBiblePrompt: vbPrompt || null,
     visualBibleReplies: vbReplies,
     replies: adReplies,
-    jevFieldsDisobeyed: disobeyed,
   };
-  gl.info('beats_scenes', `${expansions.length} scene briefs by ${sceneModel} (bible ${(vbMs / 1000).toFixed(1)}s + briefs ${(briefsMs / 1000).toFixed(1)}s)${missingBriefs.length ? ` (+${missingBriefs.length} per-page fallback)` : ''}; ${disobeyed.length} page(s) had decided fields restored`, null, {
-    pages: expansions.length, fallbackPages: missingBriefs.map(b => b.pageNumber), model: sceneModel, disobeyed: disobeyed.map(d => d.pageNumber),
+  gl.info('beats_scenes', `${expansions.length} scene briefs by ${sceneModel} (bible ${(vbMs / 1000).toFixed(1)}s + briefs ${(briefsMs / 1000).toFixed(1)}s)${missingBriefs.length ? ` (+${missingBriefs.length} per-page fallback)` : ''}`, null, {
+    pages: expansions.length, fallbackPages: missingBriefs.map(b => b.pageNumber), model: sceneModel,
   });
 
   return {
@@ -2122,7 +2119,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   // layer makes on this story — cast cuts per re-plan round, shots, light, VB
   // citations, aboard, population, gaze — stored as `stories.data.jevDecisions`
   // so a run can be replayed; `fallback` is the backup switch (jevFallBack).
-  const jevReport = { castCuts: [], shots: null, light: null, vb: null, population: null, gaze: null, fixedChanges: null, fallback: null, probe: null };
+  const jevReport = { castCuts: [], shots: null, light: null, vb: null, population: null, gaze: null, fallback: null, probe: null };
   // B — THE PRE-START HEALTH CHECK: one tiny Jev question. Down → the whole
   // story runs the backup (today's setup before the layer), never refused.
   {
@@ -3560,4 +3557,4 @@ async function applyTitleProofread(inputData, parsed, gl, deps = {}) {
   };
 }
 
-module.exports = { generateStoryViaBeats, applyTitleProofread, reportChallengeMemoryBreach, finalizePlanShots, presentOf, decideBriefFields, pinDecidedFields, pageLocations, visualBibleJsonOf, runArtDirector, arcTempFor, makeArcCreatorCall, makePlanReader, planCheckInputs, createPlanCheckRunner, recheckRecord, runReplanRounds, runVisualBibleLabelRound, resolvePipelineMode, PIPELINE_MODES, loadUsedChallengeIds, syncVisualBibleSection, replaceClothingSection, extractBibleSections, shippedReplanState, BIBLE_MARKERS, CLOTHING_MARKERS, AD_BIBLE_MARKERS };
+module.exports = { generateStoryViaBeats, applyTitleProofread, reportChallengeMemoryBreach, finalizePlanShots, presentOf, decideBriefFields, assembleBriefs, pageLocations, visualBibleJsonOf, runArtDirector, arcTempFor, makeArcCreatorCall, makePlanReader, planCheckInputs, createPlanCheckRunner, recheckRecord, runReplanRounds, runVisualBibleLabelRound, resolvePipelineMode, PIPELINE_MODES, loadUsedChallengeIds, syncVisualBibleSection, replaceClothingSection, extractBibleSections, shippedReplanState, BIBLE_MARKERS, CLOTHING_MARKERS, AD_BIBLE_MARKERS };

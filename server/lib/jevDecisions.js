@@ -1053,16 +1053,21 @@ async function decideGaze({ arc, pages, perPage }, opts = {}) {
 // ───────────────────────── the FIXED fields in the brief ─────────────────────────
 
 /**
- * The fields the decision layer owns, stated once to every brief author (the
- * page-brief call, the re-ask and iterate). Every decided field reaches the Art
- * Director as the page's FIXED block, and code pins it after each author
- * (pinBrief). The `shot` is
- * field 0 of the plan line the Art Director reads, and code pins it the same
- * way (owner, 2026-09-28): on the Jev path a rule that would change the shot —
- * a close-up widened for below-waist staging, a gap action reframed, a group
- * pulled wider — applies to the staging inside it, never to the field.
+ * The fields the decision layer owns, stated once to every brief author of the
+ * page-brief call (all-pages and per-page) and the re-ask. Every decided field
+ * reaches the Art Director as the page's FIXED block, so the prose stays
+ * consistent with it, and the Art Director does NOT write it: code merges it
+ * into the brief's METADATA (pinBrief, via jevBriefFields.assembleBriefs).
+ * Owner, 2026-10-05: "Why ask Gemini to output the same fields code decides?"
+ * — on stored replies ~25% of the briefs output was copied fixed data
+ * (decisions.md 2026-10-05, which supersedes 2026-09-27 point 5).
+ *
+ * The `shot` is field 0 of the plan line the Art Director reads; on the Jev
+ * path a rule that would change the shot — a close-up widened for below-waist
+ * staging, a gap action reframed, a group pulled wider — applies to the
+ * staging inside it, never to the field (owner, 2026-09-28).
  */
-const JEV_FIXED_FIELDS_RULE = 'A story page\'s FIXED block holds the fields decided before you write: its `shot`, `timeOfDay` and indoors, the Visual Bible ids its `objects[]` cites — its location or vantage, and for an element with looks the dotted id of the look it shows — its `aboard`, its `population` and each listed character\'s `looksAt`. Copy each into the page\'s METADATA exactly and write the prose so the picture shows it: every cited element staged, even where only part of it is in frame, and no Visual Bible element staged that `objects[]` leaves out. No other rule changes a fixed field; a rule that would change one applies to the staging inside it. `weather` stays yours — `none` when the page is indoors, never `none` outdoors. A cover\'s FIXED block holds only its location: the vantage it is staged from, first in `objects[]`, seen as that vantage shows it.';
+const JEV_FIXED_FIELDS_RULE = "A story page's FIXED block holds the fields decided before you write: its `shot`, `timeOfDay` and indoors, the Visual Bible ids its `objects[]` cites — its location or vantage, and for an element with looks the dotted id of the look it shows — its `aboard`, its `population` and each listed character's `looksAt`. Code writes each into the page's METADATA: you never write a field the FIXED block lists (a field it does not list is yours — a cover's `shot`, `population` and `aboard`, a `looksAt` for a character it leaves out, an `objects[]` id it does not list such as a garment). Write the prose so the picture shows each: every cited element staged, even where only part of it is in frame, and no Visual Bible element staged that the FIXED `objects` leaves out. No other rule changes a fixed field; a rule that would change one applies to the staging inside it. `weather` stays yours when the page is outdoors — never `none` outdoors; indoors, leave it out. A cover's FIXED block holds only its location: code writes the vantage it is staged from first in `objects[]`, and the cover is seen as that vantage shows it.";
 
 /**
  * Which shot a vantage holds, as the Visual Bible call is told it (owner,
@@ -1107,10 +1112,10 @@ function fixedBlock(page) {
   // reads as the page's whole element list, and the cover would lose its
   // central figure and the elements its beat asks for.
   if (f.coverPlace) {
-    return ['FIXED — copy into METADATA exactly; the prose shows it:',
-      `- location: ${label(f.location)} — the first id in objects[]; the cover's other ids follow its beat`].join('\n');
+    return ['FIXED — code writes it into METADATA; the prose shows it:',
+      `- location: ${label(f.location)} — code puts it first in objects[]; write the cover's other ids after it, following its beat`].join('\n');
   }
-  const lines = ['FIXED — copy each into METADATA exactly; the prose shows each:'];
+  const lines = ['FIXED — code writes each into METADATA (write none of them); the prose shows each:'];
   if (f.shot) lines.push(`- shot: ${f.shot}`);
   if (f.timeOfDay) lines.push(`- timeOfDay: ${f.timeOfDay}; ${f.indoor ? 'indoors (weather none)' : 'outdoors'}`);
   const objects = [...(f.location ? [f.location] : []), ...(f.cites || [])];
@@ -1123,8 +1128,11 @@ function fixedBlock(page) {
 }
 
 /**
- * Write the decided fields into one brief's metadata. Pure: returns the new
- * brief and what changed. `fixed`:
+ * Merge the decided fields into one brief's metadata (owner, 2026-10-05: the
+ * Art Director no longer writes them, so on the page-brief call this is the
+ * assembly of the final brief, not a restore). A change reported for the two
+ * authors that still write the whole object — the iterate rewrite — is a field
+ * the rewriter moved. Pure: returns the new brief and what changed. `fixed`:
  *   shot                           — the page's plan-line shot (Jev's)
  *   timeOfDay, indoor              — the light (weather: `none` indoors; an
  *                                    outdoor `none` is reported, never guessed)
@@ -1160,7 +1168,11 @@ function pinBrief(brief, fixed) {
     const decided = new Set((fixed.decidedIds || []).map(baseId));
     const before = Array.isArray(m.objects) ? m.objects.map(String) : [];
     const kept = before.filter(o => !decided.has(baseId(o)));
-    const next = [...kept, ...fixed.cites.filter(c => !kept.some(k => baseId(k) === baseId(c)))];
+    // Location first (the vantage a page stands on leads objects[]), then the decided
+    // cites in the FIXED block's own order — what a well-behaved author used to copy —
+    // then the ids the Art Director wrote itself (a garment, a generic).
+    const keptLoc = kept.filter(o => /^LOC\d+/i.test(o));
+    const next = [...keptLoc, ...fixed.cites.filter(c => !kept.some(k => baseId(k) === baseId(c))), ...kept.filter(o => !keptLoc.includes(o))];
     const added = fixed.cites.filter(c => !before.includes(c));
     const removed = before.filter(o => decided.has(baseId(o)) && !fixed.cites.includes(o));
     if (added.length || removed.length) { m.objects = next; changes.push({ field: 'objects', from: before, to: next, added, removed }); }

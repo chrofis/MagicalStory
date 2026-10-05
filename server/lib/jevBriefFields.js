@@ -6,7 +6,7 @@
  * Visual Bible exists and no page brief does: this module decides each story
  * page's cited elements and their looks, location, aboard, population and gaze
  * (decideBriefFields), and pins them into the briefs the page-brief call
- * returns (pinDecidedFields). A leaf module on purpose: the Test Lab, the
+ * returns (assembleBriefs). A leaf module on purpose: the Test Lab, the
  * rung-1 replay and the unit tests load it without the pipeline's provider
  * graph (beatsPipeline requires it; it never requires beatsPipeline except for
  * the transcript sync, lazily, when a transcript is passed).
@@ -70,7 +70,8 @@ function pageLocations(visualBible, pageNumbers) {
  *     names, since no interaction row exists yet).
  * With the shot (plan field 0) and the light (b.fixed) they become
  * `b.jevFixed`, which the page-brief call receives as the page's FIXED block
- * (jevDecisions.fixedBlock) and code pins after it (pinBrief). The bible's
+ * (jevDecisions.fixedBlock) and code merges them into the brief after it
+ * (assembleBriefs → pinBrief); the Art Director never writes them. The bible's
  * element page tables are made to agree with the cites before call 2 reads it.
  *
  * Mutates `beats` (b.jevFixed) and `visualBible`; returns the synced
@@ -170,31 +171,25 @@ async function decideBriefFields({ beats, visualBible, bibleSections, approvedAr
 }
 
 /**
- * Pin the decided fields into each page brief the page-brief call returned
- * (owner, 2026-09-28). The Art Director was handed them as the page's FIXED
- * block, so a pin that changes something is a field it did not copy: restored
- * by code and logged as `beats_jev_field_disobeyed` — the count measures how
- * well call 2 follows the FIXED block. An outdoor page with no outdoor weather
- * is left to the brief checks (collectBriefFindings), never guessed here.
+ * Assemble each page's final brief: merge the decided fields into the metadata
+ * the Art Director wrote (owner, 2026-10-05). The Art Director is handed them as
+ * the page's FIXED block and does not write them (decisions.md 2026-10-05), so
+ * the merge adds fields rather than restoring them. A page whose METADATA does
+ * not parse cannot be assembled: logged loudly, the brief contract has already
+ * flagged it. An outdoor page with no outdoor weather is left to the brief
+ * checks (collectBriefFindings), never guessed here.
  */
-function pinDecidedFields(expansions, briefBeats, gl) {
-  const disobeyed = [];
+function assembleBriefs(expansions, briefBeats, gl) {
   for (const x of expansions) {
     const b = (briefBeats || []).find(bb => bb && bb.pageNumber === x.pageNumber);
     if (!b || !b.jevFixed) continue;
-    const pinned = jevDecisions.pinBrief(x.brief, b.jevFixed);
-    if (pinned.unparsed) {
+    const merged = jevDecisions.pinBrief(x.brief, b.jevFixed);
+    if (merged.unparsed) {
       gl.error('beats_jev_brief_unparsed', `Page ${x.pageNumber}: the brief carries no parseable METADATA — the decided fields could not be written`, null, { pageNumber: x.pageNumber });
       continue;
     }
-    const fields = [...new Set(pinned.changes.filter(c => !c.problem).map(c => c.field))];
-    if (!fields.length) continue;
-    x.brief = pinned.brief;
-    disobeyed.push({ pageNumber: x.pageNumber, fields, changes: pinned.changes.filter(c => !c.problem) });
-    gl.warn('beats_jev_field_disobeyed', `Page ${x.pageNumber}: the page brief did not copy decided field(s) ${fields.join(', ')} — code restored them`, null, { pageNumber: x.pageNumber, fields, pass: 'page briefs' });
+    x.brief = merged.brief;
   }
-  if (disobeyed.length) log.warn(`📌 [BEATS] the page-brief call left decided fields uncopied on ${disobeyed.length} page(s) — restored: ${disobeyed.map(d => `p${d.pageNumber} ${d.fields.join('/')}`).join(', ')}`);
-  return disobeyed;
 }
 
 /** The Visual Bible JSON inside a transcript's ---VISUAL BIBLE--- section, as the page-brief call reads it. */
@@ -545,6 +540,6 @@ function applyCoverPlacePages(visualBible, citeByPage) {
 }
 
 module.exports = {
-  decideBriefFields, pinDecidedFields, pageLocations, visualBibleJsonOf,
+  decideBriefFields, assembleBriefs, pageLocations, visualBibleJsonOf,
   COVER_PLACE_SHOTS, COVER_PLACE_Q, COVER_OFFERED_Q, COVER_PLACE_FLOOR, COVER_PHOTO_MIN_SCORE, coverPhotoOf, bibleLocationOf, materializeCoverPlaces, coverPlaceCandidates, assignCoverPlaces, coverPlaceState, decideCoverPlaces, applyCoverPlacePages,
 };

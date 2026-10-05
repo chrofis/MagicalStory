@@ -281,6 +281,15 @@ function keepLightClause(light) {
 const SCENE_LIGHT_FIELD_RULE = `\`timeOfDay\` is one of ${TIME_OF_DAY_ENUM}, and \`weather\` one of ${WEATHER_ENUM} — \`none\` for an interior, where the weather is not visible. Both are required on every page, agree with the light the prose describes, and follow the book's time: they hold from page to page until the story moves the clock or the sky. They decide the page's light and the light of the plate it is painted on.`;
 
 /**
+ * The same two fields as the page-brief call states them when the decision layer
+ * fixed the page (owner, 2026-10-05): code writes `timeOfDay`, and `weather`
+ * `none` indoors, from the FIXED block, so the Art Director writes only an
+ * outdoor page's weather. One source with SCENE_LIGHT_FIELD_RULE: the enum and
+ * the "holds until the story moves the sky" clause are the same words.
+ */
+const SCENE_WEATHER_FIELD_RULE = `\`weather\` is one of ${WEATHERS.filter(w => w !== 'none').join(' | ')}, written on an outdoor page only: it agrees with the light the prose describes and holds from page to page until the story moves the sky. An indoor page leaves it out — code writes \`none\`, and the clock (\`timeOfDay\`), from its FIXED block.`;
+
+/**
  * A rewritten brief keeps the declared light of the brief it replaces when it
  * states none itself (the scene review and the iterate rewrite both rewrite
  * whole briefs). A rewrite that states a value wins — it may correct the light.
@@ -332,6 +341,7 @@ module.exports = {
   TIME_OF_DAY_ENUM,
   WEATHER_ENUM,
   SCENE_LIGHT_FIELD_RULE,
+  SCENE_WEATHER_FIELD_RULE,
   normaliseTimeOfDay,
   normaliseWeather,
   declaredLight,

@@ -92,6 +92,9 @@ Last full sweep: **2026-09-06**.
       `prompts/plan-check.txt:38`, `server/lib/promptBuilders.js` ENDING_EVENT_DEF). Deferred by the owner
       until the arcs are strong → `docs/decisions.md` "2026-09-25 — Arc prompts v3"
 
+- [ ] The iterate templates (scene-iteration.txt, scene-iteration-free.txt) still ask the rewriter for the WHOLE metadata object (shot, objects, aboard, population, looksAt, timeOfDay) and code restores the decided ones after it (images.js pinBrief); the page-brief call stopped writing them on 2026-10-05. Left alone on purpose: an iterate rewrite also serves stories saved without `jevFixed`, and the rewriter replaces a stored brief wholesale. Decide whether iterate should stop writing them on pages that carry `jevFixed` → docs/decisions.md 2026-10-05 "The Art Director stops writing the fields code decides"
+- [ ] The Art Director's `characters[]` name list is still the Art Director's: Jev's gaze roster is only the commissioned characters in frame, the list also holds others (stored staging job_1791145238223_50osg2osm p6, p9). Making the name list code's needs the roster extended to every figure in `characters[]` → docs/decisions.md 2026-10-05 "The Art Director stops writing the fields code decides"
+
 ## Image quality — unresolved render defects
 
 - [x] (2026-10-05, owner: leave it — rare, only after a repair restores a moved title) **Cover repair leaves the old title copy on the wall sign.** Re-run of the fixed repair on job_1791145238223_50osg2osm v1 (title on a cropped wall sign) painted the title back in the sky but the sign still reads "und der ...natem"; the consolidated instruction says only to repaint the title, never to clear the sign. Next round would charge it as lettering. Candidate: consolidator rule for a required_text finding whose description names the object carrying the misplaced copy → also clear it. Needs an owner call (prompt shape). → docs/decisions.md 2026-10-05

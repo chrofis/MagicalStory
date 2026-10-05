@@ -38,7 +38,7 @@ const { getSwissStoryResearch, getSwissCityById } = require('./swissStories');
 const { parseProseMetadataFormat, stripSceneMetadata, extractSceneMetadata, collectSceneCharacterNames, enforceSpreadTextPosition, parseSceneHintMetadata, resolveTextStagePictureSpec, buildTextStagePictureSpecs, SHARED_GRIP_RULE, normalisePopulation } = require('./sceneMetadata');
 const { resolveClothingForPage, buildUsedClothingText, buildAvailableAvatarsForPrompt } = require('./clothingResolve');
 const { seasonLabel, buildSeasonNote, buildSeasonInstruction } = require('./season');
-const { SCENE_LIGHT_FIELD_RULE, buildLightLine, declaredLight, TIME_OF_DAY_ENUM, WEATHER_ENUM } = require('./sceneLight');
+const { SCENE_LIGHT_FIELD_RULE, SCENE_WEATHER_FIELD_RULE, buildLightLine, declaredLight, TIME_OF_DAY_ENUM, WEATHER_ENUM } = require('./sceneLight');
 const { isNotSetRelationship, isStrangersRelationship } = require('./relationships');
 const { VB_ELEMENT_BUDGET } = require('./vbElementBudget');
 
@@ -3225,6 +3225,7 @@ function artDirectorFills(inputData, beats = [], options = {}) {
     // The page's declared light (sceneLight.js) — one rule for every brief author
     // and the scene review's check (sibling set scene-light-generator-vs-critic).
     SCENE_LIGHT_FIELD: SCENE_LIGHT_FIELD_RULE,
+    SCENE_WEATHER_FIELD: SCENE_WEATHER_FIELD_RULE,
     // The Jev decision layer's fixed fields (2026-09-27) — one constant for the
     // brief authors and the scene review (jevDecisions.JEV_FIXED_FIELDS_RULE).
     JEV_FIXED_FIELDS: require('./jevDecisions').fixedFieldsRule(jevBackup),
@@ -3321,7 +3322,7 @@ function buildSceneBriefsAllPrompt(inputData, beats = [], options = {}) {
     ...artDirectorFills(inputData, beats, options),
     VISUAL_BIBLE: vb ? '```json\n' + vb + '\n```' : '(the Visual Bible call returned no bible — cite no Visual Bible id)',
   });
-  return applyTextZoneGate(filled, textZoneRulesActive(inputData));
+  return applyJevGate(applyTextZoneGate(filled, textZoneRulesActive(inputData)), isJevBackup(options));
 }
 
 /**
@@ -3348,7 +3349,7 @@ function buildBriefReaskPrompt({ contextPrompt, pages = [], jevBackup = false })
   ].join('\n')).join('\n\n');
   return fillTemplate(template, {
     ART_DIRECTOR_PROMPT: String(contextPrompt || '').trim(),
-    FIXED_FIELDS_KEPT: jevBackup ? '' : 'every field of its FIXED block, ',
+    FIXED_FIELDS_KEPT: jevBackup ? '' : 'the staging of every field of its FIXED block (the page below shows them as code assembled it: write none of them), ',
     FLAGGED_PAGES: flagged,
   });
 }
@@ -3413,7 +3414,7 @@ function buildBriefReaskContext(inputData, briefBeats = [], flaggedPageNumbers =
   ].join('\n');
   const spliced = template.slice(0, inputStart) + slimInput + template.slice(outputStart);
   const filled = fillTemplate(spliced, fills);
-  return applyTextZoneGate(filled, textZoneRulesActive(inputData));
+  return applyJevGate(applyTextZoneGate(filled, textZoneRulesActive(inputData)), isJevBackup(options));
 }
 
 /**
@@ -3428,6 +3429,31 @@ function applyTextZoneGate(text, active) {
   return active
     ? s.replace(/<!-- TEXT_OVERLAY_(BEGIN|END) -->\n?/g, '')
     : s.replace(/<!-- TEXT_OVERLAY_BEGIN -->[\s\S]*?<!-- TEXT_OVERLAY_END -->\n?/g, '');
+}
+
+/**
+ * The two path gates of the Art Director's metadata contract (owner,
+ * 2026-10-05). On the Jev path the decision layer fixed a story page's shot,
+ * light, objects, aboard, population and gaze and the Art Director does not
+ * write them (code merges them: jevBriefFields.assembleBriefs); on the outage
+ * backup, and in the legacy per-page path, nothing is fixed and it writes every
+ * field. Both variants live in one template, so the two can never drift on what a
+ * valid brief IS:
+ *   `<!-- JEV_BACKUP_BEGIN --> … <!-- JEV_BACKUP_END -->`  kept on the backup only
+ *   `<!-- JEV_FIXED_BEGIN --> … <!-- JEV_FIXED_END -->`    kept on the Jev path only
+ * Markers on their own line take the line with them; inline markers take
+ * nothing but themselves.
+ */
+function applyJevGate(text, jevBackup) {
+  let s = String(text || '').replace(/\r\n/g, '\n');
+  for (const [kind, keep] of [['BACKUP', jevBackup], ['FIXED', !jevBackup]]) {
+    const open = `<!-- JEV_${kind}_BEGIN -->`;
+    const close = `<!-- JEV_${kind}_END -->`;
+    s = keep
+      ? s.replace(new RegExp(`^(${open}|${close})\n`, 'gm'), '').split(open).join('').split(close).join('')
+      : s.replace(new RegExp(`^${open}\n.*?^${close}\n`, 'gms'), '').replace(new RegExp(`${open}.*?${close}`, 'gs'), '');
+  }
+  return s;
 }
 
 /**
@@ -3704,6 +3730,7 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     // The page's declared light (sceneLight.js) — one rule for every brief author
     // and the scene review's check (sibling set scene-light-generator-vs-critic).
     SCENE_LIGHT_FIELD: SCENE_LIGHT_FIELD_RULE,
+    SCENE_WEATHER_FIELD: SCENE_WEATHER_FIELD_RULE,
     // The Jev decision layer's fixed fields (2026-09-27) — one constant for the
     // brief authors and the scene review (jevDecisions.JEV_FIXED_FIELDS_RULE).
     JEV_FIXED_FIELDS: require('./jevDecisions').fixedFieldsRule(jevBackup),
@@ -3746,7 +3773,7 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     typeof options.textZoneRules === 'boolean' ? options.textZoneRules
       : options.story ? textZoneRulesActive(options.story)
         : true);
-  return applyTextZoneGate(filledPage, zoneActive);
+  return applyJevGate(applyTextZoneGate(filledPage, zoneActive), jevBackup);
 }
 
 /**
@@ -12920,6 +12947,7 @@ module.exports = {
   buildRecurringElementsText,
   buildVisualBibleCallPrompt,
   buildSceneBriefsAllPrompt,
+  applyJevGate,
   buildBriefReaskPrompt,
   buildBriefReaskContext,
   shotRuleFills,
