@@ -281,7 +281,7 @@ export function StorySettings({
                   >
                     <Pencil size={14} className="text-gray-500" />
                     <span className="font-medium text-gray-700">
-                      {language === 'de' ? 'Thema ändern...' : language === 'fr' ? 'Changer le thème...' : language === 'it' ? 'Cambia tema...' : 'Change topic...'}
+                      {language === 'de' ? 'Thema ändern...' : language === 'fr' ? 'Changer le thème…' : language === 'it' ? 'Cambia tema...' : 'Change topic...'}
                     </span>
                   </button>
                 </div>
@@ -476,7 +476,7 @@ export function StorySettings({
                 {isGeneratingIdeas ? (
                   <>
                     <Loader2 size={18} className="animate-spin" />
-                    {language === 'de' ? 'Generiere...' : language === 'fr' ? 'Génération...' : language === 'it' ? 'Generazione...' : 'Generating...'}
+                    {language === 'de' ? 'Generiere...' : language === 'fr' ? 'Génération…' : language === 'it' ? 'Generazione...' : 'Generating...'}
                   </>
                 ) : (
                   <>
@@ -506,7 +506,7 @@ export function StorySettings({
                 {language === 'de'
                   ? 'Idee auswählen oder bearbeiten:'
                   : language === 'fr'
-                  ? 'Choisissez une idée ou modifiez-la:'
+                  ? 'Choisissez une idée ou modifiez-la :'
                   : language === 'it'
                   ? 'Scegli un\'idea o modificala:'
                   : 'Choose an idea or edit it:'}
@@ -548,7 +548,7 @@ export function StorySettings({
                       <span className="text-sm text-gray-500">
                         {ideaProgress1 < 80
                           ? thinkingMessage
-                          : (language === 'de' ? 'Schreibe Idee...' : language === 'fr' ? 'Rédaction...' : language === 'it' ? 'Scrittura idea...' : 'Writing idea...')}
+                          : (language === 'de' ? 'Schreibe Idee...' : language === 'fr' ? 'Rédaction…' : language === 'it' ? 'Scrittura idea...' : 'Writing idea...')}
                       </span>
                     </div>
                   ) : null}
@@ -589,7 +589,7 @@ export function StorySettings({
                       <span className="text-sm text-gray-500">
                         {ideaProgress2 < 80
                           ? thinkingMessage
-                          : (language === 'de' ? 'Schreibe Idee...' : language === 'fr' ? 'Rédaction...' : language === 'it' ? 'Scrittura idea...' : 'Writing idea...')}
+                          : (language === 'de' ? 'Schreibe Idee...' : language === 'fr' ? 'Rédaction…' : language === 'it' ? 'Scrittura idea...' : 'Writing idea...')}
                       </span>
                     </div>
                   ) : null}
@@ -612,7 +612,7 @@ export function StorySettings({
                 {language === 'de'
                   ? 'Beschreibe die Handlung oder klicke auf «Vorschlag generieren»'
                   : language === 'fr'
-                  ? 'Décrivez l\'intrigue ou cliquez sur "Générer une suggestion"'
+                  ? 'Décrivez l\'intrigue ou cliquez sur « générer une suggestion »'
                   : language === 'it'
                   ? 'Descrivi la trama oppure clicca su "Genera suggerimento"'
                   : 'Describe the plot or click "Generate Suggestion"'}
@@ -632,7 +632,7 @@ export function StorySettings({
             placeholder={language === 'de'
               ? 'z.B. «Für meine liebe Tochter Emma zum 5. Geburtstag»'
               : language === 'fr'
-              ? 'Par exemple "Pour ma chère fille Emma pour son 5ème anniversaire"'
+              ? 'Par exemple « pour ma chère fille Emma pour son 5e anniversaire »'
               : language === 'it'
               ? 'Per es. "Per la mia cara figlia Emma per il suo 5° compleanno"'
               : 'e.g. "For my dear daughter Emma on her 5th birthday"'}

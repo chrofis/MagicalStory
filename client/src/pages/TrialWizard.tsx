@@ -79,10 +79,10 @@ const trialUsedStrings: Record<string, { title: string; desc: string; signUp: st
     viewStory: 'Deine Geschichte ansehen',
   },
   fr: {
-    title: 'Vous avez déjà créé votre histoire gratuite !',
+    title: 'Vous avez déjà créé votre histoire gratuite !',
     desc: 'Créez un compte pour créer plus d\'histoires avec plusieurs personnages, des intrigues plus longues et des livres imprimés.',
     signUp: 'S\'inscrire maintenant',
-    checkInbox: 'Déjà inscrit ? Vérifiez votre boîte de réception pour le lien de vérification.',
+    checkInbox: 'Déjà inscrit ? Vérifiez votre boîte de réception pour le lien de vérification.',
     viewStory: 'Voir votre histoire',
   },
   it: {
@@ -134,7 +134,7 @@ const introStrings: Record<string, {
   fr: {
     title: 'Créez votre histoire gratuite',
     subtitle: 'Un livre pour enfants personnalisé avec votre enfant comme héros — prêt en 3 minutes.',
-    step1Title: 'Téléchargez une photo',
+    step1Title: 'Importez une photo',
     step1Desc: 'Une photo de votre enfant — et son prénom.',
     step2Title: 'Choisir un thème',
     step2Desc: 'Une aventure, ou une histoire qui transmet un message en douceur.',
@@ -177,7 +177,7 @@ const loggedInStrings: Record<string, { title: string; desc: string; goToCreate:
     goToCreate: 'Geschichte erstellen',
   },
   fr: {
-    title: 'Vous avez déjà un compte !',
+    title: 'Vous avez déjà un compte !',
     desc: 'Vous êtes connecté. Créez des histoires directement depuis votre compte — avec plus de personnages, des histoires plus longues et des livres imprimés.',
     goToCreate: 'Créer une histoire',
   },

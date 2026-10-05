@@ -186,14 +186,14 @@ function CreditOrderCard({
         <div className="space-y-2 text-sm text-gray-600">
           <p>
             <span className="font-medium">
-              {language === 'de' ? 'Datum:' : language === 'fr' ? 'Date:' : language === 'it' ? 'Data:' : 'Date:'}
+              {language === 'de' ? 'Datum:' : language === 'fr' ? 'Date :' : language === 'it' ? 'Data:' : 'Date:'}
             </span>{' '}
             {formatDate(order.createdAt)}
           </p>
           {order.amount != null && (
             <p>
               <span className="font-medium">
-                {language === 'de' ? 'Betrag:' : language === 'fr' ? 'Montant:' : language === 'it' ? 'Importo:' : 'Amount:'}
+                {language === 'de' ? 'Betrag:' : language === 'fr' ? 'Montant :' : language === 'it' ? 'Importo:' : 'Amount:'}
               </span>{' '}
               {formatAmount(order.amount, order.currency)}
             </p>
@@ -268,14 +268,14 @@ function BookOrderCard({
         <div className="space-y-1 text-sm text-gray-600 mb-4">
           <p>
             <span className="font-medium">
-              {language === 'de' ? 'Datum:' : language === 'fr' ? 'Date:' : language === 'it' ? 'Data:' : 'Date:'}
+              {language === 'de' ? 'Datum:' : language === 'fr' ? 'Date :' : language === 'it' ? 'Data:' : 'Date:'}
             </span>{' '}
             {formatDate(order.createdAt)}
           </p>
           {order.amount != null && (
             <p>
               <span className="font-medium">
-                {language === 'de' ? 'Betrag:' : language === 'fr' ? 'Montant:' : language === 'it' ? 'Importo:' : 'Amount:'}
+                {language === 'de' ? 'Betrag:' : language === 'fr' ? 'Montant :' : language === 'it' ? 'Importo:' : 'Amount:'}
               </span>{' '}
               {formatAmount(order.amount, order.currency)}
             </p>
@@ -283,7 +283,7 @@ function BookOrderCard({
           {order.shippingAddress && (
             <p>
               <span className="font-medium">
-                {language === 'de' ? 'Lieferadresse:' : language === 'fr' ? 'Adresse:' : language === 'it' ? 'Indirizzo:' : 'Ship to:'}
+                {language === 'de' ? 'Lieferadresse:' : language === 'fr' ? 'Adresse :' : language === 'it' ? 'Indirizzo:' : 'Ship to:'}
               </span>{' '}
               {order.shippingAddress.city}, {order.shippingAddress.country}
             </p>
@@ -406,7 +406,7 @@ export default function MyOrders() {
         </div>
 
         {isLoading ? (
-          <LoadingSpinner message={language === 'de' ? 'Laden...' : language === 'fr' ? 'Chargement...' : language === 'it' ? 'Caricamento...' : 'Loading...'} />
+          <LoadingSpinner message={language === 'de' ? 'Laden...' : language === 'fr' ? 'Chargement…' : language === 'it' ? 'Caricamento...' : 'Loading...'} />
         ) : orders.length === 0 ? (
           <div className="text-center py-12">
             <Package className="w-16 h-16 text-gray-300 mx-auto mb-4" />

@@ -49,9 +49,9 @@ export const occasions: OccasionData[] = [
         'Erstelle die Geschichte eine Woche vor der Party — ihr könnt sie am grossen Tag zusammen lesen',
       ],
       fr: [
-        'Choisissez un thème qui correspond à la passion actuelle de votre enfant (dinosaures, licornes, espace...)',
+        'Choisissez un thème qui correspond à la passion actuelle de votre enfant (dinosaures, licornes, espace…)',
         'Commandez la version imprimée pour un cadeau vraiment spécial à déballer',
-        'Ajoutez des frères et soeurs ou amis comme personnages secondaires',
+        'Ajoutez des frères et sœurs ou amis comme personnages secondaires',
         'Créez l\'histoire une semaine avant la fête — vous pourrez la lire ensemble le jour J',
       ],
       it: [
@@ -72,20 +72,20 @@ export const occasions: OccasionData[] = [
     deliveryNote: {
       en: 'Tip: Create the story at least two weeks before the birthday to have time for the printed book delivery.',
       de: 'Tipp: Erstelle die Geschichte mindestens zwei Wochen vor dem Geburtstag, damit das gedruckte Buch rechtzeitig ankommt.',
-      fr: 'Conseil : Créez l\'histoire au moins deux semaines avant l\'anniversaire pour recevoir le livre imprimé à temps.',
+      fr: 'Conseil : Créez l\'histoire au moins deux semaines avant l\'anniversaire pour recevoir le livre imprimé à temps.',
       it: 'Consiglio: crea la storia almeno due settimane prima del compleanno per avere il tempo necessario alla consegna del libro stampato.',
     },
     faq: [
       {
-        q: { en: 'How quickly can I get a printed book?', de: 'Wie schnell bekomme ich ein gedrucktes Buch?', fr: 'En combien de temps puis-je recevoir un livre imprimé ?', it: 'Quanto tempo ci vuole per ricevere un libro stampato?' },
+        q: { en: 'How quickly can I get a printed book?', de: 'Wie schnell bekomme ich ein gedrucktes Buch?', fr: 'En combien de temps puis-je recevoir un livre imprimé ?', it: 'Quanto tempo ci vuole per ricevere un libro stampato?' },
         a: { en: 'The digital story is ready in about an hour. Printed books are delivered within 5-7 business days to Swiss addresses.', de: 'Die digitale Geschichte ist in etwa einer Stunde fertig. Gedruckte Bücher werden innerhalb von 5-7 Werktagen an Schweizer Adressen geliefert.', fr: 'L\'histoire numérique est prête en environ une heure. Les livres imprimés sont livrés en 5 à 7 jours ouvrables en Suisse.', it: 'La storia digitale è pronta in circa un\'ora. I libri stampati vengono consegnati entro 5-7 giorni lavorativi agli indirizzi svizzeri.' },
       },
       {
-        q: { en: 'Can I add more than one child to the story?', de: 'Kann ich mehr als ein Kind zur Geschichte hinzufügen?', fr: 'Puis-je ajouter plus d\'un enfant à l\'histoire ?', it: 'Posso aggiungere più di un bambino alla storia?' },
-        a: { en: 'Yes! You can add up to 3 characters. Perfect for siblings or best friends celebrating together.', de: 'Ja! Du kannst bis zu 3 Charaktere hinzufügen. Perfekt für Geschwister oder beste Freunde, die zusammen feiern.', fr: 'Oui ! Vous pouvez ajouter jusqu\'à 3 personnages. Parfait pour les frères et soeurs ou les meilleurs amis.', it: 'Sì! Puoi aggiungere fino a 3 personaggi. Perfetto per fratelli, sorelle o migliori amici che festeggiano insieme.' },
+        q: { en: 'Can I add more than one child to the story?', de: 'Kann ich mehr als ein Kind zur Geschichte hinzufügen?', fr: 'Puis-je ajouter plus d\'un enfant à l\'histoire ?', it: 'Posso aggiungere più di un bambino alla storia?' },
+        a: { en: 'Yes! You can add up to 3 characters. Perfect for siblings or best friends celebrating together.', de: 'Ja! Du kannst bis zu 3 Charaktere hinzufügen. Perfekt für Geschwister oder beste Freunde, die zusammen feiern.', fr: 'Oui ! Vous pouvez ajouter jusqu\'à 3 personnages. Parfait pour les frères et sœurs ou les meilleurs amis.', it: 'Sì! Puoi aggiungere fino a 3 personaggi. Perfetto per fratelli, sorelle o migliori amici che festeggiano insieme.' },
       },
       {
-        q: { en: 'What age range is this suitable for?', de: 'Für welches Alter ist das geeignet?', fr: 'Pour quelle tranche d\'âge est-ce adapté ?', it: 'Per quale fascia d\'età è adatto?' },
+        q: { en: 'What age range is this suitable for?', de: 'Für welches Alter ist das geeignet?', fr: 'Pour quelle tranche d\'âge est-ce adapté ?', it: 'Per quale fascia d\'età è adatto?' },
         a: { en: 'Our stories are designed for children aged 2-12. The AI adapts the language complexity to the child\'s age.', de: 'Unsere Geschichten sind für Kinder von 2-12 Jahren konzipiert. Die KI passt die Sprachkomplexität an das Alter des Kindes an.', fr: 'Nos histoires sont conçues pour les enfants de 2 à 12 ans. L\'IA adapte la complexité du langage à l\'âge de l\'enfant.', it: 'Le nostre storie sono pensate per bambini dai 2 ai 12 anni. L\'IA adatta la complessità del linguaggio all\'età del bambino.' },
       },
     ],
@@ -111,7 +111,7 @@ export const occasions: OccasionData[] = [
     intro: {
       en: 'Christmas is the season of wonder and stories. What better gift than a story where your child meets Santa, saves Christmas, or embarks on a magical winter adventure? A personalized Christmas book becomes a family treasure that you can read together by the fire every December. It\'s more than a toy — it\'s a tradition in the making.',
       de: 'Weihnachten ist die Zeit des Staunens und der Geschichten. Was könnte schöner sein als eine Geschichte, in der dein Kind dem Weihnachtsmann begegnet, Weihnachten rettet oder ein magisches Winterabenteuer erlebt? Ein personalisiertes Weihnachtsbuch wird zum Familienschatz, den ihr jeden Dezember gemeinsam am Kamin lesen könnt. Es ist mehr als ein Spielzeug — es ist der Beginn einer Tradition.',
-      fr: 'Noël est la saison de l\'émerveillement et des histoires. Quel plus beau cadeau qu\'une histoire où votre enfant rencontre le Père Noël, sauve Noël ou vit une aventure hivernale magique ? Un livre de Noël personnalisé devient un trésor familial que vous lirez ensemble au coin du feu chaque décembre.',
+      fr: 'Noël est la saison de l\'émerveillement et des histoires. Quel plus beau cadeau qu\'une histoire où votre enfant rencontre le Père Noël, sauve Noël ou vit une aventure hivernale magique ? Un livre de Noël personnalisé devient un trésor familial que vous lirez ensemble au coin du feu chaque décembre.',
       it: 'Il Natale è la stagione della meraviglia e delle storie. C\'è forse regalo migliore di una storia in cui tuo figlio incontra Babbo Natale, salva il Natale o vive una magica avventura invernale? Un libro di Natale personalizzato diventa un tesoro di famiglia da leggere insieme davanti al camino ogni dicembre. È più di un giocattolo — è l\'inizio di una tradizione.',
     },
     tips: {
@@ -150,17 +150,17 @@ export const occasions: OccasionData[] = [
     deliveryNote: {
       en: 'Christmas deadline: Order by December 15 for guaranteed delivery before December 24.',
       de: 'Weihnachts-Frist: Bestelle bis 15. Dezember für garantierte Lieferung vor dem 24. Dezember.',
-      fr: 'Date limite Noël : Commandez avant le 15 décembre pour une livraison garantie avant le 24 décembre.',
+      fr: 'Date limite Noël : Commandez avant le 15 décembre pour une livraison garantie avant le 24 décembre.',
       it: 'Scadenza natalizia: ordina entro il 15 dicembre per la consegna garantita prima del 24 dicembre.',
     },
     faq: [
       {
-        q: { en: 'Will the story have a Christmas theme?', de: 'Hat die Geschichte ein Weihnachtsthema?', fr: 'L\'histoire aura-t-elle un thème de Noël ?', it: 'La storia avrà un tema natalizio?' },
-        a: { en: 'If you select the Christmas theme, absolutely! But you can also pick any other theme — the story itself is the gift.', de: 'Wenn du das Weihnachtsthema wählst, auf jeden Fall! Du kannst aber auch jedes andere Thema wählen — die Geschichte selbst ist das Geschenk.', fr: 'Si vous choisissez le thème Noël, absolument ! Mais vous pouvez aussi choisir n\'importe quel autre thème — l\'histoire elle-même est le cadeau.', it: 'Se scegli il tema Natale, assolutamente sì! Ma puoi anche scegliere qualsiasi altro tema — è la storia stessa il regalo.' },
+        q: { en: 'Will the story have a Christmas theme?', de: 'Hat die Geschichte ein Weihnachtsthema?', fr: 'L\'histoire aura-t-elle un thème de Noël ?', it: 'La storia avrà un tema natalizio?' },
+        a: { en: 'If you select the Christmas theme, absolutely! But you can also pick any other theme — the story itself is the gift.', de: 'Wenn du das Weihnachtsthema wählst, auf jeden Fall! Du kannst aber auch jedes andere Thema wählen — die Geschichte selbst ist das Geschenk.', fr: 'Si vous choisissez le thème Noël, absolument ! Mais vous pouvez aussi choisir n\'importe quel autre thème — l\'histoire elle-même est le cadeau.', it: 'Se scegli il tema Natale, assolutamente sì! Ma puoi anche scegliere qualsiasi altro tema — è la storia stessa il regalo.' },
       },
       {
-        q: { en: 'Can I order multiple books for siblings?', de: 'Kann ich mehrere Bücher für Geschwister bestellen?', fr: 'Puis-je commander plusieurs livres pour des frères et soeurs ?', it: 'Posso ordinare più libri per fratelli e sorelle?' },
-        a: { en: 'Yes! Create a unique story for each child, or create one story with all siblings as characters.', de: 'Ja! Erstelle eine einzigartige Geschichte für jedes Kind oder eine Geschichte mit allen Geschwistern als Charaktere.', fr: 'Oui ! Créez une histoire unique pour chaque enfant, ou une histoire avec tous les frères et soeurs comme personnages.', it: 'Sì! Crea una storia unica per ogni bambino, oppure una storia con tutti i fratelli e le sorelle come personaggi.' },
+        q: { en: 'Can I order multiple books for siblings?', de: 'Kann ich mehrere Bücher für Geschwister bestellen?', fr: 'Puis-je commander plusieurs livres pour des frères et sœurs ?', it: 'Posso ordinare più libri per fratelli e sorelle?' },
+        a: { en: 'Yes! Create a unique story for each child, or create one story with all siblings as characters.', de: 'Ja! Erstelle eine einzigartige Geschichte für jedes Kind oder eine Geschichte mit allen Geschwistern als Charaktere.', fr: 'Oui ! Créez une histoire unique pour chaque enfant, ou une histoire avec tous les frères et sœurs comme personnages.', it: 'Sì! Crea una storia unica per ogni bambino, oppure una storia con tutti i fratelli e le sorelle come personaggi.' },
       },
     ],
   },
@@ -179,13 +179,13 @@ export const occasions: OccasionData[] = [
     description: {
       en: 'An egg-citing Easter adventure with your child as the hero. The perfect surprise for the Easter basket — more memorable than chocolate!',
       de: 'Ein eifriges Oster-Abenteuer mit deinem Kind als Held. Die perfekte Überraschung fürs Osternest — unvergesslicher als Schokolade!',
-      fr: 'Une aventure de Pâques passionnante avec votre enfant comme héros. La surprise parfaite pour le panier de Pâques — plus mémorable que le chocolat !',
+      fr: 'Une aventure de Pâques passionnante avec votre enfant comme héros. La surprise parfaite pour le panier de Pâques — plus mémorable que le chocolat !',
       it: 'Un\'avventura di Pasqua uovo-sionante con tuo figlio come eroe. La sorpresa perfetta per il cestino di Pasqua — più indimenticabile del cioccolato!',
     },
     intro: {
       en: 'Easter is a time of new beginnings, spring adventures, and joyful surprises. A personalized Easter story takes your child on a magical egg hunt, a spring garden adventure, or a journey with the Easter Bunny. Tuck it into their Easter basket alongside the chocolate eggs for a gift that lasts far beyond Easter Sunday. It\'s a wonderful way to celebrate spring together.',
       de: 'Ostern ist die Zeit des Neubeginns, der Frühlingsabenteuer und fröhlicher Überraschungen. Eine personalisierte Ostergeschichte nimmt dein Kind mit auf eine magische Eiersuche, ein Frühlingsgarten-Abenteuer oder eine Reise mit dem Osterhasen. Lege es neben die Schokoladeneier ins Osternest für ein Geschenk, das weit über den Ostersonntag hinaus Freude macht. Eine wunderbare Art, den Frühling gemeinsam zu feiern.',
-      fr: 'Pâques est une période de renouveau, d\'aventures printanières et de joyeuses surprises. Une histoire de Pâques personnalisée emmène votre enfant dans une chasse aux oeufs magique ou une aventure printanière. Glissez-la dans le panier de Pâques à côté des oeufs en chocolat pour un cadeau qui dure bien au-delà du dimanche de Pâques.',
+      fr: 'Pâques est une période de renouveau, d\'aventures printanières et de joyeuses surprises. Une histoire de Pâques personnalisée emmène votre enfant dans une chasse aux œufs magique ou une aventure printanière. Glissez-la dans le panier de Pâques à côté des œufs en chocolat pour un cadeau qui dure bien au-delà du dimanche de Pâques.',
       it: 'Pasqua è il periodo dei nuovi inizi, delle avventure primaverili e delle sorprese gioiose. Una storia di Pasqua personalizzata porta tuo figlio in una magica caccia alle uova, in un\'avventura nel giardino primaverile o in un viaggio con il Coniglietto Pasquale. Nascondila nel cestino di Pasqua accanto alle uova di cioccolato, per un regalo che dura ben oltre la domenica di Pasqua. Un modo meraviglioso per festeggiare insieme la primavera.',
     },
     tips: {
@@ -202,10 +202,10 @@ export const occasions: OccasionData[] = [
         'Eine tolle Alternative zu zu viel Schokolade!',
       ],
       fr: [
-        'Cachez le livre imprimé dans le panier de Pâques avec les oeufs',
-        'Choisissez le thème Pâques pour les lapins, les oeufs et la magie du printemps',
+        'Cachez le livre imprimé dans le panier de Pâques avec les œufs',
+        'Choisissez le thème Pâques pour les lapins, les œufs et la magie du printemps',
         'Créez l\'histoire 1 à 2 semaines avant Pâques pour la livraison imprimée',
-        'Une super alternative à trop de chocolat !',
+        'Une super alternative à trop de chocolat !',
       ],
       it: [
         'Nascondi il libro stampato nel cestino di Pasqua insieme alle uova',
@@ -230,12 +230,12 @@ export const occasions: OccasionData[] = [
     },
     faq: [
       {
-        q: { en: 'Does the story feature the Easter Bunny?', de: 'Kommt der Osterhase in der Geschichte vor?', fr: 'Le lapin de Pâques apparaît-il dans l\'histoire ?', it: 'Il Coniglietto Pasquale compare nella storia?' },
+        q: { en: 'Does the story feature the Easter Bunny?', de: 'Kommt der Osterhase in der Geschichte vor?', fr: 'Le lapin de Pâques apparaît-il dans l\'histoire ?', it: 'Il Coniglietto Pasquale compare nella storia?' },
         a: { en: 'With the Easter theme, your child will go on an adventure that includes springtime elements and Easter magic. The AI crafts a unique story each time.', de: 'Mit dem Osterthema erlebt dein Kind ein Abenteuer mit Frühlingselementen und Ostermagie. Die KI erstellt jedes Mal eine einzigartige Geschichte.', fr: 'Avec le thème Pâques, votre enfant vivra une aventure avec des éléments printaniers et de la magie pascale. L\'IA crée une histoire unique à chaque fois.', it: 'Con il tema Pasqua, tuo figlio vivrà un\'avventura con elementi primaverili e magia pasquale. L\'IA crea una storia unica ogni volta.' },
       },
       {
-        q: { en: 'Is this a good Easter basket gift?', de: 'Ist das ein gutes Geschenk fürs Osternest?', fr: 'Est-ce un bon cadeau pour le panier de Pâques ?', it: 'È un buon regalo per il cestino di Pasqua?' },
-        a: { en: 'Absolutely! Parents love it as a meaningful addition to the Easter basket. It\'s a keepsake that outlasts any candy.', de: 'Auf jeden Fall! Eltern lieben es als bedeutungsvolle Ergänzung zum Osternest. Es ist ein Andenken, das länger hält als jede Süssigkeit.', fr: 'Absolument ! Les parents adorent comme ajout significatif au panier de Pâques. C\'est un souvenir qui dure plus longtemps que les bonbons.', it: 'Assolutamente sì! I genitori lo adorano come aggiunta significativa al cestino di Pasqua. È un ricordo che dura più a lungo di qualsiasi dolciume.' },
+        q: { en: 'Is this a good Easter basket gift?', de: 'Ist das ein gutes Geschenk fürs Osternest?', fr: 'Est-ce un bon cadeau pour le panier de Pâques ?', it: 'È un buon regalo per il cestino di Pasqua?' },
+        a: { en: 'Absolutely! Parents love it as a meaningful addition to the Easter basket. It\'s a keepsake that outlasts any candy.', de: 'Auf jeden Fall! Eltern lieben es als bedeutungsvolle Ergänzung zum Osternest. Es ist ein Andenken, das länger hält als jede Süssigkeit.', fr: 'Absolument ! Les parents adorent comme ajout significatif au panier de Pâques. C\'est un souvenir qui dure plus longtemps que les bonbons.', it: 'Assolutamente sì! I genitori lo adorano come aggiunta significativa al cestino di Pasqua. È un ricordo che dura più a lungo di qualsiasi dolciume.' },
       },
     ],
   },
@@ -278,7 +278,7 @@ export const occasions: OccasionData[] = [
       ],
       fr: [
         'Cadeau parfait des parrains et marraines — personnel et significatif',
-        'Choisissez un thème doux et magique comme Licorne ou Amis de la Forêt',
+        'Choisissez un thème doux et magique comme licorne ou amis de la forêt',
         'Le livre imprimé fait un beau souvenir pour la boîte à souvenirs du baptême',
         'Incluez la date du baptême comme détail personnalisé dans votre histoire',
       ],
@@ -304,11 +304,11 @@ export const occasions: OccasionData[] = [
     },
     faq: [
       {
-        q: { en: 'Is this suitable for a baby?', de: 'Ist das für ein Baby geeignet?', fr: 'Est-ce adapté pour un bébé ?', it: 'È adatto per un neonato?' },
-        a: { en: 'Yes! While the baby won\'t read it themselves yet, parents can read it aloud. The printed book becomes a cherished keepsake as the child grows.', de: 'Ja! Das Baby wird es zwar noch nicht selbst lesen, aber die Eltern können es vorlesen. Das gedruckte Buch wird zu einem wertvollen Andenken, wenn das Kind grösser wird.', fr: 'Oui ! Bien que le bébé ne le lira pas encore lui-même, les parents peuvent le lire à voix haute. Le livre imprimé devient un souvenir précieux quand l\'enfant grandit.', it: 'Sì! Anche se il neonato non potrà ancora leggerlo da solo, i genitori possono leggerlo ad alta voce. Il libro stampato diventa un ricordo prezioso man mano che il bambino cresce.' },
+        q: { en: 'Is this suitable for a baby?', de: 'Ist das für ein Baby geeignet?', fr: 'Est-ce adapté pour un bébé ?', it: 'È adatto per un neonato?' },
+        a: { en: 'Yes! While the baby won\'t read it themselves yet, parents can read it aloud. The printed book becomes a cherished keepsake as the child grows.', de: 'Ja! Das Baby wird es zwar noch nicht selbst lesen, aber die Eltern können es vorlesen. Das gedruckte Buch wird zu einem wertvollen Andenken, wenn das Kind grösser wird.', fr: 'Oui ! Bien que le bébé ne le lira pas encore lui-même, les parents peuvent le lire à voix haute. Le livre imprimé devient un souvenir précieux quand l\'enfant grandit.', it: 'Sì! Anche se il neonato non potrà ancora leggerlo da solo, i genitori possono leggerlo ad alta voce. Il libro stampato diventa un ricordo prezioso man mano che il bambino cresce.' },
       },
       {
-        q: { en: 'Can I include a dedication message?', de: 'Kann ich eine Widmung hinzufügen?', fr: 'Puis-je inclure un message de dédicace ?', it: 'Posso includere una dedica?' },
+        q: { en: 'Can I include a dedication message?', de: 'Kann ich eine Widmung hinzufügen?', fr: 'Puis-je inclure un message de dédicace ?', it: 'Posso includere una dedica?' },
         a: { en: 'The printed book includes a dedication page where you can add a personal message from the godparents or family.', de: 'Das gedruckte Buch enthält eine Widmungsseite, auf der du eine persönliche Nachricht von Götti/Gotti oder der Familie hinzufügen kannst.', fr: 'Le livre imprimé comprend une page de dédicace où vous pouvez ajouter un message personnel des parrains ou de la famille.', it: 'Il libro stampato include una pagina di dedica dove puoi aggiungere un messaggio personale da parte dei padrini o della famiglia.' },
       },
     ],
@@ -353,8 +353,8 @@ export const occasions: OccasionData[] = [
       fr: [
         'Glissez le livre dans le cartable avec les fournitures scolaires',
         'Lisez l\'histoire ensemble la veille du grand jour',
-        'Choisissez le thème "Premier jour d\'école" pour une histoire qui aborde le trac scolaire',
-        'Les thèmes éducatifs "Alphabet" ou "Nombres" sont aussi de super cadeaux de rentrée',
+        'Choisissez le thème « Premier jour d\'école » pour une histoire qui aborde le trac scolaire',
+        'Les thèmes éducatifs « Alphabet » ou « Nombres » sont aussi de super cadeaux de rentrée',
       ],
       it: [
         'Metti il libro nello Schultüte (cono di dolci) insieme alle golosità',
@@ -374,17 +374,17 @@ export const occasions: OccasionData[] = [
     deliveryNote: {
       en: 'Order 1-2 weeks before the first day of school. The Schultüte surprise is worth the planning!',
       de: 'Bestelle 1-2 Wochen vor dem ersten Schultag. Die Schultüten-Überraschung ist die Planung wert!',
-      fr: 'Commandez 1 à 2 semaines avant la rentrée. La surprise en vaut la planification !',
+      fr: 'Commandez 1 à 2 semaines avant la rentrée. La surprise en vaut la planification !',
       it: 'Ordina 1-2 settimane prima del primo giorno di scuola. La sorpresa dello Schultüte vale la pianificazione!',
     },
     faq: [
       {
-        q: { en: 'What age is Einschulung typically?', de: 'In welchem Alter ist die Einschulung?', fr: 'À quel âge a lieu la rentrée scolaire ?', it: 'A che età si inizia tipicamente la scuola?' },
+        q: { en: 'What age is Einschulung typically?', de: 'In welchem Alter ist die Einschulung?', fr: 'À quel âge a lieu la rentrée scolaire ?', it: 'A che età si inizia tipicamente la scuola?' },
         a: { en: 'In Switzerland, children typically start school (Kindergarten or 1st grade) at age 4-6. Our stories adapt the language to the child\'s age.', de: 'In der Schweiz kommen Kinder typischerweise mit 4-6 Jahren in den Kindergarten oder die 1. Klasse. Unsere Geschichten passen die Sprache an das Alter des Kindes an.', fr: 'En Suisse, les enfants commencent généralement l\'école (jardin d\'enfants ou 1ère année) à 4-6 ans. Nos histoires adaptent le langage à l\'âge de l\'enfant.', it: 'In Svizzera, i bambini iniziano tipicamente la scuola (scuola dell\'infanzia o prima elementare) tra i 4 e i 6 anni. Le nostre storie adattano il linguaggio all\'età del bambino.' },
       },
       {
-        q: { en: 'Does the story help with school anxiety?', de: 'Hilft die Geschichte bei Schulangst?', fr: 'L\'histoire aide-t-elle avec l\'anxiété scolaire ?', it: 'La storia aiuta con l\'ansia scolastica?' },
-        a: { en: 'Yes! The "First Day of School" theme is specifically designed to address common fears and show your child that school is an exciting adventure.', de: 'Ja! Das Thema «Erster Schultag» ist speziell darauf ausgelegt, häufige Ängste anzusprechen und deinem Kind zu zeigen, dass Schule ein spannendes Abenteuer ist.', fr: 'Oui ! Le thème "Premier jour d\'école" est spécialement conçu pour aborder les peurs courantes et montrer à votre enfant que l\'école est une aventure passionnante.', it: 'Sì! Il tema "Primo giorno di scuola" è pensato apposta per affrontare le paure più comuni e mostrare a tuo figlio che la scuola è un\'avventura entusiasmante.' },
+        q: { en: 'Does the story help with school anxiety?', de: 'Hilft die Geschichte bei Schulangst?', fr: 'L\'histoire aide-t-elle avec l\'anxiété scolaire ?', it: 'La storia aiuta con l\'ansia scolastica?' },
+        a: { en: 'Yes! The "First Day of School" theme is specifically designed to address common fears and show your child that school is an exciting adventure.', de: 'Ja! Das Thema «Erster Schultag» ist speziell darauf ausgelegt, häufige Ängste anzusprechen und deinem Kind zu zeigen, dass Schule ein spannendes Abenteuer ist.', fr: 'Oui ! Le thème « Premier jour d\'école » est spécialement conçu pour aborder les peurs courantes et montrer à votre enfant que l\'école est une aventure passionnante.', it: 'Sì! Il tema "Primo giorno di scuola" è pensato apposta per affrontare le paure più comuni e mostrare a tuo figlio che la scuola è un\'avventura entusiasmante.' },
       },
     ],
   },
@@ -403,13 +403,13 @@ export const occasions: OccasionData[] = [
     description: {
       en: 'Help your child welcome their new baby brother or sister with a story that celebrates becoming a big sibling.',
       de: 'Hilf deinem Kind, sein neues Brüderchen oder Schwesterchen willkommen zu heissen — mit einer Geschichte, die das Grosswerden als Geschwister feiert.',
-      fr: 'Aidez votre enfant à accueillir son nouveau petit frère ou sa petite soeur avec une histoire qui célèbre le fait de devenir grand frère ou grande soeur.',
+      fr: 'Aidez votre enfant à accueillir son nouveau petit frère ou sa petite sœur avec une histoire qui célèbre le fait de devenir grand frère ou grande sœur.',
       it: 'Aiuta tuo figlio ad accogliere il nuovo fratellino o sorellina con una storia che celebra il diventare fratello o sorella maggiore.',
     },
     intro: {
       en: 'A new baby in the family is a big adjustment for the older child. They might feel jealous, worried, or unsure about their new role. A personalized story helps them see being a big brother or sister as an exciting adventure. In the story, they\'re the hero who helps and protects — building confidence and connection before the baby even arrives. Many parents read it during pregnancy to prepare their child.',
       de: 'Ein neues Baby in der Familie ist eine grosse Umstellung für das ältere Kind. Es fühlt sich vielleicht eifersüchtig, besorgt oder unsicher in seiner neuen Rolle. Eine personalisierte Geschichte hilft ihm zu sehen, dass es ein spannendes Abenteuer ist, grosser Bruder oder grosse Schwester zu werden. In der Geschichte ist es der Held, der hilft und beschützt — das stärkt Selbstvertrauen und Verbindung, noch bevor das Baby da ist. Viele Eltern lesen sie schon in der Schwangerschaft vor.',
-      fr: 'Un nouveau bébé dans la famille est un grand changement pour l\'aîné. Il peut se sentir jaloux, inquiet ou incertain de son nouveau rôle. Une histoire personnalisée l\'aide à voir le fait d\'être grand frère ou grande soeur comme une aventure excitante. Dans l\'histoire, c\'est le héros qui aide et protège. Beaucoup de parents la lisent pendant la grossesse pour préparer leur enfant.',
+      fr: 'Un nouveau bébé dans la famille est un grand changement pour l\'aîné. Il peut se sentir jaloux, inquiet ou incertain de son nouveau rôle. Une histoire personnalisée l\'aide à voir le fait d\'être grand frère ou grande sœur comme une aventure excitante. Dans l\'histoire, c\'est le héros qui aide et protège. Beaucoup de parents la lisent pendant la grossesse pour préparer leur enfant.',
       it: 'L\'arrivo di un nuovo bebè in famiglia è un grande cambiamento per il figlio maggiore. Potrebbe sentirsi geloso, preoccupato o incerto sul suo nuovo ruolo. Una storia personalizzata lo aiuta a vedere il diventare fratello o sorella maggiore come un\'avventura entusiasmante. Nella storia, è lui l\'eroe che aiuta e protegge — costruendo fiducia e legame ancora prima che il bebè arrivi. Molti genitori la leggono durante la gravidanza per preparare il proprio figlio.',
     },
     tips: {
@@ -427,8 +427,8 @@ export const occasions: OccasionData[] = [
       ],
       fr: [
         'Créez l\'histoire avant l\'arrivée du bébé — c\'est un excellent outil de préparation',
-        'Choisissez le thème "Nouveau bébé" pour une histoire sur les émotions fraternelles',
-        'Offrez le livre comme cadeau spécial du nouveau bébé au grand frère ou à la grande soeur',
+        'Choisissez le thème « Nouveau bébé » pour une histoire sur les émotions fraternelles',
+        'Offrez le livre comme cadeau spécial du nouveau bébé au grand frère ou à la grande sœur',
         'Incluez les deux enfants dans l\'histoire si le bébé a déjà un prénom',
       ],
       it: [
@@ -453,12 +453,12 @@ export const occasions: OccasionData[] = [
     },
     faq: [
       {
-        q: { en: 'Should I create the story before or after the baby is born?', de: 'Soll ich die Geschichte vor oder nach der Geburt erstellen?', fr: 'Dois-je créer l\'histoire avant ou après la naissance ?', it: 'Devo creare la storia prima o dopo la nascita del bebè?' },
-        a: { en: 'Before is ideal! Reading the story during pregnancy helps prepare your child for the change. You can always create another story after the baby arrives.', de: 'Vorher ist ideal! Das Vorlesen während der Schwangerschaft hilft deinem Kind, sich auf die Veränderung vorzubereiten. Du kannst nach der Geburt jederzeit eine weitere Geschichte erstellen.', fr: 'Avant, c\'est idéal ! Lire l\'histoire pendant la grossesse aide à préparer votre enfant au changement. Vous pouvez toujours créer une autre histoire après la naissance.', it: 'Prima è l\'ideale! Leggere la storia durante la gravidanza aiuta a preparare tuo figlio al cambiamento. Puoi comunque creare un\'altra storia dopo la nascita del bebè.' },
+        q: { en: 'Should I create the story before or after the baby is born?', de: 'Soll ich die Geschichte vor oder nach der Geburt erstellen?', fr: 'Dois-je créer l\'histoire avant ou après la naissance ?', it: 'Devo creare la storia prima o dopo la nascita del bebè?' },
+        a: { en: 'Before is ideal! Reading the story during pregnancy helps prepare your child for the change. You can always create another story after the baby arrives.', de: 'Vorher ist ideal! Das Vorlesen während der Schwangerschaft hilft deinem Kind, sich auf die Veränderung vorzubereiten. Du kannst nach der Geburt jederzeit eine weitere Geschichte erstellen.', fr: 'Avant, c\'est idéal ! Lire l\'histoire pendant la grossesse aide à préparer votre enfant au changement. Vous pouvez toujours créer une autre histoire après la naissance.', it: 'Prima è l\'ideale! Leggere la storia durante la gravidanza aiuta a preparare tuo figlio al cambiamento. Puoi comunque creare un\'altra storia dopo la nascita del bebè.' },
       },
       {
-        q: { en: 'Can both siblings be in the story?', de: 'Können beide Geschwister in der Geschichte vorkommen?', fr: 'Les deux enfants peuvent-ils être dans l\'histoire ?', it: 'Possono comparire entrambi i fratelli nella storia?' },
-        a: { en: 'Yes! You can add multiple characters. The older child is the main hero, with the baby as a supporting character.', de: 'Ja! Du kannst mehrere Charaktere hinzufügen. Das ältere Kind ist der Hauptheld, das Baby die Nebenfigur.', fr: 'Oui ! Vous pouvez ajouter plusieurs personnages. L\'aîné est le héros principal, le bébé un personnage secondaire.', it: 'Sì! Puoi aggiungere più personaggi. Il figlio maggiore è l\'eroe principale, con il bebè come personaggio secondario.' },
+        q: { en: 'Can both siblings be in the story?', de: 'Können beide Geschwister in der Geschichte vorkommen?', fr: 'Les deux enfants peuvent-ils être dans l\'histoire ?', it: 'Possono comparire entrambi i fratelli nella storia?' },
+        a: { en: 'Yes! You can add multiple characters. The older child is the main hero, with the baby as a supporting character.', de: 'Ja! Du kannst mehrere Charaktere hinzufügen. Das ältere Kind ist der Hauptheld, das Baby die Nebenfigur.', fr: 'Oui ! Vous pouvez ajouter plusieurs personnages. L\'aîné est le héros principal, le bébé un personnage secondaire.', it: 'Sì! Puoi aggiungere più personaggi. Il figlio maggiore è l\'eroe principale, con il bebè come personaggio secondario.' },
       },
     ],
   },
@@ -483,7 +483,7 @@ export const occasions: OccasionData[] = [
     intro: {
       en: 'Forget the socks and flowers — this Mother\'s Day, give something truly from the heart. A personalized story where the child goes on an adventure with (or for) their mom is a gift that will bring tears of joy. Dads and grandparents can help the child create it as a surprise. It\'s personal, creative, and shows mom just how special she is through the eyes of her child.',
       de: 'Vergiss Socken und Blumen — schenke diesen Muttertag etwas wirklich von Herzen. Eine personalisierte Geschichte, in der das Kind ein Abenteuer mit (oder für) seine Mama erlebt, ist ein Geschenk, das Freudentränen bringt. Papas und Grosseltern können dem Kind helfen, es als Überraschung zu erstellen. Es ist persönlich, kreativ und zeigt Mama, wie besonders sie ist — durch die Augen ihres Kindes.',
-      fr: 'Oubliez les chaussettes et les fleurs — cette fête des mères, offrez quelque chose qui vient vraiment du coeur. Une histoire personnalisée où l\'enfant vit une aventure avec (ou pour) sa maman est un cadeau qui fera couler des larmes de joie. Les papas et grands-parents peuvent aider l\'enfant à le créer comme surprise.',
+      fr: 'Oubliez les chaussettes et les fleurs — cette fête des mères, offrez quelque chose qui vient vraiment du cœur. Une histoire personnalisée où l\'enfant vit une aventure avec (ou pour) sa maman est un cadeau qui fera couler des larmes de joie. Les papas et grands-parents peuvent aider l\'enfant à le créer comme surprise.',
       it: 'Dimentica calzini e fiori — per questa festa della mamma, regala qualcosa che viene davvero dal cuore. Una storia personalizzata in cui il bambino vive un\'avventura con (o per) la propria mamma è un regalo che strapperà lacrime di gioia. Papà e nonni possono aiutare il bambino a crearla come sorpresa. È personale, creativa e mostra alla mamma quanto sia speciale, vista attraverso gli occhi di suo figlio.',
     },
     tips: {
@@ -528,12 +528,12 @@ export const occasions: OccasionData[] = [
     },
     faq: [
       {
-        q: { en: 'Can the child create the story themselves?', de: 'Kann das Kind die Geschichte selbst erstellen?', fr: 'L\'enfant peut-il créer l\'histoire lui-même ?', it: 'Il bambino può creare la storia da solo?' },
+        q: { en: 'Can the child create the story themselves?', de: 'Kann das Kind die Geschichte selbst erstellen?', fr: 'L\'enfant peut-il créer l\'histoire lui-même ?', it: 'Il bambino può creare la storia da solo?' },
         a: { en: 'Older children (6+) can navigate the wizard with minimal help. For younger children, a parent or grandparent can guide them through the process.', de: 'Ältere Kinder (6+) können den Assistenten mit minimaler Hilfe bedienen. Für jüngere Kinder können Eltern oder Grosseltern sie durch den Prozess führen.', fr: 'Les enfants plus âgés (6+) peuvent utiliser l\'assistant avec un minimum d\'aide. Pour les plus jeunes, un parent ou grand-parent peut les guider.', it: 'I bambini più grandi (6+) possono usare la procedura guidata con poco aiuto. Per i più piccoli, un genitore o un nonno può accompagnarli passo dopo passo.' },
       },
       {
-        q: { en: 'Can I add mom as a character?', de: 'Kann ich Mama als Charakter hinzufügen?', fr: 'Puis-je ajouter maman comme personnage ?', it: 'Posso aggiungere la mamma come personaggio?' },
-        a: { en: 'Yes! Add mom as a second character with her name and description. She\'ll appear in the story alongside your child.', de: 'Ja! Füge Mama als zweiten Charakter mit ihrem Namen und Beschreibung hinzu. Sie erscheint in der Geschichte neben deinem Kind.', fr: 'Oui ! Ajoutez maman comme deuxième personnage avec son nom et sa description. Elle apparaîtra dans l\'histoire aux côtés de votre enfant.', it: 'Sì! Aggiungi la mamma come secondo personaggio con il suo nome e la sua descrizione. Apparirà nella storia accanto a tuo figlio.' },
+        q: { en: 'Can I add mom as a character?', de: 'Kann ich Mama als Charakter hinzufügen?', fr: 'Puis-je ajouter maman comme personnage ?', it: 'Posso aggiungere la mamma come personaggio?' },
+        a: { en: 'Yes! Add mom as a second character with her name and description. She\'ll appear in the story alongside your child.', de: 'Ja! Füge Mama als zweiten Charakter mit ihrem Namen und Beschreibung hinzu. Sie erscheint in der Geschichte neben deinem Kind.', fr: 'Oui ! Ajoutez maman comme deuxième personnage avec son nom et sa description. Elle apparaîtra dans l\'histoire aux côtés de votre enfant.', it: 'Sì! Aggiungi la mamma come secondo personaggio con il suo nome e la sua descrizione. Apparirà nella storia accanto a tuo figlio.' },
       },
     ],
   },
@@ -577,7 +577,7 @@ export const occasions: OccasionData[] = [
       fr: [
         'Maman ou les grands-parents peuvent aider l\'enfant à le créer comme surprise',
         'Ajoutez papa comme personnage — il adorera faire partie de l\'aventure',
-        'Choisissez un thème d\'action : pirate, chevalier, espace ou super-héros',
+        'Choisissez un thème d\'action : pirate, chevalier, espace ou super-héros',
         'Le livre imprimé fait un super souvenir pour le bureau de papa',
       ],
       it: [
@@ -604,12 +604,12 @@ export const occasions: OccasionData[] = [
     },
     faq: [
       {
-        q: { en: 'Can dad be a character in the story?', de: 'Kann Papa ein Charakter in der Geschichte sein?', fr: 'Papa peut-il être un personnage de l\'histoire ?', it: 'Papà può essere un personaggio della storia?' },
-        a: { en: 'Absolutely! Add dad as a second character. He\'ll appear alongside your child as an adventure partner.', de: 'Auf jeden Fall! Füge Papa als zweiten Charakter hinzu. Er erscheint als Abenteuer-Partner neben deinem Kind.', fr: 'Absolument ! Ajoutez papa comme deuxième personnage. Il apparaîtra aux côtés de votre enfant comme partenaire d\'aventure.', it: 'Assolutamente sì! Aggiungi papà come secondo personaggio. Apparirà accanto a tuo figlio come compagno d\'avventura.' },
+        q: { en: 'Can dad be a character in the story?', de: 'Kann Papa ein Charakter in der Geschichte sein?', fr: 'Papa peut-il être un personnage de l\'histoire ?', it: 'Papà può essere un personaggio della storia?' },
+        a: { en: 'Absolutely! Add dad as a second character. He\'ll appear alongside your child as an adventure partner.', de: 'Auf jeden Fall! Füge Papa als zweiten Charakter hinzu. Er erscheint als Abenteuer-Partner neben deinem Kind.', fr: 'Absolument ! Ajoutez papa comme deuxième personnage. Il apparaîtra aux côtés de votre enfant comme partenaire d\'aventure.', it: 'Assolutamente sì! Aggiungi papà come secondo personaggio. Apparirà accanto a tuo figlio come compagno d\'avventura.' },
       },
       {
-        q: { en: 'Is this just for young children?', de: 'Ist das nur für kleine Kinder?', fr: 'Est-ce seulement pour les petits enfants ?', it: 'È solo per bambini piccoli?' },
-        a: { en: 'Not at all! The AI adapts the story complexity to the child\'s age. A 10-year-old will get a more sophisticated story than a 3-year-old.', de: 'Ganz und gar nicht! Die KI passt die Komplexität der Geschichte an das Alter des Kindes an. Ein 10-Jähriger bekommt eine anspruchsvollere Geschichte als ein 3-Jähriger.', fr: 'Pas du tout ! L\'IA adapte la complexité de l\'histoire à l\'âge de l\'enfant. Un enfant de 10 ans aura une histoire plus élaborée qu\'un enfant de 3 ans.', it: 'Assolutamente no! L\'IA adatta la complessità della storia all\'età del bambino. Un bambino di 10 anni riceverà una storia più elaborata rispetto a uno di 3 anni.' },
+        q: { en: 'Is this just for young children?', de: 'Ist das nur für kleine Kinder?', fr: 'Est-ce seulement pour les petits enfants ?', it: 'È solo per bambini piccoli?' },
+        a: { en: 'Not at all! The AI adapts the story complexity to the child\'s age. A 10-year-old will get a more sophisticated story than a 3-year-old.', de: 'Ganz und gar nicht! Die KI passt die Komplexität der Geschichte an das Alter des Kindes an. Ein 10-Jähriger bekommt eine anspruchsvollere Geschichte als ein 3-Jähriger.', fr: 'Pas du tout ! L\'IA adapte la complexité de l\'histoire à l\'âge de l\'enfant. Un enfant de 10 ans aura une histoire plus élaborée qu\'un enfant de 3 ans.', it: 'Assolutamente no! L\'IA adatta la complessità della storia all\'età del bambino. Un bambino di 10 anni riceverà una storia più elaborata rispetto a uno di 3 anni.' },
       },
     ],
   },
@@ -678,11 +678,11 @@ export const occasions: OccasionData[] = [
     },
     faq: [
       {
-        q: { en: 'Is St. Nicholas the same as Santa?', de: 'Ist der Nikolaus dasselbe wie der Weihnachtsmann?', fr: 'Saint-Nicolas est-il le même que le Père Noël ?', it: 'San Nicolao è lo stesso di Babbo Natale?' },
+        q: { en: 'Is St. Nicholas the same as Santa?', de: 'Ist der Nikolaus dasselbe wie der Weihnachtsmann?', fr: 'Saint-Nicolas est-il le même que le Père Noël ?', it: 'San Nicolao è lo stesso di Babbo Natale?' },
         a: { en: 'In Swiss tradition, the Samichlaus (St. Nicholas) visits on December 6 and is distinct from the Christkind or Weihnachtsmann on December 24/25.', de: 'In der Schweizer Tradition besucht der Samichlaus die Kinder am 6. Dezember und ist verschieden vom Christkind oder Weihnachtsmann am 24./25. Dezember.', fr: 'Dans la tradition suisse, le Saint-Nicolas rend visite le 6 décembre et est distinct du Père Noël du 24/25 décembre.', it: 'Nella tradizione svizzera, il Samichlaus (San Nicolao) visita i bambini il 6 dicembre ed è una figura distinta da Gesù Bambino o Babbo Natale del 24/25 dicembre.' },
       },
       {
-        q: { en: 'Can the story include Samichlaus and Schmutzli?', de: 'Kann die Geschichte Samichlaus und Schmutzli enthalten?', fr: 'L\'histoire peut-elle inclure Saint-Nicolas et le Père Fouettard ?', it: 'La storia può includere Samichlaus e Schmutzli?' },
+        q: { en: 'Can the story include Samichlaus and Schmutzli?', de: 'Kann die Geschichte Samichlaus und Schmutzli enthalten?', fr: 'L\'histoire peut-elle inclure Saint-Nicolas et le Père Fouettard ?', it: 'La storia può includere Samichlaus e Schmutzli?' },
         a: { en: 'The Christmas theme creates a wintery, magical story. You can add custom details to guide the AI toward a Samichlaus-themed adventure.', de: 'Das Weihnachtsthema erstellt eine winterliche, magische Geschichte. Du kannst individuelle Details hinzufügen, um die KI zu einem Samichlaus-Abenteuer zu lenken.', fr: 'Le thème Noël crée une histoire hivernale et magique. Vous pouvez ajouter des détails personnalisés pour orienter l\'IA vers une aventure Saint-Nicolas.', it: 'Il tema Natale crea una storia invernale e magica. Puoi aggiungere dettagli personalizzati per guidare l\'IA verso un\'avventura a tema Samichlaus.' },
       },
     ],
@@ -752,12 +752,12 @@ export const occasions: OccasionData[] = [
     },
     faq: [
       {
-        q: { en: 'How many pages does the story have?', de: 'Wie viele Seiten hat die Geschichte?', fr: 'Combien de pages compte l\'histoire ?', it: 'Quante pagine ha la storia?' },
+        q: { en: 'How many pages does the story have?', de: 'Wie viele Seiten hat die Geschichte?', fr: 'Combien de pages compte l\'histoire ?', it: 'Quante pagine ha la storia?' },
         a: { en: 'Stories typically have 10-16 illustrated pages — perfect for reading one page per Advent evening.', de: 'Geschichten haben typischerweise 10-16 illustrierte Seiten — perfekt, um jeden Adventabend eine Seite zu lesen.', fr: 'Les histoires comptent généralement 10 à 16 pages illustrées — parfait pour lire une page chaque soir de l\'Avent.', it: 'Le storie hanno tipicamente 10-16 pagine illustrate — perfette per leggerne una ogni sera d\'Avvento.' },
       },
       {
-        q: { en: 'Can I use this in an Advent calendar?', de: 'Kann ich das in einem Adventskalender verwenden?', fr: 'Puis-je l\'utiliser dans un calendrier de l\'Avent ?', it: 'Posso usarlo in un calendario dell\'Avvento?' },
-        a: { en: 'Yes! The printed book fits perfectly as the special gift behind the last (or first) door of a DIY Advent calendar.', de: 'Ja! Das gedruckte Buch passt perfekt als besonderes Geschenk hinter dem letzten (oder ersten) Türchen eines DIY-Adventskalenders.', fr: 'Oui ! Le livre imprimé s\'intègre parfaitement comme cadeau spécial derrière la dernière (ou première) porte d\'un calendrier de l\'Avent fait maison.', it: 'Sì! Il libro stampato si adatta perfettamente come regalo speciale dietro l\'ultima (o la prima) casella di un calendario dell\'Avvento fai-da-te.' },
+        q: { en: 'Can I use this in an Advent calendar?', de: 'Kann ich das in einem Adventskalender verwenden?', fr: 'Puis-je l\'utiliser dans un calendrier de l\'Avent ?', it: 'Posso usarlo in un calendario dell\'Avvento?' },
+        a: { en: 'Yes! The printed book fits perfectly as the special gift behind the last (or first) door of a DIY Advent calendar.', de: 'Ja! Das gedruckte Buch passt perfekt als besonderes Geschenk hinter dem letzten (oder ersten) Türchen eines DIY-Adventskalenders.', fr: 'Oui ! Le livre imprimé s\'intègre parfaitement comme cadeau spécial derrière la dernière (ou première) porte d\'un calendrier de l\'Avent fait maison.', it: 'Sì! Il libro stampato si adatta perfettamente come regalo speciale dietro l\'ultima (o la prima) casella di un calendario dell\'Avvento fai-da-te.' },
       },
     ],
   },
@@ -800,7 +800,7 @@ export const occasions: OccasionData[] = [
       ],
       fr: [
         'Créez l\'histoire avant le déménagement pour faciliter la transition',
-        'Choisissez le thème "Déménagement" pour une histoire qui aborde les peurs du déménagement',
+        'Choisissez le thème « Déménagement » pour une histoire qui aborde les peurs du déménagement',
         'Lisez-la ensemble dans la nouvelle maison la première nuit — un rituel réconfortant',
         'Incluez des détails sur le nouveau chez-vous pour créer de l\'enthousiasme',
       ],
@@ -826,11 +826,11 @@ export const occasions: OccasionData[] = [
     },
     faq: [
       {
-        q: { en: 'How does this help with the move?', de: 'Wie hilft das beim Umzug?', fr: 'Comment cela aide-t-il avec le déménagement ?', it: 'In che modo questo aiuta con il trasloco?' },
+        q: { en: 'How does this help with the move?', de: 'Wie hilft das beim Umzug?', fr: 'Comment cela aide-t-il avec le déménagement ?', it: 'In che modo questo aiuta con il trasloco?' },
         a: { en: 'Children process big changes through stories. Seeing themselves bravely navigating a move in a story builds confidence and reduces anxiety about the real thing.', de: 'Kinder verarbeiten grosse Veränderungen durch Geschichten. Wenn sie sich selbst mutig einen Umzug in einer Geschichte meistern sehen, stärkt das ihr Selbstvertrauen und reduziert Ängste.', fr: 'Les enfants traitent les grands changements à travers les histoires. Se voir naviguer courageusement un déménagement dans une histoire renforce la confiance et réduit l\'anxiété.', it: 'I bambini elaborano i grandi cambiamenti attraverso le storie. Vedersi affrontare coraggiosamente un trasloco in una storia rafforza la fiducia e riduce l\'ansia per la situazione reale.' },
       },
       {
-        q: { en: 'Should I create the story before or after moving?', de: 'Soll ich die Geschichte vor oder nach dem Umzug erstellen?', fr: 'Dois-je créer l\'histoire avant ou après le déménagement ?', it: 'Devo creare la storia prima o dopo il trasloco?' },
+        q: { en: 'Should I create the story before or after moving?', de: 'Soll ich die Geschichte vor oder nach dem Umzug erstellen?', fr: 'Dois-je créer l\'histoire avant ou après le déménagement ?', it: 'Devo creare la storia prima o dopo il trasloco?' },
         a: { en: 'Before is best — it helps prepare your child for the change. But it\'s also valuable after the move to help them settle in.', de: 'Vorher ist am besten — es hilft deinem Kind, sich auf die Veränderung vorzubereiten. Aber auch nach dem Umzug kann es helfen, sich einzuleben.', fr: 'Avant, c\'est le mieux — cela aide à préparer votre enfant au changement. Mais c\'est aussi utile après le déménagement.', it: 'Prima è la scelta migliore — aiuta a preparare tuo figlio al cambiamento. Ma è utile anche dopo il trasloco, per aiutarlo ad ambientarsi.' },
       },
     ],
@@ -840,23 +840,23 @@ export const occasions: OccasionData[] = [
   {
     id: 'kindergartenstart',
     emoji: '🧒',
-    name: { en: 'Starting Kindergarten', de: 'Kindergartenstart', fr: 'Entrée en maternelle', it: 'Inizio della scuola dell\'infanzia' },
+    name: { en: 'Starting Kindergarten', de: 'Kindergartenstart', fr: 'Entrée à l\'école enfantine', it: 'Inizio della scuola dell\'infanzia' },
     title: {
       en: 'Personalized Children\'s Book for Starting Kindergarten',
       de: 'Personalisiertes Kinderbuch zum Kindergartenstart',
-      fr: 'Livre personnalisé pour l\'entrée en maternelle',
+      fr: 'Livre personnalisé pour l\'entrée à l\'école enfantine',
       it: 'Libro personalizzato per bambini per l\'inizio della scuola dell\'infanzia',
     },
     description: {
       en: 'Prepare your child for their first day at kindergarten with a story that makes this big step feel like an exciting adventure.',
       de: 'Bereite dein Kind auf seinen ersten Kindergartentag vor — mit einer Geschichte, die diesen grossen Schritt zu einem aufregenden Abenteuer macht.',
-      fr: 'Préparez votre enfant pour son premier jour de maternelle avec une histoire qui transforme cette grande étape en aventure passionnante.',
+      fr: 'Préparez votre enfant pour son premier jour d\'école enfantine avec une histoire qui transforme cette grande étape en aventure passionnante.',
       it: 'Prepara tuo figlio al suo primo giorno alla scuola dell\'infanzia con una storia che trasforma questo grande passo in un\'avventura entusiasmante.',
     },
     intro: {
       en: 'Starting kindergarten is one of the first big adventures outside the family nest. It\'s normal for children to feel a mix of excitement and nervousness. A personalized story shows your child that kindergarten is a place full of fun, new friends, and exciting discoveries. They\'ll see themselves as the brave little hero who walks through the kindergarten door and has the best day ever. Reading it together in the weeks before builds confidence and positive anticipation.',
       de: 'Der Kindergartenstart ist eines der ersten grossen Abenteuer ausserhalb des Familiennests. Es ist ganz normal, dass Kinder eine Mischung aus Aufregung und Nervosität fühlen. Eine personalisierte Geschichte zeigt deinem Kind, dass der Kindergarten ein Ort voller Spass, neuer Freunde und aufregender Entdeckungen ist. Es sieht sich selbst als kleinen mutigen Helden, der durch die Kindergartentür geht und den besten Tag aller Zeiten erlebt. Gemeinsames Vorlesen in den Wochen davor stärkt das Selbstvertrauen und die Vorfreude.',
-      fr: 'L\'entrée en maternelle est l\'une des premières grandes aventures hors du nid familial. Il est normal que les enfants ressentent un mélange d\'excitation et de nervosité. Une histoire personnalisée montre à votre enfant que la maternelle est un endroit plein de plaisir, de nouveaux amis et de découvertes passionnantes. La lire ensemble dans les semaines précédentes renforce la confiance.',
+      fr: 'L\'entrée à l\'école enfantine est l\'une des premières grandes aventures hors du nid familial. Il est normal que les enfants ressentent un mélange d\'excitation et de nervosité. Une histoire personnalisée montre à votre enfant que l\'école enfantine est un endroit plein de plaisir, de nouveaux amis et de découvertes passionnantes. La lire ensemble dans les semaines précédentes renforce la confiance.',
       it: 'L\'inizio della scuola dell\'infanzia è una delle prime grandi avventure fuori dal nido familiare. È normale che i bambini provino un misto di eccitazione e nervosismo. Una storia personalizzata mostra a tuo figlio che la scuola dell\'infanzia è un luogo pieno di divertimento, nuovi amici e scoperte entusiasmanti. Si vedrà come il piccolo eroe coraggioso che varca la porta della scuola dell\'infanzia e vive la giornata più bella di sempre. Leggerla insieme nelle settimane precedenti rafforza la fiducia e l\'attesa positiva.',
     },
     tips: {
@@ -873,10 +873,10 @@ export const occasions: OccasionData[] = [
         'Das Thema «Freunde finden» ist ebenfalls perfekt zur Kindergartenvorbereitung',
       ],
       fr: [
-        'Commencez à lire l\'histoire 2 à 3 semaines avant le début de la maternelle',
-        'Choisissez le thème "Premier jour de maternelle" pour aborder l\'anxiété de séparation',
+        'Commencez à lire l\'histoire 2 à 3 semaines avant le début de l\'école enfantine',
+        'Choisissez le thème « Premier jour d\'école enfantine » pour aborder l\'anxiété de séparation',
         'Parlez de l\'histoire ensemble — demandez à votre enfant ce qui l\'enthousiasme',
-        'Le thème "Se faire des amis" est aussi parfait pour préparer la maternelle',
+        'Le thème « Se faire des amis » est aussi parfait pour préparer l\'école enfantine',
       ],
       it: [
         'Inizia a leggere la storia 2-3 settimane prima dell\'inizio della scuola dell\'infanzia',
@@ -896,21 +896,21 @@ export const occasions: OccasionData[] = [
     deliveryNote: {
       en: 'Order 2-3 weeks before kindergarten starts so you have time to read it together multiple times.',
       de: 'Bestelle 2-3 Wochen vor Kindergartenbeginn, damit ihr Zeit habt, die Geschichte mehrmals zusammen zu lesen.',
-      fr: 'Commandez 2 à 3 semaines avant le début de la maternelle pour avoir le temps de la lire ensemble plusieurs fois.',
+      fr: 'Commandez 2 à 3 semaines avant le début de l\'école enfantine pour avoir le temps de la lire ensemble plusieurs fois.',
       it: 'Ordina 2-3 settimane prima dell\'inizio della scuola dell\'infanzia per avere tempo di leggerla insieme più volte.',
     },
     faq: [
       {
-        q: { en: 'At what age do children start kindergarten in Switzerland?', de: 'In welchem Alter kommen Kinder in der Schweiz in den Kindergarten?', fr: 'À quel âge les enfants commencent-ils la maternelle en Suisse ?', it: 'A che età i bambini iniziano la scuola dell\'infanzia in Svizzera?' },
-        a: { en: 'In most Swiss cantons, kindergarten starts at age 4 (turning 4 by July 31). Our stories are designed to be perfect for this age group.', de: 'In den meisten Schweizer Kantonen beginnt der Kindergarten mit 4 Jahren (Stichtag 31. Juli). Unsere Geschichten sind perfekt für diese Altersgruppe konzipiert.', fr: 'Dans la plupart des cantons suisses, la maternelle commence à 4 ans (anniversaire avant le 31 juillet). Nos histoires sont parfaitement adaptées à ce groupe d\'âge.', it: 'Nella maggior parte dei cantoni svizzeri, la scuola dell\'infanzia inizia a 4 anni (compiuti entro il 31 luglio). Le nostre storie sono pensate proprio per questa fascia d\'età.' },
+        q: { en: 'At what age do children start kindergarten in Switzerland?', de: 'In welchem Alter kommen Kinder in der Schweiz in den Kindergarten?', fr: 'À quel âge les enfants commencent-ils l\'école enfantine en Suisse ?', it: 'A che età i bambini iniziano la scuola dell\'infanzia in Svizzera?' },
+        a: { en: 'In most Swiss cantons, kindergarten starts at age 4 (turning 4 by July 31). Our stories are designed to be perfect for this age group.', de: 'In den meisten Schweizer Kantonen beginnt der Kindergarten mit 4 Jahren (Stichtag 31. Juli). Unsere Geschichten sind perfekt für diese Altersgruppe konzipiert.', fr: 'Dans la plupart des cantons suisses, l\'école enfantine commence à 4 ans (anniversaire avant le 31 juillet). Nos histoires sont parfaitement adaptées à ce groupe d\'âge.', it: 'Nella maggior parte dei cantoni svizzeri, la scuola dell\'infanzia inizia a 4 anni (compiuti entro il 31 luglio). Le nostre storie sono pensate proprio per questa fascia d\'età.' },
       },
       {
-        q: { en: 'Does the story help with separation anxiety?', de: 'Hilft die Geschichte bei Trennungsangst?', fr: 'L\'histoire aide-t-elle avec l\'anxiété de séparation ?', it: 'La storia aiuta con l\'ansia da separazione?' },
-        a: { en: 'Yes! The "First Kindergarten Day" theme is specifically designed to show that saying goodbye to mom/dad is okay and that kindergarten is safe and fun.', de: 'Ja! Das Thema «Erster Kindergartentag» zeigt speziell, dass es okay ist, sich von Mama/Papa zu verabschieden und dass der Kindergarten sicher und lustig ist.', fr: 'Oui ! Le thème "Premier jour de maternelle" est spécialement conçu pour montrer que dire au revoir à maman/papa est normal et que la maternelle est sûre et amusante.', it: 'Sì! Il tema "Primo giorno alla scuola dell\'infanzia" è pensato apposta per mostrare che salutare mamma/papà va bene e che la scuola dell\'infanzia è un posto sicuro e divertente.' },
+        q: { en: 'Does the story help with separation anxiety?', de: 'Hilft die Geschichte bei Trennungsangst?', fr: 'L\'histoire aide-t-elle avec l\'anxiété de séparation ?', it: 'La storia aiuta con l\'ansia da separazione?' },
+        a: { en: 'Yes! The "First Kindergarten Day" theme is specifically designed to show that saying goodbye to mom/dad is okay and that kindergarten is safe and fun.', de: 'Ja! Das Thema «Erster Kindergartentag» zeigt speziell, dass es okay ist, sich von Mama/Papa zu verabschieden und dass der Kindergarten sicher und lustig ist.', fr: 'Oui ! Le thème « Premier jour d\'école enfantine » est spécialement conçu pour montrer que dire au revoir à maman/papa est normal et que l\'école enfantine est sûre et amusante.', it: 'Sì! Il tema "Primo giorno alla scuola dell\'infanzia" è pensato apposta per mostrare che salutare mamma/papà va bene e che la scuola dell\'infanzia è un posto sicuro e divertente.' },
       },
       {
-        q: { en: 'Can I customize the kindergarten name in the story?', de: 'Kann ich den Kindergarten-Namen in der Geschichte anpassen?', fr: 'Puis-je personnaliser le nom de la maternelle dans l\'histoire ?', it: 'Posso personalizzare il nome della scuola dell\'infanzia nella storia?' },
-        a: { en: 'You can add custom details like the kindergarten name or teacher\'s name to make the story even more personal and recognizable for your child.', de: 'Du kannst individuelle Details wie den Kindergarten-Namen oder den Namen der Lehrperson hinzufügen, damit die Geschichte für dein Kind noch persönlicher und wiedererkennbarer wird.', fr: 'Vous pouvez ajouter des détails personnalisés comme le nom de la maternelle ou de l\'enseignant pour rendre l\'histoire encore plus personnelle.', it: 'Puoi aggiungere dettagli personalizzati come il nome della scuola dell\'infanzia o dell\'insegnante, per rendere la storia ancora più personale e riconoscibile per tuo figlio.' },
+        q: { en: 'Can I customize the kindergarten name in the story?', de: 'Kann ich den Kindergarten-Namen in der Geschichte anpassen?', fr: 'Puis-je personnaliser le nom de l\'école enfantine dans l\'histoire ?', it: 'Posso personalizzare il nome della scuola dell\'infanzia nella storia?' },
+        a: { en: 'You can add custom details like the kindergarten name or teacher\'s name to make the story even more personal and recognizable for your child.', de: 'Du kannst individuelle Details wie den Kindergarten-Namen oder den Namen der Lehrperson hinzufügen, damit die Geschichte für dein Kind noch persönlicher und wiedererkennbarer wird.', fr: 'Vous pouvez ajouter des détails personnalisés comme le nom de l\'école enfantine ou de l\'enseignant pour rendre l\'histoire encore plus personnelle.', it: 'Puoi aggiungere dettagli personalizzati come il nome della scuola dell\'infanzia o dell\'insegnante, per rendere la storia ancora più personale e riconoscibile per tuo figlio.' },
       },
     ],
   },

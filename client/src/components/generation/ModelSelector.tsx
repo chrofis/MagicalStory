@@ -471,7 +471,7 @@ export function ModelSelector({ selections, onChange }: ModelSelectorProps) {
         {language === 'de'
           ? 'Hinweis: Nur sichtbar für Admin-Benutzer im Entwicklermodus. «Server-Standard» verwendet die Umgebungsvariablen-Konfiguration.'
           : language === 'fr'
-          ? 'Note: Visible uniquement pour les utilisateurs admin en mode développeur. "Par défaut serveur" utilise la configuration des variables d\'environnement.'
+          ? 'Note : Visible uniquement pour les utilisateurs admin en mode développeur. « Par défaut serveur » utilise la configuration des variables d\'environnement.'
           : 'Note: Only visible to admin users in developer mode. "Server Default" uses the environment variable configuration.'}
       </p>
     </div>

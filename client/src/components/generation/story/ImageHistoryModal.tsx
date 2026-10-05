@@ -127,7 +127,7 @@ export function ImageHistoryModal({
     m = source.match(/^char-fix-round-(\d+)/);
     if (m) return language === 'de' ? `Charakter-Fix (Runde ${m[1]})` : language === 'fr' ? `Correction perso. (tour ${m[1]})` : `Character fix (round ${m[1]})`;
     m = source.match(/^character-fix:(.+)$/);
-    if (m) return language === 'de' ? `Charakter-Fix: ${m[1]}` : language === 'fr' ? `Correction perso. : ${m[1]}` : `Character fix: ${m[1]}`;
+    if (m) return language === 'de' ? `Charakter-Fix: ${m[1]}` : language === 'fr' ? `Correction perso. : ${m[1]}` : `Character fix: ${m[1]}`;
     if (source === 'character-fix') return language === 'de' ? 'Charakter-Fix' : language === 'fr' ? 'Correction perso.' : 'Character fix';
     if (source === 'entity-repair') return language === 'de' ? 'Entitäts-Reparatur' : language === 'fr' ? 'Réparation entité' : 'Entity repair';
     if (source === 'scale-repair') return language === 'de' ? 'Skala-Reparatur' : language === 'fr' ? 'Réparation d\'échelle' : 'Scale repair';

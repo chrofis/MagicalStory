@@ -56,7 +56,7 @@ const translations = {
   },
   fr: {
     brand: 'Magical Story',
-    loading: 'Validation de votre lien...',
+    loading: 'Validation de votre lien…',
     welcomeBack: 'Bon retour',
     setPassword: 'Définissez un mot de passe pour sécuriser votre compte.',
     password: 'Nouveau mot de passe',
@@ -69,7 +69,7 @@ const translations = {
     invalidTitle: 'Lien invalide ou expiré',
     invalidDesc: 'Ce lien est invalide ou a expiré. Vous pouvez toujours vous connecter si vous avez un mot de passe.',
     goToLogin: 'Aller à la connexion',
-    successTitle: 'Compte revendiqué !',
+    successTitle: 'Compte activé !',
     successCredits: `+${INITIAL_USER_CREDITS} crédits ajoutés`,
     successCreditsDesc: 'De quoi créer une histoire complète de plus.',
     successRedirect: 'Redirection vers vos histoires…',

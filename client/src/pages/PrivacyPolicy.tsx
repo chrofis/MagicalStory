@@ -377,103 +377,103 @@ Wenn Sie glauben, dass wir Ihre Datenschutzrechte verletzt haben, haben Sie das 
     ]
   },
   fr: {
-    title: 'Politique de Confidentialité',
-    lastUpdated: 'Dernière mise à jour : Janvier 2025',
+    title: 'Politique de confidentialité',
+    lastUpdated: 'Dernière mise à jour : janvier 2025',
     sections: [
       {
         title: '1. Introduction',
-        content: `Magical Story ("nous", "notre") s'engage à protéger votre vie privée. Cette Politique de Confidentialité explique comment nous collectons, utilisons, traitons et protégeons vos données personnelles lorsque vous utilisez notre service de livres d'histoires personnalisés alimenté par l'IA.
+        content: `Magical Story (« nous », « notre ») s'engage à protéger votre vie privée. Cette Politique de Confidentialité explique comment nous collectons, utilisons, traitons et protégeons vos données personnelles lorsque vous utilisez notre service de livres d'histoires personnalisés alimenté par l'IA.
 
 Nous respectons le Règlement Général sur la Protection des Données (RGPD) de l'UE, la Loi suisse sur la Protection des Données et autres lois applicables en matière de confidentialité.`
       },
       {
-        title: '2. Responsable du Traitement',
+        title: '2. Responsable du traitement',
         content: `Magical Story
 Ennetbaden, Suisse
-Email : privacy@magicalstory.ch
+E-mail : privacy@magicalstory.ch
 
 Aux fins du RGPD, nous sommes le responsable du traitement des données personnelles que nous traitons.`
       },
       {
-        title: '3. Données que Nous Collectons',
-        content: `Nous collectons et traitons les types de données suivants :
+        title: '3. Données que nous collectons',
+        content: `Nous collectons et traitons les types de données suivants :
 
-Informations de Compte :
+Informations de Compte :
 • Adresse e-mail
 • Mot de passe (chiffré)
 • Préférences de compte
 
-Photos et Données de Personnages :
-• Photos que vous téléchargez pour la création de personnages
+Photos et Données de Personnages :
+• Photos que vous importez pour la création de personnages
 • Noms et descriptions des personnages
 • Âge, sexe et traits de personnalité
 
-Contenu Généré :
+Contenu Généré :
 • Images d'avatar générées par IA
 • Texte de l'histoire et illustrations
 • Descriptions de scènes
 
-Données d'Utilisation :
+Données d'Utilisation :
 • Adresse IP
 • Type de navigateur et informations sur l'appareil
 • Pages visitées et fonctionnalités utilisées
 • Historique de génération d'histoires
 
-Informations de Paiement :
+Informations de Paiement :
 • Traitées en toute sécurité par notre prestataire de paiement (Stripe)
 • Nous ne stockons pas les numéros de carte de crédit complets`
       },
       {
-        title: '4. Comment Nous Utilisons Vos Photos',
-        content: `Ceci est important : Vos photos sont traitées comme suit :
+        title: '4. Comment nous utilisons vos photos',
+        content: `Ceci est important : Vos photos sont traitées comme suit :
 
-1. Téléchargement et Traitement : Lorsque vous téléchargez une photo, elle est envoyée à notre système de traitement d'images IA pour créer un avatar illustré qui ressemble à la personne sur la photo.
+1. Importation et traitement : Lorsque vous importez une photo, elle est envoyée à notre système de traitement d'images IA pour créer un avatar illustré qui ressemble à la personne sur la photo.
 
-2. Stockage Temporaire : Les photos originales sont stockées temporairement pendant le processus de création de l'histoire.
+2. Stockage Temporaire : Les photos originales sont stockées temporairement pendant le processus de création de l'histoire.
 
-3. Génération d'Avatar : L'IA analyse les traits du visage, les vêtements et autres éléments visuels pour créer une version cartoon/illustrée.
+3. Génération d'Avatar : L'IA analyse les traits du visage, les vêtements et autres éléments visuels pour créer une version cartoon/illustrée.
 
-4. Conservation des Données :
-   • Photos originales : Supprimées dans les 30 jours suivant l'achèvement de l'histoire
-   • Avatars générés : Conservés dans le cadre de votre histoire jusqu'à la suppression de votre compte
+4. Conservation des Données :
+   • Photos originales : Supprimées dans les 30 jours suivant l'achèvement de l'histoire
+   • Avatars générés : Conservés dans le cadre de votre histoire jusqu'à la suppression de votre compte
    • Vous pouvez demander une suppression immédiate à tout moment
 
-5. Pas de Partage avec des Tiers : Vos photos ne sont jamais partagées avec des tiers à des fins marketing ou autres. Elles sont uniquement traitées par nos systèmes IA et fournisseurs d'infrastructure cloud (sous accords stricts de traitement des données).`
+5. Pas de Partage avec des Tiers : Vos photos ne sont jamais partagées avec des tiers à des fins marketing ou autres. Elles sont uniquement traitées par nos systèmes IA et fournisseurs d'infrastructure cloud (sous accords stricts de traitement des données).`
       },
       {
-        title: '5. Base Légale du Traitement (RGPD)',
-        content: `Nous traitons vos données personnelles sur la base de :
+        title: '5. Base légale du traitement (RGPD)',
+        content: `Nous traitons vos données personnelles sur la base de :
 
-• Consentement : Pour le traitement des photos et la création d'histoires personnalisées (vous donnez un consentement explicite lors du téléchargement)
-• Contrat : Pour fournir les services que vous avez achetés
-• Intérêt Légitime : Pour améliorer nos services et prévenir la fraude
-• Obligation Légale : Pour les registres fiscaux et la conformité légale`
+• Consentement : Pour le traitement des photos et la création d'histoires personnalisées (vous donnez un consentement explicite lors de l'importation)
+• Contrat : Pour fournir les services que vous avez achetés
+• Intérêt Légitime : Pour améliorer nos services et prévenir la fraude
+• Obligation Légale : Pour les registres fiscaux et la conformité légale`
       },
       {
-        title: '6. Confidentialité des Enfants',
-        content: `Notre service peut être utilisé pour créer des histoires mettant en scène des enfants. Nous traitons ces données avec un soin particulier :
+        title: '6. Confidentialité des enfants',
+        content: `Notre service peut être utilisé pour créer des histoires mettant en scène des enfants. Nous traitons ces données avec un soin particulier :
 
-• Seuls les parents ou tuteurs légaux peuvent télécharger des photos d'enfants
+• Seuls les parents ou tuteurs légaux peuvent importer des photos d'enfants
 • Nous exigeons une confirmation de consentement explicite avant le traitement des photos de mineurs
 • Les photos d'enfants sont soumises aux mêmes mesures de sécurité et politiques de conservation
-• Nous respectons COPPA (USA), RGPD-K (UE) et autres réglementations sur la confidentialité des enfants
+• Nous respectons le COPPA (États-Unis), le RGPD (UE) et les autres réglementations sur la protection des données des enfants
 • Nous ne collectons pas sciemment de données directement auprès d'enfants de moins de 16 ans`
       },
       {
-        title: '7. Sécurité des Données',
-        content: `Nous mettons en œuvre des mesures de sécurité robustes :
+        title: '7. Sécurité des données',
+        content: `Nous mettons en œuvre des mesures de sécurité robustes :
 
-• Chiffrement : Toutes les données sont chiffrées en transit (TLS 1.3) et au repos (AES-256)
-• Contrôle d'Accès : Des contrôles d'accès stricts limitent l'accès aux données personnelles
-• Infrastructure : Nous utilisons une infrastructure cloud de niveau entreprise avec des certifications de sécurité
-• Surveillance : Surveillance de sécurité continue et audits réguliers
-• Réponse aux Incidents : Procédures documentées pour gérer toute violation de données`
+• Chiffrement : Toutes les données sont chiffrées en transit (TLS 1.3) et au repos (AES-256)
+• Contrôle d'Accès : Des contrôles d'accès stricts limitent l'accès aux données personnelles
+• Infrastructure : Nous utilisons une infrastructure cloud de niveau entreprise avec des certifications de sécurité
+• Surveillance : Surveillance de sécurité continue et audits réguliers
+• Réponse aux Incidents : Procédures documentées pour gérer toute violation de données`
       },
       {
-        title: '8. Partage des Données',
-        content: `Nous partageons des données uniquement avec :
+        title: '8. Partage des données',
+        content: `Nous partageons des données uniquement avec :
 
-Prestataires de Services (sous Accords de Traitement des Données) :
+Prestataires de Services (sous Accords de Traitement des Données) :
 • Hébergement cloud (Railway, AWS)
 • Traitement IA (Google Cloud, OpenAI)
 • Traitement des paiements (Stripe)
@@ -481,69 +481,69 @@ Prestataires de Services (sous Accords de Traitement des Données) :
 
 Nous ne vendons jamais vos données personnelles à des tiers.
 
-Exigences Légales :
+Exigences Légales :
 Nous pouvons divulguer des données si la loi l'exige, par ordonnance du tribunal, ou pour protéger nos droits légaux.`
       },
       {
-        title: '9. Transferts Internationaux de Données',
-        content: `Vos données peuvent être traitées en :
+        title: '9. Transferts internationaux de données',
+        content: `Vos données peuvent être traitées en :
 • Suisse (principal)
 • Union Européenne
 • États-Unis (pour certains traitements IA)
 
-Pour les transferts hors UE/EEE, nous nous appuyons sur :
+Pour les transferts hors UE/EEE, nous nous appuyons sur :
 • Clauses Contractuelles Types de l'UE
 • Décisions d'adéquation le cas échéant
 • Garanties appropriées requises par le RGPD`
       },
       {
-        title: '10. Vos Droits',
-        content: `En vertu du RGPD et des lois applicables, vous avez le droit de :
+        title: '10. Vos droits',
+        content: `En vertu du RGPD et des lois applicables, vous avez le droit de :
 
-• Accès : Demander une copie de vos données personnelles
-• Rectification : Corriger des données inexactes
-• Effacement : Demander la suppression de vos données ("droit à l'oubli")
-• Limitation : Limiter le traitement de vos données
-• Portabilité : Recevoir vos données dans un format portable
-• Opposition : S'opposer à certaines activités de traitement
-• Retrait du Consentement : Retirer votre consentement à tout moment
+• Accès : Demander une copie de vos données personnelles
+• Rectification : Corriger des données inexactes
+• Effacement : Demander la suppression de vos données (« droit à l'oubli »)
+• Limitation : Limiter le traitement de vos données
+• Portabilité : Recevoir vos données dans un format portable
+• Opposition : S'opposer à certaines activités de traitement
+• Retrait du Consentement : Retirer votre consentement à tout moment
 
 Pour exercer ces droits, contactez-nous à privacy@magicalstory.ch ou utilisez les paramètres du compte dans notre application.`
       },
       {
-        title: '11. Conservation des Données',
-        content: `Nous conservons les données pendant les périodes suivantes :
+        title: '11. Conservation des données',
+        content: `Nous conservons les données pendant les périodes suivantes :
 
-• Données de compte : Jusqu'à la suppression de votre compte
-• Photos originales : Maximum 30 jours après l'achèvement de l'histoire
-• Histoires et avatars générés : Jusqu'à leur suppression ou celle de votre compte
-• Registres de paiement : 7 ans (exigence légale)
-• Logs serveur : 90 jours
+• Données de compte : Jusqu'à la suppression de votre compte
+• Photos originales : Maximum 30 jours après l'achèvement de l'histoire
+• Histoires et avatars générés : Jusqu'à leur suppression ou celle de votre compte
+• Registres de paiement : 7 ans (exigence légale)
+• Logs serveur : 90 jours
 
 Vous pouvez supprimer votre compte et toutes les données associées à tout moment via les paramètres du compte.`
       },
       {
-        title: '12. Cookies et Suivi',
-        content: `Nous utilisons :
+        title: '12. Cookies et suivi',
+        content: `Nous utilisons :
 
-Cookies Essentiels :
+Cookies Essentiels :
 • Authentification et gestion de session
 • Fonctionnalités de sécurité
 
-Google Analytics 4 :
+Google Analytics 4 :
 • Nous utilisons Google Analytics 4 pour comprendre comment les visiteurs utilisent notre site (pages visitées, fonctionnalités utilisées, points d'abandon)
-• Google Analytics dépose des cookies pour reconnaître les visiteurs récurrents; les adresses IP complètes ne sont pas conservées par Google Analytics 4
+• Google Analytics dépose des cookies pour reconnaître les visiteurs récurrents ; les adresses IP complètes ne sont pas conservées par Google Analytics 4
 • Les données sont utilisées sous forme agrégée pour améliorer notre site et notre service
 
-Google Ads :
+Google Ads :
 • Nous utilisons le suivi des conversions Google Ads pour mesurer l'efficacité de notre publicité (p.ex. si un clic sur une annonce mène à une histoire d'essai)
 • Google Ads dépose des cookies pour attribuer les visites du site aux clics publicitaires
 
-Vous pouvez vous opposer au suivi à tout moment : bloquer les cookies dans les paramètres de votre navigateur, utiliser une extension comme uBlock Origin, ou installer le module de désactivation Google Analytics (tools.google.com/dlpage/gaoptout).`
+Vous pouvez vous opposer au suivi à tout moment : bloquer les cookies dans les paramètres de votre navigateur, utiliser une extension comme uBlock Origin, ou installer le module de désactivation Google Analytics (tools.google.com/dlpage/gaoptout).`
       },
       {
-        title: '13. Modifications de cette Politique',
-        content: `Nous pouvons mettre à jour cette Politique de Confidentialité périodiquement. Nous vous informerons des changements significatifs via :
+        title: '13. Modifications de cette politique',
+        content: `Nous pouvons mettre à jour cette Politique de Confidentialité périodiquement. Nous vous informerons des changements significatifs via :
 • Notification par e-mail
 • Avis visible sur notre site web
 • Notification dans l'application
@@ -551,14 +551,14 @@ Vous pouvez vous opposer au suivi à tout moment : bloquer les cookies dans les 
 L'utilisation continue après les modifications constitue l'acceptation de la politique mise à jour.`
       },
       {
-        title: '14. Contact et Réclamations',
-        content: `Pour les questions de confidentialité ou pour exercer vos droits :
+        title: '14. Contact et réclamations',
+        content: `Pour les questions de confidentialité ou pour exercer vos droits :
 
-Email : privacy@magicalstory.ch
+E-mail : privacy@magicalstory.ch
 
-Si vous pensez que nous avons violé vos droits à la vie privée, vous avez le droit de déposer une plainte auprès de votre autorité locale de protection des données :
-• Suisse : Préposé Fédéral à la Protection des Données et à la Transparence (PFPDT)
-• UE : Votre Autorité Nationale de Protection des Données`
+Si vous pensez que nous avons violé vos droits à la vie privée, vous avez le droit de déposer une plainte auprès de votre autorité locale de protection des données :
+• Suisse : Préposé fédéral à la protection des données et à la transparence (PFPDT)
+• UE : Votre autorité nationale de protection des données`
       }
     ]
   },

@@ -19,8 +19,8 @@ const emailNotRegisteredTexts = {
     createAccount: 'Konto erstellen',
   },
   fr: {
-    title: 'Email non enregistré',
-    message: 'Cette adresse email n\'est pas enregistrée:',
+    title: 'E-mail non enregistré',
+    message: 'Cette adresse email n\'est pas enregistrée :',
     changeEmail: 'Modifier l\'email',
     createAccount: 'Créer un compte',
   },

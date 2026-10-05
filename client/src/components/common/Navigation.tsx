@@ -218,7 +218,7 @@ export function Navigation({ currentStep = 0, onStepClick, canAccessStep, develo
             <button
               onClick={handleViewProgress}
               className="bg-indigo-500 text-white px-2 py-1.5 md:px-3 rounded text-xs font-semibold hover:bg-indigo-600 flex items-center gap-1.5 flex-shrink-0"
-              title={language === 'de' ? 'Geschichte wird erstellt...' : language === 'fr' ? 'Création en cours...' : language === 'it' ? 'Creazione in corso...' : 'Creating story...'}
+              title={language === 'de' ? 'Geschichte wird erstellt...' : language === 'fr' ? 'Création en cours…' : language === 'it' ? 'Creazione in corso...' : 'Creating story...'}
             >
               <Loader2 size={14} className="animate-spin flex-shrink-0" />
               <span className="hidden sm:inline">
@@ -232,11 +232,11 @@ export function Navigation({ currentStep = 0, onStepClick, canAccessStep, develo
             <button
               onClick={handleViewCompletedStory}
               className="bg-green-500 text-white px-3 py-1.5 rounded text-xs font-semibold hover:bg-green-600 flex items-center gap-2 animate-pulse"
-              title={language === 'de' ? 'Geschichte fertig!' : language === 'fr' ? 'Histoire terminée!' : language === 'it' ? 'Storia pronta!' : 'Story ready!'}
+              title={language === 'de' ? 'Geschichte fertig!' : language === 'fr' ? 'Histoire terminée !' : language === 'it' ? 'Storia pronta!' : 'Story ready!'}
             >
               <Sparkles size={14} />
               <span className="hidden md:inline">
-                {language === 'de' ? 'Fertig!' : language === 'fr' ? 'Terminé!' : language === 'it' ? 'Pronta!' : 'Ready!'}
+                {language === 'de' ? 'Fertig!' : language === 'fr' ? 'Terminé !' : language === 'it' ? 'Pronta!' : 'Ready!'}
               </span>
             </button>
           )}

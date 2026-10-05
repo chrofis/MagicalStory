@@ -33,7 +33,7 @@ export function ShareButton({ storyId, onShareStatusChange, variant = 'compact' 
     enableSharing: language === 'de' ? 'Link aktivieren' : language === 'fr' ? 'Activer le lien' : language === 'it' ? 'Attiva il link' : 'Enable sharing',
     disableSharing: language === 'de' ? 'Link deaktivieren' : language === 'fr' ? 'Désactiver le lien' : language === 'it' ? 'Disattiva il link' : 'Disable sharing',
     copyLink: language === 'de' ? 'Link kopieren' : language === 'fr' ? 'Copier le lien' : language === 'it' ? 'Copia il link' : 'Copy link',
-    copied: language === 'de' ? 'Kopiert!' : language === 'fr' ? 'Copié!' : language === 'it' ? 'Copiato!' : 'Copied!',
+    copied: language === 'de' ? 'Kopiert!' : language === 'fr' ? 'Copié !' : language === 'it' ? 'Copiato!' : 'Copied!',
     sharingEnabled: language === 'de' ? 'Teilen aktiv' : language === 'fr' ? 'Partage actif' : language === 'it' ? 'Condivisione attiva' : 'Sharing enabled',
     sharingDisabled: language === 'de' ? 'Teilen inaktiv' : language === 'fr' ? 'Partage inactif' : language === 'it' ? 'Condivisione inattiva' : 'Sharing disabled',
     anyoneWithLink: language === 'de' ? 'Jeder mit dem Link kann die Geschichte lesen' : language === 'fr' ? 'Toute personne avec le lien peut lire l\'histoire' : language === 'it' ? 'Chiunque abbia il link può leggere la storia' : 'Anyone with the link can read the story',

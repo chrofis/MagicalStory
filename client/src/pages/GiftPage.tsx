@@ -59,7 +59,7 @@ const pageTexts: Record<string, {
   fr: {
     breadcrumbRoot: 'Idées cadeaux',
     createButton: 'Créer votre histoire',
-    whyTitle: 'Pourquoi un livre personnalisé ?',
+    whyTitle: 'Pourquoi un livre personnalisé ?',
     tipsTitle: 'Conseils cadeaux',
     themesTitle: 'Thèmes recommandés',
     themesSubtitle: 'Nos meilleurs thèmes pour ce cadeau',

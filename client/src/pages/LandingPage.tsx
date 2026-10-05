@@ -133,7 +133,7 @@ const sectionTranslations = {
     // Section 1: Characters
     step1: 'Étape 1',
     createCharacters: 'Créez vos personnages',
-    createCharactersDesc: "Téléchargez des photos de votre famille et retrouvez-les comme personnages illustrés tout au long de l'histoire. Chaque personnage garde son apparence unique sur chaque page.",
+    createCharactersDesc: "Importez des photos de votre famille et retrouvez-les comme personnages illustrés tout au long de l'histoire. Chaque personnage garde son apparence unique sur chaque page.",
     addFamily: 'Ajoutez toute votre famille – les enfants, parents, grands-parents ou amis',
     defineNames: 'Définissez les noms, âges et relations entre les personnages',
     consistentCharacters: 'Les personnages apparaissent de manière cohérente tout au long de votre histoire',
@@ -142,7 +142,7 @@ const sectionTranslations = {
     tellStory: 'Racontez votre histoire',
     tellStoryDescBefore: 'Choisissez parmi ',
     tellStoryDescLink: '170+ thèmes',
-    tellStoryDescAfter: " ou décrivez votre propre aventure – des pirates au premier jour d'école. Vous avez le contrôle total : modifiez chaque texte et façonnez chaque illustration exactement comme vous le souhaitez.",
+    tellStoryDescAfter: " ou décrivez votre propre aventure – des pirates au premier jour d'école. Vous avez le contrôle total : modifiez chaque texte et façonnez chaque illustration exactement comme vous le souhaitez.",
     selectThemes: 'Aventure, fantasy, anniversaire, histoires du soir, défis de la vie, et plus',
     customElements: 'Modifiez les textes librement – chaque page, chaque mot',
     readingLevel: 'Façonnez les images – changez la scène, ajustez le style, affinez les détails',
@@ -150,30 +150,30 @@ const sectionTranslations = {
     step3: 'Étape 3',
     chooseStyle: 'Choisissez votre style',
     chooseStyleDesc: "Choisissez le style d'illustration qui correspond à votre histoire. Aquarelle, animation 3D, bande dessinée, anime – chaque style est appliqué de manière cohérente sur toutes les pages.",
-    artStyles: "14 styles artistiques uniques : 3D style Pixar, aquarelle, bande dessinée, anime, et plus",
+    artStyles: "14 styles artistiques uniques : 3D façon Pixar, aquarelle, bande dessinée, anime, et plus",
     consistentStyle: 'Style cohérent sur toutes les pages et personnages',
     bookLength: 'Choisissez la longueur de livre souhaitée – des histoires courtes aux aventures plus longues',
     // Section 4: Print
     step4: 'Étape 4',
-    printShare: 'Imprimez & Partagez',
-    printShareDesc: "Votre histoire est prête ! Téléchargez-la instantanément en PDF ou commandez un beau livre imprimé livré à votre porte.",
+    printShare: 'Imprimez & partagez',
+    printShareDesc: "Votre histoire est prête ! Téléchargez-la instantanément en PDF ou commandez un beau livre imprimé livré à votre porte.",
     pdfDownload: "Téléchargement PDF instantané – parfait pour lire sur tablette ou imprimer à la maison",
-    printOptions: 'Impression reliée ou brochée – 20x20cm, qualité professionnelle',
+    printOptions: 'Impression à couverture rigide ou souple – 20 × 20 cm, qualité professionnelle',
     shipping: 'Imprimé et expédié en Suisse – le cadeau parfait pour toute occasion',
     giftGuideLink: 'Idées cadeaux par âge et occasion',
     // Why It Works
     whyTitle: 'Une histoire vaut plus que mille mots.',
-    whyDesc: "On ne peut pas offrir la confiance à son enfant. Mais une histoire où c'est lui qui essaie, trébuche et réussit ? Elle reste, bien après la dernière page.",
-    localTitle: 'De Guillaume Tell à ton village',
-    localDesc: "Sois le héros de l'histoire suisse – ou d'une aventure qui se déroule dans ta propre ville.",
+    whyDesc: "On ne peut pas offrir la confiance à son enfant. Mais une histoire où c'est lui qui essaie, trébuche et réussit ? Elle reste, bien après la dernière page.",
+    localTitle: 'De Guillaume Tell à votre village',
+    localDesc: "Soyez le héros de l'histoire suisse – ou d'une aventure qui se déroule dans votre propre ville.",
     localCta: 'Découvrir les histoires de villes',
-    localBullet1: 'Se déroule dans ta ville – lieux et monuments réels',
+    localBullet1: 'Se déroule dans votre ville – lieux et monuments réels',
     localBullet2: "Ou revis l'histoire en héros",
     step5: 'Étape 5',
     whyLink: 'Découvrez pourquoi ça marche',
     // CTA
-    readyToCreate: 'Prêt à créer votre livre ?',
-    ctaDesc: "Téléchargez une photo, choisissez une aventure et votre histoire personnalisée est prête en moins de 3 minutes.",
+    readyToCreate: 'Prêt à créer votre livre ?',
+    ctaDesc: "Importez une photo, choisissez une aventure et votre histoire personnalisée est prête en moins de 3 minutes.",
     // Discover more (pre-footer grid)
     discoverTitle: 'Découvrir plus',
     discoverDesc: 'Trouvez de l\'inspiration, des idées cadeaux et des histoires de votre région.',
@@ -266,37 +266,37 @@ const TESTIMONIALS: { name: string; town: string; quote: Record<string, string> 
   { name: 'Franziska', town: 'Ennetbaden', quote: {
     de: `«Mein Sohn nimmt das Buch erstaunlich oft hervor. Dass er selbst darin vorkommt, hat ihn mehr gepackt als erwartet.»`,
     en: `"My son picks the book up surprisingly often. That he's in it himself grabbed him more than I expected."`,
-    fr: `«Mon fils ressort le livre étonnamment souvent. Le fait qu'il y figure lui-même l'a captivé plus que prévu.»`,
+    fr: `« Mon fils ressort le livre étonnamment souvent. Le fait qu'il y figure lui-même l'a captivé plus que prévu. »`,
     it: `«Mio figlio riprende in mano il libro sorprendentemente spesso. Il fatto di esserci lui stesso lo ha coinvolto più del previsto.»`,
   } },
   { name: 'Corina & Roland', town: 'Bremgarten', quote: {
     de: `«Schön fanden wir, dass die Geschichte an Orten spielt, die wir kennen. Das macht sie für die Kinder gleich näher.»`,
     en: `"We liked that the story is set in places we know. It makes it feel closer for the kids."`,
-    fr: `«Nous avons apprécié que l'histoire se déroule dans des lieux que nous connaissons. Cela la rend plus proche pour les enfants.»`,
+    fr: `« Nous avons apprécié que l'histoire se déroule dans des lieux que nous connaissons. Cela la rend plus proche pour les enfants. »`,
     it: `«Ci è piaciuto che la storia si svolga in luoghi che conosciamo. La rende più vicina per i bambini.»`,
   } },
   { name: 'Nicole & Petar', town: 'Zürich', quote: {
     de: `«Wir haben es zum Geburtstag verschenkt. Mal etwas anderes als das übliche Spielzeug.»`,
     en: `"We gave it as a birthday present. For once, something other than the usual toy."`,
-    fr: `«Nous l'avons offert pour un anniversaire. Pour une fois, autre chose que le jouet habituel.»`,
+    fr: `« Nous l'avons offert pour un anniversaire. Pour une fois, autre chose que le jouet habituel. »`,
     it: `«L'abbiamo regalato per un compleanno. Per una volta qualcosa di diverso dal solito giocattolo.»`,
   } },
   { name: 'Renate & Ehsan', town: 'Bern', quote: {
     de: `«Unsere Tochter hat sich die Geschichte übers Zähneputzen gemerkt und macht seither weniger Theater. Mehr wollten wir gar nicht.»`,
     en: `"Our daughter remembered the story about brushing teeth and has made less fuss since. That's all we wanted."`,
-    fr: `«Notre fille a retenu l'histoire sur le brossage des dents et fait moins d'histoires depuis. Nous n'en demandions pas plus.»`,
+    fr: `« Notre fille a retenu l'histoire sur le brossage des dents et fait moins d'histoires depuis. Nous n'en demandions pas plus. »`,
     it: `«Nostra figlia si è ricordata della storia sul lavarsi i denti e da allora fa meno storie. Non chiedevamo altro.»`,
   } },
   { name: 'Christoph', town: 'Würenlos', quote: {
     de: `«Ging schneller als gedacht, und das gedruckte Buch ist ordentlich geworden. Hatte ehrlich weniger erwartet.»`,
     en: `"Went faster than I thought, and the printed book turned out decent. Honestly expected less."`,
-    fr: `«C'est allé plus vite que prévu, et le livre imprimé est bien fait. J'en attendais honnêtement moins.»`,
+    fr: `« C'est allé plus vite que prévu, et le livre imprimé est bien fait. J'en attendais honnêtement moins. »`,
     it: `«È stato più veloce del previsto e il libro stampato è venuto bene. Onestamente mi aspettavo meno.»`,
   } },
   { name: 'Martin & Ursula', town: 'Solothurn', quote: {
     de: `«Waren zuerst skeptisch, ob so etwas funktioniert. Das Ergebnis hat uns dann positiv überrascht.»`,
     en: `"We were skeptical at first whether this would work. The result then pleasantly surprised us."`,
-    fr: `«Nous étions d'abord sceptiques quant au fonctionnement. Le résultat nous a ensuite agréablement surpris.»`,
+    fr: `« Nous étions d'abord sceptiques quant au fonctionnement. Le résultat nous a ensuite agréablement surpris. »`,
     it: `«All'inizio eravamo scettici se una cosa così funzionasse. Il risultato ci ha poi piacevolmente sorpreso.»`,
   } },
 ];
@@ -466,7 +466,7 @@ export default function LandingPage() {
                     <img src="/images/Real person.webp" alt="Your Picture" width="360" height="433" fetchPriority="high" decoding="async" className="w-full h-auto object-contain rounded-lg max-h-[100px] lg:max-h-[180px]" />
                   </div>
                   <p className="text-xs lg:text-base text-black font-semibold">
-                    {language === 'de' ? 'Dein Foto' : language === 'fr' ? 'Votre Photo' : language === 'it' ? 'La tua foto' : 'Your Picture'}
+                    {language === 'de' ? 'Dein Foto' : language === 'fr' ? 'Votre photo' : language === 'it' ? 'La tua foto' : 'Your Picture'}
                   </p>
                 </div>
 
@@ -481,7 +481,7 @@ export default function LandingPage() {
                     <img src="/images/Avatar.webp" alt="Your Character" width="360" height="360" fetchPriority="high" decoding="async" className="w-full h-auto object-contain rounded-lg max-h-[100px] lg:max-h-[180px]" />
                   </div>
                   <p className="text-xs lg:text-base text-black font-semibold">
-                    {language === 'de' ? 'Dein Charakter' : language === 'fr' ? 'Votre Personnage' : language === 'it' ? 'Il tuo personaggio' : 'Your Character'}
+                    {language === 'de' ? 'Dein Charakter' : language === 'fr' ? 'Votre personnage' : language === 'it' ? 'Il tuo personaggio' : 'Your Character'}
                   </p>
                 </div>
               </div>
@@ -507,7 +507,7 @@ export default function LandingPage() {
                   </video>
                 </div>
                 <p className="text-xs lg:text-base text-black font-semibold">
-                  {language === 'de' ? 'Deine Geschichte' : language === 'fr' ? 'Votre Histoire' : language === 'it' ? 'La tua storia' : 'Your Story'}
+                  {language === 'de' ? 'Deine Geschichte' : language === 'fr' ? 'Votre histoire' : language === 'it' ? 'La tua storia' : 'Your Story'}
                 </p>
               </div>
             </div>

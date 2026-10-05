@@ -58,23 +58,23 @@ const translations = {
     step: 'Schritt',
   },
   fr: {
-    welcome: 'Bienvenue sur MagicalStory!',
-    subtitle: "Créons votre livre d'histoires personnalisé. Voici comment ça marche:",
+    welcome: 'Bienvenue sur MagicalStory !',
+    subtitle: "Créons votre livre d'histoires personnalisé. Voici comment ça marche :",
 
     step1Title: 'Créer des personnages',
-    step1Desc: "Téléchargez des photos de votre famille et amis. Ajoutez des détails aux personnages pour donner vie à l'histoire.",
+    step1Desc: "Importez des photos de votre famille et amis. Ajoutez des détails aux personnages pour donner vie à l'histoire.",
 
     step2Title: 'Concevoir votre histoire',
     step2Desc: "Choisissez un thème, un style artistique et personnalisez l'histoire. Une fois prêt, nous créons votre histoire et vous envoyons un e-mail.",
 
-    step3Title: 'Imprimer & Partager',
+    step3Title: 'Imprimer & partager',
     step3Desc: 'Téléchargez en PDF instantanément ou commandez un livre imprimé.',
 
     creditsTitle: 'Vos crédits de départ',
     creditsAmount: String(INITIAL_USER_CREDITS),
     creditsLabel: 'crédits gratuits',
     creditsExplain: `Chaque page coûte ${CREDITS_PER_PAGE} crédits. Une histoire de ${EXAMPLE_STORY_PAGES} pages = ${EXAMPLE_STORY_CREDITS} crédits.`,
-    creditsBonus: 'Commandez un livre imprimé et récupérez vos crédits!',
+    creditsBonus: 'Commandez un livre imprimé et récupérez vos crédits !',
 
     cta: 'Créer votre première histoire',
 

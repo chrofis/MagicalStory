@@ -208,28 +208,28 @@ export function StoryCategorySelector({
       theme: 'Thème',
       topic: 'Sujet',
       setting: 'Cadre',
-      optionalTheme: 'Optionnel: Ajouter un thème d\'aventure',
+      optionalTheme: 'Facultatif : ajouter un thème d\'aventure',
       optionalThemeDesc: 'En faire une histoire de pirate, sorcier, etc.',
       noTheme: 'Pas de thème (réaliste)',
       selectedCategory: 'Type d\'histoire',
       selectedTopic: 'Sujet',
       selectedTheme: 'Thème',
       change: 'Changer',
-      customThemePlaceholder: 'Décris ton idée d\'histoire ici...\n\nPar exemple:\n- Une histoire sur l\'apprentissage du vélo\n- Une aventure dans les montagnes suisses\n- Un dragon amical qui aide aux devoirs',
-      customThemeLabel: 'Ton thème personnalisé:',
+      customThemePlaceholder: 'Décrivez votre idée d\'histoire ici…\n\nPar exemple :\n- Une histoire sur l\'apprentissage du vélo\n- Une aventure dans les montagnes suisses\n- Un dragon amical qui aide aux devoirs',
+      customThemeLabel: 'Votre thème personnalisé :',
       currentSelection: 'Sélection actuelle',
       changeStory: 'Choisir une autre histoire',
       category: 'Catégorie',
       yourCity: 'Votre ville',
       nearby: 'À proximité',
       byCanton: 'Par canton',
-      sagen: 'Légendes & Contes',
+      sagen: 'Légendes & contes',
       sageStoryIdea: 'Idée d\'histoire',
       sageBackground: 'Contexte',
       sageChoose: 'Choisir cette histoire',
       ideas: 'idées',
       km: 'km',
-      loading: 'Chargement...',
+      loading: 'Chargement…',
     },
     it: {
       storyType: 'Storia',
@@ -688,7 +688,7 @@ export function StoryCategorySelector({
 
         <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
           <Sparkles className="text-indigo-500" size={24} />
-          {lang === 'de' ? 'Historisches Ereignis' : lang === 'fr' ? 'Événement Historique' : lang === 'it' ? 'Evento storico' : 'Historical Event'}
+          {lang === 'de' ? 'Historisches Ereignis' : lang === 'fr' ? 'Événement historique' : lang === 'it' ? 'Evento storico' : 'Historical Event'}
         </h2>
 
         <div className="space-y-3">

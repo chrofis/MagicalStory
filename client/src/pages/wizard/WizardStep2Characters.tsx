@@ -252,7 +252,7 @@ export function WizardStep2Characters({
         <Users className="w-16 h-16 text-gray-300 mx-auto mb-4" />
         <p className="text-gray-600 mb-6">{t.startCreating}</p>
         <Button onClick={onStartNewCharacter} icon={Sparkles}>
-          {language === 'de' ? 'Ersten Charakter erstellen' : language === 'fr' ? 'Creer le premier personnage' : language === 'it' ? 'Crea il primo personaggio' : 'Create First Character'}
+          {language === 'de' ? 'Ersten Charakter erstellen' : language === 'fr' ? 'Créer le premier personnage' : language === 'it' ? 'Crea il primo personaggio' : 'Create First Character'}
         </Button>
       </div>
     </div>

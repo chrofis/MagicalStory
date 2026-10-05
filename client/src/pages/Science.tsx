@@ -87,7 +87,7 @@ const scienceContent: Record<string, {
       {
         icon: 'brain',
         title: 'Ils retiennent plus',
-        text: 'Les études montrent que les enfants retiennent plus de 40% d\'informations en plus quand ils sont le personnage principal. C\'est l\'effet d\'autoréférence — notre cerveau accorde simplement plus d\'attention aux informations qui nous concernent. Chez les enfants de 2 à 10 ans, cet effet est particulièrement fort.',
+        text: 'Les études montrent que les enfants retiennent plus de 40 % d\'informations en plus quand ils sont le personnage principal. C\'est l\'effet d\'autoréférence — notre cerveau accorde simplement plus d\'attention aux informations qui nous concernent. Chez les enfants de 2 à 10 ans, cet effet est particulièrement fort.',
       },
       {
         icon: 'sparkles',
@@ -101,7 +101,7 @@ const scienceContent: Record<string, {
       },
     ],
     giftTitle: 'Le cadeau parfait',
-    giftText: 'Vous cherchez un cadeau vraiment unique ? Un livre pour enfants personnalisé est quelque chose qu\'aucun autre enfant ne possède. Parfait pour les anniversaires, Noël, la rentrée scolaire, ou juste comme ça. Un cadeau qu\'ils chériront — et vous demanderont de lire chaque soir.',
+    giftText: 'Vous cherchez un cadeau vraiment unique ? Un livre pour enfants personnalisé est quelque chose qu\'aucun autre enfant ne possède. Parfait pour les anniversaires, Noël, la rentrée scolaire, ou juste comme ça. Un cadeau qu\'ils chériront — et vous demanderont de lire chaque soir.',
     ctaTitle: 'Créez leur histoire',
     ctaText: 'Votre enfant comme héros de sa propre aventure. Première histoire gratuite.',
     ctaButton: 'Commencer',

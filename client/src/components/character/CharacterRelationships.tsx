@@ -58,7 +58,7 @@ export function CharacterRelationships({
         language === 'de'
           ? 'Beziehung eingeben (z.B. «Onkel»):'
           : language === 'fr'
-          ? 'Entrer la relation (ex. "oncle"):'
+          ? 'Entrer la relation (ex. « oncle ») :'
           : language === 'it'
           ? 'Inserisci la relazione (es. "zio"):'
           : 'Enter relationship (e.g. "uncle"):'
@@ -69,7 +69,7 @@ export function CharacterRelationships({
           language === 'de'
             ? `Was ist die umgekehrte Beziehung? (z.B. wenn «${customRel.trim()}» dann vielleicht «Neffe/Nichte»):`
             : language === 'fr'
-            ? `Quelle est la relation inverse? (ex. si "${customRel.trim()}" alors peut-être "neveu/nièce"):`
+            ? `Quelle est la relation inverse ? (ex. si « ${customRel.trim()} » alors peut-être « neveu/nièce ») :`
             : language === 'it'
             ? `Qual è la relazione inversa? (es. se "${customRel.trim()}" allora forse "nipote"):`
             : `What is the inverse relationship? (e.g. if "${customRel.trim()}" then maybe "nephew/niece"):`
@@ -91,7 +91,7 @@ export function CharacterRelationships({
 
   const translations = {
     relationships: language === 'de' ? 'Beziehungen' : language === 'fr' ? 'Relations' : language === 'it' ? 'Relazioni' : 'Relationships',
-    detailsPlaceholder: language === 'de' ? 'Details...' : language === 'fr' ? 'Détails...' : language === 'it' ? 'Dettagli...' : 'Details...',
+    detailsPlaceholder: language === 'de' ? 'Details...' : language === 'fr' ? 'Détails…' : language === 'it' ? 'Dettagli...' : 'Details...',
   };
 
   // Get photo for current character (prefer AI-extracted face thumbnail).

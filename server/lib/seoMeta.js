@@ -23,41 +23,41 @@ try {
 // ─── Theme Data (id → { en, de, fr }) ────────────────────────────────────────
 
 const THEME_CATEGORIES = {
-  adventure: { en: 'Adventure Stories', de: 'Abenteuer-Geschichten', fr: "Histoires d'Aventure", it: 'Storie di Avventura' },
-  'life-challenges': { en: 'Life Challenge Stories', de: 'Lebensherausforderungen-Geschichten', fr: 'Histoires de Défis de Vie', it: 'Storie sulle Sfide della Vita' },
-  educational: { en: 'Educational Stories', de: 'Lehrreiche Geschichten', fr: 'Histoires Éducatives', it: 'Storie Educative' },
-  historical: { en: 'Historical Stories', de: 'Historische Geschichten', fr: 'Histoires Historiques', it: 'Storie Storiche' },
+  adventure: { en: 'Adventure Stories', de: 'Abenteuer-Geschichten', fr: "Histoires d'aventure", it: 'Storie di Avventura' },
+  'life-challenges': { en: 'Life Challenge Stories', de: 'Lebensherausforderungen-Geschichten', fr: 'Histoires de défis de vie', it: 'Storie sulle Sfide della Vita' },
+  educational: { en: 'Educational Stories', de: 'Lehrreiche Geschichten', fr: 'Histoires éducatives', it: 'Storie Educative' },
+  historical: { en: 'Historical Stories', de: 'Historische Geschichten', fr: 'Histoires historiques', it: 'Storie Storiche' },
 };
 
 const THEMES = {
   adventure: {
-    pirate: { en: 'Pirate Adventure', de: 'Piraten-Abenteuer', fr: 'Aventure de Pirates', it: 'Avventura dei Pirati' },
-    knight: { en: 'Knights & Princess', de: 'Ritter & Prinzessin', fr: 'Chevaliers & Princesse', it: 'Cavalieri & Principessa' },
+    pirate: { en: 'Pirate Adventure', de: 'Piraten-Abenteuer', fr: 'Aventure de pirates', it: 'Avventura dei Pirati' },
+    knight: { en: 'Knights & Princess', de: 'Ritter & Prinzessin', fr: 'Chevaliers & princesse', it: 'Cavalieri & Principessa' },
     cowboy: { en: 'Cowboys & Indians', de: 'Cowboys und Indianer', fr: 'Cowboys et Indiens', it: 'Cowboy e Indiani' },
-    ninja: { en: 'Secret Ninja', de: 'Geheimer Ninja', fr: 'Ninja Secret', it: 'Ninja Segreto' },
-    viking: { en: 'Viking Adventure', de: 'Wikinger-Abenteuer', fr: 'Aventure Viking', it: 'Avventura Vichinga' },
-    roman: { en: 'Ancient Rome', de: 'Antikes Rom', fr: 'Rome Antique', it: 'Antica Roma' },
-    egyptian: { en: 'Ancient Egypt', de: 'Altes Ägypten', fr: 'Égypte Ancienne', it: 'Antico Egitto' },
-    greek: { en: 'Ancient Greece', de: 'Antikes Griechenland', fr: 'Grèce Antique', it: 'Antica Grecia' },
-    caveman: { en: 'Stone Age', de: 'Steinzeit', fr: 'Âge de Pierre', it: "Età della Pietra" },
-    samurai: { en: 'Samurai Adventure', de: 'Samurai-Abenteuer', fr: 'Aventure Samouraï', it: 'Avventura del Samurai' },
-    wizard: { en: 'Wizard & Witch', de: 'Zauberer & Hexe', fr: 'Sorcier & Sorcière', it: 'Mago & Strega' },
-    dragon: { en: 'Dragon Quest', de: 'Drachen-Abenteuer', fr: 'Quête du Dragon', it: 'Avventura del Drago' },
-    unicorn: { en: 'Magical Unicorn', de: 'Magisches Einhorn', fr: 'Licorne Magique', it: 'Unicorno Magico' },
+    ninja: { en: 'Secret Ninja', de: 'Geheimer Ninja', fr: 'Ninja secret', it: 'Ninja Segreto' },
+    viking: { en: 'Viking Adventure', de: 'Wikinger-Abenteuer', fr: 'Aventure viking', it: 'Avventura Vichinga' },
+    roman: { en: 'Ancient Rome', de: 'Antikes Rom', fr: 'Rome antique', it: 'Antica Roma' },
+    egyptian: { en: 'Ancient Egypt', de: 'Altes Ägypten', fr: 'Égypte ancienne', it: 'Antico Egitto' },
+    greek: { en: 'Ancient Greece', de: 'Antikes Griechenland', fr: 'Grèce antique', it: 'Antica Grecia' },
+    caveman: { en: 'Stone Age', de: 'Steinzeit', fr: 'Âge de pierre', it: "Età della Pietra" },
+    samurai: { en: 'Samurai Adventure', de: 'Samurai-Abenteuer', fr: 'Aventure samouraï', it: 'Avventura del Samurai' },
+    wizard: { en: 'Wizard & Witch', de: 'Zauberer & Hexe', fr: 'Sorcier & sorcière', it: 'Mago & Strega' },
+    dragon: { en: 'Dragon Quest', de: 'Drachen-Abenteuer', fr: 'Quête du dragon', it: 'Avventura del Drago' },
+    unicorn: { en: 'Magical Unicorn', de: 'Magisches Einhorn', fr: 'Licorne magique', it: 'Unicorno Magico' },
     mermaid: { en: 'Mermaid Adventure', de: 'Meerjungfrauen-Abenteuer', fr: 'Aventure de Sirène', it: 'Avventura della Sirenetta' },
-    dinosaur: { en: 'Dinosaur World', de: 'Dinosaurier-Welt', fr: 'Monde des Dinosaures', it: 'Mondo dei Dinosauri' },
+    dinosaur: { en: 'Dinosaur World', de: 'Dinosaurier-Welt', fr: 'Monde des dinosaures', it: 'Mondo dei Dinosauri' },
     superhero: { en: 'Superhero', de: 'Superheld', fr: 'Super-héros', it: 'Supereroe' },
-    space: { en: 'Space Explorer', de: 'Weltraum-Entdecker', fr: 'Explorateur Spatial', it: 'Esploratore Spaziale' },
-    ocean: { en: 'Ocean Explorer', de: 'Ozean-Entdecker', fr: 'Explorateur des Océans', it: "Esploratore dell'Oceano" },
-    jungle: { en: 'Jungle Safari', de: 'Dschungel-Safari', fr: 'Safari dans la Jungle', it: 'Safari nella Giungla' },
-    farm: { en: 'Farm Life', de: 'Bauernhof-Leben', fr: 'Vie à la Ferme', it: 'Vita in Fattoria' },
-    forest: { en: 'Forest Friends', de: 'Waldfreunde', fr: 'Amis de la Forêt', it: 'Amici del Bosco' },
-    fireman: { en: 'Brave Firefighter', de: 'Tapferer Feuerwehrmann', fr: 'Pompier Courageux', it: 'Coraggioso Pompiere' },
+    space: { en: 'Space Explorer', de: 'Weltraum-Entdecker', fr: 'Explorateur spatial', it: 'Esploratore Spaziale' },
+    ocean: { en: 'Ocean Explorer', de: 'Ozean-Entdecker', fr: 'Explorateur des océans', it: "Esploratore dell'Oceano" },
+    jungle: { en: 'Jungle Safari', de: 'Dschungel-Safari', fr: 'Safari dans la jungle', it: 'Safari nella Giungla' },
+    farm: { en: 'Farm Life', de: 'Bauernhof-Leben', fr: 'Vie à la ferme', it: 'Vita in Fattoria' },
+    forest: { en: 'Forest Friends', de: 'Waldfreunde', fr: 'Amis de la forêt', it: 'Amici del Bosco' },
+    fireman: { en: 'Brave Firefighter', de: 'Tapferer Feuerwehrmann', fr: 'Pompier courageux', it: 'Coraggioso Pompiere' },
     doctor: { en: 'Helpful Doctor', de: 'Hilfreicher Arzt', fr: 'Docteur Serviable', it: 'Dottore Premuroso' },
     police: { en: 'Police Officer', de: 'Polizist', fr: 'Policier', it: 'Poliziotto' },
-    detective: { en: 'Detective Mystery', de: 'Detektiv-Geheimnis', fr: 'Mystère Détective', it: 'Mistero da Detective' },
+    detective: { en: 'Detective Mystery', de: 'Detektiv-Geheimnis', fr: 'Mystère détective', it: 'Mistero da Detective' },
     christmas: { en: 'Christmas Story', de: 'Weihnachts-Geschichte', fr: 'Histoire de Noël', it: 'Storia di Natale' },
-    newyear: { en: 'New Year Story', de: 'Neujahrs-Geschichte', fr: 'Histoire du Nouvel An', it: "Storia di Capodanno" },
+    newyear: { en: 'New Year Story', de: 'Neujahrs-Geschichte', fr: 'Histoire du nouvel an', it: "Storia di Capodanno" },
     easter: { en: 'Easter Story', de: 'Oster-Geschichte', fr: 'Histoire de Pâques', it: 'Storia di Pasqua' },
     halloween: { en: 'Halloween Story', de: 'Halloween-Geschichte', fr: "Histoire d'Halloween", it: 'Storia di Halloween' },
   },
@@ -79,7 +79,7 @@ const THEMES = {
     'sitting-still': { en: 'Sitting Still', de: 'Still sitzen', fr: 'Rester tranquille', it: 'Stare Seduti Fermi' },
     sharing: { en: 'Learning to Share', de: 'Teilen lernen', fr: 'Apprendre à partager', it: 'Imparare a Condividere' },
     'waiting-turn': { en: 'Waiting Your Turn', de: 'Warten können', fr: 'Attendre son tour', it: 'Aspettare il Proprio Turno' },
-    'first-kindergarten': { en: 'First Day of Kindergarten', de: 'Erster Kindergartentag', fr: 'Premier jour de maternelle', it: "Primo Giorno all'Asilo" },
+    'first-kindergarten': { en: 'First Day of Kindergarten', de: 'Erster Kindergartentag', fr: 'Premier jour d\'école enfantine', it: "Primo Giorno all'Asilo" },
     'making-friends': { en: 'Making Real Friends', de: 'Echte Freunde finden', fr: 'Se faire de vrais amis', it: 'Trovare Veri Amici' },
     'being-brave': { en: 'Being Brave', de: 'Mutig sein', fr: 'Être courageux', it: 'Essere Coraggiosi' },
     'new-sibling': { en: 'New Baby Sibling', de: 'Neues Geschwisterchen', fr: 'Nouveau bébé dans la famille', it: 'Un Nuovo Fratellino' },
@@ -97,7 +97,7 @@ const THEMES = {
     'death-pet': { en: 'Losing a Pet', de: 'Haustier verlieren', fr: "Perte d'un animal", it: 'La Perdita di un Animale' },
     'screen-time': { en: 'Screen Time Balance', de: 'Bildschirmzeit-Balance', fr: "Équilibre du temps d'écran", it: 'Il Tempo Davanti agli Schermi' },
     'peer-pressure': { en: 'Peer Pressure', de: 'Gruppenzwang', fr: 'Pression des pairs', it: 'La Pressione del Gruppo' },
-    'anxiety-worrying': { en: 'Worry & Anxiety', de: 'Sorgen & Ängste', fr: 'Soucis & Anxiété', it: 'Preoccupazioni & Ansia' },
+    'anxiety-worrying': { en: 'Worry & Anxiety', de: 'Sorgen & Ängste', fr: 'Soucis & anxiété', it: 'Preoccupazioni & Ansia' },
     'sibling-fighting': { en: 'Getting Along with Siblings', de: 'Geschwisterstreit', fr: "S'entendre avec ses frères et sœurs", it: 'Andare d\'Accordo tra Fratelli' },
     jealousy: { en: 'Dealing with Jealousy', de: 'Mit Eifersucht umgehen', fr: 'Gérer la jalousie', it: 'Gestire la Gelosia' },
     'not-giving-up': { en: 'Not Giving Up', de: 'Nicht aufgeben', fr: 'Ne pas abandonner', it: 'Non Arrendersi Mai' },
@@ -108,9 +108,9 @@ const THEMES = {
     'table-manners': { en: 'Table Manners', de: 'Tischmanieren', fr: 'Bonnes manières à table', it: 'Buone Maniere a Tavola' },
     'being-patient': { en: 'Learning to Be Patient', de: 'Geduld lernen', fr: 'Apprendre la patience', it: 'Imparare la Pazienza' },
     'reading-alone': { en: 'Learning to Read', de: 'Lesen lernen', fr: 'Apprendre à lire', it: 'Imparare a Leggere' },
-    'trying-new-things': { en: 'Growing & Learning', de: 'Wachsen & Lernen', fr: 'Grandir & Apprendre', it: 'Crescere & Imparare' },
+    'trying-new-things': { en: 'Growing & Learning', de: 'Wachsen & Lernen', fr: 'Grandir & apprendre', it: 'Crescere & Imparare' },
     'understanding-rules': { en: 'Why Parents Say No', de: 'Warum Eltern Nein sagen', fr: 'Pourquoi les parents disent non', it: 'Perché i Genitori Dicono No' },
-    'tattling-vs-telling': { en: 'Tattling vs Telling', de: 'Petzen vs Um Hilfe bitten', fr: "Rapporter vs Demander de l'aide", it: 'Fare la Spia vs Chiedere Aiuto' },
+    'tattling-vs-telling': { en: 'Tattling vs Telling', de: 'Petzen vs Um Hilfe bitten', fr: "Rapporter vs demander de l'aide", it: 'Fare la Spia vs Chiedere Aiuto' },
     'dealing-disappointment': { en: 'Dealing with Disappointment', de: 'Mit Enttäuschung umgehen', fr: 'Gérer la déception', it: 'Affrontare la Delusione' },
     'taking-care-belongings': { en: 'Taking Care of Things', de: 'Auf Sachen aufpassen', fr: 'Prendre soin de ses affaires', it: 'Avere Cura delle Cose' },
     'helping-at-home': { en: 'Helping at Home', de: 'Im Haushalt helfen', fr: 'Aider à la maison', it: 'Aiutare in Casa' },
@@ -123,12 +123,12 @@ const THEMES = {
     responsibility: { en: 'Taking Responsibility', de: 'Verantwortung übernehmen', fr: 'Prendre ses responsabilités', it: 'Assumersi Responsabilità' },
     'managing-time': { en: 'Managing Time', de: 'Zeitmanagement', fr: 'Gestion du temps', it: 'Gestire il Tempo' },
     'online-safety': { en: 'Online Safety', de: 'Sicherheit im Internet', fr: 'Sécurité en ligne', it: 'Sicurezza Online' },
-    'being-active': { en: 'Being Active & Going Outdoors', de: 'Aktiv sein & Rausgehen', fr: 'Être actif & Sortir dehors', it: "Muoversi & Stare all'Aperto" },
+    'being-active': { en: 'Being Active & Going Outdoors', de: 'Aktiv sein & Rausgehen', fr: 'Être actif & sortir dehors', it: "Muoversi & Stare all'Aperto" },
     'comparing-others': { en: 'Comparing Yourself to Others', de: 'Sich mit anderen vergleichen', fr: 'Se comparer aux autres', it: 'Confrontarsi con gli Altri' },
     'test-stress': { en: 'Test & Exam Stress', de: 'Prüfungsangst', fr: 'Stress des examens', it: "Ansia da Verifica" },
   },
   educational: {
-    alphabet: { en: 'The Alphabet (ABC)', de: 'Das Alphabet (ABC)', fr: "L'Alphabet (ABC)", it: "L'Alfabeto (ABC)" },
+    alphabet: { en: 'The Alphabet (ABC)', de: 'Das Alphabet (ABC)', fr: "L'alphabet (ABC)", it: "L'Alfabeto (ABC)" },
     vowels: { en: 'Vowels', de: 'Vokale', fr: 'Voyelles', it: 'Vocali' },
     rhyming: { en: 'Rhyming Words', de: 'Reimwörter', fr: 'Mots qui riment', it: 'Parole in Rima' },
     'numbers-1-10': { en: 'Numbers 1-10', de: 'Zahlen 1-10', fr: 'Nombres 1-10', it: 'Numeri 1-10' },
@@ -138,7 +138,7 @@ const THEMES = {
     addition: { en: 'Simple Addition', de: 'Einfaches Addieren', fr: 'Addition simple', it: 'Addizioni Semplici' },
     'colors-basic': { en: 'Basic Colors', de: 'Grundfarben', fr: 'Couleurs de base', it: 'Colori di Base' },
     'colors-mixing': { en: 'Mixing Colors', de: 'Farben mischen', fr: 'Mélanger les couleurs', it: 'Mescolare i Colori' },
-    planets: { en: 'Planets & Space', de: 'Planeten & Weltraum', fr: 'Planètes & Espace', it: 'Pianeti & Spazio' },
+    planets: { en: 'Planets & Space', de: 'Planeten & Weltraum', fr: 'Planètes & espace', it: 'Pianeti & Spazio' },
     seasons: { en: 'The Four Seasons', de: 'Die vier Jahreszeiten', fr: 'Les quatre saisons', it: 'Le Quattro Stagioni' },
     weather: { en: 'Weather', de: 'Wetter', fr: 'Météo', it: 'Il Tempo Atmosferico' },
     'water-cycle': { en: 'Water Cycle', de: 'Wasserkreislauf', fr: "Cycle de l'eau", it: "Il Ciclo dell'Acqua" },
@@ -156,7 +156,7 @@ const THEMES = {
     'months-year': { en: 'Months of the Year', de: 'Monate des Jahres', fr: "Mois de l'année", it: "Mesi dell'Anno" },
     'telling-time': { en: 'Telling Time', de: 'Uhr lesen', fr: "Lire l'heure", it: "Leggere l'Orologio" },
     continents: { en: 'Continents', de: 'Kontinente', fr: 'Continents', it: 'Continenti' },
-    'countries-flags': { en: 'Countries & Flags', de: 'Länder & Flaggen', fr: 'Pays & Drapeaux', it: 'Paesi & Bandiere' },
+    'countries-flags': { en: 'Countries & Flags', de: 'Länder & Flaggen', fr: 'Pays & drapeaux', it: 'Paesi & Bandiere' },
     instruments: { en: 'Musical Instruments', de: 'Musikinstrumente', fr: 'Instruments de musique', it: 'Strumenti Musicali' },
     'famous-artists': { en: 'Famous Artists', de: 'Berühmte Künstler', fr: 'Artistes célèbres', it: 'Artisti Famosi' },
   },
@@ -168,11 +168,11 @@ const THEMES = {
     'swiss-reformation': { en: 'Swiss Reformation', de: 'Schweizer Reformation', fr: 'Réforme Suisse', it: 'La Riforma Svizzera' },
     'red-cross-founding': { en: 'Henry Dunant Founds the Red Cross', de: 'Henry Dunant gründet das Rote Kreuz', fr: 'Henry Dunant fonde la Croix-Rouge', it: 'Henry Dunant Fonda la Croce Rossa' },
     'general-dufour': { en: 'General Dufour and Swiss Unity', de: 'General Dufour und die Schweizer Einheit', fr: "Général Dufour et l'unité suisse", it: "Il Generale Dufour e l'Unità Svizzera" },
-    'sonderbund-war': { en: 'The Sonderbund War', de: 'Der Sonderbundskrieg', fr: 'La Guerre du Sonderbund', it: 'La Guerra del Sonderbund' },
+    'sonderbund-war': { en: 'The Sonderbund War', de: 'Der Sonderbundskrieg', fr: 'La guerre du Sonderbund', it: 'La Guerra del Sonderbund' },
     'swiss-constitution': { en: 'Swiss Federal Constitution', de: 'Schweizerische Bundesverfassung', fr: 'Constitution fédérale suisse', it: 'La Costituzione Federale Svizzera' },
     'gotthard-tunnel': { en: 'Building the Gotthard Tunnel', de: 'Bau des Gotthardtunnels', fr: 'Construction du tunnel du Gothard', it: 'La Costruzione della Galleria del Gottardo' },
     'swiss-ww1-neutrality': { en: 'Swiss Neutrality in WWI', de: 'Schweizer Neutralität im 1. Weltkrieg', fr: 'Neutralité suisse pendant la Première Guerre', it: 'La Neutralità Svizzera nella Prima Guerra' },
-    'general-guisan': { en: 'General Guisan and the Rütli Report', de: 'General Guisan und der Rütlirapport', fr: 'Général Guisan et le Rapport du Grütli', it: 'Il Generale Guisan e il Rapporto del Grütli' },
+    'general-guisan': { en: 'General Guisan and the Rütli Report', de: 'General Guisan und der Rütlirapport', fr: 'Général Guisan et le rapport du Grütli', it: 'Il Generale Guisan e il Rapporto del Grütli' },
     'swiss-ww2-neutrality': { en: 'Switzerland in World War II', de: 'Die Schweiz im 2. Weltkrieg', fr: 'La Suisse pendant la Seconde Guerre', it: 'La Svizzera nella Seconda Guerra Mondiale' },
     'swiss-womens-vote': { en: 'Swiss Women Win the Vote', de: 'Schweizer Frauenstimmrecht', fr: 'Droit de vote des femmes suisses', it: 'Il Diritto di Voto delle Donne Svizzere' },
     'moon-landing': { en: 'Neil Armstrong Lands on the Moon', de: 'Neil Armstrong landet auf dem Mond', fr: 'Neil Armstrong marche sur la Lune', it: 'Neil Armstrong Sbarca sulla Luna' },
@@ -202,16 +202,16 @@ const THEMES = {
     'rosa-parks': { en: 'Rosa Parks & Bus Boycott', de: 'Rosa Parks & Busboykott', fr: 'Rosa Parks & Boycott des bus', it: 'Rosa Parks e il Boicottaggio degli Autobus' },
     'berlin-wall-fall': { en: 'Fall of the Berlin Wall', de: 'Fall der Berliner Mauer', fr: 'Chute du mur de Berlin', it: 'La Caduta del Muro di Berlino' },
     'mandela-freedom': { en: 'Mandela Wins Freedom', de: 'Mandela erringt die Freiheit', fr: 'Mandela gagne sa liberté', it: 'Mandela Conquista la Libertà' },
-    pyramids: { en: 'Building the Great Pyramids', de: 'Bau der Pyramiden', fr: 'Construction des Pyramides', it: 'La Costruzione delle Piramidi' },
+    pyramids: { en: 'Building the Great Pyramids', de: 'Bau der Pyramiden', fr: 'Construction des pyramides', it: 'La Costruzione delle Piramidi' },
     'eiffel-tower': { en: 'Eiffel Tower Opens', de: 'Eiffelturm eröffnet', fr: 'Tour Eiffel inaugurée', it: 'Inaugurazione della Torre Eiffel' },
     'panama-canal': { en: 'Panama Canal Opens', de: 'Panamakanal eröffnet', fr: 'Canal de Panama inauguré', it: 'Inaugurazione del Canale di Panama' },
     'golden-gate': { en: 'Building the Golden Gate Bridge', de: 'Bau der Golden Gate Bridge', fr: 'Construction du pont Golden Gate', it: 'La Costruzione del Golden Gate' },
     'channel-tunnel': { en: 'Channel Tunnel Opens', de: 'Eurotunnel eröffnet', fr: 'Tunnel sous la Manche', it: "Inaugurazione dell'Eurotunnel" },
-    'first-olympics': { en: 'First Modern Olympics', de: 'Erste moderne Olympiade', fr: 'Premiers Jeux Olympiques modernes', it: 'Le Prime Olimpiadi Moderne' },
+    'first-olympics': { en: 'First Modern Olympics', de: 'Erste moderne Olympiade', fr: 'Premiers jeux Olympiques modernes', it: 'Le Prime Olimpiadi Moderne' },
     'disneyland-opening': { en: 'Disneyland Opens', de: 'Disneyland eröffnet', fr: 'Disneyland ouvre', it: 'Apertura di Disneyland' },
     'first-movie': { en: 'Birth of Cinema', de: 'Geburt des Kinos', fr: 'Naissance du cinéma', it: 'La Nascita del Cinema' },
     'first-zoo': { en: 'First Modern Zoo Opens', de: 'Erster moderner Zoo', fr: 'Premier zoo moderne', it: 'Il Primo Zoo Moderno' },
-    'natural-history-museum': { en: 'Natural History Museum Opens', de: 'Naturhistorisches Museum', fr: "Musée d'Histoire Naturelle", it: 'Il Museo di Storia Naturale' },
+    'natural-history-museum': { en: 'Natural History Museum Opens', de: 'Naturhistorisches Museum', fr: "Musée d'histoire naturelle", it: 'Il Museo di Storia Naturale' },
     'king-tut': { en: "King Tut's Tomb Discovered", de: 'Tutanchamuns Grab entdeckt', fr: 'Tombeau de Toutânkhamon', it: 'La Tomba di Tutankhamon' },
     'pompeii-discovery': { en: 'Rediscovery of Pompeii', de: 'Wiederentdeckung von Pompeji', fr: 'Redécouverte de Pompéi', it: 'La Riscoperta di Pompei' },
     'terracotta-army': { en: 'Terracotta Army Discovered', de: 'Terrakotta-Armee entdeckt', fr: 'Armée de terre cuite', it: "L'Esercito di Terracotta" },
@@ -231,7 +231,7 @@ const STATIC_ROUTES = {
     description: {
       en: 'A personalized children\'s book where your child is the hero. Upload a photo, pick a theme, create your first story free.',
       de: 'Ein personalisiertes Kinderbuch, in dem dein Kind der Held ist. Foto hochladen, Thema wählen, erste Geschichte gratis erstellen.',
-      fr: 'Un livre pour enfant personnalisé où votre enfant est le héros. Téléchargez une photo, choisissez un thème, créez votre première histoire gratuitement.',
+      fr: 'Un livre pour enfant personnalisé où votre enfant est le héros. Importez une photo, choisissez un thème, créez votre première histoire gratuitement.',
       it: 'Rendi il tuo bambino il protagonista della sua storia. Carica una foto, scegli un tema, crea gratis la prima storia.',
     },
   },
@@ -287,7 +287,7 @@ const STATIC_ROUTES = {
     description: {
       en: 'Create your own children\'s book: upload a photo, describe the story you want, and AI writes and illustrates it. Not a template with the name swapped — an original story. Edit every word and regenerate any page. First story free.',
       de: 'Kinderbuch selbst erstellen: Foto hochladen, deine Geschichte beschreiben, die KI schreibt und illustriert sie. Keine Vorlage mit ausgetauschtem Namen — eine eigene Geschichte. Jedes Wort bearbeiten, jede Seite neu generieren. Erste Geschichte gratis.',
-      fr: 'Créez votre propre livre pour enfant : téléchargez une photo, décrivez votre histoire, l\'IA l\'écrit et l\'illustre. Pas un modèle avec le prénom remplacé — une histoire originale. Modifiez chaque mot, régénérez chaque page. Première histoire gratuite.',
+      fr: 'Créez votre propre livre pour enfant : importez une photo, décrivez votre histoire, l\'IA l\'écrit et l\'illustre. Pas un modèle avec le prénom remplacé — une histoire originale. Modifiez chaque mot, régénérez chaque page. Première histoire gratuite.',
       it: 'Crea il tuo libro per bambini: carica una foto, descrivi la storia che vuoi, l\'IA la scrive e la illustra. Non un modello col nome cambiato — una storia originale. Modifica ogni parola, rigenera ogni pagina. Prima storia gratis.',
     },
   },
@@ -329,7 +329,7 @@ const STATIC_ROUTES = {
     description: {
       en: 'Create your first personalized children\'s story for free. Upload a photo and choose a theme to get started.',
       de: 'Erstelle deine erste personalisierte Kindergeschichte gratis. Foto hochladen und Thema wählen.',
-      fr: 'Créez votre première histoire personnalisée gratuitement. Téléchargez une photo et choisissez un thème.',
+      fr: 'Créez votre première histoire personnalisée gratuitement. Importez une photo et choisissez un thème.',
       it: 'Crea gratis la tua prima storia personalizzata. Carica una foto e scegli un tema per iniziare.',
     },
   },
@@ -365,13 +365,13 @@ const STATIC_ROUTES = {
     title: {
       en: 'Impressum – MagicalStory',
       de: 'Impressum – MagicalStory',
-      fr: 'Impressum – MagicalStory',
+      fr: 'Mentions légales – MagicalStory',
       it: 'Impressum – MagicalStory',
     },
     description: {
       en: 'Legal notice and imprint for MagicalStory.',
       de: 'Impressum und rechtliche Hinweise für MagicalStory.',
-      fr: 'Mentions légales et impressum de MagicalStory.',
+      fr: 'Mentions légales de MagicalStory.',
       it: 'Note legali e impressum di MagicalStory.',
     },
   },
@@ -399,7 +399,7 @@ const STATIC_ROUTES = {
     description: {
       en: 'Browse all story themes: adventure, life challenges, educational, and historical. Create a personalized book for your child.',
       de: 'Alle Geschichten-Themen entdecken: Abenteuer, Lebensherausforderungen, Lehrreiches und Historisches. Ein personalisiertes Buch erstellen.',
-      fr: 'Parcourez tous les thèmes: aventure, défis de vie, éducatif et historique. Créez un livre personnalisé pour votre enfant.',
+      fr: 'Parcourez tous les thèmes : aventure, défis de vie, éducatif et historique. Créez un livre personnalisé pour votre enfant.',
       it: 'Scopri tutti i temi delle storie: avventura, sfide della vita, educativi e storici. Crea un libro personalizzato per il tuo bambino.',
     },
   },
@@ -455,7 +455,7 @@ const STATIC_ROUTES = {
     description: {
       de: 'Personalisierte Kinderbücher als Geschenk: Geburtstag, Weihnachten, Taufe, Einschulung und mehr. Erste Geschichte gratis.',
       en: 'Personalized children\'s books as gifts: birthdays, Christmas, baptism, first day of school and more. First story free.',
-      fr: 'Livres personnalisés comme cadeau: anniversaire, Noël, baptême, rentrée et plus. Première histoire gratuite.',
+      fr: 'Livres personnalisés comme cadeau : anniversaire, Noël, baptême, rentrée et plus. Première histoire gratuite.',
       it: 'Libri personalizzati per bambini come regalo: compleanno, Natale, battesimo, inizio scuola e altro. Prima storia gratuita.',
     },
   },
@@ -469,7 +469,7 @@ const STATIC_ROUTES = {
     description: {
       de: 'Finde das perfekte Geschenk für Kinder: einzigartige, personalisierte Kinderbücher mit dem Foto deines Kindes. Für Enkel, Patenkinder, zu Weihnachten, Ostern & mehr.',
       en: 'Find the perfect gift for kids: unique, personalized children\'s books with your child\'s photo. For grandkids, godchildren, Christmas, Easter & more.',
-      fr: 'Trouvez le cadeau parfait pour enfants: livres personnalisés uniques avec la photo de votre enfant. Pour petits-enfants, filleuls, Noël, Pâques et plus.',
+      fr: 'Trouvez le cadeau parfait pour enfants : livres personnalisés uniques avec la photo de votre enfant. Pour petits-enfants, filleuls, Noël, Pâques et plus.',
       it: 'Trova il regalo perfetto per bambini: libri personalizzati unici con la foto del tuo bambino. Per nipoti, figliocci, Natale, Pasqua e altro.',
     },
   },
@@ -562,13 +562,13 @@ const GUIDES = {
     title: {
       de: 'Kinderbuch mit KI erstellen: die praktische Anleitung',
       en: 'How to Create a Children\'s Book with AI: A Practical Guide',
-      fr: 'Créer un livre pour enfant avec l\'IA : le guide pratique',
+      fr: 'Créer un livre pour enfant avec l\'IA : le guide pratique',
       it: 'Creare un libro per bambini con l\'IA: la guida pratica',
     },
     description: {
       de: 'Was beim Kinderbuch-Erstellen mit KI wirklich funktioniert: wie du die Geschichte beschreibst, warum Figuren zwischen den Seiten anders aussehen und was du vor dem Druck prüfen solltest.',
       en: 'What actually works when you create a children\'s book with AI: how to describe the story, why characters change appearance between pages, and what to check before you print.',
-      fr: 'Ce qui fonctionne vraiment pour créer un livre pour enfant avec l\'IA : comment décrire l\'histoire, pourquoi les personnages changent d\'apparence, et quoi vérifier avant d\'imprimer.',
+      fr: 'Ce qui fonctionne vraiment pour créer un livre pour enfant avec l\'IA : comment décrire l\'histoire, pourquoi les personnages changent d\'apparence, et quoi vérifier avant d\'imprimer.',
       it: 'Cosa funziona davvero per creare un libro per bambini con l\'IA: come descrivere la storia, perché i personaggi cambiano aspetto tra le pagine e cosa controllare prima di stampare.',
     },
   },
@@ -576,7 +576,7 @@ const GUIDES = {
     title: {
       de: 'Geschwisterstreit: was wirklich hilft',
       en: 'Siblings Fighting Constantly: What Actually Helps',
-      fr: 'Disputes entre frères et sœurs : ce qui aide vraiment',
+      fr: 'Disputes entre frères et sœurs : ce qui aide vraiment',
       it: 'Litigi tra fratelli: cosa aiuta davvero',
     },
     description: {
@@ -604,7 +604,7 @@ const GUIDES = {
     title: {
       de: 'Ein Geschwisterchen kommt: das ältere Kind vorbereiten',
       en: 'A New Baby Is Coming: Preparing the Older Child',
-      fr: 'Un bébé arrive : préparer l\'aîné',
+      fr: 'Un bébé arrive : préparer l\'aîné',
       it: 'Arriva un fratellino: preparare il figlio maggiore',
     },
     description: {
@@ -618,7 +618,7 @@ const GUIDES = {
     title: {
       de: 'Vorlage oder eigene Geschichte? Der echte Unterschied bei personalisierten Büchern',
       en: 'Template or Your Own Story? The Real Difference in Personalized Books',
-      fr: 'Modèle ou histoire originale ? La vraie différence',
+      fr: 'Modèle ou histoire originale ? La vraie différence',
       it: 'Modello o storia originale? La vera differenza',
     },
     description: {
@@ -644,7 +644,7 @@ const OCCASIONS = {
   nikolaus: { de: 'Personalisiertes Kinderbuch zum Nikolaus', en: 'Personalized St. Nicholas Day Book', fr: 'Livre personnalisé pour la Saint-Nicolas', it: 'Libro personalizzato per San Nicolao' },
   advent: { de: 'Personalisiertes Kinderbuch zum Advent', en: 'Personalized Advent Book for Kids', fr: 'Livre personnalisé pour l\'Avent', it: 'Libro personalizzato per l\'Avvento' },
   umzug: { de: 'Personalisiertes Kinderbuch zum Umzug', en: 'Personalized Moving House Book', fr: 'Livre personnalisé pour le déménagement', it: 'Libro personalizzato per il trasloco' },
-  kindergartenstart: { de: 'Personalisiertes Kinderbuch zum Kindergartenstart', en: 'Personalized Starting Kindergarten Book', fr: 'Livre personnalisé pour l\'entrée en maternelle', it: 'Libro personalizzato per l\'inizio della scuola materna' },
+  kindergartenstart: { de: 'Personalisiertes Kinderbuch zum Kindergartenstart', en: 'Personalized Starting Kindergarten Book', fr: 'Livre personnalisé pour l\'entrée à l\'école enfantine', it: 'Libro personalizzato per l\'inizio della scuola materna' },
 };
 
 // ─── Gift Page Data (for meta tags) ───────────────────────────────────────────
@@ -837,15 +837,15 @@ const FAQ_BY_LANG = {
     "fr": [
       {
         "@type": "Question",
-        "name": "Comment fonctionne MagicalStory ?",
+        "name": "Comment fonctionne MagicalStory ?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Téléchargez une photo de votre enfant, choisissez un thème d'histoire et obtenez en quelques minutes une histoire personnalisée entièrement illustrée. Votre enfant apparaît comme personnage principal sur chaque page."
+          "text": "Importez une photo de votre enfant, choisissez un thème d'histoire et obtenez en quelques minutes une histoire personnalisée entièrement illustrée. Votre enfant apparaît comme personnage principal sur chaque page."
         }
       },
       {
         "@type": "Question",
-        "name": "Combien de temps cela prend-il ?",
+        "name": "Combien de temps cela prend-il ?",
         "acceptedAnswer": {
           "@type": "Answer",
           "text": "Votre première histoire gratuite est prête en quelques minutes. Le texte et toutes les illustrations sont générés automatiquement."
@@ -853,7 +853,7 @@ const FAQ_BY_LANG = {
       },
       {
         "@type": "Question",
-        "name": "Pour quel âge MagicalStory convient-il ?",
+        "name": "Pour quel âge MagicalStory convient-il ?",
         "acceptedAnswer": {
           "@type": "Answer",
           "text": "Les histoires peuvent être créées pour des enfants de tout âge. Le contenu et la complexité sont adaptés à l'âge indiqué."
@@ -861,15 +861,15 @@ const FAQ_BY_LANG = {
       },
       {
         "@type": "Question",
-        "name": "Puis-je ajouter plusieurs personnages ?",
+        "name": "Puis-je ajouter plusieurs personnages ?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Oui ! Vous pouvez ajouter toute la famille, des amis ou des animaux de compagnie comme personnages de l'histoire. Chaque personnage reçoit ses propres illustrations personnalisées."
+          "text": "Oui ! Vous pouvez ajouter toute la famille, des amis ou des animaux de compagnie comme personnages de l'histoire. Chaque personnage reçoit ses propres illustrations personnalisées."
         }
       },
       {
         "@type": "Question",
-        "name": "Combien coûte MagicalStory ?",
+        "name": "Combien coûte MagicalStory ?",
         "acceptedAnswer": {
           "@type": "Answer",
           "text": "Votre première histoire est entièrement gratuite. Ensuite, les histoires sont créées avec des crédits. Les livres imprimés sont disponibles à partir de CHF 37 en couverture rigide de haute qualité."
@@ -877,7 +877,7 @@ const FAQ_BY_LANG = {
       },
       {
         "@type": "Question",
-        "name": "Mes données sont-elles en sécurité ?",
+        "name": "Mes données sont-elles en sécurité ?",
         "acceptedAnswer": {
           "@type": "Answer",
           "text": "Oui. Vos photos sont utilisées exclusivement pour créer les illustrations et ne sont jamais transmises à des tiers. Nous prenons la protection des données au sérieux et respectons les lois suisses en la matière."
@@ -972,7 +972,7 @@ function buildProductJsonLdForTheme(themeName, category, themeId, lang) {
       offer: 'First story free. Hardcover from CHF 37.',
     },
     fr: {
-      name: `Livre pour enfants personnalisé : ${themeName}`,
+      name: `Livre pour enfants personnalisé : ${themeName}`,
       description: `Livre ${themeName} illustré par IA avec votre enfant comme héros.`,
       offer: 'Première histoire gratuite. Couverture rigide dès CHF 37.',
     },
@@ -1017,8 +1017,8 @@ function buildHowToJsonLd(lang) {
       { name: 'Get your story', text: 'Your personalized illustrated story is ready in minutes. Read online or order a printed book.' },
     ],
     fr: [
-      { name: 'Télécharger une photo', text: 'Téléchargez une photo de votre enfant. Il devient le héros illustré de l\'histoire.' },
-      { name: 'Choisir un thème', text: 'Choisissez parmi 170+ thèmes: aventure, défis de vie, éducatif ou historique.' },
+      { name: 'Importer une photo', text: 'Importez une photo de votre enfant. Il devient le héros illustré de l\'histoire.' },
+      { name: 'Choisir un thème', text: 'Choisissez parmi 170+ thèmes : aventure, défis de vie, éducatif ou historique.' },
       { name: 'Recevoir votre histoire', text: 'Votre histoire personnalisée illustrée est prête en quelques minutes. Lisez en ligne ou commandez un livre.' },
     ],
     it: [
@@ -1427,7 +1427,7 @@ function getMetaForRoute(routePath, lang) {
     description: lang === 'it'
       ? 'Rendi il tuo bambino il protagonista della sua storia. Carica una foto, scegli un tema, crea gratis la prima storia.'
       : lang === 'fr'
-        ? 'Un livre pour enfant personnalisé où votre enfant est le héros. Téléchargez une photo, choisissez un thème, créez votre première histoire gratuitement.'
+        ? 'Un livre pour enfant personnalisé où votre enfant est le héros. Importez une photo, choisissez un thème, créez votre première histoire gratuitement.'
         : lang === 'en'
           ? "A personalized children's book where your child is the hero. Upload a photo, pick a theme, create your first story free."
           : 'Ein personalisiertes Kinderbuch, in dem dein Kind der Held ist. Foto hochladen, Thema wählen, erste Geschichte gratis erstellen.',
@@ -1488,7 +1488,7 @@ function buildCityDescription(cityName, lang) {
   const templates = {
     de: `Personalisierte Kindergeschichten aus ${cityName}: Dein Kind erlebt echte Geschichte und lokale Sagen als Held eines illustrierten Kinderbuchs. Kostenlos testen.`,
     en: `Personalized children's stories from ${cityName}: Your child experiences real history and local legends as the hero of an illustrated book. Try free.`,
-    fr: `Histoires personnalisées pour enfants de ${cityName}: Votre enfant vit l'histoire locale en héros d'un livre illustré. Essai gratuit.`,
+    fr: `Histoires personnalisées pour enfants de ${cityName} : Votre enfant vit l'histoire locale en héros d'un livre illustré. Essai gratuit.`,
     it: `Storie personalizzate per bambini da ${cityName}: il tuo bambino vive la storia e le leggende locali da protagonista di un libro illustrato. Prova gratis.`,
   };
   return pickLang(templates, lang);
@@ -1498,7 +1498,7 @@ function buildComparisonDescription(competitorName, lang) {
   const templates = {
     de: `Ehrlicher Vergleich: MagicalStory vs ${competitorName}. Features, Preise, Vor- und Nachteile. Finde das beste personalisierte Kinderbuch.`,
     en: `Honest comparison: MagicalStory vs ${competitorName}. Features, pricing, pros and cons. Find the best personalized children's book.`,
-    fr: `Comparaison honnête: MagicalStory vs ${competitorName}. Fonctionnalités, prix, avantages et inconvénients. Trouvez le meilleur livre personnalisé.`,
+    fr: `Comparaison honnête : MagicalStory vs ${competitorName}. Fonctionnalités, prix, avantages et inconvénients. Trouvez le meilleur livre personnalisé.`,
     it: `Confronto onesto: MagicalStory vs ${competitorName}. Funzioni, prezzi, pro e contro. Trova il miglior libro personalizzato per bambini.`,
   };
   return pickLang(templates, lang);
@@ -1519,13 +1519,13 @@ function buildOccasionDescription(occasionSlug, lang) {
     nikolaus: { de: 'zum Nikolaus', en: 'for St. Nicholas Day', fr: 'Saint-Nicolas', it: 'San Nicolao' },
     advent: { de: 'zum Advent', en: 'for Advent', fr: 'Avent', it: 'l\'Avvento' },
     umzug: { de: 'zum Umzug', en: 'for a move to a new home', fr: 'déménagement', it: 'un trasloco' },
-    kindergartenstart: { de: 'zum Kindergartenstart', en: 'for starting kindergarten', fr: 'entrée en maternelle', it: 'l\'inizio della scuola materna' },
+    kindergartenstart: { de: 'zum Kindergartenstart', en: 'for starting kindergarten', fr: 'entrée à l\'école enfantine', it: 'l\'inizio della scuola materna' },
   };
   const occ = occasionGifts[occasionSlug] || { de: 'zu jedem Anlass', en: 'for any occasion', fr: 'occasion', it: 'un\'occasione speciale' };
   const templates = {
     de: `Das perfekte Geschenk ${occ.de}: Ein personalisiertes Kinderbuch mit deinem Kind als Held. 170+ Themen, Hardcover ab CHF 37. Erste Geschichte gratis.`,
     en: `The perfect gift ${occ.en}: A personalized children's book with your child as the hero. 170+ themes, hardcover from CHF 37. First story free.`,
-    fr: `Le cadeau parfait pour ${occ.fr}: Un livre personnalisé avec votre enfant en héros. 170+ thèmes, couverture rigide dès CHF 37. Première histoire gratuite.`,
+    fr: `Le cadeau parfait pour ${occ.fr} : Un livre personnalisé avec votre enfant en héros. 170+ thèmes, couverture rigide dès CHF 37. Première histoire gratuite.`,
     it: `Il regalo perfetto per ${occ.it}: un libro personalizzato con il tuo bambino come protagonista. 170+ temi, copertina rigida da CHF 37. Prima storia gratuita.`,
   };
   return pickLang(templates, lang);
@@ -1536,13 +1536,13 @@ function buildGiftDescription(giftSlug, lang) {
     'fuer-kinder': {
       de: 'Ein Geschenk, das Kinderaugen leuchten lässt: ein personalisiertes Kinderbuch mit dem eigenen Foto. 170+ Themen, Hardcover ab CHF 37. Erste Geschichte gratis testen.',
       en: 'A gift that makes children\'s eyes light up: a personalized book with their own photo. 170+ themes, hardcover from CHF 37. Try the first story free.',
-      fr: 'Un cadeau qui fait briller les yeux des enfants: un livre personnalisé avec leur photo. 170+ thèmes, couverture rigide dès CHF 37. Première histoire gratuite.',
+      fr: 'Un cadeau qui fait briller les yeux des enfants : un livre personnalisé avec leur photo. 170+ thèmes, couverture rigide dès CHF 37. Première histoire gratuite.',
       it: 'Un regalo che fa brillare gli occhi dei bambini: un libro personalizzato con la loro foto. 170+ temi, copertina rigida da CHF 37. Prova gratis la prima storia.',
     },
     'fuer-enkel': {
       de: 'Das Geschenk von Oma & Opa, das Enkel nie vergessen: ein personalisiertes Kinderbuch mit eigenem Foto. Einzigartig, liebevoll, ab CHF 29.',
       en: 'The gift from grandma & grandpa that grandchildren never forget: a personalized book with their photo. Unique, heartfelt, from CHF 29.',
-      fr: 'Le cadeau des grands-parents que les petits-enfants n\'oublient jamais: un livre personnalisé avec leur photo. Unique et touchant, dès CHF 29.',
+      fr: 'Le cadeau des grands-parents que les petits-enfants n\'oublient jamais : un livre personnalisé avec leur photo. Unique et touchant, dès CHF 29.',
       it: 'Il regalo di nonna e nonno che i nipoti non dimenticano mai: un libro personalizzato con la loro foto. Unico e speciale, da CHF 29.',
     },
     'fuer-nichte-neffe': {
@@ -1554,103 +1554,103 @@ function buildGiftDescription(giftSlug, lang) {
     'fuer-patenkind': {
       de: 'Geschenk für Göttikind oder Patenkind: ein personalisiertes Kinderbuch vom Götti oder der Gotte, mit Göttibub oder Göttimeitli als Held. Ab CHF 29.',
       en: 'A special gift from godparent to godchild: a personalized book with their photo. From CHF 29, first story free.',
-      fr: 'Un cadeau spécial du parrain ou de la marraine: un livre personnalisé avec la photo de votre filleul(e). Dès CHF 29.',
+      fr: 'Un cadeau spécial du parrain ou de la marraine : un livre personnalisé avec la photo de votre filleul(e). Dès CHF 29.',
       it: 'Un regalo speciale dal padrino o dalla madrina: un libro personalizzato con la foto del tuo figlioccio. Da CHF 29, prima storia gratuita.',
     },
     'geschenk-von-grosseltern': {
       de: 'Das ideale Geschenk von Grosseltern: ein personalisiertes Kinderbuch, das Enkel zum Helden macht. Einfach online erstellen, ab CHF 29.',
       en: 'The ideal gift from grandparents: a personalized book that makes grandchildren the hero. Easy to create online, from CHF 29.',
-      fr: 'Le cadeau idéal des grands-parents: un livre personnalisé qui fait de vos petits-enfants le héros. Facile à créer, dès CHF 29.',
+      fr: 'Le cadeau idéal des grands-parents : un livre personnalisé qui fait de vos petits-enfants le héros. Facile à créer, dès CHF 29.',
       it: 'Il regalo ideale dai nonni: un libro personalizzato che rende i nipoti il protagonista. Facile da creare online, da CHF 29.',
     },
     'ostergeschenk': {
       de: 'Das besondere Ostergeschenk für Kinder: ein personalisiertes Kinderbuch statt Schoggi-Hasen. Mit eigenem Foto, ab CHF 29. Kostenlos testen.',
       en: 'A special Easter gift for kids: a personalized book instead of chocolate bunnies. With their photo, from CHF 29. Try free.',
-      fr: 'Un cadeau de Pâques spécial: un livre personnalisé au lieu de lapins en chocolat. Avec leur photo, dès CHF 29. Essai gratuit.',
+      fr: 'Un cadeau de Pâques spécial : un livre personnalisé au lieu de lapins en chocolat. Avec leur photo, dès CHF 29. Essai gratuit.',
       it: 'Un regalo di Pasqua speciale: un libro personalizzato al posto dei conigli di cioccolato. Con la loro foto, da CHF 29. Prova gratis.',
     },
     'weihnachtsgeschenk': {
       de: 'Das Weihnachtsgeschenk, das Kinder lieben: ein personalisiertes Kinderbuch mit eigenem Foto unter dem Tannenbaum. Ab CHF 29.',
       en: 'The Christmas gift kids love: a personalized book with their photo under the tree. From CHF 29, first story free.',
-      fr: 'Le cadeau de Noël que les enfants adorent: un livre personnalisé avec leur photo sous le sapin. Dès CHF 29.',
+      fr: 'Le cadeau de Noël que les enfants adorent : un livre personnalisé avec leur photo sous le sapin. Dès CHF 29.',
       it: 'Il regalo di Natale che i bambini adorano: un libro personalizzato con la loro foto sotto l\'albero. Da CHF 29, prima storia gratuita.',
     },
     'geburtstagsgeschenk': {
       de: 'Das perfekte Geburtstagsgeschenk für Kinder: ein personalisiertes Kinderbuch mit dem Geburtstagskind als Held. Ab CHF 29.',
       en: 'The perfect birthday gift for kids: a personalized book with the birthday child as hero. From CHF 29, first story free.',
-      fr: "Le cadeau d'anniversaire parfait: un livre personnalisé avec l'enfant fêté en héros. Dès CHF 29, première histoire gratuite.",
+      fr: "Le cadeau d'anniversaire parfait : un livre personnalisé avec l'enfant fêté en héros. Dès CHF 29, première histoire gratuite.",
       it: 'Il regalo di compleanno perfetto: un libro personalizzato con il festeggiato come protagonista. Da CHF 29, prima storia gratuita.',
     },
     'taufgeschenk': {
       de: 'Ein Taufgeschenk mit bleibendem Wert: ein personalisiertes Kinderbuch mit dem Namen und Foto des Täuflings. Ab CHF 29.',
       en: 'A baptism gift with lasting value: a personalized book with the child\'s name and photo. From CHF 29.',
-      fr: 'Un cadeau de baptême à valeur durable: un livre personnalisé avec le nom et la photo de l\'enfant. Dès CHF 29.',
+      fr: 'Un cadeau de baptême à valeur durable : un livre personnalisé avec le nom et la photo de l\'enfant. Dès CHF 29.',
       it: 'Un regalo di battesimo dal valore duraturo: un libro personalizzato con il nome e la foto del bambino. Da CHF 29.',
     },
     'einschulungsgeschenk': {
       de: 'Geschenk zur Einschulung: ein personalisiertes Kinderbuch für den grossen Tag. Mit dem Schulkind als Held der Geschichte. Ab CHF 29.',
       en: 'First day of school gift: a personalized book for the big day. With the child as hero of the story. From CHF 29.',
-      fr: 'Cadeau de rentrée: un livre personnalisé pour le grand jour. L\'enfant est le héros de l\'histoire. Dès CHF 29.',
+      fr: 'Cadeau de rentrée : un livre personnalisé pour le grand jour. L\'enfant est le héros de l\'histoire. Dès CHF 29.',
       it: 'Regalo per il primo giorno di scuola: un libro personalizzato per il grande giorno. Il bambino è il protagonista della storia. Da CHF 29.',
     },
     'nikolausgeschenk': {
       de: 'Nikolausgeschenk für Kinder: ein personalisiertes Kinderbuch im Samichlaus-Sack. Mit eigenem Foto, ab CHF 29. Kostenlos testen.',
       en: 'St. Nicholas gift for kids: a personalized book in the gift bag. With their own photo, from CHF 29. Try free.',
-      fr: 'Cadeau de Saint-Nicolas: un livre personnalisé dans la hotte. Avec leur photo, dès CHF 29. Essai gratuit.',
+      fr: 'Cadeau de Saint-Nicolas : un livre personnalisé dans la hotte. Avec leur photo, dès CHF 29. Essai gratuit.',
       it: 'Regalo di San Nicolao per bambini: un libro personalizzato nel sacco dei doni. Con la loro foto, da CHF 29. Prova gratis.',
     },
     'einzigartiges-geschenk': {
       de: 'Auf der Suche nach einem einzigartigen Kindergeschenk? Ein personalisiertes Kinderbuch mit Foto — gibt es kein zweites Mal. Ab CHF 29.',
       en: 'Looking for a unique gift for kids? A personalized book with their photo — truly one of a kind. From CHF 29.',
-      fr: 'Vous cherchez un cadeau unique? Un livre personnalisé avec la photo de l\'enfant — vraiment unique. Dès CHF 29.',
+      fr: 'Vous cherchez un cadeau unique ? Un livre personnalisé avec la photo de l\'enfant — vraiment unique. Dès CHF 29.',
       it: 'Cerchi un regalo unico per bambini? Un libro personalizzato con la foto del bambino — davvero irripetibile. Da CHF 29.',
     },
     'personalisiertes-geschenk': {
       de: 'Personalisiertes Geschenk für Kinder: Kinderbuch mit eigenem Foto, Namen und 170+ Themen. Hardcover ab CHF 37. Erste Geschichte gratis.',
       en: 'Personalized gift for kids: a book with their photo, name and 170+ themes. Hardcover from CHF 37. First story free.',
-      fr: 'Cadeau personnalisé pour enfants: livre avec photo, prénom et 170+ thèmes. Couverture rigide dès CHF 37. Première histoire gratuite.',
+      fr: 'Cadeau personnalisé pour enfants : livre avec photo, prénom et 170+ thèmes. Couverture rigide dès CHF 37. Première histoire gratuite.',
       it: 'Regalo personalizzato per bambini: libro con foto, nome e 170+ temi. Copertina rigida da CHF 37. Prima storia gratuita.',
     },
     'sinnvolles-geschenk': {
       de: 'Sinnvolles Geschenk für Kinder: ein personalisiertes Kinderbuch, das Lesen fördert und Selbstvertrauen stärkt. Ab CHF 29.',
       en: 'A meaningful gift for kids: a personalized book that encourages reading and builds confidence. From CHF 29.',
-      fr: 'Un cadeau éducatif pour enfants: un livre personnalisé qui encourage la lecture et renforce la confiance. Dès CHF 29.',
+      fr: 'Un cadeau éducatif pour enfants : un livre personnalisé qui encourage la lecture et renforce la confiance. Dès CHF 29.',
       it: 'Un regalo educativo per bambini: un libro personalizzato che incoraggia la lettura e rafforza l\'autostima. Da CHF 29.',
     },
     'last-minute-geschenk': {
       de: 'Last-Minute-Geschenk für Kinder: personalisiertes Kinderbuch als PDF oder in 5–7 Werktagen als Hardcover. Ab CHF 37.',
       en: 'Last-minute gift for kids: personalized book as a PDF or as a hardcover in 5–7 business days. From CHF 37.',
-      fr: 'Cadeau de dernière minute: livre personnalisé en PDF ou en couverture rigide livrée en 5 à 7 jours ouvrables. Dès CHF 37.',
+      fr: 'Cadeau de dernière minute : livre personnalisé en PDF ou en couverture rigide livrée en 5 à 7 jours ouvrables. Dès CHF 37.',
       it: 'Regalo dell\'ultimo minuto per bambini: libro personalizzato in PDF o in copertina rigida consegnata in 5–7 giorni lavorativi. Da CHF 37.',
     },
     'geschenk-3-jahre': {
       de: 'Geschenk für 3-Jährige: ein personalisiertes Kinderbuch mit grossen Bildern und einfachen Texten. Mit eigenem Foto, ab CHF 29.',
       en: 'Gift for 3-year-olds: a personalized book with big pictures and simple text. With their photo, from CHF 29.',
-      fr: 'Cadeau pour enfant de 3 ans: un livre personnalisé avec de grandes images et des textes simples. Dès CHF 29.',
+      fr: 'Cadeau pour enfant de 3 ans : un livre personnalisé avec de grandes images et des textes simples. Dès CHF 29.',
       it: 'Regalo per bambini di 3 anni: un libro personalizzato con grandi immagini e testi semplici. Con la loro foto, da CHF 29.',
     },
     'geschenk-4-jahre': {
       de: 'Geschenk für 4-Jährige: ein personalisiertes Kinderbuch voller Abenteuer. Mit dem Kind als Held, ab CHF 29.',
       en: 'Gift for 4-year-olds: a personalized adventure book. With the child as hero, from CHF 29.',
-      fr: "Cadeau pour enfant de 4 ans: un livre d'aventures personnalisé. L'enfant est le héros, dès CHF 29.",
+      fr: "Cadeau pour enfant de 4 ans : un livre d'aventures personnalisé. L'enfant est le héros, dès CHF 29.",
       it: 'Regalo per bambini di 4 anni: un libro d\'avventura personalizzato. Il bambino è il protagonista, da CHF 29.',
     },
     'geschenk-5-jahre': {
       de: 'Geschenk für 5-Jährige: ein personalisiertes Kinderbuch zum Vorlesen und Selbstentdecken. 170+ Themen, ab CHF 29.',
       en: 'Gift for 5-year-olds: a personalized book for reading aloud and self-discovery. 170+ themes, from CHF 29.',
-      fr: 'Cadeau pour enfant de 5 ans: un livre personnalisé à lire ensemble et explorer. 170+ thèmes, dès CHF 29.',
+      fr: 'Cadeau pour enfant de 5 ans : un livre personnalisé à lire ensemble et explorer. 170+ thèmes, dès CHF 29.',
       it: 'Regalo per bambini di 5 anni: un libro personalizzato da leggere insieme e scoprire da soli. 170+ temi, da CHF 29.',
     },
     'geschenk-6-jahre': {
       de: 'Geschenk für 6-Jährige: ein personalisiertes Kinderbuch für Erstleser. Spannende Geschichten mit eigenem Foto, ab CHF 29.',
       en: 'Gift for 6-year-olds: a personalized book for early readers. Exciting stories with their photo, from CHF 29.',
-      fr: 'Cadeau pour enfant de 6 ans: un livre personnalisé pour jeunes lecteurs. Histoires passionnantes, dès CHF 29.',
+      fr: 'Cadeau pour enfant de 6 ans : un livre personnalisé pour jeunes lecteurs. Histoires passionnantes, dès CHF 29.',
       it: 'Regalo per bambini di 6 anni: un libro personalizzato per giovani lettori. Storie appassionanti con la loro foto, da CHF 29.',
     },
     'geschenk-7-8-jahre': {
       de: 'Geschenk für 7–8-Jährige: ein personalisiertes Kinderbuch mit längeren Geschichten und spannenden Abenteuern. Ab CHF 29.',
       en: 'Gift for 7-8-year-olds: a personalized book with longer stories and exciting adventures. From CHF 29.',
-      fr: 'Cadeau pour enfant de 7-8 ans: un livre personnalisé avec des histoires plus longues et des aventures passionnantes. Dès CHF 29.',
+      fr: 'Cadeau pour enfant de 7-8 ans : un livre personnalisé avec des histoires plus longues et des aventures passionnantes. Dès CHF 29.',
       it: 'Regalo per bambini di 7-8 anni: un libro personalizzato con storie più lunghe e avventure appassionanti. Da CHF 29.',
     },
   };

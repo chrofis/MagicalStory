@@ -333,7 +333,7 @@ export function WizardStep3BookSettings({
           {/* Language Selection - Custom dropdown with languages and variants */}
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-600">
-              {language === 'de' ? 'Sprache:' : language === 'fr' ? 'Langue:' : language === 'it' ? 'Lingua:' : 'Language:'}
+              {language === 'de' ? 'Sprache:' : language === 'fr' ? 'Langue :' : language === 'it' ? 'Lingua:' : 'Language:'}
             </span>
             <div className="relative" ref={languageDropdownRef}>
               {/* Dropdown trigger button */}
@@ -404,7 +404,7 @@ export function WizardStep3BookSettings({
           <div className="flex items-center gap-2 flex-wrap">
             <MapPin className="text-gray-500 shrink-0" size={16} />
             <span className="text-sm text-gray-600">
-              {language === 'de' ? 'Ort:' : language === 'fr' ? 'Lieu:' : language === 'it' ? 'Luogo:' : 'Location:'}
+              {language === 'de' ? 'Ort:' : language === 'fr' ? 'Lieu :' : language === 'it' ? 'Luogo:' : 'Location:'}
             </span>
             {isEditingLocation ? (
               <div className="flex items-center gap-1 flex-wrap">
@@ -533,7 +533,7 @@ export function WizardStep3BookSettings({
           {/* Season Dropdown */}
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-600">
-              {language === 'de' ? 'Jahreszeit:' : language === 'fr' ? 'Saison:' : language === 'it' ? 'Stagione:' : 'Season:'}
+              {language === 'de' ? 'Jahreszeit:' : language === 'fr' ? 'Saison :' : language === 'it' ? 'Stagione:' : 'Season:'}
             </span>
             <div className="relative">
               <select
@@ -614,7 +614,7 @@ export function WizardStep3BookSettings({
                 {language === 'de'
                   ? `Aktuell: ${userCredits} Credits`
                   : language === 'fr'
-                  ? `Actuel: ${userCredits} crédits`
+                  ? `Actuel : ${userCredits} crédits`
                   : language === 'it' ? `Attuale: ${userCredits} crediti` : `Current: ${userCredits} credits`}
               </p>
             </div>

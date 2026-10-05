@@ -48,13 +48,13 @@ export const guides: GuideArticle[] = [
     title: {
       en: 'How to Create a Children\'s Book with AI: A Practical Guide',
       de: 'Kinderbuch mit KI erstellen: die praktische Anleitung',
-      fr: 'Créer un livre pour enfant avec l\'IA : le guide pratique',
+      fr: 'Créer un livre pour enfant avec l\'IA : le guide pratique',
       it: 'Creare un libro per bambini con l\'IA: la guida pratica',
     },
     description: {
       en: 'What actually works when you create a children\'s book with AI: how to describe the story, why characters change appearance between pages, and what to check before you print.',
       de: 'Was beim Kinderbuch-Erstellen mit KI wirklich funktioniert: wie du die Geschichte beschreibst, warum Figuren zwischen den Seiten anders aussehen und was du vor dem Druck prüfen solltest.',
-      fr: 'Ce qui fonctionne vraiment pour créer un livre pour enfant avec l\'IA : comment décrire l\'histoire, pourquoi les personnages changent d\'apparence, et quoi vérifier avant d\'imprimer.',
+      fr: 'Ce qui fonctionne vraiment pour créer un livre pour enfant avec l\'IA : comment décrire l\'histoire, pourquoi les personnages changent d\'apparence, et quoi vérifier avant d\'imprimer.',
       it: 'Cosa funziona davvero quando si crea un libro per bambini con l\'IA: come descrivere la storia, perché i personaggi cambiano aspetto da una pagina all\'altra e cosa controllare prima di stampare.',
     },
     intro: {
@@ -83,9 +83,9 @@ export const guides: GuideArticle[] = [
             'Eine brauchbare Regel: Wenn deine Beschreibung auf jedes Kind passen könnte, entsteht eine Geschichte über kein bestimmtes Kind.',
           ],
           fr: [
-            'L\'erreur la plus courante est de demander « une histoire sur une fille courageuse et un dragon ». Cette formulation figure dix millions de fois dans les données d\'entraînement — vous obtenez la moyenne de toutes.',
-            'Ce qui produit une histoire digne d\'être lue, c\'est la précision que vous seul possédez : que votre fille ne s\'endort pas sans un lapin en peluche précis, qu\'elle vient de déménager et ne connaît personne, que le bruit de la chaudière lui fait peur la nuit. Donnez la situation au modèle et laissez-le inventer l\'intrigue.',
-            'Une règle utile : si votre description pourrait s\'appliquer à n\'importe quel enfant, elle produira une histoire sur aucun enfant en particulier.',
+            'L\'erreur la plus courante est de demander « une histoire sur une fille courageuse et un dragon ». Cette formulation figure dix millions de fois dans les données d\'entraînement — vous obtenez la moyenne de toutes.',
+            'Ce qui produit une histoire digne d\'être lue, c\'est la précision que vous seul possédez : que votre fille ne s\'endort pas sans un lapin en peluche précis, qu\'elle vient de déménager et ne connaît personne, que le bruit de la chaudière lui fait peur la nuit. Donnez la situation au modèle et laissez-le inventer l\'intrigue.',
+            'Une règle utile : si votre description pourrait s\'appliquer à n\'importe quel enfant, elle produira une histoire sur aucun enfant en particulier.',
           ],
           it: [
             'L\'errore più comune è chiedere «una storia su una bambina coraggiosa e un drago». Questa richiesta è comparsa dieci milioni di volte nei dati di addestramento, e ottieni la versione media di tutte quante.',
@@ -114,8 +114,8 @@ export const guides: GuideArticle[] = [
           ],
           fr: [
             'C\'est le plus grand écart de qualité entre un livre fait avec un générateur d\'images généraliste et un service dédié — à comprendre avant d\'y passer une soirée.',
-            'Les modèles d\'images génèrent chaque illustration indépendamment. Demandez douze fois « une fille de sept ans aux boucles brunes » et vous obtenez douze filles différentes — visage, longueur de cheveux, couleur des yeux. Un enfant le remarque immédiatement, et l\'illusion que le livre parle de lui disparaît.',
-            'La solution est une référence : la même description de personnage, idéalement la même image de référence, pour chaque page, plus une vérification qui compare chaque figure au référentiel et régénère celles qui dérivent. En autonomie, attendez-vous à régénérer beaucoup de pages. Pour choisir un service, c\'est la question à poser.',
+            'Les modèles d\'images génèrent chaque illustration indépendamment. Demandez douze fois « une fille de sept ans aux boucles brunes » et vous obtenez douze filles différentes — visage, longueur de cheveux, couleur des yeux. Un enfant le remarque immédiatement, et l\'illusion que le livre parle de lui disparaît.',
+            'La solution est une référence : la même description de personnage, idéalement la même image de référence, pour chaque page, plus une vérification qui compare chaque figure au référentiel et régénère celles qui dérivent. En autonomie, attendez-vous à régénérer beaucoup de pages. Pour choisir un service, c\'est la question à poser.',
           ],
           it: [
             'Questo è il divario di qualità più grande tra un libro fatto con un generatore di immagini generico e uno fatto con un servizio dedicato, e vale la pena capirlo prima di dedicarci una serata.',
@@ -144,7 +144,7 @@ export const guides: GuideArticle[] = [
           ],
           fr: [
             'Les textes IA tombent par défaut dans un registre un peu trop âgé et un peu trop lisse — phrases longues, mots abstraits sur les émotions, morale énoncée à la fin. Cela se lit bien pour un adulte et tombe à plat avec un enfant de quatre ans.',
-            'Demandez des contraintes plutôt qu\'un âge cible : longueur maximale de phrase, noms concrets plutôt qu\'abstractions, une seule idée nouvelle par page, pas de morale finale. « Cinq minutes de lecture maximum, apaisant plutôt que palpitant » donne un bien meilleur résultat que « pour un enfant de 4 ans ».',
+            'Demandez des contraintes plutôt qu\'un âge cible : longueur maximale de phrase, noms concrets plutôt qu\'abstractions, une seule idée nouvelle par page, pas de morale finale. « Cinq minutes de lecture maximum, apaisant plutôt que palpitant » donne un bien meilleur résultat que « pour un enfant de 4 ans ».',
             'Puis lisez-le à voix haute avant de le valider. Un texte qui paraît bon à l\'écran et un texte qui fonctionne à voix haute sont deux choses différentes.',
           ],
           it: [
@@ -194,7 +194,7 @@ export const guides: GuideArticle[] = [
         q: {
           en: 'Do I need a photo to create a children\'s book with AI?',
           de: 'Brauche ich ein Foto, um ein Kinderbuch mit KI zu erstellen?',
-          fr: 'Faut-il une photo pour créer un livre avec l\'IA ?',
+          fr: 'Faut-il une photo pour créer un livre avec l\'IA ?',
           it: 'Serve una foto per creare un libro per bambini con l\'IA?',
         },
         a: {
@@ -208,7 +208,7 @@ export const guides: GuideArticle[] = [
         q: {
           en: 'Can I sell a children\'s book I made with AI?',
           de: 'Darf ich ein mit KI erstelltes Kinderbuch verkaufen?',
-          fr: 'Puis-je vendre un livre créé avec l\'IA ?',
+          fr: 'Puis-je vendre un livre créé avec l\'IA ?',
           it: 'Posso vendere un libro per bambini creato con l\'IA?',
         },
         a: {
@@ -222,7 +222,7 @@ export const guides: GuideArticle[] = [
         q: {
           en: 'How long does it take?',
           de: 'Wie lange dauert es?',
-          fr: 'Combien de temps cela prend-il ?',
+          fr: 'Combien de temps cela prend-il ?',
           it: 'Quanto tempo ci vuole?',
         },
         a: {
@@ -243,7 +243,7 @@ export const guides: GuideArticle[] = [
     title: {
       en: 'Template or Your Own Story? The Real Difference in Personalized Books',
       de: 'Vorlage oder eigene Geschichte? Der echte Unterschied bei personalisierten Büchern',
-      fr: 'Modèle ou histoire originale ? La vraie différence',
+      fr: 'Modèle ou histoire originale ? La vraie différence',
       it: 'Modello o storia originale? La vera differenza nei libri personalizzati',
     },
     description: {
@@ -280,7 +280,7 @@ export const guides: GuideArticle[] = [
           fr: [
             'Regardez ce que demande le formulaire. S\'il ne collecte que des données insérables dans des blancs — prénom, âge, couleur des cheveux, teint, une occasion parmi six — c\'est un modèle. Rien de ce que vous saisissez ne change ce qui arrive dans l\'histoire.',
             'S\'il vous demande de décrire quelque chose avec vos propres mots, dans un champ libre, il peut écrire à partir de cette description. Ce champ est toute la différence.',
-            'Deuxième test : si le site montre le même exemple d\'histoire sur chaque page produit avec des prénoms différents, c\'est un modèle.',
+            'Deuxième test : si le site montre le même exemple d\'histoire sur chaque page produit avec des prénoms différents, c\'est un modèle.',
           ],
           it: [
             'Guarda cosa chiede il modulo d\'ordine. Se raccoglie solo dati che si possono inserire in spazi vuoti — nome, età, colore dei capelli, tono della pelle, una tra sei occasioni — è un modello. Nulla di ciò che inserisci può cambiare quello che accade nella storia.',
@@ -355,13 +355,13 @@ export const guides: GuideArticle[] = [
         q: {
           en: 'Are original AI stories worse written than template books?',
           de: 'Sind eigene KI-Geschichten schlechter geschrieben als Vorlagenbücher?',
-          fr: 'Les histoires IA sont-elles moins bien écrites que les modèles ?',
+          fr: 'Les histoires IA sont-elles moins bien écrites que les modèles ?',
           it: 'Le storie originali scritte dall\'IA sono peggio scritte dei libri modello?',
         },
         a: {
           en: 'Sentence for sentence, a template that a human editor worked on for months is usually smoother. The trade is polish against relevance: a slightly less elegant story about the thing your child is actually going through generally beats a beautifully written story about nothing in particular. Services that let you edit the text afterwards narrow the gap considerably.',
           de: 'Satz für Satz ist eine Vorlage, an der ein Lektorat monatelang gearbeitet hat, meist runder. Der Tausch heisst Politur gegen Relevanz: Eine etwas weniger elegante Geschichte über das, was dein Kind gerade durchmacht, schlägt in der Regel eine schön geschriebene Geschichte über nichts Bestimmtes. Dienste, bei denen du den Text nachbearbeiten kannst, verkleinern den Abstand deutlich.',
-          fr: 'Phrase par phrase, un modèle travaillé pendant des mois par un éditeur est généralement plus fluide. L\'échange, c\'est le poli contre la pertinence : une histoire un peu moins élégante sur ce que votre enfant traverse vaut mieux qu\'une belle histoire sur rien en particulier.',
+          fr: 'Phrase par phrase, un modèle travaillé pendant des mois par un éditeur est généralement plus fluide. L\'échange, c\'est le poli contre la pertinence : une histoire un peu moins élégante sur ce que votre enfant traverse vaut mieux qu\'une belle histoire sur rien en particulier.',
           it: 'Frase per frase, un modello su cui un redattore ha lavorato per mesi è di solito più scorrevole. Lo scambio è tra rifinitura e pertinenza: una storia leggermente meno elegante su ciò che tuo figlio sta davvero vivendo generalmente batte una storia scritta magnificamente su nulla in particolare. I servizi che ti permettono di modificare il testo in seguito riducono notevolmente il divario.',
         },
       },
@@ -369,13 +369,13 @@ export const guides: GuideArticle[] = [
         q: {
           en: 'Can I edit the story if I do not like part of it?',
           de: 'Kann ich die Geschichte bearbeiten, wenn mir etwas nicht gefällt?',
-          fr: 'Puis-je modifier l\'histoire si une partie ne me plaît pas ?',
+          fr: 'Puis-je modifier l\'histoire si une partie ne me plaît pas ?',
           it: 'Posso modificare la storia se una parte non mi piace?',
         },
         a: {
           en: 'With a template, no — the text is fixed apart from the personalized fields. With an original story it depends on the service: some hand you a finished PDF, others let you rewrite any sentence and regenerate any illustration. If you care about the wording, check this before buying rather than after.',
           de: 'Bei einer Vorlage nein — der Text steht fest, abgesehen von den personalisierten Feldern. Bei einer eigenen Geschichte hängt es vom Anbieter ab: Manche liefern ein fertiges PDF, andere lassen dich jeden Satz umschreiben und jede Illustration neu erzeugen. Wenn dir der Wortlaut wichtig ist, kläre das vor dem Kauf.',
-          fr: 'Avec un modèle, non — le texte est figé hormis les champs personnalisés. Avec une histoire originale, cela dépend du service : certains livrent un PDF fini, d\'autres permettent de réécrire chaque phrase et régénérer chaque illustration. Vérifiez avant d\'acheter.',
+          fr: 'Avec un modèle, non — le texte est figé hormis les champs personnalisés. Avec une histoire originale, cela dépend du service : certains livrent un PDF fini, d\'autres permettent de réécrire chaque phrase et régénérer chaque illustration. Vérifiez avant d\'acheter.',
           it: 'Con un modello, no — il testo è fisso a parte i campi personalizzati. Con una storia originale dipende dal servizio: alcuni ti consegnano un PDF finito, altri ti permettono di riscrivere qualsiasi frase e rigenerare qualsiasi illustrazione. Se il testo ti sta a cuore, verificalo prima di comprare, non dopo.',
         },
       },
@@ -402,7 +402,7 @@ export const guides: GuideArticle[] = [
     title: {
       en: 'Siblings Fighting Constantly: What Actually Helps',
       de: 'Geschwisterstreit: was wirklich hilft',
-      fr: 'Disputes entre frères et sœurs : ce qui aide vraiment',
+      fr: 'Disputes entre frères et sœurs : ce qui aide vraiment',
       it: 'Litigi tra fratelli continui: cosa aiuta davvero',
     },
     description: {
@@ -438,7 +438,7 @@ export const guides: GuideArticle[] = [
           ],
           fr: [
             'Deux enfants se disputent le gobelet rouge alors qu\'il y en a quatre identiques dans le placard. C\'est l\'indice. Ce qui est rare dans la pièce, ce n\'est pas le gobelet — c\'est vous, et la certitude d\'avoir une place que personne ne peut prendre.',
-            'Du point de vue d\'un enfant, les frères et sœurs sont ceux qui sont arrivés pour partager une réserve limitée d\'attention parentale. L\'essentiel de ce qui ressemble à des chamailleries teste cette réserve : est-ce qu\'elle en reçoit plus, est-ce qu\'il s\'en tire mieux, que se passe-t-il si je pousse.',
+            'Du point de vue d\'un enfant, les frères et sœurs sont ceux qui sont arrivés pour partager une réserve limitée d\'attention parentale. L\'essentiel de ce qui ressemble à des chamailleries teste cette réserve : est-ce qu\'elle en reçoit plus, est-ce qu\'il s\'en tire mieux, que se passe-t-il si je pousse.',
             'C\'est pourquoi la comptabilité de l\'équité échoue. Dès que vous mesurez les minutes et les biscuits, vous confirmez que l\'attention est une quantité rationnée, et les deux enfants se mettent à vous auditer. Ce qui fait baisser la température, c\'est une attention non mesurée et non méritée, qui arrive quand rien ne va mal.',
           ],
           it: [
@@ -467,9 +467,9 @@ export const guides: GuideArticle[] = [
             'Die Alternative ist beschreiben statt entscheiden. «Zwei Kinder, ein Trottinett, und ihr seid beide wütend.» Du hast nichts darüber gesagt, wer recht hat, aber gezeigt, dass du es gesehen hast — und das war das meiste, wofür geschrien wurde. Dann gib das Problem zurück: «Sagt mir Bescheid, wenn ihr eine Lösung habt.» Kleine Kinder brauchen mehr Begleitung, aber die Richtung bleibt: Situation schildern, beide Gefühle benennen, die Lösung bei ihnen lassen.',
           ],
           fr: [
-            'Le réflexe est d\'établir les faits et de trancher. Cela marche rarement, pour une raison structurelle : vous n\'avez pas vu le début, les deux versions sont sincères et incompatibles, et quoi que vous décidiez, le perdant apprend qu\'il faut raconter une meilleure histoire, plus vite.',
+            'Le réflexe est d\'établir les faits et de trancher. Cela marche rarement, pour une raison structurelle : vous n\'avez pas vu le début, les deux versions sont sincères et incompatibles, et quoi que vous décidiez, le perdant apprend qu\'il faut raconter une meilleure histoire, plus vite.',
             'Juger fait aussi de vous le prix. Si le conflit produit un verdict de votre part, alors produire des conflits devient le moyen de vous atteindre.',
-            'L\'alternative : décrire au lieu de décider. «Deux enfants, une trottinette, et vous êtes furieux tous les deux.» Vous n\'avez rien dit sur qui a raison, mais vous avez montré que vous aviez vu — c\'est l\'essentiel de ce pour quoi ils criaient. Puis rendez-leur le problème : dites-moi quand vous aurez trouvé.',
+            'L\'alternative : décrire au lieu de décider. « Deux enfants, une trottinette, et vous êtes furieux tous les deux. » Vous n\'avez rien dit sur qui a raison, mais vous avez montré que vous aviez vu — c\'est l\'essentiel de ce pour quoi ils criaient. Puis rendez-leur le problème : dites-moi quand vous aurez trouvé.',
           ],
           it: [
             'L\'istinto è stabilire cos\'è successo e pronunciare un verdetto. Funziona di rado, per una ragione strutturale: non hai visto l\'inizio, entrambi i racconti sono sinceri e incompatibili, e qualsiasi cosa tu decida insegna a chi perde che la prossima volta la strategia vincente è raccontare una storia migliore, più in fretta.',
@@ -498,7 +498,7 @@ export const guides: GuideArticle[] = [
           ],
           fr: [
             'Il y a une ligne claire à tenir, et elle ne porte pas sur qui a raison. Le désaccord est permis et normal, y compris bruyant. Faire mal ne l\'est pas, et cela s\'arrête immédiatement, sans discussion ni verdict.',
-            'Le geste utile quand quelqu\'un est blessé est contre-intuitif : allez d\'abord vers l\'enfant blessé et occupez-vous de lui, sans vous retourner pour accuser l\'autre. Celui qui a frappé regarde, et apprend que faire mal produit de l\'attention pour l\'autre, pas une confrontation avec vous. La conversation vient plus tard, au calme — et fonctionne bien mieux, parce que personne ne se défend.',
+            'Le geste utile quand quelqu\'un est blessé est contre-intuitif : allez d\'abord vers l\'enfant blessé et occupez-vous de lui, sans vous retourner pour accuser l\'autre. Celui qui a frappé regarde, et apprend que faire mal produit de l\'attention pour l\'autre, pas une confrontation avec vous. La conversation vient plus tard, au calme — et fonctionne bien mieux, parce que personne ne se défend.',
             'La réparation compte plus que la punition. Quelque chose de concret — aller chercher la poche de glace, reconstruire la tour renversée — restaure la relation, ce que rester assis sur une marche ne fait pas.',
           ],
           it: [
@@ -527,9 +527,9 @@ export const guides: GuideArticle[] = [
             'Der praktische Ersatz ist, den Moment zu beschreiben statt die Person. Nicht «du bist so geduldig mit ihr», das ist eine Rolle, die gehalten werden muss, sondern «du hast gewartet, bis sie fertig war, das war schwierig» — etwas, das einmal passiert ist und wieder passieren kann, ohne zu bestimmen, wer du bist.',
           ],
           fr: [
-            'Les familles distribuent vite les rôles : la raisonnable, le turbulent, la sensible, le facile. Ces étiquettes ressemblent à des observations. Elles fonctionnent comme des consignes.',
-            'La plus coûteuse est souvent «le grand», parce qu\'elle transforme un hasard de naissance en fonction permanente : céder, attendre, comprendre, être raisonnable pendant qu\'un plus petit n\'y est pas tenu. Le ressentiment envers le cadet commence généralement là — et vise la mauvaise cible.',
-            'Le remplacement pratique : décrire le moment plutôt que la personne. Non pas «tu es si patient avec elle», qui est un rôle à tenir, mais «tu as attendu qu\'elle finisse, c\'était difficile» — une chose arrivée une fois, qui peut se reproduire sans définir qui tu es.',
+            'Les familles distribuent vite les rôles : la raisonnable, le turbulent, la sensible, le facile. Ces étiquettes ressemblent à des observations. Elles fonctionnent comme des consignes.',
+            'La plus coûteuse est souvent « le grand », parce qu\'elle transforme un hasard de naissance en fonction permanente : céder, attendre, comprendre, être raisonnable pendant qu\'un plus petit n\'y est pas tenu. Le ressentiment envers le cadet commence généralement là — et vise la mauvaise cible.',
+            'Le remplacement pratique : décrire le moment plutôt que la personne. Non pas « tu es si patient avec elle », qui est un rôle à tenir, mais « tu as attendu qu\'elle finisse, c\'était difficile » — une chose arrivée une fois, qui peut se reproduire sans définir qui tu es.',
           ],
           it: [
             'Le famiglie si assestano rapidamente su ruoli fissi: quello sensato, quella vivace, quello sensibile, quella facile. Le etichette sembrano osservazioni. Funzionano come istruzioni.',
@@ -558,7 +558,7 @@ export const guides: GuideArticle[] = [
           ],
           fr: [
             'Un conflit ordinaire entre frères et sœurs est bruyant, fréquent, à peu près réciproque, et vite terminé. Les enfants qui se disputent ainsi rejouent ensemble dans l\'heure.',
-            'Certains schémas méritent plus d\'attention : quand cela va dans un seul sens et vise toujours le même enfant ; quand le but semble être l\'humiliation plutôt que la victoire ; quand un enfant devient craintif, se retire ou évite les pièces communes ; quand les disputes surgissent soudainement avec des changements de sommeil, d\'appétit ou d\'école.',
+            'Certains schémas méritent plus d\'attention : quand cela va dans un seul sens et vise toujours le même enfant ; quand le but semble être l\'humiliation plutôt que la victoire ; quand un enfant devient craintif, se retire ou évite les pièces communes ; quand les disputes surgissent soudainement avec des changements de sommeil, d\'appétit ou d\'école.',
             'Rien de cela ne signifie que quelque chose ne va pas dans votre famille, et rien n\'est un diagnostic. Cela signifie qu\'il vaut la peine d\'en parler à quelqu\'un qui peut l\'évaluer — pédiatre, service psychologique scolaire, ou centre de consultation familiale. Ce texte est une information générale, pas un conseil pour un enfant précis.',
           ],
           it: [
@@ -574,13 +574,13 @@ export const guides: GuideArticle[] = [
         q: {
           en: 'Should I make them apologise?',
           de: 'Soll ich sie zur Entschuldigung auffordern?',
-          fr: 'Dois-je les forcer à s\'excuser ?',
+          fr: 'Dois-je les forcer à s\'excuser ?',
           it: 'Devo obbligarli a scusarsi?',
         },
         a: {
           en: 'A forced apology teaches the word, not the meaning, and the wronged child can usually tell the difference. Repair works better: something concrete that helps the other person. If an apology comes later and unprompted, it is worth far more.',
           de: 'Eine erzwungene Entschuldigung lehrt das Wort, nicht die Bedeutung — und das benachteiligte Kind merkt den Unterschied meistens. Wiedergutmachung wirkt besser: etwas Konkretes, das dem anderen hilft. Kommt die Entschuldigung später von selbst, ist sie viel mehr wert.',
-          fr: 'Des excuses forcées enseignent le mot, pas le sens, et l\'enfant lésé fait généralement la différence. La réparation fonctionne mieux : quelque chose de concret qui aide l\'autre. Si les excuses viennent plus tard, spontanément, elles valent bien plus.',
+          fr: 'Des excuses forcées enseignent le mot, pas le sens, et l\'enfant lésé fait généralement la différence. La réparation fonctionne mieux : quelque chose de concret qui aide l\'autre. Si les excuses viennent plus tard, spontanément, elles valent bien plus.',
           it: 'Una scusa forzata insegna la parola, non il significato, e il bambino offeso di solito percepisce la differenza. La riparazione funziona meglio: qualcosa di concreto che aiuta l\'altra persona. Se le scuse arrivano più tardi e spontanee, valgono molto di più.',
         },
       },
@@ -588,7 +588,7 @@ export const guides: GuideArticle[] = [
         q: {
           en: 'One of them really does start it every time. Should I say so?',
           de: 'Eines fängt wirklich jedes Mal an. Soll ich das sagen?',
-          fr: 'L\'un commence vraiment à chaque fois. Dois-je le dire ?',
+          fr: 'L\'un commence vraiment à chaque fois. Dois-je le dire ?',
           it: 'Uno dei due inizia davvero ogni volta. Dovrei dirlo apertamente?',
         },
         a: {
@@ -602,13 +602,13 @@ export const guides: GuideArticle[] = [
         q: {
           en: 'Does it ever stop?',
           de: 'Hört das jemals auf?',
-          fr: 'Est-ce que cela s\'arrête un jour ?',
+          fr: 'Est-ce que cela s\'arrête un jour ?',
           it: 'Finisce mai?',
         },
         a: {
           en: 'The frequency usually drops as children get better at language and at leaving the room. What changes it most is not a technique but time spent together without a parent adjudicating — shared jokes, shared projects, being on the same side against something. Conflict does not disappear; the relationship simply gets big enough to hold it.',
           de: 'Die Häufigkeit nimmt meist ab, sobald Kinder besser sprechen und den Raum verlassen können. Am meisten ändert nicht eine Technik, sondern gemeinsame Zeit ohne schlichtende Eltern — gemeinsame Witze, gemeinsame Projekte, zusammen gegen etwas sein. Streit verschwindet nicht; die Beziehung wird nur gross genug, ihn auszuhalten.',
-          fr: 'La fréquence baisse généralement à mesure que les enfants maîtrisent le langage et savent quitter la pièce. Ce qui change le plus n\'est pas une technique mais du temps passé ensemble sans parent arbitre — blagues communes, projets communs, être du même côté contre quelque chose. Le conflit ne disparaît pas ; la relation devient assez solide pour le contenir.',
+          fr: 'La fréquence baisse généralement à mesure que les enfants maîtrisent le langage et savent quitter la pièce. Ce qui change le plus n\'est pas une technique mais du temps passé ensemble sans parent arbitre — blagues communes, projets communs, être du même côté contre quelque chose. Le conflit ne disparaît pas ; la relation devient assez solide pour le contenir.',
           it: 'La frequenza di solito diminuisce quando i bambini migliorano nel linguaggio e nel lasciare la stanza. Ciò che cambia di più non è una tecnica ma il tempo trascorso insieme senza un genitore che arbitra — battute condivise, progetti condivisi, stare dalla stessa parte contro qualcosa. Il conflitto non scompare; la relazione diventa semplicemente abbastanza grande da contenerlo.',
         },
       },
@@ -661,9 +661,9 @@ export const guides: GuideArticle[] = [
             'Deshalb beruhigt «du findest neue Freunde» niemanden. Es ist ein Versprechen über eine Zukunft, die es sich nicht vorstellen kann, im Tausch gegen eine Gegenwart, die es kennt. Konkretes wirkt besser: benennen, wer erreichbar bleibt, was samstags weiter passiert, welche Sachen ins neue Zimmer kommen und welche eigenen Abläufe sich nicht ändern.',
           ],
           fr: [
-            'Les parents mettent en avant la nouvelle maison : une plus grande chambre, un jardin, un trajet plus court. L\'enfant reste de marbre, et cela ressemble à de l\'ingratitude. Ce n\'en est pas : vous répondez à une question qu\'il n\'a pas posée.',
-            'Ce qu\'un déménagement menace, c\'est la prévisibilité et l\'appartenance : savoir dans quel placard sont les tasses, quel chemin mène au magasin, qui dit bonjour dans l\'escalier, où l\'on s\'assied à midi et qui est à côté. Ce savoir accumulé est ce qui rend un enfant compétent dans son monde, et un déménagement l\'efface d\'un coup.',
-            '« Tu te feras de nouveaux amis » ne rassure donc personne : c\'est une promesse sur un futur inimaginable, en échange d\'un présent bien réel. Du concret marche mieux : nommer qui restera joignable, ce qui continuera le samedi, quels objets iront dans la nouvelle chambre, et quelles habitudes ne changeront pas.',
+            'Les parents mettent en avant la nouvelle maison : une plus grande chambre, un jardin, un trajet plus court. L\'enfant reste de marbre, et cela ressemble à de l\'ingratitude. Ce n\'en est pas : vous répondez à une question qu\'il n\'a pas posée.',
+            'Ce qu\'un déménagement menace, c\'est la prévisibilité et l\'appartenance : savoir dans quel placard sont les tasses, quel chemin mène au magasin, qui dit bonjour dans l\'escalier, où l\'on s\'assied à midi et qui est à côté. Ce savoir accumulé est ce qui rend un enfant compétent dans son monde, et un déménagement l\'efface d\'un coup.',
+            '« Tu te feras de nouveaux amis » ne rassure donc personne : c\'est une promesse sur un futur inimaginable, en échange d\'un présent bien réel. Du concret marche mieux : nommer qui restera joignable, ce qui continuera le samedi, quels objets iront dans la nouvelle chambre, et quelles habitudes ne changeront pas.',
           ],
           it: [
             'I genitori puntano sulla nuova casa: una camera più grande, un giardino, le scale, un tragitto più breve per andare al lavoro. Il bambino resta indifferente, e sembra ingratitudine. Non lo è — stai rispondendo a una domanda che non ha fatto.',
@@ -692,8 +692,8 @@ export const guides: GuideArticle[] = [
           ],
           fr: [
             'L\'envie de repousser est protectrice et se retourne généralement contre vous. Les enfants perçoivent la tension bien avant qu\'on leur en donne la raison — cartons, visites, conversations interrompues quand ils entrent. Face à une tension inexpliquée, ils inventent une explication, souvent pire que la vérité.',
-            'Dites-le dès que c\'est certain, avec des mots simples et les détails concrets disponibles : nous déménageons, dans deux mois environ, dans un appartement de cette commune, tu auras ta chambre, tu changeras d\'école. C\'est le flou qui fait peur ; le concret est ce à quoi un enfant peut se tenir.',
-            'Attendez-vous ensuite à une réaction différée. Beaucoup d\'enfants disent « d\'accord » et retournent jouer ; la vraie réponse surgit des jours plus tard, en larmes à propos d\'autre chose. Ce décalage est normal et n\'est pas de la manipulation.',
+            'Dites-le dès que c\'est certain, avec des mots simples et les détails concrets disponibles : nous déménageons, dans deux mois environ, dans un appartement de cette commune, tu auras ta chambre, tu changeras d\'école. C\'est le flou qui fait peur ; le concret est ce à quoi un enfant peut se tenir.',
+            'Attendez-vous ensuite à une réaction différée. Beaucoup d\'enfants disent « d\'accord » et retournent jouer ; la vraie réponse surgit des jours plus tard, en larmes à propos d\'autre chose. Ce décalage est normal et n\'est pas de la manipulation.',
           ],
           it: [
             'L\'istinto di rimandare è protettivo e di solito si ritorce contro. I bambini percepiscono la tensione molto prima di sapere di cosa si tratta — scatoloni, visite, conversazioni a metà che si interrompono quando entrano nella stanza. Ciò che fanno con una tensione inspiegata è inventare una spiegazione, e quella inventata è spesso peggiore della verità.',
@@ -722,7 +722,7 @@ export const guides: GuideArticle[] = [
           ],
           fr: [
             'Un déménagement est quelque chose qui arrive à l\'enfant. Presque rien n\'est de son ressort, et cette impuissance fait une grande part de la détresse. Le remède n\'est pas un faux choix — les enfants les détectent aussitôt — mais un vrai, même minuscule.',
-            'Contre quel mur va le lit. Dans quel carton voyagent ses affaires, rempli par lui et ouvert en premier. Quels deux amis viennent pour l\'après-midi d\'adieu. Si les vieux rideaux suivent. La décision doit être réelle : vous vous y tiendrez même si vous auriez choisi autrement.',
+            'Contre quel mur va le lit. Dans quel carton voyagent ses affaires, rempli par lui et ouvert en premier. Quels deux amis viennent pour l\'après-midi d\'adieu. Si les vieux rideaux suivent. La décision doit être réelle : vous vous y tiendrez même si vous auriez choisi autrement.',
             'Un carton rempli par l\'enfant et ouvert le premier soir vaut mieux qu\'une chambre parfaitement décorée à l\'avance. Des objets familiers dans une pièce étrangère transforment un lieu où il loge en un lieu qui est le sien.',
           ],
           it: [
@@ -752,8 +752,8 @@ export const guides: GuideArticle[] = [
           ],
           fr: [
             'L\'essentiel de l\'effort va à l\'arrivée — la nouvelle chambre, la nouvelle école, l\'accueil. Le départ est traité comme la partie triste qu\'on traverse vite. C\'est l\'inverse.',
-            'Un enfant qui a vraiment terminé avec l\'ancien lieu arrive capable de commencer. Celui qu\'on a pressé arrive en le tenant encore. Donnez une forme à la fin : une dernière promenade vers les lieux qui comptaient, photographier la chambre vide, dire au revoir à voix haute à l\'appartement, un petit adieu avec les deux ou trois personnes importantes. Nommer une perte la rend plus petite, pas plus grande.',
-            'Méfiez-vous des promesses de rester en contact. Peu nombreuses, et de celles que vous pouvez garantir : un appel vidéo avec un ami nommé, un jour nommé, vaut mieux qu\'une assurance vague que rien ne changera.',
+            'Un enfant qui a vraiment terminé avec l\'ancien lieu arrive capable de commencer. Celui qu\'on a pressé arrive en le tenant encore. Donnez une forme à la fin : une dernière promenade vers les lieux qui comptaient, photographier la chambre vide, dire au revoir à voix haute à l\'appartement, un petit adieu avec les deux ou trois personnes importantes. Nommer une perte la rend plus petite, pas plus grande.',
+            'Méfiez-vous des promesses de rester en contact. Peu nombreuses, et de celles que vous pouvez garantir : un appel vidéo avec un ami nommé, un jour nommé, vaut mieux qu\'une assurance vague que rien ne changera.',
           ],
           it: [
             'Gran parte dello sforzo va nell\'arrivo — la nuova camera, la nuova scuola, il benvenuto. La partenza viene trattata come la parte triste da attraversare in fretta. È esattamente il contrario.',
@@ -782,8 +782,8 @@ export const guides: GuideArticle[] = [
           ],
           fr: [
             'Les semaines précédant un déménagement sont chargées, et l\'agitation porte les enfants. Le creux arrive généralement après, une fois l\'appartement installé et les adultes détendus — précisément quand tout le monde croit que c\'est fini.',
-            'Attendez-vous à des régressions : sommeil perturbé, besoin de coller, pipi au lit chez des enfants propres, retour d\'un doudou abandonné, refus de l\'école. Ce ne sont pas des rechutes et cela ne demande pas de correction ; cela demande les routines auxquelles ces comportements appartiennent, et du temps.',
-            'Si après deux à trois mois l\'enfant ne dort toujours pas, refuse toujours l\'école, n\'a créé aucun lien, ou reste durablement replié ou découragé, c\'est le moment d\'en parler au pédiatre ou au service psychologique scolaire. Ce n\'est pas un déménagement raté : c\'est le seuil ordinaire où un professionnel est plus utile qu\'un article.',
+            'Attendez-vous à des régressions : sommeil perturbé, besoin de coller, pipi au lit chez des enfants propres, retour d\'un doudou abandonné, refus de l\'école. Ce ne sont pas des rechutes et cela ne demande pas de correction ; cela demande les routines auxquelles ces comportements appartiennent, et du temps.',
+            'Si après deux à trois mois l\'enfant ne dort toujours pas, refuse toujours l\'école, n\'a créé aucun lien, ou reste durablement replié ou découragé, c\'est le moment d\'en parler au pédiatre ou au service psychologique scolaire. Ce n\'est pas un déménagement raté : c\'est le seuil ordinaire où un professionnel est plus utile qu\'un article.',
           ],
           it: [
             'Le settimane prima di un trasloco sono impegnate, e questa frenesia sostiene anche i bambini. Il calo di solito arriva dopo, una volta sistemato l\'appartamento e rilassati gli adulti — proprio quando tutti si aspettano che sia finita.',
@@ -798,13 +798,13 @@ export const guides: GuideArticle[] = [
         q: {
           en: 'How far in advance should we tell them?',
           de: 'Wie lange vorher sollen wir es sagen?',
-          fr: 'Combien de temps à l\'avance faut-il le dire ?',
+          fr: 'Combien de temps à l\'avance faut-il le dire ?',
           it: 'Con quanto anticipo dovremmo dirglielo?',
         },
         a: {
           en: 'As soon as it is certain rather than possible. Younger children have little use for a date months away and mainly need it repeated as it approaches; school-age children generally want the full timeline at once. The thing to avoid is their hearing it from someone else, or assembling it from overheard fragments.',
           de: 'Sobald es sicher ist statt möglich. Jüngere Kinder können mit einem Datum in Monaten wenig anfangen und brauchen es vor allem wiederholt, wenn es näher rückt; Schulkinder wollen meist den ganzen Ablauf auf einmal. Zu vermeiden ist, dass sie es von jemand anderem hören oder sich aus aufgeschnappten Fetzen zusammenreimen.',
-          fr: 'Dès que c\'est certain plutôt que possible. Les plus jeunes font peu de cas d\'une date lointaine et ont surtout besoin qu\'on la répète à mesure ; les enfants scolarisés veulent généralement tout le calendrier d\'un coup. À éviter : qu\'ils l\'apprennent par quelqu\'un d\'autre ou par bribes surprises.',
+          fr: 'Dès que c\'est certain plutôt que possible. Les plus jeunes font peu de cas d\'une date lointaine et ont surtout besoin qu\'on la répète à mesure ; les enfants scolarisés veulent généralement tout le calendrier d\'un coup. À éviter : qu\'ils l\'apprennent par quelqu\'un d\'autre ou par bribes surprises.',
           it: 'Appena è certo, non solo possibile. I bambini più piccoli hanno poco uso di una data lontana mesi e hanno soprattutto bisogno che venga ripetuta man mano che si avvicina; i bambini in età scolare vogliono di solito tutto il calendario in una volta. La cosa da evitare è che lo sentano da qualcun altro, o che lo ricostruiscano da frammenti colti per caso.',
         },
       },
@@ -812,13 +812,13 @@ export const guides: GuideArticle[] = [
         q: {
           en: 'Should we recreate the old room exactly?',
           de: 'Sollen wir das alte Zimmer genau nachbauen?',
-          fr: 'Faut-il reproduire l\'ancienne chambre à l\'identique ?',
+          fr: 'Faut-il reproduire l\'ancienne chambre à l\'identique ?',
           it: 'Dovremmo ricreare la vecchia camera esattamente uguale?',
         },
         a: {
           en: 'Keep the objects and the routines; do not try to reproduce the layout. The same bedding, the same lamp and the same order of events at bedtime carry the familiarity. An exact copy of a room that no longer exists tends to invite comparison rather than settle it.',
           de: 'Behaltet die Gegenstände und die Abläufe; versucht nicht, die Anordnung zu kopieren. Dieselbe Bettwäsche, dieselbe Lampe und dieselbe Reihenfolge beim Zubettgehen tragen das Vertraute. Eine exakte Kopie eines Zimmers, das es nicht mehr gibt, lädt eher zum Vergleichen ein, als dass sie beruhigt.',
-          fr: 'Gardez les objets et les routines ; n\'essayez pas de reproduire la disposition. La même parure de lit, la même lampe et le même ordre du coucher portent la familiarité. Une copie exacte d\'une chambre qui n\'existe plus invite à la comparaison plutôt qu\'elle n\'apaise.',
+          fr: 'Gardez les objets et les routines ; n\'essayez pas de reproduire la disposition. La même parure de lit, la même lampe et le même ordre du coucher portent la familiarité. Une copie exacte d\'une chambre qui n\'existe plus invite à la comparaison plutôt qu\'elle n\'apaise.',
           it: 'Conservate gli oggetti e le routine; non cercate di riprodurre la disposizione. La stessa biancheria da letto, la stessa lampada e lo stesso ordine di eventi prima di dormire portano familiarità. Una copia esatta di una stanza che non esiste più tende a invitare al confronto piuttosto che a placarlo.',
         },
       },
@@ -826,7 +826,7 @@ export const guides: GuideArticle[] = [
         q: {
           en: 'What if they refuse to say goodbye to anyone?',
           de: 'Was, wenn es sich von niemandem verabschieden will?',
-          fr: 'Et s\'il refuse de dire au revoir à qui que ce soit ?',
+          fr: 'Et s\'il refuse de dire au revoir à qui que ce soit ?',
           it: 'E se rifiuta di salutare qualcuno?',
         },
         a: {
@@ -851,7 +851,7 @@ export const guides: GuideArticle[] = [
     title: {
       en: 'A New Baby Is Coming: Preparing the Older Child',
       de: 'Ein Geschwisterchen kommt: das ältere Kind vorbereiten',
-      fr: 'Un bébé arrive : préparer l\'aîné',
+      fr: 'Un bébé arrive : préparer l\'aîné',
       it: 'Sta arrivando un fratellino: preparare il figlio maggiore',
     },
     description: {
@@ -886,9 +886,9 @@ export const guides: GuideArticle[] = [
             'Ebenso hilfreich ist Klarheit darüber, was sich nicht ändert. Wer aus dem Kindergarten abholt, wo man am Tisch sitzt, was beim Zubettgehen passiert, welcher Nachmittag der eigene ist. Kontinuität beruhigt mehr als jedes Versprechen über das Baby.',
           ],
           fr: [
-            '« Tu auras quelqu\'un avec qui jouer » est la préparation la plus courante et celle qui mène le plus sûrement à la déception. Ce qui arrive ne peut ni jouer, ni parler, et absorbe entièrement les adultes. Un enfant à qui on a promis un ami conclut soit qu\'on lui a menti, soit que le bébé est défectueux.',
-            'La version honnête fonctionne mieux : au début le bébé dormira, pleurera et sera porté, il ne pourra pas jouer avant longtemps, et il demandera beaucoup d\'attention qui était la tienne. Dites cette partie à voix haute. Être prévenu d\'une difficulté est bien plus facile que la découvrir pendant qu\'on vous explique combien c\'est merveilleux.',
-            'Il aide aussi d\'être clair sur ce qui ne changera pas : qui vient le chercher, où il s\'assied à table, ce qui se passe au coucher, quel après-midi est le sien. La continuité rassure plus que toute promesse sur le bébé.',
+            '« Tu auras quelqu\'un avec qui jouer » est la préparation la plus courante et celle qui mène le plus sûrement à la déception. Ce qui arrive ne peut ni jouer, ni parler, et absorbe entièrement les adultes. Un enfant à qui on a promis un ami conclut soit qu\'on lui a menti, soit que le bébé est défectueux.',
+            'La version honnête fonctionne mieux : au début le bébé dormira, pleurera et sera porté, il ne pourra pas jouer avant longtemps, et il demandera beaucoup d\'attention qui était la tienne. Dites cette partie à voix haute. Être prévenu d\'une difficulté est bien plus facile que la découvrir pendant qu\'on vous explique combien c\'est merveilleux.',
+            'Il aide aussi d\'être clair sur ce qui ne changera pas : qui vient le chercher, où il s\'assied à table, ce qui se passe au coucher, quel après-midi est le sien. La continuité rassure plus que toute promesse sur le bébé.',
           ],
           it: [
             '«Avrai qualcuno con cui giocare» è la preparazione più comune ed è quella più affidabilmente seguita da delusione. Ciò che arriva non sa giocare, non sa parlare, e assorbe completamente gli adulti. Un bambino a cui è stato promesso un amico conclude o che gli hanno mentito, o che il bebè è difettoso.',
@@ -917,8 +917,8 @@ export const guides: GuideArticle[] = [
           ],
           fr: [
             'Un enfant propre depuis un an refait pipi au lit. Un enfant qui parle par phrases revient au langage bébé. Celui qui s\'endormait seul réclame une main. C\'est extrêmement fréquent et ce n\'est pas un complot.',
-            'La logique apparaît dès qu\'on l\'énonce : une très petite créature est arrivée et reçoit d\'énormes quantités de soins. Être petit ressemble, vu de l\'extérieur, à une stratégie très efficace. La tester est une expérience raisonnable.',
-            'La réponse qui raccourcit tout cela consiste à accorder la demande sous-jacente plutôt qu\'à combattre le comportement : une cuillère donnée, être porté dans l\'escalier, être bercé — brièvement, volontiers, sans commentaire sur le fait d\'être grand. Ce qui prolonge la régression, c\'est la résistance, qui transforme une demande de proximité en bataille.',
+            'La logique apparaît dès qu\'on l\'énonce : une très petite créature est arrivée et reçoit d\'énormes quantités de soins. Être petit ressemble, vu de l\'extérieur, à une stratégie très efficace. La tester est une expérience raisonnable.',
+            'La réponse qui raccourcit tout cela consiste à accorder la demande sous-jacente plutôt qu\'à combattre le comportement : une cuillère donnée, être porté dans l\'escalier, être bercé — brièvement, volontiers, sans commentaire sur le fait d\'être grand. Ce qui prolonge la régression, c\'est la résistance, qui transforme une demande de proximité en bataille.',
           ],
           it: [
             'Un bambino asciutto da un anno ricomincia a bagnare il letto. Uno che parla per frasi complete torna al linguaggio da bebè. Chi si addormentava da solo ora ha bisogno di una mano tenuta. È estremamente comune e non è un complotto.',
@@ -946,7 +946,7 @@ export const guides: GuideArticle[] = [
             'Verteidige es sichtbar vor ihm. Zu sagen, dass das Baby dieses Regal nicht anfassen darf, in Hörweite des älteren Kindes, wirkt mehr als eine Stunde Erklären, dass man es genauso lieb hat.',
           ],
           fr: [
-            'Presque tout devient partagé : vos genoux, votre attention, le salon, bientôt les jouets et peut-être la chambre. Un enfant qui vit l\'arrivée comme une pure soustraction a de bonnes raisons d\'en vouloir à la cause.',
+            'Presque tout devient partagé : vos genoux, votre attention, le salon, bientôt les jouets et peut-être la chambre. Un enfant qui vit l\'arrivée comme une pure soustraction a de bonnes raisons d\'en vouloir à la cause.',
             'Le contrepoids est quelque chose de fiablement exempté. Une étagère où le bébé n\'aura jamais le droit d\'aller. Une peluche précise qui n\'est pas commune. Vingt minutes après le coucher du bébé qui lui appartiennent, à heure prévisible, avec une activité qu\'il choisit, téléphone dans l\'autre pièce. Court et fiable vaut mieux que long et occasionnel.',
             'Défendez-la visiblement devant lui. Dire que le bébé n\'a pas le droit de toucher cette étagère, à portée d\'oreille de l\'aîné, fait plus qu\'une heure d\'explications sur votre amour égal.',
           ],
@@ -976,9 +976,9 @@ export const guides: GuideArticle[] = [
             '«Schau, wie lieb er dich hat!» über einem Säugling, der eine Lampe anschaut. Ältere Kinder merken die Erfindung, und sie macht alles Übrige weniger glaubwürdig. Es wird echte Momente geben — das Baby folgt ihm wirklich mit den Augen durch den Raum, beruhigt sich bei seiner Stimme — und auf die zu zeigen ist viel mehr wert, gerade weil es stimmt.',
           ],
           fr: [
-            '« Tu es le grand maintenant. » Cela sonne comme une promotion et fonctionne comme une rétrogradation : un lot d\'obligations remis un jour que l\'enfant n\'a pas choisi.',
-            '« Attention, tu vas lui faire mal. » Répété assez souvent, cela décrit l\'aîné comme un danger pour le bébé — et les enfants deviennent les descriptions qu\'on leur donne. Dites plutôt quoi faire : soutenir sa tête, s\'asseoir d\'abord, prendre à deux mains.',
-            '« Regarde comme il t\'aime ! » au-dessus d\'un nourrisson qui fixe une lampe. Les aînés repèrent l\'invention, et cela rend le reste moins crédible. Il y aura de vrais moments — le bébé qui le suit vraiment des yeux, qui se calme à sa voix — et les montrer vaut bien plus, précisément parce que c\'est vrai.',
+            '« Tu es le grand maintenant. » Cela sonne comme une promotion et fonctionne comme une rétrogradation : un lot d\'obligations remis un jour que l\'enfant n\'a pas choisi.',
+            '« Attention, tu vas lui faire mal. » Répété assez souvent, cela décrit l\'aîné comme un danger pour le bébé — et les enfants deviennent les descriptions qu\'on leur donne. Dites plutôt quoi faire : soutenir sa tête, s\'asseoir d\'abord, prendre à deux mains.',
+            '« Regarde comme il t\'aime ! » au-dessus d\'un nourrisson qui fixe une lampe. Les aînés repèrent l\'invention, et cela rend le reste moins crédible. Il y aura de vrais moments — le bébé qui le suit vraiment des yeux, qui se calme à sa voix — et les montrer vaut bien plus, précisément parce que c\'est vrai.',
           ],
           it: [
             '«Ora sei il grande.» Suona come una promozione e funziona come una retrocessione: un pacchetto di obblighi consegnato in un giorno che il bambino non ha scelto. Essere grande non è qualcosa che ha chiesto di diventare.',
@@ -1007,7 +1007,7 @@ export const guides: GuideArticle[] = [
           ],
           fr: [
             'Jalousie, régression, gestes brusques et périodes où le bébé est totalement ignoré font partie de la normale, et l\'essentiel se tasse sur les premiers mois.',
-            'À signaler : des gestes blessants délibérés et répétés qui persistent malgré des réponses constantes ; un enfant durablement éteint, replié ou sans joie plutôt qu\'en colère ; un changement marqué et durable du sommeil ou de l\'appétit ; ou votre propre sentiment de ne plus y arriver, qui compte tout autant.',
+            'À signaler : des gestes blessants délibérés et répétés qui persistent malgré des réponses constantes ; un enfant durablement éteint, replié ou sans joie plutôt qu\'en colère ; un changement marqué et durable du sommeil ou de l\'appétit ; ou votre propre sentiment de ne plus y arriver, qui compte tout autant.',
             'Le pédiatre et le service de puériculture sont les premiers interlocuteurs habituels. Ce texte est une information générale, pas un conseil pour un enfant précis.',
           ],
           it: [
@@ -1023,13 +1023,13 @@ export const guides: GuideArticle[] = [
         q: {
           en: 'When should we tell the older child about the pregnancy?',
           de: 'Wann sollen wir dem älteren Kind von der Schwangerschaft erzählen?',
-          fr: 'Quand annoncer la grossesse à l\'aîné ?',
+          fr: 'Quand annoncer la grossesse à l\'aîné ?',
           it: 'Quando dovremmo dire al figlio maggiore della gravidanza?',
         },
         a: {
           en: 'Later than you tell adults, for a practical reason: small children have little grasp of months, and a long wait mostly produces repeated questions about whether it is today. Telling them once it is visible and once other people might mention it in front of them is usually about right.',
           de: 'Später als den Erwachsenen, aus einem praktischen Grund: Kleine Kinder haben wenig Gefühl für Monate, und eine lange Wartezeit erzeugt vor allem wiederholte Fragen, ob es heute soweit ist. Es zu sagen, sobald es sichtbar ist und sobald andere es in ihrer Gegenwart erwähnen könnten, trifft es meist gut.',
-          fr: 'Plus tard qu\'aux adultes, pour une raison pratique : les jeunes enfants saisissent mal les mois, et une longue attente produit surtout des questions répétées. L\'annoncer quand cela devient visible, et quand d\'autres pourraient en parler devant eux, tombe généralement juste.',
+          fr: 'Plus tard qu\'aux adultes, pour une raison pratique : les jeunes enfants saisissent mal les mois, et une longue attente produit surtout des questions répétées. L\'annoncer quand cela devient visible, et quand d\'autres pourraient en parler devant eux, tombe généralement juste.',
           it: 'Più tardi rispetto agli adulti, per una ragione pratica: i bambini piccoli hanno poca cognizione dei mesi, e un\'attesa lunga produce soprattutto domande ripetute su se è già oggi. Dirlo quando diventa visibile e quando altre persone potrebbero menzionarlo davanti a loro è di solito il momento giusto.',
         },
       },
@@ -1037,13 +1037,13 @@ export const guides: GuideArticle[] = [
         q: {
           en: 'He hits the baby. What do I do?',
           de: 'Es schlägt das Baby. Was mache ich?',
-          fr: 'Il frappe le bébé. Que faire ?',
+          fr: 'Il frappe le bébé. Que faire ?',
           it: 'Picchia il bebè. Cosa faccio?',
         },
         a: {
           en: 'Stop it physically and calmly, every time, without a lecture, and then attend to the baby. Afterwards, once things are quiet, name what you think was underneath it — that it is hard when someone else is being held. The behaviour needs a firm boundary; the feeling behind it needs somewhere else to go, and supplying that is what actually reduces the hitting.',
           de: 'Halte es jedes Mal körperlich und ruhig auf, ohne Predigt, und kümmere dich dann um das Baby. Später, wenn Ruhe ist, benenne, was du dahinter vermutest — dass es schwer ist, wenn jemand anderes gehalten wird. Das Verhalten braucht eine klare Grenze; das Gefühl dahinter braucht einen anderen Weg, und den zu geben ist das, was das Schlagen tatsächlich reduziert.',
-          fr: 'Arrêtez-le physiquement et calmement, chaque fois, sans sermon, puis occupez-vous du bébé. Plus tard, au calme, nommez ce qu\'il y avait dessous — que c\'est dur quand quelqu\'un d\'autre est dans les bras. Le comportement a besoin d\'une limite ferme ; le sentiment a besoin d\'une autre issue.',
+          fr: 'Arrêtez-le physiquement et calmement, chaque fois, sans sermon, puis occupez-vous du bébé. Plus tard, au calme, nommez ce qu\'il y avait dessous — que c\'est dur quand quelqu\'un d\'autre est dans les bras. Le comportement a besoin d\'une limite ferme ; le sentiment a besoin d\'une autre issue.',
           it: 'Fermalo fisicamente e con calma, ogni volta, senza fare una predica, e poi occupati del bebè. Dopo, quando le cose sono tranquille, nomina quello che pensi ci sia sotto — che è difficile quando qualcun altro viene tenuto in braccio. Il comportamento ha bisogno di un limite fermo; il sentimento dietro ha bisogno di un\'altra via d\'uscita, e fornirla è ciò che riduce davvero il colpire.',
         },
       },
@@ -1051,7 +1051,7 @@ export const guides: GuideArticle[] = [
         q: {
           en: 'How long does the jealousy last?',
           de: 'Wie lange dauert die Eifersucht?',
-          fr: 'Combien de temps dure la jalousie ?',
+          fr: 'Combien de temps dure la jalousie ?',
           it: 'Quanto dura la gelosia?',
         },
         a: {

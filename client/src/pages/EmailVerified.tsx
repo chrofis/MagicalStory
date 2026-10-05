@@ -48,9 +48,9 @@ const translations = {
     ],
   },
   fr: {
-    title: 'E-mail vérifié !',
-    checkingOtherWindow: 'Veuillez retourner à votre fenêtre de navigateur d\'origine où votre histoire devrait maintenant être générée...',
-    generatingInOtherWindow: 'Votre histoire est en cours de génération dans votre autre fenêtre !',
+    title: 'E-mail vérifié !',
+    checkingOtherWindow: 'Veuillez retourner à votre fenêtre de navigateur d\'origine où votre histoire devrait maintenant être générée…',
+    generatingInOtherWindow: 'Votre histoire est en cours de génération dans votre autre fenêtre !',
     otherWindowHint: 'Vous pouvez fermer cet onglet et retourner à votre fenêtre d\'origine.',
     manualHint: 'Votre fenêtre d\'origine a peut-être été fermée. Cliquez ci-dessous pour créer votre histoire.',
     notLoggedInHint: 'Veuillez vous connecter pour créer votre histoire.',

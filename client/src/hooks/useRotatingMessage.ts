@@ -14,9 +14,9 @@ const THINKING_MESSAGES: RotatingMessages = {
     'Ein Abenteuer braut sich zusammen...',
   ],
   fr: [
-    'Ton histoire prend forme...',
-    'Les idées se rassemblent...',
-    'L\'aventure se tisse...',
+    'Votre histoire prend forme…',
+    'Les idées se rassemblent…',
+    'L\'aventure se tisse…',
   ],
   it: [
     'La tua storia prende forma...',

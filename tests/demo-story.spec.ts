@@ -726,7 +726,7 @@ async function isPastCharacterStep(page: Page): Promise<boolean> {
   // and cause this helper to falsely return true, short-circuiting the
   // post-character driver before it clicks the avatar-preview Weiter.
   const stepHeading = await page.locator(
-    'text=/Wähle ein Buch|Choose a book|Choisis un livre|Wähle einen Geschichtstyp|Choose a story type|Choisis un type|Wähle einen Stil|Choose a style|Choisis un style/i'
+    'text=/Wähle ein Buch|Choose a book|Choisis(sez)? un livre|Wähle einen Geschichtstyp|Choose a story type|Choisis(sez)? un type|Wähle einen Stil|Choose a style|Choisis(sez)? un style/i'
   ).first().isVisible({ timeout: 400 }).catch(() => false);
   if (!stepHeading) return false;
   // Make sure we're not still inside a character sub-step that happens to

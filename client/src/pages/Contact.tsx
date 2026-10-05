@@ -50,7 +50,7 @@ const contactContent: Record<string, {
   },
   fr: {
     title: 'Contactez-nous',
-    subtitle: 'Vous avez une question ou besoin d\'aide ? Nous sommes là pour vous.',
+    subtitle: 'Vous avez une question ou besoin d\'aide ? Nous sommes là pour vous.',
     emailTitle: 'Écrivez-nous',
     emailText: 'Envoyez-nous un message et nous vous répondrons dès que possible.',
     emailAddress: 'info@magicalstory.ch',
@@ -59,7 +59,7 @@ const contactContent: Record<string, {
     faqTitle: 'Consultez d\'abord la FAQ',
     faqText: 'De nombreuses questions courantes y trouvent déjà réponse. Vous y trouverez peut-être plus vite.',
     faqButton: 'Voir la FAQ',
-    trialTitle: 'Pas encore sûr ?',
+    trialTitle: 'Pas encore sûr ?',
     trialText: 'Essayez gratuitement — votre première histoire en moins de 3 minutes, sans compte.',
     trialButton: 'Créer une histoire gratuite',
   },

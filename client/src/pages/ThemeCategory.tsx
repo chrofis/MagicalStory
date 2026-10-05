@@ -68,7 +68,7 @@ const texts: Record<string, {
   },
   fr: {
     breadcrumbRoot: 'Thèmes',
-    ctaTitle: 'Prêt à créer ?',
+    ctaTitle: 'Prêt à créer ?',
     ctaSubtitle: 'Choisissez un thème ci-dessus et créez une histoire personnalisée pour votre enfant en quelques minutes.',
     ctaButton: 'Commencer',
     create: 'Créer',
@@ -140,7 +140,7 @@ function getCategoryConfig(category: CategorySlug): CategoryConfig | null {
         description: {
           en: 'Travel through time! Your child witnesses real historical events — from ancient pyramids to the moon landing and beyond.',
           de: 'Reise durch die Zeit! Dein Kind erlebt echte historische Ereignisse — von den Pyramiden bis zur Mondlandung und darüber hinaus.',
-          fr: 'Voyagez dans le temps ! Votre enfant est témoin de vrais événements historiques — des pyramides à l\'alunissage et au-delà.',
+          fr: 'Voyagez dans le temps ! Votre enfant est témoin de vrais événements historiques — des pyramides à l\'alunissage et au-delà.',
           it: 'Viaggia nel tempo! Tuo figlio è testimone di eventi storici reali — dalle antiche piramidi allo sbarco sulla luna e oltre.',
         },
         groups: historicalEventGroups

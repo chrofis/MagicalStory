@@ -1163,13 +1163,13 @@ export default function AdminDashboard() {
               <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                 <div>
                   <h3 className="font-semibold text-gray-800">
-                    {language === 'de' ? '2x Token Aktion' : language === 'fr' ? 'Promotion 2x Jetons' : '2x Token Promotion'}
+                    {language === 'de' ? '2x Token Aktion' : language === 'fr' ? 'Promotion 2x crédits' : '2x Token Promotion'}
                   </h3>
                   <p className="text-sm text-gray-600">
                     {language === 'de'
                       ? 'Kunden erhalten die doppelte Anzahl Tokens beim Buchkauf (20 pro Seite statt 10)'
                       : language === 'fr'
-                      ? 'Les clients reçoivent le double de jetons lors de l\'achat de livres (20 par page au lieu de 10)'
+                      ? 'Les clients reçoivent le double de crédits lors de l\'achat de livres (20 par page au lieu de 10)'
                       : 'Customers receive double tokens on book purchases (20 per page instead of 10)'}
                   </p>
                 </div>

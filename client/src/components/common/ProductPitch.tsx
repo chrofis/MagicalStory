@@ -21,7 +21,7 @@ const texts: Record<string, { line: string; free: string; cta: string }> = {
     cta: 'Gratis testen',
   },
   fr: {
-    line: 'Votre enfant devient le héros d\'un livre illustré personnalisé — téléchargez une photo, choisissez un thème, l\'histoire est prête en quelques minutes.',
+    line: 'Votre enfant devient le héros d\'un livre illustré personnalisé — importez une photo, choisissez un thème, l\'histoire est prête en quelques minutes.',
     free: 'Première histoire gratuite',
     cta: 'Essayer gratuitement',
   },

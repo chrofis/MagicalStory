@@ -399,9 +399,9 @@ const TRIAL_REMINDER_COPY = {
     FRENCH: {
       subject: 'Vos {credits} crédits gratuits vous attendent toujours',
       headline: 'Vos {credits} crédits gratuits vous attendent toujours.',
-      body: 'Vous avez essayé MagicalStory il y a quelques jours — vos crédits gratuits sont toujours sur votre compte, de quoi créer une histoire complète de plus, entièrement gratuite. Définissez votre mot de passe pour les réclamer.',
-      ctaLabel: 'Réclamer mon histoire gratuite',
-      perksIntro: 'Avec un compte complet, vous débloquez aussi :',
+      body: 'Vous avez essayé MagicalStory il y a quelques jours — vos crédits gratuits sont toujours sur votre compte, de quoi créer une histoire complète de plus, entièrement gratuite. Définissez votre mot de passe pour les récupérer.',
+      ctaLabel: 'Récupérer mon histoire gratuite',
+      perksIntro: 'Avec un compte complet, vous débloquez aussi :',
     },
     ITALIAN: {
       subject: 'I tuoi {credits} crediti gratuiti ti aspettano ancora',
@@ -431,7 +431,7 @@ const TRIAL_REMINDER_COPY = {
       headline: 'Dernière chance — vos crédits gratuits expirent dans {daysLeft} jours.',
       body: 'Votre lien d\'activation est sur le point d\'expirer. Définissez votre mot de passe maintenant pour garder vos {credits} crédits gratuits et l\'histoire que vous avez déjà créée. Après {daysLeft} jours, le lien disparaît pour de bon.',
       ctaLabel: 'Activer mon compte maintenant',
-      perksIntro: 'Une fois votre compte activé, vous débloquez aussi :',
+      perksIntro: 'Une fois votre compte activé, vous débloquez aussi :',
     },
     ITALIAN: {
       subject: 'I tuoi crediti gratuiti scadono tra {daysLeft} giorni',

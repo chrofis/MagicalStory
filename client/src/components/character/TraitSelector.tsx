@@ -132,7 +132,7 @@ export function TraitSelector({
       {/* Collapsed view: no traits selected */}
       {!isExpanded && selectedTraits.length === 0 && (
         <div className="ml-5 text-sm text-gray-400 italic">
-          {language === 'de' ? 'Klicken zum Auswählen...' : language === 'fr' ? 'Cliquer pour sélectionner...' : language === 'it' ? 'Clicca per selezionare...' : 'Click to select...'}
+          {language === 'de' ? 'Klicken zum Auswählen...' : language === 'fr' ? 'Cliquer pour sélectionner…' : language === 'it' ? 'Clicca per selezionare...' : 'Click to select...'}
         </div>
       )}
 
@@ -172,7 +172,7 @@ export function TraitSelector({
                   language === 'de'
                     ? 'Eigene hinzufügen...'
                     : language === 'fr'
-                    ? 'Ajouter personnalisé...'
+                    ? 'Ajouter personnalisé…'
                     : language === 'it'
                     ? 'Aggiungi personalizzato...'
                     : 'Add custom...'

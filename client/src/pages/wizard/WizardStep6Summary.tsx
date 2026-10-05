@@ -243,8 +243,8 @@ export function WizardStep6Summary({
 
   const getReadingLevelLabel = () => {
     // Use same labels as WizardStep3BookSettings
-    if (languageLevel === '1st-grade') return language === 'de' ? 'Bilderbuch' : language === 'fr' ? 'Album Illustré' : language === 'it' ? 'Libro illustrato' : 'Picture Book';
-    if (languageLevel === 'standard') return language === 'de' ? 'Kinderbuch' : language === 'fr' ? 'Livre Enfant' : language === 'it' ? 'Libro per bambini' : 'Chapter Book';
+    if (languageLevel === '1st-grade') return language === 'de' ? 'Bilderbuch' : language === 'fr' ? 'Album illustré' : language === 'it' ? 'Libro illustrato' : 'Picture Book';
+    if (languageLevel === 'standard') return language === 'de' ? 'Kinderbuch' : language === 'fr' ? 'Livre enfant' : language === 'it' ? 'Libro per bambini' : 'Chapter Book';
     if (languageLevel === 'advanced') return language === 'de' ? 'Jugendbuch' : language === 'fr' ? 'Roman Jeunesse' : language === 'it' ? 'Libro per ragazzi' : 'Young Adult';
     return '';
   };
@@ -266,26 +266,26 @@ export function WizardStep6Summary({
 
   const t = {
     title: language === 'de' ? 'Geschichte erstellen' : language === 'fr' ? 'Créer l\'histoire' : language === 'it' ? 'Crea la storia' : 'Create Your Story',
-    storyDetails: language === 'de' ? 'Geschichte / Handlung' : language === 'fr' ? 'Histoire / Intrigue' : language === 'it' ? 'Storia / Trama' : 'Story / Plot',
+    storyDetails: language === 'de' ? 'Geschichte / Handlung' : language === 'fr' ? 'Histoire / intrigue' : language === 'it' ? 'Storia / Trama' : 'Story / Plot',
     storyDetailsPlaceholder: language === 'de'
       ? 'Beschreibe die Handlung deiner Geschichte...'
       : language === 'fr'
-      ? 'Décris l\'intrigue de ton histoire...'
+      ? 'Décrivez l\'intrigue de votre histoire…'
       : language === 'it' ? 'Descrivi la trama della tua storia...' : 'Describe the plot of your story...',
-    optional: language === 'de' ? '(optional)' : language === 'fr' ? '(optionnel)' : language === 'it' ? '(facoltativo)' : '(optional)',
+    optional: language === 'de' ? '(optional)' : language === 'fr' ? '(facultatif)' : language === 'it' ? '(facoltativo)' : '(optional)',
     dedication: language === 'de' ? 'Widmung' : language === 'fr' ? 'Dédicace' : language === 'it' ? 'Dedica' : 'Dedication',
     dedicationPlaceholder: language === 'de'
       ? 'z.B. «Für meine liebe Tochter Emma zum 5. Geburtstag»'
       : language === 'fr'
-      ? 'Par exemple "Pour ma chère fille Emma pour son 5ème anniversaire"'
+      ? 'Par exemple « pour ma chère fille Emma pour son 5e anniversaire »'
       : language === 'it' ? 'per es. "Per la mia cara figlia Emma per il suo 5° compleanno"' : 'e.g. "For my dear daughter Emma on her 5th birthday"',
     dedicationHelp: language === 'de'
       ? 'Dieser Text wird auf der Einführungsseite deines Buches gedruckt.'
       : language === 'fr'
-      ? 'Ce texte sera imprimé sur la page d\'introduction de ton livre.'
+      ? 'Ce texte sera imprimé sur la page d\'introduction de votre livre.'
       : language === 'it' ? 'Questo testo verrà stampato sulla pagina iniziale del tuo libro.' : 'This text will be printed on the initial page of your book.',
     generateIdeas: language === 'de' ? 'Vorschlag generieren' : language === 'fr' ? 'Générer une suggestion' : language === 'it' ? 'Genera una proposta' : 'Generate Suggestion',
-    generating: language === 'de' ? 'Generiere...' : language === 'fr' ? 'Génération...' : language === 'it' ? 'Generazione...' : 'Generating...',
+    generating: language === 'de' ? 'Generiere...' : language === 'fr' ? 'Génération…' : language === 'it' ? 'Generazione...' : 'Generating...',
     storyType: language === 'de' ? 'Geschichte' : language === 'fr' ? 'Histoire' : language === 'it' ? 'Storia' : 'Story',
     artStyleLabel: language === 'de' ? 'Kunststil' : language === 'fr' ? 'Style' : language === 'it' ? 'Stile' : 'Art Style',
     languageLabel: language === 'de' ? 'Sprachvariante' : language === 'fr' ? 'Variante de langue' : language === 'it' ? 'Variante linguistica' : 'Language Variant',
@@ -296,19 +296,19 @@ export function WizardStep6Summary({
     lengthLabel: language === 'de' ? 'Länge' : language === 'fr' ? 'Longueur' : language === 'it' ? 'Lunghezza' : 'Length',
     locationLabel: language === 'de' ? 'Ort' : language === 'fr' ? 'Lieu' : language === 'it' ? 'Luogo' : 'Location',
     seasonLabel: language === 'de' ? 'Jahreszeit' : language === 'fr' ? 'Saison' : language === 'it' ? 'Stagione' : 'Season',
-    chooseIdea: language === 'de' ? 'Idee auswählen oder bearbeiten:' : language === 'fr' ? 'Choisissez une idée ou modifiez-la:' : language === 'it' ? 'Scegli un\'idea o modificala:' : 'Choose an idea or edit it:',
+    chooseIdea: language === 'de' ? 'Idee auswählen oder bearbeiten:' : language === 'fr' ? 'Choisissez une idée ou modifiez-la :' : language === 'it' ? 'Scegli un\'idea o modificala:' : 'Choose an idea or edit it:',
     useThis: language === 'de' ? 'Diese verwenden' : language === 'fr' ? 'Utiliser celle-ci' : language === 'it' ? 'Usa questa' : 'Use this',
     option1: language === 'de' ? 'Option 1' : language === 'fr' ? 'Option 1' : language === 'it' ? 'Opzione 1' : 'Option 1',
     option2: language === 'de' ? 'Option 2' : language === 'fr' ? 'Option 2' : language === 'it' ? 'Opzione 2' : 'Option 2',
     selected: language === 'de' ? 'Ausgewählt' : language === 'fr' ? 'Sélectionné' : language === 'it' ? 'Selezionata' : 'Selected',
-    worldLocation: language === 'de' ? 'Deine Stadt' : language === 'fr' ? 'Ta ville' : language === 'it' ? 'La tua città' : 'Your city',
+    worldLocation: language === 'de' ? 'Deine Stadt' : language === 'fr' ? 'Votre ville' : language === 'it' ? 'La tua città' : 'Your city',
     worldFantasy: language === 'de' ? 'Fantasiewelt' : language === 'fr' ? 'Monde fantastique' : language === 'it' ? 'Mondo fantastico' : 'Fantasy world',
-    worldModeLabel: language === 'de' ? 'Neue Vorschläge:' : language === 'fr' ? 'Nouvelles suggestions:' : language === 'it' ? 'Nuove proposte:' : 'New suggestions:',
-    worldModeAuto: language === 'de' ? '1× dein Ort, 1× Fantasie' : language === 'fr' ? '1× ton lieu, 1× fantaisie' : language === 'it' ? '1× il tuo luogo, 1× fantasia' : '1× your location, 1× fantasy',
-    worldModeLocation: language === 'de' ? 'Beide von deinem Ort' : language === 'fr' ? 'Les deux de ton lieu' : language === 'it' ? 'Entrambe dal tuo luogo' : 'Both from your location',
+    worldModeLabel: language === 'de' ? 'Neue Vorschläge:' : language === 'fr' ? 'Nouvelles suggestions :' : language === 'it' ? 'Nuove proposte:' : 'New suggestions:',
+    worldModeAuto: language === 'de' ? '1× dein Ort, 1× Fantasie' : language === 'fr' ? '1× votre lieu, 1× fantaisie' : language === 'it' ? '1× il tuo luogo, 1× fantasia' : '1× your location, 1× fantasy',
+    worldModeLocation: language === 'de' ? 'Beide von deinem Ort' : language === 'fr' ? 'Les deux de votre lieu' : language === 'it' ? 'Entrambe dal tuo luogo' : 'Both from your location',
     worldModeFantasy: language === 'de' ? 'Beide Fantasiewelt' : language === 'fr' ? 'Les deux fantastiques' : language === 'it' ? 'Entrambe fantastiche' : 'Both fantasy',
     customTheme: language === 'de' ? 'Eigenes Thema' : language === 'fr' ? 'Thème personnalisé' : language === 'it' ? 'Tema personalizzato' : 'Custom Theme',
-    customThemePlaceholder: language === 'de' ? 'Beschreibe dein Abenteuer-Thema...' : language === 'fr' ? 'Décris ton thème...' : language === 'it' ? 'Descrivi il tuo tema...' : 'Describe your adventure theme...',
+    customThemePlaceholder: language === 'de' ? 'Beschreibe dein Abenteuer-Thema...' : language === 'fr' ? 'Décrivez votre thème…' : language === 'it' ? 'Descrivi il tuo tema...' : 'Describe your adventure theme...',
     useMyTheme: language === 'de' ? 'Mein Thema direkt verwenden' : language === 'fr' ? 'Utiliser mon thème directement' : language === 'it' ? 'Usa direttamente il mio tema' : 'Use my theme directly',
   };
 
@@ -416,7 +416,7 @@ export function WizardStep6Summary({
             {language === 'de'
               ? 'Dieses Thema wird für die Ideengenerierung verwendet. Du kannst es auch direkt als Handlung verwenden.'
               : language === 'fr'
-              ? 'Ce thème sera utilisé pour la génération d\'idées. Tu peux aussi l\'utiliser directement comme intrigue.'
+              ? 'Ce thème sera utilisé pour la génération d\'idées. Vous pouvez aussi l\'utiliser directement comme intrigue.'
               : language === 'it' ? 'Questo tema verrà usato per generare le idee. Puoi anche usarlo direttamente come trama.' : 'This theme will be used for idea generation. You can also use it directly as your plot.'}
           </p>
         </div>
@@ -568,7 +568,7 @@ export function WizardStep6Summary({
                         <p className="text-sm">
                           {(index === 0 ? ideaProgress1 : ideaProgress2) < 80
                             ? thinkingMessage
-                            : (lang === 'de' ? 'Schreibe Idee...' : lang === 'fr' ? 'Rédaction...' : lang === 'it' ? 'Scrittura idea...' : 'Writing idea...')}
+                            : (lang === 'de' ? 'Schreibe Idee...' : lang === 'fr' ? 'Rédaction…' : lang === 'it' ? 'Scrittura idea...' : 'Writing idea...')}
                         </p>
                       </div>
                     </div>
@@ -618,7 +618,7 @@ export function WizardStep6Summary({
                     <div className="flex items-center justify-center h-64 bg-gray-50 text-gray-400">
                       <p className="text-sm">
                         {lang === 'de' ? 'Klicke auf «Vorschlag generieren»' :
-                         lang === 'fr' ? 'Cliquez sur "Générer"' : lang === 'it' ? 'Clicca su "Genera una proposta"' :
+                         lang === 'fr' ? 'Cliquez sur « générer »' : lang === 'it' ? 'Clicca su "Genera una proposta"' :
                          'Click "Generate Suggestion"'}
                       </p>
                     </div>
