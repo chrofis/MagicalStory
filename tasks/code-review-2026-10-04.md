@@ -35,3 +35,11 @@ limits; NO FALLBACKS everywhere (Turnstile fails closed). One Sonnet agent at a 
 - [x] F9 Client wizard + trial (12ad105e4, 9d24efe71; decisions entry for W5 photo-fallback removal still owed) — W1-W10, D7
 - [x] F10 Client display + Nochmal for customers (client commit + server gate commit) — D1 (server gate + client), D2, D3, D4, D5, D6
 - [x] F11 Server (L4, L6 still open: testlab.js had foreign edits) — S1-S4 (regenerate via makePageImagePrompt), L1, L2, L4-L7, G1, G2, G7, G8, G10
+
+## Round 3 — texts in all languages + page layout (owner 2026-10-05)
+- [x] T-de German texts (Swiss ss/«», grammar, du/Sie, leaks, factual consistency)
+- [x] T-gaps translation completeness (missing keys, fall-through ternaries, untranslated copies, raw English errors, emails/PDF/SEO)
+- [x] T-fr French texts
+- [x] T-it Italian texts (+ English source texts)
+- [x] L-layout staging screenshots at 390 / 768 / 1440 px of the main routes
+  → findings in tasks/code-review-2026-10/10-texts-layout.md; owner decisions pending before fixes
