@@ -2310,7 +2310,7 @@ router.get('/:id/style-lab/:pageNum/history/:runId', authenticateToken, async (r
 router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter, async (req, res) => {
   try {
     const { id, pageNum } = req.params;
-    const { imageModel, sceneModel, useOriginalAsReference, blackoutIssues, evaluationFeedback, iterativePlacement, previewOnly, customImagePrompt, freeIterate, referenceMode, singlePassScene } = req.body;
+    let { imageModel, sceneModel, useOriginalAsReference, blackoutIssues, evaluationFeedback, iterativePlacement, previewOnly, customImagePrompt, freeIterate, referenceMode, singlePassScene } = req.body;
     const pageNumber = parseInt(pageNum);
     if (isNaN(pageNumber)) {
       return res.status(400).json({ error: 'Invalid page number' });
@@ -2331,10 +2331,20 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
     const userRole = userResult.rows[0].role;
     const hasInfiniteCredits = userCredits === -1 || isImpersonating;
 
-    // Only admins can use iteration (dev mode feature)
+    // Customers may iterate ("Nochmal", owner 2026-10-05) for the standard 2-credit
+    // retry; every developer knob stays admin-only, so a customer can never pick the
+    // render model, a custom prompt or a free iterate for the flat price.
     if (userRole !== 'admin' && !isImpersonating) {
-      log.warn(`🔄 [ITERATE] Access denied: role=${userRole}, impersonating=${isImpersonating}`);
-      return res.status(403).json({ error: 'Iteration is only available in developer mode' });
+      imageModel = undefined;
+      sceneModel = undefined;
+      blackoutIssues = undefined;
+      evaluationFeedback = undefined;
+      iterativePlacement = undefined;
+      previewOnly = undefined;
+      customImagePrompt = undefined;
+      freeIterate = undefined;
+      referenceMode = undefined;
+      singlePassScene = undefined;
     }
 
     if (!hasInfiniteCredits && userCredits < creditCost) {
