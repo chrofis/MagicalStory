@@ -7008,7 +7008,8 @@ const CAUSAL_COHERENCE_RULE =
   'Cause: what the main character does is what makes the outcome happen, and the step from the one to the other is visible. '
   + 'An object brought into the solution does real mechanical work — it holds, lifts, reaches, blocks or carries. '
   + 'Never a prop that is set down and plays no part in what follows, and never an action, a plan, a warning or a promise no later page acts on. '
-  + 'No consequence falls while an easier option stands open: every barrier the story leans on has its way around closed on some page.';
+  + 'No consequence falls while an easier option stands open: every barrier the story leans on has its way around closed on some page. '
+  + 'The same holds for the obvious doer: where the one who needs the thing, or is plainly the most able to fetch it, stays behind while others go, some page says what keeps them from going.';
 
 // `challengeLine: false` (the arc creator and re-teller, and the arc judge that
 // reads what they were given): the challenge-count line leaves, because the
