@@ -1,0 +1,273 @@
+{
+ "experiment": 1654,
+ "stage": "text_refine",
+ "params": {
+  "autoEval": false,
+  "fromWriterText": true,
+  "auditsFromStory": true
+ },
+ "results": [
+  {
+   "storyId": "job_1791222889407_ypl33vk8u",
+   "title": "Emma und die fehlende Hälfte",
+   "finalPages": [
+    {
+     "final": "Jedes Jahr, wenn der Herbst kam, setzte sich Grossvater Hans mit leeren Händen hoch oben auf den Herbstfelsen und summte eine Melodie in die Weite. Es war immer nur die erste Hälfte, denn die zweite hatte er nie gehört.\n\nAls er noch jung gewesen war, hatte die Meerjungfrau Mira ihm dieses Lied gesungen, bis die Flut sie fortgetragen hatte. Seither wartete er auf ein Wort von ihr. Und Emma wartete mit ihm, Jahr für Jahr, ohne genau zu wissen, worauf.\n\nUnten am Strand summte Emma dieselbe Hälfte neben Noah, Mama Sarah und Papa Daniel, denn sie kannte sie auswendig. Eine glänzende Kastanie, die sie auf dem Weg gefunden hatte, drückte sie so fest an die Brust, dass Noah sie nie halten durfte. Nur wenn es dunkel wurde, nahm sie Noahs Hand.",
+     "changed": true,
+     "original": "Jedes Jahr, wenn der Herbst kam, setzte sich Grossvater Hans hoch oben auf den Herbstfelsen und summte eine Melodie ins Weite. Es war immer nur die erste Hälfte, denn die zweite hatte er nie gehört.\n\nUnten am Strand summte Emma genau dieselbe erste Hälfte. Sie kannte sie auswendig, weil Grossvater Hans sie ihr beigebracht hatte, und die Melodie passte sich dem Rauschen der Wellen an, als gehörte sie dorthin. In ihrer Hand hielt sie eine glänzende Kastanie, die sie auf dem Weg zum Strand gefunden hatte, und sie drückte sie so fest an sich, dass Noah sie kein einziges Mal anfassen konnte.\n\nEinmal, als Grossvater Hans noch jung gewesen war, hatte eine Meerjungfrau namens Mira ihm genau diese Melodie gesungen. Dann hatte die Flut sie fortgetragen, bevor sie die zweite Hälfte zu Ende singen konnte. Seither wartete Hans auf ein Zeichen von ihr. Und Emma wartete mit ihm, Jahr für Jahr, ohne genau zu wissen, worauf.",
+     "pageNumber": 1
+    },
+    {
+     "final": "Jeden Herbst kam die alte Meeresschildkröte Kora zum untersten Stein am Wasser und blieb nur bis zum letzten Licht des Abends. Heute stand Sarah am Rand des Felsens und sah zu, wie Koras Kopf aus dem dunklen, sich kräuselnden Wasser auftauchte. Mit Koras erstem Atemzug stiegen leise Töne auf, die genau dort begannen, wo Grossvater Hans' Hälfte immer aufhörte. Nur Emma hörte sie und hielt die Luft an.\n\nGrossvater Hans sass zu weit oben, und das Donnern der Wellen schluckte die Töne, bevor sie seine alten Ohren erreichten. Seine steifen Knie trugen ihn schon lange nicht mehr über die nassen Steine hinunter zum Wasser. Wenn er Miras Antwort hören sollte, brauchte er jemanden, der sie ihm brachte. Kora aber würde mit dem letzten Licht davonschwimmen.",
+     "changed": true,
+     "original": "An jedem Herbst kam die alte Meeresschildkröte Kora zum untersten Stein am Wasser und blieb bis zum letzten Licht des Abends.\n\nSarah stand am Rand des Felsens und sah, wie Koras Kopf aus dem dunklen, kräuselnden Wasser auftauchte. Und mit Koras erstem Atemzug kamen Töne, die Sarah nichts sagten, die aber genau dort begannen, wo Grossvater Hans' Hälfte immer aufhörte. Emma hörte sie sofort und hielt die Luft an.\n\nGrossvater Hans sass zu weit oben, und das Donnern der Wellen schluckte Koras leise Töne, bevor sie zu seinen Ohren gelangten. Seine Knie trugen ihn schon lange nicht mehr über die nassen, unebenen Steine zum Wasser hinunter. Wenn er Miras Antwort hören wollte, brauchte er jemanden, der sie zu ihm brachte. Kora aber würde mit dem letzten Licht des Abends davonschwimmen. Die Zeit war kurz.",
+     "pageNumber": 2
+    },
+    {
+     "final": "Emma lief los, über die nassen grauen Steine, die Arme weit ausgestreckt. «Ich hole Miras Lied für Grossvater!», rief sie. «Emma, nein!», rief Mama Sarah ihr hinterher. «Die Steine sind glitschig!» Papa Daniel rief: «Das Wasser ist kalt und tief, Emma!», und Noah rief: «Komm sofort zurück!»\n\nDann stand sie vor der Lücke, wo der nächste Stein fehlte und nur dunkles, tiefes Wasser lag. Kora schaute sie einmal an, ruhig und kurz, und tauchte ab. Emma schluckte. Sie hüpfte auf den letzten Stein, summte Grossvaters erste Hälfte und streckte beide Arme über die Lücke.",
+     "changed": true,
+     "original": "Emma lief los.\n\n«Emma, nein!» rief Mama Sarah. «Die Steine sind glitschig!» Auch Noah und Papa Daniel riefen ihr nach, aber Emma lief weiter, Schritt für Schritt über die nassen grauen Steine, die Arme weit ausgestreckt, damit sie das Gleichgewicht hielt.\n\nDann stand sie vor der Lücke. Wo der nächste Stein hätte sein sollen, war nur dunkles, tiefes Wasser. Kora sass auf dem Stein jenseits der Lücke und schaute Emma einmal, kurz und ruhig, direkt an. Emma schluckte. Dann summte sie Grossvaters erste Hälfte, streckte beide Arme über die Lücke und wartete.",
+     "pageNumber": 3
+    },
+    {
+     "final": "Kora war nur abgetaucht, um zu sehen, ob das Kind ihr folgte. Jetzt stieg sie unter Emmas ausgestreckten Händen wieder auf, und Emma klammerte sich am Rand des Panzers fest.\n\nNoah, der ihr eben noch nachgerufen hatte, sprang hinterher und packte den Rand ebenfalls. «Allein lasse ich dich nicht gehen!», rief er.\n\n«Der Panzer ist nur für euch zwei breit genug!», rief Papa Daniel. «Haltet euch fest!» Er und Mama Sarah blieben auf dem letzten sicheren Stein zurück und sahen zu, wie Kora mit den Kindern in die kalte Tiefe tauchte.",
+     "changed": true,
+     "original": "Kora tauchte ab, aber nur für einen Moment. Sie wollte sehen, ob das Kind nachkommen würde.\n\nDann stieg sie unter Emmas ausgestreckten Händen wieder auf, und Emma griff nach dem Rand ihres Panzers. Hinter ihr landete Noah neben ihr auf dem Stein. Er hatte einfach nicht gewollt, dass sie allein über die Lücke ging, und so war er gesprungen. Seine Hände fassten ebenfalls an den Panzer.\n\nKora war breit genug für zwei kleine Kinder und nicht breiter. Ein Erwachsener hätte keinen Platz gehabt, und das Wasser war kalt und tief. Sarah und Daniel blieben auf dem letzten sicheren Stein zurück und sahen zu, wie Kora mit den Kindern in die Tiefe tauchte.",
+     "pageNumber": 4
+    },
+    {
+     "final": "Koras Panzer trug sie durch einen Korallenbogen hinunter, und solange eine Hand den Panzer berührte, konnten die Kinder unter Wasser atmen und hören. Unter dem Herbstfelsen lag Miras Riff im gedämpften Herbstlicht, und Mira schwamm ihnen entgegen. Sie summte Grossvaters fehlende zweite Hälfte leise in eine Muschel und liess die Kinder dabei nicht aus den Augen.\n\n«Ich kann nicht hinauf, und Kora hat nur Flossen», sagte sie. «Darum bringt ihr die Muschel zum Stein.» Sie legte Emma die Muschel an einer Kordel um den Hals. «Du hast Grossvaters Hälfte gesummt, Emma, deshalb gehört sie dir. Sie singt erst zurück, wenn jemand ihr den Anfang des Liedes vorsummt.» Emma fasste die Muschel kurz an und nickte.\n\nMira schaute ins dunkel werdende Wasser. «Ihr müsst jetzt gehen. Es wird früher dunkel als erwartet, und Kora muss mit dem Abendstrom fort.»",
+     "changed": true,
+     "original": "Koras Panzer trug sie durch einen Korallenbogen in die Tiefe hinunter, und solange eine Hand den Panzer berührte, konnten die Kinder atmen und hören wie unter freiem Himmel.\n\nMiras Riff lag unter dem Herbstfelsen, in gedämpftem Herbstlicht. Mira schwamm ihnen entgegen und summte Grossvaters fehlende zweite Hälfte leise in eine Muschel, während sie die Kinder ansah. «Kora hat nur Flossen», erklärte Mira. «Sie kann die Muschel nicht selbst hinauftragen.» Dann legte sie Emma die Muschel an einer Kordel um den Hals. «Sie antwortet nur, wenn sie die erste Hälfte des Liedes hört. Vergiss das nicht.»\n\nEmma fasste die Muschel kurz an, als wollte sie sich vergewissern, dass sie wirklich da war.\n\nMira schaute nach oben ins dunkel werdende Wasser. «Ihr müsst jetzt gehen», sagte sie. «Es wird früher dunkel als erwartet, und Kora muss mit dem Abendstrom fort.»",
+     "pageNumber": 5
+    },
+    {
+     "final": "Ein kleiner rötlicher Oktopus kam hinter einem Korallenstein hervor und streckte zwei Arme nach ihnen aus. «Ich bin Oskar, und ich wohne hier im Riff», blubberte er. «Aber zum Spielen hat ja sowieso niemand Zeit.» Dabei stupste er mit einem Arm gegen Emmas geschlossene Hand, in der die glänzende Kastanie steckte. Er wollte etwas Rundes und Glänzendes zum Behalten, das spürte Emma sofort.\n\n«Nein, die ist meine!», rief sie, zog die Hand zurück und schloss die Finger fester um die Kastanie. Oskar zog seinen Arm ein und sagte nichts mehr. Kora wartete schon.",
+     "changed": true,
+     "original": "Da erschien ein kleiner rötlicher Oktopus hinter einem Korallenstein und streckte zwei Arme in ihre Richtung.\n\n«Ich bin Oskar», sagte er, und seine Stimme klang wie Blasen, die aufsteigen. «Aber Zeit zum Spielen hat ja sowieso keiner.» Dabei bohrte er mit einem Arm in Emmas geschlossene Hand und stupste nach der glänzenden Kastanie. Seine Augen hingen an ihr, als wäre sie das Schönste, was er je gesehen hatte. Er wollte etwas Rundes und Glänzendes zum Behalten, das spürte Emma sofort.\n\nSie zog die Hand zurück und schloss die Finger fester um die Kastanie. Oskar zog seinen Arm ein, sagte nichts mehr und wich einen kleinen Schritt zurück. Kora wartete bereits.",
+     "pageNumber": 6
+    },
+    {
+     "final": "Auf dem Weg nach oben glitt Oskars Arm lautlos heran und streifte Emma die Kordel vom Hals. «Such sie!», rief er, spritzte seine Tinte aus, und das Wasser färbte sich schwarz. Noah griff hinein, einmal, zweimal, dreimal, und fasste jedes Mal nur Wasser.\n\nWeit hinten hielt Oskar die Muschel hoch über die dunklen Strömungen. Die Muschel war weg.",
+     "changed": true,
+     "original": "Oskar wartete nicht lange.\n\nAls Emma sich zu Kora umdrehte, glitt Oskars Arm lautlos zu ihr heran und hob die Kordel von Emmas Hals. «Such sie!» rief er, und dann kam die Tinte, schwarz und dicht, und das Wasser wurde dunkel wie die Nacht. Noah griff hinein, einmal, zweimal, dreimal, und fasste jedes Mal nur Wasser. Irgendwo im Schwarz hielt Oskar die Muschel hoch, aber man konnte ihn nicht sehen, man konnte gar nichts sehen. Die Muschel war weg.",
+     "pageNumber": 7
+    },
+    {
+     "final": "Kora drehte sich im Strom, der an ihren Flossen zog, und ihre Stimme kam ruhig durch die Tinte: «Der Strom dreht sich bald. Dann kann ich euch nicht mehr zum untersten Stein zurückbringen.»\n\n«Das gilt nicht! Ich kriege ihn!», rief Noah, griff wieder und wieder in die schwarze Wolke und bekam jedes Mal nur Wasser zu fassen. Die Muschel blieb stumm.\n\nEmma tastete nach Noahs Hand, so wie immer, wenn es dunkel wurde, aber da war nichts. Allein in der Schwärze dachte sie an Grossvater Hans, der oben auf dem Herbstfelsen sass und wartete. Wenn die Muschel nicht zu ihm kam, würde er noch ein Jahr warten.",
+     "changed": true,
+     "original": "Kora drehte sich im Strom, der an ihren Flossen zog, und ihre Stimme kam ruhig durch das Dunkel: «Der Strom dreht sich bald. Dann kann ich euch nicht mehr zum untersten Stein zurückbringen.»\n\nNoah griff weiter in die schwarze Tinte, aber er fasste nichts. Die Muschel blieb stumm.\n\nEmma war allein im Dunkel, und Noahs Hand war nicht mehr da. Das Dunkel drückte von allen Seiten, und Emma dachte an Grossvater Hans, der oben auf dem Herbstfelsen sass und wartete. Wenn die Muschel nicht zu ihm kam, würde er noch ein Jahr warten. Und das nächste. Und vielleicht noch viele mehr.",
+     "pageNumber": 8
+    },
+    {
+     "final": "Emma schwebte still im Dunkel und dachte an Miras Worte: Die Muschel antwortete nur, wenn sie die erste Hälfte des Liedes hörte. Sie öffnete den Mund und summte die Melodie laut ins Schwarze hinein.\n\nAus einem Riss in der Riffwand kam ein schwacher Gegenklang. Er war leise, aber ein zartes Leuchten schob das Dunkel zurück. Die Muschel hatte geantwortet.",
+     "changed": true,
+     "original": "Emma stand still.\n\nSie versuchte, nicht ans Dunkel zu denken, sondern nur an die Melodie. Mira hatte gesagt, die Muschel antworte, wenn sie die erste Hälfte des Liedes höre. Emma öffnete den Mund und summte. Laut, allein, ins Schwarze hinein.\n\nAus einem Riss in der Riffwand kam ein schwacher Gegenklang. Er war leise, aber er war da, und er leuchtete ganz zart im Dunkel. Die Muschel hatte geantwortet.",
+     "pageNumber": 9
+    },
+    {
+     "final": "Eine Hand fasste nach Emmas Hand, und es war Noah, der ihr Summen gehört hatte und ihm durch die Tinte gefolgt war. «Dort, Kora!», rief Emma und zeigte auf den Riss in der Wand. «Da summt sie!» Kora drehte sich und schwamm näher heran.\n\nNoah griff in den Riss und bekam die Kordel zu fassen. Kora wartete, aber sie konnte nicht ewig warten. «Gib sie her!», rief er hinein, aber die Kordel gab nicht nach. Tief im Riss stemmte Oskar alle acht Arme gegen den Fels und hielt das andere Ende fest. Noah zog, Oskar hielt, und keiner von beiden liess los, während der Strom immer stärker an Koras Flossen zerrte.",
+     "changed": true,
+     "original": "«Dort!», rief Emma und zeigte mit dem Finger auf den Riss in der Wand.\n\nKora drehte sich zu ihr und schwamm näher heran. Noah fasste in den Riss und griff nach der Kordel. Seine Finger schlossen sich darum, aber die Kordel gab nicht nach. Tief im Riss stemmte Oskar alle acht Arme gegen den Fels und hielt fest. Noah zog, Oskar hielt, und keiner von beiden liess los.\n\nKora wartete, aber sie konnte nicht ewig warten.",
+     "pageNumber": 10
+    },
+    {
+     "final": "Emma sah, wie Oskar nur auf die Kastanie starrte, und sie dachte an Grossvaters leere Hände. «Du darfst sie behalten», sagte sie und öffnete die Hand, bis die glänzende, runde Kastanie flach auf ihrer Handfläche lag. «Aber dann lass los.» Noah schaute herüber, sagte aber nichts.\n\n«Für immer?», blubberte Oskar. «Für immer», sagte Emma.\n\nDa liess Oskar die Kordel los und zog die Kastanie behutsam mit einem Arm zu sich. Noah zog die Muschel aus dem Riss und hängte Emma die Kordel wieder um den Hals. Dann wandte sich Kora nach oben, und die Kinder hielten sich an ihrem Panzer fest.",
+     "changed": true,
+     "original": "Emma öffnete die Hand.\n\nDie Kastanie lag auf ihrer Handfläche, glänzend und rund. Noah schaute kurz herüber, sagte aber nichts. Emma streckte die Hand Oskar entgegen.\n\nOskar liess die Kordel los. Er nahm die Kastanie behutsam mit einem Arm, zog sie zu sich und hielt sie fest, als wäre sie ein Schatz. Noah zog die Muschel aus dem Riss und hängte Emma die Kordel wieder um den Hals. Emma liess es geschehen und fasste die Muschel kurz mit beiden Händen an.\n\nKora wandte sich nach oben.",
+     "pageNumber": 11
+    },
+    {
+     "final": "Kora schwamm durch das letzte Licht nach oben, und Oskar ritt auf ihrem Panzer mit. «Ich will sehen, woher meine Kastanie kommt!», blubberte er. Mama Sarah sah den Panzer auftauchen und rief nach Daniel.\n\nPapa Daniel stand schon am Rand der Lücke, packte die Kinder und hob sie beide auf einmal über den Spalt auf den letzten sicheren Stein. «Puh, zwei Fische am Haken!», sagte er. Emma lachte, und Noah grinste.\n\nMama Sarah schloss die beiden in die Arme und schaute sie an, eines nach dem anderen. «Nie wieder geht ihr ohne einen Erwachsenen auf die nassen Steine, hört ihr?», sagte sie. Oskar, die Kastanie in einem Arm, blinzelte vom Panzer aus neugierig zum Ufer.",
+     "changed": true,
+     "original": "Sie stiegen auf, und das Abendlicht kam ihnen entgegen.\n\nKoras Kopf brach durch die Oberfläche, und Sarah rief Daniels Namen. Daniel stand schon am Rand der Lücke. Er streckte die Arme aus, griff die Kinder und hob sie beide auf einmal über den Spalt auf den sicheren Stein. «Gesund und unversehrt», sagte er, «und ich habe sicher keine grauen Haare bekommen.» Emma lachte, obwohl ihr noch die Knie zitterten.\n\nSarah kniete vor den Kindern und schaute sie an, eines nach dem anderen. «Nie wieder auf die nassen Steine ohne einen Erwachsenen», sagte sie. Ihre Stimme war ruhig, aber so, wie ruhig klingt, wenn man sich sehr gefürchtet hat. Auf Oskars Rücken sass Oskar, die Kastanie in einem Arm, und schaute neugierig aufs Ufer.",
+     "pageNumber": 12
+    },
+    {
+     "final": "Emma stieg an Papas Hand die nassen Steine hinauf und weiter auf den Herbstfelsen, wo Hans sass. Er hob den Kopf, als er sie kommen hörte, und Emma legte die Muschel in seine offenen Hände. «Summ, Grossvater», sagte sie. Hans betrachtete die Muschel einen Augenblick, hob sie dann ans Gesicht und summte die erste Hälfte des Liedes hinein, dieselbe Hälfte, die er seit so vielen Jahren summte.\n\nDie Muschel summte zurück. Die zweite Hälfte, die Mira hineingesungen hatte, stieg klar und vollständig aus ihr herauf, genau dort beginnend, wo seine Hälfte immer stehen geblieben war.\n\nHans sagte nichts. Er hielt die Muschel mit beiden Händen fest und summte die zweite Hälfte leise nach, ganz für sich. «Ich habe sie dir gebracht, Grossvater!», flüsterte Emma und strahlte, dann setzte sie sich neben ihn und lauschte.",
+     "changed": true,
+     "original": "Emma nahm Papas Hand, und sie stiegen gemeinsam die nassen Steine hinauf, bis der Weg sie auf den Herbstfelsen führte, wo Hans sass.\n\nEr hob den Kopf, als er sie hörte. Emma trat neben ihn und legte die Muschel in seine offenen Hände. Hans betrachtete sie einen Augenblick, dann hob er sie ans Gesicht und summte die erste Hälfte des Liedes hinein, dieselbe Hälfte, die er seit so vielen Jahren summte.\n\nDie Muschel summte zurück. Die zweite Hälfte, die Mira hineingesungen hatte, stieg klar und vollständig aus ihr herauf.\n\nHans hörte sie. Er hörte jedes Wort, jede Note. Seine Hände, die jahrelang leer gewesen waren, hielten jetzt die Antwort. Er sagte nichts. Er summte die zweite Hälfte einfach noch einmal leise nach, ganz für sich. Emma setzte sich neben ihn und lauschte.",
+     "pageNumber": 13
+    },
+    {
+     "final": "Kora blieb noch einen Atemzug länger im Wasser. «Fünfzig Herbste habe ich gewartet», sagte sie leise. «Nun will ich hören, wie das Lied endet.» Vom Herbstfelsen klang das fertige Lied zu ihr hinunter, denn die Muschel sang und Hans summte mit, und neben Kora stieg Miras Gesicht aus den Wellen.\n\n«Danke, Mira!», rief Emma hinunter, und Mira hob eine Hand. «Bis zum nächsten Herbst, Kora!», rief Emma weiter. Kora hob eine Flosse und schwamm in die Dämmerung hinaus, und auf ihrem Panzer schwenkte Oskar die glänzende Kastanie.\n\n«Behalte sie, Oskar!», rief Emma und lächelte.",
+     "changed": true,
+     "original": "Das Lied klang vom Herbstfelsen hinunter bis ans Wasser, und Miras Gesicht stieg neben Kora aus den Wellen.\n\n«Danke, Mira!», rief Emma hinunter. Mira hob eine Hand. Dann schwamm Kora einen halben Schritt zurück, und Emma rief: «Bis zum nächsten Herbst, Kora!» Kora hob eine Flosse.\n\nOskar sass noch auf Koras Panzer und schwenkte die glänzende Kastanie in die Abendluft. Emma lachte und schaute zu Noah hinüber, der neben ihr stand. Die Kastanie durfte Oskar behalten, das wusste sie. Sie hatte sie ihm gegeben, und das stimmte so.\n\nKora schwamm in die Dämmerung hinaus, bis nur noch der kleine rötliche Arm mit der Kastanie zu sehen war. Dann verschwand auch der.",
+     "pageNumber": 14
+    }
+   ],
+   "refineRounds": [
+    {
+     "kind": "repair",
+     "cost": 0.29795799999999995,
+     "ok": true
+    },
+    {
+     "kind": "repetition_fix",
+     "cost": 0.062378,
+     "ok": true
+    },
+    {
+     "kind": "diff",
+     "cost": 0.02089836,
+     "ok": true
+    },
+    {
+     "kind": "lector",
+     "cost": 0.089858,
+     "ok": true
+    }
+   ],
+   "refineMergeStats": {
+    "bySource": {
+     "jev": 2,
+     "blind": 16,
+     "arc-informed": 11,
+     "style-counter": 13
+    },
+    "duplicates": 0
+   }
+  },
+  {
+   "storyId": "job_1791040103540_atbttop6w",
+   "title": "Vier Freunde und ein Drachonei",
+   "finalPages": [
+    {
+     "final": "«Hier, zu mir!», rief Levin, und der Ball flog durch die Luft.\n\nLevin, sein kleiner Bruder Julian und ihre Freunde Max und Kiaan spielten auf dem Lindenhof. Die Linden leuchteten rot und gelb. Die Sonne schien noch auf die Türme des Grossmünsters.\n\nJulian rannte dem Ball nach, Max sprintete von links, und Kiaan hielt sich bereit. Levin lachte laut.",
+     "changed": true,
+     "original": "«Hier, zu mir!», rief Levin, und der Ball flog durch die Luft.\n\nLevin, sein kleiner Bruder Julian und ihre Freunde Max und Kiaan spielten auf dem Lindenhof. Die alten Linden standen um sie herum, und ihre Blätter leuchteten rot und gelb. Weit hinten ragten die Türme des Grossmünsters in den Nachmittagshimmel.\n\nJulian rannte dem Ball nach, Max sprintete von links, und Kiaan hielt sich bereit. Levin lachte. Das hier war der beste Platz der ganzen Stadt.",
+     "pageNumber": 1
+    },
+    {
+     "final": "Etwas brummte in der Ferne, und es wurde lauter und lauter.\n\nEin Mann in einer orangen Weste schob einen Karren auf den Lindenhof. Er hob den Laubbläser an und startete ihn. Der Lärm rollte über den ganzen Platz.\n\nLevin sah ihm zu. «Alles Laub muss in den Karren beim Schachfeld, bevor es dunkel wird!», rief der Mann. «Morgen soll hier niemand ausrutschen!»",
+     "changed": true,
+     "original": "Etwas brummte in der Ferne. Dann wurde das Brummen lauter, und lauter, und noch lauter.\n\nEin Mann mit einer orangefarbenen Weste schob einen Karren über das Pflaster des Lindenhofs. Er hob ein Laubbläsergerät an und startete es. Der Lärm rollte über den ganzen Platz.\n\nLevin sah dem Mann zu. Der Mann blies das Laub zielstrebig in Richtung des grossen Schachfeldes, Blatt für Blatt, Haufen für Haufen. Er musste fertig sein, bevor es dunkel wurde, damit am nächsten Morgen niemand auf den nassen Blättern ausrutschen würde.",
+     "pageNumber": 2
+    },
+    {
+     "final": "Der Ball rollte zwischen die dicken Wurzeln einer Linde und verschwand im Laub. Julian kniete sich hin und grub mit beiden Händen. Die Blätter flogen nach rechts und links.\n\nDann spürte er etwas Glattes und Warmes, das leise klopfte. Julian zog es vorsichtig aus dem Laub heraus. Es war ein Ei!\n\nDas Klopfen kam von innen. Julian riss die Augen auf und hielt den Atem an.",
+     "changed": true,
+     "original": "Der Ball rollte zwischen die dicken Wurzeln einer Linde und verschwand im Laub.\n\nJulian kniete sich hin und grub mit beiden Händen. Die Blätter flogen rechts und links. Dann hielten seine Finger etwas fest, das glatt war, das warm war, und das leise klopfte.\n\nEs war ein Ei. Julian hob es vorsichtig aus dem Laub heraus. Das Klopfen kam von innen, ganz zart, wie jemand, der anklopft und auf Einlass wartet. Julian riss die Augen auf und hielt den Atem an.",
+     "pageNumber": 3
+    },
+    {
+     "final": "«Schaut mal!», flüsterte Julian und drückte das Ei an sich. Max und Kiaan kamen näher. Woher kam das Ei bloss? Und wem gehörte es?\n\nLevin hob den Blick. Oben in der Krone der Linde blinzelte ihm ein goldenes Auge entgegen. Hoch in den Ästen kauerte in einem Nest ein Drache, rot und gelb, im Laub kaum zu sehen.\n\n«Ein echter Drache!», flüsterte Levin. Nur weil er blinzelte, erkannte Levin ihn.",
+     "changed": true,
+     "original": "«Schaut mal!», flüsterte Julian.\n\nLevin, Max und Kiaan traten näher. Alle betrachteten das Ei in Julians Händen. Woher kam es bloss? Und wem gehörte es?\n\nLevin hob den Blick. Oben in der Krone der Linde blinzelte ihm ein goldenes Auge entgegen. Er schaute genauer hin. Zwischen den roten und gelben Blättern sass ein Lebewesen, das aussah wie die Blätter selbst. Nur weil es blinzelte, erkannte Levin es. Dort oben, in einem Nest hoch in den Ästen, kauerte ein Drache.",
+     "pageNumber": 4
+    },
+    {
+     "final": "Der Drache beugte den Kopf herunter. «Ich heisse Rubina», sagte sie.\n\n«Der kalte Wind vom See hat mein Ei aus dem Nest geschüttelt. Es muss zurück in die Wärme, bevor die Nacht kommt, sonst schlüpft mein Kleines nie.»\n\n«Ich kann nicht zu euch herunter. Könnt ihr mir bitte helfen?»\n\nLevin schluckte. «Wir helfen dir, Rubina. Ich bin Levin, das ist Julian, und das sind Max und Kiaan.»",
+     "changed": true,
+     "original": "Der Drache beugte den Kopf herunter und sprach mit einer Stimme wie fernes Donnergrollen.\n\n«Ich heisse Rubina», sagte sie. «Der kalte Wind vom See hat mein Ei heute aus dem Nest geschüttelt. Es muss zurück in die Wärme, bevor die Nacht kommt. Sonst schlüpft mein Kleines nie.»\n\nRubina sah die vier Buben der Reihe nach an. «Ich kann nicht zu euch herunter. Könnt ihr mir helfen? Bitte?»\n\nLevin schluckte. Er liebte Drachen. Und dieser Drache brauchte sie. «Wir helfen dir, Rubina», sagte er. «Ich bin Levin, das ist Julian, und das sind Max und Kiaan.»",
+     "pageNumber": 5
+    },
+    {
+     "final": "Julian schaute hinauf. Rubina presste ihre Flügel fest über die Ohren.\n\n«Der Lärm tut meinen Ohren weh!», rief sie. «Sie sind so fein, dass sie mein Ei von weit weg klopfen hören. Mit den Flügeln darüber kann ich nicht fliegen.» «Dann sitzt du fest», sagte Julian leise.",
+     "changed": true,
+     "original": "Aber warum konnte Rubina nicht herunterkommen?\n\nJulian schaute hinauf. Rubina presste ihre Flügel fest an die Seiten ihres Kopfes, über ihre Ohren. Ihre Augen waren zusammengekniffen.\n\n«Ihre Ohren!», sagte Julian leise. Rubinas Ohren waren so fein, dass sie das schwache Klopfen ihres Eies noch von sehr weit weg hören konnte. Doch dieser Lärm des Laubbläsers tat ihr weh. Mit den Flügeln über den Ohren konnte sie nicht fliegen. Sie sass gefangen in ihrem Nest.",
+     "pageNumber": 6
+    },
+    {
+     "final": "Die Buben häuften Laub über das Ei als Decke. Levin ging zu dem Mann mit dem Laubbläser und flüsterte: «Entschuldigung.»\n\nDas Gerät brüllte, und seine Worte gingen unter. Levin zupfte den Mann am Ärmel, und der schaltete das Gerät ab. «Ich bin Herr Keller. Was ist?»\n\nLevin wurde rot und sagte nichts. Herr Keller zuckte die Schultern und wandte sich wieder dem Karren zu.",
+     "changed": true,
+     "original": "Levin ging zu dem Mann mit dem Laubbläser hinüber.\n\nEr öffnete den Mund. «Entschuldigung», sagte er. Aber das Gerät brüllte, und seine Worte verschwanden einfach so. Der Mann hörte nichts. Er blies weiter.\n\nDann schaltete der Mann das Gerät ab, um den Karren zu verschieben. Er drehte sich um. «Ich bin Herr Keller. Was ist?», fragte er. Levin spürte, wie ihm das Gesicht heiss wurde. Herr Keller schaute ihn an und wartete. Levin sagte nichts. Kein Wort kam heraus. Herr Keller zuckte die Schultern und schaltete das Gerät wieder ein.",
+     "pageNumber": 7
+    },
+    {
+     "final": "In der kurzen Stille hatte Julian etwas gesehen. Rubina war vom Nest aus den Stamm hinuntergeklettert, Stück für Stück, dem Ei entgegen.\n\nMax lief zu Herrn Keller, legte die Hände um den Mund und rief ihm ins Ohr: «Da liegt ein Drachenei unter dem Laub!» Herr Keller warf den Kopf zurück und lachte. «Drachen gibt es nur in Büchern, mein Bub!»\n\nDann schaltete er das Gerät wieder ein. Oben kletterte Rubina zurück in die Krone.",
+     "changed": true,
+     "original": "In diesem kurzen Augenblick der Stille hatte Julian etwas gesehen.\n\nRubina hatte sich vom Nest aus langsam den Stamm hinuntergetastet, Ast für Ast, auf ihre Klauen gestützt. Sie hatte sich bewegt, sobald es ruhig war.\n\nDann schaltete Herr Keller das Gerät wieder ein. Max lief zu Herr Keller, hob sich auf die Zehenspitzen und rief ihm ins Ohr: «Da liegt ein Drachonei unter dem Laub!» Herr Keller warf den Kopf zurück und lachte laut. «Drachen gibt es nur in Büchern, mein Freund!», rief er, und das Gerät brüllte weiter. Rubina kletterte zurück in die Krone.",
+     "pageNumber": 8
+    },
+    {
+     "final": "Der Windstoss des Laubbläsers fegte über die Wurzeln der Linde. Die Blätter, die die Buben über das Ei gehäuft hatten, stoben davon. Das Ei wackelte und rollte aus den Wurzeln heraus.\n\nDer Hang führte geradewegs zur steinernen Treppe. Das Ei rollte immer schneller auf die oberste Stufe zu. «Vorsicht, Treppe!», rief Levin.",
+     "changed": true,
+     "original": "Der Winddstoss des Laubbläsers fegte über die Wurzeln der Linde.\n\nDie Blätter, die die Buben über das Ei gehäuft hatten, stoben davon. Das Ei lag frei, und die Erschütterung brachte es ins Rollen. Es rollte einen, zwei, drei Zentimeter. Dann rollte es schneller.\n\nDer Hang führte geradewegs auf die steinerne Treppe zu, die vom Lindenhof hinunter in die Tiefe führte. Das Ei rollte auf die oberste Stufe zu und wurde nicht langsamer.",
+     "pageNumber": 9
+    },
+    {
+     "final": "Max hatte die Treppe schon im Blick. Er rannte los, so schnell er konnte.\n\nDas Ei rollte, Max rannte. Kies spritzte unter seinen Schuhen weg. Ganz oben an der Treppe, genau an der Kante der ersten Stufe, stellte er seinen Fuss davor, so wie ein Fussballspieler einen Ball stoppt. Das Ei stand still.\n\nMax atmete tief durch. «Das war knapp», sagte er.",
+     "changed": false,
+     "original": "Max hatte die Treppe schon im Blick. Er rannte los, so schnell er konnte.\n\nDas Ei rollte, Max rannte. Kies spritzte unter seinen Schuhen weg. Ganz oben an der Treppe, genau an der Kante der ersten Stufe, stellte er seinen Fuss davor, so wie ein Fussballspieler einen Ball stoppt. Das Ei stand still.\n\nMax atmete tief durch. «Das war knapp», sagte er.",
+     "pageNumber": 10
+    },
+    {
+     "final": "Kiaan kam zu Max gelaufen, zog seine Jacke aus und wickelte das Ei sorgfältig hinein. Dann trug er es vorsichtig zurück unter die Linde.\n\nDer Wind war kalt, und das Klopfen wurde leiser. Kiaan wollte das Bündel kurz ablegen. Seine Hände liessen schon fast los.\n\n«Nicht loslassen!», murmelte er. Er riss das Bündel an die Brust und hielt es fest.",
+     "changed": true,
+     "original": "Kiaan kam zu Max gelaufen und kniete sich neben das Ei.\n\nEr zog seine Jacke aus und legte sie auf den Boden. Dann hob er das Ei darauf und wickelte es sorgfältig ein. Das Ei war kalt geworden, und das Klopfen darin klang schwächer als vorhin.\n\nKiaan fasste das eingewickelte Bündel und wollte es kurz ablegen, um die Jacke besser zu schliessen. Seine Hände liessen schon fast los. Dann fiel ihm ein, wie wichtig es war, und er riss das Bündel wieder an die Brust und hielt es ganz fest.",
+     "pageNumber": 11
+    },
+    {
+     "final": "Die Sonne verschwand hinter den Dächern. Nur die Spitzen der Türme des Grossmünsters leuchteten noch.\n\nHerr Keller schob seinen Karren bis unter die Linde und blies die letzten Blätter weg. Das Gerät brüllte. Julian presste die Hände auf die Ohren und kauerte sich an die Wurzeln.\n\nKiaan hielt das Bündel fest an sich gedrückt. Das Klopfen darin wurde leiser und leiser. Bald war es kaum noch zu hören.",
+     "changed": true,
+     "original": "Die Sonne verschwand hinter den Dächern. Nur die Spitzen der Türme des Grossmünsters leuchteten noch.\n\nHerr Keller schob seinen Karren direkt bis zur Linde, direkt dorthin, wo Kiaan mit dem Bündel kauerte. Das Gerät brüllte auf. Julian presste die Hände auf die Ohren und drängte sich hinter Levins Rücken.\n\nKiaan hielt das Ei so fest er konnte. Aber das Klopfen darin wurde leiser und leiser. Bald war es kaum noch zu hören.",
+     "pageNumber": 12
+    },
+    {
+     "final": "Der Lärm dröhnte über den Platz. Julian dachte an vorhin, als es kurz still gewesen war. Er dachte daran, was er in dieser Stille gesehen hatte. Er riss den Mund auf und hob den Finger. «Als es still war, ist Rubina heruntergekommen!», rief er.",
+     "changed": true,
+     "original": "Dann, in dem Lärm, hatte Julian einen Gedanken.\n\nEr dachte an vorhin, als es kurz still gewesen war. Er dachte daran, was er in dieser Stille gesehen hatte. Er riss den Mund auf und hob den Finger.\n\n«Als es still war, ist Rubina heruntergekommen!», rief Julian.",
+     "pageNumber": 13
+    },
+    {
+     "final": "Levin hörte Julians Worte. Er erinnerte sich: Als er Herrn Keller am Ärmel gezupft hatte, hatte der das Gerät abgeschaltet.\n\nLevins Knie zitterten. Er schluckte. Dann ging er, Schritt für Schritt, auf Herrn Keller zu und zupfte ihn am Ärmel.\n\nHerr Keller schaltete ab und drehte sich um. Levin atmete tief durch und fragte, so laut er konnte: «Herr Keller, wie funktioniert so ein Laubbläser eigentlich?»",
+     "changed": true,
+     "original": "Levin hörte Julians Worte. Er dachte an Herr Keller, der das Gerät für jeden abschaltet, der ihn am Ärmel zupft.\n\nLevins Knie zitterten. Er schluckte einmal. Dann ging er, Schritt für Schritt, auf Herr Keller zu, streckte die Hand aus und zog ihn am Ärmel.\n\nHerr Keller schaltete ab und drehte sich um. Levin atmete durch und fragte so laut er konnte: «Herr Keller, wie funktioniert so ein Laubbläser eigentlich?»",
+     "pageNumber": 14
+    },
+    {
+     "final": "Herr Keller zeigte auf den Karren beim Schachfeld. «Hier vorne ist der Motor, und das Laub wird hinten eingesogen.» Dabei kehrte er der Linde den Rücken zu.\n\nLevin fragte, was in den Karren passt. Herr Keller griff nach dem Schalter, doch Levin fragte schon weiter: «Und wie leert man ihn?» Er zeigte es ihm.\n\nWieder griff Herr Keller nach dem Schalter, und wieder hatte Levin eine neue Frage: «Wie viel Laub kommt an einem Herbsttag zusammen?» Herr Keller dachte nach und redete weiter. Der Lindenhof blieb still.",
+     "changed": true,
+     "original": "Herr Keller stellte das Gerät ab und zeigte auf den Karren beim Schachfeld.\n\n«Also, schau, hier vorne ist der Motor», erklärte er, «und das Laub wird da hinten eingesogen.» Er drehte sich zum Karren um, den Rücken zur Linde. Levin nickte und fragte nach, was der Karren fasst. Herr Keller griff einmal nach dem Schalter. Levin fragte, wie man das Laub dann entleert. Herr Keller liess den Schalter los und zeigte es ihm. Levin fragte, wie viel Laub an einem Herbsttag zusammenkommt. Herr Keller dachte nach und redete weiter, den Blick auf den Karren gerichtet.\n\nEs blieb still auf dem Lindenhof. Still und ruhig.",
+     "pageNumber": 15
+    },
+    {
+     "final": "Rubina kletterte den Stamm hinunter. Ein Ast knackte, und Herr Keller drehte sich halb um. Rubina presste sich flach an die Rinde.\n\n«Wie schwer ist der Karren, wenn er voll ist?», fragte Levin schnell. Herr Keller wandte sich wieder ab.\n\nRubina kletterte das letzte Stück und streckte die Klauen aus. «Meine Klauen sind zum Klettern da», flüsterte sie. «Vom Boden kann ich das Ei nicht nehmen.» Kiaan hob das Bündel zu ihr hinauf.",
+     "changed": true,
+     "original": "An der Linde knackte ein Ast.\n\nRubina kletterte den Stamm Stück für Stück herunter, die Klauen in die Rinde gekrallt. Herr Keller hob den Kopf und drehte sich halb um. Rubina presste sich flach gegen die Rinde und rührte sich nicht.\n\nLevin fragte schnell: «Und wie schwer wird der Karren, wenn er voll ist?» Herr Keller wandte sich wieder ab. Rubina kletterte das letzte Stück hinunter und streckte die Klauen aus. Doch ihre Klauen waren fürs Klettern gemacht, nicht dafür, etwas vom Boden aufzuheben. Sie konnte das Bündel nicht greifen. Kiaan verstand es sofort. Er hob das eingewickelte Ei hoch und hielt es hinauf in Rubinas offene Klauen.",
+     "pageNumber": 16
+    },
+    {
+     "final": "Rubina hauchte warme Luft über das Ei und hob es sanft aus der Jacke. Die Jacke blieb in Kiaans Händen. Dann stieg sie mit dem Ei hinauf zum Nest. Ihre Flügel schlugen kräftig, und das letzte Blatt rieselte von der Linde herunter.\n\nHerr Keller drehte sich um. Im Dämmerlicht sah er seinen sauberen Platz, rot und gelb bedeckt von einer Seite zur anderen. Er stöhnte: «Das fange ich morgen von vorne an.»",
+     "changed": true,
+     "original": "Rubina hauchte warme Luft über das Bündel.\n\nSie kletterte zurück, das Ei sicher in den Klauen, und stieg höher und höher, bis sie die Krone erreichte. Dabei liess sie Kiaaans Jacke in seinen Händen zurück. Oben angekommen, breitete sie die Flügel aus und schlug sie einmal, zweimal kräftig. Jedes letzte Blatt löste sich vom Baum und rieselte herunter.\n\nHerr Keller drehte sich um. Rote und gelbe Blätter bedeckten seinen sauberen Platz von einer Seite zur anderen. Er sah seinen Karren an, er sah die Blätter an, und er stöhnte: «Das fange ich morgen von vorne an.»",
+     "pageNumber": 17
+    },
+    {
+     "final": "Oben im Nest knackte es. Die Schale brach auf, und ein kleiner Drache schaute heraus. Er blinzelte den vier Freunden zu.\n\nRubina kletterte den Stamm noch einmal herunter, bis sie vor den Buben stand. «Danke!», sagte sie und blies einen warmen Hauch auf die kalten Hände der Buben. Julian streckte die Hand aus und winkte ihr zu.\n\nLevin strahlte. «Diesmal habe ich mich getraut!», sagte er.",
+     "changed": true,
+     "original": "Oben im Nest gab es ein leises Knacken. Dann noch eins.\n\nDie Schale brach auf, und ein kleiner Drache schaute heraus. Er war rot und gelb, heller als seine Mutter, und er blinzelte in den Abendhimmel.\n\nRubina kletterte den Stamm noch einmal herunter, bis sie vor den Buben stand. «Danke», sagte sie, und blies einen warmen Hauch auf ihre kalten Hände. Julian streckte die Hand aus und streichelte ihr sanft die Nase.\n\nLevin schaute sie an und musste grinsen. «Diesmal habe ich mich getraut!», sagte er.",
+     "pageNumber": 18
+    }
+   ],
+   "refineRounds": [
+    {
+     "kind": "repair",
+     "cost": 0.372994,
+     "ok": true
+    },
+    {
+     "kind": "diff",
+     "cost": 0.02123168,
+     "ok": true
+    },
+    {
+     "kind": "lector",
+     "cost": 0.065026,
+     "ok": true
+    }
+   ],
+   "refineMergeStats": {
+    "bySource": {
+     "jev": 3,
+     "blind": 16,
+     "counter": 2,
+     "arc-informed": 9,
+     "style-counter": 11
+    },
+    "duplicates": 2
+   }
+  }
+ ]
+}

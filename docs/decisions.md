@@ -66818,3 +66818,13 @@ Replaces: the 2026-09 "nudity only when completely nude, never on a swimsuit or 
 **Not changed, reported.** Arc-side causes (an unhooked quoted line "nobody has time to play", Emma drifting alone although one hand on Kora's shell is what lets them breathe, parents passive at the dive) are the arc's; the diff pass removed "nur" from "nur Emma hörte sie" (a content edit under a grammar FIX).
 
 **Touched:** `prompts/text-refine.txt`, `prompts/story-text-audit.txt`. **Status:** 🟡 validation by Lab text_refine replay follows in its own entry.
+
+## 2026-10-05 — Text repair arc-fact rule: Lab 1654 result (kept, partial)
+
+**Evidence.** Lab #1654, `text_refine` with `fromWriterText` + `auditsFromStory` (same 42 stored findings), staging 61fdfb2d, $0.93 for two stories. Story A (ypl33): of 10 listed oddities 4 fixed (p3 Emma now says why she runs onto the stones; p11 the trade is now an act and a line, «Du darfst sie behalten», instead of "oben auf dem Felsen wartete Grossvater mit leeren Händen"; p13 "stolz und glücklich" became "strahlte"; p14 the narrator's "denn nach fünfzig Herbsten" became Kora's own line), 1 partial (p1 dark-hand plant), 4 still there (p1 cast roll call, p5 Mira's "deshalb gehört sie dir", p6 "wohne hier im Riff" and the unhooked "zum Spielen hat niemand Zeit", p12 "zwei Fische am Haken"), 1 new (p4 Papa Daniel urges the dive: "Haltet euch fest!"). Named feelings 3 to 0; "because" clauses 5 to 5 (some moved into speech). Story B (atbttop, 18p): no insertion of a narrator reason or named feeling; its shipped oddities (p6 wings "an die Seiten ihres Kopfes", p17 "bis der Baum kahl war", p18 "ihre kalten Hände") are gone, but the repair model differs (shipped on Opus 5, replay on Sonnet 5.5), so that is not attributable to the rule. Raw: `evals/runs/2026-10-05_text-refine-arc-fact-1654/`, `evals/results/results.jsonl`.
+
+**Decision.** Keep the two prompt edits of the previous entry. Not exercised: the audit-side LOADBEARING sentence (the replay used stored audits). A second paid iteration was not run (the $1.00 cap for this task was spent).
+
+**Revisit if** the next fresh staging story still shows narrator "because" clauses or an explanatory character line next to a repair-added sentence: then the rule needs the "deshalb/darum" case named, or the arc-informed audit's ENTRANCE / CAUSE questions need the same carry-as-act wording.
+
+**Open, arc side (not changed):** an unhooked quoted line in the arc ("nobody has time to play"), a world rule the arc's own sequence breaks (hand on the shell = breathing, yet Emma drifts alone), parents passive at the dive. **Touched:** `docs/decisions.md`, `evals/`. **Status:** 🟡 staging.
