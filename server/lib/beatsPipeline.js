@@ -1893,6 +1893,25 @@ ${bibleBody}` : bibleBody;
     for (const cb of coverBeats) delete cb.jevFixed;
     jevFallBack(jevReport, 'cover_places', err, gl);
   }
+  // ── The covers' other code-owned fields (owner, 2026-10-05) ───────────────
+  // Shot, gaze, light, population and era are code's on a cover, as on a story
+  // page: written into the cover's FIXED block before call 2 and pinned into its
+  // METADATA after it. The shot, the gaze and the era need no Jev, so they hold
+  // on the outage backup too; light and population exist only where Jev decided
+  // them (jevBriefFields.coverFacts). See decisions.md 2026-10-05.
+  {
+    const { coverFacts } = require('./jevBriefFields');
+    const era = visualBible && typeof visualBible.era === 'string' ? visualBible.era.trim() : '';
+    if (!era) gl.warn('beats_cover_era_missing', "The Visual Bible states no story-level era — the covers' era stays the Art Director's");
+    for (const cb of coverBeats) {
+      const facts = coverFacts({ coverKey: cb.coverKey, storyBeats: beats, location: cb.jevFixed && cb.jevFixed.location, population: jevReport && jevReport.population && jevReport.population.byLocation, era });
+      if (cb.jevFixed && cb.jevFixed.location && !facts.population && jevActive(jevReport)) {
+        gl.warn('beats_cover_population_undecided', `Cover p${cb.pageNumber}: no population decision for ${cb.jevFixed.location} (no story page stands there) — the Art Director writes its population`, null, { pageNumber: cb.pageNumber });
+      }
+      // `quiet`: on the outage backup the pin runs but no FIXED block is shown (fixedBlock).
+      cb.jevFixed = { ...(cb.jevFixed || {}), ...facts, ...(jevActive(jevReport) ? {} : { quiet: true }) };
+    }
+  }
   // A cover whose place code did not decide (the backup, or no candidate)
   // carries the Art Director's own-place rule into the page-brief call.
   if (coverBeats.some(cb => !(cb.jevFixed && cb.jevFixed.location))) {

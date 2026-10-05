@@ -5363,6 +5363,21 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "covers-fields-code-owned",
+      "title": "A cover's shot, light, population, era and gaze are code's: FIXED block before call 2, pinned after",
+      "commits": [],
+      "addedAt": "2026-10-05",
+      "claim": "On a beats story, each cover's stored brief (coverImages[*].sceneMetadata / sceneDescriptions p-1..-3) carries shot wide, looksAt viewer on every figure, timeOfDay/weather from the book's light (front = dominant outdoor light, title page = page 1, back = last page), population equal to its location's decision and era equal to the Visual Bible's `era`; the call-2 prompt shows each cover a FIXED block with those lines; the generation log has no beats_cover_era_missing.",
+      "runShape": [
+        "full-story",
+        "testlab-stage"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Read the stored cover briefs of the next beats story (or Lab beats_scenes on a stored story) and compare with the light of pages 1, last and the dominant outdoor time of day; confirm visualBible.era exists."
+      }
     }
   ],
   "runs": [

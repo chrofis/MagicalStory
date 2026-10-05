@@ -109,7 +109,7 @@ const REASK_CLOTHING_EXTRA = new Set(['outfit_missing']);
  * findings (only covers are pages -1/-2/-3, so this never collides with a
  * story page).
  */
-const COVER_ONLY_TYPES = new Set(['cover_cast_dropped', 'cover_location_repeated', 'cover_gaze_not_viewer', 'cover_text_zone_mismatch']);
+const COVER_ONLY_TYPES = new Set(['cover_cast_dropped', 'cover_location_repeated', 'cover_text_zone_mismatch']);
 
 /** The cast the brief check counts: the commissioned characters and the bible's secondaries, once each. */
 function briefCastNames(inputData, visualBible) {
@@ -149,14 +149,14 @@ function collectBriefFindings(expansions, ctx) {
   const findings = [];
   const withheld = [];
   const briefRes = checkBriefs(
-    expansions.map(x => ({ pageNumber: x.pageNumber, brief: x.brief, planLine: beatOf(x.pageNumber).planLine || '', placeDecided: !!(beatOf(x.pageNumber).jevFixed && beatOf(x.pageNumber).jevFixed.coverPlace) })),
+    expansions.map(x => ({ pageNumber: x.pageNumber, brief: x.brief, planLine: beatOf(x.pageNumber).planLine || '', placeDecided: !!(beatOf(x.pageNumber).jevFixed && beatOf(x.pageNumber).jevFixed.location && beatOf(x.pageNumber).jevFixed.coverPlace) })),
     briefCastNames(ctx.inputData, ctx.visualBible),
     ctx.visualBible,
     { textZoneRules: textZoneRulesActive(ctx.inputData) },
   );
   for (const f of briefRes.findings) {
     if (!f || !REVIEWABLE.has(f.type) || f.pageNumber === 0) continue;
-    // A cover's jevFixed holds its place alone (coverPlace): the story-page fields JEV_OWNED names are not decided there.
+    // A cover's jevFixed holds no cites, plan-cast or state fields (coverPlace): what JEV_OWNED names is not decided there.
     const fx = beatOf(f.pageNumber).jevFixed;
     if (fx && !fx.coverPlace && JEV_OWNED.has(f.type)) withheld.push(f);
     else findings.push(f);
@@ -340,7 +340,8 @@ async function runBriefChecks({ inputData, expansions, briefBeats, visualBible, 
   log.info(`🧩 [BEATS] brief checks: ${reaskable.length} finding(s) on page(s) ${flagged.join(', ')} — one re-ask to the Art Director`);
   gl.info('beats_brief_checks', `Brief checks found ${reaskable.length} fault(s) on page(s) ${flagged.join(', ')}`, null, { findings: reaskable });
   await stage(42, 'Checking the scene briefs...', { next: 51, ms: 60000 });
-  const jevBackup = !(briefBeats || []).some(b => b && b.jevFixed);
+  // A cover's jevFixed exists on the backup too (shot, gaze, era are code's); only a story page's marks the Jev path.
+  const jevBackup = !(briefBeats || []).some(b => b && b.jevFixed && !b.jevFixed.coverPlace);
   // THE SLIM CONTEXT (owner, 2026-09-30): the call-2 template's own rules and
   // output contract, the Visual Bible, and only the FLAGGED pages' plan lines
   // and FIXED blocks — never the whole book. See buildBriefReaskContext.

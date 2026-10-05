@@ -190,7 +190,7 @@ describe('offered landmarks: candidates, their own question, and their place in 
 });
 
 // ── runArtDirector end to end (scripted model replies, Jev stubbed) ─────────
-const BIBLE = ['---VISUAL BIBLE---', '```json', JSON.stringify(VB(), null, 2), '```', ''].join('\n');
+const BIBLE = ['---VISUAL BIBLE---', '```json', JSON.stringify({ era: 'medieval', ...VB() }, null, 2), '```', ''].join('\n');
 const wholeBrief = (n: number) => [`## Page ${n}`, 'The child stands in the square.', '', '---METADATA---',
   JSON.stringify({ shot: 'wide', characters: [{ name: 'Mila', looksAt: 'viewer', depth: 'foreground', expression: 'brows up, eyes wide, mouth open', emotion: 'happy' }], objects: ['LOC001.1'], interactions: [] }, null, 2), ''].join('\n');
 const savedText = textModels.callTextModelStreaming;
@@ -239,6 +239,20 @@ describe('runArtDirector: the covers\' places between the two calls', () => {
     expect(jevReport.coverPlaces.covers).toHaveLength(3);
     expect(jevReport.fallback).toBeFalsy();
   });
+  it('every cover shot, gaze, light and era are code-owned: in the FIXED block before call 2 and pinned into the brief', async () => {
+    const { out, prompts } = await run(makeJevStub().impl);
+    for (const c of out.coverBeats) {
+      expect(c.jevFixed).toMatchObject({ coverPlace: true, shot: 'wide', looksAtAll: 'viewer', era: 'medieval' });
+      expect(c.jevFixed.timeOfDay).toBeTruthy();
+      const x = out.expansions.find((e: any) => e.pageNumber === c.pageNumber);
+      const m: any = extractSceneMetadata(x.brief);
+      expect((m.fullData || m).shot).toBe('wide');
+      expect((m.fullData || m).timeOfDay).toBe(c.jevFixed.timeOfDay);
+      expect(m.era).toBe('medieval');
+      expect((m.fullData || m).characters.every((ch: any) => ch.looksAt === 'viewer')).toBe(true);
+    }
+    expect(prompts.beats_scene_expansion).toContain('era: medieval');
+  });
   it('Jev path with offered landmarks: three distinct covers, the offered places in the bible and in the call-2 prompt', async () => {
     const { out, prompts, jevReport } = await run(makeJevStub().impl, { availableLandmarks: OFFERED, userLocation: { city: 'the town' } });
     expect(jevReport.coverPlaces.unmet).toEqual([]);
@@ -264,7 +278,9 @@ describe('runArtDirector: the covers\' places between the two calls', () => {
     });
     expect(jevReport.fallback.step).toBe('cover_places');
     for (const c of out.coverBeats) {
-      expect(c.jevFixed).toBeUndefined();
+      // No place was decided, but the shot, the gaze and the era are code's with or without Jev.
+      expect(c.jevFixed.location).toBeUndefined();
+      expect(c.jevFixed).toMatchObject({ coverPlace: true, shot: 'wide', looksAtAll: 'viewer' });
       expect(c.planLine).toContain(CB.COVER_OWN_PLACE);
     }
     expect(prompts.beats_scene_expansion).toContain(CB.COVER_OWN_PLACE);

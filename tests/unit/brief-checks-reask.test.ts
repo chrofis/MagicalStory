@@ -143,16 +143,17 @@ describe('the "wearing no clothing" kind reaches the re-ask (Q7)', () => {
 describe('cover-only findings ship flagged, never reach the re-ask (owner, 2026-09-30)', () => {
   const coverPlan = 'medium — Ana and Ben — the cover moment — nothing changes';
 
-  it('a cover page whose only fault is cover_gaze_not_viewer makes no model call', async () => {
+  it('a cover page whose only fault is cover_cast_dropped makes no model call', async () => {
     const calls = stubModel(() => 'unused');
-    // The fixture's default metadata gives Ana/Ben looksAt each other, not the
-    // viewer — a cover fault (checkCoverBrief), cover-only.
+    // The cover's plan line names a cast the brief does not cite — a cover fault, cover-only.
     const x = { pageNumber: -2, brief: brief({ weather: 'clear' }) };
     const report = await runOn([x], [{ pageNumber: -2, planLine: coverPlan, jevFixed: fixed }]);
     expect(calls).toHaveLength(0);
     expect(report.reask).toBeNull();
-    expect(report.coverOnlyShipped.map((f: any) => f.type).sort()).toEqual(['cover_cast_dropped', 'cover_gaze_not_viewer']);
-    expect(BC.COVER_ONLY_TYPES.has('cover_gaze_not_viewer')).toBe(true);
+    expect(report.coverOnlyShipped.map((f: any) => f.type).sort()).toEqual(['cover_cast_dropped']);
+    expect(BC.COVER_ONLY_TYPES.has('cover_cast_dropped')).toBe(true);
+    // The gaze is code's on a cover (jevFixed.looksAtAll): no check, no finding type.
+    expect(BC.COVER_ONLY_TYPES.has('cover_gaze_not_viewer')).toBe(false);
   });
 
   it('a cover page with both a cover-only and a non-cover finding sends only the non-cover one to the re-ask', async () => {
@@ -161,8 +162,8 @@ describe('cover-only findings ship flagged, never reach the re-ask (owner, 2026-
     const report = await runOn([x], [{ pageNumber: -2, planLine: coverPlan, jevFixed: fixed }]);
     expect(calls).toHaveLength(1);
     expect(calls[0].prompt).toContain('[weather_none_outdoors]');
-    expect(calls[0].prompt).not.toContain('[cover_gaze_not_viewer]');
-    expect(report.coverOnlyShipped.some((f: any) => f.type === 'cover_gaze_not_viewer')).toBe(true);
+    expect(calls[0].prompt).not.toContain('[cover_cast_dropped]');
+    expect(report.coverOnlyShipped.some((f: any) => f.type === 'cover_cast_dropped')).toBe(true);
     expect(report.verdicts[0].accepted).toBe(true);
   });
 });

@@ -539,7 +539,94 @@ function applyCoverPlacePages(visualBible, citeByPage) {
   return changed;
 }
 
+// ───────────────────────── THE COVERS' OTHER FIXED FIELDS ─────────────────────────
+
+/**
+ * WHAT CODE OWNS ON A COVER (owner, 2026-10-05: "make code own them"). Until
+ * then the Art Director wrote a cover's own shot (the image prompt ignores it),
+ * timeOfDay and weather (staging Lab #1648: every cover said "morning" in an
+ * afternoon-to-dusk book), population (decidePopulation skipped covers), era
+ * (absent on all six stored covers) and `looksAt` (checked afterwards by the
+ * since-deleted cover_gaze_not_viewer). Now:
+ *   shot       `wide` — a cover is a wide portrait (the beat says so);
+ *   looksAt    `viewer` on every figure (SETTLED: covers are head-on);
+ *   light      the book's own, by cover (coverLight below);
+ *   population the decision for the cover's location, when one was made;
+ *   era        the story-level era the Visual Bible states.
+ * A cover keeps writing only what the beat gives it that code does not decide:
+ * its cast, the ids after its location, `aboard`, the prose.
+ */
+const COVER_SHOT = 'wide';
+const COVER_GAZE = 'viewer';
+
+/**
+ * The light of each cover, from the story pages' light decisions (b.fixed):
+ *   front cover  the book's dominant light: the most frequent timeOfDay among
+ *                the outdoor pages (all pages when none is outdoors), a tie
+ *                going to the one reached first; the light of the first page
+ *                holding it — its weather advice and indoors flag with it;
+ *   title page   page 1's light (the story opens as the dedication page does);
+ *   back cover   the last story page's light (the story ends as the book closes).
+ * `weather` is Jev's advice for that page. Pure; returns null when the source
+ * page has no decided light.
+ *
+ * @param {string} coverKey
+ * @param {Array<{pageNumber:number, fixed?:{timeOfDay:string, indoor:boolean, weatherAdvice:string}}>} storyBeats
+ */
+function coverLight(coverKey, storyBeats) {
+  const pages = (storyBeats || []).filter(b => b && b.fixed && b.fixed.timeOfDay).sort((a, b) => a.pageNumber - b.pageNumber);
+  if (!pages.length) return null;
+  let src;
+  if (coverKey === 'initialPage') src = pages[0];
+  else if (coverKey === 'backCover') src = pages[pages.length - 1];
+  else {
+    const pool = pages.some(b => !b.fixed.indoor) ? pages.filter(b => !b.fixed.indoor) : pages;
+    const tally = new Map();
+    for (const b of pool) tally.set(b.fixed.timeOfDay, (tally.get(b.fixed.timeOfDay) || 0) + 1);
+    const top = Math.max(...tally.values());
+    const time = [...tally].find(([, n]) => n === top)[0];
+    src = pool.find(b => b.fixed.timeOfDay === time);
+  }
+  return {
+    timeOfDay: src.fixed.timeOfDay,
+    indoor: !!src.fixed.indoor,
+    // An outdoor source page whose advice is `none` (Jev contradicting its own indoors answer, staging
+    // job_1791145238223_50osg2osm p3-p10) pins no weather: `none` outdoors is a fault, and none is invented.
+    ...(src.fixed.indoor ? { weather: 'none' } : (src.fixed.weatherAdvice && src.fixed.weatherAdvice !== 'none' ? { weather: src.fixed.weatherAdvice } : {})),
+    sourcePage: src.pageNumber,
+  };
+}
+
+/**
+ * The code-decided fields of one cover, to merge into its `jevFixed`. Every
+ * field is present only when code has a value for it; a field it has none for
+ * stays the Art Director's (a cover location with no population decision, a
+ * bible without an era) and the caller logs that.
+ *
+ * @param {Object} o
+ * @param {string} o.coverKey
+ * @param {Array} o.storyBeats
+ * @param {string|null} o.location - the cover's decided vantage / location id
+ * @param {Object<string,{population:string}>} [o.population] - decidePopulation's byLocation
+ * @param {string|null} [o.era] - the Visual Bible's story-level era
+ */
+function coverFacts({ coverKey, storyBeats, location = null, population = null, era = null }) {
+  const light = coverLight(coverKey, storyBeats);
+  const base = location ? String(location).trim().toUpperCase().split('.')[0] : null;
+  const pop = base && population && population[base] ? population[base].population : null;
+  const eraText = typeof era === 'string' && era.trim() ? era.trim() : null;
+  return {
+    coverPlace: true,
+    shot: COVER_SHOT,
+    looksAtAll: COVER_GAZE,
+    ...(light ? { timeOfDay: light.timeOfDay, indoor: light.indoor, ...(light.weather ? { weather: light.weather } : {}), lightFromPage: light.sourcePage } : {}),
+    ...(pop ? { population: pop } : {}),
+    ...(eraText ? { era: eraText } : {}),
+  };
+}
+
 module.exports = {
+  coverLight, coverFacts, COVER_SHOT, COVER_GAZE,
   decideBriefFields, assembleBriefs, pageLocations, visualBibleJsonOf,
   COVER_PLACE_SHOTS, COVER_PLACE_Q, COVER_OFFERED_Q, COVER_PLACE_FLOOR, COVER_PHOTO_MIN_SCORE, coverPhotoOf, bibleLocationOf, materializeCoverPlaces, coverPlaceCandidates, assignCoverPlaces, coverPlaceState, decideCoverPlaces, applyCoverPlacePages,
 };

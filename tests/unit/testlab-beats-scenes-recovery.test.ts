@@ -183,8 +183,10 @@ describe('runArtDirector — the Visual Bible call (2026-09-28, call 1 of 2)', (
     briefsPrompt = out.briefsPrompt;
     expect(briefsPrompt).toContain('"market square"');
     expect(briefsPrompt).toContain('- objects: LOC001');
-    // the cover page carries no FIXED block
-    expect(briefsPrompt.split('## Page -1')[1].split(String.fromCharCode(10, 10))[0]).not.toContain('FIXED');
+    // the cover page's FIXED block holds its code-owned shot and gaze, never an objects line
+    const coverBlock = briefsPrompt.split('## Page -1')[1].split(String.fromCharCode(10, 10))[0];
+    expect(coverBlock).toContain('shot: wide');
+    expect(coverBlock).not.toContain('- objects:');
   });
 
   it('no bible at all: the story still gets its briefs, loudly, from an empty bible', async () => {

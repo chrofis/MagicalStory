@@ -1067,7 +1067,7 @@ async function decideGaze({ arc, pages, perPage }, opts = {}) {
  * staging, a gap action reframed, a group pulled wider — applies to the
  * staging inside it, never to the field (owner, 2026-09-28).
  */
-const JEV_FIXED_FIELDS_RULE = "A story page's FIXED block holds the fields decided before you write: its `shot`, `timeOfDay` and indoors, the Visual Bible ids its `objects[]` cites — its location or vantage, and for an element with looks the dotted id of the look it shows — its `aboard`, its `population` and each listed character's `looksAt`. Code writes each into the page's METADATA: you never write a field the FIXED block lists (a field it does not list is yours — a cover's `shot`, `population` and `aboard`, a `looksAt` for a character it leaves out, an `objects[]` id it does not list such as a garment). Write the prose so the picture shows each: every cited element staged, even where only part of it is in frame, and no Visual Bible element staged that the FIXED `objects` leaves out. No other rule changes a fixed field; a rule that would change one applies to the staging inside it. `weather` stays yours on every page — `none` indoors, never `none` outdoors; a cover also writes its own `timeOfDay`. A cover's FIXED block holds only its location: code writes the vantage it is staged from first in `objects[]`, and the cover is seen as that vantage shows it.";
+const JEV_FIXED_FIELDS_RULE = "A story page's FIXED block holds the fields decided before you write: its `shot`, `timeOfDay` and indoors, the Visual Bible ids its `objects[]` cites — its location or vantage, and for an element with looks the dotted id of the look it shows — its `aboard`, its `population` and each listed character's `looksAt`. A cover's FIXED block holds its `shot`, its light (`timeOfDay` and `weather`), its location, its `population`, its `era` and the gaze of every figure (the viewer). Code writes each into the page's METADATA: you never write a field the FIXED block lists (a field it does not list is yours — a cover's `aboard`, a `looksAt` for a story-page character it leaves out, an `objects[]` id it does not list such as a garment). Write the prose so the picture shows each: every cited element staged, even where only part of it is in frame, and no Visual Bible element staged that the FIXED `objects` leaves out. No other rule changes a fixed field; a rule that would change one applies to the staging inside it. A story page's `weather` stays yours — `none` indoors, never `none` outdoors. A cover's FIXED location is the vantage code writes first in `objects[]`, and the cover is seen as that vantage shows it.";
 
 /**
  * Which shot a vantage holds, as the Visual Bible call is told it (owner,
@@ -1107,13 +1107,22 @@ function fixedBlock(page) {
   const f = page && page.jevFixed;
   if (!f) return fixedLine(page && page.fixed);
   const label = id => (f.labels && f.labels[id] ? `${id} (${f.labels[id]})` : id);
-  // A COVER'S FIXED BLOCK IS ITS PLACE ALONE (2026-10-04): code decided the
-  // vantage and nothing else, so the block never lists `objects` — that line
-  // reads as the page's whole element list, and the cover would lose its
-  // central figure and the elements its beat asks for.
+  // A COVER'S FIXED BLOCK never lists `objects` (2026-10-04): that line reads as
+  // the page's whole element list, and the cover would lose its central figure
+  // and the elements its beat asks for. Since 2026-10-05 it also holds the
+  // fields code owns on a cover (jevBriefFields.coverFacts): shot, light,
+  // population, era and the gaze.
   if (f.coverPlace) {
-    return ['FIXED — code writes it into METADATA; the prose shows it:',
-      `- location: ${label(f.location)} — code puts it first in objects[]; write the cover's other ids after it, following its beat`].join('\n');
+    // The Jev-outage backup states no FIXED block anywhere (its templates carry no FIXED rule); the pin still runs.
+    if (f.quiet) return '';
+    const lines = ['FIXED — code writes each into METADATA (write none of them); the prose shows each:'];
+    if (f.shot) lines.push(`- shot: ${f.shot}`);
+    if (f.timeOfDay) lines.push(`- timeOfDay: ${f.timeOfDay}; ${f.indoor ? 'indoors (weather none)' : `outdoors, weather ${f.weather || 'yours to write'}`}`);
+    if (f.location) lines.push(`- location: ${label(f.location)} — code puts it first in objects[]; write the cover's other ids after it, following its beat`);
+    if (f.population) lines.push(`- population: ${f.population}`);
+    if (f.era) lines.push(`- era: ${f.era}`);
+    if (f.looksAtAll) lines.push(`- looksAt: every figure → ${f.looksAtAll} (the reader)`);
+    return lines.length > 1 ? lines.join('\n') : '';
   }
   const lines = ['FIXED — code writes each into METADATA (write none of them); the prose shows each:'];
   if (f.shot) lines.push(`- shot: ${f.shot}`);
@@ -1144,6 +1153,8 @@ function fixedBlock(page) {
  *   aboard, aboardIds              — the vehicle the camera is on (or null); an
  *                                    `aboard` outside `aboardIds` (a structure) stays
  *   looksAt                        — { characterName: target }
+   looksAtAll                     — one target for EVERY character row (a cover: `viewer`)
+   weather, era                   — written as given (a cover's; a story page's weather stays the Art Director's)
  */
 function pinBrief(brief, fixed) {
   const { parseProseMetadataFormat } = require('./sceneMetadata');
@@ -1162,6 +1173,8 @@ function pinBrief(brief, fixed) {
   // only a console line (refreshPlanShot) recorded it. Pinned like the rest.
   if (fixed.shot) set('shot', fixed.shot);
   if (fixed.timeOfDay) set('timeOfDay', fixed.timeOfDay);
+  // A cover's weather is code's (coverFacts); a story page's stays the Art Director's.
+  if (fixed.weather) set('weather', fixed.weather);
   if (fixed.indoor === true) set('weather', 'none');
   else if (fixed.indoor === false && (!m.weather || m.weather === 'none')) changes.push({ field: 'weather', from: m.weather || null, to: null, problem: 'outdoors' });
   if (Array.isArray(fixed.cites)) {
@@ -1191,11 +1204,19 @@ function pinBrief(brief, fixed) {
     }
   }
   if (fixed.population) set('population', fixed.population);
+  if (fixed.era) set('era', fixed.era);
   if (fixed.aboard !== undefined) {
     const own = new Set((fixed.aboardIds || []).map(baseId));
     const cur = m.aboard ? String(m.aboard) : null;
     if (fixed.aboard) set('aboard', fixed.aboard);
     else if (cur && own.has(baseId(cur))) set('aboard', null);
+  }
+  if (fixed.looksAtAll && Array.isArray(m.characters)) {
+    m.characters = m.characters.map((c) => {
+      if (!c || typeof c !== 'object' || c.looksAt === fixed.looksAtAll) return c;
+      changes.push({ field: 'looksAt', name: c.name, from: c.looksAt ?? null, to: fixed.looksAtAll });
+      return { ...c, looksAt: fixed.looksAtAll };
+    });
   }
   if (fixed.looksAt && Array.isArray(m.characters)) {
     m.characters = m.characters.map((c) => {

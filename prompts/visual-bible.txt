@@ -120,6 +120,7 @@ Exactly this, nothing before the marker and nothing after the closing fence:
 ---VISUAL BIBLE---
 ```json
 {
+  "era": "[the story's time period in 2-4 words: medieval, 1920s, present day. One value for the whole book; the covers are drawn in it]",
   "secondaryCharacters": [
     {
       "id": "CHR001",

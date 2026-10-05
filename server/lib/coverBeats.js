@@ -137,7 +137,6 @@ function buildCoverBeats(inputData = {}, { coverTypes = ['frontCover', 'initialP
     const facts = [
       t.instant,
       ...(placeDecided ? [COVER_DECIDED_PLACE] : [COVER_KEY_PLACE, COVER_OWN_PLACE]),
-      'every figure looks at the viewer (`looksAt: "viewer"`)',
       anyCostumed(cast, clothingRequirements) ? 'every figure wears their costumed outfit' : null,
       `any animal, artifact or vehicle from the Visual Bible the picture calls for, at most ${VB_ELEMENT_BUDGET}`,
       t.space,

@@ -49,11 +49,11 @@ describe('cover beats — what code knows about a cover, written as the beat', (
     // no main character: the whole cast stands in for them
     expect(CB.coverCasts(cast(2, [])).frontCover).toEqual(['Child1', 'Child2']);
   });
-  it('each beat is shot — cast — facts — after, and carries gaze, copy space and the element budget', () => {
+  it('each beat is shot — cast — facts — after, and carries copy space and the element budget; the gaze lives in the FIXED block', () => {
     for (const b of CB.buildCoverBeats(cast(2, [1]))) {
       const parts = b.planLine.split(' — ');
       expect(parts[0]).toBe('wide');
-      expect(b.planLine).toContain('`looksAt: "viewer"`');
+      expect(b.planLine).not.toContain('looksAt');
       expect(b.planLine).toContain(`textPosition "${CB.COVER_TEXT_POSITION[b.coverKey]}"`);
       expect(b.planLine).toContain(`at most ${VB_ELEMENT_BUDGET}`);
     }
@@ -126,9 +126,9 @@ describe('the mechanical cover checks on a brief', () => {
   const meta = (looksAt: string, textPosition: string) => ({
     characters: [{ name: 'Child1', looksAt }], textPosition,
   });
-  it('a figure not looking at the viewer and a text zone off the beat are both findings', () => {
+  it('a text zone off the beat is a finding; a gaze off the viewer is not (code pins it)', () => {
     const types = SBC.checkCoverBrief({ pageNumber: -1 }, meta('Child2', 'bottom-full')).map((f: any) => f.type);
-    expect(types).toEqual(['cover_gaze_not_viewer', 'cover_text_zone_mismatch']);
+    expect(types).toEqual(['cover_text_zone_mismatch']);
   });
   it('a brief that follows its beat is clean; one with no textPosition is not a fault (the render takes the beat\'s)', () => {
     expect(SBC.checkCoverBrief({ pageNumber: -1 }, meta('viewer', 'top-full'))).toEqual([]);
@@ -138,8 +138,8 @@ describe('the mechanical cover checks on a brief', () => {
   it('a story page is never held to a cover rule', () => {
     expect(SBC.checkCoverBrief({ pageNumber: 4 }, meta('Child2', 'bottom-full'))).toEqual([]);
   });
-  it('both types reach the scene review', () => {
-    expect(SBC.REVIEWABLE.has ? SBC.REVIEWABLE.has('cover_gaze_not_viewer') : SBC.REVIEWABLE.includes('cover_gaze_not_viewer')).toBe(true);
+  it('the zone type reaches the scene review; the deleted gaze type does not exist', () => {
+    expect(SBC.REVIEWABLE.has('cover_gaze_not_viewer')).toBe(false);
     expect(SBC.REVIEWABLE.has ? SBC.REVIEWABLE.has('cover_text_zone_mismatch') : SBC.REVIEWABLE.includes('cover_text_zone_mismatch')).toBe(true);
   });
 });

@@ -295,33 +295,17 @@ function checkCoverLocations(pages = [], visualBible = null) {
 }
 
 /**
- * A COVER PAGE'S TWO BEAT FACTS (owner, 2026-09-24). A cover is a page the Art
- * Director briefs from its beat (coverBeats.js); two facts of that beat are
- * mechanical, so they are checked here and handed to the scene review like any
- * brief fault:
- *   - every figure looks at the viewer (`looksAt: "viewer"`) — the cover gaze
- *     rule (docs/SETTLED.md: covers are head-on portraits);
- *   - the text goes where the book's text goes (`coverBeats.COVER_TEXT_POSITION`).
+ * A COVER PAGE'S BEAT FACT (owner, 2026-09-24): the text goes where the book's
+ * text goes (`coverBeats.COVER_TEXT_POSITION`), checked here and handed to the
+ * scene review like any brief fault. The cover's gaze was the other fact until
+ * 2026-10-05, when code took it (jevFixed.looksAtAll, pinned into every cover's
+ * METADATA — decisions.md 2026-10-05), so nothing is left to check there.
  * Story pages return nothing.
  */
 function checkCoverBrief(page, metadata) {
   const { isCoverPage, coverKeyOfPage, COVER_TEXT_POSITION } = require('./coverBeats');
   if (!page || !isCoverPage(page.pageNumber)) return [];
   const out = [];
-  const raw = (metadata && Array.isArray(metadata.fullData && metadata.fullData.characters))
-    ? metadata.fullData.characters
-    : (metadata && Array.isArray(metadata.characters) ? metadata.characters : []);
-  const off = raw
-    .filter(c => c && typeof c === 'object' && c.name)
-    .filter(c => !/^(viewer|the viewer|camera)$/i.test(String(c.looksAt || '').trim()))
-    .map(c => `${c.name} (${c.looksAt ? `looksAt "${c.looksAt}"` : 'no looksAt'})`);
-  if (off.length > 0) {
-    out.push({
-      pageNumber: page.pageNumber,
-      type: 'cover_gaze_not_viewer',
-      detail: `This is a book cover: every figure looks at the viewer. ${off.join(', ')} — set \`looksAt: "viewer"\` and turn the figure toward the viewer in the prose.`,
-    });
-  }
   // A brief with no `textPosition` (a story whose text-zone rules are off
   // carries none) is not a fault: the render takes the beat's position. Only a
   // brief that DECLARES another zone contradicts its beat.
@@ -1660,8 +1644,8 @@ const REVIEWABLE = new Set(['vb_id_label_mismatch', 'cover_cast_dropped', 'plan_
   // and p6 (too close). SENT.
   'group_shot_too_close', 'group_facing_viewer',
   'textzone_character_collision', 'textzone_fullwidth_floor', 'textzone_top_floor', 'textzone_bottom_floor', 'textzone_half_streak',
-  // A cover page's two mechanical beat facts (checkCoverBrief, 2026-09-24).
-  'cover_gaze_not_viewer', 'cover_text_zone_mismatch']);
+  // A cover page's mechanical beat fact (checkCoverBrief). Its gaze is code's now (jevFixed.looksAtAll).
+  'cover_text_zone_mismatch']);
 
 // Reserved `action` labels for characters who are present but not acting. They
 // are values rather than an omitted field on purpose: when the field was
