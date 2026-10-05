@@ -8,7 +8,7 @@
       "source": "Reproduced on staging 6689dcee: POST /api/generate-story-ideas-stream with Accept-Encoding gzip delivered the first event (generating) only when the response ended (65.4 s without a location, 112.2 s for Fislisbach). Cause: app.use(compression()) in server.js; text/event-stream is compressible and the small events sit in the zlib buffer. e472d3e02 (2026-09-24) cut the streamed volume to comment pings, which exposed it. The trial stream /api/trial/generate-ideas-stream shares it.",
       "status": "fixed",
       "fixedAt": "2026-10-05",
-      "fixedIn": "see git log: fix(sse) compressionFilter",
+      "fixedIn": "2c26d05bd",
       "fix": "server/lib/compressionFilter.js: text/event-stream bypasses the compression middleware (covers the trial idea stream too). Test: tests/unit/sse-not-compressed.test.ts. docs/decisions.md 2026-10-05."
     },
     {
