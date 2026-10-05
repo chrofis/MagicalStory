@@ -3267,6 +3267,54 @@
       "source": "Code review 2026-10-04 (tasks/code-review-2026-10/7-client.md W10)",
       "status": "fixed",
       "fixedAt": "2026-10-05"
+    },
+    {
+      "id": "nochmal-errors-silent",
+      "title": "Nochmal (iterate) failures were console-only; credits not refreshed",
+      "rootCause": "handleImproveImage catch logged only",
+      "impact": "Spinner stopped with no message; balance stale",
+      "fixedIn": "6bbc58387",
+      "fix": "Localised toast for 402/429/other + updateCredits (client side of owner decision #5). Test: tests/unit/client-batch10-versions-share.test.ts",
+      "reportedAt": "2026-10-05",
+      "source": "Code review 2026-10-04 (tasks/code-review-2026-10/7-client.md)",
+      "status": "fixed",
+      "fixedAt": "2026-10-05"
+    },
+    {
+      "id": "share-toggle-ignores-res-ok",
+      "title": "Sharing toggle/handleShare never checked res.ok",
+      "rootCause": "fetch result unused",
+      "impact": "UI showed private while link live; dead link copied",
+      "fixedIn": "6bbc58387",
+      "fix": "setSharingOnServer returns state only on res.ok. Test: tests/unit/client-batch10-versions-share.test.ts",
+      "reportedAt": "2026-10-05",
+      "source": "Code review 2026-10-04 (tasks/code-review-2026-10/7-client.md)",
+      "status": "fixed",
+      "fixedAt": "2026-10-05"
+    },
+    {
+      "id": "history-version-index-vs-array",
+      "title": "History modal used DB versionIndex as array index",
+      "rootCause": "imageVersions[versionIndex]",
+      "impact": "Wrong picture on sparse version sets",
+      "fixedIn": "6bbc58387",
+      "fix": "findVersionByIndex (field lookup, legacy array fallback logged). Test: tests/unit/client-batch10-versions-share.test.ts",
+      "reportedAt": "2026-10-05",
+      "source": "Code review 2026-10-04 (tasks/code-review-2026-10/7-client.md)",
+      "status": "fixed",
+      "fixedAt": "2026-10-05"
+    },
+    {
+      "id": "checkout-double-session",
+      "title": "Checkout button re-enabled during Stripe redirect",
+      "rootCause": "finally{setIsCheckingOut(false)}",
+      "impact": "Second click created a second checkout session",
+      "fixedIn": "6bbc58387",
+      "fix": "Reset only in catch (+bfcache pageshow). Test: tests/unit/client-batch10-versions-share.test.ts",
+      "reportedAt": "2026-10-05",
+      "source": "Code review 2026-10-04 (tasks/code-review-2026-10/7-client.md)",
+      "status": "fixed",
+      "fixedAt": "2026-10-05"
     }
   ]
 }
