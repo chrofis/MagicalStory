@@ -51,15 +51,15 @@ Verpflichtungen zur Entfernung oder Sperrung der Nutzung von Informationen nach 
     ]
   },
   fr: {
-    title: 'Mentions Légales',
-    lastUpdated: 'Dernière mise à jour : Janvier 2025',
+    title: 'Mentions légales',
+    lastUpdated: 'Dernière mise à jour : janvier 2025',
     sections: [
       {
         title: 'Contact',
         content: `Roger Fischer
 Ennetbaden, Suisse
 
-Email : info@magicalstory.ch`
+E-mail : info@magicalstory.ch`
       },
       {
         title: 'Clause de non-responsabilité',

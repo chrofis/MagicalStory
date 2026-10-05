@@ -188,7 +188,7 @@ export default function Pricing() {
       feature2: 'Reliure durable',
       feature3: 'Couleurs vives',
       feature4: 'Page de dédicace personnelle',
-      combineNote: 'Vous pouvez combiner plusieurs histoires en un seul livre !',
+      combineNote: 'Vous pouvez combiner plusieurs histoires en un seul livre !',
       backToStories: 'Retour à Mes histoires',
       createStory: 'Créer une histoire',
     },

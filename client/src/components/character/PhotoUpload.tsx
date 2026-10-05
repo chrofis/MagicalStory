@@ -30,13 +30,13 @@ const consentTexts = {
     pleaseAccept: 'Bitte akzeptieren Sie die obigen Bedingungen, um ein Foto hochzuladen',
   },
   fr: {
-    consent1: 'Je confirme que j\'ai le droit d\'utiliser les photos téléchargées et, pour les photos de mineurs, je suis le parent/tuteur ou j\'ai obtenu leur consentement.',
+    consent1: 'Je confirme que j\'ai le droit d\'utiliser les photos importées et, pour les photos de mineurs, je suis le parent/tuteur ou j\'ai obtenu leur consentement.',
     consent2: 'J\'accepte les',
-    termsLink: 'Conditions d\'Utilisation',
+    termsLink: 'Conditions d\'utilisation',
     and: 'et la',
-    privacyLink: 'Politique de Confidentialité',
+    privacyLink: 'Politique de confidentialité',
     period: ', y compris le traitement de ces photos par l\'IA pour créer des avatars illustrés.',
-    pleaseAccept: 'Veuillez accepter les conditions ci-dessus pour télécharger une photo',
+    pleaseAccept: 'Veuillez accepter les conditions ci-dessus pour importer une photo',
   },
   it: {
     consent1: "Confermo di avere il diritto di utilizzare le foto caricate e, per le foto di minorenni, di essere il genitore/tutore o di aver ottenuto il loro consenso.",
@@ -99,7 +99,7 @@ export function PhotoUpload({ onPhotoSelect, showExamples = true }: PhotoUploadP
   const descriptionText = language === 'de'
     ? 'Deine Geschichte wird basierend auf den hochgeladenen Fotos erstellt. Verwende Fotos mit nur einer Person, idealerweise Ganzkörperaufnahmen, da auch die Kleidung in die Geschichte übernommen wird.'
     : language === 'fr'
-    ? 'Votre histoire sera générée à partir des photos téléchargées. Utilisez des photos d\'une seule personne, idéalement en pied, car les vêtements seront également intégrés dans l\'histoire.'
+    ? 'Votre histoire sera générée à partir des photos importées. Utilisez des photos d\'une seule personne, idéalement en pied, car les vêtements seront également intégrés dans l\'histoire.'
     : language === 'it'
     ? "La tua storia sarà creata in base alle foto caricate. Usa foto di una sola persona, idealmente a figura intera, perché anche i vestiti verranno ripresi nella storia."
     : 'Your story will be generated based on the photos you upload. Use photos of a single person, ideally full body shots, as clothing will also be copied into the story.';
@@ -219,7 +219,7 @@ export function PhotoUpload({ onPhotoSelect, showExamples = true }: PhotoUploadP
                 className="w-full md:max-h-32 object-contain rounded border-2 border-red-400 mb-1"
               />
               <span className="text-xs text-red-600 font-medium">
-                {language === 'de' ? 'Zu nah / Unscharf' : language === 'fr' ? 'Trop proche / Flou' : language === 'it' ? 'Troppo vicino / Sfocato' : 'Too close / Blurry'}
+                {language === 'de' ? 'Zu nah / Unscharf' : language === 'fr' ? 'Trop proche / flou' : language === 'it' ? 'Troppo vicino / Sfocato' : 'Too close / Blurry'}
               </span>
             </div>
             {/* Bad example 2: Sunglasses, hat, helmet */}
@@ -231,7 +231,7 @@ export function PhotoUpload({ onPhotoSelect, showExamples = true }: PhotoUploadP
                 className="w-full md:max-h-32 object-contain rounded border-2 border-red-400 mb-1"
               />
               <span className="text-xs text-red-600 font-medium">
-                {language === 'de' ? 'Brille / Hut / Helm' : language === 'fr' ? 'Lunettes / Chapeau' : language === 'it' ? 'Occhiali / Cappello / Casco' : 'Glasses / Hat / Helmet'}
+                {language === 'de' ? 'Brille / Hut / Helm' : language === 'fr' ? 'Lunettes / chapeau' : language === 'it' ? 'Occhiali / Cappello / Casco' : 'Glasses / Hat / Helmet'}
               </span>
             </div>
             {/* Bad example 3: Multiple people */}

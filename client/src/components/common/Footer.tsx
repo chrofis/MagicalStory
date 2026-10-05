@@ -80,7 +80,7 @@ const footerTexts = {
     about: 'À propos',
     faq: 'FAQ',
     contact: 'Contact',
-    terms: 'Conditions d\'Utilisation',
+    terms: 'Conditions d\'utilisation',
     privacy: 'Confidentialité',
     imprint: 'Mentions légales',
     tagline: 'L\'histoire de votre enfant — écrite et illustrée par l\'IA, puis modifiable par vous.',

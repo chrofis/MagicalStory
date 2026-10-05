@@ -110,7 +110,7 @@ export function SceneEditModal({
               <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                 <Users size={16} />
                 {language === 'de' ? 'Charaktere in dieser Szene:' :
-                 language === 'fr' ? 'Personnages dans cette scène:' :
+                 language === 'fr' ? 'Personnages dans cette scène :' :
                  language === 'it' ? 'Personaggi in questa scena:' :
                  'Characters in this scene:'}
               </label>
@@ -164,7 +164,7 @@ export function SceneEditModal({
               <div className="mb-4">
                 <p className="text-sm font-medium text-amber-700 mb-2">
                   {language === 'de' ? 'Behobene Probleme:' :
-                   language === 'fr' ? 'Problèmes corrigés:' :
+                   language === 'fr' ? 'Problèmes corrigés :' :
                    'Issues Fixed:'}
                 </p>
                 <ul className="text-sm text-amber-900 space-y-1">
@@ -256,7 +256,7 @@ export function SceneEditModal({
                 <div className="mt-3 p-2 bg-blue-50 rounded border border-blue-200">
                   <p className="text-xs font-medium text-blue-700 mb-1">
                     {language === 'de' ? 'Verwendete Avatare:' :
-                     language === 'fr' ? 'Avatars utilisés:' :
+                     language === 'fr' ? 'Avatars utilisés :' :
                      'Avatars used:'}
                   </p>
                   <div className="flex flex-wrap gap-2">
@@ -287,7 +287,7 @@ export function SceneEditModal({
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               {language === 'de' ? 'Szenenbeschreibung:' :
-               language === 'fr' ? 'Description de la scène:' :
+               language === 'fr' ? 'Description de la scène :' :
                language === 'it' ? 'Descrizione della scena:' :
                'Scene description:'}
             </label>
@@ -296,13 +296,13 @@ export function SceneEditModal({
               onChange={(e) => onSceneChange(e.target.value)}
               className="w-full h-40 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-y"
               placeholder={language === 'de' ? 'Beschreiben Sie die Szene...' :
-                          language === 'fr' ? 'Décrivez la scène...' :
+                          language === 'fr' ? 'Décrivez la scène…' :
                           language === 'it' ? 'Descrivi la scena...' :
                           'Describe the scene...'}
             />
             <p className="text-xs text-gray-400 mt-2">
               {language === 'de' ? 'Tipp: Beschreiben Sie die Aktionen und die Umgebung. Die ausgewählten Charaktere werden automatisch hinzugefügt.' :
-               language === 'fr' ? 'Conseil: Décrivez les actions et l\'environnement. Les personnages sélectionnés seront ajoutés automatiquement.' :
+               language === 'fr' ? 'Conseil : Décrivez les actions et l\'environnement. Les personnages sélectionnés seront ajoutés automatiquement.' :
                language === 'it' ? 'Suggerimento: descrivi le azioni e l\'ambiente. I personaggi selezionati verranno aggiunti automaticamente.' :
                'Tip: Describe the actions and the environment. Selected characters will be added automatically.'}
             </p>
@@ -338,7 +338,7 @@ export function SceneEditModal({
               {isRegenerating ? (
                 <>
                   <RefreshCw size={16} className="animate-spin" />
-                  {language === 'de' ? 'Generiere...' : language === 'fr' ? 'Génération...' : language === 'it' ? 'Generazione...' : 'Generating...'}
+                  {language === 'de' ? 'Generiere...' : language === 'fr' ? 'Génération…' : language === 'it' ? 'Generazione...' : 'Generating...'}
                 </>
               ) : (
                 <>

@@ -119,11 +119,11 @@ const wizardHelperTexts: Record<string, Record<number, string>> = {
     5: "Überprüfe deine Auswahl, füge Handlungsdetails hinzu und generiere deine Geschichte!",
   },
   fr: {
-    1: "Ajoutez des photos de vos personnages - ils apparaîtront de manière cohérente dans toute votre histoire!",
+    1: "Ajoutez des photos de vos personnages - ils apparaîtront de manière cohérente dans toute votre histoire !",
     2: "Définissez la longueur du livre et le niveau de lecture pour votre public",
     3: "Choisissez un type d'histoire et un thème",
     4: "Choisissez un style d'illustration pour votre livre",
-    5: "Vérifiez vos choix, ajoutez des détails de l'intrigue, puis générez votre histoire!",
+    5: "Vérifiez vos choix, ajoutez des détails de l'intrigue, puis générez votre histoire !",
   },
   it: {
     1: "Aggiungi le foto dei tuoi personaggi - appariranno in modo coerente in tutta la tua storia!",
@@ -188,8 +188,8 @@ export default function StoryWizard() {
       await refreshUser();
       setShowClaimModal(false);
       const creditsMsg = resData.credits
-        ? (language === 'de' ? `Passwort gesetzt! ${resData.credits} Credits erhalten.` : language === 'fr' ? `Mot de passe défini ! ${resData.credits} crédits reçus.` : language === 'it' ? `Password impostata! ${resData.credits} crediti ricevuti.` : `Password set! ${resData.credits} credits received.`)
-        : (language === 'de' ? 'Passwort gesetzt!' : language === 'fr' ? 'Mot de passe défini !' : language === 'it' ? 'Password impostata!' : 'Password set!');
+        ? (language === 'de' ? `Passwort gesetzt! ${resData.credits} Credits erhalten.` : language === 'fr' ? `Mot de passe défini ! ${resData.credits} crédits reçus.` : language === 'it' ? `Password impostata! ${resData.credits} crediti ricevuti.` : `Password set! ${resData.credits} credits received.`)
+        : (language === 'de' ? 'Passwort gesetzt!' : language === 'fr' ? 'Mot de passe défini !' : language === 'it' ? 'Password impostata!' : 'Password set!');
       showSuccess(creditsMsg);
     } catch {
       setClaimError('Failed to set password');
@@ -1526,7 +1526,7 @@ export default function StoryWizard() {
             const titles = {
               en: 'Payment Successful!',
               de: 'Zahlung erfolgreich!',
-              fr: 'Paiement réussi!',
+              fr: 'Paiement réussi !',
               it: 'Pagamento riuscito!',
             };
             const messages = {
@@ -1579,7 +1579,7 @@ export default function StoryWizard() {
         const titles = {
           en: 'Credits Added!',
           de: 'Credits hinzugefuegt!',
-          fr: 'Credits ajoutes!',
+          fr: 'Crédits ajoutés !',
           it: 'Crediti aggiunti!',
         };
         // No pack size here — the checkout return carries no package info, and every
@@ -1588,7 +1588,7 @@ export default function StoryWizard() {
         const messages = {
           en: 'Your credits have been added to your account.',
           de: 'Deine Credits wurden deinem Konto gutgeschrieben.',
-          fr: 'Vos credits ont ete ajoutes a votre compte.',
+          fr: 'Vos crédits ont été ajoutés à votre compte.',
           it: 'I tuoi crediti sono stati accreditati sul tuo conto.',
         };
         showSuccess(
@@ -1606,7 +1606,7 @@ export default function StoryWizard() {
         const messages = {
           en: 'Credits purchase was cancelled.',
           de: 'Kreditkauf wurde abgebrochen.',
-          fr: 'L\'achat de credits a ete annule.',
+          fr: 'L\'achat de crédits a été annulé.',
           it: "L'acquisto di crediti è stato annullato.",
         };
         showInfo(
@@ -2449,7 +2449,7 @@ export default function StoryWizard() {
           const waitMsg = language === 'de'
             ? `Bitte warte ${cooldown.waitSeconds} Sekunden, bevor du ein neues Foto hochlädst.`
             : language === 'fr'
-            ? `Veuillez attendre ${cooldown.waitSeconds} secondes avant de télécharger une nouvelle photo.`
+            ? `Veuillez attendre ${cooldown.waitSeconds} secondes avant d'importer une nouvelle photo.`
             : language === 'it'
             ? `Attendi ${cooldown.waitSeconds} secondi prima di caricare una nuova foto.`
             : `Please wait ${cooldown.waitSeconds} seconds before uploading a new photo.`;
@@ -4068,7 +4068,7 @@ export default function StoryWizard() {
         message: language === 'de'
           ? `Aktualisiere Avatare für ${charactersNeedingAvatars.length} Charakter(e)...`
           : language === 'fr'
-          ? `Mise à jour des avatars pour ${charactersNeedingAvatars.length} personnage(s)...`
+          ? `Mise à jour des avatars pour ${charactersNeedingAvatars.length} personnage(s)…`
           : language === 'it' ? `Aggiornamento degli avatar per ${charactersNeedingAvatars.length} personaggio/i...` : `Updating avatars for ${charactersNeedingAvatars.length} character(s)...`
       });
 
@@ -4083,7 +4083,7 @@ export default function StoryWizard() {
             message: language === 'de'
               ? `Generiere Avatare für ${char.name}...`
               : language === 'fr'
-              ? `Génération des avatars pour ${char.name}...`
+              ? `Génération des avatars pour ${char.name}…`
               : language === 'it' ? `Generazione degli avatar per ${char.name}...` : `Generating avatars for ${char.name}...`
           });
 
@@ -4134,7 +4134,7 @@ export default function StoryWizard() {
     setGenerationProgress({
       current: 5,
       total: 100,
-      message: language === 'de' ? 'Starte Generierung...' : language === 'fr' ? 'Démarrage de la génération...' : language === 'it' ? 'Avvio della generazione...' : 'Starting generation...'
+      message: language === 'de' ? 'Starte Generierung...' : language === 'fr' ? 'Démarrage de la génération…' : language === 'it' ? 'Avvio della generazione...' : 'Starting generation...'
     });
 
     try {
@@ -4523,7 +4523,7 @@ export default function StoryWizard() {
       setGenerationProgress({
         current: 100,
         total: 100,
-        message: language === 'de' ? 'Fertig!' : language === 'fr' ? 'Terminé!' : language === 'it' ? 'Fatto!' : 'Complete!'
+        message: language === 'de' ? 'Fertig!' : language === 'fr' ? 'Terminé !' : language === 'it' ? 'Fatto!' : 'Complete!'
       });
     } catch (error) {
       if (pollAbandoned || pollIsStale()) { log.warn('Abandoned poll errored, ignored:', error); return; }
@@ -4553,7 +4553,7 @@ export default function StoryWizard() {
         const cancelMessage = language === 'de'
           ? 'Eine Geschichte wird bereits erstellt. Möchtest du diese abbrechen und eine neue starten?'
           : language === 'fr'
-          ? 'Une histoire est déjà en cours de création. Voulez-vous l\'annuler et en commencer une nouvelle?'
+          ? 'Une histoire est déjà en cours de création. Voulez-vous l\'annuler et en commencer une nouvelle ?'
           : language === 'it' ? 'Una storia è già in creazione. Vuoi annullarla e avviarne una nuova?' : 'A story is already being generated. Would you like to cancel it and start a new one?';
 
         if (activeJobId && window.confirm(cancelMessage)) {
@@ -4835,7 +4835,7 @@ export default function StoryWizard() {
                     {language === 'de'
                       ? `Bilder: ${imageLoadProgress.loaded}/${imageLoadProgress.total}`
                       : language === 'fr'
-                      ? `Images: ${imageLoadProgress.loaded}/${imageLoadProgress.total}`
+                      ? `Images : ${imageLoadProgress.loaded}/${imageLoadProgress.total}`
                       : language === 'it' ? `Immagini: ${imageLoadProgress.loaded}/${imageLoadProgress.total}` : `Images: ${imageLoadProgress.loaded}/${imageLoadProgress.total}`
                     }
                   </span>
@@ -5021,7 +5021,7 @@ export default function StoryWizard() {
                   showError(language === 'de'
                     ? 'Visual Bible konnte nicht aktualisiert werden'
                     : language === 'fr'
-                    ? 'Échec de la mise à jour de la Bible Visuelle'
+                    ? 'Échec de la mise à jour de la Bible visuelle'
                     : language === 'it' ? 'Impossibile aggiornare la Visual Bible' : 'Failed to update Visual Bible');
                 }
               } : undefined}
@@ -5122,7 +5122,7 @@ export default function StoryWizard() {
                   showError(language === 'de'
                     ? `Bildgenerierung fehlgeschlagen: ${errorMsg}`
                     : language === 'fr'
-                    ? `Échec de la régénération: ${errorMsg}`
+                    ? `Échec de la régénération : ${errorMsg}`
                     : language === 'it' ? `Generazione dell'immagine non riuscita: ${errorMsg}` : `Image regeneration failed: ${errorMsg}`);
                 }
               } : undefined}
@@ -5188,7 +5188,7 @@ export default function StoryWizard() {
                     language === 'de'
                       ? 'Keine Adresse gespeichert. Bitte eingeben (Format: Vorname, Nachname, Strasse, PLZ, Ort, Land, Email):'
                       : language === 'fr'
-                      ? 'Aucune adresse enregistrée. Veuillez entrer (Format: Prénom, Nom, Rue, CP, Ville, Pays, Email):'
+                      ? 'Aucune adresse enregistrée. Veuillez entrer (Format : Prénom, Nom, Rue, CP, Ville, Pays, e-mail) :'
                       : language === 'it' ? 'Nessun indirizzo salvato. Inseriscilo (formato: Nome, Cognome, Via, NPA, Città, Paese, Email):' : 'No saved address. Please enter (Format: FirstName, LastName, Street, PostCode, City, Country, Email):'
                   );
                   if (!address) return;
@@ -5219,7 +5219,7 @@ export default function StoryWizard() {
                 const confirmMsg = language === 'de'
                   ? `Druckauftrag an folgende Adresse senden?\n\n${addressSummary}`
                   : language === 'fr'
-                  ? `Envoyer la commande à cette adresse?\n\n${addressSummary}`
+                  ? `Envoyer la commande à cette adresse ?\n\n${addressSummary}`
                   : language === 'it' ? `Inviare l'ordine di stampa a questo indirizzo?\n\n${addressSummary}` : `Send print order to this address?\n\n${addressSummary}`;
 
                 if (!confirm(confirmMsg)) return;
@@ -5239,7 +5239,7 @@ export default function StoryWizard() {
                   const successMsg = language === 'de'
                     ? `✅ Druckauftrag erfolgreich erstellt!\n\nOrder ID: ${result.orderId}\n${result.isDraft ? '(Entwurf – muss in Gelato bestätigt werden)' : ''}\n\nMöchtest du das Gelato Dashboard öffnen, um den Auftrag zu verfolgen?`
                     : language === 'fr'
-                    ? `✅ Commande d'impression créée avec succès!\n\nID de commande: ${result.orderId}\n${result.isDraft ? '(Brouillon - doit être confirmé dans Gelato)' : ''}\n\nVoulez-vous ouvrir le tableau de bord Gelato pour suivre la commande?`
+                    ? `✅ Commande d'impression créée avec succès !\n\nID de commande : ${result.orderId}\n${result.isDraft ? '(Brouillon - doit être confirmé dans Gelato)' : ''}\n\nVoulez-vous ouvrir le tableau de bord Gelato pour suivre la commande ?`
                     : language === 'it' ? `✅ Ordine di stampa creato con successo!\n\nOrder ID: ${result.orderId}\n${result.isDraft ? '(Bozza - da confermare in Gelato)' : ''}\n\nVuoi aprire la dashboard Gelato per seguire l'ordine?` : `✅ Print order created successfully!\n\nOrder ID: ${result.orderId}\n${result.isDraft ? '(Draft - must be confirmed in Gelato)' : ''}\n\nWould you like to open the Gelato dashboard to track your order?`;
 
                   if (result.dashboardUrl && confirm(successMsg)) {
@@ -5248,7 +5248,7 @@ export default function StoryWizard() {
                     showSuccess(language === 'de'
                       ? `Druckauftrag erstellt! Order ID: ${result.orderId}`
                       : language === 'fr'
-                      ? `Commande créée! ID: ${result.orderId}`
+                      ? `Commande créée ! ID : ${result.orderId}`
                       : language === 'it' ? `Ordine di stampa creato! Order ID: ${result.orderId}` : `Print order created! Order ID: ${result.orderId}`);
                   }
                 } catch (error) {
@@ -5257,7 +5257,7 @@ export default function StoryWizard() {
                   showError(language === 'de'
                     ? `Druckauftrag fehlgeschlagen: ${errorMsg}`
                     : language === 'fr'
-                    ? `Échec de la commande d'impression: ${errorMsg}`
+                    ? `Échec de la commande d'impression : ${errorMsg}`
                     : language === 'it' ? `Ordine di stampa non riuscito: ${errorMsg}` : `Print order failed: ${errorMsg}`);
                 }
               } : undefined}
@@ -5362,7 +5362,7 @@ export default function StoryWizard() {
                   showError(language === 'de'
                     ? `Cover-Generierung fehlgeschlagen: ${errorMsg}`
                     : language === 'fr'
-                    ? `Échec de la régénération: ${errorMsg}`
+                    ? `Échec de la régénération : ${errorMsg}`
                     : language === 'it' ? `Generazione della copertina non riuscita: ${errorMsg}` : `Cover regeneration failed: ${errorMsg}`);
                 } finally {
                   setRegeneratingCovers(prev => {
@@ -5833,7 +5833,7 @@ export default function StoryWizard() {
             <div className="py-12 flex flex-col items-center justify-center">
               <Loader2 className="w-12 h-12 text-indigo-500 animate-spin mb-4" />
               <p className="text-gray-600 font-medium">
-                {language === 'de' ? 'Geschichte wird geladen...' : language === 'fr' ? 'Chargement de l\'histoire...' : language === 'it' ? 'Caricamento della storia...' : 'Loading story...'}
+                {language === 'de' ? 'Geschichte wird geladen...' : language === 'fr' ? 'Chargement de l\'histoire…' : language === 'it' ? 'Caricamento della storia...' : 'Loading story...'}
               </p>
             </div>
           );
@@ -5845,7 +5845,7 @@ export default function StoryWizard() {
             <div className="flex flex-col items-center justify-center py-12">
               <div className="animate-spin rounded-full h-12 w-12 border-4 border-indigo-300 border-t-indigo-600 mb-4"></div>
               <p className="text-xl font-semibold text-indigo-700">
-                {language === 'de' ? 'Geschichte wird erstellt...' : language === 'fr' ? 'Création de l\'histoire...' : language === 'it' ? 'Creazione della storia...' : 'Creating your story...'}
+                {language === 'de' ? 'Geschichte wird erstellt...' : language === 'fr' ? 'Création de l\'histoire…' : language === 'it' ? 'Creazione della storia...' : 'Creating your story...'}
               </p>
               <p className="text-indigo-500 mt-2">
                 {language === 'de' ? 'Einen Moment Geduld bitte' : language === 'fr' ? 'Veuillez patienter' : language === 'it' ? 'Attendi un momento' : 'Please wait a moment'}
@@ -5881,7 +5881,7 @@ export default function StoryWizard() {
                 <Sparkles className="w-16 h-16 text-gray-300 mx-auto mb-4" />
                 <h2 className="text-2xl font-bold text-gray-800 mb-4">{t.generateStory}</h2>
                 <p className="text-gray-600 mb-6">
-                  {language === 'de' ? 'Bereit, deine Geschichte zu erstellen!' : language === 'fr' ? 'Prêt à créer votre histoire!' : language === 'it' ? 'Pronti a creare la tua storia!' : 'Ready to create your story!'}
+                  {language === 'de' ? 'Bereit, deine Geschichte zu erstellen!' : language === 'fr' ? 'Prêt à créer votre histoire !' : language === 'it' ? 'Pronti a creare la tua storia!' : 'Ready to create your story!'}
                 </p>
                 <Button onClick={() => generateStory()} size="lg" icon={Sparkles}>
                   {t.generateStory} ({pages * 10} Credits)
@@ -5923,7 +5923,7 @@ export default function StoryWizard() {
             </p>
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
               <p className="text-amber-800 text-sm font-medium">
-                {language === 'de' ? `🎁 Du erhältst ${INITIAL_USER_CREDITS} Gratis-Credits!` : language === 'fr' ? `🎁 Vous recevrez ${INITIAL_USER_CREDITS} crédits gratuits !` : language === 'it' ? `🎁 Ricevi ${INITIAL_USER_CREDITS} crediti gratuiti!` : `🎁 You'll receive ${INITIAL_USER_CREDITS} free credits!`}
+                {language === 'de' ? `🎁 Du erhältst ${INITIAL_USER_CREDITS} Gratis-Credits!` : language === 'fr' ? `🎁 Vous recevrez ${INITIAL_USER_CREDITS} crédits gratuits !` : language === 'it' ? `🎁 Ricevi ${INITIAL_USER_CREDITS} crediti gratuiti!` : `🎁 You'll receive ${INITIAL_USER_CREDITS} free credits!`}
               </p>
               <ul className="text-amber-700 text-xs mt-1 space-y-0.5">
                 <li>{language === 'de' ? '• Längere Geschichten mit mehr Seiten' : language === 'fr' ? '• Des histoires plus longues avec plus de pages' : language === 'it' ? '• Storie più lunghe con più pagine' : '• Longer stories with more pages'}</li>
@@ -5987,7 +5987,7 @@ export default function StoryWizard() {
         const topicName = found?.name?.[language] || found?.name?.en || storyTopic;
         return (
           <div className="mx-3 md:mx-8 mt-2 bg-indigo-50 border border-indigo-200 rounded-lg px-4 py-2 flex items-center gap-2 text-sm">
-            <span className="text-indigo-500 font-medium">{language === 'de' ? 'Gewähltes Thema:' : language === 'fr' ? 'Thème choisi :' : language === 'it' ? 'Tema scelto:' : 'Selected topic:'}</span>
+            <span className="text-indigo-500 font-medium">{language === 'de' ? 'Gewähltes Thema:' : language === 'fr' ? 'Thème choisi :' : language === 'it' ? 'Tema scelto:' : 'Selected topic:'}</span>
             <span className="text-indigo-800 font-semibold">{found?.emoji} {topicName}</span>
           </div>
         );
@@ -6003,8 +6003,8 @@ export default function StoryWizard() {
               <Loader2 className="w-12 h-12 text-indigo-500 animate-spin mb-4" />
               <p className="text-gray-600 font-medium mb-2">
                 {loadingProgress
-                  ? (language === 'de' ? 'Geschichte wird geladen...' : language === 'fr' ? 'Chargement de l\'histoire...' : language === 'it' ? 'Caricamento della storia...' : 'Loading story...')
-                  : (language === 'de' ? 'Wird geladen...' : language === 'fr' ? 'Chargement...' : language === 'it' ? 'Caricamento...' : 'Loading...')
+                  ? (language === 'de' ? 'Geschichte wird geladen...' : language === 'fr' ? 'Chargement de l\'histoire…' : language === 'it' ? 'Caricamento della storia...' : 'Loading story...')
+                  : (language === 'de' ? 'Wird geladen...' : language === 'fr' ? 'Chargement…' : language === 'it' ? 'Caricamento...' : 'Loading...')
                 }
               </p>
               {loadingProgress && (
@@ -6176,7 +6176,7 @@ export default function StoryWizard() {
                         </label>
                       </div>
                       <p className="text-xs text-orange-600 mt-2">
-                        {language === 'de' ? 'Hinweis: Übersprungene Schritte verwenden Platzhalter/leere Daten' : language === 'fr' ? 'Note: Les étapes sautées utiliseront des données vides/provisoires' : language === 'it' ? 'Nota: i passaggi saltati usano dati vuoti o segnaposto' : 'Note: Skipped steps will use placeholder/empty data'}
+                        {language === 'de' ? 'Hinweis: Übersprungene Schritte verwenden Platzhalter/leere Daten' : language === 'fr' ? 'Note : les étapes sautées utiliseront des données vides/provisoires' : language === 'it' ? 'Nota: i passaggi saltati usano dati vuoti o segnaposto' : 'Note: Skipped steps will use placeholder/empty data'}
                       </p>
 
                       {/* Pipeline Options */}
@@ -6196,14 +6196,14 @@ export default function StoryWizard() {
                         {language === 'de'
                           ? 'AN: Generiert alle Bilder → Bewertet → Regeneriert schlechte Seiten (bis 2x) → Wählt beste Version → Charakter-Reparatur'
                           : language === 'fr'
-                          ? 'ON: Génère toutes les images → Évalue → Régénère les pages faibles (jusqu\'à 2x) → Sélectionne la meilleure version → Réparation des personnages'
+                          ? 'ON : Génère toutes les images → Évalue → Régénère les pages faibles (jusqu\'à 2x) → Sélectionne la meilleure version → Réparation des personnages'
                           : language === 'it' ? 'ON: genera tutte le immagini → valuta → rigenera le pagine deboli (fino a 2×) → sceglie la versione migliore → riparazione dei personaggi' : 'ON: Generate all → Evaluate → Regen low-scoring (up to 2x) → Pick best → Character fix'}
                       </p>
                       <p className="text-xs text-gray-500 ml-6">
                         {language === 'de'
                           ? 'AUS: Nur generieren und bewerten (Scores sichtbar, keine Regenerierung)'
                           : language === 'fr'
-                          ? 'OFF: Génère et évalue uniquement (scores visibles, pas de régénération)'
+                          ? 'OFF : Génère et évalue uniquement (scores visibles, pas de régénération)'
                           : language === 'it' ? 'OFF: genera e valuta soltanto (punteggi visibili, nessuna rigenerazione)' : 'OFF: Generate and evaluate only (scores visible, no regeneration)'}
                       </p>
 
@@ -6292,7 +6292,7 @@ export default function StoryWizard() {
               {language === 'de' ? 'Geschichte wird im Hintergrund generiert' : language === 'fr' ? 'Histoire en cours de génération' : language === 'it' ? 'La storia viene generata in background' : 'Story generating in background'}
             </h3>
             <p className="text-gray-600 mb-6">
-              {language === 'de' ? 'Was möchtest du tun?' : language === 'fr' ? 'Que voulez-vous faire?' : language === 'it' ? 'Cosa vuoi fare?' : 'What would you like to do?'}
+              {language === 'de' ? 'Was möchtest du tun?' : language === 'fr' ? 'Que voulez-vous faire ?' : language === 'it' ? 'Cosa vuoi fare?' : 'What would you like to do?'}
             </p>
             <div className="space-y-3">
               <button
@@ -6391,7 +6391,7 @@ export default function StoryWizard() {
               placeholder={language === 'de'
                 ? 'Beschreibe die gewünschte Änderung...\nz.B. «Mach den Himmel blauer» oder «Füge einen Schmetterling hinzu»'
                 : language === 'fr'
-                ? 'Décrivez le changement souhaité...\npar ex. "Rendre le ciel plus bleu" ou "Ajouter un papillon"'
+                ? 'Décrivez le changement souhaité…\npar ex. « Rendre le ciel plus bleu » ou « Ajouter un papillon »'
                 : language === 'it' ? 'Descrivi la modifica desiderata...\nper es. "Rendi il cielo più azzurro" o "Aggiungi una farfalla"' : 'Describe what you want to change...\ne.g. "Make the sky bluer" or "Add a butterfly"'}
               className="w-full h-32 p-3 border-2 border-gray-200 rounded-lg focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 resize-none"
             />

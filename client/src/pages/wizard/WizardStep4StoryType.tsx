@@ -25,7 +25,7 @@ const categoryLabels: Record<string, Record<string, string>> = {
   'life-challenge': { en: 'Life Challenge', de: 'Lebensthema', fr: 'Défi de vie', it: 'Tema di vita' },
   'educational': { en: 'Educational', de: 'Lerngeschichte', fr: 'Éducatif', it: 'Didattico' },
   'historical': { en: 'History', de: 'Geschichte', fr: 'Histoire', it: 'Storia' },
-  'swiss-stories': { en: 'Swiss Stories', de: 'Schweizer Geschichten', fr: 'Histoires Suisses', it: 'Storie Svizzere' },
+  'swiss-stories': { en: 'Swiss Stories', de: 'Schweizer Geschichten', fr: 'Histoires suisses', it: 'Storie Svizzere' },
 };
 
 /**

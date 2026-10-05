@@ -42,7 +42,7 @@ export function RelationshipEditor({
         language === 'de'
           ? 'Beziehung eingeben:'
           : language === 'fr'
-          ? 'Entrer la relation:'
+          ? 'Entrer la relation :'
           : language === 'it'
           ? 'Inserisci la relazione:'
           : 'Enter relationship:'
@@ -131,7 +131,7 @@ export function RelationshipEditor({
                         type="text"
                         value={relationshipTexts[key] || ''}
                         onChange={(e) => onRelationshipTextChange(key, e.target.value)}
-                        placeholder={lang === 'de' ? 'Details...' : lang === 'fr' ? 'Détails...' : lang === 'it' ? 'Dettagli...' : 'Details...'}
+                        placeholder={lang === 'de' ? 'Details...' : lang === 'fr' ? 'Détails…' : lang === 'it' ? 'Dettagli...' : 'Details...'}
                         className="w-full px-3 py-1.5 md:px-4 md:py-2 border border-blue-300 rounded text-xs md:text-sm text-center bg-white"
                       />
                     )}

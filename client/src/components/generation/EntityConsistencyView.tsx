@@ -228,7 +228,7 @@ export function EntityConsistencyView({
       return language === 'de'
         ? `Lade ${loadingGrids.size} Grids...`
         : language === 'fr'
-          ? `Chargement de ${loadingGrids.size} grilles...`
+          ? `Chargement de ${loadingGrids.size} grilles…`
           : `Loading ${loadingGrids.size} grids...`;
     }
     return language === 'de'
@@ -295,7 +295,7 @@ export function EntityConsistencyView({
                 ? (language === 'de'
                     ? 'Alle Charaktere konsistent!'
                     : language === 'fr'
-                      ? 'Tous les personnages sont cohérents !'
+                      ? 'Tous les personnages sont cohérents !'
                       : 'All characters consistent!')
                 : (language === 'de'
                     ? `${displayedReport.totalIssues} Konsistenzprobleme gefunden`
@@ -377,7 +377,7 @@ export function EntityConsistencyView({
                       {gridImages.length === 0 && isLoading && (
                         <div className="mt-2 mb-2 h-24 flex items-center justify-center text-xs text-gray-400 bg-gray-50 rounded border border-gray-200">
                           <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                          {language === 'de' ? 'Grid wird geladen...' : language === 'fr' ? 'Chargement de la grille...' : 'Loading grid...'}
+                          {language === 'de' ? 'Grid wird geladen...' : language === 'fr' ? 'Chargement de la grille…' : 'Loading grid...'}
                         </div>
                       )}
                       {gridImages.map((img: string, gridIdx: number) => (

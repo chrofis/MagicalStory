@@ -113,7 +113,7 @@ const aboutContent: Record<string, {
     scienceText: [
       'Dans l\'histoire, votre enfant est le héros — courageux, honnête, gentil. Et quand il se regarde dans le miroir, il voit ce même héros le regarder en retour — et sait qu\'il peut le faire dans la vraie vie aussi.',
       'Cette confiance est le vrai cadeau. Bien après la dernière page — le premier jour d\'école, ou quand il est difficile de faire ce qui est juste — votre enfant l\'affronte en sachant déjà qui il est.',
-      'La recherche confirme ce que chaque parent ressent : les enfants retiennent plus, s\'engagent plus profondément et développent une vraie confiance en eux quand ils sont le héros de l\'histoire. Pas par des leçons ou des règles — par l\'aventure, le rire et la magie de se voir sur chaque page.',
+      'La recherche confirme ce que chaque parent ressent : les enfants retiennent plus, s\'engagent plus profondément et développent une vraie confiance en eux quand ils sont le héros de l\'histoire. Pas par des leçons ou des règles — par l\'aventure, le rire et la magie de se voir sur chaque page.',
     ],
     scienceLink: 'La science derrière',
     valuesTitle: 'Nos valeurs',
@@ -135,7 +135,7 @@ const aboutContent: Record<string, {
       },
     ],
     swissTitle: 'Made in Switzerland',
-    swissText: 'Conçu et opéré en Suisse. La qualité, la confidentialité et la fiabilité nous tiennent à cœur.',
+    swissText: 'Conçu et exploité en Suisse. La qualité, la confidentialité et la fiabilité nous tiennent à cœur.',
     ctaTitle: 'Essayez gratuitement',
     ctaText: 'Créez votre première histoire personnalisée en moins de 3 minutes. Sans compte.',
     ctaButton: 'Créer une histoire gratuite',

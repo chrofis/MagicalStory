@@ -48,9 +48,9 @@ const translations = {
     confirmPassword: 'Confirmer le nouveau mot de passe',
     changePassword: 'Changer le mot de passe',
     passwordsMatch: 'Les mots de passe doivent correspondre',
-    passwordTooShort: 'Le mot de passe doit contenir au moins 8 caracteres',
-    success: 'Mot de passe change avec succes!',
-    successDesc: 'Votre mot de passe a ete mis a jour.',
+    passwordTooShort: 'Le mot de passe doit contenir au moins 8 caractères',
+    success: 'Mot de passe changé avec succès !',
+    successDesc: 'Votre mot de passe a été mis à jour.',
     close: 'Fermer',
   },
   it: {

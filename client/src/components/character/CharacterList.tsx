@@ -97,7 +97,7 @@ export function CharacterList({
               {language === 'de'
                 ? 'Charakter erfolgreich erstellt!'
                 : language === 'fr'
-                ? 'Personnage créé avec succès!'
+                ? 'Personnage créé avec succès !'
                 : language === 'it'
                 ? 'Personaggio creato con successo!'
                 : 'Character Created Successfully!'}
@@ -110,7 +110,7 @@ export function CharacterList({
         <p className="text-sm text-gray-600">
           {pick(
             '⭐ Hauptrolle: Um diese Figur dreht sich die Geschichte – sie ist auf den meisten Seiten, und ihr Alter bestimmt, wie einfach oder anspruchsvoll die Geschichte wird. Höchstens 2 Hauptrollen, bei 1–2 Figuren eine. Tipp: Ist das Buch ein Geschenk für ein Kind, z. B. zum Geburtstag, wähle nur dieses Kind als Hauptrolle – Geschwister bleiben «Dabei» und kommen trotzdem vor.',
-            '⭐ Rôle principal : l\'histoire tourne autour de ce personnage, qui apparaît sur la plupart des pages, et son âge détermine si l\'histoire est simple ou exigeante. Au maximum 2 rôles principaux, un seul avec 1–2 personnages. Astuce : si le livre est un cadeau pour un enfant, par ex. pour son anniversaire, choisissez uniquement cet enfant – ses frères et sœurs restent « Présent » et apparaissent quand même.',
+            '⭐ Rôle principal : l\'histoire tourne autour de ce personnage, qui apparaît sur la plupart des pages, et son âge détermine si l\'histoire est simple ou exigeante. Au maximum 2 rôles principaux, un seul avec 1–2 personnages. Astuce : si le livre est un cadeau pour un enfant, par ex. pour son anniversaire, choisissez uniquement cet enfant – ses frères et sœurs restent « Présent » et apparaissent quand même.',
             '⭐ Protagonista: la storia ruota attorno a questo personaggio, presente nella maggior parte delle pagine, e la sua età decide quanto la storia è semplice o impegnativa. Al massimo 2 protagonisti, uno solo con 1–2 personaggi. Consiglio: se il libro è un regalo per un bambino, ad es. per il compleanno, scegli solo quel bambino – i fratelli restano «Presente» e compaiono comunque.',
             '⭐ Main: the story revolves around this character, who is on most pages, and their age decides how simple or demanding the story is. At most 2 main characters, only one with 1–2 characters. Tip: if the book is a gift for one child, e.g. a birthday, make only that child the main character – siblings stay "In" and still appear.',
           )}
@@ -291,7 +291,7 @@ export function CharacterList({
                 {language === 'de'
                   ? 'Charakter löschen?'
                   : language === 'fr'
-                  ? 'Supprimer le personnage?'
+                  ? 'Supprimer le personnage ?'
                   : language === 'it'
                   ? 'Eliminare il personaggio?'
                   : 'Delete Character?'}
@@ -301,7 +301,7 @@ export function CharacterList({
               {language === 'de'
                 ? `Möchtest du «${deleteConfirm.name}» wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.`
                 : language === 'fr'
-                ? `Voulez-vous vraiment supprimer "${deleteConfirm.name}"? Cette action est irréversible.`
+                ? `Voulez-vous vraiment supprimer « ${deleteConfirm.name} » ? Cette action est irréversible.`
                 : language === 'it'
                 ? `Vuoi davvero eliminare "${deleteConfirm.name}"? Questa azione non può essere annullata.`
                 : `Are you sure you want to delete "${deleteConfirm.name}"? This action cannot be undone.`}

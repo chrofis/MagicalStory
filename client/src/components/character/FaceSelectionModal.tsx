@@ -30,7 +30,7 @@ const translations = {
     title: 'Plusieurs visages détectés',
     description: 'Nous avons détecté plusieurs personnes sur votre photo. Veuillez sélectionner le visage du personnage que vous souhaitez créer.',
     selectFace: 'Sélectionner le visage',
-    uploadDifferent: 'Télécharger une autre photo',
+    uploadDifferent: 'Importer une autre photo',
     confidence: 'Confiance',
   },
   it: {

@@ -76,12 +76,12 @@ const GeneratingStoryCard = memo(function GeneratingStoryCard({
       <div className="p-4 flex flex-col flex-1">
         <div className="flex-1">
           <h3 className="font-bold text-lg text-gray-800 mb-1 truncate">
-            {storyTitle || (language === 'de' ? 'Wird erstellt...' : language === 'fr' ? 'Création en cours...' : language === 'it' ? 'In creazione...' : 'Generating...')}
+            {storyTitle || (language === 'de' ? 'Wird erstellt...' : language === 'fr' ? 'Création en cours…' : language === 'it' ? 'In creazione...' : 'Generating...')}
           </h3>
           <p className="text-sm text-indigo-500 mb-3">
             {percentage > 0
               ? `${percentage}%`
-              : (language === 'de' ? 'Starte...' : language === 'fr' ? 'Démarrage...' : language === 'it' ? 'Avvio...' : 'Starting...')}
+              : (language === 'de' ? 'Starte...' : language === 'fr' ? 'Démarrage…' : language === 'it' ? 'Avvio...' : 'Starting...')}
           </p>
         </div>
 
@@ -324,8 +324,8 @@ export default function MyStories() {
       refreshUser(); // Update AuthContext so hasPassword and credits reflect the change
       const resData = await res.json();
       const creditsMsg = resData.credits
-        ? (language === 'de' ? `Passwort gesetzt! ${resData.credits} Credits erhalten.` : language === 'fr' ? `Mot de passe défini ! ${resData.credits} crédits reçus.` : language === 'it' ? `Password impostata! ${resData.credits} crediti ricevuti.` : `Password set! ${resData.credits} credits received.`)
-        : (language === 'de' ? 'Passwort gesetzt!' : language === 'fr' ? 'Mot de passe défini !' : language === 'it' ? 'Password impostata!' : 'Password set!');
+        ? (language === 'de' ? `Passwort gesetzt! ${resData.credits} Credits erhalten.` : language === 'fr' ? `Mot de passe défini ! ${resData.credits} crédits reçus.` : language === 'it' ? `Password impostata! ${resData.credits} crediti ricevuti.` : `Password set! ${resData.credits} credits received.`)
+        : (language === 'de' ? 'Passwort gesetzt!' : language === 'fr' ? 'Mot de passe défini !' : language === 'it' ? 'Password impostata!' : 'Password set!');
       showSuccess(creditsMsg);
     } catch {
       setPasswordError('Failed to set password');
@@ -455,7 +455,7 @@ export default function MyStories() {
         if (status === 'completed' && finalData.order) {
           const tokensCredited = finalData.order.tokens_credited || 0;
           const titles = {
-            en: 'Order confirmed!', de: 'Bestellung bestätigt!', fr: 'Commande confirmée!', it: 'Ordine confermato!',
+            en: 'Order confirmed!', de: 'Bestellung bestätigt!', fr: 'Commande confirmée !', it: 'Ordine confermato!',
           };
           const messages = {
             en: tokensCredited > 0
@@ -465,7 +465,7 @@ export default function MyStories() {
               ? `Ihr Buch wurde zum Druck geschickt. Sie haben ${tokensCredited} Tokens erhalten!`
               : 'Ihr Buch wurde zum Druck geschickt.',
             fr: tokensCredited > 0
-              ? `Votre livre a été envoyé à l’impression. Vous avez gagné ${tokensCredited} jetons!`
+              ? `Votre livre a été envoyé à l’impression. Vous avez gagné ${tokensCredited} crédits !`
               : 'Votre livre a été envoyé à l’impression.',
             it: tokensCredited > 0
               ? `Il tuo libro è stato inviato in stampa. Hai guadagnato ${tokensCredited} token!`
@@ -751,7 +751,7 @@ export default function MyStories() {
     const confirmMsg = language === 'de'
       ? 'Diese Geschichte wirklich löschen?'
       : language === 'fr'
-      ? 'Voulez-vous vraiment supprimer cette histoire?'
+      ? 'Voulez-vous vraiment supprimer cette histoire ?'
       : language === 'it' ? 'Vuoi davvero eliminare questa storia?' : 'Are you sure you want to delete this story?';
 
     if (!confirm(confirmMsg)) return;
@@ -783,7 +783,7 @@ export default function MyStories() {
     if (!dateStr) return '';
     try {
       const date = new Date(dateStr);
-      return date.toLocaleDateString(language === 'de' ? 'de-DE' : language === 'fr' ? 'fr-FR' : language === 'it' ? 'it-CH' : 'en-US', {
+      return date.toLocaleDateString(language === 'de' ? 'de-DE' : language === 'fr' ? 'fr-CH' : language === 'it' ? 'it-CH' : 'en-US', {
         year: 'numeric',
         month: 'short',
         day: 'numeric',
@@ -855,7 +855,7 @@ export default function MyStories() {
               <div className="flex-1">
                 <p className="font-semibold text-amber-800 text-sm mb-1">
                   {language === 'de' ? `Setze ein Passwort und erhalte ${INITIAL_USER_CREDITS} Credits für weitere Geschichten!`
-                    : language === 'fr' ? `Définissez un mot de passe et recevez ${INITIAL_USER_CREDITS} crédits pour plus d'histoires !`
+                    : language === 'fr' ? `Définissez un mot de passe et recevez ${INITIAL_USER_CREDITS} crédits pour plus d'histoires !`
                     : language === 'it' ? `Imposta una password e ricevi ${INITIAL_USER_CREDITS} crediti per altre storie!` : `Set a password and get ${INITIAL_USER_CREDITS} credits for more stories!`}
                 </p>
                 <p className="text-amber-700 text-xs mb-2">
@@ -953,7 +953,7 @@ export default function MyStories() {
         )}
 
         {isLoading ? (
-          <LoadingSpinner message={language === 'de' ? 'Laden...' : language === 'fr' ? 'Chargement...' : language === 'it' ? 'Caricamento...' : 'Loading...'} />
+          <LoadingSpinner message={language === 'de' ? 'Laden...' : language === 'fr' ? 'Chargement…' : language === 'it' ? 'Caricamento...' : 'Loading...'} />
         ) : loadError ? (
           <div className="text-center py-12">
             <AlertTriangle className="w-16 h-16 text-amber-500 mx-auto mb-4" />
@@ -1068,7 +1068,7 @@ export default function MyStories() {
                   {isLoadingMore ? (
                     <>
                       <div className="w-5 h-5 spinner" />
-                      {language === 'de' ? 'Laden...' : language === 'fr' ? 'Chargement...' : language === 'it' ? 'Caricamento...' : 'Loading...'}
+                      {language === 'de' ? 'Laden...' : language === 'fr' ? 'Chargement…' : language === 'it' ? 'Caricamento...' : 'Loading...'}
                     </>
                   ) : (
                     <>

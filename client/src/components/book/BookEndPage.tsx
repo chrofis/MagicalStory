@@ -39,10 +39,10 @@ const endPageText: Record<string, Record<string, string>> = {
     f5: 'Order as a printed book',
   },
   fr: {
-    secureTitle: 'Sécurisez votre histoire !',
+    secureTitle: 'Sécurisez votre histoire !',
     secureDesc: 'Définissez un mot de passe pour accéder à votre histoire.',
     setPassword: 'Définir un mot de passe',
-    benefits: 'Avec votre compte gratuit :',
+    benefits: 'Avec votre compte gratuit :',
     endTitle: 'Fin de l\'histoire',
     printBook: 'Imprimer en livre',
     newStory: 'Nouvelle histoire',

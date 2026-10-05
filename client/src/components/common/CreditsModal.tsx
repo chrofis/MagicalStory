@@ -41,18 +41,18 @@ export function CreditsModal({ isOpen, onClose }: CreditsModalProps) {
   };
 
   const texts = {
-    title: language === 'de' ? 'Credits kaufen' : language === 'fr' ? 'Acheter des credits' : language === 'it' ? 'Acquista crediti' : 'Buy Credits',
-    credits: language === 'de' ? 'Credits' : language === 'fr' ? 'credits' : language === 'it' ? 'crediti' : 'credits',
+    title: language === 'de' ? 'Credits kaufen' : language === 'fr' ? 'Acheter des crédits' : language === 'it' ? 'Acquista crediti' : 'Buy Credits',
+    credits: language === 'de' ? 'Credits' : language === 'fr' ? 'crédits' : language === 'it' ? 'crediti' : 'credits',
     securePayment: language === 'de'
       ? 'Sichere Zahlung mit Stripe'
       : language === 'fr'
-      ? 'Paiement securise avec Stripe'
+      ? 'Paiement sécurisé avec Stripe'
       : language === 'it'
       ? 'Pagamento sicuro con Stripe'
       : 'Secure payment with Stripe',
     cancel: language === 'de' ? 'Abbrechen' : language === 'fr' ? 'Annuler' : language === 'it' ? 'Annulla' : 'Cancel',
     buyNow: language === 'de' ? 'Jetzt kaufen' : language === 'fr' ? 'Acheter maintenant' : language === 'it' ? 'Acquista ora' : 'Buy Now',
-    loading: language === 'de' ? 'Wird geladen...' : language === 'fr' ? 'Chargement...' : language === 'it' ? 'Caricamento...' : 'Loading...'
+    loading: language === 'de' ? 'Wird geladen...' : language === 'fr' ? 'Chargement…' : language === 'it' ? 'Caricamento...' : 'Loading...'
   };
 
   return (

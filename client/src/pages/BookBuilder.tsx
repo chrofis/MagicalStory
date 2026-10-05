@@ -257,19 +257,19 @@ export default function BookBuilder() {
       blankPagesTitle: 'Pages vierges dans votre livre',
       blankPagesDesc: (printed: number, content: number, blank: number) => `Votre livre compte ${printed} pages. Votre histoire en remplit ${content} – ${blank} ${blank === 1 ? 'page' : 'pages'} resteront vierges.`,
       blankPagesHint: 'Pensez à une histoire plus longue ou combinez plusieurs histoires dans un seul livre.',
-      processing: 'Traitement en cours...',
-      printPdf: 'PDF impression (Test)',
-      generatingPdf: 'Génération du PDF...',
+      processing: 'Traitement en cours…',
+      printPdf: 'PDF impression (test)',
+      generatingPdf: 'Génération du PDF…',
       quantity: 'Quantité',
       shippingSavingHint: 'Économisez sur la livraison en commandant plusieurs livres à la fois — la livraison n\'est facturée qu\'une seule fois.',
       totalPrice: 'Total',
       perBook: 'par livre',
-      promoLabel: 'Avez-vous un code de parrainage ?',
+      promoLabel: 'Avez-vous un code de parrainage ?',
       promoApply: 'Appliquer',
       promoApplied: 'Réduction CHF 10 appliquée',
       promoDiscount: 'Réduction parrainage',
       balanceLabel: 'Utiliser le solde de parrainage',
-      balanceAvailable: 'Disponible : CHF',
+      balanceAvailable: 'Disponible : CHF',
       balanceDiscount: 'Solde de parrainage',
       balanceMaxHint: 'Montant minimum CHF 1.00 — ajustez si trop élevé.',
     },
@@ -467,7 +467,7 @@ export default function BookBuilder() {
         message: language === 'de'
           ? `PDF konnte nicht heruntergeladen werden: ${errorMsg}`
           : language === 'fr'
-          ? `Impossible de télécharger le PDF: ${errorMsg}`
+          ? `Impossible de télécharger le PDF : ${errorMsg}`
           : language === 'it'
           ? `Impossibile scaricare il PDF: ${errorMsg}`
           : `Failed to download PDF: ${errorMsg}`,
@@ -486,7 +486,7 @@ export default function BookBuilder() {
     return (
       <div className="min-h-screen bg-gray-50">
         <Navigation currentStep={0} />
-        <LoadingSpinner message={language === 'de' ? 'Laden...' : language === 'fr' ? 'Chargement...' : language === 'it' ? 'Caricamento...' : 'Loading...'} />
+        <LoadingSpinner message={language === 'de' ? 'Laden...' : language === 'fr' ? 'Chargement…' : language === 'it' ? 'Caricamento...' : 'Loading...'} />
       </div>
     );
   }

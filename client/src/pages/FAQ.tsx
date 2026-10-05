@@ -264,11 +264,11 @@ const faqContent: Record<string, {
     ],
   },
   fr: {
-    title: 'Comment pouvons-nous vous aider ?',
+    title: 'Comment pouvons-nous vous aider ?',
     subtitle: 'Trouvez les réponses aux questions fréquentes sur la création de votre histoire personnalisée.',
-    searchPlaceholder: 'Rechercher une question...',
+    searchPlaceholder: 'Rechercher une question…',
     noResults: 'Aucune question correspondante. Essayez un autre terme de recherche.',
-    contactTitle: 'Encore des questions ?',
+    contactTitle: 'Encore des questions ?',
     contactText: 'Nous sommes là pour vous aider. Envoyez-nous un email et nous vous répondrons dans les 24 heures.',
     contactButton: 'Nous contacter',
     categories: [
@@ -280,15 +280,15 @@ const faqContent: Record<string, {
         label: 'Pour commencer',
         items: [
           {
-            question: 'Comment ça marche ?',
-            answer: 'Téléchargez une photo de votre enfant, choisissez un thème et nous créons une histoire personnalisée entièrement illustrée. Votre enfant apparaît comme un personnage illustré sur chaque page, gardant son apparence unique tout au long du livre.',
+            question: 'Comment ça marche ?',
+            answer: 'Importez une photo de votre enfant, choisissez un thème et nous créons une histoire personnalisée entièrement illustrée. Votre enfant apparaît comme un personnage illustré sur chaque page, gardant son apparence unique tout au long du livre.',
           },
           {
-            question: 'Combien de temps faut-il ?',
+            question: 'Combien de temps faut-il ?',
             answer: 'Votre première histoire gratuite est prête en quelques minutes. Un livre entièrement illustré prend environ une heure. Vous recevrez un email quand votre histoire sera prête.',
           },
           {
-            question: 'Pour quel âge ?',
+            question: 'Pour quel âge ?',
             answer: 'Les histoires peuvent être créées pour les enfants de tous âges. Vous pouvez ajuster le niveau de lecture — des livres d\'images simples pour les tout-petits aux histoires plus longues pour les enfants d\'âge scolaire.',
           },
         ],
@@ -301,23 +301,23 @@ const faqContent: Record<string, {
         label: 'Votre histoire',
         items: [
           {
-            question: 'Puis-je ajouter plusieurs personnages ?',
-            answer: 'Oui ! Vous pouvez ajouter toute votre famille — enfants, parents, grands-parents, frères et sœurs ou amis. Chaque personnage obtient sa propre apparence illustrée basée sur sa photo.',
+            question: 'Puis-je ajouter plusieurs personnages ?',
+            answer: 'Oui ! Vous pouvez ajouter toute votre famille — enfants, parents, grands-parents, frères et sœurs ou amis. Chaque personnage obtient sa propre apparence illustrée basée sur sa photo.',
           },
           {
-            question: 'Quels styles d\'illustration sont disponibles ?',
-            answer: 'Nous proposons 8+ styles dont le 3D style Pixar, l\'aquarelle, la bande dessinée, l\'anime et plus. Chaque style est appliqué de manière cohérente sur toutes les pages de votre histoire.',
+            question: 'Quels styles d\'illustration sont disponibles ?',
+            answer: 'Nous proposons 8+ styles dont le 3D façon Pixar, l\'aquarelle, la bande dessinée, l\'anime et plus. Chaque style est appliqué de manière cohérente sur toutes les pages de votre histoire.',
           },
           {
-            question: 'Puis-je modifier l\'histoire après sa création ?',
+            question: 'Puis-je modifier l\'histoire après sa création ?',
             answer: 'Oui, entièrement. Chaque mot de chaque page est modifiable — réécrivez des phrases, changez les noms, remplacez les dialogues. L\'IA écrit le premier brouillon, vous le personnalisez.',
           },
           {
-            question: 'Et si une page ne me plaît pas ?',
+            question: 'Et si une page ne me plaît pas ?',
             answer: 'Régénérez-la. Les pages individuelles peuvent être recréées autant de fois que vous le souhaitez, en conservant les mêmes personnages et style artistique. Chaque nouvelle version est sauvegardée, vous choisissez celle que vous préférez.',
           },
           {
-            question: 'Dois-je accepter la première version ?',
+            question: 'Dois-je accepter la première version ?',
             answer: 'Non. Rien n\'est définitif avant la commande du livre imprimé. Vous pouvez continuer à itérer — modifier le texte, régénérer les images, affiner les personnages — jusqu\'à ce que le livre soit exactement comme vous l\'imaginez.',
           },
         ],
@@ -327,14 +327,14 @@ const faqContent: Record<string, {
         icon: Printer,
         color: 'text-indigo-500',
         bgColor: 'bg-indigo-50',
-        label: 'Impression & Qualité',
+        label: 'Impression & qualité',
         items: [
           {
-            question: 'Comment le livre est-il imprimé ?',
-            answer: 'Les livres sont imprimés professionnellement sur du papier de haute qualité au format 20x20cm. Vous pouvez choisir entre couverture rigide et brochée. La qualité d\'impression est comparable aux livres pour enfants publiés professionnellement.',
+            question: 'Comment le livre est-il imprimé ?',
+            answer: 'Les livres sont imprimés professionnellement sur du papier de haute qualité au format 20 × 20 cm. Vous pouvez choisir entre couverture rigide et souple. La qualité d\'impression est comparable aux livres pour enfants publiés professionnellement.',
           },
           {
-            question: 'Puis-je télécharger mon histoire en PDF ?',
+            question: 'Puis-je télécharger mon histoire en PDF ?',
             answer: 'Oui. Chaque histoire peut être téléchargée en PDF haute résolution — parfait pour la lecture sur tablette ou l\'impression à la maison.',
           },
         ],
@@ -347,7 +347,7 @@ const faqContent: Record<string, {
         label: 'Livraison',
         items: [
           {
-            question: 'Où livrez-vous ?',
+            question: 'Où livrez-vous ?',
             answer: 'Nous livrons actuellement les livres imprimés en Suisse. La livraison internationale est disponible à un coût supplémentaire. Vous pouvez aussi télécharger votre histoire en PDF pour la lire sur n\'importe quel appareil.',
           },
         ],
@@ -360,8 +360,8 @@ const faqContent: Record<string, {
         label: 'Tarifs',
         items: [
           {
-            question: 'Combien ça coûte ?',
-            answer: 'Votre première histoire est entièrement gratuite — sans compte nécessaire. Ensuite, les histoires sont créées avec des crédits. Les livres imprimés commencent à CHF 29 en brochée et CHF 37 en couverture rigide, plus CHF 10 de livraison forfaitaire par commande en Suisse (la livraison n\'est facturée qu\'une seule fois pour plusieurs livres). Consultez notre page de tarifs pour plus de détails.',
+            question: 'Combien ça coûte ?',
+            answer: 'Votre première histoire est entièrement gratuite — sans compte nécessaire. Ensuite, les histoires sont créées avec des crédits. Les livres imprimés commencent à CHF 29 en couverture souple et CHF 37 en couverture rigide, plus CHF 10 de livraison forfaitaire par commande en Suisse (la livraison n\'est facturée qu\'une seule fois pour plusieurs livres). Consultez notre page de tarifs pour plus de détails.',
           },
         ],
       },
@@ -373,7 +373,7 @@ const faqContent: Record<string, {
         label: 'Confidentialité',
         items: [
           {
-            question: 'Mes données sont-elles en sécurité ?',
+            question: 'Mes données sont-elles en sécurité ?',
             answer: 'Oui. Vos photos sont utilisées uniquement pour créer vos illustrations et ne sont jamais partagées, vendues ou utilisées à d\'autres fins. Consultez notre Politique de confidentialité pour plus de détails.',
           },
         ],

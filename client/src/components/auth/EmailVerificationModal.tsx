@@ -50,18 +50,18 @@ const translations = {
   },
   fr: {
     title: 'Vérifiez votre e-mail',
-    description: 'Nous vous avons envoyé un lien de vérification. Votre histoire sera générée automatiquement une fois votre e-mail vérifié !',
+    description: 'Nous vous avons envoyé un lien de vérification. Votre histoire sera générée automatiquement une fois votre e-mail vérifié !',
     currentEmail: 'Vérification envoyée à',
     sendVerification: 'Envoyer l\'e-mail de vérification',
     resendVerification: 'Renvoyer l\'e-mail de vérification',
-    emailSent: 'E-mail de vérification envoyé ! Veuillez vérifier votre boîte de réception.',
-    changeEmail: 'Mauvais e-mail ? Changer',
+    emailSent: 'E-mail de vérification envoyé ! Veuillez vérifier votre boîte de réception.',
+    changeEmail: 'Mauvais e-mail ? Changer',
     newEmail: 'Nouvelle adresse e-mail',
     currentPassword: 'Mot de passe actuel',
-    confirmChange: 'Changer & Vérifier',
+    confirmChange: 'Changer & vérifier',
     cancel: 'Annuler',
-    emailChanged: 'E-mail changé ! Veuillez vérifier votre nouvelle boîte de réception pour la vérification.',
-    checkSpam: 'Pas trouvé ? Vérifiez votre dossier spam.',
+    emailChanged: 'E-mail changé ! Veuillez vérifier votre nouvelle boîte de réception pour la vérification.',
+    checkSpam: 'Pas trouvé ? Vérifiez votre dossier spam.',
     fillAllFields: 'Veuillez remplir tous les champs',
   },
   it: {
@@ -290,7 +290,7 @@ export function EmailVerificationModal({ isOpen, onClose, onVerified }: EmailVer
             <Loader2 size={16} className="animate-spin" />
             <span className="text-sm">
               {language === 'de' ? 'Warte auf Bestätigung...' :
-               language === 'fr' ? 'En attente de verification...' :
+               language === 'fr' ? 'En attente de vérification…' :
                language === 'it' ? 'In attesa di conferma...' :
                'Waiting for verification...'}
             </span>

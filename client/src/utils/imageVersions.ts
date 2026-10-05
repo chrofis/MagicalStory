@@ -64,7 +64,7 @@ export function iterateErrorMessage(language: string, status?: number): string {
 const TITLE_REPAINT_FAILED: Record<string, string> = {
   en: 'The title was saved, but repainting it on the cover failed. Please try the repaint again.',
   de: 'Der Titel wurde gespeichert, aber das Neumalen auf dem Cover ist fehlgeschlagen. Bitte versuche es erneut.',
-  fr: 'Le titre a été enregistré, mais sa re-peinture sur la couverture a échoué. Veuillez réessayer.',
+  fr: 'Le titre a été enregistré, mais son application sur la couverture a échoué. Veuillez réessayer.',
   it: 'Il titolo è stato salvato, ma il ridisegno sulla copertina non è riuscito. Riprova.',
 };
 

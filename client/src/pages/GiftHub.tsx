@@ -47,7 +47,7 @@ const texts: Record<string, {
     ctaSubtitle: 'Choisissez un thème et créez une histoire personnalisée en quelques minutes. Votre première histoire est entièrement gratuite.',
     ctaButton: 'Commencer',
     sections: {
-      recipient: 'Pour qui?',
+      recipient: 'Pour qui ?',
       occasion: 'Par occasion',
       attribute: 'Cadeaux spéciaux',
       age: 'Par âge',

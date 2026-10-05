@@ -115,11 +115,11 @@ export default function SharedStoryViewer() {
     },
     fr: {
       invalidLink: 'Lien de partage invalide', unavailable: "Cette histoire n'est plus disponible ou le lien n'est pas valide.", loadFailed: "Impossible de charger l'histoire. Veuillez réessayer plus tard.", offline: "Impossible de charger l'histoire. Veuillez vérifier votre connexion.",
-      loadingStory: "Chargement de l'histoire...", notFound: 'Histoire introuvable', createOwn: 'Créer votre histoire',
+      loadingStory: "Chargement de l'histoire…", notFound: 'Histoire introuvable', createOwn: 'Créer votre histoire',
       printPreview: 'Aperçu impression', printPreviewTitle: "Texte sur l'image, comme dans le livre imprimé",
       readMode: 'Lecture', readModeTitle: 'Texte sur une page séparée en regard, plus facile à lire',
       isPublic: 'Publique', isPrivate: 'Privée',
-      publicTitle: 'Publique : toute personne ayant le lien peut la voir', privateTitle: 'Privée : vous seul pouvez la voir',
+      publicTitle: 'Publique : toute personne ayant le lien peut la voir', privateTitle: 'Privée : vous seul pouvez la voir',
       share: 'Partager', edit: 'Modifier', menu: 'Menu',
       prevPage: 'Page précédente', nextPage: 'Page suivante', firstPage: 'Aller à la première page', storyPage: "Page de l'histoire",
     },

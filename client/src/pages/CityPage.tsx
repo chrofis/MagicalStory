@@ -213,7 +213,7 @@ const pageTexts: Record<string, {
     sagenTitle: 'Légendes locales',
     howTitle: 'Comment ça marche',
     howSteps: [
-      { title: 'Télécharger une photo', desc: 'Votre enfant devient le héros illustré de l\'histoire.' },
+      { title: 'Importer une photo', desc: 'Votre enfant devient le héros illustré de l\'histoire.' },
       { title: 'Choisir une histoire', desc: 'Choisissez parmi les histoires locales ou 170+ autres thèmes.' },
       { title: 'Recevoir votre livre', desc: 'Une histoire personnalisée illustrée prête en quelques minutes.' },
     ],

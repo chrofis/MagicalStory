@@ -46,7 +46,7 @@ export function UserMenu({ onClose, onShowCreditsModal, onShowChangePasswordModa
     about: language === 'de' ? 'Über uns' : language === 'fr' ? 'À propos' : language === 'it' ? 'Chi siamo' : 'About',
     contact: language === 'de' ? 'Kontakt' : language === 'fr' ? 'Contact' : language === 'it' ? 'Contatti' : 'Contact',
     legal: language === 'de' ? 'Rechtliches' : language === 'fr' ? 'Mentions légales' : language === 'it' ? 'Note legali' : 'Legal',
-    terms: language === 'de' ? 'AGB' : language === 'fr' ? 'CGU' : language === 'it' ? 'Termini' : 'Terms',
+    terms: language === 'de' ? 'AGB' : language === 'fr' ? 'CG' : language === 'it' ? 'Termini' : 'Terms',
     privacy: language === 'de' ? 'Datenschutz' : language === 'fr' ? 'Confidentialité' : language === 'it' ? 'Privacy' : 'Privacy',
     myAccount: language === 'de' ? 'Mein Konto' : language === 'fr' ? 'Mon compte' : language === 'it' ? 'Il mio account' : 'My Account'
   };

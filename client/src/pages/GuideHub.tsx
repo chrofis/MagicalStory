@@ -29,7 +29,7 @@ const texts = {
     sections: { helping: 'Accompagner les moments difficiles', creating: 'Créer un livre', choosing: 'Choisir un service' } as Record<GuideCategory, string>,
     minutes: 'min de lecture',
     ctaTitle: 'Créez votre première histoire gratuitement',
-    ctaDesc: 'Téléchargez une photo, décrivez l\'histoire souhaitée et voyez le résultat avant de payer.',
+    ctaDesc: 'Importez une photo, décrivez l\'histoire souhaitée et voyez le résultat avant de payer.',
     ctaButton: 'Commencer',
   },
   it: {

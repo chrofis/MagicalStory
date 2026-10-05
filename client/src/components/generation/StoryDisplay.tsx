@@ -547,7 +547,7 @@ export function StoryDisplay({
       }
       const msg = e instanceof Error ? e.message : String(e);
       alert(language === 'de' ? `Titel konnte nicht geändert werden: ${msg}`
-        : language === 'fr' ? `Impossible de modifier le titre : ${msg}`
+        : language === 'fr' ? `Impossible de modifier le titre : ${msg}`
         : language === 'it' ? `Impossibile cambiare il titolo: ${msg}`
         : `Could not change the title: ${msg}`);
     } finally {
@@ -1787,9 +1787,9 @@ export function StoryDisplay({
           title={language === 'de' ? 'Figur im Bild reparieren (Gesicht oder Körper)' : language === 'fr' ? "Corriger un personnage dans cette image (visage ou corps)" : language === 'it' ? 'Ripara un personaggio in questa immagine (viso o corpo)' : 'Fix a character in this image (face or body)'}
         >
           {isRepairing ? (
-            <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Repariere...' : language === 'fr' ? 'Réparation...' : language === 'it' ? 'Riparazione...' : 'Repairing...'}</span>
+            <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Repariere...' : language === 'fr' ? 'Réparation…' : language === 'it' ? 'Riparazione...' : 'Repairing...'}</span>
           ) : isDetecting ? (
-            <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Erkenne...' : language === 'fr' ? 'Détection...' : language === 'it' ? 'Rilevamento...' : 'Detecting...'}</span>
+            <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Erkenne...' : language === 'fr' ? 'Détection…' : language === 'it' ? 'Rilevamento...' : 'Detecting...'}</span>
           ) : (
             <><span className="flex flex-wrap items-center justify-center gap-2 text-center"><Users size={14} /> {language === 'de' ? 'Figur reparieren' : language === 'fr' ? 'Réparer personnage' : language === 'it' ? 'Ripara personaggio' : 'Fix Character'}</span><span className="text-[10px] opacity-60">({CHARACTER_REPAIR_COST} Credits)</span></>
           )}
@@ -2097,7 +2097,7 @@ export function StoryDisplay({
         title={language === 'de' ? 'Bild neu generieren — Reference Mode + Empty-Scene Plate konfigurieren' : language === 'fr' ? 'Régénérer l\'image — configurer Reference Mode + Empty-Scene Plate' : 'Regenerate image — configure Reference Mode + Empty-Scene Plate'}
       >
         {iteratingPages.has(pageNum) ? (
-          <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Generiere...' : language === 'fr' ? 'Génération...' : 'Regenerating...'}</>
+          <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Generiere...' : language === 'fr' ? 'Génération…' : 'Regenerating...'}</>
         ) : (
           <><RotateCcw size={14} /> {language === 'de' ? 'Neu generieren (Dev)' : language === 'fr' ? 'Régénérer (Dev)' : 'Regenerate (Dev)'}</>
         )}
@@ -2500,7 +2500,7 @@ export function StoryDisplay({
             title={language === 'de'
               ? 'Vorschau: Geschichte-Text auf den Bildern anzeigen — so sieht das gedruckte Buch aus. Ausschalten zeigt die Illustrationen ohne Text.'
               : language === 'fr'
-              ? 'Aperçu : afficher le texte sur les images — comme dans le livre imprimé. Désactiver montre les illustrations seules.'
+              ? 'Aperçu : afficher le texte sur les images — comme dans le livre imprimé. Désactiver montre les illustrations seules.'
               : language === 'it'
               ? 'Anteprima: mostra il testo della storia sulle immagini — come nel libro stampato. Disattiva per vedere le illustrazioni senza testo.'
               : 'Preview: show the story text on the images — how the printed book looks. Turn off to see the clean illustrations.'}
@@ -3138,7 +3138,7 @@ export function StoryDisplay({
                       {ar?.committed && block(
                         ar.committedArc != null
                           ? L(`Gewählter Arc (Arc ${ar.committedArc}) + Kritik`, `Arc retenu (Arc ${ar.committedArc}) + critique`, `Committed arc (Arc ${ar.committedArc}) + critique`)
-                          : L('Erstellter Arc: Story-Logik, Arc und Kritik', "Arc créé : logique, arc et critique", 'Created arc: story logic, arc and critique'),
+                          : L('Erstellter Arc: Story-Logik, Arc und Kritik', "Arc créé : logique, arc et critique", 'Created arc: story logic, arc and critique'),
                         ar.committed,
                       )}
                       {block(L('Verworfener Arc', 'Arc écarté', 'Discarded arc'), ar?.discarded)}
@@ -3359,7 +3359,7 @@ export function StoryDisplay({
                 <FileText size={20} />
                 {isPictureBook
                   ? (language === 'de' ? 'Vollständige API-Ausgabe (Kombiniert)' : language === 'fr' ? 'Sortie API complète (Combinée)' : 'Full API Output (Combined)')
-                  : (language === 'de' ? 'Vollständige API-Ausgabe (Outline)' : language === 'fr' ? 'Sortie API complète (Plan)' : 'Full API Output (Outline)')}
+                  : (language === 'de' ? 'Vollständige API-Ausgabe (Outline)' : language === 'fr' ? 'Sortie API complète (plan)' : 'Full API Output (Outline)')}
                 {outlineModelId && (
                   <span className="ml-2 text-sm font-normal text-indigo-500">({outlineModelId})</span>
                 )}
@@ -3374,7 +3374,7 @@ export function StoryDisplay({
                 {outlinePrompt && (
                   <div>
                     <h4 className="text-sm font-bold text-indigo-700 mb-2">
-                      {language === 'de' ? '📤 Prompt (Eingabe)' : language === 'fr' ? '📤 Prompt (Entrée)' : '📤 Prompt (Input)'}
+                      {language === 'de' ? '📤 Prompt (Eingabe)' : language === 'fr' ? '📤 Prompt (entrée)' : '📤 Prompt (Input)'}
                     </h4>
                     <pre className="text-xs text-gray-700 whitespace-pre-wrap break-words font-mono bg-white p-4 rounded-lg border border-indigo-200 overflow-x-auto max-h-[400px] overflow-y-auto">
                       {outlinePrompt}
@@ -3386,7 +3386,7 @@ export function StoryDisplay({
                   <h4 className="text-sm font-bold text-indigo-700 mb-2">
                     {isPictureBook
                       ? (language === 'de' ? '📥 API-Antwort (Kombiniert)' : language === 'fr' ? '📥 Réponse API (Combinée)' : '📥 API Response (Combined)')
-                      : (language === 'de' ? '📥 API-Antwort (Outline)' : language === 'fr' ? '📥 Réponse API (Plan)' : '📥 API Response (Outline)')}
+                      : (language === 'de' ? '📥 API-Antwort (Outline)' : language === 'fr' ? '📥 Réponse API (plan)' : '📥 API Response (Outline)')}
                   </h4>
                   <pre className="text-xs text-gray-700 whitespace-pre-wrap break-words font-mono bg-white p-4 rounded-lg border border-indigo-200 overflow-x-auto max-h-[400px] overflow-y-auto">
                     {outline}
@@ -3458,7 +3458,7 @@ export function StoryDisplay({
             <details className="bg-amber-50 border-2 border-amber-200 rounded-xl p-4">
               <summary className="cursor-pointer text-lg font-bold text-amber-800 hover:text-amber-900 flex items-center gap-2">
                 <BookOpen size={20} />
-                {language === 'de' ? 'Vollständige API-Ausgabe (Story-Text)' : language === 'fr' ? 'Sortie API complète (Texte)' : 'Full API Output (Story Text)'}
+                {language === 'de' ? 'Vollständige API-Ausgabe (Story-Text)' : language === 'fr' ? 'Sortie API complète (texte)' : 'Full API Output (Story Text)'}
                 {storyTextPrompts[0]?.modelId && (
                   <span className="ml-2 text-sm font-normal text-amber-600">({storyTextPrompts[0].modelId})</span>
                 )}
@@ -3472,7 +3472,7 @@ export function StoryDisplay({
                 {/* Input: The prompt sent to the API */}
                 <div>
                   <h4 className="text-sm font-bold text-amber-700 mb-2">
-                    {language === 'de' ? '📤 Prompt (Eingabe)' : language === 'fr' ? '📤 Prompt (Entrée)' : '📤 Prompt (Input)'}
+                    {language === 'de' ? '📤 Prompt (Eingabe)' : language === 'fr' ? '📤 Prompt (entrée)' : '📤 Prompt (Input)'}
                   </h4>
                   <pre className="text-xs text-gray-700 whitespace-pre-wrap break-words font-mono bg-white p-4 rounded-lg border border-amber-200 overflow-x-auto max-h-[400px] overflow-y-auto">
                     {storyTextPrompts[0]?.prompt || 'No prompt available'}
@@ -3508,7 +3508,7 @@ export function StoryDisplay({
             <details className="bg-rose-50 border-2 border-rose-200 rounded-xl p-4">
               <summary className="cursor-pointer text-lg font-bold text-rose-800 hover:text-rose-900 flex items-center gap-2">
                 <BookOpen size={20} />
-                {language === 'de' ? 'Visual Bible (Wiederkehrende Elemente)' : language === 'fr' ? 'Bible Visuelle (Éléments Récurrents)' : 'Visual Bible (Recurring Elements)'}
+                {language === 'de' ? 'Visual Bible (Wiederkehrende Elemente)' : language === 'fr' ? 'Bible visuelle (éléments récurrents)' : 'Visual Bible (Recurring Elements)'}
                 {visualBible.changeLog && visualBible.changeLog.length > 0 && (
                   <span className="ml-2 px-2 py-0.5 bg-rose-200 text-rose-800 rounded-full text-xs font-medium">
                     {visualBible.changeLog.length} {language === 'de' ? 'Änderungen' : language === 'fr' ? 'changements' : 'changes'}
@@ -3546,7 +3546,7 @@ export function StoryDisplay({
                   <div className="bg-white border border-indigo-300 rounded-lg p-3">
                     <h4 className="text-sm font-bold text-indigo-700 mb-2 flex items-center gap-2">
                       <span className="text-lg">👗</span>
-                      {language === 'de' ? 'Hauptcharaktere (Style Profile)' : language === 'fr' ? 'Personnages Principaux (Profil Style)' : 'Main Characters (Style Profile)'}
+                      {language === 'de' ? 'Hauptcharaktere (Style Profile)' : language === 'fr' ? 'Personnages principaux (profil style)' : 'Main Characters (Style Profile)'}
                     </h4>
                     <div className="space-y-3">
                       {visualBible.mainCharacters.map((char) => (
@@ -3600,7 +3600,7 @@ export function StoryDisplay({
                 {visualBible.secondaryCharacters && visualBible.secondaryCharacters.length > 0 && (
                   <div className="bg-white border border-rose-200 rounded-lg p-3">
                     <h4 className="text-sm font-bold text-rose-700 mb-2">
-                      {language === 'de' ? 'Nebencharaktere' : language === 'fr' ? 'Personnages Secondaires' : 'Secondary Characters'}
+                      {language === 'de' ? 'Nebencharaktere' : language === 'fr' ? 'Personnages secondaires' : 'Secondary Characters'}
                     </h4>
                     <div className="space-y-2">
                       {visualBible.secondaryCharacters.map((entry) => (
@@ -3665,7 +3665,7 @@ export function StoryDisplay({
                 {visualBible.animals?.length > 0 && (
                   <div className="bg-white border border-rose-200 rounded-lg p-3">
                     <h4 className="text-sm font-bold text-rose-700 mb-2">
-                      {language === 'de' ? 'Tiere & Wesen' : language === 'fr' ? 'Animaux & Créatures' : 'Animals & Creatures'}
+                      {language === 'de' ? 'Tiere & Wesen' : language === 'fr' ? 'Animaux & créatures' : 'Animals & Creatures'}
                     </h4>
                     <div className="space-y-2">
                       {visualBible.animals.map((entry) => (
@@ -3730,7 +3730,7 @@ export function StoryDisplay({
                 {visualBible.artifacts?.length > 0 && (
                   <div className="bg-white border border-rose-200 rounded-lg p-3">
                     <h4 className="text-sm font-bold text-rose-700 mb-2">
-                      {language === 'de' ? 'Artefakte & Objekte' : language === 'fr' ? 'Artefacts & Objets' : 'Artifacts & Objects'}
+                      {language === 'de' ? 'Artefakte & Objekte' : language === 'fr' ? 'Artefacts & objets' : 'Artifacts & Objects'}
                     </h4>
                     <div className="space-y-2">
                       {visualBible.artifacts.map((entry) => (
@@ -3795,7 +3795,7 @@ export function StoryDisplay({
                 {visualBible.locations?.length > 0 && (
                   <div className="bg-white border border-rose-200 rounded-lg p-3">
                     <h4 className="text-sm font-bold text-rose-700 mb-2">
-                      {language === 'de' ? 'Wiederkehrende Orte' : language === 'fr' ? 'Lieux Récurrents' : 'Recurring Locations'}
+                      {language === 'de' ? 'Wiederkehrende Orte' : language === 'fr' ? 'Lieux récurrents' : 'Recurring Locations'}
                     </h4>
                     <div className="space-y-2">
                       {visualBible.locations.map((entry) => (
@@ -3968,7 +3968,7 @@ export function StoryDisplay({
                   <details className="bg-white border border-amber-300 rounded-lg p-3">
                     <summary className="cursor-pointer text-sm font-bold text-amber-700 hover:text-amber-800 flex items-center gap-2">
                       <span className="text-lg">📝</span>
-                      {language === 'de' ? 'Änderungsprotokoll' : language === 'fr' ? 'Journal des Modifications' : 'Change Log'}
+                      {language === 'de' ? 'Änderungsprotokoll' : language === 'fr' ? 'Journal des modifications' : 'Change Log'}
                       <span className="ml-1 px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded text-xs">
                         {visualBible.changeLog.length}
                       </span>
@@ -5374,7 +5374,7 @@ export function StoryDisplay({
                 <div className="aspect-[3/4] bg-gradient-to-br from-indigo-100 to-indigo-100 rounded-lg shadow-lg flex flex-col items-center justify-center">
                   <div className="animate-spin rounded-full h-12 w-12 border-4 border-indigo-300 border-t-indigo-600 mb-4"></div>
                   <p className="text-indigo-500 font-medium">
-                    {storyLang === 'de' ? 'Cover wird geladen...' : storyLang === 'fr' ? 'Chargement de la couverture...' : storyLang === 'it' ? 'Caricamento copertina...' : 'Loading cover...'}
+                    {storyLang === 'de' ? 'Cover wird geladen...' : storyLang === 'fr' ? 'Chargement de la couverture…' : storyLang === 'it' ? 'Caricamento copertina...' : 'Loading cover...'}
                   </p>
                 </div>
               ) : (
@@ -5389,9 +5389,9 @@ export function StoryDisplay({
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/60 rounded-lg">
                   <Loader size={40} className="animate-spin text-indigo-500 mb-2" />
                   <p className="text-indigo-700 font-medium text-sm">
-                    {charRepairingPages.has(-1) ? (language === 'de' ? 'Figur wird repariert...' : language === 'fr' ? "Réparation du personnage..." : language === 'it' ? 'Riparazione personaggio...' : 'Repairing character...')
-                      : editingPages.has(-1) ? (language === 'de' ? 'Bild wird bearbeitet...' : language === 'fr' ? "Modification de l'image..." : language === 'it' ? 'Modifica immagine...' : 'Editing image...')
-                      : (language === 'de' ? 'Neues Bild wird erstellt...' : language === 'fr' ? "Création d'une nouvelle image..." : language === 'it' ? 'Creazione nuova immagine...' : 'Generating new image...')}
+                    {charRepairingPages.has(-1) ? (language === 'de' ? 'Figur wird repariert...' : language === 'fr' ? "Réparation du personnage…" : language === 'it' ? 'Riparazione personaggio...' : 'Repairing character...')
+                      : editingPages.has(-1) ? (language === 'de' ? 'Bild wird bearbeitet...' : language === 'fr' ? "Modification de l'image…" : language === 'it' ? 'Modifica immagine...' : 'Editing image...')
+                      : (language === 'de' ? 'Neues Bild wird erstellt...' : language === 'fr' ? "Création d'une nouvelle image…" : language === 'it' ? 'Creazione nuova immagine...' : 'Generating new image...')}
                   </p>
                 </div>
               )}
@@ -5417,7 +5417,7 @@ export function StoryDisplay({
                     title={language === 'de' ? 'Beschreibe eine Änderung am aktuellen Bild' : language === 'fr' ? "Décrivez une modification à apporter à l'image actuelle" : language === 'it' ? 'Descrivi una modifica da fare all\'immagine attuale' : 'Describe a change to make to the current image'}
                   >
                     {editingPages.has(-1) ? (
-                      <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Bearbeite...' : language === 'fr' ? 'Modification...' : language === 'it' ? 'Modifica...' : 'Editing...'}</span>
+                      <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Bearbeite...' : language === 'fr' ? 'Modification…' : language === 'it' ? 'Modifica...' : 'Editing...'}</span>
                     ) : (
                       <><span className="flex flex-wrap items-center justify-center gap-2 text-center"><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : language === 'it' ? 'Modifica' : 'Edit'}</span><span className="text-[10px] opacity-60">({COVER_REGENERATION_COST} Credits)</span></>
                     )}
@@ -5433,7 +5433,7 @@ export function StoryDisplay({
                     title={language === 'de' ? 'KI analysiert und generiert das Bild automatisch neu' : language === 'fr' ? "L'IA analyse et régénère l'image automatiquement" : language === 'it' ? 'L\'IA analizza e rigenera automaticamente l\'immagine' : 'AI analyzes and automatically regenerates the image'}
                   >
                     {improvingPages.has(-1) ? (
-                      <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : language === 'fr' ? 'Réessai...' : language === 'it' ? 'Nuovo tentativo...' : 'Retrying...'}</span>
+                      <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : language === 'fr' ? 'Réessai…' : language === 'it' ? 'Nuovo tentativo...' : 'Retrying...'}</span>
                     ) : (
                       <><span className="flex flex-wrap items-center justify-center gap-2 text-center"><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : language === 'fr' ? 'Réessayer' : language === 'it' ? 'Riprova' : 'Retry'}</span><span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span></>
                     )}
@@ -5636,9 +5636,9 @@ export function StoryDisplay({
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/60 rounded-lg">
                   <Loader size={40} className="animate-spin text-indigo-500 mb-2" />
                   <p className="text-indigo-700 font-medium text-sm">
-                    {charRepairingPages.has(-2) ? (language === 'de' ? 'Figur wird repariert...' : language === 'fr' ? "Réparation du personnage..." : language === 'it' ? 'Riparazione personaggio...' : 'Repairing character...')
-                      : editingPages.has(-2) ? (language === 'de' ? 'Bild wird bearbeitet...' : language === 'fr' ? "Modification de l'image..." : language === 'it' ? 'Modifica immagine...' : 'Editing image...')
-                      : (language === 'de' ? 'Neues Bild wird erstellt...' : language === 'fr' ? "Création d'une nouvelle image..." : language === 'it' ? 'Creazione nuova immagine...' : 'Generating new image...')}
+                    {charRepairingPages.has(-2) ? (language === 'de' ? 'Figur wird repariert...' : language === 'fr' ? "Réparation du personnage…" : language === 'it' ? 'Riparazione personaggio...' : 'Repairing character...')
+                      : editingPages.has(-2) ? (language === 'de' ? 'Bild wird bearbeitet...' : language === 'fr' ? "Modification de l'image…" : language === 'it' ? 'Modifica immagine...' : 'Editing image...')
+                      : (language === 'de' ? 'Neues Bild wird erstellt...' : language === 'fr' ? "Création d'une nouvelle image…" : language === 'it' ? 'Creazione nuova immagine...' : 'Generating new image...')}
                   </p>
                 </div>
               )}
@@ -5664,7 +5664,7 @@ export function StoryDisplay({
                     title={language === 'de' ? 'Beschreibe eine Änderung am aktuellen Bild' : language === 'fr' ? "Décrivez une modification à apporter à l'image actuelle" : language === 'it' ? 'Descrivi una modifica da fare all\'immagine attuale' : 'Describe a change to make to the current image'}
                   >
                     {editingPages.has(-2) ? (
-                      <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Bearbeite...' : language === 'fr' ? 'Modification...' : language === 'it' ? 'Modifica...' : 'Editing...'}</span>
+                      <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Bearbeite...' : language === 'fr' ? 'Modification…' : language === 'it' ? 'Modifica...' : 'Editing...'}</span>
                     ) : (
                       <><span className="flex flex-wrap items-center justify-center gap-2 text-center"><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : language === 'it' ? 'Modifica' : 'Edit'}</span><span className="text-[10px] opacity-60">({COVER_REGENERATION_COST} Credits)</span></>
                     )}
@@ -5680,7 +5680,7 @@ export function StoryDisplay({
                     title={language === 'de' ? 'KI analysiert und generiert das Bild automatisch neu' : language === 'fr' ? "L'IA analyse et régénère l'image automatiquement" : language === 'it' ? 'L\'IA analizza e rigenera automaticamente l\'immagine' : 'AI analyzes and automatically regenerates the image'}
                   >
                     {improvingPages.has(-2) ? (
-                      <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : language === 'fr' ? 'Réessai...' : language === 'it' ? 'Nuovo tentativo...' : 'Retrying...'}</span>
+                      <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : language === 'fr' ? 'Réessai…' : language === 'it' ? 'Nuovo tentativo...' : 'Retrying...'}</span>
                     ) : (
                       <><span className="flex flex-wrap items-center justify-center gap-2 text-center"><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : language === 'fr' ? 'Réessayer' : language === 'it' ? 'Riprova' : 'Retry'}</span><span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span></>
                     )}
@@ -5856,7 +5856,7 @@ export function StoryDisplay({
               {storyLang === 'de'
                 ? 'Geschichte wird erstellt...'
                 : storyLang === 'fr'
-                ? 'Création de l\'histoire...'
+                ? 'Création de l\'histoire…'
                 : storyLang === 'it'
                 ? 'Creazione della storia...'
                 : 'Creating your story...'}
@@ -5910,8 +5910,8 @@ export function StoryDisplay({
                         <div className="animate-spin rounded-full h-12 w-12 border-4 border-indigo-300 border-t-indigo-600 mb-4"></div>
                         <p className="text-indigo-500 font-medium">
                           {isLazyLoading
-                            ? (storyLang === 'de' ? 'Bild wird geladen...' : storyLang === 'fr' ? 'Chargement de l\'image...' : storyLang === 'it' ? 'Caricamento immagine...' : 'Loading image...')
-                            : (storyLang === 'de' ? 'Bild wird erstellt...' : storyLang === 'fr' ? 'Création de l\'image...' : storyLang === 'it' ? 'Creazione immagine...' : 'Creating image...')
+                            ? (storyLang === 'de' ? 'Bild wird geladen...' : storyLang === 'fr' ? 'Chargement de l\'image…' : storyLang === 'it' ? 'Caricamento immagine...' : 'Loading image...')
+                            : (storyLang === 'de' ? 'Bild wird erstellt...' : storyLang === 'fr' ? 'Création de l\'image…' : storyLang === 'it' ? 'Creazione immagine...' : 'Creating image...')
                           }
                         </p>
                         {isWaitingForImage && (
@@ -5943,12 +5943,12 @@ export function StoryDisplay({
                             <Loader size={40} className="animate-spin text-indigo-500 mb-2" />
                             <p className="text-indigo-700 font-medium text-sm">
                               {charRepairingPages.has(pageNumber)
-                                ? (language === 'de' ? 'Figur wird repariert...' : language === 'fr' ? "Réparation du personnage..." : language === 'it' ? 'Riparazione personaggio...' : 'Repairing character...')
+                                ? (language === 'de' ? 'Figur wird repariert...' : language === 'fr' ? "Réparation du personnage…" : language === 'it' ? 'Riparazione personaggio...' : 'Repairing character...')
                                 : editingPages.has(pageNumber)
-                                ? (language === 'de' ? 'Bild wird bearbeitet...' : language === 'fr' ? "Modification de l'image..." : language === 'it' ? 'Modifica immagine...' : 'Editing image...')
+                                ? (language === 'de' ? 'Bild wird bearbeitet...' : language === 'fr' ? "Modification de l'image…" : language === 'it' ? 'Modifica immagine...' : 'Editing image...')
                                 : improvingPages.has(pageNumber)
-                                ? (language === 'de' ? 'Bild wird verbessert...' : language === 'fr' ? "Amélioration de l'image..." : language === 'it' ? 'Miglioramento immagine...' : 'Improving image...')
-                                : (language === 'de' ? 'Neues Bild wird erstellt...' : language === 'fr' ? "Création d'une nouvelle image..." : language === 'it' ? 'Creazione nuova immagine...' : 'Generating new image...')}
+                                ? (language === 'de' ? 'Bild wird verbessert...' : language === 'fr' ? "Amélioration de l'image…" : language === 'it' ? 'Miglioramento immagine...' : 'Improving image...')
+                                : (language === 'de' ? 'Neues Bild wird erstellt...' : language === 'fr' ? "Création d'une nouvelle image…" : language === 'it' ? 'Creazione nuova immagine...' : 'Generating new image...')}
                             </p>
                           </div>
                         )}
@@ -5974,7 +5974,7 @@ export function StoryDisplay({
                                   title={language === 'de' ? 'Beschreibe eine Änderung am aktuellen Bild' : language === 'fr' ? "Décrivez une modification à apporter à l'image actuelle" : language === 'it' ? 'Descrivi una modifica da fare all\'immagine attuale' : 'Describe a change to make to the current image'}
                                 >
                                   {editingPages.has(pageNumber) ? (
-                                    <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Bearbeite...' : language === 'fr' ? 'Modification...' : language === 'it' ? 'Modifica...' : 'Editing...'}</span>
+                                    <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Bearbeite...' : language === 'fr' ? 'Modification…' : language === 'it' ? 'Modifica...' : 'Editing...'}</span>
                                   ) : (
                                     <><span className="flex flex-wrap items-center justify-center gap-2 text-center"><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : language === 'it' ? 'Modifica' : 'Edit'}</span><span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span></>
                                   )}
@@ -5990,7 +5990,7 @@ export function StoryDisplay({
                                   title={language === 'de' ? 'KI analysiert und generiert das Bild automatisch neu' : language === 'fr' ? "L'IA analyse et régénère l'image automatiquement" : language === 'it' ? 'L\'IA analizza e rigenera automaticamente l\'immagine' : 'AI analyzes and automatically regenerates the image'}
                                 >
                                   {improvingPages.has(pageNumber) ? (
-                                    <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : language === 'fr' ? 'Réessai...' : language === 'it' ? 'Nuovo tentativo...' : 'Retrying...'}</span>
+                                    <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : language === 'fr' ? 'Réessai…' : language === 'it' ? 'Nuovo tentativo...' : 'Retrying...'}</span>
                                   ) : (
                                     <><span className="flex flex-wrap items-center justify-center gap-2 text-center"><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : language === 'fr' ? 'Réessayer' : language === 'it' ? 'Riprova' : 'Retry'}</span><span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span></>
                                   )}
@@ -6439,7 +6439,7 @@ export function StoryDisplay({
                                   {image?.originalImage && (
                                     <div className="mt-2">
                                       <p className="text-xs font-semibold text-gray-700 mb-1">
-                                        {language === 'de' ? 'Originalbild:' : language === 'fr' ? 'Image originale:' : 'Original Image:'}
+                                        {language === 'de' ? 'Originalbild:' : language === 'fr' ? 'Image originale :' : 'Original Image:'}
                                       </p>
                                       <img
                                         src={image.originalImage}
@@ -6448,7 +6448,7 @@ export function StoryDisplay({
                                       />
                                       {image?.originalReasoning && (
                                         <div className="mt-2 text-xs text-gray-600 bg-white p-2 rounded border">
-                                          <div className="font-semibold mb-1">{language === 'de' ? 'Original Feedback:' : language === 'fr' ? 'Retour original:' : 'Original Feedback:'}</div>
+                                          <div className="font-semibold mb-1">{language === 'de' ? 'Original Feedback:' : language === 'fr' ? 'Retour original :' : 'Original Feedback:'}</div>
                                           <p className="whitespace-pre-wrap break-words">{image.originalReasoning}</p>
                                         </div>
                                       )}
@@ -6466,7 +6466,7 @@ export function StoryDisplay({
                           <>
                             <div className="animate-spin rounded-full h-10 w-10 border-4 border-indigo-300 border-t-indigo-600 mb-3"></div>
                             <p className="text-indigo-500 font-medium text-center">
-                              {storyLang === 'de' ? 'Bild wird noch erstellt...' : storyLang === 'fr' ? 'Image en cours de création...' : storyLang === 'it' ? 'Immagine ancora in creazione...' : 'Image is being created...'}
+                              {storyLang === 'de' ? 'Bild wird noch erstellt...' : storyLang === 'fr' ? 'Image en cours de création…' : storyLang === 'it' ? 'Immagine ancora in creazione...' : 'Image is being created...'}
                             </p>
                           </>
                         ) : (
@@ -6488,7 +6488,7 @@ export function StoryDisplay({
                           value={pageText.trim()}
                           onChange={(e) => handlePageTextChange(index, e.target.value)}
                           className="w-full min-h-[400px] p-3 text-gray-800 leading-snug font-serif text-xl text-center bg-white border-2 border-amber-300 rounded-lg focus:border-amber-500 focus:ring-2 focus:ring-amber-200 outline-none resize-y"
-                          placeholder={language === 'de' ? 'Text eingeben...' : language === 'fr' ? 'Entrez le texte...' : language === 'it' ? 'Inserisci il testo...' : 'Enter text...'}
+                          placeholder={language === 'de' ? 'Text eingeben...' : language === 'fr' ? 'Entrez le texte…' : language === 'it' ? 'Inserisci il testo...' : 'Enter text...'}
                         />
                       ) : (
                         <p className="text-gray-800 leading-snug whitespace-pre-wrap break-words font-serif text-xl text-center">
@@ -6509,7 +6509,7 @@ export function StoryDisplay({
                         <div className="aspect-[4/3] bg-gradient-to-br from-indigo-100 to-indigo-100 rounded-lg shadow-md flex flex-col items-center justify-center">
                           <div className="animate-spin rounded-full h-10 w-10 border-4 border-indigo-300 border-t-indigo-600 mb-3"></div>
                           <p className="text-indigo-500 font-medium text-sm">
-                            {storyLang === 'de' ? 'Bild wird geladen...' : storyLang === 'fr' ? 'Chargement de l\'image...' : storyLang === 'it' ? 'Caricamento immagine...' : 'Loading image...'}
+                            {storyLang === 'de' ? 'Bild wird geladen...' : storyLang === 'fr' ? 'Chargement de l\'image…' : storyLang === 'it' ? 'Caricamento immagine...' : 'Loading image...'}
                           </p>
                         </div>
                       </div>
@@ -6527,12 +6527,12 @@ export function StoryDisplay({
                               <Loader size={40} className="animate-spin text-indigo-500 mb-2" />
                               <p className="text-indigo-700 font-medium text-sm">
                                 {charRepairingPages.has(pageNumber)
-                                  ? (language === 'de' ? 'Figur wird repariert...' : language === 'fr' ? "Réparation du personnage..." : language === 'it' ? 'Riparazione personaggio...' : 'Repairing character...')
+                                  ? (language === 'de' ? 'Figur wird repariert...' : language === 'fr' ? "Réparation du personnage…" : language === 'it' ? 'Riparazione personaggio...' : 'Repairing character...')
                                   : editingPages.has(pageNumber)
-                                  ? (language === 'de' ? 'Bild wird bearbeitet...' : language === 'fr' ? "Modification de l'image..." : language === 'it' ? 'Modifica immagine...' : 'Editing image...')
+                                  ? (language === 'de' ? 'Bild wird bearbeitet...' : language === 'fr' ? "Modification de l'image…" : language === 'it' ? 'Modifica immagine...' : 'Editing image...')
                                   : improvingPages.has(pageNumber)
-                                  ? (language === 'de' ? 'Bild wird verbessert...' : language === 'fr' ? "Amélioration de l'image..." : language === 'it' ? 'Miglioramento immagine...' : 'Improving image...')
-                                  : (language === 'de' ? 'Neues Bild wird erstellt...' : language === 'fr' ? "Création d'une nouvelle image..." : language === 'it' ? 'Creazione nuova immagine...' : 'Generating new image...')}
+                                  ? (language === 'de' ? 'Bild wird verbessert...' : language === 'fr' ? "Amélioration de l'image…" : language === 'it' ? 'Miglioramento immagine...' : 'Improving image...')
+                                  : (language === 'de' ? 'Neues Bild wird erstellt...' : language === 'fr' ? "Création d'une nouvelle image…" : language === 'it' ? 'Creazione nuova immagine...' : 'Generating new image...')}
                               </p>
                             </div>
                           )}
@@ -6559,7 +6559,7 @@ export function StoryDisplay({
                                   title={language === 'de' ? 'Beschreibe eine Änderung am aktuellen Bild' : language === 'fr' ? "Décrivez une modification à apporter à l'image actuelle" : language === 'it' ? 'Descrivi una modifica da fare all\'immagine attuale' : 'Describe a change to make to the current image'}
                                 >
                                   {editingPages.has(pageNumber) ? (
-                                    <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Bearbeite...' : language === 'fr' ? 'Modification...' : language === 'it' ? 'Modifica...' : 'Editing...'}</span>
+                                    <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Bearbeite...' : language === 'fr' ? 'Modification…' : language === 'it' ? 'Modifica...' : 'Editing...'}</span>
                                   ) : (
                                     <><span className="flex flex-wrap items-center justify-center gap-2 text-center"><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : language === 'it' ? 'Modifica' : 'Edit'}</span><span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span></>
                                   )}
@@ -6575,7 +6575,7 @@ export function StoryDisplay({
                                   title={language === 'de' ? 'KI analysiert und generiert das Bild automatisch neu' : language === 'fr' ? "L'IA analyse et régénère l'image automatiquement" : language === 'it' ? 'L\'IA analizza e rigenera automaticamente l\'immagine' : 'AI analyzes and automatically regenerates the image'}
                                 >
                                   {improvingPages.has(pageNumber) ? (
-                                    <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : language === 'fr' ? 'Réessai...' : language === 'it' ? 'Nuovo tentativo...' : 'Retrying...'}</span>
+                                    <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : language === 'fr' ? 'Réessai…' : language === 'it' ? 'Nuovo tentativo...' : 'Retrying...'}</span>
                                   ) : (
                                     <><span className="flex flex-wrap items-center justify-center gap-2 text-center"><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : language === 'fr' ? 'Réessayer' : language === 'it' ? 'Riprova' : 'Retry'}</span><span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span></>
                                   )}
@@ -7022,7 +7022,7 @@ export function StoryDisplay({
                                   {image.originalImage && (
                                     <div className="mt-2">
                                       <p className="text-xs font-semibold text-gray-700 mb-1">
-                                        {language === 'de' ? 'Originalbild:' : language === 'fr' ? 'Image originale:' : 'Original Image:'}
+                                        {language === 'de' ? 'Originalbild:' : language === 'fr' ? 'Image originale :' : 'Original Image:'}
                                       </p>
                                       <img
                                         src={image.originalImage}
@@ -7031,7 +7031,7 @@ export function StoryDisplay({
                                       />
                                       {image.originalReasoning && (
                                         <div className="mt-2 text-xs text-gray-600 bg-white p-2 rounded border">
-                                          <div className="font-semibold mb-1">{language === 'de' ? 'Original Feedback:' : language === 'fr' ? 'Retour original:' : 'Original Feedback:'}</div>
+                                          <div className="font-semibold mb-1">{language === 'de' ? 'Original Feedback:' : language === 'fr' ? 'Retour original :' : 'Original Feedback:'}</div>
                                           <p className="whitespace-pre-wrap break-words">{image.originalReasoning}</p>
                                         </div>
                                       )}
@@ -7049,7 +7049,7 @@ export function StoryDisplay({
                           <>
                             <div className="animate-spin rounded-full h-10 w-10 border-4 border-indigo-300 border-t-indigo-600 mb-3"></div>
                             <p className="text-indigo-500 font-medium text-center">
-                              {storyLang === 'de' ? 'Bild wird noch erstellt...' : storyLang === 'fr' ? 'Image en cours de création...' : storyLang === 'it' ? 'Immagine ancora in creazione...' : 'Image is being created...'}
+                              {storyLang === 'de' ? 'Bild wird noch erstellt...' : storyLang === 'fr' ? 'Image en cours de création…' : storyLang === 'it' ? 'Immagine ancora in creazione...' : 'Image is being created...'}
                             </p>
                           </>
                         ) : (
@@ -7067,7 +7067,7 @@ export function StoryDisplay({
                           value={pageText.trim()}
                           onChange={(e) => handlePageTextChange(index, e.target.value)}
                           className="w-full flex-1 min-h-[300px] p-4 text-gray-800 leading-snug font-serif text-xl bg-white border-2 border-amber-300 rounded-lg focus:border-amber-500 focus:ring-2 focus:ring-amber-200 outline-none resize-y"
-                          placeholder={language === 'de' ? 'Text eingeben...' : language === 'fr' ? 'Entrez le texte...' : language === 'it' ? 'Inserisci il testo...' : 'Enter text...'}
+                          placeholder={language === 'de' ? 'Text eingeben...' : language === 'fr' ? 'Entrez le texte…' : language === 'it' ? 'Inserisci il testo...' : 'Enter text...'}
                         />
                       ) : (
                         <div className="prose max-w-none">
@@ -7108,9 +7108,9 @@ export function StoryDisplay({
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/60 rounded-lg">
                   <Loader size={40} className="animate-spin text-indigo-500 mb-2" />
                   <p className="text-indigo-700 font-medium text-sm">
-                    {charRepairingPages.has(-3) ? (language === 'de' ? 'Figur wird repariert...' : language === 'fr' ? "Réparation du personnage..." : language === 'it' ? 'Riparazione personaggio...' : 'Repairing character...')
-                      : editingPages.has(-3) ? (language === 'de' ? 'Bild wird bearbeitet...' : language === 'fr' ? "Modification de l'image..." : language === 'it' ? 'Modifica immagine...' : 'Editing image...')
-                      : (language === 'de' ? 'Neues Bild wird erstellt...' : language === 'fr' ? "Création d'une nouvelle image..." : language === 'it' ? 'Creazione nuova immagine...' : 'Generating new image...')}
+                    {charRepairingPages.has(-3) ? (language === 'de' ? 'Figur wird repariert...' : language === 'fr' ? "Réparation du personnage…" : language === 'it' ? 'Riparazione personaggio...' : 'Repairing character...')
+                      : editingPages.has(-3) ? (language === 'de' ? 'Bild wird bearbeitet...' : language === 'fr' ? "Modification de l'image…" : language === 'it' ? 'Modifica immagine...' : 'Editing image...')
+                      : (language === 'de' ? 'Neues Bild wird erstellt...' : language === 'fr' ? "Création d'une nouvelle image…" : language === 'it' ? 'Creazione nuova immagine...' : 'Generating new image...')}
                   </p>
                 </div>
               )}
@@ -7136,7 +7136,7 @@ export function StoryDisplay({
                     title={language === 'de' ? 'Beschreibe eine Änderung am aktuellen Bild' : language === 'fr' ? "Décrivez une modification à apporter à l'image actuelle" : language === 'it' ? 'Descrivi una modifica da fare all\'immagine attuale' : 'Describe a change to make to the current image'}
                   >
                     {editingPages.has(-3) ? (
-                      <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Bearbeite...' : language === 'fr' ? 'Modification...' : language === 'it' ? 'Modifica...' : 'Editing...'}</span>
+                      <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Bearbeite...' : language === 'fr' ? 'Modification…' : language === 'it' ? 'Modifica...' : 'Editing...'}</span>
                     ) : (
                       <><span className="flex flex-wrap items-center justify-center gap-2 text-center"><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : language === 'it' ? 'Modifica' : 'Edit'}</span><span className="text-[10px] opacity-60">({COVER_REGENERATION_COST} Credits)</span></>
                     )}
@@ -7152,7 +7152,7 @@ export function StoryDisplay({
                     title={language === 'de' ? 'KI analysiert und generiert das Bild automatisch neu' : language === 'fr' ? "L'IA analyse et régénère l'image automatiquement" : language === 'it' ? 'L\'IA analizza e rigenera automaticamente l\'immagine' : 'AI analyzes and automatically regenerates the image'}
                   >
                     {improvingPages.has(-3) ? (
-                      <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : language === 'fr' ? 'Réessai...' : language === 'it' ? 'Nuovo tentativo...' : 'Retrying...'}</span>
+                      <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : language === 'fr' ? 'Réessai…' : language === 'it' ? 'Nuovo tentativo...' : 'Retrying...'}</span>
                     ) : (
                       <><span className="flex flex-wrap items-center justify-center gap-2 text-center"><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : language === 'fr' ? 'Réessayer' : language === 'it' ? 'Riprova' : 'Retry'}</span><span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span></>
                     )}
@@ -7258,7 +7258,7 @@ export function StoryDisplay({
       {hasImages && story && (
         <div className="bg-gradient-to-r from-indigo-50 to-indigo-50 border-2 border-indigo-200 rounded-xl p-4 mt-6">
           <h3 className="text-base font-bold text-gray-800 mb-3 text-center">
-            {language === 'de' ? 'Was möchtest du als Nächstes tun?' : language === 'fr' ? 'Que souhaitez-vous faire ensuite ?' : language === 'it' ? 'Cosa vuoi fare adesso?' : 'What would you like to do next?'}
+            {language === 'de' ? 'Was möchtest du als Nächstes tun?' : language === 'fr' ? 'Que souhaitez-vous faire ensuite ?' : language === 'it' ? 'Cosa vuoi fare adesso?' : 'What would you like to do next?'}
           </h3>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
             {/* Create Book */}
@@ -7409,7 +7409,7 @@ export function StoryDisplay({
               >
                 <Save size={16} />
                 {isSaving
-                  ? (language === 'de' ? 'Speichern...' : language === 'fr' ? 'Sauvegarde...' : language === 'it' ? 'Salvataggio...' : 'Saving...')
+                  ? (language === 'de' ? 'Speichern...' : language === 'fr' ? 'Sauvegarde…' : language === 'it' ? 'Salvataggio...' : 'Saving...')
                   : (language === 'de' ? 'Speichern' : language === 'fr' ? 'Sauvegarder' : language === 'it' ? 'Salva' : 'Save')
                 }
               </button>
@@ -7469,7 +7469,7 @@ export function StoryDisplay({
                   <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                     <Users size={16} />
                     {language === 'de' ? 'Charaktere auf dem Cover:' :
-                     language === 'fr' ? 'Personnages sur la couverture:' :
+                     language === 'fr' ? 'Personnages sur la couverture :' :
                      language === 'it' ? 'Personaggi sulla copertina:' :
                      'Characters on the cover:'}
                   </label>
@@ -7514,7 +7514,7 @@ export function StoryDisplay({
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     {language === 'de' ? 'Titel:' :
-                     language === 'fr' ? 'Titre:' :
+                     language === 'fr' ? 'Titre :' :
                      language === 'it' ? 'Titolo:' :
                      'Title:'}
                   </label>
@@ -7539,7 +7539,7 @@ export function StoryDisplay({
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     {language === 'de' ? 'Widmung:' :
-                     language === 'fr' ? 'Dédicace:' :
+                     language === 'fr' ? 'Dédicace :' :
                      language === 'it' ? 'Dedica:' :
                      'Dedication:'}
                   </label>
@@ -7550,7 +7550,7 @@ export function StoryDisplay({
                     placeholder={language === 'de'
                       ? 'z.B. «Für meine liebste Tochter Emma»'
                       : language === 'fr'
-                      ? 'par ex. "Pour ma chère fille Emma"'
+                      ? 'par ex. « Pour ma chère fille Emma »'
                       : language === 'it'
                       ? 'es. "Alla mia cara figlia Emma"'
                       : 'e.g. "For my dear daughter Emma"'}
@@ -7569,7 +7569,7 @@ export function StoryDisplay({
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   {language === 'de' ? 'Szenenbeschreibung:' :
-                   language === 'fr' ? 'Description de la scène:' :
+                   language === 'fr' ? 'Description de la scène :' :
                    language === 'it' ? 'Descrizione della scena:' :
                    'Scene description:'}
                 </label>
@@ -7579,7 +7579,7 @@ export function StoryDisplay({
                   placeholder={language === 'de'
                     ? 'z.B. «Die Hauptfigur steht vor einem magischen Schloss bei Sonnenuntergang»'
                     : language === 'fr'
-                    ? 'par ex. "Le personnage principal devant un château magique au coucher du soleil"'
+                    ? 'par ex. « Le personnage principal devant un château magique au coucher du soleil »'
                     : language === 'it'
                     ? 'es. "Il personaggio principale davanti a un castello magico al tramonto"'
                     : 'e.g. "The main character standing in front of a magical castle at sunset"'}
@@ -7587,7 +7587,7 @@ export function StoryDisplay({
                 />
                 <p className="text-xs text-gray-400 mt-2">
                   {language === 'de' ? 'Tipp: Beschreibe die Aktionen und die Umgebung. Die ausgewählten Charaktere werden automatisch hinzugefügt.' :
-                   language === 'fr' ? 'Conseil: Décrivez les actions et l\'environnement. Les personnages sélectionnés seront ajoutés automatiquement.' :
+                   language === 'fr' ? 'Conseil : Décrivez les actions et l\'environnement. Les personnages sélectionnés seront ajoutés automatiquement.' :
                    language === 'it' ? 'Suggerimento: descrivi le azioni e l\'ambiente. I personaggi selezionati vengono aggiunti automaticamente.' :
                    'Tip: Describe the actions and the environment. Selected characters will be added automatically.'}
                 </p>

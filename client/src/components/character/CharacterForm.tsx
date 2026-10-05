@@ -20,7 +20,7 @@ const AGE_CATEGORY_OPTIONS: { value: AgeCategory; label: string; labelDe: string
   { value: 'infant', label: 'Infant', labelDe: 'Säugling', labelFr: 'Nourrisson', labelIt: 'Neonato' },
   { value: 'toddler', label: 'Toddler', labelDe: 'Kleinkind', labelFr: 'Bambin', labelIt: 'Bambino piccolo' },
   { value: 'preschooler', label: 'Preschooler', labelDe: 'Vorschulkind', labelFr: 'Préscolaire', labelIt: 'Età prescolare' },
-  { value: 'kindergartner', label: 'Kindergartner', labelDe: 'Kindergartenkind', labelFr: 'Maternelle', labelIt: 'Asilo' },
+  { value: 'kindergartner', label: 'Kindergartner', labelDe: 'Kindergartenkind', labelFr: 'École enfantine', labelIt: 'Asilo' },
   { value: 'young-school-age', label: 'Young School-Age', labelDe: 'Junges Schulkind', labelFr: 'Jeune écolier', labelIt: 'Giovane scolaro' },
   { value: 'school-age', label: 'School-Age', labelDe: 'Schulkind', labelFr: 'Écolier', labelIt: 'Scolaro' },
   { value: 'preteen', label: 'Preteen', labelDe: 'Vorpubertär', labelFr: 'Préadolescent', labelIt: 'Preadolescente' },
@@ -725,7 +725,7 @@ export function CharacterForm({
                     <div className="flex flex-col items-center gap-1">
                       <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
                       <span className="text-[10px] text-indigo-500 font-medium">
-                        {language === 'de' ? 'Analysiere...' : language === 'fr' ? 'Analyse...' : language === 'it' ? 'Analisi...' : 'Analyzing...'}
+                        {language === 'de' ? 'Analysiere...' : language === 'fr' ? 'Analyse…' : language === 'it' ? 'Analisi...' : 'Analyzing...'}
                       </span>
                     </div>
                   </div>
@@ -914,7 +914,7 @@ export function CharacterForm({
           />
 
           <TraitSelector
-            label={language === 'de' ? 'Konflikte / Herausforderungen' : language === 'fr' ? 'Conflits / Défis' : language === 'it' ? 'Conflitti / Sfide' : 'Conflicts / Challenges'}
+            label={language === 'de' ? 'Konflikte / Herausforderungen' : language === 'fr' ? 'Conflits / défis' : language === 'it' ? 'Conflitti / Sfide' : 'Conflicts / Challenges'}
             traits={localizedChallenges}
             selectedTraits={character.traits?.challenges || []}
             onSelect={(traits) => updateTraits('challenges', traits)}
@@ -1635,7 +1635,7 @@ export function CharacterForm({
           />
 
           <TraitSelector
-            label={language === 'de' ? 'Konflikte / Herausforderungen' : language === 'fr' ? 'Conflits / Défis' : language === 'it' ? 'Conflitti / Sfide' : 'Conflicts / Challenges'}
+            label={language === 'de' ? 'Konflikte / Herausforderungen' : language === 'fr' ? 'Conflits / défis' : language === 'it' ? 'Conflitti / Sfide' : 'Conflicts / Challenges'}
             traits={localizedChallenges}
             selectedTraits={character.traits?.challenges || []}
             onSelect={(traits) => updateTraits('challenges', traits)}
@@ -1717,7 +1717,7 @@ export function CharacterForm({
             {character.avatars?.status === 'generating' && (
               <span className="text-xs font-normal text-teal-500 flex items-center gap-1">
                 <div className="w-3 h-3 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
-                {language === 'de' ? 'Generierung läuft...' : language === 'fr' ? 'Génération en cours...' : language === 'it' ? 'Generazione in corso...' : 'Generating...'}
+                {language === 'de' ? 'Generierung läuft...' : language === 'fr' ? 'Génération en cours…' : language === 'it' ? 'Generazione in corso...' : 'Generating...'}
               </span>
             )}
             {character.avatars?.status === 'complete' && !character.avatars?.stale && (
@@ -2420,7 +2420,7 @@ export function CharacterForm({
                       {character.gender === 'female' && (
                         <div>
                           <label className="block text-xs font-medium text-gray-600 mb-1">
-                            {language === 'de' ? 'Kleid / Overall' : language === 'fr' ? 'Robe / Combinaison' : language === 'it' ? 'Vestito / Tuta' : 'Dress / Jumpsuit'}
+                            {language === 'de' ? 'Kleid / Overall' : language === 'fr' ? 'Robe / combinaison' : language === 'it' ? 'Vestito / Tuta' : 'Dress / Jumpsuit'}
                           </label>
                           <input
                             type="text"
@@ -2609,7 +2609,7 @@ export function CharacterForm({
             {character.clothing?.structured && (
               <div className="bg-gray-50 rounded-lg p-3 mb-4 text-sm">
                 <div className="font-medium text-gray-700 mb-1">
-                  {language === 'de' ? 'Aktuelle Kleidung:' : language === 'fr' ? 'Vêtements actuels:' : language === 'it' ? 'Abbigliamento attuale:' : 'Current clothing:'}
+                  {language === 'de' ? 'Aktuelle Kleidung:' : language === 'fr' ? 'Vêtements actuels :' : language === 'it' ? 'Abbigliamento attuale:' : 'Current clothing:'}
                 </div>
                 <div className="text-gray-600 space-y-0.5">
                   {character.clothing.structured.upperBody && (
@@ -2668,7 +2668,7 @@ export function CharacterForm({
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full p-6">
             <h3 className="text-xl font-bold text-gray-800 mb-2">
-              {language === 'de' ? 'Wähle deinen Avatar' : language === 'fr' ? 'Choisis ton avatar' : language === 'it' ? 'Scegli il tuo avatar' : 'Choose Your Avatar'}
+              {language === 'de' ? 'Wähle deinen Avatar' : language === 'fr' ? 'Choisissez votre avatar' : language === 'it' ? 'Scegli il tuo avatar' : 'Choose Your Avatar'}
             </h3>
             <p className="text-gray-600 mb-4 text-sm">
               {language === 'de'
