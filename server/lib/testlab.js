@@ -1301,7 +1301,10 @@ async function runQualityEvalStage(ctx, { promptOverride, experimentId, params =
     identityAgreement: result.identityAgreement || null,
     // What RAN, not what was asked: the judge key and the per-stage token
     // counts (a model's input-token signature is how a swap is verified).
-    modelId: params.model || require('../config/models').MODEL_DEFAULTS.qualityEval,
+    // The batch result carries the judge that served (a Gemini safety block swaps to
+    // Grok); the asked model is kept beside it so a swap is visible, never hidden.
+    modelId: result.modelId || null,
+    requestedModelId: params.model || require('../config/models').MODEL_DEFAULTS.qualityEval,
     usage: { ...(result.threeStageResult?.usage || {}), quality_input_tokens: result.usage?.input_tokens ?? null, quality_output_tokens: result.usage?.output_tokens ?? null },
     // The whole call's aggregate (quality + P1 + three-stage), as the pipeline
     // records it — what the judge_fixture stage prices a replay from.
@@ -10570,8 +10573,12 @@ async function runStageOnTarget(stage, target, opts) {
   // acceptable for a debugging aid. warn/error stored in full, info capped.
   const { addLogListener, removeLogListener } = require('../utils/logger');
   const captured = [];
+  let infoCaptured = 0;
   const listener = (level, line) => {
-    if (captured.length >= 400) return;
+    // warn/error are kept in full; only info/debug lines are capped, so a long
+    // stage's late failures still reach buildStageLog.
+    const isProblem = level === 'warn' || level === 'error';
+    if (!isProblem) { if (infoCaptured >= 400) return; infoCaptured++; }
     captured.push({ level, line: line.slice(0, 400) });
   };
   addLogListener(listener);
