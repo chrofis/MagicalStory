@@ -526,6 +526,18 @@ function consolidationInputs({ ev, entityIssues, orig, pageNumber, round, sceneD
     // Resolves raw VB ids out of the consolidator's input AND out of the
     // instruction fields it writes back (which reach Grok).
     visualBible,
+    // WHO A FIX IS ABOUT, by sight: the consolidator makes scene_fix.instruction
+    // name-free through this map, so the stored plan — what the iterate leg and
+    // the Test Lab read directly — never carries a cast name (see
+    // consolidateFeedback `repairNames`). Same builder the inpaint leg strips
+    // with at send time.
+    repairNames: require('./repairLogic').buildPageRepairNameMap({
+      storyData,
+      sceneDescription: sceneDescriptionOverride || orig?.sceneDescription || '',
+      detectedFigures: ev?.bboxDetection?.figures || ev?.bboxDetection?.detectionHistory?.figures || null,
+      pageNumber,
+      artStyle: storyData?.artStyle || artStyle || null,
+    }),
     // Era-aware landmark protection: drops `object_presence` removal
     // findings on a present-day page carrying a real landmark, and seeds
     // scene_fix.preserve with the landmark names.

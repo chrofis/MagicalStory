@@ -3482,6 +3482,14 @@
       "status": "fixed",
       "fixedAt": "2026-10-05",
       "fixedIn": "722a0a15f"
+    },
+    {
+      "id": "consolidator-scene-fix-names-cast",
+      "title": "A grouped face fix reaches the stored plan naming the cast (\"Emma: remove angry...; Noah: ...\") despite rules 3/8b; verify grouped-face-fix-clothing FAILED",
+      "reportedAt": "2026-10-05",
+      "source": "Staging job_1791222889407_ypl33vk8u p4 consolidatedPlan.scene_fix.instruction; replayed over the stored page: nameRepairText turns it into \"the 5-year-old girl in the skirt, second from the left: ...; the 7-year-old boy in the blue shirt, on the far right: ...\".",
+      "status": "fixed",
+      "fixedIn": "this commit"
     }
   ]
 }

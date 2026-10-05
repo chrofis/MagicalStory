@@ -641,13 +641,24 @@ function dropCropArtifactFixes(plan, pageNumber = null) {
  */
 const IDENTITY_SWAP_TYPE = 'identity_swap';
 
+/**
+ * The id a held-out finding carries in `ids` — the model's input numbering
+ * (ID_PREFIX) never includes it, so it cannot collide. A deduped row names the
+ * findings it rests on; without this the code-appended swaps were the only rows
+ * of a stored plan with no `ids` (staging job_1791222889407_ypl33vk8u, p14 and
+ * the initial page), indistinguishable from a row an error left unattributed.
+ * There is nothing to drop or cite by it: the model never sees the finding, so
+ * no fix and no not-a-defect drop can name it.
+ */
+const HELD_OUT_ID_PREFIX = 'H';
+
 function isIdentitySwap(e) {
   return String(e?.type || '').trim().toLowerCase() === IDENTITY_SWAP_TYPE;
 }
 
 /** The deduped_issues rows the page's identity swaps are charged as. */
 function identitySwapEntries(swaps) {
-  return (Array.isArray(swaps) ? swaps : []).filter(isIdentitySwap).map(e => {
+  return (Array.isArray(swaps) ? swaps : []).filter(isIdentitySwap).map((e, i) => {
     const severity = String(e.severity || 'CRITICAL').toUpperCase();
     return {
       description: e.description || '',
@@ -657,6 +668,7 @@ function identitySwapEntries(swaps) {
       character: e.characterName || e.name || null,
       sources: mergeSources(sourcesOf(e), [FINDING_SOURCES.ENTITY]),
       severities: { [FINDING_SOURCES.ENTITY]: severity },
+      ids: [`${HELD_OUT_ID_PREFIX}${i + 1}`],
     };
   });
 }
@@ -669,11 +681,24 @@ function appendIdentitySwaps(plan, swaps, pageNumber = null) {
   let added = 0;
   for (const row of identitySwapEntries(swaps)) {
     if (plan.deduped_issues.some(i => key(i?.type) === IDENTITY_SWAP_TYPE && key(i?.character) === key(row.character))) continue;
+    // One numbering per plan: the next free H<n>, whatever the swaps' own order.
+    const taken = plan.deduped_issues.filter(i => Array.isArray(i?.ids) && i.ids.some(id => String(id).startsWith(HELD_OUT_ID_PREFIX))).length;
+    row.ids = [`${HELD_OUT_ID_PREFIX}${taken + 1}`];
     plan.deduped_issues.push(row);
     added++;
   }
   if (added) log.info(`🧑‍🤝‍🧑 [FEEDBACK-CONSOLIDATOR] page ${pageNumber}: ${added} identity_swap finding(s) charged as filed — never the consolidator's to drop`);
   return added;
+}
+
+/**
+ * scene_fix.instruction as the image model may read it: no cast or bible-figure
+ * name, each figure named by sight (age, garment, place) through the one repair
+ * name map. An empty instruction is left alone.
+ */
+function nameSceneFixInstruction(instruction, repairNames) {
+  if (typeof instruction !== 'string' || !instruction.trim()) return instruction;
+  return require('./repairLogic').nameRepairText(instruction, repairNames);
 }
 
 async function consolidateFeedback({
@@ -708,6 +733,17 @@ async function consolidateFeedback({
   // and the runtime guard in callTextModel WARNs, so a caller that forgets to
   // pass it surfaces in the logs instead of leaking silently.
   visualBible = null,
+  // The page's repair name map (repairLogic.buildPageRepairNameMap): every cast
+  // and bible-figure name -> the descriptor the image model can resolve (age,
+  // garment, place). When given, scene_fix.instruction leaves here name-free.
+  // Rules 3 and 8b of the template ask the model for exactly that and it does
+  // not always comply (staging job_1791222889407_ypl33vk8u p4: a grouped face
+  // fix written "Emma: remove ...; Noah: ..."), so the plan is made name-free
+  // in code, where it is produced — the Test Lab and the iterate leg read these
+  // fields directly. inpaintPage still strips at send time, for plans stored
+  // before this. Only callers that hold the story can build the map; the repair
+  // pipeline's consolidationInputs does.
+  repairNames = null,
   // Model override — defaults to the configured eval model (resolveEvalModel,
   // key-guarded). The A/B replay passes an explicit model to compare.
   modelOverride = null,
@@ -927,6 +963,8 @@ async function consolidateFeedback({
         if (d && typeof d === 'object') d.description = clean(d.description);
       }
     }
+
+    if (repairNames) plan.scene_fix.instruction = nameSceneFixInstruction(plan.scene_fix.instruction, repairNames);
 
     // Full deduplicated issue list — the scoring source. Not capped at 3.
     // Sources, votes and severity come from the input findings each entry's
@@ -1152,6 +1190,8 @@ async function consolidateEvaluation({
   // Visual Bible — forwarded so the consolidator's INPUT and its instruction
   // OUTPUT are free of raw VB ids. Every caller that has one must pass it.
   visualBible = null,
+  // Forwarded: the page's repair name map (see consolidateFeedback).
+  repairNames = null,
   // Forwarded to consolidateFeedback so the Test Lab can A/B the consolidator's
   // model and rules without touching the shipped pipeline.
   modelOverride = null,
@@ -1208,6 +1248,7 @@ async function consolidateEvaluation({
     landmarkPhotos,
     era,
     visualBible,
+    repairNames,
     modelOverride,
     promptOverride,
   });
