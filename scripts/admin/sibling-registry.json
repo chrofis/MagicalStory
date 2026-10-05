@@ -684,6 +684,21 @@
       }
     },
     {
+      "id": "peril-ceiling-everywhere",
+      "axis": "the peril ceiling and its historical exception, at every stage that states or judges it",
+      "reason": "The ceiling (nothing that could lead to death) is ONE constant, PERIL_CEILING_RULE in promptBuilders.js, filled as {PERIL_CEILING} into the arc creator and re-teller (via TELLING_RULES), the arc reviewer, the beats text writer, the text repair and both story-idea templates. It carries the owner's historical exception (4804fe357: a historical event keeps the danger it really had, told at a child's level, never removed). The exception once reached only the two idea templates; the arc, told to stay under the ceiling, invented a blunt rubber-tipped bolt for a historical crossbow shot and it spread to the outline, text, costume and Visual Bible (staging job_1791145238223_50osg2osm, 2026-10-05). A new stage that states the ceiling takes the placeholder; it never hand-copies the sentence.",
+      "members": [
+        "server/lib/promptBuilders.js",
+        "server/routes/storyIdeas.js",
+        "prompts/story-arc-review.txt",
+        "prompts/story-text-from-beats.txt",
+        "prompts/text-refine.txt",
+        "prompts/generate-story-ideas.txt",
+        "prompts/generate-story-idea-single.txt"
+      ],
+      "severity": "block"
+    },
+    {
       "id": "character-source-claim",
       "axis": "which document outranks the saved character profile",
       "reason": "Five prompts state what a saved character profile is AUTHORITATIVE FOR, and they must not disagree. The arc creator, its re-telling and its reviewer answer to the COMMISSION; the beats planner divides a settled arc and answers to the ARC. All four fill {CHARACTER_SOURCE_RULE} from characterSourceRule() in promptBuilders.js, with the planner and the hint pass passing master:'arc'. This set exists because the rule drifted the day it was written (2026-09-19): the split landed on arc-create and arc-retell, while story-arc-review still called the profile the source of truth — so the arc creator was told the premise outranks a saved detail while its own CRITIC was told the opposite. The motivating story is staging job_1789759147125_p08djwhbl, whose premise stages four boys meeting as strangers over one egg while every profile calls them good friends. It drifted a second time the same way: arc-hints.txt, a FIFTH stage reading the same saved profiles beside the settled arc, was never given the rule at all, and on job_1789853503332_riqncqg1i it emitted a CHANGE undoing the first meeting the arc staged — the hint rides into buildBeatsPrompt, and the planner obeyed it over the arc. arc-panel.txt joined on 2026-09-23 as a SIXTH reader of the same saved profiles (it fills {CHARACTER_DETAILS} beside the committed arc) that carries NO {CHARACTER_SOURCE_RULE}: decisions.md 2026-09-19 left it out because it 'makes no source claim, so cannot contradict'. It is a member so a change to how profiles are framed is weighed there too; whether it should carry the rule is an owner question (docs/audits/prompt-audit-2026-09-23/01-arc.md B).",

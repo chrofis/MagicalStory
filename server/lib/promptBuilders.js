@@ -6332,6 +6332,7 @@ function buildTextRefinePrompt(inputData, pages = [], auditFindings = '', arc = 
     MOTIVE_AT_THE_ACT: MOTIVE_AT_THE_ACT_RULE,
     PICTURE_COUNT: PICTURE_COUNT_RULE,
     CLOSING_MOMENT: CLOSING_MOMENT_RULE,
+    PERIL_CEILING: PERIL_CEILING_RULE,
     PAYOFF_KEEP: PAYOFF_KEEP_RULE,
     MECHANISM_FIX: MECHANISM_FIX_RULE,
   });
@@ -9928,6 +9929,22 @@ const TEXT_NOT_A_CHECKLIST_RULE = textNotAChecklistRule({ role: 'judge' });
  */
 const ANIMAL_FATE_RULE = "An animal or creature a character cares about is never still, hurt, dead or eaten; it is alive and moving when the story leaves it. No meal follows a creature in the same breath.";
 
+/**
+ * THE PERIL CEILING, one string for every stage that writes or judges story
+ * content (owner, 2026-10-05): the arc creator and re-teller ({TELLING_RULES}),
+ * the arc reviewer, the beats text writer, the text repair, and both
+ * story-idea templates ({PERIL_CEILING}). The ceiling (nothing that could lead
+ * to death) used to be hand-copied into each; the historical exception ("a
+ * historical event keeps the danger it really had") reached only the two idea
+ * templates, so the arc, told to stay under the ceiling, invented a blunt
+ * rubber-tipped bolt for a historical crossbow shot and the invention spread
+ * to the text and the Visual Bible (staging job_1791145238223_50osg2osm;
+ * decisions.md 2026-10-05, after 4804fe357). Phrased as a conditional on the
+ * event, so it is harmless for a story that is not a historical event. Registry
+ * set `peril-ceiling-everywhere`.
+ */
+const PERIL_CEILING_RULE = "Nothing in the story or its pictures is dangerous enough that it could lead to death — for anyone. Frightening is the right level. A historical event keeps the danger it really had: tell it at a child's level, never remove it and never invent a safeguard or a harmless version of its weapon or hazard.";
+
 const RISK_FRAMING_RULE = '- Where a child does something with real physical risk, the risk is present in the telling: someone is careful, names it aloud, or the child feels it — and the close does not treat it as nothing. An adult who permits it still says what to watch for.';
 
 /**
@@ -10322,7 +10339,7 @@ function buildTellingRulesSection(inputData = {}) {
       : `- The opposition presses on the story to the end and stands in the scene at the turning point. ${ARC_OPPOSITION_HOLDS_RULE} A rival's thread ends with the rival present — arriving too late, seeing what they lost, paying.`,
     '- Reasons come from who someone is, what a place is for, or what someone needs; a sign, an inscription or a rule stated once to license a turn is not a reason.',
     '- An obstacle comes from the story\'s own world — weather, distance, a rival, a broken or missing or guarded thing, a character\'s own flaw — and exists for its own reasons: never shaped around a thing a character carries, never a puzzle door, riddle or test set by no one unless the commission sets it.',
-    '- Nothing in the story or its pictures is dangerous enough that it could lead to death — for anyone. Frightening is the right level; a refusal, a loss, a delay or a broken promise carries the peril instead. Nobody looks monstrous, no familiar character turns frightening, and anyone separated or lost is reunited.',
+    `- ${PERIL_CEILING_RULE} Where the story invents its own peril, a refusal, a loss, a delay or a broken promise can carry it. Nobody looks monstrous, no familiar character turns frightening, and anyone separated or lost is reunited.`,
     RISK_FRAMING_RULE,
     `- ${ANIMAL_FATE_RULE}`,
     '- The story ends with the children safe and together, one of them feeling something a child can name. A container or reveal the story promises opens before the end, and a story that enters through a doorway, portal or frame returns through it.',
@@ -11673,6 +11690,7 @@ function buildArcReviewPrompt(inputData, arc, auditFindings = '') {
     AUDIT_FINDINGS: String(auditFindings || '').trim() || '(no audit ran)',
     // Check 11 reads the creator's own inside/outside rule.
     ARC_PLACE_RULE,
+    PERIL_CEILING: PERIL_CEILING_RULE,
   });
 }
 
@@ -12026,6 +12044,7 @@ function buildStoryTextFromBeatsPrompt(inputData, beats = [], expansions = [], a
     MOTIVE_AT_THE_ACT: MOTIVE_AT_THE_ACT_RULE,
     PICTURE_COUNT: PICTURE_COUNT_RULE,
     CLOSING_MOMENT: CLOSING_MOMENT_RULE,
+    PERIL_CEILING: PERIL_CEILING_RULE,
   });
 }
 
@@ -12990,6 +13009,7 @@ module.exports = {
   stripGuidePromise,
   buildTopicPromiseSection,
   RISK_FRAMING_RULE,
+  PERIL_CEILING_RULE,
   ANIMAL_FATE_RULE,
   COUNTING_RULE,
   PLAN_LINE_CAST_RULE,
