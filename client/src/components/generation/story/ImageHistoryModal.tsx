@@ -82,12 +82,12 @@ export function ImageHistoryModal({
       const labels = COVER_LABELS[coverType];
       const label = language === 'de' ? labels.de : language === 'fr' ? labels.fr : language === 'it' ? labels.it : labels.en;
       return language === 'de' ? `Bild wählen - ${label}` :
-             language === 'fr' ? `Choisir image - ${label}` :
+             language === 'fr' ? `Choisir une image - ${label}` :
              language === 'it' ? `Scegli immagine - ${label}` :
              `Select Image - ${label}`;
     }
     return language === 'de' ? `Bild wählen - Seite ${pageNumber}` :
-           language === 'fr' ? `Choisir image - Page ${pageNumber}` :
+           language === 'fr' ? `Choisir une image - Page ${pageNumber}` :
            language === 'it' ? `Scegli immagine - Pagina ${pageNumber}` :
            `Select Image - Page ${pageNumber}`;
   };
