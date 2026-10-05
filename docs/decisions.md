@@ -66612,3 +66612,34 @@ Siblings checked: cover-generator-vs-critic (generator title line reused, judges
 **Revisit if:** the inventory misreads a declared string on more than ~1 in 5 runs on a larger sample (then propose a near-match rule for `isDeclared`; not built because the owner chose severity plus repair and a text-similarity rule is pattern matching), or a page needs a MAJOR `required_text` on a cover prop (the floor would over-charge it).
 
 **Touched files:** `server/lib/requiredText.js`, `server/lib/evalPipeline.js`, `server/lib/letteringCheck.js`, `server/lib/promptBuilders.js`, `prompts/cover-evaluation-notes.txt`, `prompts/feedback-consolidator.txt`, `tests/unit/cover-title-survives-repair.test.ts`, `tests/unit/cover-lettering-check.test.ts`.
+
+## 2026-10-05 — Customer-facing texts: one set of facts and one style per language (owner)
+
+**Context:** code review 2026-10-04 round 3 (texts in all four languages, `tasks/code-review-2026-10/10-texts-layout.md`).
+About 60 places stated book prices the database does not charge ("Hardcover from CHF 33", "CHF 28/43"); story
+creation time was stated five ways; the controller address differed between Impressum and Privacy; cities (50 vs
+100), languages (3 vs 4) and delivery times disagreed; each language mixed registers and typography.
+
+**Decision (owner, 2026-10-05):**
+- Facts follow the production `pricing_tiers` table (up to 30 pages Softcover CHF 29 / Hardcover CHF 37; digital
+  CHF 9.90; shipping CHF 10). Free trial story "in a few minutes", full illustrated book "about an hour". Controller
+  address Ennetbaden (court venue stays Zurich). 100 Swiss cities, four languages, delivery "5–7 business days".
+- German: "du" everywhere except Privacy/Terms ("Sie"); Swiss ss, tight «…». French: "vous" everywhere; narrow
+  no-break space (U+202F) before ? ! : ; and inside « … »; "importer" for uploads; sentence case; œ. Italian: "tu"
+  except quoted speech. English: US spelling.
+- Pre-rendered pages: the visitor's stored language / `?lang=` wins after hydration; the prerender language is only
+  the first paint (`client/src/utils/languagePreference.ts`).
+- Server errors keep their English `error` for logs and add a stable `code`; the client maps code → status →
+  localised message (`client/src/utils/apiErrors.ts`) and never shows raw English to a customer.
+- Comparison-table cells are per language (`ComparisonFeature.us/.them` = `{en,de,fr,it}`), no English fallback.
+- The en-dash rule stays homepage-only; dashes elsewhere were not bulk-converted.
+
+**Revisit if:** the pricing tiers change (Pricing.tsx fallback tiers and `tests/unit/texts-facts-batch12.test.ts`
+pin them), or a legal Italian page is added (it would keep Lei/voi).
+
+**Open owner calls (BACKLOG):** print size (20×20 legacy vs A4), shipping countries, max characters per story,
+relationship/trait labels keyed by French text, homepage hero image text.
+
+**Touched files:** `client/src/constants/*`, `client/src/pages/*`, `client/src/context/LanguageContext.tsx`,
+`client/src/utils/{apiErrors,languagePreference,uiLabels}.ts`, `server/lib/seoMeta.js`, `server/routes/{auth,trial,user,print,sharing}.js`,
+`emails-src/i18n.ts`, `email.js`, `server/config/trialTitles.js`.
