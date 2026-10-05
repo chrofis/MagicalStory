@@ -3351,7 +3351,7 @@
       "impact": "One of 1 stored historical stories where a commissioned character plays the title figure; the cover and the Visual Bible duplicate the character.",
       "status": "fixed",
       "fixedAt": "2026-10-05",
-      "fixedIn": "c0a9bc1b8",
+      "fixedIn": "3acae0693",
       "fix": "coverBeats: a name in the list that is a cast member's name is the central figure, nothing is appended; arc spec: a cast member who plays the figure is named by their own name, ' / ' only for a real name change. Tests: tests/unit/covers-as-pages.test.ts, tests/unit/arc-logic-first.test.ts."
     },
     {
@@ -3363,7 +3363,7 @@
       "impact": "A cut reply spends the batch retry, then the per-page fallback (page 10,-1,-2,-3 cost $0.63 on this job).",
       "status": "fixed",
       "fixedAt": "2026-10-05",
-      "fixedIn": "ce913428b",
+      "fixedIn": "30a064a61",
       "fix": "textModels.streamCutError thrown (retryable) on every streaming path when the completion signal is missing or an SSE error arrives; per-attempt diagnostics in sceneExpansionReport.replies. Test: tests/unit/text-stream-completion.test.ts. docs/decisions.md 2026-10-05."
     },
     {
@@ -3375,7 +3375,7 @@
       "impact": "The front cover shipped without a readable title (nothing in the client or PDF overlays it).",
       "status": "fixed",
       "fixedAt": "2026-10-05",
-      "fixedIn": "c72e2e2f9",
+      "fixedIn": "21b391064",
       "fix": "requiredText.floorCoverTitleSeverity raises required_text on a titled cover to CRITICAL; the cover repair clause paints the title in its required place and never over it; the caption fix leaves declared lettering alone; consolidator rule 7e; COVER_TEXT covers the title-on-an-object case. Test: tests/unit/cover-title-survives-repair.test.ts. Re-run on the stored v0 and v1 images: title present and correct (decisions.md 2026-10-05)."
     }
   ]

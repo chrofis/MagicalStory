@@ -5226,7 +5226,7 @@
       "id": "central-figure-cast-member-plays-role",
       "title": "A commissioned character who plays the title figure is named by their own name in the central figure line, and the cover cast does not add the role as a second figure",
       "commits": [
-        "c0a9bc1b8"
+        "3acae0693"
       ],
       "addedAt": "2026-10-05",
       "claim": "On the next historical story where a user character plays the title figure: the arc's 'Central figure:' line names the character alone (no 'Name / Role'); the Visual Bible has no secondary character named after the role; the front-cover plan line names the cast member once; no twin of the character appears on the cover or in the pages.",
@@ -5253,7 +5253,7 @@
       "id": "text-stream-cut-retried",
       "title": "A cut text stream is retried by the transport; page-brief attempts carry finish reason and tokens",
       "commits": [
-        "(this push)"
+        "30a064a61"
       ],
       "addedAt": "2026-10-05",
       "claim": "On staging, a text stream that ends without its completion signal is retried by the transport (ERROR log 'STREAM] CUT' with provider/model/chars/elapsedMs, then a re-send); sceneExpansionReport.replies[] attempts carry stopReason, nativeFinishReason, inputTokens, outputTokens, provider, elapsedMs and cut; no reply with 0 output tokens is accepted as a page-brief reply.",
@@ -5280,7 +5280,7 @@
       "id": "cover-title-survives-repair",
       "title": "A repaired baked front cover keeps its title; a missing or misplaced title is CRITICAL",
       "commits": [
-        "c72e2e2f9"
+        "21b391064"
       ],
       "addedAt": "2026-10-05",
       "claim": "On a full story with a baked front-cover title: when the front cover is repaired, the shipped version shows the exact title painted in the artwork (not erased, not only on a sign); and any version whose title is missing or on an object carries a CRITICAL required_text in its deductions.",
