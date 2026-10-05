@@ -7,6 +7,7 @@ import { GoogleIcon } from '@/components/auth/GoogleIcon';
 import { signInWithGooglePopup } from '@/services/googleAuth';
 import { INITIAL_USER_CREDITS } from '@/constants/credits';
 import { Navigation } from '@/components/common';
+import { localizedApiError } from '@/utils/apiErrors';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 
@@ -173,7 +174,7 @@ export default function ClaimAccount() {
         if (response.status === 404) {
           setPageState('invalid');
         } else {
-          setError(data.error || t.error);
+          setError(localizedApiError({ code: data.code, status: response.status }, language, t.error));
         }
         return;
       }
@@ -222,7 +223,7 @@ export default function ClaimAccount() {
         if (response.status === 404) {
           setPageState('invalid');
         } else {
-          setError(data.error || t.error);
+          setError(localizedApiError({ code: data.code, status: response.status }, language, t.error));
         }
         return;
       }

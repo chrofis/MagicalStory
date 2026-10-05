@@ -57,11 +57,11 @@ router.post('/register', registerLimiter, validateBody(schemas.register), async 
     // Bot protection: form submission time check (required, too fast = bot)
     const formStartTime = parseInt(req.body._formStartTime, 10);
     if (!formStartTime || formStartTime <= 0) {
-      return res.status(400).json({ error: 'Invalid form submission' });
+      return res.status(400).json({ error: 'Invalid form submission', code: 'INVALID_FORM' });
     }
     const elapsed = Date.now() - formStartTime;
     if (elapsed < 3000) { // Less than 3 seconds = likely bot
-      return res.status(429).json({ error: 'Please slow down' });
+      return res.status(429).json({ error: 'Please slow down', code: 'TOO_FAST' });
     }
 
     // Username and email are treated as the same value here — the schema has always
@@ -79,7 +79,7 @@ router.post('/register', registerLimiter, validateBody(schemas.register), async 
       // Case-insensitive: old rows may have mixed-case emails from the pre-lowercase era.
       const existing = await dbQuery('SELECT id FROM users WHERE LOWER(email) = $1', [email]);
       if (existing.length > 0) {
-        return res.status(400).json({ error: 'This email is already registered' });
+        return res.status(400).json({ error: 'This email is already registered', code: 'EMAIL_ALREADY_REGISTERED' });
       }
 
       const hashedPassword = await bcrypt.hash(password, 10);
@@ -163,7 +163,7 @@ router.post('/login', authLimiter, async (req, res) => {
     const { password } = req.body;
 
     if (!loginEmail || !password) {
-      return res.status(400).json({ error: 'Email and password required' });
+      return res.status(400).json({ error: 'Email and password required', code: 'CREDENTIALS_REQUIRED' });
     }
 
     let user;
@@ -198,7 +198,7 @@ router.post('/login', authLimiter, async (req, res) => {
 
     const validPassword = await bcrypt.compare(password, user.password);
     if (!validPassword) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+      return res.status(401).json({ error: 'Invalid credentials', code: 'INVALID_CREDENTIALS' });
     }
 
     await logActivity(user.id, user.email, 'USER_LOGIN', {});
@@ -335,7 +335,7 @@ router.post('/google', authLimiter, async (req, res) => {
     }
     if (payload.email_verified !== true) {
       log.warn(`Google auth: email not verified by Google (sub: ${sub})`);
-      return res.status(400).json({ error: 'Google has not verified this email address' });
+      return res.status(400).json({ error: 'Google has not verified this email address', code: 'GOOGLE_EMAIL_UNVERIFIED' });
     }
     const username = sanitizeString(googleEmail, 254).toLowerCase();
 
@@ -381,7 +381,7 @@ router.post('/google', authLimiter, async (req, res) => {
   } catch (err) {
     log.error('Google auth error:', { code: err.code, message: err.message, constraint: err.constraint });
     if (err.message && /Token used too late|expired/i.test(err.message)) {
-      return res.status(401).json({ error: 'Token expired. Please sign in again.' });
+      return res.status(401).json({ error: 'Token expired. Please sign in again.', code: 'GOOGLE_TOKEN_EXPIRED' });
     }
     if (err.message && /Wrong recipient|Wrong issuer|invalid/i.test(err.message)) {
       return res.status(400).json({ error: 'Invalid authentication token' });
@@ -645,7 +645,7 @@ router.post('/reset-password', passwordResetLimiter, async (req, res) => {
     const { email } = req.body;
 
     if (!email) {
-      return res.status(400).json({ error: 'Email is required' });
+      return res.status(400).json({ error: 'Email is required', code: 'EMAIL_REQUIRED' });
     }
 
     if (!isDatabaseMode()) {
@@ -707,7 +707,7 @@ router.post('/reset-password/confirm', passwordResetLimiter, validateBody(schema
     );
 
     if (result.rows.length === 0) {
-      return res.status(400).json({ error: 'Invalid or expired reset token' });
+      return res.status(400).json({ error: 'Invalid or expired reset token', code: 'RESET_TOKEN_INVALID' });
     }
 
     const user = result.rows[0];
@@ -747,16 +747,16 @@ router.post('/change-password', authenticateToken, validateBody(schemas.changePa
     const user = result.rows[0];
 
     if (user.firebase_uid && !user.password) {
-      return res.status(400).json({ error: 'Cannot change password for Google accounts.' });
+      return res.status(400).json({ error: 'Cannot change password for Google accounts.', code: 'GOOGLE_ACCOUNT_NO_PASSWORD' });
     }
 
     if (!user.password) {
-      return res.status(400).json({ error: 'No password set. Use Google sign-in or set a password first.' });
+      return res.status(400).json({ error: 'No password set. Use Google sign-in or set a password first.', code: 'NO_PASSWORD_SET' });
     }
 
     const validPassword = await bcrypt.compare(currentPassword, user.password);
     if (!validPassword) {
-      return res.status(400).json({ error: 'Current password is incorrect' });
+      return res.status(400).json({ error: 'Current password is incorrect', code: 'CURRENT_PASSWORD_INCORRECT' });
     }
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
@@ -781,7 +781,7 @@ router.post('/set-password', authenticateToken, async (req, res) => {
     const userId = req.user.id;
 
     if (!password || typeof password !== 'string' || password.length < 8 || password.length > 128) {
-      return res.status(400).json({ error: 'Password must be between 8 and 128 characters' });
+      return res.status(400).json({ error: 'Password must be between 8 and 128 characters', code: 'PASSWORD_LENGTH' });
     }
 
     if (!isDatabaseMode()) {
@@ -797,7 +797,7 @@ router.post('/set-password', authenticateToken, async (req, res) => {
 
     // Allow setting password for trial users (they have a random password they don't know)
     if (result.rows[0].password && result.rows[0].has_set_password !== false) {
-      return res.status(400).json({ error: 'Password already set. Use change-password instead.' });
+      return res.status(400).json({ error: 'Password already set. Use change-password instead.', code: 'PASSWORD_ALREADY_SET' });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -897,6 +897,7 @@ router.post('/send-verification', authenticateToken, async (req, res) => {
       if (remainingCooldown > 0) {
         return res.status(429).json({
           error: 'Please wait before requesting another verification email',
+          code: 'VERIFICATION_COOLDOWN',
           retryAfter: remainingCooldown
         });
       }
@@ -912,7 +913,7 @@ router.post('/send-verification', authenticateToken, async (req, res) => {
 
     if (!emailService) {
       log.error('Email service not available - cannot send verification email');
-      return res.status(500).json({ error: 'Email service not configured. Please contact support.' });
+      return res.status(500).json({ error: 'Email service not configured. Please contact support.', code: 'EMAIL_SERVICE_UNAVAILABLE' });
     }
 
     const verifyUrl = `${process.env.FRONTEND_URL || process.env.BASE_URL || 'https://www.magicalstory.ch'}/api/auth/verify-email/${verificationToken}`;
@@ -965,7 +966,7 @@ router.get('/verify-email/:token', async (req, res) => {
       if (expiredCheck.rows.length > 0) {
         const u = expiredCheck.rows[0];
         log.warn(`[AUTH] verify-email: token found but expired for ${u.email} (expired: ${u.email_verification_expires}, verified: ${u.email_verified})`);
-        return res.status(400).json({ error: 'Verification link has expired. Please register again.' });
+        return res.status(400).json({ error: 'Verification link has expired. Please register again.', code: 'VERIFICATION_EXPIRED' });
       }
 
       // Token not found at all — likely already used (token cleared after verification)
@@ -1053,12 +1054,12 @@ router.post('/change-email', authenticateToken, async (req, res) => {
     const { newEmail, password } = req.body;
 
     if (!newEmail || !password) {
-      return res.status(400).json({ error: 'New email and current password are required' });
+      return res.status(400).json({ error: 'New email and current password are required', code: 'CREDENTIALS_REQUIRED' });
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(newEmail)) {
-      return res.status(400).json({ error: 'Invalid email format' });
+      return res.status(400).json({ error: 'Invalid email format', code: 'INVALID_EMAIL' });
     }
 
     if (!isDatabaseMode()) {
@@ -1076,7 +1077,7 @@ router.post('/change-email', authenticateToken, async (req, res) => {
 
     const validPassword = await bcrypt.compare(password, user.password);
     if (!validPassword) {
-      return res.status(401).json({ error: 'Current password is incorrect' });
+      return res.status(401).json({ error: 'Current password is incorrect', code: 'CURRENT_PASSWORD_INCORRECT' });
     }
 
     const existingEmail = await pool.query(
@@ -1085,7 +1086,7 @@ router.post('/change-email', authenticateToken, async (req, res) => {
     );
 
     if (existingEmail.rows.length > 0) {
-      return res.status(400).json({ error: 'This email is already registered' });
+      return res.status(400).json({ error: 'This email is already registered', code: 'EMAIL_ALREADY_REGISTERED' });
     }
 
     const verificationToken = crypto.randomBytes(32).toString('hex');

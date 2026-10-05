@@ -5,6 +5,7 @@ import type { CharacterData, StoryInput, GeneratedIdea } from '../TrialWizard';
 import { trackTrialStep } from '@/utils/trialFunnel';
 import { splitIdeaRoles, joinIdeaRoles } from '@/utils/ideaRoles';
 import { isTrialSessionDead } from '@/utils/trialSession';
+import { localizedApiError } from '@/utils/apiErrors';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -263,7 +264,7 @@ export default function TrialIdeasStep({
             const data = JSON.parse(line.slice(6));
 
             if (data.error) {
-              setError(data.error);
+              setError(localizedApiError({ code: data.code }, lang, t.serverError));
               setIsGenerating(false);
               return;
             }
@@ -301,7 +302,7 @@ export default function TrialIdeasStep({
       setIsGenerating(false);
     } catch (err: any) {
       if (err.name === 'AbortError') return;
-      setError(err.message || 'Failed to generate ideas');
+      setError(err.message === t.serverError ? t.serverError : localizedApiError(err, lang, t.serverError));
       setIsGenerating(false);
     }
   }, [characterData, storyInput, userLocation, sessionToken, onSessionExpired, t]);

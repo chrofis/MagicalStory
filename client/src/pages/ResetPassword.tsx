@@ -6,6 +6,7 @@ import { Button } from '@/components/common/Button';
 import { Input } from '@/components/common/Input';
 import { Alert } from '@/components/common/Alert';
 import { KeyRound, CheckCircle, XCircle } from 'lucide-react';
+import { localizedApiError } from '@/utils/apiErrors';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 
@@ -110,10 +111,10 @@ export default function ResetPassword() {
       const data = await response.json();
 
       if (!response.ok) {
-        if (response.status === 400 && data.error?.includes('expired')) {
+        if (response.status === 400 && data.code === 'RESET_TOKEN_INVALID') {
           setInvalidToken(true);
         } else {
-          setError(data.error || 'Failed to reset password');
+          setError(localizedApiError({ code: data.code, status: response.status }, language));
         }
         return;
       }

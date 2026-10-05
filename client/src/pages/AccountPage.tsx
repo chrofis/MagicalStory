@@ -5,6 +5,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { Navigation, LoadingSpinner } from '@/components/common';
 import { storyService } from '@/services';
+import { localizedApiError } from '@/utils/apiErrors';
 
 const texts = {
   en: {
@@ -443,6 +444,7 @@ export default function AccountPage() {
         <ConvertModal
           balance={balance}
           t={t}
+          language={language}
           onClose={() => setConvertOpen(false)}
           onSuccess={refreshBalance}
         />
@@ -451,6 +453,7 @@ export default function AccountPage() {
         <CashoutModal
           balance={balance}
           t={t}
+          language={language}
           onClose={() => setCashoutOpen(false)}
           onSuccess={refreshBalance}
         />
@@ -462,11 +465,12 @@ export default function AccountPage() {
 interface ModalProps {
   balance: ReferralBalance;
   t: typeof texts.en;
+  language: string;
   onClose: () => void;
   onSuccess: () => void;
 }
 
-function ConvertModal({ balance, t, onClose, onSuccess }: ModalProps) {
+function ConvertModal({ balance, t, language, onClose, onSuccess }: ModalProps) {
   const [chf, setChf] = useState((balance.availableCents / 100).toFixed(2));
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<string | null>(null);
@@ -486,10 +490,10 @@ function ConvertModal({ balance, t, onClose, onSuccess }: ModalProps) {
         setResult(t.convertSuccess.replace('{credits}', String(r.creditsAdded)));
         onSuccess();
       } else {
-        setError(r.error || 'Failed');
+        setError(localizedApiError({}, language));
       }
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Failed');
+      setError(localizedApiError(e, language));
     } finally {
       setBusy(false);
     }
@@ -539,11 +543,11 @@ function ConvertModal({ balance, t, onClose, onSuccess }: ModalProps) {
   );
 }
 
-function CashoutModal({ balance, t, onClose, onSuccess }: ModalProps) {
+function CashoutModal({ balance, t, language, onClose, onSuccess }: ModalProps) {
   const [chf, setChf] = useState((balance.availableCents / 100).toFixed(2));
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<string | null>(null);
-  const [failed, setFailed] = useState<Array<{ orderId: number; error: string }>>([]);
+  const [failed, setFailed] = useState<Array<{ orderId: number; error: string; code?: string }>>([]);
   const [error, setError] = useState<string | null>(null);
 
   const cents = Math.round(parseFloat(chf || '0') * 100);
@@ -566,10 +570,10 @@ function CashoutModal({ balance, t, onClose, onSuccess }: ModalProps) {
       } else if (typeof r.refundableCents === 'number' && r.refundableCents === 0) {
         setError(t.cashoutNoneRefundable);
       } else {
-        setError(r.error || 'Failed');
+        setError(localizedApiError({}, language));
       }
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Failed');
+      setError(localizedApiError(e, language));
     } finally {
       setBusy(false);
     }
@@ -589,7 +593,7 @@ function CashoutModal({ balance, t, onClose, onSuccess }: ModalProps) {
             <div className="bg-green-50 border border-green-200 text-green-700 rounded-lg p-3 mb-4 text-sm">{result}</div>
             {failed.length > 0 && (
               <ul className="text-xs text-red-600 mb-4 space-y-1">
-                {failed.map((f, i) => <li key={i}>Order #{f.orderId}: {f.error}</li>)}
+                {failed.map((f, i) => <li key={i}>#{f.orderId}: {localizedApiError({ code: f.code }, language)}</li>)}
               </ul>
             )}
             <button onClick={onClose} className="w-full bg-gray-100 text-gray-700 px-3 py-2 rounded-lg font-semibold hover:bg-gray-200">{t.cancel}</button>

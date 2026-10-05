@@ -12,6 +12,7 @@ import { MAX_BOOK_PAGES } from './Pricing';
 import { INITIAL_USER_CREDITS } from '@/constants/credits';
 import { createLogger } from '@/services/logger';
 import { buildOrderDetailLines } from '@/utils/orderDetails';
+import { localizedApiError } from '@/utils/apiErrors';
 
 const log = createLogger('MyStories');
 
@@ -315,7 +316,7 @@ export default function MyStories() {
       });
       if (!res.ok) {
         const data = await res.json();
-        setPasswordError(data.error || 'Failed');
+        setPasswordError(localizedApiError({ code: data.code, status: res.status }, language));
         return;
       }
       setPasswordSet(true);

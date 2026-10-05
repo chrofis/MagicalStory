@@ -9,6 +9,7 @@ import { MAX_STRENGTHS } from '@/constants/traitLimits';
 import type { Language } from '@/types/story';
 import { trackTrialStep } from '@/utils/trialFunnel';
 import { classifyAccountCreateFailure } from '@/utils/trialSession';
+import { localizedApiError } from '@/utils/apiErrors';
 
 const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY || '';
 
@@ -464,7 +465,8 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
       // On any block (Turnstile, fingerprint, rate limit) — propagate; caller
       // can redirect to /?signup=true. The prewarm path silently swallows.
       const err = new Error(accountResult?.error || `create-anonymous-account failed (${accountResponse.status})`);
-      (err as unknown as { status: number }).status = accountResponse.status;
+      (err as unknown as { status: number; code?: string }).status = accountResponse.status;
+      (err as unknown as { code?: string }).code = accountResult?.code;
       throw err;
     }
     // Fires on the PREWARM too (the moment the form first goes valid), not only
@@ -616,7 +618,7 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
       const result = await response.json();
 
       if (!response.ok) {
-        setPhotoError(result.error || t.photoError);
+        setPhotoError(localizedApiError({ code: result.code, status: response.status }, language, t.photoError));
         return;
       }
 
@@ -645,7 +647,7 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
           setDetectedFaces([]);
         }
       } else {
-        setPhotoError(result.error || t.noFaceDetected);
+        setPhotoError(t.noFaceDetected);
       }
     } catch (err) {
       setPhotoError(t.photoError);

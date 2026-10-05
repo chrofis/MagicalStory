@@ -438,10 +438,10 @@ router.put('/update-email', authenticateToken, async (req, res) => {
     const { password } = req.body;
 
     if (!newEmail || !newEmail.includes('@')) {
-      return res.status(400).json({ error: 'Invalid email address' });
+      return res.status(400).json({ error: 'Invalid email address', code: 'INVALID_EMAIL' });
     }
     if (!password) {
-      return res.status(400).json({ error: 'Current password is required to change email' });
+      return res.status(400).json({ error: 'Current password is required to change email', code: 'CREDENTIALS_REQUIRED' });
     }
 
     if (!isDatabaseMode()) {
@@ -455,13 +455,13 @@ router.put('/update-email', authenticateToken, async (req, res) => {
     }
     const valid = userRows[0].password && await bcrypt.compare(password, userRows[0].password);
     if (!valid) {
-      return res.status(401).json({ error: 'Incorrect password' });
+      return res.status(401).json({ error: 'Incorrect password', code: 'CURRENT_PASSWORD_INCORRECT' });
     }
 
     // Check if email already in use by another account
     const existing = await dbQuery('SELECT id FROM users WHERE username = $1 AND id != $2', [newEmail, req.user.id]);
     if (existing.length > 0) {
-      return res.status(400).json({ error: 'Email already in use' });
+      return res.status(400).json({ error: 'Email already in use', code: 'EMAIL_ALREADY_REGISTERED' });
     }
 
     // Update login email + mirror email column, and require re-verification of the new address

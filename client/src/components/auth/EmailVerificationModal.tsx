@@ -6,6 +6,7 @@ import { Button } from '@/components/common/Button';
 import { Input } from '@/components/common/Input';
 import { Alert } from '@/components/common/Alert';
 import { api } from '@/services/api';
+import { localizedApiError } from '@/utils/apiErrors';
 
 interface EmailVerificationModalProps {
   isOpen: boolean;
@@ -137,7 +138,7 @@ export function EmailVerificationModal({ isOpen, onClose, onVerified }: EmailVer
             // Don't show error for rate limit on auto-send - just show cooldown
             setEmailSent(true); // Assume previous send worked
           } else {
-            setError(error.message || 'Failed to send verification email');
+            setError(localizedApiError(err, language));
           }
         } finally {
           setIsLoading(false);
@@ -223,7 +224,7 @@ export function EmailVerificationModal({ isOpen, onClose, onVerified }: EmailVer
           `Please wait ${error.retryAfter} seconds`
         );
       } else {
-        setError(error.message || 'Failed to send verification email');
+        setError(localizedApiError(err, language));
       }
     } finally {
       setIsLoading(false);
@@ -245,7 +246,7 @@ export function EmailVerificationModal({ isOpen, onClose, onVerified }: EmailVer
       setNewEmail('');
       setPassword('');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to change email');
+      setError(localizedApiError(err, language));
     } finally {
       setIsLoading(false);
     }

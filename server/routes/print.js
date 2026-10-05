@@ -1497,7 +1497,7 @@ router.post('/referral/convert-to-credits', authenticateToken, async (req, res) 
     });
     if (!result.ok) {
       if (result.reason === 'insufficient_available') {
-        return res.status(422).json({ error: 'Insufficient available balance' });
+        return res.status(422).json({ error: 'Insufficient available balance', code: 'INSUFFICIENT_REFERRAL_BALANCE' });
       }
       return res.status(400).json({ error: result.reason });
     }
@@ -1531,7 +1531,7 @@ router.post('/referral/cash-out', authenticateToken, async (req, res) => {
 
     const balance = await referralBalance.getBalance(userId);
     if (balance.availableCents < amountCents) {
-      return res.status(422).json({ error: 'Insufficient available balance', availableCents: balance.availableCents });
+      return res.status(422).json({ error: 'Insufficient available balance', code: 'INSUFFICIENT_REFERRAL_BALANCE', availableCents: balance.availableCents });
     }
 
     // Caller passes the order-aware Stripe picker so refunds hit the correct
@@ -1804,7 +1804,7 @@ router.post('/stripe/create-checkout-session', authenticateToken, async (req, re
         } catch (expireErr) {
           log.error(`❌ [CHECKOUT] failed to expire un-held session ${session.id}: ${expireErr.message}`);
         }
-        return res.status(409).json({ error: 'Referral balance is no longer available — please retry checkout.' });
+        return res.status(409).json({ error: 'Referral balance is no longer available — please retry checkout.', code: 'REFERRAL_BALANCE_CHANGED' });
       }
     }
 
