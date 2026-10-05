@@ -50,7 +50,7 @@ interface LocationState {
 
 const translations = {
   en: {
-    brand: 'Magical Story',
+    brand: 'MagicalStory',
     creatingStory: 'Creating your story...',
     storyComplete: 'Your story is ready!',
     signInToSee: 'Sign in to read your story',
@@ -89,7 +89,7 @@ const translations = {
       'Higher image quality and title page',
       'Order as a printed book',
     ],
-    rotationTrialIntro: 'This is a trial story — it should be ready in about two to three minutes. Trial stories are short. A full story takes a bit longer but gives you many more pages and richer scenes.',
+    rotationTrialIntro: 'This is a trial story — it should be ready in a few minutes. Trial stories are short. A full story takes a bit longer but gives you many more pages and richer scenes.',
     storyReadyKicker: 'Your story is ready to read',
     imagePending: 'The picture is still being drawn...',
     gateTitle: 'What happens next?',
@@ -98,7 +98,7 @@ const translations = {
     rotationEmailHint: 'Add your email after the story finishes so we can send you the PDF. Set a password too and you get free credits for a full-length story.',
   },
   de: {
-    brand: 'Magical Story',
+    brand: 'MagicalStory',
     creatingStory: 'Deine Geschichte wird erstellt...',
     storyComplete: 'Deine Geschichte ist fertig!',
     signInToSee: 'Melde dich an, um deine Geschichte zu lesen',
@@ -137,7 +137,7 @@ const translations = {
       'Höhere Bildqualität und Titelseite',
       'Als gedrucktes Buch bestellen',
     ],
-    rotationTrialIntro: 'Das ist eine Probegeschichte — sie sollte in etwa zwei bis drei Minuten fertig sein. Probegeschichten sind kurz. Eine vollständige Geschichte dauert etwas länger, hat dafür viel mehr Seiten und reichhaltigere Szenen.',
+    rotationTrialIntro: 'Das ist eine Probegeschichte — sie sollte in ein paar Minuten fertig sein. Probegeschichten sind kurz. Eine vollständige Geschichte dauert etwas länger, hat dafür viel mehr Seiten und reichhaltigere Szenen.',
     storyReadyKicker: 'Deine Geschichte ist bereit zum Lesen',
     imagePending: 'Das Bild wird noch gezeichnet...',
     gateTitle: 'Wie geht es weiter?',
@@ -146,7 +146,7 @@ const translations = {
     rotationEmailHint: 'Gib am Ende deine E-Mail an, damit wir dir die Geschichte als PDF schicken können. Setze auch ein Passwort, dann bekommst du Gratis-Credits für eine richtige Geschichte in voller Länge.',
   },
   fr: {
-    brand: 'Magical Story',
+    brand: 'MagicalStory',
     creatingStory: 'Votre histoire est en cours de création...',
     storyComplete: 'Votre histoire est prête !',
     signInToSee: 'Connectez-vous pour lire votre histoire',
@@ -185,7 +185,7 @@ const translations = {
       'Qualité d\'image supérieure et page de titre',
       'Commander en livre imprimé',
     ],
-    rotationTrialIntro: 'Ceci est une histoire d\'essai — elle devrait être prête en deux à trois minutes environ. Les histoires d\'essai sont courtes. Une histoire complète prend un peu plus de temps mais offre beaucoup plus de pages et des scènes plus riches.',
+    rotationTrialIntro: 'Ceci est une histoire d\'essai — elle devrait être prête en quelques minutes. Les histoires d\'essai sont courtes. Une histoire complète prend un peu plus de temps mais offre beaucoup plus de pages et des scènes plus riches.',
     storyReadyKicker: 'Votre histoire est prête à être lue',
     imagePending: 'L\'illustration est encore en cours de dessin...',
     gateTitle: 'Que se passe-t-il ensuite ?',
@@ -194,7 +194,7 @@ const translations = {
     rotationEmailHint: 'Saisis ton e-mail à la fin pour que nous puissions t\'envoyer le PDF de l\'histoire. Définis aussi un mot de passe et tu reçois des crédits gratuits pour une histoire complète.',
   },
   it: {
-    brand: 'Magical Story',
+    brand: 'MagicalStory',
     creatingStory: 'La tua storia sta per nascere...',
     storyComplete: 'La tua storia è pronta!',
     signInToSee: 'Accedi per leggere la tua storia',
@@ -233,7 +233,7 @@ const translations = {
       'Qualità delle immagini superiore e pagina del titolo',
       'Ordinala come libro stampato',
     ],
-    rotationTrialIntro: 'Questa è una storia di prova — dovrebbe essere pronta in circa due o tre minuti. Le storie di prova sono brevi. Una storia completa richiede un po\' più di tempo, ma offre molte più pagine e scene più ricche.',
+    rotationTrialIntro: 'Questa è una storia di prova — dovrebbe essere pronta in pochi minuti. Le storie di prova sono brevi. Una storia completa richiede un po\' più di tempo, ma offre molte più pagine e scene più ricche.',
     storyReadyKicker: 'La tua storia è pronta da leggere',
     imagePending: 'L\'immagine è ancora in disegno...',
     gateTitle: 'Come continua?',

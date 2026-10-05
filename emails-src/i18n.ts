@@ -34,7 +34,7 @@ export const langMarkers: Record<Lang, string> = {
 //   2. magicalstory.ch · info@magicalstory.ch · {country}   (built by Footer)
 export const footer: Record<Lang, { tagline: string; country: string }> = {
   en: { tagline: 'MagicalStory - Creating Magical Moments, One Story at a Time', country: 'Switzerland' },
-  de: { tagline: 'MagicalStory - Magische Momente schaffen, eine Geschichte nach der anderen', country: 'Schweiz' },
+  de: { tagline: 'MagicalStory – Magische Momente schaffen, eine Geschichte nach der anderen', country: 'Schweiz' },
   fr: { tagline: 'MagicalStory - Des moments magiques, une histoire à la fois', country: 'Suisse' },
   it: { tagline: 'MagicalStory - Momenti magici, una storia alla volta', country: 'Svizzera' },
 };
@@ -63,11 +63,11 @@ export const storyComplete: Record<Lang, {
     signoff: 'Thank you for using MagicalStory!',
   },
   de: {
-    subject: 'Deine magische Geschichte "{title}" ist fertig!',
+    subject: 'Deine magische Geschichte «{title}» ist fertig!',
     preview: 'Deine personalisierte Geschichte ist fertig — ansehen, als Buch bestellen oder als PDF herunterladen.',
     headline: 'Deine Geschichte ist fertig!',
     greeting: 'Hallo {greeting},',
-    body: 'Tolle Neuigkeiten! Deine personalisierte Geschichte "{title}" wurde erstellt und wartet auf dich.',
+    body: 'Tolle Neuigkeiten! Deine personalisierte Geschichte «{title}» wurde erstellt und wartet auf dich.',
     cta: 'Geschichte ansehen',
     perksIntro: 'Du kannst jetzt:',
     perks: [
@@ -141,7 +141,7 @@ export const storyFailed: Record<Lang, {
     warnLine: 'Für diesen Versuch wurden keine Credits abgezogen.',
     cta: 'Nochmal versuchen',
     apology: 'Wir entschuldigen uns für die Unannehmlichkeiten.',
-    signoff: 'Mit freundlichen Grüssen,\nDas MagicalStory Team',
+    signoff: 'Herzliche Grüsse,\nDein MagicalStory-Team',
   },
   fr: {
     subject: 'Un problème est survenu avec votre histoire',
@@ -195,13 +195,13 @@ export const trialStoryComplete: Record<Lang, {
     signoff: 'Thank you for trying MagicalStory!',
   },
   de: {
-    subject: 'Deine magische Geschichte "{title}" ist fertig!',
+    subject: 'Deine magische Geschichte «{title}» ist fertig!',
     preview: 'Deine Probe-Geschichte ist fertig und als PDF angehängt. Aktiviere dein Konto, um sie zu behalten.',
     headline: 'Deine Geschichte ist fertig!',
     greeting: 'Hallo {greeting},',
-    body: 'Tolle Neuigkeiten! Deine personalisierte Geschichte "{title}" wurde erstellt.',
+    body: 'Tolle Neuigkeiten! Deine personalisierte Geschichte «{title}» wurde erstellt.',
     attachmentNote: 'Das PDF der Geschichte ist dieser E-Mail angehängt, damit du sie sofort lesen kannst.',
-    claimLine: 'Setze dein Passwort und erhalte {credits} Gratis-Credits — genug für eine weitere komplette Geschichte, gratis.',
+    claimLine: 'Setze dein Passwort und erhalte {credits} Gratis-Credits — genug für eine weitere komplette Geschichte.',
     cta: 'Gratis-Geschichte sichern',
     perksIntro: 'Mit einem vollständigen Konto erhältst du ausserdem:',
     perks: [
@@ -465,7 +465,7 @@ export const orderFailed: Record<Lang, {
     subject: 'Bestellproblem — wir kümmern uns darum',
     preview: 'Ein technisches Problem hat deine Buchbestellung unterbrochen. Wir kümmern uns darum.',
     headline: 'Wir kümmern uns darum',
-    greeting: 'Liebe/r {greeting},',
+    greeting: 'Hallo {greeting},',
     body: 'Bei der Verarbeitung deiner Buchbestellung ist leider ein technisches Problem aufgetreten. Unser Team wurde automatisch benachrichtigt und kümmert sich um die Lösung.',
     reassurance: 'Du musst nichts weiter tun — wir melden uns bei dir, sobald das Problem behoben ist. Sollte eine Rückerstattung nötig sein, werden wir diese veranlassen.',
     questions: 'Bei Fragen: info@magicalstory.ch',

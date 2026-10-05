@@ -78,7 +78,7 @@ export const guides: GuideArticle[] = [
             'A useful rule: if your description could apply to any child, it will produce a story about no child in particular.',
           ],
           de: [
-            'Der häufigste Fehler ist, nach "einer Geschichte über ein mutiges Mädchen und einen Drachen" zu fragen. Diese Aufforderung stand zehn Millionen Mal in den Trainingsdaten — du bekommst den Durchschnitt aus allen.',
+            'Der häufigste Fehler ist, nach «einer Geschichte über ein mutiges Mädchen und einen Drachen» zu fragen. Diese Aufforderung stand zehn Millionen Mal in den Trainingsdaten — du bekommst den Durchschnitt aus allen.',
             'Was eine lesenswerte Geschichte ergibt, ist die Genauigkeit, die nur du hast: dass deine Tochter ohne ein bestimmtes Stoffkaninchen nicht einschläft, dass sie gerade umgezogen ist und niemanden kennt, dass sie das Geräusch der Heizung nachts erschreckt. Gib dem Modell die Situation und lass es die Handlung erfinden.',
             'Eine brauchbare Regel: Wenn deine Beschreibung auf jedes Kind passen könnte, entsteht eine Geschichte über kein bestimmtes Kind.',
           ],
@@ -109,7 +109,7 @@ export const guides: GuideArticle[] = [
           ],
           de: [
             'Das ist der grösste Qualitätsunterschied zwischen einem Buch aus einem allgemeinen Bildgenerator und einem aus einem spezialisierten Dienst — und es lohnt sich, das zu verstehen, bevor du einen Abend investierst.',
-            'Bildmodelle erzeugen jedes Bild unabhängig. Frage zwölfmal nach "einem siebenjährigen Mädchen mit braunen Locken" und du bekommst zwölf verschiedene Mädchen — andere Gesichtsform, andere Haarlänge, andere Augenfarbe. Ein Kind bemerkt das sofort, und die Illusion, dass das Buch von ihm handelt, ist zerstört.',
+            'Bildmodelle erzeugen jedes Bild unabhängig. Frage zwölfmal nach «einem siebenjährigen Mädchen mit braunen Locken» und du bekommst zwölf verschiedene Mädchen — andere Gesichtsform, andere Haarlänge, andere Augenfarbe. Ein Kind bemerkt das sofort, und die Illusion, dass das Buch von ihm handelt, ist zerstört.',
             'Die Lösung ist eine Referenz: dieselbe Figurenbeschreibung und möglichst dasselbe Referenzbild für jede Seite, plus eine anschliessende Prüfung, die jede gezeichnete Figur mit der Referenz vergleicht und abweichende Seiten neu erzeugt. Wer es selbst macht, muss viele Seiten neu generieren. Wer einen Dienst wählt, sollte genau danach fragen — das unterscheidet die guten von den billigen.',
           ],
           fr: [
@@ -139,7 +139,7 @@ export const guides: GuideArticle[] = [
           ],
           de: [
             'KI-Texte landen standardmässig in einem Register, das etwas zu alt und etwas zu glatt ist — lange Sätze, abstrakte Gefühlswörter, am Ende eine ausgesprochene Moral. Für Erwachsene liest sich das gut, bei einem Vierjährigen verpufft es.',
-            'Verlange Vorgaben statt einer Altersangabe: eine maximale Satzlänge, konkrete Substantive statt Abstraktionen, höchstens ein neuer Gedanke pro Seite, keine Schlussmoral. "Maximal fünf Minuten Vorlesezeit, beruhigend statt spannend" ergibt ein deutlich besseres Resultat als "für ein 4-jähriges Kind".',
+            'Verlange Vorgaben statt einer Altersangabe: eine maximale Satzlänge, konkrete Substantive statt Abstraktionen, höchstens ein neuer Gedanke pro Seite, keine Schlussmoral. «Maximal fünf Minuten Vorlesezeit, beruhigend statt spannend» ergibt ein deutlich besseres Resultat als «für ein 4-jähriges Kind».',
             'Lies den Text danach laut vor, bevor du ihn festlegst. Text, der auf dem Bildschirm gut aussieht, und Text, der vorgelesen funktioniert, sind zweierlei — laut lesen zeigt den Unterschied in neunzig Sekunden.',
           ],
           fr: [

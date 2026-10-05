@@ -32,14 +32,14 @@ const FALLBACK_CREDITS_PER_PAGE = 10;
 // Fallback pricing tiers (used while loading or if API fails)
 // Prices are PER BOOK, shipping (CHF 10) is added once at checkout
 const fallbackPricingTiers: PricingTier[] = [
-  { maxPages: 30, label: '1-30', softcover: 28, hardcover: 43 },
-  { maxPages: 40, label: '31-40', softcover: 35, hardcover: 50 },
-  { maxPages: 50, label: '41-50', softcover: 41, hardcover: 56 },
-  { maxPages: 60, label: '51-60', softcover: 47, hardcover: 62 },
-  { maxPages: 70, label: '61-70', softcover: 53, hardcover: 68 },
-  { maxPages: 80, label: '71-80', softcover: 59, hardcover: 74 },
-  { maxPages: 90, label: '81-90', softcover: 65, hardcover: 80 },
-  { maxPages: 100, label: '91-100', softcover: 71, hardcover: 86 },
+  { maxPages: 30, label: '1-30', softcover: 29, hardcover: 37 },
+  { maxPages: 40, label: '31-40', softcover: 35, hardcover: 43 },
+  { maxPages: 50, label: '41-50', softcover: 41, hardcover: 49 },
+  { maxPages: 60, label: '51-60', softcover: 47, hardcover: 55 },
+  { maxPages: 70, label: '61-70', softcover: 52, hardcover: 60 },
+  { maxPages: 80, label: '71-80', softcover: 58, hardcover: 66 },
+  { maxPages: 90, label: '81-90', softcover: 64, hardcover: 72 },
+  { maxPages: 100, label: '91-100', softcover: 69, hardcover: 77 },
 ];
 
 // Flat shipping cost per order (Switzerland), regardless of quantity
@@ -101,7 +101,7 @@ export default function Pricing() {
       subtitle: 'Buy credits to create stories. Print your book and get credits back.',
       // Credits section
       creditsTitle: 'Credits — to create your stories',
-      creditsIntro: `Stories are paid for with credits. ${creditsPerPage} credits = 1 page. A typical 10-page story = ${creditsPerPage * 10} credits.`,
+      creditsIntro: `Stories are paid for with credits. ${creditsPerPage} credits = 1 page. A typical 15-page story = ${creditsPerPage * 15} credits.`,
       creditsTableCredits: 'Credits',
       creditsTablePrice: 'Price',
       creditsNote: `New accounts start with free credits — enough to try a full story.`,
@@ -134,7 +134,7 @@ export default function Pricing() {
       title: 'Preise',
       subtitle: 'Kaufe Credits, um Geschichten zu erstellen. Bestelle dein Buch und erhalte Credits zurück.',
       creditsTitle: 'Credits — für deine Geschichten',
-      creditsIntro: `Geschichten werden mit Credits bezahlt. ${creditsPerPage} Credits = 1 Seite. Eine typische 10-Seiten-Geschichte = ${creditsPerPage * 10} Credits.`,
+      creditsIntro: `Geschichten werden mit Credits bezahlt. ${creditsPerPage} Credits = 1 Seite. Eine typische 15-Seiten-Geschichte = ${creditsPerPage * 15} Credits.`,
       creditsTableCredits: 'Credits',
       creditsTablePrice: 'Preis',
       creditsNote: 'Neue Konten erhalten Gratis-Credits — genug für eine ganze Geschichte zum Ausprobieren.',
@@ -165,7 +165,7 @@ export default function Pricing() {
       title: 'Tarifs',
       subtitle: 'Achetez des crédits pour créer des histoires. Commandez votre livre et récupérez des crédits.',
       creditsTitle: 'Crédits — pour créer vos histoires',
-      creditsIntro: `Les histoires sont payées en crédits. ${creditsPerPage} crédits = 1 page. Une histoire typique de 10 pages = ${creditsPerPage * 10} crédits.`,
+      creditsIntro: `Les histoires sont payées en crédits. ${creditsPerPage} crédits = 1 page. Une histoire typique de 15 pages = ${creditsPerPage * 15} crédits.`,
       creditsTableCredits: 'Crédits',
       creditsTablePrice: 'Prix',
       creditsNote: 'Les nouveaux comptes reçoivent des crédits gratuits — de quoi essayer une histoire complète.',
@@ -196,7 +196,7 @@ export default function Pricing() {
       title: 'Prezzi',
       subtitle: 'Acquista crediti per creare storie. Stampa il tuo libro e ricevi crediti indietro.',
       creditsTitle: 'Crediti — per creare le tue storie',
-      creditsIntro: `Le storie si pagano con i crediti. ${creditsPerPage} crediti = 1 pagina. Una tipica storia di 10 pagine = ${creditsPerPage * 10} crediti.`,
+      creditsIntro: `Le storie si pagano con i crediti. ${creditsPerPage} crediti = 1 pagina. Una tipica storia di 15 pagine = ${creditsPerPage * 15} crediti.`,
       creditsTableCredits: 'Crediti',
       creditsTablePrice: 'Prezzo',
       creditsNote: 'I nuovi account iniziano con crediti gratuiti — sufficienti per provare una storia completa.',

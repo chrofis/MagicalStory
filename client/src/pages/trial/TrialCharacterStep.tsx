@@ -128,7 +128,7 @@ const strings: Record<string, {
     consentMiddle: ' und ',
     privacyLink: 'Datenschutzerklärung',
     consentAfter: ', inklusive KI-Verarbeitung des Fotos für die Geschichte.',
-    pleaseAccept: 'Bitte akzeptieren Sie die obigen Bedingungen, um ein Foto hochzuladen',
+    pleaseAccept: 'Bitte akzeptiere die obigen Bedingungen, um ein Foto hochzuladen',
     selectFace: 'Wähle das richtige Gesicht',
     noFaceDetected: 'Kein Gesicht erkannt. Bitte versuche ein anderes Foto.',
     multipleFaces: 'Mehrere Gesichter erkannt. Bitte wähle das richtige aus.',

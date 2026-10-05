@@ -275,7 +275,7 @@ export function WizardStep6Summary({
     optional: language === 'de' ? '(optional)' : language === 'fr' ? '(optionnel)' : language === 'it' ? '(facoltativo)' : '(optional)',
     dedication: language === 'de' ? 'Widmung' : language === 'fr' ? 'Dédicace' : language === 'it' ? 'Dedica' : 'Dedication',
     dedicationPlaceholder: language === 'de'
-      ? 'z.B. "Für meine liebe Tochter Emma zum 5. Geburtstag"'
+      ? 'z.B. «Für meine liebe Tochter Emma zum 5. Geburtstag»'
       : language === 'fr'
       ? 'Par exemple "Pour ma chère fille Emma pour son 5ème anniversaire"'
       : language === 'it' ? 'per es. "Per la mia cara figlia Emma per il suo 5° compleanno"' : 'e.g. "For my dear daughter Emma on her 5th birthday"',
@@ -617,7 +617,7 @@ export function WizardStep6Summary({
                   ) : (
                     <div className="flex items-center justify-center h-64 bg-gray-50 text-gray-400">
                       <p className="text-sm">
-                        {lang === 'de' ? 'Klicke auf "Vorschlag generieren"' :
+                        {lang === 'de' ? 'Klicke auf «Vorschlag generieren»' :
                          lang === 'fr' ? 'Cliquez sur "Générer"' : lang === 'it' ? 'Clicca su "Genera una proposta"' :
                          'Click "Generate Suggestion"'}
                       </p>

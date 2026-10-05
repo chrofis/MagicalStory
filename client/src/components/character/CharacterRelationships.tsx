@@ -56,7 +56,7 @@ export function CharacterRelationships({
       // Prompt for the forward relationship
       const customRel = prompt(
         language === 'de'
-          ? 'Beziehung eingeben (z.B. "Onkel"):'
+          ? 'Beziehung eingeben (z.B. «Onkel»):'
           : language === 'fr'
           ? 'Entrer la relation (ex. "oncle"):'
           : language === 'it'
@@ -67,7 +67,7 @@ export function CharacterRelationships({
         // Prompt for the inverse relationship
         const inverseRel = prompt(
           language === 'de'
-            ? `Was ist die umgekehrte Beziehung? (z.B. wenn "${customRel.trim()}" dann vielleicht "Neffe/Nichte"):`
+            ? `Was ist die umgekehrte Beziehung? (z.B. wenn «${customRel.trim()}» dann vielleicht «Neffe/Nichte»):`
             : language === 'fr'
             ? `Quelle est la relation inverse? (ex. si "${customRel.trim()}" alors peut-être "neveu/nièce"):`
             : language === 'it'

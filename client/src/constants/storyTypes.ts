@@ -134,8 +134,8 @@ export const storyTypes: StoryType[] = [
   { id: 'newyear', name: { en: 'New Year Story', de: 'Neujahrs-Geschichte', fr: 'Histoire du Nouvel An', it: 'Storia di Capodanno' }, emoji: '🎆', group: 'seasonal' },
   { id: 'easter', name: { en: 'Easter Story', de: 'Oster-Geschichte', fr: 'Histoire de Pâques', it: 'Storia di Pasqua' }, emoji: '🐰', group: 'seasonal' },
   { id: 'halloween', name: { en: 'Halloween Story', de: 'Halloween-Geschichte', fr: 'Histoire d\'Halloween', it: 'Storia di Halloween' }, emoji: '🎃', group: 'seasonal' },
-  { id: 'mothers-day', name: { en: 'Mother\'s Day Story', de: 'Muttertag-Geschichte', fr: 'Histoire Fête des Mères', it: 'Storia per la Festa della Mamma' }, emoji: '💐', group: 'seasonal' },
-  { id: 'fathers-day', name: { en: 'Father\'s Day Story', de: 'Vatertag-Geschichte', fr: 'Histoire Fête des Pères', it: 'Storia per la Festa del Papà' }, emoji: '🧢', group: 'seasonal' },
+  { id: 'mothers-day', name: { en: 'Mother\'s Day Story', de: 'Geschichte zum Muttertag', fr: 'Histoire Fête des Mères', it: 'Storia per la Festa della Mamma' }, emoji: '💐', group: 'seasonal' },
+  { id: 'fathers-day', name: { en: 'Father\'s Day Story', de: 'Geschichte zum Vatertag', fr: 'Histoire Fête des Pères', it: 'Storia per la Festa del Papà' }, emoji: '🧢', group: 'seasonal' },
 
   // Custom - user creates their own theme
   { id: 'custom', name: { en: 'Create Your Own', de: 'Eigenes Thema', fr: 'Créer le vôtre', it: 'Crea la tua storia' }, emoji: '✨', group: 'custom' },
@@ -218,7 +218,7 @@ const lifeChallengeCatalogue: Omit<LifeChallenge, 'suitableAges'>[] = [
   { id: 'dealing-disappointment', name: { en: 'Dealing with Disappointment', de: 'Mit Enttäuschung umgehen', fr: 'Gérer la déception', it: 'Gestire la delusione' }, emoji: '😞', ageGroup: 'early-school', liveness: 3, pole: 'friction' },
   { id: 'anxiety-worrying', name: { en: 'Worry & Anxiety', de: 'Sorgen & Ängste', fr: 'Soucis & Anxiété', it: 'Preoccupazioni e ansia' }, emoji: '😰', ageGroup: 'early-school', liveness: 3, pole: 'friction' },
   { id: 'caring-for-pet', name: { en: 'Caring for a Pet', de: 'Sich um ein Haustier kümmern', fr: 'Prendre soin d\'un animal', it: 'Prendersi cura di un animale' }, emoji: '🐕', ageGroup: 'early-school', liveness: 2, pole: 'milestone' },
-  { id: 'tattling-vs-telling', name: { en: 'Tattling vs Telling', de: 'Petzen vs Um Hilfe bitten', fr: 'Rapporter vs Demander de l\'aide', it: 'Fare la spia o chiedere aiuto' }, emoji: '🗣️', ageGroup: 'preschool', liveness: 2, pole: 'friction' },
+  { id: 'tattling-vs-telling', name: { en: 'Tattling vs Telling', de: 'Petzen oder um Hilfe bitten', fr: 'Rapporter vs Demander de l\'aide', it: 'Fare la spia o chiedere aiuto' }, emoji: '🗣️', ageGroup: 'preschool', liveness: 2, pole: 'friction' },
   { id: 'understanding-rules', name: { en: 'Why Parents Say No', de: 'Warum Eltern Nein sagen', fr: 'Pourquoi les parents disent non', it: 'Perché i genitori dicono no' }, emoji: '🚦', ageGroup: 'preschool', liveness: 4, pole: 'friction' },
   // Family Changes (All ages)
   { id: 'moving-house', name: { en: 'Moving to a New Home', de: 'Umzug', fr: 'Déménagement', it: 'Trasloco' }, emoji: '🏠', ageGroup: 'family', liveness: 3, pole: 'both' },

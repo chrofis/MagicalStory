@@ -70,15 +70,15 @@ export const occasions: OccasionData[] = [
       { id: 'space', category: 'adventure' },
     ],
     deliveryNote: {
-      en: 'Tip: Create the story at least 5 days before the birthday to have time for the printed book delivery.',
-      de: 'Tipp: Erstelle die Geschichte mindestens 5 Tage vor dem Geburtstag, damit das gedruckte Buch rechtzeitig ankommt.',
-      fr: 'Conseil : Créez l\'histoire au moins 5 jours avant l\'anniversaire pour recevoir le livre imprimé à temps.',
-      it: 'Consiglio: crea la storia almeno 5 giorni prima del compleanno per avere il tempo necessario alla consegna del libro stampato.',
+      en: 'Tip: Create the story at least two weeks before the birthday to have time for the printed book delivery.',
+      de: 'Tipp: Erstelle die Geschichte mindestens zwei Wochen vor dem Geburtstag, damit das gedruckte Buch rechtzeitig ankommt.',
+      fr: 'Conseil : Créez l\'histoire au moins deux semaines avant l\'anniversaire pour recevoir le livre imprimé à temps.',
+      it: 'Consiglio: crea la storia almeno due settimane prima del compleanno per avere il tempo necessario alla consegna del libro stampato.',
     },
     faq: [
       {
         q: { en: 'How quickly can I get a printed book?', de: 'Wie schnell bekomme ich ein gedrucktes Buch?', fr: 'En combien de temps puis-je recevoir un livre imprimé ?', it: 'Quanto tempo ci vuole per ricevere un libro stampato?' },
-        a: { en: 'The digital story is ready in minutes. Printed books are delivered within 5-7 business days to Swiss addresses.', de: 'Die digitale Geschichte ist in wenigen Minuten fertig. Gedruckte Bücher werden innerhalb von 5-7 Werktagen an Schweizer Adressen geliefert.', fr: 'L\'histoire numérique est prête en quelques minutes. Les livres imprimés sont livrés en 5 à 7 jours ouvrables en Suisse.', it: 'La storia digitale è pronta in pochi minuti. I libri stampati vengono consegnati entro 5-7 giorni lavorativi agli indirizzi svizzeri.' },
+        a: { en: 'The digital story is ready in about an hour. Printed books are delivered within 5-7 business days to Swiss addresses.', de: 'Die digitale Geschichte ist in etwa einer Stunde fertig. Gedruckte Bücher werden innerhalb von 5-7 Werktagen an Schweizer Adressen geliefert.', fr: 'L\'histoire numérique est prête en environ une heure. Les livres imprimés sont livrés en 5 à 7 jours ouvrables en Suisse.', it: 'La storia digitale è pronta in circa un\'ora. I libri stampati vengono consegnati entro 5-7 giorni lavorativi agli indirizzi svizzeri.' },
       },
       {
         q: { en: 'Can I add more than one child to the story?', de: 'Kann ich mehr als ein Kind zur Geschichte hinzufügen?', fr: 'Puis-je ajouter plus d\'un enfant à l\'histoire ?', it: 'Posso aggiungere più di un bambino alla storia?' },
@@ -223,10 +223,10 @@ export const occasions: OccasionData[] = [
       { id: 'farm-animals', category: 'educational' },
     ],
     deliveryNote: {
-      en: 'Order at least 7 days before Easter for printed book delivery.',
-      de: 'Bestelle mindestens 7 Tage vor Ostern für die Lieferung des gedruckten Buches.',
-      fr: 'Commandez au moins 7 jours avant Pâques pour la livraison du livre imprimé.',
-      it: 'Ordina almeno 7 giorni prima di Pasqua per la consegna del libro stampato.',
+      en: 'Order at least two weeks before Easter for printed book delivery.',
+      de: 'Bestelle mindestens zwei Wochen vor Ostern für die Lieferung des gedruckten Buches.',
+      fr: 'Commandez au moins deux semaines avant Pâques pour la livraison du livre imprimé.',
+      it: 'Ordina almeno due settimane prima di Pasqua per la consegna del libro stampato.',
     },
     faq: [
       {
@@ -347,8 +347,8 @@ export const occasions: OccasionData[] = [
       de: [
         'Lege das Buch in die Schultüte neben die Süssigkeiten',
         'Lest die Geschichte zusammen am Abend vor dem grossen Tag',
-        'Wähle das Thema "Erster Schultag" für eine Geschichte, die Schulängste anspricht',
-        'Die Lernthemen "Alphabet" oder "Zahlen" sind ebenfalls tolle Geschenke zum Schulstart',
+        'Wähle das Thema «Erster Schultag» für eine Geschichte, die Schulängste anspricht',
+        'Die Lernthemen «Alphabet» oder «Zahlen» sind ebenfalls tolle Geschenke zum Schulstart',
       ],
       fr: [
         'Glissez le livre dans le cartable avec les fournitures scolaires',
@@ -384,7 +384,7 @@ export const occasions: OccasionData[] = [
       },
       {
         q: { en: 'Does the story help with school anxiety?', de: 'Hilft die Geschichte bei Schulangst?', fr: 'L\'histoire aide-t-elle avec l\'anxiété scolaire ?', it: 'La storia aiuta con l\'ansia scolastica?' },
-        a: { en: 'Yes! The "First Day of School" theme is specifically designed to address common fears and show your child that school is an exciting adventure.', de: 'Ja! Das Thema "Erster Schultag" ist speziell darauf ausgelegt, häufige Ängste anzusprechen und deinem Kind zu zeigen, dass Schule ein spannendes Abenteuer ist.', fr: 'Oui ! Le thème "Premier jour d\'école" est spécialement conçu pour aborder les peurs courantes et montrer à votre enfant que l\'école est une aventure passionnante.', it: 'Sì! Il tema "Primo giorno di scuola" è pensato apposta per affrontare le paure più comuni e mostrare a tuo figlio che la scuola è un\'avventura entusiasmante.' },
+        a: { en: 'Yes! The "First Day of School" theme is specifically designed to address common fears and show your child that school is an exciting adventure.', de: 'Ja! Das Thema «Erster Schultag» ist speziell darauf ausgelegt, häufige Ängste anzusprechen und deinem Kind zu zeigen, dass Schule ein spannendes Abenteuer ist.', fr: 'Oui ! Le thème "Premier jour d\'école" est spécialement conçu pour aborder les peurs courantes et montrer à votre enfant que l\'école est une aventure passionnante.', it: 'Sì! Il tema "Primo giorno di scuola" è pensato apposta per affrontare le paure più comuni e mostrare a tuo figlio che la scuola è un\'avventura entusiasmante.' },
       },
     ],
   },
@@ -421,7 +421,7 @@ export const occasions: OccasionData[] = [
       ],
       de: [
         'Erstelle die Geschichte vor der Geburt — sie ist ein tolles Vorbereitungswerkzeug',
-        'Wähle das Thema "Neues Geschwisterchen" für eine Geschichte über Geschwistergefühle',
+        'Wähle das Thema «Neues Geschwisterchen» für eine Geschichte über Geschwistergefühle',
         'Verschenke das Buch als spezielles Geschenk vom neuen Baby an das grosse Geschwisterchen',
         'Füge beide Kinder in die Geschichte ein, wenn das Baby bereits einen Namen hat',
       ],
@@ -794,7 +794,7 @@ export const occasions: OccasionData[] = [
       ],
       de: [
         'Erstelle die Geschichte vor dem Umzug, um beim Übergang zu helfen',
-        'Wähle das Thema "Umzug" für eine Geschichte, die direkt Umzugsängste anspricht',
+        'Wähle das Thema «Umzug» für eine Geschichte, die direkt Umzugsängste anspricht',
         'Lest es zusammen im neuen Zuhause in der ersten Nacht — ein tröstendes Ritual',
         'Füge Details über das neue Zuhause oder die neue Stadt hinzu, um Vorfreude zu wecken',
       ],
@@ -868,9 +868,9 @@ export const occasions: OccasionData[] = [
       ],
       de: [
         'Beginne 2-3 Wochen vor Kindergartenbeginn mit dem Vorlesen der Geschichte',
-        'Wähle das Thema "Erster Kindergartentag" für eine Geschichte über Trennungsangst',
+        'Wähle das Thema «Erster Kindergartentag» für eine Geschichte über Trennungsangst',
         'Sprecht gemeinsam über die Geschichte — frag dein Kind, worauf es sich freut',
-        'Das Thema "Freunde finden" ist ebenfalls perfekt zur Kindergartenvorbereitung',
+        'Das Thema «Freunde finden» ist ebenfalls perfekt zur Kindergartenvorbereitung',
       ],
       fr: [
         'Commencez à lire l\'histoire 2 à 3 semaines avant le début de la maternelle',
@@ -906,7 +906,7 @@ export const occasions: OccasionData[] = [
       },
       {
         q: { en: 'Does the story help with separation anxiety?', de: 'Hilft die Geschichte bei Trennungsangst?', fr: 'L\'histoire aide-t-elle avec l\'anxiété de séparation ?', it: 'La storia aiuta con l\'ansia da separazione?' },
-        a: { en: 'Yes! The "First Kindergarten Day" theme is specifically designed to show that saying goodbye to mom/dad is okay and that kindergarten is safe and fun.', de: 'Ja! Das Thema "Erster Kindergartentag" zeigt speziell, dass es okay ist, sich von Mama/Papa zu verabschieden und dass der Kindergarten sicher und lustig ist.', fr: 'Oui ! Le thème "Premier jour de maternelle" est spécialement conçu pour montrer que dire au revoir à maman/papa est normal et que la maternelle est sûre et amusante.', it: 'Sì! Il tema "Primo giorno alla scuola dell\'infanzia" è pensato apposta per mostrare che salutare mamma/papà va bene e che la scuola dell\'infanzia è un posto sicuro e divertente.' },
+        a: { en: 'Yes! The "First Kindergarten Day" theme is specifically designed to show that saying goodbye to mom/dad is okay and that kindergarten is safe and fun.', de: 'Ja! Das Thema «Erster Kindergartentag» zeigt speziell, dass es okay ist, sich von Mama/Papa zu verabschieden und dass der Kindergarten sicher und lustig ist.', fr: 'Oui ! Le thème "Premier jour de maternelle" est spécialement conçu pour montrer que dire au revoir à maman/papa est normal et que la maternelle est sûre et amusante.', it: 'Sì! Il tema "Primo giorno alla scuola dell\'infanzia" è pensato apposta per mostrare che salutare mamma/papà va bene e che la scuola dell\'infanzia è un posto sicuro e divertente.' },
       },
       {
         q: { en: 'Can I customize the kindergarten name in the story?', de: 'Kann ich den Kindergarten-Namen in der Geschichte anpassen?', fr: 'Puis-je personnaliser le nom de la maternelle dans l\'histoire ?', it: 'Posso personalizzare il nome della scuola dell\'infanzia nella storia?' },

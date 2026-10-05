@@ -21,11 +21,11 @@ const aboutContent: Record<string, {
   ctaButton: string;
 }> = {
   en: {
-    title: 'About Magical Story',
+    title: 'About MagicalStory',
     tagline: 'Personalized children\'s books where your child is the star.',
     missionTitle: 'Every child is a hero',
     missionText: [
-      'Every child has a story worth telling — and they deserve to be the hero of it. Magical Story turns your family photos into personalized children\'s books where your child stars on every page.',
+      'Every child has a story worth telling — and they deserve to be the hero of it. MagicalStory turns your family photos into personalized children\'s books where your child stars on every page.',
       'Not another book off the shelf. A book about them. One that captures who they really are and turns reading time into something you\'ll both treasure.',
     ],
     scienceTitle: 'They see the hero in the mirror — and know they can, too.',
@@ -61,11 +61,11 @@ const aboutContent: Record<string, {
     ctaButton: 'Create a Free Story',
   },
   de: {
-    title: 'Über Magical Story',
+    title: 'Über MagicalStory',
     tagline: 'Personalisierte Kinderbücher, in denen dein Kind der Star ist.',
     missionTitle: 'Jedes Kind ist ein Held',
     missionText: [
-      'Jedes Kind hat eine Geschichte, die es verdient, erzählt zu werden — und dein Kind sollte der Held darin sein. Magical Story verwandelt deine Familienfotos in personalisierte Kinderbücher, in denen dein Kind auf jeder Seite die Hauptrolle spielt.',
+      'Jedes Kind hat eine Geschichte, die es verdient, erzählt zu werden — und dein Kind sollte der Held darin sein. MagicalStory verwandelt deine Familienfotos in personalisierte Kinderbücher, in denen dein Kind auf jeder Seite die Hauptrolle spielt.',
       'Kein Buch von der Stange. Ein Buch über dein Kind. Eines, das einfängt, wer es wirklich ist, und das gemeinsame Lesen in etwas verwandelt, auf das ihr euch beide freut.',
     ],
     scienceTitle: 'Sie sehen den Helden im Spiegel — und wissen: Das kann ich auch.',
@@ -101,11 +101,11 @@ const aboutContent: Record<string, {
     ctaButton: 'Gratis Geschichte erstellen',
   },
   fr: {
-    title: 'À propos de Magical Story',
+    title: 'À propos de MagicalStory',
     tagline: 'Des livres pour enfants personnalisés où votre enfant est la star.',
     missionTitle: 'Chaque enfant est un héros',
     missionText: [
-      'Chaque enfant a une histoire qui mérite d\'être racontée — et votre enfant devrait en être le héros. Magical Story transforme vos photos de famille en livres personnalisés où votre enfant joue le rôle principal sur chaque page.',
+      'Chaque enfant a une histoire qui mérite d\'être racontée — et votre enfant devrait en être le héros. MagicalStory transforme vos photos de famille en livres personnalisés où votre enfant joue le rôle principal sur chaque page.',
       'Pas un livre standard. Un livre sur votre enfant. Un livre qui capture qui il est vraiment et transforme la lecture en un moment que vous attendez tous les deux avec impatience.',
     ],
     scienceTitle: 'Ils voient le héros dans le miroir — et savent qu\'ils le peuvent aussi.',
@@ -141,11 +141,11 @@ const aboutContent: Record<string, {
     ctaButton: 'Créer une histoire gratuite',
   },
   it: {
-    title: 'Chi è Magical Story',
+    title: 'Chi è MagicalStory',
     tagline: 'Libri per bambini personalizzati in cui tuo figlio è la star.',
     missionTitle: 'Ogni bambino è un eroe',
     missionText: [
-      'Ogni bambino ha una storia che merita di essere raccontata — e merita di esserne l\'eroe. Magical Story trasforma le foto di famiglia in libri per bambini personalizzati in cui tuo figlio è protagonista su ogni pagina.',
+      'Ogni bambino ha una storia che merita di essere raccontata — e merita di esserne l\'eroe. MagicalStory trasforma le foto di famiglia in libri per bambini personalizzati in cui tuo figlio è protagonista su ogni pagina.',
       'Non un libro qualsiasi. Un libro su di lui. Uno che coglie davvero chi è, e che trasforma il momento della lettura in qualcosa che aspetterete entrambi con gioia.',
     ],
     scienceTitle: 'Vedono l\'eroe allo specchio — e sanno che possono farcela anche loro.',

@@ -28,7 +28,7 @@ const sectionTranslations = {
     step3: 'Step 3',
     chooseStyle: 'Choose Your Style',
     chooseStyleDesc: 'Pick the illustration style that fits your story. Watercolor, 3D animation, comic, anime – each style is applied consistently across all pages.',
-    artStyles: '8+ unique art styles: Pixar-style 3D, Watercolor, Comic, Anime, and more',
+    artStyles: '14 unique art styles: Pixar-style 3D, Watercolor, Comic, Anime, and more',
     consistentStyle: 'Consistent style across all pages and characters',
     bookLength: 'Choose your preferred book length – from short stories to longer adventures',
     // Section 4: Print
@@ -89,7 +89,7 @@ const sectionTranslations = {
     step3: 'Schritt 3',
     chooseStyle: 'Wähle deinen Stil',
     chooseStyleDesc: 'Wähle den Illustrationsstil, der zu deiner Geschichte passt. Aquarell, 3D-Animation, Comic, Anime – jeder Stil wird einheitlich auf allen Seiten angewendet.',
-    artStyles: '8+ einzigartige Kunststile: Pixar-ähnliches 3D, Aquarell, Comic, Anime und mehr',
+    artStyles: '14 einzigartige Kunststile: Pixar-ähnliches 3D, Aquarell, Comic, Anime und mehr',
     consistentStyle: 'Einheitlicher Stil auf allen Seiten und bei allen Charakteren',
     bookLength: 'Wähle deine bevorzugte Buchlänge – von kurzen Geschichten bis zu längeren Abenteuern',
     // Section 4: Print
@@ -97,7 +97,7 @@ const sectionTranslations = {
     printShare: 'Drucken & Teilen',
     printShareDesc: 'Deine Geschichte ist fertig! Lade sie sofort als PDF herunter oder bestelle ein wunderschön gedrucktes Buch direkt zu dir nach Hause.',
     pdfDownload: 'Sofortiger PDF-Download – perfekt zum Lesen auf Tablets oder zum Ausdrucken zu Hause',
-    printOptions: 'Hardcover oder Softcover Druck – 20x20cm, professionelle Qualität',
+    printOptions: 'Hardcover- oder Softcover-Druck, 20x20cm, professionelle Qualität',
     shipping: 'Gedruckt und versandt in der Schweiz – das perfekte Geschenk für jeden Anlass',
     giftGuideLink: 'Geschenkideen nach Alter & Anlass entdecken',
     // Why It Works
@@ -150,7 +150,7 @@ const sectionTranslations = {
     step3: 'Étape 3',
     chooseStyle: 'Choisissez votre style',
     chooseStyleDesc: "Choisissez le style d'illustration qui correspond à votre histoire. Aquarelle, animation 3D, bande dessinée, anime – chaque style est appliqué de manière cohérente sur toutes les pages.",
-    artStyles: "8+ styles artistiques uniques : 3D style Pixar, aquarelle, bande dessinée, anime, et plus",
+    artStyles: "14 styles artistiques uniques : 3D style Pixar, aquarelle, bande dessinée, anime, et plus",
     consistentStyle: 'Style cohérent sur toutes les pages et personnages',
     bookLength: 'Choisissez la longueur de livre souhaitée – des histoires courtes aux aventures plus longues',
     // Section 4: Print
@@ -211,7 +211,7 @@ const sectionTranslations = {
     step3: 'Passo 3',
     chooseStyle: 'Scegli il tuo stile',
     chooseStyleDesc: 'Scegli lo stile di illustrazione che si adatta alla tua storia. Acquerello, animazione 3D, fumetto, anime – ogni stile è applicato in modo coerente in tutte le pagine.',
-    artStyles: '8+ stili artistici unici: 3D in stile Pixar, acquerello, fumetto, anime e altri',
+    artStyles: '14 stili artistici unici: 3D in stile Pixar, acquerello, fumetto, anime e altri',
     consistentStyle: 'Stile coerente in tutte le pagine e per tutti i personaggi',
     bookLength: 'Scegli la lunghezza preferita del libro – da storie brevi ad avventure più lunghe',
     // Section 4: Print

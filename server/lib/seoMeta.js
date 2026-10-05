@@ -223,10 +223,10 @@ const THEMES = {
 const STATIC_ROUTES = {
   '/': {
     title: {
-      en: 'Magical Story – Your Child as the Hero of Their Own Book',
-      de: 'Magical Story – Dein Kind als Held seiner eigenen Geschichte',
-      fr: 'Magical Story – Votre enfant héros de son propre livre',
-      it: 'Magical Story – Il tuo bambino protagonista della sua storia',
+      en: 'MagicalStory – Your Child as the Hero of Their Own Book',
+      de: 'MagicalStory – Dein Kind als Held seiner eigenen Geschichte',
+      fr: 'MagicalStory – Votre enfant héros de son propre livre',
+      it: 'MagicalStory – Il tuo bambino protagonista della sua storia',
     },
     description: {
       en: 'A personalized children\'s book where your child is the hero. Upload a photo, pick a theme, create your first story free.',
@@ -237,38 +237,38 @@ const STATIC_ROUTES = {
   },
   '/pricing': {
     title: {
-      en: 'Pricing – Magical Story',
-      de: 'Preise – Magical Story',
-      fr: 'Tarifs – Magical Story',
-      it: 'Prezzi – Magical Story',
+      en: 'Pricing – MagicalStory',
+      de: 'Preise – MagicalStory',
+      fr: 'Tarifs – MagicalStory',
+      it: 'Prezzi – MagicalStory',
     },
     description: {
-      en: 'Your first story is free. Printed books start at CHF 33. View all pricing plans for Magical Story.',
-      de: 'Deine erste Geschichte ist gratis. Gedruckte Bücher ab CHF 33. Alle Preise für Magical Story.',
-      fr: 'Votre première histoire est gratuite. Livres imprimés dès CHF 33. Tous les tarifs de Magical Story.',
-      it: 'La tua prima storia è gratis. Libri stampati da CHF 33. Tutti i prezzi di Magical Story.',
+      en: 'Your first story is free. Printed books start at CHF 29. View all pricing plans for MagicalStory.',
+      de: 'Deine erste Geschichte ist gratis. Gedruckte Bücher ab CHF 29. Alle Preise für MagicalStory.',
+      fr: 'Votre première histoire est gratuite. Livres imprimés dès CHF 29. Tous les tarifs de MagicalStory.',
+      it: 'La tua prima storia è gratis. Libri stampati da CHF 29. Tutti i prezzi di MagicalStory.',
     },
   },
   '/faq': {
     title: {
-      en: 'FAQ – Magical Story',
-      de: 'Häufige Fragen – Magical Story',
-      fr: 'FAQ – Magical Story',
-      it: 'FAQ – Magical Story',
+      en: 'FAQ – MagicalStory',
+      de: 'Häufige Fragen – MagicalStory',
+      fr: 'FAQ – MagicalStory',
+      it: 'FAQ – MagicalStory',
     },
     description: {
-      en: 'Frequently asked questions about Magical Story. Learn how personalized children\'s books work, pricing, and more.',
-      de: 'Häufig gestellte Fragen zu Magical Story. Erfahre, wie personalisierte Kinderbücher funktionieren, Preise und mehr.',
-      fr: 'Questions fréquemment posées sur Magical Story. Découvrez comment fonctionnent les livres personnalisés pour enfants.',
-      it: 'Domande frequenti su Magical Story. Scopri come funzionano i libri personalizzati per bambini, i prezzi e altro.',
+      en: 'Frequently asked questions about MagicalStory. Learn how personalized children\'s books work, pricing, and more.',
+      de: 'Häufig gestellte Fragen zu MagicalStory. Erfahre, wie personalisierte Kinderbücher funktionieren, Preise und mehr.',
+      fr: 'Questions fréquemment posées sur MagicalStory. Découvrez comment fonctionnent les livres personnalisés pour enfants.',
+      it: 'Domande frequenti su MagicalStory. Scopri come funzionano i libri personalizzati per bambini, i prezzi e altro.',
     },
   },
   '/ratgeber': {
     title: {
-      en: 'Guides — Making and Choosing Children\'s Books | Magical Story',
-      de: 'Ratgeber — Kinderbücher erstellen und Anbieter wählen | Magical Story',
-      fr: 'Guides — Créer un livre pour enfant et choisir un service | Magical Story',
-      it: 'Guide — Creare e scegliere un libro per bambini | Magical Story',
+      en: 'Guides — Making and Choosing Children\'s Books | MagicalStory',
+      de: 'Ratgeber — Kinderbücher erstellen und Anbieter wählen | MagicalStory',
+      fr: 'Guides — Créer un livre pour enfant et choisir un service | MagicalStory',
+      it: 'Guide — Creare e scegliere un libro per bambini | MagicalStory',
     },
     description: {
       en: 'Practical guides on creating a children\'s book with AI, keeping characters consistent, writing for a child\'s reading level, and choosing between personalized book services.',
@@ -279,10 +279,10 @@ const STATIC_ROUTES = {
   },
   '/kinderbuch-erstellen': {
     title: {
-      en: 'Create a Children\'s Book with AI – Your Own Story | Magical Story',
-      de: 'Kinderbuch erstellen mit KI – deine eigene Geschichte | Magical Story',
-      fr: 'Créer un livre pour enfant avec l\'IA – votre propre histoire | Magical Story',
-      it: 'Crea un libro per bambini con l\'IA – la tua storia | Magical Story',
+      en: 'Create a Children\'s Book with AI – Your Own Story | MagicalStory',
+      de: 'Kinderbuch erstellen mit KI – deine eigene Geschichte | MagicalStory',
+      fr: 'Créer un livre pour enfant avec l\'IA – votre propre histoire | MagicalStory',
+      it: 'Crea un libro per bambini con l\'IA – la tua storia | MagicalStory',
     },
     description: {
       en: 'Create your own children\'s book: upload a photo, describe the story you want, and AI writes and illustrates it. Not a template with the name swapped — an original story. Edit every word and regenerate any page. First story free.',
@@ -293,38 +293,38 @@ const STATIC_ROUTES = {
   },
   '/about': {
     title: {
-      en: 'About – Magical Story',
-      de: 'Über uns – Magical Story',
-      fr: 'À propos – Magical Story',
-      it: 'Chi siamo – Magical Story',
+      en: 'About – MagicalStory',
+      de: 'Über uns – MagicalStory',
+      fr: 'À propos – MagicalStory',
+      it: 'Chi siamo – MagicalStory',
     },
     description: {
-      en: 'Magical Story is made in Switzerland. We believe every child deserves to see themselves as the hero of their own story.',
-      de: 'Magical Story kommt aus der Schweiz. Wir glauben, dass jedes Kind verdient, der Held seiner eigenen Geschichte zu sein.',
-      fr: 'Magical Story est conçu en Suisse. Nous croyons que chaque enfant mérite d\'être le héros de sa propre histoire.',
-      it: 'Magical Story nasce in Svizzera. Crediamo che ogni bambino meriti di essere il protagonista della propria storia.',
+      en: 'MagicalStory is made in Switzerland. We believe every child deserves to see themselves as the hero of their own story.',
+      de: 'MagicalStory kommt aus der Schweiz. Wir glauben, dass jedes Kind verdient, der Held seiner eigenen Geschichte zu sein.',
+      fr: 'MagicalStory est conçu en Suisse. Nous croyons que chaque enfant mérite d\'être le héros de sa propre histoire.',
+      it: 'MagicalStory nasce in Svizzera. Crediamo che ogni bambino meriti di essere il protagonista della propria storia.',
     },
   },
   '/contact': {
     title: {
-      en: 'Contact – Magical Story',
-      de: 'Kontakt – Magical Story',
-      fr: 'Contact – Magical Story',
-      it: 'Contatto – Magical Story',
+      en: 'Contact – MagicalStory',
+      de: 'Kontakt – MagicalStory',
+      fr: 'Contact – MagicalStory',
+      it: 'Contatto – MagicalStory',
     },
     description: {
-      en: 'Get in touch with the Magical Story team. We\'re here to help with your personalized children\'s books.',
-      de: 'Kontaktiere das Magical Story Team. Wir helfen dir gerne bei deinen personalisierten Kinderbüchern.',
-      fr: 'Contactez l\'équipe Magical Story. Nous sommes là pour vous aider avec vos livres personnalisés.',
-      it: 'Contatta il team di Magical Story. Siamo qui per aiutarti con i tuoi libri personalizzati per bambini.',
+      en: 'Get in touch with the MagicalStory team. We\'re here to help with your personalized children\'s books.',
+      de: 'Kontaktiere das MagicalStory Team. Wir helfen dir gerne bei deinen personalisierten Kinderbüchern.',
+      fr: 'Contactez l\'équipe MagicalStory. Nous sommes là pour vous aider avec vos livres personnalisés.',
+      it: 'Contatta il team di MagicalStory. Siamo qui per aiutarti con i tuoi libri personalizzati per bambini.',
     },
   },
   '/try': {
     title: {
-      en: 'Create Your Free Story – Magical Story',
-      de: 'Gratis Geschichte erstellen – Magical Story',
-      fr: 'Créez votre histoire gratuite – Magical Story',
-      it: 'Crea la tua storia gratis – Magical Story',
+      en: 'Create Your Free Story – MagicalStory',
+      de: 'Gratis Geschichte erstellen – MagicalStory',
+      fr: 'Créez votre histoire gratuite – MagicalStory',
+      it: 'Crea la tua storia gratis – MagicalStory',
     },
     description: {
       en: 'Create your first personalized children\'s story for free. Upload a photo and choose a theme to get started.',
@@ -335,52 +335,52 @@ const STATIC_ROUTES = {
   },
   '/terms': {
     title: {
-      en: 'Terms of Service – Magical Story',
-      de: 'Nutzungsbedingungen – Magical Story',
-      fr: 'Conditions d\'utilisation – Magical Story',
-      it: 'Termini di servizio – Magical Story',
+      en: 'Terms of Service – MagicalStory',
+      de: 'Nutzungsbedingungen – MagicalStory',
+      fr: 'Conditions d\'utilisation – MagicalStory',
+      it: 'Termini di servizio – MagicalStory',
     },
     description: {
-      en: 'Terms of service for Magical Story personalized children\'s books.',
-      de: 'Nutzungsbedingungen für Magical Story personalisierte Kinderbücher.',
-      fr: 'Conditions d\'utilisation de Magical Story, livres personnalisés pour enfants.',
-      it: 'Termini di servizio per i libri personalizzati per bambini di Magical Story.',
+      en: 'Terms of service for MagicalStory personalized children\'s books.',
+      de: 'Nutzungsbedingungen für MagicalStory personalisierte Kinderbücher.',
+      fr: 'Conditions d\'utilisation de MagicalStory, livres personnalisés pour enfants.',
+      it: 'Termini di servizio per i libri personalizzati per bambini di MagicalStory.',
     },
   },
   '/privacy': {
     title: {
-      en: 'Privacy Policy – Magical Story',
-      de: 'Datenschutz – Magical Story',
-      fr: 'Politique de confidentialité – Magical Story',
-      it: 'Informativa sulla privacy – Magical Story',
+      en: 'Privacy Policy – MagicalStory',
+      de: 'Datenschutz – MagicalStory',
+      fr: 'Politique de confidentialité – MagicalStory',
+      it: 'Informativa sulla privacy – MagicalStory',
     },
     description: {
-      en: 'Privacy policy for Magical Story. Learn how we protect your data and photos.',
-      de: 'Datenschutzerklärung für Magical Story. Erfahre, wie wir deine Daten und Fotos schützen.',
-      fr: 'Politique de confidentialité de Magical Story. Découvrez comment nous protégeons vos données et photos.',
-      it: 'Informativa sulla privacy di Magical Story. Scopri come proteggiamo i tuoi dati e le tue foto.',
+      en: 'Privacy policy for MagicalStory. Learn how we protect your data and photos.',
+      de: 'Datenschutzerklärung für MagicalStory. Erfahre, wie wir deine Daten und Fotos schützen.',
+      fr: 'Politique de confidentialité de MagicalStory. Découvrez comment nous protégeons vos données et photos.',
+      it: 'Informativa sulla privacy di MagicalStory. Scopri come proteggiamo i tuoi dati e le tue foto.',
     },
   },
   '/impressum': {
     title: {
-      en: 'Impressum – Magical Story',
-      de: 'Impressum – Magical Story',
-      fr: 'Impressum – Magical Story',
-      it: 'Impressum – Magical Story',
+      en: 'Impressum – MagicalStory',
+      de: 'Impressum – MagicalStory',
+      fr: 'Impressum – MagicalStory',
+      it: 'Impressum – MagicalStory',
     },
     description: {
-      en: 'Legal notice and imprint for Magical Story.',
-      de: 'Impressum und rechtliche Hinweise für Magical Story.',
-      fr: 'Mentions légales et impressum de Magical Story.',
-      it: 'Note legali e impressum di Magical Story.',
+      en: 'Legal notice and imprint for MagicalStory.',
+      de: 'Impressum und rechtliche Hinweise für MagicalStory.',
+      fr: 'Mentions légales et impressum de MagicalStory.',
+      it: 'Note legali e impressum di MagicalStory.',
     },
   },
   '/science': {
     title: {
-      en: 'Why Personalized Books Work – The Science | Magical Story',
-      de: 'Warum personalisierte Kinderbücher wirken | Magical Story',
-      fr: 'Pourquoi les livres personnalisés fonctionnent | Magical Story',
-      it: 'Perché i libri personalizzati funzionano | Magical Story',
+      en: 'Why Personalized Books Work – The Science | MagicalStory',
+      de: 'Warum personalisierte Kinderbücher wirken | MagicalStory',
+      fr: 'Pourquoi les livres personnalisés fonctionnent | MagicalStory',
+      it: 'Perché i libri personalizzati funzionano | MagicalStory',
     },
     description: {
       en: 'Children remember more, engage more deeply, and build confidence when they see themselves as the hero. The perfect personalized gift for birthdays and special occasions.',
@@ -391,10 +391,10 @@ const STATIC_ROUTES = {
   },
   '/themes': {
     title: {
-      en: 'Story Themes – Magical Story',
-      de: 'Geschichten-Themen – Magical Story',
-      fr: 'Thèmes d\'histoires – Magical Story',
-      it: 'Temi delle storie – Magical Story',
+      en: 'Story Themes – MagicalStory',
+      de: 'Geschichten-Themen – MagicalStory',
+      fr: 'Thèmes d\'histoires – MagicalStory',
+      it: 'Temi delle storie – MagicalStory',
     },
     description: {
       en: 'Browse all story themes: adventure, life challenges, educational, and historical. Create a personalized book for your child.',
@@ -411,10 +411,10 @@ const STATIC_ROUTES = {
       it: 'Storie per bambini dalla Svizzera | MagicalStory',
     },
     description: {
-      de: 'Personalisierte Kindergeschichten aus 50 Schweizer Städten. Dein Kind erlebt Abenteuer in Zürich, Bern, Basel und mehr.',
-      en: 'Personalized children\'s stories from 50 Swiss cities. Your child goes on adventures in Zurich, Bern, Basel and more.',
-      fr: 'Histoires personnalisées pour enfants de 50 villes suisses. Votre enfant vit des aventures à Zurich, Berne, Bâle et plus.',
-      it: 'Storie personalizzate per bambini da 50 città svizzere. Il tuo bambino vive avventure a Zurigo, Berna, Basilea e altre città.',
+      de: 'Personalisierte Kindergeschichten aus 100 Schweizer Städten. Dein Kind erlebt Abenteuer in Zürich, Bern, Basel und mehr.',
+      en: 'Personalized children\'s stories from 100 Swiss cities. Your child goes on adventures in Zurich, Bern, Basel and more.',
+      fr: 'Histoires personnalisées pour enfants de 100 villes suisses. Votre enfant vit des aventures à Zurich, Berne, Bâle et plus.',
+      it: 'Storie personalizzate per bambini da 100 città svizzere. Il tuo bambino vive avventure a Zurigo, Berna, Basilea e altre città.',
     },
   },
   '/stadt': {
@@ -748,7 +748,7 @@ const FAQ_BY_LANG = {
         "name": "Wie lange dauert es?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Deine erste kostenlose Geschichte ist in unter 3 Minuten fertig. Text und alle Illustrationen werden automatisch generiert."
+          "text": "Deine erste kostenlose Geschichte ist in ein paar Minuten fertig. Text und alle Illustrationen werden automatisch generiert."
         }
       },
       {
@@ -772,7 +772,7 @@ const FAQ_BY_LANG = {
         "name": "Was kostet MagicalStory?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Deine erste Geschichte ist komplett gratis. Danach werden Geschichten mit Credits erstellt. Gedruckte Bücher gibt es ab CHF 33 als hochwertiges Hardcover."
+          "text": "Deine erste Geschichte ist komplett gratis. Danach werden Geschichten mit Credits erstellt. Gedruckte Bücher gibt es ab CHF 37 als hochwertiges Hardcover."
         }
       },
       {
@@ -798,7 +798,7 @@ const FAQ_BY_LANG = {
         "name": "How long does it take?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Your first free story is ready in under 3 minutes. The text and all illustrations are generated automatically."
+          "text": "Your first free story is ready in a few minutes. The text and all illustrations are generated automatically."
         }
       },
       {
@@ -822,7 +822,7 @@ const FAQ_BY_LANG = {
         "name": "What does MagicalStory cost?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Your first story is completely free. After that, stories are created using credits. Printed books start at CHF 33 as a high-quality hardcover."
+          "text": "Your first story is completely free. After that, stories are created using credits. Printed books start at CHF 37 as a high-quality hardcover."
         }
       },
       {
@@ -848,7 +848,7 @@ const FAQ_BY_LANG = {
         "name": "Combien de temps cela prend-il ?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Votre première histoire gratuite est prête en moins de 3 minutes. Le texte et toutes les illustrations sont générés automatiquement."
+          "text": "Votre première histoire gratuite est prête en quelques minutes. Le texte et toutes les illustrations sont générés automatiquement."
         }
       },
       {
@@ -872,7 +872,7 @@ const FAQ_BY_LANG = {
         "name": "Combien coûte MagicalStory ?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Votre première histoire est entièrement gratuite. Ensuite, les histoires sont créées avec des crédits. Les livres imprimés sont disponibles à partir de CHF 33 en couverture rigide de haute qualité."
+          "text": "Votre première histoire est entièrement gratuite. Ensuite, les histoires sont créées avec des crédits. Les livres imprimés sont disponibles à partir de CHF 37 en couverture rigide de haute qualité."
         }
       },
       {
@@ -898,7 +898,7 @@ const FAQ_BY_LANG = {
         "name": "Quanto tempo ci vuole?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "La tua prima storia gratuita è pronta in meno di 3 minuti. Il testo e tutte le illustrazioni vengono generati automaticamente."
+          "text": "La tua prima storia gratuita è pronta in pochi minuti. Il testo e tutte le illustrazioni vengono generati automaticamente."
         }
       },
       {
@@ -922,7 +922,7 @@ const FAQ_BY_LANG = {
         "name": "Quanto costa MagicalStory?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "La tua prima storia è completamente gratuita. Dopodiché, le storie vengono create usando crediti. I libri stampati partono da CHF 33 in copertina rigida di alta qualità."
+          "text": "La tua prima storia è completamente gratuita. Dopodiché, le storie vengono create usando crediti. I libri stampati partono da CHF 37 in copertina rigida di alta qualità."
         }
       },
       {
@@ -964,27 +964,27 @@ function buildProductJsonLdForTheme(themeName, category, themeId, lang) {
     de: {
       name: `Personalisiertes Kinderbuch: ${themeName}`,
       description: `KI-illustriertes ${themeName}-Kinderbuch mit deinem Kind als Held.`,
-      offer: 'Erste Geschichte kostenlos. Hardcover ab CHF 33.',
+      offer: 'Erste Geschichte kostenlos. Hardcover ab CHF 37.',
     },
     en: {
       name: `Personalized children's book: ${themeName}`,
       description: `AI-illustrated ${themeName} children's book with your child as the hero.`,
-      offer: 'First story free. Hardcover from CHF 33.',
+      offer: 'First story free. Hardcover from CHF 37.',
     },
     fr: {
       name: `Livre pour enfants personnalisé : ${themeName}`,
       description: `Livre ${themeName} illustré par IA avec votre enfant comme héros.`,
-      offer: 'Première histoire gratuite. Couverture rigide dès CHF 33.',
+      offer: 'Première histoire gratuite. Couverture rigide dès CHF 37.',
     },
     it: {
       name: `Libro per bambini personalizzato: ${themeName}`,
       description: `Libro ${themeName} illustrato con l'IA e tuo figlio come protagonista.`,
-      offer: 'Prima storia gratuita. Cartonato da CHF 33.',
+      offer: 'Prima storia gratuita. Cartonato da CHF 29.',
     },
   }[lang] || {
     name: `Personalized children's book: ${themeName}`,
     description: `AI-illustrated ${themeName} children's book with your child as the hero.`,
-    offer: 'First story free. Hardcover from CHF 33.',
+    offer: 'First story free. Hardcover from CHF 37.',
   };
   return {
     '@context': 'https://schema.org',
@@ -1162,7 +1162,7 @@ function getMetaForRoute(routePath, lang) {
     } else {
       // Other static pages get breadcrumb only
       const pageName = pickLang(staticMeta.title, lang);
-      meta.jsonLd = [buildBreadcrumbJsonLd([{ name: 'Home', url: '/' }, { name: pageName.replace(/ – Magical Story$/, '') }])];
+      meta.jsonLd = [buildBreadcrumbJsonLd([{ name: 'Home', url: '/' }, { name: pageName.replace(/ – MagicalStory$/, '') }])];
     }
 
     return meta;
@@ -1176,7 +1176,7 @@ function getMetaForRoute(routePath, lang) {
     if (category) {
       const catName = pickLang(category, lang);
       return {
-        title: `${catName} – Magical Story`,
+        title: `${catName} – MagicalStory`,
         description: buildCategoryDescription(catName, lang),
         canonical: canonicalUrl,
         path: cleanPath,
@@ -1291,7 +1291,7 @@ function getMetaForRoute(routePath, lang) {
     if (guide) {
       const title = pickLang(guide.title, lang);
       return {
-        title: `${title} | Magical Story`,
+        title: `${title} | MagicalStory`,
         description: pickLang(guide.description, lang),
         canonical: canonicalUrl,
         path: cleanPath,
@@ -1304,8 +1304,8 @@ function getMetaForRoute(routePath, lang) {
             headline: title,
             description: pickLang(guide.description, lang),
             inLanguage: lang,
-            author: { '@type': 'Organization', name: 'Magical Story' },
-            publisher: { '@type': 'Organization', name: 'Magical Story' },
+            author: { '@type': 'Organization', name: 'MagicalStory' },
+            publisher: { '@type': 'Organization', name: 'MagicalStory' },
             mainEntityOfPage: { '@type': 'WebPage', '@id': canonicalUrl },
           },
           buildBreadcrumbJsonLd([
@@ -1406,7 +1406,7 @@ function getMetaForRoute(routePath, lang) {
   // 9. Noindex route (auth/app pages)
   if (isNoindex) {
     return {
-      title: 'Magical Story',
+      title: 'MagicalStory',
       description: '',
       canonical: canonicalUrl,
       path: cleanPath,
@@ -1418,12 +1418,12 @@ function getMetaForRoute(routePath, lang) {
   // 10. Fallback — unknown route
   return {
     title: lang === 'it'
-      ? 'Magical Story – Il tuo bambino protagonista della sua storia'
+      ? 'MagicalStory – Il tuo bambino protagonista della sua storia'
       : lang === 'fr'
-        ? 'Magical Story – Votre enfant, héros de sa propre histoire'
+        ? 'MagicalStory – Votre enfant, héros de sa propre histoire'
         : lang === 'en'
-          ? 'Magical Story – Your Child as the Hero of Their Own Story'
-          : 'Magical Story – Dein Kind als Held seiner eigenen Geschichte',
+          ? 'MagicalStory – Your Child as the Hero of Their Own Story'
+          : 'MagicalStory – Dein Kind als Held seiner eigenen Geschichte',
     description: lang === 'it'
       ? 'Rendi il tuo bambino il protagonista della sua storia. Carica una foto, scegli un tema, crea gratis la prima storia.'
       : lang === 'fr'
@@ -1456,20 +1456,20 @@ function buildHreflang(routePath) {
 
 function buildCategoryDescription(catName, lang) {
   const templates = {
-    en: `Browse ${catName} for your child. Create a personalized illustrated book in minutes with Magical Story.`,
-    de: `Entdecke ${catName} für dein Kind. Erstelle in Minuten ein personalisiertes illustriertes Buch mit Magical Story.`,
-    fr: `Découvrez les ${catName} pour votre enfant. Créez un livre illustré personnalisé en quelques minutes avec Magical Story.`,
-    it: `Scopri ${catName} per il tuo bambino. Crea in pochi minuti un libro illustrato personalizzato con Magical Story.`,
+    en: `Browse ${catName} for your child. Create a personalized illustrated book in minutes with MagicalStory.`,
+    de: `Entdecke ${catName} für dein Kind. Erstelle in Minuten ein personalisiertes illustriertes Buch mit MagicalStory.`,
+    fr: `Découvrez les ${catName} pour votre enfant. Créez un livre illustré personnalisé en quelques minutes avec MagicalStory.`,
+    it: `Scopri ${catName} per il tuo bambino. Crea in pochi minuti un libro illustrato personalizzato con MagicalStory.`,
   };
   return pickLang(templates, lang);
 }
 
 function buildThemeDescription(themeName, lang) {
   const templates = {
-    de: `Erstelle ein personalisiertes ${themeName}-Kinderbuch mit dem Foto deines Kindes. KI-illustriert, einzigartig, ab CHF 33. Erste Geschichte gratis.`,
-    en: `Create a personalized ${themeName} children's book with your child's photo. AI-illustrated, unique, from CHF 33. First story free.`,
-    fr: `Créez un livre personnalisé ${themeName} avec la photo de votre enfant. Illustré par IA, unique, dès CHF 33. Première histoire gratuite.`,
-    it: `Crea un libro personalizzato ${themeName} con la foto del tuo bambino. Illustrato dall'IA, unico, da CHF 33. Prima storia gratuita.`,
+    de: `Erstelle ein personalisiertes ${themeName}-Kinderbuch mit dem Foto deines Kindes. KI-illustriert, einzigartig, ab CHF 29. Erste Geschichte gratis.`,
+    en: `Create a personalized ${themeName} children's book with your child's photo. AI-illustrated, unique, from CHF 29. First story free.`,
+    fr: `Créez un livre personnalisé ${themeName} avec la photo de votre enfant. Illustré par IA, unique, dès CHF 29. Première histoire gratuite.`,
+    it: `Crea un libro personalizzato ${themeName} con la foto del tuo bambino. Illustrato dall'IA, unico, da CHF 29. Prima storia gratuita.`,
   };
   return pickLang(templates, lang);
 }
@@ -1505,26 +1505,28 @@ function buildComparisonDescription(competitorName, lang) {
 }
 
 function buildOccasionDescription(occasionSlug, lang) {
+  // de/en hold the full prepositional phrase ("zum Geburtstag", "for a birthday") so
+  // the template never glues a bare noun behind a fixed preposition.
   const occasionGifts = {
-    geburtstag: { de: 'Geburtstag', en: 'birthday', fr: 'anniversaire', it: 'il compleanno' },
-    weihnachten: { de: 'Weihnachten', en: 'Christmas', fr: 'Noël', it: 'Natale' },
-    ostern: { de: 'Ostern', en: 'Easter', fr: 'Pâques', it: 'Pasqua' },
-    taufe: { de: 'Taufe', en: 'baptism', fr: 'baptême', it: 'il battesimo' },
-    einschulung: { de: 'Einschulung', en: 'first day of school', fr: 'rentrée scolaire', it: 'il primo giorno di scuola' },
-    geschwisterchen: { de: 'Geschwisterchen', en: 'new sibling', fr: 'nouveau bébé', it: 'l\'arrivo di un fratellino' },
-    muttertag: { de: 'Muttertag', en: 'Mother\'s Day', fr: 'fête des mères', it: 'la Festa della Mamma' },
-    vatertag: { de: 'Vatertag', en: 'Father\'s Day', fr: 'fête des pères', it: 'la Festa del Papà' },
-    nikolaus: { de: 'Nikolaus', en: 'St. Nicholas Day', fr: 'Saint-Nicolas', it: 'San Nicolao' },
-    advent: { de: 'Advent', en: 'Advent', fr: 'Avent', it: 'l\'Avvento' },
-    umzug: { de: 'Umzug', en: 'moving house', fr: 'déménagement', it: 'un trasloco' },
-    kindergartenstart: { de: 'Kindergartenstart', en: 'starting kindergarten', fr: 'entrée en maternelle', it: 'l\'inizio della scuola materna' },
+    geburtstag: { de: 'zum Geburtstag', en: 'for a birthday', fr: 'anniversaire', it: 'il compleanno' },
+    weihnachten: { de: 'zu Weihnachten', en: 'for Christmas', fr: 'Noël', it: 'Natale' },
+    ostern: { de: 'zu Ostern', en: 'for Easter', fr: 'Pâques', it: 'Pasqua' },
+    taufe: { de: 'zur Taufe', en: 'for a baptism', fr: 'baptême', it: 'il battesimo' },
+    einschulung: { de: 'zur Einschulung', en: 'for the first day of school', fr: 'rentrée scolaire', it: 'il primo giorno di scuola' },
+    geschwisterchen: { de: 'zum Geschwisterchen', en: 'for a new sibling', fr: 'nouveau bébé', it: 'l\'arrivo di un fratellino' },
+    muttertag: { de: 'zum Muttertag', en: 'for Mother\'s Day', fr: 'fête des mères', it: 'la Festa della Mamma' },
+    vatertag: { de: 'zum Vatertag', en: 'for Father\'s Day', fr: 'fête des pères', it: 'la Festa del Papà' },
+    nikolaus: { de: 'zum Nikolaus', en: 'for St. Nicholas Day', fr: 'Saint-Nicolas', it: 'San Nicolao' },
+    advent: { de: 'zum Advent', en: 'for Advent', fr: 'Avent', it: 'l\'Avvento' },
+    umzug: { de: 'zum Umzug', en: 'for a move to a new home', fr: 'déménagement', it: 'un trasloco' },
+    kindergartenstart: { de: 'zum Kindergartenstart', en: 'for starting kindergarten', fr: 'entrée en maternelle', it: 'l\'inizio della scuola materna' },
   };
-  const occ = occasionGifts[occasionSlug] || { de: 'Anlass', en: 'occasion', fr: 'occasion', it: 'un\'occasione speciale' };
+  const occ = occasionGifts[occasionSlug] || { de: 'zu jedem Anlass', en: 'for any occasion', fr: 'occasion', it: 'un\'occasione speciale' };
   const templates = {
-    de: `Das perfekte Geschenk zum ${occ.de}: Ein personalisiertes Kinderbuch mit deinem Kind als Held. 170+ Themen, Hardcover ab CHF 33. Erste Geschichte gratis.`,
-    en: `The perfect gift for ${occ.en}: A personalized children's book with your child as the hero. 170+ themes, hardcover from CHF 33. First story free.`,
-    fr: `Le cadeau parfait pour ${occ.fr}: Un livre personnalisé avec votre enfant en héros. 170+ thèmes, couverture rigide dès CHF 33. Première histoire gratuite.`,
-    it: `Il regalo perfetto per ${occ.it}: un libro personalizzato con il tuo bambino come protagonista. 170+ temi, copertina rigida da CHF 33. Prima storia gratuita.`,
+    de: `Das perfekte Geschenk ${occ.de}: Ein personalisiertes Kinderbuch mit deinem Kind als Held. 170+ Themen, Hardcover ab CHF 37. Erste Geschichte gratis.`,
+    en: `The perfect gift ${occ.en}: A personalized children's book with your child as the hero. 170+ themes, hardcover from CHF 37. First story free.`,
+    fr: `Le cadeau parfait pour ${occ.fr}: Un livre personnalisé avec votre enfant en héros. 170+ thèmes, couverture rigide dès CHF 37. Première histoire gratuite.`,
+    it: `Il regalo perfetto per ${occ.it}: un libro personalizzato con il tuo bambino come protagonista. 170+ temi, copertina rigida da CHF 37. Prima storia gratuita.`,
   };
   return pickLang(templates, lang);
 }
@@ -1532,134 +1534,134 @@ function buildOccasionDescription(occasionSlug, lang) {
 function buildGiftDescription(giftSlug, lang) {
   const descriptions = {
     'fuer-kinder': {
-      de: 'Ein Geschenk, das Kinderaugen leuchten lässt: ein personalisiertes Kinderbuch mit dem eigenen Foto. 170+ Themen, Hardcover ab CHF 33. Erste Geschichte gratis testen.',
-      en: 'A gift that makes children\'s eyes light up: a personalized book with their own photo. 170+ themes, hardcover from CHF 33. Try the first story free.',
-      fr: 'Un cadeau qui fait briller les yeux des enfants: un livre personnalisé avec leur photo. 170+ thèmes, couverture rigide dès CHF 33. Première histoire gratuite.',
-      it: 'Un regalo che fa brillare gli occhi dei bambini: un libro personalizzato con la loro foto. 170+ temi, copertina rigida da CHF 33. Prova gratis la prima storia.',
+      de: 'Ein Geschenk, das Kinderaugen leuchten lässt: ein personalisiertes Kinderbuch mit dem eigenen Foto. 170+ Themen, Hardcover ab CHF 37. Erste Geschichte gratis testen.',
+      en: 'A gift that makes children\'s eyes light up: a personalized book with their own photo. 170+ themes, hardcover from CHF 37. Try the first story free.',
+      fr: 'Un cadeau qui fait briller les yeux des enfants: un livre personnalisé avec leur photo. 170+ thèmes, couverture rigide dès CHF 37. Première histoire gratuite.',
+      it: 'Un regalo che fa brillare gli occhi dei bambini: un libro personalizzato con la loro foto. 170+ temi, copertina rigida da CHF 37. Prova gratis la prima storia.',
     },
     'fuer-enkel': {
-      de: 'Das Geschenk von Oma & Opa, das Enkel nie vergessen: ein personalisiertes Kinderbuch mit eigenem Foto. Einzigartig, liebevoll, ab CHF 33.',
-      en: 'The gift from grandma & grandpa that grandchildren never forget: a personalized book with their photo. Unique, heartfelt, from CHF 33.',
-      fr: 'Le cadeau des grands-parents que les petits-enfants n\'oublient jamais: un livre personnalisé avec leur photo. Unique et touchant, dès CHF 33.',
-      it: 'Il regalo di nonna e nonno che i nipoti non dimenticano mai: un libro personalizzato con la loro foto. Unico e speciale, da CHF 33.',
+      de: 'Das Geschenk von Oma & Opa, das Enkel nie vergessen: ein personalisiertes Kinderbuch mit eigenem Foto. Einzigartig, liebevoll, ab CHF 29.',
+      en: 'The gift from grandma & grandpa that grandchildren never forget: a personalized book with their photo. Unique, heartfelt, from CHF 29.',
+      fr: 'Le cadeau des grands-parents que les petits-enfants n\'oublient jamais: un livre personnalisé avec leur photo. Unique et touchant, dès CHF 29.',
+      it: 'Il regalo di nonna e nonno che i nipoti non dimenticano mai: un libro personalizzato con la loro foto. Unico e speciale, da CHF 29.',
     },
     'fuer-nichte-neffe': {
-      de: 'Überrasche Nichte oder Neffe mit einem personalisierten Kinderbuch — mit eigenem Foto als Held der Geschichte. Ab CHF 33, erste Geschichte gratis.',
-      en: 'Surprise your niece or nephew with a personalized book — starring them as the hero. From CHF 33, first story free.',
-      fr: 'Surprenez votre nièce ou neveu avec un livre personnalisé — ils sont le héros. Dès CHF 33, première histoire gratuite.',
-      it: 'Sorprendi tua nipote o tuo nipote con un libro personalizzato — sono loro il protagonista. Da CHF 33, prima storia gratuita.',
+      de: 'Überrasche Nichte oder Neffe mit einem personalisierten Kinderbuch — mit eigenem Foto als Held der Geschichte. Ab CHF 29, erste Geschichte gratis.',
+      en: 'Surprise your niece or nephew with a personalized book — starring them as the hero. From CHF 29, first story free.',
+      fr: 'Surprenez votre nièce ou neveu avec un livre personnalisé — ils sont le héros. Dès CHF 29, première histoire gratuite.',
+      it: 'Sorprendi tua nipote o tuo nipote con un libro personalizzato — sono loro il protagonista. Da CHF 29, prima storia gratuita.',
     },
     'fuer-patenkind': {
-      de: 'Geschenk für Göttikind oder Patenkind: ein personalisiertes Kinderbuch vom Götti oder der Gotte, mit Göttibub oder Göttimeitli als Held. Ab CHF 33.',
-      en: 'A special gift from godparent to godchild: a personalized book with their photo. From CHF 33, first story free.',
-      fr: 'Un cadeau spécial du parrain ou de la marraine: un livre personnalisé avec la photo de votre filleul(e). Dès CHF 33.',
-      it: 'Un regalo speciale dal padrino o dalla madrina: un libro personalizzato con la foto del tuo figlioccio. Da CHF 33, prima storia gratuita.',
+      de: 'Geschenk für Göttikind oder Patenkind: ein personalisiertes Kinderbuch vom Götti oder der Gotte, mit Göttibub oder Göttimeitli als Held. Ab CHF 29.',
+      en: 'A special gift from godparent to godchild: a personalized book with their photo. From CHF 29, first story free.',
+      fr: 'Un cadeau spécial du parrain ou de la marraine: un livre personnalisé avec la photo de votre filleul(e). Dès CHF 29.',
+      it: 'Un regalo speciale dal padrino o dalla madrina: un libro personalizzato con la foto del tuo figlioccio. Da CHF 29, prima storia gratuita.',
     },
     'geschenk-von-grosseltern': {
-      de: 'Das ideale Geschenk von Grosseltern: ein personalisiertes Kinderbuch, das Enkel zum Helden macht. Einfach online erstellen, ab CHF 33.',
-      en: 'The ideal gift from grandparents: a personalized book that makes grandchildren the hero. Easy to create online, from CHF 33.',
-      fr: 'Le cadeau idéal des grands-parents: un livre personnalisé qui fait de vos petits-enfants le héros. Facile à créer, dès CHF 33.',
-      it: 'Il regalo ideale dai nonni: un libro personalizzato che rende i nipoti il protagonista. Facile da creare online, da CHF 33.',
+      de: 'Das ideale Geschenk von Grosseltern: ein personalisiertes Kinderbuch, das Enkel zum Helden macht. Einfach online erstellen, ab CHF 29.',
+      en: 'The ideal gift from grandparents: a personalized book that makes grandchildren the hero. Easy to create online, from CHF 29.',
+      fr: 'Le cadeau idéal des grands-parents: un livre personnalisé qui fait de vos petits-enfants le héros. Facile à créer, dès CHF 29.',
+      it: 'Il regalo ideale dai nonni: un libro personalizzato che rende i nipoti il protagonista. Facile da creare online, da CHF 29.',
     },
     'ostergeschenk': {
-      de: 'Das besondere Ostergeschenk für Kinder: ein personalisiertes Kinderbuch statt Schoggi-Hasen. Mit eigenem Foto, ab CHF 33. Kostenlos testen.',
-      en: 'A special Easter gift for kids: a personalized book instead of chocolate bunnies. With their photo, from CHF 33. Try free.',
-      fr: 'Un cadeau de Pâques spécial: un livre personnalisé au lieu de lapins en chocolat. Avec leur photo, dès CHF 33. Essai gratuit.',
-      it: 'Un regalo di Pasqua speciale: un libro personalizzato al posto dei conigli di cioccolato. Con la loro foto, da CHF 33. Prova gratis.',
+      de: 'Das besondere Ostergeschenk für Kinder: ein personalisiertes Kinderbuch statt Schoggi-Hasen. Mit eigenem Foto, ab CHF 29. Kostenlos testen.',
+      en: 'A special Easter gift for kids: a personalized book instead of chocolate bunnies. With their photo, from CHF 29. Try free.',
+      fr: 'Un cadeau de Pâques spécial: un livre personnalisé au lieu de lapins en chocolat. Avec leur photo, dès CHF 29. Essai gratuit.',
+      it: 'Un regalo di Pasqua speciale: un libro personalizzato al posto dei conigli di cioccolato. Con la loro foto, da CHF 29. Prova gratis.',
     },
     'weihnachtsgeschenk': {
-      de: 'Das Weihnachtsgeschenk, das Kinder lieben: ein personalisiertes Kinderbuch mit eigenem Foto unter dem Tannenbaum. Ab CHF 33.',
-      en: 'The Christmas gift kids love: a personalized book with their photo under the tree. From CHF 33, first story free.',
-      fr: 'Le cadeau de Noël que les enfants adorent: un livre personnalisé avec leur photo sous le sapin. Dès CHF 33.',
-      it: 'Il regalo di Natale che i bambini adorano: un libro personalizzato con la loro foto sotto l\'albero. Da CHF 33, prima storia gratuita.',
+      de: 'Das Weihnachtsgeschenk, das Kinder lieben: ein personalisiertes Kinderbuch mit eigenem Foto unter dem Tannenbaum. Ab CHF 29.',
+      en: 'The Christmas gift kids love: a personalized book with their photo under the tree. From CHF 29, first story free.',
+      fr: 'Le cadeau de Noël que les enfants adorent: un livre personnalisé avec leur photo sous le sapin. Dès CHF 29.',
+      it: 'Il regalo di Natale che i bambini adorano: un libro personalizzato con la loro foto sotto l\'albero. Da CHF 29, prima storia gratuita.',
     },
     'geburtstagsgeschenk': {
-      de: 'Das perfekte Geburtstagsgeschenk für Kinder: ein personalisiertes Kinderbuch mit dem Geburtstagskind als Held. Ab CHF 33.',
-      en: 'The perfect birthday gift for kids: a personalized book with the birthday child as hero. From CHF 33, first story free.',
-      fr: "Le cadeau d'anniversaire parfait: un livre personnalisé avec l'enfant fêté en héros. Dès CHF 33, première histoire gratuite.",
-      it: 'Il regalo di compleanno perfetto: un libro personalizzato con il festeggiato come protagonista. Da CHF 33, prima storia gratuita.',
+      de: 'Das perfekte Geburtstagsgeschenk für Kinder: ein personalisiertes Kinderbuch mit dem Geburtstagskind als Held. Ab CHF 29.',
+      en: 'The perfect birthday gift for kids: a personalized book with the birthday child as hero. From CHF 29, first story free.',
+      fr: "Le cadeau d'anniversaire parfait: un livre personnalisé avec l'enfant fêté en héros. Dès CHF 29, première histoire gratuite.",
+      it: 'Il regalo di compleanno perfetto: un libro personalizzato con il festeggiato come protagonista. Da CHF 29, prima storia gratuita.',
     },
     'taufgeschenk': {
-      de: 'Ein Taufgeschenk mit bleibendem Wert: ein personalisiertes Kinderbuch mit dem Namen und Foto des Täuflings. Ab CHF 33.',
-      en: 'A baptism gift with lasting value: a personalized book with the child\'s name and photo. From CHF 33.',
-      fr: 'Un cadeau de baptême à valeur durable: un livre personnalisé avec le nom et la photo de l\'enfant. Dès CHF 33.',
-      it: 'Un regalo di battesimo dal valore duraturo: un libro personalizzato con il nome e la foto del bambino. Da CHF 33.',
+      de: 'Ein Taufgeschenk mit bleibendem Wert: ein personalisiertes Kinderbuch mit dem Namen und Foto des Täuflings. Ab CHF 29.',
+      en: 'A baptism gift with lasting value: a personalized book with the child\'s name and photo. From CHF 29.',
+      fr: 'Un cadeau de baptême à valeur durable: un livre personnalisé avec le nom et la photo de l\'enfant. Dès CHF 29.',
+      it: 'Un regalo di battesimo dal valore duraturo: un libro personalizzato con il nome e la foto del bambino. Da CHF 29.',
     },
     'einschulungsgeschenk': {
-      de: 'Geschenk zur Einschulung: ein personalisiertes Kinderbuch für den grossen Tag. Mit dem Schulkind als Held der Geschichte. Ab CHF 33.',
-      en: 'First day of school gift: a personalized book for the big day. With the child as hero of the story. From CHF 33.',
-      fr: 'Cadeau de rentrée: un livre personnalisé pour le grand jour. L\'enfant est le héros de l\'histoire. Dès CHF 33.',
-      it: 'Regalo per il primo giorno di scuola: un libro personalizzato per il grande giorno. Il bambino è il protagonista della storia. Da CHF 33.',
+      de: 'Geschenk zur Einschulung: ein personalisiertes Kinderbuch für den grossen Tag. Mit dem Schulkind als Held der Geschichte. Ab CHF 29.',
+      en: 'First day of school gift: a personalized book for the big day. With the child as hero of the story. From CHF 29.',
+      fr: 'Cadeau de rentrée: un livre personnalisé pour le grand jour. L\'enfant est le héros de l\'histoire. Dès CHF 29.',
+      it: 'Regalo per il primo giorno di scuola: un libro personalizzato per il grande giorno. Il bambino è il protagonista della storia. Da CHF 29.',
     },
     'nikolausgeschenk': {
-      de: 'Nikolausgeschenk für Kinder: ein personalisiertes Kinderbuch im Samichlaus-Sack. Mit eigenem Foto, ab CHF 33. Kostenlos testen.',
-      en: 'St. Nicholas gift for kids: a personalized book in the gift bag. With their own photo, from CHF 33. Try free.',
-      fr: 'Cadeau de Saint-Nicolas: un livre personnalisé dans la hotte. Avec leur photo, dès CHF 33. Essai gratuit.',
-      it: 'Regalo di San Nicolao per bambini: un libro personalizzato nel sacco dei doni. Con la loro foto, da CHF 33. Prova gratis.',
+      de: 'Nikolausgeschenk für Kinder: ein personalisiertes Kinderbuch im Samichlaus-Sack. Mit eigenem Foto, ab CHF 29. Kostenlos testen.',
+      en: 'St. Nicholas gift for kids: a personalized book in the gift bag. With their own photo, from CHF 29. Try free.',
+      fr: 'Cadeau de Saint-Nicolas: un livre personnalisé dans la hotte. Avec leur photo, dès CHF 29. Essai gratuit.',
+      it: 'Regalo di San Nicolao per bambini: un libro personalizzato nel sacco dei doni. Con la loro foto, da CHF 29. Prova gratis.',
     },
     'einzigartiges-geschenk': {
-      de: 'Auf der Suche nach einem einzigartigen Kindergeschenk? Ein personalisiertes Kinderbuch mit Foto — gibt es kein zweites Mal. Ab CHF 33.',
-      en: 'Looking for a unique gift for kids? A personalized book with their photo — truly one of a kind. From CHF 33.',
-      fr: 'Vous cherchez un cadeau unique? Un livre personnalisé avec la photo de l\'enfant — vraiment unique. Dès CHF 33.',
-      it: 'Cerchi un regalo unico per bambini? Un libro personalizzato con la foto del bambino — davvero irripetibile. Da CHF 33.',
+      de: 'Auf der Suche nach einem einzigartigen Kindergeschenk? Ein personalisiertes Kinderbuch mit Foto — gibt es kein zweites Mal. Ab CHF 29.',
+      en: 'Looking for a unique gift for kids? A personalized book with their photo — truly one of a kind. From CHF 29.',
+      fr: 'Vous cherchez un cadeau unique? Un livre personnalisé avec la photo de l\'enfant — vraiment unique. Dès CHF 29.',
+      it: 'Cerchi un regalo unico per bambini? Un libro personalizzato con la foto del bambino — davvero irripetibile. Da CHF 29.',
     },
     'personalisiertes-geschenk': {
-      de: 'Personalisiertes Geschenk für Kinder: Kinderbuch mit eigenem Foto, Namen und 170+ Themen. Hardcover ab CHF 33. Erste Geschichte gratis.',
-      en: 'Personalized gift for kids: a book with their photo, name and 170+ themes. Hardcover from CHF 33. First story free.',
-      fr: 'Cadeau personnalisé pour enfants: livre avec photo, prénom et 170+ thèmes. Couverture rigide dès CHF 33. Première histoire gratuite.',
-      it: 'Regalo personalizzato per bambini: libro con foto, nome e 170+ temi. Copertina rigida da CHF 33. Prima storia gratuita.',
+      de: 'Personalisiertes Geschenk für Kinder: Kinderbuch mit eigenem Foto, Namen und 170+ Themen. Hardcover ab CHF 37. Erste Geschichte gratis.',
+      en: 'Personalized gift for kids: a book with their photo, name and 170+ themes. Hardcover from CHF 37. First story free.',
+      fr: 'Cadeau personnalisé pour enfants: livre avec photo, prénom et 170+ thèmes. Couverture rigide dès CHF 37. Première histoire gratuite.',
+      it: 'Regalo personalizzato per bambini: libro con foto, nome e 170+ temi. Copertina rigida da CHF 37. Prima storia gratuita.',
     },
     'sinnvolles-geschenk': {
-      de: 'Sinnvolles Geschenk für Kinder: ein personalisiertes Kinderbuch, das Lesen fördert und Selbstvertrauen stärkt. Ab CHF 33.',
-      en: 'A meaningful gift for kids: a personalized book that encourages reading and builds confidence. From CHF 33.',
-      fr: 'Un cadeau éducatif pour enfants: un livre personnalisé qui encourage la lecture et renforce la confiance. Dès CHF 33.',
-      it: 'Un regalo educativo per bambini: un libro personalizzato che incoraggia la lettura e rafforza l\'autostima. Da CHF 33.',
+      de: 'Sinnvolles Geschenk für Kinder: ein personalisiertes Kinderbuch, das Lesen fördert und Selbstvertrauen stärkt. Ab CHF 29.',
+      en: 'A meaningful gift for kids: a personalized book that encourages reading and builds confidence. From CHF 29.',
+      fr: 'Un cadeau éducatif pour enfants: un livre personnalisé qui encourage la lecture et renforce la confiance. Dès CHF 29.',
+      it: 'Un regalo educativo per bambini: un libro personalizzato che incoraggia la lettura e rafforza l\'autostima. Da CHF 29.',
     },
     'last-minute-geschenk': {
-      de: 'Last-Minute-Geschenk für Kinder: personalisiertes Kinderbuch sofort als PDF oder in 5 Tagen als Hardcover. Ab CHF 33.',
-      en: 'Last-minute gift for kids: personalized book instantly as PDF or hardcover in 5 days. From CHF 33.',
-      fr: 'Cadeau de dernière minute: livre personnalisé en PDF immédiat ou couverture rigide en 5 jours. Dès CHF 33.',
-      it: 'Regalo dell\'ultimo minuto per bambini: libro personalizzato subito in PDF o copertina rigida in 5 giorni. Da CHF 33.',
+      de: 'Last-Minute-Geschenk für Kinder: personalisiertes Kinderbuch als PDF oder in 5–7 Werktagen als Hardcover. Ab CHF 37.',
+      en: 'Last-minute gift for kids: personalized book as a PDF or as a hardcover in 5–7 business days. From CHF 37.',
+      fr: 'Cadeau de dernière minute: livre personnalisé en PDF ou en couverture rigide livrée en 5 à 7 jours ouvrables. Dès CHF 37.',
+      it: 'Regalo dell\'ultimo minuto per bambini: libro personalizzato in PDF o in copertina rigida consegnata in 5–7 giorni lavorativi. Da CHF 37.',
     },
     'geschenk-3-jahre': {
-      de: 'Geschenk für 3-Jährige: ein personalisiertes Kinderbuch mit grossen Bildern und einfachen Texten. Mit eigenem Foto, ab CHF 33.',
-      en: 'Gift for 3-year-olds: a personalized book with big pictures and simple text. With their photo, from CHF 33.',
-      fr: 'Cadeau pour enfant de 3 ans: un livre personnalisé avec de grandes images et des textes simples. Dès CHF 33.',
-      it: 'Regalo per bambini di 3 anni: un libro personalizzato con grandi immagini e testi semplici. Con la loro foto, da CHF 33.',
+      de: 'Geschenk für 3-Jährige: ein personalisiertes Kinderbuch mit grossen Bildern und einfachen Texten. Mit eigenem Foto, ab CHF 29.',
+      en: 'Gift for 3-year-olds: a personalized book with big pictures and simple text. With their photo, from CHF 29.',
+      fr: 'Cadeau pour enfant de 3 ans: un livre personnalisé avec de grandes images et des textes simples. Dès CHF 29.',
+      it: 'Regalo per bambini di 3 anni: un libro personalizzato con grandi immagini e testi semplici. Con la loro foto, da CHF 29.',
     },
     'geschenk-4-jahre': {
-      de: 'Geschenk für 4-Jährige: ein personalisiertes Kinderbuch voller Abenteuer. Mit dem Kind als Held, ab CHF 33.',
-      en: 'Gift for 4-year-olds: a personalized adventure book. With the child as hero, from CHF 33.',
-      fr: "Cadeau pour enfant de 4 ans: un livre d'aventures personnalisé. L'enfant est le héros, dès CHF 33.",
-      it: 'Regalo per bambini di 4 anni: un libro d\'avventura personalizzato. Il bambino è il protagonista, da CHF 33.',
+      de: 'Geschenk für 4-Jährige: ein personalisiertes Kinderbuch voller Abenteuer. Mit dem Kind als Held, ab CHF 29.',
+      en: 'Gift for 4-year-olds: a personalized adventure book. With the child as hero, from CHF 29.',
+      fr: "Cadeau pour enfant de 4 ans: un livre d'aventures personnalisé. L'enfant est le héros, dès CHF 29.",
+      it: 'Regalo per bambini di 4 anni: un libro d\'avventura personalizzato. Il bambino è il protagonista, da CHF 29.',
     },
     'geschenk-5-jahre': {
-      de: 'Geschenk für 5-Jährige: ein personalisiertes Kinderbuch zum Vorlesen und Selbstentdecken. 170+ Themen, ab CHF 33.',
-      en: 'Gift for 5-year-olds: a personalized book for reading aloud and self-discovery. 170+ themes, from CHF 33.',
-      fr: 'Cadeau pour enfant de 5 ans: un livre personnalisé à lire ensemble et explorer. 170+ thèmes, dès CHF 33.',
-      it: 'Regalo per bambini di 5 anni: un libro personalizzato da leggere insieme e scoprire da soli. 170+ temi, da CHF 33.',
+      de: 'Geschenk für 5-Jährige: ein personalisiertes Kinderbuch zum Vorlesen und Selbstentdecken. 170+ Themen, ab CHF 29.',
+      en: 'Gift for 5-year-olds: a personalized book for reading aloud and self-discovery. 170+ themes, from CHF 29.',
+      fr: 'Cadeau pour enfant de 5 ans: un livre personnalisé à lire ensemble et explorer. 170+ thèmes, dès CHF 29.',
+      it: 'Regalo per bambini di 5 anni: un libro personalizzato da leggere insieme e scoprire da soli. 170+ temi, da CHF 29.',
     },
     'geschenk-6-jahre': {
-      de: 'Geschenk für 6-Jährige: ein personalisiertes Kinderbuch für Erstleser. Spannende Geschichten mit eigenem Foto, ab CHF 33.',
-      en: 'Gift for 6-year-olds: a personalized book for early readers. Exciting stories with their photo, from CHF 33.',
-      fr: 'Cadeau pour enfant de 6 ans: un livre personnalisé pour jeunes lecteurs. Histoires passionnantes, dès CHF 33.',
-      it: 'Regalo per bambini di 6 anni: un libro personalizzato per giovani lettori. Storie appassionanti con la loro foto, da CHF 33.',
+      de: 'Geschenk für 6-Jährige: ein personalisiertes Kinderbuch für Erstleser. Spannende Geschichten mit eigenem Foto, ab CHF 29.',
+      en: 'Gift for 6-year-olds: a personalized book for early readers. Exciting stories with their photo, from CHF 29.',
+      fr: 'Cadeau pour enfant de 6 ans: un livre personnalisé pour jeunes lecteurs. Histoires passionnantes, dès CHF 29.',
+      it: 'Regalo per bambini di 6 anni: un libro personalizzato per giovani lettori. Storie appassionanti con la loro foto, da CHF 29.',
     },
     'geschenk-7-8-jahre': {
-      de: 'Geschenk für 7–8-Jährige: ein personalisiertes Kinderbuch mit längeren Geschichten und spannenden Abenteuern. Ab CHF 33.',
-      en: 'Gift for 7-8-year-olds: a personalized book with longer stories and exciting adventures. From CHF 33.',
-      fr: 'Cadeau pour enfant de 7-8 ans: un livre personnalisé avec des histoires plus longues et des aventures passionnantes. Dès CHF 33.',
-      it: 'Regalo per bambini di 7-8 anni: un libro personalizzato con storie più lunghe e avventure appassionanti. Da CHF 33.',
+      de: 'Geschenk für 7–8-Jährige: ein personalisiertes Kinderbuch mit längeren Geschichten und spannenden Abenteuern. Ab CHF 29.',
+      en: 'Gift for 7-8-year-olds: a personalized book with longer stories and exciting adventures. From CHF 29.',
+      fr: 'Cadeau pour enfant de 7-8 ans: un livre personnalisé avec des histoires plus longues et des aventures passionnantes. Dès CHF 29.',
+      it: 'Regalo per bambini di 7-8 anni: un libro personalizzato con storie più lunghe e avventure appassionanti. Da CHF 29.',
     },
   };
   return pickLang(descriptions[giftSlug], lang)
     || (lang === 'it'
-      ? 'Un libro personalizzato per bambini come regalo — con la foto del tuo bambino da protagonista. Da CHF 33, prima storia gratuita.'
+      ? 'Un libro personalizzato per bambini come regalo — con la foto del tuo bambino da protagonista. Da CHF 29, prima storia gratuita.'
       : lang === 'fr'
-        ? 'Un livre personnalisé pour enfant comme cadeau — avec la photo de votre enfant en héros. Dès CHF 33, première histoire gratuite.'
+        ? 'Un livre personnalisé pour enfant comme cadeau — avec la photo de votre enfant en héros. Dès CHF 29, première histoire gratuite.'
         : lang === 'en'
-          ? 'A personalized children\'s book as a gift — with your child\'s photo as the hero. From CHF 33, first story free.'
-          : 'Personalisiertes Kinderbuch als Geschenk — mit dem Foto deines Kindes als Held. Ab CHF 33, erste Geschichte gratis.');
+          ? 'A personalized children\'s book as a gift — with your child\'s photo as the hero. From CHF 29, first story free.'
+          : 'Personalisiertes Kinderbuch als Geschenk — mit dem Foto deines Kindes als Held. Ab CHF 29, erste Geschichte gratis.');
 }
 
 // ─── injectMeta ───────────────────────────────────────────────────────────────

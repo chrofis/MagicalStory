@@ -3325,7 +3325,7 @@ export function StoryDisplay({
                   ) : (
                     <p className="text-sm text-red-700 font-medium">
                       {language === 'de'
-                        ? '⚠️ Der Autor hat die Selbstkritik übersprungen ("Reviewed externally."), aber es wurde keine Reviewer-Ausgabe gefunden — Review fehlgeschlagen oder Geschichte vor dem Deploy generiert. Siehe Generierungsprotokoll (outline_review_failed).'
+                        ? '⚠️ Der Autor hat die Selbstkritik übersprungen («Reviewed externally.»), aber es wurde keine Reviewer-Ausgabe gefunden — Review fehlgeschlagen oder Geschichte vor dem Deploy generiert. Siehe Generierungsprotokoll (outline_review_failed).'
                         : '⚠️ The writer skipped self-critique ("Reviewed externally.") but no reviewer output was found — the review failed or the story predates the deploy. Check the generation log for outline_review_failed.'}
                     </p>
                   )}
@@ -7497,7 +7497,7 @@ export function StoryDisplay({
                     value={coverEditModal.dedication || ''}
                     onChange={(e) => setCoverEditModal({ ...coverEditModal, dedication: e.target.value })}
                     placeholder={language === 'de'
-                      ? 'z.B. "Für meine liebste Tochter Emma"'
+                      ? 'z.B. «Für meine liebste Tochter Emma»'
                       : language === 'fr'
                       ? 'par ex. "Pour ma chère fille Emma"'
                       : language === 'it'
@@ -7526,7 +7526,7 @@ export function StoryDisplay({
                   value={coverEditModal.scene}
                   onChange={(e) => setCoverEditModal({ ...coverEditModal, scene: e.target.value })}
                   placeholder={language === 'de'
-                    ? 'z.B. "Die Hauptfigur steht vor einem magischen Schloss bei Sonnenuntergang"'
+                    ? 'z.B. «Die Hauptfigur steht vor einem magischen Schloss bei Sonnenuntergang»'
                     : language === 'fr'
                     ? 'par ex. "Le personnage principal devant un château magique au coucher du soleil"'
                     : language === 'it'

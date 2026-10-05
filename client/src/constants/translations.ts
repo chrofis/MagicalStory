@@ -176,7 +176,7 @@ export interface TranslationStrings {
 
 export const translations: Record<'en' | 'de' | 'fr' | 'it', TranslationStrings> = {
   en: {
-    title: 'Magical Story',
+    title: 'MagicalStory',
     subtitle: 'Personalize your story to create magic',
     heroTitle: 'Your child as the hero of their own story',
     heroSubtitle: '',
@@ -351,7 +351,7 @@ export const translations: Record<'en' | 'de' | 'fr' | 'it', TranslationStrings>
     cancelGeneration: 'Cancel',
   },
   de: {
-    title: 'Magical Story',
+    title: 'MagicalStory',
     subtitle: 'Personalisiere deine Geschichte für Magie',
     heroTitle: 'Dein Kind als Held seiner eigenen Geschichte',
     heroSubtitle: '',
@@ -395,7 +395,7 @@ export const translations: Record<'en' | 'de' | 'fr' | 'it', TranslationStrings>
     createAnother: 'Weiteren Charakter erstellen',
     continueToRelationships: 'Weiter zu Beziehungen',
     yourCharacters: 'Deine Charaktere:',
-    startCreating: 'Charakter erstellen beginnen',
+    startCreating: 'Charakter erstellen',
     characterName: 'Charaktername',
     characterPhoto: 'Charakterfoto',
     uploadPhoto: 'Foto hochladen',
@@ -458,7 +458,7 @@ export const translations: Record<'en' | 'de' | 'fr' | 'it', TranslationStrings>
     exportConfig: 'Konfiguration exportieren',
     exportStoryInfo: 'Geschichten-Info exportieren (MD)',
     importConfig: 'Konfiguration importieren',
-    charactersCreated: 'Du hast bisher {count} Charakter{s} erstellt.',
+    charactersCreated: 'Bisher erstellte Charaktere: {count}',
     mainCharacter: 'Hauptfigur',
     apiKeyRequired: 'API-Schlüssel erforderlich',
     apiKeyPrompt: 'Bitte gib deinen Anthropic API-Schlüssel ein:',
@@ -526,7 +526,7 @@ export const translations: Record<'en' | 'de' | 'fr' | 'it', TranslationStrings>
     cancelGeneration: 'Abbrechen',
   },
   fr: {
-    title: 'Magical Story',
+    title: 'MagicalStory',
     subtitle: 'Personnalisez votre histoire pour créer la magie',
     heroTitle: 'Votre enfant, héros de sa propre histoire',
     heroSubtitle: '',
@@ -701,7 +701,7 @@ export const translations: Record<'en' | 'de' | 'fr' | 'it', TranslationStrings>
     cancelGeneration: 'Annuler',
   },
   it: {
-    title: 'Magical Story',
+    title: 'MagicalStory',
     subtitle: 'Personalizza la tua storia per creare la magia',
     heroTitle: 'Il tuo bambino, eroe della sua storia',
     heroSubtitle: '',

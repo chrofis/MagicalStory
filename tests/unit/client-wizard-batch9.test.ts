@@ -32,7 +32,7 @@ describe('D7 order dialog lines', () => {
       amount_total: 1000, customer_name: 'A B', customer_email: 'a@b.ch', shipping_name: 'A B',
       shipping_address_line1: 'Weg 1', shipping_postal_code: '5400', shipping_city: undefined, shipping_country: 'CH',
     }, 'en', 5);
-    expect(lines).toContain('Tokens earned: 5');
+    expect(lines).toContain('Credits earned: 5');
     expect(lines).toContain('5400');
     expect(lines.join('\n')).not.toMatch(/undefined/);
   });
