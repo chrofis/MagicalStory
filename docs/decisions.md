@@ -66221,3 +66221,15 @@ languages. Both CTA buttons resolve to `font-medium`.
 change is attributable to trust signals near the CTA.
 
 **Touched files:** `client/src/pages/LandingPage.tsx`, `tests/unit/trial-intro-phone.test.ts`.
+
+## 2026-10-04 — One main character per child: wizard default, explanation, and a cap of 1 main for up to 2 characters, 2 for 3 or more (owner)
+
+**Context.** Prod customer (orders.id 99) made three birthday books for her 2-year-old; the wizard auto-selected every child aged 1–10 as main, so her 2-year-old and 4-year-old were both main and the oldest-main rule (2026-08-25, kept 2026-09-04) wrote all three stories in the age-4 band (FEAR AND CHOICE). In the 2-character story the half-the-cast cap from 1affe444a (2026-08-21, no recorded rationale) counted only one main, so the birthday child was silently not a main at all. Nothing in the wizard explained what "Hauptrolle" does.
+
+**Decision (owner).** (1) Cap: ≤2 characters in the story → 1 main; 3 or more → 2 (`pickMainCharacters`, replaces `max(1, min(2, floor(n/2)))`). (2) The wizard enforces the same cap at selection (radio swap at 1, disabled button at 2, trim on cast shrink and on load) so a declared main is never dropped silently; one client util `client/src/utils/mainCharacters.ts`, paired with the server in sibling-registry set `main-character-selection`. (3) Default: only the first-created child is main. (4) The character step explains the role (most pages; the oldest main's age sets how simple the story is; birthday tip) and shows a live "Geschrieben für N-Jährige (Name)" line. Intent: make clear who the book is for, and nudge one story per sibling. The oldest-main age rule itself is unchanged.
+
+**Rationale.** The age band follows the declared mains; the defect was that parents never chose them knowingly. Showing the consequence at selection fixes the cause without changing the band rule.
+
+**Revisit if** sibling books keep landing in the elder child's band after the explanation ships, or parents ask for co-equal mains in 2-character stories.
+
+**Touched:** `server/lib/promptBuilders.js`, `client/src/utils/mainCharacters.ts`, `client/src/components/character/CharacterList.tsx`, `client/src/pages/StoryWizard.tsx`, `tests/unit/main-characters-client.test.ts`, `scripts/admin/sibling-registry.json` (staging 272ec4777, 774b0a502, 0240812b9).
