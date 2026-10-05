@@ -46,25 +46,25 @@ export const giftPages: GiftPageData[] = [
         'Pick a theme your child is currently passionate about — dinosaurs, unicorns, space, or pirates',
         'Upload a clear front-facing photo for the best character likeness',
         'Add siblings or best friends as secondary characters for extra excitement',
-        'Order the hardcover version (from CHF 33) for a gift that feels special to unwrap',
+        'Order the hardcover version (from CHF 37) for a gift that feels special to unwrap',
       ],
       de: [
         'Wähle ein Thema, für das sich dein Kind gerade begeistert — Dinosaurier, Einhörner, Weltraum oder Piraten',
         'Lade ein klares Frontalfoto hoch, damit der Charakter möglichst ähnlich aussieht',
         'Füge Geschwister oder beste Freunde als Nebenfiguren hinzu für extra Spass',
-        'Bestelle die Hardcover-Version (ab CHF 33) für ein Geschenk, das sich besonders anfühlt',
+        'Bestelle die Hardcover-Version (ab CHF 37) für ein Geschenk, das sich besonders anfühlt',
       ],
       fr: [
         'Choisissez un thème qui passionne votre enfant en ce moment — dinosaures, licornes, espace ou pirates',
         'Téléchargez une photo de face claire pour une ressemblance optimale du personnage',
         'Ajoutez des frères et sœurs ou meilleurs amis comme personnages secondaires',
-        'Commandez la version cartonnée (dès CHF 33) pour un cadeau qui fait plaisir à déballer',
+        'Commandez la version cartonnée (dès CHF 37) pour un cadeau qui fait plaisir à déballer',
       ],
       it: [
         'Scegliete un tema che appassiona vostro figlio in questo momento — dinosauri, unicorni, spazio o pirati',
         'Caricate una foto frontale ben chiara per la migliore somiglianza del personaggio',
         'Aggiungete fratelli, sorelle o migliori amici come personaggi secondari per più entusiasmo',
-        'Ordinate la versione cartonata (da CHF 33) per un regalo che fa piacere anche da scartare',
+        'Ordinate la versione cartonata (da CHF 29) per un regalo che fa piacere anche da scartare',
       ],
     },
     recommendedThemes: [
@@ -76,10 +76,10 @@ export const giftPages: GiftPageData[] = [
       { id: 'dragon', category: 'adventure' },
     ],
     deliveryNote: {
-      en: 'The digital story is ready in minutes. Printed hardcover books are delivered within 5–7 business days to Swiss addresses.',
-      de: 'Die digitale Geschichte ist in wenigen Minuten fertig. Gedruckte Hardcover-Bücher werden innerhalb von 5–7 Werktagen an Schweizer Adressen geliefert.',
-      fr: 'L\'histoire numérique est prête en quelques minutes. Les livres cartonnés imprimés sont livrés en 5 à 7 jours ouvrables en Suisse.',
-      it: 'La storia digitale è pronta in pochi minuti. I libri cartonati stampati vengono consegnati entro 5–7 giorni lavorativi agli indirizzi svizzeri.',
+      en: 'The digital story is ready in about an hour. Printed hardcover books are delivered within 5–7 business days to Swiss addresses.',
+      de: 'Die digitale Geschichte ist in etwa einer Stunde fertig. Gedruckte Hardcover-Bücher werden innerhalb von 5–7 Werktagen an Schweizer Adressen geliefert.',
+      fr: 'L\'histoire numérique est prête en environ une heure. Les livres cartonnés imprimés sont livrés en 5 à 7 jours ouvrables en Suisse.',
+      it: 'La storia digitale è pronta in circa un\'ora. I libri cartonati stampati vengono consegnati entro 5–7 giorni lavorativi agli indirizzi svizzeri.',
     },
     faq: [
       {
@@ -92,7 +92,7 @@ export const giftPages: GiftPageData[] = [
       },
       {
         q: { en: 'Can I try it before buying the printed book?', de: 'Kann ich es ausprobieren, bevor ich das gedruckte Buch kaufe?', fr: 'Puis-je essayer avant d\'acheter le livre imprimé ?', it: 'Posso provarlo prima di acquistare il libro stampato?' },
-        a: { en: 'Yes! You can create a free trial story to see how your child looks in the illustrations. The printed hardcover book starts at CHF 33.', de: 'Ja! Du kannst kostenlos eine Probegeschichte erstellen, um zu sehen, wie dein Kind in den Illustrationen aussieht. Das gedruckte Hardcover-Buch gibt es ab CHF 33.', fr: 'Oui ! Vous pouvez créer une histoire d\'essai gratuite pour voir à quoi ressemble votre enfant dans les illustrations. Le livre cartonné imprimé est disponible dès CHF 33.', it: 'Sì! Potete creare gratuitamente una storia di prova per vedere come appare vostro figlio nelle illustrazioni. Il libro cartonato stampato parte da CHF 33.' },
+        a: { en: 'Yes! You can create a free trial story to see how your child looks in the illustrations. The printed hardcover book starts at CHF 37.', de: 'Ja! Du kannst kostenlos eine Probegeschichte erstellen, um zu sehen, wie dein Kind in den Illustrationen aussieht. Das gedruckte Hardcover-Buch gibt es ab CHF 37.', fr: 'Oui ! Vous pouvez créer une histoire d\'essai gratuite pour voir à quoi ressemble votre enfant dans les illustrations. Le livre cartonné imprimé est disponible dès CHF 37.', it: 'Sì! Potete creare gratuitamente una storia di prova per vedere come appare vostro figlio nelle illustrazioni. Il libro cartonato stampato parte da CHF 29.' },
       },
       {
         q: { en: 'What makes this better than a regular children\'s book?', de: 'Was macht dieses Geschenk besser als ein normales Kinderbuch?', fr: 'Qu\'est-ce qui rend ce cadeau meilleur qu\'un livre pour enfants ordinaire ?', it: 'Cosa rende questo regalo migliore di un normale libro per bambini?' },
@@ -130,25 +130,25 @@ export const giftPages: GiftPageData[] = [
         'Ask the parents for a recent front-facing photo of the child — that\'s all you need',
         'Add a personal dedication message from Grandma and Grandpa in the book',
         'Choose a theme that matches what the grandchild loves right now',
-        'Order the printed hardcover (from CHF 33) — it becomes a family heirloom',
+        'Order the printed hardcover (from CHF 37) — it becomes a family heirloom',
       ],
       de: [
         'Frag die Eltern nach einem aktuellen Frontalfoto des Kindes — mehr brauchst du nicht',
         'Füge eine persönliche Widmung von Oma und Opa im Buch hinzu',
         'Wähle ein Thema, das zum aktuellen Interesse des Enkelkindes passt',
-        'Bestelle das gedruckte Hardcover (ab CHF 33) — es wird zum Familien-Erbstück',
+        'Bestelle das gedruckte Hardcover (ab CHF 37) — es wird zum Familien-Erbstück',
       ],
       fr: [
         'Demandez aux parents une photo récente de face de l\'enfant — c\'est tout ce qu\'il faut',
         'Ajoutez une dédicace personnelle de Mamie et Papi dans le livre',
         'Choisissez un thème qui correspond aux centres d\'intérêt actuels du petit-enfant',
-        'Commandez le livre cartonné imprimé (dès CHF 33) — il deviendra un héritage familial',
+        'Commandez le livre cartonné imprimé (dès CHF 37) — il deviendra un héritage familial',
       ],
       it: [
         'Chiedete ai genitori una foto recente frontale del bambino — non serve altro',
         'Aggiungete una dedica personale di nonna e nonno nel libro',
         'Scegliete un tema in linea con ciò che appassiona il nipote in questo momento',
-        'Ordinate il libro cartonato stampato (da CHF 33) — diventerà un cimelio di famiglia',
+        'Ordinate il libro cartonato stampato (da CHF 29) — diventerà un cimelio di famiglia',
       ],
     },
     recommendedThemes: [
@@ -159,10 +159,10 @@ export const giftPages: GiftPageData[] = [
       { id: 'dinosaur', category: 'adventure' },
     ],
     deliveryNote: {
-      en: 'Create the story online in minutes — even from far away. Printed books delivered within 5–7 business days to any Swiss address.',
-      de: 'Erstelle die Geschichte online in wenigen Minuten — auch aus der Ferne. Gedruckte Bücher werden innerhalb von 5–7 Werktagen an jede Schweizer Adresse geliefert.',
-      fr: 'Créez l\'histoire en ligne en quelques minutes — même de loin. Livres imprimés livrés en 5 à 7 jours ouvrables à toute adresse suisse.',
-      it: 'Create la storia online in pochi minuti — anche da lontano. I libri stampati vengono consegnati entro 5–7 giorni lavorativi a qualsiasi indirizzo svizzero.',
+      en: 'Create the story online in about an hour — even from far away. Printed books delivered within 5–7 business days to any Swiss address.',
+      de: 'Erstelle die Geschichte online in etwa einer Stunde — auch aus der Ferne. Gedruckte Bücher werden innerhalb von 5–7 Werktagen an jede Schweizer Adresse geliefert.',
+      fr: 'Créez l\'histoire en ligne en environ une heure — même de loin. Livres imprimés livrés en 5 à 7 jours ouvrables à toute adresse suisse.',
+      it: 'Create la storia online in circa un\'ora — anche da lontano. I libri stampati vengono consegnati entro 5–7 giorni lavorativi a qualsiasi indirizzo svizzero.',
     },
     faq: [
       {
@@ -175,7 +175,7 @@ export const giftPages: GiftPageData[] = [
       },
       {
         q: { en: 'Is this a good gift from grandparents?', de: 'Ist das ein gutes Geschenk von Grosseltern?', fr: 'Est-ce un bon cadeau de la part des grands-parents ?', it: 'È un buon regalo da parte dei nonni?' },
-        a: { en: 'It\'s one of the most meaningful gifts grandparents can give. Unlike toys that break, a personalized book is a keepsake that connects generations. Many grandparents tell us their grandchildren ask to read "their book" every night.', de: 'Es ist eines der bedeutungsvollsten Geschenke, das Grosseltern machen können. Anders als Spielzeug, das kaputtgeht, ist ein personalisiertes Buch ein Erinnerungsstück, das Generationen verbindet. Viele Grosseltern erzählen uns, dass ihre Enkel jeden Abend nach "ihrem Buch" fragen.', fr: 'C\'est l\'un des cadeaux les plus significatifs que les grands-parents puissent offrir. Contrairement aux jouets qui se cassent, un livre personnalisé est un souvenir qui relie les générations.', it: 'È uno dei regali più significativi che i nonni possano fare. A differenza dei giocattoli che si rompono, un libro personalizzato è un ricordo che unisce le generazioni. Molti nonni ci raccontano che i loro nipoti chiedono di leggere «il loro libro» ogni sera.' },
+        a: { en: 'It\'s one of the most meaningful gifts grandparents can give. Unlike toys that break, a personalized book is a keepsake that connects generations. Many grandparents tell us their grandchildren ask to read "their book" every night.', de: 'Es ist eines der bedeutungsvollsten Geschenke, das Grosseltern machen können. Anders als Spielzeug, das kaputtgeht, ist ein personalisiertes Buch ein Erinnerungsstück, das Generationen verbindet. Viele Grosseltern erzählen uns, dass ihre Enkel jeden Abend nach «ihrem Buch» fragen.', fr: 'C\'est l\'un des cadeaux les plus significatifs que les grands-parents puissent offrir. Contrairement aux jouets qui se cassent, un livre personnalisé est un souvenir qui relie les générations.', it: 'È uno dei regali più significativi che i nonni possano fare. A differenza dei giocattoli che si rompono, un libro personalizzato è un ricordo che unisce le generazioni. Molti nonni ci raccontano che i loro nipoti chiedono di leggere «il loro libro» ogni sera.' },
       },
     ],
   },
@@ -209,25 +209,25 @@ export const giftPages: GiftPageData[] = [
         'Ask the parents casually what the child is into right now — then surprise them with the matching theme',
         'You only need one photo and the child\'s first name to get started',
         'A digital story is ready instantly — perfect if you forgot to plan ahead',
-        'For maximum wow-effect, order the printed hardcover (from CHF 33) and wrap it beautifully',
+        'For maximum wow-effect, order the printed hardcover (from CHF 37) and wrap it beautifully',
       ],
       de: [
         'Frag die Eltern beiläufig, wofür sich das Kind gerade begeistert — dann überrasche mit dem passenden Thema',
         'Du brauchst nur ein Foto und den Vornamen des Kindes',
         'Die digitale Geschichte ist sofort bereit — perfekt wenn du vergessen hast, rechtzeitig zu planen',
-        'Für maximalen Wow-Effekt: bestelle das gedruckte Hardcover (ab CHF 33) und verpacke es schön',
+        'Für maximalen Wow-Effekt: bestelle das gedruckte Hardcover (ab CHF 37) und verpacke es schön',
       ],
       fr: [
         'Demandez discrètement aux parents ce qui passionne l\'enfant en ce moment — puis surprenez-le avec le thème correspondant',
         'Il vous faut juste une photo et le prénom de l\'enfant',
         'L\'histoire numérique est prête instantanément — parfait si vous avez oublié de prévoir',
-        'Pour un effet wow maximal, commandez le livre cartonné (dès CHF 33) et emballez-le joliment',
+        'Pour un effet wow maximal, commandez le livre cartonné (dès CHF 37) et emballez-le joliment',
       ],
       it: [
         'Chiedete con discrezione ai genitori cosa appassiona il bambino in questo momento — poi sorprendetelo con il tema giusto',
         'Vi servono solo una foto e il nome del bambino',
         'La storia digitale è pronta subito — perfetta se avete dimenticato di organizzarvi per tempo',
-        'Per l\'effetto wow massimo, ordinate il libro cartonato (da CHF 33) e incartatelo con cura',
+        'Per l\'effetto wow massimo, ordinate il libro cartonato (da CHF 29) e incartatelo con cura',
       ],
     },
     recommendedThemes: [
@@ -238,10 +238,10 @@ export const giftPages: GiftPageData[] = [
       { id: 'detective', category: 'adventure' },
     ],
     deliveryNote: {
-      en: 'Digital story ready in minutes. Printed hardcovers ship within 5–7 business days to Swiss addresses.',
-      de: 'Digitale Geschichte in Minuten fertig. Gedruckte Hardcover werden innerhalb von 5–7 Werktagen an Schweizer Adressen geliefert.',
-      fr: 'Histoire numérique prête en quelques minutes. Livres cartonnés expédiés en 5 à 7 jours ouvrables en Suisse.',
-      it: 'Storia digitale pronta in pochi minuti. Libri cartonati spediti entro 5–7 giorni lavorativi agli indirizzi svizzeri.',
+      en: 'Digital story ready in about an hour. Printed hardcovers ship within 5–7 business days to Swiss addresses.',
+      de: 'Digitale Geschichte in etwa einer Stunde fertig. Gedruckte Hardcover werden innerhalb von 5–7 Werktagen an Schweizer Adressen geliefert.',
+      fr: 'Histoire numérique prête en environ une heure. Livres cartonnés expédiés en 5 à 7 jours ouvrables en Suisse.',
+      it: 'Storia digitale pronta in circa un\'ora. Libri cartonati spediti entro 5–7 giorni lavorativi agli indirizzi svizzeri.',
     },
     faq: [
       {
@@ -288,25 +288,25 @@ export const giftPages: GiftPageData[] = [
         'Add a personal dedication from you as godparent — "From your Godmother/Godfather, with love"',
         'Consider gifting it at the baptism ceremony or first birthday for a meaningful keepsake',
         'Choose a theme that reflects a wish for your godchild\'s future (bravery, curiosity, kindness)',
-        'The printed hardcover (from CHF 33) makes it feel like a proper christening gift',
+        'The printed hardcover (from CHF 37) makes it feel like a proper christening gift',
       ],
       de: [
-        'Füge eine persönliche Widmung als Gotte/Götti hinzu — "Von deiner Gotte/deinem Götti, mit Liebe"',
+        'Füge eine persönliche Widmung als Gotte/Götti hinzu — «Von deiner Gotte/deinem Götti, mit Liebe»',
         'Schenke es zur Taufe oder zum ersten Geburtstag als bedeutungsvolles Erinnerungsstück',
         'Wähle ein Thema, das einen Wunsch für die Zukunft deines Patenkindes widerspiegelt (Mut, Neugierde, Freundlichkeit)',
-        'Das gedruckte Hardcover (ab CHF 33) macht es zu einem richtigen Taufgeschenk',
+        'Das gedruckte Hardcover (ab CHF 37) macht es zu einem richtigen Taufgeschenk',
       ],
       fr: [
         'Ajoutez une dédicace personnelle de parrain/marraine — "De ton parrain/ta marraine, avec amour"',
         'Offrez-le lors du baptême ou du premier anniversaire comme souvenir significatif',
         'Choisissez un thème qui reflète un souhait pour l\'avenir de votre filleul(e)',
-        'Le livre cartonné imprimé (dès CHF 33) en fait un vrai cadeau de baptême',
+        'Le livre cartonné imprimé (dès CHF 37) en fait un vrai cadeau de baptême',
       ],
       it: [
         'Aggiungete una dedica personale da padrino/madrina — «Dal tuo padrino/dalla tua madrina, con affetto»',
         'Regalatelo in occasione del battesimo o del primo compleanno come ricordo significativo',
         'Scegliete un tema che rispecchi un augurio per il futuro del vostro figlioccio (coraggio, curiosità, gentilezza)',
-        'Il libro cartonato stampato (da CHF 33) lo rende un vero regalo da battesimo',
+        'Il libro cartonato stampato (da CHF 29) lo rende un vero regalo da battesimo',
       ],
     },
     recommendedThemes: [
@@ -317,15 +317,15 @@ export const giftPages: GiftPageData[] = [
       { id: 'being-brave', category: 'life-challenges' },
     ],
     deliveryNote: {
-      en: 'Digital story ready in minutes. Printed hardcovers shipped within 5–7 business days. Plan ahead for baptism gifts!',
-      de: 'Digitale Geschichte in Minuten fertig. Gedruckte Hardcover innerhalb von 5–7 Werktagen versandt. Für Taufgeschenke rechtzeitig bestellen!',
-      fr: 'Histoire numérique prête en minutes. Livres cartonnés expédiés en 5 à 7 jours ouvrables. Prévoyez à l\'avance pour les cadeaux de baptême !',
-      it: 'Storia digitale pronta in pochi minuti. Libri cartonati spediti entro 5–7 giorni lavorativi. Pianificate in anticipo per i regali di battesimo!',
+      en: 'Digital story ready in about an hour. Printed hardcovers shipped within 5–7 business days. Plan ahead for baptism gifts!',
+      de: 'Digitale Geschichte in etwa einer Stunde fertig. Gedruckte Hardcover innerhalb von 5–7 Werktagen versandt. Für Taufgeschenke rechtzeitig bestellen!',
+      fr: 'Histoire numérique prête en environ une heure. Livres cartonnés expédiés en 5 à 7 jours ouvrables. Prévoyez à l\'avance pour les cadeaux de baptême !',
+      it: 'Storia digitale pronta in circa un\'ora. Libri cartonati spediti entro 5–7 giorni lavorativi. Pianificate in anticipo per i regali di battesimo!',
     },
     faq: [
       {
         q: { en: 'What do godparents give as a gift?', de: 'Was schenkt man als Gotte oder Götti dem Göttikind?', fr: 'Que donnent les parrains et marraines comme cadeau ?', it: 'Cosa regalano tipicamente i padrini e le madrine?' },
-        a: { en: 'A personalized storybook is a modern take on the traditional meaningful godparent gift. It\'s personal, creative, and something the child will treasure — much like a classic christening gift but with a magical twist.', de: 'Ein personalisiertes Geschichtenbuch ist die moderne Variante des traditionellen, bedeutungsvollen Patengeschenks. Persönlich, kreativ und etwas, das Göttibueb oder Göttimeitli schätzen wird — wie ein klassisches Taufgeschenk, aber mit einer magischen Note.', fr: 'Un livre personnalisé est une version moderne du traditionnel cadeau significatif de parrain/marraine. Personnel, créatif et quelque chose que l\'enfant chérira.', it: 'Un libro personalizzato è la versione moderna del tradizionale regalo significativo da padrino. È personale, creativo e qualcosa che il bambino custodirà con affetto — come un classico regalo da battesimo, ma con un tocco di magia.' },
+        a: { en: 'A personalized storybook is a modern take on the traditional meaningful godparent gift. It\'s personal, creative, and something the child will treasure — much like a classic christening gift but with a magical twist.', de: 'Ein personalisiertes Geschichtenbuch ist die moderne Variante des traditionellen, bedeutungsvollen Patengeschenks. Persönlich, kreativ und etwas, das Göttibub oder Göttimeitli schätzen wird — wie ein klassisches Taufgeschenk, aber mit einer magischen Note.', fr: 'Un livre personnalisé est une version moderne du traditionnel cadeau significatif de parrain/marraine. Personnel, créatif et quelque chose que l\'enfant chérira.', it: 'Un libro personalizzato è la versione moderna del tradizionale regalo significativo da padrino. È personale, creativo e qualcosa che il bambino custodirà con affetto — come un classico regalo da battesimo, ma con un tocco di magia.' },
       },
       {
         q: { en: 'Is this appropriate as a baptism gift?', de: 'Eignet sich das als Taufgeschenk?', fr: 'Est-ce approprié comme cadeau de baptême ?', it: 'È adatto come regalo di battesimo?' },
@@ -404,7 +404,7 @@ export const giftPages: GiftPageData[] = [
     faq: [
       {
         q: { en: 'What do grandparents give their grandchild?', de: 'Was schenken Grosseltern ihrem Enkelkind?', fr: 'Que donnent les grands-parents à leur petit-enfant ?', it: 'Cosa regalano i nonni al proprio nipote?' },
-        a: { en: 'A personalized storybook is the ideal gift from grandparents — personal, creative, and lasting. Unlike toys, it creates shared reading moments and becomes a family keepsake. From CHF 33 for the printed book.', de: 'Ein personalisiertes Geschichtenbuch ist das ideale Geschenk von Grosseltern — persönlich, kreativ und bleibend. Anders als Spielzeug schafft es gemeinsame Lesemomente und wird zum Familien-Erbstück. Ab CHF 33 für das gedruckte Buch.', fr: 'Un livre personnalisé est le cadeau idéal des grands-parents — personnel, créatif et durable. Dès CHF 33 pour le livre imprimé.', it: 'Un libro personalizzato è il regalo ideale da parte dei nonni — personale, creativo e duraturo. A differenza dei giocattoli, crea momenti di lettura condivisi e diventa un ricordo di famiglia. Da CHF 33 per il libro stampato.' },
+        a: { en: 'A personalized storybook is the ideal gift from grandparents — personal, creative, and lasting. Unlike toys, it creates shared reading moments and becomes a family keepsake. From CHF 29 for the printed book.', de: 'Ein personalisiertes Geschichtenbuch ist das ideale Geschenk von Grosseltern — persönlich, kreativ und bleibend. Anders als Spielzeug schafft es gemeinsame Lesemomente und wird zum Familien-Erbstück. Ab CHF 29 für das gedruckte Buch.', fr: 'Un livre personnalisé est le cadeau idéal des grands-parents — personnel, créatif et durable. Dès CHF 29 pour le livre imprimé.', it: 'Un libro personalizzato è il regalo ideale da parte dei nonni — personale, creativo e duraturo. A differenza dei giocattoli, crea momenti di lettura condivisi e diventa un ricordo di famiglia. Da CHF 29 per il libro stampato.' },
       },
       {
         q: { en: 'Is creating the book difficult for grandparents?', de: 'Ist die Erstellung des Buches für Grosseltern schwierig?', fr: 'La création du livre est-elle difficile pour les grands-parents ?', it: 'È difficile creare il libro per i nonni?' },
@@ -416,7 +416,7 @@ export const giftPages: GiftPageData[] = [
       },
       {
         q: { en: 'How much does a personalized book cost?', de: 'Was kostet ein personalisiertes Buch?', fr: 'Combien coûte un livre personnalisé ?', it: 'Quanto costa un libro personalizzato?' },
-        a: { en: 'You can try it for free! The printed hardcover book starts at CHF 33. A digital version is also available at a lower price.', de: 'Du kannst es kostenlos testen! Das gedruckte Hardcover-Buch gibt es ab CHF 33. Eine digitale Version ist auch zu einem günstigeren Preis verfügbar.', fr: 'Vous pouvez essayer gratuitement ! Le livre cartonné imprimé est disponible dès CHF 33. Une version numérique est aussi disponible.', it: 'Potete provarlo gratis! Il libro cartonato stampato parte da CHF 33. È disponibile anche una versione digitale a un prezzo più basso.' },
+        a: { en: 'You can try it for free! The printed hardcover book starts at CHF 37. A digital version is also available at a lower price.', de: 'Du kannst es kostenlos testen! Das gedruckte Hardcover-Buch gibt es ab CHF 37. Eine digitale Version ist auch zu einem günstigeren Preis verfügbar.', fr: 'Vous pouvez essayer gratuitement ! Le livre cartonné imprimé est disponible dès CHF 37. Une version numérique est aussi disponible.', it: 'Potete provarlo gratis! Il libro cartonato stampato parte da CHF 29. È disponibile anche una versione digitale a un prezzo più basso.' },
       },
     ],
   },
@@ -444,10 +444,10 @@ export const giftPages: GiftPageData[] = [
       it: 'Cercate un regalo di Pasqua che vada oltre il cioccolato? Un libro personalizzato di Pasqua rende la festa magica — vostro figlio cerca le uova, incontra il coniglietto pasquale ed è la star della propria avventura primaverile.',
     },
     intro: {
-      en: 'Easter is more than chocolate eggs and bunny baskets. This year, give your child a gift that lasts beyond Easter Monday — a personalized story where they join the Easter Bunny on a spring adventure. With their name, face, and personality woven into every page, it\'s the kind of Easter surprise that brings real joy. The digital story is ready in minutes, so even last-minute Easter planners are covered. And if you want a book in the Easter basket, order the hardcover a week ahead.',
-      de: 'Ostern ist mehr als Schokoladen-Eier und Osterkörbchen. Schenke deinem Kind dieses Jahr etwas, das über den Ostermontag hinaus Freude macht — eine personalisierte Geschichte, in der es mit dem Osterhasen ein Frühlingsabenteuer erlebt. Mit eigenem Namen, Gesicht und Persönlichkeit auf jeder Seite ist es die Osterüberraschung, die echte Freude bringt. Die digitale Geschichte ist in Minuten fertig — auch für Last-Minute-Planer. Und wer ein Buch ins Osternest legen möchte, bestellt das Hardcover eine Woche vorher.',
-      fr: 'Pâques, c\'est plus que des œufs en chocolat. Cette année, offrez un cadeau qui dure au-delà du lundi de Pâques — une histoire personnalisée où votre enfant part à l\'aventure avec le lapin de Pâques. L\'histoire numérique est prête en minutes. Pour un livre dans le panier de Pâques, commandez le livre cartonné une semaine à l\'avance.',
-      it: 'Pasqua è molto più di uova di cioccolato e cestini pasquali. Quest\'anno regalate a vostro figlio qualcosa che duri oltre il lunedì di Pasqua — una storia personalizzata in cui parte con il coniglietto pasquale per un\'avventura di primavera. Con il suo nome, il suo volto e la sua personalità intrecciati in ogni pagina, è il tipo di sorpresa pasquale che regala gioia vera. La storia digitale è pronta in pochi minuti, quindi anche chi organizza all\'ultimo momento è coperto. E se volete un libro nel cestino di Pasqua, ordinate il cartonato con una settimana d\'anticipo.',
+      en: 'Easter is more than chocolate eggs and bunny baskets. This year, give your child a gift that lasts beyond Easter Monday — a personalized story where they join the Easter Bunny on a spring adventure. With their name, face, and personality woven into every page, it\'s the kind of Easter surprise that brings real joy. The digital story is ready in about an hour, so even last-minute Easter planners are covered. And if you want a book in the Easter basket, order the hardcover a week ahead.',
+      de: 'Ostern ist mehr als Schokoladen-Eier und Osterkörbchen. Schenke deinem Kind dieses Jahr etwas, das über den Ostermontag hinaus Freude macht — eine personalisierte Geschichte, in der es mit dem Osterhasen ein Frühlingsabenteuer erlebt. Mit eigenem Namen, Gesicht und Persönlichkeit auf jeder Seite ist es die Osterüberraschung, die echte Freude bringt. Die digitale Geschichte ist in etwa einer Stunde fertig — auch für Last-Minute-Planer. Und wer ein Buch ins Osternest legen möchte, bestellt das Hardcover eine Woche vorher.',
+      fr: 'Pâques, c\'est plus que des œufs en chocolat. Cette année, offrez un cadeau qui dure au-delà du lundi de Pâques — une histoire personnalisée où votre enfant part à l\'aventure avec le lapin de Pâques. L\'histoire numérique est prête en environ une heure. Pour un livre dans le panier de Pâques, commandez le livre cartonné une semaine à l\'avance.',
+      it: 'Pasqua è molto più di uova di cioccolato e cestini pasquali. Quest\'anno regalate a vostro figlio qualcosa che duri oltre il lunedì di Pasqua — una storia personalizzata in cui parte con il coniglietto pasquale per un\'avventura di primavera. Con il suo nome, il suo volto e la sua personalità intrecciati in ogni pagina, è il tipo di sorpresa pasquale che regala gioia vera. La storia digitale è pronta in circa un\'ora, quindi anche chi organizza all\'ultimo momento è coperto. E se volete un libro nel cestino di Pasqua, ordinate il cartonato con una settimana d\'anticipo.',
     },
     tips: {
       en: [
@@ -482,10 +482,10 @@ export const giftPages: GiftPageData[] = [
       { id: 'unicorn', category: 'adventure' },
     ],
     deliveryNote: {
-      en: 'Order the printed book at least 7 days before Easter for guaranteed delivery. Digital stories are instant!',
-      de: 'Bestelle das gedruckte Buch mindestens 7 Tage vor Ostern für garantierte Lieferung. Digitale Geschichten sind sofort bereit!',
-      fr: 'Commandez le livre imprimé au moins 7 jours avant Pâques pour une livraison garantie. Les histoires numériques sont instantanées !',
-      it: 'Ordinate il libro stampato almeno 7 giorni prima di Pasqua per una consegna garantita. Le storie digitali sono disponibili all\'istante!',
+      en: 'Order the printed book at least two weeks before Easter for guaranteed delivery. Digital stories are instant!',
+      de: 'Bestelle das gedruckte Buch mindestens zwei Wochen vor Ostern für garantierte Lieferung. Digitale Geschichten sind sofort bereit!',
+      fr: 'Commandez le livre imprimé au moins deux semaines avant Pâques pour une livraison garantie. Les histoires numériques sont instantanées !',
+      it: 'Ordinate il libro stampato almeno due settimane prima di Pasqua per una consegna garantita. Le storie digitali sono disponibili all\'istante!',
     },
     faq: [
       {
@@ -494,7 +494,7 @@ export const giftPages: GiftPageData[] = [
       },
       {
         q: { en: 'Will the book arrive before Easter?', de: 'Kommt das Buch rechtzeitig vor Ostern an?', fr: 'Le livre arrivera-t-il avant Pâques ?', it: 'Il libro arriverà in tempo per Pasqua?' },
-        a: { en: 'If you order the printed version 7+ days before Easter, yes. The digital story is ready in minutes — you can read it on Easter morning even if you order it the night before.', de: 'Wenn du die gedruckte Version 7+ Tage vor Ostern bestellst, ja. Die digitale Geschichte ist in Minuten fertig — du kannst sie am Ostermorgen lesen, selbst wenn du am Vorabend bestellst.', fr: 'Si vous commandez la version imprimée 7+ jours avant Pâques, oui. L\'histoire numérique est prête en minutes.', it: 'Se ordinate la versione stampata almeno 7 giorni prima di Pasqua, sì. La storia digitale è pronta in pochi minuti — potete leggerla la mattina di Pasqua anche se la ordinate la sera prima.' },
+        a: { en: 'If you order the printed version at least two weeks before Easter, yes. The digital story is ready in about an hour — you can read it on Easter morning even if you order it the night before.', de: 'Wenn du die gedruckte Version mindestens zwei Wochen vor Ostern bestellst, ja. Die digitale Geschichte ist in etwa einer Stunde fertig — du kannst sie am Ostermorgen lesen, selbst wenn du am Vorabend bestellst.', fr: 'Si vous commandez la version imprimée au moins deux semaines avant Pâques, oui. L\'histoire numérique est prête en environ une heure.', it: 'Se ordinate la versione stampata almeno due settimane prima di Pasqua, sì. La storia digitale è pronta in circa un\'ora — potete leggerla la mattina di Pasqua anche se la ordinate la sera prima.' },
       },
       {
         q: { en: 'What\'s a good Easter gift for children besides chocolate?', de: 'Was ist ein gutes Ostergeschenk für Kinder ausser Schokolade?', fr: 'Quel est un bon cadeau de Pâques pour enfants à part le chocolat ?', it: 'Qual è un buon regalo di Pasqua per bambini oltre al cioccolato?' },
@@ -569,7 +569,7 @@ export const giftPages: GiftPageData[] = [
     faq: [
       {
         q: { en: 'Will the book arrive before Christmas?', de: 'Kommt das Buch rechtzeitig vor Weihnachten?', fr: 'Le livre arrivera-t-il avant Noël ?', it: 'Il libro arriverà in tempo per Natale?' },
-        a: { en: 'If you order by December 15, yes! Printed hardcover books are delivered within 5–7 business days to Swiss addresses. The digital version is ready in minutes.', de: 'Wenn du bis 15. Dezember bestellst, ja! Gedruckte Hardcover werden innerhalb von 5–7 Werktagen geliefert. Die digitale Version ist in Minuten fertig.', fr: 'Si vous commandez avant le 15 décembre, oui ! Les livres cartonnés sont livrés en 5 à 7 jours ouvrables. La version numérique est prête en minutes.', it: 'Se ordinate entro il 15 dicembre, sì! I libri cartonati stampati vengono consegnati entro 5–7 giorni lavorativi agli indirizzi svizzeri. La versione digitale è pronta in pochi minuti.' },
+        a: { en: 'If you order by December 15, yes! Printed hardcover books are delivered within 5–7 business days to Swiss addresses. The digital version is ready in about an hour.', de: 'Wenn du bis 15. Dezember bestellst, ja! Gedruckte Hardcover werden innerhalb von 5–7 Werktagen geliefert. Die digitale Version ist in etwa einer Stunde fertig.', fr: 'Si vous commandez avant le 15 décembre, oui ! Les livres cartonnés sont livrés en 5 à 7 jours ouvrables. La version numérique est prête en environ une heure.', it: 'Se ordinate entro il 15 dicembre, sì! I libri cartonati stampati vengono consegnati entro 5–7 giorni lavorativi agli indirizzi svizzeri. La versione digitale è pronta in circa un\'ora.' },
       },
       {
         q: { en: 'What makes a personalized book a good Christmas gift?', de: 'Was macht ein personalisiertes Buch zu einem guten Weihnachtsgeschenk?', fr: 'Qu\'est-ce qui fait d\'un livre personnalisé un bon cadeau de Noël ?', it: 'Cosa rende un libro personalizzato un buon regalo di Natale?' },
@@ -601,32 +601,32 @@ export const giftPages: GiftPageData[] = [
       it: 'Rendete il loro compleanno indimenticabile con un libro personalizzato. Vostro figlio scarta un libro in cui è lui l\'eroe — con il suo nome, il suo volto e la sua personalità su ogni pagina. Il regalo di compleanno che viene letto tutto l\'anno.',
     },
     intro: {
-      en: 'Birthdays are the one day where a child should feel like the most important person in the world. A personalized storybook delivers exactly that feeling — a professionally illustrated book where the birthday child is the main character. No two books are alike, because every story is uniquely generated by AI based on the child\'s photo, name, and traits. Whether they\'re turning 3 or 10, this is the birthday gift that stands out from the pile of toys and is still being read months later. Create a free trial first, then order the beautiful hardcover from CHF 33.',
-      de: 'Am Geburtstag soll sich ein Kind fühlen wie die wichtigste Person der Welt. Ein personalisiertes Geschichtenbuch liefert genau dieses Gefühl — ein professionell illustriertes Buch, in dem das Geburtstagskind die Hauptfigur ist. Kein Buch gleicht dem anderen, weil jede Geschichte einzigartig von KI generiert wird, basierend auf Foto, Name und Eigenschaften des Kindes. Ob es 3 oder 10 wird — dieses Geburtstagsgeschenk sticht aus dem Spielzeugberg heraus und wird noch Monate später gelesen. Erstelle zuerst kostenlos eine Probe, dann bestelle das schöne Hardcover ab CHF 33.',
-      fr: 'Le jour de l\'anniversaire, un enfant devrait se sentir comme la personne la plus importante au monde. Un livre personnalisé offre exactement ce sentiment. Que votre enfant ait 3 ou 10 ans, c\'est le cadeau qui se démarque de la pile de jouets. Essayez gratuitement, puis commandez le livre cartonné dès CHF 33.',
-      it: 'Il compleanno è il giorno in cui un bambino dovrebbe sentirsi la persona più importante del mondo. Un libro personalizzato regala esattamente questa sensazione — un libro illustrato con professionalità in cui il festeggiato è il protagonista. Non esistono due libri uguali, perché ogni storia viene generata in modo unico dall\'IA in base alla foto, al nome e ai tratti del bambino. Che compia 3 o 10 anni, questo è il regalo di compleanno che si distingue dal mucchio di giocattoli e viene letto ancora mesi dopo. Create prima una prova gratuita, poi ordinate il bellissimo cartonato da CHF 33.',
+      en: 'Birthdays are the one day where a child should feel like the most important person in the world. A personalized storybook delivers exactly that feeling — a professionally illustrated book where the birthday child is the main character. No two books are alike, because every story is uniquely generated by AI based on the child\'s photo, name, and traits. Whether they\'re turning 3 or 10, this is the birthday gift that stands out from the pile of toys and is still being read months later. Create a free trial first, then order the beautiful hardcover from CHF 37.',
+      de: 'Am Geburtstag soll sich ein Kind fühlen wie die wichtigste Person der Welt. Ein personalisiertes Geschichtenbuch liefert genau dieses Gefühl — ein professionell illustriertes Buch, in dem das Geburtstagskind die Hauptfigur ist. Kein Buch gleicht dem anderen, weil jede Geschichte einzigartig von KI generiert wird, basierend auf Foto, Name und Eigenschaften des Kindes. Ob es 3 oder 10 wird — dieses Geburtstagsgeschenk sticht aus dem Spielzeugberg heraus und wird noch Monate später gelesen. Erstelle zuerst kostenlos eine Probe, dann bestelle das schöne Hardcover ab CHF 37.',
+      fr: 'Le jour de l\'anniversaire, un enfant devrait se sentir comme la personne la plus importante au monde. Un livre personnalisé offre exactement ce sentiment. Que votre enfant ait 3 ou 10 ans, c\'est le cadeau qui se démarque de la pile de jouets. Essayez gratuitement, puis commandez le livre cartonné dès CHF 37.',
+      it: 'Il compleanno è il giorno in cui un bambino dovrebbe sentirsi la persona più importante del mondo. Un libro personalizzato regala esattamente questa sensazione — un libro illustrato con professionalità in cui il festeggiato è il protagonista. Non esistono due libri uguali, perché ogni storia viene generata in modo unico dall\'IA in base alla foto, al nome e ai tratti del bambino. Che compia 3 o 10 anni, questo è il regalo di compleanno che si distingue dal mucchio di giocattoli e viene letto ancora mesi dopo. Create prima una prova gratuita, poi ordinate il bellissimo cartonato da CHF 29.',
     },
     tips: {
       en: [
-        'Order the printed book at least 5 days before the birthday party',
+        'Order the printed book at least two weeks before the birthday party',
         'Pick a theme matching the child\'s current passion — it shows you really know them',
         'Read the story together at the birthday party for a magical group experience',
         'Add the birthday child\'s best friend as a secondary character for extra excitement',
       ],
       de: [
-        'Bestelle das gedruckte Buch mindestens 5 Tage vor der Geburtstagsparty',
+        'Bestelle das gedruckte Buch mindestens zwei Wochen vor der Geburtstagsparty',
         'Wähle ein Thema, das zur aktuellen Begeisterung des Kindes passt — das zeigt, dass du es wirklich kennst',
         'Lest die Geschichte gemeinsam an der Geburtstagsparty für ein magisches Gruppenerlebnis',
         'Füge den besten Freund des Geburtstagskindes als Nebenfigur hinzu für extra Begeisterung',
       ],
       fr: [
-        'Commandez le livre imprimé au moins 5 jours avant la fête d\'anniversaire',
+        'Commandez le livre imprimé au moins deux semaines avant la fête d\'anniversaire',
         'Choisissez un thème qui correspond à la passion actuelle de l\'enfant',
         'Lisez l\'histoire ensemble pendant la fête pour une expérience magique de groupe',
         'Ajoutez le meilleur ami de l\'enfant comme personnage secondaire',
       ],
       it: [
-        'Ordinate il libro stampato almeno 5 giorni prima della festa di compleanno',
+        'Ordinate il libro stampato almeno due settimane prima della festa di compleanno',
         'Scegliete un tema che rispecchi la passione attuale del bambino — mostra che lo conoscete davvero',
         'Leggete la storia insieme durante la festa per un\'esperienza di gruppo magica',
         'Aggiungete il migliore amico del festeggiato come personaggio secondario per più entusiasmo',
@@ -641,10 +641,10 @@ export const giftPages: GiftPageData[] = [
       { id: 'dragon', category: 'adventure' },
     ],
     deliveryNote: {
-      en: 'Create the story at least 5 days before the birthday for printed book delivery. The digital version is ready in minutes!',
-      de: 'Erstelle die Geschichte mindestens 5 Tage vor dem Geburtstag für die Lieferung des gedruckten Buches. Die digitale Version ist in Minuten fertig!',
-      fr: 'Créez l\'histoire au moins 5 jours avant l\'anniversaire pour la livraison du livre imprimé. La version numérique est prête en minutes !',
-      it: 'Create la storia almeno 5 giorni prima del compleanno per la consegna del libro stampato. La versione digitale è pronta in pochi minuti!',
+      en: 'Create the story at least two weeks before the birthday for printed book delivery. The digital version is ready in about an hour!',
+      de: 'Erstelle die Geschichte mindestens zwei Wochen vor dem Geburtstag für die Lieferung des gedruckten Buches. Die digitale Version ist in etwa einer Stunde fertig!',
+      fr: 'Créez l\'histoire au moins deux semaines avant l\'anniversaire pour la livraison du livre imprimé. La version numérique est prête en environ une heure !',
+      it: 'Create la storia almeno due settimane prima del compleanno per la consegna del libro stampato. La versione digitale è pronta in circa un\'ora!',
     },
     faq: [
       {
@@ -653,7 +653,7 @@ export const giftPages: GiftPageData[] = [
       },
       {
         q: { en: 'How far in advance should I order for a birthday?', de: 'Wie weit im Voraus sollte ich für einen Geburtstag bestellen?', fr: 'Combien de temps à l\'avance faut-il commander pour un anniversaire ?', it: 'Con quanto anticipo devo ordinare per un compleanno?' },
-        a: { en: 'For the printed hardcover, order at least 5 days ahead. The digital story is ready in minutes — even on the day of the birthday!', de: 'Für das gedruckte Hardcover bestelle mindestens 5 Tage vorher. Die digitale Geschichte ist in Minuten fertig — sogar am Geburtstag selbst!', fr: 'Pour le livre cartonné, commandez au moins 5 jours à l\'avance. L\'histoire numérique est prête en minutes !', it: 'Per il cartonato stampato, ordinate almeno 5 giorni prima. La storia digitale è pronta in pochi minuti — anche il giorno stesso del compleanno!' },
+        a: { en: 'For the printed hardcover, order at least two weeks ahead. The digital story is ready in about an hour — even on the day of the birthday!', de: 'Für das gedruckte Hardcover bestelle mindestens zwei Wochen vorher. Die digitale Geschichte ist in etwa einer Stunde fertig — sogar am Geburtstag selbst!', fr: 'Pour le livre cartonné, commandez au moins deux semaines à l\'avance. L\'histoire numérique est prête en environ une heure !', it: 'Per il cartonato stampato, ordinate almeno due settimane prima. La storia digitale è pronta in circa un\'ora — anche il giorno stesso del compleanno!' },
       },
       {
         q: { en: 'Can this be a gift from the whole family?', de: 'Kann das ein Geschenk von der ganzen Familie sein?', fr: 'Peut-on en faire un cadeau de toute la famille ?', it: 'Può essere un regalo da parte di tutta la famiglia?' },
@@ -690,25 +690,25 @@ export const giftPages: GiftPageData[] = [
       en: [
         'Write a heartfelt dedication from the godparents or family on the first page',
         'Choose a gentle theme like forest animals or unicorns for a young child',
-        'Order the printed hardcover (from CHF 33) — a baptism gift should feel substantial',
+        'Order the printed hardcover (from CHF 37) — a baptism gift should feel substantial',
         'The book grows with the child — they\'ll start reading it themselves in a few years',
       ],
       de: [
         'Schreibe eine herzliche Widmung von den Paten oder der Familie auf die erste Seite',
         'Wähle ein sanftes Thema wie Waldtiere oder Einhörner für ein kleines Kind',
-        'Bestelle das gedruckte Hardcover (ab CHF 33) — ein Taufgeschenk sollte sich wertig anfühlen',
+        'Bestelle das gedruckte Hardcover (ab CHF 37) — ein Taufgeschenk sollte sich wertig anfühlen',
         'Das Buch wächst mit dem Kind — in ein paar Jahren liest es die Geschichte selbst',
       ],
       fr: [
         'Écrivez une dédicace sincère du parrain/marraine ou de la famille sur la première page',
         'Choisissez un thème doux comme les animaux de la forêt ou les licornes pour un jeune enfant',
-        'Commandez le livre cartonné (dès CHF 33) — un cadeau de baptême doit être de qualité',
+        'Commandez le livre cartonné (dès CHF 37) — un cadeau de baptême doit être de qualité',
         'Le livre grandit avec l\'enfant — il le lira seul dans quelques années',
       ],
       it: [
         'Scrivete una dedica sincera da parte dei padrini o della famiglia sulla prima pagina',
         'Scegliete un tema delicato come gli animali del bosco o gli unicorni per un bambino piccolo',
-        'Ordinate il libro cartonato (da CHF 33) — un regalo di battesimo deve sembrare di qualità',
+        'Ordinate il libro cartonato (da CHF 29) — un regalo di battesimo deve sembrare di qualità',
         'Il libro cresce con il bambino — tra qualche anno leggerà la storia da solo',
       ],
     },
@@ -720,10 +720,10 @@ export const giftPages: GiftPageData[] = [
       { id: 'being-brave', category: 'life-challenges' },
     ],
     deliveryNote: {
-      en: 'Order the printed hardcover at least 7 days before the baptism ceremony. Digital stories are available instantly.',
-      de: 'Bestelle das gedruckte Hardcover mindestens 7 Tage vor der Tauffeier. Digitale Geschichten sind sofort verfügbar.',
-      fr: 'Commandez le livre cartonné au moins 7 jours avant la cérémonie de baptême. Les histoires numériques sont disponibles instantanément.',
-      it: 'Ordinate il libro cartonato almeno 7 giorni prima della cerimonia di battesimo. Le storie digitali sono disponibili all\'istante.',
+      en: 'Order the printed hardcover at least two weeks before the baptism ceremony. Digital stories are available instantly.',
+      de: 'Bestelle das gedruckte Hardcover mindestens zwei Wochen vor der Tauffeier. Digitale Geschichten sind sofort verfügbar.',
+      fr: 'Commandez le livre cartonné au moins deux semaines avant la cérémonie de baptême. Les histoires numériques sont disponibles instantanément.',
+      it: 'Ordinate il libro cartonato almeno due settimane prima della cerimonia di battesimo. Le storie digitali sono disponibili all\'istante.',
     },
     faq: [
       {
@@ -761,7 +761,7 @@ export const giftPages: GiftPageData[] = [
     },
     intro: {
       en: 'Starting school is one of the biggest milestones in a child\'s life. A personalized storybook helps prepare your child for this exciting transition by showing them as a brave, capable hero who masters new challenges. Whether the story features them making new friends, discovering a magical school, or conquering a fun adventure — it builds confidence and makes the idea of school feel exciting rather than scary. A wonderful addition to the traditional school cone (Schultüte), and a gift that will be read again and again during those first weeks.',
-      de: 'Der Schulanfang ist einer der grössten Meilensteine im Leben eines Kindes. Ein personalisiertes Geschichtenbuch hilft deinem Kind, sich auf diesen aufregenden Übergang vorzubereiten — es zeigt sie als mutigen, fähigen Helden, der neue Herausforderungen meistert. Ob die Geschichte davon erzählt, wie es neue Freunde findet, eine magische Schule entdeckt oder ein spannendes Abenteuer besteht — es stärkt das Selbstvertrauen und macht Schule aufregend statt beängstigend. Eine wunderbare Ergänzung zur Schultüte, und ein Geschenk, das in den ersten Wochen immer wieder gelesen wird.',
+      de: 'Der Schulanfang ist einer der grössten Meilensteine im Leben eines Kindes. Ein personalisiertes Geschichtenbuch hilft deinem Kind, sich auf diesen aufregenden Übergang vorzubereiten — es zeigt es als mutigen, fähigen Helden, der neue Herausforderungen meistert. Ob die Geschichte davon erzählt, wie es neue Freunde findet, eine magische Schule entdeckt oder ein spannendes Abenteuer besteht — es stärkt das Selbstvertrauen und macht Schule aufregend statt beängstigend. Eine wunderbare Ergänzung zur Schultüte, und ein Geschenk, das in den ersten Wochen immer wieder gelesen wird.',
       fr: 'La rentrée scolaire est l\'un des plus grands moments dans la vie d\'un enfant. Un livre personnalisé aide à préparer votre enfant en le montrant comme un héros courageux. Un merveilleux complément au cornet de rentrée, et un cadeau qui sera relu encore et encore pendant les premières semaines.',
       it: 'L\'inizio della scuola è una delle tappe più importanti nella vita di un bambino. Un libro personalizzato aiuta a prepararlo a questa transizione emozionante mostrandolo come un eroe coraggioso e capace che affronta nuove sfide. Che la storia lo veda fare nuove amicizie, scoprire una scuola magica o vivere un\'avventura divertente, rafforza la fiducia e rende l\'idea della scuola entusiasmante invece che spaventosa. Un\'aggiunta meravigliosa al tradizionale cono di scuola, e un regalo che verrà letto e riletto durante quelle prime settimane.',
     },
@@ -773,7 +773,7 @@ export const giftPages: GiftPageData[] = [
         'Include the child\'s real school name or teacher\'s name in the dedication for a personal touch',
       ],
       de: [
-        'Wähle das Thema "Erster Kindergartentag" oder ein mutmachendes Abenteuer',
+        'Wähle das Thema «Erster Kindergartentag» oder ein mutmachendes Abenteuer',
         'Lest die Geschichte am Vorabend des Schulstarts zusammen — das steigert die Vorfreude',
         'Lege es in die Schultüte als bedeutungsvolle Überraschung',
         'Erwähne den echten Schulnamen oder den der Lehrperson in der Widmung für eine persönliche Note',
@@ -893,7 +893,7 @@ export const giftPages: GiftPageData[] = [
       },
       {
         q: { en: 'Can the story mention St. Nicholas?', de: 'Kann die Geschichte den Samichlaus erwähnen?', fr: 'L\'histoire peut-elle mentionner Saint-Nicolas ?', it: 'La storia può menzionare San Nicolao?' },
-        a: { en: 'Our Christmas theme includes winter and holiday magic. You can also use the custom theme option to specifically request a Samichlaus story.', de: 'Unser Weihnachtsthema enthält Winter- und Festtagsmagie. Du kannst auch die Option "Eigenes Thema" nutzen, um speziell eine Samichlaus-Geschichte anzufordern.', fr: 'Notre thème de Noël inclut la magie hivernale. Vous pouvez aussi utiliser l\'option thème personnalisé pour une histoire de Saint-Nicolas.', it: 'Il nostro tema natalizio include la magia dell\'inverno e delle feste. Potete anche usare l\'opzione tema personalizzato per richiedere specificamente una storia su San Nicolao.' },
+        a: { en: 'Our Christmas theme includes winter and holiday magic. You can also use the custom theme option to specifically request a Samichlaus story.', de: 'Unser Weihnachtsthema enthält Winter- und Festtagsmagie. Du kannst auch die Option «Eigenes Thema» nutzen, um speziell eine Samichlaus-Geschichte anzufordern.', fr: 'Notre thème de Noël inclut la magie hivernale. Vous pouvez aussi utiliser l\'option thème personnalisé pour une histoire de Saint-Nicolas.', it: 'Il nostro tema natalizio include la magia dell\'inverno e delle feste. Potete anche usare l\'opzione tema personalizzato per richiedere specificamente una storia su San Nicolao.' },
       },
     ],
   },
@@ -922,7 +922,7 @@ export const giftPages: GiftPageData[] = [
     },
     intro: {
       en: 'In a world of mass-produced gifts, finding something truly unique feels nearly impossible. That\'s where MagicalStory comes in. Our AI generates a completely original story for each child — not a template with a swapped name, but a fully unique narrative with custom illustrations featuring your child\'s real face. Every word, every image, every page is created specifically for the recipient. It\'s the definition of one-of-a-kind: no other child in the world will ever receive the same book. Whether for a birthday, holiday, or "just because" — this is the gift that makes people ask "where did you find this?"',
-      de: 'In einer Welt voller Massenware fühlt es sich fast unmöglich an, etwas wirklich Einzigartiges zu finden. Genau hier kommt MagicalStory ins Spiel. Unsere KI generiert eine komplett originelle Geschichte für jedes Kind — kein Template mit ausgetauschtem Namen, sondern eine vollständig einzigartige Erzählung mit individuellen Illustrationen, die das echte Gesicht deines Kindes zeigen. Jedes Wort, jedes Bild, jede Seite wird speziell für den Empfänger erstellt. Es ist die Definition von einzigartig: Kein anderes Kind auf der Welt bekommt je dasselbe Buch. Ob zum Geburtstag, Feiertag oder einfach so — das ist das Geschenk, bei dem alle fragen: "Wo hast du das gefunden?"',
+      de: 'In einer Welt voller Massenware fühlt es sich fast unmöglich an, etwas wirklich Einzigartiges zu finden. Genau hier kommt MagicalStory ins Spiel. Unsere KI generiert eine komplett originelle Geschichte für jedes Kind — kein Template mit ausgetauschtem Namen, sondern eine vollständig einzigartige Erzählung mit individuellen Illustrationen, die das echte Gesicht deines Kindes zeigen. Jedes Wort, jedes Bild, jede Seite wird speziell für den Empfänger erstellt. Es ist die Definition von einzigartig: Kein anderes Kind auf der Welt bekommt je dasselbe Buch. Ob zum Geburtstag, Feiertag oder einfach so — das ist das Geschenk, bei dem alle fragen: «Wo hast du das gefunden?»',
       fr: 'Dans un monde de cadeaux produits en masse, trouver quelque chose de vraiment unique semble presque impossible. Notre IA génère une histoire complètement originale pour chaque enfant — pas un modèle avec un nom échangé, mais un récit entièrement unique avec des illustrations personnalisées montrant le vrai visage de votre enfant. C\'est le cadeau qui fait demander à tout le monde "où as-tu trouvé ça ?"',
       it: 'In un mondo di regali prodotti in serie, trovare qualcosa di davvero unico sembra quasi impossibile. Qui entra in gioco MagicalStory. La nostra IA genera una storia completamente originale per ogni bambino — non un modello con un nome sostituito, ma un racconto del tutto unico con illustrazioni personalizzate che mostrano il vero volto di vostro figlio. Ogni parola, ogni immagine, ogni pagina è creata appositamente per il destinatario. È la definizione stessa di pezzo unico: nessun altro bambino al mondo riceverà mai lo stesso libro. Che sia per un compleanno, una festa o «semplicemente così» — è il regalo che fa chiedere a tutti «dove l\'hai trovato?»',
     },
@@ -960,10 +960,10 @@ export const giftPages: GiftPageData[] = [
       { id: 'ninja', category: 'adventure' },
     ],
     deliveryNote: {
-      en: 'Every story is uniquely generated in minutes. Printed hardcovers (from CHF 33) delivered in 5–7 business days.',
-      de: 'Jede Geschichte wird in Minuten einzigartig generiert. Gedruckte Hardcover (ab CHF 33) in 5–7 Werktagen geliefert.',
-      fr: 'Chaque histoire est générée de manière unique en quelques minutes. Livres cartonnés (dès CHF 33) livrés en 5 à 7 jours ouvrables.',
-      it: 'Ogni storia viene generata in modo unico in pochi minuti. Libri cartonati (da CHF 33) consegnati entro 5–7 giorni lavorativi.',
+      en: 'Every story is uniquely generated in about an hour. Printed hardcovers (from CHF 37) delivered in 5–7 business days.',
+      de: 'Jede Geschichte wird in etwa einer Stunde einzigartig generiert. Gedruckte Hardcover (ab CHF 37) in 5–7 Werktagen geliefert.',
+      fr: 'Chaque histoire est générée de manière unique en environ une heure. Livres cartonnés (dès CHF 37) livrés en 5 à 7 jours ouvrables.',
+      it: 'Ogni storia viene generata in modo unico in circa un\'ora. Libri cartonati (da CHF 29) consegnati entro 5–7 giorni lavorativi.',
     },
     faq: [
       {
@@ -1001,7 +1001,7 @@ export const giftPages: GiftPageData[] = [
     },
     intro: {
       en: 'Personalization is more than just printing a name on a mug. At MagicalStory, we take personalization to the next level: upload a photo of your child, and our AI generates stunning illustrations where your child\'s actual face appears on every page. The story adapts to their age, interests, and even their personality traits. It\'s not a template — it\'s a completely custom book created from scratch. Children are amazed when they see themselves riding a dragon, exploring space, or saving the day. That moment of recognition — "That\'s ME!" — is what makes this the most personal gift you can give.',
-      de: 'Personalisierung ist mehr als nur einen Namen auf eine Tasse zu drucken. Bei MagicalStory bringen wir Personalisierung auf das nächste Level: Lade ein Foto deines Kindes hoch, und unsere KI generiert beeindruckende Illustrationen, in denen das echte Gesicht deines Kindes auf jeder Seite erscheint. Die Geschichte passt sich dem Alter, den Interessen und sogar den Persönlichkeitsmerkmalen an. Es ist kein Template — es ist ein komplett individuelles Buch, von Grund auf erstellt. Kinder sind verblüfft, wenn sie sich selbst auf einem Drachen reiten, den Weltraum erkunden oder den Tag retten sehen. Dieser Moment des Erkennens — "Das bin ICH!" — macht es zum persönlichsten Geschenk, das du machen kannst.',
+      de: 'Personalisierung ist mehr als nur einen Namen auf eine Tasse zu drucken. Bei MagicalStory bringen wir Personalisierung auf das nächste Level: Lade ein Foto deines Kindes hoch, und unsere KI generiert beeindruckende Illustrationen, in denen das echte Gesicht deines Kindes auf jeder Seite erscheint. Die Geschichte passt sich dem Alter, den Interessen und sogar den Persönlichkeitsmerkmalen an. Es ist kein Template — es ist ein komplett individuelles Buch, von Grund auf erstellt. Kinder sind verblüfft, wenn sie sich selbst auf einem Drachen reiten, den Weltraum erkunden oder den Tag retten sehen. Dieser Moment des Erkennens — «Das bin ICH!» — macht es zum persönlichsten Geschenk, das du machen kannst.',
       fr: 'La personnalisation, c\'est plus qu\'un nom imprimé sur une tasse. Chez MagicalStory, nous allons plus loin : téléchargez une photo, et notre IA génère des illustrations étonnantes où le vrai visage de votre enfant apparaît sur chaque page. Ce moment de reconnaissance — "C\'est MOI !" — en fait le cadeau le plus personnel que vous puissiez offrir.',
       it: 'La personalizzazione è molto più che stampare un nome su una tazza. In MagicalStory portiamo la personalizzazione a un livello superiore: caricate una foto di vostro figlio, e la nostra IA genera illustrazioni straordinarie in cui il suo vero volto compare su ogni pagina. La storia si adatta alla sua età, ai suoi interessi e persino ai suoi tratti di personalità. Non è un modello — è un libro completamente su misura, creato da zero. I bambini restano stupiti quando si vedono cavalcare un drago, esplorare lo spazio o salvare la situazione. Quel momento di riconoscimento — «Quella sono IO!» — è ciò che rende questo il regalo più personale che possiate fare.',
     },
@@ -1010,25 +1010,25 @@ export const giftPages: GiftPageData[] = [
         'Upload a clear, well-lit front-facing photo for the most accurate character likeness',
         'Add details like hair color, skin tone, and clothing preferences for better results',
         'Include the child\'s real interests and personality traits to make the story even more personal',
-        'Combine with a printed hardcover (from CHF 33) for a gift that feels truly premium',
+        'Combine with a printed hardcover (from CHF 37) for a gift that feels truly premium',
       ],
       de: [
         'Lade ein klares, gut beleuchtetes Frontalfoto hoch für die beste Ähnlichkeit',
         'Füge Details wie Haarfarbe, Hautton und Kleidungsvorlieben hinzu für bessere Ergebnisse',
         'Gib die echten Interessen und Persönlichkeitsmerkmale des Kindes an für eine noch persönlichere Geschichte',
-        'Kombiniere mit einem gedruckten Hardcover (ab CHF 33) für ein wirklich hochwertiges Geschenk',
+        'Kombiniere mit einem gedruckten Hardcover (ab CHF 37) für ein wirklich hochwertiges Geschenk',
       ],
       fr: [
         'Téléchargez une photo de face claire et bien éclairée pour la meilleure ressemblance',
         'Ajoutez des détails comme la couleur des cheveux et le teint pour de meilleurs résultats',
         'Incluez les vrais intérêts de l\'enfant pour une histoire encore plus personnelle',
-        'Combinez avec le livre cartonné (dès CHF 33) pour un cadeau premium',
+        'Combinez avec le livre cartonné (dès CHF 37) pour un cadeau premium',
       ],
       it: [
         'Caricate una foto frontale chiara e ben illuminata per la migliore somiglianza del personaggio',
         'Aggiungete dettagli come colore dei capelli, carnagione e preferenze di abbigliamento per risultati migliori',
         'Includete i veri interessi e i tratti di personalità del bambino per una storia ancora più personale',
-        'Abbinate al libro cartonato (da CHF 33) per un regalo davvero premium',
+        'Abbinate al libro cartonato (da CHF 29) per un regalo davvero premium',
       ],
     },
     recommendedThemes: [
@@ -1040,10 +1040,10 @@ export const giftPages: GiftPageData[] = [
       { id: 'mermaid', category: 'adventure' },
     ],
     deliveryNote: {
-      en: 'Create a free trial story in minutes to see the personalization quality. Printed hardcovers from CHF 33, delivered in 5–7 days.',
-      de: 'Erstelle in Minuten eine kostenlose Probegeschichte, um die Personalisierungsqualität zu sehen. Gedruckte Hardcover ab CHF 33, in 5–7 Tagen geliefert.',
-      fr: 'Créez une histoire d\'essai gratuite en minutes pour voir la qualité de personnalisation. Livres cartonnés dès CHF 33, livrés en 5 à 7 jours.',
-      it: 'Create una storia di prova gratuita in pochi minuti per vedere la qualità della personalizzazione. Libri cartonati da CHF 33, consegnati in 5–7 giorni.',
+      en: 'Create a free trial story in minutes to see the personalization quality. Printed hardcovers from CHF 37, delivered in 5–7 business days.',
+      de: 'Erstelle in Minuten eine kostenlose Probegeschichte, um die Personalisierungsqualität zu sehen. Gedruckte Hardcover ab CHF 37, in 5–7 Werktagen geliefert.',
+      fr: 'Créez une histoire d\'essai gratuite en minutes pour voir la qualité de personnalisation. Livres cartonnés dès CHF 37, livrés en 5 à 7 jours ouvrables.',
+      it: 'Create una storia di prova gratuita in pochi minuti per vedere la qualità della personalizzazione. Libri cartonati da CHF 29, consegnati in 5–7 giorni lavorativi.',
     },
     faq: [
       {
@@ -1120,10 +1120,10 @@ export const giftPages: GiftPageData[] = [
       { id: 'detective', category: 'adventure' },
     ],
     deliveryNote: {
-      en: 'Try a free trial story to see the educational value in action. Printed hardcovers from CHF 33, delivered in 5–7 business days.',
-      de: 'Teste eine kostenlose Probegeschichte, um den pädagogischen Wert live zu sehen. Gedruckte Hardcover ab CHF 33, in 5–7 Werktagen geliefert.',
-      fr: 'Essayez une histoire d\'essai gratuite pour voir la valeur éducative en action. Livres cartonnés dès CHF 33, livrés en 5 à 7 jours ouvrables.',
-      it: 'Provate una storia di prova gratuita per vedere il valore educativo in azione. Libri cartonati da CHF 33, consegnati entro 5–7 giorni lavorativi.',
+      en: 'Try a free trial story to see the educational value in action. Printed hardcovers from CHF 37, delivered in 5–7 business days.',
+      de: 'Teste eine kostenlose Probegeschichte, um den pädagogischen Wert live zu sehen. Gedruckte Hardcover ab CHF 37, in 5–7 Werktagen geliefert.',
+      fr: 'Essayez une histoire d\'essai gratuite pour voir la valeur éducative en action. Livres cartonnés dès CHF 37, livrés en 5 à 7 jours ouvrables.',
+      it: 'Provate una storia di prova gratuita per vedere il valore educativo in azione. Libri cartonati da CHF 29, consegnati entro 5–7 giorni lavorativi.',
     },
     faq: [
       {
@@ -1149,46 +1149,46 @@ export const giftPages: GiftPageData[] = [
     name: { en: 'Last-Minute Gift', de: 'Last-Minute-Geschenk', fr: 'Cadeau de dernière minute', it: 'Regalo dell\'ultimo minuto' },
     title: {
       en: 'Last-Minute Gift for Children — Ready in Minutes',
-      de: 'Last-Minute-Geschenk für Kinder — In Minuten bereit',
-      fr: 'Cadeau de dernière minute pour enfants — Prêt en quelques minutes',
-      it: 'Regalo dell\'ultimo minuto per bambini — Pronto in pochi minuti',
+      de: 'Last-Minute-Geschenk für Kinder — In etwa einer Stunde bereit',
+      fr: 'Cadeau de dernière minute pour enfants — Prêt en environ une heure',
+      it: 'Regalo dell\'ultimo minuto per bambini — Pronto in circa un\'ora',
     },
     description: {
-      en: 'Forgot to buy a gift? No problem. Create a personalized storybook in minutes — the digital version is ready instantly. A thoughtful, personal gift that doesn\'t look last-minute at all.',
-      de: 'Geschenk vergessen? Kein Problem. Erstelle ein personalisiertes Geschichtenbuch in Minuten — die digitale Version ist sofort bereit. Ein durchdachtes, persönliches Geschenk, das überhaupt nicht nach Last-Minute aussieht.',
-      fr: 'Oublié d\'acheter un cadeau ? Pas de problème. Créez un livre personnalisé en quelques minutes — la version numérique est prête instantanément. Un cadeau réfléchi qui ne ressemble pas du tout à un cadeau de dernière minute.',
-      it: 'Avete dimenticato di comprare un regalo? Nessun problema. Create un libro personalizzato in pochi minuti — la versione digitale è pronta all\'istante. Un regalo curato e personale che non sembra affatto dell\'ultimo minuto.',
+      en: 'Forgot to buy a gift? No problem. Create a personalized storybook in about an hour — the digital version is ready instantly. A thoughtful, personal gift that doesn\'t look last-minute at all.',
+      de: 'Geschenk vergessen? Kein Problem. Erstelle ein personalisiertes Geschichtenbuch in etwa einer Stunde — die digitale Version ist sofort bereit. Ein durchdachtes, persönliches Geschenk, das überhaupt nicht nach Last-Minute aussieht.',
+      fr: 'Oublié d\'acheter un cadeau ? Pas de problème. Créez un livre personnalisé en environ une heure — la version numérique est prête instantanément. Un cadeau réfléchi qui ne ressemble pas du tout à un cadeau de dernière minute.',
+      it: 'Avete dimenticato di comprare un regalo? Nessun problema. Create un libro personalizzato in circa un\'ora — la versione digitale è pronta all\'istante. Un regalo curato e personale che non sembra affatto dell\'ultimo minuto.',
     },
     intro: {
-      en: 'We\'ve all been there — the birthday party is tomorrow, the family gathering is tonight, and you still don\'t have a gift. But here\'s the secret: a personalized storybook from MagicalStory is one of the most thoughtful gifts you can give, and it takes less than 10 minutes to create. Upload a photo, choose a theme, and our AI generates a complete, beautifully illustrated story starring the child. The digital version is ready immediately — show it on a tablet or phone, or print the cover as a "gift certificate" for the printed book that arrives later. Nobody will ever guess it was a last-minute decision.',
-      de: 'Wir kennen das alle — die Geburtstagsparty ist morgen, das Familientreffen heute Abend, und du hast noch kein Geschenk. Aber hier ist das Geheimnis: Ein personalisiertes Geschichtenbuch von MagicalStory ist eines der durchdachtesten Geschenke, und es dauert weniger als 10 Minuten. Lade ein Foto hoch, wähle ein Thema, und unsere KI generiert eine komplette, wunderschön illustrierte Geschichte mit dem Kind als Hauptfigur. Die digitale Version ist sofort bereit — zeig sie auf einem Tablet oder Handy, oder drucke das Cover als "Geschenkgutschein" für das gedruckte Buch, das später kommt. Niemand wird je erraten, dass es eine Last-Minute-Entscheidung war.',
-      fr: 'On connaît tous ça — la fête est demain et vous n\'avez pas encore de cadeau. Un livre personnalisé de MagicalStory prend moins de 10 minutes à créer. La version numérique est prête immédiatement. Montrez-la sur une tablette ou imprimez la couverture comme "bon cadeau" pour le livre imprimé qui arrive plus tard. Personne ne devinera que c\'était une décision de dernière minute.',
-      it: 'Ci siamo passati tutti — la festa di compleanno è domani, la riunione di famiglia è stasera, e non avete ancora un regalo. Ma ecco il segreto: un libro personalizzato di MagicalStory è uno dei regali più curati che si possano fare, e serve meno di 10 minuti per crearlo. Caricate una foto, scegliete un tema, e la nostra IA genera una storia completa e splendidamente illustrata con il bambino come protagonista. La versione digitale è pronta subito — mostratela su un tablet o su un telefono, oppure stampate la copertina come «buono regalo» per il libro cartonato che arriverà più tardi. Nessuno indovinerà mai che era una decisione dell\'ultimo minuto.',
+      en: 'We\'ve all been there — the birthday party is tomorrow, the family gathering is tonight, and you still don\'t have a gift. But here\'s the secret: a personalized storybook from MagicalStory is one of the most thoughtful gifts you can give, and it takes about an hour to create. Upload a photo, choose a theme, and our AI generates a complete, beautifully illustrated story starring the child. The digital version is ready immediately — show it on a tablet or phone, or print the cover as a "gift certificate" for the printed book that arrives later. Nobody will ever guess it was a last-minute decision.',
+      de: 'Wir kennen das alle — die Geburtstagsparty ist morgen, das Familientreffen heute Abend, und du hast noch kein Geschenk. Aber hier ist das Geheimnis: Ein personalisiertes Geschichtenbuch von MagicalStory ist eines der durchdachtesten Geschenke, und es dauert etwa eine Stunde. Lade ein Foto hoch, wähle ein Thema, und unsere KI generiert eine komplette, wunderschön illustrierte Geschichte mit dem Kind als Hauptfigur. Die digitale Version ist sofort bereit — zeig sie auf einem Tablet oder Handy, oder drucke das Cover als «Geschenkgutschein» für das gedruckte Buch, das später kommt. Niemand wird je erraten, dass es eine Last-Minute-Entscheidung war.',
+      fr: 'On connaît tous ça — la fête est demain et vous n\'avez pas encore de cadeau. Un livre personnalisé de MagicalStory prend environ une heure à créer. La version numérique est prête immédiatement. Montrez-la sur une tablette ou imprimez la couverture comme "bon cadeau" pour le livre imprimé qui arrive plus tard. Personne ne devinera que c\'était une décision de dernière minute.',
+      it: 'Ci siamo passati tutti — la festa di compleanno è domani, la riunione di famiglia è stasera, e non avete ancora un regalo. Ma ecco il segreto: un libro personalizzato di MagicalStory è uno dei regali più curati che si possano fare, e serve circa un\'ora per crearlo. Caricate una foto, scegliete un tema, e la nostra IA genera una storia completa e splendidamente illustrata con il bambino come protagonista. La versione digitale è pronta subito — mostratela su un tablet o su un telefono, oppure stampate la copertina come «buono regalo» per il libro cartonato che arriverà più tardi. Nessuno indovinerà mai che era una decisione dell\'ultimo minuto.',
     },
     tips: {
       en: [
-        'The digital story is ready in under 10 minutes — perfect for tonight\'s party',
+        'The digital story is ready in about an hour — perfect for tonight\'s party',
         'Print the cover page as a gift certificate: "Your personalized book is on its way!"',
         'Show the digital story on a tablet for an instant wow-moment at the party',
-        'Order the printed hardcover afterwards — it arrives in 5–7 days as a bonus surprise',
+        'Order the printed hardcover afterwards — it arrives in 5–7 business days as a bonus surprise',
       ],
       de: [
-        'Die digitale Geschichte ist in unter 10 Minuten fertig — perfekt für die Party heute Abend',
-        'Drucke die Titelseite als Geschenkgutschein aus: "Dein personalisiertes Buch ist unterwegs!"',
+        'Die digitale Geschichte ist in etwa einer Stunde fertig — perfekt für die Party heute Abend',
+        'Drucke die Titelseite als Geschenkgutschein aus: «Dein personalisiertes Buch ist unterwegs!»',
         'Zeig die digitale Geschichte auf einem Tablet für einen sofortigen Wow-Moment an der Party',
-        'Bestelle das gedruckte Hardcover danach — es kommt in 5–7 Tagen als Bonus-Überraschung',
+        'Bestelle das gedruckte Hardcover danach — es kommt in 5–7 Werktagen als Bonus-Überraschung',
       ],
       fr: [
-        'L\'histoire numérique est prête en moins de 10 minutes — parfait pour la fête de ce soir',
+        'L\'histoire numérique est prête en environ une heure — parfait pour la fête de ce soir',
         'Imprimez la couverture comme bon cadeau : "Ton livre personnalisé est en route !"',
         'Montrez l\'histoire numérique sur une tablette pour un effet wow instantané',
-        'Commandez le livre cartonné ensuite — il arrive en 5 à 7 jours comme surprise bonus',
+        'Commandez le livre cartonné ensuite — il arrive en 5 à 7 jours ouvrables comme surprise bonus',
       ],
       it: [
-        'La storia digitale è pronta in meno di 10 minuti — perfetta per la festa di stasera',
+        'La storia digitale è pronta in circa un\'ora — perfetta per la festa di stasera',
         'Stampate la copertina come buono regalo: «Il tuo libro personalizzato è in arrivo!»',
         'Mostrate la storia digitale su un tablet per un effetto wow immediato alla festa',
-        'Ordinate poi il libro cartonato — arriva in 5–7 giorni come sorpresa bonus',
+        'Ordinate poi il libro cartonato — arriva in 5–7 giorni lavorativi come sorpresa bonus',
       ],
     },
     recommendedThemes: [
@@ -1198,18 +1198,18 @@ export const giftPages: GiftPageData[] = [
       { id: 'dinosaur', category: 'adventure' },
     ],
     deliveryNote: {
-      en: 'Digital story ready in under 10 minutes — no shipping needed! Printed hardcover can be ordered anytime and arrives in 5–7 business days.',
-      de: 'Digitale Geschichte in unter 10 Minuten fertig — kein Versand nötig! Gedrucktes Hardcover kann jederzeit bestellt werden und kommt in 5–7 Werktagen.',
-      fr: 'Histoire numérique prête en moins de 10 minutes — pas de livraison nécessaire ! Le livre cartonné peut être commandé à tout moment et arrive en 5 à 7 jours ouvrables.',
-      it: 'Storia digitale pronta in meno di 10 minuti — nessuna spedizione necessaria! Il libro cartonato può essere ordinato in qualsiasi momento e arriva entro 5–7 giorni lavorativi.',
+      en: 'Digital story ready in about an hour — no shipping needed! Printed hardcover can be ordered anytime and arrives in 5–7 business days.',
+      de: 'Digitale Geschichte in etwa einer Stunde fertig — kein Versand nötig! Gedrucktes Hardcover kann jederzeit bestellt werden und kommt in 5–7 Werktagen.',
+      fr: 'Histoire numérique prête en environ une heure — pas de livraison nécessaire ! Le livre cartonné peut être commandé à tout moment et arrive en 5 à 7 jours ouvrables.',
+      it: 'Storia digitale pronta in circa un\'ora — nessuna spedizione necessaria! Il libro cartonato può essere ordinato in qualsiasi momento e arriva entro 5–7 giorni lavorativi.',
     },
     faq: [
       {
-        q: { en: 'Can I really create a quality gift in under 10 minutes?', de: 'Kann ich wirklich in unter 10 Minuten ein hochwertiges Geschenk erstellen?', fr: 'Puis-je vraiment créer un cadeau de qualité en moins de 10 minutes ?', it: 'Posso davvero creare un regalo di qualità in meno di 10 minuti?' },
+        q: { en: 'Can I really create a quality gift in about an hour?', de: 'Kann ich wirklich in etwa einer Stunde ein hochwertiges Geschenk erstellen?', fr: 'Puis-je vraiment créer un cadeau de qualité en environ une heure ?', it: 'Posso davvero creare un regalo di qualità in circa un\'ora?' },
         a: { en: 'Yes! Upload a photo (1 min), enter details (2 min), choose a theme (1 min), and AI generates the story (5 min). The result is a professional, beautifully illustrated personalized book.', de: 'Ja! Foto hochladen (1 Min.), Details eingeben (2 Min.), Thema wählen (1 Min.) und die KI generiert die Geschichte (5 Min.). Das Ergebnis ist ein professionelles, wunderschön illustriertes personalisiertes Buch.', fr: 'Oui ! Téléchargez une photo (1 min), entrez les détails (2 min), choisissez un thème (1 min), et l\'IA génère l\'histoire (5 min).', it: 'Sì! Caricate una foto (1 min), inserite i dettagli (2 min), scegliete un tema (1 min) e l\'IA genera la storia (5 min). Il risultato è un libro personalizzato professionale e splendidamente illustrato.' },
       },
       {
-        q: { en: 'What if I need a physical gift tonight?', de: 'Was wenn ich heute Abend ein physisches Geschenk brauche?', fr: 'Et si j\'ai besoin d\'un cadeau physique ce soir ?', it: 'E se avessi bisogno di un regalo fisico stasera?' },
+        q: { en: 'What if I need a physical gift tonight?', de: 'Was, wenn ich heute Abend ein physisches Geschenk brauche?', fr: 'Et si j\'ai besoin d\'un cadeau physique ce soir ?', it: 'E se avessi bisogno di un regalo fisico stasera?' },
         a: { en: 'Print the cover page as a beautiful gift certificate and present the digital story on a tablet. The child gets to experience the story immediately, and the printed hardcover arrives as a bonus surprise days later.', de: 'Drucke die Titelseite als schönen Geschenkgutschein aus und zeige die digitale Geschichte auf einem Tablet. Das Kind erlebt die Geschichte sofort, und das gedruckte Hardcover kommt Tage später als Bonus-Überraschung.', fr: 'Imprimez la couverture comme certificat cadeau et présentez l\'histoire numérique sur une tablette. Le livre imprimé arrive comme surprise bonus quelques jours plus tard.', it: 'Stampate la copertina come un bel buono regalo e presentate la storia digitale su un tablet. Il bambino vive subito la storia, mentre il libro cartonato arriva come sorpresa bonus qualche giorno dopo.' },
       },
       {
@@ -1243,7 +1243,7 @@ export const giftPages: GiftPageData[] = [
     },
     intro: {
       en: 'Three is the age where the magic of stories truly begins. Your child is starting to follow narratives, recognize themselves in pictures, and ask "read it again!" A personalized storybook from MagicalStory is perfectly calibrated for this developmental stage: short, simple sentences, large colorful illustrations, and their own face on every page. At 3, children are fascinated by animals, colors, and simple adventures — our farm, forest, and dinosaur themes are especially popular. It\'s also the age where children start developing a love of books — the perfect time to gift them a story that\'s truly theirs.',
-      de: 'Mit 3 beginnt die Magie der Geschichten richtig. Dein Kind fängt an, Erzählungen zu folgen, sich auf Bildern zu erkennen und "nochmal!" zu rufen. Ein personalisiertes Geschichtenbuch von MagicalStory ist perfekt auf diese Entwicklungsstufe abgestimmt: kurze, einfache Sätze, grosse farbige Illustrationen und das eigene Gesicht auf jeder Seite. Mit 3 sind Kinder fasziniert von Tieren, Farben und einfachen Abenteuern — unsere Bauernhof-, Wald- und Dinosaurier-Themen sind besonders beliebt. Es ist auch das Alter, in dem Kinder beginnen, Bücher zu lieben — der perfekte Zeitpunkt, ihnen eine Geschichte zu schenken, die wirklich ihre eigene ist.',
+      de: 'Mit 3 beginnt die Magie der Geschichten richtig. Dein Kind fängt an, Erzählungen zu folgen, sich auf Bildern zu erkennen und «nochmal!» zu rufen. Ein personalisiertes Geschichtenbuch von MagicalStory ist perfekt auf diese Entwicklungsstufe abgestimmt: kurze, einfache Sätze, grosse farbige Illustrationen und das eigene Gesicht auf jeder Seite. Mit 3 sind Kinder fasziniert von Tieren, Farben und einfachen Abenteuern — unsere Bauernhof-, Wald- und Dinosaurier-Themen sind besonders beliebt. Es ist auch das Alter, in dem Kinder beginnen, Bücher zu lieben — der perfekte Zeitpunkt, ihnen eine Geschichte zu schenken, die wirklich ihre eigene ist.',
       fr: 'À 3 ans, la magie des histoires commence vraiment. Votre enfant commence à suivre les récits et à se reconnaître sur les images. Un livre personnalisé de MagicalStory est parfaitement adapté à ce stade de développement : phrases courtes et simples, grandes illustrations colorées et leur propre visage sur chaque page. C\'est aussi l\'âge où les enfants commencent à aimer les livres.',
       it: 'A 3 anni inizia davvero la magia delle storie. Vostro figlio comincia a seguire i racconti, a riconoscersi nelle immagini e a chiedere «ancora!». Un libro personalizzato di MagicalStory è calibrato perfettamente per questa fase di sviluppo: frasi brevi e semplici, grandi illustrazioni colorate e il suo volto su ogni pagina. A 3 anni i bambini sono affascinati da animali, colori e avventure semplici — i nostri temi sulla fattoria, sul bosco e sui dinosauri sono particolarmente amati. È anche l\'età in cui i bambini iniziano ad amare i libri — il momento perfetto per regalare loro una storia che è davvero tutta loro.',
     },
@@ -1252,25 +1252,25 @@ export const giftPages: GiftPageData[] = [
         'Choose simple, visual themes: farm animals, forest, dinosaurs, or unicorns',
         'At this age, the illustrations matter more than complex storylines — our AI adapts accordingly',
         'Read the story as a bedtime ritual — 3-year-olds thrive on routine and repetition',
-        'The hardcover version (from CHF 33) withstands enthusiastic page-turning by little hands',
+        'The hardcover version (from CHF 37) withstands enthusiastic page-turning by little hands',
       ],
       de: [
         'Wähle einfache, visuelle Themen: Bauernhof-Tiere, Wald, Dinosaurier oder Einhörner',
         'In diesem Alter zählen die Illustrationen mehr als komplexe Handlungen — unsere KI passt sich an',
         'Lies die Geschichte als Gutenacht-Ritual vor — 3-Jährige lieben Routine und Wiederholung',
-        'Die Hardcover-Version (ab CHF 33) hält begeistertes Blättern kleiner Hände aus',
+        'Die Hardcover-Version (ab CHF 37) hält begeistertes Blättern kleiner Hände aus',
       ],
       fr: [
         'Choisissez des thèmes simples et visuels : animaux de la ferme, forêt, dinosaures ou licornes',
         'À cet âge, les illustrations comptent plus que les intrigues — notre IA s\'adapte',
         'Lisez l\'histoire comme rituel du coucher — les enfants de 3 ans adorent la routine',
-        'La version cartonnée (dès CHF 33) résiste aux petites mains enthousiastes',
+        'La version cartonnée (dès CHF 37) résiste aux petites mains enthousiastes',
       ],
       it: [
         'Scegliete temi semplici e visivi: animali della fattoria, bosco, dinosauri o unicorni',
         'A questa età le illustrazioni contano più di trame complesse — la nostra IA si adatta di conseguenza',
         'Leggete la storia come rituale della buonanotte — i bambini di 3 anni amano la routine e la ripetizione',
-        'La versione cartonata (da CHF 33) resiste alle manine entusiaste che sfogliano',
+        'La versione cartonata (da CHF 29) resiste alle manine entusiaste che sfogliano',
       ],
     },
     recommendedThemes: [
@@ -1322,7 +1322,7 @@ export const giftPages: GiftPageData[] = [
     },
     intro: {
       en: 'Four is the age of "why?" and "what if?" — when children\'s imagination truly takes off. They pretend to be pirates, build castles from cushions, and narrate their own adventures. A personalized storybook meets them exactly where they are: it turns their make-believe world into a real, beautifully illustrated book where they\'re the star. At this age, children can follow longer narratives and are thrilled by heroes who solve problems, help friends, and explore new worlds. MagicalStory\'s AI calibrates the language and story complexity perfectly for 4-year-olds — engaging but not overwhelming.',
-      de: 'Mit 4 ist das Alter von "Warum?" und "Was wäre wenn?" — die Fantasie hebt wirklich ab. Kinder spielen Piraten, bauen Burgen aus Kissen und erzählen ihre eigenen Abenteuer. Ein personalisiertes Geschichtenbuch trifft sie genau dort: Es verwandelt ihre Fantasiewelt in ein echtes, wunderschön illustriertes Buch, in dem sie der Star sind. In diesem Alter können Kinder längeren Erzählungen folgen und sind begeistert von Helden, die Probleme lösen, Freunden helfen und neue Welten erkunden. MagicalStory\'s KI kalibriert Sprache und Komplexität perfekt für 4-Jährige — fesselnd, aber nicht überfordernd.',
+      de: 'Mit 4 ist das Alter von «Warum?» und «Was wäre wenn?» — die Fantasie hebt wirklich ab. Kinder spielen Piraten, bauen Burgen aus Kissen und erzählen ihre eigenen Abenteuer. Ein personalisiertes Geschichtenbuch trifft sie genau dort: Es verwandelt ihre Fantasiewelt in ein echtes, wunderschön illustriertes Buch, in dem sie der Star sind. In diesem Alter können Kinder längeren Erzählungen folgen und sind begeistert von Helden, die Probleme lösen, Freunden helfen und neue Welten erkunden. MagicalStory\'s KI kalibriert Sprache und Komplexität perfekt für 4-Jährige — fesselnd, aber nicht überfordernd.',
       fr: 'Quatre ans, c\'est l\'âge du "pourquoi ?" et du "et si ?" — quand l\'imagination prend vraiment son envol. Un livre personnalisé transforme leur monde imaginaire en un vrai livre illustré où ils sont la vedette. Notre IA calibre le langage parfaitement pour les 4 ans.',
       it: 'A 4 anni è l\'età del «perché?» e del «e se...?» — quando la fantasia prende davvero il volo. I bambini fingono di essere pirati, costruiscono castelli con i cuscini e raccontano le proprie avventure. Un libro personalizzato li incontra esattamente lì dove sono: trasforma il loro mondo immaginario in un libro reale e splendidamente illustrato in cui sono loro la star. A questa età i bambini riescono a seguire narrazioni più lunghe e sono entusiasti di eroi che risolvono problemi, aiutano gli amici ed esplorano nuovi mondi. L\'IA di MagicalStory calibra perfettamente il linguaggio e la complessità della storia per i bambini di 4 anni — coinvolgente ma non eccessiva.',
     },
@@ -1337,7 +1337,7 @@ export const giftPages: GiftPageData[] = [
         'Mit 4 lieben Kinder Rollenspiel-Themen: Superheld, Pirat, Prinzessin (Einhorn/Meerjungfrau) oder Feuerwehr',
         'Lass das Kind das Thema selbst wählen — das macht das Geschenk noch aufregender',
         'Ein tolles Alter für Lebensherausforderungs-Themen wie Teilen oder Freunde finden',
-        'Lest zusammen und stellt Fragen: "Was würdest du als Nächstes tun?" — das steigert das Engagement',
+        'Lest zusammen und stellt Fragen: «Was würdest du als Nächstes tun?» — das steigert das Engagement',
       ],
       fr: [
         'À 4 ans, les enfants adorent les thèmes de jeu de rôle : super-héros, pirate, princesse ou pompier',
@@ -1360,10 +1360,10 @@ export const giftPages: GiftPageData[] = [
       { id: 'sharing', category: 'life-challenges' },
     ],
     deliveryNote: {
-      en: 'Stories are calibrated for 4-year-old language and attention spans. Free trial available — printed hardcover from CHF 33.',
-      de: 'Geschichten sind auf Sprache und Aufmerksamkeitsspanne von 4-Jährigen kalibriert. Kostenlose Probe verfügbar — gedrucktes Hardcover ab CHF 33.',
-      fr: 'Les histoires sont calibrées pour le langage des enfants de 4 ans. Essai gratuit disponible — livre cartonné dès CHF 33.',
-      it: 'Le storie sono calibrate sul linguaggio e sui tempi di attenzione dei bambini di 4 anni. Prova gratuita disponibile — libro cartonato da CHF 33.',
+      en: 'Stories are calibrated for 4-year-old language and attention spans. Free trial available — printed hardcover from CHF 37.',
+      de: 'Geschichten sind auf Sprache und Aufmerksamkeitsspanne von 4-Jährigen kalibriert. Kostenlose Probe verfügbar — gedrucktes Hardcover ab CHF 37.',
+      fr: 'Les histoires sont calibrées pour le langage des enfants de 4 ans. Essai gratuit disponible — livre cartonné dès CHF 37.',
+      it: 'Le storie sono calibrate sul linguaggio e sui tempi di attenzione dei bambini di 4 anni. Prova gratuita disponibile — libro cartonato da CHF 29.',
     },
     faq: [
       {
@@ -1395,7 +1395,7 @@ export const giftPages: GiftPageData[] = [
     },
     description: {
       en: 'Five-year-olds are ready for real adventures. They\'re independent thinkers who love challenges, mysteries, and being treated like "big kids." A personalized storybook delivers exactly the kind of excitement they crave.',
-      de: '5-Jährige sind bereit für echte Abenteuer. Sie sind eigenständige Denker, die Herausforderungen, Rätsel und es lieben, wie "grosse Kinder" behandelt zu werden. Ein personalisiertes Geschichtenbuch liefert genau die Aufregung, die sie sich wünschen.',
+      de: '5-Jährige sind bereit für echte Abenteuer. Sie sind eigenständige Denker, die Herausforderungen, Rätsel und es lieben, wie «grosse Kinder» behandelt zu werden. Ein personalisiertes Geschichtenbuch liefert genau die Aufregung, die sie sich wünschen.',
       fr: 'Les enfants de 5 ans sont prêts pour de vraies aventures. Ils adorent les défis, les mystères et être traités comme des "grands." Un livre personnalisé offre exactement l\'excitation qu\'ils recherchent.',
       it: 'I bambini di 5 anni sono pronti per vere avventure. Sono pensatori indipendenti che amano le sfide, i misteri ed essere trattati come «bambini grandi». Un libro personalizzato regala esattamente l\'emozione che desiderano.',
     },
@@ -1415,7 +1415,7 @@ export const giftPages: GiftPageData[] = [
       de: [
         'Mit 5 geniessen Kinder Themen mit mehr Handlung: Detektiv, Weltraum-Entdecker, Zauberer oder Ninja',
         'Lebensherausforderungs-Themen sind besonders relevant: erster Kindergartentag, Freunde finden, mutig sein',
-        'Lass sie beim Erstellen "mithelfen", indem sie das Thema wählen — sie lieben es, einbezogen zu werden',
+        'Lass sie beim Erstellen «mithelfen», indem sie das Thema wählen — sie lieben es, einbezogen zu werden',
         'Ein tolles Alter, um eine Sammlung zu starten: ein personalisiertes Buch zu jedem Geburtstag',
       ],
       fr: [
@@ -1439,10 +1439,10 @@ export const giftPages: GiftPageData[] = [
       { id: 'first-kindergarten', category: 'life-challenges' },
     ],
     deliveryNote: {
-      en: 'Stories for 5-year-olds feature richer plots and vocabulary. Free trial available — printed hardcover from CHF 33.',
-      de: 'Geschichten für 5-Jährige bieten reichhaltigere Handlungen und Wortschatz. Kostenlose Probe verfügbar — gedrucktes Hardcover ab CHF 33.',
-      fr: 'Les histoires pour 5 ans offrent des intrigues et un vocabulaire plus riches. Essai gratuit disponible — livre cartonné dès CHF 33.',
-      it: 'Le storie per i bambini di 5 anni offrono trame e vocabolario più ricchi. Prova gratuita disponibile — libro cartonato da CHF 33.',
+      en: 'Stories for 5-year-olds feature richer plots and vocabulary. Free trial available — printed hardcover from CHF 37.',
+      de: 'Geschichten für 5-Jährige bieten reichhaltigere Handlungen und Wortschatz. Kostenlose Probe verfügbar — gedrucktes Hardcover ab CHF 37.',
+      fr: 'Les histoires pour 5 ans offrent des intrigues et un vocabulaire plus riches. Essai gratuit disponible — livre cartonné dès CHF 37.',
+      it: 'Le storie per i bambini di 5 anni offrono trame e vocabolario più ricchi. Prova gratuita disponibile — libro cartonato da CHF 29.',
     },
     faq: [
       {
@@ -1455,7 +1455,7 @@ export const giftPages: GiftPageData[] = [
       },
       {
         q: { en: 'My child starts kindergarten soon — is there a theme for that?', de: 'Mein Kind kommt bald in den Kindergarten — gibt es ein Thema dafür?', fr: 'Mon enfant entre bientôt à la maternelle — y a-t-il un thème pour ça ?', it: 'Mio figlio inizierà presto la scuola dell\'infanzia — c\'è un tema apposito?' },
-        a: { en: 'Yes! Our "First Day of Kindergarten" theme helps children prepare for school by showing them as a brave hero who masters the big day. Many parents use it to reduce first-day anxiety.', de: 'Ja! Unser Thema "Erster Kindergartentag" hilft Kindern bei der Schulvorbereitung, indem es sie als mutigen Helden zeigt, der den grossen Tag meistert. Viele Eltern nutzen es, um die Aufregung am ersten Tag zu reduzieren.', fr: 'Oui ! Notre thème "Premier jour de maternelle" aide les enfants à se préparer en les montrant comme un héros courageux.', it: 'Sì! Il nostro tema «Primo giorno di scuola dell\'infanzia» aiuta i bambini a prepararsi mostrandoli come eroi coraggiosi che affrontano il grande giorno. Molti genitori lo usano per ridurre l\'ansia del primo giorno.' },
+        a: { en: 'Yes! Our "First Day of Kindergarten" theme helps children prepare for school by showing them as a brave hero who masters the big day. Many parents use it to reduce first-day anxiety.', de: 'Ja! Unser Thema «Erster Kindergartentag» hilft Kindern bei der Schulvorbereitung, indem es sie als mutigen Helden zeigt, der den grossen Tag meistert. Viele Eltern nutzen es, um die Aufregung am ersten Tag zu reduzieren.', fr: 'Oui ! Notre thème "Premier jour de maternelle" aide les enfants à se préparer en les montrant comme un héros courageux.', it: 'Sì! Il nostro tema «Primo giorno di scuola dell\'infanzia» aiuta i bambini a prepararsi mostrandoli come eroi coraggiosi che affrontano il grande giorno. Molti genitori lo usano per ridurre l\'ansia del primo giorno.' },
       },
     ],
   },
@@ -1493,7 +1493,7 @@ export const giftPages: GiftPageData[] = [
       ],
       de: [
         'Mit 6 geniessen Kinder komplexere Themen: Detektiv, Ritter, Weltraum oder Zauberer',
-        'Ein personalisiertes Buch motiviert zum Üben — sie wollen "ihre" Geschichte lesen',
+        'Ein personalisiertes Buch motiviert zum Üben — sie wollen «ihre» Geschichte lesen',
         'Perfekte Ergänzung zur Schultüte für Erstklässler',
         'Überlege, neben dem Buch ein Lesetagebuch zu führen, um die Lesekompetenz weiter zu fördern',
       ],
@@ -1518,10 +1518,10 @@ export const giftPages: GiftPageData[] = [
       { id: 'dragon', category: 'adventure' },
     ],
     deliveryNote: {
-      en: 'Stories for 6-year-olds support emerging readers with engaging, age-calibrated text. Printed hardcover from CHF 33.',
-      de: 'Geschichten für 6-Jährige unterstützen Leseanfänger mit fesselndem, altersgerechtem Text. Gedrucktes Hardcover ab CHF 33.',
-      fr: 'Les histoires pour 6 ans soutiennent les jeunes lecteurs avec un texte adapté et engageant. Livre cartonné dès CHF 33.',
-      it: 'Le storie per i bambini di 6 anni sostengono i giovani lettori con un testo coinvolgente e adatto all\'età. Libro cartonato da CHF 33.',
+      en: 'Stories for 6-year-olds support emerging readers with engaging, age-calibrated text. Printed hardcover from CHF 37.',
+      de: 'Geschichten für 6-Jährige unterstützen Leseanfänger mit fesselndem, altersgerechtem Text. Gedrucktes Hardcover ab CHF 37.',
+      fr: 'Les histoires pour 6 ans soutiennent les jeunes lecteurs avec un texte adapté et engageant. Livre cartonné dès CHF 37.',
+      it: 'Le storie per i bambini di 6 anni sostengono i giovani lettori con un testo coinvolgente e adatto all\'età. Libro cartonato da CHF 29.',
     },
     faq: [
       {
@@ -1533,7 +1533,7 @@ export const giftPages: GiftPageData[] = [
         a: { en: 'One of the best! It fits perfectly in the Schultüte and motivates the child to read. Many parents tell us it becomes the first book their child reads independently.', de: 'Eines der besten! Es passt perfekt in die Schultüte und motiviert das Kind zum Lesen. Viele Eltern berichten, dass es das erste Buch wird, das ihr Kind selbständig liest.', fr: 'Un des meilleurs ! Il s\'intègre parfaitement dans le cornet de rentrée et motive l\'enfant à lire.', it: 'Uno dei migliori! Sta perfettamente nel cono di scuola e motiva il bambino a leggere. Molti genitori ci raccontano che diventa il primo libro che il loro bambino legge in autonomia.' },
       },
       {
-        q: { en: 'What reading level is the story?', de: 'Welches Leseniveau hat die Geschichte?', fr: 'Quel est le niveau de lecture de l\'histoire ?', it: 'Qual è il livello di lettura della storia?' },
+        q: { en: 'What reading level is the story?', de: 'Welche Lesestufe hat die Geschichte?', fr: 'Quel est le niveau de lecture de l\'histoire ?', it: 'Qual è il livello di lettura della storia?' },
         a: { en: 'Our AI adapts to the child\'s age. For 6-year-olds, it uses clear, simple sentences with vocabulary that\'s just challenging enough to help them grow. The illustrations support comprehension throughout.', de: 'Unsere KI passt sich dem Alter an. Für 6-Jährige verwendet sie klare, einfache Sätze mit Wortschatz, der gerade herausfordernd genug ist. Die Illustrationen unterstützen durchgehend das Verständnis.', fr: 'Notre IA s\'adapte à l\'âge. Pour les 6 ans, elle utilise des phrases claires avec un vocabulaire légèrement stimulant. Les illustrations soutiennent la compréhension.', it: 'La nostra IA si adatta all\'età del bambino. Per i 6 anni usa frasi chiare e semplici con un vocabolario giusto per stimolare la crescita. Le illustrazioni sostengono la comprensione lungo tutta la storia.' },
       },
     ],
@@ -1573,7 +1573,7 @@ export const giftPages: GiftPageData[] = [
       de: [
         'Wähle komplexere Themen: Detektiv-Rätsel, Ninja-Abenteuer, Weltraum-Missionen oder Wikinger-Erkundungen',
         'In diesem Alter wollen Kinder oft selbst das Thema wählen — beziehe sie ein!',
-        'Das Buch motiviert zum Selberlesen — sie wollen "ihre" Geschichte alleine lesen',
+        'Das Buch motiviert zum Selberlesen — sie wollen «ihre» Geschichte alleine lesen',
         'Erwäge ein historisches Thema, um Unterhaltung mit Lernen zu verbinden (Römer, Ägypter, Wikinger)',
       ],
       fr: [
@@ -1597,23 +1597,23 @@ export const giftPages: GiftPageData[] = [
       { id: 'dragon', category: 'adventure' },
     ],
     deliveryNote: {
-      en: 'Stories for 7–8-year-olds feature richer plots perfect for independent readers. Printed hardcover from CHF 33.',
-      de: 'Geschichten für 7–8-Jährige bieten reichhaltigere Handlungen, perfekt für selbständige Leser. Gedrucktes Hardcover ab CHF 33.',
-      fr: 'Les histoires pour 7-8 ans offrent des intrigues plus riches pour les lecteurs autonomes. Livre cartonné dès CHF 33.',
-      it: 'Le storie per i bambini di 7–8 anni offrono trame più ricche, perfette per i lettori autonomi. Libro cartonato da CHF 33.',
+      en: 'Stories for 7–8-year-olds feature richer plots perfect for independent readers. Printed hardcover from CHF 37.',
+      de: 'Geschichten für 7–8-Jährige bieten reichhaltigere Handlungen, perfekt für selbständige Leser. Gedrucktes Hardcover ab CHF 37.',
+      fr: 'Les histoires pour 7-8 ans offrent des intrigues plus riches pour les lecteurs autonomes. Livre cartonné dès CHF 37.',
+      it: 'Le storie per i bambini di 7–8 anni offrono trame più ricche, perfette per i lettori autonomi. Libro cartonato da CHF 29.',
     },
     faq: [
       {
         q: { en: 'Aren\'t personalized books just for younger kids?', de: 'Sind personalisierte Bücher nicht nur für kleinere Kinder?', fr: 'Les livres personnalisés ne sont-ils pas juste pour les petits ?', it: 'I libri personalizzati non sono solo per i bambini più piccoli?' },
-        a: { en: 'Not at all! Our AI generates stories with sophisticated plots for older children. 7–8-year-olds love the rich narratives and are thrilled to see themselves as the hero of a "real" chapter-like story.', de: 'Überhaupt nicht! Unsere KI generiert Geschichten mit anspruchsvollen Handlungen für ältere Kinder. 7–8-Jährige lieben die reichhaltigen Erzählungen und sind begeistert, sich als Held einer "richtigen" Geschichte zu sehen.', fr: 'Pas du tout ! Notre IA génère des histoires avec des intrigues sophistiquées. Les 7-8 ans adorent se voir en héros d\'une "vraie" histoire.', it: 'Assolutamente no! La nostra IA genera storie con trame sofisticate anche per i bambini più grandi. I bambini di 7–8 anni amano le narrazioni ricche e sono entusiasti di vedersi come eroi di una «vera» storia a capitoli.' },
+        a: { en: 'Not at all! Our AI generates stories with sophisticated plots for older children. 7–8-year-olds love the rich narratives and are thrilled to see themselves as the hero of a "real" chapter-like story.', de: 'Überhaupt nicht! Unsere KI generiert Geschichten mit anspruchsvollen Handlungen für ältere Kinder. 7–8-Jährige lieben die reichhaltigen Erzählungen und sind begeistert, sich als Held einer «richtigen» Geschichte zu sehen.', fr: 'Pas du tout ! Notre IA génère des histoires avec des intrigues sophistiquées. Les 7-8 ans adorent se voir en héros d\'une "vraie" histoire.', it: 'Assolutamente no! La nostra IA genera storie con trame sofisticate anche per i bambini più grandi. I bambini di 7–8 anni amano le narrazioni ricche e sono entusiasti di vedersi come eroi di una «vera» storia a capitoli.' },
       },
       {
         q: { en: 'Will a 7-year-old read it themselves or need it read to them?', de: 'Liest ein 7-Jähriges es selbst oder muss es vorgelesen werden?', fr: 'Un enfant de 7 ans le lira-t-il seul ou faut-il le lui lire ?', it: 'Un bambino di 7 anni lo leggerà da solo o serve che glielo leggano?' },
         a: { en: 'Most 7–8-year-olds can and want to read it independently! Many parents tell us their child finished the whole book in one sitting. It\'s also wonderful for shared bedtime reading.', de: 'Die meisten 7–8-Jährigen können und wollen es selbst lesen! Viele Eltern berichten, dass ihr Kind das ganze Buch in einem Zug gelesen hat. Es eignet sich auch wunderbar zum gemeinsamen Vorlesen.', fr: 'La plupart des enfants de 7-8 ans peuvent et veulent lire seuls ! Beaucoup finissent le livre en une seule séance.', it: 'La maggior parte dei bambini di 7–8 anni può e vuole leggerlo in autonomia! Molti genitori ci raccontano che il loro bambino ha finito l\'intero libro in una sola seduta. È anche meraviglioso per la lettura condivisa della buonanotte.' },
       },
       {
-        q: { en: 'What themes work for children who think they\'re "too old" for picture books?', de: 'Welche Themen funktionieren für Kinder, die sich "zu alt" für Bilderbücher fühlen?', fr: 'Quels thèmes fonctionnent pour les enfants qui se sentent "trop grands" pour les livres illustrés ?', it: 'Quali temi funzionano per i bambini che si sentono «troppo grandi» per i libri illustrati?' },
-        a: { en: 'Detective mysteries, ninja adventures, and space missions feel "cool" and grown-up to 7–8-year-olds. The personalization with their real face makes it special even for children who\'ve moved past simple picture books.', de: 'Detektiv-Rätsel, Ninja-Abenteuer und Weltraum-Missionen fühlen sich "cool" und erwachsen an. Die Personalisierung mit echtem Gesicht macht es besonders, auch für Kinder, die einfache Bilderbücher hinter sich gelassen haben.', fr: 'Les mystères de détective, aventures ninja et missions spatiales semblent "cool" et adultes. La personnalisation rend le livre spécial même pour ceux qui ont dépassé les livres d\'images simples.', it: 'I misteri da detective, le avventure ninja e le missioni spaziali sembrano «cool» e da grandi ai bambini di 7–8 anni. La personalizzazione con il loro vero volto rende il libro speciale anche per chi ha superato i semplici libri illustrati.' },
+        q: { en: 'What themes work for children who think they\'re "too old" for picture books?', de: 'Welche Themen funktionieren für Kinder, die sich «zu alt» für Bilderbücher fühlen?', fr: 'Quels thèmes fonctionnent pour les enfants qui se sentent "trop grands" pour les livres illustrés ?', it: 'Quali temi funzionano per i bambini che si sentono «troppo grandi» per i libri illustrati?' },
+        a: { en: 'Detective mysteries, ninja adventures, and space missions feel "cool" and grown-up to 7–8-year-olds. The personalization with their real face makes it special even for children who\'ve moved past simple picture books.', de: 'Detektiv-Rätsel, Ninja-Abenteuer und Weltraum-Missionen fühlen sich «cool» und erwachsen an. Die Personalisierung mit echtem Gesicht macht es besonders, auch für Kinder, die einfache Bilderbücher hinter sich gelassen haben.', fr: 'Les mystères de détective, aventures ninja et missions spatiales semblent "cool" et adultes. La personnalisation rend le livre spécial même pour ceux qui ont dépassé les livres d\'images simples.', it: 'I misteri da detective, le avventure ninja e le missioni spaziali sembrano «cool» e da grandi ai bambini di 7–8 anni. La personalizzazione con il loro vero volto rende il libro speciale anche per chi ha superato i semplici libri illustrati.' },
       },
     ],
   },

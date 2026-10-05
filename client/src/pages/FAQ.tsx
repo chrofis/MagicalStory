@@ -51,7 +51,7 @@ const faqContent: Record<string, {
           },
           {
             question: 'How long does it take?',
-            answer: 'Your first free story is ready in under 3 minutes. Full stories with more pages and higher quality take about 10-15 minutes. You\'ll receive an email when your story is ready.',
+            answer: 'Your first free story is ready in a few minutes. A full illustrated book takes about an hour. You\'ll receive an email when your story is ready.',
           },
           {
             question: 'What ages is this for?',
@@ -127,7 +127,7 @@ const faqContent: Record<string, {
         items: [
           {
             question: 'How much does it cost?',
-            answer: 'Your first story is completely free — no account needed. After that, stories are created with credits. Printed books start at CHF 28 for softcover and CHF 43 for hardcover, plus a flat CHF 10 shipping per order within Switzerland (pay shipping only once when ordering multiple books). See our pricing page for details.',
+            answer: 'Your first story is completely free — no account needed. After that, stories are created with credits. Printed books start at CHF 29 for softcover and CHF 37 for hardcover, plus a flat CHF 10 shipping per order within Switzerland (pay shipping only once when ordering multiple books). See our pricing page for details.',
           },
         ],
       },
@@ -168,11 +168,11 @@ const faqContent: Record<string, {
           },
           {
             question: 'Wie lange dauert es?',
-            answer: 'Deine erste Gratis-Geschichte ist in unter 3 Minuten fertig. Vollständige Geschichten mit mehr Seiten und höherer Qualität dauern etwa 10-15 Minuten. Du erhältst eine E-Mail, wenn deine Geschichte fertig ist.',
+            answer: 'Deine erste Gratis-Geschichte ist in ein paar Minuten fertig. Ein vollständig illustriertes Buch braucht etwa eine Stunde. Du erhältst eine E-Mail, wenn deine Geschichte fertig ist.',
           },
           {
             question: 'Für welches Alter ist das geeignet?',
-            answer: 'Geschichten können für Kinder jeden Alters erstellt werden. Du kannst das Leseniveau anpassen — von einfachen Bilderbüchern für Kleinkinder bis zu längeren Geschichten für Schulkinder.',
+            answer: 'Geschichten können für Kinder jeden Alters erstellt werden. Du kannst die Lesestufe anpassen — von einfachen Bilderbüchern für Kleinkinder bis zu längeren Geschichten für Schulkinder.',
           },
         ],
       },
@@ -196,7 +196,7 @@ const faqContent: Record<string, {
             answer: 'Ja, komplett. Jedes Wort auf jeder Seite ist editierbar — Sätze umschreiben, Namen ändern, Dialoge austauschen. Die KI schreibt den ersten Entwurf, du machst ihn zu deinem.',
           },
           {
-            question: 'Was wenn mir eine Seite nicht gefällt?',
+            question: 'Was, wenn mir eine Seite nicht gefällt?',
             answer: 'Einfach neu generieren. Einzelne Seiten können beliebig oft neu erstellt werden — mit denselben Figuren und im gleichen Kunststil. Jede neue Version wird gespeichert, du wählst die beste aus.',
           },
           {
@@ -244,7 +244,7 @@ const faqContent: Record<string, {
         items: [
           {
             question: 'Was kostet es?',
-            answer: 'Deine erste Geschichte ist komplett kostenlos — ohne Konto. Danach werden Geschichten mit Credits erstellt. Gedruckte Bücher beginnen ab CHF 28 für Softcover und CHF 43 für Hardcover, zzgl. CHF 10 Pauschalversand pro Bestellung innerhalb der Schweiz (beim Bestellen mehrerer Bücher wird der Versand nur einmal verrechnet). Details findest du auf unserer Preisseite.',
+            answer: 'Deine erste Geschichte ist komplett kostenlos — ohne Konto. Danach werden Geschichten mit Credits erstellt. Gedruckte Bücher beginnen ab CHF 29 für Softcover und CHF 37 für Hardcover, zzgl. CHF 10 Pauschalversand pro Bestellung innerhalb der Schweiz (beim Bestellen mehrerer Bücher wird der Versand nur einmal verrechnet). Details findest du auf unserer Preisseite.',
           },
         ],
       },
@@ -285,7 +285,7 @@ const faqContent: Record<string, {
           },
           {
             question: 'Combien de temps faut-il ?',
-            answer: 'Votre première histoire gratuite est prête en moins de 3 minutes. Les histoires complètes avec plus de pages et une meilleure qualité prennent environ 10-15 minutes. Vous recevrez un email quand votre histoire sera prête.',
+            answer: 'Votre première histoire gratuite est prête en quelques minutes. Un livre entièrement illustré prend environ une heure. Vous recevrez un email quand votre histoire sera prête.',
           },
           {
             question: 'Pour quel âge ?',
@@ -361,7 +361,7 @@ const faqContent: Record<string, {
         items: [
           {
             question: 'Combien ça coûte ?',
-            answer: 'Votre première histoire est entièrement gratuite — sans compte nécessaire. Ensuite, les histoires sont créées avec des crédits. Les livres imprimés commencent à CHF 28 en brochée et CHF 43 en couverture rigide, plus CHF 10 de livraison forfaitaire par commande en Suisse (la livraison n\'est facturée qu\'une seule fois pour plusieurs livres). Consultez notre page de tarifs pour plus de détails.',
+            answer: 'Votre première histoire est entièrement gratuite — sans compte nécessaire. Ensuite, les histoires sont créées avec des crédits. Les livres imprimés commencent à CHF 29 en brochée et CHF 37 en couverture rigide, plus CHF 10 de livraison forfaitaire par commande en Suisse (la livraison n\'est facturée qu\'une seule fois pour plusieurs livres). Consultez notre page de tarifs pour plus de détails.',
           },
         ],
       },
@@ -402,7 +402,7 @@ const faqContent: Record<string, {
           },
           {
             question: 'Quanto tempo ci vuole?',
-            answer: 'La tua prima storia gratuita è pronta in meno di 3 minuti. Le storie complete con più pagine e qualità superiore richiedono circa 10-15 minuti. Riceverai un\'email quando la tua storia sarà pronta.',
+            answer: 'La tua prima storia gratuita è pronta in pochi minuti. Un libro completo illustrato richiede circa un\'ora. Riceverai un\'email quando la tua storia sarà pronta.',
           },
           {
             question: 'Per quali età è adatto?',
@@ -478,7 +478,7 @@ const faqContent: Record<string, {
         items: [
           {
             question: 'Quanto costa?',
-            answer: 'La tua prima storia è completamente gratuita — senza bisogno di account. Successivamente, le storie vengono create con crediti. I libri stampati partono da CHF 28 per la copertina morbida e CHF 43 per la copertina rigida, più CHF 10 di spedizione forfettaria per ordine all\'interno della Svizzera (la spedizione viene addebitata una sola volta se ordini più libri). Consulta la nostra pagina dei prezzi per i dettagli.',
+            answer: 'La tua prima storia è completamente gratuita — senza bisogno di account. Successivamente, le storie vengono create con crediti. I libri stampati partono da CHF 29 per la copertina morbida e CHF 37 per la copertina rigida, più CHF 10 di spedizione forfettaria per ordine all\'interno della Svizzera (la spedizione viene addebitata una sola volta se ordini più libri). Consulta la nostra pagina dei prezzi per i dettagli.',
           },
         ],
       },

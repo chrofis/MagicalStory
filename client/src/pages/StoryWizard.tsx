@@ -112,8 +112,8 @@ const wizardHelperTexts: Record<string, Record<number, string>> = {
     5: "Review your choices, add plot details, then generate your story!",
   },
   de: {
-    1: "Füge Fotos deiner Charaktere hinzu - sie erscheinen einheitlich in der gesamten Geschichte!",
-    2: "Lege die Buchlänge und das Leseniveau für dein Publikum fest",
+    1: "Füge Fotos deiner Charaktere hinzu – sie erscheinen einheitlich in der gesamten Geschichte!",
+    2: "Lege die Buchlänge und die Lesestufe für dein Publikum fest",
     3: "Wähle einen Geschichtstyp und ein Thema",
     4: "Wähle einen Illustrationsstil für dein Buch",
     5: "Überprüfe deine Auswahl, füge Handlungsdetails hinzu und generiere deine Geschichte!",
@@ -5237,7 +5237,7 @@ export default function StoryWizard() {
                   });
                   // Show success message with option to open Gelato dashboard
                   const successMsg = language === 'de'
-                    ? `✅ Druckauftrag erfolgreich erstellt!\n\nOrder ID: ${result.orderId}\n${result.isDraft ? '(Entwurf - muss in Gelato bestätigt werden)' : ''}\n\nMöchtest du das Gelato Dashboard öffnen, um den Auftrag zu verfolgen?`
+                    ? `✅ Druckauftrag erfolgreich erstellt!\n\nOrder ID: ${result.orderId}\n${result.isDraft ? '(Entwurf – muss in Gelato bestätigt werden)' : ''}\n\nMöchtest du das Gelato Dashboard öffnen, um den Auftrag zu verfolgen?`
                     : language === 'fr'
                     ? `✅ Commande d'impression créée avec succès!\n\nID de commande: ${result.orderId}\n${result.isDraft ? '(Brouillon - doit être confirmé dans Gelato)' : ''}\n\nVoulez-vous ouvrir le tableau de bord Gelato pour suivre la commande?`
                     : language === 'it' ? `✅ Ordine di stampa creato con successo!\n\nOrder ID: ${result.orderId}\n${result.isDraft ? '(Bozza - da confermare in Gelato)' : ''}\n\nVuoi aprire la dashboard Gelato per seguire l'ordine?` : `✅ Print order created successfully!\n\nOrder ID: ${result.orderId}\n${result.isDraft ? '(Draft - must be confirmed in Gelato)' : ''}\n\nWould you like to open the Gelato dashboard to track your order?`;
@@ -6126,7 +6126,7 @@ export default function StoryWizard() {
                   {developerMode && (
                     <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg text-left">
                       <h3 className="text-sm font-semibold text-orange-700 mb-3">
-                        🛠️ {language === 'de' ? 'Entwickler-Optionen - Schritte überspringen' : language === 'fr' ? 'Options développeur - Sauter des étapes' : language === 'it' ? 'Opzioni sviluppatore - Salta passaggi' : 'Developer Options - Skip Steps'}
+                        🛠️ {language === 'de' ? 'Entwickler-Optionen – Schritte überspringen' : language === 'fr' ? 'Options développeur - Sauter des étapes' : language === 'it' ? 'Opzioni sviluppatore - Salta passaggi' : 'Developer Options - Skip Steps'}
                       </h3>
                       <div className="space-y-2 text-sm">
                         <label className="flex items-center gap-2 cursor-pointer">
@@ -6389,7 +6389,7 @@ export default function StoryWizard() {
               value={editPromptText}
               onChange={(e) => setEditPromptText(e.target.value)}
               placeholder={language === 'de'
-                ? 'Beschreibe die gewünschte Änderung...\nz.B. "Mach den Himmel blauer" oder "Füge einen Schmetterling hinzu"'
+                ? 'Beschreibe die gewünschte Änderung...\nz.B. «Mach den Himmel blauer» oder «Füge einen Schmetterling hinzu»'
                 : language === 'fr'
                 ? 'Décrivez le changement souhaité...\npar ex. "Rendre le ciel plus bleu" ou "Ajouter un papillon"'
                 : language === 'it' ? 'Descrivi la modifica desiderata...\nper es. "Rendi il cielo più azzurro" o "Aggiungi una farfalla"' : 'Describe what you want to change...\ne.g. "Make the sky bluer" or "Add a butterfly"'}

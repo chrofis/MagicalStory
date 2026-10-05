@@ -610,7 +610,7 @@ export function StorySettings({
               />
               <p className="text-sm text-gray-500 mt-2">
                 {language === 'de'
-                  ? 'Beschreiben Sie die Handlung oder klicken Sie auf "Vorschlag generieren"'
+                  ? 'Beschreibe die Handlung oder klicke auf «Vorschlag generieren»'
                   : language === 'fr'
                   ? 'Décrivez l\'intrigue ou cliquez sur "Générer une suggestion"'
                   : language === 'it'
@@ -630,7 +630,7 @@ export function StorySettings({
             value={dedication}
             onChange={(e) => onDedicationChange(e.target.value)}
             placeholder={language === 'de'
-              ? 'z.B. "Für meine liebe Tochter Emma zum 5. Geburtstag"'
+              ? 'z.B. «Für meine liebe Tochter Emma zum 5. Geburtstag»'
               : language === 'fr'
               ? 'Par exemple "Pour ma chère fille Emma pour son 5ème anniversaire"'
               : language === 'it'
@@ -642,7 +642,7 @@ export function StorySettings({
           />
           <p className="text-sm text-gray-500 mt-1">
             {language === 'de'
-              ? 'Dieser Text wird auf der Einführungsseite Ihres Buches gedruckt. Wenn Sie nichts eingeben, enthält die Einführungsseite nur eine Illustration ohne Text.'
+              ? 'Dieser Text wird auf der Einführungsseite deines Buches gedruckt. Wenn du nichts eingibst, enthält die Einführungsseite nur eine Illustration ohne Text.'
               : language === 'fr'
               ? 'Ce texte sera imprimé sur la page d\'introduction de votre livre. Si vous ne saisissez rien, la page d\'introduction ne contiendra qu\'une illustration sans texte.'
               : language === 'it'

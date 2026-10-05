@@ -299,7 +299,7 @@ export function CharacterList({
             </div>
             <p className="text-gray-600 mb-6">
               {language === 'de'
-                ? `Möchtest du "${deleteConfirm.name}" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.`
+                ? `Möchtest du «${deleteConfirm.name}» wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.`
                 : language === 'fr'
                 ? `Voulez-vous vraiment supprimer "${deleteConfirm.name}"? Cette action est irréversible.`
                 : language === 'it'

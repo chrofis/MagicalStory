@@ -95,7 +95,7 @@ export const artStyles: ArtStyle[] = [
     image: '/images/comic book style.jpg',
     description: {
       en: 'Comic book style with bold lines and halftone',
-      de: 'Comic-Stil mit kräftigen Linien und Raster',
+      de: 'Comic-Stil mit kräftigen Linien und Rasterpunkten',
       fr: 'Style bande dessinée avec lignes épaisses et trames',
       it: 'Stile fumetto con linee marcate e retinatura',
     },
@@ -109,7 +109,7 @@ export const artStyles: ArtStyle[] = [
     image: '/images/anime style.jpg',
     description: {
       en: 'Japanese anime style with expressive features',
-      de: 'Japanischer Anime-Stil mit ausdrucksstarken Features',
+      de: 'Japanischer Anime-Stil mit ausdrucksstarken Gesichtszügen',
       fr: 'Style anime japonais aux traits expressifs',
       it: 'Stile anime giapponese con tratti espressivi',
     },

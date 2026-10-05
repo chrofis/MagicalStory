@@ -70,7 +70,7 @@ const scienceContent: Record<string, {
       },
     ],
     giftTitle: 'Das perfekte Geschenk',
-    giftText: 'Du suchst ein wirklich einzigartiges Geschenk? Ein personalisiertes Kinderbuch ist etwas, das kein anderes Kind hat. Perfekt zum Geburtstag, zu Weihnachten, zum Schulanfang oder einfach so. Ein Geschenk, das sie schätzen werden — und jeden Abend vorgelesen haben wollen.',
+    giftText: 'Du suchst ein wirklich einzigartiges Geschenk? Ein personalisiertes Kinderbuch ist etwas, das kein anderes Kind hat. Perfekt zum Geburtstag, zu Weihnachten, zum Schulanfang oder einfach so. Ein Geschenk, das es schätzen wird — und sich jeden Abend vorlesen lassen will.',
     ctaTitle: 'Erstelle ihre Geschichte',
     ctaText: 'Dein Kind als Held seines eigenen Abenteuers. Erste Geschichte gratis.',
     ctaButton: 'Jetzt starten',

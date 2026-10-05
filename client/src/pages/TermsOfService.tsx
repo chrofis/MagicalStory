@@ -150,7 +150,7 @@ We reserve the right to refuse service, remove content, and terminate accounts t
     sections: [
       {
         title: '1. Annahme der Bedingungen',
-        content: `Durch den Zugriff auf und die Nutzung von Magical Story ("der Dienst") erklären Sie sich mit diesen Nutzungsbedingungen einverstanden. Wenn Sie diesen Bedingungen nicht zustimmen, nutzen Sie den Dienst bitte nicht.`
+        content: `Durch den Zugriff auf und die Nutzung von Magical Story («der Dienst») erklären Sie sich mit diesen Nutzungsbedingungen einverstanden. Wenn Sie diesen Bedingungen nicht zustimmen, nutzen Sie den Dienst bitte nicht.`
       },
       {
         title: '2. Dienstverfügbarkeit und Berechtigung',
@@ -235,7 +235,7 @@ Wir behalten uns das Recht vor, den Dienst zu verweigern, Inhalte zu entfernen u
         title: '10. Haftungsbeschränkung',
         content: `IM GESETZLICH ZULÄSSIGEN RAHMEN:
 
-• Der Dienst wird "wie besehen" ohne jegliche Garantien bereitgestellt
+• Der Dienst wird «wie besehen» ohne jegliche Garantien bereitgestellt
 • Wir haften nicht für indirekte, zufällige, besondere oder Folgeschäden
 • Unsere Gesamthaftung übersteigt nicht den Betrag, den Sie für den spezifischen Dienst bezahlt haben, der den Anspruch begründet
 • Wir sind nicht verantwortlich für Ansprüche, die aus Ihrem Missbrauch des Dienstes oder Ihrer Verletzung dieser Bedingungen entstehen`

@@ -17,7 +17,7 @@ We comply with the EU General Data Protection Regulation (GDPR), the Swiss Data 
       {
         title: '2. Data Controller',
         content: `Magical Story
-Zurich, Switzerland
+Ennetbaden, Switzerland
 Email: privacy@magicalstory.ch
 
 For GDPR purposes, we are the data controller for the personal data we process.`
@@ -196,14 +196,14 @@ If you believe we have violated your privacy rights, you have the right to lodge
     sections: [
       {
         title: '1. Einleitung',
-        content: `Magical Story ("wir", "uns" oder "unser") verpflichtet sich zum Schutz Ihrer Privatsphäre. Diese Datenschutzrichtlinie erklärt, wie wir Ihre personenbezogenen Daten erfassen, verwenden, verarbeiten und schützen, wenn Sie unseren KI-gestützten personalisierten Geschichtenbuch-Service nutzen.
+        content: `Magical Story («wir», «uns» oder «unser») verpflichtet sich zum Schutz Ihrer Privatsphäre. Diese Datenschutzrichtlinie erklärt, wie wir Ihre personenbezogenen Daten erfassen, verwenden, verarbeiten und schützen, wenn Sie unseren KI-gestützten personalisierten Geschichtenbuch-Service nutzen.
 
 Wir halten uns an die EU-Datenschutz-Grundverordnung (DSGVO), das Schweizer Datenschutzgesetz und andere anwendbare Datenschutzgesetze.`
       },
       {
         title: '2. Verantwortlicher',
         content: `Magical Story
-Zürich, Schweiz
+Ennetbaden, Schweiz
 E-Mail: privacy@magicalstory.ch
 
 Für DSGVO-Zwecke sind wir der Verantwortliche für die von uns verarbeiteten personenbezogenen Daten.`
@@ -316,7 +316,7 @@ Für Übertragungen ausserhalb der EU/des EWR stützen wir uns auf:
 
 • Auskunft: Eine Kopie Ihrer personenbezogenen Daten anfordern
 • Berichtigung: Unrichtige Daten korrigieren
-• Löschung: Löschung Ihrer Daten beantragen ("Recht auf Vergessenwerden")
+• Löschung: Löschung Ihrer Daten beantragen («Recht auf Vergessenwerden»)
 • Einschränkung: Einschränkung der Verarbeitung Ihrer Daten
 • Datenübertragbarkeit: Ihre Daten in einem portablen Format erhalten
 • Widerspruch: Bestimmten Verarbeitungsaktivitäten widersprechen
@@ -389,7 +389,7 @@ Nous respectons le Règlement Général sur la Protection des Données (RGPD) de
       {
         title: '2. Responsable du Traitement',
         content: `Magical Story
-Zurich, Suisse
+Ennetbaden, Suisse
 Email : privacy@magicalstory.ch
 
 Aux fins du RGPD, nous sommes le responsable du traitement des données personnelles que nous traitons.`
@@ -575,7 +575,7 @@ Rispettiamo il Regolamento Generale sulla Protezione dei Dati dell'UE (GDPR), la
       {
         title: '2. Titolare del Trattamento',
         content: `Magical Story
-Zurigo, Svizzera
+Ennetbaden, Svizzera
 Email: privacy@magicalstory.ch
 
 Ai fini del GDPR, siamo il titolare del trattamento per i dati personali che trattiamo.`

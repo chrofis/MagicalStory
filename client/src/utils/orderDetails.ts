@@ -14,10 +14,10 @@ export interface OrderDetailFields {
 }
 
 const LABELS: Record<string, { customer: string; amount: string; tokens: string; shipTo: string }> = {
-  en: { customer: 'Customer', amount: 'Amount', tokens: 'Tokens earned', shipTo: 'Shipping to' },
-  de: { customer: 'Kunde', amount: 'Betrag', tokens: 'Tokens erhalten', shipTo: 'Versand an' },
-  fr: { customer: 'Client', amount: 'Montant', tokens: 'Jetons gagnés', shipTo: 'Expédié à' },
-  it: { customer: 'Cliente', amount: 'Importo', tokens: 'Token ricevuti', shipTo: 'Spedizione a' },
+  en: { customer: 'Customer', amount: 'Amount', tokens: 'Credits earned', shipTo: 'Shipping to' },
+  de: { customer: 'Kunde', amount: 'Betrag', tokens: 'Credits erhalten', shipTo: 'Versand an' },
+  fr: { customer: 'Client', amount: 'Montant', tokens: 'Crédits gagnés', shipTo: 'Expédié à' },
+  it: { customer: 'Cliente', amount: 'Importo', tokens: 'Crediti ricevuti', shipTo: 'Spedizione a' },
 };
 
 const present = (v: unknown): v is string | number => v !== undefined && v !== null && String(v).trim() !== '';

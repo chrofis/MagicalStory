@@ -2,7 +2,7 @@ import type { Language } from '@/types/story';
 
 export const defaultStrengths: Record<Language, string[]> = {
   en: ['Cheerful', 'Kind', 'Caring', 'Funny', 'Forgiving', 'Protective', 'Loyal', 'Generous', 'Fair-minded', 'Honest', 'Confident', 'Brave', 'Trustworthy', 'Determined', 'Hardworking', 'Leader', 'Patient', 'Curious', 'Imaginative', 'Smart', 'Creative', 'Observant', 'Resourceful', 'Energetic', 'Fast', 'Strong', 'Adventurous'],
-  de: ['Fröhlich', 'Freundlich', 'Hilfsbereit', 'Lustig', 'Nachsichtig', 'Beschützend', 'Treu', 'Grosszügig', 'Gerecht', 'Ehrlich', 'Selbstbewusst', 'Mutig', 'Vertrauenswürdig', 'Entschlossen', 'Fleissig', 'Leader', 'Geduldig', 'Neugierig', 'Fantasievoll', 'Klug', 'Kreativ', 'Aufmerksam', 'Einfallsreich', 'Energiegeladen', 'Schnell', 'Stark', 'Abenteuerlustig'],
+  de: ['Fröhlich', 'Freundlich', 'Hilfsbereit', 'Lustig', 'Nachsichtig', 'Beschützend', 'Treu', 'Grosszügig', 'Gerecht', 'Ehrlich', 'Selbstbewusst', 'Mutig', 'Vertrauenswürdig', 'Entschlossen', 'Fleissig', 'Anführer', 'Geduldig', 'Neugierig', 'Fantasievoll', 'Klug', 'Kreativ', 'Aufmerksam', 'Einfallsreich', 'Energiegeladen', 'Schnell', 'Stark', 'Abenteuerlustig'],
   fr: ['Joyeux', 'Gentil', 'Attentionné', 'Drôle', 'Indulgent', 'Protecteur', 'Loyal', 'Généreux', 'Équitable', 'Honnête', 'Confiant', 'Courageux', 'Digne de confiance', 'Déterminé', 'Travailleur', 'Leader', 'Patient', 'Curieux', 'Imaginatif', 'Intelligent', 'Créatif', 'Observateur', 'Débrouillard', 'Énergique', 'Rapide', 'Fort', 'Aventureux'],
   it: ['Allegro', 'Gentile', 'Premuroso', 'Divertente', 'Indulgente', 'Protettivo', 'Leale', 'Generoso', 'Giusto', 'Onesto', 'Sicuro di sé', 'Coraggioso', 'Affidabile', 'Determinato', 'Diligente', 'Leader', 'Paziente', 'Curioso', 'Fantasioso', 'Intelligente', 'Creativo', 'Attento', 'Pieno di risorse', 'Energico', 'Veloce', 'Forte', 'Avventuroso'],
 };
@@ -43,7 +43,7 @@ export const defaultChallenges: Record<Language, string[]> = {
     'Regeln befolgen',
     'Gefühle kontrollieren',
     'Mit anderen teilen',
-    'Prüfungsangst',
+    'Prüfungen und Noten',
     'Neue Freunde finden',
     'Vor anderen sprechen',
     'Neues ausprobieren',
@@ -54,8 +54,8 @@ export const defaultChallenges: Record<Language, string[]> = {
     'Angst vor der Dunkelheit',
     'Albträume und schlechte Träume',
     'Monster, Geister und Dinge unter dem Bett',
-    'Angst allein zu sein',
-    'Angst sich zu verlaufen',
+    'Angst, allein zu sein',
+    'Angst, sich zu verlaufen',
     'Ärzte, Zahnärzte und Spritzen',
     'Höhenangst',
     'Angst vor Spinnen',
