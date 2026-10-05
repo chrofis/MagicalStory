@@ -5049,6 +5049,27 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "cover-title-survives-repair",
+      "title": "A repaired baked front cover keeps its title; a missing or misplaced title is CRITICAL",
+      "commits": [
+        "b49d4f967"
+      ],
+      "addedAt": "2026-10-05",
+      "claim": "On a full story with a baked front-cover title: when the front cover is repaired, the shipped version shows the exact title painted in the artwork (not erased, not only on a sign); and any version whose title is missing or on an object carries a CRITICAL required_text in its deductions.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Open the front cover versions of the run: the active version has the title, spelled correctly, as a painted cover title; if a repair round ran on the cover, its inpaintInstruction/prompt carries the Cover title clause and no version that lost the title outranks one that has it.",
+        "images": [
+          "covers"
+        ]
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [
