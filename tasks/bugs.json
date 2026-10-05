@@ -3489,7 +3489,47 @@
       "reportedAt": "2026-10-05",
       "source": "Staging job_1791222889407_ypl33vk8u p4 consolidatedPlan.scene_fix.instruction; replayed over the stored page: nameRepairText turns it into \"the 5-year-old girl in the skirt, second from the left: ...; the 7-year-old boy in the blue shirt, on the far right: ...\".",
       "status": "fixed",
-      "fixedIn": "this commit"
+      "fixedIn": "815049d02"
+    },
+    {
+      "id": "retry-drops-plate-fields",
+      "title": "The missing-image retry dropped the plate image from the page record when the plate already existed, so p9/p14 carried no emptySceneImage and no hasEmptySceneImage flag",
+      "reportedAt": "2026-10-05",
+      "source": "Staging job_1791222889407_ypl33vk8u: p9 and p14 recovered on retry (page_image_recovered), vantage plates existed (vantage_plate_qc passed for LOC001.5 / LOC002.2), stored records have emptyScenePrompt but no emptySceneImage and no flag; test-scene.js reported no empty scene.",
+      "status": "fixed",
+      "fixedAt": "2026-10-05",
+      "fixedIn": "9da680089",
+      "fix": "storyJobPipeline.js missing-image retry now stamps plateQc.pagePlateFields(sceneBackgrounds[page]) on the recovered record, the same helper the first-render record uses. Tests: plate-qc-severity.test.ts."
+    },
+    {
+      "id": "cover-offered-place-not-in-ad-bible",
+      "title": "A cover at an offered landmark was briefed without knowing the place: the materialized location never reached the bible text the Art Director reads, so it invented a town square for a meadow plate",
+      "reportedAt": "2026-10-05",
+      "source": "Staging job_1791222889407_ypl33vk8u opening page: the AD prompt holds LOC003.1 only in the FIXED line (Fislisbach (Stadt), in front of it); sync of the transcript copies existing entries only. The plate shows a green meadow and a distant town, the cover shows a paved plaza (back cover: a traditional stone church for a modern white concrete one).",
+      "status": "fixed",
+      "fixedAt": "2026-10-05",
+      "fixedIn": "9da680089",
+      "fix": "jevBriefFields.coverPlaceLabel puts the vantage description (the chosen photo text) into the cover FIXED label. Test: cover-places.test.ts."
+    },
+    {
+      "id": "creature-row-not-asked-in-example",
+      "title": "Briefs cite animals without a creatures[] row: the METADATA example of all four brief templates lacked the field and no check flagged it",
+      "reportedAt": "2026-10-05",
+      "source": "Staging job_1791222889407_ypl33vk8u: 8 of 14 briefs cite ANI001/ANI002 with no row (p10 Oskar then had no expression line and smiled instead of pulling).",
+      "status": "fixed",
+      "fixedAt": "2026-10-05",
+      "fixedIn": "9da680089",
+      "fix": "creatures row added to the example of scene-briefs-all, scene-expansion, scene-iteration, scene-iteration-free; sceneBriefCheck.checkCreatureRows (creature_row_missing) feeds the brief re-ask. Tests: brief-review-rules-as-checks, creature-face-fields."
+    },
+    {
+      "id": "creature-tone-writes-mood-into-features",
+      "title": "The creature tone told the Visual Bible author to write mood words and a named absence into an animal features: open friendly face on every page, no visible teeth leaking into page prose",
+      "reportedAt": "2026-10-05",
+      "source": "Staging job_1791222889407_ypl33vk8u: ANI001 features open friendly face, level brow, soft rounded beak with no visible teeth; ANI002 open gentle expression, relaxed arms; the p2 prompt carries both.",
+      "status": "fixed",
+      "fixedAt": "2026-10-05",
+      "fixedIn": "9da680089",
+      "fix": "CREATURE_TONE_LEVELS and CREATURE_FEATURES_RULE state anatomy only, each as something the animal has; visual-bible.txt creature line says the same. Tests: creature-face-fields, creature-tone-reaches-the-page."
     }
   ]
 }
