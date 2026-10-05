@@ -162,7 +162,25 @@ function ComparisonTable({
 }) {
   const lang = language as 'en' | 'de' | 'fr' | 'it';
   return (
-    <div className="overflow-x-auto">
+    <>
+      {/* Phone: one card per feature. Three table columns do not fit 390px (the third was clipped with no
+          cue that it scrolls), so below sm each row stacks label / us / them. */}
+      <ul className="sm:hidden divide-y divide-stone-100">
+        {features.map((feature, i) => (
+          <li key={i} className={`px-4 py-3 ${i % 2 === 0 ? 'bg-stone-50/50' : ''}`}>
+            <div className="text-sm font-semibold text-stone-700 mb-2">{feature.label[lang] || feature.label.en}</div>
+            <div className="flex items-start gap-2 text-sm text-stone-600 mb-1.5">
+              <span className="mt-0.5 flex-shrink-0"><WinnerIcon winner={feature.winner} /></span>
+              <span className="min-w-0"><span className="block text-xs font-semibold text-indigo-500">{t.magicalStory}</span>{feature.us}</span>
+            </div>
+            <div className="flex items-start gap-2 text-sm text-stone-600">
+              <span className="mt-0.5 flex-shrink-0"><WinnerIconThem winner={feature.winner} /></span>
+              <span className="min-w-0"><span className="block text-xs font-semibold text-stone-500">{competitorName}</span>{feature.them}</span>
+            </div>
+          </li>
+        ))}
+      </ul>
+    <div className="hidden sm:block overflow-x-auto">
       <table className="w-full">
         <thead>
           <tr className="border-b-2 border-stone-200">
@@ -203,6 +221,7 @@ function ComparisonTable({
         </tbody>
       </table>
     </div>
+    </>
   );
 }
 
