@@ -66453,3 +66453,60 @@ languages. Both CTA buttons resolve to `font-medium`.
 change is attributable to trust signals near the CTA.
 
 **Touched files:** `client/src/pages/LandingPage.tsx`, `tests/unit/trial-intro-phone.test.ts`.
+
+## 2026-10-05 — Semantic judge: one severity per defect (the SEVERITIES list wins); no spec_conflict type (owner)
+
+**Context:** code review 2026-10-04 area 9b G1/G2. `prompts/image-semantic.txt` stated the same defect at two
+severities (STEP 3 tags vs the SEVERITIES list), and the judge split ~50/50: staging 45 days
+`action_interaction` 187 CRITICAL vs 227 MAJOR, prod 49 vs 62. CRITICAL decides the paid critical-repair queue.
+STEP 3 also told the judge to emit `wrong_interaction` and `spec_conflict`, which its own closed type list omits.
+
+**Decision (owner, 2026-10-05):** the SEVERITIES list wins — wrong main action MAJOR, wrong setting MAJOR, wrong
+clothing type MODERATE, a declared interaction drawn as a genuinely different category CRITICAL (matching quality
+judge D-16). The `spec_conflict` instruction is dropped (the consolidator already detects spec conflicts and
+drops those findings); `wrong_interaction` is `action_interaction`. The false "unlisted types are discarded"
+sentence is gone. `clothing_sex` gets its own TYPE_TO_BUCKET row, and `tests/unit/finding-types-closed-list.test.ts`
+now pins that every judge type list has bucket rows.
+
+**Revisit if:** a Lab `image_semantic` run over ≥3 stored stories shows wrong-scene pages no longer reaching repair.
+
+**Touched files:** `prompts/image-semantic.txt`, `server/lib/evalBuckets.js`, `tests/unit/finding-types-closed-list.test.ts`.
+
+## 2026-10-05 — Every page-render route builds its prompt through pageRenderCall; one byte-aware LLM shorten
+
+**Context:** code review area 9a S1-S4. The user-facing page regenerate, the Test Models / Style Lab routes and
+the trial streaming path built page prompts with a bare `buildImagePrompt` (no Grok VB-prose skip, no
+`vbRefElementIds`, a different grid). `shrinkPromptForModel` could call the LLM scene shorten up to four times
+because it measured characters while the cap is UTF-8 bytes (de/fr overshoot ~50 bytes).
+
+**Decision:** those routes call `pageRenderCall.makePageImagePrompt`, with the grid from the new
+`pageRenderCall.buildPageVbGrid`; `regeneration.js` joins the `page-prompt-one-construction` sibling set. The
+scene shorten works in bytes, so an over-cap page costs one LLM call (owner rule "one try", 2026-09-30); a model
+with no cap, or an unknown model key, throws `PromptFitError` instead of a silent `|| 7500` / `|| 30000` default.
+
+**Touched files:** `server/routes/regeneration.js`, `server/lib/pageRenderCall.js`, `server/lib/images.js`,
+`storyJobPipeline.js`, `scripts/admin/sibling-registry.json`.
+
+## 2026-10-05 — Writer gets the "obvious doer" half of the audit's UNFORCED rule
+
+**Context:** code review area 9b G8. The text audit faults a page where the one who needs the thing, or is
+plainly most able to fetch it, stays behind unexplained; `CAUSAL_COHERENCE_RULE` gave the writer only the
+barrier half, so the audit could fault a draft for a rule its writer was never given.
+
+**Decision:** the sentence is appended to `CAUSAL_COHERENCE_RULE` (generator side of an existing judge rule).
+
+**Touched files:** `server/lib/promptBuilders.js`, `tests/unit/causal-rule-obvious-doer.test.ts`.
+
+## 2026-10-05 — "Nochmal" (iterate) is open to customers; developer knobs stay admin-only (owner)
+
+**Context:** code review area 7 D1. The paid retry button was shown to every owner but the iterate route
+answered 403 to non-admins; prod had 54 non-admin story owners and zero successful retries.
+
+**Decision (owner, 2026-10-05):** customers may iterate a page or cover for the standard 2 credits (rate limit,
+ownership check and `chargeCredits` unchanged). For non-admin callers every developer knob (render model,
+custom prompt, free iterate, blackout, reference mode, …) is cleared before use. The client shows localised
+402/429 errors and refreshes the balance after a charge. A failed photo analysis or character save now shows an
+error and keeps the previous state instead of silently adopting the original photo (NO FALLBACKS).
+
+**Touched files:** `server/routes/regeneration.js`, `client/src/pages/StoryWizard.tsx`,
+`client/src/services/characterService.ts`, `tests/unit/iterate-open-to-customers.test.ts`.
