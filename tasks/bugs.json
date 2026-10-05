@@ -3481,7 +3481,7 @@
       "fix": "Shared fetchGrokWithRetry (grok.js): 429/503 wait with doubling backoff up to 10 min, moderation and credit errors never retried. Wardrobe writer + reviewer: a child's costume always has a long/short-sleeve swim shirt, never a one-piece or bikini; a leg-replacing costume is one tail, no feet; review check 11 may not give those up. Trial mermaid costume and the body-row judge aligned. Tests: tests/unit/grok-capacity-retry.test.ts, tests/unit/mermaid-costume-covered-tail.test.ts.",
       "status": "fixed",
       "fixedAt": "2026-10-05",
-      "fixedIn": "see git log (costume-cover commit)"
+      "fixedIn": "722a0a15f"
     }
   ]
 }
