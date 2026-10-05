@@ -503,6 +503,11 @@ router.post('/sets/:id/run', async (req, res) => {
     if (runningExperiments >= MAX_CONCURRENT_EXPERIMENTS) {
       return res.status(409).json({ error: `Test Lab is at capacity (${runningExperiments}/${MAX_CONCURRENT_EXPERIMENTS} experiments running) — retry shortly` });
     }
+    // Claim the slot NOW, as POST /experiments does — the awaits below left a
+    // window where two quick set runs both passed the check. Every early return
+    // and the catch release it through `claimed`; the runner's finally owns it
+    // once the run starts.
+    runningExperiments++; claimed = true;
     const setId = parseInt(req.params.id, 10);
     const setRows = await dbQuery('SELECT name, stage, params FROM testlab_sets WHERE id = $1', [setId]);
     if (!setRows.length) return res.status(404).json({ error: 'Set not found' });
@@ -514,10 +519,14 @@ router.post('/sets/:id/run', async (req, res) => {
     const override = req.body?.params || {};
     const promptOverride = req.body?.promptOverride ? String(req.body.promptOverride) : null;
     const targets = members.map(m => ({ ...(m.target || {}), _params: { ...setParams, ...(m.params || {}), ...override } }));
-    runningExperiments++; claimed = true;
+    // Same sweep POST /experiments gives its targets: member params are
+    // client-supplied and may carry a data URI (IRON RULE: no image bytes in JSONB).
+    await offloadJsonbImages(
+      inlineOffloadPrefix('testlab_experiments', 'targets', 'lab', `set${setId}-${Date.now()}`),
+      'testlab_experiments.targets', targets);
     const rows = await dbQuery(
-      `INSERT INTO testlab_experiments (stage, label, prompt_override, params, status, targets, created_by, set_id)
-       VALUES ($1, $2, $3, $4, 'running', $5, $6, $7) RETURNING id`,
+      `INSERT INTO testlab_experiments (stage, label, prompt_override, params, status, targets, created_by, set_id, target_count, results_count)
+       VALUES ($1, $2, $3, $4, 'running', $5, $6, $7, COALESCE(jsonb_array_length($5::jsonb), 0), 0) RETURNING id`,
       [stage, req.body?.label || `Set: ${name} (${members.length})`, promptOverride,
        JSON.stringify({ autoEval: true }), JSON.stringify(targets), req.user.username || String(req.user.id), setId]
     );
@@ -527,11 +536,13 @@ router.post('/sets/:id/run', async (req, res) => {
     log.info(`[TESTLAB] Set ${setId} (${stage}) run as experiment ${experimentId} (${members.length} members)`);
     res.json({ id: experimentId, members: members.length });
   } catch (err) {
-    // Release only what this request claimed — an early failure (missing set,
-    // empty set) never incremented, and a blanket decrement would hand out a
-    // slot that does not exist and eventually wrap the counter negative.
+    // Release only what this request claimed, and only while it still holds it.
     if (claimed) runningExperiments--;
+    claimed = false;
     res.status(500).json({ error: 'Failed to run set', details: err.message });
+  } finally {
+    // Early returns (missing set, empty set, too many members) leave the slot claimed.
+    if (claimed) runningExperiments--;
   }
 });
 
@@ -555,6 +566,7 @@ router.post('/sets/:id/run', async (req, res) => {
 // testing different things (a composite, a face repair, a prompt A/B) now run
 // side by side instead of queueing behind whichever run started first.
 const MAX_CONCURRENT_EXPERIMENTS = Math.max(1, Number(process.env.TESTLAB_MAX_CONCURRENT) || 5);
+const MAX_VARIANTS = 8;
 let runningExperiments = 0;
 
 // How often a running experiment says "still alive", and how long a silence has
@@ -567,6 +579,8 @@ const HEARTBEAT_INTERVAL_MS = 30_000;
 // so the beat here and the two readers (the Test Lab list, the push gate's busy
 // probe) can never disagree about when a quiet row counts as dead.
 const { HEARTBEAT_STALE } = require('../../lib/testlabReaper');
+
+const { unitFor, originalTargetOf } = require('../../lib/testlabUnit');
 
 async function executeExperiment(experimentId, stage, targets, opts) {
   const { runStageOnTarget } = require('../../lib/testlab');
@@ -613,29 +627,26 @@ async function executeExperiment(experimentId, stage, targets, opts) {
     delete baseParams.variants;
     delete baseParams.rerunDetection;
 
-    for (const rawTarget of targets) {
+    for (const [targetIndex, rawTarget] of targets.entries()) {
       // Set runs carry per-member params on target._params; merge them into the
       // stage params and run the CLEAN target (without _params).
-      const { _params: memberParams, ...target } = rawTarget;
+      const { target } = unitFor(baseParams, rawTarget, null);
       let detection = null;
       if (rerunDetection && target.pageNumber != null) {
         const startedAt = new Date().toISOString();
         try {
           const det = await runStageOnTarget('bbox', target, { experimentId, params: {} });
           detection = { figures: det.figures || [] };
-          await appendEntry({ ...target, ok: true, startedAt, label: 'fresh detection (used by all options below)', ...det });
+          await appendEntry({ ...target, targetIndex, ok: true, startedAt, label: 'fresh detection (used by all options below)', ...det });
         } catch (err) {
-          await appendEntry({ ...target, ok: false, startedAt, label: 'fresh detection', error: err.message });
+          await appendEntry({ ...target, targetIndex, ok: false, startedAt, label: 'fresh detection', error: err.message });
           log.warn(`[TESTLAB] exp ${experimentId} fresh detection failed: ${err.message} — options fall back to stored boxes`);
         }
       }
 
       for (const variant of (variants || [null])) {
-        const unitParams = { ...baseParams, ...(memberParams || {}), ...(variant?.params || {}) };
-        // A target-level versionIndex is a pin: the stage reads
-        // params.versionIndex, so without this line the sanitizer kept the pin
-        // on the target where nothing ever read it.
-        if (target.versionIndex != null && unitParams.versionIndex == null) unitParams.versionIndex = target.versionIndex;
+        // A target-level versionIndex is a pin (unitFor puts it on the params).
+        const { unitParams } = unitFor(baseParams, rawTarget, variant?.params);
         if (detection) unitParams.detection = detection;
         let entry;
         const startedAt = new Date().toISOString();
@@ -644,11 +655,11 @@ async function executeExperiment(experimentId, stage, targets, opts) {
         const variantMeta = variant ? { label: variant.label, variantParams: variant.params || {} } : {};
         try {
           const result = await runStageOnTarget(stage, target, { ...opts, params: unitParams, experimentId });
-          entry = { ...target, ok: true, startedAt, ...variantMeta, ...result };
+          entry = { ...target, targetIndex, ok: true, startedAt, ...variantMeta, ...result };
         } catch (err) {
           log.warn(`[TESTLAB] exp ${experimentId} ${target.storyId} P${target.pageNumber}${variant ? ` [${variant.label}]` : ''} failed: ${err.message}`);
           // Failed runs keep any intermediates the runner attached (steps etc.).
-          entry = { ...target, ok: false, startedAt, ...variantMeta, error: err.message, ...(err.partialResult || {}) };
+          entry = { ...target, targetIndex, ok: false, startedAt, ...variantMeta, error: err.message, ...(err.partialResult || {}) };
         }
         await appendEntry(entry);
       }
@@ -680,6 +691,10 @@ router.post('/experiments', async (req, res) => {
     const { STAGES } = require('../../lib/testlab');
     if (!STAGES.includes(stage)) {
       return res.status(400).json({ error: `Invalid stage. Valid: ${STAGES.join(', ')}` });
+    }
+    // Up to 25 targets run once PER variant; an unbounded list is unbounded paid calls.
+    if (Array.isArray(params?.variants) && params.variants.length > MAX_VARIANTS) {
+      return res.status(400).json({ error: `Max ${MAX_VARIANTS} variants per experiment` });
     }
     if (runningExperiments >= MAX_CONCURRENT_EXPERIMENTS) {
       return res.status(409).json({ error: `Test Lab is at capacity (${runningExperiments}/${MAX_CONCURRENT_EXPERIMENTS} experiments running) — retry shortly` });
@@ -922,8 +937,19 @@ router.get('/experiments/:id', async (req, res) => {
 let redosInFlight = 0;
 const MAX_CONCURRENT_REDOS = 3;
 
+// A redo runs for minutes on a row that is already 'completed', so the 'testlab'
+// probe (rows with status = 'running') cannot see it: the push gate and idle
+// shutdown reported idle and a deploy killed it mid-render (code review
+// 2026-10-04 L1). The counter is in-process, which is exactly where a redo lives.
+require('../../lib/idleShutdown').registerBusyProbe('testlab-redo',
+  () => (redosInFlight > 0 ? `${redosInFlight} Test Lab redo(s) in flight` : false));
+
 async function executeRedo(experimentId, exp, entry, resultIndex, override, extraRule = null) {
   const { runStageOnTarget } = require('../../lib/testlab');
+  // Same analyzer session an experiment holds, so a redo's SAM/DINO/rembg calls
+  // run against warm workers that are not reaped when another session ends.
+  const sessionName = `testlab-redo:${experimentId}:${resultIndex}:${Date.now()}`;
+  require('../../lib/analyzerClient').sessionBegin(sessionName);
   try {
     let redo;
     {
@@ -969,16 +995,20 @@ async function executeRedo(experimentId, exp, entry, resultIndex, override, extr
           experimentId, promptOverride: override, params: exp.params || {},
         });
       } else {
-        const target = { storyId: entry.storyId, pageNumber: entry.pageNumber };
-        // Per-redo extraRule wins over the experiment's stored rule — each
-        // redo is the NEXT attempt in the series.
-        let params = { ...(exp.params || {}), ...(extraRule != null ? { extraRule } : {}) };
-        delete params.styleMatrix;
+        // The ORIGINAL unit: the experiment's own target (its version pin and,
+        // for a set run, the member's params) and params, built by the same
+        // function the run used.
+        const rawTarget = originalTargetOf(exp, entry);
+        let baseParams = { ...(exp.params || {}) };
+        delete baseParams.styleMatrix;
         // Variant entries rerun THEIR option (snapshotted params) with a fresh
         // detection when the experiment chained one.
-        delete params.variants;
-        if (params.rerunDetection) { params.freshDetection = true; delete params.rerunDetection; }
-        if (entry.variantParams) params = { ...params, ...entry.variantParams };
+        delete baseParams.variants;
+        if (baseParams.rerunDetection) { baseParams.freshDetection = true; delete baseParams.rerunDetection; }
+        const { target, unitParams } = unitFor(baseParams, rawTarget, entry.variantParams);
+        // Per-redo extraRule wins over the experiment's and the member's stored
+        // rule — each redo is the NEXT attempt in the series.
+        let params = { ...unitParams, ...(extraRule != null ? { extraRule } : {}) };
         if (exp.stage === 'image' && entry.artStyle) {
           const empty = await runStageOnTarget('empty_scene', target, { experimentId, params: { artStyleOverride: entry.artStyle } });
           params = { ...params, artStyleOverride: entry.artStyle, backgroundRef: { imageType: 'empty_scene', versionIndex: empty.versionIndex } };
@@ -1004,6 +1034,7 @@ async function executeRedo(experimentId, exp, entry, resultIndex, override, extr
       [experimentId, JSON.stringify([failedEntry])]).catch(() => {});
   } finally {
     redosInFlight--;
+    require('../../lib/analyzerClient').sessionEnd(sessionName);
   }
 }
 
