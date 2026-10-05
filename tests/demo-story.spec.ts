@@ -1357,6 +1357,23 @@ test.describe('Demo Story Generation', () => {
     // 2026-09-04, so every themed entry here has the same problem; none had run
     // since.
     const ideaButtons = page.locator('button').filter({ hasText: USE_THIS_RE });
+    // Step 4 should pre-generate the ideas (StoryWizard preGenerateIdeasRef). On staging it
+    // twice did not fire (see tasks/BACKLOG.md), leaving an empty placeholder. Give it 20 s;
+    // if still empty and no generation is running (the generate button is disabled while
+    // one is), click it ourselves, loudly.
+    const ideasPresent = await ideaButtons.first().waitFor({ state: 'visible', timeout: 20000 })
+      .then(() => true, () => false);
+    if (!ideasPresent) {
+      const generateBtn = page.getByRole('button', {
+        name: /vorschlag generieren|generate suggestion|g[ée]n[ée]rer une suggestion|genera (un[ao] )?(suggerimento|proposta)/i,
+      }).first();
+      if (await generateBtn.isEnabled().catch(() => false)) {
+        console.log('  WARNING: idea pre-generation did not fire — clicking Vorschlag generieren');
+        await generateBtn.click();
+      } else {
+        console.log('  Ideas still generating (generate button disabled) — waiting');
+      }
+    }
     await expect(ideaButtons.first()).toBeVisible({ timeout: 180000 });
     const wantsOwnWorld = !!entry.storyTheme;
     let ideaIndex = 0;

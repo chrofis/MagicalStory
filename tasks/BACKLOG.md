@@ -41,6 +41,7 @@ Last full sweep: **2026-09-06**.
 
 ## In flight
 
+- [ ] Step-4 idea pre-generation sometimes does not fire (staging 2026-10-05, demo-berger, entry 18, twice): step 5 shows the empty placeholder. Diagnose the pre-generate effect; suspect the abort-on-input-change effect right below it → client/src/pages/StoryWizard.tsx:1998 (spec works around it at tests/demo-story.spec.ts, Step 5)
 - [ ] Whole-codebase code review, area by area (report only; owner picks fixes) → `tasks/code-review-2026-10-04.md`
 - [ ] Legacy root `index.html` (Babel prototype, served only without `dist/`) still calls the deleted `/api/story-draft` route — remove or update it → `tasks/code-review-2026-10-04.md` F3
 - [ ] `server/lib/ipLocation.js` `clientIp()` trusts `cf-connecting-ip` first, but no Cloudflare sits in front (measured 2026-10-04) — a client can spoof its geolocation IP; use `req.ip` → `tasks/code-review-2026-10-04.md` F4
