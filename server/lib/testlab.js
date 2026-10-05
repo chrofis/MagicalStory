@@ -4094,7 +4094,7 @@ async function runSceneHazardCountStage(target, { params = {}, promptOverride = 
     // dbQuery returns the rows array itself (database.js).
     const rows = await dbQuery('SELECT results FROM testlab_experiments WHERE id = $1', [expId]);
     if (!rows.length) throw new Error(`fromExperiment ${expId}: not found`);
-    const out = (rows[0].results || [])[0] || {};
+    const out = (rows[0].results || [])[parseInt(params.fromExperimentIndex, 10) || 0] || {};
     storyTitle = out.title || null;
     if (source === 'beats') {
       pages = (out.finalBeats || [])
