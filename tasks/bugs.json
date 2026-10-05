@@ -1280,7 +1280,7 @@
       "impact": "Six books were divided with the eleven-check plan review contributing nothing. The re-plan ranks on findings, so the ONLY faults any of those books could act on were the code counters' — which do not check emotional highlights, entrances, the wanted picture per act, the instant, peopleless pages, plants and payoffs, the last page, deed-and-effect, two heights or obstacle attribution. On job_1789759147125_p08djwhbl the discarded findings included three under check 1, three under check 2 and six under check 9; the shipped page 5 breaks four of the planner's own rules and no finding reached the re-plan.",
       "status": "fixed",
       "fixedAt": "2026-09-19",
-      "fixedIn": "(this commit)",
+      "fixedIn": "12ad105e4 + 9d24efe71",
       "fix": "parsePlanCheck accepts the contract as written: a 1-2 digit check number followed by a separator OR whitespace. Verified against the replayed reply — 22 of 22 findings recovered across 8 of the 11 checks, with the ROSTER and OBSTACLES blocks still parsing into their own shapes and 'NONE' still meaning none. The prompt was NOT tightened to demand punctuation: a parser stricter than the contract it cites is the defect, and demanding punctuation would only move the breakage to the next formatting drift."
     },
     {
@@ -1314,7 +1314,7 @@
       "impact": "Every staging/local story with more bad pages than the cap ships its over-cap pages untouched. On this run 6 of 15 bad pages were dropped, 4 of them carrying a CRITICAL (p14, p18, p15, p16). Production (3 passes) is affected only in the milder form: a page still deferred after the last round is dropped the same way.",
       "status": "fixed",
       "fixedAt": "2026-09-19",
-      "fixedIn": "(this commit)",
+      "fixedIn": "12ad105e4 + 9d24efe71",
       "fix": "applyRoundCap now takes `lastRound` and `criticalPageNums`. When no further round will run, pages carrying a CRITICAL/CATASTROPHIC finding that the cap would otherwise drop are admitted as a RESERVED allowance appended after the score-ranked slice, bounded by LAST_ROUND_CRITICAL_MAX = 5 — the same shape as the book audit allowance, so a many-CRITICAL book cannot become a whole-book regeneration. The cap itself, its shares and both thresholds are unchanged, and a NON-final round still defers exactly as before. repairPipeline passes round >= roundLimit and the round`s critical pages (hasCriticalSeverityFinding over roundEvalPages). The WARN line now says DROPPED rather than DEFERRED on the last round. Replay over the stored run: the 9 previously repaired pages are still admitted in the same order, p14/p18 (and p15/p16) join them, and only p5/p13 — no CRITICAL — stay out. Pinned by tests/unit/repair-gate-cap.test.ts (3 new cases)."
     },
     {
@@ -3245,6 +3245,54 @@
       "fixedAt": "2026-10-04",
       "fixedIn": "b6abd1656",
       "fix": "Prompt: rule 2a says a finding that the picture lacks what the brief asks for is a defect; new rule 7d - every fix carries ids, none in a rule 2/2a drop, one in a deduped entry. Code: feedbackConsolidator.checkFixesRestOnKeptFindings - a CRITICAL/MAJOR fix with no ids, unknown ids, or no id in a kept entry is logged at ERROR to the generation log (consolidator_fix_unbacked) and recorded on plan.fix_errors; nothing is reclassified. Test: tests/unit/consolidator-fix-ids.test.ts."
+    },
+    {
+      "id": "wizard-poll-outlives-view",
+      "title": "Story poll loop outlived the progress view and later navigated the user to the reader",
+      "rootCause": "pollCancelledRef was set only by the cancel button; no unmount/minimize/new-story cleanup",
+      "impact": "User mid-way through a second story or on MyStories was pulled into the first story reader",
+      "fixedIn": "12ad105e4 + 9d24efe71",
+      "fix": "run id in StoryWizard stops a stale loop without touching state; cancelled treated as terminal. Test: tests/unit/client-wizard-batch9.test.ts (stream end) ; UI paths verified by tsc only",
+      "reportedAt": "2026-10-05",
+      "source": "Code review 2026-10-04 (tasks/code-review-2026-10/7-client.md W1/W2)",
+      "status": "fixed",
+      "fixedAt": "2026-10-05"
+    },
+    {
+      "id": "trial-poll-transient-fail",
+      "title": "Transient 5xx/429 on trial job-status ended the trial on a failure screen",
+      "rootCause": "TrialGenerationPage treated any non-ok JSON response as terminal",
+      "impact": "One-trial-per-user visitor saw failed while the story kept generating",
+      "fixedIn": "12ad105e4 + 9d24efe71",
+      "fix": "utils/trialPoll.ts classification + backoff. Test: tests/unit/client-trial-batch9.test.ts",
+      "reportedAt": "2026-10-05",
+      "source": "Code review 2026-10-04 (tasks/code-review-2026-10/7-client.md W4)",
+      "status": "fixed",
+      "fixedAt": "2026-10-05"
+    },
+    {
+      "id": "trial-turnstile-token-reuse",
+      "title": "Retrying trial account creation reused a spent Turnstile token and bounced to signup",
+      "rootCause": "token refreshed only when null; any 4xx redirected to /?signup=true",
+      "impact": "Visitor lost the trial after a transient create failure",
+      "fixedIn": "12ad105e4 + 9d24efe71",
+      "fix": "token cleared + widget reset after each attempt; only 429 redirects. Test: tests/unit/client-trial-batch9.test.ts",
+      "reportedAt": "2026-10-05",
+      "source": "Code review 2026-10-04 (tasks/code-review-2026-10/7-client.md W6)",
+      "status": "fixed",
+      "fixedAt": "2026-10-05"
+    },
+    {
+      "id": "avatar-errors-english-raw",
+      "title": "Avatar failure toasts were English/raw and the 429 daily cap was not surfaced",
+      "rootCause": "showError interpolated result.error / error.message",
+      "impact": "DE/FR/IT users saw developer text",
+      "fixedIn": "12ad105e4 + 9d24efe71",
+      "fix": "utils/avatarErrors.ts + status on api errors. Test: tests/unit/client-wizard-batch9.test.ts",
+      "reportedAt": "2026-10-05",
+      "source": "Code review 2026-10-04 (tasks/code-review-2026-10/7-client.md W10)",
+      "status": "fixed",
+      "fixedAt": "2026-10-05"
     }
   ]
 }
