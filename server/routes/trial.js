@@ -882,17 +882,17 @@ async function verifySessionToken(req, res, next) {
   const token = authHeader && authHeader.split(' ')[1]; // Bearer <token>
 
   if (!token) {
-    return res.status(401).json({ error: 'Session token required' });
+    return res.status(401).json({ error: 'Session token required', code: 'TRIAL_SESSION_EXPIRED' });
   }
 
   let decoded;
   try {
     decoded = verifyToken(token);
   } catch (err) {
-    return res.status(403).json({ error: 'Session expired. Please start over.' });
+    return res.status(403).json({ error: 'Session expired. Please start over.', code: 'TRIAL_SESSION_EXPIRED' });
   }
   if (!decoded.anonymous) {
-    return res.status(403).json({ error: 'Invalid session token' });
+    return res.status(403).json({ error: 'Invalid session token', code: 'TRIAL_SESSION_EXPIRED' });
   }
   // The session carries the account's token_version like a login JWT: a Google sign-in onto
   // this account (upsertGoogleUser) bumps it, which ends a trial session somebody else may
@@ -902,10 +902,10 @@ async function verifySessionToken(req, res, next) {
     currentVersion = await currentTokenVersion(decoded.userId);
   } catch (err) {
     log.error(`[TRIAL] session lookup failed: ${err.message}`);
-    return res.status(503).json({ error: 'Temporarily unavailable. Please try again.' });
+    return res.status(503).json({ error: 'Temporarily unavailable. Please try again.', code: 'TEMPORARILY_UNAVAILABLE' });
   }
   if (currentVersion === null || (decoded.tv || 0) !== currentVersion) {
-    return res.status(403).json({ error: 'Session expired. Please start over.' });
+    return res.status(403).json({ error: 'Session expired. Please start over.', code: 'TRIAL_SESSION_EXPIRED' });
   }
   req.sessionUser = { userId: decoded.userId, anonymous: true };
   next();
@@ -937,16 +937,16 @@ router.post('/generate-preview-avatar', trialAvatarLimiter, async (req, res) => 
 
     // Validate required fields
     if (!facePhoto || !name) {
-      return res.status(400).json({ error: 'Name and photo are required' });
+      return res.status(400).json({ error: 'Name and photo are required', code: 'NAME_AND_PHOTO_REQUIRED' });
     }
     if (typeof name !== 'string' || name.length > 50) {
-      return res.status(400).json({ error: 'Invalid name' });
+      return res.status(400).json({ error: 'Invalid name', code: 'INVALID_NAME' });
     }
     if (gender && !['male', 'female'].includes(gender)) {
-      return res.status(400).json({ error: 'Invalid gender' });
+      return res.status(400).json({ error: 'Invalid gender', code: 'INVALID_GENDER' });
     }
     if (age && (isNaN(parseInt(age)) || parseInt(age) < 1 || parseInt(age) > 18)) {
-      return res.status(400).json({ error: 'Invalid age' });
+      return res.status(400).json({ error: 'Invalid age', code: 'INVALID_AGE' });
     }
 
     // Sanitize name for logging (strip newlines to prevent log injection)
@@ -957,7 +957,7 @@ router.post('/generate-preview-avatar', trialAvatarLimiter, async (req, res) => 
 
     // Check daily cap
     if (!checkAndIncrementTrialCap('avatar')) {
-      return res.status(503).json({ error: 'Service temporarily unavailable. Please try again tomorrow.' });
+      return res.status(503).json({ error: 'Service temporarily unavailable. Please try again tomorrow.', code: 'DAILY_CAPACITY_REACHED' });
     }
 
     log.info(`[TRIAL AVATAR] Generating preview avatar for "${safeName}" (age: ${age}, gender: ${gender})`);
@@ -1101,7 +1101,7 @@ OUTPUT: A single character illustration. No text, no borders, no additional elem
     }
 
     if (safetyBlocked) {
-      return res.status(422).json({ error: 'Photo could not be processed. Please try a different photo.' });
+      return res.status(422).json({ error: 'Photo could not be processed. Please try a different photo.', code: 'PHOTO_UNPROCESSABLE' });
     }
 
     // Fallback to Grok if Gemini failed
@@ -1131,7 +1131,7 @@ OUTPUT: A single character illustration. No text, no borders, no additional elem
 
     if (!avatarImage) {
       log.error('[TRIAL AVATAR] All avatar generation attempts failed');
-      return res.status(502).json({ error: 'Avatar generation failed. Please try again.' });
+      return res.status(502).json({ error: 'Avatar generation failed. Please try again.', code: 'AVATAR_FAILED' });
     }
 
     // Compress to JPEG
@@ -1180,7 +1180,7 @@ OUTPUT: A single character illustration. No text, no borders, no additional elem
 
   } catch (err) {
     log.error(`[TRIAL AVATAR] Error: ${err.message}`);
-    res.status(500).json({ error: 'Avatar generation failed. Please try again.' });
+    res.status(500).json({ error: 'Avatar generation failed. Please try again.', code: 'AVATAR_FAILED' });
   }
 });
 
@@ -1198,13 +1198,13 @@ router.post('/create-anonymous-account', trialAvatarLimiter, async (req, res) =>
     const { name, age, gender, traits, customTraits, facePhoto, bodyPhoto, bodyNoBgPhoto, faceBox, previewAvatar, turnstileToken, fingerprint } = req.body;
 
     if (!facePhoto || !name) {
-      return res.status(400).json({ error: 'Name and photo are required' });
+      return res.status(400).json({ error: 'Name and photo are required', code: 'NAME_AND_PHOTO_REQUIRED' });
     }
     if (typeof name !== 'string' || name.length > 50) {
-      return res.status(400).json({ error: 'Invalid name' });
+      return res.status(400).json({ error: 'Invalid name', code: 'INVALID_NAME' });
     }
     if (gender && !['male', 'female'].includes(gender)) {
-      return res.status(400).json({ error: 'Invalid gender' });
+      return res.status(400).json({ error: 'Invalid gender', code: 'INVALID_GENDER' });
     }
     // Traits and custom text are stored and later sent to paid prompts (code review 2026-10 T1).
     const traitsErr = guards.characterTraitsError(traits) || guards.textError('customTraits', customTraits);
@@ -1232,13 +1232,13 @@ router.post('/create-anonymous-account', trialAvatarLimiter, async (req, res) =>
         return res.status(503).json({ error: 'Verification is temporarily unavailable. Please try again in a moment.', retryable: true });
       }
       if (!turnstileValid) {
-        return res.status(403).json({ error: 'Verification failed. Please try again.' });
+        return res.status(403).json({ error: 'Verification failed. Please try again.', code: 'TURNSTILE_FAILED' });
       }
     }
 
     // Layer 2: Check fingerprint (skipped for admin testing)
     if (!adminBypass && !checkFingerprint(fingerprint)) {
-      return res.status(429).json({ error: 'Too many attempts. Please try again tomorrow.' });
+      return res.status(429).json({ error: 'Too many attempts. Please try again tomorrow.', code: 'TRIAL_LIMIT_REACHED' });
     }
 
     log.info(`[TRIAL] Creating anonymous account for "${safeName}"`);
@@ -1374,10 +1374,10 @@ router.patch('/update-character-details', verifySessionToken, async (req, res) =
     const { name, age, gender, traits, customTraits } = req.body || {};
 
     if (typeof name !== 'string' || !name.trim() || name.length > 50) {
-      return res.status(400).json({ error: 'Invalid name' });
+      return res.status(400).json({ error: 'Invalid name', code: 'INVALID_NAME' });
     }
     if (gender && !['male', 'female'].includes(gender)) {
-      return res.status(400).json({ error: 'Invalid gender' });
+      return res.status(400).json({ error: 'Invalid gender', code: 'INVALID_GENDER' });
     }
     // A PATCH that carries the age must carry a VALID one — including for an
     // in-flight trial started before the age became mandatory, whose row this
@@ -1462,7 +1462,7 @@ router.get('/check-status', verifySessionToken, async (req, res) => {
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Account not found' });
+      return res.status(404).json({ error: 'Account not found', code: 'ACCOUNT_NOT_FOUND' });
     }
 
     const user = result.rows[0];
@@ -1521,12 +1521,12 @@ router.post('/claim-session', verifySessionToken, async (req, res) => {
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Account not found' });
+      return res.status(404).json({ error: 'Account not found', code: 'ACCOUNT_NOT_FOUND' });
     }
 
     const user = result.rows[0];
     if (!user.email_verified) {
-      return res.status(403).json({ error: 'Email not yet verified' });
+      return res.status(403).json({ error: 'Email not yet verified', code: 'EMAIL_NOT_VERIFIED' });
     }
 
     const { generateToken } = require('../middleware/auth');
@@ -1569,7 +1569,7 @@ router.post('/create-story', verifySessionToken, async (req, res) => {
     const { storyCategory, storyTopic, storyTheme, storyDetails, language, userLocation, ideaKind } = req.body;
 
     if (!storyCategory && !storyTopic) {
-      return res.status(400).json({ error: 'Story topic is required' });
+      return res.status(400).json({ error: 'Story topic is required', code: 'TOPIC_REQUIRED' });
     }
     // storyDetails/storyTopic are stored and resent on every writer call (code review 2026-10 T1).
     const inputErr = guards.textFieldsError([
@@ -1596,7 +1596,7 @@ router.post('/create-story', verifySessionToken, async (req, res) => {
       // Either user doesn't exist or already used their trial
       const exists = await pool.query('SELECT id FROM users WHERE id = $1 AND is_trial = true', [userId]);
       if (exists.rows.length === 0) {
-        return res.status(404).json({ error: 'Account not found' });
+        return res.status(404).json({ error: 'Account not found', code: 'ACCOUNT_NOT_FOUND' });
       }
       // Return the visitor's existing trial job so a reload / return visit
       // resumes it instead of landing on a bare "used" state.
@@ -1629,7 +1629,7 @@ router.post('/create-story', verifySessionToken, async (req, res) => {
     const charResult = await pool.query('SELECT data FROM characters WHERE id = $1', [characterId]);
 
     if (charResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Character not found. Please start over.' });
+      return res.status(404).json({ error: 'Character not found. Please start over.', code: 'CHARACTER_NOT_FOUND' });
     }
 
     const charData = typeof charResult.rows[0].data === 'string'
@@ -1698,7 +1698,7 @@ router.post('/create-story', verifySessionToken, async (req, res) => {
     res.json({ jobId });
   } catch (err) {
     if (err.code === 'TRIAL_CAP_REACHED') {
-      return res.status(503).json({ error: 'Service temporarily unavailable. Please try again tomorrow.' });
+      return res.status(503).json({ error: 'Service temporarily unavailable. Please try again tomorrow.', code: 'DAILY_CAPACITY_REACHED' });
     }
     log.error(`[TRIAL] create-story error: ${err.message}`);
     res.status(500).json({ error: 'Failed to start story generation. Please try again.' });
@@ -1939,13 +1939,13 @@ router.post('/link-email', verifySessionToken, linkEmailSessionLimiter, linkEmai
     const { email } = req.body;
 
     if (!email || typeof email !== 'string' || email.length > 320) {
-      return res.status(400).json({ error: 'Email is required' });
+      return res.status(400).json({ error: 'Email is required', code: 'EMAIL_REQUIRED' });
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const normalizedEmail = email.toLowerCase().trim();
     if (!emailRegex.test(normalizedEmail)) {
-      return res.status(400).json({ error: 'Invalid email format' });
+      return res.status(400).json({ error: 'Invalid email format', code: 'INVALID_EMAIL' });
     }
 
     const { getPool } = require('../services/database');
@@ -1958,12 +1958,12 @@ router.post('/link-email', verifySessionToken, linkEmailSessionLimiter, linkEmai
     );
 
     if (userResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Account not found' });
+      return res.status(404).json({ error: 'Account not found', code: 'ACCOUNT_NOT_FOUND' });
     }
 
     // Allow re-submitting if email not yet verified (e.g. typo in email)
     if (userResult.rows[0].email_verified) {
-      return res.status(409).json({ error: 'Email already verified' });
+      return res.status(409).json({ error: 'Email already verified', code: 'EMAIL_ALREADY_VERIFIED' });
     }
 
     // Check email not already used by another user. Strict rule across all
@@ -2064,7 +2064,7 @@ router.post('/link-google', verifySessionToken, async (req, res) => {
       return res.status(400).json({ error: 'Could not get email from Google account' });
     }
     if (decodedToken.email_verified !== true) {
-      return res.status(400).json({ error: 'Google has not verified this email address' });
+      return res.status(400).json({ error: 'Google has not verified this email address', code: 'GOOGLE_EMAIL_UNVERIFIED' });
     }
 
     const normalizedEmail = googleEmail.toLowerCase().trim();
@@ -2079,7 +2079,7 @@ router.post('/link-google', verifySessionToken, async (req, res) => {
     );
 
     if (userResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Account not found' });
+      return res.status(404).json({ error: 'Account not found', code: 'ACCOUNT_NOT_FOUND' });
     }
 
     // Check email not used by another user. Strict rule across all
@@ -2154,7 +2154,7 @@ router.post('/link-google', verifySessionToken, async (req, res) => {
   } catch (err) {
     log.error(`[TRIAL] link-google error: ${err.message}`);
     if (err.code === 'auth/id-token-expired') {
-      return res.status(401).json({ error: 'Token expired. Please sign in again.' });
+      return res.status(401).json({ error: 'Token expired. Please sign in again.', code: 'GOOGLE_TOKEN_EXPIRED' });
     }
     res.status(500).json({ error: 'Failed to link Google account. Please try again.' });
   }
@@ -2687,7 +2687,7 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
     {
       const { getPool: getUsedPool } = require('../services/database');
       const used = await getUsedPool().query('SELECT stories_generated FROM users WHERE id = $1 AND is_trial = true', [userId]);
-      if (used.rows.length === 0) return res.status(404).json({ error: 'Account not found' });
+      if (used.rows.length === 0) return res.status(404).json({ error: 'Account not found', code: 'ACCOUNT_NOT_FOUND' });
       if (used.rows[0].stories_generated >= 1) {
         return res.status(409).json({ error: 'Trial already used', code: 'TRIAL_USED' });
       }
@@ -3399,7 +3399,7 @@ router.post('/claim-google', trialClaimLimiter, async (req, res) => {
       return res.status(400).json({ error: 'Google account must have an email address' });
     }
     if (decodedToken.email_verified !== true) {
-      return res.status(400).json({ error: 'Google has not verified this email address' });
+      return res.status(400).json({ error: 'Google has not verified this email address', code: 'GOOGLE_EMAIL_UNVERIFIED' });
     }
 
     const { getPool } = require('../services/database');
@@ -3477,7 +3477,7 @@ router.post('/claim-google', trialClaimLimiter, async (req, res) => {
   } catch (err) {
     log.error('[TRIAL] claim-google error:', err);
     if (err.code === 'auth/id-token-expired') {
-      return res.status(401).json({ error: 'Token expired. Please sign in again.' });
+      return res.status(401).json({ error: 'Token expired. Please sign in again.', code: 'GOOGLE_TOKEN_EXPIRED' });
     }
     res.status(500).json({ error: 'Failed to claim account' });
   }

@@ -5,6 +5,7 @@ import { useAuth } from '@/context/AuthContext';
 import LoginForm from './LoginForm';
 import RegisterForm from './RegisterForm';
 import PasswordResetForm from './PasswordResetForm';
+import { localizedApiError } from '@/utils/apiErrors';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -72,7 +73,7 @@ export function AuthModal({ isOpen, onClose, onSuccess, redirectUrl }: AuthModal
       handleLoginSuccess();
     } catch (err) {
       const errorWithCode = err as Error & { code?: string };
-      setError(err instanceof Error ? err.message : errors.loginFailed);
+      setError(localizedApiError(err, language, errors.loginFailed));
       setErrorCode(errorWithCode.code || null);
     } finally {
       setIsLoading(false);
@@ -87,7 +88,7 @@ export function AuthModal({ isOpen, onClose, onSuccess, redirectUrl }: AuthModal
       // After registration, login automatically happens in register()
       handleLoginSuccess();
     } catch (err) {
-      setError(err instanceof Error ? err.message : errors.registrationFailed);
+      setError(localizedApiError(err, language, errors.registrationFailed));
     } finally {
       setIsLoading(false);
     }
@@ -103,7 +104,7 @@ export function AuthModal({ isOpen, onClose, onSuccess, redirectUrl }: AuthModal
       const msg = err instanceof Error ? err.message : '';
       // Don't show error when popup was blocked and redirect is happening silently
       if (!msg.includes('Redirecting')) {
-        setError(msg || errors.googleSignInFailed);
+        setError(localizedApiError(err, language, errors.googleSignInFailed));
       }
     } finally {
       setIsLoading(false);
@@ -117,7 +118,7 @@ export function AuthModal({ isOpen, onClose, onSuccess, redirectUrl }: AuthModal
       await resetPassword(email);
       setMode('resetSent');
     } catch (err) {
-      setError(err instanceof Error ? err.message : errors.passwordResetFailed);
+      setError(localizedApiError(err, language, errors.passwordResetFailed));
     } finally {
       setIsLoading(false);
     }

@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useRef, type ReactNode } from 'react';
 import type { Language } from '@/types/story';
 import { translations, type TranslationStrings } from '@/constants/translations';
+import { isLanguage, resolveVisitorLanguage } from '@/utils/languagePreference';
 
 interface LanguageContextType {
   language: Language;
@@ -11,8 +12,6 @@ interface LanguageContextType {
 const LanguageContext = createContext<LanguageContextType | null>(null);
 
 const STORAGE_KEY = 'magicalstory_language';
-const SUPPORTED: Language[] = ['en', 'de', 'fr', 'it'];
-const isLanguage = (v: unknown): v is Language => typeof v === 'string' && SUPPORTED.includes(v as Language);
 
 const isBrowser = typeof window !== 'undefined';
 
@@ -56,19 +55,6 @@ function detectBrowserLanguage(): Language | null {
     const primary = (tag || '').toLowerCase().split('-')[0];
     if (isLanguage(primary)) return primary;
   }
-  return null;
-}
-
-/**
- * Language precedence AFTER load (decision #12): an explicit ?lang= wins, then
- * the visitor's stored choice. A pre-rendered page's language is only the first
- * paint (so hydration matches the server HTML) — it never overrides a visitor
- * who picked a language. Returns null when the visitor expressed no preference,
- * in which case the current (prerender) language stays.
- */
-export function resolveVisitorLanguage(urlLang: unknown, storedLang: unknown): Language | null {
-  if (isLanguage(urlLang)) return urlLang;
-  if (isLanguage(storedLang)) return storedLang;
   return null;
 }
 

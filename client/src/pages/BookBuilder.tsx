@@ -8,6 +8,7 @@ import { Navigation, LoadingSpinner } from '@/components/common';
 import { storyService } from '@/services';
 import { getPriceForPages, MAX_BOOK_PAGES, SHIPPING_COST_CHF } from './Pricing';
 import { createLogger } from '@/services/logger';
+import { localizedApiError } from '@/utils/apiErrors';
 
 // Type for pricing tier
 interface PricingTier {
@@ -461,7 +462,7 @@ export default function BookBuilder() {
       log.info('Print PDF downloaded successfully');
     } catch (error) {
       log.error('Failed to download print PDF:', error);
-      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      const errorMsg = localizedApiError(error, language);
       showToast({
         message: language === 'de'
           ? `PDF konnte nicht heruntergeladen werden: ${errorMsg}`

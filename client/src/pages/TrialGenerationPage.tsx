@@ -11,6 +11,7 @@ import { trackEvent } from '@/utils/analytics';
 import { trackTrialStep } from '@/utils/trialFunnel';
 import { classifyJobStatusHttp, MAX_TRANSIENT_POLL_ERRORS, pollBackoffMs } from '@/utils/trialPoll';
 import { Navigation } from '@/components/common';
+import { localizedApiError } from '@/utils/apiErrors';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 
@@ -634,7 +635,7 @@ export default function TrialGenerationPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        setAuthError(data.error || t.error);
+        setAuthError(localizedApiError({ code: data.code, status: response.status }, language, t.error));
         return;
       }
 
@@ -676,7 +677,7 @@ export default function TrialGenerationPage() {
     const data = await response.json();
 
     if (!response.ok) {
-      setAuthError(data.error || t.error);
+      setAuthError(localizedApiError({ code: data.code, status: response.status }, language, t.error));
       return;
     }
 

@@ -42,6 +42,7 @@ import { createLogger } from '@/services/logger';
 import { useDeveloperMode } from '@/hooks/useDeveloperMode';
 import { getAvatarCooldown, recordAvatarRegeneration } from '@/hooks/useAvatarCooldown';
 import { useAnalyzerPresence } from '@/hooks/useAnalyzerPresence';
+import { localizedApiError } from '@/utils/apiErrors';
 
 // Create namespaced logger
 const log = createLogger('StoryWizard');
@@ -180,7 +181,7 @@ export default function StoryWizard() {
       });
       if (!res.ok) {
         const data = await res.json();
-        setClaimError(data.error || 'Failed');
+        setClaimError(localizedApiError({ code: data.code, status: res.status }, language));
         return;
       }
       const resData = await res.json();
@@ -5117,7 +5118,7 @@ export default function StoryWizard() {
                   log.info('Image regenerated successfully, updated state');
                 } catch (error) {
                   log.error('Image regeneration failed:', error);
-                  const errorMsg = error instanceof Error ? error.message : String(error);
+                  const errorMsg = localizedApiError(error, language);
                   showError(language === 'de'
                     ? `Bildgenerierung fehlgeschlagen: ${errorMsg}`
                     : language === 'fr'
@@ -5252,7 +5253,7 @@ export default function StoryWizard() {
                   }
                 } catch (error) {
                   log.error('Print order failed:', error);
-                  const errorMsg = error instanceof Error ? error.message : String(error);
+                  const errorMsg = localizedApiError(error, language);
                   showError(language === 'de'
                     ? `Druckauftrag fehlgeschlagen: ${errorMsg}`
                     : language === 'fr'
@@ -5357,7 +5358,7 @@ export default function StoryWizard() {
                   log.info('Cover regenerated successfully');
                 } catch (error) {
                   log.error('Cover regeneration failed:', error);
-                  const errorMsg = error instanceof Error ? error.message : String(error);
+                  const errorMsg = localizedApiError(error, language);
                   showError(language === 'de'
                     ? `Cover-Generierung fehlgeschlagen: ${errorMsg}`
                     : language === 'fr'

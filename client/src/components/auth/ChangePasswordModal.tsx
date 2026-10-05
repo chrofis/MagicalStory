@@ -5,6 +5,7 @@ import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/common/Button';
 import { Input } from '@/components/common/Input';
 import { Alert } from '@/components/common/Alert';
+import { localizedApiError } from '@/utils/apiErrors';
 
 interface ChangePasswordModalProps {
   isOpen: boolean;
@@ -99,7 +100,7 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
       await changePassword(currentPassword, newPassword);
       setSuccess(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to change password');
+      setError(localizedApiError(err, language));
     } finally {
       setIsLoading(false);
     }
