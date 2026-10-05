@@ -4,6 +4,7 @@ import { storyTypes } from '@/constants/storyTypes';
 import type { CharacterData, StoryInput, GeneratedIdea } from '../TrialWizard';
 import { trackTrialStep } from '@/utils/trialFunnel';
 import { splitIdeaRoles, joinIdeaRoles } from '@/utils/ideaRoles';
+import { isTrialSessionDead } from '@/utils/trialSession';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -16,6 +17,8 @@ interface Props {
   onSelectIdea: (index: number) => void;
   onBack: () => void;
   onCreate: () => void;
+  // The server no longer accepts the trial session (401/403/404): the wizard sends the visitor back to account creation
+  onSessionExpired?: () => void;
   sessionToken?: string | null;
   onTitlePageReady?: (data: { costumeType: string | null; avatarSlides?: string[] }) => void;
   userLocation?: { city: string | null; region: string | null; country: string | null; latitude?: number | null; longitude?: number | null } | null;
@@ -61,6 +64,8 @@ const strings: Record<string, {
   back: string;
   errorTitle: string;
   errorRetry: string;
+  sessionExpired: string;
+  serverError: string;
 }> = {
   en: {
     title: 'Ideas for Your Story',
@@ -80,6 +85,8 @@ const strings: Record<string, {
     back: 'Back',
     errorTitle: 'Something went wrong',
     errorRetry: 'Try Again',
+    sessionExpired: 'Your session has expired. Please set up your character again to continue.',
+    serverError: 'The server could not create ideas right now. Please try again.',
   },
   de: {
     title: 'Ideen für deine Geschichte',
@@ -99,6 +106,8 @@ const strings: Record<string, {
     back: 'Zurück',
     errorTitle: 'Etwas ist schiefgelaufen',
     errorRetry: 'Erneut versuchen',
+    sessionExpired: 'Deine Sitzung ist abgelaufen. Bitte richte deine Figur noch einmal ein, um weiterzumachen.',
+    serverError: 'Der Server konnte gerade keine Ideen erstellen. Bitte versuche es erneut.',
   },
   fr: {
     title: 'Idées pour ton histoire',
@@ -118,6 +127,8 @@ const strings: Record<string, {
     back: 'Retour',
     errorTitle: 'Quelque chose s\'est mal passé',
     errorRetry: 'Réessayer',
+    sessionExpired: 'Votre session a expiré. Veuillez configurer à nouveau votre personnage pour continuer.',
+    serverError: "Le serveur n'a pas pu créer d'idées pour le moment. Veuillez réessayer.",
   },
   it: {
     title: 'Idee per la tua storia',
@@ -137,6 +148,8 @@ const strings: Record<string, {
     back: 'Indietro',
     errorTitle: 'Qualcosa è andato storto',
     errorRetry: 'Riprova',
+    sessionExpired: 'La tua sessione è scaduta. Configura di nuovo il tuo personaggio per continuare.',
+    serverError: 'Il server non è riuscito a creare idee in questo momento. Riprova.',
   },
 };
 
@@ -151,6 +164,7 @@ export default function TrialIdeasStep({
   onSelectIdea,
   onBack,
   onCreate,
+  onSessionExpired,
   sessionToken,
   onTitlePageReady,
   userLocation,
@@ -221,7 +235,13 @@ export default function TrialIdeasStep({
       });
 
       if (!response.ok) {
-        throw new Error(`Server error: ${response.status}`);
+        if (isTrialSessionDead(response.status)) {
+          setError(t.sessionExpired);
+          setIsGenerating(false);
+          onSessionExpired?.();
+          return;
+        }
+        throw new Error(t.serverError);
       }
 
       const reader = response.body!.getReader();
@@ -284,7 +304,7 @@ export default function TrialIdeasStep({
       setError(err.message || 'Failed to generate ideas');
       setIsGenerating(false);
     }
-  }, [characterData, storyInput, userLocation, sessionToken]);
+  }, [characterData, storyInput, userLocation, sessionToken, onSessionExpired, t]);
 
   // When both ideas are final, persist to parent
   useEffect(() => {
