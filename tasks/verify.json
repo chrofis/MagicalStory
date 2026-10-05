@@ -5309,7 +5309,9 @@
     {
       "id": "kept-garment-gate",
       "title": "A variant sheet that drops a garment which should stay is rejected by the kept-garment check, and the answer is stored",
-      "commits": [],
+      "commits": [
+        "d802a7b43"
+      ],
       "addedAt": "2026-10-05",
       "claim": "In a story with a worn-off garment, the Art Director authors keptGarments ({type, colour, details}) on every off row; each variant attempt records keptChecks (one question per kept garment, body cells 5-8) in styledAvatarGeneration[].variant.attempts[].gate; a sheet missing a kept garment is rejected and retried, an accepted one shows every kept garment in cells 5-8.",
       "runShape": [
