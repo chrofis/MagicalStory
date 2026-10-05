@@ -795,7 +795,7 @@ function dedupeIdenticalBullets(prompt) {
 // THE CUT DROPS EXACT BLOCKS, RANKED — GENERIC GUIDANCE BEFORE PAGE FACTS.
 //
 // Two faults, both reproduced on staging job_1789853503332_riqncqg1i (18 pages,
-// grok cap 7,900):
+// the Grok cap was then 7,900 chars; it is now 15,900 / 63,900 UTF-8 bytes, models.js):
 //
 //   1. Every page's built prompt ran 8.5-10.2k, and the four blocks at the top
 //      of the old order — Composition, HEIGHT ORDER, AGE & PROPORTIONS and the
@@ -899,8 +899,8 @@ function compositionBulletUnit(bullet) {
 
 /**
  * THE CUT ORDER — what shrinkPromptForModel removes, and in which order, when a
- * built image prompt is over the model's cap (Grok: 7,900 chars,
- * models.js maxPromptLength). ONE list. The shrinker walks it top to bottom and
+ * built image prompt is over the model's cap (models.js maxPromptLength, UTF-8
+ * bytes: Grok 15,900 / 63,900). ONE list. The shrinker walks it top to bottom and
  * stops the moment the prompt fits; docs/image-generation-methods.html and
  * docs/prompt-inventory.md render THIS array (scripts/admin/sync-prompt-cut-order-docs.js,
  * pinned by tests/unit/prompt-cut-order-docs.test.ts) — there is no second copy.
@@ -1159,13 +1159,16 @@ function sceneHeadOf(prompt) {
  *   prompt.
  */
 async function shrinkPromptForModel(prompt, maxPromptLength, logLabel, modelName = null, meta = null) {
+  if (!Number.isFinite(maxPromptLength) || maxPromptLength <= 0) {
+    throw new PromptFitError(`prompt-shrink [${logLabel}]: no usable prompt cap (${maxPromptLength}) for ${modelName || 'the model'}; refusing to send an unfitted prompt`);
+  }
   if (!prompt || promptBytes(prompt) <= maxPromptLength) return prompt;
   // The cap is UTF-8 bytes (xAI counts bytes, 2026-10-04); every shrink step
   // below counts chars. Shrink to a char budget, measure the bytes, tighten
   // the budget by the overshoot. An ASCII prompt fits on the first pass.
   let charBudget = maxPromptLength;
   for (let pass = 0; pass < 4; pass++) {
-    const out = await shrinkToCharBudget(prompt, charBudget, logLabel, modelName, meta);
+    const out = await shrinkToCharBudget(prompt, charBudget, maxPromptLength, logLabel, modelName, meta);
     const over = promptBytes(out) - maxPromptLength;
     if (over <= 0) return out;
     // From what came back, not what was asked: sentence and block cuts land
@@ -1175,7 +1178,11 @@ async function shrinkPromptForModel(prompt, maxPromptLength, logLabel, modelName
   throw new PromptFitError(`prompt-shrink [${logLabel}]: still over the ${maxPromptLength}-byte cap after 4 byte-tightening passes`);
 }
 
-async function shrinkToCharBudget(prompt, maxPromptLength, logLabel, modelName, meta) {
+// `maxPromptLength` is the CHAR budget for the deterministic steps; `byteCap` is
+// the real cap, which the scene shortening works against directly so the one LLM
+// try lands under it even for non-ASCII prose (a second LLM call per render is
+// forbidden: owner "one try", 2026-09-30).
+async function shrinkToCharBudget(prompt, maxPromptLength, byteCap, logLabel, modelName, meta) {
   if (prompt.length <= maxPromptLength) return prompt;
 
   // 1. Deterministic: merge duplicated bullet bodies, collapse blank runs.
@@ -1198,7 +1205,7 @@ async function shrinkToCharBudget(prompt, maxPromptLength, logLabel, modelName, 
     // 3 + 4. Still over: the scene prose is shortened — one LLM try, then a
     // sentence cut from its end until it fits (owner, 2026-09-30). Every
     // labelled block and the protected tail stay byte-exact (sceneShorten.js).
-    const fitted = await require('./sceneShorten').shortenSceneToFit(text, maxPromptLength, cut.tailStart, logLabel);
+    const fitted = await require('./sceneShorten').shortenSceneToFit(text, byteCap, cut.tailStart, logLabel);
     if (!fitted) {
       throw new PromptFitError(`prompt-shrink [${logLabel}]: ${text.length} chars after every allowed drop (${cut.dropped.join(', ') || 'none'}), cap ${maxPromptLength}; the must-keep sections (${text.length - cut.tailStart} chars) and the labelled head blocks do not fit even with the scene prose gone`);
     }
@@ -1544,7 +1551,8 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
     log.info(`🎨 [${logLabel}] Using Grok Imagine backend (model: ${grokModel}${verbose ? `, type: ${evaluationType}, aspect: ${grokAspect}` : ''})`);
 
     // Truncate to Grok's prompt-length cap BEFORE the API call.
-    const grokMaxPrompt = IMAGE_MODELS[grokTier.key]?.maxPromptLength || 7500;
+    const grokMaxPrompt = IMAGE_MODELS[grokTier.key]?.maxPromptLength;
+    if (!grokMaxPrompt) throw new PromptFitError(`[${logLabel}] Grok tier "${grokTier.key}" has no maxPromptLength in models.js IMAGE_MODELS; refusing to send an unfitted prompt`);
     const grokPrompt = await fitPrompt(prompt, grokMaxPrompt, grokModel, promptMeta);
 
     try {
@@ -1746,7 +1754,8 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
   }
 
   const modelConfig = IMAGE_MODELS[modelId];
-  const maxPromptLength = modelConfig?.maxPromptLength || 30000;
+  const maxPromptLength = modelConfig?.maxPromptLength;
+  if (!maxPromptLength) throw new PromptFitError(`[${logLabel}] image model "${modelId}" has no maxPromptLength in models.js IMAGE_MODELS; refusing to send an unfitted prompt`);
   const effectivePrompt = await fitPrompt(prompt, maxPromptLength, verbose ? modelId : null, promptMeta);
   if (effectivePrompt !== prompt) {
     parts[0] = { text: effectivePrompt };

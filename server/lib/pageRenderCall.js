@@ -77,6 +77,22 @@ function keepPageGridElements(refs, { hasPlate, sceneMetadata }) {
 }
 
 /**
+ * A page's grid, selected and built the way the story run builds it: the page's
+ * elements, minus what the SENT plate carries and the element the camera stands
+ * on, and NEVER a landmark photo (owner, settled 2026-08-18). Returns the cells
+ * kept — their ids are the `vbRefElementIds` the prompt must be built from — and
+ * the grid image (null when no cell is kept). Used by the repair/dev routes that
+ * render a page outside the run (regeneration.js); the run itself builds the
+ * grid in storyJobPipeline.js Phase 5a-pre-grid from the same two functions.
+ */
+async function buildPageVbGrid({ visualBible, pageNumber, sceneMetadata, hasPlate }) {
+  if (!visualBible) return { kept: [], visualBibleGrid: null };
+  const { buildVisualBibleGrid } = require('./referenceSheets');
+  const kept = keepPageGridElements(selectPageElementRefs(visualBible, pageNumber, sceneMetadata), { hasPlate, sceneMetadata });
+  return { kept, visualBibleGrid: kept.length > 0 ? await buildVisualBibleGrid(kept, []) : null };
+}
+
+/**
  * The model a page renders on. `modelOverrides` are the run's developer
  * overrides (sceneRouting/imageModel/imageBackend); a cover's baked title
  * renders on the typography-aware model.
@@ -171,6 +187,7 @@ function pageRenderOptions({ page, renderAspect, pageImageModel, pageImageBacken
 module.exports = {
   selectPageElementRefs,
   keepPageGridElements,
+  buildPageVbGrid,
   pageRenderModel,
   makePageImagePrompt,
   pageTextAreaMask,

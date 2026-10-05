@@ -74,7 +74,6 @@ const {
   buildCoverPrompt,
   extractPageClothing,
   buildSceneExpansionPrompt,
-  buildImagePrompt,
   buildOutlineReviewPrompt,
   buildTrialStoryPrompt,
   buildAvailableAvatarsForPrompt,
@@ -1273,7 +1272,6 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
           const pageImageModel = MODEL_DEFAULTS.simplePageImage;
           const pageImageBackend = IMAGE_MODELS[pageImageModel]?.backend || 'grok';
-          const isGrokImage = pageImageBackend === 'grok';
 
           // Resolve landmarks and VB grid for Grok reference slots
           // (sceneMetadata is parsed above, before the cell crop that needs it)
@@ -1344,13 +1342,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
           // Built AFTER the grid so the REQUIRED OBJECTS checklist can point
           // at the reference images that actually ride with this call.
-          const imagePrompt = buildImagePrompt(
-            sceneDescription, inputData, sceneCharacters, streamingVisualBible,
-            page.pageNumber, pagePhotos, {
-              skipVisualBible: isGrokImage,
-              vbRefElementIds: (trialVbGrid?.rawElements || []).map(e => e.id).filter(Boolean),
-            }
-          );
+          // Through the ONE closure the story run and the Test Lab use
+          // (pageRenderCall.makePageImagePrompt: the Grok VB-prose skip and the
+          // reference claim), so an option added there reaches trial pages too.
+          const imagePrompt = require('./server/lib/pageRenderCall').makePageImagePrompt({
+            sceneDescription, inputData, sceneCharacters, visualBible: streamingVisualBible,
+            pageNumber: page.pageNumber, characterPhotos: pagePhotos, pageImageModel,
+          })((trialVbGrid?.rawElements || []).map(e => e.id).filter(Boolean));
 
           log.info(`⚡ [TRIAL-STREAM] Page ${page.pageNumber} image generation starting (parallel with streaming)${pageLandmarkPhotos.length ? ` [${pageLandmarkPhotos.length} landmark(s)]` : ''}${trialVbGrid ? ' [VB grid]' : ''}`);
           const startTime = Date.now();

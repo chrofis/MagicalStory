@@ -29,6 +29,7 @@
  */
 
 const { log } = require('../utils/logger');
+const { promptBytes } = require('./promptFitError');
 
 /**
  * A paragraph that is one of the prompt's labelled blocks, never scene prose:
@@ -115,6 +116,10 @@ async function shortenSceneOnce(prose, targetChars, logLabel) {
  * protected tail begins (images.js protectedTailStart); nothing from there on
  * is touched, nor any labelled block of the head.
  *
+ * `maxLen` is UTF-8 BYTES (promptFitError.promptBytes, the unit the provider
+ * caps count), so a non-ASCII prompt fits after this one call instead of the
+ * caller retrying with a tighter budget and shortening again.
+ *
  * @returns {Promise<{ text: string, llmChars: number, proseCut: number } | null>}
  *   null when the prompt has no scene prose, or cannot fit even with the prose
  *   gone — the caller then fails loudly.
@@ -127,14 +132,18 @@ async function shortenSceneToFit(prompt, maxLen, tailStart, logLabel) {
   if (!idx.length) return null;
 
   const proseOf = () => idx.map(i => paras[i]).join('\n\n');
-  const excess = () => paras.join('\n\n').length + tail.length - maxLen;
+  const excess = () => promptBytes(paras.join('\n\n')) + promptBytes(tail) - maxLen;
   const prose = proseOf();
-  if (excess() >= prose.length) return null; // even no prose at all would not fit
+  const proseBytes = promptBytes(prose);
+  if (excess() >= proseBytes) return null; // even no prose at all would not fit
 
   // 1. One LLM try, into the first scene paragraph's slot.
   let llmChars = 0;
   // Through module.exports so a test can stand in for the model call.
-  const shortened = await module.exports.shortenSceneOnce(prose, prose.length - excess() - 20, logLabel);
+  // The allowance is in characters (what the model counts); scale the byte room
+  // by this prose's own bytes-per-char so non-ASCII prose is not overshot.
+  const targetChars = Math.floor((proseBytes - excess() - 20) * prose.length / proseBytes);
+  const shortened = await module.exports.shortenSceneOnce(prose, targetChars, logLabel);
   if (shortened) {
     llmChars = prose.length - shortened.length;
     paras[idx[0]] = shortened;
@@ -150,8 +159,8 @@ async function shortenSceneToFit(prompt, maxLen, tailStart, logLabel) {
     proseCut += before - paras[i].length;
   }
   const text = paras.filter((p, i) => p !== '' || !idx.includes(i)).join('\n\n').replace(/\n{3,}/g, '\n\n') + tail;
-  if (text.length > maxLen) return null;
-  if (proseCut) log.warn(`✂️ [${logLabel}] Scene prose cut by ${proseCut} chars at sentence ends to fit ${maxLen}`);
+  if (promptBytes(text) > maxLen) return null;
+  if (proseCut) log.warn(`✂️ [${logLabel}] Scene prose cut by ${proseCut} chars at sentence ends to fit ${maxLen} bytes`);
   return { text, llmChars, proseCut };
 }
 

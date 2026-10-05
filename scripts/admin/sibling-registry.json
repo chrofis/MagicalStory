@@ -1014,10 +1014,11 @@
         "storyJobPipeline.js",
         "server/lib/images.js",
         "server/lib/testlab.js",
-        "server/lib/pageRenderCall.js"
+        "server/lib/pageRenderCall.js",
+        "server/routes/regeneration.js"
       ],
       "severity": "block",
-      "reason": "Every page and full-story cover image prompt is built by ONE closure, pageRenderCall.makePageImagePrompt (buildImagePrompt + the Grok VB-prose skip + a cover's baked-title tail). The story run (Phase 5a), the Test Lab image stage and, since 2026-09-28, iteratePageCore (every iterate/repair and the cover iterate) call it. The fixed blocks of that prompt are never cut, so a copy of the construction on one path drifts in size as well as wording: staging job_1790539784661_6mjcny1c7 lost its front cover and a p18 repair to prompt_fit_failed after the page compaction (docs/decisions.md 2026-09-28). A path that builds a page prompt another way joins this set or is deleted.",
+      "reason": "Every page and full-story cover image prompt is built by ONE closure, pageRenderCall.makePageImagePrompt (buildImagePrompt + the Grok VB-prose skip + a cover's baked-title tail). The story run (Phase 5a), the Test Lab image stage and, since 2026-09-28, iteratePageCore (every iterate/repair and the cover iterate) call it. The fixed blocks of that prompt are never cut, so a copy of the construction on one path drifts in size as well as wording: staging job_1790539784661_6mjcny1c7 lost its front cover and a p18 repair to prompt_fit_failed after the page compaction (docs/decisions.md 2026-09-28). A path that builds a page prompt another way joins this set or is deleted. Since 2026-10-05 the user-facing page regenerate and the Test Models / Style Lab routes (server/routes/regeneration.js) build theirs here too, with the grid from pageRenderCall.buildPageVbGrid (code review 2026-10-04 S1).",
       "parity": {
         "anchors": [
           "makePageImagePrompt"
