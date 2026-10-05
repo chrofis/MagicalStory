@@ -544,24 +544,22 @@ async function sendTrialReminderEmail(userEmail, firstName, claimUrl, language =
  * @returns {string} Formatted delivery estimate string
  */
 function formatDeliveryEstimate(minDate, maxDate, language) {
-  // Default fallbacks by language
+  // Same normalisation as the templates: 'German', 'de', 'de-CH', 'it-ch', ... all resolve.
+  const key = normalizeLanguage(language); // ENGLISH | GERMAN | FRENCH | ITALIAN
+
+  // Decision #8: delivery is "5-7 business days" in every language.
   const defaults = {
-    'English': '5-7 business days',
-    'German': '5-7 Werktage',
-    'French': '5-7 jours ouvrables'
+    ENGLISH: '5–7 business days',
+    GERMAN: '5–7 Werktage',
+    FRENCH: '5–7 jours ouvrables',
+    ITALIAN: '5–7 giorni lavorativi'
   };
 
-  if (!minDate && !maxDate) {
-    return defaults[language] || defaults['English'];
-  }
+  if (!minDate && !maxDate) return defaults[key];
 
-  // Locale mapping
-  const locales = {
-    'English': 'en-US',
-    'German': 'de-DE',
-    'French': 'fr-FR'
-  };
-  const locale = locales[language] || 'en-US';
+  // Swiss regional locales for the Swiss-language emails (fr-FR/de-DE spelled dates differently).
+  const locales = { ENGLISH: 'en-US', GERMAN: 'de-CH', FRENCH: 'fr-CH', ITALIAN: 'it-CH' };
+  const locale = locales[key];
 
   const formatOptions = { month: 'short', day: 'numeric' };
 
@@ -572,18 +570,18 @@ function formatDeliveryEstimate(minDate, maxDate, language) {
     if (minDateObj && maxDateObj) {
       const minFormatted = minDateObj.toLocaleDateString(locale, formatOptions);
       const maxFormatted = maxDateObj.toLocaleDateString(locale, formatOptions);
-      return `${minFormatted} - ${maxFormatted}`;
+      return `${minFormatted} – ${maxFormatted}`;
     } else if (minDateObj) {
       return minDateObj.toLocaleDateString(locale, formatOptions);
     } else if (maxDateObj) {
-      const byLabel = { 'English': 'by', 'German': 'bis', 'French': 'avant le' };
-      return `${byLabel[language] || 'by'} ${maxDateObj.toLocaleDateString(locale, formatOptions)}`;
+      const byLabel = { ENGLISH: 'by', GERMAN: 'bis', FRENCH: 'd’ici le', ITALIAN: 'entro il' };
+      return `${byLabel[key]} ${maxDateObj.toLocaleDateString(locale, formatOptions)}`;
     }
   } catch (e) {
     console.error('❌ Error formatting delivery estimate:', e);
   }
 
-  return defaults[language] || defaults['English'];
+  return defaults[key];
 }
 
 /**
@@ -1374,6 +1372,7 @@ module.exports = {
   sendStoryFailedEmail,
   sendTrialReminderEmail,
   sendOrderConfirmationEmail,
+  formatDeliveryEstimate,
   sendOrderShippedEmail,
   sendOrderFailedEmail,
   // Auth emails (return structured results)
