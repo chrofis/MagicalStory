@@ -21,6 +21,15 @@ superseded and link forward.
 
 ---
 
+## 2026-10-05 — The kept-garment check judges a garment by type and colour only
+
+**Context:** Lab #1614-#1617 (entry above): the check flagged a correct Kiaan sheet 4/4 because the kept name said "corduroy" and the sheet draws plain dark trousers.
+
+**Decision (owner, 2026-10-05):** `prompts/sheet-kept-garment-check.txt` tells the judge to ignore fabric, texture, material, weave and cut words in the garment name and decide by garment type and colour. Re-measured on set #82 before anything ships; the result is recorded in the entry that follows it.
+
+**Touched files:** `prompts/sheet-kept-garment-check.txt`.
+
+
 ## 2026-10-05 — Kept-garment check (option A) measured in the Lab: bar NOT met on the original lists; not shipped
 
 **Context:** Daniel's bolt-off sheet (staging job_1791145238223_50osg2osm) lost the baldric from body cells 5-8 and nothing flagged it. The owner chose option A with a Lab bench first: one question per kept garment about body cells 5-8, `checkKeptGarment` + `prompts/sheet-kept-garment-check.txt`, Lab judge `sheet_kept` (set #82). Bar: Daniel flagged 2/2, each good sheet passed 2/2.
