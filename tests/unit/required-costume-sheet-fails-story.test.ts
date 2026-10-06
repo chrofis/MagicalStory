@@ -54,3 +54,39 @@ describe('child_torso_uncovered is a CRITICAL, repair-routable type', () => {
     expect(buckets.TYPE_TO_BUCKET?.child_torso_uncovered ?? buckets.BUCKETS?.child_torso_uncovered).toBeTruthy();
   });
 });
+
+// Staging job_1791267520938_essbvehs8: the EARLY avatar pass logged avatar_category_missing (error)
+// five minutes before the final top-up generated Emma's costumed sheet. Only the final pass states the final state.
+describe('the early avatar pass does not report an error a later pass can still close', () => {
+  const gl: any = nodeRequire('../../server/lib/generationLogger.js');
+  const events = (l: any) => l.getEntries().map((e: any) => `${e.level}:${e.event}`);
+  it('early pass: a pending warn, no error, no throw', async () => {
+    await sa.runInCacheScope('t-early', async () => {
+      const l = new gl.GenerationLogger(); gl.setCurrentLogger(l);
+      sa.setStyledAvatar('Emma', 'standard', 'pixar', IMG);
+      await expect(sa.ensureStyledAvatarCoverage([emma], 'pixar', reqs, { final: false })).resolves.toBeUndefined();
+      expect(events(l)).toEqual(['warn:avatar_category_pending']);
+      gl.clearCurrentLogger();
+    });
+  });
+  it('final pass after the sheet was generated: nothing logged', async () => {
+    await sa.runInCacheScope('t-final-ok', async () => {
+      const l = new gl.GenerationLogger(); gl.setCurrentLogger(l);
+      sa.setStyledAvatar('Emma', 'standard', 'pixar', IMG);
+      sa.setStyledAvatar('Emma', 'costumed:mermaid', 'pixar', IMG);
+      await sa.ensureStyledAvatarCoverage([emma], 'pixar', reqs, { final: false });
+      await sa.ensureStyledAvatarCoverage([emma], 'pixar', reqs);
+      expect(events(l)).toEqual([]);
+      gl.clearCurrentLogger();
+    });
+  });
+  it('final pass with the sheet still missing: the error and the throw', async () => {
+    await sa.runInCacheScope('t-final-bad', async () => {
+      const l = new gl.GenerationLogger(); gl.setCurrentLogger(l);
+      sa.setStyledAvatar('Emma', 'standard', 'pixar', IMG);
+      await expect(sa.ensureStyledAvatarCoverage([emma], 'pixar', reqs)).rejects.toBeInstanceOf(sa.MissingRequiredCostumeSheetError);
+      expect(events(l)).toContain('error:avatar_category_missing');
+      gl.clearCurrentLogger();
+    });
+  });
+});

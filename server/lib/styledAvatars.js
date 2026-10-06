@@ -581,7 +581,7 @@ function rememberStyledAvatarOnCharacter(character, artStyle, clothingCategory, 
 // outfit (a t-shirt in a winter book). Costumed sheets never take it: the
 // costume is the outfit. Not part of the cache key deliberately — the key is
 // already story-scoped (`getCacheScope()`), and a story has exactly one season.
-async function prepareStyledAvatars(characters, artStyle, pageRequirements, clothingRequirements = null, addUsage = null, imageModelOverride = null, { skipQualityEval = false, seasonOutfit = null } = {}) {
+async function prepareStyledAvatars(characters, artStyle, pageRequirements, clothingRequirements = null, addUsage = null, imageModelOverride = null, { skipQualityEval = false, seasonOutfit = null, finalPass = true } = {}) {
   log.debug(`🎨 [STYLED AVATARS] Preparing styled avatars for ${characters.length} characters in ${artStyle} style`);
 
   // For realistic style, skip standard/winter/summer style conversion (photos are already realistic)
@@ -830,7 +830,7 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
     log.debug(`✅ [STYLED AVATARS] All needed avatars already cached`);
     // Even with nothing to generate, a required character can still have zero
     // avatars (e.g. every conversion was skipped as "cannot convert").
-    await ensureStyledAvatarCoverage(characters, artStyle, pageRequirements);
+    await ensureStyledAvatarCoverage(characters, artStyle, pageRequirements, { final: finalPass });
     return styledAvatarCache;
   }
 
@@ -1002,7 +1002,7 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
   // HARD GUARANTEE — a required character with zero styled avatars after all
   // generation + fallback attempts gets the best available raw reference
   // seeded (loudly). See ensureStyledAvatarCoverage.
-  await ensureStyledAvatarCoverage(characters, artStyle, pageRequirements);
+  await ensureStyledAvatarCoverage(characters, artStyle, pageRequirements, { final: finalPass });
 
   // Publish the cache onto the character objects NOW, not at save time. The 2×4
   // cell cropper reads char.avatars.styledAvatars and nothing else, so leaving
@@ -1068,8 +1068,15 @@ class MissingRequiredCostumeSheetError extends Error {
  * @param {Array} characters
  * @param {string} artStyle
  * @param {Array<{clothingCategory, characterNames}>} pageRequirements
+ * @param {{final?: boolean}} [opts] final=false is the EARLY pass (the kickoff that runs
+ *   beside the writing stages): a gap it finds is retried by the final top-up pass, so it
+ *   is a warn event (`avatar_category_pending`) and neither an error, a styled-avatar log
+ *   failure, a seeded fallback nor a thrown MissingRequiredCostumeSheetError. Only the
+ *   final pass states the final state (staging job_1791267520938_essbvehs8: the early
+ *   pass logged `avatar_category_missing` at 06:51; the top-up generated Emma's costumed
+ *   sheet at 06:56 and the book carried an error for a sheet that existed).
  */
-async function ensureStyledAvatarCoverage(characters, artStyle, pageRequirements) {
+async function ensureStyledAvatarCoverage(characters, artStyle, pageRequirements, { final = true } = {}) {
   if (!Array.isArray(characters) || characters.length === 0) return;
   // name(lower) → Set of canonical categories the story requires
   const requiredCategories = new Map();
@@ -1121,7 +1128,10 @@ async function ensureStyledAvatarCoverage(characters, artStyle, pageRequirements
         const key = getAvatarCacheKey(char.name, cat, artStyle);
         return !styledAvatarCache.has(key) || guaranteeSeededKeys.has(key);
       });
-      if (missing.length > 0) {
+      if (missing.length > 0 && !final) {
+        log.warn(`[AVATAR] ${char.name} has no styled avatar yet for ${missing.join(', ')} — the final pass retries`);
+        getCurrentLogger()?.warn('avatar_category_pending', `Required styled avatar categor${missing.length === 1 ? 'y' : 'ies'} not generated yet: ${missing.join(', ')} — the final pass retries`, char.name, { artStyle, missing });
+      } else if (missing.length > 0) {
         log.error(`[AVATAR] ❌ ${char.name} is missing required styled avatar categor${missing.length === 1 ? 'y' : 'ies'} ${missing.join(', ')} — pages will substitute another bucket's sheet and render the outfit from prompt text only`);
         getCurrentLogger()?.error('avatar_category_missing',
           `Required styled avatar categor${missing.length === 1 ? 'y' : 'ies'} missing after all retries: ${missing.join(', ')} — another bucket's sheet substitutes`,
@@ -1143,6 +1153,13 @@ async function ensureStyledAvatarCoverage(characters, artStyle, pageRequirements
         // A missing COSTUMED sheet fails the book (see MissingRequiredCostumeSheetError).
         if (missing.includes('costumed')) missingCostumeFor.push(char.name);
       }
+      continue;
+    }
+
+    // The early pass states nothing here: the final pass seeds, fails or passes.
+    if (!final) {
+      log.warn(`[AVATAR] ${char.name} has no styled avatar yet — the final pass retries`);
+      getCurrentLogger()?.warn('avatar_category_pending', 'No styled avatar generated yet — the final pass retries', char.name, { artStyle, required: [...required] });
       continue;
     }
 

@@ -2070,7 +2070,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             try {
               const basicRequirements = avatarRequirementsFor(inputData.characters || [], requirements);
 
-              await prepareStyledAvatars(inputData.characters || [], artStyle, basicRequirements, requirements, addUsage, modelOverrides.storyAvatarModel || null, { skipQualityEval: !!inputData.trialMode, seasonOutfit: trialSeasonOutfit(inputData) });
+              await prepareStyledAvatars(inputData.characters || [], artStyle, basicRequirements, requirements, addUsage, modelOverrides.storyAvatarModel || null, { skipQualityEval: !!inputData.trialMode, seasonOutfit: trialSeasonOutfit(inputData), finalPass: false }); // the coverage top-up below is the final pass
               earlyAvatarStylingSucceeded = getStyledAvatarCacheStats().size > 0;
               log.debug(`✅ [STREAM] Early avatar styling complete: ${getStyledAvatarCacheStats().size} cached`);
             } catch (error) {
@@ -3357,7 +3357,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               characterNames: [char.name]
             }));
           });
-          await prepareStyledAvatars(inputData.characters || [], artStyle, basicCoverRequirements, clothingRequirements, addUsage, modelOverrides.storyAvatarModel || null, { skipQualityEval: !!inputData.trialMode, seasonOutfit: trialSeasonOutfit(inputData) });
+          await prepareStyledAvatars(inputData.characters || [], artStyle, basicCoverRequirements, clothingRequirements, addUsage, modelOverrides.storyAvatarModel || null, { skipQualityEval: !!inputData.trialMode, seasonOutfit: trialSeasonOutfit(inputData), finalPass: false }); // the coverage top-up below is the final pass
           log.debug(`✅ [UNIFIED] Pre-cover styled avatars ready: ${getStyledAvatarCacheStats().size} cached`);
         } catch (error) {
           log.warn(`⚠️ [UNIFIED] Pre-cover styled avatar prep failed: ${error.message}`);
