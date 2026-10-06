@@ -730,7 +730,8 @@ async function rewriteBlockedScene(sceneDescription, callTextModel) {
 
   try {
     const rewritePrompt = fillTemplate(PROMPT_TEMPLATES.rewriteBlockedScene, {
-      SCENE_DESCRIPTION: sceneDescription
+      SCENE_DESCRIPTION: sceneDescription,
+      COSTUME_BODY: require('./promptBuilders').COSTUME_BODY_RULE,
     });
 
     const rewriteResult = await callTextModel(rewritePrompt, null, require('../config/models').resolveSceneRewriteModel(), { usageLabel: 'scene_rewrite' });

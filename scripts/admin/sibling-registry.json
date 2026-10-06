@@ -1107,6 +1107,24 @@
         "client/src/utils/mainCharacters.ts"
       ],
       "severity": "block"
+    },
+    {
+      "id": "costume-body-authors",
+      "axis": "every author of a page brief vs the provider-blocked rewrite",
+      "reason": "A costume's body (one tail and no feet, a covering top) is promptBuilders.COSTUME_BODY_RULE, filled as {COSTUME_BODY} into both Art Director templates, both iterate templates and the blocked-scene rewrite; an author without it rewrites a mermaid with bare feet (essbv p3 iterate, 2026-10-06).",
+      "members": [
+        "prompts/scene-briefs-all.txt",
+        "prompts/scene-expansion.txt",
+        "prompts/scene-iteration.txt",
+        "prompts/scene-iteration-free.txt",
+        "prompts/rewrite-blocked-scene.txt"
+      ],
+      "severity": "block",
+      "parity": {
+        "anchors": [
+          "{COSTUME_BODY}"
+        ]
+      }
     }
   ],
   "withinFile": [
@@ -1183,6 +1201,19 @@
         "briefedAsPage: true,"
       ],
       "excludeReason": "briefedAsPage: true, is the terminator that closes the cover record so its body is measured exactly; it is not a record-building site.",
+      "severity": "block"
+    },
+    {
+      "id": "iterate-storydata-carries-decided-fields",
+      "axis": "the page record vs the iterate input the repair pipeline builds",
+      "reason": "iteratePageCore re-pins a rewrite from savedScene.jevFixed (pinBrief); the repair pipeline's own storyData.sceneImages whitelist lacked it, so no in-job iterate rewrite was pinned (essbv p3 v1: location, population and gaze moved, 2026-10-06).",
+      "file": "storyJobPipeline.js",
+      "blockPattern": "sceneImages: rawImages\\.map\\(r => \\(\\{|coverImages,  // a full-story cover's brief record",
+      "mustContain": "jevFixed:",
+      "exclude": [
+        "coverImages,  // a full-story cover's brief record"
+      ],
+      "excludeReason": "that comment line is the terminator that closes the sceneImages whitelist so its body is measured exactly; it is not a record-building site.",
       "severity": "block"
     }
   ]

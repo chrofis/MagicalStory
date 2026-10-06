@@ -3213,6 +3213,7 @@ function artDirectorFills(inputData, beats = [], options = {}) {
     // that author a page brief — see ONE_INSTANT_RULE and the block around it.
     // Registered as sibling set art-director-vs-iterate.
     ONE_INSTANT: ONE_INSTANT_RULE,
+    COSTUME_BODY: COSTUME_BODY_RULE,
     NO_LENS: NO_LENS_RULE,
     GAZE_TARGET: GAZE_TARGET_RULE,
     LOOKS_AT_FIELD: LOOKS_AT_FIELD_RULE,
@@ -3718,6 +3719,7 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     // that author a page brief — see ONE_INSTANT_RULE and the block around it.
     // Registered as sibling set art-director-vs-iterate.
     ONE_INSTANT: ONE_INSTANT_RULE,
+    COSTUME_BODY: COSTUME_BODY_RULE,
     NO_LENS: NO_LENS_RULE,
     GAZE_TARGET: GAZE_TARGET_RULE,
     LOOKS_AT_FIELD: LOOKS_AT_FIELD_RULE,
@@ -4197,6 +4199,7 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
     // that author a page brief — see ONE_INSTANT_RULE and the block around it.
     // Registered as sibling set art-director-vs-iterate.
     ONE_INSTANT: ONE_INSTANT_RULE,
+    COSTUME_BODY: COSTUME_BODY_RULE,
     NO_LENS: NO_LENS_RULE,
     GAZE_TARGET: GAZE_TARGET_RULE,
     LOOKS_AT_FIELD: LOOKS_AT_FIELD_RULE,
@@ -9799,6 +9802,13 @@ const CREATURE_FEATURES_RULE = 'An animal\'s `features` are its anatomy on every
 // into the prose and the plate prompt, against an ART STYLE that says "depth
 // from atmospheric haze, not optical blur" in the same image prompt.
 const NO_LENS_RULE = "The brief says what the frame holds and where the camera stands, never how it renders: no depth of field, focus, blur, bokeh, lens or film words, in the prose or in `emptyScenePrompt`. The medium comes from the art style, sent separately.";
+// A costume's body is the outfit text's, in every author of a page brief (owner, 2026-10-06). The wardrobe
+// writer and reviewer were given the covering-top / one-tail / no-feet rule (722a0a15f) but the Art Director
+// and both iterate rewriters were not: the p3 iterate rewrite of staging job_1791267520938_essbvehs8
+// wrote "her bare feet on wet sand" into a mermaid's brief. One constant at every brief author and the
+// provider-blocked rewrite (sibling set costume-body-authors).
+const COSTUME_BODY_RULE = "The outfit text decides the whole body. A figure whose outfit replaces the legs (a tail, a fin) has that one tail from the waist down and no legs, feet, bare feet, toes, shoes or footwear in the prose, a position or a pose; where it stands in water or on sand it is the tail that rests, floats or swims there. A figure whose outfit has a covering top keeps it from shoulders to waist, never bare skin and never a one-piece.";
+
 const ONE_INSTANT_RULE = "The prose never asks the picture to show how many times something happened, what just finished, or what comes next — no \"again\", \"for the third time\", \"already\", no object both mid-motion and in its ended state. Write the single visible instant.";
 
 const GAZE_TARGET_RULE = "Name at most one gaze target, and compose the frame so that target is the dominant element — large, central, or nearest the camera. Every other figure looks at that same target or at the page's action. Two named characters facing each other are the one exception — a standoff, an exchange, a conversation — and there each looks at the other; that pair is a single relationship, not two targets, and nobody else in the frame looks anywhere but at them or at the action. A gaze aimed at anything smaller or further off than the frame's dominant element lands on the dominant element instead. Never write a gaze to the viewer.";
@@ -13130,6 +13140,7 @@ module.exports = {
   GAP_ACTION_FRAMING_RULE,
   DECLARED_TRAIT_VERBATIM_RULE,
   ONE_INSTANT_RULE,
+  COSTUME_BODY_RULE,
   NO_LENS_RULE,
   GAZE_TARGET_RULE,
   LOOKS_AT_FIELD_RULE,

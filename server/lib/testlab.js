@@ -6857,7 +6857,7 @@ async function runRewriteBlockedStage(ctx, { experimentId, promptOverride, param
   // Prompt built explicitly (no PROMPT_TEMPLATES swap across the model await).
   const template = promptOverride || PROMPT_TEMPLATES.rewriteBlockedScene;
   if (!template) throw new Error('rewriteBlockedScene template not loaded');
-  const prompt = fillTemplate(template, { SCENE_DESCRIPTION: ctx.scene.sceneDescription || '' });
+  const prompt = fillTemplate(template, { SCENE_DESCRIPTION: ctx.scene.sceneDescription || '', COSTUME_BODY: require('./promptBuilders').COSTUME_BODY_RULE });
 
   const t0 = Date.now();
   const result = await callTextModel(prompt, null, null, { usageLabel: 'testlab_scene_rewrite' });

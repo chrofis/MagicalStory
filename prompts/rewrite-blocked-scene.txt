@@ -34,7 +34,7 @@ Rewrite this image scene description to avoid content safety filters while prese
    - Open outdoor spaces (gardens, parks, meadows)
    - Cheerful colors and expressions
    - Characters at appropriate distances
-   - All characters fully clothed in everyday attire
+   - All characters fully clothed in everyday attire, except that a costume or swimwear the scene gives a character stays as written: {COSTUME_BODY}
 
 **OUTPUT FORMAT:**
 Return only the rewritten scene description, nothing else. Keep the same format as the original (Setting, Characters, Action, Mood).

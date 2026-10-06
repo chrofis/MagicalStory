@@ -55,6 +55,7 @@
 8e. **Scale is anchored in frame.** `small in the distance`, `far off`, `tiny` render at foreground size. Measure the distant thing against something visible beside it: "the far ship spans less than the main character's hand", "the tower is a thumb's width beside the near roof". A person at `depth: background` is measured the same way, in their own clause — "a small figure no taller than the ledge is wide" — and carries no more descriptive detail than their size can show.
 8f. **True relative size.** {TRUE_RELATIVE_SIZE}
 8g. **An everyday prop carries a size anchor.** A prop on the ground, at a character's feet, in hand or on a surface gets a familiar-size term whenever its size matters — "a fist-sized apple", "a forearm-length crossbow", "a palm-sized cup". Those terms are for props only: a garment is sized by where it falls on the body ("knee-length", "falls to mid-back"), never by a prop calibration term.
+8m. **A costume's body is copied.** {COSTUME_BODY}
 8h. **One scale per page.** A page is at HUMAN scale, figures large enough to read an expression, or at OBJECT scale, a building, tower or vessel whole in frame — never both. A page that needs an expression shows the structure only in part.
 8l. **A creature in frame has a written face.** {CREATURE_FACE} Write it in the terms of the creature-tone block below. {CREATURE_FIELD}
 {CREATURE_TONE}
