@@ -24,7 +24,7 @@ Last full sweep: **2026-09-06**.
 
 ## P0 — gating the production promotion
 
-- [ ] Typed page plan Lab experiment: arm 0 on 4 stories + arm 2 on 1 done (Lab 1658-1662); arm 1 and more stories unrun (cost cap); inconclusive, not adopted → tasks/typed-plan-2026-10-05.md:1
+- [ ] Typed page plan Lab experiment: arm 0 on 4 stories + arm 2 on 1 done (Lab 1658-1662); arm 1 and more stories unrun (cost cap); inconclusive, not adopted. Step 3 done 2026-10-06 (Lab 1672/1673, atbttop6w, low effort, after the planner review): both runs miss the bar (Levin 8 of 9, 7-9 calibrated Jev flags beyond noise), verdict typed flow not working at this effort → docs/decisions.md 2026-10-06 "Typed plan, step 3", tasks/typed-plan-2026-10-05.md:1
 - [ ] Pipeline review 2026-09-20 on the last staging story: 15 quality, 9 recompute, 2 sequencing, 8 storage findings; owner triage pending → tasks/pipeline-review-2026-09-20.md:1
 - [ ] Verify on staging before promoting to master — **207 commits ahead as of 2026-09-11**
       (`git rev-list --count origin/master..origin/staging`, measured 2026-09-11; the owner's

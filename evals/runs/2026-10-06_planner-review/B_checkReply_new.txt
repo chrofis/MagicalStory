@@ -1,0 +1,63 @@
+ROSTER 1: people = Levin, Julian, Max, Kiaan; things = none; covers = none; unlisted = none  
+ROSTER 2: people = Levin, Herr Keller; things = none; covers = none; unlisted = none  
+ROSTER 3: people = Julian; things = none; covers = none; unlisted = none  
+ROSTER 4: people = Levin, Julian; things = none; covers = none; unlisted = Rubina  
+ROSTER 5: people = Rubina, Levin, Julian, Max, Kiaan; things = none; covers = none; unlisted = none  
+ROSTER 6: people = Julian, Rubina; things = none; covers = none; unlisted = none  
+ROSTER 7: people = Levin, Herr Keller; things = none; covers = none; unlisted = none  
+ROSTER 8: people = Max, Herr Keller; things = none; covers = none; unlisted = none  
+ROSTER 9: people = none; things = the egg; covers = none; unlisted = none  
+ROSTER 10: people = Max; things = none; covers = none; unlisted = none  
+ROSTER 11: people = Kiaan; things = none; covers = none; unlisted = none  
+ROSTER 12: people = Kiaan, Julian; things = none; covers = none; unlisted = Herr Keller  
+ROSTER 13: people = Julian; things = none; covers = none; unlisted = none  
+ROSTER 14: people = Levin, Herr Keller; things = none; covers = none; unlisted = none  
+ROSTER 15: people = Levin, Herr Keller; things = none; covers = none; unlisted = none  
+ROSTER 16: people = Kiaan, Rubina, Max; things = none; covers = none; unlisted = none  
+ROSTER 17: people = Levin, Rubina; things = none; covers = none; unlisted = none  
+ROSTER 18: people = Levin, Julian, Max, Kiaan, Rubina, the little dragon; things = none; covers = none; unlisted = none  
+
+OBSTACLES 6: Rubina  
+OBSTACLES 7: Levin  
+OBSTACLES 8: Max  
+OBSTACLES 11: Kiaan  
+OBSTACLES 12: Rubina  
+OBSTACLES 15: Levin  
+OBSTACLES 16: Rubina  
+
+PEOPLELESS 9: the egg  
+
+WANTED setup: sentence 5 — page 5  
+WANTED middle: sentence 10 — page 10  
+WANTED ending: sentence 18 — page 18  
+
+ACTION Levin: sentence 15 — page 15  
+ACTION Julian: sentence 3 — page 3  
+ACTION Max: sentence 10 — page 10  
+ACTION Kiaan: sentence 16 — page 16  
+ACTION the egg / the little dragon: sentence 3 — page none  
+
+CENTRAL: pages 3, 4, 8, 9, 10, 11, 12, 16, 17, 18  
+
+1. Page 7 stages Levin turning red in embarrassment, but Herr Keller is also in frame.  
+1. Page 8 stages Herr Keller laughing, but Max is also in frame.  
+1. Page 12 stages Julian's fear of the blower, but Kiaan is also in frame and the blower event is occurring.  
+1. Page 14 stages Levin's shaking knees, but Herr Keller is also in frame.  
+1. Page 18 stages Levin beaming among several other characters and feelings.  
+2. Page 2 has Herr Keller already in frame before anyone present names him.  
+2. Page 4 has Rubina already visible in frame before anyone present names her.  
+3. Page 5 has five named characters, but Rubina calls for help while the children look up; the third characters do not share one action.  
+3. Page 16 has three named characters, but Max only stands beside Kiaan and Rubina.  
+3. Page 18 has six named characters, but the children look up, Rubina climbs down, and the little dragon peeks out; they do not share one action.  
+9. Page 3 combines Julian's deed of pulling up the egg with the egg's discovery.  
+9. Page 8 combines Max's shout with Herr Keller's laughter and the blower going back on.  
+9. Page 9 combines the blower's blast with the blanket being blown away and the egg beginning to roll.  
+9. Page 10 combines Max's foot stopping the egg with the egg's being stopped at the stairhead.  
+9. Page 11 combines Kiaan's wrapping and clutching with the egg's being held securely.  
+9. Page 12 combines Herr Keller's blowing with the knocking's almost stopping.  
+9. Page 14 combines Levin's tug with the blower's switching off and Herr Keller's attention turning to him.  
+9. Page 15 combines Levin's questions with the quiet holding and Herr Keller's back remaining turned.  
+9. Page 18 combines the egg's cracking with the little dragon's peeking out.  
+11. Page 12's obstacle is Rubina's blocked descent, but Rubina is not named in the page's who column.  
+12. The central figure has no setup action whose instant is staged: sentence 3 gives the egg's knocking, but page 3 only shows Julian pulling it up.  
+8. Page 18 stages the hatching, but not the ending's later goodbye and thanks as its instant.

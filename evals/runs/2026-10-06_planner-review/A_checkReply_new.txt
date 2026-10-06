@@ -1,0 +1,50 @@
+ROSTER 1: people = Hans, Emma; things = none; covers = none; unlisted = none  
+ROSTER 2: people = Emma, Berta, Daniel; things = none; covers = none; unlisted = none  
+ROSTER 3: people = Emma, Hans, Sarah; things = none; covers = none; unlisted = none  
+ROSTER 4: people = none; things = none; covers = none; unlisted = none  
+ROSTER 5: people = Emma, Noah, Fridolin; things = none; covers = none; unlisted = none  
+ROSTER 6: people = Emma; things = none; covers = none; unlisted = Hans  
+ROSTER 7: people = Noah, Emma; things = none; covers = none; unlisted = none  
+ROSTER 8: people = Emma, Fridolin; things = none; covers = none; unlisted = none  
+ROSTER 9: people = Emma, Noah, Fridolin; things = none; covers = none; unlisted = none  
+ROSTER 10: people = Emma, Maren; things = none; covers = none; unlisted = none  
+ROSTER 11: people = Maren; things = none; covers = none; unlisted = none  
+ROSTER 12: people = Emma, Maren, Fridolin; things = none; covers = none; unlisted = none  
+ROSTER 13: people = Daniel, Sarah; things = none; covers = none; unlisted = none  
+ROSTER 14: people = Hans, Emma, Noah, Daniel, Sarah; things = none; covers = none; unlisted = none  
+
+OBSTACLES 5: Emma  
+OBSTACLES 7: Noah  
+OBSTACLES 8: Emma  
+OBSTACLES 9: Emma  
+
+PEOPLELESS 4: the wreck  
+
+WANTED setup: sentence 5 — page 5  
+WANTED middle: sentence 9 — page 8  
+WANTED ending: sentence 14 — page 14  
+
+ACTION Emma: sentence 9 — page 8  
+ACTION Noah: sentence 7 — page 7  
+ACTION Daniel: sentence 13 — page 13  
+ACTION Sarah: sentence 3 — page 3  
+ACTION Hans: sentence 1 — page 1  
+ACTION Maren: sentence 11 — page 11  
+
+CENTRAL: pages 10, 11, 12  
+
+1. Page 6 is Emma’s genuine solitary feeling; pages 7 and 12 are not one-person felt moments because another actor is present and another event or feeling is staged.  
+2. Page 1: Hans and Emma first appear without a visible arrival or naming act.  
+2. Page 2: Daniel first appears without a visible arrival or naming act.  
+2. Page 3: Sarah first appears without a visible arrival or naming act.  
+2. Page 5: Noah first appears without a visible arrival or naming act.  
+3. Page 2: the three characters do not share one action; Berta lies down, Daniel tells them they may go, and Emma touches Berta.  
+3. Page 3: the three characters do not share one action; Sarah calls, Hans waves, and Emma stands.  
+3. Page 5: the three characters do not share one action; Fridolin takes the shell, Emma reaches, and Noah watches.  
+3. Page 12: the three characters do not share one action; Emma hugs, Fridolin peeks, and Maren is present.  
+5. Page 6: the instant only presents Emma’s state and position—alone, tearful and empty-handed—instead of staging an action.  
+9. Page 5: the instant shows Fridolin taking the shell and the shell already being hauled away.  
+9. Page 7: the instant shows Noah tying the line and the line already tied around Emma.  
+9. Page 8: the instant shows Emma offering the share and the offer already made.  
+9. Page 10: the instant shows the garden as found while the change says the garden is found.  
+12. Maren has an action page only in the ending third; no page stages an action of hers in the setup or middle third.

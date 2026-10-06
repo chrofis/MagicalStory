@@ -1,0 +1,3 @@
+PLAN_INSTANT_TOO_LONG p1,3,4,5,6,9,11,12,15,16,17: the instant runs 23 words on page 1, 23 words on page 3, 21 words on page 4, 28 words on page 5, 22 words on page 6, 26 words on page 9, 25 words on page 11, 29 words on page 12, 24 words on page 15, 21 words on page 16, 27 words on page 17, past the 20 words an instant may take — keep the one action and move the rest to what is true after, or to a page of its own
+CAST_NOT_IN_WHO_COLUMN p12: the instant names a character the who column does not carry (page 12: Herr Keller) — write them into the who column, or take them out of the instant
+CAST_PROMISE_BROKEN p16: the CAST block promises page 16 as Kiaan's deed page, alone or with one companion, but it holds Max, Kiaan, Rubina

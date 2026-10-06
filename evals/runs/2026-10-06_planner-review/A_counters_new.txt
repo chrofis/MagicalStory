@@ -1,0 +1,5 @@
+PLAN_INSTANT_TOO_LONG p1,2,3,5,7,8,9,10,12,13,14: the instant runs 41 words on page 1, 48 words on page 2, 40 words on page 3, 35 words on page 5, 36 words on page 7, 40 words on page 8, 30 words on page 9, 33 words on page 10, 25 words on page 12, 35 words on page 13, 31 words on page 14, past the 20 words an instant may take — keep the one action and move the rest to what is true after, or to a page of its own
+CAST_PROMISE_BROKEN p3: the CAST block promises page 3 as Sarah's deed page, alone or with one companion, but it holds Emma, Sarah, Hans
+CAST_PROMISE_BROKEN p14: the CAST block keeps Hans, Emma, Noah, Daniel, Sarah, Maren together on page 14, but page 14's who column leaves out Maren
+CENTRAL_FIGURE_ABSENT_THIRD p1,2,3,4,5: the central figure (Maren) is in frame on no page of the setup (pages 1-5); stage it on one of them
+CENTRAL_FIGURE_ABSENT_THIRD p6,7,8,9: the central figure (Maren) is in frame on no page of the middle (pages 6-9); stage it on one of them

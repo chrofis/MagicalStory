@@ -1,0 +1,1 @@
+A=job_1791267520938_essbvehs8 B=job_1791040103540_atbttop6w; *_counters = stored plan + stored check reply under the new counters; *_counters_new = same plan with the roster of the NEW plan check (gpt-5.6-luna-pro, USD 0.0294 + 0.0304)
