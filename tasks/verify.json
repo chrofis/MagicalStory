@@ -5640,7 +5640,9 @@
     },
     {
       "id": "jev-weather-wildlife-aboard",
-      "commits": [],
+      "commits": [
+        "5a0b43001"
+      ],
       "addedAt": "2026-10-06",
       "claim": "A page with weather windy/drizzle/hail/thunder/snow-lying/heat/rainbow renders that weather; a wildlife or creature_crowd page draws unnamed animals/creatures and no unnamed people; a page on a ridden creature keeps the creature once, as the ground; a cover of a water book shows the cast swimming, floating or aboard at the sea.",
       "runShape": [
