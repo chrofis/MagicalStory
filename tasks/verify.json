@@ -5607,7 +5607,7 @@
     {
       "id": "jev-dark-water-and-sources",
       "commits": [
-        "368be2f86"
+        "bc89efcc2"
       ],
       "addedAt": "2026-10-06",
       "claim": "A story with an ink cloud or abyss page declares underwater_dark on it, the page and plate are painted submerged and pitch-black, a lit element cited on the page is named in its LIGHT line, and an indoor page carries window light with no sky or moon.",
@@ -5624,7 +5624,7 @@
     {
       "id": "jev-gaze-words",
       "commits": [
-        "368be2f86"
+        "bc89efcc2"
       ],
       "addedAt": "2026-10-06",
       "claim": "A story page whose character looks at the surroundings or at someone off-frame stores looksAt down/up/ahead/distance/outside (never the place id), the built EXPRESSIONS AND EYES line says so, and the name of an off-frame character appears in no image prompt.",

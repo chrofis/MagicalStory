@@ -3618,7 +3618,7 @@
       "reportedAt": "2026-10-06",
       "status": "fixed",
       "fixedAt": "2026-10-06",
-      "fixedIn": "368be2f86",
+      "fixedIn": "bc89efcc2",
       "fix": "Per-hour indoor phrasing (window light only) when weather is none; indoor repair line says no sky. Test: jev-light-gaze-options.test.ts REGRESSION indoor."
     },
     {
@@ -3628,7 +3628,7 @@
       "reportedAt": "2026-10-06",
       "status": "fixed",
       "fixedAt": "2026-10-06",
-      "fixedIn": "368be2f86",
+      "fixedIn": "bc89efcc2",
       "fix": "The place is no longer offered; Jev picks down/up/ahead/distance (gazeTargets.js) which gazeTarget passes through and the picture prompt renders. Replay: all 7 replaced. Test: jev-light-gaze-options.test.ts."
     }
   ]
