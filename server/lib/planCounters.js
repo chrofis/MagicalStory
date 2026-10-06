@@ -1848,8 +1848,8 @@ function typedPlanCounters({ pages = [], listedNames = [], commissionedNames = n
     }
     return { pageNumber: n, type: t.type || 'unknown', names: who.names, shot: null, moment: t.moment, after: t.after, planLine: p.planLine };
   });
-  const longInstants = longInstantPages(pages);
-  if (longInstants.length) addPre('PLAN_INSTANT_TOO_LONG', longInstants.map(p => p.pageNumber), longInstantDetail(longInstants));
+  // One finding per page here: the typed re-plan accepts or refuses a page by its own findings (typedPlan.PAGE_LEVEL_CODES).
+  for (const p of longInstantPages(pages)) addPre('PLAN_INSTANT_TOO_LONG', [p.pageNumber], longInstantDetail([p]));
   const counted = countPlanTargets({ rows, listedNames, commissionedNames, arcNames, mainName, maxCharactersPerScene });
   const findings = [...pre, ...counted.findings];
   return {

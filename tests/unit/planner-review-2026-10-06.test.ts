@@ -44,7 +44,16 @@ describe('the instant is at most 20 words — a counter finding, not a must-fix'
       pages: [{ pageNumber: 1, planLine: `medium — Ana — ${words(21)} — x` }, { pageNumber: 2, planLine: `medium — Ana — ${words(5)} — x` }],
       listedNames: ['Ana'], maxCharactersPerScene: 6,
     });
-    expect(typed.findings.find((x: any) => x.code === 'PLAN_INSTANT_TOO_LONG').pages).toEqual([1]);
+    expect(typed.findings.filter((x: any) => x.code === 'PLAN_INSTANT_TOO_LONG').map((x: any) => x.pages)).toEqual([[1]]);
+    // the typed re-plan sends the long instant back with its own reason, page by page
+    const long2 = PC.typedPlanCounters({
+      pages: [{ pageNumber: 1, planLine: `medium — Ana — ${words(21)} — x` }, { pageNumber: 2, planLine: `medium — Ana — ${words(30)} — x` }],
+      listedNames: ['Ana'], maxCharactersPerScene: 6,
+    });
+    const scope = TP.replanScope({ rows: long2.rows, findings: long2.findings.filter((f: any) => f.code === 'PLAN_INSTANT_TOO_LONG'), jevPages: {}, targets: CC.typedPlanTargets({ pageCount: 2, listed: ['Ana'], maxCharactersPerScene: 6 }) });
+    expect([...scope.keys()]).toEqual([1, 2]);
+    expect(scope.get(2).reasons[0]).toContain('30 words');
+    expect(scope.get(2).reasons[0]).not.toContain('21 words');
   });
 
   it('is a NOTED finding: a long instant costs a rewrite, never a picture', () => {

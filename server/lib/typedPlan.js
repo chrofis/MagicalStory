@@ -352,7 +352,7 @@ function measurePlan({ rows, jevResult, listed, commissionedNames = null, arcNam
 
 // ───────────────────────── the targeted re-plan ─────────────────────────
 
-const PAGE_LEVEL_CODES = new Set(['PLAN_LINE_INCOMPLETE', 'TYPED_TYPE_UNKNOWN', 'TYPED_WHO_COLLECTIVE', 'TYPE_CAST_MISMATCH']);
+const PAGE_LEVEL_CODES = new Set(['PLAN_LINE_INCOMPLETE', 'TYPED_TYPE_UNKNOWN', 'TYPED_WHO_COLLECTIVE', 'TYPE_CAST_MISMATCH', 'PLAN_INSTANT_TOO_LONG']);
 
 /** At most this many Jev flags go back to the planner, the largest margins first (owner 2026-10-06). */
 const REPLAN_JEV_MAX = 4;
