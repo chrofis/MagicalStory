@@ -313,10 +313,22 @@ function noFocalFix(name) {
  *
  * @param {Object} inputData  the job input (its `characters` list)
  * @param {string[]} [suppliedNames]  the arc's (commissioned)-tagged figure names
- * @returns {{listed:string[], supplied:string[], all:string[]}}
+ *   children  the listed names the every-child-acts rule is about: a listed
+ *             adult may comfort, permit or watch, so the cast-beat check
+ *             (jevAudit.jevCastBeatVoice) asks only these to act. A character
+ *             with no readable age counts as a child.
+ * @returns {{listed:string[], children:string[], supplied:string[], all:string[]}}
  */
+// The oldest age that still counts as a child here; the idea-cache age bands
+// (jevSelection.ideaAgeBands) put the grown-ups at 16 and over.
+const CHILD_MAX_AGE = 15;
+
 function commissionedCast(inputData, suppliedNames = []) {
-  const listed = (inputData?.characters || []).map(c => c && String(c.name || '').trim()).filter(Boolean);
+  const chars = (inputData?.characters || []).filter(c => c && String(c.name || '').trim());
+  const listed = chars.map(c => String(c.name).trim());
+  const children = chars
+    .filter(c => !(parseInt(c.age, 10) > CHILD_MAX_AGE))
+    .map(c => String(c.name).trim());
   const lower = new Set(listed.map(n => n.toLowerCase()));
   const supplied = [];
   for (const n of (Array.isArray(suppliedNames) ? suppliedNames : [])) {
@@ -325,7 +337,7 @@ function commissionedCast(inputData, suppliedNames = []) {
     lower.add(name.toLowerCase());
     supplied.push(name);
   }
-  return { listed, supplied, all: [...listed, ...supplied] };
+  return { listed, children, supplied, all: [...listed, ...supplied] };
 }
 
 /**

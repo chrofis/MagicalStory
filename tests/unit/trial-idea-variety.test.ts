@@ -58,7 +58,7 @@ describe('age-band views — one file, three readers', () => {
     [2, '**The child does the finding.**', '**It resolves.** The wanted thing is found before the last page.', 'The search is the story'],
     [3, "**The child's own doing.**", '**It resolves.** The third try works', 'Each try is a different kind of attempt'],
     [4, "**The child's choice resolves it.**", '**It resolves.** The fear is real enough to feel', '**Feelings on the page.**'],
-    [5, "**The hero's own idea turns it.**", '**It resolves.** The turn comes before the last page', 'Every one of those beats is on the page'],
+    [5, "**The hero's own idea turns it.**", '**It resolves.** The turn comes before the last page', 'Every one of those beats is in the story'],
   ];
 
   for (const [age, agency, resolves, beats] of resolution) {

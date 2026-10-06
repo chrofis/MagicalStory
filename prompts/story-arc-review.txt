@@ -51,7 +51,7 @@ Judge the arc as a reader who sees only this. A fault you name must change the a
 12. Subject and peril — is the thing the book is about present as the STORY SHAPE requires, rather than hinted at offstage? {PERIL_CEILING} Name anything that breaks this — including an invented safeguard or harmless version of a historical event's real danger — anyone who looks monstrous, and any separation with no reunion and no safe ending. An animal or creature that travels with the children is given a name by them, where they decide to help it; name the arc that leaves it unnamed.
 13. Flow — does the shape run opening, building, relief and ending without a stretch where nothing tightens? Name where it sags or where two turns crowd together.
 14. Clock — when the arc sets a deadline at a time of day, does the starting time leave the book's length to cross? Name a start that reaches the deadline too early or cannot reach it, and move the start rather than the deadline.
-15. Ending — does the last part show the characters safe and together, with one of them feeling something a child can name? Name an ending that closes on distance or silence alone.
+15. Ending — does the last part show the characters safe and together, with one of them showing a feeling a child can name, in an act or a spoken line? Name an ending that closes on distance or silence alone.
 
 # OUTPUT FORMAT
 

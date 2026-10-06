@@ -41,7 +41,7 @@ The story logic is the arc's ledger of facts. Repair the arc once, against that 
 - A repaired sentence changes only the words its repair needs and grows no longer than that edit: no added reason, explanation or mechanism beyond it.
 - A repair that needs a new fact adds it to the story logic first; then read every sentence against the updated logic, and a sentence it contradicts is repaired too.
 - The story keeps {HAPPENINGS}: a repair that would add a happening cuts one first, and cutting a dead end is the preferred repair.
-- A "why" fault is answered from a motive the story logic already holds before any new rule of the world; an invented rule, custom, game or mechanism named as the fault is cut and replaced by a motive.
+- A "why" fault is answered in the story logic, from a motive it already holds before any new rule of the world; an invented rule, custom, game or mechanism named as the fault is cut and replaced by a motive. The arc sentence takes that reason only where the rule under FINAL ARC allows.
 - A repair that costs suspense is a worse fault than the one it repairs.
 
 Output, in this order:
@@ -53,7 +53,7 @@ Output, in this order:
 - One line "Keeping:" — the scenes and turns that survive untouched; landmarks the arc placed inside the commission's world stay unless Fixing names them, and no landmark from outside that world is added.
 - {CHALLENGES_TAKEN_RULE}
 - One line "Used:" naming which panelists you drew on, by letter ("Panelist A").
-- "FINAL ARC:" then the {ARC_LENGTH} numbered sentences.
+- "FINAL ARC:" then the {ARC_LENGTH} numbered sentences. {ARC_SENTENCE_RULE}
 - "CRITIQUE:" then the critique of the final arc, built exactly like this:
 
 {ARC_CRITIQUE_SPEC}

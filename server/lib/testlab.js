@@ -8470,7 +8470,7 @@ async function runArcEffortStage(target, { params = {}, promptOverride = null })
     const { arcBlock, critique } = splitCommittedBlock(created.commit.committed);
     // + the Jev cast check, as production (jevAudit.arcRepairFindingsWithCastCheck).
     let jevCast = null;
-    ({ gate, jevCast } = await require('./jevAudit').arcRepairFindingsWithCastCheck({ critique, reviewedArc: arcBlock, panel: voices, castNames: require('./castCoverage').commissionedCast(storyData).listed }));
+    ({ gate, jevCast } = await require('./jevAudit').arcRepairFindingsWithCastCheck({ critique, reviewedArc: arcBlock, panel: voices, castNames: require('./castCoverage').commissionedCast(storyData).children }));
     gateJevCast = jevCast;
     if (!gate.retell) {
       retellSkipped = gate.skipReason;
@@ -9012,7 +9012,7 @@ async function runArcPanelReplayStage(target, { params = {}, promptOverride = nu
       // no quoted MAJOR or CRITICAL finding, no re-telling.
       const { arcBlock, critique } = H.splitCommittedBlock(committed);
       // + the Jev cast check, as production (jevAudit.arcRepairFindingsWithCastCheck).
-      const { gate, jevCast } = await require('./jevAudit').arcRepairFindingsWithCastCheck({ critique, reviewedArc: arcBlock, panel, castNames: require('./castCoverage').commissionedCast(storyData).listed });
+      const { gate, jevCast } = await require('./jevAudit').arcRepairFindingsWithCastCheck({ critique, reviewedArc: arcBlock, panel, castNames: require('./castCoverage').commissionedCast(storyData).children });
       const gateReport = { repair: gate.count, duplicates: gate.duplicates, critiqueRepair: gate.critiqueRepair, panelRepair: gate.panelRepair, critiqueDropped: gate.critique.dropped, critiqueMalformed: gate.critique.malformed, jevCast };
       if (!gate.retell) {
         retell = { ok: true, skipped: gate.skipReason, gate: gateReport };

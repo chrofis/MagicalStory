@@ -583,7 +583,8 @@ function arcSentencesText(arcBlock) {
  * Never throws: on a Jev error it logs an error and returns ok:false, no feedback.
  *
  * @param {string} arcBlock  the committed block's story logic + arc (splitCommittedBlock().arcBlock)
- * @param {string[]} names   the character list (castCoverage.commissionedCast().listed)
+ * @param {string[]} names   the CHILDREN on the character list (castCoverage.commissionedCast().children): the generator
+ *   rule is EVERY_CHILD_ACTS_RULE, and a listed adult may comfort, permit or watch
  * @returns {Promise<{ok:boolean, weak:Array<{name:string,score:number}>, feedback:string, scores?:Object, error?:string, cost?:number}|null>}
  */
 async function jevCastBeatVoice(arcBlock, names, { checks = JEV_CHECKS, callImpl = callJevWithOutageWait, jevFallback = null } = {}) {
@@ -601,7 +602,7 @@ async function jevCastBeatVoice(arcBlock, names, { checks = JEV_CHECKS, callImpl
     const r = await callImpl({ state: arcText, questions: buildCastBeatQuestions(list) });
     const scores = Object.fromEntries(list.map((n, i) => [n, yesProb(r.answers[`ARC_CAST_BEAT__${i}`])]));
     const weak = list.filter(n => scores[n] < cfg.threshold).map(n => ({ name: n, score: scores[n] }));
-    const feedback = weak.map(w => `- ${w.name} is on the character list and does nothing of their own in this arc that changes what happens. Where it fits, give ${w.name} one act of their own that matters to the plot, inside an event the arc already has.`).join('\n');
+    const feedback = weak.map(w => `- ${w.name} is a child on the character list and does nothing of their own in this arc that changes what happens. Where it fits, give ${w.name} one act of their own that matters to the plot, inside an event the arc already has.`).join('\n');
     if (weak.length) log.info(`🧮 [ARC/jev] cast-beat: ${weak.map(w => `${w.name} ${w.score}`).join(', ')} below ${cfg.threshold}`);
     return { ok: true, weak, feedback, scores, cost: r.cost };
   } catch (e) {

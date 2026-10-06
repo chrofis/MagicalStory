@@ -17,7 +17,7 @@ describe('CAUSAL_COHERENCE_RULE reaches the writer with both halves', () => {
   for (const age of [1, 3, 5, 9]) {
     it(`age ${age}: shape section carries the barrier half and the obvious-doer half`, () => {
       const out = PB.buildStoryShapeSection(input(age), 10, { arc: true });
-      expect(out).toContain('way around closed on some page');
+      expect(out).toContain('way around closed somewhere in the story');
       expect(out).toContain('obvious doer');
     });
   }

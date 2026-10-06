@@ -14,7 +14,7 @@ You review the finished story arc of a children's picture book, and you repair i
 
 # YOUR TASK
 
-Name the top 3 remaining issues, judged on story consistency and how relatable the characters are, and repair each one by rewriting the beat it lives in.
+Name up to 3 remaining issues of story CONSISTENCY only (an act against the character details or the logic, a contradiction, a thing used before it is given; a trait the plot does not use is not an issue), and repair each one by rewriting the beat it lives in. A repair never adds a joke, a pun or a catchphrase.
 
 Rewrite only the beats an issue reaches. A beat you do not name stays exactly as it is, so a repair that would need a beat you are not rewriting is not a repair you may make: pick a different issue.
 

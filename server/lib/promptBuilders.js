@@ -7047,9 +7047,9 @@ function challengeCatalogueBands(inputData = {}) {
 const CAUSAL_COHERENCE_RULE =
   'Cause: what the main character does is what makes the outcome happen, and the step from the one to the other is visible. '
   + 'An object brought into the solution does real mechanical work — it holds, lifts, reaches, blocks or carries. '
-  + 'Never a prop that is set down and plays no part in what follows, and never an action, a plan, a warning or a promise no later page acts on. '
-  + 'No consequence falls while an easier option stands open: every barrier the story leans on has its way around closed on some page. '
-  + 'The same holds for the obvious doer: where the one who needs the thing, or is plainly the most able to fetch it, stays behind while others go, some page says what keeps them from going.';
+  + 'Never a prop that is set down and plays no part in what follows, and never an action, a plan, a warning or a promise nothing later acts on. '
+  + 'No consequence falls while an easier option stands open: every barrier the story leans on has its way around closed somewhere in the story. '
+  + 'The same holds for the obvious doer: where the one who needs the thing, or is plainly the most able to fetch it, stays behind while others go, the story says what keeps them from going.';
 
 // `challengeLine: false` (the arc creator and re-teller, and the arc judge that
 // reads what they were given): the challenge-count line leaves, because the
@@ -7070,7 +7070,7 @@ function buildStoryShapeSection(inputData, pageCount, { arc = false, challengeLi
   const othersNames = others.map(c => c.name).join(', ');
   const shapeHeader = '# STORY SHAPE (fixed by the age of the main character — not yours to change)';
   const alongside = othersNames
-    ? `Everyone else — ${othersNames} — carries no arc of their own.${castRule ? ` ${EVERY_CHILD_ACTS_RULE}` : ''}`
+    ? `Everyone else — ${othersNames} — carries no change of their own.${castRule ? ` ${EVERY_CHILD_ACTS_RULE}` : ''}`
     : '';
 
   // The three simple bands carry no budgeted challenge, so the arithmetic below
@@ -10142,6 +10142,21 @@ const SHOWN_CALLBACK_RULE = 'A callback shown as it happens, a character doing, 
  * 5 of 11 arc-informed findings were such optional details).
  * see docs/decisions.md 2026-10-06 "Text stages edit, they do not rewrite"
  */
+// ONE definition of what the plot depends on (owner, 2026-10-06, Opus arc review
+// E1): the text stages' OWED list (parseStoryLogic().owed = the Facts lines plus
+// the cause of the main turn) and the arc sentence rule below both read it.
+// LOAD_BEARING_RULE (owned by the text-stage work) is to interpolate this same string.
+const OWED_FACT_DEF = 'a fact the plot uses (a figure\'s one ability or limit, a rule of the world) or the cause of the main turn';
+
+/**
+ * WHAT AN ARC SENTENCE CARRIES (E1): the act and what it changes; the why is
+ * the STORY LOGIC's. A sentence that states every reason grew to 40+ words and
+ * the text stages then owed all of them. A reason enters a sentence only where
+ * it is OWED (OWED_FACT_DEF), the same line the owed list draws. Filled into
+ * arc-create and arc-retell as {ARC_SENTENCE_RULE}.
+ */
+const ARC_SENTENCE_RULE = `Each arc sentence tells what a figure does and what changes by it. Its why stays in the STORY LOGIC: a sentence states a reason only where it is ${OWED_FACT_DEF}.`;
+
 const LOAD_BEARING_RULE = 'Only the OWED list is owed prose: each fact on it reaches the text once, in its specific form, on or before the page that leans on it, as something a character does, sees or says. Everything else in the arc (motives, causes, stakes, feelings, background) is the arc\'s reasoning, and a page that leaves it out drops nothing. A size, an age or a look is owed only where something is lifted, hidden, held or fitted because of it.';
 
 /**
@@ -10494,7 +10509,7 @@ function buildTellingRulesSection(inputData = {}) {
   // (arcPrinciples), stated once.
   return [
     '# RULES OF THE LOGIC',
-    '- Factual register: plain declarative sentences stating what happens and why — no imagery, inner monologue or decorative adjectives.',
+    '- Factual register: plain declarative sentences stating what happens — no imagery, inner monologue or decorative adjectives.',
     '- One main character carries a visible change: early they refuse, fail or need help at something; late they do it themselves.',
     '- The children resolve it themselves; adults may comfort, permit or watch. No rescuer, lucky arrival or accident removes an obstacle.',
     ...(lifeSkillStrategy ? ['- One thing the main character does to handle the topic works, and a child listening could do the same thing: it happens on the page, in what they do, never explained, recommended or named as a lesson.'] : []),
@@ -10507,7 +10522,7 @@ function buildTellingRulesSection(inputData = {}) {
     `- ${PERIL_CEILING_RULE} Where the story invents its own peril, a refusal, a loss, a delay or a broken promise can carry it. Nobody looks monstrous, no familiar character turns frightening, and anyone separated or lost is reunited.`,
     RISK_FRAMING_RULE,
     `- ${ANIMAL_FATE_RULE}`,
-    '- The story ends with the children safe and together, one of them feeling something a child can name. A container or reveal the story promises opens before the end, and a story that enters through a doorway, portal or frame returns through it.',
+    '- The story ends with the children safe and together, one of them showing a feeling a child can name, in an act or a spoken line. A container or reveal the story promises opens before the end, and a story that enters through a doorway, portal or frame returns through it.',
     `- ${CLOSING_MOMENT_RULE}`,
     `- ${ARC_QUESTIONS_ANSWERED_RULE} What resolves the conflict has an origin — an earlier setup or a rule the story logic states. A figure singled out — the only one who can help, waited for, chosen — has a stated reason.`,
     noSplit
@@ -10611,7 +10626,7 @@ function arcLogicSpec(inputData = {}, pageCount = 10) {
     : '';
   return [
     '"STORY LOGIC:" first — the ledger of facts the arc is told from, holding only what the plot uses, in labelled lines and dash lines, never numbered:',
-    'Want and stakes: one line — what the main character wants, what is lost if they fail, and the deadline.',
+    'Want and stakes: one line — what the main character wants, what is lost if they fail, and the deadline, where the story has one.',
     'Opposition: one line — the one force that stands in the way and the motive that drives it.',
     `Facts: one dash line per named figure the plot runs on, "- <name> (commissioned) — <the one ability or limit the plot uses>" or "- <name> (new) — …", at most one ability and one limit each. Commissioned is ${COMMISSIONED_CAST_DEF}. New is every other named figure — a person, an animal or a creature, including one on a single page, one who never speaks, and an adult who sets a rule, waits or permits. Not listed: places, vehicles and objects, a group named collectively, and ${UNNAMED_FIGURE_EXEMPT}. A figure the story needs stays listed; taking its name away does not take it off. This book has room for ${arcInventedAllowance(inputData)} new named figures. Then at most two dash lines for the rules of the world the plot runs on — what keeps a thing alive, open, warm or hidden — with a size or a look only where the plot turns on it, stated as that fact.`,
     'Motives: one dash line per figure that acts, "- <figure>: <motive> → <the act it causes>".',
@@ -10693,6 +10708,7 @@ function buildArcCreatePrompt(inputData, pageCount, { challengeIdeas = null } = 
     ARC_LOGIC_SPEC: arcLogicSpec(inputData, pageCount),
     ARC_CRITIQUE_SPEC: arcCritiqueSpec({ inputData }),
     ARC_LENGTH: arcLengthRange(pageCount),
+    ARC_SENTENCE_RULE,
   });
 }
 
@@ -10776,6 +10792,7 @@ function buildArcRetellPrompt(inputData, pageCount, arcBlock, repairFindings, { 
     ARC_LOGIC_SPEC: arcLogicSpec(inputData, pageCount),
     ARC_CRITIQUE_SPEC: arcCritiqueSpec({ retell: true, inputData }),
     ARC_LENGTH: arcLengthRange(pageCount),
+    ARC_SENTENCE_RULE,
     // A14: same block the creator got (see buildArcPanelPrompt).
     AVAILABLE_LANDMARKS_SECTION: buildAvailableLandmarksSection(inputData.availableLandmarks, inputData.landmarkRetryNote),
   });
@@ -13300,6 +13317,8 @@ module.exports = {
   STYLE_RULEBOOK,
   MOTIVE_AT_THE_ACT_RULE,
   LOAD_BEARING_RULE,
+  OWED_FACT_DEF,
+  ARC_SENTENCE_RULE,
   buildOwedFacts,
   PICTURE_COUNT_RULE,
   PAYOFF_KEEP_RULE,

@@ -2413,7 +2413,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       // act of their own is FEEDBACK for this round's re-telling if the gate opens
       // on its own findings; it never opens the gate.
       const { gate, jevCast } = await arcRepairFindingsWithCastCheck({
-        critique: roundCritique, reviewedArc: arcBlock, panel, castNames: commissionedCast(inputData).listed,
+        critique: roundCritique, reviewedArc: arcBlock, panel, castNames: commissionedCast(inputData).children,
       }, { jevFallback: jevReport.fallback });
       if (jevCast?.weak.length) {
         gl.info('arc_jev_cast', `Round ${round}: Jev cast check — ${jevCast.weak.map(w => `${w.name} ${w.score}`).join(', ')} with no act of their own; ${jevCast.delivered === 'retell' ? 'handed to the re-telling as feedback' : 'recorded only (the gate stayed shut)'}`, null, { round, ...jevCast });

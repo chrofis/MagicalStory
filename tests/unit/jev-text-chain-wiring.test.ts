@@ -149,12 +149,12 @@ describe('the Jev cast check in the arc machine: feedback for the one re-telling
     expect(gate.count).toBe(1); // the cast flag is not counted as an issue
     expect(jevCast.delivered).toBe('retell');
     expect(gate.text).toContain(J.CAST_FEEDBACK_HEADING);
-    expect(gate.text).toContain('- Julian is on the character list');
-    expect(gate.text).toContain('- Max is on the character list');
+    expect(gate.text).toContain('- Julian is a child on the character list');
+    expect(gate.text).toContain('- Max is a child on the character list');
     // …and it reaches the built re-tell prompt, in the section the re-telling repairs from.
     await require('../../server/services/prompts').loadPromptTemplates();
     const prompt = PB.buildArcRetellPrompt({ characters: [{ name: 'Levin' }, { name: 'Julian' }, { name: 'Max' }], language: 'de', pages: 10 }, 10, ARC_BLOCK, gate.text);
-    expect(prompt).toContain('- Max is on the character list');
+    expect(prompt).toContain('- Max is a child on the character list');
   });
 
   it('all names acting: no feedback even with the gate open', async () => {

@@ -90,7 +90,7 @@ describe('quotation hygiene rides on every language instruction', () => {
 describe('the causal coherence rule carries the idle and unforced clauses', () => {
   it('extends the prop half to plans, warnings and promises, and closes the easier option', () => {
     const shape = B.buildStoryShapeSection(story(9), 10);
-    expect(shape).toContain('never an action, a plan, a warning or a promise no later page acts on');
+    expect(shape).toContain('never an action, a plan, a warning or a promise nothing later acts on');
     expect(shape).toContain('No consequence falls while an easier option stands open');
   });
 });

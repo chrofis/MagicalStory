@@ -4,7 +4,7 @@
 
 [[premise:subject]]**The full shape{SHAPE_SCALE}.** Ordinary world, then a call that pulls the main character out of it,
 then challenges that get harder, then a moment where all seems lost, then the turn, then home —
-changed. [[/premise:subject]][[mechanics]]Every one of those beats is on the page, in that order.[[/mechanics]]
+changed. [[/premise:subject]][[mechanics]]Every one of those beats is in the story, in that order.[[/mechanics]]
 
 [[craft]]**A real low point is required.** Before the end there is a page where the plan has failed, the thing
 is lost, or the friend is gone, and it looks like it will stay that way. Do not soften it into a

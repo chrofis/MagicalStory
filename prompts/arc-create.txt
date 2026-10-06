@@ -35,7 +35,7 @@ Write ONE arc: its story logic first, then the arc told from it, then its critiq
 
 {CHALLENGES_TAKEN}
 
-Then "ARC:" and {ARC_LENGTH} numbered sentences told from the story logic, each following from the one before — therefore, or but, never "and then".
+Then "ARC:" and {ARC_LENGTH} numbered sentences told from the story logic, each following from the one before. {ARC_SENTENCE_RULE}
 
 Then "CRITIQUE:", built exactly like this:
 
