@@ -9978,7 +9978,11 @@ const ABSENT_THING_RULE = "\"no glow\", \"bare rail\", \"no other figures in the
  */
 const HEADLINE_PHRASE_RULE = "Write what the picture shows — faces, gestures, poses, light, what the hands do. A phrase that names the mood or the beat (\"share a proud moment\", \"a moment of triumph\", \"a happy ending\") is painted as a caption; it goes in no field.";
 
-const SCENE_INTENT_FIELD_RULE = "2-3 present-tense sentences naming the single moment the image depicts. Sentence 1: who does what to whom, where. Sentence 2: what characters hold or reach for, and the page's one gaze target — never a second target, and never a character facing one person while gazing at another. Sentence 3: the setting and the light. Name every character physically present. List the main and primary characters among them in `characters[]`; secondary characters stay in the prose and carry their CHR id in `objects[]`. One moment only — not cause plus effect.";
+// A COVER BEAT STATES ITS COPY BAND (coverBeats.COVER_COPY_SPACE, the one source), and the author echoed it into the intent as
+// "keeping the top third of the frame empty" (Lab #1674, first pass of every cover; the re-ask fixed it each time). The intent is
+// the anchor the image model weights most, so a band named there is painted. docs/decisions.md 2026-10-06.
+const SCENE_INTENT_PICTURE_ONLY = "It describes the picture only and never names a band, a third or an edge of the frame, nor a part of the frame kept empty or left for anything; a layout clause of the plan line is composition for the prose.";
+const SCENE_INTENT_FIELD_RULE = "2-3 present-tense sentences naming the single moment the image depicts. Sentence 1: who does what to whom, where. Sentence 2: what characters hold or reach for, and the page's one gaze target — never a second target, and never a character facing one person while gazing at another. Sentence 3: the setting and the light. Name every character physically present. List the main and primary characters among them in `characters[]`; secondary characters stay in the prose and carry their CHR id in `objects[]`. One moment only — not cause plus effect. " + SCENE_INTENT_PICTURE_ONLY;
 
 // THE JEV PATH'S FIELD RULES (owner, 2026-10-06, Art Director review §3). On a story page code writes `looksAt` and the
 // light, so the brief authors are not told to compose a gaze target or to name the light in `sceneIntent`: the page's
@@ -9986,7 +9990,7 @@ const SCENE_INTENT_FIELD_RULE = "2-3 present-tense sentences naming the single m
 // and the iterate rewrites keep the full rules (jevFieldFills).
 const GAZE_TARGET_FIXED_RULE = "Each figure's eyes are its FIXED `looksAt` and the prose clause for it says the same. Compose the frame so the page's one gaze target is the dominant element — large, central, or nearest the camera. Never write a gaze to the viewer. " + COVER_GAZE_EXCEPTION;
 const LOOKS_AT_FIELD_FIXED_RULE = "A figure's eyes are its FIXED `looksAt` line's, and the prose clause for it says the same: eyes only, hands live in `interactions[]`. A figure the FIXED line leaves out takes `looksAt` as another character's name, a Visual Bible id, or a gaze word (" + GAZE_TOKEN_LIST + "), never the viewer. " + COVER_GAZE_EXCEPTION + " A secondary character (a CHR id in `objects[]`) has no `characters[]` row: its gaze is a `watching` interaction whose `object` is what it looks at, and its prose clause says the same.";
-const SCENE_INTENT_FIELD_FIXED_RULE = "1-2 sentences: the plan line's instant as the picture shows it, naming every figure in frame; the setting. Present tense, one moment only — not cause plus effect. List the main and primary characters among the figures in `characters[]`; secondary characters stay in the prose and carry their CHR id in `objects[]`.";
+const SCENE_INTENT_FIELD_FIXED_RULE = "1-2 sentences: the plan line's instant as the picture shows it, naming every figure in frame; the setting. Present tense, one moment only — not cause plus effect. List the main and primary characters among the figures in `characters[]`; secondary characters stay in the prose and carry their CHR id in `objects[]`. " + SCENE_INTENT_PICTURE_ONLY;
 
 /** The three rules above per path: the full rule on the backup and the iterates, the FIXED variant on the Jev path. */
 function jevFieldFills(jevBackup) {

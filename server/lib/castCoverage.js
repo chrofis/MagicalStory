@@ -55,6 +55,9 @@ function castCoverage({ pageCount, castCount } = {}) {
   if (!(P > 0) || !(C > 0)) return null;
   const focalPagesNeeded = Math.ceil(C / 2);
   const focalEach = C === 1 || focalPagesNeeded <= Math.floor(P / 2);
+  // A page LEADS with one character (owner 2026-10-06; docs/decisions.md "Every named figure leads a page"): when the book has
+  // a page to spare for each, no two characters share a focal page. Larger casts keep the pairing the floor above allows.
+  const leadEach = C > 1 && C <= Math.floor(P / 2);
   // Pages with people on them: every page but the one people-free page.
   const peopled = Math.max(1, P - 1);
   const slots = peopled * PAGE_CAST_TYPICAL;
@@ -64,7 +67,7 @@ function castCoverage({ pageCount, castCount } = {}) {
     : Math.floor((slots - Math.ceil(P / 2)) / (C - 1));
   const max = Math.max(1, Math.min(APPEARANCES_TARGET_MAX, perCharacter));
   const min = max >= APPEARANCES_TARGET_MAX ? APPEARANCES_TARGET_MIN : max;
-  return { pageCount: P, castCount: C, focalEach, focalPagesNeeded, appearances: { min, max } };
+  return { pageCount: P, castCount: C, focalEach, leadEach, focalPagesNeeded, appearances: { min, max } };
 }
 
 const pagesWord = n => `${n} page${n === 1 ? '' : 's'}`;
@@ -243,10 +246,17 @@ function castActionRule(cov, { centralFigure = null, mayAddDeeds = false } = {})
   const cast = !cov || cov.castCount === 1
     ? ''
     : cov.focalEach
-      ? 'Every commissioned character gets a focal page of their own whose instant is the action the story gives them.'
+      ? `Every commissioned character gets a focal page of their own whose instant is the action the story gives them.${cov.leadEach ? ` ${LEAD_RULE}` : ''}`
       : 'This cast is too large for a focal page each: the characters share group moments, and each character\'s own action from the story is the instant of some page.';
   return [cast, cast && mayAddDeeds ? ADDED_DEED_RULE : '', centralFigureActionRule(centralFigure)].filter(Boolean).join(' ');
 }
+
+/**
+ * A focal page is ONE character's (owner 2026-10-06; docs/decisions.md "Every named figure leads a page"). One sentence for
+ * the planner's cast rule and CAST block, and the plan check's question 12 (castActionRule); the counter is
+ * planCounters.castTablePromises (a deed page named by two characters).
+ */
+const LEAD_RULE = 'A page leads with one character: two characters never share a focal page.';
 
 /** The Lab A/B sentence of castActionRule (`mayAddDeeds`). */
 const ADDED_DEED_RULE = 'A commissioned character the story gives no action of their own may be given one small action inside an existing event — one that serves that event and changes nothing in the plot, the order of events or the outcome.';
@@ -396,7 +406,7 @@ function castTableSpec(cov, pageCount, { replan = false, table = null } = {}) {
   }
   const also = castTableAlsoCount(cov);
   const where = cov.focalEach
-    ? 'the page whose instant is their own action from the story, alone or with one companion'
+    ? `the page whose instant is their own action from the story, alone or with one companion${cov.leadEach ? `; ${LEAD_RULE} Every line names a different page` : ''}`
     : 'the page whose instant is their own action from the story, which they may share with the group';
   const more = also > 0 ? `, and ${also} more page${also === 1 ? '' : 's'} they are in frame on` : '';
   return `Write the CAST block before the plan lines. One line per commissioned character: ${where}${more}. Then page ${pageCount}, the last: the names of everyone the story keeps together at the end. Every plan line keeps what the block promises.`;
@@ -471,6 +481,7 @@ function castTableBlock(table) {
 module.exports = {
   CAST_TABLE_HEADER,
   castTableAlsoCount,
+  LEAD_RULE,
   castTableSpec,
   castTableFormat,
   castTableBlock,

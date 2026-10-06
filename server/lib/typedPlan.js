@@ -510,7 +510,8 @@ function replanScope({ rows, findings, jevPages, castTable = null, targets, cali
   const mainFinding = findings.find(f => f.code === 'MAIN_UNDER_HALF');
   const mainName = mainFinding ? nameOf(mainFinding) : null;
   // Scarce pages first: an invented figure leaves its page, then a focal page (it needs a page holding at most one figure, which a coverage add would take).
-  const urgency = f => (f.code === 'TYPED_INVENTED_FIGURE' ? 0 : f.code === 'NO_FOCAL_PAGE' ? 1 : 2);
+  const urgency = f => (f.code === 'TYPED_INVENTED_FIGURE' ? 0 : f.code === 'TYPED_NO_FACE_PAGE' ? 0.5 : f.code === 'NO_FOCAL_PAGE' ? 1 : 2);
+  const facePagesTaken = new Set(); // the page a face nomination took: no figure is added to it (a face page is one figure)
   const findingsFirst = [...findings].sort((a, b) => urgency(a) - urgency(b));
   for (const f of findingsFirst) {
     if (f.code === 'TYPE_CAST_MISMATCH') { for (const n of f.pages) give(n, f.detail, { relax: { type: true, who: true } }); continue; }
@@ -530,24 +531,41 @@ function replanScope({ rows, findings, jevPages, castTable = null, targets, cali
     }
     let pool; let k = 2; let what; let relax = {}; let add = [];
     if (f.code === 'TYPED_NO_FACE_PAGE') {
-      pool = free.filter(r => r.type === 'medium' && r.names.length === 1 && commissionedIn(r));
-      if (!pool.length) pool = free.filter(r => r.names.length <= 2 && r.type !== 'face' && commissionedIn(r));
-      k = 1; what = 'make this a face page (one listed character, a close-up of their face)'; relax = { type: true, who: true };
+      // The nomination names WHO takes the close-up (Lab #1686, story 50osg2osm: offered only a page, the planner ignored it
+      // twice). A face page is one commissioned figure alone, so it is also that figure's focal page: a character the findings
+      // say has no focal page or too few pages takes it; otherwise the commissioned figure with the most pages. A page that
+      // already carries another add, or must keep a figure the face would drop, cannot take it. docs/decisions.md 2026-10-06.
+      const appears = n => rows.filter(r => has(r, n)).length;
+      const lacking = findings.filter(x => (x.code === 'NO_FOCAL_PAGE' || x.code === 'UNDER_COVERED_CHARACTER') && nameOf(x) && classOf(nameOf(x)) === 'commissioned').map(nameOf);
+      const taken = r => (out.get(r.pageNumber) || { adds: [] }).adds.length > 0;
+      const stays = r => promised.stay.get(r.pageNumber) || [];
+      const candidates = [...lacking, ...[...new Set(rows.flatMap(r => r.names).filter(n => classOf(n) === 'commissioned'))].sort((a, b) => appears(b) - appears(a))];
+      let faceName = null;
+      pool = [];
+      for (const name of [...new Set(candidates)]) {
+        const fits = free.filter(r => r.type === 'medium' && !taken(r) && r.names.length <= 2 && (has(r, name) || lacking.includes(name)) && stays(r).every(n => n.toLowerCase() === name.toLowerCase()) && !soleFocalFull(r));
+        const solo = fits.filter(r => r.names.length === 1 && has(r, name));
+        const found = solo.length ? solo : fits;
+        if (found.length) { faceName = name; pool = found; add = solo.length ? [] : [name]; break; }
+      }
+      k = 1; relax = { type: true, who: true };
+      what = faceName ? `make this a face page of ${faceName}: ${faceName} alone, a close-up of ${faceName}'s face` : 'make this a face page';
     } else if (f.code === 'TYPED_NO_SCENERY_PAGE') { pool = free.filter(r => r.names.length <= 2); k = 1; what = 'make this a landscape or object page'; relax = { type: true, who: true }; }
     else if (f.code === 'UNDER_COVERED_CHARACTER' || f.code === 'NO_FOCAL_PAGE') {
       const name = nameOf(f);
       // a page takes ONE added figure (two more on a two-figure page break the medium type), and a focal page holds at most two
-      pool = wide.filter(r => name && !has(r, name) && !soleFocalFull(r) && !(out.get(r.pageNumber) || { adds: [] }).adds.length && (f.code === 'NO_FOCAL_PAGE' ? r.names.length <= 1 : true));
+      pool = wide.filter(r => name && !has(r, name) && !soleFocalFull(r) && !(out.get(r.pageNumber) || { adds: [] }).adds.length && !facePagesTaken.has(r.pageNumber) && (f.code === 'NO_FOCAL_PAGE' ? r.names.length <= 1 : true));
       k = f.code === 'UNDER_COVERED_CHARACTER' ? Math.max(1, targets.appearancesMin - f.pages.length) + 1 : 2;
       what = `${name ? `put ${name} in frame here` : 'put the character in frame here'}, taking part in the page's one action`;
       if (name) add = [name];
     } else if (f.code === 'MAIN_UNDER_HALF') {
-      pool = wide.filter(r => !f.pages.includes(r.pageNumber) && !soleFocalFull(r) && !(out.get(r.pageNumber) || { adds: [] }).adds.length);
+      pool = wide.filter(r => !f.pages.includes(r.pageNumber) && !soleFocalFull(r) && !(out.get(r.pageNumber) || { adds: [] }).adds.length && !facePagesTaken.has(r.pageNumber));
       k = Math.max(1, targets.mainMin - f.pages.length) + 1; // the shortfall plus one: a page may fail the acceptance
       what = `put ${mainName || 'the main character'} in frame here, taking part in the page's one action`;
       if (mainName) add = [mainName];
     } else continue;
     const chosen = spread(pool.map(x => x.pageNumber), k);
+    if (f.code === 'TYPED_NO_FACE_PAGE') for (const n of chosen) facePagesTaken.add(n);
     for (const r of chosen) give(r, `${f.detail} — ${what}`, { relax, add });
     if (f.code === 'NO_FOCAL_PAGE' && add.length && chosen.length < k) {
       // Too few pages hold a single figure (a short book where two characters each need a focal page): the character may
@@ -555,7 +573,7 @@ function replanScope({ rows, findings, jevPages, castTable = null, targets, cali
       // Only a figure the book can spare may leave: one above its coverage floor (the main character above his), or one that is not commissioned.
       const appears = n => rows.filter(r => has(r, n)).length;
       const leavers = r => r.names.filter(n => classOf(n) !== 'commissioned' || appears(n) > (mainName && n.toLowerCase() === mainName.toLowerCase() ? targets.mainMin : targets.appearancesMin));
-      const swap = wide.filter(r => r.names.length === 2 && !has(r, add[0]) && !soleFocalFull(r) && leavers(r).length && !(out.get(r.pageNumber) || { adds: [] }).adds.length && !chosen.includes(r.pageNumber));
+      const swap = wide.filter(r => r.names.length === 2 && !has(r, add[0]) && !soleFocalFull(r) && leavers(r).length && !(out.get(r.pageNumber) || { adds: [] }).adds.length && !facePagesTaken.has(r.pageNumber) && !chosen.includes(r.pageNumber));
       for (const r of spread(swap.map(x => x.pageNumber), k - chosen.length)) give(r, `${f.detail} — give ${add[0]} a focal page here: ${add[0]}'s own action is the page's subject, ${add[0]} alone or with one companion (${leavers(rowOf(r)).join(' or ')} may leave the page)`, { relax: { type: true, who: true }, add });
     }
   }

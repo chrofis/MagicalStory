@@ -1093,7 +1093,7 @@ function runPlanCounters({ pages = [], commissionedNames = [], listedNames = nul
   //     its plan lines, each character's deed page and the pages they are in
   //     frame on, and the last page's cast (castCoverage.parsePlanCastBlock).
   //     Each plan line that breaks a promise is a finding naming the page.
-  const castTableResult = castTable ? castTablePromises({ rows, castTable, actions, cast, focalEach: !!(coverageRule && coverageRule.focalEach) }) : null;
+  const castTableResult = castTable ? castTablePromises({ rows, castTable, actions, cast, focalEach: !!(coverageRule && coverageRule.focalEach), leadEach: !!(coverageRule && coverageRule.leadEach) }) : null;
   if (castTableResult) for (const b of castTableResult.broken) add('CAST_PROMISE_BROKEN', [b.page], b.detail);
 
   // 8b. THE CENTRAL FIGURE IN EACH THIRD (owner, 2026-09-24, d4). The arc's
@@ -1150,7 +1150,7 @@ function runPlanCounters({ pages = [], commissionedNames = [], listedNames = nul
       groupPages: { pages: groupPages, budget: groupBudget ? groupBudget.max : null },
       mainCharacter: main,
       // The table's promises as counted: null when no table was given.
-      castTable: castTableResult ? { kept: castTableResult.kept, broken: castTableResult.broken.length, unanswered: castTableResult.unanswered } : null,
+      castTable: castTableResult ? { kept: castTableResult.kept, broken: castTableResult.broken.length, unanswered: castTableResult.unanswered, sharedLead: castTableResult.sharedLead } : null,
       // Only when the arc named a central figure: the pages the check said
       // show it, or `unanswered` when it gave no CENTRAL line.
       ...(Array.isArray(centralFigure) && centralFigure.length
@@ -1176,10 +1176,11 @@ function runPlanCounters({ pages = [], commissionedNames = [], listedNames = nul
  *
  * @returns {{broken: Array<{page:number, name:string|null, promise:string, detail:string}>, kept:number, unanswered:string[]}}
  */
-function castTablePromises({ rows, castTable, actions, cast, focalEach }) {
+function castTablePromises({ rows, castTable, actions, cast, focalEach, leadEach = false }) {
   const byPage = new Map(rows.map(r => [Number(r.pageNumber), r]));
   const acts = Array.isArray(actions) ? actions : [];
   const broken = [];
+  const sharedLead = []; // not a finding: the table is not rewritten by a re-plan, so a plan page cannot answer it
   const unanswered = [];
   let kept = 0;
   const canon = n => namesIn(n, cast.all, cast.aliases)[0] || null;
@@ -1191,13 +1192,19 @@ function castTablePromises({ rows, castTable, actions, cast, focalEach }) {
     .filter(a => Number(a.page) === page)
     .map(a => canon(String(a.key || '')) || String(a.key || '').trim())
     .filter(n => n && n !== except);
+  const firstClaim = new Map();
   for (const entry of castTable.characters || []) {
     const name = canon(entry.name);
     if (!name) { unanswered.push(entry.name); continue; }
     const deed = Number(entry.deedPage);
     const row = byPage.get(deed);
     const act = actionOf(name);
-    if (!row) {
+    const sharer = leadEach ? firstClaim.get(deed) : null;
+    if (leadEach && !sharer) firstClaim.set(deed, name);
+    if (sharer && sharer !== name) {
+      // A page leads with one character (castCoverage.LEAD_RULE): the table gave this page to two.
+      sharedLead.push({ page: deed, names: [sharer, name] });
+    } else if (!row) {
       broken.push({ page: deed, name, promise: 'deed', detail: `the CAST block promises ${name} page ${deed} as their deed page, but the book has no page ${deed}` });
     } else if (!act) {
       unanswered.push(name);
@@ -1233,7 +1240,7 @@ function castTablePromises({ rows, castTable, actions, cast, focalEach }) {
       kept++;
     }
   }
-  return { broken, kept, unanswered };
+  return { broken, kept, unanswered, sharedLead };
 }
 
 /** The who-in-frame column of a plan line; the whole line when it has no segments. */
@@ -1863,6 +1870,7 @@ function typedPlanCounters({ pages = [], listedNames = [], commissionedNames = n
 
 module.exports = {
   runPlanCounters,
+  castTablePromises,
   typedPlanCounters,
   countPlanTargets,
   parseTypedLine,

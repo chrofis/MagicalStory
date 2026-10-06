@@ -653,3 +653,26 @@ describe('two characters that each need a focal page on a short book (50osg2osm)
     for (const [, o] of swapped as any) expect(o.relax).toMatchObject({ type: true, who: true });
   });
 });
+
+describe('the face-page nomination names WHO takes the close-up (Lab 1686, 50osg2osm: offered only a page, ignored twice)', () => {
+  const L = ['Emma', 'Noah', 'Daniel', 'Sarah', 'Hans'];
+  const lines = [line('medium', 'Emma, Sarah, Hans'), line('medium', 'Daniel, Noah'), line('medium', 'Emma, Sarah, Hans'), line('medium', 'Emma'), line('medium', 'Emma, Daniel'), line('medium', 'Noah, Daniel'), line('medium', 'Emma, Noah'), line('medium', 'Daniel'), line('object', 'nobody'), line('group', 'Emma, Noah, Daniel, Sarah, Hans')];
+  const c = PC.typedPlanCounters({ pages: pagesOf(lines), listedNames: L, commissionedNames: L, mainName: 'Emma', maxCharactersPerScene: 6 });
+  const t = CC.typedPlanTargets({ pageCount: 10, listed: L, maxCharactersPerScene: 6 });
+  const scope = TP.replanScope({ rows: c.rows, findings: c.findings, jevPages: {}, castTable: null, targets: t, commissionedNames: L, arcNames: [] });
+  const faceEntries = [...scope.entries()].filter(([, o]: any) => o.reasons.some((r: string) => /face page of /.test(r)));
+  it('one page is nominated and its Change names a listed character', () => {
+    expect(c.findings.map((f: any) => f.code)).toContain('TYPED_NO_FACE_PAGE');
+    expect(faceEntries.length).toBe(1);
+    const reason = (faceEntries[0][1] as any).reasons.find((r: string) => /face page of /.test(r));
+    const who = (reason.match(/face page of (\w+):/) || [])[1];
+    expect(L).toContain(who);
+    expect([...c.rows[(faceEntries[0][0] as number) - 1].names, ...(faceEntries[0][1] as any).adds]).toContain(who);
+  });
+  it('the face page adds at most the named character and is not also a coverage add for another', () => {
+    const o = faceEntries[0][1] as any;
+    expect(o.adds.length).toBeLessThanOrEqual(1);
+    expect(o.reasons.filter((r: string) => /never has|under/.test(r)).length).toBe(0);
+    expect(o.reasons.some((r: string) => /in frame here|focal page here/.test(r))).toBe(false);
+  });
+});

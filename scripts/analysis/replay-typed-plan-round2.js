@@ -8,7 +8,10 @@
  */
 const fs = require('fs');
 const path = require('path');
-const tp = require('../../server/lib/typedPlan');
+// --typedplan=<module> replays another version of typedPlan (the before arm); --prompt=<dir> writes each run's round-2 prompt:
+// the stored round-1 prompt with its RE-DIVIDE section rebuilt by typedReplanSection over the round-2 scope (agent-as-model input).
+const argOf = k => (process.argv.find(a => a.startsWith(`--${k}=`)) || '').slice(k.length + 3);
+const tp = require(argOf('typedplan') ? path.resolve(argOf('typedplan')) : '../../server/lib/typedPlan');
 const PC = require('../../server/lib/planCounters');
 const { typedPlanTargets } = require('../../server/lib/castCoverage');
 const dir = path.join(__dirname, '../../evals/runs/2026-10-06_typed-plan');
@@ -24,6 +27,14 @@ for (const f of fs.readdirSync(dir).filter(x => /^full-.*rv[34]/.test(x))) {
   const targets = typedPlanTargets({ pageCount: pages.length, listed, maxCharactersPerScene: 6 });
   const jevPages = Object.fromEntries(Object.entries(t.final.jev).map(([n, o]) => [n, { scores: o.scores, flags: tp.flagsOf(o.scores, tp.CALIBRATION) }]));
   const scope = tp.replanScope({ rows: c.rows, findings: c.findings, jevPages, castTable: t.castTable, targets, commissionedNames: listed, arcNames, jevMax: 0 });
+  if (argOf('prompt') && scope.size) {
+    const p1 = t.replan.prompt;
+    const from = p1.indexOf('# RE-DIVIDE');
+    const to = p1.indexOf('\n\n# OUTPUT FORMAT', from);
+    const section = tp.typedReplanSection({ pagePlanText: c.rows.map(r => `Page ${r.pageNumber}: ${r.planLine}`).join('\n'), scope, castTable: t.castTable });
+    fs.mkdirSync(argOf('prompt'), { recursive: true });
+    fs.writeFileSync(path.join(argOf('prompt'), f.replace(/\.json$/, '_round2.txt')), p1.slice(0, from) + section + p1.slice(to));
+  }
   if (process.argv.includes('-v')) {
     console.log(c.findings.map(x => `${x.code} ${(x.detail || '').slice(0, 90)}`).join('\n'));
     console.log(c.rows.map(r => `${r.pageNumber} ${r.type} ${r.names.join('/')}`).join('\n'));
