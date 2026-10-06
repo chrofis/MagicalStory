@@ -3271,7 +3271,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     const t0 = Date.now();
     for (let attempt = 1; attempt <= 2 && !parsed; attempt++) {
       try {
-        const res = await textModels.callTextModelStreaming(textPrompt, null, onChunk, textModel, { usageLabel: 'beats_story_text' });
+        const res = await textModels.callTextModelStreaming(textPrompt, null, onChunk, textModel, { usageLabel: 'beats_story_text', ...(MODEL_DEFAULTS.storyTextEffort ? { effort: MODEL_DEFAULTS.storyTextEffort } : {}) });
         // TITLE is the LAST block (2026-09-11) — name it so the final page's
         // text stops there instead of swallowing it.
         const candidate = parseRefinedText(res.text || '', beatPages, 'STORY TEXT', ['TITLE']);

@@ -7908,6 +7908,7 @@ async function runClothingReviewStage(target, { params = {}, promptOverride = nu
  * like for like.
  *
  * params.textModel : writer under test (default MODEL_DEFAULTS.outline)
+ * params.textEffort : writer reasoning effort (default MODEL_DEFAULTS.storyTextEffort)
  */
 async function runStoryTextReplayStage(target, { params = {}, promptOverride = null }) {
   const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../services/prompts');
@@ -7982,7 +7983,7 @@ async function runStoryTextReplayStage(target, { params = {}, promptOverride = n
   if (!TEXT_MODELS[model]) throw new Error(`Unknown model "${model}"`);
 
   const t = Date.now();
-  const res = await callTextModelStreaming(prompt, null, null, model, { usageLabel: 'testlab_story_text_replay' });
+  const res = await callTextModelStreaming(prompt, null, null, model, { usageLabel: 'testlab_story_text_replay', ...((params.textEffort || MODEL_DEFAULTS.storyTextEffort) ? { effort: params.textEffort || MODEL_DEFAULTS.storyTextEffort } : {}) });
   if (!String(res.text || '').trim() || res.usage?.output_tokens === 0) {
     throw new Error(`writer ${model} returned an empty response — provider failure, not a result`);
   }

@@ -2192,3 +2192,5 @@ three below are prompt/classification questions and are the owner's call.
 - [ ] Opus arc review HELD items: E7 merge the panel lenses, E9 move the risk-framing rule, E11 rebuild the Lab story-arc-review stage → docs/decisions.md 2026-10-06 "Arc prompts: the sentence tells the act"
 - [ ] LOAD_BEARING_RULE must interpolate OWED_FACT_DEF (text-stage owner) so ARC_SENTENCE_RULE and the owed list share one string; OWED_FACT_DEF still names "the cause of the main turn", drop that if the owed list drops "why the turn works now" → server/lib/promptBuilders.js OWED_FACT_DEF
 - [ ] Replay panel + re-tell on essbvehs8 with the new arc prompts (not run, budget) and a second story for the sentence-length effect → docs/decisions.md 2026-10-06 "Arc prompts: the sentence tells the act"
+- [ ] text-v4 writer still lets characters recite world rules (3-7 RECITAL per draft, oddities 7-14 vs bar 4); needs the arc Facts spec (item 6) or a narrowed "one short line" allowance → docs/decisions.md 2026-10-06 text-v4
+- [ ] pre-existing unit failures seen on text-v4: french-texts-batch13, texts-it-en-batch14, verify-registry (runShape) → not from this change; check on staging

@@ -4,7 +4,7 @@ You are writing the narrative text of an illustrated children's book. The illust
 
 {LANGUAGE_INSTRUCTION}
 
-Never switch to a dialect or a spoken regional form.
+Write in {LANGUAGE}. Never switch to a dialect or a spoken regional form.
 
 # TARGET
 

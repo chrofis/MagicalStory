@@ -74,7 +74,7 @@ describe('the style rulebook reaches every prose-writing pass', () => {
 
   it("the writer's and the repair's specific-form rule excludes sizes and looks", () => {
     for (const pass of ['writer', 'repair']) {
-      const sentence = built[pass].split('\n').find(l => l.includes('Only the OWED list is owed')) || '';
+      const sentence = built[pass].split('\n').find(l => l.includes('Only the OWED list')) || '';
       expect(sentence).toMatch(/A size, an age or a look is owed only where something is lifted, hidden, held or fitted/);
     }
   });
@@ -222,26 +222,16 @@ describe('text-v4 text-stage inputs', () => {
     'Facts:',
     '- Mara (commissioned): climbs well; limit: afraid of the dark',
     '- Rule: a knot holds only when pulled twice',
-  ].join('
-');
+  ].join('\n');
 
   it('the OWED list is the figure and rule facts, never the last chain link', () => {
     const owed = B.parseStoryLogic(LOGIC).owed;
     expect(owed).toHaveLength(2);
-    expect(owed.join('
-')).not.toMatch(/why the turn works now/);
+    expect(owed.join('\n')).not.toMatch(/why the turn works now/);
   });
 
   it('stripChallengesTaken drops the bookkeeping list and nothing else', () => {
-    const arc = '1. A story.
-2. The end.
-
-Challenges taken:
-1. The missing stone.
-2. A tide.
-
-OWED:
-- x';
+    const arc = '1. A story.\n2. The end.\n\nChallenges taken:\n1. The missing stone.\n2. A tide.\n\nOWED:\n- x';
     const out = B.stripChallengesTaken(arc);
     expect(out).not.toMatch(/Challenges taken|missing stone|A tide/);
     expect(out).toContain('2. The end.');
@@ -249,10 +239,7 @@ OWED:
   });
 
   it('the beats writer shows no Challenges-taken list and no separate DO-NOT-WRITE section', () => {
-    const p = B.buildStoryTextFromBeatsPrompt(inputData, [{ pageNumber: 1, planLine: 'x' }], [], '1. A story.
-
-Challenges taken:
-1. The missing stone.');
+    const p = B.buildStoryTextFromBeatsPrompt(inputData, [{ pageNumber: 1, planLine: 'x' }], [], '1. A story.\n\nChallenges taken:\n1. The missing stone.');
     expect(p).not.toMatch(/Challenges taken|missing stone/);
     expect(p).not.toContain('# DO-NOT-WRITE LIST');
   });
@@ -266,5 +253,10 @@ Challenges taken:
     expect(B.STYLE_RULEBOOK).toMatch(/Never "suddenly"/);
     expect(B.STYLE_RULEBOOK).toMatch(/No jokes, puns or wordplay/);
     expect(B.STYLE_RULEBOOK).toMatch(/twice in the book/);
+  });
+
+  it('the load-bearing rule and the arc sentence rule share one OWED_FACT_DEF', () => {
+    expect(B.LOAD_BEARING_RULE).toContain(B.OWED_FACT_DEF);
+    expect(B.OWED_FACT_DEF).not.toMatch(/cause of the main turn/);
   });
 });

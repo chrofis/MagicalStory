@@ -172,7 +172,7 @@ describe('built prompts carry the load-bearing rule, the cap and the oddity rule
     const owed = B.buildOwedFacts(logic);
     expect(owed).toContain('- Mara — pulls the rope; limit: afraid of the dark.');
     expect(owed).toContain('- The rope only holds while it is wet.');
-    expect(owed).toContain('why the turn works now: but the rope was wet');
+    expect(owed).not.toContain('why the turn works now');
     expect(owed).not.toContain('wants the sail up');
     for (const prompt of out) expect(prompt).toContain(owed);
   });
@@ -180,7 +180,7 @@ describe('built prompts carry the load-bearing rule, the cap and the oddity rule
     expect(built.repair).toContain(`more than ${Math.round(MODEL_DEFAULTS.textRefineMaxChangedRatio * 100)} percent`);
   });
   it('the rulebook names the four oddity classes for every prose pass', () => {
-    for (const re of [/no because-clause and no purpose clause/, /never beside an act that already shows it/, /never explains the story's rules/, /No roll call/]) {
+    for (const re of [/no because-clause and no purpose clause/, /never beside an act that already shows it/, /said once, in a few words/, /No roll call/]) {
       expect(B.STYLE_RULEBOOK).toMatch(re);
     }
   });

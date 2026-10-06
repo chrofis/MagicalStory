@@ -65,12 +65,14 @@ describe('text-refine carries its own criteria (A7)', () => {
     expect(prompt).not.toMatch(/emit a (TEXT )?fix in/i);
   });
 
-  it('names the sections it actually sends in the output contract', () => {
+  // text-v4 (owner, 2026-10-06): the A-E checklist is deleted; the analysis is
+  // the per-finding ledger only, so the contract names no sections.
+  it('asks for the per-finding ledger, not the A-E checklist', () => {
     const contract = prompt.slice(prompt.indexOf('---ANALYSIS---'));
     for (const sec of ['**A. ', '**B. ', '**C. ', '**D. ', '**E. ']) {
-      expect(prompt, sec).toContain(sec);
+      expect(prompt, sec).not.toContain(sec);
     }
-    expect(contract).toContain('A, B, C, D and E');
+    expect(contract).toContain('per-finding ledger');
   });
 
   it('probes the cast the PAGES carry, not only the commissioned roster', () => {
@@ -83,9 +85,8 @@ describe('text-refine carries its own criteria (A7)', () => {
 
   it('negative control: no invented secondaries, no invented names', () => {
     const p2 = PB.buildTextRefinePrompt({ ...storyData, visualBible: {} }, pages, '', '');
-    // the page TEXT still names him — it is the CAST LINE and the details
-    // block that must not invent him.
-    expect(p2).toContain('For EACH of Levin, Julian who appears on a rewritable page write');
+    // the CAST LINE and the details block must not invent him.
+    expect(p2).toContain('Characters: Levin, Julian');
     expect(p2).not.toContain('**Silvan**');
   });
 

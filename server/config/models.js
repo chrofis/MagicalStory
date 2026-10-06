@@ -580,6 +580,7 @@ const MODEL_DEFAULTS = {
     ? process.env.SPLIT_OUTLINE_REVIEW !== 'false'
     : true,
   storyText: 'claude-sonnet',          // Story narrative text
+  storyTextEffort: null,               // writer reasoning effort; null = the model's default (text-v4 measures medium vs high)
   // Art Director (scene expansion). gemini-3.1-pro since 2026-08-29: 3-story x
   // 4-model hazard bake-off on frozen beats (Lab 893-944, v3 judge): gemini
   // 49 raw / 32 reviewed hazards vs sonnet 91/65, sol 80/65, opus 40/51 —

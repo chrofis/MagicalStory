@@ -71,7 +71,7 @@ describe('the text audit\'s questions reach the writer', () => {
   });
 
   it('Q12 LOADBEARING was already delivered', () => {
-    expect(prompt).toContain('never genericized');
+    expect(prompt).toContain('the way a picture book carries a fact');
     expect(prompt).toContain('OWED:');
   });
 });
