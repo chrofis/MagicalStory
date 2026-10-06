@@ -5585,6 +5585,24 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "brief-footing-field",
+      "title": "Brief rows carry footing; a standing figure is never written into the water",
+      "commits": [
+        "572bcac2b"
+      ],
+      "addedAt": "2026-10-06",
+      "claim": "On a story with a beach/shore page, every brief characters[] row has a valid footing, no figure with footing ground sits on a cameraOn water vantage, and no brief prose puts a standing figure in the water.",
+      "runShape": [
+        "page-rerun"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Lab re-brief of job_1791267520938_essbvehs8 p3: Emma staged at the water's edge (footing ground) or swimming; read the brief rows."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [
