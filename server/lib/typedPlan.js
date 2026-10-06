@@ -118,7 +118,23 @@ const PLAN_QUESTIONS = {
  * question is a number, not a finding (docs/decisions.md 2026-10-06 "Typed
  * plan: Jev calibration"; evals/results/results.jsonl, dataset typed-plan-jev-v1).
  */
-const CALIBRATION = {};
+const CALIBRATION = {
+  // Measured 2026-10-06 (evals/runs/2026-10-06_typed-plan-jev/calibration.json, dataset typed-plan-jev-v1: 42 stored
+  // plans, paired scores twice, 40 blind agent labels per question). Kept: AUC >= 0.75 and a threshold whose
+  // precision is >= 0.7 AND well above the labelled base rate (FELT and WEIGHT sit at a 0.72 base rate, so their
+  // thresholds are set where precision is ~0.95, not at the 0.7 floor, which would flag nearly every page).
+  // `noise` = 0.05, the largest repeat difference seen across 10,956 calls (mean 0.01).
+  SIMPLE: { at: 0.63, noise: 0.05, calibrated: true },   // AUC 0.867, precision 0.73
+  ACTION: { at: 0.40, noise: 0.05, calibrated: true },   // AUC 0.944, precision 0.79
+  DEED: { at: 0.495, noise: 0.05, calibrated: true },    // AUC 0.816, precision 0.70 (base 0.42); weak and noisy
+  FELT: { at: 0.55, noise: 0.05, calibrated: true },     // AUC 0.854, precision 0.95
+  OBSTACLE: { at: 0.625, noise: 0.05, calibrated: true }, // AUC 0.917 but only 6 positives in 40: thin
+  WEIGHT: { at: 0.27, noise: 0.05, calibrated: true },   // AUC 0.904, precision 0.95
+  WHOLE: { at: 0.52, noise: 0.05, calibrated: true },    // AUC 0.781, precision 0.70
+  // DROPPED (scored, never flag): HEIGHTS AUC 0.658 with 3 positives in 40; THIRD AUC 0.692.
+  HEIGHTS: { at: 1, noise: 0.05, calibrated: false },
+  THIRD: { at: 1, noise: 0.05, calibrated: false },
+};
 
 const faultScore = (pVirtue, pFault) => +(((1 - pVirtue) + pFault) / 2).toFixed(3);
 

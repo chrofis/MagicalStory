@@ -13,9 +13,14 @@ const PARAMS = {
   stored: { measureStored: true },
   today: { planFresh: true, planModel: 'claude-sonnet-5-5' },
   typed: { typedPlan: true, planModel: 'claude-sonnet-5-5' },
+  // 2026-10-06 effort sweep (first typed plan only, code count, no Jev) and full flow at a chosen effort, advisory off.
+  'first-low': { typedPlan: true, typedFirstOnly: true, planEffort: 'low', planModel: 'claude-sonnet-5-5' },
+  'first-medium': { typedPlan: true, typedFirstOnly: true, planEffort: 'medium', planModel: 'claude-sonnet-5-5' },
+  'full-low': { typedPlan: true, planEffort: 'low', advisoryOff: true, planModel: 'claude-sonnet-5-5' },
+  'full-medium': { typedPlan: true, planEffort: 'medium', advisoryOff: true, planModel: 'claude-sonnet-5-5' },
 };
 (async () => {
-  if (!PARAMS[arm] || !storyId) throw new Error('usage: <stored|today|typed> <storyId>');
+  if (!PARAMS[arm] || !storyId) throw new Error('usage: <arm> <storyId>  (REP=n suffixes the file)');
   const H = { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.TOKEN}` };
   const res = await fetch(`${BASE}/api/admin/testlab/experiments`, { method: 'POST', headers: H, body: JSON.stringify({
     stage: 'beats_replan', label: `typed-plan ${arm} ${storyId}`, params: PARAMS[arm], targets: [{ storyId, pageNumber: 1 }] }) });
@@ -30,7 +35,7 @@ const PARAMS = {
     if (e.status && e.status !== 'running') {
       const dir = path.join(__dirname, '../../evals/runs/2026-10-06_typed-plan');
       fs.mkdirSync(dir, { recursive: true });
-      fs.writeFileSync(path.join(dir, `${arm}_${storyId}.json`), JSON.stringify({ id, arm, storyId, ...e }, null, 1));
+      fs.writeFileSync(path.join(dir, `${arm}_${storyId}${process.env.REP ? `_r${process.env.REP}` : ''}.json`), JSON.stringify({ id, arm, storyId, ...e }, null, 1));
       console.log('done', e.status);
       return;
     }
