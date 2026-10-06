@@ -245,7 +245,7 @@ describe('text-v4 text-stage inputs', () => {
   });
 
   it('a rule or a limit is said once, never recited, retold or explained', () => {
-    expect(B.STYLE_RULEBOOK).toContain('is said once, in a few words, by the one who would say it at the moment it is needed');
+    expect(B.STYLE_RULEBOOK).toContain('is shown in an act wherever one can show it; otherwise it is said once in the book, in one short line, by the one who would say it at the moment it is needed');
     expect(B.STYLE_RULEBOOK).toContain('or retells what happened, to anyone');
   });
 
@@ -258,5 +258,76 @@ describe('text-v4 text-stage inputs', () => {
   it('the load-bearing rule and the arc sentence rule share one OWED_FACT_DEF', () => {
     expect(B.LOAD_BEARING_RULE).toContain(B.OWED_FACT_DEF);
     expect(B.OWED_FACT_DEF).not.toMatch(/cause of the main turn/);
+  });
+});
+
+// text-v5 (owner, 2026-10-06): a "none" Facts line is a figure but owes nothing,
+// and the narration tense is each language's own norm.
+describe('text-v5 owed facts and narration tense', () => {
+  beforeAll(async () => { await require('../../server/services/prompts').loadPromptTemplates(); });
+
+  const LOGIC = [
+    'STORY LOGIC:',
+    'Central figure: Mara',
+    'Want and stakes: she wants the kite back.',
+    'Opposition: the wind, which blows.',
+    'Facts:',
+    '- Mara (commissioned) — none',
+    '- Tom (commissioned) — None.',
+    '- Berta (new) — cannot leave the water',
+    'Motives:',
+    '- Mara: she wants the kite → she climbs',
+    'Events: 1',
+    'Chain:',
+    '- because the kite is stuck, she climbs',
+  ].join('\n');
+
+  it('a "none" figure line is dropped from the owed list but the figure still parses', () => {
+    const l = B.parseStoryLogic(LOGIC);
+    expect(l.owed).toEqual(['Berta — cannot leave the water']);
+    expect(l.commissioned).toEqual(['Mara', 'Tom']);
+    expect(l.invented).toEqual(['Berta']);
+  });
+
+  it.each([
+    ['de-ch', /Präteritum/, /never Präsens and never Perfekt/],
+    ['de-de', /Präteritum/, /never Präsens and never Perfekt/],
+    ['en', /simple past/, /never the present/],
+    ['en-gb', /simple past/, /never the present/],
+    ['fr-ch', /imparfait and the passé composé/, /never the passé simple/],
+  ])('the rulebook for %s names its tense', (lang, a, b) => {
+    const r = B.styleRulebook(lang);
+    expect(r).toMatch(a);
+    expect(r).toMatch(b);
+    expect(r).toContain('dialogue speaks as it likes');
+  });
+
+  it('the logic check asks only a child\'s why-not and a Facts limit the arc breaks', () => {
+    expect(B.ARC_LOGIC_CHECK).toContain('that a child would ask and the logic leaves open');
+    expect(B.ARC_LOGIC_CHECK).toContain('a Facts limit the arc\'s own sentences break');
+  });
+
+  it('the narrator because-rule faults a character\'s reason, not a physical cause (critics read the same constant)', () => {
+    expect(B.STYLE_RULEBOOK).toContain('a physical cause stated as what happened');
+    expect(B.buildTextAuditBlindPrompt({ language: 'en' }, [{ pageNumber: 1, text: 'A page.' }])).toContain('a physical cause stated as what happened');
+  });
+
+  it('a language with no tense norm set gets the plain rulebook', () => {
+    expect(B.styleRulebook('gsw-zh')).toBe(B.STYLE_RULEBOOK);
+    expect(B.styleRulebook('it-ch')).toBe(B.STYLE_RULEBOOK);
+  });
+
+  it('every prose pass carries the story language\'s tense line, trial writer included', () => {
+    const de = { language: 'de-ch', pages: 3, characters: [{ id: 'a', name: 'Mara', age: 5 }] };
+    const fr = { ...de, language: 'fr-ch' };
+    const pages = [{ pageNumber: 1, text: 'Eine Seite.' }];
+    expect(B.buildTextProofreadPrompt(de, pages)).toMatch(/Präteritum/);
+    expect(B.buildTextProofreadPrompt(fr, pages)).toMatch(/imparfait/);
+    expect(B.buildTextAuditBlindPrompt(de, pages)).toMatch(/Präteritum/);
+    expect(B.buildTextDiffPrompt(fr, [{ pageNumber: 1, before: 'A.', after: 'B.' }])).toMatch(/imparfait/);
+    // The trial writer is the sibling of the beats writer.
+    const trial = { ...fr, storyCategory: 'adventure', storyTheme: 'pirate', trialMode: true, languageLevel: 'standard' };
+    expect(String(B.buildTrialStoryPrompt(trial, 5))).toMatch(/imparfait and the passé composé/);
+    expect(String(B.buildTrialStoryPrompt({ ...trial, language: 'en' }, 5))).toMatch(/simple past/);
   });
 });

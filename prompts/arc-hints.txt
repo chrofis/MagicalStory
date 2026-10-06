@@ -18,6 +18,6 @@ You review the finished story arc of a children's picture book. Answer in ENGLIS
 
 # YOUR TASK
 
-Name up to 3 remaining issues of story CONSISTENCY only: an act against the character details or the logic, a contradiction, a thing used before it is given. A trait the plot does not use is not an issue. A hint never asks for a joke, a pun or a catchphrase. Output one line per issue, at most 3, nothing else, each:
+Name up to 3 remaining issues of story CONSISTENCY only: an act against the character details or the logic, a contradiction, a thing used before it is given. A trait the plot does not use is not an issue. A hint never asks for a joke, a pun or a catchphrase. A hint about how the arc is narrated (a stake stated as an outcome, a deadline's phrasing) names the logic line to change, and never asks the text to say it. Output one line per issue, at most 3, nothing else, each:
 ISSUE (s<N>): <one sentence> → CHANGE: <one sentence>
 (s<N>) names the numbered arc sentence the change lands in — (s7), or (s14-15) for a span. Each change stays inside the existing structure and costs no suspense. A change never contradicts the story logic; where it must, it names the fact it changes.

@@ -33,7 +33,7 @@ const { COVER_PAGE_NUMBERS } = require('./coverKeys');
 const { getPhysical } = require('./characterPhysical');
 const { getTraits } = require('./characterTraits');
 const { frameColorForName } = require('./characterFrames');
-const { getLanguageNote, getLanguageInstruction, getLanguageNameEnglish } = require('./languages');
+const { getLanguageNote, getLanguageInstruction, getLanguageNameEnglish, getNarrationTenseRule } = require('./languages');
 const { getEventById } = require('./historicalEvents');
 const { getSwissStoryResearch, getSwissCityById } = require('./swissStories');
 const { parseProseMetadataFormat, stripSceneMetadata, extractSceneMetadata, collectSceneCharacterNames, enforceSpreadTextPosition, parseSceneHintMetadata, resolveTextStagePictureSpec, buildTextStagePictureSpecs, SHARED_GRIP_RULE, normalisePopulation } = require('./sceneMetadata');
@@ -6360,7 +6360,7 @@ function buildTextRefinePrompt(inputData, pages = [], auditFindings = '', arc = 
     CURRENT_TEXT: currentText,
     PAGE_MEASURES: pageMeasures,
     AUDIT_FINDINGS: String(auditFindings || '').trim() || '(no audit ran)',
-    STYLE_RULEBOOK,
+    STYLE_RULEBOOK: styleRulebook(language),
     MOTIVE_AT_THE_ACT: MOTIVE_AT_THE_ACT_RULE,
     PICTURE_COUNT: PICTURE_COUNT_RULE,
     CLOSING_MOMENT: CLOSING_MOMENT_RULE,
@@ -10179,7 +10179,7 @@ const OWED_FACT_DEF = 'a fact the plot uses (a figure\'s one ability or limit, a
 const ARC_SENTENCE_RULE = `Each arc sentence tells what a figure does and what changes by it. Its why stays in the STORY LOGIC: a sentence states a reason only where it is ${OWED_FACT_DEF}.`;
 
 
-const LOAD_BEARING_RULE = `Only the OWED list (${OWED_FACT_DEF}) is owed: each fact on it reaches the text once, on or before the page that leans on it, the way a picture book carries a fact: a figure meeting its limit in the moment (one who cannot follow stays behind, one too big sticks fast), using its ability, or one short line from the one who would say it then. An owed fact is never recited whole, never voiced as a figure describing itself, and never told by the narrator as a reason. Everything else in the arc (motives, causes, stakes, feelings, background) is the arc\'s reasoning, and a page that leaves it out drops nothing. A size, an age or a look is owed only where something is lifted, hidden, held or fitted because of it.`;
+const LOAD_BEARING_RULE = `Only the OWED list (${OWED_FACT_DEF}) is owed. An owed fact is shown on the page where the story tests it: a figure meeting its limit in the moment (one who cannot follow stays behind, one too big sticks fast) or using its ability. Where no act can show it, one character says it, once in the book, in one short line at the moment it is needed, and that line carries no second fact and no reason behind it. The narrator never tells an owed fact as a reason, and no figure describes itself. Everything else in the arc (motives, causes, stakes, feelings, background) is the arc\'s reasoning, and a page that leaves it out drops nothing. A size, an age or a look is owed only where something is lifted, hidden, held or fitted because of it.`;
 
 /**
  * The OWED list as the text stages read it: one dash line per owed fact, taken
@@ -10227,14 +10227,28 @@ const STYLE_RULEBOOK = [
   'Every sentence is complete and finishes: no sentence broken off for effect, no bare fragment standing as a sentence, no caption-style line describing the scene like a stage direction. The story is told aloud.',
   'No rhetorical set-pieces: no paired negations ("Nobody answered. Nobody argued."), no coined sayings or incantations, no one-sentence paragraph for drama. Plain narration carries the story.',
   'No sentence tells what an event meant or sums up who the characters have become ("they had become something else", "he had done his part"). The telling shows the event and moves on.',
-  'The narrator never justifies, excuses or explains an action to the reader ("he had given his share, so now he could eat too"): no because-clause and no purpose clause on the narrator\'s side. A reason the story needs comes through what a character does or says in the moment.',
+  'The narrator never justifies, excuses or explains an action to the reader ("he had given his share, so now he could eat too"): only a because-clause or purpose clause that gives a character\'s reason or excuse for an act is a fault; a physical cause stated as what happened ("the rope broke because the knot slipped") is an event. A reason the story needs comes through what a character does or says in the moment.',
   'A feeling is shown by what a character does or says. The narrator names one only where no act can show it, and never beside an act that already shows it.',
-  'A rule of the story\'s magic, or a limit, is said once, in a few words, by the one who would say it at the moment it is needed. No character recites a rule, a route or a plan in full, explains a feeling or an insight to the person in front of them, or retells what happened, to anyone. No roll call: the text never goes through the cast one by one saying what each did, felt or said in the same shape; it names who acts.',
+  'A rule of the story\'s magic, or a limit, is shown in an act wherever one can show it; otherwise it is said once in the book, in one short line, by the one who would say it at the moment it is needed. No character recites a rule, a route or a plan in full, explains a feeling or an insight to the person in front of them, or retells what happened, to anyone. No roll call: the text never goes through the cast one by one saying what each did, felt or said in the same shape; it names who acts.',
   SIZE_LOOK_RULE,
   'Each named character who speaks has a voice of their own: word choice and rhythm a listener could tell apart without the name.',
   `The last page ends on the concrete act or spoken line the story ends with and lands one feeling, plainly and warmly. A string of short solemn sentences is not an ending, and neither is a closing sentence that sums up the story. ${SHOWN_CALLBACK_RULE}`,
   ...SLOP_RULES,
 ].map(r => `- ${r}`).join('\n');
+
+/**
+ * The rulebook a prose pass is given: STYLE_RULEBOOK plus the narration-tense
+ * line of the story's language (languages.js NARRATION_TENSE; owner 2026-10-06,
+ * text-v5). EVERY filler of {STYLE_RULEBOOK} calls this, never the bare
+ * constant, so the writer, the trial writer, the refine, the diff pass, the
+ * lector and both audits read one tense.
+ * @param {string} [language]
+ * @returns {string}
+ */
+function styleRulebook(language) {
+  const tense = getNarrationTenseRule(language || 'en');
+  return tense ? `${STYLE_RULEBOOK}\n- ${tense}` : STYLE_RULEBOOK;
+}
 
 /**
  * Motive at or before the act (owner, 2026-09-23). The arc gives characters
@@ -10346,7 +10360,7 @@ const COMMISSIONED_CAST_DEF = "the character list plus any named figure the prem
  * limit, a rule of the world), so SCORE-style explicit state is what the
  * finding is measured against (arXiv 2503.23512).
  */
-const ARC_LOGIC_CHECK = 'an act against the want, motive, ability or limit the story logic gives its figure; an act that no motive line causes; a happening that causes nothing later; a fact that contradicts an earlier one; a "why don\'t they just …?" the logic leaves open.';
+const ARC_LOGIC_CHECK = 'an act against the want, motive, ability or limit the story logic gives its figure; an act that no motive line causes; a happening that causes nothing later; a fact that contradicts an earlier one; a "why don\'t they just …?" that a child would ask and the logic leaves open; a Facts limit the arc\'s own sentences break.';
 
 /**
  * HOW AN ISSUE IS WRITTEN — one set of strings, the creator's critique and the
@@ -10650,7 +10664,7 @@ function arcLogicSpec(inputData = {}, pageCount = 10) {
     '"STORY LOGIC:" first — the ledger of facts the arc is told from, holding only what the plot uses, in labelled lines and dash lines, never numbered:',
     'Want and stakes: one line — what the main character wants, what is lost if they fail, and the deadline, where the story has one.',
     'Opposition: one line — the one force that stands in the way and the motive that drives it.',
-    `Facts: one dash line per named figure the plot runs on, "- <name> (commissioned) — <the one ability or limit the plot uses>" or "- <name> (new) — …", at most one ability and one limit each. Commissioned is ${COMMISSIONED_CAST_DEF}. New is every other named figure — a person, an animal or a creature, including one on a single page, one who never speaks, and an adult who sets a rule, waits or permits. Not listed: places, vehicles and objects, a group named collectively, and ${UNNAMED_FIGURE_EXEMPT}. A figure the story needs stays listed; taking its name away does not take it off. This book has room for ${arcInventedAllowance(inputData)} new named figures. Then at most two dash lines for the rules of the world the plot runs on — what keeps a thing alive, open, warm or hidden — with a size or a look only where the plot turns on it, stated as that fact.`,
+    `Facts: one dash line per named figure the plot runs on, "- <name> (commissioned) — <the one ability or limit a happening turns on, or the word none>" or "- <name> (new) — …", at most one each, and most figures have none. A limit is a narrow physical fact of this world, stated as what the figure cannot do (cannot fly, too broad for the gap): a feeling, a trait, a want or an act is never a limit or an ability, and no line answers a "why not" the story never tests. Commissioned is ${COMMISSIONED_CAST_DEF}. New is every other named figure — a person, an animal or a creature, including one on a single page, one who never speaks, and an adult who sets a rule, waits or permits. Not listed: places, vehicles and objects, a group named collectively, and ${UNNAMED_FIGURE_EXEMPT}. A figure the story needs stays listed; taking its name away does not take it off. This book has room for ${arcInventedAllowance(inputData)} new named figures. Then at most two dash lines for the rules of the world the plot runs on — what keeps a thing alive, open, warm or hidden — stated as the fact alone, with no reason, no consequence and no comparison size.`,
     'Motives: one dash line per figure that acts, "- <figure>: <motive> → <the act it causes>".',
     `Central figure: ${CENTRAL_FIGURE_DEF}, by the name the story calls it — two names separated by " / " only where the figure itself changes name (an egg that hatches into a named creature) — a commissioned character who plays the figure is named by their own name alone, never by the role they play — or "none" where the idea is about the main character.`,
     `Events: the number of happenings, ${links}.`,
@@ -11228,7 +11242,10 @@ function parseStoryLogic(raw) {
   // Nothing else in the logic or the arc is owed.
   const figureFacts = dashLines(sections.Facts)
     .filter(l => /\((?:commissioned|new)\)/i.test(l))
-    .map(l => l.replace(/\s*\((?:commissioned|new)\)/i, '').trim());
+    .map(l => l.replace(/\s*\((?:commissioned|new)\)/i, '').trim())
+    // text-v5: most figures have no fact; a "none" line is a figure (it still
+    // parses into `figures`) but nothing the text owes.
+    .filter(l => !/\s[—–-]\s*none\.?$/i.test(l));
   const ruleFacts = facts.map(l => l.replace(/^Rules?\s*:\s*/i, '').trim());
   // text-v4: the last chain link (why the turn works now) is no longer owed; it
   // is the arc's reasoning, and listing it made the writer recite the cause.
@@ -11753,7 +11770,7 @@ function buildTextProofreadPrompt(inputData, pages = []) {
     LANGUAGE: lang,
     READING_LEVEL: getReadingLevel(inputData?.languageLevel, { pacing: false }),
     PAGES: body,
-    STYLE_RULEBOOK,
+    STYLE_RULEBOOK: styleRulebook(inputData?.language),
   });
 }
 
@@ -11809,7 +11826,7 @@ function buildTextDiffPrompt(inputData, pairs = []) {
       return `--- Page ${p.pageNumber} ---\nFINDINGS THE REWRITE ANSWERED:\n${answered || '(none)'}\n\nBEFORE:\n${numberedSentences(p.before, 'B')}\n\nAFTER:\n${numberedSentences(p.after, 'A')}`;
     })
     .join('\n\n');
-  return fillTemplate(template, { LANGUAGE: lang, PAGES: body, STYLE_RULEBOOK, PAYOFF_KEEP: PAYOFF_KEEP_RULE });
+  return fillTemplate(template, { LANGUAGE: lang, PAGES: body, STYLE_RULEBOOK: styleRulebook(inputData?.language), PAYOFF_KEEP: PAYOFF_KEEP_RULE });
 }
 
 /**
@@ -11836,7 +11853,7 @@ function buildTextAuditBlindPrompt(inputData, pages = []) {
   // so a rulebook breach the writer made survived the chain unless an audit
   // filed it. The blind reader files it, against the SAME constant the writer
   // and the repair were given — never a hand copy.
-  return fillTemplate(template, { PAGES: body, STYLE_RULEBOOK, CLOSING_MOMENT: CLOSING_MOMENT_RULE, SHOWN_CALLBACK: SHOWN_CALLBACK_RULE });
+  return fillTemplate(template, { PAGES: body, STYLE_RULEBOOK: styleRulebook(inputData?.language), CLOSING_MOMENT: CLOSING_MOMENT_RULE, SHOWN_CALLBACK: SHOWN_CALLBACK_RULE });
 }
 
 /**
@@ -12286,7 +12303,7 @@ function buildStoryTextFromBeatsPrompt(inputData, beats = [], expansions = [], a
     // (2026-08-27) — the reader age is the "can a child say it" yardstick.
     AGE: readerAge(inputData),
     PAGE_OPENING_VARIETY: PAGE_OPENING_VARIETY_RULE,
-    STYLE_RULEBOOK,
+    STYLE_RULEBOOK: styleRulebook(inputData?.language),
     MOTIVE_AT_THE_ACT: MOTIVE_AT_THE_ACT_RULE,
     PICTURE_COUNT: PICTURE_COUNT_RULE,
     CLOSING_MOMENT: CLOSING_MOMENT_RULE,
@@ -12552,7 +12569,7 @@ The story takes place in ${inputData.userLocation.city}. Use real place names �
       // framing rule can reach a trial story.
       RISK_FRAMING: RISK_FRAMING_RULE,
       PAGE_OPENING_VARIETY: PAGE_OPENING_VARIETY_RULE,
-      STYLE_RULEBOOK,
+      STYLE_RULEBOOK: styleRulebook(language),
       MOTIVE_AT_THE_ACT: MOTIVE_AT_THE_ACT_RULE,
       PICTURE_COUNT: PICTURE_COUNT_RULE,
       CLOSING_MOMENT: CLOSING_MOMENT_RULE,
@@ -13340,6 +13357,7 @@ module.exports = {
   SPLIT_STATE_MARKINGS_RULE,
   PAGE_OPENING_VARIETY_RULE,
   STYLE_RULEBOOK,
+  styleRulebook,
   MOTIVE_AT_THE_ACT_RULE,
   LOAD_BEARING_RULE,
   OWED_FACT_DEF,

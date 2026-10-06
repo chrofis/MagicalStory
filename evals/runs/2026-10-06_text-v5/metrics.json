@@ -1,0 +1,1 @@
+{"run":"text-v5 agent-as-model","model_id":"agent:sonnet","essbv":{"owed_lines":3,"tense":"Praeteritum","long_rules":0,"narrator_explanations":1},"ypl33":{"tense":"Praeteritum","therefore_lines":2,"narrator_reasons":1},"note":"agent-as-model, not production; raw prompts/outputs stay local (story text, GDPR ignore rule)"}

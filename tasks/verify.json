@@ -5706,6 +5706,21 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "text-v5-facts-shown-not-said",
+      "commits": [],
+      "addedAt": "2026-10-06",
+      "claim": "A full story: the arc Facts block holds few facts (most figures \"none\"), physical limits only, no feelings; the draft carries each owed fact as an act or one short line once, no long rule, at most one narrator reason, and narration is in the language tense norm (de Praeteritum, en simple past, fr imparfait + passe compose). Agent-as-model runs only so far.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Read arcReviewReport.logic Facts (count lines, any feeling/trait as a limit), then stories.data.writerText against the OWED list: recitals, narrator because-clauses, tense of the narration."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [

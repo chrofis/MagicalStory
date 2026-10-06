@@ -522,8 +522,33 @@ function getAvailableLanguages() {
   ];
 }
 
+/**
+ * NARRATION TENSE per language family (owner, 2026-10-06, text-v5): each
+ * language's own norm for a picture-book narrator, so a draft cannot flip
+ * tense per call (both Präsens and Präteritum came back for one German story)
+ * and a refine pass cannot edit half a book into the other tense. ONE map; the
+ * STYLE_RULEBOOK line is built from it (promptBuilders.styleRulebook). A family
+ * with no entry (Swiss-German dialects, Italian) gets no tense line.
+ */
+const NARRATION_TENSE = {
+  de: 'Narration is in the past tense, Präteritum ("sie ging", "er sagte"), never Präsens and never Perfekt; dialogue speaks as it likes.',
+  en: 'Narration is in the simple past ("she walked", "he said"), never the present; dialogue speaks as it likes.',
+  fr: 'Narration is in the imparfait and the passé composé ("elle marchait", "il a dit"), never the passé simple and never the present; dialogue speaks as it likes.'
+};
+
+/**
+ * @param {string} langCode
+ * @returns {string} the tense rule for the language's family, or '' when none is set
+ */
+function getNarrationTenseRule(langCode) {
+  const code = String(langCode || '').toLowerCase();
+  const key = LANGUAGES[code] ? code : 'en';
+  return NARRATION_TENSE[key.split('-')[0]] || '';
+}
+
 module.exports = {
   LANGUAGES,
+  getNarrationTenseRule,
   getLanguageInstruction,
   stripDialogueTypography,
   stripVocabulary,

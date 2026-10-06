@@ -32,7 +32,7 @@ describe('the text audit\'s questions reach the writer', () => {
   // list and the audit's ENTRANCE, DEVICE and LIMIT questions file only for
   // what that list holds or a later act leans on, so both sides read one list.
   it('Q6/Q3/Q8 ENTRANCE, DEVICE, LIMIT — the writer owes the owed list, the audit files only for it', () => {
-    expect(prompt).toContain('An owed fact is never recited whole');
+    expect(prompt).toContain('The narrator never tells an owed fact as a reason');
     const audit = B.buildTextAuditPrompt(story(7), [{ pageNumber: 1, text: 'A page.', planLine: 'x' }], 'An arc.');
     for (const q of ['DEVICE', 'ENTRANCE', 'LIMIT']) {
       expect((audit.match(new RegExp('^\\d+\\. ' + q + ':[^\\n]*', 'm')) || [''])[0]).toMatch(/OWED list/);
@@ -71,7 +71,7 @@ describe('the text audit\'s questions reach the writer', () => {
   });
 
   it('Q12 LOADBEARING was already delivered', () => {
-    expect(prompt).toContain('the way a picture book carries a fact');
+    expect(prompt).toContain('An owed fact is shown on the page where the story tests it');
     expect(prompt).toContain('OWED:');
   });
 });

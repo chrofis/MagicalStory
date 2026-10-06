@@ -180,7 +180,7 @@ describe('built prompts carry the load-bearing rule, the cap and the oddity rule
     expect(built.repair).toContain(`more than ${Math.round(MODEL_DEFAULTS.textRefineMaxChangedRatio * 100)} percent`);
   });
   it('the rulebook names the four oddity classes for every prose pass', () => {
-    for (const re of [/no because-clause and no purpose clause/, /never beside an act that already shows it/, /said once, in a few words/, /No roll call/]) {
+    for (const re of [/a physical cause stated as what happened/, /never beside an act that already shows it/, /said once in the book, in one short line/, /No roll call/]) {
       expect(B.STYLE_RULEBOOK).toMatch(re);
     }
   });

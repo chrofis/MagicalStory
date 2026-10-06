@@ -38,7 +38,7 @@ describe('SIZE_LOOK_RULE — one rule for plan and prose', () => {
     expect(PB.SIZE_LOOK_RULE.length).toBeGreaterThan(40);
   });
 
-  it('leaves the arc; the arc keeps a size the plot turns on as a fact, at every age band', () => {
+  it('leaves the arc; the arc states a rule of the world as the fact alone, at every age band', () => {
     // A simple band and the standard band build different TELLING_RULES.
     for (const data of [input(), input({ characters: [{ id: 'a', name: 'Anna', age: 2, gender: 'female' }], mainCharacters: ['a'] })]) {
       const create = PB.buildArcCreatePrompt(data, 18);
@@ -46,7 +46,7 @@ describe('SIZE_LOOK_RULE — one rule for plan and prose', () => {
       expect(create).not.toContain(PB.SIZE_LOOK_RULE);
       expect(retell).not.toContain(PB.SIZE_LOOK_RULE);
       const spec = PB.arcLogicSpec(data, 18);
-      expect(spec).toMatch(/a size or a look only where the plot turns on it/);
+      expect(spec).toMatch(/stated as the fact alone, with no reason, no consequence and no comparison size/);
       expect(create).toContain(spec);
       expect(retell).toContain(spec);
       // The SENSE rule still lets the arc reason about how big things are.
