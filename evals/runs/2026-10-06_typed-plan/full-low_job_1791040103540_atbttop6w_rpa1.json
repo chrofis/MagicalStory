@@ -1,0 +1,1286 @@
+{
+ "id": 1672,
+ "arm": "full-low",
+ "storyId": "job_1791040103540_atbttop6w",
+ "stage": "beats_replan",
+ "label": "typed-plan full-low job_1791040103540_atbttop6w",
+ "status": "completed",
+ "promptOverride": null,
+ "params": {
+  "planModel": "claude-sonnet-5-5",
+  "typedPlan": true,
+  "planEffort": "low",
+  "advisoryOff": true
+ },
+ "targets": [
+  {
+   "storyId": "job_1791040103540_atbttop6w"
+  }
+ ],
+ "results": [
+  {
+   "ok": true,
+   "arm": "typed-plan",
+   "jev": {
+    "calls": 275,
+    "failed": 0,
+    "costUsd": 0.008833
+   },
+   "cost": 0.070497,
+   "note": "arm 2: typed plan 11 Jev flag(s) and 1 code finding(s) left after 3 replanned page(s); advisory off",
+   "calls": [
+    {
+     "ms": 9523,
+     "label": "typed_plan",
+     "usage": {
+      "elapsed_ms": 9522,
+      "input_tokens": 10279,
+      "output_tokens": 1348
+     },
+     "effort": "low",
+     "costUsd": 0.034038,
+     "modelId": "claude-sonnet-5-5",
+     "promptChars": 29998
+    },
+    {
+     "ms": 3331,
+     "label": "typed_replan",
+     "usage": {
+      "elapsed_ms": 3330,
+      "input_tokens": 12028,
+      "output_tokens": 357
+     },
+     "effort": "low",
+     "costUsd": 0.027626,
+     "modelId": "claude-sonnet-5-5",
+     "promptChars": 34534
+    }
+   ],
+   "pages": 18,
+   "typed": {
+    "final": {
+     "jev": {
+      "1": {
+       "flags": [],
+       "scores": {
+        "DEED": 0.45,
+        "WHOLE": 0.385,
+        "ACTION": 0.315,
+        "SIMPLE": 0.33,
+        "HEIGHTS": 0.315,
+        "OBSTACLE": 0.265
+       }
+      },
+      "2": {
+       "flags": [],
+       "scores": {
+        "DEED": 0.38,
+        "ACTION": 0.295,
+        "SIMPLE": 0.415,
+        "HEIGHTS": 0.23,
+        "OBSTACLE": 0.34
+       }
+      },
+      "3": {
+       "flags": [
+        "DEED"
+       ],
+       "scores": {
+        "DEED": 0.545,
+        "ACTION": 0.21,
+        "SIMPLE": 0.475,
+        "OBSTACLE": 0.235
+       }
+      },
+      "4": {
+       "flags": [
+        "FELT"
+       ],
+       "scores": {
+        "DEED": 0.38,
+        "FELT": 0.895,
+        "ACTION": 0.385,
+        "SIMPLE": 0.465,
+        "OBSTACLE": 0.38
+       }
+      },
+      "5": {
+       "flags": [
+        "SIMPLE"
+       ],
+       "scores": {
+        "DEED": 0.48,
+        "ACTION": 0.295,
+        "SIMPLE": 0.71,
+        "HEIGHTS": 0.38,
+        "OBSTACLE": 0.39
+       }
+      },
+      "6": {
+       "flags": [
+        "WEIGHT"
+       ],
+       "scores": {
+        "DEED": 0.395,
+        "SIMPLE": 0.445,
+        "WEIGHT": 0.41
+       }
+      },
+      "7": {
+       "flags": [],
+       "scores": {
+        "DEED": 0.335,
+        "ACTION": 0.315,
+        "SIMPLE": 0.495,
+        "HEIGHTS": 0.22,
+        "OBSTACLE": 0.465
+       }
+      },
+      "8": {
+       "flags": [],
+       "scores": {
+        "DEED": 0.41,
+        "ACTION": 0.285,
+        "SIMPLE": 0.575,
+        "HEIGHTS": 0.22,
+        "OBSTACLE": 0.37
+       }
+      },
+      "9": {
+       "flags": [
+        "DEED"
+       ],
+       "scores": {
+        "DEED": 0.6,
+        "SIMPLE": 0.565,
+        "WEIGHT": 0.255
+       }
+      },
+      "10": {
+       "flags": [
+        "DEED"
+       ],
+       "scores": {
+        "DEED": 0.66,
+        "ACTION": 0.29,
+        "SIMPLE": 0.405,
+        "OBSTACLE": 0.245
+       }
+      },
+      "11": {
+       "flags": [],
+       "scores": {
+        "DEED": 0.455,
+        "ACTION": 0.305,
+        "SIMPLE": 0.415,
+        "OBSTACLE": 0.325
+       }
+      },
+      "12": {
+       "flags": [],
+       "scores": {
+        "DEED": 0.485,
+        "ACTION": 0.3,
+        "SIMPLE": 0.545,
+        "HEIGHTS": 0.225,
+        "OBSTACLE": 0.415
+       }
+      },
+      "13": {
+       "flags": [],
+       "scores": {
+        "DEED": 0.475,
+        "FELT": 0.425,
+        "ACTION": 0.16,
+        "SIMPLE": 0.47,
+        "OBSTACLE": 0.385
+       }
+      },
+      "14": {
+       "flags": [
+        "DEED"
+       ],
+       "scores": {
+        "DEED": 0.51,
+        "ACTION": 0.295,
+        "SIMPLE": 0.51,
+        "HEIGHTS": 0.225,
+        "OBSTACLE": 0.385
+       }
+      },
+      "15": {
+       "flags": [],
+       "scores": {
+        "DEED": 0.475,
+        "THIRD": 0.525,
+        "ACTION": 0.295,
+        "SIMPLE": 0.465,
+        "HEIGHTS": 0.22,
+        "OBSTACLE": 0.34
+       }
+      },
+      "16": {
+       "flags": [
+        "DEED"
+       ],
+       "scores": {
+        "DEED": 0.645,
+        "ACTION": 0.29,
+        "SIMPLE": 0.335,
+        "HEIGHTS": 0.22,
+        "OBSTACLE": 0.245
+       }
+      },
+      "17": {
+       "flags": [
+        "SIMPLE"
+       ],
+       "scores": {
+        "DEED": 0.46,
+        "ACTION": 0.31,
+        "SIMPLE": 0.645,
+        "HEIGHTS": 0.36,
+        "OBSTACLE": 0.39
+       }
+      },
+      "18": {
+       "flags": [
+        "DEED",
+        "WHOLE"
+       ],
+       "scores": {
+        "DEED": 0.595,
+        "WHOLE": 0.765,
+        "ACTION": 0.39,
+        "SIMPLE": 0.41,
+        "HEIGHTS": 0.295,
+        "OBSTACLE": 0.315
+       }
+      }
+     },
+     "plan": [
+      {
+       "planLine": "wide — Levin, Julian, Max, Kiaan — the four friends kick a ball across the Lindenhof, Grossmünster towers in the sunlit distance — the friends are playing at the Lindenhof in afternoon sun",
+       "pageNumber": 1
+      },
+      {
+       "planLine": "medium — Levin, Herr Keller — Herr Keller pushes his cart up onto the Lindenhof with the leaf blower roaring while Levin watches from the side — a leaf-clearing man with a deadline has arrived",
+       "pageNumber": 2
+      },
+      {
+       "planLine": "medium — Julian — Julian digs into the big leaf heap between the linden roots and pulls out a warm egg — the egg is found and knocks softly",
+       "pageNumber": 3
+      },
+      {
+       "planLine": "close-up — Julian — Julian looks up wide-eyed at a golden eye blinking in the linden crown — a dragon is spotted in the nest",
+       "pageNumber": 4
+      },
+      {
+       "planLine": "over-the-shoulder — Levin, Rubina — Levin tells Rubina his name beneath the tree while she crouches in the crown and asks the four to help — Rubina is named and asks for help before night",
+       "pageNumber": 5
+      },
+      {
+       "planLine": "wide — nobody — the high linden crown with the empty nest, branches far above the ground, cold lake wind blowing the leaves — the tree is too high to climb and the egg is out of the nest",
+       "pageNumber": 6
+      },
+      {
+       "planLine": "over-the-shoulder — Levin, Herr Keller — Levin whispers up to Herr Keller beside the roaring blower, who cups a hand to his ear — his whisper is lost in the noise",
+       "pageNumber": 7
+      },
+      {
+       "planLine": "medium — Max, Herr Keller — Max shouts into Herr Keller's ear while Herr Keller laughs — the truth is dismissed and the blower starts again",
+       "pageNumber": 8
+      },
+      {
+       "planLine": "high-angle — nobody — the egg wobbles and rolls out of the roots across scattered leaves toward the top of the steep stairs — the egg is rolling toward the stairs",
+       "pageNumber": 9
+      },
+      {
+       "planLine": "high-angle — Max — Max stops the rolling egg with his foot at the top step — the egg is saved at the edge",
+       "pageNumber": 10
+      },
+      {
+       "planLine": "medium — Kiaan — Kiaan wraps the egg in his jacket and clutches it tightly to his chest — the egg is wrapped but the cold wind is blowing",
+       "pageNumber": 11
+      },
+      {
+       "planLine": "medium — Julian, Levin — Julian covers his ears and hides behind Levin as the blower roars near the linden — the knocking has nearly stopped and the sun leaves only the tower tips",
+       "pageNumber": 12
+      },
+      {
+       "planLine": "close-up — Julian — Julian shouts out with a bright, beaming face and lifts his small fist — the way to bring Rubina down is remembered",
+       "pageNumber": 13
+      },
+      {
+       "planLine": "medium — Levin, Herr Keller — Levin tugs Herr Keller's sleeve while the blower falls silent — the blower is off and Levin has dared to speak",
+       "pageNumber": 14
+      },
+      {
+       "planLine": "medium — Levin, Herr Keller, Max — Herr Keller walks Levin toward the cart by the chess field, while Max keeps pace beside them — the man is facing away from the tree",
+       "pageNumber": 15
+      },
+      {
+       "planLine": "medium — Kiaan, Rubina — Kiaan holds the jacket-wrapped egg up high to Rubina's claws at the foot of the trunk — the egg is in Rubina's claws",
+       "pageNumber": 16
+      },
+      {
+       "planLine": "over-the-shoulder — Rubina, Herr Keller — Rubina's wing beats shake all the leaves down while Herr Keller stares at the covered square — the square is covered in leaves again and the egg is in the nest",
+       "pageNumber": 17
+      },
+      {
+       "planLine": "wide — Levin, Julian, Max, Kiaan, Rubina — Rubina breathes a warm puff onto the four friends' cold hands beneath the linden — the little dragon has hatched and the friends are together",
+       "pageNumber": 18
+      }
+     ],
+     "shots": [
+      {
+       "shot": "wide",
+       "type": "group",
+       "scores": {
+        "wide": 0.84,
+        "aerial": 0.11,
+        "high-angle": 0.32,
+        "ultra-wide": 0.63
+       },
+       "pageNumber": 1
+      },
+      {
+       "shot": "medium",
+       "type": "medium",
+       "scores": {
+        "medium": 0.65,
+        "low-angle": 0.11,
+        "high-angle": 0.24,
+        "over-the-shoulder": 0.65
+       },
+       "pageNumber": 2
+      },
+      {
+       "shot": "medium",
+       "type": "medium",
+       "scores": {
+        "medium": 0.64,
+        "low-angle": 0.15,
+        "high-angle": 0.57
+       },
+       "pageNumber": 3
+      },
+      {
+       "shot": "close-up",
+       "type": "face",
+       "scores": {
+        "close-up": 1
+       },
+       "pageNumber": 4
+      },
+      {
+       "shot": "over-the-shoulder",
+       "type": "medium",
+       "scores": {
+        "medium": 0.54,
+        "low-angle": 0.69,
+        "high-angle": 0.19,
+        "over-the-shoulder": 0.74
+       },
+       "pageNumber": 5
+      },
+      {
+       "shot": "wide",
+       "type": "landscape",
+       "scores": {
+        "wide": 0.76,
+        "aerial": 0.14,
+        "high-angle": 0.2,
+        "ultra-wide": 0.67
+       },
+       "pageNumber": 6
+      },
+      {
+       "shot": "over-the-shoulder",
+       "type": "medium",
+       "scores": {
+        "medium": 0.67,
+        "low-angle": 0.15,
+        "high-angle": 0.19,
+        "over-the-shoulder": 0.5
+       },
+       "pageNumber": 7
+      },
+      {
+       "shot": "medium",
+       "type": "medium",
+       "scores": {
+        "medium": 0.68,
+        "low-angle": 0.12,
+        "high-angle": 0.21,
+        "over-the-shoulder": 0.46
+       },
+       "pageNumber": 8
+      },
+      {
+       "shot": "high-angle",
+       "type": "object",
+       "scores": {
+        "close-up": 0.36,
+        "high-angle": 0.64
+       },
+       "pageNumber": 9
+      },
+      {
+       "shot": "high-angle",
+       "type": "medium",
+       "scores": {
+        "medium": 0.56,
+        "low-angle": 0.15,
+        "high-angle": 0.51
+       },
+       "pageNumber": 10
+      },
+      {
+       "shot": "medium",
+       "type": "medium",
+       "scores": {
+        "medium": 0.7,
+        "low-angle": 0.14,
+        "high-angle": 0.23
+       },
+       "pageNumber": 11
+      },
+      {
+       "shot": "medium",
+       "type": "medium",
+       "scores": {
+        "medium": 0.62,
+        "low-angle": 0.19,
+        "high-angle": 0.19,
+        "over-the-shoulder": 0.45
+       },
+       "pageNumber": 12
+      },
+      {
+       "shot": "close-up",
+       "type": "face",
+       "scores": {
+        "close-up": 1
+       },
+       "pageNumber": 13
+      },
+      {
+       "shot": "medium",
+       "type": "medium",
+       "scores": {
+        "medium": 0.68,
+        "low-angle": 0.11,
+        "high-angle": 0.23,
+        "over-the-shoulder": 0.1
+       },
+       "pageNumber": 14
+      },
+      {
+       "shot": "medium",
+       "type": "medium",
+       "scores": {
+        "medium": 0.68,
+        "low-angle": 0.1,
+        "high-angle": 0.28,
+        "over-the-shoulder": 0.49
+       },
+       "pageNumber": 15
+      },
+      {
+       "shot": "medium",
+       "type": "medium",
+       "scores": {
+        "medium": 0.62,
+        "low-angle": 0.26,
+        "high-angle": 0.25,
+        "over-the-shoulder": 0.07
+       },
+       "pageNumber": 16
+      },
+      {
+       "shot": "over-the-shoulder",
+       "type": "medium",
+       "scores": {
+        "medium": 0.58,
+        "low-angle": 0.31,
+        "high-angle": 0.33,
+        "over-the-shoulder": 0.63
+       },
+       "pageNumber": 17
+      },
+      {
+       "shot": "wide",
+       "type": "group",
+       "scores": {
+        "wide": 0.63,
+        "aerial": 0.07,
+        "high-angle": 0.27,
+        "ultra-wide": 0.24
+       },
+       "pageNumber": 18
+      }
+     ],
+     "unmet": [
+      "PLAN[MAIN_UNDER_HALF] page 1, 2, 5, 7, 12, 14, 15, 18: Levin is in frame on 8 of 18 page(s), target 9",
+      "JEV[DEED] page 3, 9, 10, 14, 16, 18",
+      "JEV[FELT] page 4",
+      "JEV[SIMPLE] page 5, 17",
+      "JEV[WEIGHT] page 6",
+      "JEV[WHOLE] page 18"
+     ],
+     "metrics": {
+      "luna": null,
+      "coverage": {
+       "Max": 5,
+       "Kiaan": 4,
+       "Levin": 8,
+       "Julian": 6
+      },
+      "flagCount": 11,
+      "mainShare": {
+       "name": "Levin",
+       "pages": 8,
+       "target": 9
+      },
+      "pageCount": 18,
+      "groupPages": 2,
+      "shotCounts": {
+       "wide": 3,
+       "medium": 8,
+       "close-up": 2,
+       "high-angle": 2,
+       "over-the-shoulder": 3
+      },
+      "simplicity": {
+       "n": 18,
+       "min": 0.29,
+       "mean": 0.518,
+       "below": 6,
+       "histogram": {
+        "<0.3": 1,
+        ">=0.9": 0,
+        "0.3-0.5": 5,
+        "0.5-0.7": 12,
+        "0.7-0.9": 0
+       }
+      },
+      "typeCounts": {
+       "face": 2,
+       "group": 2,
+       "medium": 12,
+       "object": 1,
+       "landscape": 1
+      },
+      "groupBudget": 3,
+      "codeFindings": [
+       "MAIN_UNDER_HALF"
+      ],
+      "faceCloseUps": 2,
+      "peopledPages": 16,
+      "sceneryPages": 2,
+      "coverageTarget": 3,
+      "figuresByClass": {
+       "arc": 10,
+       "invented": 0,
+       "commissioned": 23
+      },
+      "flagsByQuestion": {
+       "DEED": [
+        3,
+        9,
+        10,
+        14,
+        16,
+        18
+       ],
+       "FELT": [
+        4
+       ],
+       "WHOLE": [
+        18
+       ],
+       "SIMPLE": [
+        5,
+        17
+       ],
+       "WEIGHT": [
+        6
+       ]
+      },
+      "faceCloseUpsAnyone": 2,
+      "inventedFigurePages": [],
+      "noCommissionedPages": 0,
+      "neighbourSameTypeCast": 0,
+      "neighbourSameShotCount": 0,
+      "closeUpsOnMultiFigurePages": 0
+     },
+     "findings": [
+      "PLAN[MAIN_UNDER_HALF] page 1, 2, 5, 7, 12, 14, 15, 18: Levin is in frame on 8 of 18 page(s), target 9"
+     ],
+     "shotsUnmet": null
+    },
+    "first": {
+     "jev": {
+      "1": {
+       "flags": [],
+       "scores": {
+        "DEED": 0.45,
+        "WHOLE": 0.385,
+        "ACTION": 0.315,
+        "SIMPLE": 0.33,
+        "HEIGHTS": 0.315,
+        "OBSTACLE": 0.265
+       }
+      },
+      "2": {
+       "flags": [],
+       "scores": {
+        "DEED": 0.395,
+        "ACTION": 0.225,
+        "SIMPLE": 0.39,
+        "OBSTACLE": 0.325
+       }
+      },
+      "3": {
+       "flags": [
+        "DEED"
+       ],
+       "scores": {
+        "DEED": 0.545,
+        "ACTION": 0.21,
+        "SIMPLE": 0.475,
+        "OBSTACLE": 0.235
+       }
+      },
+      "4": {
+       "flags": [
+        "FELT"
+       ],
+       "scores": {
+        "DEED": 0.38,
+        "FELT": 0.895,
+        "ACTION": 0.385,
+        "SIMPLE": 0.465,
+        "OBSTACLE": 0.38
+       }
+      },
+      "5": {
+       "flags": [
+        "SIMPLE"
+       ],
+       "scores": {
+        "DEED": 0.48,
+        "ACTION": 0.295,
+        "SIMPLE": 0.71,
+        "HEIGHTS": 0.38,
+        "OBSTACLE": 0.39
+       }
+      },
+      "6": {
+       "flags": [
+        "WEIGHT"
+       ],
+       "scores": {
+        "DEED": 0.395,
+        "SIMPLE": 0.445,
+        "WEIGHT": 0.41
+       }
+      },
+      "7": {
+       "flags": [],
+       "scores": {
+        "DEED": 0.335,
+        "ACTION": 0.315,
+        "SIMPLE": 0.495,
+        "HEIGHTS": 0.22,
+        "OBSTACLE": 0.465
+       }
+      },
+      "8": {
+       "flags": [],
+       "scores": {
+        "DEED": 0.41,
+        "ACTION": 0.285,
+        "SIMPLE": 0.575,
+        "HEIGHTS": 0.22,
+        "OBSTACLE": 0.37
+       }
+      },
+      "9": {
+       "flags": [
+        "DEED"
+       ],
+       "scores": {
+        "DEED": 0.6,
+        "SIMPLE": 0.565,
+        "WEIGHT": 0.255
+       }
+      },
+      "10": {
+       "flags": [
+        "DEED"
+       ],
+       "scores": {
+        "DEED": 0.66,
+        "ACTION": 0.29,
+        "SIMPLE": 0.405,
+        "OBSTACLE": 0.245
+       }
+      },
+      "11": {
+       "flags": [],
+       "scores": {
+        "DEED": 0.455,
+        "ACTION": 0.305,
+        "SIMPLE": 0.415,
+        "OBSTACLE": 0.325
+       }
+      },
+      "12": {
+       "flags": [],
+       "scores": {
+        "DEED": 0.485,
+        "ACTION": 0.3,
+        "SIMPLE": 0.545,
+        "HEIGHTS": 0.225,
+        "OBSTACLE": 0.415
+       }
+      },
+      "13": {
+       "flags": [
+        "ACTION"
+       ],
+       "scores": {
+        "DEED": 0.48,
+        "FELT": 0.345,
+        "ACTION": 0.425,
+        "SIMPLE": 0.555,
+        "OBSTACLE": 0.375
+       }
+      },
+      "14": {
+       "flags": [
+        "DEED"
+       ],
+       "scores": {
+        "DEED": 0.51,
+        "ACTION": 0.295,
+        "SIMPLE": 0.51,
+        "HEIGHTS": 0.225,
+        "OBSTACLE": 0.385
+       }
+      },
+      "15": {
+       "flags": [
+        "ACTION"
+       ],
+       "scores": {
+        "DEED": 0.425,
+        "ACTION": 0.425,
+        "SIMPLE": 0.365,
+        "HEIGHTS": 0.17,
+        "OBSTACLE": 0.345
+       }
+      },
+      "16": {
+       "flags": [
+        "DEED"
+       ],
+       "scores": {
+        "DEED": 0.645,
+        "ACTION": 0.29,
+        "SIMPLE": 0.335,
+        "HEIGHTS": 0.22,
+        "OBSTACLE": 0.245
+       }
+      },
+      "17": {
+       "flags": [
+        "SIMPLE"
+       ],
+       "scores": {
+        "DEED": 0.46,
+        "ACTION": 0.31,
+        "SIMPLE": 0.645,
+        "HEIGHTS": 0.36,
+        "OBSTACLE": 0.39
+       }
+      },
+      "18": {
+       "flags": [
+        "DEED",
+        "WHOLE"
+       ],
+       "scores": {
+        "DEED": 0.595,
+        "WHOLE": 0.765,
+        "ACTION": 0.39,
+        "SIMPLE": 0.41,
+        "HEIGHTS": 0.295,
+        "OBSTACLE": 0.315
+       }
+      }
+     },
+     "plan": [
+      {
+       "planLine": "group — Levin, Julian, Max, Kiaan — the four friends kick a ball across the Lindenhof, Grossmünster towers in the sunlit distance — the friends are playing at the Lindenhof in afternoon sun",
+       "pageNumber": 1
+      },
+      {
+       "planLine": "medium — Herr Keller — Herr Keller pushes his cart up onto the Lindenhof with the leaf blower roaring — a leaf-clearing man with a deadline has arrived",
+       "pageNumber": 2
+      },
+      {
+       "planLine": "medium — Julian — Julian digs into the big leaf heap between the linden roots and pulls out a warm egg — the egg is found and knocks softly",
+       "pageNumber": 3
+      },
+      {
+       "planLine": "face — Julian — Julian looks up wide-eyed at a golden eye blinking in the linden crown — a dragon is spotted in the nest",
+       "pageNumber": 4
+      },
+      {
+       "planLine": "medium — Levin, Rubina — Levin tells Rubina his name beneath the tree while she crouches in the crown and asks the four to help — Rubina is named and asks for help before night",
+       "pageNumber": 5
+      },
+      {
+       "planLine": "landscape — nobody — the high linden crown with the empty nest, branches far above the ground, cold lake wind blowing the leaves — the tree is too high to climb and the egg is out of the nest",
+       "pageNumber": 6
+      },
+      {
+       "planLine": "medium — Levin, Herr Keller — Levin whispers up to Herr Keller beside the roaring blower, who cups a hand to his ear — his whisper is lost in the noise",
+       "pageNumber": 7
+      },
+      {
+       "planLine": "medium — Max, Herr Keller — Max shouts into Herr Keller's ear while Herr Keller laughs — the truth is dismissed and the blower starts again",
+       "pageNumber": 8
+      },
+      {
+       "planLine": "object — nobody — the egg wobbles and rolls out of the roots across scattered leaves toward the top of the steep stairs — the egg is rolling toward the stairs",
+       "pageNumber": 9
+      },
+      {
+       "planLine": "medium — Max — Max stops the rolling egg with his foot at the top step — the egg is saved at the edge",
+       "pageNumber": 10
+      },
+      {
+       "planLine": "medium — Kiaan — Kiaan wraps the egg in his jacket and clutches it tightly to his chest — the egg is wrapped but the cold wind is blowing",
+       "pageNumber": 11
+      },
+      {
+       "planLine": "medium — Julian, Levin — Julian covers his ears and hides behind Levin as the blower roars near the linden — the knocking has nearly stopped and the sun leaves only the tower tips",
+       "pageNumber": 12
+      },
+      {
+       "planLine": "face — Julian — Julian looks up with a bright face, remembering the quiet — the way to bring Rubina down is remembered",
+       "pageNumber": 13
+      },
+      {
+       "planLine": "medium — Levin, Herr Keller — Levin tugs Herr Keller's sleeve while the blower falls silent — the blower is off and Levin has dared to speak",
+       "pageNumber": 14
+      },
+      {
+       "planLine": "medium — Levin, Herr Keller — Herr Keller shows Levin the cart by the chess field with his back turned to the linden — the man is facing away from the tree",
+       "pageNumber": 15
+      },
+      {
+       "planLine": "medium — Kiaan, Rubina — Kiaan holds the jacket-wrapped egg up high to Rubina's claws at the foot of the trunk — the egg is in Rubina's claws",
+       "pageNumber": 16
+      },
+      {
+       "planLine": "medium — Rubina, Herr Keller — Rubina's wing beats shake all the leaves down while Herr Keller stares at the covered square — the square is covered in leaves again and the egg is in the nest",
+       "pageNumber": 17
+      },
+      {
+       "planLine": "group — Levin, Julian, Max, Kiaan, Rubina — Rubina breathes a warm puff onto the four friends' cold hands beneath the linden — the little dragon has hatched and the friends are together",
+       "pageNumber": 18
+      }
+     ],
+     "metrics": {
+      "luna": null,
+      "coverage": {
+       "Max": 4,
+       "Kiaan": 4,
+       "Levin": 7,
+       "Julian": 6
+      },
+      "flagCount": 13,
+      "mainShare": {
+       "name": "Levin",
+       "pages": 7,
+       "target": 9
+      },
+      "pageCount": 18,
+      "groupPages": 2,
+      "shotCounts": {},
+      "simplicity": {
+       "n": 18,
+       "min": 0.29,
+       "mean": 0.52,
+       "below": 7,
+       "histogram": {
+        "<0.3": 1,
+        ">=0.9": 0,
+        "0.3-0.5": 6,
+        "0.5-0.7": 11,
+        "0.7-0.9": 0
+       }
+      },
+      "typeCounts": {
+       "face": 2,
+       "group": 2,
+       "medium": 12,
+       "object": 1,
+       "landscape": 1
+      },
+      "groupBudget": 3,
+      "codeFindings": [
+       "CONSECUTIVE_SAME_TYPE_CAST",
+       "MAIN_UNDER_HALF"
+      ],
+      "faceCloseUps": 2,
+      "peopledPages": 16,
+      "sceneryPages": 2,
+      "coverageTarget": 3,
+      "figuresByClass": {
+       "arc": 10,
+       "invented": 0,
+       "commissioned": 21
+      },
+      "flagsByQuestion": {
+       "DEED": [
+        3,
+        9,
+        10,
+        14,
+        16,
+        18
+       ],
+       "FELT": [
+        4
+       ],
+       "WHOLE": [
+        18
+       ],
+       "ACTION": [
+        13,
+        15
+       ],
+       "SIMPLE": [
+        5,
+        17
+       ],
+       "WEIGHT": [
+        6
+       ]
+      },
+      "faceCloseUpsAnyone": 2,
+      "inventedFigurePages": [],
+      "noCommissionedPages": 0,
+      "neighbourSameTypeCast": 1,
+      "neighbourSameShotCount": 0,
+      "closeUpsOnMultiFigurePages": 0
+     },
+     "findings": [
+      "PLAN[CONSECUTIVE_SAME_TYPE_CAST] page 14, 15: both pages are medium with the same characters",
+      "PLAN[MAIN_UNDER_HALF] page 1, 5, 7, 12, 14, 15, 18: Levin is in frame on 7 of 18 page(s), target 9"
+     ]
+    },
+    "replan": {
+     "ms": 3335,
+     "reply": "---PAGE PLAN---\nPage 2: medium — Levin, Herr Keller — Herr Keller pushes his cart up onto the Lindenhof with the leaf blower roaring while Levin watches from the side — a leaf-clearing man with a deadline has arrived\n\nPage 4: face — Julian — Julian gasps with wide eyes and an open mouth, startled, his gaze fixed on a golden eye blinking in the linden crown — a dragon is spotted in the nest\n\nPage 6: landscape — nobody — the egg's empty nest sits in the high linden crown, far above the ground, with cold lake wind tearing at the red and yellow leaves — the tree is too high to climb and the egg is out of the nest\n\nPage 13: face — Julian — Julian shouts out with a bright, beaming face and lifts his small fist — the way to bring Rubina down is remembered\n\nPage 15: medium — Levin, Herr Keller, Max — Herr Keller walks Levin toward the cart by the chess field, while Max keeps pace beside them — the man is facing away from the tree",
+     "scope": {
+      "2": {
+       "keep": [
+        "type medium",
+        "in frame: Herr Keller",
+        "what is true after: a leaf-clearing man with a deadline has arrived"
+       ],
+       "reasons": [
+        "Levin is in frame on 7 of 18 page(s), target 9 — put the main character in frame here"
+       ]
+      },
+      "4": {
+       "keep": [
+        "type face",
+        "in frame: Julian",
+        "what is true after: a dragon is spotted in the nest"
+       ],
+       "reasons": [
+        "Make this one character alone showing one strong feeling, with nothing else happening."
+       ]
+      },
+      "6": {
+       "keep": [
+        "type landscape",
+        "nobody in frame",
+        "what is true after: the tree is too high to climb and the egg is out of the nest"
+       ],
+       "reasons": [
+        "Give this people-free page a subject the story has been driving toward, or give the page a character."
+       ]
+      },
+      "13": {
+       "keep": [
+        "type face",
+        "in frame: Julian",
+        "what is true after: the way to bring Rubina down is remembered"
+       ],
+       "reasons": [
+        "Name the action being performed, not a presence, a position or the state after an action."
+       ]
+      },
+      "15": {
+       "keep": [
+        "type medium",
+        "in frame: Levin, Herr Keller",
+        "what is true after: the man is facing away from the tree"
+       ],
+       "reasons": [
+        "both pages are medium with the same characters (pages 14 and 15): change this page's type or cast",
+        "Name the action being performed, not a presence, a position or the state after an action."
+       ]
+      }
+     },
+     "guards": {
+      "dropped": [],
+      "restoredUnnamed": 0
+     },
+     "prompt": "# YOUR TASK\n\nThe story below is finished. Divide it into 18 pages: plan the pictures, simple pages first, then one PLAN line per page. Plan in ENGLISH; the book will be written in Swiss Standard German (ss, never ß — never dialect) — names, places and cultural details as they will appear there. Reader: kindergarten age (about five).\n\nCommissioned characters: Levin, Julian, Max, Kiaan\n\n# THE STORY (final — it was told, challenged and re-told; divide it, never retell or repair it)\n\n1. On an autumn afternoon Levin, his little brother Julian and their friends Max and Kiaan play ball on the Lindenhof, where the sun still shines on the Grossmünster towers across the roofs, and Kiaan wears his thick warm autumn jacket.\n2. A man in an orange vest pushes his cart up onto the Lindenhof and starts his leaf blower, because he must get every leaf into the cart by the chess field before dark, so that nobody slips on them tomorrow.\n3. When the ball rolls into the big leaf heap between the roots of a linden, Julian digs for it and finds an egg as big as a football and as warm as an oven tile, knocking softly from inside.\n4. Nobody knows whose egg it is, but Julian spots a golden eye blinking in the linden's crown, and there, in her nest high in the branches, crouches a dragon as big as a horse, red and yellow exactly like the leaves.\n5. Levin, who loves dragons, tells her their names, and she says she is Rubina: the cold wind from the lake shook her egg out of that nest, and it must be back in the warm nest before night, or her little one will never hatch.\n6. But the linden is far too high for the children to climb, and Rubina cannot come down to them, because the roar hurts her fine ears, which are made to hear the faint knocking of her egg from far away, and with her wings pressed over her ears she cannot fly.\n7. So the children pile leaves over the egg as a blanket, and Levin goes to ask the man to stop, but the blower swallows his whisper, and when the man switches off, says he is Herr Keller and asks \"What?\", Levin turns red and says nothing.\n8. In that short quiet Julian sees Rubina climb down the trunk with her branch-claws toward the egg, but when Max shouts into Herr Keller's ear that a dragon egg lies under the leaves, Herr Keller laughs that dragons live only in books and switches on again, and Rubina climbs back up into the crown.\n9. The blast blows the leaf blanket away, so the egg wobbles out of the roots and rolls down the slope toward the steep stairs.\n10. Levin shouts \"Careful, stairs!\", and Max runs as fast as he can and stops the egg with his foot like a football, right at the top step.\n11. Kiaan pulls off his warm jacket, wraps the egg in it and carries it carefully back under the linden, but the wind is cold and the knocking grows quieter.\n12. Soon the sun lights only the tips of the Grossmünster towers, Herr Keller roars up to blow away the last leaves right under the linden, and inside the jacket the knocking almost stops.\n13. But Julian remembers: \"When it was quiet, Rubina came down!\"\n14. Levin saw that Herr Keller switches off for anyone who tugs his sleeve, so with shaking knees he tugs it and asks loudly how the leaf blower works.\n15. Herr Keller switches off and turns to show him the cart by the chess field, his back to the linden, and Levin asks question after question: twice Herr Keller reaches for the switch, and twice Levin asks something new.\n16. Rubina climbs down the trunk, a branch cracks and Herr Keller half turns, so she presses flat against the bark until Levin quickly asks how heavy the full cart is, and then she climbs the last bit and holds out claws that are made for branches and cannot grip the egg off the ground, so Kiaan lifts it up to her in his jacket.\n17. She breathes warm air over the egg and carries it up into the nest, leaving the jacket in Kiaan's hands, and her wing beats shake every last leaf off the linden, so that Herr Keller turns round and sees his clean square covered red and yellow in the dusk and groans that he must start all over tomorrow.\n18. Up in the warm nest the egg cracks and a little dragon peeks out at the four friends, and Rubina climbs down once more, says \"Thank you!\" and breathes a warm puff onto their cold hands, Julian strokes her nose, and Levin beams: \"This time I dared!\"\n\nChallenges taken:\n1. daylight running out over the Lindenhof\n2. the egg must be home before dark\n3. the fragile egg rolls toward the steep stairs\n4. Kiaan holds the egg up into a dragon's claws\n5. Rubina freezes on the trunk as Herr Keller half turns\n\n# FIX WHILE DIVIDING — apply these where the division can carry them\n\nEach is a change to the STORY. Apply it in the pages where a picture can hold it. Where it cannot — a figure kept in frame past the cast limit, two actions at one instant — leave it to the text, which is told to apply what the division has not. Never break a rule below to honour a hint.\nA hint never changes the situation the story settled: where one asks for what the story above rules out — a saved profile's friendship where the story stages a first meeting — the story stands and the hint is dropped.\nA hint opens with the story sentence it changes, as (s7) or (s14-15): it applies where that sentence is told, never earlier, and what it changes there replaces what the sentence says.\n\nISSUE (s5): Rubina explains the problem but never asks the children for help, contrary to her motive. → CHANGE: After she says the egg must be back before night, have her ask the four to help because she cannot come down.\nISSUE (s11): Kiaan’s forgetfulness is never shown, so the 3-year-old who must hold on tight feels generic rather than himself. → CHANGE: After wrapping the egg let him nearly set it down before he remembers and clutches it tightly to his chest.\nISSUE (s12): Julian’s fear of the loud machine is never shown, making the timid 3-year-old less relatable. → CHANGE: When Herr Keller roars right up to the linden, have Julian cover his ears and hide behind Levin.\n\n# THE STORY LOGIC — the facts the story above was told from\n\nEvery page keeps to these facts. A page breaks a fact when its who, its instant or its change uses a thing, a material, an ability or a limit against what the story logic states of it. A hint that names a fact it changes replaces that fact; every other fact holds on every page.\n\nWant and stakes: Levin and Julian want the warm, knocking egg back in Rubina's nest high in the linden before night falls on the Lindenhof; if it cools out, the little dragon inside will never hatch.\nOpposition: Herr Keller with his roaring leaf blower, who has come onto the Lindenhof to get every leaf into his cart before dark so that nobody slips tomorrow.\nFacts:\n- Levin (commissioned) — loves dragons and talks and talks once he dares; limit: too shy to speak up to a grown-up he does not know, so at first he only whispers.\n- Julian (commissioned) — notices small things (an eye in the leaves, Rubina moving in the quiet); limit: he is three and afraid of the loud machine.\n- Max (commissioned) — a fast football player who stops a rolling ball with his foot; limit: he blurts out the truth at the wrong moment.\n- Kiaan (commissioned) — wears his own thick warm autumn jacket and gives it up for the egg; limit: he forgets things, so he must hold on tight.\n- Rubina (new) — her nest sits high in this linden; her warm breath warms the egg and she carries it up; limit: the blower's roar hurts her fine ears, which are made to hear her egg's faint knocking from far off, and with her wings over her ears she cannot fly.\n- Herr Keller (new) — his leaf blower clears the square fast; limit: he hears nothing over it, so he switches off when someone tugs his sleeve, and he names himself then.\n- Rubina is as big as a horse: her claws are made for branches, so she can climb the trunk but cannot grip the smooth egg off the ground — it must be lifted up to her; her red and yellow scales hide her in the crown from anyone not looking for her.\n- The egg lives on warmth: the cold lake wind cools it, its knocking grows quieter as it cools, and it must be in the warm nest before night.\nMotives:\n- Levin: loves dragons and wants Rubina's little one to hatch → whispers to Herr Keller, later keeps him talking with his back to the linden.\n- Julian: wants Rubina to get her egg back → digs out the ball, spots her eye, remembers that she came down in the quiet.\n- Max: wants to save the egg → shouts the truth into Herr Keller's ear, then runs and stops the rolling egg with his foot.\n- Kiaan: wants the egg to stay warm → wraps it in his jacket and holds it up into Rubina's claws.\n- Rubina: wants her egg back in her warm nest before night → asks the children for help, climbs down in the quiet, freezes when nearly seen, warms and carries the egg, thanks them.\n- Herr Keller: wants the square free of slippery leaves before dark → keeps blowing, laughs off the dragon, reaches for the switch again and again.\nCentral figure: the dragon egg / the little dragon\nEvents: 5\nChain:\n- Because Julian digs his ball out of the leaf heap under the linden, the four find the warm, knocking egg, and Julian spots Rubina in her nest in the crown; she tells them her name and that the egg must be in her nest before night, but the roar keeps her from flying and the tree is too high to climb.\n- But Levin is too shy, and the blower is too loud for a whisper; when he tugs Herr Keller's sleeve and the machine goes quiet, Julian sees Rubina climb down — until Max shouts the truth, Herr Keller laughs and switches on, and Rubina climbs back up.\n- Because the blast blows the leaf blanket away, the egg rolls toward the steep stairs; Max stops it with his foot and Kiaan gives up his warm jacket, but now the egg is out in the cold wind.\n- But the jacket holds only a little warmth: the sun leaves all but the tips of the Grossmünster towers, Herr Keller roars right up to the linden, and the knocking almost stops. This is the low point.\n- Because Julian remembers that Rubina came down in the quiet, and Levin saw that Herr Keller switches off for anyone who tugs his sleeve, Levin dares to keep him talking with his back to the tree; Rubina risks the climb, freezes when a branch cracks, and finishes it because Levin asks one more question, and Kiaan lifts the egg into claws that cannot grip it off the ground — it works now because the quiet lasts and nobody is looking, where the first quiet lasted one shy whisper.\n\n# THE IDEA THE STORY WAS COMMISSIONED FROM (names and world reference only)\n\nThe arc above delivers the commission; keep its names and world as written.\n\nTitle: Vier Freunde und ein Drachonei\nCategory: adventure\nType: Drachen-Abenteuer\nTheme: dragon\nSeason: Autumn\nSetting/location: Zurich, Zurich, Switzerland\nRelationships:\n  - Levin is Älteres Geschwister von Julian\n  - Julian is Jüngeres Geschwister von Levin\n\n# CHARACTER DETAILS\n\nThese details decide who each figure IS: age, gender, what they are good at, what they find hard, what they like. Never contradict one, never invent one.\nThe arc above is settled and decides the SITUATION: who knows whom here, where they are, what is happening to them. Where a saved detail contradicts the arc — a friendship where the arc stages a first meeting — the arc stands, and the detail is simply not true in this book.\n\n**Levin** (main character):\n- Age: 5\n- Gender: male\n- Strengths: Fröhlich, Freundlich, Hilfsbereit, Beschützend, Nachsichtig, Treu, Gerecht, Ehrlich, Vertrauenswürdig, Geduldig, Neugierig, Fantasievoll, Klug, Kreativ, Aufmerksam, Einfallsreich, Abenteuerlustig, Schnell, Stark, Fleissig, Leader, Mutig, Grosszügig, Selbstbewusst, Lustig\n- Flaws: Schüchtern, Unentschlossen, Leichtgläubig, Petze, Gesprächig, Vergesslich, Tollpatschig\n- Special details: Lieb Dinosaurier und Drachen. Sein Bruder ist Julian und Max und Kiaan sind seine guten Freunde. Er kann gut Velofahren und Unihockey spielen\n\n**Julian** (main character):\n- Age: 3\n- Gender: male\n- Strengths: Fröhlich, Freundlich, Hilfsbereit, Lustig, Nachsichtig, Beschützend, Treu, Grosszügig, Gerecht, Ehrlich, Vertrauenswürdig, Abenteuerlustig, Aufmerksam, Kreativ, Klug\n- Flaws: Schüchtern, Leichtgläubig, Unentschlossen, Tollpatschig, Ängstlich, Stur\n- Special details: Seine freunde: levin, julian, max. Er isst sehr gerne, liebt es mit seinem Bruder und seinen Freunden zu spielen, hat gerne Ballspiele\n\n**Max** (main character):\n- Age: 3\n- Gender: male\n- Strengths: Fröhlich, Freundlich, Lustig, Ehrlich, Selbstbewusst, Mutig, Vertrauenswürdig, Entschlossen, Fleissig, Fantasievoll, Neugierig, Kreativ, Aufmerksam, Abenteuerlustig, Stark, Schnell\n- Flaws: Gesprächig, Leichtgläubig\n- Special details: Spielt gerne mit seinen Freunden Kiaan, Levin, Max. Seine Hündin heisst Nia. Er spielt gerne Fussball und fährt gerne Velo\n\n**Kiaan** (main character):\n- Age: 3\n- Gender: male\n- Strengths: Fröhlich, Freundlich, Hilfsbereit, Lustig, Nachsichtig, Beschützend, Treu, Grosszügig, Gerecht, Ehrlich, Selbstbewusst, Vertrauenswürdig, Mutig, Geduldig, Fantasievoll, Neugierig, Klug, Kreativ, Aufmerksam, Abenteuerlustig\n- Flaws: Vergesslich, Petze, Unentschlossen, Schüchtern\n- Special details: Spielt gerne mit Levin, Julian, Max. Liesst gerne oder spielt gerne Ball oder auf dem Spielplatz\n\n**REAL LANDMARKS the story above uses:**\n- Lindenhof (Zürcher Hügelzug) [Square]\n  PHOTOS: (exterior) Town square with large mature trees providing canopy, featuring outdoor chess playing area with…; (exterior) Aerial urban cityscape of Zurich showing historic districts, modern high-rises, and surrounding…; (exterior) The baroque Zunfthaus zur Meisen guild hall and the Münsterbrücke with its bronze rider statue,…\n- Grossmünster [Church]\n  PHOTOS: (exterior) Twin cream-colored church towers with pyramidal cupolas topped by Swiss flags and cross finials.; (exterior) Twin stone towers with ornamental cupolas and Swiss flags, viewed across waterfront from lower…; (exterior) Pair of stone church towers with distinctive architectural details, contemporary structures…; (interior) Interior nave with stone columns supporting ornate gilded ceiling; stone statue of Charlemagne…\n\n- A landmark is drawn from one of its PHOTOS. Name a location or a vantage of it only from a viewpoint one of its photos shows — an exterior is seen from the street or the square, an interior from inside, a distant or view-from photo from afar. If no photo shows the view a page needs (a skyline from a hilltop, a bird's-eye, the far side), that landmark is not available for that page: use one whose photos fit, or none. A view the commission's own words describe is the exception: it stands, and the landmark in it is drawn from what its photos show\n\n# MINI HERO'S JOURNEY (age 5)\n\nThe child this book is for is five. Write for that child.\n\n**The full shape, in small.** Ordinary world, then a call that pulls the main character out of it,\nthen challenges that get harder, then a moment where all seems lost, then the turn, then home —\nchanged. Every one of those beats is in the story, in that order.\n\n**A real low point is required.** Before the end there is a page where the plan has failed, the thing\nis lost, or the friend is gone, and it looks like it will stay that way. Do not soften it into a\nsmall setback and do not skip past it in a line.\n\n**The hero's own idea turns it.** What saves the day comes out of the main character — something they\nnoticed earlier, a strength of theirs, a thing they were told and remembered. Never luck, never a\ngrown-up arriving to fix it, never a power handed over at the last moment.\n\n**It resolves.** The turn comes before the last page and they come home changed. Never a story that\nstops on the problem.\n\n**A real antagonist is allowed.** Someone who wants something opposed to what the main character\nwants, with a reason of their own. A twist, a sidekick who earns their place, and a setup on an early\npage that pays off at the end all belong here.\n\n**Competence.** The main character does things: decides, tries, fails, adapts. They are never carried\nthrough their own story.\n\n**The stake is the main character's own.** What is wanted and what is at risk belong to their own\nlife — never a piece of work set for them, an assignment, a submission, a competition entry, or a\nplace to be won in a selection. What stands in the way is something they can reach out and touch, or\nsomeone who wants the opposite, never a procedure, a schedule or a system to be satisfied.\n\n**Humour and mild peril.** A chase, a close call, a night out in the cold are fine. Nothing gory,\nnothing cruel, nobody the reader likes is really harmed.\n\n**Ending.** They come back to where they started and it reads differently, because they are different.\n\n**The age owns the props and the subject.** What the main character wants, what stands in the way, and the objects the story turns on belong to the world of someone that age — what they handle themselves, where they go on their own, what counts as a loss to them. Never a want, a comfort or a plaything the reader has outgrown, and never stakes beyond what someone that age would be given.\n\n# PAGE PLAN\n\nTHE BOOK'S TARGETS — every one is counted in code on the finished plan. A figure the STORY LOGIC names (new) is not commissioned and may share a page with commissioned characters or carry a page alone.\n- At least 1 page of type face, and a face page shows a commissioned character.\n- At least 1 page of type landscape or object; two are fine, ideally one of each.\n- No two neighbouring pages share both their type and their characters.\n- At most 3 pages of type group.\n- The who column names commissioned characters and the figures of the STORY LOGIC, nobody else: a figure you invent is a fault.\n\nEach page has a type, and the type fixes who is in frame:\n- landscape: nobody. A place, the weather, a vessel or a distant sight.\n- object: nobody, or one character's hand. One object.\n- face: exactly one character, a close-up of their face.\n- medium: one to three characters.\n- group: four or more characters, all sharing one simple action.\nThe who column holds names only, or the word nobody: never a count, a group word or a description.\n\nBefore dividing, plan the pictures — simple pages first:\n1. The story's emotional highlights: which moments earn a page of one character showing a strong feeling, close up?\n2. Which moments earn a page with no people in frame? Only a subject the story has been driving toward — a discovery, an arrival, a payoff: the castle found after the long search. A place with no story weight never gets its own page. At least one page in the book earns this. Choose one whose drama is a place, the weather, a vessel or an object seen from afar; never a page whose drama is between people — a parting, a confrontation, tears, a promise, a handover. Those pages get faces, and so does every picture question 5 names as most wanted.\n3. Which pages gather the whole cast, and what one simple action do they all share there? \n4. Where are three or more characters truly unavoidable? Bypass it where the story allows; keep it only where the story demands it. Where one is kept, the third character shares the page's one action — takes part in it, never does a second action and never only stands by.\n5. For each act — setup, middle, ending — which picture does a child most want to see there, and which page stages it as its instant? The acts are the story's sentences in thirds: setup 1–6, middle 7–12, ending 13–18. The ending's own event — the reunion, the goodbye, the parting — is always one of them. A picture that falls between two pages, or that only a page's change reports as already done, is not staged.\n6. Your CAST block, under RE-DIVIDE, stands: every page you return keeps what it promises, and the block itself is not rewritten.\nThen one line per page: type — who is in frame — the instant the picture shows — what is true after this page that was not before. The first field is the page's type: landscape, object, face, medium, group. Camera shots are chosen after the plan is final, never here.\nA complicated page — much action, many characters at once — is a fault: simplify the picture, never the story. A page after which nothing is true that was not before is filler: give it a change or give its material to a neighbouring page. What is true after is a change in the story’s state, not the instant in other words: something now held, moved, opened, broken, learned, decided or agreed that was not true before this page. A fourth field that only redescribes the picture states no change.\n\nThe plan line's instant is a single drawable moment:\n- One instant, one action: no montage, no before-and-after, no \"then\", no passage of time inside one picture; when a beat contains a change, pick the single moment that shows it. Never two actions by one character: plan the dominant one and leave the other out, never joined by \"and then\", \"before turning to\" or a trailing clause. One thing is being done, and everyone else watches it or does that same thing in the same place; two characters given different actions at one instant lose one of them, and so do two vehicles, vessels or creatures each with its own state or its own crew. The action at the moment it happens, never the state that follows it. A deed, its effect, and where the effect goes are three actions. Watching, standing and being present are not actions, and an effect that is the deed itself made visible at the same instant is part of the deed. When a plan line holds more than one action, split them across pages; a beat whose actions cannot share a picture gives one page the contact and the next page the second action, or the picture drops the secondary action and keeps the main event. The instant is at most 20 words.\n- A page holds at most 6 named characters, a named animal that acts in the story counting as one; two or three carry it best. A page that gathers the whole cast is wide or distant, all of them sharing one simple action — boarding, hauling one line together — or seen from behind moving off. All of them watching one thing is a shared action only when they are seen from behind or over the shoulder, toward what they watch; facing the viewer it never is. Standing or gathering together while a feeling shows, or while the event happens behind them, is everyone present doing nothing — never a row of figures facing the viewer. One of them acting while the rest look on — a hand-over between two, one speaking, one laughing — is not a shared action: every one of them does the same thing. Add no unnamed figures — no crew, crowd, onlookers or extra animals.\n- The second field is the complete cast of that picture. Every figure the instant stages — a person, or a creature the story tracks — including one watching from the background — belongs in that field, or is not written into the instant at all. A figure the picture shows only in part — a wing, a tail, a head or a hand reaching into the frame, a flank or a chest filling it — is in that picture exactly as if it were shown whole. Only a name without a body is context: the owner of a prop or a place, someone behind, beyond or outside what the picture shows. A figure named only in what is true after this page is not in the picture either: put them in that field or leave them off the page. A figure the previous page staged does not carry into the next one as background.\n- One camera position: an instant is seen from one spot — never inside a vehicle or structure and its exterior at once.\n- At most two height levels per picture: people, animals or objects at three or more different heights in one frame — one on the ground, one climbing the tree, one up in the tree; someone in the foreground and someone in the tree is fine. A whole cast carried together on one back or one boat is one level. Where a third level appears, stage the page on the two levels its event happens on and give the third level its own page.\n- Several characters holding or moving one thing together is fine when that is the page's one action. A hand-over or an object in flight is never the instant: pick the instant before or after it. Never a thought or realization as the instant, or a climbing or stretching pose with hidden limbs; when the event is internal or mechanical, name its visible result instead (the box open, the found object held up).\n- A figure trapped, cut off or unable to reach is given no means to end it: the obstacle's distance is named against the body (\"the rim of the shaft three times their height above them\", \"the ledge a full arm's length beyond the fingertips\"), never a grip, hold or footing that would let them out.\n- Never a pointing gesture as the instant: a look toward the thing, a turned head, a step toward it, or the thing held up instead.\n- Never an exact count of like things in the instant: one, two, or several — a number above two belongs to the text.\n- Name what is in the picture, never what is absent, empty or missing from it. When the absence is the story point, name its visible consequence, or make the empty place the page's subject.\n- Beyond the page's type, never compose the frame — what fills it, how large something looks, where it sits, or where the camera stands.\n- A size or a look is stated only where the plot turns on it: a thing too heavy for one child to lift, too big to hide, small enough to pocket. It is stated as that plot fact, never as a comparison with another thing (\"as big as a …\", \"the size of a …\"). Every other size and look is left to the pictures, which size everything themselves; leaving it out drops no fact. A plan line names each thing plainly; the Art Director sizes it.\n- The beat's main event wins the picture. A secondary figure or action is dropped before the main one is reduced to a shadow, a silhouette or a sound: the arriving creature is in frame as itself, and the reunion outranks the bystander.\n\nRequirements:\n- Each page follows causally from the one before it: no page stages a moment the story reaches only in a later sentence.\n- What a page establishes about a thing — stuck, heavy, hidden, out of reach — stays true until a later page changes it.\n- Consecutive pages do not stage the same place with the same grouping, and one gathering is not split across two pages. A page keeps its characters at one depth together; separate a figure into the background only when the page's own instant requires the separation, and keep such pages few.\n- Every page is visible: something happens that a picture can show. A character whose action is what a page's instant works against — a way blocked, a place kept, a thing taken or withheld, a refusal — is named in that page's plan line.\n- Levin is in frame on at least 9 pages; the others come and go in different combinations, not the whole group on every page. Every commissioned character gets a focal page of their own whose instant is the action the story gives them. The story's central figure, the dragon egg / the little dragon, acts in each third of the book — it chooses, moves, speaks or changes something in a page's instant, never only carried.\n- A character's focal page stages them alone or with one companion — two people sharing one action carry it — and stages them doing something visible. An internal decision gets a physical correlative — a held object, a step taken, a grip tightened; never a lone motionless figure.\n- When an AVAILABLE LANDMARKS list is present, an arc that names landmarks has chosen them — keep those, not others; an arc that names none has chosen none. A landmark may be scenery — a tower on the horizon, a bridge behind the action — and never relocates the story. No page names more than one place.\n- A page shows a character about to act, decide or know what to do only when the next page shows that same character doing it.\n- A physical challenge spends one page on the attempt itself — a character mid-effort against the obstacle. The decision before and the relief after never replace it.\n- The emotional low point — a loss, a setback, the goal looking lost — gets a page of its own; the loss and its recovery never share a page.\n- A race or deadline the story runs on is scored mid-book at least twice — a page shows who is ahead or how much remains.\n- The stake the arc has a character say aloud lands on an early page, shown as a visible act, never as the words said.\n- A character's first page stages their arrival or a naming by someone present, shown as a visible act and never as the words said; a badge, a garment, a title or an epithet is not a naming. A character in frame before anyone says who they are is unplaced.\n- A prop, pet or skill that solves a problem appears on an earlier page with its owner before it does the work, and nothing a page plants is left without a later page that pays it off.\n- At most 1 page with figures in frame holds none of the commissioned characters; every other page with figures holds at least one.\n- Page 1 opens on an action already under way, and each character's first page shows them doing something.\n- When the story's ending has an event of its own, the last page stages that event as its instant.\n- The last page shows the commissioned characters safe and together, unless the story itself separates them.\n- No plan line states what anyone learned, realised or now understands.\n\n# RE-DIVIDE — one round\n\nRewrite ONLY the pages under PAGES TO REWRITE, each answering its Change and keeping its Keep, in the same line format (type — who — instant — after). Every other page stands as written, and a page you rewrite never breaks a target that held.\n\n## THE PLAN THAT STANDS\nPage 1: group — Levin, Julian, Max, Kiaan — the four friends kick a ball across the Lindenhof, Grossmünster towers in the sunlit distance — the friends are playing at the Lindenhof in afternoon sun\nPage 2: medium — Herr Keller — Herr Keller pushes his cart up onto the Lindenhof with the leaf blower roaring — a leaf-clearing man with a deadline has arrived\nPage 3: medium — Julian — Julian digs into the big leaf heap between the linden roots and pulls out a warm egg — the egg is found and knocks softly\nPage 4: face — Julian — Julian looks up wide-eyed at a golden eye blinking in the linden crown — a dragon is spotted in the nest\nPage 5: medium — Levin, Rubina — Levin tells Rubina his name beneath the tree while she crouches in the crown and asks the four to help — Rubina is named and asks for help before night\nPage 6: landscape — nobody — the high linden crown with the empty nest, branches far above the ground, cold lake wind blowing the leaves — the tree is too high to climb and the egg is out of the nest\nPage 7: medium — Levin, Herr Keller — Levin whispers up to Herr Keller beside the roaring blower, who cups a hand to his ear — his whisper is lost in the noise\nPage 8: medium — Max, Herr Keller — Max shouts into Herr Keller's ear while Herr Keller laughs — the truth is dismissed and the blower starts again\nPage 9: object — nobody — the egg wobbles and rolls out of the roots across scattered leaves toward the top of the steep stairs — the egg is rolling toward the stairs\nPage 10: medium — Max — Max stops the rolling egg with his foot at the top step — the egg is saved at the edge\nPage 11: medium — Kiaan — Kiaan wraps the egg in his jacket and clutches it tightly to his chest — the egg is wrapped but the cold wind is blowing\nPage 12: medium — Julian, Levin — Julian covers his ears and hides behind Levin as the blower roars near the linden — the knocking has nearly stopped and the sun leaves only the tower tips\nPage 13: face — Julian — Julian looks up with a bright face, remembering the quiet — the way to bring Rubina down is remembered\nPage 14: medium — Levin, Herr Keller — Levin tugs Herr Keller's sleeve while the blower falls silent — the blower is off and Levin has dared to speak\nPage 15: medium — Levin, Herr Keller — Herr Keller shows Levin the cart by the chess field with his back turned to the linden — the man is facing away from the tree\nPage 16: medium — Kiaan, Rubina — Kiaan holds the jacket-wrapped egg up high to Rubina's claws at the foot of the trunk — the egg is in Rubina's claws\nPage 17: medium — Rubina, Herr Keller — Rubina's wing beats shake all the leaves down while Herr Keller stares at the covered square — the square is covered in leaves again and the egg is in the nest\nPage 18: group — Levin, Julian, Max, Kiaan, Rubina — Rubina breathes a warm puff onto the four friends' cold hands beneath the linden — the little dragon has hatched and the friends are together\n\n---CAST---\nLevin — deed page 14: tugs Herr Keller's sleeve to ask how the leaf blower works, with Herr Keller — also on pages 5, 18\nJulian — deed page 3: digs into the leaf heap and finds the egg — also on pages 9, 12\nMax — deed page 10: stops the rolling egg with his foot at the top step — also on pages 1, 8\nKiaan — deed page 16: lifts the egg in his jacket up to Rubina's claws, with Rubina — also on pages 1, 11\nEnding page 18: Levin, Julian, Max, Kiaan, Rubina\n\n## PAGES TO REWRITE\nPage 2\nChange: Levin is in frame on 7 of 18 page(s), target 9 — put the main character in frame here\nKeep: type medium; in frame: Herr Keller; what is true after: a leaf-clearing man with a deadline has arrived\n\nPage 4\nChange: Make this one character alone showing one strong feeling, with nothing else happening.\nKeep: type face; in frame: Julian; what is true after: a dragon is spotted in the nest\n\nPage 6\nChange: Give this people-free page a subject the story has been driving toward, or give the page a character.\nKeep: type landscape; nobody in frame; what is true after: the tree is too high to climb and the egg is out of the nest\n\nPage 13\nChange: Name the action being performed, not a presence, a position or the state after an action.\nKeep: type face; in frame: Julian; what is true after: the way to bring Rubina down is remembered\n\nPage 15\nChange: both pages are medium with the same characters (pages 14 and 15): change this page's type or cast Name the action being performed, not a presence, a position or the state after an action.\nKeep: type medium; in frame: Levin, Herr Keller; what is true after: the man is facing away from the tree\n\n# OUTPUT FORMAT\n\nOnly what the format below shows. No preamble, no commentary. One line for each page you rewrite under RE-DIVIDE, and for no other page. No changes block.\n\n---PAGE PLAN---\nPage <N>: <type> — <names, or the word nobody> — <the instant the picture shows> — <what is true after this page that was not before>\n\n",
+     "decisions": [
+      {
+       "keep": true,
+       "fixes": [
+        "MAIN_UNDER_HALF:Levin"
+       ],
+       "breaks": [],
+       "reason": "fixes something, breaks nothing",
+       "pageNumber": 2
+      },
+      {
+       "keep": false,
+       "fixes": [],
+       "breaks": [
+        "PLAN_INSTANT_TOO_LONG:4"
+       ],
+       "reason": "fixes nothing",
+       "pageNumber": 4
+      },
+      {
+       "keep": false,
+       "fixes": [],
+       "breaks": [
+        "PLAN_INSTANT_TOO_LONG:6"
+       ],
+       "reason": "fixes nothing",
+       "pageNumber": 6
+      },
+      {
+       "keep": true,
+       "fixes": [
+        "ACTION"
+       ],
+       "breaks": [],
+       "reason": "fixes something, breaks nothing",
+       "pageNumber": 13
+      },
+      {
+       "keep": true,
+       "fixes": [
+        "CONSECUTIVE_SAME_TYPE_CAST:14-15",
+        "ACTION"
+       ],
+       "breaks": [],
+       "reason": "fixes something, breaks nothing",
+       "pageNumber": 15
+      }
+     ],
+     "returnedPages": [
+      2,
+      4,
+      6,
+      13,
+      15
+     ]
+    },
+    "castTable": {
+     "raw": "Levin — deed page 14: tugs Herr Keller's sleeve to ask how the leaf blower works, with Herr Keller — also on pages 5, 18\nJulian — deed page 3: digs into the leaf heap and finds the egg — also on pages 9, 12\nMax — deed page 10: stops the rolling egg with his foot at the top step — also on pages 1, 8\nKiaan — deed page 16: lifts the egg in his jacket up to Rubina's claws, with Rubina — also on pages 1, 11\nEnding page 18: Levin, Julian, Max, Kiaan, Rubina",
+     "extra": [],
+     "ending": {
+      "page": 18,
+      "names": [
+       "Levin",
+       "Julian",
+       "Max",
+       "Kiaan",
+       "Rubina"
+      ]
+     },
+     "characters": [
+      {
+       "deed": "tugs Herr Keller's sleeve to ask how the leaf blower works, with Herr Keller",
+       "name": "Levin",
+       "alsoOn": [
+        5,
+        18
+       ],
+       "deedPage": 14
+      },
+      {
+       "deed": "digs into the leaf heap and finds the egg",
+       "name": "Julian",
+       "alsoOn": [
+        9,
+        12
+       ],
+       "deedPage": 3
+      },
+      {
+       "deed": "stops the rolling egg with his foot at the top step",
+       "name": "Max",
+       "alsoOn": [
+        1,
+        8
+       ],
+       "deedPage": 10
+      },
+      {
+       "deed": "lifts the egg in his jacket up to Rubina's claws, with Rubina",
+       "name": "Kiaan",
+       "alsoOn": [
+        1,
+        11
+       ],
+       "deedPage": 16
+      }
+     ]
+    },
+    "firstPlan": {
+     "ms": 9530,
+     "reply": "---CAST---\nLevin — deed page 14: tugs Herr Keller's sleeve to ask how the leaf blower works, with Herr Keller — also on pages 5, 18\nJulian — deed page 3: digs into the leaf heap and finds the egg — also on pages 9, 12\nMax — deed page 10: stops the rolling egg with his foot at the top step — also on pages 1, 8\nKiaan — deed page 16: lifts the egg in his jacket up to Rubina's claws, with Rubina — also on pages 1, 11\nEnding page 18: Levin, Julian, Max, Kiaan, Rubina\n---PAGE PLAN---\nPage 1: group — Levin, Julian, Max, Kiaan — the four friends kick a ball across the Lindenhof, Grossmünster towers in the sunlit distance — the friends are playing at the Lindenhof in afternoon sun\nPage 2: medium — Herr Keller — Herr Keller pushes his cart up onto the Lindenhof with the leaf blower roaring — a leaf-clearing man with a deadline has arrived\nPage 3: medium — Julian — Julian digs into the big leaf heap between the linden roots and pulls out a warm egg — the egg is found and knocks softly\nPage 4: face — Julian — Julian looks up wide-eyed at a golden eye blinking in the linden crown — a dragon is spotted in the nest\nPage 5: medium — Levin, Rubina — Levin tells Rubina his name beneath the tree while she crouches in the crown and asks the four to help — Rubina is named and asks for help before night\nPage 6: landscape — nobody — the high linden crown with the empty nest, branches far above the ground, cold lake wind blowing the leaves — the tree is too high to climb and the egg is out of the nest\nPage 7: medium — Levin, Herr Keller — Levin whispers up to Herr Keller beside the roaring blower, who cups a hand to his ear — his whisper is lost in the noise\nPage 8: medium — Max, Herr Keller — Max shouts into Herr Keller's ear while Herr Keller laughs — the truth is dismissed and the blower starts again\nPage 9: object — nobody — the egg wobbles and rolls out of the roots across scattered leaves toward the top of the steep stairs — the egg is rolling toward the stairs\nPage 10: medium — Max — Max stops the rolling egg with his foot at the top step — the egg is saved at the edge\nPage 11: medium — Kiaan — Kiaan wraps the egg in his jacket and clutches it tightly to his chest — the egg is wrapped but the cold wind is blowing\nPage 12: medium — Julian, Levin — Julian covers his ears and hides behind Levin as the blower roars near the linden — the knocking has nearly stopped and the sun leaves only the tower tips\nPage 13: face — Julian — Julian looks up with a bright face, remembering the quiet — the way to bring Rubina down is remembered\nPage 14: medium — Levin, Herr Keller — Levin tugs Herr Keller's sleeve while the blower falls silent — the blower is off and Levin has dared to speak\nPage 15: medium — Levin, Herr Keller — Herr Keller shows Levin the cart by the chess field with his back turned to the linden — the man is facing away from the tree\nPage 16: medium — Kiaan, Rubina — Kiaan holds the jacket-wrapped egg up high to Rubina's claws at the foot of the trunk — the egg is in Rubina's claws\nPage 17: medium — Rubina, Herr Keller — Rubina's wing beats shake all the leaves down while Herr Keller stares at the covered square — the square is covered in leaves again and the egg is in the nest\nPage 18: group — Levin, Julian, Max, Kiaan, Rubina — Rubina breathes a warm puff onto the four friends' cold hands beneath the linden — the little dragon has hatched and the friends are together",
+     "prompt": "# YOUR TASK\n\nThe story below is finished. Divide it into 18 pages: plan the pictures, simple pages first, then one PLAN line per page. Plan in ENGLISH; the book will be written in Swiss Standard German (ss, never ß — never dialect) — names, places and cultural details as they will appear there. Reader: kindergarten age (about five).\n\nCommissioned characters: Levin, Julian, Max, Kiaan\n\n# THE STORY (final — it was told, challenged and re-told; divide it, never retell or repair it)\n\n1. On an autumn afternoon Levin, his little brother Julian and their friends Max and Kiaan play ball on the Lindenhof, where the sun still shines on the Grossmünster towers across the roofs, and Kiaan wears his thick warm autumn jacket.\n2. A man in an orange vest pushes his cart up onto the Lindenhof and starts his leaf blower, because he must get every leaf into the cart by the chess field before dark, so that nobody slips on them tomorrow.\n3. When the ball rolls into the big leaf heap between the roots of a linden, Julian digs for it and finds an egg as big as a football and as warm as an oven tile, knocking softly from inside.\n4. Nobody knows whose egg it is, but Julian spots a golden eye blinking in the linden's crown, and there, in her nest high in the branches, crouches a dragon as big as a horse, red and yellow exactly like the leaves.\n5. Levin, who loves dragons, tells her their names, and she says she is Rubina: the cold wind from the lake shook her egg out of that nest, and it must be back in the warm nest before night, or her little one will never hatch.\n6. But the linden is far too high for the children to climb, and Rubina cannot come down to them, because the roar hurts her fine ears, which are made to hear the faint knocking of her egg from far away, and with her wings pressed over her ears she cannot fly.\n7. So the children pile leaves over the egg as a blanket, and Levin goes to ask the man to stop, but the blower swallows his whisper, and when the man switches off, says he is Herr Keller and asks \"What?\", Levin turns red and says nothing.\n8. In that short quiet Julian sees Rubina climb down the trunk with her branch-claws toward the egg, but when Max shouts into Herr Keller's ear that a dragon egg lies under the leaves, Herr Keller laughs that dragons live only in books and switches on again, and Rubina climbs back up into the crown.\n9. The blast blows the leaf blanket away, so the egg wobbles out of the roots and rolls down the slope toward the steep stairs.\n10. Levin shouts \"Careful, stairs!\", and Max runs as fast as he can and stops the egg with his foot like a football, right at the top step.\n11. Kiaan pulls off his warm jacket, wraps the egg in it and carries it carefully back under the linden, but the wind is cold and the knocking grows quieter.\n12. Soon the sun lights only the tips of the Grossmünster towers, Herr Keller roars up to blow away the last leaves right under the linden, and inside the jacket the knocking almost stops.\n13. But Julian remembers: \"When it was quiet, Rubina came down!\"\n14. Levin saw that Herr Keller switches off for anyone who tugs his sleeve, so with shaking knees he tugs it and asks loudly how the leaf blower works.\n15. Herr Keller switches off and turns to show him the cart by the chess field, his back to the linden, and Levin asks question after question: twice Herr Keller reaches for the switch, and twice Levin asks something new.\n16. Rubina climbs down the trunk, a branch cracks and Herr Keller half turns, so she presses flat against the bark until Levin quickly asks how heavy the full cart is, and then she climbs the last bit and holds out claws that are made for branches and cannot grip the egg off the ground, so Kiaan lifts it up to her in his jacket.\n17. She breathes warm air over the egg and carries it up into the nest, leaving the jacket in Kiaan's hands, and her wing beats shake every last leaf off the linden, so that Herr Keller turns round and sees his clean square covered red and yellow in the dusk and groans that he must start all over tomorrow.\n18. Up in the warm nest the egg cracks and a little dragon peeks out at the four friends, and Rubina climbs down once more, says \"Thank you!\" and breathes a warm puff onto their cold hands, Julian strokes her nose, and Levin beams: \"This time I dared!\"\n\nChallenges taken:\n1. daylight running out over the Lindenhof\n2. the egg must be home before dark\n3. the fragile egg rolls toward the steep stairs\n4. Kiaan holds the egg up into a dragon's claws\n5. Rubina freezes on the trunk as Herr Keller half turns\n\n# FIX WHILE DIVIDING — apply these where the division can carry them\n\nEach is a change to the STORY. Apply it in the pages where a picture can hold it. Where it cannot — a figure kept in frame past the cast limit, two actions at one instant — leave it to the text, which is told to apply what the division has not. Never break a rule below to honour a hint.\nA hint never changes the situation the story settled: where one asks for what the story above rules out — a saved profile's friendship where the story stages a first meeting — the story stands and the hint is dropped.\nA hint opens with the story sentence it changes, as (s7) or (s14-15): it applies where that sentence is told, never earlier, and what it changes there replaces what the sentence says.\n\nISSUE (s5): Rubina explains the problem but never asks the children for help, contrary to her motive. → CHANGE: After she says the egg must be back before night, have her ask the four to help because she cannot come down.\nISSUE (s11): Kiaan’s forgetfulness is never shown, so the 3-year-old who must hold on tight feels generic rather than himself. → CHANGE: After wrapping the egg let him nearly set it down before he remembers and clutches it tightly to his chest.\nISSUE (s12): Julian’s fear of the loud machine is never shown, making the timid 3-year-old less relatable. → CHANGE: When Herr Keller roars right up to the linden, have Julian cover his ears and hide behind Levin.\n\n# THE STORY LOGIC — the facts the story above was told from\n\nEvery page keeps to these facts. A page breaks a fact when its who, its instant or its change uses a thing, a material, an ability or a limit against what the story logic states of it. A hint that names a fact it changes replaces that fact; every other fact holds on every page.\n\nWant and stakes: Levin and Julian want the warm, knocking egg back in Rubina's nest high in the linden before night falls on the Lindenhof; if it cools out, the little dragon inside will never hatch.\nOpposition: Herr Keller with his roaring leaf blower, who has come onto the Lindenhof to get every leaf into his cart before dark so that nobody slips tomorrow.\nFacts:\n- Levin (commissioned) — loves dragons and talks and talks once he dares; limit: too shy to speak up to a grown-up he does not know, so at first he only whispers.\n- Julian (commissioned) — notices small things (an eye in the leaves, Rubina moving in the quiet); limit: he is three and afraid of the loud machine.\n- Max (commissioned) — a fast football player who stops a rolling ball with his foot; limit: he blurts out the truth at the wrong moment.\n- Kiaan (commissioned) — wears his own thick warm autumn jacket and gives it up for the egg; limit: he forgets things, so he must hold on tight.\n- Rubina (new) — her nest sits high in this linden; her warm breath warms the egg and she carries it up; limit: the blower's roar hurts her fine ears, which are made to hear her egg's faint knocking from far off, and with her wings over her ears she cannot fly.\n- Herr Keller (new) — his leaf blower clears the square fast; limit: he hears nothing over it, so he switches off when someone tugs his sleeve, and he names himself then.\n- Rubina is as big as a horse: her claws are made for branches, so she can climb the trunk but cannot grip the smooth egg off the ground — it must be lifted up to her; her red and yellow scales hide her in the crown from anyone not looking for her.\n- The egg lives on warmth: the cold lake wind cools it, its knocking grows quieter as it cools, and it must be in the warm nest before night.\nMotives:\n- Levin: loves dragons and wants Rubina's little one to hatch → whispers to Herr Keller, later keeps him talking with his back to the linden.\n- Julian: wants Rubina to get her egg back → digs out the ball, spots her eye, remembers that she came down in the quiet.\n- Max: wants to save the egg → shouts the truth into Herr Keller's ear, then runs and stops the rolling egg with his foot.\n- Kiaan: wants the egg to stay warm → wraps it in his jacket and holds it up into Rubina's claws.\n- Rubina: wants her egg back in her warm nest before night → asks the children for help, climbs down in the quiet, freezes when nearly seen, warms and carries the egg, thanks them.\n- Herr Keller: wants the square free of slippery leaves before dark → keeps blowing, laughs off the dragon, reaches for the switch again and again.\nCentral figure: the dragon egg / the little dragon\nEvents: 5\nChain:\n- Because Julian digs his ball out of the leaf heap under the linden, the four find the warm, knocking egg, and Julian spots Rubina in her nest in the crown; she tells them her name and that the egg must be in her nest before night, but the roar keeps her from flying and the tree is too high to climb.\n- But Levin is too shy, and the blower is too loud for a whisper; when he tugs Herr Keller's sleeve and the machine goes quiet, Julian sees Rubina climb down — until Max shouts the truth, Herr Keller laughs and switches on, and Rubina climbs back up.\n- Because the blast blows the leaf blanket away, the egg rolls toward the steep stairs; Max stops it with his foot and Kiaan gives up his warm jacket, but now the egg is out in the cold wind.\n- But the jacket holds only a little warmth: the sun leaves all but the tips of the Grossmünster towers, Herr Keller roars right up to the linden, and the knocking almost stops. This is the low point.\n- Because Julian remembers that Rubina came down in the quiet, and Levin saw that Herr Keller switches off for anyone who tugs his sleeve, Levin dares to keep him talking with his back to the tree; Rubina risks the climb, freezes when a branch cracks, and finishes it because Levin asks one more question, and Kiaan lifts the egg into claws that cannot grip it off the ground — it works now because the quiet lasts and nobody is looking, where the first quiet lasted one shy whisper.\n\n# THE IDEA THE STORY WAS COMMISSIONED FROM (names and world reference only)\n\nThe arc above delivers the commission; keep its names and world as written.\n\nTitle: Vier Freunde und ein Drachonei\nCategory: adventure\nType: Drachen-Abenteuer\nTheme: dragon\nSeason: Autumn\nSetting/location: Zurich, Zurich, Switzerland\nRelationships:\n  - Levin is Älteres Geschwister von Julian\n  - Julian is Jüngeres Geschwister von Levin\n\n# CHARACTER DETAILS\n\nThese details decide who each figure IS: age, gender, what they are good at, what they find hard, what they like. Never contradict one, never invent one.\nThe arc above is settled and decides the SITUATION: who knows whom here, where they are, what is happening to them. Where a saved detail contradicts the arc — a friendship where the arc stages a first meeting — the arc stands, and the detail is simply not true in this book.\n\n**Levin** (main character):\n- Age: 5\n- Gender: male\n- Strengths: Fröhlich, Freundlich, Hilfsbereit, Beschützend, Nachsichtig, Treu, Gerecht, Ehrlich, Vertrauenswürdig, Geduldig, Neugierig, Fantasievoll, Klug, Kreativ, Aufmerksam, Einfallsreich, Abenteuerlustig, Schnell, Stark, Fleissig, Leader, Mutig, Grosszügig, Selbstbewusst, Lustig\n- Flaws: Schüchtern, Unentschlossen, Leichtgläubig, Petze, Gesprächig, Vergesslich, Tollpatschig\n- Special details: Lieb Dinosaurier und Drachen. Sein Bruder ist Julian und Max und Kiaan sind seine guten Freunde. Er kann gut Velofahren und Unihockey spielen\n\n**Julian** (main character):\n- Age: 3\n- Gender: male\n- Strengths: Fröhlich, Freundlich, Hilfsbereit, Lustig, Nachsichtig, Beschützend, Treu, Grosszügig, Gerecht, Ehrlich, Vertrauenswürdig, Abenteuerlustig, Aufmerksam, Kreativ, Klug\n- Flaws: Schüchtern, Leichtgläubig, Unentschlossen, Tollpatschig, Ängstlich, Stur\n- Special details: Seine freunde: levin, julian, max. Er isst sehr gerne, liebt es mit seinem Bruder und seinen Freunden zu spielen, hat gerne Ballspiele\n\n**Max** (main character):\n- Age: 3\n- Gender: male\n- Strengths: Fröhlich, Freundlich, Lustig, Ehrlich, Selbstbewusst, Mutig, Vertrauenswürdig, Entschlossen, Fleissig, Fantasievoll, Neugierig, Kreativ, Aufmerksam, Abenteuerlustig, Stark, Schnell\n- Flaws: Gesprächig, Leichtgläubig\n- Special details: Spielt gerne mit seinen Freunden Kiaan, Levin, Max. Seine Hündin heisst Nia. Er spielt gerne Fussball und fährt gerne Velo\n\n**Kiaan** (main character):\n- Age: 3\n- Gender: male\n- Strengths: Fröhlich, Freundlich, Hilfsbereit, Lustig, Nachsichtig, Beschützend, Treu, Grosszügig, Gerecht, Ehrlich, Selbstbewusst, Vertrauenswürdig, Mutig, Geduldig, Fantasievoll, Neugierig, Klug, Kreativ, Aufmerksam, Abenteuerlustig\n- Flaws: Vergesslich, Petze, Unentschlossen, Schüchtern\n- Special details: Spielt gerne mit Levin, Julian, Max. Liesst gerne oder spielt gerne Ball oder auf dem Spielplatz\n\n**REAL LANDMARKS the story above uses:**\n- Lindenhof (Zürcher Hügelzug) [Square]\n  PHOTOS: (exterior) Town square with large mature trees providing canopy, featuring outdoor chess playing area with…; (exterior) Aerial urban cityscape of Zurich showing historic districts, modern high-rises, and surrounding…; (exterior) The baroque Zunfthaus zur Meisen guild hall and the Münsterbrücke with its bronze rider statue,…\n- Grossmünster [Church]\n  PHOTOS: (exterior) Twin cream-colored church towers with pyramidal cupolas topped by Swiss flags and cross finials.; (exterior) Twin stone towers with ornamental cupolas and Swiss flags, viewed across waterfront from lower…; (exterior) Pair of stone church towers with distinctive architectural details, contemporary structures…; (interior) Interior nave with stone columns supporting ornate gilded ceiling; stone statue of Charlemagne…\n\n- A landmark is drawn from one of its PHOTOS. Name a location or a vantage of it only from a viewpoint one of its photos shows — an exterior is seen from the street or the square, an interior from inside, a distant or view-from photo from afar. If no photo shows the view a page needs (a skyline from a hilltop, a bird's-eye, the far side), that landmark is not available for that page: use one whose photos fit, or none. A view the commission's own words describe is the exception: it stands, and the landmark in it is drawn from what its photos show\n\n# MINI HERO'S JOURNEY (age 5)\n\nThe child this book is for is five. Write for that child.\n\n**The full shape, in small.** Ordinary world, then a call that pulls the main character out of it,\nthen challenges that get harder, then a moment where all seems lost, then the turn, then home —\nchanged. Every one of those beats is in the story, in that order.\n\n**A real low point is required.** Before the end there is a page where the plan has failed, the thing\nis lost, or the friend is gone, and it looks like it will stay that way. Do not soften it into a\nsmall setback and do not skip past it in a line.\n\n**The hero's own idea turns it.** What saves the day comes out of the main character — something they\nnoticed earlier, a strength of theirs, a thing they were told and remembered. Never luck, never a\ngrown-up arriving to fix it, never a power handed over at the last moment.\n\n**It resolves.** The turn comes before the last page and they come home changed. Never a story that\nstops on the problem.\n\n**A real antagonist is allowed.** Someone who wants something opposed to what the main character\nwants, with a reason of their own. A twist, a sidekick who earns their place, and a setup on an early\npage that pays off at the end all belong here.\n\n**Competence.** The main character does things: decides, tries, fails, adapts. They are never carried\nthrough their own story.\n\n**The stake is the main character's own.** What is wanted and what is at risk belong to their own\nlife — never a piece of work set for them, an assignment, a submission, a competition entry, or a\nplace to be won in a selection. What stands in the way is something they can reach out and touch, or\nsomeone who wants the opposite, never a procedure, a schedule or a system to be satisfied.\n\n**Humour and mild peril.** A chase, a close call, a night out in the cold are fine. Nothing gory,\nnothing cruel, nobody the reader likes is really harmed.\n\n**Ending.** They come back to where they started and it reads differently, because they are different.\n\n**The age owns the props and the subject.** What the main character wants, what stands in the way, and the objects the story turns on belong to the world of someone that age — what they handle themselves, where they go on their own, what counts as a loss to them. Never a want, a comfort or a plaything the reader has outgrown, and never stakes beyond what someone that age would be given.\n\n# PAGE PLAN\n\nTHE BOOK'S TARGETS — every one is counted in code on the finished plan. A figure the STORY LOGIC names (new) is not commissioned and may share a page with commissioned characters or carry a page alone.\n- At least 1 page of type face, and a face page shows a commissioned character.\n- At least 1 page of type landscape or object; two are fine, ideally one of each.\n- No two neighbouring pages share both their type and their characters.\n- At most 3 pages of type group.\n- The who column names commissioned characters and the figures of the STORY LOGIC, nobody else: a figure you invent is a fault.\n\nEach page has a type, and the type fixes who is in frame:\n- landscape: nobody. A place, the weather, a vessel or a distant sight.\n- object: nobody, or one character's hand. One object.\n- face: exactly one character, a close-up of their face.\n- medium: one to three characters.\n- group: four or more characters, all sharing one simple action.\nThe who column holds names only, or the word nobody: never a count, a group word or a description.\n\nBefore dividing, plan the pictures — simple pages first:\n1. The story's emotional highlights: which moments earn a page of one character showing a strong feeling, close up?\n2. Which moments earn a page with no people in frame? Only a subject the story has been driving toward — a discovery, an arrival, a payoff: the castle found after the long search. A place with no story weight never gets its own page. At least one page in the book earns this. Choose one whose drama is a place, the weather, a vessel or an object seen from afar; never a page whose drama is between people — a parting, a confrontation, tears, a promise, a handover. Those pages get faces, and so does every picture question 5 names as most wanted.\n3. Which pages gather the whole cast, and what one simple action do they all share there? \n4. Where are three or more characters truly unavoidable? Bypass it where the story allows; keep it only where the story demands it. Where one is kept, the third character shares the page's one action — takes part in it, never does a second action and never only stands by.\n5. For each act — setup, middle, ending — which picture does a child most want to see there, and which page stages it as its instant? The acts are the story's sentences in thirds: setup 1–6, middle 7–12, ending 13–18. The ending's own event — the reunion, the goodbye, the parting — is always one of them. A picture that falls between two pages, or that only a page's change reports as already done, is not staged.\n6. Write the CAST block before the plan lines. One line per commissioned character: the page whose instant is their own action from the story, alone or with one companion, and 2 more pages they are in frame on. Then page 18, the last: the names of everyone the story keeps together at the end. Every plan line keeps what the block promises.\nThen one line per page: type — who is in frame — the instant the picture shows — what is true after this page that was not before. The first field is the page's type: landscape, object, face, medium, group. Camera shots are chosen after the plan is final, never here.\nA complicated page — much action, many characters at once — is a fault: simplify the picture, never the story. A page after which nothing is true that was not before is filler: give it a change or give its material to a neighbouring page. What is true after is a change in the story’s state, not the instant in other words: something now held, moved, opened, broken, learned, decided or agreed that was not true before this page. A fourth field that only redescribes the picture states no change.\n\nThe plan line's instant is a single drawable moment:\n- One instant, one action: no montage, no before-and-after, no \"then\", no passage of time inside one picture; when a beat contains a change, pick the single moment that shows it. Never two actions by one character: plan the dominant one and leave the other out, never joined by \"and then\", \"before turning to\" or a trailing clause. One thing is being done, and everyone else watches it or does that same thing in the same place; two characters given different actions at one instant lose one of them, and so do two vehicles, vessels or creatures each with its own state or its own crew. The action at the moment it happens, never the state that follows it. A deed, its effect, and where the effect goes are three actions. Watching, standing and being present are not actions, and an effect that is the deed itself made visible at the same instant is part of the deed. When a plan line holds more than one action, split them across pages; a beat whose actions cannot share a picture gives one page the contact and the next page the second action, or the picture drops the secondary action and keeps the main event. The instant is at most 20 words.\n- A page holds at most 6 named characters, a named animal that acts in the story counting as one; two or three carry it best. A page that gathers the whole cast is wide or distant, all of them sharing one simple action — boarding, hauling one line together — or seen from behind moving off. All of them watching one thing is a shared action only when they are seen from behind or over the shoulder, toward what they watch; facing the viewer it never is. Standing or gathering together while a feeling shows, or while the event happens behind them, is everyone present doing nothing — never a row of figures facing the viewer. One of them acting while the rest look on — a hand-over between two, one speaking, one laughing — is not a shared action: every one of them does the same thing. Add no unnamed figures — no crew, crowd, onlookers or extra animals.\n- The second field is the complete cast of that picture. Every figure the instant stages — a person, or a creature the story tracks — including one watching from the background — belongs in that field, or is not written into the instant at all. A figure the picture shows only in part — a wing, a tail, a head or a hand reaching into the frame, a flank or a chest filling it — is in that picture exactly as if it were shown whole. Only a name without a body is context: the owner of a prop or a place, someone behind, beyond or outside what the picture shows. A figure named only in what is true after this page is not in the picture either: put them in that field or leave them off the page. A figure the previous page staged does not carry into the next one as background.\n- One camera position: an instant is seen from one spot — never inside a vehicle or structure and its exterior at once.\n- At most two height levels per picture: people, animals or objects at three or more different heights in one frame — one on the ground, one climbing the tree, one up in the tree; someone in the foreground and someone in the tree is fine. A whole cast carried together on one back or one boat is one level. Where a third level appears, stage the page on the two levels its event happens on and give the third level its own page.\n- Several characters holding or moving one thing together is fine when that is the page's one action. A hand-over or an object in flight is never the instant: pick the instant before or after it. Never a thought or realization as the instant, or a climbing or stretching pose with hidden limbs; when the event is internal or mechanical, name its visible result instead (the box open, the found object held up).\n- A figure trapped, cut off or unable to reach is given no means to end it: the obstacle's distance is named against the body (\"the rim of the shaft three times their height above them\", \"the ledge a full arm's length beyond the fingertips\"), never a grip, hold or footing that would let them out.\n- Never a pointing gesture as the instant: a look toward the thing, a turned head, a step toward it, or the thing held up instead.\n- Never an exact count of like things in the instant: one, two, or several — a number above two belongs to the text.\n- Name what is in the picture, never what is absent, empty or missing from it. When the absence is the story point, name its visible consequence, or make the empty place the page's subject.\n- Beyond the page's type, never compose the frame — what fills it, how large something looks, where it sits, or where the camera stands.\n- A size or a look is stated only where the plot turns on it: a thing too heavy for one child to lift, too big to hide, small enough to pocket. It is stated as that plot fact, never as a comparison with another thing (\"as big as a …\", \"the size of a …\"). Every other size and look is left to the pictures, which size everything themselves; leaving it out drops no fact. A plan line names each thing plainly; the Art Director sizes it.\n- The beat's main event wins the picture. A secondary figure or action is dropped before the main one is reduced to a shadow, a silhouette or a sound: the arriving creature is in frame as itself, and the reunion outranks the bystander.\n\nRequirements:\n- Each page follows causally from the one before it: no page stages a moment the story reaches only in a later sentence.\n- What a page establishes about a thing — stuck, heavy, hidden, out of reach — stays true until a later page changes it.\n- Consecutive pages do not stage the same place with the same grouping, and one gathering is not split across two pages. A page keeps its characters at one depth together; separate a figure into the background only when the page's own instant requires the separation, and keep such pages few.\n- Every page is visible: something happens that a picture can show. A character whose action is what a page's instant works against — a way blocked, a place kept, a thing taken or withheld, a refusal — is named in that page's plan line.\n- Levin is in frame on at least 9 pages; the others come and go in different combinations, not the whole group on every page. Every commissioned character gets a focal page of their own whose instant is the action the story gives them. The story's central figure, the dragon egg / the little dragon, acts in each third of the book — it chooses, moves, speaks or changes something in a page's instant, never only carried.\n- A character's focal page stages them alone or with one companion — two people sharing one action carry it — and stages them doing something visible. An internal decision gets a physical correlative — a held object, a step taken, a grip tightened; never a lone motionless figure.\n- When an AVAILABLE LANDMARKS list is present, an arc that names landmarks has chosen them — keep those, not others; an arc that names none has chosen none. A landmark may be scenery — a tower on the horizon, a bridge behind the action — and never relocates the story. No page names more than one place.\n- A page shows a character about to act, decide or know what to do only when the next page shows that same character doing it.\n- A physical challenge spends one page on the attempt itself — a character mid-effort against the obstacle. The decision before and the relief after never replace it.\n- The emotional low point — a loss, a setback, the goal looking lost — gets a page of its own; the loss and its recovery never share a page.\n- A race or deadline the story runs on is scored mid-book at least twice — a page shows who is ahead or how much remains.\n- The stake the arc has a character say aloud lands on an early page, shown as a visible act, never as the words said.\n- A character's first page stages their arrival or a naming by someone present, shown as a visible act and never as the words said; a badge, a garment, a title or an epithet is not a naming. A character in frame before anyone says who they are is unplaced.\n- A prop, pet or skill that solves a problem appears on an earlier page with its owner before it does the work, and nothing a page plants is left without a later page that pays it off.\n- At most 1 page with figures in frame holds none of the commissioned characters; every other page with figures holds at least one.\n- Page 1 opens on an action already under way, and each character's first page shows them doing something.\n- When the story's ending has an event of its own, the last page stages that event as its instant.\n- The last page shows the commissioned characters safe and together, unless the story itself separates them.\n- No plan line states what anyone learned, realised or now understands.\n\n# OUTPUT FORMAT\n\nOnly what the format below shows. No preamble, no commentary. The CAST block, then one line per page, through page 18.\n\n---CAST---\n<name> — deed page <N>: <their own action from the story>, <alone, or with whom> — also on pages <N>, <N>\nEnding page 18: <names, comma separated>\n---PAGE PLAN---\nPage <N>: <type> — <names, or the word nobody> — <the instant the picture shows> — <what is true after this page that was not before>\n\n"
+    },
+    "pagesReturned": 5,
+    "pagesReplanned": 3
+   },
+   "usage": {
+    "input_tokens": 22307,
+    "output_tokens": 1705
+   },
+   "events": [],
+   "models": {
+    "planModel": "claude-sonnet-5-5",
+    "checkModel": "gpt-5.6-luna-pro",
+    "planModelId": "claude-sonnet-5-5"
+   },
+   "storyId": "job_1791040103540_atbttop6w",
+   "advisory": null,
+   "logLines": [
+    "📝 Prompt templates loaded: 97/97 ok",
+    "👪 [BEATS] Figures the arc tagged (commissioned), counted as commissioned: Levin, Julian, Max, Kiaan"
+   ],
+   "textCost": 0.061664,
+   "elapsedMs": 23558,
+   "startedAt": "2026-10-06T09:58:47.027Z",
+   "planEffort": "low",
+   "sentPrompts": [
+    {
+     "kind": "text",
+     "text": "# YOUR TASK\n\nThe story below is finished. Divide it into 18 pages: plan the pictures, simple pages first, then one PLAN line per page. Plan in ENGLISH; the book will be written in Swiss Standard German (ss, never ß — never dialect) — names, places and cultural details as they will appear there. Reader: kindergarten age (about five).\n\nCommissioned characters: Levin, Julian, Max, Kiaan\n\n# THE STORY (final — it was told, challenged and re-told; divide it, never retell or repair it)\n\n1. On an autumn afternoon Levin, his little brother Julian and their friends Max and Kiaan play ball on the Lindenhof, where the sun still shines on the Grossmünster towers across the roofs, and Kiaan wears his thick warm autumn jacket.\n2. A man in an orange vest pushes his cart up onto the Lindenhof and starts his leaf blower, because he must get every leaf into the cart by the chess field before dark, so that nobody slips on them tomorrow.\n3. When the ball rolls into the big leaf heap between the roots of a linden, Julian digs for it and finds an egg as big as a football and as warm as an oven tile, knocking softly from inside.\n4. Nobody knows whose egg it is, but Julian spots a golden eye blinking in the linden's crown, and there, in her nest high in the branches, crouches a dragon as big as a horse, red and yellow exactly like the leaves.\n5. Levin, who loves dragons, tells her their names, and she says she is Rubina: the cold wind from the lake shook her egg out of that nest, and it must be back in the warm nest before night, or her little one will never hatch.\n6. But the linden is far too high for the children to climb, and Rubina cannot come down to them, because the roar hurts her fine ears, which are made to hear the faint knocking of her egg from far away, and with her wings pressed over her ears she cannot fly.\n7. So the children pile leaves over the egg as a blanket, and Levin goes to ask the man to stop, but the blower swallows his whisper, and when the man switches off, says he is Herr Keller and asks \"What?\", Levin turns red and says nothing.\n8. In that short quiet Julian sees Rubina climb down the trunk with her branch-claws toward the egg, but when Max shouts into Herr Keller's ear that a dragon egg lies under the leaves, Herr Keller laughs that dragons live only in books and switches on again, and Rubina climbs back up into the crown.\n9. The blast blows the leaf blanket away, so the egg wobbles out of the roots and rolls down the slope toward the steep stairs.\n10. Levin shouts \"Careful, stairs!\", and Max runs as fast as he can and stops the egg with his foot like a football, right at the top step.\n11. Kiaan pulls off his warm jacket, wraps the egg in it and carries it carefully back under the linden, but the wind is cold and the knocking grows quieter.\n12. Soon the sun lights only the tips of the Grossmünster towers, Herr Keller roars up to blow away the last leaves right under the linden, and inside the jacket the knocking almost stops.\n13. But Julian remembers: \"When it was quiet, Rubina came down!\"\n14. Levin saw that Herr Keller switches off for anyone who tugs his sleeve, so with shaking knees he tugs it and asks loudly how the leaf blower works.\n15. Herr Keller switches off and turns to show him the cart by the chess field, his back to the linden, and Levin asks question after question: twice Herr Keller reaches for the switch, and twice Levin asks something new.\n16. Rubina climbs down the trunk, a branch cracks and Herr Keller half turns, so she presses flat against the bark until Levin quickly asks how heavy the full cart is, and then she climbs the last bit and holds out claws that are made for branches and cannot grip the egg off the ground, so Kiaan lifts it up to her in his jacket.\n17. She breathes warm air over the egg and carries it up into the nest, leaving the jacket in Kiaan's hands, and her wing beats shake every last leaf off the linden, so that Herr Keller turns round and sees his clean square covered red and yellow in the dusk and groans that he must start all over tomorrow.\n18. Up in the warm nest the egg cracks and a little dragon peeks out at the four friends, and Rubina climbs down once more, says \"Thank you!\" and breathes a warm puff onto their cold hands, Julian strokes her nose, and Levin beams: \"This time I dared!\"\n\nChallenges taken:\n1. daylight running out over the Lindenhof\n2. the egg must be home before dark\n3. the fragile egg rolls toward the steep stairs\n4. Kiaan holds the egg up into a dragon's claws\n5. Rubina freezes on the trunk as Herr Keller half turns\n\n# FIX WHILE DIVIDING — apply these where the division can carry them\n\nEach is a change to the STORY. Apply it in the pages where a picture can hold it. Where it cannot — a figure kept in frame past the cast limit, two actions at one instant — leave it to the text, which is told to apply what the division has not. Never break a rule below to honour a hint.\nA hint never changes the situation the story settled: where one asks for what the story above rules out — a saved profile's friendship where the story stages a first meeting — the story stands and the hint is dropped.\nA hint opens with the story sentence it changes, as (s7) or (s14-15): it applies where that sentence is told, never earlier, and what it changes there replaces what the sentence says.\n\nISSUE (s5): Rubina explains the problem but never asks the children for help, contrary to her motive. → CHANGE: After she says the egg must be back before night, have her ask the four to help because she cannot come down.\nISSUE (s11): Kiaan’s forgetfulness is never shown, so the 3-year-old who must hold on tight feels generic rather than himself. → CHANGE: After wrapping the egg let him nearly set it down before he remembers and clutches it tightly to his chest.\nISSUE (s12): Julian’s fear of the loud machine is never shown, making the timid 3-year-old less relatable. → CHANGE: When Herr Keller roars right up to the linden, have Julian cover his ears and hide behind Levin.\n\n# THE STORY LOGIC — the facts the story above was told from\n\nEvery page keeps to these facts. A page breaks a fact when its who, its instant or its change uses a thing, a material, an ability or a limit against what the story logic states of it. A hint that names a fact it changes replaces that fact; every other fact holds on every page.\n\nWant and stakes: Levin and Julian want the warm, knocking egg back in Rubina's nest high in the linden before night falls on the Lindenhof; if it cools out, the little dragon inside will never hatch.\nOpposition: Herr Keller with his roaring leaf blower, who has come onto the Lindenhof to get every leaf into his cart before dark so that nobody slips tomorrow.\nFacts:\n- Levin (commissioned) — loves dragons and talks and talks once he dares; limit: too shy to speak up to a grown-up he does not know, so at first he only whispers.\n- Julian (commissioned) — notices small things (an eye in the leaves, Rubina moving in the quiet); limit: he is three and afraid of the loud machine.\n- Max (commissioned) — a fast football player who stops a rolling ball with his foot; limit: he blurts out the truth at the wrong moment.\n- Kiaan (commissioned) — wears his own thick warm autumn jacket and gives it up for the egg; limit: he forgets things, so he must hold on tight.\n- Rubina (new) — her nest sits high in this linden; her warm breath warms the egg and she carries it up; limit: the blower's roar hurts her fine ears, which are made to hear her egg's faint knocking from far off, and with her wings over her ears she cannot fly.\n- Herr Keller (new) — his leaf blower clears the square fast; limit: he hears nothing over it, so he switches off when someone tugs his sleeve, and he names himself then.\n- Rubina is as big as a horse: her claws are made for branches, so she can climb the trunk but cannot grip the smooth egg off the ground — it must be lifted up to her; her red and yellow scales hide her in the crown from anyone not looking for her.\n- The egg lives on warmth: the cold lake wind cools it, its knocking grows quieter as it cools, and it must be in the warm nest before night.\nMotives:\n- Levin: loves dragons and wants Rubina's little one to hatch → whispers to Herr Keller, later keeps him talking with his back to the linden.\n- Julian: wants Rubina to get her egg back → digs out the ball, spots her eye, remembers that she came down in the quiet.\n- Max: wants to save the egg → shouts the truth into Herr Keller's ear, then runs and stops the rolling egg with his foot.\n- Kiaan: wants the egg to stay warm → wraps it in his jacket and holds it up into Rubina's claws.\n- Rubina: wants her egg back in her warm nest before night → asks the children for help, climbs down in the quiet, freezes when nearly seen, warms and carries the egg, thanks them.\n- Herr Keller: wants the square free of slippery leaves before dark → keeps blowing, laughs off the dragon, reaches for the switch again and again.\nCentral figure: the dragon egg / the little dragon\nEvents: 5\nChain:\n- Because Julian digs his ball out of the leaf heap under the linden, the four find the warm, knocking egg, and Julian spots Rubina in her nest in the crown; she tells them her name and that the egg must be in her nest before night, but the roar keeps her from flying and the tree is too high to climb.\n- But Levin is too shy, and the blower is too loud for a whisper; when he tugs Herr Keller's sleeve and the machine goes quiet, Julian sees Rubina climb down — until Max shouts the truth, Herr Keller laughs and switches on, and Rubina climbs back up.\n- Because the blast blows the leaf blanket away, the egg rolls toward the steep stairs; Max stops it with his foot and Kiaan gives up his warm jacket, but now the egg is out in the cold wind.\n- But the jacket holds only a little warmth: the sun leaves all but the tips of the Grossmünster towers, Herr Keller roars right up to the linden, and the knocking almost stops. This is the low point.\n- Because Julian remembers that Rubina came down in the quiet, and Levin saw that Herr Keller switches off for anyone who tugs his sleeve, Levin dares to keep him talking with his back to the tree; Rubina risks the climb, freezes when a branch cracks, and finishes it because Levin asks one more question, and Kiaan lifts the egg into claws that cannot grip it off the ground — it works now because the quiet lasts and nobody is looking, where the first quiet lasted one shy whisper.\n\n# THE IDEA THE STORY WAS COMMISSIONED FROM (names and world reference only)\n\nThe arc above delivers the commission; keep its names and world as written.\n\nTitle: Vier Freunde und ein Drachonei\nCategory: adventure\nType: Drachen-Abenteuer\nTheme: dragon\nSeason: Autumn\nSetting/location: Zurich, Zurich, Switzerland\nRelationships:\n  - Levin is Älteres Geschwister von Julian\n  - Julian is Jüngeres Geschwister von Levin\n\n# CHARACTER DETAILS\n\nThese details decide who each figure IS: age, gender, what they are good at, what they find hard, what they like. Never contradict one, never invent one.\nThe arc above is settled and decides the SITUATION: who knows whom here, where they are, what is happening to them. Where a saved detail contradicts the arc — a friendship where the arc stages a first meeting — the arc stands, and the detail is simply not true in this book.\n\n**Levin** (main character):\n- Age: 5\n- Gender: male\n- Strengths: Fröhlich, Freundlich, Hilfsbereit, Beschützend, Nachsichtig, Treu, Gerecht, Ehrlich, Vertrauenswürdig, Geduldig, Neugierig, Fantasievoll, Klug, Kreativ, Aufmerksam, Einfallsreich, Abenteuerlustig, Schnell, Stark, Fleissig, Leader, Mutig, Grosszügig, Selbstbewusst, Lustig\n- Flaws: Schüchtern, Unentschlossen, Leichtgläubig, Petze, Gesprächig, Vergesslich, Tollpatschig\n- Special details: Lieb Dinosaurier und Drachen. Sein Bruder ist Julian und Max und Kiaan sind seine guten Freunde. Er kann gut Velofahren und Unihockey spielen\n\n**Julian** (main character):\n- Age: 3\n- Gender: male\n- Strengths: Fröhlich, Freundlich, Hilfsbereit, Lustig, Nachsichtig, Beschützend, Treu, Grosszügig, Gerecht, Ehrlich, Vertrauenswürdig, Abenteuerlustig, Aufmerksam, Kreativ, Klug\n- Flaws: Schüchtern, Leichtgläubig, Unentschlossen, Tollpatschig, Ängstlich, Stur\n- Special details: Seine freunde: levin, julian, max. Er isst sehr gerne, liebt es mit seinem Bruder und seinen Freunden zu spielen, hat gerne Ballspiele\n\n**Max** (main character):\n- Age: 3\n- Gender: male\n- Strengths: Fröhlich, Freundlich, Lustig, Ehrlich, Selbstbewusst, Mutig, Vertrauenswürdig, Entschlossen, Fleissig, Fantasievoll, Neugierig, Kreativ, Aufmerksam, Abenteuerlustig, Stark, Schnell\n- Flaws: Gesprächig, Leichtgläubig\n- Special details: Spielt gerne mit seinen Freunden Kiaan, Levin, Max. Seine Hündin heisst Nia. Er spielt gerne Fussball und fährt gerne Velo\n\n**Kiaan** (main character):\n- Age: 3\n- Gender: male\n- Strengths: Fröhlich, Freundlich, Hilfsbereit, Lustig, Nachsichtig, Beschützend, Treu, Grosszügig, Gerecht, Ehrlich, Selbstbewusst, Vertrauenswürdig, Mutig, Geduldig, Fantasievoll, Neugierig, Klug, Kreativ, Aufmerksam, Abenteuerlustig\n- Flaws: Vergesslich, Petze, Unentschlossen, Schüchtern\n- Special details: Spielt gerne mit Levin, Julian, Max. Liesst gerne oder spielt gerne Ball oder auf dem Spielplatz\n\n**REAL LANDMARKS the story above uses:**\n- Lindenhof (Zürcher Hügelzug) [Square]\n  PHOTOS: (exterior) Town square with large mature trees providing canopy, featuring outdoor chess playing area with…; (exterior) Aerial urban cityscape of Zurich showing historic districts, modern high-rises, and surrounding…; (exterior) The baroque Zunfthaus zur Meisen guild hall and the Münsterbrücke with its bronze rider statue,…\n- Grossmünster [Church]\n  PHOTOS: (exterior) Twin cream-colored church towers with pyramidal cupolas topped by Swiss flags and cross finials.; (exterior) Twin stone towers with ornamental cupolas and Swiss flags, viewed across waterfront from lower…; (exterior) Pair of stone church towers with distinctive architectural details, contemporary structures…; (interior) Interior nave with stone columns supporting ornate gilded ceiling; stone statue of Charlemagne…\n\n- A landmark is drawn from one of its PHOTOS. Name a location or a vantage of it only from a viewpoint one of its photos shows — an exterior is seen from the street or the square, an interior from inside, a distant or view-from photo from afar. If no photo shows the view a page needs (a skyline from a hilltop, a bird's-eye, the far side), that landmark is not available for that page: use one whose photos fit, or none. A view the commission's own words describe is the exception: it stands, and the landmark in it is drawn from what its photos show\n\n# MINI HERO'S JOURNEY (age 5)\n\nThe child this book is for is five. Write for that child.\n\n**The full shape, in small.** Ordinary world, then a call that pulls the main character out of it,\nthen challenges that get harder, then a moment where all seems lost, then the turn, then home —\nchanged. Every one of those beats is in the story, in that order.\n\n**A real low point is required.** Before the end there is a page where the plan has failed, the thing\nis lost, or the friend is gone, and it looks like it will stay that way. Do not soften it into a\nsmall setback and do not skip past it in a line.\n\n**The hero's own idea turns it.** What saves the day comes out of the main character — something they\nnoticed earlier, a strength of theirs, a thing they were told and remembered. Never luck, never a\ngrown-up arriving to fix it, never a power handed over at the last moment.\n\n**It resolves.** The turn comes before the last page and they come home changed. Never a story that\nstops on the problem.\n\n**A real antagonist is allowed.** Someone who wants something opposed to what the main character\nwants, with a reason of their own. A twist, a sidekick who earns their place, and a setup on an early\npage that pays off at the end all belong here.\n\n**Competence.** The main character does things: decides, tries, fails, adapts. They are never carried\nthrough their own story.\n\n**The stake is the main character's own.** What is wanted and what is at risk belong to their own\nlife — never a piece of work set for them, an assignment, a submission, a competition entry, or a\nplace to be won in a selection. What stands in the way is something they can reach out and touch, or\nsomeone who wants the opposite, never a procedure, a schedule or a system to be satisfied.\n\n**Humour and mild peril.** A chase, a close call, a night out in the cold are fine. Nothing gory,\nnothing cruel, nobody the reader likes is really harmed.\n\n**Ending.** They come back to where they started and it reads differently, because they are different.\n\n**The age owns the props and the subject.** What the main character wants, what stands in the way, and the objects the story turns on belong to the world of someone that age — what they handle themselves, where they go on their own, what counts as a loss to them. Never a want, a comfort or a plaything the reader has outgrown, and never stakes beyond what someone that age would be given.\n\n# PAGE PLAN\n\nTHE BOOK'S TARGETS — every one is counted in code on the finished plan. A figure the STORY LOGIC names (new) is not commissioned and may share a page with commissioned characters or carry a page alone.\n- At least 1 page of type face, and a face page shows a commissioned character.\n- At least 1 page of type landscape or object; two are fine, ideally one of each.\n- No two neighbouring pages share both their type and their characters.\n- At most 3 pages of type group.\n- The who column names commissioned characters and the figures of the STORY LOGIC, nobody else: a figure you invent is a fault.\n\nEach page has a type, and the type fixes who is in frame:\n- landscape: nobody. A place, the weather, a vessel or a distant sight.\n- object: nobody, or one character's hand. One object.\n- face: exactly one character, a close-up of their face.\n- medium: one to three characters.\n- group: four or more characters, all sharing one simple action.\nThe who column holds names only, or the word nobody: never a count, a group word or a description.\n\nBefore dividing, plan the pictures — simple pages first:\n1. The story's emotional highlights: which moments earn a page of one character showing a strong feeling, close up?\n2. Which moments earn a page with no people in frame? Only a subject the story has been driving toward — a discovery, an arrival, a payoff: the castle found after the long search. A place with no story weight never gets its own page. At least one page in the book earns this. Choose one whose drama is a place, the weather, a vessel or an object seen from afar; never a page whose drama is between people — a parting, a confrontation, tears, a promise, a handover. Those pages get faces, and so does every picture question 5 names as most wanted.\n3. Which pages gather the whole cast, and what one simple action do they all share there? \n4. Where are three or more characters truly unavoidable? Bypass it where the story allows; keep it only where the story demands it. Where one is kept, the third character shares the page's one action — takes part in it, never does a second action and never only stands by.\n5. For each act — setup, middle, ending — which picture does a child most want to see there, and which page stages it as its instant? The acts are the story's sentences in thirds: setup 1–6, middle 7–12, ending 13–18. The ending's own event — the reunion, the goodbye, the parting — is always one of them. A picture that falls between two pages, or that only a page's change reports as already done, is not staged.\n6. Write the CAST block before the plan lines. One line per commissioned character: the page whose instant is their own action from the story, alone or with one companion, and 2 more pages they are in frame on. Then page 18, the last: the names of everyone the story keeps together at the end. Every plan line keeps what the block promises.\nThen one line per page: type — who is in frame — the instant the picture shows — what is true after this page that was not before. The first field is the page's type: landscape, object, face, medium, group. Camera shots are chosen after the plan is final, never here.\nA complicated page — much action, many characters at once — is a fault: simplify the picture, never the story. A page after which nothing is true that was not before is filler: give it a change or give its material to a neighbouring page. What is true after is a change in the story’s state, not the instant in other words: something now held, moved, opened, broken, learned, decided or agreed that was not true before this page. A fourth field that only redescribes the picture states no change.\n\nThe plan line's instant is a single drawable moment:\n- One instant, one action: no montage, no before-and-after, no \"then\", no passage of time inside one picture; when a beat contains a change, pick the single moment that shows it. Never two actions by one character: plan the dominant one and leave the other out, never joined by \"and then\", \"before turning to\" or a trailing clause. One thing is being done, and everyone else watches it or does that same thing in the same place; two characters given different actions at one instant lose one of them, and so do two vehicles, vessels or creatures each with its own state or its own crew. The action at the moment it happens, never the state that follows it. A deed, its effect, and where the effect goes are three actions. Watching, standing and being present are not actions, and an effect that is the deed itself made visible at the same instant is part of the deed. When a plan line holds more than one action, split them across pages; a beat whose actions cannot share a picture gives one page the contact and the next page the second action, or the picture drops the secondary action and keeps the main event. The instant is at most 20 words.\n- A page holds at most 6 named characters, a named animal that acts in the story counting as one; two or three carry it best. A page that gathers the whole cast is wide or distant, all of them sharing one simple action — boarding, hauling one line together — or seen from behind moving off. All of them watching one thing is a shared action only when they are seen from behind or over the shoulder, toward what they watch; facing the viewer it never is. Standing or gathering together while a feeling shows, or while the event happens behind them, is everyone present doing nothing — never a row of figures facing the viewer. One of them acting while the rest look on — a hand-over between two, one speaking, one laughing — is not a shared action: every one of them does the same thing. Add no unnamed figures — no crew, crowd, onlookers or extra animals.\n- The second field is the complete cast of that picture. Every figure the instant stages — a person, or a creature the story tracks — including one watching from the background — belongs in that field, or is not written into the instant at all. A figure the picture shows only in part — a wing, a tail, a head or a hand reaching into the frame, a flank or a chest filling it — is in that picture exactly as if it were shown whole. Only a name without a body is context: the owner of a prop or a place, someone behind, beyond or outside what the picture shows. A figure named only in what is true after this page is not in the picture either: put them in that field or leave them off the page. A figure the previous page staged does not carry into the next one as background.\n- One camera position: an instant is seen from one spot — never inside a vehicle or structure and its exterior at once.\n- At most two height levels per picture: people, animals or objects at three or more different heights in one frame — one on the ground, one climbing the tree, one up in the tree; someone in the foreground and someone in the tree is fine. A whole cast carried together on one back or one boat is one level. Where a third level appears, stage the page on the two levels its event happens on and give the third level its own page.\n- Several characters holding or moving one thing together is fine when that is the page's one action. A hand-over or an object in flight is never the instant: pick the instant before or after it. Never a thought or realization as the instant, or a climbing or stretching pose with hidden limbs; when the event is internal or mechanical, name its visible result instead (the box open, the found object held up).\n- A figure trapped, cut off or unable to reach is given no means to end it: the obstacle's distance is named against the body (\"the rim of the shaft three times their height above them\", \"the ledge a full arm's length beyond the fingertips\"), never a grip, hold or footing that would let them out.\n- Never a pointing gesture as the instant: a look toward the thing, a turned head, a step toward it, or the thing held up instead.\n- Never an exact count of like things in the instant: one, two, or several — a number above two belongs to the text.\n- Name what is in the picture, never what is absent, empty or missing from it. When the absence is the story point, name its visible consequence, or make the empty place the page's subject.\n- Beyond the page's type, never compose the frame — what fills it, how large something looks, where it sits, or where the camera stands.\n- A size or a look is stated only where the plot turns on it: a thing too heavy for one child to lift, too big to hide, small enough to pocket. It is stated as that plot fact, never as a comparison with another thing (\"as big as a …\", \"the size of a …\"). Every other size and look is left to the pictures, which size everything themselves; leaving it out drops no fact. A plan line names each thing plainly; the Art Director sizes it.\n- The beat's main event wins the picture. A secondary figure or action is dropped before the main one is reduced to a shadow, a silhouette or a sound: the arriving creature is in frame as itself, and the reunion outranks the bystander.\n\nRequirements:\n- Each page follows causally from the one before it: no page stages a moment the story reaches only in a later sentence.\n- What a page establishes about a thing — stuck, heavy, hidden, out of reach — stays true until a later page changes it.\n- Consecutive pages do not stage the same place with the same grouping, and one gathering is not split across two pages. A page keeps its characters at one depth together; separate a figure into the background only when the page's own instant requires the separation, and keep such pages few.\n- Every page is visible: something happens that a picture can show. A character whose action is what a page's instant works against — a way blocked, a place kept, a thing taken or withheld, a refusal — is named in that page's plan line.\n- Levin is in frame on at least 9 pages; the others come and go in different combinations, not the whole group on every page. Every commissioned character gets a focal page of their own whose instant is the action the story gives them. The story's central figure, the dragon egg / the little dragon, acts in each third of the book — it chooses, moves, speaks or changes something in a page's instant, never only carried.\n- A character's focal page stages them alone or with one companion — two people sharing one action carry it — and stages them doing something visible. An internal decision gets a physical correlative — a held object, a step taken, a grip tightened; never a lone motionless figure.\n- When an AVAILABLE LANDMARKS list is present, an arc that names landmarks has chosen them — keep those, not others; an arc that names none has chosen none. A landmark may be scenery — a tower on the horizon, a bridge behind the action — and never relocates the story. No page names more than one place.\n- A page shows a character about to act, decide or know what to do only when the next page shows that same character doing it.\n- A physical challenge spends one page on the attempt itself — a character mid-effort against the obstacle. The decision before and the relief after never replace it.\n- The emotional low point — a loss, a setback, the goal looking lost — gets a page of its own; the loss and its recovery never share a page.\n- A race or deadline the story runs on is scored mid-book at least twice — a page shows who is ahead or how much remains.\n- The stake the arc has a character say aloud lands on an early page, shown as a visible act, never as the words said.\n- A character's first page stages their arrival or a naming by someone present, shown as a visible act and never as the words said; a badge, a garment, a title or an epithet is not a naming. A character in frame before anyone says who they are is unplaced.\n- A prop, pet or skill that solves a problem appears on an earlier page with its owner before it does the work, and nothing a page plants is left without a later page that pays it off.\n- At most 1 page with figures in frame holds none of the commissioned characters; every other page with figures holds at least one.\n- Page 1 opens on an action already under way, and each character's first page shows them doing something.\n- When the story's ending has an event of its own, the last page stages that event as its instant.\n- The last page shows the commissioned characters safe and together, unless the story itself separates them.\n- No plan line states what anyone learned, realised or now understands.\n\n# OUTPUT FORMAT\n\nOnly what the format below shows. No preamble, no commentary. The CAST block, then one line per page, through page 18.\n\n---CAST---\n<name> — deed page <N>: <their own action from the story>, <alone, or with whom> — also on pages <N>, <N>\nEnding page 18: <names, comma separated>\n---PAGE PLAN---\nPage <N>: <type> — <names, or the word nobody> — <the instant the picture shows> — <what is true after this page that was not before>\n\n",
+     "chars": 29998,
+     "label": "testlab_typed_plan",
+     "modelId": "claude-sonnet-5-5",
+     "truncated": false
+    },
+    {
+     "kind": "text",
+     "text": "# YOUR TASK\n\nThe story below is finished. Divide it into 18 pages: plan the pictures, simple pages first, then one PLAN line per page. Plan in ENGLISH; the book will be written in Swiss Standard German (ss, never ß — never dialect) — names, places and cultural details as they will appear there. Reader: kindergarten age (about five).\n\nCommissioned characters: Levin, Julian, Max, Kiaan\n\n# THE STORY (final — it was told, challenged and re-told; divide it, never retell or repair it)\n\n1. On an autumn afternoon Levin, his little brother Julian and their friends Max and Kiaan play ball on the Lindenhof, where the sun still shines on the Grossmünster towers across the roofs, and Kiaan wears his thick warm autumn jacket.\n2. A man in an orange vest pushes his cart up onto the Lindenhof and starts his leaf blower, because he must get every leaf into the cart by the chess field before dark, so that nobody slips on them tomorrow.\n3. When the ball rolls into the big leaf heap between the roots of a linden, Julian digs for it and finds an egg as big as a football and as warm as an oven tile, knocking softly from inside.\n4. Nobody knows whose egg it is, but Julian spots a golden eye blinking in the linden's crown, and there, in her nest high in the branches, crouches a dragon as big as a horse, red and yellow exactly like the leaves.\n5. Levin, who loves dragons, tells her their names, and she says she is Rubina: the cold wind from the lake shook her egg out of that nest, and it must be back in the warm nest before night, or her little one will never hatch.\n6. But the linden is far too high for the children to climb, and Rubina cannot come down to them, because the roar hurts her fine ears, which are made to hear the faint knocking of her egg from far away, and with her wings pressed over her ears she cannot fly.\n7. So the children pile leaves over the egg as a blanket, and Levin goes to ask the man to stop, but the blower swallows his whisper, and when the man switches off, says he is Herr Keller and asks \"What?\", Levin turns red and says nothing.\n8. In that short quiet Julian sees Rubina climb down the trunk with her branch-claws toward the egg, but when Max shouts into Herr Keller's ear that a dragon egg lies under the leaves, Herr Keller laughs that dragons live only in books and switches on again, and Rubina climbs back up into the crown.\n9. The blast blows the leaf blanket away, so the egg wobbles out of the roots and rolls down the slope toward the steep stairs.\n10. Levin shouts \"Careful, stairs!\", and Max runs as fast as he can and stops the egg with his foot like a football, right at the top step.\n11. Kiaan pulls off his warm jacket, wraps the egg in it and carries it carefully back under the linden, but the wind is cold and the knocking grows quieter.\n12. Soon the sun lights only the tips of the Grossmünster towers, Herr Keller roars up to blow away the last leaves right under the linden, and inside the jacket the knocking almost stops.\n13. But Julian remembers: \"When it was quiet, Rubina came down!\"\n14. Levin saw that Herr Keller switches off for anyone who tugs his sleeve, so with shaking knees he tugs it and asks loudly how the leaf blower works.\n15. Herr Keller switches off and turns to show him the cart by the chess field, his back to the linden, and Levin asks question after question: twice Herr Keller reaches for the switch, and twice Levin asks something new.\n16. Rubina climbs down the trunk, a branch cracks and Herr Keller half turns, so she presses flat against the bark until Levin quickly asks how heavy the full cart is, and then she climbs the last bit and holds out claws that are made for branches and cannot grip the egg off the ground, so Kiaan lifts it up to her in his jacket.\n17. She breathes warm air over the egg and carries it up into the nest, leaving the jacket in Kiaan's hands, and her wing beats shake every last leaf off the linden, so that Herr Keller turns round and sees his clean square covered red and yellow in the dusk and groans that he must start all over tomorrow.\n18. Up in the warm nest the egg cracks and a little dragon peeks out at the four friends, and Rubina climbs down once more, says \"Thank you!\" and breathes a warm puff onto their cold hands, Julian strokes her nose, and Levin beams: \"This time I dared!\"\n\nChallenges taken:\n1. daylight running out over the Lindenhof\n2. the egg must be home before dark\n3. the fragile egg rolls toward the steep stairs\n4. Kiaan holds the egg up into a dragon's claws\n5. Rubina freezes on the trunk as Herr Keller half turns\n\n# FIX WHILE DIVIDING — apply these where the division can carry them\n\nEach is a change to the STORY. Apply it in the pages where a picture can hold it. Where it cannot — a figure kept in frame past the cast limit, two actions at one instant — leave it to the text, which is told to apply what the division has not. Never break a rule below to honour a hint.\nA hint never changes the situation the story settled: where one asks for what the story above rules out — a saved profile's friendship where the story stages a first meeting — the story stands and the hint is dropped.\nA hint opens with the story sentence it changes, as (s7) or (s14-15): it applies where that sentence is told, never earlier, and what it changes there replaces what the sentence says.\n\nISSUE (s5): Rubina explains the problem but never asks the children for help, contrary to her motive. → CHANGE: After she says the egg must be back before night, have her ask the four to help because she cannot come down.\nISSUE (s11): Kiaan’s forgetfulness is never shown, so the 3-year-old who must hold on tight feels generic rather than himself. → CHANGE: After wrapping the egg let him nearly set it down before he remembers and clutches it tightly to his chest.\nISSUE (s12): Julian’s fear of the loud machine is never shown, making the timid 3-year-old less relatable. → CHANGE: When Herr Keller roars right up to the linden, have Julian cover his ears and hide behind Levin.\n\n# THE STORY LOGIC — the facts the story above was told from\n\nEvery page keeps to these facts. A page breaks a fact when its who, its instant or its change uses a thing, a material, an ability or a limit against what the story logic states of it. A hint that names a fact it changes replaces that fact; every other fact holds on every page.\n\nWant and stakes: Levin and Julian want the warm, knocking egg back in Rubina's nest high in the linden before night falls on the Lindenhof; if it cools out, the little dragon inside will never hatch.\nOpposition: Herr Keller with his roaring leaf blower, who has come onto the Lindenhof to get every leaf into his cart before dark so that nobody slips tomorrow.\nFacts:\n- Levin (commissioned) — loves dragons and talks and talks once he dares; limit: too shy to speak up to a grown-up he does not know, so at first he only whispers.\n- Julian (commissioned) — notices small things (an eye in the leaves, Rubina moving in the quiet); limit: he is three and afraid of the loud machine.\n- Max (commissioned) — a fast football player who stops a rolling ball with his foot; limit: he blurts out the truth at the wrong moment.\n- Kiaan (commissioned) — wears his own thick warm autumn jacket and gives it up for the egg; limit: he forgets things, so he must hold on tight.\n- Rubina (new) — her nest sits high in this linden; her warm breath warms the egg and she carries it up; limit: the blower's roar hurts her fine ears, which are made to hear her egg's faint knocking from far off, and with her wings over her ears she cannot fly.\n- Herr Keller (new) — his leaf blower clears the square fast; limit: he hears nothing over it, so he switches off when someone tugs his sleeve, and he names himself then.\n- Rubina is as big as a horse: her claws are made for branches, so she can climb the trunk but cannot grip the smooth egg off the ground — it must be lifted up to her; her red and yellow scales hide her in the crown from anyone not looking for her.\n- The egg lives on warmth: the cold lake wind cools it, its knocking grows quieter as it cools, and it must be in the warm nest before night.\nMotives:\n- Levin: loves dragons and wants Rubina's little one to hatch → whispers to Herr Keller, later keeps him talking with his back to the linden.\n- Julian: wants Rubina to get her egg back → digs out the ball, spots her eye, remembers that she came down in the quiet.\n- Max: wants to save the egg → shouts the truth into Herr Keller's ear, then runs and stops the rolling egg with his foot.\n- Kiaan: wants the egg to stay warm → wraps it in his jacket and holds it up into Rubina's claws.\n- Rubina: wants her egg back in her warm nest before night → asks the children for help, climbs down in the quiet, freezes when nearly seen, warms and carries the egg, thanks them.\n- Herr Keller: wants the square free of slippery leaves before dark → keeps blowing, laughs off the dragon, reaches for the switch again and again.\nCentral figure: the dragon egg / the little dragon\nEvents: 5\nChain:\n- Because Julian digs his ball out of the leaf heap under the linden, the four find the warm, knocking egg, and Julian spots Rubina in her nest in the crown; she tells them her name and that the egg must be in her nest before night, but the roar keeps her from flying and the tree is too high to climb.\n- But Levin is too shy, and the blower is too loud for a whisper; when he tugs Herr Keller's sleeve and the machine goes quiet, Julian sees Rubina climb down — until Max shouts the truth, Herr Keller laughs and switches on, and Rubina climbs back up.\n- Because the blast blows the leaf blanket away, the egg rolls toward the steep stairs; Max stops it with his foot and Kiaan gives up his warm jacket, but now the egg is out in the cold wind.\n- But the jacket holds only a little warmth: the sun leaves all but the tips of the Grossmünster towers, Herr Keller roars right up to the linden, and the knocking almost stops. This is the low point.\n- Because Julian remembers that Rubina came down in the quiet, and Levin saw that Herr Keller switches off for anyone who tugs his sleeve, Levin dares to keep him talking with his back to the tree; Rubina risks the climb, freezes when a branch cracks, and finishes it because Levin asks one more question, and Kiaan lifts the egg into claws that cannot grip it off the ground — it works now because the quiet lasts and nobody is looking, where the first quiet lasted one shy whisper.\n\n# THE IDEA THE STORY WAS COMMISSIONED FROM (names and world reference only)\n\nThe arc above delivers the commission; keep its names and world as written.\n\nTitle: Vier Freunde und ein Drachonei\nCategory: adventure\nType: Drachen-Abenteuer\nTheme: dragon\nSeason: Autumn\nSetting/location: Zurich, Zurich, Switzerland\nRelationships:\n  - Levin is Älteres Geschwister von Julian\n  - Julian is Jüngeres Geschwister von Levin\n\n# CHARACTER DETAILS\n\nThese details decide who each figure IS: age, gender, what they are good at, what they find hard, what they like. Never contradict one, never invent one.\nThe arc above is settled and decides the SITUATION: who knows whom here, where they are, what is happening to them. Where a saved detail contradicts the arc — a friendship where the arc stages a first meeting — the arc stands, and the detail is simply not true in this book.\n\n**Levin** (main character):\n- Age: 5\n- Gender: male\n- Strengths: Fröhlich, Freundlich, Hilfsbereit, Beschützend, Nachsichtig, Treu, Gerecht, Ehrlich, Vertrauenswürdig, Geduldig, Neugierig, Fantasievoll, Klug, Kreativ, Aufmerksam, Einfallsreich, Abenteuerlustig, Schnell, Stark, Fleissig, Leader, Mutig, Grosszügig, Selbstbewusst, Lustig\n- Flaws: Schüchtern, Unentschlossen, Leichtgläubig, Petze, Gesprächig, Vergesslich, Tollpatschig\n- Special details: Lieb Dinosaurier und Drachen. Sein Bruder ist Julian und Max und Kiaan sind seine guten Freunde. Er kann gut Velofahren und Unihockey spielen\n\n**Julian** (main character):\n- Age: 3\n- Gender: male\n- Strengths: Fröhlich, Freundlich, Hilfsbereit, Lustig, Nachsichtig, Beschützend, Treu, Grosszügig, Gerecht, Ehrlich, Vertrauenswürdig, Abenteuerlustig, Aufmerksam, Kreativ, Klug\n- Flaws: Schüchtern, Leichtgläubig, Unentschlossen, Tollpatschig, Ängstlich, Stur\n- Special details: Seine freunde: levin, julian, max. Er isst sehr gerne, liebt es mit seinem Bruder und seinen Freunden zu spielen, hat gerne Ballspiele\n\n**Max** (main character):\n- Age: 3\n- Gender: male\n- Strengths: Fröhlich, Freundlich, Lustig, Ehrlich, Selbstbewusst, Mutig, Vertrauenswürdig, Entschlossen, Fleissig, Fantasievoll, Neugierig, Kreativ, Aufmerksam, Abenteuerlustig, Stark, Schnell\n- Flaws: Gesprächig, Leichtgläubig\n- Special details: Spielt gerne mit seinen Freunden Kiaan, Levin, Max. Seine Hündin heisst Nia. Er spielt gerne Fussball und fährt gerne Velo\n\n**Kiaan** (main character):\n- Age: 3\n- Gender: male\n- Strengths: Fröhlich, Freundlich, Hilfsbereit, Lustig, Nachsichtig, Beschützend, Treu, Grosszügig, Gerecht, Ehrlich, Selbstbewusst, Vertrauenswürdig, Mutig, Geduldig, Fantasievoll, Neugierig, Klug, Kreativ, Aufmerksam, Abenteuerlustig\n- Flaws: Vergesslich, Petze, Unentschlossen, Schüchtern\n- Special details: Spielt gerne mit Levin, Julian, Max. Liesst gerne oder spielt gerne Ball oder auf dem Spielplatz\n\n**REAL LANDMARKS the story above uses:**\n- Lindenhof (Zürcher Hügelzug) [Square]\n  PHOTOS: (exterior) Town square with large mature trees providing canopy, featuring outdoor chess playing area with…; (exterior) Aerial urban cityscape of Zurich showing historic districts, modern high-rises, and surrounding…; (exterior) The baroque Zunfthaus zur Meisen guild hall and the Münsterbrücke with its bronze rider statue,…\n- Grossmünster [Church]\n  PHOTOS: (exterior) Twin cream-colored church towers with pyramidal cupolas topped by Swiss flags and cross finials.; (exterior) Twin stone towers with ornamental cupolas and Swiss flags, viewed across waterfront from lower…; (exterior) Pair of stone church towers with distinctive architectural details, contemporary structures…; (interior) Interior nave with stone columns supporting ornate gilded ceiling; stone statue of Charlemagne…\n\n- A landmark is drawn from one of its PHOTOS. Name a location or a vantage of it only from a viewpoint one of its photos shows — an exterior is seen from the street or the square, an interior from inside, a distant or view-from photo from afar. If no photo shows the view a page needs (a skyline from a hilltop, a bird's-eye, the far side), that landmark is not available for that page: use one whose photos fit, or none. A view the commission's own words describe is the exception: it stands, and the landmark in it is drawn from what its photos show\n\n# MINI HERO'S JOURNEY (age 5)\n\nThe child this book is for is five. Write for that child.\n\n**The full shape, in small.** Ordinary world, then a call that pulls the main character out of it,\nthen challenges that get harder, then a moment where all seems lost, then the turn, then home —\nchanged. Every one of those beats is in the story, in that order.\n\n**A real low point is required.** Before the end there is a page where the plan has failed, the thing\nis lost, or the friend is gone, and it looks like it will stay that way. Do not soften it into a\nsmall setback and do not skip past it in a line.\n\n**The hero's own idea turns it.** What saves the day comes out of the main character — something they\nnoticed earlier, a strength of theirs, a thing they were told and remembered. Never luck, never a\ngrown-up arriving to fix it, never a power handed over at the last moment.\n\n**It resolves.** The turn comes before the last page and they come home changed. Never a story that\nstops on the problem.\n\n**A real antagonist is allowed.** Someone who wants something opposed to what the main character\nwants, with a reason of their own. A twist, a sidekick who earns their place, and a setup on an early\npage that pays off at the end all belong here.\n\n**Competence.** The main character does things: decides, tries, fails, adapts. They are never carried\nthrough their own story.\n\n**The stake is the main character's own.** What is wanted and what is at risk belong to their own\nlife — never a piece of work set for them, an assignment, a submission, a competition entry, or a\nplace to be won in a selection. What stands in the way is something they can reach out and touch, or\nsomeone who wants the opposite, never a procedure, a schedule or a system to be satisfied.\n\n**Humour and mild peril.** A chase, a close call, a night out in the cold are fine. Nothing gory,\nnothing cruel, nobody the reader likes is really harmed.\n\n**Ending.** They come back to where they started and it reads differently, because they are different.\n\n**The age owns the props and the subject.** What the main character wants, what stands in the way, and the objects the story turns on belong to the world of someone that age — what they handle themselves, where they go on their own, what counts as a loss to them. Never a want, a comfort or a plaything the reader has outgrown, and never stakes beyond what someone that age would be given.\n\n# PAGE PLAN\n\nTHE BOOK'S TARGETS — every one is counted in code on the finished plan. A figure the STORY LOGIC names (new) is not commissioned and may share a page with commissioned characters or carry a page alone.\n- At least 1 page of type face, and a face page shows a commissioned character.\n- At least 1 page of type landscape or object; two are fine, ideally one of each.\n- No two neighbouring pages share both their type and their characters.\n- At most 3 pages of type group.\n- The who column names commissioned characters and the figures of the STORY LOGIC, nobody else: a figure you invent is a fault.\n\nEach page has a type, and the type fixes who is in frame:\n- landscape: nobody. A place, the weather, a vessel or a distant sight.\n- object: nobody, or one character's hand. One object.\n- face: exactly one character, a close-up of their face.\n- medium: one to three characters.\n- group: four or more characters, all sharing one simple action.\nThe who column holds names only, or the word nobody: never a count, a group word or a description.\n\nBefore dividing, plan the pictures — simple pages first:\n1. The story's emotional highlights: which moments earn a page of one character showing a strong feeling, close up?\n2. Which moments earn a page with no people in frame? Only a subject the story has been driving toward — a discovery, an arrival, a payoff: the castle found after the long search. A place with no story weight never gets its own page. At least one page in the book earns this. Choose one whose drama is a place, the weather, a vessel or an object seen from afar; never a page whose drama is between people — a parting, a confrontation, tears, a promise, a handover. Those pages get faces, and so does every picture question 5 names as most wanted.\n3. Which pages gather the whole cast, and what one simple action do they all share there? \n4. Where are three or more characters truly unavoidable? Bypass it where the story allows; keep it only where the story demands it. Where one is kept, the third character shares the page's one action — takes part in it, never does a second action and never only stands by.\n5. For each act — setup, middle, ending — which picture does a child most want to see there, and which page stages it as its instant? The acts are the story's sentences in thirds: setup 1–6, middle 7–12, ending 13–18. The ending's own event — the reunion, the goodbye, the parting — is always one of them. A picture that falls between two pages, or that only a page's change reports as already done, is not staged.\n6. Your CAST block, under RE-DIVIDE, stands: every page you return keeps what it promises, and the block itself is not rewritten.\nThen one line per page: type — who is in frame — the instant the picture shows — what is true after this page that was not before. The first field is the page's type: landscape, object, face, medium, group. Camera shots are chosen after the plan is final, never here.\nA complicated page — much action, many characters at once — is a fault: simplify the picture, never the story. A page after which nothing is true that was not before is filler: give it a change or give its material to a neighbouring page. What is true after is a change in the story’s state, not the instant in other words: something now held, moved, opened, broken, learned, decided or agreed that was not true before this page. A fourth field that only redescribes the picture states no change.\n\nThe plan line's instant is a single drawable moment:\n- One instant, one action: no montage, no before-and-after, no \"then\", no passage of time inside one picture; when a beat contains a change, pick the single moment that shows it. Never two actions by one character: plan the dominant one and leave the other out, never joined by \"and then\", \"before turning to\" or a trailing clause. One thing is being done, and everyone else watches it or does that same thing in the same place; two characters given different actions at one instant lose one of them, and so do two vehicles, vessels or creatures each with its own state or its own crew. The action at the moment it happens, never the state that follows it. A deed, its effect, and where the effect goes are three actions. Watching, standing and being present are not actions, and an effect that is the deed itself made visible at the same instant is part of the deed. When a plan line holds more than one action, split them across pages; a beat whose actions cannot share a picture gives one page the contact and the next page the second action, or the picture drops the secondary action and keeps the main event. The instant is at most 20 words.\n- A page holds at most 6 named characters, a named animal that acts in the story counting as one; two or three carry it best. A page that gathers the whole cast is wide or distant, all of them sharing one simple action — boarding, hauling one line together — or seen from behind moving off. All of them watching one thing is a shared action only when they are seen from behind or over the shoulder, toward what they watch; facing the viewer it never is. Standing or gathering together while a feeling shows, or while the event happens behind them, is everyone present doing nothing — never a row of figures facing the viewer. One of them acting while the rest look on — a hand-over between two, one speaking, one laughing — is not a shared action: every one of them does the same thing. Add no unnamed figures — no crew, crowd, onlookers or extra animals.\n- The second field is the complete cast of that picture. Every figure the instant stages — a person, or a creature the story tracks — including one watching from the background — belongs in that field, or is not written into the instant at all. A figure the picture shows only in part — a wing, a tail, a head or a hand reaching into the frame, a flank or a chest filling it — is in that picture exactly as if it were shown whole. Only a name without a body is context: the owner of a prop or a place, someone behind, beyond or outside what the picture shows. A figure named only in what is true after this page is not in the picture either: put them in that field or leave them off the page. A figure the previous page staged does not carry into the next one as background.\n- One camera position: an instant is seen from one spot — never inside a vehicle or structure and its exterior at once.\n- At most two height levels per picture: people, animals or objects at three or more different heights in one frame — one on the ground, one climbing the tree, one up in the tree; someone in the foreground and someone in the tree is fine. A whole cast carried together on one back or one boat is one level. Where a third level appears, stage the page on the two levels its event happens on and give the third level its own page.\n- Several characters holding or moving one thing together is fine when that is the page's one action. A hand-over or an object in flight is never the instant: pick the instant before or after it. Never a thought or realization as the instant, or a climbing or stretching pose with hidden limbs; when the event is internal or mechanical, name its visible result instead (the box open, the found object held up).\n- A figure trapped, cut off or unable to reach is given no means to end it: the obstacle's distance is named against the body (\"the rim of the shaft three times their height above them\", \"the ledge a full arm's length beyond the fingertips\"), never a grip, hold or footing that would let them out.\n- Never a pointing gesture as the instant: a look toward the thing, a turned head, a step toward it, or the thing held up instead.\n- Never an exact count of like things in the instant: one, two, or several — a number above two belongs to the text.\n- Name what is in the picture, never what is absent, empty or missing from it. When the absence is the story point, name its visible consequence, or make the empty place the page's subject.\n- Beyond the page's type, never compose the frame — what fills it, how large something looks, where it sits, or where the camera stands.\n- A size or a look is stated only where the plot turns on it: a thing too heavy for one child to lift, too big to hide, small enough to pocket. It is stated as that plot fact, never as a comparison with another thing (\"as big as a …\", \"the size of a …\"). Every other size and look is left to the pictures, which size everything themselves; leaving it out drops no fact. A plan line names each thing plainly; the Art Director sizes it.\n- The beat's main event wins the picture. A secondary figure or action is dropped before the main one is reduced to a shadow, a silhouette or a sound: the arriving creature is in frame as itself, and the reunion outranks the bystander.\n\nRequirements:\n- Each page follows causally from the one before it: no page stages a moment the story reaches only in a later sentence.\n- What a page establishes about a thing — stuck, heavy, hidden, out of reach — stays true until a later page changes it.\n- Consecutive pages do not stage the same place with the same grouping, and one gathering is not split across two pages. A page keeps its characters at one depth together; separate a figure into the background only when the page's own instant requires the separation, and keep such pages few.\n- Every page is visible: something happens that a picture can show. A character whose action is what a page's instant works against — a way blocked, a place kept, a thing taken or withheld, a refusal — is named in that page's plan line.\n- Levin is in frame on at least 9 pages; the others come and go in different combinations, not the whole group on every page. Every commissioned character gets a focal page of their own whose instant is the action the story gives them. The story's central figure, the dragon egg / the little dragon, acts in each third of the book — it chooses, moves, speaks or changes something in a page's instant, never only carried.\n- A character's focal page stages them alone or with one companion — two people sharing one action carry it — and stages them doing something visible. An internal decision gets a physical correlative — a held object, a step taken, a grip tightened; never a lone motionless figure.\n- When an AVAILABLE LANDMARKS list is present, an arc that names landmarks has chosen them — keep those, not others; an arc that names none has chosen none. A landmark may be scenery — a tower on the horizon, a bridge behind the action — and never relocates the story. No page names more than one place.\n- A page shows a character about to act, decide or know what to do only when the next page shows that same character doing it.\n- A physical challenge spends one page on the attempt itself — a character mid-effort against the obstacle. The decision before and the relief after never replace it.\n- The emotional low point — a loss, a setback, the goal looking lost — gets a page of its own; the loss and its recovery never share a page.\n- A race or deadline the story runs on is scored mid-book at least twice — a page shows who is ahead or how much remains.\n- The stake the arc has a character say aloud lands on an early page, shown as a visible act, never as the words said.\n- A character's first page stages their arrival or a naming by someone present, shown as a visible act and never as the words said; a badge, a garment, a title or an epithet is not a naming. A character in frame before anyone says who they are is unplaced.\n- A prop, pet or skill that solves a problem appears on an earlier page with its owner before it does the work, and nothing a page plants is left without a later page that pays it off.\n- At most 1 page with figures in frame holds none of the commissioned characters; every other page with figures holds at least one.\n- Page 1 opens on an action already under way, and each character's first page shows them doing something.\n- When the story's ending has an event of its own, the last page stages that event as its instant.\n- The last page shows the commissioned characters safe and together, unless the story itself separates them.\n- No plan line states what anyone learned, realised or now understands.\n\n# RE-DIVIDE — one round\n\nRewrite ONLY the pages under PAGES TO REWRITE, each answering its Change and keeping its Keep, in the same line format (type — who — instant — after). Every other page stands as written, and a page you rewrite never breaks a target that held.\n\n## THE PLAN THAT STANDS\nPage 1: group — Levin, Julian, Max, Kiaan — the four friends kick a ball across the Lindenhof, Grossmünster towers in the sunlit distance — the friends are playing at the Lindenhof in afternoon sun\nPage 2: medium — Herr Keller — Herr Keller pushes his cart up onto the Lindenhof with the leaf blower roaring — a leaf-clearing man with a deadline has arrived\nPage 3: medium — Julian — Julian digs into the big leaf heap between the linden roots and pulls out a warm egg — the egg is found and knocks softly\nPage 4: face — Julian — Julian looks up wide-eyed at a golden eye blinking in the linden crown — a dragon is spotted in the nest\nPage 5: medium — Levin, Rubina — Levin tells Rubina his name beneath the tree while she crouches in the crown and asks the four to help — Rubina is named and asks for help before night\nPage 6: landscape — nobody — the high linden crown with the empty nest, branches far above the ground, cold lake wind blowing the leaves — the tree is too high to climb and the egg is out of the nest\nPage 7: medium — Levin, Herr Keller — Levin whispers up to Herr Keller beside the roaring blower, who cups a hand to his ear — his whisper is lost in the noise\nPage 8: medium — Max, Herr Keller — Max shouts into Herr Keller's ear while Herr Keller laughs — the truth is dismissed and the blower starts again\nPage 9: object — nobody — the egg wobbles and rolls out of the roots across scattered leaves toward the top of the steep stairs — the egg is rolling toward the stairs\nPage 10: medium — Max — Max stops the rolling egg with his foot at the top step — the egg is saved at the edge\nPage 11: medium — Kiaan — Kiaan wraps the egg in his jacket and clutches it tightly to his chest — the egg is wrapped but the cold wind is blowing\nPage 12: medium — Julian, Levin — Julian covers his ears and hides behind Levin as the blower roars near the linden — the knocking has nearly stopped and the sun leaves only the tower tips\nPage 13: face — Julian — Julian looks up with a bright face, remembering the quiet — the way to bring Rubina down is remembered\nPage 14: medium — Levin, Herr Keller — Levin tugs Herr Keller's sleeve while the blower falls silent — the blower is off and Levin has dared to speak\nPage 15: medium — Levin, Herr Keller — Herr Keller shows Levin the cart by the chess field with his back turned to the linden — the man is facing away from the tree\nPage 16: medium — Kiaan, Rubina — Kiaan holds the jacket-wrapped egg up high to Rubina's claws at the foot of the trunk — the egg is in Rubina's claws\nPage 17: medium — Rubina, Herr Keller — Rubina's wing beats shake all the leaves down while Herr Keller stares at the covered square — the square is covered in leaves again and the egg is in the nest\nPage 18: group — Levin, Julian, Max, Kiaan, Rubina — Rubina breathes a warm puff onto the four friends' cold hands beneath the linden — the little dragon has hatched and the friends are together\n\n---CAST---\nLevin — deed page 14: tugs Herr Keller's sleeve to ask how the leaf blower works, with Herr Keller — also on pages 5, 18\nJulian — deed page 3: digs into the leaf heap and finds the egg — also on pages 9, 12\nMax — deed page 10: stops the rolling egg with his foot at the top step — also on pages 1, 8\nKiaan — deed page 16: lifts the egg in his jacket up to Rubina's claws, with Rubina — also on pages 1, 11\nEnding page 18: Levin, Julian, Max, Kiaan, Rubina\n\n## PAGES TO REWRITE\nPage 2\nChange: Levin is in frame on 7 of 18 page(s), target 9 — put the main character in frame here\nKeep: type medium; in frame: Herr Keller; what is true after: a leaf-clearing man with a deadline has arrived\n\nPage 4\nChange: Make this one character alone showing one strong feeling, with nothing else happening.\nKeep: type face; in frame: Julian; what is true after: a dragon is spotted in the nest\n\nPage 6\nChange: Give this people-free page a subject the story has been driving toward, or give the page a character.\nKeep: type landscape; nobody in frame; what is true after: the tree is too high to climb and the egg is out of the nest\n\nPage 13\nChange: Name the action being performed, not a presence, a position or the state after an action.\nKeep: type face; in frame: Julian; what is true after: the way to bring Rubina down is remembered\n\nPage 15\nChange: both pages are medium with the same characters (pages 14 and 15): change this page's type or cast Name the action being performed, not a presence, a position or the state after an action.\nKeep: type medium; in frame: Levin, Herr Keller; what is true after: the man is facing away from the tree\n\n# OUTPUT FORMAT\n\nOnly what the format below shows. No preamble, no commentary. One line for each page you rewrite under RE-DIVIDE, and for no other page. No changes block.\n\n---PAGE PLAN---\nPage <N>: <type> — <names, or the word nobody> — <the instant the picture shows> — <what is true after this page that was not before>\n\n",
+     "chars": 34534,
+     "label": "testlab_typed_replan",
+     "modelId": "claude-sonnet-5-5",
+     "truncated": false
+    }
+   ],
+   "targetIndex": 0,
+   "standingPlan": [
+    {
+     "planLine": "wide — Levin, Julian, Max, Kiaan — the four friends kick a ball across the Lindenhof, Grossmünster towers in the sunlit distance — the friends are playing at the Lindenhof in afternoon sun",
+     "pageNumber": 1
+    },
+    {
+     "planLine": "medium — Levin, Herr Keller — Herr Keller pushes his cart up onto the Lindenhof with the leaf blower roaring while Levin watches from the side — a leaf-clearing man with a deadline has arrived",
+     "pageNumber": 2
+    },
+    {
+     "planLine": "medium — Julian — Julian digs into the big leaf heap between the linden roots and pulls out a warm egg — the egg is found and knocks softly",
+     "pageNumber": 3
+    },
+    {
+     "planLine": "close-up — Julian — Julian looks up wide-eyed at a golden eye blinking in the linden crown — a dragon is spotted in the nest",
+     "pageNumber": 4
+    },
+    {
+     "planLine": "over-the-shoulder — Levin, Rubina — Levin tells Rubina his name beneath the tree while she crouches in the crown and asks the four to help — Rubina is named and asks for help before night",
+     "pageNumber": 5
+    },
+    {
+     "planLine": "wide — nobody — the high linden crown with the empty nest, branches far above the ground, cold lake wind blowing the leaves — the tree is too high to climb and the egg is out of the nest",
+     "pageNumber": 6
+    },
+    {
+     "planLine": "over-the-shoulder — Levin, Herr Keller — Levin whispers up to Herr Keller beside the roaring blower, who cups a hand to his ear — his whisper is lost in the noise",
+     "pageNumber": 7
+    },
+    {
+     "planLine": "medium — Max, Herr Keller — Max shouts into Herr Keller's ear while Herr Keller laughs — the truth is dismissed and the blower starts again",
+     "pageNumber": 8
+    },
+    {
+     "planLine": "high-angle — nobody — the egg wobbles and rolls out of the roots across scattered leaves toward the top of the steep stairs — the egg is rolling toward the stairs",
+     "pageNumber": 9
+    },
+    {
+     "planLine": "high-angle — Max — Max stops the rolling egg with his foot at the top step — the egg is saved at the edge",
+     "pageNumber": 10
+    },
+    {
+     "planLine": "medium — Kiaan — Kiaan wraps the egg in his jacket and clutches it tightly to his chest — the egg is wrapped but the cold wind is blowing",
+     "pageNumber": 11
+    },
+    {
+     "planLine": "medium — Julian, Levin — Julian covers his ears and hides behind Levin as the blower roars near the linden — the knocking has nearly stopped and the sun leaves only the tower tips",
+     "pageNumber": 12
+    },
+    {
+     "planLine": "close-up — Julian — Julian shouts out with a bright, beaming face and lifts his small fist — the way to bring Rubina down is remembered",
+     "pageNumber": 13
+    },
+    {
+     "planLine": "medium — Levin, Herr Keller — Levin tugs Herr Keller's sleeve while the blower falls silent — the blower is off and Levin has dared to speak",
+     "pageNumber": 14
+    },
+    {
+     "planLine": "medium — Levin, Herr Keller, Max — Herr Keller walks Levin toward the cart by the chess field, while Max keeps pace beside them — the man is facing away from the tree",
+     "pageNumber": 15
+    },
+    {
+     "planLine": "medium — Kiaan, Rubina — Kiaan holds the jacket-wrapped egg up high to Rubina's claws at the foot of the trunk — the egg is in Rubina's claws",
+     "pageNumber": 16
+    },
+    {
+     "planLine": "over-the-shoulder — Rubina, Herr Keller — Rubina's wing beats shake all the leaves down while Herr Keller stares at the covered square — the square is covered in leaves again and the egg is in the nest",
+     "pageNumber": 17
+    },
+    {
+     "planLine": "wide — Levin, Julian, Max, Kiaan, Rubina — Rubina breathes a warm puff onto the four friends' cold hands beneath the linden — the little dragon has hatched and the friends are together",
+     "pageNumber": 18
+    }
+   ],
+   "elapsedMsTypedFlow": 23555
+  }
+ ],
+ "error": null,
+ "createdBy": "demo-b-hnecf@magicalstory.ch",
+ "createdAt": "2026-10-06T09:58:47.006Z",
+ "completedAt": "2026-10-06T09:59:10.804Z"
+}

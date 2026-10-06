@@ -1766,15 +1766,16 @@ function countPlanTargets({ rows, listedNames = [], commissionedNames = null, ar
   if (inventedPages.length) add('TYPED_INVENTED_FIGURE', inventedPages.map(r => r.pageNumber), `the who column names ${[...new Set(inventedPages.flatMap(r => r.names.filter(n => classOf(n) === 'invented')))].join(', ')}: neither a listed character nor a figure of the story logic`);
   if (sceneryPages.length < targets.sceneryMin) add('TYPED_NO_SCENERY_PAGE', [], `${sceneryPages.length} landscape or object page(s), target ${targets.sceneryMin}`);
 
-  const neighbourType = [];
+  // No two neighbouring pages the SAME SHOT with the SAME CAST (owner 2026-10-06). Counted only where a shot
+  // exists: the typed plan's shots are chosen by Jev AFTER the plan, so this is a finding of the shipped
+  // division (typedPlan.runTypedPlan -> measurePlan), never a plan-level re-plan reason.
   const neighbourShot = [];
   for (let i = 1; i < P; i++) {
     const a = rows[i - 1]; const b = rows[i];
     const sameCast = a.names.length === b.names.length && a.names.every(n => has(b, n));
-    if (a.type === b.type && sameCast) neighbourType.push([a.pageNumber, b.pageNumber]);
-    if (a.shot && a.shot === b.shot && a.names.length === b.names.length) neighbourShot.push([a.pageNumber, b.pageNumber]);
+    if (a.shot && a.shot === b.shot && sameCast) neighbourShot.push([a.pageNumber, b.pageNumber]);
   }
-  for (const pair of neighbourType) add('CONSECUTIVE_SAME_TYPE_CAST', pair, `both pages are ${rows.find(r => r.pageNumber === pair[0]).type} with the same characters`);
+  for (const pair of neighbourShot) add('CONSECUTIVE_SAME_SHOT_CAST', pair, `both pages are shot ${rows.find(r => r.pageNumber === pair[0]).shot} with the same characters`);
 
   const coverage = {};
   const focal = {};
@@ -1807,7 +1808,7 @@ function countPlanTargets({ rows, listedNames = [], commissionedNames = null, ar
       typeCounts, shotCounts, facePages, facePagesAll, sceneryPages, closeUpOnMultiFigurePages: closeUpMulti,
       groupPages, groupBudget: targets.groupMax, noCommissionedPages: noCommissioned, inventedPages: inventedPages.map(r => r.pageNumber),
       whoClasses: Object.fromEntries(rows.map(r => [r.pageNumber, Object.fromEntries(r.names.map(n => [n, classOf(n)]))])),
-      neighbourSameTypeCast: neighbourType, neighbourSameShotCount: neighbourShot,
+      neighbourSameShotCast: neighbourShot,
       coveragePages: coverage, focalPages: focal, mainCharacter: main,
       sceneryMixed: rows.some(r => r.type === 'landscape') && rows.some(r => r.type === 'object'),
       castPerPage: rows.map(r => ({ pageNumber: r.pageNumber, names: r.names })),

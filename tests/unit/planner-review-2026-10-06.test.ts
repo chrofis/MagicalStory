@@ -176,7 +176,9 @@ describe('the built planner, plan check and re-plan', () => {
 
   it('the main character\'s floor rides in both modes; the budget of one group is said once in typed mode', () => {
     const t = CC.typedPlanTargets({ pageCount: 12, listed: ['Ana', 'Ben'], maxCharactersPerScene: 6 });
-    for (const p of [planner(), planner({ typedPlan: true })]) expect(p).toContain(CC.mainFloorRule(t.mainMin, 'Ana'));
+    // production: the requirements line; typed: THE BOOK'S TARGETS (fix plan 2026-10-06), pointed to by the requirements line
+    expect(planner()).toContain(CC.mainFloorRule(t.mainMin, 'Ana'));
+    expect(planner({ typedPlan: true })).toContain(CC.typedTargetsRule(t, 'Ana'));
     expect(planner()).toContain(CC.groupPageRule(t.group));
     expect(planner({ typedPlan: true })).not.toContain(CC.groupPageRule(t.group));
   });

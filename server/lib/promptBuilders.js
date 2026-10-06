@@ -8734,9 +8734,11 @@ const TYPED_PLAN_TYPES_RULE = [
   'The who column holds names only, or the word nobody: never a count, a group word or a description.',
 ].join('\n');
 
-function plannerTypedFills(targets) {
+function plannerTypedFills(targets, mainName = null) {
   return {
-    TYPED_TARGETS: `${typedTargetsRule(targets)}\n\n${TYPED_PLAN_TYPES_RULE}\n\n`,
+    TYPED_TARGETS: `${typedTargetsRule(targets, mainName)}\n\n${TYPED_PLAN_TYPES_RULE}\n\n`,
+    // The floor is stated once, in THE BOOK'S TARGETS; the requirements line only points back to it.
+    MAIN_FLOOR: `${mainName ? `${mainName}'s` : "The main character's"} floor stands in THE BOOK'S TARGETS above;`,
     SHOT_PLANNING: '',
     PLAN_SHOT_FIELD: 'type',
     PLAN_SHOT_FORMAT: '<type>',
@@ -8809,7 +8811,7 @@ function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', 
     // (SHOT_DISTRIBUTION, SHOT_POSITIONS, OTS_NO_CONTACT, the close-up waist
     // sentence) went with the authorship.
     ...(typedPlan
-      ? plannerTypedFills(targets)
+      ? plannerTypedFills(targets, pickMainCharacters(inputData).focus?.name || null)
       : { TYPED_TARGETS: '', ...plannerShotFills(pageCount, legacyShots) }),
     PAGE_COUNT: pageCount,
     // HOW MUCH OF THE BOOK EACH COMMISSIONED CHARACTER GETS (owner,
@@ -8847,6 +8849,7 @@ function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', 
     CHANGES_FORMAT: String(replan || '').trim() && !typedPlan ? REPLAN_CHANGES_FORMAT : '',
     READER_LINE: readerLine,
     ONE_ACTION_DEF,
+    PEOPLELESS_WEIGHT_DEF,
     THIRD_CHARACTER_DEF,
     INTERLOCK_DEF,
     TWO_HEIGHTS_DEF,
@@ -9292,6 +9295,13 @@ const SPLIT_STATE_MARKINGS_RULE = 'Dividing, opening or breaking an object never
  * Each constant is ONE sentence of definition with no framing, so a rule can
  * precede it with an imperative and an audit with "name every page whose…".
  */
+/**
+ * What gives a page with nobody in it story weight — ONE sentence for the planner's question 2, the plan
+ * check's question 6 and the typed plan's WEIGHT question (owner 2026-10-06: a danger or obstacle with
+ * nobody in the picture counts, a thing rolling toward a drop, a nest out of reach).
+ */
+const PEOPLELESS_WEIGHT_DEF = 'A page with nobody in it has story weight when its subject is something the story has been driving toward — a discovery, an arrival, a payoff — or the danger or obstacle the characters face at that point: a thing rolling toward a drop, a goal out of reach.';
+
 const DEED_AND_EFFECT_DEF = 'A deed, its effect, and where the effect goes are three actions. Watching, standing and being present are not actions, and an effect that is the deed itself made visible at the same instant is part of the deed.';
 
 /**
@@ -11478,6 +11488,7 @@ function buildPlanCheckPrompt(inputData, beats, arc = '', pagePlan = '', { arcHi
   }
   return fillTemplate(template, {
     DEED_AND_EFFECT_DEF,
+    PEOPLELESS_WEIGHT_DEF,
     // The fourth field's contract, shared with the planner that writes it.
     PAGE_CHANGE: PAGE_CHANGE_DEF,
     TWO_HEIGHTS_DEF,
@@ -13262,6 +13273,7 @@ module.exports = {
   // constant each, filled into the rule AND the audit (sibling set
   // `beats-planner-vs-plan-check`).
   DEED_AND_EFFECT_DEF,
+  PEOPLELESS_WEIGHT_DEF,
   ONE_ACTION_DEF,
   THIRD_CHARACTER_DEF,
   INTERLOCK_DEF,

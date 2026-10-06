@@ -196,15 +196,19 @@ function planInstantRule(maxWords = PLAN_INSTANT_MAX_WORDS) {
 
 /**
  * The targets as the planner is told them, before it plans a page. Only what no other part of
- * the prompt already states: the main character's floor, the commissioned characters'
- * pages, the page budget of people without a commissioned character and the instant's
- * length are stated once, in the requirements (2026-10-06, the planner review).
+ * the prompt already states: the commissioned characters' pages, the page budget of people
+ * without a commissioned character and the instant's length are stated once, in the
+ * requirements (2026-10-06, the planner review). The main character's floor is the exception:
+ * the typed mode states it here and the requirements line points back to it.
  */
-function typedTargetsRule(t) {
+function typedTargetsRule(t, mainName = null) {
+  // The main character's floor stands HERE, with the targets (typed plan only, 2026-10-06: it was one sentence
+  // among thirty rules and the planner stopped at 6-8 of 9 at every effort). The number is t.mainMin, the one
+  // MAIN_UNDER_HALF counts; every appearance shares the page's one action (never a bystander).
   const lines = [
+    `- ${mainName || 'The main character'} is in frame on at least ${pagesWord(t.mainMin)} of ${t.pageCount}, each time taking part in that page's one action; count them as you plan.`,
     `- At least ${pagesWord(t.faceMin)} of type face, and a face page shows a commissioned character.`,
     `- At least ${pagesWord(t.sceneryMin)} of type landscape or object; two are fine, ideally one of each.`,
-    '- No two neighbouring pages share both their type and their characters.',
     `- At most ${pagesWord(t.groupMax)} of type group.`,
     '- The who column names commissioned characters and the figures of the STORY LOGIC, nobody else: a figure you invent is a fault.',
   ];

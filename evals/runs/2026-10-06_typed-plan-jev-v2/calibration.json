@@ -1,0 +1,190 @@
+{
+ "dataset": "typed-plan-jev-v2",
+ "precisionMin": 0.8,
+ "minFlagged": 4,
+ "perQuestion": {
+  "SIMPLE": {
+   "n": 96,
+   "positives": 22,
+   "auc": 0.894,
+   "agreement": 0.76,
+   "pick": {
+    "level": 0.655,
+    "flagged": 13,
+    "tp": 11,
+    "precision": 0.85,
+    "ci": [
+     0.58,
+     0.96
+    ]
+   }
+  },
+  "ACTION": {
+   "n": 101,
+   "positives": 2,
+   "auc": 0.99,
+   "agreement": 0.97,
+   "pick": null
+  },
+  "FELT": {
+   "n": 40,
+   "positives": 22,
+   "auc": 0.942,
+   "agreement": 0.93,
+   "pick": {
+    "level": 0.345,
+    "flagged": 26,
+    "tp": 21,
+    "precision": 0.81,
+    "ci": [
+     0.62,
+     0.91
+    ]
+   }
+  },
+  "OBSTACLE": {
+   "n": 113,
+   "positives": 10,
+   "auc": 0.966,
+   "agreement": 0.97,
+   "pick": {
+    "level": 0.52,
+    "flagged": 4,
+    "tp": 4,
+    "precision": 1,
+    "ci": [
+     0.51,
+     1
+    ]
+   }
+  },
+  "WEIGHT": {
+   "n": 42,
+   "positives": 2,
+   "auc": 0.975,
+   "agreement": 1,
+   "pick": null
+  },
+  "WHOLE": {
+   "n": 4,
+   "positives": 2,
+   "auc": 1,
+   "agreement": 1,
+   "pick": null
+  }
+ },
+ "calibration": {
+  "SIMPLE": {
+   "at": 0.605,
+   "noise": 0.05,
+   "calibrated": true,
+   "flagLevel": 0.655,
+   "precision": 0.85,
+   "ci": [
+    0.58,
+    0.96
+   ],
+   "flagged": 13,
+   "n": 96,
+   "positives": 22,
+   "auc": 0.894
+  },
+  "ACTION": {
+   "at": 1,
+   "noise": 0.05,
+   "calibrated": false,
+   "n": 101,
+   "positives": 2,
+   "auc": 0.99
+  },
+  "FELT": {
+   "at": 0.295,
+   "noise": 0.05,
+   "calibrated": true,
+   "flagLevel": 0.345,
+   "precision": 0.81,
+   "ci": [
+    0.62,
+    0.91
+   ],
+   "flagged": 26,
+   "n": 40,
+   "positives": 22,
+   "auc": 0.942
+  },
+  "OBSTACLE": {
+   "at": 0.47,
+   "noise": 0.05,
+   "calibrated": true,
+   "flagLevel": 0.52,
+   "precision": 1,
+   "ci": [
+    0.51,
+    1
+   ],
+   "flagged": 4,
+   "n": 113,
+   "positives": 10,
+   "auc": 0.966
+  },
+  "WEIGHT": {
+   "at": 1,
+   "noise": 0.05,
+   "calibrated": false,
+   "n": 42,
+   "positives": 2,
+   "auc": 0.975
+  },
+  "WHOLE": {
+   "at": 1,
+   "noise": 0.05,
+   "calibrated": false,
+   "n": 4,
+   "positives": 2,
+   "auc": 1
+  }
+ },
+ "disagreements": [
+  "atbttop6w|full-low_job_1791040103540_atbttop6w_rpa1|p5|SIMPLE",
+  "atbttop6w|first-medium_job_1791040103540_atbttop6w_r2|p16|SIMPLE",
+  "atbttop6w|full-low_job_1791040103540_atbttop6w_rpa2|p14|SIMPLE",
+  "atbttop6w|full-low_job_1791040103540_atbttop6w_rpa2|p15|SIMPLE",
+  "atbttop6w|first-medium_job_1791040103540_atbttop6w_r2|p5|SIMPLE",
+  "atbttop6w|first-medium_job_1791040103540_atbttop6w_r2|p18|SIMPLE",
+  "atbttop6w|full-low_job_1791040103540_atbttop6w_rpa2|p8|SIMPLE",
+  "atbttop6w|first-medium_job_1791040103540_atbttop6w_r1|p15|SIMPLE",
+  "atbttop6w|full-low_job_1791040103540_atbttop6w_rpa2|p5|SIMPLE",
+  "atbttop6w|first-low_job_1791040103540_atbttop6w_r2|p5|SIMPLE",
+  "atbttop6w|first-low_job_1791040103540_atbttop6w_r2|p14|SIMPLE",
+  "atbttop6w|first-medium_job_1791040103540_atbttop6w_r2|p8|SIMPLE",
+  "50osg2osm|first-low_job_1791145238223_50osg2osm_r1|p8|SIMPLE",
+  "50osg2osm|first-low_job_1791145238223_50osg2osm_r2|p6|SIMPLE",
+  "50osg2osm|first-low_job_1791145238223_50osg2osm_r2|p7|SIMPLE",
+  "atbttop6w|first-medium_job_1791040103540_atbttop6w_r2|p14|SIMPLE",
+  "atbttop6w|first-low_job_1791040103540_atbttop6w_r2|p16|SIMPLE",
+  "atbttop6w|first-low_job_1791040103540_atbttop6w_r2|p8|SIMPLE",
+  "atbttop6w|first-medium_job_1791040103540_atbttop6w_r1|p8|SIMPLE",
+  "atbttop6w|first-low_job_1791040103540_atbttop6w_r1|p15|SIMPLE",
+  "atbttop6w|first-medium_job_1791040103540_atbttop6w_r2|p15|SIMPLE",
+  "atbttop6w|full-low_job_1791040103540_atbttop6w_rpa2|p12|SIMPLE",
+  "atbttop6w|first-medium_job_1791040103540_atbttop6w_r1|p5|SIMPLE",
+  "atbttop6w|first-low_job_1791040103540_atbttop6w_r2|p15|SIMPLE",
+  "atbttop6w|first-medium_job_1791040103540_atbttop6w_r1|p14|SIMPLE",
+  "50osg2osm|first-low_job_1791145238223_50osg2osm_r1|p5|SIMPLE",
+  "50osg2osm|first-low_job_1791145238223_50osg2osm_r1|p6|SIMPLE",
+  "50osg2osm|first-low_job_1791145238223_50osg2osm_r2|p5|SIMPLE",
+  "atbttop6w|first-low_job_1791040103540_atbttop6w_r2|p18|SIMPLE",
+  "atbttop6w|first-low_job_1791040103540_atbttop6w_r1|p5|SIMPLE",
+  "atbttop6w|first-low_job_1791040103540_atbttop6w_r1|p14|SIMPLE",
+  "atbttop6w|first-medium_job_1791040103540_atbttop6w_r1|p9|ACTION",
+  "50osg2osm|first-low_job_1791145238223_50osg2osm_r2|p5|ACTION",
+  "atbttop6w|first-low_job_1791040103540_atbttop6w_r2|p9|ACTION",
+  "50osg2osm|first-low_job_1791145238223_50osg2osm_r2|p8|OBSTACLE",
+  "50osg2osm|first-low_job_1791145238223_50osg2osm_r1|p8|OBSTACLE",
+  "atbttop6w|first-low_job_1791040103540_atbttop6w_r2|p9|OBSTACLE",
+  "atbttop6w|first-medium_job_1791040103540_atbttop6w_r1|p9|OBSTACLE",
+  "p08djwhbl|stored|p9|FELT",
+  "50osg2osm|first-low_job_1791145238223_50osg2osm_r1|p7|FELT",
+  "vnx5l8iy7|stored|p3|FELT"
+ ]
+}

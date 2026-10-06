@@ -88,18 +88,22 @@ describe('every book target is counted, from the object the planner is told', ()
   const book = (n: number) => Array.from({ length: n }, (_, i) => line('medium', i % 2 ? 'Ana, Ben' : 'Ana, Cy'));
   it('the planner and the counters read ONE target object', () => {
     const t = CC.typedPlanTargets({ pageCount: 16, listed: LISTED, maxCharactersPerScene: 6 });
-    const rule = CC.typedTargetsRule(t);
+    const rule = CC.typedTargetsRule(t, 'Ana');
     const cov = CC.castCoverage({ pageCount: 16, castCount: 4 });
     expect(t.appearancesMin).toBe(cov.appearances.min);
     expect(t.groupMax).toBe(CC.groupPageBudget({ pageCount: 16, castCount: 4, maxCharactersPerScene: 6 }).max);
     expect(t.mainMin).toBe(8);
     expect(rule).toContain(`At most ${t.groupMax} page`);
-    // Said once (2026-10-06, the planner review): the main character's floor and the budget of pages
-    // without a commissioned character ride in the requirements of BOTH modes, the commissioned
-    // characters' floor in the CAST block, so the targets block no longer repeats them.
+    // Said once (2026-10-06, the planner review): the budget of pages without a commissioned character rides in
+    // the requirements of BOTH modes, the commissioned characters' floor in the CAST block, so the targets block
+    // does not repeat them. The MAIN character's floor is the typed mode's exception: it stands in THE BOOK'S
+    // TARGETS (the planner stopped at 6-8 of 9 when it was one sentence among thirty rules), the number being the
+    // one MAIN_UNDER_HALF counts; the production requirements line still carries it.
     expect(CC.mainFloorRule(t.mainMin, 'Ana')).toContain('Ana is in frame on at least 8 pages');
     expect(CC.noCommissionedRule(t.noCommissionedMax)).toContain(`At most ${t.noCommissionedMax} page`);
-    expect(rule).not.toContain('is in frame on at least');
+    expect(rule).toContain('Ana is in frame on at least 8 pages of 16');
+    expect(CC.typedTargetsRule(t)).toContain('The main character is in frame on at least 8 pages');
+    expect(rule).not.toContain('neighbouring pages share');
     expect(CC.castTableAlsoCount(cov) + 1).toBe(cov.appearances.min);
     // and the counters measure against exactly these
     const r = count(book(16));
@@ -113,7 +117,9 @@ describe('every book target is counted, from the object the planner is told', ()
     const lines = [line('landscape', 'nobody'), line('landscape', 'nobody'), line('landscape', 'nobody'), line('face', 'Ana'), line('face', 'Ana'),
       line('group', 'Ana, Ben, Cy, Dora'), line('group', 'Ana, Ben, Cy, Dora'), line('group', 'Ana, Ben, Cy, Dora')];
     const r2 = count(lines);
-    expect(codes(r2)).toContain('CONSECUTIVE_SAME_TYPE_CAST');
+    // neighbours are a SHOT + CAST rule, counted after Jev picks the shots (owner 2026-10-06), never a plan-level finding
+    expect(codes(r2)).not.toContain('CONSECUTIVE_SAME_TYPE_CAST');
+    expect(codes(r2)).not.toContain('CONSECUTIVE_SAME_SHOT_CAST');
     expect(codes(r2)).toContain('GROUP_PAGES_OVER_BUDGET');
     // people-free pages are not "no commissioned" pages (the counter bug of Lab #1662: 6 pages, 5 of them arc figures or scenery)
     expect(codes(r2)).not.toContain('TYPED_NO_COMMISSIONED_OVER');
@@ -177,10 +183,14 @@ describe('the planner prompt', () => {
     const p = PB.buildBeatsPrompt(input, 12, { finalArc: 'An arc.', typedPlan: true });
     const t = CC.typedPlanTargets({ pageCount: 12, listed: LISTED, maxCharactersPerScene: 6 });
     expect(p.indexOf("THE BOOK'S TARGETS")).toBeLessThan(p.indexOf('Before dividing'));
-    expect(p).toContain(CC.typedTargetsRule(t));
+    expect(p).toContain(CC.typedTargetsRule(t, 'Ana'));
+    // the main character's floor stands IN the targets block (before the planning question), once; the requirements line points back
+    expect(p.indexOf('Ana is in frame on at least 6 pages of 12')).toBeGreaterThan(-1);
+    expect(p.indexOf('Ana is in frame on at least 6 pages of 12')).toBeLessThan(p.indexOf('Before dividing'));
+    expect(p.split('is in frame on at least').length - 1).toBe(1);
+    expect(p).toContain("Ana's floor stands in THE BOOK'S TARGETS above;");
     // one term and one list: the commissioned characters are named at the head of the prompt
     expect(p).toContain('Commissioned characters: Ana, Ben, Cy, Dora');
-    expect(p).toContain(CC.mainFloorRule(t.mainMin, 'Ana'));
     expect(p).toContain(CC.noCommissionedRule(t.noCommissionedMax));
     // the group budget is said once in typed mode: as the "type group" target, not also as the planning question's budget
     expect(p.split(`At most ${t.groupMax} page`).length - 1).toBe(1);
@@ -214,7 +224,7 @@ describe('Jev: one paired question per call', () => {
     expect(asked('WEIGHT')).toEqual([1]);        // people-free pages
     expect(asked('HEIGHTS')).toEqual([3, 4, 5]); // two or more figures
     expect(asked('WHOLE')).toEqual([5]);         // every listed character in frame
-    expect(asked('ACTION')).toEqual([2, 3, 4, 5]);
+    expect(asked('ACTION')).toEqual([3, 4, 5]);  // not on a face page: a pure face is a presence by design (calibration v2)
     // two calls per (page, question): the virtue and its inverse
     expect(calls).toHaveLength(2 * Object.values(r.pages).reduce((n: number, p: any) => n + Object.keys(p.scores).length, 0));
   });
@@ -241,9 +251,9 @@ describe('Jev: one paired question per call', () => {
     const some = await TP.judgePlanPages({ arc: 'a', pages, rows, listed: LISTED }, { callImpl: impl, retryDelayMs: 1, calibration: { SIMPLE: { at: 0.85, noise: 0.1, calibrated: true }, DEED: { at: 0.7, noise: 0.1, calibrated: true }, ACTION: { at: 0.7, noise: 0.1, calibrated: false } } });
     for (const p of Object.values<any>(none.pages)) expect(p.flags.every((id: string) => TP.CALIBRATION[id] && TP.CALIBRATION[id].calibrated)).toBe(true);
     expect(some.flagged.SIMPLE).toBeUndefined();          // 0.8 < 0.85
-    expect(some.flagged.DEED).toEqual([1, 2, 3, 4, 5]);   // 0.8 >= 0.7
+    expect(some.flagged.DEED).toEqual([1, 2, 3, 4, 5]);   // 0.8 >= 0.7 + 0.1 (the flag level is the threshold plus its noise)
     expect(some.flagged.ACTION).toBeUndefined();          // scored, not calibrated
-    expect(some.pages[2].scores.ACTION).toBeCloseTo(0.8, 2);
+    expect(some.pages[3].scores.ACTION).toBeCloseTo(0.8, 2);
   });
   it('DEED is a paired question like WHOLE; HEIGHTS allows two levels, not three', () => {
     expect(TP.PLAN_QUESTIONS.DEED.virtue).toBeTruthy();
@@ -295,7 +305,7 @@ describe('the targeted re-plan', () => {
     const c = count(lines);
     const scope = scopeOf(c, jevOf({ 4: { DEED: 0.9 } }));
     expect(scope.get(4).reasons).toContain(TP.fixOf('DEED'));
-    expect(scope.get(4).keep).toEqual(expect.arrayContaining(['type medium', 'in frame: Ana, Ben']));
+    expect(scope.get(4).keep).toEqual(expect.arrayContaining(['type medium', expect.stringContaining('in frame: Ana, Ben')]));
     // no face page: candidates are interior pages with one or two figures, never page 1 or the last
     expect([...scope.keys()].every(n => n !== 1 && n !== 8)).toBe(true);
     expect([...scope.values()].flatMap(o => o.reasons).filter(w => /face page/.test(w)).length).toBeGreaterThan(0);
@@ -319,8 +329,10 @@ describe('the targeted re-plan', () => {
     const c = count(lines);
     const castTable = { characters: [{ name: 'Ana', deedPage: 3, alsoOn: [5] }], ending: { page: 8, names: ['Ana'] } };
     const prot = TP.protectedPages({ rows: c.rows, castTable, targets, classOf: (n: string) => (LISTED.includes(n) ? 'commissioned' : 'invented') });
-    for (const n of [1, 2, 3, 4, 5, 8]) expect(prot.has(n)).toBe(true);
-    for (const n of [6, 7]) expect(prot.has(n)).toBe(false);
+    // the deed page (3), the sole face (2), the sole scenery page (4), the ending (8) and the first stay locked; a page
+    // the CAST block only promises Ana "also on" (5) may be rewritten, her promise kept by its keep list
+    for (const n of [1, 2, 3, 4, 8]) expect(prot.has(n)).toBe(true);
+    for (const n of [5, 6, 7]) expect(prot.has(n)).toBe(false);
     // a Jev flag on a protected page is not sent back
     const scope = scopeOf(c, jevOf({ 2: { FELT: 0.95 }, 6: { DEED: 0.9 } }), { castTable });
     expect(scope.has(2)).toBe(false);
@@ -404,5 +416,163 @@ describe('planGuards: the production re-plan guards, one implementation', () => 
     expect(PG.duplicatePlanLine([{ planLine: 'a' }, { planLine: 'b' }])).toBeUndefined();
     expect(PG.pageCountHolds([1, 2, 3], 3)).toBe(true);
     expect(PG.pageCountHolds([1, 2, 3, 4], 3)).toBe(false);
+  });
+});
+
+// ───────────── fix plan items 1-6 (review 2026-10-06): scope, keep lists, floor, calibration v2, acceptance ─────────────
+describe('the re-plan scope reaches the main-character floor (fix 1)', () => {
+  // 18 pages, Ana the main character on 7, the CAST block promises pages the plan keeps and pages it does not.
+  const L4 = ['Ana', 'Ben', 'Cy', 'Dora'];
+  const book = [
+    line('medium', 'Ana, Ben'), line('medium', 'Ben'), line('landscape', 'nobody'), line('medium', 'Ana, Cy'), line('face', 'Dora'),
+    line('medium', 'Ben, Cy'), line('medium', 'Ana, Ben'), line('medium', 'Cy'), line('object', 'nobody'), line('medium', 'Ana, Dora'),
+    line('medium', 'Ben, Dora'), line('medium', 'Cy, Dora'), line('medium', 'Ana, Cy'), line('medium', 'Ben'), line('medium', 'Dora'),
+    line('medium', 'Cy, Ben'), line('medium', 'Ana, Ben'), line('medium', 'Ana, Dora, Cy'),
+  ];
+  const c = PC.typedPlanCounters({ pages: pagesOf(book), listedNames: L4, commissionedNames: L4, mainName: 'Ana', maxCharactersPerScene: 6 });
+  const t = CC.typedPlanTargets({ pageCount: 18, listed: L4, maxCharactersPerScene: 6 });
+  const castTable = { characters: [
+    { name: 'Ana', deedPage: 4, alsoOn: [7, 13] }, { name: 'Ben', deedPage: 2, alsoOn: [6, 14] },
+    { name: 'Cy', deedPage: 8, alsoOn: [12, 16] }, { name: 'Dora', deedPage: 5, alsoOn: [11, 15] },
+  ], ending: { page: 18, names: ['Ana', 'Dora', 'Cy'] } };
+  const CAL = Object.fromEntries(Object.keys(TP.PLAN_QUESTIONS).map(id => [id, { at: 0.5, noise: 0.1, calibrated: true }]));
+  // every page flagged: the OLD pool (not protected and not flagged) was empty
+  const flaggedAll = Object.fromEntries(c.rows.map((r: any) => [r.pageNumber, { scores: { SIMPLE: 0.95 }, flags: ['SIMPLE'] }]));
+  it('the floor is reachable: the candidate pool holds at least the shortfall plus one page, flagged pages included', () => {
+    expect(c.findings.map((f: any) => f.code)).toContain('MAIN_UNDER_HALF');
+    const scope = TP.replanScope({ rows: c.rows, findings: c.findings, jevPages: flaggedAll, castTable, targets: t, calibration: CAL, commissionedNames: L4, arcNames: [] });
+    const asked = [...scope.entries()].filter(([, o]: any) => o.reasons.some((w: string) => /in frame here, taking part/.test(w) && /Ana/.test(w)));
+    const need = t.mainMin - c.stats.mainCharacter.pages.length;
+    expect(need).toBeGreaterThan(0);
+    expect(asked.length).toBeGreaterThanOrEqual(need + 1);
+    for (const [n, o] of asked as any[]) {
+      expect([1, 18, 2, 4, 5, 8]).not.toContain(n);                  // never the first/last page or a kept deed page
+      expect(c.rows[n - 1].type).toBe('medium');
+      expect(c.rows[n - 1].names.length).toBeLessThanOrEqual(2);
+      expect(c.rows[n - 1].names).not.toContain('Ana');
+      expect(o.adds).toEqual(['Ana']);
+    }
+  });
+  it('a CAST promise the plan does not keep protects nothing; a kept "also on" promise stays in frame (keep list)', () => {
+    const broken = { ...castTable, characters: [{ name: 'Cy', deedPage: 8, alsoOn: [3, 12] }, ...castTable.characters.filter(x => x.name !== 'Cy')] };
+    const held = TP.heldPromises(broken, c.rows);
+    expect(held.deed.has(8)).toBe(true);
+    expect(held.stay.has(3)).toBe(false);                            // page 3 is nobody: Cy is not on it
+    expect(held.stay.get(12)).toEqual(['Cy']);
+    const flagged12 = { 12: { scores: { WHOLE: 0.95 }, flags: ['WHOLE'] } };
+    const scope = TP.replanScope({ rows: c.rows, findings: [], jevPages: flagged12, castTable: broken, targets: t, calibration: CAL, commissionedNames: L4, arcNames: [] });
+    expect(scope.get(12).keep.join(' | ')).toContain('stay in frame: Cy');
+    // a deed page whose promise the plan does not keep is no longer locked
+    const noDeed = { ...castTable, characters: [{ name: 'Cy', deedPage: 7, alsoOn: [] }, ...castTable.characters.filter(x => x.name !== 'Cy')] };
+    const prot = TP.protectedPages({ rows: c.rows, castTable: noDeed, targets: t, classOf: (n: string) => (L4.includes(n) ? 'commissioned' : 'invented') });
+    expect(prot.has(7)).toBe(false);                                 // page 7 is Ana, Ben: Cy is not there
+  });
+});
+
+describe('keep lists never contradict the Change (fix 2)', () => {
+  const rows = count([
+    line('medium', 'Ana, Ben', 'x', 'a dragon is spotted'), line('face', 'Cy', 'she gasps', 'a dragon is spotted'), line('landscape', 'nobody', 'the tree stands', 'the egg is out of the nest'),
+    line('medium', 'Ana, Ben', 'x', 'after'), line('medium', 'Ana, Ben', 'x', 'after'), line('medium', 'Dora', 'x', 'after'), line('medium', 'Ana', 'x', 'after'), line('medium', 'Cy', 'x', 'after'),
+  ]).rows;
+  const CALX = Object.fromEntries(Object.keys(TP.PLAN_QUESTIONS).map(id => [id, { at: 0.5, noise: 0.1, calibrated: true }]));
+  const t8 = CC.typedPlanTargets({ pageCount: 8, listed: LISTED, maxCharactersPerScene: 6 });
+  const scopeFor = (page: number, id: string) => TP.replanScope({ rows, findings: [], jevPages: { [page]: { scores: { [id]: 0.99 }, flags: [id] } }, castTable: null, targets: t8, calibration: CALX, commissionedNames: LISTED, arcNames: [] }).get(page);
+  it('FELT may name what the face reacts to: the after-field anchor is not kept', () => {
+    const o = scopeFor(2, 'FELT');
+    expect(o).toBeUndefined();                                        // the sole face page is protected: use a book with two
+    const rows2 = count([line('medium', 'Ana, Ben'), line('face', 'Cy', 'she gasps', 'a dragon is spotted'), line('face', 'Dora', 'he gasps', 'x'), line('landscape', 'nobody'), line('medium', 'Ana'), line('medium', 'Ana'), line('medium', 'Ben'), line('medium', 'Ana, Ben')]).rows;
+    const o2 = TP.replanScope({ rows: rows2, findings: [], jevPages: { 2: { scores: { FELT: 0.99 }, flags: ['FELT'] } }, castTable: null, targets: t8, calibration: CALX, commissionedNames: LISTED, arcNames: [] }).get(2);
+    expect(o2.keep.some((k: string) => k.startsWith('what is true after'))).toBe(false);
+    expect(o2.keep).toContain('type face');
+  });
+  it('WEIGHT may give the page a character: "nobody in frame" is not kept', () => {
+    const rows3 = count([line('medium', 'Ana, Ben'), line('medium', 'Ana'), line('landscape', 'nobody'), line('object', 'nobody'), line('face', 'Dora'), line('medium', 'Ana'), line('medium', 'Ben'), line('medium', 'Ana, Ben')]).rows;
+    const o = TP.replanScope({ rows: rows3, findings: [], jevPages: { 3: { scores: { WEIGHT: 0.99 }, flags: ['WEIGHT'] } }, castTable: null, targets: t8, calibration: CALX, commissionedNames: LISTED, arcNames: [] }).get(3);
+    expect(o.reasons.join(' ')).toContain('or give the page a character');
+    expect(o.keep.join(' | ')).not.toContain('nobody in frame');
+  });
+  it('a question whose repair changes who is in frame does not keep the cast, and the type follows the figure count', () => {
+    const o = scopeFor(5, 'WHOLE');
+    expect(o.keep.join(' | ')).not.toContain('in frame: Ana, Ben');
+    expect(o.keep.join(' | ')).toContain('or the type the figures left in frame call for');
+    const keepSame = scopeFor(5, 'SIMPLE');
+    expect(keepSame.keep).toEqual(expect.arrayContaining(['type medium', 'in frame: Ana, Ben']));
+  });
+  it('the main character under his floor stays in frame on every page that goes back, even when the cast may change', () => {
+    const c2 = count(Array.from({ length: 8 }, (_, i) => line('medium', i === 2 ? 'Ana, Dora' : 'Ben, Cy')));
+    expect(c2.findings.map((f: any) => f.code)).toContain('MAIN_UNDER_HALF');
+    const sc = TP.replanScope({ rows: c2.rows, findings: c2.findings, jevPages: { 3: { scores: { WHOLE: 0.99 }, flags: ['WHOLE'] } }, castTable: null, targets: t8, calibration: CALX, commissionedNames: LISTED, arcNames: [] });
+    expect(sc.get(3).keep.join(' | ')).toContain('stay in frame: Ana');
+  });
+});
+
+describe('calibration v2 on typed lines (fix 4)', () => {
+  it('DEED is scored, never a counted flag; THIRD scored with an added-figure guard only', () => {
+    expect(TP.CALIBRATION.DEED.calibrated).toBe(false);
+    expect(TP.CALIBRATION.THIRD.calibrated).toBe(false);
+    expect(TP.CALIBRATION.THIRD.guardsAdded).toBe(0.5);
+    expect(TP.flagsOf({ DEED: 0.99 }, TP.CALIBRATION)).toEqual([]);
+  });
+  it('ACTION is not asked of a face page', () => {
+    expect(TP.PLAN_QUESTIONS.ACTION.applies({ type: 'face', names: ['Ana'] })).toBe(false);
+    expect(TP.PLAN_QUESTIONS.ACTION.applies({ type: 'medium', names: ['Ana'] })).toBe(true);
+  });
+  it('FELT may name what the face reacts to outside the picture (owner 2026-10-06)', () => {
+    expect(TP.PLAN_QUESTIONS.FELT.virtue).toContain('may be named');
+    expect(TP.PLAN_QUESTIONS.FELT.virtue).toContain('outside the picture');
+  });
+  it('WEIGHT, the planner and the plan check read ONE definition: a danger or obstacle with nobody in it counts (owner 2026-10-06)', async () => {
+    await loadPromptTemplates();
+    expect(PB.PEOPLELESS_WEIGHT_DEF).toContain('danger or obstacle');
+    expect(TP.PLAN_QUESTIONS.WEIGHT.virtue).toContain(PB.PEOPLELESS_WEIGHT_DEF);
+    const input = { characters: LISTED.map((name, i) => ({ name, age: 6 + i })), language: 'en', pages: 12, storyCategory: 'adventure' };
+    expect(PB.buildBeatsPrompt(input, 12, { finalArc: 'An arc.' })).toContain(PB.PEOPLELESS_WEIGHT_DEF);
+    expect(PB.buildBeatsPrompt(input, 12, { finalArc: 'An arc.', typedPlan: true })).toContain(PB.PEOPLELESS_WEIGHT_DEF);
+    expect(PB.buildPlanCheckPrompt(input, 'beats', 'An arc.', 'Page 1: x')).toContain(PB.PEOPLELESS_WEIGHT_DEF);
+  });
+  it('the flag level is the threshold plus its noise: one level for the flag, the scope margin and the acceptance', () => {
+    expect(TP.flagLevel({ at: 0.6, noise: 0.05 })).toBe(0.65);
+    expect(TP.flagsOf({ SIMPLE: 0.64 }, { SIMPLE: { at: 0.6, noise: 0.05, calibrated: true } })).toEqual([]);
+    expect(TP.flagsOf({ SIMPLE: 0.65 }, { SIMPLE: { at: 0.6, noise: 0.05, calibrated: true } })).toEqual(['SIMPLE']);
+  });
+});
+
+describe('the neighbour rule is a SHOT + CAST rule counted after the shots (owner decision)', () => {
+  const row = (n: number, names: string[], shot: string | null, type = 'medium') => ({ pageNumber: n, type, names, shot });
+  const run = (rows: any[]) => PC.countPlanTargets({ rows, listedNames: LISTED, mainName: 'Ana', maxCharactersPerScene: 6 });
+  const has = (rows: any[]) => run(rows).findings.map((f: any) => f.code).includes('CONSECUTIVE_SAME_SHOT_CAST');
+  it('same shot and same cast on neighbours is a finding; same type and same cast with another shot is not', () => {
+    expect(has([row(1, ['Ana', 'Ben'], 'medium'), row(2, ['Ben', 'Ana'], 'medium')])).toBe(true);
+    expect(has([row(1, ['Ana', 'Ben'], 'medium'), row(2, ['Ana', 'Ben'], 'wide')])).toBe(false);
+    // the same shot with another cast of the same size is no longer a finding (it was, on the head count alone)
+    expect(has([row(1, ['Ana', 'Ben'], 'medium'), row(2, ['Ana', 'Cy'], 'medium')])).toBe(false);
+    // before the shots exist there is nothing to count
+    expect(has([row(1, ['Ana'], null), row(2, ['Ana'], null)])).toBe(false);
+  });
+});
+
+describe('acceptance: one level for fix, break and the bar (fix 5)', () => {
+  const targets = CC.typedPlanTargets({ pageCount: 4, listed: LISTED, maxCharactersPerScene: 6 });
+  const CAL2: any = { SIMPLE: { at: 0.5, noise: 0.1, calibrated: true }, THIRD: { at: 1, noise: 0.1, calibrated: false, guardsAdded: 0.5 } };
+  const rows = count([line('medium', 'Ana, Ben'), line('medium', 'Ana, Cy'), line('medium', 'Ana, Dora'), line('landscape', 'nobody')]).rows;
+  const countOf = (_: any[]) => [] as any[];
+  const J = (scores: any) => ({ 2: { scores, flags: [] } });
+  it('a flagged question that gets WORSE beyond its noise is a break, not "fixes nothing"', () => {
+    const acc = TP.acceptReplanPages({ rows, returned: [{ ...rows[1] }], countOf, jevBefore: J({ SIMPLE: 0.7 }), jevAfter: J({ SIMPLE: 0.9 }), targets, calibration: CAL2 });
+    expect(acc.decisions[0].breaks).toContain('SIMPLE');
+    expect(acc.decisions[0].keep).toBe(false);
+  });
+  it('a flag falling from the flag level to just below it is a fix (the bar counts the same level)', () => {
+    const acc = TP.acceptReplanPages({ rows, returned: [{ ...rows[1] }], countOf, jevBefore: J({ SIMPLE: 0.61 }), jevAfter: J({ SIMPLE: 0.59 }), targets, calibration: CAL2 });
+    expect(acc.decisions[0]).toMatchObject({ keep: true, fixes: ['SIMPLE'], breaks: [] });
+  });
+  it('a rewrite that ADDS a figure may not leave the third-character question high; one that adds none is not guarded', () => {
+    const added = { ...rows[1], names: ['Ana', 'Cy', 'Ben'], planLine: line('medium', 'Ana, Cy, Ben') };
+    const acc = TP.acceptReplanPages({ rows, returned: [added], countOf, jevBefore: J({ SIMPLE: 0.7 }), jevAfter: J({ SIMPLE: 0.1, THIRD: 0.8 }), targets, calibration: CAL2 });
+    expect(acc.decisions[0].breaks).toContain('THIRD');
+    expect(acc.decisions[0].keep).toBe(false);
+    const same = { ...rows[1] };
+    const acc2 = TP.acceptReplanPages({ rows, returned: [same], countOf, jevBefore: J({ SIMPLE: 0.7 }), jevAfter: J({ SIMPLE: 0.1, THIRD: 0.8 }), targets, calibration: CAL2 });
+    expect(acc2.decisions[0].keep).toBe(true);
   });
 });

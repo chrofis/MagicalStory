@@ -56,48 +56,61 @@ const PLAN_QUESTIONS = {
     fault: 'The instant of this plan line is complicated to illustrate as one picture: it holds more than one action, or more than one place.',
     applies: () => true,
     fix: 'Reduce the instant to one action in one place that a single picture can hold.',
+    relax: {},
   },
   ACTION: {
     virtue: 'The instant is an action being performed by a character, with a verb that moves.',
     fault: 'The instant is only a presence, a position or the state after an action (stands, together, visible, gathered, waits).',
-    applies: r => r.names.length > 0,
+    // Not on a face page: a pure face is a presence by design, and FELT asks that page its own question (calibration v2).
+    applies: r => r.names.length > 0 && r.type !== 'face',
     fix: 'Name the action being performed, not a presence, a position or the state after an action.',
+    relax: {},
   },
   DEED: {
     virtue: 'The instant is one action, being performed now. Its effect, and where the effect goes, are not in it.',
     fault: `The instant shows an action and the result of that action together. ${PB.DEED_AND_EFFECT_DEF}`,
     applies: () => true,
     fix: 'Keep the action in the instant and move its result to the last field.',
+    relax: {},
   },
   HEIGHTS: {
     virtue: 'The figures of the instant stand on at most two height levels in one frame.',
     fault: `The instant puts ${PB.TWO_HEIGHTS_DEF}`,
     applies: r => r.names.length >= 2,
     fix: PB.TWO_HEIGHTS_REMEDY,
+    relax: { who: true },
   },
+  // FELT2 (calibration v2, 2026-10-06): what the character reacts to may be NAMED when it is outside the picture
+  // (owner 2026-10-06: a face close-up may react to something outside the frame; the plan line names it).
   FELT: {
-    virtue: 'The instant is one character showing a strong feeling, and nothing else happens in it: no second actor, no event.',
-    fault: 'The instant is not one character alone showing a feeling: a second actor or an event is in it.',
+    virtue: 'The instant is one character whose face shows a strong feeling. What they react to may be named, as long as it is outside the picture.',
+    fault: 'The instant is not a face showing a feeling: a second character or creature acts inside the picture, or the character is busy with a task of the hands.',
     applies: r => r.type === 'face',
-    fix: 'Make this one character alone showing one strong feeling, with nothing else happening.',
+    fix: 'Make this one character alone showing one strong feeling; what they react to may be named, outside the picture.',
+    relax: { after: true },
   },
   THIRD: {
     virtue: "In the instant the third of the three characters shares the page's one action: they take part in it.",
     fault: "In the instant one of the three characters only watches or stands by, or does something other than the page's one action.",
     applies: r => r.names.length === 3,
     fix: "Have the third character share the page's one action, or take them out of the page.",
+    relax: { who: true },
   },
   OBSTACLE: {
     virtue: 'In the instant nothing works against a character, or whatever does is held by a character this plan line names in its who column.',
     fault: 'In the instant something works against what a character is doing — a way blocked, a place kept, a thing taken or withheld, a refusal — and the one holding that obstacle is a character this plan line does not name in its who column.',
     applies: r => r.names.length > 0,
     fix: 'Name the one who holds the obstacle in the who column (keeping the type\'s figure count), or change the instant.',
+    relax: { who: true },
   },
+  // WEIGHT2 (calibration v2): the SAME definition the planner's question 2 and the plan check's question 6 read
+  // (promptBuilders.PEOPLELESS_WEIGHT_DEF): a danger or obstacle with nobody in the picture is story weight.
   WEIGHT: {
-    virtue: 'The picture of the page to judge shows something the story has been driving toward: a discovery, an arrival, a payoff.',
-    fault: 'The picture of the page to judge shows a place or thing the story has not been driving toward: it carries no story weight.',
+    virtue: `The picture of the page to judge has story weight. ${PB.PEOPLELESS_WEIGHT_DEF}`,
+    fault: 'The picture of the page to judge shows a place or thing that plays no part in what happens at this point of the story: scenery only.',
     applies: r => r.names.length === 0, arcState: true,
-    fix: 'Give this people-free page a subject the story has been driving toward, or give the page a character.',
+    fix: 'Give this people-free page a subject with story weight (a discovery, an arrival, a payoff, or the danger or obstacle faced now), or give the page a character.',
+    relax: { who: true },
   },
   // Q17, as measured: the planner's own definition plus its inverse (eval-jev-replan-guard.js, `wholecast`).
   WHOLE: {
@@ -105,6 +118,7 @@ const PLAN_QUESTIONS = {
     fault: 'In the instant, the characters in frame only stand, gather or are shown together, or one of them acts while the others look on or do something else.',
     applies: (r, ctx) => ctx.listed.length > 1 && ctx.listed.every(n => r.names.some(x => String(x).toLowerCase() === String(n).toLowerCase())),
     fix: 'Give every character of the cast in frame one shared action, or take some of them out of the page.',
+    relax: { who: true },
   },
 };
 
@@ -119,28 +133,35 @@ const PLAN_QUESTIONS = {
  * plan: Jev calibration"; evals/results/results.jsonl, dataset typed-plan-jev-v1).
  */
 const CALIBRATION = {
-  // Measured 2026-10-06 (evals/runs/2026-10-06_typed-plan-jev/calibration.json, dataset typed-plan-jev-v1: 42 stored
-  // plans, paired scores twice, 40 blind agent labels per question). Kept: AUC >= 0.75 and a threshold whose
-  // precision is >= 0.7 AND well above the labelled base rate (FELT and WEIGHT sit at a 0.72 base rate, so their
-  // thresholds are set where precision is ~0.95, not at the 0.7 floor, which would flag nearly every page).
-  // `noise` = 0.05, the largest repeat difference seen across 10,956 calls (mean 0.01).
-  SIMPLE: { at: 0.63, noise: 0.05, calibrated: true },   // AUC 0.867, precision 0.73
-  ACTION: { at: 0.40, noise: 0.05, calibrated: true },   // AUC 0.944, precision 0.79
-  DEED: { at: 0.495, noise: 0.05, calibrated: true },    // AUC 0.816, precision 0.70 (base 0.42); weak and noisy
-  FELT: { at: 0.55, noise: 0.05, calibrated: true },     // AUC 0.854, precision 0.95
-  OBSTACLE: { at: 0.625, noise: 0.05, calibrated: true }, // AUC 0.917 but only 6 positives in 40: thin
-  WEIGHT: { at: 0.27, noise: 0.05, calibrated: true },   // AUC 0.904, precision 0.95
-  WHOLE: { at: 0.52, noise: 0.05, calibrated: true },    // AUC 0.781, precision 0.70
-  // DROPPED (scored, never flag): HEIGHTS AUC 0.658 with 3 positives in 40; THIRD AUC 0.692.
-  HEIGHTS: { at: 1, noise: 0.05, calibrated: false },
-  THIRD: { at: 1, noise: 0.05, calibrated: false },
+  // CALIBRATION v2, 2026-10-06 (evals/runs/2026-10-06_typed-plan-jev-v2/calibration.json, dataset typed-plan-jev-v2:
+  // 127 typed first-plan lines + 30 stored face / 32 stored people-free pages, paired scores, two blind rater
+  // labels, a label = the raters agree, 41 disagreements dropped). A question flags only where its precision on
+  // TYPED-format lines is >= 0.8 over >= 4 flags; the flag level is `at` + `noise` (flagLevel). `noise` = 0.05, the
+  // largest repeat difference seen across 10,956 calls (mean 0.01).
+  SIMPLE: { at: 0.605, noise: 0.05, calibrated: true },   // AUC 0.894, flag level 0.655: 11 of 13 flags real (0.85, CI 0.58-0.96)
+  FELT: { at: 0.295, noise: 0.05, calibrated: true },     // FELT2 wording; AUC 0.942, flag level 0.345: 21 of 26 (0.81, CI 0.62-0.91), 22 of 40 labelled faulty
+  OBSTACLE: { at: 0.47, noise: 0.05, calibrated: true },  // AUC 0.966, flag level 0.52: 4 of 4; THIN (10 positives in 113)
+  // SCORED, never flag (no level reached precision 0.8 on typed lines, or too few positives to find one):
+  DEED: { at: 1, noise: 0.05, calibrated: false },        // v1 AUC 0.56 on typed lines (review 2026-10-06): noise; SIMPLE and the planner after-field carry it
+  ACTION: { at: 1, noise: 0.05, calibrated: false },      // 2 positives in 101 typed non-face lines (AUC 0.99): no level to calibrate
+  WEIGHT: { at: 1, noise: 0.05, calibrated: false },      // WEIGHT2 wording; 2 positives in 42 (AUC 0.975): no level to calibrate
+  WHOLE: { at: 1, noise: 0.05, calibrated: false },       // only 4 typed pages hold the whole cast; v1 precision was 0.70
+  HEIGHTS: { at: 1, noise: 0.05, calibrated: false },     // v1: AUC 0.658 with 3 positives in 40
+  THIRD: { at: 1, noise: 0.05, calibrated: false, guardsAdded: 0.5 }, // scored; guards a rewrite that adds a figure (acceptReplanPages)
 };
 
 const faultScore = (pVirtue, pFault) => +(((1 - pVirtue) + pFault) / 2).toFixed(3);
 
+/**
+ * The fault score at which a question flags a page: its calibrated threshold plus the repeat noise, so a flag is
+ * always a score BEYOND the margin. The same level counts for the bar, sends a page back and decides whether a
+ * rewrite fixed or broke it (review 2026-10-06: a fix used to need `at - noise` while the bar counted `at + noise`).
+ */
+const flagLevel = c => +(c.at + (c.noise || 0)).toFixed(3);
+
 /** The ids a page's scores flag under a calibration. */
 const flagsOf = (scores, calibration) => Object.entries(scores)
-  .filter(([id, v]) => calibration[id] && calibration[id].calibrated && v >= calibration[id].at).map(([id]) => id);
+  .filter(([id, v]) => calibration[id] && calibration[id].calibrated && v >= flagLevel(calibration[id])).map(([id]) => id);
 
 const flaggedOf = pages => {
   const out = {};
@@ -199,6 +220,9 @@ async function judgePlanPages({ arc, pages, rows, listed = [], only = null, ques
 
 /** The repair sentence of a Jev question id. */
 const fixOf = id => PLAN_QUESTIONS[id].fix;
+
+/** Which fields of a page the repair of a question lets the re-plan change (the keep list never contradicts it). */
+const relaxOf = id => PLAN_QUESTIONS[id].relax || {};
 
 // ───────────────────────── rows: one reading for every arm ─────────────────────────
 
@@ -327,8 +351,7 @@ function measurePlan({ rows, jevResult, listed, commissionedNames = null, arcNam
     pageCount: rows.length,
     typeCounts: st.typeCounts,
     shotCounts: st.shotCounts,
-    neighbourSameShotCount: st.neighbourSameShotCount.length,
-    neighbourSameTypeCast: st.neighbourSameTypeCast.length,
+    neighbourSameShotCast: st.neighbourSameShotCast.length,
     faceCloseUps: st.facePages.length,
     faceCloseUpsAnyone: st.facePagesAll.length,
     sceneryPages: st.sceneryPages.length,
@@ -365,14 +388,45 @@ function spread(list, k) {
   return [...new Set(out)];
 }
 
-/** The pages a re-plan never rewrites for a book-level need or a Jev flag: first, last, CAST-promised, the sole face and the sole scenery page. */
+/**
+ * The CAST block's promises the plan actually KEEPS: the deed pages whose character is in frame, and every page a
+ * character is promised on (deed or "also on") that names them. A promise the plan does not keep protects nothing
+ * (review 2026-10-06: CAST said "Julian also on 9" while page 9 was nobody, and the page stayed locked).
+ *
+ * @returns {{deed:Set<number>, stay:Map<number,string[]>}} `stay`: page -> the promised names the page keeps in frame
+ */
+function heldPromises(castTable, rows) {
+  const out = { deed: new Set(), stay: new Map() };
+  if (!castTable) return out;
+  const spell = (page, name) => {
+    const r = rows.find(x => x.pageNumber === Number(page));
+    return r ? r.names.find(n => n.toLowerCase() === String(name).toLowerCase()) || null : null;
+  };
+  const add = (page, name) => {
+    const n = spell(page, name);
+    if (!n) return false;
+    const list = out.stay.get(Number(page)) || [];
+    if (!list.includes(n)) list.push(n);
+    out.stay.set(Number(page), list);
+    return true;
+  };
+  for (const c of castTable.characters || []) {
+    if (add(c.deedPage, c.name)) out.deed.add(Number(c.deedPage));
+    (c.alsoOn || []).forEach(n => add(n, c.name));
+  }
+  return out;
+}
+
+/**
+ * The pages a re-plan never rewrites for a book-level need or a Jev flag: first, last, the ending page, a deed page
+ * whose promise the plan keeps, the sole face and the sole scenery page. A page the CAST block only promises a
+ * character "also on" may be rewritten — its promised character stays in frame (replanScope's keep list).
+ */
 function protectedPages({ rows, castTable = null, targets, classOf }) {
   const P = rows.length;
   const prot = new Set([1, P]);
-  if (castTable) {
-    for (const c of castTable.characters || []) { prot.add(Number(c.deedPage)); (c.alsoOn || []).forEach(n => prot.add(Number(n))); }
-    if (castTable.ending) prot.add(Number(castTable.ending.page));
-  }
+  heldPromises(castTable, rows).deed.forEach(n => prot.add(n));
+  if (castTable && castTable.ending) prot.add(Number(castTable.ending.page));
   const faces = rows.filter(r => r.type === 'face' && r.names.some(n => classOf(n) === 'commissioned'));
   if (faces.length <= targets.faceMin) faces.forEach(r => prot.add(r.pageNumber));
   const scenery = rows.filter(r => r.type === 'landscape' || r.type === 'object');
@@ -380,11 +434,22 @@ function protectedPages({ rows, castTable = null, targets, classOf }) {
   return prot;
 }
 
-/** What a rewritten page must keep unless its reason forces a change. */
-function keepList(r) {
-  const keep = [`type ${r.type}`];
-  keep.push(r.names.length ? `in frame: ${r.names.join(', ')}` : 'nobody in frame');
-  if (r.after) keep.push(`what is true after: ${r.after}`);
+/**
+ * What a rewritten page must keep unless its reasons force a change — never contradicting a Change (review
+ * 2026-10-06: Keep said "nobody in frame" beside "or give the page a character", "the cast" beside "change the
+ * cast", an after-field anchor beside a face that must be alone).
+ *   relax.type / relax.who / relax.after: the reasons let that field change; `stay`: names that stay in frame
+ *   either way (the main character under his floor, a CAST promise); `adds`: names the page gains.
+ */
+function keepList(r, { relax = {}, stay = [], adds = [] } = {}) {
+  const keep = [];
+  if (!relax.type) keep.push(relax.who ? `type ${r.type}, or the type the figures left in frame call for` : `type ${r.type}`);
+  if (!relax.who) {
+    keep.push(r.names.length
+      ? `in frame: ${r.names.join(', ')}${adds.length ? ` (and ${adds.join(', ')} joins them, taking part in the page's one action)` : ''}`
+      : (adds.length ? `nobody now in frame (${adds.join(', ')} joins)` : 'nobody in frame'));
+  } else if (stay.length) keep.push(`stay in frame: ${stay.join(', ')}`);
+  if (!relax.after && r.after) keep.push(`what is true after: ${r.after}`);
   return keep;
 }
 
@@ -392,69 +457,97 @@ function keepList(r) {
  * The pages each failure sends back, and why — SMALL on purpose (owner
  * 2026-10-06; Lab #1662 sent 16 pages and kept 2):
  *   code findings, each to its own pages; a book-level miss (no face page, a
- *   character under the floor, ...) has no page, so code NOMINATES candidates
- *   from NON-PROTECTED pages only (never the first or last page, a page the
- *   CAST block promises, the sole face or sole scenery page, a page already
- *   going back); and at most REPLAN_JEV_MAX Jev flags of CALIBRATED questions,
- *   the largest margin over their threshold first, on non-protected pages.
- * A candidate is only a page the re-plan MAY rewrite; the acceptance decides.
+ *   character under the floor, ...) has no page, so code NOMINATES candidates;
+ *   and at most REPLAN_JEV_MAX Jev flags of CALIBRATED questions, the largest
+ *   margin over their flag level first, on non-protected pages.
+ * The candidate pool of a character's shortfall (the main character's floor,
+ * a character under the coverage floor) is every interior MEDIUM page with at
+ * most two figures that is not a kept deed page — flagged pages included, so a
+ * page already going back can carry the extra figure (review 2026-10-06: the
+ * old pool, unprotected and unflagged pages only, held ONE page, and the
+ * main floor was unreachable). It asks for the shortfall plus one. A candidate
+ * is only a page the re-plan MAY rewrite; the acceptance decides.
  *
- * @returns {Map<number,{reasons:string[], keep:string[]}>}
+ * @returns {Map<number,{reasons:string[], keep:string[], relax:Object, adds:string[], stay:string[]}>}
  */
 function replanScope({ rows, findings, jevPages, castTable = null, targets, calibration = CALIBRATION, commissionedNames = [], arcNames = [], jevMax = REPLAN_JEV_MAX }) {
   const out = new Map();
-  const give = (page, why) => {
-    if (!out.has(page)) { const r = rows.find(x => x.pageNumber === page); out.set(page, { reasons: [], keep: r ? keepList(r) : [] }); }
-    if (!out.get(page).reasons.includes(why)) out.get(page).reasons.push(why);
+  const P = rows.length;
+  const rowOf = page => rows.find(x => x.pageNumber === page);
+  const give = (page, why, { relax = {}, add = [] } = {}) => {
+    if (!out.has(page)) out.set(page, { reasons: [], keep: [], relax: {}, adds: [], stay: [] });
+    const o = out.get(page);
+    if (!o.reasons.includes(why)) o.reasons.push(why);
+    Object.assign(o.relax, Object.fromEntries(Object.entries(relax).filter(([, v]) => v)));
+    for (const a of add) if (!o.adds.includes(a)) o.adds.push(a);
   };
   const classOf = n => whoClassOf(n, commissionedNames, arcNames);
   const prot = protectedPages({ rows, castTable, targets, classOf });
+  const promised = heldPromises(castTable, rows);
   // Calibrated Jev flags, on pages that may be rewritten, biggest margin first.
   const jevPicks = [];
   for (const [page, o] of Object.entries(jevPages || {})) {
     if (prot.has(Number(page))) continue;
-    for (const id of o.flags || []) jevPicks.push({ page: Number(page), id, margin: o.scores[id] - calibration[id].at });
+    for (const id of o.flags || []) jevPicks.push({ page: Number(page), id, margin: o.scores[id] - flagLevel(calibration[id]) });
   }
   jevPicks.sort((a, b) => b.margin - a.margin);
   const picked = jevPicks.slice(0, jevMax);
   const flaggedPages = new Set(Object.entries(jevPages || {}).filter(([, o]) => (o.flags || []).length).map(([n]) => Number(n)));
   const free = rows.filter(r => !prot.has(r.pageNumber) && !flaggedPages.has(r.pageNumber));
+  // The wide pool of a character's shortfall: interior medium pages with <= 2 figures, not a kept deed page.
+  const wide = rows.filter(r => r.pageNumber !== 1 && r.pageNumber !== P && !promised.deed.has(r.pageNumber) && r.type === 'medium' && r.names.length <= 2);
   const has = (r, name) => r.names.some(n => n.toLowerCase() === name.toLowerCase());
   const commissionedIn = r => r.names.some(n => classOf(n) === 'commissioned');
+  const nameOf = f => (f.detail.match(/^(.+?) (?:is in frame|never has)/) || [])[1];
+  const mainFinding = findings.find(f => f.code === 'MAIN_UNDER_HALF');
+  const mainName = mainFinding ? nameOf(mainFinding) : null;
   const findingsFirst = [...findings].sort((a, b) => (a.code === 'TYPED_INVENTED_FIGURE' ? -1 : 0) - (b.code === 'TYPED_INVENTED_FIGURE' ? -1 : 0));
   for (const f of findingsFirst) {
+    if (f.code === 'TYPE_CAST_MISMATCH') { for (const n of f.pages) give(n, f.detail, { relax: { type: true, who: true } }); continue; }
+    if (f.code === 'TYPED_WHO_COLLECTIVE') { for (const n of f.pages) give(n, f.detail, { relax: { who: true } }); continue; }
     if (PAGE_LEVEL_CODES.has(f.code)) { for (const n of f.pages) give(n, f.detail); continue; }
-    if (f.code === 'TYPED_INVENTED_FIGURE') { for (const n of f.pages) give(n, `${f.detail}. Name a listed character or a figure of the story logic instead, or take the figure out of the page`); continue; }
-    if (f.code === 'CONSECUTIVE_SAME_TYPE_CAST') { give(f.pages[1], `${f.detail} (pages ${f.pages.join(' and ')}): change this page's type or cast`); continue; }
+    if (f.code === 'TYPED_INVENTED_FIGURE') { for (const n of f.pages) give(n, `${f.detail}. Name a listed character or a figure of the story logic instead, or take the figure out of the page`, { relax: { who: true } }); continue; }
     if (f.code === 'GROUP_PAGES_OVER_BUDGET') {
       const excess = f.pages.length - targets.groupMax;
       const ranked = f.pages.filter(n => !prot.has(n));
-      for (const n of ranked.slice(0, Math.max(1, excess))) give(n, `${f.detail}: cut this group page down to one to three characters`);
+      for (const n of ranked.slice(0, Math.max(1, excess))) give(n, `${f.detail}: cut this group page down to one to three characters`, { relax: { type: true, who: true } });
       continue;
     }
     if (f.code === 'TYPED_NO_COMMISSIONED_OVER') {
       const excess = f.pages.length - targets.noCommissionedMax;
-      for (const n of f.pages.filter(x => !out.has(x)).slice(-Math.max(1, excess))) give(n, `${f.detail}: put a listed character in frame on this page`);
+      for (const n of f.pages.filter(x => !out.has(x)).slice(-Math.max(1, excess))) give(n, `${f.detail}: put a listed character in frame on this page`, { relax: { who: true } });
       continue;
     }
-    let pool; let k = 2; let what;
+    let pool; let k = 2; let what; let relax = {}; let add = [];
     if (f.code === 'TYPED_NO_FACE_PAGE') {
       pool = free.filter(r => r.type === 'medium' && r.names.length === 1 && commissionedIn(r));
       if (!pool.length) pool = free.filter(r => r.names.length <= 2 && r.type !== 'face' && commissionedIn(r));
-      k = 1; what = 'make this a face page (one listed character, a close-up of their face)';
-    } else if (f.code === 'TYPED_NO_SCENERY_PAGE') { pool = free.filter(r => r.names.length <= 2); k = 1; what = 'make this a landscape or object page'; }
+      k = 1; what = 'make this a face page (one listed character, a close-up of their face)'; relax = { type: true, who: true };
+    } else if (f.code === 'TYPED_NO_SCENERY_PAGE') { pool = free.filter(r => r.names.length <= 2); k = 1; what = 'make this a landscape or object page'; relax = { type: true, who: true }; }
     else if (f.code === 'UNDER_COVERED_CHARACTER' || f.code === 'NO_FOCAL_PAGE') {
-      const name = (f.detail.match(/^(.+?) (?:is in frame|never has)/) || [])[1];
-      pool = free.filter(r => r.names.length <= 2 && name && !has(r, name)); k = 2;
-      what = `${name ? `put ${name} in frame here` : 'put the character in frame here'}, with their own action`;
+      const name = nameOf(f);
+      pool = wide.filter(r => name && !has(r, name));
+      k = f.code === 'UNDER_COVERED_CHARACTER' ? Math.max(1, targets.appearancesMin - f.pages.length) + 1 : 2;
+      what = `${name ? `put ${name} in frame here` : 'put the character in frame here'}, taking part in the page's one action`;
+      if (name) add = [name];
     } else if (f.code === 'MAIN_UNDER_HALF') {
-      const need = targets.mainMin - f.pages.length;
-      pool = free.filter(r => r.names.length <= 2 && !f.pages.includes(r.pageNumber)); k = Math.max(1, need);
-      what = 'put the main character in frame here';
+      pool = wide.filter(r => !f.pages.includes(r.pageNumber));
+      k = Math.max(1, targets.mainMin - f.pages.length) + 1; // the shortfall plus one: a page may fail the acceptance
+      what = `put ${mainName || 'the main character'} in frame here, taking part in the page's one action`;
+      if (mainName) add = [mainName];
     } else continue;
-    for (const r of spread(pool.map(x => x.pageNumber), k)) give(r, `${f.detail} — ${what}`);
+    for (const r of spread(pool.map(x => x.pageNumber), k)) give(r, `${f.detail} — ${what}`, { relax, add });
   }
-  for (const { page, id } of picked) give(page, fixOf(id));
+  for (const { page, id } of picked) give(page, fixOf(id), { relax: relaxOf(id) });
+  // Keep lists, last: they read every reason a page carries, and the figures that stay either way.
+  for (const [page, o] of out) {
+    const r = rowOf(page);
+    if (!r) continue;
+    const stay = [...(promised.stay.get(page) || [])];
+    if (mainName && has(r, mainName) && !stay.includes(mainName)) stay.push(mainName);
+    o.stay = stay;
+    o.keep = keepList(r, { relax: o.relax, stay, adds: o.adds });
+  }
   return out;
 }
 
@@ -484,11 +577,12 @@ function typedReplanSection({ pagePlanText, scope, castTable }) {
 /**
  * Keep a returned page only if it fixes something and breaks nothing.
  *  fixes  = a code finding that stood is gone (or smaller), or a CALIBRATED
- *           question's fault score fell below its threshold by more than its noise;
- *  breaks = a code finding that was not there appears (or grows), or a
- *           CALIBRATED question's fault score rose above its threshold by more
- *           than its noise. An uncalibrated question, or a move inside the noise,
- *           is neither (owner 2026-10-06).
+ *           question leaves its flag level (threshold + noise, the level the bar counts);
+ *  breaks = a code finding that was not there appears (or grows), a CALIBRATED
+ *           question reaches its flag level, or a question already flagged gets
+ *           worse by more than its noise; and a rewrite that ADDS a figure may not
+ *           leave the third-character question (guardsAdded) above its guard.
+ *           Any other uncalibrated question is neither (owner 2026-10-06).
  * Pages are tried in order against the plan as it stands then.
  *
  * @returns {{rows:Array, decisions:Array, jevPages:Object}}
@@ -526,14 +620,23 @@ function acceptReplanPages({ rows, returned, countOf, jevBefore, jevAfter, targe
     }
     const before = (jevNow[ret.pageNumber] && jevNow[ret.pageNumber].scores) || {};
     const after = (jevAfter[ret.pageNumber] && jevAfter[ret.pageNumber].scores) || {};
+    const prevRow = cur[idx];
     const lostFlags = []; const newFlags = [];
     for (const [id, c] of Object.entries(calibration)) {
-      if (!c.calibrated) continue;
       const b = id in before ? before[id] : 0; // a question the new who column makes applicable had no score before
       const a = id in after ? after[id] : 0;
-      const noise = c.noise || 0;
-      if (b >= c.at && a < c.at - noise) lostFlags.push(id);
-      else if (b < c.at && a >= c.at + noise) newFlags.push(id);
+      if (!c.calibrated) {
+        // THIRD: scored, never flagged, but a rewrite that ADDS a figure may not leave it a bystander (review 2026-10-06:
+        // probe pages that added the main character "beside" the action were accepted).
+        if (c.guardsAdded != null && ret.names.length > prevRow.names.length && a >= c.guardsAdded && a >= b + (c.noise || 0)) newFlags.push(id);
+        continue;
+      }
+      const level = flagLevel(c);
+      // A fix is leaving a flag, a break is gaining one — the SAME level the bar counts. A flagged question that gets
+      // worse beyond the repeat noise is a break too: the page ships with a bigger fault than it had.
+      if (b >= level && a < level) lostFlags.push(id);
+      else if (b < level && a >= level) newFlags.push(id);
+      else if (b >= level && a >= b + (c.noise || 0)) newFlags.push(id);
     }
     const fixes = removed.length + lostFlags.length;
     const breaks = added.length + newFlags.length;
@@ -650,6 +753,11 @@ async function runTypedPlan({ inputData, pageCount, approvedArc, arcHints, arcSt
   const shotByPage = new Map(shots.pages.map(p => [p.pageNumber, p.shot]));
   const finalRows = cFinal.rows.map(r => ({ ...r, shot: shotByPage.get(r.pageNumber) || null }));
   const finalMetrics = metricsOf(finalRows, jevFinal);
+  // The neighbour rule (owner 2026-10-06): no two neighbouring pages the same SHOT with the same CAST — known only
+  // now that Jev has picked the shots, so it is reported here (never a re-plan reason).
+  const shotFindings = countPlanTargets({ rows: finalRows, listedNames: listed, commissionedNames: known, arcNames, mainName, maxCharactersPerScene: maxCast })
+    .lines.filter(l => l.startsWith('PLAN[CONSECUTIVE_SAME_SHOT_CAST]'));
+  unmet.push(...shotFindings);
 
   return {
     planModelId: planRes.modelId,
@@ -657,7 +765,7 @@ async function runTypedPlan({ inputData, pageCount, approvedArc, arcHints, arcSt
     castTable,
     first: { plan: first.pages.map(p => ({ pageNumber: p.pageNumber, planLine: p.planLine })), findings: c1.lines, jev: j1.pages, metrics: firstMetrics },
     replan,
-    final: { plan: shots.beats.map(p => ({ pageNumber: p.pageNumber, planLine: p.planLine })), findings: cFinal.lines, jev: jevFinal.pages, metrics: finalMetrics, unmet, shots: shots.pages, shotsUnmet: shots.unmet },
+    final: { plan: shots.beats.map(p => ({ pageNumber: p.pageNumber, planLine: p.planLine })), findings: [...cFinal.lines, ...shotFindings], jev: jevFinal.pages, metrics: finalMetrics, unmet, shots: shots.pages, shotsUnmet: shots.unmet },
     pagesReplanned: replan && replan.decisions ? replan.decisions.filter(d => d.keep).length : 0,
     pagesReturned: replan ? replan.returnedPages.length : 0,
     jev: sumStats(j1.stats, replanJevStats, shots.stats),
@@ -671,6 +779,10 @@ module.exports = {
   THRESHOLD,
   PLAN_QUESTIONS,
   CALIBRATION,
+  flagLevel,
+  heldPromises,
+  keepList,
+  relaxOf,
   REPLAN_JEV_MAX,
   PLAN_LINE_HEAD,
   judgePlanPages,
