@@ -1,0 +1,625 @@
+{
+ "id": 1660,
+ "arm": "stored",
+ "storyId": "job_1790508305061_dka3jpog9",
+ "stage": "beats_replan",
+ "label": "typed-plan stored job_1790508305061_dka3jpog9",
+ "status": "completed",
+ "promptOverride": null,
+ "params": {
+  "measureStored": true
+ },
+ "targets": [
+  {
+   "storyId": "job_1790508305061_dka3jpog9"
+  }
+ ],
+ "results": [
+  {
+   "ok": true,
+   "arm": "stored-shipped-plan",
+   "cost": 0.001592,
+   "note": "arm 0: the stored shipped plan measured, 100 Jev calls",
+   "pages": 18,
+   "usage": {
+    "input_tokens": 0,
+    "output_tokens": 0
+   },
+   "events": [],
+   "storyId": "job_1790508305061_dka3jpog9",
+   "logLines": [
+    "📝 Prompt templates loaded: 97/97 ok",
+    "👪 [BEATS] Figures the arc tagged (commissioned), counted as commissioned: Levin, Julian, Max, Kiaan, Sura"
+   ],
+   "elapsedMs": 4119,
+   "startedAt": "2026-10-06T07:38:27.248Z",
+   "targetIndex": 0,
+   "standingPlan": [
+    {
+     "planLine": "wide — Levin, Julian, Max, Kiaan — the four kick a ball between the Wasserkirche and the Grossmünster on a foggy autumn afternoon — the four children and the foggy Zurich setting are established",
+     "pageNumber": 1
+    },
+    {
+     "planLine": "close-up — Levin, Julian — Julian holds up a large warm scale he has just found against the old stone wall of the Grossmünster — the warm scale exists and is now in the children's hands",
+     "pageNumber": 2
+    },
+    {
+     "planLine": "wide — Kiaan, Levin — Kiaan lifts the scale off the wall and a misty path opens in the stone behind it — the path into the dragon world stands open",
+     "pageNumber": 3
+    },
+    {
+     "planLine": "close-up — Max, Levin — Max cups his hands around his mouth and shouts into the misty silence of the open path — someone in the mist now knows the children are there",
+     "pageNumber": 4
+    },
+    {
+     "planLine": "close-up — Sura — Sura's great grey head leans out of the mist, eyes heavy, as her deep tired voice answers the call — Sura has spoken: she will rise into the clouds alone with the big evening wind",
+     "pageNumber": 5
+    },
+    {
+     "planLine": "wide — Levin, Julian, Max, Kiaan — the four walk in a line onto the misty path through the gap in the Grossmünster wall, seen from behind — the children have left the ordinary world and entered the dragon's world",
+     "pageNumber": 6
+    },
+    {
+     "planLine": "low-angle — Levin, Julian — Julian stumbles over stones in the thick low-hanging mist while Levin steadies him from in front — the fog has swallowed the path and the group cannot see where to go",
+     "pageNumber": 7
+    },
+    {
+     "planLine": "close-up — Kiaan — Kiaan holds the scale out in both hands and turns toward the direction where it grows warmest, his face intent on the warmth in his palms — the scale's warmth gives the group a way through the fog",
+     "pageNumber": 8
+    },
+    {
+     "planLine": "ultra-wide — Sura — Sura beats her great grey wings and launches off a rocky ledge toward the highest peak far above while the wind rises around her — Sura has flown to the highest peak and the wind is growing stronger",
+     "pageNumber": 9
+    },
+    {
+     "planLine": "high-angle — Levin, Kiaan, Max — on a slope of sliding loose stones Kiaan grips the scale tight while Max seizes his jacket and Levin hauls them both upward — the children have reached the top of the loose-stone slope",
+     "pageNumber": 10
+    },
+    {
+     "planLine": "wide — Levin, Julian, Max, Kiaan — the four stand at the summit before Sura's great wing stretched across the path like a wall, seen from behind as they face it — the way to Sura is barred and all four are stopped",
+     "pageNumber": 11
+    },
+    {
+     "planLine": "close-up — Max, Sura — Max tips his head back and shouts Sura's name at the turned-away dragon looming above him — Sura does not turn and the wind is now almost strong enough to lift her",
+     "pageNumber": 12
+    },
+    {
+     "planLine": "low-angle — Levin, Sura — Levin's foot slips on the last high rock above the wing but his hands clench tight on the stone and he calls Sura's name up into the autumn wind — Levin is alone on the high rock calling out loud",
+     "pageNumber": 13
+    },
+    {
+     "planLine": "close-up — Sura — Sura's great head turns slowly toward the small boy on the rock, her eye wide with fear for him, and her chest swings around to face the children — Sura's chest is now turned toward the children for the first time",
+     "pageNumber": 14
+    },
+    {
+     "planLine": "close-up — Julian, Levin — Julian points at the dark gap in Sura's chest where a tiny flame flickers, and Levin, level with it, stares at the scale in his hands — the gap and the scale belong together: Levin knows what to do",
+     "pageNumber": 15
+    },
+    {
+     "planLine": "close-up — Levin, Sura — Levin presses the scale firmly into the gap in Sura's chest and the flame behind it swells from a flicker into a strong warm glow — the gap is closed, the wind is blocked, and Sura's fire burns big and warm again",
+     "pageNumber": 16
+    },
+    {
+     "planLine": "wide — Sura, Levin, Julian, Max, Kiaan — Sura leads the four children back through the fog, all moving together toward the faint glow of the doorway in the old wall ahead — Sura stays and guides the children safely back through the fog",
+     "pageNumber": 17
+    },
+    {
+     "planLine": "wide — Levin, Julian, Max, Kiaan — the four run together across the Rathausbrücke in the evening as the mist thins behind them and the Grossmünster stands in the clearing autumn air — the children are home safe together and the adventure is done",
+     "pageNumber": 18
+    }
+   ],
+   "typedMeasure": {
+    "jev": {
+     "1": {
+      "flags": [],
+      "scores": {
+       "DEED": 0.49,
+       "WHOLE": 0.415,
+       "ACTION": 0.92,
+       "SIMPLE": 0.85,
+       "HEIGHTS": 0.22,
+       "OBSTACLE": 0.21,
+       "WHOLE_FAULT": 0.34,
+       "WHOLE_SHARED": 0.51
+      }
+     },
+     "2": {
+      "flags": [
+       "DEED"
+      ],
+      "scores": {
+       "DEED": 0.7,
+       "ACTION": 0.88,
+       "SIMPLE": 0.81,
+       "HEIGHTS": 0.17,
+       "OBSTACLE": 0.19
+      }
+     },
+     "3": {
+      "flags": [
+       "DEED"
+      ],
+      "scores": {
+       "DEED": 0.66,
+       "ACTION": 0.83,
+       "SIMPLE": 0.79,
+       "HEIGHTS": 0.15,
+       "OBSTACLE": 0.16
+      }
+     },
+     "4": {
+      "flags": [
+       "DEED"
+      ],
+      "scores": {
+       "DEED": 0.64,
+       "ACTION": 0.95,
+       "SIMPLE": 0.8,
+       "HEIGHTS": 0.12,
+       "OBSTACLE": 0.3
+      }
+     },
+     "5": {
+      "flags": [
+       "DEED"
+      ],
+      "scores": {
+       "DEED": 0.54,
+       "FELT": 0.57,
+       "ACTION": 0.74,
+       "SIMPLE": 0.67,
+       "OBSTACLE": 0.21
+      }
+     },
+     "6": {
+      "flags": [
+       "DEED"
+      ],
+      "scores": {
+       "DEED": 0.53,
+       "WHOLE": 0.205,
+       "ACTION": 0.87,
+       "SIMPLE": 0.83,
+       "HEIGHTS": 0.14,
+       "OBSTACLE": 0.23,
+       "WHOLE_FAULT": 0.3,
+       "WHOLE_SHARED": 0.89
+      }
+     },
+     "7": {
+      "flags": [],
+      "scores": {
+       "DEED": 0.49,
+       "ACTION": 0.94,
+       "SIMPLE": 0.76,
+       "HEIGHTS": 0.15,
+       "OBSTACLE": 0.34
+      }
+     },
+     "8": {
+      "flags": [
+       "DEED",
+       "FELT"
+      ],
+      "scores": {
+       "DEED": 0.58,
+       "FELT": 0.39,
+       "ACTION": 0.95,
+       "SIMPLE": 0.78,
+       "OBSTACLE": 0.27
+      }
+     },
+     "9": {
+      "flags": [
+       "DEED"
+      ],
+      "scores": {
+       "DEED": 0.62,
+       "ACTION": 0.88,
+       "SIMPLE": 0.52,
+       "OBSTACLE": 0.11
+      }
+     },
+     "10": {
+      "flags": [
+       "DEED"
+      ],
+      "scores": {
+       "DEED": 0.64,
+       "THIRD": 0.6,
+       "ACTION": 0.86,
+       "SIMPLE": 0.7,
+       "HEIGHTS": 0.38,
+       "OBSTACLE": 0.18
+      }
+     },
+     "11": {
+      "flags": [
+       "ACTION",
+       "OBSTACLE",
+       "WHOLE"
+      ],
+      "scores": {
+       "DEED": 0.43,
+       "WHOLE": 0.515,
+       "ACTION": 0.15,
+       "SIMPLE": 0.83,
+       "HEIGHTS": 0.09,
+       "OBSTACLE": 0.73,
+       "WHOLE_FAULT": 0.84,
+       "WHOLE_SHARED": 0.81
+      }
+     },
+     "12": {
+      "flags": [
+       "DEED",
+       "HEIGHTS",
+       "OBSTACLE"
+      ],
+      "scores": {
+       "DEED": 0.53,
+       "ACTION": 0.89,
+       "SIMPLE": 0.54,
+       "HEIGHTS": 0.57,
+       "OBSTACLE": 0.59
+      }
+     },
+     "13": {
+      "flags": [
+       "DEED",
+       "HEIGHTS"
+      ],
+      "scores": {
+       "DEED": 0.57,
+       "ACTION": 0.91,
+       "SIMPLE": 0.76,
+       "HEIGHTS": 0.81,
+       "OBSTACLE": 0.27
+      }
+     },
+     "14": {
+      "flags": [
+       "DEED",
+       "FELT"
+      ],
+      "scores": {
+       "DEED": 0.56,
+       "FELT": 0.17,
+       "ACTION": 0.84,
+       "SIMPLE": 0.55,
+       "OBSTACLE": 0.23
+      }
+     },
+     "15": {
+      "flags": [],
+      "scores": {
+       "DEED": 0.42,
+       "ACTION": 0.86,
+       "SIMPLE": 0.68,
+       "HEIGHTS": 0.19,
+       "OBSTACLE": 0.36
+      }
+     },
+     "16": {
+      "flags": [
+       "DEED"
+      ],
+      "scores": {
+       "DEED": 0.59,
+       "ACTION": 0.91,
+       "SIMPLE": 0.84,
+       "HEIGHTS": 0.16,
+       "OBSTACLE": 0.19
+      }
+     },
+     "17": {
+      "flags": [
+       "DEED"
+      ],
+      "scores": {
+       "DEED": 0.59,
+       "WHOLE": 0.265,
+       "ACTION": 0.91,
+       "SIMPLE": 0.75,
+       "HEIGHTS": 0.13,
+       "OBSTACLE": 0.25,
+       "WHOLE_FAULT": 0.28,
+       "WHOLE_SHARED": 0.75
+      }
+     },
+     "18": {
+      "flags": [
+       "DEED"
+      ],
+      "scores": {
+       "DEED": 0.6,
+       "WHOLE": 0.14,
+       "ACTION": 0.89,
+       "SIMPLE": 0.86,
+       "HEIGHTS": 0.1,
+       "OBSTACLE": 0.15,
+       "WHOLE_FAULT": 0.07,
+       "WHOLE_SHARED": 0.79
+      }
+     }
+    },
+    "rows": [
+     {
+      "shot": "wide",
+      "type": "group",
+      "names": [
+       "Levin",
+       "Julian",
+       "Max",
+       "Kiaan"
+      ],
+      "pageNumber": 1
+     },
+     {
+      "shot": "close-up",
+      "type": "medium",
+      "names": [
+       "Levin",
+       "Julian"
+      ],
+      "pageNumber": 2
+     },
+     {
+      "shot": "wide",
+      "type": "medium",
+      "names": [
+       "Levin",
+       "Kiaan"
+      ],
+      "pageNumber": 3
+     },
+     {
+      "shot": "close-up",
+      "type": "medium",
+      "names": [
+       "Levin",
+       "Max"
+      ],
+      "pageNumber": 4
+     },
+     {
+      "shot": "close-up",
+      "type": "face",
+      "names": [
+       "Sura"
+      ],
+      "pageNumber": 5
+     },
+     {
+      "shot": "wide",
+      "type": "group",
+      "names": [
+       "Levin",
+       "Julian",
+       "Max",
+       "Kiaan"
+      ],
+      "pageNumber": 6
+     },
+     {
+      "shot": "low-angle",
+      "type": "medium",
+      "names": [
+       "Levin",
+       "Julian"
+      ],
+      "pageNumber": 7
+     },
+     {
+      "shot": "close-up",
+      "type": "face",
+      "names": [
+       "Kiaan"
+      ],
+      "pageNumber": 8
+     },
+     {
+      "shot": "ultra-wide",
+      "type": "medium",
+      "names": [
+       "Sura"
+      ],
+      "pageNumber": 9
+     },
+     {
+      "shot": "high-angle",
+      "type": "medium",
+      "names": [
+       "Levin",
+       "Max",
+       "Kiaan"
+      ],
+      "pageNumber": 10
+     },
+     {
+      "shot": "wide",
+      "type": "group",
+      "names": [
+       "Levin",
+       "Julian",
+       "Max",
+       "Kiaan"
+      ],
+      "pageNumber": 11
+     },
+     {
+      "shot": "close-up",
+      "type": "medium",
+      "names": [
+       "Max",
+       "Sura"
+      ],
+      "pageNumber": 12
+     },
+     {
+      "shot": "low-angle",
+      "type": "medium",
+      "names": [
+       "Levin",
+       "Sura"
+      ],
+      "pageNumber": 13
+     },
+     {
+      "shot": "close-up",
+      "type": "face",
+      "names": [
+       "Sura"
+      ],
+      "pageNumber": 14
+     },
+     {
+      "shot": "close-up",
+      "type": "medium",
+      "names": [
+       "Levin",
+       "Julian"
+      ],
+      "pageNumber": 15
+     },
+     {
+      "shot": "close-up",
+      "type": "medium",
+      "names": [
+       "Levin",
+       "Sura"
+      ],
+      "pageNumber": 16
+     },
+     {
+      "shot": "wide",
+      "type": "group",
+      "names": [
+       "Levin",
+       "Julian",
+       "Max",
+       "Kiaan",
+       "Sura"
+      ],
+      "pageNumber": 17
+     },
+     {
+      "shot": "wide",
+      "type": "group",
+      "names": [
+       "Levin",
+       "Julian",
+       "Max",
+       "Kiaan"
+      ],
+      "pageNumber": 18
+     }
+    ],
+    "metrics": {
+     "coverage": {
+      "Max": 8,
+      "Kiaan": 8,
+      "Levin": 13,
+      "Julian": 8
+     },
+     "flagCount": 22,
+     "mainShare": {
+      "name": "Levin",
+      "pages": 13,
+      "target": 9
+     },
+     "pageCount": 18,
+     "groupPages": 5,
+     "shotCounts": {
+      "wide": 6,
+      "close-up": 8,
+      "low-angle": 2,
+      "high-angle": 1,
+      "ultra-wide": 1
+     },
+     "simplicity": {
+      "n": 18,
+      "min": 0.52,
+      "mean": 0.74,
+      "below": 0,
+      "histogram": {
+       "<0.3": 0,
+       ">=0.9": 0,
+       "0.3-0.5": 0,
+       "0.5-0.7": 5,
+       "0.7-0.9": 13
+      }
+     },
+     "typeCounts": {
+      "face": 3,
+      "group": 5,
+      "medium": 10
+     },
+     "groupBudget": 3,
+     "codeFindings": [
+      "TYPED_NO_SCENERY_PAGE",
+      "GROUP_PAGES_OVER_BUDGET"
+     ],
+     "faceCloseUps": 3,
+     "sceneryPages": 0,
+     "coverageTarget": 3,
+     "flagsByQuestion": {
+      "DEED": [
+       2,
+       3,
+       4,
+       5,
+       6,
+       8,
+       9,
+       10,
+       12,
+       13,
+       14,
+       16,
+       17,
+       18
+      ],
+      "FELT": [
+       8,
+       14
+      ],
+      "WHOLE": [
+       11
+      ],
+      "ACTION": [
+       11
+      ],
+      "HEIGHTS": [
+       12,
+       13
+      ],
+      "OBSTACLE": [
+       11,
+       12
+      ]
+     },
+     "noCommissionedPages": 0,
+     "neighbourSameTypeCast": 0,
+     "neighbourSameShotCount": 1,
+     "closeUpsOnMultiFigurePages": 5
+    },
+    "jevStats": {
+     "calls": 100,
+     "maxMs": 1431,
+     "p50ms": 260,
+     "errors": [],
+     "failed": 0,
+     "costUsd": 0.001592,
+     "retries": 0
+    },
+    "elapsedMs": 4119,
+    "pagesReplanned": 7
+   }
+  }
+ ],
+ "error": null,
+ "createdBy": "demo-b-hnecf@magicalstory.ch",
+ "createdAt": "2026-10-06T07:38:27.234Z",
+ "completedAt": "2026-10-06T07:38:31.531Z"
+}

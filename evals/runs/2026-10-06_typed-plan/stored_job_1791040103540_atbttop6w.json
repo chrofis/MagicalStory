@@ -1,0 +1,612 @@
+{
+ "id": 1658,
+ "arm": "stored",
+ "storyId": "job_1791040103540_atbttop6w",
+ "stage": "beats_replan",
+ "label": "typed-plan stored job_1791040103540_atbttop6w",
+ "status": "completed",
+ "promptOverride": null,
+ "params": {
+  "measureStored": true
+ },
+ "targets": [
+  {
+   "storyId": "job_1791040103540_atbttop6w"
+  }
+ ],
+ "results": [
+  {
+   "ok": true,
+   "arm": "stored-shipped-plan",
+   "cost": 0.001547,
+   "note": "arm 0: the stored shipped plan measured, 93 Jev calls",
+   "pages": 18,
+   "usage": {
+    "input_tokens": 0,
+    "output_tokens": 0
+   },
+   "events": [],
+   "storyId": "job_1791040103540_atbttop6w",
+   "logLines": [
+    "📝 Prompt templates loaded: 97/97 ok",
+    "👪 [BEATS] Figures the arc tagged (commissioned), counted as commissioned: Levin, Julian, Max, Kiaan"
+   ],
+   "elapsedMs": 3617,
+   "startedAt": "2026-10-06T07:37:56.091Z",
+   "targetIndex": 0,
+   "standingPlan": [
+    {
+     "planLine": "wide — Levin, Julian, Max, Kiaan — the four kick and chase a ball across the Lindenhof under the linden trees, the Grossmünster towers catching afternoon sun in the distance — the four friends and the autumn square are established as the story's world",
+     "pageNumber": 1
+    },
+    {
+     "planLine": "over-the-shoulder — Levin, Herr Keller — the man in the orange vest lifts his leaf blower and starts it near the chess field while Levin watches — the roaring leaf blower is now running on the square",
+     "pageNumber": 2
+    },
+    {
+     "planLine": "medium — Julian — he kneels in the big leaf heap between the linden roots, both hands pulling a large warm egg up out of the leaves — the warm, softly knocking egg is found",
+     "pageNumber": 3
+    },
+    {
+     "planLine": "low-angle — Levin, Julian — Julian holds the egg while Levin looks up into the linden's crown where one golden eye blinks down from the branches — Rubina in her nest is discovered",
+     "pageNumber": 4
+    },
+    {
+     "planLine": "wide — Rubina, Levin, Julian, Max, Kiaan — the four children stand below the linden with their backs to the viewer, looking up at Rubina in her nest who calls down to them asking for help — the four are asked for help and the stake is spoken aloud",
+     "pageNumber": 5
+    },
+    {
+     "planLine": "over-the-shoulder — Julian, Rubina — Julian looks up at Rubina in the linden crown, where she presses her wings hard over her ears against the blower's roar — the children know Rubina cannot fly down to help them",
+     "pageNumber": 6
+    },
+    {
+     "planLine": "medium — Levin, Herr Keller — Levin stands beside Herr Keller whose blower is roaring, Levin's mouth open in a whisper that the machine swallows — the blower roars on and Levin's first chance was wasted",
+     "pageNumber": 7
+    },
+    {
+     "planLine": "close-up — Max, Herr Keller — Max cups his hands and shouts into Herr Keller's ear; Herr Keller throws his head back laughing — Herr Keller has been told about the egg and dismissed it; the blower goes back on",
+     "pageNumber": 8
+    },
+    {
+     "planLine": "ultra-wide — the egg — the egg wobbles out from the linden roots and rolls down the slope toward the top of the steep stairs, the leaf blanket scattered behind it — the egg is rolling toward the stairs unguarded",
+     "pageNumber": 9
+    },
+    {
+     "planLine": "medium — Max — he sprints and plants his foot against the egg, stopping it at the very top step — the egg is stopped at the stairhead; the danger is past",
+     "pageNumber": 10
+    },
+    {
+     "planLine": "close-up — Kiaan — he wraps the egg tightly in his autumn jacket, then nearly sets the bundle down before catching himself and clutching it hard against his chest — the egg is wrapped and held; Kiaan's forgetfulness is shown and overcome",
+     "pageNumber": 11
+    },
+    {
+     "planLine": "medium — Kiaan, Julian — Julian covers his ears and presses behind Levin as Herr Keller blows right up to the linden, while Kiaan clutches the jacketed egg and watches the knocking almost stop — the knocking has nearly stopped; the sun lights only the tips of the Grossmünster towers; this is the low point",
+     "pageNumber": 12
+    },
+    {
+     "planLine": "close-up — Julian — Julian stands with his mouth open and one finger raised as he speaks — Julian has spoken the key observation aloud",
+     "pageNumber": 13
+    },
+    {
+     "planLine": "close-up — Levin, Herr Keller — with shaking knees Levin reaches out and tugs Herr Keller's sleeve — the blower is off and Herr Keller's attention is on Levin",
+     "pageNumber": 14
+    },
+    {
+     "planLine": "medium — Levin, Herr Keller — Levin points at the leaf cart by the chess field, asking question after question while Herr Keller stands with his back to the linden — the quiet holds; Herr Keller's back stays turned",
+     "pageNumber": 15
+    },
+    {
+     "planLine": "medium — Kiaan, Rubina, Max — Kiaan stretches up, holding the jacketed egg toward Rubina's open branch-claws at the foot of the linden trunk, Max beside him — Rubina has the egg",
+     "pageNumber": 16
+    },
+    {
+     "planLine": "low-angle — Levin, Rubina — Levin looks up as Rubina rises above the linden's crown carrying the egg toward her nest, her wingbeats shaking a cascade of red and yellow leaves down — the egg is safely in the nest and every last leaf has fallen",
+     "pageNumber": 17
+    },
+    {
+     "planLine": "wide — Levin, Julian, Max, Kiaan, Rubina, the little dragon — the four children look up from below as the little dragon peeks out of the cracked egg in Rubina's nest — the little dragon has hatched and the egg's journey is complete",
+     "pageNumber": 18
+    }
+   ],
+   "typedMeasure": {
+    "jev": {
+     "1": {
+      "flags": [
+       "DEED"
+      ],
+      "scores": {
+       "DEED": 0.51,
+       "WHOLE": 0.25,
+       "ACTION": 0.95,
+       "SIMPLE": 0.88,
+       "HEIGHTS": 0.11,
+       "OBSTACLE": 0.24,
+       "WHOLE_FAULT": 0.14,
+       "WHOLE_SHARED": 0.64
+      }
+     },
+     "2": {
+      "flags": [],
+      "scores": {
+       "DEED": 0.49,
+       "ACTION": 0.89,
+       "SIMPLE": 0.78,
+       "HEIGHTS": 0.17,
+       "OBSTACLE": 0.19
+      }
+     },
+     "3": {
+      "flags": [
+       "DEED"
+      ],
+      "scores": {
+       "DEED": 0.56,
+       "ACTION": 0.94,
+       "SIMPLE": 0.85,
+       "OBSTACLE": 0.13
+      }
+     },
+     "4": {
+      "flags": [
+       "HEIGHTS"
+      ],
+      "scores": {
+       "DEED": 0.43,
+       "ACTION": 0.74,
+       "SIMPLE": 0.65,
+       "HEIGHTS": 0.72,
+       "OBSTACLE": 0.32
+      }
+     },
+     "5": {
+      "flags": [
+       "HEIGHTS",
+       "WHOLE"
+      ],
+      "scores": {
+       "DEED": 0.39,
+       "WHOLE": 0.56,
+       "ACTION": 0.57,
+       "SIMPLE": 0.77,
+       "HEIGHTS": 0.75,
+       "OBSTACLE": 0.27,
+       "WHOLE_FAULT": 0.69,
+       "WHOLE_SHARED": 0.57
+      }
+     },
+     "6": {
+      "flags": [
+       "HEIGHTS"
+      ],
+      "scores": {
+       "DEED": 0.46,
+       "ACTION": 0.88,
+       "SIMPLE": 0.63,
+       "HEIGHTS": 0.76,
+       "OBSTACLE": 0.45
+      }
+     },
+     "7": {
+      "flags": [
+       "DEED"
+      ],
+      "scores": {
+       "DEED": 0.53,
+       "ACTION": 0.72,
+       "SIMPLE": 0.69,
+       "HEIGHTS": 0.18,
+       "OBSTACLE": 0.36
+      }
+     },
+     "8": {
+      "flags": [
+       "DEED"
+      ],
+      "scores": {
+       "DEED": 0.56,
+       "ACTION": 0.86,
+       "SIMPLE": 0.66,
+       "HEIGHTS": 0.19,
+       "OBSTACLE": 0.21
+      }
+     },
+     "9": {
+      "flags": [
+       "DEED",
+       "WEIGHT"
+      ],
+      "scores": {
+       "DEED": 0.53,
+       "SIMPLE": 0.77,
+       "WEIGHT": 0.47
+      }
+     },
+     "10": {
+      "flags": [
+       "DEED"
+      ],
+      "scores": {
+       "DEED": 0.64,
+       "ACTION": 0.86,
+       "SIMPLE": 0.76,
+       "OBSTACLE": 0.24
+      }
+     },
+     "11": {
+      "flags": [
+       "DEED",
+       "FELT"
+      ],
+      "scores": {
+       "DEED": 0.58,
+       "FELT": 0.48,
+       "ACTION": 0.79,
+       "SIMPLE": 0.63,
+       "OBSTACLE": 0.13
+      }
+     },
+     "12": {
+      "flags": [
+       "SIMPLE",
+       "OBSTACLE"
+      ],
+      "scores": {
+       "DEED": 0.48,
+       "ACTION": 0.82,
+       "SIMPLE": 0.42,
+       "HEIGHTS": 0.2,
+       "OBSTACLE": 0.52
+      }
+     },
+     "13": {
+      "flags": [],
+      "scores": {
+       "DEED": 0.45,
+       "FELT": 0.51,
+       "ACTION": 0.87,
+       "SIMPLE": 0.85,
+       "OBSTACLE": 0.27
+      }
+     },
+     "14": {
+      "flags": [
+       "DEED"
+      ],
+      "scores": {
+       "DEED": 0.57,
+       "ACTION": 0.93,
+       "SIMPLE": 0.79,
+       "HEIGHTS": 0.19,
+       "OBSTACLE": 0.2
+      }
+     },
+     "15": {
+      "flags": [],
+      "scores": {
+       "DEED": 0.39,
+       "ACTION": 0.81,
+       "SIMPLE": 0.69,
+       "HEIGHTS": 0.13,
+       "OBSTACLE": 0.25
+      }
+     },
+     "16": {
+      "flags": [
+       "DEED",
+       "HEIGHTS"
+      ],
+      "scores": {
+       "DEED": 0.6,
+       "THIRD": 0.58,
+       "ACTION": 0.93,
+       "SIMPLE": 0.84,
+       "HEIGHTS": 0.7,
+       "OBSTACLE": 0.11
+      }
+     },
+     "17": {
+      "flags": [
+       "DEED",
+       "HEIGHTS"
+      ],
+      "scores": {
+       "DEED": 0.56,
+       "ACTION": 0.69,
+       "SIMPLE": 0.52,
+       "HEIGHTS": 0.79,
+       "OBSTACLE": 0.12
+      }
+     },
+     "18": {
+      "flags": [
+       "WHOLE"
+      ],
+      "scores": {
+       "DEED": 0.47,
+       "WHOLE": 0.75,
+       "ACTION": 0.67,
+       "SIMPLE": 0.82,
+       "HEIGHTS": 0.44,
+       "OBSTACLE": 0.15,
+       "WHOLE_FAULT": 0.81,
+       "WHOLE_SHARED": 0.31
+      }
+     }
+    },
+    "rows": [
+     {
+      "shot": "wide",
+      "type": "group",
+      "names": [
+       "Levin",
+       "Julian",
+       "Max",
+       "Kiaan"
+      ],
+      "pageNumber": 1
+     },
+     {
+      "shot": "over-the-shoulder",
+      "type": "medium",
+      "names": [
+       "Levin",
+       "Herr Keller"
+      ],
+      "pageNumber": 2
+     },
+     {
+      "shot": "medium",
+      "type": "medium",
+      "names": [
+       "Julian"
+      ],
+      "pageNumber": 3
+     },
+     {
+      "shot": "low-angle",
+      "type": "medium",
+      "names": [
+       "Levin",
+       "Julian"
+      ],
+      "pageNumber": 4
+     },
+     {
+      "shot": "wide",
+      "type": "group",
+      "names": [
+       "Levin",
+       "Julian",
+       "Max",
+       "Kiaan",
+       "Rubina"
+      ],
+      "pageNumber": 5
+     },
+     {
+      "shot": "over-the-shoulder",
+      "type": "medium",
+      "names": [
+       "Julian",
+       "Rubina"
+      ],
+      "pageNumber": 6
+     },
+     {
+      "shot": "medium",
+      "type": "medium",
+      "names": [
+       "Levin",
+       "Herr Keller"
+      ],
+      "pageNumber": 7
+     },
+     {
+      "shot": "close-up",
+      "type": "medium",
+      "names": [
+       "Max",
+       "Herr Keller"
+      ],
+      "pageNumber": 8
+     },
+     {
+      "shot": "ultra-wide",
+      "type": "scenery",
+      "names": [],
+      "pageNumber": 9
+     },
+     {
+      "shot": "medium",
+      "type": "medium",
+      "names": [
+       "Max"
+      ],
+      "pageNumber": 10
+     },
+     {
+      "shot": "close-up",
+      "type": "face",
+      "names": [
+       "Kiaan"
+      ],
+      "pageNumber": 11
+     },
+     {
+      "shot": "medium",
+      "type": "medium",
+      "names": [
+       "Julian",
+       "Kiaan"
+      ],
+      "pageNumber": 12
+     },
+     {
+      "shot": "close-up",
+      "type": "face",
+      "names": [
+       "Julian"
+      ],
+      "pageNumber": 13
+     },
+     {
+      "shot": "close-up",
+      "type": "medium",
+      "names": [
+       "Levin",
+       "Herr Keller"
+      ],
+      "pageNumber": 14
+     },
+     {
+      "shot": "medium",
+      "type": "medium",
+      "names": [
+       "Levin",
+       "Herr Keller"
+      ],
+      "pageNumber": 15
+     },
+     {
+      "shot": "medium",
+      "type": "medium",
+      "names": [
+       "Max",
+       "Kiaan",
+       "Rubina"
+      ],
+      "pageNumber": 16
+     },
+     {
+      "shot": "low-angle",
+      "type": "medium",
+      "names": [
+       "Levin",
+       "Rubina"
+      ],
+      "pageNumber": 17
+     },
+     {
+      "shot": "wide",
+      "type": "group",
+      "names": [
+       "Levin",
+       "Julian",
+       "Max",
+       "Kiaan",
+       "Rubina",
+       "little dragon"
+      ],
+      "pageNumber": 18
+     }
+    ],
+    "metrics": {
+     "coverage": {
+      "Max": 6,
+      "Kiaan": 6,
+      "Levin": 9,
+      "Julian": 8
+     },
+     "flagCount": 21,
+     "mainShare": {
+      "name": "Levin",
+      "pages": 9,
+      "target": 9
+     },
+     "pageCount": 18,
+     "groupPages": 3,
+     "shotCounts": {
+      "wide": 3,
+      "medium": 6,
+      "close-up": 4,
+      "low-angle": 2,
+      "ultra-wide": 1,
+      "over-the-shoulder": 2
+     },
+     "simplicity": {
+      "n": 18,
+      "min": 0.42,
+      "mean": 0.722,
+      "below": 1,
+      "histogram": {
+       "<0.3": 0,
+       ">=0.9": 0,
+       "0.3-0.5": 1,
+       "0.5-0.7": 7,
+       "0.7-0.9": 10
+      }
+     },
+     "typeCounts": {
+      "face": 2,
+      "group": 3,
+      "medium": 12,
+      "scenery": 1
+     },
+     "groupBudget": 3,
+     "codeFindings": [
+      "CONSECUTIVE_SAME_TYPE_CAST"
+     ],
+     "faceCloseUps": 2,
+     "sceneryPages": 1,
+     "coverageTarget": 3,
+     "flagsByQuestion": {
+      "DEED": [
+       1,
+       3,
+       7,
+       8,
+       9,
+       10,
+       11,
+       14,
+       16,
+       17
+      ],
+      "FELT": [
+       11
+      ],
+      "WHOLE": [
+       5,
+       18
+      ],
+      "SIMPLE": [
+       12
+      ],
+      "WEIGHT": [
+       9
+      ],
+      "HEIGHTS": [
+       4,
+       5,
+       6,
+       16,
+       17
+      ],
+      "OBSTACLE": [
+       12
+      ]
+     },
+     "noCommissionedPages": 1,
+     "neighbourSameTypeCast": 1,
+     "neighbourSameShotCount": 0,
+     "closeUpsOnMultiFigurePages": 2
+    },
+    "jevStats": {
+     "calls": 93,
+     "maxMs": 1639,
+     "p50ms": 255,
+     "errors": [],
+     "failed": 0,
+     "costUsd": 0.001547,
+     "retries": 0
+    },
+    "elapsedMs": 3617,
+    "pagesReplanned": 9
+   }
+  }
+ ],
+ "error": null,
+ "createdBy": "demo-b-hnecf@magicalstory.ch",
+ "createdAt": "2026-10-06T07:37:56.073Z",
+ "completedAt": "2026-10-06T07:37:59.878Z"
+}

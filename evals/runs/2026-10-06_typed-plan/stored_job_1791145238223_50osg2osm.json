@@ -1,0 +1,397 @@
+{
+ "id": 1659,
+ "arm": "stored",
+ "storyId": "job_1791145238223_50osg2osm",
+ "stage": "beats_replan",
+ "label": "typed-plan stored job_1791145238223_50osg2osm",
+ "status": "completed",
+ "promptOverride": null,
+ "params": {
+  "measureStored": true
+ },
+ "targets": [
+  {
+   "storyId": "job_1791145238223_50osg2osm"
+  }
+ ],
+ "results": [
+  {
+   "ok": true,
+   "arm": "stored-shipped-plan",
+   "cost": 0.000863,
+   "note": "arm 0: the stored shipped plan measured, 54 Jev calls",
+   "pages": 10,
+   "usage": {
+    "input_tokens": 0,
+    "output_tokens": 0
+   },
+   "events": [],
+   "storyId": "job_1791145238223_50osg2osm",
+   "logLines": [
+    "📝 Prompt templates loaded: 97/97 ok",
+    "👪 [BEATS] Figures the arc tagged (commissioned), counted as commissioned: Emma, Noah, Daniel, Sarah, Hans",
+    "[LOCATIONS] Getting locations for event: wilhelm-tell (aspect: default, variant: A4)",
+    "[LOCATIONS] Found 7 locations for wilhelm-tell"
+   ],
+   "elapsedMs": 3073,
+   "startedAt": "2026-10-06T07:38:11.704Z",
+   "targetIndex": 0,
+   "standingPlan": [
+    {
+     "planLine": "medium — Emma, Sarah, Hans — Emma grips Sarah's hand and pulls toward the Dorfplatz while Sarah holds firm and Hans watches the stage ahead, the lanterns already lit around them — the play has begun, Emma is afraid and being held back",
+     "pageNumber": 1
+    },
+    {
+     "planLine": "over-the-shoulder — Daniel, Noah — Noah stands alone under the lime tree with an apple on his head while Daniel faces him with the loaded crossbow, a second bolt at his belt — the shot is ordered and Noah is alone in the open place",
+     "pageNumber": 2
+    },
+    {
+     "planLine": "medium — Sarah, Emma, Hans — Sarah speaks to Emma with one hand raised toward the lane while Hans holds Emma's mitten, the open lane visible beside them — Emma knows she cannot enter the lane or shout, and nobody may follow her there",
+     "pageNumber": 3
+    },
+    {
+     "planLine": "close-up — Emma — Emma frozen among the dark wall of coat-hems, cheeks puffed in the lion breath alone, one hand pressed to a stranger's coat, the grown-ups' legs rising around her on all sides — Emma has used the lion breath to go on and is now moving alone through the packed crowd",
+     "pageNumber": 4
+    },
+    {
+     "planLine": "ultra-wide — Emma, Daniel — Emma arrives in the front row at Daniel's side, two soldiers' crossed wooden spears blocking the lane ahead of her, the lit lantern beside Daniel throwing light on her face — Emma is stopped at the lane's edge and can neither cross to Noah nor call to him",
+     "pageNumber": 5
+    },
+    {
+     "planLine": "medium — Daniel, Gessler — Daniel holds the crossbow lowered, his eyes on Noah, while Gessler stands at the frame's edge with his counting hand raised, marking six, seven — the shot is not taken and the count is running out",
+     "pageNumber": 6
+    },
+    {
+     "planLine": "over-the-shoulder — Emma, Noah — Emma raises both hands like paws in the lantern light and breathes the lion breath big and slow; across the lane Noah's eyes find her and his hands stay at his sides — Noah has joined the breath and is steady",
+     "pageNumber": 7
+    },
+    {
+     "planLine": "close-up — Noah — the blunt bolt strikes the apple from Noah's head at the count of nine, the apple spinning in the air above him, Noah's hands still at his sides — the apple is off and the shot is made before Gessler's ten",
+     "pageNumber": 8
+    },
+    {
+     "planLine": "medium — Daniel, Gessler — Daniel faces Gessler in the open place and holds up the second bolt while Gessler steps back from the open place before the crowd — Gessler can take no action and steps back",
+     "pageNumber": 9
+    },
+    {
+     "planLine": "wide — Emma, Daniel, Noah, Sarah, Hans — Daniel holds Emma up and grins at her while Noah reaches up to give her the bigger half of the broken apple; Sarah and Hans stand beside them and Hans holds up the empty mitten — the family is together and Emma is proud",
+     "pageNumber": 10
+    }
+   ],
+   "typedMeasure": {
+    "jev": {
+     "1": {
+      "flags": [],
+      "scores": {
+       "DEED": 0.33,
+       "THIRD": 0.73,
+       "ACTION": 0.94,
+       "SIMPLE": 0.65,
+       "HEIGHTS": 0.11,
+       "OBSTACLE": 0.08
+      }
+     },
+     "2": {
+      "flags": [],
+      "scores": {
+       "DEED": 0.43,
+       "ACTION": 0.61,
+       "SIMPLE": 0.83,
+       "HEIGHTS": 0.13,
+       "OBSTACLE": 0.18
+      }
+     },
+     "3": {
+      "flags": [
+       "DEED"
+      ],
+      "scores": {
+       "DEED": 0.53,
+       "THIRD": 0.71,
+       "ACTION": 0.85,
+       "SIMPLE": 0.74,
+       "HEIGHTS": 0.16,
+       "OBSTACLE": 0.22
+      }
+     },
+     "4": {
+      "flags": [
+       "DEED",
+       "FELT",
+       "OBSTACLE"
+      ],
+      "scores": {
+       "DEED": 0.65,
+       "FELT": 0.16,
+       "ACTION": 0.8,
+       "SIMPLE": 0.61,
+       "OBSTACLE": 0.64
+      }
+     },
+     "5": {
+      "flags": [
+       "OBSTACLE"
+      ],
+      "scores": {
+       "DEED": 0.49,
+       "ACTION": 0.58,
+       "SIMPLE": 0.69,
+       "HEIGHTS": 0.14,
+       "OBSTACLE": 0.73
+      }
+     },
+     "6": {
+      "flags": [],
+      "scores": {
+       "DEED": 0.27,
+       "ACTION": 0.65,
+       "SIMPLE": 0.57,
+       "HEIGHTS": 0.18,
+       "OBSTACLE": 0.31
+      }
+     },
+     "7": {
+      "flags": [],
+      "scores": {
+       "DEED": 0.45,
+       "ACTION": 0.91,
+       "SIMPLE": 0.63,
+       "HEIGHTS": 0.11,
+       "OBSTACLE": 0.11
+      }
+     },
+     "8": {
+      "flags": [
+       "DEED",
+       "FELT"
+      ],
+      "scores": {
+       "DEED": 0.58,
+       "FELT": 0.06,
+       "ACTION": 0.67,
+       "SIMPLE": 0.76,
+       "OBSTACLE": 0.37
+      }
+     },
+     "9": {
+      "flags": [
+       "DEED"
+      ],
+      "scores": {
+       "DEED": 0.6,
+       "ACTION": 0.84,
+       "SIMPLE": 0.61,
+       "HEIGHTS": 0.15,
+       "OBSTACLE": 0.3
+      }
+     },
+     "10": {
+      "flags": [
+       "DEED",
+       "HEIGHTS",
+       "WHOLE"
+      ],
+      "scores": {
+       "DEED": 0.52,
+       "WHOLE": 0.725,
+       "ACTION": 0.89,
+       "SIMPLE": 0.69,
+       "HEIGHTS": 0.62,
+       "OBSTACLE": 0.1,
+       "WHOLE_FAULT": 0.56,
+       "WHOLE_SHARED": 0.11
+      }
+     }
+    },
+    "rows": [
+     {
+      "shot": "medium",
+      "type": "medium",
+      "names": [
+       "Emma",
+       "Sarah",
+       "Hans"
+      ],
+      "pageNumber": 1
+     },
+     {
+      "shot": "over-the-shoulder",
+      "type": "medium",
+      "names": [
+       "Noah",
+       "Daniel"
+      ],
+      "pageNumber": 2
+     },
+     {
+      "shot": "medium",
+      "type": "medium",
+      "names": [
+       "Emma",
+       "Sarah",
+       "Hans"
+      ],
+      "pageNumber": 3
+     },
+     {
+      "shot": "close-up",
+      "type": "face",
+      "names": [
+       "Emma"
+      ],
+      "pageNumber": 4
+     },
+     {
+      "shot": "ultra-wide",
+      "type": "medium",
+      "names": [
+       "Emma",
+       "Daniel"
+      ],
+      "pageNumber": 5
+     },
+     {
+      "shot": "medium",
+      "type": "medium",
+      "names": [
+       "Daniel",
+       "Gessler"
+      ],
+      "pageNumber": 6
+     },
+     {
+      "shot": "over-the-shoulder",
+      "type": "medium",
+      "names": [
+       "Emma",
+       "Noah"
+      ],
+      "pageNumber": 7
+     },
+     {
+      "shot": "close-up",
+      "type": "face",
+      "names": [
+       "Noah"
+      ],
+      "pageNumber": 8
+     },
+     {
+      "shot": "medium",
+      "type": "medium",
+      "names": [
+       "Daniel",
+       "Gessler"
+      ],
+      "pageNumber": 9
+     },
+     {
+      "shot": "wide",
+      "type": "group",
+      "names": [
+       "Emma",
+       "Noah",
+       "Daniel",
+       "Sarah",
+       "Hans"
+      ],
+      "pageNumber": 10
+     }
+    ],
+    "metrics": {
+     "coverage": {
+      "Emma": 6,
+      "Hans": 3,
+      "Noah": 4,
+      "Sarah": 3,
+      "Daniel": 5
+     },
+     "flagCount": 11,
+     "mainShare": {
+      "name": "Emma",
+      "pages": 6,
+      "target": 5
+     },
+     "pageCount": 10,
+     "groupPages": 1,
+     "shotCounts": {
+      "wide": 1,
+      "medium": 4,
+      "close-up": 2,
+      "ultra-wide": 1,
+      "over-the-shoulder": 2
+     },
+     "simplicity": {
+      "n": 10,
+      "min": 0.57,
+      "mean": 0.678,
+      "below": 0,
+      "histogram": {
+       "<0.3": 0,
+       ">=0.9": 0,
+       "0.3-0.5": 0,
+       "0.5-0.7": 7,
+       "0.7-0.9": 3
+      }
+     },
+     "typeCounts": {
+      "face": 2,
+      "group": 1,
+      "medium": 7
+     },
+     "groupBudget": 2,
+     "codeFindings": [
+      "TYPED_NO_SCENERY_PAGE",
+      "NO_FOCAL_PAGE",
+      "NO_FOCAL_PAGE"
+     ],
+     "faceCloseUps": 2,
+     "sceneryPages": 0,
+     "coverageTarget": 3,
+     "flagsByQuestion": {
+      "DEED": [
+       3,
+       4,
+       8,
+       9,
+       10
+      ],
+      "FELT": [
+       4,
+       8
+      ],
+      "WHOLE": [
+       10
+      ],
+      "HEIGHTS": [
+       10
+      ],
+      "OBSTACLE": [
+       4,
+       5
+      ]
+     },
+     "noCommissionedPages": 0,
+     "neighbourSameTypeCast": 0,
+     "neighbourSameShotCount": 0,
+     "closeUpsOnMultiFigurePages": 0
+    },
+    "jevStats": {
+     "calls": 54,
+     "maxMs": 1180,
+     "p50ms": 258,
+     "errors": [],
+     "failed": 0,
+     "costUsd": 0.000863,
+     "retries": 0
+    },
+    "elapsedMs": 3073,
+    "pagesReplanned": 3
+   }
+  }
+ ],
+ "error": null,
+ "createdBy": "demo-b-hnecf@magicalstory.ch",
+ "createdAt": "2026-10-06T07:38:11.691Z",
+ "completedAt": "2026-10-06T07:38:14.943Z"
+}

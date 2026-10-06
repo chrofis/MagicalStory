@@ -1,0 +1,574 @@
+{
+ "id": 1661,
+ "arm": "stored",
+ "storyId": "job_1790446348343_z3fw660ie",
+ "stage": "beats_replan",
+ "label": "typed-plan stored job_1790446348343_z3fw660ie",
+ "status": "completed",
+ "promptOverride": null,
+ "params": {
+  "measureStored": true
+ },
+ "targets": [
+  {
+   "storyId": "job_1790446348343_z3fw660ie"
+  }
+ ],
+ "results": [
+  {
+   "ok": true,
+   "arm": "stored-shipped-plan",
+   "cost": 0.001458,
+   "note": "arm 0: the stored shipped plan measured, 85 Jev calls",
+   "pages": 16,
+   "usage": {
+    "input_tokens": 0,
+    "output_tokens": 0
+   },
+   "events": [],
+   "storyId": "job_1790446348343_z3fw660ie",
+   "logLines": [
+    "📝 Prompt templates loaded: 97/97 ok",
+    "👪 [BEATS] Figures the arc tagged (commissioned), counted as commissioned: Fiona, Sarah, Saira, Facundo, Lorena"
+   ],
+   "elapsedMs": 3145,
+   "startedAt": "2026-10-06T07:38:42.846Z",
+   "targetIndex": 0,
+   "standingPlan": [
+    {
+     "planLine": "medium — Fiona, Sarah, Saira, Facundo, Lorena — the five friends in their hand-sewn pirate costumes walk through the entrance of the Nationalmuseum as chestnuts lie on the cobbles behind them, Fiona's doubled sailcloth sash and sewing scissors visible at her side — the five friends and their costumes are established, Fiona's sash and scissors are in the story",
+     "pageNumber": 1
+    },
+    {
+     "planLine": "close-up — Fiona — Kapitän Zollingers Seekarte slides halfway out from behind the crooked frame as Fiona's fingers catch its edge — the chart is found",
+     "pageNumber": 2
+    },
+    {
+     "planLine": "close-up — Fiona — Fiona holds the sea chart open, the red cross marking one stone visible on it — the chart's destination, the stone under the Lindenhof, is known",
+     "pageNumber": 3
+    },
+    {
+     "planLine": "medium — Sarah, Herr Brunner — Sarah stands in the narrow passage gesturing at a suit of armour and talking at Herr Brunner, who faces her, unable to pass — the others have time to reach the back door while Herr Brunner is held",
+     "pageNumber": 4
+    },
+    {
+     "planLine": "ultra-wide — Seeschwalbe — the Seeschwalbe glides out of the fog on the Limmat toward the river bank, her old hull and rigging emerging from grey mist, no people in frame — the pirate ship exists and has come for the chart",
+     "pageNumber": 5
+    },
+    {
+     "planLine": "medium — Fiona, Facundo, Sarah, Saira, Lorena, Herr Brunner — Facundo hauls Sarah over the ship's rail one step ahead of Herr Brunner's reaching hand, the others already aboard — the five friends are aboard the Seeschwalbe",
+     "pageNumber": 6
+    },
+    {
+     "planLine": "close-up — Fiona, Facundo — Facundo's open hand reaches toward Fiona, who grips Kapitän Zollingers Seekarte against her chest with one hand and pulls back her sailcloth sash with the other — Fiona refuses; the sash and the chart both stay with her",
+     "pageNumber": 7
+    },
+    {
+     "planLine": "low-angle — Facundo — a loose flap of his costume slapping across his face, Facundo braces under the falling mast and catches it on his shoulders so it does not strike anyone — the mast is down safely but its yard tip strikes the bridge and breaks away",
+     "pageNumber": 8
+    },
+    {
+     "planLine": "medium — Saira, Facundo — Saira grips an oar, her body checked for one instant against the pull of the current, then leans hard into the stroke as Facundo rows beside her — the crew reach the Lindenhof wall before sunset",
+     "pageNumber": 9
+    },
+    {
+     "planLine": "high-angle — Herr Brunner, Fiona — looking down from the Lindenhof, Herr Brunner stands at the top of the steps to the landing while far below Fiona stands on the deck of the Seeschwalbe pressed against the smooth wall, the marked stone high above her reach — the wall is smooth and the deck lies too far below the stone; Herr Brunner is closing in",
+     "pageNumber": 10
+    },
+    {
+     "planLine": "medium — Fiona — Fiona drives her sewing scissors into the fabric of her own coat and cuts it into strips, her face set, the sash still at her waist — the coat-rope exists; something Fiona valued is spent",
+     "pageNumber": 11
+    },
+    {
+     "planLine": "over-the-shoulder — Facundo, Fiona, Pfeffer — from behind Facundo bracing at the rail, Fiona presses both hands flat against the smooth wall while Pfeffer perches on the iron ring above, the knotted coat-rope looped through it — Fiona is on the wall; the rope is threaded and she can climb",
+     "pageNumber": 12
+    },
+    {
+     "planLine": "medium — Lorena, Herr Brunner — Lorena holds the chart behind her back and faces Herr Brunner, who reaches toward her, the crew standing between them — Herr Brunner cannot take the chart; the crew obey Lorena",
+     "pageNumber": 13
+    },
+    {
+     "planLine": "close-up — Fiona, Facundo, Lorena — Fiona, pressed against the wall, ties the small chest to the coat-rope while Facundo grips the rope's lower end below her — the chest is secured to the rope and ready to be lowered",
+     "pageNumber": 14
+    },
+    {
+     "planLine": "medium — Fiona, Lorena, Herr Brunner — Fiona, in half a coat, holds Kapitän Zollingers Seekarte out to Herr Brunner while Lorena stands at her side and the open chest sits at their feet — the chart is returned; the chest is in the open",
+     "pageNumber": 15
+    },
+    {
+     "planLine": "wide — Fiona, Sarah, Saira, Facundo, Lorena, Herr Brunner — the six stand together on the landing as the Seeschwalbe fades into the fog behind them, Fiona laughing in her cut coat — everyone is safe ashore together and the adventure is over",
+     "pageNumber": 16
+    }
+   ],
+   "typedMeasure": {
+    "jev": {
+     "1": {
+      "flags": [],
+      "scores": {
+       "DEED": 0.4,
+       "WHOLE": 0.43,
+       "ACTION": 0.85,
+       "SIMPLE": 0.81,
+       "HEIGHTS": 0.11,
+       "OBSTACLE": 0.24,
+       "WHOLE_FAULT": 0.48,
+       "WHOLE_SHARED": 0.62
+      }
+     },
+     "2": {
+      "flags": [
+       "DEED",
+       "FELT"
+      ],
+      "scores": {
+       "DEED": 0.56,
+       "FELT": 0.1,
+       "ACTION": 0.92,
+       "SIMPLE": 0.8,
+       "OBSTACLE": 0.26
+      }
+     },
+     "3": {
+      "flags": [
+       "FELT"
+      ],
+      "scores": {
+       "DEED": 0.47,
+       "FELT": 0.18,
+       "ACTION": 0.89,
+       "SIMPLE": 0.69,
+       "OBSTACLE": 0.33
+      }
+     },
+     "4": {
+      "flags": [
+       "DEED"
+      ],
+      "scores": {
+       "DEED": 0.56,
+       "ACTION": 0.9,
+       "SIMPLE": 0.82,
+       "HEIGHTS": 0.11,
+       "OBSTACLE": 0.18
+      }
+     },
+     "5": {
+      "flags": [],
+      "scores": {
+       "DEED": 0.43,
+       "SIMPLE": 0.78,
+       "WEIGHT": 0.89
+      }
+     },
+     "6": {
+      "flags": [
+       "DEED",
+       "HEIGHTS",
+       "WHOLE"
+      ],
+      "scores": {
+       "DEED": 0.59,
+       "WHOLE": 0.715,
+       "ACTION": 0.95,
+       "SIMPLE": 0.77,
+       "HEIGHTS": 0.72,
+       "OBSTACLE": 0.18,
+       "WHOLE_FAULT": 0.53,
+       "WHOLE_SHARED": 0.1
+      }
+     },
+     "7": {
+      "flags": [
+       "DEED"
+      ],
+      "scores": {
+       "DEED": 0.61,
+       "ACTION": 0.92,
+       "SIMPLE": 0.7,
+       "HEIGHTS": 0.16,
+       "OBSTACLE": 0.21
+      }
+     },
+     "8": {
+      "flags": [
+       "SIMPLE",
+       "DEED"
+      ],
+      "scores": {
+       "DEED": 0.7,
+       "ACTION": 0.93,
+       "SIMPLE": 0.46,
+       "OBSTACLE": 0.22
+      }
+     },
+     "9": {
+      "flags": [
+       "DEED"
+      ],
+      "scores": {
+       "DEED": 0.62,
+       "ACTION": 0.91,
+       "SIMPLE": 0.64,
+       "HEIGHTS": 0.2,
+       "OBSTACLE": 0.35
+      }
+     },
+     "10": {
+      "flags": [
+       "SIMPLE",
+       "HEIGHTS"
+      ],
+      "scores": {
+       "DEED": 0.39,
+       "ACTION": 0.62,
+       "SIMPLE": 0.26,
+       "HEIGHTS": 0.81,
+       "OBSTACLE": 0.23
+      }
+     },
+     "11": {
+      "flags": [
+       "DEED"
+      ],
+      "scores": {
+       "DEED": 0.61,
+       "ACTION": 0.93,
+       "SIMPLE": 0.83,
+       "OBSTACLE": 0.2
+      }
+     },
+     "12": {
+      "flags": [
+       "DEED",
+       "HEIGHTS"
+      ],
+      "scores": {
+       "DEED": 0.55,
+       "THIRD": 0.74,
+       "ACTION": 0.86,
+       "SIMPLE": 0.69,
+       "HEIGHTS": 0.73,
+       "OBSTACLE": 0.17
+      }
+     },
+     "13": {
+      "flags": [],
+      "scores": {
+       "DEED": 0.49,
+       "ACTION": 0.83,
+       "SIMPLE": 0.72,
+       "HEIGHTS": 0.13,
+       "OBSTACLE": 0.32
+      }
+     },
+     "14": {
+      "flags": [
+       "DEED",
+       "HEIGHTS",
+       "THIRD"
+      ],
+      "scores": {
+       "DEED": 0.55,
+       "THIRD": 0.46,
+       "ACTION": 0.95,
+       "SIMPLE": 0.83,
+       "HEIGHTS": 0.63,
+       "OBSTACLE": 0.15
+      }
+     },
+     "15": {
+      "flags": [
+       "DEED"
+      ],
+      "scores": {
+       "DEED": 0.58,
+       "THIRD": 0.64,
+       "ACTION": 0.84,
+       "SIMPLE": 0.71,
+       "HEIGHTS": 0.18,
+       "OBSTACLE": 0.2
+      }
+     },
+     "16": {
+      "flags": [
+       "ACTION",
+       "WHOLE"
+      ],
+      "scores": {
+       "DEED": 0.44,
+       "WHOLE": 0.75,
+       "ACTION": 0.24,
+       "SIMPLE": 0.83,
+       "HEIGHTS": 0.1,
+       "OBSTACLE": 0.14,
+       "WHOLE_FAULT": 0.78,
+       "WHOLE_SHARED": 0.28
+      }
+     }
+    },
+    "rows": [
+     {
+      "shot": "medium",
+      "type": "group",
+      "names": [
+       "Sarah",
+       "Saira",
+       "Facundo",
+       "Fiona",
+       "Lorena"
+      ],
+      "pageNumber": 1
+     },
+     {
+      "shot": "close-up",
+      "type": "face",
+      "names": [
+       "Fiona"
+      ],
+      "pageNumber": 2
+     },
+     {
+      "shot": "close-up",
+      "type": "face",
+      "names": [
+       "Fiona"
+      ],
+      "pageNumber": 3
+     },
+     {
+      "shot": "medium",
+      "type": "medium",
+      "names": [
+       "Sarah",
+       "Herr Brunner"
+      ],
+      "pageNumber": 4
+     },
+     {
+      "shot": "ultra-wide",
+      "type": "scenery",
+      "names": [],
+      "pageNumber": 5
+     },
+     {
+      "shot": "medium",
+      "type": "group",
+      "names": [
+       "Sarah",
+       "Saira",
+       "Facundo",
+       "Fiona",
+       "Lorena",
+       "Herr Brunner"
+      ],
+      "pageNumber": 6
+     },
+     {
+      "shot": "close-up",
+      "type": "medium",
+      "names": [
+       "Facundo",
+       "Fiona"
+      ],
+      "pageNumber": 7
+     },
+     {
+      "shot": "low-angle",
+      "type": "medium",
+      "names": [
+       "Facundo"
+      ],
+      "pageNumber": 8
+     },
+     {
+      "shot": "medium",
+      "type": "medium",
+      "names": [
+       "Saira",
+       "Facundo"
+      ],
+      "pageNumber": 9
+     },
+     {
+      "shot": "high-angle",
+      "type": "medium",
+      "names": [
+       "Fiona",
+       "Herr Brunner"
+      ],
+      "pageNumber": 10
+     },
+     {
+      "shot": "medium",
+      "type": "medium",
+      "names": [
+       "Fiona"
+      ],
+      "pageNumber": 11
+     },
+     {
+      "shot": "over-the-shoulder",
+      "type": "medium",
+      "names": [
+       "Facundo",
+       "Fiona",
+       "Pfeffer"
+      ],
+      "pageNumber": 12
+     },
+     {
+      "shot": "medium",
+      "type": "medium",
+      "names": [
+       "Lorena",
+       "Herr Brunner"
+      ],
+      "pageNumber": 13
+     },
+     {
+      "shot": "close-up",
+      "type": "medium",
+      "names": [
+       "Facundo",
+       "Fiona",
+       "Lorena"
+      ],
+      "pageNumber": 14
+     },
+     {
+      "shot": "medium",
+      "type": "medium",
+      "names": [
+       "Fiona",
+       "Lorena",
+       "Herr Brunner"
+      ],
+      "pageNumber": 15
+     },
+     {
+      "shot": "wide",
+      "type": "group",
+      "names": [
+       "Sarah",
+       "Saira",
+       "Facundo",
+       "Fiona",
+       "Lorena",
+       "Herr Brunner"
+      ],
+      "pageNumber": 16
+     }
+    ],
+    "metrics": {
+     "coverage": {
+      "Fiona": 11,
+      "Saira": 4,
+      "Sarah": 4,
+      "Lorena": 6,
+      "Facundo": 8
+     },
+     "flagCount": 22,
+     "mainShare": {
+      "name": "Fiona",
+      "pages": 11,
+      "target": 8
+     },
+     "pageCount": 16,
+     "groupPages": 3,
+     "shotCounts": {
+      "wide": 1,
+      "medium": 7,
+      "close-up": 4,
+      "low-angle": 1,
+      "high-angle": 1,
+      "ultra-wide": 1,
+      "over-the-shoulder": 1
+     },
+     "simplicity": {
+      "n": 16,
+      "min": 0.26,
+      "mean": 0.709,
+      "below": 2,
+      "histogram": {
+       "<0.3": 1,
+       ">=0.9": 0,
+       "0.3-0.5": 1,
+       "0.5-0.7": 3,
+       "0.7-0.9": 11
+      }
+     },
+     "typeCounts": {
+      "face": 2,
+      "group": 3,
+      "medium": 10,
+      "scenery": 1
+     },
+     "groupBudget": 3,
+     "codeFindings": [
+      "CONSECUTIVE_SAME_TYPE_CAST"
+     ],
+     "faceCloseUps": 2,
+     "sceneryPages": 1,
+     "coverageTarget": 3,
+     "flagsByQuestion": {
+      "DEED": [
+       2,
+       4,
+       6,
+       7,
+       8,
+       9,
+       11,
+       12,
+       14,
+       15
+      ],
+      "FELT": [
+       2,
+       3
+      ],
+      "THIRD": [
+       14
+      ],
+      "WHOLE": [
+       6,
+       16
+      ],
+      "ACTION": [
+       16
+      ],
+      "SIMPLE": [
+       8,
+       10
+      ],
+      "HEIGHTS": [
+       6,
+       10,
+       12,
+       14
+      ]
+     },
+     "noCommissionedPages": 1,
+     "neighbourSameTypeCast": 1,
+     "neighbourSameShotCount": 1,
+     "closeUpsOnMultiFigurePages": 2
+    },
+    "jevStats": {
+     "calls": 85,
+     "maxMs": 1670,
+     "p50ms": 250,
+     "errors": [],
+     "failed": 0,
+     "costUsd": 0.001458,
+     "retries": 0
+    },
+    "elapsedMs": 3145,
+    "pagesReplanned": 6
+   }
+  }
+ ],
+ "error": null,
+ "createdBy": "demo-b-hnecf@magicalstory.ch",
+ "createdAt": "2026-10-06T07:38:42.834Z",
+ "completedAt": "2026-10-06T07:38:46.121Z"
+}
