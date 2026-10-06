@@ -413,7 +413,7 @@ const SCENE_LIGHT_FIELD_RULE = `\`timeOfDay\` is one of ${TIME_OF_DAY_ENUM}, and
  * (21 of 21 briefs `light_undeclared`). One source with SCENE_LIGHT_FIELD_RULE:
  * the same enums and the same "holds until the story moves the sky" clause.
  */
-const SCENE_WEATHER_FIELD_RULE = `\`weather\` is one of ${WEATHER_ENUM} — \`none\` for an interior, where the weather is not visible. It is required on every page, agrees with the light the prose describes, and holds from page to page until the story moves the sky. A page's \`timeOfDay\` is code's, from its FIXED block, and a cover's \`weather\` is code's too. ${SKYLESS_LIGHT_RULE}`;
+const SCENE_WEATHER_FIELD_RULE = `\`weather\` is one of ${WEATHER_ENUM} — \`none\` for an interior, where the weather is not visible. It is required on every page, agrees with the light the prose describes, and holds from page to page until the story moves the sky. A page's \`timeOfDay\` is code's, from its FIXED block, and a cover's \`weather\` is code's when its FIXED block states one. ${SKYLESS_LIGHT_RULE}`;
 
 /**
  * A rewritten brief keeps the declared light of the brief it replaces when it

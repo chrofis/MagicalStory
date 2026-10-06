@@ -3,7 +3,9 @@
   "entries": [
     {
       "id": "ad-review-2026-10-06",
-      "commits": [],
+      "commits": [
+        "4fdb61452"
+      ],
       "addedAt": "2026-10-06",
       "claim": "On a Jev-path full story the page briefs still stage every FIXED element and show the FIXED light and gaze in their prose (the Art Director's gaze, sceneIntent and cross-page rules are now FIXED variants); a cover brief names its copy band as a picture (no title, book or mood word) and renders without painted lettering; a blocked scene rewrites into the same place, light and costume; a creature page states no metres and no camera height.",
       "runShape": [

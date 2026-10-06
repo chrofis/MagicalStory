@@ -107,6 +107,13 @@ describe('§3 the decision layer\'s fields are not asked of the Art Director twi
     expect(backup()).toContain('Include every recurring visual element visible in the scene');
   });
 
+  it('a cover\'s weather: the FIXED paragraph no longer says a cover carries none while its FIXED block can leave it to the author', () => {
+    const p = briefs();
+    expect(p).toContain('nor its `weather` when its FIXED block states one');
+    expect(p).not.toMatch(/a cover's none of `shot`, `timeOfDay`, `weather`/);
+    expect(req('../../server/lib/sceneLight.js').SCENE_WEATHER_FIELD_RULE).toContain('a cover\'s `weather` is code\'s when its FIXED block states one');
+  });
+
   it('vb_page_uncited is a decided field\'s on a Jev story page: withheld from the re-ask, never sent as a citation the FIXED rule forbids', () => {
     expect(BC.JEV_OWNED.has('vb_page_uncited')).toBe(true);
     const vb = { artifacts: [{ id: 'ART001', label: 'lamp', name: 'lamp', pages: [1], description: 'a brass lamp' }], locations: [{ id: 'LOC001', name: 'quay', pages: [1] }] };
@@ -158,7 +165,7 @@ describe('§6 size: one constant, the creature tone speaks bands, no metres, no 
 
   it('a background figure is described by hair and top colour only', () => {
     const t = String(PROMPT_TEMPLATES.sceneBriefsAll);
-    expect(t).toContain('described by hair colour and top colour only');
+    expect(t).toContain('by hair colour and top colour only');
   });
 
   it('11f is the owner\'s heights rule: at most two levels, depth is distance, in both Art Directors and the trial writer', () => {
@@ -250,6 +257,11 @@ describe('§7, §9, §12 the templates', () => {
     const t = String(PROMPT_TEMPLATES.sceneBriefsAll);
     expect(t).toContain('except what the frame crops');
     expect(t).not.toContain('The outfit list still names all garments including footwear');
+    // Lab 1674 (first wording): p8 and p13 came back with no description at all for three figures. The exemption names the
+    // MINIMUM for each, and the output checklist (which asked for the full outfit of every figure) agrees with it.
+    expect(t).toContain('No figure in frame is left without a description');
+    expect(t).toContain('a cropped or background figure as rule 10 says');
+    expect(t).toContain('is still described, in one short clause, by hair colour and top colour only');
     expect(t).toContain('"clothing": "costumed:<costume>"');
   });
 
