@@ -5612,7 +5612,7 @@
       "addedAt": "2026-10-06",
       "claim": "On a story with a beach/shore page, every brief characters[] row has a valid footing, no figure with footing ground sits on a cameraOn water vantage, and no brief prose puts a standing figure in the water.",
       "runShape": [
-        "page-rerun"
+        "lab-stage"
       ],
       "check": {
         "kind": "human",

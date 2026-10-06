@@ -91,6 +91,16 @@ describe('stakes and open questions: one list, generator and critics', () => {
   });
 });
 
+describe('a deadline the arc sets is paid off (generator and critic read one rule)', () => {
+  it('the questions-answered rule names deadlines and losses, and reaches the arc critique and the panel', () => {
+    expect(PB.ARC_QUESTIONS_ANSWERED_RULE).toMatch(/every deadline or loss the story sets is met or paid/);
+    const data = input(7);
+    expect(PB.arcCritiqueSpec({ inputData: data })).toContain(PB.ARC_QUESTIONS_ANSWERED_RULE);
+    expect(PB.buildArcPanelPrompt(data, 'ARC: a committed arc')).toContain(PB.ARC_QUESTIONS_ANSWERED_RULE);
+    expect(PB.buildArcCreatePrompt(data, 16)).toContain(PB.ARC_QUESTIONS_ANSWERED_RULE);
+  });
+});
+
 describe('one-sentence narration paragraphs are counted in code', () => {
   const page = (pageNumber: number, text: string) => ({ pageNumber, text });
 

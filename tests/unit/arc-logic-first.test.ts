@@ -335,10 +335,13 @@ describe('the arc prompts v2 (owner, 2026-09-25)', () => {
   it('the logic block is capped: one want, one opposition, one ability or limit, two world rules, motive lines', () => {
     const spec = PB.arcLogicSpec(input(5), 18);
     expect(spec).toMatch(/Opposition: one line — the one force/);
-    expect(spec).toMatch(/at most one each, and most figures have none/);
+    expect(spec).toMatch(/a single ability or a single limit, in one clause, never two joined by "and" or a semicolon, and most figures have none/);
     expect(spec).toContain('a feeling, a trait, a want or an act is never a limit or an ability');
     expect(spec).toContain('stated as the fact alone, with no reason, no consequence and no comparison size');
     expect(spec).toMatch(/at most two dash lines for the rules of the world/);
+    // a magic that changes a figure's body is a world rule, said once; a deadline lives in Want and stakes only
+    expect(spec).toContain("what the world's magic does to a figure's body (a tail for legs, breathing under water), said once for everyone it changes, with where it ends in the same line");
+    expect(spec).toContain('A deadline is said in Want and stakes only, never again as a fact.');
     expect(spec).toContain('Motives: one dash line per figure that acts, "- <figure>: <motive> → <the act it causes>"');
   });
 

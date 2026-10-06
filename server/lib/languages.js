@@ -528,12 +528,15 @@ function getAvailableLanguages() {
  * tense per call (both Präsens and Präteritum came back for one German story)
  * and a refine pass cannot edit half a book into the other tense. ONE map; the
  * STYLE_RULEBOOK line is built from it (promptBuilders.styleRulebook). A family
- * with no entry (Swiss-German dialects, Italian) gets no tense line.
+ * with no entry gets no tense line. gsw and it were added the same day (owner):
+ * a dialect story is told in the Perfekt, Italian in passato prossimo + imperfetto.
  */
 const NARRATION_TENSE = {
   de: 'Narration is in the past tense, Präteritum ("sie ging", "er sagte"), never Präsens and never Perfekt; dialogue speaks as it likes.',
   en: 'Narration is in the simple past ("she walked", "he said"), never the present; dialogue speaks as it likes.',
-  fr: 'Narration is in the imparfait and the passé composé ("elle marchait", "il a dit"), never the passé simple and never the present; dialogue speaks as it likes.'
+  fr: 'Narration is in the imparfait and the passé composé ("elle marchait", "il a dit"), never the passé simple and never the present; dialogue speaks as it likes.',
+  gsw: 'Narration is in the Perfekt, as a story is told in dialect ("sie isch gloffe", "er het gseit"), never the Präteritum and never the present; dialogue speaks as it likes.',
+  it: 'Narration is in the passato prossimo and the imperfetto ("lei ha camminato", "lui diceva"), never the passato remoto and never the present; dialogue speaks as it likes.'
 };
 
 /**

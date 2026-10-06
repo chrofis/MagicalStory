@@ -295,6 +295,10 @@ describe('text-v5 owed facts and narration tense', () => {
     ['en', /simple past/, /never the present/],
     ['en-gb', /simple past/, /never the present/],
     ['fr-ch', /imparfait and the passé composé/, /never the passé simple/],
+    ['gsw-zh', /Perfekt.*isch gloffe/, /never the Präteritum/],
+    ['gsw-be', /Perfekt.*isch gloffe/, /never the Präteritum/],
+    ['it-ch', /passato prossimo and the imperfetto/, /never the passato remoto/],
+    ['it', /passato prossimo and the imperfetto/, /never the passato remoto/],
   ])('the rulebook for %s names its tense', (lang, a, b) => {
     const r = B.styleRulebook(lang);
     expect(r).toMatch(a);
@@ -310,11 +314,6 @@ describe('text-v5 owed facts and narration tense', () => {
   it('the narrator because-rule faults a character\'s reason, not a physical cause (critics read the same constant)', () => {
     expect(B.STYLE_RULEBOOK).toContain('a physical cause stated as what happened');
     expect(B.buildTextAuditBlindPrompt({ language: 'en' }, [{ pageNumber: 1, text: 'A page.' }])).toContain('a physical cause stated as what happened');
-  });
-
-  it('a language with no tense norm set gets the plain rulebook', () => {
-    expect(B.styleRulebook('gsw-zh')).toBe(B.STYLE_RULEBOOK);
-    expect(B.styleRulebook('it-ch')).toBe(B.STYLE_RULEBOOK);
   });
 
   it('every prose pass carries the story language\'s tense line, trial writer included', () => {
