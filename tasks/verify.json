@@ -5484,7 +5484,9 @@
     {
       "id": "text-edit-cap",
       "title": "The text repair edits instead of recomposing: every shipped page changes at most 30% of its words against the writer draft; the writer carries the load-bearing arc facts",
-      "commits": [],
+      "commits": [
+        "9504caf28"
+      ],
       "addedAt": "2026-10-06",
       "claim": "On the next full story: textRefineReport.editRatios shows every page at or under 0.30; roundTrace[repair].editCap lists any page that went over and its re-ask; no arc-informed LOADBEARING finding names an optional detail (a trait, a feeling an act already shows); the page text has no roll call, no narrator because/purpose clause, no character explaining the rules.",
       "runShape": [
