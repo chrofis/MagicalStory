@@ -307,3 +307,28 @@ describe('Jev first: the decided fields exist before the page briefs', () => {
     expect(p.changes).toContainEqual({ field: 'location', from: ['LOC002'], to: 'LOC001.1', removed: ['LOC002'] });
   });
 });
+
+describe('a cover place no story page stands on gets a population decision', () => {
+  // essbv: the title page (church) and the back cover (town) logged beats_cover_population_undecided.
+  const JBF = req('../../server/lib/jevBriefFields');
+  const vb = { locations: [{ id: 'LOC006', name: 'jetty' }, { id: 'LOC007', name: 'church square' }, { id: 'LOC008', name: 'town' }] };
+  const covers = [
+    { pageNumber: -1, planLine: 'wide — Ana — x — y', jevFixed: { location: 'LOC006.2' } },
+    { pageNumber: -2, planLine: 'wide — Ana — x — y', jevFixed: { location: 'LOC007.1' } },
+    { pageNumber: -3, planLine: 'wide — Ana — x — y', jevFixed: { location: 'LOC008.1' } },
+  ];
+  it('asks once per undecided place, never for a place a story page decided', async () => {
+    const stub = makeJevStub({ noul: (q: string, s: string) => (/public can walk into/.test(q) ? (/church/.test(s) ? 0.9 : 0.1) : 0.1) });
+    const d = await JBF.decideCoverPopulation({ arc: 'A', coverBeats: covers, visualBible: vb, decided: { LOC006: { population: 'cast_only' } }, opts: { callImpl: stub.impl } });
+    expect(Object.keys(d.byLocation).sort()).toEqual(['LOC007', 'LOC008']);
+    expect(d.byLocation.LOC007.population).toBe('ambient');
+    expect(d.byLocation.LOC008.population).toBe('cast_only');
+    expect(stub.calls).toHaveLength(2);
+    expect(stub.calls[0].state).toContain('A cover:');
+  });
+  it('null when every cover place is decided; coverFacts then carries the decision', async () => {
+    expect(await JBF.decideCoverPopulation({ arc: 'A', coverBeats: covers, visualBible: vb, decided: { LOC006: {}, LOC007: {}, LOC008: {} } })).toBeNull();
+    const f = JBF.coverFacts({ coverKey: 'initialPage', storyBeats: [], location: 'LOC007.1', population: { LOC007: { population: 'ambient' } }, era: null });
+    expect(f.population).toBe('ambient');
+  });
+});

@@ -649,8 +649,33 @@ function coverFacts({ coverKey, storyBeats, location = null, population = null, 
   };
 }
 
+/**
+ * THE POPULATION OF A COVER'S PLACE (owner, 2026-10-06). Population is the place's
+ * (decidePopulation), and a cover's place no story page stands on (an offered
+ * landmark: the title page and the back cover of staging
+ * job_1791267520938_essbvehs8) had no decision. Jev decides it from the cover's own
+ * beat, once per place not decided yet. Returns null when every cover place already
+ * has a decision.
+ *
+ * @param {Object} o
+ * @param {string} o.arc
+ * @param {Array<{pageNumber:number, planLine:string, jevFixed?:{location?:string}}>} o.coverBeats
+ * @param {Object} o.visualBible
+ * @param {Object<string,Object>} [o.decided] - decidePopulation's byLocation so far
+ * @param {Object} [o.opts] - passed to decidePopulation (callImpl in tests)
+ * @returns {Promise<{byLocation:Object, stats:Object}|null>}
+ */
+async function decideCoverPopulation({ arc, coverBeats, visualBible, decided = {}, opts = {} }) {
+  const baseOf = id => String(id || '').trim().toUpperCase().split('.')[0];
+  const locOf = new Map((coverBeats || [])
+    .filter(cb => cb && cb.jevFixed && cb.jevFixed.location && !decided[baseOf(cb.jevFixed.location)])
+    .map(cb => [Number(cb.pageNumber), baseOf(cb.jevFixed.location)]));
+  if (!locOf.size) return null;
+  return jevDecisions.decidePopulation({ arc, pages: coverBeats, visualBible, locOf }, opts);
+}
+
 module.exports = {
-  coverLight, coverFacts, COVER_SHOT, COVER_GAZE,
+  coverLight, coverFacts, decideCoverPopulation, COVER_SHOT, COVER_GAZE,
   decideBriefFields, assembleBriefs, pageLocations, visualBibleJsonOf,
   COVER_PLACE_SHOTS, COVER_PLACE_Q, COVER_OFFERED_Q, COVER_PLACE_FLOOR, COVER_PHOTO_MIN_SCORE, coverPhotoOf, bibleLocationOf, materializeCoverPlaces, coverPlaceLabel, coverPlaceCandidates, assignCoverPlaces, coverPlaceState, decideCoverPlaces, applyCoverPlacePages,
 };

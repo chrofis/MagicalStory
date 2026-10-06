@@ -932,7 +932,9 @@ const POP_CROWD_Q = 'The story sets this place around a crowd: a market, a fair,
  * public ≥ 0.5 → `ambient`, else `cast_only`.
  *
  * @param {{arc:string, pages:Array, visualBible:Object, locOf:Map<number,string>}} input
- *   `locOf` — page → the base LOC id its brief cites.
+ *   `locOf` — page → the base LOC id its brief cites. A cover beat (page number
+ *   below 1) takes part like a page: the covers' places no story page stands on
+ *   (offered landmarks) are decided from the cover's own plan line.
  */
 async function decidePopulation({ arc, pages, visualBible, locOf }, opts = {}) {
   const stats = newStats();
@@ -943,7 +945,8 @@ async function decidePopulation({ arc, pages, visualBible, locOf }, opts = {}) {
   for (const [id, nums] of pagesAt) {
     const l = locs.find(x => baseId(x.id) === id);
     if (!l) continue;
-    const planLines = pages.filter(p => nums.includes(Number(p.pageNumber))).map(p => `Page ${p.pageNumber}: ${stripPlanShot(p.planLine)}`);
+    // A cover (page number below 1) is a picture of this place too: a landmark no story page stands on is judged from its cover beats.
+    const planLines = pages.filter(p => nums.includes(Number(p.pageNumber))).map(p => `${Number(p.pageNumber) > 0 ? `Page ${p.pageNumber}` : 'A cover'}: ${stripPlanShot(p.planLine)}`);
     const desc = String(l.description || '').slice(0, 240);
     const st = `A PLACE IN A CHILDREN'S PICTURE BOOK: ${l.name}${l.setting ? ` (${l.setting})` : ''} — ${desc}\n\nTHE STORY, beat by beat:\n${String(arc || '').trim()}\n\nTHE PAGES SET THERE (who is in frame — the instant — what is true after):\n${planLines.join('\n')}`;
     reqs.push(...repeat({ key: `pop:${id}`, state: st, questions: { PUBLIC: { type: 'noul', instructions: POP_PUBLIC_Q }, CROWD: { type: 'noul', instructions: POP_CROWD_Q } } }, JEV_DECISIONS.population.reps));

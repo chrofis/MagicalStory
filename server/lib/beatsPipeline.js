@@ -1913,6 +1913,21 @@ ${bibleBody}` : bibleBody;
     const { coverFacts } = require('./jevBriefFields');
     const era = visualBible && typeof visualBible.era === 'string' ? visualBible.era.trim() : '';
     if (!era) gl.warn('beats_cover_era_missing', "The Visual Bible states no story-level era — the covers' era stays the Art Director's");
+    // POPULATION IS THE PLACE'S (owner, 2026-10-06): a cover's place no story page stands on (an
+    // offered landmark: the title page and the back cover on staging job_1791267520938_essbvehs8)
+    // had no decision and logged beats_cover_population_undecided. Jev decides it from the
+    // cover's own beat, once per place, the same question the story pages' places are asked.
+    if (jevActive(jevReport) && jevReport) try {
+      const { decideCoverPopulation } = require('./jevBriefFields');
+      const decidedCovers = await decideCoverPopulation({ arc: approvedArc, coverBeats, visualBible, decided: (jevReport.population && jevReport.population.byLocation) || {} });
+      if (decidedCovers) {
+        jevReport.population = { ...(jevReport.population || {}), byLocation: { ...((jevReport.population && jevReport.population.byLocation) || {}), ...decidedCovers.byLocation }, coverStats: decidedCovers.stats };
+        gl.info('beats_cover_population', `Cover places by Jev: ${Object.entries(decidedCovers.byLocation).map(([id, v]) => `${id} ${v.population}`).join(', ')}`, null, { byLocation: decidedCovers.byLocation, stats: decidedCovers.stats });
+      }
+    } catch (err) {
+      if (!(err instanceof JevDecisionError)) throw err;
+      jevFallBack(jevReport, 'cover_population', err, gl);
+    }
     for (const cb of coverBeats) {
       const facts = coverFacts({ coverKey: cb.coverKey, storyBeats: beats, location: cb.jevFixed && cb.jevFixed.location, population: jevReport && jevReport.population && jevReport.population.byLocation, era });
       if (cb.jevFixed && cb.jevFixed.location && !facts.population && jevActive(jevReport)) {
