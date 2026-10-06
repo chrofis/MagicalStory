@@ -53,12 +53,24 @@ describe('C4 names the two axes for what they are', () => {
   });
 
   it('renders both lists, and the distance list is only the four distances', () => {
-    const built = pb.buildSceneBriefsAllPrompt(input(), [{ pageNumber: 1, planLine: 'medium — Levin — waits — nothing' }], { maxCharactersPerScene: 6, finalArc: '1.' });
+    // The backup path picks the shot itself, so only it names the two axes; on the Jev path the shots are fixed (next test).
+    const built = pb.buildSceneBriefsAllPrompt(input(), [{ pageNumber: 1, planLine: 'medium — Levin — waits — nothing' }], { maxCharactersPerScene: 6, finalArc: '1.', jevBackup: true });
     const c4 = built.split('\n').find(l => l.startsWith('C4.')) || '';
     expect(c4).toContain('`close-up`, `medium`, `wide`, `ultra-wide`');
     for (const id of POSITION_SHOTS) expect(c4).toContain(`\`${id}\``);
     // the distance half must not have swallowed the positions
     expect(c4.slice(c4.indexOf('camera distance'), c4.indexOf('where the camera stands'))).not.toContain('aerial');
+  });
+
+  it('on the Jev path the shots are fixed: C4 asks for a different grouping and names no shot list, and C6 (the visual arc) is the backup\'s', () => {
+    const plan = [{ pageNumber: 1, planLine: 'medium — Levin — waits — nothing' }];
+    const jev = pb.buildSceneBriefsAllPrompt(input(), plan, { maxCharactersPerScene: 6, finalArc: '1.' });
+    const c4 = jev.split('\n').find(l => l.startsWith('C4.')) || '';
+    expect(c4).toContain('character grouping');
+    expect(c4).not.toContain('camera distance');
+    expect(jev).not.toMatch(/^C6\./m);
+    const backup = pb.buildSceneBriefsAllPrompt(input(), plan, { maxCharactersPerScene: 6, finalArc: '1.', jevBackup: true });
+    expect(backup).toMatch(/^C6\./m);
   });
 });
 

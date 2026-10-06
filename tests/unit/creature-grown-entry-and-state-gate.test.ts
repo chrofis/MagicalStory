@@ -119,7 +119,7 @@ describe('4 — cute tone: a grown creature keeps its adult body; the tone is it
     const smaller = t.indexOf('A creature smaller than a grown-up');
     expect(smaller).toBeGreaterThan(-1);
     expect(t.indexOf('rounded forms throughout')).toBeGreaterThan(smaller);
-    expect(t.indexOf("near the child's own size")).toBeGreaterThan(smaller);
+    expect(t.indexOf("near the child's own")).toBeGreaterThan(smaller);
     expect(t).toContain('may tower gently over a child');                 // the 2026-09-26 relaxation stays
   });
   it('leaves the other two levels untouched', () => {

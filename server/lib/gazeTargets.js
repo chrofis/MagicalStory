@@ -31,8 +31,6 @@ const GAZE_TARGETS = [
     phrase: 'eyes on the far distance', judge: 'looks into the distance' },
   { id: 'away', looking: 'looking away from everyone in the frame', jev: 'turned away: face and eyes turned away from everyone and everything in the picture (shy, sulking, hiding, a back turned)',
     phrase: 'eyes turned away from everyone in the frame', judge: 'looks away from everyone in the frame' },
-  { id: 'closed', looking: 'with the eyes closed', jev: 'closed: eyes shut (humming, wishing, hugging, sleeping, savouring)',
-    phrase: 'eyes closed', judge: 'has the eyes closed', faceFollows: false },
   { id: 'outside', looking: 'looking at someone just outside the picture', jev: 'someone just outside the picture, not drawn in it',
     phrase: 'eyes on someone just outside the picture', judge: 'looks at someone just outside the picture' },
   { id: 'held', looking: 'looking at what it holds', jev: 'what they hold: the thing in their own hands',

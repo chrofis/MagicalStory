@@ -61,10 +61,12 @@ function keepDeclaredLight(pageNumber, rewritten, previous, pass, gl) {
 /**
  * Finding types a decided field owns on a Jev page (the decision layer wrote
  * the field; a brief rewrite cannot move it): the who column vs the cited
- * figures, a state's page range, the shot against the plan or the plate.
+ * figures, an element the bible puts on the page that the decided `objects` line does not cite
+ * (`vb_page_uncited`: the fix it names is a citation the FIXED rule forbids the author to write),
+ * a state's page range, the shot against the plan or the plate.
  * Withheld from the re-ask on those pages and returned for the log.
  */
-const JEV_OWNED = new Set(['plan_cast_uncited', 'vb_state_contradicted', 'vb_state_no_base', 'shot_off_plate', 'shot_widened']);
+const JEV_OWNED = new Set(['plan_cast_uncited', 'vb_page_uncited', 'vb_state_contradicted', 'vb_state_no_base', 'shot_off_plate', 'shot_widened']);
 
 /**
  * Clothing findings the re-ask sends beyond clothingCheck.REVIEWABLE (owner,

@@ -2781,6 +2781,14 @@ function handsPerObject(interactions) {
 const SHARED_GRIP_RULE = 'One object takes one pair of hands, unless holding or moving it together is the page\'s only action: then several characters may share the grip, written as one fused row. Otherwise, when a second character reaches for the object, one holds it out and the other reaches — their hands never share the grip.';
 
 /**
+ * Reserved `action` labels for a character who is present and not acting: `watching` (only looks on), `standing` (merely
+ * present), `holding` (carries a prop and does nothing else with it). They are values, not an omitted field, so "not
+ * acting" is a claim a check can see; none of them counts toward the page's one action. ONE set for the brief check, the
+ * consistency check and the shared-grip rule.
+ */
+const PASSIVE_ACTIONS = new Set(['watching', 'standing', 'holding']);
+
+/**
  * The shared grips a page may NOT have: objects with two or more pairs of
  * hands (handsPerObject), except where every hands row on that object carries
  * the page's one non-passive `action` label and the page has no other. Read
@@ -2791,7 +2799,7 @@ const SHARED_GRIP_RULE = 'One object takes one pair of hands, unless holding or 
  */
 function forbiddenSharedGrips(interactions) {
   const rows = (Array.isArray(interactions) ? interactions : []).filter(Boolean);
-  const PASSIVE = new Set(['watching', 'standing']);
+  const PASSIVE = PASSIVE_ACTIONS;
   const label = (r) => String(r.action || '').trim().toLowerCase();
   const pageActions = new Set(rows.map(label).filter(a => a && !PASSIVE.has(a)));
   const out = [];
@@ -2845,6 +2853,7 @@ module.exports = {
   parseCreatures,
   SHARED_GRIP_RULE,
   forbiddenSharedGrips,
+  PASSIVE_ACTIONS,
   handsPerObject,
   POPULATION_LEVELS,
   POPULATION_TABLE,

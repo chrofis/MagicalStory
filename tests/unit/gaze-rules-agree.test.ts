@@ -8,6 +8,11 @@ const built = () => pb.buildSceneBriefsAllPrompt(
   { pages: 4, season: 'autumn', language: 'de-CH', languageLevel: '1st-grade', storyDetails: 'x', characters: chars, mainCharacters: ['a'] },
   [{ pageNumber: 1, planLine: 'medium — Levin — waits — nothing' }],
   { maxCharactersPerScene: 6, finalArc: '1.' });
+// The backup path authors every field, so it carries the full gaze rules; the Jev path carries the FIXED variants.
+const builtBackup = () => pb.buildSceneBriefsAllPrompt(
+  { pages: 4, season: 'autumn', language: 'de-CH', languageLevel: '1st-grade', storyDetails: 'x', characters: chars, mainCharacters: ['a'] },
+  [{ pageNumber: 1, planLine: 'medium — Levin — waits — nothing' }],
+  { maxCharactersPerScene: 6, finalArc: '1.', jevBackup: true });
 
 /**
  * Two rules in one prompt disagreed about gaze, twice.
@@ -34,7 +39,8 @@ describe('the gaze rules agree about the viewer', () => {
 
   it('and the ban is still stated where it always was', () => {
     expect(pb.GAZE_TARGET_RULE).toContain('Never write a gaze to the viewer');
-    expect(built()).toContain('Eyes look at what they interact with, not at the camera');
+    expect(built()).toContain('not at the camera');
+    expect(pb.GAZE_TARGET_FIXED_RULE).toContain('Never write a gaze to the viewer');
   });
 
   it('the value list is gone from the templates too — it was a third copy', () => {
@@ -69,8 +75,18 @@ describe('the gaze rules agree about how many targets a page has', () => {
   });
 
   it('both rules reach the built prompt, so the exception and the rule travel together', () => {
-    const p = built();
+    const p = builtBackup();
     expect(p).toContain(pb.GAZE_TARGET_RULE);
     expect(p).toContain(pb.LOOKS_AT_FIELD_RULE);
+  });
+
+  it('on the Jev path the gaze is the FIXED line: the variants replace the full rules, and the viewer ban and cover exception stay', () => {
+    const p = built();
+    expect(p).toContain(pb.GAZE_TARGET_FIXED_RULE);
+    expect(p).toContain(pb.LOOKS_AT_FIELD_FIXED_RULE);
+    expect(p).not.toContain(pb.GAZE_TARGET_RULE);
+    expect(p).not.toContain(pb.LOOKS_AT_FIELD_RULE);
+    for (const r of [pb.GAZE_TARGET_FIXED_RULE, pb.LOOKS_AT_FIELD_FIXED_RULE]) expect(r).toContain(pb.COVER_GAZE_EXCEPTION);
+    expect(pb.LOOKS_AT_FIELD_FIXED_RULE).not.toMatch(/`camera`/);
   });
 });

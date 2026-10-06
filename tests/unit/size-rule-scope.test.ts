@@ -34,9 +34,9 @@ describe('the ratio rule asks only for what a ratio is for', () => {
   it('and it says outright what does NOT take one, pointing at the rule that does', () => {
     const r = pb.TRUE_RELATIVE_SIZE_RULE;
     expect(r).toContain('Nothing else takes a ratio');
-    expect(r).toContain('An everyday prop is sized by its own rule below');
+    expect(r).toContain('An everyday prop is sized by its own rule');
     expect(r).toContain('a garment by where it falls on the body');
-    expect(r).toContain('a CREATURE by the creature rule above');
+    expect(r).toContain('a CREATURE by its `scaleClass` band');
   });
 
   it('it points at scaleClass, which already carries every element size once', () => {

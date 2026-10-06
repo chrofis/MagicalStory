@@ -31,8 +31,8 @@ describe('Art Director template parity', () => {
   // gap-fill and the all-pages fallback), so a rule that reaches only the
   // all-pages template silently stops applying on the pages that fall back.
   const SHARED_RULES = [
-    '- A NAME IS NOT A PRESENCE.',
-    'An object WITH states is always cited dotted',
+    '- A name is not a presence.',
+    'An object with states is always cited dotted',
   ];
   for (const rule of SHARED_RULES) {
     it(`both templates carry: ${rule.slice(0, 48)}`, () => {

@@ -7,7 +7,7 @@
  *   underwater_deep / underwater_night / underwater_dark join underwater and dark; an INDOOR page (weather
  *   none) is told window light, never a sky or a moon (bug); a dark page names the lit element it is lit by;
  *   a cover is lit by its own place's pages.
- * GAZE: Jev may pick down / up / ahead / distance / away / closed / outside / held; the place itself is no
+ * GAZE: Jev may pick down / up / ahead / distance / away / outside / held (never `closed`: closed eyes read as asleep, EYES_OPEN_RULE stands; decisions.md 2026-10-06); the place itself is no
  *   target; an out-of-frame character is never named in a prompt.
  */
 import { describe, it, expect } from 'vitest';
@@ -178,14 +178,14 @@ describe('gaze words: one table, wired to every consumer', () => {
     expect(gazeTarget('LOC001', ['LOC001'])).toBe('');          // an Art Director's place gaze (backup path) is still no eyes target
     expect(JD.fixedBlock({ jevFixed: { cites: [], looksAt: { Ana: 'down' } } })).toContain('Ana → down (eyes cast down)');
   });
-  it('the picture prompt: every word has its own eyes line; closed keeps no face-turn; outside never names anyone', () => {
+  it('the picture prompt: every word has its own eyes line; outside never names anyone', () => {
     const phrases = G.GAZE_TOKEN_IDS.map((t: string) => PB.looksAtPhrase(t));
     expect(new Set(phrases).size).toBe(G.GAZE_TOKEN_IDS.length);
     expect(PB.looksAtPhrase('away')).toBe('eyes turned away from everyone in the frame');   // unchanged: stored `away` renders as before
     expect(PB.looksAtPhrase('distance')).not.toBe(PB.looksAtPhrase('away'));
     expect(PB.looksAtPhrase('outside')).toBe('eyes on someone just outside the picture');
-    const poses = PB.buildExactPosesBlock([], [{ name: 'Ana', depth: 'foreground', looksAt: 'closed' }, { name: 'Ben', depth: 'foreground', looksAt: 'down' }]);
-    expect(poses).toContain('- Ana: eyes closed, never to the viewer');
+    const poses = PB.buildExactPosesBlock([], [{ name: 'Ana', depth: 'foreground', looksAt: 'ahead' }, { name: 'Ben', depth: 'foreground', looksAt: 'down' }]);
+    expect(poses).toContain('- Ana: eyes straight ahead along the way forward, face turned the same way, never to the viewer');
     expect(poses).toContain('- Ben: eyes cast down, face turned the same way, never to the viewer');
     const out = PB.buildExactPosesBlock([], [{ name: 'Ana', depth: 'foreground', looksAt: 'outside' }]);
     expect(out).not.toMatch(/Cleo/);
@@ -200,16 +200,23 @@ describe('gaze words: one table, wired to every consumer', () => {
   it('the gaze check skips every word the blind describer cannot confirm; `away` still only meets eyes on the reader', () => {
     const inventory = { figures: [{ label: 'a girl', gaze: 'at the viewer', facing: 'camera' }] };
     const matches = [{ reference: 'Ana', body_bbox: [0, 0, 10, 10], figure_label: 'a girl' }];
-    for (const t of ['down', 'up', 'ahead', 'distance', 'closed', 'outside', 'held']) {
+    for (const t of ['down', 'up', 'ahead', 'distance', 'outside', 'held']) {
       expect(checkDeclaredGaze({ declared: [{ name: 'Ana', looksAt: t }], inventory, matches }), t).toEqual([]);
     }
   });
   it('the composite cast keeps a gaze word as it is, and the blend clause is a phrase', () => {
     expect(resolveLooksAt('down', null)).toBe('down');
-    expect(G.gazeLookingClause('closed')).toBe('with the eyes closed');
+    expect(G.gazeLookingClause('down')).toBe('looking down');
     expect(G.gazeLookingClause('Ana')).toBe('looking at Ana');
   });
   it('the Art Director\'s field rule lists the words', () => {
     for (const t of G.GAZE_TOKEN_IDS) expect(PB.LOOKS_AT_FIELD_RULE).toContain(`\`${t}\``);
+  });
+  it('`closed` is not a gaze word: closed eyes read as asleep, so no Jev option, no picture line, no field-rule word (owner verdict kept 2026-10-06)', () => {
+    expect(G.GAZE_TOKEN_IDS).not.toContain('closed');
+    expect(G.gazeToken('closed')).toBeNull();
+    expect(PB.LOOKS_AT_FIELD_RULE).not.toMatch(/closed/);
+    expect(PB.LOOKS_AT_FIELD_FIXED_RULE).not.toMatch(/closed/);
+    expect(PB.EYES_OPEN_RULE).toContain('No closed eyes');
   });
 });

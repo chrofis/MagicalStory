@@ -24,6 +24,7 @@ Last full sweep: **2026-09-06**.
 
 ## P0 — gating the production promotion
 
+- [ ] Art Director review 2026-10-06, left open: (a) the footing value `aboard` shares a word with the brief field `aboard` and the vantage `cameraOn: aboard` (rename, e.g. `on a vessel`); (b) `vb_cite_offpage` has the same shape as `vb_page_uncited` (the fix it names is a citation or a Visual Bible edit the Jev-path author cannot make): withhold it as well?; (c) the beats per-page fallback still runs scene-expansion.txt: rebuilding it from the `buildBriefReaskContext` splice for one page needs the parse (`## Page N`) and the Lab stages that call `buildSceneExpansionPrompt` moved together → docs/decisions.md ("Art Director review edit list applied", points 2, 3, 10)
 - [ ] Typed page plan Lab experiment: arm 0 on 4 stories + arm 2 on 1 done (Lab 1658-1662); arm 1 and more stories unrun (cost cap); inconclusive, not adopted → tasks/typed-plan-2026-10-05.md:1
 - [ ] Pipeline review 2026-09-20 on the last staging story: 15 quality, 9 recompute, 2 sequencing, 8 storage findings; owner triage pending → tasks/pipeline-review-2026-09-20.md:1
 - [ ] Verify on staging before promoting to master — **207 commits ahead as of 2026-09-11**

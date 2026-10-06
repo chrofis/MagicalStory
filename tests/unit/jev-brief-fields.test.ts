@@ -145,7 +145,7 @@ describe('gaze: a choice over code-listed targets, 3 calls averaged', () => {
     const idx = JD.gazeIndex({ animals: [{ id: 'ANI001', name: 'Drako', description: 'a dragon' }], artifacts: [{ id: 'ART001', name: 'lamp', description: 'a lamp' }], locations: [{ id: 'LOC001', name: 'square' }] });
     const mat = JD.gazePageMaterial({ objects: ['ART001', 'LOC001'], interactions: [{ object: 'CLO001' }], planLine: 'SHOT — Ana, Ben — Ana looks at Drako — x', index: idx });
     const c = JD.gazeCandidates({ roster: ['Ana', 'Ben'], ...mat }, 'Ana').map((k: any) => k.target);
-    expect(c).toEqual(['Ben', 'ART001', 'ANI001', 'down', 'up', 'ahead', 'distance', 'away', 'closed']);
+    expect(c).toEqual(['Ben', 'ART001', 'ANI001', 'down', 'up', 'ahead', 'distance', 'away']);
     expect(c).not.toContain('viewer');
     expect(c).not.toContain('LOC001');
   });
@@ -190,7 +190,7 @@ describe('pinBrief: code writes the decided fields; the review is told what chan
   });
   it('a figure is never offered itself as a gaze target, by name or by id', () => {
     const c = JD.gazeCandidates({ roster: ['Noah', 'CHR001'], elements: [{ id: 'CHR001', kind: 'figure', name: 'the captain', desc: 'a captain' }], named: [] }, 'CHR001').map((k: any) => k.target);
-    expect(c).toEqual(['Noah', 'down', 'up', 'ahead', 'distance', 'away', 'closed', 'held']);
+    expect(c).toEqual(['Noah', 'down', 'up', 'ahead', 'distance', 'away', 'held']);
   });
 });
 

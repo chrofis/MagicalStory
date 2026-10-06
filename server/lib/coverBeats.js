@@ -38,20 +38,30 @@ const { VB_ELEMENT_BUDGET } = require('./vbElementBudget');
  */
 const COVER_BEAT_TEXT = Object.freeze({
   frontCover: {
-    instant: 'the cast stand together in a bright, welcoming portrait, every figure whole in frame',
-    space: 'the top third of the picture is open sky or background, clear of every figure, prop and effect, for the book title (textPosition "top-full")',
-    after: 'the reader sees the book\'s title picture',
+    instant: 'the cast stand together, every figure whole in frame',
+    after: 'the cast have not moved',
   },
   initialPage: {
-    instant: 'the cast share an inviting, warm opening moment that draws the reader in, every figure whole in frame',
-    space: 'the bottom fifth of the picture is calm ground, clear of every figure, face and prop, for the dedication (textPosition "bottom-full")',
-    after: 'the book is opened',
+    instant: 'the cast stand together, every figure whole in frame',
+    after: 'the cast have not moved',
   },
   backCover: {
-    instant: 'the cast are happy and relaxed after the adventure, every figure whole in frame',
-    space: 'the bottom tenth of the picture is calm ground, clear of every figure, face and prop (textPosition "bottom-full")',
-    after: 'the book is closed',
+    instant: 'the cast sit or stand together, every figure whole in frame',
+    after: 'the cast have not moved',
   },
+});
+
+/**
+ * THE COPY SPACE OF EACH COVER, ONE SENTENCE (owner, 2026-10-06, Art Director review §1): the band the book's text will
+ * sit in, written as the picture the band holds and never as an absence, and with no word about what the text is — a
+ * title, a dedication or a book is lettering bait. One source for the full-story cover beats below and for the trial
+ * cover's composition section (cover-composition.txt, filled by promptBuilders.buildCoverPrompt). `textPosition` is
+ * COVER_TEXT_POSITION.
+ */
+const COVER_COPY_SPACE = Object.freeze({
+  frontCover: "the top third of the picture is the scene's own sky or upper wall in its own colours, with every head, hand, prop, raised arm and effect below the one-third line and the group scaled down to the lower two thirds, feet at the bottom",
+  initialPage: "the bottom fifth of the picture is the scene's own ground in its own colours, with every figure, face and prop above it",
+  backCover: "the bottom tenth of the picture is the scene's own ground in its own colours, with every figure, face and prop above it",
 });
 
 /** The story's main characters, in the order the story lists its cast. */
@@ -139,7 +149,7 @@ function buildCoverBeats(inputData = {}, { coverTypes = ['frontCover', 'initialP
       ...(placeDecided ? [COVER_DECIDED_PLACE] : [COVER_KEY_PLACE, COVER_OWN_PLACE]),
       anyCostumed(cast, clothingRequirements) ? 'every figure wears their costumed outfit' : null,
       `any animal, artifact or vehicle from the Visual Bible the picture calls for, at most ${VB_ELEMENT_BUDGET}`,
-      t.space,
+      `${COVER_COPY_SPACE[coverKey]} (textPosition "${COVER_TEXT_POSITION[coverKey]}")`,
     ].filter(Boolean).join('; ');
     beats.push({
       pageNumber: COVER_PAGE_NUMBERS[coverKey],
@@ -205,6 +215,7 @@ function coverIteratePath(storyData, coverKey) {
 }
 
 module.exports = {
+  COVER_COPY_SPACE,
   COVER_OWN_PLACE,
   COVER_KEY_PLACE,
   COVER_DECIDED_PLACE,

@@ -2724,8 +2724,10 @@ function buildCoverPrompt(coverType, {
     }
     return m.slice(m.indexOf('\n') + 1).trim();
   })();
-  let composition = section
-    ? `**COMPOSITION GUIDELINES:**\n${section.trim()}`
+  // The copy space is one sentence, coverBeats.COVER_COPY_SPACE, which the full-story cover beats state too.
+  const filledSection = section ? fillTemplate(section, { COVER_COPY_SPACE: (s => s.charAt(0).toUpperCase() + s.slice(1) + '.')(require('./coverBeats').COVER_COPY_SPACE[key === 'front' ? 'frontCover' : 'backCover']) }) : '';
+  let composition = filledSection
+    ? `**COMPOSITION GUIDELINES:**\n${filledSection.trim()}`
     : '';
 
   // BAKED TITLE (runtime `coverTitleMode`). The front cover is rendered WITH its
@@ -3155,13 +3157,15 @@ function artDirectorFills(inputData, beats = [], options = {}) {
 
   return {
     PAGE_COUNT: beats.length,
-    ALL_PLAN_LINES: planBlocks(beats),
+    ALL_PLAN_LINES: planBlocks(beats, { fixed: options.planLight !== false }),
     // The whole story, read-only: the Art Director stages each page's plan line
     // with the arc in view for judgment, never as extra material to stage.
     FINAL_ARC: String(options.finalArc || '').trim() || '(no arc was recorded for this story)',
     CHARACTER_DESCRIPTIONS: characterDescriptions,
     CHARACTER_COUNT: characters.length,
     HEIGHT_ORDER: buildRelativeHeightDescription(characters) || '',
+    HEIGHT_LEVELS: HEIGHT_LEVELS_RULE,
+    INTERACTIONS_CAP: INTERACTIONS_CAP_RULE,
     AVAILABLE_AVATARS: options.availableAvatars || buildAvailableAvatarsForPrompt(characters),
     // The Art Director AUTHORS the Visual Bible now (2026-09-11), so the three
     // inputs the bible rules need travel here instead of to the bible stage.
@@ -3174,6 +3178,7 @@ function artDirectorFills(inputData, beats = [], options = {}) {
     AVAILABLE_LANDMARKS_SECTION: buildAvailableLandmarksSection(inputData.availableLandmarks, inputData.landmarkRetryNote, { forArtDirector: true }),
     CHILD_AGE_BAND: buildChildAgeBandNote(commissionedChildBand(inputData.characters || [])),
     CREATURE_TONE: buildCreatureToneSection(inputData),
+    CREATURE_TONE_ENTRY: buildCreatureToneSection(inputData, { page: false }),
     MAX_CHARACTERS_PER_SCENE: options.maxCharactersPerScene || 3,
     // The owner's cap of packable Visual Bible elements per page (four since
     // 2026-09-11), from
@@ -3209,22 +3214,19 @@ function artDirectorFills(inputData, beats = [], options = {}) {
     SHARED_GRIP: SHARED_GRIP_RULE,
     CREATURE_FACE: CREATURE_FACE_RULE,
     CREATURE_FIELD: CREATURE_FIELD_RULE,
-    ELEMENT_SIZE_WORD: ELEMENT_SIZE_WORD_RULE,
     // SEVEN page-brief contracts, one constant each, filled at all FOUR sites
     // that author a page brief — see ONE_INSTANT_RULE and the block around it.
     // Registered as sibling set art-director-vs-iterate.
     ONE_INSTANT: ONE_INSTANT_RULE,
     COSTUME_BODY: COSTUME_BODY_RULE,
     NO_LENS: NO_LENS_RULE,
-    GAZE_TARGET: GAZE_TARGET_RULE,
-    LOOKS_AT_FIELD: LOOKS_AT_FIELD_RULE,
+    ...jevFieldFills(jevBackup),
     EXPRESSION_FIELD: EXPRESSION_FIELD_RULE,
     GARMENT_REMOVED: GARMENT_REMOVED_RULE,
     WORN_ITEMS_ROW: WORN_ITEMS_ROW_RULE,
     WORN_ON_OTHER: WORN_ON_OTHER_RULE,
     NEVER_NAME_ABSENT: ABSENT_THING_RULE,
     NO_HEADLINE_PHRASES: HEADLINE_PHRASE_RULE,
-    SCENE_INTENT_FIELD: SCENE_INTENT_FIELD_RULE,
     // The page's declared light (sceneLight.js) — one rule for every brief author
     // and the scene review's check (sibling set scene-light-generator-vs-critic).
     SCENE_LIGHT_FIELD: SCENE_LIGHT_FIELD_RULE,
@@ -3303,7 +3305,8 @@ function buildVisualBibleCallPrompt(inputData, beats = [], options = {}) {
     log.error('[PROMPT] visualBible template not loaded — the Visual Bible call is unavailable');
     return null;
   }
-  return fillTemplate(template, artDirectorFills(inputData, beats, options));
+  // The plan lines carry no FIXED light line here: the plates the bible writes hold no light words.
+  return fillTemplate(template, artDirectorFills(inputData, beats, { ...options, planLight: false }));
 }
 
 /**
@@ -3693,6 +3696,8 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     // 8f, filled here too: the per-page template DECLARES {TRUE_RELATIVE_SIZE}
     // and fillTemplate drops a declared placeholder nobody supplies, silently.
     TRUE_RELATIVE_SIZE: TRUE_RELATIVE_SIZE_RULE,
+    HEIGHT_LEVELS: HEIGHT_LEVELS_RULE,
+    INTERACTIONS_CAP: INTERACTIONS_CAP_RULE,
     // ONE cast contract and ONE multi-picture prop contract, shared with the
     // scene review — see PLAN_LINE_CAST_RULE / MULTI_PICTURE_PROP_RULE.
     PLAN_LINE_CAST: PLAN_LINE_CAST_RULE,
@@ -3715,22 +3720,19 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     SHARED_GRIP: SHARED_GRIP_RULE,
     CREATURE_FACE: CREATURE_FACE_RULE,
     CREATURE_FIELD: CREATURE_FIELD_RULE,
-    ELEMENT_SIZE_WORD: ELEMENT_SIZE_WORD_RULE,
     // SEVEN page-brief contracts, one constant each, filled at all FOUR sites
     // that author a page brief — see ONE_INSTANT_RULE and the block around it.
     // Registered as sibling set art-director-vs-iterate.
     ONE_INSTANT: ONE_INSTANT_RULE,
     COSTUME_BODY: COSTUME_BODY_RULE,
     NO_LENS: NO_LENS_RULE,
-    GAZE_TARGET: GAZE_TARGET_RULE,
-    LOOKS_AT_FIELD: LOOKS_AT_FIELD_RULE,
+    ...jevFieldFills(jevBackup),
     EXPRESSION_FIELD: EXPRESSION_FIELD_RULE,
     GARMENT_REMOVED: GARMENT_REMOVED_RULE,
     WORN_ITEMS_ROW: WORN_ITEMS_ROW_RULE,
     WORN_ON_OTHER: WORN_ON_OTHER_RULE,
     NEVER_NAME_ABSENT: ABSENT_THING_RULE,
     NO_HEADLINE_PHRASES: HEADLINE_PHRASE_RULE,
-    SCENE_INTENT_FIELD: SCENE_INTENT_FIELD_RULE,
     // The page's declared light (sceneLight.js) — one rule for every brief author
     // and the scene review's check (sibling set scene-light-generator-vs-critic).
     SCENE_LIGHT_FIELD: SCENE_LIGHT_FIELD_RULE,
@@ -4171,7 +4173,7 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
       LANGUAGE_NAME: languageName,
       LANGUAGE_INSTRUCTION: languageInstruction,
       LANGUAGE_NOTE: getLanguageNote(language),
-      CORRECTION_NOTES: correctionNotes ? `\n**CORRECTION NOTES (from previous attempt - MUST be addressed):**\n${correctionNotes}\n` : '',
+      CORRECTION_NOTES: correctionNotes ? `\n**CORRECTION NOTES (from previous attempt — address each):**\n${correctionNotes}\n` : '',
       MAX_CHARACTERS_PER_SCENE: iterImageModelConfig?.maxCharactersPerScene || 3,
       OBJECT_ID_STABILITY: OBJECT_ID_STABILITY_RULE,
       // The same four brief-authoring contracts the Art Director templates
@@ -4192,7 +4194,6 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
       TRUE_RELATIVE_SIZE: TRUE_RELATIVE_SIZE_RULE,
       CREATURE_FACE: CREATURE_FACE_RULE,
       CREATURE_FIELD: CREATURE_FIELD_RULE,
-      ELEMENT_SIZE_WORD: ELEMENT_SIZE_WORD_RULE,
     // The shot rules per path (shotRuleFills): a strict iterate of a page whose
     // shot the decision layer fixed stages inside it (owner, 2026-09-28).
     ...shotRuleFills({ fixedShot: options.fixedShot === true }),
@@ -4231,6 +4232,7 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
       PLAN_LINE_CAST: PLAN_LINE_CAST_RULE,
       MULTI_PICTURE_PROP: MULTI_PICTURE_PROP_RULE,
       COUNTING_RULE,
+      INTERACTIONS_CAP: INTERACTIONS_CAP_RULE,
       VB_ELEMENT_BUDGET,
       SHOT_ENUM,
       // The below-waist verbs a close-up may not stage, from the one constant the
@@ -5841,7 +5843,7 @@ function looksAtPhrase(target, visualBible = null) {
   if (!t) return '';
   const k = t.toLowerCase();
   if (k === 'camera' || k === 'the viewer' || k === 'viewer') return 'eyes on the viewer';
-  // The gaze words (gazeTargets.js: down, up, ahead, distance, away, closed, outside, held): one table.
+  // The gaze words (gazeTargets.js: down, up, ahead, distance, away, outside, held): one table.
   // `outside` never carries a name; the line says someone just outside the picture.
   const row = gazeTokenRow(t);
   if (row) return row.phrase;
@@ -5983,10 +5985,9 @@ function buildExactPosesBlock(interactions, sceneCharacters = [], visualBible = 
     if (String(c.depth || '').toLowerCase() === 'background') continue;
     const expr = typeof c.expression === 'string' ? c.expression.trim() : '';
     const gaze = looksAtPhrase(c.looksAt, visualBible);
-    const row = gazeTokenRow(c.looksAt);
     const eyes = gaze === 'eyes on the viewer'
       ? gaze
-      : (row && row.faceFollows === false ? `${gaze}, never to the viewer` : `${gaze || 'eyes off into the scene'}, face turned the same way, never to the viewer`);
+      : `${gaze || 'eyes off into the scene'}, face turned the same way, never to the viewer`;
     exprLines.push(`- ${name}: ${[expr, eyes].filter(Boolean).join('; ')}`);
   }
   const exprBlock = exprLines.length > 0
@@ -6946,9 +6947,9 @@ function buildTopicWindowSection(inputData = {}) {
 // the tone governs its face and expression only. decisions.md 2026-09-28.
 const GROWN_BANDS_TEXT = [...GROWN_CREATURE_SCALE_CLASSES].join(', ');
 const CREATURE_TONE_LEVELS = {
-  cute: `Animals, creatures and non-human characters are drawn cute: soft faces, large round eyes, a closed, rounded mouth with the lips over the teeth, soft relaxed paws, an open upright posture, warm colours. A horned, spined or crested one carries a single pair at most, short and blunt-tipped — never a crown of horns around the head or rows of spikes down it. A non-human character reads as a playmate. A creature smaller than a grown-up is cute in body too: rounded forms throughout, and for size lean toward one near the child's own size — a scale a child could stand beside or hug — going bigger only where the story needs it: a being that is ridden, carries characters or fills a doorway is that size. A grown creature — one the story makes as tall as a grown-up or taller (scaleClass ${GROWN_BANDS_TEXT}) — keeps a grown adult's build, body proportions and full size: the cute tone governs its face only — soft features, large round eyes, a closed rounded mouth — never its body or its size. A being may be large — state its size in metres or against a familiar room, never as a multiple of a child. A being the story makes large is drawn at that full size and may tower gently over a child: calm and soft-faced, its head lowered toward them, never looming, lunging or menacing.`,
-  'not-menacing': "Animals, creatures and non-human characters are drawn with kind eyes and a soft face: a level brow rather than a heavy or overhanging one, open rather than deep-set eyes, the lips over the teeth whether the mouth is shut or open. Any claws stay folded and relaxed at rest. A horned, spined or crested one carries a single pair at most, kept short and smooth-tipped — never a crown of horns around the head or rows of spikes down it. For size, a creature may be clearly bigger than a child; prefer one that still fits in frame beside them and reads as approachable over an overwhelming one, unless the story needs otherwise — a being that is ridden, carries characters or blocks a way is that size. A being may be large — state its size in metres, not as a multiple of a child. The camera stays at the child's eye level; a being the story makes large stands at its full size beside them, calm and upright, never looming over them.",
-  formidable: "A creature the story gives a powerful, wild or formidable nature is drawn as one: claws and teeth visible rather than hidden, real physical weight and presence, weathered or rugged hide, scale, fur or feather where they suit it. No rounded, toy-like or plush softening of such a creature. It may loom, and its size may be stated against a child. A creature the story means as gentle — a pet, a domestic animal, a comic one — stays gentle and friendly-looking; the story's own nature for each creature decides which of the two it gets. Size may be whatever the story wants; a genuinely huge creature is welcome.",
+  cute: `Animals, creatures and non-human characters are drawn cute: soft faces, large round eyes, a closed, rounded mouth with the lips over the teeth, soft relaxed paws, an open upright posture, warm colours. A horned, spined or crested one carries a single pair at most, short and blunt-tipped — never a crown of horns around the head or rows of spikes down it. A non-human character reads as a playmate. A creature smaller than a grown-up is cute in body too: rounded forms throughout, and for size lean toward a \`scaleClass\` band near the child's own, \`knee-high\` to \`chest-high\` — a scale a child could stand beside or hug — going bigger only where the story needs it: a being that is ridden, carries characters or fills a doorway is that size. A grown creature — one the story makes as tall as a grown-up or taller (scaleClass ${GROWN_BANDS_TEXT}) — keeps a grown adult's build, body proportions and full size: the cute tone governs its face only — soft features, large round eyes, a closed rounded mouth — never its body or its size. A being the story makes large is drawn at the full size its \`scaleClass\` band states and may tower gently over a child: calm and soft-faced, its head lowered toward them, never looming, lunging or menacing.`,
+  'not-menacing': "Animals, creatures and non-human characters are drawn with kind eyes and a soft face: a level brow rather than a heavy or overhanging one, open rather than deep-set eyes, the lips over the teeth whether the mouth is shut or open. Any claws stay folded and relaxed at rest. A horned, spined or crested one carries a single pair at most, kept short and smooth-tipped — never a crown of horns around the head or rows of spikes down it. For size, a creature may be clearly bigger than a child; prefer a `scaleClass` band that still fits in frame beside them and reads as approachable over an overwhelming one, unless the story needs otherwise — a being that is ridden, carries characters or blocks a way is that size. A being the story makes large stands at the full size its band states beside them, calm and upright, never looming over them.",
+  formidable: "A creature the story gives a powerful, wild or formidable nature is drawn as one: claws and teeth visible rather than hidden, real physical weight and presence, weathered or rugged hide, scale, fur or feather where they suit it. No rounded, toy-like or plush softening of such a creature. It may loom. A creature the story means as gentle — a pet, a domestic animal, a comic one — stays gentle and friendly-looking; the story's own nature for each creature decides which of the two it gets. Size may be whatever the story wants; a genuinely huge creature is welcome.",
 };
 
 /**
@@ -6989,9 +6990,10 @@ function creatureToneLevel(inputData = {}) {
 // in a book whose tone level says teeth are "not bared, raised or displayed".
 const CREATURE_TONE_PAGE_RULE = ' Where a creature is in frame, the page\'s own prose states its face and expression in these terms — a creature\'s entry does not travel to the page, so a face left unwritten is drawn from the action alone, and effort reads as teeth.';
 
-function buildCreatureToneSection(inputData = {}) {
+// `page: false` is the Visual Bible call's block: it authors entries and no page, so the page rule is a brief author's.
+function buildCreatureToneSection(inputData = {}, { page = true } = {}) {
   const level = CREATURE_TONE_LEVELS[creatureToneLevel(inputData)];
-  return level ? `${level}${CREATURE_TONE_PAGE_RULE}` : '';
+  return level ? `${level}${page ? CREATURE_TONE_PAGE_RULE : ''}` : '';
 }
 
 /**
@@ -8968,13 +8970,14 @@ function parsePlanResponse(raw, expectedPages = []) {
  * One renderer so the planner, the checker, the bible, the wardrobe review, the
  * Art Director and the writer can never be shown different divisions.
  */
-function planBlocks(pages = []) {
+function planBlocks(pages = [], { fixed = true } = {}) {
   // A story page's FIXED line (the Jev decision layer's time of day and
-  // indoors, 2026-09-27) rides under its plan line; covers carry none.
+  // indoors, 2026-09-27) rides under its plan line; covers carry none. `fixed: false`
+  // leaves it out: the Visual Bible call writes plates, which hold no light words.
   const { fixedBlock } = require('./jevDecisions');
   return (pages || [])
     .filter(p => p && p.pageNumber != null)
-    .map(p => [`## Page ${p.pageNumber}`, `PLAN: ${String(p.planLine || '').trim()}`, fixedBlock(p)].filter(Boolean).join('\n'))
+    .map(p => [`## Page ${p.pageNumber}`, `PLAN: ${String(p.planLine || '').trim()}`, fixed ? fixedBlock(p) : ''].filter(Boolean).join('\n'))
     .join('\n\n');
 }
 
@@ -9351,6 +9354,9 @@ const UNNAMED_FIGURE_EXEMPT = 'a figure given no name, referred to only by what 
  */
 const WHOLE_CAST_DEF = 'A page that gathers the whole cast is wide or distant, all of them sharing one simple action — boarding, hauling one line together — or seen from behind moving off. All of them watching one thing is a shared action only when they are seen from behind or over the shoulder, toward what they watch; facing the viewer it never is. Standing or gathering together while a feeling shows, or while the event happens behind them, is everyone present doing nothing — never a row of figures facing the viewer. One of them acting while the rest look on — a hand-over between two, one speaking, one laughing — is not a shared action: every one of them does the same thing.';
 
+// THE ART DIRECTORS' HEIGHT RULE (owner, 2026-10-06, aligned with TWO_HEIGHTS_DEF below): at most two height levels per
+// frame; a height is never a `depth`. The two levels are drawn with the distance between them, never as equals across the edge.
+const HEIGHT_LEVELS_RULE = "A frame holds at most two height levels, however many figures it has: someone in the foreground and someone up in the tree is fine, someone on the ground and someone climbing and someone in the tree is not. Two named figures on the two levels are drawn with the distance between them, never as equals across the edge — the renderer puts every figure on one plane and raises the lower surface, so a boat alongside ends up sitting on the deck. Camera on the upper level looking down over the edge: the lower figure is small and far below, `depth: background`, on a surface visibly below the edge. Or camera on the lower level looking up: the upper figure stands at the edge above, `depth: background`. `depth` is the distance from the camera and never a height. Figures on one surface — a deck, a quay level with it, one flight of stairs — are one level. Figures on one small shared surface — a boat, a raft, a cart, a wagon, a sled — are one level and carry the same `depth`, whatever their pose.";
 const TWO_HEIGHTS_DEF = 'people, animals or objects at three or more different heights in one frame — one on the ground, one climbing the tree, one up in the tree; someone in the foreground and someone in the tree is fine. A whole cast carried together on one back or one boat is one level.';
 // THE ONE REMEDY for a third height, said the same by the planner, the plan check and the typed question (2026-10-06, the planner review).
 const TWO_HEIGHTS_REMEDY = 'Where a third level appears, stage the page on the two levels its event happens on and give the third level its own page.';
@@ -9409,7 +9415,9 @@ function arcActSpans(finalArc) {
 
 const WANTED_PICTURE_DEF = "For each act — setup, middle, ending — the picture a child most wants to see there, and the page whose plan line stages it as its instant. The ending's own event — the reunion, the goodbye, the parting — is always one of them.";
 
-const COUNTING_RULE = 'Counting rule: an exact number for a group of like things may be stated only up to three, and then it is drawn exactly. Above three the group is staged as more than three, a cluster, a row, a few or several — never an exact number, in the prose, `sceneIntent` or `emptyScenePrompt`. A group that recurs across pages holds the same size impression, role and placement.';
+// The `interactions[]` cap, one line for every brief author (the iterates said 1–4, the Art Directors 1–6; the passive labels are sceneMetadata.PASSIVE_ACTIONS).
+const INTERACTIONS_CAP_RULE = 'Cap: 1–6 entries, 0–2 with `storyRelevant: true`, and one `action` label per page beyond `"watching"`, `"standing"` and `"holding"`.';
+const COUNTING_RULE = 'Counting rule: an exact number for a group of like things may be stated only up to three, and then it is drawn exactly. Above three the group is staged as more than three, a cluster, a row, a few or several — never an exact number, in the prose or in any metadata field. A group that recurs across pages holds the same size impression, role and placement.';
 
 /**
  * ONE cast-from-the-plan-line contract for the Art Director (both templates,
@@ -9751,16 +9759,10 @@ const REACHABLE_CONTACT_RULE = "An object more than one character touches: ask f
  * ONE constant: the rule was hand-copied, byte-identical, into both Art Director
  * templates.
  */
-const TRUE_RELATIVE_SIZE_RULE = "A vessel, building, vehicle or creature holds its real size against the figures near it — a person reaches about to a boat's rail, a doorway lintel or a wheel hub, never eye-level with a masthead, a rooftop or a chimney. Every page that cites one of THOSE — a vessel, a building, a vehicle — and holds a figure too names its size as a ratio against a figure in the prose: \"the mast rises five times her height\", \"the door stands twice as tall as the person in front of it\". Nothing else takes a ratio. An everyday prop is sized by its own rule below, a garment by where it falls on the body, and a CREATURE by the creature rule above — in metres or against a familiar room for a young reader, against a figure only where that rule allows it. Every element states its size once already, in its `scaleClass`, and the image prompt turns that band into a size against the figures in frame; where your prose disagrees, that computed size wins, so a ratio you write follows the band — about as tall as a grown-up for `adult-height`, twice that for `twice-adult-height`, several grown-ups high for `house-height`. An adjective is not a ratio — massive, tiny, huge, enormous carry no scale into the picture. Two entries of one kind that differ in size each carry their own ratio on a page holding both. A creature or a secondary character keeps the size its entry’s `scaleClass` band states on every page it appears on, whatever the shot, and is measured against nothing at all on a page where it is alone. When an entry states its height against another named figure, write that relation into the prose on every page the two share.";
+const TRUE_RELATIVE_SIZE_RULE = "A vessel, building, vehicle or creature holds its real size against the figures near it — a person reaches about to a boat's rail, a doorway lintel or a wheel hub, never eye-level with a masthead, a rooftop or a chimney. Every page that cites one of THOSE — a vessel, a building, a vehicle — and holds a figure too names its size as a ratio against a figure in the prose: \"the mast rises five times her height\", \"the door stands twice as tall as the person in front of it\". Nothing else takes a ratio. An everyday prop is sized by its own rule, a garment by where it falls on the body, and a CREATURE by its `scaleClass` band, never in metres and never as a multiple of a child. Every element states its size once already, in its `scaleClass`, and the image prompt turns that band into a size against the figures in frame; where your prose disagrees, that computed size wins, so a ratio you write follows the band — about as tall as a grown-up for `adult-height`, twice that for `twice-adult-height`, several grown-ups high for `house-height`. The prose names an element's size only in its band's own words or a familiar-size term that agrees with the band, never an intensifier that disagrees with it. An adjective is not a ratio — massive, huge, giant, enormous, tiny carry no scale into the picture. Two entries of one kind that differ in size each carry their own ratio on a page holding both. A creature or a secondary character keeps the size its entry’s `scaleClass` band states on every page it appears on, whatever the shot, and is measured against nothing at all on a page where it is alone. When an entry states its height against another named figure, write that relation into the prose on every page the two share.";
 
-/**
- * AN ELEMENT'S SIZE HAS ONE SOURCE (owner-approved 2026-10-04). Staging job_1791040103540_atbttop6w p3 wrote "a massive, perfect
- * smooth oval dragon egg. The melon-sized egg …" — the intensifier copied from
- * a bible description the schema had asked to carry a size — and p12/p16 wrote
- * "the massive earth-toned dragon egg" beside a REQUIRED OBJECTS line giving
- * it a head's size. One constant for all four page-brief authoring sites.
- */
-const ELEMENT_SIZE_WORD_RULE = 'A Visual Bible element is sized in the prose by its scale band\'s own words or a familiar-size term that agrees with the band, never by an intensifier that disagrees with it — massive, huge, giant, enormous, tiny. The image prompt states the computed size, and that size wins.';
+// An element's size has one source: its `scaleClass` (owner-approved 2026-10-04; the intensifier rule merged into TRUE_RELATIVE_SIZE_RULE 2026-10-06).
+// Staging job_1791040103540_atbttop6w p3 wrote "a massive, perfect smooth oval dragon egg. The melon-sized egg …" beside a head-sized entry.
 
 const ELEMENT_ENTRY_PAGE_RULE = "An element's `pages` always includes the page the story first brings it in \u2014 handed over, found, taken out, put on \u2014 even when that page's plan line is about something else. That is the page the reader learns what it looks like on.";
 
@@ -9856,13 +9858,13 @@ const CREATURE_FEATURES_RULE = 'An animal\'s `features` are its anatomy on every
 // on staging job_1790100385959_1nitlympp p17 wrote "shallow depth of field"
 // into the prose and the plate prompt, against an ART STYLE that says "depth
 // from atmospheric haze, not optical blur" in the same image prompt.
-const NO_LENS_RULE = "The brief says what the frame holds and where the camera stands, never how it renders: no depth of field, focus, blur, bokeh, lens or film words, in the prose or in `emptyScenePrompt`. The medium comes from the art style, sent separately.";
+const NO_LENS_RULE = "The brief says what the frame holds and where the camera stands, never how it renders: no depth of field, focus, blur, bokeh, lens or film words, anywhere in the brief. The medium comes from the art style, sent separately.";
 // A costume's body is the outfit text's, in every author of a page brief (owner, 2026-10-06). The wardrobe
 // writer and reviewer were given the covering-top / one-tail / no-feet rule (722a0a15f) but the Art Director
 // and both iterate rewriters were not: the p3 iterate rewrite of staging job_1791267520938_essbvehs8
 // wrote "her bare feet on wet sand" into a mermaid's brief. One constant at every brief author and the
 // provider-blocked rewrite (sibling set costume-body-authors).
-const COSTUME_BODY_RULE = "The outfit text decides the whole body. A figure whose outfit replaces the legs (a tail, a fin) has that one tail from the waist down and no legs, feet, bare feet, toes, shoes or footwear in the prose, a position or a pose; where it stands in water or on sand it is the tail that rests, floats or swims there. A figure whose outfit has a covering top keeps it from shoulders to waist, never bare skin and never a one-piece.";
+const COSTUME_BODY_RULE = "The outfit text decides the whole body. A figure whose outfit replaces the legs (a tail, a fin) has that one tail from the waist down and no legs, feet, bare feet, toes, shoes or footwear in the prose, a position or a pose; in the water it swims on that tail, on sand or rock it rests on it. A figure whose outfit has a covering top keeps it from shoulders to waist, never bare skin and never a one-piece.";
 
 const ONE_INSTANT_RULE = "The prose never asks the picture to show how many times something happened, what just finished, or what comes next — no \"again\", \"for the third time\", \"already\", no object both mid-motion and in its ended state. Write the single visible instant.";
 
@@ -9877,7 +9879,7 @@ const GAZE_TARGET_RULE = "Name at most one gaze target, and compose the frame so
  */
 const COVER_GAZE_EXCEPTION = "A book cover page is the one exception — page -1 is the front cover, page -2 the opening (dedication) page, page -3 the back cover, each a picture posed for the reader rather than a moment of the story: its plan line poses the cast for the reader, every figure's `looksAt` is `viewer`, and that plan line overrides every rule against facing or looking at the viewer.";
 
-const LOOKS_AT_FIELD_RULE = "Every foreground or midground character carries `looksAt`: another character's name, a Visual Bible id, or a gaze word (" + GAZE_TOKEN_LIST + ": eyes down, up, straight ahead, on the far distance, turned away from everyone, closed, on someone just outside the picture, on what the figure holds). There is no value for the viewer: a figure never meets the reader's eye. " + COVER_GAZE_EXCEPTION + " It is the eyes only; hands live in `interactions[]`, and a character holding a thing does not look at it unless the plan line says so. When the plan line stages two named characters facing each other, in a standoff, an exchange or a conversation, each one's `looksAt` is the other — unless the plan line gives one of them a different gaze (\"looks up at it\", \"stares at the chest\"), in which case that one looks where the plan says and the other looks at them. On different levels the lower one looks up, the upper one looks down. The prose clause says the same thing the field says. A secondary character (a CHR id in `objects[]`) has no `characters[]` row: its gaze is a `watching` interaction whose `object` is what it looks at, and its prose clause says the same.";
+const LOOKS_AT_FIELD_RULE = "Every foreground or midground character carries `looksAt`: another character's name, a Visual Bible id, or a gaze word (" + GAZE_TOKEN_LIST + ": eyes down, up, straight ahead, on the far distance, turned away from everyone, on someone just outside the picture, on what the figure holds). There is no value for the viewer: a figure never meets the reader's eye. " + COVER_GAZE_EXCEPTION + " It is the eyes only; hands live in `interactions[]`, and a character holding a thing does not look at it unless the plan line says so. When the plan line stages two named characters facing each other, in a standoff, an exchange or a conversation, each one's `looksAt` is the other — unless the plan line gives one of them a different gaze (\"looks up at it\", \"stares at the chest\"), in which case that one looks where the plan says and the other looks at them. On different levels the lower one looks up, the upper one looks down. The prose clause says the same thing the field says. A secondary character (a CHR id in `objects[]`) has no `characters[]` row: its gaze is a `watching` interaction whose `object` is what it looks at, and its prose clause says the same.";
 
 /**
  * ONE contract for the `expression` field, at every site that writes a brief.
@@ -9972,6 +9974,21 @@ const ABSENT_THING_RULE = "\"no glow\", \"bare rail\", \"no other figures in the
 const HEADLINE_PHRASE_RULE = "Write what the picture shows — faces, gestures, poses, light, what the hands do. A phrase that names the mood or the beat (\"share a proud moment\", \"a moment of triumph\", \"a happy ending\") is painted as a caption; it goes in no field.";
 
 const SCENE_INTENT_FIELD_RULE = "2-3 present-tense sentences naming the single moment the image depicts. Sentence 1: who does what to whom, where. Sentence 2: what characters hold or reach for, and the page's one gaze target — never a second target, and never a character facing one person while gazing at another. Sentence 3: the setting and the light. Name every character physically present. List the main and primary characters among them in `characters[]`; secondary characters stay in the prose and carry their CHR id in `objects[]`. One moment only — not cause plus effect.";
+
+// THE JEV PATH'S FIELD RULES (owner, 2026-10-06, Art Director review §3). On a story page code writes `looksAt` and the
+// light, so the brief authors are not told to compose a gaze target or to name the light in `sceneIntent`: the page's
+// FIXED block is their source, and these variants replace the three rules above on that path only. The Jev-outage backup
+// and the iterate rewrites keep the full rules (jevFieldFills).
+const GAZE_TARGET_FIXED_RULE = "Each figure's eyes are its FIXED `looksAt` and the prose clause for it says the same. Compose the frame so the page's one gaze target is the dominant element — large, central, or nearest the camera. Never write a gaze to the viewer. " + COVER_GAZE_EXCEPTION;
+const LOOKS_AT_FIELD_FIXED_RULE = "A figure's eyes are its FIXED `looksAt` line's, and the prose clause for it says the same: eyes only, hands live in `interactions[]`. A figure the FIXED line leaves out takes `looksAt` as another character's name, a Visual Bible id, or a gaze word (" + GAZE_TOKEN_LIST + "), never the viewer. " + COVER_GAZE_EXCEPTION + " A secondary character (a CHR id in `objects[]`) has no `characters[]` row: its gaze is a `watching` interaction whose `object` is what it looks at, and its prose clause says the same.";
+const SCENE_INTENT_FIELD_FIXED_RULE = "1-2 sentences: the plan line's instant as the picture shows it, naming every figure in frame; the setting. Present tense, one moment only — not cause plus effect. List the main and primary characters among the figures in `characters[]`; secondary characters stay in the prose and carry their CHR id in `objects[]`.";
+
+/** The three rules above per path: the full rule on the backup and the iterates, the FIXED variant on the Jev path. */
+function jevFieldFills(jevBackup) {
+  return jevBackup
+    ? { GAZE_TARGET: GAZE_TARGET_RULE, LOOKS_AT_FIELD: LOOKS_AT_FIELD_RULE, SCENE_INTENT_FIELD: SCENE_INTENT_FIELD_RULE }
+    : { GAZE_TARGET: GAZE_TARGET_FIXED_RULE, LOOKS_AT_FIELD: LOOKS_AT_FIELD_FIXED_RULE, SCENE_INTENT_FIELD: SCENE_INTENT_FIELD_FIXED_RULE };
+}
 
 /**
  * THE PAGE TEXT IS NOT A CHECKLIST FOR THE PICTURE (owner, 2026-09-18).
@@ -10286,13 +10303,13 @@ const MECHANISM_FIX_RULE = 'A fault about how something physically works (how a 
 const AD_COMPOSITION_RULE = [
   '- One moment, one focal point. One main action draws the eye, drawn at its peak of motion — mid-leap, mid-swing, mid-throw — not the static pose that follows.',
   '- One instant, no history. Never ask the picture to show how many times something happened, what just finished or what comes next — no "again", no "already", no object both mid-motion and in its ended state.',
-  '- One level per frame. Two named figures on different levels — one on a deck, floor, bank, wall or roof, the other on the water, ground or stair below — cannot be drawn facing each other at equal size: the renderer flattens every figure onto one plane. Stage the page from one level; the figure on the other level is `depth: background`, small, and on a surface visibly above or below the edge.',
+  '- At most two height levels per frame. ' + HEIGHT_LEVELS_RULE,
   "- No partial immersion. A character is either on standable ground or fully swimming. Wading, ankle-deep and knee-deep poses render as standing on the water surface — restage them at the water's edge or as swimming.",
   '- Footing. Every standing character has something standable at their declared position and depth — a bank, path, floor, deck or walkway — never open water or air. A moment that puts a figure where nothing standable exists moves the figure or the camera.',
   // The SIXTH copy of the close-up rule, and until 2026-09-20 the one still
   // hand-written after the other five moved to the shared constant. Filled
   // from CLOSEUP_BELOW_WAIST_PHRASE like the rest.
-  '- A `close-up` frame ends at the waist. A pose the frame simply crops — sitting, kneeling, crouching — is fine there. What it cannot show is an action whose subject lies below the frame line: no '
+  '- A `close-up` frame ends at the waist. A pose the frame simply crops — sitting, kneeling, crouching — is fine there. What it cannot show is an action whose subject lies below the frame line: no action on '
     + CLOSEUP_BELOW_WAIST_PHRASE
     + ', and nothing placed behind the character. A moment whose point is below the waist is a `medium` shot.',
 ].join('\n');
@@ -13282,7 +13299,6 @@ module.exports = {
   EXPRESSION_FIELD_RULE,
   CREATURE_FIELD_RULE,
   CREATURE_FEATURES_RULE,
-  ELEMENT_SIZE_WORD_RULE,
   GARMENT_REMOVED_RULE,
   WORN_ITEMS_ROW_RULE,
   WORN_ON_OTHER_RULE,
@@ -13326,6 +13342,12 @@ module.exports = {
   SHOWN_CALLBACK_RULE,
   MECHANISM_FIX_RULE,
   AD_COMPOSITION_RULE,
+  HEIGHT_LEVELS_RULE,
+  INTERACTIONS_CAP_RULE,
+  GAZE_TARGET_FIXED_RULE,
+  LOOKS_AT_FIELD_FIXED_RULE,
+  SCENE_INTENT_FIELD_FIXED_RULE,
+  jevFieldFills,
   parseArcHints,
   parseArcCreate,
   parseArcRetell,

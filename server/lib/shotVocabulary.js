@@ -568,7 +568,8 @@ const CLOSEUP_KEPT_FIXED_SHOT_RULE = 'A `close-up` stays `close-up`: restage the
  */
 const FOOTING_VALUES = ['ground', 'swimming', 'aboard', 'airborne'];
 const CAMERA_ON_VALUES = ['ground', 'water', 'aboard'];
-const FOOTING_RULE = 'No partial immersion. A character is either on standable ground or fully swimming. Wading, ankle-deep and knee-deep poses render as standing on the water surface — restage the moment at the water2019s edge (`footing: ground`, on sand, a bank, a jetty or a rock) or as swimming (`footing: swimming`). A plan line that says "stands in the shallow water" is staged at the water2019s edge, the water beside and behind the figure.';
+// No heading and no field name inside the text: every template that fills it opens the line with its own "No partial immersion." label, and the Visual Bible call (which writes no `footing`) fills it too.
+const FOOTING_RULE = 'A character is either on standable ground or fully swimming. Wading, ankle-deep and knee-deep poses render as standing on the water surface — restage the moment at the water’s edge (on sand, a bank, a jetty or a rock) or as swimming. A plan line that says "stands in the shallow water" is staged at the water’s edge, the water beside and behind the figure.';
 const FOOTING_FIELD = `\`footing\` on every character row says what the figure is on: ${FOOTING_VALUES.map(v => `\`${v}\``).join(', ')} — \`ground\` is any standable surface (bank, sand, floor, ice, stair, rock), \`swimming\` is in the water with no footing, \`aboard\` is on a vessel, vehicle or mount, \`airborne\` is flying, leaping or falling. A figure whose \`footing\` is not \`swimming\` is never written into the water.`;
 
 /**

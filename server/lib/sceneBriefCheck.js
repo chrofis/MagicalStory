@@ -1716,12 +1716,12 @@ const REVIEWABLE = new Set(['vb_id_label_mismatch', 'cover_cast_dropped', 'plan_
   // A cover page's mechanical beat fact (checkCoverBrief). Its gaze is code's now (jevFixed.looksAtAll).
   'cover_text_zone_mismatch']);
 
-// Reserved `action` labels for characters who are present but not acting. They
+// Reserved `action` labels for characters who are present but not acting (sceneMetadata.PASSIVE_ACTIONS: watching, standing, holding). They
 // are values rather than an omitted field on purpose: when the field was
 // optional, exp 818 left 7 of 21 rows blank — a pointer, a speaker and a helmsman
 // among them — and each blank silently escaped the one-action count. A reserved
 // value makes "not acting" a claim the reviewer can see and disagree with.
-const PASSIVE_ACTIONS = new Set(['watching', 'standing']);
+const { PASSIVE_ACTIONS } = require('./sceneMetadata');
 
 /** Render findings as the {BRIEF_FINDINGS} block for scene-review.txt. */
 function renderFindingsBlock(byPage) {

@@ -1037,7 +1037,7 @@ async function decidePopulation({ arc, pages, visualBible, locOf }, opts = {}) {
 // Wording and candidate builder verbatim from scripts/analysis/eval-jev-extra-fields.js
 // (G2, "Gaze, depth, story relevance asked as fit", e3c329da1).
 
-// The gaze words (down, up, ahead, distance, away, closed, outside, held) are ONE table: gazeTargets.js.
+// The gaze words (down, up, ahead, distance, away, outside, held) are ONE table: gazeTargets.js.
 // Owner, 2026-10-06: a missing option forces Jev onto a wrong answer, so the list is wide. A page's own
 // place is no longer a target (vbIdGuard.gazeTarget blanks a looksAt naming the place the page stands in:
 // 7 of 153 stored decisions wrote no eyes line); the figure looks down, up, ahead or into the distance.

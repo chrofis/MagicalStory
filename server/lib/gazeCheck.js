@@ -150,7 +150,7 @@ function checkDeclaredGaze({ declared, inventory, matches, resolveTarget } = {})
     // frame. It still contradicts eyes on the reader — the same schema says a
     // figure never meets the reader's eye — so it is compared, but it has to
     // read as a phrase rather than be plugged in as a noun.
-    // The other gaze words (down, up, ahead, distance, closed, outside, held) name no figure and no
+    // The other gaze words (down, up, ahead, distance, outside, held) name no figure and no
     // thing the blind describer could confirm or contradict: skipped, like an unresolved id.
     if (gazeToken(looksAt) && gazeToken(looksAt) !== 'away') continue;
     const declaredAway = norm(looksAt) === 'away';

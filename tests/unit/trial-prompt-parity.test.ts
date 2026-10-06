@@ -57,7 +57,7 @@ describe('Art Director composition rules reach the trial scene hints', () => {
   const rules: Array<[string, RegExp]> = [
     ['one focal point', /One moment, one focal point/],
     ['one instant, no history', /One instant, no history/],
-    ['one level per frame', /One level per frame/],
+    ['two height levels per frame', /two height levels per frame/],
     ['no partial immersion', /No partial immersion/],
     ['footing', /^- Footing\./m],
     ['close-up ends at the waist', /frame ends at the waist/],

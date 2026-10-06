@@ -2,6 +2,21 @@
   "_readme": "VERIFICATION REGISTRY. A behaviour change whose proof needs a story run gets an entry here in the same push (pre-push gate scripts/admin/check-verify-coupling.js; escape: a `Verify: none (<reason>)` or `Verify: <entry-id>` commit trailer). RULE (owner, 2026-09-27): after EVERY verification run, `node scripts/admin/verify-run.js <storyId> [--env=prod] --write` and commit this file; the pre-push hook warns (never blocks) while a staging run since 2026-09-24 is unrecorded (`verify-run.js --unrecorded`). The checker judges every pending entry against the stored run: CONFIRMED / FAILED / HUMAN / NOT COVERED. A run is evidence only for commits its recorded build (stories.data.analytics.build.commitFull) contains; an absent run shape (no over-the-shoulder page, no iterate repair ...) is NOT COVERED, never a pass. --write (rules in scripts/admin/verify-core.js applyVerdicts): CONFIRMED appends evidence and sets status confirmed; FAILED appends evidence and sets status failed (add a tasks/BACKLOG.md line); HUMAN and NOT COVERED leave the status alone and overwrite lastChecked {storyId, env, build, runDate, checkedAt, result, note}; the run is logged once in runs[]. The staging server judges every completed story into story_verify_reports; `verify-run.js --pull` writes those reports here (containment re-checked with git). HUMAN entries a run exercises: `node scripts/admin/verify-review.js <storyId>` writes one local HTML page with the images, the claim and a verdict control; its downloaded verdicts file is recorded with `verify-run.js <storyId> --apply=<file>`. A person's verdict (Claude or the owner, after looking): `--mark=<id>:confirmed|failed --note=\"what was seen\" --by=claude|owner`. Fields: id; title; commits (every one must be in the run's build); addedAt; claim (what a new run must show, one sentence); runShape (all must hold: any | full-story | trial | age-band:N (or N|M) | needs-shot:<shot> | needs-iterate-repair | needs-char-fix | needs-inpaint | needs-fresh-idea | needs-worn-off | needs-fresh-avatar-sheet | needs-composite | lab-stage — defined in scripts/admin/verify-checks.js SHAPES); check ({kind:'auto', fn} names a function in verify-checks.js, {kind:'human', what} says what to look at; optional images: [pages | versions | plates | covers | sheets] names what the review page shows); status (pending | confirmed | failed | superseded); evidence[] (appended by --write or --mark; never edited by hand, never deleted); lastChecked (the last run a HUMAN / NOT COVERED verdict was read against); triage (a hand-recorded status decision made from stored data outside the checker: {date, status, note}). Entries are never deleted: a change that is replaced becomes superseded with a note.",
   "entries": [
     {
+      "id": "ad-review-2026-10-06",
+      "commits": [],
+      "addedAt": "2026-10-06",
+      "claim": "On a Jev-path full story the page briefs still stage every FIXED element and show the FIXED light and gaze in their prose (the Art Director's gaze, sceneIntent and cross-page rules are now FIXED variants); a cover brief names its copy band as a picture (no title, book or mood word) and renders without painted lettering; a blocked scene rewrites into the same place, light and costume; a creature page states no metres and no camera height.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Read the stored page briefs and the three cover briefs of a new staging story (sceneIntent, prose light and gaze against the FIXED blocks in the stored call-2 prompt); view the covers for lettering and the copy band; in the generation log find a scene rewrite (if one fired) and compare its place, light and costume with the original scene."
+      },
+      "status": "pending",
+      "evidence": []
+    },
+    {
       "id": "creature-part-in-who-column",
       "title": "A Visual Bible creature the instant shows only in part is in the plan line's who column and cited in the brief",
       "commits": [
