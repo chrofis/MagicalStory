@@ -10411,7 +10411,7 @@ async function runTypedPlanArm({ target, params, storyData, approvedArc, arcHint
     storyId: target.storyId, pages: pageCount, arm: 'typed-plan',
     models: { planModel, planModelId: result.planModelId, checkModel },
     typed: {
-      firstPlan: result.firstPlan, castTable: result.castTable, first: result.first, replan: result.replan, final: result.final,
+      firstPlan: result.firstPlan, castTable: result.castTable, first: result.first, replan: result.replan, replanRounds: result.replanRounds, final: result.final,
       pagesReplanned: result.pagesReplanned, pagesReturned: result.pagesReturned,
     },
     advisory, calls: callLog, planEffort,

@@ -67044,3 +67044,14 @@ Result: dka3jpog9 (18p) 2 of 2 runs pass (2 flags, main 12/9, no code finding); 
 Decision: not adopted yet; the floor and flag bars are mostly met, the coverage floor on a short five-character book is not. One re-plan round cannot place two characters that each need a focal page.
 Revisit if: a second code-only re-plan round (BACKLOG) lifts 50osg2osm to clean.
 Touched: server/lib/typedPlan.js, evals/runs/2026-10-06_typed-plan/*rv2_*, *rv3_*.
+
+## 2026-10-06 - Typed plan: second, code-triggered re-plan round (+ scarce-page ordering and focal swap)
+Context: Lab 1675-1685 left story 50osg2osm (10 pages, 5 characters) at NO_FOCAL_PAGE (1-3) because one re-plan round cannot give two characters each a focal page. Free replay of the stored round-1 standing plans (scripts/analysis/replay-typed-plan-round2.js): run 1 still had NO_FACE_PAGE + two NO_FOCAL_PAGE, run 2 one NO_FOCAL_PAGE; the old round-2 scope held one candidate page for two characters (only page 4 held a single figure), so a bare second round could not have fixed run 1.
+Decision (Lab-only typed plan, production unchanged), ONE mechanism:
+1. runTypedPlan step 3 is a loop, MAX_REPLAN_ROUNDS = 2. Round 1 is unchanged (code findings plus up to 4 calibrated Jev flags). Round 2 runs only when replanScope, given the plan as it stands after round 1 and jevMax 0, still has code findings with pages to send back (no Jev flag triggers a round or goes back in round 2). Each round is judged and accepted by the same acceptReplanPages. The result carries `replanRounds`; `replan` stays round 1; pagesReplanned/pagesReturned sum the rounds. Cost about USD 0.03 per extra round, only when a target is unmet.
+2. replanScope orders findings by scarcity: invented figure, then NO_FOCAL_PAGE, then everything else (a coverage add had taken the only single-figure pages before a focal finding looked).
+3. A character's add never goes to a two-figure page that is another character's only focal page (it would take that focal page away).
+4. NO_FOCAL_PAGE swap: when fewer than two single-figure pages are left, the character may take a two-figure page, one of its figures leaving (relax type and who). The acceptance still refuses a swap that costs a coverage or another focal page. This is the "focal nomination from pages already holding a figure" option, folded into the same scope function rather than a second path.
+Considered: a second round alone (replay: one candidate page for two characters, cannot reach clean); a separate nomination pass (two mechanisms); fixing the CAST table that puts two characters on one deed page with the main character (the root cause on 50osg2osm, castTableSpec is production, untouched).
+Revisit if: Lab validation (entry follows) misses the bar, or round 2 breaks pages round 1 fixed.
+Touched: server/lib/typedPlan.js, server/lib/testlab.js (stores replanRounds), tests/unit/typed-plan.test.ts, scripts/analysis/replay-typed-plan-round2.js.

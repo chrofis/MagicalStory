@@ -380,6 +380,9 @@ const PAGE_LEVEL_CODES = new Set(['PLAN_LINE_INCOMPLETE', 'TYPED_TYPE_UNKNOWN', 
 /** At most this many Jev flags go back to the planner, the largest margins first (owner 2026-10-06). */
 const REPLAN_JEV_MAX = 4;
 
+/** Re-plan rounds: the first answers code findings and Jev flags, the second only the code findings still unmet (decisions.md 2026-10-06 "Typed plan: second re-plan round"). */
+const MAX_REPLAN_ROUNDS = 2;
+
 /** k pages spread evenly over a sorted list. */
 function spread(list, k) {
   if (list.length <= k) return [...list];
@@ -497,11 +500,18 @@ function replanScope({ rows, findings, jevPages, castTable = null, targets, cali
   // The wide pool of a character's shortfall: interior medium pages with <= 2 figures, not a kept deed page.
   const wide = rows.filter(r => r.pageNumber !== 1 && r.pageNumber !== P && !promised.deed.has(r.pageNumber) && r.type === 'medium' && r.names.length <= 2);
   const has = (r, name) => r.names.some(n => n.toLowerCase() === name.toLowerCase());
+  // A page that is a commissioned character's ONLY focal page (at most two in frame) cannot take a third figure: the add
+  // would take that focal page away (round 2 of a short five-character book offered the page round 1 had just made focal).
+  const focalCount = new Map();
+  for (const r of rows) if (r.names.length <= 2) for (const n of r.names) if (classOf(n) === 'commissioned') focalCount.set(n.toLowerCase(), (focalCount.get(n.toLowerCase()) || 0) + 1);
+  const soleFocalFull = r => r.names.length >= 2 && r.names.some(n => focalCount.get(n.toLowerCase()) === 1);
   const commissionedIn = r => r.names.some(n => classOf(n) === 'commissioned');
   const nameOf = f => (f.detail.match(/^(.+?) (?:is in frame|never has)/) || [])[1];
   const mainFinding = findings.find(f => f.code === 'MAIN_UNDER_HALF');
   const mainName = mainFinding ? nameOf(mainFinding) : null;
-  const findingsFirst = [...findings].sort((a, b) => (a.code === 'TYPED_INVENTED_FIGURE' ? -1 : 0) - (b.code === 'TYPED_INVENTED_FIGURE' ? -1 : 0));
+  // Scarce pages first: an invented figure leaves its page, then a focal page (it needs a page holding at most one figure, which a coverage add would take).
+  const urgency = f => (f.code === 'TYPED_INVENTED_FIGURE' ? 0 : f.code === 'NO_FOCAL_PAGE' ? 1 : 2);
+  const findingsFirst = [...findings].sort((a, b) => urgency(a) - urgency(b));
   for (const f of findingsFirst) {
     if (f.code === 'TYPE_CAST_MISMATCH') { for (const n of f.pages) give(n, f.detail, { relax: { type: true, who: true } }); continue; }
     if (f.code === 'TYPED_WHO_COLLECTIVE') { for (const n of f.pages) give(n, f.detail, { relax: { who: true } }); continue; }
@@ -527,17 +537,24 @@ function replanScope({ rows, findings, jevPages, castTable = null, targets, cali
     else if (f.code === 'UNDER_COVERED_CHARACTER' || f.code === 'NO_FOCAL_PAGE') {
       const name = nameOf(f);
       // a page takes ONE added figure (two more on a two-figure page break the medium type), and a focal page holds at most two
-      pool = wide.filter(r => name && !has(r, name) && !(out.get(r.pageNumber) || { adds: [] }).adds.length && (f.code === 'NO_FOCAL_PAGE' ? r.names.length <= 1 : true));
+      pool = wide.filter(r => name && !has(r, name) && !soleFocalFull(r) && !(out.get(r.pageNumber) || { adds: [] }).adds.length && (f.code === 'NO_FOCAL_PAGE' ? r.names.length <= 1 : true));
       k = f.code === 'UNDER_COVERED_CHARACTER' ? Math.max(1, targets.appearancesMin - f.pages.length) + 1 : 2;
       what = `${name ? `put ${name} in frame here` : 'put the character in frame here'}, taking part in the page's one action`;
       if (name) add = [name];
     } else if (f.code === 'MAIN_UNDER_HALF') {
-      pool = wide.filter(r => !f.pages.includes(r.pageNumber) && !(out.get(r.pageNumber) || { adds: [] }).adds.length);
+      pool = wide.filter(r => !f.pages.includes(r.pageNumber) && !soleFocalFull(r) && !(out.get(r.pageNumber) || { adds: [] }).adds.length);
       k = Math.max(1, targets.mainMin - f.pages.length) + 1; // the shortfall plus one: a page may fail the acceptance
       what = `put ${mainName || 'the main character'} in frame here, taking part in the page's one action`;
       if (mainName) add = [mainName];
     } else continue;
-    for (const r of spread(pool.map(x => x.pageNumber), k)) give(r, `${f.detail} — ${what}`, { relax, add });
+    const chosen = spread(pool.map(x => x.pageNumber), k);
+    for (const r of chosen) give(r, `${f.detail} — ${what}`, { relax, add });
+    if (f.code === 'NO_FOCAL_PAGE' && add.length && chosen.length < k) {
+      // Too few pages hold a single figure (a short book where two characters each need a focal page): the character may
+      // TAKE a two-figure page, one of its figures leaving. The acceptance refuses a swap that costs a coverage or a focal page.
+      const swap = wide.filter(r => r.names.length === 2 && !has(r, add[0]) && !soleFocalFull(r) && !(out.get(r.pageNumber) || { adds: [] }).adds.length && !chosen.includes(r.pageNumber));
+      for (const r of spread(swap.map(x => x.pageNumber), k - chosen.length)) give(r, `${f.detail} — give ${add[0]} a focal page here: ${add[0]}'s own action is the page's subject, ${add[0]} alone or with one companion (a figure of the page may leave it)`, { relax: { type: true, who: true }, add });
+    }
   }
   for (const { page, id } of picked) give(page, fixOf(id), { relax: relaxOf(id) });
   // Keep lists, last: they read every reason a page carries, and the figures that stay either way.
@@ -699,50 +716,55 @@ async function runTypedPlan({ inputData, pageCount, approvedArc, arcHints, arcSt
   const j1 = await judgePlanPages({ arc: approvedArc, pages: first.pages, rows: c1.rows, listed }, { calibration });
   const firstMetrics = metricsOf(c1.rows, j1);
 
-  // 3. ONE TARGETED RE-PLAN.
+  // 3. TARGETED RE-PLAN ROUNDS. Round 1 answers the code findings and the calibrated Jev flags; each later round is
+  // CODE-triggered only (a book-level target is still unmet: two characters that each need a focal page cannot both
+  // be placed by one round — 50osg2osm, Lab 1675-1685) and answers the code findings alone, against the plan as it
+  // stands. The loop ends when no code finding has a page to send back or MAX_REPLAN_ROUNDS is spent.
   let standing = first.pages;
   let standingRows = c1.rows;
   let jevPages = j1.pages;
-  let replan = null;
+  const rounds = [];
   let replanJevStats = null;
-  const scope = replanScope({ rows: c1.rows, findings: c1.findings, jevPages: j1.pages, castTable, targets, calibration, commissionedNames: known, arcNames });
-  if (scope.size) {
+  for (let round = 1; round <= MAX_REPLAN_ROUNDS; round++) {
+    const cNow = round === 1 ? c1 : count(standing);
+    const scope = replanScope({ rows: cNow.rows, findings: cNow.findings, jevPages, castTable, targets, calibration, commissionedNames: known, arcNames, jevMax: round === 1 ? REPLAN_JEV_MAX : 0 });
+    if (!scope.size) break;
     const t1 = Date.now();
     const section = typedReplanSection({ pagePlanText: standing.map(p => `Page ${p.pageNumber}: ${p.planLine}`).join('\n'), scope, castTable });
     const rp = PB.buildBeatsPrompt(inputData, pageCount, { finalArc: approvedArc, arcHints, storyLogic: arcStoryLogic, centralFigure: arcCentralFigure, castTable, typedPlan: true, replan: section, ...labPromptOptions });
-    const rpRes = await callModel(rp, 'typed_replan', callOpts);
+    const rpRes = await callModel(rp, round === 1 ? 'typed_replan' : `typed_replan_${round}`, callOpts);
     const rpReply = String(rpRes.text || '');
     const returned = readPlan(rpReply).parsed.pages;
     const guards = { dropped: [] };
     // The production guards, on the merged division.
     const { pages: merged, overridden } = mergeReplanPages(returned, standing, { inScope: n => scope.has(Number(n)), scopeAll: false });
     guards.restoredUnnamed = overridden;
-    replan = { prompt: rp, reply: rpReply, scope: Object.fromEntries([...scope.entries()].sort((a, b) => a[0] - b[0])), returnedPages: returned.map(p => p.pageNumber), guards, ms: Date.now() - t1 };
+    const replan = { round, prompt: rp, reply: rpReply, scope: Object.fromEntries([...scope.entries()].sort((a, b) => a[0] - b[0])), returnedPages: returned.map(p => p.pageNumber), guards, ms: Date.now() - t1 };
+    rounds.push(replan);
     const dupe = duplicatePlanLine(merged);
-    if (dupe) { guards.discarded = `two pages share the line "${dupe.slice(0, 80)}"`; }
-    else if (!pageCountHolds(merged, pageCount)) { guards.discarded = `${merged.length} pages for a ${pageCount}-page book`; }
-    else {
-      const byStanding = new Map(standing.map(p => [p.pageNumber, p.planLine]));
-      const changed = merged.filter(p => p.planLine !== byStanding.get(p.pageNumber)).map(p => p.pageNumber);
-      const cm = count(merged);
-      const judgeAfter = changed.length ? await judgePlanPages({ arc: approvedArc, pages: merged, rows: cm.rows, listed, only: changed }, { calibration }) : { pages: {}, stats: null };
-      replanJevStats = judgeAfter.stats;
-      const returnedRows = cm.rows.filter(r => changed.includes(r.pageNumber));
-      const acc = acceptReplanPages({
-        rows: standingRows,
-        returned: returnedRows,
-        countOf: rows => count(rows.map(r => ({ pageNumber: r.pageNumber, planLine: r.planLine }))).findings,
-        jevBefore: jevPages,
-        jevAfter: judgeAfter.pages,
-        targets,
-        calibration,
-      });
-      replan.decisions = acc.decisions;
-      standingRows = acc.rows;
-      jevPages = acc.jevPages;
-      standing = standingRows.map(r => ({ pageNumber: r.pageNumber, planLine: r.planLine }));
-    }
+    if (dupe) { guards.discarded = `two pages share the line "${dupe.slice(0, 80)}"`; continue; }
+    if (!pageCountHolds(merged, pageCount)) { guards.discarded = `${merged.length} pages for a ${pageCount}-page book`; continue; }
+    const byStanding = new Map(standing.map(p => [p.pageNumber, p.planLine]));
+    const changed = merged.filter(p => p.planLine !== byStanding.get(p.pageNumber)).map(p => p.pageNumber);
+    const cm = count(merged);
+    const judgeAfter = changed.length ? await judgePlanPages({ arc: approvedArc, pages: merged, rows: cm.rows, listed, only: changed }, { calibration }) : { pages: {}, stats: null };
+    replanJevStats = sumStats(replanJevStats, judgeAfter.stats);
+    const returnedRows = cm.rows.filter(r => changed.includes(r.pageNumber));
+    const acc = acceptReplanPages({
+      rows: standingRows,
+      returned: returnedRows,
+      countOf: rows => count(rows.map(r => ({ pageNumber: r.pageNumber, planLine: r.planLine }))).findings,
+      jevBefore: jevPages,
+      jevAfter: judgeAfter.pages,
+      targets,
+      calibration,
+    });
+    replan.decisions = acc.decisions;
+    standingRows = acc.rows;
+    jevPages = acc.jevPages;
+    standing = standingRows.map(r => ({ pageNumber: r.pageNumber, planLine: r.planLine }));
   }
+  const replan = rounds[0] || null;
 
   // 4. RECOUNT the shipped division; what is still unmet ships as a warning.
   const cFinal = count(standing);
@@ -767,8 +789,9 @@ async function runTypedPlan({ inputData, pageCount, approvedArc, arcHints, arcSt
     first: { plan: first.pages.map(p => ({ pageNumber: p.pageNumber, planLine: p.planLine })), findings: c1.lines, jev: j1.pages, metrics: firstMetrics },
     replan,
     final: { plan: shots.beats.map(p => ({ pageNumber: p.pageNumber, planLine: p.planLine })), findings: [...cFinal.lines, ...shotFindings], jev: jevFinal.pages, metrics: finalMetrics, unmet, shots: shots.pages, shotsUnmet: shots.unmet },
-    pagesReplanned: replan && replan.decisions ? replan.decisions.filter(d => d.keep).length : 0,
-    pagesReturned: replan ? replan.returnedPages.length : 0,
+    replanRounds: rounds,
+    pagesReplanned: rounds.reduce((n, r) => n + (r.decisions ? r.decisions.filter(d => d.keep).length : 0), 0),
+    pagesReturned: rounds.reduce((n, r) => n + r.returnedPages.length, 0),
     jev: sumStats(j1.stats, replanJevStats, shots.stats),
     pages: shots.beats,
     rows: finalRows,
@@ -785,6 +808,7 @@ module.exports = {
   keepList,
   relaxOf,
   REPLAN_JEV_MAX,
+  MAX_REPLAN_ROUNDS,
   PLAN_LINE_HEAD,
   judgePlanPages,
   faultScore,

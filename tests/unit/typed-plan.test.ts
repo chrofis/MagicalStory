@@ -591,3 +591,65 @@ describe('a page is asked to take ONE added figure (Lab 1680-1685: Sarah and Han
     }
   });
 });
+
+describe('a second, code-triggered re-plan round (BACKLOG 2026-10-06; 50osg2osm needed two focal pages one round could not place)', () => {
+  beforeAll(async () => { await loadPromptTemplates(); });
+  const L = ['Ana', 'Ben', 'Cy', 'Dora'];
+  const base = [line('medium', 'Ana, Ben', 'they cross the bridge'), line('medium', 'Ana', 'she counts the stones'), line('medium', 'Ana, Ben', 'they argue about the map'), line('landscape', 'nobody', 'the valley lies open'), line('face', 'Ben', 'he frowns at the sky'), line('medium', 'Ana', 'she climbs the wall'), line('medium', 'Ana, Ben', 'they share the bread'), line('medium', 'Ana', 'she lights the lamp'), line('medium', 'Ben, Ana', 'they hide from the wind'), line('medium', 'Ana, Ben', 'they reach the gate'), line('medium', 'Ana', 'she opens the gate')];
+  const input = { characters: L.map((name, i) => ({ name, age: 6 + i })), language: 'en', pages: 11, storyCategory: 'adventure' };
+  const readPlan = (reply: string) => ({ parsed: { pages: JSON.parse(reply), missing: [] } });
+  // The Lab's planner stub: the first plan is `base`; each re-plan round answers ONE page per character named in the
+  // Change lines (the figure joins whoever the page holds), the way one round left a short book's second character
+  // without a focal page.
+  const makeCall = (log: string[]) => async (prompt: string, label: string) => {
+    log.push(label);
+    if (label === 'typed_plan') return { text: JSON.stringify(pagesOf(base)), modelId: 'stub' };
+    const changes = [...prompt.matchAll(/Page (\d+)\nChange: [^\n]*?put (\w+) in frame here/g)].map(m => ({ page: Number(m[1]), name: m[2] }));
+    const done = new Set<string>();
+    const pages: any[] = [];
+    for (const c of changes) {
+      if (done.has(c.name) || pages.some(p => p.pageNumber === c.page)) continue;
+      done.add(c.name);
+      const held = (prompt.match(new RegExp(`^Page ${c.page}: [^—]+— ([^—]+) —`, 'm')) || [])[1] || '';
+      const who = [...held.split(',').map(x => x.trim()).filter(n => n && n !== 'nobody'), c.name].join(', ');
+      pages.push({ pageNumber: c.page, planLine: line('medium', who, `${c.name} finds the lamp on page ${c.page}`, 'the lamp is lit') });
+    }
+    return { text: JSON.stringify(pages), modelId: 'stub' };
+  };
+  const run = async (log: string[]) => {
+    const orig = JD.runJevRequests;
+    JD.runJevRequests = async (reqs: any[]) => new Map(reqs.map(r => [r.key, [{ [Object.keys(r.questions)[0]]: { noul: r.key.endsWith(':V') ? 0.9 : r.key.endsWith(':F') ? 0.1 : 0.5 } }]]));
+    try {
+      return await TP.runTypedPlan({ inputData: input, pageCount: 11, approvedArc: 'An arc.', arcHints: null, arcStoryLogic: null, arcCentralFigure: null, commission: { listed: L, all: L }, maxCast: 6, mainName: 'Ana', readPlan, callModel: makeCall(log), parseCastTable: () => null });
+    } finally { JD.runJevRequests = orig; }
+  };
+  it('runs a second round when a code target is still unmet after round 1, and it answers code findings only', async () => {
+    const log: string[] = [];
+    const r = await run(log);
+    expect(log.filter(l => l.startsWith('typed_replan'))).toEqual(['typed_replan', 'typed_replan_2']);
+    expect(r.replanRounds.length).toBe(2);
+    expect(r.replanRounds[1].round).toBe(2);
+    expect(Object.values<any>(r.replanRounds[1].scope).flatMap((o: any) => o.reasons).every((w: string) => !/Jev|question/i.test(w))).toBe(true);
+    const focal = (lines: string[]) => lines.filter(f => f.includes('NO_FOCAL_PAGE')).length;
+    expect(focal(r.final.findings)).toBe(0);
+  });
+});
+
+describe('two characters that each need a focal page on a short book (50osg2osm)', () => {
+  const L = ['Emma', 'Noah', 'Daniel', 'Sarah', 'Hans'];
+  const lines = [line('medium', 'Emma, Sarah, Hans'), line('medium', 'Daniel, Noah'), line('medium', 'Emma, Sarah, Hans'), line('medium', 'Emma'), line('medium', 'Emma, Daniel'), line('medium', 'Noah, Daniel'), line('medium', 'Emma, Noah'), line('medium', 'Daniel'), line('object', 'nobody'), line('group', 'Emma, Noah, Daniel, Sarah, Hans')];
+  const c = PC.typedPlanCounters({ pages: pagesOf(lines), listedNames: L, commissionedNames: L, mainName: 'Emma', maxCharactersPerScene: 6 });
+  const t = CC.typedPlanTargets({ pageCount: 10, listed: L, maxCharactersPerScene: 6 });
+  const scope = TP.replanScope({ rows: c.rows, findings: c.findings, jevPages: {}, castTable: null, targets: t, commissionedNames: L, arcNames: [] });
+  it('both are sent to pages, and no page takes two added figures', () => {
+    const asked = (n: string) => [...scope.entries()].filter(([, o]: any) => o.adds.includes(n)).map(([p]: any) => p);
+    expect(asked('Sarah').length).toBeGreaterThan(0);
+    expect(asked('Hans').length).toBeGreaterThan(0);
+    for (const [, o] of scope as any) expect(o.adds.length).toBeLessThanOrEqual(1);
+  });
+  it('a swap candidate (a two-figure page) may change who is in frame and its type', () => {
+    const swapped = [...scope.entries()].filter(([p, o]: any) => o.adds.length && c.rows[p - 1].names.length === 2);
+    expect(swapped.length).toBeGreaterThan(0);
+    for (const [, o] of swapped as any) expect(o.relax).toMatchObject({ type: true, who: true });
+  });
+});
