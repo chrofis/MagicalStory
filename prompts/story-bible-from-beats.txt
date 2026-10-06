@@ -43,16 +43,16 @@ Determine which clothing variants each character needs, based on the page plan.
 - {GARMENT_ONE_OUTFIT_RULE}
 - Costumed descriptions name every slot the character actually wears: headwear, top, bottom, footwear, belt/waist, outer layer. Each slot names colour and material. OMIT a slot they do not wear; never write it out as `none`. Clothing only — no pets, carried objects or bag contents.
 - Name structural garment parts, not just the garment. Dungarees, pinafore, suspenders, kilt, kimono, sari and similar render as plain garments when only named: keep the garment name in front and spell out its parts ("denim dungaree shorts — square bib panel over the chest held by two shoulder straps").
-- No headwear, helmets, crowns or masks that cover the face.
-- **The costume must read as that costume at a glance.** Every garment is one that costume is known for, named with the word that names it there. A garment that only hints at the theme does not count, and neither does one borrowed from a different costume.
-- **Every garment matches the character's sex.** A male character wears garments made for boys or men, a female character garments made for girls or women. When a costume has a male and a female form, each character wears the form matching theirs.
-- **A child's swimwear or costume always has a covering top** — a long-sleeve or short-sleeve `swim shirt` (rash-guard) over the whole torso, shoulders to waist. Never `bikini`, a bare chest, a bare midriff, or a one-piece (a skirt or tail below it leaves the torso reading bare).
-- **A costume that replaces the legs (a tail, a fin) is one tail from the waist down, written as replacing the legs** — never a skirt over legs, and no feet, bare feet or footwear.
+- {FACE_COVER_DEF}
+- **The costume must read as that costume at a glance.** {COSTUME_RECOGNISABLE_DEF}
+- **Every garment matches the character's sex.** {SEX_FIT_DEF}
+- **A child's swimwear or costume has a covering top.** {CHILD_TOP_DEF}
+- **A costume that replaces the legs is one tail from the waist down.** {TAIL_DEF}
 - **Characters are told apart by colour.** A different dominant colour per character, on their largest garment.
-  - Every colour is one of these words, alone: red, blue, green, yellow, orange, purple, brown, black, white, grey. No shade name, no modifier (dark, light, pale) and no compound.
+  - {COLOUR_WORDS_DEF}
   - Never distinguish by a print, badge, pin, brooch, embroidery, trim, buckle, laces, feather, earring, watch or buttons, or anything small.
-- **Outfits differ in garment type and silhouette, not colour alone.** Two characters never wear the same set of garments recoloured — neither the whole outfit nor what is left once a page takes an outer layer off. The story world decides the wardrobe; within it one wears a long coat, another a vest, another rolled sleeves and a sash. Vary headwear and footwear the same way.
-- **One state per garment slot.** Never two that exclude each other. Omit a slot the character does not wear.
+- **Outfits differ in garment type and silhouette, not colour alone.** {VARIETY_DEF} The story world decides the wardrobe; within it one wears a long coat, another a vest, another rolled sleeves and a sash. Vary headwear and footwear the same way.
+- **One state per garment slot.** {SLOT_STATE_DEF}
 {STYLE_WARDROBE}
 - Never write `none`, `n/a`, `tbd` or `""` as a value. Omit the field instead. `used: false` carries no `description`.
 

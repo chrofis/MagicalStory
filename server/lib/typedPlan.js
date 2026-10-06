@@ -36,7 +36,7 @@ const { castTableBlock } = require('./castCoverage');
 /** The neutral midpoint: used only for a metric's "below" count, never as a flag threshold. */
 const THRESHOLD = 0.5;
 
-const PLAN_LINE_HEAD = 'A picture plan line (who is in frame — the moment the picture shows — what is true after):';
+const PLAN_LINE_HEAD = 'A picture plan line (who is in frame — the instant the picture shows — what is true after):';
 
 /** The plan line without field 0 (the type or the shot): the question never sees what it may choose. */
 const bareLine = planLine => jev.planParts(planLine).slice(1).join(' — ');
@@ -52,46 +52,46 @@ const localState = planLine => `${PLAN_LINE_HEAD}\n${bareLine(planLine)}`;
 
 const PLAN_QUESTIONS = {
   SIMPLE: {
-    virtue: 'The moment of this plan line is simple to illustrate as one picture: one action, in one place.',
-    fault: 'The moment of this plan line is complicated to illustrate as one picture: it holds more than one action, or more than one place.',
+    virtue: 'The instant of this plan line is simple to illustrate as one picture: one action, in one place.',
+    fault: 'The instant of this plan line is complicated to illustrate as one picture: it holds more than one action, or more than one place.',
     applies: () => true,
-    fix: 'Reduce the moment to one action in one place that a single picture can hold.',
+    fix: 'Reduce the instant to one action in one place that a single picture can hold.',
   },
   ACTION: {
-    virtue: 'The moment is an action being performed by a character, with a verb that moves.',
-    fault: 'The moment is only a presence, a position or the state after an action (stands, together, visible, gathered, waits).',
+    virtue: 'The instant is an action being performed by a character, with a verb that moves.',
+    fault: 'The instant is only a presence, a position or the state after an action (stands, together, visible, gathered, waits).',
     applies: r => r.names.length > 0,
     fix: 'Name the action being performed, not a presence, a position or the state after an action.',
   },
   DEED: {
-    virtue: 'The moment is one action, being performed now. Its effect, and where the effect goes, are not in it.',
-    fault: `The moment shows an action and the result of that action together. ${PB.DEED_AND_EFFECT_DEF}`,
+    virtue: 'The instant is one action, being performed now. Its effect, and where the effect goes, are not in it.',
+    fault: `The instant shows an action and the result of that action together. ${PB.DEED_AND_EFFECT_DEF}`,
     applies: () => true,
-    fix: 'Keep the action in the moment and move its result to the last field.',
+    fix: 'Keep the action in the instant and move its result to the last field.',
   },
   HEIGHTS: {
-    virtue: 'The figures of the moment stand on at most two height levels in one frame.',
-    fault: `The moment puts ${PB.TWO_HEIGHTS_DEF}`,
+    virtue: 'The figures of the instant stand on at most two height levels in one frame.',
+    fault: `The instant puts ${PB.TWO_HEIGHTS_DEF}`,
     applies: r => r.names.length >= 2,
-    fix: 'Keep at most two height levels in the frame: stage it on the two levels the event happens on, with the figure on the third level out of the frame (and out of the who column).',
+    fix: PB.TWO_HEIGHTS_REMEDY,
   },
   FELT: {
-    virtue: 'The moment is one character showing a strong feeling, and nothing else happens in it: no second actor, no event.',
-    fault: 'The moment is not one character alone showing a feeling: a second actor or an event is in it.',
+    virtue: 'The instant is one character showing a strong feeling, and nothing else happens in it: no second actor, no event.',
+    fault: 'The instant is not one character alone showing a feeling: a second actor or an event is in it.',
     applies: r => r.type === 'face',
     fix: 'Make this one character alone showing one strong feeling, with nothing else happening.',
   },
   THIRD: {
-    virtue: 'The moment gives each of the three characters something of their own that the picture cannot show without them.',
-    fault: 'In the moment one of the three characters only repeats the action, names the place or is asserted to be needed; the picture shows nothing of their own.',
+    virtue: "In the instant the third of the three characters shares the page's one action: they take part in it.",
+    fault: "In the instant one of the three characters only watches or stands by, or does something other than the page's one action.",
     applies: r => r.names.length === 3,
-    fix: 'Give the third character an action of their own that the page cannot show without them, or take them out of the page.',
+    fix: "Have the third character share the page's one action, or take them out of the page.",
   },
   OBSTACLE: {
-    virtue: 'In the moment nothing works against a character, or whatever does is held by a character this plan line names in its who column.',
-    fault: 'In the moment something works against what a character is doing — a way blocked, a place kept, a thing taken or withheld, a refusal — and the one holding that obstacle is a character this plan line does not name in its who column.',
+    virtue: 'In the instant nothing works against a character, or whatever does is held by a character this plan line names in its who column.',
+    fault: 'In the instant something works against what a character is doing — a way blocked, a place kept, a thing taken or withheld, a refusal — and the one holding that obstacle is a character this plan line does not name in its who column.',
     applies: r => r.names.length > 0,
-    fix: 'Name the one who holds the obstacle in the who column (keeping the type\'s figure count), or change the moment.',
+    fix: 'Name the one who holds the obstacle in the who column (keeping the type\'s figure count), or change the instant.',
   },
   WEIGHT: {
     virtue: 'The picture of the page to judge shows something the story has been driving toward: a discovery, an arrival, a payoff.',
@@ -101,8 +101,8 @@ const PLAN_QUESTIONS = {
   },
   // Q17, as measured: the planner's own definition plus its inverse (eval-jev-replan-guard.js, `wholecast`).
   WHOLE: {
-    virtue: `The moment gives every character in frame one and the same action, by this rule: ${PB.WHOLE_CAST_DEF}`,
-    fault: 'In the moment, the characters in frame only stand, gather or are shown together, or one of them acts while the others look on or do something else.',
+    virtue: `The instant gives every character in frame one and the same action, by this rule: ${PB.WHOLE_CAST_DEF}`,
+    fault: 'In the instant, the characters in frame only stand, gather or are shown together, or one of them acts while the others look on or do something else.',
     applies: (r, ctx) => ctx.listed.length > 1 && ctx.listed.every(n => r.names.some(x => String(x).toLowerCase() === String(n).toLowerCase())),
     fix: 'Give every character of the cast in frame one shared action, or take some of them out of the page.',
   },
@@ -470,7 +470,7 @@ function typedReplanSection({ pagePlanText, scope, castTable }) {
   return [
     '# RE-DIVIDE — one round',
     '',
-    'Rewrite ONLY the pages under PAGES TO REWRITE, each answering its Change and keeping its Keep, in the same line format (type — who — moment — after). Every other page stands as written, and a page you rewrite never breaks a target that held.',
+    'Rewrite ONLY the pages under PAGES TO REWRITE, each answering its Change and keeping its Keep, in the same line format (type — who — instant — after). Every other page stands as written, and a page you rewrite never breaks a target that held.',
     '',
     '## THE PLAN THAT STANDS',
     pagePlanText,

@@ -10,7 +10,7 @@
  */
 import { describe, it, beforeAll, expect } from 'vitest';
 
-const { castCoverage, castCoverageRule, commissionedCast } = require('../../server/lib/castCoverage');
+const { castCoverage, castCoverageRule, castTableAlsoCount, commissionedCast } = require('../../server/lib/castCoverage');
 const { runPlanCounters } = require('../../server/lib/planCounters');
 const PB = require('../../server/lib/promptBuilders');
 const { loadPromptTemplates } = require('../../server/services/prompts');
@@ -62,10 +62,22 @@ describe('generator and critic use the same numbers', () => {
   };
   beforeAll(async () => { await loadPromptTemplates(); });
 
-  it('the built planner prompt states the rule castCoverage gives this book', () => {
+  // The floor is said ONCE (2026-10-06, the planner review): by the CAST block's "also on" pages
+  // while a block is written or stands, and by the coverage rule only when no block stands.
+  it('the first division states the action half, and the CAST block carries the floor castCoverage gives this book', () => {
+    const cov = castCoverage({ pageCount: 18, castCount: 4 });
     const prompt = PB.buildBeatsPrompt(inputData, 18, { finalArc: '1. A thing happens.' });
-    expect(prompt).toContain(castCoverageRule(castCoverage({ pageCount: 18, castCount: 4 })));
+    expect(prompt).toContain(castCoverageRule(cov, { floor: false }));
+    expect(prompt).not.toContain('Every commissioned character is in frame on at least');
+    expect(castTableAlsoCount(cov) + 1).toBe(cov.appearances.min);
+    expect(prompt).toContain(`${castTableAlsoCount(cov)} more pages they are in frame on`);
     expect(prompt).not.toContain('{CAST_COVERAGE}');
+  });
+
+  it('a re-plan of a division with no CAST block states the whole rule, floor included', () => {
+    const cov = castCoverage({ pageCount: 18, castCount: 4 });
+    const prompt = PB.buildBeatsPrompt(inputData, 18, { finalArc: '1. A thing happens.', replan: '# RE-DIVIDE', castTable: null });
+    expect(prompt).toContain(castCoverageRule(cov));
   });
 
   it('the counters fire UNDER_COVERED_CHARACTER at the floor the planner was told, and never for a supplied figure', () => {

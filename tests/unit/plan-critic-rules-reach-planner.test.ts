@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 
-const { buildBeatsPrompt } = require('../../server/lib/promptBuilders');
+const { buildBeatsPrompt, buildPlanCheckPrompt, THIRD_CHARACTER_DEF } = require('../../server/lib/promptBuilders');
 
 // Owner ruling 2026-09-15 (generator↔critic gap audit, rows 1/7/10/11/25/29):
 // plan-check.txt enforces entrances, a wanted picture per act, a justified
@@ -24,8 +24,12 @@ describe('the plan critic\'s checks reach the planner', () => {
     expect(prompt).toContain('a badge, a garment, a title or an epithet is not a naming');
   });
 
-  it('check 3 — the plan line justifies the third character', () => {
-    expect(prompt).toContain('the plan line itself carries what the third character does that the page cannot show without them');
+  it('check 3 — the third character shares the page one action, said by one constant on both sides', () => {
+    expect(prompt).toContain(`Where one is kept, ${THIRD_CHARACTER_DEF}`);
+    const check = buildPlanCheckPrompt({ characters: [{ name: 'Mara', age: 7 }], language: 'de', pages: 18 }, new Array(18).fill({}), 'An arc.', 'Page 1: SHOT — Mara — she runs — she is out.');
+    expect(check).toContain(THIRD_CHARACTER_DEF);
+    // the old wording asked the planner for a second action by the third character
+    expect(prompt).not.toContain('what the third character does that the page cannot show without them');
   });
 
   it('check 4 — the picture a child most wants, per act', () => {
@@ -41,7 +45,7 @@ describe('the plan critic\'s checks reach the planner', () => {
   });
 
   it('the roster — a named animal counts toward the cast cap', () => {
-    expect(prompt).toContain('a named animal that acts in the story counts as one of them');
+    expect(prompt).toContain('a named animal that acts in the story counting as one');
   });
 
   it('leaves no unfilled placeholder behind', () => {

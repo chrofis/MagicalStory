@@ -2,6 +2,7 @@ import { describe, it, beforeAll, expect } from 'vitest';
 
 const pb = require('../../server/lib/promptBuilders');
 const { loadPromptTemplates } = require('../../server/services/prompts');
+const { PLAN_INSTANT_MAX_WORDS } = require('../../server/lib/castCoverage');
 
 const input = () => ({
   pages: 18, language: 'de-CH', languageLevel: '1st-grade', storyDetails: 'x',
@@ -22,7 +23,7 @@ const checker = () => pb.buildPlanCheckPrompt(
 describe('planner and checker share one definition, not two copies', () => {
   beforeAll(async () => { await loadPromptTemplates(); });
 
-  for (const name of ['DEED_AND_EFFECT_DEF', 'TWO_HEIGHTS_DEF', 'WHOLE_CAST_DEF', 'NAMING_DEF', 'ENDING_EVENT_DEF', 'EXCITING_START_DEF', 'HAPPY_ENDING_DEF']) {
+  for (const name of ['DEED_AND_EFFECT_DEF', 'TWO_HEIGHTS_DEF', 'TWO_HEIGHTS_REMEDY', 'THIRD_CHARACTER_DEF', 'WHOLE_CAST_DEF', 'NAMING_DEF', 'ENDING_EVENT_DEF', 'EXCITING_START_DEF', 'HAPPY_ENDING_DEF']) {
     it(`${name} reaches BOTH prompts, verbatim`, () => {
       const def = pb[name];
       expect(def, `${name} is not exported`).toBeTruthy();
@@ -64,13 +65,33 @@ describe('planner and checker share one definition, not two copies', () => {
     }
   });
 
+  // The seven one-action bullets are ONE bullet (2026-10-06): the deed-and-effect sentence and the
+  // length budget ride inside it, once.
+  it('the one-action bullet holds the deed-and-effect definition and the instant budget, once', () => {
+    const p = planner();
+    expect(p).toContain(pb.ONE_ACTION_DEF);
+    expect(p.split(pb.DEED_AND_EFFECT_DEF).length - 1).toBe(1);
+    expect(pb.ONE_ACTION_DEF).toContain(`at most ${PLAN_INSTANT_MAX_WORDS} words`);
+    expect(p).not.toContain('- One action per page.');
+    expect(p).not.toContain('- The action at the moment it happens');
+  });
+
+  it('a re-plan states the whole-cast definition once, beside the findings', () => {
+    const section = pb.buildReplanSection('Page 1: wide — Levin — he runs — he is out', [{ check: 17, line: 'CHECK[17]: page 1 x' }], { pageCount: 1 });
+    const full = pb.buildBeatsPrompt(input(), 18, { finalArc: '1. A story.', arcHints: '', replan: section });
+    expect(full.split(pb.WHOLE_CAST_DEF).length - 1).toBe(1);
+    expect(full.indexOf(pb.WHOLE_CAST_DEF)).toBeGreaterThan(full.indexOf('# RE-DIVIDE'));
+    // the first division, with no re-plan block, still carries it in the planning list
+    expect(planner().split(pb.WHOLE_CAST_DEF).length - 1).toBe(1);
+  });
+
   it('neither prompt ships an unfilled placeholder', () => {
     expect(planner().match(/\{[A-Z_]+\}/g) || []).toEqual([]);
     expect(checker().match(/\{[A-Z_]+\}/g) || []).toEqual([]);
   });
 
   it('each side keeps its own framing — the rule commands, the audit asks', () => {
-    expect(planner()).toContain('- One action per page.');
+    expect(planner()).toContain('- One instant, one action:');
     expect(checker()).toContain('9. Deed and effect. Name every page');
     // The article differs by site and both wordings are pinned elsewhere.
     expect(planner()).toContain("A character's first page stages their arrival");

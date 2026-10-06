@@ -35,7 +35,7 @@ const {
   SHOT_PATTERNS, SHOT_AXIS, POSITION_SHOTS, MID_DISTANCE_SHOTS, SHOT_FLOOR_CODE,
   shotFloors, MAX_MEDIUM_WIDE_SHARE, closeUpBelowWaistVerbs, PEOPLELESS_SHARED_SHOT,
 } = require('./shotVocabulary');
-const { castCoverage, groupPageBudget, underCoveredFix, noFocalFix } = require('./castCoverage');
+const { castCoverage, groupPageBudget, underCoveredFix, noFocalFix, NO_COMMISSIONED_PAGES_MAX, PLAN_INSTANT_MAX_WORDS } = require('./castCoverage');
 
 /** Words that look like names but never are, in the who-column's grammar. */
 const NAME_STOPWORDS = new Set([
@@ -131,6 +131,32 @@ function planSegments(planLine) {
     .split(SEGMENT_SPLIT)
     .map(s => s.trim())
     .filter(Boolean);
+}
+
+/**
+ * THE INSTANT's words (the planner review, 2026-10-06; owner goal: simple pictures). The instant is
+ * everything between the who column and the last field, and a plan line past
+ * castCoverage.PLAN_INSTANT_MAX_WORDS of it is a finding (PLAN_INSTANT_TOO_LONG): a mechanical
+ * count, never a reading of what the words say. NOTED, not must-fix: a long instant costs a
+ * rewrite, never a picture.
+ * @returns {{words:number, complete:boolean}} words = 0 for a line with no instant
+ */
+function instantWordCount(planLine) {
+  const segs = planSegments(planLine);
+  if (segs.length < 4) return { words: 0, complete: false };
+  const instant = segs.slice(2, -1).join(' ');
+  return { words: instant.split(/\s+/).filter(w => /[\p{L}\p{N}]/u.test(w)).length, complete: true };
+}
+
+/** The pages whose instant is past the budget, with their word counts. */
+function longInstantPages(pages) {
+  return pages
+    .map(p => ({ pageNumber: Number(p.pageNumber), words: instantWordCount(p.planLine).words }))
+    .filter(p => p.words > PLAN_INSTANT_MAX_WORDS);
+}
+
+function longInstantDetail(long) {
+  return `the instant runs ${long.map(p => `${p.words} words on page ${p.pageNumber}`).join(', ')}, past the ${PLAN_INSTANT_MAX_WORDS} words an instant may take — keep the one action and move the rest to what is true after, or to a page of its own`;
 }
 
 /** Classify a plan line's shot column. Returns 'other' when nothing matches. */
@@ -686,6 +712,9 @@ function runPlanCounters({ pages = [], commissionedNames = [], listedNames = nul
       'the plan line does not carry all four of shot, who, the instant, and what is true after');
   }
 
+  const longInstants = longInstantPages(pages);
+  if (longInstants.length) add('PLAN_INSTANT_TOO_LONG', longInstants.map(p => p.pageNumber), longInstantDetail(longInstants));
+
   // 2. NO SHOT COUNTER (2026-09-27). The planner writes the placeholder
   //    shotVocabulary.PLAN_SHOT_PLACEHOLDER; code assigns every page's shot
   //    after the re-plan (jevDecisions.decideShots), holding the floors, the
@@ -985,10 +1014,12 @@ function runPlanCounters({ pages = [], commissionedNames = [], listedNames = nul
   // holds the names the roster says the column reaches (`coveredNames`), so the
   // whole commissioned cast in frame under one phrase reads as present, not
   // absent.
+  // One such page is allowed (castCoverage.NO_COMMISSIONED_PAGES_MAX): the planner is told the
+  // same number in both modes, so the counter flags only the pages past it.
   const noCommissioned = rows.filter(r => r.peopled && r.commissionedPresent.length === 0).map(r => r.pageNumber);
-  if (noCommissioned.length) {
+  if (noCommissioned.length > NO_COMMISSIONED_PAGES_MAX) {
     add('NO_COMMISSIONED_ON_PAGE', noCommissioned,
-      'a peopled page with none of the commissioned characters in frame');
+      `${noCommissioned.length} peopled pages hold none of the commissioned characters, at most ${NO_COMMISSIONED_PAGES_MAX} may`);
   }
 
   // 7. Every commissioned character earns at least one focal page: in frame
@@ -1817,6 +1848,8 @@ function typedPlanCounters({ pages = [], listedNames = [], commissionedNames = n
     }
     return { pageNumber: n, type: t.type || 'unknown', names: who.names, shot: null, moment: t.moment, after: t.after, planLine: p.planLine };
   });
+  const longInstants = longInstantPages(pages);
+  if (longInstants.length) addPre('PLAN_INSTANT_TOO_LONG', longInstants.map(p => p.pageNumber), longInstantDetail(longInstants));
   const counted = countPlanTargets({ rows, listedNames, commissionedNames, arcNames, mainName, maxCharactersPerScene });
   const findings = [...pre, ...counted.findings];
   return {
@@ -1839,6 +1872,8 @@ module.exports = {
   collectCalendarNames,
   calendarNamesForLocale,
   planSegments,
+  instantWordCount,
+  longInstantPages,
   classifyShot,
   refreshPlanShot,
   nameCandidates,

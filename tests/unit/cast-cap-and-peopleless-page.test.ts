@@ -21,8 +21,8 @@ describe('the planner reads the configured cap, like the rest of the pipeline', 
 
   it('states the ceiling as the configured cap, not a literal three', () => {
     const p = buildBeatsPrompt(input(), 18, { finalArc: '1. A story.', arcHints: '' });
-    expect(p).toContain('Two or three named characters carry a page best');
-    expect(p).toMatch(/\d+ is the ceiling the image model can hold/);
+    expect(p).toMatch(/A page holds at most \d+ named characters/);
+    expect(p).toContain('two or three carry it best');
     expect(p).not.toContain('At most three named characters in frame');
     expect(p).not.toContain('at most one whole-cast page');
     expect(p).not.toContain('{MAX_CHARACTERS_PER_SCENE}');
@@ -30,7 +30,7 @@ describe('the planner reads the configured cap, like the rest of the pipeline', 
 
   it('keeps every STAGING rule the old sentence carried — only the count moved', () => {
     const p = buildBeatsPrompt(input(), 18, { finalArc: '1. A story.', arcHints: '' });
-    expect(p).toContain('a named animal that acts in the story counts as one of them');
+    expect(p).toContain('a named animal that acts in the story counting as one');
     expect(p).toContain('wide or distant');
     expect(p).toContain('never a row of figures facing the viewer');
     expect(p).toContain('Add no unnamed figures');

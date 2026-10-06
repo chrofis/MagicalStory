@@ -56,7 +56,43 @@ describe('one reconciler, three callers', () => {
     const src = read('server/lib/idleShutdown.js');
     expect(src).toMatch(/return `\$\{n\} experiment\(s\) running`/);
     // The freshness window itself is untouched: widening it back to 2h is what
-    // blocked every push for an hour (exp747).
-    expect(src).toMatch(/heartbeat_at > NOW\(\) - INTERVAL '5 minutes'/);
+    // blocked every push for an hour (exp747). The predicate is the reaper's own
+    // (liveRunningSql), so the probe and the reconciler cannot disagree.
+    expect(src).toContain('liveRunningSql()');
+    expect(require('../../server/lib/testlabReaper.js').liveRunningSql()).toContain("heartbeat_at > NOW() - INTERVAL '5 minutes'");
+  });
+});
+
+/**
+ * REGRESSION (2026-10-06): Test Lab experiment #1664 died before its first heartbeat, and the busy
+ * probe counted a 'running' row with a NULL heartbeat as busy for up to 2 hours, so it blocked every
+ * staging push for ~40 minutes. A live run beats the moment it starts, so a NULL heartbeat gets a
+ * short grace from created_at (10 minutes), defined once and shared by the probe, the reaper and the
+ * stale counter.
+ */
+describe('a row with no heartbeat is dead after a short grace, never 2 hours', () => {
+  const R = require('../../server/lib/testlabReaper.js');
+
+  it('the grace is ten minutes and far under the old 2h rule', () => {
+    expect(R.NULL_HEARTBEAT_GRACE).toBe('10 minutes');
+    expect(R.liveRunningSql()).not.toContain('2 hours');
+    expect(R.staleRunningSql()).not.toContain('2 hours');
+  });
+
+  it('live and stale are one window, mirrored: same two intervals, opposite comparison', () => {
+    const live = R.liveRunningSql();
+    const stale = R.staleRunningSql();
+    for (const sql of [live, stale]) {
+      expect(sql).toContain(`INTERVAL '${R.HEARTBEAT_STALE}'`);
+      expect(sql).toContain(`created_at ${sql === live ? '>' : '<'} NOW() - INTERVAL '${R.NULL_HEARTBEAT_GRACE}'`);
+    }
+  });
+
+  it('the probe, the reaper UPDATE and the stale counter all read the shared predicates, none its own copy', () => {
+    const probe = read('server/lib/idleShutdown.js');
+    const reaper = read('server/lib/testlabReaper.js');
+    expect(probe).not.toMatch(/heartbeat_at IS NULL/);
+    expect(reaper.match(/staleRunningSql\(\)\}/g)?.length).toBe(2);
+    expect(reaper.match(/heartbeat_at IS NULL/g)?.length).toBe(2); // the two predicate definitions, once each
   });
 });

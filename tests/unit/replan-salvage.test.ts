@@ -63,14 +63,22 @@ beforeAll(async () => {
 
 describe('the stored round, replayed', () => {
   it('composing each check from its stored reply reproduces the stored counter findings', () => {
-    const stored = (lines: string[]) => lines.map(l => (l.match(/^PLAN\[([A-Z_]+)\]/) || [])[1]).sort();
-    expect(codes(given)).toEqual(stored(fx.beatsReviewReport.counterFindings));
-    expect(codes(recheck)).toEqual(stored(round.recheck.counterFindings));
+    // Two counter changes of 2026-10-06 (the planner review) postdate this stored round: one page
+    // without a commissioned character is allowed (castCoverage.NO_COMMISSIONED_PAGES_MAX), so a
+    // stored finding naming a single page no longer fires; and PLAN_INSTANT_TOO_LONG is new and
+    // counts the long instants of a book planned before the budget. Everything else is unchanged.
+    const stored = (lines: string[]) => lines
+      .filter(l => !/^PLAN\[NO_COMMISSIONED_ON_PAGE\] page \d+:/.test(l))
+      .map(l => (l.match(/^PLAN\[([A-Z_]+)\]/) || [])[1]).sort();
+    const nowCodes = (c: any) => codes(c).filter((x: string) => x !== 'PLAN_INSTANT_TOO_LONG');
+    expect(nowCodes(given)).toEqual(stored(fx.beatsReviewReport.counterFindings));
+    expect(nowCodes(recheck)).toEqual(stored(round.recheck.counterFindings));
   });
 
-  it('the whole round regresses 6 → 8 and the guard discards it', () => {
+  it('the whole round regresses 5 → 7 (6 → 8 before one commissioned-free page was allowed), and the guard discards it', () => {
     const v = PB.replanRoundRegressed(given, recheck, round.changedPages, { round: 1 });
-    expect([v.before, v.after, v.discard]).toEqual([6, 8, true]);
+    // 6 → 8 when stored; the one page without a commissioned character is now allowed, so 5 → 7.
+    expect([v.before, v.after, v.discard]).toEqual([5, 7, true]);
     expect(whoOf(returned, 4)).toMatch(/Levin/);
     expect(whoOf(returned, 7)).toMatch(/Levin/);
   });

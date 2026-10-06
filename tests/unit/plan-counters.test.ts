@@ -621,8 +621,10 @@ describe('the roster decides, not the shape of the sentence (replaces the acts-l
     // child on the list (Sarah) to half the book, while this story's declared
     // main (stories.data.mainCharacters) is Fiona, who is on more than half.
     // The shot findings left this list on 2026-09-27 (code assigns the shots).
+    // PLAN_INSTANT_TOO_LONG joined 2026-10-06 (the instant is at most 20 words; this book was
+    // planned before the budget existed, so its long instants are counted).
     expect(res.findings.map((f: any) => f.code)).toEqual([
-      'NO_COMMISSIONED_ON_PAGE', 'UNDER_COVERED_CHARACTER', 'UNDER_COVERED_CHARACTER',
+      'PLAN_INSTANT_TOO_LONG', 'NO_COMMISSIONED_ON_PAGE', 'UNDER_COVERED_CHARACTER', 'UNDER_COVERED_CHARACTER',
     ]);
     // Five children in sixteen pages owe 3 pages in frame each since 2026-09-23
     // (castCoverage, owner: "ideally each one is on 3-4 images"); the floor was 2.

@@ -22,7 +22,7 @@ const { SCALE_CLASS_SPEC, ANIMAL_ANATOMY_SPEC, GROWN_CREATURE_SCALE_CLASSES, bui
 const { SHOT_ENUM, SHOT_POSITIONS, DISTANCE_SHOTS, SHOT_DEFINITIONS, CLOSEUP_BELOW_WAIST_PHRASE, CLOSEUP_KEPT_RULE, CLOSEUP_KEPT_FIXED_SHOT_RULE, FOOTING_RULE, FOOTING_FIELD, PLAN_SHOT_PLACEHOLDER, shotDistributionPhrase, buildShotDefinitions, OTS_NEAR_FIGURE_CROP, OTS_NEAR_FIGURE_RULE, OTS_NO_CONTACT_RULE, isOverTheShoulderPerspective, VANTAGE_SHOT_RULE, GROUP_STAGING_RULE, GROUP_STAGING_FIXED_SHOT_RULE } = require('./shotVocabulary');
 const { labelOf } = require('./vbLabel');
 const { SLOP_RULES } = require('./proseSlop');
-const { castCoverage, castCoverageRule, castActionRule, castTableSpec, castTableFormat, castTableBlock, groupPageBudget, groupPageRule, typedPlanTargets, typedTargetsRule } = require('./castCoverage');
+const { castCoverage, castCoverageRule, castActionRule, castTableSpec, castTableFormat, castTableBlock, groupPageBudget, groupPageRule, typedPlanTargets, typedTargetsRule, mainFloorRule, noCommissionedRule, planInstantRule } = require('./castCoverage');
 const { PLAN_TYPE_IDS } = require('./shotVocabulary');
 // REQUIRED IN-IMAGE TEXT: one source for the generator block, the repair
 // clause and the judges' TEXT RULES block. Safe as a top-level require --
@@ -8229,7 +8229,7 @@ function buildReplanSection(pagePlan, findingLines, { pageCount = null, keep = [
     // The same constant plan-check question 17 reads.
     `A page holding every commissioned character — the one a whole-cast finding names, and any such page you rewrite for another finding — gets one action all of them do together. ${WHOLE_CAST_DEF}`,
     `The book keeps ${span}. No number is added and none is retired. A moment that earns a picture of its own takes an existing number: that page's material joins a neighbouring page, and the freed number stages the moment. Return both pages.`,
-    'A finding is answered by adding or by removing, whichever that finding asks for. A page holding none of the commissioned characters gains one. A page past the cast ceiling loses one, or a page holding more than one action keeps the first alone and what follows from it goes to "what is true after" or to a page of its own. A name, an action or a page goes only where a finding asks for less in frame, never where one asks for more.',
+    'A finding is answered by adding or by removing, whichever that finding asks for. A peopled page holding none of the commissioned characters gains one. A page past the cast ceiling loses one, or a page holding more than one action keeps the first alone and what follows from it goes to "what is true after" or to a page of its own. A name, an action or a page goes only where a finding asks for less in frame, never where one asks for more.',
     `Two figures stay wherever they are: the character whose action a page's instant works against, and a character the division would leave with fewer than two pages in the book${floor > 2 ? ` — for a commissioned character, fewer than ${floor}` : ''}.`,
     // WHO A PAGE GAINS (2026-09-25). On Lab #1494 every page that asked for a
     // commissioned character gained the main character (Levin 8 -> 14) while
@@ -8702,6 +8702,10 @@ function plannerShotFills(pageCount, legacyShots = false) {
       PLAN_SHOT_FORMAT: PLAN_SHOT_PLACEHOLDER,
       PLAN_SHOT_NOTE: ` The first field is always the word ${PLAN_SHOT_PLACEHOLDER}: each page's camera shot is chosen after the plan is final, never here.`,
       PLANNER_GROUP_STAGING: '',
+      // Words that compose the frame: the camera is chosen later, so the planner is not given them (2026-10-06).
+      CLOSE_UP_WORD: '',
+      AFAR_WORD: '',
+      FRAME_RULE_LEAD: 'Never',
     };
   }
   return {
@@ -8710,6 +8714,9 @@ function plannerShotFills(pageCount, legacyShots = false) {
     PLAN_SHOT_FORMAT: '<shot>',
     PLAN_SHOT_NOTE: '',
     PLANNER_GROUP_STAGING: ` ${GROUP_STAGING_RULE}`,
+    CLOSE_UP_WORD: ', close up',
+    AFAR_WORD: ' seen from afar',
+    FRAME_RULE_LEAD: 'Never',
   };
 }
 
@@ -8727,17 +8734,21 @@ const TYPED_PLAN_TYPES_RULE = [
   '- face: exactly one character, a close-up of their face.',
   '- medium: one to three characters.',
   '- group: four or more characters, all sharing one simple action.',
-  'The who column holds names only, or the word nobody: never a count, a group word or a description. The moment is simple to illustrate: one action, in one place, drawable in a single picture.',
+  'The who column holds names only, or the word nobody: never a count, a group word or a description.',
 ].join('\n');
 
-function plannerTypedFills(targets, mainName) {
+function plannerTypedFills(targets) {
   return {
-    TYPED_TARGETS: `${typedTargetsRule(targets, { mainName })}\n\n${TYPED_PLAN_TYPES_RULE}\n\n`,
+    TYPED_TARGETS: `${typedTargetsRule(targets)}\n\n${TYPED_PLAN_TYPES_RULE}\n\n`,
     SHOT_PLANNING: '',
     PLAN_SHOT_FIELD: 'type',
     PLAN_SHOT_FORMAT: '<type>',
     PLAN_SHOT_NOTE: ` The first field is the page's type: ${PLAN_TYPE_IDS.join(', ')}. Camera shots are chosen after the plan is final, never here.`,
     PLANNER_GROUP_STAGING: '',
+    // The type fixes the frame; the camera inside it is chosen later.
+    CLOSE_UP_WORD: ', close up',
+    AFAR_WORD: ' seen from afar',
+    FRAME_RULE_LEAD: "Beyond the page's type, never",
   };
 }
 
@@ -8771,9 +8782,17 @@ function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', 
   // the shape band would send a 12-year-old "kindergarten age (about five)".
   const readerLine = READER_LINES[resolvePacingBand(inputData)]
     || `elementary-school age (about ${readerAge(inputData)} years old)`;
+  // The book's targets: ONE object for the typed targets block, the main
+  // character's floor and the budget of pages without a commissioned
+  // character, in every mode (the counters measure the same numbers).
+  const targets = typedPlanTargets({ pageCount, listed: (inputData?.characters || []).map(c => c && String(c.name || '').trim()).filter(Boolean), maxCharactersPerScene: ctx.MAX_CHARACTERS_PER_SCENE });
   return fillTemplate(template, {
     LANGUAGE: ctx.LANGUAGE,
     CHARACTER_DETAILS: ctx.CHARACTER_DETAILS,
+    // The commissioned list, one term for both modes (plan-check.txt opens with the same line).
+    CHARACTER_NAMES: ctx.CHARACTER_NAMES,
+    MAIN_FLOOR: mainFloorRule(targets.mainMin, pickMainCharacters(inputData).focus?.name || null),
+    NO_COMMISSIONED_DEF: noCommissionedRule(targets.noCommissionedMax),
     // 'arc', not the default 'premise': this stage divides a story that is
     // already settled ("divide it, never retell or repair it"), so the document
     // that outranks a saved profile here is the ARC, never the commission.
@@ -8793,10 +8812,7 @@ function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', 
     // (SHOT_DISTRIBUTION, SHOT_POSITIONS, OTS_NO_CONTACT, the close-up waist
     // sentence) went with the authorship.
     ...(typedPlan
-      ? plannerTypedFills(
-        typedPlanTargets({ pageCount, listed: (inputData?.characters || []).map(c => c && String(c.name || '').trim()).filter(Boolean), maxCharactersPerScene: ctx.MAX_CHARACTERS_PER_SCENE }),
-        pickMainCharacters(inputData).focus?.name || null,
-      )
+      ? plannerTypedFills(targets)
       : { TYPED_TARGETS: '', ...plannerShotFills(pageCount, legacyShots) }),
     PAGE_COUNT: pageCount,
     // HOW MUCH OF THE BOOK EACH COMMISSIONED CHARACTER GETS (owner,
@@ -8805,7 +8821,9 @@ function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', 
     // plan counters measure NO_FOCAL_PAGE and UNDER_COVERED_CHARACTER against.
     // The central figure's sentence rides in the same rule (2026-09-24, d4).
     // `mayAddDeeds`: Test Lab only (castActionRule); production never passes it.
-    CAST_COVERAGE: castCoverageRule(castCoverage({ pageCount, castCount: (inputData?.characters || []).filter(c => c && c.name).length }), { centralFigure, mayAddDeeds }),
+    // The floor rides in the CAST block's "also on" pages; it is stated here only
+    // when no block stands (a re-plan of a division that wrote none).
+    CAST_COVERAGE: castCoverageRule(castCoverage({ pageCount, castCount: (inputData?.characters || []).filter(c => c && c.name).length }), { centralFigure, mayAddDeeds, floor: !!String(replan || '').trim() && !castTable }),
     // THE CAST TABLE (owner, 2026-09-25): the first division writes one promise
     // per commissioned character before its plan lines — its deed page and the
     // pages it is in frame on, as many as the castCoverage() floor above — and
@@ -8816,7 +8834,8 @@ function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', 
     // from the same castCoverage.groupPageBudget the counter
     // GROUP_PAGES_OVER_BUDGET measures, on the same ceiling the pipeline
     // passes the counters (IMAGE_MODELS maxCharactersPerScene).
-    GROUP_PAGE_BUDGET: groupPageRule(groupPageBudget({ pageCount, castCount: (inputData?.characters || []).filter(c => c && c.name).length, maxCharactersPerScene: ctx.MAX_CHARACTERS_PER_SCENE })),
+    // Typed mode states the same budget once, as the "type group" target.
+    GROUP_PAGE_BUDGET: typedPlan ? '' : groupPageRule(groupPageBudget({ pageCount, castCount: (inputData?.characters || []).filter(c => c && c.name).length, maxCharactersPerScene: ctx.MAX_CHARACTERS_PER_SCENE })),
     // The output scope follows the mode. A first plan (no replan section)
     // owes every page; a re-plan owes only the pages it changes under RE-DIVIDE
     // — the merge in beatsPipeline restores every other page from the division
@@ -8830,9 +8849,15 @@ function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', 
     // Only a re-plan declares changes; a first division has nothing to declare.
     CHANGES_FORMAT: String(replan || '').trim() && !typedPlan ? REPLAN_CHANGES_FORMAT : '',
     READER_LINE: readerLine,
-    DEED_AND_EFFECT_DEF,
+    ONE_ACTION_DEF,
+    THIRD_CHARACTER_DEF,
+    INTERLOCK_DEF,
     TWO_HEIGHTS_DEF,
-    WHOLE_CAST_DEF,
+    TWO_HEIGHTS_REMEDY,
+    // ONE copy of the whole-cast definition in a re-plan: the RE-DIVIDE block states it beside the
+    // findings (Lab #1537), so the planning list does not state it again (2026-10-06). The typed
+    // re-plan section carries none, so its template keeps it.
+    WHOLE_CAST_RULE: String(replan || '').trim() && !typedPlan ? '' : ` ${WHOLE_CAST_DEF}`,
     NAMING_DEF,
     ENDING_EVENT_DEF,
     EXCITING_START_DEF,
@@ -9326,9 +9351,11 @@ const UNNAMED_FIGURE_EXEMPT = 'a figure given no name, referred to only by what 
  */
 const WHOLE_CAST_DEF = 'A page that gathers the whole cast is wide or distant, all of them sharing one simple action — boarding, hauling one line together — or seen from behind moving off. All of them watching one thing is a shared action only when they are seen from behind or over the shoulder, toward what they watch; facing the viewer it never is. Standing or gathering together while a feeling shows, or while the event happens behind them, is everyone present doing nothing — never a row of figures facing the viewer. One of them acting while the rest look on — a hand-over between two, one speaking, one laughing — is not a shared action: every one of them does the same thing.';
 
-const TWO_HEIGHTS_DEF = 'characters, animals or objects at three or more different heights in one frame — one on the ground, one climbing the tree, one up in the tree. A frame holds at most two height levels, however many figures it has: someone in the foreground and someone in the tree is fine. A whole cast carried together on one back or one boat is one level.';
+const TWO_HEIGHTS_DEF = 'people, animals or objects at three or more different heights in one frame — one on the ground, one climbing the tree, one up in the tree; someone in the foreground and someone in the tree is fine. A whole cast carried together on one back or one boat is one level.';
+// THE ONE REMEDY for a third height, said the same by the planner, the plan check and the typed question (2026-10-06, the planner review).
+const TWO_HEIGHTS_REMEDY = 'Where a third level appears, stage the page on the two levels its event happens on and give the third level its own page.';
 // No leading article: the planner says "stages THEIR arrival", the checker "stages AN arrival", and both wordings are pinned by tests.
-const NAMING_DEF = 'arrival or a naming by someone present; a badge, a garment, a title or an epithet is not a naming.';
+const NAMING_DEF = 'arrival or a naming by someone present, shown as a visible act and never as the words said; a badge, a garment, a title or an epithet is not a naming.';
 const ENDING_EVENT_DEF = "When the story's ending has an event of its own, the last page stages that event as its instant.";
 /**
  * THE START AND THE END OF THE PAGE PLAN (owner, 2026-09-25, the stage split:
@@ -9339,7 +9366,23 @@ const ENDING_EVENT_DEF = "When the story's ending has an event of its own, the l
  * the book owes, like Q4 and Q8. On Lab #1494 page 18 showed Levin and Julian
  * only; Max and Kiaan were never back.
  */
-const EXCITING_START_DEF = 'Page 1 opens on an action already under way, and each character is introduced through what they do.';
+const EXCITING_START_DEF = "Page 1 opens on an action already under way, and each character's first page shows them doing something.";
+/**
+ * THE THIRD CHARACTER ON A PAGE (planner review 2026-10-06): the planner's question 4 and the plan
+ * check's question 3 asked for "what the third character does that the page cannot show without
+ * them", which is a second action by construction and contradicted the one-action rule. The third
+ * character shares the page's one action. Planner, plan check and the typed question read this.
+ */
+const THIRD_CHARACTER_DEF = "the third character shares the page's one action — takes part in it, never does a second action and never only stands by.";
+/**
+ * ONE INSTANT, ONE ACTION — the seven one-action bullets the planner carried (one moment, two
+ * consecutive actions, one action, one centre of action, the action at the moment it happens, one
+ * action per page, two forbidden actions) as ONE bullet (2026-10-06, the planner review), with the
+ * length budget the counter PLAN_INSTANT_TOO_LONG measures (castCoverage.PLAN_INSTANT_MAX_WORDS).
+ */
+const ONE_ACTION_DEF = `One instant, one action: no montage, no before-and-after, no "then", no passage of time inside one picture; when a beat contains a change, pick the single moment that shows it. Never two actions by one character: plan the dominant one and leave the other out, never joined by "and then", "before turning to" or a trailing clause. One thing is being done, and everyone else watches it or does that same thing in the same place; two characters given different actions at one instant lose one of them, and so do two vehicles, vessels or creatures each with its own state or its own crew. The action at the moment it happens, never the state that follows it. ${DEED_AND_EFFECT_DEF} When a plan line holds more than one action, split them across pages; a beat whose actions cannot share a picture gives one page the contact and the next page the second action, or the picture drops the secondary action and keeps the main event. ${planInstantRule()}`;
+// Several hands on one thing: allowed as the page's one action, consistent with sceneMetadata.SHARED_GRIP_RULE (owner 2026-09-23).
+const INTERLOCK_DEF = "Several characters holding or moving one thing together is fine when that is the page's one action. A hand-over or an object in flight is never the instant: pick the instant before or after it.";
 const HAPPY_ENDING_DEF = 'The last page shows the commissioned characters safe and together, unless the story itself separates them.';
 /**
  * THE ACTS BY SENTENCE NUMBER (2026-09-23). Q4 asks for the most wanted picture
@@ -9395,7 +9438,7 @@ const COUNTING_RULE = 'Counting rule: an exact number for a group of like things
  * cast field names uncited (0 pages) — the misses are all figures the cast
  * field left out, which is why the rule has to reach the planner too.
  */
-const FIGURE_PART_IN_FRAME_RULE = 'A figure the picture shows only in part — a wing, a tail, a head or a hand reaching into the frame, a flank or a chest filling it — is in that picture exactly as if it were shown whole. Only a name without a body is context: the owner of a prop, someone behind, beyond or outside what the picture shows.';
+const FIGURE_PART_IN_FRAME_RULE = 'A figure the picture shows only in part — a wing, a tail, a head or a hand reaching into the frame, a flank or a chest filling it — is in that picture exactly as if it were shown whole. Only a name without a body is context: the owner of a prop or a place, someone behind, beyond or outside what the picture shows.';
 
 const PLAN_LINE_CAST_RULE = `The plan line's second field is the complete cast of that picture. Every name in it is in the picture, whatever the rest of the line says about them — a Visual Bible figure among them stays cited by its id in \`objects[]\` and named in the prose — and no rewrite removes one. A person named anywhere else in the line and absent from the second field — as the owner of a prop, or in a clause that places them behind, beyond or outside the action — is context for the staging and never becomes a character: no \`characters[]\` entry, no appearance, no expression, no place in the frame. Stage what such a clause makes visible, the prop or the aftermath, without the person. ${FIGURE_PART_IN_FRAME_RULE} A tracked animal — one with a Visual Bible entry — counts as a character for this rule: it is in a page's frame only when that page's plan line names it, whichever way it enters — \`characters[]\`, \`objects[]\` or the prose — and its entry's \`pages\` never claims a page whose plan line leaves it out.`;
 
@@ -9418,7 +9461,7 @@ const PLAN_LINE_CAST_RULE = `The plan line's second field is the complete cast o
  * cast, and the producer must not write one. Either alone leaves the other
  * side's behaviour undefined.
  */
-const PLAN_LINE_FIELD_CONTRACT = `The second field is the complete cast of that picture. Every figure the instant stages — a person, or a creature the story tracks — including one named only as the owner of a prop, or one watching from the background — belongs in that field, or is not written into the instant at all. ${FIGURE_PART_IN_FRAME_RULE} A figure named only in what is true after this page is not in the picture either: put them in that field or leave them off the page. A figure the previous page staged does not carry into the next one as background.`;
+const PLAN_LINE_FIELD_CONTRACT = `The second field is the complete cast of that picture. Every figure the instant stages — a person, or a creature the story tracks — including one watching from the background — belongs in that field, or is not written into the instant at all. ${FIGURE_PART_IN_FRAME_RULE} A figure named only in what is true after this page is not in the picture either: put them in that field or leave them off the page. A figure the previous page staged does not carry into the next one as background.`;
 
 /**
  * ONE contract for an object that shows a different picture on different
@@ -11388,6 +11431,10 @@ function buildPlanCheckPrompt(inputData, beats, arc = '', pagePlan = '', { arcHi
     // The fourth field's contract, shared with the planner that writes it.
     PAGE_CHANGE: PAGE_CHANGE_DEF,
     TWO_HEIGHTS_DEF,
+    TWO_HEIGHTS_REMEDY,
+    THIRD_CHARACTER_DEF,
+    // The roster's UNLISTED line reads the same sentence the planner's who column is held to.
+    FIGURE_PART_IN_FRAME_RULE,
     WHOLE_CAST_DEF,
     NAMING_DEF,
     ENDING_EVENT_DEF,
@@ -11917,6 +11964,26 @@ const OUTFIT_APPEARANCE_RULE = 'An outfit `description` is appearance only: garm
 const GARMENT_ONE_OUTFIT_RULE = "A garment belongs to ONE outfit: that of the character who wears it first. When the plan hands it to another character — to hold, wrap, wear or keep — the plan line and that page's `wornItems` row carry the handoff; the receiver's outfit never names it. No two outfits name the same garment.";
 
 /**
+ * THE WARDROBE RULES THE BIBLE WRITER AND THE WARDROBE REVIEWER BOTH HOLD (2026-10-06, the
+ * planner review). Eight rules were typed by hand into story-bible-from-beats.txt and again,
+ * reworded, into clothing-review.txt, and had drifted: the reviewer's variety check carried the
+ * covering-top and tail exception the writer never saw, and the writer's face rule lacked the
+ * brim and the glasses sentence. One definition each, filled into both
+ * (wardrobeSharedFills; sibling set wardrobe-bible-vs-clothing-review).
+ */
+const WARDROBE_RULES = {
+  COSTUME_RECOGNISABLE_DEF: 'Every garment is one that costume is known for, named with the word that names it there. A garment that only hints at the theme does not count, and neither does one borrowed from a different costume or named with a word belonging to one.',
+  COLOUR_WORDS_DEF: 'Every colour is one of these words, alone: red, blue, green, yellow, orange, purple, brown, black, white, grey. No shade name, no modifier (dark, light, pale) and no compound.',
+  SEX_FIT_DEF: "A male character wears garments made for boys or men, a female character garments made for girls or women. When a costume has a male and a female form, each character wears the form matching theirs.",
+  CHILD_TOP_DEF: "A child's swimwear or costume always has a covering top: a long-sleeve or short-sleeve `swim shirt` (rash-guard) over the whole torso, shoulders to waist. Never a `bikini`, a bare chest, a bare midriff, or a one-piece (a skirt or tail below it leaves the torso reading bare).",
+  TAIL_DEF: 'A costume that replaces the legs (a tail, a fin) is one tail from the waist down, written as replacing the legs. Never a skirt over legs, and no feet, bare feet or footwear.',
+  SLOT_STATE_DEF: 'One state per garment slot: never two garments in one slot that exclude each other, and a slot the character does not wear is omitted, never written out as empty.',
+  VARIETY_DEF: "Two characters never wear the same set of garments recoloured, neither the whole outfit nor what is left once a page takes an outer layer off. A child's covering top and a leg-replacing tail are never the garment given up: vary colour, sleeve length, neckline and trim around them.",
+  FACE_COVER_DEF: 'No garment covers the face or the eyes, or shadows them with a brim: no mask, visor, veil, helmet, crown or low brim. Glasses are identity, not a garment: a character whose outfit lists glasses keeps them, and every rewrite of that outfit still lists them.',
+};
+const wardrobeSharedFills = () => ({ ...WARDROBE_RULES });
+
+/**
  * Wardrobe review of the bible's clothing contract. Returns null when the
  * story has no dressed character to review — a bible that produced no usable
  * outfit has nothing for a reviewer to correct.
@@ -11953,6 +12020,7 @@ function buildClothingReviewPrompt(inputData, clothingRequirements, beats = []) 
     PLAN_LINES: planBlocks(beats) || '(page plan not available)',
     OUTFIT_APPEARANCE_RULE,
     GARMENT_ONE_OUTFIT_RULE,
+    ...wardrobeSharedFills(),
   });
 }
 
@@ -12282,6 +12350,7 @@ function buildStoryBibleFromBeatsPrompt(inputData, beats = [], { arc = '' } = {}
     PLAN_LINES: planBlocks(beats),
     OUTFIT_APPEARANCE_RULE,
     GARMENT_ONE_OUTFIT_RULE,
+    ...wardrobeSharedFills(),
   });
 }
 
@@ -13162,7 +13231,11 @@ module.exports = {
   // constant each, filled into the rule AND the audit (sibling set
   // `beats-planner-vs-plan-check`).
   DEED_AND_EFFECT_DEF,
+  ONE_ACTION_DEF,
+  THIRD_CHARACTER_DEF,
+  INTERLOCK_DEF,
   TWO_HEIGHTS_DEF,
+  TWO_HEIGHTS_REMEDY,
   WHOLE_CAST_DEF,
   HINT_VS_ARC_RULE,
   STORY_LOGIC_FACT_RULE,
@@ -13288,6 +13361,7 @@ module.exports = {
   buildClothingReviewPrompt,
   OUTFIT_APPEARANCE_RULE,
   GARMENT_ONE_OUTFIT_RULE,
+  WARDROBE_RULES,
   parseClothingReview,
   parseBeats,
   parsePagePlan,

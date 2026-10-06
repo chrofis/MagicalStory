@@ -139,7 +139,21 @@ function groupPageRule(budget) {
  */
 const TYPED_FACE_MIN = 1;
 const TYPED_SCENERY_MIN = 1;
-const TYPED_NO_COMMISSIONED_MAX = 1;
+/**
+ * HOW MANY PEOPLED PAGES MAY HOLD NO COMMISSIONED CHARACTER, one number for the
+ * planner in BOTH modes (`noCommissionedRule`, story-beats.txt {NO_COMMISSIONED_DEF})
+ * and the counter NO_COMMISSIONED_ON_PAGE (planCounters), which flags only the pages
+ * past it (2026-10-06, the planner review: production's counter flagged the first such
+ * page while only the typed planner was told one is allowed).
+ */
+const NO_COMMISSIONED_PAGES_MAX = 1;
+const TYPED_NO_COMMISSIONED_MAX = NO_COMMISSIONED_PAGES_MAX;
+/**
+ * HOW LONG A PLAN LINE'S INSTANT MAY BE (owner goal: simple pictures; the reviewer's
+ * edit list 2026-10-06). The planner is told the number (`planInstantRule`) and the
+ * counter PLAN_INSTANT_TOO_LONG (planCounters) counts the words of the instant.
+ */
+const PLAN_INSTANT_MAX_WORDS = 20;
 function typedPlanTargets({ pageCount, listed = [], maxCharactersPerScene } = {}) {
   const P = Math.floor(Number(pageCount));
   const C = listed.length;
@@ -149,7 +163,7 @@ function typedPlanTargets({ pageCount, listed = [], maxCharactersPerScene } = {}
     pageCount: P,
     faceMin: TYPED_FACE_MIN,
     sceneryMin: TYPED_SCENERY_MIN,
-    noCommissionedMax: TYPED_NO_COMMISSIONED_MAX,
+    noCommissionedMax: NO_COMMISSIONED_PAGES_MAX,
     appearancesMin: cov && C > 1 ? cov.appearances.min : 0,
     focalEach: !!(cov && C > 1 && cov.focalEach),
     mainMin: Math.ceil(P / 2),
@@ -159,21 +173,42 @@ function typedPlanTargets({ pageCount, listed = [], maxCharactersPerScene } = {}
   };
 }
 
-/** The targets as the planner is told them, before it plans a page. */
-function typedTargetsRule(t, { mainName = null } = {}) {
+/**
+ * The main character's floor, as the planner is told it in BOTH modes
+ * (story-beats.txt {MAIN_FLOOR}); the number is typedPlanTargets.mainMin, the one the
+ * counter MAIN_UNDER_HALF measures.
+ * @param {number} mainMin
+ * @param {string|null} mainName
+ */
+function mainFloorRule(mainMin, mainName = null) {
+  return `${mainName || 'The main character'} is in frame on at least ${pagesWord(mainMin)};`;
+}
+
+/** The peopled-page-without-a-commissioned-character budget, for the planner in both modes. */
+function noCommissionedRule(max = NO_COMMISSIONED_PAGES_MAX) {
+  return `At most ${pagesWord(max)} with figures in frame holds none of the commissioned characters; every other page with figures holds at least one.`;
+}
+
+/** The length of a plan line's instant, for the planner. */
+function planInstantRule(maxWords = PLAN_INSTANT_MAX_WORDS) {
+  return `The instant is at most ${maxWords} words.`;
+}
+
+/**
+ * The targets as the planner is told them, before it plans a page. Only what no other part of
+ * the prompt already states: the main character's floor, the commissioned characters'
+ * pages, the page budget of people without a commissioned character and the instant's
+ * length are stated once, in the requirements (2026-10-06, the planner review).
+ */
+function typedTargetsRule(t) {
   const lines = [
-    `- At least ${pagesWord(t.faceMin)} of type face, and a face page shows a listed character.`,
+    `- At least ${pagesWord(t.faceMin)} of type face, and a face page shows a commissioned character.`,
     `- At least ${pagesWord(t.sceneryMin)} of type landscape or object; two are fine, ideally one of each.`,
     '- No two neighbouring pages share both their type and their characters.',
+    `- At most ${pagesWord(t.groupMax)} of type group.`,
+    '- The who column names commissioned characters and the figures of the STORY LOGIC, nobody else: a figure you invent is a fault.',
   ];
-  if (t.appearancesMin > 0) {
-    lines.push(`- Every listed character is in frame on at least ${pagesWord(t.appearancesMin)}${t.focalEach ? ', one of them a page with that character alone or with one companion' : ''}.`);
-  }
-  if (t.mainMin > 0) lines.push(`- ${mainName ? mainName : 'The main character'} is in frame on at least ${pagesWord(t.mainMin)}.`);
-  lines.push(`- At most ${pagesWord(t.groupMax)} of type group.`);
-  lines.push(`- At most ${pagesWord(t.noCommissionedMax)} where figures are in frame and none of them is a listed character.`);
-  lines.push('- The who column names listed characters and the figures of the STORY LOGIC, nobody else: a figure you invent is a fault.');
-  return ["THE BOOK'S TARGETS — every one is counted in code on the finished plan. A listed character is one of the characters given above (the CAST block names them); a figure the STORY LOGIC names (new) is not listed and may share a page with listed characters or carry a page alone.", ...lines].join('\n');
+  return ["THE BOOK'S TARGETS — every one is counted in code on the finished plan. A figure the STORY LOGIC names (new) is not commissioned and may share a page with commissioned characters or carry a page alone.", ...lines].join('\n');
 }
 
 /**
@@ -225,11 +260,15 @@ function centralFigureActionRule(centralFigure) {
  * (UNDER_COVERED_CHARACTER at `appearances.min`). Stated as a floor — "at least"
  * — never as a range a reader could take for a ceiling.
  *
+ * The floor is stated by the CAST block's "also on" pages (castTableSpec) whenever the
+ * block is written or shown; the planner is given it here only when no block stands
+ * (`floor`), so the number is said once (2026-10-06, the planner review).
+ *
  * @param {ReturnType<typeof castCoverage>} cov
  * @returns {string}
  */
-function castCoverageRule(cov, { centralFigure = null, mayAddDeeds = false } = {}) {
-  const floor = cov && cov.castCount !== 1
+function castCoverageRule(cov, { centralFigure = null, mayAddDeeds = false, floor: withFloor = true } = {}) {
+  const floor = withFloor && cov && cov.castCount !== 1
     ? `Every commissioned character is in frame on at least ${pagesWord(cov.appearances.min)}.`
     : '';
   return [castActionRule(cov, { centralFigure, mayAddDeeds }), floor].filter(Boolean).join(' ');
@@ -344,13 +383,13 @@ function castTableSpec(cov, pageCount, { replan = false, table = null } = {}) {
     ? 'the page whose instant is their own action from the story, alone or with one companion'
     : 'the page whose instant is their own action from the story, which they may share with the group';
   const more = also > 0 ? `, and ${also} more page${also === 1 ? '' : 's'} they are in frame on` : '';
-  return `Write the CAST block before the plan lines. One line per commissioned character: ${where}${more}. Then page ${pageCount}, the last, with everyone the story keeps together at the end. Every plan line keeps what the block promises.`;
+  return `Write the CAST block before the plan lines. One line per commissioned character: ${where}${more}. Then page ${pageCount}, the last: the names of everyone the story keeps together at the end. Every plan line keeps what the block promises.`;
 }
 
 /** The block as the OUTPUT FORMAT shows it (first division only). */
 function castTableFormat(cov, pageCount, { replan = false } = {}) {
   if (!cov || replan) return '';
-  return [CAST_TABLE_HEADER, castTableDeedLine(cov), `Ending page ${pageCount}: <everyone the story keeps together at the end>`].join('\n');
+  return [CAST_TABLE_HEADER, castTableDeedLine(cov), `Ending page ${pageCount}: <names, comma separated>`].join('\n');
 }
 
 /**
@@ -424,6 +463,11 @@ module.exports = {
   castCoverage,
   typedPlanTargets,
   typedTargetsRule,
+  mainFloorRule,
+  noCommissionedRule,
+  planInstantRule,
+  NO_COMMISSIONED_PAGES_MAX,
+  PLAN_INSTANT_MAX_WORDS,
   groupPageBudget,
   groupPageRule,
   castActionRule,

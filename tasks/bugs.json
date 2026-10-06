@@ -2,6 +2,27 @@
   "_readme": "CLEAR-BUG REGISTRY. A bug the owner reported, or one confirmed from stored evidence, goes here the moment it is confirmed - and the pre-push gate (scripts/admin/check-open-bugs.js) BLOCKS every push while any entry is open. That is the point: a reported bug is fixed immediately, not backlogged. Only CLEAR bugs belong here (reproduced, or owner-reported with evidence); design questions and improvements go to the task list instead. Close an entry by setting status to 'fixed' with the commit hash IN THE SAME COMMIT as the fix. Emergency escape: PUSH_WITH_OPEN_BUGS=1 git push (documented, visible, deliberate).",
   "bugs": [
     {
+      "id": "plan-check-possessive-name-counts-as-unlisted",
+      "title": "CAST_NOT_IN_WHO_COLUMN: a name that only owns a place or a prop in the instant ('the mermaid Maren's garden', 'Berta's path') was reported UNLISTED by the plan check and counted by the recount, a false must-fix",
+      "reportedAt": "2026-10-06",
+      "source": "Planner review, replay of essbvehs8: PLAN[CAST_NOT_IN_WHO_COLUMN] page 1 (Maren) and page 13 (Berta) on the stored roster ('ROSTER 1: ... unlisted = Maren'); the instant of p1 names Maren only as the owner of the garden the leaves drift to.",
+      "rootCause": "plan-check.txt told the roster to list every character 'whose name the instant contains', while the planner's own contract (FIGURE_PART_IN_FRAME_RULE) says only a name without a body is context. The counter recounts that the claimed name is in the instant (namesIn counts a possessive as present on purpose: 'Maren's hand' is a figure shown in part), so it cannot tell a hand from a garden; that distinction is language, the prompt's (CLAUDE.md eval-logic rule).",
+      "status": "fixed",
+      "fixedAt": "2026-10-06",
+      "fixedIn": "pending",
+      "fix": "The roster's UNLISTED paragraph reads FIGURE_PART_IN_FRAME_RULE (one constant with the planner), whose last sentence now names 'the owner of a prop or a place'; PLAN_LINE_FIELD_CONTRACT no longer lists the prop owner as a who-column figure. Replay with the real plan check on essbvehs8 and atbttop6w (USD 0.060): p1 Maren and p13 Berta no longer unlisted; the remaining finding (Herr Keller working the blower) is a real figure. Test: tests/unit/planner-review-2026-10-06.test.ts. docs/decisions.md 2026-10-06 'Planner review'."
+    },
+    {
+      "id": "testlab-null-heartbeat-blocks-push-2h",
+      "title": "The Test Lab busy probe counted a 'running' row with a NULL heartbeat as busy for up to 2 hours: experiment #1664 died before its first heartbeat and blocked every staging push for ~40 minutes",
+      "reportedAt": "2026-10-06",
+      "source": "Owner report 2026-10-06 (a push to staging was refused for ~40 minutes by an experiment that never beat). server/lib/idleShutdown.js testlab probe: heartbeat_at IS NULL AND created_at > NOW() - INTERVAL '2 hours'.",
+      "status": "fixed",
+      "fixedAt": "2026-10-06",
+      "fixedIn": "pending",
+      "fix": "server/lib/testlabReaper.js NULL_HEARTBEAT_GRACE = 10 minutes and one shared pair of predicates (liveRunningSql / staleRunningSql) read by the probe, the reaper and the stale counter. Test: tests/unit/testlab-orphan-reaper.test.ts (a row with no heartbeat is dead after a short grace). docs/decisions.md 2026-10-06."
+    },
+    {
       "id": "idea-stream-gzip-buffered",
       "title": "Idea cards never appear: the gzip middleware buffers the SSE idea streams until the response ends, so the client sees nothing for 65-112 s and aborts at its 2-minute idle timeout",
       "reportedAt": "2026-10-05",

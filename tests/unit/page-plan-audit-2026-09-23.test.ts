@@ -57,7 +57,9 @@ describe('the plan check and the planner', () => {
     const cov = castCoverage({ pageCount: 18, castCount: 4 });
     const check = PB.buildPlanCheckPrompt(inputData, BEATS, ARC, '');
     expect(check).toContain(castActionRule(cov));
-    expect(PB.buildBeatsPrompt(inputData, 18, { finalArc: ARC })).toContain(castCoverageRule(cov));
+    // The floor is said once, by the CAST block's "also on" pages (2026-10-06), so the planner's own
+    // coverage sentence is the action half; the floor is the table's (cast-coverage.test.ts).
+    expect(PB.buildBeatsPrompt(inputData, 18, { finalArc: ARC })).toContain(castCoverageRule(cov, { floor: false }));
     expect(check).not.toContain(`at least ${cov.appearances.min} pages`);
   });
 

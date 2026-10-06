@@ -88,14 +88,19 @@ describe('every book target is counted, from the object the planner is told', ()
   const book = (n: number) => Array.from({ length: n }, (_, i) => line('medium', i % 2 ? 'Ana, Ben' : 'Ana, Cy'));
   it('the planner and the counters read ONE target object', () => {
     const t = CC.typedPlanTargets({ pageCount: 16, listed: LISTED, maxCharactersPerScene: 6 });
-    const rule = CC.typedTargetsRule(t, { mainName: 'Ana' });
+    const rule = CC.typedTargetsRule(t);
     const cov = CC.castCoverage({ pageCount: 16, castCount: 4 });
     expect(t.appearancesMin).toBe(cov.appearances.min);
     expect(t.groupMax).toBe(CC.groupPageBudget({ pageCount: 16, castCount: 4, maxCharactersPerScene: 6 }).max);
     expect(t.mainMin).toBe(8);
-    expect(rule).toContain(`at least ${cov.appearances.min} page`);
     expect(rule).toContain(`At most ${t.groupMax} page`);
-    expect(rule).toContain('Ana is in frame on at least 8 pages');
+    // Said once (2026-10-06, the planner review): the main character's floor and the budget of pages
+    // without a commissioned character ride in the requirements of BOTH modes, the commissioned
+    // characters' floor in the CAST block, so the targets block no longer repeats them.
+    expect(CC.mainFloorRule(t.mainMin, 'Ana')).toContain('Ana is in frame on at least 8 pages');
+    expect(CC.noCommissionedRule(t.noCommissionedMax)).toContain(`At most ${t.noCommissionedMax} page`);
+    expect(rule).not.toContain('is in frame on at least');
+    expect(CC.castTableAlsoCount(cov) + 1).toBe(cov.appearances.min);
     // and the counters measure against exactly these
     const r = count(book(16));
     expect(r.stats.targets.mainMin).toBe(t.mainMin);
@@ -129,10 +134,10 @@ describe('every book target is counted, from the object the planner is told', ()
     const ok = [line('face', 'Rufus'), line('face', 'Ana'), line('landscape', 'nobody')];
     expect(codes(count(ok, { arcNames: ['Rufus'] }))).not.toContain('TYPED_NO_FACE_PAGE');
   });
-  it('the planner is told what listed means and that the who column names nobody else', () => {
-    const rule = CC.typedTargetsRule(CC.typedPlanTargets({ pageCount: 12, listed: LISTED, maxCharactersPerScene: 6 }), { mainName: 'Ana' });
-    expect(rule).toContain('a face page shows a listed character');
-    expect(rule).toContain('A listed character is one of the characters given above');
+  it('the planner is told who is commissioned (one term) and that the who column names nobody else', () => {
+    const rule = CC.typedTargetsRule(CC.typedPlanTargets({ pageCount: 12, listed: LISTED, maxCharactersPerScene: 6 }));
+    expect(rule).toContain('a face page shows a commissioned character');
+    expect(rule).not.toContain("listed");
     expect(rule).toContain('a figure you invent is a fault');
   });
   it('one who reader for every arm: an untyped plan is read through parseTypedWho, luna only cross-checks', () => {
@@ -172,7 +177,13 @@ describe('the planner prompt', () => {
     const p = PB.buildBeatsPrompt(input, 12, { finalArc: 'An arc.', typedPlan: true });
     const t = CC.typedPlanTargets({ pageCount: 12, listed: LISTED, maxCharactersPerScene: 6 });
     expect(p.indexOf("THE BOOK'S TARGETS")).toBeLessThan(p.indexOf('Before dividing'));
-    expect(p).toContain(CC.typedTargetsRule(t, { mainName: 'Ana' }));
+    expect(p).toContain(CC.typedTargetsRule(t));
+    // one term and one list: the commissioned characters are named at the head of the prompt
+    expect(p).toContain('Commissioned characters: Ana, Ben, Cy, Dora');
+    expect(p).toContain(CC.mainFloorRule(t.mainMin, 'Ana'));
+    expect(p).toContain(CC.noCommissionedRule(t.noCommissionedMax));
+    // the group budget is said once in typed mode: as the "type group" target, not also as the planning question's budget
+    expect(p.split(`At most ${t.groupMax} page`).length - 1).toBe(1);
     expect(p).toContain('Page <N>: <type> —');
     for (const id of SV.PLAN_TYPE_IDS) expect(p).toContain(`- ${id}:`);
     expect(p).not.toContain(`Page <N>: ${SV.PLAN_SHOT_PLACEHOLDER} —`);
@@ -238,8 +249,12 @@ describe('Jev: one paired question per call', () => {
     expect(TP.PLAN_QUESTIONS.DEED.virtue).toBeTruthy();
     expect(TP.PLAN_QUESTIONS.DEED.fault).toContain(PB.DEED_AND_EFFECT_DEF);
     expect(TP.PLAN_QUESTIONS.HEIGHTS.fault).toContain('three or more different heights');
-    expect(TP.PLAN_QUESTIONS.HEIGHTS.fault).toContain('at most two height levels');
     expect(TP.PLAN_QUESTIONS.HEIGHTS.virtue).toContain('at most two height levels');
+    // one remedy everywhere: the planner, the plan check and the typed question say the same sentence
+    expect(TP.fixOf('HEIGHTS')).toBe(PB.TWO_HEIGHTS_REMEDY);
+    // the third character shares the page's one action, in the typed question as in the planner's
+    expect(TP.PLAN_QUESTIONS.THIRD.virtue).toContain("shares the page's one action");
+    expect(TP.PLAN_QUESTIONS.THIRD.fault).not.toContain('names the place');
   });
 });
 

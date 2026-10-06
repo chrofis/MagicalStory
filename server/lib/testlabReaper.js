@@ -23,8 +23,12 @@
  * The 5-minute freshness rule is NOT loosened. Widening it back to the old
  * blanket 2h is what held every push, staging and production, for an hour
  * (exp747, 2026-08-19). A live run beats every 30s; a quiet row is a dead row.
- * Rows predating the heartbeat column carry NULL and keep the 2h rule, so a
- * pre-migration run is never mistaken for dead.
+ * A NULL heartbeat is NOT a legacy row any more (2026-10-06): an experiment beats at once when it
+ * starts (routes/admin/testlab.js `await beat()`), so a row still NULL ten minutes after its
+ * `created_at` never started — experiment #1664 was inserted and died before its first beat, and
+ * the old 2h grace for NULL held every staging push for ~40 minutes. NULL_HEARTBEAT_GRACE is the
+ * one window; liveRunningSql / staleRunningSql are the one pair of predicates the busy probe, the
+ * reaper and the stale counter share, so the three can never disagree again.
  */
 'use strict';
 
@@ -32,6 +36,15 @@ const { log } = require('../utils/logger');
 
 /** Matches routes/admin/testlab.js — a live run beats every 30s. */
 const HEARTBEAT_STALE = '5 minutes';
+/** How long a row may carry a NULL heartbeat after `created_at` before it counts as dead. */
+const NULL_HEARTBEAT_GRACE = '10 minutes';
+
+/** SQL: a 'running' row that is alive — fresh heartbeat, or no beat yet inside the grace. */
+const liveRunningSql = () => `(heartbeat_at > NOW() - INTERVAL '${HEARTBEAT_STALE}'
+              OR (heartbeat_at IS NULL AND created_at > NOW() - INTERVAL '${NULL_HEARTBEAT_GRACE}'))`;
+/** SQL: a 'running' row that is dead — the exact complement of liveRunningSql. */
+const staleRunningSql = () => `(heartbeat_at < NOW() - INTERVAL '${HEARTBEAT_STALE}'
+            OR (heartbeat_at IS NULL AND created_at < NOW() - INTERVAL '${NULL_HEARTBEAT_GRACE}'))`;
 
 /**
  * Mark every 'running' row whose heartbeat has gone quiet as failed.
@@ -50,8 +63,7 @@ async function reapOrphanedExperiments(reason = 'server restarted mid-run') {
     const rows = await dbQuery(
       `UPDATE testlab_experiments SET status = 'failed', error = $1, completed_at = NOW()
         WHERE status = 'running'
-          AND (heartbeat_at < NOW() - INTERVAL '${HEARTBEAT_STALE}'
-            OR (heartbeat_at IS NULL AND created_at < NOW() - INTERVAL '2 hours'))
+          AND ${staleRunningSql()}
           AND to_regclass('public.testlab_experiments') IS NOT NULL
         RETURNING id`,
       [reason]
@@ -84,8 +96,7 @@ async function countStaleRunning() {
     const r = await dbQuery(
       `SELECT COUNT(*)::int AS n FROM testlab_experiments
         WHERE status = 'running'
-          AND (heartbeat_at < NOW() - INTERVAL '${HEARTBEAT_STALE}'
-            OR (heartbeat_at IS NULL AND created_at < NOW() - INTERVAL '2 hours'))
+          AND ${staleRunningSql()}
           AND to_regclass('public.testlab_experiments') IS NOT NULL`
     );
     return r[0]?.n || 0;
@@ -94,4 +105,4 @@ async function countStaleRunning() {
   }
 }
 
-module.exports = { reapOrphanedExperiments, countStaleRunning, HEARTBEAT_STALE };
+module.exports = { reapOrphanedExperiments, countStaleRunning, HEARTBEAT_STALE, NULL_HEARTBEAT_GRACE, liveRunningSql, staleRunningSql };

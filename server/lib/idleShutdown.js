@@ -88,8 +88,9 @@ function ensureDefaultProbes() {
     // rows with a FRESH heartbeat means a run that died with its process stops
     // blocking pushes within minutes instead of the 2h bound — which once held
     // every push, staging and production, for an hour (exp747, 2026-08-19).
-    // Rows predating the heartbeat column have NULL and keep the 2h rule, so a
-    // pre-migration run is never mistaken for dead.
+    // A NULL heartbeat gets NULL_HEARTBEAT_GRACE (10 minutes) from created_at, not 2h: a live run
+    // beats at once, and exp #1664 died before its first beat and blocked every push for ~40 min
+    // (2026-10-06). The predicate is shared with the reaper (testlabReaper.liveRunningSql).
     //
     // DEPLOY-ORDER SAFE. Migrations are applied by hand (there is no runner), so
     // this code can reach an environment whose DB lacks heartbeat_at. A throwing
@@ -105,8 +106,7 @@ function ensureDefaultProbes() {
       r = await dbQuery(
         `SELECT COUNT(*)::int AS n FROM testlab_experiments
           WHERE status = 'running'
-            AND (heartbeat_at > NOW() - INTERVAL '5 minutes'
-              OR (heartbeat_at IS NULL AND created_at > NOW() - INTERVAL '2 hours'))
+            AND ${require('./testlabReaper').liveRunningSql()}
             AND to_regclass('public.testlab_experiments') IS NOT NULL`
       );
     } catch (err) {

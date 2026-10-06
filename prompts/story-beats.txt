@@ -2,6 +2,8 @@
 
 The story below is finished. Divide it into {PAGE_COUNT} pages: plan the pictures, simple pages first, then one PLAN line per page. Plan in ENGLISH; the book will be written in {LANGUAGE} — names, places and cultural details as they will appear there. Reader: {READER_LINE}.
 
+Commissioned characters: {CHARACTER_NAMES}
+
 # THE STORY (final — it was told, challenged and re-told; divide it, never retell or repair it)
 
 {FINAL_ARC}
@@ -29,34 +31,28 @@ The arc above delivers the commission; keep its names and world as written.
 # PAGE PLAN
 
 {TYPED_TARGETS}Before dividing, plan the pictures — simple pages first:
-1. The story's emotional highlights: which moments earn a page of one character showing a strong feeling, close up?
-2. Which moments earn a page with no people in frame? Only a subject the story has been driving toward — a discovery, an arrival, a payoff: the castle found after the long search. A place with no story weight never gets its own page. At least one page in the book earns this. Choose one whose drama is a place, the weather, a vessel or an object seen from afar; never a page whose drama is between people — a parting, a confrontation, tears, a promise, a handover. Those pages get faces, and so does every picture question 5 names as most wanted.
+1. The story's emotional highlights: which moments earn a page of one character showing a strong feeling{CLOSE_UP_WORD}?
+2. Which moments earn a page with no people in frame? Only a subject the story has been driving toward — a discovery, an arrival, a payoff: the castle found after the long search. A place with no story weight never gets its own page. At least one page in the book earns this. Choose one whose drama is a place, the weather, a vessel or an object{AFAR_WORD}; never a page whose drama is between people — a parting, a confrontation, tears, a promise, a handover. Those pages get faces, and so does every picture question 5 names as most wanted.
 3. Which pages gather the whole cast, and what one simple action do they all share there? {GROUP_PAGE_BUDGET}
-4. Where are three or more characters truly unavoidable? Bypass it where the story allows; keep it only where the story demands it. Where one is kept, the plan line itself carries what the third character does that the page cannot show without them — repeating the action, naming the place, or asserting the characters are needed does not hold.
+4. Where are three or more characters truly unavoidable? Bypass it where the story allows; keep it only where the story demands it. Where one is kept, {THIRD_CHARACTER_DEF}
 5. For each act — setup, middle, ending — which picture does a child most want to see there, and which page stages it as its instant? {ACT_SPANS} The ending's own event — the reunion, the goodbye, the parting — is always one of them. A picture that falls between two pages, or that only a page's change reports as already done, is not staged.
 6. {CAST_TABLE}
 {SHOT_PLANNING}Then one line per page: {PLAN_SHOT_FIELD} — who is in frame — the instant the picture shows — what is true after this page that was not before.{PLAN_SHOT_NOTE}
 A complicated page — much action, many characters at once — is a fault: simplify the picture, never the story. A page after which nothing is true that was not before is filler: give it a change or give its material to a neighbouring page. {PAGE_CHANGE}
 
 The plan line's instant is a single drawable moment:
-- One moment — no montage, no before-and-after, no "then", no passage of time inside one picture, no sequence of actions by one character; when a beat contains a change, pick the single moment that shows it.
-- Two consecutive actions by one character give the picture one of them: plan the dominant moment and leave the other out, rather than joining both into one instant with "and then", "before turning to", or a trailing clause carrying the second action.
-- One action: one thing is being done, and everyone else watches it or does that same thing in the same place. Two characters given different actions at one instant lose one of them.
-- Two or three named characters carry a page best; {MAX_CHARACTERS_PER_SCENE} is the ceiling the image model can hold, and a named animal that acts in the story counts as one of them.{PLANNER_GROUP_STAGING} {WHOLE_CAST_DEF} Add no unnamed figures — no crew, crowd, onlookers or extra animals.
+- {ONE_ACTION_DEF}
+- A page holds at most {MAX_CHARACTERS_PER_SCENE} named characters, a named animal that acts in the story counting as one; two or three carry it best.{PLANNER_GROUP_STAGING}{WHOLE_CAST_RULE} Add no unnamed figures — no crew, crowd, onlookers or extra animals.
 - {PLAN_LINE_FIELDS}
-- One centre of action: never two vehicles, vessels or creatures each with its own state or its own crew.
 - One camera position: an instant is seen from one spot — never inside a vehicle or structure and its exterior at once.
-- At most two height levels per picture: {TWO_HEIGHTS_DEF} Where a third level appears, stage the page on the two levels its event happens on and give the other level its own page.
-- Never two characters interlocked at one instant — a shared grip on one object, an object in flight, a hand-over: pick the moment before or after it. Never a thought or realization as the instant, or a climbing or stretching pose with hidden limbs; when the event is internal or mechanical, name its visible result instead (the box open, the found object held up).
+- At most two height levels per picture: {TWO_HEIGHTS_DEF} {TWO_HEIGHTS_REMEDY}
+- {INTERLOCK_DEF} Never a thought or realization as the instant, or a climbing or stretching pose with hidden limbs; when the event is internal or mechanical, name its visible result instead (the box open, the found object held up).
 - A figure trapped, cut off or unable to reach is given no means to end it: the obstacle's distance is named against the body ("the rim of the shaft three times their height above them", "the ledge a full arm's length beyond the fingertips"), never a grip, hold or footing that would let them out.
 - Never a pointing gesture as the instant: a look toward the thing, a turned head, a step toward it, or the thing held up instead.
 - Never an exact count of like things in the instant: one, two, or several — a number above two belongs to the text.
-- The action at the moment it happens, never the state that follows it.
-- One action per page. {DEED_AND_EFFECT_DEF} When a plan line holds more than one, split them across pages.
 - Name what is in the picture, never what is absent, empty or missing from it. When the absence is the story point, name its visible consequence, or make the empty place the page's subject.
-- Never compose the frame — what fills it, how large something looks, where it sits, or where the camera stands.
+- {FRAME_RULE_LEAD} compose the frame — what fills it, how large something looks, where it sits, or where the camera stands.
 - {SIZE_LOOK_RULE} A plan line names each thing plainly; the Art Director sizes it.
-- A beat holding two forbidden actions splits across two adjacent pages — one page the contact, the next page the second action — or the picture drops the secondary action and keeps the main event.
 - The beat's main event wins the picture. A secondary figure or action is dropped before the main one is reduced to a shadow, a silhouette or a sound: the arriving creature is in frame as itself, and the reunion outranks the bystander.
 
 Requirements:
@@ -64,21 +60,20 @@ Requirements:
 - What a page establishes about a thing — stuck, heavy, hidden, out of reach — stays true until a later page changes it.
 - Consecutive pages do not stage the same place with the same grouping, and one gathering is not split across two pages. A page keeps its characters at one depth together; separate a figure into the background only when the page's own instant requires the separation, and keep such pages few.
 - Every page is visible: something happens that a picture can show. A character whose action is what a page's instant works against — a way blocked, a place kept, a thing taken or withheld, a refusal — is named in that page's plan line.
-- The main character appears on most pages; the others come and go in different combinations, not the whole group on every page. {CAST_COVERAGE}
-- A character's focal page stages them alone or with one companion — two people sharing one action carry it — and stages them doing something visible. An internal decision gets a physical correlative — a held object, a step taken, a grip tightened — or the rest of the cast small in the background; never a lone motionless figure.
+- {MAIN_FLOOR} the others come and go in different combinations, not the whole group on every page. {CAST_COVERAGE}
+- A character's focal page stages them alone or with one companion — two people sharing one action carry it — and stages them doing something visible. An internal decision gets a physical correlative — a held object, a step taken, a grip tightened; never a lone motionless figure.
 - When an AVAILABLE LANDMARKS list is present, an arc that names landmarks has chosen them — keep those, not others; an arc that names none has chosen none. A landmark may be scenery — a tower on the horizon, a bridge behind the action — and never relocates the story. No page names more than one place.
 - A page shows a character about to act, decide or know what to do only when the next page shows that same character doing it.
 - A physical challenge spends one page on the attempt itself — a character mid-effort against the obstacle. The decision before and the relief after never replace it.
 - The emotional low point — a loss, a setback, the goal looking lost — gets a page of its own; the loss and its recovery never share a page.
-- A page may put the subject alone in frame — the creature, the artifact, the place — when the story has been driving toward it: hatching, breaking, glowing, arriving, the sought place found, with the characters just outside the frame. A place the story has not sought never fills a page alone.
 - A race or deadline the story runs on is scored mid-book at least twice — a page shows who is ahead or how much remains.
-- The stake the arc has a character say aloud lands on an early page, spoken.
+- The stake the arc has a character say aloud lands on an early page, shown as a visible act, never as the words said.
 - A character's first page stages their {NAMING_DEF} A character in frame before anyone says who they are is unplaced.
 - A prop, pet or skill that solves a problem appears on an earlier page with its owner before it does the work, and nothing a page plants is left without a later page that pays it off.
+- {NO_COMMISSIONED_DEF}
 - {EXCITING_START_DEF}
 - {ENDING_EVENT_DEF}
 - {HAPPY_ENDING_DEF}
-- Stage a page with two people rather than three when two carry it.
 - No plan line states what anyone learned, realised or now understands.
 
 {REPLAN_SECTION}
@@ -89,5 +84,5 @@ Only what the format below shows. No preamble, no commentary. {OUTPUT_SCOPE}
 
 {CAST_FORMAT}
 ---PAGE PLAN---
-Page <N>: {PLAN_SHOT_FORMAT} — <who is in frame> — <the instant the picture shows> — <what is true after this page that was not before>
+Page <N>: {PLAN_SHOT_FORMAT} — <names, or the word nobody> — <the instant the picture shows> — <what is true after this page that was not before>
 {CHANGES_FORMAT}

@@ -169,7 +169,7 @@ describe('the planner no longer authors a shot', () => {
   beforeAll(async () => { await loadPromptTemplates(); });
   it('the built planner writes the placeholder and carries no distribution', () => {
     const p = String(PB.buildBeatsPrompt({ characters: [{ name: 'Ana' }, { name: 'Ben' }], language: 'en', pages: 18 }, 18, { finalArc: '1. A thing.' }));
-    expect(p).toContain(`Page <N>: ${P} — <who is in frame>`);
+    expect(p).toContain(`Page <N>: ${P} — <names, or the word nobody>`);
     expect(p).not.toMatch(/medium or wide|close-up page|over-the-shoulder/i);
     expect(p).not.toMatch(/\{[A-Z_]{3,}\}/);
   });
