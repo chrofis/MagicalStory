@@ -5413,7 +5413,9 @@
       "check": {
         "kind": "human",
         "what": "Read the stored cover briefs of the next beats story (or Lab beats_scenes on a stored story) and compare with the light of pages 1, last and the dominant outdoor time of day; confirm visualBible.era exists."
-      }
+      },
+      "status": "pending",
+      "evidence": []
     },
     {
       "id": "child-mermaid-costume-covered-tail",
@@ -5431,7 +5433,26 @@
         "kind": "human",
         "what": "Read stories.data.clothingRequirements for the costumed child, grep generationLog for avatar_category_missing, and view the back cover and two mermaid pages."
       },
-      "status": "pending"
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "content-fixes-ypl33",
+      "title": "Cover place text reaches the AD, creature rows asked and checked, anatomy-only creature tone, high/background figures placed and measured, plate fields kept on the missing-image retry",
+      "commits": [
+        "9da680089"
+      ],
+      "addedAt": "2026-10-06",
+      "claim": "On the next full story with an animal and a cover at an offered landmark: every brief citing an ANI has a creatures[] row (no creature_row_missing left after the re-ask); VB animal features carry anatomy only, no mood words and no named absence in prose; a cover FIXED label carries the vantage description and the cover shows that place; a figure high on a cliff stands on a named ledge and is small at distance; pages recovered on retry keep emptySceneImage.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Grep briefCheckReport for creature_row_missing, read visualBible animals features, read the cover FIXED blocks in sceneExpansionReport, view the covers and any cliff/high-figure page, check sceneImages[].emptySceneImage on recovered pages."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [
