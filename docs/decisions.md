@@ -67037,3 +67037,10 @@ Decision (Lab-only typed plan; production paths unchanged except item 7):
 Considered: rewording DEED (DEED2 AUC 0.53/0.45, cannot be saved); recalibrating WEIGHT on 2 positives (not possible, scored only); a second re-plan round (not built: one round reaches the floor in the probes; open in BACKLOG).
 Revisit if: the validation runs miss the bar, or WEIGHT/ACTION/WHOLE gain enough labelled faults to calibrate.
 Touched: server/lib/typedPlan.js, castCoverage.js, planCounters.js, promptBuilders.js, prompts/story-beats.txt, prompts/plan-check.txt, tests/unit/typed-plan.test.ts, planner-review-2026-10-06.test.ts, scripts/analysis/typed-plan-calibration-v2*.js, replay-typed-plan-scope.js.
+
+## 2026-10-06 - Typed plan: fix-plan validation vs the new bar (Lab 1675-1685, claude-sonnet-5-5 low effort, full typed flow)
+Context: bar = all code targets met, <= 2 counted flags per 18 pages, typed >= production on the picture targets, 3 stories x 2 runs. Cost USD 0.54 (about CHF 0.43) plus USD 0.02 calibration.
+Result: dka3jpog9 (18p) 2 of 2 runs pass (2 flags, main 12/9, no code finding); atbttop6w (18p) 1 of 2 (run 1 main 8/9, 2 flags; run 2 main 9/9, 1 flag); 50osg2osm (10p, 5 characters) 0 of 2 on the first code version (4 flags, NO_FOCAL_PAGE x2: the re-plan asked two characters onto one two-figure page, TYPE_CAST_MISMATCH, refused), after the one-add-per-page fix (511e3bdf) 0 of 2 (1-2 flags; NO_FOCAL_PAGE x1-3, one NO_FACE_PAGE). Main-character floor: met in 5 of 6 first runs (was 0 of 2 before), and 2 of 2 on 50osg2osm. Typed beats production (stored plans, same measure) on flags (1-4 vs 11-22), face and scenery pages, group budget and neighbours.
+Decision: not adopted yet; the floor and flag bars are mostly met, the coverage floor on a short five-character book is not. One re-plan round cannot place two characters that each need a focal page.
+Revisit if: a second code-only re-plan round (BACKLOG) lifts 50osg2osm to clean.
+Touched: server/lib/typedPlan.js, evals/runs/2026-10-06_typed-plan/*rv2_*, *rv3_*.
