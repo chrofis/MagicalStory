@@ -23,6 +23,9 @@ Characters: {CHARACTER_NAMES}
 
 {STORY_ARC}
 
+OWED:
+{OWED_FACTS}
+
 {ARC_HINTS}
 
 # THE PAGE PLAN (how the story was divided into pictures)
@@ -63,9 +66,9 @@ A finding is a claim from a reader who saw less than you: one read the pages col
 
 # YOUR TASK
 
-A page is rewritable when AUDIT FINDINGS names it, and otherwise not. Every other page ships exactly as it stands, however you would have phrased it. Five cases add a page to that set and no others: a MISMATCH move needs its destination page; no early page states plainly what must happen and why, which is fixed on the earliest fitting page; a page's text states the opposite of what its scene outline stages; a page carries an abbreviation or acronym, which is named the way a child says it; a page carries a banned dash. Closing a finding on a page the finding does not name is allowed only under these five, and the ledger says which one.
+A page is rewritable when AUDIT FINDINGS names it, and otherwise not. Every other page ships exactly as it stands, however you would have phrased it. Four cases add a page to that set and no others: a MISMATCH move needs its destination page; a page's text states the opposite of what its scene outline stages; a page carries an abbreviation or acronym, which is named the way a child says it; a page carries a banned dash. Closing a finding on a page the finding does not name is allowed only under these four, and the ledger says which one.
 
-The checks below are answered for the rewritable pages only, with their neighbours read as context; every other page is scanned for the five cases above and not analysed. A clean analysis section is a real answer.
+The checks below are answered for the rewritable pages only, with their neighbours read as context; every other page is scanned for the four cases above and not analysed. A clean analysis section is a real answer.
 
 Return only the pages you rewrote. Omit every page you left alone. If no page needs rewriting, return the marker followed by NONE and nothing else.
 
@@ -83,7 +86,7 @@ A STYLE finding quotes one sentence that breaks one of these rules. One you acce
 
 A fault that a character acts on a reason the page has not given is closed this way: {MOTIVE_AT_THE_ACT}.
 
-A finding that says the page dropped a fact is answered only where the fact is load-bearing (see THE STORY above); for an optional fact the ledger line reads `<id> STANDS: optional`. A load-bearing fact comes back the way a picture book carries it: as what a character does, looks at or says in their own voice, in the sentence where the thing happens, and in one added sentence at most. It never comes back as the narrator's reason (a "because" clause), as a feeling named on top of an act that already shows it, or as a character explaining the story's rules to the person in front of them; a rule of the story's magic is said once, in the line a character needs it. A fact the page's act already shows, or a later page shows, is left as it stands and the ledger says so.
+A finding that says the page dropped a fact is answered only where the fact is on the OWED list; for any other fact the ledger line reads `<id> STANDS: not owed`. An owed fact comes back the way a picture book carries it: as what a character does, looks at or says in their own voice, in the sentence where the thing happens, and in one added sentence at most. It never comes back as the narrator's reason (a "because" clause), as a feeling named on top of an act that already shows it, or as a character explaining the story's rules to the person in front of them; a rule of the story's magic is said once, in the line a character needs it. A fact the page's act already shows, or a later page shows, is left as it stands and the ledger says so.
 
 A COUNT fault is closed by the rule it names, recasting only the sentence that counts: {PICTURE_COUNT}.
 
@@ -91,7 +94,7 @@ An ENDING fault is closed by what the ending owes, never by cutting what the end
 
 A sentence longer than the reading level allows, a subordinate clause inside another subordinate clause, or a word a child at that level does not already use: recast it for that level.
 
-Judge the text as a reader who has only the pages in front of them. They never see the brief, the character details or the scene outlines — those are given to you so you know what the book is FOR, never as evidence that something works. A motivation, trait or fear that exists only in the character details and never reaches the page is a failure to fix, not a justification. Never resolve a weakness by citing the brief.
+Judge the text as a reader who has only the pages in front of them. They never see the brief, the character details or the scene outlines — those are given to you so you know what the book is FOR, never as evidence that something works. A fact that exists only there and is not on the OWED list is no fault to fix, and never a justification for a page that leaves an owed fact out. Never resolve a weakness by citing the brief.
 
 Work in two steps.
 
@@ -143,7 +146,7 @@ Mark an axis ✗ only where you can name the page and the line that fails it.
 7. **Consistency** — Any moment out of character, any trait established early and contradicted later, any ability or fear the pages break?
 8. **Voice** — Does this character sound different from the others in dialogue? Two characters whose lines could swap unnoticed is a voice failure: name both and the page.
 9. **Show vs tell** — Find one emotion written as a label ("he was proud") for this character and say what action would show it instead.
-10. **Motivation** — Is it clear from the pages alone WHY this character acts as they do on their busiest page? Motivation that exists only in the character details and never reaches a page fails.
+10. **Motivation** — Does a reader of the pages alone follow this character's act on their busiest page? A reason the act already shows needs no sentence.
 11. **Growth** (main characters only) — Do they end in a different emotional or knowledge state, and on which page does the shift become visible? A shift told rather than shown fails.
 
 ---

@@ -123,7 +123,10 @@ describe('the load-bearing rule reaches the writer, the refine and the arc-infor
     for (const f of ['story-text-from-beats.txt', 'text-refine.txt', 'story-text-audit.txt']) {
       expect(fs.readFileSync(`prompts/${f}`, 'utf8')).toContain('{LOAD_BEARING}');
     }
-    expect(LOAD_BEARING_RULE).toMatch(/optional/);
+    expect(LOAD_BEARING_RULE).toMatch(/OWED/);
+    for (const f of ['story-text-from-beats.txt', 'text-refine.txt', 'story-text-audit.txt']) {
+      expect(fs.readFileSync(`prompts/${f}`, 'utf8')).toContain('{OWED_FACTS}');
+    }
   });
 });
 
@@ -144,6 +147,34 @@ describe('built prompts carry the load-bearing rule, the cap and the oddity rule
   it.each(['writer', 'repair', 'audit'])('%s: load-bearing rule once, nothing unfilled', (name) => {
     expect(built[name].split(LOAD_BEARING_RULE).length - 1).toBe(1);
     expect(built[name]).not.toMatch(/\{(LOAD_BEARING|EDIT_CAP_PERCENT)\}/);
+  });
+  it('every text stage reads the SAME owed list, taken from the stored story logic', () => {
+    const logic = [
+      'Want and stakes: Mara wants the sail up.',
+      'Opposition: the wind.',
+      'Facts:',
+      '- Mara (commissioned) — pulls the rope; limit: afraid of the dark.',
+      '- Rule: The rope only holds while it is wet.',
+      'Motives:',
+      '- Mara: wants to sail → pulls the rope.',
+      'Central figure: none',
+      'Events: 2',
+      'Chain:',
+      '- because the wind rose, she pulled.',
+      '- but the rope was wet, so the sail held.',
+    ].join('\n');
+    const pages = [{ pageNumber: 1, text: 'Mara zog am Seil.', planLine: PLAN, sceneBrief: 'x' }];
+    const out = [
+      B.buildStoryTextFromBeatsPrompt(input, [{ pageNumber: 1, planLine: PLAN }], [], 'An arc.', { storyLogic: logic }),
+      B.buildTextRefinePrompt(input, pages, 'T1 FAULT[CAUSE]: p1 — x', 'An arc.', { storyLogic: logic }),
+      B.buildTextAuditPrompt(input, pages, 'An arc.', { storyLogic: logic }),
+    ];
+    const owed = B.buildOwedFacts(logic);
+    expect(owed).toContain('- Mara — pulls the rope; limit: afraid of the dark.');
+    expect(owed).toContain('- The rope only holds while it is wet.');
+    expect(owed).toContain('why the turn works now: but the rope was wet');
+    expect(owed).not.toContain('wants the sail up');
+    for (const prompt of out) expect(prompt).toContain(owed);
   });
   it('the repair states the cap the code enforces', () => {
     expect(built.repair).toContain(`more than ${Math.round(MODEL_DEFAULTS.textRefineMaxChangedRatio * 100)} percent`);

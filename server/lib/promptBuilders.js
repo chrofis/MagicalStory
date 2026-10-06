@@ -6246,7 +6246,7 @@ function refineCast(inputData, commissionedDetails = '') {
   };
 }
 
-function buildTextRefinePrompt(inputData, pages = [], auditFindings = '', arc = '', { arcHints = '' } = {}) {
+function buildTextRefinePrompt(inputData, pages = [], auditFindings = '', arc = '', { arcHints = '', storyLogic = '' } = {}) {
   const template = PROMPT_TEMPLATES.textRefine;
   if (!template) {
     log.error('[PROMPT] textRefine template not loaded — text refinement unavailable');
@@ -6372,6 +6372,7 @@ function buildTextRefinePrompt(inputData, pages = [], auditFindings = '', arc = 
     PAYOFF_KEEP: PAYOFF_KEEP_RULE,
     MECHANISM_FIX: MECHANISM_FIX_RULE,
     LOAD_BEARING: LOAD_BEARING_RULE,
+    OWED_FACTS: buildOwedFacts(storyLogic),
     EDIT_CAP_PERCENT: Math.round(MODEL_DEFAULTS.textRefineMaxChangedRatio * 100),
   });
 }
@@ -10098,7 +10099,25 @@ const SHOWN_CALLBACK_RULE = 'A callback shown as it happens, a character doing, 
  * 5 of 11 arc-informed findings were such optional details).
  * see docs/decisions.md 2026-10-06 "Text stages edit, they do not rewrite"
  */
-const LOAD_BEARING_RULE = 'A story fact is load-bearing when a later page depends on it or it is the cause of the story\'s main turn: an ability, limit, object, rule or spoken line that a later act uses, and the reason the turn happens. A load-bearing fact reaches the text in its specific form, on or before the page that leans on it. Every other fact the summary states (a trait, a habit, a feeling or motive the page\'s own act already shows, a background detail no later page uses) is optional: the text may leave it out. A detail the plot never uses — an age, a size, a colour, a look — is never load-bearing, and a page that leaves it out drops nothing: a size or a look is not such a fact, and reaches the text only where something is lifted, hidden, held or fitted because of it.';
+const LOAD_BEARING_RULE = 'Only the OWED list is owed prose: each fact on it reaches the text once, in its specific form, on or before the page that leans on it, as something a character does, sees or says. Everything else in the arc (motives, causes, stakes, feelings, background) is the arc\'s reasoning, and a page that leaves it out drops nothing. A size, an age or a look is owed only where something is lifted, hidden, held or fitted because of it.';
+
+/**
+ * The OWED list as the text stages read it: one dash line per owed fact, taken
+ * from the stored STORY LOGIC (parseStoryLogic().owed). ONE builder for the
+ * writer, the arc-informed audit and the refine, so all three judge against the
+ * same list. A story written before the logic-first arc has no logic: the
+ * block says so, loudly, rather than reviving the whole arc as owed.
+ * @param {string} storyLogic - the logic block body (arcReviewReport.logic)
+ * @returns {string}
+ */
+function buildOwedFacts(storyLogic) {
+  const raw = String(storyLogic || '').trim();
+  if (!raw) {
+    log.error('[PROMPT] no STORY LOGIC recorded: the OWED list is empty for this story');
+    return '(no owed list was recorded for this story)';
+  }
+  return parseStoryLogic(`STORY LOGIC:\n${raw}`).owed.map(l => `- ${l}`).join('\n');
+}
 
 /**
  * THE STYLE RULEBOOK (owner, 2026-09-23): one block for every pass that
@@ -11100,6 +11119,17 @@ function parseStoryLogic(raw) {
   const chain = dashLines(sections.Chain);
   if (!chain.length) throw new Error('STORY LOGIC has no chain links');
   const facts = dashLines(sections.Facts).filter(l => !/\((?:commissioned|new)\)/i.test(l));
+  // THE OWED LIST (owner, 2026-10-06, text-v3): what the page text must carry
+  // out of the arc. The logic's Facts block already holds exactly the facts the
+  // plot uses (one ability or limit per figure, at most two rules of the world),
+  // and the last chain link says why the solution works now and did not before:
+  // the cause of the main turn. Nothing else in the logic or the arc is owed.
+  const figureFacts = dashLines(sections.Facts)
+    .filter(l => /\((?:commissioned|new)\)/i.test(l))
+    .map(l => l.replace(/\s*\((?:commissioned|new)\)/i, '').trim());
+  const ruleFacts = facts.map(l => l.replace(/^Rules?\s*:\s*/i, '').trim());
+  const turnCause = chain.length ? chain[chain.length - 1] : '';
+  const owed = [...figureFacts, ...ruleFacts, ...(turnCause ? [`why the turn works now: ${turnCause}`] : [])];
   // "- <figure>: <motive> → <act>" (2026-09-25). A line without an arrow is
   // kept with an empty act: the reader sees it, nothing is guessed.
   const motives = dashLines(sections.Motives).map((l) => {
@@ -11119,6 +11149,7 @@ function parseStoryLogic(raw) {
     invented: figures.filter(f => f.tag === 'new').map(f => f.name),
     centralFigure: centralFigure && centralFigure.length ? centralFigure : null,
     facts,
+    owed,
     motives,
     eventsDeclared,
     chain,
@@ -11707,7 +11738,7 @@ function buildTextAuditBlindPrompt(inputData, pages = []) {
  * stale docblock claiming "back cover + DEPICTS only" sat above the lector
  * builder until 2026-09-23).
  */
-function buildTextAuditPrompt(inputData, pages = [], arc = '', { arcHints = '' } = {}) {
+function buildTextAuditPrompt(inputData, pages = [], arc = '', { arcHints = '', storyLogic = '' } = {}) {
   const template = PROMPT_TEMPLATES.storyTextAudit;
   if (!template) {
     log.error('[PROMPT] storyTextAudit template not loaded — text audit unavailable');
@@ -11774,6 +11805,7 @@ function buildTextAuditPrompt(inputData, pages = [], arc = '', { arcHints = '' }
     CLOSING_MOMENT: CLOSING_MOMENT_RULE,
     SHOWN_CALLBACK: SHOWN_CALLBACK_RULE,
     LOAD_BEARING: LOAD_BEARING_RULE,
+    OWED_FACTS: buildOwedFacts(storyLogic),
     PAGES: body,
   });
 }
@@ -12100,7 +12132,7 @@ function doNotWriteListBody({ forChecker = false } = {}) {
  *   scene briefs, post scene-review. Text is written to match the picture that
  *   will actually be drawn; see the ordering note in beatsPipeline.
  */
-function buildStoryTextFromBeatsPrompt(inputData, beats = [], expansions = [], arc = '', { arcHints = '', visualBible = null, clothingRequirements = null } = {}) {
+function buildStoryTextFromBeatsPrompt(inputData, beats = [], expansions = [], arc = '', { arcHints = '', storyLogic = '', visualBible = null, clothingRequirements = null } = {}) {
   const template = PROMPT_TEMPLATES.storyTextFromBeats;
   if (!template) {
     log.error('[PROMPT] storyTextFromBeats template not loaded — beats text writing unavailable');
@@ -12150,6 +12182,7 @@ function buildStoryTextFromBeatsPrompt(inputData, beats = [], expansions = [], a
     CLOSING_MOMENT: CLOSING_MOMENT_RULE,
     PERIL_CEILING: PERIL_CEILING_RULE,
     LOAD_BEARING: LOAD_BEARING_RULE,
+    OWED_FACTS: buildOwedFacts(storyLogic),
   });
 }
 
@@ -13194,6 +13227,7 @@ module.exports = {
   STYLE_RULEBOOK,
   MOTIVE_AT_THE_ACT_RULE,
   LOAD_BEARING_RULE,
+  buildOwedFacts,
   PICTURE_COUNT_RULE,
   PAYOFF_KEEP_RULE,
   CLOSING_MOMENT_RULE,

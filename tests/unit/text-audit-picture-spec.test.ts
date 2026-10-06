@@ -79,7 +79,7 @@ describe('Lab audit replay == production', () => {
   it('the replay call site passes the arc, its hints and the story records the spec is built from', () => {
     const fs = require('node:fs');
     const src = fs.readFileSync(new URL('../../server/lib/testlab.js', import.meta.url), 'utf8');
-    expect(src).toContain('H.buildTextAuditPrompt(storyData, pages, arc, { arcHints: resolveReplayArcHints(storyData) })');
+    expect(src).toContain('H.buildTextAuditPrompt(storyData, pages, arc, { arcHints: resolveReplayArcHints(storyData), storyLogic: resolveReplayStoryLogic(storyData) })');
     expect(src).toContain('const pages = extractRefinablePages(storyData.sceneImages || [], { visualBible: storyData.visualBible, clothingRequirements: storyData.clothingRequirements });');
   });
 });

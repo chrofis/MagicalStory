@@ -3261,7 +3261,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       log.warn('⚠️ [BEATS] Step 6 has NO scene briefs — text is being written blind to the illustrations');
       gl.warn('beats_text_without_briefs', 'Page text written without scene briefs — text and art may disagree');
     }
-    const textPrompt = buildStoryTextFromBeatsPrompt(inputData, beats, finalExpansions, approvedArc, { arcHints, visualBible, clothingRequirements });
+    const textPrompt = buildStoryTextFromBeatsPrompt(inputData, beats, finalExpansions, approvedArc, { arcHints, storyLogic: arcStoryLogic, visualBible, clothingRequirements });
     if (!textPrompt) throw new Error('story-text-from-beats template unavailable — beats pipeline cannot run');
     const beatPages = beats.map(b => b.pageNumber);
     let raw = '';

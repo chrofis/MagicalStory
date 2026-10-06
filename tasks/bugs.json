@@ -3630,6 +3630,16 @@
       "fixedAt": "2026-10-06",
       "fixedIn": "bc89efcc2",
       "fix": "The place is no longer offered; Jev picks down/up/ahead/distance (gazeTargets.js) which gazeTarget passes through and the picture prompt renders. Replay: all 7 replaced. Test: jev-light-gaze-options.test.ts."
+    },
+    {
+      "id": "book-audit-text-route-presence-critical",
+      "title": "The book audit files \"text names a character not in the picture\" as FAULT[TEXT][CRITICAL] and the post-audit round rewrites pages, deleting a payoff line",
+      "reportedAt": "2026-10-06",
+      "source": "Staging job_1791267520938_essbvehs8 (German mermaid rerun): 4 stored CRITICAL presence faults (p4, p10, p11, p13); p10/p11 lost the Fridolin payoff. Fable analysis 2026-10-06.",
+      "status": "fixed",
+      "fixedAt": "2026-10-06",
+      "fixedIn": "text-v3 commit",
+      "fix": "prompts/book-audit.txt: presence is FAULT[TEXT][MINOR] only where one quoted sentence puts the character IN the pictured instant and the picture shows it empty; a character named off-picture or acting beside the drawn figures is no fault. Prompt classification, code only routes it. Replay of the 4 stored faults recorded in decisions.md."
     }
   ]
 }

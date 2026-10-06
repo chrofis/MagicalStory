@@ -94,19 +94,24 @@ describe('stakes and open questions: one list, generator and critics', () => {
 describe('one-sentence narration paragraphs are counted in code', () => {
   const page = (pageNumber: number, text: string) => ({ pageNumber, text });
 
-  it('flags a lone narration sentence, never a spoken line, and never a one-paragraph page', () => {
+  it('flags the one-liners of a page that has two or more, never a spoken line, a one-paragraph page, or a lone opening or closing one-liner', () => {
     const pages = [
       page(1, 'Sie liefen zum Hafen. Das Boot lag still.\n\nDie Sonne ging unter.'),
       page(2, 'Er hob die Kiste. Sie war schwer.\n\n«Halt!»\n\n«Komm her!», rief sie.'),
       page(3, 'Der Wind drehte.'),
+      page(5, 'Es war Nacht.\n\nSie liefen zum Hafen. Das Boot lag still.\n\nDie Sonne ging auf.'),
       page(4, 'Er rief. Niemand kam.\n\nDer Drache stiess einen Ruf aus: «Huuum.»'),
     ];
-    expect(TR.findOneSentenceParagraphs(pages)).toEqual([{ pageNumber: 1, sentence: 'Die Sonne ging unter.' }]);
+    expect(TR.findOneSentenceParagraphs(pages)).toEqual([
+      { pageNumber: 5, sentence: 'Es war Nacht.' },
+      { pageNumber: 5, sentence: 'Die Sonne ging auf.' },
+    ]);
   });
 
   it('the hits become STYLE findings for their page, quoting the sentence', () => {
-    const raw = TR.buildOneSentenceParagraphFindings([page(9, 'Sie ruderten los. Es war weit.\n\nJetzt mussten sie rudern.')]);
-    const [f] = TR.parseFaultLines(raw, 'style-counter');
+    expect(TR.buildOneSentenceParagraphFindings([page(9, 'Sie ruderten los. Es war weit.\n\nJetzt mussten sie rudern.')])).toBe('');
+    const raw = TR.buildOneSentenceParagraphFindings([page(9, 'Es war still.\n\nSie ruderten los. Es war weit.\n\nJetzt mussten sie rudern.')]);
+    const f = TR.parseFaultLines(raw, 'style-counter').find((x: any) => x.text.includes('Jetzt mussten'));
     expect(f.category).toBe('STYLE');
     expect(f.pageNumber).toBe(9);
     expect(f.text).toContain('«Jetzt mussten sie rudern.»');
@@ -114,14 +119,14 @@ describe('one-sentence narration paragraphs are counted in code', () => {
   });
 
   it('a counter STYLE finding folds only into a blind STYLE finding on the same sentence', () => {
-    const counter = TR.buildOneSentenceParagraphFindings([page(15, 'Sie liefen. Sie lachten.\n\nDie Sonne verschwand.')]);
+    const counter = TR.buildOneSentenceParagraphFindings([page(15, 'Es wurde Abend.\n\nSie liefen. Sie lachten.\n\nDie Sonne verschwand.')]);
     const otherSentence = 'FAULT[STYLE]: p15 — «Sie liefen.» a fragment for effect';
     const sameSentence = 'FAULT[STYLE]: p15 — «Die Sonne verschwand.» a one-sentence paragraph for drama';
     const kept = TR.mergeAuditFindings([{ source: 'blind', raw: otherSentence }, { source: 'style-counter', raw: counter }]);
-    expect(kept.findings).toHaveLength(2);
+    expect(kept.findings).toHaveLength(3);
     const folded = TR.mergeAuditFindings([{ source: 'blind', raw: sameSentence }, { source: 'style-counter', raw: counter }]);
-    expect(folded.findings).toHaveLength(1);
-    expect(folded.findings[0].sources).toEqual(['blind', 'style-counter']);
+    expect(folded.findings).toHaveLength(2);
+    expect(folded.findings.find((f: any) => f.sources.length === 2).sources).toEqual(['blind', 'style-counter']);
   });
 
   it('two findings of another category on one page still fold on the tag', () => {

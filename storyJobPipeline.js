@@ -3773,6 +3773,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // The hints the writer was told to apply — the critics read the story
           // with them applied.
           arcHints: beatsResult?.arcReviewReport?.arcHints || '',
+          // The OWED list is read from the arc's STORY LOGIC (text-v3).
+          storyLogic: beatsResult?.arcReviewReport?.logic || '',
           // No `rounds`: the chain is fixed at two parallel audits → one repair
           // → one lector (owner ruling 2026-09-03). There is no loop to bound.
           usageLabel: 'text_refine',
@@ -6091,6 +6093,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               {
                 arc: beatsResult?.arcReviewReport?.finalArc || beatsResult?.beatsReviewReport?.arc || '',
                 arcHints: beatsResult?.arcReviewReport?.arcHints || '',
+                storyLogic: beatsResult?.arcReviewReport?.logic || '',
                 usageLabel: 'text_refine_post_audit',
               }
             );

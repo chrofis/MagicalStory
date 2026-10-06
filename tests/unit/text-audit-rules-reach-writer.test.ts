@@ -24,20 +24,19 @@ describe('the text audit\'s questions reach the writer', () => {
   });
 
   it('Q1 ASSUMED — a character knows only what a page gave them', () => {
-    expect(prompt).toContain('a character knows only what an earlier page or picture gave them');
+    expect(prompt).toContain('A character knows only what an earlier page or picture gave them');
   });
 
-  it('Q6 ENTRANCE — a stated cause places a character at their first appearance', () => {
-    expect(prompt).toContain('a first appearance carries the stated cause that puts them there');
-  });
-
-  it('Q3 DEVICE — a device earns its meaning where it first appears', () => {
-    expect(prompt).toContain('earns its meaning on the page it first appears');
-  });
-
-  it('Q8 LIMIT — the limit the plot leans on is stated and never broken', () => {
-    expect(prompt).toContain('a limit or deadline the plot leans on');
-    expect(prompt).toContain('no later page breaks it or lets the time pass without saying why it still holds');
+  // text-v3 (owner, 2026-10-06): the first-appearance, device, limit and
+  // deadline rules left the writer as separate rules. The writer owes the OWED
+  // list and the audit's ENTRANCE, DEVICE and LIMIT questions file only for
+  // what that list holds or a later act leans on, so both sides read one list.
+  it('Q6/Q3/Q8 ENTRANCE, DEVICE, LIMIT — the writer owes the owed list, the audit files only for it', () => {
+    expect(prompt).toContain('The owed facts reach the page once');
+    const audit = B.buildTextAuditPrompt(story(7), [{ pageNumber: 1, text: 'A page.', planLine: 'x' }], 'An arc.');
+    for (const q of ['DEVICE', 'ENTRANCE', 'LIMIT']) {
+      expect((audit.match(new RegExp('^\\d+\\. ' + q + ':[^\\n]*', 'm')) || [''])[0]).toMatch(/OWED list/);
+    }
   });
 
   // 2026-09-23 (prompt audit 05): the questions the audit gained are rules the
@@ -56,7 +55,7 @@ describe('the text audit\'s questions reach the writer', () => {
   });
 
   it('Q12 LOADBEARING is scoped to what the plot turns on, on both sides', () => {
-    expect(prompt).toContain('What the plot turns on — a cause, a uniqueness, a limitation, a spoken line a later page depends on');
+    expect(prompt).toContain(B.LOAD_BEARING_RULE);
   });
 
   it('Q9 PAYOFF — a promise is answered, a price leaves a mark', () => {
@@ -73,6 +72,7 @@ describe('the text audit\'s questions reach the writer', () => {
 
   it('Q12 LOADBEARING was already delivered', () => {
     expect(prompt).toContain('never genericized');
+    expect(prompt).toContain('OWED:');
   });
 });
 

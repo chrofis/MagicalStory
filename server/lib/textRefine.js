@@ -731,6 +731,12 @@ function buildWordBudgetFindings(pages = [], languageLevel) {
  * dialogue, which the rule does not govern; a page that is a single sentence
  * is the reading level's shape, not a set-piece.
  *
+ * ONLY A PAGE WITH TWO OR MORE (owner, 2026-10-06, text-v3): one opening or
+ * closing one-liner is a legitimate beat. On staging job_1791222889407_ypl33vk8u
+ * 17 of 42 findings were this counter's, most of them a lone one-liner, each a
+ * rewrite of a sentence that was fine. A page with a second one is the habit
+ * the rule bans, so every one on that page is filed.
+ *
  * @param {Array<{pageNumber:number,text:string}>} pages
  * @returns {Array<{pageNumber:number, sentence:string}>}
  */
@@ -743,11 +749,13 @@ function findOneSentenceParagraphs(pages = []) {
     const byParagraph = new Map();
     for (const s of sentences) byParagraph.set(s.paragraph, [...(byParagraph.get(s.paragraph) || []), s]);
     if (byParagraph.size < 2) continue;
+    const onPage = [];
     for (const list of byParagraph.values()) {
       if (list.length === 1 && !DIALOGUE_MARK_RE.test(list[0].text)) {
-        hits.push({ pageNumber: p.pageNumber, sentence: list[0].text });
+        onPage.push({ pageNumber: p.pageNumber, sentence: list[0].text });
       }
     }
+    if (onPage.length >= 2) hits.push(...onPage);
   }
   return hits;
 }
@@ -1220,7 +1228,7 @@ const POST_AUDIT_SCOPE_NOTE = [
  * @param {Array<{pageNumber:number,text:string}>} pages  the FINAL pages (extractRefinablePages)
  * @param {Array<{page:number|null,severity:string|null,line:string}>} textFaults
  *        the audit's TEXT route, verbatim (bookAudit.parseRoutes)
- * @param {Object} [opts] {model, arc, arcHints, usageLabel}
+ * @param {Object} [opts] {model, arc, arcHints, storyLogic, usageLabel}
  * @returns {Promise<{pages:Array, entry:Object}|null>} null when there is nothing to do
  */
 async function runPostAuditTextRound(storyData, pages, textFaults = [], opts = {}) {
@@ -1266,7 +1274,7 @@ async function runPostAuditTextRound(storyData, pages, textFaults = [], opts = {
   // Numbered: the refine's ledger cites these ids, and a finding it declines
   // (`STANDS:`) is recorded open (parseDeclinedFindings).
   const findingsText = `${POST_AUDIT_SCOPE_NOTE}\n\n${numberedFindingsText(findings)}`;
-  const prompt = buildTextRefinePrompt(storyData, pages, findingsText, String(opts.arc || '').trim(), { arcHints: opts.arcHints });
+  const prompt = buildTextRefinePrompt(storyData, pages, findingsText, String(opts.arc || '').trim(), { arcHints: opts.arcHints, storyLogic: opts.storyLogic });
   if (!prompt) {
     log.error('❌ [TEXT-POST-AUDIT] text-refine template unavailable — the TEXT route goes unanswered');
     return fail('text-refine template unavailable');
@@ -1434,6 +1442,9 @@ async function refineStoryText(storyData, pages, opts = {}) {
   // The arc's hints — amendments the writer applied. The arc-informed audit and
   // the repair read the story with them applied (buildCriticArcHintsSection).
   const arcHints = String(opts.arcHints || '').trim();
+  // The OWED list's source (text-v3, 2026-10-06): the arc's STORY LOGIC, read by
+  // the audit and the repair the way the writer read it.
+  const storyLogic = String(opts.storyLogic || '').trim();
 
   const original = pages.map(p => ({ ...p }));
   let current = pages.map(p => ({ ...p }));
@@ -1644,7 +1655,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
   audits = Array.isArray(opts.audits)
     ? opts.audits.map(a => ({ ...a, replayed: true }))
     : await Promise.all([
-      withDeadline(runAudit('arc-informed', auditModel, buildTextAuditPrompt(storyData, current, arc, { arcHints }), 'text_audit'), 'arc-informed'),
+      withDeadline(runAudit('arc-informed', auditModel, buildTextAuditPrompt(storyData, current, arc, { arcHints, storyLogic }), 'text_audit'), 'arc-informed'),
       withDeadline(runAudit('blind', blindAuditModel, buildTextAuditBlindPrompt(storyData, current), 'text_audit_blind'), 'blind'),
       withDeadline(runJev(), 'jev'),
     ]);
@@ -1691,7 +1702,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
     // Numbered (T1, T2 …): the ledger cites the ids, and a finding the pass
     // declines (`STANDS:`) is recorded open (parseDeclinedFindings).
     const findingsText = numberedFindingsText(findings);
-    let prompt = buildTextRefinePrompt(storyData, base, findingsText, arc, { arcHints });
+    let prompt = buildTextRefinePrompt(storyData, base, findingsText, arc, { arcHints, storyLogic });
     if (!prompt) throw new Error('text-refine template unavailable');
     if (opts.promptOverride) prompt = opts.promptOverride;
     const t0 = Date.now();
@@ -1741,7 +1752,7 @@ ${notice}
 ${numberedFindingsText(subset)}`
           : buildTextRefinePrompt(storyData, base, `${notice}
 
-${numberedFindingsText(subset)}`, arc, { arcHints });
+${numberedFindingsText(subset)}`, arc, { arcHints, storyLogic });
         const t1 = Date.now();
         const r2 = await callTextModelStreaming(askPrompt, null, null, repairModel, { usageLabel: `${usageLabel}_${kind}_cap_reask` });
         if (r2.truncation?.suspected) throw new Error(`reply ${describeTruncation(r2.truncation)} — rewrites unusable`);

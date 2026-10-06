@@ -69,13 +69,13 @@ describe('the style rulebook reaches every prose-writing pass', () => {
     // analysis step): the writer named the refusal and placed a glimpse at it.
     const step1 = built.writer.split(/\r?\n/).find(l => l.startsWith('Step 1')) || '';
     expect(step1).toMatch(/refusal, demand, flight or lie whose reason the story gives only later/);
-    expect(step1).toMatch(/each size or look a page states and what in the plot turns on it/);
+    expect(step1).toMatch(/any owed fact that has not yet found its page/);
   });
 
   it("the writer's and the repair's specific-form rule excludes sizes and looks", () => {
     for (const pass of ['writer', 'repair']) {
       const sentence = built[pass].split('\n').find(l => l.includes('in its specific form')) || '';
-      expect(sentence).toMatch(/a size or a look is not such a fact/);
+      expect(sentence).toMatch(/A size, an age or a look is owed only where something is lifted, hidden, held or fitted/);
     }
   });
 });
@@ -104,7 +104,8 @@ describe('the arc-informed audit carries the ending check and the widened INFERR
   });
 
   it('LOADBEARING never counts an unused size or look as a dropped fact', () => {
-    expect(question('LOADBEARING')).toMatch(/a size, a colour, a look\W+is never load-bearing, and a page that leaves it out drops nothing/);
+    expect(question("LOADBEARING")).toMatch(/A size, an age or a look is owed only where something is lifted/);
+    expect(question("LOADBEARING")).toMatch(/File nothing for anything the OWED list does not hold/);
   });
 });
 

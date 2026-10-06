@@ -4016,7 +4016,7 @@ async function runAuditReplayStage(target, { params = {}, promptOverride = null 
     }
     prompt = blind
       ? H.buildTextAuditBlindPrompt(storyData, pages)
-      : H.buildTextAuditPrompt(storyData, pages, arc, { arcHints: resolveReplayArcHints(storyData) });
+      : H.buildTextAuditPrompt(storyData, pages, arc, { arcHints: resolveReplayArcHints(storyData), storyLogic: resolveReplayStoryLogic(storyData) });
   }
   if (!prompt) throw new Error(`${templateKey} template unavailable`);
 
@@ -4642,6 +4642,7 @@ async function runTextRefineStage(target, { params = {}, promptOverride = null }
     audits,
     arc: storyData.arcReviewReport?.finalArc || storyData.beatsReviewReport?.arc || '',
     arcHints: resolveReplayArcHints(storyData),
+    storyLogic: resolveReplayStoryLogic(storyData),
     model: params.model,
     auditModel: params.auditModel,
     blindAuditModel: params.blindAuditModel,
@@ -7935,7 +7936,7 @@ async function runStoryTextReplayStage(target, { params = {}, promptOverride = n
     const pages = (basePages.length ? basePages : prior.map(p => ({ pageNumber: p.pageNumber, text: p.text, sceneIntent: '', sceneBrief: '' })))
       .map(p => ({ ...p, text: priorBy.get(p.pageNumber) || p.text }));
     const t = Date.now();
-    const rr = await refineStoryText(storyData, pages, { rounds: 1, model, usageLabel: 'testlab_text_branch', arc: storyData.arcReviewReport?.finalArc || storyData.beatsReviewReport?.arc || '', arcHints: resolveReplayArcHints(storyData) });
+    const rr = await refineStoryText(storyData, pages, { rounds: 1, model, usageLabel: 'testlab_text_branch', arc: storyData.arcReviewReport?.finalArc || storyData.beatsReviewReport?.arc || '', storyLogic: resolveReplayStoryLogic(storyData), arcHints: resolveReplayArcHints(storyData) });
     const genMs = Date.now() - t;
     const genCost = (rr.rounds || []).reduce((s, r) => s + (r.cost || 0), 0);
     const storyText = rr.pages.map(p => `--- Page ${p.pageNumber} ---\n${p.text}`).join('\n\n');
@@ -7973,7 +7974,7 @@ async function runStoryTextReplayStage(target, { params = {}, promptOverride = n
   let prompt;
   try {
     prompt = buildStoryTextFromBeatsPrompt(
-      storyData, textArgs.beats, textArgs.expansions, textArgs.arc, { arcHints: textArgs.arcHints, visualBible: storyData.visualBible, clothingRequirements: storyData.clothingRequirements });
+      storyData, textArgs.beats, textArgs.expansions, textArgs.arc, { arcHints: textArgs.arcHints, storyLogic: textArgs.storyLogic, visualBible: storyData.visualBible, clothingRequirements: storyData.clothingRequirements });
   } finally { PROMPT_TEMPLATES.storyTextFromBeats = orig; }
   if (!prompt) throw new Error('story-text-from-beats template unavailable');
 
@@ -8137,7 +8138,7 @@ async function runWriterCompareStage(target, { params = {} }) {
           // Production: buildStoryTextFromBeatsPrompt(inputData, beats, finalExpansions,
           // approvedArc, { arcHints }) — beatsPipeline.js:2327.
           const r = await call(SH.buildStoryTextFromBeatsPrompt(
-            storyData, beats, textArgs.expansions, textArgs.arc, { arcHints: textArgs.arcHints, visualBible: storyData.visualBible, clothingRequirements: storyData.clothingRequirements }), model, 'text');
+            storyData, beats, textArgs.expansions, textArgs.arc, { arcHints: textArgs.arcHints, storyLogic: textArgs.storyLogic, visualBible: storyData.visualBible, clothingRequirements: storyData.clothingRequirements }), model, 'text');
           // Same parse production uses (beatsPipeline.js:3126). Without TITLE
           // named as a trailing marker the last page swallows the whole
           // ---TITLE--- block, and every arm was scored on a final page
