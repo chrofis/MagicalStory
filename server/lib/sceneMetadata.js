@@ -1373,12 +1373,19 @@ function collectSceneCharacterNames(sceneMetadata, extraNames = []) {
  * entry that is not id-shaped is matched by name, so a brief that writes the
  * animal's name instead of its id resolves too.
  *
- * @param {Object|null} sceneMetadata - extractSceneMetadata() result
+ * @param {Object|null} sceneMetadata - extractSceneMetadata() result (`objects[]` and `creatures[]`)
  * @param {Object|null} visualBible - story.data.visualBible
  * @returns {string[]} Visual Bible names, deduplicated, first spelling wins
  */
 function collectSceneObjectFigureNames(sceneMetadata, visualBible) {
-  const objects = Array.isArray(sceneMetadata?.objects) ? sceneMetadata.objects : [];
+  // A creature the brief DRAWS is declared by a `creatures[]` row (CREATURE_FIELD_RULE) even
+  // when `objects[]` does not cite it: staging job_1791267520938_essbvehs8 p13 staged the
+  // turtle in `creatures[]` while `objects[]` held the lantern and the place only, and the
+  // judge called it an `extra_character` CRITICAL. The row is the brief declaring the
+  // figure; the roster reads it like an `objects[]` id.
+  const creatureIds = (Array.isArray(sceneMetadata?.creatures) ? sceneMetadata.creatures : [])
+    .map(r => r && r.id).filter(Boolean);
+  const objects = [...(Array.isArray(sceneMetadata?.objects) ? sceneMetadata.objects : []), ...creatureIds];
   if (objects.length === 0) return [];
   const vb = visualBible || {};
   const asList = (v) => (Array.isArray(v) ? v : Object.values(v || {}));

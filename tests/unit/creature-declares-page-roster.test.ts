@@ -141,3 +141,23 @@ describe('the evaluator roster carries the creature', () => {
     expect(r.nonHumanNames).toEqual([]);
   });
 });
+
+describe('a creature the brief declares in creatures[] is on the roster without an objects[] id', () => {
+  // essbv p13: objects [LOC006.1, ART002], creatures [ANI001] -> extra_character CRITICAL on the turtle.
+  const block = (meta: any) => buildExpectedCastBlock({
+    sceneCharacters: ['Levin', 'Julian'],
+    sceneMetadata: meta,
+    originalPrompt: '',
+    visualBible: VB,
+    evaluationType: 'scene',
+    storyData: { characters: [{ name: 'Levin' }, { name: 'Julian' }], visualBible: VB },
+  });
+  it('lists it', () => {
+    const r = block({ characters: ['Levin', 'Julian'], objects: ['LOC003'], creatures: [{ id: NIA.id, depth: 'foreground' }] });
+    expect(r.names).toContain(NIA.name);
+  });
+  it('lists nothing extra when creatures[] is empty', () => {
+    const r = block({ characters: ['Levin', 'Julian'], objects: ['LOC003'], creatures: [] });
+    expect(r.names).not.toContain(NIA.name);
+  });
+});
