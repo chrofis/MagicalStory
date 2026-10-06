@@ -1639,11 +1639,16 @@ function parseTypedLine(planLine) {
  *
  * @returns {{nobody:boolean, names:string[], rejected:Array<{entry:string, why:string}>}}
  */
-function parseTypedWho(whoRaw, commissionedNames = []) {
+function parseTypedWho(whoRaw, commissionedNames = [], arcNames = []) {
   const raw = String(whoRaw || '').trim().replace(/[.;]+$/, '');
-  if (!raw || WHO_NOBODY.test(raw)) return { nobody: true, names: [], rejected: [] };
+  if (!raw || WHO_NOBODY.test(raw)) return { nobody: true, names: [], rejected: [], classes: {} };
   const names = [];
   const rejected = [];
+  const classes = {};
+  const sameName = (c, lc) => {
+    const cl = String(c).toLowerCase();
+    return cl === lc || cl.split(/\s+/)[0] === lc || lc.split(/\s+/)[0] === cl;
+  };
   for (const piece of raw.split(WHO_SPLIT)) {
     const entry = piece.trim();
     if (!entry) continue;
@@ -1652,14 +1657,23 @@ function parseTypedWho(whoRaw, commissionedNames = []) {
     if (PERSON_WORDS.test(entry) || WHO_COLLECTIVE.test(entry)) { rejected.push({ entry, why: 'a count or a group word, not a name' }); continue; }
     if (entry.split(/\s+/).length > 3 || /[()]/.test(entry)) { rejected.push({ entry, why: 'more than a name' }); continue; }
     const lc = entry.toLowerCase();
-    const known = commissionedNames.find(c => {
-      const cl = String(c).toLowerCase();
-      return cl === lc || cl.split(/\s+/)[0] === lc || lc.split(/\s+/)[0] === cl;
-    });
-    const name = known || entry;
-    if (!names.includes(name)) names.push(name);
+    const known = commissionedNames.find(c => sameName(c, lc));
+    const arc = known ? null : arcNames.find(c => sameName(c, lc));
+    const name = known || arc || entry;
+    if (!names.includes(name)) { names.push(name); classes[name] = known ? 'commissioned' : arc ? 'arc' : 'invented'; }
   }
-  return { nobody: false, names, rejected };
+  return { nobody: false, names, rejected, classes };
+}
+
+/**
+ * Who-class of a name in frame: the commission's own character ('commissioned'),
+ * a figure the arc's STORY LOGIC tagged (new) ('arc'), or any other named figure
+ * ('invented': the planner made it up). One reading for every arm.
+ */
+function whoClassOf(name, commissionedNames = [], arcNames = []) {
+  const lc = String(name).toLowerCase();
+  const eq = list => list.some(c => String(c).toLowerCase() === lc);
+  return eq(commissionedNames) ? 'commissioned' : eq(arcNames) ? 'arc' : 'invented';
 }
 
 /**
@@ -1688,7 +1702,7 @@ const isScenery = t => t === 'landscape' || t === 'object' || t === 'scenery';
  * @param {number} args.maxCharactersPerScene
  * @returns {{findings:Array, lines:string[], stats:Object}}
  */
-function countPlanTargets({ rows, listedNames = [], commissionedNames = null, mainName = null, maxCharactersPerScene = 3 } = {}) {
+function countPlanTargets({ rows, listedNames = [], commissionedNames = null, arcNames = [], mainName = null, maxCharactersPerScene = 3 } = {}) {
   const findings = [];
   const add = (code, pages, detail) => findings.push({ code, pages, detail });
   const P = rows.length;
@@ -1703,13 +1717,22 @@ function countPlanTargets({ rows, listedNames = [], commissionedNames = null, ma
     typeCounts[r.type] = (typeCounts[r.type] || 0) + 1;
     if (r.shot) shotCounts[r.shot] = (shotCounts[r.shot] || 0) + 1;
   }
-  const facePages = rows.filter(r => r.type === 'face').map(r => r.pageNumber);
+  const classOf = n => whoClassOf(n, commissioned, arcNames.map(a => String(a).toLowerCase()));
+  // A face page shows a COMMISSIONED child (owner 2026-10-06 D2): a dragon's face is a face, but not the book's.
+  const facePagesAll = rows.filter(r => r.type === 'face').map(r => r.pageNumber);
+  const facePages = rows.filter(r => r.type === 'face' && r.names.some(n => classOf(n) === 'commissioned')).map(r => r.pageNumber);
   const sceneryPages = rows.filter(r => isScenery(r.type)).map(r => r.pageNumber);
   const closeUpMulti = rows.filter(r => r.shot === 'close-up' && r.names.length > 1).map(r => r.pageNumber);
   const groupPages = rows.filter(r => r.names.length > GROUP_STAGING_MAX).map(r => r.pageNumber);
-  const noCommissioned = rows.filter(r => !r.names.some(n => commissioned.includes(lcOf(n)))).map(r => r.pageNumber);
+  // Peopled pages only (a scenery page has no one to be commissioned), and an arc
+  // figure may carry a page without a commissioned child (owner 2026-10-06): only a
+  // page whose figures are all planner-invented counts against the target.
+  const peopled = rows.filter(r => r.names.length > 0);
+  const noCommissioned = peopled.filter(r => !r.names.some(n => classOf(n) !== 'invented')).map(r => r.pageNumber);
+  const inventedPages = peopled.filter(r => r.names.some(n => classOf(n) === 'invented'));
 
-  if (facePages.length < targets.faceMin) add('TYPED_NO_FACE_PAGE', [], `${facePages.length} face page(s), target ${targets.faceMin}`);
+  if (facePages.length < targets.faceMin) add('TYPED_NO_FACE_PAGE', [], `${facePages.length} face page(s) of a listed character, target ${targets.faceMin}${facePagesAll.length ? ` (${facePagesAll.length} face page(s) show someone else)` : ''}`);
+  if (inventedPages.length) add('TYPED_INVENTED_FIGURE', inventedPages.map(r => r.pageNumber), `the who column names ${[...new Set(inventedPages.flatMap(r => r.names.filter(n => classOf(n) === 'invented')))].join(', ')}: neither a listed character nor a figure of the story logic`);
   if (sceneryPages.length < targets.sceneryMin) add('TYPED_NO_SCENERY_PAGE', [], `${sceneryPages.length} landscape or object page(s), target ${targets.sceneryMin}`);
 
   const neighbourType = [];
@@ -1741,7 +1764,7 @@ function countPlanTargets({ rows, listedNames = [], commissionedNames = null, ma
     if (pages.length < targets.mainMin) add('MAIN_UNDER_HALF', pages, `${mainName} is in frame on ${pages.length} of ${P} page(s), target ${targets.mainMin}`);
   }
   if (groupPages.length > targets.groupMax) add('GROUP_PAGES_OVER_BUDGET', groupPages, `${groupPages.length} page(s) hold more than ${GROUP_STAGING_MAX} characters, budget ${targets.groupMax}`);
-  if (noCommissioned.length > targets.noCommissionedMax) add('TYPED_NO_COMMISSIONED_OVER', noCommissioned, `${noCommissioned.length} page(s) have no commissioned character in frame, target at most ${targets.noCommissionedMax}`);
+  if (noCommissioned.length > targets.noCommissionedMax) add('TYPED_NO_COMMISSIONED_OVER', noCommissioned, `${noCommissioned.length} page(s) show only invented figures, no listed character, target at most ${targets.noCommissionedMax}`);
 
   const lines = findings.map(f => `PLAN[${f.code}]${f.pages && f.pages.length ? ` page ${f.pages.join(', ')}` : ''}: ${f.detail}`);
   return {
@@ -1750,8 +1773,9 @@ function countPlanTargets({ rows, listedNames = [], commissionedNames = null, ma
     stats: {
       pageCount: P,
       targets: { faceMin: targets.faceMin, sceneryMin: targets.sceneryMin, noCommissionedMax: targets.noCommissionedMax, appearancesMin: targets.appearancesMin, focalEach: targets.focalEach, mainMin: targets.mainMin, groupMax: targets.groupMax },
-      typeCounts, shotCounts, facePages, sceneryPages, closeUpOnMultiFigurePages: closeUpMulti,
-      groupPages, groupBudget: targets.groupMax, noCommissionedPages: noCommissioned,
+      typeCounts, shotCounts, facePages, facePagesAll, sceneryPages, closeUpOnMultiFigurePages: closeUpMulti,
+      groupPages, groupBudget: targets.groupMax, noCommissionedPages: noCommissioned, inventedPages: inventedPages.map(r => r.pageNumber),
+      whoClasses: Object.fromEntries(rows.map(r => [r.pageNumber, Object.fromEntries(r.names.map(n => [n, classOf(n)]))])),
       neighbourSameTypeCast: neighbourType, neighbourSameShotCount: neighbourShot,
       coveragePages: coverage, focalPages: focal, mainCharacter: main,
       sceneryMixed: rows.some(r => r.type === 'landscape') && rows.some(r => r.type === 'object'),
@@ -1773,13 +1797,13 @@ function countPlanTargets({ rows, listedNames = [], commissionedNames = null, ma
  * @param {string|null} [args.mainName]
  * @param {number} [args.maxCharactersPerScene]
  */
-function typedPlanCounters({ pages = [], listedNames = [], commissionedNames = null, mainName = null, maxCharactersPerScene = 3 } = {}) {
+function typedPlanCounters({ pages = [], listedNames = [], commissionedNames = null, arcNames = [], mainName = null, maxCharactersPerScene = 3 } = {}) {
   const pre = [];
   const addPre = (code, pageList, detail) => pre.push({ code, pages: pageList, detail });
   const known = commissionedNames || listedNames;
   const rows = pages.map((p) => {
     const t = parseTypedLine(p.planLine);
-    const who = parseTypedWho(t.who, known);
+    const who = parseTypedWho(t.who, known, arcNames);
     const n = Number(p.pageNumber);
     if (!t.complete) addPre('PLAN_LINE_INCOMPLETE', [n], 'the typed plan line has fewer than four fields (type — who — moment — after)');
     if (!t.type) addPre('TYPED_TYPE_UNKNOWN', [n], `the first field "${t.typeWord.slice(0, 40)}" is not one of ${PLAN_TYPE_IDS.join(', ')}`);
@@ -1793,7 +1817,7 @@ function typedPlanCounters({ pages = [], listedNames = [], commissionedNames = n
     }
     return { pageNumber: n, type: t.type || 'unknown', names: who.names, shot: null, moment: t.moment, after: t.after, planLine: p.planLine };
   });
-  const counted = countPlanTargets({ rows, listedNames, commissionedNames, mainName, maxCharactersPerScene });
+  const counted = countPlanTargets({ rows, listedNames, commissionedNames, arcNames, mainName, maxCharactersPerScene });
   const findings = [...pre, ...counted.findings];
   return {
     findings,
@@ -1809,6 +1833,7 @@ module.exports = {
   countPlanTargets,
   parseTypedLine,
   parseTypedWho,
+  whoClassOf,
   deriveRowType,
   collectPlaceNames,
   collectCalendarNames,

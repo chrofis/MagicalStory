@@ -49,7 +49,7 @@ Answer only these {CHECK_COUNT}:
 
 9. Deed and effect. Name every page whose instant shows an action and the result of that action together. {DEED_AND_EFFECT_DEF} The instant shows one, and what follows it belongs in what is true after. {PAGE_CHANGE} Name every page whose what-is-true-after states no change its instant does not already show. Name a page once here, under the half that fits it.
 
-10. Two heights. Name every page whose instant puts {TWO_HEIGHTS_DEF} Such a page is staged from the level its event happens on, with the other character out of frame, or split into a page per level.
+10. Heights. Name every page whose instant puts {TWO_HEIGHTS_DEF} Such a page is staged on the two levels its event happens on, and the other level gets its own page.
 
 11. Obstacles. Name every page whose instant works against what a character is doing — a way blocked, a place kept, a thing taken or withheld, a refusal. For each, give that page an OBSTACLES line naming that character, and say whether the page's plan line names them. A page whose obstacle is held by a character the plan line does not name is a finding.
 

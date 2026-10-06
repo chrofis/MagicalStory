@@ -41,8 +41,13 @@ function stubJev(noul: (q: string, state: string) => number = () => 0.9) {
 
 describe('the who column of a typed line', () => {
   it('reads names, canonicalises a first name, and reads nobody', () => {
-    expect(PC.parseTypedWho('Ana, Ben and Cy', ['Ana Meier', 'Ben', 'Cy'])).toEqual({ nobody: false, names: ['Ana Meier', 'Ben', 'Cy'], rejected: [] });
-    expect(PC.parseTypedWho('nobody', LISTED)).toEqual({ nobody: true, names: [], rejected: [] });
+    expect(PC.parseTypedWho('Ana, Ben and Cy', ['Ana Meier', 'Ben', 'Cy'])).toMatchObject({ nobody: false, names: ['Ana Meier', 'Ben', 'Cy'], rejected: [] });
+    expect(PC.parseTypedWho('nobody', LISTED)).toMatchObject({ nobody: true, names: [], rejected: [] });
+  });
+  it('classes each name: commissioned, arc figure, or planner-invented', () => {
+    const r = PC.parseTypedWho('Ana, Rufus, Stranger', LISTED, ['Rufus']);
+    expect(r.classes).toEqual({ Ana: 'commissioned', Rufus: 'arc', Stranger: 'invented' });
+    expect(PC.whoClassOf('rufus', LISTED, ['Rufus'])).toBe('arc');
   });
   it('rejects a collective, a count and a description loudly, and counts the names that did parse', () => {
     const r = PC.parseTypedWho('the four boys, Ana', LISTED);
@@ -105,7 +110,8 @@ describe('every book target is counted, from the object the planner is told', ()
     const r2 = count(lines);
     expect(codes(r2)).toContain('CONSECUTIVE_SAME_TYPE_CAST');
     expect(codes(r2)).toContain('GROUP_PAGES_OVER_BUDGET');
-    expect(codes(r2)).toContain('TYPED_NO_COMMISSIONED_OVER');
+    // people-free pages are not "no commissioned" pages (the counter bug of Lab #1662: 6 pages, 5 of them arc figures or scenery)
+    expect(codes(r2)).not.toContain('TYPED_NO_COMMISSIONED_OVER');
     const none = [line('landscape', 'nobody'), line('medium', 'Ben, Cy'), line('face', 'Dora'), line('medium', 'Ben, Cy'), line('medium', 'Dora, Cy'), line('medium', 'Ben, Dora'), line('medium', 'Cy, Ben'), line('medium', 'Dora')];
     expect(codes(count(none))).toContain('MAIN_UNDER_HALF');
   });
@@ -116,6 +122,27 @@ describe('every book target is counted, from the object the planner is told', ()
       line('group', 'Ana, Ben, Cy, Dora'), line('medium', 'Ana, Ben'), line('medium', 'Cy, Ana'), line('medium', 'Ben, Dora'),
     ];
     expect(count(clean).lines).toEqual([]);
+  });
+  it('a face page must show a listed child: a face of an arc figure does not count', () => {
+    const lines = [line('face', 'Rufus'), line('landscape', 'nobody'), line('medium', 'Ana, Ben')];
+    expect(codes(count(lines, { arcNames: ['Rufus'] }))).toContain('TYPED_NO_FACE_PAGE');
+    const ok = [line('face', 'Rufus'), line('face', 'Ana'), line('landscape', 'nobody')];
+    expect(codes(count(ok, { arcNames: ['Rufus'] }))).not.toContain('TYPED_NO_FACE_PAGE');
+  });
+  it('the planner is told what listed means and that the who column names nobody else', () => {
+    const rule = CC.typedTargetsRule(CC.typedPlanTargets({ pageCount: 12, listed: LISTED, maxCharactersPerScene: 6 }), { mainName: 'Ana' });
+    expect(rule).toContain('a face page shows a listed character');
+    expect(rule).toContain('A listed character is one of the characters given above');
+    expect(rule).toContain('a figure you invent is a fault');
+  });
+  it('one who reader for every arm: an untyped plan is read through parseTypedWho, luna only cross-checks', () => {
+    const pages = pagesOf(['wide — Ana, Ben — they run — x', 'medium — the egg — it rolls — x', 'close-up — Ana — she smiles — x']);
+    const present = new Map([[1, ['Ana', 'Ben']], [2, []], [3, ['Ana', 'little dragon']]]);
+    const rows = TP.rowsOfUntypedPlan(pages, present, { commissionedNames: LISTED, arcNames: [] });
+    expect(rows.map((r: any) => r.names)).toEqual([['Ana', 'Ben'], [], ['Ana']]);
+    expect(rows[1].unreadable).toEqual(['the egg']);
+    expect(rows.map((r: any) => r.type)).toEqual(['medium', 'scenery', 'face']);
+    expect(TP.crossCheckRows(rows).map((x: any) => x.page)).toEqual([2, 3]);
   });
   it('the same counter measures a plan that carries no type (stored / today): type derived, shot read', () => {
     const rows = [
@@ -157,15 +184,17 @@ describe('the planner prompt', () => {
   });
 });
 
-describe('Jev: one question per call', () => {
+describe('Jev: one paired question per call', () => {
   const lines = [
     line('landscape', 'nobody'), line('face', 'Ana'), line('medium', 'Ana, Ben'), line('medium', 'Ana, Ben, Cy'), line('group', 'Ana, Ben, Cy, Dora'),
   ];
   const pages = pagesOf(lines);
   const rows = count(lines).rows;
-  it('asks exactly one question in every call and applies each question where it belongs', async () => {
+  const CAL = Object.fromEntries(Object.keys(TP.PLAN_QUESTIONS).map(id => [id, { at: 0.5, noise: 0.1, calibrated: true }]));
+  const isVirtue = (q: string) => Object.values<any>(TP.PLAN_QUESTIONS).some(x => x.virtue === q);
+  it('asks exactly one question in every call (virtue and fault apart) and applies each question where it belongs', async () => {
     const { impl, calls } = stubJev();
-    const r = await TP.judgePlanPages({ arc: 'The arc.', pages, rows, listed: LISTED }, { callImpl: impl, retryDelayMs: 1 });
+    const r = await TP.judgePlanPages({ arc: 'The arc.', pages, rows, listed: LISTED }, { callImpl: impl, retryDelayMs: 1, calibration: CAL });
     for (const c of calls) expect(Object.keys(c.questions)).toHaveLength(1);
     const asked = (id: string) => Object.keys(r.pages).filter(n => id in r.pages[n].scores).map(Number);
     expect(asked('SIMPLE')).toEqual([1, 2, 3, 4, 5]);
@@ -173,28 +202,44 @@ describe('Jev: one question per call', () => {
     expect(asked('THIRD')).toEqual([4]);         // exactly three figures
     expect(asked('WEIGHT')).toEqual([1]);        // people-free pages
     expect(asked('HEIGHTS')).toEqual([3, 4, 5]); // two or more figures
-    expect(asked('WHOLE_SHARED')).toEqual([5]);  // every listed character in frame
+    expect(asked('WHOLE')).toEqual([5]);         // every listed character in frame
     expect(asked('ACTION')).toEqual([2, 3, 4, 5]);
+    // two calls per (page, question): the virtue and its inverse
+    expect(calls).toHaveLength(2 * Object.values(r.pages).reduce((n: number, p: any) => n + Object.keys(p.scores).length, 0));
   });
   it('the question never sees field 0 (type or shot)', async () => {
     const { impl, calls } = stubJev();
-    await TP.judgePlanPages({ arc: 'The arc.', pages: pagesOf([line('face', 'Ana', 'she laughs', 'it is funny'), line('medium', 'Ben', 'he waves', 'x')]), rows: count([line('face', 'Ana', 'she laughs', 'it is funny'), line('medium', 'Ben', 'he waves', 'x')]).rows, listed: LISTED }, { callImpl: impl, retryDelayMs: 1 });
-    const simple = calls.find(c => c.questions.Q.instructions.startsWith('The moment of this plan line is simple'));
+    const ls = [line('face', 'Ana', 'she laughs', 'it is funny'), line('medium', 'Ben', 'he waves', 'x')];
+    await TP.judgePlanPages({ arc: 'The arc.', pages: pagesOf(ls), rows: count(ls).rows, listed: LISTED }, { callImpl: impl, retryDelayMs: 1, calibration: CAL });
+    const simple = calls.find(c => c.questions.Q.instructions === TP.PLAN_QUESTIONS.SIMPLE.virtue);
     expect(simple.state).toContain('Ana — she laughs — it is funny');
     expect(simple.state).not.toMatch(/\bface —/);
   });
-  it('flags by side of the threshold: a virtue below it, a fault at or above it', async () => {
-    const { impl } = stubJev(q => (q.startsWith('The moment of this plan line is simple') ? 0.3 : q.startsWith('The moment shows an action and the result') ? 0.8 : 0.9));
-    const r = await TP.judgePlanPages({ arc: 'The arc.', pages, rows, listed: LISTED }, { callImpl: impl, retryDelayMs: 1 });
-    expect(r.flagged.SIMPLE).toEqual([1, 2, 3, 4, 5]);
-    expect(r.flagged.DEED).toEqual([1, 2, 3, 4, 5]);
-    expect(r.flagged.ACTION).toBeUndefined();
-  });
-  it('WHOLE averages the shared question inverted with its inverse phrasing, as measured', async () => {
-    const { impl } = stubJev(q => (q.startsWith('The moment gives every character in frame one and the same action') ? 0.2 : 0.8));
-    const r = await TP.judgePlanPages({ arc: 'a', pages, rows, listed: LISTED, only: [5] }, { callImpl: impl, retryDelayMs: 1 });
+  it('the score is the fault probability: ((1 - P(virtue)) + P(fault)) / 2, and agreeing with both pulls to 0.5', async () => {
+    expect(TP.faultScore(0.9, 0.1)).toBeCloseTo(0.1, 3);
+    expect(TP.faultScore(0.1, 0.9)).toBeCloseTo(0.9, 3);
+    expect(TP.faultScore(0.9, 0.9)).toBeCloseTo(0.5, 3);
+    const { impl } = stubJev(q => (isVirtue(q) ? 0.2 : 0.8));
+    const r = await TP.judgePlanPages({ arc: 'a', pages, rows, listed: LISTED, only: [5] }, { callImpl: impl, retryDelayMs: 1, calibration: CAL });
     expect(r.pages[5].scores.WHOLE).toBeCloseTo(0.8, 2);
     expect(r.pages[5].flags).toContain('WHOLE');
+  });
+  it('only a CALIBRATED question flags a page, at its own threshold', async () => {
+    const { impl } = stubJev(q => (isVirtue(q) ? 0.2 : 0.8)); // every question's fault score is 0.8
+    const none = await TP.judgePlanPages({ arc: 'a', pages, rows, listed: LISTED }, { callImpl: impl, retryDelayMs: 1 }); // the shipped CALIBRATION
+    const some = await TP.judgePlanPages({ arc: 'a', pages, rows, listed: LISTED }, { callImpl: impl, retryDelayMs: 1, calibration: { SIMPLE: { at: 0.85, noise: 0.1, calibrated: true }, DEED: { at: 0.7, noise: 0.1, calibrated: true }, ACTION: { at: 0.7, noise: 0.1, calibrated: false } } });
+    for (const p of Object.values<any>(none.pages)) expect(p.flags.every((id: string) => TP.CALIBRATION[id] && TP.CALIBRATION[id].calibrated)).toBe(true);
+    expect(some.flagged.SIMPLE).toBeUndefined();          // 0.8 < 0.85
+    expect(some.flagged.DEED).toEqual([1, 2, 3, 4, 5]);   // 0.8 >= 0.7
+    expect(some.flagged.ACTION).toBeUndefined();          // scored, not calibrated
+    expect(some.pages[2].scores.ACTION).toBeCloseTo(0.8, 2);
+  });
+  it('DEED is a paired question like WHOLE; HEIGHTS allows two levels, not three', () => {
+    expect(TP.PLAN_QUESTIONS.DEED.virtue).toBeTruthy();
+    expect(TP.PLAN_QUESTIONS.DEED.fault).toContain(PB.DEED_AND_EFFECT_DEF);
+    expect(TP.PLAN_QUESTIONS.HEIGHTS.fault).toContain('three or more different heights');
+    expect(TP.PLAN_QUESTIONS.HEIGHTS.fault).toContain('at most two height levels');
+    expect(TP.PLAN_QUESTIONS.HEIGHTS.virtue).toContain('at most two height levels');
   });
 });
 
@@ -227,44 +272,100 @@ describe('the camera inside the type', () => {
 
 describe('the targeted re-plan', () => {
   const targets = CC.typedPlanTargets({ pageCount: 8, listed: LISTED, maxCharactersPerScene: 6 });
-  it('sends back a flagged page with its exact reason, and nominates candidates for a book-level shortfall', () => {
+  const CAL = Object.fromEntries(Object.keys(TP.PLAN_QUESTIONS).map(id => [id, { at: 0.5, noise: 0.1, calibrated: true }]));
+  const jevOf = (flagged: Record<number, Record<string, number>>) => Object.fromEntries(Object.entries(flagged).map(([n, s]) => [n, { scores: s, flags: TP.flagsOf(s, CAL) }]));
+  const scopeOf = (c: any, jevPages: any, extra: any = {}) => TP.replanScope({ rows: c.rows, findings: c.findings, jevPages, castTable: null, targets, calibration: CAL, commissionedNames: LISTED, arcNames: [], ...extra });
+  it('sends back a flagged page with its reason and a keep list, and nominates candidates for a book-level shortfall', () => {
     const lines = Array.from({ length: 8 }, (_, i) => line('medium', i % 2 ? 'Ana, Ben' : 'Ana, Cy'));
     const c = count(lines);
-    const flags: any = { 4: ['DEED'] };
-    const reasons = TP.replanScope({ rows: c.rows, findings: c.findings, flags, castTable: null, targets });
-    expect(reasons.get(4)).toContain(TP.fixOf('DEED'));
+    const scope = scopeOf(c, jevOf({ 4: { DEED: 0.9 } }));
+    expect(scope.get(4).reasons).toContain(TP.fixOf('DEED'));
+    expect(scope.get(4).keep).toEqual(expect.arrayContaining(['type medium', 'in frame: Ana, Ben']));
     // no face page: candidates are interior pages with one or two figures, never page 1 or the last
-    expect([...reasons.keys()].every(n => n !== 1 && n !== 8)).toBe(true);
-    const faceWhy = [...reasons.values()].flat().filter(w => /face page/.test(w));
-    expect(faceWhy.length).toBeGreaterThan(0);
+    expect([...scope.keys()].every(n => n !== 1 && n !== 8)).toBe(true);
+    expect([...scope.values()].flatMap(o => o.reasons).filter(w => /face page/.test(w)).length).toBeGreaterThan(0);
   });
-  it('promised pages (the CAST block) are never nominated', () => {
-    const lines = Array.from({ length: 8 }, () => line('medium', 'Ana, Ben'));
+  it('sends at most four Jev flags, the largest margin first; an uncalibrated question sends none', () => {
+    const lines = Array.from({ length: 12 }, (_, i) => line('medium', i % 2 ? 'Ana, Ben' : 'Ana, Cy'));
+    const c = PC.typedPlanCounters({ pages: pagesOf(lines), listedNames: LISTED, mainName: 'Ana', maxCharactersPerScene: 6 });
+    const t12 = CC.typedPlanTargets({ pageCount: 12, listed: LISTED, maxCharactersPerScene: 6 });
+    const scores: any = {};
+    for (let n = 2; n <= 11; n++) scores[n] = { DEED: 0.55 + n / 100 };
+    const cal = { ...CAL };
+    const jp = Object.fromEntries(Object.entries(scores).map(([n, s]) => [n, { scores: s, flags: TP.flagsOf(s as any, cal) }]));
+    const scope = TP.replanScope({ rows: c.rows, findings: [], jevPages: jp, castTable: null, targets: t12, calibration: cal, commissionedNames: LISTED, arcNames: [] });
+    expect([...scope.keys()].sort((a, b) => a - b)).toEqual([8, 9, 10, 11]); // margins 0.13 .. 0.16 are the four largest
+    const off = { ...CAL, DEED: { at: 0.5, noise: 0.1, calibrated: false } };
+    const jp2 = Object.fromEntries(Object.entries(scores).map(([n, s]) => [n, { scores: s, flags: TP.flagsOf(s as any, off) }]));
+    expect(TP.replanScope({ rows: c.rows, findings: [], jevPages: jp2, castTable: null, targets: t12, calibration: off, commissionedNames: LISTED, arcNames: [] }).size).toBe(0);
+  });
+  it('protects the first and last page, CAST-promised pages, the sole face page and the sole scenery page', () => {
+    const lines = [line('medium', 'Ana, Ben'), line('face', 'Ana'), line('medium', 'Ana, Ben'), line('landscape', 'nobody'), line('medium', 'Ana, Ben'), line('medium', 'Ana, Cy'), line('medium', 'Ana, Dora'), line('medium', 'Ana, Ben')];
     const c = count(lines);
     const castTable = { characters: [{ name: 'Ana', deedPage: 3, alsoOn: [5] }], ending: { page: 8, names: ['Ana'] } };
-    const reasons = TP.replanScope({ rows: c.rows, findings: c.findings.filter((f: any) => f.code === 'TYPED_NO_FACE_PAGE'), flags: {}, castTable, targets });
-    for (const n of [1, 3, 5, 8]) expect(reasons.has(n)).toBe(false);
+    const prot = TP.protectedPages({ rows: c.rows, castTable, targets, classOf: (n: string) => (LISTED.includes(n) ? 'commissioned' : 'invented') });
+    for (const n of [1, 2, 3, 4, 5, 8]) expect(prot.has(n)).toBe(true);
+    for (const n of [6, 7]) expect(prot.has(n)).toBe(false);
+    // a Jev flag on a protected page is not sent back
+    const scope = scopeOf(c, jevOf({ 2: { FELT: 0.95 }, 6: { DEED: 0.9 } }), { castTable });
+    expect(scope.has(2)).toBe(false);
+    expect(scope.has(6)).toBe(true);
+  });
+  it('an arc figure carries a page without a listed child; only a planner-invented figure is a finding', () => {
+    const lines = [line('medium', 'Ana, Ben'), line('medium', 'Rufus'), line('medium', 'Cy, Dora'), line('medium', 'Stranger'), line('face', 'Ana'), line('landscape', 'nobody')];
+    const c = count(lines, { arcNames: ['Rufus'] });
+    const cls = c.stats.whoClasses;
+    expect(cls[2]).toEqual({ Rufus: 'arc' });
+    expect(cls[4]).toEqual({ Stranger: 'invented' });
+    expect(codes(c)).toContain('TYPED_INVENTED_FIGURE');
+    expect(c.stats.inventedPages).toEqual([4]);
+    // the people-free page 6 and the arc-only page 2 are not "no commissioned" pages; the invented-only page 4 is
+    expect(c.stats.noCommissionedPages).toEqual([4]);
+  });
+  it('the replan scope for an invented-figure page names the figure; the section carries each reason once with a Keep line', () => {
+    const lines = Array.from({ length: 8 }, () => line('medium', 'Ana, Ben'));
+    lines[3] = line('medium', 'Stranger');
+    const c = count(lines);
+    const scope = scopeOf(c, {});
+    expect(scope.get(4).reasons.join(' ')).toContain('Stranger');
+    const text = TP.typedReplanSection({ pagePlanText: 'Page 1: x', scope, castTable: null });
+    expect(text).toContain('Page 4\nChange: ');
+    expect(text).toContain('\nKeep: type medium');
   });
   const base = () => count([line('medium', 'Ana, Ben'), line('medium', 'Ana, Cy'), line('medium', 'Ana, Dora'), line('landscape', 'nobody')]);
+  const sc = (v: number) => ({ SIMPLE: v });
   it('keeps a page only when it fixes something and breaks nothing', () => {
     const c = base();
     const countOf = (rows: any[]) => PC.typedPlanCounters({ pages: rows.map(r => ({ pageNumber: r.pageNumber, planLine: r.planLine })), listedNames: LISTED, mainName: 'Ana', maxCharactersPerScene: 6 }).findings;
     const retRows = (l: string, n: number) => count([...Array(n - 1).fill(line('medium', 'Ana, Ben')), l]).rows[n - 1];
-    // page 2 becomes a face page: fixes TYPED_NO_FACE_PAGE, breaks nothing
+    const J = (v: number) => ({ 2: { scores: sc(v), flags: v >= 0.5 ? ['SIMPLE'] : [] } });
+    // page 2 becomes a face page of a listed child: fixes TYPED_NO_FACE_PAGE, breaks nothing
     const good = { ...retRows(line('face', 'Cy'), 2), pageNumber: 2 };
-    const acc = TP.acceptReplanPages({ rows: c.rows, returned: [good], countOf, jevBefore: { 2: { scores: {}, flags: ['DEED'] } }, jevAfter: { 2: { scores: {}, flags: [] } }, targets });
+    const acc = TP.acceptReplanPages({ rows: c.rows, returned: [good], countOf, jevBefore: J(0.9), jevAfter: J(0.1), targets, calibration: CAL });
     expect(acc.decisions[0].keep).toBe(true);
     expect(acc.rows.find((r: any) => r.pageNumber === 2).type).toBe('face');
     // a page that fixes nothing is dropped
     const same = { ...c.rows[1] };
-    const acc2 = TP.acceptReplanPages({ rows: c.rows, returned: [same], countOf, jevBefore: { 2: { scores: {}, flags: [] } }, jevAfter: { 2: { scores: {}, flags: [] } }, targets });
+    const acc2 = TP.acceptReplanPages({ rows: c.rows, returned: [same], countOf, jevBefore: J(0.1), jevAfter: J(0.1), targets, calibration: CAL });
     expect(acc2.decisions[0]).toMatchObject({ keep: false, reason: 'fixes nothing' });
-    // a page that fixes a flag but gains another is dropped
-    const acc3 = TP.acceptReplanPages({ rows: c.rows, returned: [same], countOf, jevBefore: { 2: { scores: {}, flags: ['DEED'] } }, jevAfter: { 2: { scores: {}, flags: ['SIMPLE'] } }, targets });
+    // a flag that falls only INSIDE the noise margin is not a fix
+    const acc2b = TP.acceptReplanPages({ rows: c.rows, returned: [same], countOf, jevBefore: J(0.55), jevAfter: J(0.45), targets, calibration: CAL });
+    expect(acc2b.decisions[0].keep).toBe(false);
+    // a page that fixes a flag but gains another beyond the margin is dropped
+    const before = { 2: { scores: { SIMPLE: 0.9, DEED: 0.1 }, flags: ['SIMPLE'] } };
+    const after = { 2: { scores: { SIMPLE: 0.1, DEED: 0.9 }, flags: ['DEED'] } };
+    const acc3 = TP.acceptReplanPages({ rows: c.rows, returned: [same], countOf, jevBefore: before, jevAfter: after, targets, calibration: CAL });
     expect(acc3.decisions[0].keep).toBe(false);
+    expect(acc3.decisions[0].breaks).toContain('DEED');
+    // ... but a new flag inside the noise margin, or on an uncalibrated question, is not a break
+    const soft = { 2: { scores: { SIMPLE: 0.1, DEED: 0.55 }, flags: ['DEED'] } };
+    const acc3b = TP.acceptReplanPages({ rows: c.rows, returned: [same], countOf, jevBefore: before, jevAfter: soft, targets, calibration: CAL });
+    expect(acc3b.decisions[0].keep).toBe(true);
+    const acc3c = TP.acceptReplanPages({ rows: c.rows, returned: [same], countOf, jevBefore: before, jevAfter: after, targets, calibration: { ...CAL, DEED: { at: 0.5, noise: 0.1, calibrated: false } } });
+    expect(acc3c.decisions[0].keep).toBe(true);
     // a page that fixes one finding and breaks a code target is dropped (the face page empties a character's coverage)
     const breaksCover = { ...c.rows[1], type: 'face', names: ['Ben'], planLine: line('face', 'Ben') };
-    const acc4 = TP.acceptReplanPages({ rows: c.rows, returned: [breaksCover], countOf, jevBefore: { 2: { scores: {}, flags: ['DEED'] } }, jevAfter: { 2: { scores: {}, flags: [] } }, targets });
+    const acc4 = TP.acceptReplanPages({ rows: c.rows, returned: [breaksCover], countOf, jevBefore: J(0.9), jevAfter: J(0.1), targets, calibration: CAL });
     expect(acc4.decisions[0].keep).toBe(false);
     expect(acc4.decisions[0].breaks.length).toBeGreaterThan(0);
   });

@@ -162,7 +162,7 @@ function typedPlanTargets({ pageCount, listed = [], maxCharactersPerScene } = {}
 /** The targets as the planner is told them, before it plans a page. */
 function typedTargetsRule(t, { mainName = null } = {}) {
   const lines = [
-    `- At least ${pagesWord(t.faceMin)} of type face.`,
+    `- At least ${pagesWord(t.faceMin)} of type face, and a face page shows a listed character.`,
     `- At least ${pagesWord(t.sceneryMin)} of type landscape or object; two are fine, ideally one of each.`,
     '- No two neighbouring pages share both their type and their characters.',
   ];
@@ -171,8 +171,9 @@ function typedTargetsRule(t, { mainName = null } = {}) {
   }
   if (t.mainMin > 0) lines.push(`- ${mainName ? mainName : 'The main character'} is in frame on at least ${pagesWord(t.mainMin)}.`);
   lines.push(`- At most ${pagesWord(t.groupMax)} of type group.`);
-  lines.push(`- At most ${pagesWord(t.noCommissionedMax)} with no listed character in frame.`);
-  return ["THE BOOK'S TARGETS — every one is counted in code on the finished plan:", ...lines].join('\n');
+  lines.push(`- At most ${pagesWord(t.noCommissionedMax)} where figures are in frame and none of them is a listed character.`);
+  lines.push('- The who column names listed characters and the figures of the STORY LOGIC, nobody else: a figure you invent is a fault.');
+  return ["THE BOOK'S TARGETS — every one is counted in code on the finished plan. A listed character is one of the characters given above (the CAST block names them); a figure the STORY LOGIC names (new) is not listed and may share a page with listed characters or carry a page alone.", ...lines].join('\n');
 }
 
 /**

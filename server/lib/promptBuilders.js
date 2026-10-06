@@ -9317,7 +9317,7 @@ const UNNAMED_FIGURE_EXEMPT = 'a figure given no name, referred to only by what 
  */
 const WHOLE_CAST_DEF = 'A page that gathers the whole cast is wide or distant, all of them sharing one simple action — boarding, hauling one line together — or seen from behind moving off. All of them watching one thing is a shared action only when they are seen from behind or over the shoulder, toward what they watch; facing the viewer it never is. Standing or gathering together while a feeling shows, or while the event happens behind them, is everyone present doing nothing — never a row of figures facing the viewer. One of them acting while the rest look on — a hand-over between two, one speaking, one laughing — is not a shared action: every one of them does the same thing.';
 
-const TWO_HEIGHTS_DEF = 'two named characters at different heights — deck and water, ledge and ground, roof and street. A whole cast carried together on one back or one boat is one level.';
+const TWO_HEIGHTS_DEF = 'characters, animals or objects at three or more different heights in one frame — one on the ground, one climbing the tree, one up in the tree. A frame holds at most two height levels, however many figures it has: someone in the foreground and someone in the tree is fine. A whole cast carried together on one back or one boat is one level.';
 // No leading article: the planner says "stages THEIR arrival", the checker "stages AN arrival", and both wordings are pinned by tests.
 const NAMING_DEF = 'arrival or a naming by someone present; a badge, a garment, a title or an epithet is not a naming.';
 const ENDING_EVENT_DEF = "When the story's ending has an event of its own, the last page stages that event as its instant.";

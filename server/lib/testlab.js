@@ -10258,7 +10258,7 @@ async function runBeatsReplanStage(target, { params = {} }) {
   }) : null;
   const { appliedPlan, ...complianceFields } = verdict || {};
   const typedMeasure = planFresh ? await measureUntypedDivision({
-    pages: shot.beats, check: shippedDivision.check, approvedArc, commission, mainName, maxCast,
+    pages: shot.beats, check: shippedDivision.check, approvedArc, commission, arcNames: arcInventedNames || [], mainName, maxCast,
     replanned: shipped.changedPages.length, startedAt: t0,
   }) : null;
   const roundsOut = replanRounds.map(r => ({
@@ -10293,15 +10293,16 @@ async function runBeatsReplanStage(target, { params = {} }) {
  * code + Jev reading as the typed arm (typedPlan.measurePlan). `present` is the
  * plan check's head count of the division (planCounters castPerPage).
  */
-async function measureUntypedDivision({ pages, check, present = null, approvedArc, commission, mainName, maxCast, replanned = null, startedAt = null }) {
+async function measureUntypedDivision({ pages, check, present = null, approvedArc, commission, arcNames = [], mainName, maxCast, replanned = null, startedAt = null }) {
   const { presentOf } = require('./beatsPipeline');
   const tp = require('./typedPlan');
   const head = present || presentOf(check);
   if (!head) throw new Error('measureUntypedDivision: the division has no head count (the plan check gave no roster), so it cannot be measured');
-  const rows = tp.rowsOfUntypedPlan(pages, head);
+  // The who column is read by the SAME reader as a typed plan's (parseTypedWho); luna's head count is a cross-check only.
+  const rows = tp.rowsOfUntypedPlan(pages, head, { commissionedNames: commission.all, arcNames });
   const jevResult = await tp.judgePlanPages({ arc: approvedArc, pages, rows, listed: commission.listed });
   return {
-    metrics: tp.measurePlan({ rows, jevResult, listed: commission.listed, commissionedNames: commission.all, mainName, maxCharactersPerScene: maxCast }),
+    metrics: tp.measurePlan({ rows, jevResult, listed: commission.listed, commissionedNames: commission.all, arcNames, mainName, maxCharactersPerScene: maxCast }),
     jev: jevResult.pages,
     jevStats: jevResult.stats,
     rows: rows.map(r => ({ pageNumber: r.pageNumber, type: r.type, shot: r.shot, names: r.names })),
@@ -10344,7 +10345,7 @@ async function runTypedPlanArm({ target, params, storyData, approvedArc, arcHint
     const perPage = (rep.recheck && rep.recheck.counterStats && rep.recheck.counterStats.castPerPage) || (rep.counterStats && rep.counterStats.castPerPage);
     if (!perPage) throw new Error(`story ${target.storyId} stores no head count for its shipped plan`);
     const present = new Map(perPage.map(r => [Number(r.pageNumber), r.names || []]));
-    const m = await measureUntypedDivision({ pages: parsed.pages, present, approvedArc, commission, mainName, maxCast, replanned: (rep.changedPages || []).length, startedAt: t0 });
+    const m = await measureUntypedDivision({ pages: parsed.pages, present, approvedArc, commission, arcNames: arcInventedNames || [], mainName, maxCast, replanned: (rep.changedPages || []).length, startedAt: t0 });
     return {
       storyId: target.storyId, pages: pageCount, arm: 'stored-shipped-plan', typedMeasure: m,
       standingPlan: parsed.pages, cost: m.jevStats.costUsd, usage: { input_tokens: 0, output_tokens: 0 },
@@ -10354,25 +10355,49 @@ async function runTypedPlanArm({ target, params, storyData, approvedArc, arcHint
 
   // ARM 2: the typed design.
   if (!TEXT_MODELS[planModel]) throw new Error(`Unknown model "${planModel}"`);
+  // Lab params (2026-10-06): planEffort (low|medium|high) goes to each planner call through the
+  // existing effort mechanism (textModels anthropicOutputConfig); typedFirstOnly stops after the
+  // first plan and its code count (the effort sweep); advisoryOff skips the luna check.
+  const planEffort = params.planEffort ? String(params.planEffort) : null;
+  if (planEffort && !['low', 'medium', 'high'].includes(planEffort)) throw new Error(`planEffort must be low, medium or high, not "${planEffort}"`);
+  const firstOnly = params.typedFirstOnly === true || params.typedFirstOnly === 'true';
+  const advisoryOff = params.advisoryOff === true || params.advisoryOff === 'true';
+  const callLog = [];
   const result = await tp.runTypedPlan({
     inputData: storyData, pageCount, approvedArc, arcHints, arcStoryLogic: storyLogic, arcCentralFigure: centralFigure,
-    commission, maxCast, mainName, readPlan, parseCastTable: readCastTable, labPromptOptions,
-    callModel: async (prompt, label) => {
-      const res = await callTextModelStreaming(prompt, null, null, planModel, { usageLabel: `testlab_${label}` });
+    commission, maxCast, mainName, arcNames: arcInventedNames || [], readPlan, parseCastTable: readCastTable, labPromptOptions,
+    planEffort, firstOnly,
+    callModel: async (prompt, label, callOpts = {}) => {
+      const t = Date.now();
+      const res = await callTextModelStreaming(prompt, null, null, planModel, { usageLabel: `testlab_${label}`, ...callOpts });
       onCall(res);
+      callLog.push({ label, modelId: res.modelId, effort: callOpts.effort || null, usage: res.usage || null, costUsd: +costOf(res).toFixed(6), ms: Date.now() - t, promptChars: prompt.length });
       return res;
     },
   });
+  if (firstOnly) {
+    return {
+      storyId: target.storyId, pages: pageCount, arm: 'typed-first-plan',
+      models: { planModel, planModelId: result.planModelId },
+      typed: { firstPlan: result.firstPlan, castTable: result.castTable, first: result.first },
+      calls: callLog, planEffort,
+      standingPlan: result.first.plan, jev: result.jev,
+      cost: +textCost().toFixed(6), textCost: +textCost().toFixed(6),
+      usage: { input_tokens: calls.reduce((a, r) => a + (r.usage?.input_tokens || 0), 0), output_tokens: calls.reduce((a, r) => a + (r.usage?.output_tokens || 0), 0) },
+      elapsedMs: Date.now() - t0,
+      note: `typed first plan at effort ${planEffort || 'default'}: ${result.first.findings.length} code finding(s)`, events,
+    };
+  }
   // THE ADVISORY LUNA CHECK on the shipped typed plan: nothing is re-planned from it.
   const checkModel = params.checkModel || inputs.planCheckModel;
-  const runCheck = createPlanCheckRunner({
+  const runCheck = advisoryOff ? null : createPlanCheckRunner({
     inputData: storyData, approvedArc, arcHints, arcStoryLogic: storyLogic, arcCentralFigure: centralFigure, castTable: result.castTable,
     commission, commissionedNames, placeNames: inputs.placeNames, maxCast, arcInventedNames, arcInventedLimit, mainName,
     planCheckModel: checkModel, onChunk: null, gl, labPromptOptions, onCall,
   });
-  const check = await runCheck('plan_check', result.pages, result.pages.map(p => `Page ${p.pageNumber}: ${p.planLine}`).join('\n'));
-  const modelFindings = check.findings.filter(f => f.kind === 'check');
-  const advisory = {
+  const check = !runCheck ? null : await runCheck('plan_check', result.pages, result.pages.map(p => `Page ${p.pageNumber}: ${p.planLine}`).join('\n'));
+  const modelFindings = check ? check.findings.filter(f => f.kind === 'check') : [];
+  const advisory = !check ? null : {
     checkModel: check.checkModelId || checkModel,
     findings: modelFindings.map(f => ({ check: f.check, line: f.line })),
     // Questions the typed flow asks Jev about the picture vs story-level checks it does not ask.
@@ -10387,12 +10412,12 @@ async function runTypedPlanArm({ target, params, storyData, approvedArc, arcHint
       firstPlan: result.firstPlan, castTable: result.castTable, first: result.first, replan: result.replan, final: result.final,
       pagesReplanned: result.pagesReplanned, pagesReturned: result.pagesReturned,
     },
-    advisory,
+    advisory, calls: callLog, planEffort,
     standingPlan: result.final.plan,
     jev: result.jev,
     cost: +(text + result.jev.costUsd).toFixed(6), textCost: +text.toFixed(6), usage: { input_tokens: calls.reduce((a, r) => a + (r.usage?.input_tokens || 0), 0), output_tokens: calls.reduce((a, r) => a + (r.usage?.output_tokens || 0), 0) },
     elapsedMs: Date.now() - t0, elapsedMsTypedFlow: result.elapsedMs,
-    note: `arm 2: typed plan ${result.final.metrics.flagCount} Jev flag(s) and ${result.final.findings.length} code finding(s) left after ${result.pagesReplanned} replanned page(s); ${advisory.findings.length} advisory luna finding(s), ${advisory.lostStoryLevel.length} story-level`,
+    note: `arm 2: typed plan ${result.final.metrics.flagCount} Jev flag(s) and ${result.final.findings.length} code finding(s) left after ${result.pagesReplanned} replanned page(s); ${advisory ? `${advisory.findings.length} advisory luna finding(s), ${advisory.lostStoryLevel.length} story-level` : 'advisory off'}`,
     events,
   };
 }

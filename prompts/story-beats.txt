@@ -46,7 +46,7 @@ The plan line's instant is a single drawable moment:
 - {PLAN_LINE_FIELDS}
 - One centre of action: never two vehicles, vessels or creatures each with its own state or its own crew.
 - One camera position: an instant is seen from one spot — never inside a vehicle or structure and its exterior at once.
-- One level per picture: {TWO_HEIGHTS_DEF} Two such characters do not share a frame. Stage it from the level the page's event happens on, with the other character out of frame, or give each level its own page.
+- At most two height levels per picture: {TWO_HEIGHTS_DEF} Where a third level appears, stage the page on the two levels its event happens on and give the other level its own page.
 - Never two characters interlocked at one instant — a shared grip on one object, an object in flight, a hand-over: pick the moment before or after it. Never a thought or realization as the instant, or a climbing or stretching pose with hidden limbs; when the event is internal or mechanical, name its visible result instead (the box open, the found object held up).
 - A figure trapped, cut off or unable to reach is given no means to end it: the obstacle's distance is named against the body ("the rim of the shaft three times their height above them", "the ledge a full arm's length beyond the fingertips"), never a grip, hold or footing that would let them out.
 - Never a pointing gesture as the instant: a look toward the thing, a turned head, a step toward it, or the thing held up instead.
