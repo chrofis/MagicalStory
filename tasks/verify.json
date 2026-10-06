@@ -5495,6 +5495,96 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "underwater-dark-light",
+      "title": "A page set underwater or in the dark declares timeOfDay underwater|dark (weather none) and is drawn without a sky",
+      "commits": [
+        "54a40ab90"
+      ],
+      "addedAt": "2026-10-06",
+      "claim": "On a story with underwater or ink-dark pages, jevDecisions.light and the stored briefs carry timeOfDay underwater|dark with weather none on those pages (the hour continues around them), the page prompt's LIGHT line and the plate prompt's LIGHT line name no sun, moon, sky or horizon, the season line has no 'sky and daylight colour', and the plates and pages show no sky, surface scene or dry land.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Read stories.data.jevDecisions.light and each affected page's imageVersions[0].prompt (LIGHT and SEASON lines) and plate prompt, then view the plates and pages of the submerged pages."
+      },
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "iterate-keeps-decided-fields",
+      "title": "An in-job iterate rewrite is re-pinned to the page's decided fields (location, population, gaze, shot)",
+      "commits": [
+        "b24c20a4c"
+      ],
+      "addedAt": "2026-10-06",
+      "claim": "On a beats story whose repair loop ran an iterate rewrite (a version with source iterate-round-N), that version's brief metadata equals the page's jevFixed on location, population and looksAt, and the strict iterate kept the page's shot.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "For each iterate-round version compare its description's METADATA objects[0], population and characters[].looksAt with sceneImages[].jevFixed."
+      },
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "sheet-glasses-declared",
+      "title": "A character's declared glasses are stated to the 2x4 sheet generator and checked per cell by both row judges",
+      "commits": [
+        "ffe72fb2b"
+      ],
+      "addedAt": "2026-10-06",
+      "claim": "On a story with a character whose physical.glasses is set, the stored pass-1 prompts (styledAvatarGeneration[].passes.pass1.prompt) carry a Glasses line, the row verdicts carry glasses.perCell, and the styled sheet's front and three-quarter head cells wear the glasses; the pages, covers and face repairs of that character show them.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Download the character's styled sheet and view the head row; grep the stored pass-1 prompt for 'Glasses:'; view two pages and a cover."
+      },
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "expected-cast-reads-creatures",
+      "title": "The evaluator's expected cast includes every creature the brief declares in creatures[]",
+      "commits": [
+        "a083acca6"
+      ],
+      "addedAt": "2026-10-06",
+      "claim": "No page's evaluation carries an extra_character issue for a creature that the page's brief declares in creatures[], whether or not objects[] cites it.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Grep the stored page evaluations for extra_character against a creature and compare with the brief's creatures[]."
+      },
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "avatar-category-final-state",
+      "title": "avatar_category_missing is logged only by the final avatar pass",
+      "commits": [
+        "8d88e5fd4"
+      ],
+      "addedAt": "2026-10-06",
+      "claim": "A story whose early avatar pass lacked a required sheet that the final pass generated has no avatar_category_missing error in its generationLog, only an avatar_category_pending warn; a sheet still missing after the final pass errors and fails the book.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "grep generationLog for avatar_category_missing / avatar_category_pending and compare with the character's styledAvatars."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [
