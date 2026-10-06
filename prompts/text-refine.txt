@@ -45,7 +45,7 @@ One move is allowed: when a MISMATCH finding says a page's text carries a scene 
 These outlines name clothing and faces as well as events. None of that is the prose's business: never narrate where someone stands, what they are wearing or how they are framed. The picture shows one instant; the text tells the rest of that page's stretch of the story. Events the story carries and the picture doesn't show are the text's cargo — never cut them for image fidelity. The text's one duty to the picture is non-contradiction: rewrite a sentence only where it states the opposite of what the outline stages.
 
 That duty covers appearance, not only events. Where the story needs to name a thing the outline describes — a garment, a costume, a creature, a prop — the prose may name it plainly but never gives it a colour, material or kind the outline does not. A page that colours such a thing differently from the outline is flagged, and the rewrite uses the outline's colour or drops the colour word.
-The outline is the story in summary and the text is the telling of it, so the text carries what a summary leaves out: feelings, dialogue, and the ordinary business between its turns (going somewhere and arriving, waiting, approaching people, asking, a greeting, names given and heard). That is filler, not event: never cut it as an addition, and write it in where a page opens after a jump. What is fixed is what the story is made of: no character, creature, object, place or turn of the plot the story does not carry, and nothing that changes what happens, to whom, or what it costs.
+The outline is the story in summary and the text is the telling of it, so the text carries what a summary leaves out: feelings, dialogue, and the ordinary business between its turns (going somewhere and arriving, waiting, approaching people, asking, a greeting). That is filler, not event: never cut it as an addition, and write it in where a page opens after a jump. What is fixed is what the story is made of: no character, creature, object, place or turn of the plot the story does not carry, and nothing that changes what happens, to whom, or what it costs.
 {PERIL_CEILING} A fault is never fixed by putting a person in danger.
 
 {SCENE_OUTLINES}
@@ -68,7 +68,7 @@ A finding is a claim from a reader who saw less than you: one read the pages col
 
 A page is rewritable when AUDIT FINDINGS names it, and otherwise not. Every other page ships exactly as it stands, however you would have phrased it. Four cases add a page to that set and no others: a MISMATCH move needs its destination page; a page's text states the opposite of what its scene outline stages; a page carries an abbreviation or acronym, which is named the way a child says it; a page carries a banned dash. Closing a finding on a page the finding does not name is allowed only under these four, and the ledger says which one.
 
-The checks below are answered for the rewritable pages only, with their neighbours read as context; every other page is scanned for the four cases above and not analysed. A clean analysis section is a real answer.
+Only the rewritable pages are analysed, with their neighbours read as context; every other page is scanned for the four cases above. An empty analysis is a real answer.
 
 Return only the pages you rewrote. Omit every page you left alone. If no page needs rewriting, return the marker followed by NONE and nothing else.
 
@@ -82,7 +82,7 @@ Every page you rewrite keeps the style rules below:
 
 {STYLE_RULEBOOK}
 
-A STYLE finding quotes one sentence that breaks one of these rules. One you accept is closed by recasting that sentence alone, or by joining it into the sentence beside it, and it never licenses a change anywhere else on its page. A page named only by STYLE findings is not analysed under the checks below.
+A STYLE finding quotes one sentence that breaks one of these rules. One you accept is closed by recasting that sentence alone, or by joining it into the sentence beside it, and it never licenses a change anywhere else on its page.
 
 A fault that a character acts on a reason the page has not given is closed this way: {MOTIVE_AT_THE_ACT}.
 
@@ -98,9 +98,9 @@ Judge the text as a reader who has only the pages in front of them. They never s
 
 Work in two steps.
 
-Step 1 — write the analysis. Answer every check below for the rewritable pages, naming pages and quoting lines. This is the work: a page is weak because a check found something specific wrong with it, not because it could be phrased differently.
+Step 1 — write the analysis: for each finding and each of the four cases, the page and the quoted line that is wrong and what it changes to. A page is weak because something specific is wrong with it, not because it could be phrased differently.
 
-Step 2 — edit the rewritable pages your analysis found problems on, sentence by sentence, keeping every sentence no finding names. Every other page stays exactly as it is. End the analysis with a line per named problem — the problem, then the page(s) the rewrite fixes it on, or the reason it stands. A named problem with neither is a failed review. Every AUDIT FINDING above enters that ledger the same way, and it has three ways to close: fixed on a page, the detail removed, or a stated reason it stands. Each AUDIT FINDING starts with its id (T1, T2 …); its ledger line starts with that id, and a finding you leave standing reads `<id> STANDS: <reason>`. A fault whose reason exists in the scene outlines is fixed by saying that reason on a page, never by citing the outline. Close a fault about a missing path, arrival or move by showing it happening on one of the pages, or by leaving it to the page turn; never by opening a page with the move already completed. A fault about something the book never established is closed by establishing it on an earlier page or by cutting the claim, never by adding a sentence that asserts both the claim and its opposite. A fault naming an ability or event the pages need but never establish is closed by establishing it earlier, never by describing the moment more vividly.
+Step 2 — edit the rewritable pages your analysis found problems on, sentence by sentence, keeping every sentence no finding names. Every other page stays exactly as it is. End the analysis with the ledger: a line per named problem — the problem, then the page(s) the rewrite fixes it on, or the reason it stands. A named problem with neither is a failed review. Every AUDIT FINDING above enters that ledger the same way, and it has three ways to close: fixed on a page, the detail removed, or a stated reason it stands. Each AUDIT FINDING starts with its id (T1, T2 …); its ledger line starts with that id, and a finding you leave standing reads `<id> STANDS: <reason>`. A fault whose reason exists in the scene outlines is fixed by saying that reason on a page, never by citing the outline. Close a fault about a missing path, arrival or move by showing it happening on one of the pages, or by leaving it to the page turn; never by opening a page with the move already completed. A fault about something the book never established is closed by establishing it on an earlier page or by cutting the claim, never by adding a sentence that asserts both the claim and its opposite. A fault naming an ability or event the pages need but never establish is closed by establishing it earlier, never by describing the moment more vividly.
 
 Take the second way whenever the detail that caused the fault carries no plot: drop the detail instead of inventing an event to justify it. Never invent an event that makes an established obstacle easier to pass, and never state a clock time or a named part of the day to close a fault — light, shadow and what the characters do carry time instead.
 
@@ -110,75 +110,14 @@ A sentence naming what a character feels, notices, or almost does is never the s
 
 A rewritten page keeps everything the fix does not touch: no fact of the page is dropped, changed or contradicted, and every pronoun and name still lands on the person, thing and moment it did before.
 
-# THE CHECKS
-
-Read the pages in # CURRENT TEXT against # THE STORY, # THE PAGE PLAN and # SCENE OUTLINES. Every answer names a specific page and quotes the line it is about. An answer with no page and no quote is not an answer.
-
-The pictures are locked. Where a page's text names or implies something its scene outline does not show — a figure, an object, an action, a detail of the place — the TEXT is what moves. There is no way to change a picture from here.
-
-Priority: sections A and B first and at length, C after them, D and E last.
-
----
-
-**A. NARRATIVE & PLOT**
-
-1. **Plot holes** — Name the weakest causal link. What happens because the plot needs it to rather than because the earlier pages forced it?
-2. **Cause and effect** — Does each page's event follow from the page before? Name the transition that reads most arbitrary.
-3. **Pacing** — Name the slowest page and the most rushed one, with word counts or beat density. Say what would be cut from one and expanded in the other.
-4. **Stakes** — Name the beat where the stakes read weakest. If they are stated and not felt, that is a show-vs-tell failure and belongs in section B.
-5. **Resolution** — Is the ending earned by the pages before it? Name one element that could be stronger.
-6. **The forcing figure on the page** — Wherever a page plays out a coerced action — a punishment, a forced choice, a rule imposed, something taken — that page's TEXT names the character forcing it or carries their words. What the picture shows does not count. Name any such page where the forcing figure is absent from the words.
-
----
-
-**B. CHARACTER & DIALOGUE (per-character, by name)**
-
-For EACH of {CHARACTER_NAMES} who appears on a rewritable page write one line — none of them may be skipped, including a character the commission did not name who the pages carry anyway. If all five axes hold, write `none found`; never invent a weakness to fill the line.
-
-Format A (all five axes hold):
-- **[Name]**: consistency ✓, voice ✓, show-not-tell ✓, motivation ✓, growth ✓ — none found.
-
-Format B (at least one fails):
-- **[Name]**: consistency [✓/✗], voice [✓/✗], show-not-tell [✓/✗], motivation [✓/✗], growth [✓/✗ or N/A]. Weakest moment: Page X, "[quoted line]" — [one sentence why]. Fix: [the concrete change].
-
-Mark an axis ✗ only where you can name the page and the line that fails it.
-
-7. **Consistency** — Any moment out of character, any trait established early and contradicted later, any ability or fear the pages break?
-8. **Voice** — Does this character sound different from the others in dialogue? Two characters whose lines could swap unnoticed is a voice failure: name both and the page.
-9. **Show vs tell** — Find one emotion written as a label ("he was proud") for this character and say what action would show it instead.
-10. **Motivation** — Does a reader of the pages alone follow this character's act on their busiest page? A reason the act already shows needs no sentence.
-11. **Growth** (main characters only) — Do they end in a different emotional or knowledge state, and on which page does the shift become visible? A shift told rather than shown fails.
-
----
-
-**C. PROSE QUALITY**
-
-12. **Reading level** — Name one word or sentence off-register for the target level and what replaces it.
-13. **Repetition** — List any word (names, articles and pronouns excluded) used four or more times across the pages, and any sentence shape repeated on three consecutive pages. Name the replacements.
-14. **Flow** — Name the most awkward sentence and rewrite it.
-15. **Passive voice** — List passive constructions in narration and their active forms. Dialogue is exempt.
-
----
-
-**D. TEXT VS THE LOCKED PICTURE**
-
-16. **The moment** — Does each page's text narrate the moment its scene outline stages? Name every page where it narrates a different one.
-17. **Figures acting on the page** — For each page, find the verbs aimed AT a main character: chasing, catching, holding back, freeing, guarding, surrounding, threatening, mocking, accusing, blocking, rescuing. Where such a verb has a named or implied doer that the page's scene outline does not stage, the picture stays as it is and the text moves: the doer's action goes off the page (already done, heard, remembered) or the moment is retold as what the picture shows. A figure mentioned in passing needs nothing.
-
----
-
-**E. DO-NOT-WRITE LIST**
-
-18. **Verification** — Confirm the pages honour the DO-NOT-WRITE LIST below: banned gestures, banned phrases, banned trait labels, banned buzzwords, the gesture re-use cap, banned plot formulas, banned page-1 openings. Name the page and the line for anything that slipped in. If nothing did, write `clean`.
-
-{DO_NOT_WRITE_SECTION}
+The pictures are locked: where a page's text names or implies something its scene outline does not show (a figure, an object, an action, a detail of the place), the TEXT moves. Where a page narrates a moment its outline does not stage, or a verb aimed at a main character has a doer the outline does not stage, the doer's action goes off the page (already done, heard, remembered) or the moment is retold as what the picture shows. Banned dashes, the style rules above and the OWED list are the standing checks.
 
 # OUTPUT FORMAT
 
 Both blocks, in this order, nothing before or after.
 
 ---ANALYSIS---
-<your answers to A, B, C, D and E, in that order, in the formats those sections specify, then the ledger>
+<the per-finding ledger>
 
 ---STORY TEXT---
 ## Page <number>

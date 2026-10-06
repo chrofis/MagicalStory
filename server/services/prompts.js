@@ -291,8 +291,8 @@ async function loadPromptTemplates() {
     // THE canonical DO-NOT-WRITE list — banned gestures, phrases, page-1
     // openings, trait labels, buzzwords, plot formulas, the gesture re-use cap.
     // Body only; each consuming template keeps its own heading. Read by
-    // buildDoNotWriteSection (beats text writer + refiner) and by the
-    // split-review reviewer — so there is exactly one copy. It used to be
+    // the split-review reviewer (the beats writer and the refine left it in text-v4:
+    // their bans live in STYLE_RULEBOOK, proseSlop.js) — so there is exactly one copy. It used to be
     // SLICED out of story-unified-imagefirst.txt at runtime, which made
     // deleting that "legacy" template a silent way to strip the whole list
     // from production (rule-survival audit 2026-09-03, item M2). That template

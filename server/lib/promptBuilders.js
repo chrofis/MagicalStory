@@ -6332,10 +6332,6 @@ function buildTextRefinePrompt(inputData, pages = [], auditFindings = '', arc = 
   // A brief was computed and passed here until 2026-09-13; the template silently
   // dropped it, and the argument is deleted rather than wired up.
 
-  // The canonical DO-NOT-WRITE list, so the ban categories can never drift
-  // between writing and refining — as a checker reads it: check 18 IS the re-check.
-  const doNotWriteSection = buildDoNotWriteSection({ forChecker: true });
-
   // The COMPLETE language definition, not the bare name. getLanguageNameEnglish
   // returns "Swiss German" for de-ch, which a model reads as Schwyzerdütsch — it
   // duly rewrote the whole book into dialect ("S'Fescht", "blybt stoh"). The
@@ -6354,7 +6350,7 @@ function buildTextRefinePrompt(inputData, pages = [], auditFindings = '', arc = 
     CHARACTER_DETAILS: cast.details,
     // The whole story — every fact it states belongs on some page. Read-only:
     // never a licence to add events the story does not carry.
-    STORY_ARC: String(arc || '').trim() || '(no arc was recorded for this story)',
+    STORY_ARC: stripChallengesTaken(arc).trim() || '(no arc was recorded for this story)',
     // The hints amend the arc; the writer applied them (buildCriticArcHintsSection).
     ARC_HINTS: buildCriticArcHintsSection(arcHints),
     // How the story was divided into pictures (beats mode only). Empty on a
@@ -6364,7 +6360,6 @@ function buildTextRefinePrompt(inputData, pages = [], auditFindings = '', arc = 
     CURRENT_TEXT: currentText,
     PAGE_MEASURES: pageMeasures,
     AUDIT_FINDINGS: String(auditFindings || '').trim() || '(no audit ran)',
-    DO_NOT_WRITE_SECTION: doNotWriteSection,
     STYLE_RULEBOOK,
     MOTIVE_AT_THE_ACT: MOTIVE_AT_THE_ACT_RULE,
     PICTURE_COUNT: PICTURE_COUNT_RULE,
@@ -10160,10 +10155,9 @@ const SHOWN_CALLBACK_RULE = 'A callback shown as it happens, a character doing, 
  * see docs/decisions.md 2026-10-06 "Text stages edit, they do not rewrite"
  */
 // ONE definition of what the plot depends on (owner, 2026-10-06, Opus arc review
-// E1): the text stages' OWED list (parseStoryLogic().owed = the Facts lines plus
-// the cause of the main turn) and the arc sentence rule below both read it.
-// LOAD_BEARING_RULE (owned by the text-stage work) is to interpolate this same string.
-const OWED_FACT_DEF = 'a fact the plot uses (a figure\'s one ability or limit, a rule of the world) or the cause of the main turn';
+// E1): the text stages' OWED list (parseStoryLogic().owed = the Facts lines) and the arc sentence rule below both read it.
+// LOAD_BEARING_RULE interpolates this same string (text-v4).
+const OWED_FACT_DEF = 'a fact the plot uses (a figure\'s one ability or limit, a rule of the world)';
 
 /**
  * WHAT AN ARC SENTENCE CARRIES (E1): the act and what it changes; the why is
@@ -10174,7 +10168,8 @@ const OWED_FACT_DEF = 'a fact the plot uses (a figure\'s one ability or limit, a
  */
 const ARC_SENTENCE_RULE = `Each arc sentence tells what a figure does and what changes by it. Its why stays in the STORY LOGIC: a sentence states a reason only where it is ${OWED_FACT_DEF}.`;
 
-const LOAD_BEARING_RULE = 'Only the OWED list is owed prose: each fact on it reaches the text once, in its specific form, on or before the page that leans on it, as something a character does, sees or says. Everything else in the arc (motives, causes, stakes, feelings, background) is the arc\'s reasoning, and a page that leaves it out drops nothing. A size, an age or a look is owed only where something is lifted, hidden, held or fitted because of it.';
+
+const LOAD_BEARING_RULE = `Only the OWED list (${OWED_FACT_DEF}) is owed: each fact on it reaches the text once, on or before the page that leans on it, the way a picture book carries a fact: a figure meeting its limit in the moment (one who cannot follow stays behind, one too big sticks fast), using its ability, or one short line from the one who would say it then. An owed fact is never recited whole, never voiced as a figure describing itself, and never told by the narrator as a reason. Everything else in the arc (motives, causes, stakes, feelings, background) is the arc\'s reasoning, and a page that leaves it out drops nothing. A size, an age or a look is owed only where something is lifted, hidden, held or fitted because of it.`;
 
 /**
  * The OWED list as the text stages read it: one dash line per owed fact, taken
@@ -10223,8 +10218,8 @@ const STYLE_RULEBOOK = [
   'No rhetorical set-pieces: no paired negations ("Nobody answered. Nobody argued."), no coined sayings or incantations, no one-sentence paragraph for drama. Plain narration carries the story.',
   'No sentence tells what an event meant or sums up who the characters have become ("they had become something else", "he had done his part"). The telling shows the event and moves on.',
   'The narrator never justifies, excuses or explains an action to the reader ("he had given his share, so now he could eat too"): no because-clause and no purpose clause on the narrator\'s side. A reason the story needs comes through what a character does or says in the moment.',
-  'A feeling is shown by what a character does or says. The narrator names one only where no act can show it, and never beside an act that already shows it; a character never explains a feeling or an insight to the person in front of them.',
-  'A character never explains the story\'s rules, or what has just happened, to someone who saw it; a rule of the story\'s magic is said once, in the line a character needs it. No roll call: the text never goes through the cast one by one saying what each did, felt or said in the same shape; it names who acts.',
+  'A feeling is shown by what a character does or says. The narrator names one only where no act can show it, and never beside an act that already shows it.',
+  'A rule of the story\'s magic, or a limit, is said once, in a few words, by the one who would say it at the moment it is needed. No character recites a rule, a route or a plan in full, explains a feeling or an insight to the person in front of them, or retells what happened, to anyone. No roll call: the text never goes through the cast one by one saying what each did, felt or said in the same shape; it names who acts.',
   SIZE_LOOK_RULE,
   'Each named character who speaks has a voice of their own: word choice and rhythm a listener could tell apart without the name.',
   `The last page ends on the concrete act or spoken line the story ends with and lands one feeling, plainly and warmly. A string of short solemn sentences is not an ending, and neither is a closing sentence that sums up the story. ${SHOWN_CALLBACK_RULE}`,
@@ -11107,6 +11102,27 @@ function splitCommittedBlock(committed) {
 const arcHeadingRe = (label, flags = 'mi') => new RegExp(`^\\s*(?:\\*\\*|#+\\s*)?${label}(?:\\s*\\*\\*)?\\s*(?::|$)`, flags);
 
 /**
+ * The arc as the TEXT stages read it: the stored final arc ends with the
+ * creator's "Challenges taken:" bookkeeping list (catalogue notes, not story).
+ * The writer, the audit and the refine all read the arc, so a note like "Oskar
+ * lets go only for the chestnut" read as an owed beat (text-v4, owner
+ * 2026-10-06). One helper, applied at all three sites.
+ */
+function stripChallengesTaken(arc) {
+  const out = [];
+  let skipping = false;
+  for (const line of String(arc || '').split('\n')) {
+    if (arcHeadingRe('Challenges taken', 'i').test(line)) { skipping = true; continue; }
+    if (skipping) {
+      if (line.trim() === '') { skipping = false; out.push(line); }
+      continue;
+    }
+    out.push(line);
+  }
+  return out.join('\n');
+}
+
+/**
  * Where the STORY LOGIC block ends: the next top-level output heading of the
  * create or the re-tell reply.
  */
@@ -11199,14 +11215,14 @@ function parseStoryLogic(raw) {
   // THE OWED LIST (owner, 2026-10-06, text-v3): what the page text must carry
   // out of the arc. The logic's Facts block already holds exactly the facts the
   // plot uses (one ability or limit per figure, at most two rules of the world),
-  // and the last chain link says why the solution works now and did not before:
-  // the cause of the main turn. Nothing else in the logic or the arc is owed.
+  // Nothing else in the logic or the arc is owed.
   const figureFacts = dashLines(sections.Facts)
     .filter(l => /\((?:commissioned|new)\)/i.test(l))
     .map(l => l.replace(/\s*\((?:commissioned|new)\)/i, '').trim());
   const ruleFacts = facts.map(l => l.replace(/^Rules?\s*:\s*/i, '').trim());
-  const turnCause = chain.length ? chain[chain.length - 1] : '';
-  const owed = [...figureFacts, ...ruleFacts, ...(turnCause ? [`why the turn works now: ${turnCause}`] : [])];
+  // text-v4: the last chain link (why the turn works now) is no longer owed; it
+  // is the arc's reasoning, and listing it made the writer recite the cause.
+  const owed = [...figureFacts, ...ruleFacts];
   // "- <figure>: <motive> → <act>" (2026-09-25). A line without an arrow is
   // kept with an empty act: the reader sees it, nothing is guessed.
   const motives = dashLines(sections.Motives).map((l) => {
@@ -11862,7 +11878,7 @@ function buildTextAuditPrompt(inputData, pages = [], arc = '', { arcHints = '', 
   // guessed by the judge.
   const simpleBand = SIMPLE_BANDS.has(resolveAgeBand(inputData));
   return fillTemplate(template, {
-    STORY_ARC: String(arc || '').trim() || '(no story was recorded — audit the pages alone)',
+    STORY_ARC: stripChallengesTaken(arc).trim() || '(no story was recorded — audit the pages alone)',
     ARC_HINTS: buildCriticArcHintsSection(arcHints),
     // The CHARACTER DETAILS the writer wrote from (2026-09-26, standing rule
     // "every critic judges the source the generator was given"): the same
@@ -12178,24 +12194,6 @@ function parseBeats(raw, expectedPages = []) {
 }
 
 /**
- * The canonical DO-NOT-WRITE list, so every prompt that produces narrative text
- * bans the same categories. Shared by the refiner and by the beats-first text
- * writer.
- *
- * Reads prompts/do-not-write-list.txt directly. Until 2026-09-03 it SLICED the
- * list back out of the unified writer template at runtime, which meant the
- * beats pipeline's do-not-write list lived inside a file the beats pipeline
- * does not use — and deleting that template as dead code would have stripped
- * the list from production with the builder just returning '' (rule-survival
- * audit, item M2). The list now lives in a file this pipeline owns, and the
- * unified templates read it through their {DO_NOT_WRITE_LIST} placeholder.
- */
-function buildDoNotWriteSection({ forChecker = false } = {}) {
-  const list = doNotWriteListBody({ forChecker });
-  return list ? `# DO-NOT-WRITE LIST\n\n${list}` : '';
-}
-
-/**
  * The list's text. The file opens with a line for the WRITER — "the analysis
  * pass does NOT need to re-check them" — which is false for a stage whose job
  * includes the re-check: the outline reviewer (check 25) and the text refine
@@ -12252,7 +12250,7 @@ function buildStoryTextFromBeatsPrompt(inputData, beats = [], expansions = [], a
     })
     .join('\n\n');
   return fillTemplate(template, {
-    STORY_ARC: String(arc || '').trim() || '(no arc was recorded for this story)',
+    STORY_ARC: stripChallengesTaken(arc).trim() || '(no arc was recorded for this story)',
     ARC_HINTS: String(arcHints || '').trim()
       ? `# HINTS — apply these in the text where the beats have not\n\n${HINT_VS_ARC_RULE}\n${HINT_ANCHOR_RULE}\n\n${String(arcHints).trim()}`
       : '',
@@ -12276,7 +12274,6 @@ function buildStoryTextFromBeatsPrompt(inputData, beats = [], expansions = [], a
     // The writer that produced the candidates also picks the shipped title
     // (2026-08-27) — the reader age is the "can a child say it" yardstick.
     AGE: readerAge(inputData),
-    DO_NOT_WRITE_SECTION: buildDoNotWriteSection(),
     PAGE_OPENING_VARIETY: PAGE_OPENING_VARIETY_RULE,
     STYLE_RULEBOOK,
     MOTIVE_AT_THE_ACT: MOTIVE_AT_THE_ACT_RULE,
@@ -13354,6 +13351,7 @@ module.exports = {
   parseChallengesTaken,
   CHALLENGES_TAKEN_RULE,
   parseStoryLogic,
+  stripChallengesTaken,
   isNegativeFigureAnswer,
   arcInventedAllowance,
   critiqueMaxSeverity,
@@ -13409,7 +13407,6 @@ module.exports = {
   parsePlanResponse,
   planBlocks,
   planInstant,
-  buildDoNotWriteSection,
   buildStoryTextFromBeatsPrompt,
   buildTitleRule,
   buildStoryBibleFromBeatsPrompt,

@@ -102,15 +102,14 @@ describe('the DO-NOT-WRITE list as a checker reads it', () => {
 
   const REF_LINE = /analysis pass does NOT need to re-check/;
 
-  it('the refine, whose check 18 is the re-check, is not told there is no re-check', () => {
+  // text-v4: the banned lists live in STYLE_RULEBOOK (proseSlop.js); neither the
+  // beats writer nor the refine carries a separate DO-NOT-WRITE section.
+  it('neither the refine nor the beats writer carries a separate DO-NOT-WRITE section', () => {
     const p = PB.buildTextRefinePrompt({ language: 'en', languageLevel: 'standard', characters: [] },
       [{ pageNumber: 1, text: 'A page.' }], 'FAULT[CAUSE]: p1 - x', '1. A story.');
-    expect(p).toContain('# DO-NOT-WRITE LIST');
-    expect(p).not.toMatch(REF_LINE);
-  });
-
-  it('the writer still gets the full list', () => {
-    expect(PB.buildDoNotWriteSection()).toMatch(REF_LINE);
+    expect(p).not.toContain('# DO-NOT-WRITE LIST');
+    expect(PB.buildStoryTextFromBeatsPrompt({ language: 'en', languageLevel: 'standard', characters: [] },
+      [{ pageNumber: 1, planLine: 'x' }], [], '1. A story.')).not.toContain('# DO-NOT-WRITE LIST');
   });
 
   it('the refine carries no hint block when the story has no hints', () => {

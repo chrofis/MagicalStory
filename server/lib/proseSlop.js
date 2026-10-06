@@ -86,10 +86,19 @@ const SLOP_TYPES = [
   },
 ];
 
-/** The "suddenly" rule; the critic side is the $0 count MECH_SUDDENLY (two per page flags). */
-const SUDDENLY_RULE = '"Suddenly" (or its equivalent in the story\'s language) at most once on a page, and only where something happens without warning.';
+/** The "suddenly" rule; the critic side is the $0 count MECH_SUDDENLY (two per page flags). Banned outright (text-v4): the writer was told "at most once" here and "never" in the DO-NOT-WRITE list. */
+const SUDDENLY_RULE = 'Never "suddenly" or its equivalent in the story\'s language, and never "without warning".';
+
+/**
+ * The old DO-NOT-WRITE list's writer-side bans, folded into one line (text-v4,
+ * owner 2026-10-06): no jokes, the gesture bans and the once-per-book cap, the
+ * page-1 openings, trait labels and buzzwords. The beats writer no longer
+ * carries the separate list; every prose pass reads this line through
+ * STYLE_RULEBOOK.
+ */
+const STOCK_BAN_RULE = 'No jokes, puns or wordplay. No stock gestures (a hand on a shoulder, ruffled hair, a knowing nod), and no gesture (a hug, a wink, a shrug, a high five) twice in the book. No "it was a [adjective] day", no weather, waking up or backstory to open page 1, no trait labels ("she was brave") and no words like dramatic, ethereal, breathtaking or stunning.';
 
 /** The writer-side lines, in order, for STYLE_RULEBOOK. */
-const SLOP_RULES = [...SLOP_TYPES.filter(t => t.rule).map(t => t.rule), SUDDENLY_RULE];
+const SLOP_RULES = [...SLOP_TYPES.filter(t => t.rule).map(t => t.rule), SUDDENLY_RULE, STOCK_BAN_RULE];
 
-module.exports = { SLOP_TYPES, SLOP_RULES, SUDDENLY_RULE };
+module.exports = { SLOP_TYPES, SLOP_RULES, SUDDENLY_RULE, STOCK_BAN_RULE };

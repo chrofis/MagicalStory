@@ -74,7 +74,7 @@ describe('the style rulebook reaches every prose-writing pass', () => {
 
   it("the writer's and the repair's specific-form rule excludes sizes and looks", () => {
     for (const pass of ['writer', 'repair']) {
-      const sentence = built[pass].split('\n').find(l => l.includes('in its specific form')) || '';
+      const sentence = built[pass].split('\n').find(l => l.includes('Only the OWED list is owed')) || '';
       expect(sentence).toMatch(/A size, an age or a look is owed only where something is lifted, hidden, held or fitted/);
     }
   });
@@ -202,5 +202,69 @@ describe('the closing moment and the shown callback reach generator and critic a
 
   it('the rulebook says a shown callback is an act, so every prose pass has it', () => {
     expect(B.STYLE_RULEBOOK).toContain(B.SHOWN_CALLBACK_RULE);
+  });
+});
+
+// text-v4 (owner, 2026-10-06, Opus text review items 1-4): the OWED list holds
+// the figure and rule facts only, the story the text stages read carries no
+// "Challenges taken:" notes, one rulebook line says a rule is said once and
+// never recited, and the beats writer carries no separate DO-NOT-WRITE list.
+describe('text-v4 text-stage inputs', () => {
+  beforeAll(async () => { await require('../../server/services/prompts').loadPromptTemplates(); });
+
+  const LOGIC = [
+    'STORY LOGIC:',
+    'Central figure: Mara',
+    'Want and stakes: she wants the kite back.',
+    'Chain:',
+    '- the kite is stuck',
+    '- she climbs and frees it, because the rope holds now',
+    'Facts:',
+    '- Mara (commissioned): climbs well; limit: afraid of the dark',
+    '- Rule: a knot holds only when pulled twice',
+  ].join('
+');
+
+  it('the OWED list is the figure and rule facts, never the last chain link', () => {
+    const owed = B.parseStoryLogic(LOGIC).owed;
+    expect(owed).toHaveLength(2);
+    expect(owed.join('
+')).not.toMatch(/why the turn works now/);
+  });
+
+  it('stripChallengesTaken drops the bookkeeping list and nothing else', () => {
+    const arc = '1. A story.
+2. The end.
+
+Challenges taken:
+1. The missing stone.
+2. A tide.
+
+OWED:
+- x';
+    const out = B.stripChallengesTaken(arc);
+    expect(out).not.toMatch(/Challenges taken|missing stone|A tide/);
+    expect(out).toContain('2. The end.');
+    expect(out).toContain('OWED:');
+  });
+
+  it('the beats writer shows no Challenges-taken list and no separate DO-NOT-WRITE section', () => {
+    const p = B.buildStoryTextFromBeatsPrompt(inputData, [{ pageNumber: 1, planLine: 'x' }], [], '1. A story.
+
+Challenges taken:
+1. The missing stone.');
+    expect(p).not.toMatch(/Challenges taken|missing stone/);
+    expect(p).not.toContain('# DO-NOT-WRITE LIST');
+  });
+
+  it('a rule or a limit is said once, never recited, retold or explained', () => {
+    expect(B.STYLE_RULEBOOK).toContain('is said once, in a few words, by the one who would say it at the moment it is needed');
+    expect(B.STYLE_RULEBOOK).toContain('or retells what happened, to anyone');
+  });
+
+  it('the old DO-NOT-WRITE bans live in the rulebook: suddenly banned, jokes banned, gesture cap', () => {
+    expect(B.STYLE_RULEBOOK).toMatch(/Never "suddenly"/);
+    expect(B.STYLE_RULEBOOK).toMatch(/No jokes, puns or wordplay/);
+    expect(B.STYLE_RULEBOOK).toMatch(/twice in the book/);
   });
 });

@@ -5,7 +5,7 @@
  * Two lists the beats chain enforces used to be SLICED out of the "legacy"
  * unified templates at runtime (rule-survival audit 2026-09-03, items M1+M2):
  *   - the DO-NOT-WRITE list, read from prompts/do-not-write-list.txt by
- *     buildDoNotWriteSection() for the beats text writer AND the refiner;
+ *     the split-review reviewer (the beats writer and refiner stopped reading it in text-v4);
  *   - the text review CRITERIA, cut out of outline-analysis-imagefirst.txt by
  *     buildTextRefinePrompt().
  * Deleting either "unused" file as dead code would therefore have stripped the
@@ -66,7 +66,7 @@ const readPrompt = f => fs.readFileSync(path.join(ROOT, 'prompts', f), 'utf8');
     // story-unified.txt / story-unified-imagefirst.txt read the list through
     // {DO_NOT_WRITE_LIST} and were pinned here until 2026-09-15, when both were
     // deleted as unreachable (docs/decisions.md). The live consumers are
-    // buildDoNotWriteSection (beats writer + refiner, pinned above) and the
+    // the (text-v4: beats writer and refiner no longer read it)
     // split-review reviewer prompt.
   }
 
