@@ -47,6 +47,7 @@ You are an Art Director reviewing scene briefs for children's book illustrations
 33. **A TWO-SIDED PROP** - {MULTI_PICTURE_PROP}
 34. **A CREATURE IN FRAME HAS A WRITTEN FACE** - {CREATURE_FACE} Write it in the terms of the creature-tone block below. {CREATURE_FIELD}
 35. **TRUE RELATIVE SIZE** - {TRUE_RELATIVE_SIZE}
+36. **NO PARTIAL IMMERSION** - {FOOTING_RULE}
 {CREATURE_TONE}
 
 ---
@@ -257,8 +258,8 @@ After the prose, emit exactly `---METADATA---` on its own line, then a single JS
     "fixesApplied": []
   },
   "characters": [
-    {"name": "CharacterA", "clothing": "winter", "position": "right foreground", "depth": "foreground", "looksAt": "LOC001", "expression": "alarmed, mouth open, brows pulled tight", "emotion": "afraid"},
-    {"name": "CharacterB", "clothing": "winter", "position": "beside CharacterA", "depth": "midground", "looksAt": "LOC001", "expression": "calm, attentive, neutral mouth", "emotion": "neutral"}
+    {"name": "CharacterA", "clothing": "winter", "position": "right foreground", "depth": "foreground", "footing": "ground", "looksAt": "LOC001", "expression": "alarmed, mouth open, brows pulled tight", "emotion": "afraid"},
+    {"name": "CharacterB", "clothing": "winter", "position": "beside CharacterA", "depth": "midground", "footing": "ground", "looksAt": "LOC001", "expression": "calm, attentive, neutral mouth", "emotion": "neutral"}
   ],
   "shot": "medium",
   "timeOfDay": "afternoon",
@@ -301,6 +302,7 @@ After the prose, emit exactly `---METADATA---` on its own line, then a single JS
 - `wornItems[]`: {WORN_ITEMS_ROW}
 
 - `characters[]`: one entry per character. Always `name`, `clothing`, `position`, `depth` and `looksAt`; for foreground/midground characters add `expression` and `emotion` (rule 28b). `depth` is `foreground`, `midground` or `background` — distance from the camera, never elevation and never a size.
+  - {FOOTING_FIELD}
   - `position` is a short relational phrase matching the prose (`on the boat`, `behind the protagonist`, `in the foreground`, `at the doorway`). Use `left`/`right` only when the VISUAL LANGUAGE rule allows it.
   - `clothing` must match the outline exactly — if the outline says `costumed`, write `costumed`, not `standard`. Also describe the costume in the prose.
   - `expression` is a short visible-cue phrase from the page text ("alarmed, mouth open, brows pulled tight"), never an emotion word alone. Keep it consistent with the prose. The underlying emotion comes from the page text and the draft — you may strengthen the visible cue, never replace the emotion itself.

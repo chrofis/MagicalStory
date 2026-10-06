@@ -1084,6 +1084,49 @@ function checkCharacterFields(page, metadata) {
 }
 
 /**
+ * footing_invalid / footing_in_water — the no-partial-immersion rule as fields
+ * (owner rule 2026-08-15; shotVocabulary.FOOTING_RULE). Every character row
+ * carries `footing` from FOOTING_VALUES; a row without a valid one is a fault,
+ * and so is a figure whose `footing` is not `swimming` or `aboard` on a page
+ * whose cited vantage the Visual Bible set `cameraOn: "water"` — the plate
+ * puts the camera in the water, and a figure with footing is then drawn
+ * standing on the surface. Structural only: no prose is read. Staging job
+ * job_1791267520938_essbvehs8 p3.
+ */
+function checkFooting(page, metadata, visualBible) {
+  const rows = (metadata && Array.isArray(metadata.characters)) ? metadata.characters : [];
+  const named = rows.filter(c => c && typeof c === 'object' && c.name);
+  if (!named.length) return [];
+  const { FOOTING_VALUES } = require('./shotVocabulary');
+  const out = [];
+  const bad = named.filter(c => !FOOTING_VALUES.includes(String(c.footing || '').trim().toLowerCase()));
+  if (bad.length) {
+    out.push({
+      pageNumber: page.pageNumber, type: 'footing_invalid', characters: bad.map(c => c.name),
+      detail: `${bad.map(c => c.name).join(', ')} ${bad.length > 1 ? 'have' : 'has'} no valid \`footing\` in the characters[] row. Set it to one of ${FOOTING_VALUES.map(v => `\`${v}\``).join(', ')}; a figure in shallow water is staged at the water's edge (\`ground\`) or swimming.`,
+    });
+  }
+  if (visualBible) {
+    const { getPrimaryVantageForPage } = require('./sceneMetadata');
+    const objects = (metadata && Array.isArray(metadata.objects)) ? metadata.objects
+      : ((metadata && metadata.fullData && Array.isArray(metadata.fullData.objects)) ? metadata.fullData.objects : []);
+    const hit = getPrimaryVantageForPage({ objects, fullData: { shot: briefField(metadata, 'shot') } }, visualBible, { pageNumber: Number(page.pageNumber) });
+    const vantages = hit && hit.location && Array.isArray(hit.location.vantages) ? hit.location.vantages : [];
+    if (hit && vantages.includes(hit.vantage) && String(hit.vantage.cameraOn || '').trim().toLowerCase() === 'water') {
+      const standing = named.filter(c => ['ground'].includes(String(c.footing || '').trim().toLowerCase()));
+      if (standing.length) {
+        const alt = vantages.filter(v => v && v !== hit.vantage && String(v.cameraOn || '').trim().toLowerCase() !== 'water').map(v => v.id);
+        out.push({
+          pageNumber: page.pageNumber, type: 'footing_in_water', characters: standing.map(c => c.name), ids: [String(hit.vantageId)],
+          detail: `${hit.vantageId} puts the camera in the water, and ${standing.map(c => c.name).join(', ')} ${standing.length > 1 ? 'have' : 'has'} \`footing: ground\`. Cite a vantage on the shore${alt.length ? ` (${alt.join(', ')})` : ''}, or stage ${standing.length > 1 ? 'them' : 'the figure'} swimming (\`footing: swimming\`).`,
+        });
+      }
+    }
+  }
+  return out;
+}
+
+/**
  * creature_row_missing — the brief cites a Visual Bible animal in `objects[]`
  * and gives it no `creatures[]` row (promptBuilders.CREATURE_FIELD_RULE). The
  * row is what carries the creature's depth, gaze, expression and emotion into
@@ -1712,6 +1755,7 @@ module.exports = {
   checkNegationNamed,
   checkElementUncited,
   checkCharacterFields,
+  checkFooting,
   checkCreatureRows,
   checkCastNotInPlan,
   checkRequiredTextUndeclared,

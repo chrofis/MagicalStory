@@ -19,7 +19,7 @@ const { commissionedChildBand, buildChildAgeBandNote, secondaryAgeCues } = requi
 const { REQUIRED_TEXT_AUTHORING_RULE } = require('./requiredText');
 const { GARMENT_BACK_RULE } = require('./wornItems');
 const { SCALE_CLASS_SPEC, ANIMAL_ANATOMY_SPEC, GROWN_CREATURE_SCALE_CLASSES, buildVisualBiblePrompt, englishEntityRef, englishLocationRef, clauseRef, objectStates, resolveObjectState, elementScaleNote, withScaleNote } = require('./visualBible');
-const { SHOT_ENUM, SHOT_POSITIONS, DISTANCE_SHOTS, SHOT_DEFINITIONS, CLOSEUP_BELOW_WAIST_PHRASE, CLOSEUP_KEPT_RULE, CLOSEUP_KEPT_FIXED_SHOT_RULE, PLAN_SHOT_PLACEHOLDER, shotDistributionPhrase, buildShotDefinitions, OTS_NEAR_FIGURE_CROP, OTS_NEAR_FIGURE_RULE, OTS_NO_CONTACT_RULE, isOverTheShoulderPerspective, VANTAGE_SHOT_RULE, GROUP_STAGING_RULE, GROUP_STAGING_FIXED_SHOT_RULE } = require('./shotVocabulary');
+const { SHOT_ENUM, SHOT_POSITIONS, DISTANCE_SHOTS, SHOT_DEFINITIONS, CLOSEUP_BELOW_WAIST_PHRASE, CLOSEUP_KEPT_RULE, CLOSEUP_KEPT_FIXED_SHOT_RULE, FOOTING_RULE, FOOTING_FIELD, PLAN_SHOT_PLACEHOLDER, shotDistributionPhrase, buildShotDefinitions, OTS_NEAR_FIGURE_CROP, OTS_NEAR_FIGURE_RULE, OTS_NO_CONTACT_RULE, isOverTheShoulderPerspective, VANTAGE_SHOT_RULE, GROUP_STAGING_RULE, GROUP_STAGING_FIXED_SHOT_RULE } = require('./shotVocabulary');
 const { labelOf } = require('./vbLabel');
 const { SLOP_RULES } = require('./proseSlop');
 const { castCoverage, castCoverageRule, castActionRule, castTableSpec, castTableFormat, castTableBlock, groupPageBudget, groupPageRule, typedPlanTargets, typedTargetsRule } = require('./castCoverage');
@@ -9626,7 +9626,9 @@ const GAP_ACTION_FRAMING_FIXED_SHOT_RULE = `${GAP_ACTION_WHEN} the page's fixed 
  */
 function shotRuleFills({ fixedShot = false } = {}) {
   const shotField = 'Decide it once — the scene prose and the metadata use this same framing, and it is a framing the plate of the vantage this page cites can hold.';
+  const footing = { FOOTING_RULE, FOOTING_FIELD };
   return fixedShot ? {
+    ...footing,
     GAP_ACTION_FRAMING: GAP_ACTION_FRAMING_FIXED_SHOT_RULE,
     CLOSEUP_KEPT: CLOSEUP_KEPT_FIXED_SHOT_RULE,
     GROUP_STAGING: GROUP_STAGING_FIXED_SHOT_RULE,
@@ -9634,6 +9636,7 @@ function shotRuleFills({ fixedShot = false } = {}) {
     SHOT_FIELD: `On a story page it is the page's fixed shot exactly, and the prose stages the moment in that framing; on a cover, ${shotField.charAt(0).toLowerCase()}${shotField.slice(1)}`,
     CLOSEUP_WAIST_SHOT: 'On a story page the shot is fixed: a close-up whose moment reaches below the waist is staged waist-up.',
   } : {
+    ...footing,
     GAP_ACTION_FRAMING: GAP_ACTION_FRAMING_RULE,
     CLOSEUP_KEPT: CLOSEUP_KEPT_RULE,
     GROUP_STAGING: GROUP_STAGING_RULE,

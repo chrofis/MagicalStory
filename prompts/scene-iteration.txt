@@ -45,6 +45,7 @@
 22. **A two-sided prop.** {MULTI_PICTURE_PROP}
 23. **A creature in frame has a written face.** {CREATURE_FACE} Write it in the terms of the creature-tone block below. {CREATURE_FIELD}
 24. **True relative size.** {TRUE_RELATIVE_SIZE}
+25. **No partial immersion.** {FOOTING_RULE}
 {CREATURE_TONE}
 
 ---
@@ -140,8 +141,8 @@ After the prose, emit exactly `---METADATA---` on its own line, then a single JS
     "fixesApplied": []
   },
   "characters": [
-    {"name": "CharacterA", "clothing": "winter", "position": "foreground", "depth": "foreground", "looksAt": "LOC001", "expression": "alarmed, mouth open, brows pulled tight", "emotion": "afraid"},
-    {"name": "CharacterB", "clothing": "winter", "position": "beside CharacterA", "depth": "midground", "looksAt": "LOC001", "expression": "calm, attentive, neutral mouth", "emotion": "neutral"}
+    {"name": "CharacterA", "clothing": "winter", "position": "foreground", "depth": "foreground", "footing": "ground", "looksAt": "LOC001", "expression": "alarmed, mouth open, brows pulled tight", "emotion": "afraid"},
+    {"name": "CharacterB", "clothing": "winter", "position": "beside CharacterA", "depth": "midground", "footing": "ground", "looksAt": "LOC001", "expression": "calm, attentive, neutral mouth", "emotion": "neutral"}
   ],
   "shot": "medium",
   "timeOfDay": "afternoon",
@@ -173,6 +174,7 @@ After the prose, emit exactly `---METADATA---` on its own line, then a single JS
 <!-- TEXT_OVERLAY_BEGIN -->
 - `draftValidation`: must include `calmZoneCheck` confirming no named character / weapon / crowd in the textPosition corner.
 <!-- TEXT_OVERLAY_END -->
+- {FOOTING_FIELD}
 - `characters[]`: one entry per character. Always `name`, `clothing`, `position`, `depth` and `looksAt`. `depth` is `foreground`, `midground` or `background` — distance from the camera, never elevation and never a size. `position` is a short relational phrase matching the prose (`on the boat`, `behind the protagonist`, `in the foreground`, `at the doorway`). Use `left`/`right` only when Rule 10 allows it. Add `"perspective": "back view"`, `"side"` or `"over-the-shoulder"` (the near figure of an `over-the-shoulder` page) only when non-standard. Add `"depth": "background"` only for tiny/distant figures. For foreground/midground characters add `expression`: a short visible-cue phrase from the page text ("alarmed, mouth open, brows pulled tight"), never an emotion word alone; keep it consistent with the prose. Add `emotion` beside it (rule 6d). The underlying emotion comes from the page text and the draft — strengthen the visible cue if needed, never replace the emotion itself.
 - `clothing` must match the outline exactly — if the outline says `costumed`, write `costumed`, not `standard`. Also describe the costume in the prose.
 - `objects[]`: string array of Visual Bible IDs only (`LOC001`, `ART002.2`). Include every recurring element visible. At most {VB_ELEMENT_BUDGET} of them per page — secondary characters, animals, artifacts and vehicles count, a LOC does not; keep the ones the page is about. A real landmark is cited by its bare id (`LOC003`); its reference photo is the one its plate cites.

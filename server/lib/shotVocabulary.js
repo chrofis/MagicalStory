@@ -556,6 +556,22 @@ const CLOSEUP_KEPT_RULE = 'A close-up the page\'s plan asks for stays `close-up`
 const CLOSEUP_KEPT_FIXED_SHOT_RULE = 'A `close-up` stays `close-up`: restage the moment waist-up — holding, reaching, reacting — and bring what the moment acts on up into the frame.';
 
 /**
+ * FOOTING (owner rule 2026-08-15, decisions.md "no partial immersion"; made
+ * structural 2026-10-06). Every character row of a brief carries `footing`,
+ * so the rule "on standable ground or fully swimming" is a field the brief
+ * check reads, not prose it would have to interpret. Staging job
+ * job_1791267520938_essbvehs8 p3: the rule had survived only in the Visual
+ * Bible prompt and the image prompt after the scene review was deleted
+ * (7c726d21e), and the brief put a figure "in the shallow seawater" on a
+ * vantage the Bible had placed in the water; the model drew a desert.
+ * `cameraOn` is the matching field on a Visual Bible vantage.
+ */
+const FOOTING_VALUES = ['ground', 'swimming', 'aboard', 'airborne'];
+const CAMERA_ON_VALUES = ['ground', 'water', 'aboard'];
+const FOOTING_RULE = 'No partial immersion. A character is either on standable ground or fully swimming. Wading, ankle-deep and knee-deep poses render as standing on the water surface — restage the moment at the water2019s edge (`footing: ground`, on sand, a bank, a jetty or a rock) or as swimming (`footing: swimming`). A plan line that says "stands in the shallow water" is staged at the water2019s edge, the water beside and behind the figure.';
+const FOOTING_FIELD = `\`footing\` on every character row says what the figure is on: ${FOOTING_VALUES.map(v => `\`${v}\``).join(', ')} — \`ground\` is any standable surface (bank, sand, floor, ice, stair, rock), \`swimming\` is in the water with no footing, \`aboard\` is on a vessel, vehicle or mount, \`airborne\` is flying, leaping or falling. A figure whose \`footing\` is not \`swimming\` is never written into the water.`;
+
+/**
  * A capitalised name or a person pronoun — kept for the entry that needs an
  * actor named BEFORE the match rather than inside it. No current entry does
  * (every one is `selfSubject`), and the guard stays because the next pattern
@@ -899,6 +915,10 @@ module.exports = {
   CLOSEUP_BELOW_WAIST_VERBS,
   CLOSEUP_KEPT_RULE,
   CLOSEUP_KEPT_FIXED_SHOT_RULE,
+  FOOTING_VALUES,
+  CAMERA_ON_VALUES,
+  FOOTING_RULE,
+  FOOTING_FIELD,
   CLOSEUP_BELOW_WAIST_PHRASE,
   closeUpBelowWaistVerbs,
   shotFloors,
