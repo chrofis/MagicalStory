@@ -5654,6 +5654,23 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "text-v3-owed-list",
+      "commits": [
+        "e5ee6bac4"
+      ],
+      "addedAt": "2026-10-06",
+      "claim": "A full story draft is written against the arc OWED list: the writer draft carries few STYLE oddities (because-clauses, named feelings, rule-explaining, recap), a page has at most one lone one-liner paragraph filed, and the book audit files a presence fault only for a character the words put IN the pictured instant.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Read the writer draft (stories.data.writerText) and the blind-audit STYLE lines; read the book-audit TEXT route faults and the post-audit round for any rewritten off-picture mention."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [
