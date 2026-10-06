@@ -118,7 +118,7 @@ async function decideBriefFields({ beats, visualBible, bibleSections, approvedAr
   const commissioned = (inputData.characters || []).map(c => c && c.name).filter(Boolean);
   const els = jevDecisions.vbElements(vb, commissioned);
   const decidedIds = els.map(e => e.id);
-  const vehicleIds = els.filter(e => e.type === 'vehicle').map(e => e.id);
+  const vehicleIds = els.filter(e => e.type === 'vehicle' || e.type === 'creature').map(e => e.id); // what Jev may set `aboard` to
   const pagesOf = e => (Array.isArray(e.appearsInPages) ? e.appearsInPages : (Array.isArray(e.pages) ? e.pages : [])).map(Number);
   // The Art Director's own page claims from the Visual Bible call: the draft
   // the 0.5–0.7 object band reads (it read the brief's cites before).
@@ -263,21 +263,37 @@ function jevAuditYes(answers, id) {
 }
 
 /**
- * The yes/no each OFFERED landmark gets per cover (owner, 2026-10-04): does
- * this famous place of the town suit this cover's picture? Generic wording —
- * the cover's purpose and the place's own label, nothing of any one story.
+ * WHAT EACH COVER IS FOR (owner, 2026-10-04, widened 2026-10-06): the key place of the whole story, where it
+ * starts, where it ends at rest. Generic wording, no story's own names.
  */
-const COVER_OFFERED_Q = Object.freeze({
-  frontCover: label => `This famous place of the book's town suits the book's front cover: a bright portrait of the cast standing together in front of it, under the book's title. The place: ${label}`,
-  initialPage: label => `This famous place of the book's town suits the title page, the opening picture before the story begins: the cast standing together in front of it, setting out. The place: ${label}`,
-  backCover: label => `This famous place of the book's town suits the back cover, a calm closing picture after the adventure: the cast standing together, at rest, in front of it. The place: ${label}`,
+const COVER_PURPOSE = Object.freeze({
+  frontCover: "the book's front cover, under the book title: the place and viewpoint that best stands for the whole story, its key place",
+  initialPage: 'the title page inside the book, the opening picture before page 1: the place and viewpoint where the story begins',
+  backCover: 'the back cover, a calm closing picture after the adventure: the place and viewpoint where the story ends at rest',
 });
 
-const COVER_PLACE_Q = Object.freeze({
-  frontCover: 'The front cover, under the book title: the place and viewpoint that best stands for the whole story — its key place, where the cast can stand together.',
-  initialPage: 'The title page inside the book, the opening picture before page 1: the place and viewpoint where the story begins, where the cast can stand together.',
-  backCover: 'The back cover, a calm closing picture after the adventure: the place and viewpoint where the story ends at rest, where the cast can stand together.',
-});
+/**
+ * The cast's footing on a cover (owner, 2026-10-06): standing together on solid ground, OR, in a book on
+ * the water or in the air, swimming or floating together, or standing aboard. Evidence: staging
+ * essbvehs8 and ypl33 (mermaid books) put two covers inland because "on solid ground" ruled the sea out.
+ */
+const COVER_FOOTING = 'the cast together, whole in frame: standing on solid ground, or, where the story is on or under the water or in the air, swimming, floating or standing aboard together';
+
+/** A book with one place only (owner, 2026-10-06): its covers are the same place from other viewpoints, in other light. */
+const COVER_ONE_PLACE_NOTE = " This book has one place only: the covers show it from different viewpoints and in the light of their own moment.";
+
+/**
+ * ONE QUESTION PER CANDIDATE PER COVER, the same wording for a visited vantage and an offered landmark
+ * (owner, 2026-10-06). Two scales used to meet: the visited vantages split one choice (probabilities
+ * summing to 1), each offered landmark got its own yes/no on "suits the cover", with no story in it, so
+ * inland landmarks rated 0.08-0.21 on story fit still beat the reef and the jetty (staging essbvehs8,
+ * ypl33). Now every candidate is asked: is this the place for THIS cover's purpose, with this cast footing,
+ * in THIS story. P(yes) of each is directly comparable.
+ */
+const coverFitQuestion = (coverKey, label, { onePlace = false } = {}) =>
+  `This place and viewpoint is the right one for ${COVER_PURPOSE[coverKey]}, showing ${COVER_FOOTING}, in this story.${onePlace ? COVER_ONE_PLACE_NOTE : ''} The place: ${label}`;
+
+
 
 const normName = x => String(x || '').toLowerCase().replace(/[()[\],.]/g, ' ').replace(/\s+/g, ' ').trim();
 
@@ -497,7 +513,7 @@ function assignCoverPlaces(coverKeys, probs, { cands = null, casts = null, floor
 /** The cover question's state: the arc and the whole page plan (shot stripped). */
 function coverPlaceState(arc, pages, town = null) {
   const plan = pages.map(p => `Page ${p.pageNumber}: ${jevDecisions.stripPlanShot(p.planLine)}`).join('\n');
-  return `THE STORY, beat by beat:\n${String(arc || '').trim() || '(no arc stored)'}\n\n${jevDecisions.PLAN_HEAD}\n${plan}\n\nTHE BOOK'S COVERS each show the cast standing together, whole in frame, on solid ground at a place of this story${town ? ` or a famous place of its town, ${town}` : ''}, seen wide.`;
+  return `THE STORY, beat by beat:\n${String(arc || '').trim() || '(no arc stored)'}\n\n${jevDecisions.PLAN_HEAD}\n${plan}\n\nTHE BOOK'S COVERS each show the cast together, whole in frame, at a place of this story${town ? ` or a famous place of its town, ${town}` : ''}, seen wide.`;
 }
 
 /**
@@ -510,43 +526,25 @@ function coverPlaceState(arc, pages, town = null) {
  */
 async function decideCoverPlaces({ arc, pages, visualBible, coverKeys, casts = {}, availableLandmarks = [], town = null }, opts = {}) {
   const stats = jevDecisions.newStats();
-  const keys = (coverKeys || []).filter(k => COVER_PLACE_Q[k]);
+  const keys = (coverKeys || []).filter(k => COVER_PURPOSE[k]);
   const cands = coverPlaceCandidates(visualBible, pages.map(p => Number(p.pageNumber)), availableLandmarks);
   if (!keys.length) return { covers: [], candidates: [], stats: jevDecisions.summarise(stats) };
   if (!cands.length) return { covers: [], candidates: [], reason: 'no wide or ultra-wide vantage of a location a story page stands on, and no offered landmark with a cover photo', stats: jevDecisions.summarise(stats) };
-  // TWO RANKINGS (owner, 2026-10-04): the visited vantages compete in one
-  // choice per cover, as before; each OFFERED landmark gets its own yes/no per
-  // cover — never ranked against the places the story visits, which take
-  // nearly all of a shared choice's probability (replay: ~0.01 for every
-  // offered landmark). The rating of a candidate is its choice probability or
-  // its P(yes); assignCoverPlaces reads both on one scale.
+  // ONE SCALE (owner, 2026-10-06): every candidate, visited or offered, gets the same yes/no per cover
+  // (coverFitQuestion), so a rating of a candidate is its P(yes) and assignCoverPlaces reads them all
+  // together. The earlier two-ranking design (a shared choice for the visited vantages, an independent
+  // yes/no for each offered landmark) put an inland landmark above the reef the story is set in.
   const state = coverPlaceState(arc, pages, town);
-  const visited = cands.map((c, j) => [c, j]).filter(([c]) => !c.offered);
-  const offered = cands.map((c, j) => [c, j]).filter(([c]) => c.offered);
-  const reqs = [];
-  for (const k of keys) {
-    if (visited.length) {
-      reqs.push({ key: `cover:${k}`, state, questions: { PLACE: { type: 'choice', instructions: COVER_PLACE_Q[k], criteria: Object.fromEntries(visited.map(([c, j]) => [`v${j}`, c.label])) } } });
-    }
-    if (offered.length) {
-      reqs.push({ key: `offered:${k}`, state, questions: Object.fromEntries(offered.map(([c, j]) => [`o${j}`, { type: 'noul', instructions: COVER_OFFERED_Q[k](c.label) }])) });
-    }
-  }
+  const onePlace = new Set(cands.map(c => c.base)).size === 1;
+  const reqs = keys.map(k => ({
+    key: `cover:${k}`, state,
+    questions: Object.fromEntries(cands.map((c, j) => [`c${j}`, { type: 'noul', instructions: coverFitQuestion(k, c.label, { onePlace }) }])),
+  }));
   const ans = await jevDecisions.runJevRequests(reqs, { ...opts, usageLabel: 'jev_decisions_cover_place', stats });
   const mean = xs => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
   const probs = keys.map((k) => {
-    const row = new Array(cands.length).fill(0);
     const a = ans.get(`cover:${k}`) || [];
-    for (const [, j] of visited) {
-      row[j] = mean(a.map((x) => {
-        const q = x && x.PLACE;
-        if (!q || !q.probabilities) throw new JevDecisionError(`Jev cover place answer for ${k} carries no probabilities`);
-        return Number(q.probabilities[`v${j}`] || 0);
-      }));
-    }
-    const b = ans.get(`offered:${k}`) || [];
-    for (const [, j] of offered) row[j] = mean(b.map(x => jevAuditYes(x, `o${j}`)));
-    return row;
+    return cands.map((_, j) => mean(a.map(x => jevAuditYes(x, `c${j}`))));
   });
   const { pick, unmet } = assignCoverPlaces(keys, probs, { cands, casts: keys.map(k => casts[k] || []) });
   const covers = keys.map((k, i) => ({
@@ -720,5 +718,5 @@ async function decideCoverPopulation({ arc, coverBeats, visualBible, decided = {
 module.exports = {
   litCandidates, offFrameOf, coverLight, coverFacts, decideCoverPopulation, COVER_SHOT, COVER_GAZE,
   decideBriefFields, assembleBriefs, pageLocations, visualBibleJsonOf,
-  COVER_PLACE_SHOTS, COVER_PLACE_Q, COVER_OFFERED_Q, COVER_PLACE_FLOOR, COVER_PHOTO_MIN_SCORE, coverPhotoOf, bibleLocationOf, materializeCoverPlaces, coverPlaceLabel, coverPlaceCandidates, assignCoverPlaces, coverPlaceState, decideCoverPlaces, applyCoverPlacePages,
+  COVER_PLACE_SHOTS, COVER_PURPOSE, COVER_FOOTING, COVER_ONE_PLACE_NOTE, coverFitQuestion, COVER_PLACE_FLOOR, COVER_PHOTO_MIN_SCORE, coverPhotoOf, bibleLocationOf, materializeCoverPlaces, coverPlaceLabel, coverPlaceCandidates, assignCoverPlaces, coverPlaceState, decideCoverPlaces, applyCoverPlacePages,
 };

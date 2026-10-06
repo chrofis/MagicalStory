@@ -42,6 +42,9 @@ STRUCTURE REFERENCE: the image labelled [Visual Bible reference] is the referenc
 ### LIGHT_FOG
 - Light, fog: fog softens the distance. Look at the far distance. Far buildings, hills or trees drawn with crisp edges, full colour and fine detail — as clear as the near ground — FAIL (check key `light`); name what stands sharp in the distance.
 
+### LIGHT_SNOW_LYING
+- Light, snow lying: the weather is snow lying on the ground. Look at the ground, roofs and branches. Bare ground, green grass or snow-free roofs where the place is open to the weather FAIL (check key `light`); name what is bare. Falling snow is not required.
+
 ### ERA_CHECK
 - Anachronistic elements for the stated STORY ERA above: are there objects that don't fit the period? (FAIL — name them. Cars, parked vehicles, modern street lights, traffic signs, billboards, power lines, utility poles, satellite dishes, air conditioners, modern shopfront windows with price stickers, commercial ads, plastic bins, painted crosswalks, road markings, telephone poles, fire hydrants. A real landmark the scene is set at is never one of them — it stays as it really stands. Skip this check only if the story era is "present-day" or "modern".)
 

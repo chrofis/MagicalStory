@@ -3850,7 +3850,25 @@ function recordElementCellGate(visualBible, elementId, verdict) {
   }
 }
 
+/**
+ * The aboard id whose reference image is WITHHELD from the grids (owner, 2026-10-06). A vessel or structure the
+ * camera stands on or inside is withheld: its render is an exterior view and the page is deck-level. A CREATURE
+ * the cast rides or sits inside (`ANI...`) is the ground too, but it is drawn in the page itself, from its
+ * reference cell, so its cell stays. Null when nothing is withheld.
+ */
+function aboardWithheldId(aboardId) {
+  const id = String(aboardId || '').trim();
+  return id && !/^ANI/i.test(id) ? id : null;
+}
+
+/** Is this aboard id a creature the cast rides or sits inside? */
+function isCreatureAboard(aboardId) {
+  return /^ANI/i.test(String(aboardId || '').trim());
+}
+
 module.exports = {
+  aboardWithheldId,
+  isCreatureAboard,
   recordElementCellGate,
   SCALE_CLASSES,
   SCALE_CLASS_SPEC,

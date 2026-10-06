@@ -1630,9 +1630,11 @@ async function buildPageCompositeRefs(visualBible, pageNumber, landmarkPhotos = 
     finalLandmarkPhotos = [];
     log.debug(`🔲 [${logTag}] Page ${pageNumber}: sceneBackground set — dropping plate-borne elements and landmarks from composite refs`);
   }
-  if (aboardId) {
+  // A ridden or entered creature keeps its cell (visualBible.aboardWithheldId): it is drawn in the page.
+  const withheldAboardId = require('./visualBible').aboardWithheldId(aboardId);
+  if (withheldAboardId) {
     const before = elementReferences.length;
-    elementReferences = elementReferences.filter(e => e.id !== aboardId);
+    elementReferences = elementReferences.filter(e => e.id !== withheldAboardId);
     if (elementReferences.length < before) {
       log.debug(`🔲 [${logTag}] Page ${pageNumber}: aboard ${aboardId} withheld from the grid (exterior render, deck-level page)`);
     }

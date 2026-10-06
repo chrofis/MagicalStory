@@ -161,7 +161,7 @@ function buildCoverBeats(inputData = {}, { coverTypes = ['frontCover', 'initialP
 const COVER_OWN_PLACE = 'its own place: a Visual Bible location no other cover cites while the bible holds one no cover uses yet, otherwise a vantage (`LOC###.N`) of it no other cover cites';
 
 /** Where a cover stands when the Art Director picks it (with COVER_OWN_PLACE) — see COVER_DECIDED_PLACE. */
-const COVER_KEY_PLACE = 'at the story\'s key place: a real landmark from the Visual Bible (`isRealLandmark: true`) that the pages use; with no real landmark in the bible, the most story-defining invented place; a place the cast stand in on solid ground, never under water or in the air';
+const COVER_KEY_PLACE = 'at the story\'s key place: a real landmark from the Visual Bible (`isRealLandmark: true`) that the pages use; with no real landmark in the bible, the most story-defining invented place; a place the cast are together in: standing on solid ground, or swimming, floating or aboard together where the story is on or under the water or in the air';
 
 /**
  * CODE DECIDES THE PLACE (owner, 2026-10-04). On the Jev path each cover's
@@ -173,7 +173,7 @@ const COVER_KEY_PLACE = 'at the story\'s key place: a real landmark from the Vis
  * keeps COVER_KEY_PLACE and COVER_OWN_PLACE, and the brief check
  * `cover_location_repeated` holds those covers to them.
  */
-const COVER_DECIDED_PLACE = 'seen wide, at the place its FIXED location names, on solid ground the cast stand on';
+const COVER_DECIDED_PLACE = 'seen wide, at the place its FIXED location names, where the cast are together: on solid ground, or swimming, floating or aboard together where the story is on or under the water or in the air';
 
 /** True for a cover page number (-1 / -2 / -3). */
 function isCoverPage(pageNumber) {

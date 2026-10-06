@@ -123,19 +123,54 @@ const JEV_TIME_CRITERIA = Object.fromEntries(LIGHTS.map(l => [l.id, l.jev]));
 const JUDGE_SKYLESS_NOTES = LIGHTS.filter(l => !l.hour).map(l => l.judge).join('; ');
 
 /**
- * The weathers: id -> what Jev is told it means. `none`: an interior, where the weather is not visible.
+ * THE WEATHER TABLE: the one place a `weather` value is defined (owner, 2026-10-06, same rule as LIGHTS).
+ * Jev's criteria, the phrases, the sky-owning set, the neighbour rule of the visual-flow judge and the
+ * plate-QC checks are all derived from it. `sky: 'covers'` weathers OWN the sky (no sun, moon or blue sky;
+ * `day`/`dark` phrases, closed by COVERED_SKY_CLAUSE); `sky: 'open'` weathers leave the sky to the hour
+ * (`open` phrase). `near`: the weathers a judge cannot tell from this one (a drizzle beside a rain), so a
+ * rendered neighbour is never a contradiction (weatherContradicts). `qc`: the plate-QC template key of the
+ * extra check this weather gets. `none` is an interior, where the weather is not visible.
  * Jev's answer is advisory (the Art Director's own `weather` stays the field).
  */
-const JEV_WEATHER_CRITERIA = {
-  clear: 'clear sky',
-  overcast: 'overcast, grey clouds',
-  rain: 'rain',
-  snow: 'snow',
-  fog: 'fog or mist',
-  storm: 'storm, strong wind',
-  none: 'none: the scene is indoors',
-};
-const WEATHERS = Object.keys(JEV_WEATHER_CRITERIA);
+const WEATHER_TABLE = [
+  { id: 'clear', jev: 'clear sky', sky: 'open', open: 'a clear sky', near: ['windy', 'heat', 'rainbow'] },
+  { id: 'overcast', jev: 'overcast, grey clouds', sky: 'covers',
+    day: 'overcast: a flat grey cloud-covered sky, soft even light, soft faint shadows',
+    dark: 'overcast: a flat dark cloud-covered sky', near: ['fog', 'drizzle'] },
+  { id: 'rain', jev: 'rain', sky: 'covers',
+    day: 'rain falling from a grey cloud-covered sky, surfaces wet and shining',
+    dark: 'rain falling from a dark cloud-covered sky, surfaces wet and shining with the reflected lamplight', near: ['drizzle', 'storm', 'thunder'] },
+  { id: 'drizzle', jev: 'drizzle: a fine light rain from a grey sky, surfaces damp', sky: 'covers',
+    day: 'a fine drizzle falling from a grey cloud-covered sky, surfaces damp and dull',
+    dark: 'a fine drizzle falling from a dark cloud-covered sky, surfaces damp with a few lamp reflections', near: ['rain', 'overcast', 'fog'] },
+  { id: 'snow', jev: 'snow', sky: 'covers',
+    day: 'snow falling from a pale grey sky',
+    dark: 'snow falling from a dark grey sky', near: ['snow-lying'] },
+  { id: 'snow-lying', jev: 'snow lying: a dry day with snow on the ground, roofs and branches, none falling', sky: 'open',
+    open: 'snow lying thick on the ground, roofs and branches, none falling', qc: 'LIGHT_SNOW_LYING', near: ['snow', 'clear', 'overcast'] },
+  { id: 'fog', jev: 'fog or mist', sky: 'covers',
+    day: 'fog: the sky a flat pale grey-white, distant forms fading out into the fog, only the nearest things clear, no hard shadows',
+    dark: 'fog: the sky a flat dark grey haze, distant forms fading out into it, the lamps glowing with soft halos', qc: 'LIGHT_FOG', near: ['overcast', 'drizzle'] },
+  { id: 'storm', jev: 'storm, strong wind', sky: 'covers',
+    day: 'a storm: dark clouds filling the sky, wind, heavy rain',
+    dark: 'a storm: black clouds filling the sky, wind, heavy rain', near: ['rain', 'thunder', 'windy', 'hail'] },
+  { id: 'thunder', jev: 'thunderstorm: black clouds, heavy rain, lightning', sky: 'covers',
+    day: 'a thunderstorm: black clouds filling the sky, heavy rain, forked lightning in the distance',
+    dark: 'a thunderstorm: black clouds filling the sky, heavy rain, forked lightning lighting the clouds', near: ['storm', 'rain'] },
+  { id: 'hail', jev: 'hail: white ice pellets falling from a dark sky', sky: 'covers',
+    day: 'hail falling from a dark grey cloud-covered sky, white ice pellets bouncing on the ground',
+    dark: 'hail falling from a black cloud-covered sky, white ice pellets bouncing on the ground', near: ['storm', 'rain'] },
+  { id: 'windy', jev: 'windy: a dry day with strong wind, things blowing, no rain or snow', sky: 'open',
+    open: 'wind: a dry day, clouds streaming across the sky, grass, leaves, hair and cloth blowing the same way', near: ['clear', 'storm', 'overcast'] },
+  { id: 'rainbow', jev: 'rainbow: sun with passing showers, a rainbow in the sky', sky: 'open',
+    open: 'a rainbow arching across the sky after a shower, the ground still wet, the sun low behind the viewer', near: ['clear', 'rain', 'drizzle'] },
+  { id: 'heat', jev: 'heat: a hot dry day, shimmering haze, a pale bleached sky', sky: 'open',
+    open: 'heat: a hot dry day, a pale bleached sky, a shimmering haze rising off the ground', near: ['clear', 'windy'] },
+  { id: 'none', jev: 'none: the scene is indoors', sky: 'open', open: "indoors: the light comes from the room's own sources and any window", near: [] },
+];
+
+const JEV_WEATHER_CRITERIA = Object.fromEntries(WEATHER_TABLE.map(w => [w.id, w.jev]));
+const WEATHERS = WEATHER_TABLE.map(w => w.id);
 
 const TIME_OF_DAY_ENUM = TIMES_OF_DAY.join(' | ');
 const WEATHER_ENUM = WEATHERS.join(' | ');
@@ -164,38 +199,11 @@ const DARK_TIMES = new Set(['dusk', 'night']);
 /** Closes every covered-sky phrase: the weather hides every light source above. */
 const COVERED_SKY_CLAUSE = 'no sun disc, no moon and no blue sky anywhere in the picture';
 
-/**
- * The weathers that OWN the sky, with a phrasing for the light hours and one
- * for the dark hours (DARK_TIMES). Each is closed by COVERED_SKY_CLAUSE.
- */
-const COVERED_WEATHER_PHRASES = {
-  overcast: {
-    day: 'overcast: a flat grey cloud-covered sky, soft even light, soft faint shadows',
-    dark: 'overcast: a flat dark cloud-covered sky',
-  },
-  rain: {
-    day: 'rain falling from a grey cloud-covered sky, surfaces wet and shining',
-    dark: 'rain falling from a dark cloud-covered sky, surfaces wet and shining with the reflected lamplight',
-  },
-  snow: {
-    day: 'snow falling from a pale grey sky',
-    dark: 'snow falling from a dark grey sky',
-  },
-  fog: {
-    day: 'fog: the sky a flat pale grey-white, distant forms fading out into the fog, only the nearest things clear, no hard shadows',
-    dark: 'fog: the sky a flat dark grey haze, distant forms fading out into it, the lamps glowing with soft halos',
-  },
-  storm: {
-    day: 'a storm: dark clouds filling the sky, wind, heavy rain',
-    dark: 'a storm: black clouds filling the sky, wind, heavy rain',
-  },
-};
+/** The weathers that OWN the sky: a phrasing for the light hours and one for the dark hours (DARK_TIMES). Each is closed by COVERED_SKY_CLAUSE. */
+const COVERED_WEATHER_PHRASES = Object.fromEntries(WEATHER_TABLE.filter(w => w.sky === 'covers').map(w => [w.id, { day: w.day, dark: w.dark }]));
 
 /** The weathers that leave the sky to the time of day. */
-const OPEN_WEATHER_PHRASES = {
-  clear: 'a clear sky',
-  none: 'indoors: the light comes from the room\'s own sources and any window',
-};
+const OPEN_WEATHER_PHRASES = Object.fromEntries(WEATHER_TABLE.filter(w => w.sky === 'open').map(w => [w.id, w.open]));
 
 /** Does this declared weather own the sky? */
 function weatherOwnsSky(weather) {
@@ -460,7 +468,29 @@ function timeContradicts(declared, rendered) {
   return Math.abs(d - r) > 1;
 }
 
+/**
+ * Is a rendered weather a contradiction of the declared one? A neighbour in the table (a drizzle beside
+ * a rain, snow falling beside snow lying) is not: a judge cannot tell them apart reliably and neither can
+ * a reader. An interior declares no sky; `indoor` and `none` contradict nothing.
+ */
+function weatherContradicts(declared, rendered) {
+  if (!declared || !rendered || declared === 'none' || declared === rendered || rendered === 'indoor') return false;
+  const row = WEATHER_TABLE.find(w => w.id === declared);
+  if (!row) return false;
+  const back = WEATHER_TABLE.find(w => w.id === rendered);
+  return !(row.near.includes(rendered) || (back && back.near.includes(declared)));
+}
+
+/** The plate-QC template key of the extra check a declared weather gets, or null. */
+function weatherQcCheck(weather) {
+  const row = WEATHER_TABLE.find(w => w.id === weather);
+  return (row && row.qc) || null;
+}
+
 module.exports = {
+  WEATHER_TABLE,
+  weatherContradicts,
+  weatherQcCheck,
   LIGHTS,
   JEV_TIME_CRITERIA,
   JEV_WEATHER_CRITERIA,

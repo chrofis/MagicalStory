@@ -1,0 +1,115 @@
+🌗 [JEV/light] p1:dusk p2:dusk p3:dusk p4:dusk p5:dusk p6:dusk p7:dusk p8:dusk p9:dusk p10:dusk (10 calls)
+[WARN] 🧱 [JEV/vb] page 5: 5 elements in the picture, budget 4 — left out (lowest P): CHR004
+🧩 [JEV/vb] p1:[] p2:[ART003,CHR002,ART002.1,ART004] p3:[] p4:[] p5:[ART005,CHR002,ART001,CHR003] p6:[ART003,CHR001,CHR002,ART004] p7:[] p8:[ART004,ART002.1] p9:[CHR001,CHR002,ART004] p10:[CHR002] (16 calls)
+🏙️ [JEV/population] LOC001:crowd (1 calls)
+🖼️ [JEV/cover-place] frontCover LOC001.1 0.69, initialPage LOC001.6 0.45 (shared), backCover LOC001.6 0.39 (shared) over 2 candidate(s) (3 calls) — NOT DISTINCT: distinct: initialPage and backCover share LOC001 and its viewpoint with the same cast
+
+job_1791145238223_50osg2osm  (30 calls, USD 0.00289)
+  weather new: {"none":10}  moved vs old advice: p1:clear->none p2:clear->none
+  new-day P>=0.5: none | clock held: none
+  light vs stored: same
+  aboard old: none | new: none
+  aboard top scores: 
+  population LOC001: crowd -> crowd  (public 0.96, crowd 0.8, creatureCrowd 0.01, wildlife 0.09, sparse 0.15) pages 1,2,3,4,5,6,7,8,9,10
+  cover old: frontCover LOC001.1 0.8 | initialPage LOC001.6 0.39 | backCover LOC001.6 0.33
+  cover new: frontCover LOC001.1 0.69 | initialPage LOC001.6 0.45 | backCover LOC001.6 0.39 UNMET distinct: initialPage and backCover share LOC001 and its viewpoint with the same cast
+    frontCover candidates: {"LOC001.1":0.69,"LOC001.6":0.47}
+    initialPage candidates: {"LOC001.1":0.58,"LOC001.6":0.45}
+    backCover candidates: {"LOC001.1":0.6,"LOC001.6":0.39}
+[WARN] 🌗 [JEV/light] page 14: Jev said evening after dusk — the clock never runs backwards, held at dusk
+🌗 [JEV/light] p1:afternoon p2:afternoon p3:afternoon p4:afternoon p5:afternoon p6:afternoon p7:afternoon p8:afternoon p9:afternoon p10:afternoon p11:afternoon p12:dusk p13:dusk p14:dusk p15:dusk p16:dusk p17:dusk p18:dusk (18 calls)
+🧩 [JEV/vb] p1:[ART003] p2:[CHR001,ART002] p3:[ART001.1] p4:[ART001.1,ANI001] p5:[ANI001] p6:[ANI001] p7:[CHR001,ART002] p8:[CHR001,ART002] p9:[ART001.1] p10:[ART001.1] p11:[ART001.1] p12:[ART001.1,ART002,CHR001] p13:[] p14:[CHR001] p15:[CHR001,VEH001] p16:[ANI001,ART001.1] p17:[ANI001,ART001.1] p18:[ANI001,ANI002,ART001.2] (45 calls)
+🏙️ [JEV/population] LOC001:ambient (1 calls)
+
+job_1791040103540_atbttop6w  (64 calls, USD 0.00729)
+  weather new: {"clear":16,"windy":2}  moved vs old advice: p11:clear->windy p16:clear->windy
+  new-day P>=0.5: none | clock held: p14:evening->dusk
+  light vs stored: same
+  aboard old: none | new: none
+  aboard top scores: p1[VEH001 0.03/ANI001 0.01] p2[VEH001 0.08/ANI001 0.01] p3[VEH001 0.04/ANI001 0.01] p4[VEH001 0.04/ANI001 0.01] p5[VEH001 0.04/ANI001 0.01] p6[VEH001 0.05/ANI001 0.01] p7[VEH001 0.07/ANI002 0.01] p8[VEH001 0.08/ANI001 0.01] p9[VEH001 0.05/ANI001 0.01] p10[VEH001 0.03/ANI001 0.01] p11[VEH001 0.04/ANI001 0.01] p12[VEH001 0.06/ANI001 0.01] p13[VEH001 0.04/ANI001 0.01] p14[VEH001 0.07/ANI001 0.01] p15[VEH001 0.1/ANI001 0.01] p16[VEH001 0.06/ANI001 0.02] p17[VEH001 0.07/ANI001 0.02] p18[VEH001 0.04/ANI001 0.02]
+  population LOC001: ambient -> ambient  (public 0.97, crowd 0.02, creatureCrowd 0.01, wildlife 0.31, sparse 0.25) pages 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18
+🌗 [JEV/light] p1:afternoon p2:afternoon p3:afternoon p4:afternoon (4 calls)
+🧩 [JEV/vb] p1:[ART001,ANI001,VEH001]@VEH001 p2:[VEH001,ART002] p3:[CHR001,ANI001,VEH002,ART003]@VEH002 p4:[VEH001,ANI001,ART004,VEH002] (4 calls)
+🏙️ [JEV/population] LOC001:ambient LOC002:cast_only (2 calls)
+
+job_1790618717512_n9wrh5u0j  (10 calls, USD 0.00077)
+  weather new: {"fog":4}  moved vs old advice: none
+  new-day P>=0.5: none | clock held: none
+  light vs stored: same
+  aboard old: p1:VEH001 p3:VEH002 | new: p1:VEH001 p3:VEH002
+  aboard top scores: p1[VEH001 0.54/VEH002 0.07] p2[VEH001 0.19/VEH002 0.02] p3[VEH002 0.92/VEH001 0.03] p4[VEH001 0.12/VEH002 0.04]
+  population LOC001: ambient -> ambient  (public 0.89, crowd 0.04, creatureCrowd 0.01, wildlife 0.26, sparse 0.26) pages 1,2,4
+  population LOC002: cast_only -> cast_only  (public 0.1, crowd 0.05, creatureCrowd 0.01, wildlife 0.28, sparse 0.24) pages 3
+🌗 [JEV/light] p1:midday p2:afternoon p3:afternoon p4:afternoon p5:afternoon p6:afternoon/in p7:afternoon p8:afternoon p9:afternoon p10:afternoon p11:afternoon p12:afternoon p13:afternoon p14:afternoon p15:afternoon p16:afternoon p17:afternoon p18:afternoon (18 calls)
+🧩 [JEV/vb] p1:[ANI001.1,ART001.1] p2:[CHR001] p3:[ART001.2,ANI001.2] p4:[ANI001.2] p5:[ART001.2] p6:[ART001.2,VEH001]@VEH001 p7:[CHR001] p8:[] p9:[ART001.2] p10:[ART001.2] p11:[ANI001.2] p12:[ANI001.2] p13:[ANI001.2] p14:[] p15:[ANI001.2] p16:[ANI001.2,ART001.2] p17:[ANI001.3] p18:[ANI001.3] (60 calls)
+🏙️ [JEV/population] no located page (0 calls)
+
+job_1790539784661_6mjcny1c7  (78 calls, USD 0.00775)
+  weather new: {"overcast":7,"clear":1,"none":1,"fog":9}  moved vs old advice: p4:overcast->clear
+  new-day P>=0.5: none | clock held: none
+  light vs stored: p1:afternoon->midday
+  aboard old: p6:VEH001 | new: p6:VEH001
+  aboard top scores: p1[ANI001 0.07/VEH001 0.01] p2[VEH001 0.02/ANI001 0.02] p3[ANI001 0.02/VEH001 0.01] p4[ANI001 0.02/VEH001 0.01] p5[VEH001 0.03/ANI001 0.01] p6[VEH001 0.7/ANI001 0.01] p7[VEH001 0.02/ANI001 0.01] p8[VEH001 0.01/ANI001 0.01] p9[VEH001 0.01/ANI001 0.01] p10[VEH001 0.02/ANI001 0.01] p11[ANI001 0.02/VEH001 0.01] p12[ANI001 0.02/VEH001 0.01] p13[ANI001 0.02/VEH001 0.01] p14[VEH001 0.01/ANI001 0.01] p15[ANI001 0.03/VEH001 0.01] p16[ANI001 0.06/VEH001 0.01] p17[ANI001 0.06/VEH001 0.01] p18[ANI001 0.1/VEH001 0.01]
+🌗 [JEV/light] p1:afternoon p2:afternoon p3:dark/in p4:evening (4 calls)
+🧩 [JEV/vb] p1:[ANI001,ART001.2] p2:[CHR001,ART002,VEH001]@VEH001 p3:[VEH001,ANI001]@VEH001 p4:[VEH002,ANI001]@VEH002 (7 calls)
+🏙️ [JEV/population] no located page (0 calls)
+
+job_1790536739048_ruynosw80  (11 calls, USD 0.00080)
+  weather new: {"none":3,"clear":1}  moved vs old advice: p2:clear->none
+  new-day P>=0.5: none | clock held: none
+  light vs stored: p3:afternoon->dark p4:afternoon->evening
+  aboard old: p2:VEH001 p3:VEH001 p4:VEH002 | new: p2:VEH001 p3:VEH001 p4:VEH002
+  aboard top scores: p1[VEH001 0.09/VEH002 0.06] p2[VEH001 0.77/VEH002 0.21] p3[VEH001 0.83/VEH002 0.05] p4[VEH002 0.76/VEH001 0.04]
+🌗 [JEV/light] p1:morning p2:morning p3:morning p4:morning (4 calls)
+[WARN] 🧱 [JEV/vb] page 4: 6 elements in the picture, budget 4 — left out (lowest P): VEH001, ART001
+🧩 [JEV/vb] p1:[ART002,ART001.1,VEH001] p2:[VEH002] p3:[CHR001,ART001.2,VEH001]@VEH001 p4:[ANI001,ART004,ART003,VEH002]@VEH002 (10 calls)
+🏙️ [JEV/population] no located page (0 calls)
+
+job_1790529840433_ar4u7qry3  (14 calls, USD 0.00098)
+  weather new: {"fog":4}  moved vs old advice: none
+  new-day P>=0.5: none | clock held: none
+  light vs stored: same
+  aboard old: p3:VEH001 p4:VEH002 | new: p3:VEH001 p4:VEH002
+  aboard top scores: p1[VEH001 0.08/VEH002 0.06] p2[VEH002 0.13/VEH001 0.02] p3[VEH001 0.9/VEH002 0.03] p4[VEH002 0.65/VEH001 0.28]
+🌗 [JEV/light] p1:evening p2:evening p3:evening p4:evening p5:underwater/in p6:underwater/in p7:underwater_dark/in p8:underwater_dark/in p9:underwater_dark/in p10:underwater_dark/in p11:underwater_dark/in p12:dusk p13:dusk p14:dusk (14 calls)
+🧩 [JEV/vb] p1:[ART001] p2:[ANI001] p3:[] p4:[ANI001]@ANI001 p5:[CHR001,ART002.1] p6:[ANI002,ART001] p7:[ANI002,ART002.1] p8:[ANI001] p9:[] p10:[ANI002,ART002.2] p11:[ANI002,ART001,ART002.2] p12:[] p13:[ART002.2] p14:[ANI001,ANI002,CHR001,ART001] (29 calls)
+🏙️ [JEV/population] LOC001:wildlife LOC002:wildlife (2 calls)
+🖼️ [JEV/cover-place] frontCover LOC001.1 0.69, initialPage LOC003+ 0.34, backCover LOC001.5 0.73 over 5 candidate(s) (3 calls)
+
+job_1791222889407_ypl33vk8u  (48 calls, USD 0.00534)
+  weather new: {"clear":4,"none":9,"overcast":1}  moved vs old advice: p4:clear->none p12:clear->overcast
+  new-day P>=0.5: none | clock held: none
+  light vs stored: p1:afternoon->evening p5:evening->underwater p6:evening->underwater p7:evening->underwater_dark p8:evening->underwater_dark p9:evening->underwater_dark p10:evening->underwater_dark p11:evening->underwater_dark
+  aboard old: none | new: p4:ANI001
+  aboard top scores: p1[ANI001 0.02/ANI002 0.01] p2[ANI001 0.06/ANI002 0.01] p3[ANI001 0.04/ANI002 0.01] p4[ANI001 0.59/ANI002 0.01] p5[ANI001 0.06/ANI002 0.01] p6[ANI001 0.07/ANI002 0.02] p7[ANI001 0.08/ANI002 0.03] p8[ANI001 0.2/ANI002 0.01] p9[ANI001 0.04/ANI002 0.01] p10[ANI001 0.08/ANI002 0.02] p11[ANI001 0.03/ANI002 0.02] p12[ANI001 0.06/ANI002 0.01] p13[ANI001 0.02/ANI002 0.01] p14[ANI001 0.06/ANI002 0.01]
+  population LOC001: cast_only -> wildlife  (public 0.15, crowd 0.02, creatureCrowd 0.02, wildlife 0.56, sparse 0.16) pages 1,2,3,4,12,13,14
+  population LOC002: cast_only -> wildlife  (public 0.03, crowd 0.02, creatureCrowd 0.03, wildlife 0.5, sparse 0.25) pages 5,6,7,8,9,10,11
+  cover old: frontCover LOC001.1 0.88 | initialPage LOC003.1* 0.35 | backCover LOC004.1* 0.43
+  cover new: frontCover LOC001.1 0.69 | initialPage LOC003+* 0.34 | backCover LOC001.5 0.73 
+    frontCover candidates: {"LOC001.1":0.69,"LOC001.5":0.62,"LOC002.4":0.15,"LOC003+":0.21,"LOC004+":0.15}
+    initialPage candidates: {"LOC001.1":0.64,"LOC001.5":0.53,"LOC002.4":0.1,"LOC003+":0.34,"LOC004+":0.22}
+    backCover candidates: {"LOC001.1":0.78,"LOC001.5":0.73,"LOC002.4":0.07,"LOC003+":0.43,"LOC004+":0.28}
+🌗 [JEV/light] p1:afternoon p2:afternoon p3:afternoon p4:underwater/in p5:underwater/in p6:underwater_dark/in p7:dusk p8:underwater_dark/in p9:underwater_dark/in p10:dusk p11:underwater/in p12:underwater/in p13:dusk p14:dusk (14 calls)
+🧩 [JEV/vb] p1:[ART001] p2:[ANI001] p3:[] p4:[VEH001] p5:[ANI002,VEH001,ART001] p6:[] p7:[ART003,VEH001] p8:[ANI002,ART003,ART001,VEH001]@VEH001 p9:[ANI002] p10:[CHR001,ART001] p11:[CHR001,ART001] p12:[ANI002,CHR001] p13:[ART002] p14:[ART001] (14 calls)
+🏙️ [JEV/population] LOC001:cast_only LOC002:cast_only LOC003:cast_only LOC004:cast_only LOC005:cast_only LOC006:cast_only (6 calls)
+🖼️ [JEV/cover-place] frontCover LOC005.2 0.52, initialPage LOC008+ 0.21, backCover LOC006.2 0.64 over 6 candidate(s) (3 calls)
+
+job_1791267520938_essbvehs8  (37 calls, USD 0.00471)
+  weather new: {"clear":9,"none":5}  moved vs old advice: none
+  new-day P>=0.5: none | clock held: none
+  light vs stored: p4:evening->underwater p5:evening->underwater p6:dusk->underwater_dark p8:dusk->underwater_dark p9:dusk->underwater_dark p11:dusk->underwater p12:dusk->underwater
+  aboard old: p8:VEH001 | new: p8:VEH001
+  aboard top scores: p1[VEH001 0.01/ANI001 0.01] p2[ANI001 0.04/VEH001 0.01] p3[ANI001 0.02/VEH001 0.01] p4[VEH001 0.16/ANI001 0.01] p5[VEH001 0.12/ANI002 0.02] p6[VEH001 0.07/ANI001 0.01] p7[VEH001 0.14/ANI001 0.01] p8[VEH001 0.84/ANI002 0.04] p9[VEH001 0.06/ANI001 0.01] p10[VEH001 0.03/ANI001 0.01] p11[VEH001 0.02/ANI001 0.01] p12[VEH001 0.03/ANI001 0.01] p13[VEH001 0.01/ANI001 0.01] p14[VEH001 0.01/ANI001 0.01]
+  population LOC001: cast_only -> cast_only  (public 0.27, crowd 0.01, creatureCrowd 0.04, wildlife 0.44, sparse 0.3) pages 1,2,3
+  population LOC002: cast_only -> cast_only  (public 0.02, crowd 0.01, creatureCrowd 0.03, wildlife 0.49, sparse 0.4) pages 4,5,6,7
+  population LOC003: cast_only -> cast_only  (public 0.02, crowd 0.01, creatureCrowd 0.03, wildlife 0.39, sparse 0.33) pages 8
+  population LOC004: cast_only -> cast_only  (public 0.03, crowd 0.02, creatureCrowd 0.04, wildlife 0.44, sparse 0.38) pages 9
+  population LOC005: cast_only -> cast_only  (public 0.03, crowd 0.02, creatureCrowd 0.05, wildlife 0.49, sparse 0.38) pages 10,11,12
+  population LOC006: cast_only -> cast_only  (public 0.39, crowd 0.01, creatureCrowd 0.03, wildlife 0.38, sparse 0.23) pages 13,14
+  cover old: frontCover LOC006.2 0.81 | initialPage LOC007.1* 0.26 | backCover LOC008.1* 0.4
+  cover new: frontCover LOC005.2 0.52 | initialPage LOC008+* 0.21 | backCover LOC006.2 0.64 
+    frontCover candidates: {"LOC002.1":0.28,"LOC005.2":0.52,"LOC006.1":0.28,"LOC006.2":0.45,"LOC008+":0.16,"LOC007+":0.11}
+    initialPage candidates: {"LOC002.1":0.15,"LOC005.2":0.2,"LOC006.1":0.18,"LOC006.2":0.23,"LOC008+":0.21,"LOC007+":0.14}
+    backCover candidates: {"LOC002.1":0.1,"LOC005.2":0.23,"LOC006.1":0.29,"LOC006.2":0.64,"LOC008+":0.23,"LOC007+":0.18}
+
+TOTAL 292 calls, USD 0.03052

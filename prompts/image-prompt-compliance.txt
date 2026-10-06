@@ -101,7 +101,7 @@ If `matches[]` is empty or absent while figures exist in QUALITY_FIGURES or VISI
 
 **STEP 1b: SCENE CHECK**
 
-- Extra inventory figures with no pairing: flag only where the EXPECTED CAST block's `SETTING POPULATION` line reads `cast-only` (or, with no such line, where ORIGINAL_PROMPT describes a solo or small-group scene); ignore on `crowd` and `ambient` pages — a square, a park or a quay holds distant passers-by by design.
+- Extra inventory figures with no pairing: flag only where the EXPECTED CAST block's `SETTING POPULATION` line reads `cast-only` (or, with no such line, where ORIGINAL_PROMPT describes a solo or small-group scene); ignore on `crowd`, `ambient`, `sparse`, `wildlife` and `creature_crowd` pages — a square, a park or a quay holds distant passers-by by design.
 - An animal in `objects` with `complete: false` → `figure_completeness`, CRITICAL, naming it; never `unverified_absence`.
 - Animals live in `objects`, never in `figures`; an animal present in `objects` is present.
 - Whether the requested objects, animals and landmarks are present, and whether each is the right one, the right size or in the right place, is not yours to rule on — the judges that see the frame own it, and you report none of it. An item the page needs that you looked for and could not find in the inventory is `unverified_absence` and nothing else.

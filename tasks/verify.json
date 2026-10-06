@@ -5637,6 +5637,21 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "jev-weather-wildlife-aboard",
+      "commits": [],
+      "addedAt": "2026-10-06",
+      "claim": "A page with weather windy/drizzle/hail/thunder/snow-lying/heat/rainbow renders that weather; a wildlife or creature_crowd page draws unnamed animals/creatures and no unnamed people; a page on a ridden creature keeps the creature once, as the ground; a cover of a water book shows the cast swimming, floating or aboard at the sea.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "View the images of the pages the stored jevDecisions mark with a new weather, population or aboard creature; read the built prompts (LIGHT line, REQUIRED CAST) and the cover places."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [

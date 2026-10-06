@@ -229,7 +229,25 @@ function parseCreatures(rows) {
  */
 const { normaliseTimeOfDay, normaliseWeather, normaliseLightSources } = require('./sceneLight');
 
-const POPULATION_LEVELS = ['cast_only', 'ambient', 'crowd'];
+/**
+ * THE POPULATION TABLE: the one place a `population` value is defined (owner, 2026-10-06, same rule as the
+ * light table). `line` is what the judges' SETTING POPULATION line says (evalPipeline.buildExpectedCastBlock);
+ * `arithmetic` is how the figure count treats the page: `all` counts every person, `ambient` subtracts
+ * background-scale people by geometry, `decline` derives nothing (the unmatched figures are the crowd). The
+ * wildlife levels count people strictly: the arithmetic reads people only, unnamed animals never enter it, and
+ * they are excused by the judges' line instead. The illustrator's tail per level is
+ * promptBuilders.REQUIRED_CAST_BACKGROUND (a parity test pins the same keys). Wildlife is drawn in the page
+ * render, never on the shared plate (SETTLED, "A backdrop plate holds NO people").
+ */
+const POPULATION_TABLE = [
+  { id: 'cast_only', arithmetic: 'all', line: 'cast-only — this page holds the EXPECTED CAST and no other people.' },
+  { id: 'sparse', arithmetic: 'ambient', line: 'sparse — one or two unnamed people far in the distance may be in the frame; they are not EXPECTED CAST and are never a surplus figure. Only a figure at the same scale as the cast can be one.' },
+  { id: 'ambient', arithmetic: 'ambient', line: 'ambient — this is a public setting and distant background people belong in it. They are not EXPECTED CAST and are never a surplus figure. Only a figure at the same scale as the cast can be one.' },
+  { id: 'crowd', arithmetic: 'decline', line: 'crowd — this page is written around unnamed background people; they are not surplus cast.' },
+  { id: 'wildlife', arithmetic: 'all', line: 'wildlife — unnamed animals belong in this setting (fish, a flock, a herd, small wild creatures); they are not EXPECTED CAST and are never a surplus figure, however many. No unnamed people belong in it.' },
+  { id: 'creature_crowd', arithmetic: 'all', line: 'creature_crowd — this page is written around a crowd of unnamed creatures; they are not surplus cast, however many. No unnamed people belong in it.' },
+];
+const POPULATION_LEVELS = POPULATION_TABLE.map(p => p.id);
 
 function normalisePopulation(raw, legacyCrowdExpected) {
   const v = String(raw || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
@@ -2829,6 +2847,7 @@ module.exports = {
   forbiddenSharedGrips,
   handsPerObject,
   POPULATION_LEVELS,
+  POPULATION_TABLE,
   normalisePopulation,
   extractJsonFromText,
   sanitizeInteractions,

@@ -9216,6 +9216,9 @@ const REQUIRED_CAST_UNACTED = 'A character given no action is still drawn, place
 const REQUIRED_CAST_BACKGROUND = {
   cast_only: ', and no one else is added.',
   ambient: ". Add a few unnamed passers-by far behind the cast (where the scene description places them, if it does), each much smaller than any listed character, busy with their own business and mostly turned away, every face fully drawn, none sharing a listed character's hair, build or outfit. No one else is added.",
+  sparse: ". Add at most one or two unnamed people, tiny and far behind the cast, busy with their own business and turned away, every face fully drawn, none sharing a listed character's hair, build or outfit. No one else is added.",
+  wildlife: ". Add the unnamed animals the scene description places — fish, a flock, a herd — as ordinary members of their kind, none matching a listed character or creature. No unnamed people are added.",
+  creature_crowd: ". Paint the crowd of unnamed creatures the scene description places, as it places them: many of their kind, varied in size and markings, none matching a listed character or creature. No unnamed people are added.",
   crowd: ". Paint the unnamed people the scene description places, as it places them: busy with their own business, every face fully drawn, varied hair and garment colours and shapes, none sharing a listed character's hair, build or outfit. No one else is added.",
 };
 

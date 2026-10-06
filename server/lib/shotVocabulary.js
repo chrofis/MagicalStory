@@ -720,7 +720,7 @@ const PLATE_EDGE_RULE = `The painting fills the frame edge to edge, the scene it
 // "part or faint trace of one" named 2026-09-26: Lab 1505 carried a
 // half-erased ghost of a person and passed the Figures check.
 const PLATE_PEOPLE = 'person, passer-by, crowd, rider, silhouette of a person, or part or faint trace of one';
-const PLATE_NO_PEOPLE_RULE = `The place is painted with no people in it: no ${PLATE_PEOPLE} anywhere in the frame, however small or distant, even where such a place is normally busy or the description mentions people.`;
+const PLATE_NO_PEOPLE_RULE = `The place is painted with no people in it: no ${PLATE_PEOPLE} anywhere in the frame, however small or distant, even where such a place is normally busy or the description mentions people. Unnamed wildlife — fish, a flock, a herd — is drawn in the page, never in the backdrop.`;
 
 /**
  * What a landmark plate is told about its reference photo, and what its judge

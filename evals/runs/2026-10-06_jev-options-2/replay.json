@@ -1,0 +1,2353 @@
+{
+ "results": [
+  {
+   "id": "job_1791145238223_50osg2osm",
+   "stats": {
+    "calls": 30,
+    "costUsd": 0.002894
+   },
+   "weather": [
+    {
+     "page": 1,
+     "oldAdvice": "clear",
+     "newAdvice": "none",
+     "oldTime": "dusk",
+     "time": "dusk",
+     "jevTime": "dusk",
+     "newDayP": 0.02,
+     "indoor": false
+    },
+    {
+     "page": 2,
+     "oldAdvice": "clear",
+     "newAdvice": "none",
+     "oldTime": "dusk",
+     "time": "dusk",
+     "jevTime": "dusk",
+     "newDayP": 0.02,
+     "indoor": false
+    },
+    {
+     "page": 3,
+     "oldAdvice": "none",
+     "newAdvice": "none",
+     "oldTime": "dusk",
+     "time": "dusk",
+     "jevTime": "dusk",
+     "newDayP": 0.02,
+     "indoor": false
+    },
+    {
+     "page": 4,
+     "oldAdvice": "none",
+     "newAdvice": "none",
+     "oldTime": "dusk",
+     "time": "dusk",
+     "jevTime": "dusk",
+     "newDayP": 0.02,
+     "indoor": false
+    },
+    {
+     "page": 5,
+     "oldAdvice": "none",
+     "newAdvice": "none",
+     "oldTime": "dusk",
+     "time": "dusk",
+     "jevTime": "dusk",
+     "newDayP": 0.01,
+     "indoor": false
+    },
+    {
+     "page": 6,
+     "oldAdvice": "none",
+     "newAdvice": "none",
+     "oldTime": "dusk",
+     "time": "dusk",
+     "jevTime": "dusk",
+     "newDayP": 0.01,
+     "indoor": false
+    },
+    {
+     "page": 7,
+     "oldAdvice": "none",
+     "newAdvice": "none",
+     "oldTime": "dusk",
+     "time": "dusk",
+     "jevTime": "dusk",
+     "newDayP": 0.02,
+     "indoor": false
+    },
+    {
+     "page": 8,
+     "oldAdvice": "none",
+     "newAdvice": "none",
+     "oldTime": "dusk",
+     "time": "dusk",
+     "jevTime": "dusk",
+     "newDayP": 0.01,
+     "indoor": false
+    },
+    {
+     "page": 9,
+     "oldAdvice": "none",
+     "newAdvice": "none",
+     "oldTime": "dusk",
+     "time": "dusk",
+     "jevTime": "dusk",
+     "newDayP": 0.02,
+     "indoor": false
+    },
+    {
+     "page": 10,
+     "oldAdvice": "none",
+     "newAdvice": "none",
+     "oldTime": "dusk",
+     "time": "dusk",
+     "jevTime": "dusk",
+     "newDayP": 0.02,
+     "indoor": false
+    }
+   ],
+   "clockHeld": [],
+   "aboard": [
+    {
+     "page": 1,
+     "old": null,
+     "new": null,
+     "scores": {},
+     "oldCites": "ART001",
+     "newCites": ""
+    },
+    {
+     "page": 2,
+     "old": null,
+     "new": null,
+     "scores": {},
+     "oldCites": "ART002,ART003,ART004,CHR002",
+     "newCites": "ART002,ART003,ART004,CHR002"
+    },
+    {
+     "page": 3,
+     "old": null,
+     "new": null,
+     "scores": {},
+     "oldCites": "",
+     "newCites": ""
+    },
+    {
+     "page": 4,
+     "old": null,
+     "new": null,
+     "scores": {},
+     "oldCites": "",
+     "newCites": ""
+    },
+    {
+     "page": 5,
+     "old": null,
+     "new": null,
+     "scores": {},
+     "oldCites": "ART001,ART005,CHR002,CHR003",
+     "newCites": "ART001,ART005,CHR002,CHR003"
+    },
+    {
+     "page": 6,
+     "old": null,
+     "new": null,
+     "scores": {},
+     "oldCites": "ART003,ART004,CHR001,CHR002",
+     "newCites": "ART003,ART004,CHR001,CHR002"
+    },
+    {
+     "page": 7,
+     "old": null,
+     "new": null,
+     "scores": {},
+     "oldCites": "ART001",
+     "newCites": ""
+    },
+    {
+     "page": 8,
+     "old": null,
+     "new": null,
+     "scores": {},
+     "oldCites": "ART002,ART004",
+     "newCites": "ART002,ART004"
+    },
+    {
+     "page": 9,
+     "old": null,
+     "new": null,
+     "scores": {},
+     "oldCites": "ART004,CHR001,CHR002",
+     "newCites": "ART004,CHR001,CHR002"
+    },
+    {
+     "page": 10,
+     "old": null,
+     "new": null,
+     "scores": {},
+     "oldCites": "ART002,CHR002",
+     "newCites": "CHR002"
+    }
+   ],
+   "population": [
+    {
+     "loc": "LOC001",
+     "old": "crowd",
+     "new": "crowd",
+     "publicP": 0.96,
+     "crowdP": 0.8,
+     "creatureCrowdP": 0.01,
+     "wildlifeP": 0.09,
+     "sparseP": 0.15,
+     "pages": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10
+     ]
+    }
+   ],
+   "cover": {
+    "old": [
+     {
+      "key": "frontCover",
+      "cite": "LOC001.1",
+      "label": "Fislisbach village square, full open square wide",
+      "p": 0.8,
+      "offered": false
+     },
+     {
+      "key": "initialPage",
+      "cite": "LOC001.6",
+      "label": "Fislisbach village square, full square ultra-wide",
+      "p": 0.39,
+      "offered": false
+     },
+     {
+      "key": "backCover",
+      "cite": "LOC001.6",
+      "label": "Fislisbach village square, full square ultra-wide",
+      "p": 0.33,
+      "offered": false
+     }
+    ],
+    "new": [
+     {
+      "key": "frontCover",
+      "cite": "LOC001.1",
+      "label": "Fislisbach village square, full open square wide",
+      "p": 0.69,
+      "offered": false,
+      "candidates": {
+       "LOC001.1": 0.69,
+       "LOC001.6": 0.47
+      }
+     },
+     {
+      "key": "initialPage",
+      "cite": "LOC001.6",
+      "label": "Fislisbach village square, full square ultra-wide",
+      "p": 0.45,
+      "offered": false,
+      "candidates": {
+       "LOC001.1": 0.58,
+       "LOC001.6": 0.45
+      }
+     },
+     {
+      "key": "backCover",
+      "cite": "LOC001.6",
+      "label": "Fislisbach village square, full square ultra-wide",
+      "p": 0.39,
+      "offered": false,
+      "candidates": {
+       "LOC001.1": 0.6,
+       "LOC001.6": 0.39
+      }
+     }
+    ],
+    "unmet": [
+     "distinct: initialPage and backCover share LOC001 and its viewpoint with the same cast"
+    ]
+   }
+  },
+  {
+   "id": "job_1791040103540_atbttop6w",
+   "stats": {
+    "calls": 64,
+    "costUsd": 0.007286
+   },
+   "weather": [
+    {
+     "page": 1,
+     "oldAdvice": "clear",
+     "newAdvice": "clear",
+     "oldTime": "afternoon",
+     "time": "afternoon",
+     "jevTime": "afternoon",
+     "newDayP": 0.01,
+     "indoor": false
+    },
+    {
+     "page": 2,
+     "oldAdvice": "clear",
+     "newAdvice": "clear",
+     "oldTime": "afternoon",
+     "time": "afternoon",
+     "jevTime": "afternoon",
+     "newDayP": 0.02,
+     "indoor": false
+    },
+    {
+     "page": 3,
+     "oldAdvice": "clear",
+     "newAdvice": "clear",
+     "oldTime": "afternoon",
+     "time": "afternoon",
+     "jevTime": "afternoon",
+     "newDayP": 0.02,
+     "indoor": false
+    },
+    {
+     "page": 4,
+     "oldAdvice": "clear",
+     "newAdvice": "clear",
+     "oldTime": "afternoon",
+     "time": "afternoon",
+     "jevTime": "afternoon",
+     "newDayP": 0.01,
+     "indoor": false
+    },
+    {
+     "page": 5,
+     "oldAdvice": "clear",
+     "newAdvice": "clear",
+     "oldTime": "afternoon",
+     "time": "afternoon",
+     "jevTime": "afternoon",
+     "newDayP": 0.02,
+     "indoor": false
+    },
+    {
+     "page": 6,
+     "oldAdvice": "clear",
+     "newAdvice": "clear",
+     "oldTime": "afternoon",
+     "time": "afternoon",
+     "jevTime": "afternoon",
+     "newDayP": 0.02,
+     "indoor": false
+    },
+    {
+     "page": 7,
+     "oldAdvice": "clear",
+     "newAdvice": "clear",
+     "oldTime": "afternoon",
+     "time": "afternoon",
+     "jevTime": "afternoon",
+     "newDayP": 0.02,
+     "indoor": false
+    },
+    {
+     "page": 8,
+     "oldAdvice": "clear",
+     "newAdvice": "clear",
+     "oldTime": "afternoon",
+     "time": "afternoon",
+     "jevTime": "afternoon",
+     "newDayP": 0.01,
+     "indoor": false
+    },
+    {
+     "page": 9,
+     "oldAdvice": "clear",
+     "newAdvice": "clear",
+     "oldTime": "afternoon",
+     "time": "afternoon",
+     "jevTime": "afternoon",
+     "newDayP": 0.02,
+     "indoor": false
+    },
+    {
+     "page": 10,
+     "oldAdvice": "clear",
+     "newAdvice": "clear",
+     "oldTime": "afternoon",
+     "time": "afternoon",
+     "jevTime": "afternoon",
+     "newDayP": 0.01,
+     "indoor": false
+    },
+    {
+     "page": 11,
+     "oldAdvice": "clear",
+     "newAdvice": "windy",
+     "oldTime": "afternoon",
+     "time": "afternoon",
+     "jevTime": "afternoon",
+     "newDayP": 0.02,
+     "indoor": false
+    },
+    {
+     "page": 12,
+     "oldAdvice": "clear",
+     "newAdvice": "clear",
+     "oldTime": "dusk",
+     "time": "dusk",
+     "jevTime": "dusk",
+     "newDayP": 0.02,
+     "indoor": false
+    },
+    {
+     "page": 13,
+     "oldAdvice": "clear",
+     "newAdvice": "clear",
+     "oldTime": "dusk",
+     "time": "dusk",
+     "jevTime": "dusk",
+     "newDayP": 0.02,
+     "indoor": false
+    },
+    {
+     "page": 14,
+     "oldAdvice": "clear",
+     "newAdvice": "clear",
+     "oldTime": "dusk",
+     "time": "dusk",
+     "jevTime": "evening",
+     "newDayP": 0.02,
+     "indoor": false
+    },
+    {
+     "page": 15,
+     "oldAdvice": "clear",
+     "newAdvice": "clear",
+     "oldTime": "dusk",
+     "time": "dusk",
+     "jevTime": "dusk",
+     "newDayP": 0.02,
+     "indoor": false
+    },
+    {
+     "page": 16,
+     "oldAdvice": "clear",
+     "newAdvice": "windy",
+     "oldTime": "dusk",
+     "time": "dusk",
+     "jevTime": "dusk",
+     "newDayP": 0.02,
+     "indoor": false
+    },
+    {
+     "page": 17,
+     "oldAdvice": "clear",
+     "newAdvice": "clear",
+     "oldTime": "dusk",
+     "time": "dusk",
+     "jevTime": "dusk",
+     "newDayP": 0.02,
+     "indoor": false
+    },
+    {
+     "page": 18,
+     "oldAdvice": "clear",
+     "newAdvice": "clear",
+     "oldTime": "dusk",
+     "time": "dusk",
+     "jevTime": "dusk",
+     "newDayP": 0.02,
+     "indoor": false
+    }
+   ],
+   "clockHeld": [
+    {
+     "pageNumber": 14,
+     "jev": "evening",
+     "held": "dusk"
+    }
+   ],
+   "aboard": [
+    {
+     "page": 1,
+     "old": null,
+     "new": null,
+     "scores": {
+      "VEH001": 0.03,
+      "ANI001": 0.01,
+      "ANI002": 0.01
+     },
+     "oldCites": "ART003",
+     "newCites": "ART003"
+    },
+    {
+     "page": 2,
+     "old": null,
+     "new": null,
+     "scores": {
+      "VEH001": 0.08,
+      "ANI001": 0.01,
+      "ANI002": 0
+     },
+     "oldCites": "ART002,CHR001",
+     "newCites": "ART002,CHR001"
+    },
+    {
+     "page": 3,
+     "old": null,
+     "new": null,
+     "scores": {
+      "VEH001": 0.04,
+      "ANI001": 0.01,
+      "ANI002": 0.01
+     },
+     "oldCites": "ART001",
+     "newCites": "ART001"
+    },
+    {
+     "page": 4,
+     "old": null,
+     "new": null,
+     "scores": {
+      "VEH001": 0.04,
+      "ANI001": 0.01,
+      "ANI002": 0.01
+     },
+     "oldCites": "ANI001,ART001",
+     "newCites": "ANI001,ART001"
+    },
+    {
+     "page": 5,
+     "old": null,
+     "new": null,
+     "scores": {
+      "VEH001": 0.04,
+      "ANI001": 0.01,
+      "ANI002": 0.01
+     },
+     "oldCites": "ANI001",
+     "newCites": "ANI001"
+    },
+    {
+     "page": 6,
+     "old": null,
+     "new": null,
+     "scores": {
+      "VEH001": 0.05,
+      "ANI001": 0.01,
+      "ANI002": 0.01
+     },
+     "oldCites": "ANI001",
+     "newCites": "ANI001"
+    },
+    {
+     "page": 7,
+     "old": null,
+     "new": null,
+     "scores": {
+      "VEH001": 0.07,
+      "ANI002": 0.01,
+      "ANI001": 0
+     },
+     "oldCites": "ART002,CHR001",
+     "newCites": "ART002,CHR001"
+    },
+    {
+     "page": 8,
+     "old": null,
+     "new": null,
+     "scores": {
+      "VEH001": 0.08,
+      "ANI001": 0.01,
+      "ANI002": 0.01
+     },
+     "oldCites": "ART002,CHR001",
+     "newCites": "ART002,CHR001"
+    },
+    {
+     "page": 9,
+     "old": null,
+     "new": null,
+     "scores": {
+      "VEH001": 0.05,
+      "ANI001": 0.01,
+      "ANI002": 0.01
+     },
+     "oldCites": "ART001",
+     "newCites": "ART001"
+    },
+    {
+     "page": 10,
+     "old": null,
+     "new": null,
+     "scores": {
+      "VEH001": 0.03,
+      "ANI001": 0.01,
+      "ANI002": 0.01
+     },
+     "oldCites": "ART001",
+     "newCites": "ART001"
+    },
+    {
+     "page": 11,
+     "old": null,
+     "new": null,
+     "scores": {
+      "VEH001": 0.04,
+      "ANI001": 0.01,
+      "ANI002": 0.01
+     },
+     "oldCites": "ART001",
+     "newCites": "ART001"
+    },
+    {
+     "page": 12,
+     "old": null,
+     "new": null,
+     "scores": {
+      "VEH001": 0.06,
+      "ANI001": 0.01,
+      "ANI002": 0.01
+     },
+     "oldCites": "ART001,ART002,CHR001",
+     "newCites": "ART001,ART002,CHR001"
+    },
+    {
+     "page": 13,
+     "old": null,
+     "new": null,
+     "scores": {
+      "VEH001": 0.04,
+      "ANI001": 0.01,
+      "ANI002": 0.01
+     },
+     "oldCites": "",
+     "newCites": ""
+    },
+    {
+     "page": 14,
+     "old": null,
+     "new": null,
+     "scores": {
+      "VEH001": 0.07,
+      "ANI001": 0.01,
+      "ANI002": 0.01
+     },
+     "oldCites": "ART002,CHR001",
+     "newCites": "CHR001"
+    },
+    {
+     "page": 15,
+     "old": null,
+     "new": null,
+     "scores": {
+      "VEH001": 0.1,
+      "ANI001": 0.01,
+      "ANI002": 0
+     },
+     "oldCites": "ART002,CHR001,VEH001",
+     "newCites": "CHR001,VEH001"
+    },
+    {
+     "page": 16,
+     "old": null,
+     "new": null,
+     "scores": {
+      "VEH001": 0.06,
+      "ANI001": 0.02,
+      "ANI002": 0.01
+     },
+     "oldCites": "ANI001,ART001",
+     "newCites": "ANI001,ART001"
+    },
+    {
+     "page": 17,
+     "old": null,
+     "new": null,
+     "scores": {
+      "VEH001": 0.07,
+      "ANI001": 0.02,
+      "ANI002": 0.01
+     },
+     "oldCites": "ANI001,ART001",
+     "newCites": "ANI001,ART001"
+    },
+    {
+     "page": 18,
+     "old": null,
+     "new": null,
+     "scores": {
+      "VEH001": 0.04,
+      "ANI001": 0.02,
+      "ANI002": 0.01
+     },
+     "oldCites": "ANI001,ANI002,ART001",
+     "newCites": "ANI001,ANI002,ART001"
+    }
+   ],
+   "population": [
+    {
+     "loc": "LOC001",
+     "old": "ambient",
+     "new": "ambient",
+     "publicP": 0.97,
+     "crowdP": 0.02,
+     "creatureCrowdP": 0.01,
+     "wildlifeP": 0.31,
+     "sparseP": 0.25,
+     "pages": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18
+     ]
+    }
+   ]
+  },
+  {
+   "id": "job_1790618717512_n9wrh5u0j",
+   "stats": {
+    "calls": 10,
+    "costUsd": 0.0007729999999999999
+   },
+   "weather": [
+    {
+     "page": 1,
+     "oldAdvice": "fog",
+     "newAdvice": "fog",
+     "oldTime": "afternoon",
+     "time": "afternoon",
+     "jevTime": "afternoon",
+     "newDayP": 0.02,
+     "indoor": false
+    },
+    {
+     "page": 2,
+     "oldAdvice": "fog",
+     "newAdvice": "fog",
+     "oldTime": "afternoon",
+     "time": "afternoon",
+     "jevTime": "afternoon",
+     "newDayP": 0.04,
+     "indoor": false
+    },
+    {
+     "page": 3,
+     "oldAdvice": "fog",
+     "newAdvice": "fog",
+     "oldTime": "afternoon",
+     "time": "afternoon",
+     "jevTime": "afternoon",
+     "newDayP": 0.03,
+     "indoor": false
+    },
+    {
+     "page": 4,
+     "oldAdvice": "fog",
+     "newAdvice": "fog",
+     "oldTime": "afternoon",
+     "time": "afternoon",
+     "jevTime": "afternoon",
+     "newDayP": 0.03,
+     "indoor": false
+    }
+   ],
+   "clockHeld": [],
+   "aboard": [
+    {
+     "page": 1,
+     "old": "VEH001",
+     "new": "VEH001",
+     "scores": {
+      "VEH001": 0.54,
+      "VEH002": 0.07,
+      "ANI001": 0.01
+     },
+     "oldCites": "ANI001,ART001,VEH001",
+     "newCites": "ANI001,ART001,VEH001"
+    },
+    {
+     "page": 2,
+     "old": null,
+     "new": null,
+     "scores": {
+      "VEH001": 0.19,
+      "VEH002": 0.02,
+      "ANI001": 0.01
+     },
+     "oldCites": "ART002,VEH001",
+     "newCites": "ART002,VEH001"
+    },
+    {
+     "page": 3,
+     "old": "VEH002",
+     "new": "VEH002",
+     "scores": {
+      "VEH002": 0.92,
+      "VEH001": 0.03,
+      "ANI001": 0.02
+     },
+     "oldCites": "ANI001,ART003,CHR001,VEH002",
+     "newCites": "ANI001,ART003,CHR001,VEH002"
+    },
+    {
+     "page": 4,
+     "old": null,
+     "new": null,
+     "scores": {
+      "VEH001": 0.12,
+      "VEH002": 0.04,
+      "ANI001": 0.02
+     },
+     "oldCites": "ANI001,ART004,VEH001,VEH002",
+     "newCites": "ANI001,ART004,VEH001,VEH002"
+    }
+   ],
+   "population": [
+    {
+     "loc": "LOC001",
+     "old": "ambient",
+     "new": "ambient",
+     "publicP": 0.89,
+     "crowdP": 0.04,
+     "creatureCrowdP": 0.01,
+     "wildlifeP": 0.26,
+     "sparseP": 0.26,
+     "pages": [
+      1,
+      2,
+      4
+     ]
+    },
+    {
+     "loc": "LOC002",
+     "old": "cast_only",
+     "new": "cast_only",
+     "publicP": 0.1,
+     "crowdP": 0.05,
+     "creatureCrowdP": 0.01,
+     "wildlifeP": 0.28,
+     "sparseP": 0.24,
+     "pages": [
+      3
+     ]
+    }
+   ]
+  },
+  {
+   "id": "job_1790539784661_6mjcny1c7",
+   "stats": {
+    "calls": 78,
+    "costUsd": 0.007749
+   },
+   "weather": [
+    {
+     "page": 1,
+     "oldAdvice": "overcast",
+     "newAdvice": "overcast",
+     "oldTime": "afternoon",
+     "time": "midday",
+     "jevTime": "midday",
+     "newDayP": 0.03,
+     "indoor": false
+    },
+    {
+     "page": 2,
+     "oldAdvice": "overcast",
+     "newAdvice": "overcast",
+     "oldTime": "afternoon",
+     "time": "afternoon",
+     "jevTime": "afternoon",
+     "newDayP": 0.05,
+     "indoor": false
+    },
+    {
+     "page": 3,
+     "oldAdvice": "overcast",
+     "newAdvice": "overcast",
+     "oldTime": "afternoon",
+     "time": "afternoon",
+     "jevTime": "afternoon",
+     "newDayP": 0.05,
+     "indoor": false
+    },
+    {
+     "page": 4,
+     "oldAdvice": "overcast",
+     "newAdvice": "clear",
+     "oldTime": "afternoon",
+     "time": "afternoon",
+     "jevTime": "afternoon",
+     "newDayP": 0.04,
+     "indoor": false
+    },
+    {
+     "page": 5,
+     "oldAdvice": "overcast",
+     "newAdvice": "overcast",
+     "oldTime": "afternoon",
+     "time": "afternoon",
+     "jevTime": "afternoon",
+     "newDayP": 0.02,
+     "indoor": false
+    },
+    {
+     "page": 6,
+     "oldAdvice": "none",
+     "newAdvice": "none",
+     "oldTime": "afternoon",
+     "time": "afternoon",
+     "jevTime": "afternoon",
+     "newDayP": 0.02,
+     "indoor": true
+    },
+    {
+     "page": 7,
+     "oldAdvice": "overcast",
+     "newAdvice": "overcast",
+     "oldTime": "afternoon",
+     "time": "afternoon",
+     "jevTime": "afternoon",
+     "newDayP": 0.02,
+     "indoor": false
+    },
+    {
+     "page": 8,
+     "oldAdvice": "overcast",
+     "newAdvice": "overcast",
+     "oldTime": "afternoon",
+     "time": "afternoon",
+     "jevTime": "afternoon",
+     "newDayP": 0.02,
+     "indoor": false
+    },
+    {
+     "page": 9,
+     "oldAdvice": "overcast",
+     "newAdvice": "overcast",
+     "oldTime": "afternoon",
+     "time": "afternoon",
+     "jevTime": "afternoon",
+     "newDayP": 0.02,
+     "indoor": false
+    },
+    {
+     "page": 10,
+     "oldAdvice": "fog",
+     "newAdvice": "fog",
+     "oldTime": "afternoon",
+     "time": "afternoon",
+     "jevTime": "afternoon",
+     "newDayP": 0.02,
+     "indoor": false
+    },
+    {
+     "page": 11,
+     "oldAdvice": "fog",
+     "newAdvice": "fog",
+     "oldTime": "afternoon",
+     "time": "afternoon",
+     "jevTime": "afternoon",
+     "newDayP": 0.02,
+     "indoor": false
+    },
+    {
+     "page": 12,
+     "oldAdvice": "fog",
+     "newAdvice": "fog",
+     "oldTime": "afternoon",
+     "time": "afternoon",
+     "jevTime": "afternoon",
+     "newDayP": 0.03,
+     "indoor": false
+    },
+    {
+     "page": 13,
+     "oldAdvice": "fog",
+     "newAdvice": "fog",
+     "oldTime": "afternoon",
+     "time": "afternoon",
+     "jevTime": "afternoon",
+     "newDayP": 0.02,
+     "indoor": false
+    },
+    {
+     "page": 14,
+     "oldAdvice": "fog",
+     "newAdvice": "fog",
+     "oldTime": "afternoon",
+     "time": "afternoon",
+     "jevTime": "afternoon",
+     "newDayP": 0.02,
+     "indoor": false
+    },
+    {
+     "page": 15,
+     "oldAdvice": "fog",
+     "newAdvice": "fog",
+     "oldTime": "afternoon",
+     "time": "afternoon",
+     "jevTime": "afternoon",
+     "newDayP": 0.02,
+     "indoor": false
+    },
+    {
+     "page": 16,
+     "oldAdvice": "fog",
+     "newAdvice": "fog",
+     "oldTime": "afternoon",
+     "time": "afternoon",
+     "jevTime": "afternoon",
+     "newDayP": 0.02,
+     "indoor": false
+    },
+    {
+     "page": 17,
+     "oldAdvice": "fog",
+     "newAdvice": "fog",
+     "oldTime": "afternoon",
+     "time": "afternoon",
+     "jevTime": "afternoon",
+     "newDayP": 0.02,
+     "indoor": false
+    },
+    {
+     "page": 18,
+     "oldAdvice": "fog",
+     "newAdvice": "fog",
+     "oldTime": "afternoon",
+     "time": "afternoon",
+     "jevTime": "afternoon",
+     "newDayP": 0.02,
+     "indoor": false
+    }
+   ],
+   "clockHeld": [],
+   "aboard": [
+    {
+     "page": 1,
+     "old": null,
+     "new": null,
+     "scores": {
+      "ANI001": 0.07,
+      "VEH001": 0.01
+     },
+     "oldCites": "ANI001,ART001",
+     "newCites": "ANI001,ART001"
+    },
+    {
+     "page": 2,
+     "old": null,
+     "new": null,
+     "scores": {
+      "VEH001": 0.02,
+      "ANI001": 0.02
+     },
+     "oldCites": "CHR001",
+     "newCites": "CHR001"
+    },
+    {
+     "page": 3,
+     "old": null,
+     "new": null,
+     "scores": {
+      "ANI001": 0.02,
+      "VEH001": 0.01
+     },
+     "oldCites": "ANI001,ART001",
+     "newCites": "ANI001,ART001"
+    },
+    {
+     "page": 4,
+     "old": null,
+     "new": null,
+     "scores": {
+      "ANI001": 0.02,
+      "VEH001": 0.01
+     },
+     "oldCites": "ANI001",
+     "newCites": "ANI001"
+    },
+    {
+     "page": 5,
+     "old": null,
+     "new": null,
+     "scores": {
+      "VEH001": 0.03,
+      "ANI001": 0.01
+     },
+     "oldCites": "ART001",
+     "newCites": "ART001"
+    },
+    {
+     "page": 6,
+     "old": "VEH001",
+     "new": "VEH001",
+     "scores": {
+      "VEH001": 0.7,
+      "ANI001": 0.01
+     },
+     "oldCites": "ART001,VEH001",
+     "newCites": "ART001,VEH001"
+    },
+    {
+     "page": 7,
+     "old": null,
+     "new": null,
+     "scores": {
+      "VEH001": 0.02,
+      "ANI001": 0.01
+     },
+     "oldCites": "CHR001",
+     "newCites": "CHR001"
+    },
+    {
+     "page": 8,
+     "old": null,
+     "new": null,
+     "scores": {
+      "VEH001": 0.01,
+      "ANI001": 0.01
+     },
+     "oldCites": "",
+     "newCites": ""
+    },
+    {
+     "page": 9,
+     "old": null,
+     "new": null,
+     "scores": {
+      "VEH001": 0.01,
+      "ANI001": 0.01
+     },
+     "oldCites": "ART001",
+     "newCites": "ART001"
+    },
+    {
+     "page": 10,
+     "old": null,
+     "new": null,
+     "scores": {
+      "VEH001": 0.02,
+      "ANI001": 0.01
+     },
+     "oldCites": "ART001",
+     "newCites": "ART001"
+    },
+    {
+     "page": 11,
+     "old": null,
+     "new": null,
+     "scores": {
+      "ANI001": 0.02,
+      "VEH001": 0.01
+     },
+     "oldCites": "ANI001",
+     "newCites": "ANI001"
+    },
+    {
+     "page": 12,
+     "old": null,
+     "new": null,
+     "scores": {
+      "ANI001": 0.02,
+      "VEH001": 0.01
+     },
+     "oldCites": "ANI001",
+     "newCites": "ANI001"
+    },
+    {
+     "page": 13,
+     "old": null,
+     "new": null,
+     "scores": {
+      "ANI001": 0.02,
+      "VEH001": 0.01
+     },
+     "oldCites": "ANI001",
+     "newCites": "ANI001"
+    },
+    {
+     "page": 14,
+     "old": null,
+     "new": null,
+     "scores": {
+      "VEH001": 0.01,
+      "ANI001": 0.01
+     },
+     "oldCites": "",
+     "newCites": ""
+    },
+    {
+     "page": 15,
+     "old": null,
+     "new": null,
+     "scores": {
+      "ANI001": 0.03,
+      "VEH001": 0.01
+     },
+     "oldCites": "ANI001",
+     "newCites": "ANI001"
+    },
+    {
+     "page": 16,
+     "old": null,
+     "new": null,
+     "scores": {
+      "ANI001": 0.06,
+      "VEH001": 0.01
+     },
+     "oldCites": "ANI001,ART001",
+     "newCites": "ANI001,ART001"
+    },
+    {
+     "page": 17,
+     "old": null,
+     "new": null,
+     "scores": {
+      "ANI001": 0.06,
+      "VEH001": 0.01
+     },
+     "oldCites": "ANI001",
+     "newCites": "ANI001"
+    },
+    {
+     "page": 18,
+     "old": null,
+     "new": null,
+     "scores": {
+      "ANI001": 0.1,
+      "VEH001": 0.01
+     },
+     "oldCites": "ANI001",
+     "newCites": "ANI001"
+    }
+   ],
+   "population": []
+  },
+  {
+   "id": "job_1790536739048_ruynosw80",
+   "stats": {
+    "calls": 11,
+    "costUsd": 0.000796
+   },
+   "weather": [
+    {
+     "page": 1,
+     "oldAdvice": "none",
+     "newAdvice": "none",
+     "oldTime": "afternoon",
+     "time": "afternoon",
+     "jevTime": "afternoon",
+     "newDayP": 0.02,
+     "indoor": false
+    },
+    {
+     "page": 2,
+     "oldAdvice": "clear",
+     "newAdvice": "none",
+     "oldTime": "afternoon",
+     "time": "afternoon",
+     "jevTime": "afternoon",
+     "newDayP": 0.04,
+     "indoor": false
+    },
+    {
+     "page": 3,
+     "oldAdvice": "none",
+     "newAdvice": "none",
+     "oldTime": "afternoon",
+     "time": "dark",
+     "jevTime": "dark",
+     "newDayP": 0.02,
+     "indoor": true
+    },
+    {
+     "page": 4,
+     "oldAdvice": "clear",
+     "newAdvice": "clear",
+     "oldTime": "afternoon",
+     "time": "evening",
+     "jevTime": "evening",
+     "newDayP": 0.04,
+     "indoor": false
+    }
+   ],
+   "clockHeld": [],
+   "aboard": [
+    {
+     "page": 1,
+     "old": null,
+     "new": null,
+     "scores": {
+      "VEH001": 0.09,
+      "VEH002": 0.06,
+      "ANI001": 0.01
+     },
+     "oldCites": "ANI001,ART001",
+     "newCites": "ANI001,ART001"
+    },
+    {
+     "page": 2,
+     "old": "VEH001",
+     "new": "VEH001",
+     "scores": {
+      "VEH001": 0.77,
+      "VEH002": 0.21,
+      "ANI001": 0.01
+     },
+     "oldCites": "ART002,CHR001,VEH001",
+     "newCites": "ART002,CHR001,VEH001"
+    },
+    {
+     "page": 3,
+     "old": "VEH001",
+     "new": "VEH001",
+     "scores": {
+      "VEH001": 0.83,
+      "VEH002": 0.05,
+      "ANI001": 0.01
+     },
+     "oldCites": "ANI001,VEH001",
+     "newCites": "ANI001,VEH001"
+    },
+    {
+     "page": 4,
+     "old": "VEH002",
+     "new": "VEH002",
+     "scores": {
+      "VEH002": 0.76,
+      "VEH001": 0.04,
+      "ANI001": 0.01
+     },
+     "oldCites": "ANI001,VEH002",
+     "newCites": "ANI001,VEH002"
+    }
+   ],
+   "population": []
+  },
+  {
+   "id": "job_1790529840433_ar4u7qry3",
+   "stats": {
+    "calls": 14,
+    "costUsd": 0.000977
+   },
+   "weather": [
+    {
+     "page": 1,
+     "oldAdvice": "fog",
+     "newAdvice": "fog",
+     "oldTime": "morning",
+     "time": "morning",
+     "jevTime": "morning",
+     "newDayP": 0.02,
+     "indoor": false
+    },
+    {
+     "page": 2,
+     "oldAdvice": "fog",
+     "newAdvice": "fog",
+     "oldTime": "morning",
+     "time": "morning",
+     "jevTime": "morning",
+     "newDayP": 0.03,
+     "indoor": false
+    },
+    {
+     "page": 3,
+     "oldAdvice": "fog",
+     "newAdvice": "fog",
+     "oldTime": "morning",
+     "time": "morning",
+     "jevTime": "morning",
+     "newDayP": 0.03,
+     "indoor": false
+    },
+    {
+     "page": 4,
+     "oldAdvice": "fog",
+     "newAdvice": "fog",
+     "oldTime": "morning",
+     "time": "morning",
+     "jevTime": "morning",
+     "newDayP": 0.03,
+     "indoor": false
+    }
+   ],
+   "clockHeld": [],
+   "aboard": [
+    {
+     "page": 1,
+     "old": null,
+     "new": null,
+     "scores": {
+      "VEH001": 0.08,
+      "VEH002": 0.06,
+      "ANI001": 0.01
+     },
+     "oldCites": "ART001,ART002,VEH001",
+     "newCites": "ART001,ART002,VEH001"
+    },
+    {
+     "page": 2,
+     "old": null,
+     "new": null,
+     "scores": {
+      "VEH002": 0.13,
+      "VEH001": 0.02,
+      "ANI001": 0.01
+     },
+     "oldCites": "VEH002",
+     "newCites": "VEH002"
+    },
+    {
+     "page": 3,
+     "old": "VEH001",
+     "new": "VEH001",
+     "scores": {
+      "VEH001": 0.9,
+      "VEH002": 0.03,
+      "ANI001": 0.01
+     },
+     "oldCites": "ART001,CHR001,VEH001",
+     "newCites": "ART001,CHR001,VEH001"
+    },
+    {
+     "page": 4,
+     "old": "VEH002",
+     "new": "VEH002",
+     "scores": {
+      "VEH002": 0.65,
+      "VEH001": 0.28,
+      "ANI001": 0.01
+     },
+     "oldCites": "ANI001,ART003,ART004,VEH002",
+     "newCites": "ANI001,ART003,ART004,VEH002"
+    }
+   ],
+   "population": []
+  },
+  {
+   "id": "job_1791222889407_ypl33vk8u",
+   "stats": {
+    "calls": 48,
+    "costUsd": 0.005335
+   },
+   "weather": [
+    {
+     "page": 1,
+     "oldAdvice": "clear",
+     "newAdvice": "clear",
+     "oldTime": "afternoon",
+     "time": "evening",
+     "jevTime": "evening",
+     "newDayP": 0.05,
+     "indoor": false
+    },
+    {
+     "page": 2,
+     "oldAdvice": "clear",
+     "newAdvice": "clear",
+     "oldTime": "evening",
+     "time": "evening",
+     "jevTime": "evening",
+     "newDayP": 0.07,
+     "indoor": false
+    },
+    {
+     "page": 3,
+     "oldAdvice": "clear",
+     "newAdvice": "clear",
+     "oldTime": "evening",
+     "time": "evening",
+     "jevTime": "evening",
+     "newDayP": 0.04,
+     "indoor": false
+    },
+    {
+     "page": 4,
+     "oldAdvice": "clear",
+     "newAdvice": "none",
+     "oldTime": "evening",
+     "time": "evening",
+     "jevTime": "evening",
+     "newDayP": 0.03,
+     "indoor": false
+    },
+    {
+     "page": 5,
+     "oldAdvice": "none",
+     "newAdvice": "none",
+     "oldTime": "evening",
+     "time": "underwater",
+     "jevTime": "underwater",
+     "newDayP": 0.03,
+     "indoor": true
+    },
+    {
+     "page": 6,
+     "oldAdvice": "none",
+     "newAdvice": "none",
+     "oldTime": "evening",
+     "time": "underwater",
+     "jevTime": "underwater",
+     "newDayP": 0.03,
+     "indoor": true
+    },
+    {
+     "page": 7,
+     "oldAdvice": "none",
+     "newAdvice": "none",
+     "oldTime": "evening",
+     "time": "underwater_dark",
+     "jevTime": "underwater_dark",
+     "newDayP": 0.02,
+     "indoor": true
+    },
+    {
+     "page": 8,
+     "oldAdvice": "none",
+     "newAdvice": "none",
+     "oldTime": "evening",
+     "time": "underwater_dark",
+     "jevTime": "underwater_dark",
+     "newDayP": 0.02,
+     "indoor": true
+    },
+    {
+     "page": 9,
+     "oldAdvice": "none",
+     "newAdvice": "none",
+     "oldTime": "evening",
+     "time": "underwater_dark",
+     "jevTime": "underwater_dark",
+     "newDayP": 0.02,
+     "indoor": true
+    },
+    {
+     "page": 10,
+     "oldAdvice": "none",
+     "newAdvice": "none",
+     "oldTime": "evening",
+     "time": "underwater_dark",
+     "jevTime": "underwater_dark",
+     "newDayP": 0.02,
+     "indoor": true
+    },
+    {
+     "page": 11,
+     "oldAdvice": "none",
+     "newAdvice": "none",
+     "oldTime": "evening",
+     "time": "underwater_dark",
+     "jevTime": "underwater_dark",
+     "newDayP": 0.02,
+     "indoor": true
+    },
+    {
+     "page": 12,
+     "oldAdvice": "clear",
+     "newAdvice": "overcast",
+     "oldTime": "dusk",
+     "time": "dusk",
+     "jevTime": "dusk",
+     "newDayP": 0.03,
+     "indoor": false
+    },
+    {
+     "page": 13,
+     "oldAdvice": "none",
+     "newAdvice": "none",
+     "oldTime": "dusk",
+     "time": "dusk",
+     "jevTime": "dusk",
+     "newDayP": 0.05,
+     "indoor": false
+    },
+    {
+     "page": 14,
+     "oldAdvice": "clear",
+     "newAdvice": "clear",
+     "oldTime": "dusk",
+     "time": "dusk",
+     "jevTime": "dusk",
+     "newDayP": 0.03,
+     "indoor": false
+    }
+   ],
+   "clockHeld": [],
+   "aboard": [
+    {
+     "page": 1,
+     "old": null,
+     "new": null,
+     "scores": {
+      "ANI001": 0.02,
+      "ANI002": 0.01
+     },
+     "oldCites": "ART001",
+     "newCites": "ART001"
+    },
+    {
+     "page": 2,
+     "old": null,
+     "new": null,
+     "scores": {
+      "ANI001": 0.06,
+      "ANI002": 0.01
+     },
+     "oldCites": "ANI001",
+     "newCites": "ANI001"
+    },
+    {
+     "page": 3,
+     "old": null,
+     "new": null,
+     "scores": {
+      "ANI001": 0.04,
+      "ANI002": 0.01
+     },
+     "oldCites": "",
+     "newCites": ""
+    },
+    {
+     "page": 4,
+     "old": null,
+     "new": "ANI001",
+     "scores": {
+      "ANI001": 0.59,
+      "ANI002": 0.01
+     },
+     "oldCites": "ANI001",
+     "newCites": "ANI001"
+    },
+    {
+     "page": 5,
+     "old": null,
+     "new": null,
+     "scores": {
+      "ANI001": 0.06,
+      "ANI002": 0.01
+     },
+     "oldCites": "ART002,CHR001",
+     "newCites": "ART002,CHR001"
+    },
+    {
+     "page": 6,
+     "old": null,
+     "new": null,
+     "scores": {
+      "ANI001": 0.07,
+      "ANI002": 0.02
+     },
+     "oldCites": "ANI002,ART001",
+     "newCites": "ANI002,ART001"
+    },
+    {
+     "page": 7,
+     "old": null,
+     "new": null,
+     "scores": {
+      "ANI001": 0.08,
+      "ANI002": 0.03
+     },
+     "oldCites": "ANI002,ART002",
+     "newCites": "ANI002,ART002"
+    },
+    {
+     "page": 8,
+     "old": null,
+     "new": null,
+     "scores": {
+      "ANI001": 0.2,
+      "ANI002": 0.01
+     },
+     "oldCites": "ANI001",
+     "newCites": "ANI001"
+    },
+    {
+     "page": 9,
+     "old": null,
+     "new": null,
+     "scores": {
+      "ANI001": 0.04,
+      "ANI002": 0.01
+     },
+     "oldCites": "ART002",
+     "newCites": ""
+    },
+    {
+     "page": 10,
+     "old": null,
+     "new": null,
+     "scores": {
+      "ANI001": 0.08,
+      "ANI002": 0.02
+     },
+     "oldCites": "ANI002,ART002",
+     "newCites": "ANI002,ART002"
+    },
+    {
+     "page": 11,
+     "old": null,
+     "new": null,
+     "scores": {
+      "ANI001": 0.03,
+      "ANI002": 0.02
+     },
+     "oldCites": "ANI002,ART001,ART002",
+     "newCites": "ANI002,ART001,ART002"
+    },
+    {
+     "page": 12,
+     "old": null,
+     "new": null,
+     "scores": {
+      "ANI001": 0.06,
+      "ANI002": 0.01
+     },
+     "oldCites": "ART002",
+     "newCites": ""
+    },
+    {
+     "page": 13,
+     "old": null,
+     "new": null,
+     "scores": {
+      "ANI001": 0.02,
+      "ANI002": 0.01
+     },
+     "oldCites": "ART002",
+     "newCites": "ART002"
+    },
+    {
+     "page": 14,
+     "old": null,
+     "new": null,
+     "scores": {
+      "ANI001": 0.06,
+      "ANI002": 0.01
+     },
+     "oldCites": "ANI001,ANI002,ART001,CHR001",
+     "newCites": "ANI001,ANI002,ART001,CHR001"
+    }
+   ],
+   "population": [
+    {
+     "loc": "LOC001",
+     "old": "cast_only",
+     "new": "wildlife",
+     "publicP": 0.15,
+     "crowdP": 0.02,
+     "creatureCrowdP": 0.02,
+     "wildlifeP": 0.56,
+     "sparseP": 0.16,
+     "pages": [
+      1,
+      2,
+      3,
+      4,
+      12,
+      13,
+      14
+     ]
+    },
+    {
+     "loc": "LOC002",
+     "old": "cast_only",
+     "new": "wildlife",
+     "publicP": 0.03,
+     "crowdP": 0.02,
+     "creatureCrowdP": 0.03,
+     "wildlifeP": 0.5,
+     "sparseP": 0.25,
+     "pages": [
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11
+     ]
+    }
+   ],
+   "cover": {
+    "old": [
+     {
+      "key": "frontCover",
+      "cite": "LOC001.1",
+      "label": "The Herbstfelsen Shore, Wide Shoreline Vista",
+      "p": 0.88,
+      "offered": false
+     },
+     {
+      "key": "initialPage",
+      "cite": "LOC003.1",
+      "label": "Fislisbach (Stadt)",
+      "p": 0.35,
+      "offered": true
+     },
+     {
+      "key": "backCover",
+      "cite": "LOC004.1",
+      "label": "Kirche Rohrdorf",
+      "p": 0.43,
+      "offered": true
+     }
+    ],
+    "new": [
+     {
+      "key": "frontCover",
+      "cite": "LOC001.1",
+      "label": "The Herbstfelsen Shore, Wide Shoreline Vista",
+      "p": 0.69,
+      "offered": false,
+      "candidates": {
+       "LOC001.1": 0.69,
+       "LOC001.5": 0.62,
+       "LOC002.4": 0.15,
+       "LOC003+": 0.21,
+       "LOC004+": 0.15
+      }
+     },
+     {
+      "key": "initialPage",
+      "cite": "LOC003+",
+      "label": "Fislisbach (Stadt)",
+      "p": 0.34,
+      "offered": true,
+      "candidates": {
+       "LOC001.1": 0.64,
+       "LOC001.5": 0.53,
+       "LOC002.4": 0.1,
+       "LOC003+": 0.34,
+       "LOC004+": 0.22
+      }
+     },
+     {
+      "key": "backCover",
+      "cite": "LOC001.5",
+      "label": "The Herbstfelsen Shore, Shoreline Crossing",
+      "p": 0.73,
+      "offered": false,
+      "candidates": {
+       "LOC001.1": 0.78,
+       "LOC001.5": 0.73,
+       "LOC002.4": 0.07,
+       "LOC003+": 0.43,
+       "LOC004+": 0.28
+      }
+     }
+    ],
+    "unmet": []
+   }
+  },
+  {
+   "id": "job_1791267520938_essbvehs8",
+   "stats": {
+    "calls": 37,
+    "costUsd": 0.004712999999999999
+   },
+   "weather": [
+    {
+     "page": 1,
+     "oldAdvice": "clear",
+     "newAdvice": "clear",
+     "oldTime": "afternoon",
+     "time": "afternoon",
+     "jevTime": "afternoon",
+     "newDayP": 0.03,
+     "indoor": false
+    },
+    {
+     "page": 2,
+     "oldAdvice": "clear",
+     "newAdvice": "clear",
+     "oldTime": "afternoon",
+     "time": "afternoon",
+     "jevTime": "afternoon",
+     "newDayP": 0.05,
+     "indoor": false
+    },
+    {
+     "page": 3,
+     "oldAdvice": "clear",
+     "newAdvice": "clear",
+     "oldTime": "afternoon",
+     "time": "afternoon",
+     "jevTime": "afternoon",
+     "newDayP": 0.03,
+     "indoor": false
+    },
+    {
+     "page": 4,
+     "oldAdvice": "clear",
+     "newAdvice": "clear",
+     "oldTime": "evening",
+     "time": "underwater",
+     "jevTime": "underwater",
+     "newDayP": 0.02,
+     "indoor": true
+    },
+    {
+     "page": 5,
+     "oldAdvice": "none",
+     "newAdvice": "none",
+     "oldTime": "evening",
+     "time": "underwater",
+     "jevTime": "underwater",
+     "newDayP": 0.02,
+     "indoor": true
+    },
+    {
+     "page": 6,
+     "oldAdvice": "clear",
+     "newAdvice": "clear",
+     "oldTime": "dusk",
+     "time": "underwater_dark",
+     "jevTime": "underwater_dark",
+     "newDayP": 0.02,
+     "indoor": true
+    },
+    {
+     "page": 7,
+     "oldAdvice": "clear",
+     "newAdvice": "clear",
+     "oldTime": "dusk",
+     "time": "dusk",
+     "jevTime": "dusk",
+     "newDayP": 0.02,
+     "indoor": false
+    },
+    {
+     "page": 8,
+     "oldAdvice": "none",
+     "newAdvice": "none",
+     "oldTime": "dusk",
+     "time": "underwater_dark",
+     "jevTime": "underwater_dark",
+     "newDayP": 0.02,
+     "indoor": true
+    },
+    {
+     "page": 9,
+     "oldAdvice": "clear",
+     "newAdvice": "clear",
+     "oldTime": "dusk",
+     "time": "underwater_dark",
+     "jevTime": "underwater_dark",
+     "newDayP": 0.02,
+     "indoor": true
+    },
+    {
+     "page": 10,
+     "oldAdvice": "none",
+     "newAdvice": "none",
+     "oldTime": "dusk",
+     "time": "dusk",
+     "jevTime": "dusk",
+     "newDayP": 0.02,
+     "indoor": false
+    },
+    {
+     "page": 11,
+     "oldAdvice": "none",
+     "newAdvice": "none",
+     "oldTime": "dusk",
+     "time": "underwater",
+     "jevTime": "underwater",
+     "newDayP": 0.03,
+     "indoor": true
+    },
+    {
+     "page": 12,
+     "oldAdvice": "none",
+     "newAdvice": "none",
+     "oldTime": "dusk",
+     "time": "underwater",
+     "jevTime": "underwater",
+     "newDayP": 0.03,
+     "indoor": true
+    },
+    {
+     "page": 13,
+     "oldAdvice": "clear",
+     "newAdvice": "clear",
+     "oldTime": "dusk",
+     "time": "dusk",
+     "jevTime": "dusk",
+     "newDayP": 0.03,
+     "indoor": false
+    },
+    {
+     "page": 14,
+     "oldAdvice": "clear",
+     "newAdvice": "clear",
+     "oldTime": "dusk",
+     "time": "dusk",
+     "jevTime": "dusk",
+     "newDayP": 0.03,
+     "indoor": false
+    }
+   ],
+   "clockHeld": [],
+   "aboard": [
+    {
+     "page": 1,
+     "old": null,
+     "new": null,
+     "scores": {
+      "VEH001": 0.01,
+      "ANI001": 0.01,
+      "ANI002": 0.01
+     },
+     "oldCites": "ART001",
+     "newCites": "ART001"
+    },
+    {
+     "page": 2,
+     "old": null,
+     "new": null,
+     "scores": {
+      "ANI001": 0.04,
+      "VEH001": 0.01,
+      "ANI002": 0.01
+     },
+     "oldCites": "ANI001",
+     "newCites": "ANI001"
+    },
+    {
+     "page": 3,
+     "old": null,
+     "new": null,
+     "scores": {
+      "ANI001": 0.02,
+      "VEH001": 0.01,
+      "ANI002": 0.01
+     },
+     "oldCites": "",
+     "newCites": ""
+    },
+    {
+     "page": 4,
+     "old": null,
+     "new": null,
+     "scores": {
+      "VEH001": 0.16,
+      "ANI001": 0.01,
+      "ANI002": 0.01
+     },
+     "oldCites": "VEH001",
+     "newCites": "VEH001"
+    },
+    {
+     "page": 5,
+     "old": null,
+     "new": null,
+     "scores": {
+      "VEH001": 0.12,
+      "ANI002": 0.02,
+      "ANI001": 0.01
+     },
+     "oldCites": "ANI002,ART001,VEH001",
+     "newCites": "ANI002,ART001,VEH001"
+    },
+    {
+     "page": 6,
+     "old": null,
+     "new": null,
+     "scores": {
+      "VEH001": 0.07,
+      "ANI001": 0.01,
+      "ANI002": 0.01
+     },
+     "oldCites": "",
+     "newCites": ""
+    },
+    {
+     "page": 7,
+     "old": null,
+     "new": null,
+     "scores": {
+      "VEH001": 0.14,
+      "ANI001": 0.01,
+      "ANI002": 0.01
+     },
+     "oldCites": "ART003,VEH001",
+     "newCites": "ART003,VEH001"
+    },
+    {
+     "page": 8,
+     "old": "VEH001",
+     "new": "VEH001",
+     "scores": {
+      "VEH001": 0.84,
+      "ANI002": 0.04,
+      "ANI001": 0.01
+     },
+     "oldCites": "ANI002,ART001,ART003,VEH001",
+     "newCites": "ANI002,ART001,ART003,VEH001"
+    },
+    {
+     "page": 9,
+     "old": null,
+     "new": null,
+     "scores": {
+      "VEH001": 0.06,
+      "ANI001": 0.01,
+      "ANI002": 0.01
+     },
+     "oldCites": "ANI002",
+     "newCites": "ANI002"
+    },
+    {
+     "page": 10,
+     "old": null,
+     "new": null,
+     "scores": {
+      "VEH001": 0.03,
+      "ANI001": 0.01,
+      "ANI002": 0.01
+     },
+     "oldCites": "ART001,CHR001",
+     "newCites": "ART001,CHR001"
+    },
+    {
+     "page": 11,
+     "old": null,
+     "new": null,
+     "scores": {
+      "VEH001": 0.02,
+      "ANI001": 0.01,
+      "ANI002": 0.01
+     },
+     "oldCites": "ART001,CHR001",
+     "newCites": "ART001,CHR001"
+    },
+    {
+     "page": 12,
+     "old": null,
+     "new": null,
+     "scores": {
+      "VEH001": 0.03,
+      "ANI001": 0.01,
+      "ANI002": 0.01
+     },
+     "oldCites": "ANI002,CHR001",
+     "newCites": "ANI002,CHR001"
+    },
+    {
+     "page": 13,
+     "old": null,
+     "new": null,
+     "scores": {
+      "VEH001": 0.01,
+      "ANI001": 0.01,
+      "ANI002": 0.01
+     },
+     "oldCites": "ART002",
+     "newCites": "ART002"
+    },
+    {
+     "page": 14,
+     "old": null,
+     "new": null,
+     "scores": {
+      "VEH001": 0.01,
+      "ANI001": 0.01,
+      "ANI002": 0.01
+     },
+     "oldCites": "ART001,ART002",
+     "newCites": "ART001"
+    }
+   ],
+   "population": [
+    {
+     "loc": "LOC001",
+     "old": "cast_only",
+     "new": "cast_only",
+     "publicP": 0.27,
+     "crowdP": 0.01,
+     "creatureCrowdP": 0.04,
+     "wildlifeP": 0.44,
+     "sparseP": 0.3,
+     "pages": [
+      1,
+      2,
+      3
+     ]
+    },
+    {
+     "loc": "LOC002",
+     "old": "cast_only",
+     "new": "cast_only",
+     "publicP": 0.02,
+     "crowdP": 0.01,
+     "creatureCrowdP": 0.03,
+     "wildlifeP": 0.49,
+     "sparseP": 0.4,
+     "pages": [
+      4,
+      5,
+      6,
+      7
+     ]
+    },
+    {
+     "loc": "LOC003",
+     "old": "cast_only",
+     "new": "cast_only",
+     "publicP": 0.02,
+     "crowdP": 0.01,
+     "creatureCrowdP": 0.03,
+     "wildlifeP": 0.39,
+     "sparseP": 0.33,
+     "pages": [
+      8
+     ]
+    },
+    {
+     "loc": "LOC004",
+     "old": "cast_only",
+     "new": "cast_only",
+     "publicP": 0.03,
+     "crowdP": 0.02,
+     "creatureCrowdP": 0.04,
+     "wildlifeP": 0.44,
+     "sparseP": 0.38,
+     "pages": [
+      9
+     ]
+    },
+    {
+     "loc": "LOC005",
+     "old": "cast_only",
+     "new": "cast_only",
+     "publicP": 0.03,
+     "crowdP": 0.02,
+     "creatureCrowdP": 0.05,
+     "wildlifeP": 0.49,
+     "sparseP": 0.38,
+     "pages": [
+      10,
+      11,
+      12
+     ]
+    },
+    {
+     "loc": "LOC006",
+     "old": "cast_only",
+     "new": "cast_only",
+     "publicP": 0.39,
+     "crowdP": 0.01,
+     "creatureCrowdP": 0.03,
+     "wildlifeP": 0.38,
+     "sparseP": 0.23,
+     "pages": [
+      13,
+      14
+     ]
+    }
+   ],
+   "cover": {
+    "old": [
+     {
+      "key": "frontCover",
+      "cite": "LOC006.2",
+      "label": "Wooden Jetty, Jetty deck wide",
+      "p": 0.81,
+      "offered": false
+     },
+     {
+      "key": "initialPage",
+      "cite": "LOC007.1",
+      "label": "Kirche Rohrdorf",
+      "p": 0.26,
+      "offered": true
+     },
+     {
+      "key": "backCover",
+      "cite": "LOC008.1",
+      "label": "Fislisbach (Stadt)",
+      "p": 0.4,
+      "offered": true
+     }
+    ],
+    "new": [
+     {
+      "key": "frontCover",
+      "cite": "LOC005.2",
+      "label": "Maren's Coral Garden, Coral garden wide portrait",
+      "p": 0.52,
+      "offered": false,
+      "candidates": {
+       "LOC002.1": 0.28,
+       "LOC005.2": 0.52,
+       "LOC006.1": 0.28,
+       "LOC006.2": 0.45,
+       "LOC008+": 0.16,
+       "LOC007+": 0.11
+      }
+     },
+     {
+      "key": "initialPage",
+      "cite": "LOC008+",
+      "label": "Fislisbach (Stadt)",
+      "p": 0.21,
+      "offered": true,
+      "candidates": {
+       "LOC002.1": 0.15,
+       "LOC005.2": 0.2,
+       "LOC006.1": 0.18,
+       "LOC006.2": 0.23,
+       "LOC008+": 0.21,
+       "LOC007+": 0.14
+      }
+     },
+     {
+      "key": "backCover",
+      "cite": "LOC006.2",
+      "label": "Wooden Jetty, Jetty deck wide",
+      "p": 0.64,
+      "offered": false,
+      "candidates": {
+       "LOC002.1": 0.1,
+       "LOC005.2": 0.23,
+       "LOC006.1": 0.29,
+       "LOC006.2": 0.64,
+       "LOC008+": 0.23,
+       "LOC007+": 0.18
+      }
+     }
+    ],
+    "unmet": []
+   }
+  }
+ ],
+ "total": {
+  "calls": 292,
+  "costUsd": 0.030522999999999998
+ }
+}

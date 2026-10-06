@@ -98,6 +98,9 @@ function needsScaleRepair(sceneMetadata, castableCharacters = null) {
   const castable = normaliseCastableNames(castableCharacters);
   if (castable) figures = figures.filter(c => castable.has((c?.name || '').trim().toLowerCase()));
   if (figures.length < 2) return false;
+  // The cast rides or sits inside a creature (`aboard` an ANI id): the figures are physically on its body, and
+  // relocating one to a distant spot takes it off the creature (owner, 2026-10-06, Jev aboard options).
+  if (require('./visualBible').isCreatureAboard(sceneMetadata?.aboard ?? sceneMetadata?.fullData?.aboard)) return false;
   const depthOf = (c) => (c.depth || '').toLowerCase();
   // One figure in front and one further back is the depth the composite exists
   // to hold; midground counts as 'further back' now that a midground figure can

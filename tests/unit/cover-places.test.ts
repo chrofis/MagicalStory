@@ -77,15 +77,15 @@ describe('assignment: the front picks first; the covers must be distinct', () =>
   });
 });
 
-describe('decideCoverPlaces: one Jev choice per cover, code assigns', () => {
+describe('decideCoverPlaces: one yes/no per candidate per cover, code assigns', () => {
   it('asks once per cover over the candidates and returns distinct vantages', async () => {
     const calls: any[] = [];
-    const stub = { calls, impl: async ({ state, questions }: any) => { calls.push({ state, questions }); return { answers: { PLACE: { choice: 'v0', probabilities: { v0: 0.4, v1: 0.35, v2: 0.25 } } }, cost: 0, model: 'stub', usage: {} }; } };
+    const stub = { calls, impl: async ({ state, questions }: any) => { calls.push({ state, questions }); return { answers: Object.fromEntries(Object.keys(questions).map((id, i) => [id, { noul: 0.6 - 0.1 * i }])), cost: 0, model: 'stub', usage: {} }; } };
     const casts = { frontCover: ['Child1', 'Creature'], initialPage: ['Child1'], backCover: ['Child1', 'Child2'] };
     const d = await JBF.decideCoverPlaces({ arc: 'an arc', pages, visualBible: VB(), coverKeys: ['frontCover', 'initialPage', 'backCover'], casts }, { callImpl: stub.impl });
     expect(d.unmet).toEqual([]);
     expect(stub.calls).toHaveLength(3);
-    for (const c of stub.calls) expect(Object.keys(c.questions.PLACE.criteria)).toHaveLength(3);
+    for (const c of stub.calls) expect(Object.keys(c.questions)).toHaveLength(3);
     expect(new Set(d.covers.map((c: any) => c.cite)).size).toBe(3);
     expect(d.covers.every((c: any) => ['LOC001.1', 'LOC001.3', 'LOC001.4'].includes(c.cite))).toBe(true);
   });
@@ -153,16 +153,20 @@ describe('offered landmarks: candidates, their own question, and their place in 
     const off = c.filter((x: any) => x.offered);
     expect(off.map((x: any) => [x.name, x.offered.photo.variantNumber])).toEqual([['The Old Cathedral', 2], ['The River Bridge', 1]]);
   });
-  it('is rated by its own yes/no per cover, never inside the visited choice', async () => {
+  it('is rated on ONE scale with the visited vantages: the same yes/no wording per candidate, in the same call', async () => {
     const stub = makeJevStub();
     const casts = { frontCover: ['Child1'], initialPage: ['Child1'], backCover: ['Child1'] };
     const d = await JBF.decideCoverPlaces({ arc: 'a', pages, visualBible: VB(), coverKeys: ['frontCover', 'initialPage', 'backCover'], casts, availableLandmarks: OFFERED, town: 'the town' }, { callImpl: stub.impl });
-    const choices = stub.calls.filter((c: any) => c.questions.PLACE);
-    const nouls = stub.calls.filter((c: any) => !c.questions.PLACE);
-    expect(choices).toHaveLength(3);
-    expect(nouls).toHaveLength(3);
-    for (const c of choices) expect(Object.values(c.questions.PLACE.criteria).join(' ')).not.toContain('Cathedral');
-    for (const c of nouls) expect(Object.values(c.questions).every((q: any) => q.type === 'noul')).toBe(true);
+    expect(stub.calls).toHaveLength(3); // one call per cover
+    for (const c of stub.calls) {
+      const qs = Object.values<any>(c.questions);
+      expect(qs.every((q: any) => q.type === 'noul')).toBe(true);
+      // visited vantages and offered landmarks share the question; only the place differs
+      const stem = (q: any) => q.instructions.split(' The place: ')[0];
+      expect(new Set(qs.map(stem)).size).toBe(1);
+      expect(qs.some((q: any) => q.instructions.includes('Cathedral'))).toBe(true);
+      expect(qs.some((q: any) => q.instructions.includes('square wide'))).toBe(true);
+    }
     // One landmark visited with one cast: the other covers go to distinct offered landmarks.
     expect(d.unmet).toEqual([]);
     expect(d.covers.filter((c: any) => c.offered).map((c: any) => c.label).sort()).toEqual(['The Old Cathedral', 'The River Bridge']);
@@ -283,7 +287,7 @@ describe('runArtDirector: the covers\' places between the two calls', () => {
     JD.JEV_OUTAGE.waitMs = 0;
     const ok = makeJevStub().impl;
     const { out, prompts, jevReport } = await run(async (rq: any) => {
-      if (rq.questions && rq.questions.PLACE) throw new Error('HTTP 503');
+      if (rq.questions && rq.questions.c0) throw new Error('HTTP 503');
       return ok(rq);
     });
     expect(jevReport.fallback.step).toBe('cover_places');
@@ -294,5 +298,40 @@ describe('runArtDirector: the covers\' places between the two calls', () => {
       expect(c.planLine).toContain(CB.COVER_OWN_PLACE);
     }
     expect(prompts.beats_scene_expansion).toContain(CB.COVER_OWN_PLACE);
+  });
+});
+
+// (b) water and air books, (c) one scale, (d) purposes per cover (owner, 2026-10-06; essbvehs8 and ypl33 put two covers inland)
+describe('cover places: footing, one scale, purposes', () => {
+  it('a cover may show the cast swimming, floating or aboard, not only on solid ground', () => {
+    expect(JBF.COVER_FOOTING).toMatch(/swimming/);
+    expect(JBF.COVER_FOOTING).toMatch(/aboard/);
+    expect(JBF.coverPlaceState('arc', pages)).not.toMatch(/solid ground/);
+    expect(CB.COVER_DECIDED_PLACE).toMatch(/swimming, floating or aboard/);
+    expect(CB.COVER_KEY_PLACE).not.toMatch(/never under water/);
+  });
+  it('each cover has its own purpose: key place, where it starts, where it ends at rest', () => {
+    expect(Object.keys(JBF.COVER_PURPOSE)).toEqual(['frontCover', 'initialPage', 'backCover']);
+    const q = (k: string) => JBF.coverFitQuestion(k, 'LABEL');
+    expect(new Set(['frontCover', 'initialPage', 'backCover'].map(q)).size).toBe(3);
+    expect(q('frontCover')).toMatch(/key place/);
+    expect(q('initialPage')).toMatch(/begins/);
+    expect(q('backCover')).toMatch(/ends at rest/);
+  });
+  it('a book with one place says its covers differ by viewpoint and light', async () => {
+    const calls: any[] = [];
+    const vb = { locations: [{ id: 'LOC001', name: 'the reef', appearsInPages: [1, 2], vantages: [
+      { id: 'LOC001.1', name: 'reef wide', shot: 'wide', pages: [1] }, { id: 'LOC001.2', name: 'reef far', shot: 'ultra-wide', pages: [2] }] }] };
+    const impl = async ({ questions }: any) => { calls.push(questions); return { answers: Object.fromEntries(Object.keys(questions).map((id) => [id, { noul: 0.5 }])), cost: 0, model: 'stub', usage: {} }; };
+    await JBF.decideCoverPlaces({ arc: 'a', pages: pages.slice(0, 2), visualBible: vb, coverKeys: ['frontCover'] }, { callImpl: impl });
+    expect(Object.values<any>(calls[0])[0].instructions).toContain(JBF.COVER_ONE_PLACE_NOTE.trim());
+  });
+  it('an inland landmark that fits the story at 0.1 no longer beats the reef the story is set in', async () => {
+    const lm = (name: string) => ({ name, type: 'Church', photoVariants: [{ variantNumber: 1, kind: 'exterior', framing: 'wide', photoScore: 80, description: '[summer, day] A church.' }] });
+    const vb = { locations: [{ id: 'LOC001', name: 'the reef', appearsInPages: [1, 2], vantages: [{ id: 'LOC001.1', name: 'reef wide', shot: 'wide', pages: [1] }] }] };
+    // Jev rates each candidate on the one scale: the reef 0.8, the landmark 0.1.
+    const impl = async ({ questions }: any) => ({ answers: Object.fromEntries(Object.entries<any>(questions).map(([id, q]) => [id, { noul: q.instructions.includes('reef wide') ? 0.8 : 0.1 }])), cost: 0, model: 'stub', usage: {} });
+    const d = await JBF.decideCoverPlaces({ arc: 'a', pages: pages.slice(0, 2), visualBible: vb, coverKeys: ['frontCover'], availableLandmarks: [lm('The Inland Church')] }, { callImpl: impl });
+    expect(d.covers[0].cite).toBe('LOC001.1');
   });
 });

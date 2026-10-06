@@ -71,12 +71,12 @@ const JEV_DECISIONS = {
   together: { reps: 3 },            // ranking only, never a fixed threshold (AUC 0.90, 7/7 in budget)
   needed: { reps: 3, cutBelow: 0.5 }, // AUC 0.98, 51 cuts 0 wrong
   shot: { reps: 1 },                // A1 0.918 acceptable, 0 rule violations
-  light: { reps: 1, indoorAt: 0.5 },
+  light: { reps: 1, indoorAt: 0.5, newDayAt: 0.5 },
   lightSource: { reps: 1, at: 0.5 }, // which cited element lights a dark page (owner, 2026-10-06)
   vb: { reps: 1, creature: 0.7, vehicle: 0.5, secondary: 0.5, object: 0.7, objectBand: 0.5 },
   aboard: { reps: 1, at: 0.5 },     // 9/10 on the one ship book
   reads: { at: 0.5 },               // rides the vb call; 7/7 true on 674 stored plan lines (2026-09-28)
-  population: { reps: 1, publicAt: 0.5, crowdAt: 0.5 }, // 13/13
+  population: { reps: 1, publicAt: 0.5, crowdAt: 0.5, creatureCrowdAt: 0.5, wildlifeAt: 0.4, sparseAt: 0.5 }, // wildlifeAt 0.4: a reef's fish read 0.44-0.56 on the two sea books (replay 2026-10-06), a land place 0.26-0.31; 13/13 for crowd/ambient/cast_only; the creature and sparse questions only ever read a place that was cast_only
   gaze: { reps: 3 },                // G2 128/139 averaged (owner: 3 calls for this field)
   state: { reps: 3 },               // a choice, averaged as gaze is (owner, 2026-09-28)
 };
@@ -682,6 +682,7 @@ function lightQuestions() {
     TIME: { type: 'choice', instructions: 'The time of day in the picture of the page to judge, following the story\'s clock: it holds from page to page until the story moves it. A page set beneath the water, or in a place no daylight reaches (ink, a cave, a ship\'s hold), takes one of the underwater or dark options whatever the hour; the story\'s clock goes on around it.', criteria: JEV_TIME_CRITERIA },
     WEATHER: { type: 'choice', instructions: 'The weather visible in the picture of the page to judge. `none` when the scene is indoors, where the sky is not seen. Weather holds from page to page until the story changes it.', criteria: JEV_WEATHER_CRITERIA },
     INDOOR: { type: 'noul', instructions: 'The picture of the page to judge is set indoors: inside a building, a room, a cave or an enclosed vehicle.' },
+    NEWDAY: { type: 'noul', instructions: 'The picture of the page to judge is on a LATER DAY than the page before it: the story has moved to the next day or beyond (a night slept through, "the next morning", "days later"), so its hour may be earlier than that of the page before.' },
   };
 }
 
@@ -692,11 +693,12 @@ const DAY_START = new Set(['dawn', 'morning', 'midday']);
 /**
  * THE CLOCK NEVER RUNS BACKWARDS. Page by page, an hour earlier than the one
  * before is a new day only when the page before ended the day (evening, dusk,
- * night) and this one starts one (dawn, morning, midday); any other earlier
- * hour holds the previous page's hour. Pure; returns the corrected list and
- * what it held.
+ * night) and this one starts one (dawn, morning, midday), or when Jev said the
+ * page is on a later day (`newDays[i]`, the NEWDAY question: afternoon to the
+ * next morning is allowed); any other earlier hour holds the previous page's
+ * hour. Pure; returns the corrected list and what it held.
  */
-function forwardClock(times) {
+function forwardClock(times, newDays = []) {
   const idx = t => CLOCK_HOURS.indexOf(t);
   const out = []; const held = [];
   // A skyless page (underwater, dark) is not an hour: it passes through as it is and the clock is
@@ -705,7 +707,7 @@ function forwardClock(times) {
   for (let i = 0; i < times.length; i++) {
     const cur = times[i];
     if (isSkylessLight(cur)) { out.push(cur); continue; }
-    if (lastHour && idx(cur) < idx(lastHour) && !(DAY_END.has(lastHour) && DAY_START.has(cur))) {
+    if (lastHour && idx(cur) < idx(lastHour) && !(DAY_END.has(lastHour) && DAY_START.has(cur)) && !newDays[i]) {
       out.push(lastHour); held.push({ index: i, jev: cur, held: lastHour });
     } else { out.push(cur); lastHour = cur; }
   }
@@ -727,13 +729,14 @@ async function decideLight({ arc, pages }, opts = {}) {
     if (!TIMES_OF_DAY.includes(time)) throw new JevDecisionError(`Jev TIME answer "${time}" is outside ${TIMES_OF_DAY.join('|')}`);
     if (!WEATHERS.includes(weather)) throw new JevDecisionError(`Jev WEATHER answer "${weather}" is outside ${WEATHERS.join('|')}`);
     const indoorP = meanNoul(a, 'INDOOR');
+    const newDayP = meanNoul(a, 'NEWDAY');
     // A skyless light has no sky to show: it is `indoor` for everything downstream (weather `none`, no outdoor light
     // for a cover's dominant hour), whatever the INDOOR question's probability said.
     const tp = (a && a[0] && a[0].TIME && a[0].TIME.probabilities) || {};
     const timeTop = Object.entries(tp).sort((x, y) => y[1] - x[1]).slice(0, 3).map(([k, v]) => `${k} ${(+v).toFixed(2)}`);
-    return { pageNumber: Number(p.pageNumber), jevTime: time, timeTop, weatherAdvice: weather, indoorP: +indoorP.toFixed(3), indoor: isSkylessLight(time) || indoorP >= JEV_DECISIONS.light.indoorAt };
+    return { pageNumber: Number(p.pageNumber), jevTime: time, timeTop, weatherAdvice: weather, newDayP: +newDayP.toFixed(3), indoorP: +indoorP.toFixed(3), indoor: isSkylessLight(time) || indoorP >= JEV_DECISIONS.light.indoorAt };
   });
-  const clock = forwardClock(raw.map(r => r.jevTime));
+  const clock = forwardClock(raw.map(r => r.jevTime), raw.map(r => r.newDayP >= JEV_DECISIONS.light.newDayAt));
   raw.forEach((r, i) => { r.timeOfDay = clock.times[i]; });
   for (const h of clock.held) log.warn(`🌗 [JEV/light] page ${raw[h.index].pageNumber}: Jev said ${h.jev} after ${h.held} — the clock never runs backwards, held at ${h.held}`);
   log.info(`🌗 [JEV/light] ${raw.map(r => `p${r.pageNumber}:${r.timeOfDay}${r.indoor ? '/in' : ''}`).join(' ')} (${stats.calls} calls)`);
@@ -808,6 +811,15 @@ function aboardQuestion(v) {
   const name = v.entry.properName || v.label || v.name || v.id;
   const desc = String(v.entry.description || '').slice(0, 200);
   return `The camera of the picture of the page to judge stands on or inside ${name} (${desc.slice(0, 120)}): its deck, floor or interior is the ground the picture is taken from.`;
+}
+
+/**
+ * A CREATURE THE CAST RIDES OR SITS INSIDE (owner, 2026-10-06; staging ypl33 p4: children gripping a turtle's
+ * shell, `aboard` null). Asked per creature beside the vehicles' aboard question; the page's `aboard` is the
+ * highest of both sets. The creature stays in the picture, drawn from its own cell, as the ground the cast is on.
+ */
+function rideQuestion(c) {
+  return `In the picture of the page to judge, the cast ride on ${c.name}${c.species ? `, the ${c.species}` : ''} (${c.desc.slice(0, 120)}), grip it or sit inside its body: its body is what they stand on, hold or sit in, so the camera is on it or in it.`;
 }
 
 /**
@@ -922,11 +934,13 @@ async function decideVbAndAboard({ arc, pages, visualBible, commissionedNames = 
   const { VB_ELEMENT_BUDGET } = require('./vbElementBudget');
   const els = vbElements(visualBible, commissionedNames);
   const vehicles = els.filter(e => e.type === 'vehicle');
+  const creatures = els.filter(e => e.type === 'creature');
   const stats = newStats();
   const reqs = pages.flatMap(p => {
     const qs = { READ: { type: 'noul', instructions: READ_TEXT_Q } };
     els.forEach((e, i) => { qs[`E${i}`] = { type: 'noul', instructions: vbQuestion(e) }; });
     vehicles.forEach((v, i) => { qs[`ABOARD${i}`] = { type: 'noul', instructions: aboardQuestion(v) }; });
+    creatures.forEach((c, i) => { qs[`RIDE${i}`] = { type: 'noul', instructions: rideQuestion(c) }; });
     return repeat({ key: `vb:p${p.pageNumber}`, state: pageState(arc, pages, p), questions: qs }, JEV_DECISIONS.vb.reps);
   });
   const ans = await runJevRequests(reqs, { ...opts, usageLabel: 'jev_decisions_vb', stats });
@@ -942,7 +956,8 @@ async function decideVbAndAboard({ arc, pages, visualBible, commissionedNames = 
     }).sort((x, y) => y.p - x.p);
     const overBudget = inPicture.slice(VB_ELEMENT_BUDGET).map(x => x.e.id);
     const kept = inPicture.slice(0, VB_ELEMENT_BUDGET);
-    const aboardScores = vehicles.map((v, i) => ({ id: v.id, p: meanNoul(a, `ABOARD${i}`) })).sort((x, y) => y.p - x.p);
+    const aboardScores = [...vehicles.map((v, i) => ({ id: v.id, p: meanNoul(a, `ABOARD${i}`) })),
+      ...creatures.map((c, i) => ({ id: c.id, p: meanNoul(a, `RIDE${i}`) }))].sort((x, y) => y.p - x.p);
     const aboard = aboardScores.length && aboardScores[0].p >= JEV_DECISIONS.aboard.at ? aboardScores[0].id : null;
     const readP = meanNoul(a, 'READ');
     return {
@@ -970,11 +985,17 @@ async function decideVbAndAboard({ arc, pages, visualBible, commissionedNames = 
 
 const POP_PUBLIC_Q = 'This place is one the public can walk into: a street, a square, a park, a bridge, a station, a shop, a museum hall.';
 const POP_CROWD_Q = 'The story sets this place around a crowd: a market, a fair, a parade, a packed hall — many people are part of the scene.';
+// The wider levels (owner, 2026-10-06): asked beside the two above, read only for a place they would leave `cast_only`.
+const POP_CREATURE_CROWD_Q = 'The story sets this place around a crowd of unnamed creatures, not people: a shoal of fish, a swarm, a stampede, a flock filling the sky — a great many of them are part of the scene.';
+const POP_WILDLIFE_Q = 'Unnamed animals belong in this place as part of its setting, not people: fish on a reef, a flock in a meadow, a herd on a plain, birds on a cliff.';
+const POP_SPARSE_Q = 'One or two unnamed people may be far off in this place, tiny in the distance: a lone fisherman on a far pier, a figure on a distant hillside.';
 
 /**
  * Population is a property of the PLACE (per page it was ❌). Per location the
  * pages set there: PUBLIC and CROWD nouls → crowd ≥ 0.5 → `crowd`, else
- * public ≥ 0.5 → `ambient`, else `cast_only`.
+ * public ≥ 0.5 → `ambient`; a place that would be `cast_only` is then read by three more nouls:
+ * `creature_crowd`, `wildlife`, `sparse` (in that order), else `cast_only`. The new levels never move a
+ * place the two old questions already placed.
  *
  * @param {{arc:string, pages:Array, visualBible:Object, locOf:Map<number,string>}} input
  *   `locOf` — page → the base LOC id its brief cites. A cover beat (page number
@@ -994,7 +1015,7 @@ async function decidePopulation({ arc, pages, visualBible, locOf }, opts = {}) {
     const planLines = pages.filter(p => nums.includes(Number(p.pageNumber))).map(p => `${Number(p.pageNumber) > 0 ? `Page ${p.pageNumber}` : 'A cover'}: ${stripPlanShot(p.planLine)}`);
     const desc = String(l.description || '').slice(0, 240);
     const st = `A PLACE IN A CHILDREN'S PICTURE BOOK: ${l.name}${l.setting ? ` (${l.setting})` : ''} — ${desc}\n\nTHE STORY, beat by beat:\n${String(arc || '').trim()}\n\nTHE PAGES SET THERE (who is in frame — the instant — what is true after):\n${planLines.join('\n')}`;
-    reqs.push(...repeat({ key: `pop:${id}`, state: st, questions: { PUBLIC: { type: 'noul', instructions: POP_PUBLIC_Q }, CROWD: { type: 'noul', instructions: POP_CROWD_Q } } }, JEV_DECISIONS.population.reps));
+    reqs.push(...repeat({ key: `pop:${id}`, state: st, questions: { PUBLIC: { type: 'noul', instructions: POP_PUBLIC_Q }, CROWD: { type: 'noul', instructions: POP_CROWD_Q }, CREATURE_CROWD: { type: 'noul', instructions: POP_CREATURE_CROWD_Q }, WILDLIFE: { type: 'noul', instructions: POP_WILDLIFE_Q }, SPARSE: { type: 'noul', instructions: POP_SPARSE_Q } } }, JEV_DECISIONS.population.reps));
   }
   const ans = reqs.length ? await runJevRequests(reqs, { ...opts, usageLabel: 'jev_decisions_population', stats }) : new Map();
   const byLoc = {};
@@ -1003,7 +1024,10 @@ async function decidePopulation({ arc, pages, visualBible, locOf }, opts = {}) {
     if (!a) continue;
     const pub = meanNoul(a, 'PUBLIC'); const crowd = meanNoul(a, 'CROWD');
     const P = JEV_DECISIONS.population;
-    byLoc[id] = { population: crowd >= P.crowdAt ? 'crowd' : pub >= P.publicAt ? 'ambient' : 'cast_only', publicP: +pub.toFixed(3), crowdP: +crowd.toFixed(3), pages: pagesAt.get(id).sort((x, y) => x - y) };
+    const cc = meanNoul(a, 'CREATURE_CROWD'); const wl = meanNoul(a, 'WILDLIFE'); const sp = meanNoul(a, 'SPARSE');
+    const population = crowd >= P.crowdAt ? 'crowd' : pub >= P.publicAt ? 'ambient'
+      : cc >= P.creatureCrowdAt ? 'creature_crowd' : wl >= P.wildlifeAt ? 'wildlife' : sp >= P.sparseAt ? 'sparse' : 'cast_only';
+    byLoc[id] = { population, publicP: +pub.toFixed(3), crowdP: +crowd.toFixed(3), creatureCrowdP: +cc.toFixed(3), wildlifeP: +wl.toFixed(3), sparseP: +sp.toFixed(3), pages: pagesAt.get(id).sort((x, y) => x - y) };
   }
   log.info(`🏙️ [JEV/population] ${Object.entries(byLoc).map(([id, v]) => `${id}:${v.population}`).join(' ') || 'no located page'} (${stats.calls} calls)`);
   return { byLocation: byLoc, stats: summarise(stats) };
@@ -1233,7 +1257,7 @@ function fixedBlock(page) {
  *                                    not in `cites` leaves objects[]; everything
  *                                    else (locations, undecided ids) stays
  *   population                     — the page's location's value
- *   aboard, aboardIds              — the vehicle the camera is on (or null); an
+ *   aboard, aboardIds              — the vehicle or ridden creature the camera is on (or null); an
  *                                    `aboard` outside `aboardIds` (a structure) stays
  *   looksAt                        — { characterName: target }
    looksAtAll                     — one target for EVERY character row (a cover: `viewer`)
@@ -1411,6 +1435,7 @@ module.exports = {
   vbElements,
   vbQuestion,
   aboardQuestion,
+  rideQuestion,
   stateOptions,
   stateQuestion,
   decideStates,

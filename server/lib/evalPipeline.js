@@ -579,7 +579,7 @@ function buildEmptySceneQcPrompt({ sceneDescription = '', era = null, framing = 
   // weather it was told to paint and on nothing read out of prose.
   // A weather that owns the sky adds the sky phrase the author was given
   // (describeLightForJudge, 2026-09-26), so a sun in a fog plate is judged.
-  const { describeLightForJudge, weatherOwnsSky, normaliseWeather } = require('./sceneLight');
+  const { describeLightForJudge, weatherOwnsSky, normaliseWeather, weatherQcCheck } = require('./sceneLight');
   const lightWords = describeLightForJudge(light);
   // A covered sky has failure cases of its own (2026-09-26): LOC005.1 of
   // staging job_1790446348343_z3fw660ie declared fog and passed with a sunny
@@ -589,7 +589,8 @@ function buildEmptySceneQcPrompt({ sceneDescription = '', era = null, framing = 
   const weather = normaliseWeather(light?.weather);
   const coveredSky = lightWords && weatherOwnsSky(weather)
     ? `\n${fillTemplate(qc.LIGHT_COVERED_SKY, { WEATHER: weather })}` : '';
-  const fogCheck = lightWords && weather === 'fog' ? `\n${qc.LIGHT_FOG}` : '';
+  const weatherQc = lightWords && weatherQcCheck(weather);
+  const fogCheck = weatherQc ? `\n${qc[weatherQc]}` : '';
   const lightCheck = lightWords
     ? `\n${fillTemplate(qc.LIGHT_CHECK, { LIGHT: lightWords })}${coveredSky}${fogCheck}` : '';
   // THE FRAMING CHECK (2026-09-26): the plate is held to the structure or view
@@ -1574,11 +1575,9 @@ function buildExpectedCastBlock({
   // to ask the evaluator to work out for itself whether the USER_PROMPT called
   // for a populated setting. The Art Director already decided that, per page —
   // so the decision is handed over rather than guessed at a second time.
-  lines.push(population === 'crowd'
-    ? 'SETTING POPULATION: crowd — this page is written around unnamed background people; they are not surplus cast.'
-    : population === 'ambient'
-      ? 'SETTING POPULATION: ambient — this is a public setting and distant background people belong in it. They are not EXPECTED CAST and are never a surplus figure. Only a figure at the same scale as the cast can be one.'
-      : 'SETTING POPULATION: cast-only — this page holds the EXPECTED CAST and no other people.');
+  // One table (sceneMetadata.POPULATION_TABLE): the line of every level, wildlife included.
+  const { POPULATION_TABLE } = require('./sceneMetadata');
+  lines.push(`SETTING POPULATION: ${(POPULATION_TABLE.find(p => p.id === population) || POPULATION_TABLE[0]).line}`);
   const det = Number(detectedFigureCount);
   if (detectedFigureCount !== null && detectedFigureCount !== undefined && Number.isFinite(det)) {
     lines.push(`Detector figure count (GroundingDINO): ${det}`);
@@ -1950,7 +1949,9 @@ function derivePresenceFinding({ figures, matches, cast, detectedFigureCount, de
     // background people belong in the frame; they are subtracted by SCALE
     // (bboxDetection.countAmbientFigures: geometry only). Without geometry the
     // page declines rather than guessing.
-    if (cast.population === 'ambient') {
+    // `sparse` is read like `ambient` (background-scale people subtracted by geometry); the wildlife levels count
+    // people strictly: unnamed animals never enter this arithmetic (sceneMetadata.POPULATION_TABLE).
+    if (cast.population === 'ambient' || cast.population === 'sparse') {
       const bbox = require('./bboxDetection');
       if (!bbox.hasAmbientGeometry(detectorFigures)) return decline('ambient_without_geometry');
       const ambientDropped = bbox.countAmbientFigures(detectorFigures);

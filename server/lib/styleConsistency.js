@@ -64,7 +64,7 @@ const CONFIRMATION_FLAG_RATIO = 0.2;
 // contradict their briefs before anyone decides what to do about it.
 // ─────────────────────────────────────────────────────────────────────
 
-const { TIMES_OF_DAY, WEATHERS, declaredLightOfBrief, timeContradicts, JUDGE_SKYLESS_NOTES } = require('./sceneLight');
+const { TIMES_OF_DAY, WEATHERS, declaredLightOfBrief, timeContradicts, weatherContradicts, JUDGE_SKYLESS_NOTES } = require('./sceneLight');
 // The judge's vocabularies: the declared enums, plus the answer for a cell
 // whose light cannot be read. `none` (an interior) is the declared value; the
 // judge names what it sees, `indoor`.
@@ -686,8 +686,8 @@ Use the red corner code as the "page" value: -1 front cover, -2 initial page, -3
         renderedWeather,
         // Weather is compared outdoors only: a declared interior (`none`) and a
         // cell the judge reads as indoor contradict no sky.
-        weatherMismatch: !!(declared?.weather && declared.weather !== 'none' && renderedWeather
-          && renderedWeather !== 'indoor' && renderedWeather !== declared.weather),
+        // Neighbouring weathers (a drizzle beside a rain) are no contradiction: sceneLight.weatherContradicts.
+        weatherMismatch: weatherContradicts(declared?.weather, renderedWeather),
         facing: FACING_SET.has(c.facing) ? c.facing : null,
         // Season rides on the same row. `declaredSeason` is undefined on cover
         // cells (they carry no brief and no location), so they can neither

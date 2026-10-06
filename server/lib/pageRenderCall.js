@@ -69,8 +69,8 @@ function selectPageElementRefs(visualBible, pageNumber, sceneMetadata) {
  * never enters the grid. A plateless page keeps its large elements.
  */
 function keepPageGridElements(refs, { hasPlate, sceneMetadata }) {
-  const aboardId = sceneMetadata?.aboard || null;
-  const { isPlateBorneElement } = require('./visualBible');
+  const { isPlateBorneElement, aboardWithheldId } = require('./visualBible');
+  const aboardId = aboardWithheldId(sceneMetadata?.aboard);
   const sceneObjects = sceneMetadata?.objects || null;
   return (hasPlate ? (refs || []).filter(e => !isPlateBorneElement(e, sceneObjects)) : (refs || []))
     .filter(e => !aboardId || e.id !== aboardId);
