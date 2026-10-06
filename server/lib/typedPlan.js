@@ -526,12 +526,13 @@ function replanScope({ rows, findings, jevPages, castTable = null, targets, cali
     } else if (f.code === 'TYPED_NO_SCENERY_PAGE') { pool = free.filter(r => r.names.length <= 2); k = 1; what = 'make this a landscape or object page'; relax = { type: true, who: true }; }
     else if (f.code === 'UNDER_COVERED_CHARACTER' || f.code === 'NO_FOCAL_PAGE') {
       const name = nameOf(f);
-      pool = wide.filter(r => name && !has(r, name));
+      // a page takes ONE added figure (two more on a two-figure page break the medium type), and a focal page holds at most two
+      pool = wide.filter(r => name && !has(r, name) && !(out.get(r.pageNumber) || { adds: [] }).adds.length && (f.code === 'NO_FOCAL_PAGE' ? r.names.length <= 1 : true));
       k = f.code === 'UNDER_COVERED_CHARACTER' ? Math.max(1, targets.appearancesMin - f.pages.length) + 1 : 2;
       what = `${name ? `put ${name} in frame here` : 'put the character in frame here'}, taking part in the page's one action`;
       if (name) add = [name];
     } else if (f.code === 'MAIN_UNDER_HALF') {
-      pool = wide.filter(r => !f.pages.includes(r.pageNumber));
+      pool = wide.filter(r => !f.pages.includes(r.pageNumber) && !(out.get(r.pageNumber) || { adds: [] }).adds.length);
       k = Math.max(1, targets.mainMin - f.pages.length) + 1; // the shortfall plus one: a page may fail the acceptance
       what = `put ${mainName || 'the main character'} in frame here, taking part in the page's one action`;
       if (mainName) add = [mainName];

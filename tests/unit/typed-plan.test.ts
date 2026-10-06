@@ -576,3 +576,18 @@ describe('acceptance: one level for fix, break and the bar (fix 5)', () => {
     expect(acc2.decisions[0].keep).toBe(true);
   });
 });
+
+describe('a page is asked to take ONE added figure (Lab 1680-1685: Sarah and Hans both added to a two-figure page broke the type)', () => {
+  it('two characters without a focal page are sent to different pages, each holding at most one figure before the add', () => {
+    const L = ['Ana', 'Ben', 'Cy', 'Dora'];
+    const lines = [line('medium', 'Ana, Ben'), line('medium', 'Ana'), line('medium', 'Ana, Ben'), line('landscape', 'nobody'), line('face', 'Ben'), line('medium', 'Ana'), line('medium', 'Ana, Ben'), line('medium', 'Ana'), line('medium', 'Ben, Ana'), line('medium', 'Ana, Ben'), line('medium', 'Ana')];
+    const c = PC.typedPlanCounters({ pages: pagesOf(lines), listedNames: L, commissionedNames: L, mainName: 'Ana', maxCharactersPerScene: 6 });
+    expect(c.findings.filter((f: any) => f.code === 'NO_FOCAL_PAGE').length).toBeGreaterThanOrEqual(2);
+    const t = CC.typedPlanTargets({ pageCount: 11, listed: L, maxCharactersPerScene: 6 });
+    const scope = TP.replanScope({ rows: c.rows, findings: c.findings, jevPages: {}, castTable: null, targets: t, commissionedNames: L, arcNames: [] });
+    for (const [n, o] of scope as any) {
+      expect(o.adds.length).toBeLessThanOrEqual(1);
+      if (o.adds.length) expect(c.rows[n - 1].names.length).toBeLessThanOrEqual(2);
+    }
+  });
+});

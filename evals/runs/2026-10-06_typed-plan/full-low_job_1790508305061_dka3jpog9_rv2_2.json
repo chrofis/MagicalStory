@@ -1,0 +1,1146 @@
+{
+ "id": 1677,
+ "arm": "full-low",
+ "storyId": "job_1790508305061_dka3jpog9",
+ "stage": "beats_replan",
+ "label": "typed-plan full-low job_1790508305061_dka3jpog9",
+ "status": "completed",
+ "promptOverride": null,
+ "params": {
+  "planModel": "claude-sonnet-5-5",
+  "typedPlan": true,
+  "planEffort": "low",
+  "advisoryOff": true
+ },
+ "targets": [
+  {
+   "storyId": "job_1790508305061_dka3jpog9"
+  }
+ ],
+ "results": [
+  {
+   "ok": true,
+   "arm": "typed-plan",
+   "jev": {
+    "calls": 237,
+    "failed": 0,
+    "costUsd": 0.007538
+   },
+   "cost": 0.066296,
+   "note": "arm 2: typed plan 2 Jev flag(s) and 0 code finding(s) left after 1 replanned page(s); advisory off",
+   "calls": [
+    {
+     "ms": 10055,
+     "label": "typed_plan",
+     "usage": {
+      "elapsed_ms": 10055,
+      "input_tokens": 10440,
+      "output_tokens": 1341
+     },
+     "effort": "low",
+     "costUsd": 0.03429,
+     "modelId": "claude-sonnet-5-5",
+     "promptChars": 30623
+    },
+    {
+     "ms": 1757,
+     "label": "typed_replan",
+     "usage": {
+      "elapsed_ms": 1757,
+      "input_tokens": 11889,
+      "output_tokens": 69
+     },
+     "effort": "low",
+     "costUsd": 0.024468,
+     "modelId": "claude-sonnet-5-5",
+     "promptChars": 34329
+    }
+   ],
+   "pages": 18,
+   "typed": {
+    "final": {
+     "jev": {
+      "1": {
+       "flags": [],
+       "scores": {
+        "DEED": 0.545,
+        "WHOLE": 0.36,
+        "ACTION": 0.28,
+        "SIMPLE": 0.585,
+        "HEIGHTS": 0.29,
+        "OBSTACLE": 0.37
+       }
+      },
+      "2": {
+       "flags": [],
+       "scores": {
+        "DEED": 0.41,
+        "ACTION": 0.31,
+        "SIMPLE": 0.42,
+        "HEIGHTS": 0.275,
+        "OBSTACLE": 0.295
+       }
+      },
+      "3": {
+       "flags": [],
+       "scores": {
+        "DEED": 0.565,
+        "ACTION": 0.23,
+        "SIMPLE": 0.52,
+        "HEIGHTS": 0.205,
+        "OBSTACLE": 0.235
+       }
+      },
+      "4": {
+       "flags": [
+        "SIMPLE"
+       ],
+       "scores": {
+        "DEED": 0.44,
+        "ACTION": 0.185,
+        "SIMPLE": 0.675,
+        "HEIGHTS": 0.195,
+        "OBSTACLE": 0.35
+       }
+      },
+      "5": {
+       "flags": [],
+       "scores": {
+        "DEED": 0.415,
+        "FELT": 0.185,
+        "SIMPLE": 0.545,
+        "OBSTACLE": 0.38
+       }
+      },
+      "6": {
+       "flags": [],
+       "scores": {
+        "DEED": 0.525,
+        "ACTION": 0.24,
+        "SIMPLE": 0.42,
+        "HEIGHTS": 0.175,
+        "OBSTACLE": 0.31
+       }
+      },
+      "7": {
+       "flags": [],
+       "scores": {
+        "DEED": 0.505,
+        "ACTION": 0.265,
+        "SIMPLE": 0.535,
+        "HEIGHTS": 0.2,
+        "OBSTACLE": 0.405
+       }
+      },
+      "8": {
+       "flags": [
+        "FELT"
+       ],
+       "scores": {
+        "DEED": 0.515,
+        "FELT": 0.565,
+        "SIMPLE": 0.395,
+        "OBSTACLE": 0.3
+       }
+      },
+      "9": {
+       "flags": [],
+       "scores": {
+        "DEED": 0.435,
+        "SIMPLE": 0.51,
+        "WEIGHT": 0.145
+       }
+      },
+      "10": {
+       "flags": [],
+       "scores": {
+        "DEED": 0.545,
+        "WHOLE": 0.54,
+        "ACTION": 0.26,
+        "SIMPLE": 0.575,
+        "HEIGHTS": 0.455,
+        "OBSTACLE": 0.26
+       }
+      },
+      "11": {
+       "flags": [],
+       "scores": {
+        "DEED": 0.625,
+        "ACTION": 0.33,
+        "SIMPLE": 0.425,
+        "HEIGHTS": 0.235,
+        "OBSTACLE": 0.29
+       }
+      },
+      "12": {
+       "flags": [],
+       "scores": {
+        "DEED": 0.38,
+        "ACTION": 0.365,
+        "SIMPLE": 0.485,
+        "HEIGHTS": 0.215,
+        "OBSTACLE": 0.36
+       }
+      },
+      "13": {
+       "flags": [],
+       "scores": {
+        "DEED": 0.525,
+        "ACTION": 0.205,
+        "SIMPLE": 0.595,
+        "OBSTACLE": 0.305
+       }
+      },
+      "14": {
+       "flags": [],
+       "scores": {
+        "DEED": 0.5,
+        "FELT": 0.21,
+        "SIMPLE": 0.465,
+        "OBSTACLE": 0.345
+       }
+      },
+      "15": {
+       "flags": [],
+       "scores": {
+        "DEED": 0.42,
+        "THIRD": 0.59,
+        "ACTION": 0.315,
+        "SIMPLE": 0.47,
+        "HEIGHTS": 0.285,
+        "OBSTACLE": 0.38
+       }
+      },
+      "16": {
+       "flags": [],
+       "scores": {
+        "DEED": 0.65,
+        "ACTION": 0.22,
+        "SIMPLE": 0.51,
+        "OBSTACLE": 0.27
+       }
+      },
+      "17": {
+       "flags": [],
+       "scores": {
+        "DEED": 0.55,
+        "ACTION": 0.31,
+        "SIMPLE": 0.455,
+        "HEIGHTS": 0.175,
+        "OBSTACLE": 0.235
+       }
+      },
+      "18": {
+       "flags": [],
+       "scores": {
+        "DEED": 0.46,
+        "WHOLE": 0.255,
+        "ACTION": 0.335,
+        "SIMPLE": 0.445,
+        "HEIGHTS": 0.285,
+        "OBSTACLE": 0.265
+       }
+      }
+     },
+     "plan": [
+      {
+       "planLine": "wide — Levin, Julian, Max, Kiaan — all four kick the ball to each other in the foggy autumn square between the Wasserkirche and the Grossmünster — the ball is rolling away toward the old wall",
+       "pageNumber": 1
+      },
+      {
+       "planLine": "low-angle — Julian, Levin — Julian reaches up to a big warm scale hanging on the old stone wall of the Grossmünster — a scale is found, and Levin has come to stand beside him",
+       "pageNumber": 2
+      },
+      {
+       "planLine": "medium — Kiaan, Max — Kiaan lifts the scale off the stone wall in his hands while Max watches — a path in the wall opens into mist and rocky peaks",
+       "pageNumber": 3
+      },
+      {
+       "planLine": "over-the-shoulder — Levin, Max — Levin opens his mouth shyly toward the mist while Max cups his hands and calls loudly — the call is out in the silence",
+       "pageNumber": 4
+      },
+      {
+       "planLine": "close-up — Sura — Sura's old grey dragon face looks tired out of the mist and speaks of the evening wind — the children know she will rise alone forever",
+       "pageNumber": 5
+      },
+      {
+       "planLine": "medium — Levin, Julian — Levin steps onto the misty path and holds out a hand to Julian — the way into the mist is begun",
+       "pageNumber": 6
+      },
+      {
+       "planLine": "over-the-shoulder — Julian, Levin — Julian stumbles over a stone behind Levin in the low mist that hides the path — the path is lost and the going is slow",
+       "pageNumber": 7
+      },
+      {
+       "planLine": "close-up — Kiaan — Kiaan holds the scale tight in both hands with a look of focus — he leads them toward where it is warmest",
+       "pageNumber": 8
+      },
+      {
+       "planLine": "wide — nobody — a high rocky peak above the low mist, wind bending the grass on its slope — Sura is on the highest peak and the wind is stronger",
+       "pageNumber": 9
+      },
+      {
+       "planLine": "wide — Levin, Max, Kiaan, Julian — the four climb the loose sliding stones, Max grabs Kiaan's jacket and Levin pulls them up — all reach the top",
+       "pageNumber": 10
+      },
+      {
+       "planLine": "medium — Sura, Levin — Sura turns her big head away and lays one wing across the path like a wall — the little ones cannot reach her",
+       "pageNumber": 11
+      },
+      {
+       "planLine": "over-the-shoulder — Max, Sura — Max calls \"Sura, wait!\" while Sura keeps her head turned away, wind lifting her wing — she does not turn and all looks lost",
+       "pageNumber": 12
+      },
+      {
+       "planLine": "low-angle — Levin — Levin climbs the last rock, his foot slips once, he holds on tight and calls Sura's name — the call rings out loud",
+       "pageNumber": 13
+      },
+      {
+       "planLine": "close-up — Sura — Sura turns her worried face toward the small boy on the high rock — her chest turns toward the children",
+       "pageNumber": 14
+      },
+      {
+       "planLine": "medium — Julian, Levin, Sura — Julian points at a dark gap in Sura's chest where a tiny fire flickers, Levin stands beside it — the missing scale is found",
+       "pageNumber": 15
+      },
+      {
+       "planLine": "close-up — Levin — Levin's hands press the warm scale into the gap in Sura's chest — the wind is blocked and the fire grows big and warm",
+       "pageNumber": 16
+      },
+      {
+       "planLine": "medium — Sura, Levin — Sura lifts Levin gently down with her nose, wings folded — she stays and her warm flame lights the way home",
+       "pageNumber": 17
+      },
+      {
+       "planLine": "wide — Levin, Julian, Max, Kiaan — the four run together over the Rathausbrücke in the evening — they are home and safe, and Levin is proud of his loud call",
+       "pageNumber": 18
+      }
+     ],
+     "shots": [
+      {
+       "shot": "wide",
+       "type": "group",
+       "scores": {
+        "wide": 0.82,
+        "aerial": 0.12,
+        "high-angle": 0.46,
+        "ultra-wide": 0.68
+       },
+       "pageNumber": 1
+      },
+      {
+       "shot": "low-angle",
+       "type": "medium",
+       "scores": {
+        "medium": 0.63,
+        "low-angle": 0.58,
+        "high-angle": 0.2,
+        "over-the-shoulder": 0.1
+       },
+       "pageNumber": 2
+      },
+      {
+       "shot": "medium",
+       "type": "medium",
+       "scores": {
+        "medium": 0.66,
+        "low-angle": 0.22,
+        "high-angle": 0.26,
+        "over-the-shoulder": 0.18
+       },
+       "pageNumber": 3
+      },
+      {
+       "shot": "over-the-shoulder",
+       "type": "medium",
+       "scores": {
+        "medium": 0.67,
+        "low-angle": 0.17,
+        "high-angle": 0.18,
+        "over-the-shoulder": 0.55
+       },
+       "pageNumber": 4
+      },
+      {
+       "shot": "close-up",
+       "type": "face",
+       "scores": {
+        "close-up": 1
+       },
+       "pageNumber": 5
+      },
+      {
+       "shot": "medium",
+       "type": "medium",
+       "scores": {
+        "medium": 0.67,
+        "low-angle": 0.21,
+        "high-angle": 0.29,
+        "over-the-shoulder": 0.43
+       },
+       "pageNumber": 6
+      },
+      {
+       "shot": "over-the-shoulder",
+       "type": "medium",
+       "scores": {
+        "medium": 0.62,
+        "low-angle": 0.15,
+        "high-angle": 0.4,
+        "over-the-shoulder": 0.63
+       },
+       "pageNumber": 7
+      },
+      {
+       "shot": "close-up",
+       "type": "face",
+       "scores": {
+        "close-up": 1
+       },
+       "pageNumber": 8
+      },
+      {
+       "shot": "wide",
+       "type": "landscape",
+       "scores": {
+        "wide": 0.78,
+        "aerial": 0.14,
+        "high-angle": 0.27,
+        "ultra-wide": 0.67
+       },
+       "pageNumber": 9
+      },
+      {
+       "shot": "wide",
+       "type": "group",
+       "scores": {
+        "wide": 0.61,
+        "aerial": 0.11,
+        "high-angle": 0.41,
+        "ultra-wide": 0.37
+       },
+       "pageNumber": 10
+      },
+      {
+       "shot": "medium",
+       "type": "medium",
+       "scores": {
+        "medium": 0.52,
+        "low-angle": 0.2,
+        "high-angle": 0.26,
+        "over-the-shoulder": 0.54
+       },
+       "pageNumber": 11
+      },
+      {
+       "shot": "over-the-shoulder",
+       "type": "medium",
+       "scores": {
+        "medium": 0.58,
+        "low-angle": 0.27,
+        "high-angle": 0.2,
+        "over-the-shoulder": 0.77
+       },
+       "pageNumber": 12
+      },
+      {
+       "shot": "low-angle",
+       "type": "medium",
+       "scores": {
+        "medium": 0.55,
+        "low-angle": 0.67,
+        "high-angle": 0.24
+       },
+       "pageNumber": 13
+      },
+      {
+       "shot": "close-up",
+       "type": "face",
+       "scores": {
+        "close-up": 1
+       },
+       "pageNumber": 14
+      },
+      {
+       "shot": "medium",
+       "type": "medium",
+       "scores": {
+        "medium": 0.55,
+        "low-angle": 0.14,
+        "high-angle": 0.19,
+        "over-the-shoulder": 0.31
+       },
+       "pageNumber": 15
+      },
+      {
+       "shot": "close-up",
+       "type": "object",
+       "scores": {
+        "close-up": 0.79,
+        "high-angle": 0.2
+       },
+       "pageNumber": 16
+      },
+      {
+       "shot": "medium",
+       "type": "medium",
+       "scores": {
+        "medium": 0.58,
+        "low-angle": 0.2,
+        "high-angle": 0.25,
+        "over-the-shoulder": 0.11
+       },
+       "pageNumber": 17
+      },
+      {
+       "shot": "wide",
+       "type": "group",
+       "scores": {
+        "wide": 0.68,
+        "aerial": 0.11,
+        "high-angle": 0.31,
+        "ultra-wide": 0.36
+       },
+       "pageNumber": 18
+      }
+     ],
+     "unmet": [
+      "JEV[SIMPLE] page 4",
+      "JEV[FELT] page 8"
+     ],
+     "metrics": {
+      "luna": null,
+      "coverage": {
+       "Max": 6,
+       "Kiaan": 5,
+       "Levin": 12,
+       "Julian": 7
+      },
+      "flagCount": 2,
+      "mainShare": {
+       "name": "Levin",
+       "pages": 12,
+       "target": 9
+      },
+      "pageCount": 18,
+      "groupPages": 3,
+      "shotCounts": {
+       "wide": 4,
+       "medium": 5,
+       "close-up": 4,
+       "low-angle": 2,
+       "over-the-shoulder": 3
+      },
+      "simplicity": {
+       "n": 18,
+       "min": 0.325,
+       "mean": 0.498,
+       "below": 9,
+       "histogram": {
+        "<0.3": 0,
+        ">=0.9": 0,
+        "0.3-0.5": 9,
+        "0.5-0.7": 9,
+        "0.7-0.9": 0
+       }
+      },
+      "typeCounts": {
+       "face": 3,
+       "group": 3,
+       "medium": 10,
+       "object": 1,
+       "landscape": 1
+      },
+      "groupBudget": 3,
+      "codeFindings": [],
+      "faceCloseUps": 3,
+      "peopledPages": 17,
+      "sceneryPages": 2,
+      "coverageTarget": 3,
+      "figuresByClass": {
+       "arc": 0,
+       "invented": 0,
+       "commissioned": 36
+      },
+      "flagsByQuestion": {
+       "FELT": [
+        8
+       ],
+       "SIMPLE": [
+        4
+       ]
+      },
+      "faceCloseUpsAnyone": 3,
+      "inventedFigurePages": [],
+      "noCommissionedPages": 0,
+      "neighbourSameShotCast": 0,
+      "closeUpsOnMultiFigurePages": 0
+     },
+     "findings": [],
+     "shotsUnmet": null
+    },
+    "first": {
+     "jev": {
+      "1": {
+       "flags": [],
+       "scores": {
+        "DEED": 0.545,
+        "WHOLE": 0.36,
+        "ACTION": 0.28,
+        "SIMPLE": 0.585,
+        "HEIGHTS": 0.29,
+        "OBSTACLE": 0.37
+       }
+      },
+      "2": {
+       "flags": [],
+       "scores": {
+        "DEED": 0.41,
+        "ACTION": 0.31,
+        "SIMPLE": 0.42,
+        "HEIGHTS": 0.275,
+        "OBSTACLE": 0.295
+       }
+      },
+      "3": {
+       "flags": [],
+       "scores": {
+        "DEED": 0.565,
+        "ACTION": 0.23,
+        "SIMPLE": 0.52,
+        "HEIGHTS": 0.205,
+        "OBSTACLE": 0.235
+       }
+      },
+      "4": {
+       "flags": [
+        "SIMPLE"
+       ],
+       "scores": {
+        "DEED": 0.44,
+        "ACTION": 0.185,
+        "SIMPLE": 0.675,
+        "HEIGHTS": 0.195,
+        "OBSTACLE": 0.35
+       }
+      },
+      "5": {
+       "flags": [],
+       "scores": {
+        "DEED": 0.415,
+        "FELT": 0.185,
+        "SIMPLE": 0.545,
+        "OBSTACLE": 0.38
+       }
+      },
+      "6": {
+       "flags": [],
+       "scores": {
+        "DEED": 0.525,
+        "ACTION": 0.24,
+        "SIMPLE": 0.42,
+        "HEIGHTS": 0.175,
+        "OBSTACLE": 0.31
+       }
+      },
+      "7": {
+       "flags": [],
+       "scores": {
+        "DEED": 0.505,
+        "ACTION": 0.265,
+        "SIMPLE": 0.535,
+        "HEIGHTS": 0.2,
+        "OBSTACLE": 0.405
+       }
+      },
+      "8": {
+       "flags": [
+        "FELT"
+       ],
+       "scores": {
+        "DEED": 0.515,
+        "FELT": 0.565,
+        "SIMPLE": 0.395,
+        "OBSTACLE": 0.3
+       }
+      },
+      "9": {
+       "flags": [],
+       "scores": {
+        "DEED": 0.54,
+        "SIMPLE": 0.635,
+        "WEIGHT": 0.105
+       }
+      },
+      "10": {
+       "flags": [],
+       "scores": {
+        "DEED": 0.545,
+        "WHOLE": 0.54,
+        "ACTION": 0.26,
+        "SIMPLE": 0.575,
+        "HEIGHTS": 0.455,
+        "OBSTACLE": 0.26
+       }
+      },
+      "11": {
+       "flags": [],
+       "scores": {
+        "DEED": 0.625,
+        "ACTION": 0.33,
+        "SIMPLE": 0.425,
+        "HEIGHTS": 0.235,
+        "OBSTACLE": 0.29
+       }
+      },
+      "12": {
+       "flags": [],
+       "scores": {
+        "DEED": 0.38,
+        "ACTION": 0.365,
+        "SIMPLE": 0.485,
+        "HEIGHTS": 0.215,
+        "OBSTACLE": 0.36
+       }
+      },
+      "13": {
+       "flags": [],
+       "scores": {
+        "DEED": 0.525,
+        "ACTION": 0.205,
+        "SIMPLE": 0.595,
+        "OBSTACLE": 0.305
+       }
+      },
+      "14": {
+       "flags": [],
+       "scores": {
+        "DEED": 0.5,
+        "FELT": 0.21,
+        "SIMPLE": 0.465,
+        "OBSTACLE": 0.345
+       }
+      },
+      "15": {
+       "flags": [],
+       "scores": {
+        "DEED": 0.42,
+        "THIRD": 0.59,
+        "ACTION": 0.315,
+        "SIMPLE": 0.47,
+        "HEIGHTS": 0.285,
+        "OBSTACLE": 0.38
+       }
+      },
+      "16": {
+       "flags": [],
+       "scores": {
+        "DEED": 0.65,
+        "ACTION": 0.22,
+        "SIMPLE": 0.51,
+        "OBSTACLE": 0.27
+       }
+      },
+      "17": {
+       "flags": [],
+       "scores": {
+        "DEED": 0.55,
+        "ACTION": 0.31,
+        "SIMPLE": 0.455,
+        "HEIGHTS": 0.175,
+        "OBSTACLE": 0.235
+       }
+      },
+      "18": {
+       "flags": [],
+       "scores": {
+        "DEED": 0.46,
+        "WHOLE": 0.255,
+        "ACTION": 0.335,
+        "SIMPLE": 0.445,
+        "HEIGHTS": 0.285,
+        "OBSTACLE": 0.265
+       }
+      }
+     },
+     "plan": [
+      {
+       "planLine": "group — Levin, Julian, Max, Kiaan — all four kick the ball to each other in the foggy autumn square between the Wasserkirche and the Grossmünster — the ball is rolling away toward the old wall",
+       "pageNumber": 1
+      },
+      {
+       "planLine": "medium — Julian, Levin — Julian reaches up to a big warm scale hanging on the old stone wall of the Grossmünster — a scale is found, and Levin has come to stand beside him",
+       "pageNumber": 2
+      },
+      {
+       "planLine": "medium — Kiaan, Max — Kiaan lifts the scale off the stone wall in his hands while Max watches — a path in the wall opens into mist and rocky peaks",
+       "pageNumber": 3
+      },
+      {
+       "planLine": "medium — Levin, Max — Levin opens his mouth shyly toward the mist while Max cups his hands and calls loudly — the call is out in the silence",
+       "pageNumber": 4
+      },
+      {
+       "planLine": "face — Sura — Sura's old grey dragon face looks tired out of the mist and speaks of the evening wind — the children know she will rise alone forever",
+       "pageNumber": 5
+      },
+      {
+       "planLine": "medium — Levin, Julian — Levin steps onto the misty path and holds out a hand to Julian — the way into the mist is begun",
+       "pageNumber": 6
+      },
+      {
+       "planLine": "medium — Julian, Levin — Julian stumbles over a stone behind Levin in the low mist that hides the path — the path is lost and the going is slow",
+       "pageNumber": 7
+      },
+      {
+       "planLine": "face — Kiaan — Kiaan holds the scale tight in both hands with a look of focus — he leads them toward where it is warmest",
+       "pageNumber": 8
+      },
+      {
+       "planLine": "landscape — nobody — a high rocky peak above the low mist, with Sura's great grey wings beating as she flies toward it and wind bending the grass — Sura is on the highest peak and the wind is stronger",
+       "pageNumber": 9
+      },
+      {
+       "planLine": "group — Levin, Max, Kiaan, Julian — the four climb the loose sliding stones, Max grabs Kiaan's jacket and Levin pulls them up — all reach the top",
+       "pageNumber": 10
+      },
+      {
+       "planLine": "medium — Sura, Levin — Sura turns her big head away and lays one wing across the path like a wall — the little ones cannot reach her",
+       "pageNumber": 11
+      },
+      {
+       "planLine": "medium — Max, Sura — Max calls \"Sura, wait!\" while Sura keeps her head turned away, wind lifting her wing — she does not turn and all looks lost",
+       "pageNumber": 12
+      },
+      {
+       "planLine": "medium — Levin — Levin climbs the last rock, his foot slips once, he holds on tight and calls Sura's name — the call rings out loud",
+       "pageNumber": 13
+      },
+      {
+       "planLine": "face — Sura — Sura turns her worried face toward the small boy on the high rock — her chest turns toward the children",
+       "pageNumber": 14
+      },
+      {
+       "planLine": "medium — Julian, Levin, Sura — Julian points at a dark gap in Sura's chest where a tiny fire flickers, Levin stands beside it — the missing scale is found",
+       "pageNumber": 15
+      },
+      {
+       "planLine": "object — Levin — Levin's hands press the warm scale into the gap in Sura's chest — the wind is blocked and the fire grows big and warm",
+       "pageNumber": 16
+      },
+      {
+       "planLine": "medium — Sura, Levin — Sura lifts Levin gently down with her nose, wings folded — she stays and her warm flame lights the way home",
+       "pageNumber": 17
+      },
+      {
+       "planLine": "group — Levin, Julian, Max, Kiaan — the four run together over the Rathausbrücke in the evening — they are home and safe, and Levin is proud of his loud call",
+       "pageNumber": 18
+      }
+     ],
+     "metrics": {
+      "luna": null,
+      "coverage": {
+       "Max": 6,
+       "Kiaan": 5,
+       "Levin": 12,
+       "Julian": 7
+      },
+      "flagCount": 2,
+      "mainShare": {
+       "name": "Levin",
+       "pages": 12,
+       "target": 9
+      },
+      "pageCount": 18,
+      "groupPages": 3,
+      "shotCounts": {},
+      "simplicity": {
+       "n": 18,
+       "min": 0.325,
+       "mean": 0.491,
+       "below": 9,
+       "histogram": {
+        "<0.3": 0,
+        ">=0.9": 0,
+        "0.3-0.5": 9,
+        "0.5-0.7": 9,
+        "0.7-0.9": 0
+       }
+      },
+      "typeCounts": {
+       "face": 3,
+       "group": 3,
+       "medium": 10,
+       "object": 1,
+       "landscape": 1
+      },
+      "groupBudget": 3,
+      "codeFindings": [],
+      "faceCloseUps": 3,
+      "peopledPages": 17,
+      "sceneryPages": 2,
+      "coverageTarget": 3,
+      "figuresByClass": {
+       "arc": 0,
+       "invented": 0,
+       "commissioned": 36
+      },
+      "flagsByQuestion": {
+       "FELT": [
+        8
+       ],
+       "SIMPLE": [
+        4
+       ]
+      },
+      "faceCloseUpsAnyone": 3,
+      "inventedFigurePages": [],
+      "noCommissionedPages": 0,
+      "neighbourSameShotCast": 0,
+      "closeUpsOnMultiFigurePages": 0
+     },
+     "findings": [
+      "PLAN[PLAN_INSTANT_TOO_LONG] page 9: the instant runs 24 words on page 9, past the 20 words an instant may take — keep the one action and move the rest to what is true after, or to a page of its own"
+     ]
+    },
+    "replan": {
+     "ms": 1759,
+     "reply": "---PAGE PLAN---\nPage 9: landscape — nobody — a high rocky peak above the low mist, wind bending the grass on its slope — Sura is on the highest peak and the wind is stronger",
+     "scope": {
+      "9": {
+       "adds": [],
+       "keep": [
+        "type landscape",
+        "nobody in frame",
+        "what is true after: Sura is on the highest peak and the wind is stronger"
+       ],
+       "stay": [],
+       "relax": {},
+       "reasons": [
+        "the instant runs 24 words on page 9, past the 20 words an instant may take — keep the one action and move the rest to what is true after, or to a page of its own"
+       ]
+      }
+     },
+     "guards": {
+      "dropped": [],
+      "restoredUnnamed": 0
+     },
+     "prompt": "# YOUR TASK\n\nThe story below is finished. Divide it into 18 pages: plan the pictures, simple pages first, then one PLAN line per page. Plan in ENGLISH; the book will be written in Swiss Standard German (ss, never ß — never dialect) — names, places and cultural details as they will appear there. Reader: kindergarten age (about five).\n\nCommissioned characters: Levin, Julian, Max, Kiaan\n\n# THE STORY (final — it was told, challenged and re-told; divide it, never retell or repair it)\n\n1. On a foggy autumn afternoon, Levin, his little brother Julian and their friends Max and Kiaan play ball between the Wasserkirche and the Grossmünster.\n2. The ball rolls to the old stone wall of the Grossmünster, and when Julian fetches it, he finds a scale as big as Levin's hand hanging on the stone, still warm, as if it had come loose only a moment ago.\n3. Kiaan lifts the scale off, and behind it a path opens in the wall, leading into a world of mist and rocky peaks.\n4. Levin wants to call \"Hello?\" into the mist, but he is shy and his voice is only a whisper, so Max calls loudly into the silence instead.\n5. A deep, tired voice answers: \"I am Sura, and I am old. Go home, children. When the big evening wind comes, I will rise into the clouds, alone and forever.\"\n6. Levin loves dragons and does not want Sura to vanish alone, so the four step onto the misty path.\n7. But the fog is so thick that Julian stumbles over stones behind Levin, and nobody can see where Sura is.\n8. Kiaan notices that the scale grows warmer when he points it toward the peaks. So he holds it in both hands, so as not to lose the way, and leads them where it is warmest.\n9. But Sura sees the children coming, beats her great grey wings and flies away to the highest peak, and the wind blows harder.\n10. The way up that peak is loose stones that slide back with every step. Kiaan slips and nearly lets go of the scale, but he holds it tight in both hands while Max grabs his jacket and Levin pulls them all up.\n11. At the top Sura turns her big head away when she sees the four children, and she lays one wing across the path like a wall, so the little ones cannot come to her.\n12. Max calls \"Sura, wait!\", but she does not turn, and the wind is almost strong enough to lift her.\n13. The only way past her wing is the last rock, too high for the three little ones. Kiaan presses the warm scale into Levin's hands. Levin is scared of the wind, but he climbs up, holds on tight and calls Sura's name into the autumn wind, louder than ever before.\n14. Sura is afraid for the small boy alone on the high rock, and that fear is bigger than her shame, so she turns her head to him, and her chest turns toward the children too.\n15. Julian sees a dark gap there where a scale is missing, with a tiny fire flickering behind it like a candle in the wind, and he shouts: \"A scale is missing!\"\n16. Levin is now right beside her chest, and he presses the scale into the gap. Now the wind cannot get in, and the fire behind the scale grows big and warm.\n17. With her fire warm again Sura is strong enough to hold herself on the rock, so she lifts Levin gently down with her nose and folds her wings to stay. Then she breathes a warm flame that lights the children's way back through the fog to the door in the old wall.\n18. The four step out at the Grossmünster, the mist thins and the door in the old stone closes behind them, and they run home together across the Rathausbrücke in the evening, and Levin feels proud, because this time he called out loud all by himself.\n\nChallenges taken:\n1. The rising evening wind is the visible clock.\n2. Levin's voice fails him; a loud call is needed.\n3. Loose stones slide them back down the peak.\n4. Sura must be persuaded to stay, not asked away.\n5. A missing scale pressed back to block the wind.\n\n# FIX WHILE DIVIDING — apply these where the division can carry them\n\nEach is a change to the STORY. Apply it in the pages where a picture can hold it. Where it cannot — a figure kept in frame past the cast limit, two actions at one instant — leave it to the text, which is told to apply what the division has not. Never break a rule below to honour a hint.\nA hint never changes the situation the story settled: where one asks for what the story above rules out — a saved profile's friendship where the story stages a first meeting — the story stands and the hint is dropped.\nA hint opens with the story sentence it changes, as (s7) or (s14-15): it applies where that sentence is told, never earlier, and what it changes there replaces what the sentence says.\n\nISSUE (s7-9): Thick fog that stops the children seeing the way yet lets Sura see them coming is inconsistent. → CHANGE: The mist hangs low so the children lose the path while Sura on a peak still sees them and flies higher.\nISSUE (s13): Levin climbs the last rock without a hint of clumsiness, which contradicts his Tollpatschig flaw and weakens relatability. → CHANGE: His foot slips once but he holds on tight and still calls her name in time.\nISSUE (s15): Shy, fearful three-year-old Julian shouting about the gap does not match his character. → CHANGE: He points at the flickering gap so Levin, already beside the chest, still presses the scale in.\n\n# THE STORY LOGIC — the facts the story above was told from\n\nEvery page keeps to these facts. A page breaks a fact when its who, its instant or its change uses a thing, a material, an ability or a limit against what the story logic states of it. A hint that names a fact it changes replaces that fact; every other fact holds on every page.\n\nWant and stakes: Levin wants to reach Sura, the old dragon lady, on her rock peak before the big evening wind carries her up into the clouds, alone and forever; if he fails she is gone for good, and the deadline is that rising autumn wind.\nOpposition: Sura herself. She is ashamed that her fire is going out and wants nobody to see it. So she sends the children home, flies away from them, turns her head away and blocks the path with her wing.\nFacts:\n- Levin (commissioned) — ability: strong and quick, he can climb a rock too high for the three-year-olds; limit: shy, so when he wants to call into the mist his voice stays a whisper.\n- Julian (commissioned) — ability: notices small things; limit: small and scared, he stumbles in the fog.\n- Max (commissioned) — ability: calls loudly into the silence and grabs hold fast.\n- Kiaan (commissioned) — ability: holds the scale tight in both hands and follows its warmth.\n- Sura (commissioned) — ability: flies and makes wind with her great grey wings; limit: with her weak fire she manages only short flights, and to rise into the clouds she must wait for the big evening wind.\n- A dragon's fire burns in her chest behind her scales. Where one scale is missing, the wind blows in and the fire flickers small, like a candle in the wind; with the gap closed the fire grows big and warm, and a dragon with warm fire is strong enough to hold herself on a rock in any wind.\n- Sura lost one scale this same afternoon at the door in the old wall of the Grossmünster; it hangs there warm on the stone and grows warmer the nearer it comes to her, and only since then does the wind weaken her fire.\nMotives:\n- Levin: loves dragons and does not want Sura to vanish alone → steps into the mist, pulls the others up, climbs the last rock, calls her name, presses the scale on.\n- Julian: wants to stay with his big brother and sees small things → fetches the ball, stumbles along behind Levin, spots the gap.\n- Max: wants to know who is there, and holds on to his friends → calls into the mist, grabs Kiaan's jacket.\n- Kiaan: does not want to lose the way → lifts the scale, holds it in both hands, follows its warmth, gives it to Levin.\n- Sura: ashamed of her weak fire and sure she is simply old → warns them away, flies to the highest peak, turns her head away, blocks the path with her wing. Afraid for a small child alone in the wind, and that fear is bigger than her shame → turns her head to Levin, so that her chest turns too. Once her fire is warm again she is strong enough to hold herself against the wind and no longer needs it → stays and lights their way home.\nCentral figure: Sura\nEvents: 5\nChain:\n- Because Julian fetches the ball from the old Grossmünster wall, Kiaan lifts off the warm scale hanging there and a misty path opens. Levin's call stays a whisper, so Max calls, and Sura answers that she will rise into the clouds forever with the big evening wind. Now she also knows children are coming.\n- But the fog is so thick that Julian stumbles and nobody sees the way, so Kiaan follows the scale's warmth, holding it in both hands. This is slow, and the wind keeps rising.\n- But Sura sees them coming and flies to the highest peak, where the way up is loose stones that slide back. Kiaan nearly loses the scale, Max grabs his jacket and Levin pulls them all up, which costs strength and time while the wind grows.\n- But on top Sura turns her head away and lays one wing across the path like a wall, so the little ones cannot reach her. Max's call does not turn her, and the wind is almost strong enough, so all looks lost.\n- Because Kiaan gives Levin the scale and Levin climbs the last rock and calls her name loudly into the wind, Sura's fear for the small boy alone up there beats her shame and she turns her head to him, so her chest turns toward the children too. Julian sees the gap where a scale is missing and the fire flickering like a candle in the wind, and Levin, now level with her chest and holding the scale, presses it in. This works now because only now is her hidden chest turned to them and the scale in the hands of the one child high enough to reach it. The wind is blocked, her fire grows warm and strong, so she can hold herself on the rock, stays, and lights their way back through the door.\n\n# THE IDEA THE STORY WAS COMMISSIONED FROM (names and world reference only)\n\nThe arc above delivers the commission; keep its names and world as written.\n\nTitle: Die Schuppe im Nebel\nCategory: adventure\nType: Drachen-Abenteuer\nTheme: dragon\nSeason: Autumn\nSetting/location: Zurich, Zurich, Switzerland\nRelationships:\n  - Levin is Älteres Geschwister von Julian\n  - Julian is Jüngeres Geschwister von Levin\n\n# CHARACTER DETAILS\n\nThese details decide who each figure IS: age, gender, what they are good at, what they find hard, what they like. Never contradict one, never invent one.\nThe arc above is settled and decides the SITUATION: who knows whom here, where they are, what is happening to them. Where a saved detail contradicts the arc — a friendship where the arc stages a first meeting — the arc stands, and the detail is simply not true in this book.\n\n**Levin** (main character):\n- Age: 5\n- Gender: male\n- Strengths: Fröhlich, Freundlich, Hilfsbereit, Beschützend, Nachsichtig, Treu, Gerecht, Ehrlich, Vertrauenswürdig, Geduldig, Neugierig, Fantasievoll, Klug, Kreativ, Aufmerksam, Einfallsreich, Abenteuerlustig, Schnell, Stark, Fleissig, Leader, Mutig, Grosszügig, Selbstbewusst, Lustig\n- Flaws: Schüchtern, Unentschlossen, Leichtgläubig, Petze, Gesprächig, Vergesslich, Tollpatschig\n- Special details: Lieb Dinosaurier und Drachen. Sein Bruder ist Julian und Max und Kiaan sind seine guten Freunde. Er kann gut Velofahren und Unihockey spielen\n\n**Julian** (main character):\n- Age: 3\n- Gender: male\n- Strengths: Fröhlich, Freundlich, Hilfsbereit, Lustig, Nachsichtig, Beschützend, Treu, Grosszügig, Gerecht, Ehrlich, Vertrauenswürdig, Abenteuerlustig, Aufmerksam, Kreativ, Klug\n- Flaws: Schüchtern, Leichtgläubig, Unentschlossen, Tollpatschig, Ängstlich, Stur\n- Special details: Seine freunde: levin, julian, max. Er isst sehr gerne, liebt es mit seinem Bruder und seinen Freunden zu spielen, hat gerne Ballspiele\n\n**Max** (main character):\n- Age: 3\n- Gender: male\n- Strengths: Fröhlich, Freundlich, Lustig, Ehrlich, Selbstbewusst, Mutig, Vertrauenswürdig, Entschlossen, Fleissig, Fantasievoll, Neugierig, Kreativ, Aufmerksam, Abenteuerlustig, Stark, Schnell\n- Flaws: Gesprächig, Leichtgläubig\n- Special details: Spielt gerne mit seinen Freunden Kiaan, Levin, Max. Seine Hündin heisst Nia. Er spielt gerne Fussball und fährt gerne Velo\n\n**Kiaan** (main character):\n- Age: 3\n- Gender: male\n- Strengths: Fröhlich, Freundlich, Hilfsbereit, Lustig, Nachsichtig, Beschützend, Treu, Grosszügig, Gerecht, Ehrlich, Selbstbewusst, Vertrauenswürdig, Mutig, Geduldig, Fantasievoll, Neugierig, Klug, Kreativ, Aufmerksam, Abenteuerlustig\n- Flaws: Vergesslich, Petze, Unentschlossen, Schüchtern\n- Special details: Spielt gerne mit Levin, Julian, Max. Liesst gerne oder spielt gerne Ball oder auf dem Spielplatz\n\n**REAL LANDMARKS the story above uses:**\n- Grossmünster [Church]\n  PHOTOS: (exterior) Twin cream-colored church towers with pyramidal cupolas topped by Swiss flags and cross finials.; (exterior) Twin stone towers with ornamental cupolas and Swiss flags, viewed across waterfront from lower…; (exterior) Pair of stone church towers with distinctive architectural details, contemporary structures…; (interior) Interior nave with stone columns supporting ornate gilded ceiling; stone statue of Charlemagne…\n- Rathaus (Zürich) [Building]\n  PHOTOS: (exterior) Cream-colored Renaissance building with mansard roof and multiple chimneys; stone facade with…; (exterior) Same building viewed from slightly further angle showing riverside setting; cream stone facade…; (exterior) Aerial cityscape showing Rathaus among surrounding buildings with Grossmünster's twin towers…; (exterior) Cream stone facade with distinctive orderly fenestration and decorative window surrounds;…; (exterior) Building on waterfront quay showing cream-colored stone facade, mansard roof with multiple…; (interior) Ornate interior hall with elaborately decorated ceiling featuring elaborate plasterwork and…\n- Rathausbrücke (Zürich) [Bridge]\n  PHOTOS: (exterior) Stone bridge with yellow construction/loading equipment, spanning green river. City buildings…; (exterior) River landscape showing stone bridge structure and densely-built waterfront architecture. Pale…; (exterior) Stone bridge viewed from plaza level with modern balusters and speed-limit signs. City…\n- Wasserkirche [Church]\n  PHOTOS: (exterior) Wasserkirche church with pointed limestone spire and Helmhaus Renaissance building adjacent,…; (exterior) Wasserkirche church exterior from Limmat waterfront with tall spire, stone masonry walls,…; (exterior) Riverside view of Wasserkirche church and Helmhaus from Limmat river, showing cream facades,…; (interior) Wasserkirche interior sanctuary showing ribbed Gothic vault ceiling, tall stained glass windows…\n\n- A landmark is drawn from one of its PHOTOS. Name a location or a vantage of it only from a viewpoint one of its photos shows — an exterior is seen from the street or the square, an interior from inside, a distant or view-from photo from afar. If no photo shows the view a page needs (a skyline from a hilltop, a bird's-eye, the far side), that landmark is not available for that page: use one whose photos fit, or none. A view the commission's own words describe is the exception: it stands, and the landmark in it is drawn from what its photos show\n\n# MINI HERO'S JOURNEY (age 5)\n\nThe child this book is for is five. Write for that child.\n\n**The full shape, in small.** Ordinary world, then a call that pulls the main character out of it,\nthen challenges that get harder, then a moment where all seems lost, then the turn, then home —\nchanged. Every one of those beats is in the story, in that order.\n\n**A real low point is required.** Before the end there is a page where the plan has failed, the thing\nis lost, or the friend is gone, and it looks like it will stay that way. Do not soften it into a\nsmall setback and do not skip past it in a line.\n\n**The hero's own idea turns it.** What saves the day comes out of the main character — something they\nnoticed earlier, a strength of theirs, a thing they were told and remembered. Never luck, never a\ngrown-up arriving to fix it, never a power handed over at the last moment.\n\n**It resolves.** The turn comes before the last page and they come home changed. Never a story that\nstops on the problem.\n\n**A real antagonist is allowed.** Someone who wants something opposed to what the main character\nwants, with a reason of their own. A twist, a sidekick who earns their place, and a setup on an early\npage that pays off at the end all belong here.\n\n**Competence.** The main character does things: decides, tries, fails, adapts. They are never carried\nthrough their own story.\n\n**The stake is the main character's own.** What is wanted and what is at risk belong to their own\nlife — never a piece of work set for them, an assignment, a submission, a competition entry, or a\nplace to be won in a selection. What stands in the way is something they can reach out and touch, or\nsomeone who wants the opposite, never a procedure, a schedule or a system to be satisfied.\n\n**Humour and mild peril.** A chase, a close call, a night out in the cold are fine. Nothing gory,\nnothing cruel, nobody the reader likes is really harmed.\n\n**Ending.** They come back to where they started and it reads differently, because they are different.\n\n**The age owns the props and the subject.** What the main character wants, what stands in the way, and the objects the story turns on belong to the world of someone that age — what they handle themselves, where they go on their own, what counts as a loss to them. Never a want, a comfort or a plaything the reader has outgrown, and never stakes beyond what someone that age would be given.\n\n# PAGE PLAN\n\nTHE BOOK'S TARGETS — every one is counted in code on the finished plan. A figure the STORY LOGIC names (new) is not commissioned and may share a page with commissioned characters or carry a page alone.\n- Levin is in frame on at least 9 pages of 18, each time taking part in that page's one action; count them as you plan.\n- At least 1 page of type face, and a face page shows a commissioned character.\n- At least 1 page of type landscape or object; two are fine, ideally one of each.\n- At most 3 pages of type group.\n- The who column names commissioned characters and the figures of the STORY LOGIC, nobody else: a figure you invent is a fault.\n\nEach page has a type, and the type fixes who is in frame:\n- landscape: nobody. A place, the weather, a vessel or a distant sight.\n- object: nobody, or one character's hand. One object.\n- face: exactly one character, a close-up of their face.\n- medium: one to three characters.\n- group: four or more characters, all sharing one simple action.\nThe who column holds names only, or the word nobody: never a count, a group word or a description.\n\nBefore dividing, plan the pictures — simple pages first:\n1. The story's emotional highlights: which moments earn a page of one character showing a strong feeling, close up?\n2. Which moments earn a page with no people in frame? A page with nobody in it has story weight when its subject is something the story has been driving toward — a discovery, an arrival, a payoff — or the danger or obstacle the characters face at that point: a thing rolling toward a drop, a goal out of reach. A place with no story weight never gets its own page. At least one page in the book earns this. Choose one whose drama is a place, the weather, a vessel or an object seen from afar; never a page whose drama is between people — a parting, a confrontation, tears, a promise, a handover. Those pages get faces, and so does every picture question 5 names as most wanted.\n3. Which pages gather the whole cast, and what one simple action do they all share there? \n4. Where are three or more characters truly unavoidable? Bypass it where the story allows; keep it only where the story demands it. Where one is kept, the third character shares the page's one action — takes part in it, never does a second action and never only stands by.\n5. For each act — setup, middle, ending — which picture does a child most want to see there, and which page stages it as its instant? The acts are the story's sentences in thirds: setup 1–6, middle 7–12, ending 13–18. The ending's own event — the reunion, the goodbye, the parting — is always one of them. A picture that falls between two pages, or that only a page's change reports as already done, is not staged.\n6. Your CAST block, under RE-DIVIDE, stands: every page you return keeps what it promises, and the block itself is not rewritten.\nThen one line per page: type — who is in frame — the instant the picture shows — what is true after this page that was not before. The first field is the page's type: landscape, object, face, medium, group. Camera shots are chosen after the plan is final, never here.\nA complicated page — much action, many characters at once — is a fault: simplify the picture, never the story. A page after which nothing is true that was not before is filler: give it a change or give its material to a neighbouring page. What is true after is a change in the story’s state, not the instant in other words: something now held, moved, opened, broken, learned, decided or agreed that was not true before this page. A fourth field that only redescribes the picture states no change.\n\nThe plan line's instant is a single drawable moment:\n- One instant, one action: no montage, no before-and-after, no \"then\", no passage of time inside one picture; when a beat contains a change, pick the single moment that shows it. Never two actions by one character: plan the dominant one and leave the other out, never joined by \"and then\", \"before turning to\" or a trailing clause. One thing is being done, and everyone else watches it or does that same thing in the same place; two characters given different actions at one instant lose one of them, and so do two vehicles, vessels or creatures each with its own state or its own crew. The action at the moment it happens, never the state that follows it. A deed, its effect, and where the effect goes are three actions. Watching, standing and being present are not actions, and an effect that is the deed itself made visible at the same instant is part of the deed. When a plan line holds more than one action, split them across pages; a beat whose actions cannot share a picture gives one page the contact and the next page the second action, or the picture drops the secondary action and keeps the main event. The instant is at most 20 words.\n- A page holds at most 6 named characters, a named animal that acts in the story counting as one; two or three carry it best. A page that gathers the whole cast is wide or distant, all of them sharing one simple action — boarding, hauling one line together — or seen from behind moving off. All of them watching one thing is a shared action only when they are seen from behind or over the shoulder, toward what they watch; facing the viewer it never is. Standing or gathering together while a feeling shows, or while the event happens behind them, is everyone present doing nothing — never a row of figures facing the viewer. One of them acting while the rest look on — a hand-over between two, one speaking, one laughing — is not a shared action: every one of them does the same thing. Add no unnamed figures — no crew, crowd, onlookers or extra animals.\n- The second field is the complete cast of that picture. Every figure the instant stages — a person, or a creature the story tracks — including one watching from the background — belongs in that field, or is not written into the instant at all. A figure the picture shows only in part — a wing, a tail, a head or a hand reaching into the frame, a flank or a chest filling it — is in that picture exactly as if it were shown whole. Only a name without a body is context: the owner of a prop or a place, someone behind, beyond or outside what the picture shows. A figure named only in what is true after this page is not in the picture either: put them in that field or leave them off the page. A figure the previous page staged does not carry into the next one as background.\n- One camera position: an instant is seen from one spot — never inside a vehicle or structure and its exterior at once.\n- At most two height levels per picture: people, animals or objects at three or more different heights in one frame — one on the ground, one climbing the tree, one up in the tree; someone in the foreground and someone in the tree is fine. A whole cast carried together on one back or one boat is one level. Where a third level appears, stage the page on the two levels its event happens on and give the third level its own page.\n- Several characters holding or moving one thing together is fine when that is the page's one action. A hand-over or an object in flight is never the instant: pick the instant before or after it. Never a thought or realization as the instant, or a climbing or stretching pose with hidden limbs; when the event is internal or mechanical, name its visible result instead (the box open, the found object held up).\n- A figure trapped, cut off or unable to reach is given no means to end it: the obstacle's distance is named against the body (\"the rim of the shaft three times their height above them\", \"the ledge a full arm's length beyond the fingertips\"), never a grip, hold or footing that would let them out.\n- Never a pointing gesture as the instant: a look toward the thing, a turned head, a step toward it, or the thing held up instead.\n- Never an exact count of like things in the instant: one, two, or several — a number above two belongs to the text.\n- Name what is in the picture, never what is absent, empty or missing from it. When the absence is the story point, name its visible consequence, or make the empty place the page's subject.\n- Beyond the page's type, never compose the frame — what fills it, how large something looks, where it sits, or where the camera stands.\n- A size or a look is stated only where the plot turns on it: a thing too heavy for one child to lift, too big to hide, small enough to pocket. It is stated as that plot fact, never as a comparison with another thing (\"as big as a …\", \"the size of a …\"). Every other size and look is left to the pictures, which size everything themselves; leaving it out drops no fact. A plan line names each thing plainly; the Art Director sizes it.\n- The beat's main event wins the picture. A secondary figure or action is dropped before the main one is reduced to a shadow, a silhouette or a sound: the arriving creature is in frame as itself, and the reunion outranks the bystander.\n\nRequirements:\n- Each page follows causally from the one before it: no page stages a moment the story reaches only in a later sentence.\n- What a page establishes about a thing — stuck, heavy, hidden, out of reach — stays true until a later page changes it.\n- Consecutive pages do not stage the same place with the same grouping, and one gathering is not split across two pages. A page keeps its characters at one depth together; separate a figure into the background only when the page's own instant requires the separation, and keep such pages few.\n- Every page is visible: something happens that a picture can show. A character whose action is what a page's instant works against — a way blocked, a place kept, a thing taken or withheld, a refusal — is named in that page's plan line.\n- Levin's floor stands in THE BOOK'S TARGETS above; the others come and go in different combinations, not the whole group on every page. Every commissioned character gets a focal page of their own whose instant is the action the story gives them. The story's central figure, Sura, acts in each third of the book — it chooses, moves, speaks or changes something in a page's instant, never only carried.\n- A character's focal page stages them alone or with one companion — two people sharing one action carry it — and stages them doing something visible. An internal decision gets a physical correlative — a held object, a step taken, a grip tightened; never a lone motionless figure.\n- When an AVAILABLE LANDMARKS list is present, an arc that names landmarks has chosen them — keep those, not others; an arc that names none has chosen none. A landmark may be scenery — a tower on the horizon, a bridge behind the action — and never relocates the story. No page names more than one place.\n- A page shows a character about to act, decide or know what to do only when the next page shows that same character doing it.\n- A physical challenge spends one page on the attempt itself — a character mid-effort against the obstacle. The decision before and the relief after never replace it.\n- The emotional low point — a loss, a setback, the goal looking lost — gets a page of its own; the loss and its recovery never share a page.\n- A race or deadline the story runs on is scored mid-book at least twice — a page shows who is ahead or how much remains.\n- The stake the arc has a character say aloud lands on an early page, shown as a visible act, never as the words said.\n- A character's first page stages their arrival or a naming by someone present, shown as a visible act and never as the words said; a badge, a garment, a title or an epithet is not a naming. A character in frame before anyone says who they are is unplaced.\n- A prop, pet or skill that solves a problem appears on an earlier page with its owner before it does the work, and nothing a page plants is left without a later page that pays it off.\n- At most 1 page with figures in frame holds none of the commissioned characters; every other page with figures holds at least one.\n- Page 1 opens on an action already under way, and each character's first page shows them doing something.\n- When the story's ending has an event of its own, the last page stages that event as its instant.\n- The last page shows the commissioned characters safe and together, unless the story itself separates them.\n- No plan line states what anyone learned, realised or now understands.\n\n# RE-DIVIDE — one round\n\nRewrite ONLY the pages under PAGES TO REWRITE, each answering its Change and keeping its Keep, in the same line format (type — who — instant — after). Every other page stands as written, and a page you rewrite never breaks a target that held.\n\n## THE PLAN THAT STANDS\nPage 1: group — Levin, Julian, Max, Kiaan — all four kick the ball to each other in the foggy autumn square between the Wasserkirche and the Grossmünster — the ball is rolling away toward the old wall\nPage 2: medium — Julian, Levin — Julian reaches up to a big warm scale hanging on the old stone wall of the Grossmünster — a scale is found, and Levin has come to stand beside him\nPage 3: medium — Kiaan, Max — Kiaan lifts the scale off the stone wall in his hands while Max watches — a path in the wall opens into mist and rocky peaks\nPage 4: medium — Levin, Max — Levin opens his mouth shyly toward the mist while Max cups his hands and calls loudly — the call is out in the silence\nPage 5: face — Sura — Sura's old grey dragon face looks tired out of the mist and speaks of the evening wind — the children know she will rise alone forever\nPage 6: medium — Levin, Julian — Levin steps onto the misty path and holds out a hand to Julian — the way into the mist is begun\nPage 7: medium — Julian, Levin — Julian stumbles over a stone behind Levin in the low mist that hides the path — the path is lost and the going is slow\nPage 8: face — Kiaan — Kiaan holds the scale tight in both hands with a look of focus — he leads them toward where it is warmest\nPage 9: landscape — nobody — a high rocky peak above the low mist, with Sura's great grey wings beating as she flies toward it and wind bending the grass — Sura is on the highest peak and the wind is stronger\nPage 10: group — Levin, Max, Kiaan, Julian — the four climb the loose sliding stones, Max grabs Kiaan's jacket and Levin pulls them up — all reach the top\nPage 11: medium — Sura, Levin — Sura turns her big head away and lays one wing across the path like a wall — the little ones cannot reach her\nPage 12: medium — Max, Sura — Max calls \"Sura, wait!\" while Sura keeps her head turned away, wind lifting her wing — she does not turn and all looks lost\nPage 13: medium — Levin — Levin climbs the last rock, his foot slips once, he holds on tight and calls Sura's name — the call rings out loud\nPage 14: face — Sura — Sura turns her worried face toward the small boy on the high rock — her chest turns toward the children\nPage 15: medium — Julian, Levin, Sura — Julian points at a dark gap in Sura's chest where a tiny fire flickers, Levin stands beside it — the missing scale is found\nPage 16: object — Levin — Levin's hands press the warm scale into the gap in Sura's chest — the wind is blocked and the fire grows big and warm\nPage 17: medium — Sura, Levin — Sura lifts Levin gently down with her nose, wings folded — she stays and her warm flame lights the way home\nPage 18: group — Levin, Julian, Max, Kiaan — the four run together over the Rathausbrücke in the evening — they are home and safe, and Levin is proud of his loud call\n\n---CAST---\nLevin — deed page 13: climbs the last rock, slips once, holds on tight and calls Sura's name into the wind, alone — also on pages 1, 6, 10, 16, 17, 18\nJulian — deed page 15: points at the flickering gap in Sura's chest, with Levin beside it — also on pages 2, 7, 18\nMax — deed page 4: calls loudly into the mist, with Levin — also on pages 10, 12, 18\nKiaan — deed page 8: holds the warm scale in both hands and leads where it is warmest, alone — also on pages 3, 10, 18\nSura — deed page 14: turns her head to the small boy on the rock, alone with Levin — also on pages 5, 9, 11, 16, 17\nEnding page 18: Levin, Julian, Max, Kiaan\n\n## PAGES TO REWRITE\nPage 9\nChange: the instant runs 24 words on page 9, past the 20 words an instant may take — keep the one action and move the rest to what is true after, or to a page of its own\nKeep: type landscape; nobody in frame; what is true after: Sura is on the highest peak and the wind is stronger\n\n# OUTPUT FORMAT\n\nOnly what the format below shows. No preamble, no commentary. One line for each page you rewrite under RE-DIVIDE, and for no other page. No changes block.\n\n---PAGE PLAN---\nPage <N>: <type> — <names, or the word nobody> — <the instant the picture shows> — <what is true after this page that was not before>\n\n",
+     "decisions": [
+      {
+       "keep": true,
+       "fixes": [
+        "PLAN_INSTANT_TOO_LONG:9"
+       ],
+       "breaks": [],
+       "reason": "fixes something, breaks nothing",
+       "pageNumber": 9
+      }
+     ],
+     "returnedPages": [
+      9
+     ]
+    },
+    "castTable": {
+     "raw": "Levin — deed page 13: climbs the last rock, slips once, holds on tight and calls Sura's name into the wind, alone — also on pages 1, 6, 10, 16, 17, 18\nJulian — deed page 15: points at the flickering gap in Sura's chest, with Levin beside it — also on pages 2, 7, 18\nMax — deed page 4: calls loudly into the mist, with Levin — also on pages 10, 12, 18\nKiaan — deed page 8: holds the warm scale in both hands and leads where it is warmest, alone — also on pages 3, 10, 18\nSura — deed page 14: turns her head to the small boy on the rock, alone with Levin — also on pages 5, 9, 11, 16, 17\nEnding page 18: Levin, Julian, Max, Kiaan",
+     "extra": [
+      "Sura"
+     ],
+     "ending": {
+      "page": 18,
+      "names": [
+       "Levin",
+       "Julian",
+       "Max",
+       "Kiaan"
+      ]
+     },
+     "characters": [
+      {
+       "deed": "climbs the last rock, slips once, holds on tight and calls Sura's name into the wind, alone",
+       "name": "Levin",
+       "alsoOn": [
+        1,
+        6,
+        10,
+        16,
+        17,
+        18
+       ],
+       "deedPage": 13
+      },
+      {
+       "deed": "points at the flickering gap in Sura's chest, with Levin beside it",
+       "name": "Julian",
+       "alsoOn": [
+        2,
+        7,
+        18
+       ],
+       "deedPage": 15
+      },
+      {
+       "deed": "calls loudly into the mist, with Levin",
+       "name": "Max",
+       "alsoOn": [
+        10,
+        12,
+        18
+       ],
+       "deedPage": 4
+      },
+      {
+       "deed": "holds the warm scale in both hands and leads where it is warmest, alone",
+       "name": "Kiaan",
+       "alsoOn": [
+        3,
+        10,
+        18
+       ],
+       "deedPage": 8
+      }
+     ]
+    },
+    "firstPlan": {
+     "ms": 10058,
+     "reply": "---CAST---\nLevin — deed page 13: climbs the last rock, slips once, holds on tight and calls Sura's name into the wind, alone — also on pages 1, 6, 10, 16, 17, 18\nJulian — deed page 15: points at the flickering gap in Sura's chest, with Levin beside it — also on pages 2, 7, 18\nMax — deed page 4: calls loudly into the mist, with Levin — also on pages 10, 12, 18\nKiaan — deed page 8: holds the warm scale in both hands and leads where it is warmest, alone — also on pages 3, 10, 18\nSura — deed page 14: turns her head to the small boy on the rock, alone with Levin — also on pages 5, 9, 11, 16, 17\nEnding page 18: Levin, Julian, Max, Kiaan\n---PAGE PLAN---\nPage 1: group — Levin, Julian, Max, Kiaan — all four kick the ball to each other in the foggy autumn square between the Wasserkirche and the Grossmünster — the ball is rolling away toward the old wall\nPage 2: medium — Julian, Levin — Julian reaches up to a big warm scale hanging on the old stone wall of the Grossmünster — a scale is found, and Levin has come to stand beside him\nPage 3: medium — Kiaan, Max — Kiaan lifts the scale off the stone wall in his hands while Max watches — a path in the wall opens into mist and rocky peaks\nPage 4: medium — Levin, Max — Levin opens his mouth shyly toward the mist while Max cups his hands and calls loudly — the call is out in the silence\nPage 5: face — Sura — Sura's old grey dragon face looks tired out of the mist and speaks of the evening wind — the children know she will rise alone forever\nPage 6: medium — Levin, Julian — Levin steps onto the misty path and holds out a hand to Julian — the way into the mist is begun\nPage 7: medium — Julian, Levin — Julian stumbles over a stone behind Levin in the low mist that hides the path — the path is lost and the going is slow\nPage 8: face — Kiaan — Kiaan holds the scale tight in both hands with a look of focus — he leads them toward where it is warmest\nPage 9: landscape — nobody — a high rocky peak above the low mist, with Sura's great grey wings beating as she flies toward it and wind bending the grass — Sura is on the highest peak and the wind is stronger\nPage 10: group — Levin, Max, Kiaan, Julian — the four climb the loose sliding stones, Max grabs Kiaan's jacket and Levin pulls them up — all reach the top\nPage 11: medium — Sura, Levin — Sura turns her big head away and lays one wing across the path like a wall — the little ones cannot reach her\nPage 12: medium — Max, Sura — Max calls \"Sura, wait!\" while Sura keeps her head turned away, wind lifting her wing — she does not turn and all looks lost\nPage 13: medium — Levin — Levin climbs the last rock, his foot slips once, he holds on tight and calls Sura's name — the call rings out loud\nPage 14: face — Sura — Sura turns her worried face toward the small boy on the high rock — her chest turns toward the children\nPage 15: medium — Julian, Levin, Sura — Julian points at a dark gap in Sura's chest where a tiny fire flickers, Levin stands beside it — the missing scale is found\nPage 16: object — Levin — Levin's hands press the warm scale into the gap in Sura's chest — the wind is blocked and the fire grows big and warm\nPage 17: medium — Sura, Levin — Sura lifts Levin gently down with her nose, wings folded — she stays and her warm flame lights the way home\nPage 18: group — Levin, Julian, Max, Kiaan — the four run together over the Rathausbrücke in the evening — they are home and safe, and Levin is proud of his loud call",
+     "prompt": "# YOUR TASK\n\nThe story below is finished. Divide it into 18 pages: plan the pictures, simple pages first, then one PLAN line per page. Plan in ENGLISH; the book will be written in Swiss Standard German (ss, never ß — never dialect) — names, places and cultural details as they will appear there. Reader: kindergarten age (about five).\n\nCommissioned characters: Levin, Julian, Max, Kiaan\n\n# THE STORY (final — it was told, challenged and re-told; divide it, never retell or repair it)\n\n1. On a foggy autumn afternoon, Levin, his little brother Julian and their friends Max and Kiaan play ball between the Wasserkirche and the Grossmünster.\n2. The ball rolls to the old stone wall of the Grossmünster, and when Julian fetches it, he finds a scale as big as Levin's hand hanging on the stone, still warm, as if it had come loose only a moment ago.\n3. Kiaan lifts the scale off, and behind it a path opens in the wall, leading into a world of mist and rocky peaks.\n4. Levin wants to call \"Hello?\" into the mist, but he is shy and his voice is only a whisper, so Max calls loudly into the silence instead.\n5. A deep, tired voice answers: \"I am Sura, and I am old. Go home, children. When the big evening wind comes, I will rise into the clouds, alone and forever.\"\n6. Levin loves dragons and does not want Sura to vanish alone, so the four step onto the misty path.\n7. But the fog is so thick that Julian stumbles over stones behind Levin, and nobody can see where Sura is.\n8. Kiaan notices that the scale grows warmer when he points it toward the peaks. So he holds it in both hands, so as not to lose the way, and leads them where it is warmest.\n9. But Sura sees the children coming, beats her great grey wings and flies away to the highest peak, and the wind blows harder.\n10. The way up that peak is loose stones that slide back with every step. Kiaan slips and nearly lets go of the scale, but he holds it tight in both hands while Max grabs his jacket and Levin pulls them all up.\n11. At the top Sura turns her big head away when she sees the four children, and she lays one wing across the path like a wall, so the little ones cannot come to her.\n12. Max calls \"Sura, wait!\", but she does not turn, and the wind is almost strong enough to lift her.\n13. The only way past her wing is the last rock, too high for the three little ones. Kiaan presses the warm scale into Levin's hands. Levin is scared of the wind, but he climbs up, holds on tight and calls Sura's name into the autumn wind, louder than ever before.\n14. Sura is afraid for the small boy alone on the high rock, and that fear is bigger than her shame, so she turns her head to him, and her chest turns toward the children too.\n15. Julian sees a dark gap there where a scale is missing, with a tiny fire flickering behind it like a candle in the wind, and he shouts: \"A scale is missing!\"\n16. Levin is now right beside her chest, and he presses the scale into the gap. Now the wind cannot get in, and the fire behind the scale grows big and warm.\n17. With her fire warm again Sura is strong enough to hold herself on the rock, so she lifts Levin gently down with her nose and folds her wings to stay. Then she breathes a warm flame that lights the children's way back through the fog to the door in the old wall.\n18. The four step out at the Grossmünster, the mist thins and the door in the old stone closes behind them, and they run home together across the Rathausbrücke in the evening, and Levin feels proud, because this time he called out loud all by himself.\n\nChallenges taken:\n1. The rising evening wind is the visible clock.\n2. Levin's voice fails him; a loud call is needed.\n3. Loose stones slide them back down the peak.\n4. Sura must be persuaded to stay, not asked away.\n5. A missing scale pressed back to block the wind.\n\n# FIX WHILE DIVIDING — apply these where the division can carry them\n\nEach is a change to the STORY. Apply it in the pages where a picture can hold it. Where it cannot — a figure kept in frame past the cast limit, two actions at one instant — leave it to the text, which is told to apply what the division has not. Never break a rule below to honour a hint.\nA hint never changes the situation the story settled: where one asks for what the story above rules out — a saved profile's friendship where the story stages a first meeting — the story stands and the hint is dropped.\nA hint opens with the story sentence it changes, as (s7) or (s14-15): it applies where that sentence is told, never earlier, and what it changes there replaces what the sentence says.\n\nISSUE (s7-9): Thick fog that stops the children seeing the way yet lets Sura see them coming is inconsistent. → CHANGE: The mist hangs low so the children lose the path while Sura on a peak still sees them and flies higher.\nISSUE (s13): Levin climbs the last rock without a hint of clumsiness, which contradicts his Tollpatschig flaw and weakens relatability. → CHANGE: His foot slips once but he holds on tight and still calls her name in time.\nISSUE (s15): Shy, fearful three-year-old Julian shouting about the gap does not match his character. → CHANGE: He points at the flickering gap so Levin, already beside the chest, still presses the scale in.\n\n# THE STORY LOGIC — the facts the story above was told from\n\nEvery page keeps to these facts. A page breaks a fact when its who, its instant or its change uses a thing, a material, an ability or a limit against what the story logic states of it. A hint that names a fact it changes replaces that fact; every other fact holds on every page.\n\nWant and stakes: Levin wants to reach Sura, the old dragon lady, on her rock peak before the big evening wind carries her up into the clouds, alone and forever; if he fails she is gone for good, and the deadline is that rising autumn wind.\nOpposition: Sura herself. She is ashamed that her fire is going out and wants nobody to see it. So she sends the children home, flies away from them, turns her head away and blocks the path with her wing.\nFacts:\n- Levin (commissioned) — ability: strong and quick, he can climb a rock too high for the three-year-olds; limit: shy, so when he wants to call into the mist his voice stays a whisper.\n- Julian (commissioned) — ability: notices small things; limit: small and scared, he stumbles in the fog.\n- Max (commissioned) — ability: calls loudly into the silence and grabs hold fast.\n- Kiaan (commissioned) — ability: holds the scale tight in both hands and follows its warmth.\n- Sura (commissioned) — ability: flies and makes wind with her great grey wings; limit: with her weak fire she manages only short flights, and to rise into the clouds she must wait for the big evening wind.\n- A dragon's fire burns in her chest behind her scales. Where one scale is missing, the wind blows in and the fire flickers small, like a candle in the wind; with the gap closed the fire grows big and warm, and a dragon with warm fire is strong enough to hold herself on a rock in any wind.\n- Sura lost one scale this same afternoon at the door in the old wall of the Grossmünster; it hangs there warm on the stone and grows warmer the nearer it comes to her, and only since then does the wind weaken her fire.\nMotives:\n- Levin: loves dragons and does not want Sura to vanish alone → steps into the mist, pulls the others up, climbs the last rock, calls her name, presses the scale on.\n- Julian: wants to stay with his big brother and sees small things → fetches the ball, stumbles along behind Levin, spots the gap.\n- Max: wants to know who is there, and holds on to his friends → calls into the mist, grabs Kiaan's jacket.\n- Kiaan: does not want to lose the way → lifts the scale, holds it in both hands, follows its warmth, gives it to Levin.\n- Sura: ashamed of her weak fire and sure she is simply old → warns them away, flies to the highest peak, turns her head away, blocks the path with her wing. Afraid for a small child alone in the wind, and that fear is bigger than her shame → turns her head to Levin, so that her chest turns too. Once her fire is warm again she is strong enough to hold herself against the wind and no longer needs it → stays and lights their way home.\nCentral figure: Sura\nEvents: 5\nChain:\n- Because Julian fetches the ball from the old Grossmünster wall, Kiaan lifts off the warm scale hanging there and a misty path opens. Levin's call stays a whisper, so Max calls, and Sura answers that she will rise into the clouds forever with the big evening wind. Now she also knows children are coming.\n- But the fog is so thick that Julian stumbles and nobody sees the way, so Kiaan follows the scale's warmth, holding it in both hands. This is slow, and the wind keeps rising.\n- But Sura sees them coming and flies to the highest peak, where the way up is loose stones that slide back. Kiaan nearly loses the scale, Max grabs his jacket and Levin pulls them all up, which costs strength and time while the wind grows.\n- But on top Sura turns her head away and lays one wing across the path like a wall, so the little ones cannot reach her. Max's call does not turn her, and the wind is almost strong enough, so all looks lost.\n- Because Kiaan gives Levin the scale and Levin climbs the last rock and calls her name loudly into the wind, Sura's fear for the small boy alone up there beats her shame and she turns her head to him, so her chest turns toward the children too. Julian sees the gap where a scale is missing and the fire flickering like a candle in the wind, and Levin, now level with her chest and holding the scale, presses it in. This works now because only now is her hidden chest turned to them and the scale in the hands of the one child high enough to reach it. The wind is blocked, her fire grows warm and strong, so she can hold herself on the rock, stays, and lights their way back through the door.\n\n# THE IDEA THE STORY WAS COMMISSIONED FROM (names and world reference only)\n\nThe arc above delivers the commission; keep its names and world as written.\n\nTitle: Die Schuppe im Nebel\nCategory: adventure\nType: Drachen-Abenteuer\nTheme: dragon\nSeason: Autumn\nSetting/location: Zurich, Zurich, Switzerland\nRelationships:\n  - Levin is Älteres Geschwister von Julian\n  - Julian is Jüngeres Geschwister von Levin\n\n# CHARACTER DETAILS\n\nThese details decide who each figure IS: age, gender, what they are good at, what they find hard, what they like. Never contradict one, never invent one.\nThe arc above is settled and decides the SITUATION: who knows whom here, where they are, what is happening to them. Where a saved detail contradicts the arc — a friendship where the arc stages a first meeting — the arc stands, and the detail is simply not true in this book.\n\n**Levin** (main character):\n- Age: 5\n- Gender: male\n- Strengths: Fröhlich, Freundlich, Hilfsbereit, Beschützend, Nachsichtig, Treu, Gerecht, Ehrlich, Vertrauenswürdig, Geduldig, Neugierig, Fantasievoll, Klug, Kreativ, Aufmerksam, Einfallsreich, Abenteuerlustig, Schnell, Stark, Fleissig, Leader, Mutig, Grosszügig, Selbstbewusst, Lustig\n- Flaws: Schüchtern, Unentschlossen, Leichtgläubig, Petze, Gesprächig, Vergesslich, Tollpatschig\n- Special details: Lieb Dinosaurier und Drachen. Sein Bruder ist Julian und Max und Kiaan sind seine guten Freunde. Er kann gut Velofahren und Unihockey spielen\n\n**Julian** (main character):\n- Age: 3\n- Gender: male\n- Strengths: Fröhlich, Freundlich, Hilfsbereit, Lustig, Nachsichtig, Beschützend, Treu, Grosszügig, Gerecht, Ehrlich, Vertrauenswürdig, Abenteuerlustig, Aufmerksam, Kreativ, Klug\n- Flaws: Schüchtern, Leichtgläubig, Unentschlossen, Tollpatschig, Ängstlich, Stur\n- Special details: Seine freunde: levin, julian, max. Er isst sehr gerne, liebt es mit seinem Bruder und seinen Freunden zu spielen, hat gerne Ballspiele\n\n**Max** (main character):\n- Age: 3\n- Gender: male\n- Strengths: Fröhlich, Freundlich, Lustig, Ehrlich, Selbstbewusst, Mutig, Vertrauenswürdig, Entschlossen, Fleissig, Fantasievoll, Neugierig, Kreativ, Aufmerksam, Abenteuerlustig, Stark, Schnell\n- Flaws: Gesprächig, Leichtgläubig\n- Special details: Spielt gerne mit seinen Freunden Kiaan, Levin, Max. Seine Hündin heisst Nia. Er spielt gerne Fussball und fährt gerne Velo\n\n**Kiaan** (main character):\n- Age: 3\n- Gender: male\n- Strengths: Fröhlich, Freundlich, Hilfsbereit, Lustig, Nachsichtig, Beschützend, Treu, Grosszügig, Gerecht, Ehrlich, Selbstbewusst, Vertrauenswürdig, Mutig, Geduldig, Fantasievoll, Neugierig, Klug, Kreativ, Aufmerksam, Abenteuerlustig\n- Flaws: Vergesslich, Petze, Unentschlossen, Schüchtern\n- Special details: Spielt gerne mit Levin, Julian, Max. Liesst gerne oder spielt gerne Ball oder auf dem Spielplatz\n\n**REAL LANDMARKS the story above uses:**\n- Grossmünster [Church]\n  PHOTOS: (exterior) Twin cream-colored church towers with pyramidal cupolas topped by Swiss flags and cross finials.; (exterior) Twin stone towers with ornamental cupolas and Swiss flags, viewed across waterfront from lower…; (exterior) Pair of stone church towers with distinctive architectural details, contemporary structures…; (interior) Interior nave with stone columns supporting ornate gilded ceiling; stone statue of Charlemagne…\n- Rathaus (Zürich) [Building]\n  PHOTOS: (exterior) Cream-colored Renaissance building with mansard roof and multiple chimneys; stone facade with…; (exterior) Same building viewed from slightly further angle showing riverside setting; cream stone facade…; (exterior) Aerial cityscape showing Rathaus among surrounding buildings with Grossmünster's twin towers…; (exterior) Cream stone facade with distinctive orderly fenestration and decorative window surrounds;…; (exterior) Building on waterfront quay showing cream-colored stone facade, mansard roof with multiple…; (interior) Ornate interior hall with elaborately decorated ceiling featuring elaborate plasterwork and…\n- Rathausbrücke (Zürich) [Bridge]\n  PHOTOS: (exterior) Stone bridge with yellow construction/loading equipment, spanning green river. City buildings…; (exterior) River landscape showing stone bridge structure and densely-built waterfront architecture. Pale…; (exterior) Stone bridge viewed from plaza level with modern balusters and speed-limit signs. City…\n- Wasserkirche [Church]\n  PHOTOS: (exterior) Wasserkirche church with pointed limestone spire and Helmhaus Renaissance building adjacent,…; (exterior) Wasserkirche church exterior from Limmat waterfront with tall spire, stone masonry walls,…; (exterior) Riverside view of Wasserkirche church and Helmhaus from Limmat river, showing cream facades,…; (interior) Wasserkirche interior sanctuary showing ribbed Gothic vault ceiling, tall stained glass windows…\n\n- A landmark is drawn from one of its PHOTOS. Name a location or a vantage of it only from a viewpoint one of its photos shows — an exterior is seen from the street or the square, an interior from inside, a distant or view-from photo from afar. If no photo shows the view a page needs (a skyline from a hilltop, a bird's-eye, the far side), that landmark is not available for that page: use one whose photos fit, or none. A view the commission's own words describe is the exception: it stands, and the landmark in it is drawn from what its photos show\n\n# MINI HERO'S JOURNEY (age 5)\n\nThe child this book is for is five. Write for that child.\n\n**The full shape, in small.** Ordinary world, then a call that pulls the main character out of it,\nthen challenges that get harder, then a moment where all seems lost, then the turn, then home —\nchanged. Every one of those beats is in the story, in that order.\n\n**A real low point is required.** Before the end there is a page where the plan has failed, the thing\nis lost, or the friend is gone, and it looks like it will stay that way. Do not soften it into a\nsmall setback and do not skip past it in a line.\n\n**The hero's own idea turns it.** What saves the day comes out of the main character — something they\nnoticed earlier, a strength of theirs, a thing they were told and remembered. Never luck, never a\ngrown-up arriving to fix it, never a power handed over at the last moment.\n\n**It resolves.** The turn comes before the last page and they come home changed. Never a story that\nstops on the problem.\n\n**A real antagonist is allowed.** Someone who wants something opposed to what the main character\nwants, with a reason of their own. A twist, a sidekick who earns their place, and a setup on an early\npage that pays off at the end all belong here.\n\n**Competence.** The main character does things: decides, tries, fails, adapts. They are never carried\nthrough their own story.\n\n**The stake is the main character's own.** What is wanted and what is at risk belong to their own\nlife — never a piece of work set for them, an assignment, a submission, a competition entry, or a\nplace to be won in a selection. What stands in the way is something they can reach out and touch, or\nsomeone who wants the opposite, never a procedure, a schedule or a system to be satisfied.\n\n**Humour and mild peril.** A chase, a close call, a night out in the cold are fine. Nothing gory,\nnothing cruel, nobody the reader likes is really harmed.\n\n**Ending.** They come back to where they started and it reads differently, because they are different.\n\n**The age owns the props and the subject.** What the main character wants, what stands in the way, and the objects the story turns on belong to the world of someone that age — what they handle themselves, where they go on their own, what counts as a loss to them. Never a want, a comfort or a plaything the reader has outgrown, and never stakes beyond what someone that age would be given.\n\n# PAGE PLAN\n\nTHE BOOK'S TARGETS — every one is counted in code on the finished plan. A figure the STORY LOGIC names (new) is not commissioned and may share a page with commissioned characters or carry a page alone.\n- Levin is in frame on at least 9 pages of 18, each time taking part in that page's one action; count them as you plan.\n- At least 1 page of type face, and a face page shows a commissioned character.\n- At least 1 page of type landscape or object; two are fine, ideally one of each.\n- At most 3 pages of type group.\n- The who column names commissioned characters and the figures of the STORY LOGIC, nobody else: a figure you invent is a fault.\n\nEach page has a type, and the type fixes who is in frame:\n- landscape: nobody. A place, the weather, a vessel or a distant sight.\n- object: nobody, or one character's hand. One object.\n- face: exactly one character, a close-up of their face.\n- medium: one to three characters.\n- group: four or more characters, all sharing one simple action.\nThe who column holds names only, or the word nobody: never a count, a group word or a description.\n\nBefore dividing, plan the pictures — simple pages first:\n1. The story's emotional highlights: which moments earn a page of one character showing a strong feeling, close up?\n2. Which moments earn a page with no people in frame? A page with nobody in it has story weight when its subject is something the story has been driving toward — a discovery, an arrival, a payoff — or the danger or obstacle the characters face at that point: a thing rolling toward a drop, a goal out of reach. A place with no story weight never gets its own page. At least one page in the book earns this. Choose one whose drama is a place, the weather, a vessel or an object seen from afar; never a page whose drama is between people — a parting, a confrontation, tears, a promise, a handover. Those pages get faces, and so does every picture question 5 names as most wanted.\n3. Which pages gather the whole cast, and what one simple action do they all share there? \n4. Where are three or more characters truly unavoidable? Bypass it where the story allows; keep it only where the story demands it. Where one is kept, the third character shares the page's one action — takes part in it, never does a second action and never only stands by.\n5. For each act — setup, middle, ending — which picture does a child most want to see there, and which page stages it as its instant? The acts are the story's sentences in thirds: setup 1–6, middle 7–12, ending 13–18. The ending's own event — the reunion, the goodbye, the parting — is always one of them. A picture that falls between two pages, or that only a page's change reports as already done, is not staged.\n6. Write the CAST block before the plan lines. One line per commissioned character: the page whose instant is their own action from the story, alone or with one companion, and 2 more pages they are in frame on. Then page 18, the last: the names of everyone the story keeps together at the end. Every plan line keeps what the block promises.\nThen one line per page: type — who is in frame — the instant the picture shows — what is true after this page that was not before. The first field is the page's type: landscape, object, face, medium, group. Camera shots are chosen after the plan is final, never here.\nA complicated page — much action, many characters at once — is a fault: simplify the picture, never the story. A page after which nothing is true that was not before is filler: give it a change or give its material to a neighbouring page. What is true after is a change in the story’s state, not the instant in other words: something now held, moved, opened, broken, learned, decided or agreed that was not true before this page. A fourth field that only redescribes the picture states no change.\n\nThe plan line's instant is a single drawable moment:\n- One instant, one action: no montage, no before-and-after, no \"then\", no passage of time inside one picture; when a beat contains a change, pick the single moment that shows it. Never two actions by one character: plan the dominant one and leave the other out, never joined by \"and then\", \"before turning to\" or a trailing clause. One thing is being done, and everyone else watches it or does that same thing in the same place; two characters given different actions at one instant lose one of them, and so do two vehicles, vessels or creatures each with its own state or its own crew. The action at the moment it happens, never the state that follows it. A deed, its effect, and where the effect goes are three actions. Watching, standing and being present are not actions, and an effect that is the deed itself made visible at the same instant is part of the deed. When a plan line holds more than one action, split them across pages; a beat whose actions cannot share a picture gives one page the contact and the next page the second action, or the picture drops the secondary action and keeps the main event. The instant is at most 20 words.\n- A page holds at most 6 named characters, a named animal that acts in the story counting as one; two or three carry it best. A page that gathers the whole cast is wide or distant, all of them sharing one simple action — boarding, hauling one line together — or seen from behind moving off. All of them watching one thing is a shared action only when they are seen from behind or over the shoulder, toward what they watch; facing the viewer it never is. Standing or gathering together while a feeling shows, or while the event happens behind them, is everyone present doing nothing — never a row of figures facing the viewer. One of them acting while the rest look on — a hand-over between two, one speaking, one laughing — is not a shared action: every one of them does the same thing. Add no unnamed figures — no crew, crowd, onlookers or extra animals.\n- The second field is the complete cast of that picture. Every figure the instant stages — a person, or a creature the story tracks — including one watching from the background — belongs in that field, or is not written into the instant at all. A figure the picture shows only in part — a wing, a tail, a head or a hand reaching into the frame, a flank or a chest filling it — is in that picture exactly as if it were shown whole. Only a name without a body is context: the owner of a prop or a place, someone behind, beyond or outside what the picture shows. A figure named only in what is true after this page is not in the picture either: put them in that field or leave them off the page. A figure the previous page staged does not carry into the next one as background.\n- One camera position: an instant is seen from one spot — never inside a vehicle or structure and its exterior at once.\n- At most two height levels per picture: people, animals or objects at three or more different heights in one frame — one on the ground, one climbing the tree, one up in the tree; someone in the foreground and someone in the tree is fine. A whole cast carried together on one back or one boat is one level. Where a third level appears, stage the page on the two levels its event happens on and give the third level its own page.\n- Several characters holding or moving one thing together is fine when that is the page's one action. A hand-over or an object in flight is never the instant: pick the instant before or after it. Never a thought or realization as the instant, or a climbing or stretching pose with hidden limbs; when the event is internal or mechanical, name its visible result instead (the box open, the found object held up).\n- A figure trapped, cut off or unable to reach is given no means to end it: the obstacle's distance is named against the body (\"the rim of the shaft three times their height above them\", \"the ledge a full arm's length beyond the fingertips\"), never a grip, hold or footing that would let them out.\n- Never a pointing gesture as the instant: a look toward the thing, a turned head, a step toward it, or the thing held up instead.\n- Never an exact count of like things in the instant: one, two, or several — a number above two belongs to the text.\n- Name what is in the picture, never what is absent, empty or missing from it. When the absence is the story point, name its visible consequence, or make the empty place the page's subject.\n- Beyond the page's type, never compose the frame — what fills it, how large something looks, where it sits, or where the camera stands.\n- A size or a look is stated only where the plot turns on it: a thing too heavy for one child to lift, too big to hide, small enough to pocket. It is stated as that plot fact, never as a comparison with another thing (\"as big as a …\", \"the size of a …\"). Every other size and look is left to the pictures, which size everything themselves; leaving it out drops no fact. A plan line names each thing plainly; the Art Director sizes it.\n- The beat's main event wins the picture. A secondary figure or action is dropped before the main one is reduced to a shadow, a silhouette or a sound: the arriving creature is in frame as itself, and the reunion outranks the bystander.\n\nRequirements:\n- Each page follows causally from the one before it: no page stages a moment the story reaches only in a later sentence.\n- What a page establishes about a thing — stuck, heavy, hidden, out of reach — stays true until a later page changes it.\n- Consecutive pages do not stage the same place with the same grouping, and one gathering is not split across two pages. A page keeps its characters at one depth together; separate a figure into the background only when the page's own instant requires the separation, and keep such pages few.\n- Every page is visible: something happens that a picture can show. A character whose action is what a page's instant works against — a way blocked, a place kept, a thing taken or withheld, a refusal — is named in that page's plan line.\n- Levin's floor stands in THE BOOK'S TARGETS above; the others come and go in different combinations, not the whole group on every page. Every commissioned character gets a focal page of their own whose instant is the action the story gives them. The story's central figure, Sura, acts in each third of the book — it chooses, moves, speaks or changes something in a page's instant, never only carried.\n- A character's focal page stages them alone or with one companion — two people sharing one action carry it — and stages them doing something visible. An internal decision gets a physical correlative — a held object, a step taken, a grip tightened; never a lone motionless figure.\n- When an AVAILABLE LANDMARKS list is present, an arc that names landmarks has chosen them — keep those, not others; an arc that names none has chosen none. A landmark may be scenery — a tower on the horizon, a bridge behind the action — and never relocates the story. No page names more than one place.\n- A page shows a character about to act, decide or know what to do only when the next page shows that same character doing it.\n- A physical challenge spends one page on the attempt itself — a character mid-effort against the obstacle. The decision before and the relief after never replace it.\n- The emotional low point — a loss, a setback, the goal looking lost — gets a page of its own; the loss and its recovery never share a page.\n- A race or deadline the story runs on is scored mid-book at least twice — a page shows who is ahead or how much remains.\n- The stake the arc has a character say aloud lands on an early page, shown as a visible act, never as the words said.\n- A character's first page stages their arrival or a naming by someone present, shown as a visible act and never as the words said; a badge, a garment, a title or an epithet is not a naming. A character in frame before anyone says who they are is unplaced.\n- A prop, pet or skill that solves a problem appears on an earlier page with its owner before it does the work, and nothing a page plants is left without a later page that pays it off.\n- At most 1 page with figures in frame holds none of the commissioned characters; every other page with figures holds at least one.\n- Page 1 opens on an action already under way, and each character's first page shows them doing something.\n- When the story's ending has an event of its own, the last page stages that event as its instant.\n- The last page shows the commissioned characters safe and together, unless the story itself separates them.\n- No plan line states what anyone learned, realised or now understands.\n\n# OUTPUT FORMAT\n\nOnly what the format below shows. No preamble, no commentary. The CAST block, then one line per page, through page 18.\n\n---CAST---\n<name> — deed page <N>: <their own action from the story>, <alone, or with whom> — also on pages <N>, <N>\nEnding page 18: <names, comma separated>\n---PAGE PLAN---\nPage <N>: <type> — <names, or the word nobody> — <the instant the picture shows> — <what is true after this page that was not before>\n\n"
+    },
+    "pagesReturned": 1,
+    "pagesReplanned": 1
+   },
+   "usage": {
+    "input_tokens": 22329,
+    "output_tokens": 1410
+   },
+   "events": [],
+   "models": {
+    "planModel": "claude-sonnet-5-5",
+    "checkModel": "gpt-5.6-luna-pro",
+    "planModelId": "claude-sonnet-5-5"
+   },
+   "storyId": "job_1790508305061_dka3jpog9",
+   "advisory": null,
+   "logLines": [
+    "[TESTLAB] Experiment 1678 started: stage=beats_replan, targets=1, override=no",
+    "[TESTLAB] Experiment 1679 started: stage=beats_replan, targets=1, override=no",
+    "📝 Prompt templates loaded: 97/97 ok",
+    "📝 Prompt templates loaded: 97/97 ok",
+    "📝 Prompt templates loaded: 97/97 ok",
+    "👪 [BEATS] Figures the arc tagged (commissioned), counted as commissioned: Levin, Julian, Max, Kiaan",
+    "👪 [BEATS] Figures the arc tagged (commissioned), counted as commissioned: Emma, Noah, Daniel, Sarah, Hans",
+    "[LOCATIONS] Getting locations for event: wilhelm-tell (aspect: default, variant: A4)",
+    "[LOCATIONS] Found 7 locations for wilhelm-tell",
+    "👪 [BEATS] Figures the arc tagged (commissioned), counted as commissioned: Emma, Noah, Daniel, Sarah, Hans",
+    "[LOCATIONS] Getting locations for event: wilhelm-tell (aspect: default, variant: A4)",
+    "[LOCATIONS] Found 7 locations for wilhelm-tell",
+    "👪 [BEATS] Figures the arc tagged (commissioned), counted as commissioned: Levin, Julian, Max, Kiaan, Sura",
+    "👪 [BEATS] Figures the arc tagged (commissioned), counted as commissioned: Levin, Julian, Max, Kiaan",
+    "[TESTLAB] Experiment 1678 completed (1 targets)",
+    "[TESTLAB] Experiment 1679 completed (1 targets)"
+   ],
+   "textCost": 0.058758,
+   "elapsedMs": 21090,
+   "startedAt": "2026-10-06T17:40:07.370Z",
+   "planEffort": "low",
+   "sentPrompts": [
+    {
+     "kind": "text",
+     "text": "# YOUR TASK\n\nThe story below is finished. Divide it into 18 pages: plan the pictures, simple pages first, then one PLAN line per page. Plan in ENGLISH; the book will be written in Swiss Standard German (ss, never ß — never dialect) — names, places and cultural details as they will appear there. Reader: kindergarten age (about five).\n\nCommissioned characters: Levin, Julian, Max, Kiaan\n\n# THE STORY (final — it was told, challenged and re-told; divide it, never retell or repair it)\n\n1. On a foggy autumn afternoon, Levin, his little brother Julian and their friends Max and Kiaan play ball between the Wasserkirche and the Grossmünster.\n2. The ball rolls to the old stone wall of the Grossmünster, and when Julian fetches it, he finds a scale as big as Levin's hand hanging on the stone, still warm, as if it had come loose only a moment ago.\n3. Kiaan lifts the scale off, and behind it a path opens in the wall, leading into a world of mist and rocky peaks.\n4. Levin wants to call \"Hello?\" into the mist, but he is shy and his voice is only a whisper, so Max calls loudly into the silence instead.\n5. A deep, tired voice answers: \"I am Sura, and I am old. Go home, children. When the big evening wind comes, I will rise into the clouds, alone and forever.\"\n6. Levin loves dragons and does not want Sura to vanish alone, so the four step onto the misty path.\n7. But the fog is so thick that Julian stumbles over stones behind Levin, and nobody can see where Sura is.\n8. Kiaan notices that the scale grows warmer when he points it toward the peaks. So he holds it in both hands, so as not to lose the way, and leads them where it is warmest.\n9. But Sura sees the children coming, beats her great grey wings and flies away to the highest peak, and the wind blows harder.\n10. The way up that peak is loose stones that slide back with every step. Kiaan slips and nearly lets go of the scale, but he holds it tight in both hands while Max grabs his jacket and Levin pulls them all up.\n11. At the top Sura turns her big head away when she sees the four children, and she lays one wing across the path like a wall, so the little ones cannot come to her.\n12. Max calls \"Sura, wait!\", but she does not turn, and the wind is almost strong enough to lift her.\n13. The only way past her wing is the last rock, too high for the three little ones. Kiaan presses the warm scale into Levin's hands. Levin is scared of the wind, but he climbs up, holds on tight and calls Sura's name into the autumn wind, louder than ever before.\n14. Sura is afraid for the small boy alone on the high rock, and that fear is bigger than her shame, so she turns her head to him, and her chest turns toward the children too.\n15. Julian sees a dark gap there where a scale is missing, with a tiny fire flickering behind it like a candle in the wind, and he shouts: \"A scale is missing!\"\n16. Levin is now right beside her chest, and he presses the scale into the gap. Now the wind cannot get in, and the fire behind the scale grows big and warm.\n17. With her fire warm again Sura is strong enough to hold herself on the rock, so she lifts Levin gently down with her nose and folds her wings to stay. Then she breathes a warm flame that lights the children's way back through the fog to the door in the old wall.\n18. The four step out at the Grossmünster, the mist thins and the door in the old stone closes behind them, and they run home together across the Rathausbrücke in the evening, and Levin feels proud, because this time he called out loud all by himself.\n\nChallenges taken:\n1. The rising evening wind is the visible clock.\n2. Levin's voice fails him; a loud call is needed.\n3. Loose stones slide them back down the peak.\n4. Sura must be persuaded to stay, not asked away.\n5. A missing scale pressed back to block the wind.\n\n# FIX WHILE DIVIDING — apply these where the division can carry them\n\nEach is a change to the STORY. Apply it in the pages where a picture can hold it. Where it cannot — a figure kept in frame past the cast limit, two actions at one instant — leave it to the text, which is told to apply what the division has not. Never break a rule below to honour a hint.\nA hint never changes the situation the story settled: where one asks for what the story above rules out — a saved profile's friendship where the story stages a first meeting — the story stands and the hint is dropped.\nA hint opens with the story sentence it changes, as (s7) or (s14-15): it applies where that sentence is told, never earlier, and what it changes there replaces what the sentence says.\n\nISSUE (s7-9): Thick fog that stops the children seeing the way yet lets Sura see them coming is inconsistent. → CHANGE: The mist hangs low so the children lose the path while Sura on a peak still sees them and flies higher.\nISSUE (s13): Levin climbs the last rock without a hint of clumsiness, which contradicts his Tollpatschig flaw and weakens relatability. → CHANGE: His foot slips once but he holds on tight and still calls her name in time.\nISSUE (s15): Shy, fearful three-year-old Julian shouting about the gap does not match his character. → CHANGE: He points at the flickering gap so Levin, already beside the chest, still presses the scale in.\n\n# THE STORY LOGIC — the facts the story above was told from\n\nEvery page keeps to these facts. A page breaks a fact when its who, its instant or its change uses a thing, a material, an ability or a limit against what the story logic states of it. A hint that names a fact it changes replaces that fact; every other fact holds on every page.\n\nWant and stakes: Levin wants to reach Sura, the old dragon lady, on her rock peak before the big evening wind carries her up into the clouds, alone and forever; if he fails she is gone for good, and the deadline is that rising autumn wind.\nOpposition: Sura herself. She is ashamed that her fire is going out and wants nobody to see it. So she sends the children home, flies away from them, turns her head away and blocks the path with her wing.\nFacts:\n- Levin (commissioned) — ability: strong and quick, he can climb a rock too high for the three-year-olds; limit: shy, so when he wants to call into the mist his voice stays a whisper.\n- Julian (commissioned) — ability: notices small things; limit: small and scared, he stumbles in the fog.\n- Max (commissioned) — ability: calls loudly into the silence and grabs hold fast.\n- Kiaan (commissioned) — ability: holds the scale tight in both hands and follows its warmth.\n- Sura (commissioned) — ability: flies and makes wind with her great grey wings; limit: with her weak fire she manages only short flights, and to rise into the clouds she must wait for the big evening wind.\n- A dragon's fire burns in her chest behind her scales. Where one scale is missing, the wind blows in and the fire flickers small, like a candle in the wind; with the gap closed the fire grows big and warm, and a dragon with warm fire is strong enough to hold herself on a rock in any wind.\n- Sura lost one scale this same afternoon at the door in the old wall of the Grossmünster; it hangs there warm on the stone and grows warmer the nearer it comes to her, and only since then does the wind weaken her fire.\nMotives:\n- Levin: loves dragons and does not want Sura to vanish alone → steps into the mist, pulls the others up, climbs the last rock, calls her name, presses the scale on.\n- Julian: wants to stay with his big brother and sees small things → fetches the ball, stumbles along behind Levin, spots the gap.\n- Max: wants to know who is there, and holds on to his friends → calls into the mist, grabs Kiaan's jacket.\n- Kiaan: does not want to lose the way → lifts the scale, holds it in both hands, follows its warmth, gives it to Levin.\n- Sura: ashamed of her weak fire and sure she is simply old → warns them away, flies to the highest peak, turns her head away, blocks the path with her wing. Afraid for a small child alone in the wind, and that fear is bigger than her shame → turns her head to Levin, so that her chest turns too. Once her fire is warm again she is strong enough to hold herself against the wind and no longer needs it → stays and lights their way home.\nCentral figure: Sura\nEvents: 5\nChain:\n- Because Julian fetches the ball from the old Grossmünster wall, Kiaan lifts off the warm scale hanging there and a misty path opens. Levin's call stays a whisper, so Max calls, and Sura answers that she will rise into the clouds forever with the big evening wind. Now she also knows children are coming.\n- But the fog is so thick that Julian stumbles and nobody sees the way, so Kiaan follows the scale's warmth, holding it in both hands. This is slow, and the wind keeps rising.\n- But Sura sees them coming and flies to the highest peak, where the way up is loose stones that slide back. Kiaan nearly loses the scale, Max grabs his jacket and Levin pulls them all up, which costs strength and time while the wind grows.\n- But on top Sura turns her head away and lays one wing across the path like a wall, so the little ones cannot reach her. Max's call does not turn her, and the wind is almost strong enough, so all looks lost.\n- Because Kiaan gives Levin the scale and Levin climbs the last rock and calls her name loudly into the wind, Sura's fear for the small boy alone up there beats her shame and she turns her head to him, so her chest turns toward the children too. Julian sees the gap where a scale is missing and the fire flickering like a candle in the wind, and Levin, now level with her chest and holding the scale, presses it in. This works now because only now is her hidden chest turned to them and the scale in the hands of the one child high enough to reach it. The wind is blocked, her fire grows warm and strong, so she can hold herself on the rock, stays, and lights their way back through the door.\n\n# THE IDEA THE STORY WAS COMMISSIONED FROM (names and world reference only)\n\nThe arc above delivers the commission; keep its names and world as written.\n\nTitle: Die Schuppe im Nebel\nCategory: adventure\nType: Drachen-Abenteuer\nTheme: dragon\nSeason: Autumn\nSetting/location: Zurich, Zurich, Switzerland\nRelationships:\n  - Levin is Älteres Geschwister von Julian\n  - Julian is Jüngeres Geschwister von Levin\n\n# CHARACTER DETAILS\n\nThese details decide who each figure IS: age, gender, what they are good at, what they find hard, what they like. Never contradict one, never invent one.\nThe arc above is settled and decides the SITUATION: who knows whom here, where they are, what is happening to them. Where a saved detail contradicts the arc — a friendship where the arc stages a first meeting — the arc stands, and the detail is simply not true in this book.\n\n**Levin** (main character):\n- Age: 5\n- Gender: male\n- Strengths: Fröhlich, Freundlich, Hilfsbereit, Beschützend, Nachsichtig, Treu, Gerecht, Ehrlich, Vertrauenswürdig, Geduldig, Neugierig, Fantasievoll, Klug, Kreativ, Aufmerksam, Einfallsreich, Abenteuerlustig, Schnell, Stark, Fleissig, Leader, Mutig, Grosszügig, Selbstbewusst, Lustig\n- Flaws: Schüchtern, Unentschlossen, Leichtgläubig, Petze, Gesprächig, Vergesslich, Tollpatschig\n- Special details: Lieb Dinosaurier und Drachen. Sein Bruder ist Julian und Max und Kiaan sind seine guten Freunde. Er kann gut Velofahren und Unihockey spielen\n\n**Julian** (main character):\n- Age: 3\n- Gender: male\n- Strengths: Fröhlich, Freundlich, Hilfsbereit, Lustig, Nachsichtig, Beschützend, Treu, Grosszügig, Gerecht, Ehrlich, Vertrauenswürdig, Abenteuerlustig, Aufmerksam, Kreativ, Klug\n- Flaws: Schüchtern, Leichtgläubig, Unentschlossen, Tollpatschig, Ängstlich, Stur\n- Special details: Seine freunde: levin, julian, max. Er isst sehr gerne, liebt es mit seinem Bruder und seinen Freunden zu spielen, hat gerne Ballspiele\n\n**Max** (main character):\n- Age: 3\n- Gender: male\n- Strengths: Fröhlich, Freundlich, Lustig, Ehrlich, Selbstbewusst, Mutig, Vertrauenswürdig, Entschlossen, Fleissig, Fantasievoll, Neugierig, Kreativ, Aufmerksam, Abenteuerlustig, Stark, Schnell\n- Flaws: Gesprächig, Leichtgläubig\n- Special details: Spielt gerne mit seinen Freunden Kiaan, Levin, Max. Seine Hündin heisst Nia. Er spielt gerne Fussball und fährt gerne Velo\n\n**Kiaan** (main character):\n- Age: 3\n- Gender: male\n- Strengths: Fröhlich, Freundlich, Hilfsbereit, Lustig, Nachsichtig, Beschützend, Treu, Grosszügig, Gerecht, Ehrlich, Selbstbewusst, Vertrauenswürdig, Mutig, Geduldig, Fantasievoll, Neugierig, Klug, Kreativ, Aufmerksam, Abenteuerlustig\n- Flaws: Vergesslich, Petze, Unentschlossen, Schüchtern\n- Special details: Spielt gerne mit Levin, Julian, Max. Liesst gerne oder spielt gerne Ball oder auf dem Spielplatz\n\n**REAL LANDMARKS the story above uses:**\n- Grossmünster [Church]\n  PHOTOS: (exterior) Twin cream-colored church towers with pyramidal cupolas topped by Swiss flags and cross finials.; (exterior) Twin stone towers with ornamental cupolas and Swiss flags, viewed across waterfront from lower…; (exterior) Pair of stone church towers with distinctive architectural details, contemporary structures…; (interior) Interior nave with stone columns supporting ornate gilded ceiling; stone statue of Charlemagne…\n- Rathaus (Zürich) [Building]\n  PHOTOS: (exterior) Cream-colored Renaissance building with mansard roof and multiple chimneys; stone facade with…; (exterior) Same building viewed from slightly further angle showing riverside setting; cream stone facade…; (exterior) Aerial cityscape showing Rathaus among surrounding buildings with Grossmünster's twin towers…; (exterior) Cream stone facade with distinctive orderly fenestration and decorative window surrounds;…; (exterior) Building on waterfront quay showing cream-colored stone facade, mansard roof with multiple…; (interior) Ornate interior hall with elaborately decorated ceiling featuring elaborate plasterwork and…\n- Rathausbrücke (Zürich) [Bridge]\n  PHOTOS: (exterior) Stone bridge with yellow construction/loading equipment, spanning green river. City buildings…; (exterior) River landscape showing stone bridge structure and densely-built waterfront architecture. Pale…; (exterior) Stone bridge viewed from plaza level with modern balusters and speed-limit signs. City…\n- Wasserkirche [Church]\n  PHOTOS: (exterior) Wasserkirche church with pointed limestone spire and Helmhaus Renaissance building adjacent,…; (exterior) Wasserkirche church exterior from Limmat waterfront with tall spire, stone masonry walls,…; (exterior) Riverside view of Wasserkirche church and Helmhaus from Limmat river, showing cream facades,…; (interior) Wasserkirche interior sanctuary showing ribbed Gothic vault ceiling, tall stained glass windows…\n\n- A landmark is drawn from one of its PHOTOS. Name a location or a vantage of it only from a viewpoint one of its photos shows — an exterior is seen from the street or the square, an interior from inside, a distant or view-from photo from afar. If no photo shows the view a page needs (a skyline from a hilltop, a bird's-eye, the far side), that landmark is not available for that page: use one whose photos fit, or none. A view the commission's own words describe is the exception: it stands, and the landmark in it is drawn from what its photos show\n\n# MINI HERO'S JOURNEY (age 5)\n\nThe child this book is for is five. Write for that child.\n\n**The full shape, in small.** Ordinary world, then a call that pulls the main character out of it,\nthen challenges that get harder, then a moment where all seems lost, then the turn, then home —\nchanged. Every one of those beats is in the story, in that order.\n\n**A real low point is required.** Before the end there is a page where the plan has failed, the thing\nis lost, or the friend is gone, and it looks like it will stay that way. Do not soften it into a\nsmall setback and do not skip past it in a line.\n\n**The hero's own idea turns it.** What saves the day comes out of the main character — something they\nnoticed earlier, a strength of theirs, a thing they were told and remembered. Never luck, never a\ngrown-up arriving to fix it, never a power handed over at the last moment.\n\n**It resolves.** The turn comes before the last page and they come home changed. Never a story that\nstops on the problem.\n\n**A real antagonist is allowed.** Someone who wants something opposed to what the main character\nwants, with a reason of their own. A twist, a sidekick who earns their place, and a setup on an early\npage that pays off at the end all belong here.\n\n**Competence.** The main character does things: decides, tries, fails, adapts. They are never carried\nthrough their own story.\n\n**The stake is the main character's own.** What is wanted and what is at risk belong to their own\nlife — never a piece of work set for them, an assignment, a submission, a competition entry, or a\nplace to be won in a selection. What stands in the way is something they can reach out and touch, or\nsomeone who wants the opposite, never a procedure, a schedule or a system to be satisfied.\n\n**Humour and mild peril.** A chase, a close call, a night out in the cold are fine. Nothing gory,\nnothing cruel, nobody the reader likes is really harmed.\n\n**Ending.** They come back to where they started and it reads differently, because they are different.\n\n**The age owns the props and the subject.** What the main character wants, what stands in the way, and the objects the story turns on belong to the world of someone that age — what they handle themselves, where they go on their own, what counts as a loss to them. Never a want, a comfort or a plaything the reader has outgrown, and never stakes beyond what someone that age would be given.\n\n# PAGE PLAN\n\nTHE BOOK'S TARGETS — every one is counted in code on the finished plan. A figure the STORY LOGIC names (new) is not commissioned and may share a page with commissioned characters or carry a page alone.\n- Levin is in frame on at least 9 pages of 18, each time taking part in that page's one action; count them as you plan.\n- At least 1 page of type face, and a face page shows a commissioned character.\n- At least 1 page of type landscape or object; two are fine, ideally one of each.\n- At most 3 pages of type group.\n- The who column names commissioned characters and the figures of the STORY LOGIC, nobody else: a figure you invent is a fault.\n\nEach page has a type, and the type fixes who is in frame:\n- landscape: nobody. A place, the weather, a vessel or a distant sight.\n- object: nobody, or one character's hand. One object.\n- face: exactly one character, a close-up of their face.\n- medium: one to three characters.\n- group: four or more characters, all sharing one simple action.\nThe who column holds names only, or the word nobody: never a count, a group word or a description.\n\nBefore dividing, plan the pictures — simple pages first:\n1. The story's emotional highlights: which moments earn a page of one character showing a strong feeling, close up?\n2. Which moments earn a page with no people in frame? A page with nobody in it has story weight when its subject is something the story has been driving toward — a discovery, an arrival, a payoff — or the danger or obstacle the characters face at that point: a thing rolling toward a drop, a goal out of reach. A place with no story weight never gets its own page. At least one page in the book earns this. Choose one whose drama is a place, the weather, a vessel or an object seen from afar; never a page whose drama is between people — a parting, a confrontation, tears, a promise, a handover. Those pages get faces, and so does every picture question 5 names as most wanted.\n3. Which pages gather the whole cast, and what one simple action do they all share there? \n4. Where are three or more characters truly unavoidable? Bypass it where the story allows; keep it only where the story demands it. Where one is kept, the third character shares the page's one action — takes part in it, never does a second action and never only stands by.\n5. For each act — setup, middle, ending — which picture does a child most want to see there, and which page stages it as its instant? The acts are the story's sentences in thirds: setup 1–6, middle 7–12, ending 13–18. The ending's own event — the reunion, the goodbye, the parting — is always one of them. A picture that falls between two pages, or that only a page's change reports as already done, is not staged.\n6. Write the CAST block before the plan lines. One line per commissioned character: the page whose instant is their own action from the story, alone or with one companion, and 2 more pages they are in frame on. Then page 18, the last: the names of everyone the story keeps together at the end. Every plan line keeps what the block promises.\nThen one line per page: type — who is in frame — the instant the picture shows — what is true after this page that was not before. The first field is the page's type: landscape, object, face, medium, group. Camera shots are chosen after the plan is final, never here.\nA complicated page — much action, many characters at once — is a fault: simplify the picture, never the story. A page after which nothing is true that was not before is filler: give it a change or give its material to a neighbouring page. What is true after is a change in the story’s state, not the instant in other words: something now held, moved, opened, broken, learned, decided or agreed that was not true before this page. A fourth field that only redescribes the picture states no change.\n\nThe plan line's instant is a single drawable moment:\n- One instant, one action: no montage, no before-and-after, no \"then\", no passage of time inside one picture; when a beat contains a change, pick the single moment that shows it. Never two actions by one character: plan the dominant one and leave the other out, never joined by \"and then\", \"before turning to\" or a trailing clause. One thing is being done, and everyone else watches it or does that same thing in the same place; two characters given different actions at one instant lose one of them, and so do two vehicles, vessels or creatures each with its own state or its own crew. The action at the moment it happens, never the state that follows it. A deed, its effect, and where the effect goes are three actions. Watching, standing and being present are not actions, and an effect that is the deed itself made visible at the same instant is part of the deed. When a plan line holds more than one action, split them across pages; a beat whose actions cannot share a picture gives one page the contact and the next page the second action, or the picture drops the secondary action and keeps the main event. The instant is at most 20 words.\n- A page holds at most 6 named characters, a named animal that acts in the story counting as one; two or three carry it best. A page that gathers the whole cast is wide or distant, all of them sharing one simple action — boarding, hauling one line together — or seen from behind moving off. All of them watching one thing is a shared action only when they are seen from behind or over the shoulder, toward what they watch; facing the viewer it never is. Standing or gathering together while a feeling shows, or while the event happens behind them, is everyone present doing nothing — never a row of figures facing the viewer. One of them acting while the rest look on — a hand-over between two, one speaking, one laughing — is not a shared action: every one of them does the same thing. Add no unnamed figures — no crew, crowd, onlookers or extra animals.\n- The second field is the complete cast of that picture. Every figure the instant stages — a person, or a creature the story tracks — including one watching from the background — belongs in that field, or is not written into the instant at all. A figure the picture shows only in part — a wing, a tail, a head or a hand reaching into the frame, a flank or a chest filling it — is in that picture exactly as if it were shown whole. Only a name without a body is context: the owner of a prop or a place, someone behind, beyond or outside what the picture shows. A figure named only in what is true after this page is not in the picture either: put them in that field or leave them off the page. A figure the previous page staged does not carry into the next one as background.\n- One camera position: an instant is seen from one spot — never inside a vehicle or structure and its exterior at once.\n- At most two height levels per picture: people, animals or objects at three or more different heights in one frame — one on the ground, one climbing the tree, one up in the tree; someone in the foreground and someone in the tree is fine. A whole cast carried together on one back or one boat is one level. Where a third level appears, stage the page on the two levels its event happens on and give the third level its own page.\n- Several characters holding or moving one thing together is fine when that is the page's one action. A hand-over or an object in flight is never the instant: pick the instant before or after it. Never a thought or realization as the instant, or a climbing or stretching pose with hidden limbs; when the event is internal or mechanical, name its visible result instead (the box open, the found object held up).\n- A figure trapped, cut off or unable to reach is given no means to end it: the obstacle's distance is named against the body (\"the rim of the shaft three times their height above them\", \"the ledge a full arm's length beyond the fingertips\"), never a grip, hold or footing that would let them out.\n- Never a pointing gesture as the instant: a look toward the thing, a turned head, a step toward it, or the thing held up instead.\n- Never an exact count of like things in the instant: one, two, or several — a number above two belongs to the text.\n- Name what is in the picture, never what is absent, empty or missing from it. When the absence is the story point, name its visible consequence, or make the empty place the page's subject.\n- Beyond the page's type, never compose the frame — what fills it, how large something looks, where it sits, or where the camera stands.\n- A size or a look is stated only where the plot turns on it: a thing too heavy for one child to lift, too big to hide, small enough to pocket. It is stated as that plot fact, never as a comparison with another thing (\"as big as a …\", \"the size of a …\"). Every other size and look is left to the pictures, which size everything themselves; leaving it out drops no fact. A plan line names each thing plainly; the Art Director sizes it.\n- The beat's main event wins the picture. A secondary figure or action is dropped before the main one is reduced to a shadow, a silhouette or a sound: the arriving creature is in frame as itself, and the reunion outranks the bystander.\n\nRequirements:\n- Each page follows causally from the one before it: no page stages a moment the story reaches only in a later sentence.\n- What a page establishes about a thing — stuck, heavy, hidden, out of reach — stays true until a later page changes it.\n- Consecutive pages do not stage the same place with the same grouping, and one gathering is not split across two pages. A page keeps its characters at one depth together; separate a figure into the background only when the page's own instant requires the separation, and keep such pages few.\n- Every page is visible: something happens that a picture can show. A character whose action is what a page's instant works against — a way blocked, a place kept, a thing taken or withheld, a refusal — is named in that page's plan line.\n- Levin's floor stands in THE BOOK'S TARGETS above; the others come and go in different combinations, not the whole group on every page. Every commissioned character gets a focal page of their own whose instant is the action the story gives them. The story's central figure, Sura, acts in each third of the book — it chooses, moves, speaks or changes something in a page's instant, never only carried.\n- A character's focal page stages them alone or with one companion — two people sharing one action carry it — and stages them doing something visible. An internal decision gets a physical correlative — a held object, a step taken, a grip tightened; never a lone motionless figure.\n- When an AVAILABLE LANDMARKS list is present, an arc that names landmarks has chosen them — keep those, not others; an arc that names none has chosen none. A landmark may be scenery — a tower on the horizon, a bridge behind the action — and never relocates the story. No page names more than one place.\n- A page shows a character about to act, decide or know what to do only when the next page shows that same character doing it.\n- A physical challenge spends one page on the attempt itself — a character mid-effort against the obstacle. The decision before and the relief after never replace it.\n- The emotional low point — a loss, a setback, the goal looking lost — gets a page of its own; the loss and its recovery never share a page.\n- A race or deadline the story runs on is scored mid-book at least twice — a page shows who is ahead or how much remains.\n- The stake the arc has a character say aloud lands on an early page, shown as a visible act, never as the words said.\n- A character's first page stages their arrival or a naming by someone present, shown as a visible act and never as the words said; a badge, a garment, a title or an epithet is not a naming. A character in frame before anyone says who they are is unplaced.\n- A prop, pet or skill that solves a problem appears on an earlier page with its owner before it does the work, and nothing a page plants is left without a later page that pays it off.\n- At most 1 page with figures in frame holds none of the commissioned characters; every other page with figures holds at least one.\n- Page 1 opens on an action already under way, and each character's first page shows them doing something.\n- When the story's ending has an event of its own, the last page stages that event as its instant.\n- The last page shows the commissioned characters safe and together, unless the story itself separates them.\n- No plan line states what anyone learned, realised or now understands.\n\n# OUTPUT FORMAT\n\nOnly what the format below shows. No preamble, no commentary. The CAST block, then one line per page, through page 18.\n\n---CAST---\n<name> — deed page <N>: <their own action from the story>, <alone, or with whom> — also on pages <N>, <N>\nEnding page 18: <names, comma separated>\n---PAGE PLAN---\nPage <N>: <type> — <names, or the word nobody> — <the instant the picture shows> — <what is true after this page that was not before>\n\n",
+     "chars": 30623,
+     "label": "testlab_typed_plan",
+     "modelId": "claude-sonnet-5-5",
+     "truncated": false
+    },
+    {
+     "kind": "text",
+     "text": "# YOUR TASK\n\nThe story below is finished. Divide it into 18 pages: plan the pictures, simple pages first, then one PLAN line per page. Plan in ENGLISH; the book will be written in Swiss Standard German (ss, never ß — never dialect) — names, places and cultural details as they will appear there. Reader: kindergarten age (about five).\n\nCommissioned characters: Levin, Julian, Max, Kiaan\n\n# THE STORY (final — it was told, challenged and re-told; divide it, never retell or repair it)\n\n1. On a foggy autumn afternoon, Levin, his little brother Julian and their friends Max and Kiaan play ball between the Wasserkirche and the Grossmünster.\n2. The ball rolls to the old stone wall of the Grossmünster, and when Julian fetches it, he finds a scale as big as Levin's hand hanging on the stone, still warm, as if it had come loose only a moment ago.\n3. Kiaan lifts the scale off, and behind it a path opens in the wall, leading into a world of mist and rocky peaks.\n4. Levin wants to call \"Hello?\" into the mist, but he is shy and his voice is only a whisper, so Max calls loudly into the silence instead.\n5. A deep, tired voice answers: \"I am Sura, and I am old. Go home, children. When the big evening wind comes, I will rise into the clouds, alone and forever.\"\n6. Levin loves dragons and does not want Sura to vanish alone, so the four step onto the misty path.\n7. But the fog is so thick that Julian stumbles over stones behind Levin, and nobody can see where Sura is.\n8. Kiaan notices that the scale grows warmer when he points it toward the peaks. So he holds it in both hands, so as not to lose the way, and leads them where it is warmest.\n9. But Sura sees the children coming, beats her great grey wings and flies away to the highest peak, and the wind blows harder.\n10. The way up that peak is loose stones that slide back with every step. Kiaan slips and nearly lets go of the scale, but he holds it tight in both hands while Max grabs his jacket and Levin pulls them all up.\n11. At the top Sura turns her big head away when she sees the four children, and she lays one wing across the path like a wall, so the little ones cannot come to her.\n12. Max calls \"Sura, wait!\", but she does not turn, and the wind is almost strong enough to lift her.\n13. The only way past her wing is the last rock, too high for the three little ones. Kiaan presses the warm scale into Levin's hands. Levin is scared of the wind, but he climbs up, holds on tight and calls Sura's name into the autumn wind, louder than ever before.\n14. Sura is afraid for the small boy alone on the high rock, and that fear is bigger than her shame, so she turns her head to him, and her chest turns toward the children too.\n15. Julian sees a dark gap there where a scale is missing, with a tiny fire flickering behind it like a candle in the wind, and he shouts: \"A scale is missing!\"\n16. Levin is now right beside her chest, and he presses the scale into the gap. Now the wind cannot get in, and the fire behind the scale grows big and warm.\n17. With her fire warm again Sura is strong enough to hold herself on the rock, so she lifts Levin gently down with her nose and folds her wings to stay. Then she breathes a warm flame that lights the children's way back through the fog to the door in the old wall.\n18. The four step out at the Grossmünster, the mist thins and the door in the old stone closes behind them, and they run home together across the Rathausbrücke in the evening, and Levin feels proud, because this time he called out loud all by himself.\n\nChallenges taken:\n1. The rising evening wind is the visible clock.\n2. Levin's voice fails him; a loud call is needed.\n3. Loose stones slide them back down the peak.\n4. Sura must be persuaded to stay, not asked away.\n5. A missing scale pressed back to block the wind.\n\n# FIX WHILE DIVIDING — apply these where the division can carry them\n\nEach is a change to the STORY. Apply it in the pages where a picture can hold it. Where it cannot — a figure kept in frame past the cast limit, two actions at one instant — leave it to the text, which is told to apply what the division has not. Never break a rule below to honour a hint.\nA hint never changes the situation the story settled: where one asks for what the story above rules out — a saved profile's friendship where the story stages a first meeting — the story stands and the hint is dropped.\nA hint opens with the story sentence it changes, as (s7) or (s14-15): it applies where that sentence is told, never earlier, and what it changes there replaces what the sentence says.\n\nISSUE (s7-9): Thick fog that stops the children seeing the way yet lets Sura see them coming is inconsistent. → CHANGE: The mist hangs low so the children lose the path while Sura on a peak still sees them and flies higher.\nISSUE (s13): Levin climbs the last rock without a hint of clumsiness, which contradicts his Tollpatschig flaw and weakens relatability. → CHANGE: His foot slips once but he holds on tight and still calls her name in time.\nISSUE (s15): Shy, fearful three-year-old Julian shouting about the gap does not match his character. → CHANGE: He points at the flickering gap so Levin, already beside the chest, still presses the scale in.\n\n# THE STORY LOGIC — the facts the story above was told from\n\nEvery page keeps to these facts. A page breaks a fact when its who, its instant or its change uses a thing, a material, an ability or a limit against what the story logic states of it. A hint that names a fact it changes replaces that fact; every other fact holds on every page.\n\nWant and stakes: Levin wants to reach Sura, the old dragon lady, on her rock peak before the big evening wind carries her up into the clouds, alone and forever; if he fails she is gone for good, and the deadline is that rising autumn wind.\nOpposition: Sura herself. She is ashamed that her fire is going out and wants nobody to see it. So she sends the children home, flies away from them, turns her head away and blocks the path with her wing.\nFacts:\n- Levin (commissioned) — ability: strong and quick, he can climb a rock too high for the three-year-olds; limit: shy, so when he wants to call into the mist his voice stays a whisper.\n- Julian (commissioned) — ability: notices small things; limit: small and scared, he stumbles in the fog.\n- Max (commissioned) — ability: calls loudly into the silence and grabs hold fast.\n- Kiaan (commissioned) — ability: holds the scale tight in both hands and follows its warmth.\n- Sura (commissioned) — ability: flies and makes wind with her great grey wings; limit: with her weak fire she manages only short flights, and to rise into the clouds she must wait for the big evening wind.\n- A dragon's fire burns in her chest behind her scales. Where one scale is missing, the wind blows in and the fire flickers small, like a candle in the wind; with the gap closed the fire grows big and warm, and a dragon with warm fire is strong enough to hold herself on a rock in any wind.\n- Sura lost one scale this same afternoon at the door in the old wall of the Grossmünster; it hangs there warm on the stone and grows warmer the nearer it comes to her, and only since then does the wind weaken her fire.\nMotives:\n- Levin: loves dragons and does not want Sura to vanish alone → steps into the mist, pulls the others up, climbs the last rock, calls her name, presses the scale on.\n- Julian: wants to stay with his big brother and sees small things → fetches the ball, stumbles along behind Levin, spots the gap.\n- Max: wants to know who is there, and holds on to his friends → calls into the mist, grabs Kiaan's jacket.\n- Kiaan: does not want to lose the way → lifts the scale, holds it in both hands, follows its warmth, gives it to Levin.\n- Sura: ashamed of her weak fire and sure she is simply old → warns them away, flies to the highest peak, turns her head away, blocks the path with her wing. Afraid for a small child alone in the wind, and that fear is bigger than her shame → turns her head to Levin, so that her chest turns too. Once her fire is warm again she is strong enough to hold herself against the wind and no longer needs it → stays and lights their way home.\nCentral figure: Sura\nEvents: 5\nChain:\n- Because Julian fetches the ball from the old Grossmünster wall, Kiaan lifts off the warm scale hanging there and a misty path opens. Levin's call stays a whisper, so Max calls, and Sura answers that she will rise into the clouds forever with the big evening wind. Now she also knows children are coming.\n- But the fog is so thick that Julian stumbles and nobody sees the way, so Kiaan follows the scale's warmth, holding it in both hands. This is slow, and the wind keeps rising.\n- But Sura sees them coming and flies to the highest peak, where the way up is loose stones that slide back. Kiaan nearly loses the scale, Max grabs his jacket and Levin pulls them all up, which costs strength and time while the wind grows.\n- But on top Sura turns her head away and lays one wing across the path like a wall, so the little ones cannot reach her. Max's call does not turn her, and the wind is almost strong enough, so all looks lost.\n- Because Kiaan gives Levin the scale and Levin climbs the last rock and calls her name loudly into the wind, Sura's fear for the small boy alone up there beats her shame and she turns her head to him, so her chest turns toward the children too. Julian sees the gap where a scale is missing and the fire flickering like a candle in the wind, and Levin, now level with her chest and holding the scale, presses it in. This works now because only now is her hidden chest turned to them and the scale in the hands of the one child high enough to reach it. The wind is blocked, her fire grows warm and strong, so she can hold herself on the rock, stays, and lights their way back through the door.\n\n# THE IDEA THE STORY WAS COMMISSIONED FROM (names and world reference only)\n\nThe arc above delivers the commission; keep its names and world as written.\n\nTitle: Die Schuppe im Nebel\nCategory: adventure\nType: Drachen-Abenteuer\nTheme: dragon\nSeason: Autumn\nSetting/location: Zurich, Zurich, Switzerland\nRelationships:\n  - Levin is Älteres Geschwister von Julian\n  - Julian is Jüngeres Geschwister von Levin\n\n# CHARACTER DETAILS\n\nThese details decide who each figure IS: age, gender, what they are good at, what they find hard, what they like. Never contradict one, never invent one.\nThe arc above is settled and decides the SITUATION: who knows whom here, where they are, what is happening to them. Where a saved detail contradicts the arc — a friendship where the arc stages a first meeting — the arc stands, and the detail is simply not true in this book.\n\n**Levin** (main character):\n- Age: 5\n- Gender: male\n- Strengths: Fröhlich, Freundlich, Hilfsbereit, Beschützend, Nachsichtig, Treu, Gerecht, Ehrlich, Vertrauenswürdig, Geduldig, Neugierig, Fantasievoll, Klug, Kreativ, Aufmerksam, Einfallsreich, Abenteuerlustig, Schnell, Stark, Fleissig, Leader, Mutig, Grosszügig, Selbstbewusst, Lustig\n- Flaws: Schüchtern, Unentschlossen, Leichtgläubig, Petze, Gesprächig, Vergesslich, Tollpatschig\n- Special details: Lieb Dinosaurier und Drachen. Sein Bruder ist Julian und Max und Kiaan sind seine guten Freunde. Er kann gut Velofahren und Unihockey spielen\n\n**Julian** (main character):\n- Age: 3\n- Gender: male\n- Strengths: Fröhlich, Freundlich, Hilfsbereit, Lustig, Nachsichtig, Beschützend, Treu, Grosszügig, Gerecht, Ehrlich, Vertrauenswürdig, Abenteuerlustig, Aufmerksam, Kreativ, Klug\n- Flaws: Schüchtern, Leichtgläubig, Unentschlossen, Tollpatschig, Ängstlich, Stur\n- Special details: Seine freunde: levin, julian, max. Er isst sehr gerne, liebt es mit seinem Bruder und seinen Freunden zu spielen, hat gerne Ballspiele\n\n**Max** (main character):\n- Age: 3\n- Gender: male\n- Strengths: Fröhlich, Freundlich, Lustig, Ehrlich, Selbstbewusst, Mutig, Vertrauenswürdig, Entschlossen, Fleissig, Fantasievoll, Neugierig, Kreativ, Aufmerksam, Abenteuerlustig, Stark, Schnell\n- Flaws: Gesprächig, Leichtgläubig\n- Special details: Spielt gerne mit seinen Freunden Kiaan, Levin, Max. Seine Hündin heisst Nia. Er spielt gerne Fussball und fährt gerne Velo\n\n**Kiaan** (main character):\n- Age: 3\n- Gender: male\n- Strengths: Fröhlich, Freundlich, Hilfsbereit, Lustig, Nachsichtig, Beschützend, Treu, Grosszügig, Gerecht, Ehrlich, Selbstbewusst, Vertrauenswürdig, Mutig, Geduldig, Fantasievoll, Neugierig, Klug, Kreativ, Aufmerksam, Abenteuerlustig\n- Flaws: Vergesslich, Petze, Unentschlossen, Schüchtern\n- Special details: Spielt gerne mit Levin, Julian, Max. Liesst gerne oder spielt gerne Ball oder auf dem Spielplatz\n\n**REAL LANDMARKS the story above uses:**\n- Grossmünster [Church]\n  PHOTOS: (exterior) Twin cream-colored church towers with pyramidal cupolas topped by Swiss flags and cross finials.; (exterior) Twin stone towers with ornamental cupolas and Swiss flags, viewed across waterfront from lower…; (exterior) Pair of stone church towers with distinctive architectural details, contemporary structures…; (interior) Interior nave with stone columns supporting ornate gilded ceiling; stone statue of Charlemagne…\n- Rathaus (Zürich) [Building]\n  PHOTOS: (exterior) Cream-colored Renaissance building with mansard roof and multiple chimneys; stone facade with…; (exterior) Same building viewed from slightly further angle showing riverside setting; cream stone facade…; (exterior) Aerial cityscape showing Rathaus among surrounding buildings with Grossmünster's twin towers…; (exterior) Cream stone facade with distinctive orderly fenestration and decorative window surrounds;…; (exterior) Building on waterfront quay showing cream-colored stone facade, mansard roof with multiple…; (interior) Ornate interior hall with elaborately decorated ceiling featuring elaborate plasterwork and…\n- Rathausbrücke (Zürich) [Bridge]\n  PHOTOS: (exterior) Stone bridge with yellow construction/loading equipment, spanning green river. City buildings…; (exterior) River landscape showing stone bridge structure and densely-built waterfront architecture. Pale…; (exterior) Stone bridge viewed from plaza level with modern balusters and speed-limit signs. City…\n- Wasserkirche [Church]\n  PHOTOS: (exterior) Wasserkirche church with pointed limestone spire and Helmhaus Renaissance building adjacent,…; (exterior) Wasserkirche church exterior from Limmat waterfront with tall spire, stone masonry walls,…; (exterior) Riverside view of Wasserkirche church and Helmhaus from Limmat river, showing cream facades,…; (interior) Wasserkirche interior sanctuary showing ribbed Gothic vault ceiling, tall stained glass windows…\n\n- A landmark is drawn from one of its PHOTOS. Name a location or a vantage of it only from a viewpoint one of its photos shows — an exterior is seen from the street or the square, an interior from inside, a distant or view-from photo from afar. If no photo shows the view a page needs (a skyline from a hilltop, a bird's-eye, the far side), that landmark is not available for that page: use one whose photos fit, or none. A view the commission's own words describe is the exception: it stands, and the landmark in it is drawn from what its photos show\n\n# MINI HERO'S JOURNEY (age 5)\n\nThe child this book is for is five. Write for that child.\n\n**The full shape, in small.** Ordinary world, then a call that pulls the main character out of it,\nthen challenges that get harder, then a moment where all seems lost, then the turn, then home —\nchanged. Every one of those beats is in the story, in that order.\n\n**A real low point is required.** Before the end there is a page where the plan has failed, the thing\nis lost, or the friend is gone, and it looks like it will stay that way. Do not soften it into a\nsmall setback and do not skip past it in a line.\n\n**The hero's own idea turns it.** What saves the day comes out of the main character — something they\nnoticed earlier, a strength of theirs, a thing they were told and remembered. Never luck, never a\ngrown-up arriving to fix it, never a power handed over at the last moment.\n\n**It resolves.** The turn comes before the last page and they come home changed. Never a story that\nstops on the problem.\n\n**A real antagonist is allowed.** Someone who wants something opposed to what the main character\nwants, with a reason of their own. A twist, a sidekick who earns their place, and a setup on an early\npage that pays off at the end all belong here.\n\n**Competence.** The main character does things: decides, tries, fails, adapts. They are never carried\nthrough their own story.\n\n**The stake is the main character's own.** What is wanted and what is at risk belong to their own\nlife — never a piece of work set for them, an assignment, a submission, a competition entry, or a\nplace to be won in a selection. What stands in the way is something they can reach out and touch, or\nsomeone who wants the opposite, never a procedure, a schedule or a system to be satisfied.\n\n**Humour and mild peril.** A chase, a close call, a night out in the cold are fine. Nothing gory,\nnothing cruel, nobody the reader likes is really harmed.\n\n**Ending.** They come back to where they started and it reads differently, because they are different.\n\n**The age owns the props and the subject.** What the main character wants, what stands in the way, and the objects the story turns on belong to the world of someone that age — what they handle themselves, where they go on their own, what counts as a loss to them. Never a want, a comfort or a plaything the reader has outgrown, and never stakes beyond what someone that age would be given.\n\n# PAGE PLAN\n\nTHE BOOK'S TARGETS — every one is counted in code on the finished plan. A figure the STORY LOGIC names (new) is not commissioned and may share a page with commissioned characters or carry a page alone.\n- Levin is in frame on at least 9 pages of 18, each time taking part in that page's one action; count them as you plan.\n- At least 1 page of type face, and a face page shows a commissioned character.\n- At least 1 page of type landscape or object; two are fine, ideally one of each.\n- At most 3 pages of type group.\n- The who column names commissioned characters and the figures of the STORY LOGIC, nobody else: a figure you invent is a fault.\n\nEach page has a type, and the type fixes who is in frame:\n- landscape: nobody. A place, the weather, a vessel or a distant sight.\n- object: nobody, or one character's hand. One object.\n- face: exactly one character, a close-up of their face.\n- medium: one to three characters.\n- group: four or more characters, all sharing one simple action.\nThe who column holds names only, or the word nobody: never a count, a group word or a description.\n\nBefore dividing, plan the pictures — simple pages first:\n1. The story's emotional highlights: which moments earn a page of one character showing a strong feeling, close up?\n2. Which moments earn a page with no people in frame? A page with nobody in it has story weight when its subject is something the story has been driving toward — a discovery, an arrival, a payoff — or the danger or obstacle the characters face at that point: a thing rolling toward a drop, a goal out of reach. A place with no story weight never gets its own page. At least one page in the book earns this. Choose one whose drama is a place, the weather, a vessel or an object seen from afar; never a page whose drama is between people — a parting, a confrontation, tears, a promise, a handover. Those pages get faces, and so does every picture question 5 names as most wanted.\n3. Which pages gather the whole cast, and what one simple action do they all share there? \n4. Where are three or more characters truly unavoidable? Bypass it where the story allows; keep it only where the story demands it. Where one is kept, the third character shares the page's one action — takes part in it, never does a second action and never only stands by.\n5. For each act — setup, middle, ending — which picture does a child most want to see there, and which page stages it as its instant? The acts are the story's sentences in thirds: setup 1–6, middle 7–12, ending 13–18. The ending's own event — the reunion, the goodbye, the parting — is always one of them. A picture that falls between two pages, or that only a page's change reports as already done, is not staged.\n6. Your CAST block, under RE-DIVIDE, stands: every page you return keeps what it promises, and the block itself is not rewritten.\nThen one line per page: type — who is in frame — the instant the picture shows — what is true after this page that was not before. The first field is the page's type: landscape, object, face, medium, group. Camera shots are chosen after the plan is final, never here.\nA complicated page — much action, many characters at once — is a fault: simplify the picture, never the story. A page after which nothing is true that was not before is filler: give it a change or give its material to a neighbouring page. What is true after is a change in the story’s state, not the instant in other words: something now held, moved, opened, broken, learned, decided or agreed that was not true before this page. A fourth field that only redescribes the picture states no change.\n\nThe plan line's instant is a single drawable moment:\n- One instant, one action: no montage, no before-and-after, no \"then\", no passage of time inside one picture; when a beat contains a change, pick the single moment that shows it. Never two actions by one character: plan the dominant one and leave the other out, never joined by \"and then\", \"before turning to\" or a trailing clause. One thing is being done, and everyone else watches it or does that same thing in the same place; two characters given different actions at one instant lose one of them, and so do two vehicles, vessels or creatures each with its own state or its own crew. The action at the moment it happens, never the state that follows it. A deed, its effect, and where the effect goes are three actions. Watching, standing and being present are not actions, and an effect that is the deed itself made visible at the same instant is part of the deed. When a plan line holds more than one action, split them across pages; a beat whose actions cannot share a picture gives one page the contact and the next page the second action, or the picture drops the secondary action and keeps the main event. The instant is at most 20 words.\n- A page holds at most 6 named characters, a named animal that acts in the story counting as one; two or three carry it best. A page that gathers the whole cast is wide or distant, all of them sharing one simple action — boarding, hauling one line together — or seen from behind moving off. All of them watching one thing is a shared action only when they are seen from behind or over the shoulder, toward what they watch; facing the viewer it never is. Standing or gathering together while a feeling shows, or while the event happens behind them, is everyone present doing nothing — never a row of figures facing the viewer. One of them acting while the rest look on — a hand-over between two, one speaking, one laughing — is not a shared action: every one of them does the same thing. Add no unnamed figures — no crew, crowd, onlookers or extra animals.\n- The second field is the complete cast of that picture. Every figure the instant stages — a person, or a creature the story tracks — including one watching from the background — belongs in that field, or is not written into the instant at all. A figure the picture shows only in part — a wing, a tail, a head or a hand reaching into the frame, a flank or a chest filling it — is in that picture exactly as if it were shown whole. Only a name without a body is context: the owner of a prop or a place, someone behind, beyond or outside what the picture shows. A figure named only in what is true after this page is not in the picture either: put them in that field or leave them off the page. A figure the previous page staged does not carry into the next one as background.\n- One camera position: an instant is seen from one spot — never inside a vehicle or structure and its exterior at once.\n- At most two height levels per picture: people, animals or objects at three or more different heights in one frame — one on the ground, one climbing the tree, one up in the tree; someone in the foreground and someone in the tree is fine. A whole cast carried together on one back or one boat is one level. Where a third level appears, stage the page on the two levels its event happens on and give the third level its own page.\n- Several characters holding or moving one thing together is fine when that is the page's one action. A hand-over or an object in flight is never the instant: pick the instant before or after it. Never a thought or realization as the instant, or a climbing or stretching pose with hidden limbs; when the event is internal or mechanical, name its visible result instead (the box open, the found object held up).\n- A figure trapped, cut off or unable to reach is given no means to end it: the obstacle's distance is named against the body (\"the rim of the shaft three times their height above them\", \"the ledge a full arm's length beyond the fingertips\"), never a grip, hold or footing that would let them out.\n- Never a pointing gesture as the instant: a look toward the thing, a turned head, a step toward it, or the thing held up instead.\n- Never an exact count of like things in the instant: one, two, or several — a number above two belongs to the text.\n- Name what is in the picture, never what is absent, empty or missing from it. When the absence is the story point, name its visible consequence, or make the empty place the page's subject.\n- Beyond the page's type, never compose the frame — what fills it, how large something looks, where it sits, or where the camera stands.\n- A size or a look is stated only where the plot turns on it: a thing too heavy for one child to lift, too big to hide, small enough to pocket. It is stated as that plot fact, never as a comparison with another thing (\"as big as a …\", \"the size of a …\"). Every other size and look is left to the pictures, which size everything themselves; leaving it out drops no fact. A plan line names each thing plainly; the Art Director sizes it.\n- The beat's main event wins the picture. A secondary figure or action is dropped before the main one is reduced to a shadow, a silhouette or a sound: the arriving creature is in frame as itself, and the reunion outranks the bystander.\n\nRequirements:\n- Each page follows causally from the one before it: no page stages a moment the story reaches only in a later sentence.\n- What a page establishes about a thing — stuck, heavy, hidden, out of reach — stays true until a later page changes it.\n- Consecutive pages do not stage the same place with the same grouping, and one gathering is not split across two pages. A page keeps its characters at one depth together; separate a figure into the background only when the page's own instant requires the separation, and keep such pages few.\n- Every page is visible: something happens that a picture can show. A character whose action is what a page's instant works against — a way blocked, a place kept, a thing taken or withheld, a refusal — is named in that page's plan line.\n- Levin's floor stands in THE BOOK'S TARGETS above; the others come and go in different combinations, not the whole group on every page. Every commissioned character gets a focal page of their own whose instant is the action the story gives them. The story's central figure, Sura, acts in each third of the book — it chooses, moves, speaks or changes something in a page's instant, never only carried.\n- A character's focal page stages them alone or with one companion — two people sharing one action carry it — and stages them doing something visible. An internal decision gets a physical correlative — a held object, a step taken, a grip tightened; never a lone motionless figure.\n- When an AVAILABLE LANDMARKS list is present, an arc that names landmarks has chosen them — keep those, not others; an arc that names none has chosen none. A landmark may be scenery — a tower on the horizon, a bridge behind the action — and never relocates the story. No page names more than one place.\n- A page shows a character about to act, decide or know what to do only when the next page shows that same character doing it.\n- A physical challenge spends one page on the attempt itself — a character mid-effort against the obstacle. The decision before and the relief after never replace it.\n- The emotional low point — a loss, a setback, the goal looking lost — gets a page of its own; the loss and its recovery never share a page.\n- A race or deadline the story runs on is scored mid-book at least twice — a page shows who is ahead or how much remains.\n- The stake the arc has a character say aloud lands on an early page, shown as a visible act, never as the words said.\n- A character's first page stages their arrival or a naming by someone present, shown as a visible act and never as the words said; a badge, a garment, a title or an epithet is not a naming. A character in frame before anyone says who they are is unplaced.\n- A prop, pet or skill that solves a problem appears on an earlier page with its owner before it does the work, and nothing a page plants is left without a later page that pays it off.\n- At most 1 page with figures in frame holds none of the commissioned characters; every other page with figures holds at least one.\n- Page 1 opens on an action already under way, and each character's first page shows them doing something.\n- When the story's ending has an event of its own, the last page stages that event as its instant.\n- The last page shows the commissioned characters safe and together, unless the story itself separates them.\n- No plan line states what anyone learned, realised or now understands.\n\n# RE-DIVIDE — one round\n\nRewrite ONLY the pages under PAGES TO REWRITE, each answering its Change and keeping its Keep, in the same line format (type — who — instant — after). Every other page stands as written, and a page you rewrite never breaks a target that held.\n\n## THE PLAN THAT STANDS\nPage 1: group — Levin, Julian, Max, Kiaan — all four kick the ball to each other in the foggy autumn square between the Wasserkirche and the Grossmünster — the ball is rolling away toward the old wall\nPage 2: medium — Julian, Levin — Julian reaches up to a big warm scale hanging on the old stone wall of the Grossmünster — a scale is found, and Levin has come to stand beside him\nPage 3: medium — Kiaan, Max — Kiaan lifts the scale off the stone wall in his hands while Max watches — a path in the wall opens into mist and rocky peaks\nPage 4: medium — Levin, Max — Levin opens his mouth shyly toward the mist while Max cups his hands and calls loudly — the call is out in the silence\nPage 5: face — Sura — Sura's old grey dragon face looks tired out of the mist and speaks of the evening wind — the children know she will rise alone forever\nPage 6: medium — Levin, Julian — Levin steps onto the misty path and holds out a hand to Julian — the way into the mist is begun\nPage 7: medium — Julian, Levin — Julian stumbles over a stone behind Levin in the low mist that hides the path — the path is lost and the going is slow\nPage 8: face — Kiaan — Kiaan holds the scale tight in both hands with a look of focus — he leads them toward where it is warmest\nPage 9: landscape — nobody — a high rocky peak above the low mist, with Sura's great grey wings beating as she flies toward it and wind bending the grass — Sura is on the highest peak and the wind is stronger\nPage 10: group — Levin, Max, Kiaan, Julian — the four climb the loose sliding stones, Max grabs Kiaan's jacket and Levin pulls them up — all reach the top\nPage 11: medium — Sura, Levin — Sura turns her big head away and lays one wing across the path like a wall — the little ones cannot reach her\nPage 12: medium — Max, Sura — Max calls \"Sura, wait!\" while Sura keeps her head turned away, wind lifting her wing — she does not turn and all looks lost\nPage 13: medium — Levin — Levin climbs the last rock, his foot slips once, he holds on tight and calls Sura's name — the call rings out loud\nPage 14: face — Sura — Sura turns her worried face toward the small boy on the high rock — her chest turns toward the children\nPage 15: medium — Julian, Levin, Sura — Julian points at a dark gap in Sura's chest where a tiny fire flickers, Levin stands beside it — the missing scale is found\nPage 16: object — Levin — Levin's hands press the warm scale into the gap in Sura's chest — the wind is blocked and the fire grows big and warm\nPage 17: medium — Sura, Levin — Sura lifts Levin gently down with her nose, wings folded — she stays and her warm flame lights the way home\nPage 18: group — Levin, Julian, Max, Kiaan — the four run together over the Rathausbrücke in the evening — they are home and safe, and Levin is proud of his loud call\n\n---CAST---\nLevin — deed page 13: climbs the last rock, slips once, holds on tight and calls Sura's name into the wind, alone — also on pages 1, 6, 10, 16, 17, 18\nJulian — deed page 15: points at the flickering gap in Sura's chest, with Levin beside it — also on pages 2, 7, 18\nMax — deed page 4: calls loudly into the mist, with Levin — also on pages 10, 12, 18\nKiaan — deed page 8: holds the warm scale in both hands and leads where it is warmest, alone — also on pages 3, 10, 18\nSura — deed page 14: turns her head to the small boy on the rock, alone with Levin — also on pages 5, 9, 11, 16, 17\nEnding page 18: Levin, Julian, Max, Kiaan\n\n## PAGES TO REWRITE\nPage 9\nChange: the instant runs 24 words on page 9, past the 20 words an instant may take — keep the one action and move the rest to what is true after, or to a page of its own\nKeep: type landscape; nobody in frame; what is true after: Sura is on the highest peak and the wind is stronger\n\n# OUTPUT FORMAT\n\nOnly what the format below shows. No preamble, no commentary. One line for each page you rewrite under RE-DIVIDE, and for no other page. No changes block.\n\n---PAGE PLAN---\nPage <N>: <type> — <names, or the word nobody> — <the instant the picture shows> — <what is true after this page that was not before>\n\n",
+     "chars": 34329,
+     "label": "testlab_typed_replan",
+     "modelId": "claude-sonnet-5-5",
+     "truncated": false
+    }
+   ],
+   "targetIndex": 0,
+   "standingPlan": [
+    {
+     "planLine": "wide — Levin, Julian, Max, Kiaan — all four kick the ball to each other in the foggy autumn square between the Wasserkirche and the Grossmünster — the ball is rolling away toward the old wall",
+     "pageNumber": 1
+    },
+    {
+     "planLine": "low-angle — Julian, Levin — Julian reaches up to a big warm scale hanging on the old stone wall of the Grossmünster — a scale is found, and Levin has come to stand beside him",
+     "pageNumber": 2
+    },
+    {
+     "planLine": "medium — Kiaan, Max — Kiaan lifts the scale off the stone wall in his hands while Max watches — a path in the wall opens into mist and rocky peaks",
+     "pageNumber": 3
+    },
+    {
+     "planLine": "over-the-shoulder — Levin, Max — Levin opens his mouth shyly toward the mist while Max cups his hands and calls loudly — the call is out in the silence",
+     "pageNumber": 4
+    },
+    {
+     "planLine": "close-up — Sura — Sura's old grey dragon face looks tired out of the mist and speaks of the evening wind — the children know she will rise alone forever",
+     "pageNumber": 5
+    },
+    {
+     "planLine": "medium — Levin, Julian — Levin steps onto the misty path and holds out a hand to Julian — the way into the mist is begun",
+     "pageNumber": 6
+    },
+    {
+     "planLine": "over-the-shoulder — Julian, Levin — Julian stumbles over a stone behind Levin in the low mist that hides the path — the path is lost and the going is slow",
+     "pageNumber": 7
+    },
+    {
+     "planLine": "close-up — Kiaan — Kiaan holds the scale tight in both hands with a look of focus — he leads them toward where it is warmest",
+     "pageNumber": 8
+    },
+    {
+     "planLine": "wide — nobody — a high rocky peak above the low mist, wind bending the grass on its slope — Sura is on the highest peak and the wind is stronger",
+     "pageNumber": 9
+    },
+    {
+     "planLine": "wide — Levin, Max, Kiaan, Julian — the four climb the loose sliding stones, Max grabs Kiaan's jacket and Levin pulls them up — all reach the top",
+     "pageNumber": 10
+    },
+    {
+     "planLine": "medium — Sura, Levin — Sura turns her big head away and lays one wing across the path like a wall — the little ones cannot reach her",
+     "pageNumber": 11
+    },
+    {
+     "planLine": "over-the-shoulder — Max, Sura — Max calls \"Sura, wait!\" while Sura keeps her head turned away, wind lifting her wing — she does not turn and all looks lost",
+     "pageNumber": 12
+    },
+    {
+     "planLine": "low-angle — Levin — Levin climbs the last rock, his foot slips once, he holds on tight and calls Sura's name — the call rings out loud",
+     "pageNumber": 13
+    },
+    {
+     "planLine": "close-up — Sura — Sura turns her worried face toward the small boy on the high rock — her chest turns toward the children",
+     "pageNumber": 14
+    },
+    {
+     "planLine": "medium — Julian, Levin, Sura — Julian points at a dark gap in Sura's chest where a tiny fire flickers, Levin stands beside it — the missing scale is found",
+     "pageNumber": 15
+    },
+    {
+     "planLine": "close-up — Levin — Levin's hands press the warm scale into the gap in Sura's chest — the wind is blocked and the fire grows big and warm",
+     "pageNumber": 16
+    },
+    {
+     "planLine": "medium — Sura, Levin — Sura lifts Levin gently down with her nose, wings folded — she stays and her warm flame lights the way home",
+     "pageNumber": 17
+    },
+    {
+     "planLine": "wide — Levin, Julian, Max, Kiaan — the four run together over the Rathausbrücke in the evening — they are home and safe, and Levin is proud of his loud call",
+     "pageNumber": 18
+    }
+   ],
+   "elapsedMsTypedFlow": 21087
+  }
+ ],
+ "error": null,
+ "createdBy": "demo-b-hnecf@magicalstory.ch",
+ "createdAt": "2026-10-06T17:40:07.351Z",
+ "completedAt": "2026-10-06T17:40:29.055Z"
+}
