@@ -129,3 +129,7 @@ describe('the DO-NOT-WRITE list as a checker reads it', () => {
     }
   });
 });
+
+// These fixtures replace whole one-line pages; the edit cap (text-refine-edit-cap.test.ts) is not what they test.
+// @ts-ignore CommonJS
+require("../../server/config/models").MODEL_DEFAULTS.textRefineMaxChangedRatio = 1;

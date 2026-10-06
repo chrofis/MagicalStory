@@ -6363,6 +6363,8 @@ function buildTextRefinePrompt(inputData, pages = [], auditFindings = '', arc = 
     PERIL_CEILING: PERIL_CEILING_RULE,
     PAYOFF_KEEP: PAYOFF_KEEP_RULE,
     MECHANISM_FIX: MECHANISM_FIX_RULE,
+    LOAD_BEARING: LOAD_BEARING_RULE,
+    EDIT_CAP_PERCENT: Math.round(MODEL_DEFAULTS.textRefineMaxChangedRatio * 100),
   });
 }
 
@@ -10063,6 +10065,21 @@ const CLOSING_MOMENT_RULE = "The story's main relationship, between the main cha
 const SHOWN_CALLBACK_RULE = 'A callback shown as it happens, a character doing, holding or saying again in the moment what an earlier page set up, is an act and never a summary; a sentence retelling what happened earlier or what it meant is a summary.';
 
 /**
+ * WHICH ARC FACTS MUST REACH THE TEXT (owner, 2026-10-06: "some minor arc
+ * details might be skipped if they are not load-bearing"). ONE string for the
+ * writer (story-text-from-beats.txt), the refine (text-refine.txt) and the
+ * arc-informed audit's LOADBEARING question (story-text-audit.txt), so the
+ * generator is told exactly what the critic may deduct for. Before it the
+ * writer was told EVERY fact, cause, feeling and line "finds its home on some
+ * page" while the audit's LOADBEARING question was narrower, so the audit filed
+ * a trait, a motive an act already shows and a feeling as dropped facts and the
+ * refine rewrote whole pages to add them (staging job_1791222889407_ypl33vk8u:
+ * 5 of 11 arc-informed findings were such optional details).
+ * see docs/decisions.md 2026-10-06 "Text stages edit, they do not rewrite"
+ */
+const LOAD_BEARING_RULE = 'A story fact is load-bearing when a later page depends on it or it is the cause of the story\'s main turn: an ability, limit, object, rule or spoken line that a later act uses, and the reason the turn happens. A load-bearing fact reaches the text in its specific form, on or before the page that leans on it. Every other fact the summary states (a trait, a habit, a feeling or motive the page\'s own act already shows, a background detail no later page uses) is optional: the text may leave it out. A detail the plot never uses — an age, a size, a colour, a look — is never load-bearing, and a page that leaves it out drops nothing: a size or a look is not such a fact, and reaches the text only where something is lifted, hidden, held or fitted because of it.';
+
+/**
  * THE STYLE RULEBOOK (owner, 2026-09-23): one block for every pass that
  * writes page prose, filled into the {STYLE_RULEBOOK} placeholder each
  * declares — the beats writer, the trial writer, the text repair
@@ -10090,7 +10107,9 @@ const STYLE_RULEBOOK = [
   'Every sentence is complete and finishes: no sentence broken off for effect, no bare fragment standing as a sentence, no caption-style line describing the scene like a stage direction. The story is told aloud.',
   'No rhetorical set-pieces: no paired negations ("Nobody answered. Nobody argued."), no coined sayings or incantations, no one-sentence paragraph for drama. Plain narration carries the story.',
   'No sentence tells what an event meant or sums up who the characters have become ("they had become something else", "he had done his part"). The telling shows the event and moves on.',
-  'The narrator never justifies, excuses or explains an action to the reader ("he had given his share, so now he could eat too"). A reason the story needs comes through a character\'s words, thoughts or feelings in the moment.',
+  'The narrator never justifies, excuses or explains an action to the reader ("he had given his share, so now he could eat too"): no because-clause and no purpose clause on the narrator\'s side. A reason the story needs comes through what a character does or says in the moment.',
+  'A feeling is shown by what a character does or says. The narrator names one only where no act can show it, and never beside an act that already shows it; a character never explains a feeling or an insight to the person in front of them.',
+  'A character never explains the story\'s rules, or what has just happened, to someone who saw it; a rule of the story\'s magic is said once, in the line a character needs it. No roll call: the text never goes through the cast one by one saying what each did, felt or said in the same shape; it names who acts.',
   SIZE_LOOK_RULE,
   'Each named character who speaks has a voice of their own: word choice and rhythm a listener could tell apart without the name.',
   `The last page ends on the concrete act or spoken line the story ends with and lands one feeling, plainly and warmly. A string of short solemn sentences is not an ending, and neither is a closing sentence that sums up the story. ${SHOWN_CALLBACK_RULE}`,
@@ -10119,7 +10138,7 @@ const STYLE_RULEBOOK = [
  */
 const PICTURE_COUNT_RULE = 'When a page\'s picture leaves out someone the story has with the others at that moment — whoever that page\'s plan line or scene does not put in frame — the page\'s text gives that group no number and never says all, both or every one of them, in whatever language it is written: it names who acts, or speaks of the rest without a count';
 
-const MOTIVE_AT_THE_ACT_RULE = 'Where a character refuses, demands, flees, hides or lies for a reason the story reveals only later, the reader gets a glimpse of that reason at or before the act (a look, a half-said word, a feeling named) without giving the later reveal away. The reason is the story\'s own, so this invents nothing';
+const MOTIVE_AT_THE_ACT_RULE = 'Where a character refuses, demands, flees, hides or lies for a reason the story reveals only later, the reader gets a glimpse of that reason at or before the act (a look, a half-said word, an act) without giving the later reveal away. The reason is the story\'s own, so this invents nothing';
 
 /**
  * A payoff survives every fix (owner, 2026-09-24). ONE string for every pass
@@ -11733,6 +11752,7 @@ function buildTextAuditPrompt(inputData, pages = [], arc = '', { arcHints = '' }
     // The ENDING question reads the writer's own strings (2026-09-27).
     CLOSING_MOMENT: CLOSING_MOMENT_RULE,
     SHOWN_CALLBACK: SHOWN_CALLBACK_RULE,
+    LOAD_BEARING: LOAD_BEARING_RULE,
     PAGES: body,
   });
 }
@@ -12108,6 +12128,7 @@ function buildStoryTextFromBeatsPrompt(inputData, beats = [], expansions = [], a
     PICTURE_COUNT: PICTURE_COUNT_RULE,
     CLOSING_MOMENT: CLOSING_MOMENT_RULE,
     PERIL_CEILING: PERIL_CEILING_RULE,
+    LOAD_BEARING: LOAD_BEARING_RULE,
   });
 }
 
@@ -13150,6 +13171,7 @@ module.exports = {
   PAGE_OPENING_VARIETY_RULE,
   STYLE_RULEBOOK,
   MOTIVE_AT_THE_ACT_RULE,
+  LOAD_BEARING_RULE,
   PICTURE_COUNT_RULE,
   PAYOFF_KEEP_RULE,
   CLOSING_MOMENT_RULE,

@@ -19,7 +19,7 @@ Characters: {CHARACTER_NAMES}
 
 {CHARACTER_DETAILS}
 
-# THE STORY (final — this arc IS the story; every fact, cause and spoken line it states belongs on some page, in its specific form; a size or a look is not such a fact, and belongs on a page only where the story uses it)
+# THE STORY (final — this arc IS the story. {LOAD_BEARING})
 
 {STORY_ARC}
 
@@ -69,7 +69,9 @@ The checks below are answered for the rewritable pages only, with their neighbou
 
 Return only the pages you rewrote. Omit every page you left alone. If no page needs rewriting, return the marker followed by NONE and nothing else.
 
-A rewritable page is rewritten for a real problem, never for stylistic preference. On every page you rewrite, also fix what follows.
+A rewritable page is EDITED, never recomposed. The text already has its voice and its sentences; you correct what a finding names. A sentence no finding names is copied word for word. A finding is closed by changing the sentence it quotes or names (recast it, join it into the sentence beside it, or cut it) and, where a fact must come back, by adding one sentence at most. The code counts: a page whose words change by more than {EDIT_CAP_PERCENT} percent against the text you were given is thrown out whole and keeps its current text, and every fix you made on it is lost.
+
+A rewritable page is changed for a real problem, never for stylistic preference. On every page you change, also fix what follows.
 
 Never use an em-dash (—) or an en-dash (–), anywhere, for any purpose. Replace every one you find with a comma, a full stop, a colon, or parentheses, and recast the sentence if none of those fit.
 
@@ -81,7 +83,7 @@ A STYLE finding quotes one sentence that breaks one of these rules. One you acce
 
 A fault that a character acts on a reason the page has not given is closed this way: {MOTIVE_AT_THE_ACT}.
 
-A fact a finding says the page dropped (a reason, a trait, a feeling) comes back the way a picture book carries it: as what a character does, looks at or says in their own voice, in the sentence where the thing happens, and in one added sentence at most. It never comes back as the narrator's reason (a "because" clause), as a feeling named on top of an act that already shows it, or as a character explaining the story's rules to the person in front of them; a rule of the story's magic is said once, in the line a character needs it. A fact the page's act already shows, or a later page shows, is left as it stands and the ledger says so.
+A finding that says the page dropped a fact is answered only where the fact is load-bearing (see THE STORY above); for an optional fact the ledger line reads `<id> STANDS: optional`. A load-bearing fact comes back the way a picture book carries it: as what a character does, looks at or says in their own voice, in the sentence where the thing happens, and in one added sentence at most. It never comes back as the narrator's reason (a "because" clause), as a feeling named on top of an act that already shows it, or as a character explaining the story's rules to the person in front of them; a rule of the story's magic is said once, in the line a character needs it. A fact the page's act already shows, or a later page shows, is left as it stands and the ledger says so.
 
 A COUNT fault is closed by the rule it names, recasting only the sentence that counts: {PICTURE_COUNT}.
 
@@ -95,7 +97,7 @@ Work in two steps.
 
 Step 1 — write the analysis. Answer every check below for the rewritable pages, naming pages and quoting lines. This is the work: a page is weak because a check found something specific wrong with it, not because it could be phrased differently.
 
-Step 2 — rewrite the rewritable pages your analysis found problems on. Every other page stays exactly as it is. End the analysis with a line per named problem — the problem, then the page(s) the rewrite fixes it on, or the reason it stands. A named problem with neither is a failed review. Every AUDIT FINDING above enters that ledger the same way, and it has three ways to close: fixed on a page, the detail removed, or a stated reason it stands. Each AUDIT FINDING starts with its id (T1, T2 …); its ledger line starts with that id, and a finding you leave standing reads `<id> STANDS: <reason>`. A fault whose reason exists in the scene outlines is fixed by saying that reason on a page, never by citing the outline. Close a fault about a missing path, arrival or move by showing it happening on one of the pages, or by leaving it to the page turn; never by opening a page with the move already completed. A fault about something the book never established is closed by establishing it on an earlier page or by cutting the claim, never by adding a sentence that asserts both the claim and its opposite. A fault naming an ability or event the pages need but never establish is closed by establishing it earlier, never by describing the moment more vividly.
+Step 2 — edit the rewritable pages your analysis found problems on, sentence by sentence, keeping every sentence no finding names. Every other page stays exactly as it is. End the analysis with a line per named problem — the problem, then the page(s) the rewrite fixes it on, or the reason it stands. A named problem with neither is a failed review. Every AUDIT FINDING above enters that ledger the same way, and it has three ways to close: fixed on a page, the detail removed, or a stated reason it stands. Each AUDIT FINDING starts with its id (T1, T2 …); its ledger line starts with that id, and a finding you leave standing reads `<id> STANDS: <reason>`. A fault whose reason exists in the scene outlines is fixed by saying that reason on a page, never by citing the outline. Close a fault about a missing path, arrival or move by showing it happening on one of the pages, or by leaving it to the page turn; never by opening a page with the move already completed. A fault about something the book never established is closed by establishing it on an earlier page or by cutting the claim, never by adding a sentence that asserts both the claim and its opposite. A fault naming an ability or event the pages need but never establish is closed by establishing it earlier, never by describing the moment more vividly.
 
 Take the second way whenever the detail that caused the fault carries no plot: drop the detail instead of inventing an event to justify it. Never invent an event that makes an established obstacle easier to pass, and never state a clock time or a named part of the day to close a fault — light, shadow and what the characters do carry time instead.
 

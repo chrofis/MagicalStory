@@ -100,3 +100,7 @@ describe('refineStoryText — the diff prompt carries the findings the whole-pag
     expect(diff).not.toContain('--- Page 2 ---');
   });
 });
+
+// These fixtures replace whole one-line pages; the edit cap (text-refine-edit-cap.test.ts) is not what they test.
+// @ts-ignore CommonJS
+require("../../server/config/models").MODEL_DEFAULTS.textRefineMaxChangedRatio = 1;
