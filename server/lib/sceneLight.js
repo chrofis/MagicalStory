@@ -29,7 +29,23 @@
  */
 
 /** In the order a day runs. Adjacent values are neighbours on the clock. */
-const TIMES_OF_DAY = ['dawn', 'morning', 'midday', 'afternoon', 'evening', 'dusk', 'night'];
+const CLOCK_HOURS = ['dawn', 'morning', 'midday', 'afternoon', 'evening', 'dusk', 'night'];
+
+/**
+ * LIGHTS THAT ARE NOT AN HOUR (owner, 2026-10-06, reversing the 2026-09-24 "the light is one of seven
+ * hours" line for the pages that have no sky). A page set beneath the water, or in a place no daylight
+ * reaches (ink, a cave, a ship's hold), is not at any hour of the clock: the hour's sun and sky wording
+ * drew staging job_1791267520938_essbvehs8 p5, p7 and p9-p12 at the surface or on dry land with a sky
+ * (and ypl33 p9 a bright reef against pitch-black ink). They sit outside the clock: the book's hour goes
+ * on around them, they name no sun, moon or sky, and their weather is `none`.
+ */
+const SKYLESS_LIGHTS = ['underwater', 'dark'];
+
+/** The `timeOfDay` enum: the seven hours, then the two skyless lights. */
+const TIMES_OF_DAY = [...CLOCK_HOURS, ...SKYLESS_LIGHTS];
+
+/** Is this declared value a light with no sky (underwater, dark) rather than an hour? */
+function isSkylessLight(timeOfDay) { return SKYLESS_LIGHTS.includes(timeOfDay); }
 
 /** `none`: an interior, where the weather is not visible. */
 const WEATHERS = ['clear', 'overcast', 'rain', 'snow', 'fog', 'storm', 'none'];
@@ -78,6 +94,15 @@ const TIME_OF_DAY_PHRASES = {
   night: {
     open: 'night: a dark sky, the scene lit by the moon and by the light sources in it',
     veiled: 'night: dark, the scene lit only by the light sources in it',
+  },
+  // No sun, moon, sky or horizon is named, and the same words hold whatever the weather says.
+  underwater: {
+    open: 'underwater: the whole picture is beneath the sea, blue-green water all around, soft light falling through it from above, drifting particles',
+    veiled: 'underwater: the whole picture is beneath the sea, blue-green water all around, soft light falling through it from above, drifting particles',
+  },
+  dark: {
+    open: 'dark: a pitch-dark place, the scene lit only by the light sources in it',
+    veiled: 'dark: a pitch-dark place, the scene lit only by the light sources in it',
   },
 };
 
@@ -132,6 +157,8 @@ function weatherOwnsSky(weather) {
  */
 function lightParts(light) {
   const l = light || {};
+  // A skyless light has no sky to describe, whatever weather the brief carries.
+  if (isSkylessLight(l.timeOfDay)) return { time: TIME_OF_DAY_PHRASES[l.timeOfDay].open, sky: '' };
   const covered = weatherOwnsSky(l.weather);
   const time = l.timeOfDay ? TIME_OF_DAY_PHRASES[l.timeOfDay][covered ? 'veiled' : 'open'] : '';
   let sky = '';
@@ -190,6 +217,7 @@ function lightKey(light) {
 /** "night, rain" / "evening" — for logs and judge lines. '' when undeclared. */
 function describeLight(light) {
   const l = light || {};
+  if (isSkylessLight(l.timeOfDay)) return l.timeOfDay;
   return [l.timeOfDay, l.weather && l.weather !== 'none' ? l.weather : (l.weather === 'none' ? 'indoors' : null)]
     .filter(Boolean).join(', ');
 }
@@ -211,6 +239,7 @@ function describeLightForJudge(light) {
   const words = describeLight(light);
   if (!words) return '';
   const l = light || {};
+  if (isSkylessLight(l.timeOfDay)) return TIME_OF_DAY_PHRASES[l.timeOfDay].open;
   return weatherOwnsSky(l.weather) ? `${words} — ${lightParts(l).sky}` : words;
 }
 
@@ -238,6 +267,8 @@ function buildLightLine(light, { plate = false } = {}) {
 function buildRepairLightLine(light) {
   const phrase = lightPhrase(light);
   if (!phrase) return '';
+  // A skyless page (underwater, dark) is told nothing about a sky it does not have.
+  if (isSkylessLight(light.timeOfDay)) return `**LIGHT:** ${phrase}. This is the page's light: the edited image keeps exactly this light, and the edit changes none of it.`;
   return `**LIGHT:** ${phrase}. This is the page's time of day and weather: the edited image keeps exactly this light, sky and weather, and the edit changes none of them.`;
 }
 
@@ -249,6 +280,10 @@ function buildRepairLightLine(light) {
 function buildPlateRelightInstruction(light) {
   const phrase = lightPhrase(light);
   if (!phrase) return null;
+  if (isSkylessLight(light.timeOfDay)) {
+    return `This backdrop shows a place. Re-paint it for ${phrase}. `
+      + 'The camera, the framing and the surfaces keep their shape, material, colour and arrangement exactly, and the season stays the same. Only the light and what surrounds the surfaces change, and no one is added to it.';
+  }
   return `This backdrop shows a place. Re-light it for ${phrase}. `
     + 'The camera, the framing, the buildings, walls, roofs, trees, paths and surfaces keep their shape, material, colour and arrangement exactly, and the season stays the same. Only the light, the shadows, the sky and the weather change, and no one is added to it.';
 }
@@ -270,6 +305,7 @@ function relightClause(light) {
  */
 function keepLightClause(light) {
   const phrase = lightPhrase(light);
+  if (phrase && isSkylessLight((light || {}).timeOfDay)) return `The picture is painted in this light: ${phrase}.`;
   return phrase ? `The picture is painted in this light, sky and weather: ${phrase}.` : '';
 }
 
@@ -278,7 +314,9 @@ function keepLightClause(light) {
  * brief (both Art Director templates, both iterate templates) and into the
  * scene review's check, so the author and the critic read the same words.
  */
-const SCENE_LIGHT_FIELD_RULE = `\`timeOfDay\` is one of ${TIME_OF_DAY_ENUM}, and \`weather\` one of ${WEATHER_ENUM} — \`none\` for an interior, where the weather is not visible. Both are required on every page, agree with the light the prose describes, and follow the book's time: they hold from page to page until the story moves the clock or the sky. They decide the page's light and the light of the plate it is painted on.`;
+const SKYLESS_LIGHT_RULE = `\`underwater\` is a page set beneath the water and \`dark\` a place no daylight reaches (ink, a cave, a ship's hold); each takes weather \`none\`, names no sun, moon, sky or horizon in the prose, and the book's hour goes on around it.`;
+
+const SCENE_LIGHT_FIELD_RULE = `\`timeOfDay\` is one of ${TIME_OF_DAY_ENUM}, and \`weather\` one of ${WEATHER_ENUM} — \`none\` for an interior, where the weather is not visible. Both are required on every page, agree with the light the prose describes, and follow the book's time: they hold from page to page until the story moves the clock or the sky. ${SKYLESS_LIGHT_RULE} They decide the page's light and the light of the plate it is painted on.`;
 
 /**
  * The light fields as the page-brief call states them when the decision layer
@@ -289,7 +327,7 @@ const SCENE_LIGHT_FIELD_RULE = `\`timeOfDay\` is one of ${TIME_OF_DAY_ENUM}, and
  * (21 of 21 briefs `light_undeclared`). One source with SCENE_LIGHT_FIELD_RULE:
  * the same enums and the same "holds until the story moves the sky" clause.
  */
-const SCENE_WEATHER_FIELD_RULE = `\`weather\` is one of ${WEATHER_ENUM} — \`none\` for an interior, where the weather is not visible. It is required on every page, agrees with the light the prose describes, and holds from page to page until the story moves the sky. A page's \`timeOfDay\` is code's, from its FIXED block, and a cover's \`weather\` is code's too.`;
+const SCENE_WEATHER_FIELD_RULE = `\`weather\` is one of ${WEATHER_ENUM} — \`none\` for an interior, where the weather is not visible. It is required on every page, agrees with the light the prose describes, and holds from page to page until the story moves the sky. A page's \`timeOfDay\` is code's, from its FIXED block, and a cover's \`weather\` is code's too. ${SKYLESS_LIGHT_RULE}`;
 
 /**
  * A rewritten brief keeps the declared light of the brief it replaces when it
@@ -331,6 +369,13 @@ function carryForwardLightInBrief(newBrief, previous) {
  * tell them apart reliably and neither can a reader.
  */
 function timeContradicts(declared, rendered) {
+  // A skyless light is contradicted by a daylight read (a bright reef or a lit shore for a dark or
+  // underwater page; a bright day for a dark one) and by nothing else: a judge cannot tell dark water
+  // from night, and ink from a hold.
+  if (isSkylessLight(declared) || isSkylessLight(rendered)) {
+    const other = isSkylessLight(declared) ? rendered : declared;
+    return ['morning', 'midday', 'afternoon'].includes(other);
+  }
   const d = TIMES_OF_DAY.indexOf(declared);
   const r = TIMES_OF_DAY.indexOf(rendered);
   if (d < 0 || r < 0) return false;
@@ -338,6 +383,10 @@ function timeContradicts(declared, rendered) {
 }
 
 module.exports = {
+  CLOCK_HOURS,
+  SKYLESS_LIGHTS,
+  SKYLESS_LIGHT_RULE,
+  isSkylessLight,
   TIMES_OF_DAY,
   WEATHERS,
   TIME_OF_DAY_ENUM,

@@ -89,6 +89,12 @@ function seasonLabel(inputData = {}, opts = {}) {
 function buildSeasonNote(inputData = {}, opts = {}) {
   const label = seasonLabel(inputData, opts);
   if (!label) return '';
+  // A page with no sky (underwater, dark: sceneLight.SKYLESS_LIGHTS) is told nothing about the sky or the
+  // daylight: "sky and daylight colour are autumn's" drew staging job_1791267520938_essbvehs8's submerged
+  // pages with an autumn sky.
+  if (opts && opts.skyless) {
+    return `**SEASON:** ${label}. Foliage and ground cover are ${label.toLowerCase()}'s on every page, the same place alike from page to page, even when a reference photo shows another season.`;
+  }
   // Terse on purpose: never cut from the page prompt (2026-09-27, "shorten the fixed blocks").
   return `**SEASON:** ${label}. Foliage, ground cover, sky and daylight colour are ${label.toLowerCase()}'s on every page, the same place alike from page to page, even when a reference photo shows another season. Indoor frames and the page's time of day are unaffected.`;
 }

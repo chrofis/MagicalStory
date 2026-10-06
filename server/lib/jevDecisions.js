@@ -48,7 +48,7 @@
 
 const J = require('./jevAudit');
 const SV = require('./shotVocabulary');
-const { TIMES_OF_DAY, WEATHERS } = require('./sceneLight');
+const { TIMES_OF_DAY, CLOCK_HOURS, SKYLESS_LIGHTS, isSkylessLight, WEATHERS } = require('./sceneLight');
 const { openRouterUsage } = require('./providerUsage');
 const { recordTextUsage } = require('./usageContext');
 const { log } = require('../utils/logger');
@@ -673,9 +673,16 @@ function castCutFindings(cutDecision) {
 // ───────────────────────── LIGHT (TIME / INDOOR / WEATHER) ─────────────────────────
 // Wording verbatim from eval-jev-decision-layer.js (meta items).
 
+// What Jev is told each skyless value means (owner, 2026-10-06: the pages with no sky were drawn at the
+// surface or on dry land under an hour's sun and sky; see sceneLight.SKYLESS_LIGHTS).
+const SKYLESS_CRITERIA = {
+  underwater: 'underwater: the picture is beneath the surface of the sea or a lake, whatever the hour above it',
+  dark: 'dark: pitch dark, no daylight reaches the place — a cave, a ship\'s hold, a cloud of ink, a sealed room',
+};
+
 function lightQuestions() {
   return {
-    TIME: { type: 'choice', instructions: 'The time of day in the picture of the page to judge, following the story\'s clock: it holds from page to page until the story moves it.', criteria: Object.fromEntries(TIMES_OF_DAY.map(t => [t, t])) },
+    TIME: { type: 'choice', instructions: 'The time of day in the picture of the page to judge, following the story\'s clock: it holds from page to page until the story moves it. A page set beneath the water, or in a place no daylight reaches (ink, a cave, a ship\'s hold), takes `underwater` or `dark` whatever the hour; the story\'s clock goes on around it.', criteria: Object.fromEntries(TIMES_OF_DAY.map(t => [t, SKYLESS_CRITERIA[t] || t])) },
     WEATHER: { type: 'choice', instructions: 'The weather visible in the picture of the page to judge. `none` when the scene is indoors, where the sky is not seen. Weather holds from page to page until the story changes it.', criteria: { clear: 'clear sky', overcast: 'overcast, grey clouds', rain: 'rain', snow: 'snow', fog: 'fog or mist', storm: 'storm, strong wind', none: 'none: the scene is indoors' } },
     INDOOR: { type: 'noul', instructions: 'The picture of the page to judge is set indoors: inside a building, a room, a cave or an enclosed vehicle.' },
   };
@@ -693,14 +700,17 @@ const DAY_START = new Set(['dawn', 'morning', 'midday']);
  * what it held.
  */
 function forwardClock(times) {
-  const idx = t => TIMES_OF_DAY.indexOf(t);
+  const idx = t => CLOCK_HOURS.indexOf(t);
   const out = []; const held = [];
+  // A skyless page (underwater, dark) is not an hour: it passes through as it is and the clock is
+  // read against the last page that had an hour, so a dark page between two evenings moves nothing.
+  let lastHour = null;
   for (let i = 0; i < times.length; i++) {
     const cur = times[i];
-    const prev = out[i - 1];
-    if (i > 0 && idx(cur) < idx(prev) && !(DAY_END.has(prev) && DAY_START.has(cur))) {
-      out.push(prev); held.push({ index: i, jev: cur, held: prev });
-    } else out.push(cur);
+    if (isSkylessLight(cur)) { out.push(cur); continue; }
+    if (lastHour && idx(cur) < idx(lastHour) && !(DAY_END.has(lastHour) && DAY_START.has(cur))) {
+      out.push(lastHour); held.push({ index: i, jev: cur, held: lastHour });
+    } else { out.push(cur); lastHour = cur; }
   }
   return { times: out, held };
 }
@@ -720,7 +730,9 @@ async function decideLight({ arc, pages }, opts = {}) {
     if (!TIMES_OF_DAY.includes(time)) throw new JevDecisionError(`Jev TIME answer "${time}" is outside ${TIMES_OF_DAY.join('|')}`);
     if (!WEATHERS.includes(weather)) throw new JevDecisionError(`Jev WEATHER answer "${weather}" is outside ${WEATHERS.join('|')}`);
     const indoorP = meanNoul(a, 'INDOOR');
-    return { pageNumber: Number(p.pageNumber), jevTime: time, weatherAdvice: weather, indoorP: +indoorP.toFixed(3), indoor: indoorP >= JEV_DECISIONS.light.indoorAt };
+    // A skyless light has no sky to show: it is `indoor` for everything downstream (weather `none`, no outdoor light
+    // for a cover's dominant hour), whatever the INDOOR question's probability said.
+    return { pageNumber: Number(p.pageNumber), jevTime: time, weatherAdvice: weather, indoorP: +indoorP.toFixed(3), indoor: isSkylessLight(time) || indoorP >= JEV_DECISIONS.light.indoorAt };
   });
   const clock = forwardClock(raw.map(r => r.jevTime));
   raw.forEach((r, i) => { r.timeOfDay = clock.times[i]; });
@@ -1107,10 +1119,16 @@ function vantageShotRule(jevBackup = false) {
 const JEV_BACKUP_SHOT_RULE = `A plan line whose first field is still the word ${SV.PLAN_SHOT_PLACEHOLDER} leaves that page's camera shot to you.`;
 function fixedFieldsRule(jevBackup = false) { return jevBackup ? JEV_BACKUP_SHOT_RULE : JEV_FIXED_FIELDS_RULE; }
 
+/** How a FIXED line says where the page's light comes from: no sky, indoors, or outdoors. */
+function fixedLightPlace(f, outdoors = 'outdoors') {
+  if (isSkylessLight(f.timeOfDay)) return 'no sky (weather none)';
+  return f.indoor ? 'indoors (weather none)' : outdoors;
+}
+
 /** The FIXED line under a page's PLAN line in the Art Director's plan block. */
 function fixedLine(fixed) {
   if (!fixed || !fixed.timeOfDay) return '';
-  return `FIXED: timeOfDay ${fixed.timeOfDay}; ${fixed.indoor ? 'indoors (weather none)' : 'outdoors'}`;
+  return `FIXED: timeOfDay ${fixed.timeOfDay}; ${fixedLightPlace(fixed)}`;
 }
 
 /**
@@ -1135,7 +1153,7 @@ function fixedBlock(page) {
     if (f.quiet) return '';
     const lines = ['FIXED — code writes each into METADATA (write none of them); the prose shows each:'];
     if (f.shot) lines.push(`- shot: ${f.shot}`);
-    if (f.timeOfDay) lines.push(`- timeOfDay: ${f.timeOfDay}; ${f.indoor ? 'indoors (weather none)' : `outdoors, weather ${f.weather || 'yours to write'}`}`);
+    if (f.timeOfDay) lines.push(`- timeOfDay: ${f.timeOfDay}; ${fixedLightPlace(f, `outdoors, weather ${f.weather || 'yours to write'}`)}`);
     if (f.location) lines.push(`- location: ${label(f.location)} — code puts it first in objects[]; write the cover's other ids after it, following its beat`);
     if (f.population) lines.push(`- population: ${f.population}`);
     if (f.era) lines.push(`- era: ${f.era}`);
@@ -1144,7 +1162,7 @@ function fixedBlock(page) {
   }
   const lines = ['FIXED — code writes each into METADATA (write none of them); the prose shows each:'];
   if (f.shot) lines.push(`- shot: ${f.shot}`);
-  if (f.timeOfDay) lines.push(`- timeOfDay: ${f.timeOfDay}; ${f.indoor ? 'indoors (weather none)' : 'outdoors'}`);
+  if (f.timeOfDay) lines.push(`- timeOfDay: ${f.timeOfDay}; ${fixedLightPlace(f)}`);
   const objects = [...(f.location ? [f.location] : []), ...(f.cites || [])];
   lines.push(`- objects: ${objects.length ? objects.map(label).join('; ') : 'none'}`);
   lines.push(`- aboard: ${f.aboard ? label(f.aboard) : 'none'}`);

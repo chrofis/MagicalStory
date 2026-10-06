@@ -299,7 +299,8 @@ describe('every repair that repaints pixels carries the declared light', () => {
 // pages (job_1790277448294_5herh01j7).
 describe('weather owns the sky', () => {
   const COVERED = ['overcast', 'rain', 'snow', 'fog', 'storm'];
-  const TIMES = [...L.TIMES_OF_DAY, null];
+  // The hours only: a skyless light (underwater, dark) has no sky for a weather to cover (scene-light-skyless.test.ts).
+  const TIMES = [...L.CLOCK_HOURS, null];
   // A sky light source named anywhere except inside the clause that forbids it.
   const namesSkySource = (s: string) => /sun|moon|blue sky|blue fading|golden/i.test(s.split(L.COVERED_SKY_CLAUSE).join(''));
 

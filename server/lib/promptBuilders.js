@@ -39,7 +39,7 @@ const { getSwissStoryResearch, getSwissCityById } = require('./swissStories');
 const { parseProseMetadataFormat, stripSceneMetadata, extractSceneMetadata, collectSceneCharacterNames, enforceSpreadTextPosition, parseSceneHintMetadata, resolveTextStagePictureSpec, buildTextStagePictureSpecs, SHARED_GRIP_RULE, normalisePopulation } = require('./sceneMetadata');
 const { resolveClothingForPage, buildUsedClothingText, buildAvailableAvatarsForPrompt } = require('./clothingResolve');
 const { seasonLabel, buildSeasonNote, buildSeasonInstruction } = require('./season');
-const { SCENE_LIGHT_FIELD_RULE, SCENE_WEATHER_FIELD_RULE, buildLightLine, declaredLight, TIME_OF_DAY_ENUM, WEATHER_ENUM } = require('./sceneLight');
+const { SCENE_LIGHT_FIELD_RULE, SCENE_WEATHER_FIELD_RULE, buildLightLine, declaredLight, isSkylessLight, TIME_OF_DAY_ENUM, WEATHER_ENUM } = require('./sceneLight');
 const { isNotSetRelationship, isStrangersRelationship } = require('./relationships');
 const { VB_ELEMENT_BUDGET } = require('./vbElementBudget');
 
@@ -5469,7 +5469,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
       // Season note, same shape as ERA_GUARD: a book-wide condition the
       // renderer must honour even when an attached landmark reference photo
       // was shot in a different season (decisions.md 2026-08-16).
-      SEASON_NOTE: buildSeasonNote(inputData || {}),
+      SEASON_NOTE: buildSeasonNote(inputData || {}, { skyless: isSkylessLight(declaredLight(metadata).timeOfDay) }),
       // The page's declared time of day and weather (sceneLight.js), a fixed
       // line from the brief's two fields. In the protected tail
       // (images.js PROMPT_NEVER_CUT marker **LIGHT:**) and it wins over the
