@@ -5974,6 +5974,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             // empty because the jacket it had taken OFF was resolved back to
             // "worn" and omitted as already-referenced.
             sceneMetadata: r.sceneMetadata || null,
+            // THE FIELDS THE JEV LAYER FIXED (2026-10-06). iteratePageCore re-pins them after
+            // a rewrite (pinBrief) and reads `savedScene.jevFixed.shot` to tell a strict from a
+            // free iterate. This whitelist lacked them, so every in-job iterate rewrite shipped
+            // unpinned: essbv p3 v1 kept location LOC001 for the vantage LOC001.2, no population
+            // and Emma's gaze at "water" where the plan, the text and the pin say Hans.
+            jevFixed: r.scene?.jevFixed || null,
             imageAspect: inputData?.layout?.imageAspect,
             textInImage: inputData?.layout?.textInImage,
             // The page's locked text-overlay position. Used by iteratePageCore
