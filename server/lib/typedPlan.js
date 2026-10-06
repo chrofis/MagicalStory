@@ -552,8 +552,11 @@ function replanScope({ rows, findings, jevPages, castTable = null, targets, cali
     if (f.code === 'NO_FOCAL_PAGE' && add.length && chosen.length < k) {
       // Too few pages hold a single figure (a short book where two characters each need a focal page): the character may
       // TAKE a two-figure page, one of its figures leaving. The acceptance refuses a swap that costs a coverage or a focal page.
-      const swap = wide.filter(r => r.names.length === 2 && !has(r, add[0]) && !soleFocalFull(r) && !(out.get(r.pageNumber) || { adds: [] }).adds.length && !chosen.includes(r.pageNumber));
-      for (const r of spread(swap.map(x => x.pageNumber), k - chosen.length)) give(r, `${f.detail} — give ${add[0]} a focal page here: ${add[0]}'s own action is the page's subject, ${add[0]} alone or with one companion (a figure of the page may leave it)`, { relax: { type: true, who: true }, add });
+      // Only a figure the book can spare may leave: one above its coverage floor (the main character above his), or one that is not commissioned.
+      const appears = n => rows.filter(r => has(r, n)).length;
+      const leavers = r => r.names.filter(n => classOf(n) !== 'commissioned' || appears(n) > (mainName && n.toLowerCase() === mainName.toLowerCase() ? targets.mainMin : targets.appearancesMin));
+      const swap = wide.filter(r => r.names.length === 2 && !has(r, add[0]) && !soleFocalFull(r) && leavers(r).length && !(out.get(r.pageNumber) || { adds: [] }).adds.length && !chosen.includes(r.pageNumber));
+      for (const r of spread(swap.map(x => x.pageNumber), k - chosen.length)) give(r, `${f.detail} — give ${add[0]} a focal page here: ${add[0]}'s own action is the page's subject, ${add[0]} alone or with one companion (${leavers(rowOf(r)).join(' or ')} may leave the page)`, { relax: { type: true, who: true }, add });
     }
   }
   for (const { page, id } of picked) give(page, fixOf(id), { relax: relaxOf(id) });
