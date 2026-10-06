@@ -126,3 +126,31 @@ describe('the load-bearing rule reaches the writer, the refine and the arc-infor
     expect(LOAD_BEARING_RULE).toMatch(/optional/);
   });
 });
+
+describe('built prompts carry the load-bearing rule, the cap and the oddity rules, with no unfilled placeholder', () => {
+  // @ts-ignore CommonJS
+  const B = require('../../server/lib/promptBuilders');
+  const input = { language: 'de-ch', languageLevel: 'standard', characters: [{ id: 1, name: 'Mara', age: 7, gender: 'female', isMain: true }], mainCharacters: [1], pages: 4 };
+  const PLAN = 'wide — Mara — Mara pulls the rope — the sail is up';
+  let built: Record<string, string>;
+  beforeAll(async () => {
+    await require('../../server/services/prompts').loadPromptTemplates();
+    built = {
+      writer: B.buildStoryTextFromBeatsPrompt(input, [{ pageNumber: 1, planLine: PLAN }], [], 'An arc.'),
+      repair: B.buildTextRefinePrompt(input, [{ pageNumber: 1, text: 'Mara zog am Seil.', planLine: PLAN, sceneBrief: 'x' }], 'T1 FAULT[CAUSE]: p1 — x', 'An arc.'),
+      audit: B.buildTextAuditPrompt(input, [{ pageNumber: 1, text: 'Mara zog am Seil.', planLine: PLAN, sceneBrief: 'x' }], 'An arc.'),
+    };
+  });
+  it.each(['writer', 'repair', 'audit'])('%s: load-bearing rule once, nothing unfilled', (name) => {
+    expect(built[name].split(LOAD_BEARING_RULE).length - 1).toBe(1);
+    expect(built[name]).not.toMatch(/\{(LOAD_BEARING|EDIT_CAP_PERCENT)\}/);
+  });
+  it('the repair states the cap the code enforces', () => {
+    expect(built.repair).toContain(`more than ${Math.round(MODEL_DEFAULTS.textRefineMaxChangedRatio * 100)} percent`);
+  });
+  it('the rulebook names the four oddity classes for every prose pass', () => {
+    for (const re of [/no because-clause and no purpose clause/, /never beside an act that already shows it/, /never explains the story's rules/, /No roll call/]) {
+      expect(B.STYLE_RULEBOOK).toMatch(re);
+    }
+  });
+});
