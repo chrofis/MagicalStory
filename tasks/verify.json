@@ -5686,6 +5686,24 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "text-v4-owed-short-line",
+      "commits": [
+        "536bcc95e",
+        "ba6653fbe"
+      ],
+      "addedAt": "2026-10-06",
+      "claim": "A full story draft carries each owed fact as an act or one short line: no character recites a world rule or route in full, no narrator reason, 'suddenly' and jokes absent, 'Challenges taken' never reaches the writer. Console replay missed the bar (recital 3-7 per draft); this checks the real run.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Read stories.data.writerText against the OWED list; count recitals and narrator because-clauses; read the blind-audit STYLE lines."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [
