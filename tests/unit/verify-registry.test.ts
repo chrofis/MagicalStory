@@ -166,3 +166,20 @@ describe('tasks/verify.json', () => {
     }
   });
 });
+
+describe('verify registry: every runShape names a known shape', () => {
+  // A shape the evaluator does not know turns every run into NOT COVERED for that
+  // entry (testlab-stage on three entries, 2026-10-06, essbv): proof by a Lab stage is `lab-stage`.
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { SHAPES } = require('../../scripts/admin/verify-checks.js');
+  it('has no unknown runShape name', () => {
+    const reg = JSON.parse(fs.readFileSync(path.join(__dirname, '../../tasks/verify.json'), 'utf8'));
+    const bad: string[] = [];
+    for (const e of reg.entries) {
+      for (const raw of Array.isArray(e.runShape) ? e.runShape : [e.runShape || 'any']) {
+        if (!(String(raw).split(':')[0] in SHAPES)) bad.push(`${e.id}: ${raw}`);
+      }
+    }
+    expect(bad).toEqual([]);
+  });
+});

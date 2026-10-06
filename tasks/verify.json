@@ -5381,8 +5381,7 @@
       "addedAt": "2026-10-05",
       "claim": "On a beats story, the page-brief reply (sceneExpansionReport.replies[].text) carries no `shot`, `timeOfDay`, `population` or `aboard`, no `looksAt` on a character the FIXED block lists, and an `objects` that holds only ids the FIXED line does not list, while every stored brief (sceneDescriptions) carries all of them equal to the FIXED block; the generation log has no beats_jev_field_disobeyed line and sceneExpansionReport has no jevFieldsDisobeyed; the output tokens of call 2 fall against Lab #1623/#1624.",
       "runShape": [
-        "full-story",
-        "testlab-stage"
+        "full-story"
       ],
       "check": {
         "kind": "human",
@@ -5407,8 +5406,7 @@
       "addedAt": "2026-10-05",
       "claim": "On a beats story, each cover's stored brief (coverImages[*].sceneMetadata / sceneDescriptions p-1..-3) carries shot wide, looksAt viewer on every figure, timeOfDay/weather from the book's light (front = dominant outdoor light, title page = page 1, back = last page), population equal to its location's decision and era equal to the Visual Bible's `era`; the call-2 prompt shows each cover a FIXED block with those lines; the generation log has no beats_cover_era_missing.",
       "runShape": [
-        "full-story",
-        "testlab-stage"
+        "full-story"
       ],
       "check": {
         "kind": "human",
@@ -5435,8 +5433,7 @@
       "addedAt": "2026-10-05",
       "claim": "On the next story with a child costumed:mermaid, clothingRequirements[child].costumed.description names a long/short-sleeve swim shirt and a tail replacing the legs with no feet/bare feet/one-piece; the costumed sheet is generated (no avatar_category_missing in generationLog); the cover and page images show a covered torso and no feet under the tail. A required costumed sheet that cannot be generated fails the job (error names the character, credits refunded); a child shown with an uncovered torso is typed child_torso_uncovered CRITICAL in the page/cover eval.",
       "runShape": [
-        "full-story",
-        "testlab-stage"
+        "full-story"
       ],
       "check": {
         "kind": "human",

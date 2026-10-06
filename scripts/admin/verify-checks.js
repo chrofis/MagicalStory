@@ -139,6 +139,7 @@ const SHAPES = {
     ? { ok: true } : { ok: false, why: 'scene composite did not run (disabled)' },
   // Proved by a Test Lab stage, never by a story run: record it with --mark on the Lab evidence.
   'lab-stage': () => ({ ok: false, why: 'proved by a Test Lab stage, not a story run — --mark it from the Lab result' }),
+  'replay': () => ({ ok: false, why: 'proved by a replay over stored data, not a story run — --mark it from the replay result' }),
 };
 
 /** runShape: array of "name" or "name:arg"; every one must hold. */
