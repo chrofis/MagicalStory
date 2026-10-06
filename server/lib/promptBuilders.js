@@ -39,6 +39,7 @@ const { getSwissStoryResearch, getSwissCityById } = require('./swissStories');
 const { parseProseMetadataFormat, stripSceneMetadata, extractSceneMetadata, collectSceneCharacterNames, enforceSpreadTextPosition, parseSceneHintMetadata, resolveTextStagePictureSpec, buildTextStagePictureSpecs, SHARED_GRIP_RULE, normalisePopulation } = require('./sceneMetadata');
 const { resolveClothingForPage, buildUsedClothingText, buildAvailableAvatarsForPrompt } = require('./clothingResolve');
 const { seasonLabel, buildSeasonNote, buildSeasonInstruction } = require('./season');
+const { gazeTokenRow, GAZE_TOKEN_LIST } = require('./gazeTargets');
 const { SCENE_LIGHT_FIELD_RULE, SCENE_WEATHER_FIELD_RULE, buildLightLine, declaredLight, isSkylessLight, TIME_OF_DAY_ENUM, WEATHER_ENUM } = require('./sceneLight');
 const { isNotSetRelationship, isStrangersRelationship } = require('./relationships');
 const { VB_ELEMENT_BUDGET } = require('./vbElementBudget');
@@ -5840,7 +5841,10 @@ function looksAtPhrase(target, visualBible = null) {
   if (!t) return '';
   const k = t.toLowerCase();
   if (k === 'camera' || k === 'the viewer' || k === 'viewer') return 'eyes on the viewer';
-  if (k === 'away') return 'eyes turned away from everyone in the frame';
+  // The gaze words (gazeTargets.js: down, up, ahead, distance, away, closed, outside, held): one table.
+  // `outside` never carries a name; the line says someone just outside the picture.
+  const row = gazeTokenRow(t);
+  if (row) return row.phrase;
   const { scrubVbIds } = require('./vbIdGuard');
   return `eyes on ${scrubVbIds(t, visualBible)}`;
 }
@@ -5979,9 +5983,10 @@ function buildExactPosesBlock(interactions, sceneCharacters = [], visualBible = 
     if (String(c.depth || '').toLowerCase() === 'background') continue;
     const expr = typeof c.expression === 'string' ? c.expression.trim() : '';
     const gaze = looksAtPhrase(c.looksAt, visualBible);
+    const row = gazeTokenRow(c.looksAt);
     const eyes = gaze === 'eyes on the viewer'
       ? gaze
-      : `${gaze || 'eyes off into the scene'}, face turned the same way, never to the viewer`;
+      : (row && row.faceFollows === false ? `${gaze}, never to the viewer` : `${gaze || 'eyes off into the scene'}, face turned the same way, never to the viewer`);
     exprLines.push(`- ${name}: ${[expr, eyes].filter(Boolean).join('; ')}`);
   }
   const exprBlock = exprLines.length > 0
@@ -9825,7 +9830,7 @@ const GAZE_TARGET_RULE = "Name at most one gaze target, and compose the frame so
  */
 const COVER_GAZE_EXCEPTION = "A book cover page is the one exception — page -1 is the front cover, page -2 the opening (dedication) page, page -3 the back cover, each a picture posed for the reader rather than a moment of the story: its plan line poses the cast for the reader, every figure's `looksAt` is `viewer`, and that plan line overrides every rule against facing or looking at the viewer.";
 
-const LOOKS_AT_FIELD_RULE = "Every foreground or midground character carries `looksAt`: another character's name, a Visual Bible id, or `away`. There is no value for the viewer: a figure never meets the reader's eye. " + COVER_GAZE_EXCEPTION + " It is the eyes only; hands live in `interactions[]`, and a character holding a thing does not look at it unless the plan line says so. When the plan line stages two named characters facing each other, in a standoff, an exchange or a conversation, each one's `looksAt` is the other — unless the plan line gives one of them a different gaze (\"looks up at it\", \"stares at the chest\"), in which case that one looks where the plan says and the other looks at them. On different levels the lower one looks up, the upper one looks down. The prose clause says the same thing the field says. A secondary character (a CHR id in `objects[]`) has no `characters[]` row: its gaze is a `watching` interaction whose `object` is what it looks at, and its prose clause says the same.";
+const LOOKS_AT_FIELD_RULE = "Every foreground or midground character carries `looksAt`: another character's name, a Visual Bible id, or a gaze word (" + GAZE_TOKEN_LIST + ": eyes down, up, straight ahead, on the far distance, turned away from everyone, closed, on someone just outside the picture, on what the figure holds). There is no value for the viewer: a figure never meets the reader's eye. " + COVER_GAZE_EXCEPTION + " It is the eyes only; hands live in `interactions[]`, and a character holding a thing does not look at it unless the plan line says so. When the plan line stages two named characters facing each other, in a standoff, an exchange or a conversation, each one's `looksAt` is the other — unless the plan line gives one of them a different gaze (\"looks up at it\", \"stares at the chest\"), in which case that one looks where the plan says and the other looks at them. On different levels the lower one looks up, the upper one looks down. The prose clause says the same thing the field says. A secondary character (a CHR id in `objects[]`) has no `characters[]` row: its gaze is a `watching` interaction whose `object` is what it looks at, and its prose clause says the same.";
 
 /**
  * ONE contract for the `expression` field, at every site that writes a brief.

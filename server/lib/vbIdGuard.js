@@ -23,6 +23,7 @@
  */
 
 const { log } = require('../utils/logger');
+const { gazeToken, gazeTokenRow } = require('./gazeTargets');
 
 /** Pool prefixes the Visual Bible mints ids from. */
 const VB_ID_POOLS = 'CHR|ANI|ART|LOC|VEH|CLO';
@@ -284,6 +285,9 @@ function gazeCreatures(meta, visualBible) {
 function gazeTarget(looksAt, pageObjects = []) {
   const t = String(looksAt || '').trim();
   if (!t) return '';
+  // A gaze word (gazeTargets.js) is no id and no place: it passes through, in its one spelling.
+  const word = gazeToken(t);
+  if (word) return word;
   const base = baseVbId(t);
   if (!base || !/^LOC/i.test(base)) return t;
   const cited = (Array.isArray(pageObjects) ? pageObjects : [])
@@ -295,7 +299,7 @@ function formatInteractionsBlock(interactions, visualBible = null, characters = 
   const list = Array.isArray(interactions) ? interactions : [];
   const gazes = (Array.isArray(characters) ? characters : [])
     .filter(c => c?.name && c.looksAt)
-    .map(c => `- ${c.name} looks at ${String(c.looksAt).trim()}`);
+    .map(c => { const row = gazeTokenRow(c.looksAt); return row ? `- ${c.name} ${row.judge}` : `- ${c.name} looks at ${String(c.looksAt).trim()}`; });
   if (list.length === 0 && gazes.length === 0) return '(none declared)';
   const block = [
     ...list.map(i => `- ${i?.character || '?'} + ${i?.object || '?'}: ${i?.where || '(no placement given)'}`),

@@ -47,6 +47,7 @@ const { stripDataUriPrefix, bytesFromAnyImage } = require('./r2');
 const { GROK_ASPECT_PRESETS, closestGrokAspect } = require('./grokAspect');
 const { rembgRemoveBackground } = require('./rembg');
 const { scrubVbIds, warnIfVbIds } = require('./vbIdGuard');
+const { gazeTokenRow, gazeLookingClause } = require('./gazeTargets');
 const { assertPromptFilled } = require('../services/prompts');
 
 /**
@@ -1374,7 +1375,7 @@ function buildInPlaceRenderPrompt(c, visualBible = null, { refMode = 'sheet' } =
   const name = c.name || 'the character';
   const clauses = [];
   if (c.action) clauses.push(String(c.action).trim());
-  if (c.looksAt) clauses.push(`looking at ${String(c.looksAt).trim()}`);
+  if (c.looksAt) clauses.push(gazeLookingClause(c.looksAt));
   const poseLine = clauses.length ? ` The figure is ${clauses.join(', ')}.` : '';
   // refMode 'cell' (owner's design 2026-09-11): Image 2 is ONE view cropped
   // from the 2x4 sheet (or a single-image bible reference), not the grid. The
@@ -1852,7 +1853,7 @@ function buildCastLines(cast) {
       profile:      'profile view',
       back:         'back view, viewer sees the back of the head',
     }[c.pose] || 'three-quarter view';
-    const actionClause = (c.action ? `, ${c.action}` : '') + (c.looksAt ? `, looking at ${c.looksAt}` : '');
+    const actionClause = (c.action ? `, ${c.action}` : '') + (c.looksAt ? `, ${gazeLookingClause(c.looksAt)}` : '');
     // Per-pose eye markers — black dot(s) inside the silhouette's head.
     // Front/three-quarter show two eyes; profile shows one; back shows none.
     const markerSpec = (() => {
@@ -2462,7 +2463,7 @@ function buildBlendEditPrompt(scene, cast = null) {
       if (actions[c.name]) bits.push(` ${_sentence(actions[c.name])}`);
       if (attention[c.name]) {
         const k = String(attention[c.name]).toLowerCase();
-        bits.push(k === 'camera' ? ' Looking at the viewer.' : k === 'away' ? ' Looking away from everyone in the frame.' : ` Looking at ${attention[c.name]}.`);
+        bits.push(k === 'camera' ? ' Looking at the viewer.' : gazeTokenRow(k) ? ` ${_sentence(gazeTokenRow(k).phrase)}` : ` Looking at ${attention[c.name]}.`);
       }
       if (expressions[c.name]) bits.push(` ${_sentence(expressions[c.name])}`);
       // Size-neutral, and the occluder is deliberately NOT named: run E of Lab
@@ -2662,7 +2663,7 @@ function buildBackCharLines(cast) {
       profile:      'profile view',
       back:         'back view, viewer sees the back of the head',
     }[c.pose] || 'three-quarter view';
-    const actionClause = (c.action ? `, ${c.action}` : '') + (c.looksAt ? `, looking at ${c.looksAt}` : '');
+    const actionClause = (c.action ? `, ${c.action}` : '') + (c.looksAt ? `, ${gazeLookingClause(c.looksAt)}` : '');
     return `- ${c.name}: ${posHint}, ${poseLabel}${actionClause}. Size: ${sizeHint}. Match the matching reference sheet for face, hair, and clothing.`;
   }).join('\n');
 }

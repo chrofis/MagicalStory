@@ -18,9 +18,9 @@ const { buildSeasonNote } = req('../../server/lib/season');
 const SKY_WORDS = /\b(sun|moon|sky|skies|horizon|daylight)\b/i;
 
 describe('the enum', () => {
-  it('keeps the seven hours and adds the two skyless lights after them', () => {
+  it('keeps the seven hours and adds the skyless lights after them', () => {
     expect(SL.CLOCK_HOURS).toEqual(['dawn', 'morning', 'midday', 'afternoon', 'evening', 'dusk', 'night']);
-    expect(SL.TIMES_OF_DAY).toEqual([...SL.CLOCK_HOURS, 'underwater', 'dark']);
+    expect(SL.TIMES_OF_DAY).toEqual([...SL.CLOCK_HOURS, 'underwater', 'underwater_deep', 'underwater_night', 'underwater_dark', 'dark']);
     expect(SL.normaliseTimeOfDay('Underwater')).toBe('underwater');
     expect(SL.declaredLight({ timeOfDay: 'dark', weather: 'none' })).toEqual({ timeOfDay: 'dark', weather: 'none' });
   });
@@ -32,7 +32,7 @@ describe('the enum', () => {
 });
 
 describe('a skyless page is never given sun or sky wording', () => {
-  for (const t of ['underwater', 'dark']) {
+  for (const t of SL.SKYLESS_LIGHTS) {
     for (const weather of ['clear', 'fog', 'none']) {
       it(`${t} / ${weather}: page, plate, repair, relight, derive and judge lines`, () => {
         const light = { timeOfDay: t, weather };
@@ -78,6 +78,7 @@ describe('Jev light: the clock goes on around a skyless page', () => {
     expect(Object.keys(q.criteria)).toEqual(SL.TIMES_OF_DAY);
     expect(q.criteria.dark).toMatch(/cave/);
     expect(q.criteria.underwater).toMatch(/beneath the surface/);
+    expect(q.criteria.underwater_dark).toMatch(/ink/);
   });
   it('a skyless answer is indoor (weather none) whatever the INDOOR question said', async () => {
     // the stub picks the first TIME criterion (`dawn`); give it the skyless one through the answer shape

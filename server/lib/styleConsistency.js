@@ -64,7 +64,7 @@ const CONFIRMATION_FLAG_RATIO = 0.2;
 // contradict their briefs before anyone decides what to do about it.
 // ─────────────────────────────────────────────────────────────────────
 
-const { TIMES_OF_DAY, WEATHERS, declaredLightOfBrief, timeContradicts } = require('./sceneLight');
+const { TIMES_OF_DAY, WEATHERS, declaredLightOfBrief, timeContradicts, JUDGE_SKYLESS_NOTES } = require('./sceneLight');
 // The judge's vocabularies: the declared enums, plus the answer for a cell
 // whose light cannot be read. `none` (an interior) is the declared value; the
 // judge names what it sees, `indoor`.
@@ -593,7 +593,7 @@ For each flagged page, name 2-4 SPECIFIC differences. Severity:
 - "minor"    — subtle inconsistency (slight colour cast, small edge-style variation)
 
 Separately, report four OBSERVATIONS per cell. These are descriptions, not judgments — never let them change a style verdict.
-- "renderedTime": the time of day the cell's own light shows, one of: ${TIME_BUCKETS}. Use "unclear" when the light gives no time.
+- "renderedTime": the time of day the cell's own light shows, one of: ${TIME_BUCKETS}. A cell with no sky takes the bucket for its light: ${JUDGE_SKYLESS_NOTES}. Use "unclear" when the light gives no time.
 - "renderedWeather": the weather the cell's own sky and surfaces show, one of: ${WEATHER_BUCKETS}. Use "indoor" for an interior, "unclear" when nothing shows it.
 - "renderedSeason": the season this cell's own foliage, ground cover and daylight colour show, one of: ${SEASON_BUCKETS}. Judge the cell alone; never carry a season from another cell. Use "indeterminate" for an interior, a night frame, or any cell showing no foliage, ground or sky.
 - "facing": which way the dominant figure faces — "frame-left", "frame-right", or "camera". Use "none" when no figure dominates.

@@ -227,7 +227,7 @@ function parseCreatures(rows) {
  * anything else → 'cast_only'. `crowdExpected` continues to be published
  * alongside, derived, for every consumer that only asks the old question.
  */
-const { normaliseTimeOfDay, normaliseWeather } = require('./sceneLight');
+const { normaliseTimeOfDay, normaliseWeather, normaliseLightSources } = require('./sceneLight');
 
 const POPULATION_LEVELS = ['cast_only', 'ambient', 'crowd'];
 
@@ -1020,6 +1020,7 @@ function extractSceneMetadata(sceneDescription) {
         // null. Null on a brief written before the fields existed.
         timeOfDay: normaliseTimeOfDay(metadata.timeOfDay),
         weather: normaliseWeather(metadata.weather),
+        lightSources: normaliseLightSources(metadata.lightSources),
         background: metadata.background || null,
         // The Art Director writes `sceneIntent` on every page, and this
         // allowlist dropped it — so the two branches of this function
@@ -1071,6 +1072,7 @@ function extractSceneMetadata(sceneDescription) {
       sceneIntent: metadata.sceneIntent || null,
       timeOfDay: normaliseTimeOfDay(metadata.timeOfDay),
       weather: normaliseWeather(metadata.weather),
+      lightSources: normaliseLightSources(metadata.lightSources),
       background: metadata.background || null,
       isJsonFormat: true,
       isProseFormat: true
@@ -1217,6 +1219,7 @@ function extractSceneMetadata(sceneDescription) {
       // object; null on a hint that predates the fields.
       timeOfDay: normaliseTimeOfDay(parsedData.timeOfDay),
       weather: normaliseWeather(parsedData.weather),
+      lightSources: normaliseLightSources(parsedData.lightSources),
       isJsonFormat: true
     };
   }

@@ -18,6 +18,32 @@ const { log } = require('../utils/logger');
 const jevDecisions = require('./jevDecisions');
 const { JevDecisionError } = jevDecisions;
 const { resolveShotId } = require('./shotVocabulary');
+const { isDimLight } = require('./sceneLight');
+
+/**
+ * The cited elements of one page as the light-source question asks about them (decideLightSources):
+ * each cite with its name, short description and the name of the look it shows. Clothing is not asked.
+ * @param {{elements:Array<{id:string, cite:string, type:string}>}|undefined} vbRow - decideVbAndAboard's row for the page
+ * @param {Object} gIndex - jevDecisions.gazeIndex(visualBible)
+ * @param {Map<string,string>} lookOf - dotted state id -> the look's label
+ */
+function litCandidates(vbRow, gIndex, lookOf) {
+  const baseOf = id => String(id || '').trim().toUpperCase().split('.')[0];
+  return (vbRow ? vbRow.elements : []).filter(x => x.type !== 'clothing').map((x) => {
+    const g = gIndex[baseOf(x.cite)] || gIndex[baseOf(x.id)];
+    return { id: x.cite, name: g ? g.name : x.id, desc: g ? g.desc : '', look: lookOf.get(String(x.cite).toUpperCase()) || '' };
+  });
+}
+
+/**
+ * The commissioned characters a page's plan line names who are not in its picture: the gaze word
+ * `outside` is offered for them, and their names are never written into an image prompt.
+ */
+function offFrameOf(commissioned, roster, planLine) {
+  const planText = jevDecisions.planParts(planLine).slice(1).join(' ');
+  return (commissioned || []).filter(c => !(roster || []).includes(c) && jevDecisions.namedIn(c, planText));
+}
+
 
 /**
  * THE LOCATION OF EVERY STORY PAGE, from the Visual Bible's own page tables
@@ -134,6 +160,12 @@ async function decideBriefFields({ beats, visualBible, bibleSections, approvedAr
       readsText: !!(r && r.readsText),
     };
   }
+  // What lights a dark page: Jev says which cited element is lit or glowing (owner, 2026-10-06). Pages in a light
+  // with sky and sun keep no list ([] clears a stale one when a brief is re-pinned).
+  const litPages = storyBeats.filter(b => b.fixed && isDimLight(b.fixed.timeOfDay));
+  const litEls = litPages.map(b => ({ pageNumber: Number(b.pageNumber), elements: litCandidates(vbByPage.get(Number(b.pageNumber)), gIndex, lookOf) }));
+  const lit = await jevDecisions.decideLightSources({ arc: approvedArc, pages: storyBeats, perPage: litEls });
+  for (const b of storyBeats) b.jevFixed.lightSources = (lit.byPage.get(Number(b.pageNumber)) || []).map(x => x.name);
   // Gaze: the roster is the head count's commissioned characters; the
   // candidates are the page's decided cites and the figures its plan line names.
   const perPage = storyBeats.map((b) => {
@@ -141,7 +173,8 @@ async function decideBriefFields({ beats, visualBible, bibleSections, approvedAr
     const inFrame = present.get(n) || [];
     const roster = commissioned.filter(c => inFrame.some(name => isSameFigureName(c, name)));
     const objects = [...(b.jevFixed.location ? [b.jevFixed.location] : []), ...b.jevFixed.cites];
-    return { pageNumber: n, roster, ...jevDecisions.gazePageMaterial({ objects, interactions: [], planLine: b.planLine, index: gIndex }) };
+    const offFrame = offFrameOf(commissioned, roster, b.planLine);
+    return { pageNumber: n, roster, offFrame, ...jevDecisions.gazePageMaterial({ objects, interactions: [], planLine: b.planLine, index: gIndex }) };
   });
   const gaze = await jevDecisions.decideGaze({ arc: approvedArc, pages: storyBeats, perPage });
   for (const g of gaze.pages) {
@@ -150,7 +183,7 @@ async function decideBriefFields({ beats, visualBible, bibleSections, approvedAr
   }
   for (const b of storyBeats) {
     const f = b.jevFixed;
-    const ids = [f.location, ...f.cites, f.aboard, ...Object.values(f.looksAt || {})].filter(id => id && id !== jevDecisions.GAZE_AWAY && /^[A-Z]{3}\d{3}/i.test(String(id)));
+    const ids = [f.location, ...f.cites, f.aboard, ...Object.values(f.looksAt || {})].filter(id => id && /^[A-Z]{3}\d{3}/i.test(String(id)));
     f.labels = Object.fromEntries(ids.map(id => [id, labelOf(id)]));
   }
   // The element page tables follow the cites, before the page-brief call reads the bible.
@@ -163,9 +196,9 @@ async function decideBriefFields({ beats, visualBible, bibleSections, approvedAr
       else bibleSections = synced;
     }
   }
-  const report = { vb: decidedVb, population: pop, gaze, locations: Object.fromEntries([...located.byPage].map(([n, r]) => [n, r.cite])), unlocated: located.unplaced, elapsedMs: Date.now() - t0 };
+  const report = { vb: decidedVb, population: pop, gaze, lightSources: Object.fromEntries([...lit.byPage]), locations: Object.fromEntries([...located.byPage].map(([n, r]) => [n, r.cite])), unlocated: located.unplaced, elapsedMs: Date.now() - t0 };
   gl.info('beats_jev_brief_fields', `Jev decided the cited elements, looks, location, aboard, population and gaze of ${storyBeats.length} page(s) before the briefs (${decidedVb.stats.calls + pop.stats.calls + gaze.stats.calls} Jev calls, ${(report.elapsedMs / 1000).toFixed(1)}s)`, null, {
-    stats: { vb: decidedVb.stats, population: pop.stats, gaze: gaze.stats },
+    stats: { vb: decidedVb.stats, population: pop.stats, gaze: gaze.stats, lightSources: lit.stats },
   });
   return { bibleSections, report };
 }
@@ -594,12 +627,22 @@ const COVER_GAZE = 'viewer';
  * `weather` is Jev's advice for that page. Pure; returns null when the source
  * page has no decided light.
  *
+ * THE COVER'S OWN PLACE (owner, 2026-10-06): when the cover's place (`location`, a LOC or vantage id) has
+ * story pages, the rules above run over THOSE pages only: a cover standing in a cave is lit like the
+ * cave pages, not like the book's average. A place no story page stands on (an offered landmark) has no
+ * light of its own to read, so the book's pages are the evidence, as before.
+ *
  * @param {string} coverKey
- * @param {Array<{pageNumber:number, fixed?:{timeOfDay:string, indoor:boolean, weatherAdvice:string}}>} storyBeats
+ * @param {Array<{pageNumber:number, fixed?:{timeOfDay:string, indoor:boolean, weatherAdvice:string}, jevFixed?:{location?:string}}>} storyBeats
+ * @param {string|null} [location] - the cover's decided location / vantage id
  */
-function coverLight(coverKey, storyBeats) {
-  const pages = (storyBeats || []).filter(b => b && b.fixed && b.fixed.timeOfDay).sort((a, b) => a.pageNumber - b.pageNumber);
-  if (!pages.length) return null;
+function coverLight(coverKey, storyBeats, location = null) {
+  const decided = (storyBeats || []).filter(b => b && b.fixed && b.fixed.timeOfDay).sort((a, b) => a.pageNumber - b.pageNumber);
+  if (!decided.length) return null;
+  const base = id => String(id || '').trim().toUpperCase().split('.')[0];
+  const place = location ? base(location) : null;
+  const own = place ? decided.filter(b => b.jevFixed && b.jevFixed.location && base(b.jevFixed.location) === place) : [];
+  const pages = own.length ? own : decided;
   let src;
   if (coverKey === 'initialPage') src = pages[0];
   else if (coverKey === 'backCover') src = pages[pages.length - 1];
@@ -635,7 +678,7 @@ function coverLight(coverKey, storyBeats) {
  * @param {string|null} [o.era] - the Visual Bible's story-level era
  */
 function coverFacts({ coverKey, storyBeats, location = null, population = null, era = null }) {
-  const light = coverLight(coverKey, storyBeats);
+  const light = coverLight(coverKey, storyBeats, location);
   const base = location ? String(location).trim().toUpperCase().split('.')[0] : null;
   const pop = base && population && population[base] ? population[base].population : null;
   const eraText = typeof era === 'string' && era.trim() ? era.trim() : null;
@@ -675,7 +718,7 @@ async function decideCoverPopulation({ arc, coverBeats, visualBible, decided = {
 }
 
 module.exports = {
-  coverLight, coverFacts, decideCoverPopulation, COVER_SHOT, COVER_GAZE,
+  litCandidates, offFrameOf, coverLight, coverFacts, decideCoverPopulation, COVER_SHOT, COVER_GAZE,
   decideBriefFields, assembleBriefs, pageLocations, visualBibleJsonOf,
   COVER_PLACE_SHOTS, COVER_PLACE_Q, COVER_OFFERED_Q, COVER_PLACE_FLOOR, COVER_PHOTO_MIN_SCORE, coverPhotoOf, bibleLocationOf, materializeCoverPlaces, coverPlaceLabel, coverPlaceCandidates, assignCoverPlaces, coverPlaceState, decideCoverPlaces, applyCoverPlacePages,
 };

@@ -3610,6 +3610,26 @@
       "fixedAt": "2026-10-06",
       "fixedIn": "54a40ab90",
       "fix": "timeOfDay gains underwater and dark outside the clock (weather none, no sun/sky wording in any built line, season note without sky); Jev TIME offers both; decideLight marks them indoor. Replay over both stories and one plate+page re-render viewed. Tests: scene-light-skyless.test.ts."
+    },
+    {
+      "id": "indoor-page-told-sky-and-moon",
+      "title": "An indoor page (weather none) was given the open-sky hour phrase: \"a deep blue fading sky\", \"lit by the moon\"",
+      "source": "Staging essbvehs8 p8 (the ship's hold) and 6mjcny1c7 p6 (a tram), reviewed 2026-10-06: sceneLight.lightParts used the open phrase unless the weather owned the sky.",
+      "reportedAt": "2026-10-06",
+      "status": "fixed",
+      "fixedAt": "2026-10-06",
+      "fixedIn": "368be2f86",
+      "fix": "Per-hour indoor phrasing (window light only) when weather is none; indoor repair line says no sky. Test: jev-light-gaze-options.test.ts REGRESSION indoor."
+    },
+    {
+      "id": "jev-place-gaze-pick-blanked",
+      "title": "Jev's \"the place itself\" gaze pick was thrown away by vbIdGuard.gazeTarget: no eyes line (7 of 153 stored decisions, e.g. ypl33 p3 Emma)",
+      "source": "Replay of the 8 stored Jev books 2026-10-06 (old place picks: 7).",
+      "reportedAt": "2026-10-06",
+      "status": "fixed",
+      "fixedAt": "2026-10-06",
+      "fixedIn": "368be2f86",
+      "fix": "The place is no longer offered; Jev picks down/up/ahead/distance (gazeTargets.js) which gazeTarget passes through and the picture prompt renders. Replay: all 7 replaced. Test: jev-light-gaze-options.test.ts."
     }
   ]
 }

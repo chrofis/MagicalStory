@@ -48,7 +48,8 @@
 
 const J = require('./jevAudit');
 const SV = require('./shotVocabulary');
-const { TIMES_OF_DAY, CLOCK_HOURS, SKYLESS_LIGHTS, isSkylessLight, WEATHERS } = require('./sceneLight');
+const { TIMES_OF_DAY, CLOCK_HOURS, isSkylessLight, WEATHERS, JEV_TIME_CRITERIA, JEV_WEATHER_CRITERIA } = require('./sceneLight');
+const G = require('./gazeTargets');
 const { openRouterUsage } = require('./providerUsage');
 const { recordTextUsage } = require('./usageContext');
 const { log } = require('../utils/logger');
@@ -71,6 +72,7 @@ const JEV_DECISIONS = {
   needed: { reps: 3, cutBelow: 0.5 }, // AUC 0.98, 51 cuts 0 wrong
   shot: { reps: 1 },                // A1 0.918 acceptable, 0 rule violations
   light: { reps: 1, indoorAt: 0.5 },
+  lightSource: { reps: 1, at: 0.5 }, // which cited element lights a dark page (owner, 2026-10-06)
   vb: { reps: 1, creature: 0.7, vehicle: 0.5, secondary: 0.5, object: 0.7, objectBand: 0.5 },
   aboard: { reps: 1, at: 0.5 },     // 9/10 on the one ship book
   reads: { at: 0.5 },               // rides the vb call; 7/7 true on 674 stored plan lines (2026-09-28)
@@ -673,17 +675,12 @@ function castCutFindings(cutDecision) {
 // ───────────────────────── LIGHT (TIME / INDOOR / WEATHER) ─────────────────────────
 // Wording verbatim from eval-jev-decision-layer.js (meta items).
 
-// What Jev is told each skyless value means (owner, 2026-10-06: the pages with no sky were drawn at the
-// surface or on dry land under an hour's sun and sky; see sceneLight.SKYLESS_LIGHTS).
-const SKYLESS_CRITERIA = {
-  underwater: 'underwater: the picture is beneath the surface of the sea or a lake, whatever the hour above it',
-  dark: 'dark: pitch dark, no daylight reaches the place — a cave, a ship\'s hold, a cloud of ink, a sealed room',
-};
-
+// What Jev is told each value means comes from the light table (sceneLight.LIGHTS / JEV_WEATHER_CRITERIA): one
+// table, no hand-kept copy here (owner, 2026-10-06).
 function lightQuestions() {
   return {
-    TIME: { type: 'choice', instructions: 'The time of day in the picture of the page to judge, following the story\'s clock: it holds from page to page until the story moves it. A page set beneath the water, or in a place no daylight reaches (ink, a cave, a ship\'s hold), takes `underwater` or `dark` whatever the hour; the story\'s clock goes on around it.', criteria: Object.fromEntries(TIMES_OF_DAY.map(t => [t, SKYLESS_CRITERIA[t] || t])) },
-    WEATHER: { type: 'choice', instructions: 'The weather visible in the picture of the page to judge. `none` when the scene is indoors, where the sky is not seen. Weather holds from page to page until the story changes it.', criteria: { clear: 'clear sky', overcast: 'overcast, grey clouds', rain: 'rain', snow: 'snow', fog: 'fog or mist', storm: 'storm, strong wind', none: 'none: the scene is indoors' } },
+    TIME: { type: 'choice', instructions: 'The time of day in the picture of the page to judge, following the story\'s clock: it holds from page to page until the story moves it. A page set beneath the water, or in a place no daylight reaches (ink, a cave, a ship\'s hold), takes one of the underwater or dark options whatever the hour; the story\'s clock goes on around it.', criteria: JEV_TIME_CRITERIA },
+    WEATHER: { type: 'choice', instructions: 'The weather visible in the picture of the page to judge. `none` when the scene is indoors, where the sky is not seen. Weather holds from page to page until the story changes it.', criteria: JEV_WEATHER_CRITERIA },
     INDOOR: { type: 'noul', instructions: 'The picture of the page to judge is set indoors: inside a building, a room, a cave or an enclosed vehicle.' },
   };
 }
@@ -732,13 +729,49 @@ async function decideLight({ arc, pages }, opts = {}) {
     const indoorP = meanNoul(a, 'INDOOR');
     // A skyless light has no sky to show: it is `indoor` for everything downstream (weather `none`, no outdoor light
     // for a cover's dominant hour), whatever the INDOOR question's probability said.
-    return { pageNumber: Number(p.pageNumber), jevTime: time, weatherAdvice: weather, indoorP: +indoorP.toFixed(3), indoor: isSkylessLight(time) || indoorP >= JEV_DECISIONS.light.indoorAt };
+    const tp = (a && a[0] && a[0].TIME && a[0].TIME.probabilities) || {};
+    const timeTop = Object.entries(tp).sort((x, y) => y[1] - x[1]).slice(0, 3).map(([k, v]) => `${k} ${(+v).toFixed(2)}`);
+    return { pageNumber: Number(p.pageNumber), jevTime: time, timeTop, weatherAdvice: weather, indoorP: +indoorP.toFixed(3), indoor: isSkylessLight(time) || indoorP >= JEV_DECISIONS.light.indoorAt };
   });
   const clock = forwardClock(raw.map(r => r.jevTime));
   raw.forEach((r, i) => { r.timeOfDay = clock.times[i]; });
   for (const h of clock.held) log.warn(`🌗 [JEV/light] page ${raw[h.index].pageNumber}: Jev said ${h.jev} after ${h.held} — the clock never runs backwards, held at ${h.held}`);
   log.info(`🌗 [JEV/light] ${raw.map(r => `p${r.pageNumber}:${r.timeOfDay}${r.indoor ? '/in' : ''}`).join(' ')} (${stats.calls} calls)`);
   return { pages: raw, clockHeld: clock.held.map(h => ({ pageNumber: raw[h.index].pageNumber, jev: h.jev, held: h.held })), stats: summarise(stats) };
+}
+
+/**
+ * WHAT LIGHTS A DARK PAGE (owner, 2026-10-06). On a page whose light is too dim to see by (night, dark,
+ * deep or night water, ink) the picture needs a light source in it, and the cited elements say which: a
+ * lantern, a glow-fish. Per such page and cited element (clothing excluded) one noul: it is lit or glowing
+ * in its cited look and part of what lights the scene. Jev decides; code never reads a glow out of a
+ * description (SETTLED: an object's own glow is a Visual Bible state, drawn from its state's reference
+ * cell; this only names which lit element the page is lit by).
+ *
+ * @param {{arc:string, pages:Array<{pageNumber:number, planLine:string}>,
+ *          perPage:Array<{pageNumber:number, elements:Array<{id:string, name:string, desc:string, look:string}>}>}} input
+ * @returns {Promise<{byPage: Map<number, Array<{id:string, name:string, p:number}>>, stats:Object}>}
+ */
+async function decideLightSources({ arc, pages, perPage }, opts = {}) {
+  const stats = newStats();
+  const byNum = new Map(pages.map(p => [Number(p.pageNumber), p]));
+  const plans = perPage.filter(p => p.elements && p.elements.length && byNum.has(Number(p.pageNumber)));
+  const reqs = plans.map((p) => {
+    const qs = {};
+    p.elements.forEach((e, i) => {
+      qs[`LIT${i}`] = { type: 'noul', instructions: `${e.name}${e.look ? ` (${e.look})` : e.desc ? ` (${e.desc.slice(0, 100)})` : ''} is lit or glowing in the picture of the page to judge, and its light is part of what lights the scene.` };
+    });
+    return { key: `lit:p${p.pageNumber}`, state: pageState(arc, pages, byNum.get(Number(p.pageNumber))), questions: qs };
+  }).flatMap(rq => repeat(rq, JEV_DECISIONS.lightSource.reps));
+  const ans = reqs.length ? await runJevRequests(reqs, { ...opts, usageLabel: 'jev_decisions_light_sources', stats }) : new Map();
+  const byPage = new Map();
+  for (const p of plans) {
+    const a = ans.get(`lit:p${p.pageNumber}`);
+    byPage.set(Number(p.pageNumber), p.elements.map((e, i) => ({ id: e.id, name: e.name, p: +meanNoul(a, `LIT${i}`).toFixed(3) }))
+      .filter(x => x.p >= JEV_DECISIONS.lightSource.at).sort((x, y) => y.p - x.p));
+  }
+  log.info(`💡 [JEV/lightSources] ${[...byPage].map(([n, xs]) => `p${n}:[${xs.map(x => x.name).join(',')}]`).join(' ')} (${stats.calls} calls)`);
+  return { byPage, stats: summarise(stats) };
 }
 
 // ───────────────────────── VB CITATIONS, ABOARD, POPULATION ─────────────────────────
@@ -980,9 +1013,10 @@ async function decidePopulation({ arc, pages, visualBible, locOf }, opts = {}) {
 // Wording and candidate builder verbatim from scripts/analysis/eval-jev-extra-fields.js
 // (G2, "Gaze, depth, story relevance asked as fit", e3c329da1).
 
-const GAZE_AWAY = 'away';
-const GAZE_AWAY_LABEL = 'nothing in the picture: away, into the distance, or at nothing in particular';
-const GAZE_AWAY_OPTION = 'nothing in the picture: away, into the distance';
+// The gaze words (down, up, ahead, distance, away, closed, outside, held) are ONE table: gazeTargets.js.
+// Owner, 2026-10-06: a missing option forces Jev onto a wrong answer, so the list is wide. A page's own
+// place is no longer a target (vbIdGuard.gazeTarget blanks a looksAt naming the place the page stands in:
+// 7 of 153 stored decisions wrote no eyes line); the figure looks down, up, ahead or into the distance.
 
 /**
  * The page's gaze targets as the eval indexed the Visual Bible: kind + name +
@@ -1017,13 +1051,18 @@ function gazePageMaterial({ objects = [], interactions = [], planLine = '', inde
   const clothingActedOn = interactions.map(x => x && x.object).filter(o => o && /^CLO/i.test(String(o)));
   const cited = [...new Set([...objects, ...interactions.map(x => x && x.object)].filter(o => o && !/^CLO/i.test(String(o))).map(baseId))];
   const elements = [...cited, ...new Set(clothingActedOn.map(baseId))].map(id => (index[id] ? { id, kind: index[id].kind, name: index[id].name, desc: index[id].desc } : null)).filter(Boolean);
-  const named = Object.values(index).filter(e => (e.kind === 'creature' || e.kind === 'figure') && !e.vantage && !cited.includes(e.id)
+  // Uncited items the plan line names are targets too (a held or mentioned thing, a vehicle), not only creatures and figures.
+  const named = Object.values(index).filter(e => ['creature', 'figure', 'thing', 'vehicle'].includes(e.kind) && !/^CLO/i.test(String(e.id)) && !e.vantage && !cited.includes(e.id)
     && namedIn(e.name, stripPlanShot(planLine))).map(e => ({ id: e.id, kind: e.kind, name: e.name, desc: e.desc }));
   return { elements, named };
 }
 
-/** Gaze candidates, enumerated in code: { target, label } (target = a name, an element id, or 'away'). */
-function gazeCandidates({ roster, elements, named }, name) {
+/**
+ * Gaze candidates, enumerated in code: { target, label } (target = a name, an element id, or a gaze word).
+ * `offFrame`: the commissioned characters the plan line names who are not in the picture; when there are
+ * any, `outside` is offered (its label names them for Jev only; the stored value never carries a name).
+ */
+function gazeCandidates({ roster, elements, named, offFrame }, name) {
   const out = [];
   roster.filter(o => o !== name).forEach(o => out.push({ target: o, label: o }));
   const rosterSet = new Set(roster);
@@ -1031,9 +1070,16 @@ function gazeCandidates({ roster, elements, named }, name) {
   // character's id (smoke story job_1790529840433_ar4u7qry3 p3: "CHR001" was
   // offered CHR001 and looked at itself).
   const self = String(name || '').trim().toUpperCase();
-  [...elements, ...(named || [])].filter(e => !rosterSet.has(e.name) && baseId(e.id) !== baseId(self) && String(e.name || '').trim().toUpperCase() !== self)
-    .forEach(e => out.push({ target: e.id, label: e.kind === 'place' ? `the place itself: ${e.name}` : `${e.name} (${e.desc.slice(0, 80)})` }));
-  out.push({ target: GAZE_AWAY, label: GAZE_AWAY_LABEL });
+  [...elements, ...(named || [])].filter(e => e.kind !== 'place' && !rosterSet.has(e.name) && baseId(e.id) !== baseId(self) && String(e.name || '').trim().toUpperCase() !== self)
+    .forEach(e => out.push({ target: e.id, label: `${e.name} (${e.desc.slice(0, 80)})` }));
+  const off = (offFrame || []).filter(n => n !== name);
+  // `held` is for a held thing the page does not list: when a thing or vehicle is listed, the eyes on it name it (replay 2026-10-06: `held` took 8 listed targets at P 0.7-1.0).
+  const listsThing = out.some(k => /^(ART|VEH|GEN|OBJ)/i.test(String(k.target)) || (k.target !== name && [...elements, ...(named || [])].some(e => e.id === k.target && (e.kind === 'thing' || e.kind === 'vehicle'))));
+  for (const t of G.GAZE_TARGETS) {
+    if (t.id === 'held' && listsThing) continue;
+    if (t.id === 'outside') { if (off.length) out.push({ target: t.id, label: `${t.jev}: ${whoText(off)}` }); continue; }
+    out.push({ target: t.id, label: t.jev });
+  }
   return out;
 }
 
@@ -1055,8 +1101,8 @@ async function decideGaze({ arc, pages, perPage }, opts = {}) {
   const reqs = plans.flatMap(p => {
     const qs = {};
     p.roster.forEach((n, i) => {
-      qs[`EYES${i}`] = { type: 'choice', instructions: `In the instant of the page to judge, what are ${n}'s eyes and hands on?`,
-        criteria: Object.fromEntries(p.cands[i].map((k, j) => [`t${j}`, k.target === GAZE_AWAY ? GAZE_AWAY_OPTION : k.label])) };
+      qs[`EYES${i}`] = { type: 'choice', instructions: `In the instant of the page to judge, what are ${n}'s eyes and hands on? When they are on a listed person or thing, that is the answer; the direction options are for eyes on nothing listed.`,
+        criteria: Object.fromEntries(p.cands[i].map((k, j) => [`t${j}`, k.label])) };
     });
     return repeat({ key: `gaze:p${p.pageNumber}`, state: pageState(arc, pages, byNum.get(Number(p.pageNumber))), questions: qs }, JEV_DECISIONS.gaze.reps);
   });
@@ -1163,12 +1209,13 @@ function fixedBlock(page) {
   const lines = ['FIXED — code writes each into METADATA (write none of them); the prose shows each:'];
   if (f.shot) lines.push(`- shot: ${f.shot}`);
   if (f.timeOfDay) lines.push(`- timeOfDay: ${f.timeOfDay}; ${fixedLightPlace(f)}`);
+  if (f.lightSources && f.lightSources.length) lines.push(`- lightSources: ${f.lightSources.join('; ')} (lit and glowing: the light the page is lit by)`);
   const objects = [...(f.location ? [f.location] : []), ...(f.cites || [])];
   lines.push(`- objects: ${objects.length ? objects.map(label).join('; ') : 'none'}`);
   lines.push(`- aboard: ${f.aboard ? label(f.aboard) : 'none'}`);
   if (f.population) lines.push(`- population: ${f.population}`);
   const gaze = Object.entries(f.looksAt || {});
-  if (gaze.length) lines.push(`- looksAt: ${gaze.map(([n, t]) => `${n} → ${t === GAZE_AWAY ? 'away' : label(t)}`).join('; ')}`);
+  if (gaze.length) lines.push(`- looksAt: ${gaze.map(([n, t]) => `${n} → ${G.gazeToken(t) ? `${t} (${G.gazeTokenRow(t).phrase})` : label(t)}`).join('; ')}`);
   return lines.join('\n');
 }
 
@@ -1209,6 +1256,8 @@ function pinBrief(brief, fixed) {
   // only a console line (refreshPlanShot) recorded it. Pinned like the rest.
   if (fixed.shot) set('shot', fixed.shot);
   if (fixed.timeOfDay) set('timeOfDay', fixed.timeOfDay);
+  // The names of the lit elements of a dark page (decideLightSources); [] clears a stale list.
+  if (Array.isArray(fixed.lightSources)) set('lightSources', fixed.lightSources.length ? fixed.lightSources : null);
   // A cover's weather is code's (coverFacts); a story page's stays the Art Director's.
   if (fixed.weather) set('weather', fixed.weather);
   if (fixed.indoor === true) set('weather', 'none');
@@ -1327,7 +1376,7 @@ module.exports = {
   gazePageMaterial,
   gazeCandidates,
   decideGaze,
-  GAZE_AWAY,
+  namedIn,
   JEV_DECISIONS,
   JEV_DECISION_CONCURRENCY,
   PLAN_SHOT_PLACEHOLDER,
@@ -1358,6 +1407,7 @@ module.exports = {
   lightQuestions,
   forwardClock,
   decideLight,
+  decideLightSources,
   vbElements,
   vbQuestion,
   aboardQuestion,

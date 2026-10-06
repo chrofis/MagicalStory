@@ -348,7 +348,8 @@ describe('weather owns the sky', () => {
   it('clear and indoor pages are unchanged', () => {
     expect(L.lightPhrase({ timeOfDay: 'afternoon', weather: 'clear' })).toBe('afternoon: warm daylight from a sun past its height; a clear sky');
     expect(L.lightPhrase({ timeOfDay: 'night', weather: 'clear' })).toBe('night: a dark sky, the scene lit by the moon and by the light sources in it; a clear sky');
-    expect(L.lightPhrase({ timeOfDay: 'evening', weather: 'none' })).toBe("evening: a low golden sun, long shadows; indoors: the light comes from the room's own sources and any window");
+    // indoors is window light only: no sun, sky or moon (bug 2026-10-06, essbvehs8 p8 / 6mjcny1c7 p6)
+    expect(L.lightPhrase({ timeOfDay: 'evening', weather: 'none' })).toBe("evening: the daylight at the windows fading to gold, the lamps beginning to glow; indoors: the light comes from the room's own sources and any window");
     expect(L.lightPhrase({ timeOfDay: 'dusk', weather: null })).toBe('dusk: the sun down, a deep blue fading sky, the first lamps lit');
     expect(L.describeLightForJudge({ timeOfDay: 'night', weather: 'clear' })).toBe('night, clear');
     expect(L.describeLightForJudge({ timeOfDay: null, weather: null })).toBe('');

@@ -28,27 +28,114 @@
  * light wrong. Nothing reads the hour out of the prose.
  */
 
-/** In the order a day runs. Adjacent values are neighbours on the clock. */
-const CLOCK_HOURS = ['dawn', 'morning', 'midday', 'afternoon', 'evening', 'dusk', 'night'];
-
 /**
- * LIGHTS THAT ARE NOT AN HOUR (owner, 2026-10-06, reversing the 2026-09-24 "the light is one of seven
- * hours" line for the pages that have no sky). A page set beneath the water, or in a place no daylight
- * reaches (ink, a cave, a ship's hold), is not at any hour of the clock: the hour's sun and sky wording
- * drew staging job_1791267520938_essbvehs8 p5, p7 and p9-p12 at the surface or on dry land with a sky
- * (and ypl33 p9 a bright reef against pitch-black ink). They sit outside the clock: the book's hour goes
- * on around them, they name no sun, moon or sky, and their weather is `none`.
+ * THE LIGHT TABLE: the one place a `timeOfDay` value is defined (owner, 2026-10-06: one table instead of
+ * hand-kept copies). Every list that names the values is derived from it: the enum, the phrases, what
+ * Jev is told each value means (`jev`), what the visual-flow judge is told (`judge`). A value added
+ * here reaches all of them; the parity test (tests/unit/scene-light-table.test.ts) pins that.
+ *
+ * Seven HOURS, in the order a day runs (adjacent values are neighbours on the clock), each with the
+ * phrasing the illustrator is given under an open sky (`open`), under a covered one (`veiled`, weather
+ * owns the sky: no sun or moon named) and INDOORS (`indoor`, weather `none`: window light only, no sky,
+ * sun or moon; owner, 2026-10-06 bug: an indoor page was told "a deep blue fading sky" and "lit by the
+ * moon", essbvehs8 p8 the ship's hold, 6mjcny1c7 p6 a tram).
+ *
+ * Then the SKYLESS LIGHTS (owner, 2026-10-06, reversing the 2026-09-24 "the light is one of seven hours"
+ * line for the pages that have no sky). A page set beneath the water, or in a place no daylight reaches
+ * (ink, a cave, a ship's hold), is not at any hour: the hour's sun and sky wording drew staging
+ * job_1791267520938_essbvehs8 p5, p7 and p9-p12 at the surface or on dry land with a sky (and ypl33 p9 a
+ * bright reef against pitch-black ink). Water has its own variants (sunlit, deep, night, dark: the ink
+ * pages p6, p9 of essbvehs8 and p7-p9 of ypl33 are submerged AND pitch dark). They sit outside the clock:
+ * the book's hour goes on around them, they name no sun, moon or sky, and their weather is `none`.
  */
-const SKYLESS_LIGHTS = ['underwater', 'dark'];
+const LIGHTS = [
+  { id: 'dawn', hour: true, jev: 'dawn', judge: 'dawn',
+    open: 'dawn: the sun just up, low pale light, long soft shadows',
+    veiled: 'dawn: faint cool early light, the day just beginning',
+    indoor: 'dawn: faint cool early light at the windows, the day just beginning' },
+  { id: 'morning', hour: true, jev: 'morning', judge: 'morning',
+    open: 'morning: fresh daylight from a low sun',
+    veiled: 'morning: fresh cool daylight',
+    indoor: 'morning: fresh daylight at the windows' },
+  { id: 'midday', hour: true, jev: 'midday', judge: 'midday',
+    open: 'midday: bright daylight from a high sun, short shadows',
+    veiled: 'midday: full daylight, the brightest hour of the day',
+    indoor: 'midday: bright daylight at the windows' },
+  { id: 'afternoon', hour: true, jev: 'afternoon', judge: 'afternoon',
+    open: 'afternoon: warm daylight from a sun past its height',
+    veiled: 'afternoon: full daylight, a touch warm',
+    indoor: 'afternoon: warm daylight at the windows' },
+  { id: 'evening', hour: true, jev: 'evening', judge: 'evening',
+    open: 'evening: a low golden sun, long shadows',
+    veiled: 'evening: the daylight fading, lit windows beginning to glow',
+    indoor: 'evening: the daylight at the windows fading to gold, the lamps beginning to glow' },
+  { id: 'dusk', hour: true, jev: 'dusk', judge: 'dusk',
+    open: 'dusk: the sun down, a deep blue fading sky, the first lamps lit',
+    veiled: 'dusk: dim blue-grey light, the first lamps lit',
+    indoor: 'dusk: dim blue-grey light at the windows, the lamps lit' },
+  { id: 'night', hour: true, dim: true, jev: 'night', judge: 'night',
+    open: 'night: a dark sky, the scene lit by the moon and by the light sources in it',
+    veiled: 'night: dark, the scene lit only by the light sources in it',
+    indoor: 'night: dark at the windows, the room lit only by its own lamps and fires' },
+  // No sun, moon, sky or horizon is named, and the same words hold whatever the weather says.
+  { id: 'underwater', hour: false,
+    jev: 'underwater: the picture is beneath the surface of the sea or a lake in daylight, sunlit blue-green water',
+    judge: 'underwater: beneath the sea in sunlit blue-green water',
+    phrase: 'underwater: the whole picture is beneath the sea, blue-green water all around, soft light falling through it from above, drifting particles' },
+  { id: 'underwater_deep', hour: false, dim: true,
+    jev: 'deep underwater: far below the surface of the sea, dim deep-blue water, only a faint glow reaching down from above',
+    judge: 'underwater_deep: deep beneath the sea in dim deep-blue water',
+    phrase: 'deep underwater: the whole picture is far beneath the sea, dim deep-blue water all around, only a faint blue glow reaching down from above, the far distance fading into dark blue, drifting particles' },
+  { id: 'underwater_night', hour: false, dim: true,
+    jev: 'underwater at night: beneath the surface of the sea while it is night above, dark blue water with a faint pale silvery glow from above',
+    judge: 'underwater_night: beneath the sea at night in dark blue water with a faint pale glow',
+    phrase: 'underwater at night: the whole picture is beneath the sea, dark blue water all around, a faint pale silvery glow falling through it from above, drifting particles' },
+  { id: 'underwater_dark', hour: false, dim: true,
+    jev: 'dark underwater: beneath the surface in pitch-black water — a cloud of ink, the abyss, the inside of a sunken wreck — no daylight reaches it',
+    judge: 'underwater_dark: beneath the sea in pitch-black water, lit only by light sources in it',
+    phrase: 'dark underwater: the whole picture is beneath the sea in pitch-black water, nothing reaches it from above, the scene lit only by the light sources in it, drifting particles' },
+  { id: 'dark', hour: false, dim: true,
+    jev: 'dark: pitch dark, no daylight reaches the place — a cave, a ship\'s hold, a sealed room',
+    judge: 'dark: a pitch-dark place with no daylight, lit only by light sources in it',
+    phrase: 'dark: a pitch-dark place, the scene lit only by the light sources in it' },
+];
 
-/** The `timeOfDay` enum: the seven hours, then the two skyless lights. */
-const TIMES_OF_DAY = [...CLOCK_HOURS, ...SKYLESS_LIGHTS];
+/** In the order a day runs. Adjacent values are neighbours on the clock. */
+const CLOCK_HOURS = LIGHTS.filter(l => l.hour).map(l => l.id);
+
+/** The lights that are not an hour: no sky, no sun, no moon. */
+const SKYLESS_LIGHTS = LIGHTS.filter(l => !l.hour).map(l => l.id);
+
+/** The lights too dim to see by without a light source in the picture: Jev is asked what is lit (jevDecisions.decideLightSources). */
+const DIM_LIGHTS = LIGHTS.filter(l => l.dim).map(l => l.id);
+function isDimLight(timeOfDay) { return DIM_LIGHTS.includes(timeOfDay); }
+
+/** The `timeOfDay` enum: the seven hours, then the skyless lights. */
+const TIMES_OF_DAY = LIGHTS.map(l => l.id);
 
 /** Is this declared value a light with no sky (underwater, dark) rather than an hour? */
 function isSkylessLight(timeOfDay) { return SKYLESS_LIGHTS.includes(timeOfDay); }
 
-/** `none`: an interior, where the weather is not visible. */
-const WEATHERS = ['clear', 'overcast', 'rain', 'snow', 'fog', 'storm', 'none'];
+/** What Jev is told each `timeOfDay` value means: id -> label (jevDecisions.lightQuestions). */
+const JEV_TIME_CRITERIA = Object.fromEntries(LIGHTS.map(l => [l.id, l.jev]));
+
+/** What the visual-flow judge is told each skyless bucket means (the hours need no gloss). */
+const JUDGE_SKYLESS_NOTES = LIGHTS.filter(l => !l.hour).map(l => l.judge).join('; ');
+
+/**
+ * The weathers: id -> what Jev is told it means. `none`: an interior, where the weather is not visible.
+ * Jev's answer is advisory (the Art Director's own `weather` stays the field).
+ */
+const JEV_WEATHER_CRITERIA = {
+  clear: 'clear sky',
+  overcast: 'overcast, grey clouds',
+  rain: 'rain',
+  snow: 'snow',
+  fog: 'fog or mist',
+  storm: 'storm, strong wind',
+  none: 'none: the scene is indoors',
+};
+const WEATHERS = Object.keys(JEV_WEATHER_CRITERIA);
 
 const TIME_OF_DAY_ENUM = TIMES_OF_DAY.join(' | ');
 const WEATHER_ENUM = WEATHERS.join(' | ');
@@ -58,53 +145,18 @@ const WEATHER_ENUM = WEATHERS.join(' | ');
  *
  * WEATHER OWNS THE SKY (owner, 2026-09-26). Time of day sets the brightness,
  * the colour of the light, the shadows and whether the lamps are lit; the
- * weather decides what the sky shows. Each time of day therefore has two
- * phrasings: `open`, under a clear (or undeclared) sky, which names the sun or
- * the moon, and `veiled`, under a covered one, which names no light source in
- * the sky. The line used to append the weather to the open phrase, so a fog
- * page was told "warm daylight from a sun past its height; fog softening the
- * distance" and Grok painted the sun: fog rendered on 1 of 12 staging fog
- * pages and 0 of 6 night-fog pages (job_1790277448294_5herh01j7).
+ * weather decides what the sky shows. Each hour therefore has three phrasings:
+ * `open`, under a clear (or undeclared) sky, which names the sun or the moon,
+ * `veiled`, under a covered one, which names no light source in the sky, and
+ * `indoor`, with weather `none`, window light only. The line used to append the
+ * weather to the open phrase, so a fog page was told "warm daylight from a sun
+ * past its height; fog softening the distance" and Grok painted the sun: fog
+ * rendered on 1 of 12 staging fog pages and 0 of 6 night-fog pages
+ * (job_1790277448294_5herh01j7). Derived from LIGHTS.
  */
-const TIME_OF_DAY_PHRASES = {
-  dawn: {
-    open: 'dawn: the sun just up, low pale light, long soft shadows',
-    veiled: 'dawn: faint cool early light, the day just beginning',
-  },
-  morning: {
-    open: 'morning: fresh daylight from a low sun',
-    veiled: 'morning: fresh cool daylight',
-  },
-  midday: {
-    open: 'midday: bright daylight from a high sun, short shadows',
-    veiled: 'midday: full daylight, the brightest hour of the day',
-  },
-  afternoon: {
-    open: 'afternoon: warm daylight from a sun past its height',
-    veiled: 'afternoon: full daylight, a touch warm',
-  },
-  evening: {
-    open: 'evening: a low golden sun, long shadows',
-    veiled: 'evening: the daylight fading, lit windows beginning to glow',
-  },
-  dusk: {
-    open: 'dusk: the sun down, a deep blue fading sky, the first lamps lit',
-    veiled: 'dusk: dim blue-grey light, the first lamps lit',
-  },
-  night: {
-    open: 'night: a dark sky, the scene lit by the moon and by the light sources in it',
-    veiled: 'night: dark, the scene lit only by the light sources in it',
-  },
-  // No sun, moon, sky or horizon is named, and the same words hold whatever the weather says.
-  underwater: {
-    open: 'underwater: the whole picture is beneath the sea, blue-green water all around, soft light falling through it from above, drifting particles',
-    veiled: 'underwater: the whole picture is beneath the sea, blue-green water all around, soft light falling through it from above, drifting particles',
-  },
-  dark: {
-    open: 'dark: a pitch-dark place, the scene lit only by the light sources in it',
-    veiled: 'dark: a pitch-dark place, the scene lit only by the light sources in it',
-  },
-};
+const TIME_OF_DAY_PHRASES = Object.fromEntries(LIGHTS.map(l => [l.id, l.hour
+  ? { open: l.open, veiled: l.veiled, indoor: l.indoor }
+  : { open: l.phrase, veiled: l.phrase, indoor: l.phrase }]));
 
 /** The hours whose covered sky is dark, not pale. */
 const DARK_TIMES = new Set(['dusk', 'night']);
@@ -160,7 +212,9 @@ function lightParts(light) {
   // A skyless light has no sky to describe, whatever weather the brief carries.
   if (isSkylessLight(l.timeOfDay)) return { time: TIME_OF_DAY_PHRASES[l.timeOfDay].open, sky: '' };
   const covered = weatherOwnsSky(l.weather);
-  const time = l.timeOfDay ? TIME_OF_DAY_PHRASES[l.timeOfDay][covered ? 'veiled' : 'open'] : '';
+  // Indoors (weather `none`) is window light only: no sun, moon or sky is named.
+  const variant = l.weather === 'none' ? 'indoor' : (covered ? 'veiled' : 'open');
+  const time = l.timeOfDay ? TIME_OF_DAY_PHRASES[l.timeOfDay][variant] : '';
   let sky = '';
   if (covered) {
     sky = `${COVERED_WEATHER_PHRASES[l.weather][DARK_TIMES.has(l.timeOfDay) ? 'dark' : 'day']}; ${COVERED_SKY_CLAUSE}`;
@@ -181,6 +235,25 @@ function normaliseTimeOfDay(raw) { return normaliseEnum(raw, TIMES_OF_DAY); }
 function normaliseWeather(raw) { return normaliseEnum(raw, WEATHERS); }
 
 /**
+ * THE LIGHT SOURCES of a dark page (owner, 2026-10-06): the names of the cited elements that are lit or
+ * glowing in the picture (a lantern, a glow-fish), decided by Jev from the element's cited look
+ * (jevDecisions.decideLightSources) and pinned into the brief's `lightSources`. An element's own glow
+ * stays a Visual Bible STATE (SETTLED: it is drawn from its state's reference cell); this line only says
+ * that this lit element is what the page is lit by. Names, never ids: the line is read by an image model.
+ */
+function normaliseLightSources(raw) {
+  return (Array.isArray(raw) ? raw : []).map(x => String(x == null ? '' : x).replace(/\s+/g, ' ').trim()).filter(Boolean).slice(0, 4);
+}
+
+/** The sources as a clause, '' when none. */
+function sourcesClause(light) {
+  const names = normaliseLightSources((light || {}).sources);
+  if (!names.length) return '';
+  const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+  return `the light comes from ${list}, lit and glowing in the picture`;
+}
+
+/**
  * The page's declared light from parsed brief metadata (either the flat keys
  * extractSceneMetadata publishes or its `fullData`).
  * @returns {{timeOfDay: string|null, weather: string|null}}
@@ -188,9 +261,11 @@ function normaliseWeather(raw) { return normaliseEnum(raw, WEATHERS); }
 function declaredLight(metadata) {
   const m = metadata || {};
   const f = m.fullData || {};
+  const sources = normaliseLightSources(m.lightSources ?? f.lightSources);
   return {
     timeOfDay: normaliseTimeOfDay(m.timeOfDay ?? f.timeOfDay),
     weather: normaliseWeather(m.weather ?? f.weather),
+    ...(sources.length ? { sources } : {}),
   };
 }
 
@@ -222,10 +297,13 @@ function describeLight(light) {
     .filter(Boolean).join(', ');
 }
 
-/** The light as phrases, '' when undeclared. Shared by every line below. */
-function lightPhrase(light) {
+/**
+ * The light as phrases, '' when undeclared. Shared by every line below. `sources`: the page's own light
+ * sources join the PAGE and REPAIR lines only; a plate is the empty place and a derive never carries them.
+ */
+function lightPhrase(light, { sources = false } = {}) {
   const { time, sky } = lightParts(light);
-  return [time, sky].filter(Boolean).join('; ');
+  return [time, sky, time && sources ? sourcesClause(light) : ''].filter(Boolean).join('; ');
 }
 
 /**
@@ -253,7 +331,7 @@ function buildLightLine(light, { plate = false } = {}) {
   if (!phrase) return '';
   return plate
     ? `**LIGHT:** ${phrase}. Paint the place in this time of day and weather; it wins over any other time or weather named above and over the light of a reference photo.`
-    : `**LIGHT:** ${phrase}. It wins over the light and weather of any reference image.`;
+    : `**LIGHT:** ${lightPhrase(light, { sources: true })}. It wins over the light and weather of any reference image.`;
 }
 
 /**
@@ -265,10 +343,10 @@ function buildLightLine(light, { plate = false } = {}) {
  * light — the edit is then told nothing about it, as before.
  */
 function buildRepairLightLine(light) {
-  const phrase = lightPhrase(light);
+  const phrase = lightPhrase(light, { sources: true });
   if (!phrase) return '';
-  // A skyless page (underwater, dark) is told nothing about a sky it does not have.
-  if (isSkylessLight(light.timeOfDay)) return `**LIGHT:** ${phrase}. This is the page's light: the edited image keeps exactly this light, and the edit changes none of it.`;
+  // A skyless page (underwater, dark) and an interior (weather none) are told nothing about a sky they do not show.
+  if (isSkylessLight(light.timeOfDay) || light.weather === 'none') return `**LIGHT:** ${phrase}. This is the page's light: the edited image keeps exactly this light, and the edit changes none of it.`;
   return `**LIGHT:** ${phrase}. This is the page's time of day and weather: the edited image keeps exactly this light, sky and weather, and the edit changes none of them.`;
 }
 
@@ -314,7 +392,7 @@ function keepLightClause(light) {
  * brief (both Art Director templates, both iterate templates) and into the
  * scene review's check, so the author and the critic read the same words.
  */
-const SKYLESS_LIGHT_RULE = `\`underwater\` is a page set beneath the water and \`dark\` a place no daylight reaches (ink, a cave, a ship's hold); each takes weather \`none\`, names no sun, moon, sky or horizon in the prose, and the book's hour goes on around it.`;
+const SKYLESS_LIGHT_RULE = `The skyless lights are \`underwater\` (sunlit water), \`underwater_deep\`, \`underwater_night\`, \`underwater_dark\` (pitch-black water: ink, the abyss) and \`dark\` (a place no daylight reaches: a cave, a ship's hold); each takes weather \`none\`, names no sun, moon, sky or horizon in the prose, and the book's hour goes on around it.`;
 
 const SCENE_LIGHT_FIELD_RULE = `\`timeOfDay\` is one of ${TIME_OF_DAY_ENUM}, and \`weather\` one of ${WEATHER_ENUM} — \`none\` for an interior, where the weather is not visible. Both are required on every page, agree with the light the prose describes, and follow the book's time: they hold from page to page until the story moves the clock or the sky. ${SKYLESS_LIGHT_RULE} They decide the page's light and the light of the plate it is painted on.`;
 
@@ -383,10 +461,15 @@ function timeContradicts(declared, rendered) {
 }
 
 module.exports = {
+  LIGHTS,
+  JEV_TIME_CRITERIA,
+  JEV_WEATHER_CRITERIA,
+  JUDGE_SKYLESS_NOTES,
   CLOCK_HOURS,
   SKYLESS_LIGHTS,
   SKYLESS_LIGHT_RULE,
   isSkylessLight,
+  isDimLight,
   TIMES_OF_DAY,
   WEATHERS,
   TIME_OF_DAY_ENUM,
@@ -395,6 +478,7 @@ module.exports = {
   SCENE_WEATHER_FIELD_RULE,
   normaliseTimeOfDay,
   normaliseWeather,
+  normaliseLightSources,
   declaredLight,
   declaredLightOfBrief,
   lightKey,
