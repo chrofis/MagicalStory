@@ -9,7 +9,7 @@
       "rootCause": "plan-check.txt told the roster to list every character 'whose name the instant contains', while the planner's own contract (FIGURE_PART_IN_FRAME_RULE) says only a name without a body is context. The counter recounts that the claimed name is in the instant (namesIn counts a possessive as present on purpose: 'Maren's hand' is a figure shown in part), so it cannot tell a hand from a garden; that distinction is language, the prompt's (CLAUDE.md eval-logic rule).",
       "status": "fixed",
       "fixedAt": "2026-10-06",
-      "fixedIn": "pending",
+      "fixedIn": "ea6be2b8e",
       "fix": "The roster's UNLISTED paragraph reads FIGURE_PART_IN_FRAME_RULE (one constant with the planner), whose last sentence now names 'the owner of a prop or a place'; PLAN_LINE_FIELD_CONTRACT no longer lists the prop owner as a who-column figure. Replay with the real plan check on essbvehs8 and atbttop6w (USD 0.060): p1 Maren and p13 Berta no longer unlisted; the remaining finding (Herr Keller working the blower) is a real figure. Test: tests/unit/planner-review-2026-10-06.test.ts. docs/decisions.md 2026-10-06 'Planner review'."
     },
     {
@@ -19,7 +19,7 @@
       "source": "Owner report 2026-10-06 (a push to staging was refused for ~40 minutes by an experiment that never beat). server/lib/idleShutdown.js testlab probe: heartbeat_at IS NULL AND created_at > NOW() - INTERVAL '2 hours'.",
       "status": "fixed",
       "fixedAt": "2026-10-06",
-      "fixedIn": "pending",
+      "fixedIn": "ea6be2b8e",
       "fix": "server/lib/testlabReaper.js NULL_HEARTBEAT_GRACE = 10 minutes and one shared pair of predicates (liveRunningSql / staleRunningSql) read by the probe, the reaper and the stale counter. Test: tests/unit/testlab-orphan-reaper.test.ts (a row with no heartbeat is dead after a short grace). docs/decisions.md 2026-10-06."
     },
     {
