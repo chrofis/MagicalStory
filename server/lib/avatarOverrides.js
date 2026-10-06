@@ -148,4 +148,16 @@ function resolveDeclaredAvatarOverrides({ physicalTraits = null, clothing = null
   };
 }
 
-module.exports = { resolveDeclaredAvatarOverrides, normalizeDeclaredAge };
+/**
+ * The glasses a character is declared to wear ("rectangular black-framed glasses"), or null.
+ * ONE reader for the sheet generator and the sheet judges (character2x4Sheet): the
+ * 2x4 reference sheet never stated them, so the model kept them in the profile and body
+ * cells and dropped them in the front head cells, and every page's face repair copies
+ * that front cell (staging job_1791267520938_essbvehs8: Sarah, no glasses on 4 images).
+ */
+function declaredGlasses(character) {
+  const g = character && character.physical && character.physical.glasses;
+  return isSet(g) && !isNone(g) ? String(g).trim() : null;
+}
+
+module.exports = { resolveDeclaredAvatarOverrides, normalizeDeclaredAge, declaredGlasses };

@@ -18,6 +18,9 @@ Each cell shows exactly ONE head: the same single character in every cell. Any s
 TASK 5: CROP
 Name the lowest part of the figure visible in each cell. Upper chest or higher in every cell = 9-10. Down to the elbows = 6-7. Any cell showing a hand, a waistband, a belt, the hem of a top or any of the legwear = 1-3. cropScore 1-10.
 
+TASK 6: DECLARED GLASSES
+For each cell say whether its face wears the glasses REQUESTED_GLASSES names, in that frame: yes; no (a face without them, or in another frame); na (no face shows in that cell). When REQUESTED_GLASSES says none declared, answer na for every cell.
+
 finalScore = lowest of angles.score, cleanScore, coverageScore, soloScore, cropScore. valid = finalScore ≥ 6.
 
 Return EXACTLY this JSON shape. Every score and reason comes from what you see in this image — never return this template's placeholders:
@@ -27,6 +30,7 @@ Return EXACTLY this JSON shape. Every score and reason comes from what you see i
   "coverage": {"coverageScore": <1-10>, "reason": "<the garment, colour and neckline you see, per cell>"},
   "solo": {"soloScore": <1-10>, "reason": "<heads you count per cell; name any extra one and where>"},
   "crop": {"cropScore": <1-10>, "reason": "cell1: <lowest visible part>; cell2: <lowest part>; cell3: <lowest part>; cell4: <lowest part>"},
+  "glasses": {"perCell": {"cell1": "<yes|no|na>", "cell2": "<yes|no|na>", "cell3": "<yes|no|na>", "cell4": "<yes|no|na>"}, "reason": "<the glasses you see on each face, or none>"},
   "finalScore": <1-10>,
   "valid": <true|false>,
   "failureReasons": []
@@ -35,3 +39,4 @@ Return EXACTLY this JSON shape. Every score and reason comes from what you see i
 If invalid, populate failureReasons with short strings naming each failed sub-check (e.g. "cleanRender: cell4 has coloured arrows sticking out of the back of the head", "solo: an adult face is blended into cells 2 and 3", "coverage: cells 1-4 show a blue collar the outfit does not name").
 
 {REQUESTED_OUTFIT}
+{REQUESTED_GLASSES}

@@ -26,9 +26,13 @@ Each cell shows exactly ONE figure: the same single character in every cell. Any
 TASK 6: PLAIN BACKGROUND
 The area behind and around the figures must be plain white and empty (thin cell dividers are fine). Any painted scene, scenery, streets, walls, floor, sky, fog, or coloured/illustrated backdrop behind a figure = backgroundScore ≤ 2. {SHEET_LETTERING} Any written caption, word, letter or number anywhere in the row — above, below or beside a figure — = backgroundScore ≤ 2. Plain white/empty in every cell = 10. backgroundScore 1-10.
 
+TASK 7: DECLARED GLASSES
+For each cell say whether its face wears the glasses REQUESTED_GLASSES names, in that frame: yes; no (a face without them, or in another frame); na (no face shows in that cell). When REQUESTED_GLASSES says none declared, answer na for every cell.
+
 finalScore = lowest of fullBodyScore, angles.score, outfitScore, costumeReadsScore, proportions.score, soloScore, backgroundScore. valid = finalScore ≥ 6.
 
 {REQUESTED_OUTFIT}
+{REQUESTED_GLASSES}
 {REQUESTED_COSTUME}
 {CHARACTER_AGE}
 
@@ -41,6 +45,7 @@ Return EXACTLY this JSON shape. Every score and reason comes from what you see i
   "solo": {"soloScore": <1-10>, "reason": "<figures you count per cell; name any extra one and where>"},
   "proportions": {"score": <1-10>, "reason": "<how many heads tall, and the age that reads>"},
   "background": {"backgroundScore": <1-10>, "reason": "<what is behind and around the figures, including any lettering>"},
+  "glasses": {"perCell": {"cell1": "<yes|no|na>", "cell2": "<yes|no|na>", "cell3": "<yes|no|na>", "cell4": "<yes|no|na>"}, "reason": "<the glasses you see on each face, or none>"},
   "finalScore": <1-10>,
   "valid": <true|false>,
   "failureReasons": []

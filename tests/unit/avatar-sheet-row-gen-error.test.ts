@@ -69,6 +69,7 @@ async function runPass1(throwsOn: string[] = []) {
     resolveFacePhoto: async () => 'data:image/jpeg;base64,FACE',
     resolveStandardAvatar: async () => 'data:image/jpeg;base64,AVATAR',
     splitSheetRows: async () => ({ topHeads: 'data:image/jpeg;base64,HEADS' }),
+    declaredGlasses: () => null,
     loadPhantomVariant: () => 'phantom',
     phantomRow: async () => 'data:image/jpeg;base64,PHANTOM',
     buildBodyRowPrompt: () => 'BODY PROMPT',

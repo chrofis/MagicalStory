@@ -6992,7 +6992,7 @@ async function runAvatarEvalStage(target, { experimentId, promptOverride, params
       const { split } = await _internal.evaluateAvatarSheet(sheet.imageData, {
         pass: 1, facePhoto,
         costumeDescription: costume.description || 'standard outfit',
-        declaredAge, model, promptOverrides,
+        declaredAge, glasses: require('./avatarOverrides').declaredGlasses(character), model, promptOverrides,
       });
       evalResult = { split: true, splitY: split.splitY, model, heads: split.heads, bodies: split.bodies, identity: split.identity, finalScore: split.verdict.finalScore, valid: split.verdict.valid };
     }
@@ -7063,7 +7063,7 @@ async function runAvatarEvalStage(target, { experimentId, promptOverride, params
     const { split } = await _internal.evaluateAvatarSheet(sheetForDisplay, {
       pass: 1, facePhoto, standardAvatar,
       costumeDescription: costume.description || 'standard outfit',
-      declaredAge, model, promptOverrides,
+      declaredAge, glasses: require('./avatarOverrides').declaredGlasses(character), model, promptOverrides,
     });
     const { heads, bodies, identity } = split;
     splitPromptUsed = split.promptUsed;

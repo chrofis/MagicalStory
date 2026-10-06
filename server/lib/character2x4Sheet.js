@@ -32,6 +32,7 @@ const { MODEL_DEFAULTS } = require('../config/models');
 const { photoAnalyzerUrl } = require('./photoAnalyzerClient');
 const r2 = require('./r2');
 const { getFacePhoto, getStandardAvatar } = require('./characterPhotos');
+const { declaredGlasses } = require('./avatarOverrides');
 const { assessImageResponse, describeImageBlock, describeImageOutcome } = require('./imageReplyGuard');
 
 // Minimal Gemini image-edit for the avatar style-transfer pass. Same contract
@@ -199,6 +200,16 @@ function phantomTierForAge(age) {
 // fields are populated by trial.js:737-745 (Gemini photo analysis) and
 // stamped onto character.physical — they're free text the sheet prompt
 // can just paste in.
+// A character declared to wear glasses wears them in every cell that shows the face. Left
+// unstated, the sheet model kept them in the profile and body cells and dropped them in the
+// front head cells of Sarah's sheet (staging job_1791267520938_essbvehs8), and every page's
+// face repair copies the front cell. The sheet judges check the same fact (REQUESTED_GLASSES).
+// Nothing is said for a character without glasses: the face photo decides that alone.
+function buildGlassesBlock(character) {
+  const g = declaredGlasses(character);
+  return g ? `\nGlasses: ${g} — worn on the face in EVERY cell that shows the face, front and three-quarter included, the same frame in all, never taken off.\n` : '';
+}
+
 function buildHairBlock(character) {
   const p = character?.physical || {};
   const hairBits = [];
@@ -354,7 +365,7 @@ The figure reads as a ${costumeName} at a glance. Each garment is worn the way t
   return `Image 1 indicates only the camera angle and facing direction in each cell — ignore its silhouette, body, and face. The output contains no arrows.
 ${bodyRef}
 
-${outfitRule}${readsAs}${buildSeasonOutfitBlock(seasonOutfit, redress)}${hairBlock}
+${outfitRule}${readsAs}${buildSeasonOutfitBlock(seasonOutfit, redress)}${hairBlock}${buildGlassesBlock(character)}
 Render every cell as a REALISTIC reference — the same visual style as the source face photo in Image 3. Photographic / lifelike, natural proportions${ageFromPhoto}. No cartoon, no anime, no watercolour. This sheet is an identity anchor.
 
 Output a 1×4 grid: ONE row, four cells side by side, thin black vertical dividers, pure white background, same cell layout as Image 1.
@@ -378,7 +389,7 @@ Costume: ${costumeDescription} — the same garment the body sheet wears. Every 
   return `Image 1 shows the four camera angles for a head-shot row — use it ONLY for facing direction; ignore its face and features, and never draw arrows.
 Image 2 is the character's face photo — the identity; match this exact face.
 Image 3 is the character's full-body reference sheet — match the SAME face, hair colour, hairstyle, and skin tone shown there so the heads belong to that body.${outfitLine}
-${buildGarmentRule()} Where the neckline shows, it is the one Image 3 wears. ${buildUnnamedTrimRule(redress)}${hairBlock}
+${buildGarmentRule()} Where the neckline shows, it is the one Image 3 wears. ${buildUnnamedTrimRule(redress)}${hairBlock}${buildGlassesBlock(character)}
 Output a 1×4 grid: ONE row, four cells side by side, thin black vertical dividers, pure white background. Each cell is framed like a passport photo of the SAME PERSON: head, neck and the top of the shoulders wearing the costume, cut off at the upper chest, with plain white above the hair and filling the rest of the cell; no bare skin below the neck. No waist, hands or lower body in any cell. Never crop the top of the head. Cell 1 front, cell 2 three-quarter, cell 3 profile.
 Cell 4 is a REAR TURN, distinct from cell 3's profile: ${REAR_TURN_POSE}. Cell 4 is never a second profile and never a flat back of the head with no face showing — Image 1's cell 4 is a plain placeholder silhouette, ignore its exact head angle entirely.
 Photographic / lifelike; identity from Image 2; hair, skin tone, and costume consistent with Image 3.${declaredAgeBlock(character)} No arrows or symbols. ${SHEET_NO_LETTERING_RULE} ${CELL_NAMES_NOT_DRAWN}`;
@@ -454,6 +465,7 @@ function applyPoseHeadGate(bodies, poseHeads) {
     bodies.proportions?.score ?? 10,
     bodies.solo?.soloScore ?? 10,
     bodies.background?.backgroundScore ?? 10,
+    bodies.glasses?.glassesScore ?? 10,
   );
   bodies.valid = bodies.finalScore >= 6;
   if (fb.fullBodyScore <= 2) bodies.failureReasons = [...(bodies.failureReasons || []), `fullBody: ${headReason}`];
@@ -462,20 +474,20 @@ function applyPoseHeadGate(bodies, poseHeads) {
 
 // Review the 1×4 body row on its own (it IS the bottom-body crop the eval wants,
 // so no split needed): pose head-check + Gemini bodies eval, merged by the gate.
-async function reviewBodyRow(bodyRowData, { costumeDescription, costumeName = null, model, usageTracker, declaredAge = null }) {
+async function reviewBodyRow(bodyRowData, { costumeDescription, costumeName = null, model, usageTracker, declaredAge = null, glasses = null }) {
   const [poseHeads, bodiesR] = await Promise.all([
     detectBodyRowHeads(bodyRowData),
-    evaluateSheetRow(bodyRowData, 'bodies', { costumeDescription, costumeName, model, usageTracker, declaredAge }),
+    evaluateSheetRow(bodyRowData, 'bodies', { costumeDescription, costumeName, model, usageTracker, declaredAge, glasses }),
   ]);
   const bodies = applyPoseHeadGate(bodiesR.report, poseHeads);
   return { valid: !!bodies.valid, score: bodies.finalScore ?? 0, bodies, promptUsed: bodiesR.promptUsed };
 }
 
 // Review the 1×4 head row: heads-structure eval + identity vs face photo/avatar.
-async function reviewHeadRow(headRowData, { facePhoto, avatarFaces, model, usageTracker, declaredAge = null, costumeDescription = '' }) {
+async function reviewHeadRow(headRowData, { facePhoto, avatarFaces, model, usageTracker, declaredAge = null, costumeDescription = '', glasses = null }) {
   const hasRefs = !!(facePhoto || avatarFaces);
   const [headsR, identityR] = await Promise.all([
-    evaluateSheetRow(headRowData, 'heads', { costumeDescription, model, usageTracker }),
+    evaluateSheetRow(headRowData, 'heads', { costumeDescription, model, usageTracker, glasses }),
     hasRefs ? evaluateIdentity(headRowData, { sourcePhoto: facePhoto, avatarFaces, model, usageTracker, declaredAge }) : Promise.resolve(null),
   ]);
   const heads = headsR.report;
@@ -539,7 +551,7 @@ async function generateComposited2x4(character, { costumeDescription, costumeNam
     let review = { valid: true, score: null, evaluated: false, bodies: null };
     if (!skipReview) {
       try {
-        review = await reviewBodyRow(res.imageData, { costumeDescription, costumeName, model, usageTracker, declaredAge: character?.age });
+        review = await reviewBodyRow(res.imageData, { costumeDescription, costumeName, model, usageTracker, declaredAge: character?.age, glasses: declaredGlasses(character) });
       } catch (err) {
         // Keep the sheet. Losing the eval costs a quality gate; losing the
         // sheet costs the character its face on every page of the book, which
@@ -583,7 +595,7 @@ async function generateComposited2x4(character, { costumeDescription, costumeNam
     let review = { valid: true, score: null, evaluated: false, heads: null, identity: null };
     if (!skipReview) {
       try {
-        review = await reviewHeadRow(res.imageData, { facePhoto, avatarFaces, model, usageTracker, declaredAge: character?.age, costumeDescription });
+        review = await reviewHeadRow(res.imageData, { facePhoto, avatarFaces, model, usageTracker, declaredAge: character?.age, costumeDescription, glasses: declaredGlasses(character) });
       } catch (err) {
         log.error(`[CHARACTER 2×4] ${character?.name} head eval FAILED (${err.message}) — keeping the unscored row`);
         review = { valid: true, score: 0, heads: null, identity: null, evalFailed: err.message };
@@ -1159,6 +1171,7 @@ const HEADS_AXES = [
   ['coverage', r => r.coverage?.coverageScore],
   ['solo', r => r.solo?.soloScore],
   ['crop', r => r.crop?.cropScore],
+  ['glasses', r => r.glasses?.glassesScore],
 ];
 function scoreHeadsReport(report) {
   return stampVerdict(report, lowestAxis(report, HEADS_AXES, 'row eval (heads)'));
@@ -1359,8 +1372,25 @@ const inlinePartOf = (dataUri) => ({ inline_data: { mime_type: dataUri.match(/^d
 // judges what's actually there. which='heads' → sheet-row-heads-eval (heads-only
 // / angles / clean); 'bodies' → sheet-row-bodies-eval (head-to-toe / angles /
 // outfit / proportions). Identity is a SEPARATE call — see evaluateIdentity.
+// The glasses axis is COMPUTED, never scored by the judge: asked for a 1-10 score, the judge
+// listed two glassless faces in its own reason and still wrote 7-9 (replay over Sarah's stored
+// head row, staging job_1791267520938_essbvehs8). It answers yes / no / na per cell; one `no`
+// is a failed axis. Nothing declared: the axis is 10 and the cells are not read.
+function applyGlassesAxis(report, glasses) {
+  if (!report || typeof report !== 'object') return report;
+  const cells = report.glasses && report.glasses.perCell && typeof report.glasses.perCell === 'object' ? Object.values(report.glasses.perCell) : [];
+  const missing = glasses ? cells.filter(v => String(v).trim().toLowerCase() === 'no') : [];
+  if (glasses && !cells.length) log.warn(`[CHARACTER 2×4] the row judge returned no per-cell glasses answer although "${glasses}" is declared — the axis is unscored`);
+  report.glasses = {
+    ...(report.glasses || {}),
+    ...(glasses && !cells.length ? {} : { glassesScore: missing.length ? 1 : 10 }),
+  };
+  if (missing.length) report.failureReasons = [...(report.failureReasons || []), `glasses: ${missing.length} cell(s) show a face without the declared ${glasses}`];
+  return report;
+}
+
 async function evaluateSheetRow(rowImageData, which, opts = {}) {
-  const { costumeDescription = '', costumeName = null, model = 'gemini-2.5-flash', promptOverride = null, usageTracker = null, declaredAge = null } = opts;
+  const { costumeDescription = '', costumeName = null, model = 'gemini-2.5-flash', promptOverride = null, usageTracker = null, declaredAge = null, glasses = null } = opts;
   const tplKey = which === 'heads' ? 'sheetRowHeadsEval' : 'sheetRowBodiesEval';
   let prompt = promptOverride || PROMPT_TEMPLATES[tplKey];
   if (!prompt) throw new Error(`${tplKey} template not loaded`);
@@ -1374,6 +1404,7 @@ async function evaluateSheetRow(rowImageData, which, opts = {}) {
     REAR_TURN: REAR_TURN_POSE,
     SHEET_LETTERING: SHEET_NO_LETTERING_RULE,
     REQUESTED_OUTFIT: costumeDescription ? `REQUESTED_OUTFIT: ${costumeDescription}` : '',
+    REQUESTED_GLASSES: glasses ? `REQUESTED_GLASSES: ${glasses}` : 'REQUESTED_GLASSES: none declared',
     ...(which === 'bodies'
       ? {
         REQUESTED_COSTUME: costumeName ? `REQUESTED_COSTUME: ${costumeName}` : '',
@@ -1385,6 +1416,7 @@ async function evaluateSheetRow(rowImageData, which, opts = {}) {
   // No cap (owner rule: no output caps): a 4000 cap once truncated the bodies
   // JSON mid-string, and the throw cost three characters their whole ref sheet.
   const raw = await askSheetJudge({ model, parts, prompt, label: `row eval (${which})`, usageTracker, usageFn: `character_2x4_${which}_eval`, apiKey: process.env.GEMINI_API_KEY });
+  applyGlassesAxis(raw, glasses);
   // bodies: recomputed by applyPoseHeadGate, which also owns the head axis.
   const report = which === 'heads' ? scoreHeadsReport(raw) : raw;
   return { report, promptUsed: prompt };
@@ -1423,17 +1455,17 @@ async function evaluateIdentity(headsCrop, opts = {}) {
 async function evaluateSheetSplit(sheetImageData, opts = {}) {
   // promptOverrides: Test Lab only — { heads?, bodies?, identity? }, each
   // replacing that ONE judge's template. Production passes none.
-  const { facePhoto = null, standardAvatar = null, costumeDescription = 'standard outfit', costumeName = null, model = 'gemini-2.5-flash', promptOverrides = {}, usageTracker = null, declaredAge = null } = opts;
+  const { facePhoto = null, standardAvatar = null, costumeDescription = 'standard outfit', costumeName = null, model = 'gemini-2.5-flash', promptOverrides = {}, usageTracker = null, declaredAge = null, glasses = null } = opts;
   const avatarFaces = standardAvatar ? (await splitSheetRows(standardAvatar)).topHeads : null;
   const { topHeads, bottomBody, splitY } = await splitSheetRows(sheetImageData);
   const hasRefs = !!(facePhoto || avatarFaces);
   const [headsR, bodiesR, identityR, poseHeads] = await Promise.all([
-    evaluateSheetRow(topHeads, 'heads', { costumeDescription, model, promptOverride: promptOverrides.heads || null, usageTracker }),
+    evaluateSheetRow(topHeads, 'heads', { costumeDescription, model, promptOverride: promptOverrides.heads || null, usageTracker, glasses }),
     // Bodies row (flash): feet / angles / outfit / proportions / background. It
     // does NOT judge head presence — a VLM hallucinates a head on a headless torso
     // (POPE-adversarial co-occurrence) — so the head axis is owned by pose
     // (detectBodyRowHeads) and merged in below. ONE source of truth per concept.
-    evaluateSheetRow(bottomBody, 'bodies', { costumeDescription, costumeName, model, promptOverride: promptOverrides.bodies || null, usageTracker, declaredAge }),
+    evaluateSheetRow(bottomBody, 'bodies', { costumeDescription, costumeName, model, promptOverride: promptOverrides.bodies || null, usageTracker, declaredAge, glasses }),
     hasRefs ? evaluateIdentity(topHeads, { sourcePhoto: facePhoto, avatarFaces, model, usageTracker, declaredAge, promptOverride: promptOverrides.identity || null }) : Promise.resolve(null),
     detectBodyRowHeads(bottomBody),
   ]);
@@ -1498,7 +1530,7 @@ async function evaluateAvatarSheet(sheet, opts = {}) {
     pass, facePhoto = null, standardAvatar = null, realisticSheet = null,
     costumeDescription = 'standard outfit', costumeName = null, artStyle = 'watercolor',
     declaredAge = null, model = null, promptOverrides = {}, usageTracker = null,
-    imageLabels = null,
+    imageLabels = null, glasses = null,
   } = opts;
   // promptOverrides (Test Lab only) name the ONE judge template each replaces:
   // heads / bodies / identity on pass 1, style on pass 2. An override for a
@@ -1508,7 +1540,7 @@ async function evaluateAvatarSheet(sheet, opts = {}) {
   if (stray.length) throw new Error(`pass ${pass} has no ${stray.join('/')} judge to override (it runs: ${wanted.join(', ')})`);
   if (Number(pass) === 1) {
     const split = await evaluateSheetSplit(sheet, {
-      facePhoto, standardAvatar, costumeDescription, costumeName, declaredAge,
+      facePhoto, standardAvatar, costumeDescription, costumeName, declaredAge, glasses,
       model: model || MODEL_DEFAULTS.sheetEvalModel, promptOverrides: promptOverrides || {}, usageTracker,
     });
     return { verdict: split.verdict, split, promptUsed: split.promptUsed };
@@ -2144,6 +2176,7 @@ module.exports = {
   declaredAgeBlock,
   buildBodyRowPrompt,
   buildHeadRowPrompt,
+  buildGlassesBlock,
   // Standalone Pass 2 (style transfer from an existing realistic sheet) +
   // face-photo resolver — used by Test Lab to reuse one realistic anchor
   // across many style transfers.
@@ -2151,5 +2184,5 @@ module.exports = {
   resolveFacePhoto,
   buildStyleTransferPrompt,
   // exposed for tests
-  _internal: { parseJudgeJson, buildBodyRowPrompt, buildHeadRowPrompt, buildFootwearRule, buildGarmentRule, buildSeasonOutfitBlock, buildStyleTransferPrompt, resolveFacePhoto, resolveStandardAvatar, quickLayoutCheck, evaluateStyledSheetWithGemini, runStyleTransferPass, splitSheetRows, evaluateSheetRow, evaluateIdentity, evaluateSheetSplit, evaluateAvatarSheet, isEchoedJudgeVerdict, REAR_TURN_POSE, SHEET_GROUND_RULE, SHEET_NO_LETTERING_RULE, CELL_NAMES_NOT_DRAWN, garmentColourRule, buildUnnamedTrimRule, scoreHeadsReport, scoreStyleReport, scoreIdentityReport },
+  _internal: { applyGlassesAxis, applyPoseHeadGate, parseJudgeJson, buildBodyRowPrompt, buildHeadRowPrompt, buildFootwearRule, buildGarmentRule, buildSeasonOutfitBlock, buildStyleTransferPrompt, resolveFacePhoto, resolveStandardAvatar, quickLayoutCheck, evaluateStyledSheetWithGemini, runStyleTransferPass, splitSheetRows, evaluateSheetRow, evaluateIdentity, evaluateSheetSplit, evaluateAvatarSheet, isEchoedJudgeVerdict, REAR_TURN_POSE, SHEET_GROUND_RULE, SHEET_NO_LETTERING_RULE, CELL_NAMES_NOT_DRAWN, garmentColourRule, buildUnnamedTrimRule, scoreHeadsReport, scoreStyleReport, scoreIdentityReport },
 };
