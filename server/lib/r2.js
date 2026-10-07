@@ -429,6 +429,27 @@ async function deleteByPrefixDetailed(prefix) {
 }
 
 /**
+ * List every object under `prefix` as `{ key, size }`. THROWS on an S3 error —
+ * the callers are erasure dry runs and post-delete verification, and a listing
+ * that cannot see the objects must never read as "nothing there". An
+ * unconfigured client throws for the same reason.
+ */
+async function listByPrefix(prefix) {
+  if (!isConfigured()) throw new Error('R2 is not configured — cannot list objects');
+  const Bucket = process.env.R2_BUCKET;
+  const objects = [];
+  let ContinuationToken;
+  do {
+    const res = await getClient().send(new ListObjectsV2Command({
+      Bucket, Prefix: prefix, ContinuationToken, MaxKeys: 1000,
+    }));
+    for (const o of res.Contents || []) objects.push({ key: o.Key, size: o.Size || 0 });
+    ContinuationToken = res.IsTruncated ? res.NextContinuationToken : null;
+  } while (ContinuationToken);
+  return objects;
+}
+
+/**
  * Convenience: delete every R2 artefact for a story. Equivalent to
  * deleteByPrefix(`stories/{storyId}/`).
  */
@@ -495,6 +516,7 @@ module.exports = {
   bytesFromAnyImage,
   deleteByPrefix,
   deleteByPrefixDetailed,
+  listByPrefix,
   deleteStoryArtefacts,
   storyPrefix,
   objectExists,

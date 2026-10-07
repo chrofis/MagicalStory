@@ -1,9 +1,25 @@
 # GDPR erasure — admin SOP
 
-How to handle a "delete my data" request. The tool is
-**`scripts/admin/delete-user-data.js`** — the most destructive script in this repo.
+How to handle a "delete my data" request. **One implementation:
+`server/lib/userErasure.js`**, reached two ways:
 
-Design notes, the full table list and the FK reasoning: `tasks/gdpr-erasure-2026-09-11.md`.
+- **`scripts/admin/delete-user-data.js`** — the CLI; dry run by default, prints the plan
+  and the exact R2 keys. The most destructive script in this repo.
+- **`DELETE /api/admin/users/:userId`** (admin dashboard trash icon) — admin-only, and the
+  account's email must be typed back (`confirmEmail`). No dry run: use the CLI first.
+
+Until 2026-10-07 the admin route was a second, divergent implementation (no transaction, no
+sentinel move, and it DELETED `orders`); it is gone. The table list is
+`ERASURE_COVERAGE` in the module — `tests/unit/user-erasure.test.ts` parses
+`migrations/*.sql` and **fails when a table with a `user_id` / `story_id` column is not
+named there**, so the list cannot drift again (it had: `email_sends`, `email_events`,
+`idea_events`, `eval_calls`, `eval_finding_stats`, `story_verify_reports` were all missing).
+
+The story-keyed tables with no FK (`STORY_DERIVED_DELETE`) are swept by the same
+`deleteStoryDerivedRows()` from the user story-delete route and the anonymous-trial
+cleanup, so a normal story delete no longer orphans judge transcripts, metrics or scores.
+`email_sends.story_id` / `idea_events.story_id` are NULLed on a story delete (the event
+stays; the idea funnel's pick rate must not lose picks) and deleted on an erasure.
 
 > **Status (2026-09-12):** admin-run script only, and the privacy policy now says so — it
 > describes the email request path (`privacy@magicalstory.ch`, one month) instead of a
@@ -138,6 +154,7 @@ The receipt says this too. You must be able to repeat it to the person.
 | Kept | Rule |
 |---|---|
 | `orders` rows — amount, currency, payment status, Stripe session/payment-intent id, Gelato order id, shipping **country**, dates | Swiss **OR art. 958f**: business records and accounting vouchers must be kept **10 years**; the privacy policy states 10 years for payment records. **GDPR art. 17(3)(b)** exempts processing required by law. |
+| `email_sends` / `email_events` / `idea_events` / `trial_events` / `failure_log` / `logs` | **Deleted** — `email_sends` and `email_events` by `user_id` **or by recipient address** (a mail sent before the account id was stamped is still theirs). |
 | `credit_transactions` and `referral_payouts` — amounts, balances, types, dates, `order_stripe_session_id`, `stripe_refund_id` | Ruling Q1 (2026-09-12): the credit and commission ledgers are an audit trail and are kept. Both columns are `NOT NULL`, so the rows are reassigned to the sentinel user `gdpr-erased-sentinel` and **scrubbed** of `description` / `reference_id` on the way. The sentinel cannot log in, cannot be emailed, and does not appear in any admin listing or user count. |
 
 **Nothing records when a retained row expires, and no purge job exists** (ruling Q5): these

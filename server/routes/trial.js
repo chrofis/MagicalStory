@@ -15,6 +15,7 @@ const crypto = require('crypto');
 const sharp = require('sharp');
 const { log } = require('../utils/logger');
 const { stripDataUriPrefix } = require('../lib/r2');
+const { deleteStoryDerivedRows } = require('../lib/userErasure');
 const { lookupIpLocation } = require('../lib/ipLocation');
 const { normalizeCharacterName } = require('../lib/characterName');
 const { trialSourceWhereClause } = require('../lib/trialSource');
@@ -2295,7 +2296,7 @@ setInterval(async () => {
       const anonFilter = 'WHERE user_id = ANY($1::varchar[])';
       const anonParams = [deleteUserIds];
 
-      const jobsResult = await client.query(`DELETE FROM story_jobs ${anonFilter}`, anonParams);
+      const jobsResult = await client.query(`DELETE FROM story_jobs ${anonFilter} RETURNING id`, anonParams);
       const charsResult = await client.query(`DELETE FROM characters ${anonFilter}`, anonParams);
       // RETURNING file_url: the files row is the only reference to the PDF's
       // R2 key (orders/{files.id}.pdf), which lives outside both prefixes
@@ -2306,6 +2307,9 @@ setInterval(async () => {
       // likeness-derived illustrations) + its story_images survived forever.
       // story_images DOES cascade from stories, so deleting stories cleans it.
       const storiesResult = await client.query(`DELETE FROM stories ${anonFilter} RETURNING id`, anonParams);
+      // Story-keyed rows with no FK (eval transcripts, metrics, scores, failure
+      // detail) — the same list the user story-delete and the GDPR erasure use.
+      await deleteStoryDerivedRows(client, [...storiesResult.rows.map((r) => r.id), ...jobsResult.rows.map((r) => r.id)]);
 
       // Delete the anonymous users themselves — the same held-back set.
       const usersResult = await client.query(

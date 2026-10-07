@@ -11,6 +11,7 @@ const { dbQuery, getPool, isDatabaseMode, logActivity } = require('../../service
 const { authenticateToken, invalidateAuthState } = require('../../middleware/auth');
 const { log } = require('../../utils/logger');
 const { sentinelExclusion } = require('../../lib/gdprSentinel');
+const erasure = require('../../lib/userErasure');
 
 // Middleware to check admin role
 const requireAdmin = (req, res, next) => {
@@ -645,108 +646,74 @@ router.get('/:userId/stories/:storyId', authenticateToken, requireAdmin, async (
   }
 });
 
-// DELETE /api/admin/users/:userId - Delete user and all data
+// DELETE /api/admin/users/:userId - GDPR erasure of a user and all their data.
+//
+// Runs server/lib/userErasure.js — the SAME module as
+// scripts/admin/delete-user-data.js. Until 2026-10-07 this route was a second
+// implementation (no transaction, no sentinel, and it deleted `orders`, which
+// the owner's rulings retain). Body: { confirmEmail } must equal the account's
+// address exactly — typing it back is the interlock, as --confirm= is for the CLI.
+// The receipt is the GDPR_ERASURE row the module writes (erased id + counts,
+// never the email); no second audit row with the address is written here.
 router.delete('/:userId', authenticateToken, requireAdmin, async (req, res) => {
+  const userIdToDelete = req.params.userId;
+  if (!userIdToDelete) return res.status(400).json({ error: 'Invalid user ID' });
+  if (String(userIdToDelete) === String(req.user.id)) {
+    return res.status(400).json({ error: 'Cannot delete your own account' });
+  }
+  if (!isDatabaseMode()) return res.status(501).json({ error: 'Database mode required' });
+
+  const confirmEmail = typeof req.body?.confirmEmail === 'string' ? req.body.confirmEmail.trim() : '';
+  if (!confirmEmail) {
+    return res.status(400).json({ error: 'confirmEmail is required: type the account\'s email address back to confirm the erasure' });
+  }
+
+  const client = await getPool().connect();
   try {
-    const userIdToDelete = req.params.userId;
-
-    if (!userIdToDelete) {
-      return res.status(400).json({ error: 'Invalid user ID' });
+    const user = await erasure.resolveSubject(client, { userId: userIdToDelete });
+    if (confirmEmail.toLowerCase() !== String(user.email || '').trim().toLowerCase()) {
+      return res.status(400).json({ error: 'confirmEmail does not match the account\'s email address. Nothing was touched.' });
     }
 
-    if (String(userIdToDelete) === String(req.user.id)) {
-      return res.status(400).json({ error: 'Cannot delete your own account' });
+    log.info(`[ADMIN] GDPR erasure of user ${user.id} requested by ${req.user.username}`);
+    const out = await erasure.eraseUser(client, {
+      userId: user.id,
+      actor: req.user.username,
+      environment: process.env.RAILWAY_ENVIRONMENT_NAME || 'local',
+      apply: true,
+    });
+
+    if (!out.complete) {
+      log.error(`[ADMIN] GDPR erasure of user ${user.id}: database erased, R2 INCOMPLETE — ${out.r2.failures.join('; ')}`);
+    } else {
+      log.info(`[ADMIN] GDPR erasure of user ${user.id} complete (${out.r2.deleted} R2 objects)`);
     }
-
-    if (!isDatabaseMode()) {
-      return res.status(501).json({ error: 'Database mode required' });
-    }
-
-    const pool = getPool();
-    const userResult = await pool.query('SELECT username, email FROM users WHERE id = $1', [userIdToDelete]);
-    if (userResult.rows.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    const user = userResult.rows[0];
-    log.info(`[ADMIN] Deleting user ${user.username} (${user.email}) and all their data...`);
-
-    // Delete in order due to foreign key constraints
-    const deletedJobs = await pool.query('DELETE FROM story_jobs WHERE user_id = $1 RETURNING id', [userIdToDelete]);
-    const deletedOrders = await pool.query('DELETE FROM orders WHERE user_id = $1 RETURNING id', [userIdToDelete]);
-    const deletedStories = await pool.query('DELETE FROM stories WHERE user_id = $1 RETURNING id', [userIdToDelete]);
-    const deletedCharacters = await pool.query('DELETE FROM characters WHERE user_id = $1 RETURNING id', [userIdToDelete]);
-    // file_url too: the files row is the only reference to orders/{id}.pdf.
-    const deletedFiles = await pool.query('DELETE FROM files WHERE user_id = $1 RETURNING id, file_url', [userIdToDelete]);
-
-    // Prune R2 artefacts for every story this user owned. Sequential to avoid
-    // hammering R2 with 100s of parallel ListObjects calls; each story's
-    // prune is itself batched in 1000-key chunks.
-    try {
-      const r2Pending = require('../../lib/r2Pending');
-      let totalR2 = 0;
-      for (const row of deletedStories.rows) {
-        totalR2 += await r2Pending.pruneStory(row.id, `user ${userIdToDelete} deleted`);
-        // Sibling prefix minted by the JSONB offload (dbHousekeeping):
-        // stories/{userId}/{storyId}/migrated/… — not under stories/{storyId}/.
-        totalR2 += await r2Pending.prunePrefix(
-          `stories/${userIdToDelete}/${row.id}/`, `user ${userIdToDelete} deleted (migrated subtree)`);
-      }
-      // Sibling path of the single-character delete: the user's whole
-      // character namespace (photos, avatars, styled, avatar-refs) —
-      // previously orphaned on every user deletion.
-      totalR2 += await r2Pending.prunePrefix(`characters/${userIdToDelete}/`, `user ${userIdToDelete} deleted`);
-      // And the user's PDFs, which live under orders/ and are named only by
-      // the files rows deleted above.
-      totalR2 += await r2Pending.pruneFileRows(deletedFiles.rows, `user ${userIdToDelete} deleted`);
-      if (totalR2 > 0) log.info(`[ADMIN] Pruned ${totalR2} R2 objects across ${deletedStories.rows.length} stories + character namespace + ${deletedFiles.rows.length} files`);
-    } catch (r2Err) {
-      log.warn(`[ADMIN] R2 cleanup partial: ${r2Err.message}`);
-    }
-
-    let deletedLogsCount = 0;
-    try {
-      const deletedLogs = await pool.query('DELETE FROM logs WHERE user_id = $1 RETURNING id', [userIdToDelete]);
-      deletedLogsCount = deletedLogs.rows.length;
-    } catch (err) {
-      log.warn(`[ADMIN] Failed to cleanup logs for deleted user ${userIdToDelete}: ${err.message}`);
-    }
-
-    await pool.query('DELETE FROM users WHERE id = $1', [userIdToDelete]);
-
-    log.info(`[ADMIN] Successfully deleted user ${user.username} and all associated data`);
-    // Audit the admin action AFTER the user is deleted so we don't write a row
-    // that the per-user log cleanup just removed. user_id on the audit row
-    // points at the admin (the actor); the deleted user's identity is in details.
-    await logActivity(req.user.id, req.user.username, 'ADMIN_DELETE_USER', {
-      deletedUserId: userIdToDelete,
-      deletedUsername: user.username,
-      deletedEmail: user.email,
-      counts: {
-        jobs: deletedJobs.rows.length,
-        orders: deletedOrders.rows.length,
-        stories: deletedStories.rows.length,
-        characters: deletedCharacters.rows.length,
-        files: deletedFiles.rows.length,
-        logs: deletedLogsCount,
-      },
-    }, req.user);
 
     res.json({
       success: true,
-      message: `User ${user.username} and all associated data deleted successfully`,
-      deletedCounts: {
-        storyJobs: deletedJobs.rows.length,
-        orders: deletedOrders.rows.length,
-        stories: deletedStories.rows.length,
-        characters: deletedCharacters.rows.length,
-        files: deletedFiles.rows.length,
-        activityLogs: deletedLogsCount
-      }
+      complete: out.complete,
+      message: out.complete
+        ? `User ${user.username} erased; ${out.r2.deleted} R2 object(s) deleted`
+        : `User ${user.username} erased from the database, but ${out.r2.failures.length} R2 step(s) FAILED — finish them by hand (see r2Failures)`,
+      deletedCounts: out.result.deleted,
+      anonymisedOrders: out.result.anonymisedOrders,
+      retainedToSentinel: out.result.retainedToSentinel,
+      r2Deleted: out.r2.deleted,
+      r2Failures: out.r2.failures,
+      followUp: {
+        stripeSessions: out.plan.orders.map((o) => o.stripe_session_id).filter(Boolean),
+        gelatoOrders: out.plan.orders.map((o) => o.gelato_order_id).filter(Boolean),
+      },
     });
   } catch (err) {
+    if (err.code === 'ERASURE_NOT_FOUND') return res.status(404).json({ error: 'User not found' });
+    if (err.code === 'ERASURE_SENTINEL') return res.status(400).json({ error: err.message });
+    if (err.code === 'ERASURE_PREFLIGHT') return res.status(409).json({ error: 'Erasure blocked', problems: err.problems });
+    if (err.code === 'ERASURE_R2_UNAVAILABLE') return res.status(503).json({ error: err.message });
     console.error('[ADMIN] Error deleting user:', err);
     res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
   }
 });
 

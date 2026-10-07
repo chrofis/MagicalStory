@@ -347,10 +347,16 @@ export default function AdminDashboard() {
 
   const handleDeleteUser = async (targetUser: AdminUser) => {
     if (!confirm(texts.confirmDelete)) return;
+    // The server's interlock: the account's email typed back, exactly.
+    const typed = prompt(`${texts.confirmDeleteEmail}\n${targetUser.email}`);
+    if (typed === null) return;
     setIsActionLoading(true);
     try {
-      await adminService.deleteUser(targetUser.id);
+      const out = await adminService.deleteUser(targetUser.id, typed.trim());
       setUsers(users.filter(u => u.id !== targetUser.id));
+      setActionMessage(out.complete
+        ? { type: 'success', text: out.message }
+        : { type: 'error', text: `${out.message}: ${out.r2Failures.join('; ')}` });
     } catch (err) {
       setActionMessage({ type: 'error', text: err instanceof Error ? err.message : 'Failed' });
     } finally {

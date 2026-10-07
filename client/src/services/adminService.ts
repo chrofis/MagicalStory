@@ -71,6 +71,18 @@ export interface TrialStepFunnel {
   allSourcesVisits: number;
 }
 
+export interface DeleteUserResponse {
+  success: boolean;
+  /** false when the database is erased but an R2 step failed — see r2Failures. */
+  complete: boolean;
+  message: string;
+  deletedCounts: Record<string, number>;
+  anonymisedOrders: number;
+  r2Deleted: number;
+  r2Failures: string[];
+  followUp: { stripeSessions: string[]; gelatoOrders: string[] };
+}
+
 export interface AdminUser {
   id: string;
   username: string;
@@ -467,8 +479,12 @@ export const adminService = {
     return api.post(`/api/admin/users/${userId}/role`, { role });
   },
 
-  async deleteUser(userId: string): Promise<void> {
-    return api.delete(`/api/admin/users/${userId}`);
+  /**
+   * GDPR erasure. `confirmEmail` must be the account's address typed back —
+   * the server refuses anything else (server/routes/admin/users.js).
+   */
+  async deleteUser(userId: string, confirmEmail: string): Promise<DeleteUserResponse> {
+    return api.delete<DeleteUserResponse>(`/api/admin/users/${userId}`, { body: JSON.stringify({ confirmEmail }) });
   },
 
   async toggleEmailVerified(userId: string, emailVerified: boolean): Promise<{ user: { emailVerified: boolean } }> {

@@ -23,6 +23,7 @@ const { getTextAreaMask } = require('../lib/textMasks');
 const { loadVbReferenceBytes } = require('../lib/characterPhotos');
 const { stripDataUriPrefix } = require('../lib/r2');
 const { recordStoryView } = require('../lib/storyViews');
+const { deleteStoryDerivedRows } = require('../lib/userErasure');
 
 /**
  * Normalize image data to ensure it has the correct data URI prefix.
@@ -3336,6 +3337,17 @@ router.delete('/:id', authenticateToken, async (req, res) => {
         await pool.query('DELETE FROM story_jobs WHERE id = $1 AND user_id = $2', [id, req.user.id]);
       } catch (jobErr) {
         log.warn(`Could not delete story_job ${id}:`, jobErr.message);
+      }
+
+      // Story-keyed rows with NO foreign key (judge transcripts, metrics,
+      // scores, failure detail) — orphaned by the stories delete until
+      // 2026-10-07. One list, shared with the GDPR erasure (userErasure.js).
+      try {
+        const derived = await deleteStoryDerivedRows(getPool(), [id]);
+        const n = Object.values(derived).reduce((s, v) => s + v, 0);
+        if (n > 0) console.log(`🧹 Deleted ${n} story-derived rows for ${id}`);
+      } catch (derivedErr) {
+        log.error(`Could not delete story-derived rows for ${id}: ${derivedErr.message}`);
       }
 
       // The story's PDFs go with the story (owner, 2026-09-12). The files row

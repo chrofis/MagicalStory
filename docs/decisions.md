@@ -67224,3 +67224,22 @@ result, mirroring the in-process language ladder (`inputData.language` → profi
 
 **Touched files**: `server/lib/processGuards.js`, `server.js`, `email.js`,
 `tests/unit/process-guards.test.ts`.
+
+## 2026-10-07 — GDPR erasure is ONE module (server/lib/userErasure.js) behind the CLI and the admin route; story-derived rows are swept by one shared function
+
+**Context:** A DB review found two erasure paths that disagreed: `scripts/admin/delete-user-data.js` (transaction, sentinel, orders retained — the 2026-09-12 rulings) and `DELETE /api/admin/users/:userId` (no transaction, no sentinel, deleted `orders`, R2 failures logged at warn). The script also predated six tables with `user_id` / `story_id` columns (`email_sends` — keyed by recipient *address*, `email_events`, `idea_events`, `eval_calls`, `eval_finding_stats`, `story_verify_reports`), and the normal story delete left every story-keyed no-FK table orphaned. `avatar_sheet_set_members` had been dropped in migration 012 but was still in the mental list.
+
+**Decision:**
+- `server/lib/userErasure.js` holds the table list (`ERASURE_COVERAGE`), the order, the retention rules and the R2 work. The CLI prints its plan; the admin route runs it with `confirmEmail` typed back (the same interlock as `--confirm=`). The route's own implementation is deleted, not kept as a fallback.
+- `planErasure` is read-only and IS the dry run (per-table counts, exact R2 keys). `executeErasure` is one BEGIN…COMMIT. `pruneErasureR2` runs after COMMIT, re-lists every prefix, and returns every failure in `result.r2.failures` — the CLI exits 1, the route answers `complete:false` with the list. Never swallowed.
+- Retained exactly as ruled 2026-09-12: `orders` anonymised (OR art. 958f), `credit_transactions` / `referral_payouts` moved to the sentinel and scrubbed, `referral_events.buyer_user_id` / `referral_payouts.source_user_id` tombstoned, third parties' rows untouched.
+- `deleteStoryDerivedRows(client, storyIds)` deletes `consolidator_calls, story_metrics, story_scores, failure_log, eval_calls, eval_finding_stats, story_verify_reports` and NULLs `story_id` on `email_sends` / `idea_events`; it runs from the story delete route, the anonymous-trial cleanup and the erasure. Story ids and job ids share one id space, so the erasure sweeps both (a job that failed before its story row has judge rows under the job id).
+- The receipt (`logs` row `GDPR_ERASURE`) stays id-only; the route no longer writes a second audit row carrying the email.
+- `tests/unit/user-erasure.test.ts` parses `migrations/*.sql` (CREATE/DROP/ALTER ADD COLUMN) and fails when a `user_id` / `story_id` table is missing from `ERASURE_COVERAGE`, when a listed table does not exist, when a no-FK `story_id` table is not swept, or when a "cascade" claim has no `ON DELETE CASCADE`.
+
+**Rationale:** CLAUDE.md "NO FALLBACKS": two implementations drift, and the weaker one (the route) was the one a click reached. A migration-parsing guard is the only thing that stops the list rotting a third time. Unlinking rather than deleting the idea/mail events on a story delete keeps the idea funnel honest (a deleted story is still a pick that happened); on an erasure the rows go anyway.
+
+**Not done (owner):** no self-serve delete button (Q6 still deferred); `testlab_set_members.target` JSONB holds story ids as Test Lab fixtures, not user data, and is untouched; the orphan-cleanup paths (`server/routes/admin/database.js`, `scripts/admin/cleanup-orphaned-data.js`) still delete stories without the derived sweep.
+
+**Touched:** `server/lib/userErasure.js` (new), `server/lib/r2.js` (`listByPrefix`), `scripts/admin/delete-user-data.js`, `server/routes/admin/users.js`, `server/routes/stories.js`, `server/routes/trial.js`, `client/src/services/adminService.ts`, `client/src/pages/AdminDashboard.tsx`, `client/src/pages/admin/translations.ts`, `tests/unit/user-erasure.test.ts`, `docs/gdpr-erasure.md`.
+**Status:** ✅ active — unit-tested with a captured-SQL pg stub; NOT yet run against a real database (owner: `node scripts/admin/delete-user-data.js --email=<x> --production` dry run first).
