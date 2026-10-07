@@ -18,6 +18,8 @@ function walk(dir: string, out: string[] = []): string[] {
     const p = path.join(dir, e.name);
     if (e.isDirectory()) walk(p, out);
     else if (/\.(ts|tsx|js)$/.test(e.name)) out.push(p);
+    // The theme-page copy is one JSON file per theme (constants/themeContent/*.json, 2026-10-07)
+    else if (e.name.endsWith('.json') && dir.endsWith(path.join('constants', 'themeContent'))) out.push(p);
   }
   return out;
 }
@@ -33,8 +35,10 @@ const FILES = [
 interface Slot { file: string; line: number; raw: string }
 const SLOTS: Slot[] = [];
 for (const f of FILES) {
-  const text = fs.readFileSync(f, 'utf8');
-  for (const s of extractFrench(f, text).slots) {
+  // A bare JSON object parses as a block statement; as a default export it is the
+  // object literal the extractor walks (same line numbers: the prefix stays on line 1).
+  const text = (f.endsWith('.json') ? 'export default ' : '') + fs.readFileSync(f, 'utf8');
+  for (const s of extractFrench(f.replace(/\.json$/, '.ts'), text).slots) {
     SLOTS.push({ file: path.relative(ROOT, f).split(path.sep).join('/'), line: s.line, raw: s.raw });
   }
 }
@@ -155,7 +159,7 @@ describe('FR-C: vous everywhere in the UI', () => {
   });
   it('theme card descriptions address the reader with vous', () => {
     const re = /^(?:Découvre|Rencontre|Apprends|Explore|Regarde|Plonge|Assiste|Cours|Marche|Suis|Franchis|Fais|Vole|Grimpe|Descends|Creuse|Rejoins|Prends|Chevauche|Retiens|Mélange|Aide|Voyage|Flotte|Navigue|Tire|Travaille|Accompagne|Acclame|Avance|Crie|Reste|Arpente|Célèbre|Tiens|Clique|Visite|Flâne|Déterre|Assieds-toi|Faufile-toi)(?![\p{L}-])/u;
-    expect(offenders(re, (s) => s.file === 'client/src/constants/themeContent.ts')).toEqual([]);
+    expect(offenders(re, (s) => s.file.startsWith('client/src/constants/themeContent/'))).toEqual([]);
   });
 });
 
