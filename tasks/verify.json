@@ -5957,8 +5957,36 @@
           "pages"
         ]
       },
-      "status": "pending",
-      "evidence": []
+      "status": "confirmed",
+      "evidence": [
+        {
+          "storyId": "job_1791391658113_h0y6ktpoe",
+          "env": "staging",
+          "build": "9f946244",
+          "runDate": "2026-10-07 18:46 CH",
+          "checkedAt": "2026-10-07 19:30 CH",
+          "result": "CONFIRMED",
+          "note": "Noah 4 de: job 113s, writer 36s, 5982 out tok; text 7.5 vs 7 at high. High-effort baseline runs: job_1791390810945_7yp1e0rh3 / job_1791390831811_j5diensbo / job_1791390816625_2o820i76x (199-285s writer, 27k-40k out tok). Owner chose medium for all 2026-10-07."
+        },
+        {
+          "storyId": "job_1791391658361_4eylyr1w4",
+          "env": "staging",
+          "build": "9f946244",
+          "runDate": "2026-10-07 18:46 CH",
+          "checkedAt": "2026-10-07 19:30 CH",
+          "result": "CONFIRMED",
+          "note": "Jules 6 fr: job 113s, writer 39s, 6090 out tok; text 7.5 vs 6 at high. High-effort baseline runs: job_1791390810945_7yp1e0rh3 / job_1791390831811_j5diensbo / job_1791390816625_2o820i76x (199-285s writer, 27k-40k out tok). Owner chose medium for all 2026-10-07."
+        },
+        {
+          "storyId": "job_1791391675043_2klh8pkk8",
+          "env": "staging",
+          "build": "9f946244",
+          "runDate": "2026-10-07 18:47 CH",
+          "checkedAt": "2026-10-07 19:30 CH",
+          "result": "CONFIRMED",
+          "note": "Rohan 8 de: job 134s, writer 37s, 5862 out tok; text 6.5 vs 8 at high (simpler, weaker causality). High-effort baseline runs: job_1791390810945_7yp1e0rh3 / job_1791390831811_j5diensbo / job_1791390816625_2o820i76x (199-285s writer, 27k-40k out tok). Owner chose medium for all 2026-10-07."
+        }
+      ]
     },
     {
       "id": "phantom-cast-described-on-page",

@@ -780,6 +780,9 @@ Run verifications now live in **`tasks/verify.json`** (judge a stored run: `node
 ---
 
 ## Decisions waiting on the owner
+- [ ] (2026-10-07) Watch: trial effort medium wrote a simpler, less causal story for an 8-year-old (job_1791391675043_2klh8pkk8 vs job_1791390816625_2o820i76x); if it recurs consider effort by age band → docs/decisions.md 2026-10-07 owner rulings
+- [ ] (2026-10-07) Photo analyzer misses faces when photos are analysed concurrently (2 of 3 parallel trial uploads, twice: faceCrop NO; same photo alone → face found). Suspect the shared MTCNN detector (photo_analyzer.py ~1160, not thread-safe under waitress) → tasks/session-handover-2026-10-07.md
+- [ ] (2026-10-07) Trial defects seen on staging A/B: held animal dropped from p1 despite reference cell (Jules, job_1791390831811_j5diensbo); place name painted into page 2 (job_1791391658361_4eylyr1w4); hero drawn ~5-6 for an 8-year-old; cover dog colour/collar differs from pages
 - [ ] (2026-10-07) Session review: security config, reliability/alerting, DB, prompt contradictions, SEO/content copy, conversion, a11y/perf leftovers — ~45 owner items → tasks/session-review-2026-10-07.md
 - [ ] (2026-10-07) Trial: reading level (LANGUAGE_LEVELS standard 40-150, varied pacing) instead of the flat 100-140 words/page — likely shorter output, changes page look → tasks/trial-quality-review-2026-10-07.md §5.1
 - [ ] (2026-10-07) Trial time budget: Jev landmark probe+scoring runs sequentially before the writer (≤20 s); back cover starts only after the parse and is the 155-216 s tail — move either off the path? → tasks/trial-quality-review-2026-10-07.md §5.2

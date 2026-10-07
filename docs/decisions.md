@@ -67258,3 +67258,10 @@ Context: three staging trials on 6401111c (job_1791390810945_7yp1e0rh3, job_1791
 Decision (owner 2026-10-07, "test lower effort"): MODEL_DEFAULTS.trialStoryEffort = 'medium' on the trial writer call; the beats writer keeps storyTextEffort. An A/B on staging (same three rotation entries) decides whether it stays.
 Rationale: speed is the trial's product requirement; effort is the one lever that moves output length without touching the prompt.
 Touched files: server/config/models.js, storyJobPipeline.js, tests/unit/trial-writer-effort.test.ts, tasks/verify.json.
+
+## 2026-10-07 - Owner rulings after the trial effort A/B and the French typography finding
+Context: A/B on staging, rotation entries 1/5/8, effort high (job_1791390810945_7yp1e0rh3, job_1791390831811_j5diensbo, job_1791390816625_2o820i76x) vs medium (job_1791391658113_h0y6ktpoe, job_1791391658361_4eylyr1w4, job_1791391675043_2klh8pkk8): trial job 287-348 s → 113-134 s, writer 199-285 s → 36-39 s, writer cost ~$0.30-0.43 → ~$0.09; reviewed text 7→7.5 (age 4), 6→7.5 (age 6), 8→6.5 (age 8), n=1 each.
+Decision: (1) MODEL_DEFAULTS.trialStoryEffort stays 'medium' for every trial age (owner: "Medium for all"). (2) French STORY text keeps the Swiss tight style that languages.js rule (5) asks for (no space before ! ? : ; and none inside « »); decision #10's U+202F spacing applies to UI/email copy only. The unwired normaliser built to test option A was deleted unmerged.
+Rationale: speed is the trial's product requirement; the older-reader regression is noted as a watch item, not a blocker.
+Revisit if: more 7+ trials read noticeably simpler than full stories (then consider effort by age band).
+Touched files: tasks/verify.json (trial-writer-effort-medium → confirmed).
