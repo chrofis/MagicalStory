@@ -22,3 +22,45 @@ export function isStoryTypeComplete(sel: StoryTypeSelection): boolean {
   // life-challenge, educational, historical, swiss-stories: a topic
   return !!sel.storyTopic;
 }
+
+// Keys of the step-3/5 state the wizard restores from localStorage.
+const STORY_TYPE_KEYS = ['story_type', 'story_theme', 'story_custom_theme_text', 'story_details', 'story_topic_name'] as const;
+
+export interface StoredStoryType {
+  storyType: string;
+  storyCategory: StoryCategory;
+  storyTopic: string;
+  storyTheme: string;
+  customThemeText: string;
+  storyDetails: string;
+}
+
+/**
+ * The step-3 selection the wizard starts with. `?category=…&topic=…` (theme
+ * pages, the trial's "create the full story" button) is a NEW selection: the
+ * theme, custom text, plot and topic name a previous visit left in storage
+ * belong to another story and are dropped — the clear-on-change effect skips
+ * the initial mount, so without this a dentist topic kept the dragon plot. The
+ * theme and legacy storyType are what StoryCategorySelector's own category and
+ * topic handlers would have set for that click ('realistic' wrapper, topic id).
+ */
+export function initialStoryType(search: string, storage: Pick<Storage, 'getItem' | 'removeItem'>): StoredStoryType {
+  const params = new URLSearchParams(search);
+  const urlCategory = params.get('category');
+  const urlTopic = params.get('topic');
+  if (!urlCategory && !urlTopic) {
+    return {
+      storyType: storage.getItem('story_type') || '',
+      storyCategory: (storage.getItem('story_category') || '') as StoryCategory,
+      storyTopic: storage.getItem('story_topic') || '',
+      storyTheme: storage.getItem('story_theme') || '',
+      customThemeText: storage.getItem('story_custom_theme_text') || '',
+      storyDetails: storage.getItem('story_details') || '',
+    };
+  }
+  STORY_TYPE_KEYS.forEach(k => storage.removeItem(k));
+  const storyCategory = (urlCategory || '') as StoryCategory;
+  const storyTopic = urlTopic || '';
+  const storyTheme = storyCategory === 'adventure' || storyCategory === '' ? '' : storyCategory === 'custom' ? 'custom' : 'realistic';
+  return { storyType: storyCategory === 'custom' ? 'custom' : storyTopic, storyCategory, storyTopic, storyTheme, customThemeText: '', storyDetails: '' };
+}

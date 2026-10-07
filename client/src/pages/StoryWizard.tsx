@@ -27,7 +27,7 @@ import { getCurrentSeason } from './wizard/WizardStep3BookSettings';
 import { EmailVerificationModal } from '@/components/auth/EmailVerificationModal';
 import { FaceSelectionModal } from '@/components/character';
 import { INITIAL_USER_CREDITS, IMAGE_REGENERATION_COST, COVER_REGENERATION_COST } from '@/constants/credits';
-import { isStoryTypeComplete } from '@/utils/wizardStoryType';
+import { isStoryTypeComplete, initialStoryType } from '@/utils/wizardStoryType';
 
 // Types
 import type { Character, RelationshipMap, RelationshipTextMap, VisualBible, ChangedTraits, DetectedFace, AgeCategory, PhysicalTraits, PhysicalTraitsSource } from '@/types/character';
@@ -242,25 +242,14 @@ export default function StoryWizard() {
   // progress modal until the job is complete (owner 2026-09-24).
   const showLivePartialStory = developerMode && (user?.role === 'admin' || isImpersonating);
 
-  // Story Type & Art Style settings - load from localStorage (used in step 4)
-  const [storyType, setStoryType] = useState(() => {
-    return localStorage.getItem('story_type') || '';
-  });
-  // New story category system — URL params override localStorage (from theme pages)
-  const [storyCategory, setStoryCategory] = useState<'adventure' | 'life-challenge' | 'educational' | 'historical' | 'swiss-stories' | 'custom' | ''>(() => {
-    const urlCategory = searchParams.get('category');
-    return (urlCategory || localStorage.getItem('story_category') || '') as 'adventure' | 'life-challenge' | 'educational' | 'historical' | 'swiss-stories' | 'custom' | '';
-  });
-  const [storyTopic, setStoryTopic] = useState(() => {
-    const urlTopic = searchParams.get('topic');
-    return urlTopic || localStorage.getItem('story_topic') || '';
-  });
-  const [storyTheme, setStoryTheme] = useState(() => {
-    return localStorage.getItem('story_theme') || '';
-  });
-  const [customThemeText, setCustomThemeText] = useState(() => {
-    return localStorage.getItem('story_custom_theme_text') || '';
-  });
+  // Story Type settings (step 3) - restored from localStorage; ?category=&topic=
+  // (theme pages, the trial hand-off) start a new selection — see initialStoryType.
+  const [initialSelection] = useState(() => initialStoryType(window.location.search, localStorage));
+  const [storyType, setStoryType] = useState(initialSelection.storyType);
+  const [storyCategory, setStoryCategory] = useState<'adventure' | 'life-challenge' | 'educational' | 'historical' | 'swiss-stories' | 'custom' | ''>(initialSelection.storyCategory);
+  const [storyTopic, setStoryTopic] = useState(initialSelection.storyTopic);
+  const [storyTheme, setStoryTheme] = useState(initialSelection.storyTheme);
+  const [customThemeText, setCustomThemeText] = useState(initialSelection.customThemeText);
   const [artStyle, setArtStyle] = useState(() => {
     return localStorage.getItem('story_art_style') || 'watercolor';
   });
@@ -342,9 +331,7 @@ export default function StoryWizard() {
   const [dedication, setDedication] = useState(() => {
     return localStorage.getItem('story_dedication') || '';
   });
-  const [storyDetails, setStoryDetails] = useState(() => {
-    return localStorage.getItem('story_details') || '';
-  });
+  const [storyDetails, setStoryDetails] = useState(initialSelection.storyDetails);
   const [isGeneratingIdeas, setIsGeneratingIdeas] = useState(false);
   const [isGeneratingIdea1, setIsGeneratingIdea1] = useState(false);
   const [isGeneratingIdea2, setIsGeneratingIdea2] = useState(false);
