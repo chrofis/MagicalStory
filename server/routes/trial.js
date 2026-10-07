@@ -579,13 +579,37 @@ async function recordTrialEvent(event) {
   const pool = getPool();
   if (!pool) return false;
 
+  // An authenticated event belongs to the visit that already carries this
+  // user, whatever visit id the client sent. The visit id lives in the
+  // browser's localStorage, and the email verification link is opened wherever
+  // the mail client opens it — a mail app's web view, another browser, the
+  // phone's default browser when the trial ran inside an in-app browser — where
+  // that storage is empty, so EmailVerified.tsx minted a fresh visit id and
+  // `account_created` landed on a one-row visit with no landing, while the real
+  // trail never got its conversion (tasks/BACKLOG.md, seen 2026-09-03/09-07).
+  // user_id is attached server-side from the token at character_saved and
+  // back-filled onto the earlier rows, so "the earliest visit with this user" is
+  // a lookup, not a guess; a user with no row yet keeps the client's visit id.
+  let visitId = event.visitId;
+  if (event.userId) {
+    const owned = await pool.query(
+      'SELECT visit_id FROM trial_events WHERE user_id = $1 ORDER BY created_at ASC LIMIT 1',
+      [event.userId]
+    );
+    const ownedVisitId = owned.rows[0]?.visit_id;
+    if (ownedVisitId && ownedVisitId !== visitId) {
+      log.info(`[TRIAL FUNNEL] ${event.step} from visit ${visitId} attached to the user's visit ${ownedVisitId}`);
+      visitId = ownedVisitId;
+    }
+  }
+
   const result = await pool.query(
     `INSERT INTO trial_events
        (visit_id, step, utm_source, utm_medium, utm_campaign, utm_term, gclid, referrer, language, device, user_id, meta)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
      ON CONFLICT (visit_id, step) DO NOTHING`,
     [
-      event.visitId,
+      visitId,
       event.step,
       _trim(event.utmSource, 60),
       _trim(event.utmMedium, 60),
@@ -606,7 +630,7 @@ async function recordTrialEvent(event) {
   if (event.userId) {
     await pool.query(
       'UPDATE trial_events SET user_id = $1 WHERE visit_id = $2 AND user_id IS NULL',
-      [event.userId, event.visitId]
+      [event.userId, visitId]
     );
   }
 
@@ -618,7 +642,9 @@ async function recordTrialEvent(event) {
  *
  * Unauthenticated by design: the first events fire before any account exists.
  * If a trial session token happens to be present we resolve the user id from it
- * server-side; a client-supplied user id is never trusted.
+ * server-side; a client-supplied user id is never trusted. Once a user is
+ * known, the event lands on the visit that already carries that user, not on
+ * whatever visit id this browser context holds (see recordTrialEvent).
  *
  * Always answers 204, even on a bad step — this is fire-and-forget beacon
  * traffic from a page that is often mid-unload, and no measurement failure may
@@ -3597,6 +3623,7 @@ module.exports.extractTraitsShared = extractTraitsShared;
 module.exports.ACCEPTED_EVENT_STEPS = ACCEPTED_EVENT_STEPS;
 module.exports.OPTIONAL_TRIAL_STEPS = OPTIONAL_TRIAL_STEPS;
 module.exports.sanitizeTrialEventMeta = sanitizeTrialEventMeta;
+module.exports.recordTrialEvent = recordTrialEvent;
 module.exports.buildTrialFunnelRows = buildTrialFunnelRows;
 module.exports.resolveTrialWindow = resolveTrialWindow;
 module.exports.loadTrialCountersFromDb = loadTrialCountersFromDb;
