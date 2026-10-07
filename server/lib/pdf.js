@@ -1147,7 +1147,36 @@ async function generateViewPdf(storyData, bookFormat = DEFAULT_FORMAT, options =
   return pdfBuffer;
 }
 
+/**
+ * Content-Disposition for a story PDF download, from the story title.
+ *
+ * `filename=` is the ASCII fallback: German umlauts and ß transliterate
+ * (Bär → Baer), every other accented letter drops only its accent (Léa → Lea,
+ * forêt → foret, Noël → Noel). The three route copies this replaces deleted
+ * the whole letter instead ("Léa et la forêt" downloaded as "La_et_la_fort.pdf"),
+ * and the book route did not even transliterate umlauts ("Bär" → "Br.pdf").
+ * `filename*=` (RFC 5987) carries the real title; every current browser prefers it.
+ *
+ * @param {string} title
+ * @param {string} [suffix=''] e.g. '-print'
+ * @returns {string} header value
+ */
+function pdfContentDisposition(title, suffix = '') {
+  const raw = String(title || '').trim() || 'story';
+  const ascii = raw
+    .replace(/[\u2013\u2014]/g, '-')
+    .replace(/ä/g, 'ae').replace(/Ä/g, 'Ae').replace(/ö/g, 'oe').replace(/Ö/g, 'Oe').replace(/ü/g, 'ue').replace(/Ü/g, 'Ue').replace(/ß/g, 'ss')
+    .replace(/œ/g, 'oe').replace(/Œ/g, 'Oe').replace(/æ/g, 'ae').replace(/Æ/g, 'Ae')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9\s\-_.]/g, '')
+    .trim().replace(/\s+/g, '_')
+    .substring(0, 100) || 'story';
+  const utf8 = raw.replace(/[\/\\"\x00-\x1f\x7f]/g, '').replace(/\s+/g, '_').substring(0, 100);
+  return `attachment; filename="${ascii}${suffix}.pdf"; filename*=UTF-8''${encodeURIComponent(utf8 + suffix)}.pdf`;
+}
+
 module.exports = {
+  pdfContentDisposition,
   resolveImageBuffer,
   generatePrintPdf,
   generateViewPdf,

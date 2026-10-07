@@ -24,6 +24,9 @@ const { getPool, rehydrateStoryImages, logActivity } = require('../services/data
 // Lib modules
 const { generatePrintPdf, generateViewPdf, generateCombinedBookPdf } = require('../lib/pdf');
 const { processBookOrder, resumeBookOrder, getCoverDimensions, countBookContentPages, computeBookPageInfo, shippingFromSession } = require('../lib/gelato');
+
+const { generatePrintPdf, generateViewPdf, generateCombinedBookPdf, pdfContentDisposition } = require('../lib/pdf');
+const { processBookOrder, resumeBookOrder, getCoverDimensions, countBookContentPages, computeBookPageInfo } = require('../lib/gelato');
 const { stripDataUriPrefix } = require('../lib/r2');
 const email = require('../../email');
 
@@ -697,13 +700,7 @@ router.get('/stories/:id/pdf', authenticateToken, async (req, res) => {
 
     // NO database storage - just send directly to user
     res.setHeader('Content-Type', 'application/pdf');
-    const safeFilename = (storyData.title || 'story')
-      .replace(/[–—]/g, '-')
-      .replace(/[äÄ]/g, 'ae').replace(/[öÖ]/g, 'oe').replace(/[üÜ]/g, 'ue').replace(/ß/g, 'ss')
-      .replace(/[^a-zA-Z0-9\s\-_.]/g, '')
-      .replace(/\s+/g, '_')
-      .substring(0, 100);
-    res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}.pdf"`);
+    res.setHeader('Content-Disposition', pdfContentDisposition(storyData.title));
     res.send(pdfBuffer);
 
   } catch (err) {
@@ -766,13 +763,7 @@ router.get('/stories/:id/print-pdf', authenticateToken, async (req, res) => {
 
     // Return PDF for download
     res.setHeader('Content-Type', 'application/pdf');
-    const safeFilename = (storyData.title || 'story')
-      .replace(/[–—]/g, '-')
-      .replace(/[äÄ]/g, 'ae').replace(/[öÖ]/g, 'oe').replace(/[üÜ]/g, 'ue').replace(/ß/g, 'ss')
-      .replace(/[^a-zA-Z0-9\s\-_.]/g, '')
-      .replace(/\s+/g, '_')
-      .substring(0, 100);
-    res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}-print.pdf"`);
+    res.setHeader('Content-Disposition', pdfContentDisposition(storyData.title, '-print'));
     res.send(pdfBuffer);
 
   } catch (err) {
@@ -1190,10 +1181,8 @@ router.post('/generate-book-pdf', authenticateToken, async (req, res) => {
 
     // Send PDF
     res.setHeader('Content-Type', 'application/pdf');
-    const bookTitle = stories.length > 1
-      ? `Book_${stories.length}_Stories`
-      : (stories[0].data.title || 'Book').replace(/[^a-zA-Z0-9\s\-_.]/g, '').replace(/\s+/g, '_');
-    res.setHeader('Content-Disposition', `attachment; filename="${bookTitle}.pdf"`);
+    res.setHeader('Content-Disposition', pdfContentDisposition(
+      stories.length > 1 ? `Book_${stories.length}_Stories` : (stories[0].data.title || 'Book')));
     res.send(pdfBuffer);
 
   } catch (err) {
