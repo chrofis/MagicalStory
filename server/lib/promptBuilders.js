@@ -12647,7 +12647,6 @@ The story takes place in ${inputData.userLocation.city}. Use real place names â€
       LANGUAGE_INSTRUCTION: getLanguageInstruction(language),
       PAGES: pageCount,
       LANGUAGE: getLanguageNameEnglish(language),
-      LANGUAGE_NOTE: getLanguageNote(language),
       CHARACTERS: characterDesc || 'A child',
       STORY_DETAILS: wrapUserInput(inputData.storyDetails || inputData.storyTheme || 'A fun adventure'),
       CATEGORY_GUIDELINES: categoryGuidelines,
