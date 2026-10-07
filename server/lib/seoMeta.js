@@ -1798,11 +1798,30 @@ function escapeAttr(str) {
 
 /**
  * Generates a complete XML sitemap string.
+ *
+ * <lastmod> is the build time of the page's prerendered file (the German one;
+ * all four languages are written in the same run), read from
+ * `prerenderDir`. It used to be the current date on every request, which
+ * told crawlers that all ~1400 URLs changed every day — a lastmod that is
+ * always "now" carries no information and Google documents that it ignores
+ * one that is consistently wrong. A URL without a prerendered file (/try is
+ * the SPA wizard) gets no <lastmod> at all: nothing is known, nothing is claimed.
+ *
+ * @param {{ prerenderDir: string }} opts - directory of the prerendered HTML
  * @returns {string} XML sitemap
  */
-function generateSitemap() {
+function generateSitemap({ prerenderDir } = {}) {
+  if (!prerenderDir) throw new Error('generateSitemap: prerenderDir is required');
   const paths = [];
-  const today = new Date().toISOString().split('T')[0];
+  const lastmodFor = (routePath) => {
+    const slug = routePath === '/' ? '/index' : routePath;
+    try {
+      return fs.statSync(path.join(prerenderDir, `${slug}.de.html`)).mtime.toISOString().split('T')[0];
+    } catch (err) {
+      if (err.code === 'ENOENT') return null;
+      throw err;
+    }
+  };
 
   // Priority mappings
   const staticPriorities = {
@@ -1830,7 +1849,7 @@ function generateSitemap() {
   for (const [route, priority] of Object.entries(staticPriorities)) {
     paths.push({
       path: route,
-      lastmod: today,
+      lastmod: lastmodFor(route),
       changefreq: route === '/' ? 'weekly' : 'monthly',
       priority,
     });
@@ -1840,7 +1859,7 @@ function generateSitemap() {
   for (const categoryId of Object.keys(THEME_CATEGORIES)) {
     paths.push({
       path: `/themes/${categoryId}`,
-      lastmod: today,
+      lastmod: lastmodFor(`/themes/${categoryId}`),
       changefreq: 'monthly',
       priority: '0.7',
     });
@@ -1851,7 +1870,7 @@ function generateSitemap() {
     for (const themeId of Object.keys(themes)) {
       paths.push({
         path: `/themes/${categoryId}/${themeId}`,
-        lastmod: today,
+        lastmod: lastmodFor(`/themes/${categoryId}/${themeId}`),
         changefreq: 'monthly',
         priority: '0.6',
       });
@@ -1870,7 +1889,7 @@ function generateSitemap() {
   for (const compSlug of Object.keys(COMPARISONS)) {
     paths.push({
       path: `/vergleich/${compSlug}`,
-      lastmod: today,
+      lastmod: lastmodFor(`/vergleich/${compSlug}`),
       changefreq: 'monthly',
       priority: '0.6',
     });
@@ -1880,7 +1899,7 @@ function generateSitemap() {
   for (const guideSlug of Object.keys(GUIDES)) {
     paths.push({
       path: `/ratgeber/${guideSlug}`,
-      lastmod: today,
+      lastmod: lastmodFor(`/ratgeber/${guideSlug}`),
       changefreq: 'monthly',
       priority: '0.7',
     });
@@ -1890,7 +1909,7 @@ function generateSitemap() {
   for (const occasionSlug of Object.keys(OCCASIONS)) {
     paths.push({
       path: `/anlass/${occasionSlug}`,
-      lastmod: today,
+      lastmod: lastmodFor(`/anlass/${occasionSlug}`),
       changefreq: 'monthly',
       priority: '0.6',
     });
@@ -1900,7 +1919,7 @@ function generateSitemap() {
   for (const giftSlug of Object.keys(GIFT_PAGES)) {
     paths.push({
       path: `/geschenk/${giftSlug}`,
-      lastmod: today,
+      lastmod: lastmodFor(`/geschenk/${giftSlug}`),
       changefreq: 'monthly',
       priority: '0.7',
     });
@@ -1910,7 +1929,7 @@ function generateSitemap() {
   for (const city of SWISS_CITIES) {
     paths.push({
       path: `/stadt/${city.id}`,
-      lastmod: today,
+      lastmod: lastmodFor(`/stadt/${city.id}`),
       changefreq: 'monthly',
       priority: '0.6',
     });
@@ -1926,7 +1945,8 @@ function generateSitemap() {
         ? `${BASE_URL}${p.path === '/' ? '' : p.path}`
         : `${BASE_URL}${p.path === '/' ? '' : p.path}?lang=${lang}`;
 
-      let entry = `  <url>\n    <loc>${escapeXml(loc)}</loc>\n    <lastmod>${p.lastmod}</lastmod>\n    <changefreq>${p.changefreq}</changefreq>\n    <priority>${p.priority}</priority>`;
+      const lastmod = p.lastmod ? `\n    <lastmod>${p.lastmod}</lastmod>` : '';
+      let entry = `  <url>\n    <loc>${escapeXml(loc)}</loc>${lastmod}\n    <changefreq>${p.changefreq}</changefreq>\n    <priority>${p.priority}</priority>`;
 
       // xhtml:link alternates for regional + language variants
       const basePath = p.path === '/' ? '' : p.path;

@@ -2435,8 +2435,12 @@ app.get('/robots.txt', (req, res) => {
   res.type('text/plain').sendFile(robotsPath);
 });
 
+// Built once per process: its lastmod values are the prerendered files' build
+// times, and those only change with a deploy (= a restart).
+let sitemapXml = null;
 app.get('/sitemap.xml', (req, res) => {
-  res.type('application/xml').send(generateSitemap());
+  if (sitemapXml === null) sitemapXml = generateSitemap({ prerenderDir: PRERENDER_DIR });
+  res.type('application/xml').send(sitemapXml);
 });
 
 // NOTE: Public shared story routes moved to server/routes/sharing.js
