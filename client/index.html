@@ -58,6 +58,7 @@
     <meta property="og:locale" content="de_CH" />
     <meta property="og:locale:alternate" content="en_US" />
     <meta property="og:locale:alternate" content="fr_CH" />
+    <meta property="og:locale:alternate" content="it_CH" />
     <meta property="og:site_name" content="Magical Story" />
 
     <!-- Twitter Card -->
@@ -72,35 +73,9 @@
     <meta name="author" content="Magical Story" />
     <meta name="keywords" content="personalisierte Kinderbücher, Kinderbuch personalisiert, KI Illustrationen, Bilderbuch mit eigenem Kind, personalisierte Geschenke, Kindergeschichten" />
 
-    <!-- JSON-LD Structured Data -->
-    <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "WebApplication",
-      "name": "Magical Story",
-      "url": "https://magicalstory.ch",
-      "description": "Erstelle magische, personalisierte Geschichten mit KI-generierten Illustrationen deiner Liebsten",
-      "applicationCategory": "Entertainment",
-      "operatingSystem": "Web",
-      "offers": {
-        "@type": "Offer",
-        "price": "0",
-        "priceCurrency": "CHF",
-        "description": "Kostenlos Geschichten erstellen, nur für gedruckte Bücher bezahlen"
-      },
-      "creator": {
-        "@type": "Organization",
-        "name": "Magical Story",
-        "url": "https://magicalstory.ch"
-      },
-      "featureList": [
-        "KI-generierte personalisierte Illustrationen",
-        "Individuelle Kinderbücher",
-        "Verschiedene Kunststile",
-        "Print-on-Demand Bücher"
-      ]
-    }
-    </script>
+    <!-- JSON-LD is injected per route (and per language) by server/lib/seoMeta.js
+         injectMeta — at prerender time and for the SPA shell. Nothing static
+         here: a fixed block would ship German text on every non-German page. -->
 
     <!-- Google Fonts — loaded async (preload + onload swap) so the stylesheet
          is off the critical render path; display=swap shows fallback text immediately -->

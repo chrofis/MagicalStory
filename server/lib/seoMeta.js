@@ -697,7 +697,7 @@ const ORGANIZATION_JSON_LD = {
   name: 'Magical Story',
   url: BASE_URL,
   logo: `${BASE_URL}/images/logo.png`,
-  description: 'AI-powered personalized children\'s storybooks made in Switzerland. 170+ themes, 8 art styles, 3 languages.',
+  description: 'AI-powered personalized children\'s storybooks made in Switzerland. 170+ themes, 8 art styles, 4 languages.',
   foundingLocation: { '@type': 'Place', name: 'Switzerland' },
   sameAs: [],
   contactPoint: {
@@ -740,8 +740,11 @@ function buildProductJsonLd(lang) {
     brand: { '@type': 'Brand', name: 'Magical Story' },
     offers: {
       '@type': 'AggregateOffer',
+      // Softcover CHF 29 to hardcover CHF 77 (91–100 pages), the production
+      // pricing_tiers table (decisions.md 2026-10-05); 96 was the stale
+      // migration seed value. The free first story is digital, hence 0.
       lowPrice: '0',
-      highPrice: '96',
+      highPrice: '77',
       priceCurrency: 'CHF',
       availability: 'https://schema.org/InStock',
       offerCount: '170',
@@ -996,7 +999,7 @@ function buildProductJsonLdForTheme(themeName, category, themeId, lang) {
     it: {
       name: `Libro per bambini personalizzato: ${themeName}`,
       description: `Libro ${themeName} illustrato con l'IA e tuo figlio come protagonista.`,
-      offer: 'Prima storia gratuita. Cartonato da CHF 29.',
+      offer: 'Prima storia gratuita. Cartonato da CHF 37.',
     },
   }[lang] || {
     name: `Personalized children's book: ${themeName}`,
