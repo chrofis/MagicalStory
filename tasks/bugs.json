@@ -3918,6 +3918,36 @@
       "fixedAt": "2026-10-07",
       "fixedIn": "b18ebb1b5",
       "fix": "TAIL_POSE_RULE (one constant, second wording: the figure sits with the tail curved on the ground; the first wording, a prohibition, left Lab 1700 standing on the fin; Lab 1701 sits) is stated in the body-row generator and scored by the bodies judge (feet: no for a tail figure upright on its fin). Test: avatar-sheet-consistency-2026-10-07.test.ts."
+    },
+    {
+      "id": "char-repair-false-borrowed-label-refusal",
+      "title": "An automatic char-fix is refused as a 'borrowed label' ('No figures were detected at all') when the stored detection does not pair with the bytes being repaired (e.g. after a garment-recolour inputOverride), although the figure is on the page",
+      "reportedAt": "2026-10-07",
+      "source": "Repair investigation 2026-10-07: prod 7f2t99tk6 p4/p5, Lab 1694. charRepairTarget.resolveCharBbox tier 1 returned figures: paired?.figures || [] and charFixCall.findBorrowedLabel reads [] as zero figures drawn.",
+      "status": "fixed",
+      "fixedAt": "2026-10-07",
+      "fixedIn": "da9cd1185",
+      "fix": "resolveCharBbox tier 1 returns figures null (no opinion) for an unpaired detection; findBorrowedLabel already returns no verdict for null. Test: tests/unit/char-repair-protection.test.ts (REGRESSION: an unpaired detection yields figures null)."
+    },
+    {
+      "id": "char-fix-rejected-frames-and-spend-lost",
+      "title": "A rejected automatic char-fix (up to three paid Grok draws) left only an error string: no frame was kept and the spend was not billed (usage was tracked only after the face gate passed)",
+      "reportedAt": "2026-10-07",
+      "source": "Repair investigation 2026-10-07: repairPipeline.executeCharFixAction returned { error } for blend-gate and face-gate rejections; faceRepair kept attemptFrames but the pipeline route dropped them.",
+      "status": "fixed",
+      "fixedAt": "2026-10-07",
+      "fixedIn": "da9cd1185",
+      "fix": "faceRepair frames carry usage; executeCharFixAction bills every attempt once (rejected frames plus the returned image's usage only when an image came back) and returns attemptFrames, which the round writes to the page's retryHistory entry (R2-offloaded on save, nothing inline). Verified by run-through of the code path and node --check; real-story verify pending (tasks/verify.json repair-mechanics-2026-10-07)."
+    },
+    {
+      "id": "blend-gate-rejects-silhouette-changing-repairs",
+      "title": "The blend gate's 0.55 mask-IoU floor refused exactly the char repairs that must change the figure's outline (identity_swap hair, age_shift, body_build); Lab 1696 rejected the faithful repaint and accepted the worse one",
+      "reportedAt": "2026-10-07",
+      "source": "Repair investigation 2026-10-07: Lab 1696, 39-story corpus (blend_gate rejections on ypl33vk8u initialPage 44% and p12 50%).",
+      "status": "fixed",
+      "fixedAt": "2026-10-07",
+      "fixedIn": "da9cd1185",
+      "fix": "samBlend.anchorVerdict judges those defect types on centroid, feet and protected-neighbour overlap instead of IoU (faceRepair.SILHOUETTE_CHANGING_DEFECTS); face_drift keeps the floor. Test: tests/unit/blend-anchor-gate.test.ts (synthetic masks; Lab replay of stored blends is open in BACKLOG)."
     }
   ]
 }
