@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { CreditCard, Loader2, Check } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useToast } from '@/context/ToastContext';
@@ -15,6 +15,23 @@ export function CreditsModal({ isOpen, onClose }: CreditsModalProps) {
   const { showError } = useToast();
   const [isBuyingCredits, setIsBuyingCredits] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(1); // Default to "Popular"
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  // Escape closes (unless a checkout is in flight); focus moves into the dialog on open and
+  // back to the opener on close — the same contract as common/Modal.
+  useEffect(() => {
+    if (!isOpen) return;
+    const opener = document.activeElement as HTMLElement | null;
+    panelRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !isBuyingCredits) onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      opener?.focus?.();
+    };
+  }, [isOpen, isBuyingCredits, onClose]);
 
   if (!isOpen) return null;
 
@@ -60,8 +77,16 @@ export function CreditsModal({ isOpen, onClose }: CreditsModalProps) {
       className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
       onClick={() => !isBuyingCredits && onClose()}
     >
-      <div className="bg-white rounded-lg p-6 max-w-md mx-4 shadow-xl w-full" onClick={(e) => e.stopPropagation()}>
-        <h2 className="text-xl font-bold text-gray-900 mb-4">{texts.title}</h2>
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="credits-modal-title"
+        tabIndex={-1}
+        className="bg-white rounded-lg p-6 max-w-md mx-4 shadow-xl w-full outline-none"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 id="credits-modal-title" className="text-xl font-bold text-gray-900 mb-4">{texts.title}</h2>
 
         {/* Credit Packages */}
         <div className="space-y-2 mb-5">

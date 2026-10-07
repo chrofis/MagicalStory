@@ -33,4 +33,15 @@ describe('public pages a11y chrome', () => {
     const faq = src('pages/FAQ.tsx');
     expect(faq).toContain('aria-label={content.searchPlaceholder}');
   });
+
+  it('all three dialogs are announced as modal dialogs, take focus on open and close on Escape', () => {
+    for (const rel of ['components/common/Modal.tsx', 'components/common/CreditsModal.tsx', 'components/auth/ChangePasswordModal.tsx']) {
+      const s = src(rel);
+      expect(s, rel).toContain('role="dialog"');
+      expect(s, rel).toContain('aria-modal="true"');
+      expect(s, rel).toMatch(/aria-labelledby=/);
+      expect(s, rel).toContain('panelRef.current?.focus()');
+      expect(s, rel).toMatch(/e\.key === 'Escape'/);
+    }
+  });
 });

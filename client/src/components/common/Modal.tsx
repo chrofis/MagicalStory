@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useCallback } from 'react';
+import { ReactNode, useEffect, useCallback, useRef } from 'react';
 import { X } from 'lucide-react';
 import { uiLabel } from '@/utils/uiLabels';
 import { useLanguage } from '@/context/LanguageContext';
@@ -33,6 +33,7 @@ export function Modal({
   closeOnEscape = true,
 }: ModalProps) {
   const { language } = useLanguage();
+  const panelRef = useRef<HTMLDivElement>(null);
   const handleEscape = useCallback(
     (e: KeyboardEvent) => {
       if (e.key === 'Escape' && closeOnEscape) {
@@ -53,6 +54,15 @@ export function Modal({
     };
   }, [isOpen, handleEscape]);
 
+  // Keyboard / screen-reader users: focus moves into the dialog when it opens and
+  // back to the control that opened it when it closes (it used to stay behind the overlay).
+  useEffect(() => {
+    if (!isOpen) return;
+    const opener = document.activeElement as HTMLElement | null;
+    panelRef.current?.focus();
+    return () => { opener?.focus?.(); };
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   return (
@@ -65,8 +75,13 @@ export function Modal({
 
       {/* Modal Content */}
       <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={title ? 'modal-title' : undefined}
+        tabIndex={-1}
         className={`
-          relative bg-white rounded-2xl shadow-2xl w-full mx-4
+          relative bg-white rounded-2xl shadow-2xl w-full mx-4 outline-none
           transform transition-all duration-300 ease-out
           animate-in fade-in zoom-in-95
           ${sizeClasses[size]}
@@ -76,7 +91,7 @@ export function Modal({
         {(title || showCloseButton) && (
           <div className="flex items-center justify-between p-4 border-b border-gray-100">
             {title && (
-              <h2 className="text-xl font-bold text-gray-800">{title}</h2>
+              <h2 id="modal-title" className="text-xl font-bold text-gray-800">{title}</h2>
             )}
             {showCloseButton && (
               <button

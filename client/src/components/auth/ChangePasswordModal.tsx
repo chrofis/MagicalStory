@@ -1,4 +1,4 @@
-import { useState, FormEvent } from 'react';
+import { useState, useEffect, useRef, FormEvent } from 'react';
 import { X, KeyRound, CheckCircle } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
@@ -80,6 +80,37 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
 
+  const handleClose = () => {
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setError('');
+    setSuccess(false);
+    onClose();
+  };
+
+  const panelRef = useRef<HTMLDivElement>(null);
+  // Ref so the Escape listener always calls the current handleClose without re-running the
+  // focus effect on every render.
+  const handleCloseRef = useRef(handleClose);
+  handleCloseRef.current = handleClose;
+
+  // Escape closes (unless a request is in flight); focus moves into the dialog on open and
+  // back to the opener on close — the same contract as common/Modal and CreditsModal.
+  useEffect(() => {
+    if (!isOpen) return;
+    const opener = document.activeElement as HTMLElement | null;
+    panelRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !isLoading) handleCloseRef.current();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      opener?.focus?.();
+    };
+  }, [isOpen, isLoading]);
+
   if (!isOpen) return null;
 
   const handleSubmit = async (e: FormEvent) => {
@@ -107,18 +138,16 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
     }
   };
 
-  const handleClose = () => {
-    setCurrentPassword('');
-    setNewPassword('');
-    setConfirmPassword('');
-    setError('');
-    setSuccess(false);
-    onClose();
-  };
-
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-8 animate-fade-in relative">
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="change-password-title"
+        tabIndex={-1}
+        className="bg-white rounded-2xl shadow-xl max-w-md w-full p-8 animate-fade-in relative outline-none"
+      >
         <button
           onClick={handleClose}
           className="absolute top-4 right-4 p-2 rounded-full hover:bg-gray-100 transition-colors"
@@ -132,7 +161,7 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <CheckCircle className="w-8 h-8 text-green-600" />
             </div>
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">{t.success}</h2>
+            <h2 id="change-password-title" className="text-2xl font-bold text-gray-800 mb-2">{t.success}</h2>
             <p className="text-gray-500 mb-6">{t.successDesc}</p>
             <Button onClick={handleClose} variant="primary" className="w-full">
               {t.close}
@@ -144,7 +173,7 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
               <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <KeyRound className="w-8 h-8 text-indigo-500" />
               </div>
-              <h2 className="text-2xl font-bold text-gray-800 mb-2">{t.title}</h2>
+              <h2 id="change-password-title" className="text-2xl font-bold text-gray-800 mb-2">{t.title}</h2>
               <p className="text-gray-500">{t.description}</p>
             </div>
 
