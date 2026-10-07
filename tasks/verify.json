@@ -3,7 +3,7 @@
   "entries": [
     {
       "id": "trial-photo-glasses-and-features",
-      "commits": [],
+      "commits": ["898de1137"],
       "addedAt": "2026-10-07",
       "claim": "On a trial whose photo shows glasses or a distinctive mark, the character row carries physical.glasses / physical.other (and physical.detailedHairAnalysis) from the one analyze-photo call; the sheet generator's glasses line, the row judges' glasses check and the page prompt's DISTINCTIVE FEATURES block carry them, with no extra call.",
       "runShape": [
@@ -18,7 +18,7 @@
     },
     {
       "id": "trial-page-grid-production-selector",
-      "commits": [],
+      "commits": ["e4f6ccb16"],
       "addedAt": "2026-10-07",
       "claim": "On a trial run every page's VB grid is the production page grid: at most 4 cells, no landmark photo among the cells, a plate-borne vehicle/structure named in the hint's objects[] absent from the grid on a plated page, and the stored prompt's reference claim names exactly the kept cells; the trial still makes one image call per page.",
       "runShape": [
@@ -5902,7 +5902,7 @@
     {
       "id": "trial-writer-shared-image-rules",
       "title": "Trial scene hints carry a `population` level and the Art Director's costume-body, eyes-open, absent-thing, no-lens, one-instant, footing, small-prop, contact-verb, shared-grip and true-relative-size rules, with no extra call",
-      "commits": [],
+      "commits": ["eee1bc1c5"],
       "addedAt": "2026-10-07",
       "claim": "On the next trial run every stored scene hint carries `population` as one of the six levels; the image prompt of a public-place page (square, market, station, shop) asks for passers-by only where the hint's level is ambient, sparse or crowd, and a private-room or forest page says \"no one else is added\" with no crowd in its BACKGROUND line; a costumed figure keeps the costume's body (a tail from the waist down and no feet, a covering top) on every page; every standing figure is on standable ground, never ankle-deep in water; no figure has closed eyes; the hint prose names nothing as absent and no lens or blur word; the writer prompt is still ONE streaming call of about 12.4k input tokens (was about 10.8k).",
       "runShape": [

@@ -40,8 +40,10 @@ session ported.
       → e4f6ccb1, verify `trial-page-grid-production-selector`
 - [x] Photo glasses / recorded features / hair analysis reach the trial character (fields were already in the
       one analysis call, dropped on the way). → 898de113, verify `trial-photo-glasses-and-features`
-- [ ] Trial writer image rules (population enum, costume-body, footing, eyes-open, contact rules) — in progress,
-      see section 6.
+- [x] Trial writer gets the Art Director's image rules (COSTUME_BODY, EYES_OPEN, NEVER_NAME_ABSENT, NO_LENS,
+      contact/grip rules, ONE_INSTANT + FOOTING constants, TRUE_RELATIVE_SIZE) and a one-word `population` level per
+      page, which ends the REQUIRED CAST "no one else" vs BACKGROUND "busy crowd" contradiction on every trial page.
+      +~1650 input tokens (≈15 %, prefill), +~45 output tokens per story. → eee1bc1c, verify `trial-writer-shared-image-rules`
 
 ## 4. Not ported — would add time (out of scope under the owner constraint)
 
