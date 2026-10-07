@@ -2271,7 +2271,7 @@ export const storyService = {
   },
 
   // Referral: validate a promo code before checkout
-  async validateReferralCode(code: string): Promise<{ valid: boolean; discountChf?: number; reason?: string }> {
+  async validateReferralCode(code: string): Promise<{ valid: boolean; discountChf?: number; reason?: string; code?: string }> {
     return api.post('/api/referral/validate', { code });
   },
 

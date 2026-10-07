@@ -1317,23 +1317,24 @@ const { hasPaidOrder, orderStatusView } = require('../lib/orders');
 const referralBalance = require('../lib/referralBalance');
 
 /**
- * Validate a referral code for a given buyer. Returns { valid, referrerUserId, discountChf, reason }.
+ * Validate a referral code for a given buyer. Returns { valid, referrerUserId, discountChf } or
+ * { valid: false, reason, code } - `code` is the stable REFERRAL_* key the client localises.
  */
 async function validateReferralCodeForUser(code, buyerUserId) {
-  if (!code || typeof code !== 'string') return { valid: false, reason: 'No code provided' };
+  if (!code || typeof code !== 'string') return { valid: false, reason: 'No code provided', code: 'REFERRAL_CODE_REQUIRED' };
   const trimmed = code.trim();
-  if (!trimmed) return { valid: false, reason: 'No code provided' };
+  if (!trimmed) return { valid: false, reason: 'No code provided', code: 'REFERRAL_CODE_REQUIRED' };
 
   // Look up the code owner (case-insensitive — codes are mixed case like MagicRoger42)
   const ownerResult = await getDbPool().query(
     'SELECT id, referral_code, email FROM users WHERE LOWER(referral_code) = LOWER($1)', [trimmed]
   );
-  if (ownerResult.rows.length === 0) return { valid: false, reason: 'Code not found' };
+  if (ownerResult.rows.length === 0) return { valid: false, reason: 'Code not found', code: 'REFERRAL_CODE_NOT_FOUND' };
   const referrerUserId = ownerResult.rows[0].id;
   const storedCode = ownerResult.rows[0].referral_code; // exact stored casing
 
   // No self-referral
-  if (referrerUserId === buyerUserId) return { valid: false, reason: 'Cannot use your own code' };
+  if (referrerUserId === buyerUserId) return { valid: false, reason: 'Cannot use your own code', code: 'REFERRAL_OWN_CODE' };
 
   // Buyer can only use ONE referral code ever
   const buyerResult = await getDbPool().query(
@@ -1342,16 +1343,16 @@ async function validateReferralCodeForUser(code, buyerUserId) {
   // Second account of the same person (P9): same inbox after +tag / gmail-dot normalisation.
   const referrerEmail = normalizeEmailForSelfReferral(ownerResult.rows[0].email);
   if (referrerEmail && referrerEmail === normalizeEmailForSelfReferral(buyerResult.rows[0]?.email)) {
-    return { valid: false, reason: 'Cannot use your own code' };
+    return { valid: false, reason: 'Cannot use your own code', code: 'REFERRAL_OWN_CODE' };
   }
   if (buyerResult.rows.length > 0 && buyerResult.rows[0].referred_by) {
-    return { valid: false, reason: 'You have already used a referral code' };
+    return { valid: false, reason: 'You have already used a referral code', code: 'REFERRAL_ALREADY_USED' };
   }
 
   // First-time-buyer rule: only users with no past paid order can redeem.
   // Webhook re-checks this after Stripe completion (race protection).
   if (await hasPaidOrder(buyerUserId)) {
-    return { valid: false, reason: 'Referral codes are only available for first-time customers' };
+    return { valid: false, reason: 'Referral codes are only available for first-time customers', code: 'REFERRAL_FIRST_ORDER_ONLY' };
   }
 
   return {
@@ -1427,7 +1428,8 @@ router.post('/referral/validate', authenticateToken, async (req, res) => {
     if (result.valid) {
       res.json({ valid: true, discountChf: result.discountChf });
     } else {
-      res.json({ valid: false, reason: result.reason });
+      // `code` is the stable key the client localises (apiErrors.ts); `reason` stays English for logs.
+      res.json({ valid: false, reason: result.reason, code: result.code });
     }
   } catch (err) {
     log.error('❌ Error validating referral code:', err);
@@ -1974,3 +1976,4 @@ router.get('/stripe/order-status/:sessionId', async (req, res) => {
 // NOTE: processBookOrder moved to server/lib/gelato.js
 
 module.exports = router;
+module.exports.validateReferralCodeForUser = validateReferralCodeForUser;

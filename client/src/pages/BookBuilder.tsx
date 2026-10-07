@@ -105,10 +105,11 @@ export default function BookBuilder() {
       } else {
         setPromoValid(false);
         setPromoDiscount(0);
-        setPromoError(result.reason || 'Invalid code');
+        // The server's `reason` is English for logs; `code` is what the customer reads.
+        setPromoError(localizedApiError({ code: result.code }, language));
       }
-    } catch {
-      setPromoError('Failed to validate code');
+    } catch (err) {
+      setPromoError(localizedApiError(err, language));
     } finally {
       setPromoChecking(false);
     }
