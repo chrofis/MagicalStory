@@ -42,19 +42,19 @@ Where the story itself needs to name one of these things, name it: a transformat
 
 Write the text for all {PAGE_COUNT} pages, in page order, plus a title. Each page covers its own stretch of the story and nothing that belongs to a later page. The illustration already shows the instant, so write what it cannot show: the dialogue, the turn, the move that got them there. Never contradict a page's illustration, and never mention pages, plans or illustrations.
 {PICTURE_COUNT}.
-Never use an em-dash or an en-dash, except where the LANGUAGE block above names one use for it. Use a comma, a full stop, a colon or parentheses.
+{NO_DASH}
 Style, on every page:
 {STYLE_RULEBOOK}
 {PAGE_OPENING_VARIETY}.
-A character knows only what an earlier page or picture gave them; a feeling a page says someone had is one an earlier page showed; no page states as true what an earlier page told otherwise. A character who refuses, gives up or discards a thing stays done with it, and a later page that has them want it back or take it up again says what changed. Every reveal a page promises is answered on a later page, and every price paid leaves a mark a later page shows.
+{PAGE_CONTINUITY}
 {MOTIVE_AT_THE_ACT}.
-No phrase is repeated from a neighbouring sentence.
+{NEIGHBOUR_PHRASE}
 Fill what the summary leaves out: dialogue, and the ordinary business between the story's turns (going somewhere and arriving, waiting, asking and being answered, a thing tried and let go). Invent no character, creature, object, place or turn of the plot the story does not carry, and nothing that changes what happens, to whom, or what it costs. A move between the story's states is told as it happens, never already finished when a page opens. A change of place, of what someone holds, or of the company they are among carries its path on the page.
 The final page gets the same care as the first sentence. {CLOSING_MOMENT}
 {PERIL_CEILING}
-No onomatopoeia or sound-effect words and no baby-talk. The register follows the reading level, never a character's age: every word is one a child at the reading level above already uses, and a sentence keeps to one idea when the word count is tight. No abbreviation or acronym reaches the page; write the thing the way a child says it.
+No onomatopoeia or sound-effect words and no baby-talk. The register follows the reading level, never a character's age: every word is one a child at the reading level above already uses, and a sentence keeps to one idea when the word count is tight. {NO_ABBREVIATION}
 {TITLE_RULE}
-Then name the candidate to ship, judged in this order: every word of it is true of the pages you wrote, a title naming a condition, a lack or an inability is one the story shows happening on a page, never one a character only mentions; it names the adventure or the bond the story is about, not a vehicle, object or place that merely carries it; it gives away no ending; a child of {AGE} can say it out loud. Where no candidate is true of the pages, write a fourth that is and ship that one.
+Then name the candidate to ship, judged in this order: {TITLE_CRITERIA} Where no candidate is true of the pages, write a fourth that is and ship that one.
 
 Work in two steps.
 

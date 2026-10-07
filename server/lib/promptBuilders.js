@@ -10122,6 +10122,30 @@ const ANIMAL_FATE_RULE = "An animal or creature a character cares about is never
  */
 const PERIL_CEILING_RULE = "Nothing in the story or its pictures is dangerous enough that it could lead to death — for anyone. Frightening is the right level. A historical event keeps the danger it really had: tell it at a child's level, never remove it and never invent a safeguard or a harmless version of its weapon or hazard.";
 
+/**
+ * The prose rules both story writers share, ONE constant each, filled as a
+ * placeholder into story-text-from-beats.txt and story-trial.txt (registry set
+ * `story-prose-writers`). They were prose in the beats template only; the trial
+ * writer, which runs no refine and no audit (the trial's time budget — see
+ * docs/decisions.md 2026-10-07), had none of them, so a trial story could carry
+ * em-dashes, a neighbour-phrase echo, an abbreviation or a page contradicting
+ * an earlier one with nothing downstream to catch it. A writer that states one
+ * of these takes the placeholder; it never hand-copies the sentence.
+ */
+const NO_DASH_RULE = 'Never use an em-dash or an en-dash, except where the LANGUAGE block above names one use for it. Use a comma, a full stop, a colon or parentheses.';
+const PAGE_CONTINUITY_RULE = 'A character knows only what an earlier page or picture gave them; a feeling a page says someone had is one an earlier page showed; no page states as true what an earlier page told otherwise. A character who refuses, gives up or discards a thing stays done with it, and a later page that has them want it back or take it up again says what changed. Every reveal a page promises is answered on a later page, and every price paid leaves a mark a later page shows.';
+const NEIGHBOUR_PHRASE_RULE = 'No phrase is repeated from a neighbouring sentence.';
+const NO_ABBREVIATION_RULE = 'No abbreviation or acronym reaches the page; write the thing the way a child says it.';
+
+/**
+ * What makes a title the one to ship, in judging order — the same criteria for
+ * the beats writer's pick among its candidates and the trial writer's single
+ * title. `age` is the reader age (readerAge), the "can a child say it" yardstick.
+ */
+function titleCriteria(age) {
+  return `every word of it is true of the pages you wrote, a title naming a condition, a lack or an inability is one the story shows happening on a page, never one a character only mentions; it names the adventure or the bond the story is about, not a vehicle, object or place that merely carries it; it gives away no ending; a child of ${age} can say it out loud.`;
+}
+
 const RISK_FRAMING_RULE = '- Where a child does something with real physical risk, the risk is present in the telling: someone is careful, names it aloud, or the child feels it — and the close does not treat it as nothing. An adult who permits it still says what to watch for.';
 
 /**
@@ -12326,13 +12350,18 @@ function buildStoryTextFromBeatsPrompt(inputData, beats = [], expansions = [], a
     TITLE_RULE: buildTitleRule(inputData),
     // The writer that produced the candidates also picks the shipped title
     // (2026-08-27) — the reader age is the "can a child say it" yardstick.
-    AGE: readerAge(inputData),
+    TITLE_CRITERIA: titleCriteria(readerAge(inputData)),
     PAGE_OPENING_VARIETY: PAGE_OPENING_VARIETY_RULE,
     STYLE_RULEBOOK: styleRulebook(inputData?.language),
     MOTIVE_AT_THE_ACT: MOTIVE_AT_THE_ACT_RULE,
     PICTURE_COUNT: PICTURE_COUNT_RULE,
     CLOSING_MOMENT: CLOSING_MOMENT_RULE,
     PERIL_CEILING: PERIL_CEILING_RULE,
+    // Shared with the trial writer (story-prose-writers), one constant each.
+    NO_DASH: NO_DASH_RULE,
+    PAGE_CONTINUITY: PAGE_CONTINUITY_RULE,
+    NEIGHBOUR_PHRASE: NEIGHBOUR_PHRASE_RULE,
+    NO_ABBREVIATION: NO_ABBREVIATION_RULE,
     LOAD_BEARING: LOAD_BEARING_RULE,
     OWED_FACTS: buildOwedFacts(storyLogic),
   });
@@ -12520,12 +12549,16 @@ function buildTrialStoryPrompt(inputData, sceneCount = null) {
       // Bare `costumed` — the flat clothing enum (one costume per character
       // per story; the specific costume lives in clothingRequirements, not
       // in the enum value). `costumed:subtype` was legacy shape.
+      // The arithmetic follows the page count (a trial has 6 pages since
+      // 2026-10; the "3 out of 5" it stated was the old 5-page trial).
+      const costumedMin = Math.ceil(pageCount * 0.6);
+      const standardMax = Math.max(1, pageCount - costumedMin);
       avatarSelection = `# Avatar Selection
 The main character has two avatar styles available:
 - \`standard\` — everyday modern clothes
 - \`costumed\` — ${costume.description}
 
-**IMPORTANT**: The MAJORITY of scenes (at least 3 out of 5) MUST use \`costumed\` for the main character's clothing in scene hints. Use \`standard\` only for 1-2 scenes where it makes narrative sense (e.g., before a transformation, or a brief real-world moment).`;
+**IMPORTANT**: The MAJORITY of scenes (at least ${costumedMin} out of ${pageCount}) MUST use \`costumed\` for the main character's clothing in scene hints. Use \`standard\` only for 1-${standardMax} scenes where it makes narrative sense (e.g., before a transformation, or a brief real-world moment).`;
     }
 
     // Build landmarks instruction for the visual bible.
@@ -12593,6 +12626,25 @@ The story takes place in ${inputData.userLocation.city}. Use real place names �
       // no review stage of any kind, so the writer prompt is the only place a
       // framing rule can reach a trial story.
       RISK_FRAMING: RISK_FRAMING_RULE,
+      // The beats text writer's rules, the same constants (2026-10-07): the
+      // trial runs no refine, no audit and no arc review, so these reach a
+      // trial story through this prompt or not at all. Zero extra calls.
+      PERIL_CEILING: PERIL_CEILING_RULE,
+      // The trial writer is its own arc creator: the stakes rule the arc
+      // creator, critique and panel read (arcStakesRules) is a writer rule here.
+      ARC_QUESTIONS_ANSWERED: ARC_QUESTIONS_ANSWERED_RULE,
+      NO_DASH: NO_DASH_RULE,
+      PAGE_CONTINUITY: PAGE_CONTINUITY_RULE,
+      NEIGHBOUR_PHRASE: NEIGHBOUR_PHRASE_RULE,
+      NO_ABBREVIATION: NO_ABBREVIATION_RULE,
+      TITLE_RULE: buildTitleRule(inputData),
+      TITLE_CRITERIA: titleCriteria(readerAge(inputData)),
+      // Scene arithmetic follows the page count (trial.js sets 6; the template
+      // used to hard-code the old 5-page split): intro 1, tension 2..N-2,
+      // resolution N-1..N; backgrounds min(3,N)..N.
+      TENSION_SCENES: `2-${Math.max(2, pageCount - 2)}`,
+      RESOLVE_SCENES: `${Math.max(3, pageCount - 1)}-${pageCount}`,
+      BACKGROUND_RANGE: `${Math.min(3, pageCount)}-${pageCount}`,
       PAGE_OPENING_VARIETY: PAGE_OPENING_VARIETY_RULE,
       STYLE_RULEBOOK: styleRulebook(language),
       MOTIVE_AT_THE_ACT: MOTIVE_AT_THE_ACT_RULE,
@@ -13303,6 +13355,11 @@ module.exports = {
   buildTopicPromiseSection,
   RISK_FRAMING_RULE,
   PERIL_CEILING_RULE,
+  NO_DASH_RULE,
+  PAGE_CONTINUITY_RULE,
+  NEIGHBOUR_PHRASE_RULE,
+  NO_ABBREVIATION_RULE,
+  titleCriteria,
   ANIMAL_FATE_RULE,
   COUNTING_RULE,
   PLAN_LINE_CAST_RULE,

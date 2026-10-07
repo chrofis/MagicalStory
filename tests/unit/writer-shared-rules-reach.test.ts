@@ -90,3 +90,75 @@ describe('no writer prompt leaves an unfilled placeholder', () => {
     expect(unfilled(built[name])).toEqual([]);
   });
 });
+
+// 2026-10-07: the beats writer's prose rules reach the trial writer as the SAME
+// constants (zero extra calls — the trial runs no refine and no audit, so the
+// writer prompt is the only place they can land). Pinned on the built prompts:
+// the VALUE of each export is in both, the trial's scene arithmetic follows the
+// page count, and the beats template's text is unchanged by the extraction.
+describe('shared prose rules reach both writers as one constant each', () => {
+  const {
+    PERIL_CEILING_RULE,
+    NO_DASH_RULE,
+    PAGE_CONTINUITY_RULE,
+    NEIGHBOUR_PHRASE_RULE,
+    NO_ABBREVIATION_RULE,
+    ARC_QUESTIONS_ANSWERED_RULE,
+    buildTitleRule,
+    titleCriteria,
+  } = require('../../server/lib/promptBuilders.js');
+
+  const shared: Array<[string, string]> = [
+    ['PERIL_CEILING_RULE', PERIL_CEILING_RULE],
+    ['NO_DASH_RULE', NO_DASH_RULE],
+    ['PAGE_CONTINUITY_RULE', PAGE_CONTINUITY_RULE],
+    ['NEIGHBOUR_PHRASE_RULE', NEIGHBOUR_PHRASE_RULE],
+    ['NO_ABBREVIATION_RULE', NO_ABBREVIATION_RULE],
+  ];
+  for (const [name, value] of shared) {
+    it.each(['beats', 'trial'])(`${name} reaches %s`, (writer) => {
+      expect(value.length).toBeGreaterThan(20);
+      expect(built[writer]).toContain(value);
+    });
+  }
+
+  it('each shared rule is stated once per prompt, never duplicated', () => {
+    for (const [, value] of shared) {
+      for (const writer of ['beats', 'trial']) {
+        const hits = built[writer].split(value).length - 1;
+        expect(hits, `${value.slice(0, 30)} in ${writer}`).toBe(1);
+      }
+    }
+  });
+
+  it('the trial carries the beats title rule and the pick criteria on its single TITLE line', () => {
+    expect(built.trial).toContain(buildTitleRule(input({ trialMode: true })));
+    expect(built.trial).toContain('does not spoil the ending');
+    expect(built.trial).toContain(titleCriteria(8));
+    expect(built.beats).toContain(titleCriteria(8));
+    // The parser reads the one `TITLE:` line (outlineParser/unified.js); the
+    // rule rides on the next line, never on it.
+    expect(built.trial).toMatch(/^TITLE: \[A creative, specific title in [^\]]+\]\n\(Every title is in the story language/m);
+  });
+
+  it('the trial writer, its own arc creator, gets the stakes rule the arc creator and critics read', () => {
+    expect(built.trial).toContain(ARC_QUESTIONS_ANSWERED_RULE);
+  });
+
+  it('the trial scene arithmetic follows the page count (6 pages since 2026-10)', () => {
+    const six = buildTrialStoryPrompt(input({ trialMode: true, storyTheme: 'pirate' }), 6);
+    expect(unfilled(six)).toEqual([]);
+    expect(six).toContain('build tension (2-4), resolve (5-6)');
+    expect(six).toContain('Keep it MINIMAL for a 6-scene story');
+    expect(six).toContain('3-6 backgrounds');
+    expect(six).toContain('A 6-page story rarely benefits');
+    expect(six).toContain('at least 4 out of 6');
+    expect(six).not.toMatch(/5-scene|out of 5|5-page story|resolve \(4-5\)|3-5 backgrounds/);
+    // The 5-page build keeps the split the template used to hard-code.
+    expect(built.trial).toContain('build tension (2-3), resolve (4-5)');
+  });
+
+  it('the trial does not keep its old refuses/gives-up bullet beside the continuity rule', () => {
+    expect(built.trial).not.toContain('stays done with it; where a later scene');
+  });
+});

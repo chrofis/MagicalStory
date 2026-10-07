@@ -155,8 +155,9 @@ describe('a reversed decision is a rule on both sides', () => {
     expect(beats()).toContain('stays done with it, and a later page that has them want it back or take it up again says what changed');
   });
 
-  it('the trial writer is told it', () => {
-    expect(trial()).toContain('stays done with it; where a later scene has them want it back or take it up again, that scene says what changed');
+  it('the trial writer is told it (the same PAGE_CONTINUITY_RULE as the beats writer, since 2026-10-07)', () => {
+    expect(trial()).toContain('stays done with it, and a later page that has them want it back or take it up again says what changed');
+    expect(trial()).toContain(B.PAGE_CONTINUITY_RULE);
   });
 
   it('the arc-informed auditor asks it under CAUSE, not under a new type', () => {

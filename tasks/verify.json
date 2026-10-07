@@ -5847,6 +5847,25 @@
         "result": "HUMAN",
         "note": "human check | LOOK: Read arcReviewReport.logic Facts (count lines, any feeling/trait as a limit), then stories.data.writerText against the OWED list: recitals, narrator because-clauses, tense of the narration."
       }
+    },
+    {
+      "id": "trial-writer-shared-prose-rules",
+      "title": "Trial writer carries the beats writer's shared prose rules (peril ceiling, no dashes, continuity, neighbour phrase, no abbreviation, title rule and criteria, questions answered) with no extra call",
+      "commits": [],
+      "addedAt": "2026-10-07",
+      "claim": "On the next trial run the story text has no em-dash or en-dash outside a dialogue use the language block allows, no abbreviation, no phrase repeated from the neighbouring sentence, no page contradicting an earlier one, nothing that could lead to death, a title that does not spoil the ending and is true of the pages, and every question or deadline the story sets answered or paid by the last page; the writer prompt is still ONE streaming call of about 10.8k input tokens (was about 10.4k).",
+      "runShape": [
+        "trial"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Read the six pages of the stored trial text: count em/en-dashes (expect 0 outside Swiss-French speaker turns), abbreviations, a phrase echoed in the next sentence, a page that states as true what an earlier page told otherwise; check the peril stays frightening not deadly; check the title gives away no ending and names the adventure or bond. Confirm the stored unified_story prompt carries the six rules and the TITLE rule line, and that only one writer call ran (no refine, no audit).",
+        "images": [
+          "pages"
+        ]
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [
