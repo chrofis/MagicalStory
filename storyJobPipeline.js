@@ -2813,9 +2813,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       const unifiedResult = await callTextModelStreaming(unifiedPrompt, null, (chunk, fullText) => {
         progressiveParser.processChunk(chunk, fullText);
         unifiedHeartbeat();  // throttled — fires at most every 30s
-      // Same reasoning effort as the beats text writer (effort parity,
-      // 2026-10-07): MODEL_DEFAULTS.storyTextEffort, null = the model's default.
-      }, modelOverrides.outlineModel, { usageLabel: 'unified_story', ...(MODEL_DEFAULTS.storyTextEffort ? { effort: MODEL_DEFAULTS.storyTextEffort } : {}) });
+      // The trial writer has its own effort (MODEL_DEFAULTS.trialStoryEffort): the
+      // trial's product requirement is speed, and at the model default (`high`)
+      // most of its output is thinking (decisions.md 2026-10-07).
+      }, modelOverrides.outlineModel, { usageLabel: 'unified_story', effort: MODEL_DEFAULTS.trialStoryEffort });
       unifiedResponse = unifiedResult.text;
       unifiedModelId = unifiedResult.modelId;
       unifiedUsage = unifiedResult.usage || { input_tokens: 0, output_tokens: 0 };

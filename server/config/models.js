@@ -581,6 +581,10 @@ const MODEL_DEFAULTS = {
     : true,
   storyText: 'claude-sonnet',          // Story narrative text
   storyTextEffort: null,               // writer reasoning effort; null = the model's default (text-v4 measures medium vs high)
+  // Trial writer effort (owner 2026-10-07: test lower effort). Sonnet 5.5 defaults to `high`;
+  // 3 staging trials at the default spent 27-40k output tokens (~5-6k of it story text)
+  // and 199-285 s in the writer vs the 123 s trial baseline. Staging A/B in progress.
+  trialStoryEffort: 'medium',
   // Art Director (scene expansion). gemini-3.1-pro since 2026-08-29: 3-story x
   // 4-model hazard bake-off on frozen beats (Lab 893-944, v3 judge): gemini
   // 49 raw / 32 reviewed hazards vs sonnet 91/65, sol 80/65, opus 40/51 —
