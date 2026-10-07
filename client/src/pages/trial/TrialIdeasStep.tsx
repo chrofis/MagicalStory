@@ -248,6 +248,17 @@ export default function TrialIdeasStep({
       const reader = response.body!.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
+      // Which cards reached their final text. Read here, not from React state:
+      // the stream can end with `done` (a card whose self-check rerun produced
+      // no idea is never emitted as final) or without it (connection cut).
+      // Either way the step must show the retry — until 2026-10-07 it showed
+      // two half cards, no button, and a disabled "Create", a dead end.
+      const finals = [false, false];
+      const endedIncomplete = () => {
+        if (finals[0] && finals[1]) return false;
+        setError(t.serverError);
+        return true;
+      };
 
       while (true) {
         const { done, value } = await reader.read();
@@ -270,10 +281,15 @@ export default function TrialIdeasStep({
             }
 
             if (data.done) {
+              endedIncomplete();
               setIsGenerating(false);
               return;
             }
 
+            if (data.isFinal) {
+              if (data.story1 !== undefined) finals[0] = true;
+              if (data.story2 !== undefined) finals[1] = true;
+            }
             // Update streaming ideas
             setStreamingIdeas((prev) => {
               const next = [...prev];
@@ -299,6 +315,8 @@ export default function TrialIdeasStep({
         }
       }
 
+      // The server closed the stream without its `done` event.
+      endedIncomplete();
       setIsGenerating(false);
     } catch (err: any) {
       if (err.name === 'AbortError') return;
