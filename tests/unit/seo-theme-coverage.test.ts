@@ -43,5 +43,11 @@ describe('every theme page the client renders has server meta (title, Product, s
     }
     expect(getMetaForRoute('/themes/adventure/mothers-day', 'de').title).toBe('Personalisiertes Muttertags-Kinderbuch | Magical Story');
     expect(getMetaForRoute('/themes/adventure/custom', 'de').noindex).toBe(true);
+    // The French theme title must not collide with the occasion page's
+    // ("Livre personnalisé fête des mères" is /anlass/muttertag).
+    for (const [theme, occasion] of [['mothers-day', 'muttertag'], ['fathers-day', 'vatertag']]) {
+      expect(getMetaForRoute(`/themes/adventure/${theme}`, 'fr').title)
+        .not.toBe(getMetaForRoute(`/anlass/${occasion}`, 'fr').title);
+    }
   });
 });

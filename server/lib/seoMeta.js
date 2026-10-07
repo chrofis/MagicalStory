@@ -61,8 +61,8 @@ const THEMES = {
     newyear: { en: 'New Year Story', de: 'Neujahrs-Geschichte', fr: 'Histoire du nouvel an', it: "Storia di Capodanno" },
     easter: { en: 'Easter Story', de: 'Oster-Geschichte', fr: 'Histoire de Pâques', it: 'Storia di Pasqua' },
     halloween: { en: 'Halloween Story', de: 'Halloween-Geschichte', fr: "Histoire d'Halloween", it: 'Storia di Halloween' },
-    'mothers-day': { en: "Mother's Day", de: 'Muttertags', fr: 'fête des mères', it: 'Festa della Mamma' },
-    'fathers-day': { en: "Father's Day", de: 'Vatertags', fr: 'fête des pères', it: 'Festa del Papà' },
+    'mothers-day': { en: "Mother's Day", de: 'Muttertags', fr: 'histoire fête des mères', it: 'Festa della Mamma' },
+    'fathers-day': { en: "Father's Day", de: 'Vatertags', fr: 'histoire fête des pères', it: 'Festa del Papà' },
   },
   'life-challenges': {
     'bath-time': { en: 'Bath Time', de: 'Baden', fr: 'Le bain', it: 'Il bagnetto' },
