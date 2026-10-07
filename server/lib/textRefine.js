@@ -1562,6 +1562,18 @@ async function refineStoryText(storyData, pages, opts = {}) {
       }
       const raw = String(r.text || '').trim();
       const elapsedMs = Date.now() - t0;
+      // EMPTY TWICE IS A FAILED AUDIT, SAID SO (2026-10-07). It used to fall
+      // through to the success shape with `ok: false` and no `error`: the log
+      // said "0 fault(s)" at info, the stored report showed error:null, and
+      // the merge ran on the other auditors as if this one had read the book
+      // and found it clean. A missing auditor is a loss that is named, like a
+      // truncated or thrown one (tests/unit/text-refine-empty-audit-is-an-error.test.ts).
+      if (!raw) {
+        const error = 'returned empty output twice — no findings from this auditor';
+        log.warn(`⚠️ [TEXT-AUDIT/${source}] ${modelKey}: ${error}`);
+        return { source, modelKey, ok: false, error, modelId: r.modelId || TEXT_MODELS[modelKey].modelId, raw, prompt, elapsedMs,
+          usage: { input_tokens: r.usage?.input_tokens || 0, output_tokens: r.usage?.output_tokens || 0 } };
+      }
       // A cut fault list is not a shorter fault list: a truncated audit is
       // FAILED and its findings stay out of the merge (textReplyGuard.js).
       if (r.truncation?.suspected) {

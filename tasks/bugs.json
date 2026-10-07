@@ -3705,6 +3705,17 @@
       "fixedAt": "2026-10-07",
       "fixedIn": "f9c1d388",
       "fix": "refineStoryText keeps `lengthEntry` and the diff pass's page set is the union of the repair, repetition_fix and length_fix changedPages. Test: tests/unit/text-refine-diff-covers-length-fix.test.ts."
+    },
+    {
+      "id": "text-refine-empty-audit-reported-as-clean",
+      "title": "A text auditor that returned an empty body on both tries was recorded as ok:false with error:null and logged as '0 fault(s)' at info — a missing auditor indistinguishable in the stored report and the log from one that read the book and found it clean",
+      "reportedAt": "2026-10-07",
+      "source": "Code reading of refineStoryText's runAudit (server/lib/textRefine.js): after the one empty-body retry the code fell through to the success shape (`ok: raw.length > 0`, no error field); the only log line was the info '0 fault(s)' count, and the post-audit loop logs only audits that carry an error. gemini-3.1-pro's documented occasional empty body (models.js) is the live path. Reproduced offline: tests/unit/text-refine-empty-audit-is-an-error.test.ts fails on the pre-fix code (arc.error undefined).",
+      "rootCause": "The empty-retry branch set up a second call but never turned a second empty reply into a failure; `ok: raw.length > 0` dropped the audit from the merge silently, which is the quiet degrade NO FALLBACKS forbids.",
+      "status": "fixed",
+      "fixedAt": "2026-10-07",
+      "fixedIn": "pending",
+      "fix": "runAudit returns `{ok:false, error:'returned empty output twice — no findings from this auditor', …}` with a warn line, the same shape a truncated or thrown audit returns, so the report's audits[].error and the text_refine log name the loss. Test: tests/unit/text-refine-empty-audit-is-an-error.test.ts."
     }
   ]
 }
