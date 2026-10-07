@@ -701,6 +701,11 @@ export const testlabService = {
     return api.get<{ version: string; hash: string | null; prompt: string }>(`/api/admin/testlab/eval-version/${encodeURIComponent(version)}`);
   },
 
+  // Stops a running experiment after the unit in flight; the row closes as 'aborted'.
+  abort(experimentId: number) {
+    return api.post<{ aborting: boolean; afterCurrentUnit: boolean }>(`/api/admin/testlab/experiments/${experimentId}/abort`, {});
+  },
+
   redo(experimentId: number, resultIndex: number, promptOverride?: string | null, useCurrentTemplates?: boolean, extraRule?: string | null) {
     return api.post<{ started: boolean }>(
       `/api/admin/testlab/experiments/${experimentId}/redo`,

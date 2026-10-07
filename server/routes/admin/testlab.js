@@ -585,9 +585,11 @@ const HEARTBEAT_INTERVAL_MS = 30_000;
 const { HEARTBEAT_STALE } = require('../../lib/testlabReaper');
 
 const { unitFor, originalTargetOf } = require('../../lib/testlabUnit');
+const abortReg = require('../../lib/testlabAbort');
 
 async function executeExperiment(experimentId, stage, targets, opts) {
   const { runStageOnTarget } = require('../../lib/testlab');
+  abortReg.markRunning(experimentId);
   // The slot was claimed by the route that started us (a counter, so claiming
   // twice would leak one). This function's finally is what releases it.
   // Analyzer session for the whole experiment — its model workers (SAM/DINO/
@@ -631,11 +633,21 @@ async function executeExperiment(experimentId, stage, targets, opts) {
     delete baseParams.variants;
     delete baseParams.rerunDetection;
 
+    // Read between units, never inside one: the unit in flight completes (its
+    // paid call is never half-cancelled), everything after it is skipped.
+    const totalUnits = targets.length * (variants ? variants.length : 1);
+    let doneUnits = 0;
+    const stopIfAborted = () => {
+      const req = abortReg.abortRequested(experimentId);
+      if (req) throw new abortReg.ExperimentAborted(experimentId, { by: req.by, done: doneUnits, total: totalUnits });
+    };
+
     for (const [targetIndex, rawTarget] of targets.entries()) {
       // Set runs carry per-member params on target._params; merge them into the
       // stage params and run the CLEAN target (without _params).
       const { target } = unitFor(baseParams, rawTarget, null);
       let detection = null;
+      stopIfAborted();
       if (rerunDetection && target.pageNumber != null) {
         const startedAt = new Date().toISOString();
         try {
@@ -649,6 +661,7 @@ async function executeExperiment(experimentId, stage, targets, opts) {
       }
 
       for (const variant of (variants || [null])) {
+        stopIfAborted();
         // A target-level versionIndex is a pin (unitFor puts it on the params).
         const { unitParams } = unitFor(baseParams, rawTarget, variant?.params);
         if (detection) unitParams.detection = detection;
@@ -666,6 +679,7 @@ async function executeExperiment(experimentId, stage, targets, opts) {
           entry = { ...target, targetIndex, ok: false, startedAt, ...variantMeta, error: err.message, ...(err.partialResult || {}) };
         }
         await appendEntry(entry);
+        doneUnits++;
       }
     }
     await dbQuery(
@@ -674,13 +688,17 @@ async function executeExperiment(experimentId, stage, targets, opts) {
     );
     log.info(`[TESTLAB] Experiment ${experimentId} completed (${targets.length} targets)`);
   } catch (err) {
-    log.error(`[TESTLAB] Experiment ${experimentId} aborted: ${err.message}`);
+    // A requested abort closes the row as 'aborted' (results so far kept);
+    // anything else is a failure of the run itself.
+    const status = err instanceof abortReg.ExperimentAborted ? 'aborted' : 'failed';
+    log.error(`[TESTLAB] Experiment ${experimentId} ${status}: ${err.message}`);
     await dbQuery(
-      `UPDATE testlab_experiments SET status = 'failed', error = $2, completed_at = NOW() WHERE id = $1`,
-      [experimentId, err.message]
+      `UPDATE testlab_experiments SET status = $3, error = $2, completed_at = NOW() WHERE id = $1`,
+      [experimentId, err.message, status]
     ).catch(() => {});
   } finally {
     clearInterval(heartbeat);
+    abortReg.markDone(experimentId);
     runningExperiments = Math.max(0, runningExperiments - 1);
     require('../../lib/analyzerClient').sessionEnd(`testlab:${experimentId}`);
   }
@@ -1069,6 +1087,28 @@ router.post('/experiments/:id/redo', async (req, res) => {
   } catch (err) {
     log.error(`[TESTLAB] redo start failed: ${err.message}`);
     res.status(500).json({ error: 'Redo failed to start', details: err.message });
+  }
+});
+
+// POST /api/admin/testlab/experiments/:id/abort
+// Stops a running experiment after the unit in flight: every unit after it is
+// skipped and the row closes as 'aborted' with the results it reached. Only an
+// experiment THIS process runs can be aborted — a 'running' row nobody runs is
+// the reaper's (server/lib/testlabReaper.js), not an abort's.
+router.post('/experiments/:id/abort', async (req, res) => {
+  try {
+    const experimentId = parseInt(req.params.id, 10);
+    const rows = await dbQuery('SELECT status FROM testlab_experiments WHERE id = $1', [experimentId]);
+    if (!rows.length) return res.status(404).json({ error: 'Experiment not found' });
+    if (rows[0].status !== 'running') return res.status(409).json({ error: `Experiment is ${rows[0].status}, not running` });
+    if (!abortReg.requestAbort(experimentId, req.user?.email || 'admin')) {
+      return res.status(409).json({ error: 'Experiment is not running in this process — the reaper closes a stale row after 5 quiet minutes' });
+    }
+    log.info(`[TESTLAB] abort requested for exp ${experimentId} by ${req.user?.email || 'admin'}`);
+    res.json({ aborting: true, afterCurrentUnit: true });
+  } catch (err) {
+    log.error(`[TESTLAB] abort failed: ${err.message}`);
+    res.status(500).json({ error: 'Abort failed', details: err.message });
   }
 });
 

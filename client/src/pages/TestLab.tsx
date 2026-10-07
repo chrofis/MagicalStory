@@ -636,7 +636,7 @@ function SetsTab() {
                 <span className="text-gray-400">runs:</span>
                 {s.runs.map(r => (
                   <a key={r.id} href={`/admin/test-lab?exp=${r.id}`}
-                    className={`px-2 py-0.5 rounded-full border hover:bg-indigo-50 ${r.status === 'completed' ? 'border-emerald-200 text-emerald-700' : r.status === 'failed' ? 'border-red-200 text-red-600' : 'border-amber-200 text-amber-700'}`}
+                    className={`px-2 py-0.5 rounded-full border hover:bg-indigo-50 ${r.status === 'completed' ? 'border-emerald-200 text-emerald-700' : (r.status === 'failed' || r.status === 'aborted') ? 'border-red-200 text-red-600' : 'border-amber-200 text-amber-700'}`}
                     title={`${r.label || ''} — ${new Date(r.createdAt).toLocaleString('de-CH')}`}>
                     #{r.id}{r.label && !/^Set: /.test(r.label) ? ` · ${r.label.slice(0, 38)}` : ''}
                   </a>
@@ -1965,6 +1965,15 @@ function ExperimentDetailView({ detail, onBack, onRefresh, onReuse }: { detail: 
           </div>
           <div className="flex gap-2">
             {detail.status === 'running' && <Button variant="secondary" size="sm" onClick={onRefresh}><RefreshCw size={14} /></Button>}
+            {detail.status === 'running' && (
+              <Button variant="secondary" size="sm" title="Stop after the result in progress; the results so far are kept" onClick={async () => {
+                if (!window.confirm(`Abort experiment #${detail.id} after the result in progress?`)) return;
+                try { await testlabService.abort(detail.id); } catch (e) { window.alert(`Abort failed: ${(e as Error).message}`); }
+                onRefresh();
+              }}>
+                Abort
+              </Button>
+            )}
             {detail.status !== 'running' && (
               <Button variant="secondary" size="sm" onClick={() => onReuse(detail)} title="Load this experiment's stage, targets and settings back into the form so you can change a model and run it again">
                 Re-run with changes
