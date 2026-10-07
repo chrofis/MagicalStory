@@ -73,7 +73,8 @@ export default function OrderConfirmation({ lang }: Props) {
           <Text style={{ ...valueStyle, margin: '0 0 12px' }}>
             {'{addressLine1}'}
             <br />
-            {'{city}, {postalCode}'}
+            {/* Swiss address order: postal code before the town (5400 Baden). */}
+            {'{postalCode} {city}'}
             <br />
             {'{country}'}
           </Text>
