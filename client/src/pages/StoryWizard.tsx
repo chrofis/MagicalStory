@@ -27,6 +27,7 @@ import { getCurrentSeason } from './wizard/WizardStep3BookSettings';
 import { EmailVerificationModal } from '@/components/auth/EmailVerificationModal';
 import { FaceSelectionModal } from '@/components/character';
 import { INITIAL_USER_CREDITS, IMAGE_REGENERATION_COST, COVER_REGENERATION_COST } from '@/constants/credits';
+import { isStoryTypeComplete } from '@/utils/wizardStoryType';
 
 // Types
 import type { Character, RelationshipMap, RelationshipTextMap, VisualBible, ChangedTraits, DetectedFace, AgeCategory, PhysicalTraits, PhysicalTraitsSource } from '@/types/character';
@@ -3735,8 +3736,11 @@ export default function StoryWizard() {
     if (s === 1) return true;
     if (s === 2) return characters.length > 0;
     if (s === 3) return characters.length > 0;
-    if (s === 4) return characters.length > 0 && storyCategory !== '';
-    if (s === 5) return characters.length > 0 && storyCategory !== '' && artStyle !== '';
+    // Steps 4/5 sit behind a COMPLETE story type (same rule as step 3's Next):
+    // category alone let "adventure" without a theme jump to the summary.
+    const storyTypeDone = isStoryTypeComplete({ storyCategory, storyTheme, storyTopic, customThemeText });
+    if (s === 4) return characters.length > 0 && storyTypeDone;
+    if (s === 5) return characters.length > 0 && storyTypeDone && artStyle !== '';
     if (s === 6) return generatedStory !== '';
     return false;
   };
@@ -3755,20 +3759,17 @@ export default function StoryWizard() {
     }
     if (step === 3) {
       // Step 3: Story Type - must have story category and topic/theme selected
-      if (!storyCategory) return false;
-      if (storyCategory === 'adventure' && !storyTheme) return false;
-      if ((storyCategory === 'life-challenge' || storyCategory === 'educational' || storyCategory === 'swiss-stories' || storyCategory === 'historical') && !storyTopic) return false;
-      if (storyCategory === 'custom' && !customThemeText?.trim()) return false;
-      return true;
+      return isStoryTypeComplete({ storyCategory, storyTheme, storyTopic, customThemeText });
     }
     if (step === 4) {
       // Step 4: Art Style - must have art style selected
       return artStyle !== '';
     }
     if (step === 5) {
-      // Step 5: Summary - must have main character and story details
+      // Step 5: Summary - must have main character, a complete story type and story details
       const charactersInStory = characters.filter(c => !excludedCharacters.includes(c.id));
-      return charactersInStory.length > 0 && charactersInStory.length <= MAX_CHARACTERS_PER_STORY && mainCharacters.length > 0 && storyDetails.trim().length > 0;
+      return charactersInStory.length > 0 && charactersInStory.length <= MAX_CHARACTERS_PER_STORY && mainCharacters.length > 0
+        && isStoryTypeComplete({ storyCategory, storyTheme, storyTopic, customThemeText }) && storyDetails.trim().length > 0;
     }
     return false;
   };
