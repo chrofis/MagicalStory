@@ -1158,6 +1158,22 @@
           "{POPULATION_FIELD}"
         ]
       }
+    },
+    {
+      "id": "analyze-photo-analyzer-call",
+      "axis": "regular avatar route vs trial route",
+      "reason": "POST /api/analyze-photo (routes/avatars.js) and POST /api/trial/analyze-photo (routes/trial.js) each hand-build the same fetch to the analyzer's /analyze and parse the same response; the trial copy moved its timeout to 90s for the cold face-worker spawn (2026-08-23) while the signed-in copy kept 30s, so a logged-in upload after the workers were reaped aborted where the trial's succeeded.",
+      "members": [
+        "server/routes/avatars.js",
+        "server/routes/trial.js"
+      ],
+      "severity": "block",
+      "parity": {
+        "anchors": [
+          "signal: AbortSignal.timeout(90000)",
+          "analyzerData.error === 'no_face_detected'"
+        ]
+      }
     }
   ],
   "withinFile": [
