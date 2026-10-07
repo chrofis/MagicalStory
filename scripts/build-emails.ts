@@ -99,13 +99,29 @@ const TEMPLATES: TemplateSpec[] = [
 
 const EMAILS_DIR = path.resolve(__dirname, '..', 'emails');
 
+/**
+ * The plain-text renderer upper-cases headings, so a `{headline}` placeholder
+ * inside an <h1> (trial-reminder) comes out as `{HEADLINE}` — and `email.js`
+ * fills placeholders case-sensitively, so the reminder's text part shipped the
+ * raw token. The HTML render keeps every name as written; it is the case
+ * reference, and every upper-cased token in the text goes back to its name.
+ */
+function restorePlaceholderCase(text: string, html: string): string {
+  const byUpper = new Map<string, string>();
+  for (const m of html.matchAll(/\{(\w+)\}/g)) byUpper.set(m[1].toUpperCase(), m[1]);
+  return text.replace(/\{([A-Z0-9_]+)\}/g, (whole, upper) => {
+    const name = byUpper.get(upper);
+    return name ? `{${name}}` : whole;
+  });
+}
+
 async function buildOne(spec: TemplateSpec) {
   const blocks: string[] = [];
 
   for (const lang of i18n.LANGS) {
     const element = React.createElement(spec.Component, { lang });
     const html = await render(element, { pretty: true });
-    const text = await render(element, { plainText: true });
+    const text = restorePlaceholderCase(await render(element, { plainText: true }), html);
     const subject = spec.subjects[lang];
 
     const block = `[${i18n.langMarkers[lang]}]
