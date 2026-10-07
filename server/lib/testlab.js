@@ -3967,10 +3967,14 @@ async function runAuditReplayStage(target, { params = {}, promptOverride = null 
   // the LOADBEARING question could not fire in the Lab and fault counts came
   // out lower for reasons that had nothing to do with the prompt under test.
   const arc = H.parseBeats(outline).arc || storyData.beatsReviewReport?.arc || '';
+  // The prompt is BUILT inside the override scope: the builders are what read
+  // PROMPT_TEMPLATES[templateKey], the model call reads only the finished
+  // string. The override used to wrap the call alone, so every audit_replay
+  // with a promptOverride sent the stored template.
   if (level === 'arc') {
     templateKey = 'storyArcAudit';
     if (!arc.trim()) throw new Error('story has no stored arc to audit');
-    prompt = H.buildArcAuditPrompt(storyData, arc);
+    prompt = withTemplates({ [templateKey]: promptOverride }, () => H.buildArcAuditPrompt(storyData, arc));
   } else {
     const blind = level === 'text-blind';
     templateKey = blind ? 'storyTextAuditBlind' : 'storyTextAudit';
@@ -4014,9 +4018,9 @@ async function runAuditReplayStage(target, { params = {}, promptOverride = null 
       if (missing.length) throw new Error(`fromWriterText: writerText has no page(s) ${missing.join(', ')}`);
       for (const p of pages) p.text = textOf.get(p.pageNumber);
     }
-    prompt = blind
+    prompt = withTemplates({ [templateKey]: promptOverride }, () => (blind
       ? H.buildTextAuditBlindPrompt(storyData, pages)
-      : H.buildTextAuditPrompt(storyData, pages, arc, { arcHints: resolveReplayArcHints(storyData), storyLogic: resolveReplayStoryLogic(storyData) });
+      : H.buildTextAuditPrompt(storyData, pages, arc, { arcHints: resolveReplayArcHints(storyData), storyLogic: resolveReplayStoryLogic(storyData) })));
   }
   if (!prompt) throw new Error(`${templateKey} template unavailable`);
 
@@ -4024,8 +4028,7 @@ async function runAuditReplayStage(target, { params = {}, promptOverride = null 
   const runs = await Promise.all(models.map(async (model) => {
     const t = Date.now();
     try {
-      const res = await withTemplates({ [templateKey]: promptOverride }, () =>
-        callTextModelStreaming(prompt, null, null, model, { usageLabel: 'testlab_audit_replay', temperature: 0 }));
+      const res = await callTextModelStreaming(prompt, null, null, model, { usageLabel: 'testlab_audit_replay', temperature: 0 });
       const raw = String(res.text || '').trim();
       return {
         model,

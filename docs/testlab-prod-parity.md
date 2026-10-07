@@ -64,7 +64,7 @@ Audit date: 2026-09-27 (staging `c76dac6fc`). Every B/C divergence still open ha
 | cover | `iterateFullStoryCover` (page path) / `iterateCover` (trial) | A / B | Trial path: `forceRestampWhenUnbaked` is not passed; `compositeCovers` defaults to off. |
 | style_check | `checkStoryStyleConsistency` | A (admin route) | Pipeline input is `buildStyleAuditInput`. |
 | book_audit | `auditStoryBook` | B | Page-level fields instead of the picked version's; no covers. |
-| text_refine / audit_replay | `refineStoryText` | B | Refines the shipped text, not the writer draft, unless `fromWriterText` is set. `audit_replay`'s `promptOverride` has no effect. |
+| text_refine / audit_replay | `refineStoryText` | B | Refines the shipped text, not the writer draft, unless `fromWriterText` is set. `audit_replay`'s `promptOverride` had no effect (the prompt was built outside `withTemplates`) — fixed 2026-10-07, pinned by `tests/unit/testlab-audit-replay-prompt-override.test.ts`. |
 | story_bible_replay / story_text_replay / clothing_review | `beatsPipeline.js` bible / text / clothing-review calls | B(+C) | Pre-replan beats. Stored `modelOverrides` are ignored. clothing_review reviews the post-review contract and has its own apply loop. |
 | writer_compare | the beats builders | B+C | The text arm always throws (`parseRefinedText` is given a number). |
 | arc_effort | arc create / panel / re-tell | B+C | Effort defaults, no retry, one round. |
