@@ -1770,6 +1770,46 @@ function injectMeta(html, meta, lang = 'de') {
   return result;
 }
 
+// ─── Accept-Language redirect inputs ─────────────────────────────────────────
+
+/**
+ * Best supported language from the visitor's Accept-Language header, or null.
+ * Parses q-values and matches on the PRIMARY subtag only, so it-CH, it-IT and
+ * it all resolve to 'it' — the same rule the client's detectBrowserLanguage()
+ * uses (client/src/context/LanguageContext.tsx).
+ */
+function preferredLangFromHeader(header) {
+  if (!header || typeof header !== 'string') return null;
+  const ranked = header
+    .split(',')
+    .map(part => {
+      const [tag, ...params] = part.trim().split(';');
+      const q = params
+        .map(p => /^\s*q=([0-9.]+)\s*$/.exec(p))
+        .find(Boolean);
+      return { tag: (tag || '').trim().toLowerCase(), q: q ? parseFloat(q[1]) : 1 };
+    })
+    .filter(e => e.tag && !Number.isNaN(e.q) && e.q > 0)
+    .sort((a, b) => b.q - a.q);
+  for (const { tag } of ranked) {
+    if (tag === '*') return null;
+    const primary = tag.split('-')[0];
+    if (HTML_LANG[primary]) return primary;
+  }
+  return null;
+}
+
+// Search engine and link-preview crawlers. They must always be served the
+// URL they asked for: a crawler that sends Accept-Language (Googlebot's
+// locale-adaptive crawl does) and gets a 302 to ?lang=xx cannot index the
+// German page at its own address, and every alternate is already reachable
+// through hreflang. The list is deliberately broad on the generic words.
+const CRAWLER_UA = /bot|crawl|spider|slurp|facebookexternalhit|facebot|twitterbot|linkedinbot|whatsapp|telegrambot|pinterest|embedly|quora link preview|bingpreview|google-inspectiontool|lighthouse|headlesschrome|petalbot|yandex|duckduckbot|applebot|ia_archiver|mediapartners-google|adsbot|storebot/i;
+
+function isCrawlerUserAgent(userAgent) {
+  return CRAWLER_UA.test(String(userAgent || ''));
+}
+
 /**
  * The HTML for a route that has no prerendered page: the SPA shell with that
  * route's own meta (title, self-canonical, noindex for app pages, JSON-LD for
@@ -2002,4 +2042,4 @@ function escapeXml(str) {
 
 // ─── Exports ──────────────────────────────────────────────────────────────────
 
-module.exports = { getMetaForRoute, injectMeta, renderSpaShell, isAppRoute, generateSitemap, HTML_LANG, NOINDEX_ROUTES, APP_ROUTES, THEMES };
+module.exports = { getMetaForRoute, injectMeta, renderSpaShell, isAppRoute, generateSitemap, preferredLangFromHeader, isCrawlerUserAgent, HTML_LANG, NOINDEX_ROUTES, APP_ROUTES, THEMES };

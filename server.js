@@ -256,7 +256,7 @@ const { createJobHeartbeat } = require('./server/lib/jobHeartbeat');
 const { getActiveIndexAfterPush } = require('./server/lib/versionManager');
 const { GenerationLogger, setCurrentLogger, clearCurrentLogger } = require('./server/lib/generationLogger');
 const { hasPhotos: hasCharacterPhotos, getFacePhoto } = require('./server/lib/characterPhotos');
-const { generateSitemap, renderSpaShell } = require('./server/lib/seoMeta');
+const { generateSitemap, renderSpaShell, preferredLangFromHeader, isCrawlerUserAgent } = require('./server/lib/seoMeta');
 const { stripDataUriPrefix } = require('./server/lib/r2');
 const configRoutes = require('./server/routes/config');
 const healthRoutes = require('./server/routes/health');
@@ -2487,31 +2487,6 @@ app.get('*', (req, res, next) => {
   return res.redirect(301, `${req.protocol}://${canonicalHost}${target || req.path}${qs}`);
 });
 
-// Best supported language from the visitor's Accept-Language header, or null.
-// Parses q-values and matches on the PRIMARY subtag only, so it-CH, it-IT and
-// it all resolve to 'it' — the same rule the client's detectBrowserLanguage()
-// uses (client/src/context/LanguageContext.tsx).
-function preferredLangFromHeader(header) {
-  if (!header || typeof header !== 'string') return null;
-  const ranked = header
-    .split(',')
-    .map(part => {
-      const [tag, ...params] = part.trim().split(';');
-      const q = params
-        .map(p => /^\s*q=([0-9.]+)\s*$/.exec(p))
-        .find(Boolean);
-      return { tag: (tag || '').trim().toLowerCase(), q: q ? parseFloat(q[1]) : 1 };
-    })
-    .filter(e => e.tag && !Number.isNaN(e.q) && e.q > 0)
-    .sort((a, b) => b.q - a.q);
-  for (const { tag } of ranked) {
-    if (tag === '*') return null;
-    const primary = tag.split('-')[0];
-    if (SUPPORTED_LANGS.has(primary)) return primary;
-  }
-  return null;
-}
-
 // SPA fallback — serves pre-rendered HTML for SEO routes, raw index.html for app routes
 app.get('*', (req, res, next) => {
   // Skip API routes
@@ -2528,7 +2503,10 @@ app.get('*', (req, res, next) => {
   // visitor's language for everyone. The redirect itself is never cached.
   // Googlebot sends no Accept-Language (or 'en'), so it keeps crawling the
   // German x-default and reaches every alternate through hreflang.
-  if (!req.query.lang) {
+  // Crawlers never get this redirect: Googlebot's locale-adaptive crawl sends
+  // Accept-Language headers too, and a German URL that 302s to ?lang=en for it
+  // is a German page Google cannot index at its own address.
+  if (!req.query.lang && !isCrawlerUserAgent(req.headers['user-agent'])) {
     const preferred = preferredLangFromHeader(req.headers['accept-language']);
     if (preferred && preferred !== 'de' && resolvePrerenderedFile(req.path, preferred)) {
       res.set('Cache-Control', 'no-store');
