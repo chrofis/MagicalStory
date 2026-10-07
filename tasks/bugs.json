@@ -3836,7 +3836,7 @@
       "source": "Concurrency audit of photo_analyzer.py after commit 026b8e0db: detect_illustration_faces called anime_face_cascade.detectMultiScale and _FRONTAL_FACE_CASCADE.detectMultiScale unlocked (and detect_all_faces_opencv likewise); the race on exactly these objects was reproduced twice on staging the same day (bug analyzer-concurrent-face-detection-no-face). server/lib/entityConsistency.js detectIllustrationFaces runs this route per page concurrently, so a clash lost or garbled the cascade face boxes behind the character-consistency merge.",
       "status": "fixed",
       "fixedAt": "2026-10-07",
-      "fixedIn": "pending",
+      "fixedIn": "94950c5c0",
       "fix": "Both cascade calls in detect_illustration_faces and the one in detect_all_faces_opencv run under _face_detector_lock. Pinned by tests/analyzer/test_photo_analyzer_contract.py (test_illustration_faces_cascades_are_serialised, fail before / pass after) and a within-file sibling set (analyzer-shared-detector-calls-locked) that blocks any shared-detector call site without the lock."
     },
     {
@@ -3846,7 +3846,7 @@
       "source": "Concurrency audit of photo_analyzer.py: _face_mesh is a module-level mp.solutions.face_mesh.FaceMesh built lazily in get_face_mesh() and align_face_arcface() called mesh.process() on it unlocked; a mediapipe solution is a calculator graph (process() pushes one packet and waits for the graph's output), the same mechanism as the shared detectors whose race was reproduced on staging 2026-10-07. The ONNX ArcFace path is what server/lib/faceIdentity.js scores avatar candidates with, several per character at once.",
       "status": "fixed",
       "fixedAt": "2026-10-07",
-      "fixedIn": "pending",
+      "fixedIn": "94950c5c0",
       "fix": "_face_mesh_lock around the build and the full process()+landmark copy in align_face_arcface; the warp and the ONNX session.run stay outside it. Pinned by tests/analyzer/test_photo_analyzer_contract.py test_face_mesh_landmarks_are_serialised (fail before / pass after)."
     }
   ]
