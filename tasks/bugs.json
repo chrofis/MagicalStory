@@ -3826,7 +3826,7 @@
       "source": "Staging trial runs 2026-10-07: 3 parallel /api/trial/analyze-photo calls, 2 of 3 returned no face crop (twice: 18:32 and 18:46 CH); the same Rohan photo alone found its face at 15:52 CH. photo_analyzer.py: one module-level MTCNN (cv2.dnn) and two CascadeClassifiers shared by every waitress thread, and detect_all_faces_mtcnn / detect_all_faces_anime returned [] on any exception.",
       "status": "fixed",
       "fixedAt": "2026-10-07",
-      "fixedIn": "pending",
+      "fixedIn": "026b8e0db",
       "fix": "_face_detector_lock serialises every shared detector call (MTCNN, frontal and anime cascades); a detector exception raises instead of returning [] so /analyze reports a failure, never 'no face'. Pinned by tests/analyzer/test_photo_analyzer_contract.py (concurrency + failure tests, fail before / pass after)."
     }
   ]
