@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Stand on the Swiss border in 1914 and see how a small nation stayed peaceful while the world erupted in war.",
+    "de": "Steh 1914 an der Schweizer Grenze und sieh, wie ein kleines Land friedlich blieb, während die Welt im Krieg versank.",
+    "fr": "Restez à la frontière suisse en 1914 et voyez comment un petit pays resta en paix alors que le monde entrait en guerre.",
+    "it": "Resta al confine svizzero nel 1914 e scopri come una piccola nazione è rimasta in pace mentre il mondo precipitava nella guerra."
+  },
+  "longDescription": {
+    "en": "This personalized historical story explains Switzerland's neutrality during World War I. Your child learns how Switzerland mobilized its army not to fight but to defend its borders and protect its diverse population. The story teaches the value of peace, diplomacy, and humanitarian aid — showing how the Red Cross worked tirelessly during this period.",
+    "de": "Diese Geschichtserzählung erklärt die Schweizer Neutralität im Ersten Weltkrieg. Dein Kind lernt, wie die Schweiz ihre Armee mobilisierte — nicht um zu kämpfen, sondern um Grenzen zu schützen. Die Geschichte lehrt den Wert von Frieden und humanitärer Hilfe.",
+    "fr": "Cette histoire historique explique la neutralité suisse pendant la Première Guerre mondiale. L'histoire enseigne la valeur de la paix et de l'aide humanitaire.",
+    "it": "Questa storia personalizzata a sfondo storico spiega la neutralità svizzera durante la Prima guerra mondiale. Tuo figlio scopre come la Svizzera mobilitò il proprio esercito non per combattere ma per difendere i propri confini e proteggere la sua popolazione variegata. La storia insegna il valore della pace, della diplomazia e dell'aiuto umanitario, mostrando come la Croce Rossa lavorò instancabilmente in questo periodo."
+  },
+  "skills": {
+    "en": "Neutrality, peace, humanitarian values, Swiss identity.",
+    "de": "Neutralität, Frieden, humanitäre Werte, Schweizer Identität.",
+    "fr": "Neutralité, paix, valeurs humanitaires, identité suisse.",
+    "it": "Neutralità, pace, valori umanitari, identità svizzera."
+  },
+  "ageRecommendation": "7-10",
+  "faq": [
+    {
+      "q": {
+        "en": "Is the historical content accurate?",
+        "de": "Ist der historische Inhalt korrekt?",
+        "fr": "Le contenu historique est-il exact ?",
+        "it": "Il contenuto storico è accurato?"
+      },
+      "a": {
+        "en": "Yes! The stories are carefully researched. The historical facts, dates, and key figures are accurate.",
+        "de": "Ja! Die Geschichten sind sorgfältig recherchiert.",
+        "fr": "Oui ! Les histoires sont soigneusement recherchées.",
+        "it": "Sì! Le storie sono accuratamente documentate. I fatti storici, le date e i personaggi chiave sono corretti."
+      }
+    }
+  ]
+}

@@ -25,6 +25,9 @@ import { giftPages } from './constants/giftData';
 import { comparisons } from './constants/comparisonData';
 import { guides } from './constants/guideData';
 
+// The prerender injects one theme's content per theme route (constants/themeContent.ts)
+export { themeContentForRoute } from './constants/themeContentAll';
+
 export interface RenderResult {
   /** The rendered HTML for the React tree (goes inside <div id="root">) */
   html: string;

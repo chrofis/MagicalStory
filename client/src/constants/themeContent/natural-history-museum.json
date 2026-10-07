@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Wander through grand halls of dinosaur skeletons and sparkling gemstones as the Natural History Museum opens in London.",
+    "de": "Wandere durch grosse Hallen mit Dinosaurierskeletten und funkelnden Edelsteinen, als das Naturkundemuseum in London eröffnet.",
+    "fr": "Flânez dans les grandes salles de squelettes de dinosaures et de pierres précieuses à l'ouverture du Musée d'Histoire Naturelle.",
+    "it": "Vaga tra grandi sale piene di scheletri di dinosauri e pietre preziose scintillanti mentre il Museo di Storia Naturale apre a Londra."
+  },
+  "longDescription": {
+    "en": "This personalized historical story takes your child to 1881 London for the opening of the Natural History Museum. Your child walks through halls filled with dinosaur skeletons, whale models, and mineral collections, discovering the wonder of the natural world preserved for future generations. The story inspires a love of science and museums.",
+    "de": "Diese Geschichtserzählung nimmt dein Kind mit ins London von 1881 zur Eröffnung des Naturhistorischen Museums. Dein Kind wandert durch Hallen voller Dinosaurierskelette und Mineralsammlungen und entdeckt die Wunder der Natur.",
+    "fr": "Cette histoire historique emmène votre enfant à Londres en 1881 pour l'ouverture du Musée d'Histoire Naturelle.",
+    "it": "Questa storia personalizzata a sfondo storico porta tuo figlio nella Londra del 1881 per l'apertura del Museo di Storia Naturale. Tuo figlio cammina tra sale piene di scheletri di dinosauri, modelli di balene e collezioni di minerali, scoprendo la meraviglia del mondo naturale conservata per le generazioni future. La storia ispira l'amore per la scienza e per i musei."
+  },
+  "skills": {
+    "en": "Natural sciences, museum appreciation, curiosity, biodiversity.",
+    "de": "Naturwissenschaften, Museumsschätzung, Neugierde, Artenvielfalt.",
+    "fr": "Sciences naturelles, appréciation des musées, curiosité, biodiversité.",
+    "it": "Scienze naturali, apprezzamento dei musei, curiosità, biodiversità."
+  },
+  "ageRecommendation": "5-10",
+  "faq": [
+    {
+      "q": {
+        "en": "Is the historical content accurate?",
+        "de": "Ist der historische Inhalt korrekt?",
+        "fr": "Le contenu historique est-il exact ?",
+        "it": "Il contenuto storico è accurato?"
+      },
+      "a": {
+        "en": "Yes! The stories are carefully researched. The historical facts, dates, and key figures are accurate.",
+        "de": "Ja! Die Geschichten sind sorgfältig recherchiert.",
+        "fr": "Oui ! Les histoires sont soigneusement recherchées.",
+        "it": "Sì! Le storie sono accuratamente documentate. I fatti storici, le date e i personaggi chiave sono corretti."
+      }
+    }
+  ]
+}

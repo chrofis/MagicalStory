@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Your child befriends a misunderstood dragon and goes on an epic quest to save a magical kingdom together.",
+    "de": "Dein Kind freundet sich mit einem missverstandenen Drachen an und bricht gemeinsam auf, um ein Zauberreich zu retten.",
+    "fr": "Votre enfant se lie d'amitié avec un dragon incompris et part en quête épique pour sauver ensemble un royaume magique.",
+    "it": "Tuo figlio fa amicizia con un drago incompreso e parte per una missione epica per salvare insieme un regno magico."
+  },
+  "longDescription": {
+    "en": "Your child discovers a baby dragon hiding in a cave, shivering and alone. While everyone fears dragons, your child sees a friend who needs help. Together, they trek through enchanted valleys and over smoldering mountains to reunite the dragon with its family.\n\nThe story carries a powerful message about empathy, accepting those who are different, and the strength of unlikely friendships. Your child rides on the dragon's back through stunning fantasy landscapes. Perfect for children aged 3 to 8 who believe kindness can change the world.",
+    "de": "Dein Kind entdeckt einen zitternden Babydrachen in einer Höhle. Während alle Drachen fürchten, sieht dein Kind einen Freund. Gemeinsam bringen sie den Drachen zu seiner Familie zurück. Die Geschichte vermittelt Empathie und die Stärke ungewöhnlicher Freundschaften. Perfekt für Kinder von 3 bis 8 Jahren.",
+    "fr": "Votre enfant découvre un bébé dragon caché dans une grotte. L'histoire porte un message puissant sur l'empathie et l'amitié. Parfait pour les enfants de 3 à 8 ans.",
+    "it": "Tuo figlio scopre un cucciolo di drago nascosto in una grotta, tremante e solo. Mentre tutti temono i draghi, tuo figlio vede un amico che ha bisogno di aiuto. Insieme, attraversano valli incantate e montagne fumanti per ricongiungere il drago alla sua famiglia.\n\nLa storia porta un messaggio potente sull'empatia, sull'accettazione di chi è diverso e sulla forza delle amicizie inaspettate. Tuo figlio cavalca sul dorso del drago attraverso paesaggi fantastici mozzafiato. Perfetta per bambini dai 3 agli 8 anni che credono che la gentilezza possa cambiare il mondo."
+  },
+  "skills": {
+    "en": "Empathy, friendship, courage, accepting differences, trust.",
+    "de": "Empathie, Freundschaft, Mut, Unterschiede akzeptieren, Vertrauen.",
+    "fr": "Empathie, amitié, courage, acceptation des différences, confiance.",
+    "it": "Empatia, amicizia, coraggio, accettazione delle differenze, fiducia."
+  },
+  "ageRecommendation": "3-8",
+  "faq": [
+    {
+      "q": {
+        "en": "Is the dragon scary?",
+        "de": "Ist der Drache gruselig?",
+        "fr": "Le dragon est-il effrayant ?",
+        "it": "Il drago fa paura?"
+      },
+      "a": {
+        "en": "Not at all! It is a gentle baby who becomes your child's best friend.",
+        "de": "Überhaupt nicht! Er ist ein sanftes Baby, das der beste Freund deines Kindes wird.",
+        "fr": "Pas du tout ! C'est un gentil bébé qui devient le meilleur ami de votre enfant.",
+        "it": "Assolutamente no! È un cucciolo dolcissimo che diventa il migliore amico di tuo figlio."
+      }
+    }
+  ]
+}

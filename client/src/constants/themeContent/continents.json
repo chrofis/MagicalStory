@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Travel to all seven continents and discover the amazing animals, landscapes, and people that make each one unique.",
+    "de": "Zu allen sieben Kontinenten reisen und die erstaunlichen Tiere, Landschaften und Menschen entdecken, die jeden einzigartig machen.",
+    "fr": "Voyager sur les sept continents et découvrir les animaux, paysages et peuples incroyables qui rendent chacun unique.",
+    "it": "Viaggia in tutti e sette i continenti e scopri gli animali, i paesaggi e i popoli straordinari che rendono unico ognuno di essi."
+  },
+  "longDescription": {
+    "en": "This personalized educational story takes your child on a round-the-world adventure, landing on each of the seven continents. From the frozen landscapes of Antarctica to the lush rainforests of South America, your child discovers what makes each continent special — its animals, landmarks, climate, and cultures. The story builds geographical awareness and a sense of global citizenship. Your child returns home with a richer understanding of our diverse planet.",
+    "de": "Diese Lerngeschichte nimmt dein Kind mit auf eine Weltreise zu allen sieben Kontinenten. Von den eisigen Landschaften der Antarktis bis zu den Regenwäldern Südamerikas entdeckt dein Kind, was jeden Kontinent besonders macht. Die Geschichte baut geografisches Bewusstsein und globales Bürgertum auf.",
+    "fr": "Cette histoire éducative emmène votre enfant faire le tour du monde, visitant chaque continent. L'histoire construit la conscience géographique et un sentiment de citoyenneté mondiale.",
+    "it": "Questa storia educativa personalizzata porta tuo figlio in un'avventura intorno al mondo, con una tappa su ciascuno dei sette continenti. Dai paesaggi ghiacciati dell'Antartide alle rigogliose foreste pluviali del Sudamerica, tuo figlio scopre cosa rende speciale ogni continente — i suoi animali, i luoghi iconici, il clima e le culture. La storia costruisce consapevolezza geografica e un senso di cittadinanza globale. Tuo figlio torna a casa con una comprensione più ricca del nostro pianeta variegato."
+  },
+  "skills": {
+    "en": "Geography, cultural awareness, global citizenship, biodiversity.",
+    "de": "Geografie, Kulturbewusstsein, globales Bürgertum, Artenvielfalt.",
+    "fr": "Géographie, conscience culturelle, citoyenneté mondiale, biodiversité.",
+    "it": "Geografia, consapevolezza culturale, cittadinanza globale, biodiversità."
+  },
+  "ageRecommendation": "5-8",
+  "faq": [
+    {
+      "q": {
+        "en": "Will my child actually learn from this story?",
+        "de": "Lernt mein Kind wirklich etwas?",
+        "fr": "Mon enfant apprend-il vraiment ?",
+        "it": "Mio figlio imparerà davvero qualcosa da questa storia?"
+      },
+      "a": {
+        "en": "Yes! Children remember continents much better through adventure stories than from maps alone.",
+        "de": "Ja! Kinder merken sich Kontinente viel besser durch Abenteuergeschichten als durch Karten allein.",
+        "fr": "Oui ! Les enfants retiennent mieux les continents à travers des histoires d'aventure.",
+        "it": "Sì! I bambini ricordano i continenti molto meglio attraverso storie d'avventura che con le sole mappe."
+      }
+    }
+  ]
+}

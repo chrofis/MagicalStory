@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Journey through all twelve months and discover what makes each one special — from snowy January to sunny August.",
+    "de": "Eine Reise durch alle zwölf Monate und entdecken, was jeden besonders macht — vom verschneiten Januar bis zum sonnigen August.",
+    "fr": "Voyager à travers les douze mois et découvrir ce qui rend chacun spécial — du janvier enneigé à l'août ensoleillé.",
+    "it": "Viaggia attraverso tutti e dodici i mesi e scopri cosa rende speciale ognuno di loro — dal gennaio innevato all'agosto assolato."
+  },
+  "longDescription": {
+    "en": "This personalized educational story takes your child on a month-by-month journey through the year. Each month brings its own weather, celebrations, and activities. Your child learns the names and order of all twelve months, connects them to seasons, and discovers special events associated with each. The story uses repetition and memorable associations to help the sequence stick, and ends by coming full circle — showing that the year is a cycle that repeats.",
+    "de": "Diese Lerngeschichte nimmt dein Kind Monat für Monat mit durch das Jahr. Jeder Monat bringt eigenes Wetter, Feste und Aktivitäten. Dein Kind lernt die Namen und Reihenfolge aller zwölf Monate und verbindet sie mit Jahreszeiten. Die Geschichte nutzt Wiederholung und einprägsame Verbindungen.",
+    "fr": "Cette histoire éducative emmène votre enfant mois par mois à travers l'année. Chaque mois apporte sa météo, ses fêtes et ses activités. L'histoire utilise la répétition pour ancrer la séquence.",
+    "it": "Questa storia educativa personalizzata porta tuo figlio in un viaggio mese dopo mese attraverso l'anno. Ogni mese porta con sé il proprio tempo atmosferico, le proprie festività e attività. Tuo figlio impara i nomi e l'ordine di tutti e dodici i mesi, li collega alle stagioni e scopre gli eventi speciali legati a ciascuno. La storia usa la ripetizione e associazioni facili da ricordare per far restare impressa la sequenza, e si conclude tornando al punto di partenza — mostrando che l'anno è un ciclo che si ripete."
+  },
+  "skills": {
+    "en": "Calendar knowledge, sequencing, seasonal awareness, memory.",
+    "de": "Kalenderwissen, Reihenfolge, Jahreszeitenbewusstsein, Gedächtnis.",
+    "fr": "Connaissance du calendrier, séquençage, conscience saisonnière, mémoire.",
+    "it": "Conoscenza del calendario, capacità di sequenza, consapevolezza delle stagioni, memoria."
+  },
+  "ageRecommendation": "4-7",
+  "faq": [
+    {
+      "q": {
+        "en": "Will my child actually learn from this story?",
+        "de": "Lernt mein Kind wirklich etwas?",
+        "fr": "Mon enfant apprend-il vraiment ?",
+        "it": "Mio figlio imparerà davvero qualcosa da questa storia?"
+      },
+      "a": {
+        "en": "Yes! The month-by-month structure with seasonal anchors makes the sequence memorable and easy to recall.",
+        "de": "Ja! Die Struktur Monat für Monat mit Jahreszeiten-Ankern macht die Reihenfolge einprägsam.",
+        "fr": "Oui ! La structure mois par mois avec des repères saisonniers rend la séquence mémorable.",
+        "it": "Sì! La struttura mese per mese con riferimenti alle stagioni rende la sequenza memorabile e facile da ricordare."
+      }
+    }
+  ]
+}

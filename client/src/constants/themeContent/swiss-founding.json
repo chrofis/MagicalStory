@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Watch three forest cantons join hands on the Rütli meadow and forge a pact that births a nation.",
+    "de": "Erlebe, wie drei Waldstätte auf dem Rütli einen Bund schliessen und damit eine Nation erschaffen.",
+    "fr": "Assistez à la naissance d'une nation quand trois cantons forestiers se donnent la main sur la prairie du Rütli.",
+    "it": "Guarda tre cantoni forestali darsi la mano sul prato del Rütli e stringere un patto da cui nasce una nazione."
+  },
+  "longDescription": {
+    "en": "This personalized historical story transports your child back in time to witness one of history's most remarkable moments: Founding of Switzerland (the Rütli Oath). Your child becomes an eyewitness, standing alongside the key figures as events unfold. The story brings history to life through vivid, age-appropriate storytelling that makes your child feel as if they are truly there.\n\nEvery page features your child illustrated in period-appropriate clothing, interacting with historical figures and experiencing the sights, sounds, and emotions of the era. The narrative is carefully researched to be historically accurate while remaining engaging and accessible for young readers. Complex historical events are explained through the eyes of a child, making them easy to understand and deeply memorable.\n\nThis approach to learning history is far more effective than textbooks because it creates emotional connections with historical events. When your child is part of the story, they remember the facts, understand the significance, and develop a genuine love of history. Parents and teachers across Switzerland use these stories to supplement school curricula and spark discussions about important historical events.",
+    "de": "Diese personalisierte Geschichtserzählung versetzt dein Kind zurück in die Vergangenheit, um einen der bemerkenswertesten Momente der Geschichte mitzuerleben: die Gründung der Schweiz. Dein Kind wird zum Augenzeugen und steht neben den Schlüsselfiguren, während die Ereignisse sich entfalten.\n\nJede Seite zeigt dein Kind in zeitgenössischer Kleidung illustriert, im Gespräch mit historischen Persönlichkeiten und beim Erleben der Epoche. Die Erzählung ist sorgfältig recherchiert, um historisch korrekt und gleichzeitig altersgerecht und fesselnd zu sein. Komplexe Ereignisse werden durch Kinderaugen erklärt.\n\nDieser Ansatz zum Geschichtslernen ist weitaus effektiver als Lehrbücher, weil er emotionale Verbindungen schafft. Wenn dein Kind Teil der Geschichte ist, merkt es sich die Fakten, versteht die Bedeutung und entwickelt eine echte Liebe zur Geschichte. Eltern und Lehrkräfte in der ganzen Schweiz nutzen diese Geschichten, um den Schulstoff zu ergänzen.",
+    "fr": "Cette histoire historique personnalisée transporte votre enfant dans le temps pour assister à l'un des moments les plus remarquables de l'histoire : la fondation de la Suisse. Chaque page illustre votre enfant en vêtements d'époque, interagissant avec des personnages historiques. Cette approche crée des connexions émotionnelles avec l'histoire, bien plus efficace que les manuels scolaires.",
+    "it": "Questa storia storica personalizzata riporta tuo figlio indietro nel tempo per assistere a uno dei momenti più straordinari della storia: la fondazione della Svizzera. Tuo figlio diventa testimone oculare, al fianco dei protagonisti mentre gli eventi si svolgono. La storia dà vita al passato attraverso una narrazione vivida e adatta all'età, che fa sentire tuo figlio davvero presente.\n\nOgni pagina mostra tuo figlio illustrato con abiti dell'epoca, mentre interagisce con figure storiche e vive i suoni, le immagini e le emozioni di quel tempo. La narrazione è curata con attenzione per essere storicamente accurata pur restando coinvolgente e accessibile ai giovani lettori. Eventi storici complessi vengono spiegati attraverso gli occhi di un bambino, rendendoli facili da capire e indimenticabili.\n\nQuesto modo di imparare la storia è molto più efficace dei libri di testo perché crea legami emotivi con gli eventi storici. Quando tuo figlio fa parte della storia, ricorda i fatti, ne capisce l'importanza e sviluppa un amore autentico per la storia. Genitori e insegnanti in tutta la Svizzera usano queste storie per completare il programma scolastico e avviare discussioni su eventi storici importanti."
+  },
+  "skills": {
+    "en": "Swiss history, civic values, cooperation, national identity.",
+    "de": "Schweizer Geschichte, bürgerliche Werte, Zusammenarbeit, Identität.",
+    "fr": "Histoire suisse, valeurs civiques, coopération, identité nationale.",
+    "it": "Storia svizzera, valori civici, cooperazione, identità nazionale."
+  },
+  "ageRecommendation": "5-10",
+  "faq": [
+    {
+      "q": {
+        "en": "Is the historical content accurate?",
+        "de": "Ist der historische Inhalt korrekt?",
+        "fr": "Le contenu historique est-il exact ?",
+        "it": "Il contenuto storico è accurato?"
+      },
+      "a": {
+        "en": "Yes! The stories are carefully researched. While the narrative adds a child-friendly adventure layer, the historical facts, dates, and key figures are accurate.",
+        "de": "Ja! Die Geschichten sind sorgfältig recherchiert. Die historischen Fakten, Daten und Schlüsselfiguren sind korrekt.",
+        "fr": "Oui ! Les histoires sont soigneusement recherchées. Les faits historiques sont exacts.",
+        "it": "Sì! Le storie sono curate con attenzione. Anche se la narrazione aggiunge uno strato d'avventura adatto ai bambini, i fatti storici, le date e le figure chiave restano accurati."
+      }
+    }
+  ]
+}

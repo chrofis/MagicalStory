@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Help build the iconic Golden Gate Bridge, stringing cables high above the foggy San Francisco Bay.",
+    "de": "Hilf beim Bau der ikonischen Golden Gate Bridge, spanne Kabel hoch über der nebligen Bucht von San Francisco.",
+    "fr": "Aidez à construire l'emblématique pont du Golden Gate, tendant des câbles au-dessus de la baie brumeuse de San Francisco.",
+    "it": "Aiuta a costruire l'iconico Golden Gate Bridge, tendendo cavi in alto sopra la baia nebbiosa di San Francisco."
+  },
+  "longDescription": {
+    "en": "This personalized historical story takes your child to 1937 to witness the construction of the Golden Gate Bridge. Your child learns how engineers overcame fog, wind, and deep water to build one of the world's most recognizable landmarks. A story about human ingenuity and the courage to build something beautiful against the odds.",
+    "de": "Diese Geschichtserzählung nimmt dein Kind mit ins Jahr 1937 zum Bau der Golden Gate Bridge. Dein Kind lernt, wie Ingenieure Nebel, Wind und tiefes Wasser überwanden, um eines der bekanntesten Wahrzeichen der Welt zu bauen.",
+    "fr": "Cette histoire historique emmène votre enfant en 1937 pour la construction du pont du Golden Gate.",
+    "it": "Questa storia personalizzata a sfondo storico porta tuo figlio nel 1937 alla costruzione del Golden Gate Bridge. Tuo figlio scopre come gli ingegneri abbiano superato nebbia, vento e acque profonde per costruire uno dei simboli più riconoscibili al mondo. Una storia sull'ingegno umano e sul coraggio di realizzare qualcosa di bello contro ogni difficoltà."
+  },
+  "skills": {
+    "en": "Engineering, architecture, problem-solving, determination.",
+    "de": "Ingenieurskunst, Architektur, Problemlösung, Entschlossenheit.",
+    "fr": "Ingénierie, architecture, résolution de problèmes, détermination.",
+    "it": "Ingegneria, architettura, capacità di risolvere problemi, determinazione."
+  },
+  "ageRecommendation": "5-10",
+  "faq": [
+    {
+      "q": {
+        "en": "Is the historical content accurate?",
+        "de": "Ist der historische Inhalt korrekt?",
+        "fr": "Le contenu historique est-il exact ?",
+        "it": "Il contenuto storico è accurato?"
+      },
+      "a": {
+        "en": "Yes! The stories are carefully researched. The historical facts, dates, and key figures are accurate.",
+        "de": "Ja! Die Geschichten sind sorgfältig recherchiert.",
+        "fr": "Oui ! Les histoires sont soigneusement recherchées.",
+        "it": "Sì! Le storie sono accuratamente documentate. I fatti storici, le date e i personaggi chiave sono corretti."
+      }
+    }
+  ]
+}

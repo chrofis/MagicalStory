@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Your child becomes a Roman citizen, walks the streets of ancient Rome, and takes part in a grand spectacle.",
+    "de": "Dein Kind wird zum römischen Bürger, erlebt das antike Rom und erlebt ein grosses Fest im Kolosseum.",
+    "fr": "Votre enfant devient citoyen romain, arpente les rues de la Rome antique et assiste à un grand spectacle.",
+    "it": "Tuo figlio diventa un cittadino romano, cammina per le strade dell'antica Roma e prende parte a un grande spettacolo."
+  },
+  "longDescription": {
+    "en": "Step back in time to ancient Rome! Your child walks through the bustling streets of the Eternal City, past marble temples and the mighty Colosseum. Dressed in a toga, your little citizen meets friendly senators, watches chariot races, and solves a mystery involving a missing golden eagle.\n\nThe story brings Roman daily life to vivid detail — aqueducts, mosaics, and lively forums. The climax takes place in the Colosseum as a celebration, not a fight. Every illustration places your child at the heart of the Roman world. Perfect for young history enthusiasts aged 4 to 9 who love learning about how people lived long ago.",
+    "de": "Reise in die Glanzzeit des antiken Roms! Dein Kind spaziert durch die Strassen der Ewigen Stadt, vorbei an Tempeln und dem Kolosseum. In einer Toga gekleidet, trifft dein kleiner Bürger Senatoren, beobachtet Wagenrennen und löst ein Rätsel um einen verschwundenen goldenen Adler.\n\nDie Geschichte erweckt den römischen Alltag zum Leben. Der Höhepunkt im Kolosseum ist eine Feier, kein Kampf. Perfekt für junge Geschichtsfans von 4 bis 9 Jahren.",
+    "fr": "Remontez le temps dans la Rome antique ! Votre enfant parcourt les rues animées, résout un mystère et découvre la culture romaine. Le Colisée est le lieu d'une célébration, pas d'un combat. Parfait pour les jeunes passionnés d'histoire.",
+    "it": "Fai un salto indietro nel tempo, nell'antica Roma! Tuo figlio cammina tra le vie animate della Città Eterna, tra templi di marmo e il maestoso Colosseo. Vestito con una toga, il tuo piccolo cittadino incontra senatori cordiali, assiste a corse di bighe e risolve un mistero legato a un'aquila d'oro scomparsa.\n\nLa storia dà vita nei minimi dettagli alla vita quotidiana romana — acquedotti, mosaici e fori animati. Il culmine si svolge al Colosseo come una celebrazione, non una battaglia. Ogni illustrazione pone tuo figlio al centro del mondo romano. Perfetta per i giovani appassionati di storia dai 4 ai 9 anni che amano scoprire come vivevano le persone nell'antichità."
+  },
+  "skills": {
+    "en": "History, problem-solving, civic values, curiosity about ancient civilizations.",
+    "de": "Geschichte, Problemlösung, bürgerliche Werte, Neugierde auf antike Zivilisationen.",
+    "fr": "Histoire, résolution de problèmes, valeurs civiques, curiosité pour les civilisations anciennes.",
+    "it": "Storia, capacità di risolvere problemi, valori civici, curiosità per le civiltà antiche."
+  },
+  "ageRecommendation": "4-9",
+  "faq": [
+    {
+      "q": {
+        "en": "Does it include gladiator fighting?",
+        "de": "Enthält es Gladiatorenkämpfe?",
+        "fr": "Y a-t-il des combats de gladiateurs ?",
+        "it": "Include combattimenti tra gladiatori?"
+      },
+      "a": {
+        "en": "No. The Colosseum scene is a celebration ceremony, not a fight.",
+        "de": "Nein. Die Kolosseum-Szene ist eine Feier, kein Kampf.",
+        "fr": "Non. La scène du Colisée est une célébration, pas un combat.",
+        "it": "No. La scena al Colosseo è una cerimonia di celebrazione, non un combattimento."
+      }
+    }
+  ]
+}

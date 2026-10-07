@@ -9,7 +9,8 @@ import {
   educationalTopics,
   historicalEvents,
 } from '@/constants/storyTypes';
-import { themeContent } from '@/constants/themeContent';
+import { useThemeContent } from '@/hooks/useThemeContent';
+import type { ThemeContent } from '@/constants/themeContent';
 import type { LocalizedString } from '@/types/character';
 
 type CategorySlug = 'adventure' | 'life-challenges' | 'educational' | 'historical';
@@ -134,8 +135,7 @@ function getCategoryName(category: CategorySlug, language: string): string {
   return names[category]?.[language] || names[category]?.en || category;
 }
 
-function getDescription(themeId: string, language: string = 'en'): string {
-  const content = themeContent[themeId];
+function getDescription(content: ThemeContent | null, language: string = 'en'): string {
   if (content?.description) {
     const desc = content.description;
     return (desc as Record<string, string>)[language] || desc.en;
@@ -143,8 +143,7 @@ function getDescription(themeId: string, language: string = 'en'): string {
   return '';
 }
 
-function getLongDescription(themeId: string, language: string = 'en'): string {
-  const content = themeContent[themeId];
+function getLongDescription(content: ThemeContent | null, language: string = 'en'): string {
   if (content?.longDescription) {
     const desc = content.longDescription;
     return (desc as Record<string, string>)[language] || desc.en;
@@ -152,8 +151,7 @@ function getLongDescription(themeId: string, language: string = 'en'): string {
   return '';
 }
 
-function getSkills(themeId: string, language: string = 'en'): string {
-  const content = themeContent[themeId];
+function getSkills(content: ThemeContent | null, language: string = 'en'): string {
   if (content?.skills) {
     const skills = content.skills;
     return (skills as Record<string, string>)[language] || skills.en;
@@ -161,12 +159,11 @@ function getSkills(themeId: string, language: string = 'en'): string {
   return '';
 }
 
-function getAgeRecommendation(themeId: string): string {
-  return themeContent[themeId]?.ageRecommendation || '';
+function getAgeRecommendation(content: ThemeContent | null): string {
+  return content?.ageRecommendation || '';
 }
 
-function getFaq(themeId: string, language: string = 'en'): Array<{ q: string; a: string }> {
-  const content = themeContent[themeId];
+function getFaq(content: ThemeContent | null, language: string = 'en'): Array<{ q: string; a: string }> {
   if (!content?.faq) return [];
   return content.faq.map(item => ({
     q: (item.q as Record<string, string>)[language] || item.q.en,
@@ -261,6 +258,9 @@ export default function ThemePage() {
     return getRelatedThemes(category as CategorySlug, themeId);
   }, [category, themeId]);
 
+  // Prerendered entry on hydration, the theme's own chunk on client navigation.
+  const content = useThemeContent(themeId || '');
+
   if (!theme || !category) {
     return <Navigate to="/themes" replace />;
   }
@@ -268,11 +268,11 @@ export default function ThemePage() {
   const catSlug = category as CategorySlug;
   const themeName = theme.name[language] || theme.name.en;
   const categoryName = getCategoryName(catSlug, language);
-  const description = getDescription(themeId!, language);
-  const longDescription = getLongDescription(themeId!, language);
-  const skills = getSkills(themeId!, language);
-  const ageRec = getAgeRecommendation(themeId!);
-  const faq = getFaq(themeId!, language);
+  const description = getDescription(content, language);
+  const longDescription = getLongDescription(content, language);
+  const skills = getSkills(content, language);
+  const ageRec = getAgeRecommendation(content);
+  const faq = getFaq(content, language);
   const bullets = getExpectBullets(catSlug, language);
 
   const howSteps = [

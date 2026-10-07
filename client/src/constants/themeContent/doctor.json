@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Your child puts on a white coat, listens to patients, and solves a tricky case in their very own clinic.",
+    "de": "Dein Kind schlüpft in den weissen Kittel, hört Patienten zu und löst einen kniffligen Fall in der eigenen Arztpraxis.",
+    "fr": "Votre enfant enfile sa blouse blanche, écoute ses patients et résout un cas mystérieux dans sa propre clinique.",
+    "it": "Tuo figlio indossa un camice bianco, ascolta i pazienti e risolve un caso complicato nel proprio ambulatorio."
+  },
+  "longDescription": {
+    "en": "Your child puts on a white coat and opens their own clinic! Patients arrive — a teddy with a sore paw, a doll with a headache, even a dragon with a cough. Your child listens, examines gently, and prescribes the perfect remedy.\n\nThe story demystifies medical visits, teaching that doctors are kind helpers. Every illustration shows your child as a caring doctor. Perfect for children aged 3 to 7 who are curious about medicine or need reassurance before doctor visits.",
+    "de": "Dein Kind schlüpft in den weissen Kittel und eröffnet seine Praxis! Patienten kommen — ein Teddy, eine Puppe, ein Drache. Die Geschichte nimmt Kindern die Angst vor Arztbesuchen. Perfekt für Kinder von 3 bis 7 Jahren.",
+    "fr": "Votre enfant enfile une blouse blanche et ouvre sa clinique ! L'histoire démystifie les visites médicales. Parfait pour les enfants de 3 à 7 ans.",
+    "it": "Tuo figlio indossa un camice bianco e apre il proprio ambulatorio! Arrivano i pazienti — un orsacchiotto con una zampa dolorante, una bambola con mal di testa, persino un drago con la tosse. Tuo figlio ascolta, esamina con delicatezza e prescrive il rimedio perfetto.\n\nLa storia svela il mistero delle visite mediche, insegnando che i medici sono aiutanti gentili. Ogni illustrazione mostra tuo figlio come un medico premuroso. Perfetta per bambini dai 3 ai 7 anni curiosi della medicina o che hanno bisogno di rassicurazione prima di una visita medica."
+  },
+  "skills": {
+    "en": "Empathy, observation, helping others, overcoming fear of doctors.",
+    "de": "Empathie, Beobachtungsgabe, anderen helfen, Angst vor Ärzten überwinden.",
+    "fr": "Empathie, observation, entraide, surmonter la peur du médecin.",
+    "it": "Empatia, capacità di osservazione, aiuto reciproco, superamento della paura del medico."
+  },
+  "ageRecommendation": "3-7",
+  "faq": [
+    {
+      "q": {
+        "en": "Will it help reduce fear of doctors?",
+        "de": "Hilft es gegen Arztangst?",
+        "fr": "Aide-t-il à réduire la peur du médecin ?",
+        "it": "Aiuterà a ridurre la paura del medico?"
+      },
+      "a": {
+        "en": "Yes! By putting your child in the doctor role, medical tools become familiar and friendly.",
+        "de": "Ja! Indem dein Kind den Arzt spielt, werden Instrumente vertraut.",
+        "fr": "Oui ! En jouant le rôle du médecin, les outils médicaux deviennent familiers.",
+        "it": "Sì! Mettendo tuo figlio nei panni del medico, gli strumenti medici diventano familiari e amichevoli."
+      }
+    }
+  ]
+}

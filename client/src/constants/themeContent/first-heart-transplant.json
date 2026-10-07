@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Witness the moment Christiaan Barnard gives a patient a new heart — the first time in human history.",
+    "de": "Erlebe den Moment, als Christiaan Barnard einem Patienten ein neues Herz gibt — zum ersten Mal in der Menschheitsgeschichte.",
+    "fr": "Assistez au moment où Christiaan Barnard donne un nouveau cœur à un patient — pour la première fois dans l'histoire.",
+    "it": "Assisti al momento in cui Christiaan Barnard dona a un paziente un nuovo cuore: la prima volta nella storia dell'umanità."
+  },
+  "longDescription": {
+    "en": "This personalized historical story takes your child to 1967 Cape Town to witness Dr. Christiaan Barnard perform the first successful human heart transplant. Your child learns about the incredible advances in medicine, the courage of both doctor and patient, and the power of never giving up on the impossible.",
+    "de": "Diese Geschichtserzählung nimmt dein Kind mit ins Kapstadt von 1967, als Dr. Christiaan Barnard die erste erfolgreiche Herztransplantation durchführte. Dein Kind lernt über medizinischen Fortschritt und den Mut von Arzt und Patient.",
+    "fr": "Cette histoire historique emmène votre enfant au Cap en 1967 pour la première transplantation cardiaque réussie par le Dr Barnard.",
+    "it": "Questa storia personalizzata a sfondo storico porta tuo figlio nella Città del Capo del 1967 ad assistere al primo trapianto di cuore umano riuscito, eseguito dal dott. Christiaan Barnard. Tuo figlio scopre gli incredibili progressi della medicina, il coraggio sia del medico sia del paziente, e la forza di non arrendersi mai di fronte all'impossibile."
+  },
+  "skills": {
+    "en": "Medical breakthroughs, courage, innovation, saving lives.",
+    "de": "Medizinische Durchbrüche, Mut, Innovation, Leben retten.",
+    "fr": "Percées médicales, courage, innovation, sauver des vies.",
+    "it": "Progressi della medicina, coraggio, innovazione, salvare vite."
+  },
+  "ageRecommendation": "6-10",
+  "faq": [
+    {
+      "q": {
+        "en": "Is the historical content accurate?",
+        "de": "Ist der historische Inhalt korrekt?",
+        "fr": "Le contenu historique est-il exact ?",
+        "it": "Il contenuto storico è accurato?"
+      },
+      "a": {
+        "en": "Yes! The stories are carefully researched. The historical facts, dates, and key figures are accurate.",
+        "de": "Ja! Die Geschichten sind sorgfältig recherchiert.",
+        "fr": "Oui ! Les histoires sont soigneusement recherchées.",
+        "it": "Sì! Le storie sono accuratamente documentate. I fatti storici, le date e i personaggi chiave sono corretti."
+      }
+    }
+  ]
+}

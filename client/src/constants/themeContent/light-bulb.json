@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Stay up late in Edison's workshop as he tests filament after filament until — at last — a bulb glows steadily.",
+    "de": "Bleib spätabends in Edisons Werkstatt, als er Faden um Faden testet, bis — endlich — eine Glühbirne stetig leuchtet.",
+    "fr": "Restez tard dans l'atelier d'Edison alors qu'il teste filament après filament jusqu'à ce qu'une ampoule brille enfin.",
+    "it": "Resta sveglio fino a tardi nel laboratorio di Edison, mentre testa filamento dopo filamento finché, finalmente, una lampadina brilla senza smettere."
+  },
+  "longDescription": {
+    "en": "This personalized historical story takes your child to 1879 to join Thomas Edison in his workshop as he invents the practical incandescent light bulb. After thousands of failed experiments, your child witnesses the moment when the right filament finally glows for hours. A powerful story about persistence and the idea that failure is just another step toward success.",
+    "de": "Diese Geschichtserzählung nimmt dein Kind mit ins Jahr 1879 zu Thomas Edison, als er nach Tausenden gescheiterten Versuchen die praktische Glühbirne erfindet. Eine kraftvolle Geschichte über Ausdauer und die Idee, dass Scheitern nur ein Schritt zum Erfolg ist.",
+    "fr": "Cette histoire historique emmène votre enfant en 1879 dans l'atelier de Thomas Edison, une histoire puissante sur la persévérance.",
+    "it": "Questa storia personalizzata a sfondo storico porta tuo figlio nel 1879 accanto a Thomas Edison nel suo laboratorio, mentre inventa la lampadina a incandescenza pratica. Dopo migliaia di esperimenti falliti, tuo figlio assiste al momento in cui il filamento giusto finalmente brilla per ore. Una storia potente sulla perseveranza e sull'idea che il fallimento sia solo un altro passo verso il successo."
+  },
+  "skills": {
+    "en": "Persistence, invention, scientific method, learning from failure.",
+    "de": "Ausdauer, Erfindung, wissenschaftliche Methode, aus Fehlern lernen.",
+    "fr": "Persévérance, invention, méthode scientifique, apprendre de l'échec.",
+    "it": "Perseveranza, invenzione, metodo scientifico, imparare dagli errori."
+  },
+  "ageRecommendation": "5-10",
+  "faq": [
+    {
+      "q": {
+        "en": "Is the historical content accurate?",
+        "de": "Ist der historische Inhalt korrekt?",
+        "fr": "Le contenu historique est-il exact ?",
+        "it": "Il contenuto storico è accurato?"
+      },
+      "a": {
+        "en": "Yes! The stories are carefully researched. The historical facts, dates, and key figures are accurate.",
+        "de": "Ja! Die Geschichten sind sorgfältig recherchiert.",
+        "fr": "Oui ! Les histoires sont soigneusement recherchées.",
+        "it": "Sì! Le storie sono accuratamente documentate. I fatti storici, le date e i personaggi chiave sono corretti."
+      }
+    }
+  ]
+}

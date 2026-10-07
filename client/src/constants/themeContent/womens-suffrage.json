@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "March alongside brave women who fought for the right to vote and changed democracy for all future generations.",
+    "de": "Marschiere mit mutigen Frauen, die für das Wahlrecht kämpften und die Demokratie für alle zukünftigen Generationen veränderten.",
+    "fr": "Marchez aux côtés de femmes courageuses qui se battirent pour le droit de vote et changèrent la démocratie.",
+    "it": "Marcia accanto a donne coraggiose che hanno lottato per il diritto di voto e hanno cambiato la democrazia per tutte le generazioni future."
+  },
+  "longDescription": {
+    "en": "This personalized historical story takes your child to the early 20th century to march with the suffragettes who fought for women's right to vote. Your child learns about peaceful protest, perseverance against injustice, and why every voice matters in a democracy. The story celebrates the courage of ordinary women who changed history.",
+    "de": "Diese Geschichtserzählung nimmt dein Kind mit ins frühe 20. Jahrhundert, um mit den Suffragetten zu marschieren. Dein Kind lernt über friedlichen Protest, Ausdauer gegen Ungerechtigkeit und warum jede Stimme in einer Demokratie zählt.",
+    "fr": "Cette histoire historique emmène votre enfant au début du 20e siècle pour marcher avec les suffragettes.",
+    "it": "Questa storia personalizzata a sfondo storico porta tuo figlio all'inizio del Novecento a marciare con le suffragette che lottarono per il diritto di voto delle donne. Tuo figlio scopre la protesta pacifica, la perseveranza contro l'ingiustizia e perché ogni voce conta in una democrazia. La storia celebra il coraggio di donne comuni che hanno cambiato la storia."
+  },
+  "skills": {
+    "en": "Democracy, equality, peaceful protest, perseverance.",
+    "de": "Demokratie, Gleichheit, friedlicher Protest, Ausdauer.",
+    "fr": "Démocratie, égalité, protestation pacifique, persévérance.",
+    "it": "Democrazia, uguaglianza, protesta pacifica, perseveranza."
+  },
+  "ageRecommendation": "6-10",
+  "faq": [
+    {
+      "q": {
+        "en": "Is the historical content accurate?",
+        "de": "Ist der historische Inhalt korrekt?",
+        "fr": "Le contenu historique est-il exact ?",
+        "it": "Il contenuto storico è accurato?"
+      },
+      "a": {
+        "en": "Yes! The stories are carefully researched. The historical facts, dates, and key figures are accurate.",
+        "de": "Ja! Die Geschichten sind sorgfältig recherchiert.",
+        "fr": "Oui ! Les histoires sont soigneusement recherchées.",
+        "it": "Sì! Le storie sono accuratamente documentate. I fatti storici, le date e i personaggi chiave sono corretti."
+      }
+    }
+  ]
+}

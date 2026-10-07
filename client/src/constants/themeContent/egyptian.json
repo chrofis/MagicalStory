@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Your child explores mysterious pyramids, unravels ancient hieroglyphics, and uncovers a pharaoh's hidden secret.",
+    "de": "Dein Kind erkundet geheimnisvolle Pyramiden, entziffert Hieroglyphen und lüftet das Geheimnis eines Pharaos.",
+    "fr": "Votre enfant explore des pyramides mystérieuses, déchiffre des hiéroglyphes et découvre le secret caché d'un pharaon.",
+    "it": "Tuo figlio esplora piramidi misteriose, decifra antichi geroglifici e scopre il segreto nascosto di un faraone."
+  },
+  "longDescription": {
+    "en": "Journey to the land of the pharaohs! Your child arrives at the Great Pyramids, where golden sand stretches to the horizon and the Sphinx guards its secrets. Armed with a flashlight and journal, your young explorer ventures into dark pyramid passages, deciphering hieroglyphic clues. Each puzzle leads deeper into a lost pharaoh's treasure chamber.\n\nYour child meets scribes who teach Egyptian writing, discovers how the pyramids were built, and learns about daily life along the Nile. The story balances wonder and education, teaching real facts about one of the world's oldest civilizations. Illustrations show your child amid golden tombs and starlit desert skies. Perfect for curious children aged 4 to 9 who love puzzles and ancient history.",
+    "de": "Reise ins Land der Pharaonen! Dein Kind kommt an den Grossen Pyramiden an, wo goldener Sand bis zum Horizont reicht. Mit Fackel und Tagebuch erkundet dein junger Entdecker dunkle Pyramidengänge und entziffert Hieroglyphen. Jedes Rätsel führt tiefer in eine Schatzkammer.\n\nDein Kind trifft Schreiber, die ägyptische Schrift beibringen, und erfährt, wie die Pyramiden gebaut wurden. Die Geschichte verbindet Staunen und Bildung. Perfekt für neugierige Kinder von 4 bis 9 Jahren.",
+    "fr": "Voyagez au pays des pharaons ! Votre enfant explore les pyramides et déchiffre des hiéroglyphes. L'histoire équilibre émerveillement et éducation. Parfait pour les enfants curieux de 4 à 9 ans.",
+    "it": "Viaggia nella terra dei faraoni! Tuo figlio arriva alle Grandi Piramidi, dove la sabbia dorata si estende fino all'orizzonte e la Sfinge custodisce i suoi segreti. Armato di torcia e diario, il tuo giovane esploratore si avventura in oscuri corridoi della piramide, decifrando indizi geroglifici. Ogni enigma conduce sempre più a fondo verso la camera del tesoro di un faraone perduto.\n\nTuo figlio incontra scribi che insegnano la scrittura egizia, scopre come sono state costruite le piramidi e impara com'era la vita quotidiana lungo il Nilo. La storia bilancia meraviglia ed educazione, insegnando fatti reali su una delle civiltà più antiche del mondo. Le illustrazioni mostrano tuo figlio tra tombe dorate e cieli desertici stellati. Perfetta per bambini curiosi dai 4 ai 9 anni che amano gli enigmi e la storia antica."
+  },
+  "skills": {
+    "en": "Archaeological curiosity, puzzle-solving, ancient history, patience and observation.",
+    "de": "Archäologische Neugierde, Rätsel lösen, antike Geschichte, Geduld und Beobachtungsgabe.",
+    "fr": "Curiosité archéologique, résolution d'énigmes, histoire ancienne, patience et observation.",
+    "it": "Curiosità archeologica, capacità di risolvere enigmi, storia antica, pazienza e capacità di osservazione."
+  },
+  "ageRecommendation": "4-9",
+  "faq": [
+    {
+      "q": {
+        "en": "Are there scary mummies?",
+        "de": "Gibt es gruselige Mumien?",
+        "fr": "Y a-t-il des momies effrayantes ?",
+        "it": "Ci sono mummie spaventose?"
+      },
+      "a": {
+        "en": "The pyramid is presented as a place of wonder, not horror. The focus is on discovery and puzzles.",
+        "de": "Die Pyramide ist ein Ort des Staunens, nicht des Schreckens.",
+        "fr": "La pyramide est un lieu d'émerveillement, pas de frayeur.",
+        "it": "La piramide viene presentata come un luogo di meraviglia, non di terrore. L'attenzione è sulla scoperta e sugli enigmi."
+      }
+    }
+  ]
+}

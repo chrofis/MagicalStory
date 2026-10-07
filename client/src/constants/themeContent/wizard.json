@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Your child enrolls in a school of magic, learns spells, and faces an enchanted challenge that only their wits can solve.",
+    "de": "Dein Kind besucht eine Zauberschule, lernt Zaubersprüche und löst mit Köpfchen eine verzauberte Herausforderung.",
+    "fr": "Votre enfant s'inscrit dans une école de magie, apprend des sortilèges et relève un défi enchanté que seul son esprit peut résoudre.",
+    "it": "Tuo figlio si iscrive a una scuola di magia, impara incantesimi e affronta una sfida incantata che solo il suo ingegno può risolvere."
+  },
+  "longDescription": {
+    "en": "Your child receives a mysterious letter inviting them to a school of magic in the clouds! From day one, your little wizard learns spells, brews colorful potions, and flies on a broomstick across starlit skies. When a mischievous enchantment threatens to turn all books into frogs, only your child's quick thinking can save the day.\n\nThe story is filled with whimsy, wonder, and the message that real magic comes from believing in yourself. Every page features your child in wizard's robes with a sparkling wand. Perfect for imaginative children aged 3 to 8 who dream of enchanted worlds. Parents love how it encourages creativity and confidence.",
+    "de": "Dein Kind erhält einen geheimnisvollen Brief an eine Zauberschule in den Wolken! Ab dem ersten Tag lernt dein kleiner Zauberer Sprüche, braut Tränke und fliegt auf einem Besen. Als ein Zauber alle Bücher in Frösche zu verwandeln droht, kann nur dein Kind die Lage retten.\n\nDie Geschichte steckt voller Wunder und der Botschaft, dass echte Magie aus dem Glauben an sich selbst entsteht. Perfekt für fantasievolle Kinder von 3 bis 8 Jahren. Eltern lieben es, wie das Thema Kreativität und Selbstvertrauen fördert.",
+    "fr": "Votre enfant reçoit une lettre mystérieuse pour une école de magie ! L'histoire est pleine de merveilleux et du message que la vraie magie vient de la confiance en soi. Parfait pour les enfants imaginatifs de 3 à 8 ans.",
+    "it": "Tuo figlio riceve una misteriosa lettera che lo invita a una scuola di magia tra le nuvole! Fin dal primo giorno, il tuo piccolo mago impara incantesimi, prepara pozioni colorate e vola su una scopa attraverso cieli stellati. Quando un incantesimo dispettoso minaccia di trasformare tutti i libri in rane, solo la prontezza di tuo figlio può salvare la situazione.\n\nLa storia è piena di stupore, meraviglia e del messaggio che la vera magia nasce dal credere in se stessi. Ogni pagina ritrae tuo figlio in una veste da mago con una bacchetta scintillante. Perfetta per bambini pieni di fantasia dai 3 agli 8 anni che sognano mondi incantati. I genitori adorano come il tema incoraggi creatività e sicurezza in se stessi."
+  },
+  "skills": {
+    "en": "Creativity, logic, self-confidence, imagination, reading love.",
+    "de": "Kreativität, Logik, Selbstvertrauen, Fantasie, Lesefreude.",
+    "fr": "Créativité, logique, confiance en soi, imagination, amour de la lecture.",
+    "it": "Creatività, logica, sicurezza in se stessi, immaginazione, amore per la lettura."
+  },
+  "ageRecommendation": "3-8",
+  "faq": [
+    {
+      "q": {
+        "en": "Is it similar to Harry Potter?",
+        "de": "Ähnelt es Harry Potter?",
+        "fr": "Est-ce similaire à Harry Potter ?",
+        "it": "È simile a Harry Potter?"
+      },
+      "a": {
+        "en": "It shares the fun of a magic school but is original, age-appropriate, and personalized with your child as hero.",
+        "de": "Es teilt den Spass einer Zauberschule, ist aber original, altersgerecht und mit deinem Kind als Held.",
+        "fr": "L'histoire partage le plaisir d'une école de magie mais est originale et adaptée.",
+        "it": "Condivide il divertimento di una scuola di magia, ma è originale, adatta all'età e personalizzata con tuo figlio come eroe."
+      }
+    }
+  ]
+}

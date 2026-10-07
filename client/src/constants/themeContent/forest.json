@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Your child wanders through an enchanted forest, makes friends with woodland animals, and solves a magical mystery.",
+    "de": "Dein Kind wandert durch einen Zauberwald, schliesst Freundschaft mit Waldtieren und löst ein magisches Geheimnis.",
+    "fr": "Votre enfant se promène dans une forêt enchantée, se lie d'amitié avec les animaux des bois et résout un mystère magique.",
+    "it": "Tuo figlio si addentra in una foresta incantata, fa amicizia con gli animali del bosco e risolve un mistero magico."
+  },
+  "longDescription": {
+    "en": "Your child wanders into an enchanted woodland where trees whisper secrets. Guided by a friendly fox, your child follows a winding path, meets talking rabbits and wise owls, and helps hedgehogs rebuild after a storm. The forest adventure teaches mindfulness, kindness toward animals, and the beauty of slowing down.\n\nEvery illustration features dappled sunlight, ancient trees, and charming creatures. Perfect for gentle children aged 3 to 7 who love nature walks.",
+    "de": "Dein Kind wandert in einen Zauberwald mit flüsternden Bäumen. Geführt von einem Fuchs, trifft es sprechende Hasen und weise Eulen. Die Geschichte lehrt Achtsamkeit und Freundlichkeit. Perfekt für sanfte Kinder von 3 bis 7 Jahren.",
+    "fr": "Votre enfant se promène dans un bois enchanté. L'histoire enseigne la pleine conscience. Parfait pour les enfants de 3 à 7 ans.",
+    "it": "Tuo figlio si addentra in un bosco incantato dove gli alberi sussurrano segreti. Guidato da una volpe amichevole, tuo figlio segue un sentiero tortuoso, incontra conigli parlanti e saggi gufi, e aiuta i ricci a ricostruire dopo una tempesta. L'avventura nel bosco insegna consapevolezza, gentilezza verso gli animali e la bellezza di rallentare.\n\nOgni illustrazione ritrae luce screziata dal sole, alberi secolari e creature affascinanti. Perfetta per bambini dall'animo delicato dai 3 ai 7 anni che amano le passeggiate nella natura."
+  },
+  "skills": {
+    "en": "Nature appreciation, friendship, mystery-solving, mindfulness.",
+    "de": "Naturschätzung, Freundschaft, Rätsellösung, Achtsamkeit.",
+    "fr": "Appréciation de la nature, amitié, mystères, pleine conscience.",
+    "it": "Apprezzamento della natura, amicizia, risoluzione di misteri, consapevolezza."
+  },
+  "ageRecommendation": "3-7",
+  "faq": [
+    {
+      "q": {
+        "en": "Suitable for very young children?",
+        "de": "Für ganz Kleine geeignet?",
+        "fr": "Adapté aux très jeunes enfants ?",
+        "it": "Adatto ai bambini molto piccoli?"
+      },
+      "a": {
+        "en": "Yes! It is gentle and calming, perfect from age 3.",
+        "de": "Ja! Sanft und beruhigend, perfekt ab 3 Jahren.",
+        "fr": "Oui ! Doux et apaisant, parfait dès 3 ans.",
+        "it": "Sì! È delicato e rilassante, perfetto già dai 3 anni."
+      }
+    }
+  ]
+}

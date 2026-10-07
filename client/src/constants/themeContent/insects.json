@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Explore the tiny world of insects — from busy ants to beautiful butterflies — and discover their vital role in nature.",
+    "de": "Die winzige Welt der Insekten erkunden — von fleissigen Ameisen bis zu schönen Schmetterlingen — und ihre wichtige Rolle in der Natur entdecken.",
+    "fr": "Explorer le petit monde des insectes — des fourmis affairées aux beaux papillons — et découvrir leur rôle vital dans la nature.",
+    "it": "Esplora il piccolo mondo degli insetti — dalle formiche indaffarate alle splendide farfalle — e scopri il loro ruolo fondamentale nella natura."
+  },
+  "longDescription": {
+    "en": "This personalized educational story shrinks your child down to insect size for a close-up look at the most diverse group of animals on Earth. Your child meets ants building tunnels, bees making honey, caterpillars transforming into butterflies, and ladybugs protecting gardens. The story teaches that insects are not scary but fascinating and essential for pollination, soil health, and the food chain. Every page features your child observing these tiny wonders through a magnifying glass.",
+    "de": "Diese Lerngeschichte schrumpft dein Kind auf Insektengrösse für einen Nahblick auf die vielfältigste Tiergruppe der Erde. Dein Kind trifft Ameisen, Bienen, Raupen und Marienkäfer und lernt, dass Insekten faszinierend und wichtig sind für Bestäubung und den Boden.",
+    "fr": "Cette histoire éducative rétrécit votre enfant à la taille d'un insecte pour découvrir le groupe animal le plus diversifié de la Terre. L'histoire enseigne que les insectes sont fascinants et essentiels.",
+    "it": "Questa storia educativa personalizzata rimpicciolisce tuo figlio fino alla taglia di un insetto per osservare da vicino il gruppo di animali più diversificato della Terra. Tuo figlio incontra formiche che scavano gallerie, api che producono miele, bruchi che si trasformano in farfalle e coccinelle che proteggono i giardini. La storia insegna che gli insetti non fanno paura, anzi sono affascinanti ed essenziali per l'impollinazione, la salute del terreno e la catena alimentare. In ogni pagina tuo figlio osserva queste piccole meraviglie con una lente d'ingrandimento."
+  },
+  "skills": {
+    "en": "Entomology basics, observation, respect for small creatures, biodiversity.",
+    "de": "Insektenkunde-Grundlagen, Beobachtung, Respekt vor kleinen Lebewesen, Artenvielfalt.",
+    "fr": "Bases d'entomologie, observation, respect des petites créatures, biodiversité.",
+    "it": "Nozioni base di entomologia, osservazione, rispetto per le piccole creature, biodiversità."
+  },
+  "ageRecommendation": "3-7",
+  "faq": [
+    {
+      "q": {
+        "en": "Will my child actually learn from this story?",
+        "de": "Lernt mein Kind wirklich etwas?",
+        "fr": "Mon enfant apprend-il vraiment ?",
+        "it": "Mio figlio imparerà davvero qualcosa da questa storia?"
+      },
+      "a": {
+        "en": "Yes! Children often become fascinated with observing insects in real life after reading this story.",
+        "de": "Ja! Kinder werden danach oft fasziniert davon, echte Insekten zu beobachten.",
+        "fr": "Oui ! Les enfants sont souvent fascinés par les insectes après cette lecture.",
+        "it": "Sì! Dopo questa lettura i bambini restano spesso affascinati dall'osservare gli insetti nella vita reale."
+      }
+    }
+  ]
+}

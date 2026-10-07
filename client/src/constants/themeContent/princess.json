@@ -1,0 +1,51 @@
+{
+  "description": {
+    "en": "Your child becomes royalty in a magical kingdom, attending a grand ball and discovering the true meaning of kindness.",
+    "de": "Dein Kind wird zum Königskind in einem magischen Königreich, besucht einen grossen Ball und entdeckt die wahre Bedeutung von Freundlichkeit.",
+    "fr": "Votre enfant devient membre de la royauté dans un royaume magique, participe à un grand bal et découvre le vrai sens de la gentillesse.",
+    "it": "Tuo figlio diventa un membro della famiglia reale in un regno magico, partecipa a un grande ballo e scopre il vero significato della gentilezza."
+  },
+  "longDescription": {
+    "en": "In this enchanting princess story, your child discovers a golden invitation to the royal castle. Dressed in a magnificent gown or royal attire, they explore grand halls, secret gardens, and a glittering ballroom. Along the way, they befriend talking animals, help a lost fairy find her wings, and learn that true royalty comes from kindness, not crowns.\n\nThe story culminates in a magical ball where your child is celebrated by the entire kingdom. Every illustration shows your child in stunning royal splendor — walking through rose-covered archways, dancing under chandeliers, and waving from a castle balcony.\n\nThis theme is perfect for children who dream of castles, sparkle, and fairy-tale magic. The story teaches that being kind and brave is what makes someone truly royal.",
+    "de": "In dieser zauberhaften Prinzessinnen-Geschichte entdeckt dein Kind eine goldene Einladung zum königlichen Schloss. In prachtvoller Kleidung erkundet es grosse Säle, geheime Gärten und einen glitzernden Ballsaal. Unterwegs freundet es sich mit sprechenden Tieren an, hilft einer verlorenen Fee und lernt, dass wahres Königtum aus Freundlichkeit kommt.\n\nDie Geschichte gipfelt in einem magischen Ball. Jede Illustration zeigt dein Kind in königlicher Pracht. Perfekt für Kinder, die von Schlössern und Märchenmagie träumen.",
+    "fr": "Dans cette histoire enchanteresse, votre enfant découvre une invitation dorée au château royal. Vêtu d'une tenue magnifique, il explore de grandes salles, des jardins secrets et une salle de bal scintillante. L'histoire culmine lors d'un bal magique. Parfait pour les enfants qui rêvent de châteaux et de magie.",
+    "it": "In questa incantevole storia da principessa, tuo figlio scopre un invito dorato per il castello reale. Vestito con un abito magnifico o con abiti regali, esplora grandi saloni, giardini segreti e una sala da ballo scintillante. Lungo il cammino, fa amicizia con animali parlanti, aiuta una fatina smarrita a ritrovare le ali e impara che la vera regalità viene dalla gentilezza, non dalle corone.\n\nLa storia culmina in un ballo magico in cui tuo figlio viene festeggiato da tutto il regno. Ogni illustrazione mostra tuo figlio in tutto il suo splendore regale — mentre attraversa archi ricoperti di rose, danza sotto i lampadari e saluta da un balcone del castello.\n\nQuesto tema è perfetto per i bambini che sognano castelli, luccichii e magia da fiaba. La storia insegna che essere gentili e coraggiosi è ciò che rende qualcuno davvero regale."
+  },
+  "skills": {
+    "en": "Kindness, empathy, creativity, social confidence, self-expression.",
+    "de": "Freundlichkeit, Empathie, Kreativität, soziales Selbstvertrauen, Selbstausdruck.",
+    "fr": "Gentillesse, empathie, créativité, confiance sociale, expression de soi.",
+    "it": "Gentilezza, empatia, creatività, sicurezza sociale, espressione di sé."
+  },
+  "ageRecommendation": "3-8",
+  "faq": [
+    {
+      "q": {
+        "en": "Is the princess story only for girls?",
+        "de": "Ist die Prinzessinnen-Geschichte nur für Mädchen?",
+        "fr": "L'histoire de princesse est-elle réservée aux filles ?",
+        "it": "La storia della principessa è solo per le bambine?"
+      },
+      "a": {
+        "en": "Not at all! Boys get a prince costume with a royal doublet and gold circlet. The story is about kindness and bravery, not gender.",
+        "de": "Überhaupt nicht! Jungen bekommen ein Prinzen-Kostüm mit königlichem Wams und goldener Krone. Die Geschichte handelt von Freundlichkeit und Mut.",
+        "fr": "Pas du tout ! Les garçons reçoivent un costume de prince. L'histoire parle de gentillesse et de bravoure.",
+        "it": "Assolutamente no! I bambini ricevono un costume da principe con farsetto regale e diadema dorato. La storia parla di gentilezza e coraggio, non di genere."
+      }
+    },
+    {
+      "q": {
+        "en": "Does the story have a fairy-tale ending?",
+        "de": "Hat die Geschichte ein Märchen-Ende?",
+        "fr": "L'histoire a-t-elle une fin de conte de fées ?",
+        "it": "La storia ha un finale da fiaba?"
+      },
+      "a": {
+        "en": "Yes! The story ends with a grand ball and celebration — a magical ending that children love.",
+        "de": "Ja! Die Geschichte endet mit einem grossen Ball und Feier — ein magisches Ende, das Kinder lieben.",
+        "fr": "Oui ! L'histoire se termine par un grand bal et une célébration magique.",
+        "it": "Sì! La storia si conclude con un grande ballo e una festa — un finale magico che i bambini adorano."
+      }
+    }
+  ]
+}

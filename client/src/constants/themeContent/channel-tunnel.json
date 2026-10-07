@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Dig beneath the English Channel and cheer when drilling teams from England and France finally meet in the middle.",
+    "de": "Grabe unter dem Ärmelkanal und jubel, als die Bohrteams aus England und Frankreich sich endlich in der Mitte treffen.",
+    "fr": "Creusez sous la Manche et criez de joie quand les équipes anglaise et française se rencontrent enfin au milieu.",
+    "it": "Scava sotto la Manica ed esulta quando le squadre di perforazione inglese e francese si incontrano finalmente al centro."
+  },
+  "longDescription": {
+    "en": "This personalized historical story takes your child to 1994 to witness the opening of the Channel Tunnel connecting England and France beneath the sea. Your child learns about the incredible engineering challenge of drilling from both sides and meeting in the middle, and how this tunnel brought two nations closer together.",
+    "de": "Diese Geschichtserzählung nimmt dein Kind mit ins Jahr 1994 zur Eröffnung des Eurotunnels. Dein Kind lernt über die unglaubliche Ingenieursleistung, von beiden Seiten zu bohren und sich in der Mitte zu treffen.",
+    "fr": "Cette histoire historique emmène votre enfant en 1994 pour l'ouverture du tunnel sous la Manche.",
+    "it": "Questa storia personalizzata a sfondo storico porta tuo figlio nel 1994 all'inaugurazione dell'Eurotunnel, che collega Inghilterra e Francia sotto il mare. Tuo figlio scopre l'incredibile sfida ingegneristica di scavare da entrambi i lati e incontrarsi esattamente al centro, e come questo tunnel abbia avvicinato due nazioni."
+  },
+  "skills": {
+    "en": "Engineering, international cooperation, persistence, innovation.",
+    "de": "Ingenieurskunst, internationale Zusammenarbeit, Ausdauer, Innovation.",
+    "fr": "Ingénierie, coopération internationale, persévérance, innovation.",
+    "it": "Ingegneria, cooperazione internazionale, costanza, innovazione."
+  },
+  "ageRecommendation": "5-10",
+  "faq": [
+    {
+      "q": {
+        "en": "Is the historical content accurate?",
+        "de": "Ist der historische Inhalt korrekt?",
+        "fr": "Le contenu historique est-il exact ?",
+        "it": "Il contenuto storico è accurato?"
+      },
+      "a": {
+        "en": "Yes! The stories are carefully researched. The historical facts, dates, and key figures are accurate.",
+        "de": "Ja! Die Geschichten sind sorgfältig recherchiert.",
+        "fr": "Oui ! Les histoires sont soigneusement recherchées.",
+        "it": "Sì! Le storie sono accuratamente documentate. I fatti storici, le date e i personaggi chiave sono corretti."
+      }
+    }
+  ]
+}

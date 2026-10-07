@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Your child spends a day on the farm, cares for animals, helps with the harvest, and learns where food comes from.",
+    "de": "Dein Kind verbringt einen Tag auf dem Bauernhof, pflegt Tiere, hilft bei der Ernte und lernt, wo unser Essen herkommt.",
+    "fr": "Votre enfant passe une journée à la ferme, s'occupe des animaux, aide à la récolte et apprend d'où vient la nourriture.",
+    "it": "Tuo figlio trascorre una giornata in fattoria, si prende cura degli animali, aiuta con il raccolto e scopre da dove viene il cibo."
+  },
+  "longDescription": {
+    "en": "Your child spends a wonderful day on a sunny farm! From feeding baby chicks and collecting eggs to milking a cow and riding a tractor, your child experiences farm life from sunrise to sunset. The story teaches where food comes from — how wheat becomes bread, milk becomes cheese, and seeds grow into vegetables.\n\nYour child helps a lost lamb, plants sunflowers, and enjoys a harvest feast. Every illustration shows your child in adorable farm overalls surrounded by friendly animals. Perfect for younger children aged 2 to 6 who love animals and the outdoors.",
+    "de": "Dein Kind verbringt einen Tag auf einem sonnigen Bauernhof! Vom Füttern der Küken über das Eiersammeln bis zur Traktorfahrt erlebt dein Kind das Bauernhofleben. Die Geschichte zeigt, wo unser Essen herkommt. Perfekt für Kinder von 2 bis 6 Jahren.",
+    "fr": "Votre enfant passe une journée à la ferme ! L'histoire montre d'où vient notre nourriture. Parfait pour les enfants de 2 à 6 ans.",
+    "it": "Tuo figlio trascorre una giornata meravigliosa in una fattoria soleggiata! Dal dare da mangiare ai pulcini e raccogliere le uova, alla mungitura di una mucca e un giro in trattore, tuo figlio vive la vita di fattoria dall'alba al tramonto. La storia insegna da dove viene il cibo — come il grano diventa pane, il latte diventa formaggio e i semi crescono in ortaggi.\n\nTuo figlio aiuta un agnellino smarrito, pianta girasoli e si gode una festa del raccolto. Ogni illustrazione mostra tuo figlio in un'adorabile salopette da fattoria circondato da animali amichevoli. Perfetta per i bambini più piccoli dai 2 ai 6 anni che amano gli animali e la vita all'aria aperta."
+  },
+  "skills": {
+    "en": "Animal care, food awareness, daily routines, responsibility.",
+    "de": "Tierpflege, Wissen über Lebensmittel, Tagesabläufe, Verantwortung.",
+    "fr": "Soin des animaux, connaissance alimentaire, routines, responsabilité.",
+    "it": "Cura degli animali, consapevolezza alimentare, routine quotidiane, responsabilità."
+  },
+  "ageRecommendation": "2-6",
+  "faq": [
+    {
+      "q": {
+        "en": "Is it educational?",
+        "de": "Ist es lehrreich?",
+        "fr": "Est-ce éducatif ?",
+        "it": "È educativo?"
+      },
+      "a": {
+        "en": "Yes! Children learn where milk, eggs, bread and vegetables come from through hands-on activities.",
+        "de": "Ja! Kinder lernen, woher Milch, Eier und Gemüse kommen.",
+        "fr": "Oui ! Les enfants apprennent d'où viennent le lait et les légumes.",
+        "it": "Sì! I bambini imparano da dove vengono il latte, le uova, il pane e le verdure attraverso attività pratiche."
+      }
+    }
+  ]
+}

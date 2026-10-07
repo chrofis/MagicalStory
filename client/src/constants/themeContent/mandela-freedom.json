@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Walk through the prison gates with Nelson Mandela after 27 years and feel the hope of a nation reborn.",
+    "de": "Geh mit Nelson Mandela nach 27 Jahren durch die Gefängnistore und spüre die Hoffnung einer wiedergeborenen Nation.",
+    "fr": "Franchissez les portes de la prison avec Nelson Mandela après 27 ans et ressentez l'espoir d'une nation renaissante.",
+    "it": "Attraversa i cancelli del carcere con Nelson Mandela dopo 27 anni e senti la speranza di una nazione che rinasce."
+  },
+  "longDescription": {
+    "en": "This personalized historical story takes your child to 1990 South Africa to witness Nelson Mandela's release from prison after 27 years. Your child learns about forgiveness, reconciliation, and how Mandela chose unity over revenge. The story teaches that true strength lies in the ability to forgive and build bridges, even after great suffering.",
+    "de": "Diese Geschichtserzählung nimmt dein Kind mit ins Südafrika von 1990, als Nelson Mandela nach 27 Jahren aus dem Gefängnis entlassen wurde. Dein Kind lernt über Vergebung, Versöhnung und wie Mandela Einheit statt Rache wählte.",
+    "fr": "Cette histoire historique emmène votre enfant en Afrique du Sud en 1990 pour la libération de Nelson Mandela après 27 ans de prison.",
+    "it": "Questa storia personalizzata a sfondo storico porta tuo figlio nel Sudafrica del 1990 ad assistere alla scarcerazione di Nelson Mandela dopo 27 anni. Tuo figlio scopre il perdono, la riconciliazione e come Mandela abbia scelto l'unità invece della vendetta. La storia insegna che la vera forza sta nella capacità di perdonare e costruire ponti, anche dopo una grande sofferenza."
+  },
+  "skills": {
+    "en": "Forgiveness, reconciliation, leadership, hope, justice.",
+    "de": "Vergebung, Versöhnung, Führung, Hoffnung, Gerechtigkeit.",
+    "fr": "Pardon, réconciliation, leadership, espoir, justice.",
+    "it": "Perdono, riconciliazione, leadership, speranza, giustizia."
+  },
+  "ageRecommendation": "6-10",
+  "faq": [
+    {
+      "q": {
+        "en": "Is the historical content accurate?",
+        "de": "Ist der historische Inhalt korrekt?",
+        "fr": "Le contenu historique est-il exact ?",
+        "it": "Il contenuto storico è accurato?"
+      },
+      "a": {
+        "en": "Yes! The stories are carefully researched. The historical facts, dates, and key figures are accurate.",
+        "de": "Ja! Die Geschichten sind sorgfältig recherchiert.",
+        "fr": "Oui ! Les histoires sont soigneusement recherchées.",
+        "it": "Sì! Le storie sono accuratamente documentate. I fatti storici, le date e i personaggi chiave sono corretti."
+      }
+    }
+  ]
+}

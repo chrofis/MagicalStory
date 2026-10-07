@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Witness Arnold von Winkelried's legendary sacrifice at Sempach that turned the tide for Swiss freedom.",
+    "de": "Erlebe Arnold von Winkelrieds legendäre Aufopferung bei Sempach, die das Blatt für die Schweizer Freiheit wendete.",
+    "fr": "Assistez au sacrifice légendaire d'Arnold von Winkelried à Sempach qui changea le cours de la liberté suisse.",
+    "it": "Assisti al leggendario sacrificio di Arnold von Winkelried a Sempach, che cambiò le sorti della libertà svizzera."
+  },
+  "longDescription": {
+    "en": "This personalized historical story takes your child to 1386 to the Battle of Sempach. Your child witnesses Arnold von Winkelried's legendary act of bravery, learning about sacrifice, courage, and the fight for Swiss independence. The story brings medieval Swiss history to life in an age-appropriate way.",
+    "de": "Diese Geschichtserzählung nimmt dein Kind mit ins Jahr 1386 zur Schlacht bei Sempach. Dein Kind erlebt Arnold von Winkelrieds legendäre Heldentat und lernt über Aufopferung, Mut und den Kampf für Schweizer Unabhängigkeit.",
+    "fr": "Cette histoire historique emmène votre enfant en 1386 à la bataille de Sempach, témoin de l'acte légendaire d'Arnold von Winkelried.",
+    "it": "Questa storia storica personalizzata porta tuo figlio nel 1386, alla battaglia di Sempach. Tuo figlio assiste al leggendario gesto di coraggio di Arnold von Winkelried, imparando cosa significano il sacrificio, il coraggio e la lotta per l'indipendenza svizzera. La storia dà vita alla storia medievale svizzera in un modo adatto alla sua età."
+  },
+  "skills": {
+    "en": "Swiss history, courage, sacrifice, national identity.",
+    "de": "Schweizer Geschichte, Mut, Aufopferung, nationale Identität.",
+    "fr": "Histoire suisse, courage, sacrifice, identité nationale.",
+    "it": "Storia svizzera, coraggio, sacrificio, identità nazionale."
+  },
+  "ageRecommendation": "6-10",
+  "faq": [
+    {
+      "q": {
+        "en": "Is the historical content accurate?",
+        "de": "Ist der historische Inhalt korrekt?",
+        "fr": "Le contenu historique est-il exact ?",
+        "it": "Il contenuto storico è accurato?"
+      },
+      "a": {
+        "en": "Yes! The stories are carefully researched. The historical facts, dates, and key figures are accurate.",
+        "de": "Ja! Die Geschichten sind sorgfältig recherchiert.",
+        "fr": "Oui ! Les histoires sont soigneusement recherchées.",
+        "it": "Sì! Le storie sono accuratamente documentate. I fatti storici, le date e i personaggi chiave sono esatti."
+      }
+    }
+  ]
+}

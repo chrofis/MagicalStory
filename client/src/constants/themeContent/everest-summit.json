@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Climb to the roof of the world with Hillary and Tenzing, one frozen step at a time, until the whole Earth lies below you.",
+    "de": "Erklimme mit Hillary und Tenzing das Dach der Welt, einen eisigen Schritt nach dem anderen, bis die ganze Erde unter dir liegt.",
+    "fr": "Grimpez au sommet du monde avec Hillary et Tenzing, un pas gelé après l'autre, jusqu'à ce que la Terre entière soit à vos pieds.",
+    "it": "Sali sul tetto del mondo con Hillary e Tenzing, un passo gelato dopo l'altro, finché tutta la Terra non ti si stende sotto i piedi."
+  },
+  "longDescription": {
+    "en": "This personalized historical story takes your child to 1953 to join Edmund Hillary and Tenzing Norgay on their historic ascent of Mount Everest. Your child experiences the thin air, the ice walls, the teamwork, and the breathtaking view from the summit. A story about human endurance, partnership, and reaching for the impossible.",
+    "de": "Diese Geschichtserzählung nimmt dein Kind mit ins Jahr 1953 zum historischen Aufstieg von Hillary und Tenzing auf den Mount Everest. Dein Kind erlebt die dünne Luft, die Eiswände, die Teamarbeit und den atemberaubenden Blick vom Gipfel.",
+    "fr": "Cette histoire historique emmène votre enfant en 1953 pour l'ascension historique de l'Everest avec Hillary et Tenzing.",
+    "it": "Questa storia personalizzata a sfondo storico porta tuo figlio nel 1953 a unirsi a Edmund Hillary e Tenzing Norgay nella loro storica scalata dell'Everest. Tuo figlio vive l'aria rarefatta, le pareti di ghiaccio, il lavoro di squadra e la vista mozzafiato dalla vetta. Una storia sulla resistenza umana, sulla collaborazione e sul raggiungere l'impossibile."
+  },
+  "skills": {
+    "en": "Mountaineering, teamwork, perseverance, geography.",
+    "de": "Bergsteigen, Teamarbeit, Ausdauer, Geografie.",
+    "fr": "Alpinisme, travail d'équipe, persévérance, géographie.",
+    "it": "Alpinismo, lavoro di squadra, perseveranza, geografia."
+  },
+  "ageRecommendation": "5-10",
+  "faq": [
+    {
+      "q": {
+        "en": "Is the historical content accurate?",
+        "de": "Ist der historische Inhalt korrekt?",
+        "fr": "Le contenu historique est-il exact ?",
+        "it": "Il contenuto storico è accurato?"
+      },
+      "a": {
+        "en": "Yes! The stories are carefully researched. The historical facts, dates, and key figures are accurate.",
+        "de": "Ja! Die Geschichten sind sorgfältig recherchiert.",
+        "fr": "Oui ! Les histoires sont soigneusement recherchées.",
+        "it": "Sì! Le storie sono accuratamente documentate. I fatti storici, le date e i personaggi chiave sono corretti."
+      }
+    }
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "description": {
+    "en": "Your child dons shining armor to protect the kingdom, rescue a princess, and prove their bravery.",
+    "de": "Dein Kind legt strahlende Rüstung an, schützt das Königreich und beweist seinen Mut auf einer ehrenvollen Quest.",
+    "fr": "Votre enfant revêt une armure brillante pour protéger le royaume, sauver une princesse et prouver sa bravoure.",
+    "it": "Tuo figlio indossa un'armatura scintillante per proteggere il regno, salvare una principessa e dimostrare il proprio coraggio."
+  },
+  "longDescription": {
+    "en": "In this personalized knight adventure, your child is summoned to the royal castle to receive a noble quest. Dressed in shining armor with a shield bearing their own crest, your little knight rides across rolling green hills, through enchanted forests, and over drawbridges to protect the kingdom from harm.\n\nAlong the way, they face riddles from a wise old owl, help villagers in need, and prove their bravery not through fighting but through kindness, cleverness, and honor. The story culminates in a grand celebration at the castle, where the king and queen thank your child for their courage.\n\nEvery illustration features your child as the hero in full medieval splendor — riding a noble steed, raising a banner, and standing tall before the cheering crowd. The knight theme teaches children about chivalry, helping others, and the idea that true strength comes from the heart.\n\nIt is especially popular with children who love castles, dragons (who appear as friendly allies!), and the romance of a bygone era. The language is rich and atmospheric, transporting your child to a world of turrets and torches, yet always age-appropriate and warm. Parents appreciate how the story encourages bravery without aggression, and children adore seeing themselves as the hero who saves the day.",
+    "de": "In diesem personalisierten Ritterabenteuer wird dein Kind zur königlichen Burg gerufen, um einen edlen Auftrag zu empfangen. In strahlender Rüstung mit einem Schild, das das eigene Wappen trägt, reitet dein kleiner Ritter über sanfte grüne Hügel, durch verwunschene Wälder und über Zugbrücken, um das Königreich vor Unheil zu schützen.\n\nUnterwegs stellt sich dein Kind den Rätseln einer weisen alten Eule, hilft Dorfbewohnern in Not und beweist seinen Mut nicht durch Kämpfen, sondern durch Freundlichkeit, Cleverness und Ehre. Die Geschichte gipfelt in einem grossen Fest auf der Burg, bei dem König und Königin deinem Kind für seinen Mut danken.\n\nJede Illustration zeigt dein Kind als Held in voller mittelalterlicher Pracht — auf einem edlen Ross reitend, ein Banner schwenkend und stolz vor der jubelnden Menge stehend. Das Ritterthema vermittelt Kindern Werte wie Ritterlichkeit, Hilfsbereitschaft und die Idee, dass wahre Stärke aus dem Herzen kommt.\n\nEs ist besonders beliebt bei Kindern, die Burgen, Drachen (die als freundliche Verbündete auftreten!) und die Romantik vergangener Zeiten lieben. Eltern schätzen, dass die Geschichte Mut fördert, ohne Aggression zu zeigen, und Kinder lieben es, sich selbst als den Helden zu sehen, der den Tag rettet.",
+    "fr": "Dans cette aventure de chevalier personnalisée, votre enfant est convoqué au château royal pour recevoir une noble quête. Vêtu d'une armure étincelante portant son propre blason, votre petit chevalier chevauche à travers des collines verdoyantes, des forêts enchantées et des ponts-levis pour protéger le royaume.\n\nEn chemin, il résout les énigmes d'un vieux hibou sage, aide des villageois en détresse et prouve sa bravoure par la gentillesse et l'honneur. L'histoire culmine lors d'une grande célébration au château.\n\nChaque illustration met en scène votre enfant en héros médiéval. Le thème du chevalier enseigne la chevalerie, l'entraide et l'idée que la vraie force vient du cœur. Il est particulièrement apprécié des enfants qui aiment les châteaux et les dragons (qui apparaissent comme des alliés !). Un merveilleux cadeau d'anniversaire qui renforce la confiance en soi.",
+    "it": "In questa avventura da cavaliere personalizzata, tuo figlio viene convocato al castello reale per ricevere una nobile missione. Vestito con un'armatura scintillante e uno scudo che porta il proprio stemma, il tuo piccolo cavaliere cavalca attraverso dolci colline verdi, foreste incantate e ponti levatoi per proteggere il regno da ogni pericolo.\n\nLungo il cammino, affronta gli indovinelli di un vecchio gufo saggio, aiuta i villici in difficoltà e dimostra il proprio coraggio non con la lotta ma con la gentilezza, l'astuzia e l'onore. La storia culmina in una grande festa al castello, dove il re e la regina ringraziano tuo figlio per il suo coraggio.\n\nOgni illustrazione ritrae tuo figlio come l'eroe in tutto il suo splendore medievale — in sella a un nobile destriero, mentre alza uno stendardo e si erge fiero davanti alla folla in festa. Il tema del cavaliere insegna ai bambini i valori della cavalleria, dell'aiuto reciproco e l'idea che la vera forza viene dal cuore.\n\nÈ particolarmente amato dai bambini che adorano i castelli, i draghi (che qui appaiono come alleati amichevoli!) e il fascino di un'epoca lontana. Il linguaggio è ricco e suggestivo, trasporta tuo figlio in un mondo di torri e torce, ma resta sempre caldo e adatto all'età. I genitori apprezzano come la storia incoraggi il coraggio senza aggressività, e i bambini adorano vedersi come l'eroe che salva la giornata."
+  },
+  "skills": {
+    "en": "Chivalry and honor, empathy and helping others, puzzle-solving, courage without aggression.",
+    "de": "Ritterlichkeit und Ehre, Empathie und Hilfsbereitschaft, Rätselknacken, Mut ohne Aggression.",
+    "fr": "Chevalerie et honneur, empathie et entraide, résolution d'énigmes, courage sans agressivité.",
+    "it": "Cavalleria e onore, empatia e aiuto reciproco, capacità di risolvere enigmi, coraggio senza aggressività."
+  },
+  "ageRecommendation": "3-8",
+  "faq": [
+    {
+      "q": {
+        "en": "Is the knight story only for boys?",
+        "de": "Ist die Rittergeschichte nur für Jungen?",
+        "fr": "L'histoire de chevalier est-elle réservée aux garçons ?",
+        "it": "La storia del cavaliere è solo per i maschi?"
+      },
+      "a": {
+        "en": "Absolutely not! The story focuses on bravery and honor rather than gender roles. Many parents choose it for daughters who love castles.",
+        "de": "Auf keinen Fall! Die Geschichte fokussiert auf Mut und Ehre. Viele Eltern wählen sie für Töchter, die Burgen lieben.",
+        "fr": "Absolument pas ! L'histoire met l'accent sur le courage et l'honneur plutôt que sur les rôles de genre.",
+        "it": "Assolutamente no! La storia mette l'accento sul coraggio e sull'onore, non sui ruoli di genere. Molti genitori la scelgono anche per le figlie che amano i castelli."
+      }
+    },
+    {
+      "q": {
+        "en": "Does the knight story contain violence?",
+        "de": "Enthält die Rittergeschichte Gewalt?",
+        "fr": "L'histoire contient-elle de la violence ?",
+        "it": "La storia del cavaliere contiene violenza?"
+      },
+      "a": {
+        "en": "No. Challenges are solved through cleverness and kindness — never through fighting.",
+        "de": "Nein. Herausforderungen werden durch Cleverness und Freundlichkeit gelöst — nie durch Kampf.",
+        "fr": "Non. Les défis sont résolus par l'intelligence et la gentillesse — jamais par la violence.",
+        "it": "No. Le sfide vengono risolte con astuzia e gentilezza — mai con la lotta."
+      }
+    }
+  ]
+}

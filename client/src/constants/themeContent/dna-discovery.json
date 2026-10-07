@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Stand beside Watson and Crick as they piece together the twisted ladder that holds the secret of life.",
+    "de": "Schau mit Watson und Crick durchs Mikroskop, als sie die verdrehte Leiter enträtseln, die das Geheimnis des Lebens birgt.",
+    "fr": "Regardez dans le microscope avec Watson et Crick alors qu'ils dévoilent l'échelle torsadée qui détient le secret de la vie.",
+    "it": "Affianca Watson e Crick mentre compongono la scala attorcigliata che custodisce il segreto della vita."
+  },
+  "longDescription": {
+    "en": "This personalized historical story takes your child to 1953 to witness the discovery of DNA's double helix structure. Your child learns that every living thing carries a set of instructions inside its cells, and that understanding this code opened the door to modern medicine and biology.",
+    "de": "Diese Geschichtserzählung nimmt dein Kind mit ins Jahr 1953 zur Entdeckung der DNA-Doppelhelix. Dein Kind lernt, dass jedes Lebewesen einen Bauplan in seinen Zellen trägt.",
+    "fr": "Cette histoire historique emmène votre enfant en 1953 pour la découverte de la structure en double hélice de l'ADN.",
+    "it": "Questa storia personalizzata a sfondo storico porta tuo figlio nel 1953 ad assistere alla scoperta della struttura a doppia elica del DNA. Tuo figlio scopre che ogni essere vivente porta un insieme di istruzioni dentro le sue cellule, e che comprendere questo codice ha aperto la strada alla medicina e alla biologia moderne."
+  },
+  "skills": {
+    "en": "Genetics basics, scientific discovery, teamwork, wonder of life.",
+    "de": "Genetik-Grundlagen, wissenschaftliche Entdeckung, Teamarbeit, Staunen über das Leben.",
+    "fr": "Bases de génétique, découverte scientifique, travail d'équipe, émerveillement de la vie.",
+    "it": "Nozioni base di genetica, scoperta scientifica, lavoro di squadra, meraviglia della vita."
+  },
+  "ageRecommendation": "7-10",
+  "faq": [
+    {
+      "q": {
+        "en": "Is the historical content accurate?",
+        "de": "Ist der historische Inhalt korrekt?",
+        "fr": "Le contenu historique est-il exact ?",
+        "it": "Il contenuto storico è accurato?"
+      },
+      "a": {
+        "en": "Yes! The stories are carefully researched. The historical facts, dates, and key figures are accurate.",
+        "de": "Ja! Die Geschichten sind sorgfältig recherchiert.",
+        "fr": "Oui ! Les histoires sont soigneusement recherchées.",
+        "it": "Sì! Le storie sono accuratamente documentate. I fatti storici, le date e i personaggi chiave sono corretti."
+      }
+    }
+  ]
+}

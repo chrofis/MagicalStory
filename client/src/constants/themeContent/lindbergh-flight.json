@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Fly solo across the Atlantic with Charles Lindbergh, battling fog, exhaustion, and endless ocean for 33 hours.",
+    "de": "Fliege allein mit Charles Lindbergh über den Atlantik, kämpfe gegen Nebel, Erschöpfung und endlosen Ozean — 33 Stunden lang.",
+    "fr": "Volez seul au-dessus de l'Atlantique avec Charles Lindbergh, luttant contre le brouillard et l'épuisement pendant 33 heures.",
+    "it": "Vola in solitaria sopra l'Atlantico con Charles Lindbergh, lottando contro nebbia, sfinimento e un oceano infinito per 33 ore."
+  },
+  "longDescription": {
+    "en": "This personalized historical story puts your child in the cockpit with Charles Lindbergh during his legendary 1927 solo flight across the Atlantic. Your child experiences the loneliness, the fog, the exhaustion, and the triumphant arrival in Paris. A story about perseverance and the human spirit.",
+    "de": "Diese Geschichtserzählung setzt dein Kind 1927 ins Cockpit mit Charles Lindbergh bei seinem legendären Solo-Atlantikflug. Dein Kind erlebt die Einsamkeit, den Nebel und die triumphale Ankunft in Paris.",
+    "fr": "Cette histoire historique place votre enfant dans le cockpit avec Charles Lindbergh lors de son vol solo légendaire en 1927.",
+    "it": "Questa storia personalizzata a sfondo storico mette tuo figlio in cabina di pilotaggio con Charles Lindbergh durante la sua leggendaria traversata solitaria dell'Atlantico nel 1927. Tuo figlio vive la solitudine, la nebbia, la stanchezza e il trionfale arrivo a Parigi. Una storia sulla perseveranza e sullo spirito umano."
+  },
+  "skills": {
+    "en": "Aviation history, perseverance, courage, determination.",
+    "de": "Fluggeschichte, Ausdauer, Mut, Entschlossenheit.",
+    "fr": "Histoire de l'aviation, persévérance, courage, détermination.",
+    "it": "Storia dell'aviazione, perseveranza, coraggio, determinazione."
+  },
+  "ageRecommendation": "5-10",
+  "faq": [
+    {
+      "q": {
+        "en": "Is the historical content accurate?",
+        "de": "Ist der historische Inhalt korrekt?",
+        "fr": "Le contenu historique est-il exact ?",
+        "it": "Il contenuto storico è accurato?"
+      },
+      "a": {
+        "en": "Yes! The stories are carefully researched. The historical facts, dates, and key figures are accurate.",
+        "de": "Ja! Die Geschichten sind sorgfältig recherchiert.",
+        "fr": "Oui ! Les histoires sont soigneusement recherchées.",
+        "it": "Sì! Le storie sono accuratamente documentate. I fatti storici, le date e i personaggi chiave sono corretti."
+      }
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Your child captains a research submarine, maps undiscovered ocean depths, and encounters incredible sea life.",
+    "de": "Dein Kind steuert ein Forschungs-U-Boot, kartiert unentdeckte Meerestiefen und begegnet faszinierenden Meeresbewohnern.",
+    "fr": "Votre enfant pilote un sous-marin de recherche, cartographie les profondeurs inexplorées et rencontre une vie marine incroyable.",
+    "it": "Tuo figlio comanda un sottomarino di ricerca, mappa profondità oceaniche inesplorate e incontra una vita marina incredibile."
+  },
+  "longDescription": {
+    "en": "Your child commands a research submarine into the deepest ocean. Descending through tropical shallows, past the twilight zone where bioluminescent creatures glow, and to the ocean floor, your child maps underwater mountains, discovers new species, and helps a lost baby whale find its mother.\n\nThe story combines deep-sea thrills with real marine biology facts about ocean ecosystems and marine conservation. Every illustration shows your child at the submarine helm. Perfect for children aged 4 to 9 who love the ocean.",
+    "de": "Dein Kind steuert ein Forschungs-U-Boot in die Tiefsee. Es kartiert Unterwasserberge, entdeckt neue Arten und hilft einem Babywal. Die Geschichte verbindet Tiefsee-Abenteuer mit echten Fakten über Meeresbiologie. Perfekt für Kinder von 4 bis 9 Jahren.",
+    "fr": "Votre enfant pilote un sous-marin de recherche. L'histoire combine frissons et faits de biologie marine. Parfait pour les enfants de 4 à 9 ans.",
+    "it": "Tuo figlio comanda un sottomarino di ricerca fino all'oceano più profondo. Scendendo attraverso bassi fondali tropicali, oltrepassando la zona crepuscolare dove creature bioluminescenti brillano, fino ad arrivare sul fondale oceanico, tuo figlio mappa montagne sottomarine, scopre nuove specie e aiuta un cucciolo di balena smarrito a ritrovare la madre.\n\nLa storia unisce l'emozione degli abissi a fatti reali di biologia marina su ecosistemi oceanici e conservazione marina. Ogni illustrazione mostra tuo figlio al comando del sottomarino. Perfetta per bambini dai 4 ai 9 anni che amano il mare."
+  },
+  "skills": {
+    "en": "Marine biology basics, environmental care, scientific curiosity, courage.",
+    "de": "Grundlagen Meeresbiologie, Umweltschutz, wissenschaftliche Neugierde, Mut.",
+    "fr": "Biologie marine, protection de l'environnement, curiosité scientifique, courage.",
+    "it": "Basi di biologia marina, cura dell'ambiente, curiosità scientifica, coraggio."
+  },
+  "ageRecommendation": "4-9",
+  "faq": [
+    {
+      "q": {
+        "en": "Is the deep sea scary?",
+        "de": "Ist die Tiefsee gruselig?",
+        "fr": "Les profondeurs sont-elles effrayantes ?",
+        "it": "Gli abissi fanno paura?"
+      },
+      "a": {
+        "en": "It is presented as a place of wonder. Bioluminescent creatures glow beautifully.",
+        "de": "Die Tiefsee wird als Ort des Staunens dargestellt. Leuchtende Kreaturen glühen wunderschön.",
+        "fr": "L'océan profond est présenté comme un lieu d'émerveillement.",
+        "it": "Vengono presentati come un luogo di meraviglia. Le creature bioluminescenti brillano in modo splendido."
+      }
+    }
+  ]
+}

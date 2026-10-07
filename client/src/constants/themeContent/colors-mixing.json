@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Mix red and blue and — surprise — you get purple! Discover the magic of how colors blend into new ones.",
+    "de": "Mische Rot und Blau und — Überraschung — du bekommst Lila! Die Magie entdecken, wie Farben sich zu neuen mischen.",
+    "fr": "Mélangez le rouge et le bleu et — surprise — vous obtenez du violet ! Découvrir la magie du mélange des couleurs.",
+    "it": "Mescola rosso e blu e — sorpresa — ottieni il viola! Scopri la magia di come i colori si fondono per crearne di nuovi."
+  },
+  "longDescription": {
+    "en": "This personalized educational story introduces color mixing as pure magic. Your child experiments with paint and discovers that combining primary colors creates entirely new ones: red + blue = purple, red + yellow = orange, blue + yellow = green. Through a creative art adventure, your child learns color theory while getting wonderfully messy. The story sparks a love of art and experimentation.",
+    "de": "Diese Lerngeschichte stellt das Farbenmischen als reine Magie vor. Dein Kind experimentiert mit Farben und entdeckt, dass Grundfarben ganz neue ergeben: Rot + Blau = Lila. Durch ein kreatives Kunstabenteuer lernt dein Kind Farbtheorie und bekommt Lust aufs Malen.",
+    "fr": "Cette histoire éducative présente le mélange des couleurs comme de la magie pure. Votre enfant découvre que combiner les couleurs primaires crée de nouvelles couleurs.",
+    "it": "Questa storia educativa personalizzata presenta la mescolanza dei colori come pura magia. Tuo figlio sperimenta con la pittura e scopre che combinare i colori primari ne crea di completamente nuovi: rosso + blu = viola, rosso + giallo = arancione, blu + giallo = verde. Attraverso un'avventura artistica e creativa, tuo figlio impara la teoria dei colori mentre si sporca meravigliosamente le mani. La storia accende l'amore per l'arte e la sperimentazione."
+  },
+  "skills": {
+    "en": "Color theory, creativity, experimentation, observation.",
+    "de": "Farbtheorie, Kreativität, Experimentieren, Beobachtung.",
+    "fr": "Théorie des couleurs, créativité, expérimentation, observation.",
+    "it": "Teoria dei colori, creatività, sperimentazione, osservazione."
+  },
+  "ageRecommendation": "3-6",
+  "faq": [
+    {
+      "q": {
+        "en": "Will my child actually learn from this story?",
+        "de": "Lernt mein Kind wirklich etwas?",
+        "fr": "Mon enfant apprend-il vraiment ?",
+        "it": "Mio figlio imparerà davvero da questa storia?"
+      },
+      "a": {
+        "en": "Yes! Many children want to try mixing colors after reading. Pair the story with real paint for maximum impact.",
+        "de": "Ja! Viele Kinder wollen danach selbst Farben mischen. Kombiniere die Geschichte mit echten Farben.",
+        "fr": "Oui ! Beaucoup d'enfants veulent ensuite mélanger de vraies couleurs.",
+        "it": "Sì! Molti bambini vogliono mescolare i colori dopo la lettura. Abbina la storia a dei veri colori per un effetto ancora più grande."
+      }
+    }
+  ]
+}

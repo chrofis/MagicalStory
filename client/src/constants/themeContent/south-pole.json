@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Race to the South Pole with Amundsen through blinding blizzards and endless white, where every step writes history.",
+    "de": "Renne mit Amundsen zum Südpol durch blendende Schneestürme und endloses Weiss, wo jeder Schritt Geschichte schreibt.",
+    "fr": "Courez au Pôle Sud avec Amundsen à travers les blizzards aveuglants, où chaque pas écrit l'histoire.",
+    "it": "Corri verso il Polo Sud con Amundsen tra tormente accecanti e un bianco infinito, dove ogni passo scrive la storia."
+  },
+  "longDescription": {
+    "en": "This personalized historical story takes your child to 1911 to join Roald Amundsen's expedition to the South Pole. Your child experiences the brutal cold, the dog sleds, and the exhilaration of reaching the southernmost point on Earth. A story about preparation, determination, and the thrill of exploration.",
+    "de": "Diese Geschichtserzählung nimmt dein Kind mit ins Jahr 1911 zu Roald Amundsens Expedition zum Südpol. Dein Kind erlebt die brutale Kälte, die Hundeschlitten und die Begeisterung, den südlichsten Punkt der Erde zu erreichen.",
+    "fr": "Cette histoire historique emmène votre enfant en 1911 pour l'expédition de Roald Amundsen au Pôle Sud.",
+    "it": "Questa storia personalizzata a sfondo storico porta tuo figlio nel 1911 a unirsi alla spedizione di Roald Amundsen al Polo Sud. Tuo figlio vive il freddo brutale, le slitte trainate dai cani e l'euforia di raggiungere il punto più a sud della Terra. Una storia sulla preparazione, la determinazione e l'emozione dell'esplorazione."
+  },
+  "skills": {
+    "en": "Polar exploration, preparation, endurance, geography.",
+    "de": "Polarforschung, Vorbereitung, Ausdauer, Geografie.",
+    "fr": "Exploration polaire, préparation, endurance, géographie.",
+    "it": "Esplorazione polare, preparazione, resistenza, geografia."
+  },
+  "ageRecommendation": "5-10",
+  "faq": [
+    {
+      "q": {
+        "en": "Is the historical content accurate?",
+        "de": "Ist der historische Inhalt korrekt?",
+        "fr": "Le contenu historique est-il exact ?",
+        "it": "Il contenuto storico è accurato?"
+      },
+      "a": {
+        "en": "Yes! The stories are carefully researched. The historical facts, dates, and key figures are accurate.",
+        "de": "Ja! Die Geschichten sind sorgfältig recherchiert.",
+        "fr": "Oui ! Les histoires sont soigneusement recherchées.",
+        "it": "Sì! Le storie sono accuratamente documentate. I fatti storici, le date e i personaggi chiave sono corretti."
+      }
+    }
+  ]
+}

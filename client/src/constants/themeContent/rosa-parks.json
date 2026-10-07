@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Sit beside Rosa Parks on a bus in Montgomery and watch one quiet act of courage spark a movement for justice.",
+    "de": "Sitz neben Rosa Parks in einem Bus in Montgomery und erlebe, wie ein stiller Akt des Mutes eine Bewegung für Gerechtigkeit auslöst.",
+    "fr": "Asseyez-vous à côté de Rosa Parks dans un bus à Montgomery et regardez un acte de courage silencieux déclencher un mouvement.",
+    "it": "Siediti accanto a Rosa Parks su un autobus a Montgomery e guarda come un gesto silenzioso di coraggio abbia acceso un movimento per la giustizia."
+  },
+  "longDescription": {
+    "en": "This personalized historical story takes your child to 1955 Montgomery, Alabama, to sit beside Rosa Parks when she refused to give up her bus seat. Your child learns about the civil rights movement, the power of peaceful resistance, and how one person's courage can inspire millions. The story teaches equality, dignity, and the importance of standing up against injustice.",
+    "de": "Diese Geschichtserzählung nimmt dein Kind mit ins Montgomery von 1955, als Rosa Parks sich weigerte, ihren Busplatz aufzugeben. Dein Kind lernt über die Bürgerrechtsbewegung und wie der Mut einer Person Millionen inspirieren kann.",
+    "fr": "Cette histoire historique emmène votre enfant à Montgomery en 1955, à côté de Rosa Parks quand elle refusa de céder sa place dans le bus.",
+    "it": "Questa storia personalizzata a sfondo storico porta tuo figlio nella Montgomery del 1955, accanto a Rosa Parks nel momento in cui rifiutò di cedere il proprio posto sull'autobus. Tuo figlio scopre il movimento per i diritti civili, la forza della resistenza pacifica e come il coraggio di una sola persona possa ispirare milioni. La storia insegna l'uguaglianza, la dignità e l'importanza di opporsi all'ingiustizia."
+  },
+  "skills": {
+    "en": "Civil rights, courage, peaceful resistance, equality.",
+    "de": "Bürgerrechte, Mut, friedlicher Widerstand, Gleichheit.",
+    "fr": "Droits civiques, courage, résistance pacifique, égalité.",
+    "it": "Diritti civili, coraggio, resistenza pacifica, uguaglianza."
+  },
+  "ageRecommendation": "6-10",
+  "faq": [
+    {
+      "q": {
+        "en": "Is the historical content accurate?",
+        "de": "Ist der historische Inhalt korrekt?",
+        "fr": "Le contenu historique est-il exact ?",
+        "it": "Il contenuto storico è accurato?"
+      },
+      "a": {
+        "en": "Yes! The stories are carefully researched. The historical facts, dates, and key figures are accurate.",
+        "de": "Ja! Die Geschichten sind sorgfältig recherchiert.",
+        "fr": "Oui ! Les histoires sont soigneusement recherchées.",
+        "it": "Sì! Le storie sono accuratamente documentate. I fatti storici, le date e i personaggi chiave sono corretti."
+      }
+    }
+  ]
+}

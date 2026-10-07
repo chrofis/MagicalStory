@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Understand why the sun goes to bed and the stars come out — and what happens on the other side of the world.",
+    "de": "Verstehen, warum die Sonne schlafen geht und die Sterne erscheinen — und was auf der anderen Seite der Welt passiert.",
+    "fr": "Comprendre pourquoi le soleil se couche et les étoiles apparaissent — et ce qui se passe de l'autre côté du monde.",
+    "it": "Capisci perché il sole va a dormire e spuntano le stelle — e cosa succede dall'altra parte del mondo."
+  },
+  "longDescription": {
+    "en": "This personalized educational story explains the cycle of day and night in a way young children can grasp. Your child learns that the Earth is a giant spinning ball and that when our side faces the sun, it is day — and when it turns away, it is night. The story shows what happens during both periods: daytime for play, learning, and exploring; nighttime for rest, stars, owls, and dreams. It introduces the concept that when it is night here, children on the other side of the world are having their day.",
+    "de": "Diese Lerngeschichte erklärt den Wechsel von Tag und Nacht verständlich. Dein Kind lernt, dass die Erde eine riesige drehende Kugel ist. Wenn unsere Seite zur Sonne zeigt, ist Tag — wenn sie sich wegdreht, ist Nacht. Die Geschichte zeigt, was zu beiden Zeiten passiert, und führt das Konzept ein, dass auf der anderen Seite der Welt gerade Tag ist.",
+    "fr": "Cette histoire éducative explique le cycle jour-nuit de manière accessible. Votre enfant apprend que la Terre tourne et que quand c'est la nuit ici, c'est le jour de l'autre côté du monde.",
+    "it": "Questa storia educativa personalizzata spiega il ciclo del giorno e della notte in un modo che anche i bambini più piccoli possono capire. Tuo figlio impara che la Terra è una gigantesca palla che gira, e che quando il nostro lato è rivolto verso il sole è giorno — mentre quando si allontana è notte. La storia mostra cosa succede in entrambi i momenti: il giorno per giocare, imparare ed esplorare; la notte per riposare, guardare le stelle, incontrare i gufi e sognare. Introduce l'idea che quando qui è notte, dall'altra parte del mondo i bambini stanno vivendo il loro giorno."
+  },
+  "skills": {
+    "en": "Earth science basics, day-night cycle, global awareness, curiosity.",
+    "de": "Erdkunde-Grundlagen, Tag-Nacht-Zyklus, globales Bewusstsein, Neugierde.",
+    "fr": "Sciences de la Terre, cycle jour-nuit, conscience globale, curiosité.",
+    "it": "Nozioni base di scienze della Terra, ciclo giorno-notte, consapevolezza globale, curiosità."
+  },
+  "ageRecommendation": "3-6",
+  "faq": [
+    {
+      "q": {
+        "en": "Will my child actually learn from this story?",
+        "de": "Lernt mein Kind wirklich etwas?",
+        "fr": "Mon enfant apprend-il vraiment ?",
+        "it": "Mio figlio imparerà davvero qualcosa da questa storia?"
+      },
+      "a": {
+        "en": "Yes! The concept of a spinning Earth is made tangible through relatable analogies that stick with children.",
+        "de": "Ja! Das Konzept der sich drehenden Erde wird durch verständliche Vergleiche greifbar.",
+        "fr": "Oui ! Le concept est rendu tangible par des analogies que les enfants retiennent.",
+        "it": "Sì! Il concetto di una Terra che gira diventa tangibile grazie ad analogie semplici che restano impresse nei bambini."
+      }
+    }
+  ]
+}

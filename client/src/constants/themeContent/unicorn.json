@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Your child gallops through enchanted meadows with a rainbow unicorn, spreading kindness and discovering pure magic.",
+    "de": "Dein Kind galoppiert mit einem Regenbogen-Einhorn durch Zauberwiesen und verbreitet Freundlichkeit und Magie.",
+    "fr": "Votre enfant galope à travers des prairies enchantées avec une licorne arc-en-ciel, semant la gentillesse et la magie.",
+    "it": "Tuo figlio galoppa attraverso prati incantati con un unicorno arcobaleno, diffondendo gentilezza e scoprendo la magia pura."
+  },
+  "longDescription": {
+    "en": "Your child discovers a rainbow bridge leading to an enchanted meadow where unicorns roam freely. Together with a shimmering unicorn, they journey to restore color to a world turned gray. Galloping through crystal waterfalls, giant flower fields, and silver forests, your child spreads kindness — and with every kind act, color returns.\n\nThe story celebrates gentleness, beauty, and the power of a kind heart. Every page bursts with breathtaking fantasy landscapes. Perfect for children aged 3 to 7 who love magic and colors.",
+    "de": "Dein Kind entdeckt eine Regenbogenbrücke zu einer Zauberwiese. Gemeinsam mit einem schimmernden Einhorn gibt es einer grauen Welt die Farben zurück. Die Geschichte feiert Sanftmut und die Kraft eines guten Herzens. Perfekt für Kinder von 3 bis 7 Jahren.",
+    "fr": "Votre enfant découvre un pont arc-en-ciel vers une prairie enchantée. L'histoire célèbre la gentillesse et le pouvoir d'un bon cœur. Parfait pour les enfants de 3 à 7 ans.",
+    "it": "Tuo figlio scopre un ponte arcobaleno che conduce a un prato incantato dove gli unicorni vivono liberi. Insieme a un unicorno scintillante, intraprende un viaggio per restituire i colori a un mondo diventato grigio. Galoppando tra cascate di cristallo, immensi campi di fiori e foreste argentate, tuo figlio diffonde gentilezza — e a ogni gesto gentile, il colore ritorna.\n\nLa storia celebra la dolcezza, la bellezza e il potere di un cuore gentile. Ogni pagina esplode di paesaggi fantastici mozzafiato. Perfetta per bambini dai 3 ai 7 anni che amano la magia e i colori."
+  },
+  "skills": {
+    "en": "Kindness, creativity, wonder, emotional expression, beauty of nature.",
+    "de": "Freundlichkeit, Kreativität, Staunen, emotionaler Ausdruck, Naturschönheit.",
+    "fr": "Gentillesse, créativité, émerveillement, expression émotionnelle, beauté de la nature.",
+    "it": "Gentilezza, creatività, meraviglia, espressione emotiva, bellezza della natura."
+  },
+  "ageRecommendation": "3-7",
+  "faq": [
+    {
+      "q": {
+        "en": "Is it only for girls?",
+        "de": "Ist es nur für Mädchen?",
+        "fr": "Est-ce réservé aux filles ?",
+        "it": "È solo per le bambine?"
+      },
+      "a": {
+        "en": "No! It is about kindness and magic — themes every child enjoys.",
+        "de": "Nein! Es geht um Freundlichkeit und Magie — Themen, die jedes Kind liebt.",
+        "fr": "Non ! C'est l'histoire de la gentillesse et de la magie — des thèmes universels.",
+        "it": "No! Parla di gentilezza e magia — temi che ogni bambino ama."
+      }
+    }
+  ]
+}

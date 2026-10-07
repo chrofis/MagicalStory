@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Learn that healthy eating is not about rules — it is about fueling your body so you can run, think, and play at your best.",
+    "de": "Gesundes Essen heisst nicht Regeln — es heisst, den Körper so zu tanken, dass man rennen, denken und spielen kann.",
+    "fr": "Apprendre que manger sainement n'est pas une question de règles — c'est donner à votre corps l'énergie pour courir, réfléchir et jouer.",
+    "it": "Scopri che mangiare in modo sano non significa seguire regole rigide — significa dare al corpo l'energia per correre, pensare e giocare al meglio."
+  },
+  "longDescription": {
+    "en": "This personalized educational story teaches balanced nutrition through an adventure where different food groups are represented as teams working together to power your child's body. Fruits and vegetables are the shield team (protection), grains are the energy team (fuel), proteins are the building team (muscles), and dairy is the strength team (bones). Your child learns why a mix of all groups makes them feel their best. The story avoids labeling foods as 'good' or 'bad' and instead focuses on balance and variety.",
+    "de": "Diese Lerngeschichte lehrt ausgewogene Ernährung durch ein Abenteuer, in dem verschiedene Lebensmittelgruppen als Teams zusammenarbeiten. Obst und Gemüse sind das Schutzteam, Getreide das Energieteam, Proteine das Aufbauteam. Die Geschichte vermeidet «gute» und «schlechte» Lebensmittel und fokussiert auf Balance und Vielfalt.",
+    "fr": "Cette histoire éducative enseigne la nutrition équilibrée à travers une aventure où les groupes alimentaires travaillent ensemble. L'histoire évite de qualifier les aliments de 'bons' ou 'mauvais' et se concentre sur l'équilibre.",
+    "it": "Questa storia educativa personalizzata insegna un'alimentazione equilibrata attraverso un'avventura in cui i diversi gruppi alimentari sono rappresentati come squadre che lavorano insieme per dare energia al corpo di tuo figlio. Frutta e verdura sono la squadra scudo (protezione), i cereali sono la squadra energia (carburante), le proteine sono la squadra costruzione (muscoli) e i latticini sono la squadra forza (ossa). Tuo figlio capisce perché un mix di tutti i gruppi lo fa sentire al meglio. La storia evita di etichettare i cibi come 'buoni' o 'cattivi' e si concentra invece su equilibrio e varietà."
+  },
+  "skills": {
+    "en": "Nutrition awareness, food groups, balanced eating, body knowledge.",
+    "de": "Ernährungsbewusstsein, Lebensmittelgruppen, ausgewogenes Essen, Körperwissen.",
+    "fr": "Conscience nutritionnelle, groupes alimentaires, alimentation équilibrée, connaissance du corps.",
+    "it": "Consapevolezza nutrizionale, gruppi alimentari, alimentazione equilibrata, conoscenza del corpo."
+  },
+  "ageRecommendation": "4-7",
+  "faq": [
+    {
+      "q": {
+        "en": "Will my child actually learn from this story?",
+        "de": "Lernt mein Kind wirklich etwas?",
+        "fr": "Mon enfant apprend-il vraiment ?",
+        "it": "Mio figlio imparerà davvero qualcosa da questa storia?"
+      },
+      "a": {
+        "en": "Yes! Children start recognizing food groups and making connections between what they eat and how they feel.",
+        "de": "Ja! Kinder beginnen, Lebensmittelgruppen zu erkennen und Verbindungen zwischen Essen und Befinden herzustellen.",
+        "fr": "Oui ! Les enfants commencent à reconnaître les groupes alimentaires.",
+        "it": "Sì! I bambini iniziano a riconoscere i gruppi alimentari e a fare collegamenti tra ciò che mangiano e come si sentono."
+      }
+    }
+  ]
+}

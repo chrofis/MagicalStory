@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Your child ventures deep into the rainforest, tracks exotic wildlife, and uncovers a hidden ancient temple.",
+    "de": "Dein Kind wagt sich tief in den Regenwald, verfolgt exotische Wildtiere und entdeckt einen verborgenen antiken Tempel.",
+    "fr": "Votre enfant s'aventure au cœur de la forêt tropicale, piste des animaux exotiques et découvre un temple antique caché.",
+    "it": "Tuo figlio si avventura nel cuore della foresta pluviale, segue le tracce di animali esotici e scopre un antico tempio nascosto."
+  },
+  "longDescription": {
+    "en": "Your child ventures deep into a tropical rainforest teeming with wildlife and towering trees. Armed with binoculars and a guidebook, your explorer tracks parrots, discovers a hidden waterfall, and stumbles upon an ancient temple overgrown with orchids.\n\nThe story teaches rainforest biodiversity, respect for nature, and the thrill of discovery. Every illustration features your child in explorer gear amid lush foliage and spectacular wildlife. Perfect for nature-loving children aged 3 to 8.",
+    "de": "Dein Kind wagt sich tief in einen Regenwald voller Tiere. Mit Fernglas und Reiseführer entdeckt dein Kind Papageien, einen Wasserfall und einen uralten Tempel. Die Geschichte lehrt Respekt vor der Natur. Perfekt für naturliebende Kinder von 3 bis 8 Jahren.",
+    "fr": "Votre enfant s'aventure dans une forêt tropicale luxuriante. L'histoire enseigne le respect de la nature. Parfait pour les enfants de 3 à 8 ans.",
+    "it": "Tuo figlio si avventura nel profondo di una foresta pluviale tropicale brulicante di animali e alberi maestosi. Armato di binocolo e guida, il tuo esploratore segue le tracce dei pappagalli, scopre una cascata nascosta e s'imbatte in un antico tempio ricoperto di orchidee.\n\nLa storia insegna la biodiversità della foresta pluviale, il rispetto per la natura e il brivido della scoperta. Ogni illustrazione ritrae tuo figlio con l'attrezzatura da esploratore tra una vegetazione lussureggiante e una fauna spettacolare. Perfetta per bambini amanti della natura dai 3 agli 8 anni."
+  },
+  "skills": {
+    "en": "Nature awareness, tracking skills, respect for wildlife, persistence.",
+    "de": "Naturbewusstsein, Spurenlesen, Respekt vor Wildtieren, Ausdauer.",
+    "fr": "Conscience de la nature, pistage, respect de la faune, persévérance.",
+    "it": "Consapevolezza della natura, capacità di seguire tracce, rispetto per la fauna selvatica, perseveranza."
+  },
+  "ageRecommendation": "3-8",
+  "faq": [
+    {
+      "q": {
+        "en": "Are there dangerous animals?",
+        "de": "Gibt es gefährliche Tiere?",
+        "fr": "Y a-t-il des animaux dangereux ?",
+        "it": "Ci sono animali pericolosi?"
+      },
+      "a": {
+        "en": "Wild animals are shown respectfully from a distance. The focus is observation, not danger.",
+        "de": "Wilde Tiere werden respektvoll aus der Distanz gezeigt.",
+        "fr": "Les animaux sont montrés respectueusement à distance.",
+        "it": "Gli animali selvatici vengono mostrati con rispetto e a distanza. L'attenzione è sull'osservazione, non sul pericolo."
+      }
+    }
+  ]
+}

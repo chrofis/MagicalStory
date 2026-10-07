@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Listen to the unique voice of each musical instrument — from the gentle flute to the thundering drums.",
+    "de": "Die einzigartige Stimme jedes Musikinstruments hören — von der sanften Flöte bis zu den donnernden Trommeln.",
+    "fr": "Écouter la voix unique de chaque instrument de musique — de la douce flûte aux tambours tonnants.",
+    "it": "Ascoltare la voce unica di ogni strumento musicale — dal dolce flauto ai tamburi tonanti."
+  },
+  "longDescription": {
+    "en": "This personalized educational story introduces your child to the world of musical instruments through an adventure in a magical music shop. Your child discovers string instruments (guitar, violin), wind instruments (flute, trumpet), percussion (drums, xylophone), and keyboard instruments (piano). Each instrument has its own personality and sound in the story, and your child learns how they work together in an orchestra. The story sparks curiosity about making music.",
+    "de": "Diese Lerngeschichte führt dein Kind in die Welt der Musikinstrumente durch ein Abenteuer in einem magischen Musikladen. Dein Kind entdeckt Streich-, Blas-, Schlag- und Tasteninstrumente. Jedes Instrument hat seine eigene Persönlichkeit in der Geschichte, und dein Kind lernt, wie sie im Orchester zusammenarbeiten.",
+    "fr": "Cette histoire éducative introduit les instruments de musique à travers une aventure dans un magasin de musique magique. Chaque instrument a sa propre personnalité dans l'histoire.",
+    "it": "Questa storia educativa personalizzata introduce tuo figlio al mondo degli strumenti musicali attraverso un'avventura in un negozio di musica magico. Tuo figlio scopre gli strumenti a corda (chitarra, violino), a fiato (flauto, tromba), a percussione (tamburi, xilofono) e a tastiera (pianoforte). Ogni strumento ha la propria personalità e il proprio suono nella storia, e tuo figlio impara come collaborano in un'orchestra. La storia risveglia la curiosità per il fare musica."
+  },
+  "skills": {
+    "en": "Musical awareness, instrument families, listening skills, cultural appreciation.",
+    "de": "Musikbewusstsein, Instrumentenfamilien, Zuhören, kulturelle Wertschätzung.",
+    "fr": "Conscience musicale, familles d'instruments, écoute, appréciation culturelle.",
+    "it": "Consapevolezza musicale, famiglie di strumenti, capacità di ascolto, apprezzamento culturale."
+  },
+  "ageRecommendation": "4-7",
+  "faq": [
+    {
+      "q": {
+        "en": "Will my child actually learn from this story?",
+        "de": "Lernt mein Kind wirklich etwas?",
+        "fr": "Mon enfant apprend-il vraiment ?",
+        "it": "Mio figlio imparerà davvero qualcosa da questa storia?"
+      },
+      "a": {
+        "en": "Yes! Children often ask to hear real instruments afterward. The story pairs well with listening to music together.",
+        "de": "Ja! Kinder wollen danach oft echte Instrumente hören. Die Geschichte passt gut zum gemeinsamen Musikhören.",
+        "fr": "Oui ! Les enfants veulent souvent écouter de vrais instruments après la lecture.",
+        "it": "Sì! Dopo la lettura i bambini chiedono spesso di ascoltare strumenti veri. La storia si abbina bene all'ascolto di musica insieme."
+      }
+    }
+  ]
+}

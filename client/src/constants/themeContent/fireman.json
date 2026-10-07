@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Your child joins the fire station crew, rushes to the rescue, and helps the whole town stay safe.",
+    "de": "Dein Kind wird Teil der Feuerwehrmannschaft, eilt zur Rettung und hilft dabei, die ganze Gemeinde in Sicherheit zu bringen.",
+    "fr": "Votre enfant rejoint l'équipe de la caserne, se précipite au secours et aide toute la ville à rester en sécurité.",
+    "it": "Tuo figlio si unisce alla squadra dei vigili del fuoco, corre in soccorso e aiuta a mantenere sicura tutta la città."
+  },
+  "longDescription": {
+    "en": "Your child joins the fire station crew! After polishing the truck and sliding down the pole, the alarm sounds. Your child races to rescue a family, saves a kitten from a tree, and puts out flames with the big hose.\n\nThe story emphasizes bravery, teamwork, and community service. Every illustration shows your child in full firefighter gear, climbing ladders and being cheered by citizens. Perfect for children aged 3 to 7 who dream of being firefighters.",
+    "de": "Dein Kind wird Teil der Feuerwehr! Nach dem Polieren des Löschfahrzeugs ertönt der Alarm. Dein Kind eilt zur Rettung. Die Geschichte betont Mut und Teamarbeit. Perfekt für Kinder von 3 bis 7 Jahren.",
+    "fr": "Votre enfant rejoint la caserne ! L'histoire met l'accent sur le courage et le travail d'équipe. Parfait pour les enfants de 3 à 7 ans.",
+    "it": "Tuo figlio si unisce alla squadra dei vigili del fuoco! Dopo aver lucidato il camion e sceso lungo la pertica, suona l'allarme. Tuo figlio corre a salvare una famiglia, mette in salvo un gattino da un albero e spegne le fiamme con la grande manichetta.\n\nLa storia mette l'accento sul coraggio, sul lavoro di squadra e sul servizio alla comunità. Ogni illustrazione mostra tuo figlio con l'equipaggiamento completo da vigile del fuoco, mentre sale le scale ed è acclamato dai cittadini. Perfetta per bambini dai 3 ai 7 anni che sognano di diventare vigili del fuoco."
+  },
+  "skills": {
+    "en": "Bravery, teamwork, community service, safety awareness.",
+    "de": "Mut, Teamarbeit, Gemeinschaftsdienst, Sicherheitsbewusstsein.",
+    "fr": "Courage, travail d'équipe, service communautaire, sécurité.",
+    "it": "Coraggio, lavoro di squadra, servizio alla comunità, consapevolezza della sicurezza."
+  },
+  "ageRecommendation": "3-7",
+  "faq": [
+    {
+      "q": {
+        "en": "Does it show real fires?",
+        "de": "Zeigt es echte Feuer?",
+        "fr": "Montre-t-il de vrais incendies ?",
+        "it": "Mostra incendi reali?"
+      },
+      "a": {
+        "en": "Fire appears but the focus is on bravery and safety. Scenes are heroic, not frightening.",
+        "de": "Feuer kommt vor, aber der Fokus liegt auf Mut und Sicherheit.",
+        "fr": "Le feu apparaît mais l'accent est mis sur le courage.",
+        "it": "Il fuoco compare, ma l'attenzione è sul coraggio e sulla sicurezza. Le scene sono eroiche, non spaventose."
+      }
+    }
+  ]
+}

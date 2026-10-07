@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Your child patrols the neighborhood as an officer, keeps the peace, and solves a surprising local mystery.",
+    "de": "Dein Kind patrouilliert als Polizist durch das Viertel, sorgt für Ordnung und löst ein überraschendes Rätsel.",
+    "fr": "Votre enfant patrouille dans le quartier en tant qu'agent, maintient la paix et résout un mystère local surprenant.",
+    "it": "Tuo figlio pattuglia il quartiere come agente, mantiene l'ordine e risolve un sorprendente mistero locale."
+  },
+  "longDescription": {
+    "en": "Your child becomes the newest officer in the neighborhood! On a shiny bicycle, they help lost children and solve the mystery of the baker's missing prize cake before the village fair. The story celebrates community protection, fairness, and problem-solving.\n\nEvery illustration features your child in a smart police uniform, examining evidence and being thanked by the community. Perfect for children aged 3 to 7 who love solving puzzles.",
+    "de": "Dein Kind wird zum jüngsten Polizisten im Viertel! Auf einem Fahrrad hilft es verlorenen Kindern und löst ein Rätsel. Die Geschichte feiert Fairness und Gemeinschaftsschutz. Perfekt für Kinder von 3 bis 7 Jahren.",
+    "fr": "Votre enfant devient le plus jeune agent du quartier ! L'histoire célèbre la justice et la résolution de problèmes. Parfait pour les enfants de 3 à 7 ans.",
+    "it": "Tuo figlio diventa il più giovane agente del quartiere! Su una bicicletta scintillante, aiuta i bambini smarriti e risolve il mistero della torta premiata del fornaio, scomparsa poco prima della fiera del paese. La storia celebra la protezione della comunità, la giustizia e la capacità di risolvere problemi.\n\nOgni illustrazione ritrae tuo figlio in un'elegante uniforme da poliziotto, mentre esamina indizi e riceve i ringraziamenti della comunità. Perfetta per bambini dai 3 ai 7 anni che amano risolvere enigmi."
+  },
+  "skills": {
+    "en": "Fairness, observation, community protection, problem-solving.",
+    "de": "Fairness, Beobachtungsgabe, Gemeinschaftsschutz, Problemlösung.",
+    "fr": "Justice, observation, protection de la communauté, résolution de problèmes.",
+    "it": "Giustizia, capacità di osservazione, protezione della comunità, capacità di risolvere problemi."
+  },
+  "ageRecommendation": "3-7",
+  "faq": [
+    {
+      "q": {
+        "en": "Are officers shown positively?",
+        "de": "Werden Polizisten positiv gezeigt?",
+        "fr": "Les policiers sont-ils positifs ?",
+        "it": "Gli agenti vengono mostrati in modo positivo?"
+      },
+      "a": {
+        "en": "Yes, as community helpers who solve problems with fairness and kindness.",
+        "de": "Ja, als Gemeinschaftshelfer, die fair und freundlich handeln.",
+        "fr": "Oui, comme des aides communautaires justes et bienveillants.",
+        "it": "Sì, come aiutanti della comunità che risolvono i problemi con giustizia e gentilezza."
+      }
+    }
+  ]
+}

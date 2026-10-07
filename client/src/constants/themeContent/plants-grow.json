@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Plant a tiny seed and watch it grow step by step into a tall, strong plant with leaves and flowers.",
+    "de": "Einen winzigen Samen pflanzen und Schritt für Schritt beobachten, wie er zu einer grossen, starken Pflanze mit Blättern und Blüten wächst.",
+    "fr": "Planter une petite graine et la regarder grandir étape par étape en une plante haute et forte avec des feuilles et des fleurs.",
+    "it": "Pianta un minuscolo seme e osservalo crescere passo dopo passo fino a diventare una pianta alta e forte, con foglie e fiori."
+  },
+  "longDescription": {
+    "en": "This personalized educational story follows the life of a seed from planting to full bloom. Your child discovers what plants need to grow — soil, water, sunlight, and time — and watches the stages unfold: germination, sprouting, growing leaves, budding, and flowering. The story connects plant growth to the food we eat and the oxygen we breathe. It inspires children to plant their own seeds and observe the magic of nature firsthand.",
+    "de": "Diese Lerngeschichte folgt dem Leben eines Samens vom Pflanzen bis zur vollen Blüte. Dein Kind entdeckt, was Pflanzen zum Wachsen brauchen, und beobachtet die Stadien: Keimung, Sprossen, Blätter, Knospen und Blühen. Die Geschichte inspiriert Kinder, eigene Samen zu pflanzen.",
+    "fr": "Cette histoire éducative suit la vie d'une graine de la plantation à la floraison. Votre enfant découvre ce dont les plantes ont besoin pour grandir et observe les étapes du développement.",
+    "it": "Questa storia educativa personalizzata segue la vita di un seme dalla semina fino alla piena fioritura. Tuo figlio scopre di cosa hanno bisogno le piante per crescere — terra, acqua, luce del sole e tempo — e osserva le fasi che si susseguono: germinazione, germoglio, crescita delle foglie, formazione dei boccioli e fioritura. La storia collega la crescita delle piante al cibo che mangiamo e all'ossigeno che respiriamo. Invita i bambini a piantare i propri semi e a osservare con i propri occhi la magia della natura."
+  },
+  "skills": {
+    "en": "Plant biology, patience, observation, nurturing, scientific method.",
+    "de": "Pflanzenbiologie, Geduld, Beobachtung, Pflege, wissenschaftliche Methode.",
+    "fr": "Biologie végétale, patience, observation, soin, méthode scientifique.",
+    "it": "Biologia delle piante, pazienza, osservazione, cura, metodo scientifico."
+  },
+  "ageRecommendation": "3-6",
+  "faq": [
+    {
+      "q": {
+        "en": "Will my child actually learn from this story?",
+        "de": "Lernt mein Kind wirklich etwas?",
+        "fr": "Mon enfant apprend-il vraiment ?",
+        "it": "Mio figlio imparerà davvero qualcosa da questa storia?"
+      },
+      "a": {
+        "en": "Yes! Many families plant real seeds alongside reading the story, creating a hands-on learning experience.",
+        "de": "Ja! Viele Familien pflanzen echte Samen parallel zur Geschichte und schaffen so ein praktisches Lernerlebnis.",
+        "fr": "Oui ! Beaucoup de familles plantent de vraies graines en parallèle de la lecture.",
+        "it": "Sì! Molte famiglie piantano semi veri mentre leggono la storia, creando così un'esperienza di apprendimento pratica."
+      }
+    }
+  ]
+}

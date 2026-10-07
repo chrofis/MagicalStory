@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Your child joins a Viking crew to navigate icy seas, explore new lands, and uncover Norse legends.",
+    "de": "Dein Kind schliesst sich einer Wikingercrew an, durchquert eisige Meere und entdeckt nordische Legenden.",
+    "fr": "Votre enfant rejoint un équipage viking pour naviguer sur des mers glacées et explorer des terres nouvelles.",
+    "it": "Tuo figlio si unisce a un equipaggio vichingo per navigare mari ghiacciati, esplorare nuove terre e scoprire leggende nordiche."
+  },
+  "longDescription": {
+    "en": "Set sail on a Viking longship through icy northern waters! Your child joins a crew of friendly Vikings on a daring voyage to discover new lands. Steering through towering icebergs, past playful seals, and under the northern lights, your little explorer encounters mythical Norse creatures, discovers ancient runes, and learns about courage, loyalty, and exploration.\n\nThe story brings the Viking age to life without raids or battles — just the thrill of discovery and crew camaraderie. Your child wears a fur-lined cloak and Viking helmet, standing proudly at the bow. Perfect for children fascinated by history, the ocean, and mythological creatures. The magnificent illustrations of northern landscapes and glowing auroras make this one of the most visually stunning stories in our collection.",
+    "de": "Setzt die Segel auf einem Wikinger-Langschiff durch eisige Nordgewässer! Dein Kind schliesst sich freundlichen Wikingern an und bricht auf, neue Länder zu entdecken. Vorbei an Eisbergen, verspielten Robben und unter dem Nordlicht trifft dein kleiner Entdecker auf mythische Kreaturen und entdeckt uralte Runen.\n\nDie Geschichte erweckt die Wikingerzeit kindgerecht zum Leben — ohne Überfälle oder Schlachten. Dein Kind trägt einen pelzgefütterten Umhang und Wikingerhelm. Perfekt für Kinder, die von Geschichte und Mythologie fasziniert sind. Die grossartigen Illustrationen nordischer Landschaften machen dies zu einer visuell beeindruckenden Geschichte.",
+    "fr": "Hissez les voiles sur un drakkar viking ! Votre enfant rejoint un équipage sympathique pour un voyage audacieux. L'histoire donne vie à l'ère viking sans raids ni batailles. Les magnifiques illustrations de paysages nordiques en font une histoire visuellement impressionnante.",
+    "it": "Salpa su una nave vichinga attraverso acque gelide del nord! Tuo figlio si unisce a un equipaggio di vichinghi amichevoli in un audace viaggio alla scoperta di nuove terre. Manovrando tra iceberg maestosi, foche giocose e sotto l'aurora boreale, il tuo piccolo esploratore incontra creature mitiche norrene, scopre antiche rune e impara il valore del coraggio, della lealtà e dell'esplorazione.\n\nLa storia dà vita all'epoca vichinga senza incursioni o battaglie — solo il brivido della scoperta e il cameratismo dell'equipaggio. Tuo figlio indossa un mantello foderato di pelliccia e un elmo vichingo, fiero a prua. Perfetta per i bambini affascinati dalla storia, dal mare e dalle creature mitologiche. Le magnifiche illustrazioni di paesaggi nordici e aurore luminose ne fanno una delle storie visivamente più spettacolari della nostra collezione."
+  },
+  "skills": {
+    "en": "Exploration and curiosity, teamwork, resilience, respect for nature and legends.",
+    "de": "Entdeckergeist und Neugierde, Teamarbeit, Widerstandsfähigkeit, Respekt vor Natur und Legenden.",
+    "fr": "Exploration et curiosité, travail d'équipe, résilience, respect de la nature et des légendes.",
+    "it": "Esplorazione e curiosità, lavoro di squadra, resilienza, rispetto per la natura e le leggende."
+  },
+  "ageRecommendation": "4-9",
+  "faq": [
+    {
+      "q": {
+        "en": "Does the Viking story include fighting?",
+        "de": "Enthält die Wikinger-Geschichte Kämpfe?",
+        "fr": "L'histoire viking comprend-elle des combats ?",
+        "it": "La storia vichinga include combattimenti?"
+      },
+      "a": {
+        "en": "No. It is about exploration and discovery, not raids.",
+        "de": "Nein. Es geht um Erkundung und Entdeckung.",
+        "fr": "Non. Elle porte sur l'exploration et la découverte.",
+        "it": "No. Parla di esplorazione e scoperta, non di incursioni."
+      }
+    }
+  ]
+}

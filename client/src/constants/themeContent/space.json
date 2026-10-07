@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Your child blasts off into the cosmos, visits strange planets, and makes a discovery that changes everything.",
+    "de": "Dein Kind startet ins Weltall, besucht fremdartige Planeten und macht eine bahnbrechende Entdeckung im Kosmos.",
+    "fr": "Votre enfant décolle vers le cosmos, visite des planètes étranges et fait une découverte qui change tout.",
+    "it": "Tuo figlio decolla verso il cosmo, visita pianeti sconosciuti e fa una scoperta che cambia tutto."
+  },
+  "longDescription": {
+    "en": "Your child blasts off in a gleaming rocket and soars past the Moon, through asteroid fields, and toward the farthest planets. As the youngest astronaut ever, your child visits each planet — bouncing on the Moon, marveling at Jupiter's Great Red Spot, and skating across Saturn's rings.\n\nWhen the computer detects a mysterious signal beyond Neptune, your child must decide: turn back or venture into the unknown? The story celebrates curiosity, bravery, and the wonder of the cosmos. Perfect for children aged 4 to 9 who dream of becoming astronauts.",
+    "de": "Dein Kind startet in einer Rakete und besucht jeden Planeten — hüpft auf dem Mond, staunt über Jupiters Roten Fleck und gleitet über Saturns Ringe. Die Geschichte feiert Neugierde und das Staunen über den Kosmos. Perfekt für Kinder von 4 bis 9 Jahren.",
+    "fr": "Votre enfant décolle dans une fusée et visite chaque planète du système solaire. L'histoire célèbre la curiosité scientifique. Parfait pour les enfants de 4 à 9 ans.",
+    "it": "Tuo figlio decolla su un razzo scintillante e vola oltre la Luna, attraverso campi di asteroidi, verso i pianeti più lontani. Come il più giovane astronauta di sempre, tuo figlio visita ogni pianeta — saltella sulla Luna, si meraviglia davanti alla Grande Macchia Rossa di Giove e scivola sugli anelli di Saturno.\n\nQuando il computer rileva un misterioso segnale oltre Nettuno, tuo figlio deve decidere: tornare indietro o avventurarsi nell'ignoto? La storia celebra la curiosità, il coraggio e la meraviglia del cosmo. Perfetta per bambini dai 4 ai 9 anni che sognano di diventare astronauti."
+  },
+  "skills": {
+    "en": "Science and astronomy, problem-solving, wonder, exploration spirit.",
+    "de": "Wissenschaft und Astronomie, Problemlösung, Staunen, Entdeckergeist.",
+    "fr": "Science et astronomie, résolution de problèmes, émerveillement, esprit d'exploration.",
+    "it": "Scienza e astronomia, capacità di risolvere problemi, meraviglia, spirito di esplorazione."
+  },
+  "ageRecommendation": "4-9",
+  "faq": [
+    {
+      "q": {
+        "en": "Does my child need to know about planets?",
+        "de": "Muss mein Kind schon etwas über Planeten wissen?",
+        "fr": "Mon enfant doit-il connaître les planètes ?",
+        "it": "Mio figlio deve già conoscere i pianeti?"
+      },
+      "a": {
+        "en": "No! The story introduces each planet in a fun way as your child visits them.",
+        "de": "Nein! Die Geschichte stellt jeden Planeten spielerisch vor.",
+        "fr": "Non ! L'histoire présente chaque planète de manière amusante.",
+        "it": "No! La storia presenta ogni pianeta in modo divertente man mano che tuo figlio lo visita."
+      }
+    }
+  ]
+}

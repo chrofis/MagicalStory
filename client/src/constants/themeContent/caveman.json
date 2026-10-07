@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Your child lives alongside woolly mammoths, discovers fire, and survives thrilling Stone Age adventures.",
+    "de": "Dein Kind lebt Seite an Seite mit Wollmammuts, entdeckt das Feuer und besteht aufregende Abenteuer in der Steinzeit.",
+    "fr": "Votre enfant vit aux côtés des mammouths laineux, découvre le feu et survit à des aventures palpitantes de l'âge de pierre.",
+    "it": "Tuo figlio vive fianco a fianco con i mammut lanosi, scopre il fuoco e affronta avventure emozionanti nell'età della pietra."
+  },
+  "longDescription": {
+    "en": "Travel back to the dawn of humanity! Your child wakes up in a cozy cave, wrapped in furs, and steps into a prehistoric world with woolly mammoths, saber-toothed cats, and vast ice-age landscapes. Your young cave dweller learns to gather berries, paint on cave walls, craft stone tools, and — most excitingly — discover the secret of fire.\n\nThe adventure shows how early humans cooperated, communicated through pictures, and survived by being clever. Your child befriends a baby mammoth and helps the tribe find shelter. The illustrations feature towering glaciers, lush forests, and vast plains. Perfect for children aged 3 to 8 who love animals, nature, and learning about where we all came from.",
+    "de": "Reise zurück zu den Anfängen der Menschheit! Dein Kind wacht in einer Höhle auf und tritt in eine Welt voller Mammuts und Säbelzahnkatzen. Es lernt Beeren zu sammeln, auf Höhlenwände zu malen, Steinwerkzeuge herzustellen und das Feuer zu entdecken.\n\nDie Geschichte zeigt, wie frühe Menschen zusammenarbeiteten und durch Cleverness überlebten. Dein Kind freundet sich mit einem Mammutbaby an. Perfekt für Kinder von 3 bis 8 Jahren, die Tiere und Natur lieben.",
+    "fr": "Voyagez à l'aube de l'humanité ! Votre enfant découvre un monde préhistorique avec des mammouths et apprend à survivre par la coopération. Parfait pour les enfants de 3 à 8 ans.",
+    "it": "Viaggia indietro fino agli albori dell'umanità! Tuo figlio si sveglia in una calda caverna, avvolto in pellicce, ed entra in un mondo preistorico popolato da mammut lanosi, tigri dai denti a sciabola e vasti paesaggi glaciali. Il tuo piccolo abitante delle caverne impara a raccogliere bacche, a dipingere sulle pareti rocciose, a costruire utensili di pietra e — l'emozione più grande — a scoprire il segreto del fuoco.\n\nL'avventura mostra come i primi uomini collaborassero, comunicassero con immagini e sopravvivessero grazie all'astuzia. Tuo figlio fa amicizia con un cucciolo di mammut e aiuta la tribù a trovare riparo. Le illustrazioni raffigurano ghiacciai maestosi, foreste rigogliose e vaste pianure. Perfetta per bambini dai 3 agli 8 anni che amano gli animali, la natura e scoprire le nostre origini."
+  },
+  "skills": {
+    "en": "Survival skills, cooperation, creativity, respect for nature, prehistoric knowledge.",
+    "de": "Überlebenskunst, Kooperation, Kreativität, Respekt vor der Natur, Wissen über die Urzeit.",
+    "fr": "Débrouillardise, coopération, créativité, respect de la nature, connaissances préhistoriques.",
+    "it": "Capacità di sopravvivenza, cooperazione, creatività, rispetto per la natura, conoscenze sulla preistoria."
+  },
+  "ageRecommendation": "3-8",
+  "faq": [
+    {
+      "q": {
+        "en": "Are prehistoric animals scary?",
+        "de": "Sind Urzeittiere gruselig?",
+        "fr": "Les animaux préhistoriques sont-ils effrayants ?",
+        "it": "Gli animali preistorici fanno paura?"
+      },
+      "a": {
+        "en": "They inspire wonder, not fear. The mammoth becomes a friend.",
+        "de": "Sie wecken Staunen, nicht Angst. Das Mammut wird zum Freund.",
+        "fr": "Ils inspirent l'émerveillement. Le mammouth devient un ami.",
+        "it": "Suscitano meraviglia, non paura. Il mammut diventa un amico."
+      }
+    }
+  ]
+}

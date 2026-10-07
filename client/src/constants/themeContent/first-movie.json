@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Sit in the audience with the Lumiere Brothers as moving pictures flicker on a screen for the very first time.",
+    "de": "Sitz im Publikum der Brüder Lumière, als zum allerersten Mal bewegte Bilder über eine Leinwand flimmern.",
+    "fr": "Asseyez-vous dans le public avec les frères Lumière quand des images bougent sur un écran pour la toute première fois.",
+    "it": "Siediti tra il pubblico dei fratelli Lumière mentre immagini in movimento scorrono su uno schermo per la primissima volta."
+  },
+  "longDescription": {
+    "en": "This personalized historical story takes your child to 1895 Paris to witness the birth of cinema with the Lumiere Brothers. Your child experiences the gasps of the audience seeing moving pictures for the first time and learns how this invention transformed entertainment, storytelling, and culture forever.",
+    "de": "Diese Geschichtserzählung nimmt dein Kind mit ins Paris von 1895 zur Geburt des Kinos. Dein Kind erlebt das Staunen des Publikums beim ersten Film und lernt, wie diese Erfindung Unterhaltung und Geschichtenerzählen für immer veränderte.",
+    "fr": "Cette histoire historique emmène votre enfant à Paris en 1895 pour la naissance du cinéma avec les frères Lumière.",
+    "it": "Questa storia personalizzata a sfondo storico porta tuo figlio nella Parigi del 1895 ad assistere alla nascita del cinema con i fratelli Lumière. Tuo figlio vive lo stupore del pubblico che vede immagini in movimento per la prima volta e scopre come questa invenzione abbia trasformato per sempre l'intrattenimento, la narrazione e la cultura."
+  },
+  "skills": {
+    "en": "Film history, storytelling, innovation, cultural impact.",
+    "de": "Filmgeschichte, Geschichtenerzählen, Innovation, kulturelle Wirkung.",
+    "fr": "Histoire du cinéma, narration, innovation, impact culturel.",
+    "it": "Storia del cinema, narrazione, innovazione, impatto culturale."
+  },
+  "ageRecommendation": "5-10",
+  "faq": [
+    {
+      "q": {
+        "en": "Is the historical content accurate?",
+        "de": "Ist der historische Inhalt korrekt?",
+        "fr": "Le contenu historique est-il exact ?",
+        "it": "Il contenuto storico è accurato?"
+      },
+      "a": {
+        "en": "Yes! The stories are carefully researched. The historical facts, dates, and key figures are accurate.",
+        "de": "Ja! Die Geschichten sind sorgfältig recherchiert.",
+        "fr": "Oui ! Les histoires sont soigneusement recherchées.",
+        "it": "Sì! Le storie sono accuratamente documentate. I fatti storici, le date e i personaggi chiave sono corretti."
+      }
+    }
+  ]
+}

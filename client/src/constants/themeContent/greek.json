@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Your child embarks on a mythological odyssey, meeting gods and heroes while solving the riddles of ancient Greece.",
+    "de": "Dein Kind begibt sich auf eine mythologische Odyssee, begegnet Göttern und Helden und löst Rätsel des antiken Griechenlands.",
+    "fr": "Votre enfant part pour une odyssée mythologique, rencontre dieux et héros, et résout les énigmes de la Grèce antique.",
+    "it": "Tuo figlio intraprende un'odissea mitologica, incontra dèi ed eroi risolvendo gli enigmi dell'antica Grecia."
+  },
+  "longDescription": {
+    "en": "Embark on an odyssey through Greek mythology! Your child sails the Aegean Sea, climbs Mount Olympus, and meets legendary figures. Guided by wise Athena, your young hero faces riddles from the Sphinx, races with Hermes through olive groves, and helps Poseidon calm a stormy sea.\n\nThe story brings Greek myths to life in a child-friendly way, celebrating cleverness and the power of asking good questions. Your child wears a Greek tunic, explores marble temples, and receives a laurel wreath for their wisdom. Ideal for children aged 4 to 9 who love mythology, puzzles, and different cultures.",
+    "de": "Begib dich auf eine Odyssee durch die griechische Mythologie! Dein Kind segelt über die Ägäis, erklimmt den Olymp und trifft legendäre Figuren. Geführt von Athene, löst dein junger Held Rätsel der Sphinx und hilft Poseidon. Die Geschichte erweckt griechische Mythen kindgerecht zum Leben. Ideal für Kinder von 4 bis 9 Jahren.",
+    "fr": "Partez pour une odyssée à travers la mythologie grecque ! L'histoire donne vie aux mythes grecs de manière adaptée aux enfants. Parfait pour les enfants de 4 à 9 ans.",
+    "it": "Parti per un'odissea nella mitologia greca! Tuo figlio naviga nel Mar Egeo, scala il Monte Olimpo e incontra figure leggendarie. Guidato dalla saggia Atena, il tuo giovane eroe affronta gli enigmi della Sfinge, gareggia con Hermes tra gli uliveti e aiuta Poseidone a calmare un mare in tempesta.\n\nLa storia dà vita ai miti greci in modo adatto ai bambini, celebrando l'astuzia e il potere di porre le domande giuste. Tuo figlio indossa una tunica greca, esplora templi di marmo e riceve una corona d'alloro per la sua saggezza. Ideale per bambini dai 4 ai 9 anni che amano la mitologia, gli enigmi e le culture diverse."
+  },
+  "skills": {
+    "en": "Mythology, riddle-solving, creative thinking, cultural literacy.",
+    "de": "Mythologie, Rätsel lösen, kreatives Denken, Kulturwissen.",
+    "fr": "Mythologie, résolution d'énigmes, pensée créative, culture générale.",
+    "it": "Mitologia, risoluzione di enigmi, pensiero creativo, cultura generale."
+  },
+  "ageRecommendation": "4-9",
+  "faq": [
+    {
+      "q": {
+        "en": "Are the Greek gods child-friendly?",
+        "de": "Sind die Götter kindgerecht?",
+        "fr": "Les dieux sont-ils adaptés aux enfants ?",
+        "it": "Gli dèi greci sono adatti ai bambini?"
+      },
+      "a": {
+        "en": "Yes! They appear as helpful, colorful characters. Darker mythology is excluded.",
+        "de": "Ja! Sie erscheinen als hilfreiche Figuren. Dunkle Aspekte sind ausgeschlossen.",
+        "fr": "Oui ! Ils apparaissent comme des personnages bienveillants.",
+        "it": "Sì! Appaiono come personaggi disponibili e colorati. Gli aspetti più oscuri della mitologia sono esclusi."
+      }
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Grab a hammer with thousands of jubilant Berliners and smash down the wall that has divided a city for 28 years.",
+    "de": "Greif mit Tausenden jubelnder Berliner zu einem Hammer und schlage die Mauer nieder, die eine Stadt 28 Jahre lang geteilt hat.",
+    "fr": "Prenez un marteau avec des milliers de Berlinois en liesse et abattez le mur qui a divisé une ville pendant 28 ans.",
+    "it": "Afferra un martello insieme a migliaia di berlinesi in festa e abbatti il muro che ha diviso una città per 28 anni."
+  },
+  "longDescription": {
+    "en": "This personalized historical story transports your child back in time to witness one of history's most remarkable moments: Fall of the Berlin Wall. Your child becomes an eyewitness, standing alongside the key figures as events unfold. The story brings history to life through vivid, age-appropriate storytelling that makes your child feel as if they are truly there.\n\nEvery page features your child illustrated in period-appropriate clothing, interacting with historical figures and experiencing the sights, sounds, and emotions of the era. The narrative is carefully researched to be historically accurate while remaining engaging and accessible for young readers. Complex historical events are explained through the eyes of a child, making them easy to understand and deeply memorable.\n\nThis approach to learning history is far more effective than textbooks because it creates emotional connections with historical events. When your child is part of the story, they remember the facts, understand the significance, and develop a genuine love of history. Parents and teachers across Switzerland use these stories to supplement school curricula and spark discussions about important historical events.",
+    "de": "Diese personalisierte Geschichtserzählung versetzt dein Kind zurück in die Vergangenheit, um einen der bemerkenswertesten Momente der Geschichte mitzuerleben: den Fall der Berliner Mauer. Dein Kind wird zum Augenzeugen und steht neben den Schlüsselfiguren, während die Ereignisse sich entfalten.\n\nJede Seite zeigt dein Kind in zeitgenössischer Kleidung illustriert, im Gespräch mit historischen Persönlichkeiten und beim Erleben der Epoche. Die Erzählung ist sorgfältig recherchiert, um historisch korrekt und gleichzeitig altersgerecht und fesselnd zu sein. Komplexe Ereignisse werden durch Kinderaugen erklärt.\n\nDieser Ansatz zum Geschichtslernen ist weitaus effektiver als Lehrbücher, weil er emotionale Verbindungen schafft. Wenn dein Kind Teil der Geschichte ist, merkt es sich die Fakten, versteht die Bedeutung und entwickelt eine echte Liebe zur Geschichte. Eltern und Lehrkräfte in der ganzen Schweiz nutzen diese Geschichten, um den Schulstoff zu ergänzen.",
+    "fr": "Cette histoire historique personnalisée transporte votre enfant dans le temps pour assister à l'un des moments les plus remarquables de l'histoire : la chute du mur de Berlin. Chaque page illustre votre enfant en vêtements d'époque, interagissant avec des personnages historiques. Cette approche crée des connexions émotionnelles avec l'histoire, bien plus efficace que les manuels scolaires.",
+    "it": "Questa storia storica personalizzata riporta tuo figlio indietro nel tempo per assistere a uno dei momenti più straordinari della storia: la caduta del Muro di Berlino. Tuo figlio diventa testimone oculare, al fianco dei protagonisti mentre gli eventi si svolgono. La storia dà vita al passato attraverso un racconto vivido e adatto all'età, che fa sentire tuo figlio davvero presente.\n\nOgni pagina ritrae tuo figlio illustrato con abiti d'epoca, mentre interagisce con personaggi storici e vive gli scorci, i suoni e le emozioni dell'epoca. Il racconto è accuratamente documentato per essere storicamente fedele pur restando coinvolgente e accessibile ai giovani lettori. Gli eventi storici complessi vengono spiegati attraverso gli occhi di un bambino, rendendoli facili da capire e indimenticabili.\n\nQuesto approccio all'apprendimento della storia è molto più efficace dei libri di testo perché crea legami emotivi con gli eventi storici. Quando tuo figlio fa parte della storia, ricorda i fatti, ne comprende il significato e sviluppa un vero amore per la storia. In tutta la Svizzera, genitori e insegnanti usano queste storie per integrare i programmi scolastici e stimolare discussioni su eventi storici importanti."
+  },
+  "skills": {
+    "en": "Freedom, unity, history, peaceful revolution, hope.",
+    "de": "Freiheit, Einheit, Geschichte, friedliche Revolution, Hoffnung.",
+    "fr": "Liberté, unité, histoire, révolution pacifique, espoir.",
+    "it": "Libertà, unità, storia, rivoluzione pacifica, speranza."
+  },
+  "ageRecommendation": "6-10",
+  "faq": [
+    {
+      "q": {
+        "en": "Is the historical content accurate?",
+        "de": "Ist der historische Inhalt korrekt?",
+        "fr": "Le contenu historique est-il exact ?",
+        "it": "I contenuti storici sono accurati?"
+      },
+      "a": {
+        "en": "Yes! The stories are carefully researched. While the narrative adds a child-friendly adventure layer, the historical facts, dates, and key figures are accurate.",
+        "de": "Ja! Die Geschichten sind sorgfältig recherchiert. Die historischen Fakten, Daten und Schlüsselfiguren sind korrekt.",
+        "fr": "Oui ! Les histoires sont soigneusement recherchées. Les faits historiques sont exacts.",
+        "it": "Sì! Le storie sono accuratamente documentate. Anche se la narrazione aggiunge un livello di avventura adatto ai bambini, i fatti storici, le date e i personaggi chiave sono accurati."
+      }
+    }
+  ]
+}

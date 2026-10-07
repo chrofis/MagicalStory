@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Discover the fun of putting numbers together — two apples plus three apples makes a whole bag of five.",
+    "de": "Den Spass am Zusammenzählen entdecken — zwei Äpfel plus drei Äpfel ergeben eine ganze Tüte mit fünf.",
+    "fr": "Découvrir le plaisir d'assembler les nombres — deux pommes plus trois pommes font un sac entier de cinq.",
+    "it": "Scopri il divertimento di mettere insieme i numeri — due mele più tre mele fanno un intero sacchetto di cinque."
+  },
+  "longDescription": {
+    "en": "This personalized educational story turns simple addition into hands-on fun. Your child learns that adding means putting groups together and counting the total. Through story scenarios — collecting shells on the beach, stacking blocks, sharing snacks — your child practices sums up to ten. Visual grouping makes abstract math concrete, and the satisfaction of getting the right answer builds mathematical confidence.",
+    "de": "Diese Lerngeschichte verwandelt einfaches Addieren in greifbaren Spass. Dein Kind lernt, dass Addieren heisst, Gruppen zusammenzulegen und das Ergebnis zu zählen. Durch Szenarien wie Muscheln sammeln und Blöcke stapeln übt dein Kind Aufgaben bis zehn.",
+    "fr": "Cette histoire éducative transforme l'addition en plaisir concret. Votre enfant apprend que l'addition signifie réunir des groupes et compter le total.",
+    "it": "Questa storia educativa personalizzata trasforma l'addizione semplice in un divertimento concreto. Tuo figlio impara che sommare significa mettere insieme dei gruppi e contare il totale. Attraverso scenari della storia — raccogliere conchiglie in spiaggia, impilare cubi, condividere merende — tuo figlio esercita le somme fino a dieci. Il raggruppamento visivo rende concreta la matematica astratta, e la soddisfazione di trovare la risposta giusta costruisce fiducia in ambito matematico."
+  },
+  "skills": {
+    "en": "Addition basics, number sense, problem-solving, mathematical confidence.",
+    "de": "Additions-Grundlagen, Zahlengefühl, Problemlösung, mathematisches Selbstvertrauen.",
+    "fr": "Bases de l'addition, sens des nombres, résolution de problèmes, confiance mathématique.",
+    "it": "Basi dell'addizione, senso del numero, capacità di risolvere problemi, fiducia matematica."
+  },
+  "ageRecommendation": "4-7",
+  "faq": [
+    {
+      "q": {
+        "en": "Will my child actually learn from this story?",
+        "de": "Lernt mein Kind wirklich etwas?",
+        "fr": "Mon enfant apprend-il vraiment ?",
+        "it": "Mio figlio imparerà davvero da questa storia?"
+      },
+      "a": {
+        "en": "Yes! The story uses concrete, visual examples that make addition intuitive rather than abstract.",
+        "de": "Ja! Die Geschichte nutzt konkrete, visuelle Beispiele, die Addition anschaulich statt abstrakt machen.",
+        "fr": "Oui ! L'histoire utilise des exemples concrets qui rendent l'addition intuitive.",
+        "it": "Sì! La storia usa esempi concreti e visivi che rendono l'addizione intuitiva invece che astratta."
+      }
+    }
+  ]
+}

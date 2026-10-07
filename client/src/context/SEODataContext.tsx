@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import type { ThemeContent } from '@/constants/themeContent';
 
 /**
  * Pre-loaded data that SEO pages need to render in initial HTML.
@@ -49,6 +50,8 @@ export interface SwissStoriesData {
 
 export interface SEOData {
   swissStories: SwissStoriesData | null;
+  /** Theme-page content for the prerendered route only (one entry), see constants/themeContent.ts */
+  themeContent?: Record<string, ThemeContent>;
 }
 
 interface SEODataContextValue {
@@ -129,4 +132,9 @@ export function useSwissStories(): {
     data: ctx.data?.swissStories || null,
     loading: ctx.loading,
   };
+}
+
+/** The prerender-injected data as-is (partial: the current route's entries only). */
+export function useSEOData(): SEOData | null {
+  return useContext(SEODataContext).data;
 }

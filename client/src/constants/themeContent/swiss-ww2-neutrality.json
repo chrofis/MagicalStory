@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Experience how Switzerland navigated the most dangerous period in modern history while surrounded by warring nations.",
+    "de": "Erlebe, wie die Schweiz die gefährlichste Zeit der modernen Geschichte meisterte, umgeben von kriegführenden Nationen.",
+    "fr": "Vivre comment la Suisse navigua la période la plus dangereuse de l'histoire moderne, entourée de nations en guerre.",
+    "it": "Scopri come la Svizzera ha attraversato il periodo più pericoloso della storia moderna, circondata da nazioni in guerra."
+  },
+  "longDescription": {
+    "en": "This personalized historical story explains Switzerland's complex position during World War II. Your child learns about the Réduit strategy, the challenges of maintaining neutrality, and how Switzerland served as a refuge and humanitarian hub. The story honestly addresses both the courage and the difficult choices of the era, adapted for young readers.",
+    "de": "Diese Geschichtserzählung erklärt die komplexe Position der Schweiz im Zweiten Weltkrieg. Dein Kind lernt über die Réduit-Strategie und die Herausforderungen der Neutralität. Die Geschichte behandelt sowohl den Mut als auch die schwierigen Entscheidungen der Epoche.",
+    "fr": "Cette histoire historique explique la position complexe de la Suisse pendant la Seconde Guerre mondiale, abordant honnêtement le courage et les choix difficiles de l'époque.",
+    "it": "Questa storia personalizzata a sfondo storico spiega la posizione complessa della Svizzera durante la Seconda guerra mondiale. Tuo figlio scopre la strategia del Ridotto, le difficoltà di mantenere la neutralità e come la Svizzera fu rifugio e centro umanitario. La storia affronta con onestà sia il coraggio sia le scelte difficili di quell'epoca, adattata per i giovani lettori."
+  },
+  "skills": {
+    "en": "WWII history, neutrality, moral complexity, Swiss identity.",
+    "de": "Geschichte des 2. WK, Neutralität, moralische Komplexität, Schweizer Identität.",
+    "fr": "Histoire WWII, neutralité, complexité morale, identité suisse.",
+    "it": "Storia della Seconda guerra mondiale, neutralità, complessità morale, identità svizzera."
+  },
+  "ageRecommendation": "8-10",
+  "faq": [
+    {
+      "q": {
+        "en": "Is the historical content accurate?",
+        "de": "Ist der historische Inhalt korrekt?",
+        "fr": "Le contenu historique est-il exact ?",
+        "it": "Il contenuto storico è accurato?"
+      },
+      "a": {
+        "en": "Yes! The stories are carefully researched. The historical facts, dates, and key figures are accurate.",
+        "de": "Ja! Die Geschichten sind sorgfältig recherchiert.",
+        "fr": "Oui ! Les histoires sont soigneusement recherchées.",
+        "it": "Sì! Le storie sono accuratamente documentate. I fatti storici, le date e i personaggi chiave sono corretti."
+      }
+    }
+  ]
+}

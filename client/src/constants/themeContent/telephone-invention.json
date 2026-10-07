@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Hold the very first telephone with Alexander Graham Bell and hear a human voice travel through a wire for the first time.",
+    "de": "Halte mit Alexander Graham Bell das allererste Telefon und höre zum ersten Mal eine menschliche Stimme durch einen Draht.",
+    "fr": "Tenez le tout premier téléphone avec Alexander Graham Bell et entendez une voix humaine voyager à travers un fil.",
+    "it": "Tieni in mano il primissimo telefono con Alexander Graham Bell e ascolta per la prima volta una voce umana viaggiare attraverso un filo."
+  },
+  "longDescription": {
+    "en": "This personalized historical story takes your child to 1876 to witness Alexander Graham Bell's first telephone call. Your child experiences the wonder of hearing a voice travel through a wire and learns how this invention connected the world forever. The story connects to modern communication, showing how far we have come.",
+    "de": "Diese Geschichtserzählung nimmt dein Kind mit ins Jahr 1876 zum ersten Telefonanruf. Dein Kind erlebt das Staunen, eine Stimme durch einen Draht zu hören, und lernt, wie diese Erfindung die Welt für immer verband.",
+    "fr": "Cette histoire historique emmène votre enfant en 1876 pour le premier appel téléphonique d'Alexander Graham Bell.",
+    "it": "Questa storia personalizzata a sfondo storico porta tuo figlio nel 1876 ad assistere alla prima chiamata telefonica di Alexander Graham Bell. Tuo figlio vive la meraviglia di sentire una voce viaggiare attraverso un filo e scopre come questa invenzione abbia collegato il mondo per sempre. La storia si collega alla comunicazione moderna, mostrando quanta strada abbiamo fatto."
+  },
+  "skills": {
+    "en": "Invention, communication history, persistence, technology evolution.",
+    "de": "Erfindung, Kommunikationsgeschichte, Ausdauer, Technologieentwicklung.",
+    "fr": "Invention, histoire de la communication, persévérance, évolution technologique.",
+    "it": "Invenzione, storia della comunicazione, costanza, evoluzione della tecnologia."
+  },
+  "ageRecommendation": "5-10",
+  "faq": [
+    {
+      "q": {
+        "en": "Is the historical content accurate?",
+        "de": "Ist der historische Inhalt korrekt?",
+        "fr": "Le contenu historique est-il exact ?",
+        "it": "Il contenuto storico è accurato?"
+      },
+      "a": {
+        "en": "Yes! The stories are carefully researched. The historical facts, dates, and key figures are accurate.",
+        "de": "Ja! Die Geschichten sind sorgfältig recherchiert.",
+        "fr": "Oui ! Les histoires sont soigneusement recherchées.",
+        "it": "Sì! Le storie sono accuratamente documentate. I fatti storici, le date e i personaggi chiave sono corretti."
+      }
+    }
+  ]
+}

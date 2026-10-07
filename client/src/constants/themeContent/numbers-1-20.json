@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Count all the way to twenty and discover the exciting pattern that makes teen numbers easy to remember.",
+    "de": "Bis zwanzig zählen und das spannende Muster entdecken, das die Teenager-Zahlen leicht merkbar macht.",
+    "fr": "Compter jusqu'à vingt et découvrir le motif passionnant qui rend les nombres faciles à retenir.",
+    "it": "Contare fino a venti e scoprire l'entusiasmante schema che rende facili da ricordare i numeri della seconda decina."
+  },
+  "longDescription": {
+    "en": "This personalized educational story extends counting to twenty through an adventure filled with increasingly large collections. Your child discovers the pattern of teen numbers (thirteen = three + ten), practices skip-counting by twos, and uses counting in practical situations throughout the story. Each number gets its own moment in the narrative, making the learning memorable and fun.",
+    "de": "Diese Lerngeschichte erweitert das Zählen bis zwanzig durch ein Abenteuer mit immer grösseren Sammlungen. Dein Kind entdeckt das Muster der Teenager-Zahlen und übt Zählen in Zweierschritten. Jede Zahl bekommt ihren eigenen Moment in der Geschichte.",
+    "fr": "Cette histoire éducative étend le comptage jusqu'à vingt à travers une aventure. Votre enfant découvre le motif des nombres et pratique le comptage par deux.",
+    "it": "Questa storia educativa personalizzata estende il conteggio fino a venti attraverso un'avventura piena di collezioni via via più grandi. Tuo figlio scopre lo schema dei numeri della seconda decina (tredici = tre + dieci), esercita il conteggio a salti di due e usa il contare in situazioni pratiche lungo tutta la storia. Ogni numero ha il suo momento nella narrazione, rendendo l'apprendimento memorabile e divertente."
+  },
+  "skills": {
+    "en": "Extended counting, number patterns, skip counting, mathematical thinking.",
+    "de": "Erweitertes Zählen, Zahlenmuster, Zählen in Schritten, mathematisches Denken.",
+    "fr": "Comptage étendu, motifs numériques, comptage par sauts, pensée mathématique.",
+    "it": "Conteggio esteso, schemi numerici, conteggio a salti, pensiero matematico."
+  },
+  "ageRecommendation": "4-6",
+  "faq": [
+    {
+      "q": {
+        "en": "Will my child actually learn from this story?",
+        "de": "Lernt mein Kind wirklich etwas?",
+        "fr": "Mon enfant apprend-il vraiment ?",
+        "it": "Mio figlio imparerà davvero da questa storia?"
+      },
+      "a": {
+        "en": "Yes! Research shows children learn most effectively through stories. The educational content is woven into the narrative so learning happens naturally.",
+        "de": "Ja! Forschung zeigt, dass Kinder am besten durch Geschichten lernen.",
+        "fr": "Oui ! La recherche montre que les enfants apprennent mieux à travers les histoires.",
+        "it": "Sì! Le ricerche dimostrano che i bambini imparano più efficacemente attraverso le storie. Il contenuto educativo è intrecciato nella narrazione, così l'apprendimento avviene in modo naturale."
+      }
+    }
+  ]
+}

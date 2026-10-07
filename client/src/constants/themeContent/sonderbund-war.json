@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Experience the short conflict that ultimately forged modern Switzerland into the united federal state it is today.",
+    "de": "Erlebe den kurzen Konflikt, der die moderne Schweiz zum vereinten Bundesstaat formte, der sie heute ist.",
+    "fr": "Vivre le bref conflit qui forgea la Suisse moderne en l'État fédéral uni qu'elle est aujourd'hui.",
+    "it": "Vivi il breve conflitto che alla fine forgiò la Svizzera moderna nello stato federale unito che è oggi."
+  },
+  "longDescription": {
+    "en": "This personalized historical story brings the Sonderbund War of 1847 to life. Your child witnesses how internal conflict between Catholic and Protestant cantons was resolved quickly and with minimal bloodshed, leading directly to the creation of the Swiss Federal Constitution. A story about how disagreement can lead to a stronger union.",
+    "de": "Diese Geschichtserzählung erweckt den Sonderbundskrieg von 1847 zum Leben. Dein Kind erlebt, wie der interne Konflikt zwischen Kantonen schnell und mit wenig Blutvergiessen gelöst wurde und direkt zur Bundesverfassung führte.",
+    "fr": "Cette histoire historique fait revivre la Guerre du Sonderbund de 1847. Votre enfant découvre comment le conflit interne mena à la création de la Constitution fédérale.",
+    "it": "Questa storia storica personalizzata dà vita alla guerra del Sonderbund del 1847. Tuo figlio scopre come il conflitto interno tra cantoni cattolici e protestanti fu risolto rapidamente e con pochissimo spargimento di sangue, portando direttamente alla creazione della Costituzione federale svizzera. Una storia su come il disaccordo possa portare a un'unione più forte."
+  },
+  "skills": {
+    "en": "Swiss history, conflict resolution, federalism, national unity.",
+    "de": "Schweizer Geschichte, Konfliktlösung, Föderalismus, nationale Einheit.",
+    "fr": "Histoire suisse, résolution de conflits, fédéralisme, unité nationale.",
+    "it": "Storia svizzera, risoluzione dei conflitti, federalismo, unità nazionale."
+  },
+  "ageRecommendation": "7-10",
+  "faq": [
+    {
+      "q": {
+        "en": "Is the historical content accurate?",
+        "de": "Ist der historische Inhalt korrekt?",
+        "fr": "Le contenu historique est-il exact ?",
+        "it": "Il contenuto storico è accurato?"
+      },
+      "a": {
+        "en": "Yes! The stories are carefully researched. The historical facts, dates, and key figures are accurate.",
+        "de": "Ja! Die Geschichten sind sorgfältig recherchiert.",
+        "fr": "Oui ! Les histoires sont soigneusement recherchées.",
+        "it": "Sì! Le storie sono accuratamente documentate. I fatti storici, le date e i personaggi chiave sono esatti."
+      }
+    }
+  ]
+}

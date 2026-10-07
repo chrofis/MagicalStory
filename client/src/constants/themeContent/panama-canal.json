@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Watch as engineers carve a waterway through mountains and jungle to connect two great oceans.",
+    "de": "Beobachte, wie Ingenieure einen Wasserweg durch Berge und Dschungel graben, um zwei grosse Ozeane zu verbinden.",
+    "fr": "Regardez des ingénieurs creuser une voie navigable à travers montagnes et jungle pour relier deux grands océans.",
+    "it": "Guarda gli ingegneri scavare una via d'acqua tra montagne e giungla per collegare due grandi oceani."
+  },
+  "longDescription": {
+    "en": "This personalized historical story takes your child to 1914 to witness the opening of the Panama Canal, one of the greatest engineering feats in history. Your child learns about the massive effort to connect the Atlantic and Pacific oceans, the challenges of building through jungle and mountains, and how this waterway changed world trade forever.",
+    "de": "Diese Geschichtserzählung nimmt dein Kind mit ins Jahr 1914 zur Eröffnung des Panamakanals. Dein Kind lernt über die gewaltige Leistung, zwei Ozeane zu verbinden, und wie dieser Wasserweg den Welthandel für immer veränderte.",
+    "fr": "Cette histoire historique emmène votre enfant en 1914 pour l'ouverture du canal de Panama, l'un des plus grands exploits d'ingénierie de l'histoire.",
+    "it": "Questa storia personalizzata a sfondo storico porta tuo figlio nel 1914 all'inaugurazione del Canale di Panama, una delle più grandi imprese ingegneristiche della storia. Tuo figlio scopre l'enorme sforzo compiuto per collegare l'Oceano Atlantico e il Pacifico, le difficoltà di costruire attraverso giungla e montagne, e come questa via d'acqua abbia cambiato per sempre il commercio mondiale."
+  },
+  "skills": {
+    "en": "Engineering, perseverance, geography, global trade.",
+    "de": "Ingenieurskunst, Ausdauer, Geografie, Welthandel.",
+    "fr": "Ingénierie, persévérance, géographie, commerce mondial.",
+    "it": "Ingegneria, perseveranza, geografia, commercio mondiale."
+  },
+  "ageRecommendation": "5-10",
+  "faq": [
+    {
+      "q": {
+        "en": "Is the historical content accurate?",
+        "de": "Ist der historische Inhalt korrekt?",
+        "fr": "Le contenu historique est-il exact ?",
+        "it": "Il contenuto storico è accurato?"
+      },
+      "a": {
+        "en": "Yes! The stories are carefully researched. The historical facts, dates, and key figures are accurate.",
+        "de": "Ja! Die Geschichten sind sorgfältig recherchiert.",
+        "fr": "Oui ! Les histoires sont soigneusement recherchées.",
+        "it": "Sì! Le storie sono accuratamente documentate. I fatti storici, le date e i personaggi chiave sono corretti."
+      }
+    }
+  ]
+}

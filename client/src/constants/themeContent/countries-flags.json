@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Discover colorful flags from around the world and learn what each country's design tells about its history and culture.",
+    "de": "Bunte Flaggen aus aller Welt entdecken und lernen, was das Design jedes Landes über seine Geschichte und Kultur verrät.",
+    "fr": "Découvrir les drapeaux colorés du monde entier et apprendre ce que le design de chaque pays raconte sur son histoire.",
+    "it": "Scopri le bandiere colorate di tutto il mondo e impara cosa racconta il design di ogni paese sulla sua storia e cultura."
+  },
+  "longDescription": {
+    "en": "This personalized educational story turns flag recognition into a treasure hunt around the world. Your child visits different countries, discovers their flags, and learns the stories behind the colors and symbols. Why does Switzerland have a white cross? Why does Japan have a red circle? Through these fascinating stories, your child develops an appreciation for world cultures and the visual language of national identity.",
+    "de": "Diese Lerngeschichte verwandelt Flaggenerkennung in eine Schatzsuche um die Welt. Dein Kind besucht verschiedene Länder, entdeckt ihre Flaggen und lernt die Geschichten hinter den Farben und Symbolen. Warum hat die Schweiz ein weisses Kreuz?",
+    "fr": "Cette histoire éducative transforme la reconnaissance des drapeaux en chasse au trésor autour du monde. Votre enfant découvre les histoires fascinantes derrière les couleurs et symboles.",
+    "it": "Questa storia educativa personalizzata trasforma il riconoscimento delle bandiere in una caccia al tesoro in giro per il mondo. Tuo figlio visita diversi paesi, scopre le loro bandiere e impara le storie dietro i colori e i simboli. Perché la Svizzera ha una croce bianca? Perché il Giappone ha un cerchio rosso? Attraverso queste storie affascinanti, tuo figlio sviluppa un apprezzamento per le culture del mondo e per il linguaggio visivo dell'identità nazionale."
+  },
+  "skills": {
+    "en": "Geography, cultural literacy, visual recognition, world awareness.",
+    "de": "Geografie, Kulturwissen, visuelle Erkennung, Weltbewusstsein.",
+    "fr": "Géographie, culture générale, reconnaissance visuelle, conscience mondiale.",
+    "it": "Geografia, cultura generale, riconoscimento visivo, consapevolezza del mondo."
+  },
+  "ageRecommendation": "5-8",
+  "faq": [
+    {
+      "q": {
+        "en": "Will my child actually learn from this story?",
+        "de": "Lernt mein Kind wirklich etwas?",
+        "fr": "Mon enfant apprend-il vraiment ?",
+        "it": "Mio figlio imparerà davvero qualcosa da questa storia?"
+      },
+      "a": {
+        "en": "Yes! Flags become memorable when connected to stories about each country. Children love testing themselves afterward.",
+        "de": "Ja! Flaggen werden einprägsam, wenn sie mit Geschichten über jedes Land verbunden sind.",
+        "fr": "Oui ! Les drapeaux deviennent mémorables quand ils sont liés à des histoires.",
+        "it": "Sì! Le bandiere diventano memorabili quando sono legate a storie su ogni paese. Ai bambini piace mettersi alla prova dopo la lettura."
+      }
+    }
+  ]
+}

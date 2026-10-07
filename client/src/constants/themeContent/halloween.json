@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Your child dons a costume, ventures into a friendly haunted neighborhood, and solves a spooky mystery before midnight.",
+    "de": "Dein Kind zieht sich ein Kostüm an, erkundet eine freundlich-gruselige Nachbarschaft und löst vor Mitternacht ein gespenstisches Geheimnis.",
+    "fr": "Votre enfant revêt un costume, s'aventure dans un quartier amicalement hanté et résout un mystère effrayant avant minuit.",
+    "it": "Tuo figlio indossa un costume, si avventura in un quartiere amichevolmente infestato e risolve un mistero da brivido prima di mezzanotte."
+  },
+  "longDescription": {
+    "en": "Your child puts on an amazing costume and ventures into a friendly-spooky neighborhood on Halloween night. When the town's candy chest vanishes, your child follows silly-spooky clues to find it before midnight.\n\nThe story takes the fear out of Halloween — friendly monsters, giggly ghosts, and a mischievous black cat. Every illustration features your child trick-or-treating under a harvest moon. Perfect for children aged 4 to 8 who want Halloween excitement without real scares.",
+    "de": "Dein Kind zieht ein Kostüm an und erkundet eine freundlich-gruselige Nachbarschaft. Als eine Süssigkeitentruhe verschwindet, folgt dein Kind lustigen Hinweisen. Die Geschichte macht Halloween lustig statt gruselig. Perfekt für Kinder von 4 bis 8 Jahren.",
+    "fr": "Votre enfant explore un quartier amicalement effrayant. L'histoire rend Halloween amusant, pas effrayant. Parfait pour les enfants de 4 à 8 ans.",
+    "it": "Tuo figlio indossa uno straordinario costume e si avventura in un quartiere amichevolmente spettrale nella notte di Halloween. Quando il forziere di dolci del paese scompare, tuo figlio segue indizi buffi e un po' inquietanti per ritrovarlo prima di mezzanotte.\n\nLa storia toglie la paura da Halloween — mostri simpatici, fantasmi ridacchianti e un gatto nero dispettoso. Ogni illustrazione ritrae tuo figlio a bussare di porta in porta sotto una luna piena autunnale. Perfetta per bambini dai 4 agli 8 anni che vogliono l'emozione di Halloween senza spaventi veri."
+  },
+  "skills": {
+    "en": "Courage, creative expression, mystery-solving, fun with mild spookiness.",
+    "de": "Mut, kreativer Ausdruck, Rätsellösung, spielerischer Grusel.",
+    "fr": "Courage, expression créative, résolution de mystères, amusement.",
+    "it": "Coraggio, espressione creativa, risoluzione di misteri, divertimento con un tocco di brivido leggero."
+  },
+  "ageRecommendation": "4-8",
+  "faq": [
+    {
+      "q": {
+        "en": "Is it too scary for sensitive children?",
+        "de": "Zu gruselig für empfindliche Kinder?",
+        "fr": "Trop effrayant pour les enfants sensibles ?",
+        "it": "È troppo spaventosa per i bambini più sensibili?"
+      },
+      "a": {
+        "en": "Not at all! Everything is fun-spooky. Ghosts giggle and monsters are friendly.",
+        "de": "Überhaupt nicht! Alles ist lustig-gruselig. Geister kichern und Monster sind freundlich.",
+        "fr": "Pas du tout ! Tout est amusant. Les fantômes rigolent et les monstres sont sympathiques.",
+        "it": "Assolutamente no! Tutto è divertente e solo leggermente inquietante. I fantasmi ridacchiano e i mostri sono amichevoli."
+      }
+    }
+  ]
+}

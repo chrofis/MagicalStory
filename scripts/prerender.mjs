@@ -92,7 +92,7 @@ const swissStoriesData = {
 const indexHtmlTemplate = fs.readFileSync(INDEX_HTML, 'utf-8');
 
 // ── Import the SSR bundle ────────────────────────────────────────────────────
-const { render, enumerateRoutes } = await import(pathToFileURL(SSR_BUNDLE).href);
+const { render, enumerateRoutes, themeContentForRoute } = await import(pathToFileURL(SSR_BUNDLE).href);
 
 // ── Enumerate routes ─────────────────────────────────────────────────────────
 const routes = enumerateRoutes(enrichedCities);
@@ -162,7 +162,11 @@ for (const route of routes) {
   for (const language of LANGUAGES) {
     try {
       const swissStories = buildSwissStoriesForRoute(route);
-      const seoData = swissStories ? { swissStories } : null;
+      // A theme route carries its ONE theme's content (the catalogue is no longer in the client bundle)
+      const themeContent = themeContentForRoute(route);
+      const seoData = swissStories || themeContent
+        ? { swissStories: swissStories || null, ...(themeContent ? { themeContent } : {}) }
+        : null;
       const { html: rawBodyHtml } = render({ url: route, language, seoData });
 
       // React 19's renderToString auto-emits <link rel="preload" as="image">

@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Follow a raindrop on its incredible journey from cloud to river to ocean and back up into the sky.",
+    "de": "Folge einem Regentropfen auf seiner unglaublichen Reise von der Wolke zum Fluss zum Ozean und zurück in den Himmel.",
+    "fr": "Suivez une goutte de pluie dans son incroyable voyage du nuage à la rivière, à l'océan et retour dans le ciel.",
+    "it": "Segui una goccia di pioggia nel suo incredibile viaggio dalla nuvola al fiume, all'oceano e di nuovo su nel cielo."
+  },
+  "longDescription": {
+    "en": "This personalized educational story makes the water cycle come alive by following a single raindrop named Splash on its endless journey. Your child travels with Splash from cloud to rain to puddle to stream to river to ocean, then watches evaporation carry Splash back up to form a new cloud. The story explains condensation, precipitation, and evaporation through vivid storytelling rather than textbook definitions. Children understand for the first time that the water they drink may once have been part of a dinosaur's ocean.",
+    "de": "Diese Lerngeschichte erweckt den Wasserkreislauf zum Leben, indem sie einem Regentropfen namens Splash auf seiner endlosen Reise folgt. Dein Kind reist mit Splash von der Wolke zum Regen zum Fluss zum Ozean und sieht, wie Verdunstung Splash zurück in eine neue Wolke trägt.",
+    "fr": "Cette histoire éducative suit une goutte de pluie nommée Splash dans son voyage sans fin. L'évaporation, la condensation et les précipitations sont expliquées par une narration vivante.",
+    "it": "Questa storia educativa personalizzata dà vita al ciclo dell'acqua seguendo una singola goccia di pioggia di nome Splash nel suo viaggio senza fine. Tuo figlio viaggia insieme a Splash dalla nuvola alla pioggia, alla pozzanghera, al ruscello, al fiume, all'oceano, per poi vedere come l'evaporazione riporta Splash in alto a formare una nuova nuvola. La storia spiega condensazione, precipitazione ed evaporazione con una narrazione vivace, non con definizioni da manuale. I bambini capiscono per la prima volta che l'acqua che bevono potrebbe essere stata, un tempo, parte dell'oceano dei dinosauri."
+  },
+  "skills": {
+    "en": "Water cycle, evaporation, precipitation, environmental awareness.",
+    "de": "Wasserkreislauf, Verdunstung, Niederschlag, Umweltbewusstsein.",
+    "fr": "Cycle de l'eau, évaporation, précipitations, conscience environnementale.",
+    "it": "Ciclo dell'acqua, evaporazione, precipitazioni, consapevolezza ambientale."
+  },
+  "ageRecommendation": "4-7",
+  "faq": [
+    {
+      "q": {
+        "en": "Will my child actually learn from this story?",
+        "de": "Lernt mein Kind wirklich etwas?",
+        "fr": "Mon enfant apprend-il vraiment ?",
+        "it": "Mio figlio imparerà davvero qualcosa da questa storia?"
+      },
+      "a": {
+        "en": "Yes! Following a character through the cycle makes the science memorable. Children often explain it back to their parents afterward.",
+        "de": "Ja! Einer Figur durch den Kreislauf zu folgen macht die Wissenschaft einprägsam.",
+        "fr": "Oui ! Suivre un personnage rend la science mémorable.",
+        "it": "Sì! Seguire un personaggio lungo tutto il ciclo rende la scienza memorabile. I bambini spesso la spiegano poi ai genitori."
+      }
+    }
+  ]
+}

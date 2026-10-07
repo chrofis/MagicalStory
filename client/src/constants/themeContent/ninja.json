@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Your child trains as a ninja, masters stealth and discipline, and completes a daring secret mission.",
+    "de": "Dein Kind wird zum Ninja ausgebildet, lernt Stille und Disziplin und vollführt eine waghalsige Geheimmission.",
+    "fr": "Votre enfant s'entraîne comme un ninja, maîtrise la furtivité et la discipline, et accomplit une mission secrète audacieuse.",
+    "it": "Tuo figlio si allena come ninja, padroneggia furtività e disciplina e porta a termine un'audace missione segreta."
+  },
+  "longDescription": {
+    "en": "In this thrilling personalized ninja adventure, your child enters the hidden dojo of a legendary ninja master and begins training in stealth, balance, and focus. Under the watchful eye of a wise sensei, your little ninja learns to move silently through bamboo forests, leap across rooftops, and solve challenges requiring patience and quick thinking.\n\nWhen a mysterious message requests help, your child embarks on a secret mission through a moonlit Japanese landscape filled with cherry blossoms, ancient temples, and hidden passages. The story celebrates discipline, focus, and inner strength — showing children that the most powerful weapon is their mind.\n\nEvery illustration features your child in a sleek ninja outfit, performing acrobatic moves and outsmarting obstacles. Parents appreciate how it channels energy into positive values: concentration, respect, and patience. The adventure is exciting without being aggressive.",
+    "de": "In diesem spannenden Ninja-Abenteuer betritt dein Kind das verborgene Dojo eines legendären Ninja-Meisters und beginnt sein Training in Tarnung, Balance und Konzentration. Unter dem wachsamen Auge eines weisen Senseis lernt dein kleiner Ninja, sich lautlos durch Bambuswälder zu bewegen und Herausforderungen mit Geduld und schnellem Denken zu meistern.\n\nAls eine geheimnisvolle Nachricht um Hilfe bittet, bricht dein Kind zu einer Geheimmission durch eine mondbeleuchtete japanische Landschaft auf. Die Geschichte feiert Disziplin, Fokus und innere Stärke.\n\nJede Illustration zeigt dein Kind im Ninja-Outfit bei akrobatischen Bewegungen. Eltern schätzen, wie das Thema Energie in positive Werte kanalisiert: Konzentration, Respekt und Geduld.",
+    "fr": "Dans cette aventure ninja palpitante, votre enfant entre dans le dojo caché d'un maître ninja légendaire. L'histoire célèbre la discipline, la concentration et la force intérieure. Les parents apprécient comment le thème canalise l'énergie vers des valeurs positives.",
+    "it": "In questa avvincente avventura da ninja personalizzata, tuo figlio entra nel dojo nascosto di un leggendario maestro ninja e inizia l'addestramento in furtività, equilibrio e concentrazione. Sotto lo sguardo vigile di un saggio sensei, il tuo piccolo ninja impara a muoversi silenziosamente tra i boschi di bambù, a saltare da un tetto all'altro e a risolvere sfide che richiedono pazienza e prontezza di pensiero.\n\nQuando un misterioso messaggio chiede aiuto, tuo figlio parte per una missione segreta attraverso un paesaggio giapponese illuminato dalla luna, pieno di fiori di ciliegio, antichi templi e passaggi nascosti. La storia celebra la disciplina, la concentrazione e la forza interiore — mostrando ai bambini che l'arma più potente è la loro mente.\n\nOgni illustrazione ritrae tuo figlio in un elegante costume da ninja, mentre esegue mosse acrobatiche e supera gli ostacoli con astuzia. I genitori apprezzano come incanali l'energia verso valori positivi: concentrazione, rispetto e pazienza. L'avventura è emozionante senza essere aggressiva."
+  },
+  "skills": {
+    "en": "Focus, self-discipline, patience, physical coordination, quick thinking.",
+    "de": "Fokus, Selbstdisziplin, Geduld, körperliche Koordination, schnelles Denken.",
+    "fr": "Concentration, autodiscipline, patience, coordination physique, réflexion rapide.",
+    "it": "Concentrazione, autodisciplina, pazienza, coordinazione fisica, prontezza di pensiero."
+  },
+  "ageRecommendation": "4-9",
+  "faq": [
+    {
+      "q": {
+        "en": "Is the ninja story too intense for preschoolers?",
+        "de": "Ist die Ninja-Geschichte zu intensiv für Vorschulkinder?",
+        "fr": "L'histoire de ninja est-elle trop intense ?",
+        "it": "La storia del ninja è troppo intensa per i bambini in età prescolare?"
+      },
+      "a": {
+        "en": "No, missions involve stealth and puzzles, not combat. Children as young as 4 enjoy it.",
+        "de": "Nein, die Missionen beinhalten Tarnung und Rätsel, keinen Kampf.",
+        "fr": "Non, les missions sont des énigmes et de la furtivité, pas des combats.",
+        "it": "No, le missioni si basano su furtività ed enigmi, non su combattimenti. Piace anche ai bambini a partire dai 4 anni."
+      }
+    }
+  ]
+}

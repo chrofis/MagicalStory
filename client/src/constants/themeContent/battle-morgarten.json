@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Stand with a small band of Swiss farmers as they outsmart a much larger army at the Battle of Morgarten.",
+    "de": "Steh mit einer kleinen Gruppe Schweizer Bauern, die bei der Schlacht am Morgarten ein viel grösseres Heer überlisten.",
+    "fr": "Restez aux côtés d'un petit groupe de fermiers suisses qui déjouent une armée bien plus grande à Morgarten.",
+    "it": "Resta al fianco di un piccolo gruppo di contadini svizzeri mentre superano in astuzia un esercito molto più grande nella battaglia di Morgarten."
+  },
+  "longDescription": {
+    "en": "This personalized historical story transports your child to 1315 to witness the Battle of Morgarten, where a small group of Swiss confederates used the mountain terrain to defeat a much larger Habsburg army. Your child sees how cleverness and knowledge of the land can overcome brute force, learning about Swiss independence and mountain strategy.",
+    "de": "Diese personalisierte Geschichtserzählung versetzt dein Kind ins Jahr 1315 zur Schlacht am Morgarten, wo eine kleine Gruppe Eidgenossen das Berggelände nutzte, um ein viel grösseres Habsburger-Heer zu besiegen. Dein Kind lernt, wie Cleverness und Geländekenntnis rohe Gewalt überwinden können.",
+    "fr": "Cette histoire historique transporte votre enfant en 1315 pour la bataille de Morgarten, où un petit groupe de confédérés suisses utilisa le terrain montagneux pour vaincre une armée bien plus grande.",
+    "it": "Questa storia storica personalizzata trasporta tuo figlio nel 1315 per assistere alla battaglia di Morgarten, dove un piccolo gruppo di confederati svizzeri usò il terreno montano per sconfiggere un esercito asburgico molto più numeroso. Tuo figlio scopre come l'astuzia e la conoscenza del territorio possano avere la meglio sulla forza bruta, imparando qualcosa sull'indipendenza svizzera e sulla strategia in montagna."
+  },
+  "skills": {
+    "en": "Swiss history, strategy, teamwork, independence.",
+    "de": "Schweizer Geschichte, Strategie, Teamarbeit, Unabhängigkeit.",
+    "fr": "Histoire suisse, stratégie, travail d'équipe, indépendance.",
+    "it": "Storia svizzera, strategia, lavoro di squadra, indipendenza."
+  },
+  "ageRecommendation": "6-10",
+  "faq": [
+    {
+      "q": {
+        "en": "Is the historical content accurate?",
+        "de": "Ist der historische Inhalt korrekt?",
+        "fr": "Le contenu historique est-il exact ?",
+        "it": "Il contenuto storico è accurato?"
+      },
+      "a": {
+        "en": "Yes! The stories are carefully researched. The historical facts, dates, and key figures are accurate.",
+        "de": "Ja! Die Geschichten sind sorgfältig recherchiert.",
+        "fr": "Oui ! Les histoires sont soigneusement recherchées.",
+        "it": "Sì! Le storie sono accuratamente documentate. I fatti storici, le date e i personaggi chiave sono esatti."
+      }
+    }
+  ]
+}

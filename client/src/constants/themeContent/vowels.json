@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Meet the five special letters — A, E, I, O, U — that appear in every single word you will ever read.",
+    "de": "Lerne die fünf besonderen Buchstaben kennen — A, E, I, O, U — die in jedem Wort vorkommen, das du je lesen wirst.",
+    "fr": "Rencontrez les cinq lettres spéciales — A, E, I, O, U — qui apparaissent dans chaque mot que vous lirez jamais.",
+    "it": "Scopri le cinque lettere speciali — A, E, I, O, U — che compaiono in ogni singola parola che leggerai mai."
+  },
+  "longDescription": {
+    "en": "This personalized educational story introduces the five vowels as special characters on a language adventure. Your child discovers that every word needs at least one vowel to work — they are like the engine of every word. Through playful scenes, your child learns both short and long vowel sounds, finds vowels hidden in character names, and practices with fun word games woven into the narrative. The story makes phonics feel like play rather than study.",
+    "de": "Diese personalisierte Lerngeschichte stellt die fünf Vokale als besondere Figuren auf einem Sprachabenteuer vor. Dein Kind entdeckt, dass jedes Wort mindestens einen Vokal braucht. Durch spielerische Szenen lernt dein Kind kurze und lange Vokale und übt mit lustigen Wortspielen in der Geschichte.",
+    "fr": "Cette histoire éducative personnalisée présente les cinq voyelles comme des personnages spéciaux. Votre enfant découvre que chaque mot a besoin d'au moins une voyelle. L'apprentissage se fait par le jeu.",
+    "it": "Questa storia educativa personalizzata presenta le cinque vocali come personaggi speciali in un'avventura linguistica. Tuo figlio scopre che ogni parola ha bisogno di almeno una vocale per funzionare — sono come il motore di ogni parola. Attraverso scene giocose, tuo figlio impara i suoni vocalici brevi e lunghi, trova le vocali nascoste nei nomi dei personaggi e si esercita con divertenti giochi di parole intrecciati nella narrazione. La storia rende la fonetica un gioco, non uno studio."
+  },
+  "skills": {
+    "en": "Vowel recognition, phonics, reading readiness, language awareness.",
+    "de": "Vokalerkennung, Laute, Lesevorbereitung, Sprachbewusstsein.",
+    "fr": "Reconnaissance des voyelles, phonétique, préparation à la lecture, conscience linguistique.",
+    "it": "Riconoscimento delle vocali, fonetica, preparazione alla lettura, consapevolezza linguistica."
+  },
+  "ageRecommendation": "4-6",
+  "faq": [
+    {
+      "q": {
+        "en": "Will my child actually learn from this story?",
+        "de": "Lernt mein Kind wirklich etwas?",
+        "fr": "Mon enfant apprend-il vraiment ?",
+        "it": "Mio figlio imparerà davvero da questa storia?"
+      },
+      "a": {
+        "en": "Yes! Research shows children learn most effectively through stories. The educational content is woven into the narrative so learning happens naturally.",
+        "de": "Ja! Forschung zeigt, dass Kinder am besten durch Geschichten lernen. Die Inhalte sind in die Handlung eingewoben.",
+        "fr": "Oui ! La recherche montre que les enfants apprennent mieux à travers les histoires.",
+        "it": "Sì! Le ricerche dimostrano che i bambini imparano più efficacemente attraverso le storie. Il contenuto educativo è intrecciato nella narrazione, così l'apprendimento avviene in modo naturale."
+      }
+    }
+  ]
+}

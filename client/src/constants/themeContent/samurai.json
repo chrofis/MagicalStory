@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Your child trains under a wise sensei, masters the code of bushido, and defends their village with honor.",
+    "de": "Dein Kind lernt bei einem weisen Sensei, meistert den Ehrenkodex Bushido und verteidigt sein Dorf mit Heldenmut.",
+    "fr": "Votre enfant s'entraîne auprès d'un sage sensei, maîtrise le code du bushido et défend son village avec honneur.",
+    "it": "Tuo figlio si allena sotto la guida di un saggio sensei, padroneggia il codice del bushido e difende il proprio villaggio con onore."
+  },
+  "longDescription": {
+    "en": "Your child enters the serene world of feudal Japan, where cherry blossoms fall like pink snow and temples rise above misty mountains. Under a wise sensei, your young samurai learns the seven virtues of bushido: courage, honor, compassion, respect, honesty, loyalty, and self-control.\n\nThrough challenges — balancing on a bridge, calming a horse, solving an ancient riddle — your child proves they can protect their village. The story celebrates Japanese culture with bamboo groves, koi ponds, and traditional dojos. Your child wears a samurai outfit and practices with a bamboo sword. Perfect for children aged 4 to 9 drawn to martial arts or Japanese culture.",
+    "de": "Dein Kind betritt die friedvolle Welt des feudalen Japan. Unter einem weisen Sensei lernt dein junger Samurai die sieben Tugenden des Bushido. Durch Herausforderungen beweist dein Kind seinen Mut. Die Geschichte feiert die japanische Kultur mit Bambushainen und Dojos. Perfekt für Kinder von 4 bis 9 Jahren.",
+    "fr": "Votre enfant entre dans le monde serein du Japon féodal et apprend les sept vertus du bushido. L'histoire célèbre la culture japonaise. Parfait pour les enfants de 4 à 9 ans.",
+    "it": "Tuo figlio entra nel mondo sereno del Giappone feudale, dove i fiori di ciliegio cadono come neve rosa e i templi si ergono sopra montagne avvolte nella nebbia. Sotto la guida di un saggio sensei, il tuo giovane samurai impara le sette virtù del bushido: coraggio, onore, compassione, rispetto, onestà, lealtà e autocontrollo.\n\nAttraverso varie prove — mantenere l'equilibrio su un ponte, calmare un cavallo, risolvere un antico indovinello — tuo figlio dimostra di saper proteggere il proprio villaggio. La storia celebra la cultura giapponese con boschi di bambù, stagni di carpe koi e dojo tradizionali. Tuo figlio indossa un abito da samurai e si esercita con una spada di bambù. Perfetta per bambini dai 4 ai 9 anni appassionati di arti marziali o cultura giapponese."
+  },
+  "skills": {
+    "en": "Discipline, respect, honor, integrity, cultural appreciation.",
+    "de": "Disziplin, Respekt, Ehre, Integrität, kulturelle Wertschätzung.",
+    "fr": "Discipline, respect, honneur, intégrité, appréciation culturelle.",
+    "it": "Disciplina, rispetto, onore, integrità, apprezzamento culturale."
+  },
+  "ageRecommendation": "4-9",
+  "faq": [
+    {
+      "q": {
+        "en": "Does it contain sword fighting?",
+        "de": "Gibt es Schwertkämpfe?",
+        "fr": "Y a-t-il des combats à l'épée ?",
+        "it": "Include combattimenti con la spada?"
+      },
+      "a": {
+        "en": "No real fighting. Challenges are solved through wisdom and respect.",
+        "de": "Keine echten Kämpfe. Herausforderungen werden durch Weisheit gelöst.",
+        "fr": "Pas de vrai combat. Les défis sont relevés par la sagesse.",
+        "it": "Nessun combattimento reale. Le sfide vengono risolte con saggezza e rispetto."
+      }
+    }
+  ]
+}

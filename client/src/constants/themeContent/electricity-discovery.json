@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Fly a kite into a thunderstorm with Benjamin Franklin and feel the spark that changed the modern world.",
+    "de": "Lass mit Benjamin Franklin einen Drachen in ein Gewitter steigen und spüre den Funken, der die moderne Welt veränderte.",
+    "fr": "Faites voler un cerf-volant dans un orage avec Benjamin Franklin et ressentez l'étincelle qui changea le monde moderne.",
+    "it": "Fai volare un aquilone in un temporale con Benjamin Franklin e senti la scintilla che ha cambiato il mondo moderno."
+  },
+  "longDescription": {
+    "en": "This personalized historical story takes your child to 1752 to witness Benjamin Franklin's legendary kite experiment. Your child learns about the power of curiosity, the scientific method, and how understanding electricity transformed human civilization. A thrilling story about one of science's greatest breakthroughs.",
+    "de": "Diese Geschichtserzählung nimmt dein Kind mit ins Jahr 1752 zu Benjamin Franklins legendärem Drachenexperiment. Dein Kind lernt über die Kraft der Neugierde und wie das Verständnis von Elektrizität die Zivilisation veränderte.",
+    "fr": "Cette histoire historique emmène votre enfant en 1752 pour l'expérience légendaire du cerf-volant de Benjamin Franklin.",
+    "it": "Questa storia personalizzata a sfondo storico porta tuo figlio nel 1752 ad assistere al leggendario esperimento dell'aquilone di Benjamin Franklin. Tuo figlio scopre la forza della curiosità, il metodo scientifico e come la comprensione dell'elettricità abbia trasformato la civiltà umana. Una storia avvincente su una delle più grandi scoperte della scienza."
+  },
+  "skills": {
+    "en": "Scientific curiosity, electricity basics, experimentation, history of science.",
+    "de": "Wissenschaftliche Neugierde, Elektrizitäts-Grundlagen, Experimentieren, Wissenschaftsgeschichte.",
+    "fr": "Curiosité scientifique, bases de l'électricité, expérimentation, histoire des sciences.",
+    "it": "Curiosità scientifica, nozioni base di elettricità, sperimentazione, storia della scienza."
+  },
+  "ageRecommendation": "5-10",
+  "faq": [
+    {
+      "q": {
+        "en": "Is the historical content accurate?",
+        "de": "Ist der historische Inhalt korrekt?",
+        "fr": "Le contenu historique est-il exact ?",
+        "it": "Il contenuto storico è accurato?"
+      },
+      "a": {
+        "en": "Yes! The stories are carefully researched. The historical facts, dates, and key figures are accurate.",
+        "de": "Ja! Die Geschichten sind sorgfältig recherchiert.",
+        "fr": "Oui ! Les histoires sont soigneusement recherchées.",
+        "it": "Sì! Le storie sono accuratamente documentate. I fatti storici, le date e i personaggi chiave sono corretti."
+      }
+    }
+  ]
+}

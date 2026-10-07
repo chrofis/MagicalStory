@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Discover the magic of words that sound alike and learn to create your own silly rhymes.",
+    "de": "Die Magie von Wörtern entdecken, die sich gleich anhören, und eigene lustige Reime erfinden.",
+    "fr": "Découvrir la magie des mots qui se ressemblent et apprendre à créer ses propres rimes amusantes.",
+    "it": "Scopri la magia delle parole che suonano simili e impara a inventare le tue buffe rime."
+  },
+  "longDescription": {
+    "en": "This personalized educational story turns rhyming into a musical adventure. Your child discovers that words like cat/hat, moon/spoon, and tree/free share a special sound connection. Through a journey where rhyming words unlock doors, solve puzzles, and make animals laugh, your child naturally absorbs phonological awareness — a key building block for reading. The story encourages creating new rhymes and celebrates silly word play.",
+    "de": "Diese Lerngeschichte verwandelt Reimen in ein musikalisches Abenteuer. Dein Kind entdeckt, dass Wörter wie Maus/Haus und Baum/Traum eine besondere Klangverbindung teilen. Die Geschichte fördert phonologisches Bewusstsein — ein Schlüsselbaustein fürs Lesen.",
+    "fr": "Cette histoire éducative transforme les rimes en aventure musicale. Votre enfant découvre les connexions sonores entre les mots, développant la conscience phonologique essentielle à la lecture.",
+    "it": "Questa storia educativa personalizzata trasforma le rime in un'avventura musicale. Tuo figlio scopre che parole come gatto/matto, luna/duna e sole/cuore condividono un legame sonoro speciale. Attraverso un viaggio in cui le parole in rima aprono porte, risolvono enigmi e fanno ridere gli animali, tuo figlio assorbe naturalmente la consapevolezza fonologica — un tassello fondamentale per la lettura. La storia incoraggia a inventare nuove rime e celebra i giochi di parole più buffi."
+  },
+  "skills": {
+    "en": "Phonological awareness, word play, pre-reading skills, creativity.",
+    "de": "Phonologisches Bewusstsein, Wortspiele, Lesevorbereitung, Kreativität.",
+    "fr": "Conscience phonologique, jeux de mots, pré-lecture, créativité.",
+    "it": "Consapevolezza fonologica, giochi di parole, competenze pre-lettura, creatività."
+  },
+  "ageRecommendation": "3-6",
+  "faq": [
+    {
+      "q": {
+        "en": "Will my child actually learn from this story?",
+        "de": "Lernt mein Kind wirklich etwas?",
+        "fr": "Mon enfant apprend-il vraiment ?",
+        "it": "Mio figlio imparerà davvero da questa storia?"
+      },
+      "a": {
+        "en": "Yes! Rhyming is one of the strongest predictors of reading success. This story builds the skill through play.",
+        "de": "Ja! Reimen ist einer der stärksten Prädiktoren für Leseerfolg. Diese Geschichte baut die Fähigkeit spielerisch auf.",
+        "fr": "Oui ! Les rimes sont un prédicteur fort du succès en lecture.",
+        "it": "Sì! Le rime sono uno dei predittori più forti del successo nella lettura. Questa storia costruisce l'abilità attraverso il gioco."
+      }
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Your child joins Santa on Christmas Eve, helps deliver gifts around the world, and discovers the true magic of giving.",
+    "de": "Dein Kind begleitet den Weihnachtsmann am Heiligen Abend, liefert Geschenke aus und erlebt die Magie des Schenkens.",
+    "fr": "Votre enfant accompagne le Père Noël la veille de Noël, distribue des cadeaux et découvre la vraie magie du don.",
+    "it": "Tuo figlio accompagna Babbo Natale la vigilia di Natale, aiuta a consegnare i regali in tutto il mondo e scopre la vera magia del donare."
+  },
+  "longDescription": {
+    "en": "Your child receives a magical letter from Santa asking for help on Christmas Eve! Whisked to the North Pole, your child helps elves wrap presents, feeds reindeer, and joins Santa delivering gifts around the world.\n\nFlying over snow-covered rooftops, squeezing down chimneys, and leaving presents under twinkling trees, your child discovers the true magic of Christmas — the joy of giving. A beautiful keepsake to read every year.",
+    "de": "Dein Kind erhält einen magischen Brief vom Weihnachtsmann! Am Nordpol hilft es Elfen und begleitet den Weihnachtsmann auf seiner Reise. Die Geschichte feiert die Freude am Schenken. Ein wunderschönes Andenken für jedes Weihnachten.",
+    "fr": "Votre enfant reçoit une lettre magique du Père Noël ! L'histoire célèbre la joie de donner. Un beau souvenir à relire chaque Noël.",
+    "it": "Tuo figlio riceve una lettera magica da Babbo Natale che chiede aiuto per la vigilia di Natale! Portato al Polo Nord, tuo figlio aiuta gli elfi a incartare i regali, dà da mangiare alle renne e si unisce a Babbo Natale nella consegna dei doni in tutto il mondo.\n\nVolando sopra tetti innevati, infilandosi nei camini e lasciando regali sotto alberi scintillanti, tuo figlio scopre la vera magia del Natale — la gioia di donare. Un bellissimo ricordo da leggere ogni anno."
+  },
+  "skills": {
+    "en": "Generosity, gratitude, the joy of giving, family values.",
+    "de": "Grosszügigkeit, Dankbarkeit, Freude am Schenken, Familienwerte.",
+    "fr": "Générosité, gratitude, joie de donner, valeurs familiales.",
+    "it": "Generosità, gratitudine, gioia del donare, valori familiari."
+  },
+  "ageRecommendation": "3-8",
+  "faq": [
+    {
+      "q": {
+        "en": "Is it religious?",
+        "de": "Ist es religiös?",
+        "fr": "Est-ce religieux ?",
+        "it": "È religioso?"
+      },
+      "a": {
+        "en": "It focuses on Santa, gift-giving, and family togetherness. Secular and inclusive.",
+        "de": "Es konzentriert sich auf den Weihnachtsmann und Familienzeit. Weltlich und inklusiv.",
+        "fr": "L'histoire se concentre sur le Père Noël et la famille. Laïque et inclusive.",
+        "it": "Si concentra su Babbo Natale, sul dono dei regali e sulla vicinanza in famiglia. Laico e inclusivo."
+      }
+    }
+  ]
+}

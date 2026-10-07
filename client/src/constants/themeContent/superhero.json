@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Your child discovers their very own superpower and uses it to protect the city from a dastardly villain.",
+    "de": "Dein Kind entdeckt seine ganz eigene Superkraft und nutzt sie, um die Stadt vor einem fiesen Schurken zu retten.",
+    "fr": "Votre enfant découvre son propre super-pouvoir et l'utilise pour protéger la ville d'un méchant redoutable.",
+    "it": "Tuo figlio scopre il proprio superpotere e lo usa per proteggere la città da un perfido cattivo."
+  },
+  "longDescription": {
+    "en": "Your child wakes up one morning with an incredible superpower! Whether it is flying, super speed, or talking to animals, your child learns to control their gift and protect the city from a mischievous villain causing harmless but silly chaos.\n\nThe story teaches that the greatest superpower is choosing to help others. Every illustration shows your child in a custom superhero outfit, cape flowing, saving the day with a smile. Perfect for children aged 3 to 8 who dream of superpowers.",
+    "de": "Dein Kind wacht auf und entdeckt eine Superkraft! Es lernt, sie zu beherrschen und die Stadt zu beschützen. Die Geschichte lehrt, dass die grösste Superkraft die Entscheidung ist, anderen zu helfen. Perfekt für Kinder von 3 bis 8 Jahren.",
+    "fr": "Votre enfant découvre un super-pouvoir ! L'histoire montre que le plus grand pouvoir est d'aider les autres. Parfait pour les enfants de 3 à 8 ans.",
+    "it": "Una mattina tuo figlio si sveglia con un incredibile superpotere! Che si tratti di volare, di una velocità straordinaria o di parlare con gli animali, tuo figlio impara a controllare il proprio dono e a proteggere la città da un cattivo dispettoso che semina un caos innocuo ma buffo.\n\nLa storia insegna che il superpotere più grande è scegliere di aiutare gli altri. Ogni illustrazione mostra tuo figlio in un costume da supereroe su misura, mantello al vento, mentre salva la situazione con un sorriso. Perfetta per bambini dai 3 agli 8 anni che sognano superpoteri."
+  },
+  "skills": {
+    "en": "Responsibility, helping others, self-confidence, moral choices.",
+    "de": "Verantwortung, anderen helfen, Selbstvertrauen, moralische Entscheidungen.",
+    "fr": "Responsabilité, entraide, confiance en soi, choix moraux.",
+    "it": "Responsabilità, aiuto reciproco, sicurezza in se stessi, scelte morali."
+  },
+  "ageRecommendation": "3-8",
+  "faq": [
+    {
+      "q": {
+        "en": "Is the villain scary?",
+        "de": "Ist der Schurke gruselig?",
+        "fr": "Le méchant est-il effrayant ?",
+        "it": "Il cattivo fa paura?"
+      },
+      "a": {
+        "en": "The villain is mischievous, not threatening. They cause silly chaos, not real danger.",
+        "de": "Der Schurke ist schelmisch, nicht bedrohlich. Lustiges Chaos, keine echte Gefahr.",
+        "fr": "Le vilain est espiègle, pas menaçant. Il cause un chaos amusant.",
+        "it": "Il cattivo è dispettoso, non minaccioso. Semina un caos buffo, non un pericolo reale."
+      }
+    }
+  ]
+}

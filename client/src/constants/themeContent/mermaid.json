@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Your child dives into a shimmering underwater world, befriends sea creatures, and protects the ocean kingdom.",
+    "de": "Dein Kind taucht in eine schimmernde Unterwasserwelt, freundet sich mit Meerestieren an und schützt das Ozeanreich.",
+    "fr": "Votre enfant plonge dans un monde sous-marin scintillant, se lie d'amitié avec des créatures marines et protège le royaume de l'océan.",
+    "it": "Tuo figlio si immerge in un mondo sottomarino scintillante, fa amicizia con creature marine e protegge il regno dell'oceano."
+  },
+  "longDescription": {
+    "en": "Your child dives beneath the waves into a shimmering underwater kingdom of coral castles, playful dolphins, and sunken ships. Transformed into a mermaid with a sparkling tail, your child befriends sea creatures and helps the Ocean Queen find the Great Pearl that keeps the ocean clean.\n\nSwimming through underwater caves, kelp forests, and past sea turtles, your child uses kindness and cleverness to restore balance. The story teaches environmental awareness and the importance of protecting our oceans. Every illustration shows your child with a magnificent tail alongside whales and coral gardens. Perfect for children aged 3 to 7 who love the sea.",
+    "de": "Dein Kind taucht in ein Unterwasserkönigreich voller Korallenpaläste und Delfine. Als Meerjungfrau mit funkelndem Schwanz hilft dein Kind der Meereskönigin, die Grosse Perle zu finden, die das Meer sauber hält. Die Geschichte lehrt Umweltbewusstsein und Meeresschutz. Perfekt für Kinder von 3 bis 7 Jahren.",
+    "fr": "Votre enfant plonge dans un royaume sous-marin scintillant. L'histoire enseigne la conscience environnementale et la protection des océans. Parfait pour les enfants de 3 à 7 ans.",
+    "it": "Tuo figlio si tuffa sotto le onde in un regno sottomarino scintillante fatto di castelli di corallo, delfini giocosi e navi affondate. Trasformato in una sirena con una coda scintillante, tuo figlio fa amicizia con le creature marine e aiuta la Regina del Mare a trovare la Grande Perla che mantiene l'oceano pulito.\n\nNuotando tra grotte sottomarine, foreste di alghe e tartarughe marine, tuo figlio usa gentilezza e astuzia per ripristinare l'equilibrio. La storia insegna la consapevolezza ambientale e l'importanza di proteggere i nostri oceani. Ogni illustrazione mostra tuo figlio con una magnifica coda accanto a balene e giardini di corallo. Perfetta per bambini dai 3 ai 7 anni che amano il mare."
+  },
+  "skills": {
+    "en": "Environmental awareness, friendship, curiosity, compassion, ocean knowledge.",
+    "de": "Umweltbewusstsein, Freundschaft, Neugierde, Mitgefühl, Wissen über den Ozean.",
+    "fr": "Conscience environnementale, amitié, curiosité, compassion, connaissance de l'océan.",
+    "it": "Consapevolezza ambientale, amicizia, curiosità, compassione, conoscenza dell'oceano."
+  },
+  "ageRecommendation": "3-7",
+  "faq": [
+    {
+      "q": {
+        "en": "Can boys be merpeople?",
+        "de": "Können Jungen Meermenschen sein?",
+        "fr": "Les garçons peuvent-ils être des tritons ?",
+        "it": "I maschi possono essere tritoni?"
+      },
+      "a": {
+        "en": "Absolutely! Boys become mermen with equally magnificent tails.",
+        "de": "Selbstverständlich! Jungen werden zu Meermännern.",
+        "fr": "Absolument ! Les garçons deviennent des tritons.",
+        "it": "Assolutamente sì! I maschi diventano tritoni con code altrettanto magnifiche."
+      }
+    }
+  ]
+}

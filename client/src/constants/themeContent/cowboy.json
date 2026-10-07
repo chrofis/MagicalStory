@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Your child rides across the Wild West, befriends a companion, and solves a frontier mystery.",
+    "de": "Dein Kind reitet durch den Wilden Westen, findet einen Freund und löst gemeinsam ein Geheimnis der Grenzlande.",
+    "fr": "Votre enfant chevauche à travers le Far West, se lie d'amitié avec un compagnon et résout un mystère de la frontière.",
+    "it": "Tuo figlio cavalca attraverso il Far West, fa amicizia con un compagno e risolve un mistero di frontiera."
+  },
+  "longDescription": {
+    "en": "Saddle up for a Wild West adventure! In this personalized cowboy story, your child rides through dusty canyons, across wide-open prairies, and into a frontier town that needs a hero. With a trusty horse by their side, your little wrangler follows mysterious tracks, helps a lost calf find its way home, and uncovers a secret that brings the whole town together.\n\nThe story captures the spirit of the American frontier — wide skies, campfire stories, and the freedom of the open range — while keeping everything warm and age-appropriate. Along the way, your child learns about friendship, responsibility, and standing up for what is right.\n\nThe personalized illustrations show your child in full cowboy gear, lassoing, riding, and tipping their hat to grateful townspeople. This theme is perfect for children who love horses, the outdoors, and exploration. Parents appreciate how it encourages independence and resourcefulness while celebrating kindness and community. Whether read at bedtime or on a Sunday afternoon, this Wild West adventure sparks imagination and fills little hearts with the thrill of the frontier.",
+    "de": "Auf in den Wilden Westen! In dieser personalisierten Cowboy-Geschichte reitet dein Kind durch staubige Schluchten, weite Prärien und in eine Grenzstadt, die einen Helden braucht. Mit einem treuen Pferd an der Seite folgt dein kleiner Wrangler geheimnisvollen Spuren, hilft einem verirrten Kalb nach Hause und lüftet ein Geheimnis, das die ganze Stadt zusammenbringt.\n\nDie Geschichte fängt den Geist des Wilden Westens ein — weite Himmel, Lagerfeuergeschichten und die Freiheit der offenen Weite — und bleibt dabei warmherzig und altersgerecht. Unterwegs lernt dein Kind über Freundschaft, Verantwortung und wie wichtig es ist, für das Richtige einzustehen.\n\nDie personalisierten Illustrationen zeigen dein Kind in voller Cowboy-Ausrüstung. Perfekt für Kinder, die Pferde, die Natur und Abenteuer lieben. Eltern schätzen, wie das Cowboy-Thema Eigenständigkeit und Gemeinschaft feiert.",
+    "fr": "En selle pour une aventure dans le Far West ! Votre enfant chevauche à travers des canyons et des prairies pour aider une ville frontière. L'histoire capture l'esprit de la frontière américaine tout en restant chaleureuse et adaptée. Parfait pour les enfants qui aiment les chevaux et l'exploration.",
+    "it": "In sella per un'avventura nel Far West! In questa storia da cowboy personalizzata, tuo figlio cavalca attraverso canyon polverosi, ampie praterie e arriva in una città di frontiera che ha bisogno di un eroe. Con un cavallo fidato al proprio fianco, il tuo piccolo mandriano segue tracce misteriose, aiuta un vitellino smarrito a ritrovare la strada di casa e svela un segreto che unisce tutta la città.\n\nLa storia cattura lo spirito della frontiera americana — cieli immensi, racconti attorno al fuoco e la libertà degli spazi aperti — restando allo stesso tempo calda e adatta all'età. Lungo il cammino, tuo figlio impara il valore dell'amicizia, della responsabilità e del difendere ciò che è giusto.\n\nLe illustrazioni personalizzate mostrano tuo figlio con l'equipaggiamento completo da cowboy, mentre lancia il lazo, cavalca e saluta con il cappello gli abitanti riconoscenti della città. Questo tema è perfetto per i bambini che amano i cavalli, la vita all'aria aperta e l'esplorazione. I genitori apprezzano come stimoli indipendenza e intraprendenza celebrando allo stesso tempo la gentilezza e il senso di comunità. Che venga letta prima di dormire o in una domenica pomeriggio, questa avventura nel Far West accende l'immaginazione e riempie i piccoli cuori del brivido della frontiera."
+  },
+  "skills": {
+    "en": "Independence, animal care, mystery-solving, community spirit.",
+    "de": "Eigenständigkeit, Tierpflege, Rätsel lösen, Gemeinschaftssinn.",
+    "fr": "Indépendance, soin des animaux, résolution de mystères, esprit communautaire.",
+    "it": "Indipendenza, cura degli animali, risoluzione di misteri, spirito comunitario."
+  },
+  "ageRecommendation": "3-8",
+  "faq": [
+    {
+      "q": {
+        "en": "Does the cowboy story include guns?",
+        "de": "Enthält die Cowboy-Geschichte Waffen?",
+        "fr": "L'histoire inclut-elle des armes ?",
+        "it": "La storia da cowboy include armi da fuoco?"
+      },
+      "a": {
+        "en": "No. The adventure focuses on exploration, mystery-solving, and helping the community.",
+        "de": "Nein. Das Abenteuer konzentriert sich auf Erkundung und Gemeinschaftshilfe.",
+        "fr": "Non. L'aventure se concentre sur l'exploration et l'entraide.",
+        "it": "No. L'avventura si concentra sull'esplorazione, sulla risoluzione di misteri e sull'aiuto alla comunità."
+      }
+    }
+  ]
+}

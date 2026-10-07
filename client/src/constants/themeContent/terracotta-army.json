@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Unearth thousands of life-size clay soldiers guarding a Chinese emperor's tomb — each one with a unique face.",
+    "de": "Grabe Tausende lebensgrosse Tonsoldaten aus, die das Grab eines chinesischen Kaisers bewachen — jeder mit einem einzigartigen Gesicht.",
+    "fr": "Déterrez des milliers de soldats en terre cuite grandeur nature gardant le tombeau d'un empereur chinois — chacun avec un visage unique.",
+    "it": "Riporta alla luce migliaia di soldati di terracotta a grandezza naturale a guardia della tomba di un imperatore cinese, ognuno con un volto unico."
+  },
+  "longDescription": {
+    "en": "This personalized historical story takes your child to 1974 China when farmers accidentally discovered the Terracotta Army while digging a well. Your child joins the excavation and discovers thousands of life-size clay soldiers, each with a unique face, guarding the tomb of Emperor Qin Shi Huang. A story about one of archaeology's greatest surprises and the artistry of ancient China.",
+    "de": "Diese Geschichtserzählung nimmt dein Kind mit ins China von 1974, als Bauern beim Brunnenbohren zufällig die Terrakotta-Armee entdeckten. Dein Kind schliesst sich der Ausgrabung an und entdeckt Tausende lebensgrosse Tonsoldaten mit jeweils einzigartigem Gesicht.",
+    "fr": "Cette histoire historique emmène votre enfant en Chine en 1974 quand des fermiers découvrirent accidentellement l'armée de terre cuite.",
+    "it": "Questa storia personalizzata a sfondo storico porta tuo figlio nella Cina del 1974, quando alcuni contadini scoprirono per caso l'Esercito di Terracotta scavando un pozzo. Tuo figlio partecipa allo scavo e scopre migliaia di soldati di terracotta a grandezza naturale, ognuno con un volto unico, a guardia della tomba dell'Imperatore Qin Shi Huang. Una storia su una delle più grandi sorprese dell'archeologia e sull'arte dell'antica Cina."
+  },
+  "skills": {
+    "en": "Chinese history, archaeology, artistic achievement, accidental discovery.",
+    "de": "Chinesische Geschichte, Archäologie, künstlerische Leistung, zufällige Entdeckung.",
+    "fr": "Histoire chinoise, archéologie, réalisation artistique, découverte accidentelle.",
+    "it": "Storia cinese, archeologia, traguardo artistico, scoperta casuale."
+  },
+  "ageRecommendation": "5-10",
+  "faq": [
+    {
+      "q": {
+        "en": "Is the historical content accurate?",
+        "de": "Ist der historische Inhalt korrekt?",
+        "fr": "Le contenu historique est-il exact ?",
+        "it": "Il contenuto storico è accurato?"
+      },
+      "a": {
+        "en": "Yes! The stories are carefully researched. The historical facts, dates, and key figures are accurate.",
+        "de": "Ja! Die Geschichten sind sorgfältig recherchiert.",
+        "fr": "Oui ! Les histoires sont soigneusement recherchées.",
+        "it": "Sì! Le storie sono accuratamente documentate. I fatti storici, le date e i personaggi chiave sono corretti."
+      }
+    }
+  ]
+}

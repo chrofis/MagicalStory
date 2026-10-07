@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Your child follows the Easter Bunny through a colorful garden, hunts for decorated eggs, and discovers springtime wonders.",
+    "de": "Dein Kind folgt dem Osterhasen durch einen bunten Garten, sucht bemalte Eier und entdeckt die Wunder des Frühlings.",
+    "fr": "Votre enfant suit le lapin de Pâques dans un jardin coloré, cherche des œufs décorés et découvre les merveilles du printemps.",
+    "it": "Tuo figlio segue il Coniglietto di Pasqua attraverso un giardino colorato, cerca uova decorate e scopre le meraviglie della primavera."
+  },
+  "longDescription": {
+    "en": "Your child follows the Easter Bunny through a magical spring garden filled with blooming flowers and hidden surprises. Together they hunt for beautifully decorated eggs — and one special golden egg that grants a wish!\n\nThe story celebrates spring, the joy of searching, and the magic of renewal. Your child helps baby animals, plants seeds, and shares chocolate with friends. Every illustration bursts with color. Perfect for children aged 3 to 7 during Easter.",
+    "de": "Dein Kind folgt dem Osterhasen durch einen magischen Frühlingsgarten und sucht bemalte Eier — darunter ein goldenes Ei, das einen Wunsch erfüllt! Die Geschichte feiert den Frühling und die Freude am Suchen. Perfekt für Kinder von 3 bis 7 Jahren.",
+    "fr": "Votre enfant suit le lapin de Pâques dans un jardin printanier magique. L'histoire célèbre le printemps et la recherche. Parfait pour les enfants de 3 à 7 ans.",
+    "it": "Tuo figlio segue il Coniglietto di Pasqua attraverso un magico giardino primaverile pieno di fiori sbocciati e sorprese nascoste. Insieme cercano uova decorate in modo splendido — e un uovo dorato speciale che esaudisce un desiderio!\n\nLa storia celebra la primavera, la gioia della ricerca e la magia del rinnovamento. Tuo figlio aiuta cuccioli di animali, pianta semi e condivide cioccolato con gli amici. Ogni illustrazione esplode di colori. Perfetta per bambini dai 3 ai 7 anni durante il periodo pasquale."
+  },
+  "skills": {
+    "en": "Curiosity, searching and finding, spring awareness, joy of sharing.",
+    "de": "Neugierde, Suchen und Finden, Frühlingsbewusstsein, Freude am Teilen.",
+    "fr": "Curiosité, recherche, conscience du printemps, joie du partage.",
+    "it": "Curiosità, cercare e trovare, consapevolezza della primavera, gioia della condivisione."
+  },
+  "ageRecommendation": "3-7",
+  "faq": [
+    {
+      "q": {
+        "en": "Is it religious?",
+        "de": "Ist es religiös?",
+        "fr": "Est-ce religieux ?",
+        "it": "È religiosa?"
+      },
+      "a": {
+        "en": "It focuses on the Easter Bunny, egg hunts, and spring. Secular and fun.",
+        "de": "Es konzentriert sich auf den Osterhasen und den Frühling. Weltlich und fröhlich.",
+        "fr": "L'histoire se concentre sur le lapin de Pâques et le printemps. Laïque et joyeuse.",
+        "it": "Si concentra sul Coniglietto di Pasqua, sulla caccia alle uova e sulla primavera. Laica e divertente."
+      }
+    }
+  ]
+}

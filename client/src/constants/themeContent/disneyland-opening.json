@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Walk through the gates of Disneyland on opening day with Walt Disney and see a dream become reality.",
+    "de": "Geh am Eröffnungstag mit Walt Disney durch die Tore von Disneyland und erlebe, wie ein Traum Wirklichkeit wird.",
+    "fr": "Franchissez les portes de Disneyland le jour de l'ouverture avec Walt Disney et voyez un rêve devenir réalité.",
+    "it": "Varca i cancelli di Disneyland il giorno dell'apertura con Walt Disney e guarda un sogno diventare realtà."
+  },
+  "longDescription": {
+    "en": "This personalized historical story takes your child to 1955 to join Walt Disney as Disneyland opens its gates for the first time. Your child explores the magical park, rides the original attractions, and learns about Walt's incredible journey from a boy who loved to draw to the creator of the happiest place on Earth. A story about imagination, persistence, and the power of dreams.",
+    "de": "Diese Geschichtserzählung nimmt dein Kind mit ins Jahr 1955, als Disneyland zum ersten Mal seine Tore öffnete. Dein Kind erkundet den magischen Park und lernt Walts unglaubliche Reise vom zeichnenden Jungen zum Schöpfer des glücklichsten Ortes der Welt.",
+    "fr": "Cette histoire historique emmène votre enfant en 1955 quand Disneyland ouvrit ses portes pour la première fois.",
+    "it": "Questa storia personalizzata a sfondo storico porta tuo figlio nel 1955, quando Disneyland aprì i suoi cancelli per la prima volta insieme a Walt Disney. Tuo figlio esplora il parco magico, prova le attrazioni originali e scopre l'incredibile percorso di Walt, da bambino appassionato di disegno a creatore del luogo più felice della Terra. Una storia sull'immaginazione, la perseveranza e la forza dei sogni."
+  },
+  "skills": {
+    "en": "Imagination, persistence, creativity, entrepreneurship.",
+    "de": "Fantasie, Ausdauer, Kreativität, Unternehmertum.",
+    "fr": "Imagination, persévérance, créativité, esprit d'entreprise.",
+    "it": "Immaginazione, perseveranza, creatività, spirito imprenditoriale."
+  },
+  "ageRecommendation": "5-10",
+  "faq": [
+    {
+      "q": {
+        "en": "Is the historical content accurate?",
+        "de": "Ist der historische Inhalt korrekt?",
+        "fr": "Le contenu historique est-il exact ?",
+        "it": "Il contenuto storico è accurato?"
+      },
+      "a": {
+        "en": "Yes! The stories are carefully researched. The historical facts, dates, and key figures are accurate.",
+        "de": "Ja! Die Geschichten sind sorgfältig recherchiert.",
+        "fr": "Oui ! Les histoires sont soigneusement recherchées.",
+        "it": "Sì! Le storie sono accuratamente documentate. I fatti storici, le date e i personaggi chiave sono corretti."
+      }
+    }
+  ]
+}

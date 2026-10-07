@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Your child picks up a magnifying glass and follows clues through a twisting mystery that only the sharpest mind can crack.",
+    "de": "Dein Kind nimmt die Lupe zur Hand, folgt Hinweisen durch ein verwirrendes Rätsel und löst den Fall mit scharfem Verstand.",
+    "fr": "Votre enfant saisit sa loupe et suit des indices à travers un mystère sinueux que seul l'esprit le plus vif peut résoudre.",
+    "it": "Tuo figlio prende una lente d'ingrandimento e segue gli indizi in un mistero avvincente che solo la mente più acuta può risolvere."
+  },
+  "longDescription": {
+    "en": "Your child picks up a magnifying glass and dons a detective's cap. A priceless painting has vanished from the museum! Following cryptic clues — a mysterious footprint, a torn ticket, a coded message — your child narrows down suspects and cracks the case.\n\nThe story teaches logical thinking, careful observation, and the satisfaction of solving problems step by step. Perfect for children aged 4 to 9 who love puzzles and mysteries.",
+    "de": "Dein Kind nimmt die Lupe und löst den Fall eines verschwundenen Gemäldes! Die Geschichte lehrt logisches Denken und die Zufriedenheit, Probleme Schritt für Schritt zu lösen. Perfekt für Kinder von 4 bis 9 Jahren.",
+    "fr": "Votre enfant prend sa loupe et résout un mystère au musée. L'histoire enseigne la pensée logique. Parfait pour les enfants de 4 à 9 ans.",
+    "it": "Tuo figlio prende una lente d'ingrandimento e indossa il cappello da detective. Un quadro inestimabile è scomparso dal museo! Seguendo indizi criptici — un'impronta misteriosa, un biglietto strappato, un messaggio in codice — tuo figlio restringe il cerchio dei sospetti e risolve il caso.\n\nLa storia insegna il pensiero logico, l'osservazione attenta e la soddisfazione di risolvere i problemi passo dopo passo. Perfetta per bambini dai 4 ai 9 anni che amano gli enigmi e i misteri."
+  },
+  "skills": {
+    "en": "Logical thinking, observation, deduction, patience, persistence.",
+    "de": "Logisches Denken, Beobachtungsgabe, Deduktion, Geduld, Ausdauer.",
+    "fr": "Pensée logique, observation, déduction, patience, persévérance.",
+    "it": "Pensiero logico, capacità di osservazione, deduzione, pazienza, perseveranza."
+  },
+  "ageRecommendation": "4-9",
+  "faq": [
+    {
+      "q": {
+        "en": "How complex is the mystery?",
+        "de": "Wie komplex ist das Rätsel?",
+        "fr": "Le mystère est-il complexe ?",
+        "it": "Quanto è complesso il mistero?"
+      },
+      "a": {
+        "en": "Age-appropriate with clear clues. The AI adjusts complexity based on the child's age.",
+        "de": "Altersgerecht mit klaren Hinweisen. Die KI passt die Komplexität an.",
+        "fr": "Adapté à l'âge avec des indices clairs. L'IA ajuste la complexité.",
+        "it": "Adatto all'età, con indizi chiari. L'IA adatta la complessità in base all'età del bambino."
+      }
+    }
+  ]
+}

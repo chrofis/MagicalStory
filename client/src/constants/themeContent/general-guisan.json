@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Join General Guisan on the Rütli meadow in 1940 as he rallies Switzerland to defend its freedom against all odds.",
+    "de": "Begleite General Guisan 1940 auf die Rütli-Wiese, als er die Schweiz versammelt, um ihre Freiheit um jeden Preis zu verteidigen.",
+    "fr": "Rejoignez le Général Guisan au Grütli en 1940 alors qu'il rassemble la Suisse pour défendre sa liberté.",
+    "it": "Unisciti al Generale Guisan sul Prato del Grütli nel 1940, mentre raduna la Svizzera per difendere la propria libertà contro ogni previsione."
+  },
+  "longDescription": {
+    "en": "This personalized historical story takes your child to 1940 to witness General Henri Guisan's famous Rütli Report, where he gathered Swiss military leaders on the historic meadow to declare Switzerland's determination to resist invasion. Your child learns about courage, national unity, and standing firm in the face of overwhelming pressure.",
+    "de": "Diese Geschichtserzählung nimmt dein Kind mit ins Jahr 1940 zum berühmten Rütlirapport, wo General Guisan die Schweizer Offiziere auf der historischen Wiese versammelte, um den Verteidigungswillen zu bekräftigen.",
+    "fr": "Cette histoire historique emmène votre enfant en 1940 pour le célèbre Rapport du Grütli, où le Général Guisan rassembla les officiers suisses.",
+    "it": "Questa storia personalizzata a sfondo storico porta tuo figlio nel 1940 ad assistere al celebre Rapporto del Grütli del Generale Henri Guisan, quando radunò i comandanti militari svizzeri sul prato storico per dichiarare la determinazione della Svizzera a resistere a un'invasione. Tuo figlio impara il coraggio, l'unità nazionale e la fermezza di fronte a una pressione schiacciante."
+  },
+  "skills": {
+    "en": "Leadership, courage, Swiss WWII history, national determination.",
+    "de": "Führung, Mut, Schweizer Geschichte im 2. WK, nationale Entschlossenheit.",
+    "fr": "Leadership, courage, histoire suisse WWII, détermination nationale.",
+    "it": "Leadership, coraggio, storia svizzera della Seconda guerra mondiale, determinazione nazionale."
+  },
+  "ageRecommendation": "7-10",
+  "faq": [
+    {
+      "q": {
+        "en": "Is the historical content accurate?",
+        "de": "Ist der historische Inhalt korrekt?",
+        "fr": "Le contenu historique est-il exact ?",
+        "it": "Il contenuto storico è accurato?"
+      },
+      "a": {
+        "en": "Yes! The stories are carefully researched. The historical facts, dates, and key figures are accurate.",
+        "de": "Ja! Die Geschichten sind sorgfältig recherchiert.",
+        "fr": "Oui ! Les histoires sont soigneusement recherchées.",
+        "it": "Sì! Le storie sono accuratamente documentate. I fatti storici, le date e i personaggi chiave sono corretti."
+      }
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Learn the seven days and discover why every day of the week has its own special rhythm.",
+    "de": "Lerne die sieben Wochentage kennen und entdecke, warum jeder Tag seinen eigenen besonderen Rhythmus hat.",
+    "fr": "Apprenez les sept jours et découvrez pourquoi chaque jour de la semaine a son propre rythme particulier.",
+    "it": "Impara i sette giorni e scopri perché ogni giorno della settimana ha il suo ritmo speciale."
+  },
+  "longDescription": {
+    "en": "This personalized educational story turns learning about the days of the week into an exciting adventure where your child is the hero. Instead of flashcards and worksheets, your child discovers the days of the week through a narrative journey filled with colorful illustrations, interactive moments, and gentle challenges that make learning feel like play.\n\nEvery page features your child exploring, discovering, and mastering new concepts in a story context that makes knowledge stick. The AI-generated narrative weaves educational content seamlessly into an engaging plot, so children absorb information naturally rather than through rote memorization. Research shows that children learn most effectively when they are emotionally engaged with the material — and nothing engages a child more than being the hero of their own story.\n\nParents and educators appreciate how this approach makes the days of the week accessible and fun for children who might otherwise resist structured learning. The story can be read repeatedly, with children noticing new details and reinforcing their understanding each time.",
+    "de": "Diese personalisierte Lerngeschichte verwandelt das Thema Wochentage in ein spannendes Abenteuer, in dem dein Kind der Held ist. Statt Karteikarten und Arbeitsblättern entdeckt dein Kind die Wochentage durch eine Erzählreise voller bunter Illustrationen, interaktiver Momente und sanfter Herausforderungen.\n\nJede Seite zeigt dein Kind beim Erkunden und Meistern neuer Konzepte im Rahmen einer Geschichte, die Wissen verankert. Die KI-generierte Erzählung verwebt Bildungsinhalte nahtlos in eine fesselnde Handlung, sodass Kinder Informationen natürlich aufnehmen statt durch stures Auswendiglernen. Forschung zeigt, dass Kinder am effektivsten lernen, wenn sie emotional eingebunden sind — und nichts fesselt ein Kind mehr als der Held seiner eigenen Geschichte zu sein.\n\nEltern und Pädagogen schätzen, wie dieser Ansatz die Wochentage zugänglich und spassig macht, auch für Kinder, die sich gegen strukturiertes Lernen sträuben.",
+    "fr": "Cette histoire éducative personnalisée transforme l'apprentissage des jours de la semaine en aventure passionnante où votre enfant est le héros. L'IA intègre le contenu éducatif dans une histoire captivante. Les parents apprécient comment cette approche rend les jours de la semaine accessibles et amusant.",
+    "it": "Questa storia educativa personalizzata trasforma l'apprendimento dei giorni della settimana in un'avventura entusiasmante in cui tuo figlio è l'eroe. Invece di schede e fogli di esercizi, tuo figlio scopre i giorni della settimana attraverso un viaggio narrativo pieno di illustrazioni colorate, momenti interattivi e piccole sfide che rendono l'apprendimento simile al gioco.\n\nOgni pagina mostra tuo figlio esplorare, scoprire e padroneggiare nuovi concetti all'interno di una storia che fa sedimentare la conoscenza. La narrazione generata dall'IA intreccia i contenuti educativi in una trama coinvolgente, così i bambini assorbono le informazioni in modo naturale invece che con l'apprendimento meccanico. Le ricerche mostrano che i bambini imparano nel modo più efficace quando sono coinvolti emotivamente nel materiale — e nulla coinvolge un bambino più che essere l'eroe della propria storia.\n\nGenitori ed educatori apprezzano come questo approccio renda i giorni della settimana accessibili e divertenti anche per i bambini che altrimenti resisterebbero all'apprendimento strutturato. La storia può essere letta più volte, e ogni volta il bambino nota nuovi dettagli e rafforza la propria comprensione."
+  },
+  "skills": {
+    "en": "Time concepts, routine understanding, sequencing, memory.",
+    "de": "Zeitbegriffe, Routinen verstehen, Reihenfolge, Gedächtnis.",
+    "fr": "Concepts de temps, compréhension des routines, séquençage, mémoire.",
+    "it": "Concetti di tempo, comprensione delle routine, sequenze, memoria."
+  },
+  "ageRecommendation": "4-6",
+  "faq": [
+    {
+      "q": {
+        "en": "Will my child actually learn from this story?",
+        "de": "Lernt mein Kind wirklich etwas?",
+        "fr": "Mon enfant apprend-il vraiment ?",
+        "it": "Mio figlio imparerà davvero da questa storia?"
+      },
+      "a": {
+        "en": "Yes! Research shows children learn most effectively through stories. The educational content is woven into the narrative so learning happens naturally through engagement, not rote memorization.",
+        "de": "Ja! Forschung zeigt, dass Kinder am besten durch Geschichten lernen. Die Inhalte sind in die Handlung eingewoben.",
+        "fr": "Oui ! La recherche montre que les enfants apprennent mieux à travers les histoires.",
+        "it": "Sì! Le ricerche dimostrano che i bambini imparano nel modo più efficace attraverso le storie. Il contenuto educativo è intrecciato nella narrazione, così l'apprendimento avviene in modo naturale grazie al coinvolgimento, non attraverso la memorizzazione meccanica."
+      }
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Your child travels back 65 million years, tames a friendly dinosaur, and explores a prehistoric jungle.",
+    "de": "Dein Kind reist 65 Millionen Jahre zurück, zähmt einen freundlichen Dinosaurier und erkundet einen urzeitlichen Dschungel.",
+    "fr": "Votre enfant voyage 65 millions d'années en arrière, apprivoise un dinosaure amical et explore une jungle préhistorique.",
+    "it": "Tuo figlio viaggia indietro nel tempo di 65 milioni di anni, addomestica un dinosauro amichevole ed esplora una giungla preistorica."
+  },
+  "longDescription": {
+    "en": "Your child travels 65 million years back through a time portal into a lush prehistoric jungle where dinosaurs still roam. Your young paleontologist befriends a Brachiosaurus, rides a Triceratops, and learns to identify species by their footprints and diets.\n\nWhen a volcano rumbles, your child guides their dinosaur friends to safety. The story weaves real paleontological facts into an exciting narrative. Every illustration shows your child in explorer gear surrounded by magnificent dinosaurs. Perfect for dinosaur-obsessed children aged 3 to 8.",
+    "de": "Dein Kind reist 65 Millionen Jahre zurück in einen urzeitlichen Dschungel. Dein kleiner Paläontologe freundet sich mit Dinosauriern an und lernt echte Fakten über verschiedene Arten. Perfekt für dinosaurierbegeisterte Kinder von 3 bis 8 Jahren.",
+    "fr": "Votre enfant voyage 65 millions d'années en arrière. L'histoire intègre de vrais faits paléontologiques. Parfait pour les enfants passionnés de dinosaures.",
+    "it": "Tuo figlio viaggia 65 milioni di anni indietro nel tempo, attraverso un portale temporale, in una rigogliosa giungla preistorica dove i dinosauri vivono ancora. Il tuo giovane paleontologo fa amicizia con un Brachiosauro, cavalca un Triceratopo e impara a identificare le specie dalle loro impronte e dalla loro dieta.\n\nQuando un vulcano inizia a brontolare, tuo figlio guida i suoi amici dinosauri verso la salvezza. La storia intreccia fatti paleontologici reali in una narrazione avvincente. Ogni illustrazione mostra tuo figlio con l'attrezzatura da esploratore circondato da magnifici dinosauri. Perfetta per bambini appassionati di dinosauri dai 3 agli 8 anni."
+  },
+  "skills": {
+    "en": "Paleontology basics, bravery, scientific curiosity, friendship with animals.",
+    "de": "Grundlagen der Paläontologie, Mut, wissenschaftliche Neugierde, Tierfreundschaft.",
+    "fr": "Bases de paléontologie, courage, curiosité scientifique, amitié avec les animaux.",
+    "it": "Basi di paleontologia, coraggio, curiosità scientifica, amicizia con gli animali."
+  },
+  "ageRecommendation": "3-8",
+  "faq": [
+    {
+      "q": {
+        "en": "Does it include real facts?",
+        "de": "Enthält es echte Fakten?",
+        "fr": "Inclut-il de vrais faits ?",
+        "it": "Include fatti reali?"
+      },
+      "a": {
+        "en": "Yes! Real paleontological facts about species, diets, and habitats are woven into the adventure.",
+        "de": "Ja! Echte paläontologische Fakten sind in das Abenteuer eingewoben.",
+        "fr": "Oui ! De vrais faits paléontologiques sont intégrés à l'aventure.",
+        "it": "Sì! Fatti paleontologici reali su specie, diete e habitat sono intrecciati nell'avventura."
+      }
+    }
+  ]
+}

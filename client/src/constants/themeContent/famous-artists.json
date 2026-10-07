@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Meet legendary artists like Picasso and Monet and discover how they saw the world differently through their art.",
+    "de": "Legendäre Künstler wie Picasso und Monet treffen und entdecken, wie sie die Welt durch ihre Kunst anders sahen.",
+    "fr": "Rencontrer des artistes légendaires comme Picasso et Monet et découvrir comment ils voyaient le monde différemment.",
+    "it": "Incontra artisti leggendari come Picasso e Monet e scopri come vedevano il mondo in modo diverso attraverso la loro arte."
+  },
+  "longDescription": {
+    "en": "This personalized educational story takes your child on a tour through art history, meeting famous artists and seeing the world through their eyes. Your child visits Monet's garden, Picasso's studio, and Van Gogh's starry night. Each artist's unique style is explained in a way children can understand and try themselves. The story celebrates creativity, different perspectives, and the idea that there is no single 'right' way to make art. It inspires children to experiment with their own artistic expression.",
+    "de": "Diese Lerngeschichte nimmt dein Kind mit auf eine Tour durch die Kunstgeschichte. Dein Kind besucht Monets Garten, Picassos Atelier und Van Goghs Sternennacht. Die Geschichte feiert Kreativität und verschiedene Perspektiven und inspiriert Kinder, mit eigenem künstlerischen Ausdruck zu experimentieren.",
+    "fr": "Cette histoire éducative emmène votre enfant à travers l'histoire de l'art, rencontrant des artistes célèbres. L'histoire célèbre la créativité et inspire les enfants à expérimenter.",
+    "it": "Questa storia educativa personalizzata porta tuo figlio in un viaggio nella storia dell'arte, incontrando artisti famosi e vedendo il mondo con i loro occhi. Tuo figlio visita il giardino di Monet, l'atelier di Picasso e la notte stellata di Van Gogh. Lo stile unico di ogni artista viene spiegato in un modo comprensibile per i bambini, che possono anche provarlo da soli. La storia celebra la creatività, i diversi punti di vista e l'idea che non esiste un unico modo «giusto» di fare arte. Ispira i bambini a sperimentare la propria espressione artistica."
+  },
+  "skills": {
+    "en": "Art appreciation, creativity, diverse perspectives, art history basics.",
+    "de": "Kunstschätzung, Kreativität, verschiedene Perspektiven, Kunstgeschichte-Grundlagen.",
+    "fr": "Appréciation de l'art, créativité, perspectives diverses, bases d'histoire de l'art.",
+    "it": "Apprezzamento dell'arte, creatività, prospettive diverse, nozioni base di storia dell'arte."
+  },
+  "ageRecommendation": "5-8",
+  "faq": [
+    {
+      "q": {
+        "en": "Will my child actually learn from this story?",
+        "de": "Lernt mein Kind wirklich etwas?",
+        "fr": "Mon enfant apprend-il vraiment ?",
+        "it": "Mio figlio imparerà davvero qualcosa da questa storia?"
+      },
+      "a": {
+        "en": "Yes! Children start recognizing famous artworks and want to try different styles themselves.",
+        "de": "Ja! Kinder erkennen berühmte Kunstwerke und wollen selbst verschiedene Stile ausprobieren.",
+        "fr": "Oui ! Les enfants commencent à reconnaître des œuvres célèbres et veulent essayer eux-mêmes.",
+        "it": "Sì! I bambini iniziano a riconoscere opere d'arte famose e vogliono provare da soli stili diversi."
+      }
+    }
+  ]
+}

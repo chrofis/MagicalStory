@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Explore rain, sun, wind, and snow — and understand why the sky keeps changing its mood.",
+    "de": "Regen, Sonne, Wind und Schnee erkunden — und verstehen, warum der Himmel immer seine Stimmung wechselt.",
+    "fr": "Explorer la pluie, le soleil, le vent et la neige — et comprendre pourquoi le ciel change constamment d'humeur.",
+    "it": "Scopri la pioggia, il sole, il vento e la neve — e capisci perché il cielo cambia continuamente umore."
+  },
+  "longDescription": {
+    "en": "This personalized educational story takes your child on a journey through all types of weather. From sunny days perfect for picnics to rainy days that make puddles for jumping, your child discovers what causes different weather, how to dress for each type, and why weather matters for plants, animals, and people. The story introduces simple meteorological concepts in a fun, accessible way.",
+    "de": "Diese Lerngeschichte nimmt dein Kind mit auf eine Reise durch alle Wetterarten. Von sonnigen Picknicktagen bis zu Regentagen mit Pfützenhüpfen entdeckt dein Kind, was verschiedenes Wetter verursacht und warum es für Pflanzen, Tiere und Menschen wichtig ist.",
+    "fr": "Cette histoire éducative emmène votre enfant à travers tous les types de météo. Simple et accessible, elle introduit des concepts météorologiques de base.",
+    "it": "Questa storia educativa personalizzata porta tuo figlio in un viaggio attraverso tutti i tipi di tempo atmosferico. Dalle giornate di sole perfette per un picnic ai giorni di pioggia con le pozzanghere da saltare, tuo figlio scopre cosa causa i diversi fenomeni meteorologici, come vestirsi in ogni occasione e perché il tempo è importante per piante, animali e persone. La storia introduce semplici concetti di meteorologia in modo divertente e accessibile."
+  },
+  "skills": {
+    "en": "Weather awareness, seasonal knowledge, dressing appropriately, scientific curiosity.",
+    "de": "Wetterbewusstsein, Jahreszeitenwissen, passende Kleidung, wissenschaftliche Neugierde.",
+    "fr": "Conscience météo, connaissances saisonnières, s'habiller correctement, curiosité scientifique.",
+    "it": "Consapevolezza del tempo atmosferico, conoscenza delle stagioni, come vestirsi in modo adeguato, curiosità scientifica."
+  },
+  "ageRecommendation": "3-6",
+  "faq": [
+    {
+      "q": {
+        "en": "Will my child actually learn from this story?",
+        "de": "Lernt mein Kind wirklich etwas?",
+        "fr": "Mon enfant apprend-il vraiment ?",
+        "it": "Mio figlio imparerà davvero qualcosa da questa storia?"
+      },
+      "a": {
+        "en": "Yes! After reading, children start noticing and naming weather patterns in their daily life.",
+        "de": "Ja! Nach dem Lesen beginnen Kinder, Wetterphänomene im Alltag zu benennen.",
+        "fr": "Oui ! Après la lecture, les enfants commencent à observer et nommer la météo.",
+        "it": "Sì! Dopo la lettura, i bambini iniziano a notare e a dare un nome ai fenomeni meteorologici nella vita di tutti i giorni."
+      }
+    }
+  ]
+}

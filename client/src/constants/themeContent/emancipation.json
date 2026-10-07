@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Stand with Americans as slavery ends and Lincoln's vision comes true.",
+    "de": "Steh neben Abraham Lincoln, als er das Dokument unterzeichnet, das Millionen befreit und die Geschichte für immer verändert.",
+    "fr": "Restez aux côtés d'Abraham Lincoln quand il signe le document qui libère des millions et change l'histoire pour toujours.",
+    "it": "Resta accanto agli americani mentre la schiavitù finisce e la visione di Lincoln diventa realtà."
+  },
+  "longDescription": {
+    "en": "This personalized historical story takes your child to 1865 to witness the abolition of slavery in America. Your child learns about the courage of those who fought for freedom, the importance of human dignity, and why equality matters. The story is told with sensitivity and age-appropriate language, focusing on hope, justice, and the power of standing up for what is right.",
+    "de": "Diese Geschichtserzählung nimmt dein Kind mit ins Jahr 1865 zur Abschaffung der Sklaverei. Dein Kind lernt über den Mut derer, die für Freiheit kämpften, und warum Gleichheit wichtig ist. Die Geschichte wird sensibel und altersgerecht erzählt.",
+    "fr": "Cette histoire historique emmène votre enfant en 1865 pour l'abolition de l'esclavage, racontée avec sensibilité et un langage adapté à l'âge.",
+    "it": "Questa storia personalizzata a sfondo storico porta tuo figlio nel 1865 ad assistere all'abolizione della schiavitù in America. Tuo figlio scopre il coraggio di chi ha lottato per la libertà, l'importanza della dignità umana e perché l'uguaglianza è fondamentale. La storia è raccontata con sensibilità e un linguaggio adatto all'età, concentrandosi sulla speranza, la giustizia e la forza di battersi per ciò che è giusto."
+  },
+  "skills": {
+    "en": "Human rights, equality, courage, justice, empathy.",
+    "de": "Menschenrechte, Gleichheit, Mut, Gerechtigkeit, Empathie.",
+    "fr": "Droits humains, égalité, courage, justice, empathie.",
+    "it": "Diritti umani, uguaglianza, coraggio, giustizia, empatia."
+  },
+  "ageRecommendation": "7-10",
+  "faq": [
+    {
+      "q": {
+        "en": "Is the historical content accurate?",
+        "de": "Ist der historische Inhalt korrekt?",
+        "fr": "Le contenu historique est-il exact ?",
+        "it": "Il contenuto storico è accurato?"
+      },
+      "a": {
+        "en": "Yes! The stories are carefully researched. The historical facts, dates, and key figures are accurate.",
+        "de": "Ja! Die Geschichten sind sorgfältig recherchiert.",
+        "fr": "Oui ! Les histoires sont soigneusement recherchées.",
+        "it": "Sì! Le storie sono accuratamente documentate. I fatti storici, le date e i personaggi chiave sono corretti."
+      }
+    }
+  ]
+}

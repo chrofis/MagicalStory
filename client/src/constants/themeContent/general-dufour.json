@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "March alongside General Dufour as he unites a divided Switzerland through wisdom rather than vengeance.",
+    "de": "Marschiere mit General Dufour, der eine gespaltene Schweiz durch Weisheit statt Rache vereint.",
+    "fr": "Marchez aux côtés du Général Dufour qui unit une Suisse divisée par la sagesse plutôt que la vengeance.",
+    "it": "Marcia al fianco del Generale Dufour mentre unisce una Svizzera divisa attraverso la saggezza anziché la vendetta."
+  },
+  "longDescription": {
+    "en": "This personalized historical story transports your child to 1847 to witness General Guillaume-Henri Dufour's leadership during the Sonderbund War. Your child learns how Dufour chose reconciliation over revenge, keeping casualties low and preserving national unity. A powerful story about wise leadership and the value of mercy.",
+    "de": "Diese Geschichtserzählung versetzt dein Kind ins Jahr 1847. Dein Kind erlebt General Dufours Führung während des Sonderbundskriegs und lernt, wie er Versöhnung statt Rache wählte.",
+    "fr": "Cette histoire historique transporte votre enfant en 1847 pour assister au leadership du Général Dufour, qui choisit la réconciliation plutôt que la vengeance.",
+    "it": "Questa storia storica personalizzata trasporta tuo figlio nel 1847 per assistere alla guida del Generale Guillaume-Henri Dufour durante la guerra del Sonderbund. Tuo figlio scopre come Dufour scelse la riconciliazione al posto della vendetta, mantenendo basso il numero di vittime e preservando l'unità nazionale. Una storia potente sulla saggezza nella guida e sul valore della clemenza."
+  },
+  "skills": {
+    "en": "Leadership, reconciliation, Swiss unity, mercy and wisdom.",
+    "de": "Führung, Versöhnung, Schweizer Einheit, Gnade und Weisheit.",
+    "fr": "Leadership, réconciliation, unité suisse, clémence et sagesse.",
+    "it": "Leadership, riconciliazione, unità svizzera, clemenza e saggezza."
+  },
+  "ageRecommendation": "7-10",
+  "faq": [
+    {
+      "q": {
+        "en": "Is the historical content accurate?",
+        "de": "Ist der historische Inhalt korrekt?",
+        "fr": "Le contenu historique est-il exact ?",
+        "it": "Il contenuto storico è accurato?"
+      },
+      "a": {
+        "en": "Yes! The stories are carefully researched. The historical facts, dates, and key figures are accurate.",
+        "de": "Ja! Die Geschichten sind sorgfältig recherchiert.",
+        "fr": "Oui ! Les histoires sont soigneusement recherchées.",
+        "it": "Sì! Le storie sono accuratamente documentate. I fatti storici, le date e i personaggi chiave sono esatti."
+      }
+    }
+  ]
+}

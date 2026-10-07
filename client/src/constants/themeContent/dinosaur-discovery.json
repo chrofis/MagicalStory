@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Dig in the earth with William Buckland and gasp as massive ancient bones reveal a creature no one knew existed.",
+    "de": "Grabe mit William Buckland in der Erde und staune, als riesige uralte Knochen ein Wesen enthüllen, das niemand kannte.",
+    "fr": "Creusez la terre avec William Buckland et découvrez avec stupeur des os massifs révélant une créature inconnue.",
+    "it": "Scava nella terra con William Buckland e resta a bocca aperta quando enormi ossa antichissime rivelano una creatura che nessuno conosceva."
+  },
+  "longDescription": {
+    "en": "This personalized historical story takes your child to 1824 when William Buckland named the first dinosaur — Megalosaurus. Your child experiences the excitement of pulling enormous bones from the earth and realizing that giant reptiles once walked where we walk today. A story about curiosity, scientific discovery, and the wonder of deep time.",
+    "de": "Diese Geschichtserzählung nimmt dein Kind mit ins Jahr 1824, als William Buckland den ersten Dinosaurier benannte. Dein Kind erlebt die Aufregung, riesige Knochen aus der Erde zu ziehen und zu begreifen, dass Riesenechsen einst dort liefen, wo wir heute gehen.",
+    "fr": "Cette histoire historique emmène votre enfant en 1824 quand William Buckland nomma le premier dinosaure.",
+    "it": "Questa storia personalizzata a sfondo storico porta tuo figlio nel 1824, quando William Buckland battezzò il primo dinosauro, il Megalosaurus. Tuo figlio vive l'emozione di estrarre ossa enormi dalla terra e la scoperta che rettili giganti un tempo camminavano dove oggi camminiamo noi. Una storia sulla curiosità, la scoperta scientifica e la meraviglia dei tempi remoti."
+  },
+  "skills": {
+    "en": "Paleontology, scientific method, deep time, wonder and curiosity.",
+    "de": "Paläontologie, wissenschaftliche Methode, Erdzeitalter, Staunen und Neugierde.",
+    "fr": "Paléontologie, méthode scientifique, temps géologiques, émerveillement et curiosité.",
+    "it": "Paleontologia, metodo scientifico, tempi geologici, meraviglia e curiosità."
+  },
+  "ageRecommendation": "5-10",
+  "faq": [
+    {
+      "q": {
+        "en": "Is the historical content accurate?",
+        "de": "Ist der historische Inhalt korrekt?",
+        "fr": "Le contenu historique est-il exact ?",
+        "it": "Il contenuto storico è accurato?"
+      },
+      "a": {
+        "en": "Yes! The stories are carefully researched. The historical facts, dates, and key figures are accurate.",
+        "de": "Ja! Die Geschichten sind sorgfältig recherchiert.",
+        "fr": "Oui ! Les histoires sont soigneusement recherchées.",
+        "it": "Sì! Le storie sono accuratamente documentate. I fatti storici, le date e i personaggi chiave sono corretti."
+      }
+    }
+  ]
+}

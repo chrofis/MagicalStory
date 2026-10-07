@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Visit the London Zoo on its opening day in 1828 and meet exotic animals that Londoners had never seen before.",
+    "de": "Besuche den Londoner Zoo am Eröffnungstag 1828 und triff exotische Tiere, die Londoner noch nie gesehen haben.",
+    "fr": "Visitez le zoo de Londres le jour de son ouverture en 1828 et rencontrez des animaux exotiques jamais vus.",
+    "it": "Visita lo zoo di Londra il giorno della sua apertura nel 1828 e incontra animali esotici che i londinesi non hanno mai visto prima."
+  },
+  "longDescription": {
+    "en": "This personalized historical story takes your child to 1828 to visit the world's first modern zoo in London. Your child meets lions, elephants, and monkeys for the first time, just as Londoners of the day did. The story explores the wonder of encountering exotic animals and introduces ideas about animal welfare and conservation that have evolved since then.",
+    "de": "Diese Geschichtserzählung nimmt dein Kind mit ins Jahr 1828 zum ersten modernen Zoo der Welt in London. Dein Kind trifft Löwen, Elefanten und Affen und lernt über Tierschutz und wie sich dieser seit damals entwickelt hat.",
+    "fr": "Cette histoire historique emmène votre enfant en 1828 au premier zoo moderne du monde à Londres.",
+    "it": "Questa storia personalizzata a sfondo storico porta tuo figlio nel 1828 in visita al primo zoo moderno del mondo, a Londra. Tuo figlio incontra leoni, elefanti e scimmie per la prima volta, proprio come i londinesi dell'epoca vittoriana. La storia esplora la meraviglia dell'incontro con animali esotici e introduce idee sul benessere animale e la conservazione che da allora si sono evolute."
+  },
+  "skills": {
+    "en": "Animal knowledge, conservation awareness, history, wonder.",
+    "de": "Tierwissen, Naturschutzbewusstsein, Geschichte, Staunen.",
+    "fr": "Connaissances animales, conscience de la conservation, histoire, émerveillement.",
+    "it": "Conoscenza degli animali, sensibilità alla conservazione, storia, meraviglia."
+  },
+  "ageRecommendation": "5-10",
+  "faq": [
+    {
+      "q": {
+        "en": "Is the historical content accurate?",
+        "de": "Ist der historische Inhalt korrekt?",
+        "fr": "Le contenu historique est-il exact ?",
+        "it": "Il contenuto storico è accurato?"
+      },
+      "a": {
+        "en": "Yes! The stories are carefully researched. The historical facts, dates, and key figures are accurate.",
+        "de": "Ja! Die Geschichten sind sorgfältig recherchiert.",
+        "fr": "Oui ! Les histoires sont soigneusement recherchées.",
+        "it": "Sì! Le storie sono accuratamente documentate. I fatti storici, le date e i personaggi chiave sono corretti."
+      }
+    }
+  ]
+}

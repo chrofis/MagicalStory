@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Descend to the deepest point on Earth with Jacques Piccard in a tiny submersible, where no human has ever been.",
+    "de": "Tauche mit Jacques Piccard im winzigen U-Boot zum tiefsten Punkt der Erde, wo noch nie ein Mensch war.",
+    "fr": "Descendez au point le plus profond de la Terre avec Jacques Piccard dans un minuscule submersible.",
+    "it": "Scendi nel punto più profondo della Terra con Jacques Piccard a bordo di un minuscolo sommergibile, dove nessun essere umano è mai stato."
+  },
+  "longDescription": {
+    "en": "This personalized historical story takes your child to 1960 to join Jacques Piccard and Don Walsh in the bathyscaphe Trieste as they descend to the bottom of the Mariana Trench. Your child experiences the crushing pressure, the darkness, and the astonishment of finding life at the deepest point on Earth. A story about courage, science, and the wonders of the deep ocean.",
+    "de": "Diese Geschichtserzählung nimmt dein Kind mit ins Jahr 1960, als Jacques Piccard und Don Walsh im Bathyscaph Trieste zum Boden des Marianengrabens tauchten. Dein Kind erlebt den gewaltigen Druck, die Dunkelheit und das Staunen, in der grössten Tiefe Leben zu finden.",
+    "fr": "Cette histoire historique emmène votre enfant en 1960 dans le bathyscaphe Trieste, descendant au fond de la fosse des Mariannes.",
+    "it": "Questa storia personalizzata a sfondo storico porta tuo figlio nel 1960 a unirsi a Jacques Piccard e Don Walsh nel batiscafo Trieste, mentre scendono sul fondo della Fossa delle Marianne. Tuo figlio vive la pressione schiacciante, il buio e lo stupore di trovare vita nel punto più profondo della Terra. Una storia sul coraggio, la scienza e le meraviglie degli abissi oceanici."
+  },
+  "skills": {
+    "en": "Ocean science, courage, Swiss innovation, deep-sea exploration.",
+    "de": "Meereswissenschaft, Mut, Schweizer Innovation, Tiefsee-Erkundung.",
+    "fr": "Science océanique, courage, innovation suisse, exploration des profondeurs.",
+    "it": "Scienza degli oceani, coraggio, innovazione svizzera, esplorazione degli abissi."
+  },
+  "ageRecommendation": "5-10",
+  "faq": [
+    {
+      "q": {
+        "en": "Is the historical content accurate?",
+        "de": "Ist der historische Inhalt korrekt?",
+        "fr": "Le contenu historique est-il exact ?",
+        "it": "Il contenuto storico è accurato?"
+      },
+      "a": {
+        "en": "Yes! The stories are carefully researched. The historical facts, dates, and key figures are accurate.",
+        "de": "Ja! Die Geschichten sind sorgfältig recherchiert.",
+        "fr": "Oui ! Les histoires sont soigneusement recherchées.",
+        "it": "Sì! Le storie sono accuratamente documentate. I fatti storici, le date e i personaggi chiave sono corretti."
+      }
+    }
+  ]
+}

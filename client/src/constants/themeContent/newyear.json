@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Your child counts down to midnight with friends from around the world and welcomes the new year with dazzling fireworks.",
+    "de": "Dein Kind zählt mit Freunden aus aller Welt bis Mitternacht und begrüsst das neue Jahr mit einem glitzernden Feuerwerk.",
+    "fr": "Votre enfant compte à rebours jusqu'à minuit avec des amis du monde entier et accueille la nouvelle année avec un feu d'artifice éblouissant.",
+    "it": "Tuo figlio fa il conto alla rovescia verso mezzanotte con amici di tutto il mondo e accoglie il nuovo anno con fuochi d'artificio scintillanti."
+  },
+  "longDescription": {
+    "en": "Your child travels around the world to celebrate midnight with children from different countries! From Sydney fireworks to Tokyo countdowns, Rio dancing, and Northern Lights wishes, your child discovers how people everywhere welcome the new year.\n\nThe story celebrates cultural diversity, gratitude, and excitement for what lies ahead. Perfect for children aged 3 to 8 who are curious about the world.",
+    "de": "Dein Kind reist um die Welt und feiert Mitternacht mit Kindern aus verschiedenen Ländern! Die Geschichte feiert kulturelle Vielfalt und Neujahrs-Hoffnung. Perfekt für neugierige Kinder von 3 bis 8 Jahren.",
+    "fr": "Votre enfant fait le tour du monde pour célébrer minuit ! L'histoire célèbre la diversité culturelle. Parfait pour les enfants de 3 à 8 ans.",
+    "it": "Tuo figlio viaggia intorno al mondo per festeggiare la mezzanotte con bambini di paesi diversi! Dai fuochi d'artificio di Sydney al conto alla rovescia di Tokyo, dai balli di Rio ai desideri sotto l'aurora boreale, tuo figlio scopre come le persone in tutto il mondo accolgono il nuovo anno.\n\nLa storia celebra la diversità culturale, la gratitudine e l'entusiasmo per ciò che verrà. Perfetta per bambini dai 3 agli 8 anni curiosi del mondo."
+  },
+  "skills": {
+    "en": "Cultural awareness, reflection, goal-setting, celebration of diversity.",
+    "de": "Kulturbewusstsein, Reflexion, Ziele setzen, Vielfalt feiern.",
+    "fr": "Conscience culturelle, réflexion, fixation d'objectifs, célébration de la diversité.",
+    "it": "Consapevolezza culturale, riflessione, definizione di obiettivi, celebrazione della diversità."
+  },
+  "ageRecommendation": "3-8",
+  "faq": [
+    {
+      "q": {
+        "en": "Does the story stay up past bedtime?",
+        "de": "Bleibt man lange wach?",
+        "fr": "L'histoire reste-t-elle éveillée tard ?",
+        "it": "Nella storia si resta svegli fino a tardi?"
+      },
+      "a": {
+        "en": "It uses magical time travel — your child experiences midnight celebrations without actually staying up late!",
+        "de": "Magisches Zeitreisen — dein Kind erlebt Mitternachtsfeiern, ohne tatsächlich aufzubleiben!",
+        "fr": "Un voyage magique dans le temps — pas besoin de veiller !",
+        "it": "Usa un magico viaggio nel tempo — tuo figlio vive i festeggiamenti di mezzanotte senza dover davvero restare sveglio fino a tardi!"
+      }
+    }
+  ]
+}
