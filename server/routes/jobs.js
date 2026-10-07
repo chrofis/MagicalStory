@@ -636,9 +636,13 @@ router.get('/:jobId/status', jobStatusLimiter, authenticateToken, async (req, re
         }
       }
 
-      // Fetch user's current credits when job is completed
+      // Fetch user's current credits once the job is terminal: completed (the
+      // final charge) and failed/cancelled (the refund). The wizard showed the
+      // reserved amount as deducted from job creation on, so a failure that
+      // carried no balance left the header stale under "your credits were not
+      // charged" until the next full page load.
       let currentCredits = null;
-      if (job.status === 'completed') {
+      if (job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled') {
         const creditsResult = await getDbPool().query(
           'SELECT credits FROM users WHERE id = $1',
           [userId]

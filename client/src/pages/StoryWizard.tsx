@@ -4488,9 +4488,13 @@ export default function StoryWizard() {
           } else if (status.result.storyId) {
             setSearchParams({ storyId: status.result.storyId }, { replace: true });
           }
-        } else if (status.status === 'failed') {
-          throw new Error(status.error || 'Story generation failed');
-        } else if (status.status === 'cancelled') {
+        } else if (status.status === 'failed' || status.status === 'cancelled') {
+          // The reservation was refunded with the status write; the header was
+          // updated to the reserved balance at job creation, so take the refunded one.
+          if (status.currentCredits !== null && status.currentCredits !== undefined) {
+            updateCredits(status.currentCredits);
+          }
+          if (status.status === 'failed') throw new Error(status.error || 'Story generation failed');
           // Cancelled elsewhere (other tab, admin): same terminal handling as GenerationContext
           cancelledElsewhere = true;
           break;
