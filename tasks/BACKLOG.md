@@ -1495,13 +1495,13 @@ rebuilt: `resolveEvalSceneHint` (3b3070dce), `resolveGeneratedOutfit` (e403345b1
       it is to build the list from the page's RESOLVED CAST, so a new cast category can never be
       forgotten again. Confirm from stored repairs that a secondary has actually been damaged
       before building → `server/lib/repairPipeline.js`
-- [ ] **Covers are not evaluated by the stage that catches prop and cast defects.** `threeStageResult`
+- [x] **Covers are not evaluated by the stage that catches prop and cast defects.** `threeStageResult` — ALREADY DONE (found 2026-10-07): root-record mirror fixed fdf30adf (applyCoverEvalMirror); covers briefed with REQUIRED OBJECTS 8dfdb2b0; covers on the page path 6fbd2b59
       present on 0 of 96 cover records across 40 stories — the compliance evaluator does not run on
       covers at all. Cover prompts also carry no REQUIRED OBJECTS block (`promptBuilders.js:2109`),
       and `image-evaluation.txt:155` skips D-16b (held-object swap) without one, so it is disabled on
       every cover — the one surface where `holds:` is a declared field. This is the measured answer
       to the owner's "cover and normal pages must be the same" → task #51
-- [ ] **Three cover eval endpoints still on the pre-`1f5101ef9` pattern** (`regeneration.js:4008-4023`,
+- [x] **Three cover eval endpoints still on the pre-`1f5101ef9` pattern** (`regeneration.js:4008-4023`, — ALREADY DONE (found 2026-10-07): 837b91d5; pinned by tests/unit/cover-eval-endpoints.test.ts
       `:4357`, `:6523`); one appends "TEXT REQUIREMENT - CRITICAL" so a correct TEXTLESS cover is
       judged as missing its title. Plus `regeneration.js:4294` passes `-1/-2/-3` to `getActiveVersion`
       where cover keys are `frontCover`/`initialPage`/`backCover`, re-evaluating v0 instead of the
