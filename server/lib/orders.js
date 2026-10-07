@@ -29,8 +29,30 @@ async function hasPaidOrder(userId, dbClient = null) {
   // gate must treat the whole set as "has paid" — querying 'paid' alone
   // matched almost nothing and let repeat buyers redeem first-time discounts.
   const result = await conn.query(
-    `SELECT 1 FROM orders WHERE user_id = $1 AND payment_status IN ('paid','processing','completed','failed') LIMIT 1`,
+    `SELECT 1 FROM orders WHERE user_id = $1 AND payment_status IN (${PAID_STATUSES_SQL}) LIMIT 1`,
     [userId]
+  );
+  return result.rows.length > 0;
+}
+
+/** Every payment_status a row inserted after a successful Stripe payment can carry. */
+const PAID_STATUSES = ['paid', 'processing', 'completed', 'failed'];
+const PAID_STATUSES_SQL = PAID_STATUSES.map(s => `'${s}'`).join(',');
+
+/**
+ * The webhook's re-check of the first-time-buyer rule, inside its transaction: does the
+ * buyer have a paid order OTHER than the session being completed? Same status set as
+ * hasPaidOrder - a check on 'paid' alone misses every earlier order the moment
+ * processBookOrder moves it on.
+ */
+async function hasOtherPaidOrder(dbClient, userId, sessionId) {
+  const result = await dbClient.query(
+    `SELECT 1 FROM orders
+       WHERE user_id = $1
+         AND payment_status IN (${PAID_STATUSES_SQL})
+         AND stripe_session_id != $2
+       LIMIT 1`,
+    [userId, sessionId]
   );
   return result.rows.length > 0;
 }
@@ -62,6 +84,8 @@ function orderStatusView(row, viewerUserId = null) {
 }
 
 module.exports = {
+  PAID_STATUSES,
   hasPaidOrder,
+  hasOtherPaidOrder,
   orderStatusView,
 };

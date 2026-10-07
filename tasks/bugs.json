@@ -2,6 +2,16 @@
   "_readme": "CLEAR-BUG REGISTRY. A bug the owner reported, or one confirmed from stored evidence, goes here the moment it is confirmed - and the pre-push gate (scripts/admin/check-open-bugs.js) BLOCKS every push while any entry is open. That is the point: a reported bug is fixed immediately, not backlogged. Only CLEAR bugs belong here (reproduced, or owner-reported with evidence); design questions and improvements go to the task list instead. Close an entry by setting status to 'fixed' with the commit hash IN THE SAME COMMIT as the fix. Emergency escape: PUSH_WITH_OPEN_BUGS=1 git push (documented, visible, deliberate).",
   "bugs": [
     {
+      "id": "referral-cashback-recheck-sees-only-paid-status",
+      "title": "The webhook re-check of the first-time-buyer rule before paying referral cashback matched payment_status = \"paid\" only, a status every earlier order leaves within seconds (processing/completed/failed), so a buyer who completed another checkout between claiming a code and paying still earned the referrer CHF 10",
+      "reportedAt": "2026-10-07",
+      "source": "Buying review 2026-10-07. server.js Stripe webhook (referral cashback block): SELECT 1 FROM orders WHERE user_id = $1 AND payment_status = \"paid\" AND stripe_session_id != $2, while server/lib/orders.js hasPaidOrder documents that querying \"paid\" alone matched almost nothing and uses IN (paid, processing, completed, failed). The code comment above the query claims the race window is closed; it was not.",
+      "status": "fixed",
+      "fixedAt": "2026-10-07",
+      "fixedIn": "pending",
+      "fix": "server/lib/orders.js PAID_STATUSES shared by hasPaidOrder and the new hasOtherPaidOrder(client, userId, sessionId); the webhook calls the latter inside its transaction. Test: tests/unit/referral-first-order-recheck.test.ts."
+    },
+    {
       "id": "promo-code-rejection-english-only",
       "title": "A rejected referral code in the book builder shows the server English reason (\"Code not found\", \"You have already used a referral code\", \"Referral codes are only available for first-time customers\") to German, French and Italian customers",
       "reportedAt": "2026-10-07",

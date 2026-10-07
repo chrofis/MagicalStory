@@ -856,16 +856,8 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
                 // First-time-buyer race re-check. NOTE: this order itself
                 // hasn't been counted yet (orders.payment_status update happens
                 // above but in same flow) — exclude THIS session from the check.
-                const { hasPaidOrder } = require('./server/lib/orders');
-                const otherPaid = await client.query(
-                  `SELECT 1 FROM orders
-                     WHERE user_id = $1
-                       AND payment_status = 'paid'
-                       AND stripe_session_id != $2
-                     LIMIT 1`,
-                  [userId, fullSession.id]
-                );
-                if (otherPaid.rows.length > 0) {
+                const { hasOtherPaidOrder } = require('./server/lib/orders');
+                if (await hasOtherPaidOrder(client, userId, fullSession.id)) {
                   await client.query('ROLLBACK');
                   log.warn(`⚠️ [STRIPE WEBHOOK] Buyer ${userId} already had a paid order — skipping referral reward (race window).`);
                 } else {
