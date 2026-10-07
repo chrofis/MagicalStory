@@ -8,7 +8,7 @@ import { useGenerationOptional } from '@/context/GenerationContext';
 import { storyService } from '@/services';
 import { LoadingSpinner, Navigation } from '@/components/common';
 import { checkpointToPercent } from '@/components/generation/GenerationProgress';
-import { MAX_BOOK_PAGES } from './Pricing';
+import { MAX_BOOK_PAGES } from '@/utils/bookPricing';
 import { INITIAL_USER_CREDITS } from '@/constants/credits';
 import { createLogger } from '@/services/logger';
 import { buildOrderDetailLines } from '@/utils/orderDetails';

@@ -6,17 +6,9 @@ import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { Navigation, LoadingSpinner } from '@/components/common';
 import { storyService } from '@/services';
-import { getPriceForPages, MAX_BOOK_PAGES, SHIPPING_COST_CHF } from './Pricing';
+import { getPriceForPages, MAX_BOOK_PAGES, SHIPPING_COST_CHF, type PricingTier } from '@/utils/bookPricing';
 import { createLogger } from '@/services/logger';
 import { localizedApiError } from '@/utils/apiErrors';
-
-// Type for pricing tier
-interface PricingTier {
-  maxPages: number;
-  label: string;
-  softcover: number;
-  hardcover: number;
-}
 
 const log = createLogger('BookBuilder');
 
@@ -345,31 +337,40 @@ export default function BookBuilder() {
     }
   }, [isAuthenticated, isAuthLoading, navigate, location.state]);
 
-  // Calculate total pages
+  // Total pages as the story list counts them (scenes + cover pages per story): the
+  // over-limit pre-check and the display. NOT what the book is billed on.
   const totalPages = useMemo(() => {
     return stories.reduce((sum, story) => sum + story.pages, 0);
   }, [stories]);
 
-  // Calculate price (using fetched pricing tiers)
-  const price = useMemo(() => {
-    return getPriceForPages(totalPages, coverType === 'hardcover', pricingTiers);
-  }, [totalPages, coverType, pricingTiers]);
-
   const isOverLimit = totalPages > MAX_BOOK_PAGES;
 
-  // Printed page count / blank pages for the selected cover type, from the
-  // server (same computation that pads the print PDF).
+  // Content / printed / blank page counts from the server — the same
+  // computeBookPageInfo the order flow pads the PDF with. `contentPages` is the
+  // count the checkout picks the price tier from (countBookContentPages), so the
+  // quote below is derived from it, never from the client-side scene sum.
   const [pageInfo, setPageInfo] = useState<{ contentPages: number; printedPages: number; blankPages: number } | null>(null);
   const storyIdsKey = stories.map(s => s.id).join(',');
   useEffect(() => {
     if (!storyIdsKey || isOverLimit) { setPageInfo(null); return; }
     let cancelled = false;
-    setPageInfo(null);
     storyService.getBookPageInfo(storyIdsKey.split(','), coverType, bookFormat)
       .then(info => { if (!cancelled) setPageInfo(info); })
-      .catch(err => log.error('Failed to fetch book page info:', err));
+      .catch(err => {
+        log.error('Failed to fetch book page info:', err);
+        if (!cancelled) {
+          setPageInfo(null);
+          showToast({ message: localizedApiError(err, language), variant: 'error' });
+        }
+      });
     return () => { cancelled = true; };
-  }, [storyIdsKey, coverType, bookFormat, isOverLimit]);
+  }, [storyIdsKey, coverType, bookFormat, isOverLimit, language, showToast]);
+
+  // Price for the billed page count; null until the server has counted the book.
+  const billedPages = pageInfo?.contentPages ?? null;
+  const price = useMemo(() => {
+    return billedPages === null ? null : getPriceForPages(billedPages, coverType === 'hardcover', pricingTiers);
+  }, [billedPages, coverType, pricingTiers]);
   // Owner 2026-10-04: up to 3 blank pages are fine and stay silent; from 4 on,
   // warn and suggest a longer story / combining stories.
   const BLANK_PAGES_WARN_FROM = 4;
@@ -652,9 +653,9 @@ export default function BookBuilder() {
                     <div className="font-semibold text-gray-800">{t.softcover}</div>
                     <div className="text-sm text-gray-500">{t.softcoverSize}</div>
                   </div>
-                  {!isOverLimit && (
+                  {!isOverLimit && billedPages !== null && (
                     <div className="text-lg sm:text-xl font-bold text-gray-800 shrink-0">
-                      CHF {getPriceForPages(totalPages, false, pricingTiers)}.-
+                      CHF {getPriceForPages(billedPages, false, pricingTiers)}.-
                     </div>
                   )}
                 </div>
@@ -675,9 +676,9 @@ export default function BookBuilder() {
                     <div className="font-semibold text-gray-800">{t.hardcover}</div>
                     <div className="text-sm text-gray-500">{t.hardcoverSize}</div>
                   </div>
-                  {!isOverLimit && (
+                  {!isOverLimit && billedPages !== null && (
                     <div className="text-lg sm:text-xl font-bold text-indigo-700 shrink-0">
-                      CHF {getPriceForPages(totalPages, true, pricingTiers)}.-
+                      CHF {getPriceForPages(billedPages, true, pricingTiers)}.-
                     </div>
                   )}
                 </div>

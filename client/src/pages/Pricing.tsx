@@ -5,14 +5,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { Navigation } from '@/components/common';
 import { storyService } from '@/services';
-
-// Type for pricing tier
-interface PricingTier {
-  maxPages: number;
-  label: string;
-  softcover: number;
-  hardcover: number;
-}
+import { fallbackPricingTiers, SHIPPING_COST_CHF, type PricingTier } from '@/utils/bookPricing';
 
 interface CreditPackage {
   credits: number;
@@ -28,32 +21,6 @@ const fallbackCreditPackages: CreditPackage[] = [
   { credits: 2000, amountCHF: 50 },
 ];
 const FALLBACK_CREDITS_PER_PAGE = 10;
-
-// Fallback pricing tiers (used while loading or if API fails)
-// Prices are PER BOOK, shipping (CHF 10) is added once at checkout
-const fallbackPricingTiers: PricingTier[] = [
-  { maxPages: 30, label: '1-30', softcover: 29, hardcover: 37 },
-  { maxPages: 40, label: '31-40', softcover: 35, hardcover: 43 },
-  { maxPages: 50, label: '41-50', softcover: 41, hardcover: 49 },
-  { maxPages: 60, label: '51-60', softcover: 47, hardcover: 55 },
-  { maxPages: 70, label: '61-70', softcover: 52, hardcover: 60 },
-  { maxPages: 80, label: '71-80', softcover: 58, hardcover: 66 },
-  { maxPages: 90, label: '81-90', softcover: 64, hardcover: 72 },
-  { maxPages: 100, label: '91-100', softcover: 69, hardcover: 77 },
-];
-
-// Flat shipping cost per order (Switzerland), regardless of quantity
-export const SHIPPING_COST_CHF = 10;
-
-// Helper function to get price for a page count (uses fallback if tiers not loaded)
-export function getPriceForPages(pageCount: number, isHardcover: boolean, tiers?: PricingTier[]): number | null {
-  const pricingTiers = tiers || fallbackPricingTiers;
-  const tier = pricingTiers.find(t => pageCount <= t.maxPages);
-  if (!tier) return null; // Exceeds maximum
-  return isHardcover ? tier.hardcover : tier.softcover;
-}
-
-export const MAX_BOOK_PAGES = 100;
 
 export default function Pricing() {
   const navigate = useNavigate();

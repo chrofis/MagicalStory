@@ -2,6 +2,17 @@
   "_readme": "CLEAR-BUG REGISTRY. A bug the owner reported, or one confirmed from stored evidence, goes here the moment it is confirmed - and the pre-push gate (scripts/admin/check-open-bugs.js) BLOCKS every push while any entry is open. That is the point: a reported bug is fixed immediately, not backlogged. Only CLEAR bugs belong here (reproduced, or owner-reported with evidence); design questions and improvements go to the task list instead. Close an entry by setting status to 'fixed' with the commit hash IN THE SAME COMMIT as the fix. Emergency escape: PUSH_WITH_OPEN_BUGS=1 git push (documented, visible, deliberate).",
   "bugs": [
     {
+      "id": "book-builder-quotes-scene-sum-not-billed-pages",
+      "title": "The book builder quotes a price from the story list page count (scenes + 3 cover pages per story) while the checkout bills countBookContentPages; at a tier boundary the customer sees one price and Stripe charges another (5 eleven-page stories: quoted CHF 52, charged CHF 58; two stories of 12 + 13 pages: quoted CHF 35, charged CHF 29)",
+      "reportedAt": "2026-10-07",
+      "source": "Buying review 2026-10-07. client/src/pages/BookBuilder.tsx totalPages = sum(story.pages) where story.pages is server/routes/stories.js pageCount = sceneCount + 3; server/routes/print.js create-checkout-session prices getPriceForPages(countBookContentPages(stories)) = 1 + scenes + 2 per extra story (+1 back cover, +1 separator). Reproduced in tests/unit/book-price-quote.test.ts.",
+      "rootCause": "Two page counts with the same name: the list count exists for the over-limit check and the display, the billing count lives server-side and was already returned to the builder by POST /api/book-page-info (contentPages) for the blank-page warning, but the quote never read it.",
+      "status": "fixed",
+      "fixedAt": "2026-10-07",
+      "fixedIn": "pending",
+      "fix": "BookBuilder prices on pageInfo.contentPages (the checkout count); the quote is empty until the server has counted the book, and a failed count is reported, not priced. The pure price facts moved to client/src/utils/bookPricing.ts (Pricing.tsx and MyStories import it) so the test can hold them against the server seed and SHIPPING_COST_CHF. Test: tests/unit/book-price-quote.test.ts."
+    },
+    {
       "id": "book-ships-to-billing-address",
       "title": "A printed book ships to the Stripe BILLING address: the webhook, admin retry and stuck-order resume read session.shipping (gone since Stripe API 2025-03-31) and fall back to customer_details.address, so a book paid for with a different billing address goes to the cardholder, not the recipient typed into the shipping form",
       "reportedAt": "2026-10-07",
