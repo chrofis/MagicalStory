@@ -1604,8 +1604,29 @@ async function existingTrialJobResponse(pool, userId) {
  * Protected by: session token + 1 story per account + daily cap.
  */
 router.post('/create-story', verifySessionToken, async (req, res) => {
+  const { userId } = req.sessionUser;
+  // The ONE trial slot is taken atomically below, BEFORE the character read,
+  // the image offload, the trial_data write and the job insert. Every exit
+  // between the increment and the job row must give the slot back: the
+  // handler answers "start over" / "try again" / "try again tomorrow" (daily
+  // cap), and a retry against a taken slot answers 409 TRIAL_USED with no
+  // job behind it (the `TRIAL_USED ... but no story_jobs row found` line).
+  let slotTaken = false;
+  let pool = null;
+  const releaseSlot = async (why) => {
+    if (!slotTaken || !pool) return;
+    slotTaken = false;
+    try {
+      await pool.query(
+        'UPDATE users SET stories_generated = stories_generated - 1 WHERE id = $1 AND stories_generated > 0',
+        [userId]
+      );
+      log.warn(`[TRIAL] Trial slot released for user ${userId}: ${why}`);
+    } catch (e) {
+      log.error(`[TRIAL] Trial slot release failed for user ${userId} (${why}): ${e.message}`);
+    }
+  };
   try {
-    const { userId } = req.sessionUser;
     const { storyCategory, storyTopic, storyTheme, storyDetails, language, userLocation, ideaKind } = req.body;
 
     const { getPool } = require('../services/database');
@@ -1626,6 +1647,11 @@ router.post('/create-story', verifySessionToken, async (req, res) => {
     ]) || guards.locationError(userLocation);
     if (inputErr) return res.status(400).json({ error: inputErr });
 
+
+
+    const { getPool } = require('../services/database');
+    pool = getPool();
+
     // Atomic check-and-increment to prevent race condition (two simultaneous requests).
     // Hard cap: ONE trial story per user, no environment exceptions. To
     // retest the trial flow create a fresh account; do not reintroduce a
@@ -1645,6 +1671,7 @@ router.post('/create-story', verifySessionToken, async (req, res) => {
       log.error(`[TRIAL] create-story: increment refused for user ${userId} but the trial reads as unused`);
       return res.status(409).json(buildTrialUsedResponse(undefined).body);
     }
+    slotTaken = true;
 
     // If a prepare-title call is still in flight for this user, wait for it
     // (with a safety timeout) so preGeneratedStyledAvatars are persisted before
@@ -1664,6 +1691,7 @@ router.post('/create-story', verifySessionToken, async (req, res) => {
     const charResult = await pool.query('SELECT data FROM characters WHERE id = $1', [characterId]);
 
     if (charResult.rows.length === 0) {
+      await releaseSlot('character row missing');
       return res.status(404).json({ error: 'Character not found. Please start over.', code: 'CHARACTER_NOT_FOUND' });
     }
 
@@ -1722,6 +1750,7 @@ router.post('/create-story', verifySessionToken, async (req, res) => {
     );
 
     const jobId = await createTrialStoryJob(pool, userId, characterId, characterData, storyInput, resolvedLocation);
+    slotTaken = false; // the job row now accounts for the slot
 
     if (deps.processStoryJob) {
       deps.processStoryJob(jobId).catch(err => {
@@ -1732,6 +1761,7 @@ router.post('/create-story', verifySessionToken, async (req, res) => {
     log.info(`[TRIAL] Story job ${jobId} started for anonymous user ${userId}`);
     res.json({ jobId });
   } catch (err) {
+    await releaseSlot(err.code || err.message);
     if (err.code === 'TRIAL_CAP_REACHED') {
       return res.status(503).json({ error: 'Service temporarily unavailable. Please try again tomorrow.', code: 'DAILY_CAPACITY_REACHED' });
     }

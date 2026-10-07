@@ -3716,6 +3716,16 @@
       "fixedAt": "2026-10-07",
       "fixedIn": "7ae4c96cd",
       "fix": "runAudit returns `{ok:false, error:'returned empty output twice — no findings from this auditor', …}` with a warn line, the same shape a truncated or thrown audit returns, so the report's audits[].error and the text_refine log name the loss. Test: tests/unit/text-refine-empty-audit-is-an-error.test.ts."
+    },
+    {
+      "id": "trial-create-story-burns-slot-without-job",
+      "title": "POST /api/trial/create-story takes the visitor's one trial slot (stories_generated + 1) before the character read / image offload / trial_data write / job insert; any failure there answers 'start over' / 'try again' / 'try again tomorrow' (daily cap) while the slot stays taken, so the retry it asks for gets 409 TRIAL_USED with no job",
+      "reportedAt": "2026-10-07",
+      "source": "Code path server/routes/trial.js create-story: the atomic UPDATE ... stories_generated < 1 RETURNING runs first; CHARACTER_NOT_FOUND (404), TRIAL_CAP_REACHED (503 'try again tomorrow') and the generic catch (500 'Please try again') all return without a job row and without giving the slot back. The handler's own `TRIAL_USED for user ... but no story_jobs row found` error line is this state. Reproduced by tests/unit/trial-create-story-slot-rollback.test.ts with a stateful fake pool (first call 404, second call was 409 TRIAL_USED).",
+      "status": "fixed",
+      "fixedAt": "2026-10-07",
+      "fixedIn": "pending",
+      "fix": "The handler tracks the slot from the increment until createTrialStoryJob returns the job id; the 404 exit and the catch (daily cap included) release it with one UPDATE (stories_generated - 1 WHERE stories_generated > 0). The one-trial cap itself is unchanged: a job row still consumes the slot for good."
     }
   ]
 }
