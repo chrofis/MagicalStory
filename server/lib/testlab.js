@@ -5967,8 +5967,32 @@ async function runSceneExpansionAbStage(ctx, { experimentId, promptOverride, par
     { ...ctx, scene: { ...ctx.scene, sceneDescription } },
     { experimentId, autoEval: params.autoEval !== false, params: {} }
   );
-  const imgA = await renderFor(resA.text);
-  const imgB = await renderFor(resB.text);
+  // The text arms are the paid-for answer to a prompt-shape question; a render
+  // that then fails (an IMAGE_OTHER refusal: 1 of 5 pages in exp 815) must not
+  // take them with it. The run loop merges err.partialResult into the failed
+  // entry, so the brief comparison — and A's image, when A rendered — survive.
+  const textArms = {
+    newSceneDescriptionA: resA.text,
+    newSceneDescriptionB: resB.text,
+    extraRule,
+    promptOverridden: !!promptOverride,
+    // Full prompts for the details view — the card itself shows the diff.
+    promptUsedA: promptA,
+    promptUsedB: promptB,
+  };
+  let imgA;
+  let imgB;
+  try {
+    imgA = await renderFor(resA.text);
+    imgB = await renderFor(resB.text);
+  } catch (err) {
+    err.partialResult = {
+      ...(err.partialResult || {}),
+      ...textArms,
+      ...(imgA ? { imageType: 'scene', versionIndex: imgA.versionIndex, scores: imgA.scores, modelId: imgA.modelId || null } : {}),
+    };
+    throw err;
+  }
   const elapsedMs = Date.now() - t0;
 
   return {
@@ -5979,13 +6003,7 @@ async function runSceneExpansionAbStage(ctx, { experimentId, promptOverride, par
     variantVersionIndex: imgB.versionIndex,
     scores: imgA.scores,
     variantScores: imgB.scores,
-    newSceneDescriptionA: resA.text,
-    newSceneDescriptionB: resB.text,
-    extraRule,
-    promptOverridden: !!promptOverride,
-    // Full prompts for the details view — the card itself shows the diff.
-    promptUsedA: promptA,
-    promptUsedB: promptB,
+    ...textArms,
     elapsedMs,
     modelId: imgA.modelId || null,
   };

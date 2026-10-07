@@ -47,7 +47,7 @@ Audit date: 2026-09-27 (staging `c76dac6fc`). Every B/C divergence still open ha
 | artifact_repair / repair_verify | `gridBasedRepair` / `verifyRepairWithGemini` | no live production path | The production route `POST artifact-repair` throws "outputDir is required" (reported, not fixed). |
 | scale_repair / style_transfer | admin routes only | B | Missing plate, background descriptions and style / `targetModel` options. |
 | pick_best | the repair round's pick, `repairPipeline.selectBestVersion` (`pickBestVersionIndex` with the pipeline's `earliest` tie-break) | **A** (2026-09-27) | none |
-| scene_expansion / _ab / scene_variant | beats all-pages Art Director (`buildSceneExpansionAllPrompt`); per-page only as fallback | B | Per-page builder, wrong model (global `TEXT_MODEL`), no plan line, no `story` / `clothingRequirements` / `maxCharactersPerScene`. |
+| scene_expansion / _ab / scene_variant | beats all-pages Art Director (`buildSceneExpansionAllPrompt`); per-page only as fallback | B | Per-page builder on the stored page text, no plan line. Since 2026-10-07 the model is the run's brief author (`modelOverrides.sceneDescriptionModel \|\| MODEL_DEFAULTS.sceneDescription`) and `modelOverrides` come from `replayInputs` via `resolveReplayInputData` (an older story replays with the default models), pinned by `tests/unit/testlab-scene-expansion-replay-model.test.ts`; `story` / `clothingRequirements` / `maxCharactersPerScene` are passed (`labSceneExpansionOptions`). Not passed: the run's `adBriefsReasoningEffort` call option. |
 | scene_description | `/regenerate/scene-description` | B | No `previousScenes`; clothing hard-coded to 'standard'; model fallback. |
 | rewrite_blocked | `rewriteBlockedScene` | C | Rebuilds the template itself and uses the wrong model. |
 | qwen_insert / empty_scene_adherence / inventory_ab | none | R | |
@@ -84,4 +84,5 @@ Audit date: 2026-09-27 (staging `c76dac6fc`). Every B/C divergence still open ha
 - **The pre-review visual bible** is stored since 2026-09-27 as
   `sceneReviewReport.visualBibleIn`, only when the review corrected the bible. Older stories
   whose review corrected it replay against the corrected bible.
-- **The scene_expansion family** does not read `replayInputs` yet (backlog).
+- **The scene_expansion family** reads `replayInputs` (`modelOverrides`) since 2026-10-07; the per-page
+  expansion carries no landmark section, so the landmark list is not read.
