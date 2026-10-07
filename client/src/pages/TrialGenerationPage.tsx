@@ -755,22 +755,28 @@ export default function TrialGenerationPage() {
 
   const slideshowItems = useMemo<Slide[]>(() => {
     const items: Slide[] = [];
-    const lang = (state?.storyInput?.language || 'de').split('-')[0] as 'en' | 'de' | 'fr' | 'it';
-    const characterName = state?.characterName || 'Your hero';
+    // The resume paths (the wizard's "View your story", storage recovery) carry
+    // storyInput {} and no character name: the captions then follow the UI
+    // language, and only the lines without a {name} slot are used — until
+    // 2026-10-07 they defaulted to German and read "Your hero macht sich bereit".
+    const lang = (state?.storyInput?.language || language).split('-')[0] as 'en' | 'de' | 'fr' | 'it';
+    const characterName = state?.characterName || '';
+    const funnyPool = characterName ? funnyMessages : funnyMessages.filter(m => !m.en.includes('{name}'));
 
     // Intro phase — no story images yet. Rotate avatar + benefits/funny
     // captions while the pipeline warms up.
     const avatarPool: { src: string; label: string }[] = [];
-    if (state?.previewAvatar) avatarPool.push({ src: state.previewAvatar, label: characterName });
+    const heroLabel = characterName || t.brand;
+    if (state?.previewAvatar) avatarPool.push({ src: state.previewAvatar, label: heroLabel });
     for (let i = 0; i < avatarSlides.length; i++) {
-      avatarPool.push({ src: avatarSlides[i], label: `${characterName} - Style ${i + 1}` });
+      avatarPool.push({ src: avatarSlides[i], label: `${heroLabel} - Style ${i + 1}` });
     }
     const pickAvatar = (i: number) => avatarPool.length > 0 ? avatarPool[i % avatarPool.length] : null;
     // Pick funny captions WITHOUT repeating until the whole pool is exhausted.
     // shuffleDeck draws once per intro build so the deck is stable across
     // re-renders within the same intro phase.
     const shuffledFunny = (() => {
-      const idx = funnyMessages.map((_, i) => i);
+      const idx = funnyPool.map((_, i) => i);
       for (let i = idx.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [idx[i], idx[j]] = [idx[j], idx[i]];
@@ -778,7 +784,7 @@ export default function TrialGenerationPage() {
       return idx;
     })();
     const funnyAt = (slot: number) => {
-      const msg = funnyMessages[shuffledFunny[slot % shuffledFunny.length]];
+      const msg = funnyPool[shuffledFunny[slot % shuffledFunny.length]];
       const tmpl = msg[lang] || msg.en;
       return tmpl.replace('{name}', characterName);
     };
@@ -802,7 +808,7 @@ export default function TrialGenerationPage() {
     return items;
   // funnyMessages is a module-scope const (declared above the component); safe to omit from deps
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state?.previewAvatar, state?.characterName, state?.storyInput?.language, avatarSlides, t]);
+  }, [state?.previewAvatar, state?.characterName, state?.storyInput?.language, language, avatarSlides, t]);
 
   // Rotate slideshow — info messages stay up longer so they're readable;
   // funny + image-only slides tick faster. The interval re-fires on every
