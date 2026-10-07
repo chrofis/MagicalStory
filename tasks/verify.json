@@ -6080,6 +6080,22 @@
       },
       "status": "pending",
       "evidence": null
+    },
+    {
+      "id": "ad-showcase-fixes-2026-10-07",
+      "title": "Handover object in plan instant, no band words in brief prose, cover costume follows place, waist-high wording",
+      "commits": [],
+      "addedAt": "2026-10-07",
+      "claim": "On a full story with a handed-over object, a costumed cast and a dry cover place: (1) the plan line of the handover page names the object in its instant and the brief cites it; (2) no cover brief prose contains a band, third, fifth or kept-empty phrase; (3) a cover whose place is dry carries standard clothing for a water-only costume; (4) REQUIRED OBJECTS size lines say 'waist-high', never 'hip-high'.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "stories.data sceneDescriptions (covers), beatsPlan lines, image prompts REQUIRED OBJECTS."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [

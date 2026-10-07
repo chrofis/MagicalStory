@@ -9929,7 +9929,12 @@ const CREATURE_FEATURES_RULE = 'An animal\'s `features` are its anatomy on every
 // on staging job_1790100385959_1nitlympp p17 wrote "shallow depth of field"
 // into the prose and the plate prompt, against an ART STYLE that says "depth
 // from atmospheric haze, not optical blur" in the same image prompt.
-const NO_LENS_RULE = "The brief says what the frame holds and where the camera stands, never how it renders: no depth of field, focus, blur, bokeh, lens or film words, anywhere in the brief. The medium comes from the art style, sent separately.";
+// ONE clause for "the frame's bands are never named": the intent rule (SCENE_INTENT_PICTURE_ONLY) and the brief-wide
+// content rule (NO_LENS_RULE, so the prose too) both read it. A cover beat states its copy band (coverBeats.COVER_COPY_SPACE,
+// the one source) and the author echoed it into the prose as "filling the lower two thirds ... the sky fills the upper third"
+// (staging job_1791315635053_t0t8qpebu front cover), which the image model paints as a band. docs/decisions.md 2026-10-07.
+const FRAME_BAND_CLAUSE = "never names a band, a third or an edge of the frame, nor a part of the frame kept empty or left for anything";
+const NO_LENS_RULE = "The brief says what the frame holds and where the camera stands, never how it renders: no depth of field, focus, blur, bokeh, lens or film words, anywhere in the brief. The medium comes from the art style, sent separately. The prose, like the intent, " + FRAME_BAND_CLAUSE + "; a layout clause of the plan line is carried out by where the figures stand and how large they are.";
 // A costume's body is the outfit text's, in every author of a page brief (owner, 2026-10-06). The wardrobe
 // writer and reviewer were given the covering-top / one-tail / no-feet rule (722a0a15f) but the Art Director
 // and both iterate rewriters were not: the p3 iterate rewrite of staging job_1791267520938_essbvehs8
@@ -10047,7 +10052,7 @@ const HEADLINE_PHRASE_RULE = "Write what the picture shows — faces, gestures, 
 // A COVER BEAT STATES ITS COPY BAND (coverBeats.COVER_COPY_SPACE, the one source), and the author echoed it into the intent as
 // "keeping the top third of the frame empty" (Lab #1674, first pass of every cover; the re-ask fixed it each time). The intent is
 // the anchor the image model weights most, so a band named there is painted. docs/decisions.md 2026-10-06.
-const SCENE_INTENT_PICTURE_ONLY = "It describes the picture only and never names a band, a third or an edge of the frame, nor a part of the frame kept empty or left for anything; a layout clause of the plan line is composition for the prose. On a page with no characters the first sentence names the event itself (what happens to what, where): it is the page's main action, and the semantic judge scores its absence as MAJOR.";
+const SCENE_INTENT_PICTURE_ONLY = "It describes the picture only and " + FRAME_BAND_CLAUSE + "; a layout clause of the plan line is composition for the prose. On a page with no characters the first sentence names the event itself (what happens to what, where): it is the page's main action, and the semantic judge scores its absence as MAJOR.";
 const SCENE_INTENT_FIELD_RULE = "2-3 present-tense sentences naming the single moment the image depicts. Sentence 1: who does what to whom, where. Sentence 2: what characters hold or reach for, and the page's one gaze target — never a second target, and never a character facing one person while gazing at another. Sentence 3: the setting and the light. Name every character physically present. List the main and primary characters among them in `characters[]`; secondary characters stay in the prose and carry their CHR id in `objects[]`. One moment only — not cause plus effect. " + SCENE_INTENT_PICTURE_ONLY;
 
 // THE JEV PATH'S FIELD RULES (owner, 2026-10-06, Art Director review §3). On a story page code writes `looksAt` and the

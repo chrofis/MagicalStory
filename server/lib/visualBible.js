@@ -867,7 +867,7 @@ const SCALE_PHRASES = Object.freeze({
   'forearm-sized': "about as long as an adult's forearm",
   'arm-sized': "about as long as an adult's whole arm",
   'knee-high': 'stands knee-high to an adult',
-  'waist-high': 'stands hip-high to an adult',
+  'waist-high': 'stands waist-high to an adult',
   'chest-high': 'stands chest-high to an adult',
   'adult-height': 'as tall as a standing adult',
   'twice-adult-height': 'twice the height of a standing adult',
@@ -1034,7 +1034,8 @@ function withScaleNote(description, entry) {
  * standard anthropometric heights as a fraction of stature (Drillis & Contini
  * 1966, the segment-length proportions of Winter's Biomechanics and Motor
  * Control of Human Movement: knee 0.285 H, hip 0.530 H, chest 0.720 H).
- * `waist-high` renders "stands hip-high", so it is the hip.
+ * `waist-high` renders "stands waist-high" (the token the author and the brief prose use; it was "hip-high" until
+ * 2026-10-07, which put two words for one band on a page); 0.530 H is the table's value for that band.
  *
  * adult-height and twice-adult-height state their multiple outright.
  * house-height states "several adults high, the size of a house": 3 is the

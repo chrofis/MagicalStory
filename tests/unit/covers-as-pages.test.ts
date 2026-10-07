@@ -62,8 +62,10 @@ describe('cover beats — what code knows about a cover, written as the beat', (
     const input = cast(2, [1]);
     const withCostume = CB.buildCoverBeats(input, { clothingRequirements: { Child1: { costumed: { used: true } } } });
     const without = CB.buildCoverBeats(input, { clothingRequirements: { Child1: { standard: { used: true } } } });
-    expect(withCostume[0].planLine).toMatch(/costumed outfit/);
-    expect(without[0].planLine).not.toMatch(/costumed outfit/);
+    expect(withCostume[0].planLine).toContain(CB.COVER_COSTUME_FACT);
+    expect(without[0].planLine).not.toContain(CB.COVER_COSTUME_FACT);
+    // a costume is worn where the place suits it, never forced on every cover (dry hillside in a tail)
+    expect(withCostume[0].planLine).not.toMatch(/every figure wears their costumed/);
   });
   it('a story with no characters has no cover cast, and says so loudly', () => {
     expect(() => CB.buildCoverBeats({ characters: [] })).toThrow(/no cast/);

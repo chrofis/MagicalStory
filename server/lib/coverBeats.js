@@ -94,6 +94,14 @@ function coverCasts(inputData = {}) {
   return { frontCover: mainCapped, initialPage: group, backCover: group };
 }
 
+/**
+ * THE COVER COSTUME FOLLOWS THE PLACE (2026-10-07). The beat used to say "every figure wears their costumed outfit", so a
+ * body costume (a tail) went onto the dedication page's dry inland hillside (staging job_1791315635053_t0t8qpebu:
+ * "rests on her tail fin on the grass"). The Art Director now chooses per figure by the cover's place, as a story page's
+ * clothing follows its plan line (scene-briefs-all C3). Classification stays in the prompt, not in code.
+ */
+const COVER_COSTUME_FACT = 'each figure with a costumed outfit wears it where the place suits it (a tail in or at the water, a suit of armour in a castle) and their standard outfit where the costume does not belong';
+
 /** True when any cast member's wardrobe contract uses a costumed outfit. */
 function anyCostumed(names, clothingRequirements) {
   if (!clothingRequirements || typeof clothingRequirements !== 'object') return false;
@@ -147,7 +155,7 @@ function buildCoverBeats(inputData = {}, { coverTypes = ['frontCover', 'initialP
     const facts = [
       t.instant,
       ...(placeDecided ? [COVER_DECIDED_PLACE] : [COVER_KEY_PLACE, COVER_OWN_PLACE]),
-      anyCostumed(cast, clothingRequirements) ? 'every figure wears their costumed outfit' : null,
+      anyCostumed(cast, clothingRequirements) ? COVER_COSTUME_FACT : null,
       `any animal, artifact or vehicle from the Visual Bible the picture calls for, at most ${VB_ELEMENT_BUDGET}`,
       `${COVER_COPY_SPACE[coverKey]} (textPosition "${COVER_TEXT_POSITION[coverKey]}")`,
     ].filter(Boolean).join('; ');
@@ -216,6 +224,7 @@ function coverIteratePath(storyData, coverKey) {
 
 module.exports = {
   COVER_COPY_SPACE,
+  COVER_COSTUME_FACT,
   COVER_OWN_PLACE,
   COVER_KEY_PLACE,
   COVER_DECIDED_PLACE,

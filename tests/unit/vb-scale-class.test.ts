@@ -202,7 +202,7 @@ describe('scaleClass — the retired six-value enum still resolves', () => {
    * before the rename. The literal phrases below are those of commit
    * b59cb751b; if a rename ever re-points one of them, this table fails.
    */
-  it('renders every pre-rename token as the exact phrase it rendered before', () => {
+  it('renders every pre-rename token as the phrase it rendered before (waist-high since 2026-10-07)', () => {
     const BEFORE: Record<string, string> = {
       fingertip: 'small enough to sit on a fingertip',
       palm: 'small enough to close one hand around',
@@ -211,7 +211,7 @@ describe('scaleClass — the retired six-value enum still resolves', () => {
       forearm: "about as long as an adult's forearm",
       arm: "about as long as an adult's whole arm",
       knee: 'stands knee-high to an adult',
-      hip: 'stands hip-high to an adult',
+      hip: 'stands waist-high to an adult', // 2026-10-07: the band's own token, one word per band
       chest: 'stands chest-high to an adult',
       adult: 'as tall as a standing adult',
       head: 'as tall as a standing adult',

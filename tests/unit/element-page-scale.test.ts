@@ -31,6 +31,17 @@ const egg = { id: 'ART003', name: 'dragon egg', label: 'dragon egg', scaleClass:
 const cart = { id: 'VEH001', name: 'hay cart', label: 'hay cart', scaleClass: 'adult-height', pages: [9] };
 const pup = { id: 'ANI001', name: 'Nia', scaleClass: 'waist-high', species: 'dog', pages: [9] };
 
+describe('one word per band (staging job_1791315635053_t0t8qpebu: brief "waist-high", REQUIRED OBJECTS "hip-high")', () => {
+  it('every height band renders in the word of its own token, in the band phrase and in the page note', () => {
+    for (const band of ['knee-high', 'waist-high', 'chest-high']) {
+      const word = band.split('-')[0];
+      expect(P[band], band).toContain(`${word}-high`);
+      expect(PB.elementPageScaleNote({ ...pup, scaleClass: band }, [LEVIN]), band).toContain(`${word}-high`);
+    }
+    expect(PB.elementPageScaleNote(pup, [LEVIN])).not.toMatch(/hip-high/);
+  });
+});
+
 describe('the one fraction table', () => {
   it('defines the three body bands, the two stated multiples and house-height — nothing else', () => {
     expect(Object.keys(VB.SCALE_ADULT_HEIGHT_FRACTION).sort()).toEqual(
