@@ -28,4 +28,9 @@ describe('public pages a11y chrome', () => {
     expect(btn).toContain('aria-expanded={showMenu}');
     expect(nav).toMatch(/event\.key === 'Escape'\) setShowMenu\(false\)/);
   });
+
+  it('FAQ search input is labelled in the page language', () => {
+    const faq = src('pages/FAQ.tsx');
+    expect(faq).toContain('aria-label={content.searchPlaceholder}');
+  });
 });
