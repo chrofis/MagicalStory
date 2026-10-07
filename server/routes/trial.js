@@ -2114,7 +2114,7 @@ router.post('/link-email', verifySessionToken, linkEmailSessionLimiter, linkEmai
     const parsedTrial = typeof trialData === 'string' ? JSON.parse(trialData) : trialData;
     const language = parsedTrial?.storyInput?.language || 'en';
 
-    const verifyUrl = `${process.env.FRONTEND_URL || process.env.BASE_URL || 'https://www.magicalstory.ch'}/api/auth/verify-email/${verificationToken}`;
+    const verifyUrl = `${process.env.FRONTEND_URL || process.env.BASE_URL || 'https://magicalstory.ch'}/api/auth/verify-email/${verificationToken}`;
     // The sender reports failure in its result instead of throwing: success is only claimed when it sent.
     const sent = await emailService.sendEmailVerificationEmail(normalizedEmail, displayName, verifyUrl, language);
     if (!sent?.success) {

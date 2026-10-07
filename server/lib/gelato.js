@@ -383,7 +383,7 @@ async function processBookOrder(dbPool, sessionId, userId, storyIds, customerInf
     ]);
 
     // Get the base URL from environment or construct it
-    const baseUrl = process.env.BASE_URL || 'https://www.magicalstory.ch';
+    const baseUrl = process.env.BASE_URL || 'https://magicalstory.ch';
     const pdfUrl = `${baseUrl}/api/files/${pdfFileId}`;
     console.log(`✅ [BACKGROUND] PDF saved with URL: ${pdfUrl}`);
 

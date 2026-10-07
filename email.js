@@ -280,7 +280,7 @@ async function sendStoryCompleteEmail(userEmail, firstName, storyTitle, storyId,
   // server/lib/shareLinkSig.js for the threat model.
   let storyUrl;
   if (options.shareToken) {
-    storyUrl = `https://www.magicalstory.ch/shared/${options.shareToken}`;
+    storyUrl = `https://magicalstory.ch/shared/${options.shareToken}`;
     try {
       const { sign } = require('./server/lib/shareLinkSig');
       const key = sign(options.shareToken);
@@ -289,9 +289,9 @@ async function sendStoryCompleteEmail(userEmail, firstName, storyTitle, storyId,
       console.warn('⚠️ [email] could not sign share link, falling back to bare URL:', err.message);
     }
   } else if (storyId) {
-    storyUrl = `https://www.magicalstory.ch/create?storyId=${storyId}`;
+    storyUrl = `https://magicalstory.ch/create?storyId=${storyId}`;
   } else {
-    storyUrl = 'https://www.magicalstory.ch';
+    storyUrl = 'https://magicalstory.ch';
   }
 
   // Resolve cover URL: caller-provided wins, otherwise look up the story's
@@ -982,7 +982,7 @@ async function sendAdminStoryFailureAlert(jobId, userId, userName, userEmail, er
           <pre style="background: #1f2937; color: #f3f4f6; padding: 15px; border-radius: 8px; overflow-x: auto; white-space: pre-wrap;">${errorMessage}</pre>
 
           <p>
-            <a href="https://www.magicalstory.ch/admin"
+            <a href="https://magicalstory.ch/admin"
                style="display: inline-block; background: #6366f1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">
               View Admin Dashboard
             </a>
@@ -1050,7 +1050,7 @@ async function sendAdminOrderFailureAlert(sessionId, customerEmail, customerName
                style="display: inline-block; background: #6366f1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-right: 10px;">
               Stripe Dashboard
             </a>
-            <a href="https://www.magicalstory.ch/admin"
+            <a href="https://magicalstory.ch/admin"
                style="display: inline-block; background: #374151; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">
               Admin Dashboard
             </a>
@@ -1192,7 +1192,7 @@ async function sendAdminDailySummary(feed, dateLabel) {
             ${rows}
           </table>` : '<p style="color:#6b7280;">Keine Aktivität in den letzten 24 Stunden.</p>'}
           <p style="margin-top:18px;">
-            <a href="https://www.magicalstory.ch/admin?tab=activity"
+            <a href="https://magicalstory.ch/admin?tab=activity"
                style="display:inline-block; background:#6366f1; color:white; padding:10px 20px; text-decoration:none; border-radius:6px;">
               Zum Admin Dashboard
             </a>

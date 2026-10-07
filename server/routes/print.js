@@ -134,7 +134,7 @@ router.post('/print-provider/order', authenticateToken, async (req, res) => {
           [pdfFileId, req.user.id, 'print_pdf', storyId, 'application/pdf', pdfBase64, pdfBuffer.length, `story-${storyId}-print.pdf`]
         );
 
-        const baseUrl = process.env.BASE_URL || 'https://www.magicalstory.ch';
+        const baseUrl = process.env.BASE_URL || 'https://magicalstory.ch';
         pdfUrl = `${baseUrl}/api/files/${pdfFileId}`;
         log.debug(`🖨️ [PRINT] PDF generated and saved with URL: ${pdfUrl}, pageCount: ${pageCount}`);
       } catch (pdfErr) {
@@ -1711,8 +1711,8 @@ router.post('/stripe/create-checkout-session', authenticateToken, async (req, re
         quantity: 1,
       }],
       mode: 'payment',
-      success_url: `${process.env.FRONTEND_URL || process.env.BASE_URL || 'https://www.magicalstory.ch'}/stories?payment=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.FRONTEND_URL || process.env.BASE_URL || 'https://www.magicalstory.ch'}/stories?payment=cancelled`,
+      success_url: `${process.env.FRONTEND_URL || process.env.BASE_URL || 'https://magicalstory.ch'}/stories?payment=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.FRONTEND_URL || process.env.BASE_URL || 'https://magicalstory.ch'}/stories?payment=cancelled`,
       metadata: {
         userId: userId.toString(),
         storyIds: JSON.stringify(allStoryIds),
@@ -1823,8 +1823,8 @@ router.post('/stripe/create-credits-checkout', authenticateToken, async (req, re
         quantity: 1,
       }],
       mode: 'payment',
-      success_url: `${process.env.FRONTEND_URL || process.env.BASE_URL || 'https://www.magicalstory.ch'}/create?credits_payment=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.FRONTEND_URL || process.env.BASE_URL || 'https://www.magicalstory.ch'}/create?credits_payment=cancelled`,
+      success_url: `${process.env.FRONTEND_URL || process.env.BASE_URL || 'https://magicalstory.ch'}/create?credits_payment=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.FRONTEND_URL || process.env.BASE_URL || 'https://magicalstory.ch'}/create?credits_payment=cancelled`,
       metadata: {
         type: 'credits',
         userId: userId.toString(),
