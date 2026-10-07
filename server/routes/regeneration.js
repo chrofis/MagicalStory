@@ -22,7 +22,7 @@ const { sumUsage } = require('../lib/providerUsage');
 
 // Services
 const { log } = require('../utils/logger');
-const { saveStoryData, saveScenePageData, saveCoverData, saveFinalChecksReport, rehydrateStoryImages, saveStoryImage, getStoryImage, getActiveVersion, setActiveVersion, getNextVersionIndex, getPool, dbQuery, saveStyleLabImage, getStyleLabThumbnails, getStyleLabRunImages } = require('../services/database');
+const { saveStoryData, saveScenePageData, saveCoverData, saveFinalChecksReport, rehydrateStoryImages, saveStoryImage, getStoryImage, getActiveVersion, setActiveVersion, getNextVersionIndex, getPool, dbQuery, saveStyleLabImage, getStyleLabThumbnails, getStyleLabRunImages, imgBytesAsync } = require('../services/database');
 const { PROMPT_TEMPLATES, fillTemplate, assertPromptFilled } = require('../services/prompts');
 const { chargeCredits } = require('../lib/jobCredits');
 
@@ -226,29 +226,6 @@ async function fetchStoryRowForUser(id, req, columns = '*') {
   return result;
 }
 
-// SPD-2: byte-exact replica of database.js `imgBytesAsync` — returns the inline
-// bytes when present, otherwise fetches from R2 and wraps as a data URI with the
-// same mime sniffing. Kept local because imgBytesAsync isn't exported; must stay
-// in lock-step with the source so partial-rehydrate consumers get an identical
-// string to the one the full rehydrate produced.
-async function imgRowToBytes(row) {
-  if (!row) return null;
-  if (row.image_data) return row.image_data;
-  if (!row.image_url) return null;
-  try {
-    const buf = await r2.fetchImageBytes(row.image_url);
-    if (!buf) return row.image_url;
-    const mime = buf[0] === 0x89 && buf[1] === 0x50 ? 'image/png'
-               : buf[0] === 0xFF && buf[1] === 0xD8 ? 'image/jpeg'
-               : buf[0] === 0x52 && buf[1] === 0x49 ? 'image/webp'
-               : 'image/jpeg';
-    return `data:${mime};base64,${buf.toString('base64')}`;
-  } catch (err) {
-    log.warn(`[R2] imgRowToBytes fetch failed: ${err.message}`);
-    return row.image_url;
-  }
-}
-
 // SPD-2: rehydrate image bytes for a SINGLE scene page instead of the whole
 // story. `rehydrateStoryImages` (activeOnly) loads the active image for EVERY
 // page + cover (~50-100MB for a 30-page story), which OOM-503s under concurrent
@@ -256,7 +233,7 @@ async function imgRowToBytes(row) {
 // target page's bytes, so we load just that one page. Behaviour matches the full
 // rehydrate's activeOnly path exactly: (1) copy the active version's
 // bboxDetection up to the scene root, (2) populate scene.imageData with the
-// active version's bytes (R2-safe via imgRowToBytes). Active-version selection
+// active version's bytes (R2-safe via database.imgBytesAsync). Active-version selection
 // mirrors getActiveStoryImages — image_version_meta.activeVersion, falling back
 // to version_index 0 when unset or when that version row is missing. Only used
 // for scene pages (pageNumber >= 0); cover branches keep the full rehydrate.
@@ -291,7 +268,7 @@ async function rehydrateActivePageImage(storyId, storyData, pageNumber) {
   // which may hold a different version than the pinned active one).
   const activeRow = rows.find(r => r.version_index === activeDbIndex)
     || rows.find(r => r.version_index === 0);
-  sceneEntry.imageData = await imgRowToBytes(activeRow);
+  sceneEntry.imageData = await imgBytesAsync(activeRow);
   return storyData;
 }
 
