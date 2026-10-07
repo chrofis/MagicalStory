@@ -690,7 +690,7 @@ export function RepairWorkflowPanel({
                 <option value="">Server Default (gemini-2.5-flash)</option>
                 <option value="gemini-2.0-flash">Gemini 2.0 Flash — fast, no bbox ($0.005/eval)</option>
                 <option value="gemini-2.5-flash">Gemini 2.5 Flash — thorough, bbox ($0.026/eval)</option>
-                <option value="grok-4-fast">Grok 4 Fast — vision ($0.01/eval)</option>
+                <option value="grok-4.3">Grok 4.3 — vision ($0.06/eval)</option>
               </select>
             </div>
           )}

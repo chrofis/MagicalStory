@@ -33,23 +33,15 @@ export const TEXT_MODELS = {
     descriptionDe: 'Gemini 2.0 Flash - Sehr schnell',
     descriptionFr: 'Gemini 2.0 Flash - Très rapide'
   },
-  'grok-3-mini': {
+  // grok-3-mini / grok-3 / grok-4-fast were retired by xAI on 2026-09-18; the
+  // ids still answer (xAI redirects them to grok-4.3 and bills its rate), so
+  // offering them would record a model and a price that no longer exist.
+  // tests/unit/model-pricing-integrity.test.ts fails on any retired id here.
+  'grok-4.3': {
     provider: 'xai',
-    description: 'Grok 3 Mini (xAI) - Fast & cheap ($0.30/$0.50 per 1M)',
-    descriptionDe: 'Grok 3 Mini (xAI) - Schnell & günstig ($0.30/$0.50 pro 1M)',
-    descriptionFr: 'Grok 3 Mini (xAI) - Rapide & économique ($0.30/$0.50 par 1M)'
-  },
-  'grok-3': {
-    provider: 'xai',
-    description: 'Grok 3 (xAI) - Good quality ($3.00/$15.00 per 1M)',
-    descriptionDe: 'Grok 3 (xAI) - Gute Qualität ($3.00/$15.00 pro 1M)',
-    descriptionFr: 'Grok 3 (xAI) - Bonne qualité ($3.00/$15.00 par 1M)'
-  },
-  'grok-4-fast': {
-    provider: 'xai',
-    description: 'Grok 4 Fast (xAI) - Very cheap, 2M context ($0.20/$0.50 per 1M)',
-    descriptionDe: 'Grok 4 Fast (xAI) - Sehr günstig, 2M Kontext ($0.20/$0.50 pro 1M)',
-    descriptionFr: 'Grok 4 Fast (xAI) - Très économique, 2M contexte ($0.20/$0.50 par 1M)'
+    description: 'Grok 4.3 (xAI) - Cheapest live Grok, 1M context ($1.25/$2.50 per 1M)',
+    descriptionDe: 'Grok 4.3 (xAI) - Günstigstes aktives Grok, 1M Kontext ($1.25/$2.50 pro 1M)',
+    descriptionFr: 'Grok 4.3 (xAI) - Grok actif le moins cher, 1M contexte ($1.25/$2.50 par 1M)'
   },
   'deepseek-v4-pro': {
     provider: 'openrouter',
@@ -116,10 +108,10 @@ export const QUALITY_MODELS = {
     descriptionDe: 'Gemini 2.5 Flash - Gründlicher ($0.30/$2.50 pro 1M)',
     descriptionFr: 'Gemini 2.5 Flash - Plus approfondi ($0.30/$2.50 par 1M)'
   },
-  'grok-4-fast': {
-    description: 'Grok 4 Fast - Cheapest vision ($0.20/$0.50 per 1M)',
-    descriptionDe: 'Grok 4 Fast - Günstigstes Vision ($0.20/$0.50 pro 1M)',
-    descriptionFr: 'Grok 4 Fast - Vision la moins chère ($0.20/$0.50 par 1M)'
+  'grok-4.3': {
+    description: 'Grok 4.3 - Cheapest live Grok vision ($1.25/$2.50 per 1M)',
+    descriptionDe: 'Grok 4.3 - Günstigstes aktives Grok-Vision ($1.25/$2.50 pro 1M)',
+    descriptionFr: 'Grok 4.3 - Vision Grok active la moins chère ($1.25/$2.50 par 1M)'
   }
 } as const;
 

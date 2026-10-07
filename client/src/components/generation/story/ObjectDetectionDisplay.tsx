@@ -71,7 +71,7 @@ const BBOX_MODELS = [
   { value: '', label: 'Default' },
   { value: 'gemini-2.5-flash', label: 'Gemini 2.5' },
   { value: 'gemini-2.0-flash', label: 'Gemini 2.0' },
-  { value: 'grok-4-fast', label: 'Grok 4' },
+  { value: 'grok-4.3', label: 'Grok 4.3' },
   { value: 'claude-sonnet', label: 'Claude Sonnet' },
   { value: 'claude-haiku', label: 'Claude Haiku' },
 ];

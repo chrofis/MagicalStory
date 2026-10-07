@@ -1176,7 +1176,7 @@ function ExperimentsTab() {
                     <option value="gemini-2.0-flash">gemini-2.0-flash</option>
                   </optgroup>
                   <optgroup label="Grok (xAI)">
-                    <option value="grok-4-fast">grok-4-fast</option>
+                    <option value="grok-4.3">grok-4.3</option>
                   </optgroup>
                   <optgroup label="Qwen-VL (OpenRouter)">
                     <option value="qwen3-vl">qwen3-vl-32b (spatial leader)</option>
@@ -1236,7 +1236,7 @@ function ExperimentsTab() {
             placeholder={stage === 'qwen_insert'
               ? 'Params JSON — e.g. {"crop":{"x":0.1,"y":0.5,"w":0.3,"h":0.45},"pose":"standing on the grass, arms raised","base":"empty_scene"}'
               : stage === 'consolidate'
-              ? 'Params JSON — e.g. {"model":"claude-sonnet"} · also: qwen-plus, qwen3-max, gemini-2.5-flash, deepseek-v4-pro, grok-4-fast'
+              ? 'Params JSON — e.g. {"model":"claude-sonnet"} · also: qwen-plus, qwen3-max, gemini-2.5-flash, deepseek-v4-pro, grok-4.3'
               : stage === 'quality_eval'
               ? 'Params JSON — e.g. {"complianceModel":"claude-sonnet"} · compliancePrompt overrides the stage-2 template'
               : stage === 'eval_variance'

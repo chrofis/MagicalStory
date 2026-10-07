@@ -2132,12 +2132,10 @@ export function StoryDisplay({
           <div className="flex gap-2 mt-2 pt-2 border-t border-gray-200">
             <select value={improveSceneModel} onChange={e => setImproveSceneModel(e.target.value)} className="flex-1 rounded border-gray-300 text-xs p-1">
               <option value="">Scene: Default</option>
-              <option value="grok-4-fast">Grok 4 Fast ($0.002)</option>
               <option value="gemini-2.0-flash">Gemini 2.0 Flash ($0.002)</option>
-              <option value="grok-3-mini">Grok 3 Mini ($0.002)</option>
+              <option value="grok-4.3">Grok 4.3 ($0.012)</option>
               <option value="gemini-2.5-flash">Gemini 2.5 Flash ($0.013)</option>
               <option value="claude-haiku">Haiku 4.5 ($0.028)</option>
-              <option value="grok-3">Grok 3 ($0.038)</option>
               <option value="gemini-2.5-pro">Gemini 2.5 Pro ($0.046)</option>
               <option value="claude-sonnet">Sonnet 5.5</option>
             </select>

@@ -268,14 +268,21 @@ describe('retired models — nothing live may resolve to one', () => {
       .toBe(`${GROK_VISION_FALLBACK}: exists=true, provider=xai, retired=no`);
   });
 
-  it('no server source file hardcodes a retired model key', () => {
+  it('no server or client source file hardcodes a retired model key', () => {
     // The actual reintroduction path. Not "does a dead id exist in the repo" —
     // the retired entries and their prices are supposed to exist, and so are
     // the comments explaining them. This asks the narrower question: does any
     // file OUTSIDE the config hand a retired key to code as a live value?
+    //
+    // client/src is in scope too (2026-10-07): six dev-mode dropdowns kept
+    // offering grok-3-mini / grok-3 / grok-4-fast for three weeks after the
+    // server retired them, because this scan only walked server/. A dropdown
+    // <option value="grok-4-fast"> is exactly the silent path the server guard
+    // closes — the id still answers, as grok-4.3, at grok-4.3's price.
     const ROOT = join(__dirname, '..', '..');
-    const SEARCH = ['server'];
+    const SEARCH = ['server', join('client', 'src')];
     const SKIP_FILES = new Set([join(ROOT, 'server', 'config', 'models.js')]);
+    const SOURCE_EXT = /\.(js|ts|tsx)$/;
 
     const files: string[] = [];
     const walk = (dir: string) => {
@@ -283,7 +290,7 @@ describe('retired models — nothing live may resolve to one', () => {
         if (name === 'node_modules' || name.startsWith('.')) continue;
         const full = join(dir, name);
         if (statSync(full).isDirectory()) walk(full);
-        else if (name.endsWith('.js') && !SKIP_FILES.has(full)) files.push(full);
+        else if (SOURCE_EXT.test(name) && !SKIP_FILES.has(full)) files.push(full);
       }
     };
     for (const d of SEARCH) walk(join(ROOT, d));
