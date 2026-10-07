@@ -80,8 +80,10 @@ export function enumerateRoutes(swissCities: Array<{ id: string }> = []): string
     '/themes/historical'
   );
 
-  // Theme detail pages — adventure, life-challenges, educational, historical
-  for (const t of storyTypes) routes.push(`/themes/adventure/${t.id}`);
+  // Theme detail pages — adventure, life-challenges, educational, historical.
+  // 'custom' is the wizard's "describe your own theme" option, not a theme
+  // page: it has no theme content or meta, so it is not a public URL.
+  for (const t of storyTypes) if (t.id !== 'custom') routes.push(`/themes/adventure/${t.id}`);
   for (const t of lifeChallenges) routes.push(`/themes/life-challenges/${t.id}`);
   for (const t of educationalTopics) routes.push(`/themes/educational/${t.id}`);
   for (const t of historicalEvents) routes.push(`/themes/historical/${t.id}`);

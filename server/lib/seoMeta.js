@@ -32,7 +32,8 @@ const THEME_CATEGORIES = {
 const THEMES = {
   adventure: {
     pirate: { en: 'Pirate Adventure', de: 'Piraten-Abenteuer', fr: 'Aventure de pirates', it: 'Avventura dei Pirati' },
-    knight: { en: 'Knights & Princess', de: 'Ritter & Prinzessin', fr: 'Chevaliers & princesse', it: 'Cavalieri & Principessa' },
+    knight: { en: 'Knights & Dragons', de: 'Ritter & Drachen', fr: 'Chevaliers & dragons', it: 'Cavalieri e Draghi' },
+    princess: { en: 'Princess', de: 'Prinzessinnen', fr: 'princesse', it: 'Principessa' },
     cowboy: { en: 'Cowboys & Indians', de: 'Cowboys und Indianer', fr: 'Cowboys et Indiens', it: 'Cowboy e Indiani' },
     ninja: { en: 'Secret Ninja', de: 'Geheimer Ninja', fr: 'Ninja secret', it: 'Ninja Segreto' },
     viking: { en: 'Viking Adventure', de: 'Wikinger-Abenteuer', fr: 'Aventure viking', it: 'Avventura Vichinga' },
@@ -60,6 +61,8 @@ const THEMES = {
     newyear: { en: 'New Year Story', de: 'Neujahrs-Geschichte', fr: 'Histoire du nouvel an', it: "Storia di Capodanno" },
     easter: { en: 'Easter Story', de: 'Oster-Geschichte', fr: 'Histoire de Pâques', it: 'Storia di Pasqua' },
     halloween: { en: 'Halloween Story', de: 'Halloween-Geschichte', fr: "Histoire d'Halloween", it: 'Storia di Halloween' },
+    'mothers-day': { en: "Mother's Day", de: 'Muttertags', fr: 'fête des mères', it: 'Festa della Mamma' },
+    'fathers-day': { en: "Father's Day", de: 'Vatertags', fr: 'fête des pères', it: 'Festa del Papà' },
   },
   'life-challenges': {
     'bath-time': { en: 'Bath Time', de: 'Baden', fr: 'Le bain', it: 'Il bagnetto' },
@@ -131,6 +134,7 @@ const THEMES = {
     alphabet: { en: 'The Alphabet (ABC)', de: 'Das Alphabet (ABC)', fr: "L'alphabet (ABC)", it: "L'Alfabeto (ABC)" },
     vowels: { en: 'Vowels', de: 'Vokale', fr: 'Voyelles', it: 'Vocali' },
     rhyming: { en: 'Rhyming Words', de: 'Reimwörter', fr: 'Mots qui riment', it: 'Parole in Rima' },
+    'spelling-name': { en: 'Spelling My Name', de: 'Namen schreiben', fr: 'Écrire mon nom', it: 'Scrivere il mio nome' },
     'numbers-1-10': { en: 'Numbers 1-10', de: 'Zahlen 1-10', fr: 'Nombres 1-10', it: 'Numeri 1-10' },
     'numbers-1-20': { en: 'Numbers 1-20', de: 'Zahlen 1-20', fr: 'Nombres 1-20', it: 'Numeri 1-20' },
     counting: { en: 'Learning to Count', de: 'Zählen lernen', fr: 'Apprendre à compter', it: 'Imparare a Contare' },
@@ -1995,4 +1999,4 @@ function escapeXml(str) {
 
 // ─── Exports ──────────────────────────────────────────────────────────────────
 
-module.exports = { getMetaForRoute, injectMeta, renderSpaShell, isAppRoute, generateSitemap, HTML_LANG, NOINDEX_ROUTES, APP_ROUTES };
+module.exports = { getMetaForRoute, injectMeta, renderSpaShell, isAppRoute, generateSitemap, HTML_LANG, NOINDEX_ROUTES, APP_ROUTES, THEMES };
