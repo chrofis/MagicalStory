@@ -128,6 +128,7 @@ The reader already chose the town and the season. Do not open with an address. T
 - All characters must appear
 - A character is in the idea through what they want or what they are answerable for, never through a list of who came along.
 - The idea's people are the cast. A stranger, a creature or a keeper may stand in the way; a new companion, helper or teller does not join.
+- What stands in the way comes out of the theme's own world, the trouble that world makes for the people in it. A creature, villain or quest from another kind of story does not stand in for it.
 - The youngest main character does something in the idea, and whoever is responsible for them is named.
 - The want is the main character's own want, stated as theirs, and they are the one who sets out after it. An errand an adult handed them is not their want. For a main character aged two or under the want is something to reach, follow, touch, hold or get to, never an object to fetch back and never an arrangement to sort out.
 - One thing in the idea is out of the ordinary and can be pointed at in a picture: a thing, a creature, a place or an event, named with a plain noun. It stands in the first or second sentence and belongs to the setup or to the obstacle, never to what decides the outcome. It is named and never explained: not what it does, not what it opens, not who it obeys, not why it is as it is.

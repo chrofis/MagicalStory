@@ -190,7 +190,7 @@ Each background describes a scene with no people, no human figures. Include: loc
 - {CREATURE_FEATURES}
 - A name the story gives an element lives in `properName` and nowhere else — never in `label`, `name`, `description` or the page prose. One `properName` belongs to one id: two entries never share a name. An object that transforms later in the story and the creature it becomes are separate ids, and only one of them carries the name.
 - max **2 artifacts** (only props that actually drive the action across multiple scenes — not background dressing)
-- max **2 secondary characters** (only if they appear on 2+ pages — single-scene helpers can stay nameless in prose)
+- max **2 secondary characters**, and only a person who is drawn on 2 or more pages. A person who is in one page only gets no entry and no name; the prose calls them "a friend" or "a neighbour"
 - {BACKGROUND_RANGE} backgrounds (one per scene if scenes change settings, fewer if scenes share a setting)
 
 Every entry costs a reference image generation pass. A {PAGES}-page story rarely benefits from more than 2 of each — pick the elements that need consistency across scenes and leave the rest as scene-prose details.

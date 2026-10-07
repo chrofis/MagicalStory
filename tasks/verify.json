@@ -6096,6 +6096,22 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "text-rules-2026-10-08",
+      "commits": [],
+      "addedAt": "2026-10-08",
+      "claim": "On the next trial: the idea cards' obstacle belongs to the theme's world (no stock dragon in a ninja story) and no companion child appears unless the premise needs one; no VB entry for a one-page person. On the next full story: refine adds no narrator-link or two-fact line, the arc's world rules carry one fact per line, every commissioned figure (adults included) has an act and a want given early is answered by the ending, dialogue states no rule nobody set.",
+      "runShape": [
+        "trial",
+        "full"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Read stories.data.ideaGeneration cards and visualBible.secondaryCharacters[].appearsInPages on a trial; on a full story read arcReviewReport.logic (Facts, world rules) and textRefineReport.pages before/after for added 'also/so' sentences."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [

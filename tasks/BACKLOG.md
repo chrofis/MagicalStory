@@ -2240,3 +2240,5 @@ three below are prompt/classification questions and are the owner's call.
 - [ ] Verify ad-showcase-fixes-2026-10-07 on the next real story (agent-as-model only; costume-on-dry-cover not reproduced in replay) → tasks/verify.json ad-showcase-fixes-2026-10-07
 - [ ] Trial cover still forces `costumed` for every figure (promptBuilders ~12622), sibling of the full-story cover costume fix → server/lib/promptBuilders.js
 - [ ] Plan-check / typed-plan have no critic for "handover object only in what-is-true-after" (generator rule added to story-beats.txt only; a critic needs calibration) → prompts/plan-check.txt
+- [ ] Mermaid p9 climax: refine/audit still apply the Facts line «Oskar cannot keep his arms still» against the plot's turn (letter arm holds until the dot dances); also p5 narrator names an unshown «Kanal». Agent run 2026-10-08, rule added in arcLogicSpec, unproven → tasks/showcase-fixes-2026-10-07.md, evals/runs/2026-10-08_trial-idea-text-rules
+- [ ] tests/unit/verify-registry.test.ts + public-pages-a11y.test.ts fail on a clean HEAD (verify.json entry repair-version-selection-2026-10-07 evidence shape; a second <main>) → not mine, found 2026-10-08

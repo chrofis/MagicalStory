@@ -31,7 +31,9 @@ const TRIAL_IDEA_COMMISSION_RULE = `What gets in the way is an outside event tha
 ${COMMISSIONED_ACT_PHRASE} — never a different difficulty put in its place, and never named
 outright. The event is what makes that hard thing unavoidable, and slot 2 is the main character
 doing it; an event that merely happens alongside it is a fault. The setting is where that struggle
-happens, not scenery around it.`;
+happens, not scenery around it. When the story was asked for no particular hard thing, the trouble
+comes out of the theme's own world: the kind of trouble that world makes for the people in it, never
+a creature, villain or quest borrowed from another kind of story.`;
 
 const CHECK_MARKER = 'CHECK';
 const NO_ACT = 'NONE';
