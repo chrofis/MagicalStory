@@ -162,3 +162,73 @@ describe('shared prose rules reach both writers as one constant each', () => {
     expect(built.trial).not.toContain('stays done with it; where a later scene');
   });
 });
+
+// 2026-10-07: the Art Director's brief-authoring IMAGE rules reach the trial
+// writer as the SAME constants (input only — the trial is one streaming call
+// with no Art Director, no judge and no repair, so the writer prompt is the
+// only place a scene-hint rule can land). Pinned on the built prompt: the
+// VALUE of each export is in the trial once; the two paraphrased bullets of
+// AD_COMPOSITION_RULE are now the constants themselves; the `population`
+// authoring rule is one constant for the trial and the Art Director backup.
+describe('shared image rules reach the trial scene-hint author as one constant each', () => {
+  const PB = require('../../server/lib/promptBuilders.js');
+  const { FOOTING_RULE } = require('../../server/lib/shotVocabulary.js');
+  const { POPULATION_LEVELS } = require('../../server/lib/sceneMetadata.js');
+
+  const ported: Array<[string, string]> = [
+    ['COSTUME_BODY_RULE', PB.COSTUME_BODY_RULE],
+    ['EYES_OPEN_RULE', PB.EYES_OPEN_RULE],
+    ['ABSENT_THING_RULE', PB.ABSENT_THING_RULE],
+    ['NO_LENS_RULE', PB.NO_LENS_RULE],
+    ['SMALL_PROP_CONTACT_RULE', PB.SMALL_PROP_CONTACT_RULE],
+    ['CONTACT_VERB_RULE', PB.CONTACT_VERB_RULE],
+    ['SHARED_GRIP_RULE', PB.SHARED_GRIP_RULE],
+    ['ONE_INSTANT_RULE', PB.ONE_INSTANT_RULE],
+    ['FOOTING_RULE', FOOTING_RULE],
+    ['TRUE_RELATIVE_SIZE_RULE', PB.TRUE_RELATIVE_SIZE_RULE],
+    ['POPULATION_FIELD_RULE', PB.POPULATION_FIELD_RULE],
+  ];
+  for (const [name, value] of ported) {
+    it(`${name} reaches the trial exactly once`, () => {
+      expect(value.length).toBeGreaterThan(20);
+      expect(built.trial.split(value).length - 1, name).toBe(1);
+    });
+  }
+
+  it('none of them reaches the beats text writer, which stages nothing', () => {
+    for (const [name, value] of ported) {
+      expect(built.beats, name).not.toContain(value);
+    }
+  });
+
+  it('AD_COMPOSITION_RULE carries the one-instant and footing constants behind their labels, not paraphrases', () => {
+    expect(AD_COMPOSITION_RULE).toContain('- One instant, no history. ' + PB.ONE_INSTANT_RULE);
+    expect(AD_COMPOSITION_RULE).toContain('- No partial immersion. ' + FOOTING_RULE);
+    expect(AD_COMPOSITION_RULE).not.toContain('restage them at the water');
+  });
+
+  it('the trial hint schema declares `population` with the six levels of the population table', () => {
+    expect(built.trial).toContain(`"population": "[${POPULATION_LEVELS.join('|')}]"`);
+    for (const level of POPULATION_LEVELS) {
+      expect(PB.POPULATION_FIELD_RULE, level).toContain(`\`"${level}"\``);
+    }
+    expect(POPULATION_LEVELS).toHaveLength(6);
+    expect(PB.POPULATION_FIELD_RULE).toContain('in one of six values');
+  });
+
+  it('the trial ties the free-text `background` to `population`, so the two cannot contradict', () => {
+    expect(built.trial).toMatch(/a `background` with passers-by or a crowd is never a `cast_only` page/);
+  });
+
+  it('the Art Director gets the population rule from the same constant on the Jev-outage backup, and not on the Jev path where code fixes the field', () => {
+    const roster = [{ id: 'c1', name: 'Mia', age: 8, gender: 'girl' }];
+    const ad = { ...input(), characters: roster, pages: 6, language: 'de-ch', languageLevel: 'medium', artStyle: 'watercolor', relationships: {}, relationshipTexts: {} };
+    const backup = String(PB.buildSceneBriefsAllPrompt(ad, beats, { jevBackup: true }));
+    const jev = String(PB.buildSceneBriefsAllPrompt(ad, beats, {}));
+    expect(backup.split(PB.POPULATION_FIELD_RULE).length - 1).toBe(1);
+    expect(jev).not.toContain(PB.POPULATION_FIELD_RULE);
+    expect(jev).toContain("`population` is the page's FIXED `population`, written by code");
+    expect(unfilled(backup)).toEqual([]);
+    expect(unfilled(jev)).toEqual([]);
+  });
+});

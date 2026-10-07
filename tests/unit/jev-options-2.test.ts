@@ -244,10 +244,13 @@ describe('population: wildlife, sparse, creature_crowd', () => {
     expect(none.byLocation.LOC001.population).toBe('cast_only');
   });
   it('both Art Director templates list the new values', () => {
+    // The rule is one constant since 2026-10-07 (POPULATION_FIELD_RULE, filled
+    // as {POPULATION_FIELD} into both templates and the trial writer).
     const fs = require('node:fs');
     for (const f of ['scene-expansion', 'scene-briefs-all']) {
       const t = fs.readFileSync(require.resolve(`../../prompts/${f}.txt`), 'utf8');
-      for (const n of NEW) expect(t, `${f} ${n}`).toContain(`"${n}"`);
+      expect(t, f).toContain('{POPULATION_FIELD}');
     }
+    for (const n of NEW) expect(PB.POPULATION_FIELD_RULE, n).toContain(`"${n}"`);
   });
 });

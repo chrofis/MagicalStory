@@ -5898,6 +5898,25 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "trial-writer-shared-image-rules",
+      "title": "Trial scene hints carry a `population` level and the Art Director's costume-body, eyes-open, absent-thing, no-lens, one-instant, footing, small-prop, contact-verb, shared-grip and true-relative-size rules, with no extra call",
+      "commits": [],
+      "addedAt": "2026-10-07",
+      "claim": "On the next trial run every stored scene hint carries `population` as one of the six levels; the image prompt of a public-place page (square, market, station, shop) asks for passers-by only where the hint's level is ambient, sparse or crowd, and a private-room or forest page says \"no one else is added\" with no crowd in its BACKGROUND line; a costumed figure keeps the costume's body (a tail from the waist down and no feet, a covering top) on every page; every standing figure is on standable ground, never ankle-deep in water; no figure has closed eyes; the hint prose names nothing as absent and no lens or blur word; the writer prompt is still ONE streaming call of about 12.4k input tokens (was about 10.8k).",
+      "runShape": [
+        "trial"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Open the six stored trial scene hints: each has `population` in {cast_only, sparse, ambient, crowd, wildlife, creature_crowd}, and a hint whose `background` names passers-by or a crowd is not cast_only. On each stored page prompt read REQUIRED CAST beside BACKGROUND: they agree (a crowd/ambient page asks for unnamed people, a cast_only page adds no one). Look at the pages: crowded public-place pages show passers-by only where the hint's population says so, and private pages show nobody extra; a costume covers the body (tail and no feet for a mermaid, a covering top, never a one-piece); feet are on ground, a bank or a deck, never standing in the water; no closed eyes. Confirm the stored unified_story prompt carries the population bullet list, the costume-body, eyes-open, never-name-absent, content-not-rendering and true-relative-size lines once each, and that only one writer call ran.",
+        "images": [
+          "pages"
+        ]
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [

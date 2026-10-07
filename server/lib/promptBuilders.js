@@ -36,7 +36,7 @@ const { frameColorForName } = require('./characterFrames');
 const { getLanguageNote, getLanguageInstruction, getLanguageNameEnglish, getNarrationTenseRule } = require('./languages');
 const { getEventById } = require('./historicalEvents');
 const { getSwissStoryResearch, getSwissCityById } = require('./swissStories');
-const { parseProseMetadataFormat, stripSceneMetadata, extractSceneMetadata, collectSceneCharacterNames, enforceSpreadTextPosition, parseSceneHintMetadata, resolveTextStagePictureSpec, buildTextStagePictureSpecs, SHARED_GRIP_RULE, normalisePopulation } = require('./sceneMetadata');
+const { parseProseMetadataFormat, stripSceneMetadata, extractSceneMetadata, collectSceneCharacterNames, enforceSpreadTextPosition, parseSceneHintMetadata, resolveTextStagePictureSpec, buildTextStagePictureSpecs, SHARED_GRIP_RULE, normalisePopulation, POPULATION_LEVELS } = require('./sceneMetadata');
 const { resolveClothingForPage, buildUsedClothingText, buildAvailableAvatarsForPrompt } = require('./clothingResolve');
 const { seasonLabel, buildSeasonNote, buildSeasonInstruction } = require('./season');
 const { gazeTokenRow, GAZE_TOKEN_LIST } = require('./gazeTargets');
@@ -3221,6 +3221,10 @@ function artDirectorFills(inputData, beats = [], options = {}) {
     COSTUME_BODY: COSTUME_BODY_RULE,
     NO_LENS: NO_LENS_RULE,
     ...jevFieldFills(jevBackup),
+    // The `population` field, one constant for the Jev-outage backup here and
+    // the trial writer — see POPULATION_FIELD_RULE (inside the JEV_BACKUP block
+    // of the template, so the Jev path, where code fixes the field, drops it).
+    POPULATION_FIELD: POPULATION_FIELD_RULE,
     EXPRESSION_FIELD: EXPRESSION_FIELD_RULE,
     GARMENT_REMOVED: GARMENT_REMOVED_RULE,
     WORN_ITEMS_ROW: WORN_ITEMS_ROW_RULE,
@@ -3727,6 +3731,10 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     COSTUME_BODY: COSTUME_BODY_RULE,
     NO_LENS: NO_LENS_RULE,
     ...jevFieldFills(jevBackup),
+    // The `population` field, one constant for the Jev-outage backup here and
+    // the trial writer — see POPULATION_FIELD_RULE (inside the JEV_BACKUP block
+    // of the template, so the Jev path, where code fixes the field, drops it).
+    POPULATION_FIELD: POPULATION_FIELD_RULE,
     EXPRESSION_FIELD: EXPRESSION_FIELD_RULE,
     GARMENT_REMOVED: GARMENT_REMOVED_RULE,
     WORN_ITEMS_ROW: WORN_ITEMS_ROW_RULE,
@@ -9276,6 +9284,29 @@ function buildRequiredCastRule(population) {
   return `${REQUIRED_CAST_LEAD}${tail} ${REQUIRED_CAST_UNACTED}`;
 }
 
+/**
+ * THE `population` FIELD, for every author that writes it (2026-10-07): the
+ * two Art Director templates on the Jev-outage backup (on the Jev path code
+ * fixes the field: jevBriefFields) and the trial writer, which authors its own
+ * scene hints with no Art Director. One constant filled as {POPULATION_FIELD};
+ * the six values are sceneMetadata.POPULATION_LEVELS (a test pins that every
+ * level is named here). Lifted verbatim from the two Art Director templates,
+ * where it was hand-kept prose: the trial hint carried no `population`, so
+ * normalisePopulation read every trial page as `cast_only` and the image
+ * prompt's REQUIRED CAST said "no one else is added" under a BACKGROUND line
+ * the same hint had written as "busy crowd".
+ */
+const POPULATION_FIELD_RULE = [
+  "- `population` says how populated the page's setting is, in one of six values, and it is about the SETTING, not about who matters to the story.",
+  "  - `\"crowd\"` — the page is written around unnamed background people: a market, a busy street, a gathering, a body of troops.",
+  "  - `\"ambient\"` — a public place that simply has people in it: a city square, a park, a promenade, a quay, a playground, a station concourse, a shop. Distant passers-by, someone on a bench, a figure by a wall belong in the picture and are not cast.",
+  "  - `\"cast_only\"` — nobody but the listed figures: a private room, a garden, a forest clearing, an empty night street.",
+  "  - `\"sparse\"` — a place where one or two unnamed people may be far off: a lone fisherman on a distant pier, a figure on a far hillside.",
+  "  - `\"wildlife\"` — the setting holds unnamed animals and no unnamed people: a reef with fish, a meadow with a flock, a plain with a herd. They belong in the picture and are not cast.",
+  "  - `\"creature_crowd\"` — the page is written around a crowd of unnamed creatures: a shoal, a swarm, a stampede, a flock filling the sky.",
+  "  Omit it and the page is read as `\"cast_only\"`. Choose `\"ambient\"` over `\"cast_only\"` whenever the location is one the public can walk into; a square with nobody on it reads as abandoned. The prose then does not claim the place is empty — never write \"no other people are present\" about an `ambient` or `crowd` setting. Describe background people the way the setting holds them, in this page's own prose (\"a few distant passers-by cross the far side of the square\") and never in a plate, which holds no people; keep them unnamed, distant and small. The page render draws them. The rule runs both ways: prose that puts unnamed figures in the frame — people crossing the square, riders passing, adults at the tables, onlookers — is a setting with people in it, so `population` is `ambient` or `crowd` on that page, never `cast_only`.",
+].join('\n');
+
 const COUNTS_RULE = '**COUNTS:** An exact number the scene states for a group of like things is three or fewer, and exactly that many are drawn. A group given as more than three, a cluster, a row, a few or several is drawn with no countable exact number.';
 
 /** The Composition block of an image prompt. A cover omits the facing bullet. */
@@ -10360,19 +10391,23 @@ const MECHANISM_FIX_RULE = 'A fault about how something physically works (how a 
 
 /**
  * The Art Director composition rules for a writer that authors its own scene
- * hints without an Art Director stage: trial and both unified variants. The
- * six bullets were reworded for a scene hint from scene-expansion(-all).txt
- * rules 5, 5c, 11f, the close-up rule and the immersion/footing rules
- * (2026-09-13) and lived only in story-trial.txt as prose; the unified
- * templates carried their own two-bullet subset. One constant, filled into
- * the {AD_COMPOSITION} placeholder. The beats path does not receive it — its
- * text writer stages nothing, the Art Director does.
+ * hints without an Art Director stage: the trial writer (story-trial.txt is
+ * the only template that declares {AD_COMPOSITION} since the two unified
+ * writers were deleted 2026-09-15). The six bullets were reworded for a scene
+ * hint from scene-expansion(-all).txt rules 5, 5c, 11f, the close-up rule and
+ * the immersion/footing rules (2026-09-13) and lived only in story-trial.txt
+ * as prose. Since 2026-10-07 the "one instant" and "no partial immersion"
+ * bullets are the Art Director's own constants (ONE_INSTANT_RULE,
+ * shotVocabulary.FOOTING_RULE) behind the same labels, not paraphrases of
+ * them: a scene-hint author gets the sentence the brief authors get. The
+ * beats path does not receive it — its text writer stages nothing, the Art
+ * Director does.
  */
 const AD_COMPOSITION_RULE = [
   '- One moment, one focal point. One main action draws the eye, drawn at its peak of motion — mid-leap, mid-swing, mid-throw — not the static pose that follows.',
-  '- One instant, no history. Never ask the picture to show how many times something happened, what just finished or what comes next — no "again", no "already", no object both mid-motion and in its ended state.',
+  '- One instant, no history. ' + ONE_INSTANT_RULE,
   '- At most two height levels per frame. ' + HEIGHT_LEVELS_RULE,
-  "- No partial immersion. A character is either on standable ground or fully swimming. Wading, ankle-deep and knee-deep poses render as standing on the water surface — restage them at the water's edge or as swimming.",
+  '- No partial immersion. ' + FOOTING_RULE,
   '- Footing. Every standing character has something standable at their declared position and depth — a bank, path, floor, deck or walkway — never open water or air. A moment that puts a figure where nothing standable exists moves the figure or the camera.',
   // The SIXTH copy of the close-up rule, and until 2026-09-20 the one still
   // hand-written after the other five moved to the shared constant. Filled
@@ -12653,6 +12688,25 @@ The story takes place in ${inputData.userLocation.city}. Use real place names �
       // Trial has no Art Director either: the scene-hint composition rules
       // reach a trial page only through the writer prompt.
       AD_COMPOSITION: AD_COMPOSITION_RULE,
+      // The Art Director's brief-authoring rules that read correctly for a
+      // scene-hint author, the same constants (2026-10-07, input only — no
+      // new call, no new per-page sentence). NOT filled, because each names a
+      // brief field the trial hint does not carry: FOOTING_FIELD (`footing`),
+      // LOOKS_AT_FIELD (`looksAt`), SCENE_INTENT_FIELD (`sceneIntent`),
+      // CREATURE_FIELD (`creatures[]`), WORN_ITEMS_ROW (`wornItems[]`).
+      COSTUME_BODY: COSTUME_BODY_RULE,
+      EYES_OPEN: EYES_OPEN_RULE,
+      NEVER_NAME_ABSENT: ABSENT_THING_RULE,
+      NO_LENS: NO_LENS_RULE,
+      SMALL_PROP_CONTACT: SMALL_PROP_CONTACT_RULE,
+      CONTACT_VERB: CONTACT_VERB_RULE,
+      SHARED_GRIP: SHARED_GRIP_RULE,
+      // The one new OUTPUT field, a one-word enum per page: `population`, the
+      // field the image prompt's REQUIRED CAST line and the judges read
+      // (normalisePopulation; absent → cast_only). Same rule text the Art
+      // Director gets on the Jev-outage backup — see POPULATION_FIELD_RULE.
+      POPULATION_FIELD: POPULATION_FIELD_RULE,
+      POPULATION_ENUM: POPULATION_LEVELS.join('|'),
       // Same resolver the full pipeline's Art Director uses. Trial has no Art
       // Director, so without this the creature tone never reaches a trial page.
       CREATURE_TONE: buildCreatureToneSection(inputData),
@@ -13451,6 +13505,7 @@ module.exports = {
   SHOWN_CALLBACK_RULE,
   MECHANISM_FIX_RULE,
   AD_COMPOSITION_RULE,
+  POPULATION_FIELD_RULE,
   HEIGHT_LEVELS_RULE,
   INTERACTIONS_CAP_RULE,
   GAZE_TARGET_FIXED_RULE,

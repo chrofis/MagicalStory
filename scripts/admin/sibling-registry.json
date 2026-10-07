@@ -1127,18 +1127,35 @@
     {
       "id": "costume-body-authors",
       "axis": "every author of a page brief vs the provider-blocked rewrite",
-      "reason": "A costume's body (one tail and no feet, a covering top) is promptBuilders.COSTUME_BODY_RULE, filled as {COSTUME_BODY} into both Art Director templates, both iterate templates and the blocked-scene rewrite; an author without it rewrites a mermaid with bare feet (essbv p3 iterate, 2026-10-06).",
+      "reason": "A costume's body (one tail and no feet, a covering top) is promptBuilders.COSTUME_BODY_RULE, filled as {COSTUME_BODY} into both Art Director templates, both iterate templates and the blocked-scene rewrite; an author without it rewrites a mermaid with bare feet (essbv p3 iterate, 2026-10-06). The trial writer joined 2026-10-07: it authors its own scene hints with no Art Director, and a trial costume (a mermaid tail) had no body rule at all.",
       "members": [
         "prompts/scene-briefs-all.txt",
         "prompts/scene-expansion.txt",
         "prompts/scene-iteration.txt",
         "prompts/scene-iteration-free.txt",
-        "prompts/rewrite-blocked-scene.txt"
+        "prompts/rewrite-blocked-scene.txt",
+        "prompts/story-trial.txt"
       ],
       "severity": "block",
       "parity": {
         "anchors": [
           "{COSTUME_BODY}"
+        ]
+      }
+    },
+    {
+      "id": "population-field-authors",
+      "axis": "every author that writes a page's `population`",
+      "reason": "The `population` field (sceneMetadata.POPULATION_TABLE) is what the image prompt's REQUIRED CAST line (promptBuilders.buildRequiredCastRule) and the judges' SETTING POPULATION line read; a page without it is cast_only. Its authoring rule is ONE constant, promptBuilders.POPULATION_FIELD_RULE, filled as {POPULATION_FIELD} into both Art Director templates (inside their JEV_BACKUP block: on the Jev path code fixes the field, jevBriefFields) and the trial writer, which writes its own scene hints with no Art Director. Until 2026-10-07 the trial hint had no such field, so every trial page rendered under \"no one else is added\" beneath a BACKGROUND line the same hint had written as \"busy crowd\". An author that gains a level, or a reworded value, reaches the other two through the constant or not at all.",
+      "members": [
+        "prompts/scene-briefs-all.txt",
+        "prompts/scene-expansion.txt",
+        "prompts/story-trial.txt"
+      ],
+      "severity": "block",
+      "parity": {
+        "anchors": [
+          "{POPULATION_FIELD}"
         ]
       }
     }

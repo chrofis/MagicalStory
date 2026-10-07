@@ -48,20 +48,22 @@ describe('Art Director template parity', () => {
   // field and its rule must exist in BOTH templates or the fallback path
   // silently reads the page as cast-only.
   it('population is declared and ruled in both templates, with all three values', () => {
+    // Since 2026-10-07 the rule is ONE constant (promptBuilders.POPULATION_FIELD_RULE,
+    // shared with the trial writer) filled through {POPULATION_FIELD}; the
+    // template declares the placeholder, the constant carries the rule.
+    const { POPULATION_FIELD_RULE } = require('../../server/lib/promptBuilders');
     for (const file of [PER_PAGE, ALL_PAGES]) {
       const text = fs.readFileSync(file, 'utf8');
       expect(metadataKeys(file), path.basename(file)).toContain('population');
-      // A rule line, not just the schema example.
-      expect(
-        /^- `population`/m.test(text),
-        `${path.basename(file)} states a population rule`
-      ).toBe(true);
-      for (const value of ['"crowd"', '"ambient"', '"cast_only"']) {
-        expect(text.includes(value), `${path.basename(file)} names ${value}`).toBe(true);
-      }
-      // The prose must never assert a populated place is empty — that claim is
-      // what the judge was holding correct pictures to.
-      expect(text).toContain('no other people are present');
+      expect(text, `${path.basename(file)} declares the population rule`).toContain('{POPULATION_FIELD}');
     }
+    // A rule line, not just the schema example.
+    expect(/^- `population`/m.test(POPULATION_FIELD_RULE)).toBe(true);
+    for (const value of ['"crowd"', '"ambient"', '"cast_only"']) {
+      expect(POPULATION_FIELD_RULE.includes(value), `names ${value}`).toBe(true);
+    }
+    // The prose must never assert a populated place is empty — that claim is
+    // what the judge was holding correct pictures to.
+    expect(POPULATION_FIELD_RULE).toContain('no other people are present');
   });
 });
