@@ -120,7 +120,7 @@ export default function OccasionPage() {
   }, [occasionSlug]);
 
   if (!occasion) {
-    return <Navigate to="/anlaesse" replace />;
+    return <Navigate to="/anlass" replace />;
   }
 
   const dataLang = language as 'en' | 'de' | 'fr' | 'it';
@@ -148,7 +148,7 @@ export default function OccasionPage() {
       <div className="bg-white border-b border-stone-100">
         <div className="max-w-4xl mx-auto px-4 pt-4 pb-0">
           <nav className="flex items-center gap-1.5 text-sm text-stone-500">
-            <Link to="/anlaesse" className="hover:text-indigo-500 transition-colors">{t.breadcrumbRoot}</Link>
+            <Link to="/anlass" className="hover:text-indigo-500 transition-colors">{t.breadcrumbRoot}</Link>
             <ChevronRight size={14} className="text-stone-300" />
             <span className="text-stone-800 font-medium">{name}</span>
           </nav>

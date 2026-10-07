@@ -17,7 +17,6 @@ import {
   Loader2,
   RefreshCw,
   Download,
-  FileText,
   History,
   Eye,
   Calendar,
@@ -1135,14 +1134,6 @@ export default function AdminDashboard() {
                 >
                   <Download size={16} />
                   {texts.exportData}
-                </Button>
-                <Button
-                  variant="secondary"
-                  onClick={() => navigate('/admin/logs')}
-                  disabled={isActionLoading}
-                >
-                  <FileText size={16} />
-                  {texts.viewLogs}
                 </Button>
                 <Button
                   variant="danger"
