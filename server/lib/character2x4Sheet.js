@@ -828,6 +828,9 @@ async function quickLayoutCheck(imageData) {
   const { data, info } = await sharp(buf).removeAlpha().raw().toBuffer({ resolveWithObject: true });
   const W = info.width, H = info.height;
   const band = Math.max(2, Math.round(Math.min(W, H) * 0.015));
+  // The head/body gutter sits where the rows meet, not at H/2: since the head row is cut at the chest
+  // (cropHeadRowToShoulders) it is roughly a quarter of the sheet's height.
+  const { mid: gutterY } = await detectSheetRowDivider(imageData, buf, W, H);
 
   // Per-channel distance from median that still counts as "same tone".
   // 25 is roughly the tolerance for paper noise / wash gradients without
@@ -873,7 +876,7 @@ async function quickLayoutCheck(imageData) {
     return uniformFraction(samples);
   }
   const checks = [
-    { name: 'mid-row gutter',  uniformFrac: rowBand(Math.floor(H / 2)) },
+    { name: 'mid-row gutter',  uniformFrac: rowBand(gutterY) },
     { name: 'col gutter 1/4',  uniformFrac: colBand(Math.floor(W / 4)) },
     { name: 'col gutter 2/4',  uniformFrac: colBand(Math.floor(W / 2)) },
     { name: 'col gutter 3/4',  uniformFrac: colBand(Math.floor(3 * W / 4)) },
