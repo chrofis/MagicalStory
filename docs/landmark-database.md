@@ -451,8 +451,8 @@ Mounted at `/api/admin/swiss-landmarks` (`server/routes/admin/swiss-landmarks.js
 `POST /index`, `GET /index/status`, `POST /recalculate-scores`,
 `POST /update-type`, `GET /stats`, `GET /`, `DELETE /broken`, `DELETE /by-ids`.
 
-> `server/routes/admin/landmark-index.js` defines a near-identical router that is
-> **required by nothing and mounted nowhere** — dead code as of 2026-08-29.
+> A near-identical unmounted router, `server/routes/admin/landmark-index.js`, was
+> dead code from 2026-08-29 and was deleted on 2026-10-07.
 
 ---
 

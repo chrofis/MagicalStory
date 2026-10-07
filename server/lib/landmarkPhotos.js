@@ -2314,7 +2314,9 @@ async function discoverLandmarksForLocation(city, country, limit = 30) {
     }).join(', ')}`);
 
     // Run FULL indexing in background (multi-photo with AI diversity selection)
-    // This is identical to running /api/admin/landmark-index/index-city
+    // The same per-city indexing the mounted admin router runs for every city
+    // (POST /api/admin/swiss-landmarks/index -> indexLandmarksForCities) and
+    // scripts/admin/discover-missing-city-landmarks.js runs offline.
     log.info(`[LANDMARK] 💾 Running full indexing for "${city}, ${country}" in background...`);
 
     // Run in background - don't await
