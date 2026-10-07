@@ -9,7 +9,7 @@
       "rootCause": "Two page counts with the same name: the list count exists for the over-limit check and the display, the billing count lives server-side and was already returned to the builder by POST /api/book-page-info (contentPages) for the blank-page warning, but the quote never read it.",
       "status": "fixed",
       "fixedAt": "2026-10-07",
-      "fixedIn": "pending",
+      "fixedIn": "130344a23",
       "fix": "BookBuilder prices on pageInfo.contentPages (the checkout count); the quote is empty until the server has counted the book, and a failed count is reported, not priced. The pure price facts moved to client/src/utils/bookPricing.ts (Pricing.tsx and MyStories import it) so the test can hold them against the server seed and SHIPPING_COST_CHF. Test: tests/unit/book-price-quote.test.ts."
     },
     {
