@@ -657,21 +657,22 @@ router.get('/:jobId/status', jobStatusLimiter, authenticateToken, async (req, re
       let partialCovers = {};
       let storyText = null;
       if (job.status === 'processing' || job.status === 'failed') {
-        // Fetch partial pages (also for failed jobs to allow data recovery)
+        // Fetch partial pages (also for failed jobs to allow data recovery).
+        // Pages the client already rendered (knownPages) are excluded IN SQL: a
+        // partial_page checkpoint's step_index IS its pageNumber (both
+        // saveCheckpoint call sites in storyJobPipeline.js pass page.pageNumber as
+        // the index), so a known page's base64 is never read off disk, let alone
+        // shipped to node, on every poll. Pages NOT in knownPages are returned
+        // unchanged (full pageNumber/text/imageData).
         const partialPagesResult = await getDbPool().query(
           `SELECT step_index, step_data
            FROM story_job_checkpoints
            WHERE job_id = $1 AND step_name = 'partial_page'
+             AND NOT (step_index = ANY($2::int[]))
            ORDER BY step_index ASC`,
-          [jobId]
+          [jobId, [...knownPages]]
         );
         partialPages = partialPagesResult.rows.map(row => row.step_data);
-
-        // Drop base64 for pages the client already rendered (bandwidth optimization).
-        // Pages NOT in knownPages are returned unchanged (full pageNumber/text/imageData).
-        if (knownPages.size > 0) {
-          partialPages = partialPages.filter(p => !knownPages.has(p.pageNumber));
-        }
 
         // Fetch partial covers (generated during streaming)
         const partialCoversResult = await getDbPool().query(
