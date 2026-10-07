@@ -24,6 +24,7 @@ async function sendTrialCompletionEmailIfDeferred(userId) {
   const pool = getPool();
   if (!pool) return { sent: false, reason: 'no-pool' };
 
+  let claimed = false;
   try {
     // Check user state: real email, no prior send, has a completed trial story.
     const userRes = await pool.query(
@@ -53,6 +54,22 @@ async function sendTrialCompletionEmailIfDeferred(userId) {
       [userId]
     );
     if (storyRes.rows.length === 0) return { sent: false, reason: 'no-story' };
+
+    // Claim the send BEFORE building and sending. The column used to be
+    // stamped after the send, so two overlapping callers (a mail client's link
+    // prefetch plus the click, verify-email and link-google) both read NULL
+    // above and both sent. The claim is one conditional UPDATE: the second
+    // caller updates no row and stops here. A failure below releases it.
+    const claimRes = await pool.query(
+      `UPDATE users SET trial_completion_email_sent_at = CURRENT_TIMESTAMP
+        WHERE id = $1 AND trial_completion_email_sent_at IS NULL
+        RETURNING id`,
+      [userId]
+    );
+    if (claimRes.rowCount === 0 && (claimRes.rows || []).length === 0) {
+      return { sent: false, reason: 'already-sent' };
+    }
+    claimed = true;
 
     const storyId = storyRes.rows[0].id;
     let storyData = typeof storyRes.rows[0].data === 'string'
@@ -95,16 +112,21 @@ async function sendTrialCompletionEmailIfDeferred(userId) {
 
     await email.sendStoryCompleteEmail(user.email, firstName, title, storyId, language, emailOptions);
 
-    // Mark sent so we don't double-send on repeated verify clicks.
-    await pool.query(
-      'UPDATE users SET trial_completion_email_sent_at = CURRENT_TIMESTAMP WHERE id = $1',
-      [userId]
-    );
-
+    // The claim above is the sent stamp.
     log.info(`[TRIAL-EMAIL] Sent deferred completion email to ${user.email} for story ${storyId}`);
     return { sent: true, storyId };
   } catch (err) {
     log.error(`[TRIAL-EMAIL] Failed to send deferred completion email for ${userId}: ${err.message}`);
+    if (claimed) {
+      // Nothing was sent: give the claim back so the next verify / link
+      // attempt sends. Logged, not thrown — the caller's route is already
+      // answering the user.
+      try {
+        await pool.query('UPDATE users SET trial_completion_email_sent_at = NULL WHERE id = $1', [userId]);
+      } catch (e) {
+        log.error(`[TRIAL-EMAIL] Could not release the send claim for ${userId}: ${e.message}`);
+      }
+    }
     return { sent: false, reason: 'error', error: err.message };
   }
 }

@@ -3726,6 +3726,16 @@
       "fixedAt": "2026-10-07",
       "fixedIn": "pending",
       "fix": "The handler tracks the slot from the increment until createTrialStoryJob returns the job id; the 404 exit and the catch (daily cap included) release it with one UPDATE (stories_generated - 1 WHERE stories_generated > 0). The one-trial cap itself is unchanged: a job row still consumes the slot for good."
+    },
+    {
+      "id": "trial-completion-email-double-send-on-overlap",
+      "title": "sendTrialCompletionEmailIfDeferred stamped trial_completion_email_sent_at AFTER the PDF build and the send, so two overlapping callers (mail-client link prefetch + the click on verify-email, or verify-email and link-google) both read NULL and both sent the story-complete mail with the PDF",
+      "reportedAt": "2026-10-07",
+      "source": "server/lib/trialEmail.js: guard read at the top, UPDATE at the bottom, with rehydrateStoryImages + generateViewPdf + Resend in between (seconds). Called from verify-email and link-google (server/routes/trial.js). Reproduced by tests/unit/trial-email-single-send.test.ts: two concurrent calls with a fake pool and a 20 ms send sent twice.",
+      "status": "fixed",
+      "fixedAt": "2026-10-07",
+      "fixedIn": "pending",
+      "fix": "The stamp is an atomic claim taken before the build: UPDATE ... SET trial_completion_email_sent_at = CURRENT_TIMESTAMP WHERE id = $1 AND trial_completion_email_sent_at IS NULL RETURNING id; a caller that updates no row returns already-sent. A failure after the claim (PDF, Resend) releases it so the next verify / link attempt sends."
     }
   ]
 }
