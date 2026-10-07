@@ -210,7 +210,7 @@ class GenerationLogger {
   apiUsage(functionName, model, usage, estimatedCost) {
     const calls = usage.calls || 1;
     const tokens = usage.inputTokens || usage.outputTokens
-      ? `${(usage.inputTokens || 0).toLocaleString()} in / ${(usage.outputTokens || 0).toLocaleString()} out${usage.thinkingTokens ? ` / ${usage.thinkingTokens.toLocaleString()} think` : ''}`
+      ? `${(usage.inputTokens || 0).toLocaleString()} in / ${(usage.outputTokens || 0).toLocaleString()} out${usage.thinkingTokens ? ` / ${usage.thinkingTokens.toLocaleString()} think` : (usage.thinkingInOutput ? ' / thinking inside out' : '')}${usage.cachedInputTokens ? ` / ${usage.cachedInputTokens.toLocaleString()} cached` : ''}${usage.cutCalls ? ` / ${usage.cutCalls} cut` : ''}`
       : null;
     const costStr = `$${estimatedCost.toFixed(4)}`;
     const message = tokens
@@ -224,6 +224,13 @@ class GenerationLogger {
       outputTokens: usage.outputTokens || 0,
       thinkingTokens: usage.thinkingTokens || 0,
       directCost: usage.directCost || 0,
+      // Ledger detail (costLedger.js): cache subsets, Anthropic thinking living
+      // inside output_tokens, cut streams booked part-way, calls with no price.
+      cachedInputTokens: usage.cachedInputTokens || 0,
+      cacheWriteTokens: usage.cacheWriteTokens || 0,
+      thinkingInOutput: !!usage.thinkingInOutput,
+      cutCalls: usage.cutCalls || 0,
+      unpricedCalls: usage.unpricedCalls || 0,
       calls,
       estimatedCost
     });

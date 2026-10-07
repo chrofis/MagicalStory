@@ -384,7 +384,7 @@ async function repairGridWithGemini(gridBuffer, manifest, retryCount = 0) {
 
     return {
       buffer: repairedBuffer,
-      usage: response.usageMetadata,
+      usage: require('./providerUsage').geminiUsage(response.usageMetadata),
       textResponse
     };
   } catch (err) {

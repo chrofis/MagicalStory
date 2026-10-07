@@ -46,7 +46,7 @@
 const sharp = require('sharp');
 const { log } = require('../utils/logger');
 const { baseVbId } = require('./vbIdGuard');
-const { MODEL_DEFAULTS } = require('../config/models');
+const { MODEL_DEFAULTS, priceUsage } = require('../config/models');
 const { coverLabel, COVER_PAGE_NUMBERS } = require('./coverKeys');
 const { parseHoldsId } = require('./coverHolds');
 const { stripDataUriPrefix } = require('./r2');
@@ -952,7 +952,7 @@ Keep the same characters — no additions, no removals. The background stays a p
   log.info(`🎨 [COVER-COMPOSITE] ${label}: pass 1 (repose) — Grok edit${propBuf ? ' + prop ref' : ''}${vbGridBuf ? ' + VB grid ref' : ''}`);
   const pass1Inputs = refSlots.length > 0 ? [pass1Input, ...refSlots] : pass1Input;
   const pass1 = await callGrokEdit(pass1Prompt, pass1Inputs);
-  if (usageTracker) usageTracker('grok', { cost: 0.02, direct_cost: 0.02, inferenceTime: pass1.elapsedMs }, 'cover_composite_pass1', pass1.modelId);
+  if (usageTracker) usageTracker('grok', { direct_cost: priceUsage(pass1.modelId, {}), inferenceTime: pass1.elapsedMs }, 'cover_composite_pass1', pass1.modelId);
 
   // Single-pass mode (sceneBackground provided) OR no-landmark fallback:
   // pass 1 IS the final result. Skip the cutout + landmark composite + pass 2
@@ -1067,7 +1067,7 @@ DO NOT redraw or reposition buildings. DO NOT replace the landmark with a generi
   // 10. Call Grok pass 2
   log.info(`🎨 [COVER-COMPOSITE] ${label}: pass 2 (watercolor + landmark) — Grok edit`);
   const pass2 = await callGrokEdit(pass2Prompt, pass2Input);
-  if (usageTracker) usageTracker('grok', { cost: 0.02, direct_cost: 0.02, inferenceTime: pass2.elapsedMs }, 'cover_composite_pass2', pass2.modelId);
+  if (usageTracker) usageTracker('grok', { direct_cost: priceUsage(pass2.modelId, {}), inferenceTime: pass2.elapsedMs }, 'cover_composite_pass2', pass2.modelId);
 
   return {
     imageData: `data:image/jpeg;base64,${pass2.imageData.toString('base64')}`,

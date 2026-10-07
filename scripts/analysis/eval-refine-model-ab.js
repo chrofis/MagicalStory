@@ -59,7 +59,7 @@ function parseJson(text) {
 
 (async () => {
   const { callTextModelStreaming } = require(path.join(ROOT, 'server/lib/textModels'));
-  const { TEXT_MODELS, calculateTextCost } = require(path.join(ROOT, 'server/config/models'));
+  const { TEXT_MODELS, priceUsage } = require(path.join(ROOT, 'server/config/models'));
   for (const j of JUDGES) if (!TEXT_MODELS[j]) throw new Error(`unknown judge ${j}`);
   const template = fs.readFileSync(path.join(ROOT, PROMPT_FILE), 'utf8');
   const pool = new Pool({ connectionString: process.env.STAGING_DATABASE_URL, ssl: { rejectUnauthorized: false } });
@@ -134,7 +134,7 @@ function parseJson(text) {
     results.push(...await Promise.all(batch.map(async (j) => {
       try {
         const r = await callTextModelStreaming(j.prompt, null, null, j.judge, { usageLabel: 'eval_refine_rank' });
-        const c = r.usage?.direct_cost ?? calculateTextCost(r.modelId || TEXT_MODELS[j.judge].modelId, r.usage || {});
+        const c = priceUsage(r.modelId || TEXT_MODELS[j.judge].modelId, r.usage || {});
         cost += c || 0;
         return { ...j, prompt: undefined, raw: r.text, parsed: parseJson(r.text), cost: c };
       } catch (e) { return { ...j, prompt: undefined, error: String(e.message || e) }; }

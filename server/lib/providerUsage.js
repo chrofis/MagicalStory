@@ -23,16 +23,50 @@
  * - OpenRouter (`usage`, OpenAI-shaped): `completion_tokens` INCLUDES the
  *   reasoning tokens (textReplyGuard.js, measured 2026-09-11), so
  *   `thinking_tokens` stays 0 and `reasoning_tokens` is informational only.
- * - Anthropic needs no normaliser: `output_tokens` includes extended thinking.
+ * - ANTHROPIC (`usage`, Messages API): `output_tokens` INCLUDES extended
+ *   thinking (billed at the output rate, never reported separately), so
+ *   `thinking_tokens` stays 0 and the ledger flags `thinking_in_output`: a "0
+ *   thinking" row on a Claude call means "inside output_tokens", not "none".
+ *   `input_tokens` on the wire is ONLY the uncached remainder; cache reads and
+ *   cache writes are separate counters. anthropicUsage() folds them back so
+ *   `input_tokens` is ALL prompt tokens, like every other provider, with
+ *   `cached_input_tokens` (reads) and `cache_write_tokens` as SUBSETS.
+ *
+ * CACHE FIELDS (all providers): `cached_input_tokens` = prompt tokens served
+ * from the provider's cache, a SUBSET of `input_tokens`; `cache_write_tokens`
+ * (Anthropic only) is the subset written to the cache. priceUsage() in
+ * config/models.js bills the subsets at their own rates.
  */
 
 /** Gemini `usageMetadata` (REST or SDK `response.usageMetadata`). */
 function geminiUsage(usageMetadata) {
   const um = usageMetadata || {};
-  return {
+  const usage = {
     input_tokens: um.promptTokenCount || 0,
     output_tokens: um.candidatesTokenCount || 0,
     thinking_tokens: um.thoughtsTokenCount || 0,
+  };
+  // promptTokenCount already includes the cached tokens (a subset), billed at
+  // Google's context-caching rate. Present only when a cache hit happened.
+  if (um.cachedContentTokenCount) usage.cached_input_tokens = um.cachedContentTokenCount;
+  return usage;
+}
+
+/**
+ * Anthropic Messages API `usage` (non-streaming response, or the merge of a
+ * stream's message_start + message_delta usage).
+ */
+function anthropicUsage(usage) {
+  const u = usage || {};
+  const read = u.cache_read_input_tokens || 0;
+  const write = u.cache_creation_input_tokens || 0;
+  return {
+    input_tokens: (u.input_tokens || 0) + read + write,
+    output_tokens: u.output_tokens || 0,
+    thinking_tokens: 0,
+    thinking_in_output: true,
+    cached_input_tokens: read,
+    cache_write_tokens: write,
   };
 }
 
@@ -66,8 +100,10 @@ function sumUsage(usages) {
     total.input_tokens += u.input_tokens || 0;
     total.output_tokens += u.output_tokens || 0;
     total.thinking_tokens += u.thinking_tokens || 0;
+    if (u.cached_input_tokens) total.cached_input_tokens = (total.cached_input_tokens || 0) + u.cached_input_tokens;
+    if (u.cache_write_tokens) total.cache_write_tokens = (total.cache_write_tokens || 0) + u.cache_write_tokens;
   }
   return total;
 }
 
-module.exports = { geminiUsage, xaiUsage, openRouterUsage, sumUsage };
+module.exports = { geminiUsage, anthropicUsage, xaiUsage, openRouterUsage, sumUsage };

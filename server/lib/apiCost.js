@@ -103,6 +103,20 @@ async function buildApiCostReport({ pool, days = 7 }) {
       const thinking = fn.thinking_tokens || 0;
       let direct = fn.direct_cost || 0;
 
+      // Stories recorded by the per-call ledger (costLedger.js) carry their exact
+      // cost; re-deriving it from the bucket's tokens would price a mixed-model
+      // bucket at one model. Older stories (no `ledger` marker) are re-priced
+      // below from their aggregates: the stored shape cannot be priced per call.
+      if (fn.ledger === 2) {
+        const provider = fn.provider || 'unknown';
+        byProvider[provider] ||= emptyBucket();
+        byFunction[fnName] ||= emptyBucket();
+        const payload = { calls: fn.calls, input, output, thinking, direct: fn.cost || 0, tokenCost: 0 };
+        addTo(byProvider[provider], payload);
+        addTo(byFunction[fnName], payload);
+        continue;
+      }
+
       const textModel = pickTextModel(fn.models);
       const imageModel = pickImageModel(fn.models);
 

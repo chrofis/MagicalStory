@@ -17,7 +17,7 @@ const { imageRegenerationLimiter } = require('../middleware/rateLimit');
 
 // Config
 const { CREDIT_CONFIG, CREDIT_COSTS } = require('../config/credits');
-const { calculateImageCost, calculateTextCost, formatCostSummary, MODEL_DEFAULTS, MODEL_PRICING, REPAIR_DEFAULTS, IMAGE_MODELS, TEXT_MODELS } = require('../config/models');
+const { calculateImageCost, priceUsage, formatCostSummary, MODEL_DEFAULTS, MODEL_PRICING, REPAIR_DEFAULTS, IMAGE_MODELS, TEXT_MODELS } = require('../config/models');
 const { sumUsage } = require('../lib/providerUsage');
 
 // Services
@@ -4393,7 +4393,7 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, imageRegenera
 
     // Calculate cost before responding
     const evalModel = qualityModelOverride || 'gemini-2.5-flash';
-    const apiCost = calculateTextCost(evalModel, sumUsage(Object.values(pages).map(p => p.usage)));
+    const apiCost = priceUsage(evalModel, sumUsage(Object.values(pages).map(p => p.usage)));
 
     log.info(`✅ [REPAIR-WORKFLOW] Re-evaluation complete for ${Object.keys(pages).length} pages`);
     const badPages = findBadPages(pages, scoreThreshold ? { scoreThreshold } : {});
@@ -5321,7 +5321,7 @@ router.post('/:id/repair-workflow/consistency-check', authenticateToken, imageRe
 
     // Calculate cost before responding
     const { inputTokens = 0, outputTokens = 0, thinkingTokens = 0, model: checkModel } = report.tokenUsage || {};
-    const apiCost = calculateTextCost(checkModel || 'gemini-2.5-flash', { input_tokens: inputTokens, output_tokens: outputTokens, thinking_tokens: thinkingTokens });
+    const apiCost = priceUsage(checkModel || 'gemini-2.5-flash', { input_tokens: inputTokens, output_tokens: outputTokens, thinking_tokens: thinkingTokens });
 
     log.info(`✅ [REPAIR-WORKFLOW] Consistency check complete: ${report.totalIssues} issues found`);
     res.json({ report, apiCost });

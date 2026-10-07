@@ -3239,8 +3239,9 @@ async function generateSceneComposite(opts) {
         repairLog.push({ name: c.name, skipped: err.message });
         log.warn(`[SCENE COMPOSITE]   ${c.name}: repair threw — ${err.message}`);
       }
-      if (usageTracker) usageTracker('grok', { cost: 0.02 }, 'scene_composite_char_repair', GROK_MODELS.STANDARD);
-      totalCost += 0.02;
+      const repairCost = require('../config/models').priceUsage(GROK_MODELS.STANDARD, {});
+      if (usageTracker) usageTracker('grok', { direct_cost: repairCost }, 'scene_composite_char_repair', GROK_MODELS.STANDARD);
+      totalCost += repairCost;
     }
     debug.charRepairLog = repairLog;
     debug.charRepairSteps = repairSteps;

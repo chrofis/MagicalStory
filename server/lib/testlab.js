@@ -3886,7 +3886,7 @@ async function runBookAuditStage(target, { params = {}, promptOverride = null })
   const { loadPromptTemplates, withTemplates } = require('../services/prompts');
   await loadPromptTemplates();
   const { auditStoryBook } = require('./bookAudit');
-  const { calculateTextCost } = require('../config/models');
+  const { priceUsage } = require('../config/models');
   const { storyData } = await loadStoryDataFull(target.storyId);
   // Covers are audited on their textless art, as in the story run
   // (coverEvalLayer.js); a stamped cover with no art layer is left out.
@@ -3910,7 +3910,7 @@ async function runBookAuditStage(target, { params = {}, promptOverride = null })
     // only, so those are priced with the same table production uses.
     usageTracker: (provider, u, fnName, mid) => usage.push({
       provider, fn: fnName, modelId: mid,
-      cost: u?.cost_usd ?? calculateTextCost(mid || '', u || {}),
+      cost: u?.cost_usd ?? priceUsage(mid || '', u || {}),
     }),
   }));
   const modelCalls = usage.length;
@@ -3960,7 +3960,7 @@ async function runAuditReplayStage(target, { params = {}, promptOverride = null 
   const { loadPromptTemplates, withTemplates } = require('../services/prompts');
   await loadPromptTemplates();
   const { callTextModelStreaming } = require('./textModels');
-  const { TEXT_MODELS, MODEL_DEFAULTS, calculateTextCost } = require('../config/models');
+  const { TEXT_MODELS, MODEL_DEFAULTS, priceUsage } = require('../config/models');
   const H = require('./storyHelpers');
 
   const level = String(params.level || '').toLowerCase();
@@ -4058,7 +4058,7 @@ async function runAuditReplayStage(target, { params = {}, promptOverride = null 
         raw: raw.slice(0, 30000),
         elapsedMs: Date.now() - t,
         usage: { input_tokens: res.usage?.input_tokens || 0, output_tokens: res.usage?.output_tokens || 0 },
-        cost: res.usage?.direct_cost ?? calculateTextCost(res.modelId || '', res.usage || {}),
+        cost: priceUsage(res.modelId || '', res.usage || {}),
       };
     } catch (e) {
       return { model, ok: false, error: e.message, elapsedMs: Date.now() - t };
@@ -4096,7 +4096,7 @@ async function runSceneHazardCountStage(target, { params = {}, promptOverride = 
   const { loadPromptTemplates, PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
   await loadPromptTemplates();
   const { callTextModelStreaming } = require('./textModels');
-  const { TEXT_MODELS, MODEL_DEFAULTS, calculateTextCost } = require('../config/models');
+  const { TEXT_MODELS, MODEL_DEFAULTS, priceUsage } = require('../config/models');
   const { parseBeats } = require('./storyHelpers');
 
   const source = String(params.source || 'briefs').toLowerCase();
@@ -4195,7 +4195,7 @@ async function runSceneHazardCountStage(target, { params = {}, promptOverride = 
         raw: raw.slice(0, 30000),
         elapsedMs: Date.now() - t,
         usage: { input_tokens: res.usage?.input_tokens || 0, output_tokens: res.usage?.output_tokens || 0 },
-        cost: res.usage?.direct_cost ?? calculateTextCost(res.modelId || '', res.usage || {}),
+        cost: priceUsage(res.modelId || '', res.usage || {}),
       };
     } catch (e) {
       return { model, ok: false, error: e.message, elapsedMs: Date.now() - t };
@@ -4319,7 +4319,7 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
   await loadPromptTemplates();
   const { buildBeatsPrompt, parseBeats, parsePlanResponse } = require('./storyHelpers');
   const { callTextModelStreaming } = require('./textModels');
-  const { TEXT_MODELS, MODEL_DEFAULTS, calculateTextCost } = require('../config/models');
+  const { TEXT_MODELS, MODEL_DEFAULTS, priceUsage } = require('../config/models');
 
   // The run's inputData: the stored landmark list and model overrides
   // (resolveReplayInputData, stored since 2026-09-27).
@@ -4335,7 +4335,7 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
   const beatsModel = params.beatsModel || MODEL_DEFAULTS.outline;
   if (!TEXT_MODELS[beatsModel]) throw new Error(`Unknown model "${beatsModel}"`);
 
-  const costOf = r => r.usage?.direct_cost ?? calculateTextCost(r.modelId || '', r.usage || {});
+  const costOf = r => priceUsage(r.modelId || '', r.usage || {});
   const lockStart = Date.now();
   let plainStoredBeats = null;
 
@@ -4453,7 +4453,7 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
     // per-page fallback, the pin) and briefChecks.runBriefChecks (2026-09-28),
     // on the inputs the run held.
     const { runArtDirector } = require('./beatsPipeline');
-    const { calculateTextCost: textCost } = require('../config/models');
+    const { priceUsage: textCost } = require('../config/models');
     const record = (level) => (event, message) => { events.push({ level, event, message }); };
     const gl = { info: record('info'), warn: record('warn'), error: record('error'), debug: record('debug') };
     const storedByPage = new Map((storyData.sceneImages || []).map(s => [s.pageNumber, s.sceneDescription || '']));
@@ -7603,7 +7603,7 @@ async function scoreArtifactsWithJudge(artifacts, { model, promptOverride = null
   const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../services/prompts');
   await loadPromptTemplates();
   const { callTextModelStreaming } = require('./textModels');
-  const { MODEL_DEFAULTS, TEXT_MODELS, calculateTextCost } = require('../config/models');
+  const { MODEL_DEFAULTS, TEXT_MODELS, priceUsage } = require('../config/models');
   const sc = require('./storyScorecard');
 
   // From version 2 on the evaluator version PINS the judge (2.1 Anna/Sonnet,
@@ -7652,7 +7652,7 @@ async function scoreArtifactsWithJudge(artifacts, { model, promptOverride = null
   if (!scored) throw new Error(`judge ${judge} returned nothing usable in 3 attempts: ${lastErr?.message}`);
   const scorecard = { ...scored, ...sc.evaluatorStamp(template, version), judgeModel: judge, scorerName: ev.name };
   const judgeMs = Date.now() - t;
-  const judgeCost = res.usage?.direct_cost ?? calculateTextCost(res.modelId || '', res.usage || {});
+  const judgeCost = priceUsage(res.modelId || '', res.usage || {});
 
   // Persist to story_scores so this lands on the live scores page. `persist`
   // carries the story context + the GENERATING model (the comparison axis) +
@@ -7821,7 +7821,7 @@ async function runStoryBibleReplayStage(target, { params = {}, promptOverride = 
   await loadPromptTemplates();
   const { buildStoryBibleFromBeatsPrompt, getPageText, extractSceneMetadata, parseBeats } = require('./storyHelpers');
   const { callTextModelStreaming } = require('./textModels');
-  const { MODEL_DEFAULTS, TEXT_MODELS, calculateTextCost } = require('../config/models');
+  const { MODEL_DEFAULTS, TEXT_MODELS, priceUsage } = require('../config/models');
   const { UnifiedStoryParser } = require('./outlineParser/unified');
 
   const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
@@ -7868,7 +7868,7 @@ async function runStoryBibleReplayStage(target, { params = {}, promptOverride = 
   let scorecard = null;
   if (params.scoreOutput === true || params.scoreOutput === 'true') {
     const visualBible = String(res.text || '').slice(0, 20000);
-    if (visualBible.trim()) scorecard = (await scoreArtifactsWithJudge({ visualBible }, { model: params.judgeModel, evalVersion: params.evalVersion, persist: { storyId: target.storyId, title: storyData.title, language: storyData.language, artStyle: storyData.artStyle, source: 'story_bible_replay', model, ...(fromRound != null ? { round: fromRound + 1, label: `regen (no critique) · ${model}` } : {}), genCost: res.usage?.direct_cost ?? calculateTextCost(res.modelId || '', res.usage || {}), genMs: Date.now() - t } })).scorecard;
+    if (visualBible.trim()) scorecard = (await scoreArtifactsWithJudge({ visualBible }, { model: params.judgeModel, evalVersion: params.evalVersion, persist: { storyId: target.storyId, title: storyData.title, language: storyData.language, artStyle: storyData.artStyle, source: 'story_bible_replay', model, ...(fromRound != null ? { round: fromRound + 1, label: `regen (no critique) · ${model}` } : {}), genCost: priceUsage(res.modelId || '', res.usage || {}), genMs: Date.now() - t } })).scorecard;
   }
 
   return {
@@ -7876,7 +7876,7 @@ async function runStoryBibleReplayStage(target, { params = {}, promptOverride = 
     beatsSource,
     model, modelId: res.modelId,
     elapsedMs: Date.now() - t,
-    cost: res.usage?.direct_cost ?? calculateTextCost(res.modelId || '', res.usage || {}),
+    cost: priceUsage(res.modelId || '', res.usage || {}),
     usage: res.usage,
     promptChars: prompt.length,
     prompt,
@@ -7903,7 +7903,7 @@ async function runClothingReviewStage(target, { params = {}, promptOverride = nu
   await loadPromptTemplates();
   const { buildClothingReviewPrompt, parseClothingReview, getPageText, extractSceneMetadata } = require('./storyHelpers');
   const { callTextModelStreaming } = require('./textModels');
-  const { MODEL_DEFAULTS, TEXT_MODELS, calculateTextCost } = require('../config/models');
+  const { MODEL_DEFAULTS, TEXT_MODELS, priceUsage } = require('../config/models');
 
   const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
   const before = JSON.parse(JSON.stringify(storyData.clothingRequirements || {}));
@@ -7961,7 +7961,7 @@ async function runClothingReviewStage(target, { params = {}, promptOverride = nu
     model, modelId: res.modelId,
     reasoning: MODEL_DEFAULTS.clothingReviewReasoning,
     elapsedMs: Date.now() - t,
-    cost: res.usage?.direct_cost ?? calculateTextCost(res.modelId || '', res.usage || {}),
+    cost: priceUsage(res.modelId || '', res.usage || {}),
     usage: res.usage,
     promptChars: prompt.length,
     prompt,
@@ -7993,7 +7993,7 @@ async function runStoryTextReplayStage(target, { params = {}, promptOverride = n
   await loadPromptTemplates();
   const { buildStoryTextFromBeatsPrompt, parseRefinedText, getPageText, extractSceneMetadata, parseBeats } = require('./storyHelpers');
   const { callTextModelStreaming } = require('./textModels');
-  const { MODEL_DEFAULTS, TEXT_MODELS, calculateTextCost } = require('../config/models');
+  const { MODEL_DEFAULTS, TEXT_MODELS, priceUsage } = require('../config/models');
 
   const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
   const fullText = storyData.storyText || storyData.story || '';
@@ -8080,7 +8080,7 @@ async function runStoryTextReplayStage(target, { params = {}, promptOverride = n
   let scorecard = null;
   if (params.scoreOutput === true || params.scoreOutput === 'true') {
     const storyText = (parsed.pages || []).map(p => `--- Page ${p.pageNumber} ---\n${p.text}`).join('\n\n');
-    if (storyText.trim()) scorecard = (await scoreArtifactsWithJudge({ storyText }, { model: params.judgeModel, evalVersion: params.evalVersion, persist: { storyId: target.storyId, title: storyData.title, language: storyData.language, artStyle: storyData.artStyle, source: 'story_text_replay', model, genCost: res.usage?.direct_cost ?? calculateTextCost(res.modelId || '', res.usage || {}), genMs: Date.now() - t } })).scorecard;
+    if (storyText.trim()) scorecard = (await scoreArtifactsWithJudge({ storyText }, { model: params.judgeModel, evalVersion: params.evalVersion, persist: { storyId: target.storyId, title: storyData.title, language: storyData.language, artStyle: storyData.artStyle, source: 'story_text_replay', model, genCost: priceUsage(res.modelId || '', res.usage || {}), genMs: Date.now() - t } })).scorecard;
   }
 
   return {
@@ -8094,7 +8094,7 @@ async function runStoryTextReplayStage(target, { params = {}, promptOverride = n
     overridden: textArgs.overridden,
     model, modelId: res.modelId,
     elapsedMs: Date.now() - t,
-    cost: res.usage?.direct_cost ?? calculateTextCost(res.modelId || '', res.usage || {}),
+    cost: priceUsage(res.modelId || '', res.usage || {}),
     usage: res.usage,
     promptChars: prompt.length,
     prompt,
@@ -8124,7 +8124,7 @@ async function runWriterCompareStage(target, { params = {} }) {
   await loadPromptTemplates();
   const SH = require('./storyHelpers');
   const { callTextModelStreaming } = require('./textModels');
-  const { MODEL_DEFAULTS, TEXT_MODELS, calculateTextCost, IMAGE_MODELS } = require('../config/models');
+  const { MODEL_DEFAULTS, TEXT_MODELS, priceUsage, IMAGE_MODELS } = require('../config/models');
   const { UnifiedStoryParser } = require('./outlineParser/unified');
   const WC = require('./testlabWriterCompare');
 
@@ -8172,7 +8172,7 @@ async function runWriterCompareStage(target, { params = {} }) {
     if (!text.trim() || res.usage?.output_tokens === 0) throw new Error(`${model} returned nothing for ${label}`);
     return {
       text, elapsedMs: Date.now() - t,
-      cost: res.usage?.direct_cost ?? calculateTextCost(res.modelId || '', res.usage || {}),
+      cost: priceUsage(res.modelId || '', res.usage || {}),
       usage: res.usage, modelId: res.modelId,
     };
   };
@@ -8333,7 +8333,7 @@ async function runArcEffortStage(target, { params = {}, promptOverride = null })
   await loadPromptTemplates();
   const { buildArcCreatePrompt, buildArcPanelPrompt, buildArcRetellPrompt, parseArcCreate, parseArcRetell, filterPanelFindings, splitCommittedBlock, arcShapeCounts, drawChallengeIdeas } = require('./storyHelpers');
   const { callTextModelStreaming } = require('./textModels');
-  const { TEXT_MODELS, MODEL_DEFAULTS, calculateTextCost } = require('../config/models');
+  const { TEXT_MODELS, MODEL_DEFAULTS, priceUsage } = require('../config/models');
   const sc = require('./storyScorecard');
 
   const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
@@ -8420,7 +8420,7 @@ async function runArcEffortStage(target, { params = {}, promptOverride = null })
   const judgeTemplate = PROMPT_TEMPLATES.storyArcJudge;
   if (!judgeTemplate) throw new Error('story-arc-judge template unavailable');
   const context = sc.buildBriefContext({ ...storyData, pages: pageCount }, { arc: true });
-  const costOf = r => r.usage?.direct_cost ?? calculateTextCost(r.modelId || '', r.usage || {});
+  const costOf = r => priceUsage(r.modelId || '', r.usage || {});
 
   const scoreArc = async (arcText) => {
     const input = `# BRIEF (the commission — context only, not scored)\n${context}\n\n===\n\n# ARC\n${arcText}`;
@@ -8691,7 +8691,7 @@ async function runArcAmendStage(target, { params = {}, promptOverride = null }) 
   const { extractJsonFromText } = require('./storyHelpers');
   const { parseArcAmend, checkAmendGuards, applyArcAmendment, splitArcBeats } = require('./arcAmend');
   const { callTextModelStreaming } = require('./textModels');
-  const { TEXT_MODELS, calculateTextCost } = require('../config/models');
+  const { TEXT_MODELS, priceUsage } = require('../config/models');
 
   const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
   const arc = resolveReplayArc(storyData);
@@ -8718,7 +8718,7 @@ async function runArcAmendStage(target, { params = {}, promptOverride = null }) 
   const judgeTemplate = PROMPT_TEMPLATES.arcAmendJudge;
   if (!judgeTemplate) throw new Error('arc-amend-judge template unavailable');
   const beforeByNumber = new Map(splitArcBeats(arc).map(b => [b.n, b.text]));
-  const costOf = r => r.usage?.direct_cost ?? calculateTextCost(r.modelId || '', r.usage || {});
+  const costOf = r => priceUsage(r.modelId || '', r.usage || {});
 
   const judgeOne = async (issue, n, after) => {
     const input = fillTemplate(judgeTemplate, {
@@ -8798,7 +8798,7 @@ async function runArcRoundsStage(target, { params = {}, promptOverride = null })
   const { PROMPT_TEMPLATES } = require('../services/prompts');
   const { buildBeatsPrompt, buildArcReviewPrompt, parseArcReview, parseBeats } = require('./storyHelpers');
   const { callTextModelStreaming } = require('./textModels');
-  const { TEXT_MODELS, MODEL_DEFAULTS, calculateTextCost } = require('../config/models');
+  const { TEXT_MODELS, MODEL_DEFAULTS, priceUsage } = require('../config/models');
   const sc = require('./storyScorecard');
 
   const { storyData: loaded } = await loadStoryDataFull(target.storyId, { rehydrate: false });
@@ -8817,7 +8817,7 @@ async function runArcRoundsStage(target, { params = {}, promptOverride = null })
   // the two arms being compared, and `|| 3` would silently turn it into three.
   const _r = parseInt(params.rounds, 10);
   const rounds = Math.min(Math.max(Number.isFinite(_r) ? _r : 3, 0), 5);
-  const costOf = r => r.usage?.direct_cost ?? calculateTextCost(r.modelId || '', r.usage || {});
+  const costOf = r => priceUsage(r.modelId || '', r.usage || {});
 
   const { ARC_RUBRIC } = sc;
   const judgeTemplate = PROMPT_TEMPLATES.storyArcJudge;
@@ -9012,7 +9012,7 @@ async function runArcPanelReplayStage(target, { params = {}, promptOverride = nu
   await loadPromptTemplates();
   const H = require('./storyHelpers');
   const { callTextModelStreaming } = require('./textModels');
-  const { MODEL_DEFAULTS, TEXT_MODELS, calculateTextCost } = require('../config/models');
+  const { MODEL_DEFAULTS, TEXT_MODELS, priceUsage } = require('../config/models');
 
   const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
   // THE RUN'S inputData for the arc prompts: the stored landmark list the
@@ -9065,7 +9065,7 @@ async function runArcPanelReplayStage(target, { params = {}, promptOverride = nu
       runs.push({
         model, modelId: res.modelId, ok: true,
         elapsedMs: Date.now() - t,
-        cost: res.usage?.direct_cost ?? calculateTextCost(res.modelId || '', res.usage || {}),
+        cost: priceUsage(res.modelId || '', res.usage || {}),
         usage: res.usage,
         raw: text,
         text: f.text,
@@ -9130,7 +9130,7 @@ async function runArcPanelReplayStage(target, { params = {}, promptOverride = nu
           ok: true,
           model: retellModel, modelId: res.modelId,
           elapsedMs: Date.now() - t,
-          cost: retellCalls.reduce((a, c) => a + (c.usage?.direct_cost ?? calculateTextCost(c.modelId || '', c.usage || {})), 0),
+          cost: retellCalls.reduce((a, c) => a + (priceUsage(c.modelId || '', c.usage || {})), 0),
           attempts: retellCalls.length,
           fixing: parsed.fixing, keeping: parsed.keeping, used: parsed.used,
           logic: parsed.logic.text,
@@ -9464,7 +9464,7 @@ async function runTrialIdeaVarietyStage(target, { params = {}, promptOverride = 
   const { buildSeasonInstruction } = require('./season');
   const { getLanguageInstruction } = require('./languages');
   const { callTextModelStreaming } = require('./textModels');
-  const { TEXT_MODELS, calculateTextCost } = require('../config/models');
+  const { TEXT_MODELS, priceUsage } = require('../config/models');
 
   const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
 
@@ -9555,7 +9555,7 @@ async function runTrialIdeaVarietyStage(target, { params = {}, promptOverride = 
 
   const t0 = Date.now();
   const usage = [];
-  const costOf = r => r.usage?.direct_cost ?? calculateTextCost(r.modelId || '', r.usage || {});
+  const costOf = r => priceUsage(r.modelId || '', r.usage || {});
   const pairs = [];
   for (let i = 1; i <= draws; i++) {
     // Both ideas of a pair in parallel, as the route does. One flaky response
@@ -9714,7 +9714,7 @@ async function runTrialChallengeDrawStage(target, { params = {}, promptOverride 
   await loadPromptTemplates();
   const { buildTrialStoryPrompt, buildChallengeIdeasSection, resolveAgeBand, buildAgeModeSection } = require('./promptBuilders');
   const { callTextModelStreaming } = require('./textModels');
-  const { TEXT_MODELS, MODEL_DEFAULTS, calculateTextCost } = require('../config/models');
+  const { TEXT_MODELS, MODEL_DEFAULTS, priceUsage } = require('../config/models');
 
   const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
   const pageCount = parseInt(params.pages, 10) || 5;
@@ -9769,7 +9769,7 @@ async function runTrialChallengeDrawStage(target, { params = {}, promptOverride 
   if (!basePrompt) throw new Error('story-trial template unavailable');
 
   const usage = [];
-  const costOf = r => r.usage?.direct_cost ?? calculateTextCost(r.modelId || '', r.usage || {});
+  const costOf = r => priceUsage(r.modelId || '', r.usage || {});
   const runArm = async (label, prompt) => {
     const t = Date.now();
     const res = await callTextModelStreaming(prompt, null, null, model, { usageLabel: 'testlab_trial_challenge_draw' });
@@ -10090,7 +10090,7 @@ async function runBeatsReplanStage(target, { params = {} }) {
   const { parsePlanCastBlock, commissionedCast } = require('./castCoverage');
   const { parseBeats } = require('./storyHelpers');
   const { callTextModelStreaming } = require('./textModels');
-  const { MODEL_DEFAULTS, TEXT_MODELS, calculateTextCost } = require('../config/models');
+  const { MODEL_DEFAULTS, TEXT_MODELS, priceUsage } = require('../config/models');
   // THE RUN'S OWN STEP 2 (owner 2026-09-27: "The Lab must use 100% identical
   // code to production"): the plan check and the re-plan rounds are the
   // functions generateStoryViaBeats calls (beatsPipeline.planCheckInputs,
@@ -10241,7 +10241,7 @@ async function runBeatsReplanStage(target, { params = {} }) {
     commission, commissionedNames, placeNames: inputs.placeNames, maxCast, arcInventedNames, arcInventedLimit, mainName,
     planCheckModel: checkModel, onChunk: null, gl, labPromptOptions, onCall,
   });
-  const costOf = r => r.usage?.direct_cost ?? calculateTextCost(r.modelId || '', r.usage || {});
+  const costOf = r => priceUsage(r.modelId || '', r.usage || {});
   const tally = () => ({
     cost: calls.reduce((a, r) => a + costOf(r), 0),
     usage: {
@@ -10410,13 +10410,13 @@ async function runTypedPlanArm({ target, params, storyData, approvedArc, arcHint
   const { planCheckInputs, createPlanCheckRunner, shippedReplanState } = require('./beatsPipeline');
   const { pickMainCharacters, parsePlanResponse } = require('./promptBuilders');
   const { callTextModelStreaming } = require('./textModels');
-  const { TEXT_MODELS, calculateTextCost } = require('../config/models');
+  const { TEXT_MODELS, priceUsage } = require('../config/models');
   const tp = require('./typedPlan');
   const t0 = Date.now();
   const inputs = planCheckInputs(storyData, { arcPremiseNames, modelOverrides: storyData.modelOverrides });
   const { commission, commissionedNames, maxCast } = inputs;
   const mainName = pickMainCharacters(storyData).focus?.name || null;
-  const costOf = r => r.usage?.direct_cost ?? calculateTextCost(r.modelId || '', r.usage || {});
+  const costOf = r => priceUsage(r.modelId || '', r.usage || {});
   const textCost = () => calls.reduce((a, r) => a + costOf(r), 0);
 
   if (!typedPlan) {

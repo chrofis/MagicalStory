@@ -21,6 +21,7 @@ const { PromptFitError, promptBytes } = require('./promptFitError');
 
 const XAI_API_KEY = process.env.XAI_API_KEY;
 const XAI_API_URL = 'https://api.x.ai/v1';
+const { priceUsage } = require('../config/models');
 
 // Credit-exhaustion siren (2026-08-29). A 403 credits/spending-limit error
 // means EVERY further Grok call in the run will fail in ~170ms and the whole
@@ -51,20 +52,13 @@ if (XAI_API_KEY) {
 const GROK_MODELS = {
   STANDARD: 'grok-imagine-image',       // $0.02/image, 300 RPM
   IMAGE_2: 'grok-imagine-image-2.0',    // $0.04/image, typography-aware (2026-08-07)
-  PRO: 'grok-imagine-image-pro',        // $0.07/image, 30 RPM
+  PRO: 'grok-imagine-image-pro',        // 30 RPM; price in models.js MODEL_PRICING
 };
 
-// Per-image price by model id. Both call sites used
-// `model === PRO ? 0.07 : 0.02`, which books EVERY non-pro model at $0.02 — so
-// Imagine 2.0 was reported at half what xAI actually bills ($0.04). A table
-// means a new model is priced by adding a row, not by remembering to widen a
-// ternary in two places.
-const GROK_IMAGE_PRICE = {
-  [GROK_MODELS.STANDARD]: 0.02,
-  [GROK_MODELS.IMAGE_2]: 0.04,
-  [GROK_MODELS.PRO]: 0.07,
-};
-const grokImageCost = (model) => GROK_IMAGE_PRICE[model] ?? 0.02;
+// Per-image price: models.js MODEL_PRICING is the one table (this file used to
+// keep its own, and its PRO row said 0.07 against the vendor's 0.05). An id with
+// no row fails loudly in the ledger as unpriced rather than booking a default.
+const grokImageCost = (model) => priceUsage(model, {});
 
 function isGrokConfigured() {
   return !!XAI_API_KEY;

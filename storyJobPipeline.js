@@ -45,7 +45,6 @@ const {
   callTextModelStreaming
 } = require('./server/lib/textModels');
 const {
-  MODEL_PRICING,
   IMAGE_MODELS,
   REPAIR_DEFAULTS,
   emptyScenePlateRouting
@@ -91,6 +90,7 @@ const { UnifiedStoryParser, ProgressiveUnifiedParser } = require('./server/lib/o
 const { checkSceneConsistency, formatSceneConsistencySummary } = require('./server/lib/sceneConsistencyCheck');
 const { generateStoryViaBeats, resolvePipelineMode } = require('./server/lib/beatsPipeline');
 const { createJobHeartbeat, startJobHeartbeat } = require('./server/lib/jobHeartbeat');
+const { newTokenUsage, recordCall, ledgerTotal } = require('./server/lib/costLedger');
 const { GenerationLogger, setCurrentLogger, clearCurrentLogger } = require('./server/lib/generationLogger');
 const { stripDataUriPrefix } = require('./server/lib/r2');
 const { COVER_PAGE_NUMBERS } = require('./server/lib/coverKeys');
@@ -477,139 +477,27 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
   setCurrentLogger(genLog);
   genLog.setStage('outline');
 
-  // Token usage tracker - same structure as other modes
-  const tokenUsage = {
-    anthropic: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
-    gemini_text: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
-    gemini_image: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
-    gemini_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
-    // OpenRouter-hosted Qwen/DeepSeek (A/B) — token-based like Claude/Gemini.
-    // direct_cost carries OpenRouter's ACTUAL charge (usage.cost) when it reports
-    // one — throughput-sorted routing can pick a pricier upstream than
-    // MODEL_PRICING assumes, so the reported figure beats the estimate.
-    openrouter: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, direct_cost: 0, calls: 0 },
-    // Runware/Grok use direct cost instead of tokens
-    runware: { direct_cost: 0, calls: 0 },
-    grok: { direct_cost: 0, calls: 0 },
-    byFunction: {
-      unified_story: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: null, models: new Set() },
-      scene_expansion: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: null, models: new Set() },
-      scene_iterate: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: null, models: new Set() },
-      cover_expansion: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: null, models: new Set() },
-      phantom_patch: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: null, models: new Set() },
-      cover_images: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, direct_cost: 0, calls: 0, provider: 'gemini_image', models: new Set() },
-      cover_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'gemini_quality', models: new Set() },
-      page_images: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, direct_cost: 0, calls: 0, provider: 'gemini_image', models: new Set() },
-      page_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'gemini_quality', models: new Set() },
-      inpaint: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, direct_cost: 0, calls: 0, provider: null, models: new Set() },
-      // Avatar generation tracking
-      avatar_styled: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, direct_cost: 0, calls: 0, provider: null, models: new Set() },
-      avatar_costumed: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, direct_cost: 0, calls: 0, provider: null, models: new Set() },
-      // Consistency check tracking
-      consistency_check: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'gemini_quality', models: new Set() },
-      text_check: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: null, models: new Set() },
-      // Scene rewrite tracking (when safety blocks trigger rewrites)
-      scene_rewrite: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'anthropic', models: new Set() }
-    }
-  };
-
-  // Fallback pricing by provider (uses centralized MODEL_PRICING from server/config/models.js)
-  // Note: gemini_image uses per-image pricing, not token pricing - see calculateImageCost
-  const PROVIDER_PRICING = {
-    anthropic: MODEL_PRICING['claude-sonnet-4-5'] || { input: 3.00, output: 15.00 },
-    // Read the CONFIGURED quality model, never a hardcoded id: this line named
-    // 'gemini-2.0-flash' while the judge actually running was
-    // MODEL_DEFAULTS.qualityEval (gemini-2.5-flash, 3x the input and 6.25x the
-    // output price), so any quality-eval call that reached this fallback was
-    // priced at a sixth of its cost. Mirrors apiCost.js's
-    // PROVIDER_FALLBACK_MODEL, which already resolves it this way.
-    // (This comment used to add "a model Google shut down". It is not shut
-    // down — delisted from GET /v1beta/models but still answering, verified
-    // 2026-09-18. The hardcoding was the bug; the id's liveness never was.)
-    gemini_quality: MODEL_PRICING[MODEL_DEFAULTS.qualityEval] || MODEL_PRICING['gemini-2.5-flash'],
-    gemini_text: MODEL_PRICING['gemini-2.5-flash'] || { input: 0.30, output: 2.50 }
-  };
-
-  // Helper to calculate image generation cost (per-image pricing, not token-based)
-  const calculateImageCost = (modelId, imageCount) => {
-    const pricing = MODEL_PRICING[modelId];
-    if (pricing?.perImage) {
-      return pricing.perImage * imageCount;
-    }
-    // Fallback to default Gemini image pricing
-    return 0.04 * imageCount;
-  };
+  // Token usage tracker: the per-job cost ledger (server/lib/costLedger.js).
+  // Every call is priced once, when it is recorded, with the model it ran on.
+  const tokenUsage = newTokenUsage();
 
   // ── Per-job spend cap (owner ruling 2026-09-04, sibling of the 180-min age
   // backstop in server/routes/jobs.js). The heartbeat staleness check cannot
   // catch a loop that keeps making PAID calls — updated_at stays fresh while
   // money burns — so the job's live accumulated provider cost is capped at
-  // ~3x a normal full run ($4.93 measured). Direct-cost providers (Grok,
-  // Runware) report exact dollars; token providers are priced via
-  // MODEL_PRICING; token-less image calls fall back to the per-image rate.
+  // ~3x a normal full run ($4.93 measured). The running total is the sum of the
+  // very per-call costs the headline total and the api_usage events read, so the
+  // cap and the report cannot disagree.
   const JOB_SPEND_CAP_USD = 15;
   let jobSpentUsd = 0;
 
   const addUsage = (provider, usage, functionName = null, modelName = null) => {
-    // Idempotency guard: the text chokepoint records every callTextModel result;
-    // if a caller ALSO hands the same usage object here, count it once. Marks the
-    // object (non-enumerable) so a second add of the identical reference no-ops.
-    if (usage && usage.__accounted) return;
-    if (usage && typeof usage === 'object') {
-      try { Object.defineProperty(usage, '__accounted', { value: true, configurable: true, enumerable: false }); } catch { /* frozen usage — skip guard */ }
-    }
-    if (usage && tokenUsage[provider]) {
-      tokenUsage[provider].input_tokens += usage.input_tokens || 0;
-      tokenUsage[provider].output_tokens += usage.output_tokens || 0;
-      tokenUsage[provider].thinking_tokens += usage.thinking_tokens || 0;
-      // OpenAI-compatible providers (OpenRouter) fold reasoning into
-      // output_tokens and cached input into input_tokens. Recorded alongside,
-      // never added — adding would double-count what was already billed.
-      if (usage.reasoning_tokens) tokenUsage[provider].reasoning_tokens = (tokenUsage[provider].reasoning_tokens || 0) + usage.reasoning_tokens;
-      if (usage.cached_input_tokens) tokenUsage[provider].cached_input_tokens = (tokenUsage[provider].cached_input_tokens || 0) + usage.cached_input_tokens;
-      tokenUsage[provider].calls += 1;
-      // Accumulate direct_cost for providers that use it (Grok, Runware)
-      if (usage.direct_cost != null && tokenUsage[provider].direct_cost !== undefined) {
-        tokenUsage[provider].direct_cost += usage.direct_cost;
-      }
-    }
-    if (functionName) {
-      // Auto-create the bucket so a label the chokepoint emits (e.g. text_check,
-      // vb_chr_dedup) is never silently dropped from the breakdown.
-      if (!tokenUsage.byFunction[functionName]) {
-        tokenUsage.byFunction[functionName] = { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, direct_cost: 0, calls: 0, elapsed_ms: 0, provider: null, models: new Set() };
-      }
-      tokenUsage.byFunction[functionName].input_tokens += usage?.input_tokens || 0;
-      tokenUsage.byFunction[functionName].output_tokens += usage?.output_tokens || 0;
-      tokenUsage.byFunction[functionName].thinking_tokens += usage?.thinking_tokens || 0;
-      // See above: subsets of output_tokens / input_tokens, recorded not summed in.
-      if (usage?.reasoning_tokens) tokenUsage.byFunction[functionName].reasoning_tokens = (tokenUsage.byFunction[functionName].reasoning_tokens || 0) + usage.reasoning_tokens;
-      if (usage?.cached_input_tokens) tokenUsage.byFunction[functionName].cached_input_tokens = (tokenUsage.byFunction[functionName].cached_input_tokens || 0) + usage.cached_input_tokens;
-      tokenUsage.byFunction[functionName].calls += 1;
-      // Summed wall-clock across this function's calls. Stamped by the text
-      // chokepoint (textModels.js), so a function is timed without timing itself.
-      tokenUsage.byFunction[functionName].elapsed_ms = (tokenUsage.byFunction[functionName].elapsed_ms || 0) + (usage?.elapsed_ms || 0);
-      tokenUsage.byFunction[functionName].provider = provider;
-      // Coerce to a string id — a mis-wired caller can pass a model OBJECT,
-      // which otherwise renders as "[object Object]" in the api_usage log.
-      if (modelName) tokenUsage.byFunction[functionName].models.add(typeof modelName === 'string' ? modelName : (modelName.modelId || modelName.model || String(modelName)));
-      // Accumulate direct_cost on byFunction entries that support it
-      if (usage?.direct_cost != null && tokenUsage.byFunction[functionName].direct_cost !== undefined) {
-        tokenUsage.byFunction[functionName].direct_cost += usage.direct_cost;
-      }
-    }
-    // Live spend estimate for JOB_SPEND_CAP_USD. Never throws and never aborts
-    // mid-call — the cap trips at the next checkCancellation checkpoint.
+    // Accounting is best-effort; it must never break a render.
     try {
-      if (usage && usage.direct_cost != null) {
-        jobSpentUsd += usage.direct_cost || 0;
-      } else if (usage && (usage.input_tokens || usage.output_tokens)) {
-        const mid = typeof modelName === 'string' ? modelName : (modelName && (modelName.modelId || modelName.model)) || null;
-        jobSpentUsd += calculateCost(mid || provider, usage.input_tokens || 0, usage.output_tokens || 0, usage.thinking_tokens || 0).total;
-      } else if (provider === 'gemini_image' || provider === 'grok' || provider === 'runware') {
-        jobSpentUsd += calculateImageCost(typeof modelName === 'string' ? modelName : '', 1);
-      }
-    } catch { /* accounting is best-effort; the cap must never break a render */ }
+      jobSpentUsd += recordCall(tokenUsage, provider, usage, functionName, modelName).cost;
+    } catch (e) {
+      log.error(`❌ [COST] could not record a ${provider}/${functionName} call: ${e.message}`);
+    }
   };
   // Register addUsage as the text-usage sink for this job's async context, so
   // every callTextModel/callTextModelStreaming records automatically (the
@@ -624,14 +512,6 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     if (jobSpentUsd > JOB_SPEND_CAP_USD) {
       throw new Error(`Job spend cap exceeded: ~$${jobSpentUsd.toFixed(2)} in provider calls (cap $${JOB_SPEND_CAP_USD}) — aborting a probable paid-call loop`);
     }
-  };
-
-  const calculateCost = (modelOrProvider, inputTokens, outputTokens, thinkingTokens = 0) => {
-    const pricing = MODEL_PRICING[modelOrProvider] || PROVIDER_PRICING[modelOrProvider] || { input: 0, output: 0 };
-    const inputCost = (inputTokens / 1000000) * pricing.input;
-    const outputCost = (outputTokens / 1000000) * pricing.output;
-    const thinkingCost = (thinkingTokens / 1000000) * pricing.output;
-    return { input: inputCost, output: outputCost, thinking: thinkingCost, total: inputCost + outputCost + thinkingCost };
   };
 
   // Picture-book layout for all reading levels: 1 page = 1 scene
@@ -1123,7 +1003,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               // Track validation costs
               if (validationResult.usage) {
                 if (validationResult.usage.previewCost) {
-                  addUsage('runware', { cost: validationResult.usage.previewCost }, 'scene_validation_preview');
+                  addUsage('runware', { direct_cost: validationResult.usage.previewCost }, 'scene_validation_preview');
                 }
                 if (validationResult.usage.visionUsage || validationResult.usage.comparisonUsage) {
                   // Was a Gemini-shaped { promptTokenCount } object, which
@@ -6441,116 +6321,35 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     log.debug(`   Page images:      ${((timing.pagesEnd - timing.pagesStart) / 1000).toFixed(1)}s`);
     log.debug(`   TOTAL:            ${((timing.end - timing.start) / 1000).toFixed(1)}s`);
 
-    // Log token usage summary with costs (including thinking tokens)
-    const totalInputTokens = Object.keys(tokenUsage).filter(k => k !== 'byFunction').reduce((sum, k) => sum + (tokenUsage[k].input_tokens || 0), 0);
-    const totalOutputTokens = Object.keys(tokenUsage).filter(k => k !== 'byFunction').reduce((sum, k) => sum + (tokenUsage[k].output_tokens || 0), 0);
-    const totalThinkingTokens = Object.keys(tokenUsage).filter(k => k !== 'byFunction').reduce((sum, k) => sum + tokenUsage[k].thinking_tokens, 0);
-    const anthropicCost = calculateCost('anthropic', tokenUsage.anthropic.input_tokens, tokenUsage.anthropic.output_tokens, tokenUsage.anthropic.thinking_tokens);
-    const geminiTextCost = calculateCost('gemini_text', tokenUsage.gemini_text.input_tokens, tokenUsage.gemini_text.output_tokens, tokenUsage.gemini_text.thinking_tokens);
-    const geminiQualityCost = calculateCost('gemini_quality', tokenUsage.gemini_quality.input_tokens, tokenUsage.gemini_quality.output_tokens, tokenUsage.gemini_quality.thinking_tokens);
-    // Calculate image costs using per-image pricing (not token-based)
+    // Log token usage summary with costs. Every figure below is the sum of
+    // per-call costs booked by the ledger (server/lib/costLedger.js): a bucket that
+    // mixes models is priced per call, and the headline equals the sum of the rows.
+    const providerKeys = Object.keys(tokenUsage).filter(k => k !== 'byFunction');
+    const totalInputTokens = providerKeys.reduce((sum, k) => sum + (tokenUsage[k].input_tokens || 0), 0);
+    const totalOutputTokens = providerKeys.reduce((sum, k) => sum + (tokenUsage[k].output_tokens || 0), 0);
+    const totalThinkingTokens = providerKeys.reduce((sum, k) => sum + (tokenUsage[k].thinking_tokens || 0), 0);
     const byFunc = tokenUsage.byFunction;
     const getModels = (func) => Array.from(func.models).join(', ') || func.provider || 'unknown';
-    const getCostModel = (func) => func.models?.size > 0 ? Array.from(func.models)[0] : (func.provider || 'anthropic');
-    // Per-function cost — the SAME logic the api_usage events use, so the
-    // headline totalCost is exactly the sum of the per-call breakdown. The old
-    // formula summed provider aggregates + a hardcoded 4-bucket imageCost and
-    // dropped every Grok direct-cost bucket (composite, scale_repair, char_fix)
-    // — under-reporting the true cost.
-    const IMAGE_FN = ['cover_images', 'page_images', 'avatar_styled', 'avatar_costumed'];
-    const functionCost = (funcName, func) => {
-      if (!(func?.calls > 0)) return 0;
-      if ((func.direct_cost || 0) > 0) return func.direct_cost;
-      if (IMAGE_FN.includes(funcName)) return calculateImageCost(getModels(func), func.calls);
-      return calculateCost(getCostModel(func), func.input_tokens, func.output_tokens, func.thinking_tokens).total;
-    };
-    const imageCost = IMAGE_FN.reduce((sum, fn) => sum + (byFunc[fn]?.calls > 0 ? calculateImageCost(getModels(byFunc[fn]), byFunc[fn].calls) : 0), 0);
-    const grokDirectCost = tokenUsage.grok?.direct_cost || 0;
-    const runwareDirectCost = tokenUsage.runware?.direct_cost || 0;
-    // Authoritative total = sum of every per-function cost (== sum of the
-    // api_usage events emitted below).
-    //
-    // Stamp each function's own cost back onto the ledger as `cost`. Without
-    // this the value is computed, summed into the headline, and thrown away:
-    // `direct_cost` is only set by providers that return a price (Grok,
-    // OpenRouter), so every Anthropic and Gemini row persisted as $0 and the
-    // "Models used" panel under-reported a 14-page story by $1.10 of $2.60 —
-    // Gemini's 740k eval input tokens showed as free. Kept separate from
-    // `direct_cost` so "the provider billed us" stays distinguishable from
-    // "we computed it from tokens".
-    const totalCost = Object.entries(byFunc).reduce((sum, [fn, fd]) => {
-      const c = functionCost(fn, fd);
-      if (fd && fd.calls > 0) fd.cost = c;
-      return sum + c;
-    }, 0);
+    const functionCost = (funcName, func) => (func?.calls > 0 ? (func.cost || 0) : 0);
+    const totalCost = ledgerTotal(tokenUsage);
+    const unpricedCalls = Object.values(byFunc).reduce((n, f) => n + (f.unpriced_calls || 0), 0);
+    if (unpricedCalls > 0) log.error(`❌ [COST] ${unpricedCalls} call(s) had no price (no direct_cost, no MODEL_PRICING row) and are booked at $0 — the total is a lower bound`);
 
     log.debug(`📊 [UNIFIED] Token usage & cost summary:`);
     log.debug(`   BY PROVIDER:`);
-    const thinkingAnthropicStr = tokenUsage.anthropic.thinking_tokens > 0 ? ` + ${tokenUsage.anthropic.thinking_tokens.toLocaleString()} think` : '';
-    const thinkingTextStr = tokenUsage.gemini_text.thinking_tokens > 0 ? ` + ${tokenUsage.gemini_text.thinking_tokens.toLocaleString()} think` : '';
-    const thinkingQualityStr = tokenUsage.gemini_quality.thinking_tokens > 0 ? ` + ${tokenUsage.gemini_quality.thinking_tokens.toLocaleString()} think` : '';
-    log.debug(`   Anthropic:      ${tokenUsage.anthropic.input_tokens.toLocaleString().padStart(8)} in / ${tokenUsage.anthropic.output_tokens.toLocaleString().padStart(8)} out${thinkingAnthropicStr}  $${anthropicCost.total.toFixed(4)}`);
-    log.debug(`   Gemini Text:    ${tokenUsage.gemini_text.input_tokens.toLocaleString().padStart(8)} in / ${tokenUsage.gemini_text.output_tokens.toLocaleString().padStart(8)} out${thinkingTextStr}  $${geminiTextCost.total.toFixed(4)}`);
-    log.debug(`   Gemini Image:   ${tokenUsage.gemini_image.calls} images  $${imageCost.toFixed(4)}`);
-    log.debug(`   Gemini Quality: ${tokenUsage.gemini_quality.input_tokens.toLocaleString().padStart(8)} in / ${tokenUsage.gemini_quality.output_tokens.toLocaleString().padStart(8)} out${thinkingQualityStr}  $${geminiQualityCost.total.toFixed(4)}`);
-    if (grokDirectCost > 0) {
-      log.debug(`   Grok:           ${tokenUsage.grok.calls} images  $${grokDirectCost.toFixed(4)}`);
-    }
-    if (runwareDirectCost > 0) {
-      log.debug(`   Runware:        ${tokenUsage.runware.calls} images  $${runwareDirectCost.toFixed(4)}`);
+    for (const prov of providerKeys) {
+      const pt = tokenUsage[prov];
+      if (!(pt.calls > 0)) continue;
+      const thinkStr = pt.thinking_tokens > 0 ? ` + ${pt.thinking_tokens.toLocaleString()} think` : (pt.thinking_in_output ? ' (thinking inside out)' : '');
+      log.debug(`   ${prov.padEnd(15)} ${(pt.input_tokens || 0).toLocaleString().padStart(8)} in / ${(pt.output_tokens || 0).toLocaleString().padStart(8)} out${thinkStr} (${pt.calls} calls)  $${(pt.cost || 0).toFixed(4)}`);
     }
 
-    // Log by function
     log.debug(`   BY FUNCTION:`);
-    // getCostModel + functionCost defined above (shared with totalCost).
-
-    if (byFunc.unified_story?.calls > 0) {
-      const cost = calculateCost(getCostModel(byFunc.unified_story), byFunc.unified_story.input_tokens, byFunc.unified_story.output_tokens, byFunc.unified_story.thinking_tokens);
-      const thinkStr = byFunc.unified_story.thinking_tokens > 0 ? ` + ${byFunc.unified_story.thinking_tokens.toLocaleString()} think` : '';
-      log.debug(`   Unified Story: ${byFunc.unified_story.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.unified_story.output_tokens.toLocaleString().padStart(8)} out${thinkStr} (${byFunc.unified_story.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.unified_story)}]`);
-    }
-    if (byFunc.scene_expansion?.calls > 0) {
-      const cost = calculateCost(getCostModel(byFunc.scene_expansion), byFunc.scene_expansion.input_tokens, byFunc.scene_expansion.output_tokens, byFunc.scene_expansion.thinking_tokens);
-      log.debug(`   Scene Expand:  ${byFunc.scene_expansion.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.scene_expansion.output_tokens.toLocaleString().padStart(8)} out (${byFunc.scene_expansion.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.scene_expansion)}]`);
-    }
-    if (byFunc.scene_iterate?.calls > 0) {
-      const cost = calculateCost(getCostModel(byFunc.scene_iterate), byFunc.scene_iterate.input_tokens, byFunc.scene_iterate.output_tokens, byFunc.scene_iterate.thinking_tokens);
-      log.debug(`   Scene Iterate:${byFunc.scene_iterate.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.scene_iterate.output_tokens.toLocaleString().padStart(8)} out (${byFunc.scene_iterate.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.scene_iterate)}]`);
-    }
-    if (byFunc.cover_expansion?.calls > 0) {
-      const cost = calculateCost(getCostModel(byFunc.cover_expansion), byFunc.cover_expansion.input_tokens, byFunc.cover_expansion.output_tokens, byFunc.cover_expansion.thinking_tokens);
-      log.debug(`   Cover Expand: ${byFunc.cover_expansion.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.cover_expansion.output_tokens.toLocaleString().padStart(8)} out (${byFunc.cover_expansion.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.cover_expansion)}]`);
-    }
-    if (byFunc.phantom_patch?.calls > 0) {
-      const cost = calculateCost(getCostModel(byFunc.phantom_patch), byFunc.phantom_patch.input_tokens, byFunc.phantom_patch.output_tokens, byFunc.phantom_patch.thinking_tokens);
-      log.debug(`   Phantom Patch:${byFunc.phantom_patch.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.phantom_patch.output_tokens.toLocaleString().padStart(8)} out (${byFunc.phantom_patch.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.phantom_patch)}]`);
-    }
-    if (byFunc.cover_images?.calls > 0) {
-      const model = getModels(byFunc.cover_images);
-      const cost = calculateImageCost(model, byFunc.cover_images.calls);
-      log.debug(`   Cover Images:  ${byFunc.cover_images.calls} images  $${cost.toFixed(4)}  [${model}]`);
-    }
-    if (byFunc.cover_quality?.calls > 0) {
-      const cost = calculateCost(getCostModel(byFunc.cover_quality), byFunc.cover_quality.input_tokens, byFunc.cover_quality.output_tokens, byFunc.cover_quality.thinking_tokens);
-      log.debug(`   Cover Quality: ${byFunc.cover_quality.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.cover_quality.output_tokens.toLocaleString().padStart(8)} out (${byFunc.cover_quality.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.cover_quality)}]`);
-    }
-    if (byFunc.page_images?.calls > 0) {
-      const model = getModels(byFunc.page_images);
-      const cost = calculateImageCost(model, byFunc.page_images.calls);
-      log.debug(`   Page Images:   ${byFunc.page_images.calls} images  $${cost.toFixed(4)}  [${model}]`);
-    }
-    if (byFunc.page_quality?.calls > 0) {
-      const cost = calculateCost(getCostModel(byFunc.page_quality), byFunc.page_quality.input_tokens, byFunc.page_quality.output_tokens, byFunc.page_quality.thinking_tokens);
-      log.debug(`   Page Quality:  ${byFunc.page_quality.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.page_quality.output_tokens.toLocaleString().padStart(8)} out (${byFunc.page_quality.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.page_quality)}]`);
-    }
-    if (byFunc.inpaint?.calls > 0) {
-      // Grok/Runware bill per-image and report cost as direct_cost, not as tokens.
-      // Use direct_cost when present; fall back to token-based for Gemini.
-      const directCost = byFunc.inpaint.direct_cost || 0;
-      const cost = directCost > 0
-        ? { total: directCost }
-        : calculateCost(getCostModel(byFunc.inpaint), byFunc.inpaint.input_tokens, byFunc.inpaint.output_tokens, byFunc.inpaint.thinking_tokens);
-      log.debug(`   Inpaint:       ${byFunc.inpaint.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.inpaint.output_tokens.toLocaleString().padStart(8)} out (${byFunc.inpaint.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.inpaint)}]`);
+    for (const [funcName, func] of Object.entries(byFunc)) {
+      if (!(func.calls > 0)) continue;
+      const thinkStr = func.thinking_tokens > 0 ? ` + ${func.thinking_tokens.toLocaleString()} think` : (func.thinking_in_output ? ' (thinking inside out)' : '');
+      const cutStr = func.cut_calls ? ` [${func.cut_calls} cut]` : '';
+      log.debug(`   ${funcName.padEnd(28)} ${(func.input_tokens || 0).toLocaleString().padStart(8)} in / ${(func.output_tokens || 0).toLocaleString().padStart(8)} out${thinkStr} (${func.calls} calls)  $${(func.cost || 0).toFixed(4)}${cutStr}  [${getModels(func)}]`);
     }
 
     const thinkingTotal = totalThinkingTokens > 0 ? ` + ${totalThinkingTokens.toLocaleString()} thinking` : '';
@@ -6707,7 +6506,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     log.debug(`📊 [UNIFIED] Logging API usage to generationLog. Functions with calls:`);
     let emittedCostSum = 0;
     for (const [funcName, funcData] of Object.entries(byFunc)) {
-      log.debug(`   - ${funcName}: ${funcData.calls} calls, ${funcData.input_tokens} in, ${funcData.output_tokens} out, thinking: ${funcData.thinking_tokens || 0}`);
+      log.debug(`   - ${funcName}: ${funcData.calls} calls, ${funcData.input_tokens} in, ${funcData.output_tokens} out, thinking: ${funcData.thinking_in_output ? 'inside output' : (funcData.thinking_tokens || 0)}`);
       if (funcData.calls > 0) {
         const model = getModels(funcData);
         const directCost = funcData.direct_cost || 0;
@@ -6721,6 +6520,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           outputTokens: funcData.output_tokens,
           thinkingTokens: funcData.thinking_tokens,
           directCost: directCost,
+          cachedInputTokens: funcData.cached_input_tokens || 0,
+          cacheWriteTokens: funcData.cache_write_tokens || 0,
+          thinkingInOutput: !!funcData.thinking_in_output,
+          cutCalls: funcData.cut_calls || 0,
+          unpricedCalls: funcData.unpriced_calls || 0,
           // Pass the real call count — the emission previously omitted it, so
           // every event defaulted to "1 call" even when a bucket aggregated 15+.
           calls: funcData.calls
@@ -6732,6 +6536,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // emitted per-call costs; (2) each token provider's total must equal the
     // sum of its per-function buckets — a mismatch means a call recorded to a
     // provider total but not to any bucket (or vice-versa).
+    if (Math.abs(jobSpentUsd - totalCost) > 0.001) {
+      log.warn(`⚠️ [ACCOUNTING] spend-cap running total $${jobSpentUsd.toFixed(4)} != headline totalCost $${totalCost.toFixed(4)}`);
+    }
     if (Math.abs(emittedCostSum - totalCost) > 0.001) {
       log.warn(`⚠️ [ACCOUNTING] totalCost $${totalCost.toFixed(4)} != sum of per-call costs $${emittedCostSum.toFixed(4)} — cost breakdown drift`);
     }
@@ -7633,128 +7440,6 @@ async function _processStoryJobImpl(jobId) {
   // Avatar generation logs are per-cache-scope (see processStoryJob wrapper).
   // No clear-at-start needed — the wrapper's finally block clears once after
   // capture so a single bucket lives for the full job lifecycle.
-
-  // Token usage tracker - accumulates usage from all API calls by provider and function
-  const tokenUsage = {
-    // By provider (for backwards compatibility) - includes thinking_tokens for Gemini 2.5
-    anthropic: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
-    gemini_text: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
-    gemini_image: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
-    gemini_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
-    // OpenRouter-hosted Qwen/DeepSeek (A/B) — token-based.
-    // direct_cost carries OpenRouter's ACTUAL charge (usage.cost) when it reports
-    // one — throughput-sorted routing can pick a pricier upstream than
-    // MODEL_PRICING assumes, so the reported figure beats the estimate.
-    openrouter: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, direct_cost: 0, calls: 0 },
-    // Runware/Grok use direct cost instead of tokens
-    runware: { direct_cost: 0, calls: 0 },
-    grok: { direct_cost: 0, calls: 0 },
-    // By function (for detailed breakdown)
-    byFunction: {
-      outline: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'anthropic', models: new Set() },
-      scene_descriptions: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'anthropic', models: new Set() },
-      story_text: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'anthropic', models: new Set() },
-      cover_images: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, direct_cost: 0, calls: 0, provider: 'gemini_image', models: new Set() },
-      cover_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'gemini_quality', models: new Set() },
-      page_images: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, direct_cost: 0, calls: 0, provider: 'gemini_image', models: new Set() },
-      page_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'gemini_quality', models: new Set() },
-      inpaint: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, direct_cost: 0, calls: 0, provider: null, models: new Set() },
-      // Avatar generation tracking
-      avatar_styled: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, direct_cost: 0, calls: 0, provider: null, models: new Set() },
-      avatar_costumed: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, direct_cost: 0, calls: 0, provider: null, models: new Set() },
-      // Consistency check tracking
-      consistency_check: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'gemini_quality', models: new Set() },
-      text_check: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: null, models: new Set() },
-      // Scene rewrite tracking (when safety blocks trigger rewrites)
-      scene_rewrite: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'anthropic', models: new Set() }
-    }
-  };
-
-  // Fallback pricing by provider (uses centralized MODEL_PRICING from server/config/models.js)
-  // Note: gemini_image uses per-image pricing, not token pricing - see calculateImageCost
-  const PROVIDER_PRICING = {
-    anthropic: MODEL_PRICING['claude-sonnet-4-5'] || { input: 3.00, output: 15.00 },
-    // Read the CONFIGURED quality model, never a hardcoded id: this line named
-    // 'gemini-2.0-flash' while the judge actually running was
-    // MODEL_DEFAULTS.qualityEval (gemini-2.5-flash, 3x the input and 6.25x the
-    // output price), so any quality-eval call that reached this fallback was
-    // priced at a sixth of its cost. Mirrors apiCost.js's
-    // PROVIDER_FALLBACK_MODEL, which already resolves it this way.
-    // (This comment used to add "a model Google shut down". It is not shut
-    // down — delisted from GET /v1beta/models but still answering, verified
-    // 2026-09-18. The hardcoding was the bug; the id's liveness never was.)
-    gemini_quality: MODEL_PRICING[MODEL_DEFAULTS.qualityEval] || MODEL_PRICING['gemini-2.5-flash'],
-    gemini_text: MODEL_PRICING['gemini-2.5-flash'] || { input: 0.30, output: 2.50 }
-  };
-
-  // Helper to calculate image generation cost (per-image pricing, not token-based)
-  const calculateImageCost = (modelId, imageCount) => {
-    const pricing = MODEL_PRICING[modelId];
-    if (pricing?.perImage) {
-      return pricing.perImage * imageCount;
-    }
-    // Fallback to default Gemini image pricing
-    return 0.04 * imageCount;
-  };
-
-  // Helper to add usage - now supports function-level tracking with model names, thinking tokens, and direct costs
-  const addUsage = (provider, usage, functionName = null, modelName = null) => {
-    // Idempotency guard — see the create-story pipeline's addUsage for rationale.
-    if (usage && usage.__accounted) return;
-    if (usage && typeof usage === 'object') {
-      try { Object.defineProperty(usage, '__accounted', { value: true, configurable: true, enumerable: false }); } catch { /* frozen — skip */ }
-    }
-    if (usage && tokenUsage[provider]) {
-      // Handle Runware/Grok (direct cost) vs token-based providers
-      if (provider === 'runware' || provider === 'grok') {
-        tokenUsage[provider].direct_cost += usage.direct_cost || usage.cost || 0;
-        tokenUsage[provider].calls += 1;
-      } else {
-        tokenUsage[provider].input_tokens += usage.input_tokens || 0;
-        tokenUsage[provider].output_tokens += usage.output_tokens || 0;
-        tokenUsage[provider].thinking_tokens += usage.thinking_tokens || 0;
-        // Subsets of output_tokens / input_tokens — recorded, never summed in.
-        if (usage.reasoning_tokens) tokenUsage[provider].reasoning_tokens = (tokenUsage[provider].reasoning_tokens || 0) + usage.reasoning_tokens;
-        if (usage.cached_input_tokens) tokenUsage[provider].cached_input_tokens = (tokenUsage[provider].cached_input_tokens || 0) + usage.cached_input_tokens;
-        tokenUsage[provider].calls += 1;
-      }
-    }
-    // Also track by function if specified. Auto-create the bucket so any label
-    // the text chokepoint emits is captured (never silently dropped).
-    if (functionName) {
-      if (!tokenUsage.byFunction[functionName]) {
-        tokenUsage.byFunction[functionName] = { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, direct_cost: 0, calls: 0, elapsed_ms: 0, provider: null, models: new Set() };
-      }
-      const func = tokenUsage.byFunction[functionName];
-      func.input_tokens += usage.input_tokens || 0;
-      func.output_tokens += usage.output_tokens || 0;
-      func.thinking_tokens += usage.thinking_tokens || 0;
-      if (usage.reasoning_tokens) func.reasoning_tokens = (func.reasoning_tokens || 0) + usage.reasoning_tokens;
-      if (usage.cached_input_tokens) func.cached_input_tokens = (func.cached_input_tokens || 0) + usage.cached_input_tokens;
-      func.direct_cost = (func.direct_cost || 0) + (usage.direct_cost || 0);
-      func.calls += 1;
-      // Summed wall-clock, stamped by the text chokepoint (textModels.js).
-      func.elapsed_ms = (func.elapsed_ms || 0) + (usage?.elapsed_ms || 0);
-      func.provider = provider; // Track actual provider used
-      // Coerce to a string id (a mis-wired caller can pass a model object).
-      if (modelName) {
-        func.models.add(typeof modelName === 'string' ? modelName : (modelName.modelId || modelName.model || String(modelName)));
-      }
-    }
-  };
-  // Register this job's sink so every text call records automatically.
-  require('./server/lib/usageContext').setUsageSink(addUsage);
-
-  // Helper to calculate cost - uses model-specific pricing if available
-  // Thinking tokens are billed at output rate for Gemini 2.5 models
-  const calculateCost = (modelOrProvider, inputTokens, outputTokens, thinkingTokens = 0) => {
-    // Try model-specific pricing first, then fall back to provider pricing
-    const pricing = MODEL_PRICING[modelOrProvider] || PROVIDER_PRICING[modelOrProvider] || { input: 0, output: 0 };
-    const inputCost = (inputTokens / 1000000) * pricing.input;
-    const outputCost = (outputTokens / 1000000) * pricing.output;
-    const thinkingCost = (thinkingTokens / 1000000) * pricing.output; // Thinking billed at output rate
-    return { input: inputCost, output: outputCost, thinking: thinkingCost, total: inputCost + outputCost + thinkingCost };
-  };
 
   try {
     // Get job data

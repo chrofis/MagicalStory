@@ -790,9 +790,15 @@ async function validateEmptyScene(imageData, textPosition, pageContext = '', opt
     // ── Phase 2: Gemini Flash-lite vision check ──
     // Catches things pixels can't: people/figures, setting mismatch, content errors.
     let visionFeedback = null;
+    // Set when the judge could not run or answered with an error: the plate then
+    // "passes" on the pixel checks alone, which is NOT a verdict. Logged at error
+    // level and returned as `notEvaluated` (owner decision C5b, docs/decisions.md
+    // 2026-10-08) instead of a silent pass.
+    let notEvalDetail = null;
     if (!skipVision && issues.length === 0) {
       try {
         const apiKey = process.env.GEMINI_API_KEY;
+        if (!apiKey) notEvalDetail = 'GEMINI_API_KEY not set';
         if (apiKey) {
           const base64ForVision = r2Lib.stripDataUriPrefix(imageData);
           const mimeType = imageData.match(/^data:(image\/\w+);/)?.[1] || 'image/jpeg';
@@ -849,9 +855,15 @@ async function validateEmptyScene(imageData, textPosition, pageContext = '', opt
             signal: AbortSignal.timeout(30000),
           });
 
+          if (!visionResp.ok) notEvalDetail = `plate judge HTTP ${visionResp.status}`;
           if (visionResp.ok) {
             const visionData = await visionResp.json();
             const visionText = visionData.candidates?.[0]?.content?.parts?.[0]?.text || '';
+            // The plate judge is a paid Gemini call with seven images; it was the
+            // one eval call that never reached the ledger (2026-10-08).
+            if (visionData.usageMetadata) {
+              require('./usageContext').recordTextUsage('gemini_quality', geminiUsage(visionData.usageMetadata), 'plate_qc', 'gemini-2.5-flash');
+            }
             require('./evalCallLog').recordEvalCall({
               kind: 'plate_qc', label: pageContext || null, pageNumber: options.pageNumber ?? null, model: 'gemini-2.5-flash', prompt: qcPrompt, rawResponse: visionText,
             });
@@ -881,8 +893,9 @@ async function validateEmptyScene(imageData, textPosition, pageContext = '', opt
           }
         }
       } catch (visionErr) {
-        log.debug(`⚠️ [EMPTY-SCENE-QC] ${pageContext} Vision check skipped: ${visionErr.message}`);
+        notEvalDetail = `plate judge threw: ${visionErr.message}`;
       }
+      if (notEvalDetail) log.error(`❌ [EMPTY-SCENE-QC] ${pageContext} NOT EVALUATED by the vision judge (${notEvalDetail}) — the plate passes on pixel checks only`);
     }
 
     const pass = issues.length === 0;
@@ -892,10 +905,10 @@ async function validateEmptyScene(imageData, textPosition, pageContext = '', opt
       log.debug(`✅ [EMPTY-SCENE-QC] ${pageContext} passed (brightness ${(avgBrightness * 100).toFixed(0)}%, text calmness ${(calmnessScore * 100).toFixed(0)}%, white ${(whiteBoxPct * 100).toFixed(0)}%, black ${(blackBoxPct * 100).toFixed(0)}%)`);
     }
 
-    return { pass, issues, findings, calmnessScore, visionFeedback };
+    return { pass, issues, findings, calmnessScore, visionFeedback, notEvaluated: notEvalDetail ? [{ dimension: 'plate_vision', reason: 'judge_unavailable', detail: notEvalDetail }] : [] };
   } catch (err) {
-    log.warn(`⚠️ [EMPTY-SCENE-QC] ${pageContext} Error: ${err.message} — skipping check`);
-    return { pass: true, issues: [], findings: [], calmnessScore: 0.5, visionFeedback: null };
+    log.error(`❌ [EMPTY-SCENE-QC] ${pageContext} NOT EVALUATED (${err.message}) — the plate is not checked`);
+    return { pass: true, issues: [], findings: [], calmnessScore: 0.5, visionFeedback: null, notEvaluated: [{ dimension: 'plate_vision', reason: 'plate_qc_threw', detail: err.message }] };
   }
 }
 
@@ -2473,6 +2486,42 @@ function prepareEvalJudgeInputs({ originalPrompt, referenceImages, evaluationTyp
 }
 
 /**
+ * One evaluation's paid calls, each with its own model. evaluateImageQuality
+ * makes up to five (quality judge, blind inventory, semantic judge, compliance
+ * judge, absence second look) on DIFFERENT models and used to hand back one
+ * summed `usage` that every record site booked as a single page_quality call on
+ * the quality model, so a Qwen inventory was priced as Gemini and the shared
+ * inventory was counted twice (once as P1, once as three-stage stage 1).
+ * `usageParts` is what the ledger records instead. The compliance judge is NOT
+ * a part: it goes through callTextModel, whose chokepoint already books it.
+ */
+function buildEvalUsageParts({ modelId, quality, p1Usage, semanticUsage, secondLook }) {
+  const parts = [{ suffix: '', modelId, usage: quality }];
+  if (p1Usage) {
+    parts.push({ suffix: '_inventory', modelId: p1Usage.modelId, usage: { input_tokens: p1Usage.inputTokens || 0, output_tokens: p1Usage.outputTokens || 0, thinking_tokens: p1Usage.thinkingTokens || 0 } });
+  }
+  if (semanticUsage && (semanticUsage.input_tokens || semanticUsage.output_tokens)) {
+    parts.push({ suffix: '_semantic', modelId: semanticUsage.modelId, usage: { input_tokens: semanticUsage.input_tokens || 0, output_tokens: semanticUsage.output_tokens || 0, thinking_tokens: semanticUsage.thinking_tokens || 0, cached_input_tokens: semanticUsage.cached_input_tokens || 0 } });
+  }
+  if (secondLook?.usage) {
+    parts.push({ suffix: '_absence', modelId: MODEL_DEFAULTS.absenceSecondLookModel, usage: secondLook.usage });
+  }
+  return parts;
+}
+
+/** Book an evaluation's usageParts on the job ledger: one call per component, own model, `label` + a component suffix. */
+function recordEvalUsage(usageTracker, evaluation, label) {
+  if (!usageTracker || !evaluation) return;
+  if (!evaluation.usageParts) {
+    if (evaluation.usage) log.error(`❌ [COST] evaluation for ${label} carries usage but no usageParts — its spend is NOT booked (every evaluateImageQuality return must set usageParts)`);
+    return;
+  }
+  for (const part of evaluation.usageParts) {
+    usageTracker('gemini_quality', { ...part.usage }, `${label}${part.suffix}`, part.modelId);
+  }
+}
+
+/**
  * The options evaluateImageQuality hands the semantic judge — shared with the
  * Test Lab semantic_eval stage.
  */
@@ -3598,7 +3647,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
             // is used only where the evaluator named nobody — there is no pair
             // to break, and an honest figure list still beats none.
             if (p1Result.figures?.length && matches.length === 0) figures = p1Result.figures;
-            p1Usage = { inputTokens: p1Result.inputTokens, outputTokens: p1Result.outputTokens, thinkingTokens: p1Result.thinkingTokens || 0 };
+            p1Usage = { inputTokens: p1Result.inputTokens, outputTokens: p1Result.outputTokens, thinkingTokens: p1Result.thinkingTokens || 0, modelId: p1Result.servedByModel || null };
 
             // DECLARED GAZE vs OBSERVED GAZE. The one thing P1 can settle
             // that the evaluator structurally cannot: it saw the picture
@@ -3948,6 +3997,9 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         secondLook,                       // absence second look {checked, capped, confirmed, error} (null = not run)
         letteringInventory,               // {items, declared} the lettering check compared (null = not run)
         usage: totalUsage,
+        // `usage` is the summed display aggregate; the ledger books `usageParts`
+        // (recordEvalUsage), each component on its own model.
+        usageParts: buildEvalUsageParts({ modelId, quality: { input_tokens: qualityInputTokens, output_tokens: qualityOutputTokens, thinking_tokens: qualityThinkingTokens }, p1Usage, semanticUsage, secondLook }),
         modelId: modelId
       };
     }
@@ -3964,7 +4016,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         try {
           const p1Result = await p1Promise;
           if (p1Result) {
-            p1Usage = { inputTokens: p1Result.inputTokens, outputTokens: p1Result.outputTokens, thinkingTokens: p1Result.thinkingTokens || 0 };
+            p1Usage = { inputTokens: p1Result.inputTokens, outputTokens: p1Result.outputTokens, thinkingTokens: p1Result.thinkingTokens || 0, modelId: p1Result.servedByModel || null };
           }
         } catch (e) { /* already logged */ }
       }
@@ -4055,6 +4107,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         semanticResult,
         threeStageResult,
         usage: totalUsage,
+        usageParts: buildEvalUsageParts({ modelId, quality: { input_tokens: qualityInputTokens, output_tokens: qualityOutputTokens, thinking_tokens: qualityThinkingTokens }, p1Usage, semanticUsage, secondLook: null }),
         modelId: modelId
       };
     };
@@ -4108,6 +4161,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
 }
 
 module.exports = {
+  recordEvalUsage,
   recordSemanticJudgeFailure,
   presenceCounterName,
   runVisualInventory,

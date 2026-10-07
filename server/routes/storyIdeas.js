@@ -674,8 +674,8 @@ function pickPremiseShapes(seedInput = {}) {
 function ideaCallCost(modelId, usage) {
   if (!usage || !modelId) return null;
   try {
-    const { calculateTextCost } = require('../config/models');
-    const cost = calculateTextCost(modelId, {
+    const { priceUsage } = require('../config/models');
+    const cost = priceUsage(modelId, {
       inputTokens: usage.input_tokens || 0,
       outputTokens: usage.output_tokens || 0,
       thinkingTokens: usage.thinking_tokens || 0,

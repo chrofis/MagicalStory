@@ -36,6 +36,7 @@ const getStoryHelpers = () => require('./storyHelpers');
 // Leaf module (parsers only) — safe to require eagerly, no cycle back here.
 const { resolveEvalSceneHint } = require('./sceneMetadata');
 const images = () => require('./images');
+const recordEvalUsage = (...args) => require('./evalPipeline').recordEvalUsage(...args);
 const { resolveRepairScene } = require('./landmarkScene');
 
 function selectBestVersion(versions) {
@@ -864,7 +865,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   // Track usage
   for (const evalResult of evaluations) {
     if (evalResult.usage && usageTracker) {
-      usageTracker('gemini_quality', evalResult.usage, 'page_quality', evalResult.modelId);
+      recordEvalUsage(usageTracker, evalResult, 'page_quality');
     }
     // The arbiter is a paid call made inside the evaluation task, on the rare
     // deadlocked page. Its own byFunction key so its cost is never hidden
@@ -934,7 +935,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     for (const ev of baselineEvals) {
       baselineEvalsByPage.set(ev.pageNumber, ev);
       if (ev.usage && usageTracker) {
-        usageTracker('gemini_quality', ev.usage, 'page_quality_original_baseline', ev.modelId);
+        recordEvalUsage(usageTracker, ev, 'page_quality_original_baseline');
       }
     }
     log.info(`📊 [UNIFIED PIPELINE] Evaluated ${baselineEvalInputs.length} non-winner originals for baseline scores`);
@@ -2448,7 +2449,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
 
           for (const ev of recolourEvals) {
             if (ev.usage && usageTracker) {
-              usageTracker('gemini_quality', ev.usage, `unified_pipeline_recolour_r${round}`, ev.modelId);
+              recordEvalUsage(usageTracker, ev, `unified_pipeline_recolour_r${round}`);
             }
             const versions = pageVersions.get(ev.pageNumber);
             const rc = recolourMap.get(ev.pageNumber);
@@ -2886,7 +2887,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       // is possible and no per-page lock is needed.
       for (const ev of roundEvals) {
         if (ev.usage && usageTracker) {
-          usageTracker('gemini_quality', ev.usage, `unified_pipeline_quality_r${round}`, ev.modelId);
+          recordEvalUsage(usageTracker, ev, `unified_pipeline_quality_r${round}`);
         }
         const versions = pageVersions.get(ev.pageNumber);
         const repairResult = roundSuccess.find(r => r.pageNumber === ev.pageNumber);
@@ -3126,7 +3127,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         const entry = rescueEntries.find(r => r.pageNumber === ev.pageNumber);
         if (!entry) continue;
         if (ev.usage && usageTracker) {
-          usageTracker('gemini_quality', ev.usage, 'unified_pipeline_quality_rescue', ev.modelId);
+          recordEvalUsage(usageTracker, ev, 'unified_pipeline_quality_rescue');
         }
         const evScore = ev.score ?? ev.qualityScore ?? null;
         if (evScore == null) continue;
@@ -3307,7 +3308,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       const tsEvals = await images().evaluateImageBatch(buildEvalInputs(tsEntries), { concurrency: evalConcurrency, qualityModelOverride, visualBible, clothingRequirements: storyData?.clothingRequirements || null, storyData, artStyle, ...evalStoryMeta });
       for (const c of textSpaceCandidates) {
         const ev = tsEvals.find(e => e.pageNumber === c.pageNumber);
-        if (ev?.usage && usageTracker) usageTracker('gemini_quality', ev.usage, 'post_repair_text_quality', ev.modelId);
+        if (ev?.usage && usageTracker) recordEvalUsage(usageTracker, ev, 'post_repair_text_quality');
         if (!ev || ev.evaluated === false) {
           log.error(`❌ [POST-REPAIR-TEXT] P${c.pageNumber}: the re-rendered image could not be evaluated (${ev?.evalError || ev?.error || 'no result'}) — it cannot compete, keeping the current best`);
           continue;

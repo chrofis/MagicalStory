@@ -1969,10 +1969,9 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
       // cost the tracker falls into token-rate lookup, finds none for image
       // models, and poisons the run total with NaN (observed: $NaN TOTAL on
       // the 2026-07-21 run via gemini-3-pro style transfer).
-      const { MODEL_PRICING } = require('../config/models');
       const usage = {
         ...result.usage,
-        cost: result.usage.cost ?? MODEL_PRICING[result.modelId]?.perImage ?? 0.04,
+        cost: result.usage.cost ?? require('../config/models').priceUsage(result.modelId, result.usage),
       };
       usageTracker(result.provider || 'grok', usage, 'character_2x4_style_transfer', result.modelId);
     }
@@ -2332,10 +2331,9 @@ async function redressSheetVariant(baseSheetImageData, opts = {}) {
       continue;
     }
     if (usageTracker && result.usage) {
-      const { MODEL_PRICING } = require('../config/models');
       usageTracker(result.provider || 'grok', {
         ...result.usage,
-        cost: result.usage.cost ?? MODEL_PRICING[result.modelId]?.perImage ?? 0.02,
+        cost: result.usage.cost ?? require('../config/models').priceUsage(result.modelId, result.usage),
       }, 'character_2x4_wardrobe_variant', result.modelId);
     }
     if (!result?.imageData) {

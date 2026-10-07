@@ -1235,7 +1235,7 @@ async function runPostAuditTextRound(storyData, pages, textFaults = [], opts = {
   const { loadPromptTemplates } = require('../services/prompts');
   const { buildTextRefinePrompt, parseRefinedText, stripTrailingSeparator } = require('./storyHelpers');
   const { callTextModelStreaming, describeTruncation } = require('./textModels');
-  const { TEXT_MODELS, MODEL_DEFAULTS, calculateTextCost } = require('../config/models');
+  const { TEXT_MODELS, MODEL_DEFAULTS, priceUsage } = require('../config/models');
 
   const lines = (textFaults || []).map(f => String(f?.line || '').trim()).filter(Boolean);
   if (lines.length === 0) return null;          // the only silent exit: nothing was routed here
@@ -1320,7 +1320,7 @@ async function runPostAuditTextRound(storyData, pages, textFaults = [], opts = {
         modelId: r.modelId || TEXT_MODELS[model].modelId,
         elapsedMs,
         usage: { input_tokens: r.usage?.input_tokens || 0, output_tokens: r.usage?.output_tokens || 0 },
-        cost: r.usage?.direct_cost ?? calculateTextCost(r.modelId || TEXT_MODELS[model].modelId, r.usage || {}),
+        cost: priceUsage(r.modelId || TEXT_MODELS[model].modelId, r.usage || {}),
         faults: lines,
         scopedPages: scope,
         returnedPages,
@@ -1418,7 +1418,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
     countFaults, faultsByCategory,
   } = require('./storyHelpers');
   const { callTextModelStreaming, describeTruncation } = require('./textModels');
-  const { TEXT_MODELS, MODEL_DEFAULTS, calculateTextCost } = require('../config/models');
+  const { TEXT_MODELS, MODEL_DEFAULTS, priceUsage } = require('../config/models');
   const { runJevTextSource, JEV_MODEL } = require('./jevAudit');
 
   if (!Array.isArray(pages) || pages.length === 0) {
@@ -1588,7 +1588,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
         modelId: r.modelId || TEXT_MODELS[modelKey].modelId,
         raw, prompt, faults: countFaults(raw), byCategory: faultsByCategory(raw), elapsedMs,
         usage: { input_tokens: r.usage?.input_tokens || 0, output_tokens: r.usage?.output_tokens || 0 },
-        cost: r.usage?.direct_cost ?? calculateTextCost(r.modelId || TEXT_MODELS[modelKey].modelId, r.usage || {}),
+        cost: priceUsage(r.modelId || TEXT_MODELS[modelKey].modelId, r.usage || {}),
       };
     } catch (e) {
       log.warn(`⚠️ [TEXT-AUDIT/${source}] failed (${e.message}) — its findings are missing from the merge`);
@@ -1777,7 +1777,7 @@ ${numberedFindingsText(subset)}`, arc, { arcHints, storyLogic });
         reask = {
           ok: true, elapsedMs: Date.now() - t1, prompt: askPrompt, rawResponse: (r2.text || '').slice(0, 40000),
           usage: { input_tokens: r2.usage?.input_tokens || 0, output_tokens: r2.usage?.output_tokens || 0 },
-          cost: r2.usage?.direct_cost ?? calculateTextCost(r2.modelId || TEXT_MODELS[repairModel].modelId, r2.usage || {}),
+          cost: priceUsage(r2.modelId || TEXT_MODELS[repairModel].modelId, r2.usage || {}),
           stillOver: capped2.over,
         };
       } catch (e) {
@@ -1829,7 +1829,7 @@ ${numberedFindingsText(subset)}`, arc, { arcHints, storyLogic });
         // call is unexplainable (same model+provider has measured 60 vs 137 tok/s).
         ttftMs: r.ttft ?? null,
         usage: { input_tokens: r.usage?.input_tokens || 0, output_tokens: r.usage?.output_tokens || 0 },
-        cost: (r.usage?.direct_cost ?? calculateTextCost(r.modelId || TEXT_MODELS[repairModel].modelId, r.usage || {})) + (reask?.cost || 0),
+        cost: (priceUsage(r.modelId || TEXT_MODELS[repairModel].modelId, r.usage || {})) + (reask?.cost || 0),
         // EDIT CAP: what each pass held to (changedWordRatio vs the writer's draft).
         editCap: { cap, exempt: [...mismatchPages].filter(n => n != null), overFirst, reask, rejected: rejectedPages },
         editRatios: computeEditRatios(original, next),
@@ -2136,7 +2136,7 @@ ${numberedFindingsText(subset)}`, arc, { arcHints, storyLogic });
         elapsedMs: Date.now() - t0,
         reviewedPages: pairs.map(p => p.pageNumber),
         usage: { input_tokens: dr.usage?.input_tokens || 0, output_tokens: dr.usage?.output_tokens || 0 },
-        cost: dr.usage?.direct_cost ?? calculateTextCost(dr.modelId || TEXT_MODELS[diffModel].modelId, dr.usage || {}),
+        cost: priceUsage(dr.modelId || TEXT_MODELS[diffModel].modelId, dr.usage || {}),
         rawResponse: diffReview.slice(0, 40000),
         findings: diffFindings.map(f => ({ pageNumber: f.pageNumber, quote: f.quote, correction: f.correction })),
         appliedCount: diffApplied.length,
@@ -2232,7 +2232,7 @@ ${numberedFindingsText(subset)}`, arc, { arcHints, storyLogic });
         modelId: lr.modelId || TEXT_MODELS[lectorModel].modelId,
         elapsedMs: Date.now() - t0,
         usage: { input_tokens: lr.usage?.input_tokens || 0, output_tokens: lr.usage?.output_tokens || 0 },
-        cost: lr.usage?.direct_cost ?? calculateTextCost(lr.modelId || TEXT_MODELS[lectorModel].modelId, lr.usage || {}),
+        cost: priceUsage(lr.modelId || TEXT_MODELS[lectorModel].modelId, lr.usage || {}),
         rawResponse: proofread.slice(0, 40000),
         findings: lectorFindings.map(f => ({ pageNumber: f.pageNumber, quote: f.quote, correction: f.correction })),
         appliedCount: lectorApplied.length,

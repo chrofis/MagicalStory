@@ -24,7 +24,7 @@ const { Pool } = require('pg');
   const { buildTextDiffPrompt } = require('../../server/lib/storyHelpers');
   const { callTextModelStreaming } = require('../../server/lib/textModels');
   const { parseLectorFindings, applyLectorFindings } = require('../../server/lib/textRefine');
-  const { TEXT_MODELS, MODEL_DEFAULTS, calculateTextCost } = require('../../server/config/models');
+  const { TEXT_MODELS, MODEL_DEFAULTS, priceUsage } = require('../../server/config/models');
 
   const changed = rep.changedPages || [];
   const pairs = rep.pages.filter(p => changed.includes(p.pageNumber))
@@ -43,6 +43,6 @@ const { Pool } = require('pg');
   console.log('\nfindings:', JSON.stringify(findings, null, 1));
   console.log('applied:', res.applied.map(a => `p${a.pageNumber} "${a.quote}" -> "${a.correction}"`));
   console.log('dropped:', res.dropped.map(d => `p${d.pageNumber} "${d.quote}" (${d.reason})`));
-  const cost = r.usage?.direct_cost ?? calculateTextCost(r.modelId || TEXT_MODELS[modelKey].modelId, r.usage || {});
+  const cost = priceUsage(r.modelId || TEXT_MODELS[modelKey].modelId, r.usage || {});
   console.log(`\n${((Date.now() - t0) / 1000).toFixed(0)}s, in ${r.usage?.input_tokens} out ${r.usage?.output_tokens}, $${Number(cost).toFixed(4)}`);
 })().catch(e => { console.error(e); process.exit(1); });

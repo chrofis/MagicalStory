@@ -50,7 +50,7 @@ Last full sweep: **2026-09-06**.
 - [ ] (2026-10-07) Branch claude/backlog-trial-2026-10-07 (~125 commits) awaiting staging + owner OK; 8 stopped follow-up tasks incl. the owner-approved keyword H1s → tasks/session-handover-2026-10-07.md
 
 - [ ] Step-4 idea pre-generation sometimes does not fire (staging 2026-10-05, demo-berger, entry 18, twice): step 5 shows the empty placeholder. Diagnose the pre-generate effect; suspect the abort-on-input-change effect right below it → client/src/pages/StoryWizard.tsx:1998 (spec works around it at tests/demo-story.spec.ts, Step 5)
-- [ ] Cost cuts (no quality loss) + cost-accounting fixes, groups B+C approved 2026-10-05; owner decisions pending → tasks/cost-cuts-2026-10-05.md:1
+- [ ] Cost cuts (no quality loss), group B open (group C accounting DONE 2026-10-08); owner decisions pending → tasks/cost-cuts-2026-10-05.md:1
 
 - [ ] Whole-codebase code review, area by area (report only; owner picks fixes) → `tasks/code-review-2026-10-04.md`
 - [ ] Legacy root `index.html` (Babel prototype, served only without `dist/`) still calls the deleted `/api/story-draft` route — remove or update it → `tasks/code-review-2026-10-04.md` F3
@@ -2245,3 +2245,10 @@ three below are prompt/classification questions and are the owner's call.
 - [ ] Plan-check / typed-plan have no critic for "handover object only in what-is-true-after" (generator rule added to story-beats.txt only; a critic needs calibration) → prompts/plan-check.txt
 - [ ] Mermaid p9 climax: refine/audit still apply the Facts line «Oskar cannot keep his arms still» against the plot's turn (letter arm holds until the dot dances); also p5 narrator names an unshown «Kanal». Agent run 2026-10-08, rule added in arcLogicSpec, unproven → tasks/showcase-fixes-2026-10-07.md, evals/runs/2026-10-08_trial-idea-text-rules
 - [ ] tests/unit/verify-registry.test.ts + public-pages-a11y.test.ts fail on a clean HEAD (verify.json entry repair-version-selection-2026-10-07 evidence shape; a second <main>) → not mine, found 2026-10-08
+- [ ] Cost ledger follow-ups (2026-10-08): admin TokenUsageTab.tsx prices its daily/monthly/user columns with client-side hardcoded rates (server should send per-provider `cost` from ledger buckets) → client/src/pages/admin/TokenUsageTab.tsx:203
+- [ ] Cost ledger follow-ups: runware.js has three response-less fallback prices as literals (0.002 / 0.0006 / 0.005); move to MODEL_PRICING or fail loudly → server/lib/runware.js:194
+- [ ] Cost ledger follow-ups: gridBasedRepair never records its Gemini grid-repair spend (repairGridWithGemini usage is returned, not booked) → server/lib/gridBasedRepair.js:406
+- [ ] Cost ledger follow-ups: sites that destructure geminiUsage into three fields drop cachedContentTokenCount (evalPipeline inventory/quality, imageInpainting, avatars); cached tokens there bill at the plain input rate (over-reports slightly) → server/lib/providerUsage.js:40
+- [ ] Cost ledger follow-ups: `evaluation.usage` is still the old summed display aggregate (counts the shared inventory and compliance stage twice); Lab cost displays read it → server/lib/evalPipeline.js:3921
+- [ ] Cost ledger: paid 4-page smoke story vs Anthropic/Google/xAI/OpenRouter consoles (cache, plate_qc, cut, eval components) → tasks/verify.json:cost-ledger-2026-10-08
+

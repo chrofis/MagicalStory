@@ -1419,34 +1419,40 @@ const MODEL_PRICING = {
   // ── Anthropic, called directly (TEXT_MODELS provider 'anthropic').
   // Source: https://platform.claude.com/docs/en/about-claude/pricing, fetched
   // 2026-09-18. All ten entries below matched the page exactly — no change.
+  // 2026-10-08: `cacheRead` / `cacheWrite` (5-minute write; nothing here sends
+  // a 1-hour ttl) added from the same page, fetched that day. Opus 5.5 and
+  // Sonnet 5.5 read at 0.05x input, every other model at 0.1x.
   // `thinking` = `output`: Anthropic bills extended thinking at the output rate.
-  'claude-opus-5': { input: 5.00, output: 25.00, thinking: 25.00 },
-  'claude-opus': { input: 5.00, output: 25.00, thinking: 25.00 },
+  'claude-opus-5': { input: 5.00, output: 25.00, thinking: 25.00, cacheRead: 0.50, cacheWrite: 6.25 },
+  'claude-opus': { input: 5.00, output: 25.00, thinking: 25.00, cacheRead: 0.50, cacheWrite: 6.25 },
   // Opus 5.5: same page, fetched 2026-09-23 — $4 input / $20 output.
   // MUST stay an exact key: without it calculateTextCost strips the trailing
   // "-5" and prices this model as claude-opus-5 ($5/$25).
-  'claude-opus-5-5': { input: 4.00, output: 20.00, thinking: 20.00 },
+  'claude-opus-5-5': { input: 4.00, output: 20.00, thinking: 20.00, cacheRead: 0.20, cacheWrite: 5.00 },
   // Sonnet 5.5: same page, fetched 2026-10-04 — $2 input / $10 output.
   // Exact key for the same reason as Opus 5.5: the "-5" strip would otherwise
   // land on a claude-sonnet prefix ($3/$15).
-  'claude-sonnet-5-5': { input: 2.00, output: 10.00, thinking: 10.00 },
+  'claude-sonnet-5-5': { input: 2.00, output: 10.00, thinking: 10.00, cacheRead: 0.10, cacheWrite: 2.50 },
   // Historical cost lookups only: no stage routes to 4.6 since 2026-10-05.
-  'claude-sonnet-4-6': { input: 3.00, output: 15.00, thinking: 15.00 },
-  'claude-sonnet-4-5-20250929': { input: 3.00, output: 15.00, thinking: 15.00 },
-  'claude-sonnet-4-5': { input: 3.00, output: 15.00, thinking: 15.00 },
-  'claude-sonnet': { input: 2.00, output: 10.00, thinking: 10.00 }, // = Sonnet 5.5, the alias's model
-  'claude-haiku-4-5-20251001': { input: 1.00, output: 5.00, thinking: 5.00 },
-  'claude-haiku-4-5': { input: 1.00, output: 5.00, thinking: 5.00 },
-  'claude-3-5-haiku-20241022': { input: 0.80, output: 4.00, thinking: 4.00 },
-  'claude-haiku': { input: 1.00, output: 5.00, thinking: 5.00 },
+  'claude-sonnet-4-6': { input: 3.00, output: 15.00, thinking: 15.00, cacheRead: 0.30, cacheWrite: 3.75 },
+  'claude-sonnet-4-5-20250929': { input: 3.00, output: 15.00, thinking: 15.00, cacheRead: 0.30, cacheWrite: 3.75 },
+  'claude-sonnet-4-5': { input: 3.00, output: 15.00, thinking: 15.00, cacheRead: 0.30, cacheWrite: 3.75 },
+  'claude-sonnet': { input: 2.00, output: 10.00, thinking: 10.00, cacheRead: 0.10, cacheWrite: 2.50 }, // = Sonnet 5.5, the alias's model
+  'claude-haiku-4-5-20251001': { input: 1.00, output: 5.00, thinking: 5.00, cacheRead: 0.10, cacheWrite: 1.25 },
+  'claude-haiku-4-5': { input: 1.00, output: 5.00, thinking: 5.00, cacheRead: 0.10, cacheWrite: 1.25 },
+  'claude-3-5-haiku-20241022': { input: 0.80, output: 4.00, thinking: 4.00, cacheRead: 0.08, cacheWrite: 1.00 },
+  'claude-haiku': { input: 1.00, output: 5.00, thinking: 5.00, cacheRead: 0.10, cacheWrite: 1.25 },
 
   // ── Google Gemini, called directly (TEXT_MODELS provider 'google').
   // Source: https://ai.google.dev/gemini-api/docs/pricing, fetched 2026-09-18.
+  // 2026-10-08: `cacheRead` (context-caching rate, text/image/video) added for
+  // the entries the page lists; models without it bill cached tokens at the
+  // input rate (priceUsage).
   // 2.5 Pro / Flash / Flash-Lite all matched the page — no change. Google's
   // "output" column explicitly INCLUDES thinking tokens, hence thinking=output.
-  'gemini-2.5-pro': { input: 1.25, output: 10.00, thinking: 10.00 },   // >200k prompt: 2.50/15.00 (not modelled)
-  'gemini-2.5-flash': { input: 0.30, output: 2.50, thinking: 2.50 },
-  'gemini-2.5-flash-lite': { input: 0.10, output: 0.40, thinking: 0.40 },
+  'gemini-2.5-pro': { input: 1.25, output: 10.00, thinking: 10.00, cacheRead: 0.125 },   // >200k prompt: 2.50/15.00 (not modelled)
+  'gemini-2.5-flash': { input: 0.30, output: 2.50, thinking: 2.50, cacheRead: 0.03 },
+  'gemini-2.5-flash-lite': { input: 0.10, output: 0.40, thinking: 0.40, cacheRead: 0.01 },
   // NOT SERVED. Absent from the pricing page AND from GET v1beta/models
   // (both checked 2026-09-18) — the id 404s. The figures are the last known
   // ones and are UNVERIFIABLE today; the entry stays only so an old stored
@@ -1459,7 +1465,7 @@ const MODEL_PRICING = {
   // (`~google/gemini-pro-latest`, GET /api/v1/models 2026-09-18) prices it at
   // $2.00/$12.00 — Gemini 3.x Pro rates, not the 2.5 Pro rates ($1.25/$10.00)
   // this entry used to carry. >200k prompt: 4.00/18.00 (not modelled).
-  'gemini-pro-latest': { input: 2.00, output: 12.00, thinking: 12.00 },
+  'gemini-pro-latest': { input: 2.00, output: 12.00, thinking: 12.00, cacheRead: 0.20 },
 
   // ── xAI, called directly (TEXT_MODELS provider 'xai').
   // Source: GET https://api.x.ai/v1/models and /v1/language-models, fetched
@@ -1580,9 +1586,11 @@ const MODEL_PRICING = {
   // Grok: grokImageCost() reads them and reports the result as direct_cost.
   'grok-imagine-image': { perImage: 0.02 },      // $0.02 at 1K and 2K alike — confirmed
   // 1K low $0.04 (this entry) / 2K low $0.06 / 1K medium $0.06 / 2K medium
-  // $0.08. NOT MODELLED: xAI also bills $0.01 per INPUT image, and the edit
-  // path sends reference sheets — so a 2.0 edit with one reference really costs
-  // $0.05, not $0.04.
+  // $0.08. INPUT IMAGES: docs.x.ai/docs/models/grok-imagine-image-2.0 and the
+  // models page, fetched 2026-10-08, list NO per-input-image charge (an earlier
+  // comment here claimed $0.01 per input image; no vendor page shows it, so it
+  // is not billed — see docs/decisions.md 2026-10-08). Revisit if the xAI
+  // invoice for an edit-heavy story exceeds this ledger.
   'grok-imagine-image-2.0': { perImage: 0.04 },
   // Alias of `grok-imagine-image-quality`: 1K $0.05, 2K $0.07. Was 0.07 here —
   // that is the 2K price, and nothing in this repo requests 2K.
@@ -1596,8 +1604,11 @@ const MODEL_PRICING = {
   // deprecated with shutdown on 2026-10-02.
   'gemini-2.5-flash-image': { perImage: 0.039 },
   // 1120 tokens at $120/1M = $0.134 for 1K/2K (was 0.15); 4K is $0.24. Input
-  // images add $0.0011 each, not modelled.
-  'gemini-3-pro-image-preview': { perImage: 0.134 },
+  // is billed on top at $2.00/1M (text/image; a reference image is ~560 tokens =
+  // $0.0011) and text/thinking output at $12.00/1M — pricing page fetched
+  // 2026-10-08. priceUsage adds `promptPerM` x input_tokens and
+  // `thinkingPerM` x thinking_tokens to the perImage price for a model that lists them.
+  'gemini-3-pro-image-preview': { perImage: 0.134, promptPerM: 2.00, thinkingPerM: 12.00 },
   // Runware publishes no per-model list price on any fetchable page (checked
   // runware.ai/pricing 2026-09-18: "pricing varies across thousands of
   // parameters", range $0.0006-$0.24). These three are UNVERIFIED fallbacks and
@@ -1609,61 +1620,103 @@ const MODEL_PRICING = {
   'ace-plus-plus': { perImage: 0.005 }
 };
 
+/** The MODEL_PRICING row for a model id (exact, then bare-name, then prefix match), or null. */
+function findModelPricing(modelId) {
+  if (!modelId || typeof modelId !== 'string') return null;
+  if (MODEL_PRICING[modelId]) return MODEL_PRICING[modelId];
+
+  // OpenRouter models are keyed with their vendor prefix ('qwen/qwen-plus'),
+  // but MODEL_DEFAULTS refers to them bare ('qwen-plus'), and neither branch
+  // below matches across the slash: 'qwen/qwen-plus'.startsWith('qwen-plus')
+  // is false, and 'qwen-plus'.includes('qwen/qwen-plus') is false too.
+  // Result: every eval/compliance call through OpenRouter priced at $0 —
+  // silent under-reporting in the pipeline's own cost accounting, not just in
+  // reports built on top of it. Match the part after the slash as well.
+  const lower = modelId.toLowerCase();
+  for (const [key, value] of Object.entries(MODEL_PRICING)) {
+    const bare = key.includes('/') ? key.split('/').pop() : key;
+    if (bare.toLowerCase() === lower) return value;
+  }
+
+  // Try to find a matching key by normalizing the model ID
+  const normalizedId = lower.replace(/-\d+$/, '');
+  for (const [key, value] of Object.entries(MODEL_PRICING)) {
+    if (key.toLowerCase().startsWith(normalizedId) || modelId.includes(key)) return value;
+  }
+  return null;
+}
+
 /**
- * Calculate the cost for a text model API call
- * @param {string} modelId - The model ID used (e.g., 'claude-sonnet-4-5-20250929', 'gemini-2.5-flash')
- * @param {object} usage - Token usage: { inputTokens, outputTokens, thinkingTokens? }
+ * Token cost of a text-model call at the model's own rates.
+ * Usage shape: providerUsage.js. `cached_input_tokens` (and Anthropic's
+ * `cache_write_tokens`) are SUBSETS of `input_tokens`, billed at the model's
+ * `cacheRead` / `cacheWrite` rate; a model with no listed cache rate bills them
+ * at the plain input rate (the page shows no discount we could cite).
+ * Cut streams book partial usage, so every field is optional.
+ * Prefer priceUsage() for ledger work: it also honours a provider-reported charge.
+ * @param {string} modelId
+ * @param {object} usage - { input_tokens, output_tokens, thinking_tokens?, cached_input_tokens?, cache_write_tokens? }
  * @returns {number} Estimated cost in USD
  */
 function calculateTextCost(modelId, usage) {
-  // Find pricing - try exact match first, then normalize
-  let pricing = MODEL_PRICING[modelId];
-
-  if (!pricing) {
-    // OpenRouter models are keyed with their vendor prefix ('qwen/qwen-plus'),
-    // but MODEL_DEFAULTS refers to them bare ('qwen-plus'), and neither branch
-    // below matches across the slash: 'qwen/qwen-plus'.startsWith('qwen-plus')
-    // is false, and 'qwen-plus'.includes('qwen/qwen-plus') is false too.
-    // Result: every eval/compliance call through OpenRouter priced at $0 —
-    // silent under-reporting in the pipeline's own cost accounting, not just in
-    // reports built on top of it. Match the part after the slash as well.
-    const lower = modelId.toLowerCase();
-    for (const [key, value] of Object.entries(MODEL_PRICING)) {
-      const bare = key.includes('/') ? key.split('/').pop() : key;
-      if (bare.toLowerCase() === lower) {
-        pricing = value;
-        break;
-      }
-    }
-  }
-
-  if (!pricing) {
-    // Try to find a matching key by normalizing the model ID
-    const normalizedId = modelId.toLowerCase().replace(/-\d+$/, '');
-    for (const [key, value] of Object.entries(MODEL_PRICING)) {
-      if (key.toLowerCase().startsWith(normalizedId) || modelId.includes(key)) {
-        pricing = value;
-        break;
-      }
-    }
-  }
+  const pricing = findModelPricing(modelId);
 
   if (!pricing || pricing.perImage) {
-    // Unknown text model or this is an image model
+    // Unknown text model or this is an image model (priceUsage prices those)
     console.warn(`[COST] No token pricing found for model: ${modelId}`);
     return 0;
   }
 
-  const inputTokens = usage.inputTokens || usage.input_tokens || 0;
-  const outputTokens = usage.outputTokens || usage.output_tokens || 0;
-  const thinkingTokens = usage.thinkingTokens || usage.thinking_tokens || 0;
+  const u = usage || {};
+  const inputTokens = u.inputTokens || u.input_tokens || 0;
+  const outputTokens = u.outputTokens || u.output_tokens || 0;
+  const thinkingTokens = u.thinkingTokens || u.thinking_tokens || 0;
+  const cachedRead = Math.min(u.cached_input_tokens || 0, inputTokens);
+  const cacheWrite = Math.min(u.cache_write_tokens || 0, inputTokens - cachedRead);
+  const plainInput = inputTokens - cachedRead - cacheWrite;
 
   // Calculate cost: price per 1M tokens * (tokens / 1M)
-  const inputCost = (pricing.input * inputTokens) / 1_000_000;
+  const inputCost = (pricing.input * plainInput
+    + (pricing.cacheRead ?? pricing.input) * cachedRead
+    + (pricing.cacheWrite ?? pricing.input) * cacheWrite) / 1_000_000;
   const outputCost = (pricing.output * outputTokens) / 1_000_000;
   const thinkingCost = (pricing.thinking || pricing.output) * thinkingTokens / 1_000_000;
 
   return inputCost + outputCost + thinkingCost;
+}
+
+/**
+ * THE pricer: what one provider call cost, in USD. Every ledger (per-job
+ * buckets, the spend cap, the headline total, api_usage events) prices each call
+ * through this and sums the results, so a bucket that mixes models is priced per
+ * call, not at its first model.
+ *  1. a provider-reported charge (usage.direct_cost: OpenRouter, Runware, the
+ *     Grok per-image figure) wins;
+ *  2. a per-image model (Gemini/Grok image) costs its perImage, tokens ignored;
+ *  3. otherwise tokens at the model's rates, cache subsets included.
+ * An unknown model prices 0 and warns (calculateTextCost) — the caller counts it.
+ * @param {string} modelId
+ * @param {object} usage
+ * @returns {number} USD
+ */
+function priceUsage(modelId, usage) {
+  if (usage && usage.direct_cost != null) return usage.direct_cost || 0;
+  const pricing = findModelPricing(modelId);
+  if (pricing?.perImage) {
+    // An image model that also lists token rates bills its prompt (reference
+    // images included) and any thinking on top of the per-image price.
+    const u = usage || {};
+    return pricing.perImage
+      + ((pricing.promptPerM || 0) * (u.input_tokens || 0) + (pricing.thinkingPerM || 0) * (u.thinking_tokens || 0)) / 1_000_000;
+  }
+  // A display name ('grok-imagine') or backend key ('grok') of an image model.
+  if (!pricing && (IMAGE_MODELS[modelId] || IMAGE_BACKENDS[modelId])) return calculateImageCost(modelId, 1);
+  return calculateTextCost(modelId, usage);
+}
+
+/** True when priceUsage can price this model id (a ledger counts the rest as unpriced). */
+function pricingKnown(modelId) {
+  return !!(findModelPricing(modelId) || (modelId && (IMAGE_MODELS[modelId] || IMAGE_BACKENDS[modelId])));
 }
 
 /**
@@ -1796,6 +1849,9 @@ module.exports = {
   REPAIR_DEFAULTS,
   // Cost calculation utilities
   calculateTextCost,
+  priceUsage,
+  pricingKnown,
+  findModelPricing,
   calculateImageCost,
   formatCostSummary
 };

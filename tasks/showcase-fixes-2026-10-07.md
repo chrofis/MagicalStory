@@ -24,7 +24,7 @@ Code-editing agents run one at a time in the main checkout (no worktrees). Cost 
       5 of 8 figures carry a fact, Sarah has no scene, Noah's thread unresolved
 - [x] (2026-10-08, decisions.md) Speed/cost: planner/re-plan/bible effort medium (low measured worse), 10-05 entry corrected; trial writer already medium
 - [x] (2026-10-08) Small: progress counter counts covers (D1); review-page.js reads R2 image_url (D2); stale verify.json hashes (D3b)
-- [ ] Cost ledger, cost-cuts group C (owner ✅) → tasks/cost-cuts-2026-10-05.md
+- [x] Cost ledger, cost-cuts group C (owner ✅) (2026-10-08, docs/decisions.md; paid smoke vs consoles still owed) → tasks/cost-cuts-2026-10-05.md
 - [ ] Measure renders per story after the repair fixes (target ~25, was 45)
 
 - [x] Repair mechanics built 2026-10-07 (routing to iterate, billing, kept frames, anchor gate, paste-back, no-op, prompt composition; see decisions.md); rounds still NOT cut. Original item: deep investigation running (char-fix failures 22/24 on prod, per-method review of last

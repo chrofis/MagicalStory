@@ -17,7 +17,7 @@ const { buildCastIndex, resolveEntity } = require('./castResolver');
 const { generateWithRunware, isRunwareConfigured, RUNWARE_MODELS } = require('./runware');
 const { generateWithGrok, editWithGrok, isGrokConfigured, packReferences } = require('./grok');
 const { PromptFitError, promptBytes } = require('./promptFitError');
-const { MODEL_PRICING } = require('../config/models');
+const { priceUsage } = require('../config/models');
 const { geminiUsage, xaiUsage, openRouterUsage } = require('./providerUsage');
 const { getCurrentLogger } = require('./generationLogger');
 const r2Lib = require('./r2');
@@ -138,7 +138,7 @@ const EVAL_TYPE_TO_FUNC_NAME = {
 function recordImageApiUsage(modelId, evaluationType, imageUsage) {
   const genLog = getCurrentLogger();
   if (!genLog) return;  // Not in a generation context (e.g. ad-hoc avatar request)
-  const perImage = MODEL_PRICING[modelId]?.perImage ?? 0.04;
+  const perImage = priceUsage(modelId, imageUsage);
   const funcName = EVAL_TYPE_TO_FUNC_NAME[evaluationType] || evaluationType || 'image';
   genLog.apiUsage(funcName, modelId, {
     inputTokens: imageUsage.input_tokens || 0,
@@ -3354,6 +3354,7 @@ async function evaluateImageBatch(images, options = {}) {
         identityAgreement,
         bboxOverlayImage,
         usage: qualityResult?.usage || null,
+        usageParts: qualityResult?.usageParts || null,
         modelId: qualityResult?.modelId || null,
         // Semantic fidelity results (parallel evaluation when pageText provided)
         semanticResult: qualityResult?.semanticResult || null,
@@ -5696,7 +5697,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
           }
         );
         if (usageTracker && iterQuality?.usage) {
-          usageTracker('gemini_quality', iterQuality.usage, 'page_quality', iterQuality.modelId);
+          require('./evalPipeline').recordEvalUsage(usageTracker, iterQuality, 'page_quality');
         }
       } catch (evalErr) {
         log.warn(`⚠️ [ITERATE] Page ${pageNumber}: eval failed (${evalErr.message}) — serving unscored render`);
@@ -6281,7 +6282,9 @@ async function _maybeGenerateComposite(options, usageTracker = null, pageLabel =
       modelId: compositeResult.modelId,
       totalAttempts: compositeResult.totalAttempts || 1,
       prompt: compositeResult.prompt,
-      usage: { cost: 0.04, direct_cost: 0.04 }, // 2 Grok edits
+      // Both Grok edits are booked by coverComposite itself (cover_composite_pass1/2 via
+      // the usageTracker handed in above); a charge here as well booked the cover twice.
+      usage: { direct_cost: 0 },
       grokRefImages: null,
       compositeDebug: compositeResult.debug,
     };

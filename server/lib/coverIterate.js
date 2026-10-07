@@ -1497,7 +1497,7 @@ async function iterateCover(coverKey, storyData, options = {}) {
           evalScore = qualityResult.score ?? null;
           evalReasoning = qualityResult.reasoning || null;
           if (usageTracker && qualityResult.usage) {
-            usageTracker('gemini_quality', qualityResult.usage, 'cover_quality', qualityResult.modelId);
+            require('./evalPipeline').recordEvalUsage(usageTracker, qualityResult, 'cover_quality');
           }
         }
       } catch (evalErr) {
@@ -1596,7 +1596,7 @@ async function iterateCover(coverKey, storyData, options = {}) {
           compScore = qualityResult.score ?? null;
           compReasoning = qualityResult.reasoning || null;
           if (usageTracker && qualityResult.usage) {
-            usageTracker('gemini_quality', qualityResult.usage, 'cover_quality', qualityResult.modelId);
+            require('./evalPipeline').recordEvalUsage(usageTracker, qualityResult, 'cover_quality');
           }
         }
       } catch (evalErr) {

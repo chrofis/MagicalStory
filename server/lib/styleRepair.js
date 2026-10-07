@@ -159,7 +159,8 @@ async function geminiStyleRepaint(prompt, pageImage, { retries = 3, refImages = 
       const um = j?.usageMetadata;
       // direct_cost mirrors cost: addUsage (storyJobPipeline) only sums
       // usage.direct_cost, so per-image spend recorded in `cost` alone lands as $0.
-      const usage = { ...geminiUsage(um), cost: 0.039, direct_cost: 0.039 };
+      const imageCost = require('../config/models').priceUsage('gemini-2.5-flash-image', {});
+      const usage = { ...geminiUsage(um), cost: imageCost, direct_cost: imageCost };
       return { imageData: 'data:image/jpeg;base64,' + inline.data, usage };
     }
     lastReason = cand?.finishReason || 'no-image';

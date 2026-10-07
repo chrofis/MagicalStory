@@ -9,7 +9,7 @@ const { TEXT_MODELS, MODEL_DEFAULTS } = require('../config/models');
 const { withAnthropic, withGemini, withGrok } = require('./aiConcurrency');
 const apiHealth = require('./apiHealth');
 const { recordTextUsage } = require('./usageContext');
-const { geminiUsage, xaiUsage, openRouterUsage } = require('./providerUsage');
+const { geminiUsage, anthropicUsage, xaiUsage, openRouterUsage } = require('./providerUsage');
 const { guardPromptString } = require('../services/prompts');
 
 // Map a text-model provider to its tokenUsage accounting key. Text Gemini
@@ -116,6 +116,46 @@ function linkExternalAbort(controller, signal) {
   signal.addEventListener('abort', () => controller.abort(signal.reason), { once: true });
 }
 
+// streamCutError's provider names ('gemini', 'xai') are not the ledger keys.
+const CUT_PROVIDER_KEY = { anthropic: 'anthropic', gemini: 'gemini_text', xai: 'grok', openrouter: 'openrouter' };
+
+/** Book a cut stream's known usage. `cut: true` marks it as partial (output tokens
+ *  unknown unless the provider reported them, or OpenRouter's generation lookup supplied the cost). */
+function recordCutStreamUsage(provider, usage, label, modelId) {
+  recordTextUsage(CUT_PROVIDER_KEY[provider] || provider, { ...usage, cut: true }, label || 'text_uncategorized', modelId);
+}
+
+/**
+ * OpenRouter bills a cut stream too, but a cut stream never delivers its usage
+ * chunk. GET /api/v1/generation?id= returns the exact charge; the stats can lag
+ * the call by a moment, so retry briefly. Returns a usage object carrying
+ * direct_cost, or null when the lookup does not answer (the caller then books
+ * the known parts and the row stays flagged cut).
+ */
+async function openRouterCutUsage(generationId, apiKey, known) {
+  if (!generationId) return null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await new Promise(r => setTimeout(r, attempt === 0 ? 1000 : 2500));
+    try {
+      const res = await fetch(`https://openrouter.ai/api/v1/generation?id=${encodeURIComponent(generationId)}`, {
+        headers: { Authorization: `Bearer ${apiKey}` }, signal: AbortSignal.timeout(10000)
+      });
+      if (!res.ok) continue;
+      const d = (await res.json())?.data;
+      if (d && typeof d.total_cost === 'number') {
+        return {
+          ...known,
+          input_tokens: d.tokens_prompt ?? known.input_tokens,
+          output_tokens: d.tokens_completion ?? known.output_tokens,
+          direct_cost: d.total_cost,
+        };
+      }
+    } catch { /* retry */ }
+  }
+  log.warn(`⚠️ [OPENROUTER STREAM] cut stream ${generationId}: generation lookup gave no cost — booking known parts only`);
+  return null;
+}
+
 /**
  * A text stream that did not finish is a failed call, never a short reply
  * (staging job_1791145238223_50osg2osm: two Gemini 3.1 Pro page-brief streams
@@ -125,7 +165,11 @@ function linkExternalAbort(controller, signal) {
  * carries streamCut so withRetry re-sends it.
  * @param {{provider:string, modelId:string, chars:number, startTime:number, why:string}} p
  */
-function streamCutError({ provider, modelId, chars, startTime, why }) {
+function streamCutError({ provider, modelId, chars, startTime, why, usage, label }) {
+  // A cut stream was still billed for what it produced: book the usage the
+  // stream had reported so far (flagged `cut`) instead of dropping the call from
+  // the ledger. docs/decisions.md 2026-10-08 "Cost accounting: one pricer".
+  if (usage) recordCutStreamUsage(provider, usage, label, modelId);
   const elapsedMs = Date.now() - startTime;
   const err = new Error(`${provider} stream cut (${why}) on ${modelId} after ${chars} chars, ${elapsedMs}ms`);
   err.streamCut = true;
@@ -374,17 +418,15 @@ async function callAnthropicAPI(prompt, maxTokens, modelId, options = {}) {
     return res.json();
   }, { maxRetries: 2, baseDelay: 2000 }));
 
-  // Extract token usage. With prompt caching, input_tokens is the NON-cached
-  // (full-price) portion; cache_read_input_tokens are billed at ~10% and
-  // cache_creation at ~1.25×. Surface them so cache effectiveness is visible.
-  const inputTokens = data.usage?.input_tokens || 0;
-  const outputTokens = data.usage?.output_tokens || 0;
-  const cacheReadTokens = data.usage?.cache_read_input_tokens || 0;
-  const cacheCreationTokens = data.usage?.cache_creation_input_tokens || 0;
+  // Extract token usage. With prompt caching the wire `input_tokens` is only the
+  // uncached remainder; anthropicUsage() folds the cache counters back in
+  // (input_tokens = all prompt tokens, cached_input_tokens / cache_write_tokens
+  // = priced subsets). See providerUsage.js.
+  const usage = anthropicUsage(data.usage);
 
-  if (inputTokens > 0 || outputTokens > 0 || cacheReadTokens > 0) {
-    const cacheStr = cacheReadTokens > 0 || cacheCreationTokens > 0 ? ` (cache: ${cacheReadTokens.toLocaleString()} read / ${cacheCreationTokens.toLocaleString()} write)` : '';
-    log.debug(`📊 [ANTHROPIC] Token usage - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}${cacheStr}, stop_reason=${data.stop_reason || 'none'}`);
+  if (usage.input_tokens > 0 || usage.output_tokens > 0) {
+    const cacheStr = usage.cached_input_tokens > 0 || usage.cache_write_tokens > 0 ? ` (cache: ${usage.cached_input_tokens.toLocaleString()} read / ${usage.cache_write_tokens.toLocaleString()} write)` : '';
+    log.debug(`📊 [ANTHROPIC] Token usage - input: ${usage.input_tokens.toLocaleString()}, output: ${usage.output_tokens.toLocaleString()}${cacheStr}, stop_reason=${data.stop_reason || 'none'}`);
   }
 
   // Prepend prefill to response only for models that support assistant prefill.
@@ -400,12 +442,7 @@ async function callAnthropicAPI(prompt, maxTokens, modelId, options = {}) {
     // Finish reason, read by the truncation guard in callTextModel:
     // 'max_tokens' means the reply was cut at the ceiling.
     stop_reason: data.stop_reason || null,
-    usage: {
-      input_tokens: inputTokens,
-      output_tokens: outputTokens,
-      cache_read_tokens: cacheReadTokens,
-      cache_creation_tokens: cacheCreationTokens
-    }
+    usage
   };
 }
 
@@ -492,6 +529,9 @@ IMPORTANT: Start your response EXACTLY with: ${options.prefill}`
     let buffer = '';
     let inputTokens = 0;
     let outputTokens = 0;
+    // The wire usage counters, merged across message_start (prompt side incl.
+    // cache counters) and message_delta (output side). Normalised once at the end.
+    const wireUsage = {};
     let stopReason = null;
     let sawMessageStop = false;
     let firstChunkTime = null;
@@ -542,10 +582,11 @@ IMPORTANT: Start your response EXACTLY with: ${options.prefill}`
               }
             } else if (event.type === 'message_delta') {
               // Final message with usage stats + stop_reason
-              if (event.usage) outputTokens = event.usage.output_tokens || 0;
+              if (event.usage) { Object.assign(wireUsage, event.usage); outputTokens = event.usage.output_tokens || 0; }
               if (event.delta?.stop_reason) stopReason = event.delta.stop_reason;
             } else if (event.type === 'message_start' && event.message?.usage) {
               // Initial message with input token count
+              Object.assign(wireUsage, event.message.usage);
               inputTokens = event.message.usage.input_tokens || 0;
             } else if (event.type === 'message_stop') {
               sawMessageStop = true;
@@ -567,7 +608,7 @@ IMPORTANT: Start your response EXACTLY with: ${options.prefill}`
 
     // Anthropic ends every message with message_delta(stop_reason) then message_stop.
     if (!sawMessageStop && !stopReason) {
-      throw streamCutError({ provider: 'anthropic', modelId, chars: fullText.length, startTime, why: 'body ended without message_stop or stop_reason' });
+      throw streamCutError({ provider: 'anthropic', modelId, chars: fullText.length, startTime, why: 'body ended without message_stop or stop_reason', usage: anthropicUsage(wireUsage), label: options.usageLabel });
     }
 
     // Always log token usage for debugging, even if 0
@@ -582,10 +623,7 @@ IMPORTANT: Start your response EXACTLY with: ${options.prefill}`
     return {
       text: responseText,
       stop_reason: stopReason,
-      usage: {
-        input_tokens: inputTokens,
-        output_tokens: outputTokens
-      },
+      usage: anthropicUsage(wireUsage),
       modelId,
       ttft: firstChunkTime ? firstChunkTime - startTime : null
     };
@@ -701,7 +739,7 @@ async function callGeminiTextAPIStreaming(prompt, maxTokens, modelId, onChunk, o
             const event = JSON.parse(data);
             const evErr = sseErrorOf(event);
             if (evErr) {
-              const streamErr = streamCutError({ provider: 'gemini', modelId, chars: fullText.length, startTime, why: `SSE error event ${evErr}` });
+              const streamErr = streamCutError({ provider: 'gemini', modelId, chars: fullText.length, startTime, why: `SSE error event ${evErr}`, usage, label: options.usageLabel });
               streamErr.isStreamError = true;
               throw streamErr;
             }
@@ -736,7 +774,7 @@ async function callGeminiTextAPIStreaming(prompt, maxTokens, modelId, onChunk, o
     // The last candidate chunk carries finishReason (STOP, MAX_TOKENS, SAFETY, ...).
     // usageMetadata rides on every chunk, so it proves nothing about completion.
     if (!finishReason && !promptBlocked) {
-      throw streamCutError({ provider: 'gemini', modelId, chars: fullText.length, startTime, why: 'body ended without a finishReason' });
+      throw streamCutError({ provider: 'gemini', modelId, chars: fullText.length, startTime, why: 'body ended without a finishReason', usage, label: options.usageLabel });
     }
 
     // Always log token usage for debugging, even if 0
@@ -1041,7 +1079,7 @@ async function callXaiAPIStreaming(prompt, maxTokens, modelId, onChunk, options 
               const event = JSON.parse(data);
               const evErr = sseErrorOf(event);
               if (evErr) {
-                const streamErr = streamCutError({ provider: 'xai', modelId, chars: fullText.length, startTime, why: `SSE error event ${evErr}` });
+                const streamErr = streamCutError({ provider: 'xai', modelId, chars: fullText.length, startTime, why: `SSE error event ${evErr}`, usage, label: options.usageLabel });
                 streamErr.isStreamError = true;
                 throw streamErr;
               }
@@ -1072,7 +1110,7 @@ async function callXaiAPIStreaming(prompt, maxTokens, modelId, onChunk, options 
 
       // OpenAI-compatible end of stream: [DONE], a finish_reason, or the usage chunk.
       if (!sawDone && !finishReason && !sawUsage) {
-        throw streamCutError({ provider: 'xai', modelId, chars: fullText.length, startTime, why: 'body ended without [DONE], finish_reason or usage' });
+        throw streamCutError({ provider: 'xai', modelId, chars: fullText.length, startTime, why: 'body ended without [DONE], finish_reason or usage', usage, label: options.usageLabel });
       }
 
       log.debug(`📊 [XAI STREAM] Token usage - input: ${usage.input_tokens.toLocaleString()}, output: ${usage.output_tokens.toLocaleString()}, reasoning: ${usage.thinking_tokens.toLocaleString()}, finish_reason=${finishReason || 'none'}`);
@@ -1228,6 +1266,7 @@ async function callOpenRouterAPIStreaming(prompt, maxTokens, modelId, onChunk, o
       let cachedInputTokens = 0;
       let totalTokens = 0;
       let rawUsage = null;
+      let generationId = null;
       let usageEvents = 0;
       let sawDone = false;
       let finishReason = null;  // 'stop' | 'length' (cut at max_tokens) | null when the upstream omits it
@@ -1271,8 +1310,10 @@ async function callOpenRouterAPIStreaming(prompt, maxTokens, modelId, onChunk, o
               // OpenRouter reports an upstream failure mid-stream as an event
               // with a top-level `error` and finish_reason 'error'.
               const evErr = sseErrorOf(event);
+              if (event.id && !generationId) generationId = event.id;
               if (evErr) {
-                const streamErr = streamCutError({ provider: 'openrouter', modelId, chars: fullText.length, startTime, why: `SSE error event ${evErr}` });
+                const known = { input_tokens: inputTokens, output_tokens: outputTokens, thinking_tokens: 0 };
+                const streamErr = streamCutError({ provider: 'openrouter', modelId, chars: fullText.length, startTime, why: `SSE error event ${evErr}`, usage: await openRouterCutUsage(generationId, apiKey, known) || known, label: options.usageLabel });
                 streamErr.isStreamError = true;
                 throw streamErr;
               }
@@ -1316,7 +1357,8 @@ async function callOpenRouterAPIStreaming(prompt, maxTokens, modelId, onChunk, o
       // None of them = the body just ended (the cut that shipped two truncated
       // page-brief replies as successes).
       if (!sawDone && !finishReason && usageEvents === 0) {
-        throw streamCutError({ provider: 'openrouter', modelId, chars: fullText.length, startTime, why: 'body ended without [DONE], finish_reason or usage' });
+        const known = { input_tokens: inputTokens, output_tokens: outputTokens, thinking_tokens: 0 };
+        throw streamCutError({ provider: 'openrouter', modelId, chars: fullText.length, startTime, why: 'body ended without [DONE], finish_reason or usage', usage: await openRouterCutUsage(generationId, apiKey, known) || known, label: options.usageLabel });
       }
 
       // Throughput is the diagnostic: the same model on a different upstream has

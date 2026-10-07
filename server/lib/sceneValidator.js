@@ -29,7 +29,7 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 // forever (stuck-at-51% incident, 2026-07-07). The SDK aborts after this, the
 // error propagates, and callers skip the eval instead of hanging.
 const EVAL_REQUEST_OPTIONS = { timeout: 120000 };
-const { MODEL_DEFAULTS, resolveSceneValidationModel, GROK_VISION_FALLBACK, calculateTextCost } = require('../config/models');
+const { MODEL_DEFAULTS, resolveSceneValidationModel, GROK_VISION_FALLBACK, priceUsage } = require('../config/models');
 const { geminiUsage } = require('./providerUsage');
 const VISION_MODEL = MODEL_DEFAULTS.qualityEval || 'gemini-2.0-flash';
 const COMPARISON_MODEL = MODEL_DEFAULTS.qualityEval || 'gemini-2.0-flash';
@@ -41,8 +41,9 @@ function pricedUsage(usageMetadata, modelId) {
   const usage = geminiUsage(usageMetadata);
   return {
     ...usage,
+    modelId,
     tokens: usage.input_tokens + usage.output_tokens + usage.thinking_tokens,
-    estimatedCost: calculateTextCost(modelId, usage),
+    estimatedCost: priceUsage(modelId, usage),
   };
 }
 

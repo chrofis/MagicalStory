@@ -11,7 +11,7 @@ const router = express.Router();
 const { dbQuery, getPool, isDatabaseMode } = require('../../services/database');
 const { authenticateToken } = require('../../middleware/auth');
 const { log } = require('../../utils/logger');
-const { MODEL_PRICING, MODEL_DEFAULTS, calculateTextCost } = require('../../config/models');
+const { MODEL_PRICING, MODEL_DEFAULTS, priceUsage } = require('../../config/models');
 const { ch, fromPgNaive } = require('../../../scripts/lib/chTime');
 const { getTrialStats, getTrialStatsHistory, getTrialFunnel, getTrialStepFunnel } = require('../trial');
 const { TRIAL_SOURCES } = require('../../lib/trialSource');
@@ -281,7 +281,7 @@ function openrouterStoryCost(bucket) {
   if (!bucket) return 0;
   if (bucket.direct_cost > 0) return bucket.direct_cost;
   if (!(bucket.input_tokens || bucket.output_tokens || bucket.thinking_tokens)) return 0;
-  return calculateTextCost(MODEL_DEFAULTS.evalModel, {
+  return priceUsage(MODEL_DEFAULTS.evalModel, {
     input_tokens: bucket.input_tokens || 0,
     output_tokens: bucket.output_tokens || 0,
     thinking_tokens: bucket.thinking_tokens || 0,
