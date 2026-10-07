@@ -3916,8 +3916,8 @@
       "source": "Emma costumed mermaid sheet; pages 8 and 10. Staging showcase job_1791315635053_t0t8qpebu, stored styledAvatarGeneration and the sheets viewed on the pixels (2026-10-07).",
       "status": "fixed",
       "fixedAt": "2026-10-07",
-      "fixedIn": "9ac820b79",
-      "fix": "TAIL_POSE_RULE (one constant) is stated in the body-row generator and scored by the bodies judge (feet: no for a tail figure upright on its fin). Test: avatar-sheet-consistency-2026-10-07.test.ts."
+      "fixedIn": "b18ebb1b5",
+      "fix": "TAIL_POSE_RULE (one constant, second wording: the figure sits with the tail curved on the ground; the first wording, a prohibition, left Lab 1700 standing on the fin; Lab 1701 sits) is stated in the body-row generator and scored by the bodies judge (feet: no for a tail figure upright on its fin). Test: avatar-sheet-consistency-2026-10-07.test.ts."
     }
   ]
 }
