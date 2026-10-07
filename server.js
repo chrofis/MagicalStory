@@ -7,6 +7,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const compression = require('compression');
+const { cacheControlFor } = require('./server/lib/staticCacheHeaders');
 const helmet = require('helmet');
 
 const bcrypt = require('bcryptjs');
@@ -1459,19 +1460,14 @@ if (authRoutes.initAuthRoutes) {
 }
 
 if (hasDistFolder) {
-  // Serve the built React app from dist/. express.static defaults to
-  // Cache-Control: max-age=0, so every hashed bundle (index-<hash>.js/.css) was
-  // re-downloaded on every visit. Vite content-hashes everything under /assets/,
-  // so those are safe to cache immutably forever; /fonts/ are stable too. HTML
-  // and other unhashed files keep the default (revalidate) so deploys show up.
+  // Serve the built React app from dist/. Cache-Control per path family
+  // (hashed /assets/ immutable, /fonts/ 30 d, /images/ 1 d, HTML revalidates):
+  // server/lib/staticCacheHeaders.js.
   app.use(express.static(distPath, {
     index: false,
     setHeaders: (res, filePath) => {
-      if (filePath.includes(`${path.sep}assets${path.sep}`)) {
-        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-      } else if (filePath.includes(`${path.sep}fonts${path.sep}`)) {
-        res.setHeader('Cache-Control', 'public, max-age=2592000');
-      }
+      const cacheControl = cacheControlFor(filePath);
+      if (cacheControl) res.setHeader('Cache-Control', cacheControl);
     },
   }));
   log.debug('📦 Serving built React app from dist/');
