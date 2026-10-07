@@ -13,7 +13,10 @@ interface Props {
   characterData: CharacterData;
   storyInput: StoryInput;
   generatedIdeas: GeneratedIdea[];
+  /** A fresh pair of ideas from the stream — the parent drops the selection. */
   onIdeasGenerated: (ideas: GeneratedIdea[]) => void;
+  /** The visitor edited one card's text — the parent keeps the selection. */
+  onIdeaEdited: (ideas: GeneratedIdea[]) => void;
   selectedIdeaIndex: number | null;
   onSelectIdea: (index: number) => void;
   onBack: () => void;
@@ -161,6 +164,7 @@ export default function TrialIdeasStep({
   storyInput,
   generatedIdeas,
   onIdeasGenerated,
+  onIdeaEdited,
   selectedIdeaIndex,
   onSelectIdea,
   onBack,
@@ -605,7 +609,9 @@ export default function TrialIdeasStep({
                         const summary = lines.slice(1).join('\n').trim();
                         const updated = [...generatedIdeas];
                         updated[index] = { ...updated[index], title, summary };
-                        onIdeasGenerated(updated);
+                        // Not onIdeasGenerated: that resets the selection, and
+                        // the visitor is editing the card they just picked.
+                        onIdeaEdited(updated);
                       }}
                       onClick={(e) => e.stopPropagation()}
                       className="flex-1 w-full text-sm text-gray-700 leading-relaxed bg-transparent border-0 outline-none resize-none p-0"

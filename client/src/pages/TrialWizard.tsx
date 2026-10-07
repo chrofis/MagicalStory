@@ -452,6 +452,14 @@ export default function TrialWizard() {
     setSelectedIdeaIndex(null);
   }, []);
 
+  // An edit keeps the selection: the ideas step's hint invites a click into the
+  // text of the picked card, and until 2026-10-07 the first keystroke went
+  // through handleIdeasGenerated, cleared selectedIdeaIndex and greyed out
+  // "Create my story" — the visitor had to find and press "Select" again.
+  const handleIdeaEdited = useCallback((ideas: GeneratedIdea[]) => {
+    setGeneratedIdeas(ideas);
+  }, []);
+
   // Wrapped rather than passing setSelectedIdeaIndex straight down: the ideas
   // step selects from two different places, and this keeps the stamp in one.
   const handleSelectIdea = useCallback((index: number) => {
@@ -729,6 +737,7 @@ export default function TrialWizard() {
                 storyInput={storyInput}
                 generatedIdeas={generatedIdeas}
                 onIdeasGenerated={handleIdeasGenerated}
+                onIdeaEdited={handleIdeaEdited}
                 selectedIdeaIndex={selectedIdeaIndex}
                 onSelectIdea={handleSelectIdea}
                 onBack={goBack}
