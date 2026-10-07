@@ -107,6 +107,14 @@ describe('runVisualBibleLabelRound', () => {
     expect(vb.artifacts[0].label).not.toBe(vb.artifacts[1].label);
   });
 
+  it('names the story language in the prompt, so "no word from the story language" is decidable', async () => {
+    stubModel(() => ({ text: JSON.stringify({ labels: [{ id: 'ART001', label: 'steel chisel' }, { id: 'ART002', label: 'wooden mallet' }] }) }));
+    await runVisualBibleLabelRound(faulty(), { model: 'm', language: 'de-de', gl, log: logger });
+    expect(calls.length).toBe(1);
+    expect(calls[0]).toContain('The story language is German (Standard).');
+    expect(calls[0]).not.toContain('{STORY_LANGUAGE}');
+  });
+
   it('treats a truncated reply as a failed round', async () => {
     stubModel(() => ({ text: '{"labels":[{"id":"ART001","lab', truncation: { suspected: true, reason: 'max_tokens' } }));
     const vb = faulty();

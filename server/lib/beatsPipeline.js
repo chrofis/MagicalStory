@@ -439,10 +439,12 @@ async function runVisualBibleLabelRound(visualBible, { model, language, gl, log:
       type: e.type ?? null,
       description: e.extractedDescription || e.description || null,
     }));
+    // The rule "no word from the story language" needs the language NAMED —
+    // the English name, as every other writer prompt states it.
     const prompt = fillTemplate(template, {
       LABEL_FINDINGS: block,
       LABEL_ENTRIES: JSON.stringify(entries, null, 2),
-      STORY_LANGUAGE: language || '',
+      STORY_LANGUAGE: require('./languages').getLanguageNameEnglish(language),
     });
 
     // maxTokens null = the model's own maximum (owner rule: no output caps).

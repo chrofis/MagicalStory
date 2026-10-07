@@ -8,6 +8,8 @@ A label is the only handle the illustration prompt has on an element. Each eleme
 - not the element's proper name
 - no word from the story language, no element id
 
+The story language is {STORY_LANGUAGE}.
+
 # FAULTS
 
 {LABEL_FINDINGS}
