@@ -955,6 +955,13 @@ async function sendPasswordResetEmail(userEmail, userName, resetUrl, language = 
 /**
  * Send admin alert for story generation failure
  */
+/** Error text comes from provider responses and stack traces: never raw into HTML. */
+function escapeHtml(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 async function sendAdminStoryFailureAlert(jobId, userId, userName, userEmail, errorMessage) {
   if (!resend) {
     console.log('📧 Email not configured - skipping admin alert');
@@ -979,7 +986,7 @@ async function sendAdminStoryFailureAlert(jobId, userId, userName, userEmail, er
           </div>
 
           <h3>Error Message:</h3>
-          <pre style="background: #1f2937; color: #f3f4f6; padding: 15px; border-radius: 8px; overflow-x: auto; white-space: pre-wrap;">${errorMessage}</pre>
+          <pre style="background: #1f2937; color: #f3f4f6; padding: 15px; border-radius: 8px; overflow-x: auto; white-space: pre-wrap;">${escapeHtml(errorMessage)}</pre>
 
           <p>
             <a href="https://magicalstory.ch/admin"
@@ -1036,7 +1043,7 @@ async function sendAdminOrderFailureAlert(sessionId, customerEmail, customerName
           </ul>
 
           <h3>Error:</h3>
-          <pre style="background: #1f2937; color: #f3f4f6; padding: 15px; border-radius: 8px; overflow-x: auto; white-space: pre-wrap;">${errorMessage}</pre>
+          <pre style="background: #1f2937; color: #f3f4f6; padding: 15px; border-radius: 8px; overflow-x: auto; white-space: pre-wrap;">${escapeHtml(errorMessage)}</pre>
 
           <h3>Action Required:</h3>
           <ol>
@@ -1421,6 +1428,7 @@ module.exports = {
   sendPasswordResetEmail,
   // Admin emails
   sendAdminStoryFailureAlert,
+  escapeHtml,
   sendAdminOrderFailureAlert,
   sendAdminDailySummary,
   sendAdminWeeklyCostReport,

@@ -67195,3 +67195,32 @@ Touched: migrations/045_users_marketing_opt_out.sql, server/lib/unsubscribeToken
 **Not done (owner calls, flagged by the review, left untouched):** deleting checkpoints of failed/cancelled jobs after 24 h contradicts the 2026-08-23 owner decision in `cleanupOldCompletedJobs` ("NEVER auto-deleted … forensic record") — needs explicit sign-off; dropping the `OR result_data->>'storyId' = $1` branch in `storyMetrics.collectStoryMetrics` needs the storyId === jobId proof across every save path, not verified in this session.
 **Touched:** `server/routes/jobs.js`, `migrations/046_token_and_job_sweep_indexes.sql`, `tests/unit/job-status-known-pages-sql.test.ts`.
 **Status:** ✅ active
+
+## 2026-10-07 — Process-level guards: unhandled rejections are logged and alerted, uncaught exceptions exit; sweep-failed jobs still need customer mail
+
+**Context**: an observability review found no `process.on` handler anywhere in `server.js`,
+`storyJobPipeline.js` or `server/`. Node ≥ 20 terminates on an unhandled promise rejection, so
+one stray `.then()` without a catch killed the container — and every in-flight paid story — with
+no log line, no `failure_log` row and no admin mail. Separately, the admin failure alert
+interpolated provider error text straight into HTML (two `<pre>` sites in `email.js`).
+
+**Decision**: `server/lib/processGuards.js`, installed once in `server.js` before `app.listen`.
+`unhandledRejection` → `log.error` with stack + `recordFailure` + admin alert, deduped by message
+for 10 min and capped at 20 mails/hour so a loop cannot spam; the process keeps running.
+`uncaughtException` → same, then `process.exit(1)` within 3 s: Node documents application state
+as undefined after an uncaught exception, Railway restarts the container, and the boot zombie
+cleanup settles the orphaned jobs. **No SIGTERM handler** that touches job state — it could race
+the pre-push deploy flow and boot zombie cleanup; that stays an owner decision.
+Error text in the admin alert HTML is now `escapeHtml`'d (both the story-failure and the
+post-payment-failure alert).
+
+**Still open (not shipped in this entry)**: the five watchdog / stale-sweep / boot-zombie sites
+(`server/routes/jobs.js` ~355, ~612, ~826; `server.js` sweepStaleJobs ~2369, ~2612) call
+`settleJobWithRefund(... 'failed')` but never send `sendStoryFailedEmail` /
+`sendAdminStoryFailureAlert` — only the in-process catch in `storyJobPipeline.js` does.
+Customers are refunded silently. Planned shape: one `failJobAndNotify(pool, jobId, errorMessage,
+{reason})` helper that settles, then mails exactly once per job keyed on the settle's `changed`
+result, mirroring the in-process language ladder (`inputData.language` → profile → English).
+
+**Touched files**: `server/lib/processGuards.js`, `server.js`, `email.js`,
+`tests/unit/process-guards.test.ts`.

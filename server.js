@@ -2532,6 +2532,14 @@ initialize().then(() => {
   // without waiting for the first image-save call.
   require('./server/lib/r2').isConfigured();
 
+  // Process-level guards: an unhandled rejection used to kill the container
+  // silently (Node >= 20), taking every in-flight paid story with it.
+  require('./server/lib/processGuards').installProcessGuards({
+    log,
+    recordFailure: require('./server/lib/failureLog').recordFailure,
+    sendAdminAlert: email.sendAdminStoryFailureAlert,
+  });
+
   const server = app.listen(PORT, () => {
     log.info(`🚀 MagicalStory Server Running`);
     log.info(`📍 URL: http://localhost:${PORT}`);
