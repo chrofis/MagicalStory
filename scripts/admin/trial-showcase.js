@@ -110,10 +110,12 @@ function parseIdea(text) {
 // POST /api/trial/generate-ideas-stream and return the two final cards.
 // SSE: each `data:` line is a JSON frame; story1/story2 carry the growing text
 // and the last one for each is flagged isFinal. Mirrors the client's reader.
-async function generateIdeas(base, entry) {
+async function generateIdeas(base, entry, sessionToken) {
+  // The route sits behind verifySessionToken (spend limits, 2026-10-04): send the
+  // trial session like the wizard does, or it answers 401 TRIAL_SESSION_EXPIRED.
   const res = await fetch(`${base}/api/trial/generate-ideas-stream`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sessionToken}` },
     body: JSON.stringify({
       storyCategory: entry.storyCategory,
       storyTopic: entry.storyTopic || '',
@@ -322,7 +324,7 @@ function faceDataUri(entry) {
   let storyDetails = presetDetails;
   let ideaKind = null;
   if (!storyDetails) {
-    const ideas = await generateIdeas(args.base, entry);
+    const ideas = await generateIdeas(args.base, entry, acct.sessionToken);
     const idx = pickIdeaIndex(args.idea);
     const idea = ideas[idx];
     // Byte-for-byte the client's shape (TrialWizard.tsx handleCreate).
