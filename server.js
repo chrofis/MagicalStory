@@ -89,7 +89,7 @@ const email = require('./email');
 const { initializePool: initModularPool, logActivity, isDatabaseMode, saveStoryData, upsertStory, saveStoryImage, getStoryImage, setActiveVersion, rehydrateStoryImages } = require('./server/services/database');
 const { validateBody, schemas, sanitizeString, sanitizeInteger } = require('./server/middleware/validation');
 const { authenticateToken } = require('./server/middleware/auth');
-const { authLimiter, registerLimiter, apiLimiter, aiProxyLimiter, storyGenerationLimiter, imageRegenerationLimiter } = require('./server/middleware/rateLimit');
+const { authLimiter, registerLimiter, apiLimiter, aiProxyLimiter, storyGenerationLimiter, imageRegenerationLimiter, landmarkDiscoverLimiter } = require('./server/middleware/rateLimit');
 const { PROMPT_TEMPLATES, loadPromptTemplates, fillTemplate, buildEmptyScenePrompt } = require('./server/services/prompts');
 const { generatePrintPdf, generateViewPdf, generateCombinedBookPdf } = require('./server/lib/pdf');
 const { processBookOrder, resolveBookOrderInputs, sweepStuckBookOrders, getCoverDimensions } = require('./server/lib/gelato');
@@ -2257,7 +2257,7 @@ async function writeJSON(filePath, data) {
 
 // Trigger landmark discovery early (called when user enters wizard or gets location)
 // This runs in background so landmarks are ready when story generation starts
-app.post('/api/landmarks/discover', async (req, res) => {
+app.post('/api/landmarks/discover', landmarkDiscoverLimiter, async (req, res) => {
   try {
     const { city, country } = req.body;
 

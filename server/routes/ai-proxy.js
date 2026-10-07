@@ -7,8 +7,15 @@
 
 const express = require('express');
 const router = express.Router();
-const { authenticateToken } = require('../middleware/auth');
+const { authenticateToken, requireAdmin } = require('../middleware/auth');
 const { aiProxyLimiter } = require('../middleware/rateLimit');
+
+// Admin only (security review 2026-10-07): both routes forward the client's raw
+// prompt / max_tokens / contents to Sonnet and Gemini (incl. the image models)
+// and charge NO credits. No client code calls them (storyService.callClaude /
+// callGemini have no caller), so any signed-in account could burn paid calls at
+// the limiter's 60/min with nothing deducted. The role is read fresh from the DB
+// by verifySession, so a demoted admin loses this immediately.
 const { log } = require('../utils/logger');
 const { logActivity } = require('../services/database');
 const fs = require('fs').promises;
@@ -36,7 +43,7 @@ async function readJSON(filepath) {
  * POST /api/claude
  * Proxy endpoint for Claude/Anthropic API
  */
-router.post('/claude', aiProxyLimiter, authenticateToken, async (req, res) => {
+router.post('/claude', aiProxyLimiter, authenticateToken, requireAdmin, async (req, res) => {
   log.debug('📖 === CLAUDE/ANTHROPIC ENDPOINT CALLED ===');
   log.debug(`  User: ${req.user?.username || 'unknown'}`);
   log.debug(`  Time: ${new Date().toISOString()}`);
@@ -114,7 +121,7 @@ router.post('/claude', aiProxyLimiter, authenticateToken, async (req, res) => {
  * POST /api/gemini
  * Proxy endpoint for Gemini API
  */
-router.post('/gemini', aiProxyLimiter, authenticateToken, async (req, res) => {
+router.post('/gemini', aiProxyLimiter, authenticateToken, requireAdmin, async (req, res) => {
   log.debug('🎨 === GEMINI ENDPOINT CALLED ===');
   log.debug(`  User: ${req.user?.username || 'unknown'}`);
   log.debug(`  Time: ${new Date().toISOString()}`);

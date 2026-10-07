@@ -175,6 +175,21 @@ const ideaLandmarksPrepareLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// POST /api/landmarks/discover (security review 2026-10-07): unauthenticated by
+// design (the trial wizard fires it before any session exists), and one call for
+// a city not yet in landmark_index runs geocode + Wikipedia + up to 30 photo
+// fetches + one gemini-2.5-flash vision call PER landmark, in the background.
+// The global 100/min/IP apiLimiter allowed ~3000 paid vision calls a minute from
+// one address by cycling real city names. A visitor legitimately sends one or two
+// (wizard mount, location change), so 10/h/IP is generous. Its OWN store.
+const landmarkDiscoverLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 10,
+  message: { error: 'Too many requests. Please slow down.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 /** Reset trial-related stores from this module */
 function resetTrialMiddlewareStores() {
   trialAvatarStore.resetAll();
@@ -195,6 +210,7 @@ module.exports = {
   storyIdeasLimiter,
   avatarGenerationLimiter,
   ideaLandmarksPrepareLimiter,
+  landmarkDiscoverLimiter,
   resetTrialMiddlewareStores,
   _peekAdminFromToken,
 };
