@@ -1498,6 +1498,7 @@ app.get('/api/swiss-stories', (req, res) => {
   }
 });
 app.use('/api/trial', express.json({ limit: '50mb' }), trialRoutes);  // Anonymous trial story flow
+app.use('/api/email', require('./server/routes/email'));  // /api/email/unsubscribe/:token — opt-out from promotional mail
 app.use('/api', sharingApiRoutes);  // /api/shared/* (public story data, images, OG image)
 app.use('/', sharingHtmlRoutes);  // /s/:shareToken, /shared/:shareToken (HTML)
 

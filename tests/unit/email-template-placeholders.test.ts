@@ -30,7 +30,7 @@ const SENDER_VALUES: Record<string, Record<string, string>> = {
   'story-complete': { greeting, title: 'Der Drache', storyUrl: 'https://www.magicalstory.ch/shared/t', claimUrl: '', coverUrl: 'https://r2/c.jpg', credits: '10' },
   'trial-story-complete': { greeting, title: 'Der Drache', storyUrl: 'https://www.magicalstory.ch/shared/t', claimUrl: 'https://magicalstory.ch/claim/x', coverUrl: 'https://r2/c.jpg', credits: '10' },
   'story-failed': { greeting },
-  'trial-reminder': { greeting, claimUrl: 'https://magicalstory.ch/claim/x', subject: 'S', headline: 'Deine 10 Gratis-Credits warten noch.', body: 'B', ctaLabel: 'C', perksIntro: 'P', credits: '10', daysLeft: '3' },
+  'trial-reminder': { greeting, claimUrl: 'https://magicalstory.ch/claim/x', subject: 'S', headline: 'Deine 10 Gratis-Credits warten noch.', body: 'B', ctaLabel: 'C', perksIntro: 'P', credits: '10', daysLeft: '3', unsubscribeUrl: 'https://magicalstory.ch/api/email/unsubscribe/dTE.ab' },
   'order-confirmation': { greeting, orderId: 'ABCD1234', amount: '49.00', currency: 'CHF', addressLine1: 'Weg 1', city: 'Baden', postalCode: '5400', country: 'CH', deliveryEstimate: '5–7 Werktage', coverUrl: 'https://r2/c.jpg' },
   'order-shipped': { greeting, orderId: 'ABCD1234', trackingNumber: 'TN1', trackingUrl: 'https://track/x', coverUrl: 'https://r2/c.jpg' },
   'order-failed': { greeting },

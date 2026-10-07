@@ -7,6 +7,7 @@ const { CREDIT_CONFIG } = require('./server/config/credits');
 // Every send goes through sendTracked so it lands in email_sends and carries
 // the tags the Resend webhook correlates on — see server/lib/emailSends.js.
 const { sendTracked } = require('./server/lib/emailSends');
+const { buildUnsubscribeUrl } = require('./server/lib/unsubscribeToken');
 
 // Initialize Resend client
 const resend = process.env.RESEND_API_KEY
@@ -451,6 +452,7 @@ const TRIAL_REMINDER_COPY = {
  * @param {string} claimUrl - Already-built /claim/<token> URL
  * @param {string} language - English | German | French | Italian (case-insensitive, prefix-tolerant)
  * @param {object} options
+ * @param {string} options.userId - REQUIRED: signs the per-user unsubscribe link
  * @param {('day5'|'day25')} options.reminderType - which reminder this is
  * @param {number} [options.daysLeft] - required for day25 (days until token expiry)
  * @param {Buffer} [options.pdfBuffer] - optional PDF attachment (we deliberately
@@ -466,6 +468,16 @@ async function sendTrialReminderEmail(userEmail, firstName, claimUrl, language =
     console.error('❌ [EMAIL] Invalid trial-reminder recipient:', userEmail);
     return null;
   }
+  // The reminder is promotional mail and MUST carry a working opt-out (Swiss
+  // UWG Art. 3 lit. o): a signed per-user link in the footer plus the
+  // List-Unsubscribe headers mail clients surface as a button. No user id
+  // means no link can be signed, so no mail goes out — said loudly, not
+  // quietly sent without.
+  if (!options.userId) {
+    console.error('❌ [EMAIL] trial reminder needs options.userId to sign the unsubscribe link; not sent to', userEmail);
+    return null;
+  }
+  const unsubscribeUrl = buildUnsubscribeUrl(options.userId);
 
   const reminderType = options.reminderType || 'day5';
   if (!TRIAL_REMINDER_COPY[reminderType]) {
@@ -502,6 +514,7 @@ async function sendTrialReminderEmail(userEmail, firstName, claimUrl, language =
     perksIntro: copy.perksIntro,
     credits,
     daysLeft,
+    unsubscribeUrl,
   };
 
   try {
@@ -512,6 +525,12 @@ async function sendTrialReminderEmail(userEmail, firstName, claimUrl, language =
       subject: fillTemplate(template.subject, values),
       text: fillTemplate(template.text, values),
       html: fillTemplate(template.html, values),
+      // RFC 2369 + RFC 8058: Gmail/Apple Mail show an "Unsubscribe" control
+      // and POST to the URL without opening a page.
+      headers: {
+        'List-Unsubscribe': `<${unsubscribeUrl}>`,
+        'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+      },
     };
 
     if (options.pdfBuffer) {
@@ -521,7 +540,7 @@ async function sendTrialReminderEmail(userEmail, firstName, claimUrl, language =
       }];
     }
 
-    const { data, error } = await sendTracked(resend, 'trial-reminder', emailPayload, { storyId: options.storyId, language, detail: { reminderType } });
+    const { data, error } = await sendTracked(resend, 'trial-reminder', emailPayload, { storyId: options.storyId, userId: options.userId, language, detail: { reminderType } });
 
     if (error) {
       console.error('❌ Failed to send trial reminder email:', error);
@@ -1371,6 +1390,7 @@ module.exports = {
   // way a send does and prove no placeholder is left unfilled.
   getTemplateSection,
   fillTemplate,
+  normalizeLanguage,
   // Customer emails
   sendStoryCompleteEmail,
   sendStoryFailedEmail,

@@ -13,6 +13,7 @@ const stubbedEmail = {
   sentEmails: [],
   async sendTrialReminderEmail(userEmail, firstName, claimUrl, language, options) {
     this.sentEmails.push({ userEmail, firstName, claimUrl, language, options });
+    if (!options.userId) throw new Error('sendTrialReminderEmail: options.userId is required to sign the unsubscribe link');
     return { id: `stub-${this.sentEmails.length}` };
   },
 };

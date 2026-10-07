@@ -16,7 +16,7 @@ const ROOT = path.resolve(__dirname, '..', '..');
 
 // Stub email.js before the sweep requires it (CommonJS require cache; the same
 // approach as tests/manual/test-trial-reminders.js).
-const sent: Array<{ userEmail: string; reminderType: string }> = [];
+const sent: Array<{ userEmail: string; reminderType: string; userId?: string }> = [];
 let sendResult: (() => unknown) = () => ({ id: 'stub' });
 const emailPath = path.join(ROOT, 'email.js');
 require.cache[emailPath] = {
@@ -24,8 +24,8 @@ require.cache[emailPath] = {
   exports: {
     isEmailConfigured: () => true,
     resolveGreetingName: () => 'Anna',
-    async sendTrialReminderEmail(userEmail: string, _n: string, _u: string, _l: string, options: { reminderType: string }) {
-      sent.push({ userEmail, reminderType: options.reminderType });
+    async sendTrialReminderEmail(userEmail: string, _n: string, _u: string, _l: string, options: { reminderType: string; userId?: string }) {
+      sent.push({ userEmail, reminderType: options.reminderType, userId: options.userId });
       return sendResult();
     },
   },
@@ -44,14 +44,17 @@ const ROW = {
 // returns the row while it is unstamped, the claim UPDATE stamps it only when
 // it is still NULL, and the release UPDATE clears it.
 function makePool() {
-  const state = { stamped5: false, stamped25: false, releaseFails: false };
+  const state = { stamped5: false, stamped25: false, releaseFails: false, optedOut: false };
   const pool = {
     state,
     async query(sql: string, params: unknown[]) {
       if (/FROM users/.test(sql) && /trial_reminder_5d_sent_at IS NULL/.test(sql)) {
-        return { rows: state.stamped5 ? [] : [ROW] };
+        // The opt-out gate is part of the SELECT, not a JS filter after it.
+        expect(sql).toMatch(/marketing_opt_out_at IS NULL/);
+        return { rows: state.stamped5 || state.optedOut ? [] : [ROW] };
       }
       if (/FROM users/.test(sql) && /trial_reminder_25d_sent_at IS NULL/.test(sql)) {
+        expect(sql).toMatch(/marketing_opt_out_at IS NULL/);
         return { rows: [] };
       }
       if (/FROM stories/.test(sql)) return { rows: [] };
@@ -87,10 +90,26 @@ describe('trial-reminder sweep claims a row before mailing it', () => {
       runTrialReminderSweep(pool, quiet),
       runTrialReminderSweep(pool, quiet),
     ]);
-    expect(sent).toEqual([{ userEmail: 'a@example.com', reminderType: 'day5' }]);
+    expect(sent).toEqual([{ userEmail: 'a@example.com', reminderType: 'day5', userId: 'u1' }]);
     expect(a.sent.day5 + b.sent.day5).toBe(1);
     expect(a.errors + b.errors).toBe(0);
     expect(pool.state.stamped5).toBe(true);
+  });
+
+  it('hands the sender the user id, so the mail can sign its unsubscribe link', async () => {
+    const pool = makePool();
+    await runTrialReminderSweep(pool, quiet);
+    expect(sent).toEqual([{ userEmail: 'a@example.com', reminderType: 'day5', userId: 'u1' }]);
+  });
+
+  it('an opted-out row (marketing_opt_out_at set) is never mailed or claimed', async () => {
+    const pool = makePool();
+    pool.state.optedOut = true;
+    const result = await runTrialReminderSweep(pool, quiet);
+    expect(sent).toEqual([]);
+    expect(result.sent).toEqual({ day5: 0, day25: 0 });
+    expect(result.errors).toBe(0);
+    expect(pool.state.stamped5).toBe(false);
   });
 
   it('a second sweep after a successful one sends nothing', async () => {

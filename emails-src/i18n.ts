@@ -258,9 +258,14 @@ export const trialStoryComplete: Record<Lang, {
 // computed in email.js per send (day-5 vs day-25). The template only owns the
 // static intro greeting + the perks bullet list + signoff per language.
 // Placeholders: {greeting}, {claimUrl}, {subject}, {headline}, {body},
-// {ctaLabel}, {perksIntro}, {credits}, {daysLeft}.
+// {ctaLabel}, {perksIntro}, {credits}, {daysLeft}, {unsubscribeUrl}.
+//
+// The reminder is promotional mail (Swiss UWG Art. 3 lit. o), so it is the ONE
+// template with an unsubscribe line: `unsubscribeNote` is the sentence before
+// the link, `unsubscribe` the link text. Transactional templates carry none.
 export const trialReminder: Record<Lang, {
   preview: string; greeting: string; perks: string[]; signoff: string;
+  unsubscribeNote: string; unsubscribe: string;
 }> = {
   en: {
     preview: 'Your free credits are still waiting — claim your account to keep them.',
@@ -273,6 +278,8 @@ export const trialReminder: Record<Lang, {
       'Available as a printed book',
     ],
     signoff: 'Thank you for trying Magical Story!',
+    unsubscribeNote: 'You receive this reminder because you tried Magical Story. No more reminders?',
+    unsubscribe: 'Unsubscribe',
   },
   de: {
     preview: 'Deine Gratis-Credits warten noch — aktiviere dein Konto, um sie zu sichern.',
@@ -285,6 +292,8 @@ export const trialReminder: Record<Lang, {
       'Bestellbar als gedrucktes Buch',
     ],
     signoff: 'Vielen Dank, dass du Magical Story ausprobiert hast!',
+    unsubscribeNote: 'Du erhältst diese Erinnerung, weil du Magical Story ausprobiert hast. Keine weiteren Erinnerungen?',
+    unsubscribe: 'Abmelden',
   },
   fr: {
     preview: 'Vos crédits gratuits vous attendent toujours — activez votre compte pour les conserver.',
@@ -297,6 +306,8 @@ export const trialReminder: Record<Lang, {
       'Disponible en livre imprimé',
     ],
     signoff: "Merci d'avoir essayé Magical Story !",
+    unsubscribeNote: 'Vous recevez ce rappel parce que vous avez essayé Magical Story. Plus de rappels ?',
+    unsubscribe: 'Se désabonner',
   },
   it: {
     preview: 'I tuoi crediti gratuiti ti aspettano ancora — attiva il tuo account per conservarli.',
@@ -309,6 +320,8 @@ export const trialReminder: Record<Lang, {
       'Disponibile come libro stampato',
     ],
     signoff: 'Grazie per aver provato Magical Story!',
+    unsubscribeNote: 'Ricevi questo promemoria perché hai provato Magical Story. Non vuoi più promemoria?',
+    unsubscribe: 'Disiscriviti',
   },
 };
 

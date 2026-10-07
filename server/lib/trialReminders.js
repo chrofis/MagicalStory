@@ -11,6 +11,11 @@
 // trial_reminder_5d_sent_at / trial_reminder_25d_sent_at are the dedupe key.
 // Migration 004 adds them.
 //
+// The reminders are promotional mail, so every one carries a signed unsubscribe
+// link (server/lib/unsubscribeToken.js, GET|POST /api/email/unsubscribe/:token)
+// that stamps users.marketing_opt_out_at (migration 045); both SELECTs below
+// skip a stamped row. Transactional mail is not gated on that column.
+//
 // We deliberately skip attaching the trial PDF on reminders: the user already
 // has the original story-complete email with the PDF; resending it doubles
 // Resend bandwidth, costs us PDF re-generation compute, and doesn't move the
@@ -83,6 +88,7 @@ async function sendOne(dbPool, log, row, reminderType) {
   try {
     const storyTitle = await fetchLatestStoryTitle(dbPool, row.id);
     result = await email.sendTrialReminderEmail(row.email, firstName, claimUrl, language, {
+      userId: row.id, // signs the unsubscribe link in the footer
       reminderType,
       daysLeft,
       storyTitle,
@@ -131,6 +137,7 @@ async function runTrialReminderSweep(dbPool, log = console) {
           AND claim_token_expires > NOW()
           AND created_at < NOW() - INTERVAL '5 days'
           AND trial_reminder_5d_sent_at IS NULL
+          AND marketing_opt_out_at IS NULL
         ORDER BY created_at ASC
         LIMIT $1`,
       [PER_SWEEP_CAP]
@@ -161,6 +168,7 @@ async function runTrialReminderSweep(dbPool, log = console) {
           AND claim_token_expires > NOW()
           AND claim_token_expires < NOW() + INTERVAL '5 days'
           AND trial_reminder_25d_sent_at IS NULL
+          AND marketing_opt_out_at IS NULL
         ORDER BY claim_token_expires ASC
         LIMIT $1`,
       [PER_SWEEP_CAP]
