@@ -3670,7 +3670,7 @@
       "rootCause": "buildSceneDescriptionPrompt (server/lib/promptBuilders.js) rendered prev.characterClothing as a name->category map, a key no caller ever sets, and fell through to interpolating prev.clothing as a string. Every caller (images.js iteratePageCore, routes/regeneration.js, scripts/test-models.js) sets `clothing: pageClothing[prevPage]`, which the unified pipeline stores as a per-character map {Name: category}.",
       "status": "fixed",
       "fixedAt": "2026-10-07",
-      "fixedIn": "pending",
+      "fixedIn": "f506189f5",
       "fix": "formatPreviousPageClothing in promptBuilders.js renders the map as 'Name: category, Name2: category', keeps a category string as-is, and throws on any other shape; the dead characterClothing branch is deleted. Fixed at the single consumer so all callers are covered. Test: tests/unit/previous-scenes-clothing.test.ts."
     }
   ]
