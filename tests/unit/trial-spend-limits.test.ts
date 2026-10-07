@@ -124,6 +124,8 @@ describe('T1: stored trial text is capped', () => {
   it('create-story rejects an oversized storyDetails', async () => {
     const handler = route('post', '/create-story').pop();
     const res = mockRes();
+    // An unspent trial account: the resume check (existingTrialJobResponse) runs before validation.
+    poolQuery = async (sql: string) => (/SELECT stories_generated FROM users/.test(sql) ? { rows: [{ stories_generated: 0 }] } : { rows: [] });
     await handler({ sessionUser: { userId: 'u' }, body: { storyCategory: 'adventure', storyDetails: 'x'.repeat(4001) } }, res);
     expect(res.code).toBe(400);
   });

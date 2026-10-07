@@ -35,6 +35,8 @@ function fakePool(state: { generated: number; characterRow: any[] }) {
         return { rows: [{ id: 'u1' }] };
       }
       if (/SELECT id FROM users WHERE id = \$1 AND is_trial = true/.test(sql)) return { rows: [{ id: 'u1' }] };
+      // The resume check (existingTrialJobResponse) reads the slot before any input is validated.
+      if (/SELECT stories_generated FROM users WHERE id = \$1 AND is_trial = true/.test(sql)) return { rows: [{ stories_generated: state.generated }] };
       if (/FROM story_jobs/.test(sql)) return { rows: [] };
       if (/FROM characters/.test(sql)) return { rows: state.characterRow };
       throw new Error(`unexpected query in test: ${sql.slice(0, 60)}`);

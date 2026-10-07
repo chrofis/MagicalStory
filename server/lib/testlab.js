@@ -5852,12 +5852,27 @@ function labSceneExpansionOptions(ctx, storyData, extra = {}) {
 }
 
 /** Re-run the Art Director expansion for one page (scene-expansion.txt). */
+/**
+ * The scene_expansion family authors its brief the way the run did: on the
+ * run's brief model (`replayInputs.modelOverrides.sceneDescriptionModel`, else
+ * MODEL_DEFAULTS.sceneDescription — as beatsPipeline expandOnePage does), read
+ * through the same resolver the beats replays use. A story stored before
+ * replayInputs replays on the default model, never on a top-level record.
+ */
+async function labSceneExpansionStory(ctx) {
+  const { MODEL_DEFAULTS } = require('../config/models');
+  const { storyData } = await loadStoryDataFull(ctx.storyId, { rehydrate: false });
+  const replay = resolveReplayInputData(storyData);
+  const sceneModel = replay.modelOverrides.sceneDescriptionModel || MODEL_DEFAULTS.sceneDescription;
+  return { storyData, sceneModel };
+}
+
 async function runSceneExpansionStage(ctx, { experimentId, promptOverride, params = {} }) {
   const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../services/prompts');
   await loadPromptTemplates();
   const { buildSceneExpansionPrompt, buildAvailableAvatarsForPrompt } = require('./storyHelpers');
   const { callTextModel } = require('./textModels');
-  const { storyData } = await loadStoryDataFull(ctx.storyId, { rehydrate: false });
+  const { storyData, sceneModel } = await labSceneExpansionStory(ctx);
 
   const characters = (storyData.characters || []).filter(c =>
     (ctx.scene.sceneCharacters || []).some(sc => (sc.name || sc) === c.name)
@@ -5886,7 +5901,7 @@ async function runSceneExpansionStage(ctx, { experimentId, promptOverride, param
   }
 
   const t0 = Date.now();
-  const result = await callTextModel(prompt, null, null, { usageLabel: 'testlab_scene_expansion' });
+  const result = await callTextModel(prompt, null, sceneModel, { usageLabel: 'testlab_scene_expansion' });
   const elapsedMs = Date.now() - t0;
   return {
     elapsedMs, modelId: result.modelId || null, promptUsed: prompt,
@@ -5919,7 +5934,7 @@ async function runSceneExpansionAbStage(ctx, { experimentId, promptOverride, par
   await loadPromptTemplates();
   const { buildSceneExpansionPrompt, buildAvailableAvatarsForPrompt } = require('./storyHelpers');
   const { callTextModel } = require('./textModels');
-  const { storyData } = await loadStoryDataFull(ctx.storyId, { rehydrate: false });
+  const { storyData, sceneModel } = await labSceneExpansionStory(ctx);
 
   const characters = (storyData.characters || []).filter(c =>
     (ctx.scene.sceneCharacters || []).some(sc => (sc.name || sc) === c.name)
@@ -5956,8 +5971,8 @@ async function runSceneExpansionAbStage(ctx, { experimentId, promptOverride, par
 
   const t0 = Date.now();
   const [resA, resB] = await Promise.all([
-    callTextModel(promptA, null, null, { usageLabel: 'testlab_scene_expansion_ab' }),
-    callTextModel(promptB, null, null, { usageLabel: 'testlab_scene_expansion_ab' }),
+    callTextModel(promptA, null, sceneModel, { usageLabel: 'testlab_scene_expansion_ab' }),
+    callTextModel(promptB, null, sceneModel, { usageLabel: 'testlab_scene_expansion_ab' }),
   ]);
 
   // Render each variant's scene description through the standard image stage
@@ -6022,7 +6037,7 @@ async function runSceneVariantStage(ctx, { experimentId, promptOverride, params 
   await loadPromptTemplates();
   const { buildSceneExpansionPrompt, buildAvailableAvatarsForPrompt } = require('./storyHelpers');
   const { callTextModel } = require('./textModels');
-  const { storyData } = await loadStoryDataFull(ctx.storyId, { rehydrate: false });
+  const { storyData, sceneModel } = await labSceneExpansionStory(ctx);
 
   const characters = (storyData.characters || []).filter(c =>
     (ctx.scene.sceneCharacters || []).some(sc => (sc.name || sc) === c.name)
@@ -6059,7 +6074,7 @@ async function runSceneVariantStage(ctx, { experimentId, promptOverride, params 
   }
 
   const t0 = Date.now();
-  const res = await callTextModel(prompt, null, null, { usageLabel: 'testlab_scene_variant' });
+  const res = await callTextModel(prompt, null, sceneModel, { usageLabel: 'testlab_scene_variant' });
   // The text arm survives a failed render (same as scene_expansion_ab above):
   // the run loop merges err.partialResult into the failed entry.
   const textArm = {

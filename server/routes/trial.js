@@ -1669,7 +1669,7 @@ router.post('/create-story', verifySessionToken, async (req, res) => {
     const { storyCategory, storyTopic, storyTheme, storyDetails, language, userLocation, ideaKind } = req.body;
 
     const { getPool } = require('../services/database');
-    const pool = getPool();
+    pool = getPool();
 
     // A spent trial resumes its job before any input is looked at: the resume
     // request carries no topic (see existingTrialJobResponse).
@@ -1685,11 +1685,6 @@ router.post('/create-story', verifySessionToken, async (req, res) => {
       ['storyDetails', storyDetails, guards.IDEA_TEXT_MAX_CHARS], ['language', language, 20], ['ideaKind', ideaKind, 20],
     ]) || guards.locationError(userLocation);
     if (inputErr) return res.status(400).json({ error: inputErr });
-
-
-
-    const { getPool } = require('../services/database');
-    pool = getPool();
 
     // Atomic check-and-increment to prevent race condition (two simultaneous requests).
     // Hard cap: ONE trial story per user, no environment exceptions. To

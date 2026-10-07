@@ -76,11 +76,11 @@ describe('book prices follow the production pricing tiers (owner decision 2026-1
     }
     expect(offenders).toEqual([]);
   });
-  it('Pricing.tsx fallback tiers equal the tiers seeded into pricing_tiers', () => {
+  it('the client fallback tiers (utils/bookPricing.ts) equal the tiers seeded into pricing_tiers', () => {
     const parse = (s: string, re: RegExp) =>
       [...s.matchAll(re)].map((m) => [Number(m[1]), Number(m[2]), Number(m[3])]);
     const fallback = parse(
-      read('client/src/pages/Pricing.tsx').split('fallbackPricingTiers')[1].split('];')[0],
+      read('client/src/utils/bookPricing.ts').split('fallbackPricingTiers')[1].split('];')[0],
       /maxPages: (\d+), label: '[^']+', softcover: (\d+), hardcover: (\d+)/g,
     );
     const seeded = parse(

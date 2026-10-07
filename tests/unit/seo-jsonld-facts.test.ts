@@ -20,8 +20,8 @@ describe('JSON-LD states the facts the site charges (decisions.md 2026-10-05)', 
     }
   });
 
-  it('the AggregateOffer high price is the dearest tier in Pricing.tsx, not the migration seed', () => {
-    const tiers = read('client/src/pages/Pricing.tsx');
+  it('the AggregateOffer high price is the dearest fallback tier (utils/bookPricing.ts), not the migration seed', () => {
+    const tiers = read('client/src/utils/bookPricing.ts'); // tiers moved out of Pricing.tsx (book-price-quote fix)
     const maxHardcover = Math.max(...[...tiers.matchAll(/hardcover: (\d+) \}/g)].map(m => Number(m[1])));
     expect(maxHardcover).toBe(77);
     for (const route of ['/', '/pricing', '/anlass/geburtstag', '/geschenk/fuer-enkel']) {
