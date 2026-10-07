@@ -608,11 +608,11 @@ measurement, is lost).
 - [x] (2026-09-06) Drop the legacy `pictureBook` / `outlineAndText` paths — **done**; the only
       surviving mentions are comments at `storyJobPipeline.js:7365` and `promptBuilders.js:3064`
       stating unified is the only pipeline → `docs/compliance-and-todo.html:114`
-- [ ] Migration drift into CI — **nothing was wired: there is no `.github/` directory at all**;
+- [ ] Migration drift into CI — **nothing was wired: there is no `.github/` directory at all**; — PARTIAL 2026-10-07: 12 scripts/_tmp_*.js deleted; CI wiring, refine-tell collapse, R2 phase 3, panel consolidation still open
       prune `scripts/_tmp_*.js` (**12 files still present**); collapse 40+ `refine-tell-vN.js`;
       inline base64 → R2 Phase 3;
       consolidate the three test-image panels → `docs/compliance-and-todo.html:114`
-- [ ] REV-7 (P3) deferred minors: second poller lacks `knownPages`; `imgRowToBytes` is a
+- [ ] REV-7 (P3) deferred minors: second poller lacks `knownPages`; `imgRowToBytes` is a — PARTIAL 2026-10-07: imgRowToBytes fork removed (regeneration.js reads imgBytesAsync); knownPages + dropInlineBase64 still open
       hand-copied fork of `imgBytesAsync`; `dropInlineBase64` mutates shared refs
       → `docs/review-2026-07-04.html:124`
 - [x] `callGrokEdit` in coverComposite has no prompt-length guard before the Grok API call — ALREADY DONE (found 2026-10-07): coverComposite.js:431 calls assertGrokPromptFits
