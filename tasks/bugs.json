@@ -3978,6 +3978,16 @@
       "fixedAt": "2026-10-08",
       "fixedIn": "dc916cf03",
       "fix": "Reads image_url || image_data through r2.bytesFromAnyImage, names the extension from the bytes, lists every failure and exits 1. Run on showcase job_1791315635053_t0t8qpebu p4 --staging: 3 images written (jpg)."
+    },
+    {
+      "id": "cost-ledger-undercounts-and-double-counts",
+      "title": "The per-job cost ledger booked a bucket of several models at its first model, kept three disagreeing pricers (cap, headline, grok.js), ignored Anthropic/Gemini cache tokens, never recorded cut streams or the plate-QC judge, and counted the shared eval inventory twice in page_quality; the cover composite also booked its two Grok passes twice",
+      "reportedAt": "2026-10-08",
+      "source": "Cost-cuts review 2026-10-05 (tasks/cost-cuts-2026-10-05.md Group C) confirmed against code: storyJobPipeline addUsage/calculateCost/functionCost, textModels.js cut paths throw before recordTextUsage, evalPipeline.js validateEmptyScene has no usage record, evaluateImageQuality sums P1 and three-stage stage 1 (the same inventoryPromise).",
+      "status": "fixed",
+      "fixedAt": "2026-10-08",
+      "fixedIn": "73b3fcb65",
+      "fix": "server/lib/costLedger.js + priceUsage (config/models.js); tests/unit/cost-ledger.test.ts. Decisions: docs/decisions.md 2026-10-08."
     }
   ]
 }
