@@ -1972,6 +1972,7 @@ ${numberedFindingsText(subset)}`, arc, { arcHints, storyLogic });
   // that is still over after the corrective pass SHIPS with a WARN — a paid run
   // is never killed for length, and forcing the cut is what deleted causality
   // before (2026-09-07).
+  let lengthEntry = null;
   {
     const stillRaw = buildWordBudgetFindings(current, storyData?.languageLevel);
     wordBudget = {
@@ -1990,6 +1991,7 @@ ${numberedFindingsText(subset)}`, arc, { arcHints, storyLogic });
         beginStep();
         const { next, entry } = await runRepairPass(parseFaultLines(stillRaw), current, 'length_fix');
         rounds.push(entry);
+        lengthEntry = entry;
         current = next;
         wordBudget.correctivePassRan = true;
         wordBudget.cost = entry.cost || 0;
@@ -2044,10 +2046,17 @@ ${numberedFindingsText(subset)}`, arc, { arcHints, storyLogic });
   // the session found. (The lector's own catch below logs at warn only; left as
   // it is rather than changed unasked — noted in the report.)
   try {
-    // Every page either whole-page pass rewrote. BEFORE = the writer's text
-    // (nothing changes a page before the repair), AFTER = the text as the
-    // corrective pass left it.
-    const changedPages = [...new Set([...(repairEntry?.changedPages || []), ...(repetitionEntry?.changedPages || [])])];
+    // Every page any of the THREE whole-page passes rewrote — the repair, the
+    // repetition fix and the length fix. BEFORE = the writer's text (nothing
+    // changes a page before the repair), AFTER = the text as the last
+    // corrective pass left it. The length fix was missing from this union
+    // until 2026-10-07: a page only it rewrote never reached the diff, and its
+    // rewrite damage went unchecked (tests/unit/text-refine-diff-covers-length-fix.test.ts).
+    const changedPages = [...new Set([
+      ...(repairEntry?.changedPages || []),
+      ...(repetitionEntry?.changedPages || []),
+      ...(lengthEntry?.changedPages || []),
+    ])];
     // THE LEDGER (owner decision 2026-09-23): per page, every finding a
     // whole-page pass held for it or for a page next to it. Without it a
     // deliberate fix reads as a dropped fact and the diff pass restores it

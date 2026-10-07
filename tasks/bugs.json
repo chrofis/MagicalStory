@@ -3694,6 +3694,17 @@
       "source": "security review 2026-10-07: server.js:2260 -> landmarkPhotos.js discoverLandmarksForLocation:2131 -> analyzeLandmarkPhoto:865 (gemini-2.5-flash). Cycling real city names from one address allowed ~3000 paid vision calls a minute. Proven by tests/unit/security-paid-endpoints.test.ts (11th call -> 429).",
       "rootCause": "The route must stay anonymous (the trial wizard fires it before a session exists) and was never given its own limiter like the idea-landmark prepare call got on 2026-09-27.",
       "fix": "landmarkDiscoverLimiter (10/h/IP, own store) in server/middleware/rateLimit.js, mounted on the route in server.js."
+    },
+    {
+      "id": "text-refine-diff-skips-length-fix-pages",
+      "title": "A page only the word-budget corrective pass (length_fix) rewrote never reached the diff pass: the diff's page set was built from the repair and repetition_fix entries alone, so the length fix's rewrite damage shipped unchecked",
+      "reportedAt": "2026-10-07",
+      "source": "Code reading of refineStoryText (server/lib/textRefine.js): the diff's `changedPages` union read repairEntry and repetitionEntry only, while the length_fix pass (its own header: 'placed before the diff so the diff reviews this rewrite too') stored its entry in `rounds` and nowhere the diff reads. Reproduced offline: tests/unit/text-refine-diff-covers-length-fix.test.ts fails on the pre-fix code (no text_diff call, no diff round, for a page the length fix changed).",
+      "rootCause": "The length corrective pass was added after the diff's pair-building (2026-09-11 vs 2026-09-06) and captured no entry variable; the diff pass's comment 'every page either whole-page pass rewrote' counted two passes when there are three (WHOLE_PAGE_PASS_KINDS lists all three for the ledger, but the pairs did not).",
+      "status": "fixed",
+      "fixedAt": "2026-10-07",
+      "fixedIn": "pending",
+      "fix": "refineStoryText keeps `lengthEntry` and the diff pass's page set is the union of the repair, repetition_fix and length_fix changedPages. Test: tests/unit/text-refine-diff-covers-length-fix.test.ts."
     }
   ]
 }
