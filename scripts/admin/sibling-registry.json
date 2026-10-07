@@ -1273,6 +1273,15 @@
       ],
       "excludeReason": "that comment line is the terminator that closes the sceneImages whitelist so its body is measured exactly; it is not a record-building site.",
       "severity": "block"
+    },
+    {
+      "id": "analyzer-shared-detector-calls-locked",
+      "axis": "every call site of one shared cv2 detector object (MTCNN, frontal and anime cascades)",
+      "reason": "photo_analyzer.py calls the module-level MTCNN and the two CascadeClassifiers from five sites (the /analyze wrappers, detect_all_faces_opencv, and /detect-illustration-faces for entity consistency); none of these objects is thread-safe across waitress threads (staging 2026-10-07: 2 of 3 parallel uploads answered no_face_detected), and the first fix locked three of the five. A call site without `with _face_detector_lock:` directly above it is the race back. The pattern swallows the lock line when present, so a block holds it only when the call is serialised.",
+      "file": "photo_analyzer.py",
+      "blockPattern": "(?:with _face_detector_lock:\\s*\\n\\s*)?\\w+ = (\\w+)\\.(?:detectMultiScale|detect_faces)\\(",
+      "mustContain": "with _face_detector_lock:",
+      "severity": "block"
     }
   ]
 }

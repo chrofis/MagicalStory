@@ -1299,12 +1299,13 @@ def detect_all_faces_opencv(image):
     min_face_size = int(min(img_w, img_h) * 0.04)
     min_face_size = max(min_face_size, 30)  # At least 30px (original OpenCV default)
 
-    faces_detected = face_cascade.detectMultiScale(
-        gray,
-        scaleFactor=1.1,
-        minNeighbors=5,  # Keep original to catch more faces
-        minSize=(min_face_size, min_face_size)
-    )
+    with _face_detector_lock:
+        faces_detected = face_cascade.detectMultiScale(
+            gray,
+            scaleFactor=1.1,
+            minNeighbors=5,  # Keep original to catch more faces
+            minSize=(min_face_size, min_face_size)
+        )
 
     faces = []
 
@@ -1664,9 +1665,14 @@ def remove_background(image):
 
             return bgra, binary_mask
         except Exception as e:
-            print(f"[WARN] rembg failed: {e}, falling back to MediaPipe")
+            # A U2-Net failure is a FAILURE, not a reason to hand back the
+            # selfie-segmentation cutout (which misses heads — the reason rembg
+            # was chosen) as if it were the answer. NO FALLBACKS: raise, and
+            # the endpoint reports it (process_photo → success:false → 500).
+            print(f"[REMBG] failed: {e}")
+            raise RuntimeError(f"background removal failed: {e}") from e
 
-    # Fallback to MediaPipe
+    # MediaPipe selfie segmentation: only when rembg is not INSTALLED.
     if not MEDIAPIPE_AVAILABLE:
         return None, None
 
@@ -1958,18 +1964,18 @@ def process_photo(image_data, is_base64=True, selected_face_id=None, cached_face
 
         # 5. REMOVE BACKGROUND (fast - ~100ms)
         print("[BG] Removing background...")
-        full_img_rgba = None
-        body_mask = None
-        try:
-            full_img_rgba, body_mask = remove_background(img)
-            if full_img_rgba is not None:
-                h, w = full_img_rgba.shape[:2]
-                visible = np.sum(full_img_rgba[:,:,3] > 128)
-                print(f"   Background removed: {visible}/{h*w} pixels visible ({100*visible/(h*w):.1f}%)")
-            else:
-                print("   Background removal returned None")
-        except Exception as bg_error:
-            print(f"   Background removal failed: {bg_error}")
+        # No try/except here: a background-removal exception used to be
+        # printed and the request went on to answer success:true with no
+        # face thumbnail and no body cutout, which Node then adopted as the
+        # character's photo. The exception propagates to the outer handler,
+        # which answers success:false (HTTP 500 from /analyze).
+        full_img_rgba, body_mask = remove_background(img)
+        if full_img_rgba is not None:
+            h, w = full_img_rgba.shape[:2]
+            visible = np.sum(full_img_rgba[:,:,3] > 128)
+            print(f"   Background removed: {visible}/{h*w} pixels visible ({100*visible/(h*w):.1f}%)")
+        else:
+            print("   Background removal returned None")
 
         # 6. REMOVE NON-SELECTED FACES (if multiple faces and one was selected)
         # Make them transparent so AI can't use them for avatar generation
@@ -3274,7 +3280,7 @@ def release_memory_endpoint():
     the whole point is that gc.collect() alone does NOT lower RSS; only the
     malloc_trim(0) inside _release_memory() hands pages back to the OS.
     """
-    global _mobilesam_model, _gdino_model, _gdino_processor, _rembg_session, rembg_remove
+    global _mobilesam_model, _gdino_model, _gdino_processor, _rembg_session
     before = _rss_mb()
     unloaded = []
     # Parent role: the models live in worker processes, so "unload" means
@@ -3324,9 +3330,12 @@ def release_memory_endpoint():
             _gdino_processor = None
             unloaded.append('groundingdino')
         if _rembg_session is not None:
+            # Only the session holds memory. `rembg_remove` (the stateless
+            # module function) is deliberately left in place: nulling it here
+            # raced a thread between get_rembg_session() and the call in
+            # remove_background() ("'NoneType' object is not callable").
             with _rembg_lock:
                 _rembg_session = None
-                rembg_remove = None
             unloaded.append('rembg')
         # ArcFace: drop DeepFace's cached model objects (the cache is a module
         # global created lazily inside build_model, so it may not exist yet).
@@ -3638,19 +3647,26 @@ def test():
 
 # LPIPS model (lazy loaded)
 _lpips_model = None
+# Guards the BUILD only: two first-time /lpips calls each constructed their own
+# LPIPS (AlexNet weights ~230MB) and one copy leaked. Inference (an eval-mode
+# torch forward under no_grad) holds no per-call state on the module, so it
+# runs unlocked.
+_lpips_lock = threading.Lock()
 
 def get_lpips_model():
     """Lazy load LPIPS model to avoid startup delay"""
     global _lpips_model
     if _lpips_model is None:
-        try:
-            import lpips
-            print("[LPIPS] Loading LPIPS model (AlexNet)...")
-            _lpips_model = lpips.LPIPS(net='alex')
-            print("   LPIPS model loaded")
-        except ImportError:
-            print("[WARN] LPIPS not available - install with: pip install lpips")
-            return None
+        with _lpips_lock:
+            if _lpips_model is None:  # double-checked
+                try:
+                    import lpips
+                    print("[LPIPS] Loading LPIPS model (AlexNet)...")
+                    _lpips_model = lpips.LPIPS(net='alex')
+                    print("   LPIPS model loaded")
+                except ImportError:
+                    print("[WARN] LPIPS not available - install with: pip install lpips")
+                    return None
     return _lpips_model
 
 
@@ -4454,6 +4470,13 @@ def extract_face():
 
 # DeepFace for ArcFace embeddings (lazy loaded)
 _deepface_loaded = False
+# Serialises every DeepFace call (represent / extract_faces). DeepFace keeps
+# its models in a module-level dict it builds lazily (a double build of ArcFace
+# on two first calls), and its 'opencv' detector backend is a shared
+# cv2.CascadeClassifier — the very object class the /analyze race of
+# 2026-10-07 proved unsafe across waitress threads. One lock for this model
+# so the ONNX ArcFace path and Face Mesh still run alongside it.
+_deepface_lock = threading.Lock()
 
 def get_arcface_embedding(image_path_or_array, assume_face_crop=False):
     """
@@ -4474,20 +4497,25 @@ def get_arcface_embedding(image_path_or_array, assume_face_crop=False):
     # is the import that costs the memory we are trying to give back.
     _note_arcface_used()
 
-    try:
-        from deepface import DeepFace
+    # No blanket except: a DeepFace/TensorFlow failure used to come back as
+    # (None, False), which /face-embedding and /compare-identity turned into a
+    # 500 but /detect-all-faces read as "no similarity for this face" and
+    # answered success:true. The exception propagates; every caller's route
+    # handler answers success:false.
+    from deepface import DeepFace
 
-        if not _deepface_loaded:
-            print("[ARCFACE] Loading ArcFace model via DeepFace...")
-            _deepface_loaded = True
+    if not _deepface_loaded:
+        print("[ARCFACE] Loading ArcFace model via DeepFace...")
+        _deepface_loaded = True
 
-        face_detected = False
+    face_detected = False
 
-        # Strategy:
-        # 1. If assume_face_crop=True, skip detection entirely
-        # 2. Otherwise, try detection with opencv first
-        # 3. If that fails, try with skip (assume input is face)
+    # Strategy:
+    # 1. If assume_face_crop=True, skip detection entirely
+    # 2. Otherwise, try detection with opencv first
+    # 3. If that fails, try with skip (assume input is face)
 
+    with _deepface_lock:
         if assume_face_crop:
             # Input is already a face crop - skip detection
             result = DeepFace.represent(
@@ -4521,17 +4549,15 @@ def get_arcface_embedding(image_path_or_array, assume_face_crop=False):
                 else:
                     raise
 
-        if result and len(result) > 0:
-            embedding = np.array(result[0]['embedding'])
-            # Normalize for cosine similarity
-            embedding = embedding / np.linalg.norm(embedding)
-            return embedding, face_detected
+    if result and len(result) > 0:
+        embedding = np.array(result[0]['embedding'])
+        # Normalize for cosine similarity
+        embedding = embedding / np.linalg.norm(embedding)
+        return embedding, face_detected
 
-        return None, False
-
-    except Exception as e:
-        print(f"[ARCFACE] Error: {e}")
-        return None, False
+    # DeepFace answered with no embedding at all: that is "nothing to embed",
+    # distinct from a failure, and the callers report it as such.
+    return None, False
 
 
 def extract_embedding_from_image(image_data, assume_face_crop=False):
@@ -4728,27 +4754,34 @@ def get_face_embedding():
 # Weights: buffalo_l recognition (w600k_r50), ~174MB, path via ARCFACE_ONNX_MODEL.
 _arcface_onnx_session = None
 _arcface_onnx_failed = False
+# Guards the BUILD only: onnxruntime's InferenceSession.run is thread-safe and
+# arcface_onnx_embedding keeps every intermediate local, but two first-time
+# calls each built a 174MB session and one of them leaked.
+_arcface_onnx_lock = threading.Lock()
 
 def get_arcface_onnx_session():
     """Lazy-load the ONNX ArcFace session. Returns None if unavailable."""
     global _arcface_onnx_session, _arcface_onnx_failed
     if _arcface_onnx_session is not None or _arcface_onnx_failed:
         return _arcface_onnx_session
-    try:
-        import onnxruntime as ort
-        model_path = os.environ.get('ARCFACE_ONNX_MODEL',
-                                    os.path.join(os.path.dirname(__file__), 'arcface_w600k_r50.onnx'))
-        if not os.path.exists(model_path):
-            print(f"[ARCFACE-ONNX] weights not found at {model_path}")
+    with _arcface_onnx_lock:
+        if _arcface_onnx_session is not None or _arcface_onnx_failed:  # double-checked
+            return _arcface_onnx_session
+        try:
+            import onnxruntime as ort
+            model_path = os.environ.get('ARCFACE_ONNX_MODEL',
+                                        os.path.join(os.path.dirname(__file__), 'arcface_w600k_r50.onnx'))
+            if not os.path.exists(model_path):
+                print(f"[ARCFACE-ONNX] weights not found at {model_path}")
+                _arcface_onnx_failed = True
+                return None
+            _arcface_onnx_session = ort.InferenceSession(model_path, providers=['CPUExecutionProvider'])
+            print(f"[ARCFACE-ONNX] loaded {os.path.basename(model_path)}")
+            return _arcface_onnx_session
+        except Exception as e:
+            print(f"[ARCFACE-ONNX] load failed: {e}")
             _arcface_onnx_failed = True
             return None
-        _arcface_onnx_session = ort.InferenceSession(model_path, providers=['CPUExecutionProvider'])
-        print(f"[ARCFACE-ONNX] loaded {os.path.basename(model_path)}")
-        return _arcface_onnx_session
-    except Exception as e:
-        print(f"[ARCFACE-ONNX] load failed: {e}")
-        _arcface_onnx_failed = True
-        return None
 
 
 # ArcFace's canonical 5-point template for a 112x112 crop (insightface).
@@ -4764,9 +4797,17 @@ ARCFACE_TEMPLATE_5PT = np.array([
 # Face Mesh indices for those same five points.
 _MESH_5PT = {'left_eye': 33, 'right_eye': 263, 'nose': 1, 'mouth_left': 61, 'mouth_right': 291}
 _face_mesh = None
+# One shared mediapipe FaceMesh serves every /face-embedding-onnx call, and a
+# mediapipe solution is a calculator graph: process() pushes a packet and
+# waits for that graph's output, so two threads inside it at once get each
+# other's landmarks or a graph error — the same mechanism as the shared
+# detectors behind _face_detector_lock. Build AND process() run under this
+# lock; the ONNX session and DeepFace have their own, so they still overlap.
+_face_mesh_lock = threading.Lock()
 
 def get_face_mesh():
-    """Lazy Face Mesh — needed for the 5 landmarks ArcFace aligns on."""
+    """Lazy Face Mesh — needed for the 5 landmarks ArcFace aligns on.
+    Call under _face_mesh_lock."""
     global _face_mesh
     if _face_mesh is None and MEDIAPIPE_AVAILABLE:
         try:
@@ -4789,23 +4830,27 @@ def align_face_arcface(image_bgr):
     ONNX path correlated with the aligned DeepFace path at only 0.258 Spearman,
     scoring clean frontal portraits (0.789 aligned) as low as 0.240.
     """
-    mesh = get_face_mesh()
-    if mesh is None:
-        return None
     h, w = image_bgr.shape[:2]
-    res = mesh.process(cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB))
-    if not res.multi_face_landmarks:
-        return None
-    lm = res.multi_face_landmarks[0].landmark
-    try:
-        src = np.array([[lm[_MESH_5PT['left_eye']].x * w,   lm[_MESH_5PT['left_eye']].y * h],
-                        [lm[_MESH_5PT['right_eye']].x * w,  lm[_MESH_5PT['right_eye']].y * h],
-                        [lm[_MESH_5PT['nose']].x * w,       lm[_MESH_5PT['nose']].y * h],
-                        [lm[_MESH_5PT['mouth_left']].x * w, lm[_MESH_5PT['mouth_left']].y * h],
-                        [lm[_MESH_5PT['mouth_right']].x * w, lm[_MESH_5PT['mouth_right']].y * h]],
-                       dtype=np.float32)
-    except (IndexError, AttributeError):
-        return None
+    rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
+    with _face_mesh_lock:
+        mesh = get_face_mesh()
+        if mesh is None:
+            return None
+        res = mesh.process(rgb)
+        if not res.multi_face_landmarks:
+            return None
+        lm = res.multi_face_landmarks[0].landmark
+        # Copy the five points out while the graph is ours; the warp below
+        # works on this array and needs no lock.
+        try:
+            src = np.array([[lm[_MESH_5PT['left_eye']].x * w,   lm[_MESH_5PT['left_eye']].y * h],
+                            [lm[_MESH_5PT['right_eye']].x * w,  lm[_MESH_5PT['right_eye']].y * h],
+                            [lm[_MESH_5PT['nose']].x * w,       lm[_MESH_5PT['nose']].y * h],
+                            [lm[_MESH_5PT['mouth_left']].x * w, lm[_MESH_5PT['mouth_left']].y * h],
+                            [lm[_MESH_5PT['mouth_right']].x * w, lm[_MESH_5PT['mouth_right']].y * h]],
+                           dtype=np.float32)
+        except (IndexError, AttributeError):
+            return None
     M, _ = cv2.estimateAffinePartial2D(src, ARCFACE_TEMPLATE_5PT, method=cv2.LMEDS)
     if M is None:
         return None
@@ -5189,21 +5234,33 @@ def detect_all_faces():
         face_objs = []
         detectors = ['opencv', 'mtcnn', 'retinaface']
 
+        # A detector that ANSWERS with no faces hands over to the next one;
+        # a detector that RAISES is remembered, and if none ever answered the
+        # request fails. Before, every error was swallowed with `continue`
+        # and three failures became success:true, total_faces 0 — "no faces
+        # on this page" — for a dead model.
+        answered = False
+        last_err = None
         for detector in detectors:
             try:
                 print(f"[DETECT-ALL] Trying detector: {detector}")
-                face_objs = DeepFace.extract_faces(
-                    img_path=image_rgb,
-                    detector_backend=detector,
-                    enforce_detection=False,
-                    align=True
-                )
+                with _deepface_lock:
+                    face_objs = DeepFace.extract_faces(
+                        img_path=image_rgb,
+                        detector_backend=detector,
+                        enforce_detection=False,
+                        align=True
+                    )
+                answered = True
                 if face_objs:
                     print(f"[DETECT-ALL] {detector} found {len(face_objs)} faces")
                     break
             except Exception as e:
                 print(f"[DETECT-ALL] {detector} error: {e}")
+                last_err = e
                 continue
+        if not answered:
+            raise RuntimeError(f"face detection failed on every detector: {last_err}") from last_err
 
         print(f"[DETECT-ALL] Found {len(face_objs)} faces")
 
@@ -5230,20 +5287,21 @@ def detect_all_faces():
 
             # If reference provided, compute similarity
             if ref_embedding is not None and face_img is not None:
-                try:
-                    # face_img is already a numpy array (RGB, float 0-1)
-                    face_uint8 = (face_img * 255).astype(np.uint8)
-                    face_pil = Image.fromarray(face_uint8)
-                    face_emb, _ = extract_embedding_from_image(face_pil, assume_face_crop=True)
+                # No per-face try/except: an embedding failure used to leave
+                # this face without a similarity, which the caller reads as
+                # "not the reference person". It propagates to the route's
+                # handler (success:false, 500).
+                # face_img is already a numpy array (RGB, float 0-1)
+                face_uint8 = (face_img * 255).astype(np.uint8)
+                face_pil = Image.fromarray(face_uint8)
+                face_emb, _ = extract_embedding_from_image(face_pil, assume_face_crop=True)
 
-                    if face_emb is not None:
-                        face_emb = face_emb / np.linalg.norm(face_emb)
-                        similarity = float(np.dot(ref_embedding, face_emb))
-                        face_info["similarity"] = round(similarity, 4)
-                        face_info["same_person"] = similarity > 0.45
-                        face_info["match_confidence"] = "high" if similarity > 0.6 else "medium" if similarity > 0.45 else "low"
-                except Exception as e:
-                    print(f"[DETECT-ALL] Error computing similarity for face {i}: {e}")
+                if face_emb is not None:
+                    face_emb = face_emb / np.linalg.norm(face_emb)
+                    similarity = float(np.dot(ref_embedding, face_emb))
+                    face_info["similarity"] = round(similarity, 4)
+                    face_info["same_person"] = similarity > 0.45
+                    face_info["match_confidence"] = "high" if similarity > 0.6 else "medium" if similarity > 0.45 else "low"
 
             faces.append(face_info)
 
@@ -5386,11 +5444,15 @@ def detect_illustration_faces():
         gray_eq = cv2.equalizeHist(gray)
 
         # Run anime cascade (best for illustrations)
+        # Both cascades are the module-level objects behind _face_detector_lock
+        # (sibling of detect_all_faces_anime / detect_face_opencv): entity
+        # consistency calls this route once per page, in parallel.
         anime_faces = []
         if ANIME_CASCADE_AVAILABLE and anime_face_cascade is not None:
-            detections = anime_face_cascade.detectMultiScale(
-                gray_eq, scaleFactor=1.05, minNeighbors=2, minSize=(20, 20)
-            )
+            with _face_detector_lock:
+                detections = anime_face_cascade.detectMultiScale(
+                    gray_eq, scaleFactor=1.05, minNeighbors=2, minSize=(20, 20)
+                )
             anime_faces = [(int(x), int(y), int(w), int(h)) for (x, y, w, h) in detections]
 
         # Run Haar cascade (catches some faces anime misses). Uses the
@@ -5398,9 +5460,10 @@ def detect_illustration_faces():
         haar_cascade = _FRONTAL_FACE_CASCADE
         haar_faces = []
         if haar_cascade is not None:
-            haar_faces_raw = haar_cascade.detectMultiScale(
-                gray, scaleFactor=1.1, minNeighbors=3, minSize=(30, 30)
-            )
+            with _face_detector_lock:
+                haar_faces_raw = haar_cascade.detectMultiScale(
+                    gray, scaleFactor=1.1, minNeighbors=3, minSize=(30, 30)
+                )
             haar_faces = [(int(x), int(y), int(w), int(h)) for (x, y, w, h) in haar_faces_raw]
 
         # Compute IoU for matching

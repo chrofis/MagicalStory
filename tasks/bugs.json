@@ -3828,6 +3828,26 @@
       "fixedAt": "2026-10-07",
       "fixedIn": "026b8e0db",
       "fix": "_face_detector_lock serialises every shared detector call (MTCNN, frontal and anime cascades); a detector exception raises instead of returning [] so /analyze reports a failure, never 'no face'. Pinned by tests/analyzer/test_photo_analyzer_contract.py (concurrency + failure tests, fail before / pass after)."
+    },
+    {
+      "id": "analyzer-illustration-faces-cascades-unlocked",
+      "title": "/detect-illustration-faces (entity consistency, once per page in parallel) still called the shared anime and frontal CascadeClassifiers without _face_detector_lock — the same two objects the 2026-10-07 /analyze race fix serialised, on the sibling path it did not reach",
+      "reportedAt": "2026-10-07",
+      "source": "Concurrency audit of photo_analyzer.py after commit 026b8e0db: detect_illustration_faces called anime_face_cascade.detectMultiScale and _FRONTAL_FACE_CASCADE.detectMultiScale unlocked (and detect_all_faces_opencv likewise); the race on exactly these objects was reproduced twice on staging the same day (bug analyzer-concurrent-face-detection-no-face). server/lib/entityConsistency.js detectIllustrationFaces runs this route per page concurrently, so a clash lost or garbled the cascade face boxes behind the character-consistency merge.",
+      "status": "fixed",
+      "fixedAt": "2026-10-07",
+      "fixedIn": "pending",
+      "fix": "Both cascade calls in detect_illustration_faces and the one in detect_all_faces_opencv run under _face_detector_lock. Pinned by tests/analyzer/test_photo_analyzer_contract.py (test_illustration_faces_cascades_are_serialised, fail before / pass after) and a within-file sibling set (analyzer-shared-detector-calls-locked) that blocks any shared-detector call site without the lock."
+    },
+    {
+      "id": "analyzer-face-mesh-shared-unlocked",
+      "title": "One shared mediapipe FaceMesh aligned every /face-embedding-onnx call with no lock; parallel avatar-likeness calls ran a non-thread-safe solution graph concurrently, so a candidate could be embedded from the other call's landmarks (or fall to the unaligned crop) and score a wrong likeness",
+      "reportedAt": "2026-10-07",
+      "source": "Concurrency audit of photo_analyzer.py: _face_mesh is a module-level mp.solutions.face_mesh.FaceMesh built lazily in get_face_mesh() and align_face_arcface() called mesh.process() on it unlocked; a mediapipe solution is a calculator graph (process() pushes one packet and waits for the graph's output), the same mechanism as the shared detectors whose race was reproduced on staging 2026-10-07. The ONNX ArcFace path is what server/lib/faceIdentity.js scores avatar candidates with, several per character at once.",
+      "status": "fixed",
+      "fixedAt": "2026-10-07",
+      "fixedIn": "pending",
+      "fix": "_face_mesh_lock around the build and the full process()+landmark copy in align_face_arcface; the warp and the ONNX session.run stay outside it. Pinned by tests/analyzer/test_photo_analyzer_contract.py test_face_mesh_landmarks_are_serialised (fail before / pass after)."
     }
   ]
 }
