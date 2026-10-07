@@ -91,12 +91,15 @@ function qcSeverity(qc) {
  * - A DERIVED plate whose two attempts both carry a hard defect is dropped: its
  *   pages keep the base plate (owner: a wrong camera on the right place beats
  *   no plate).
- * - Any other plate that ships with a hard defect ships visibly
- *   (`shipFailed`, the plate_shipped_failed_qc event) — gates are guidelines.
+ * - Any other plate that ships with a defect, hard or soft, ships visibly
+ *   (`shipFailed`, the plate_shipped_failed_qc event at error level) — gates are
+ *   guidelines, so the plate ships, but never in silence (owner, 2026-10-07: staging
+ *   job_1791315635053_t0t8qpebu p4 kept a beach under a water ceiling after two
+ *   failed attempts and the log said only `keeping the first attempt`).
  *
  * @param {{firstQc: Object, retryQc: Object|null, derived?: boolean}} a
  *   `retryQc` null = the retry produced no image.
- * @returns {{keep: 'first'|'retry'|'base', shipFailed: boolean, hardDefects: Array<{check,issue}>}}
+ * @returns {{keep: 'first'|'retry'|'base', shipFailed: boolean, hardDefects: Array<{check,issue}>, softDefects: Array<{check,issue}>}}
  */
 function decidePlateAfterRetry({ firstQc, retryQc, derived = false }) {
   const first = qcSeverity(firstQc);
@@ -108,12 +111,12 @@ function decidePlateAfterRetry({ firstQc, retryQc, derived = false }) {
       || (retry.hard.length === first.hard.length && retry.soft.length < first.soft.length);
     if (better) keep = 'retry';
     if (derived && first.hard.length > 0 && retry.hard.length > 0) {
-      return { keep: 'base', shipFailed: false, hardDefects: retry.hard.length <= first.hard.length ? retry.hard : first.hard };
+      return { keep: 'base', shipFailed: false, hardDefects: retry.hard.length <= first.hard.length ? retry.hard : first.hard, softDefects: [] };
     }
   }
   const keptQc = keep === 'retry' ? retryQc : firstQc;
-  const hardDefects = keptQc.pass ? [] : qcSeverity(keptQc).hard;
-  return { keep, shipFailed: hardDefects.length > 0, hardDefects };
+  const kept = keptQc.pass ? { hard: [], soft: [] } : qcSeverity(keptQc);
+  return { keep, shipFailed: !keptQc.pass, hardDefects: kept.hard, softDefects: kept.soft };
 }
 
 /**
@@ -130,7 +133,8 @@ function plateQcRecord({ firstImage, firstQc, retryImage = null, retryQc = null,
     retryImageData: retryImage || null,
     retryIssues: retryQc ? (retryQc.issues || []) : null,
     keptAttempt: outcome?.keep || 'first',
-    shippedWithHardDefects: outcome?.shipFailed ? outcome.hardDefects : null,
+    shippedWithHardDefects: outcome?.shipFailed && outcome.hardDefects.length ? outcome.hardDefects : null,
+    shippedWithSoftDefects: outcome?.shipFailed && (outcome.softDefects || []).length ? outcome.softDefects : null,
   };
 }
 
@@ -150,6 +154,7 @@ function emptySceneQcOf(src) {
     retryIssues: src.retryIssues || null,
     keptAttempt: src.keptAttempt || null,
     shippedWithHardDefects: src.shippedWithHardDefects || null,
+    shippedWithSoftDefects: src.shippedWithSoftDefects || null,
   };
 }
 
@@ -204,8 +209,9 @@ function logPlateOutcome(genLog, { event, label, pages = null, outcome, firstQc,
     genLog.warn(event, `${label}: ${retryQc ? `retry not less severe (${sev(retryQc)}: ${retryQc.issues.join(', ')})` : 'retry produced no image'} — keeping the first attempt (${sev(firstQc)})`);
   }
   if (outcome.shipFailed) {
-    genLog.warn('plate_shipped_failed_qc', `${label} ships with a hard QC defect: ${describeDefects(outcome.hardDefects)}`, null,
-      { label, pages, keptAttempt: outcome.keep, defects: outcome.hardDefects });
+    const all = [...outcome.hardDefects, ...(outcome.softDefects || [])];
+    genLog.error('plate_shipped_failed_qc', `${label} ships with a failed QC (${outcome.hardDefects.length} hard, ${(outcome.softDefects || []).length} soft): ${describeDefects(all)}`, null,
+      { label, pages, keptAttempt: outcome.keep, defects: outcome.hardDefects, softDefects: outcome.softDefects || [] });
   }
 }
 

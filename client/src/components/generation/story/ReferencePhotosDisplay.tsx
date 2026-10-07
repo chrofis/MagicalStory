@@ -377,6 +377,12 @@ export function ReferencePhotosDisplay({
                     {emptySceneQc.shippedWithHardDefects!.map(f => `[${f.check}] ${f.issue}`).join('; ')}
                   </div>
                 )}
+                {(emptySceneQc.shippedWithSoftDefects?.length ?? 0) > 0 && (
+                  <div className="text-sm text-red-700">
+                    {language === 'de' ? 'Ausgeliefert mit Fehler: ' : 'Shipped with a defect: '}
+                    {emptySceneQc.shippedWithSoftDefects!.map(f => `[${f.check}] ${f.issue}`).join('; ')}
+                  </div>
+                )}
                 {/* V2 = the retry. Records before 2026-09-25 carry no retryImageData;
                     there the retry was the plate in use. */}
                 <div>

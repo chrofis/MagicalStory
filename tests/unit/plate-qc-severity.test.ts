@@ -34,7 +34,8 @@ describe('decidePlateAfterRetry', () => {
       retryQc: qc(['setting', 'the balustrade does not match']),
       derived: true,
     });
-    expect(o).toMatchObject({ keep: 'retry', shipFailed: false });
+    // A retry whose only fault is soft still failed QC: it ships, loudly (owner, 2026-10-07).
+    expect(o).toMatchObject({ keep: 'retry', shipFailed: true, hardDefects: [], softDefects: [{ check: 'setting', issue: 'the balustrade does not match' }] });
   });
 
   it('LOC001.1: a base plate hard twice keeps one and ships it visibly', () => {
@@ -61,7 +62,25 @@ describe('decidePlateAfterRetry', () => {
       retryQc: qc(['figures', 'a passer-by'], ['camera', 'eye level'], ['light', 'daylight']),
     });
     expect(o.keep).toBe('retry');
-    expect(o.shipFailed).toBe(false);
+    expect(o.hardDefects).toEqual([]);
+    expect(o.softDefects).toHaveLength(3);
+    expect(o.shipFailed).toBe(true);
+  });
+
+  it('REGRESSION p4 2026-10-07: two failed attempts with soft defects only ship loudly, never silently', () => {
+    const o = decidePlateAfterRetry({
+      firstQc: qc(['setting', 'the plate is not entirely underwater']),
+      retryQc: qc(['setting', 'an above-water view with the sky visible'], ['light', 'daylight']),
+    });
+    expect(o).toMatchObject({ keep: 'first', shipFailed: true, hardDefects: [] });
+    expect(o.softDefects).toEqual([{ check: 'setting', issue: 'the plate is not entirely underwater' }]);
+    const events: any[] = [];
+    const genLog = { info: () => {}, warn: () => {}, error: (e: string, m: string, _c: any, d: any) => events.push({ e, m, d }) };
+    logPlateOutcome(genLog, { event: 'vantage_plate_qc_retry', label: 'Vantage plate LOC001.4', pages: [4], outcome: o, firstQc: qc(['setting', 'a']), retryQc: qc(['setting', 'b'], ['light', 'c']) });
+    expect(events.find(x => x.e === 'plate_shipped_failed_qc').d.softDefects).toHaveLength(1);
+    const rec = plateQcRecord({ firstImage: 'A', firstQc: qc(['setting', 'a']), retryImage: 'B', retryQc: qc(['setting', 'b']), retryPrompt: 'P', outcome: o });
+    expect(rec.shippedWithSoftDefects).toEqual(o.softDefects);
+    expect(rec.shippedWithHardDefects).toBeNull();
   });
 
   it('equal hard counts: fewer soft defects win; a full tie keeps the first', () => {
@@ -138,7 +157,7 @@ describe('pagePlateFields — one plate record for the first render and the miss
 describe('logging and the deterministic-failure guard', () => {
   it('a hard defect that ships raises plate_shipped_failed_qc with the defect', () => {
     const events: any[] = [];
-    const genLog = { info: (e: string, m: string) => events.push({ e, m }), warn: (e: string, m: string, _c: any, d: any) => events.push({ e, m, d }) };
+    const genLog = { info: (e: string, m: string) => events.push({ e, m }), warn: () => {}, error: (e: string, m: string, _c: any, d: any) => events.push({ e, m, d }) };
     const firstQc = qc(['medium', 'photograph']); const retryQc = qc(['text', 'signature']);
     logPlateOutcome(genLog, { event: 'vantage_plate_qc_retry', label: 'Vantage plate V1', pages: [1], outcome: decidePlateAfterRetry({ firstQc, retryQc }), firstQc, retryQc });
     const shipped = events.find(x => x.e === 'plate_shipped_failed_qc');

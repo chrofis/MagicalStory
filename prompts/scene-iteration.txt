@@ -87,7 +87,7 @@ Clothing rules:
 **Recurring visual elements (copy IDs exactly):**
 {RECURRING_ELEMENTS}
 {WORN_STATE}
-**Season:** {SEASON} — foliage, ground cover, sky and daylight colour are that season's, and no rewrite changes it.
+**Season:** {SEASON} — foliage, ground cover, sky and daylight colour are that season's, and no rewrite changes it. {SEASON_NO_SKY}
 {CORRECTION_NOTES}
 
 ---

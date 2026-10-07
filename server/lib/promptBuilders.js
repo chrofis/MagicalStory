@@ -38,7 +38,7 @@ const { getEventById } = require('./historicalEvents');
 const { getSwissStoryResearch, getSwissCityById } = require('./swissStories');
 const { parseProseMetadataFormat, stripSceneMetadata, extractSceneMetadata, collectSceneCharacterNames, enforceSpreadTextPosition, parseSceneHintMetadata, resolveTextStagePictureSpec, buildTextStagePictureSpecs, SHARED_GRIP_RULE, normalisePopulation, POPULATION_LEVELS } = require('./sceneMetadata');
 const { resolveClothingForPage, buildUsedClothingText, buildAvailableAvatarsForPrompt } = require('./clothingResolve');
-const { seasonLabel, buildSeasonNote, buildSeasonInstruction } = require('./season');
+const { seasonLabel, buildSeasonNote, buildSeasonInstruction, SEASON_NO_SKY_RULE } = require('./season');
 const { gazeTokenRow, GAZE_TOKEN_LIST } = require('./gazeTargets');
 const { SCENE_LIGHT_FIELD_RULE, SCENE_WEATHER_FIELD_RULE, buildLightLine, declaredLight, isSkylessLight, TIME_OF_DAY_ENUM, WEATHER_ENUM } = require('./sceneLight');
 const { isNotSetRelationship, isStrangersRelationship } = require('./relationships');
@@ -3191,6 +3191,7 @@ function artDirectorFills(inputData, beats = [], options = {}) {
     // season-blind. `inputData` is the job's inputData; pageSeasonLabel says so
     // out loud if it is not resolvable from the story itself.
     SEASON: pageSeasonLabel(inputData, 'scene-expansion-all'),
+    SEASON_NO_SKY: SEASON_NO_SKY_RULE,
     // ONE counting rule for both Art Director templates — see COUNTING_RULE.
     COUNTING_RULE,
     // ONE cast contract and ONE multi-picture prop contract, shared with the
@@ -3692,6 +3693,7 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     // inputData; a caller that omits it is named in the log, not silently
     // given today's season — see pageSeasonLabel.
     SEASON: pageSeasonLabel(options.story, `scene-expansion P${pageNumber}`),
+    SEASON_NO_SKY: SEASON_NO_SKY_RULE,
     // The per-page fallback cites a location the bible already holds; only the
     // inside/outside half of the one-place rule applies (PLACE_INSIDE_OUTSIDE_RULE).
     PLACE_INSIDE_OUTSIDE: PLACE_INSIDE_OUTSIDE_RULE,
@@ -4280,6 +4282,7 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
       // so a season it is never told is a season it can contradict. Callers
       // that omit `story` are named in the log — see pageSeasonLabel.
       SEASON: pageSeasonLabel(options.story, `scene-iteration P${pageNumber}`),
+      SEASON_NO_SKY: SEASON_NO_SKY_RULE,
       HEIGHT_ORDER: buildRelativeHeightDescription(characters) || '',
       // THREE INPUTS THE REWRITER NEVER HAD. It was handed a SCORE and a list
       // of findings and asked to diagnose root causes with neither the
@@ -5510,7 +5513,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
       // Season note, same shape as ERA_GUARD: a book-wide condition the
       // renderer must honour even when an attached landmark reference photo
       // was shot in a different season (decisions.md 2026-08-16).
-      SEASON_NOTE: buildSeasonNote(inputData || {}, { skyless: isSkylessLight(declaredLight(metadata).timeOfDay) }),
+      SEASON_NOTE: buildSeasonNote(inputData || {}, { skyless: isSkylessLight(declaredLight(metadata).timeOfDay), indoor: declaredLight(metadata).weather === 'none' }),
       // The page's declared time of day and weather (sceneLight.js), a fixed
       // line from the brief's two fields. In the protected tail
       // (images.js PROMPT_NEVER_CUT marker **LIGHT:**) and it wins over the

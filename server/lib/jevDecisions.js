@@ -48,7 +48,7 @@
 
 const J = require('./jevAudit');
 const SV = require('./shotVocabulary');
-const { TIMES_OF_DAY, CLOCK_HOURS, isSkylessLight, WEATHERS, JEV_TIME_CRITERIA, JEV_WEATHER_CRITERIA } = require('./sceneLight');
+const { TIMES_OF_DAY, CLOCK_HOURS, isSkylessLight, isSkyHidden, WEATHERS, JEV_TIME_CRITERIA, JEV_WEATHER_CRITERIA, JEV_SUBMERGED_CRITERIA } = require('./sceneLight');
 const G = require('./gazeTargets');
 const { openRouterUsage } = require('./providerUsage');
 const { recordTextUsage } = require('./usageContext');
@@ -679,7 +679,7 @@ function castCutFindings(cutDecision) {
 // table, no hand-kept copy here (owner, 2026-10-06).
 function lightQuestions() {
   return {
-    TIME: { type: 'choice', instructions: 'The time of day in the picture of the page to judge, following the story\'s clock: it holds from page to page until the story moves it. A page set beneath the water, or in a place no daylight reaches (ink, a cave, a ship\'s hold), takes one of the underwater or dark options whatever the hour; the story\'s clock goes on around it.', criteria: JEV_TIME_CRITERIA },
+    TIME: { type: 'choice', instructions: 'The time of day in the picture of the page to judge, following the story\'s clock: it holds from page to page until the story moves it. A page set beneath the water, or in a place no daylight reaches (ink, a cave, a ship\'s hold), takes one of the underwater or dark options whatever the hour; the story\'s clock goes on around it. Judge the light at the place the camera stands: outside a dark structure (the outer hull of a wreck, a cave mouth) the camera is in the open water or the open air and the light is that open place\'s own; only a camera inside the structure has its dark.', criteria: JEV_TIME_CRITERIA },
     WEATHER: { type: 'choice', instructions: 'The weather visible in the picture of the page to judge. `none` when the scene is indoors, where the sky is not seen. Weather holds from page to page until the story changes it.', criteria: JEV_WEATHER_CRITERIA },
     INDOOR: { type: 'noul', instructions: 'The picture of the page to judge is set indoors: inside a building, a room, a cave or an enclosed vehicle.' },
     NEWDAY: { type: 'noul', instructions: 'The picture of the page to judge is on a LATER DAY than the page before it: the story has moved to the next day or beyond (a night slept through, "the next morning", "days later"), so its hour may be earlier than that of the page before.' },
@@ -730,17 +730,66 @@ async function decideLight({ arc, pages }, opts = {}) {
     if (!WEATHERS.includes(weather)) throw new JevDecisionError(`Jev WEATHER answer "${weather}" is outside ${WEATHERS.join('|')}`);
     const indoorP = meanNoul(a, 'INDOOR');
     const newDayP = meanNoul(a, 'NEWDAY');
-    // A skyless light has no sky to show: it is `indoor` for everything downstream (weather `none`, no outdoor light
-    // for a cover's dominant hour), whatever the INDOOR question's probability said.
+    // `indoor` is Jev's own INDOOR answer. A skyless light hides the sky too, but that is isSkyHidden's to say (weather
+    // `none`, no outdoor light for a cover's dominant hour); folding it into this flag made an underwater page read
+    // indoor with indoorP 0.01 (staging job_1791315635053_t0t8qpebu p4).
     const tp = (a && a[0] && a[0].TIME && a[0].TIME.probabilities) || {};
     const timeTop = Object.entries(tp).sort((x, y) => y[1] - x[1]).slice(0, 3).map(([k, v]) => `${k} ${(+v).toFixed(2)}`);
-    return { pageNumber: Number(p.pageNumber), jevTime: time, timeTop, weatherAdvice: weather, newDayP: +newDayP.toFixed(3), indoorP: +indoorP.toFixed(3), indoor: isSkylessLight(time) || indoorP >= JEV_DECISIONS.light.indoorAt };
+    return { pageNumber: Number(p.pageNumber), jevTime: time, timeTop, weatherAdvice: weather, newDayP: +newDayP.toFixed(3), indoorP: +indoorP.toFixed(3), indoor: indoorP >= JEV_DECISIONS.light.indoorAt };
   });
-  const clock = forwardClock(raw.map(r => r.jevTime), raw.map(r => r.newDayP >= JEV_DECISIONS.light.newDayAt));
-  raw.forEach((r, i) => { r.timeOfDay = clock.times[i]; });
-  for (const h of clock.held) log.warn(`🌗 [JEV/light] page ${raw[h.index].pageNumber}: Jev said ${h.jev} after ${h.held} — the clock never runs backwards, held at ${h.held}`);
+  const clockHeld = applyClock(raw);
+  for (const h of clockHeld) log.warn(`🌗 [JEV/light] page ${h.pageNumber}: Jev said ${h.jev} after ${h.held} — the clock never runs backwards, held at ${h.held}`);
   log.info(`🌗 [JEV/light] ${raw.map(r => `p${r.pageNumber}:${r.timeOfDay}${r.indoor ? '/in' : ''}`).join(' ')} (${stats.calls} calls)`);
-  return { pages: raw, clockHeld: clock.held.map(h => ({ pageNumber: raw[h.index].pageNumber, jev: h.jev, held: h.held })), stats: summarise(stats) };
+  return { pages: raw, clockHeld, stats: summarise(stats) };
+}
+
+/**
+ * THE CLOCK OVER DECIDED LIGHT ROWS: `timeOfDay` of every row from its `jevTime` and `newDayP`, the clock held
+ * forward. One place for decideLight and for a re-decision (decideSubmergedLight) that changes a row's `jevTime`.
+ * Mutates the rows; returns what was held.
+ */
+function applyClock(rows) {
+  const clock = forwardClock(rows.map(r => r.jevTime), rows.map(r => r.newDayP >= JEV_DECISIONS.light.newDayAt));
+  rows.forEach((r, i) => { r.timeOfDay = clock.times[i]; });
+  return clock.held.map(h => ({ pageNumber: rows[h.index].pageNumber, jev: h.jev, held: h.held }));
+}
+
+/**
+ * THE LIGHT OF A PAGE AT OR ABOARD A SUBMERGED PLACE (owner, 2026-10-07). The Visual Bible carries `submerged`
+ * once per location or vehicle (jevBriefFields.submergedPages); the light is decided before the bible exists, so
+ * the first answer, an hour for the inside of a sunken wreck (staging job_1791315635053_t0t8qpebu p9-p11:
+ * evening, so a night sky, a lantern and a dry room), is replaced here: Jev is asked TIME again with its options
+ * restricted to the lights beneath the surface (sceneLight.JEV_SUBMERGED_CRITERIA), and the clock is re-held.
+ * Only the rows named in `pageNumbers` are asked; `jevTimeFirst` keeps the first answer for the record.
+ *
+ * @param {{arc:string, pages:Array, light:{pages:Array, clockHeld:Array}, pageNumbers:number[]}} input - `light` is decideLight's result, mutated
+ * @returns {Promise<{asked:number[], changed:Array<{pageNumber:number, from:string, to:string}>, clockHeld:Array, stats:Object}>}
+ */
+async function decideSubmergedLight({ arc, pages, light, pageNumbers }, opts = {}) {
+  const stats = newStats();
+  const want = new Set((pageNumbers || []).map(Number));
+  const asked = pages.filter(p => want.has(Number(p.pageNumber)));
+  if (!asked.length) return { asked: [], changed: [], clockHeld: light.clockHeld || [], stats: summarise(stats) };
+  const questions = { TIME: { type: 'choice', instructions: 'The light in the picture of the page to judge. The place of this page lies beneath the surface of the water, so the picture is beneath it too. Judge the light at the place the camera stands: outside a dark structure (the outer hull of a wreck) the camera is in open water and the light is that water\'s own; only a camera inside the structure has its dark.', criteria: JEV_SUBMERGED_CRITERIA } };
+  const reqs = asked.map(p => ({ key: `submerged:p${p.pageNumber}`, state: pageState(arc, pages, p), questions }));
+  const ans = await runJevRequests(reqs, { ...opts, usageLabel: 'jev_decisions_light_submerged', stats });
+  for (const p of asked) {
+    const row = light.pages.find(r => Number(r.pageNumber) === Number(p.pageNumber));
+    const answers = ans.get(`submerged:p${p.pageNumber}`);
+    const time = modalChoice(answers, 'TIME');
+    if (!Object.prototype.hasOwnProperty.call(JEV_SUBMERGED_CRITERIA, time)) throw new JevDecisionError(`Jev TIME answer "${time}" on submerged page ${p.pageNumber} is outside ${Object.keys(JEV_SUBMERGED_CRITERIA).join('|')}`);
+    const tp = (answers[0].TIME && answers[0].TIME.probabilities) || {};
+    row.submerged = true;
+    row.jevTimeFirst = row.jevTime;
+    row.timeTop = Object.entries(tp).sort((x, y) => y[1] - x[1]).slice(0, 3).map(([k, v]) => `${k} ${(+v).toFixed(2)}`);
+    row.jevTime = time;
+  }
+  const before = new Map(light.pages.map(r => [Number(r.pageNumber), r.timeOfDay]));
+  light.clockHeld = applyClock(light.pages);
+  for (const h of light.clockHeld) log.warn(`🌗 [JEV/light] page ${h.pageNumber}: Jev said ${h.jev} after ${h.held} — the clock never runs backwards, held at ${h.held}`);
+  const changed = light.pages.filter(r => r.timeOfDay !== before.get(Number(r.pageNumber))).map(r => ({ pageNumber: Number(r.pageNumber), from: before.get(Number(r.pageNumber)), to: r.timeOfDay }));
+  log.info(`🌗 [JEV/light] submerged pages ${asked.map(p => p.pageNumber).join(', ')} re-asked beneath the surface: ${changed.map(c => `p${c.pageNumber} ${c.from}→${c.to}`).join(' ') || 'no change'} (${stats.calls} calls)`);
+  return { asked: asked.map(p => Number(p.pageNumber)), changed, clockHeld: light.clockHeld, stats: summarise(stats) };
 }
 
 /**
@@ -1284,7 +1333,7 @@ function pinBrief(brief, fixed) {
   if (Array.isArray(fixed.lightSources)) set('lightSources', fixed.lightSources.length ? fixed.lightSources : null);
   // A cover's weather is code's (coverFacts); a story page's stays the Art Director's.
   if (fixed.weather) set('weather', fixed.weather);
-  if (fixed.indoor === true) set('weather', 'none');
+  if (isSkyHidden(fixed)) set('weather', 'none');
   else if (fixed.indoor === false && (!m.weather || m.weather === 'none')) changes.push({ field: 'weather', from: m.weather || null, to: null, problem: 'outdoors' });
   if (Array.isArray(fixed.cites)) {
     const decided = new Set((fixed.decidedIds || []).map(baseId));
@@ -1431,6 +1480,8 @@ module.exports = {
   lightQuestions,
   forwardClock,
   decideLight,
+  decideSubmergedLight,
+  applyClock,
   decideLightSources,
   vbElements,
   vbQuestion,

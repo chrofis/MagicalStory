@@ -97,7 +97,9 @@ One backdrop plate is painted per vantage, and every page of that vantage is dra
 - **Inside is not outside.** A page whose plan line puts a character inside, below or at the bottom of something — a shaft, a pit, a hollow trunk, a tank — takes a vantage whose plate is the interior the character occupies: its floor, its walls rising, the opening above, seen from the rim looking down or from the floor looking up. A cellar, basement, cave or other below-ground space is written from inside at the top of the steps looking down: the stairs recede downward and away, never a door seen from outside and never steps rising to a door.
 - Foreground, midground and background bands show the place's own ground, floor, deck or water continuing unbroken — figures are composited into them on every page that uses this plate, so those bands are written as the scene's own surface and never as a reference to the figures themselves. Everywhere else the room or landscape keeps its furnishing; never clear the whole frame.
 - A place in a fantastical or strongly-themed world, or a real place the story's premise has transformed into one, is furnished with a lot of that world's characteristic environmental elements; an everyday interior — a kitchen, a living room, a bedroom, a workshop, a classroom, a shop — with its lived-in detail: worn surfaces, crockery and cookware, appliances and fittings, textiles, things on shelves and walls. An unfurnished box room is a fault.
-- The season is **{SEASON}**: foliage and ground cover are that season's on every plate, the same for the same place; an interior shows it only through a window.
+- The season is **{SEASON}**: foliage and ground cover are that season's on every plate, the same for the same place; an interior shows it only through a window. {SEASON_NO_SKY}
+- **Beneath the surface is not at the shore.** A vantage whose pages put the figures beneath the surface of the water describes the view from beneath it: water all around, the seabed or the structure on it, the light falling from above. Nothing of the shore, the surface or the sky is in it, whatever the location's other vantages show.
+- **A vantage shows what the camera sees.** Its description and plate name the location's features and signature element only where this camera has them in view: an exterior vantage draws the structure from outside, whole, and an interior vantage draws the inside.
 - The geography gives a standing character footing at every depth the pages on this vantage place one — a bank, path, floor, deck or walkway, never open water or air under a standing figure. A plan line that puts a figure where nothing standable exists moves the figure or takes another vantage. A character inside a shaft, pit or hollow stands on its floor: that floor is the standable surface, shown from within.
 - A vantage's `cameraOn` is `ground` (the camera and every figure stand on a bank, floor, sand or shore), `aboard` (on a vessel, see above) or `water` (the camera floats or swims in the water). A vantage whose pages put any figure on its feet is `ground` and its plate is painted from the shore, bank or jetty; `water` is only for a vantage whose every page has its figures swimming.
 - **No partial immersion.** {FOOTING_RULE} The plate carries a water's edge to stand at instead.
@@ -177,6 +179,7 @@ Exactly this, nothing before the marker and nothing after the closing fence:
       "colors": "[specific colours]",
       "features": "[distinctive visual elements]",
       "signatureElement": "[one unique detail]",
+      "submerged": "[OMIT unless the place lies beneath the surface of the water — a sea floor, a reef, a lake bed, the inside of a sunken wreck: true. Stated here once; code reads it for every page at this place]",
       "isRealLandmark": false,
       "landmarkQuery": null,
       "emptyScenePrompt": "[the backdrop plate for this place; OMIT when this entry has vantages[], which carry one each]",
@@ -194,7 +197,8 @@ Exactly this, nothing before the marker and nothing after the closing fence:
       "scaleClass": "[one band from the scaleClass rule]",
       "generic": "[OMIT unless generic — see the generic rule]",
       "colorAndDetails": "[appearance: shape, colour, material, distinctive features — no size]",
-      "signatureElement": "[one unique detail]"
+      "signatureElement": "[one unique detail]",
+      "submerged": "[OMIT unless the vehicle lies beneath the surface of the water — a sunken ship, a submarine: true. Stated here once; code reads it for every page aboard it]"
     }
   ],
   "clothing": [

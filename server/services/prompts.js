@@ -774,7 +774,7 @@ function buildEmptyScenePrompt(opts = {}) {
 // quotes them, so a plate is failed only for a structure its author was told
 // to match, and never for showing the part of it the camera sees.
 const PLATE_STRUCTURE_MATCH_RULE = 'Any vessel, vehicle or built structure in this backdrop is one of those described below — match its colour, construction and named parts, never a generic substitute';
-const PLATE_STRUCTURE_PART_RULE = 'Render only the part of the vessel the camera sees. When the camera stands on board, show the deck, rail and fittings around it — never the vessel seen from outside.';
+const PLATE_STRUCTURE_PART_RULE = 'Render only the part of the vessel the camera sees. When the camera stands on board, show the deck, rail and fittings around it — never the vessel seen from outside. When the camera stands outside it, show the vessel from outside, whole to the part the camera sees.';
 
 function buildPlateStructuresText(opts = {}) {
   // The Visual Bible description of every vehicle listed for this page.

@@ -78,19 +78,19 @@ const LIGHTS = [
     veiled: 'night: dark, the scene lit only by the light sources in it',
     indoor: 'night: dark at the windows, the room lit only by its own lamps and fires' },
   // No sun, moon, sky or horizon is named, and the same words hold whatever the weather says.
-  { id: 'underwater', hour: false,
+  { id: 'underwater', hour: false, water: true,
     jev: 'underwater: the picture is beneath the surface of the sea or a lake in daylight, sunlit blue-green water',
     judge: 'underwater: beneath the sea in sunlit blue-green water',
     phrase: 'underwater: the whole picture is beneath the sea, blue-green water all around, soft light falling through it from above, drifting particles' },
-  { id: 'underwater_deep', hour: false, dim: true,
+  { id: 'underwater_deep', hour: false, water: true, dim: true,
     jev: 'deep underwater: far below the surface of the sea, dim deep-blue water, only a faint glow reaching down from above',
     judge: 'underwater_deep: deep beneath the sea in dim deep-blue water',
     phrase: 'deep underwater: the whole picture is far beneath the sea, dim deep-blue water all around, only a faint blue glow reaching down from above, the far distance fading into dark blue, drifting particles' },
-  { id: 'underwater_night', hour: false, dim: true,
+  { id: 'underwater_night', hour: false, water: true, dim: true,
     jev: 'underwater at night: beneath the surface of the sea while it is night above, dark blue water with a faint pale silvery glow from above',
     judge: 'underwater_night: beneath the sea at night in dark blue water with a faint pale glow',
     phrase: 'underwater at night: the whole picture is beneath the sea, dark blue water all around, a faint pale silvery glow falling through it from above, drifting particles' },
-  { id: 'underwater_dark', hour: false, dim: true,
+  { id: 'underwater_dark', hour: false, water: true, dim: true,
     jev: 'dark underwater: beneath the surface in pitch-black water — a cloud of ink, the abyss, the inside of a sunken wreck — no daylight reaches it',
     judge: 'underwater_dark: beneath the sea in pitch-black water, lit only by light sources in it',
     phrase: 'dark underwater: the whole picture is beneath the sea in pitch-black water, nothing reaches it from above, the scene lit only by the light sources in it, drifting particles' },
@@ -106,6 +106,9 @@ const CLOCK_HOURS = LIGHTS.filter(l => l.hour).map(l => l.id);
 /** The lights that are not an hour: no sky, no sun, no moon. */
 const SKYLESS_LIGHTS = LIGHTS.filter(l => !l.hour).map(l => l.id);
 
+/** The lights beneath the surface of the water: the only lights a submerged place (Visual Bible `submerged`) can have. */
+const SUBMERGED_LIGHTS = LIGHTS.filter(l => l.water).map(l => l.id);
+
 /** The lights too dim to see by without a light source in the picture: Jev is asked what is lit (jevDecisions.decideLightSources). */
 const DIM_LIGHTS = LIGHTS.filter(l => l.dim).map(l => l.id);
 function isDimLight(timeOfDay) { return DIM_LIGHTS.includes(timeOfDay); }
@@ -118,6 +121,20 @@ function isSkylessLight(timeOfDay) { return SKYLESS_LIGHTS.includes(timeOfDay); 
 
 /** What Jev is told each `timeOfDay` value means: id -> label (jevDecisions.lightQuestions). */
 const JEV_TIME_CRITERIA = Object.fromEntries(LIGHTS.map(l => [l.id, l.jev]));
+
+/** The options Jev is given for a page at or aboard a submerged place (jevDecisions.decideSubmergedLight). */
+const JEV_SUBMERGED_CRITERIA = Object.fromEntries(LIGHTS.filter(l => l.water).map(l => [l.id, l.jev]));
+
+/**
+ * Is the sky out of this picture: a skyless light, or an interior? One test for every reader of a page's
+ * decided light (the weather is `none` and no outdoor hour applies). `indoor` is Jev's own INDOOR answer and
+ * says nothing about the light: a skyless light was once folded into it, so an underwater page read as
+ * indoor with an INDOOR probability of 0.01 (staging job_1791315635053_t0t8qpebu p4).
+ */
+function isSkyHidden(light) {
+  const l = light || {};
+  return isSkylessLight(l.timeOfDay) || l.indoor === true;
+}
 
 /** What the visual-flow judge is told each skyless bucket means (the hours need no gloss). */
 const JUDGE_SKYLESS_NOTES = LIGHTS.filter(l => !l.hour).map(l => l.judge).join('; ');
@@ -497,6 +514,9 @@ module.exports = {
   JUDGE_SKYLESS_NOTES,
   CLOCK_HOURS,
   SKYLESS_LIGHTS,
+  SUBMERGED_LIGHTS,
+  JEV_SUBMERGED_CRITERIA,
+  isSkyHidden,
   SKYLESS_LIGHT_RULE,
   isSkylessLight,
   isDimLight,

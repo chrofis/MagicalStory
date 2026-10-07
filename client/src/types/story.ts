@@ -923,6 +923,7 @@ export interface SceneImage {
     retryIssues?: string[] | null;
     keptAttempt?: 'first' | 'retry' | 'base' | null;  // 'base' = a derived plate dropped for its base plate
     shippedWithHardDefects?: { check: string; issue: string }[] | null;
+    shippedWithSoftDefects?: { check: string; issue: string }[] | null;
   } | null;
   textAreaMask?: string | null;  // Base64 data URL — B/W mask sent to Grok marking the text zone (black ~20% = text zone, white ~80% = rest of scene)
   emptySceneVbGrid?: string | null;  // Base64 data URL — filtered VB grid (vehicles + non-landmark locations) actually sent to the empty-scene call

@@ -18,7 +18,7 @@ const { log } = require('../utils/logger');
 const jevDecisions = require('./jevDecisions');
 const { JevDecisionError } = jevDecisions;
 const { resolveShotId } = require('./shotVocabulary');
-const { isDimLight } = require('./sceneLight');
+const { isDimLight, isSkyHidden } = require('./sceneLight');
 
 /**
  * The cited elements of one page as the light-source question asks about them (decideLightSources):
@@ -81,6 +81,29 @@ function pageLocations(visualBible, pageNumbers) {
 }
 
 /**
+ * The pages at or aboard a SUBMERGED place (owner, 2026-10-07): a location or a vehicle the Visual Bible marks
+ * `submerged: true` (written once by the Visual Bible call). A page is at a location (`locOf`: page -> base id)
+ * and aboard a vehicle (`aboardOf`: page -> id or null). Pure.
+ *
+ * @param {Object} visualBible
+ * @param {Map<number,string>} locOf
+ * @param {Map<number,string|null>} aboardOf
+ * @returns {Array<{pageNumber:number, place:string}>}
+ */
+function submergedPages(visualBible, locOf, aboardOf) {
+  const vb = visualBible || {};
+  const baseOf = id => String(id || '').trim().toUpperCase().split('.')[0];
+  const isTrue = v => v === true || String(v).trim().toLowerCase() === 'true';
+  const submerged = new Set([...(vb.locations || []), ...(vb.vehicles || [])].filter(e => e && e.id && isTrue(e.submerged)).map(e => baseOf(e.id)));
+  const out = [];
+  for (const n of new Set([...locOf.keys(), ...aboardOf.keys()])) {
+    const place = [locOf.get(n), aboardOf.get(n)].map(baseOf).find(id => id && submerged.has(id));
+    if (place) out.push({ pageNumber: Number(n), place });
+  }
+  return out.sort((a, b) => a.pageNumber - b.pageNumber);
+}
+
+/**
  * THE DECISION LAYER BEFORE THE PAGE BRIEFS (owner, 2026-09-28: "Jev first,
  * then remove the scene review"). Runs between the Art Director's two calls:
  * the Visual Bible exists, no page brief does. Per story page it decides
@@ -105,7 +128,7 @@ function pageLocations(visualBible, pageNumbers) {
  *
  * @param {Map<number,string[]>} present - page → the names the shipped plan check counts in frame
  */
-async function decideBriefFields({ beats, visualBible, bibleSections, approvedArc, inputData, present, gl }) {
+async function decideBriefFields({ beats, visualBible, bibleSections, approvedArc, inputData, present, gl, light = null }) {
   const { isCoverPage } = require('./coverBeats');
   const { isSameFigureName } = require('./sceneMetadata');
   const t0 = Date.now();
@@ -144,6 +167,18 @@ async function decideBriefFields({ beats, visualBible, bibleSections, approvedAr
     return look ? `${name}, ${look}` : name;
   };
   const vbByPage = new Map(decidedVb.pages.map(r => [r.pageNumber, r]));
+  // A page at or aboard a submerged place has its light decided again, beneath the surface (the bible exists now,
+  // the first answer was blind to it): the clock is re-held and every page's decided light follows.
+  let submergedLight = null;
+  if (light) {
+    const wet = submergedPages(vb, locOf, new Map(decidedVb.pages.map(r => [r.pageNumber, r.aboard])));
+    if (wet.length) {
+      submergedLight = await jevDecisions.decideSubmergedLight({ arc: approvedArc, pages: storyBeats, light, pageNumbers: wet.map(w => w.pageNumber) });
+      const rowOf = new Map(light.pages.map(r => [Number(r.pageNumber), r]));
+      for (const b of storyBeats) { const r = rowOf.get(Number(b.pageNumber)); if (r && b.fixed) b.fixed.timeOfDay = r.timeOfDay; }
+      gl.info('beats_jev_light_submerged', `Submerged pages ${wet.map(w => `p${w.pageNumber} (${w.place})`).join(', ')}: light re-decided beneath the surface${submergedLight.changed.length ? ` — ${submergedLight.changed.map(c => `p${c.pageNumber} ${c.from}→${c.to}`).join(', ')}` : ' — no change'}`, null, { pages: wet, changed: submergedLight.changed, stats: submergedLight.stats });
+    }
+  }
   for (const b of storyBeats) {
     const n = Number(b.pageNumber);
     const r = vbByPage.get(n);
@@ -645,7 +680,7 @@ function coverLight(coverKey, storyBeats, location = null) {
   if (coverKey === 'initialPage') src = pages[0];
   else if (coverKey === 'backCover') src = pages[pages.length - 1];
   else {
-    const pool = pages.some(b => !b.fixed.indoor) ? pages.filter(b => !b.fixed.indoor) : pages;
+    const pool = pages.some(b => !isSkyHidden(b.fixed)) ? pages.filter(b => !isSkyHidden(b.fixed)) : pages;
     const tally = new Map();
     for (const b of pool) tally.set(b.fixed.timeOfDay, (tally.get(b.fixed.timeOfDay) || 0) + 1);
     const top = Math.max(...tally.values());
@@ -657,7 +692,7 @@ function coverLight(coverKey, storyBeats, location = null) {
     indoor: !!src.fixed.indoor,
     // An outdoor source page whose advice is `none` (Jev contradicting its own indoors answer, staging
     // job_1791145238223_50osg2osm p3-p10) pins no weather: `none` outdoors is a fault, and none is invented.
-    ...(src.fixed.indoor ? { weather: 'none' } : (src.fixed.weatherAdvice && src.fixed.weatherAdvice !== 'none' ? { weather: src.fixed.weatherAdvice } : {})),
+    ...(isSkyHidden(src.fixed) ? { weather: 'none' } : (src.fixed.weatherAdvice && src.fixed.weatherAdvice !== 'none' ? { weather: src.fixed.weatherAdvice } : {})),
     sourcePage: src.pageNumber,
   };
 }
@@ -717,6 +752,6 @@ async function decideCoverPopulation({ arc, coverBeats, visualBible, decided = {
 
 module.exports = {
   litCandidates, offFrameOf, coverLight, coverFacts, decideCoverPopulation, COVER_SHOT, COVER_GAZE,
-  decideBriefFields, assembleBriefs, pageLocations, visualBibleJsonOf,
+  decideBriefFields, assembleBriefs, pageLocations, submergedPages, visualBibleJsonOf,
   COVER_PLACE_SHOTS, COVER_PURPOSE, COVER_FOOTING, COVER_ONE_PLACE_NOTE, coverFitQuestion, COVER_PLACE_FLOOR, COVER_PHOTO_MIN_SCORE, coverPhotoOf, bibleLocationOf, materializeCoverPlaces, coverPlaceLabel, coverPlaceCandidates, assignCoverPlaces, coverPlaceState, decideCoverPlaces, applyCoverPlacePages,
 };

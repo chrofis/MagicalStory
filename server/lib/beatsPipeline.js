@@ -1847,7 +1847,7 @@ ${bibleBody}` : bibleBody;
 
   // ── The decided fields of every story page (Jev first) ───────────────────
   if (jevActive(jevReport)) try {
-    const decided = await decideBriefFields({ beats, visualBible, bibleSections, approvedArc, inputData, present, gl });
+    const decided = await decideBriefFields({ beats, visualBible, bibleSections, approvedArc, inputData, present, gl, light: jevReport ? jevReport.light : null });
     bibleSections = decided.bibleSections;
     if (jevReport) Object.assign(jevReport, { vb: decided.report.vb, population: decided.report.population, gaze: decided.report.gaze, locations: decided.report.locations });
   } catch (err) {

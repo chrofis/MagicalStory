@@ -52,10 +52,16 @@ describe('a skyless page is never given sun or sky wording', () => {
   it('an hour still names its sky (nothing else changed)', () => {
     expect(SL.buildLightLine({ timeOfDay: 'dusk', weather: 'clear' })).toMatch(/sky/);
   });
-  it('the season note drops the sky and the daylight for a skyless page only', () => {
+  it('a skyless page carries no SEASON line at all: no foliage, ground cover, sky or daylight colour', () => {
     const season = { season: 'autumn' };
-    expect(buildSeasonNote(season, { skyless: true })).not.toMatch(SKY_WORDS);
+    // staging job_1791315635053_t0t8qpebu p4/p6: autumn leaves drifted in the water under "foliage and ground cover are autumn's"
+    expect(buildSeasonNote(season, { skyless: true })).toBe('');
     expect(buildSeasonNote(season, {})).toMatch(/sky and daylight/);
+  });
+  it('an interior shows the season only through a window or a door', () => {
+    const note = buildSeasonNote({ season: 'autumn' }, { indoor: true });
+    expect(note).toMatch(/window or door/);
+    expect(note).not.toMatch(/ground cover|sky|daylight/);
   });
   it('a skyless light is contradicted by a daylight read and by nothing else', () => {
     expect(SL.timeContradicts('underwater', 'afternoon')).toBe(true);
@@ -80,7 +86,7 @@ describe('Jev light: the clock goes on around a skyless page', () => {
     expect(q.criteria.underwater).toMatch(/beneath the surface/);
     expect(q.criteria.underwater_dark).toMatch(/ink/);
   });
-  it('a skyless answer is indoor (weather none) whatever the INDOOR question said', async () => {
+  it('REGRESSION p4 2026-10-07: a skyless answer keeps the INDOOR answer honest (indoorP 0.01 is not indoor) and still hides the sky', async () => {
     // the stub picks the first TIME criterion (`dawn`); give it the skyless one through the answer shape
     const stub = makeJevStub({ noul: () => 0.0 });
     const impl = async (args: any) => {
@@ -90,7 +96,14 @@ describe('Jev light: the clock goes on around a skyless page', () => {
     };
     const d = await JD.decideLight({ arc: 'A', pages: [{ pageNumber: 1, planLine: 'SHOT — Ana — swims — y' }] }, { callImpl: impl });
     expect(d.pages[0].timeOfDay).toBe('underwater');
-    expect(d.pages[0].indoor).toBe(true);
+    expect(d.pages[0].indoor).toBe(false);
+    expect(SL.isSkyHidden(d.pages[0])).toBe(true);
+    expect(SL.isSkyHidden({ timeOfDay: 'evening', indoor: false })).toBe(false);
+    expect(SL.isSkyHidden({ timeOfDay: 'evening', indoor: true })).toBe(true);
+    // the pin: weather none for every sky-hidden page, indoors or skyless
+    const brief = ['x', '', '---METADATA---', ''].join('\n') + JSON.stringify({ sceneIntent: 'x', characters: [], objects: [], weather: 'clear' });
+    const pinned = JD.pinBrief(brief, { timeOfDay: 'underwater', indoor: false });
+    expect(pinned.changes.some((c: any) => c.field === 'weather' && c.to === 'none')).toBe(true);
   });
   it('the FIXED line says no sky, never indoors or outdoors', () => {
     expect(JD.fixedLine({ timeOfDay: 'underwater', indoor: true })).toContain('no sky (weather none)');

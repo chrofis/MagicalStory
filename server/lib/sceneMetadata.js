@@ -2114,8 +2114,13 @@ function vantageSettingText(v, plateText = '') {
   // English-only: the bare VB location name is story-language and carries no
   // visual info, so it goes out with the entry's English visual fields
   // inlined (same rule as covers / sanitizeVbIdsInPrompt; decisions.md 2026-07-31).
-  const locationRef = englishLocationRef(v?.location) || v?.locationName || '';
   const description = String(v?.description || '').trim();
+  // A vantage that has its own description gets the place's NAME and COLOURS only: the location's features and
+  // signature element belong to the place as a whole, and a camera that cannot see them was told to paint them
+  // (staging job_1791315635053_t0t8qpebu: p4's underwater plate kept the beach's bench and dunes under a water
+  // ceiling, p6's exterior of a wreck became its interior through "ribs forming the enclosed hull space"). The
+  // vantage description, written from this camera, carries what is in view.
+  const locationRef = englishLocationRef(v?.location, description ? { fields: ['colors'] } : undefined) || v?.locationName || '';
   return [
     `**LOCATION:** ${locationRef}\n**VANTAGE:** ${v?.name || ''}`,
     description && description !== String(plateText || '').trim() ? description : '',

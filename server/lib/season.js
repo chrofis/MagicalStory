@@ -81,6 +81,13 @@ function seasonLabel(inputData = {}, opts = {}) {
 }
 
 /**
+ * The rule every brief author is given beside the season (Art Director both templates, both iterate templates and
+ * the Visual Bible call), one constant for all of them: a picture with no sky shows no season. The page prompt's
+ * own SEASON line is dropped for such a page in code (buildSeasonNote, `skyless`).
+ */
+const SEASON_NO_SKY_RULE = 'A page set beneath the water or in a place no daylight reaches shows no season: add no leaf, foliage or ground cover to it.';
+
+/**
  * The image-side instruction. Season governs foliage, ground cover and daylight
  * colour across every page, which is exactly the continuity that broke: the
  * same forest path must not be green on one page and orange on the next. It
@@ -89,11 +96,14 @@ function seasonLabel(inputData = {}, opts = {}) {
 function buildSeasonNote(inputData = {}, opts = {}) {
   const label = seasonLabel(inputData, opts);
   if (!label) return '';
-  // A page with no sky (underwater, dark: sceneLight.SKYLESS_LIGHTS) is told nothing about the sky or the
-  // daylight: "sky and daylight colour are autumn's" drew staging job_1791267520938_essbvehs8's submerged
-  // pages with an autumn sky.
-  if (opts && opts.skyless) {
-    return `**SEASON:** ${label}. Foliage and ground cover are ${label.toLowerCase()}'s on every page, the same place alike from page to page, even when a reference photo shows another season.`;
+  // A page with no sky (underwater, dark: sceneLight.SKYLESS_LIGHTS) shows no season at all: no foliage, no ground
+  // cover, no sky, no daylight colour. "sky and daylight colour are autumn's" drew staging
+  // job_1791267520938_essbvehs8's submerged pages with an autumn sky, and "foliage and ground cover are autumn's"
+  // drew autumn leaves in the water of job_1791315635053_t0t8qpebu p4 and p6. The page prompt carries no SEASON line.
+  if (opts && opts.skyless) return '';
+  // An interior shows the season only through a window or a door.
+  if (opts && opts.indoor) {
+    return `**SEASON:** ${label}. What a window or door shows of the outdoors is ${label.toLowerCase()}'s, the same place alike from page to page; the room itself shows no season.`;
   }
   // Terse on purpose: never cut from the page prompt (2026-09-27, "shorten the fixed blocks").
   return `**SEASON:** ${label}. Foliage, ground cover, sky and daylight colour are ${label.toLowerCase()}'s on every page, the same place alike from page to page, even when a reference photo shows another season. Indoor frames and the page's time of day are unaffected.`;
@@ -187,4 +197,5 @@ module.exports = {
   resolveSeason,
   seasonLabel,
   buildSeasonNote,
+  SEASON_NO_SKY_RULE,
 };

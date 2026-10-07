@@ -65,11 +65,11 @@ describe('every skyless light, in every consumer, names no sun, moon or sky', ()
     const times = ['evening', 'underwater_dark', 'underwater_deep', 'dusk', 'underwater_night', 'morning'];
     expect(JD.forwardClock(times).times).toEqual(times);
   });
-  it('a skyless answer is indoor for everything downstream (weather none), underwater_dark included', async () => {
+  it('a skyless answer hides the sky for everything downstream (weather none), underwater_dark included, without calling the page indoor', async () => {
     const stub = makeJevStub({ noul: () => 0.0 });
     const impl = async (args: any) => { const r = await stub.impl(args); r.answers.TIME = { choice: 'underwater_dark', probabilities: { underwater_dark: 1 } }; return r; };
     const d = await JD.decideLight({ arc: 'A', pages: [{ pageNumber: 1, planLine: 'SHOT — Ana — swims into a cloud — y' }] }, { callImpl: impl });
-    expect(d.pages[0]).toMatchObject({ timeOfDay: 'underwater_dark', indoor: true });
+    expect(d.pages[0]).toMatchObject({ timeOfDay: 'underwater_dark', indoor: false });
     expect(JD.fixedLine({ timeOfDay: 'underwater_dark', indoor: true })).toContain('no sky (weather none)');
   });
 });

@@ -1956,11 +1956,11 @@ function englishEntityRef(entry, genericNoun = 'object', opts = {}) {
  * (settled cover-prompt pattern, docs/decisions.md 2026-07-31). Returns null
  * when the entry has no name — callers keep their own fallbacks.
  */
-function englishLocationRef(loc) {
+function englishLocationRef(loc, { fields = ['features', 'colors', 'signatureElement'] } = {}) {
   if (!loc) return null;
   const name = String(loc.name || '').trim();
   if (!name) return null;
-  const visuals = [loc.features, loc.colors, loc.signatureElement]
+  const visuals = fields.map(f => loc[f])
     .map(v => String(v || '').trim())
     .filter(Boolean)
     .join('; ');
