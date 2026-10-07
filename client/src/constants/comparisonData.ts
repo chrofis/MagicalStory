@@ -1925,7 +1925,7 @@ export const comparisons: ComparisonData[] = [
         features: {
           en: ['$5 per digital story', 'Up to 3 characters from photos', '7 art styles', 'Custom location uploads', 'Story-aware outfits', 'Free 5-page preview'],
           de: ['$5 pro digitaler Geschichte', 'Bis zu 3 Figuren aus Fotos', '7 Kunststile', 'Eigene Orts-Uploads', 'Szenengerechte Kleidung', 'Gratis 5-Seiten-Vorschau'],
-          fr: ['5$ par histoire numérique', 'Jusqu\'à 3 personnages depuis photos', '7 styles', 'Upload de lieux', 'Tenues adaptées', 'Aperçu gratuit 5 pages'],
+          fr: ['5$ par histoire numérique', 'Jusqu\'à 3 personnages depuis photos', '7 styles', 'Import de lieux', 'Tenues adaptées', 'Aperçu gratuit 5 pages'],
           it: ['5$ per storia digitale', 'Fino a 3 personaggi da foto', '7 stili artistici', 'Caricamento di luoghi personalizzati', 'Abiti adattati alla scena', 'Anteprima gratuita di 5 pagine'],
         },
       },

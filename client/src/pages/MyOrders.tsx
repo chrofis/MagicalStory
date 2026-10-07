@@ -42,7 +42,7 @@ function txLabel(tx: CreditTransaction, language: string): string {
   // Story descriptions carry the page count, e.g. "Reserved 250 credits for 25-page story"
   if (tx.type === 'story_reserve') {
     const m = /(\d+)-page/.exec(tx.description || '');
-    if (m) label += language === 'de' ? ` (${m[1]} Seiten)` : language === 'it' ? ` (${m[1]} pagine)` : ` (${m[1]} pages)`;
+    if (m) label += language === 'de' ? ` (${m[1]} Seiten)` : language === 'fr' ? ` (${m[1]} pages)` : language === 'it' ? ` (${m[1]} pagine)` : ` (${m[1]} pages)`;
   }
   return label;
 }
