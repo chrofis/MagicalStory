@@ -2112,11 +2112,36 @@ async function prepareWardrobeVariantAvatars(characters, artStyle, variantRequir
   return stored;
 }
 
+/**
+ * Names of the characters in `photos` that were asked for their COSTUME and
+ * did not get a costumed reference: getCharacterPhotoDetails falls through to
+ * the standard avatar when the styled costumed sheet is missing, and
+ * applyStyledAvatars keeps that photo on a costumed cache miss (it logs, it
+ * does not throw). A render that goes ahead with such a photo draws the hero
+ * in modern clothes. The trial streams its pages and covers BEFORE the final
+ * coverage pass (ensureStyledAvatarCoverage) would fail the book, so the
+ * trial render sites ask this and refuse the render instead.
+ * @param {Array<{name:string, photoType?:string, isStyled?:boolean, requestedClothingCategory?:string, clothingCategory?:string}>} photos
+ * @returns {string[]} character names rendered on a non-costumed photo
+ */
+function missingCostumedRefs(photos) {
+  const missing = [];
+  for (const photo of photos || []) {
+    if (!photo) continue;
+    const requested = normalizeClothingCategory(photo.requestedClothingCategory || photo.clothingCategory || '');
+    if (requested !== 'costumed') continue;
+    const hasCostumedRef = (typeof photo.photoType === 'string' && photo.photoType.startsWith('costumed-')) || photo.isStyled === true;
+    if (!hasCostumedRef) missing.push(photo.name);
+  }
+  return missing;
+}
+
 module.exports = {
   // Core functions
   getOrCreateStyledAvatar,
   prepareStyledAvatars,
   MissingRequiredCostumeSheetError,
+  missingCostumedRefs,
   ensureStyledAvatarCoverage,
   prepareWardrobeVariantAvatars,
   variantLogEntry,

@@ -25,6 +25,7 @@ const { runUnifiedRepairPipeline } = require('./server/lib/repairPipeline');
 const {
   prepareStyledAvatars,
   applyStyledAvatars,
+  missingCostumedRefs,
   collectAvatarRequirements,
   setStyledAvatar,
   runInCacheScope,
@@ -869,7 +870,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           earlyAvatarStylingSucceeded = getStyledAvatarCacheStats().size > 0;
           log.info(`✅ [TRIAL] Early avatar styling complete: ${getStyledAvatarCacheStats().size} cached`);
         } catch (error) {
-          log.warn(`⚠️ [TRIAL] Early avatar styling failed: ${error.message}`);
+          // Not rethrown: the final coverage pass (prepareStyledAvatars before
+          // the page loop) retries and fails the book if the sheet is still
+          // missing. Until then every streamed page and cover refuses to
+          // render without its costumed ref (missingCostumedRefs).
+          log.error(`❌ [TRIAL] Early avatar styling failed: ${error.message}`);
         }
       })();
     }
@@ -1247,6 +1252,20 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // Get character photos with styled avatars applied
           let pagePhotos = getCharacterPhotoDetails(sceneCharacters, 'standard', inputData.artStyle, sceneClothingRequirements);
           pagePhotos = applyStyledAvatars(pagePhotos, inputData.artStyle);
+          // COSTUME OR FAIL. The early styling pass above swallows its error
+          // (the final coverage pass retries and fails the book), but this page
+          // streams BEFORE that pass: with the costumed sheet missing, the
+          // photo above is the standard avatar / raw photo and the page would
+          // render the hero in modern clothes, then be REUSED by the page loop
+          // even when the retry produced the sheet. Fail the streamed page
+          // instead; the page loop renders it after the coverage pass.
+          {
+            const bare = missingCostumedRefs(pagePhotos);
+            if (bare.length > 0) {
+              log.error(`❌ [TRIAL-PAGE] Page ${page.pageNumber}: costumed sheet missing for ${bare.join(', ')} — page not rendered on the standard avatar`);
+              throw new Error(`page ${page.pageNumber}: costumed sheet missing for ${bare.join(', ')}`);
+            }
+          }
 
           // Build the image prompt — trial uses rich scene hint as scene description
           const sceneDescription = page.sceneHint || page.text || '';
@@ -1720,6 +1739,17 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           mergedClothingRequirements
         );
         coverPhotos = applyStyledAvatars(coverPhotos, artStyle);
+        // COSTUME OR FAIL — same rule as the streamed trial page (see
+        // startTrialPageImageGeneration): this cover renders before the final
+        // coverage pass, so a missing costumed sheet fails the cover rather
+        // than drawing the hero in the standard avatar.
+        {
+          const bare = missingCostumedRefs(coverPhotos);
+          if (bare.length > 0) {
+            log.error(`❌ [TRIAL-COVER] ${coverType}: costumed sheet missing for ${bare.join(', ')} — cover not rendered on the standard avatar`);
+            throw new Error(`${coverType}: costumed sheet missing for ${bare.join(', ')}`);
+          }
+        }
         // Phase 7: cell-crop refs from story sheets. For covers we use front
         // pose by default (head-on shot) — no per-page scene metadata at this point.
         // OUTFIT VERSIONS follow the page rule (owner, 2026-09-24): a character
@@ -2380,6 +2410,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             // Get character photos with styled avatars
             let coverPhotos = getCharacterPhotoDetails(coverCharacters, 'standard', artStyle, coverClothingReqs);
             coverPhotos = applyStyledAvatars(coverPhotos, artStyle);
+            // COSTUME OR FAIL — same rule as the streamed trial page.
+            {
+              const bare = missingCostumedRefs(coverPhotos);
+              if (bare.length > 0) {
+                log.error(`❌ [TRIAL-COVER] frontCover: costumed sheet missing for ${bare.join(', ')} — cover not rendered on the standard avatar`);
+                throw new Error(`frontCover: costumed sheet missing for ${bare.join(', ')}`);
+              }
+            }
 
             // Build prompt components
             const pageImageModel = MODEL_DEFAULTS.simplePageImage;

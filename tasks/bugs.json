@@ -3736,6 +3736,16 @@
       "fixedAt": "2026-10-07",
       "fixedIn": "pending",
       "fix": "The stamp is an atomic claim taken before the build: UPDATE ... SET trial_completion_email_sent_at = CURRENT_TIMESTAMP WHERE id = $1 AND trial_completion_email_sent_at IS NULL RETURNING id; a caller that updates no row returns already-sent. A failure after the claim (PDF, Resend) releases it so the next verify / link attempt sends."
+    },
+    {
+      "id": "trial-streamed-render-on-standard-avatar-when-costume-sheet-missing",
+      "title": "A trial page or cover that streams before the final avatar coverage pass rendered the costumed hero on the STANDARD avatar when the costumed sheet was missing: the early styling pass swallowed its MissingRequiredCostumeSheetError, getCharacterPhotoDetails fell through to the standard photo, applyStyledAvatars logged the costumed miss and kept it, and the page loop reused the image even after the coverage pass's retry had produced the sheet",
+      "reportedAt": "2026-10-07",
+      "source": "storyJobPipeline.js: streamingAvatarStylingPromise catch (log.warn, not rethrown) → startTrialPageImageGeneration / onCoverScene / startCoverGeneration call getCharacterPhotoDetails + applyStyledAvatars and render; page loop (`reusing pre-generated streaming image`) takes any streamResult.imageData. clothingResolve.js 'Photo falls through to standard avatar below' and styledAvatars.getStyledAvatar 'COSTUMED CACHE MISS ... return null' (applyStyledAvatars returns the photo on null). Reproduced by tests/unit/trial-costumed-ref-or-fail.test.ts: a costumed request with no sheet yields photoUrl = the standard avatar with requestedClothingCategory 'costumed'.",
+      "status": "fixed",
+      "fixedAt": "2026-10-07",
+      "fixedIn": "pending",
+      "fix": "styledAvatars.missingCostumedRefs(photos) names the characters asked for their costume whose photo is neither a costumed-* ref nor a styled cache hit; the streamed trial page and both trial covers throw on a non-empty result right after applyStyledAvatars (COSTUME OR FAIL, same shape as PLATE OR FAIL). The failed page returns null and is rendered by the page loop after the coverage pass; a failed cover is recorded as cover_failed. The early styling failure logs at ERROR. The full-mode page path renders after the coverage pass that throws and is unchanged."
     }
   ]
 }
