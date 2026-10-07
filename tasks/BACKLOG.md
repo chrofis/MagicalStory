@@ -685,6 +685,7 @@ are listed stage by stage in the audit table.
 ---
 
 ## Verification pending (code shipped, proof not taken)
+- [ ] (2026-10-07) Next trial run: check verify entries trial-writer-shared-prose-rules, trial-page-grid-production-selector, trial-photo-glasses-and-features; review the last 2 weeks of prod trials (commands in the doc) → tasks/trial-quality-review-2026-10-07.md §6
 Run verifications now live in **`tasks/verify.json`** (judge a stored run: `node scripts/admin/verify-run.js <storyId> --write`); the lines below point at their registry ids. Non-run chores (UI, admin, SEO, state files) stay here only.
 
 - [ ] `creature-part-in-who-column` (3a65d887e): the figure-shown-in-part rule is in the planner, Art Director, iterate and scene-review prompts; Lab 1575 (scene_review_replay on dka3jpog9, stored plan lines) still left p11 uncited — the reviewer does not add a creature the who column omits, so the fix rests on the planner writing it there. Needs a full-story run (planner first division) → `tasks/verify.json` creature-part-in-who-column
@@ -776,6 +777,10 @@ Run verifications now live in **`tasks/verify.json`** (judge a stored run: `node
 ---
 
 ## Decisions waiting on the owner
+- [ ] (2026-10-07) Trial: reading level (LANGUAGE_LEVELS standard 40-150, varied pacing) instead of the flat 100-140 words/page — likely shorter output, changes page look → tasks/trial-quality-review-2026-10-07.md §5.1
+- [ ] (2026-10-07) Trial time budget: Jev landmark probe+scoring runs sequentially before the writer (≤20 s); back cover starts only after the parse and is the 155-216 s tail — move either off the path? → tasks/trial-quality-review-2026-10-07.md §5.2
+- [ ] (2026-10-07) Order flow still falls back to GELATO_PHOTOBOOK_UID when no gelato_products row matches (gelato.js ~323); admin PDF route now fails loudly → tasks/trial-quality-review-2026-10-07.md §5.3
+- [ ] (2026-10-07) Trial hint fields deferred for output length: sceneIntent (THIS IMAGE DEPICTS blank on every trial page), looksAt, creatures[]; trial cover code-owned shot/gaze/weather; back cover from the main LOC → tasks/trial-quality-review-2026-10-07.md §5.4
 
 - [x] ANSWERED 2026-10-04 (measured, none adopted; follow-up = the TASK 10 wording owner call) — the Pass-2 style judge passes a sheet whose head row changed medium and crop (Fiona costumed--off variant, z3fw660ie: flat line-art waist-up head row scored style 9; reasons cite a "dark grey vest" and "no hard outlines" that are not in the image — it reads Image 2). Same judge approves every base sheet; eval-prompt change is the owner's call → docs/decisions.md:24
 - [x] DONE 2026-09-27 (owner: "slop + logic/arc rewrites"; eval story text stays out of git) — wired in 82b4b4d2a: Jev is the third text auditor, slop rules joined STYLE_RULEBOOK via proseSlop.js; the cast check is FEEDBACK for the one arc re-telling, never a gate opener (owner: "There is one arc rewrite, add it as feedback there"). Proof on a real story pending: tasks/verify.json `jev-text-chain-wired` → docs/decisions.md (2026-09-27 "Jev text audit wired")
