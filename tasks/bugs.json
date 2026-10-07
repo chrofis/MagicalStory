@@ -3958,6 +3958,26 @@
       "fixedAt": "2026-10-07",
       "fixedIn": "42920022c",
       "fix": "extractSceneMetadata returns creatures at the top level in the prose and JSON branches. Test: tests/unit/creature-declares-page-roster.test.ts (REGRESSION: runs a real prose brief through extractSceneMetadata; fails without the fix)."
+    },
+    {
+      "id": "illustration-progress-counts-covers-over-page-total",
+      "title": "The illustration pass progress read \"Illustration 17/14 done\" and overshot its percentage: completions include the 3 covers but were divided by the story page count",
+      "reportedAt": "2026-10-07",
+      "source": "Showcase review 2026-10-07: storyJobPipeline.js bumpProgress counted pageDataArray completions (pages + covers) over expandedScenes.length.",
+      "status": "fixed",
+      "fixedAt": "2026-10-08",
+      "fixedIn": "dc916cf03",
+      "fix": "server/lib/illustrationProgress.js divides by pageDataArray.length; tests/unit/illustration-progress.test.ts."
+    },
+    {
+      "id": "review-page-dumps-empty-folder-image-data-null",
+      "title": "scripts/analysis/review-page.js selected only story_images.image_data (NULL since images moved to R2 image_url) and silently wrote an empty folder, with a .png extension for JPEGs and swallowed errors",
+      "reportedAt": "2026-10-07",
+      "source": "Showcase review 2026-10-07: the dump step printed nothing for current rows.",
+      "status": "fixed",
+      "fixedAt": "2026-10-08",
+      "fixedIn": "dc916cf03",
+      "fix": "Reads image_url || image_data through r2.bytesFromAnyImage, names the extension from the bytes, lists every failure and exits 1. Run on showcase job_1791315635053_t0t8qpebu p4 --staging: 3 images written (jpg)."
     }
   ]
 }
