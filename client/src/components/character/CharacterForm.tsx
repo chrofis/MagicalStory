@@ -2046,9 +2046,9 @@ export function CharacterForm({
         return (
           <div className="bg-indigo-50 border border-indigo-300 rounded-lg p-4">
             <h4 className="text-sm font-semibold text-indigo-700 mb-3 flex items-center gap-2">
-              🎨 {language === 'de' ? 'Stilisierte Avatare (2×4)' : language === 'fr' ? 'Avatars stylisés (2×4)' : 'Styled Avatars (2×4)'}
+              🎨 {language === 'de' ? 'Stilisierte Avatare (2×4)' : language === 'fr' ? 'Avatars stylisés (2×4)' : language === 'it' ? 'Avatar stilizzati (2×4)' : 'Styled Avatars (2×4)'}
               <span className="text-xs font-normal text-indigo-500">
-                ({total} {language === 'de' ? 'Blätter' : language === 'fr' ? 'feuilles' : 'sheets'})
+                ({total} {language === 'de' ? 'Blätter' : language === 'fr' ? 'feuilles' : language === 'it' ? 'fogli' : 'sheets'})
               </span>
             </h4>
             <div className="space-y-4">
@@ -2721,7 +2721,7 @@ export function CharacterForm({
                 }}
                 className="px-4 py-3 text-gray-600 hover:text-gray-800 transition-colors"
               >
-                {language === 'de' ? 'Abbrechen' : 'Cancel'}
+                {language === 'de' ? 'Abbrechen' : language === 'fr' ? 'Annuler' : language === 'it' ? 'Annulla' : 'Cancel'}
               </button>
             </div>
           </div>

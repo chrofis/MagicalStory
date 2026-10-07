@@ -153,6 +153,7 @@ export function SceneEditModal({
                 <h4 className="font-semibold text-amber-800">
                   {language === 'de' ? 'Konsistenz-Korrektur angewendet' :
                    language === 'fr' ? 'Correction de cohérence appliquée' :
+                   language === 'it' ? 'Correzione di coerenza applicata' :
                    'Consistency Fix Applied'}
                 </h4>
                 <span className="text-xs bg-amber-200 text-amber-800 px-2 py-0.5 rounded">
@@ -165,6 +166,7 @@ export function SceneEditModal({
                 <p className="text-sm font-medium text-amber-700 mb-2">
                   {language === 'de' ? 'Behobene Probleme:' :
                    language === 'fr' ? 'Problèmes corrigés :' :
+                   language === 'it' ? 'Problemi risolti:' :
                    'Issues Fixed:'}
                 </p>
                 <ul className="text-sm text-amber-900 space-y-1">
@@ -185,7 +187,7 @@ export function SceneEditModal({
               <div className="grid grid-cols-2 gap-4 mb-4">
                 <div>
                   <p className="text-xs font-medium text-gray-500 mb-1 text-center">
-                    {language === 'de' ? 'Original' : language === 'fr' ? 'Original' : 'Original'}
+                    {language === 'de' ? 'Original' : language === 'fr' ? 'Original' : language === 'it' ? 'Originale' : 'Original'}
                   </p>
                   <img
                     src={consistencyRegen.originalImage}
@@ -196,7 +198,7 @@ export function SceneEditModal({
                 </div>
                 <div>
                   <p className="text-xs font-medium text-green-600 mb-1 text-center">
-                    {language === 'de' ? 'Korrigiert' : language === 'fr' ? 'Corrigé' : 'Fixed'}
+                    {language === 'de' ? 'Korrigiert' : language === 'fr' ? 'Corrigé' : language === 'it' ? 'Corretto' : 'Fixed'}
                   </p>
                   <img
                     src={consistencyRegen.fixedImage}
@@ -214,7 +216,7 @@ export function SceneEditModal({
                   className="flex items-center gap-1 text-xs text-gray-600 hover:text-gray-800"
                 >
                   {showOriginalPrompt ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                  {language === 'de' ? 'Original-Prompt' : language === 'fr' ? 'Prompt original' : 'Original Prompt'}
+                  {language === 'de' ? 'Original-Prompt' : language === 'fr' ? 'Prompt original' : language === 'it' ? 'Prompt originale' : 'Original Prompt'}
                 </button>
                 {showOriginalPrompt && (
                   <pre className="text-xs bg-gray-100 p-2 rounded overflow-x-auto max-h-32 overflow-y-auto whitespace-pre-wrap">
@@ -229,6 +231,7 @@ export function SceneEditModal({
                   {showFixedPrompt ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                   {language === 'de' ? 'Korrigierter Prompt (mit Korrekturen)' :
                    language === 'fr' ? 'Prompt corrigé (avec corrections)' :
+                   language === 'it' ? 'Prompt corretto (con correzioni)' :
                    'Fixed Prompt (with corrections)'}
                 </button>
                 {showFixedPrompt && (
@@ -242,6 +245,7 @@ export function SceneEditModal({
                 <p className="text-xs text-gray-400">
                   {language === 'de' ? `Korrigiert am ${new Date(consistencyRegen.timestamp).toLocaleString()}` :
                    language === 'fr' ? `Corrigé le ${new Date(consistencyRegen.timestamp).toLocaleString()}` :
+                   language === 'it' ? `Corretto il ${new Date(consistencyRegen.timestamp).toLocaleString()}` :
                    `Fixed at ${new Date(consistencyRegen.timestamp).toLocaleString()}`}
                 </p>
                 {consistencyRegen.clothing && (
@@ -257,6 +261,7 @@ export function SceneEditModal({
                   <p className="text-xs font-medium text-blue-700 mb-1">
                     {language === 'de' ? 'Verwendete Avatare:' :
                      language === 'fr' ? 'Avatars utilisés :' :
+                     language === 'it' ? 'Avatar utilizzati:' :
                      'Avatars used:'}
                   </p>
                   <div className="flex flex-wrap gap-2">
@@ -344,7 +349,7 @@ export function SceneEditModal({
                 <>
                   <RefreshCw size={16} />
                   {language === 'de' ? 'Neu generieren' : language === 'fr' ? 'Régénérer' : language === 'it' ? 'Rigenera' : 'Regenerate'}
-                  <span className="text-xs opacity-80">({IMAGE_REGENERATION_COST} {language === 'de' ? 'Credits' : language === 'it' ? 'crediti' : 'credits'})</span>
+                  <span className="text-xs opacity-80">({IMAGE_REGENERATION_COST} {language === 'de' ? 'Credits' : language === 'fr' ? 'crédits' : language === 'it' ? 'crediti' : 'credits'})</span>
                 </>
               )}
             </button>
