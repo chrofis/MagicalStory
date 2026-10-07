@@ -1566,6 +1566,38 @@ function buildTrialUsedResponse(jobRow) {
 }
 
 /**
+ * The answer for a visitor whose trial is already spent, or null while it is
+ * unused: 404 ACCOUNT_NOT_FOUND without a trial users row, else the 409
+ * TRIAL_USED body with the newest story job (buildTrialUsedResponse).
+ *
+ * Runs BEFORE the request body is validated. The waiting page resumes a story
+ * by POSTing create-story again — after a reload, from the wizard's "View your
+ * story" button, or from a direct visit — and those resumes carry no topic
+ * (storyInput is {}). Validating first answered 400 TOPIC_REQUIRED, which the
+ * page shows as "Something went wrong" for a story that exists and may be
+ * finished. The atomic increment in the handler stays the cap; this is a read.
+ */
+async function existingTrialJobResponse(pool, userId) {
+  const user = await pool.query(
+    'SELECT stories_generated FROM users WHERE id = $1 AND is_trial = true',
+    [userId]
+  );
+  if (user.rows.length === 0) {
+    return { status: 404, body: { error: 'Account not found', code: 'ACCOUNT_NOT_FOUND' } };
+  }
+  if (user.rows[0].stories_generated < 1) return null;
+  const jobRow = await pool.query(
+    'SELECT id, status FROM story_jobs WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1',
+    [userId]
+  );
+  const used = buildTrialUsedResponse(jobRow.rows[0]);
+  if (!used.body.jobId) {
+    log.error(`[TRIAL] TRIAL_USED for user ${userId} but no story_jobs row found`);
+  }
+  return used;
+}
+
+/**
  * POST /api/trial/create-story
  *
  * Start story generation for an anonymous trial user.
@@ -1576,6 +1608,14 @@ router.post('/create-story', verifySessionToken, async (req, res) => {
     const { userId } = req.sessionUser;
     const { storyCategory, storyTopic, storyTheme, storyDetails, language, userLocation, ideaKind } = req.body;
 
+    const { getPool } = require('../services/database');
+    const pool = getPool();
+
+    // A spent trial resumes its job before any input is looked at: the resume
+    // request carries no topic (see existingTrialJobResponse).
+    const spent = await existingTrialJobResponse(pool, userId);
+    if (spent) return res.status(spent.status).json(spent.body);
+
     if (!storyCategory && !storyTopic) {
       return res.status(400).json({ error: 'Story topic is required', code: 'TOPIC_REQUIRED' });
     }
@@ -1585,9 +1625,6 @@ router.post('/create-story', verifySessionToken, async (req, res) => {
       ['storyDetails', storyDetails, guards.IDEA_TEXT_MAX_CHARS], ['language', language, 20], ['ideaKind', ideaKind, 20],
     ]) || guards.locationError(userLocation);
     if (inputErr) return res.status(400).json({ error: inputErr });
-
-    const { getPool } = require('../services/database');
-    const pool = getPool();
 
     // Atomic check-and-increment to prevent race condition (two simultaneous requests).
     // Hard cap: ONE trial story per user, no environment exceptions. To
@@ -1601,22 +1638,12 @@ router.post('/create-story', verifySessionToken, async (req, res) => {
     );
 
     if (userResult.rows.length === 0) {
-      // Either user doesn't exist or already used their trial
-      const exists = await pool.query('SELECT id FROM users WHERE id = $1 AND is_trial = true', [userId]);
-      if (exists.rows.length === 0) {
-        return res.status(404).json({ error: 'Account not found', code: 'ACCOUNT_NOT_FOUND' });
-      }
-      // Return the visitor's existing trial job so a reload / return visit
-      // resumes it instead of landing on a bare "used" state.
-      const jobRow = await pool.query(
-        'SELECT id, status FROM story_jobs WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1',
-        [userId]
-      );
-      const used = buildTrialUsedResponse(jobRow.rows[0]);
-      if (!used.body.jobId) {
-        log.error(`[TRIAL] TRIAL_USED for user ${userId} but no story_jobs row found`);
-      }
-      return res.status(used.status).json(used.body);
+      // Lost the race against a parallel create-story (or the account vanished):
+      // answer with the job that request created, so this tab resumes it too.
+      const raced = await existingTrialJobResponse(pool, userId);
+      if (raced) return res.status(raced.status).json(raced.body);
+      log.error(`[TRIAL] create-story: increment refused for user ${userId} but the trial reads as unused`);
+      return res.status(409).json(buildTrialUsedResponse(undefined).body);
     }
 
     // If a prepare-title call is still in flight for this user, wait for it
@@ -3537,6 +3564,7 @@ module.exports.triggerAvatarGenerationForUser = triggerAvatarGenerationForUser;
 module.exports.TRIAL_FREE_PAGES = TRIAL_FREE_PAGES;
 module.exports.TRIAL_ART_STYLE = TRIAL_ART_STYLE;
 module.exports.buildTrialUsedResponse = buildTrialUsedResponse;
+module.exports.existingTrialJobResponse = existingTrialJobResponse;
 module.exports.buildTrialStoryPages = buildTrialStoryPages;
 module.exports.mergeTrialPageRecords = mergeTrialPageRecords;
 module.exports.isTrialContactEmail = isTrialContactEmail;
