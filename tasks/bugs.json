@@ -3948,6 +3948,16 @@
       "fixedAt": "2026-10-07",
       "fixedIn": "da9cd1185",
       "fix": "samBlend.anchorVerdict judges those defect types on centroid, feet and protected-neighbour overlap instead of IoU (faceRepair.SILHOUETTE_CHANGING_DEFECTS); face_drift keeps the floor. Test: tests/unit/blend-anchor-gate.test.ts (synthetic masks; Lab replay of stored blends is open in BACKLOG)."
+    },
+    {
+      "id": "creatures-not-top-level-roster-empty",
+      "title": "extractSceneMetadata kept creatures only inside fullData, so collectSceneObjectFigureNames (a083acca6) read an empty list on every real prose brief; the declared creature was judged an extra character and repair deleted it",
+      "reportedAt": "2026-10-07",
+      "source": "Showcase job_1791315635053_t0t8qpebu front cover (turtle Berta): stored sceneMetadata.creatures undefined, fullData.creatures present; replayed buildExpectedCastBlock: [Emma] vs [Emma, Berta] with the rows at top level.",
+      "status": "fixed",
+      "fixedAt": "2026-10-07",
+      "fixedIn": "42920022c",
+      "fix": "extractSceneMetadata returns creatures at the top level in the prose and JSON branches. Test: tests/unit/creature-declares-page-roster.test.ts (REGRESSION: runs a real prose brief through extractSceneMetadata; fails without the fix)."
     }
   ]
 }

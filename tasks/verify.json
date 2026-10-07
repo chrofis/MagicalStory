@@ -6062,6 +6062,24 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "repair-version-selection-2026-10-07",
+      "title": "Paired re-judge, reader findings out of selection, new MAJORs block critical-gone-wins, repairPlan stored, creatures on the roster",
+      "commits": [
+        "42920022c"
+      ],
+      "addedAt": "2026-10-07",
+      "claim": "On a full story whose repair rounds run: (1) every repair version's semanticResult carries parentFindings (id, fixed|still_present) and the eval prompt in eval_calls holds 'PARENT PICTURE (REPAIR CHECK)' with two images; first-render evals do not; (2) repair versions store repairPlan; (3) a front cover or page that declares a creature in creatures[] has that creature on the judge's EXPECTED CAST and no extra_character finding for it; (4) when a repair clears a CRITICAL and files a new untagged MAJOR the pick follows the score ([SCORE] lines, activeVersion), and a reader-only book-audit finding never changes which version is active.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "stories.data sceneImages[].imageVersions[] (repairPlan, parentFindings, deductions with alsoInParent / chargedFromChild), eval_calls prompts for kind semantic on repair children, Railway [SCORE] lines."
+      },
+      "status": "pending",
+      "evidence": null
     }
   ],
   "runs": [
