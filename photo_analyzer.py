@@ -3588,7 +3588,13 @@ def analyze_photo():
 
         result = process_photo(image_data, is_base64=True, selected_face_id=selected_face_id, cached_faces=cached_faces)
 
-        if result['success']:
+        # no_face_detected is an answer about the user's photo, not a failure of
+        # this service, so it travels as 200. Node (routes/avatars.js and
+        # routes/trial.js) checks `analyzerResponse.ok` BEFORE it reads the body
+        # and turns every non-2xx into a 502 "Photo analysis service error", so
+        # as a 500 this result never reached its `error === 'no_face_detected'`
+        # branch: the user got the generic failure text instead of "no face".
+        if result['success'] or result.get('error') == 'no_face_detected':
             return jsonify(result), 200
         else:
             return jsonify(result), 500
