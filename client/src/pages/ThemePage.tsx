@@ -12,8 +12,6 @@ import {
 } from '@/constants/storyTypes';
 import { useThemeContent } from '@/hooks/useThemeContent';
 import type { ThemeContent } from '@/constants/themeContent';
-
-import { themeContent } from '@/constants/themeContent';
 import { guides } from '@/constants/guideData';
 import type { LocalizedString } from '@/types/character';
 

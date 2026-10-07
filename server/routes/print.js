@@ -22,11 +22,8 @@ const { log } = require('../utils/logger');
 const { getPool, rehydrateStoryImages, logActivity } = require('../services/database');
 
 // Lib modules
-const { generatePrintPdf, generateViewPdf, generateCombinedBookPdf } = require('../lib/pdf');
-const { processBookOrder, resumeBookOrder, getCoverDimensions, countBookContentPages, computeBookPageInfo, shippingFromSession } = require('../lib/gelato');
-
 const { generatePrintPdf, generateViewPdf, generateCombinedBookPdf, pdfContentDisposition } = require('../lib/pdf');
-const { processBookOrder, resumeBookOrder, getCoverDimensions, countBookContentPages, computeBookPageInfo } = require('../lib/gelato');
+const { processBookOrder, resumeBookOrder, getCoverDimensions, countBookContentPages, computeBookPageInfo, shippingFromSession } = require('../lib/gelato');
 const { stripDataUriPrefix } = require('../lib/r2');
 const email = require('../../email');
 
