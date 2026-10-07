@@ -410,8 +410,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    // Clear all auth storage
+    // Clear all auth storage, and the wizard's half-built story — the next
+    // account on this browser must not open on this user's step, plot and dedication.
     storage.clearAuthStorage();
+    storage.clearWizardStorage();
 
     // Disable Google Identity Services auto-select so the next sign-in shows chooser
     googleSignOut().catch(err => {

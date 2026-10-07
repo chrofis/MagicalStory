@@ -28,6 +28,7 @@ import { EmailVerificationModal } from '@/components/auth/EmailVerificationModal
 import { FaceSelectionModal } from '@/components/character';
 import { INITIAL_USER_CREDITS, IMAGE_REGENERATION_COST, COVER_REGENERATION_COST } from '@/constants/credits';
 import { isStoryTypeComplete, initialStoryType } from '@/utils/wizardStoryType';
+import { clearWizardStorage } from '@/services/storage';
 
 // Types
 import type { Character, RelationshipMap, RelationshipTextMap, VisualBible, ChangedTraits, DetectedFace, AgeCategory, PhysicalTraits, PhysicalTraitsSource } from '@/types/character';
@@ -976,17 +977,7 @@ export default function StoryWizard() {
       setStoryCharacters(null);
 
       // Clear localStorage for story settings
-      localStorage.removeItem('story_type');
-      localStorage.removeItem('story_category');
-      localStorage.removeItem('story_topic');
-      localStorage.removeItem('story_theme');
-      localStorage.removeItem('story_custom_theme_text');
-      localStorage.removeItem('story_art_style');
-      localStorage.removeItem('story_language_level');
-      localStorage.removeItem('story_pages');
-      localStorage.removeItem('story_dedication');
-      localStorage.removeItem('story_details');
-      localStorage.removeItem('wizard_step');
+      clearWizardStorage();
 
       // Remove the 'new' param from URL to avoid resetting on refresh
       const newParams = new URLSearchParams(searchParams);
@@ -5290,21 +5281,11 @@ export default function StoryWizard() {
                 setPages(15);
                 setDedication('');
                 setStoryDetails('');
+                setCustomThemeText('');
                 // Keep character configuration (mainCharacters, excludedCharacters) - user preference persists
 
-                // Clear localStorage for story settings
-                localStorage.removeItem('story_type');
-                localStorage.removeItem('story_category');
-                localStorage.removeItem('story_topic');
-                localStorage.removeItem('story_theme');
-                localStorage.removeItem('story_art_style');
-                localStorage.removeItem('story_language_level');
-                localStorage.removeItem('story_pages');
-                localStorage.removeItem('story_dedication');
-                localStorage.removeItem('story_details');
-                // Keep story_main_characters and story_excluded_characters - user preference persists
-                localStorage.removeItem('wizard_step');
-                localStorage.removeItem('verificationGenerationStarted');
+                // Clear localStorage for story settings (character roles live in the DB)
+                clearWizardStorage();
 
                 // Clear any character being edited and reset to character list
                 setCurrentCharacter(null);

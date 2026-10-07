@@ -149,6 +149,36 @@ export function clearAuthStorage(): void {
 }
 
 /**
+ * Every key the full story wizard (pages/StoryWizard.tsx) restores a NEW story
+ * from. One list for "Neue Geschichte", "?new=true" and logout: the two inline
+ * lists had drifted (one forgot story_custom_theme_text, both forgot
+ * story_topic_name), and logout cleared none of them, so the next account on
+ * the same browser opened the wizard on the previous user's step, plot and
+ * dedication. story_language is a preference and stays.
+ */
+export const WIZARD_STORY_KEYS = [
+  'story_type',
+  'story_category',
+  'story_topic',
+  'story_topic_name',
+  'story_theme',
+  'story_custom_theme_text',
+  'story_art_style',
+  'story_language_level',
+  'story_pages',
+  'story_dedication',
+  'story_details',
+  'wizard_step',
+  'verificationGenerationStarted',
+  'pending_story_type',
+  'pending_art_style',
+] as const;
+
+export function clearWizardStorage(): void {
+  WIZARD_STORY_KEYS.forEach(key => removeItem(key));
+}
+
+/**
  * Get the current storage type being used
  */
 export function getStorageType(): string {
@@ -180,6 +210,7 @@ export default {
   setItem,
   removeItem,
   clearAuthStorage,
+  clearWizardStorage,
   getStorageType,
   isPersistentStorage,
   STORAGE_KEYS,
