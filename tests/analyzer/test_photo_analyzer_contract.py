@@ -120,6 +120,23 @@ def test_analyze_missing_image_is_400():
     assert status == 400
 
 
+# ── process_photo must not persist the upload ───────────────────────────────
+def test_process_photo_writes_no_copy_of_the_photo_to_disk():
+    """A decoded copy of every uploaded photo used to be written to TEMP_DIR
+    (one shared filename for every concurrent request) — the same class of
+    leak the comment above the decode step says was removed."""
+    _cv2.reset_mock()
+    _cv2.imdecode.return_value = np.zeros((100, 80, 3), dtype=np.uint8)
+    one_face = [{'id': 0, 'x': 30.0, 'y': 20.0, 'width': 20.0, 'height': 25.0,
+                 'confidence': 0.99}]
+    with mock.patch.object(pa, 'detect_all_faces_mediapipe', return_value=one_face), \
+         mock.patch.object(pa, 'remove_background', return_value=(None, None)):
+        result = pa.process_photo("data:image/jpeg;base64,AAAA", is_base64=True)
+    assert result["face_count"] == 1
+    assert not _cv2.imwrite.called, \
+        f"photo written to disk: {[c.args[0] for c in _cv2.imwrite.call_args_list]}"
+
+
 if __name__ == '__main__':
     failures = 0
     for name, fn in sorted(globals().items()):
