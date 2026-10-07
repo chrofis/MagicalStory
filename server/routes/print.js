@@ -23,7 +23,7 @@ const { getPool, rehydrateStoryImages, logActivity } = require('../services/data
 
 // Lib modules
 const { generatePrintPdf, generateViewPdf, generateCombinedBookPdf } = require('../lib/pdf');
-const { processBookOrder, resumeBookOrder, getCoverDimensions, countBookContentPages, computeBookPageInfo } = require('../lib/gelato');
+const { processBookOrder, resumeBookOrder, getCoverDimensions, countBookContentPages, computeBookPageInfo, shippingFromSession } = require('../lib/gelato');
 const { stripDataUriPrefix } = require('../lib/r2');
 const email = require('../../email');
 
@@ -1913,15 +1913,16 @@ router.get('/stripe/order-status/:sessionId', async (req, res) => {
       log.error('❌ No Stripe client configured to retrieve session');
       return res.status(500).json({ error: 'Stripe not configured' });
     }
-    const session = await stripe.checkout.sessions.retrieve(sessionId, {
-      expand: ['customer_details', 'shipping_details']
-    });
+    // customer_details and the shipping address are plain fields of the session (neither is
+    // expandable - Stripe rejects an `expand` naming them); the address sits in
+    // collected_information.shipping_details, see shippingFromSession.
+    const session = await stripe.checkout.sessions.retrieve(sessionId);
     log.debug(`📋 Stripe session status: ${session.payment_status}`);
 
     // If payment was successful, construct order-like response from Stripe data
     if (session.payment_status === 'paid') {
       const customerDetails = session.customer_details || {};
-      const shippingDetails = session.shipping_details || {};
+      const shippingDetails = shippingFromSession(session) || {};
       const shippingAddress = shippingDetails.address || {};
 
       // Calculate expected tokens (webhook may not have run yet)

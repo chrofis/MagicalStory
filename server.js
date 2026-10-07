@@ -602,17 +602,7 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
           return;
         }
 
-        // Extract customer information
-        const customerInfo = {
-          name: fullSession.customer_details?.name || fullSession.shipping?.name || 'N/A',
-          email: fullSession.customer_details?.email || 'N/A',
-          address: fullSession.shipping?.address || fullSession.customer_details?.address || {}
-        };
-
-        log.debug('📦 [STRIPE WEBHOOK] Customer Information:');
-        log.debug('   Name:', customerInfo.name);
-        log.info('   Email:', customerInfo.email);
-        log.debug('   Address:', JSON.stringify(customerInfo.address, null, 2));
+        log.info('   Email:', fullSession.customer_details?.email || 'N/A');
         log.debug('   Metadata:', JSON.stringify(fullSession.metadata, null, 2));
 
         // Check if this is a credits purchase
@@ -718,14 +708,16 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
 
         // Store order in database (book purchase)
         if (STORAGE_MODE === 'database') {
-          // userId, cover/format/quantity, preferred language and the validated story ids come
-          // from ONE function shared with the admin retry and the stuck-order resume (P2/P8).
+          // userId, recipient + shipping address (collected_information.shipping_details, never
+          // the billing address), cover/format/quantity, preferred language and the validated
+          // story ids come from ONE function shared with the admin retry and the stuck-order
+          // resume (P2/P8).
           const {
             userId, address, validatedStoryIds,
             coverType: orderCoverType, bookFormat: orderBookFormat, quantity: orderQuantity,
-            customerInfo: resolvedCustomer,
+            customerInfo,
           } = await resolveBookOrderInputs(dbPool, fullSession);
-          customerInfo.language = resolvedCustomer.language;
+          log.debug('📦 [STRIPE WEBHOOK] Ship to:', customerInfo.shippingName, JSON.stringify(address));
 
           // Use first story ID as the primary for orders table (for backwards compatibility)
           const primaryStoryId = validatedStoryIds[0];
@@ -769,7 +761,7 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
             `, [
               userId, primaryStoryId, fullSession.id, fullSession.payment_intent,
               customerInfo.name, customerInfo.email,
-              fullSession.shipping?.name || customerInfo.name,
+              customerInfo.shippingName,
               address.line1, address.line2,
               address.city, address.state, address.postal_code, address.country,
               fullSession.amount_total, fullSession.currency, fullSession.payment_status,

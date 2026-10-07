@@ -408,6 +408,7 @@ async function processBookOrder(dbPool, sessionId, userId, storyIds, customerInf
 
     // Create order reference using first story ID or combined if multiple
     const orderRefId = storyIds.length === 1 ? storyIds[0] : `multi-${storyIds.length}-${storyIds[0]}`;
+    const recipientName = customerInfo.shippingName || customerInfo.name;
 
     const printOrderPayload = {
       orderType: gelatoOrderType,
@@ -426,8 +427,9 @@ async function processBookOrder(dbPool, sessionId, userId, storyIds, customerInf
       }],
       shipmentMethodUid: 'standard',
       shippingAddress: {
-        firstName: customerInfo.name.split(' ')[0] || customerInfo.name,
-        lastName: customerInfo.name.split(' ').slice(1).join(' ') || '',
+        // The name the customer typed into the shipping form, not the cardholder's.
+        firstName: recipientName.split(' ')[0] || recipientName,
+        lastName: recipientName.split(' ').slice(1).join(' ') || '',
         addressLine1: shippingAddress.line1 || '',
         addressLine2: shippingAddress.line2 || '',
         city: shippingAddress.city || '',
@@ -522,19 +524,40 @@ The book IS ordered. Write gelato_order_id onto the orders row by hand; do NOT r
 }
 
 /**
+ * The parcel's recipient and address from a Checkout Session, or null when the session
+ * collected none. Since Stripe API 2025-03-31 (stripe-node v18+; this repo pins v20 =
+ * 2025-11-17.clover) the address the customer typed into the shipping form lives ONLY in
+ * `collected_information.shipping_details` - the old top-level `shipping` / `shipping_details`
+ * fields no longer exist on the object. `customer_details.address` is the BILLING address,
+ * which equals the shipping address only while "billing same as shipping" stays ticked.
+ */
+function shippingFromSession(session) {
+  const details = session?.collected_information?.shipping_details;
+  if (!details?.address) return null;
+  return { name: details.name || '', address: details.address };
+}
+
+/**
  * Everything processBookOrder needs, derived from a (retrieved) Stripe Checkout session:
  * the webhook and the admin retry / stuck-order resume all build their inputs here, so a
  * re-run orders exactly what the customer paid for (every story, quantity, cover, format).
- * Throws when the session lacks a user or any valid story - never guesses.
+ * Throws when the session lacks a user, a shipping address or any valid story - never guesses.
  */
 async function resolveBookOrderInputs(dbPool, fullSession) {
   const userId = fullSession.metadata?.userId;
   if (!userId) throw new Error('Invalid userId in session metadata');
 
+  // A book checkout always runs with shipping_address_collection, so a paid session without
+  // one is a contract breach, not a case to paper over with the billing address.
+  const shipping = shippingFromSession(fullSession);
+  if (!shipping) {
+    throw new Error(`Checkout session ${fullSession.id || '?'} carries no shipping address (collected_information.shipping_details) - cannot ship a book`);
+  }
   const customerInfo = {
-    name: fullSession.customer_details?.name || fullSession.shipping?.name || 'N/A',
+    name: fullSession.customer_details?.name || shipping.name || 'N/A',
     email: fullSession.customer_details?.email || 'N/A',
-    address: fullSession.shipping?.address || fullSession.customer_details?.address || {},
+    shippingName: shipping.name || fullSession.customer_details?.name || 'N/A',
+    address: shipping.address,
   };
   const address = customerInfo.address;
   const coverType = fullSession.metadata?.coverType || 'softcover';
@@ -656,6 +679,7 @@ Status 'processing' with no Gelato order id since ${o.updated_at}. The process l
 }
 
 module.exports = {
+  shippingFromSession,
   resolveBookOrderInputs,
   resumeBookOrder,
   sweepStuckBookOrders,

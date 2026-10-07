@@ -109,7 +109,9 @@ describe('sweepStuckBookOrders (P8)', () => {
 
 describe('resumeBookOrder (P2)', () => {
   const session = { id: 'cs_9', payment_status: 'paid', metadata: { userId: 'u1', storyIds: JSON.stringify(['s1', 's2']), coverType: 'hardcover', bookFormat: 'A4', quantity: '3' },
-    customer_details: { name: 'A B', email: 'a@b.ch' }, shipping: { address: { line1: 'x' } } };
+    customer_details: { name: 'A B', email: 'a@b.ch' },
+    // stripe-node v20 shape: the shipping address sits under collected_information
+    collected_information: { shipping_details: { name: 'A B', address: { line1: 'x', country: 'CH' } } } };
   const dbPool = { query: async (sql: string) => (sql.includes('FROM stories') ? { rows: [{ id: 's' }] } : { rows: [{ preferred_language: 'German' }] }) };
   const stripeFor = (s: any) => ({ checkout: { sessions: { retrieve: async () => s } } });
   const noop = async () => {};

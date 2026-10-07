@@ -2,6 +2,17 @@
   "_readme": "CLEAR-BUG REGISTRY. A bug the owner reported, or one confirmed from stored evidence, goes here the moment it is confirmed - and the pre-push gate (scripts/admin/check-open-bugs.js) BLOCKS every push while any entry is open. That is the point: a reported bug is fixed immediately, not backlogged. Only CLEAR bugs belong here (reproduced, or owner-reported with evidence); design questions and improvements go to the task list instead. Close an entry by setting status to 'fixed' with the commit hash IN THE SAME COMMIT as the fix. Emergency escape: PUSH_WITH_OPEN_BUGS=1 git push (documented, visible, deliberate).",
   "bugs": [
     {
+      "id": "book-ships-to-billing-address",
+      "title": "A printed book ships to the Stripe BILLING address: the webhook, admin retry and stuck-order resume read session.shipping (gone since Stripe API 2025-03-31) and fall back to customer_details.address, so a book paid for with a different billing address goes to the cardholder, not the recipient typed into the shipping form",
+      "reportedAt": "2026-10-07",
+      "source": "Buying review 2026-10-07. node_modules/stripe v20 (API 2025-11-17.clover) types/Checkout/Sessions.d.ts: the Checkout Session has no top-level shipping / shipping_details; the collected address is collected_information.shipping_details only. server.js webhook (customerInfo.address = fullSession.shipping?.address || fullSession.customer_details?.address), server/lib/gelato.js resolveBookOrderInputs (same expression), server/routes/print.js order-status fallback (expand: [customer_details, shipping_details] - neither is expandable - and session.shipping_details). Orders only looked right because Stripe copies the shipping address into the billing one while the customer leaves \"billing same as shipping\" ticked.",
+      "rootCause": "The readers were written against a pre-2025 Checkout Session shape and never updated when stripe-node v20 was pinned (c803569c, 2026-08-23). The Gelato payload also split customer_details.name (the cardholder) into the parcel recipient.",
+      "status": "fixed",
+      "fixedAt": "2026-10-07",
+      "fixedIn": "pending",
+      "fix": "server/lib/gelato.js shippingFromSession reads collected_information.shipping_details (recipient name + address); resolveBookOrderInputs throws for a paid session without one instead of shipping to the billing address; the webhook, the admin retry and the stuck-order resume all go through it; orders.shipping_name and the Gelato recipient are the shipping-form name. The order-status fallback retrieves the session without the invalid expand. Test: tests/unit/checkout-shipping-address.test.ts (v20 fixture with billing != shipping; the installed SDK types have no top-level shipping field; no reader asks for session.shipping any more)."
+    },
+    {
       "id": "plan-check-possessive-name-counts-as-unlisted",
       "title": "CAST_NOT_IN_WHO_COLUMN: a name that only owns a place or a prop in the instant ('the mermaid Maren's garden', 'Berta's path') was reported UNLISTED by the plan check and counted by the recount, a false must-fix",
       "reportedAt": "2026-10-06",
