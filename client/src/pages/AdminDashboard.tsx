@@ -45,6 +45,18 @@ import { Modal } from '@/components/common/Modal';
 import { Input } from '@/components/common/Input';
 import { adminTranslations, StatCard, TokenUsageTab, StoryStatsTab } from './admin';
 
+// AI-assistant traffic buckets of the step funnel. Brand names, so no
+// translation; the keys must match ASSISTANT_SOURCES in server/lib/trialSource.js
+// (pinned by tests/unit/trial-source-bucketing.test.ts) — the server answers
+// 'all' to an unknown source rather than erroring.
+const ASSISTANT_SOURCE_FILTERS = [
+  ['chatgpt', 'ChatGPT'],
+  ['perplexity', 'Perplexity'],
+  ['gemini', 'Gemini'],
+  ['copilot', 'Copilot'],
+] as const;
+type StepFunnelSource = 'all' | 'paid' | (typeof ASSISTANT_SOURCE_FILTERS)[number][0] | 'organic' | 'direct';
+
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -60,7 +72,7 @@ export default function AdminDashboard() {
   const [trialHistory, setTrialHistory] = useState<TrialStatsHistoryEntry[]>([]);
   const [trialFunnel, setTrialFunnel] = useState<TrialFunnel | null>(null);
   const [trialStepFunnel, setTrialStepFunnel] = useState<TrialStepFunnel | null>(null);
-  const [stepFunnelSource, setStepFunnelSource] = useState<'all' | 'paid' | 'organic' | 'direct'>('all');
+  const [stepFunnelSource, setStepFunnelSource] = useState<StepFunnelSource>('all');
   const [stepFunnelRange, setStepFunnelRange] = useState<TrialFunnelRange>('30d');
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [pagination, setPagination] = useState<PaginationInfo | null>(null);
@@ -145,7 +157,7 @@ export default function AdminDashboard() {
   // Re-fetch the step funnel when the traffic filter changes. Kept out of
   // fetchStats (which is once-only, guarded on `stats`) because this one has to
   // re-run on every source switch.
-  const selectStepFunnelSource = async (source: 'all' | 'paid' | 'organic' | 'direct') => {
+  const selectStepFunnelSource = async (source: StepFunnelSource) => {
     setStepFunnelSource(source);
     const data = await adminService.getTrialStepFunnel(stepFunnelRange, source).catch(() => null);
     if (data) setTrialStepFunnel(data);
@@ -1016,6 +1028,7 @@ export default function AdminDashboard() {
                     {([
                       ['all', texts.trialStepFunnelSourceAll],
                       ['paid', texts.trialStepFunnelSourcePaid],
+                      ...ASSISTANT_SOURCE_FILTERS,
                       ['organic', texts.trialStepFunnelSourceOrganic],
                       ['direct', texts.trialStepFunnelSourceDirect],
                     ] as const).map(([key, label]) => (

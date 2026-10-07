@@ -775,8 +775,9 @@ function resolveTrialWindow(range = '30d', now = new Date()) {
 /**
  * Per-step trial funnel: how many distinct visits reached each step.
  *
- * `source` buckets on the landing UTMs:
- *   paid    — utm_medium/​source says an ad brought them (this is the ads question)
+ * `source` buckets on the landing UTMs / referrer (server/lib/trialSource.js):
+ *   paid    — utm_medium/​source or a gclid says an ad brought them (this is the ads question)
+ *   chatgpt, perplexity, gemini, copilot — an AI assistant's utm_source or referrer host
  *   organic — arrived with some other referrer/UTM
  *   direct  — no attribution at all
  *
