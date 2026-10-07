@@ -469,7 +469,7 @@ measurement, is lost).
 ## Growth, ads, product
 
 - [x] (2026-09-09, c3028d793) **Trial funnel "Bezahlt" filter empty-state + paid bucket honours `gclid`** — `server/lib/trialSource.js` is the single bucket definition; `allSourcesVisits` lets the card say "no visits from this source". → `tasks/ads-reactivation-2026-09-09.md`
-- [ ] **Trial claim breaks visit linkage: after an email claim `generation_completed` posts on a fresh visit_id with `user_id NULL`** (seen 2026-09-03, 2026-09-07). Likely the verify link opens in another browser context (no `trial_visit_id`/token) and `/event` only accepts anonymous tokens — design question, not verified from rows. Also: chatgpt.com deserves its own source bucket (5 of 8 trials). → `client/src/utils/trialFunnel.ts:150`, `server/routes/trial.js` event handler
+- [x] **Trial claim breaks visit linkage: after an email claim `generation_completed` posts on a fresh visit_id with `user_id NULL`** (seen 2026-09-03, 2026-09-07). Likely the verify link opens in another browser context (no `trial_visit_id`/token) and `/event` only accepts anonymous tokens — design question, not verified from rows. Also: chatgpt.com deserves its own source bucket (5 of 8 trials). → `client/src/utils/trialFunnel.ts:150`, `server/routes/trial.js` event handler — DONE 2026-10-07: authenticated events land on the visit that carries the user; chatgpt/perplexity/gemini/copilot buckets; gate_seen/gate_unlocked steps
 - [x] (2026-09-06, e37e3194a) **E1 — confirm the GA4 conversion event actually fires** — CONFIRMED:
       `client/src/utils/gtagConversion.ts` defines 3 Ads conversions, wired in `TrialWizard.tsx` +
       `TrialGenerationPage.tsx`; `decisions.md:1500` records a conversion-goal decision taken ON real
@@ -777,6 +777,7 @@ Run verifications now live in **`tasks/verify.json`** (judge a stored run: `node
 ---
 
 ## Decisions waiting on the owner
+- [ ] (2026-10-07) Session review: security config, reliability/alerting, DB, prompt contradictions, SEO/content copy, conversion, a11y/perf leftovers — ~45 owner items → tasks/session-review-2026-10-07.md
 - [ ] (2026-10-07) Trial: reading level (LANGUAGE_LEVELS standard 40-150, varied pacing) instead of the flat 100-140 words/page — likely shorter output, changes page look → tasks/trial-quality-review-2026-10-07.md §5.1
 - [ ] (2026-10-07) Trial time budget: Jev landmark probe+scoring runs sequentially before the writer (≤20 s); back cover starts only after the parse and is the 155-216 s tail — move either off the path? → tasks/trial-quality-review-2026-10-07.md §5.2
 - [ ] (2026-10-07) Order flow still falls back to GELATO_PHOTOBOOK_UID when no gelato_products row matches (gelato.js ~323); admin PDF route now fails loudly → tasks/trial-quality-review-2026-10-07.md §5.3
