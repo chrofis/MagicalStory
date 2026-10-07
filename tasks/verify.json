@@ -5851,7 +5851,9 @@
     {
       "id": "trial-writer-shared-prose-rules",
       "title": "Trial writer carries the beats writer's shared prose rules (peril ceiling, no dashes, continuity, neighbour phrase, no abbreviation, title rule and criteria, questions answered) with no extra call",
-      "commits": [],
+      "commits": [
+        "645cf7fc3"
+      ],
       "addedAt": "2026-10-07",
       "claim": "On the next trial run the story text has no em-dash or en-dash outside a dialogue use the language block allows, no abbreviation, no phrase repeated from the neighbouring sentence, no page contradicting an earlier one, nothing that could lead to death, a title that does not spoil the ending and is true of the pages, and every question or deadline the story sets answered or paid by the last page; the writer prompt is still ONE streaming call of about 10.8k input tokens (was about 10.4k).",
       "runShape": [
