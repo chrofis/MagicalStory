@@ -33,6 +33,21 @@ export default defineConfig((env) => {
               if (id.includes('node_modules/lucide-react')) {
                 return 'vendor-icons';
               }
+              // FingerprintJS (126 kB) is used by the trial's character step only,
+              // react-pageflip + its page-flip engine (47 kB) by the book viewer
+              // only — but the catch-all below put both into vendor-react, i.e.
+              // into the entry graph of every page (the landing page paid ~40 kB
+              // gzipped for code it never runs). Own chunks, loaded by the one
+              // chunk that imports them. No cycle (see below): FingerprintJS and
+              // page-flip do not reference React at all, and react-pageflip only
+              // imports React and page-flip, so vendor-pageflip -> vendor-react is
+              // one-directional — nothing in vendor-react imports it back.
+              if (id.includes('node_modules/@fingerprintjs/')) {
+                return 'vendor-fingerprint';
+              }
+              if (id.includes('node_modules/page-flip/') || id.includes('node_modules/react-pageflip/')) {
+                return 'vendor-pageflip';
+              }
 
               // EVERYTHING ELSE from node_modules goes into one vendor-react chunk.
               //
