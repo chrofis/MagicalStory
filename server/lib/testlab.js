@@ -6060,24 +6060,35 @@ async function runSceneVariantStage(ctx, { experimentId, promptOverride, params 
 
   const t0 = Date.now();
   const res = await callTextModel(prompt, null, null, { usageLabel: 'testlab_scene_variant' });
-  const img = await runImageStage(
-    { ...ctx, scene: { ...ctx.scene, sceneDescription: res.text } },
-    { experimentId, autoEval: params.autoEval !== false, params: {} }
-  );
-  return {
-    imageType: 'scene',
-    versionIndex: img.versionIndex,
-    scores: img.scores,
+  // The text arm survives a failed render (same as scene_expansion_ab above):
+  // the run loop merges err.partialResult into the failed entry.
+  const textArm = {
     newSceneDescription: res.text,
     storedSceneDescription: ctx.scene.sceneDescription || null,
     extraRule,
     promptOverridden: !!promptOverride,
+    promptUsed: prompt,
+  };
+  let img;
+  try {
+    img = await runImageStage(
+      { ...ctx, scene: { ...ctx.scene, sceneDescription: res.text } },
+      { experimentId, autoEval: params.autoEval !== false, params: {} }
+    );
+  } catch (err) {
+    err.partialResult = { ...(err.partialResult || {}), ...textArm };
+    throw err;
+  }
+  return {
+    imageType: 'scene',
+    versionIndex: img.versionIndex,
+    scores: img.scores,
+    ...textArm,
     // The IMAGE prompt actually sent to the image model — the contract the
     // result must fulfil (scene overview at top, interactions at bottom).
     // Always displayed in full on the card. promptUsed = the Art Director
     // prompt that produced the scene description (detail view).
     imagePrompt: img.promptUsed || null,
-    promptUsed: prompt,
     elapsedMs: Date.now() - t0,
     modelId: img.modelId || null,
   };
