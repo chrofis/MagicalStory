@@ -54,4 +54,12 @@ describe('public pages a11y chrome', () => {
       expect(tag, tag.slice(0, 80)).toMatch(/height="\d+"/);
     }
   });
+
+  it('ThemePage has no h3 before its first h2 (no heading level skip under the h1)', () => {
+    const s = src('pages/ThemePage.tsx');
+    const firstH2 = s.indexOf('<h2');
+    const firstH3 = s.indexOf('<h3');
+    expect(firstH2).toBeGreaterThan(-1);
+    expect(firstH3 === -1 || firstH3 > firstH2).toBe(true);
+  });
 });

@@ -354,17 +354,17 @@ export default function ThemePage() {
                 <div className="flex flex-wrap gap-4 pt-2 border-t border-stone-100">
                   {skills && (
                     <div className="flex-1 min-w-[200px]">
-                      <h3 className="text-sm font-semibold text-stone-500 mb-1">
+                      <h2 className="text-sm font-semibold text-stone-500 mb-1">
                         {language === 'de' ? 'Was dein Kind lernt' : language === 'fr' ? 'Ce que votre enfant apprend' : language === 'it' ? 'Cosa impara tuo figlio' : 'What your child learns'}
-                      </h3>
+                      </h2>
                       <p className="text-sm text-stone-700">{skills}</p>
                     </div>
                   )}
                   {ageRec && (
                     <div>
-                      <h3 className="text-sm font-semibold text-stone-500 mb-1">
+                      <h2 className="text-sm font-semibold text-stone-500 mb-1">
                         {language === 'de' ? 'Empfohlenes Alter' : language === 'fr' ? 'Âge recommandé' : language === 'it' ? 'Età consigliata' : 'Recommended age'}
-                      </h3>
+                      </h2>
                       <p className="text-sm text-stone-700">{ageRec} {language === 'de' ? 'Jahre' : language === 'fr' ? 'ans' : language === 'it' ? 'anni' : 'years'}</p>
                     </div>
                   )}
