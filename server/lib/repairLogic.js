@@ -1543,13 +1543,13 @@ const NOT_INPAINTABLE_TYPES = new Set([
   // inpaint: a local edit cannot re-stage a creature at several times its drawn
   // size. The page redo owns it — see ITERATE_ROUTED_TYPES and gate 2d.
   'creature_scale',
-  // extra_character is NOT here (owner, 2026-09-24, superseding 2026-09-13).
-  // Under the three-case presence model an `extra_character` means every cast
-  // member is already matched and this figure is surplus, so removing it cannot
-  // erase a commissioned character — the danger that closed the route. The
-  // removal is an inpaint (whole-frame Grok edit), the method that can actually
-  // take a figure out; a figure that might BE a missing cast member is the
-  // MIXED case (`character_identity`), which stays here and goes to char-fix.
+  // RE-STAGING defects (owner, 2026-10-07, reversing 2026-09-24 for these three):
+  // a figure to remove or add, or a place drawn wrong, is a page that must be
+  // painted again, and a whole-frame inpaint edit does not do that. Measured over
+  // 39 stories: iterate cleared extra_character 22/23, missing_character 10/11,
+  // setting 15/22; inpaint 12/18, 4/6, 2/3. Routed by ITERATE_ROUTED_TYPES /
+  // gate 2d. docs/decisions.md 2026-10-07 "Re-staging defects go to iterate".
+  'extra_character', 'missing_character', 'setting',
   // cutout_artifact: see CROP_ARTIFACT_TYPES — the page has no such defect.
   'cutout_artifact',
 ]);
@@ -1562,7 +1562,7 @@ const NOT_INPAINTABLE_TYPES = new Set([
  * the p16 drop on staging job_1790373080139_vnx5l8iy7 told the log a
  * character repair would handle a dragon, and nothing ever did.
  */
-const ITERATE_ROUTED_TYPES = new Set(['creature_scale']);
+const ITERATE_ROUTED_TYPES = new Set(['creature_scale', 'extra_character', 'missing_character', 'setting']);
 
 /**
  * Types that describe OUR entity-grid crop, not the page: a hard white gap or a
@@ -1985,6 +1985,32 @@ function resolveRepairIds(text, nameMap) {
 }
 
 /**
+ * An EXPRESSION edit that cannot be painted: the face is turned away from the
+ * viewer or too small to carry one. Inpaint asked to change the expression of a
+ * back-turned or pinhead face invents a face or distorts the head (owner,
+ * 2026-10-07, repair mechanics). Structured fields only: the brief's declared
+ * `pose: back` / over-the-shoulder perspective, and the detected face box.
+ * @returns {string|null} the reason, or null when the edit may go ahead.
+ */
+const TINY_FACE_MAX_HEIGHT = 0.035;   // of the image height
+const EXPRESSION_TYPES = new Set(['emotion', 'expression']);
+function expressionEditBlocked({ types, characterName, sceneMetadata = null, figures = null } = {}) {
+  const list = (Array.isArray(types) ? types : []).map(t => String(t || '').toLowerCase()).filter(Boolean);
+  if (!list.length || !list.every(t => EXPRESSION_TYPES.has(t))) return null;
+  if (!characterName) return null;
+  const { canonicalName } = require('./castResolver');
+  const canon = canonicalName(characterName);
+  const persp = sceneMetadata?.characterPerspectives || sceneMetadata?.fullData?.characterPerspectives || {};
+  const ann = Object.entries(persp).find(([n]) => canonicalName(n) === canon)?.[1];
+  if (ann?.pose === 'back') return 'its face is turned away from the viewer';
+  if (/^over[-\s]?the[-\s]?shoulder\b/i.test(String(ann?.perspective || ''))) return 'it is the over-the-shoulder near figure (back to the viewer)';
+  const fig = (Array.isArray(figures) ? figures : []).find(f => f?.name && canonicalName(f.name) === canon);
+  const fb = fig?.faceBox;
+  if (Array.isArray(fb) && fb.length === 4 && (fb[2] - fb[0]) < TINY_FACE_MAX_HEIGHT) return `its face is only ${(100 * (fb[2] - fb[0])).toFixed(1)}% of the image tall`;
+  return null;
+}
+
+/**
  * Repair text as the image model may read it: ids resolved, then every cast
  * and bible-figure name replaced by its descriptor (imageCompositing
  * stripCharacterNames, one pass). `keep` exempts one name — the char-fix
@@ -2005,5 +2031,5 @@ function nameRepairText(text, nameMap, { keep = null, vidByName, ownVisualId = n
 }
 
 module.exports = {
-  describeFigureForRepair, buildRepairNameMap, buildPageRepairNameMap, nameRepairText, resolveRepairIds,
+  expressionEditBlocked, describeFigureForRepair, buildRepairNameMap, buildPageRepairNameMap, nameRepairText, resolveRepairIds,
   repairAttemptFromResult, describeCharFixFailure, detectionForRetryEntry, findBadPages, applyRoundCap, LAST_ROUND_CRITICAL_MAX, planBookAuditRound, admitPagesFromAudit, attributeReaderFindings, summarizeRepairRound, baseRepairMethod, AUDIT_ADMIT_MAX, AUDIT_ADMIT_SEVERITIES, collectShippedDefective, collectSurvivingCriticals, resolveDeclaredCast, inheritSceneContract, resolveVersionCompressedScene, resolveVersionPrompt, resolveOwnRenderPrompt, SAFE_REPAIRABLE_TYPES, typesAreInpaintable, semanticFindings, findSafeRepairableFinding, selectCharRepairTasks, decideRepairMethod, charFixEntityFindings, NOT_INPAINTABLE_TYPES, ITERATE_ROUTED_TYPES, CROP_ARTIFACT_TYPES, isCropArtifact, hasCriticalSeverityFinding, collectCriticalFindings, buildPreserveClause, PRESERVE_MAX, scoredFindingPools };

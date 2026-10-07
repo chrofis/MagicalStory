@@ -29,14 +29,15 @@ describe('NOT_INPAINTABLE_TYPES', () => {
       'age_shift', 'skin_tone', 'scale']) {
       expect(NOT_INPAINTABLE_TYPES.has(t), `${t} should be blocked`).toBe(true);
     }
-    // extra_character is REMOVED by inpaint since the owner's 2026-09-24
-    // reversal: it now means a confirmed surplus (every cast member matched).
-    expect(NOT_INPAINTABLE_TYPES.has('extra_character')).toBe(false);
+    // Re-staging defects go to a page redo (owner, 2026-10-07; decisions.md).
+    for (const t of ['extra_character', 'missing_character', 'setting']) {
+      expect(NOT_INPAINTABLE_TYPES.has(t), `${t} should be blocked`).toBe(true);
+    }
   });
 
   it('leaves the classes inpaint exists for alone', () => {
     for (const t of ['action_interaction', 'object_presence', 'missing_element',
-      'accessory', 'accessory_missing', 'setting']) {
+      'accessory', 'accessory_missing']) {
       expect(NOT_INPAINTABLE_TYPES.has(t), `${t} should be allowed`).toBe(false);
     }
   });

@@ -720,6 +720,10 @@ const CHAR_FIX_DEFECT_PHRASES = Object.freeze({
   placeholder_figure: 'the marked figure is a flat placeholder silhouette — paint the character there instead',
 });
 
+// Defects whose correct repair changes the figure's outline. The blend gate
+// judges these on the figure's anchor instead of mask IoU (samBlend.anchorVerdict).
+const SILHOUETTE_CHANGING_DEFECTS = new Set(['identity_swap', 'age_shift', 'body_build', 'hair', 'hair_change', 'hair_nuance']);
+
 function charFixDefectContext(defectTypes) {
   const phrases = [];
   for (const t of (Array.isArray(defectTypes) ? defectTypes : [])) {
@@ -987,6 +991,8 @@ async function repairCharacterFace(sceneInput, avatarInput, opts = {}) {
       samRecomputed: r?.samRecomputed ?? null,
       cutoutSent: r?.cutoutSent || null,
       iou: r?.iou ?? r?.blend?.iou ?? null,
+      // Every rejected attempt was a paid Grok call; the caller bills it.
+      usage: r?.usage || null,
     });
   };
   for (let attempt = 1; attempt <= REPAIR_ATTEMPTS; attempt++) {
@@ -1338,6 +1344,9 @@ async function _repairCharacterFaceOnce(sceneInput, avatarInput, opts = {}) {
       blendShape: opts.blendShape !== undefined ? opts.blendShape : (faceOnly ? 'padded-union' : 'figure-exact'),
       // Uniform gates — tunable for the Test Lab A/B, default ON in production.
       gateIou: gates.iou,
+      // Silhouette-changing defects (hair / age / build) are judged on the figure's
+      // anchor, not the outline overlap — see samBlend.anchorVerdict.
+      anchorGate: (Array.isArray(opts.defectTypes) ? opts.defectTypes : []).some(t => SILHOUETTE_CHANGING_DEFECTS.has(String(t || '').toLowerCase().trim())),
       gateWhiteCard: gates.whiteCard,
       gateWhiteHole: gates.whiteHole,
       ...(opts.iouThreshold != null ? { iouThreshold: opts.iouThreshold } : {}),

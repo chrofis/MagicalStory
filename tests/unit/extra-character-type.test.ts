@@ -162,8 +162,10 @@ describe('extra_character — scoring and taxonomy', () => {
   // removal cannot erase a commissioned character — inpaint may take it out.
   // The figure that might BE a missing member is `character_identity`, which
   // stays barred from inpaint and goes to a figure-targeted char-fix.
-  it('is inpaintable (a confirmed surplus is removed); character_identity is not', () => {
-    expect(NOT_INPAINTABLE_TYPES.has('extra_character')).toBe(false);
+  // Owner reversal 2026-10-07 (supersedes 2026-09-24 for the re-staging types):
+  // iterate clears extra_character 22/23 vs inpaint 12/18 over 39 stories.
+  it('is a page redo (not inpaintable, iterate-routed); character_identity is char-fix territory', () => {
+    expect(NOT_INPAINTABLE_TYPES.has('extra_character')).toBe(true);
     expect(NOT_INPAINTABLE_TYPES.has('character_identity')).toBe(true);
   });
 });

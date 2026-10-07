@@ -3410,8 +3410,12 @@ async function evaluateImageBatch(images, options = {}) {
 function buildInpaintInstruction({ editInstruction, preserveClause = '', sizeClause = '', quietZoneSuffix = '', requiredTextClause = '', sceneDescription = '' }) {
   const { buildRepairLightLine, declaredLightOfBrief } = require('./sceneLight');
   const lightLine = buildRepairLightLine(declaredLightOfBrief(sceneDescription));
-  const lightClause = lightLine ? `\n\n${lightLine}` : '';
-  return `Fix these issues in this children's book illustration:\n${editInstruction}${preserveClause}${sizeClause}${quietZoneSuffix}${requiredTextClause}${lightClause}`;
+  // Each clause is trimmed and joined with a blank line HERE, so no upstream
+  // step (the name map trims its input) can fuse two clauses into one sentence
+  // ("...the flipper.Sizes that hold...").
+  const clauses = [preserveClause, sizeClause, quietZoneSuffix, requiredTextClause, lightLine]
+    .map(c => String(c || '').trim()).filter(Boolean);
+  return `Fix these issues in this children's book illustration:\n${editInstruction}${clauses.map(c => `\n\n${c}`).join('')}`;
 }
 
 /**
@@ -3425,9 +3429,16 @@ function buildInpaintInstruction({ editInstruction, preserveClause = '', sizeCla
  * when the page cites no sized element. Shared by the pipeline inpaint and the
  * manual repair route.
  */
-function buildElementSizeClauseForRepair({ visualBible, sceneMetadata, characters, nameMap }) {
+function buildElementSizeClauseForRepair({ visualBible, sceneMetadata, characters, nameMap, issues = [] }) {
   const { buildElementSizeRepairClause, castFiguresInFrame, wholeFiguresInFrame } = require('./promptBuilders');
-  const objectIds = Array.isArray(sceneMetadata?.objects) ? sceneMetadata.objects : [];
+  // ONLY THE TARGET (owner, 2026-10-07): a size line for every element the page
+  // cites told the editor about elements the edit does not touch, and it
+  // repainted them. The elements the findings being repaired name (their
+  // `element` id) are the target; none named, no size line.
+  const base = (raw) => String(raw || '').trim().toUpperCase().split('.')[0];
+  const targetIds = new Set((Array.isArray(issues) ? issues : []).map(i => base(i?.element)).filter(Boolean));
+  const objectIds = (Array.isArray(sceneMetadata?.objects) ? sceneMetadata.objects : [])
+    .filter(o => targetIds.has(base(typeof o === 'string' ? o : o?.id)));
   const figures = wholeFiguresInFrame(castFiguresInFrame(characters, sceneMetadata?.characters), sceneMetadata);
   const interactions = sceneMetadata?.interactions || sceneMetadata?.fullData?.interactions || [];
   const clause = buildElementSizeRepairClause(visualBible, objectIds, figures, interactions);
@@ -3645,6 +3656,9 @@ async function inpaintPage(imageData, evaluation, options = {}) {
   // See repairLogic.buildPreserveClause for why this channel exists.
   let preserveClause = '';
   let consolidatedPlan = null;
+  // The boxes this edit is confined to (inpaintTarget.js), or null when any fix
+  // is scene-wide / not box-addressable.
+  let targetBoxes = null;
   const referenceImages = [];
   const referenceImageSources = [];
 
@@ -3732,8 +3746,18 @@ async function inpaintPage(imageData, evaluation, options = {}) {
       const blocked = !typesAreInpaintable(types);
       if (blocked) {
         log.info(`[INPAINT PAGE] P${pageNumber}: dropping "${types.join('/')}" fix for ${p.characterName || 'a character'} — not inpaintable, character repair owns it`);
+        return false;
       }
-      return !blocked;
+      const noExpression = require('./repairLogic').expressionEditBlocked({
+        types, characterName: p.characterName,
+        sceneMetadata: sceneMetadata || (sceneDescription ? require('./sceneMetadata').extractSceneMetadata(sceneDescription) : null),
+        figures: detectedFigures,
+      });
+      if (noExpression) {
+        log.info(`[INPAINT PAGE] P${pageNumber}: dropping the expression fix for ${p.characterName} — ${noExpression}`);
+        return false;
+      }
+      return true;
     });
     const perCharItems = perCharSource
       .map(p => {
@@ -3765,7 +3789,23 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     const items = [];
     if (sceneInstr) items.push({ severity: consolidatedPlan.scene_fix?.severity, text: sceneInstr });
     for (const c of perCharItems) items.push(c);
+    targetBoxes = require('./inpaintTarget').targetBoxesForFixes({
+      fixes: perCharSource.filter(p => typeof p?.fix_instruction === 'string' && p.fix_instruction.trim()),
+      hasSceneFix: !!sceneInstr,
+      figures: detectedFigures,
+    });
     items.sort((a, b) => sevRank(b.severity) - sevRank(a.severity));
+    // A CRITICAL repair carries no MINOR riders (owner, 2026-10-07): each extra
+    // item is a chance for the whole-frame edit to disturb what was right.
+    // MINOR rides only a round that has nothing heavier to do.
+    if (items.length && sevRank(items[0].severity) >= SEV_RANK.CRITICAL) {
+      for (let k = items.length - 1; k > 0; k--) {
+        if (sevRank(items[k].severity) <= SEV_RANK.MINOR) {
+          log.info(`[INPAINT PAGE] P${pageNumber}: dropping a MINOR item from a CRITICAL repair — "${items[k].text.slice(0, 80)}"`);
+          items.splice(k, 1);
+        }
+      }
+    }
     editInstruction = items
       .map((it, i) => `${i + 1}. ${it.text}`)
       .join('\n');
@@ -4006,6 +4046,7 @@ async function inpaintPage(imageData, evaluation, options = {}) {
       sceneMetadata: sceneMetadata || (sceneDescription ? require('./sceneMetadata').extractSceneMetadata(sceneDescription) : null),
       characters,
       nameMap: repairNameMap,
+      issues: combinedIssues,
     });
   } catch (err) {
     // Loud: a creature repainted without its size is how p10 lost it.
@@ -4035,8 +4076,37 @@ async function inpaintPage(imageData, evaluation, options = {}) {
         log.warn(`[INPAINT PAGE] Edit produced too-small image (${editResult.imageData.length} chars), rejecting`);
         return { imageData: null, repaired: false, instruction: editInstruction, consolidatedPlan, usage: editResult.usage };
       }
+      let editedData = editResult.imageData;
+      let pasteBack = null;
+      if (targetBoxes) {
+        // The edit is whole-frame; every fix names a figure we hold a box for,
+        // so keep the edit inside those boxes and the original everywhere else,
+        // and refuse an edit that left its own target untouched.
+        const IT = require('./inpaintTarget');
+        try {
+          const m = await IT.measureChange(imageData, editedData, targetBoxes);
+          if (IT.isNoop(m)) {
+            log.warn(`[INPAINT PAGE] P${pageNumber}: no-op — the target region changed by ${m.insideMad.toFixed(1)} grey levels (${m.insideChangedCells}/${m.insideCells} cells), the rest of the frame by ${m.outsideMad.toFixed(1)}`);
+            return { imageData: null, repaired: false, noop: true, instruction: editInstruction, referenceImages, referenceImageSources, consolidatedPlan, usage: editResult.usage };
+          }
+          const pasted = await IT.pasteBackOutside(imageData, editedData, targetBoxes);
+          if (pasted) {
+            const after = await IT.measureChange(imageData, pasted, targetBoxes);
+            pasteBack = { boxes: targetBoxes, outsideChangedCellsBefore: m.outsideChangedCells, outsideChangedCellsAfter: after.outsideChangedCells, outsideMadBefore: m.outsideMad, outsideMadAfter: after.outsideMad };
+            log.info(`[INPAINT PAGE] P${pageNumber}: pasted back outside the target box — collateral ${m.outsideChangedCells} → ${after.outsideChangedCells} changed cells (mean diff ${m.outsideMad.toFixed(1)} → ${after.outsideMad.toFixed(1)})`);
+            editedData = pasted;
+          } else {
+            log.warn(`[INPAINT PAGE] P${pageNumber}: edit changed the frame's shape — paste-back skipped, edit kept whole`);
+          }
+        } catch (err) {
+          // No fallback: an unconfined whole-frame edit is the defect this exists to stop.
+          log.error(`[INPAINT PAGE] P${pageNumber}: target confinement failed (${err.message}) — edit discarded`);
+          return { imageData: null, repaired: false, instruction: editInstruction, referenceImages, referenceImageSources, consolidatedPlan, usage: editResult.usage, error: `target confinement failed: ${err.message}` };
+        }
+      }
       return {
-        imageData: editResult.imageData,
+        pasteBack,
+        imageData: editedData,
         repaired: true,
         instruction: editInstruction,
         // The COMPLETE string handed to the editor — `instruction` is only its

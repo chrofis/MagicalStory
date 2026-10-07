@@ -6044,6 +6044,24 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "repair-mechanics-2026-10-07",
+      "title": "Repair mechanics: anchor gate for silhouette repairs, inpaint confined to its target box, no-op gate, billed and kept char-fix rejections, re-staging types to iterate",
+      "commits": [
+        "PENDING"
+      ],
+      "addedAt": "2026-10-07",
+      "claim": "On a story whose repair rounds run: (1) a char-fix on an identity_swap / age_shift / body_build / hair finding whose mask IoU is under 0.55 but whose figure kept its place is accepted (log '[TESTLAB] mask IoU .. but the figure kept its anchor'), and one that moved is refused with an 'Anchor check:' reason; (2) a rejected char-fix leaves a retryHistory entry of type round_repair_failed carrying attemptFrames (R2 urls, not inline) and its Grok calls appear in the job's unified_pipeline_char_fix usage; (3) an inpaint whose plan holds only per-figure fixes logs 'pasted back outside the target box' with collateral cells dropping toward 0, an inpaint that left its target unchanged logs 'no-op' and re-routes to iterate once; (4) extra_character / missing_character / setting findings at MAJOR or above route to iterate, not inpaint; (5) no char-fix is refused with 'could not be reliably identified ... No figures were detected at all' after a garment recolour; (6) the inpaint instruction never fuses 'flipper.Sizes', names size only for elements a finding cites, and carries no MINOR item beside a CRITICAL one.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Railway/stored logs of the repair rounds ([INPAINT PAGE], [CHAR-FIX], [REPAIR-DECIDE], [TESTLAB] anchor lines); sceneImages[].retryHistory entries (round_repair_failed.attemptFrames); generationLog usage rows funcName unified_pipeline_char_fix; the stored inpaint promptSent."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [

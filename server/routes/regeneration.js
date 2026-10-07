@@ -3835,6 +3835,7 @@ router.post('/:id/repair/image/:pageNum', authenticateToken, imageRegenerationLi
               || require('../lib/sceneMetadata').extractSceneMetadata(currentScene.sceneDescription || currentScene.description || ''),
             characters: storyData.characters || [],
             nameMap: repairNames,
+            issues: combinedIssues,
           });
           const sentInstruction = buildInpaintInstruction({
             editInstruction: sanitizeIssueForInpaint(nameRepairText(editInstruction, repairNames)),

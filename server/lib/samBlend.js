@@ -478,6 +478,50 @@ function measureWhiteHole({ oldA, sOld, newDil, candRaw, n }) {
   return { oldCnt, uncoveredWhite, frac: oldCnt ? uncoveredWhite / oldCnt : 0 };
 }
 
+// ---------------------------------------------------------------------------
+// ANCHOR GATE — the blend gate for repairs that MUST change the silhouette.
+// A mask-IoU floor (0.55) refuses exactly the repairs whose job is to alter the
+// outline (identity_swap hair, age_shift, body_build): Lab 1696 rejected the
+// faithful repaint and accepted the worse one. Those defect types are judged on
+// WHERE the figure stands instead: the new figure's centroid and feet must stay
+// where the old figure's were, and it must not grow into a protected neighbour.
+// face_drift-type repairs keep the IoU floor (they must not move anything).
+// All tolerances are fractions of the OLD figure's own size, so they hold at any
+// crop scale. Masks are n-length byte buffers, >128 = figure.
+// ---------------------------------------------------------------------------
+const ANCHOR_MAX_CENTROID_SHIFT = 0.30;  // sideways, of the old figure's bbox width; vertically of its height at half that
+const ANCHOR_MAX_FOOT_SHIFT = 0.15;      // of the old figure's bbox height
+const ANCHOR_MAX_PROTECTED_FRAC = 0.08;  // of the new figure's area inside a neighbour's box
+function anchorVerdict({ oldBin, newBin, w, h, protectedBoxes = null }) {
+  const stats = (m) => {
+    let n = 0, sx = 0, sy = 0, x0 = w, y0 = h, x1 = -1, y1 = -1;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      if (m[y * w + x] > 128) { n++; sx += x; sy += y; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    }
+    return n ? { n, cx: sx / n, cy: sy / n, x0, y0, x1, y1 } : null;
+  };
+  const o = stats(oldBin), nw = stats(newBin);
+  if (!o || !nw) return { ok: false, reason: 'a figure mask is empty', centroidShift: 1, footShift: 1, protectedFrac: 0 };
+  const width = o.x1 - o.x0 + 1;
+  const height = o.y1 - o.y0 + 1;
+  // Sideways relative to the figure's own width (a tall thin figure shifting a
+  // body-width is a different person's place), vertical at twice the weight.
+  const centroidShift = Math.max(Math.abs(nw.cx - o.cx) / width, 2 * Math.abs(nw.cy - o.cy) / height);
+  const footShift = Math.abs(nw.y1 - o.y1) / height;
+  let inProt = 0;
+  for (const b of (protectedBoxes || [])) {
+    for (let y = Math.max(0, b[1]); y < Math.min(h, b[3]); y++) for (let x = Math.max(0, b[0]); x < Math.min(w, b[2]); x++) {
+      if (newBin[y * w + x] > 128 && !(oldBin[y * w + x] > 128)) inProt++;
+    }
+  }
+  const protectedFrac = inProt / nw.n;
+  const bad = [];
+  if (centroidShift > ANCHOR_MAX_CENTROID_SHIFT) bad.push(`centroid moved ${(centroidShift * 100).toFixed(0)}% of the figure size (max ${ANCHOR_MAX_CENTROID_SHIFT * 100}%)`);
+  if (footShift > ANCHOR_MAX_FOOT_SHIFT) bad.push(`feet moved ${(footShift * 100).toFixed(0)}% of the figure height (max ${ANCHOR_MAX_FOOT_SHIFT * 100}%)`);
+  if (protectedFrac > ANCHOR_MAX_PROTECTED_FRAC) bad.push(`${(protectedFrac * 100).toFixed(0)}% of the new figure sits inside a neighbour's box (max ${ANCHOR_MAX_PROTECTED_FRAC * 100}%)`);
+  return { ok: bad.length === 0, reason: bad.join('; '), centroidShift, footShift, protectedFrac };
+}
+
 /**
  * THE shared repair blend — engine-agnostic. Given the original crop and a
  * candidate crop (any model's output for the same region), put ONLY the
@@ -493,7 +537,7 @@ function measureWhiteHole({ oldA, sOld, newDil, candRaw, n }) {
  * Returns a feathered RGBA PNG to composite at the crop position; throws
  * (with steps attached) on gate failures. Every mask is emitted as a step.
  */
-async function samUnionBlend({ originalCropBuf, candidateCropBuf: candidateCropBufIn, boxInCrop, cropW, cropH, oldMaskPng = null, addStep = async () => {}, failCtx = {}, clipRect = null, maskPoints = null, maskFetcher = null, colorCorrect = true, featherPx = null, erodeFeather = true, colorBorderRefine = true, bodyColorMode = false, bgBorderMatch = true, garmentOnly = true, featherMode = null, padMode = 'union', blendShape = 'padded-union', rawPaste = false, registerCandidate = false, protectedBoxesInCrop = null, faceBoxInCrop = null, newBoxInCrop = null, r2Prompt = 'face', iouThreshold = 0.55, whiteCardMaxFrac = 0.22, gateIou = true, gateWhiteCard = true, gateWhiteHole = true, whiteHoleMaxFrac = 0.02 }) {
+async function samUnionBlend({ originalCropBuf, candidateCropBuf: candidateCropBufIn, boxInCrop, cropW, cropH, oldMaskPng = null, addStep = async () => {}, failCtx = {}, clipRect = null, maskPoints = null, maskFetcher = null, colorCorrect = true, featherPx = null, erodeFeather = true, colorBorderRefine = true, bodyColorMode = false, bgBorderMatch = true, garmentOnly = true, featherMode = null, padMode = 'union', blendShape = 'padded-union', rawPaste = false, registerCandidate = false, protectedBoxesInCrop = null, faceBoxInCrop = null, newBoxInCrop = null, r2Prompt = 'face', iouThreshold = 0.55, anchorGate = false, whiteCardMaxFrac = 0.22, gateIou = true, gateWhiteCard = true, gateWhiteHole = true, whiteHoleMaxFrac = 0.02 }) {
   const sharp = require('sharp');
   let candidateCropBuf = candidateCropBufIn;
   const fail = (msg) => {
@@ -1047,7 +1091,17 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf: candidateCropB
   // Lab A/B can calibrate before the legacy box-blur/crosshatch paths (which
   // never faced this gate) route through here in production.
   if (gateIou && iou < iouThreshold) {
-    throw fail(`Painted figure barely overlaps the original (mask IoU ${(iou * 100).toFixed(0)}%) — the figure moved or changed pose. Redo instead of blending a misaligned figure.`);
+    // Defect-aware (see DECISIONS: blend gate by defect type). A repair whose
+    // whole purpose is to change the silhouette (hair, age, build) is judged on
+    // WHERE the figure stands, not on how much of the old outline it re-covers.
+    const sOldG = Math.max(1, Math.round(oldA.length / n));
+    const anchor = anchorGate ? anchorVerdict({ oldBin: Buffer.from(Array.from({ length: n }, (_, i) => oldA[i * sOldG])), newBin, w: cropW, h: cropH, protectedBoxes: protectedBoxesInCrop }) : null;
+    if (anchor && anchor.ok) {
+      log.info(`[TESTLAB] mask IoU ${(iou * 100).toFixed(0)}% < ${(iouThreshold * 100).toFixed(0)}% but the figure kept its anchor (centroid ${(anchor.centroidShift * 100).toFixed(0)}%, foot ${(anchor.footShift * 100).toFixed(0)}% of height, neighbour overlap ${(anchor.protectedFrac * 100).toFixed(0)}%) — silhouette-changing defect, gate passed`);
+    } else {
+      if (anchor) log.warn(`[TESTLAB] anchor gate refused: ${anchor.reason}`);
+      throw fail(`Painted figure barely overlaps the original (mask IoU ${(iou * 100).toFixed(0)}%) — the figure moved or changed pose. Redo instead of blending a misaligned figure.${anchor ? ` Anchor check: ${anchor.reason}.` : ''}`);
+    }
   }
 
   // Disagreement visualization: red = old-only, green = new-only.
@@ -1311,4 +1365,4 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf: candidateCropB
   return { feathered, iou, redPx, colorInfo, registration, blendRule: blendShape === 'figure-exact' ? 'figure-exact-pad6' : BLEND_RULE_VERSION };
 }
 
-module.exports = { samUnionBlend, maskBlurThreshold, _faceConnectedComponent, _interiorSeedPoints, fetchMaskWithRetry, BLEND_RULE_VERSION, computeFigureRegistration, transformBox, boxIou, measureWhiteHole };
+module.exports = { samUnionBlend, anchorVerdict, maskBlurThreshold, _faceConnectedComponent, _interiorSeedPoints, fetchMaskWithRetry, BLEND_RULE_VERSION, computeFigureRegistration, transformBox, boxIou, measureWhiteHole };

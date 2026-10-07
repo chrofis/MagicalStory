@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 
 // REGRESSION: the entity-report tier (tier 1, the MOST trusted) returned only
 // the target box and no `figures`. The caller builds protectedFaces/protectedBodies
@@ -56,10 +56,31 @@ describe('resolveCharBbox — entity tier carries the cast for neighbour protect
     expect(r.clothing).toBe('standard');
   });
 
-  it('returns an empty cast rather than throwing when no detection exists', () => {
+  it('returns no cast (null = no opinion) rather than throwing when no detection exists', () => {
     const r = resolveCharBbox('Julian', { bestEval: {}, entityReport, pageNumber: -2 });
     expect(r.source).toBe('entity');
-    expect(r.figures).toEqual([]);
+    expect(r.figures).toBeNull();
+  });
+
+  // REGRESSION (prod 7f2t99tk6 p4/p5, Lab 1694): a detection that does not pair
+  // with the bytes (garment-recolour inputOverride) came back as figures [],
+  // which findBorrowedLabel read as "No figures were detected at all" and refused.
+  it('REGRESSION: an unpaired detection yields figures null, and findBorrowedLabel has no opinion', async () => {
+    const mod: any = await import('../../server/lib/charRepairTarget.js');
+    const images = require('../../server/lib/images');
+    const spy = vi.spyOn(images, 'bboxPairsWith').mockImplementation((d: any) => d !== bestEval.bboxDetection);
+    try {
+      const r = mod.resolveCharBbox('Julian', { bestEval, entityReport, pageNumber: -2, imageData: 'data:image/png;base64,AAAA' });
+      expect(r.source).toBe('entity');
+      expect(r.figures).toBeNull();
+      const borrowed = mod.findBorrowedLabel({
+        figures: r.figures,
+        sceneCharacters: ['Julian', 'Kiaan', 'Levin'],
+        characterName: 'Julian',
+        pageNumber: 4,
+      });
+      expect(borrowed).toBeNull();
+    } finally { spy.mockRestore(); }
   });
 
   it('bodyMask is null when the detection came back from the DB (_gdinoMasks is non-enumerable)', () => {

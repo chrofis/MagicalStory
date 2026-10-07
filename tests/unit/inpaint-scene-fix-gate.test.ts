@@ -54,19 +54,15 @@ describe('typesAreInpaintable — the gate both plan channels share', () => {
     expect(typesAreInpaintable(['repaint the character identity'])).toBe(true);
   });
 
-  it('lets a confirmed surplus figure through — the owner reversed the 2026-09-13 closure on 2026-09-24', () => {
-    // The gate was written for `extra_character`; under the three-case presence
-    // model that type means every cast member is matched, so its removal can no
-    // longer erase a commissioned figure. The figure that might BE a missing
-    // member is `character_identity`, which the gate still blocks.
-    expect(typesAreInpaintable(['extra_character'])).toBe(true);
+  it('blocks a surplus figure from inpaint — a page redo owns it (owner, 2026-10-07, reversing 2026-09-24)', () => {
+    expect(typesAreInpaintable(['extra_character'])).toBe(false);
     expect(NOT_INPAINTABLE_TYPES.has('character_identity')).toBe(true);
   });
 
   it('does not block the types the four measured pages actually carried', () => {
     // emotion and missing_element are NOT forbidden — an earlier reading of the
     // set said otherwise and was wrong. Pinned so the claim cannot drift back.
-    for (const t of ['emotion', 'missing_element', 'action_interaction', 'setting', 'rendered_text']) {
+    for (const t of ['emotion', 'missing_element', 'action_interaction', 'rendered_text']) {
       expect(NOT_INPAINTABLE_TYPES.has(t)).toBe(false);
       expect(typesAreInpaintable([t])).toBe(true);
     }

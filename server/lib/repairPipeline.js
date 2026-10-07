@@ -1454,6 +1454,38 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     log.info(`👤 [UNIFIED PIPELINE] Round ${roundNum} char-fix ${charName} on p${pageNumber}: ${useFaceOnly ? 'FACE' : 'BODY'} bbox=[${(useFaceOnly ? faceBbox : repairBbox).map(v => Math.round(v * 100) + '%').join(', ')}] (${decision.severity})`);
     require('./runMetrics').forJob(storyData?.id || jobId).count('consistency_regen');
     let repairResult;
+    // Every Grok call is billed, accepted or not: a rejected attempt cost the
+    // same $0.02 and used to vanish from the job's cost (tracked only after the
+    // face gate passed). Rejected attempts ride on attemptFrames[].usage; the
+    // returned image's own usage is billed once, whichever way it ends.
+    const billCharFix = (r) => {
+      if (!usageTracker || !r) return;
+      // The returned result's own usage is the LAST attempt: already a frame when
+      // that attempt was rejected (no image), so it is added only when an image
+      // came back (accepted or refused downstream) — never twice.
+      const usages = [...(r.attemptFrames || []).map(f => f.usage), r.imageData ? r.usage : null].filter(Boolean);
+      for (const u of usages) {
+        usageTracker('grok', {
+          input_tokens: u.inputTokens || 0,
+          output_tokens: u.outputTokens || 0,
+          cost: u.cost,
+          direct_cost: u.direct_cost ?? u.cost,
+        }, 'unified_pipeline_char_fix', u.model);
+      }
+    };
+    // The rejected frames, as the manual route persists them: R2-offloaded by
+    // the save path, never inline JSONB (iron rule). Rides the failure result to
+    // the round's retryHistory entry.
+    const failureFrames = (r) => (r?.attemptFrames || []).map(f => ({
+      attempt: f.attempt,
+      rejectedReason: f.rejectedReason || null,
+      gateMessage: f.gateMessage || null,
+      iou: f.iou ?? null,
+      charRepairGrokRaw: f.grokRawResult || null,
+      charRepairWhiteout: f.blackoutImage || null,
+      charRepairBlendMask: f.blendMask || null,
+      blendSteps: f.blendSteps || [],
+    }));
     try {
       repairResult = await images().repairCharacterMismatch(currentImageData, call.avatarPhoto, repairBbox, charName, call.request);
     } catch (err) {
@@ -1470,7 +1502,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       // into the log, retryHistory, failedRepairs and repairRounds.
       const error = require('./repairLogic').describeCharFixFailure(repairResult);
       log.warn(`🚫 [CHAR-FIX] Page ${pageNumber} ${charName}: ${error}`);
-      return { pageNumber, imageData: null, method: 'char-fix', error };
+      billCharFix(repairResult);
+      return { pageNumber, imageData: null, method: 'char-fix', error, charName, attemptFrames: failureFrames(repairResult) };
     }
 
     // FACE-INTEGRITY GATE — one implementation, shared with the two manual
@@ -1483,20 +1516,24 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     );
     if (!faceGate.ok) {
       log.warn(`🚫 [CHAR-FIX] Page ${pageNumber} ${charName}: REFUSED — the repair left the face unreadable (${faceGate.reason}). Keeping the original.`);
-      return { pageNumber, imageData: null, error: `char-fix refused: face not intact after repair (${faceGate.reason})` };
+      billCharFix(repairResult);
+      // The refused frame is the evidence: the accepted-looking image the face
+      // gate threw away rides along with the earlier rejected attempts.
+      return {
+        pageNumber, imageData: null, method: 'char-fix', charName,
+        error: `char-fix refused: face not intact after repair (${faceGate.reason})`,
+        attemptFrames: [
+          ...failureFrames(repairResult),
+          { attempt: (repairResult.attempts || 1), rejectedReason: 'face_gate', gateMessage: faceGate.reason || null, iou: null,
+            charRepairGrokRaw: repairResult.grokRawResult || null, charRepairWhiteout: repairResult.blackoutImage || null,
+            charRepairBlendMask: repairResult.blendMask || null, blendSteps: repairResult.blendSteps || [] },
+        ],
+      };
     }
 
-    if (repairResult.usage && usageTracker) {
-      // Provider is Grok for char-repair (repairCharacterMismatchWithGrok);
-      // the prior 'gemini_image' label was a copy-paste miscategorisation
-      // that inflated the Gemini column and hid Grok char-repair spend.
-      usageTracker('grok', {
-        input_tokens: repairResult.usage.inputTokens || 0,
-        output_tokens: repairResult.usage.outputTokens || 0,
-        cost: repairResult.usage.cost,
-        direct_cost: repairResult.usage.direct_cost ?? repairResult.usage.cost,
-      }, 'unified_pipeline_char_fix', repairResult.usage.model);
-    }
+    // Provider is Grok for char-repair (repairCharacterMismatchWithGrok); the
+    // prior 'gemini_image' label miscategorised it and hid Grok spend.
+    billCharFix(repairResult);
 
     // Stash dev-panel debug data on charFixDetails so the dev panel still
     // shows the per-character before/after/blackout/cutout/grok-raw thumbnails.
@@ -2502,10 +2539,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           // hole is a page whose recolour eval failed (no version) — there the
           // corrected bytes are returned as the round result so the round eval
           // grades them instead.
-          const failed = (error) => ((recolourInput && !recolourVersioned.has(pageNumber))
+          const failed = (error, extra = {}) => ((recolourInput && !recolourVersioned.has(pageNumber))
             ? { pageNumber, imageData: recolourInput, method: 'recolour',
                 source: `garment-recolour-round-${round}`, repairError: error }
-            : { pageNumber, imageData: null, method, error });
+            : { pageNumber, imageData: null, method, error, ...extra });
 
           // 'recolour' as a METHOD means the recolour IS the repair for this
           // page. Phase (c) already produced and graded that version, so the
@@ -2514,38 +2551,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             return { pageNumber, imageData: null, skipped: true };
           }
 
-          if (method === 'inpaint') {
-            const inpaintResult = await executeInpaintAction(img, latestEval, round, recolourInput);
-            if (inpaintResult.repaired && inpaintResult.imageData) {
-              return {
-                pageNumber,
-                imageData: inpaintResult.imageData,
-                source: `inpaint-round-${round}`,
-                modelId: inpaintResult.usage?.model || 'grok-text-edit',
-                // The full string handed to the editor for THIS render
-                // (`instruction` is the un-wrapped core of it). Stamped so the
-                // version stops falling back to the original page prompt.
-                prompt: inpaintResult.promptSent || inpaintResult.instruction || null,
-                inpaintInstruction: inpaintResult.instruction,
-                inpaintReferenceImages: inpaintResult.referenceImages || null,
-                inpaintReferenceSources: inpaintResult.referenceImageSources || null,
-                consolidatedPlan: inpaintResult.consolidatedPlan || null,
-                grokRefImages: null,
-              };
-            }
-            // SAY WHICH OF THE THREE IT WAS. "inpaint produced no result" reads
-            // as an image-model failure and was recorded for all of them, so a
-            // page that never reached a model, one whose editor errored, and one
-            // whose editor returned nothing were indistinguishable in the round
-            // record — on job_1789853503332_riqncqg1i three of four failed
-            // repairs carried that one string and none of the causes survived.
-            return failed(
-              inpaintResult.error ? `inpaint edit failed: ${inpaintResult.error}`
-                : inpaintResult.instruction ? 'inpaint editor returned no image'
-                  : 'inpaint had no instruction to send (every finding was filtered or the plan left it empty)'
-            );
-          }
-          if (method === 'iterate') {
+          const iterateOutcome = async () => {
             const result = await executeIterateAction(img, latestEval);
             if (result?.imageData) {
               // For composite-cover iterate the bottom-line "result" hides a
@@ -2612,14 +2618,62 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
                 bboxDetection: result.bboxDetection || null,
               };
             }
-            return { pageNumber, imageData: null, method, error: 'iterate produced no result' };
+            return { pageNumber, imageData: null, method: 'iterate', error: 'iterate produced no result' };
+          };
+
+          if (method === 'inpaint') {
+            const inpaintResult = await executeInpaintAction(img, latestEval, round, recolourInput);
+            // NO-OP ON THE TARGET (owner, 2026-10-07): the edit came back and the
+            // region it was asked to change is, pixel for pixel, unchanged. A
+            // second inpaint repeats it; the page redo is the other method. Once
+            // per page, and only while no iterate has been tried on it.
+            if (inpaintResult?.noop) {
+              const triedIterate = (pageVersions.get(pageNumber) || []).some(v => String(v?.source || '').startsWith('iterate-') || String(v?.source || '').startsWith('composite-iterate-'));
+              if (!triedIterate) {
+                log.warn(`🪃 [UNIFIED PIPELINE] Round ${round} page ${pageNumber}: the inpaint changed nothing inside its target — re-routing to iterate`);
+                require('./runMetrics').forJob(storyData?.id || jobId).count('inpaint_noop_rerouted');
+                return iterateOutcome();
+              }
+              log.warn(`🚫 [UNIFIED PIPELINE] Round ${round} page ${pageNumber}: the inpaint changed nothing inside its target, and an iterate was already tried`);
+            }
+            if (inpaintResult.repaired && inpaintResult.imageData) {
+              return {
+                pageNumber,
+                imageData: inpaintResult.imageData,
+                source: `inpaint-round-${round}`,
+                modelId: inpaintResult.usage?.model || 'grok-text-edit',
+                // The full string handed to the editor for THIS render
+                // (`instruction` is the un-wrapped core of it). Stamped so the
+                // version stops falling back to the original page prompt.
+                prompt: inpaintResult.promptSent || inpaintResult.instruction || null,
+                inpaintInstruction: inpaintResult.instruction,
+                inpaintReferenceImages: inpaintResult.referenceImages || null,
+                inpaintReferenceSources: inpaintResult.referenceImageSources || null,
+                consolidatedPlan: inpaintResult.consolidatedPlan || null,
+                grokRefImages: null,
+              };
+            }
+            // SAY WHICH OF THE THREE IT WAS. "inpaint produced no result" reads
+            // as an image-model failure and was recorded for all of them, so a
+            // page that never reached a model, one whose editor errored, and one
+            // whose editor returned nothing were indistinguishable in the round
+            // record — on job_1789853503332_riqncqg1i three of four failed
+            // repairs carried that one string and none of the causes survived.
+            return failed(
+              inpaintResult.noop ? 'inpaint no-op: the target region came back unchanged'
+                : inpaintResult.error ? `inpaint edit failed: ${inpaintResult.error}`
+                : inpaintResult.instruction ? 'inpaint editor returned no image'
+                  : 'inpaint had no instruction to send (every finding was filtered or the plan left it empty)'
+            );
           }
+          if (method === 'iterate') return iterateOutcome();
           if (method === 'char-fix') {
             const result = await executeCharFixAction(img, decision, round, recolourInput);
             if (result?.imageData) {
               return result;
             }
-            return failed(result?.error || 'char-fix produced no result');
+            return failed(result?.error || 'char-fix produced no result',
+              { charName: result?.charName || null, attemptFrames: result?.attemptFrames || [] });
           }
           return { pageNumber, imageData: null, method, error: `unknown method ${method}` };
         } catch (err) {
@@ -2669,6 +2723,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         round,
         method: f.method || null,
         error: f.error || 'no result',
+        // Rejected char-fix frames (Grok raw, whiteout, blend mask): inspectable
+        // after the fact; the save path offloads the bytes to R2.
+        ...(f.attemptFrames?.length ? { character: f.charName || null, attemptFrames: f.attemptFrames } : {}),
         timestamp: new Date().toISOString(),
       });
     }

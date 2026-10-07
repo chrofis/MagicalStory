@@ -83,11 +83,28 @@ describe('D — a creature drawn too small is a page redo, and every repaint kee
     const nameMap = buildRepairNameMap({ characters: [LEVIN, MAX], visualBible: vb, pageNumber: 10 });
     const clause = buildElementSizeClauseForRepair({
       visualBible: vb, sceneMetadata: { objects: ['ANI001'], characters: ['Levin', 'Max'] }, characters: [LEVIN, MAX], nameMap,
+      issues: [{ type: 'object_presence', element: 'ANI001' }],
     });
     expect(clause).toContain('Sizes that hold after the edit — the grown dragon');
     expect(clause).toContain(`${TWICE} — about three to four times the height of the people beside it`);
     expect(clause).not.toMatch(/Rubina|Levin|Max/);
     const sent = buildInpaintInstruction({ editInstruction: '1. Turn the dragon toward the boy.', sizeClause: clause });
     expect(sent).toContain(clause);
+  });
+
+  // Owner 2026-10-07: only the TARGET's size line; and the clause must never fuse
+  // onto the instruction (the name map trims its leading blank line).
+  it('names only the element the finding targets, and keeps the clause apart from the instruction', () => {
+    const { buildRepairNameMap } = cjs('../../server/lib/repairLogic.js');
+    const { buildElementSizeClauseForRepair, buildInpaintInstruction } = cjs('../../server/lib/images.js');
+    const vb = bible();
+    const nameMap = buildRepairNameMap({ characters: [LEVIN, MAX], visualBible: vb, pageNumber: 10 });
+    const args = { visualBible: vb, sceneMetadata: { objects: ['ANI001', 'ANI002'], characters: ['Levin', 'Max'] }, characters: [LEVIN, MAX], nameMap };
+    const only = buildElementSizeClauseForRepair({ ...args, issues: [{ element: 'ANI002' }] });
+    expect(only).toContain(MELON);
+    expect(only).not.toContain(TWICE);
+    expect(buildElementSizeClauseForRepair({ ...args, issues: [{ type: 'emotion' }] })).toBe('');
+    const sent = buildInpaintInstruction({ editInstruction: '1. Shrink the flipper.', sizeClause: only });
+    expect(sent).toContain('flipper.' + String.fromCharCode(10, 10) + 'Sizes that hold');
   });
 });

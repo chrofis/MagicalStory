@@ -76,10 +76,10 @@ describe('presence routing: a name the page does not hold is never char-fixed; E
   };
   const EXTRA = { type: 'extra_character', severity: 'CRITICAL', character: 'figure 1', figure: 1, description: 'surplus figure', fix: 'Remove this figure: it is not one of the characters this page holds.' };
 
-  it('p7 shape (cast [], extra_character + entity CRITICAL on a roster name) → inpaint removal, not char-fix', () => {
+  it('p7 shape (cast [], extra_character + entity CRITICAL on a roster name) → page redo (iterate), not char-fix, not inpaint', () => {
     const d = decideRepairMethod(7, { ...SCORES, fixableIssues: [EXTRA, { ...EXTRA, figure: 2, character: 'figure 2' }] }, ENTITY_CRIT,
       { characters: ROSTER, expectedCast: [] });
-    expect(d.method).toBe('inpaint');
+    expect(d.method).toBe('iterate');
   });
 
   it('an entity CRITICAL on a name outside the declared cast never becomes a char-fix', () => {

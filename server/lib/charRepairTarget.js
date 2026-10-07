@@ -282,8 +282,12 @@ function resolveCharBbox(charName, { bestEval, entityReport, pageNumber, imageDa
           // back to a fresh SAM call, exactly as it does for tier 2.
           const detection = bestEval?.bboxDetection;
           const paired = pairs(detection) ? detection : null;
-          const figs = paired?.figures || [];
-          const selfIdx = figs.findIndex(f => f?.name && canonicalName(f.name) === canonName);
+          // null (no opinion), never [] : an unpaired detection says nothing
+          // about how many figures the bytes hold, and findBorrowedLabel reads
+          // [] as "No figures were detected at all" and refuses the repair
+          // (prod 7f2t99tk6 p4/p5, Lab 1694 after a garment-recolour override).
+          const figs = paired ? (paired.figures || []) : null;
+          const selfIdx = (figs || []).findIndex(f => f?.name && canonicalName(f.name) === canonName);
           return {
             faceBbox,
             bodyBbox,
