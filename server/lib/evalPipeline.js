@@ -720,6 +720,7 @@ async function validateEmptyScene(imageData, textPosition, pageContext = '', opt
     // failure is decided on. `issues` stays the plain text every reader shows.
     const findings = [];
     const { PIXEL_CHECK_KEYS, normaliseJudgeIssue, UNCLASSIFIED } = require('./plateQc');
+    const { isDimLight } = require('./sceneLight');
     const addIssue = (check, issue) => { issues.push(issue); findings.push({ check, issue }); };
 
     // Check 1: uniform-patch artifact detection — a flat white OR a flat
@@ -740,7 +741,11 @@ async function validateEmptyScene(imageData, textPosition, pageContext = '', opt
     if (whiteBoxPct > 0.08) {
       addIssue(PIXEL_CHECK_KEYS.box, `white box artifact: ${(whiteBoxPct * 100).toFixed(0)}% of image is uniform white`);
     }
-    if (blackBoxPct > 0.08) {
+    // A plate painted in a DIM declared light (night, dark, deep or dark water) is mostly black on purpose: the
+    // patch is the dark itself, and failing it hard kept the vision judge from running (staging
+    // job_1791315635053_t0t8qpebu p6 and p11: 15-41% black, both attempts, the interior-for-exterior plate shipped).
+    // The vision judge's own `artefact` check still reads a black box on those plates.
+    if (blackBoxPct > 0.08 && !isDimLight(light && light.timeOfDay)) {
       addIssue(PIXEL_CHECK_KEYS.box, `black box artifact: ${(blackBoxPct * 100).toFixed(0)}% of image is uniform black`);
     }
 

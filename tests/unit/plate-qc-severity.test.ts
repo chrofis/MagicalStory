@@ -122,6 +122,23 @@ describe('the judge files each issue under a closed check key', () => {
     });
   });
 
+  it('REGRESSION 2026-10-07: a big black patch is the dark itself on a plate painted in a dim declared light, and a box on any other', async () => {
+    const sharp = require_('sharp');
+    // mid-grey frame with a 40% x 100% black block: an interior patch large enough to trip the box check
+    const w = 256, h = 256;
+    const raw = Buffer.alloc(w * h * 3, 120);
+    for (let y = 40; y < 216; y++) for (let x = 40; x < 216; x++) { const i = (y * w + x) * 3; raw[i] = raw[i + 1] = raw[i + 2] = 0; }
+    const buf = await sharp(raw, { raw: { width: w, height: h, channels: 3 } }).png().toBuffer();
+    const { validateEmptyScene } = require_('../../server/lib/evalPipeline');
+    const uri = `data:image/png;base64,${buf.toString('base64')}`;
+    const lit = await validateEmptyScene(uri, null, 'T', { skipVision: true, light: { timeOfDay: 'afternoon', weather: 'clear' } });
+    expect(lit.findings.some((f: any) => f.check === 'artefact' && /black box/.test(f.issue))).toBe(true);
+    for (const t of ['underwater_dark', 'dark', 'night', 'underwater_deep']) {
+      const dim = await validateEmptyScene(uri, null, 'T', { skipVision: true, light: { timeOfDay: t, weather: 'none' } });
+      expect(dim.findings.some((f: any) => /black box/.test(f.issue)), t).toBe(false);
+    }
+  });
+
   it('the pixel check files a white box under artefact (hard)', async () => {
     const sharp = require_('sharp');
     const buf = await sharp({ create: { width: 256, height: 256, channels: 3, background: { r: 255, g: 255, b: 255 } } }).png().toBuffer();

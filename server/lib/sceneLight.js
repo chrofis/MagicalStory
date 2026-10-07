@@ -91,7 +91,7 @@ const LIGHTS = [
     judge: 'underwater_night: beneath the sea at night in dark blue water with a faint pale glow',
     phrase: 'underwater at night: the whole picture is beneath the sea, dark blue water all around, a faint pale silvery glow falling through it from above, drifting particles' },
   { id: 'underwater_dark', hour: false, water: true, dim: true,
-    jev: 'dark underwater: beneath the surface in pitch-black water — a cloud of ink, the abyss, the inside of a sunken wreck — no daylight reaches it',
+    jev: 'dark underwater: beneath the surface in pitch-black water — a cloud of ink, the abyss, the inside of a sunken wreck, enclosed and dark even where a thin beam falls through a gap in it — no daylight fills it',
     judge: 'underwater_dark: beneath the sea in pitch-black water, lit only by light sources in it',
     phrase: 'dark underwater: the whole picture is beneath the sea in pitch-black water, nothing reaches it from above, the scene lit only by the light sources in it, drifting particles' },
   { id: 'dark', hour: false, dim: true,
