@@ -77,7 +77,35 @@ describe('a deep-linked arrival is distinguishable from an in-grid choice', () =
     // preselected must compare the ARRIVAL topic to the chosen one — a bare
     // "was there a deep link" flag would count a visitor who changed their mind
     // in the grid as pre-selected.
-    expect(metaFor('topic_selected')).toContain('deepLink.topic === storyInput.storyTopic');
+    expect(metaFor('topic_selected')).toContain('deepLink.topic === input.storyTopic');
+  });
+});
+
+describe('an auto-advanced pick records the field that was just chosen', () => {
+  // The topic step calls onChange(next) and onNext() in the SAME click when the
+  // pick completes the selection (theme on adventure, the last of topic/theme on
+  // a life challenge). React applies the setState after the handler, so a
+  // goNext() that reads `storyInput` sees the PREVIOUS input: theme undefined on
+  // every adventure row, topic or theme undefined on every life-challenge row.
+  const TOPIC_STEP = fs.readFileSync(
+    path.join(__dirname, '..', '..', 'client', 'src', 'pages', 'trial', 'TrialTopicStep.tsx'),
+    'utf8'
+  ).split('\r\n').join('\n');
+
+  it('every auto-advance hands the completed input to onNext', () => {
+    const autoAdvances = TOPIC_STEP.match(/onNext\([^)]*\);/g) || [];
+    // handleThemeSelect (2 branches) + handleTopicSelect; handleNext (button) passes nothing.
+    expect(autoAdvances.filter(c => c === 'onNext(next);')).toHaveLength(3);
+    expect(TOPIC_STEP).toMatch(/onNext: \(next\?: StoryInput\) => void/);
+  });
+
+  it('the wizard reads the handed-over input for topic, theme and preselected', () => {
+    expect(WIZARD).toMatch(/const goNext = \(chosen\?: StoryInput\) =>/);
+    const meta = metaFor('topic_selected');
+    expect(meta).toContain('topic: input.storyTopic');
+    expect(meta).toContain('theme: input.storyTheme');
+    expect(meta).not.toContain('storyInput.storyTheme');
+    expect(WIZARD).toContain('const input = chosen ?? storyInput;');
   });
 });
 

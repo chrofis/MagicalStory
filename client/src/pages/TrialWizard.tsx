@@ -405,12 +405,18 @@ export default function TrialWizard() {
 
   const currentStepIndex = STEPS.indexOf(currentStep);
 
-  const goNext = () => {
+  // `chosen`: the story input the leaving step just committed. The topic step
+  // auto-advances in the SAME click that sets the last field (theme or topic),
+  // before React has applied that setState — read from `storyInput` here, the
+  // topic_selected row carried the field as missing on every auto-advanced
+  // pick (the theme on every adventure, the last pick on every life challenge).
+  const goNext = (chosen?: StoryInput) => {
     const nextIndex = currentStepIndex + 1;
     // Stamp the step being LEFT here rather than inside each step component —
     // one place, and it can't drift out of sync with the actual navigation.
     if (currentStep === 'character') trackTrialStep('character_done');
     if (currentStep === 'topic') {
+      const input = chosen ?? storyInput;
       // WHICH topic, not just that one was picked. This is the funnel's
       // highest-intent signal and is what replaces the authored `liveness`
       // weights in storyTypes.ts with measurement once enough rows exist.
@@ -418,10 +424,10 @@ export default function TrialWizard() {
       // so a topic's pick rate is only readable against its own denominator.
       const age = parseChildAge(characterData.age);
       trackTrialStep('topic_selected', {
-        category: storyInput.storyCategory || undefined,
-        topic: storyInput.storyTopic || undefined,
-        theme: storyInput.storyTheme || undefined,
-        preselected: !!deepLink.topic && deepLink.topic === storyInput.storyTopic,
+        category: input.storyCategory || undefined,
+        topic: input.storyTopic || undefined,
+        theme: input.storyTheme || undefined,
+        preselected: !!deepLink.topic && deepLink.topic === input.storyTopic,
         ...(age !== null ? { age } : {}),
       });
     }

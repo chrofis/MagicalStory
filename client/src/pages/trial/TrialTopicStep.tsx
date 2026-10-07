@@ -17,7 +17,8 @@ interface Props {
   storyInput: StoryInput;
   onChange: (data: StoryInput) => void;
   onBack: () => void;
-  onNext: () => void;
+  /** `next`: the input this click completed — the parent reads it before its own state catches up (auto-advance). */
+  onNext: (next?: StoryInput) => void;
   previewAvatar?: string | null;
   characterName?: string;
   characterGender?: string;
@@ -168,9 +169,9 @@ export default function TrialTopicStep({ storyInput, onChange, onBack, onNext, p
     // summary screen. Adventure: theme alone is enough. Life-challenge: theme
     // is the second pick after topic.
     if (next.storyCategory === 'adventure') {
-      onNext();
+      onNext(next);
     } else if (next.storyCategory === 'life-challenge' && next.storyTopic) {
-      onNext();
+      onNext(next);
     }
   };
 
@@ -180,7 +181,7 @@ export default function TrialTopicStep({ storyInput, onChange, onBack, onNext, p
     // Auto-advance if this completes a life-challenge pick (theme already set).
     // Otherwise stay on this screen so user can pick the style.
     if (next.storyCategory === 'life-challenge' && next.storyTheme) {
-      onNext();
+      onNext(next);
     }
   };
 
