@@ -3661,6 +3661,17 @@
       "fixedAt": "2026-10-06",
       "fixedIn": "text-v3 commit",
       "fix": "prompts/book-audit.txt: presence is FAULT[TEXT][MINOR] only where one quoted sentence puts the character IN the pictured instant and the picture shows it empty; a character named off-picture or acting beside the drawn figures is no fault. Prompt classification, code only routes it. Replay of the 4 stored faults recorded in decisions.md."
+    },
+    {
+      "id": "previous-scenes-clothing-object-object",
+      "title": "previousScenes[].clothing reaches the Art Director as the literal \"[object Object]\" in the PREVIOUS SCENES block of every iterate / regenerate scene prompt",
+      "reportedAt": "2026-10-07",
+      "source": "tasks/BACKLOG.md:1943 (duplicate :1914): built prompt for p5 of job_1789759147125_p08djwhbl shows 'Clothing: [object Object]' twice; byte-identical at prod commit a79c8bee. Reached from iteratePageCore (auto-repair, manual iterate, Lab iterate stage) and the regenerate route.",
+      "rootCause": "buildSceneDescriptionPrompt (server/lib/promptBuilders.js) rendered prev.characterClothing as a name->category map, a key no caller ever sets, and fell through to interpolating prev.clothing as a string. Every caller (images.js iteratePageCore, routes/regeneration.js, scripts/test-models.js) sets `clothing: pageClothing[prevPage]`, which the unified pipeline stores as a per-character map {Name: category}.",
+      "status": "fixed",
+      "fixedAt": "2026-10-07",
+      "fixedIn": "pending",
+      "fix": "formatPreviousPageClothing in promptBuilders.js renders the map as 'Name: category, Name2: category', keeps a category string as-is, and throws on any other shape; the dead characterClothing branch is deleted. Fixed at the single consumer so all callers are covered. Test: tests/unit/previous-scenes-clothing.test.ts."
     }
   ]
 }

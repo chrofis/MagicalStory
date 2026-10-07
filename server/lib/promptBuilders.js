@@ -3783,6 +3783,29 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
 }
 
 /**
+ * Render a previous page's clothing for the PREVIOUS SCENES block.
+ * Accepts the two shapes `pageClothing[page]` is stored in — a per-character
+ * map {Name: 'category'} (unified pipeline) rendered as "Name: category,
+ * Name2: category", or a bare category string (legacy parser,
+ * parseClothingCategory) kept as-is. Nothing (null/undefined/empty) renders
+ * nothing. Any other shape THROWS: it would otherwise reach the model as
+ * "[object Object]" (NO FALLBACKS).
+ */
+function formatPreviousPageClothing(clothing, pageNumber) {
+  if (clothing === null || clothing === undefined || clothing === '') return '';
+  if (typeof clothing === 'string') return clothing;
+  if (typeof clothing === 'object' && !Array.isArray(clothing)) {
+    const entries = Object.entries(clothing);
+    const bad = entries.find(([, cat]) => typeof cat !== 'string');
+    if (bad) {
+      throw new Error(`[SCENE PROMPT] Page ${pageNumber}: previous-page clothing for "${bad[0]}" is ${JSON.stringify(bad[1])}, expected a category string`);
+    }
+    return entries.map(([name, cat]) => `${name}: ${cat}`).join(', ');
+  }
+  throw new Error(`[SCENE PROMPT] Page ${pageNumber}: previous-page clothing has unsupported shape ${JSON.stringify(clothing)}`);
+}
+
+/**
  * Build Art Director scene description prompt (iteration/retry - full validation)
  * Uses scene-iteration.txt template - includes all 18 checks, draft-then-validate, preview feedback
  * Alias: buildSceneDescriptionPrompt (backwards compat)
@@ -3792,7 +3815,7 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
  * @param {string} shortSceneDesc - Scene hint from outline (current page) - DEPRECATED when using rawOutlineContext
  * @param {string} language - Output language
  * @param {Object} visualBible - Visual Bible data
- * @param {Array} previousScenes - Array of {pageNumber, text, sceneHint, characterClothing} for previous pages (max 2) - DEPRECATED when using rawOutlineContext
+ * @param {Array} previousScenes - Array of {pageNumber, text, sceneHint, clothing} for previous pages (max 2); `clothing` is pageClothing[page] (per-character map or category string) - DEPRECATED when using rawOutlineContext
  * @param {Object|string} characterClothing - Per-character clothing map {Name: 'category'} or legacy string - DEPRECATED when using rawOutlineContext
  * @param {string} correctionNotes - Notes from previous failed attempt (for regeneration)
  * @param {string} availableAvatars - Pre-built string of available avatars per character
@@ -3959,17 +3982,15 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
         if (prev.sceneHint) {
           previousScenesText += `  Scene: ${prev.sceneHint}\n`;
         }
-        // Show per-character clothing for previous scenes
-        if (prev.characterClothing && typeof prev.characterClothing === 'object') {
-          const clothingList = Object.entries(prev.characterClothing)
-            .map(([name, cat]) => `${name}: ${cat}`)
-            .join(', ');
-          if (clothingList) {
-            previousScenesText += `  Clothing: ${clothingList}\n`;
-          }
-        } else if (prev.clothing) {
-          // Legacy format fallback
-          previousScenesText += `  Clothing: ${prev.clothing}\n`;
+        // Previous page's clothing: every caller passes `pageClothing[prevPage]`
+        // (or parseClothingCategory's string) under `clothing`, which is a
+        // per-character map {Name: category} on the unified pipeline and a
+        // category string on the legacy parser. Interpolating the map used to
+        // reach the model as the literal "[object Object]" (bugs.json
+        // previous-scenes-clothing-object-object).
+        const prevClothingText = formatPreviousPageClothing(prev.clothing, prev.pageNumber);
+        if (prevClothingText) {
+          previousScenesText += `  Clothing: ${prevClothingText}\n`;
         }
       }
       previousScenesText += '\n';
