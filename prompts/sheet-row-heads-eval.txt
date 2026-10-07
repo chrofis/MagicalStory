@@ -6,7 +6,7 @@ TASK 1: FACING ANGLES
 Say what each cell actually shows, then compare it to front, three-quarter, profile, rear turn, left to right. Cell 4 duplicating cell 3's profile, or showing a flat back-of-head with no visible eye or cheek, scores 1-3. Score 1-10.
 
 TASK 2: CLEAN RENDER (no arrows or stray marks)
-Check every head for arrows, lines, pointers, symbols, letters, or graphics coming out of or drawn on the head, face, hair, or skin. Coloured axis arrows (red / green / blue) sticking out of a head are a leaked pose-marker and score 1. Any clear stray mark on a head scores 1-3. Then check the whole row, in and between the cells: {SHEET_LETTERING} Any written caption, word, letter or number anywhere in the row scores 1-3. No marks and no lettering = 9-10. cleanScore 1-10.
+Check every head for arrows, lines, pointers, symbols, letters, or graphics coming out of or drawn on the head, face, hair, or skin. Coloured axis arrows (red / green / blue) sticking out of a head are a leaked pose-marker and score 1. Any clear stray mark on a head scores 1-3. Then check the whole row, in and between the cells: {SHEET_LETTERING} Any written caption, word, letter or number anywhere in the row scores 1-3. No marks and no lettering = 9-10. cleanScore 1-10. Also state letteringSeen: true when any caption, label, word, letter or number is on the paper in or between the cells, however it is excused, and quote it in letteringQuoted; false otherwise.
 
 TASK 3: COVERAGE AND GARMENT (no bare skin below the neck, and the right garment)
 Where a cell shows any shoulder or upper torso, it is clothed — collar, fabric, or costume visible. A cell showing a bare chest, bare shoulders, or an unclothed torso scores 1-3.
@@ -21,6 +21,12 @@ Name the lowest part of the figure visible in each cell. Upper chest or higher i
 TASK 6: DECLARED GLASSES
 For each cell say whether its face wears the glasses REQUESTED_GLASSES names, in that frame: yes; no (a face without them, or in another frame); na (no face shows in that cell). When REQUESTED_GLASSES says none declared, answer na for every cell.
 
+TASK 7: HAIR
+For each cell say whether its hair matches REQUESTED_HAIR AND matches the other cells: match, or differs. Read four things in every cell: the colour name, the length, whether the hair is worn down, up or in a ponytail, and the parting. One cell whose colour name, length, up-or-down style or parting is not the one the other cells show, or not the one REQUESTED_HAIR names, is differs. Light and shade do not change a colour name; a hairstyle REQUESTED_HAIR calls natural names no particular style. When REQUESTED_HAIR says none declared, the cells are compared with each other alone. In the rear turn, judge what the hair shows.
+
+TASK 8: ONE PERSON IN EVERY CELL
+For each cell say whether it shows the same person as cell 1: same, or different. Compare the face, the hair colour and the glasses. A cell whose face, hair colour or glasses are another person's is different; pose and angle differ by design. Cell 1 is same.
+
 finalScore = lowest of angles.score, cleanScore, coverageScore, soloScore, cropScore. valid = finalScore ≥ 6.
 
 Return EXACTLY this JSON shape. Every score and reason comes from what you see in this image — never return this template's placeholders:
@@ -31,6 +37,10 @@ Return EXACTLY this JSON shape. Every score and reason comes from what you see i
   "solo": {"soloScore": <1-10>, "reason": "<heads you count per cell; name any extra one and where>"},
   "crop": {"cropScore": <1-10>, "reason": "cell1: <lowest visible part>; cell2: <lowest part>; cell3: <lowest part>; cell4: <lowest part>"},
   "glasses": {"perCell": {"cell1": "<yes|no|na>", "cell2": "<yes|no|na>", "cell3": "<yes|no|na>", "cell4": "<yes|no|na>"}, "reason": "<the glasses you see on each face, or none>"},
+  "hair": {"perCell": {"cell1": "<match|differs>", "cell2": "<match|differs>", "cell3": "<match|differs>", "cell4": "<match|differs>"}, "reason": "cell1: <colour name, length, up or down, parting>; cell2: <same four>; cell3: <same four>; cell4: <same four>"},
+  "person": {"perCell": {"cell1": "same", "cell2": "<same|different>", "cell3": "<same|different>", "cell4": "<same|different>"}, "reason": "<the face, hair colour and glasses you see per cell>"},
+  "letteringSeen": <true|false>,
+  "letteringQuoted": "<each word, letter or number you see on the paper, or none>",
   "finalScore": <1-10>,
   "valid": <true|false>,
   "failureReasons": []
@@ -40,3 +50,4 @@ If invalid, populate failureReasons with short strings naming each failed sub-ch
 
 {REQUESTED_OUTFIT}
 {REQUESTED_GLASSES}
+{REQUESTED_HAIR}

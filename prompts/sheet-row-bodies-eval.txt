@@ -5,7 +5,7 @@ You receive ONE image: the body row — 4 cells left to right: front, three-quar
 TASK 1: HEAD AND FEET
 For each cell report two things:
 - head: yes if the top of the head is drawn; no if the figure begins at the collar or shoulders with nothing above them.
-- feet: yes if both feet with shoes are fully visible; no if cut at thigh, knee, or ankle. When REQUESTED_OUTFIT replaces the legs (a tail, a fin), feet: yes only if the whole tail is visible to its tip and no leg, foot or toe shows below the waist; any foot or leg showing is no.
+- feet: yes if both feet with shoes are fully visible; no if cut at thigh, knee, or ankle. When REQUESTED_OUTFIT replaces the legs (a tail, a fin), feet: yes only if the whole tail is visible to its tip and no leg, foot or toe shows below the waist; any foot or leg showing is no. {TAIL_POSE} A tail figure standing upright on its fin is no.
 headScore = lowest cell for head (8-10 = every cell has a head; 1-2 = any head missing). feetScore = lowest cell for feet (same scale). fullBodyScore = lower of headScore and feetScore. In the reason, report per cell like "cellN: head=<yes|no>, feet=<yes|no>".
 
 TASK 2: FACING ANGLES
@@ -24,15 +24,22 @@ TASK 5: SINGLE SUBJECT — ONE FIGURE PER CELL
 Each cell shows exactly ONE figure: the same single character in every cell. Any second figure anywhere in the row — another person, a partial body, a face in the margin, a figure of a different age or sex — is a defect. This includes faint, ghosted, semi-transparent or sketched-in figures, and figures overlapping or blended into the character. Cells must read as four separate figures with space between them, not a merged group. Any extra figure, or figures merged across cells = 1-3; one clean figure per cell = 9-10. soloScore 1-10.
 
 TASK 6: PLAIN BACKGROUND
-The area behind and around the figures must be plain white and empty (thin cell dividers are fine). Any painted scene, scenery, streets, walls, floor, sky, fog, or coloured/illustrated backdrop behind a figure = backgroundScore ≤ 2. {SHEET_LETTERING} Any written caption, word, letter or number anywhere in the row — above, below or beside a figure — = backgroundScore ≤ 2. Plain white/empty in every cell = 10. backgroundScore 1-10.
+The area behind and around the figures must be plain white and empty (thin cell dividers are fine). Any painted scene, scenery, streets, walls, floor, sky, fog, or coloured/illustrated backdrop behind a figure = backgroundScore ≤ 2. {SHEET_LETTERING} Any written caption, label, word, letter or number anywhere in the row — above, below or beside a figure, and however it is excused — = backgroundScore ≤ 2. Plain white/empty in every cell = 10. backgroundScore 1-10. Also state letteringSeen: true when any such lettering is on the paper, and quote it in letteringQuoted; false otherwise.
 
 TASK 7: DECLARED GLASSES
 For each cell say whether its face wears the glasses REQUESTED_GLASSES names, in that frame: yes; no (a face without them, or in another frame); na (no face shows in that cell). When REQUESTED_GLASSES says none declared, answer na for every cell.
+
+TASK 8: HAIR
+For each cell say whether its hair matches REQUESTED_HAIR AND matches the other cells: match, or differs. Read four things in every cell: the colour name, the length, whether the hair is worn down, up or in a ponytail, and the parting. One cell whose colour name, length, up-or-down style or parting is not the one the other cells show, or not the one REQUESTED_HAIR names, is differs. Light and shade do not change a colour name; a hairstyle REQUESTED_HAIR calls natural names no particular style. When REQUESTED_HAIR says none declared, the cells are compared with each other alone. In the rear turn, judge what the hair shows.
+
+TASK 9: ONE PERSON IN EVERY CELL
+For each cell say whether it shows the same person as cell 1: same, or different. Compare the face, the hair colour, the glasses and the build. A cell whose face, hair colour, glasses or build are another person's is different; pose and angle differ by design. Cell 1 is same.
 
 finalScore = lowest of fullBodyScore, angles.score, outfitScore, costumeReadsScore, proportions.score, soloScore, backgroundScore. valid = finalScore ≥ 6.
 
 {REQUESTED_OUTFIT}
 {REQUESTED_GLASSES}
+{REQUESTED_HAIR}
 {REQUESTED_COSTUME}
 {CHARACTER_AGE}
 
@@ -46,6 +53,10 @@ Return EXACTLY this JSON shape. Every score and reason comes from what you see i
   "proportions": {"score": <1-10>, "reason": "<how many heads tall, and the age that reads>"},
   "background": {"backgroundScore": <1-10>, "reason": "<what is behind and around the figures, including any lettering>"},
   "glasses": {"perCell": {"cell1": "<yes|no|na>", "cell2": "<yes|no|na>", "cell3": "<yes|no|na>", "cell4": "<yes|no|na>"}, "reason": "<the glasses you see on each face, or none>"},
+  "hair": {"perCell": {"cell1": "<match|differs>", "cell2": "<match|differs>", "cell3": "<match|differs>", "cell4": "<match|differs>"}, "reason": "cell1: <colour name, length, up or down, parting>; cell2: <same four>; cell3: <same four>; cell4: <same four>"},
+  "person": {"perCell": {"cell1": "same", "cell2": "<same|different>", "cell3": "<same|different>", "cell4": "<same|different>"}, "reason": "<the face, hair colour, glasses and build you see per cell>"},
+  "letteringSeen": <true|false>,
+  "letteringQuoted": "<each word, letter or number you see on the paper, or none>",
   "finalScore": <1-10>,
   "valid": <true|false>,
   "failureReasons": []

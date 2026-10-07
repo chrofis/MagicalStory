@@ -269,6 +269,7 @@ async function loadPromptTemplates() {
     ['sheetRowHeadsEval', 'sheet-row-heads-eval.txt'],
     ['sheetRowBodiesEval', 'sheet-row-bodies-eval.txt'],
     ['sheetRowIdentityEval', 'sheet-row-identity-eval.txt'],
+    ['sheetRowCellsEval', 'sheet-row-cells-eval.txt'],
     ['styledCostumedAvatar', 'styled-costumed-avatar.txt'],
     ['visualBibleAnalysis', 'visual-bible-analysis.txt'],
     ['illustrationEdit', 'illustration-edit.txt'],

@@ -12179,6 +12179,11 @@ const WARDROBE_RULES = {
   TAIL_DEF: 'A costume that replaces the legs (a tail, a fin) is one tail from the waist down, written as replacing the legs. Never a skirt over legs, and no feet, bare feet or footwear.',
   SLOT_STATE_DEF: 'One state per garment slot: never two garments in one slot that exclude each other, and a slot the character does not wear is omitted, never written out as empty.',
   VARIETY_DEF: "Two characters never wear the same set of garments recoloured, neither the whole outfit nor what is left once a page takes an outer layer off. A child's covering top and a leg-replacing tail are never the garment given up: vary colour, sleeve length, neckline and trim around them.",
+  // A prop is never a garment (2026-10-07). The bible's "worn object the story turns on" line
+  // listed a picnic blanket the plan has someone spread and wrap as an outfit item; the avatar
+  // sheet then drew it as a scarf on every cell and every page copied it (staging showcase
+  // job_1791315635053_t0t8qpebu, Daniel). The Visual Bible and the plan line carry a prop.
+  PROP_NOT_GARMENT_DEF: 'A garment is clothing a person wears: coat, scarf, hat, cloak, boots. A blanket, towel, sheet, tablecloth, bag, umbrella, toy, tool or any other object that is carried, held, spread out, shared or wrapped around someone for a page is a story prop, never a garment: no outfit names it, however the plan uses it. The plan line and the Visual Bible carry a prop.',
   FACE_COVER_DEF: 'No garment covers the face or the eyes, or shadows them with a brim: no mask, visor, veil, helmet, crown or low brim. Glasses are identity, not a garment: a character whose outfit lists glasses keeps them, and every rewrite of that outfit still lists them.',
 };
 const wardrobeSharedFills = () => ({ ...WARDROBE_RULES });

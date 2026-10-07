@@ -14,7 +14,9 @@ import { createRequire } from 'node:module';
 const cjs = createRequire(import.meta.url);
 const { loadPromptTemplates } = cjs('../../server/services/prompts.js');
 
-const PIXEL = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=';
+// Big enough to split into its two rows (the styled judge asks its per-cell checks of each row).
+const PIXEL = 'data:image/jpeg;base64,/9j/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAQABADASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAj/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFAEBAAAAAAAAAAAAAAAAAAAAAP/EABQRAQAAAAAAAAAAAAAAAAAAAAD/2gAMAwEAAhEDEQA/AKpAB//Z';
+const ROW_OK = { cells: Object.fromEntries([1, 2, 3, 4].map(i => [`cell${i}`, { medium: 'illustrated', hair: 'match', person: 'same' }])), letteringSeen: false, letteringQuoted: 'none', reason: 'cell1: brown hair, no glasses, illustrated' };
 const STYLE_OK = { layoutScore: 9, identityScore: 9, styleScore: 9, cleanScore: 9, bodyFaceScore: 9, ageScore: 9, soloScore: 9, backgroundScore: 9 };
 
 let SHEET: any;
@@ -30,6 +32,7 @@ function stubJudges(garmentAnswers: boolean[], keptAnswers: boolean[] = [true, t
   let k = 0;
   sentQuestions.length = 0;
   globalThis.fetch = (async (_u: any, init: any) => {
+    if (!JSON.parse(init.body).contents) return { ok: true, status: 200, json: async () => ({}), text: async () => '' }; // the analyzer's row-divider call
     const text = JSON.parse(init.body).contents[0].parts.map((p: any) => p.text || '').join('\n');
     if (/is .+ visible on the figure in cells 5 to 8/.test(text)) sentQuestions.push(text);
     const keptAns = /is .+ visible on the figure in cells 5 to 8/.test(text) ? keptAnswers[k++] : null;
@@ -37,6 +40,7 @@ function stubJudges(garmentAnswers: boolean[], keptAnswers: boolean[] = [true, t
       ? { cells: 'cell5: yes; cell6: yes; cell7: yes; cell8: yes', visible: keptAns, reason: keptAns ? 'all four show it' : 'cells 5-8 show no strap' }
       : /is .+ visible on the figure/.test(text)
       ? { cells: 'cell1: red coat; cell2: red coat', visible: garmentAnswers[q++], reason: garmentAnswers[q - 1] ? 'cell 3 shows a mitten' : 'no cell shows it' }
+      : /ONE row of a styled character reference sheet/.test(text) ? ROW_OK
       : STYLE_OK;
     return { ok: true, status: 200, json: async () => ({ candidates: [{ content: { parts: [{ text: JSON.stringify(verdict) }] }, finishReason: 'STOP' }], usageMetadata: {} }), text: async () => '' };
   }) as any;

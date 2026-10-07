@@ -2774,6 +2774,8 @@ def get_pose_model():
 
 # COCO-17 head keypoints: nose, left/right eye, left/right ear.
 _POSE_HEAD_KP = [0, 1, 2, 3, 4]
+_POSE_NOSE_KP = 0
+_POSE_SHOULDER_KP = [5, 6]  # COCO-17 left/right shoulder
 
 
 @app.route('/pose-heads', methods=['POST'])
@@ -2788,7 +2790,7 @@ def pose_heads():
     Returns:
     {
       "success": true,
-      "cells": [ { "head": bool, "head_max": 0-1, "n_kp": int,
+      "cells": [ { "head": bool, "head_max": 0-1, "n_kp": int, "nose_y_frac"/"shoulder_y_frac": 0-1|null,
                    "head_y_frac": 0-1|null, "clipped": bool }, ... ],
       "all_heads": bool, "any_clipped": bool
     }
@@ -2832,11 +2834,19 @@ def pose_heads():
                 n_kp = sum(1 for x in head_conf if x > conf_th)
                 head_ys = [kxy[i][1] for i in _POSE_HEAD_KP if kcf[i] > 0.3]
                 head_y_frac = float(min(head_ys) / cell.shape[0]) if head_ys else None
+                # Where the face and the shoulders sit, as fractions of the cell height. The
+                # head-row crop (character2x4Sheet cropHeadRowToShoulders) reads these: the
+                # row generator keeps drawing thigh-length figures into tall head cells.
+                nose_y_frac = float(kxy[_POSE_NOSE_KP][1] / cell.shape[0]) if kcf[_POSE_NOSE_KP] > 0.3 else None
+                sh_ys = [kxy[i][1] for i in _POSE_SHOULDER_KP if kcf[i] > 0.3]
+                shoulder_y_frac = float(sum(sh_ys) / len(sh_ys) / cell.shape[0]) if sh_ys else None
                 has_head = n_kp >= 1 and head_max > conf_th
                 clipped = bool(has_head and head_y_frac is not None and head_y_frac < clip_frac)
                 cells.append({"head": has_head, "head_max": round(head_max, 3),
                               "n_kp": n_kp,
                               "head_y_frac": round(head_y_frac, 3) if head_y_frac is not None else None,
+                              "nose_y_frac": round(nose_y_frac, 3) if nose_y_frac is not None else None,
+                              "shoulder_y_frac": round(shoulder_y_frac, 3) if shoulder_y_frac is not None else None,
                               "clipped": clipped})
         return jsonify({
             "success": True, "cols": cols, "cells": cells,

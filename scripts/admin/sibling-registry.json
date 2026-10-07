@@ -347,6 +347,7 @@
         "prompts/sheet-row-bodies-eval.txt",
         "prompts/sheet-row-identity-eval.txt",
         "prompts/sheet-2x4-style-eval.txt",
+        "prompts/sheet-row-cells-eval.txt",
         "prompts/sheet-garment-gone-check.txt",
         "prompts/sheet-kept-garment-check.txt"
       ],

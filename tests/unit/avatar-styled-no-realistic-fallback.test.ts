@@ -62,6 +62,7 @@ function makeCtx(attempts: Attempt[]) {
     MAX_SHEET_RETRIES: attempts.length - 1,
     MODEL_DEFAULTS: { avatarStyleTransferBackend: 'grok' },
     process: { env: { GEMINI_API_KEY: 'k' } },
+    hairRequest: () => '',
     loadStyleAnchor: () => null,
     buildStyleTransferPrompt: () => 'P',
     quickLayoutCheck: async () => ({ valid: true }),

@@ -142,14 +142,19 @@ describe('the per-garment check (owner decision 2026-10-04)', () => {
   const sheetReply = (extra: Record<string, unknown> = {}) => ({
     ...Object.fromEntries(['layout', 'identity', 'style', 'clean', 'bodyFace', 'age', 'solo', 'background', 'garment'].map(a => [`${a}Score`, 9])), ...extra,
   });
-  /** Style judge calls carry 3 images; the garment check carries 1. */
+  // Big enough to split into its two rows: the styled judge asks its per-cell checks of each row.
+  const SHEET_IMG = IMG('/9j/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAQABADASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAj/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFAEBAAAAAAAAAAAAAAAAAAAAAP/EABQRAQAAAAAAAAAAAAAAAAAAAAD/2gAMAwEAAhEDEQA/AKpAB//Z');
+  const rowReply = { cells: Object.fromEntries([1, 2, 3, 4].map(i => [`cell${i}`, { medium: 'illustrated', hair: 'match', person: 'same' }])), letteringSeen: false, letteringQuoted: 'none', reason: 'cell1: brown hair, illustrated' };
+  /** Style judge calls carry 3 images; the row-cells check and the garment check carry 1. */
   function stubJudges(visibleByGarment: Record<string, boolean | 'throw'>) {
     const asked: string[] = [];
     globalThis.fetch = (async (_url: string, init: any) => {
+      if (!JSON.parse(init.body).contents) return { ok: true, json: async () => ({}) }; // the analyzer's row-divider call
       const parts = JSON.parse(init.body).contents[0].parts;
       const imgs = parts.filter((p: any) => p.inline_data).length;
       let out: any;
       if (imgs === 3) out = sheetReply();
+      else if (/ONE row of a styled character reference sheet/.test(parts[parts.length - 1].text)) out = rowReply;
       else {
         const prompt = parts[parts.length - 1].text;
         const g = Object.keys(visibleByGarment).find(k => prompt.includes(`is ${k} visible`))!;
@@ -161,7 +166,7 @@ describe('the per-garment check (owner decision 2026-10-04)', () => {
     }) as any;
     return asked;
   }
-  const run = (removed: string[]) => SHEET.evaluateVariantSheet(IMG('SHEET'), { facePhoto: IMG('FACE'), realisticSheet: IMG('REF'), artStyle: 'watercolor', declaredAge: 7, removedGarments: removed, keptCheckSkipped: 'test: kept check is pinned in variant-gate-record' });
+  const run = (removed: string[]) => SHEET.evaluateVariantSheet(SHEET_IMG, { facePhoto: IMG('FACE'), realisticSheet: IMG('REF'), artStyle: 'watercolor', declaredAge: 7, removedGarments: removed, keptCheckSkipped: 'test: kept check is pinned in variant-gate-record' });
   const prev = process.env.GEMINI_API_KEY;
   beforeAll(() => { process.env.GEMINI_API_KEY = prev || 'k'; });
 
@@ -172,7 +177,7 @@ describe('the per-garment check (owner decision 2026-10-04)', () => {
     globalThis.fetch = (async (u: string, init: any) => { seen.push(JSON.parse(init.body).contents[0].parts.filter((p: any) => p.inline_data).length); return (f as any)(u, init); }) as any;
     const out = await run(['autumn jacket', 'wool scarf']);
     expect(asked.sort()).toEqual(['autumn jacket', 'wool scarf']);
-    expect(seen.filter(n => n === 1)).toHaveLength(2);
+    expect(seen.filter(n => n === 1)).toHaveLength(2 + 2); // two garment checks + the two row-cell checks
     expect(out.verdict.valid).toBe(true);
   });
 

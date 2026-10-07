@@ -2900,6 +2900,7 @@ async function runAvatarStyleStage(target, { experimentId, promptOverride, param
     artStyle,
     characterName: character.name,
     characterAge: character.age ?? null,
+    hair: require('./character2x4Sheet')._internal.hairRequest(character),
     promptOverride: promptOverride || null,
   });
   if (!result?.imageData) throw new Error('style transfer returned no image');
@@ -7047,13 +7048,13 @@ async function runAvatarEvalStage(target, { experimentId, promptOverride, params
       ({ verdict: evalResult } = await _internal.evaluateAvatarSheet(sheet.imageData, {
         pass: 2, facePhoto, realisticSheet: anchor.imageData,
         artStyle: params.artStyle || target.artStyle || 'pixar',
-        declaredAge, model, promptOverrides,
+        declaredAge, hair: _internal.hairRequest(character), model, promptOverrides,
       }));
     } else {
       const { split } = await _internal.evaluateAvatarSheet(sheet.imageData, {
         pass: 1, facePhoto,
         costumeDescription: costume.description || 'standard outfit',
-        declaredAge, glasses: require('./avatarOverrides').declaredGlasses(character), model, promptOverrides,
+        declaredAge, glasses: require('./avatarOverrides').declaredGlasses(character), hair: _internal.hairRequest(character), model, promptOverrides,
       });
       evalResult = { split: true, splitY: split.splitY, model, heads: split.heads, bodies: split.bodies, identity: split.identity, finalScore: split.verdict.finalScore, valid: split.verdict.valid };
     }
@@ -7124,7 +7125,7 @@ async function runAvatarEvalStage(target, { experimentId, promptOverride, params
     const { split } = await _internal.evaluateAvatarSheet(sheetForDisplay, {
       pass: 1, facePhoto, standardAvatar,
       costumeDescription: costume.description || 'standard outfit',
-      declaredAge, glasses: require('./avatarOverrides').declaredGlasses(character), model, promptOverrides,
+      declaredAge, glasses: require('./avatarOverrides').declaredGlasses(character), hair: _internal.hairRequest(character), model, promptOverrides,
     });
     const { heads, bodies, identity } = split;
     splitPromptUsed = split.promptUsed;
@@ -7149,7 +7150,7 @@ async function runAvatarEvalStage(target, { experimentId, promptOverride, params
       // No costumeDescription: pass 2 is a style transfer and its judge does
       // not score the outfit (that axis lives on pass 1).
       pass: 2, facePhoto, realisticSheet: realistic, artStyle,
-      declaredAge, model, promptOverrides,
+      declaredAge, hair: _internal.hairRequest(character), model, promptOverrides,
     }));
   }
 
