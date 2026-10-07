@@ -5942,7 +5942,9 @@
     {
       "id": "trial-writer-effort-medium",
       "title": "Trial writer runs at effort medium (MODEL_DEFAULTS.trialStoryEffort) instead of the Sonnet 5.5 default high",
-      "commits": [],
+      "commits": [
+        "686e64d88"
+      ],
       "addedAt": "2026-10-07",
       "claim": "On the same three rotation entries (1 Noah 4 de, 5 Jules 6 fr, 8 Rohan 8 de) the writer phase (analytics.storyGenDurationMs) and tokenUsage.byFunction.unified_story output_tokens drop clearly below the effort-high runs of 2026-10-07 (199-285 s, 27k-40k output tokens: job_1791390810945_7yp1e0rh3, job_1791390831811_j5diensbo, job_1791390816625_2o820i76x) with no visible text-quality loss.",
       "runShape": [
