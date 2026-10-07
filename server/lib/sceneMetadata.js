@@ -571,7 +571,9 @@ function buildTextFromJson(scene) {
     lines.push('');
     for (const char of scene.characters) {
       const position = stripEntityIds(expandPositionAbbreviations(char.position) || '');
-      const parts = [stripEntityIds(char.name || '') + ':'];
+      // The name is the label, the rest is the comma list — the name used to
+      // sit INSIDE the list, so every line read "- Noah:, left, stands …".
+      const parts = [];
       if (position) parts.push(position);
       if (char.action) parts.push(stripEntityIds(char.action));
       if (char.expression) parts.push(stripEntityIds(char.expression));
@@ -581,7 +583,7 @@ function buildTextFromJson(scene) {
       // for old stories whose stored metadata still carries the field.
       const heldText = formatHoldingForPrompt(char.holding);
       if (heldText) parts.push('holding: ' + heldText);
-      lines.push('- ' + parts.join(', '));
+      lines.push(`- ${stripEntityIds(char.name || '')}: ${parts.join(', ')}`.trimEnd());
     }
   }
 

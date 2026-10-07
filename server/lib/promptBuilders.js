@@ -4362,7 +4362,16 @@ function collectSecondaryCastForPage(visualBible, metadata, sceneCharacters, ref
   const seen = new Set();
   const take = (entry) => {
     if (!entry || seen.has(entry)) return;
-    if (!entry.description || covered.has(norm(entry.name))) return;
+    if (covered.has(norm(entry.name))) return;
+    if (!entry.description) {
+      // A bible entry on this page with nothing to draw it from is a producer
+      // bug (every producer composes `description`; the phantom patch did not
+      // until 2026-10-07), and a silent skip here is how it shipped: the cast
+      // block simply lacked a line, and the model drew that character as a
+      // copy of whoever it WAS given.
+      log.error(`[IMAGE PROMPT] Page ${pageNumber}: bible entry ${entry.id || ''} "${entry.name}" is in this page's cast but has no description — the image model gets no look for it`);
+      return;
+    }
     seen.add(entry);
     out.push(entry);
   };

@@ -5959,6 +5959,25 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "phantom-cast-described-on-page",
+      "title": "A phantom-patched bible character is described in CAST WITHOUT A REFERENCE IMAGE and rendered as their own person, not a copy of another described adult",
+      "commits": [],
+      "addedAt": "2026-10-07",
+      "claim": "On a run whose tokenUsage.phantom_patch.calls >= 1 (a page cast member the writer never declared), every page that stages the patched character has a \"- <name>: <bible description>\" line in the CAST WITHOUT A REFERENCE IMAGE block of its stored prompt, and the rendered page shows that character with the bible's hair, build and clothing, visibly distinct from the other described cast (job_1791390810945_7yp1e0rh3 p6 drew Mama as a second Frau Carter).",
+      "runShape": [
+        "any"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Confirm tokenUsage.phantom_patch.calls >= 1 (else NOT COVERED); for the patched entry (visualBible.secondaryCharacters with pages and no appearsInPages) read each staged page's stored prompt for its CAST line, then look at the page: hair, build and clothing match the bible entry and differ from the other described cast.",
+        "images": [
+          "pages"
+        ]
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [

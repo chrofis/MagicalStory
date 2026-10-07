@@ -17,7 +17,9 @@
  */
 
 const { log } = require('../utils/logger');
-const { callClaudeAPI } = require('./textModels');
+// Module object, not a destructured binding: a test stubs textModels.callClaudeAPI
+// with the stored patch answer (beatsPipeline.js holds it the same way).
+const textModels = require('./textModels');
 
 const { baseVbId } = require('./vbIdGuard');
 const { buildCastIndex, resolveEntity, canonicalName } = require('./castResolver');
@@ -237,7 +239,7 @@ async function detectAndPatchPhantomCharacters({ storyPages, visualBible, inputC
 
   let result;
   try {
-    result = await callClaudeAPI(prompt, null, modelId || 'claude-haiku-4-5', { usageLabel: 'phantom_patch' });
+    result = await textModels.callClaudeAPI(prompt, null, modelId || 'claude-haiku-4-5', { usageLabel: 'phantom_patch' });
   } catch (callErr) {
     log.warn(`👻 [PHANTOM] Patch call failed: ${callErr.message}`);
     return null;
@@ -313,6 +315,23 @@ async function detectAndPatchPhantomCharacters({ storyPages, visualBible, inputC
     }
     delete entry.phantom;
     entry.pages = pagesByPhantom[normalizeName(matchedPhantom)] || [];
+    // The patch model answers in the bible's FIELD shape (age/build/hair/face/
+    // signatureLook/clothing) and never writes `description` — the one string
+    // every page-side reader consumes (collectSecondaryCastForPage emits only
+    // entries that have it). The parser composes it for writer-declared
+    // entries at parse time (outlineParser/unified.js), which this entry
+    // arrives too late for: staging trial job_1791390810945_7yp1e0rh3 p6 had
+    // CHR003 "Mama" in the bible with every field but this one, the CAST
+    // WITHOUT A REFERENCE IMAGE block named only CHR001, and the image model
+    // drew Mama as a second Frau Carter. ONE builder, visualBible.js's.
+    if (!entry.description) {
+      const { buildCharacterDescription } = require('./visualBible');
+      entry.description = buildCharacterDescription(entry);
+    }
+    if (!entry.description) {
+      log.error(`👻 [PHANTOM] "${entry.name}" (phantom=${matchedPhantom}): the patch returned no visual field at all — entry dropped, the name stays a phantom`);
+      continue;
+    }
     visualBible.secondaryCharacters.push(entry);
     log.info(`👻 [PHANTOM] Added "${entry.name}" (phantom=${matchedPhantom}) to Visual Bible as ${entry.id} (pages: ${entry.pages.join(',')})`);
     added++;
@@ -412,7 +431,7 @@ Output ONLY a JSON array — no markdown fence, no commentary:
 
   let result;
   try {
-    result = await callClaudeAPI(prompt, null, modelId || 'claude-haiku-4-5', { usageLabel: 'phantom_patch' });
+    result = await textModels.callClaudeAPI(prompt, null, modelId || 'claude-haiku-4-5', { usageLabel: 'phantom_patch' });
   } catch (err) {
     log.warn(`👻 [ORPHAN-ID] Patch call failed: ${err.message}`);
     return null;
