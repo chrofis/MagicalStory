@@ -12,7 +12,7 @@ const fs = require('fs').promises;
 const path = require('path');
 
 const { getPool, isDatabaseMode, logActivity } = require('../services/database');
-const { authenticateToken, requireAdmin, verifySession, generateToken, signToken } = require('../middleware/auth');
+const { authenticateToken, requireAdmin, generateToken, signToken } = require('../middleware/auth');
 const { log } = require('../utils/logger');
 
 function getDbPool() { return getPool(); }
@@ -317,31 +317,18 @@ router.post('/config/token-promo', authenticateToken, async (req, res) => {
 // - POST /api/claude
 // - POST /api/gemini
 
-// Admin endpoint to clear landmarks cache (forces re-discovery with new scoring)
-// Supports either JWT auth (admin role) or secret key via query param
-router.delete('/landmarks-cache', async (req, res) => {
+// Escape the LIKE wildcards in a user value so `_` and `%` match themselves
+// (Postgres' default LIKE escape character is the backslash).
+function escapeLike(value) {
+  return value.replace(/[\\%_]/g, '\\$&');
+}
+
+// Admin endpoint to clear landmarks (forces re-discovery with new scoring).
+// Admin session only — a `?secret=` lands in proxy and access logs (code review 2026-10 M3).
+// With no `city` the WHOLE judged landmark_index is deleted; that needs `?confirm=all`.
+router.delete('/landmarks-cache', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const { city, secret } = req.query;
-
-    // Check auth: either valid admin JWT or secret key
-    const hasValidSecret = process.env.ADMIN_SECRET && secret === process.env.ADMIN_SECRET;
-
-    if (!hasValidSecret) {
-      // Try JWT auth
-      const authHeader = req.headers.authorization;
-      if (!authHeader) {
-        return res.status(401).json({ error: 'Authentication required' });
-      }
-      try {
-        const token = authHeader.split(' ')[1];
-        const session = await verifySession(token);
-        if (session.role !== 'admin') {
-          return res.status(403).json({ error: 'Admin access required' });
-        }
-      } catch (jwtErr) {
-        return res.status(401).json({ error: 'Invalid token' });
-      }
-    }
+    const { city, confirm } = req.query;
     let result;
 
     if (city) {
@@ -349,7 +336,7 @@ router.delete('/landmarks-cache', async (req, res) => {
       const cacheKey = city.toLowerCase().replace(/\s+/g, '_');
       result = await getDbPool().query(
         'DELETE FROM landmark_index WHERE LOWER(nearest_city) LIKE $1',
-        [`%${cacheKey}%`]
+        [`%${escapeLike(cacheKey)}%`]
       );
       // Also clear in-memory cache
       for (const key of deps.userLandmarkCache.keys()) {
@@ -359,6 +346,9 @@ router.delete('/landmarks-cache', async (req, res) => {
       }
       log.info(`[ADMIN] Cleared landmarks for "${city}" (${result.rowCount} rows from landmark_index)`);
     } else {
+      if (confirm !== 'all') {
+        return res.status(400).json({ error: 'Deleting the whole landmark_index needs ?confirm=all (or pass ?city=)' });
+      }
       // Clear all from landmark_index
       result = await getDbPool().query('DELETE FROM landmark_index');
       deps.userLandmarkCache.clear();

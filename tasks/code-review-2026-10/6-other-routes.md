@@ -43,7 +43,8 @@ Where: routes/storyIdeas.js:765 and :986 (body fields), :328 (`customThemeText` 
 Failure: `customThemeText`, `characters`, `relationships`, `storyTopic` have no length cap, so one call can fill a model's context. The stream route does not abort the model call when the client disconnects. The model override is admin-only (:844), so this is size, not model choice.
 Fix direction: cap field lengths at the route, shared with the T1 fix; abort the stream on `req.on('close')`.
 
-### M3 `DELETE /api/admin/landmarks-cache` wipes `landmark_index` in one request, with a secret accepted in the query string
+### [x] M3 `DELETE /api/admin/landmarks-cache` wipes `landmark_index` in one request, with a secret accepted in the query string
+Fixed 2026-10-07: admin session only (`authenticateToken, requireAdmin`), the city value is LIKE-escaped, the full wipe needs `?confirm=all`; test `tests/unit/admin-landmarks-cache-route.test.ts`. The `?secret=` siblings (`/landmarks-photos`, `/job-input`, `admin/swiss-landmarks.js`) are read-only or already listed as 2026-07-25 P3 and were not touched.
 Severity: minor (admin or secret holder only).
 Where: routes/admin.js:329-372.
 Failure: with no `city` it runs `DELETE FROM landmark_index` (the judged landmark dataset); with a `city` the value goes into `LIKE '%…%'` unescaped, so `_` or `%` also matches everything. `ADMIN_SECRET` is accepted as `?secret=`, which ends up in proxy and access logs. The finder's LIKE point is real but secondary — the unfiltered branch already deletes everything by design of the code.
