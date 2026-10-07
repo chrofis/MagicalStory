@@ -13,12 +13,13 @@ const { log } = require('../utils/logger');
 const isPrivateIp = ip => !ip || ip === '::1' || ip === '127.0.0.1'
   || ip.startsWith('192.168.') || ip.startsWith('10.') || ip.startsWith('172.');
 
-// The original client: Cloudflare's header, else the FIRST public hop in
-// x-forwarded-for (leftmost = client), else x-real-ip, else the socket.
+// The original client is req.ip: Express resolves it from X-Forwarded-For using
+// `trust proxy` (runtime trustProxyHops, docs/decisions.md 2026-10-04 "client IP
+// is trust-proxy 2"). Raw headers are never read here — no Cloudflare sits in
+// front, so a client-sent cf-connecting-ip / x-real-ip / X-Forwarded-For entry
+// would let a caller pick its own geolocation.
 function clientIp(req) {
-  const forwardedFor = req.headers['x-forwarded-for'];
-  const forwardedIps = typeof forwardedFor === 'string' ? forwardedFor.split(',').map(s => s.trim()) : [];
-  return req.headers['cf-connecting-ip'] || forwardedIps.find(ip => !isPrivateIp(ip)) || req.headers['x-real-ip'] || req.ip;
+  return req.ip;
 }
 
 async function lookupIpLocation(req, tag = 'LOCATION') {
