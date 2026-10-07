@@ -8084,6 +8084,11 @@ async function runWriterCompareStage(target, { params = {} }) {
   const { beats, source: beatsSource } = resolveStoryBeats(storyData, {
     getPageText: SH.getPageText, extractSceneMetadata: SH.extractSceneMetadata,
   });
+  // The page NUMBERS the writer is asked for — what parseRefinedText takes
+  // (beatsPipeline.js `beatPages`). `expectedPages` above is a COUNT, for the
+  // scorers and the planner prompt; handing it to the parser threw
+  // "expectedPages.filter is not a function" and failed every text arm.
+  const beatPages = beats.map(b => b.pageNumber);
 
   // The arguments production hands each of these calls, resolved once from the
   // stored story (server/lib/beatsReplayInputs.js). Every arm below is a MODEL
@@ -8160,7 +8165,7 @@ async function runWriterCompareStage(target, { params = {} }) {
           // named as a trailing marker the last page swallows the whole
           // ---TITLE--- block, and every arm was scored on a final page
           // carrying the candidate list and the pick line.
-          const parsed = SH.parseRefinedText(r.text, expectedPages, 'STORY TEXT', ['TITLE']);
+          const parsed = SH.parseRefinedText(r.text, beatPages, 'STORY TEXT', ['TITLE']);
           arm.stages.text = { ...WC.scoreText(parsed.pages || [], expectedPages, storyData.language), cost: r.cost, elapsedMs: r.elapsedMs, outTok: r.usage?.output_tokens };
         }
       } catch (err) {
