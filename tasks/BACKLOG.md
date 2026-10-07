@@ -458,7 +458,7 @@ measurement, is lost).
 
 ## Compliance + legal — not built
 
-- [ ] GDPR hard-delete: wipe Postgres rows, wipe R2 objects, honour Stripe/Gelato retention,
+- [ ] GDPR hard-delete: wipe Postgres rows, wipe R2 objects, honour Stripe/Gelato retention, — BUILT 2026-10-07 3fadcc33 (server/lib/userErasure.js behind CLI + admin route; dry-run on prod before the first real erasure; orphan-cleanup paths + self-serve still open)
       confirmation flow + email receipt (endpoint shape sketched, nothing implemented)
       → `docs/compliance-and-todo.html:57`
 - [ ] Geo-blocking: restrict checkout to CH/EU/UK, block sanctioned jurisdictions at the edge,
