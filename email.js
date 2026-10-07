@@ -422,9 +422,9 @@ const TRIAL_REMINDER_COPY = {
     ITALIAN: {
       subject: 'I tuoi {credits} crediti gratuiti ti aspettano ancora',
       headline: 'I tuoi {credits} crediti gratuiti ti aspettano ancora.',
-      body: 'Hai provato Magical Story qualche giorno fa — i tuoi crediti gratuiti sono ancora sul tuo conto, abbastanza per creare un\'altra storia completa, del tutto gratis. Imposta la tua password per riscattarli.',
+      body: 'Hai provato Magical Story qualche giorno fa — i tuoi crediti gratuiti sono ancora sul tuo account, abbastanza per creare un\'altra storia completa, del tutto gratis. Imposta la tua password per riscattarli.',
       ctaLabel: 'Ottieni la mia storia gratuita',
-      perksIntro: 'Con un conto completo ottieni inoltre:',
+      perksIntro: 'Con un account completo ottieni inoltre:',
     },
   },
   day25: {
@@ -453,8 +453,8 @@ const TRIAL_REMINDER_COPY = {
       subject: 'I tuoi crediti gratuiti scadono tra {daysLeft} giorni',
       headline: 'Ultima occasione — i tuoi crediti gratuiti scadono tra {daysLeft} giorni.',
       body: 'Il tuo link di attivazione sta per scadere. Imposta subito la tua password per conservare i tuoi {credits} crediti gratuiti e la storia che hai già creato. Dopo {daysLeft} giorni il link sparisce definitivamente.',
-      ctaLabel: 'Attiva ora il mio conto',
-      perksIntro: 'Una volta attivato il conto, ottieni inoltre:',
+      ctaLabel: 'Attiva ora il mio account',
+      perksIntro: "Una volta attivato l'account, ottieni inoltre:",
     },
   },
 };
