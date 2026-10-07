@@ -3703,7 +3703,7 @@
       "rootCause": "The length corrective pass was added after the diff's pair-building (2026-09-11 vs 2026-09-06) and captured no entry variable; the diff pass's comment 'every page either whole-page pass rewrote' counted two passes when there are three (WHOLE_PAGE_PASS_KINDS lists all three for the ledger, but the pairs did not).",
       "status": "fixed",
       "fixedAt": "2026-10-07",
-      "fixedIn": "f9c1d388",
+      "fixedIn": "ebf744cee",
       "fix": "refineStoryText keeps `lengthEntry` and the diff pass's page set is the union of the repair, repetition_fix and length_fix changedPages. Test: tests/unit/text-refine-diff-covers-length-fix.test.ts."
     },
     {
@@ -3714,7 +3714,7 @@
       "rootCause": "The empty-retry branch set up a second call but never turned a second empty reply into a failure; `ok: raw.length > 0` dropped the audit from the merge silently, which is the quiet degrade NO FALLBACKS forbids.",
       "status": "fixed",
       "fixedAt": "2026-10-07",
-      "fixedIn": "3047982a",
+      "fixedIn": "7ae4c96cd",
       "fix": "runAudit returns `{ok:false, error:'returned empty output twice — no findings from this auditor', …}` with a warn line, the same shape a truncated or thrown audit returns, so the report's audits[].error and the text_refine log name the loss. Test: tests/unit/text-refine-empty-audit-is-an-error.test.ts."
     }
   ]
