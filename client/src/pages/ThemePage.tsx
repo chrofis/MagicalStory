@@ -12,6 +12,9 @@ import {
 } from '@/constants/storyTypes';
 import { useThemeContent } from '@/hooks/useThemeContent';
 import type { ThemeContent } from '@/constants/themeContent';
+
+import { themeContent } from '@/constants/themeContent';
+import { guides } from '@/constants/guideData';
 import type { LocalizedString } from '@/types/character';
 
 type CategorySlug = 'adventure' | 'life-challenges' | 'educational' | 'historical';
@@ -43,6 +46,7 @@ const pageTexts: Record<string, {
   personLabel: string;
   heroPitchChallenge: string;
   heroPitchGeneric: string;
+  guideLink: string;
 }> = {
   en: {
     breadcrumbRoot: 'Themes',
@@ -63,6 +67,7 @@ const pageTexts: Record<string, {
     personLabel: 'Historical figure',
     heroPitchChallenge: 'A personalized picture book in which your child is the hero — and masters this challenge themselves. The first story is free.',
     heroPitchGeneric: 'A personalized picture book in which your child is the hero and experiences this story themselves. The first story is free.',
+    guideLink: 'Our guide on this topic',
   },
   de: {
     breadcrumbRoot: 'Themen',
@@ -83,6 +88,7 @@ const pageTexts: Record<string, {
     personLabel: 'Historische Persönlichkeit',
     heroPitchChallenge: 'Ein personalisiertes Bilderbuch, in dem dein Kind die Hauptfigur ist — und diese Herausforderung selbst meistert. Die erste Geschichte ist gratis.',
     heroPitchGeneric: 'Ein personalisiertes Bilderbuch, in dem dein Kind die Hauptfigur ist und diese Geschichte selbst erlebt. Die erste Geschichte ist gratis.',
+    guideLink: 'Unser Ratgeber zu diesem Thema',
   },
   fr: {
     breadcrumbRoot: 'Thèmes',
@@ -103,6 +109,7 @@ const pageTexts: Record<string, {
     personLabel: 'Personnage historique',
     heroPitchChallenge: 'Un livre illustré personnalisé où votre enfant est le héros — et surmonte ce défi lui-même. La première histoire est gratuite.',
     heroPitchGeneric: 'Un livre illustré personnalisé où votre enfant est le héros et vit cette histoire lui-même. La première histoire est gratuite.',
+    guideLink: 'Notre guide sur ce sujet',
   },
   it: {
     breadcrumbRoot: 'Temi',
@@ -123,6 +130,7 @@ const pageTexts: Record<string, {
     personLabel: 'Personaggio storico',
     heroPitchChallenge: 'Un libro illustrato personalizzato in cui tuo figlio è l\'eroe — e supera da solo questa sfida. La prima storia è gratuita.',
     heroPitchGeneric: 'Un libro illustrato personalizzato in cui tuo figlio è l\'eroe e vive questa storia in prima persona. La prima storia è gratuita.',
+    guideLink: 'La nostra guida su questo tema',
   },
 };
 
@@ -276,6 +284,8 @@ export default function ThemePage() {
   const ageRec = getAgeRecommendation(content);
   const faq = getFaq(content, language);
   const bullets = getExpectBullets(catSlug, language);
+  // Reverse of GuidePage's relatedTheme link: the guide that names this theme links back here.
+  const guide = catSlug === 'life-challenges' ? guides.find((g) => g.relatedTheme === themeId) || null : null;
 
   const howSteps = [
     { icon: Upload, title: t.howStep1Title, desc: t.howStep1Desc },
@@ -447,6 +457,25 @@ export default function ThemePage() {
             })}
           </div>
         </div>
+
+        {/* Guide that references this theme (reverse of GuidePage → theme) */}
+        {guide && (
+          <div className="mb-12">
+            <Link
+              to={lp(`/ratgeber/${guide.id}`)}
+              className="flex items-center gap-3 bg-white rounded-2xl shadow-sm border border-stone-100 p-5 hover:shadow-md hover:border-indigo-200 transition-all group"
+            >
+              <BookOpen size={22} className="text-indigo-500 flex-shrink-0" />
+              <span className="flex-1 min-w-0">
+                <span className="block text-xs text-stone-400">{t.guideLink}</span>
+                <span className="block font-medium text-stone-800 group-hover:text-indigo-500 transition-colors">
+                  {guide.title[language]}
+                </span>
+              </span>
+              <ArrowRight size={16} className="text-stone-300 group-hover:text-indigo-500 transition-colors" />
+            </Link>
+          </div>
+        )}
 
         {/* Related Themes */}
         {relatedThemes.length > 0 && (

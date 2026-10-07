@@ -5,6 +5,7 @@ import { useLangPath } from '@/hooks/useLangPath';
 import { Navigation, Footer } from '@/components/common';
 import { ArrowRight, ChevronRight, ChevronDown, Check, Clock, Gift, Lightbulb } from 'lucide-react';
 import { occasions } from '@/constants/occasionData';
+import { giftForOccasion } from '@/constants/giftOccasionPairs';
 import {
   storyTypes,
   lifeChallenges,
@@ -28,6 +29,7 @@ const pageTexts: Record<string, {
   ctaSubtitle: string;
   ctaButton: string;
   viewTheme: string;
+  giftLink: string;
 }> = {
   en: {
     breadcrumbRoot: 'Occasions',
@@ -42,6 +44,7 @@ const pageTexts: Record<string, {
     ctaSubtitle: 'Your child as the main character in their very own story. Try it free — no account needed.',
     ctaButton: 'Start Creating Now',
     viewTheme: 'View theme',
+    giftLink: 'Gift ideas for this occasion',
   },
   de: {
     breadcrumbRoot: 'Anlässe',
@@ -56,6 +59,7 @@ const pageTexts: Record<string, {
     ctaSubtitle: 'Dein Kind als Hauptfigur in seiner eigenen Geschichte. Jetzt kostenlos testen — kein Konto nötig.',
     ctaButton: 'Jetzt starten',
     viewTheme: 'Thema ansehen',
+    giftLink: 'Geschenkideen zu diesem Anlass',
   },
   fr: {
     breadcrumbRoot: 'Occasions',
@@ -70,6 +74,7 @@ const pageTexts: Record<string, {
     ctaSubtitle: 'Votre enfant comme personnage principal de sa propre histoire. Essayez gratuitement — aucun compte requis.',
     ctaButton: 'Commencer maintenant',
     viewTheme: 'Voir le thème',
+    giftLink: 'Idées cadeaux pour cette occasion',
   },
   it: {
     breadcrumbRoot: 'Occasioni',
@@ -84,6 +89,7 @@ const pageTexts: Record<string, {
     ctaSubtitle: 'Tuo figlio come protagonista della sua storia. Provalo gratis — nessun account necessario.',
     ctaButton: 'Inizia ora',
     viewTheme: 'Vedi il tema',
+    giftLink: 'Idee regalo per questa occasione',
   },
 };
 
@@ -133,6 +139,7 @@ export default function OccasionPage() {
   const tips = occasion.tips[dataLang] || occasion.tips.en;
   const deliveryNote = occasion.deliveryNote[dataLang] || occasion.deliveryNote.en;
   const faq = occasion.faq;
+  const giftTwin = giftForOccasion(occasion.id);
 
   const themeCards = occasion.recommendedThemes
     .map(rt => {
@@ -200,6 +207,25 @@ export default function OccasionPage() {
             </div>
           </div>
         </div>
+
+        {/* Gift twin (taufe ↔ taufgeschenk): the same subject from the other angle */}
+        {giftTwin && (
+          <div className="mb-12">
+            <Link
+              to={lp(`/geschenk/${giftTwin.id}`)}
+              className="flex items-center gap-3 bg-white rounded-2xl shadow-sm border border-stone-100 p-5 hover:shadow-md hover:border-indigo-200 transition-all group"
+            >
+              <span className="text-3xl">{giftTwin.emoji}</span>
+              <span className="flex-1 min-w-0">
+                <span className="block text-xs text-stone-400">{t.giftLink}</span>
+                <span className="block font-medium text-stone-800 group-hover:text-indigo-500 transition-colors">
+                  {giftTwin.name[dataLang] || giftTwin.name.en}
+                </span>
+              </span>
+              <ArrowRight size={16} className="text-stone-300 group-hover:text-indigo-500 transition-colors" />
+            </Link>
+          </div>
+        )}
 
         {/* Recommended Themes */}
         {themeCards.length > 0 && (
