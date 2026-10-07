@@ -86,9 +86,17 @@ function extractTraitsShared(photoStr, photoDataUri, extractFn) {
       const result = await extractFn(photoDataUri);
       // Carry the analysis confidence with the traits: clampApparentAge treats a
       // low-confidence age read as untrustworthy (as routes/avatars.js does).
-      const traits = result?.traits
-        ? (result.confidence && !result.traits.confidence ? { ...result.traits, confidence: result.confidence } : result.traits)
-        : null;
+      // Carry `detailedHairAnalysis` the same way: prompts/character-analysis.txt
+      // returns it BESIDE `traits`, not inside, and the regular avatar path reads
+      // it from the result (routes/avatars.js, "detailedHairAnalysis from photo").
+      // Returning `result.traits` alone dropped it, so applyTrialPhotoTraits never
+      // had it to stamp and the preview avatar's HAIR line was empty (2026-10-07).
+      let traits = null;
+      if (result?.traits) {
+        traits = { ...result.traits };
+        if (result.confidence && !traits.confidence) traits.confidence = result.confidence;
+        if (result.detailedHairAnalysis && !traits.detailedHairAnalysis) traits.detailedHairAnalysis = result.detailedHairAnalysis;
+      }
       if (traits) cacheTraits(photoStr, traits);
       return traits;
     } catch {
@@ -3516,6 +3524,7 @@ module.exports.getTrialFunnel = getTrialFunnel;
 module.exports.getTrialStepFunnel = getTrialStepFunnel;
 module.exports.TRIAL_FUNNEL_STEPS = TRIAL_FUNNEL_STEPS;
 module.exports.SITE_VISIT_STEPS = SITE_VISIT_STEPS;
+module.exports.extractTraitsShared = extractTraitsShared;
 module.exports.ACCEPTED_EVENT_STEPS = ACCEPTED_EVENT_STEPS;
 module.exports.OPTIONAL_TRIAL_STEPS = OPTIONAL_TRIAL_STEPS;
 module.exports.sanitizeTrialEventMeta = sanitizeTrialEventMeta;

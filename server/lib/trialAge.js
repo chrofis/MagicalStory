@@ -70,6 +70,17 @@ function applyTrialPhotoTraits(physical, traits, statedAge) {
   if (traits.eyeColor) physical.eyeColor = traits.eyeColor;
   if (traits.skinTone) physical.skinTone = traits.skinTone;
   if (traits.detailedHairAnalysis) physical.detailedHairAnalysis = traits.detailedHairAnalysis;
+  // The photo's glasses and recorded features (prompts/character-analysis.txt
+  // returns `glasses` and `distinctive markings`; the regular avatar path maps
+  // the latter to `other`, routes/avatars.js). Stored raw, 'none' included, as
+  // that path stores them: every reader (avatarOverrides.declaredGlasses,
+  // promptBuilders.recordedFeatures / extractCharacterVisualProfile) drops a
+  // 'none' itself. Until 2026-10-07 the trial never stamped either, so the
+  // sheet generator's glasses line, both row judges' glasses check and the
+  // page prompt's DISTINCTIVE FEATURES block were empty on every trial.
+  if (traits.glasses) physical.glasses = traits.glasses;
+  const other = traits.other || traits['distinctive markings'];
+  if (other) physical.other = other;
   let clamp = null;
   if (traits.apparentAge) {
     clamp = clampApparentAge(traits.apparentAge, statedAge, traits.confidence?.overallConfidence || null);
