@@ -42,6 +42,7 @@ Last full sweep: **2026-09-06**.
 ---
 
 ## In flight
+- [ ] (2026-10-07) Branch claude/backlog-trial-2026-10-07 (~125 commits) awaiting staging + owner OK; 8 stopped follow-up tasks incl. the owner-approved keyword H1s → tasks/session-handover-2026-10-07.md
 
 - [ ] Step-4 idea pre-generation sometimes does not fire (staging 2026-10-05, demo-berger, entry 18, twice): step 5 shows the empty placeholder. Diagnose the pre-generate effect; suspect the abort-on-input-change effect right below it → client/src/pages/StoryWizard.tsx:1998 (spec works around it at tests/demo-story.spec.ts, Step 5)
 - [ ] Whole-codebase code review, area by area (report only; owner picks fixes) → `tasks/code-review-2026-10-04.md`
