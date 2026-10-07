@@ -8,7 +8,7 @@
       "source": "Buying review 2026-10-07. client/src/pages/BookBuilder.tsx handleApplyPromo: setPromoError(result.reason || \"Invalid code\") / \"Failed to validate code\"; server/routes/print.js validateReferralCodeForUser returned English reason strings and no code, unlike every other customer-facing route (apiErrors.ts: code -> localised text).",
       "status": "fixed",
       "fixedAt": "2026-10-07",
-      "fixedIn": "pending",
+      "fixedIn": "bf556b1bc",
       "fix": "validateReferralCodeForUser names each rejection with a stable REFERRAL_* code (REQUIRED, NOT_FOUND, OWN_CODE, ALREADY_USED, FIRST_ORDER_ONLY), POST /api/referral/validate returns it, BookBuilder localises it through localizedApiError (apiErrors.ts rows in en/de/fr/it); a failed validation call is localised too. Test: tests/unit/referral-reason-codes.test.ts (every rejection carries its code; case/whitespace still accepted; every code the route can send is in the table with distinct de/fr/it text)."
     },
     {
