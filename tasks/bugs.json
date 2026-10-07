@@ -3816,7 +3816,7 @@
       "source": "Staging trial job_1791390810945_7yp1e0rh3 p6: visualBible.secondaryCharacters CHR003 \"Mama\" (pages [6], every field but description; tokenUsage.phantom_patch = 1 call), sceneImages[5].prompt lists only CHR001 Frau Carter under CAST WITHOUT A REFERENCE IMAGE and \"- Noah:, left, …\"; replay of the stored brief + bible through buildImagePrompt reproduces both.",
       "status": "fixed",
       "fixedAt": "2026-10-07",
-      "fixedIn": "pending",
+      "fixedIn": "424281986",
       "fix": "phantomCharacters.js composes `description` with visualBible.buildCharacterDescription (the one builder) before pushing the entry, and drops an entry with no visual field loudly; collectSecondaryCastForPage logs an error for an on-page entry without a description instead of skipping it; buildTextFromJson puts the name outside the comma list. Test: phantom-cast-description-reaches-prompt.test.ts (5 fail on parent, 5 pass)."
     }
   ]
