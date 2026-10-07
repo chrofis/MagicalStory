@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Link, useParams, Navigate } from 'react-router-dom';
 import { useLanguage } from '@/context/LanguageContext';
+import { useLangPath } from '@/hooks/useLangPath';
 import { Navigation, Footer, ProductPitch } from '@/components/common';
 import { ArrowRight, ChevronRight } from 'lucide-react';
 import {
@@ -157,6 +158,7 @@ function getCategoryConfig(category: CategorySlug): CategoryConfig | null {
 export default function ThemeCategory() {
   const { category } = useParams<{ category: string }>();
   const { language } = useLanguage();
+  const lp = useLangPath();
   const t = texts[language] || texts.en;
 
   const config = useMemo(() => {
@@ -165,7 +167,7 @@ export default function ThemeCategory() {
   }, [category]);
 
   if (!config) {
-    return <Navigate to="/themes" replace />;
+    return <Navigate to={lp('/themes')} replace />;
   }
 
   const categoryName = config.name[language] || config.name.en;
@@ -190,7 +192,7 @@ export default function ThemeCategory() {
       {/* Breadcrumb */}
       <div className="max-w-5xl mx-auto px-4 pt-6 w-full">
         <nav className="flex items-center gap-1.5 text-sm text-stone-500">
-          <Link to="/themes" className="hover:text-indigo-500 transition-colors">{t.breadcrumbRoot}</Link>
+          <Link to={lp('/themes')} className="hover:text-indigo-500 transition-colors">{t.breadcrumbRoot}</Link>
           <ChevronRight size={14} className="text-stone-300" />
           <span className="text-stone-800 font-medium">{categoryName}</span>
         </nav>
@@ -218,7 +220,7 @@ export default function ThemeCategory() {
                   {themes.map((theme) => (
                     <Link
                       key={theme.id}
-                      to={`/themes/${category}/${theme.id}`}
+                      to={lp(`/themes/${category}/${theme.id}`)}
                       className="bg-white rounded-2xl shadow-sm border border-stone-100 px-4 py-3.5 flex items-center gap-3 hover:shadow-md hover:border-indigo-200 transition-all group"
                     >
                       <span className="text-2xl flex-shrink-0">{theme.emoji}</span>
@@ -246,7 +248,7 @@ export default function ThemeCategory() {
           <h2 className="font-title text-2xl md:text-3xl font-bold mb-3">{t.ctaTitle}</h2>
           <p className="text-indigo-100 mb-6 max-w-lg mx-auto">{t.ctaSubtitle}</p>
           <Link
-            to="/try"
+            to={lp('/try')}
             className="inline-flex items-center gap-2 px-8 py-3 rounded-lg bg-white text-indigo-500 font-semibold hover:bg-indigo-50 transition-colors"
           >
             {t.ctaButton} <ArrowRight size={18} />

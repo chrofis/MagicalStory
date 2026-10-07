@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Link, useParams, Navigate } from 'react-router-dom';
 import { useLanguage } from '@/context/LanguageContext';
+import { useLangPath } from '@/hooks/useLangPath';
 import { Navigation, Footer } from '@/components/common';
 import { ArrowRight, ChevronRight, Upload, Palette, BookOpen, Check } from 'lucide-react';
 import {
@@ -246,6 +247,7 @@ function getRelatedThemes(category: CategorySlug, currentId: string): ThemeData[
 export default function ThemePage() {
   const { category, themeId } = useParams<{ category: string; themeId: string }>();
   const { language } = useLanguage();
+  const lp = useLangPath();
   const t = pageTexts[language] || pageTexts.en;
 
   const theme = useMemo(() => {
@@ -262,7 +264,7 @@ export default function ThemePage() {
   const content = useThemeContent(themeId || '');
 
   if (!theme || !category) {
-    return <Navigate to="/themes" replace />;
+    return <Navigate to={lp('/themes')} replace />;
   }
 
   const catSlug = category as CategorySlug;
@@ -289,9 +291,9 @@ export default function ThemePage() {
       <div className="bg-white border-b border-stone-100">
         <div className="max-w-4xl mx-auto px-4 pt-4 pb-0">
           <nav className="flex items-center gap-1.5 text-sm text-stone-500">
-            <Link to="/themes" className="hover:text-indigo-500 transition-colors">{t.breadcrumbRoot}</Link>
+            <Link to={lp('/themes')} className="hover:text-indigo-500 transition-colors">{t.breadcrumbRoot}</Link>
             <ChevronRight size={14} className="text-stone-300" />
-            <Link to={`/themes/${category}`} className="hover:text-indigo-500 transition-colors">{categoryName}</Link>
+            <Link to={lp(`/themes/${category}`)} className="hover:text-indigo-500 transition-colors">{categoryName}</Link>
             <ChevronRight size={14} className="text-stone-300" />
             <span className="text-stone-800 font-medium">{themeName}</span>
           </nav>
@@ -332,7 +334,7 @@ export default function ThemePage() {
             const wizardCategory = categoryMap[catSlug] || catSlug;
             return (
               <Link
-                to={`/try?category=${wizardCategory}&topic=${themeId}`}
+                to={lp(`/try?category=${wizardCategory}&topic=${themeId}`)}
                 className="inline-flex items-center gap-2 px-8 py-3.5 rounded-lg bg-indigo-500 text-white font-semibold hover:bg-indigo-600 transition-colors text-lg"
               >
                 {t.createButton} <ArrowRight size={20} />
@@ -454,7 +456,7 @@ export default function ThemePage() {
               {relatedThemes.map((related) => (
                 <Link
                   key={related.id}
-                  to={`/themes/${category}/${related.id}`}
+                  to={lp(`/themes/${category}/${related.id}`)}
                   className="bg-white rounded-2xl shadow-sm border border-stone-100 p-4 text-center hover:shadow-md hover:border-indigo-200 transition-all group"
                 >
                   <span className="text-2xl block mb-2">{related.emoji}</span>
@@ -479,7 +481,7 @@ export default function ThemePage() {
             const wizardCategory = categoryMap[catSlug] || catSlug;
             return (
               <Link
-                to={`/try?category=${wizardCategory}&topic=${themeId}`}
+                to={lp(`/try?category=${wizardCategory}&topic=${themeId}`)}
                 className="inline-flex items-center gap-2 px-8 py-3 rounded-lg bg-white text-indigo-500 font-semibold hover:bg-indigo-50 transition-colors"
               >
                 {t.ctaButton} <ArrowRight size={18} />

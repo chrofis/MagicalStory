@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Link, useParams, Navigate } from 'react-router-dom';
 import { useLanguage } from '@/context/LanguageContext';
+import { useLangPath } from '@/hooks/useLangPath';
 import { useSwissStories } from '@/context/SEODataContext';
 import { Navigation, Footer } from '@/components/common';
 import { ArrowRight, ChevronRight, ChevronDown, BookOpen, Sparkles } from 'lucide-react';
@@ -271,6 +272,7 @@ function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): nu
 export default function CityPage() {
   const { cityId } = useParams<{ cityId: string }>();
   const { language } = useLanguage();
+  const lp = useLangPath();
   const t = pageTexts[language] || pageTexts.en;
   const { data } = useSwissStories();
   const [openContext, setOpenContext] = useState<string | null>(null);
@@ -315,7 +317,7 @@ export default function CityPage() {
   }, [data, city]);
 
   if (data && !city) {
-    return <Navigate to="/stadt" replace />;
+    return <Navigate to={lp('/stadt')} replace />;
   }
 
   const loc = (s: LocalizedString) => s[language as keyof LocalizedString] || s.de;
@@ -328,7 +330,7 @@ export default function CityPage() {
       <div className="bg-white border-b border-stone-100">
         <div className="max-w-5xl mx-auto px-4 pt-4 pb-0">
           <nav className="flex items-center gap-1.5 text-sm text-stone-500">
-            <Link to="/stadt" className="hover:text-indigo-500 transition-colors">{t.breadcrumbRoot}</Link>
+            <Link to={lp('/stadt')} className="hover:text-indigo-500 transition-colors">{t.breadcrumbRoot}</Link>
             <ChevronRight size={14} className="text-stone-300" />
             <span className="text-stone-800 font-medium">{city ? loc(city.name) : '...'}</span>
           </nav>
@@ -425,13 +427,13 @@ export default function CityPage() {
                     the city in automatically when started from /stadt/...). */}
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
                   <Link
-                    to="/create"
+                    to={lp('/create')}
                     className="inline-flex items-center gap-2 px-8 py-3.5 rounded-lg bg-indigo-500 text-white font-semibold hover:bg-indigo-600 transition-colors text-lg"
                   >
                     {t.ctaButton} <ArrowRight size={20} />
                   </Link>
                   <Link
-                    to="/try"
+                    to={lp('/try')}
                     className="inline-flex items-center gap-2 px-6 py-3 rounded-lg border-2 border-indigo-200 text-indigo-500 font-medium hover:bg-indigo-50 transition-colors text-sm"
                   >
                     {t.ctaTrialButton}
@@ -472,7 +474,7 @@ export default function CityPage() {
                           <ChevronDown size={14} className={`transition-transform ${isOpen ? 'rotate-180' : ''}`} />
                         </button>
                         <Link
-                          to="/create"
+                          to={lp('/create')}
                           className="ml-auto inline-flex items-center gap-1.5 text-sm font-medium text-indigo-500 hover:text-indigo-700 transition-colors"
                           title={t.createAccountNote}
                         >
@@ -537,7 +539,7 @@ export default function CityPage() {
               {nearbyCities.map(nc => (
                 <Link
                   key={nc.id}
-                  to={`/stadt/${nc.id}`}
+                  to={lp(`/stadt/${nc.id}`)}
                   className="bg-white rounded-2xl shadow-sm border border-stone-100 p-4 text-center hover:shadow-md hover:border-indigo-200 transition-all group"
                 >
                   <span className="font-medium text-stone-800 group-hover:text-indigo-500 transition-colors">
@@ -589,13 +591,13 @@ export default function CityPage() {
           <p className="text-indigo-100 mb-6 max-w-lg mx-auto">{t.ctaSubtitle}</p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
             <Link
-              to="/create"
+              to={lp('/create')}
               className="inline-flex items-center gap-2 px-8 py-3 rounded-lg bg-white text-indigo-500 font-semibold hover:bg-indigo-50 transition-colors"
             >
               {t.ctaButton} <ArrowRight size={18} />
             </Link>
             <Link
-              to="/try"
+              to={lp('/try')}
               className="inline-flex items-center gap-2 px-6 py-2.5 rounded-lg border-2 border-indigo-300 text-white font-medium hover:bg-indigo-600 transition-colors text-sm"
             >
               {t.ctaTrialButton}

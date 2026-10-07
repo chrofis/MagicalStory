@@ -1,6 +1,7 @@
 import { Link, useParams, Navigate } from 'react-router-dom';
 import { ArrowRight, ArrowLeft, Clock } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
+import { useLangPath } from '@/hooks/useLangPath';
 import { Navigation, Footer } from '@/components/common';
 import { guides } from '@/constants/guideData';
 
@@ -52,10 +53,10 @@ export default function GuidePage() {
   const { language } = useLanguage();
   const lang = (language in texts ? language : 'de') as keyof typeof texts;
   const t = texts[lang];
-  const suffix = lang !== 'de' ? `?lang=${lang}` : '';
+  const lp = useLangPath();
 
   const guide = guides.find((g) => g.id === guideSlug);
-  if (!guide) return <Navigate to={`/ratgeber${suffix}`} replace />;
+  if (!guide) return <Navigate to={lp('/ratgeber')} replace />;
 
   const related = guides.filter((g) => g.id !== guide.id);
 
@@ -67,7 +68,7 @@ export default function GuidePage() {
         <header className="pt-24 pb-8 px-4 bg-gradient-to-b from-indigo-50 to-white">
           <div className="max-w-3xl mx-auto">
             <Link
-              to={`/ratgeber${suffix}`}
+              to={lp('/ratgeber')}
               className="inline-flex items-center gap-1.5 text-sm text-indigo-500 hover:underline mb-4"
             >
               <ArrowLeft size={14} />
@@ -122,7 +123,7 @@ export default function GuidePage() {
               {related.map((g) => (
                 <Link
                   key={g.id}
-                  to={`/ratgeber/${g.id}${suffix}`}
+                  to={lp(`/ratgeber/${g.id}`)}
                   className="block bg-stone-50 border border-stone-200 rounded-xl p-4 hover:border-indigo-300 transition-colors"
                 >
                   <span className="font-semibold text-gray-900">{g.title[lang]}</span>
@@ -130,14 +131,14 @@ export default function GuidePage() {
               ))}
               {guide.relatedTheme && (
                 <Link
-                  to={`/themes/life-challenges/${guide.relatedTheme}${suffix}`}
+                  to={lp(`/themes/life-challenges/${guide.relatedTheme}`)}
                   className="block bg-stone-50 border border-stone-200 rounded-xl p-4 hover:border-indigo-300 transition-colors"
                 >
                   <span className="font-semibold text-gray-900">{t.themeLink}</span>
                 </Link>
               )}
               <Link
-                to={`/kinderbuch-erstellen${suffix}`}
+                to={lp('/kinderbuch-erstellen')}
                 className="block bg-stone-50 border border-stone-200 rounded-xl p-4 hover:border-indigo-300 transition-colors"
               >
                 <span className="font-semibold text-gray-900">
@@ -160,7 +161,7 @@ export default function GuidePage() {
           <h2 className="text-3xl font-bold text-gray-900 mb-4">{t.ctaTitle}</h2>
           <p className="text-lg text-gray-600 mb-8">{t.ctaDesc}</p>
           <Link
-            to={`/try${suffix}`}
+            to={lp('/try')}
             className="inline-flex items-center gap-2 bg-indigo-500 text-white px-8 py-4 rounded-xl text-lg font-semibold hover:bg-indigo-600 transition-colors shadow-lg shadow-indigo-200"
           >
             {t.ctaButton}

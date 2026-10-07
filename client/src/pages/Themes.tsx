@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useLanguage } from '@/context/LanguageContext';
+import { useLangPath } from '@/hooks/useLangPath';
 import { Navigation, Footer, ProductPitch } from '@/components/common';
 import { Compass, ArrowRight } from 'lucide-react';
 import {
@@ -86,6 +87,7 @@ interface CategoryCardData {
 
 export default function Themes() {
   const { language } = useLanguage();
+  const lp = useLangPath();
   const t = texts[language] || texts.en;
 
   const categories: CategoryCardData[] = [
@@ -206,7 +208,7 @@ export default function Themes() {
           {categories.map((cat) => (
             <Link
               key={cat.id}
-              to={cat.path}
+              to={lp(cat.path)}
               className={`bg-white rounded-2xl shadow-sm border ${cat.borderColor} overflow-hidden hover:shadow-md transition-shadow group`}
             >
               {/* Gradient top border */}
@@ -259,7 +261,7 @@ export default function Themes() {
             {popularThemes.map((theme) => (
               <Link
                 key={theme.id}
-                to={theme.path}
+                to={lp(theme.path)}
                 className="bg-white rounded-2xl shadow-sm border border-stone-100 p-4 text-center hover:shadow-md hover:border-indigo-200 transition-all group"
               >
                 <span className="text-3xl block mb-2">{theme.emoji}</span>
@@ -276,7 +278,7 @@ export default function Themes() {
           <h2 className="font-title text-2xl md:text-3xl font-bold mb-3">{t.ctaTitle}</h2>
           <p className="text-indigo-100 mb-6 max-w-lg mx-auto">{t.ctaSubtitle}</p>
           <Link
-            to="/try"
+            to={lp('/try')}
             className="inline-flex items-center gap-2 px-8 py-3 rounded-lg bg-white text-indigo-500 font-semibold hover:bg-indigo-50 transition-colors"
           >
             {t.ctaButton} <ArrowRight size={18} />

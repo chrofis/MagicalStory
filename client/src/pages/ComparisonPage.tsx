@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Link, useParams, Navigate } from 'react-router-dom';
 import { useLanguage } from '@/context/LanguageContext';
+import { useLangPath } from '@/hooks/useLangPath';
 import { Navigation, Footer } from '@/components/common';
 import {
   ArrowRight,
@@ -250,6 +251,7 @@ function ListicleCard({
   t: typeof pageTexts.en;
 }) {
   const lang = language as 'en' | 'de' | 'fr' | 'it';
+  const lp = useLangPath();
   const isUs = entry.name === 'Magical Story';
 
   return (
@@ -317,7 +319,7 @@ function ListicleCard({
         <div className="flex items-center gap-4 pt-2">
           {isUs ? (
             <Link
-              to="/try"
+              to={lp('/try')}
               className="inline-flex items-center gap-1.5 text-sm font-medium text-indigo-500 hover:text-indigo-700"
             >
               {t.ctaButton} <ArrowRight size={14} />
@@ -340,6 +342,7 @@ function ListicleCard({
 
 function ComparisonPageContent({ data }: { data: ComparisonData }) {
   const { language } = useLanguage();
+  const lp = useLangPath();
   const t = pageTexts[language] || pageTexts.en;
   const lang = language as 'en' | 'de' | 'fr' | 'it';
 
@@ -356,7 +359,7 @@ function ComparisonPageContent({ data }: { data: ComparisonData }) {
         <div className="bg-white border-b border-stone-100">
           <div className="max-w-5xl mx-auto px-4 pt-4 pb-0">
             <nav className="flex items-center gap-1.5 text-sm text-stone-500">
-              <Link to="/vergleich" className="hover:text-indigo-500 transition-colors">
+              <Link to={lp('/vergleich')} className="hover:text-indigo-500 transition-colors">
                 {t.breadcrumbRoot}
               </Link>
               <ChevronRight size={14} className="text-stone-300" />
@@ -431,7 +434,7 @@ function ComparisonPageContent({ data }: { data: ComparisonData }) {
             <h2 className="font-title text-2xl md:text-3xl font-bold mb-3">{t.ctaTitle}</h2>
             <p className="text-indigo-100 mb-6 max-w-lg mx-auto">{t.ctaSubtitle}</p>
             <Link
-              to="/try"
+              to={lp('/try')}
               className="inline-flex items-center gap-2 px-8 py-3 rounded-lg bg-white text-indigo-500 font-semibold hover:bg-indigo-50 transition-colors"
             >
               {t.ctaButton} <ArrowRight size={18} />
@@ -456,7 +459,7 @@ function ComparisonPageContent({ data }: { data: ComparisonData }) {
       <div className="bg-white border-b border-stone-100">
         <div className="max-w-5xl mx-auto px-4 pt-4 pb-0">
           <nav className="flex items-center gap-1.5 text-sm text-stone-500">
-            <Link to="/vergleich" className="hover:text-indigo-500 transition-colors">
+            <Link to={lp('/vergleich')} className="hover:text-indigo-500 transition-colors">
               {t.breadcrumbRoot}
             </Link>
             <ChevronRight size={14} className="text-stone-300" />
@@ -581,7 +584,7 @@ function ComparisonPageContent({ data }: { data: ComparisonData }) {
           <h2 className="font-title text-2xl md:text-3xl font-bold mb-3">{t.ctaTitle}</h2>
           <p className="text-indigo-100 mb-6 max-w-lg mx-auto">{t.ctaSubtitle}</p>
           <Link
-            to="/try"
+            to={lp('/try')}
             className="inline-flex items-center gap-2 px-8 py-3 rounded-lg bg-white text-indigo-500 font-semibold hover:bg-indigo-50 transition-colors"
           >
             {t.ctaButton} <ArrowRight size={18} />
@@ -596,6 +599,7 @@ function ComparisonPageContent({ data }: { data: ComparisonData }) {
 
 export default function ComparisonPage() {
   const { competitorSlug } = useParams<{ competitorSlug: string }>();
+  const lp = useLangPath();
 
   const data = useMemo(() => {
     if (!competitorSlug) return null;
@@ -603,7 +607,7 @@ export default function ComparisonPage() {
   }, [competitorSlug]);
 
   if (!data) {
-    return <Navigate to="/vergleich" replace />;
+    return <Navigate to={lp('/vergleich')} replace />;
   }
 
   return <ComparisonPageContent data={data} />;

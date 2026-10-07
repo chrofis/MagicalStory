@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useLanguage } from '@/context/LanguageContext';
+import { useLangPath } from '@/hooks/useLangPath';
 
 // The footer is the site's internal link architecture: it renders on all ~999
 // pre-rendered pages, so every destination listed here is reachable from every
@@ -121,10 +122,9 @@ export function Footer() {
   const texts = footerTexts[language as keyof typeof footerTexts] || footerTexts.en;
   const currentYear = new Date().getFullYear();
 
-  // Language is carried on the query string (?lang=en); the default (de) omits it,
-  // matching the canonical URLs emitted by server/lib/seoMeta.js.
-  const suffix = language && language !== 'de' ? `?lang=${language}` : '';
-  const to = (path: string) => `${path}${suffix}`;
+  // Language rides on the query string (?lang=en); the default (de) omits it,
+  // matching the canonical URLs emitted by server/lib/seoMeta.js (utils/langPath).
+  const to = useLangPath();
 
   const columns = [
     {

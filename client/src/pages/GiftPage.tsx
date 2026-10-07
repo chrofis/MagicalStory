@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Link, useParams, Navigate } from 'react-router-dom';
 import { useLanguage } from '@/context/LanguageContext';
+import { useLangPath } from '@/hooks/useLangPath';
 import { Navigation, Footer } from '@/components/common';
 import { ArrowRight, ChevronRight, ChevronDown, Check, Clock, Gift, Lightbulb } from 'lucide-react';
 import { giftPages } from '@/constants/giftData';
@@ -112,6 +113,7 @@ function getThemeInfo(themeId: string, category: CategorySlug): { name: Localize
 export default function GiftPage() {
   const { giftSlug } = useParams<{ giftSlug: string }>();
   const { language } = useLanguage();
+  const lp = useLangPath();
   const t = pageTexts[language] || pageTexts.en;
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
@@ -120,7 +122,7 @@ export default function GiftPage() {
   }, [giftSlug]);
 
   if (!gift) {
-    return <Navigate to="/geschenk" replace />;
+    return <Navigate to={lp('/geschenk')} replace />;
   }
 
   const lang = language as 'en' | 'de' | 'fr' | 'it';
@@ -148,7 +150,7 @@ export default function GiftPage() {
       <div className="bg-white border-b border-stone-100">
         <div className="max-w-5xl mx-auto px-4 pt-4 pb-0">
           <nav className="flex items-center gap-1.5 text-sm text-stone-500">
-            <Link to="/geschenk" className="hover:text-indigo-500 transition-colors">{t.breadcrumbRoot}</Link>
+            <Link to={lp('/geschenk')} className="hover:text-indigo-500 transition-colors">{t.breadcrumbRoot}</Link>
             <ChevronRight size={14} className="text-stone-300" />
             <span className="text-stone-800 font-medium">{name}</span>
           </nav>
@@ -162,7 +164,7 @@ export default function GiftPage() {
           <h1 className="font-title text-3xl md:text-4xl font-bold text-stone-900 mb-4">{title}</h1>
           <p className="text-stone-500 text-lg max-w-xl mx-auto mb-6">{description}</p>
           <Link
-            to="/try"
+            to={lp('/try')}
             className="inline-flex items-center gap-2 px-8 py-3.5 rounded-lg bg-indigo-500 text-white font-semibold hover:bg-indigo-600 transition-colors text-lg"
           >
             {t.createButton} <ArrowRight size={20} />
@@ -210,7 +212,7 @@ export default function GiftPage() {
               {themeCards.map((theme) => (
                 <Link
                   key={`${theme.category}-${theme.id}`}
-                  to={`/themes/${theme.category}/${theme.id}`}
+                  to={lp(`/themes/${theme.category}/${theme.id}`)}
                   className="bg-white rounded-2xl shadow-sm border border-stone-100 p-4 text-center hover:shadow-md hover:border-indigo-200 transition-all group"
                 >
                   <span className="text-3xl block mb-2">{theme.emoji}</span>
@@ -282,7 +284,7 @@ export default function GiftPage() {
           <h2 className="font-title text-2xl md:text-3xl font-bold mb-3">{t.ctaTitle}</h2>
           <p className="text-indigo-100 mb-6 max-w-lg mx-auto">{t.ctaSubtitle}</p>
           <Link
-            to="/try"
+            to={lp('/try')}
             className="inline-flex items-center gap-2 px-8 py-3 rounded-lg bg-white text-indigo-500 font-semibold hover:bg-indigo-50 transition-colors"
           >
             {t.ctaButton} <ArrowRight size={18} />

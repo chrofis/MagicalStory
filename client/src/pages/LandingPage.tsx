@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useLanguage } from '@/context/LanguageContext';
+import { useLangPath } from '@/hooks/useLangPath';
 import { Sparkles, ArrowRight, Camera, Users, BookOpen, Palette, Printer, Download, ChevronDown, Heart, Gift, MapPin, Scale, GraduationCap } from 'lucide-react';
 import { AuthModal } from '@/components/auth';
 import { Navigation, Footer, Button } from '@/components/common';
@@ -305,6 +306,7 @@ export default function LandingPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { t, language } = useLanguage();
+  const lp = useLangPath();
   // Always start closed so SSR and client first render produce the same DOM.
   // Reading searchParams during the initial render would mismatch hydration
   // (StaticRouter has no query string at prerender time) → React error #418.
@@ -549,7 +551,7 @@ export default function LandingPage() {
                 {st.whyDesc}
               </p>
               <Link
-                to="/science"
+                to={lp('/science')}
                 className="inline-flex items-center gap-1 mt-2 text-indigo-500 hover:text-indigo-800 font-medium text-sm"
               >
                 {st.whyLink} <ArrowRight size={16} />
@@ -625,7 +627,7 @@ export default function LandingPage() {
               </h2>
               <p className="text-lg text-stone-600 mb-4">
                 {st.tellStoryDescBefore}
-                <Link to="/themes" className="text-indigo-500 hover:text-indigo-700 font-semibold underline">
+                <Link to={lp('/themes')} className="text-indigo-500 hover:text-indigo-700 font-semibold underline">
                   {st.tellStoryDescLink}
                 </Link>
                 {st.tellStoryDescAfter}
@@ -645,7 +647,7 @@ export default function LandingPage() {
                 </li>
               </ul>
               <Link
-                to="/themes"
+                to={lp('/themes')}
                 className="inline-flex items-center gap-1 mt-4 text-indigo-500 hover:text-indigo-800 font-medium text-sm"
               >
                 {language === 'de' ? 'Alle Themen entdecken' : language === 'fr' ? 'Découvrir tous les thèmes' : language === 'it' ? 'Esplora tutti i temi' : 'Browse all themes'} <ArrowRight size={16} />
@@ -696,7 +698,7 @@ export default function LandingPage() {
                 </li>
               </ul>
               <Link
-                to="/stadt"
+                to={lp('/stadt')}
                 className="inline-flex items-center gap-1 mt-4 text-indigo-500 hover:text-indigo-800 font-medium text-sm"
               >
                 {st.localCta} <ArrowRight size={16} />
@@ -799,7 +801,7 @@ export default function LandingPage() {
                 </li>
               </ul>
               <Link
-                to="/geschenk"
+                to={lp('/geschenk')}
                 className="inline-flex items-center gap-1 mt-4 text-indigo-500 hover:text-indigo-800 font-medium text-sm"
               >
                 {st.giftGuideLink} <ArrowRight size={16} />
@@ -892,7 +894,7 @@ export default function LandingPage() {
             ].map(({ to, icon: Icon, title, desc }) => (
               <Link
                 key={to}
-                to={to}
+                to={lp(to)}
                 className="group bg-white rounded-2xl border-2 border-stone-200 p-6 hover:border-indigo-500 hover:shadow-lg transition-all flex flex-col"
               >
                 <div className="bg-indigo-100 group-hover:bg-indigo-200 transition-colors w-14 h-14 rounded-full flex items-center justify-center mb-4">

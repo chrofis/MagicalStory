@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useLanguage } from '@/context/LanguageContext';
+import { useLangPath } from '@/hooks/useLangPath';
 import { Navigation, Footer } from '@/components/common';
 import { ArrowRight, Shield, Trophy, ChevronRight } from 'lucide-react';
 import { comparisons } from '@/constants/comparisonData';
@@ -114,6 +115,7 @@ const competitorDescriptions: Record<string, Record<string, string>> = {
 
 export default function Comparisons() {
   const { language } = useLanguage();
+  const lp = useLangPath();
   const t = pageTexts[language] || pageTexts.en;
 
   const oneOnOne = comparisons.filter((c) => !c.isListicle);
@@ -149,7 +151,7 @@ export default function Comparisons() {
               return (
                 <Link
                   key={comp.id}
-                  to={`/vergleich/${comp.id}`}
+                  to={lp(`/vergleich/${comp.id}`)}
                   className="bg-white rounded-2xl shadow-sm border border-stone-100 p-5 hover:shadow-md hover:border-indigo-200 transition-all group"
                 >
                   <div className="flex items-center gap-2 mb-2">
@@ -180,7 +182,7 @@ export default function Comparisons() {
               return (
                 <Link
                   key={comp.id}
-                  to={`/vergleich/${comp.id}`}
+                  to={lp(`/vergleich/${comp.id}`)}
                   className="bg-white rounded-2xl shadow-sm border border-stone-100 p-6 hover:shadow-md hover:border-amber-200 transition-all group"
                 >
                   <div className="flex items-center gap-2 mb-2">
@@ -204,7 +206,7 @@ export default function Comparisons() {
           <h2 className="font-title text-2xl md:text-3xl font-bold mb-3">{t.ctaTitle}</h2>
           <p className="text-indigo-100 mb-6 max-w-lg mx-auto">{t.ctaSubtitle}</p>
           <Link
-            to="/try"
+            to={lp('/try')}
             className="inline-flex items-center gap-2 px-8 py-3 rounded-lg bg-white text-indigo-500 font-semibold hover:bg-indigo-50 transition-colors"
           >
             {t.ctaButton} <ArrowRight size={18} />

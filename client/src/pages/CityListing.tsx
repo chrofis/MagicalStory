@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '@/context/LanguageContext';
+import { useLangPath } from '@/hooks/useLangPath';
 import { useSwissStories } from '@/context/SEODataContext';
 import { Navigation, Footer } from '@/components/common';
 import { MapPin, ArrowRight, ChevronDown } from 'lucide-react';
@@ -61,6 +62,7 @@ const texts: Record<string, {
 
 export default function CityListing() {
   const { language } = useLanguage();
+  const lp = useLangPath();
   const t = texts[language] || texts.en;
   const { data } = useSwissStories();
   const [openCantons, setOpenCantons] = useState<Set<string>>(new Set());
@@ -148,7 +150,7 @@ export default function CityListing() {
                           return (
                             <Link
                               key={city.id}
-                              to={`/stadt/${city.id}`}
+                              to={lp(`/stadt/${city.id}`)}
                               className="flex items-center justify-between p-3 rounded-xl border border-stone-100 hover:border-indigo-200 hover:shadow-sm transition-all group"
                             >
                               <div>
@@ -179,7 +181,7 @@ export default function CityListing() {
           <h2 className="font-title text-2xl md:text-3xl font-bold mb-3">{t.ctaTitle}</h2>
           <p className="text-indigo-100 mb-6 max-w-lg mx-auto">{t.ctaSubtitle}</p>
           <Link
-            to="/try"
+            to={lp('/try')}
             className="inline-flex items-center gap-2 px-8 py-3 rounded-lg bg-white text-indigo-500 font-semibold hover:bg-indigo-50 transition-colors"
           >
             {t.ctaButton} <ArrowRight size={18} />

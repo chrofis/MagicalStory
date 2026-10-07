@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useLanguage } from '@/context/LanguageContext';
+import { useLangPath } from '@/hooks/useLangPath';
 import { Navigation, Footer } from '@/components/common';
 import { Gift, ArrowRight } from 'lucide-react';
 import { occasions } from '@/constants/occasionData';
@@ -58,6 +59,7 @@ const texts: Record<string, {
 
 export default function Occasions() {
   const { language } = useLanguage();
+  const lp = useLangPath();
   const t = texts[language as keyof typeof texts] || texts.en;
 
   return (
@@ -88,7 +90,7 @@ export default function Occasions() {
             return (
               <Link
                 key={occasion.id}
-                to={`/anlass/${occasion.id}`}
+                to={lp(`/anlass/${occasion.id}`)}
                 className="bg-white rounded-2xl shadow-sm border border-stone-100 p-5 hover:shadow-md hover:border-indigo-200 transition-all group"
               >
                 <span className="text-4xl block mb-3">{occasion.emoji}</span>
@@ -109,7 +111,7 @@ export default function Occasions() {
           <h2 className="font-title text-2xl md:text-3xl font-bold mb-3">{t.ctaTitle}</h2>
           <p className="text-indigo-100 mb-6 max-w-lg mx-auto">{t.ctaSubtitle}</p>
           <Link
-            to="/try"
+            to={lp('/try')}
             className="inline-flex items-center gap-2 px-8 py-3 rounded-lg bg-white text-indigo-500 font-semibold hover:bg-indigo-50 transition-colors"
           >
             {t.ctaButton} <ArrowRight size={18} />
@@ -121,7 +123,7 @@ export default function Occasions() {
           <h2 className="font-title text-xl font-bold text-stone-900 mb-2">{t.giftBannerTitle}</h2>
           <p className="text-stone-500 mb-4 max-w-lg mx-auto">{t.giftBannerText}</p>
           <Link
-            to="/geschenk"
+            to={lp('/geschenk')}
             className="inline-flex items-center gap-2 text-indigo-500 font-semibold hover:text-indigo-800 transition-colors"
           >
             {t.giftBannerLink} <ArrowRight size={16} />

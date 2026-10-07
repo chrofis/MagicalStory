@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { BookOpen, ArrowRight, Clock } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
+import { useLangPath } from '@/hooks/useLangPath';
 import { Navigation, Footer } from '@/components/common';
 import { guides, guidesByCategory, type GuideCategory } from '@/constants/guideData';
 
@@ -49,7 +50,7 @@ export default function GuideHub() {
   const { language } = useLanguage();
   const lang = (language in texts ? language : 'de') as keyof typeof texts;
   const t = texts[lang];
-  const suffix = lang !== 'de' ? `?lang=${lang}` : '';
+  const lp = useLangPath();
 
   return (
     <div className="min-h-screen bg-white">
@@ -74,7 +75,7 @@ export default function GuideHub() {
                   {items.map((g) => (
                     <Link
                       key={g.id}
-                      to={`/ratgeber/${g.id}${suffix}`}
+                      to={lp(`/ratgeber/${g.id}`)}
                       className="block bg-stone-50 border border-stone-200 rounded-2xl p-6 hover:border-indigo-300 transition-colors"
                     >
                       <div className="flex items-start gap-4">
@@ -105,7 +106,7 @@ export default function GuideHub() {
           <h2 className="text-3xl font-bold text-gray-900 mb-4">{t.ctaTitle}</h2>
           <p className="text-lg text-gray-600 mb-8">{t.ctaDesc}</p>
           <Link
-            to={`/try${suffix}`}
+            to={lp('/try')}
             className="inline-flex items-center gap-2 bg-indigo-500 text-white px-8 py-4 rounded-xl text-lg font-semibold hover:bg-indigo-600 transition-colors shadow-lg shadow-indigo-200"
           >
             {t.ctaButton}
