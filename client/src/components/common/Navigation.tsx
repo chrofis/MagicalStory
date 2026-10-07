@@ -74,20 +74,25 @@ export function Navigation({ currentStep = 0, onStepClick, canAccessStep, develo
   // Check if generation is in progress (has active job and not complete)
   const isGenerationInProgress = generation?.activeJob && !generation?.isComplete && !generation?.error;
 
-  // Close menu when clicking outside
+  // Close menu when clicking outside, or on Escape (keyboard users had no way to dismiss it)
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setShowMenu(false);
       }
     };
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setShowMenu(false);
+    };
 
     if (showMenu) {
       document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('keydown', handleEscape);
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
     };
   }, [showMenu]);
 
@@ -268,6 +273,9 @@ export function Navigation({ currentStep = 0, onStepClick, canAccessStep, develo
             <button
               onClick={() => setShowMenu(!showMenu)}
               className="bg-gray-800 text-white px-3 py-1.5 rounded text-xs font-semibold hover:bg-gray-700 flex items-center gap-2"
+              aria-label={uiLabel('menu', language)}
+              aria-expanded={showMenu}
+              aria-haspopup="true"
             >
               <Menu size={16} />
               <span className="hidden md:inline">{uiLabel('menu', language)}</span>
