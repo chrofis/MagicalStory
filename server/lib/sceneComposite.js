@@ -1,4 +1,4 @@
-const { photoAnalyzerUrl } = require('./photoAnalyzerClient');
+const { analyzerJson, AnalyzerError, reportAnalyzerFailure } = require('./photoAnalyzerClient');
 /**
  * Scene composite page-generation pipeline.
  *
@@ -64,7 +64,6 @@ function scrubBlendPrompt(prompt, visualBible, tag) {
   return out;
 }
 
-const PHOTO_ANALYZER_URL = photoAnalyzerUrl();
 
 // ─── Pose enum → cell index in the 2×4 sheet ──────────────────────────────
 // Cells 1–4 are head-only views (not used by scene composite).
@@ -938,15 +937,10 @@ function judgeSheetColumnSplit(widths, opts = {}) {
  */
 async function splitSheetByEdgeDetection(sheetBuf) {
   const b64 = sheetBuf.toString('base64');
-  const r = await fetch(`${PHOTO_ANALYZER_URL}/split-reference-sheet`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ image: `data:image/png;base64,${b64}`, count: 8, cols: 4, rows: 2 }),
-  });
-  if (!r.ok) throw new Error(`split-reference-sheet HTTP ${r.status}`);
-  const data = await r.json();
-  if (!data.success || !Array.isArray(data.cells)) {
-    throw new Error(`split-reference-sheet bad response: ${data.error || JSON.stringify(data).slice(0,120)}`);
+  // Throws an AnalyzerError when the analyzer cannot answer.
+  const data = await analyzerJson('/split-reference-sheet', { image: `data:image/png;base64,${b64}`, count: 8, cols: 4, rows: 2 });
+  if (!Array.isArray(data.cells)) {
+    throw new AnalyzerError('/split-reference-sheet', `bad response: ${JSON.stringify(data).slice(0, 120)}`);
   }
   const cells = data.cells.map(b64png => b64png ? Buffer.from(b64png, 'base64') : null);
 
@@ -1024,7 +1018,10 @@ async function cropSheetCell(sheetBuf, cellIdx, sheetKey = null) {
       try {
         return await splitSheetByEdgeDetection(sheetBuf);
       } catch (err) {
-        log.warn(`[SCENE COMPOSITE] edge-detection split failed: ${err.message} — falling back to fixed-math crop for this call (decisions 2026-09-19)`);
+        // The fixed-grid crop is the decided fallback (decisions 2026-09-19)
+        // and stays; the analyzer failure itself is reported, not warned away.
+        if (err instanceof AnalyzerError) reportAnalyzerFailure('[SCENE COMPOSITE] edge-detection split → fixed-math crop', err);
+        else log.warn(`[SCENE COMPOSITE] edge-detection split failed: ${err.message} — falling back to fixed-math crop for this call (decisions 2026-09-19)`);
         // Never cache a transient analyzer failure (code review 2026-10 C5): a
         // cached null pinned the sheet to the fixed grid until LRU eviction.
         // The fixed-grid crop itself is the documented fallback and stays.
@@ -1059,6 +1056,8 @@ async function figureTouchesBottomEdge(cutBuf, rows = 3, minFraction = 0.08) {
 async function removeBackground(buf) {
   const out = await rembgRemoveBackground(buf);
   if (out) return out;
+  // rembg already reported the analyzer failure; this names the consequence.
+  log.error('❌ [SCENE COMPOSITE] rembg unavailable — cut-out DEGRADED to the white-threshold fallback (decisions 2026-09-10)');
   return whiteToTransparent(buf);
 }
 
@@ -1705,7 +1704,10 @@ async function renderFiguresInPlace({ cast, bboxes, silhouetteMasks, detection, 
           if (m?.alpha) mask = m.alpha;
         }
       } catch (err) {
-        log.warn(`[SCENE COMPOSITE]   ${c.name}: figure detection on the render failed — ${err.message}`);
+        // No DINO box / SAM mask → this attempt cannot pass the ok gate below
+        // (mask stays null); an analyzer failure is reported as one.
+        if (err instanceof AnalyzerError) reportAnalyzerFailure('[SCENE COMPOSITE] figure detection on the render', err, { character: c.name });
+        else log.warn(`[SCENE COMPOSITE]   ${c.name}: figure detection on the render failed — ${err.message}`);
       }
       // Height is measured only down to the silhouette's bottom edge: that
       // edge is the feet or the line where scenery hides the figure (a

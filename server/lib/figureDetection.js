@@ -22,7 +22,7 @@ const r2Lib = require('./r2');
 const { canonicalName } = require('./castResolver');
 const { assertPromptFilled } = require('../services/prompts');
 const { baseVbId } = require('./vbIdGuard');
-const { photoAnalyzerUrl: _photoAnalyzerUrl, withAnalyzerSlot } = require('./photoAnalyzerClient');
+const { analyzerJson, AnalyzerError, reportAnalyzerFailure } = require('./photoAnalyzerClient');
 const { getCurrentLogger } = require('./generationLogger');
 
 const getStoryHelpers = () => require('./storyHelpers');
@@ -653,12 +653,23 @@ async function _maskBoxesFrontFirst(imageDataUri, boxesPx, W, H, pageLabel = '',
   }
 
   // Pass 3 of 3: the SAM calls, prompts now final.
+  const maskErrors = {};   // figure index → analyzer failure message
   for (let i = 0; i < n; i++) {
     const P = prompts[i];
     if (!P) continue;
     const { box, own, points, labels, seeds, seedTrace, samPoints } = P;
-    const m = await _mobilesamMaskFull(imageDataUri, box, W, H,
-      points.length ? points : null, points.length ? labels : null);
+    let m;
+    try {
+      m = await _mobilesamMaskFull(imageDataUri, box, W, H,
+        points.length ? points : null, points.length ? labels : null);
+    } catch (err) {
+      // The analyzer could not answer for this figure: reported, and the figure
+      // keeps its box with verdict 'analyzer-failed' — never 'no-mask', which
+      // means SAM looked and found nothing.
+      reportAnalyzerFailure('[SAM]', err, { pageLabel: `${pageLabel}figure ${i}: ` });
+      maskErrors[i] = err.message;
+      continue;
+    }
     if (!m) continue;
     // Drop components outside the box (neighbour-grab / degraded-analyzer
     // garbage). No coverage floor here: an occluded figure is legitimately
@@ -738,7 +749,10 @@ async function _maskBoxesFrontFirst(imageDataUri, boxesPx, W, H, pageLabel = '',
       box, mask: null, keptBox: null, coverage: null, verdict: 'no-mask',
       occluded: false, occludedByIdx: [], pxLostToFront: 0, maskPx: 0,
     };
-    if (!raw[i]) { out[i] = base; continue; }
+    if (!raw[i]) {
+      out[i] = maskErrors[i] ? { ...base, verdict: 'analyzer-failed', maskError: maskErrors[i] } : base;
+      continue;
+    }
     const { mask, separated, kept, lost, seeds, seedTrace, samPoints, samBox, facePoint } = raw[i];
     const pxLost = [...lost.values()].reduce((a, b) => a + b, 0);
     const occludedByIdx = [...lost.keys()].filter(k => lost.get(k) > 0);
@@ -884,30 +898,31 @@ async function _cleanMaskAndCheck(mask, gdinoBoxPx, opts = {}) {
   return { keptBox: mask.bbox, droppedOutside, coverage };
 }
 
-// GroundingDINO text→box for a set of prompts.
+// GroundingDINO text→box for a set of prompts. THROWS an AnalyzerError when
+// the analyzer cannot answer (unreachable, timeout, non-2xx, success:false) —
+// a returned object is always a real detection answer (owner 2026-10-07: a
+// dead analyzer must never read as "no figures"). The caller reports the
+// failure (reportAnalyzerFailure) and decides what stops.
 async function _gdinoDetect(imageDataUri, prompts) {
   const _t0 = Date.now();
   try {
-    const res = await withAnalyzerSlot(() => fetch(`${_photoAnalyzerUrl()}/detect-figures-text`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image: imageDataUri, prompts }),
+    return await analyzerJson('/detect-figures-text', { image: imageDataUri, prompts }, {
+      slot: true,
       // The first call after a cold start (or post-idle-unload) pays the ~90s
       // model load on top of one forward pass per character; 180s wasn't enough
       // for a 4-5 char page and the endpoint's completed work was abandoned for
       // a spurious Gemini fallback. 300s covers cold load + passes; warm calls
       // finish in ~60-100s. Genuine hangs still fall back to Gemini after this.
-      signal: AbortSignal.timeout(300_000),
-    }));
+      timeoutMs: 300_000,
+    });
+  } catch (e) {
     // COUNT EVERY FAILURE SHAPE (bug: Kapitänin Fiona shipped 33/33 failed
     // DINO calls with dino_detect_fail=0 — the outage answered clean HTTP 503s,
-    // which this branch swallowed without counting, so the degraded-story
+    // which the old branch swallowed without counting, so the degraded-story
     // alert never fired).
-    if (!res.ok) { log.warn(`⚠️ [GDINO-DETECT] /detect-figures-text HTTP ${res.status}`); require('./runMetrics').forJob(_metricsJobId()).count('dino_detect_fail'); return null; }
-    const j = await res.json();
-    if (!j?.success) { log.warn(`⚠️ [GDINO-DETECT] endpoint error: ${j?.error}`); require('./runMetrics').forJob(_metricsJobId()).count('dino_detect_fail'); return null; }
-    return j;
-  } catch (e) { log.warn(`⚠️ [GDINO-DETECT] detect failed: ${e.message}`); require('./runMetrics').forJob(_metricsJobId()).count('dino_detect_fail'); return null; }
-  finally {
+    require('./runMetrics').forJob(_metricsJobId()).count('dino_detect_fail');
+    throw e;
+  } finally {
     // Reliable wall-clock split DINO vs SAM (owner, 2026-08-10): counters per
     // story run, readable from runMetrics after any generation.
     const m = require('./runMetrics').forJob(_metricsJobId());
@@ -927,26 +942,27 @@ async function _mobilesamMaskFull(imageDataUri, boxPx, W, H, points = null, labe
     // repair phase fired unbounded concurrent masks at the analyzer; the server
     // now serializes SAM under a lock, and this bounds the in-flight queue so
     // callers don't pile up decoded pages waiting on that lock.
-    const res = await withAnalyzerSlot(() => fetch(`${_photoAnalyzerUrl()}/figure-mask`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(points && points.length
-        ? { image: imageDataUri, box: boxPx, points, point_labels: labels }
-        : { image: imageDataUri, box: boxPx }),
+    // THROWS an AnalyzerError when the analyzer cannot answer; returns null
+    // only for a real empty answer (SAM filled no pixel in the box).
+    const j = await analyzerJson('/figure-mask', points && points.length
+      ? { image: imageDataUri, box: boxPx, points, point_labels: labels }
+      : { image: imageDataUri, box: boxPx }, {
+      slot: true,
       // 150s: an aborted request does NOT cancel the analyzer's computation —
       // short timeouts under CPU contention stack zombie work until the
       // service starves (observed SAM outage). Waiting beats re-firing.
-      signal: AbortSignal.timeout(150_000),
-    }));
-    if (!res.ok) return null;
-    const j = await res.json();
+      timeoutMs: 150_000,
+    });
     const m = j?.image?.match?.(/^data:image\/\w+;base64,(.+)$/);
-    if (!j?.success || !m || !(j.fill_pixels > 0)) return null;
+    if (!m || !(j.fill_pixels > 0)) return null;
     const pngBuf = Buffer.from(m[1], 'base64');
     const mask = await _binMaskFromBuffer(pngBuf, W, H);
     if (mask) mask.pngBuf = pngBuf; // kept for the overlay's cutout strip (never persisted)
     return mask;
-  } catch (e) { log.warn(`⚠️ [GDINO-DETECT] mask failed: ${e.message}`); require('./runMetrics').forJob(_metricsJobId()).count('dino_mask_fail'); return null; }
-  finally {
+  } catch (e) {
+    require('./runMetrics').forJob(_metricsJobId()).count('dino_mask_fail');
+    throw e;
+  } finally {
     const m = require('./runMetrics').forJob(_metricsJobId());
     m.count('sam_calls'); m.add('sam_ms', Date.now() - _t0);
   }
@@ -993,7 +1009,11 @@ async function detectPersonBoxInCrop(cropJpegBuffer, faceBoxInCrop = null, pageL
     log.info(`🔎 [GDINO-DETECT] ${pageLabel}round-2 person re-detect: ${persons.length} box(es), picked face-containing (score ${pick.p.score?.toFixed?.(2) ?? '?'})`);
     return pick.p.box.map(v => Math.round(v));
   } catch (e) {
-    log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}round-2 person re-detect failed: ${e.message}`);
+    // An analyzer failure is reported (ERROR + failure_log); the caller keeps
+    // its copied box, which is the documented answer to "no box found" — but
+    // the failure is now visible as a failure, not as a clean miss.
+    if (e instanceof AnalyzerError) reportAnalyzerFailure('[GDINO-DETECT] round-2 person re-detect', e, { pageLabel });
+    else log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}round-2 person re-detect failed: ${e.message}`);
     require('./runMetrics').forJob(_metricsJobId()).count('dino_round2_fail');
     return null;
   }
@@ -1092,8 +1112,12 @@ async function recoverFaceBox(imageDataUri, bodyBoxNorm, pageLabel = '') {
     log.info(`🔎 [GDINO-DETECT] ${pageLabel}face recovered via body-crop zoom (score ${faces[0].score?.toFixed?.(2) ?? '?'})`);
     return _padDinoFaceBox(pagePxBox, W, H, bodyBoxNorm);
   } catch (e) {
-    log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}face recovery failed: ${e.message}`);
     require('./runMetrics').forJob(_metricsJobId()).count('face_recovery_fail');
+    // null means "even the zoomed crop has no face". An analyzer failure is not
+    // that answer: report it and let it propagate, so the face repair fails
+    // with the true reason instead of "no face found".
+    if (e instanceof AnalyzerError) { reportAnalyzerFailure('[GDINO-DETECT] face recovery', e, { pageLabel }); throw e; }
+    log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}face recovery failed: ${e.message}`);
     return null;
   }
 }
@@ -2217,7 +2241,16 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
     let text = src.split(/[—,;(.]/)[0].trim().toLowerCase();
     if (text.length > 60) text = text.slice(0, 60).replace(/\s+\S*$/, ''); // word-boundary cap
     if (!text) text = cleaned.toLowerCase();
-    const od = await _gdinoDetect(imageDataUri, [{ name: cleaned, text }]);
+    let od;
+    try {
+      od = await _gdinoDetect(imageDataUri, [{ name: cleaned, text }]);
+    } catch (err) {
+      // Reported, and the object is marked as NOT GROUNDED (analyzerError) —
+      // distinct from found:false, which means DINO looked and did not find it.
+      reportAnalyzerFailure('[GDINO-DETECT] object grounding', err, { pageLabel, detail: { object: cleaned } });
+      diag.objects.push({ name: cleaned, text, found: false, analyzerError: err.message });
+      continue;
+    }
     const obj = od?.figures?.[0];
     if (obj?.box && obj.score >= GDINO_OBJECT_MIN_SCORE) {
       const bodyBox = _pxBoxToNorm(obj.box, W, H);

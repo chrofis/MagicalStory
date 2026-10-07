@@ -79,14 +79,16 @@ router.post('/remove-bg', authenticateToken, async (req, res) => {
     const data = await response.json();
 
     if (!response.ok || !data.success) {
-      log.error(`📸 [REMOVE-BG] Python error: ${data.error}`);
+      const { AnalyzerError, reportAnalyzerFailure } = require('../lib/photoAnalyzerClient');
+      reportAnalyzerFailure('📸 [REMOVE-BG]', new AnalyzerError('/remove-bg', `HTTP ${response.status} ${data.error || 'success:false'}`, { status: response.status }), { severity: 'customer', userId: req.user?.id });
       return res.status(response.status).json(data);
     }
 
     log.debug(`📸 [REMOVE-BG] Success: ${Math.round(data.image.length / 1024)}KB PNG`);
     res.json(data);
   } catch (err) {
-    log.error(`📸 [REMOVE-BG] Error: ${err.message}`);
+    const { AnalyzerError, reportAnalyzerFailure } = require('../lib/photoAnalyzerClient');
+    reportAnalyzerFailure('📸 [REMOVE-BG]', new AnalyzerError('/remove-bg', `unavailable: ${err.message}`, { cause: err }), { severity: 'customer', userId: req.user?.id });
     res.status(503).json({ success: false, error: err.message });
   }
 });

@@ -29,7 +29,7 @@ const { editWithGrok, GROK_MODELS } = require('./grok');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { assertPromptFilled, guardPromptString } = require('../services/prompts');
 const { MODEL_DEFAULTS } = require('../config/models');
-const { photoAnalyzerUrl } = require('./photoAnalyzerClient');
+const { analyzerJson, AnalyzerError, reportAnalyzerFailure } = require('./photoAnalyzerClient');
 const r2 = require('./r2');
 const { getFacePhoto, getStandardAvatar } = require('./characterPhotos');
 const { declaredGlasses } = require('./avatarOverrides');
@@ -1309,49 +1309,40 @@ async function askSheetJudge({ model, parts, prompt, label, usageTracker, usageF
 // than hard-failing on a cold service.
 async function detectBodyRowHeads(bottomBodyImageData) {
   try {
-    const url = photoAnalyzerUrl() + '/pose-heads';
-    const r = await fetch(url, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image: bottomBodyImageData, cols: 4 }),
-      signal: AbortSignal.timeout(60_000),
-    });
-    if (r.ok) {
-      const j = await r.json();
-      if (j?.success && Array.isArray(j.cells)) return j;
-    }
-    log.warn('[CHARACTER 2×4] /pose-heads gave no result — bodies head-check falls back to Gemini');
+    const j = await analyzerJson('/pose-heads', { image: bottomBodyImageData, cols: 4 }, { timeoutMs: 60_000 });
+    if (!Array.isArray(j.cells)) throw new AnalyzerError('/pose-heads', `answered without cells: ${JSON.stringify(j).slice(0, 120)}`);
+    return j;
   } catch (err) {
-    log.warn(`[CHARACTER 2×4] /pose-heads unreachable (${err.message}) — bodies head-check falls back to Gemini`);
+    // Reported (ERROR + failure_log analyzer_pose_heads_failed). The null is
+    // the explicit "pose unavailable" signal applyPoseHeadGate stamps as
+    // headSource 'gemini-fallback' — a marked degraded result, never a score.
+    reportAnalyzerFailure('[CHARACTER 2×4] /pose-heads — bodies head-check falls back to Gemini', err);
+    return null;
   }
-  return null;
 }
 
+// Returns { mid, source }: source 'analyzer' for the edge-detected divider,
+// 'variance-fallback' when the analyzer could not answer (reported, ERROR +
+// failure_log) or found no usable separator (warned) — so a split can never
+// pass as edge-detected when it was not.
 async function detectSheetRowDivider(imageData, buf, W, H) {
   try {
-    const url = photoAnalyzerUrl() + '/split-reference-sheet';
-    const r = await fetch(url, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image: imageData, count: 8, cols: 4, rows: 2 }),
-      signal: AbortSignal.timeout(60_000),
-    });
-    if (r.ok) {
-      const j = await r.json();
-      const h = j?.separators?.horizontal;
-      if (j?.success && Array.isArray(h) && h.length && h[0] > 0 && h[0] < H) return Math.round(h[0]);
-    }
+    const j = await analyzerJson('/split-reference-sheet', { image: imageData, count: 8, cols: 4, rows: 2 }, { timeoutMs: 60_000 });
+    const h = j?.separators?.horizontal;
+    if (Array.isArray(h) && h.length && h[0] > 0 && h[0] < H) return { mid: Math.round(h[0]), source: 'analyzer' };
     log.warn(`[CHARACTER 2×4] split-reference-sheet gave no horizontal separator — falling back to variance detector`);
   } catch (err) {
-    log.warn(`[CHARACTER 2×4] split-reference-sheet unreachable (${err.message}) — falling back to variance detector`);
+    reportAnalyzerFailure('[CHARACTER 2×4] split-reference-sheet — falling back to variance detector', err);
   }
   const { detectMinVarianceSeparator } = require('./grok');
   const { data } = await sharp(buf).greyscale().raw().toBuffer({ resolveWithObject: true });
-  return detectMinVarianceSeparator(data, W, H, 'h', 0.25, 0.75);
+  return { mid: detectMinVarianceSeparator(data, W, H, 'h', 0.25, 0.75), source: 'variance-fallback' };
 }
 
 async function splitSheetRows(imageData) {
   const buf = Buffer.from(r2.stripDataUriPrefix(imageData), 'base64');
   const { width: W, height: H } = await sharp(buf).metadata();
-  const mid = await detectSheetRowDivider(imageData, buf, W, H);
+  const { mid, source: splitSource } = await detectSheetRowDivider(imageData, buf, W, H);
   const [top, bottom] = await Promise.all([
     sharp(buf).extract({ left: 0, top: 0, width: W, height: mid }).jpeg().toBuffer(),
     sharp(buf).extract({ left: 0, top: mid, width: W, height: H - mid }).jpeg().toBuffer(),
@@ -1359,7 +1350,7 @@ async function splitSheetRows(imageData) {
   return {
     topHeads: 'data:image/jpeg;base64,' + top.toString('base64'),
     bottomBody: 'data:image/jpeg;base64,' + bottom.toString('base64'),
-    splitY: mid, width: W, height: H,
+    splitY: mid, splitSource, width: W, height: H,
   };
 }
 
@@ -2184,5 +2175,5 @@ module.exports = {
   resolveFacePhoto,
   buildStyleTransferPrompt,
   // exposed for tests
-  _internal: { applyGlassesAxis, applyPoseHeadGate, parseJudgeJson, buildBodyRowPrompt, buildHeadRowPrompt, buildFootwearRule, buildGarmentRule, buildSeasonOutfitBlock, buildStyleTransferPrompt, resolveFacePhoto, resolveStandardAvatar, quickLayoutCheck, evaluateStyledSheetWithGemini, runStyleTransferPass, splitSheetRows, evaluateSheetRow, evaluateIdentity, evaluateSheetSplit, evaluateAvatarSheet, isEchoedJudgeVerdict, REAR_TURN_POSE, SHEET_GROUND_RULE, SHEET_NO_LETTERING_RULE, CELL_NAMES_NOT_DRAWN, garmentColourRule, buildUnnamedTrimRule, scoreHeadsReport, scoreStyleReport, scoreIdentityReport },
+  _internal: { applyGlassesAxis, applyPoseHeadGate, detectBodyRowHeads, detectSheetRowDivider, parseJudgeJson, buildBodyRowPrompt, buildHeadRowPrompt, buildFootwearRule, buildGarmentRule, buildSeasonOutfitBlock, buildStyleTransferPrompt, resolveFacePhoto, resolveStandardAvatar, quickLayoutCheck, evaluateStyledSheetWithGemini, runStyleTransferPass, splitSheetRows, evaluateSheetRow, evaluateIdentity, evaluateSheetSplit, evaluateAvatarSheet, isEchoedJudgeVerdict, REAR_TURN_POSE, SHEET_GROUND_RULE, SHEET_NO_LETTERING_RULE, CELL_NAMES_NOT_DRAWN, garmentColourRule, buildUnnamedTrimRule, scoreHeadsReport, scoreStyleReport, scoreIdentityReport },
 };

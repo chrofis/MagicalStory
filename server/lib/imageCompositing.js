@@ -24,7 +24,7 @@ const { closestGrokAspect, GROK_ASPECT_PRESETS } = require('./grokAspect');
 const { editWithGrok } = require('./grok');
 const r2Lib = require('./r2');
 const { MODEL_DEFAULTS } = require('../config/models');
-const { withAnalyzerSlot, photoAnalyzerUrl } = require('./photoAnalyzerClient');
+const { analyzerJson, reportAnalyzerFailure } = require('./photoAnalyzerClient');
 
 function computePresetAlignedExtract({ pixelLeft, pixelTop, pixelWidth, pixelHeight, padFactor, sceneWidth, sceneHeight }) {
   // Start from the minimum-padded box
@@ -92,26 +92,22 @@ function computePresetAlignedExtract({ pixelLeft, pixelTop, pixelWidth, pixelHei
  * tweaks to colour, alpha, or transport go in one place.
  */
 async function fetchSilhouettePng(cropJpegBuffer) {
-  const analyzerBase = photoAnalyzerUrl();
+  let j;
   try {
-    const res = await fetch(`${analyzerBase}/silhouette-edge`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        image: `data:image/jpeg;base64,${cropJpegBuffer.toString('base64')}`,
-        color: [255, 255, 255],
-        alpha: 255,
-      }),
-      signal: AbortSignal.timeout(15_000),
-    });
-    if (!res.ok) return null;
-    const j = await res.json();
-    const m = j?.image?.match?.(/^data:image\/\w+;base64,(.+)$/);
-    if (!j?.success || !m) return null;
-    return Buffer.from(m[1], 'base64');
-  } catch {
+    j = await analyzerJson('/silhouette-edge', {
+      image: `data:image/jpeg;base64,${cropJpegBuffer.toString('base64')}`,
+      color: [255, 255, 255],
+      alpha: 255,
+    }, { timeoutMs: 15_000 });
+  } catch (err) {
+    // Reported (ERROR + failure_log analyzer_silhouette_edge_failed); the null
+    // keeps the callers' documented non-shape path, but the outage is counted.
+    reportAnalyzerFailure('[SILHOUETTE]', err);
     return null;
   }
+  const m = j?.image?.match?.(/^data:image\/\w+;base64,(.+)$/);
+  if (!m) { log.warn('⚠️ [SILHOUETTE] rembg answered without a silhouette image'); return null; }
+  return Buffer.from(m[1], 'base64');
 }
 
 /**
@@ -483,38 +479,36 @@ async function correctColorShift(originalCropBuf, candidateCropBuf, maskAlpha, w
 async function fetchFigureMaskPng(cropJpegBuffer, boxInCrop, opts = {}) {
   const backend = MODEL_DEFAULTS.figureMaskBackend || 'rembg';
   if (backend === 'mobilesam' && Array.isArray(boxInCrop) && boxInCrop.length === 4) {
-    const analyzerBase = photoAnalyzerUrl();
     try {
-      const res = await withAnalyzerSlot(() => fetch(`${analyzerBase}/figure-mask`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          image: `data:image/jpeg;base64,${cropJpegBuffer.toString('base64')}`,
-          box: boxInCrop,
-          // Optional positive point prompts ([x,y] pairs) — face repairs pass
-          // a hair point so SAM includes the hair, not just the face.
-          ...(Array.isArray(opts.points) && opts.points.length ? { points: opts.points, point_labels: opts.pointLabels || opts.points.map(() => 1) } : {}),
-          color: [255, 255, 255],
-          alpha: 255,
-        }),
+      const j = await analyzerJson('/figure-mask', {
+        image: `data:image/jpeg;base64,${cropJpegBuffer.toString('base64')}`,
+        box: boxInCrop,
+        // Optional positive point prompts ([x,y] pairs) — face repairs pass
+        // a hair point so SAM includes the hair, not just the face.
+        ...(Array.isArray(opts.points) && opts.points.length ? { points: opts.points, point_labels: opts.pointLabels || opts.points.map(() => 1) } : {}),
+        color: [255, 255, 255],
+        alpha: 255,
+      }, {
+        slot: true,
         // 150s: an aborted request does NOT cancel the analyzer's computation —
         // short timeouts under CPU contention stack zombie work until the
         // service starves (observed SAM outage: 12 consecutive 30s aborts).
-        signal: AbortSignal.timeout(150_000),
-      }));
-      if (res.ok) {
-        const j = await res.json();
-        const m = j?.image?.match?.(/^data:image\/\w+;base64,(.+)$/);
-        if (j?.success && m && j.fill_pixels > 0) {
-          log.info(`👤 [FIGURE MASK] mobilesam mask, ${j.fill_pixels}px filled`);
-          return Buffer.from(m[1], 'base64');
-        }
-        log.warn(`⚠️ [FIGURE MASK] mobilesam returned ${j?.success ? 'an empty mask' : `no mask (${j?.error || 'unknown'})`} — falling back to rembg`);
-      } else {
-        log.warn(`⚠️ [FIGURE MASK] /figure-mask HTTP ${res.status} — falling back to rembg`);
+        timeoutMs: 150_000,
+      });
+      const m = j?.image?.match?.(/^data:image\/\w+;base64,(.+)$/);
+      if (m && j.fill_pixels > 0) {
+        log.info(`👤 [FIGURE MASK] mobilesam mask, ${j.fill_pixels}px filled`);
+        return Buffer.from(m[1], 'base64');
       }
+      // A real answer: SAM looked and filled nothing in the box.
+      log.warn(`⚠️ [FIGURE MASK] mobilesam returned an empty mask — ${opts.requireMobilesam ? 'no fallback (caller requires SAM)' : 'falling back to rembg'}`);
     } catch (err) {
-      log.warn(`⚠️ [FIGURE MASK] mobilesam failed (${err.message}) — ${opts.requireMobilesam ? 'no fallback (caller requires SAM)' : 'falling back to rembg'}`);
+      // The analyzer could not answer. Reported (ERROR + failure_log
+      // analyzer_figure_mask_failed); the rembg silhouette below is the decided
+      // fallback for callers that accept any figure mask (2026-07-10 shootout).
+      reportAnalyzerFailure('[FIGURE MASK] mobilesam', err, {
+        detail: { fallback: opts.requireMobilesam ? 'none (caller requires SAM)' : 'rembg silhouette' },
+      });
     }
   }
   // Face repairs REQUIRE the box-prompted SAM head mask: rembg's whole-figure

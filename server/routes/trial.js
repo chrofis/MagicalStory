@@ -2396,7 +2396,8 @@ router.post('/analyze-photo', trialPhotoLimiter, async (req, res) => {
       });
       if (!analyzerResponse.ok) {
         const text = await analyzerResponse.text().catch(() => '');
-        log.error(`[TRIAL] [PHOTO] Python analyzer HTTP ${analyzerResponse.status}: ${text.substring(0, 200)}`);
+        const { AnalyzerError, reportAnalyzerFailure } = require('../lib/photoAnalyzerClient');
+        reportAnalyzerFailure('[TRIAL] [PHOTO]', new AnalyzerError('/analyze', `HTTP ${analyzerResponse.status} ${text.substring(0, 200)}`, { status: analyzerResponse.status }), { severity: 'customer' });
         return res.status(502).json({ error: 'Photo analysis service error', details: `HTTP ${analyzerResponse.status}` });
       }
       const analyzerData = await analyzerResponse.json();
@@ -2423,7 +2424,8 @@ router.post('/analyze-photo', trialPhotoLimiter, async (req, res) => {
             error: 'no_face_detected'
           });
         }
-        log.error('[TRIAL] [PHOTO] Python analysis failed:', analyzerData.error, analyzerData.traceback);
+        const { AnalyzerError, reportAnalyzerFailure } = require('../lib/photoAnalyzerClient');
+        reportAnalyzerFailure('[TRIAL] [PHOTO] analysis failed', new AnalyzerError('/analyze', String(analyzerData.error || 'success:false')), { severity: 'customer', detail: { traceback: analyzerData.traceback ? String(analyzerData.traceback).slice(0, 500) : null } });
         return res.status(500).json({
           error: 'Photo analysis failed',
           details: analyzerData.error || 'Unknown error'
@@ -2483,7 +2485,12 @@ router.post('/analyze-photo', trialPhotoLimiter, async (req, res) => {
       res.json(response);
 
     } catch (fetchErr) {
-      log.error('[TRIAL] Photo analyzer service error:', fetchErr.message);
+      // Network-level failure (refused, reset, timeout): reported as a
+      // customer-visible analyzer failure, then answered as before.
+      {
+        const { AnalyzerError, reportAnalyzerFailure } = require('../lib/photoAnalyzerClient');
+        reportAnalyzerFailure('[TRIAL] [PHOTO] analyzer service error', new AnalyzerError('/analyze', `unavailable: ${fetchErr?.cause?.code || fetchErr.message}`, { cause: fetchErr }), { severity: 'customer' });
+      }
 
       if (fetchErr.cause?.code === 'ECONNREFUSED') {
         return res.status(503).json({

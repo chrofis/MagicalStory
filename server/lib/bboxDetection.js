@@ -44,6 +44,7 @@ const { MODEL_DEFAULTS, withRetry } = require('./textModels');
 const { canonicalName } = require('./castResolver');
 const { MODEL_DEFAULTS: CONFIG_DEFAULTS, TEXT_MODELS, GROK_VISION_FALLBACK } = require('../config/models');
 const { getCurrentLogger } = require('./generationLogger');
+const { AnalyzerError, reportAnalyzerFailure } = require('./photoAnalyzerClient');
 const r2Lib = require('./r2');
 const { detectFiguresWithGroundingDino, attachSamMasksToFigures, _shortGarmentPhrase } = require('./figureDetection');
 
@@ -505,7 +506,17 @@ async function _detectAllBoundingBoxesImpl(imageData, options = {}) {
         getCurrentLogger()?.warn?.('detection_fallback', `${pageLabel}figure detection fell back to Gemini — GroundingDINO returned nothing (analyzer cold/unhealthy?)`, null, { pageLabel, reason: gdinoDiag?.reason || 'no figures' });
       }
     } catch (gdErr) {
-      log.warn(`⚠️ [BBOX-DETECT] ${pageLabel}GroundingDINO backend error (${gdErr.message}) — falling back to Gemini`);
+      // The Gemini fallback is the decided resilience path (docs/decisions.md
+      // 2026-08-17) and stays. The FAILURE is no longer silent: an analyzer
+      // failure is reported (ERROR + failure_log) and the result carries it in
+      // gdinoDiag.analyzerError, so a Gemini-fallback page can be told apart
+      // from a page DINO genuinely found nothing on.
+      if (gdErr instanceof AnalyzerError) {
+        reportAnalyzerFailure('[BBOX-DETECT] GroundingDINO backend → Gemini fallback', gdErr, { pageLabel });
+        gdinoDiag = { ...(gdinoDiag || { backend: 'grounding-dino' }), fellBack: true, reason: 'analyzer failed', analyzerError: gdErr.message };
+      } else {
+        log.warn(`⚠️ [BBOX-DETECT] ${pageLabel}GroundingDINO backend error (${gdErr.message}) — falling back to Gemini`);
+      }
       getCurrentLogger()?.warn?.('detection_fallback', `${pageLabel}figure detection fell back to Gemini — GroundingDINO ERROR: ${gdErr.message} (analyzer down/unhealthy?)`, null, { pageLabel, error: gdErr.message });
     }
   }
@@ -1085,7 +1096,9 @@ async function _detectAllBoundingBoxesImpl(imageData, options = {}) {
           Object.defineProperty(dinoUndercountResult, '_gdinoMasks',
             { value: [...dinoMasks, ...extraMasks], enumerable: false, configurable: true });
         } catch (maskErr) {
+          if (maskErr instanceof AnalyzerError) reportAnalyzerFailure('[BBOX-DETECT] SAM mask attach on Gemini extras', maskErr, { pageLabel });
           log.warn(`⚠️ [BBOX-DETECT] ${pageLabel}SAM mask attach on Gemini extras failed (${maskErr.message}) — extras stay maskless`);
+          for (const ex of extras) ex.maskError = maskErr.message;
         }
         dinoUndercountResult.figures.push(...extras);
         dinoUndercountResult.detectionBackend = 'dino+gemini-extra';

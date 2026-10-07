@@ -693,7 +693,7 @@ async function detectOnHighlighted(cropBuf, alpha, cw, ch, garmentKey, cfg) {
   return { pick: multi.pick, tried: multi.tried, paintedBuf };
 }
 
-const { photoAnalyzerUrl: _photoAnalyzerUrl } = require('./photoAnalyzerClient');
+const { analyzerJson, AnalyzerError, reportAnalyzerFailure } = require('./photoAnalyzerClient');
 const bytesOf = (input) => {
   if (Buffer.isBuffer(input)) return input;
   const m = String(input).match(/^data:[^;]+;base64,(.*)$/);
@@ -752,18 +752,12 @@ function selectDistinctBoxes(candidates, opts = {}) {
  */
 async function detectGarmentBoxes(cropUri, opts = {}) {
   const cfg = { ...DEFAULTS, ...opts };
-  const res = await fetch(`${_photoAnalyzerUrl()}/detect-figures-text`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      image: cropUri,
-      prompts: [{ name: 'garment', text: opts.prompt }],
-      box_threshold: cfg.boxThreshold, text_threshold: cfg.textThreshold,
-    }),
-    signal: AbortSignal.timeout(300_000),
-  });
-  if (!res.ok) throw new Error(`detect-figures-text HTTP ${res.status}`);
-  const j = await res.json();
-  if (!j?.success) throw new Error(`detect-figures-text: ${j?.error}`);
+  // Throws an AnalyzerError when the analyzer cannot answer.
+  const j = await analyzerJson('/detect-figures-text', {
+    image: cropUri,
+    prompts: [{ name: 'garment', text: opts.prompt }],
+    box_threshold: cfg.boxThreshold, text_threshold: cfg.textThreshold,
+  }, { timeoutMs: 300_000 });
   const g = (j.figures || [])[0];
   if (!g?.box) return [];
   // Older analyzer builds answer without `candidates`; the best box is still there.
@@ -797,18 +791,12 @@ async function detectGarmentBoxMulti(cropUri, opts = {}) {
   const queries = opts.queries && opts.queries.length ? opts.queries : [opts.prompt];
   const cropArea = Math.max(1, (opts.cropW || 0) * (opts.cropH || 0));
   const askOne = async (text) => {
-    const res = await fetch(`${_photoAnalyzerUrl()}/detect-figures-text`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        image: cropUri,
-        prompts: [{ name: 'q', text }],
-        box_threshold: cfg.boxThreshold, text_threshold: cfg.textThreshold,
-      }),
-      signal: AbortSignal.timeout(300_000),
-    });
-    if (!res.ok) throw new Error(`detect-figures-text HTTP ${res.status}`);
-    const j = await res.json();
-    if (!j?.success) throw new Error(`detect-figures-text: ${j?.error}`);
+    // Throws an AnalyzerError when the analyzer cannot answer.
+    const j = await analyzerJson('/detect-figures-text', {
+      image: cropUri,
+      prompts: [{ name: 'q', text }],
+      box_threshold: cfg.boxThreshold, text_threshold: cfg.textThreshold,
+    }, { timeoutMs: 300_000 });
     const f = (j.figures || [])[0];
     const box = f?.box || null;
     const area = box ? Math.max(0, box[2] - box[0]) * Math.max(0, box[3] - box[1]) : null;
@@ -953,14 +941,8 @@ async function segmentGarment(cropUri, box, w, h, prompts = null) {
   // never sent any.
   const body = { image: cropUri, box };
   if (prompts?.points?.length) { body.points = prompts.points; body.point_labels = prompts.labels; }
-  const res = await fetch(`${_photoAnalyzerUrl()}/figure-mask`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(150_000),
-  });
-  if (!res.ok) throw new Error(`figure-mask HTTP ${res.status}`);
-  const j = await res.json();
-  if (!j?.success) throw new Error(`figure-mask: ${j?.error}`);
+  // Throws an AnalyzerError when the analyzer cannot answer.
+  const j = await analyzerJson('/figure-mask', body, { timeoutMs: 150_000 });
   const png = Buffer.from(String(j.image).replace(/^data:[^;]+;base64,/, ''), 'base64');
   const { data, info } = await sharp(png).resize(w, h, { fit: 'fill' }).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   const alpha = Buffer.alloc(w * h);
@@ -1123,7 +1105,8 @@ async function avatarGarmentLab(avatarUri, opts = {}) {
     };
   } catch (e) {
     const reason = `segmentation failed: ${e.message}`;
-    log.warn(`[GARMENT-COLOUR] avatar "${opts.garmentKey}" ${reason} — no target`);
+    if (e instanceof AnalyzerError) reportAnalyzerFailure(`[GARMENT-COLOUR] avatar "${opts.garmentKey}" — no target`, e, { detail: { garmentKey: opts.garmentKey } });
+    else log.warn(`[GARMENT-COLOUR] avatar "${opts.garmentKey}" ${reason} — no target`);
     return { target: null, reason };
   }
 }
@@ -1320,6 +1303,10 @@ async function fixFigureGarmentColour(pageImageData, figure, avatarUri, options 
     }
   } catch (e) {
     report.reason = `segmentation failed: ${e.message}`;
+    // The page is returned unchanged with the reason on the report; an
+    // analyzer failure is additionally reported (ERROR + failure_log).
+    if (e instanceof AnalyzerError) reportAnalyzerFailure('[GARMENT-COLOUR] page segmentation — page left unchanged', e);
+    else log.warn(`[GARMENT-COLOUR] ${report.reason} — page left unchanged`);
     return { changed: false, imageData: pageImageData, report, steps };
   }
   report.cropPx = cw * ch;

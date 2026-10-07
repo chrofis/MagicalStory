@@ -305,7 +305,9 @@ async function extractQuadrant(buffer, which = 'body-front') {
 async function removeBackground(buf) {
   const out = await rembgRemoveBackground(buf, { maxSize: 1024 });
   if (out) return out;
-  // Fallback: edge-flood chroma-key
+  // Fallback: edge-flood chroma-key. rembg already reported the analyzer
+  // failure (ERROR + failure_log); this names the consequence.
+  log.error('❌ [COVER COMPOSITE] rembg unavailable — cut-out DEGRADED to the chroma-key fallback');
   return chromaKeyBg(buf, 45);
 }
 

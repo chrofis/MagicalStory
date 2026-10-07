@@ -17,9 +17,8 @@
  */
 
 const { log } = require('../utils/logger');
-const { photoAnalyzerUrl } = require('./photoAnalyzerClient');
+const { analyzerJson, AnalyzerError, reportAnalyzerFailure } = require('./photoAnalyzerClient');
 
-const BASE = () =>photoAnalyzerUrl();
 
 /**
  * Gate threshold (owner's call, 2026-08-22). On the measured corpus this flags
@@ -80,17 +79,8 @@ function serialise(fn) {
   return run;
 }
 
-async function analyzerPost(endpoint, body, timeoutMs = 60000) {
-  const res = await fetch(`${BASE()}${endpoint}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(timeoutMs),
-  });
-  const json = await res.json().catch(() => null);
-  if (!res.ok) throw new Error(`${endpoint} ${res.status}: ${json?.error || 'no body'}`);
-  return json;
-}
+// Throws an AnalyzerError when the analyzer cannot answer.
+const analyzerPost = (endpoint, body, timeoutMs = 60000) => analyzerJson(endpoint, body, { timeoutMs });
 
 const asDataUri = (img) => (String(img).startsWith('data:') ? img : `data:image/jpeg;base64,${img}`);
 
@@ -153,7 +143,9 @@ async function scoreAvatarLikenessInner(photo, sheetImage) {
         if (best === null || sim > best) best = sim;
       } catch (err) {
         cells[q] = null;
-        log.debug(`[ARCFACE] cell ${q} failed: ${err.message}`);
+        // embed() returns null for "no face"; a throw here is the analyzer failing.
+        if (err instanceof AnalyzerError) reportAnalyzerFailure(`[ARCFACE] cell ${q}`, err);
+        else log.debug(`[ARCFACE] cell ${q} failed: ${err.message}`);
       }
     }
     if (best === null) return { score: null, cells, unavailable: 'no face in any head cell' };
@@ -163,7 +155,10 @@ async function scoreAvatarLikenessInner(photo, sheetImage) {
     // what a 3/4 view is meant to look like; ArcFace does not.
     return { score: Number(best.toFixed(4)), cells };
   } catch (err) {
-    log.warn(`[ARCFACE] likeness scoring unavailable: ${err.message}`);
+    // The null score is the documented "no opinion" (fails open); the analyzer
+    // failure behind it is reported, not warned away.
+    if (err instanceof AnalyzerError) reportAnalyzerFailure('[ARCFACE] likeness scoring unavailable', err);
+    else log.warn(`[ARCFACE] likeness scoring unavailable: ${err.message}`);
     return { score: null, cells: {}, unavailable: err.message };
   }
 }

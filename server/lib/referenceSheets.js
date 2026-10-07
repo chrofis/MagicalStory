@@ -1,4 +1,4 @@
-const { photoAnalyzerUrl } = require('./photoAnalyzerClient');
+const { analyzerJson, reportAnalyzerFailure } = require('./photoAnalyzerClient');
 /**
  * Reference sheets and Visual Bible grids — the reference imagery a page
  * generation is given, not the page itself.
@@ -410,32 +410,22 @@ async function splitGridIntoReferences(gridImage, count, elements = null) {
 
   // Try Python service first — variance-based separator detection that
   // finds the ACTUAL cell boundaries instead of blindly dividing pixels.
-  const analyzerBase = photoAnalyzerUrl();
   try {
-    const response = await fetch(`${analyzerBase}/split-reference-sheet`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        image: `data:image/png;base64,${base64}`,
-        count: layout.cells,
-        cols: layout.cols,
-        rows: layout.rows,
-      }),
-      signal: AbortSignal.timeout(10000),
-    });
-
-    if (response.ok) {
-      const result = await response.json();
-      if (result.success && Array.isArray(result.cells) && result.cells.length === layout.cells) {
-        log.info(`[REF-SHEET] Python split: ${result.layout.cols}x${result.layout.rows}, separators v=[${result.separators.vertical.join(',')}] h=[${result.separators.horizontal.join(',')}]`);
-        return referencesFromCells(result.cells, layout, count);
-      }
-      log.warn(`[REF-SHEET] Python split returned ${result.cells?.length ?? 'no'} cells (expected ${layout.cells}) — falling back to sharp`);
-    } else {
-      log.debug(`[REF-SHEET] Python service unavailable (${response.status}) — using sharp fallback`);
+    const result = await analyzerJson('/split-reference-sheet', {
+      image: `data:image/png;base64,${base64}`,
+      count: layout.cells,
+      cols: layout.cols,
+      rows: layout.rows,
+    }, { timeoutMs: 10000 });
+    if (Array.isArray(result.cells) && result.cells.length === layout.cells) {
+      log.info(`[REF-SHEET] Python split: ${result.layout.cols}x${result.layout.rows}, separators v=[${result.separators.vertical.join(',')}] h=[${result.separators.horizontal.join(',')}]`);
+      return referencesFromCells(result.cells, layout, count);
     }
+    log.warn(`[REF-SHEET] Python split returned ${result.cells?.length ?? 'no'} cells (expected ${layout.cells}) — falling back to sharp`);
   } catch (err) {
-    log.debug(`[REF-SHEET] Python service unreachable (${err.message}) — using sharp fallback`);
+    // Was a DEBUG line: an analyzer outage read as a normal sharp crop. The
+    // blind equal-cell crop below stays as the fallback; the outage is reported.
+    reportAnalyzerFailure('[REF-SHEET] split-reference-sheet — falling back to blind equal-cell crop', err);
   }
 
   // Fallback: blind equal-cell math via sharp. Works only when cells are

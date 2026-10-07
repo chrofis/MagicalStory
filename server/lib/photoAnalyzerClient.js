@@ -62,4 +62,90 @@ async function withAnalyzerSlot(fn) {
   return (await _analyzerLimitPromise)(fn);
 }
 
-module.exports = { photoAnalyzerUrl, withAnalyzerSlot };
+// ─── Failing loudly (owner, 2026-10-07: "fail loudly too") ────────────────────
+//
+// Every Node call into the analyzer used to map "the service could not answer"
+// (unreachable, timeout, non-2xx, success:false) onto the same value a real
+// answer produces — null, [], "no mask", "no figures". A dead analyzer then read
+// as an empty page, and nothing counted it. The rule now: the CLIENT throws an
+// AnalyzerError on every failure shape, and the CALLER reports it through
+// reportAnalyzerFailure (ERROR log + failure_log row under a stable kind) and
+// then either stops that piece of work or keeps a result that is explicitly
+// marked as degraded. A null/[] from a client means only "the model found
+// nothing".
+
+class AnalyzerError extends Error {
+  constructor(endpoint, message, { status = null, cause = null } = {}) {
+    super(`analyzer ${endpoint} failed: ${message}`);
+    this.name = 'AnalyzerError';
+    this.endpoint = endpoint;
+    this.status = status;
+    if (cause) this.cause = cause;
+    this.kind = analyzerFailureKind(endpoint);
+  }
+}
+
+/** Stable failure_log kind for an endpoint: '/figure-mask' → 'analyzer_figure_mask_failed'. */
+function analyzerFailureKind(endpoint) {
+  const slug = String(endpoint || '').replace(/^\//, '').replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, '').toLowerCase();
+  return `analyzer_${slug || 'call'}_failed`;
+}
+
+/**
+ * POST JSON to the analyzer and return the parsed answer, or THROW an
+ * AnalyzerError. Failure shapes that throw: the service is unreachable or the
+ * call times out, a non-2xx status, an unparseable body, `success` not true.
+ * `slot` routes the request through withAnalyzerSlot (the in-flight cap);
+ * `retryRestart` through analyzerClient.analyzerFetch (rides out a restart).
+ */
+async function analyzerJson(endpoint, body, { timeoutMs = 60_000, slot = false, retryRestart = false } = {}) {
+  const url = `${photoAnalyzerUrl()}${endpoint}`;
+  const options = {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(timeoutMs),
+  };
+  const doFetch = retryRestart
+    ? () => require('./analyzerClient').analyzerFetch(endpoint, options)
+    : () => fetch(url, options);
+  let res;
+  try {
+    res = await (slot ? withAnalyzerSlot(doFetch) : doFetch());
+  } catch (err) {
+    throw new AnalyzerError(endpoint, `unavailable: ${err?.cause?.code || err?.message || err}`, { cause: err });
+  }
+  if (!res.ok) {
+    const text = typeof res.text === 'function' ? await res.text().catch(() => '') : '';
+    throw new AnalyzerError(endpoint, `HTTP ${res.status} ${String(text).slice(0, 200)}`.trim(), { status: res.status });
+  }
+  let json;
+  try { json = await res.json(); } catch (err) {
+    throw new AnalyzerError(endpoint, `unparseable answer: ${err.message}`, { status: res.status });
+  }
+  if (!json || json.success !== true) {
+    throw new AnalyzerError(endpoint, String(json?.error || 'success:false'), { status: res.status });
+  }
+  return json;
+}
+
+/**
+ * The caller's half of the rule: ERROR log + failure_log row. `err` is normally
+ * an AnalyzerError (its `kind` names the endpoint); any other error is filed
+ * under 'analyzer_call_failed'. Never throws.
+ */
+function reportAnalyzerFailure(tag, err, { pageLabel = '', severity = 'internal', storyId, pageNumber, character, userId, detail } = {}) {
+  const message = String(err?.message || err);
+  log.error(`❌ ${tag} ${pageLabel}${message}`);
+  try {
+    require('./failureLog').recordFailure({
+      kind: err?.kind || 'analyzer_call_failed',
+      severity,
+      fingerprint: message.slice(0, 80),
+      summary: `${tag} ${pageLabel}${message.slice(0, 160)}`,
+      storyId, pageNumber, character, userId, detail,
+    });
+  } catch { /* reporting must never break the caller */ }
+}
+
+module.exports = { photoAnalyzerUrl, withAnalyzerSlot, AnalyzerError, analyzerFailureKind, analyzerJson, reportAnalyzerFailure };
