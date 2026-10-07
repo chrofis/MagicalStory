@@ -202,11 +202,18 @@ export interface ModelUsage {
   cost?: number;
 }
 
+/** OpenRouter: tokens plus the charge it reported; `cost` is USD summed per story. */
+export interface OpenRouterUsage extends ProviderTokens {
+  direct_cost: number;
+  cost: number;
+}
+
 export interface TokenUsageTotals {
   anthropic: ProviderTokens;
   gemini_text: ProviderTokens;
   gemini_image: ProviderTokens;
   gemini_quality: ProviderTokens;
+  openrouter?: OpenRouterUsage;
   runware: RunwareUsage;
   grok: RunwareUsage;
   avatarByModel: Record<string, ModelUsage>;
@@ -225,6 +232,7 @@ export interface TokenUsageCosts {
   gemini_quality: ProviderCost;
   runware: { total: number };
   grok: { total: number };
+  openrouter?: { total: number };
   avatarByModel: Record<string, ModelUsage>;
   totalAvatarCost: number;
   grandTotal: number;
@@ -241,6 +249,7 @@ export interface TokenUsageByUser {
   gemini_image: ProviderTokens;
   gemini_quality: ProviderTokens;
   avatarByModel: Record<string, ModelUsage>;
+  openrouter?: OpenRouterUsage;
   runware: RunwareUsage;
   grok: RunwareUsage;
 }
@@ -253,6 +262,7 @@ export interface TokenUsageByDay {
   gemini_text: ProviderTokens;
   gemini_image: ProviderTokens;
   gemini_quality: ProviderTokens;
+  openrouter?: OpenRouterUsage;
   runware: RunwareUsage;
   grok: RunwareUsage;
   totalCost: number;
@@ -266,6 +276,7 @@ export interface TokenUsageByMonth {
   gemini_text: ProviderTokens;
   gemini_image: ProviderTokens;
   gemini_quality: ProviderTokens;
+  openrouter?: OpenRouterUsage;
   runware: RunwareUsage;
   grok: RunwareUsage;
   totalCost: number;
