@@ -9,6 +9,7 @@ const path = require('path');
 // Stub email.js BEFORE the sweep requires it.
 const stubbedEmail = {
   isEmailConfigured: () => true,
+  resolveGreetingName: (row) => (row.shipping_first_name || row.username || '').split(/\s+/)[0] || null,
   sentEmails: [],
   async sendTrialReminderEmail(userEmail, firstName, claimUrl, language, options) {
     this.sentEmails.push({ userEmail, firstName, claimUrl, language, options });
@@ -78,7 +79,8 @@ const fakePool = {
     }
     if (lower.startsWith('update users set')) {
       updates.push({ sql, params });
-      return { rowCount: 1 };
+      // The claim UPDATE (`... IS NULL RETURNING id`) reads rows: one row = claimed.
+      return { rowCount: 1, rows: [{ id: params[0] }] };
     }
     return { rows: [] };
   },

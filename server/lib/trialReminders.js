@@ -51,29 +51,59 @@ async function fetchLatestStoryTitle(dbPool, userId) {
   }
 }
 
+// Returns true when this call sent the reminder, false when another sweep had
+// already claimed the row. Throws when the send fails (the claim is handed back
+// first, so the next sweep retries).
 async function sendOne(dbPool, log, row, reminderType) {
-  const claimUrl = buildClaimUrl(row.claim_token);
-  const firstName = email.resolveGreetingName(row);
-  const language = row.preferred_language || 'English';
-  const storyTitle = await fetchLatestStoryTitle(dbPool, row.id);
-  const daysLeft = reminderType === 'day25' ? daysUntil(row.claim_token_expires) : null;
-
-  const result = await email.sendTrialReminderEmail(row.email, firstName, claimUrl, language, {
-    reminderType,
-    daysLeft,
-    storyTitle,
-    // PDF intentionally omitted — see file header.
-  });
-
-  if (!result) {
-    throw new Error(`sendTrialReminderEmail returned null for ${row.email}`);
-  }
-
   const column = reminderType === 'day5'
     ? 'trial_reminder_5d_sent_at'
     : 'trial_reminder_25d_sent_at';
-  await dbPool.query(`UPDATE users SET ${column} = NOW() WHERE id = $1`, [row.id]);
+
+  // Claim the row BEFORE sending. Two sweeps can run at once — the boot sweep
+  // of a freshly deployed container next to the hourly tick of the one it is
+  // replacing — and both read the same unclaimed rows. The first UPDATE wins;
+  // the other finds the column already set and skips, so an address is never
+  // mailed twice. Stamping after the send (the old order) left that window
+  // open, and also re-sent whenever the stamp itself failed after a success.
+  const claim = await dbPool.query(
+    `UPDATE users SET ${column} = NOW() WHERE id = $1 AND ${column} IS NULL RETURNING id`,
+    [row.id]
+  );
+  if (claim.rows.length === 0) {
+    log.info?.(`[trial-reminders] ${reminderType} for ${row.email} already claimed by another sweep, skipping`);
+    return false;
+  }
+
+  const claimUrl = buildClaimUrl(row.claim_token);
+  const firstName = email.resolveGreetingName(row);
+  const language = row.preferred_language || 'English';
+  const daysLeft = reminderType === 'day25' ? daysUntil(row.claim_token_expires) : null;
+
+  let result;
+  try {
+    const storyTitle = await fetchLatestStoryTitle(dbPool, row.id);
+    result = await email.sendTrialReminderEmail(row.email, firstName, claimUrl, language, {
+      reminderType,
+      daysLeft,
+      storyTitle,
+      // PDF intentionally omitted — see file header.
+    });
+    if (!result) {
+      throw new Error(`sendTrialReminderEmail returned null for ${row.email}`);
+    }
+  } catch (err) {
+    // Hand the claim back so the next sweep retries. If even that fails the row
+    // stays stamped and this reminder is lost — said at ERROR, not silently.
+    try {
+      await dbPool.query(`UPDATE users SET ${column} = NULL WHERE id = $1`, [row.id]);
+    } catch (releaseErr) {
+      log.error?.(`[trial-reminders] ${reminderType} for ${row.email} failed AND the claim could not be released (${releaseErr.message}); this reminder will not be retried`);
+    }
+    throw err;
+  }
+
   log.info(`[trial-reminders] sent ${reminderType} to ${row.email} (lang=${language})`);
+  return true;
 }
 
 async function runTrialReminderSweep(dbPool, log = console) {
@@ -108,8 +138,7 @@ async function runTrialReminderSweep(dbPool, log = console) {
 
     for (const row of day5Rows) {
       try {
-        await sendOne(dbPool, log, row, 'day5');
-        counts.day5 += 1;
+        if (await sendOne(dbPool, log, row, 'day5')) counts.day5 += 1;
       } catch (err) {
         errors += 1;
         log.error?.(`[trial-reminders] day5 failed for ${row.email}: ${err.message}`);
@@ -139,8 +168,7 @@ async function runTrialReminderSweep(dbPool, log = console) {
 
     for (const row of day25Rows) {
       try {
-        await sendOne(dbPool, log, row, 'day25');
-        counts.day25 += 1;
+        if (await sendOne(dbPool, log, row, 'day25')) counts.day25 += 1;
       } catch (err) {
         errors += 1;
         log.error?.(`[trial-reminders] day25 failed for ${row.email}: ${err.message}`);
