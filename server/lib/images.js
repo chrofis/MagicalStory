@@ -2987,6 +2987,9 @@ function batchEvalQualityCall(img, options = {}) {
     // pipeline (landmark refs + scene era). Absent → no protection.
     landmarkPhotos: img.landmarkPhotos || null,
     era: img.era || null,
+    // Repair children only: the parent picture and its findings, for the semantic judge's paired
+    // re-judge (sceneValidator.buildParentCompareBlock). Null on every first-render eval.
+    parentCompare: img.parentCompare || null,
     // The page's PARSED metadata, so the EXPECTED CAST roster reads the
     // brief's `objects[]` even when sceneHint is a plan line.
     sceneMetadata: img.sceneMetadata || null,

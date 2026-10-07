@@ -263,7 +263,7 @@ Mark `storyRelevant: true` only when the contact is the page's plot moment, iden
 
 Omit entirely (do not include with `false`): pure ground/floor/path contact, leaning on walls, sitting on generic chairs.
 
-Field shape: `{character, object, where, action, hands, storyRelevant, priority}`. {CONTACT_VERB} `where` is a short sentence naming the object as the contact action ("holds the parchment map", "hands the letter to the messenger"). No body-part positioning, no pose detail: write "pushes the cart", not "presses both palms flat against the cart's side" — the visible grip belongs in the prose (rule 7b). Name which hand, how many hands, or where on the object they land only when the story turns on it.
+Field shape: `{character, object, where, action, hands, storyRelevant, priority}`. {CONTACT_VERB} `where` is a short sentence naming the object as the contact action ("holds the parchment map", "hands the letter to the messenger"). No body-part positioning, no pose detail: write "pushes the cart", not "presses both palms flat against the cart's side" — the visible grip belongs in the prose (rule 7b). Name how many hands, or where on the object they land, only when the story turns on it; never which hand.
 
 `receiver` (optional): when the action's result later arrives at a second object — a basin under a spout, a bucket under a pump, a pool below — its VB id or plain name. `target` (optional): what the tool acts on, as a short noun phrase ("the crack in the rock face"). The page shows the result at the contact, with the receiver clear of the tool.
 

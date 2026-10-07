@@ -451,8 +451,30 @@ function votesFromIds(ids, index) {
 const NOT_A_DEFECT_DROPS = ['profile_says_trait_is_correct', 'finding_contradicts_brief'];
 
 function isNotADefectDrop(d) {
+  return notADefectCode(d) !== null;
+}
+
+function notADefectCode(d) {
   const reason = String(d?.reason || '').replace(/^["'`\s]+/, '').toLowerCase();
-  return NOT_A_DEFECT_DROPS.some(code => reason.startsWith(code));
+  return NOT_A_DEFECT_DROPS.find(code => reason.startsWith(code)) || null;
+}
+
+/**
+ * WHICH FINDING TYPES A DROP REASON MAY BE APPLIED TO (2026-10-07). Rule 2 compares an
+ * appearance trait with the character profile, so `profile_says_trait_is_correct` can only
+ * be true of an identity / hair / face / accessory finding. Staging
+ * job_1791315635053_t0t8qpebu applied it to a `missing_element` finding (the missing
+ * object was a real defect), which removed it from the scoring list. A type check on the
+ * finding's DECLARED type, never its text; a reason with no entry here has no restriction.
+ */
+const DROP_REASON_BUCKETS = {
+  profile_says_trait_is_correct: ['character_identity', 'accessory'],
+};
+
+function dropReasonAllowedFor(code, finding) {
+  const buckets = DROP_REASON_BUCKETS[code];
+  if (!buckets) return true;
+  return buckets.includes(require('./evalBuckets').bucketForType(finding?.type || finding?.category));
 }
 
 /**
@@ -467,6 +489,9 @@ function notADefectDroppedIds(plan, index, fail = () => {}) {
     if (!ids) { fail(`a "${String(d.reason).split(/[\s—-]/)[0]}" drop names no finding id — not applied`); continue; }
     const unknown = ids.filter(id => !index.has(id));
     if (unknown.length) { fail(`a "${String(d.reason).split(/[\s—-]/)[0]}" drop names unknown id(s) ${unknown.join(', ')} — not applied`); continue; }
+    const code = notADefectCode(d);
+    const wrongType = ids.filter(id => !dropReasonAllowedFor(code, index.get(id).finding));
+    if (wrongType.length) { fail(`a "${code}" drop names finding(s) ${wrongType.join(', ')} of a type that reason cannot apply to — not applied`); continue; }
     ids.forEach(id => dropped.add(id));
   }
   return dropped;
@@ -523,6 +548,8 @@ function resolveDedupedIssues(plan, index, pageNumber = null) {
       ids: live,
       sources,
       severities,
+      // The paired re-judge saw every finding behind this entry in the repair's parent too (A2).
+      ...(live.every(id => index.get(id).finding?.alsoInParent === true) ? { alsoInParent: true } : {}),
     });
   }
   if (removedByDrops) log.info(`🧠 [FEEDBACK-CONSOLIDATOR] page ${pageNumber}: ${removedByDrops} deduped issue(s) removed — every finding in them was dropped as not a defect`);

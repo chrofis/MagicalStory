@@ -2507,6 +2507,8 @@ function semanticFidelityOptions(judgeInputs, evalOptions) {
     visualBible: evalOptions.visualBible || null,
     // Where the call's prompt is recorded (eval_calls).
     pageNumber: evalOptions.pageNumber ?? null,
+    // A repaired version is judged beside its parent (A2): { imageData, findings }, else null.
+    parent: evalOptions.parentCompare || null,
   };
 }
 

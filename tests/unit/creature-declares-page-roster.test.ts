@@ -161,3 +161,31 @@ describe('a creature the brief declares in creatures[] is on the roster without 
     expect(r.names).not.toContain(NIA.name);
   });
 });
+
+describe('REGRESSION: a creature declared in a REAL prose brief reaches the roster through extractSceneMetadata', () => {
+  // The previous test fed hand-built top-level metadata; extractSceneMetadata kept creatures only
+  // inside fullData, so on every real brief the roster was empty (front cover of staging
+  // job_1791315635053_t0t8qpebu: the declared turtle was judged an extra character and repaired away).
+  const { extractSceneMetadata } = require_('../../server/lib/sceneMetadata');
+  const meta = {
+    sceneIntent: 'The two boys meet the dog at the gate.',
+    characters: [{ name: 'Levin', position: 'left midground' }, { name: 'Julian', position: 'right midground' }],
+    objects: ['LOC003'], interactions: [], wornItems: [],
+    creatures: [{ id: 'ANI001', depth: 'foreground' }],
+  };
+  const brief = `The two boys stand at the gate while the dog watches.\n\n---METADATA---\n${JSON.stringify(meta, null, 2)}`;
+  it('puts creatures at the top level of the extracted metadata', () => {
+    expect(extractSceneMetadata(brief).creatures).toEqual([{ id: NIA.id, depth: 'foreground' }]);
+  });
+  it('the expected cast built from the extracted metadata lists the creature', () => {
+    const r = buildExpectedCastBlock({
+      sceneCharacters: ['Levin', 'Julian'],
+      sceneMetadata: extractSceneMetadata(brief),
+      originalPrompt: '',
+      visualBible: VB,
+      evaluationType: 'scene',
+      storyData: { characters: [{ name: 'Levin' }, { name: 'Julian' }], visualBible: VB },
+    });
+    expect(r.names).toContain(NIA.name);
+  });
+});

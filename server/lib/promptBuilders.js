@@ -9639,7 +9639,7 @@ const STAGED_PROP_RULE = "A prop the page's own text puts against a character \u
  * 2026-08-12 "a beat needing kneeling/floor contact is medium" decision. Owner
  * decision, logged in docs/decisions.md and tasks/BACKLOG.md.
  */
-const CONTACT_VERB_RULE = "An interaction's `where` opens with the verb the character performs, never with the body part: `presses his ear to the door`, not `ear pressed to the door`. A contact made with something other than the hands states in that verb which part of the body makes it. That character is then given no second interaction row for a hand — no brace, no balance, no steadying touch — and the prose says where both hands are and that they are off the object.";
+const CONTACT_VERB_RULE = "An interaction's `where` opens with the verb the character performs, never with the body part: `presses his ear to the door`, not `ear pressed to the door`. A contact made with something other than the hands states in that verb which part of the body makes it. That character is then given no second interaction row for a hand — no brace, no balance, no steadying touch — and the prose says where both hands are and that they are off the object. `where` never names a left or right hand or fist: a side is a mirror of the same pose, so write `grips the rope`, not `grips the rope with his left fist`.";
 
 /**
  * ONE contract for an object the page gives more than one toucher.
@@ -10047,7 +10047,7 @@ const HEADLINE_PHRASE_RULE = "Write what the picture shows — faces, gestures, 
 // A COVER BEAT STATES ITS COPY BAND (coverBeats.COVER_COPY_SPACE, the one source), and the author echoed it into the intent as
 // "keeping the top third of the frame empty" (Lab #1674, first pass of every cover; the re-ask fixed it each time). The intent is
 // the anchor the image model weights most, so a band named there is painted. docs/decisions.md 2026-10-06.
-const SCENE_INTENT_PICTURE_ONLY = "It describes the picture only and never names a band, a third or an edge of the frame, nor a part of the frame kept empty or left for anything; a layout clause of the plan line is composition for the prose.";
+const SCENE_INTENT_PICTURE_ONLY = "It describes the picture only and never names a band, a third or an edge of the frame, nor a part of the frame kept empty or left for anything; a layout clause of the plan line is composition for the prose. On a page with no characters the first sentence names the event itself (what happens to what, where): it is the page's main action, and the semantic judge scores its absence as MAJOR.";
 const SCENE_INTENT_FIELD_RULE = "2-3 present-tense sentences naming the single moment the image depicts. Sentence 1: who does what to whom, where. Sentence 2: what characters hold or reach for, and the page's one gaze target — never a second target, and never a character facing one person while gazing at another. Sentence 3: the setting and the light. Name every character physically present. List the main and primary characters among them in `characters[]`; secondary characters stay in the prose and carry their CHR id in `objects[]`. One moment only — not cause plus effect. " + SCENE_INTENT_PICTURE_ONLY;
 
 // THE JEV PATH'S FIELD RULES (owner, 2026-10-06, Art Director review §3). On a story page code writes `looksAt` and the

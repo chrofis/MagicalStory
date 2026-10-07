@@ -781,6 +781,24 @@ async function validateAndRepairScene(sceneJson, options = {}) {
  * @param {object} parts - the per-page inputs, already resolved by the caller
  * @param {'light'|'full'} level - Gemini-safety sanitisation level
  */
+/**
+ * The PAIRED RE-JUDGE block (A2, owner 2026-10-07), shown only when a repaired version is judged
+ * beside the version it was repaired from. '' on every other call, so the happy-path prompt is
+ * the template with one empty line. Pure.
+ *
+ * @param {{imageData: string, findings: Array<{id,severity,type,character,description}>}|null} parent
+ */
+function buildParentCompareBlock(parent) {
+  if (!parent || !parent.imageData) return '';
+  const list = (parent.findings || []).map(f =>
+    `- ${f.id} [${f.severity}] ${f.type ? `(${f.type}) ` : ''}${f.character ? `${f.character}: ` : ''}${f.description}`);
+  return [
+    '**PARENT PICTURE (REPAIR CHECK):** this picture is a repair of an earlier picture, attached SECOND. Judge the FIRST picture only, by every rule here; the second is for comparison and is never itself judged. The earlier picture was found to have:',
+    list.length ? list.join('\n') : '- (no findings recorded)',
+    'Add `parent_findings` to the JSON: one entry `{"id": "P1", "status": "fixed" | "still_present"}` for each finding above, answered from what the two pictures show. Add `also_in_parent` to EVERY `fixable_issues` entry: `true` when the same defect is visible in the second picture, else `false`.',
+  ].join('\n');
+}
+
 function buildSemanticPrompt(template, { storyText, sceneHint, imagePrompt, interactionsBlock, elementsBlock, declaredLight = '', evalContext = {} } = {}, level = 'light') {
   const { sanitizeForGemini } = require('./images');
   const clean = (text) => text ? sanitizeForGemini(stripEntityIds(text), level) : null;
@@ -813,6 +831,7 @@ function buildSemanticPrompt(template, { storyText, sceneHint, imagePrompt, inte
     // against what the illustrator was told and never read out of prose.
     // '' when the brief declares none: the check is then skipped.
     DECLARED_LIGHT: declaredLight || '',
+    PARENT_COMPARE: buildParentCompareBlock(evalContext.parent || null),
     // ONE rule for every template that authors or judges a page against its
     // text (promptBuilders.TEXT_NOT_A_CHECKLIST_RULE, 2026-09-18). The
     // CHARACTER AUTHORITY paragraph in image-semantic.txt used to state the
@@ -928,6 +947,11 @@ async function evaluateSemanticFidelity(imageData, storyText, imagePrompt, scene
     imageBase64 = imageData.split(',')[1];
   }
 
+  // The parent picture of a paired re-judge goes second; nothing is added otherwise.
+  const parentData = evalContext.parent?.imageData || null;
+  const parentBase64 = parentData ? (parentData.startsWith('data:') ? parentData.split(',')[1] : parentData) : null;
+  const parentParts = parentBase64 ? [{ inlineData: { mimeType: 'image/png', data: parentBase64 } }] : [];
+
   // Build prompt at a given sanitization level
   const buildPrompt = (level) => buildSemanticPrompt(template, {
     storyText, sceneHint, imagePrompt, interactionsBlock, elementsBlock, declaredLight: declaredLightLine, evalContext,
@@ -961,6 +985,11 @@ async function evaluateSemanticFidelity(imageData, storyText, imagePrompt, scene
       analysis.fixable_issues || analysis.semantic_issues || [],
       require('./findingSources').FINDING_SOURCES.SEMANTIC
     );
+    // PAIRED RE-JUDGE: the judge's own tag, carried as a boolean. Read only when a parent picture
+    // was attached; any other call can never mark a finding as shared.
+    if (evalContext.parent?.imageData) {
+      for (const i of semanticIssues) if (i && i.also_in_parent === true) i.alsoInParent = true;
+    }
 
     log.info(`🔍 [SEMANTIC] Token usage - input: ${usage.input_tokens.toLocaleString()}, output: ${usage.output_tokens.toLocaleString()}, thinking: ${usage.thinking_tokens.toLocaleString()}, cost: $${usage.estimatedCost.toFixed(4)}`);
     if (semanticIssues.length > 0) {
@@ -983,6 +1012,8 @@ async function evaluateSemanticFidelity(imageData, storyText, imagePrompt, scene
       semanticScore10,
       verdict: analysis.verdict || 'UNKNOWN',
       semanticIssues,
+      // The judge's answer per parent finding (id, fixed | still_present); null off the paired call.
+      parentFindings: evalContext.parent?.imageData && Array.isArray(analysis.parent_findings) ? analysis.parent_findings : null,
       visible: analysis.visible || null,
       expected: analysis.expected || null,
       issues: analysis.issues || [],
@@ -999,7 +1030,8 @@ async function evaluateSemanticFidelity(imageData, storyText, imagePrompt, scene
     try {
       const result = await model.generateContent([
         prompt,
-        { inlineData: { mimeType: 'image/png', data: imageBase64 } }
+        { inlineData: { mimeType: 'image/png', data: imageBase64 } },
+        ...parentParts,
       ]);
       const text = result.response.text(); // throws on block
       require('./evalCallLog').recordEvalCall({
@@ -1034,6 +1066,7 @@ async function evaluateSemanticFidelity(imageData, storyText, imagePrompt, scene
     const fullPrompt = buildPrompt('full');
     const parts = [
       { inline_data: { mime_type: 'image/png', data: imageBase64 } },
+      ...(parentBase64 ? [{ inline_data: { mime_type: 'image/png', data: parentBase64 } }] : []),
       { text: fullPrompt }
     ];
     const grokResponse = await callGrokVisionAPI(grokModelId, grokModel.modelId || grokModelId, parts, fullPrompt);
@@ -1072,6 +1105,7 @@ module.exports = {
   buildSimplePreviewPrompt,
   evaluateSemanticFidelity,
   buildSemanticPrompt,
+  buildParentCompareBlock,
   semanticDeclaredLight,
   semanticDeclaredBlocks
 };

@@ -1635,6 +1635,21 @@ async function runSemanticEvalStage(ctx, { promptOverride, experimentId }) {
   // reference is its brief), the Visual Bible reference cells and the story
   // language; its scene hint was not resolveEvalSceneHint's.
   const { input, options } = labEvalCall(ctx, { imageData, loadedVersion: ctx.imageDataOverride ? null : (getLastPageLoad()?.loadedVersion ?? null) });
+  // PAIRED RE-JUDGE (A2): `target.parentVersionIndex` is the stored version this one was repaired
+  // from. The run hands the judge the same two things for a repair child: the parent picture and
+  // the parent's stored findings (scoring.parentFindingsForCompare), carried on the batch input.
+  const parentIdx = pinnedVersionIndex(ctx.target?.parentVersionIndex);
+  let parentCompare = null;
+  if (parentIdx !== null) {
+    const versions = ctx.scene.imageVersions || [];
+    const parentVersion = versions[require('./versionManager').arrayIndexForDb(versions, parentIdx, 'scene')] || null;
+    if (!parentVersion) throw new Error(`parentVersionIndex ${parentIdx} not found on this page`);
+    parentCompare = {
+      imageData: await loadActivePageImage(ctx.storyId, ctx.pageNumber, parentIdx),
+      findings: require('./scoring').parentFindingsForCompare(parentVersion),
+    };
+    input.parentCompare = parentCompare;
+  }
   const evalCall = require('./images').batchEvalQualityCall(input, options);
   const { judgedSceneText, prepareEvalJudgeInputs, semanticFidelityOptions } = require('./evalPipeline');
   const pageContext = `testlab-exp${experimentId}-P${ctx.pageNumber}`;
@@ -1659,6 +1674,8 @@ async function runSemanticEvalStage(ctx, { promptOverride, experimentId }) {
     elapsedMs,
     scores: { semantic: result.score ?? null, verdict: result.verdict || null },
     semanticIssues: result.semanticIssues || [],
+    parentFindingsShown: parentCompare ? parentCompare.findings : null,
+    parentFindings: result.parentFindings || null,
     visible: result.visible || null,
     expected: result.expected || null,
     storedBaseline: { semanticScore: ctx.scene.semanticScore ?? null },

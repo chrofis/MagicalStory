@@ -100,10 +100,29 @@ describe('resolveDedupedIssues — votes come from the input findings', () => {
   it('a dropped id leaves an entry that merges it with a live finding; the votes are recomputed without it', () => {
     const plan = {
       deduped_issues: [{ type: 'action_interaction', character: 'Kiaan', description: 'merged', ids: ['S2', 'R1'] }],
-      dropped_issues: [{ reason: 'profile_says_trait_is_correct', ids: ['S2'] }],
+      dropped_issues: [{ reason: 'finding_contradicts_brief', ids: ['S2'] }],
     };
     const { deduped } = FC.resolveDedupedIssues(plan, index(), 12);
     expect(deduped).toEqual([expect.objectContaining({ ids: ['R1'], sources: ['reader'], severity: 'MAJOR' })]);
+  });
+  it('REGRESSION: profile_says_trait_is_correct is refused for a missing_element finding (2026-10-07)', () => {
+    const idx = FC.indexFindings({ semanticIssues: [{ type: 'missing_element', severity: 'MAJOR', description: 'the lantern is absent' }] });
+    const plan = {
+      deduped_issues: [{ type: 'missing_element', description: 'lantern absent', ids: ['S1'] }],
+      dropped_issues: [{ reason: 'profile_says_trait_is_correct', ids: ['S1'] }],
+    };
+    const { deduped, errors, removedByDrops } = FC.resolveDedupedIssues(plan, idx, 4);
+    expect(removedByDrops).toBe(0);
+    expect(errors.length).toBe(1);
+    expect(deduped).toEqual([expect.objectContaining({ ids: ['S1'], severity: 'MAJOR' })]);
+  });
+  it('profile_says_trait_is_correct still drops a hair finding', () => {
+    const idx = FC.indexFindings({ fixableIssues: [{ type: 'hair', severity: 'MAJOR', description: 'wrong hair' }] });
+    const plan = {
+      deduped_issues: [{ type: 'hair', description: 'wrong hair', ids: ['Q1'] }],
+      dropped_issues: [{ reason: 'profile_says_trait_is_correct', ids: ['Q1'] }],
+    };
+    expect(FC.resolveDedupedIssues(plan, idx, 4).removedByDrops).toBe(1);
   });
   it('NEGATIVE CONTROL: a plan-only drop (capped at 3) removes nothing', () => {
     const plan = {

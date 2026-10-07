@@ -11,6 +11,7 @@ Check whether this illustration shows the right STORY BEAT. You are not grading 
 **LANDMARK CONTEXT (empty when this page carries no real-world landmark reference):** {LANDMARK_CONTEXT}
 **TEXT RULES (the strings this page must show as readable lettering — empty when it asks for none):** {TEXT_RULES}
 **DECLARED LIGHT (the page's time of day and weather — empty when the page declares none):** {DECLARED_LIGHT}
+{PARENT_COMPARE}
 
 **⚠️ CHARACTER AUTHORITY RULE — CRITICAL, READ ONCE, APPLY THROUGHOUT:**
 
@@ -51,10 +52,13 @@ Only check these things (using SCENE_HINT + IMAGE_PROMPT as the source of truth)
 - Gaze direction matches a DECLARED INTERACTION? Flag ONLY when TWO named characters, declared as physically interacting, are turned fully back-to-back / facing directly opposite ways so the interaction cannot read at all. A head angled slightly off, or gaze "not directly at" an object, is NEVER a deduction; image models cannot stage mutual gaze among three or more figures. — **[MODERATE]** when flagged
 - A figure looking at the VIEWER — posing for the camera — is a defect in exactly two cases: the beat's emotion is anything other than happy, or that figure has a declared interaction needing their attention. Otherwise facing the viewer is fine and is never a deduction. Use `type: viewer_address`, **[MODERATE]**, at most one per figure. Never on a cover.
 - **Declared interactions placement** (overrides the "ignore spatial arrangement" rule below — declared interactions ARE spatial requirements that matter):
+  - An essential declared interaction (the `storyRelevant` row, or the one `sceneIntent` is built on) whose verb is visibly not the one drawn is at least **[MAJOR]** `action_interaction`: "wrapped around" drawn as "held in front of", "pulling" drawn as "resting on", "pouring into" drawn as "holding above". It outranks the mirror and pose-detail rules below, which concern which side or how a limb is angled, never which action is performed.
   - Verify each entry: the object is at that exact location relative to the character. "In pocket" must be a tiny silhouette in the pocket, not a held plush. "Climbing rope" must show hands gripping the rope. "Standing on stairs" must show feet on the step.
   - Categories that count as wrong: held-vs-pocket, on-head-vs-in-hand, gripping-vs-near, on-shoulder-vs-in-hand. These are PHYSICAL-CONTACT placements — flag as `action_interaction` — **[CRITICAL]**. A character-to-character interaction whose `where` is only a FACING or ORIENTATION ("faces X", "turns toward X", "across from X in disagreement") — no physical contact — that isn't staged is at most **[MODERATE]** when both characters are present and the scene's emotion reads; image models cannot reliably stage mutual facing among three or more figures, so never treat it as the wrong main action.
   - Pose details from the scene prose that are NOT in DECLARED INTERACTIONS (e.g. "hands drawn in tight", "fingers curled", "chin tucked", a hand at the side vs raised, an arm relaxed vs reaching, a hand resting near the face/glasses) are descriptive only — do NOT flag. Only a physical-contact placement listed in DECLARED INTERACTIONS counts; a resting hand or arm position never does.
   - Extra background figures are scene-appropriate — do NOT flag — whenever the EXPECTED CAST block's `SETTING POPULATION` line reads `crowd`, `ambient`, `sparse`, `wildlife` or `creature_crowd` (the last two for unnamed animals and creatures, never for people), or the hint itself describes a populated setting (crowd, vendors, villagers, marketgoers, a public square, a park, a quay). On `ambient` this holds however many distant figures there are; only a figure at the cast's own scale could be a fault.
+- **A figure the frame cuts off, or the brief stages over the shoulder,** shows only part of the body: no lower body is in the picture to judge. A declared contact or placement below the visible part (feet on a step, a hand at the hip, a pocket, a knee on the ground) is never a finding, and neither is the lower body being absent. Judge such a figure on the part the frame shows.
+- **A page with no characters** (EXPECTED CAST names no person): the event the brief's `sceneIntent` names is the main action. The picture not showing that event happening is **[MAJOR]** `action_interaction`, however well the place is drawn.
 - **Action physics & direction toward a NAMED target** (emit `type: action_interaction`). Only when the SCENE_HINT/IMAGE_PROMPT names the action AND its target/consequence, and the render clearly contradicts it:
   - *Physics of the action:* a rope / leash / line / reins shown SLACK or bent while the beat is actively pulling / towing / tugging / hauling (a line under tension reads taut and straight); a "lifting/carrying" pose with the load still resting on the ground; a "leaning on X" figure not in contact with X. — **[MAJOR]**
   - *Aim / pointing toward a named target:* the beat has a character aiming / pointing / reaching / drawing a bow / holding out something AT a specific named thing, and the figure is clearly oriented AWAY from that named target or aimed at empty space. — **[MAJOR]**
@@ -88,6 +92,8 @@ Tag every `fixable_issues[]` entry with a severity — the pipeline computes the
 - Declared interaction missing or in a genuinely different category (e.g. object in pocket drawn as large held plush, on-head drawn in-hand): CRITICAL. Any left/right mirror (arm, hand, foot, shoulder, pocket, or compound body-part swap) is equivalent and does NOT deduct — treat the interaction as matched. Pose details in the scene prose that are NOT in DECLARED INTERACTIONS do NOT deduct.
 - Wrong setting/location: MAJOR
 - Wrong main action: MAJOR
+- A page with no characters whose `sceneIntent` event is not happening in the picture: MAJOR
+- An essential declared interaction whose verb is visibly not the one drawn (wrapped around vs held in front): at least MAJOR
 - Missing key object: MAJOR
 - A named object the scene has one of, rendered twice or more: MAJOR
 

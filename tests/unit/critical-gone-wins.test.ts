@@ -23,10 +23,29 @@ const lettering = (items: any[]) => ({ letteringInventory: { items, declared: []
 
 describe('critical-gone wins — pickBestVersionIndex', () => {
   it('p18 shape: the inpaint that removed the caption wins over the higher-scoring original', () => {
+    // The MAJORs the re-evaluation filed are judge noise on unchanged pixels: the paired re-judge
+    // (2026-10-07) tags them alsoInParent, and a shared finding is not something the repair added.
+    const shared = (f: any) => ({ ...f, alsoInParent: true });
     const v0 = version('original', 75, [finding('rendered_text', 'critical')], lettering([CAPTION]));
-    const v1 = version('inpaint-round-1', 33, [finding('clothing', 'major', 'A'), finding('scale', 'major', 'B')], lettering([]));
+    const v1 = version('inpaint-round-1', 33, [shared(finding('clothing', 'major', 'A')), shared(finding('scale', 'major', 'B'))], lettering([]));
     expect(pickBestVersionIndex([v0, v1], { tieBreak: 'earliest' })).toBe(1);
     expect(pickBestVersionIndex([v0, v1], { tieBreak: 'latest' })).toBe(1);
+  });
+
+  it('B5 (2026-10-07): a repair that clears a CRITICAL but adds a NEW MAJOR does not dominate; the score decides', () => {
+    const v0 = version('original', 75, [finding('rendered_text', 'critical')], lettering([CAPTION]));
+    const v1 = version('inpaint-round-1', 33, [finding('clothing', 'major', 'A'), finding('scale', 'major', 'B')], lettering([]));
+    expect(dominatesByCritical(v1, v0)).toBe(false);
+    expect(pickBestVersionIndex([v0, v1], { tieBreak: 'earliest' })).toBe(0);
+  });
+
+  it('B2 (2026-10-07): a reader-only finding charged to the audited version does not decide the pick', () => {
+    const reader = { ...finding('object_presence', 'major', 'X'), sources: ['reader'] };
+    const v0 = version('original', 55, [reader]);          // audited: pays 15 for the reader line
+    const v1 = version('inpaint-round-1', 60, []);          // painted later, never audited
+    expect(pickBestVersionIndex([v0, v1], { tieBreak: 'earliest' })).toBe(0);   // 55 + 15 = 70 > 60
+    const mixed = { ...reader, sources: ['semantic', 'reader'] };
+    expect(pickBestVersionIndex([version('original', 55, [mixed]), v1], { tieBreak: 'earliest' })).toBe(1);
   });
 
   it('a lettering CRITICAL is not confirmed gone without the child\'s lettering record', () => {

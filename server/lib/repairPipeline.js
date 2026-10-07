@@ -2780,6 +2780,17 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       }));
       const freshEntityCheckData = buildEntityCheckData(repairedEntries);
       const roundEvalInputs = buildEvalInputs(roundSuccess);
+      // PAIRED RE-JUDGE (A2): each repaired version is judged beside the version it was repaired
+      // from, with that version's findings. Happy-path pages never reach this loop.
+      {
+        const { parentFindingsForCompare } = require('./scoring');
+        for (const input of roundEvalInputs) {
+          const parent = roundParent.get(input.pageNumber);
+          if (parent && typeof parent.imageData === 'string' && parent.imageData.length > 0) {
+            input.parentCompare = { imageData: parent.imageData, findings: parentFindingsForCompare(parent) };
+          }
+        }
+      }
 
       const evalProgressPct = progressBase + 6;
       await updateProgress(evalProgressPct, `Round ${round}: Evaluating + entity check ${roundSuccess.length} repaired images...`);
@@ -2951,6 +2962,15 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             charRepairGrokRaw: repairResult.charRepairGrokRaw || null,
             charRepairBlendMask: repairResult.charRepairBlendMask || null,
             charRepairWhiteout: repairResult.charRepairWhiteout || null,
+            // THE PLAN THIS REPAIR EXECUTED, frozen at creation (B1, 2026-10-07).
+            // `consolidatedPlan` above is the plan of THIS version's own evaluation, and a later
+            // book-audit re-consolidation (rescoreWithReaderFindings) overwrites it, so nothing
+            // stored said what the round actually asked for. The inpaint result carries the plan it
+            // re-derived; every other method ran from the round's page evaluation.
+            repairPlan: (() => {
+              const plan = repairResult.consolidatedPlan || roundEvalPages[ev.pageNumber]?.consolidatedPlan || null;
+              return plan ? JSON.parse(JSON.stringify(plan)) : null;
+            })(),
           };
           // Canonical stamp AT CREATION (single scale): the same applyScore
           // math the persist path uses, so Step-3 selectBestVersion and
@@ -2973,6 +2993,15 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             consolidatedPlan: roundConsolidated.get(ev.pageNumber) || null,
             requireConsolidation: true, // failed consolidation = not evaluated (D3)
           });
+          // A finding the paired judge saw in the parent too is charged to the parent as well, so it
+          // cannot decide which of the two ships (A2).
+          {
+            const { chargeSharedFindingsToParent } = require('./scoring');
+            const parentVersion = roundParent.get(ev.pageNumber);
+            if (parentVersion) chargeSharedFindingsToParent(newVersion, parentVersion);
+            // The judge's per-finding answer travels with the version it described.
+            newVersion.parentFindings = ev.semanticResult?.parentFindings || null;
+          }
           versions.push(newVersion);
         }
       }
@@ -3805,6 +3834,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       // Eval-time consolidation: deduped issue list that fed the math score
       // (dev panel shows the dedupe) + which issue set was scored.
       consolidatedPlan: v.consolidatedPlan || null,
+      // The plan the repair that made this version executed (see newVersion in the round loop).
+      repairPlan: v.repairPlan || null,
+      // Paired re-judge answer per parent finding ({id, status}); null when unpaired.
+      parentFindings: v.parentFindings || null,
       scoreSource: v.scoreSource || null,
       evalScore: v.evalScore ?? null,
       // Eval↔bytes fingerprint (applyScore stamp). Without this whitelist line

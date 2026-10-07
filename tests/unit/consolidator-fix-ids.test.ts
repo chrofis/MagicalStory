@@ -71,7 +71,7 @@ describe('checkFixesRestOnKeptFindings', () => {
     const plan: any = {
       scene_fix: sceneFix(),
       per_character_fixes: [],
-      dropped_issues: [{ reason: 'profile_says_trait_is_correct', ids: ['S2'] }],
+      dropped_issues: [{ reason: 'finding_contradicts_brief', ids: ['S2'] }],
       deduped_issues: [{ description: 'd', severity: 'CRITICAL', ids: ['S1'] }],
     };
     expect(FC.checkFixesRestOnKeptFindings(plan, index(), 17)).toEqual([]);
@@ -84,7 +84,7 @@ describe('checkFixesRestOnKeptFindings', () => {
         { characterName: 'A', severity: 'MAJOR', ids: ['S9'], fix_instruction: 'Turn the head left.' },
         { characterName: 'B', severity: 'MAJOR', ids: ['S2'], fix_instruction: 'Open the eyes wide.' },
       ],
-      dropped_issues: [{ reason: 'profile_says_trait_is_correct', ids: ['S2'] }],
+      dropped_issues: [{ reason: 'finding_contradicts_brief', ids: ['S2'] }],
       deduped_issues: [{ description: 'd', severity: 'CRITICAL', ids: ['S1'] }],
     };
     const errors = FC.checkFixesRestOnKeptFindings(plan, index(), 3);

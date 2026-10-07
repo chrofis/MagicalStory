@@ -1021,6 +1021,10 @@ function extractSceneMetadata(sceneDescription) {
       objects: objectIds,
       interactions: interactions.length > 0 ? interactions : null,
       wornItems,
+      // Top level like sceneIntent: collectSceneObjectFigureNames reads
+      // `sceneMetadata.creatures`, and the rows used to live only in fullData, so on a real
+      // prose brief the roster never saw the creature (bugs.json, 2026-10-07).
+      creatures: parseCreatures(metadata.creatures),
       // fullData carries the metadata fields downstream consumers expect.
       // shot / setting / time / weather are added explicitly because the
       // empty-scene SHOT prefix in server.js reads `fullData.shot` and was
@@ -1207,6 +1211,7 @@ function extractSceneMetadata(sceneDescription) {
       objects: objectIds,
       interactions: interactionsJson.length > 0 ? interactionsJson : null,
       wornItems: wornItemsJson,
+      creatures: parsedData.creatures,  // top level, as in the prose branch
       // Store full parsed data for buildTextFromJson
       fullData: parsedData,
       thinking: parsed.thinking || null,

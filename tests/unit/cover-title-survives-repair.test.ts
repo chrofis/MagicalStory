@@ -87,8 +87,9 @@ describe('a version that lost the title cannot beat the one that has it', () => 
     letteringInventory: { items: [{ text: TITLE, surface: 'wooden sign attached to wall', position: 'left-midground', spelling: 'correct', placement: 'fits' }], declared: [TITLE] },
   });
 
-  it('regression: with the title finding left MAJOR, critical-gone-wins ships the titleless v1', () => {
-    expect(pickBestVersionIndex([v0, v1('MAJOR')])).toBe(1);
+  it('with the title finding left MAJOR, the new MAJOR keeps v1 from dominating and the score keeps the titled v0', () => {
+    // Before 2026-10-07 (B5) critical-gone-wins shipped the titleless v1 here.
+    expect(pickBestVersionIndex([v0, v1('MAJOR')])).toBe(0);
   });
 
   it('with the title finding CRITICAL, v0 (the version with the title) wins', () => {

@@ -395,6 +395,8 @@ function normalizeIssues(rawIssues, source) {
       // billed 2 for the same finding. Quality/semantic/compliance issues
       // carry no subType, so this is entity-only in practice.
       ...(it.subType ? { subType: it.subType } : {}),
+      // The paired re-judge (A2) saw this defect in the repair's parent picture too.
+      ...(it.alsoInParent === true ? { alsoInParent: true } : {}),
       name: it.character || it.name || it.element || null,
       source,
       // Consolidator deduped issues carry the evaluator names that flagged
@@ -858,6 +860,96 @@ function computeFinalScore(version) {
   return fallback - (Number(version.entityPenalty) || 0);
 }
 
+// ── READER FINDINGS DO NOT DECIDE WHICH VERSION SHIPS (owner, 2026-10-07) ──
+// The book audit reads the shipping version of each page and its findings are charged to THAT
+// version only (repairPipeline.rescoreWithReaderFindings); a version painted afterwards is never
+// audited, so it carries none. Ranking on the charged score therefore rewards the unaudited
+// version for not having been read. Measured over the stored 39-story corpus: showcase p10,
+// fcmlfa8kn p5, o8ynpdjw6 p1, 9n47zi342 p10 shipped the lower picture for this reason alone.
+// The findings still feed the repair plan and the stored finalScore (repair triggers read it); the
+// SELECTION view below leaves out the consolidated entries whose only source is the reader.
+function isReaderOnly(d) {
+  return Array.isArray(d?.sources) && d.sources.length > 0 && d.sources.every(x => x === 'reader');
+}
+
+/** The version's deductions as version selection sees them: reader-only entries removed. */
+function selectionDeductions(version) {
+  const d = version?.deductions;
+  if (!d || typeof d !== 'object') return d || null;
+  if (!Array.isArray(d.consolidated) || !d.consolidated.some(isReaderOnly)) return d;
+  return { ...d, consolidated: d.consolidated.filter(x => !isReaderOnly(x)) };
+}
+
+/** finalScore with the reader-only charges given back; equals computeFinalScore when there are none. */
+function selectionScore(version) {
+  const s = computeFinalScore(version);
+  if (s == null) return null;
+  const sel = selectionDeductions(version);
+  if (sel === version.deductions) return s;
+  return s + sumDeductionPoints(version.deductions) - sumDeductionPoints(sel);
+}
+
+// ── PAIRED RE-JUDGE (A2, owner 2026-10-07) ──────────────────────────────────
+// A repaired version is judged beside its parent. A finding the judge says is ALSO in the parent
+// is the same defect, not something the repair did; it is charged to both versions so it cannot
+// decide which one ships, and the dominance rule ignores it (severeFindings).
+
+/**
+ * The parent version's scored findings as the paired judge is shown them: [{id, severity, type,
+ * character, description}] in a stable order, MODERATE and above, at most 12. Empty when the
+ * version carries no `deductions` record.
+ */
+function parentFindingsForCompare(version) {
+  const d = version?.deductions;
+  if (!d || typeof d !== 'object') return [];
+  const rows = [];
+  for (const bucket of ['consolidated', 'quality', 'semantic', 'compliance', 'entity']) {
+    for (const f of (Array.isArray(d[bucket]) ? d[bucket] : [])) {
+      if (!f || deductionPoints(f, { entity: bucket === 'entity' }) < SEVERITY_POINTS.moderate) continue;
+      rows.push({ severity: String(f.severity || '').toUpperCase(), type: f.subType || f.type || null, character: f.name || null, description: f.description || '' });
+    }
+  }
+  rows.sort((a, b) => (SEVERITY_POINTS[String(b.severity).toLowerCase()] || 0) - (SEVERITY_POINTS[String(a.severity).toLowerCase()] || 0));
+  return rows.slice(0, 12).map((r, i) => ({ id: `P${i + 1}`, ...r }));
+}
+
+/**
+ * Charge every finding the child shares with its parent (`alsoInParent`) to the parent too, when
+ * the parent's own judging missed it: same class (deductionClassKey) at no lower a charge. Both
+ * versions then pay the same for it. Mutates the parent's deductions and score; returns the
+ * number of findings added.
+ */
+function chargeSharedFindingsToParent(child, parent) {
+  const cd = child?.deductions;
+  const pd = parent?.deductions;
+  if (!cd || !pd || typeof parent.finalScore !== 'number') return 0;
+  const parentPoints = new Map();
+  for (const bucket of ['consolidated', 'quality', 'semantic', 'compliance', 'entity']) {
+    for (const f of (Array.isArray(pd[bucket]) ? pd[bucket] : [])) {
+      const k = deductionClassKey(f);
+      parentPoints.set(k, Math.max(parentPoints.get(k) ?? 0, deductionPoints(f, { entity: bucket === 'entity' })));
+    }
+  }
+  let added = 0;
+  for (const f of (Array.isArray(cd.consolidated) ? cd.consolidated : [])) {
+    if (f?.alsoInParent !== true) continue;
+    const p = deductionPoints(f);
+    const k = deductionClassKey(f);
+    if ((parentPoints.get(k) ?? 0) >= p) continue;
+    if (!Array.isArray(pd.consolidated)) pd.consolidated = [];
+    pd.consolidated.push({ ...f, alsoInParent: undefined, chargedFromChild: true });
+    parentPoints.set(k, p);
+    added++;
+  }
+  if (added > 0) {
+    const before = parent.finalScore;
+    parent.finalScore = computeMathFinalScore(pd);
+    if (typeof parent.evalScore === 'number') parent.evalScore += parent.finalScore - before;
+    log.info(`[SCORE] ${added} finding(s) shared with the repair child charged to the parent too — finalScore ${before} → ${parent.finalScore}`);
+  }
+  return added;
+}
+
 // Canonical severity → weight for the un-clamped ranking tiebreak below.
 // DELIBERATELY different calibration from SEVERITY_POINTS (the score) —
 // see the three-tables note above SEVERITY_POINTS before changing either.
@@ -1006,7 +1098,7 @@ function criticalClassKey(d) {
  * @returns {Set<string>|null}
  */
 function chargedCriticalKeys(version) {
-  const d = version?.deductions;
+  const d = selectionDeductions(version);
   if (!d || typeof d !== 'object') return null;
   const keys = new Set();
   for (const [bucket, list] of Object.entries(d)) {
@@ -1039,8 +1131,38 @@ function criticalConfirmedGone(version, key, keys = chargedCriticalKeys(version)
 }
 
 /**
+ * The CRITICAL/MAJOR-charged findings of a version as { subject, id }: `subject` is the
+ * finding's own `name` (the character the judge filed it on), `id` its declared type plus
+ * subject. A finding the paired re-judge tagged `alsoInParent` (A2) is the parent's defect
+ * too and is left out. Null when the version has no `deductions` record.
+ */
+function severeFindings(version) {
+  const d = selectionDeductions(version);
+  if (!d || typeof d !== 'object') return null;
+  const out = [];
+  for (const [bucket, list] of Object.entries(d)) {
+    if (!Array.isArray(list)) continue;
+    for (const f of list) {
+      if (!f || f.alsoInParent) continue;
+      if (deductionPoints(f, { entity: bucket === 'entity' }) < SEVERITY_POINTS.major) continue;
+      const subject = String(f.name || '').trim().toLowerCase();
+      out.push({ subject, id: `${String(f.subType || f.type || '').toLowerCase()}|${subject}` });
+    }
+  }
+  return out;
+}
+
+/**
  * Does version `a` dominate version `b` under critical-gone-wins? See the
  * block comment above for the rule and its ties.
+ *
+ * A version only wins by clearing a CRITICAL if it adds no new CRITICAL/MAJOR (owner,
+ * 2026-10-07; staging job_1791315635053_t0t8qpebu p14 and 50osg2osm p7/p10/front cover: the
+ * cleared CRITICAL came back as a MAJOR on the same figure, or the repair filed new MAJORs
+ * elsewhere, and the lower picture shipped). "New" = a CRITICAL/MAJOR whose declared type and
+ * `name` the other version does not carry at CRITICAL/MAJOR; compared structurally, never on
+ * prose, and a finding tagged `alsoInParent` (A2) is not new. Such a pair is decided by the
+ * score, as before the rule existed.
  */
 function dominatesByCritical(a, b) {
   const ka = chargedCriticalKeys(a);
@@ -1053,7 +1175,10 @@ function dominatesByCritical(a, b) {
     if (!criticalConfirmedGone(a, k, ka)) return false;
     cleared = true;
   }
-  return cleared;
+  if (!cleared) return false;
+  const bIds = new Set((severeFindings(b) || []).map(f => f.id));
+  if ((severeFindings(a) || []).some(f => !bIds.has(f.id))) return false;
+  return true;
 }
 
 /**
@@ -1074,7 +1199,7 @@ function pickBestVersionIndex(versions, { tieBreak = 'latest' } = {}) {
   if (!Array.isArray(versions) || versions.length === 0) return -1;
   const scored = [];
   for (let i = 0; i < versions.length; i++) {
-    const s = computeFinalScore(versions[i]);
+    const s = selectionScore(versions[i]);
     // An unscored version used to be SKIPPED silently, which meant a repair
     // did not have to WIN — it won by walkover, because the thing it replaced
     // had no number to lose with. That is how a page shipped a repair scoring
@@ -1456,6 +1581,9 @@ module.exports = {
   chargedCriticalKeys,
   criticalConfirmedGone,
   dominatesByCritical,
+  selectionScore,
+  parentFindingsForCompare,
+  chargeSharedFindingsToParent,
   recomputeActiveVersion,
   recomputeAllActiveVersions,
   shouldRedo,
