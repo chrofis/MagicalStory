@@ -16,6 +16,7 @@ require('dotenv').config();
 const os = require('os');
 const path = require('path');
 const { buildCostReport } = require('../../server/lib/railwayCost');
+const { ch } = require('../lib/chTime');
 
 const PROJECT_ID = process.env.RAILWAY_PROJECT_ID || '5da5a1d8-bac8-4881-9469-84330d81a880';
 
@@ -41,7 +42,10 @@ function arrow(cur, prev) {
 function print(report) {
   const { current, previous, days } = report;
   console.log(`\nRailway cost — ${report.projectName} — last ${days} days`);
-  console.log(`${current.startISO.slice(0, 10)} → ${current.endISO.slice(0, 10)}\n`);
+  // The window ends "now" and is shown as Swiss calendar days (CLAUDE.md
+  // timezone rule). Slicing the ISO string gave the UTC day: run after midnight
+  // CH and the end date read as yesterday.
+  console.log(`${ch(current.startISO).slice(0, 10)} → ${ch(current.endISO).slice(0, 10)} CH\n`);
 
   const w = [26, 11, 10, 9, 9, 9, 10];
   console.log(
@@ -149,7 +153,11 @@ async function main() {
   }
 }
 
-main().catch((e) => {
-  console.error(e.message);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((e) => {
+    console.error(e.message);
+    process.exit(1);
+  });
+}
+
+module.exports = { print };
