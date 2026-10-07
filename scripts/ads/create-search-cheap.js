@@ -71,6 +71,14 @@ const GIRLS = {
 };
 
 const AGE_GROUPS = [
+  // Alter-2 added 2026-10-05 (owner). No /geschenk/geschenk-2-jahre page exists (it serves the SPA shell, generic title), so it lands on
+  // /geschenk/fuer-kinder like Alter-9-10 rather than on the "3-Jährige" page. Keywords: Keyword Planner CH/DE 2026-10-05, raw rows in
+  // tasks/ads-keywords-2026-10-05/age2.json; the girls' ones (tochter / 'eine') are planner rows too, not a pattern. Dropped: Easter, toys (kugelbahn), "beziehung".
+  { name: 'Alter-2', lp: '/geschenk/fuer-kinder', path: ['Geschenk', '2-Jahre'], copy: ageCopy('2-Jährige', '2 Jahre'),
+    keywords: ['geschenke für 2 jährige jungs', 'geschenke 2 jährige jungs', 'geschenke für 2 jährige', 'geschenk 2 jährige', 'geschenk für eine 2 jährige',
+      'geschenke zum 2 geburtstag', 'geschenke jungs 2 jahre', 'sinnvolle geschenke für 2 jährige', 'geburtstagsgeschenk 2 jahre', 'geburtstagsgeschenk für 2 jährige',
+      'geschenke für zweijährige', 'geschenkideen 2 jährige', 'geschenke ab 2 jahre', 'weihnachtsgeschenk 2 jährige', 'personalisierte geschenke für 2 jährige',
+      'geschenk für 2 jährige tochter', 'geschenk tochter 2 jahre'] },
   { name: 'Alter-3', lp: '/geschenk/geschenk-3-jahre', path: ['Geschenk', '3-Jahre'], copy: ageCopy('3-Jährige', '3 Jahre'),
     keywords: ['geschenke 3 jährige jungs', 'geschenk 3 jährig', 'geschenke für 3 jährige', 'geschenke für jungs 3 jahre', 'geschenk 3 jahre',
       'geschenke 3 jährige', 'geschenke zum 3 geburtstag', 'geburtstagsgeschenk 3 jährige', 'geburtstagsgeschenk 3 jahre', 'weihnachtsgeschenk 3 jährige',

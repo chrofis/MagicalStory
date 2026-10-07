@@ -969,3 +969,9 @@ Launch a paid run only on an explicit start word ("go", "start it", "run it") gi
 
 ## 2026-10-05 - A fixed defect came back twice because nothing pinned it
 The no-nudity guard (30e105463) and "a tail has no feet" (2ea328b04) were both fixed in prompts, with no test, and a later reviewer rewrite plus an unmatched judge silently undid them (mermaid showcase job_1791222889407_ypl33vk8u). **Rule:** every owner-visible fix ships with a behaviour test that fails if it disappears, and a fix to a generator rule is not done until the judge that scores the same thing is checked for the opposite demand (the body-row judge still required feet).
+
+## 2026-10-05 — "Needs a migration" was a guess, not a count
+A fix agent parked the French label rewording as "needs a data migration first"; the owner asked why.
+One read-only count: 0 stored relationship labels in prod (rename was free), 83 trait strings (a
+French-only alias map in TraitSelector covered them). **Rule:** before calling a stored-text change
+blocked, count the stored rows; 0 → change it, some → alias map at the read site, migration last.

@@ -1044,9 +1044,28 @@ function runPlanCounters({ pages = [], commissionedNames = [], listedNames = nul
     .map(n => String(n || '').trim().toLowerCase()).filter(Boolean));
   const listed = cast.commissioned.filter(n => listedLower.has(n.toLowerCase()));
   const coverageRule = castCoverage({ pageCount, castCount: listed.length });
+  // A PAGE LEADS WITH ONE CHARACTER (castCoverage.LEAD_RULE, owner 2026-10-06).
+  // When the book owes every figure a lead page, presence on a page of at most
+  // two is not enough: a small page that stages ANOTHER listed character's own
+  // action (the check's Q12 ACTION line) is that character's lead page, not
+  // the companion's. A page no listed character owns stays open to whoever is
+  // in frame on it.
+  const ownerOfPage = new Map();
+  if (coverageRule && coverageRule.leadEach) {
+    for (const a of (Array.isArray(actions) ? actions : [])) {
+      if (!a || a.page == null) continue;
+      const who = namesIn(String(a.key || ''), listed, cast.aliases)[0];
+      if (!who) continue;
+      ownerOfPage.set(Number(a.page), [...(ownerOfPage.get(Number(a.page)) || []), who]);
+    }
+  }
+  const leadPagesOf = (name) => focalOf(name).filter((n) => {
+    const owners = ownerOfPage.get(Number(n));
+    return !owners || owners.includes(name);
+  });
   const focal = {};
   for (const name of listed) {
-    focal[name] = focalOf(name);
+    focal[name] = leadPagesOf(name);
     if (coverageRule && coverageRule.focalEach && focal[name].length === 0) {
       add('NO_FOCAL_PAGE', [], `${name} never has a focal page — never in frame with at most one companion, never the subject of a close-up. ${noFocalFix(name)}`);
     }
@@ -1094,7 +1113,7 @@ function runPlanCounters({ pages = [], commissionedNames = [], listedNames = nul
   //     frame on, and the last page's cast (castCoverage.parsePlanCastBlock).
   //     Each plan line that breaks a promise is a finding naming the page.
   const castTableResult = castTable ? castTablePromises({ rows, castTable, actions, cast, focalEach: !!(coverageRule && coverageRule.focalEach), leadEach: !!(coverageRule && coverageRule.leadEach) }) : null;
-  if (castTableResult) for (const b of castTableResult.broken) add('CAST_PROMISE_BROKEN', [b.page], b.detail);
+  if (castTableResult) for (const b of castTableResult.broken) add(b.promise === 'focal' ? 'CAST_PROMISE_FOCAL_BROKEN' : 'CAST_PROMISE_BROKEN', [b.page], b.detail);
 
   // 8b. THE CENTRAL FIGURE IN EACH THIRD (owner, 2026-09-24, d4). The arc's
   //     critique used to certify "the central figure acts in every third"
@@ -1193,6 +1212,12 @@ function castTablePromises({ rows, castTable, actions, cast, focalEach, leadEach
     .map(a => canon(String(a.key || '')) || String(a.key || '').trim())
     .filter(n => n && n !== except);
   const firstClaim = new Map();
+  const leadWins = [];
+  const deedOwner = new Map();
+  for (const entry of castTable.characters || []) {
+    const n = canon(entry.name);
+    if (n && !deedOwner.has(Number(entry.deedPage))) deedOwner.set(Number(entry.deedPage), n);
+  }
   for (const entry of castTable.characters || []) {
     const name = canon(entry.name);
     if (!name) { unanswered.push(entry.name); continue; }
@@ -1219,6 +1244,11 @@ function castTablePromises({ rows, castTable, actions, cast, focalEach, leadEach
       kept++;
     }
     for (const p of entry.alsoOn || []) {
+      // A page another character leads is not an "also on" promise (the lead
+      // rule wins, like a deed page the table gave to two): the table is not
+      // rewritten by a re-plan, so a plan page could not answer both, and
+      // job_1791315635053_t0t8qpebu's Sarah p13 held four figures to keep it.
+      if (leadEach && deedOwner.has(Number(p)) && deedOwner.get(Number(p)) !== name) { leadWins.push({ page: Number(p), name, lead: deedOwner.get(Number(p)) }); continue; }
       const r = byPage.get(Number(p));
       if (r && r.present.includes(name)) { kept++; continue; }
       broken.push({
@@ -1240,7 +1270,7 @@ function castTablePromises({ rows, castTable, actions, cast, focalEach, leadEach
       kept++;
     }
   }
-  return { broken, kept, unanswered, sharedLead };
+  return { broken, kept, unanswered, sharedLead, leadWins };
 }
 
 /** The who-in-frame column of a plan line; the whole line when it has no segments. */
@@ -1399,6 +1429,11 @@ const REPLAN_FINDING_DIRECTION = new Map([
   // A plan line that breaks the CAST block's promise is answered by casting the
   // promised character in (2026-09-25).
   ['CAST_PROMISE_BROKEN', 'more'],
+  // The deed page holds more figures than "alone or with one companion": only a
+  // removal answers it. Filed under CAST_PROMISE_BROKEN until 2026-10-07 it read
+  // 'more', and the review refused every `cast out` that was the one right
+  // answer (job_1791315635053_t0t8qpebu: Berta p5 twice, Emma p3).
+  ['CAST_PROMISE_FOCAL_BROKEN', 'fewer'],
   ['CAST_OVER_CEILING', 'fewer'],
   // More pages hold a group than the book's budget: answered by casting out.
   ['GROUP_PAGES_OVER_BUDGET', 'fewer'],
@@ -1409,6 +1444,20 @@ const REPLAN_FINDING_DIRECTION = new Map([
   ['CHECK:3', 'fewer'],   // three or more named characters in frame
   ['CHECK:11', 'more'],   // the page's obstacle-holder is not named
 ]);
+
+/**
+ * Plan-check questions whose finding is a CONTRADICTION of a fact the arc
+ * states (Q18, the story logic). Q18 stays a noted finding for the mandate
+ * (REPLAN_MUST_FIX_CHECKS is unchanged: the re-plan is not obliged to spend a
+ * round on it), but the `protected` rule may not block its answer: a protected
+ * page that contradicts the story's own fact is the wrong picture, and
+ * protection exists to stop a noted LINE-QUALITY finding deleting a picture the
+ * book must keep, not to freeze a falsehood. job_1791315635053_t0t8qpebu: the
+ * only correct fix of "page 5 breaks the fact that Berta cannot slide into the
+ * sea" was refused because page 5 is Noah's ACTION page.
+ */
+const ARC_FACT_CHECKS = new Set([18]);
+const breaksArcFact = tag => !!(tag && tag.check != null && ARC_FACT_CHECKS.has(Number(tag.check)));
 
 /** The direction of the finding a change declares it answers; null when unknown. */
 function replanChangeDirection(tag) {
@@ -1547,7 +1596,7 @@ function reviewPlanChanges({ changes = [], standing = [], returned = [], castNam
     if (!c.answers) notes.push(`p${page}: "${String(c.line || '').slice(0, 120)}" names no finding tag`);
 
     // A page the re-plan was told stays changes only for a must-fix finding.
-    if (isProtected(page) && !isMust(c.answers)) {
+    if (isProtected(page) && !isMust(c.answers) && !breaksArcFact(c.answers)) {
       refuse(page, 'protected', `${protectedPages.get(page)} stays, and ${c.answersText || 'an untagged change'} is a noted finding, not a must-fix one`, c.line);
       continue;
     }

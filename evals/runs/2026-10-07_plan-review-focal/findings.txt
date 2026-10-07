@@ -1,0 +1,33 @@
+PLAN[PLAN_INSTANT_TOO_LONG] page 1, 2, 6, 8, 10: the instant runs 23 words on page 1, 21 words on page 2, 23 words on page 6, 23 words on page 8, 24 words on page 10, past the 20 words an instant may take — keep the one action and move the rest to what is true after, or to a page of its own
+PLAN[PEOPLELESS_ON_INTERACTION_PAGE] page 11: 1 page(s) put no one in frame while the plan line stages a moment between people — a people-free page belongs on drama that is a place, weather, a vessel or an object seen from afar, never on a parting, a confrontation or a moment of feeling between characters
+PLAN[NO_FOCAL_PAGE]: Daniel never has a focal page — never in frame with at most one companion, never the subject of a close-up. Answer it with a page whose instant is Daniel's own action, Daniel alone or with one companion: move that action onto a page of its own, or out of a shared moment onto a neighbouring page — never by taking another character's only focal page.
+PLAN[NO_FOCAL_PAGE]: Sarah never has a focal page — never in frame with at most one companion, never the subject of a close-up. Answer it with a page whose instant is Sarah's own action, Sarah alone or with one companion: move that action onto a page of its own, or out of a shared moment onto a neighbouring page — never by taking another character's only focal page.
+PLAN[CAST_PROMISE_FOCAL_BROKEN] page 5: the CAST block promises page 5 as Noah's deed page, alone or with one companion, but it holds Emma, Noah, Berta
+PLAN[CAST_PROMISE_BROKEN] page 3: the CAST block promises Daniel page 3 as their deed page, but page 3's instant is not Daniel's own action (no page stages it)
+PLAN[CAST_PROMISE_FOCAL_BROKEN] page 13: the CAST block promises page 13 as Sarah's deed page, alone or with one companion, but it holds Emma, Noah, Daniel, Sarah, Hans, Mira
+PLAN[CENTRAL_FIGURE_ABSENT_THIRD] page 6, 7, 8, 9: the central figure (Berta) is in frame on no page of the middle (pages 6-9); stage it on one of them
+CHECK[1]: Page 12 stages Mira laughing as a strong feeling, but Emma is also in frame, so it is not truly one person's felt moment.
+CHECK[2]: Hans first appears on page 1 without an arrival or visible naming.
+CHECK[2]: Berta first appears on page 1 without an arrival or visible naming.
+CHECK[2]: Emma first appears on page 2 without an arrival or visible naming.
+CHECK[2]: Daniel first appears on page 3 without an arrival or visible naming.
+CHECK[2]: Sarah first appears on page 3 without an arrival or visible naming.
+CHECK[2]: Noah first appears on page 4 without an arrival or visible naming.
+CHECK[2]: Oskar first appears on page 7 without an arrival or visible naming.
+CHECK[2]: Mira first appears on page 12 without an arrival or visible naming.
+CHECK[3]: Page 4 has three characters, but Berta stretches the flipper while Emma and Noah grip it; they do not share one action.
+CHECK[3]: Page 5 has three characters, but Noah, Emma and Berta perform different actions.
+CHECK[3]: Page 13 has six characters, but Sarah and Daniel wrap, Mira sings, and Hans stands while Emma and Noah are merely wrapped.
+CHECK[3]: Page 14 has six characters, but the characters wave, raise a flipper and swim rather than sharing one action.
+CHECK[5]: Page 1's instant includes Berta lying in position and Hans waiting rather than staging only an action.
+CHECK[5]: Page 3 states the blanket as already spread, giving the result of Daniel and Sarah's action rather than staging that action.
+CHECK[5]: Page 9 stages Oskar watching the beam rather than an action being performed.
+CHECK[5]: Page 11 shows the sea-glass already wedged and the dot already dancing, a state after the action.
+CHECK[9]: Page 3's instant states the result of Daniel and Sarah's blanket-spreading action.
+CHECK[9]: Page 5's what-is-true-after states no change beyond what the instant already shows.
+CHECK[9]: Page 6's what-is-true-after states no change beyond what the instant already shows.
+CHECK[9]: Page 9's what-is-true-after states no change beyond the first beam and Oskar's jerking arms already shown in the instant.
+CHECK[10]: Page 1 places the leaves above Hans on the bench and Berta on the sand at three different heights.
+CHECK[15]: Page 1 opens on Hans waiting and Berta lying in position rather than on an action already under way for each character.
+CHECK[17]: Page 14 gathers the whole commissioned cast, but they perform different actions instead of one shared action.
+CHECK[18]: Page 5 breaks the fact that Berta cannot slide into the sea until the rising tide reaches her: it shows Berta swimming her arc before the tide lifts her on page 14.

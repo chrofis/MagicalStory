@@ -1,0 +1,34 @@
+---PAGE PLAN---
+Page 1: SHOT — Hans — Hans pulls his hat down against the blowing leaves on the dune bench — Hans sits waiting on the bench for Mira's answer.
+Page 3: SHOT — Daniel, Sarah — Daniel and Sarah spread the blanket over the sand — The blanket is down and Papa has set the rule to call back at the orange light.
+Page 5: SHOT — Noah, Emma — Noah swims straight across the reef toward the wreck, Emma following — The children are on the short way across the reef and the sun hangs lower.
+Page 9: SHOT — Berta — Berta swims her long arc along the outside of the wreck in the first orange light — Berta is on her arc beyond the wreck and the orange light has reached the reef.
+Page 11: SHOT — nobody — The blue sea-glass sits wedged in a plank hole of the hull, its dot of sunlight dancing on the wall — The sea-glass stays in the hull and its dot keeps dancing.
+Page 13: SHOT — Sarah, Emma — Sarah wraps the blanket around Emma at the surf in the last orange light — Emma is warm in the blanket.
+Page 14: SHOT — Emma, Mira, Hans, Sarah, Daniel, Berta — Emma, Mira, Hans, Sarah and Daniel, seen from behind in the surf, wave after Berta, who raises a flipper swimming away — Berta has swum off, lifted by the rising tide.
+
+---CHANGES---
+Page 1: cast out Berta — CHECK[15] — Berta only lay in position, so Hans's action alone opens the page
+Page 1: action out Berta lying at the water's edge with the letter on her shell — CHECK[15] — a lying figure is no action already under way
+Page 3: cast out Emma — PLAN[NO_FOCAL_PAGE] — Daniel leads the page with one companion, Sarah
+Page 3: action out Emma tilts her blue sea-glass so a dot dances — PLAN[CAST_PROMISE_BROKEN] — the instant is Daniel's own action, spreading the blanket
+Page 3: action in Daniel and Sarah spread the blanket over the sand — PLAN[CAST_PROMISE_BROKEN] — stages the deed the CAST block promises Daniel
+Page 5: cast out Berta — PLAN[CAST_PROMISE_FOCAL_BROKEN] — Noah's focal page holds only one companion, Emma
+Page 5: action out Berta swims her long arc around the wreck — PLAN[CAST_PROMISE_FOCAL_BROKEN] — Noah's swim is the one action
+Page 5: material to page 9 Berta's long arc around the wreck — CHECK[18] — the arc moves to the page where the orange light has risen
+Page 9: material from page 5 Berta's long arc around the wreck — PLAN[CENTRAL_FIGURE_ABSENT_THIRD] — puts Berta in frame in the middle third
+Page 9: cast in Berta — PLAN[CENTRAL_FIGURE_ABSENT_THIRD] — Berta acts in the middle third
+Page 9: cast out Emma — PLAN[CENTRAL_FIGURE_ABSENT_THIRD] — Berta's page holds one figure
+Page 9: cast out Oskar — PLAN[CENTRAL_FIGURE_ABSENT_THIRD] — Berta's page holds one figure
+Page 9: action out Oskar's arms jerk after the first orange beam while Emma watches — CHECK[5] — the page stages one action by Berta
+Page 9: material to page 10 Oskar's arms following the moving light — CHECK[5] — page 10 already stages Oskar chasing the dot
+Page 11: action out Emma has swum out of the hull's far end — PLAN[PEOPLELESS_ON_INTERACTION_PAGE] — the page keeps only the object, the sea-glass and its dot
+Page 11: action out left behind for Oskar's game — PLAN[PEOPLELESS_ON_INTERACTION_PAGE] — drops the between-people moment so the empty page is about an object
+Page 13: cast out Noah — PLAN[CAST_PROMISE_FOCAL_BROKEN] — Sarah's focal page holds one companion, Emma
+Page 13: cast out Daniel — PLAN[CAST_PROMISE_FOCAL_BROKEN] — Sarah's focal page holds one companion, Emma
+Page 13: cast out Hans — PLAN[CAST_PROMISE_FOCAL_BROKEN] — Sarah's focal page holds one companion, Emma
+Page 13: cast out Mira — PLAN[CAST_PROMISE_FOCAL_BROKEN] — Sarah's focal page holds one companion, Emma
+Page 13: action out Mira sings and Hans stands up — PLAN[CAST_PROMISE_FOCAL_BROKEN] — Sarah's wrap is the one action
+Page 13: action to page 14 Mira and Hans in the surf with the family — CHECK[17] — Mira and Hans join the ending page
+Page 14: action in the five seen from behind wave after Berta, who raises a flipper — CHECK[17] — everyone does one shared action, waving
+Changes: 24

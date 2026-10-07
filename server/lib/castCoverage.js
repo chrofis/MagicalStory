@@ -406,7 +406,7 @@ function castTableSpec(cov, pageCount, { replan = false, table = null } = {}) {
   }
   const also = castTableAlsoCount(cov);
   const where = cov.focalEach
-    ? `the page whose instant is their own action from the story, alone or with one companion${cov.leadEach ? `; ${LEAD_RULE} Every line names a different page` : ''}`
+    ? `the page whose instant is their own action from the story, alone or with one companion${cov.leadEach ? `; ${LEAD_RULE} Every line names a different page, and a character's deed page is never another character's "also on" page` : ''}`
     : 'the page whose instant is their own action from the story, which they may share with the group';
   const more = also > 0 ? `, and ${also} more page${also === 1 ? '' : 's'} they are in frame on` : '';
   return `Write the CAST block before the plan lines. One line per commissioned character: ${where}${more}. Then page ${pageCount}, the last: the names of everyone the story keeps together at the end. Every plan line keeps what the block promises.`;

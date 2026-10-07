@@ -111,16 +111,20 @@ On staging (all verified on staging, iPhone/Android screenshots sent to the owne
   StoryWizard + TrialGenerationPage roots — 8e4cca4f2 (645cb5082). Re-measured: /create and /try bars stay.
 
 OPEN (owner):
-- [ ] Owner phone test on staging, then explicit OK for production. Production = cherry-pick ONLY these commits
+- [ ] Owner (2026-10-05): run ANOTHER staging test first, then everything below goes to production EXCEPT the footer. Then explicit OK for production. Production = cherry-pick ONLY these commits
       onto origin/master in a scratch worktree (staging is hundreds of commits ahead; master is far behind in
       trial.js — expect adaptation; re-run tsc + tests/unit/{trial-story-gate,trial-reload-and-art-style,
       trial-intro-phone,navigation-always-sticky,trial-funnel-*}.test.ts on the merged state first).
-- [ ] Decide: ad-visit tracking (site_arrival/site_exit, fbb75e248) with that push or not.
-- [ ] Google Ads OAuth consent screen Testing -> In production, then scripts/ads/authorize.js (token dies every 7 days).
+- [x] Ad-visit tracking (site_arrival/site_exit, fbb75e248) goes WITH the production push (owner 2026-10-05: "the rest goes all to production"). Until then the attribution report shows arrived=0 for paid clicks.
+- [x] Google Ads OAuth: magicalstory-admin-tools re-published + token re-issued 2026-10-05 (decisions.md 8ef99e81e).
 - [ ] After production: resume Search-Deutschschweiz-v1 (activate-week.js ARMS status -> ENABLED, --apply), measure.
-- [ ] Footer tagline still uses "—" (site-wide footer, outside the homepage fix) — owner to decide.
+- [x] Footer tagline "—": owner 2026-10-05 — leave it.
 - [ ] Wilhelm Tell staging run job_1791145238223_50osg2osm findings reported to owner, NOT investigated/fixed
       (another session's verification run): covers initialPage ≈ backCover (logged "not distinct", shipped);
       repairs on dismissed findings (consolidator_fix_unbacked p5, p7); p7 73→55 and p10 60→55 with the
       lower-scoring repair shown (check the picker's critical-gone rule before calling it a bug); outline 31/55 min.
 - Known gap: trial users never set a password (return from another device = "forgot password").
+
+## Ads addendum 2026-10-05/06
+- Added live (owner chose "add keywords only", no bid raise until prod): Alter-2 + 10 life-challenge groups, CHF 0.20, all approved — e7209844a. Cheap campaigns lose ~90% of auctions on rank (0.20 vs ~1.16 first page). Next lever AFTER prod: raise ceiling (set-keyword-bids.js) and resume Deutschschweiz.
+- Local commits not yet on origin/staging: 8ef99e81e (decisions note), e7209844a (ads scripts) — docs/scripts only, push with the next staging push.
