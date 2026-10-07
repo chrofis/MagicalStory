@@ -8,7 +8,7 @@
       "source": "Buying review 2026-10-07. server.js Stripe webhook (referral cashback block): SELECT 1 FROM orders WHERE user_id = $1 AND payment_status = \"paid\" AND stripe_session_id != $2, while server/lib/orders.js hasPaidOrder documents that querying \"paid\" alone matched almost nothing and uses IN (paid, processing, completed, failed). The code comment above the query claims the race window is closed; it was not.",
       "status": "fixed",
       "fixedAt": "2026-10-07",
-      "fixedIn": "280a25e0d",
+      "fixedIn": "cbc73dc0f",
       "fix": "server/lib/orders.js PAID_STATUSES shared by hasPaidOrder and the new hasOtherPaidOrder(client, userId, sessionId); the webhook calls the latter inside its transaction. Test: tests/unit/referral-first-order-recheck.test.ts."
     },
     {
@@ -18,7 +18,7 @@
       "source": "Buying review 2026-10-07. client/src/pages/BookBuilder.tsx handleApplyPromo: setPromoError(result.reason || \"Invalid code\") / \"Failed to validate code\"; server/routes/print.js validateReferralCodeForUser returned English reason strings and no code, unlike every other customer-facing route (apiErrors.ts: code -> localised text).",
       "status": "fixed",
       "fixedAt": "2026-10-07",
-      "fixedIn": "bf556b1bc",
+      "fixedIn": "2a3bc6e57",
       "fix": "validateReferralCodeForUser names each rejection with a stable REFERRAL_* code (REQUIRED, NOT_FOUND, OWN_CODE, ALREADY_USED, FIRST_ORDER_ONLY), POST /api/referral/validate returns it, BookBuilder localises it through localizedApiError (apiErrors.ts rows in en/de/fr/it); a failed validation call is localised too. Test: tests/unit/referral-reason-codes.test.ts (every rejection carries its code; case/whitespace still accepted; every code the route can send is in the table with distinct de/fr/it text)."
     },
     {
@@ -29,7 +29,7 @@
       "rootCause": "Two page counts with the same name: the list count exists for the over-limit check and the display, the billing count lives server-side and was already returned to the builder by POST /api/book-page-info (contentPages) for the blank-page warning, but the quote never read it.",
       "status": "fixed",
       "fixedAt": "2026-10-07",
-      "fixedIn": "130344a23",
+      "fixedIn": "70766a061",
       "fix": "BookBuilder prices on pageInfo.contentPages (the checkout count); the quote is empty until the server has counted the book, and a failed count is reported, not priced. The pure price facts moved to client/src/utils/bookPricing.ts (Pricing.tsx and MyStories import it) so the test can hold them against the server seed and SHIPPING_COST_CHF. Test: tests/unit/book-price-quote.test.ts."
     },
     {
@@ -40,7 +40,7 @@
       "rootCause": "The readers were written against a pre-2025 Checkout Session shape and never updated when stripe-node v20 was pinned (c803569c, 2026-08-23). The Gelato payload also split customer_details.name (the cardholder) into the parcel recipient.",
       "status": "fixed",
       "fixedAt": "2026-10-07",
-      "fixedIn": "c7ad58c04",
+      "fixedIn": "58de6473a",
       "fix": "server/lib/gelato.js shippingFromSession reads collected_information.shipping_details (recipient name + address); resolveBookOrderInputs throws for a paid session without one instead of shipping to the billing address; the webhook, the admin retry and the stuck-order resume all go through it; orders.shipping_name and the Gelato recipient are the shipping-form name. The order-status fallback retrieves the session without the invalid expand. Test: tests/unit/checkout-shipping-address.test.ts (v20 fixture with billing != shipping; the installed SDK types have no top-level shipping field; no reader asks for session.shipping any more)."
     },
     {
