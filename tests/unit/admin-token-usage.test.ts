@@ -5,13 +5,19 @@ import express from 'express';
 
 /**
  * GET /api/admin/token-usage (server/routes/admin/analytics.js), driven over
- * HTTP with the pool stubbed. Defect found 2026-10-07:
+ * HTTP with the pool stubbed. Two defects found 2026-10-07:
  *
- * A story's data.tokenUsage carries an `openrouter` bucket (the reviewers
+ * 1. A story's data.tokenUsage carries an `openrouter` bucket (the reviewers
  *    on four stages, eval/compliance traffic) with tokens AND the charge
  *    OpenRouter reported. The route's provider lists were hand-copied five
  *    times and none had the key, so that spend was $0 in the grand total, the
  *    daily/monthly rows and the per-user rows while the story itself booked it.
+ *
+ * 2. byDay / byMonth were keyed by `toISOString()` — the UTC calendar day. A
+ *    story generated at 00:30 CH sat on the previous day's row (and, at a month
+ *    boundary, in the previous month). The owner reads Swiss days (CLAUDE.md
+ *    timezone rule); stories.created_at is a naive TIMESTAMP node-pg parses as
+ *    server-local, so the key is now fromPgNaive → Europe/Zurich.
  */
 
 const nodeRequire = createRequire(import.meta.url);
@@ -28,6 +34,9 @@ function get(port: number, p: string, token: string): Promise<{ status: number; 
   });
 }
 
+// What node-pg hands the route for a stored naive '2026-09-30 22:30:00' (UTC
+// wall clock): a Date whose LOCAL components are that wall clock, whatever the
+// machine's zone. 22:30 UTC is 00:30 CH on 2026-10-01.
 const PG_NAIVE = new Date(2026, 8, 30, 22, 30, 0);
 
 const textBucket = (n: number) => ({ input_tokens: n, output_tokens: n, thinking_tokens: 0, calls: 1 });
@@ -124,4 +133,10 @@ describe('GET /api/admin/token-usage', () => {
     expect(body.totals.grok.direct_cost).toBeCloseTo(0.02, 6);
   });
 
+  it('buckets days and months by the Swiss calendar day, from the naive pg timestamp', async () => {
+    const { body } = await get(port, '/api/admin/token-usage?days=30', adminTok);
+    // Stored 2026-09-30 22:30 UTC = 2026-10-01 00:30 CH: the owner's "1 October", not "30 September".
+    expect(body.byDay.map((d: any) => d.date)).toEqual(['2026-10-01']);
+    expect(body.byMonth.map((m: any) => m.month)).toEqual(['2026-10']);
+  });
 });

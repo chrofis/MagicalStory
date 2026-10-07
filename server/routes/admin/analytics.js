@@ -12,6 +12,7 @@ const { dbQuery, getPool, isDatabaseMode } = require('../../services/database');
 const { authenticateToken } = require('../../middleware/auth');
 const { log } = require('../../utils/logger');
 const { MODEL_PRICING, MODEL_DEFAULTS, calculateTextCost } = require('../../config/models');
+const { ch, fromPgNaive } = require('../../../scripts/lib/chTime');
 const { getTrialStats, getTrialStatsHistory, getTrialFunnel, getTrialStepFunnel } = require('../trial');
 const { TRIAL_SOURCES } = require('../../lib/trialSource');
 const { sentinelExclusion } = require('../../lib/gdprSentinel');
@@ -309,6 +310,19 @@ function addProviderUsage(target, tokenUsage) {
   }
 }
 
+/**
+ * Swiss calendar day / month a story belongs to. stories.created_at is a naive
+ * TIMESTAMP that node-pg parses as server-local, so it is rehomed first
+ * (CLAUDE.md timezone rule); the old `toISOString().slice(0, 10)` bucketed by
+ * UTC day, which put a story generated at 00:30 CH on the previous day's row.
+ */
+function chDayKey(createdAt) {
+  if (!createdAt) return 'unknown';
+  const d = fromPgNaive(createdAt);
+  if (isNaN(d)) return 'unknown';
+  return ch(d).slice(0, 10);
+}
+
 // GET /api/admin/token-usage - Token usage statistics
 // Query params: days (default 30), limit (default 1000)
 router.get('/token-usage', authenticateToken, requireAdmin, async (req, res) => {
@@ -498,7 +512,7 @@ router.get('/token-usage', authenticateToken, requireAdmin, async (req, res) => 
           addProviderUsage(byStoryType[storyType], tokenUsage);
 
           // Aggregate by month
-          const monthKey = row.created_at ? new Date(row.created_at).toISOString().substring(0, 7) : 'unknown';
+          const monthKey = chDayKey(row.created_at).slice(0, 7);
           if (!byMonth[monthKey]) {
             byMonth[monthKey] = {
               storyCount: 0,
@@ -511,7 +525,7 @@ router.get('/token-usage', authenticateToken, requireAdmin, async (req, res) => 
           addProviderUsage(byMonth[monthKey], tokenUsage);
 
           // Aggregate by day
-          const dayKey = row.created_at ? new Date(row.created_at).toISOString().substring(0, 10) : 'unknown';
+          const dayKey = chDayKey(row.created_at);
           if (!byDay[dayKey]) {
             byDay[dayKey] = {
               storyCount: 0,
