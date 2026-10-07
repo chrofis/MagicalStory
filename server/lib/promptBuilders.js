@@ -10077,7 +10077,8 @@ function jevFieldFills(jevBackup) {
  * first and wave the second away, and it names the artefact that is at fault —
  * the PLAN — so a per-page judge never charges it to a picture.
  *
- * ONE constant, nine templates. Hand-kept copies of a shared rule drifted four
+ * ONE constant, every template that authors or judges a page against its
+ * text. Hand-kept copies of a shared rule drifted four
  * times in one week in this repo (`docs/decisions.md`, "fix the mirror class,
  * not the instance"), and this rule already had three partial copies living on
  * their own: image-semantic.txt's CHARACTER AUTHORITY paragraph (characters
@@ -13472,10 +13473,11 @@ module.exports = {
   // Re-exported from sceneLight.js: the parity tests read every brief-authoring
   // rule off this module.
   SCENE_LIGHT_FIELD_RULE,
-  // ONE rule for the nine templates that author or judge a page against its
-  // text — see TEXT_NOT_A_CHECKLIST_RULE. Exported so the four fill sites that
-  // live outside this file (prompts.js, evalPipeline.js, sceneValidator.js,
-  // bookAudit.js) read the same string, never a copy of it.
+  // ONE rule for every template that authors or judges a page against its
+  // text — see TEXT_NOT_A_CHECKLIST_RULE. Exported so the three fill sites that
+  // live outside this file (evalPipeline.js, sceneValidator.js, bookAudit.js)
+  // read the same string, never a copy of it; prompts.js deliberately does
+  // not fill it (its own comment says why).
   TEXT_NOT_A_CHECKLIST_RULE,
   textNotAChecklistRule,
   ELEMENT_ENTRY_PAGE_RULE,
