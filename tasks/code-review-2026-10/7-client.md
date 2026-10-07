@@ -29,7 +29,8 @@ Where: TrialGenerationPage.tsx:471-474. Any non-ok JSON response sets `pageState
 Failure: the story keeps generating, but the visitor sees "failed" and a "try again" link to /try. Non-JSON 502s from the edge are survived, because `response.json()` throws into the continue-polling catch. JSON 5xx responses are not.
 Fix direction: treat 5xx and 429 as retryable, and stop only on 403/404 or `status:'failed'`.
 
-### W5 Photo-analysis failures are swallowed and the wizard carries on with a half-set-up character
+### [x] W5 Photo-analysis failures are swallowed and the wizard carries on with a half-set-up character
+Fixed 2026-10-05 in `9d24efe71` (F9); the owed decisions.md entry was written 2026-10-07 ("The wizard never adopts a photo whose analysis failed").
 Severity: minor.
 Where: characterService.ts:1063-1066 maps any error to `{success:false, error:'unknown_error'}`. StoryWizard.tsx:2756-2774 then keeps the original photo, clears avatars, and shows no toast.
 Failure: when the analyzer is down (502/503, now a separate Railway service) or the character save fails (avatars.js:1538 returns 500 "Could not save the character. Please try again."), the user sees their photo accepted. They get no face box, no body crop and no server-side save, and the server's message is thrown away. This conflicts with the "fail loudly" rule.
