@@ -22,7 +22,7 @@ const { log } = require('../utils/logger');
 const { getPool, rehydrateStoryImages, logActivity } = require('../services/database');
 
 // Lib modules
-const { generatePrintPdf, generateViewPdf, generateCombinedBookPdf, parseStoryPages } = require('../lib/pdf');
+const { generatePrintPdf, generateViewPdf, generateCombinedBookPdf } = require('../lib/pdf');
 const { processBookOrder, resumeBookOrder, getCoverDimensions, countBookContentPages, computeBookPageInfo } = require('../lib/gelato');
 const { stripDataUriPrefix } = require('../lib/r2');
 const email = require('../../email');
@@ -1150,62 +1150,38 @@ router.post('/generate-book-pdf', authenticateToken, async (req, res) => {
 
     log.debug(`📚 [BOOK PDF] Loaded ${stories.length} stories: ${stories.map(s => s.data.title).join(', ')}`);
 
-    // Estimate Gelato page count: dedication (1) + story content + trailing blank (1)
-    // NOTE: parseStoryPages from storyHelpers expects a TEXT string, not storyData object
-    let storyContentPages = 0;
-    for (const story of stories) {
-      const storyText = story.data.storyText || story.data.generatedStory || story.data.story || story.data.text || '';
-      const storyPages = parseStoryPages(storyText);
-      // Picture-book layout for all reading levels: 1 scene = 1 print page
-      console.log(`📊 [BOOK PDF] Story "${story.data.title}": ${storyPages.length} pages`);
-      storyContentPages += storyPages.length;
+    // Page count + SKU come from computeBookPageInfo — the same function the
+    // checkout preview (POST /api/book-page-info) and the order flow
+    // (processBookOrder) use, so this test PDF is padded to the page count
+    // Gelato receives. No product → no SKU to size a cover for: fail loudly.
+    const pageInfo = await computeBookPageInfo(getDbPool(), stories.map(s => s.data), coverType, bookFormat);
+    const { estimatedPageCount, printedPages: snappedPageCount, productUid: printProductUid } = pageInfo;
+    console.log(`📊 [BOOK PDF] Estimated Gelato pageCount: ${estimatedPageCount} (${pageInfo.contentPages} content pages incl. dedication)`);
+    if (!pageInfo.product) {
+      return res.status(500).json({ error: `No active gelato_products row matches coverType=${coverType}, format=${bookFormat}` });
     }
-    const estimatedPageCount = 1 + storyContentPages + 1;
-    console.log(`📊 [BOOK PDF] Estimated Gelato pageCount: ${estimatedPageCount} (${storyContentPages} story content pages)`);
-
-    // Find matching product to get spine width
-    const formatPattern = bookFormat === 'A4' ? '210x280' : '200x200';
-    let printProductUid = null;
-    const productsResult = await getDbPool().query(
-      'SELECT product_uid, product_name, min_pages, max_pages FROM gelato_products WHERE is_active = true AND LOWER(product_uid) LIKE $1 AND LOWER(product_uid) LIKE $2',
-      [`%${coverType.toLowerCase()}%`, `%${formatPattern}%`]
-    );
-    if (productsResult.rows.length > 0) {
-      const matchingProduct = productsResult.rows.find(p =>
-        estimatedPageCount >= (p.min_pages || 0) && estimatedPageCount <= (p.max_pages || 999)
-      );
-      if (matchingProduct) {
-        printProductUid = matchingProduct.product_uid;
-        log.debug(`📚 [BOOK PDF] Selected product: ${matchingProduct.product_name}`);
-      }
+    if (snappedPageCount !== estimatedPageCount) {
+      log.info(`📐 [BOOK PDF] Snapping ${estimatedPageCount} → ${snappedPageCount} pages for ${pageInfo.product.product_name} (${pageInfo.blankPages} blank of ${snappedPageCount})`);
     }
-    if (!printProductUid) {
-      printProductUid = process.env.GELATO_PHOTOBOOK_UID;
-      console.log(`⚠️ [BOOK PDF] No product found for coverType=${coverType}, format=${formatPattern}, pages=${estimatedPageCount}. Fallback: ${printProductUid}`);
-    } else {
-      console.log(`📚 [BOOK PDF] Product: ${printProductUid} (coverType=${coverType}, format=${formatPattern})`);
-    }
+    console.log(`📚 [BOOK PDF] Product: ${printProductUid} (${pageInfo.product.product_name}, coverType=${coverType}, format=${bookFormat})`);
 
     // Fetch cover dimensions from Gelato API
-    let coverDims = null;
-    if (printProductUid) {
-      coverDims = await getCoverDimensions(printProductUid, estimatedPageCount);
-      if (coverDims) {
-        console.log(`📚 [BOOK PDF] Gelato cover dims: ${coverDims.coverPageWidth}x${coverDims.coverPageHeight}mm, spine: ${coverDims.spineWidth}mm`);
-      } else {
-        console.log(`⚠️ [BOOK PDF] getCoverDimensions returned null for product=${printProductUid}, pages=${estimatedPageCount}`);
-      }
+    const coverDims = await getCoverDimensions(printProductUid, snappedPageCount);
+    if (coverDims) {
+      console.log(`📚 [BOOK PDF] Gelato cover dims: ${coverDims.coverPageWidth}x${coverDims.coverPageHeight}mm, spine: ${coverDims.spineWidth}mm`);
+    } else {
+      console.log(`⚠️ [BOOK PDF] getCoverDimensions returned null for product=${printProductUid}, pages=${snappedPageCount}`);
     }
 
     // Use the SAME PDF generation functions as the Gelato order flow
     let pdfBuffer, pageCount;
 
     if (stories.length === 1) {
-      const result = await generatePrintPdf(stories[0].data, bookFormat, { gelatoCoverDims: coverDims });
+      const result = await generatePrintPdf(stories[0].data, bookFormat, { gelatoCoverDims: coverDims, targetGelatoPageCount: snappedPageCount });
       pdfBuffer = result.pdfBuffer;
       pageCount = result.pageCount;
     } else {
-      const result = await generateCombinedBookPdf(stories, bookFormat, { gelatoCoverDims: coverDims });
+      const result = await generateCombinedBookPdf(stories, bookFormat, { gelatoCoverDims: coverDims, targetGelatoPageCount: snappedPageCount });
       pdfBuffer = result.pdfBuffer;
       pageCount = result.pageCount;
     }
