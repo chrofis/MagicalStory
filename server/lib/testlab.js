@@ -10427,7 +10427,7 @@ async function runTypedPlanArm({ target, params, storyData, approvedArc, arcHint
 // The first check's findings that answer "does every commissioned character
 // get a page": the coverage counters here, and every plan-check Q12 (ACTION)
 // finding by its check number.
-const CAST_FINDING_CODES = new Set(['UNDER_COVERED_CHARACTER', 'NO_FOCAL_PAGE', 'CENTRAL_FIGURE_ABSENT_THIRD', 'NO_COMMISSIONED_ON_PAGE', 'CAST_PROMISE_BROKEN']);
+const CAST_FINDING_CODES = new Set(['UNDER_COVERED_CHARACTER', 'NO_FOCAL_PAGE', 'CENTRAL_FIGURE_ABSENT_THIRD', 'NO_COMMISSIONED_ON_PAGE', 'CAST_PROMISE_BROKEN', 'CAST_PROMISE_FOCAL_BROKEN']);
 
 /**
  * Per commissioned character (the character list), what the plan check's

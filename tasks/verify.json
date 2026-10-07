@@ -5847,6 +5847,21 @@
         "result": "HUMAN",
         "note": "human check | LOOK: Read arcReviewReport.logic Facts (count lines, any feeling/trait as a limit), then stories.data.writerText against the OWED list: recitals, narrator because-clauses, tense of the narration."
       }
+    },
+    {
+      "id": "plan-review-focal-and-lead-2026-10-07",
+      "commits": [],
+      "addedAt": "2026-10-07",
+      "claim": "On a story whose first page plan breaks a deed-page promise (too many figures) or an arc fact: the re-plan round cast-out answers are accepted (no direction/protected refusals in beatsReviewReport.changeRefusals); NO_FOCAL_PAGE on leadEach books counts lead pages by ACTION owner; an idea-card story tags card-invented figures (new) in arcReviewReport.logic and counts them against the allowance.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "beatsReviewReport.changeRefusals rule histogram (no direction refusal on a PLAN[CAST_PROMISE_FOCAL_BROKEN] cast out, no protected refusal on a CHECK[18] change); findings NO_FOCAL_PAGE per round; arcReviewReport.logic figure tags vs ideaPick names."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [

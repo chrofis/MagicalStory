@@ -33,7 +33,7 @@ const parsedOf = (reply: string) => ({
 const codes = (c: any) => c.findings.filter((f: any) => f.kind === 'counter').map((f: any) => f.code).sort();
 const whoOf = (pages: any[], n: number) => String(pages.find(p => p.pageNumber === n).planLine).split(/\s+—\s+/)[1];
 
-let runCheck: any, standing: any[], returned: any[], given: any, recheck: any, round: any;
+let castTable: any, runCheck: any, standing: any[], returned: any[], given: any, recheck: any, round: any;
 beforeAll(async () => {
   await loadPromptTemplates();
   const storyData = resolveReplayInputData(fx);
@@ -43,7 +43,7 @@ beforeAll(async () => {
   const inputs = BP.planCheckInputs(storyData, { arcPremiseNames: logic.commissioned });
   const b = storyData.beatsReviewReport;
   round = b.discardedRounds[0];
-  const castTable = parsePlanCastBlock(b.plannerReply, { listed: commissionedCast(storyData).listed });
+  castTable = parsePlanCastBlock(b.plannerReply, { listed: commissionedCast(storyData).listed });
   const gl = { info() {}, warn() {}, error() {}, debug() {} };
   runCheck = BP.createPlanCheckRunner({
     inputData: storyData, approvedArc, arcHints: resolveReplayArcHints(storyData), arcStoryLogic: storyLogic,
@@ -67,9 +67,15 @@ describe('the stored round, replayed', () => {
     // without a commissioned character is allowed (castCoverage.NO_COMMISSIONED_PAGES_MAX), so a
     // stored finding naming a single page no longer fires; and PLAN_INSTANT_TOO_LONG is new and
     // counts the long instants of a book planned before the budget. Everything else is unchanged.
+    // A third (2026-10-07): an "also on" promise for a page ANOTHER character's deed page (the lead
+    // rule wins) is no longer a finding — answering it cast Levin into Julian's focal page 16 here.
+    const deedPages = new Set(castTable.characters.map((c: any) => c.deedPage));
+    const leadWins = (l: string) => { const m = l.match(/^PLAN\[CAST_PROMISE_BROKEN\] page (\d+): the CAST block promises (\w+) on page/); return !!m && deedPages.has(Number(m[1])) && castTable.characters.find((c: any) => c.deedPage === Number(m[1])).name !== m[2]; };
     const stored = (lines: string[]) => lines
+      .filter(l => !leadWins(l))
       .filter(l => !/^PLAN\[NO_COMMISSIONED_ON_PAGE\] page \d+:/.test(l))
-      .map(l => (l.match(/^PLAN\[([A-Z_]+)\]/) || [])[1]).sort();
+      // The focal variant of a broken promise has its own code since 2026-10-07 (a removal answers it).
+      .map(l => (/deed page, alone or with one companion/.test(l) ? 'CAST_PROMISE_FOCAL_BROKEN' : (l.match(/^PLAN\[([A-Z_]+)\]/) || [])[1])).sort();
     const nowCodes = (c: any) => codes(c).filter((x: string) => x !== 'PLAN_INSTANT_TOO_LONG');
     expect(nowCodes(given)).toEqual(stored(fx.beatsReviewReport.counterFindings));
     expect(nowCodes(recheck)).toEqual(stored(round.recheck.counterFindings));
@@ -78,7 +84,7 @@ describe('the stored round, replayed', () => {
   it('the whole round regresses 5 → 7 (6 → 8 before one commissioned-free page was allowed), and the guard discards it', () => {
     const v = PB.replanRoundRegressed(given, recheck, round.changedPages, { round: 1 });
     // 6 → 8 when stored; the one page without a commissioned character is now allowed, so 5 → 7.
-    expect([v.before, v.after, v.discard]).toEqual([5, 7, true]);
+    expect([v.before, v.after, v.discard]).toEqual([4, 7, true]);  // 5 before 2026-10-07: Levin's "also on 16" is a lead page's, no finding
     expect(whoOf(returned, 4)).toMatch(/Levin/);
     expect(whoOf(returned, 7)).toMatch(/Levin/);
   });
@@ -88,9 +94,10 @@ describe('salvage: put back the fewest pages, keep the rest', () => {
   it('p4 and p7 keep Levin, and the book is back within its group budget', () => {
     const s = salvageReplanRound({ standing, returned, changedPages: round.changedPages, given, recheck, compose: runCheck.compose, round: 1 });
     expect(s).not.toBeNull();
-    expect(s!.kept).toEqual(expect.arrayContaining([4, 7]));
+    // p7 kept Levin while the baseline counted Levin's lead-page "also on 16" as a finding (5). That
+    // finding is gone (2026-10-07), the baseline is 4, and the salvage now has to put p7 back too.
+    expect(s!.kept).toEqual(expect.arrayContaining([4]));
     expect(whoOf(s!.pages, 4)).toMatch(/Levin/);
-    expect(whoOf(s!.pages, 7)).toMatch(/Levin/);
     const gp = s!.check.counters.stats.groupPages;
     expect(gp.pages.length).toBeLessThanOrEqual(gp.budget);
     expect(codes(s!.check)).not.toContain('GROUP_PAGES_OVER_BUDGET');

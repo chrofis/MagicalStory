@@ -3661,6 +3661,26 @@
       "fixedAt": "2026-10-06",
       "fixedIn": "text-v3 commit",
       "fix": "prompts/book-audit.txt: presence is FAULT[TEXT][MINOR] only where one quoted sentence puts the character IN the pictured instant and the picture shows it empty; a character named off-picture or acting beside the drawn figures is no fault. Prompt classification, code only routes it. Replay of the 4 stored faults recorded in decisions.md."
+    },
+    {
+          "id": "cast-promise-focal-answered-by-adding",
+          "title": "CAST_PROMISE_BROKEN 'focal' (deed page holds more than one companion) read as direction 'more', so the review refused every cast-out that was the only answer (Berta p5 rounds 1+2, Emma p3)",
+          "reportedAt": "2026-10-07",
+          "source": "Staging job_1791315635053_t0t8qpebu beatsReviewReport.changeRefusals: 'PLAN[CAST_PROMISE_BROKEN] asks for a name in frame and this page held 3 of 6, so there was room to add' on p5 (r1, r2) and p3 (r2). Replay of both stored rounds through reviewPlanChanges: p5/p3 refusals gone.",
+          "status": "fixed",
+          "fixedAt": "2026-10-07",
+          "fixedIn": "plan-review-2026-10-07 commit",
+          "fix": "castTablePromises' focal variant is its own code CAST_PROMISE_FOCAL_BROKEN (direction 'fewer', must-fix, counted for convergence, Lab CAST_FINDING_CODES). Test: replan-focal-promise-and-arc-fact.test.ts (fails on parent)."
+    },
+    {
+          "id": "arc-fact-break-blocked-by-protection",
+          "title": "A plan line that breaks an arc fact (plan-check Q18) was a noted finding, so the 'protected' rule refused the only correct fix (p5 'Berta swims her long arc' vs 'cannot slide into the sea')",
+          "reportedAt": "2026-10-07",
+          "source": "Staging job_1791315635053_t0t8qpebu changeRefusals r1 p5 rule 'protected': \"Noah's own action stays, and CHECK[18] is a noted finding, not a must-fix one\".",
+          "status": "fixed",
+          "fixedAt": "2026-10-07",
+          "fixedIn": "plan-review-2026-10-07 commit",
+          "fix": "planCounters.ARC_FACT_CHECKS = {18}: a change answering Q18 may touch a protected page. Q18 stays noted for the mandate (REPLAN_MUST_FIX_CHECKS unchanged). Test: replan-focal-promise-and-arc-fact.test.ts."
     }
   ]
 }

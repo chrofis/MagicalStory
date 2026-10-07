@@ -7929,6 +7929,8 @@ const REPLAN_MUST_FIX_CODES = new Set([
   // A plan line that breaks the CAST block the planner wrote before dividing
   // (2026-09-25): a deed page, a promised appearance or the ending's cast.
   'CAST_PROMISE_BROKEN',
+  // Its removal-answered sibling (the deed page holds too many figures).
+  'CAST_PROMISE_FOCAL_BROKEN',
   // More pages hold more than three characters than the book's budget
   // (castCoverage.groupPageBudget, one page in six). Owner ruling 2026-09-27:
   // going over the budget forces a re-plan. It is a cast finding — a page is
@@ -10353,6 +10355,29 @@ const AD_COMPOSITION_RULE = [
 const COMMISSIONED_CAST_DEF = "the character list plus any named figure the premise supplies or a character's saved details name — a sibling, a friend, a pet, a companion";
 
 /**
+ * The same definition for a premise the IDEA GENERATOR wrote (the customer
+ * clicked a card: `ideaPick` / `ideaGeneration` on the input). A name that only
+ * that card carries was invented by the generator, not commissioned by anyone,
+ * so it is new and counts against the allowance. On staging
+ * job_1791315635053_t0t8qpebu the card invented "Berta" and "Mira"; the arc
+ * tagged both (commissioned) under the premise clause and only Oskar counted
+ * against an allowance of 2. A premise the customer wrote or pasted keeps
+ * COMMISSIONED_CAST_DEF. Classification stays with the prompt, never a code
+ * reading of the arc.
+ */
+const COMMISSIONED_CAST_DEF_CARD = "the character list plus any named figure a character's saved details name — a sibling, a friend, a pet, a companion. The premise below was written by an idea generator, not by the customer, so a figure only the premise names is new";
+
+/** True when the premise on this input is an idea card the customer picked, not text the customer wrote. */
+function premiseIsIdeaCard(inputData) {
+  return !!(inputData && (inputData.ideaPick || inputData.ideaGeneration));
+}
+
+/** The one definition of "commissioned" the arc is shown for THIS input. */
+function commissionedCastDef(inputData) {
+  return premiseIsIdeaCard(inputData) ? COMMISSIONED_CAST_DEF_CARD : COMMISSIONED_CAST_DEF;
+}
+
+/**
  * THE LOGIC CHECK — what a logic fault IS, one string, two readers (owner,
  * 2026-09-24): the creator's critique ("Faults:", arcCritiqueSpec) and the
  * panel's first lens (LOGIC, arc-panel.txt).
@@ -10668,7 +10693,7 @@ function arcLogicSpec(inputData = {}, pageCount = 10) {
     '"STORY LOGIC:" first — the ledger of facts the arc is told from, holding only what the plot uses, in labelled lines and dash lines, never numbered:',
     'Want and stakes: one line — what the main character wants, what is lost if they fail, and the deadline, where the story has one.',
     'Opposition: one line — the one force that stands in the way and the motive that drives it.',
-    `Facts: one dash line per named figure the plot runs on, "- <name> (commissioned) — <the one fact a happening turns on, or the word none>" or "- <name> (new) — …", one fact each: a single ability or a single limit, in one clause, never two joined by "and" or a semicolon, and most figures have none. A limit is a narrow physical fact of this world, stated as what the figure cannot do (cannot fly, too broad for the gap): a feeling, a trait, a want or an act is never a limit or an ability, and no line answers a "why not" the story never tests. Commissioned is ${COMMISSIONED_CAST_DEF}. New is every other named figure — a person, an animal or a creature, including one on a single page, one who never speaks, and an adult who sets a rule, waits or permits. Not listed: places, vehicles and objects, a group named collectively, and ${UNNAMED_FIGURE_EXEMPT}. A figure the story needs stays listed; taking its name away does not take it off. This book has room for ${arcInventedAllowance(inputData)} new named figures. Then at most two dash lines for the rules of the world the plot runs on — what keeps a thing alive, open, warm or hidden, or what the world's magic does to a figure's body (a tail for legs, breathing under water), said once for everyone it changes, with where it ends in the same line — stated as the fact alone, with no reason, no consequence and no comparison size. A deadline is said in Want and stakes only, never again as a fact.`,
+    `Facts: one dash line per named figure the plot runs on, "- <name> (commissioned) — <the one fact a happening turns on, or the word none>" or "- <name> (new) — …", one fact each: a single ability or a single limit, in one clause, never two joined by "and" or a semicolon, and most figures have none. A limit is a narrow physical fact of this world, stated as what the figure cannot do (cannot fly, too broad for the gap): a feeling, a trait, a want or an act is never a limit or an ability, and no line answers a "why not" the story never tests. Commissioned is ${commissionedCastDef(inputData)}. New is every other named figure — a person, an animal or a creature, including one on a single page, one who never speaks, and an adult who sets a rule, waits or permits. Not listed: places, vehicles and objects, a group named collectively, and ${UNNAMED_FIGURE_EXEMPT}. A figure the story needs stays listed; taking its name away does not take it off. This book has room for ${arcInventedAllowance(inputData)} new named figures. Then at most two dash lines for the rules of the world the plot runs on — what keeps a thing alive, open, warm or hidden, or what the world's magic does to a figure's body (a tail for legs, breathing under water), said once for everyone it changes, with where it ends in the same line — stated as the fact alone, with no reason, no consequence and no comparison size. A deadline is said in Want and stakes only, never again as a fact.`,
     'Motives: one dash line per figure that acts, "- <figure>: <motive> → <the act it causes>".',
     `Central figure: ${CENTRAL_FIGURE_DEF}, by the name the story calls it — two names separated by " / " only where the figure itself changes name (an egg that hatches into a named creature) — a commissioned character who plays the figure is named by their own name alone, never by the role they play — or "none" where the idea is about the main character.`,
     `Events: the number of happenings, ${links}.`,
@@ -13263,6 +13288,9 @@ module.exports = {
   ARC_QUESTIONS_ANSWERED_RULE,
   arcStakesRules,
   COMMISSIONED_CAST_DEF,
+  COMMISSIONED_CAST_DEF_CARD,
+  commissionedCastDef,
+  premiseIsIdeaCard,
   ARC_ENTRANCE_RULE,
   ARC_GIVEN_RULE,
   ARC_SENSE_RULE,
