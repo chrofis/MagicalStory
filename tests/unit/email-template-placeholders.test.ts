@@ -78,3 +78,30 @@ describe('trial-reminder: the plain-text headline token keeps its case', () => {
     });
   }
 });
+
+describe('order-shipped: no tracking URL means no tracking button, never a dead "#" one', () => {
+  const base = { greeting, orderId: 'ABCD1234', trackingNumber: 'TN1', coverUrl: 'https://r2/c.jpg' };
+  for (const language of LANGUAGES) {
+    it(`[${language}] the {?trackingUrl} block is stripped when the value is empty`, () => {
+      const { html, text } = getTemplateSection('order-shipped', language);
+      const filledHtml = fillTemplate(html, { ...base, trackingUrl: '' }, { html: true });
+      const filledText = fillTemplate(text, { ...base, trackingUrl: '' });
+      expect(filledHtml).not.toContain('href="#"');
+      expect(filledHtml).not.toMatch(/<a[^>]*href=""/);
+      expect(filledHtml.match(TOKEN) || []).toEqual([]);
+      expect(filledText.match(TOKEN) || []).toEqual([]);
+      const withUrl = fillTemplate(html, { ...base, trackingUrl: 'https://track/x' }, { html: true });
+      expect(withUrl).toContain('href="https://track/x"');
+      // The CTA label exists only inside the conditional block.
+      const cta = withUrl.match(/href="https:\/\/track\/x"[^>]*>\s*(?:<[^>]+>\s*)*([^<]+)</)?.[1]?.trim();
+      expect(cta).toBeTruthy();
+      expect(filledHtml).not.toContain(cta as string);
+    });
+  }
+  it('email.js passes an empty value, not "#"', () => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const source = require('fs').readFileSync(path.join(ROOT, 'email.js'), 'utf8');
+    expect(source).not.toMatch(/trackingUrl\s*\|\|\s*'#'/);
+    expect(source).toMatch(/trackingUrl: trackingDetails\.trackingUrl \|\| ''/);
+  });
+});

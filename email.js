@@ -714,7 +714,9 @@ async function sendOrderShippedEmail(customerEmail, customerName, trackingDetail
     greeting: greetingValue(customerName),
     orderId: trackingDetails.orderId || 'N/A',
     trackingNumber: trackingDetails.trackingNumber || 'N/A',
-    trackingUrl: trackingDetails.trackingUrl || '#',
+    // Empty strips the template's {?trackingUrl} block — no button rather
+    // than a button that goes nowhere.
+    trackingUrl: trackingDetails.trackingUrl || '',
     coverUrl: coverUrl || ''
   };
 

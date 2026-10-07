@@ -70,9 +70,13 @@ export default function OrderShipped({ lang }: Props) {
           <Text style={labelStyle}>{t.labelTracking}</Text>
           <Text style={{ ...valueStyle, margin: '0' }}>{'{trackingNumber}'}</Text>
         </InfoPanel>
-        <div style={{ textAlign: 'center', margin: '8px 0 24px' }}>
-          <Button href="{trackingUrl}">{t.cta}</Button>
-        </div>
+        {/* No tracking URL from the carrier yet → no button at all, never a
+            dead one. email.js passes '' and the block is stripped. */}
+        <Cond when="trackingUrl">
+          <div style={{ textAlign: 'center', margin: '8px 0 24px' }}>
+            <Button href="{trackingUrl}">{t.cta}</Button>
+          </div>
+        </Cond>
         <Paragraph>{t.closing}</Paragraph>
         <Paragraph muted>{t.reviewPrompt}</Paragraph>
         <Paragraph muted>{t.signoff}</Paragraph>
