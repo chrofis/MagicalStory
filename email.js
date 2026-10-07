@@ -154,16 +154,31 @@ function getTemplateSection(templateName, language) {
 //                         (including the markers) is stripped.
 // Conditional blocks are processed FIRST so that placeholders inside a
 // stripped block don't accidentally leave a leftover `{name}` token.
-function fillTemplate(template, values) {
+//
+// `{ html: true }` HTML-escapes every substituted value (& < > " ') — the
+// Html section of a template is markup, and a story title like «Max & Moritz»
+// or a shipping name with a `<` would otherwise be injected as tags. The
+// Subject and Text parts are plain text and take the values raw. Every value
+// a sender passes is plain text or a URL (no caller passes markup — see the
+// `values` objects below), so there is no raw marker: a value that must stay
+// markup would need one, and a test pins that none is needed today.
+const HTML_ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, (c) => HTML_ESCAPES[c]);
+}
+
+function fillTemplate(template, values, { html = false } = {}) {
   let result = template;
   // Step 1 — conditional blocks
   result = result.replace(
     /\{\?(\w+)\}([\s\S]*?)\{\/\1\}/g,
     (_match, key, inner) => (values[key] ? inner : '')
   );
-  // Step 2 — plain placeholder substitution
+  // Step 2 — plain placeholder substitution. A function replacement so a `$`
+  // in a value (a price, a token) is never read as a replacement pattern.
   for (const [key, value] of Object.entries(values)) {
-    result = result.replace(new RegExp(`\\{${key}\\}`, 'g'), value || '');
+    const filled = value == null || value === '' ? '' : (html ? escapeHtml(value) : String(value));
+    result = result.replace(new RegExp(`\\{${key}\\}`, 'g'), () => filled);
   }
   return result;
 }
@@ -300,7 +315,7 @@ async function sendStoryCompleteEmail(userEmail, firstName, storyTitle, storyId,
       to: userEmail,
       subject: fillTemplate(template.subject, values),
       text: fillTemplate(template.text, values),
-      html: fillTemplate(template.html, values),
+      html: fillTemplate(template.html, values, { html: true }),
     };
 
     // Attach PDF if provided (for trial story completion emails)
@@ -358,7 +373,7 @@ async function sendStoryFailedEmail(userEmail, firstName, language = 'English') 
       to: userEmail,
       subject: fillTemplate(template.subject, values),
       text: fillTemplate(template.text, values),
-      html: fillTemplate(template.html, values),
+      html: fillTemplate(template.html, values, { html: true }),
     }, { language });
 
     if (error) {
@@ -524,7 +539,7 @@ async function sendTrialReminderEmail(userEmail, firstName, claimUrl, language =
       to: userEmail,
       subject: fillTemplate(template.subject, values),
       text: fillTemplate(template.text, values),
-      html: fillTemplate(template.html, values),
+      html: fillTemplate(template.html, values, { html: true }),
       // RFC 2369 + RFC 8058: Gmail/Apple Mail show an "Unsubscribe" control
       // and POST to the URL without opening a page.
       headers: {
@@ -655,7 +670,7 @@ async function sendOrderConfirmationEmail(customerEmail, customerName, orderDeta
       to: customerEmail,
       subject: fillTemplate(template.subject, values),
       text: fillTemplate(template.text, values),
-      html: fillTemplate(template.html, values),
+      html: fillTemplate(template.html, values, { html: true }),
     }, { storyId: orderDetails.storyId, language });
 
     if (error) {
@@ -711,7 +726,7 @@ async function sendOrderShippedEmail(customerEmail, customerName, trackingDetail
       bcc: 'magicalstory.ch+adf14de298@invite.trustpilot.com',
       subject: fillTemplate(template.subject, values),
       text: fillTemplate(template.text, values),
-      html: fillTemplate(template.html, values),
+      html: fillTemplate(template.html, values, { html: true }),
     }, { language });
 
     if (error) {
@@ -756,7 +771,7 @@ async function sendOrderFailedEmail(customerEmail, customerName, errorMessage, l
       to: customerEmail,
       subject: fillTemplate(template.subject, values),
       text: fillTemplate(template.text, values),
-      html: fillTemplate(template.html, values),
+      html: fillTemplate(template.html, values, { html: true }),
     }, { language });
 
     if (error) {
@@ -832,7 +847,7 @@ async function sendEmailVerificationEmail(userEmail, userName, verifyUrl, langua
       to: userEmail,
       subject: fillTemplate(template.subject, values),
       text: fillTemplate(template.text, values),
-      html: fillTemplate(template.html, values),
+      html: fillTemplate(template.html, values, { html: true }),
     }, { language });
 
     if (error) {
@@ -907,7 +922,7 @@ async function sendPasswordResetEmail(userEmail, userName, resetUrl, language = 
       to: userEmail,
       subject: fillTemplate(template.subject, values),
       text: fillTemplate(template.text, values),
-      html: fillTemplate(template.html, values),
+      html: fillTemplate(template.html, values, { html: true }),
     }, { language });
 
     if (error) {
