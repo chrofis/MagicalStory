@@ -8116,9 +8116,10 @@ async function _processStoryJobImpl(jobId) {
 
     // Send failure notifications
     try {
-      const jobResult = await dbPool.query('SELECT user_id FROM story_jobs WHERE id = $1', [jobId]);
+      const jobResult = await dbPool.query('SELECT user_id, input_data FROM story_jobs WHERE id = $1', [jobId]);
       if (jobResult.rows.length > 0) {
         const userId = jobResult.rows[0].user_id;
+        const storyLanguage = jobResult.rows[0].input_data?.language;
         const userResult = await dbPool.query(
           'SELECT email, username, shipping_first_name, preferred_language FROM users WHERE id = $1',
           [userId]
@@ -8130,8 +8131,11 @@ async function _processStoryJobImpl(jobId) {
           // Notify customer
           if (user.email) {
             const firstName = email.resolveGreetingName(user);
-            // Prefer story language over DB default (DB defaults to 'English' for trial users)
-            const emailLanguage = user.preferred_language || 'en';
+            // Same choice as the story-complete mail: the story's own language
+            // first, then the profile. The profile column defaults to 'English'
+            // for trial users, so reading it first mailed a German story's
+            // failure in English.
+            const emailLanguage = storyLanguage || user.preferred_language || 'English';
             await email.sendStoryFailedEmail(user.email, firstName, emailLanguage);
           }
         }
