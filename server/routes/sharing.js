@@ -16,7 +16,12 @@ const path = require('path');
 const fs = require('fs').promises;
 const sharp = require('sharp');
 
-const { dbQuery, getStoryImage, getActiveVersion, imagesExistByType } = require('../services/database');
+const { dbQuery, getStoryImage, getActiveVersion, getActiveVersionMeta, imagesExistByType } = require('../services/database');
+// One page-marker parser for every reader of a story's text. The route used to carry its
+// own copy that knew only Page/Seite — the Italian i18n commit (428f7215) taught
+// sceneMetadata.getPageText and pdf.js "Pagina" and never reached this copy, so every
+// page of an Italian story (`## Pagina N`) read as empty text in the shared viewer.
+const { getPageText } = require('../lib/storyHelpers');
 const { log } = require('../utils/logger');
 const { stripDataUriPrefix } = require('../lib/r2');
 const { verifySession } = require('../middleware/auth');
@@ -165,43 +170,6 @@ async function getSharedStoryId(shareToken, userId = null) {
     [shareToken, userId]
   );
   return rows.length > 0 ? rows[0].id : null;
-}
-
-/**
- * Extract page text from story text by page number
- */
-function getPageText(storyText, pageNumber) {
-  if (!storyText) return null;
-
-  // Handle array format (unified mode)
-  if (Array.isArray(storyText)) {
-    const page = storyText.find(p => p.pageNumber === pageNumber);
-    return page?.text || null;
-  }
-
-  // Try multiple page marker formats
-  // Format 1: "--- Page N ---" or "--- Seite N ---"
-  // Format 2: "## Page N" or "## Seite N"
-  const markers = [
-    `--- Page ${pageNumber} ---`,
-    `--- Seite ${pageNumber} ---`,
-    `## Page ${pageNumber}`,
-    `## Seite ${pageNumber}`,
-  ];
-
-  for (const marker of markers) {
-    const pageIndex = storyText.indexOf(marker);
-    if (pageIndex === -1) continue;
-
-    const textStart = pageIndex + marker.length;
-    // Find start of next page (any format)
-    const nextMatch = storyText.substring(textStart).match(/(?:---\s*(?:Page|Seite)\s+\d+\s*---|##\s*(?:Page|Seite)\s+\d+)/i);
-    const textEnd = nextMatch ? textStart + nextMatch.index : storyText.length;
-
-    return storyText.substring(textStart, textEnd).trim();
-  }
-
-  return null;
 }
 
 // ============================================
