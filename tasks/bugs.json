@@ -3714,7 +3714,7 @@
       "rootCause": "The empty-retry branch set up a second call but never turned a second empty reply into a failure; `ok: raw.length > 0` dropped the audit from the merge silently, which is the quiet degrade NO FALLBACKS forbids.",
       "status": "fixed",
       "fixedAt": "2026-10-07",
-      "fixedIn": "pending",
+      "fixedIn": "3047982a",
       "fix": "runAudit returns `{ok:false, error:'returned empty output twice — no findings from this auditor', …}` with a warn line, the same shape a truncated or thrown audit returns, so the report's audits[].error and the text_refine log name the loss. Test: tests/unit/text-refine-empty-audit-is-an-error.test.ts."
     }
   ]
