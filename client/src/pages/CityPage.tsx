@@ -465,28 +465,38 @@ export default function CityPage() {
                     <div className="p-5 md:p-6">
                       <h3 className="font-title text-lg font-bold text-stone-900 mb-2">{loc(idea.title)}</h3>
                       <p className="text-stone-600 text-sm leading-relaxed mb-3">{loc(idea.description)}</p>
-                      <div className="flex items-center gap-3 flex-wrap">
-                        <button
-                          onClick={() => setOpenContext(isOpen ? null : idea.id)}
-                          className="text-xs font-medium text-indigo-500 hover:text-indigo-700 transition-colors flex items-center gap-1"
-                        >
-                          {t.contextLabel}
-                          <ChevronDown size={14} className={`transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-                        </button>
-                        <Link
-                          to={lp('/create')}
-                          className="ml-auto inline-flex items-center gap-1.5 text-sm font-medium text-indigo-500 hover:text-indigo-700 transition-colors"
-                          title={t.createAccountNote}
-                        >
-                          {t.createButton} <ArrowRight size={14} />
-                        </Link>
-                      </div>
-                    </div>
-                    {/* Always rendered (so it's in the DOM for SEO crawlers); CSS hides when collapsed */}
-                    <div className={`px-5 pb-5 md:px-6 md:pb-6 pt-0 ${isOpen ? '' : 'hidden'}`}>
-                      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-                        <p className="text-amber-900 text-sm leading-relaxed">{loc(idea.context)}</p>
-                      </div>
+                      {/* Native disclosure: the historical context (~600 words per city) is real
+                          page content, so it sits in the HTML as readable text rather than behind
+                          a `hidden` class. <details> keeps it collapsed for the reader, crawlers
+                          read it, and a text-fragment / find-in-page opens it. `open` stays
+                          controlled so the cityId reset above still collapses it. */}
+                      <details
+                        open={isOpen}
+                        onToggle={(e) => {
+                          const nowOpen = e.currentTarget.open;
+                          // The previously open card fires a closing toggle when React removes
+                          // its `open`: only the card that owns the state may clear it.
+                          setOpenContext((prev) => (nowOpen ? idea.id : prev === idea.id ? null : prev));
+                        }}
+                        className="group"
+                      >
+                        <summary className="flex items-center gap-3 flex-wrap list-none cursor-pointer [&::-webkit-details-marker]:hidden">
+                          <span className="text-xs font-medium text-indigo-500 hover:text-indigo-700 transition-colors flex items-center gap-1">
+                            {t.contextLabel}
+                            <ChevronDown size={14} className="transition-transform group-open:rotate-180" />
+                          </span>
+                          <Link
+                            to={lp('/create')}
+                            className="ml-auto inline-flex items-center gap-1.5 text-sm font-medium text-indigo-500 hover:text-indigo-700 transition-colors"
+                            title={t.createAccountNote}
+                          >
+                            {t.createButton} <ArrowRight size={14} />
+                          </Link>
+                        </summary>
+                        <div className="mt-5 md:mt-6 bg-amber-50 border border-amber-200 rounded-xl p-4">
+                          <p className="text-amber-900 text-sm leading-relaxed">{loc(idea.context)}</p>
+                        </div>
+                      </details>
                     </div>
                   </div>
                 );
