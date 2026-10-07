@@ -47,7 +47,7 @@ export default function OrderConfirmation({ lang }: Props) {
       footerCountry={f.country}
     >
       <Cond when="coverUrl">
-        <Cover src="{coverUrl}" alt="{title}" size="thumbnail" />
+        <Cover src="{coverUrl}" alt={t.coverAlt} size="thumbnail" />
       </Cond>
       <CardBody headline={t.headline}>
         <Paragraph>{t.greeting}</Paragraph>

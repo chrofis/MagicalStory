@@ -1367,6 +1367,10 @@ module.exports = {
   isEmailConfigured,
   // Greeting resolution — the single source of truth for "what name may we print"
   resolveGreetingName,
+  // Template parsing + fill, exported so tests can render every template the
+  // way a send does and prove no placeholder is left unfilled.
+  getTemplateSection,
+  fillTemplate,
   // Customer emails
   sendStoryCompleteEmail,
   sendStoryFailedEmail,

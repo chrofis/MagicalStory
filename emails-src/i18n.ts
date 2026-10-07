@@ -315,15 +315,19 @@ export const trialReminder: Record<Lang, {
 // ─── order-confirmation ──────────────────────────────────────────────────────
 // Placeholders: {greeting}, {orderId}, {amount}, {currency}, {addressLine1},
 //   {city}, {postalCode}, {country}, {deliveryEstimate}, {?coverUrl}{/coverUrl}.
+// The order senders have no story title (orders carry only story_id), so the
+// cover thumbnail's alt is this static string, never a {title} placeholder.
 export const orderConfirmation: Record<Lang, {
   subject: string; preview: string; headline: string; greeting: string;
   body: string; detailsTitle: string; labelOrderId: string; labelAmount: string;
   labelShipping: string; labelDelivery: string; followUp: string; signoff: string;
+  coverAlt: string;
 }> = {
   en: {
     subject: 'Order confirmed — your Magical Story book is being printed!',
     preview: 'Your order is confirmed. We\'ll email you again when it ships.',
     headline: 'Your book is being printed',
+    coverAlt: 'The cover of your book',
     greeting: 'Hello{greeting},',
     body: 'Thank you for your order! Your personalized storybook is now being printed.',
     detailsTitle: 'Order details',
@@ -338,6 +342,7 @@ export const orderConfirmation: Record<Lang, {
     subject: 'Bestellung bestätigt — dein Magical Story Buch wird gedruckt!',
     preview: 'Deine Bestellung ist bestätigt. Wir melden uns wieder, sobald sie versandt wird.',
     headline: 'Dein Buch wird gedruckt',
+    coverAlt: 'Das Cover deines Buches',
     greeting: 'Hallo{greeting},',
     body: 'Vielen Dank für deine Bestellung! Dein personalisiertes Geschichtenbuch wird jetzt gedruckt.',
     detailsTitle: 'Bestelldetails',
@@ -352,6 +357,7 @@ export const orderConfirmation: Record<Lang, {
     subject: 'Commande confirmée — votre livre Magical Story est en cours d\'impression !',
     preview: 'Votre commande est confirmée. Nous vous écrirons à nouveau lors de l\'expédition.',
     headline: 'Votre livre est en cours d\'impression',
+    coverAlt: 'La couverture de votre livre',
     greeting: 'Bonjour{greeting},',
     body: "Merci pour votre commande ! Votre livre d'histoires personnalisé est en cours d'impression.",
     detailsTitle: 'Détails de la commande',
@@ -366,6 +372,7 @@ export const orderConfirmation: Record<Lang, {
     subject: 'Ordine confermato — il tuo libro Magical Story è in stampa!',
     preview: 'Il tuo ordine è confermato. Ti scriveremo di nuovo al momento della spedizione.',
     headline: 'Il tuo libro è in stampa',
+    coverAlt: 'La copertina del tuo libro',
     greeting: 'Ciao{greeting},',
     body: 'Grazie per il tuo ordine! Il tuo libro di storie personalizzato è in stampa.',
     detailsTitle: "Dettagli dell'ordine",
@@ -380,17 +387,19 @@ export const orderConfirmation: Record<Lang, {
 
 // ─── order-shipped ───────────────────────────────────────────────────────────
 // Placeholders: {greeting}, {orderId}, {trackingNumber}, {trackingUrl},
-//   {?coverUrl}{/coverUrl}.
+//   {?coverUrl}{/coverUrl}. `coverAlt` is static for the same reason as in
+//   order-confirmation: the sender has no story title.
 export const orderShipped: Record<Lang, {
   subject: string; preview: string; headline: string; greeting: string;
   body: string; trackingTitle: string; labelOrderId: string;
   labelTracking: string; cta: string; closing: string;
-  reviewPrompt: string; signoff: string;
+  reviewPrompt: string; signoff: string; coverAlt: string;
 }> = {
   en: {
     subject: 'Your Magical Story book has shipped!',
     preview: 'Your personalized storybook is on its way — track it here.',
     headline: 'Your book is on its way',
+    coverAlt: 'The cover of your book',
     greeting: 'Hello{greeting},',
     body: 'Great news! Your personalized storybook is on its way.',
     trackingTitle: 'Tracking information',
@@ -405,6 +414,7 @@ export const orderShipped: Record<Lang, {
     subject: 'Dein Magical Story Buch ist unterwegs!',
     preview: 'Dein personalisiertes Geschichtenbuch ist auf dem Weg — Sendung verfolgen.',
     headline: 'Dein Buch ist unterwegs',
+    coverAlt: 'Das Cover deines Buches',
     greeting: 'Hallo{greeting},',
     body: 'Tolle Neuigkeiten! Dein personalisiertes Geschichtenbuch ist auf dem Weg.',
     trackingTitle: 'Sendungsverfolgung',
@@ -419,6 +429,7 @@ export const orderShipped: Record<Lang, {
     subject: 'Votre livre Magical Story est en route !',
     preview: 'Votre livre personnalisé est en route — suivez son acheminement.',
     headline: 'Votre livre est en route',
+    coverAlt: 'La couverture de votre livre',
     greeting: 'Bonjour{greeting},',
     body: "Bonne nouvelle ! Votre livre d'histoires personnalisé est en route.",
     trackingTitle: 'Informations de suivi',
@@ -433,6 +444,7 @@ export const orderShipped: Record<Lang, {
     subject: 'Il tuo libro Magical Story è in viaggio!',
     preview: 'Il tuo libro personalizzato è in viaggio — seguilo qui.',
     headline: 'Il tuo libro è in viaggio',
+    coverAlt: 'La copertina del tuo libro',
     greeting: 'Ciao{greeting},',
     body: 'Buone notizie! Il tuo libro di storie personalizzato è in viaggio.',
     trackingTitle: 'Informazioni di tracciamento',
