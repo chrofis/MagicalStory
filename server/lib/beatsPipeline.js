@@ -1081,7 +1081,7 @@ async function runReplanRounds({ inputData, pageCount, plan, check1, replanRound
         replan: buildReplanSection(pagePlan, roundFindings, { pageCount: beats.length, keep, refused: lastRefusals, castFloor: coverageRule ? coverageRule.appearances.min : null, castTable }),
       });
       if (!replanPrompt) throw new Error('story-beats template unavailable');
-      const rpRes = await textModels.callTextModelStreaming(replanPrompt, null, onChunk, planModel, { usageLabel: 'beats_replan' });
+      const rpRes = await textModels.callTextModelStreaming(replanPrompt, null, onChunk, planModel, { usageLabel: 'beats_replan', effort: MODEL_DEFAULTS.beatsPlanEffort });
       if (onCall) onCall(rpRes);
       const second = readPlan(rpRes.text);
       if (second.parsed.pages.length === 0) throw new Error('re-plan returned no parseable plan lines');
@@ -1443,7 +1443,7 @@ async function runReplanRounds({ inputData, pageCount, plan, check1, replanRound
       // that produced it (a model finding) plus the pages it names — never its
       // prose, which this codebase forbids reading for meaning.
       {
-        const conv = replanRoundConverged(pendingCheck, check2);
+        const conv = replanRoundConverged(pendingCheck, check2, changedThisRound);
         if (!conv.converged) {
           const why = conv.minted.length
             ? `the recheck names ${conv.minted.length} cast/focal must-fix finding(s) the check before it did not`
@@ -2693,7 +2693,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
 
   t = Date.now();
   await stage(3, 'Planning the story beats...', { next: 5, ms: 25000 });
-  const planRes = await textModels.callTextModelStreaming(planPrompt, null, onChunk, planModel, { usageLabel: 'beats_plan' });
+  const planRes = await textModels.callTextModelStreaming(planPrompt, null, onChunk, planModel, { usageLabel: 'beats_plan', effort: MODEL_DEFAULTS.beatsPlanEffort });
   meta.timings.planMs = Date.now() - t;
   const first = readPlan(planRes.text);
   // The planner's reply verbatim (2026-09-23): the report kept only the parsed
@@ -2928,7 +2928,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     t = Date.now();
     try {
       await stage(18, 'Building the wardrobe contract...', { next: 23, ms: 71000 });
-      const bibleRes = await textModels.callTextModelStreaming(biblePrompt, null, onChunk, bibleModel, { usageLabel: 'beats_story_bible' });
+      const bibleRes = await textModels.callTextModelStreaming(biblePrompt, null, onChunk, bibleModel, { usageLabel: 'beats_story_bible', effort: MODEL_DEFAULTS.beatsPlanEffort });
       const sections = extractBibleSections(bibleRes.text || '', CLOTHING_MARKERS);
       meta.timings.storyBibleMs = Date.now() - t;
       storyBibleReport = {

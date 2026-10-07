@@ -580,6 +580,11 @@ const MODEL_DEFAULTS = {
     ? process.env.SPLIT_OUTLINE_REVIEW !== 'false'
     : true,
   storyText: 'claude-sonnet',          // Story narrative text
+  // Beats planner / re-plan / wardrobe-bible effort. Sonnet 5.5 defaults to `high` with hidden
+  // thinking billed in output_tokens: beats_plan spent 48-56k output tokens ($0.575) for a ~1.1k-token
+  // reply on 2026-10-06 stories (508-1,365 before). Probed at low/medium: ~1.3-1.4k output tokens, ~$0.03,
+  // ~10 s; medium's plan_check must-fix 12/8 vs the stored high plans' 10/8, low's 17/12. docs/decisions.md 2026-10-08.
+  beatsPlanEffort: 'medium',
   storyTextEffort: null,               // writer reasoning effort; null = the model's default (text-v4 measures medium vs high)
   // Trial writer effort (owner 2026-10-07: test lower effort). Sonnet 5.5 defaults to `high`;
   // 3 staging trials at the default spent 27-40k output tokens (~5-6k of it story text)

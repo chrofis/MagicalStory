@@ -71,3 +71,44 @@ describe('replanRoundConverged', () => {
     expect(r.converged).toBe(true);
   });
 });
+
+describe('replanRoundConverged — flips on pages the round never touched (2026-10-08)', () => {
+  // Measured on 3 stored books: after the round-1 fix every recheck "minted" 3-4
+  // cast/focal must-fix findings, most on pages the round never touched, so
+  // round 2 was never bought.
+  it('a counter relabelled on an untouched page is not a minted finding', () => {
+    const given = { findings: [f('CAST_PROMISE_BROKEN', [3]), f('NO_FOCAL_PAGE', []), f('PEOPLELESS_ON_INTERACTION_PAGE', [11])] };
+    const recheck = { findings: [f('CAST_PROMISE_FOCAL_BROKEN', [3]), f('NO_FOCAL_PAGE', [])] };
+    // the round changed page 11 only
+    const r = replanRoundConverged(given, recheck, [11]);
+    expect(r.minted).toEqual([]);
+    expect(r.noise.length).toBe(2);
+    expect(r.given).toBe(2);
+    expect(r.surviving).toBe(1);
+    expect(r.converged).toBe(true);
+  });
+
+  it('a new finding on a page the round DID change still blocks convergence', () => {
+    const given = { findings: [f('NO_PEOPLELESS_PAGE', [3]), f('NO_COMMISSIONED_ON_PAGE', [7])] };
+    const recheck = { findings: [f('CAST_PROMISE_BROKEN', [7])] };
+    const r = replanRoundConverged(given, recheck, [7]);
+    expect(r.converged).toBe(false);
+    expect(r.minted.length).toBe(1);
+  });
+
+  it('a whole-book counter that is new always counts', () => {
+    const given = { findings: [f('NO_PEOPLELESS_PAGE', [3]), f('NO_COMMISSIONED_ON_PAGE', [7])] };
+    const recheck = { findings: [f('NO_FOCAL_PAGE', [])] };
+    const r = replanRoundConverged(given, recheck, [9]);
+    expect(r.minted.length).toBe(1);
+    expect(r.converged).toBe(false);
+  });
+
+  it('a model finding on an untouched page is set aside too', () => {
+    const given = { findings: [q(12, 2), q(15, 1)] };
+    const recheck = { findings: [q(15, 1)] };
+    const r = replanRoundConverged(given, recheck, [5]);
+    expect(r.noise.length).toBe(1);
+    expect(r.given).toBe(1);
+  });
+});

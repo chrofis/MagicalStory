@@ -24,6 +24,9 @@ Last full sweep: **2026-09-06**.
 
 ## P0 — gating the production promotion
 
+- [ ] Showcase fixes 2026-10-07 plan (open items: render count after repair fixes, cost ledger, round-2 convergence verify) → tasks/showcase-fixes-2026-10-07.md
+- [ ] tests/unit/public-pages-a11y.test.ts "no page or component nests a second <main>" fails on staging HEAD (fails without the 2026-10-08 changes too; not investigated) → tests/unit/public-pages-a11y.test.ts:88
+- [ ] Re-plan round 2: after the untouched-page change the three stored rechecks still mint 1-3 findings on changed pages or with no page, so no round 2; decide whether a whole-book model finding (CHECK[12], no page) should be set aside → docs/decisions.md (2026-10-08 planner effort entry)
 - [ ] Version-selection follow-ups 2026-10-07: o8ynpdjw6 p1 and 9n47zi342 p10 do not flip under B2 on stored deductions (recompute with the original at-selection scores); showcase p11 gained a MAJOR setting finding in 2/3 Lab runs (1703) with no baseline repeat; B1 repairPlan and A2 end-to-end unverified until a full story runs (tasks/verify.json repair-version-selection-2026-10-07); A4 does not pass the vision inventory's clipped_by (latency) → docs/decisions.md (2026-10-07 version selection entry)
 
 - [ ] Art Director review 2026-10-06, left open: (a) the footing value `aboard` shares a word with the brief field `aboard` and the vantage `cameraOn: aboard` (rename, e.g. `on a vessel`); (b) `vb_cite_offpage` has the same shape as `vb_page_uncited` (the fix it names is a citation or a Visual Bible edit the Jev-path author cannot make): withhold it as well?; (c) the beats per-page fallback still runs scene-expansion.txt: rebuilding it from the `buildBriefReaskContext` splice for one page needs the parse (`## Page N`) and the Lab stages that call `buildSceneExpansionPrompt` moved together → docs/decisions.md ("Art Director review edit list applied", points 2, 3, 10)

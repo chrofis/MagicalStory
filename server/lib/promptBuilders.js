@@ -8043,9 +8043,58 @@ function replanFindingKey(finding) {
   return `${tag}|${findingPages(f).slice().sort((a, b) => a - b).join(',')}`;
 }
 
-function replanRoundConverged(givenCheck, recheck) {
-  const given = ((givenCheck && givenCheck.findings) || []).filter(countsTowardConvergence);
-  const surviving = ((recheck && recheck.findings) || []).filter(countsTowardConvergence);
+/**
+ * The checker's verdicts that flip on pages the round never touched, in one of
+ * the two checks only — the checker disagreeing with itself, not something the
+ * round did (a page's plan line is byte-identical in both checks). Both the
+ * keep-or-discard guard (`replanRoundRegressed`) and the further-round test
+ * (`replanRoundConverged`) set them aside, so a round is judged on its own
+ * pages only. A finding counts as a flip when it names pages (a counter's
+ * `pages`, or the page numbers in a model finding's line), ALL of them
+ * untouched, and its key (`replanFindingKey`) is absent from the other check.
+ *
+ * `counters` says whether counter findings may be set aside. The regression
+ * guard keeps them OUT (they are arithmetic; a counter whose page list grows
+ * to include a changed page is the round's doing — job_1790100385959_1nitlympp).
+ * The further-round test takes them IN (2026-10-08): the promise / people-free
+ * / central-figure counters read the checker's own ACTIONS, PEOPLELESS and
+ * CENTRAL lines, and on 3 stored books 3-4 of the findings a round-1 recheck
+ * "minted" sat on pages the round never touched (a deed page relabelled
+ * CAST_PROMISE_BROKEN → CAST_PROMISE_FOCAL_BROKEN, the people-free nomination
+ * moving to another page), which stopped round 2 every time.
+ * A finding naming no page (a whole-book counter) always counts.
+ *
+ * @returns {{given:Array, surviving:Array, noise:Array}} both counted lists
+ *   already without the set-aside verdicts, plus the set-aside verdicts.
+ */
+function setAsideUntouchedFlips(given, surviving, changedPages, { counters }) {
+  // null = the caller does not know which pages changed: nothing is set aside.
+  if (changedPages == null) return { given, surviving, noise: [] };
+  const changed = new Set((changedPages || []).map(Number));
+  const givenKeys = new Set(given.map(replanFindingKey));
+  const survivingKeys = new Set(surviving.map(replanFindingKey));
+  const untouchedVerdict = (f) => {
+    if (!f || typeof f === 'string') return false;
+    if (!counters && (f.code || f.check == null)) return false;
+    const pages = findingPages(f);
+    return pages.length > 0 && pages.every(n => !changed.has(Number(n)));
+  };
+  const noise = [
+    ...given.filter(f => untouchedVerdict(f) && !survivingKeys.has(replanFindingKey(f))),
+    ...surviving.filter(f => untouchedVerdict(f) && !givenKeys.has(replanFindingKey(f))),
+  ];
+  const noiseSet = new Set(noise);
+  return { given: given.filter(f => !noiseSet.has(f)), surviving: surviving.filter(f => !noiseSet.has(f)), noise };
+}
+
+function replanRoundConverged(givenCheck, recheck, changedPages = null) {
+  const counted = setAsideUntouchedFlips(
+    ((givenCheck && givenCheck.findings) || []).filter(countsTowardConvergence),
+    ((recheck && recheck.findings) || []).filter(countsTowardConvergence),
+    changedPages,
+    { counters: true },
+  );
+  const { given, surviving } = counted;
   const givenKeys = new Set(given.map(replanFindingKey));
   const minted = surviving.filter(f => !givenKeys.has(replanFindingKey(f)));
   return {
@@ -8053,6 +8102,7 @@ function replanRoundConverged(givenCheck, recheck) {
     given: given.length,
     surviving: surviving.length,
     minted,
+    noise: counted.noise,
   };
 }
 
@@ -8063,16 +8113,16 @@ function replanRoundConverged(givenCheck, recheck) {
  *
  * The measure is the cast/focal must-fix count (`countsTowardConvergence`) of
  * the check the round was given against the recheck of what it returned, with
- * ONE correction for the checker's instability: a MODEL finding (a plan-check
- * question, `check` set, no counter `code`) that names only pages the round did
- * not change, and appears in just one of the two checks, is left out of BOTH
- * counts. Such a page's plan line is byte-identical in both checks, so a
- * verdict that flips on it is the checker disagreeing with itself, not
- * something the round did — measured 2026-09-24 over every stored recheck on
- * staging and prod: 4 of 71 new cast/focal must-fix findings sat on untouched
- * pages. Counter findings always count: they are arithmetic over the check's
- * roster, and the roster of an untouched page drifted on 0 of 39 stored pages.
- * A finding naming no page (a whole-book counter) always counts.
+ * ONE correction for the checker's instability (`setAsideUntouchedFlips`): a
+ * MODEL finding (a plan-check question, `check` set, no counter `code`) that
+ * names only pages the round did not change, and appears in just one of the two
+ * checks, is left out of BOTH counts. Such a page's plan line is byte-identical
+ * in both checks, so a verdict that flips on it is the checker disagreeing with
+ * itself, not something the round did — measured 2026-09-24 over every stored
+ * recheck on staging and prod: 4 of 71 new cast/focal must-fix findings sat on
+ * untouched pages. Counter findings always count here: they are arithmetic over
+ * the check's roster. A finding naming no page (a whole-book counter) always
+ * counts.
  *
  *   regressed — the round ends with MORE than it started with: discard it on
  *               any round. Round 1 used to be exempt (`round > 1`); 10 of 34
@@ -8092,23 +8142,15 @@ function replanRoundConverged(givenCheck, recheck) {
  * @returns {{before:number, after:number, regressed:boolean, reduced:boolean, discard:boolean, noise:Array}}
  */
 function replanRoundRegressed(givenCheck, recheck, changedPages = [], { round = 1 } = {}) {
-  const changed = new Set((changedPages || []).map(Number));
-  const given = ((givenCheck && givenCheck.findings) || []).filter(countsTowardConvergence);
-  const surviving = ((recheck && recheck.findings) || []).filter(countsTowardConvergence);
-  const givenKeys = new Set(given.map(replanFindingKey));
-  const survivingKeys = new Set(surviving.map(replanFindingKey));
-  const untouchedVerdict = (f) => {
-    if (!f || typeof f === 'string' || f.code || f.check == null) return false;
-    const pages = findingPages(f);
-    return pages.length > 0 && pages.every(n => !changed.has(Number(n)));
-  };
-  const noise = [
-    ...given.filter(f => untouchedVerdict(f) && !survivingKeys.has(replanFindingKey(f))),
-    ...surviving.filter(f => untouchedVerdict(f) && !givenKeys.has(replanFindingKey(f))),
-  ];
-  const noiseSet = new Set(noise);
-  const before = given.filter(f => !noiseSet.has(f)).length;
-  const after = surviving.filter(f => !noiseSet.has(f)).length;
+  const counted = setAsideUntouchedFlips(
+    ((givenCheck && givenCheck.findings) || []).filter(countsTowardConvergence),
+    ((recheck && recheck.findings) || []).filter(countsTowardConvergence),
+    changedPages,
+    { counters: false },
+  );
+  const { noise } = counted;
+  const before = counted.given.length;
+  const after = counted.surviving.length;
   const regressed = after > before;
   const reduced = after < before;
   return { before, after, regressed, reduced, discard: regressed || (Number(round) > 1 && !reduced), noise };

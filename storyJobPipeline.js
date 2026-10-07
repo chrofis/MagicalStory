@@ -4872,10 +4872,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       let pagesDone = 0;
       const bumpProgress = () => {
         pagesDone++;
-        const pct = 60 + Math.min(4, Math.floor((pagesDone / expandedScenes.length) * 4));
+        const { pct, message } = require('./server/lib/illustrationProgress').illustrationProgress(pagesDone, pageDataArray.length);
         dbPool.query(
           'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3 AND status = $4',
-          [pct, `Illustration ${pagesDone}/${expandedScenes.length} done...`, jobId, 'processing']
+          [pct, message, jobId, 'processing']
         ).catch(err => log.debug(`[PROGRESS] job ${jobId}: ${err.message}`));
       };
 

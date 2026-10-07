@@ -279,7 +279,7 @@ async function main() {
         const outDir = path.join(process.cwd(), 'tmp', `review-${row.id}-p${pageNum}`);
         fs.mkdirSync(outDir, { recursive: true });
         const imgRows = await pool.query(
-          `SELECT image_type, version_index, image_data
+          `SELECT image_type, version_index, image_url, image_data
              FROM story_images
             WHERE story_id = $1 AND page_number = $2
             ORDER BY image_type, version_index`,
@@ -290,16 +290,31 @@ async function main() {
           console.log('(no story_images rows for this page)');
         } else {
           console.log(`Output dir: ${outDir}`);
+          // Images live on R2 (image_url); image_data is legacy inline base64 and NULL on
+          // current rows. A row that yields no bytes is a FAILURE, never a silent skip.
+          const { bytesFromAnyImage } = require('../../server/lib/r2');
+          const extOf = (b) => (b[0] === 0xff && b[1] === 0xd8 ? 'jpg'
+            : b[0] === 0x89 && b[1] === 0x50 ? 'png'
+            : b.slice(0, 4).toString() === 'RIFF' && b.slice(8, 12).toString() === 'WEBP' ? 'webp' : 'bin');
+          const failed = [];
           for (const r2 of imgRows.rows) {
-            const data = (r2.image_data || '').replace(/^data:image\/\w+;base64,/, '');
-            if (!data) continue;
-            const fname = `${r2.image_type}-v${r2.version_index}.png`;
-            fs.writeFileSync(path.join(outDir, fname), Buffer.from(data, 'base64'));
-            console.log(`  ${fname} (${Math.round(data.length / 1024)} KB)`);
+            const label = `${r2.image_type}-v${r2.version_index}`;
+            let bytes = null;
+            try { bytes = await bytesFromAnyImage(r2.image_url || r2.image_data); } catch (e) { failed.push(`${label}: ${e.message}`); continue; }
+            if (!bytes || bytes.length === 0) { failed.push(`${label}: no bytes (image_url=${r2.image_url ? 'set' : 'null'}, image_data=${r2.image_data ? 'set' : 'null'})`); continue; }
+            const fname = `${label}.${extOf(bytes)}`;
+            fs.writeFileSync(path.join(outDir, fname), bytes);
+            console.log(`  ${fname} (${Math.round(bytes.length / 1024)} KB)`);
+          }
+          if (failed.length) {
+            console.error(`IMAGE DUMP FAILED for ${failed.length}/${imgRows.rows.length} image(s):`);
+            failed.forEach(f => console.error(`  - ${f}`));
+            process.exitCode = 1;
           }
         }
       } catch (e) {
-        console.log(`(image dump failed: ${e.message})`);
+        console.error(`(image dump failed: ${e.message})`);
+        process.exitCode = 1;
       }
     }
 
