@@ -55,7 +55,7 @@ const FINDING_SOURCES = Object.freeze({
   QUALITY: 'quality',
   /** image-semantic.txt — image-vs-brief fidelity. */
   SEMANTIC: 'semantic',
-  /** image-vision-inventory + image-prompt-compliance.txt — the three-stage judge. */
+  /** image-inventory-unified.txt (runVisualInventory, blind) + image-prompt-compliance.txt — the three-stage judge. */
   COMPLIANCE: 'compliance',
   /** entityConsistency.js — cross-page character appearance drift. */
   ENTITY: 'entity',
