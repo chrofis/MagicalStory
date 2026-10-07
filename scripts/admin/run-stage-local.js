@@ -23,9 +23,9 @@
  * which stamps the row so the mismatch travels with the evidence).
  *
  * STAGES THAT CANNOT RUN HERE: anything needing a service this machine does not
- * have. `entity` calls the Python analyzer for cascade face detection and
- * SWALLOWS the failure (detectIllustrationFaces returns [] on any error), so it
- * would silently produce a degraded result that looks valid. Same class of
+ * have. `entity` calls the Python analyzer for cascade face detection; without
+ * it every page reports illustration_face_detection_failed and keeps unrefined
+ * face boxes — a measurement of a run that does not exist. Same class of
  * problem for SAM-dependent repair/composite stages. Those are refused by name.
  *
  * Usage:

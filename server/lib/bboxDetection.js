@@ -988,8 +988,9 @@ async function _detectAllBoundingBoxesImpl(imageData, options = {}) {
     // detector (anime + haar) typically finds looser, better-centered faces. Merge
     // them in before returning so every downstream consumer (character repair,
     // masking, entity check) gets the improved box.
+    const { detectIllustrationFaces, mergeCascadeFacesWithGemini, reportCascadeFailure } = require('./entityConsistency');
+    let cascadeFaceError = null;
     try {
-      const { detectIllustrationFaces, mergeCascadeFacesWithGemini } = require('./entityConsistency');
       const cascadeFaces = await detectIllustrationFaces(imageData, 60);
       if (cascadeFaces.length > 0) {
         let imgW = 1024, imgH = 1024;
@@ -1005,7 +1006,8 @@ async function _detectAllBoundingBoxesImpl(imageData, options = {}) {
         }
       }
     } catch (cascadeErr) {
-      log.debug(`[BBOX-DETECT] ${pageLabel}Cascade merge skipped: ${cascadeErr.message}`);
+      reportCascadeFailure('[BBOX-DETECT]', pageLabel, cascadeErr);
+      cascadeFaceError = cascadeErr.message;
     }
 
     // Compute found/missing objects from final results
@@ -1021,6 +1023,8 @@ async function _detectAllBoundingBoxesImpl(imageData, options = {}) {
       foundObjects,
       missingObjects,
       unknownFigures: finalFigures.filter(f => f.name === 'UNKNOWN').length,
+      // Set when the cascade face pass failed: face boxes are unrefined Gemini/DINO boxes.
+      cascadeFaceError,
       usage: totalUsage,
       // Include raw prompt and response for dev mode debugging
       rawPrompt: prompt,

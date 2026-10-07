@@ -67271,3 +67271,9 @@ Context: staging trials (2026-10-07) analysed 3 photos in parallel; 2 of 3 came 
 Decision: one `_face_detector_lock` around every shared detector call; detector exceptions raise (process_photo → success:false → HTTP 500) instead of returning [].
 Rationale: detection on a ≤1200 px image is sub-second, so serialising costs little; NO FALLBACKS — a failure must not masquerade as "no face". Not changed: server/lib/entityConsistency.js still maps a non-2xx /detect-illustration-faces to [] with a warn (evaluation behaviour, owner call).
 Touched files: photo_analyzer.py, tests/analyzer/test_photo_analyzer_contract.py, tasks/bugs.json.
+
+## 2026-10-07 - Illustration face detection fails loudly on the Node side too
+Context: after the analyzer fix (same day), server/lib/entityConsistency.js detectIllustrationFaces still mapped an unreachable analyzer, a non-2xx or success:false to [] with a warn, and both callers (bboxDetection.js cascade merge, entityConsistency.js collectEntityAppearances) swallowed any error at DEBUG — a dead analyzer read as "this page has no faces". Owner: "Fail loudly too".
+Decision: detectIllustrationFaces throws on every failure ([] means only "the detectors found none"). Each caller reports it through reportCascadeFailure (ERROR log + failure_log kind illustration_face_detection_failed, daily summary) and keeps its own Gemini/DINO boxes; bbox results carry `cascadeFaceError`.
+Rationale: the failed piece of work is the face-box refinement, so that piece stops visibly; propagating into _detectAllBoundingBoxesImpl would hit its outer catch, which returns null and would drop every box on the page for an analyzer hiccup.
+Touched files: server/lib/entityConsistency.js, server/lib/bboxDetection.js, scripts/admin/run-stage-local.js, tests/unit/illustration-face-detection-fails-loudly.test.ts.

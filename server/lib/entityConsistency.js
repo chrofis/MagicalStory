@@ -87,33 +87,53 @@ function resolveActiveVersionData(img) {
  * Detect faces in an illustration using anime + Haar cascades via Python service.
  * Returns face locations with padded crops. Much more accurate than Gemini bbox for
  * finding actual face positions in watercolor/cartoon illustrations.
+ *
+ * THROWS when the analyzer cannot answer (unreachable, non-2xx, success:false):
+ * an empty array means "the detectors found no face", never "the detector broke"
+ * (owner 2026-10-07: fail loudly; the old [] made a dead analyzer look like a
+ * faceless page).
  * @param {string} imageData - base64 data URL of the illustration
  * @param {number} padPercent - padding around face crops (default 60%)
- * @returns {Array<{source, confidence, faceBox, paddedBox, cropData}>} or empty array on failure
+ * @returns {Array<{source, confidence, faceBox, paddedBox, cropData}>}
  */
 async function detectIllustrationFaces(imageData, padPercent = 60) {
+  let response;
   try {
-    const response = await fetch(`${PHOTO_ANALYZER_URL}/detect-illustration-faces`, {
+    response = await fetch(`${PHOTO_ANALYZER_URL}/detect-illustration-faces`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ image: imageData, pad_percent: padPercent }),
       signal: AbortSignal.timeout(15000),
     });
-    if (!response.ok) {
-      log.warn(`[CASCADE-DETECT] Python service returned ${response.status}`);
-      return [];
-    }
-    const result = await response.json();
-    if (!result.success) {
-      log.warn(`[CASCADE-DETECT] Detection failed: ${result.error}`);
-      return [];
-    }
-    log.debug(`[CASCADE-DETECT] Found ${result.total_faces} faces (anime: ${result.detectors?.anime}, haar: ${result.detectors?.haar})`);
-    return result.faces || [];
   } catch (err) {
-    log.warn(`[CASCADE-DETECT] Service unavailable: ${err.message}`);
-    return [];
+    throw new Error(`illustration face detection unavailable: ${err.message}`);
   }
+  if (!response.ok) {
+    const body = await response.text().catch(() => '');
+    throw new Error(`illustration face detection failed: analyzer HTTP ${response.status} ${body.slice(0, 200)}`);
+  }
+  const result = await response.json();
+  if (!result.success) {
+    throw new Error(`illustration face detection failed: ${result.error || 'success:false'}`);
+  }
+  log.debug(`[CASCADE-DETECT] Found ${result.total_faces} faces (anime: ${result.detectors?.anime}, haar: ${result.detectors?.haar})`);
+  return result.faces || [];
+}
+
+/**
+ * One loud report for a failed cascade face pass: ERROR log + failure_log row
+ * (daily summary). The caller keeps its Gemini/DINO boxes, marks the result,
+ * and does not pretend the page has no faces.
+ */
+function reportCascadeFailure(where, pageLabel, err) {
+  log.error(`❌ [CASCADE-DETECT] ${where} ${pageLabel}face-box refinement FAILED — boxes are unrefined: ${err.message}`);
+  try {
+    require('./failureLog').recordFailure({
+      kind: 'illustration_face_detection_failed', severity: 'internal',
+      fingerprint: String(err.message).slice(0, 80),
+      summary: `${where} ${pageLabel}cascade face detection failed: ${String(err.message).slice(0, 160)}`,
+    });
+  } catch { /* reporting must never break detection */ }
 }
 
 /**
@@ -2138,7 +2158,7 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
           }
         }
       } catch (err) {
-        log.debug(`[ENTITY-COLLECT] Page ${pageNumber}: Cascade face detection skipped: ${err.message}`);
+        reportCascadeFailure('[ENTITY-COLLECT]', `Page ${pageNumber}: `, err);
       }
       // Fallback: even without cascade, ensure bodyBox contains faceBox
       if (!cascadeRan) {
@@ -3793,6 +3813,7 @@ module.exports = {
 
   // Helper functions (exported for testing)
   detectIllustrationFaces,
+  reportCascadeFailure,
   mergeCascadeFacesWithGemini,
   normalizeClothingCategory,
   groupAppearancesByClothing,
