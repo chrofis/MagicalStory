@@ -81,6 +81,7 @@ const { evaluateImageQuality } = require_('../../server/lib/evalPipeline.js');
 const realCallTextModel = textModels.callTextModel;
 const realFetch = globalThis.fetch;
 const ORIGINAL_GEMINI_KEY = process.env.GEMINI_API_KEY;
+const ORIGINAL_OPENROUTER_KEY = process.env.OPENROUTER_API_KEY;
 
 /** A 1x1 JPEG-shaped data URI — never decoded, only passed through. */
 const IMAGE = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAEB';
@@ -159,6 +160,9 @@ beforeAll(async () => {
   // "stage 1 still ran" is actually observable. Nothing is sent anywhere —
   // fetch is stubbed for the whole describe block.
   process.env.GEMINI_API_KEY = process.env.GEMINI_API_KEY || 'test-key-not-used';
+  // An OpenRouter key in the shell reroutes the judge away from the stubbed
+  // Gemini path, so the assertions below would see a different call.
+  delete process.env.OPENROUTER_API_KEY;
 });
 
 afterEach(() => {
@@ -169,6 +173,7 @@ afterEach(() => {
 afterAll(() => {
   if (ORIGINAL_GEMINI_KEY === undefined) delete process.env.GEMINI_API_KEY;
   else process.env.GEMINI_API_KEY = ORIGINAL_GEMINI_KEY;
+  if (ORIGINAL_OPENROUTER_KEY !== undefined) process.env.OPENROUTER_API_KEY = ORIGINAL_OPENROUTER_KEY;
 });
 
 /** The compliance judge's own usage label — its one call site, its one bucket. */
