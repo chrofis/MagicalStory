@@ -6,6 +6,7 @@ Disallow: /admin/
 Disallow: /create/
 Disallow: /stories
 Disallow: /orders
+Disallow: /account
 Disallow: /book-builder
 Disallow: /welcome
 Disallow: /trial-generation

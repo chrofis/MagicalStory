@@ -477,9 +477,22 @@ const STATIC_ROUTES = {
 
 // Routes that should have noindex
 const NOINDEX_ROUTES = [
-  '/create', '/stories', '/orders', '/admin', '/book-builder',
+  '/create', '/stories', '/orders', '/account', '/admin', '/book-builder',
   '/welcome', '/trial-generation', '/claim', '/reset-password', '/email-verified',
 ];
+
+// Client-only routes (App.tsx) that have no prerendered page: the SPA shell is
+// the right 200 answer for them. Any other path without a prerendered file is
+// a page that does not exist and answers 404 — before 2026-10-07 every unknown
+// URL got the shell with a 200 and the homepage's meta (a soft-404), and the
+// app routes above were served with "index, follow" and a canonical pointing
+// at the homepage because the shell was sent untouched.
+const APP_ROUTES = [...NOINDEX_ROUTES, '/try', '/shared', '/s'];
+
+function isAppRoute(routePath) {
+  const p = String(routePath || '').replace(/\/+$/, '') || '/';
+  return APP_ROUTES.some(r => p === r || p.startsWith(r + '/'));
+}
 
 // ─── Town Data (for meta tags) ────────────────────────────────────────────────
 
@@ -1403,38 +1416,18 @@ function getMetaForRoute(routePath, lang) {
     }
   }
 
-  // 9. Noindex route (auth/app pages)
-  if (isNoindex) {
-    return {
-      title: 'Magical Story',
-      description: '',
-      canonical: canonicalUrl,
-      path: cleanPath,
-      noindex: true,
-      hreflang: [],
-    };
-  }
-
-  // 10. Fallback — unknown route
+  // 9. Noindex route (auth/app pages) — and 10. any route nobody declared.
+  // An undeclared route used to get the homepage's title, description and
+  // hreflang set with "index, follow": a crawler then saw a second copy of the
+  // homepage on every mistyped or retired URL. Nothing is known about such a
+  // page, so nothing is claimed for it.
   return {
-    title: lang === 'it'
-      ? 'Magical Story – Il tuo bambino protagonista della sua storia'
-      : lang === 'fr'
-        ? 'Magical Story – Votre enfant, héros de sa propre histoire'
-        : lang === 'en'
-          ? 'Magical Story – Your Child as the Hero of Their Own Story'
-          : 'Magical Story – Dein Kind als Held seiner eigenen Geschichte',
-    description: lang === 'it'
-      ? 'Rendi il tuo bambino il protagonista della sua storia. Carica una foto, scegli un tema, crea gratis la prima storia.'
-      : lang === 'fr'
-        ? 'Un livre pour enfant personnalisé où votre enfant est le héros. Importez une photo, choisissez un thème, créez votre première histoire gratuitement.'
-        : lang === 'en'
-          ? "A personalized children's book where your child is the hero. Upload a photo, pick a theme, create your first story free."
-          : 'Ein personalisiertes Kinderbuch, in dem dein Kind der Held ist. Foto hochladen, Thema wählen, erste Geschichte gratis erstellen.',
+    title: 'Magical Story',
+    description: '',
     canonical: canonicalUrl,
     path: cleanPath,
-    noindex: false,
-    hreflang: buildHreflang(cleanPath),
+    noindex: true,
+    hreflang: [],
   };
 }
 
@@ -1770,6 +1763,22 @@ function injectMeta(html, meta, lang = 'de') {
   return result;
 }
 
+/**
+ * The HTML for a route that has no prerendered page: the SPA shell with that
+ * route's own meta (title, self-canonical, noindex for app pages, JSON-LD for
+ * /try) instead of the homepage's, and a 404 status when the route is not one
+ * the client app serves at all.
+ * @param {string} shellHtml - dist/index.html contents
+ * @param {string} routePath
+ * @param {string} lang
+ * @returns {{ html: string, status: number }}
+ */
+function renderSpaShell(shellHtml, routePath, lang) {
+  lang = normalizeLang(lang);
+  const html = injectMeta(shellHtml, getMetaForRoute(routePath, lang), lang);
+  return { html, status: isAppRoute(routePath) ? 200 : 404 };
+}
+
 function escapeHtml(str) {
   return String(str)
     .replace(/&/g, '&amp;')
@@ -1966,4 +1975,4 @@ function escapeXml(str) {
 
 // ─── Exports ──────────────────────────────────────────────────────────────────
 
-module.exports = { getMetaForRoute, injectMeta, generateSitemap, HTML_LANG };
+module.exports = { getMetaForRoute, injectMeta, renderSpaShell, isAppRoute, generateSitemap, HTML_LANG, NOINDEX_ROUTES, APP_ROUTES };

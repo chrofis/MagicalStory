@@ -256,7 +256,7 @@ const { createJobHeartbeat } = require('./server/lib/jobHeartbeat');
 const { getActiveIndexAfterPush } = require('./server/lib/versionManager');
 const { GenerationLogger, setCurrentLogger, clearCurrentLogger } = require('./server/lib/generationLogger');
 const { hasPhotos: hasCharacterPhotos, getFacePhoto } = require('./server/lib/characterPhotos');
-const { generateSitemap } = require('./server/lib/seoMeta');
+const { generateSitemap, renderSpaShell } = require('./server/lib/seoMeta');
 const { stripDataUriPrefix } = require('./server/lib/r2');
 const configRoutes = require('./server/routes/config');
 const healthRoutes = require('./server/routes/health');
@@ -2425,13 +2425,14 @@ async function initialize() {
 }
 
 // SEO files - serve before SPA fallback to ensure correct content-type
+// One source: client/public/robots.txt (copied into dist/ by the client build).
+// The inline copy that used to stand in when dist/ was missing had already
+// drifted from the file (no /account line); a missing file now fails loudly.
 app.get('/robots.txt', (req, res) => {
-  const robotsPath = path.join(distPath, 'robots.txt');
-  if (hasDistFolder && require('fs').existsSync(robotsPath)) {
-    res.type('text/plain').sendFile(robotsPath);
-  } else {
-    res.type('text/plain').send(`User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /admin/\nDisallow: /create/\nDisallow: /stories\nDisallow: /orders\nDisallow: /book-builder\nDisallow: /welcome\nDisallow: /trial-generation\nDisallow: /claim/\nDisallow: /reset-password/\nDisallow: /email-verified\n\nSitemap: https://magicalstory.ch/sitemap.xml`);
-  }
+  const robotsPath = hasDistFolder
+    ? path.join(distPath, 'robots.txt')
+    : path.join(__dirname, 'client', 'public', 'robots.txt');
+  res.type('text/plain').sendFile(robotsPath);
 });
 
 app.get('/sitemap.xml', (req, res) => {
@@ -2543,13 +2544,25 @@ app.get('*', (req, res, next) => {
     return res.type('html').sendFile(prerenderedFile);
   }
 
-  // App routes (/create, /wizard, /admin, etc.) — serve SPA shell
-  if (hasDistFolder) {
-    res.sendFile(path.join(distPath, 'index.html'));
-  } else {
-    res.sendFile(path.join(__dirname, 'index.html'));
-  }
+  // App routes (/create, /try, /admin, etc.) — the SPA shell, carrying the
+  // route's own meta: self-canonical, noindex for account/wizard pages, the
+  // HowTo on /try. A path that is neither prerendered nor a client route does
+  // not exist and says so with a 404 (the shell still renders, and the client
+  // router sends the visitor home) — serving it with a 200 and the homepage's
+  // meta made every mistyped URL a duplicate of the homepage for crawlers.
+  const { html, status } = renderSpaShell(loadSpaShell(), req.path, lang);
+  res.status(status).type('html').send(html);
 });
+
+// dist/index.html only changes on deploy (= process restart), so read it once.
+let spaShellHtml = null;
+function loadSpaShell() {
+  if (spaShellHtml === null) {
+    const shellPath = hasDistFolder ? path.join(distPath, 'index.html') : path.join(__dirname, 'index.html');
+    spaShellHtml = require('fs').readFileSync(shellPath, 'utf8');
+  }
+  return spaShellHtml;
+}
 
 initialize().then(() => {
   // Force R2 init at boot so the [R2] config line appears in deploy logs
