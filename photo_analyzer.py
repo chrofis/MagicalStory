@@ -194,6 +194,14 @@ _boot_mark("mediapipe")
 
 # Try to initialize MTCNN (best accuracy)
 # Try mtcnn-opencv first (lightweight, no TensorFlow), then fall back to mtcnn (TensorFlow)
+# One lock for every module-level detector object. mtcnn_cv2's MTCNN wraps
+# cv2.dnn Nets and the Haar/LBP CascadeClassifiers keep per-call state — none is
+# safe to call from two waitress threads at once. Measured 2026-10-07 on staging:
+# 3 parallel trial uploads, 2 came back `no_face_detected` while the same photo
+# alone found its face (twice reproduced). Detection on a <=1200 px image takes a
+# fraction of a second, so serialising it costs little.
+_face_detector_lock = threading.Lock()
+
 MTCNN_AVAILABLE = False
 mtcnn_detector = None
 try:
@@ -1109,12 +1117,13 @@ def detect_all_faces_anime(image, min_size=30, scale_factor=1.1, min_neighbors=2
         height, width = gray.shape[:2]
 
         # Detect faces - anime cascade works better with smaller scale factor
-        faces_detected = anime_face_cascade.detectMultiScale(
-            gray,
-            scaleFactor=scale_factor,
-            minNeighbors=min_neighbors,
-            minSize=(min_size, min_size)
-        )
+        with _face_detector_lock:
+            faces_detected = anime_face_cascade.detectMultiScale(
+                gray,
+                scaleFactor=scale_factor,
+                minNeighbors=min_neighbors,
+                minSize=(min_size, min_size)
+            )
 
         faces = []
         for idx, (x, y, w, h) in enumerate(faces_detected):
@@ -1140,7 +1149,7 @@ def detect_all_faces_anime(image, min_size=30, scale_factor=1.1, min_neighbors=2
 
     except Exception as e:
         print(f"[ANIME] Error: {e}")
-        return []
+        raise RuntimeError(f"illustration face detection failed: {e}") from e
 
 
 def detect_all_faces_mtcnn(image, min_confidence=0.9):
@@ -1157,8 +1166,9 @@ def detect_all_faces_mtcnn(image, min_confidence=0.9):
         # MTCNN expects RGB, OpenCV uses BGR
         rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
-        # Detect faces
-        faces_data = mtcnn_detector.detect_faces(rgb_image)
+        # Detect faces (serialised: the detector is shared across threads)
+        with _face_detector_lock:
+            faces_data = mtcnn_detector.detect_faces(rgb_image)
 
         faces = []
         for idx, face in enumerate(faces_data):
@@ -1189,8 +1199,11 @@ def detect_all_faces_mtcnn(image, min_confidence=0.9):
         return faces
 
     except Exception as e:
+        # A detector failure is NOT "no face": returning [] here made /analyze
+        # answer no_face_detected for a photo with a clear face. Fail loudly —
+        # process_photo turns this into success:false (HTTP 500).
         print(f"[MTCNN] Error: {e}")
-        return []
+        raise RuntimeError(f"face detection failed: {e}") from e
 
 
 def detect_face_opencv(image):
@@ -1208,12 +1221,13 @@ def detect_face_opencv(image):
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
     # Detect faces
-    faces = face_cascade.detectMultiScale(
-        gray,
-        scaleFactor=1.1,
-        minNeighbors=5,
-        minSize=(30, 30)
-    )
+    with _face_detector_lock:
+        faces = face_cascade.detectMultiScale(
+            gray,
+            scaleFactor=1.1,
+            minNeighbors=5,
+            minSize=(30, 30)
+        )
 
     if len(faces) > 0:
         # Get the largest face (by area)

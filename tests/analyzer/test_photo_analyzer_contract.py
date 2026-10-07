@@ -137,6 +137,69 @@ def test_process_photo_writes_no_copy_of_the_photo_to_disk():
         f"photo written to disk: {[c.args[0] for c in _cv2.imwrite.call_args_list]}"
 
 
+# ── shared face detector under concurrent requests ─────────────────────────
+class _NotThreadSafeDetector:
+    """Behaves like mtcnn_cv2's MTCNN (cv2.dnn Nets): a second thread entering
+    while one is inside corrupts the shared net. Staging, 2026-10-07: 3 parallel
+    trial uploads, 2 answered no_face_detected for photos with a clear face."""
+    def __init__(self):
+        import threading as _t
+        self.inside = 0
+        self.max_inside = 0
+        self._guard = _t.Lock()
+
+    def detect_faces(self, rgb):
+        import time as _time
+        with self._guard:
+            self.inside += 1
+            self.max_inside = max(self.max_inside, self.inside)
+            clash = self.inside > 1
+        try:
+            _time.sleep(0.05)
+            if clash:
+                raise RuntimeError('cv2.dnn: net reused concurrently')
+            return [{'box': [10, 10, 30, 30], 'confidence': 0.99}]
+        finally:
+            with self._guard:
+                self.inside -= 1
+
+
+def test_concurrent_detections_never_overlap_and_all_find_the_face():
+    import threading as _t
+    det = _NotThreadSafeDetector()
+    img = np.zeros((100, 100, 3), dtype=np.uint8)
+    results, errors = [], []
+
+    def run():
+        try:
+            results.append(pa.detect_all_faces_mtcnn(img, min_confidence=0.9))
+        except Exception as e:  # noqa: BLE001
+            errors.append(e)
+
+    with mock.patch.object(pa, 'mtcnn_detector', det), mock.patch.object(pa, 'MTCNN_AVAILABLE', True):
+        threads = [_t.Thread(target=run) for _ in range(3)]
+        for t in threads: t.start()
+        for t in threads: t.join()
+    assert det.max_inside == 1, f"detector entered by {det.max_inside} threads at once"
+    assert not errors, errors
+    assert [len(r) for r in results] == [1, 1, 1]
+
+
+def test_a_detector_failure_is_an_error_not_no_face():
+    """Returning [] on a detector exception made /analyze answer
+    no_face_detected; the failure must surface as success:false with the
+    detector error (HTTP 500 from /analyze), never as 'no face'."""
+    class Broken:
+        def detect_faces(self, rgb):
+            raise RuntimeError('boom')
+    _cv2.imdecode.return_value = np.zeros((100, 80, 3), dtype=np.uint8)
+    with mock.patch.object(pa, 'mtcnn_detector', Broken()), mock.patch.object(pa, 'MTCNN_AVAILABLE', True):
+        result = pa.process_photo("data:image/jpeg;base64,AAAA", is_base64=True)
+    assert result["success"] is False
+    assert result["error"] != "no_face_detected"
+    assert "face detection failed" in result["error"]
+
+
 if __name__ == '__main__':
     failures = 0
     for name, fn in sorted(globals().items()):

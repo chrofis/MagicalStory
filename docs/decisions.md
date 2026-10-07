@@ -67265,3 +67265,9 @@ Decision: (1) MODEL_DEFAULTS.trialStoryEffort stays 'medium' for every trial age
 Rationale: speed is the trial's product requirement; the older-reader regression is noted as a watch item, not a blocker.
 Revisit if: more 7+ trials read noticeably simpler than full stories (then consider effort by age band).
 Touched files: tasks/verify.json (trial-writer-effort-medium → confirmed).
+
+## 2026-10-07 - Photo analyzer serialises its shared face detectors; a detector error is never "no face"
+Context: staging trials (2026-10-07) analysed 3 photos in parallel; 2 of 3 came back without a face, twice; the same photo alone found its face. photo_analyzer.py shares one MTCNN (mtcnn_cv2, cv2.dnn Nets) and two CascadeClassifiers across waitress threads, none thread-safe, and the MTCNN/anime wrappers turned any exception into an empty face list.
+Decision: one `_face_detector_lock` around every shared detector call; detector exceptions raise (process_photo → success:false → HTTP 500) instead of returning [].
+Rationale: detection on a ≤1200 px image is sub-second, so serialising costs little; NO FALLBACKS — a failure must not masquerade as "no face". Not changed: server/lib/entityConsistency.js still maps a non-2xx /detect-illustration-faces to [] with a warn (evaluation behaviour, owner call).
+Touched files: photo_analyzer.py, tests/analyzer/test_photo_analyzer_contract.py, tasks/bugs.json.

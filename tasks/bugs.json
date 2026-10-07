@@ -3790,24 +3790,24 @@
       "fix": "styledAvatars.missingCostumedRefs(photos) names the characters asked for their costume whose photo is neither a costumed-* ref nor a styled cache hit; the streamed trial page and both trial covers throw on a non-empty result right after applyStyledAvatars (COSTUME OR FAIL, same shape as PLATE OR FAIL). The failed page returns null and is rendered by the page loop after the coverage pass; a failed cover is recorded as cover_failed. The early styling failure logs at ERROR. The full-mode page path renders after the coverage pass that throws and is unchanged."
     },
     {
-          "id": "cast-promise-focal-answered-by-adding",
-          "title": "CAST_PROMISE_BROKEN 'focal' (deed page holds more than one companion) read as direction 'more', so the review refused every cast-out that was the only answer (Berta p5 rounds 1+2, Emma p3)",
-          "reportedAt": "2026-10-07",
-          "source": "Staging job_1791315635053_t0t8qpebu beatsReviewReport.changeRefusals: 'PLAN[CAST_PROMISE_BROKEN] asks for a name in frame and this page held 3 of 6, so there was room to add' on p5 (r1, r2) and p3 (r2). Replay of both stored rounds through reviewPlanChanges: p5/p3 refusals gone.",
-          "status": "fixed",
-          "fixedAt": "2026-10-07",
-          "fixedIn": "4be3f986c",
-          "fix": "castTablePromises' focal variant is its own code CAST_PROMISE_FOCAL_BROKEN (direction 'fewer', must-fix, counted for convergence, Lab CAST_FINDING_CODES). Test: replan-focal-promise-and-arc-fact.test.ts (fails on parent)."
+      "id": "cast-promise-focal-answered-by-adding",
+      "title": "CAST_PROMISE_BROKEN 'focal' (deed page holds more than one companion) read as direction 'more', so the review refused every cast-out that was the only answer (Berta p5 rounds 1+2, Emma p3)",
+      "reportedAt": "2026-10-07",
+      "source": "Staging job_1791315635053_t0t8qpebu beatsReviewReport.changeRefusals: 'PLAN[CAST_PROMISE_BROKEN] asks for a name in frame and this page held 3 of 6, so there was room to add' on p5 (r1, r2) and p3 (r2). Replay of both stored rounds through reviewPlanChanges: p5/p3 refusals gone.",
+      "status": "fixed",
+      "fixedAt": "2026-10-07",
+      "fixedIn": "4be3f986c",
+      "fix": "castTablePromises' focal variant is its own code CAST_PROMISE_FOCAL_BROKEN (direction 'fewer', must-fix, counted for convergence, Lab CAST_FINDING_CODES). Test: replan-focal-promise-and-arc-fact.test.ts (fails on parent)."
     },
     {
-          "id": "arc-fact-break-blocked-by-protection",
-          "title": "A plan line that breaks an arc fact (plan-check Q18) was a noted finding, so the 'protected' rule refused the only correct fix (p5 'Berta swims her long arc' vs 'cannot slide into the sea')",
-          "reportedAt": "2026-10-07",
-          "source": "Staging job_1791315635053_t0t8qpebu changeRefusals r1 p5 rule 'protected': \"Noah's own action stays, and CHECK[18] is a noted finding, not a must-fix one\".",
-          "status": "fixed",
-          "fixedAt": "2026-10-07",
-          "fixedIn": "4be3f986c",
-          "fix": "planCounters.ARC_FACT_CHECKS = {18}: a change answering Q18 may touch a protected page. Q18 stays noted for the mandate (REPLAN_MUST_FIX_CHECKS unchanged). Test: replan-focal-promise-and-arc-fact.test.ts."
+      "id": "arc-fact-break-blocked-by-protection",
+      "title": "A plan line that breaks an arc fact (plan-check Q18) was a noted finding, so the 'protected' rule refused the only correct fix (p5 'Berta swims her long arc' vs 'cannot slide into the sea')",
+      "reportedAt": "2026-10-07",
+      "source": "Staging job_1791315635053_t0t8qpebu changeRefusals r1 p5 rule 'protected': \"Noah's own action stays, and CHECK[18] is a noted finding, not a must-fix one\".",
+      "status": "fixed",
+      "fixedAt": "2026-10-07",
+      "fixedIn": "4be3f986c",
+      "fix": "planCounters.ARC_FACT_CHECKS = {18}: a change answering Q18 may touch a protected page. Q18 stays noted for the mandate (REPLAN_MUST_FIX_CHECKS unchanged). Test: replan-focal-promise-and-arc-fact.test.ts."
     },
     {
       "id": "phantom-patched-cast-has-no-description",
@@ -3818,6 +3818,16 @@
       "fixedAt": "2026-10-07",
       "fixedIn": "939b32287",
       "fix": "phantomCharacters.js composes `description` with visualBible.buildCharacterDescription (the one builder) before pushing the entry, and drops an entry with no visual field loudly; collectSecondaryCastForPage logs an error for an on-page entry without a description instead of skipping it; buildTextFromJson puts the name outside the comma list. Test: phantom-cast-description-reaches-prompt.test.ts (5 fail on parent, 5 pass)."
+    },
+    {
+      "id": "analyzer-concurrent-face-detection-no-face",
+      "title": "Photo analyzer answers no_face_detected for clear faces when several photos are analysed at once",
+      "reportedAt": "2026-10-07",
+      "source": "Staging trial runs 2026-10-07: 3 parallel /api/trial/analyze-photo calls, 2 of 3 returned no face crop (twice: 18:32 and 18:46 CH); the same Rohan photo alone found its face at 15:52 CH. photo_analyzer.py: one module-level MTCNN (cv2.dnn) and two CascadeClassifiers shared by every waitress thread, and detect_all_faces_mtcnn / detect_all_faces_anime returned [] on any exception.",
+      "status": "fixed",
+      "fixedAt": "2026-10-07",
+      "fixedIn": "pending",
+      "fix": "_face_detector_lock serialises every shared detector call (MTCNN, frontal and anime cascades); a detector exception raises instead of returning [] so /analyze reports a failure, never 'no face'. Pinned by tests/analyzer/test_photo_analyzer_contract.py (concurrency + failure tests, fail before / pass after)."
     }
   ]
 }
