@@ -479,9 +479,14 @@ its own cap of 9.</p>
 2026-09-15). Every Visual Bible element carries an authored <code>scaleClass</code>
 (<code>hand | arm | person | vehicle | building | landscape</code>); anything at
 <code>vehicle</code>, <code>building</code> or <code>landscape</code> scale is
-<em>plate-borne</em> and is dropped from the page grid by both filter sites
-(<code>buildPageCompositeRefs</code> and Phase 5a-pre-grid in
-<code>storyJobPipeline.js</code>) through the shared <code>isPlateBorneElement</code>.
+<em>plate-borne</em> and is dropped from the page grid by every filter site
+(<code>buildPageCompositeRefs</code>, Phase 5a-pre-grid in
+<code>storyJobPipeline.js</code>, and &mdash; since 2026-10-07 &mdash; the streamed TRIAL page,
+which builds its grid through the same <code>pageRenderCall.buildPageVbGrid</code>:
+selection with the hint&rsquo;s <code>objects[]</code> and cited ids, the cap of 4, the
+plate-borne drop, the <code>aboard</code> withhold, no landmark photo in the grid; it had
+hand-rolled a cap-6 selection with no filter and the secondary landmark photos among the
+cells) through the shared <code>isPlateBorneElement</code>.
 Routing is by the CLASS, not by the VB collection, so a building-scale <em>artifact</em>
 (a monument, a mill, a bridge) routes like a ship does. A cell has exactly one size
 &mdash; its own &mdash; and nothing in it says whether it depicts a thumb or a

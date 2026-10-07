@@ -1145,6 +1145,15 @@
   ],
   "withinFile": [
     {
+      "id": "trial-page-grid-vs-production-page-grid",
+      "axis": "streamed trial page grid vs Phase 5a-pre-grid production page grid",
+      "reason": "storyJobPipeline.js builds a page's Visual Bible grid at TWO sites: the streamed trial page (startTrialPageImageGeneration, pageRenderCall.buildPageVbGrid) and the full story's Phase 5a-pre-grid (pageRenderCall.keepPageGridElements over the Phase 5a selection). Both must rebuild the prompt's reference claim from the cells actually KEPT after the plate-borne filter, never from the selection or the grid's raw order. Until 2026-10-07 the trial hand-rolled its own selection (cap 6, no plate filter, no aboard withhold, landmark photos among the cells) and claimed the grid's rawElements; a grid rule changed at one site belongs at the other, and the cell-selection logic itself belongs in pageRenderCall.js where the Test Lab reads it too (set lab-vs-prod-page-render).",
+      "file": "storyJobPipeline.js",
+      "blockPattern": "require\\('\\./server/lib/pageRenderCall'\\)\\.(buildPageVbGrid|keepPageGridElements)\\(",
+      "mustContain": "(kept.map(e => e.id).filter(Boolean))",
+      "severity": "block"
+    },
+    {
       "id": "textmodel-stream-completion",
       "axis": "streaming provider entry points (Anthropic / Gemini / xAI / OpenRouter)",
       "reason": "every streaming entry point in textModels.js must throw streamCutError when its body ends without that provider's completion signal; the OpenRouter path accepted two cut page-brief streams as successes (staging job_1791145238223_50osg2osm, 7 of the last 40 staging beats stories). docs/decisions.md 2026-10-05.",

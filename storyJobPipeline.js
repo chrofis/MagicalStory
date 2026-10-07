@@ -54,8 +54,6 @@ const {
   initializeVisualBibleMainCharacters,
   linkPreDiscoveredLandmarks,
   injectHistoricalLocations,
-  getElementReferenceImagesForPage,
-  getElementReferenceImagesByIds,
   dedupeSecondaryCharacterIds
 } = require('./server/lib/visualBible');
 const { rollUpScenePrompts, projectSceneCast } = require('./server/lib/storyShape');
@@ -1307,48 +1305,43 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           }
           // Wait for the parallel ref-sheet generation (started in onVisualBible
           // alongside empty scenes + costumed avatars) before reading element
-          // refs — otherwise getElementReferenceImagesForPage returns an empty
-          // array because referenceImageUrl hasn't been populated on each VB
-          // entry yet. The promise typically resolves well before page render
+          // refs — otherwise the page selector (pageRenderCall.buildPageVbGrid)
+          // finds no usable cell because referenceImageUrl hasn't been
+          // populated on each VB entry yet. The promise typically resolves well before page render
           // since costumed avatar gen takes ~30s and ref sheets ~15-20s; this
           // await is usually a no-op by the time we hit it. Falls through on
           // failure (ref sheets are an enhancement, not a hard requirement).
           if (trialReferenceSheetPromise) {
             try { await trialReferenceSheetPromise; } catch { /* logged in the catch in onVisualBible */ }
           }
-          let elementRefs = getElementReferenceImagesForPage(streamingVisualBible, page.pageNumber, 6);
-          // Also match by IDs from scene hint (same as Phase 5a)
-          if (sceneMetadata?.fullData) {
-            const sceneIds = [];
-            for (const char of sceneMetadata.fullData.characters || []) {
-              if (char.id && char.id !== 'null') sceneIds.push(char.id);
-            }
-            for (const obj of sceneMetadata.fullData.objects || []) {
-              const id = typeof obj === 'string' ? obj.match(/((?:ART|OBJ|CHR|VEH)\d+)/i)?.[1] : obj?.id;
-              if (id && !id.startsWith('LOC')) sceneIds.push(id);
-            }
-            if (sceneIds.length > 0) {
-              const idBasedRefs = getElementReferenceImagesByIds(streamingVisualBible, sceneIds, page.pageNumber);
-              const existingIds = new Set(elementRefs.map(r => r.id));
-              const newRefs = idBasedRefs.filter(r => !existingIds.has(r.id));
-              if (newRefs.length > 0) elementRefs = [...elementRefs, ...newRefs].slice(0, 6);
-            }
-          }
-          const secondaryLandmarks = pageLandmarkPhotos.slice(1);
-          let trialVbGrid = null;
-          if (elementRefs.length > 0 || secondaryLandmarks.length > 0) {
-            trialVbGrid = await buildVisualBibleGrid(elementRefs, secondaryLandmarks);
-          }
+          // The page's VB grid, selected, filtered and built by the ONE helper
+          // the story run (Phase 5a / 5a-pre-grid), the Test Lab image stage
+          // and the regenerate routes use (pageRenderCall.buildPageVbGrid):
+          // the page's elements with the scene hint's objects[] and the ids it
+          // cites, the physical cap VB_SLOT_MAX_ELEMENTS, the plate-borne
+          // filter when a plate is sent, the camera's `aboard` element
+          // withheld, and NEVER a landmark photo in the grid (owner, settled
+          // 2026-08-18). Until 2026-10-07 the trial hand-rolled this selection
+          // at cap 6 with no plate filter and with the secondary landmark
+          // photos composited among the cells (decisions.md 2026-10-07).
+          // The trial sends its plate straight to the render (no reference
+          // mode), so "plate sent" is the plate itself; every reference mode
+          // passes the plate through unchanged (clothingResolve.applyReferenceMode).
+          const { kept, visualBibleGrid: trialVbGrid } = await require('./server/lib/pageRenderCall').buildPageVbGrid({
+            visualBible: streamingVisualBible, pageNumber: page.pageNumber, sceneMetadata, hasPlate: !!trialPlate,
+          });
+          log.info(`🔲 [VB-GRID] Trial page ${page.pageNumber}: ${kept.length} cell(s)${kept.length ? ` — ${kept.map(e => e.id).join(', ')}` : ''} (${trialPlate ? 'plate sent, plate-borne vehicle/structure dropped' : 'no plate sent, vehicle/structure kept'})`);
 
           // Built AFTER the grid so the REQUIRED OBJECTS checklist can point
-          // at the reference images that actually ride with this call.
+          // at the reference images that actually ride with this call — the
+          // KEPT cells, as Phase 5a-pre-grid rebuilds its claim.
           // Through the ONE closure the story run and the Test Lab use
           // (pageRenderCall.makePageImagePrompt: the Grok VB-prose skip and the
           // reference claim), so an option added there reaches trial pages too.
           const imagePrompt = require('./server/lib/pageRenderCall').makePageImagePrompt({
             sceneDescription, inputData, sceneCharacters, visualBible: streamingVisualBible,
             pageNumber: page.pageNumber, characterPhotos: pagePhotos, pageImageModel,
-          })((trialVbGrid?.rawElements || []).map(e => e.id).filter(Boolean));
+          })(kept.map(e => e.id).filter(Boolean));
 
           log.info(`⚡ [TRIAL-STREAM] Page ${page.pageNumber} image generation starting (parallel with streaming)${pageLandmarkPhotos.length ? ` [${pageLandmarkPhotos.length} landmark(s)]` : ''}${trialVbGrid ? ' [VB grid]' : ''}`);
           const startTime = Date.now();
