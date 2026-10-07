@@ -21,7 +21,8 @@ db.dbQuery = async (sql: string) => {
   return [];
 };
 db.imagesExistByType = async () => new Set();
-db.getActiveVersionMeta = async () => ({});
+let versionMeta: any = {};
+db.getActiveVersionMeta = async () => versionMeta;
 
 const { apiRouter } = nodeRequire('../../server/routes/sharing.js');
 
@@ -46,6 +47,7 @@ const pageText = (word: string, n: number) => `${word} ${n} text with é, ß and
 const scenes = (n: number) => Array.from({ length: n }, (_, i) => ({ pageNumber: i + 1 }));
 
 beforeEach(() => {
+  versionMeta = {};
   row = { id: 's1', user_id: 'owner', is_shared: true, admin_draft: false, data: { title: 'T', sceneImages: scenes(3) } };
 });
 
@@ -71,5 +73,18 @@ describe('shared story page text parser', () => {
     row.data.storyText = `## Seite 1\n\nuno\n\n## Seite 3\n\ntre`;
     const r = await getStory();
     expect(r.body.pages.map((p: any) => [p.pageNumber, p.text])).toEqual([[1, 'uno'], [2, ''], [3, 'tre']]);
+  });
+});
+
+describe('shared story active image versions', () => {
+  // /image/:page and /cover-image/:type answer with a 24h-cacheable redirect to the
+  // active version's R2 object. The viewer keys its image URLs on these numbers so a
+  // version switch is a new URL instead of a day-old cached redirect to the old picture.
+  it('each page and cover carries the active version from image_version_meta (0 when unset)', async () => {
+    row.data.storyText = `## Seite 1\n\nuno\n\n## Seite 2\n\ndue\n\n## Seite 3\n\ntre`;
+    versionMeta = { '2': { activeVersion: 3 }, frontCover: { activeVersion: 1 } };
+    const r = await getStory();
+    expect(r.body.pages.map((p: any) => p.imageVersion)).toEqual([0, 3, 0]);
+    expect(r.body.coverVersions).toEqual({ frontCover: 1, initialPage: 0, backCover: 0 });
   });
 });

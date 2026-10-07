@@ -37,6 +37,10 @@ interface SharedStoryPage {
   text: string;
   textPosition?: string | null;
   hasImage?: boolean;
+  // Active image version (server, image_version_meta). Part of the image URL so
+  // a version switch is a new URL — the image endpoints answer with a cacheable
+  // redirect, and a URL without the version showed the old picture for a day.
+  imageVersion?: number;
 }
 
 interface SharedStoryData {
@@ -53,6 +57,11 @@ interface SharedStoryData {
     frontCover?: boolean;
     initialPage?: boolean;
     backCover?: boolean;
+  };
+  coverVersions?: {
+    frontCover?: number;
+    initialPage?: number;
+    backCover?: number;
   };
   isOwner?: boolean;
   isShared?: boolean;
@@ -252,10 +261,13 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
       if (signedKey) parts.push(`key=${encodeURIComponent(signedKey)}`);
       return parts.length ? `?${parts.join('&')}` : '';
     })();
-    const coverImageUrl = (type: string) =>
-      `/api/shared/${shareToken}/cover-image/${type}${tokenQuery}`;
-    const pageImageUrl = (pageNum: number) =>
-      `/api/shared/${shareToken}/image/${pageNum}${tokenQuery}`;
+    // `v` keys the browser cache on the active version (see SharedStoryPage.imageVersion).
+    const versionQuery = (version: number | undefined) =>
+      `${tokenQuery ? '&' : '?'}v=${version ?? 0}`;
+    const coverImageUrl = (type: 'frontCover' | 'initialPage' | 'backCover') =>
+      `/api/shared/${shareToken}/cover-image/${type}${tokenQuery}${versionQuery(story.coverVersions?.[type])}`;
+    const pageImageUrl = (page: SharedStoryPage) =>
+      `/api/shared/${shareToken}/image/${page.pageNumber}${tokenQuery}${versionQuery(page.imageVersion)}`;
 
     // Build the page components list.
     // physicalToLogical maps each flipbook index back to the pageList index
@@ -325,7 +337,7 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
             // when imageUrl is null.
             const imageUrl = storyPage.hasImage === false
               ? null
-              : pageImageUrl(storyPage.pageNumber);
+              : pageImageUrl(storyPage);
             bookPages.push(
               <BookStoryPage
                 key={`story-${storyPage.pageNumber}`}

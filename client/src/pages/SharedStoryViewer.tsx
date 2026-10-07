@@ -20,6 +20,8 @@ interface SharedStoryPage {
   // skip the image fetch (would 404) and render a placeholder. The page text
   // can still be displayed.
   hasImage?: boolean;
+  // Active image version — part of the image URL (see BookViewer).
+  imageVersion?: number;
 }
 
 interface SharedStoryData {
@@ -36,6 +38,11 @@ interface SharedStoryData {
     frontCover?: boolean;
     initialPage?: boolean;
     backCover?: boolean;
+  };
+  coverVersions?: {
+    frontCover?: number;
+    initialPage?: number;
+    backCover?: number;
   };
   isOwner?: boolean;
   isShared?: boolean;
@@ -448,14 +455,17 @@ export default function SharedStoryViewer() {
       if (idx < 0 || idx >= totalPages) continue;
       const entry = pageList[idx];
       if (entry.type === 'endPage' || entry.type === 'storyText') continue;
+      // Same URL BookViewer renders (incl. the active-version key), or the
+      // preload warms a cache entry the book never reads.
+      const versionQuery = (version: number | undefined) => `${tokenParam ? '&' : '?'}v=${version ?? 0}`;
       if (entry.type === 'story') {
         const p = story.pages[entry.storyPageIdx];
         if (p.hasImage === false) continue;  // no row → would 404
         const img = new Image();
-        img.src = `/api/shared/${shareToken}/image/${p.pageNumber}${tokenParam}`;
+        img.src = `/api/shared/${shareToken}/image/${p.pageNumber}${tokenParam}${versionQuery(p.imageVersion)}`;
       } else {
         const img = new Image();
-        img.src = `/api/shared/${shareToken}/cover-image/${entry.type}${tokenParam}`;
+        img.src = `/api/shared/${shareToken}/cover-image/${entry.type}${tokenParam}${versionQuery(story.coverVersions?.[entry.type])}`;
       }
     }
   }, [currentPage, story, shareToken, totalPages]);

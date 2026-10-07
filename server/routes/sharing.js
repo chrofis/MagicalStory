@@ -306,6 +306,14 @@ apiRouter.get('/shared/:shareToken', async (req, res) => {
       [story.id]
     );
     const pagesWithImage = new Set(sceneRows.map(r => r.page_number));
+    // Active image version per page and cover (image_version_meta, the single
+    // source of truth getActiveVersion reads). The viewer keys its image URLs
+    // on it: /image/:page and /cover-image/:type answer with a 24h-cacheable
+    // redirect to the active version's R2 object, so a URL without the version
+    // kept showing the OLD picture for a day after the owner picked another
+    // version (or a repair made a new one active).
+    const versionMeta = await getActiveVersionMeta(story.id);
+    const activeVersionOf = (key) => Number(versionMeta?.[key]?.activeVersion) || 0;
     const pages = [];
     for (let i = 1; i <= sceneCount; i++) {
       const sceneImg = data.sceneImages?.find(s => Number(s.pageNumber) === i);
@@ -317,6 +325,7 @@ apiRouter.get('/shared/:shareToken', async (req, res) => {
         text: getPageText(storyText, i) || '',
         textPosition: sceneImg?.textPosition || null,
         hasImage,
+        imageVersion: activeVersionOf(String(i)),
       });
     }
 
@@ -332,9 +341,11 @@ apiRouter.get('/shared/:shareToken', async (req, res) => {
     const coverTypes = ['frontCover', 'initialPage', 'backCover'];
     const existing = await imagesExistByType(story.id, coverTypes);
     const covers = {};
+    const coverVersions = {};
     for (const coverType of coverTypes) {
       covers[coverType] = existing.has(coverType)
         || !!data.coverImages?.[coverType]?.imageData; // legacy fallback
+      coverVersions[coverType] = activeVersionOf(coverType);
     }
 
     res.json({
@@ -352,6 +363,7 @@ apiRouter.get('/shared/:shareToken', async (req, res) => {
       dedication: data.dedication,
       hasImages: true,
       covers,
+      coverVersions,
       isOwner,
       isShared: story.isShared,
       needsPassword,
