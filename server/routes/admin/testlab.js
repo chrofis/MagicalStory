@@ -755,6 +755,8 @@ router.post('/experiments', refuseWhileDeployPending, async (req, res) => {
           // the CASE (two versions of one page are two different cases), which
           // is also what makes them distinct members of a set.
           ...(Number.isFinite(Number(t.versionIndex)) ? { versionIndex: Number(t.versionIndex) } : {}),
+          // semantic_eval's paired re-judge: the stored version this one was repaired from.
+          ...(t.parentVersionIndex != null && Number.isFinite(Number(t.parentVersionIndex)) ? { parentVersionIndex: Number(t.parentVersionIndex) } : {}),
           // Per-target params (the set-run mechanism) work on direct POSTs too.
           // This sanitizer silently dropped them — exp #9 stored the target as
           // {storyId,pageNumber} and the "pinned" run tested the wrong bytes.
