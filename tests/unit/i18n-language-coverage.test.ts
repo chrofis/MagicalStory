@@ -75,6 +75,7 @@ function devGated(node: Node): boolean {
 /** [file:line, missing languages] for every incomplete inline translation. */
 function gaps(file: string): string[] {
   const text = fs.readFileSync(file, 'utf8');
+  if (!/=== ['"](?:de|fr|it|en)['"]|\b(?:de|fr|it|en)\s*:/.test(text)) return []; // nothing to translate here
   const sf = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
   const rel = path.relative(ROOT, file).split(path.sep).join('/');
   const out: string[] = [];
@@ -129,5 +130,5 @@ describe('inline translations in customer-facing client files cover en, de, fr a
   it('has no language ternary or map that falls through to English for fr or it', () => {
     const all = FILES.flatMap(gaps);
     expect(all).toEqual([]);
-  });
+  }, 60_000); // parses ~150 files with the TypeScript compiler; the 10 s default is tight under a full parallel run
 });
