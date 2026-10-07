@@ -3856,7 +3856,7 @@
       "source": "Staging job_1791315635053_t0t8qpebu stories.data.jevDecisions.light p4 and p5: indoor true, indoorP 0.01, jevTime underwater (owner review 2026-10-07).",
       "status": "fixed",
       "fixedAt": "2026-10-07",
-      "fixedIn": "PENDING",
+      "fixedIn": "c5f5b9c47",
       "fix": "`indoor` is Jev's own INDOOR answer (indoorP >= indoorAt); sceneLight.isSkyHidden (skyless light or indoor) is the one test for weather none and the cover's outdoor pool (pinBrief, coverLight). Tests: scene-light-skyless.test.ts and jev-submerged-light.test.ts (fail on parent, pass now)."
     },
     {
@@ -3866,7 +3866,7 @@
       "source": "Staging job_1791315635053_t0t8qpebu p4 (vantage LOC001.4): emptySceneQc v1Issues and retryIssues both 'not entirely underwater', keptAttempt first, shippedWithHardDefects null; the beach under a water ceiling shipped.",
       "status": "fixed",
       "fixedAt": "2026-10-07",
-      "fixedIn": "PENDING",
+      "fixedIn": "c5f5b9c47",
       "fix": "decidePlateAfterRetry reports shipFailed for any kept attempt that did not pass; logPlateOutcome raises plate_shipped_failed_qc at ERROR with hard and soft defects; the record stores shippedWithSoftDefects and the plate card shows it. Test: plate-qc-severity.test.ts (fails on parent, passes now)."
     }
   ]

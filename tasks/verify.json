@@ -6008,6 +6008,24 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "submerged-place-light-season-plates",
+      "title": "A submerged place has water light, no season, and plates that hold what the camera sees",
+      "commits": [
+        "c5f5b9c47"
+      ],
+      "addedAt": "2026-10-07",
+      "claim": "On a story with a sea, lake or wreck place: the Visual Bible carries `submerged: true` on that location (and on a sunken vehicle); every page at or aboard it has a water timeOfDay in jevDecisions.light (rows carry `submerged` and `jevTimeFirst`), no hour and no dry `dark`; no page prompt or brief puts a leaf, foliage or ground cover under water; a vantage plate's LOCATION line holds the name and colours only; an exterior vantage of a wreck is drawn from outside; a plate that fails QC twice raises plate_shipped_failed_qc (soft defects included).",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "stories.data.visualBible locations/vehicles `submerged`; stories.data.jevDecisions.light rows (submerged, jevTimeFirst, timeOfDay); sceneImages[].jevFixed.timeOfDay on pages at the sea place; the stored page prompts and plate prompts (emptyScenePrompt) for a SEASON line or leaf wording on those pages; the plate images of the exterior and interior wreck vantages; generationLog events plate_shipped_failed_qc."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [
