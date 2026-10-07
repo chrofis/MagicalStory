@@ -63,3 +63,56 @@ describe('public pages a11y chrome', () => {
     expect(firstH3 === -1 || firstH3 > firstH2).toBe(true);
   });
 });
+
+describe('public pages landmarks and focus management (2026-10-07 follow-up)', () => {
+  const mainTag = /^\s*<main\b/gm;
+
+  it('the route shells (App.tsx, SSRApp.tsx) each render exactly one <main id="main-content"> around the routes', () => {
+    for (const rel of ['App.tsx', 'SSRApp.tsx']) {
+      const s = src(rel);
+      expect(s.match(mainTag)?.length, rel).toBe(1);
+      expect(s, rel).toContain('<main id="main-content">');
+      expect(s.indexOf('<main id="main-content">'), rel).toBeLessThan(s.indexOf('<Routes>'));
+      expect(s.indexOf('</Routes>'), rel).toBeLessThan(s.indexOf('</main>'));
+      expect(s, rel).toContain('<SkipLink />');
+    }
+  });
+
+  it('no page or component nests a second <main>', () => {
+    const root = path.join(__dirname, '../../client/src');
+    const walk = (dir: string): string[] => fs.readdirSync(dir, { withFileTypes: true }).flatMap((d) =>
+      d.isDirectory() ? walk(path.join(dir, d.name)) : /\.tsx?$/.test(d.name) ? [path.join(dir, d.name)] : []);
+    const offenders = walk(root)
+      .filter((f) => !/\/(App|SSRApp)\.tsx$/.test(f))
+      .filter((f) => mainTag.test(fs.readFileSync(f, 'utf8')) && (mainTag.lastIndex = 0, true));
+    expect(offenders).toEqual([]);
+  });
+
+  it('the skip link is the first element of both shells and is localized in all four languages', () => {
+    const skip = src('components/common/SkipLink.tsx');
+    expect(skip).toContain('href="#main-content"');
+    expect(skip).toContain('sr-only focus:not-sr-only');
+    expect(skip).toContain("uiLabel('skipToContent', language)");
+    const labels = src('utils/uiLabels.ts');
+    const row = labels.match(/skipToContent: \{([^}]*)\}/)?.[1] || '';
+    for (const lang of ['en', 'de', 'fr', 'it']) expect(row, lang).toMatch(new RegExp(`${lang}: '[^']+'`));
+    for (const rel of ['App.tsx', 'SSRApp.tsx']) {
+      const s = src(rel);
+      const body = s.slice(s.indexOf('return ('));
+      expect(body.indexOf('<SkipLink />'), rel).toBeLessThan(body.indexOf('<ScrollToTop />'));
+    }
+  });
+
+  it('all three dialogs trap Tab inside the panel via useFocusTrap', () => {
+    for (const rel of ['components/common/Modal.tsx', 'components/common/CreditsModal.tsx', 'components/auth/ChangePasswordModal.tsx']) {
+      const s = src(rel);
+      expect(s, rel).toContain('useFocusTrap(panelRef, isOpen)');
+    }
+  });
+
+  it('landing discover cards (Themes and siblings) show a focus-visible ring', () => {
+    const s = src('pages/LandingPage.tsx');
+    const card = s.slice(s.indexOf("{ to: '/themes',"), s.indexOf('<Icon className'));
+    expect(card).toContain('focus-visible:ring-2');
+  });
+});

@@ -778,7 +778,7 @@ export default function SharedStoryViewer() {
       )}
 
       {/* Book with side navigation arrows */}
-      <main className="flex-1 min-h-0 flex items-center justify-center px-2 md:px-4 py-1 md:py-4 short:py-0">
+      <div className="flex-1 min-h-0 flex items-center justify-center px-2 md:px-4 py-1 md:py-4 short:py-0">
         {/* Left arrow - desktop only */}
         <div className="hidden md:flex flex-col items-center gap-2 mr-3 lg:mr-6 flex-shrink-0">
           <button
@@ -848,7 +848,7 @@ export default function SharedStoryViewer() {
         >
           <ChevronRight className="w-6 h-6 lg:w-8 lg:h-8" />
         </button>
-      </main>
+      </div>
 
       {/* Text overlay toggle + page counter. In squat landscape viewports the
           row floats over the book instead of consuming layout height. */}

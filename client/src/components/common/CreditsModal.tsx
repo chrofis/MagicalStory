@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { CreditCard, Loader2, Check } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useToast } from '@/context/ToastContext';
@@ -16,6 +17,7 @@ export function CreditsModal({ isOpen, onClose }: CreditsModalProps) {
   const [isBuyingCredits, setIsBuyingCredits] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(1); // Default to "Popular"
   const panelRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(panelRef, isOpen);
 
   // Escape closes (unless a checkout is in flight); focus moves into the dialog on open and
   // back to the opener on close — the same contract as common/Modal.

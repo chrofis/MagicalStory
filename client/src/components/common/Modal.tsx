@@ -1,4 +1,5 @@
 import { ReactNode, useEffect, useCallback, useRef } from 'react';
+import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { X } from 'lucide-react';
 import { uiLabel } from '@/utils/uiLabels';
 import { useLanguage } from '@/context/LanguageContext';
@@ -34,6 +35,7 @@ export function Modal({
 }: ModalProps) {
   const { language } = useLanguage();
   const panelRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(panelRef, isOpen);
   const handleEscape = useCallback(
     (e: KeyboardEvent) => {
       if (e.key === 'Escape' && closeOnEscape) {

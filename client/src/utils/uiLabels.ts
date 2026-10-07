@@ -23,6 +23,7 @@ const LABELS = {
   exampleNoAccessories: { en: 'No accessories example', de: 'Beispiel: ohne Accessoires', fr: 'Exemple : sans accessoires', it: 'Esempio: senza accessori' },
   exampleOnePerson: { en: 'One person only example', de: 'Beispiel: nur eine Person', fr: 'Exemple : une seule personne', it: 'Esempio: una sola persona' },
   menu: { en: 'Menu', de: 'Menü', fr: 'Menu', it: 'Menu' },
+  skipToContent: { en: 'Skip to content', de: 'Zum Inhalt springen', fr: 'Aller au contenu', it: 'Vai al contenuto' },
 } as const;
 
 export type UiLabelKey = keyof typeof LABELS;

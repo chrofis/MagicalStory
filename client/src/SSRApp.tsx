@@ -14,6 +14,7 @@
  */
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { ScrollToTop } from './components/common/ScrollToTop';
+import { SkipLink } from './components/common/SkipLink';
 
 // Static page imports (SEO-public routes only)
 import LandingPage from './pages/LandingPage';
@@ -43,7 +44,9 @@ import CityPage from './pages/CityPage';
 export default function SSRApp() {
   return (
     <>
+      <SkipLink />
       <ScrollToTop />
+      <main id="main-content">
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/pricing" element={<Pricing />} />
@@ -70,6 +73,7 @@ export default function SSRApp() {
         <Route path="/stadt/:cityId" element={<CityPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </main>
     </>
   );
 }

@@ -4,6 +4,7 @@ import { LoadingSpinner } from './components/common/LoadingSpinner';
 import { ImpersonationBanner } from './components/common/ImpersonationBanner';
 import { ScrollToTop } from './components/common/ScrollToTop';
 import { RouteTracker } from './components/common/RouteTracker';
+import { SkipLink } from './components/common/SkipLink';
 import { GenerationProvider } from './context/GenerationContext';
 import { useAuth } from './context/AuthContext';
 import { startSiteVisitTracking } from './utils/trialFunnel';
@@ -83,10 +84,12 @@ function App() {
 
   return (
     <GenerationProvider>
+      <SkipLink />
       <ScrollToTop />
       <RouteTracker />
       <ImpersonationBanner />
       <Suspense fallback={<LoadingSpinner fullScreen />}>
+        <main id="main-content">
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/welcome" element={<WelcomePage />} />
@@ -128,6 +131,7 @@ function App() {
           <Route path="/claim/:token" element={<ClaimAccount />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        </main>
       </Suspense>
     </GenerationProvider>
   );

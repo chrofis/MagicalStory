@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, FormEvent } from 'react';
+import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { X, KeyRound, CheckCircle } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
@@ -90,6 +91,7 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
   };
 
   const panelRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(panelRef, isOpen);
   // Ref so the Escape listener always calls the current handleClose without re-running the
   // focus effect on every render.
   const handleCloseRef = useRef(handleClose);

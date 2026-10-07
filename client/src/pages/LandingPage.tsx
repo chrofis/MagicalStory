@@ -895,7 +895,7 @@ export default function LandingPage() {
               <Link
                 key={to}
                 to={lp(to)}
-                className="group bg-white rounded-2xl border-2 border-stone-200 p-6 hover:border-indigo-500 hover:shadow-lg transition-all flex flex-col"
+                className="group bg-white rounded-2xl border-2 border-stone-200 p-6 hover:border-indigo-500 hover:shadow-lg transition-all flex flex-col focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
               >
                 <div className="bg-indigo-100 group-hover:bg-indigo-200 transition-colors w-14 h-14 rounded-full flex items-center justify-center mb-4">
                   <Icon className="w-7 h-7 text-indigo-500" />
