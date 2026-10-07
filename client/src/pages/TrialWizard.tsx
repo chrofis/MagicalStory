@@ -591,7 +591,7 @@ export default function TrialWizard() {
               screens down; 4 of the 5 paid visitors who reached this screen left
               without a tap. */}
           <div className="lg:hidden mb-28">
-            <img src="/images/try/step3-spread.webp" alt="" decoding="async" fetchPriority="high"
+            <img src="/images/try/step3-spread.webp" alt="" width="900" height="506" decoding="async" fetchPriority="high"
               className="w-full max-h-60 object-contain rounded-2xl shadow-sm mb-5" />
             <ol className="space-y-3 max-w-sm mx-auto">
               {/* Steps 2 and 3 use dedicated 56px thumbnails (owner-approved 2026-10-04, originals in scripts/ads/approved/try-steps/): the desktop images crop badly at thumbnail size; step 1's photo crops fine. */}
@@ -601,7 +601,7 @@ export default function TrialWizard() {
                 { n: 3, img: '/images/try/step3-thumb.webp', title: intro.step3Title, desc: intro.step3Desc },
               ] as const).map((s) => (
                 <li key={s.n} className="flex items-center gap-3 text-left">
-                  <img src={s.img} alt="" decoding="async"
+                  <img src={s.img} alt="" width="168" height="168" decoding="async"
                     className="w-14 h-14 object-cover rounded-xl shadow-sm flex-shrink-0" />
                   <div>
                     <h2 className="text-base font-bold text-gray-800">{s.n}. {s.title}</h2>
@@ -634,6 +634,8 @@ export default function TrialWizard() {
             <img
               src="/images/try/step1-photo.webp"
               alt=""
+              width="540"
+              height="540"
               loading="lazy"
               decoding="async"
               className="w-full md:w-auto max-h-72 md:max-h-none md:h-96 object-contain rounded-2xl shadow-sm flex-shrink-0"
@@ -651,6 +653,8 @@ export default function TrialWizard() {
             <img
               src="/images/try/step2-topics.webp"
               alt=""
+              width="500"
+              height="745"
               loading="lazy"
               decoding="async"
               className="w-full md:w-auto max-h-72 md:max-h-none md:h-96 object-contain rounded-2xl shadow-sm flex-shrink-0"
@@ -665,6 +669,8 @@ export default function TrialWizard() {
             <img
               src="/images/try/step3-spread.webp"
               alt=""
+              width="900"
+              height="506"
               loading="lazy"
               decoding="async"
               className="w-full md:w-auto md:max-w-[55%] max-h-96 object-contain rounded-2xl shadow-sm flex-shrink-0"

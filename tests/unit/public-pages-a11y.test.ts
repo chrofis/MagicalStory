@@ -44,4 +44,14 @@ describe('public pages a11y chrome', () => {
       expect(s, rel).toMatch(/e\.key === 'Escape'/);
     }
   });
+
+  it('every /try step image reserves its box with width and height', () => {
+    const s = src('pages/TrialWizard.tsx');
+    const tags = s.match(/<img[^>]*\/images\/try\/[^>]*>|<img[^>]*src=\{s\.img\}[^>]*>/gs) || [];
+    expect(tags.length).toBeGreaterThanOrEqual(5);
+    for (const tag of tags) {
+      expect(tag, tag.slice(0, 80)).toMatch(/width="\d+"/);
+      expect(tag, tag.slice(0, 80)).toMatch(/height="\d+"/);
+    }
+  });
 });
