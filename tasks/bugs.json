@@ -9,7 +9,7 @@
       "rootCause": "The readers were written against a pre-2025 Checkout Session shape and never updated when stripe-node v20 was pinned (c803569c, 2026-08-23). The Gelato payload also split customer_details.name (the cardholder) into the parcel recipient.",
       "status": "fixed",
       "fixedAt": "2026-10-07",
-      "fixedIn": "pending",
+      "fixedIn": "c7ad58c04",
       "fix": "server/lib/gelato.js shippingFromSession reads collected_information.shipping_details (recipient name + address); resolveBookOrderInputs throws for a paid session without one instead of shipping to the billing address; the webhook, the admin retry and the stuck-order resume all go through it; orders.shipping_name and the Gelato recipient are the shipping-form name. The order-status fallback retrieves the session without the invalid expand. Test: tests/unit/checkout-shipping-address.test.ts (v20 fixture with billing != shipping; the installed SDK types have no top-level shipping field; no reader asks for session.shipping any more)."
     },
     {
