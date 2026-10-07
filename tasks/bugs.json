@@ -3868,6 +3868,56 @@
       "fixedAt": "2026-10-07",
       "fixedIn": "c5f5b9c47",
       "fix": "decidePlateAfterRetry reports shipFailed for any kept attempt that did not pass; logPlateOutcome raises plate_shipped_failed_qc at ERROR with hard and soft defects; the record stores shippedWithSoftDefects and the plate card shows it. Test: plate-qc-severity.test.ts (fails on parent, passes now)."
+    },
+    {
+      "id": "styled-sheet-whole-sheet-judge-blind-per-cell",
+      "title": "A styled avatar sheet holding two different people, photographic cells or a caption strip passed the style judge at 9-10: asked per cell of the whole sheet the judge answered same person / illustrated / no lettering for all 8 cells",
+      "reportedAt": "2026-10-07",
+      "source": "Sarah standard: head row + cells 5, 8 a photoreal blonde with glasses, cells 6, 7 a red-haired Pixar woman (identity 9, solo 10, style 9); Daniel / Emma-costumed / Noah-costumed photographic at 9; Daniel body row printed Front / Three-quarter / Profile / Rear turn and the judge excused it. Staging showcase job_1791315635053_t0t8qpebu, stored styledAvatarGeneration and the sheets viewed on the pixels (2026-10-07).",
+      "status": "fixed",
+      "fixedAt": "2026-10-07",
+      "fixedIn": "9ac820b79",
+      "fix": "The per-cell checks are their own judge (prompts/sheet-row-cells-eval.txt) asked of each row crop, and code computes style / identity / hair / ground axes from its per-cell answers (observeStyledRows, applyStyledSheetConsistencyAxes); the pass-1 row judges check hair, one person and lettering the same way. Test: avatar-sheet-consistency-2026-10-07.test.ts. Replayed on the stored sheets: Sarah, Daniel, Emma standard and costumed, Noah costumed fail; two good Pixar sheets still pass."
+    },
+    {
+      "id": "styled-sheet-hair-not-checked-against-declared",
+      "title": "No sheet judge compared hair with the declared hair: pass 2 turned blonde hair brown (Noah) and mixed hair down with a ponytail (Emma) at style 9 / identity 9",
+      "reportedAt": "2026-10-07",
+      "source": "Noah standard sheet brown hair with traits blonde #E8D3A3 (the pass-1 sheet is blonde); Emma sheet hair down in cells 1-2 and a ponytail in 3-4. Staging showcase job_1791315635053_t0t8qpebu, stored styledAvatarGeneration and the sheets viewed on the pixels (2026-10-07).",
+      "status": "fixed",
+      "fixedAt": "2026-10-07",
+      "fixedIn": "9ac820b79",
+      "fix": "hairRequest(character) is the one hair value: buildHairBlock tells the generator, every judge is sent it as REQUESTED_HAIR (colour, up / down / ponytail, parting; stored lengths are not judged) and a hair axis is computed from per-cell match / differs answers. Test: avatar-sheet-consistency-2026-10-07.test.ts."
+    },
+    {
+      "id": "head-row-thigh-length-crop-ships",
+      "title": "The head row came back waist- or thigh-length in 4 of 6 attempts and two shipped failing; the \"passport photo\" wording fix of 2026-09-23 did not hold (each cell of the 20:9 row is a 5:9 portrait the model fills with a body)",
+      "reportedAt": "2026-10-07",
+      "source": "Daniel head row down to the thighs on both tries (score 1, shipped); Sarah try 2 mid-thigh; Emma try 1 waistband. Staging showcase job_1791315635053_t0t8qpebu, stored styledAvatarGeneration and the sheets viewed on the pixels (2026-10-07).",
+      "status": "fixed",
+      "fixedAt": "2026-10-07",
+      "fixedIn": "9ac820b79",
+      "fix": "cropHeadRowToShoulders cuts each generated head row at the lowest cell's shoulder line plus half the nose-to-shoulder distance, from /pose-heads nose_y_frac / shoulder_y_frac (photo_analyzer.py). Test: avatar-sheet-consistency-2026-10-07.test.ts (headRowCropFraction on the measured keypoints); needs the analyzer deployed with the keypoints, otherwise the row stays uncropped and the failure is logged at ERROR."
+    },
+    {
+      "id": "story-prop-listed-as-outfit-garment",
+      "title": "A picnic blanket the plan has someone spread and wrap was listed in the clothing contract as an outfit item, so the sheet drew it as a scarf on every cell and every page copied it",
+      "reportedAt": "2026-10-07",
+      "source": "Daniel standard description \"...; with a large thick wool picnic blanket in solid yellow with fringed short edges\"; the bodies judge scored outfit 10 for it. Staging showcase job_1791315635053_t0t8qpebu, stored styledAvatarGeneration and the sheets viewed on the pixels (2026-10-07).",
+      "status": "fixed",
+      "fixedAt": "2026-10-07",
+      "fixedIn": "9ac820b79",
+      "fix": "WARDROBE_RULES.PROP_NOT_GARMENT_DEF is filled into the bible writer (new line) and the wardrobe reviewer (new check 14), and the writer's plot-garment line no longer lists \"spread\". Test: prop-not-garment.test.ts."
+    },
+    {
+      "id": "mermaid-sheet-stands-on-flat-fin",
+      "title": "A costumed tail figure was drawn standing upright on a flat fin on the sheet, so pages drew her standing on the fin on hard floors",
+      "reportedAt": "2026-10-07",
+      "source": "Emma costumed mermaid sheet; pages 8 and 10. Staging showcase job_1791315635053_t0t8qpebu, stored styledAvatarGeneration and the sheets viewed on the pixels (2026-10-07).",
+      "status": "fixed",
+      "fixedAt": "2026-10-07",
+      "fixedIn": "9ac820b79",
+      "fix": "TAIL_POSE_RULE (one constant) is stated in the body-row generator and scored by the bodies judge (feet: no for a tail figure upright on its fin). Test: avatar-sheet-consistency-2026-10-07.test.ts."
     }
   ]
 }

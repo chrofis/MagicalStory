@@ -6026,6 +6026,24 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "avatar-sheet-per-cell-checks",
+      "title": "Styled avatar sheets are checked per cell, hair is one value, the head row is cut at the chest, a prop is never a garment, a tail figure does not stand on its fin",
+      "commits": [
+        "9ac820b79"
+      ],
+      "addedAt": "2026-10-07",
+      "claim": "On a story with several characters: no stored styled sheet (stories.data.styledAvatarGeneration) is photographic in any cell or holds a second person, every sheet's hair matches the declared hair in every cell, no sheet carries a caption strip, each head row is head-and-shoulders (passes.pass1.attempts head entries carry crop.applied true or a stated reason), no outfit description in clothingRequirements lists a carried or spread-out object, and a costumed tail figure is not drawn standing upright on its fin.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "stories.data.styledAvatarGeneration[*] passes.pass1.attempts (head rows: crop), passes.pass2.finalVerdict (hair / style / identity axes and failureReasons), the sheet images themselves (view the pixels), stories.data.clothingRequirements descriptions."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [
