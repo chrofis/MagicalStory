@@ -97,11 +97,11 @@ export const storyComplete: Record<Lang, {
     signoff: "Merci d'utiliser Magical Story !",
   },
   it: {
-    subject: 'La tua storia magica "{title}" è pronta!',
+    subject: 'La tua storia magica «{title}» è pronta!',
     preview: 'La tua storia personalizzata è pronta — guarda, ordina come libro stampato o scarica in PDF.',
     headline: 'La tua storia è pronta!',
     greeting: 'Ciao{greeting},',
-    body: 'Buone notizie! La tua storia personalizzata "{title}" è stata creata e ti aspetta.',
+    body: 'Buone notizie! La tua storia personalizzata «{title}» è stata creata e ti aspetta.',
     cta: 'Vedi la tua storia',
     perksIntro: 'Ora puoi:',
     perks: [
@@ -233,11 +233,11 @@ export const trialStoryComplete: Record<Lang, {
     signoff: "Merci d'avoir essayé Magical Story !",
   },
   it: {
-    subject: 'La tua storia magica "{title}" è pronta!',
+    subject: 'La tua storia magica «{title}» è pronta!',
     preview: 'La tua storia di prova è pronta e allegata in PDF. Attiva il tuo account per conservarla.',
     headline: 'La tua storia è pronta!',
     greeting: 'Ciao{greeting},',
-    body: 'Buone notizie! La tua storia personalizzata "{title}" è stata creata.',
+    body: 'Buone notizie! La tua storia personalizzata «{title}» è stata creata.',
     attachmentNote: "Il PDF della storia è allegato a questa e-mail, così puoi leggerla subito.",
     claimLine: "Imposta la tua password e sblocca {credits} crediti gratuiti — abbastanza per creare un'altra storia completa, gratis.",
     cta: 'Sblocca la mia storia gratuita',
