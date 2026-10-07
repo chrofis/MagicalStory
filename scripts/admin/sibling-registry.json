@@ -1006,6 +1006,21 @@
       }
     },
     {
+      "id": "lab-vs-prod-artifact-repair",
+      "axis": "Lab vs prod",
+      "reason": "The Test Lab artifact_repair stage and the production artifact-repair route (server/routes/regeneration.js, POST /:id/repair-workflow/artifact-repair) call grid repair through the SAME function, testlab.gridRepairStoredPage, which turns a stored scene's eval into gridBasedRepair's (imageData, pageNumber, evalResults, {outputDir, storyId, bboxDetection}) contract. The route once called gridBasedRepair(scene, {retryHistory}) and threw on the required outputDir on every page (code review 2026-10-07); tests/unit/artifact-repair-call-shape.test.ts pins the shape.",
+      "members": [
+        "server/routes/regeneration.js",
+        "server/lib/testlab.js"
+      ],
+      "severity": "block",
+      "parity": {
+        "anchors": [
+          "gridRepairStoredPage"
+        ]
+      }
+    },
+    {
       "id": "lab-vs-prod-plate",
       "axis": "Lab vs prod",
       "reason": "The Test Lab empty_scene stage and the story run's plates (storyJobPipeline.js Phase 5a-pre-vantage and 5a-pre) run the SAME functions in server/lib/platePipeline.js (owner 2026-09-27: the Lab must use 100% identical code to production). A change to how a plate's prompt, mask, references, QC, retry or derive is built must land in platePipeline.js, where both call it; tests/unit/lab-prod-call-parity.test.ts compares the two calls.",

@@ -5682,20 +5682,24 @@ async function runEditImageStage(ctx, { experimentId, promptOverride, params = {
 }
 
 /**
- * Grid-based artifact repair. Contract (gridBasedRepair.js):
- * (imageDataUri, pageNumber, {quality, incremental, final}, {outputDir, ...})
- * (gridBasedRepair's own contract; the former quality-retry wrapper is gone).
+ * Grid-based artifact repair of a STORED page, from the evaluation persisted on
+ * its scene record. The ONE place that turns a scene into gridBasedRepair's
+ * contract — (imageData, pageNumber, {quality, incremental, final},
+ * {outputDir, storyId, ...}) — for both callers: this Lab stage and the
+ * production artifact-repair route (server/routes/regeneration.js). The route
+ * once called gridBasedRepair(scene, {retryHistory}) and died on the required
+ * outputDir every time (sibling set lab-vs-prod-artifact-repair).
+ * Returns gridBasedRepair's own result ({imageData, repaired, history,
+ * fixedCount, failedCount, totalIssues, annotatedOriginal, grids}).
  */
-async function runArtifactRepairStage(ctx, { experimentId, params = {} }) {
-  const { loadPromptTemplates } = require('../services/prompts');
-  await loadPromptTemplates();
+async function gridRepairStoredPage(imageData, pageNumber, scene, storyId) {
   const { gridBasedRepair } = require('./gridBasedRepair');
   const os = require('os');
   const path = require('path');
   const fs = require('fs');
+  if (!imageData) throw new Error(`No image to repair for ${storyId} page ${pageNumber}`);
 
-  const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber);
-  const stored = storedEvalFromScene(ctx.scene);
+  const stored = storedEvalFromScene(scene);
   const evalResults = {
     quality: {
       score: stored.finalScore,
@@ -5706,17 +5710,26 @@ async function runArtifactRepairStage(ctx, { experimentId, params = {} }) {
     incremental: null,
     final: null,
   };
-  const outputDir = path.join(os.tmpdir(), `testlab-grid-${ctx.storyId}-P${ctx.pageNumber}`);
+  const outputDir = path.join(os.tmpdir(), `grid-repair-${storyId}-P${pageNumber}`);
   fs.mkdirSync(outputDir, { recursive: true });
 
-  const t0 = Date.now();
-  const result = await gridBasedRepair(imageData, ctx.pageNumber, evalResults, {
+  return gridBasedRepair(imageData, pageNumber, evalResults, {
     outputDir,
-    storyId: ctx.storyId,
+    storyId,
     skipVerification: false,
     saveIntermediates: false,
-    bboxDetection: ctx.scene.bboxDetection || null,
+    bboxDetection: scene.bboxDetection || null,
   });
+}
+
+/** Grid-based artifact repair (gridRepairStoredPage, shared with production). */
+async function runArtifactRepairStage(ctx, { experimentId, params = {} }) {
+  const { loadPromptTemplates } = require('../services/prompts');
+  await loadPromptTemplates();
+
+  const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber);
+  const t0 = Date.now();
+  const result = await gridRepairStoredPage(imageData, ctx.pageNumber, ctx.scene, ctx.storyId);
   const elapsedMs = Date.now() - t0;
   if (!result?.repaired || !result?.imageData) {
     throw new Error(`artifact repair made no changes (fixed ${result?.fixedCount || 0}/${result?.totalIssues || 0} issues)`);
@@ -10898,6 +10911,8 @@ async function checkRuleGenericity(ruleText, storyId) {
 
 module.exports = {
   pinnedVersionIndex,
+  storedEvalFromScene,
+  gridRepairStoredPage,
   storedCreatePrompt,
   storedRefineAudits,
   // beats_scenes truncation recovery — exported so the decisions can be pinned

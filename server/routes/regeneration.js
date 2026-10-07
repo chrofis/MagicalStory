@@ -6640,8 +6640,9 @@ router.post('/:id/repair-workflow/artifact-repair', authenticateToken, imageRege
     const pagesProcessed = [];
     let issuesFixed = 0;
 
-    // Process each page with grid repair
-    const { gridBasedRepair } = require('../lib/gridBasedRepair');
+    // Process each page with grid repair — the Lab's call shape (sibling set
+    // lab-vs-prod-artifact-repair); gridBasedRepair itself needs an outputDir.
+    const { gridRepairStoredPage } = require('../lib/testlab');
 
     for (const pageNumber of pageNumbers) {
       const sceneIndex = storyData.sceneImages?.findIndex(s => s.pageNumber === pageNumber);
@@ -6650,8 +6651,8 @@ router.post('/:id/repair-workflow/artifact-repair', authenticateToken, imageRege
       const scene = storyData.sceneImages[sceneIndex];
 
       try {
-        // Run grid repair on the scene
-        const repairResult = await gridBasedRepair(scene, { retryHistory: scene.retryHistory || [] });
+        // Run grid repair on the scene's active image (rehydrated above)
+        const repairResult = await gridRepairStoredPage(scene.imageData, pageNumber, scene, id);
 
         if (repairResult.repaired && repairResult.imageData) {
           // Add to image versions
