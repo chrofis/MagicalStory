@@ -386,7 +386,7 @@ export const adminTranslations = {
     makeAdmin: 'Rendre admin',
     removeAdmin: 'Retirer admin',
     deleteUser: 'Supprimer l\'utilisateur',
-    confirmDeleteEmail: 'Effacement RGPD : supprime le compte, toutes les histoires, personnages, photos et images, et anonymise les commandes conservées. Saisissez l\'adresse e-mail du compte pour confirmer :',
+    confirmDeleteEmail: 'Effacement RGPD : supprime le compte, toutes les histoires, personnages, photos et images, et anonymise les commandes conservées. Saisissez l\'adresse e-mail du compte pour confirmer :',
     confirmDelete: 'Êtes-vous sûr de vouloir supprimer cet utilisateur ?',
     unlimited: 'Illimite',
     cleaned: '{count} fichiers orphelins nettoyes',

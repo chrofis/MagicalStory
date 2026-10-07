@@ -67,13 +67,20 @@ describe('delete-user-data.js (GDPR erasure) — by construction', () => {
     expect(src).not.toMatch(/r2\.deleteStoryArtefacts\b/);
   });
 
-  it('prunes prefixes and order PDFs through the ledger, and still throws on a failed PDF prune', () => {
-    expect(src).toMatch(/await r2Pending\.prunePrefix\(prefix, pruneReason\)/);
-    expect(src).toMatch(/await r2Pending\.pruneObject\(key, pruneReason\) === 1/);
-    expect(src).toMatch(/throw new Error\(`R2 delete failed for order PDF/);
+  // Since 2026-10-07 the R2 work lives in server/lib/userErasure.js (shared by the
+  // CLI and the admin route); the script prints the result and fails on any failure.
+  const mod = fs.readFileSync(path.join(ROOT, 'server', 'lib', 'userErasure.js'), 'utf8');
+
+  it('prunes prefixes and order PDFs through the ledger, and a failed PDF prune fails the erasure', () => {
+    expect(mod).toMatch(/await r2Pending\.prunePrefix\(prefix, reason\)/);
+    expect(mod).toMatch(/await r2Pending\.pruneObject\(key, reason\)/);
+    expect(mod).toMatch(/order PDF .* still exists/);
+    expect(src).toMatch(/R2 ERASURE INCOMPLETE/);
+    expect(mod).not.toMatch(/r2\.deleteByPrefix\b|r2\.deleteObject\b|r2\.deleteStoryArtefacts\b/);
   });
 
   it('keeps the independent post-delete verification', () => {
-    expect(src).toMatch(/R2 VERIFICATION FAILED/);
+    expect(mod).toMatch(/prunePrefix returns a count rather than throwing — verify independently/);
+    expect(mod).toMatch(/await r2\.listByPrefix\(prefix\)/);
   });
 });
