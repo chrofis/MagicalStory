@@ -350,6 +350,26 @@ export default function TrialGenerationPage() {
   // Where the sign-in block sits: before the first locked page. Remembered, so
   // it does not jump to the bottom once an unlock removes the locked pages.
   const gateIndexRef = useRef<number | null>(null);
+  // Funnel: `gate_seen` once per mount, the first time the sign-in block at the
+  // gate (locked pages after it) is actually on screen — a visitor who never
+  // scrolls down to it was not shown the gate. The server dedupes per visit.
+  const gateSeenFiredRef = useRef(false);
+  const gateObserverRef = useRef<IntersectionObserver | null>(null);
+  const gateRef = useCallback((el: HTMLDivElement | null) => {
+    gateObserverRef.current?.disconnect();
+    gateObserverRef.current = null;
+    if (!el || gateSeenFiredRef.current || typeof IntersectionObserver === 'undefined') return;
+    const observer = new IntersectionObserver((entries) => {
+      if (!entries.some(e => e.isIntersecting) || gateSeenFiredRef.current) return;
+      gateSeenFiredRef.current = true;
+      observer.disconnect();
+      trackTrialStep('gate_seen');
+    }, { threshold: 0.25 });
+    observer.observe(el);
+    gateObserverRef.current = observer;
+  }, []);
+  // `gate_unlocked` the first time job-status reports the pages unlocked.
+  const gateUnlockedFiredRef = useRef(false);
   const [avatarSlides, setAvatarSlides] = useState<string[]>(state?.titlePageData?.avatarSlides || []);
   const [slideshowIndex, setSlideshowIndex] = useState(0);
 
@@ -518,6 +538,10 @@ export default function TrialGenerationPage() {
       }
 
       setServerUnlocked(data.unlocked === true);
+      if (data.unlocked === true && !gateUnlockedFiredRef.current) {
+        gateUnlockedFiredRef.current = true;
+        trackTrialStep('gate_unlocked');
+      }
 
       // Story title + pages (text only where the server unlocked it)
       if (data.storyTitle && Array.isArray(data.pages) && data.pages.length > 0) {
@@ -1028,6 +1052,9 @@ export default function TrialGenerationPage() {
   const firstLockedIdx = pages.findIndex(p => p.locked);
   if (firstLockedIdx >= 0 && gateIndexRef.current === null) gateIndexRef.current = firstLockedIdx;
   const gateIdx = firstLockedIdx >= 0 ? firstLockedIdx : (gateIndexRef.current ?? pages.length);
+  // Observed for `gate_seen` only while a page is locked: after an unlock the
+  // same block shows the success / check-your-email state, not a gate.
+  const gateSignInBlock = <div ref={firstLockedIdx >= 0 ? gateRef : undefined}>{signInBlock}</div>;
   const imagePlaceholder = (
     <div className="w-full aspect-square flex flex-col items-center justify-center gap-2 rounded-xl bg-indigo-50 text-indigo-400 text-sm">
       <Loader2 className="w-5 h-5 animate-spin" />
@@ -1052,7 +1079,7 @@ export default function TrialGenerationPage() {
           {idx === gateIdx && (
             <>
               <div className="h-px bg-gray-200 my-6" />
-              {signInBlock}
+              {gateSignInBlock}
               <div className="h-px bg-gray-200 my-6" />
             </>
           )}
@@ -1069,7 +1096,7 @@ export default function TrialGenerationPage() {
       {gateIdx >= pages.length && (
         <>
           <div className="h-px bg-gray-200 my-6" />
-          {signInBlock}
+          {gateSignInBlock}
         </>
       )}
     </div>

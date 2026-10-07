@@ -31,6 +31,10 @@ export type TrialStep =
   | 'idea_selected'
   | 'create_clicked'
   | 'generation_started'
+  /** The reading gate (pages 4–6 locked behind the sign-in) scrolled into view — optional, once per visit. */
+  | 'gate_seen'
+  /** job-status reported the pages unlocked (email submitted or Google linked) — optional. */
+  | 'gate_unlocked'
   | 'generation_completed'
   /** The email LEAD — optional, the Google signup path never passes through it. */
   | 'email_submitted'

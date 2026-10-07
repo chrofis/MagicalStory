@@ -442,6 +442,16 @@ const TRIAL_FUNNEL_STEPS = [
   'idea_selected',        // picked one
   'create_clicked',       // pressed create — navigates to /trial-generation
   'generation_started',   // the job was accepted
+  // The reading gate (tasks/trial-story-gate-2026-10-04.md): pages 1–3 are
+  // readable while the book is drawn, pages 4–6 are locked server-side behind
+  // the sign-in. The 2026-10-04 readout found 7 of 9 lost visits stayed to the
+  // end and left at exactly this point, and at ~9 trial starts a month the
+  // step has to be its own row to be readable at all.
+  // Both are OPTIONAL (see OPTIONAL_TRIAL_STEPS): a visitor who leaves during
+  // the writer phase never sees a gate, and one who links Google before the
+  // text exists never has a locked page.
+  'gate_seen',            // the locked pages / sign-in block scrolled into view
+  'gate_unlocked',        // job-status reported the pages unlocked (email submitted or Google linked)
   'generation_completed', // the story finished
   // A LEAD, not a conversion, and optional: the Google path never passes through
   // it. Reported like any other step but it can't be the baseline for the one
@@ -472,8 +482,10 @@ const ACCEPTED_EVENT_STEPS = new Set([...TRIAL_FUNNEL_STEPS, ...SITE_VISIT_STEPS
 // other, but they can't be the baseline for the step after them — the
 // face-selection modal appears only when a photo has 2+ faces, so a run of
 // single-face photos would otherwise read as "everyone was lost at face_picked"
-// and drive the next step's rate to 0%.
-const OPTIONAL_TRIAL_STEPS = new Set(['face_picked', 'email_submitted']);
+// and drive the next step's rate to 0%. The two gate steps are optional for the
+// same reason: not every visit reaches a locked page (writer-phase quitters,
+// Google before the text), and not every visit unlocks one.
+const OPTIONAL_TRIAL_STEPS = new Set(['face_picked', 'gate_seen', 'gate_unlocked', 'email_submitted']);
 
 // Crawlers hit /try and would otherwise inflate `landing`. Not a security
 // control — a bot that wants in can lie — just noise reduction so the top of
