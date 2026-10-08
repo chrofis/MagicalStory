@@ -317,6 +317,23 @@ function faceDataUri(entry) {
   });
   console.log(`[${chTime(new Date())}] trial account ${acct.userId} created`);
 
+  // 3b. prepare-title, fired WITHOUT awaiting, exactly as TrialIdeasStep.tsx does on
+  //     mount (parallel with the ideas). It styles the costumed sheet the job reuses;
+  //     a create-story that lands while it still runs exercises the in-flight
+  //     handoff (docs/decisions.md 2026-10-08 "create-story starts the job at once").
+  //     Skipping it ran every showcase on a path no real visitor takes.
+  const tPrepare = Date.now();
+  const preparePromise = api(args.base, '/api/trial/prepare-title', {
+    bearer: acct.sessionToken,
+    body: {
+      storyTopic: entry.storyTopic || '', storyCategory: entry.storyCategory,
+      storyTheme: entry.storyTheme || '', language: entry.language,
+    },
+  }).then(
+    r => console.log(`[${chTime(new Date())}] prepare-title done in ${Math.round((Date.now() - tPrepare) / 1000)}s (costume: ${r.costumeType || 'none'}, slides: ${(r.avatarSlides || []).length})`),
+    e => console.warn(`[${chTime(new Date())}] prepare-title failed: ${e.message.slice(0, 160)}`),
+  );
+
   // 4. The premise. A real user reaches create-story only through the ideas
   //    step, so the harness does too — unless the rotation entry (or --details)
   //    already states one. A failure here is FATAL: falling through to an empty
@@ -361,14 +378,27 @@ function faceDataUri(entry) {
     return;
   }
 
-  // 6. Poll to completion.
+  // 6. Poll to completion, on the client's cadence and URL (TrialGenerationPage.tsx),
+  //    noting when each thing a visitor can SEE first arrives.
   let last = -1;
+  const seen = {};
+  const mark = (key, label) => {
+    if (seen[key]) return;
+    seen[key] = Math.round((Date.now() - tJobStart) / 1000);
+    console.log(`  [${chTime(new Date())}] first ${label} visible, job +${seen[key]}s`);
+  };
   while (Date.now() - t0 < POLL_TIMEOUT_MS) {
-    await new Promise(r => setTimeout(r, 10000));
+    await new Promise(r => setTimeout(r, 3000));
     let st;
     try {
-      st = await api(args.base, `/api/trial/job-status/${jobId}`, { method: 'GET', bearer: acct.sessionToken });
+      st = await api(args.base, `/api/trial/job-status/${jobId}${seen.title ? '' : '?needTitlePage=1'}`, { method: 'GET', bearer: acct.sessionToken });
     } catch (e) { console.warn(`  poll error: ${e.message.slice(0, 120)}`); continue; }
+    if ((st.avatarSlides || []).length) mark('slides', `avatar slides (${st.avatarSlides.length})`);
+    if (st.titlePageImage) mark('title', 'title page');
+    const pages = st.pages || st.sceneImages || [];
+    if (pages.some(p => p && (p.imageData || p.imageUrl))) mark('page', 'page image');
+    if (pages.some(p => p && p.locked && p.teaser)) mark('teaser', 'locked-page teaser');
+    if (pages.some(p => p && p.locked && p.text)) console.error('  ✗ a locked page carries its full text');
     if (st.progress !== last) {
       console.log(`  [${chTime(new Date())}] ${st.status}: ${st.progress}% ${st.progress_message || st.progressMessage || ''}`);
       last = st.progress;
@@ -383,6 +413,8 @@ function faceDataUri(entry) {
         console.log(`  setup : ${setupSecs}s  (photo analysis + preview avatar — cold on an idle staging, warm in production)`);
         console.log(`  job   : ${jobSecs}s  ← compare THIS against the baseline`);
       }
+      console.log(`  first visible (job +s): slides ${seen.slides ?? '—'}, title ${seen.title ?? '—'}, page ${seen.page ?? '—'}, teaser ${seen.teaser ?? '—'}`);
+      await preparePromise;
       if (st.error_message) console.log(`error: ${st.error_message}`);
       console.log(`story : ${args.base}/create?storyId=${jobId}`);
       console.log(`job   : ${jobId}`);
