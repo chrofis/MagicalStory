@@ -508,12 +508,20 @@ function expandPositionAbbreviations(position) {
  *   2. make the vision-based semantic eval report the object as "missing" or
  *      "unverifiable" because the IDs are not visible in the image.
  *
+ * A location is written `Name (qualifier) [LOC002]`: the parenthesis is the landmark
+ * index's disambiguator ("Fislisbach (Stadt)", "Kapellbrücke (Luzern)"), a row label and
+ * never a name a picture may show. Left in the prompt's Setting line it was painted as a
+ * caption ("Fislisbach (Stadt)", staging job_1791496201302_6vgktllu5, page 2). It is
+ * dropped only where it sits directly before a LOC tag — the structured name slot.
+ *
  * @param {string} str
  * @returns {string}
  */
 function stripEntityIds(str) {
   if (!str || typeof str !== 'string') return str;
   return str
+    // Index qualifier of a location name: "Fislisbach (Stadt) [LOC002]" → "Fislisbach [LOC002]"
+    .replace(/\s*\([^()]*\)(?=\s*\[LOC\d+(?:\.\d+)?\])/gi, '')
     // Bracketed: "Kurpark [LOC003.2]" → "Kurpark"
     .replace(/\s*\[(?:LOC|ART|CHAR|CLO|OBJ|ANI|VEH|CHR)\d+(?:\.\d+)?\]/gi, '')
     // Bare: "grab ART003 from" → "grab  from" (then collapsed by whitespace pass)

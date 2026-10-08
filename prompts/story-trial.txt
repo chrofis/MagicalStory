@@ -28,7 +28,7 @@ SHORT story — {PAGES} scenes. Keep it focused:
 - A sentence never gives one thing two states (a thing caught or held is not said to lie somewhere in the same breath), and a property stated for one part of a subject is not restated for another with "also" or "too": say it once.
 - Where a figure looks, faces or turns their head is the picture's business: write no look away, turn of the head or change of facing the scene hint does not stage.
 - {NO_DASH}
-- Never describe a character's hair, eye colour, skin or clothing in the story text — appearance belongs to the scene hints and the illustrations
+- Never describe a character's or creature's hair, eye colour, skin or clothing, or the look of a creature's eyes, gaze, mouth or beak, in the story text — appearance belongs to the scene hints and the illustrations. A creature does things and matters to the child; its face is never written.
 - No onomatopoeia or sound-effect words (clang-clang, whoosh, boom) and no baby-talk. The register follows the reading level, never a character's age: a story about a toddler is not written in toddler speech. {NO_ABBREVIATION}
 {RISK_FRAMING}
 - {PERIL_CEILING}
@@ -108,7 +108,7 @@ It must be detailed enough to illustrate without additional context.
 - `objects`: include visual bible items visible in the scene with their IDs. `size` restates the object's scale for this page's shot, in the same shape the visual bible uses; it overrides the bible entry where they differ.
 - `background`: describes crowd/environment density. Tells image generator if scene feels isolated or populated. The people it names are the page's `population`: a `background` with passers-by or a crowd is never a `cast_only` page.
 {POPULATION_FIELD}
-- `interactions`: 1-4 visible character-to-object or character-to-character contacts, one row per foreground/midground character. `priority: "essential"` for the page's central action, `"low"` for incidental gaze or pose. {CONTACT_VERB} When several characters use ONE object together, join their names with ` + ` in one row — separate rows with the same object render as duplicate objects. {SHARED_GRIP} {SMALL_PROP_CONTACT} Omit pure ground/floor contact, leaning on walls and sitting on generic chairs. Every row also appears in the story text as the same physical contact.
+- `interactions`: 1-4 visible character-to-object or character-to-character contacts, one row per foreground/midground character. `priority: "essential"` for the page's central action, `"low"` for incidental gaze or pose. {CONTACT_VERB} When several characters use ONE object together, join their names with ` + ` in one row — separate rows with the same object render as duplicate objects. {SHARED_GRIP} {SMALL_PROP_CONTACT} Omit pure ground/floor contact, leaning on walls and sitting on generic chairs. Every row also appears in the story text as the same physical contact. **Coverage:** every foreground/midground character appears in `interactions` exactly once, and `interactions` is never empty on a page that has one. A character with no real action gets a `priority: "low"` row naming what they watch or stand beside (e.g. `{"character": "[Name]", "object": "[what they watch]", "where": "watches the [object]", "priority": "low"}`): without it the image model draws a camera-facing portrait. Background characters are exempt.
 - `timeOfDay` and `weather` (required on every scene): {SCENE_LIGHT_FIELD}
 
 **Composition — every scene hint obeys these:**

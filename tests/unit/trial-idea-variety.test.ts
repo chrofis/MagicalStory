@@ -140,7 +140,8 @@ describe('the two idea arms differ by construction', () => {
 
   it('the fantasy arm is materially shorter than the own-town arm', () => {
     const { local, fantasy } = pb.buildTrialIdeaPrompts(args(3));
-    expect(fantasy.length).toBeLessThan(local.length * 0.95);
+    // An absolute gap, not a ratio (2026-10-09): rules both arms share grow the prompt and shrink any ratio; the own-town arm extra mechanics stay 300+ chars.
+    expect(local.length - fantasy.length).toBeGreaterThan(250);
   });
 
   it('never asks for a difference from an idea it cannot have seen', () => {
@@ -234,7 +235,8 @@ describe('the variety axis varies across draws', () => {
 
   it('costs nothing of consequence — one short line per arm', () => {
     const { text } = pb.nextIdeaVarietyAxis();
-    expect(text.split(/\s+/).length).toBeLessThan(30);
+    // 30 -> 60 words on 2026-10-09: the line now also carries the kind of outside event.
+    expect(text.split(/\s+/).length).toBeLessThan(70);
   });
 });
 

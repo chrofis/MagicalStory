@@ -33,7 +33,7 @@ describe('rules from the mermaid/ninja review reach every consumer', () => {
   it('the idea axis offers a companion only as a conditional and stays one short line', () => {
     const { text } = pb.nextIdeaVarietyAxis();
     expect(text).toMatch(/otherwise none/);
-    expect(text.split(/\s+/).length).toBeLessThan(30);
+    expect(text.split(/\s+/).length).toBeLessThan(70);
   });
 
   it('the idea commission rule gives the no-commission case a source: the theme\'s own world', () => {

@@ -9,76 +9,76 @@ const TRIAL_COSTUMES = {
   // ══════════════════════════════════════════════════════════════
   adventure: {
     pirate: {
-      male: "Striped sailor shirt, brown leather vest, loose canvas trousers tucked into tall boots, wide leather belt with brass buckle",
-      female: "Striped sailor blouse, brown leather corset vest, flowing skirt over trousers, tall boots, wide leather belt"
+      male: "Red and white horizontal-striped sailor shirt, brown leather vest over it, dark brown canvas trousers tucked into tall black boots, wide black leather belt with brass buckle",
+      female: "Red and white horizontal-striped sailor blouse, brown leather corset vest over it, dark blue flowing skirt over dark trousers, tall black boots, wide black leather belt"
     },
     knight: {
-      male: "Silver chain mail tunic over padded gambeson, leather bracers, brown leather boots, simple sword belt",
-      female: "Silver chain mail tunic over padded gambeson, leather bracers, brown leather boots, simple sword belt"
+      male: "Silver chain mail tunic over a grey padded gambeson, brown leather bracers, dark brown leather boots, plain brown sword belt",
+      female: "Silver chain mail tunic over a grey padded gambeson, brown leather bracers, dark brown leather boots, plain brown sword belt"
     },
     cowboy: {
-      male: "Denim jeans, plaid flannel shirt, brown leather vest, cowboy boots with spurs, bandana around neck",
-      female: "Denim jeans, plaid flannel shirt, brown leather vest, cowboy boots, bandana around neck"
+      male: "Blue denim jeans, red and black plaid flannel shirt, brown leather vest, brown cowboy boots with silver spurs, red bandana around neck",
+      female: "Blue denim jeans, red and black plaid flannel shirt, brown leather vest, brown cowboy boots, red bandana around neck"
     },
     ninja: {
-      male: "Dark blue traditional ninja outfit (shinobi shozoku), cloth wraps on forearms, soft tabi boots",
-      female: "Dark blue traditional ninja outfit (shinobi shozoku), cloth wraps on forearms, soft tabi boots"
+      male: "Dark blue traditional ninja outfit (shinobi shozoku), black cloth wraps on forearms, black soft tabi boots",
+      female: "Dark blue traditional ninja outfit (shinobi shozoku), black cloth wraps on forearms, black soft tabi boots"
     },
     viking: {
-      male: "Brown fur-trimmed tunic, leather bracers, thick leather belt with round buckle, fur-lined boots, woolen cloak",
-      female: "Long woolen dress with embroidered trim, leather belt with pouch, fur-lined cloak, leather boots"
+      male: "Brown fur-trimmed tunic, brown leather bracers, thick brown leather belt with round bronze buckle, fur-lined brown boots, grey woolen cloak",
+      female: "Long dark red woolen dress with gold embroidered trim, brown leather belt with pouch, grey fur-lined cloak, brown leather boots"
     },
     roman: {
-      male: "White tunic (tunica) with red trim, leather sandals (caligae), leather wrist guards, simple belt",
-      female: "White stola dress with golden trim, leather sandals, simple belt with decorative clasp"
+      male: "White tunic (tunica) with red trim, brown leather sandals (caligae), brown leather wrist guards, simple brown belt",
+      female: "White stola dress with gold trim, brown leather sandals, brown belt with gold clasp"
     },
     egyptian: {
-      male: "White linen kilt (shendyt), gold collar necklace, leather sandals, gold arm bands",
-      female: "White linen dress with gold belt, beaded collar necklace, leather sandals, gold arm bands"
+      male: "White linen kilt (shendyt), gold collar necklace, tan leather sandals, gold arm bands",
+      female: "White linen dress with gold belt, blue and gold beaded collar necklace, tan leather sandals, gold arm bands"
     },
     greek: {
-      male: "White chiton tunic with blue border, leather sandals, rope belt, simple shoulder clasp",
-      female: "White flowing peplos dress with golden trim, leather sandals, golden waist belt"
+      male: "White chiton tunic with blue border, brown leather sandals, brown rope belt, silver shoulder clasp",
+      female: "White flowing peplos dress with gold trim, brown leather sandals, gold waist belt"
     },
     caveman: {
-      male: "Animal fur tunic, leather cord belt, bare feet or simple leather wraps, bone necklace",
-      female: "Animal fur dress, leather cord belt, bare feet or simple leather wraps, shell necklace"
+      male: "Brown animal fur tunic, brown leather cord belt, bare feet, white bone necklace",
+      female: "Tan animal fur dress, brown leather cord belt, bare feet, white shell necklace"
     },
     samurai: {
-      male: "Traditional hakama pants, kimono top with family crest, obi sash belt, wooden sandals (geta)",
-      female: "Traditional hakama pants, kimono top with floral pattern, obi sash belt, wooden sandals (geta)"
+      male: "Dark grey hakama pants, navy kimono top with white family crest, red obi sash belt, brown wooden sandals (geta)",
+      female: "Dark grey hakama pants, pale pink kimono top with floral pattern, red obi sash belt, brown wooden sandals (geta)"
     },
     wizard: {
-      male: "Long flowing robe in deep blue with silver star patterns, leather belt with pouch, pointed cloth shoes",
-      female: "Long flowing robe in deep purple with golden moon patterns, leather belt with pouch, pointed cloth shoes"
+      male: "Long flowing robe in deep blue with silver star patterns, brown leather belt with pouch, pointed grey cloth shoes",
+      female: "Long flowing robe in deep purple with golden moon patterns, brown leather belt with pouch, pointed grey cloth shoes"
     },
     dragon: {
-      male: "Leather armor vest with scale pattern, sturdy boots, arm guards, adventurer's belt with pouches",
-      female: "Leather armor vest with scale pattern, sturdy boots, arm guards, adventurer's belt with pouches"
+      male: "Brown leather armor vest with scale pattern, dark brown sturdy boots, brown arm guards, brown adventurer's belt with pouches",
+      female: "Brown leather armor vest with scale pattern, dark brown sturdy boots, brown arm guards, brown adventurer's belt with pouches"
     },
     superhero: {
-      male: "Bright colored bodysuit with cape, boots, utility belt, emblem on chest",
-      female: "Bright colored bodysuit with cape, boots, utility belt, emblem on chest"
+      male: "Bright red bodysuit with blue cape, blue boots, yellow utility belt, yellow emblem on chest",
+      female: "Bright red bodysuit with blue cape, blue boots, yellow utility belt, yellow emblem on chest"
     },
     detective: {
-      male: "Tweed jacket, white shirt, brown trousers, polished shoes, magnifying glass on a chain",
-      female: "Tweed blazer, white blouse, plaid skirt, polished shoes, magnifying glass on a chain"
+      male: "Brown tweed jacket, white shirt, dark brown trousers, black polished shoes, brass magnifying glass on a chain",
+      female: "Brown tweed blazer, white blouse, green plaid skirt, black polished shoes, brass magnifying glass on a chain"
     },
     princess: {
       male: "Royal blue velvet doublet with gold embroidery, white silk shirt, dark blue trousers, polished boots, thin gold circlet crown",
       female: "Flowing pink and gold ball gown with puffy sleeves, satin gloves, sparkling tiara, delicate glass slippers"
     },
     unicorn: {
-      male: "Shimmering white tunic with rainbow trim, silver boots, crystal pendant, star-dusted cape",
-      female: "Shimmering white dress with rainbow ribbons, silver shoes, crystal tiara, star-dusted cape"
+      male: "Shimmering white tunic with rainbow trim, silver boots, crystal pendant, lilac star-dusted cape",
+      female: "Shimmering white dress with rainbow ribbons, silver shoes, crystal tiara, lilac star-dusted cape"
     },
     mermaid: {
-      male: "Long-sleeve scale-pattern swim shirt in sea green over the whole torso, one merman tail replacing the legs from the waist down, no feet, shell necklace, coral arm band",
-      female: "Long-sleeve scale-pattern swim shirt in sea green over the whole torso, one mermaid tail replacing the legs from the waist down, no feet, shell necklace, coral tiara"
+      male: "Long-sleeve scale-pattern swim shirt in sea green over the whole torso, one merman tail replacing the legs from the waist down, no feet, white shell necklace, orange coral arm band",
+      female: "Long-sleeve scale-pattern swim shirt in sea green over the whole torso, one mermaid tail replacing the legs from the waist down, no feet, white shell necklace, pink coral tiara"
     },
     dinosaur: {
-      male: "Khaki explorer shorts, safari vest with many pockets, hiking boots, adventurer's belt",
-      female: "Khaki explorer shorts, safari vest with many pockets, hiking boots, adventurer's belt"
+      male: "Khaki explorer shorts, olive safari vest with many pockets, brown hiking boots, brown adventurer's belt",
+      female: "Khaki explorer shorts, olive safari vest with many pockets, brown hiking boots, brown adventurer's belt"
     },
     space: {
       male: "Silver-white space suit with blue patches, utility belt, space boots, mission patch on shoulder",
@@ -89,24 +89,24 @@ const TRIAL_COSTUMES = {
       female: "Wetsuit in blue and black, diving flippers, waterproof utility belt"
     },
     jungle: {
-      male: "Khaki shorts, green explorer shirt with rolled sleeves, hiking boots, canvas backpack",
-      female: "Khaki shorts, green explorer shirt with rolled sleeves, hiking boots, canvas backpack"
+      male: "Khaki shorts, green explorer shirt with rolled sleeves, brown hiking boots, tan canvas backpack",
+      female: "Khaki shorts, green explorer shirt with rolled sleeves, brown hiking boots, tan canvas backpack"
     },
     farm: {
-      male: "Denim overalls over plaid shirt, rubber boots, straw in pocket",
-      female: "Denim overalls over plaid shirt, rubber boots, gardening gloves tucked in pocket"
+      male: "Blue denim overalls over red and white plaid shirt, green rubber boots, straw in pocket",
+      female: "Blue denim overalls over red and white plaid shirt, green rubber boots, brown gardening gloves tucked in pocket"
     },
     forest: {
-      male: "Green tunic, brown leather boots, hooded cloak, leather belt with pouch",
-      female: "Green tunic dress, brown leather boots, hooded cloak, leather belt with pouch"
+      male: "Green tunic, brown leather boots, dark green hooded cloak, brown leather belt with pouch",
+      female: "Green tunic dress, brown leather boots, dark green hooded cloak, brown leather belt with pouch"
     },
     fireman: {
-      male: "Yellow firefighter turnout coat with reflective stripes, dark trousers, rubber boots",
-      female: "Yellow firefighter turnout coat with reflective stripes, dark trousers, rubber boots"
+      male: "Yellow firefighter turnout coat with silver reflective stripes, dark navy trousers, black rubber boots",
+      female: "Yellow firefighter turnout coat with silver reflective stripes, dark navy trousers, black rubber boots"
     },
     doctor: {
-      male: "White lab coat over blue scrubs, comfortable shoes, stethoscope around neck",
-      female: "White lab coat over blue scrubs, comfortable shoes, stethoscope around neck"
+      male: "White lab coat over light blue scrubs, white comfortable shoes, grey stethoscope around neck",
+      female: "White lab coat over light blue scrubs, white comfortable shoes, grey stethoscope around neck"
     },
     police: {
       male: "Dark blue police uniform shirt with badge, dark trousers, black shoes, utility belt",
@@ -117,16 +117,16 @@ const TRIAL_COSTUMES = {
       female: "Red velvet dress with white fur trim, black boots, candy cane striped stockings"
     },
     newyear: {
-      male: "Sparkly formal suit in midnight blue, bow tie, shiny shoes, party hat",
-      female: "Sparkly formal dress in midnight blue, shiny shoes, glittery tiara"
+      male: "Sparkly formal suit in midnight blue, silver bow tie, black shiny shoes, gold party hat",
+      female: "Sparkly formal dress in midnight blue, silver shiny shoes, gold glittery tiara"
     },
     easter: {
-      male: "Pastel colored vest over white shirt, light trousers, bow tie, basket",
-      female: "Pastel colored dress with flower pattern, white shoes, flower crown"
+      male: "Pastel yellow vest over white shirt, beige trousers, light blue bow tie, wicker basket",
+      female: "Pastel pink dress with white flower pattern, white shoes, flower crown of white and yellow flowers"
     },
     halloween: {
-      male: "Black cape over dark clothes, spiderweb-patterned vest, dark boots",
-      female: "Black cape over dark dress, spiderweb-patterned bodice, dark boots"
+      male: "Black cape over black clothes, grey spiderweb-patterned vest, black boots",
+      female: "Black cape over black dress, grey spiderweb-patterned bodice, black boots"
     }
   },
 

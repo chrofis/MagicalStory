@@ -10368,7 +10368,7 @@ const RISK_FRAMING_RULE = '- Where a child does something with real physical ris
  * beats template, whose rules are plain sentences, writes it bare with its
  * full stop — the built prompts are byte-identical to the prose they replaced.
  */
-const PAGE_OPENING_VARIETY_RULE = "Vary how each page begins: not always with a character's name — open some pages with time, place, speech, sound or action, and never start consecutive pages the same way";
+const PAGE_OPENING_VARIETY_RULE = "Vary how each page begins: at most one page in three begins with a character's name (a six-page story has two such pages at most), the others open with time, place, speech, sound or action, and no two consecutive pages start the same way";
 
 /**
  * SIZES AND LOOKS BELONG TO THE PICTURES (owner, 2026-09-23). ONE string for
@@ -12732,7 +12732,7 @@ function buildStoryBibleFromBeatsPrompt(inputData, beats = [], { arc = '' } = {}
 function labelCreatureToneForTrialWriter(tone) {
   if (!tone) return '';
   return `# Creature look (picture only)
-This is for the scene hints and the illustration, never for the story text. The story text never describes a creature's mouth, lips, teeth, brow, eyes or face; it says what the creature does and what it means to the child.
+This is for the scene hints and the illustration, never for the story text. The story text never describes a creature's mouth, lips, teeth, brow, eyes, gaze, beak or face, and never repeats a phrase of this block (a calm or open gaze is a picture word, not a sentence); it says what the creature does and what it means to the child.
 ${tone}`;
 }
 
@@ -13324,6 +13324,27 @@ const IDEA_COMPANION_AXES = [
   'a grown-up who stays out of the solving',
   'a favourite object treated as a friend',
 ];
+/**
+ * The KIND of outside event, the third idea axis. Left to itself the model's
+ * outside event is a gust of wind: 4 of 5 picked staging cards on 2026-10-09
+ * (the "one outside event" wording plus effort low). Same mechanism as the
+ * want axis — one drawn per arm, rotated, shape-classed so the two arms of a
+ * cell never get the same kind. 9 entries: coprime with the 7 wants and the 4
+ * companions, so the pairing turns over.
+ */
+const IDEA_OBSTACLE_AXES = [
+  { kind: 'animal', obstacle: 'an animal carries off or scares away something the main character needs' },
+  { kind: 'blocked', obstacle: 'a door, gate or bridge on the only way is shut or locked' },
+  { kind: 'breaks', obstacle: 'something the main character relies on breaks or tears' },
+  { kind: 'lost', obstacle: 'something is mislaid among many things that look alike' },
+  { kind: 'blocked', obstacle: 'a crowd or a queue fills the only way through' },
+  { kind: 'runs-out', obstacle: 'something needed is used up or empty' },
+  { kind: 'animal', obstacle: 'an animal sits in the way and will not move' },
+  { kind: 'stuck', obstacle: 'something is stuck fast in a gap, a branch or the mud' },
+  { kind: 'lost', obstacle: 'someone the main character needs is not where they should be' },
+];
+let ideaObstacleCursor = 0;
+let ideaFantasyObstacleCursor = 3;
 let ideaAxisCursor = 0;
 // A SECOND cursor, for the fantasy arm's want alone. With one cursor the two
 // arms drew adjacent entries (i and i+1), and four of the seven entries are the
@@ -13334,14 +13355,15 @@ let ideaAxisCursor = 0;
 let ideaFantasyWantCursor = 0;
 let ideaFantasySubCursor = 0;
 
-function ideaAxisText(want, companion) {
-  return `This idea's want: ${want}. If it needs company: ${companion}; otherwise none.`;
+function ideaAxisText(want, companion, obstacle) {
+  return `This idea's want: ${want}. The outside event that stops it, never wind or weather, of this kind unless a nearer kind forces the hard thing asked for: ${obstacle}. If it needs company: ${companion}; otherwise none.`;
 }
 
 function ideaAxisAt(i) {
   const entry = IDEA_WANT_AXES[i % IDEA_WANT_AXES.length];
   const companion = IDEA_COMPANION_AXES[i % IDEA_COMPANION_AXES.length];
-  return { want: entry.want, shape: entry.shape, companion, text: ideaAxisText(entry.want, companion) };
+  const ob = IDEA_OBSTACLE_AXES[ideaObstacleCursor++ % IDEA_OBSTACLE_AXES.length];
+  return { want: entry.want, shape: entry.shape, companion, obstacle: ob.obstacle, obstacleKind: ob.kind, text: ideaAxisText(entry.want, companion, ob.obstacle) };
 }
 
 function nextIdeaVarietyAxis() {
@@ -13387,13 +13409,20 @@ function nextIdeaAxisPair() {
     ideaFantasyWantCursor++;
   }
 
+  // The fantasy arm's kind of event comes from its own cursor and is never the
+  // local arm's class (same rule as the want's shape).
+  let ob;
+  do { ob = IDEA_OBSTACLE_AXES[ideaFantasyObstacleCursor++ % IDEA_OBSTACLE_AXES.length]; } while (ob.kind === local.obstacleKind);
+
   return {
     local,
     fantasy: {
       want: entry.want,
       shape: entry.shape,
       companion: fantasyCompanion,
-      text: ideaAxisText(entry.want, fantasyCompanion),
+      obstacle: ob.obstacle,
+      obstacleKind: ob.kind,
+      text: ideaAxisText(entry.want, fantasyCompanion, ob.obstacle),
     },
   };
 }
@@ -13870,6 +13899,7 @@ module.exports = {
   nextIdeaVarietyAxis,
   nextIdeaAxisPair,
   IDEA_WANT_AXES,
+  IDEA_OBSTACLE_AXES,
   applyBandView,
   BAND_VIEW_KEEPS,
   BAND_PREMISE_SLOTS,

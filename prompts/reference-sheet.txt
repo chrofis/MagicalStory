@@ -30,6 +30,7 @@ Generate one image laid out as a {GRID_SHAPE_PHRASE}.{GRID_SEPARATION} Each cell
 - Simple angle that shows the object clearly
 - A comparison in the description gives size or shape only. Draw the named object, never the thing it is compared to, and never a blend of the two
 - One object per cell, even when the description mentions its parts or what it is made of
+- An object that is held, worn or attached to a person or creature (a lead, leash, rein, string, strap, collar, harness) is drawn alone, lying or hanging by itself: never with the person or creature it attaches to, not even as a silhouette, shadow, faint outline or part of one, and never a second copy of the object
 - Only the material the description names is drawn: an object built of leaves, snow or sand shows those loose, with no twigs, straw, wicker, rim or woven frame the description does not name
 
 **FOR VEHICLES/VESSELS/STRUCTURES:**

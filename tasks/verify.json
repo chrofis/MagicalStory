@@ -7538,6 +7538,38 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "trial-idea-chain-2026-10-09",
+      "title": "Trial idea cards: obstacle kind varies (no wind default) and the chain check holds",
+      "commits": [],
+      "addedAt": "2026-10-09",
+      "claim": "Over several /try idea draws the two cards of a draw show different kinds of outside event, fewer than 1 in 5 cards use wind or a gust, no card has an English word inside a German card, and the idea log shows how many cards reran for their CHECK block (target under about 25%).",
+      "runShape": [
+        "trial"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Read the idea cards of 5+ staging /try draws and the \"failed its own check\" log lines."
+      },
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "trial-review-fixes-2026-10-09",
+      "title": "Trial writer, costume, location-name and reference-cell fixes from the 2026-10-08 review",
+      "commits": [],
+      "addedAt": "2026-10-09",
+      "claim": "On a staging trial: no more than 2 of 6 pages open on the main character name; EXACT POSES in every page prompt; no creature eye/gaze/beak description in page text; Setting line shows no \"(Stadt)\"-style qualifier; the head row and body row agree on the costume colours; a held-object reference cell (lead, leash) shows the object alone.",
+      "runShape": [
+        "trial"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "verify-run trialPromptParity plus looking at the costumed sheet and the lead cell image on a pirate story and a dog-lead story."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [
