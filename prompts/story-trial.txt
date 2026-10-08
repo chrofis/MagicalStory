@@ -25,6 +25,8 @@ SHORT story — {PAGES} scenes. Keep it focused:
 - Show character personality through actions
 - {PAGE_CONTINUITY}
 - {NEIGHBOUR_PHRASE}
+- A sentence never gives one thing two states (a thing caught or held is not said to lie somewhere in the same breath), and a property stated for one part of a subject is not restated for another with "also" or "too": say it once.
+- Where a figure looks, faces or turns their head is the picture's business: write no look away, turn of the head or change of facing the scene hint does not stage.
 - {NO_DASH}
 - Never describe a character's hair, eye colour, skin or clothing in the story text — appearance belongs to the scene hints and the illustrations
 - No onomatopoeia or sound-effect words (clang-clang, whoosh, boom) and no baby-talk. The register follows the reading level, never a character's age: a story about a toddler is not written in toddler speech. {NO_ABBREVIATION}

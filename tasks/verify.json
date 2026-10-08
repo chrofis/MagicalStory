@@ -6806,6 +6806,22 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "text-chain-figure-rules-2026-10-08",
+      "title": "Text chain: no personified force, no self-named feeling, no self-undoing sentence; extras dressed apart",
+      "commits": [],
+      "addedAt": "2026-10-08",
+      "claim": "On a full story, no page has weather/cold/night acting as a person, no character says a feeling word about themselves in a thanks or ending line, no sentence gives a held thing a resting place or restates a property with also/too, and background people in a page picture wear no cast member garment colour.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Read the final text for those four patterns; look at every ambient/crowd page picture for extras in a cast colour (green, red, blue, yellow, orange jackets)."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [

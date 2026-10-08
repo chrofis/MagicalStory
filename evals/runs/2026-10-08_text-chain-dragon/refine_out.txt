@@ -1,0 +1,73 @@
+---ANALYSIS---
+Rewritable pages: p1 (T1), p5 (T2, T3), p6 (T4, T5, T6), p14 (T7), p15 (T8), p16 (T9), p17 (T10), p18 (T11). All other pages are scanned for the four extra cases (outline contradiction, abbreviation or acronym, banned dash): none found, so they ship unchanged.
+
+p1: «Plötzlich zeigte Julian in den Himmel.» becomes «Julian zeigte in den Himmel.» Also, as the page is rewritten, the plain size statements that no plot event turns on are cut: «Grosser roter Vogel!» becomes «Roter Vogel!», and Max's «Der ist viel zu gross.» goes; his «Das ist kein Vogel» stays.
+p5: «Sie senkte ihren riesigen Kopf.» is recast as «Ihr Blick ging nur zu dem Ei im Schal.» This drops the size look and shows, by what she looks at, that she came for the egg.
+p6: Julian's retreat is joined and recast so that no three sentences open alike, and the hint's fear is added as the reason for the silence: «Vor Angst brachte er kein Wort heraus.» This replaces «Er sagte kein Wort.» No later "does not come out again" wording is added.
+p14: Max is out of frame in the picture, which shows Kiaan and Levin at an empty nest. The doers are changed to the two the picture shows: Kiaan wraps the egg and lays it in the nest, and Levin fetches the scarf. The scarf is no longer handed to Max.
+p15: «Warm» is joined into the paragraph before it, so it no longer stands as a one-line paragraph.
+p16: A short line from Glutta is added, the owed fact that a dragon's body stays warm without fire. It is said once, in her own gruff voice, at the moment the egg glows against her.
+p17: «Ein kleiner Drache» becomes «Ein Drache» (size cut). On the same page, «Die Kälte fiel auf den Lindenhof.» gave the cold an act, so it becomes the plain change «Es wurde kalt auf dem Lindenhof.»
+p18: Glutta's thanks no longer names her shame. The fact stands in its place: «ich habe es euch nicht gesagt».
+
+LEDGER
+T1 fixed on p1 (Plötzlich removed).
+T2 fixed on p5 (her look goes to the egg in the scarf, which shows she came for it).
+T3 fixed on p5 (the size sentence is recast; the look is left to the pictures).
+T4 fixed on p6 (the fear is now given at the act of hiding, so the reader has the reason before p15).
+T5 fixed on p6 («Vor Angst brachte er kein Wort heraus.»).
+T6 fixed on p6 (the openings are varied: Julian / Er / Sie / Dann / Dort / Vor).
+T7 fixed on p14 (the doer of the wrapping and laying is Kiaan, who is in frame; Levin fetches the scarf; Max is no longer on the page).
+T8 fixed on p15 («Warm» is joined into the preceding paragraph).
+T9 fixed on p16 (Glutta says «Auch ohne Feuer bin ich warm», the owed fact, once).
+T10 fixed on p17 (the size word «kleiner» is cut).
+T11 fixed on p18 (the feeling word is replaced by the fact «ich habe es euch nicht gesagt»).
+Extra-case scan of all other pages: STANDS, no outline contradiction, no abbreviation or acronym, no banned dash.
+Sentences removed: p1 «Der ist viel zu gross.», plus the word «Grosser» in Julian's cry. p5 «Sie senkte ihren riesigen Kopf.» (replaced). p6 «Er sagte kein Wort.» (replaced). p14 «Er holte den Schal und gab ihn Max.» (recast without Max). p15 none. p16 none. p17 «Die Kälte fiel auf den Lindenhof.» (recast). p18 none, the thanks line is recast.
+
+---STORY TEXT---
+## Page 1
+Das Laub flog hoch in die Luft. Levin, Julian, Max und Kiaan warfen es mit den Händen in die Höhe und fingen es wieder, rotes und gelbes, auf dem Lindenhof. Julian zeigte in den Himmel.
+
+«Schaut!», rief er. «Roter Vogel!»
+
+Die rote Gestalt glitt langsam über die Türme des Grossmünsters. Max legte den Kopf in den Nacken. «Das ist kein Vogel», sagte er.
+
+## Page 5
+Ein Schatten fiel über den Platz. Die rote Gestalt tauchte herab, das Laub wirbelte auf, und auf dem Hügel landete eine alte Drachin. Ihr Blick ging nur zu dem Ei im Schal.
+
+Max stellte sich breitbeinig hin. «Ich bin Max», sagte er laut. «Das sind Levin, Julian und Kiaan. Wie heisst du?»
+
+Die Drachin knurrte tief. «Glutta.»
+
+## Page 6
+Julian wich einen Schritt zurück und stolperte. Er fiel gegen die Seite der Drachin und legte die Hand flach auf ihre Schuppen. Sie waren warm.
+
+Dann zog er die Hand weg und rannte hinter die Linde. Dort drückte er sich an den Stamm. Vor Angst brachte er kein Wort heraus.
+
+## Page 14
+Kiaan zeigte auf die Stelle zwischen den Wurzeln. «Hier bewegt sich nichts», sagte er. «Hier kann es bleiben.»
+
+Levin häufte Laub zu einem Nest auf. Dann holte er den Schal. Kiaan wickelte das Ei wieder ein und legte es ins Nest. Sie warteten, aber das Ei blieb grau.
+
+## Page 15
+Hinter der Linde kam Julian hervor. Er ging zum Nest, hob das Ei im Schal heraus und trug es mit beiden Armen über den Platz.
+
+Er blieb bei Glutta stehen und drückte das Ei fest an ihre Seite. «Warm», sagte Julian.
+
+## Page 16
+Das Ei begann zu glimmen, erst schwach, dann orange. Glutta sah es und riss die Augen auf. «Auch ohne Feuer bin ich warm», brummte sie. Sie nahm es vorsichtig in die Kralle und trug es zum Nest zurück.
+
+Dort legte sie sich im Kreis darum und breitete einen Flügel darüber. Vom Grossmünster läutete die Glocke den Abend.
+
+## Page 17
+Es wurde kalt auf dem Lindenhof. Das Ei aber blieb orange. Es knackte, und die Schale sprang oben auf.
+
+Ein Drache kletterte heraus. Er hickste, und ein warmer Schimmer stieg aus seinem Maul. Julian kniete neben ihm und lachte. «Funki!», rief er.
+
+## Page 18
+Glutta sah die Buben an. «Danke», sagte sie. «Mein Feuer ist ausgegangen, und ich habe es euch nicht gesagt.»
+
+Die Buben beugten sich mit ihr über das Nest. Julian zog den Schal unter der Schale hervor und legte ihn um Funki. Funki kuschelte sich hinein.
+
+Julian lachte. «Funki ist warm», sagte er.

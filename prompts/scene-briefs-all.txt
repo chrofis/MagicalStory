@@ -242,6 +242,7 @@ A story page's METADATA carries no `shot`, `population`, `aboard`, `timeOfDay` o
 <!-- JEV_FIXED_BEGIN -->
 - `population` is the page's FIXED `population`, written by code. The prose agrees with it: where it is `ambient` or `crowd`, background people cross the setting in this page's own prose, unnamed, distant and small, and the prose never calls the place empty; where it is `cast_only`, no unnamed figure appears.
 <!-- JEV_FIXED_END -->
+- Background people the prose places are dressed apart from the cast: each unnamed figure gets a garment kind and colour no cast member wears (read CHARACTER DETAILS; a cast in green, red, blue, yellow or orange has passers-by in grey, black, brown, white or dark purple), and a figure of the cast's age band is never dressed like one of them. A page whose `population` is `ambient` or `crowd` names these figures with their garments in the prose, so the picture is not left to invent them from the cast's own palette.
 - A `close-up` frame ends at the waist. A pose the frame simply crops — sitting, kneeling, crouching — is fine there: the legs fall below the bottom edge, which is what a close-up IS, and a crouch or a kneel brings the head DOWN to what it is looking at. What a close-up cannot show is an action whose subject lies below the frame line — {CLOSEUP_BELOW_WAIST} — and nothing placed behind the character. {CLOSEUP_WAIST_SHOT}
 
 **`objects[]`**

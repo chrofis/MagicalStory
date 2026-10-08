@@ -17,7 +17,7 @@
  * (generator-vs-critic, sibling set `prose-slop-generator-vs-critic`).
  *
  * Deliberately NOT here:
- *   - "she felt sad" emotion labels — MOTIVE_AT_THE_ACT_RULE tells the writer a
+ *   - the NARRATOR's "she felt sad" emotion labels (a character naming their own feeling aloud is OWN_FEELING_RULE below) — MOTIVE_AT_THE_ACT_RULE tells the writer a
  *     glimpse may be "a feeling named", and the last page lands one feeling
  *     "plainly"; a rule against naming feelings would contradict both.
  *   - "suddenly" — Jev answers it 0.6-0.87 on every page; it is a count
@@ -98,7 +98,19 @@ const SUDDENLY_RULE = 'Never "suddenly" or its equivalent in the story\'s langua
  */
 const STOCK_BAN_RULE = 'No jokes, puns or wordplay. No stock gestures (a hand on a shoulder, ruffled hair, a knowing nod), and no gesture (a hug, a wink, a shrug, a high five) twice in the book. No "it was a [adjective] day", no weather, waking up or backstory to open page 1, no trait labels ("she was brave") and no words like dramatic, ethereal, breathtaking or stunning.';
 
-/** The writer-side lines, in order, for STYLE_RULEBOOK. */
-const SLOP_RULES = [...SLOP_TYPES.filter(t => t.rule).map(t => t.rule), SUDDENLY_RULE, STOCK_BAN_RULE];
+/**
+ * Two figure rules (owner mandate 2026-10-08, staging job_1791489793707_2ir6nl5kw
+ * p17 "Die Kälte fiel auf den Lindenhof", p18 «ich habe mich geschämt»). Neither
+ * has a Jev question: they reach every prose pass and both audits through
+ * STYLE_RULEBOOK, which the blind audit checks sentence by sentence. The arc's
+ * own wording ("the cold falls on the square", "says she was ashamed") is
+ * summary, so the rule says the telling does not copy it.
+ * see docs/decisions.md 2026-10-08 "Figure rules and the text chain"
+ */
+const PERSONIFIED_FORCE_RULE = 'Weather, light, cold, night, silence or any other force never acts like a person or an animal ("the cold fell on the square", "the night swallowed the path", "the wind whispered"): say what the characters do or feel, or state the plain change ("it grew cold"). A phrase of the story summary is never copied for its wording.';
+const OWN_FEELING_RULE = 'A character never names their own feeling to the person in front of them ("I was ashamed", "I am so sad", "I was afraid"), in a thanks or on the last page too: they say the fact or the wish that carries it ("my fire went out and I hid it") and an act or a look shows the rest. Where the story summary says a character "says she was ashamed", the line is told as that fact, never as the feeling word.';
 
-module.exports = { SLOP_TYPES, SLOP_RULES, SUDDENLY_RULE, STOCK_BAN_RULE };
+/** The writer-side lines, in order, for STYLE_RULEBOOK. */
+const SLOP_RULES = [...SLOP_TYPES.filter(t => t.rule).map(t => t.rule), SUDDENLY_RULE, STOCK_BAN_RULE, PERSONIFIED_FORCE_RULE, OWN_FEELING_RULE];
+
+module.exports = { SLOP_TYPES, SLOP_RULES, SUDDENLY_RULE, STOCK_BAN_RULE, PERSONIFIED_FORCE_RULE, OWN_FEELING_RULE };

@@ -1,0 +1,523 @@
+You are refining the narrative text of an illustrated children's book. The illustrations already exist and cannot change.
+
+# LANGUAGE
+
+You MUST write your response in German. Use Swiss Standard German spelling and vocabulary. CRITICAL RULES: (1) Use ä, ö, ü - NEVER ae, oe, ue. (2) NEVER use "ß", always use "ss" instead. (3) Use Swiss vocabulary: "Bub" (not "Junge"), "Kappe" (not "Mütze"), "Rüebli" (not "Karotte"), "Velo" (not "Fahrrad"), "parkieren" (not "parken"), "grillieren" (not "grillen"), "Trottoir" (not "Bürgersteig"), "Lavabo" (not "Waschbecken"), "Natel" (not "Handy"), "Poulet" (not "Hähnchen"), "Glace" (not "Eis"), "Znüni/Zvieri" for snacks. (4) More formal register, no contractions. (5) DIALOGUE TYPOGRAPHY — Swiss style: use guillemets «...» for direct speech with NO internal spaces (Swiss tight style), NEVER an em-dash (—) for opening a dialogue. Examples: «Hallo!», not « Hallo ! » (that's French style with spaces). NO space before !?:; CORRECT: "grösser", "süss", "das Velo", "das Rüebli", "parkieren", "das Poulet", «Wie geht es dir?» | WRONG: "größer", "süß", "das Fahrrad", "die Karotte", "parken", "das Hähnchen", « Wie geht es dir ? » (spaces inside guillemets), — Wie geht es dir? (em-dash for dialogue open). QUOTATION MARKS: never open one of a kind inside another of the same kind, and never leave one unclosed.
+
+(Swiss German: NEVER ß, always ss. Guillemets «text» tight, NO em-dash dialogue. CORRECT: "grösser", «Hallo!» | WRONG: "größer", « Hallo ! », — Hallo!)
+
+Write in Swiss Standard German (ss, never ß — never dialect). Keep the register of the current text. Never switch to a dialect or a spoken regional form.
+
+# TARGET
+
+Reading level: Simple words and very short sentences for early readers. 4-9 sentences per page (approximately 25-70 words). PACING: Small amount of variation is fine — some pages can sit at the low end (a quiet beat), others near the top. Don't aim for a uniform word count. The extra room buys more sentences, never longer ones: keep sentences short, one idea each.
+A rewritten page keeps the paragraph shape. Each paragraph runs 2-4 sentences, a page holds at most 5 paragraphs, and a blank line separates them.
+Pages: 18
+Characters: Levin, Julian, Max, Kiaan
+
+# CHARACTER DETAILS
+
+**Levin** (main character):
+- Age: 5
+- Gender: male
+- Strengths: Fröhlich, Freundlich, Hilfsbereit, Beschützend, Nachsichtig, Treu, Gerecht, Ehrlich, Vertrauenswürdig, Geduldig, Neugierig, Fantasievoll, Klug, Kreativ, Aufmerksam, Einfallsreich, Abenteuerlustig, Schnell, Stark, Fleissig, Leader, Mutig, Grosszügig, Selbstbewusst, Lustig
+- Flaws: Schüchtern, Unentschlossen, Leichtgläubig, Petze, Gesprächig, Vergesslich, Tollpatschig
+- Special details: Lieb Dinosaurier und Drachen. Sein Bruder ist Julian und Max und Kiaan sind seine guten Freunde. Er kann gut Velofahren und Unihockey spielen
+
+**Julian** (main character):
+- Age: 3
+- Gender: male
+- Strengths: Fröhlich, Freundlich, Hilfsbereit, Lustig, Nachsichtig, Beschützend, Treu, Grosszügig, Gerecht, Ehrlich, Vertrauenswürdig, Abenteuerlustig, Aufmerksam, Kreativ, Klug
+- Flaws: Schüchtern, Leichtgläubig, Unentschlossen, Tollpatschig, Ängstlich, Stur
+- Special details: Seine freunde: levin, julian, max. Er isst sehr gerne, liebt es mit seinem Bruder und seinen Freunden zu spielen, hat gerne Ballspiele
+
+**Max** (main character):
+- Age: 3
+- Gender: male
+- Strengths: Fröhlich, Freundlich, Lustig, Ehrlich, Selbstbewusst, Mutig, Vertrauenswürdig, Entschlossen, Fleissig, Fantasievoll, Neugierig, Kreativ, Aufmerksam, Abenteuerlustig, Stark, Schnell
+- Flaws: Gesprächig, Leichtgläubig
+- Special details: Spielt gerne mit seinen Freunden Kiaan, Levin, Max. Seine Hündin heisst Nia. Er spielt gerne Fussball und fährt gerne Velo
+
+**Kiaan** (main character):
+- Age: 3
+- Gender: male
+- Strengths: Fröhlich, Freundlich, Hilfsbereit, Lustig, Nachsichtig, Beschützend, Treu, Grosszügig, Gerecht, Ehrlich, Selbstbewusst, Vertrauenswürdig, Mutig, Geduldig, Fantasievoll, Neugierig, Klug, Kreativ, Aufmerksam, Abenteuerlustig
+- Flaws: Vergesslich, Petze, Unentschlossen, Schüchtern
+- Special details: Spielt gerne mit Levin, Julian, Max. Liesst gerne oder spielt gerne Ball oder auf dem Spielplatz
+
+# THE STORY (final — this arc IS the story. Only the OWED list (a fact the plot uses (a figure's one ability or limit, a rule of the world)) is owed. An owed fact is shown on the page where the story tests it: a figure meeting its limit in the moment (one who cannot follow stays behind, one too big sticks fast) or using its ability. Where no act can show it, one character says it, once in the book, in one short line at the moment it is needed, and that line carries no second fact, no reason behind it and no place or person the book has not shown. The narrator never tells an owed fact as a reason, and no figure describes itself. A fact is never applied against the story's own turn: where a figure holds out until the event that breaks it, the page before shows the holding out, and the fact gives way on the page of the event. Past an owed limit nothing the fact rules out happens on any page: no sound, sight or reach crosses it that the fact says cannot. Everything else in the arc (motives, causes, stakes, feelings, background) is the arc's reasoning, and a page that leaves it out drops nothing. A size, an age or a look is owed only where something is lifted, hidden, held or fitted because of it.)
+
+1. On an autumn afternoon Levin, Julian, Max and Kiaan play among the red and yellow leaves on the Lindenhof, and Julian points at a big red shape that glides over the towers of the Grossmünster.
+2. Between the roots of the big linden Levin finds an egg as big as a football and as warm as a stove tile, and it glows orange and knocks twice from inside.
+3. Levin tells his friends that dinosaur mothers sit on their eggs, so they will keep this egg warm and wait for its mother before the Grossmünster bell rings the evening.
+4. Julian gives his scarf, and the four friends wrap the egg in it.
+5. The big red shape dives onto the hill and lands as an old dragon, and Max tells her all four names and asks for hers, and she growls "Glutta".
+6. Julian tumbles against her side, feels that it is warm, and runs behind the linden too afraid to speak, and he does not come out again.
+7. Glutta says the egg is hers and that she hid it between the roots while she looked for a warm cave, and she takes it from Levin in one claw.
+8. Glutta blows on the egg, but only grey smoke comes out, and she says she needs no help from small ones.
+9. Glutta cannot walk the far way to a warm cave on her stiff legs, so she spreads her stiff wings to fly the egg there, but the cold wind from the lake pushes her back, and the egg slips from her claw and rolls down the path to the roots of the big linden.
+10. Max runs after it and stops it with both hands between the roots, and Kiaan sees that the leaves lie still there and that the egg glows brighter, and he calls it out.
+11. Glutta limps over and blows on the egg in Max's arms, but she gets only smoke, and the egg turns grey while the sun sinks low.
+12. Glutta sits down and says that her fire is gone and that dragons warm eggs only with fire, and the egg lies grey in Max's arms.
+13. Levin asks her to lie round the egg like a dinosaur mother, but she says she is a dragon and no hen.
+14. Kiaan points to the still place between the roots, and Levin, Max and Kiaan heap leaves into a nest there and lay the egg in it, still wrapped in the scarf, but it stays grey.
+15. Julian comes out from behind the linden, lifts the egg out of the nest in his scarf, carries it to Glutta, presses it against her side, and says "warm".
+16. The egg glows orange again, Glutta sees it, carries it back to the nest and lies round it with one wing over the top, and the bell of the Grossmünster rings the evening.
+17. The cold falls on the Lindenhof, but the egg stays orange and cracks open, and a little dragon climbs out, hiccups a small warm glow, and Julian calls it Funki.
+18. Glutta thanks the boys and says her fire went out and she was ashamed, and Julian tucks his scarf around Funki, who snuggles into it while Julian laughs.
+
+OWED:
+- Levin — knows from his dinosaur book that dinosaur mothers sit on their eggs
+- Glutta — cannot walk far on her stiff old legs
+- Funki — its shell glows orange while warm and turns grey when cold
+- A dragon's body stays warm without fire.
+- No dragon can lift off from the ground against the cold wind from the lake.
+
+# HINTS — changes made to the story above after it was settled. Read the story with them applied: a page that follows a hint follows the story.
+
+A hint never changes the situation the story settled: where one asks for what the story above rules out — a saved profile's friendship where the story stages a first meeting — the story stands and the hint is dropped.
+A hint opens with the story sentence it changes, as (s7) or (s14-15): it applies where that sentence is told, never earlier, and what it changes there replaces what the sentence says.
+
+ISSUE (s6): The wording that Julian does not come out again contradicts his later emergence. → CHANGE: Julian tumbles against her side, feels that it is warm, and runs behind the linden too afraid to speak.
+
+# THE PAGE PLAN (how the story was divided into pictures)
+
+One line per page: shot — who is in frame — the instant the picture shows — what is true after that page that was not before. A page's text carries the stretch of the story that leads to its instant, and never a stretch a later page carries.
+
+## Page 1
+wide — Levin, Julian, Max, Kiaan — all four toss red and yellow leaves on the Lindenhof; a red shape glides over the Grossmünster towers — the red shape is now in the autumn sky above the friends.
+
+## Page 2
+close-up — Levin — Levin kneels between the roots of the big linden and lifts the egg, its shell glowing orange — Levin holds a warm egg that glows from inside.
+
+## Page 3
+close-up — Levin, Kiaan — Levin holds up an open dinosaur book showing a dinosaur mother sitting on her eggs, Kiaan leaning in — the friends agree to keep the egg warm until its mother comes.
+
+## Page 4
+high-angle — Levin, Julian, Max, Kiaan — the four kneel round the egg and wind Julian's red scarf around it — the egg is wrapped in the scarf in the children's hands.
+
+## Page 5
+over-the-shoulder — Max, Glutta — the old dragon lands on the hill and lowers her huge head to Max, who stands his ground — Max has asked her name and she has answered Glutta.
+
+## Page 6
+close-up — Julian, Glutta — Julian tumbles against Glutta's side, his palm flat on her warm scales — Julian has felt that her side is warm.
+
+## Page 7
+medium — Levin, Glutta — Glutta holds the egg in one claw while Levin's hands are empty and raised — Glutta has taken the egg and says it is hers.
+
+## Page 8
+medium — Levin, Max, Glutta — Glutta breathes grey smoke over the egg in her claw while Levin and Max watch — only smoke comes, and Glutta refuses the small ones' help.
+
+## Page 9
+wide — Julian, Glutta — Glutta spreads her stiff wings on the path, pushed back by the cold lake wind — the egg is loose and slipping from her claw.
+
+## Page 10
+ultra-wide — nobody — The egg rolls down the sloping path toward the roots of the big linden — the egg is rolling away from everyone toward the roots.
+
+## Page 11
+close-up — Max — Max's two hands close around the rolling egg between the roots, the egg glowing brighter in them — the egg is caught and safe in Max's arms.
+
+## Page 12
+medium — Max, Glutta — Glutta sits down heavily on the grass beside Max, who holds the grey egg — Glutta has said her fire is gone and dragons warm eggs only with fire.
+
+## Page 13
+over-the-shoulder — Levin, Glutta — Levin holds up the open dinosaur book to a mother dinosaur lying over her eggs, facing Glutta — Glutta has refused: she is a dragon and no hen.
+
+## Page 14
+medium — Kiaan, Levin — Kiaan kneels at the still leaves between the roots while Levin heaps leaves into a nest beside him — the still place has a leaf nest ready for the egg.
+
+## Page 15
+close-up — Julian, Glutta — Julian holds the scarf-wrapped egg, lifted from the nest, and presses it against Glutta's side — the egg has been carried to the warm dragon and is still grey.
+
+## Page 16
+high-angle — Glutta — Glutta curls her body round the leaf nest between the roots, one wing laid over the top — the egg glows orange again as the Grossmünster bell rings the evening.
+
+## Page 17
+close-up — Julian, Funki — a small dragon climbs out of the cracked orange shell in the nest while Julian kneels close beside it — Funki is out and Julian has named it.
+
+## Page 18
+wide — Levin, Julian, Max, Kiaan, Glutta, Funki — seen from behind, all six lean over the leaf nest together, looking in at Funki — Funki is warm and wrapped in the scarf, and the friends are together.
+
+# SCENE OUTLINES — read-only
+
+What each page's illustration shows. The picture is already drawn from this and cannot change.
+
+You may rewrite how a page READS; you may never change what HAPPENS on it. Do not add, remove, reorder or reverse an event, an action or an outcome. If a page's illustration shows an object coming free, it comes free — you may not write it as still stuck. If a character is doing something in the outline, the prose may name it, describe it differently, or leave it unsaid, but it must never state the opposite. A reader sees the words and the picture together on one page.
+
+A MISMATCH finding can name more than one gap (a doer who is out of frame, and an object the picture lacks). Each gap gets its own ledger line, and the finding is closed only when every gap is closed: swapping the doer while the missing object stays on the page closes half. A gap is closed by taking the thing off the page (it happened between pages, is told as already done, or is carried by the neighbouring page's picture) or by giving the act to a figure the picture shows. An object that comes from nowhere (handed over by someone the picture does not show, fetched from a place no page names) is a gap of its own.
+
+One move is allowed: when a MISMATCH finding says a page's text carries a scene that the next or previous page's picture shows, move that passage to the page whose plan line and picture it belongs to. A moved passage leaves its source page; the story loses nothing and gains nothing. The same scene, event or spoken line never appears on two pages.
+
+These outlines name clothing and faces as well as events. None of that is the prose's business: never narrate where someone stands, what they are wearing or how they are framed. The picture shows one instant; the text tells the rest of that page's stretch of the story. Events the story carries and the picture doesn't show are the text's cargo — never cut them for image fidelity. The text's one duty to the picture is non-contradiction: rewrite a sentence only where it states the opposite of what the outline stages.
+
+That duty covers appearance, not only events. Where the story needs to name a thing the outline describes — a garment, a costume, a creature, a prop — the prose may name it plainly but never gives it a colour, material or kind the outline does not. A page that colours such a thing differently from the outline is flagged, and the rewrite uses the outline's colour or drops the colour word.
+The outline is the story in summary and the text is the telling of it, so the text carries what a summary leaves out: feelings, dialogue, and the ordinary business between its turns (going somewhere and arriving, waiting, approaching people, asking, a greeting). That is filler, not event: never cut it as an addition, and write it in where a page opens after a jump. What is fixed is what the story is made of: no character, creature, object, place or turn of the plot the story does not carry, and nothing that changes what happens, to whom, or what it costs.
+Nothing in the story or its pictures is dangerous enough that it could lead to death — for anyone. Frightening is the right level. A historical event keeps the danger it really had: tell it at a child's level, never remove it and never invent a safeguard or a harmless version of its weapon or hazard. A fault is never fixed by putting a person in danger.
+
+## Page 1
+WHERE: Grossmünster (Skyline view)
+WHAT HAPPENS: Levin, Julian, Max, and Kiaan toss autumn leaves into the air on the Lindenhof square while a red shape flies over the twin church towers in the background.
+WHO:
+- Levin: wears Green hooded wool-blend cardigan, brown corduroy trousers, brown leather ankle boots. Face: brows raised, eyes wide, mouth open in a smile
+- Julian: wears Red chunky hand-knitted wool scarf, long and wide,, blue denim trousers, grey rubber rain boots. Face: brows raised, eyes wide, mouth open in a smile
+- Max: wears Yellow waterproof rain jacket, black stretch trousers, black sneakers, orange knitted beanie. Face: brows raised, eyes wide, mouth open in a smile
+- Kiaan: wears Blue wool duffle coat, brown corduroy dungaree trousers, brown leather lace-up boots. Face: brows raised, eyes wide, mouth open in a smile
+
+## Page 2
+WHERE: Lindenhof (Close roots view)
+WHAT HAPPENS: Levin kneels between the tree roots, holding a glowing orange dinosaur egg in his hands.
+WHO:
+- Levin: wears Green hooded wool-blend cardigan, brown corduroy trousers, brown leather ankle boots. Face: brows raised, eyes wide, mouth slightly open
+ALSO IN VIEW: dinosaur egg — a smooth, round egg glowing with a warm orange internal light
+
+## Page 3
+WHERE: Lindenhof (Close roots view)
+WHAT HAPPENS: Levin holds open a dinosaur book for Kiaan to see, showing a mother dinosaur on a nest.
+WHO:
+- Levin: wears Green hooded wool-blend cardigan, brown corduroy trousers, brown leather ankle boots. Face: brows level, eyes focused, mouth closed
+- Kiaan: wears Blue wool duffle coat, brown corduroy dungaree trousers, brown leather lace-up boots. Face: brows raised, eyes wide, mouth slightly open
+ALSO IN VIEW: picture book — the open pages facing the camera, showing an illustration of a large dinosaur mother sitting on a nest of eggs
+
+## Page 4
+WHERE: Lindenhof (High angle roots)
+WHAT HAPPENS: Looking down, Levin, Julian, Max, and Kiaan kneel on the autumn leaves and wrap Julian's red scarf around the glowing dinosaur egg.
+WHO:
+- Levin: wears Green hooded wool-blend cardigan, brown corduroy trousers, brown leather ankle boots. Face: brows drawn together, eyes focused down, mouth closed
+- Julian: wears red quilted puffer jacket, blue denim trousers, grey rubber rain boots. Face: brows drawn together, eyes focused down, mouth closed
+- Max: wears Yellow waterproof rain jacket, black stretch trousers, black sneakers, orange knitted beanie. Face: brows drawn together, eyes focused down, mouth closed
+- Kiaan: wears Blue wool duffle coat, brown corduroy dungaree trousers, brown leather lace-up boots. Face: brows drawn together, eyes focused down, mouth closed
+ALSO IN VIEW: dinosaur egg — a smooth, round egg glowing with a warm orange internal light
+
+## Page 5
+WHERE: Lindenhof (Tree trunk view)
+WHAT HAPPENS: Seen over Max's shoulder, the old dragon Glutta lowers her huge red head toward him on the leaf-strewn gravel.
+WHO:
+- Max: wears Yellow waterproof rain jacket, black stretch trousers, black sneakers, orange knitted beanie. Face: face not visible
+ALSO IN VIEW: Glutta — Old Dragon, Deep crimson red scales with a dull orange underbelly.
+
+## Page 6
+WHERE: Lindenhof (Close roots view)
+WHAT HAPPENS: Julian tumbles against Glutta's vast side, pressing his hand flat against her warm red scales.
+WHO:
+- Julian: wears red quilted puffer jacket, blue denim trousers, grey rubber rain boots. Face: brows raised, eyes wide, mouth slightly open
+ALSO IN VIEW: Glutta — Old Dragon, Deep crimson red scales with a dull orange underbelly.
+
+## Page 7
+WHERE: Lindenhof (Medium roots view)
+WHAT HAPPENS: Glutta the old dragon takes the glowing egg in one claw while Levin raises his empty hands.
+WHO:
+- Levin: wears Green hooded wool-blend cardigan, brown corduroy trousers, brown leather ankle boots. Face: brows pulled up, eyes wide, mouth slightly open
+ALSO IN VIEW: Glutta — Old Dragon, Deep crimson red scales with a dull orange underbelly.; dinosaur egg — a smooth, round egg glowing with a warm orange internal light
+
+## Page 8
+WHERE: Lindenhof (Medium roots view)
+WHAT HAPPENS: Glutta breathes grey smoke over the glowing egg in her claw while Levin and Max watch.
+WHO:
+- Levin: wears Green hooded wool-blend cardigan, brown corduroy trousers, brown leather ankle boots. Face: brows raised, eyes wide, mouth closed
+- Max: wears Yellow waterproof rain jacket, black stretch trousers, black sneakers, orange knitted beanie. Face: brows furrowed, eyes narrowed, mouth closed
+ALSO IN VIEW: Glutta — Old Dragon, Deep crimson red scales with a dull orange underbelly.; dinosaur egg — a smooth, round egg glowing with a warm orange internal light
+
+## Page 9
+WHERE: Lindenhof (Wide square view)
+WHAT HAPPENS: Pushed back by the wind, Glutta spreads her wings and the glowing egg slips from her claw while Julian watches from afar.
+WHO:
+- Julian: wears red quilted puffer jacket, blue denim trousers, grey rubber rain boots. Face: brows raised, eyes wide, mouth open
+ALSO IN VIEW: Glutta — Old Dragon, Deep crimson red scales with a dull orange underbelly.; dinosaur egg — a smooth, round egg glowing with a warm orange internal light
+
+## Page 10
+WHERE: Lindenhof (Ultra-wide path)
+WHAT HAPPENS: The glowing orange dinosaur egg rolls alone down the sloping gravel path toward the linden roots.
+ALSO IN VIEW: dinosaur egg — a smooth, round egg glowing with a warm orange internal light
+
+## Page 11
+WHERE: Lindenhof (Close roots view)
+WHAT HAPPENS: Max catches the rolling egg between the tree roots with both hands, and it glows brightly again.
+WHO:
+- Max: wears Yellow waterproof rain jacket, black stretch trousers, black sneakers, orange knitted beanie. Face: brows drawn together, eyes wide, mouth closed in a tight line
+ALSO IN VIEW: dinosaur egg — the egg is glowing with a warm orange internal light again
+
+## Page 12
+WHERE: Lindenhof (Medium roots view)
+WHAT HAPPENS: Glutta sits heavily beside Max on the grassy clearing beneath the linden tree. Max holds the grey dinosaur egg against his chest and looks down at it. Dusk light falls softly across the autumn leaf-littered ground and the thick linden roots.
+WHO:
+- Max. Face: eyes down, brows slightly furrowed, mouth softly closed
+- Glutta. Face: brows level, eyes wide, mouth closed
+ALSO IN VIEW: Glutta — Old Dragon, Deep crimson red scales with a dull orange underbelly.; dinosaur egg — the egg has turned a dull, matte grey
+
+## Page 13
+WHERE: Lindenhof (Tree trunk view)
+WHAT HAPPENS: Seen over Levin's shoulder at dusk, he holds the open dinosaur book up to Glutta, showing her the mother dinosaur.
+WHO:
+- Levin: wears Green hooded wool-blend cardigan, brown corduroy trousers, brown leather ankle boots. Face: face not visible
+ALSO IN VIEW: Glutta — Old Dragon, Deep crimson red scales with a dull orange underbelly.; picture book — the open pages facing the camera, showing an illustration of a large dinosaur mother sitting on a nest of eggs
+
+## Page 14
+WHERE: Lindenhof (Medium roots view)
+WHAT HAPPENS: At dusk, Kiaan kneels by the tree roots while Levin builds a nest out of autumn leaves.
+WHO:
+- Kiaan: wears Blue wool duffle coat, brown corduroy dungaree trousers, brown leather lace-up boots. Face: brows level, eyes focused down, mouth closed
+- Levin: wears Green hooded wool-blend cardigan, brown corduroy trousers, brown leather ankle boots. Face: brows drawn together in focus, eyes looking down, mouth closed
+ALSO IN VIEW: leaf nest
+
+## Page 15
+WHERE: Lindenhof (Close roots view)
+WHAT HAPPENS: At dusk, Julian holds the scarf-wrapped, grey egg and presses it against Glutta's red scales.
+WHO:
+- Julian: wears red quilted puffer jacket, blue denim trousers, grey rubber rain boots. Face: brows pulled together, eyes focused on the dragon, mouth firmly closed
+ALSO IN VIEW: Glutta — Old Dragon, Deep crimson red scales with a dull orange underbelly.; dinosaur egg — the egg has turned a dull, matte grey
+
+## Page 16
+WHERE: Lindenhof (High angle roots)
+WHAT HAPPENS: Seen from a high angle at dusk, Glutta curls her body and wing completely around the leaf nest, where the egg now glows bright orange again.
+ALSO IN VIEW: Glutta — Old Dragon, Deep crimson red scales with a dull orange underbelly.; leaf nest; dinosaur egg — the egg is glowing with a warm orange internal light again
+
+## Page 17
+WHERE: Lindenhof (Close roots view)
+WHAT HAPPENS: At dusk, Funki the baby orange dragon climbs out of the cracked, glowing eggshell in the leaf nest while Julian kneels happily beside it.
+WHO:
+- Julian: wears red quilted puffer jacket, blue denim trousers, grey rubber rain boots. Face: brows raised high, eyes wide, mouth open in a big smile
+ALSO IN VIEW: Funki — Baby Dragon, Bright vibrant orange scales with a pale yellow underbelly.; leaf nest; dinosaur egg — the glowing orange egg is broken open with jagged cracked edges at the top
+
+## Page 18
+WHERE: Lindenhof (Wide square view)
+WHAT HAPPENS: All six figures lean forward together in a circle around the leaf nest, looking down at Funki who sits wrapped in Julian's red wool scarf. Glutta towers behind the children, her head lowered toward the nest. Dusk light falls across the gravel square scattered with autumn leaves.
+WHO:
+- Levin. Face: eyes focused down, mouth relaxed
+- Julian. Face: smiling broadly, eyes crinkled, brows lifted
+- Max. Face: eyes wide, mouth slightly open
+- Kiaan. Face: eyes focused down, mouth closed
+ALSO IN VIEW: Glutta — Old Dragon, Deep crimson red scales with a dull orange underbelly.; Funki — Baby Dragon, Bright vibrant orange scales with a pale yellow underbelly.; leaf nest
+
+# CURRENT TEXT
+
+## Page 1
+Das Laub flog hoch in die Luft. Levin, Julian, Max und Kiaan warfen es mit den Händen in die Höhe und fingen es wieder, rotes und gelbes, auf dem Lindenhof. Plötzlich zeigte Julian in den Himmel.
+
+«Schaut!», rief er. «Grosser roter Vogel!»
+
+Die rote Gestalt glitt langsam über die Türme des Grossmünsters. Max legte den Kopf in den Nacken. «Das ist kein Vogel», sagte er. «Der ist viel zu gross.»
+
+## Page 2
+Zwischen den Wurzeln der grossen Linde lag etwas Rundes. Levin kniete sich hin und schob das Laub zur Seite. Es war ein Ei, und es leuchtete orange.
+
+«Es ist ganz warm», flüsterte er. Vorsichtig hob er es hoch. Von innen klopfte es zweimal.
+
+## Page 3
+«Kommt schnell!», rief Levin. Die anderen rannten herbei, und Kiaan beugte sich als Erster über das Ei.
+
+Levin schlug sein Dinosaurierbuch auf. «Hier steht es», sagte er. «Dinosauriermütter sitzen auf ihren Eiern, damit die Eier warm bleiben.»
+
+«Dann kommt die Mutter bestimmt bald», sagte Kiaan leise.
+
+«Wir halten es warm», sagte Levin. «Wir warten, bis die Glocke vom Grossmünster den Abend läutet.»
+
+## Page 4
+Es wurde kühler auf dem Lindenhof. Julian zog seinen roten Schal vom Hals. «Da», sagte er. «Für das Ei.»
+
+Die vier knieten sich ins Laub. Sie wickelten den Schal rund um das Ei, Lage für Lage. «Nicht zu fest», sagte Kiaan. «Aber es darf keine Kälte hinein», sagte Max.
+
+## Page 5
+Ein Schatten fiel über den Platz. Die rote Gestalt tauchte herab, das Laub wirbelte auf, und auf dem Hügel landete eine alte Drachin. Sie senkte ihren riesigen Kopf.
+
+Max stellte sich breitbeinig hin. «Ich bin Max», sagte er laut. «Das sind Levin, Julian und Kiaan. Wie heisst du?»
+
+Die Drachin knurrte tief. «Glutta.»
+
+## Page 6
+Julian wich einen Schritt zurück und stolperte. Er fiel gegen die Seite der Drachin und legte die Hand flach auf ihre Schuppen. Sie waren warm.
+
+Julian zog die Hand weg. Er rannte hinter die Linde und drückte sich an den Stamm. Er sagte kein Wort.
+
+## Page 7
+«Das Ei gehört mir», sagte Glutta. «Ich habe es zwischen den Wurzeln versteckt, während ich eine warme Höhle suchte.»
+
+«Wir haben nur auf die Mutter gewartet», sagte Levin. Er hielt ihr das Ei hin.
+
+Glutta nahm es mit einer Kralle. Der rote Schal glitt zu Boden und blieb im Laub liegen. Levin hob die leeren Hände.
+
+## Page 8
+Glutta holte tief Luft und blies auf das Ei. Es kam nur grauer Rauch heraus. Ihre Kralle zitterte ein wenig.
+
+Levin und Max sahen es. «Wir können dir helfen», sagte Max.
+
+«Ich brauche keine Hilfe von Kleinen», knurrte Glutta.
+
+## Page 9
+Glutta machte zwei Schritte über den Weg. Ihre steifen Beine zitterten. «Meine alten Beine tragen mich nicht weit», brummte sie.
+
+Sie breitete die Flügel aus, die auch steif waren. Vom See wehte ein kalter Wind. Er drückte sie zurück, und das Ei rutschte ihr aus der Kralle. Julian sah es hinter der Linde hervor.
+
+## Page 10
+Das Ei fiel auf den Weg und rollte los. Es rollte über den Kies und durch das Laub den Hang hinunter. Sein oranges Licht huschte über den Boden, genau auf die Wurzeln der grossen Linde zu. Max rannte hinterher.
+
+## Page 11
+Max warf sich nach vorn und fing das Ei mit beiden Händen. Es lag zwischen den Wurzeln, und es leuchtete heller als zuvor.
+
+Kiaan war nachgekommen. «Schaut, hier liegen die Blätter ganz still», sagte er. «Und das Ei leuchtet heller.»
+
+## Page 12
+Glutta humpelte heran. Sie blies auf das Ei in Max' Armen, doch es kam nur Rauch. Das Ei wurde grau, und die Sonne stand tief.
+
+Glutta setzte sich schwer ins Gras. «Mein Feuer ist weg», sagte sie. «Drachen wärmen Eier nur mit Feuer.»
+
+Max sah auf das graue Ei. «Es ist ganz kalt», sagte er leise.
+
+## Page 13
+Levin trat vor die Drachin und hielt ihr sein Buch hin. «Schau, die Dinosauriermutter liegt um ihre Eier», sagte er. «Du könntest dich um das Ei legen.»
+
+Glutta sah auf das Bild und wandte den Kopf ab. «Ich bin ein Drache und keine Henne», sagte sie.
+
+## Page 14
+Kiaan zeigte auf die Stelle zwischen den Wurzeln. «Hier bewegt sich nichts», sagte er. «Hier kann es bleiben.»
+
+Levin häufte Laub zu einem Nest auf. Er holte den Schal und gab ihn Max. Max wickelte das Ei wieder ein und legte es ins Nest. Sie warteten, aber das Ei blieb grau.
+
+## Page 15
+Hinter der Linde kam Julian hervor. Er ging zum Nest, hob das Ei im Schal heraus und trug es mit beiden Armen über den Platz.
+
+Er blieb bei Glutta stehen und drückte das Ei fest an ihre Seite.
+
+«Warm», sagte Julian.
+
+## Page 16
+Das Ei begann zu glimmen, erst schwach, dann orange. Glutta sah es und riss die Augen auf. Sie nahm es vorsichtig in die Kralle und trug es zum Nest zurück.
+
+Dort legte sie sich im Kreis darum und breitete einen Flügel darüber. Vom Grossmünster läutete die Glocke den Abend.
+
+## Page 17
+Die Kälte fiel auf den Lindenhof. Das Ei aber blieb orange. Es knackte, und die Schale sprang oben auf.
+
+Ein kleiner Drache kletterte heraus. Er hickste, und ein warmer Schimmer stieg aus seinem Maul. Julian kniete neben ihm und lachte. «Funki!», rief er.
+
+## Page 18
+Glutta sah die Buben an. «Danke», sagte sie. «Mein Feuer ist ausgegangen, und ich habe mich geschämt.»
+
+Die Buben beugten sich mit ihr über das Nest. Julian zog den Schal unter der Schale hervor und legte ihn um Funki. Funki kuschelte sich hinein.
+
+Julian lachte. «Funki ist warm», sagte er.
+
+# PAGE MEASURES (counted in code, against the reading level above)
+
+p1: 70 words, 9 sentences, 3 paragraphs
+p2: 43 words, 6 sentences, 2 paragraphs
+p3: 62 words, 8 sentences, 4 paragraphs
+p4: 49 words, 8 sentences, 2 paragraphs
+p5: 53 words, 8 sentences, 3 paragraphs
+p6: 45 words, 6 sentences, 2 paragraphs
+p7: 56 words, 7 sentences, 3 paragraphs
+p8: 39 words, 6 sentences, 3 paragraphs
+p9: 54 words, 7 sentences, 2 paragraphs
+p10: 39 words, 4 sentences, 1 paragraphs
+p11: 40 words, 5 sentences, 2 paragraphs
+p12: 56 words, 8 sentences, 3 paragraphs
+p13: 46 words, 5 sentences, 2 paragraphs
+p14: 51 words, 7 sentences, 2 paragraphs
+p15: 41 words, 4 sentences, 3 paragraphs
+p16: 49 words, 5 sentences, 2 paragraphs
+p17: 43 words, 7 sentences, 2 paragraphs
+p18: 50 words, 8 sentences, 3 paragraphs
+
+# AUDIT FINDINGS (from two independent readers of the finished pages)
+
+T1 FAULT[STYLE]: p1 — «Plötzlich zeigte Julian in den Himmel.» "Plötzlich" is the story's word for "suddenly," which the book must not use.
+T2 FAULT[ENTRANCE]: p5 — Glutta lands on the hill where her egg lies, but no page says she came back for it, and her later claim on the egg leans on that arrival.
+T3 FAULT[STYLE]: p5 — «Sie senkte ihren riesigen Kopf.» The dragon's size is stated as a look that no plot event depends on, so the pictures should carry it.
+T4 FAULT[INFERRED]: p6 — Julian hides behind the linden and stays silent, and no page gives a reason until he reappears on p15.
+T5 FAULT[HINT]: p6 — the hint's "too afraid to speak" is missing, so Julian's silence has no fear behind it.
+T6 FAULT[SLOP]: p6 — [SLOP_REPETITIVE_OPENINGS] Three or more sentences in a row begin with the same word or the same name.
+T7 FAULT[MISMATCH]: p14 — the text has Max wrap the egg and lay it in the nest, but the picture shows only Kiaan and Levin heaping leaves into an empty nest.
+T8 FAULT[STYLE]: p15 — «Warm», sagte Julian. The one-word line stands alone as its own paragraph for dramatic effect.
+T9 FAULT[CONTRADICTION]: p16 — «Dort legte sie sich im Kreis darum und breitete einen Flügel darüber.» Glutta said on page 12 that dragons warm eggs only with fire, yet the egg is warmed and hatches with only her wing over it, and no page says why the rule no longer holds.
+T10 FAULT[STYLE]: p17 — «Ein kleiner Drache kletterte heraus.» The hatchling's smallness is stated as a size that no plot event turns on.
+T11 FAULT[STYLE]: p18 — «Mein Feuer ist ausgegangen, und ich habe mich geschämt.» Glutta names her own shame to the boys in front of her, when the feeling should show in what she does or says.
+
+A finding is a claim from a reader who saw less than you: one read the pages cold, the other without the pictures. Weigh each against the story, the plan and the scene outlines before acting on it. A finding that is wrong for this book, such as a detail the story turns on or the ending's own act, is left as it stands. A STYLE finding on a spoken line, the ending's included, is never declined for the line being the story's: the act and the fact it carries stay, and only the wording is recast to the rule, and your analysis names it as declined with one line why. A declined finding does not make its page rewritable.
+
+# YOUR TASK
+
+A page is rewritable when AUDIT FINDINGS names it, and otherwise not. Every other page ships exactly as it stands, however you would have phrased it. Four cases add a page to that set and no others: a MISMATCH move needs its destination page; a page's text states the opposite of what its scene outline stages; a page carries an abbreviation or acronym, which is named the way a child says it; a page carries a banned dash. Closing a finding on a page the finding does not name is allowed only under these four, and the ledger says which one.
+
+Only the rewritable pages are analysed, with their neighbours read as context; every other page is scanned for the four cases above. An empty analysis is a real answer.
+
+Return only the pages you rewrote. Omit every page you left alone. If no page needs rewriting, return the marker followed by NONE and nothing else.
+
+A rewritable page is EDITED, never recomposed. The text already has its voice and its sentences; you correct what a finding names. A sentence no finding names is copied word for word. A finding is closed by changing the sentence it quotes or names (recast it, join it into the sentence beside it, or cut it) and, where a fact must come back, by adding one sentence at most. The code counts: a page whose words change by more than 30 percent against the text you were given is thrown out whole and keeps its current text, and every fix you made on it is lost.
+
+A rewritable page is changed for a real problem, never for stylistic preference. On every page you change, also fix what follows.
+
+Never use an em-dash (—) or an en-dash (–), anywhere, for any purpose. Replace every one you find with a comma, a full stop, a colon, or parentheses, and recast the sentence if none of those fit.
+
+Every page you rewrite keeps the style rules below:
+
+- Every sentence is complete and finishes: no sentence broken off for effect, no bare fragment standing as a sentence, no caption-style line describing the scene like a stage direction. The story is told aloud.
+- No rhetorical set-pieces: no paired negations ("Nobody answered. Nobody argued."), no coined sayings or incantations, no one-sentence paragraph for drama. Plain narration carries the story.
+- No sentence tells what an event meant or sums up who the characters have become ("they had become something else", "he had done his part"). The telling shows the event and moves on.
+- The narrator never justifies, excuses or explains an action to the reader ("he had given his share, so now he could eat too"): only a because-clause or purpose clause that gives a character's reason or excuse for an act is a fault; a physical cause stated as what happened ("the rope broke because the knot slipped") is an event. A reason the story needs comes through what a character does or says in the moment.
+- A feeling is shown by what a character does or says. The narrator names one only where no act can show it, and never beside an act that already shows it.
+- A rule of the story's magic, or a limit, is shown in an act wherever one can show it; otherwise it is said once in the book, in one short line, by the one who would say it at the moment it is needed. No character recites a rule, a route or a plan in full, explains a feeling or an insight to the person in front of them, or retells what happened, to anyone. No roll call: the text never goes through the cast one by one saying what each did, felt or said in the same shape; it names who acts.
+- Dialogue never invents a rule: a character who tells another to stay, wait, go or obey repeats what a character already said or did on an earlier page, in the same words, and never states a rule nobody has set.
+- A size or a look is stated only where the plot turns on it: a thing too heavy for one child to lift, too big to hide, small enough to pocket. It is stated as that plot fact, never as a comparison with another thing ("as big as a …", "the size of a …"). Every other size and look is left to the pictures, which size everything themselves; leaving it out drops no fact.
+- Each named character who speaks has a voice of their own: word choice and rhythm a listener could tell apart without the name.
+- The last page ends on the concrete act or spoken line the story ends with and lands one feeling, plainly and warmly. A string of short solemn sentences is not an ending, and neither is a closing sentence that sums up the story. A callback shown as it happens, a character doing, holding or saying again in the moment what an earlier page set up, is an act and never a summary; a sentence retelling what happened earlier or what it meant is a summary.
+- No stock phrases of awe or magic ("a sense of wonder", "magic filled the air", "eyes sparkling with wonder"): show the one thing that amazes.
+- No body clichés for a feeling (a heart swelling, a heart pounding with excitement, warmth spreading through a chest): a feeling shows in what the character does or says.
+- No narrator teasers ("little did they know", "they did not know yet that", "this was only the beginning"): the story tells what happens when it happens.
+- No strings of three adjectives or abstract nouns for rhythm ("brave, kind and true").
+- No empty intensifiers ("very", "really", "truly", "incredibly", "absolutely") where they add nothing.
+- Never three sentences in a row that begin with the same word or the same name.
+- At most one simile at a time, and never a decorative one ("like a thousand tiny stars", "as if the whole world held its breath").
+- No generic warm formula at a close (hearts full of love, the stars smiling down, a day they would never forget).
+- Never "suddenly" or its equivalent in the story's language, and never "without warning".
+- No jokes, puns or wordplay. No stock gestures (a hand on a shoulder, ruffled hair, a knowing nod), and no gesture (a hug, a wink, a shrug, a high five) twice in the book. No "it was a [adjective] day", no weather, waking up or backstory to open page 1, no trait labels ("she was brave") and no words like dramatic, ethereal, breathtaking or stunning.
+- Weather, light, cold, night, silence or any other force never acts like a person or an animal ("the cold fell on the square", "the night swallowed the path", "the wind whispered"): say what the characters do or feel, or state the plain change ("it grew cold"). A phrase of the story summary is never copied for its wording.
+- A character never names their own feeling to the person in front of them ("I was ashamed", "I am so sad", "I was afraid"), in a thanks or on the last page too: they say the fact or the wish that carries it ("my fire went out and I hid it") and an act or a look shows the rest. Where the story summary says a character "says she was ashamed", the line is told as that fact, never as the feeling word.
+- Narration is in the past tense, Präteritum ("sie ging", "er sagte"), never Präsens and never Perfekt; dialogue speaks as it likes.
+
+A STYLE finding quotes one sentence that breaks one of these rules. One you accept is closed by recasting that sentence alone, or by joining it into the sentence beside it, and it never licenses a change anywhere else on its page.
+
+A fault that a character acts on a reason the page has not given is closed this way: Where a character refuses, demands, flees, hides or lies for a reason the story reveals only later, the reader gets a glimpse of that reason at or before the act (a look, a half-said word, an act) without giving the later reveal away. The reason is the story's own, so this invents nothing.
+
+A finding that says the page dropped a fact is answered only where the fact is on the OWED list; for any other fact the ledger line reads `<id> STANDS: not owed`. An owed fact comes back the way a picture book carries it: as what a character does, looks at or says in their own voice, in the sentence where the thing happens, and in one added sentence at most. It never comes back as the narrator's reason (a "because" clause), as a feeling named on top of an act that already shows it, or as a character explaining the story's rules to the person in front of them; a rule of the story's magic is said once, in the line a character needs it. A fact the page's act already shows, or a later page shows, is left as it stands and the ledger says so. A sentence added to close a finding is a character's act, look or word. It is never a narrator link ("so", "also", "therefore") that tells what an event means, and it never holds two facts in one mouth.
+
+A COUNT fault is closed by the rule it names, recasting only the sentence that counts: When a page's picture leaves out someone the story has with the others at that moment — whoever that page's plan line or scene does not put in frame — the page's text gives that group no number and never says all, both or every one of them, in whatever language it is written: it names who acts, or speaks of the rest without a count.
+
+An ENDING fault is closed by what the ending owes, never by cutting what the ending shows: The story's main relationship, between the main character or characters and the figure the story is about with them (a creature, a helper, a friend), gets a closing moment near the end where the story has such a figure: a goodbye, a thanks or a moment of warmth between them, shown as an act or a spoken line. The story never ends on getting somewhere, a race home or an order to hurry, or on a narrator's summary.
+
+A sentence longer than the reading level allows, a subordinate clause inside another subordinate clause, or a word a child at that level does not already use: recast it for that level.
+
+Judge the text as a reader who has only the pages in front of them. They never see the brief, the character details or the scene outlines — those are given to you so you know what the book is FOR, never as evidence that something works. A fact that exists only there and is not on the OWED list is no fault to fix, and never a justification for a page that leaves an owed fact out. Never resolve a weakness by citing the brief.
+
+Work in two steps.
+
+Step 1 — write the analysis: for each finding and each of the four cases, the page and the quoted line that is wrong and what it changes to. A page is weak because something specific is wrong with it, not because it could be phrased differently.
+
+Step 2 — edit the rewritable pages your analysis found problems on, sentence by sentence, keeping every sentence no finding names. Every other page stays exactly as it is. End the analysis with the ledger: a line per named problem — the problem, then the page(s) the rewrite fixes it on, or the reason it stands. A named problem with neither is a failed review. Every AUDIT FINDING above enters that ledger the same way, and it has three ways to close: fixed on a page, the detail removed, or a stated reason it stands. Each AUDIT FINDING starts with its id (T1, T2 …); its ledger line starts with that id, and a finding you leave standing reads `<id> STANDS: <reason>`. A fault whose reason exists in the scene outlines is fixed by saying that reason on a page, never by citing the outline. Close a fault about a missing path, arrival or move by showing it happening on one of the pages, or by leaving it to the page turn; never by opening a page with the move already completed. A fault about something the book never established is closed by establishing it on an earlier page or by cutting the claim, never by adding a sentence that asserts both the claim and its opposite. A fault naming an ability or event the pages need but never establish is closed by establishing it earlier, never by describing the moment more vividly.
+
+Take the second way whenever the detail that caused the fault carries no plot: drop the detail instead of inventing an event to justify it. Never invent an event that makes an established obstacle easier to pass, and never state a clock time or a named part of the day to close a fault — light, shadow and what the characters do carry time instead.
+
+A fault about how something physically works (how a thing is lifted, tied, opened, crossed or carried) is fixed only with the objects, parts, positions and abilities the pages already establish. Where none of them makes it work, add nothing to make it work: the page stays as it is, and the ledger closes the fault on a line of its own, "ARC FAULT: p<N>: <what cannot happen as told, and what the story lacks>".
+
+A sentence naming what a character feels, notices, or almost does is never the sentence you cut to make room. Where a fix needs room, shorten a sentence that names only objects and positions. A sentence that shows something an earlier page set up doing its work, or a payoff the story names, is never deleted by a fix. Where a finding touches it, the fix rewrites around it and keeps what it shows. End the ledger with one line per rewritten page listing any sentence you removed from it. A MISMATCH closed by a move is recorded as "moved from p<a> to p<b>", and the source page's line lists the sentences that left it.
+
+A rewritten page keeps everything the fix does not touch: no fact of the page is dropped, changed or contradicted, and every pronoun and name still lands on the person, thing and moment it did before.
+
+The pictures are locked: where a page's text names or implies something its scene outline does not show (a figure, an object, an action, a detail of the place), the TEXT moves. Where a page narrates a moment its outline does not stage, or a verb aimed at a main character has a doer the outline does not stage, the doer's action goes off the page (already done, heard, remembered) or the moment is retold as what the picture shows. Banned dashes, the style rules above and the OWED list are the standing checks.
+
+# OUTPUT FORMAT
+
+Both blocks, in this order, nothing before or after.
+
+---ANALYSIS---
+<the per-finding ledger>
+
+---STORY TEXT---
+## Page <number>
+<rewritten text for that page>
+
+## Page <number>
+<rewritten text for that page>
+
+Include a page under STORY TEXT only if you rewrote it. Use its real page number. When the analysis found nothing to rewrite, still output the analysis, then:
+
+---STORY TEXT---
+NONE

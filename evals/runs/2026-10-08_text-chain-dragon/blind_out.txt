@@ -1,0 +1,8 @@
+FAULT[STYLE]: p1 — «Plötzlich zeigte Julian in den Himmel.» "Plötzlich" is the story's word for "suddenly", which the rules forbid.
+FAULT[STYLE]: p5 — «Sie senkte ihren riesigen Kopf.» A size is stated where the plot does not turn on it; the picture shows it.
+FAULT[STYLE]: p9 — «Sie breitete die Flügel aus, die auch steif waren.» The stiffness already given to her legs in the sentence before is restated for the same subject with "auch".
+FAULT[STYLE]: p10 — «Sein oranges Licht huschte über den Boden, genau auf die Wurzeln der grossen Linde zu.» The light moves like a creature ("huschte"), which the rules forbid for light.
+FAULT[LANGUAGE]: p11 — «Und das Ei leuchtet heller.» Repeats the brighter glow narrated in the sentence just before, for the same egg.
+FAULT[STYLE]: p17 — «Die Kälte fiel auf den Lindenhof.» Cold acts as a falling force, the rule's own example of a forbidden weather verb.
+FAULT[STYLE]: p18 — «Mein Feuer ist ausgegangen, und ich habe mich geschämt.» Glutta names her own feeling of shame ("geschämt") to the boys in her thanks; the rules require the fact alone.
+FAULTS: 7
