@@ -6382,7 +6382,7 @@
       "id": "fiona-group-c-2026-10-08",
       "title": "Art Director briefs, plates and Visual Bible: OTS never on a hand act, aboard-on-ground vantage reported, interior plate carries no palette line",
       "commits": [
-        "PENDING"
+        "24bcc7661"
       ],
       "addedAt": "2026-10-08",
       "claim": "On a story with a ship or other aboard pages and over-the-shoulder pages: (1) no over-the-shoulder page has a hands:true interaction on its near figure (jevDecisions.shots scores for a hand-act page stay low for over-the-shoulder); (2) a page whose Jev aboard sits on a ground vantage logs beats_jev_aboard_on_ground_vantage and its FIXED block carries \"the figures stand on its deck\"; (3) the plate prompt of an indoor vantage (weather none) has a LOCATION line with the name only, so no plants or ground cover from the place palette; (4) a state-batch cell whose first state is a blank back passes the identity gate (vb_state_cells_gate, not vb_state_cells_rerender); (5) the Visual Bible of a story with a plan-named hiding place carries it as an entry or on the plate.",
