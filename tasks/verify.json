@@ -7936,6 +7936,60 @@
           "note": "Cover magpie, potion bottle (red ribbon) and Rohrdorf bell tower match page 4; wizard hat deep purple pointed with gold band on cover and p4 as the costume states. Minor: p1 hat lying on a fence (off the head) drawn grey-brown."
         }
       ]
+    },
+    {
+      "id": "trial-age-band-length-escort-2026-10-09",
+      "title": "A trial for a child aged 0-4 is written at 25-70 words a page and never sends the child anywhere alone",
+      "commits": [
+        "c55d9fea9"
+      ],
+      "addedAt": "2026-10-09",
+      "claim": "On a trial with a main character aged 1-4 every page text is at most ~70 words and no page shows the child leaving home or its garden without a grown-up; a trial for age 5+ still writes 100-140 words.",
+      "runShape": [
+        "trial"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Count words per page of a /try story for a 1- or 2-year-old with a landmark idea; read the landmark page: the child arrives carried or by the hand with a grown-up on the page, or the story stays where the child is."
+      },
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "ambient-extras-dressed-2026-10-09",
+      "title": "Pages with population ambient or crowd name their unnamed people with garments in colours the cast does not wear",
+      "commits": [
+        "c55d9fea9"
+      ],
+      "addedAt": "2026-10-09",
+      "claim": "On a story whose pages are ambient/crowd, each such page brief names 1-2 unnamed people with garment kind and a colour no cast member wears, and the rendered extras are not in the cast colours.",
+      "runShape": [
+        "story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Read the page briefs of an ambient page and view the picture: extras exist, are small, and wear a colour no cast member wears."
+      },
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "trial-preview-avatar-age-2026-10-09",
+      "title": "The trial plain avatar of a 7-year-old is drawn as a 7-year-old, not about 4",
+      "commits": [
+        "c55d9fea9"
+      ],
+      "addedAt": "2026-10-09",
+      "claim": "The trial preview avatar prompt states N-year-old plus grade-school proportions; a 7-year-old reads as early grade-school (about 5.5 heads), clearly older than a preschooler.",
+      "runShape": [
+        "trial"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "View the plain avatar of a 6-9 year old next to the photo: proportions and face read school-age, not preschool."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [
