@@ -25,6 +25,11 @@
  *   - Named competitor titles ("bilderbuch jim ist mies drauf", "das gewuenschteste wunschkind trotzphase").
  *   - Institutional buyers ("bilderbuch gefuehle krippe / grundschule").
  *   - Thumb-sucking ("daumen abgewoehnen") - we have no landing page for it.
+ *
+ * LIVE CHANGE 2026-10-08 (owner, set via the API, not by this script): DESKTOP bid modifier +50% (1.5) on this
+ * campaign; mobile/tablet unadjusted. Context: 29 of 32 impressions in the prior 14 days were mobile, and the one
+ * organic-Google trial that week came from desktop. Bids deliberately LEFT at CHF 0.20 although Google's first-page
+ * estimate is ~CHF 1.16 (owner: the 3-cent click is good). Re-creating the campaign must re-apply the modifier.
  */
 const { run, CHF } = require('./lib/search-campaign');
 
