@@ -33,9 +33,9 @@
  *
  * Usage:
  *   node scripts/admin/verify-run.js <storyId> [--env=staging|prod] [--write] [--all]
- *   node scripts/admin/verify-run.js <storyId> --mark=<entryId>:confirmed|failed --note="what you saw" [--by=claude|owner] [--env=...]
+ *   node scripts/admin/verify-run.js <storyId> --mark=<entryId>:confirmed|failed|fixed --note="what you saw" [--by=claude|owner] [--env=...]
  *   node scripts/admin/verify-run.js <storyId> --apply=<verdicts.json> [--env=...]  # verdicts from the review page (verify-review.js)
- *   node scripts/admin/verify-run.js --pull [--all]     # write the reports the staging server stored
+ *   node scripts/admin/verify-run.js --pull [--all] [--story=<id>[,<id>]]  # write the reports the staging server stored (--story re-pulls recorded runs)
  *   node scripts/admin/verify-run.js --unrecorded       # staging runs not yet judged into the registry (warns)
  *   node scripts/admin/verify-run.js --list
  *
@@ -46,6 +46,9 @@
  *
  *   --write  record the verdicts (rules above).
  *   --all    also judge entries that are already confirmed or failed (regression read).
+ *   --pull judges pending entries, and ALSO confirmed/failed ones but records only a FAILED there
+ *            (a regression on a confirmed entry); --story=<id> re-pulls an already recorded run.
+ *   status is the worst across runs: a pass never clears a failed entry; `--mark=<id>:fixed` does.
  *   --mark   record a person's verdict for one entry on this run (writes).
  *
  * Reads: stories (data, image_version_meta, idea columns), story_images
@@ -147,14 +150,16 @@ async function pull(env) {
     rows = (await pool.query('SELECT story_id, build, report, created_at FROM story_verify_reports ORDER BY created_at')).rows;
   } finally { await pool.end(); }
   const seen = core.recordedStoryIds(reg);
-  const fresh = rows.filter(r => !seen.has(`${env}:${r.story_id}`));
+  const only = arg('story') && arg('story') !== true ? new Set(String(arg('story')).split(',')) : null;
+  const fresh = rows.filter(r => only ? only.has(r.story_id) : !seen.has(`${env}:${r.story_id}`));
   if (!fresh.length) { console.log(`verify-run --pull: all ${rows.length} stored ${env} report(s) are already recorded in tasks/verify.json`); return; }
   const checkedAt = ch(new Date());
   const allFailed = [];
   for (const r of fresh) {
     const report = typeof r.report === 'string' ? JSON.parse(r.report) : r.report;
-    const targets = reg.entries.filter(e => e.status === 'pending' || (arg('all') && ['confirmed', 'failed'].includes(e.status)));
-    const verdicts = core.verdictsFromReport(report, targets, buildContains);
+    const targets = reg.entries.filter(e => ['pending', 'confirmed', 'failed'].includes(e.status));
+    const verdicts = core.verdictsFromReport(report, targets, buildContains)
+      .filter(({ e, v }) => e.status === 'pending' || arg('all') || v.result === 'FAILED');
     const run = { storyId: r.story_id, env, build: report.build || null, runDate: report.runAt ? ch(new Date(report.runAt)) : null };
     console.log(`\n${r.story_id} (${env}) — run ${run.runDate || '?'}, build ${run.build ? run.build.slice(0, 9) : 'UNRECORDED'}`);
     for (const { e, v } of verdicts) if (v.result !== 'NOT COVERED') printRow(e, v);
@@ -213,7 +218,7 @@ async function main() {
 
   const storyId = process.argv.slice(2).find(a => !a.startsWith('--'));
   if (!storyId) {
-    console.error('Usage: node scripts/admin/verify-run.js <storyId> [--env=staging|prod] [--write] [--all] | --mark=<id>:confirmed|failed --note="..." | --unrecorded | --list');
+    console.error('Usage: node scripts/admin/verify-run.js <storyId> [--env=staging|prod] [--write] [--all] | --mark=<id>:confirmed|failed|fixed --note="..." | --unrecorded | --list');
     process.exit(2);
   }
   const env = arg('env') || 'staging';
@@ -235,7 +240,8 @@ async function main() {
     const [id, verdict] = String(mark).split(':');
     const note = arg('note');
     const by = arg('by');
-    core.markVerdict(reg, run, { id, verdict, note: note === true ? '' : note, by: by === true ? null : by }, { checkedAt });
+    const marked = core.markVerdict(reg, run, { id, verdict, note: note === true ? '' : note, by: by === true ? null : by }, { checkedAt });
+    if (verdict === 'confirmed' && marked.status === 'failed') console.log(`${id} stays FAILED (a pass does not clear a failure) — once the fix is deployed: --mark=${id}:fixed --note="..."`);
     saveRegistry(reg);
     console.log(`marked ${id} ${verdict} on ${storyId}`);
     return;

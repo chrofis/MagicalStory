@@ -2326,3 +2326,11 @@ three below are prompt/classification questions and are the owner's call.
 ## 2026-10-08 dragon run leftovers, follow-ups (job_1791489793707_2ir6nl5kw)
 - [ ] Watch Q13 as must-fix: if a book gets more than ~3 order findings or a re-plan round regresses on them, narrow the question rather than demote it -> docs/decisions.md 2026-10-08 "Dragon run leftovers"
 - [ ] Creature scale from boxes is validated on ONE stored story (6 of 6 true hits p5/7/8/9/12/13, 0 false in 18 pages); confirm on a second creature story before widening beyond animals with a height band -> tasks/verify.json creature-scale-from-boxes-2026-10-08
+
+## 2026-10-09 verify entries FAILED on the 2026-10-08/09 staging trials (being fixed by other sessions; indexed here)
+- [ ] FAILED verify trial-idea-effort-low-chain-2026-10-08 on 4 of 5 staging trial runs (job_1791496201302_6vgktllu5, _373280_q83mcaygv, _611607_urmd4qkq2, _820206_qwcnrq30r; the 5th passed) -> tasks/verify.json trial-idea-effort-low-chain-2026-10-08
+- [ ] FAILED verify trial-avatar-sheet-parallel-one-try-2026-10-08 on job_1791496986667_r4sgw3870 -> tasks/verify.json trial-avatar-sheet-parallel-one-try-2026-10-08
+- [ ] FAILED verify trial-writer-hair-and-creature-look-2026-10-08 on job_1791496201302_6vgktllu5 and job_1791496986667_r4sgw3870 -> tasks/verify.json trial-writer-hair-and-creature-look-2026-10-08
+- [ ] FAILED verify trial-writer-shared-image-rules on job_1791496611607_urmd4qkq2 -> tasks/verify.json trial-writer-shared-image-rules
+- [ ] FAILED (regression, was confirmed 2026-09-27) verify trial-prompt-parity on 3 of 5 staging trials (job_1791496201302_6vgktllu5, _611607_urmd4qkq2, _986667_r4sgw3870) -> tasks/verify.json trial-prompt-parity
+- [ ] FAILED verify idea-pick-recorded on the same 3 trial runs plus earlier job_1790508305061_dka3jpog9 (see line 815; the trial harness may not send ideaPick) -> tasks/verify.json idea-pick-recorded

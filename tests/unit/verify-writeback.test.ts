@@ -75,7 +75,7 @@ describe('markVerdict', () => {
     const reg: any = { entries: [entry('h')] };
     expect(() => core.markVerdict(reg, run, { id: 'h', verdict: 'confirmed', note: ' ' }, opts)).toThrow(/note/);
     expect(() => core.markVerdict(reg, run, { id: 'x', verdict: 'confirmed', note: 'n' }, opts)).toThrow(/no entry/);
-    expect(() => core.markVerdict(reg, run, { id: 'h', verdict: 'maybe', note: 'n' }, opts)).toThrow(/confirmed or failed/);
+    expect(() => core.markVerdict(reg, run, { id: 'h', verdict: 'maybe', note: 'n' }, opts)).toThrow(/confirmed, failed or fixed/);
   });
 });
 
@@ -87,5 +87,50 @@ describe('judge + verdictOf', () => {
     expect(core.verdictOf(e, j)).toEqual({ id: 'e', result: 'HUMAN', detail: 'human check', human: 'look at p1' });
     const [{ j: j2 }] = core.judgeAll([e], ctx, () => false);
     expect(core.verdictOf(e, j2)).toMatchObject({ result: 'NOT COVERED', why: expect.stringMatching(/lacks abc/), oldCode: true });
+  });
+});
+
+describe('status is the worst across runs (2026-10-09)', () => {
+  const run2 = { ...run, storyId: 'job_2' };
+  const pass = (e: any) => ({ e, v: { id: e.id, result: 'CONFIRMED', detail: 'ok' } });
+  const fail = (e: any) => ({ e, v: { id: e.id, result: 'FAILED', detail: 'bad' } });
+
+  it('a FAILED on a confirmed entry is recorded as a regression', () => {
+    const reg: any = { entries: [entry('a', 'confirmed')] };
+    const { flipped } = core.applyVerdicts(reg, run, [fail(reg.entries[0])], opts);
+    expect(reg.entries[0].status).toBe('failed');
+    expect(reg.entries[0].evidence.map((x: any) => x.result)).toEqual(['FAILED']);
+    expect(flipped).toEqual([{ id: 'a', from: 'confirmed', to: 'failed' }]);
+  });
+
+  it('a later passing run does not clear a failed entry, but its evidence is kept', () => {
+    const reg: any = { entries: [entry('a')] };
+    core.applyVerdicts(reg, run, [fail(reg.entries[0])], opts);
+    core.applyVerdicts(reg, run2, [pass(reg.entries[0])], opts);
+    expect(reg.entries[0].status).toBe('failed');
+    expect(reg.entries[0].evidence.map((x: any) => x.result)).toEqual(['FAILED', 'CONFIRMED']);
+  });
+
+  it('a human confirmed mark does not clear it either; a fixed mark does', () => {
+    const reg: any = { entries: [entry('a', 'failed')] };
+    core.markVerdict(reg, run2, { id: 'a', verdict: 'confirmed', note: 'passes here' }, opts);
+    expect(reg.entries[0].status).toBe('failed');
+    core.markVerdict(reg, run2, { id: 'a', verdict: 'fixed', note: 'fix deployed, rechecked' }, opts);
+    expect(reg.entries[0].status).toBe('confirmed');
+    expect(reg.entries[0].evidence.at(-1).result).toBe('HUMAN-FIXED');
+  });
+
+  it('five runs, one passing among four failing, stays failed (the effort-low chain case)', () => {
+    const reg: any = { entries: [entry('a')] };
+    ['f1', 'f2', 'f3', 'f4'].forEach(id => core.markVerdict(reg, { ...run, storyId: id }, { id: 'a', verdict: 'failed', note: 'n' }, opts));
+    core.markVerdict(reg, { ...run, storyId: 'p' }, { id: 'a', verdict: 'confirmed', note: 'n' }, opts);
+    expect(reg.entries[0].status).toBe('failed');
+  });
+
+  it('a re-pull of an already recorded failing run adds no duplicate evidence', () => {
+    const reg: any = { entries: [entry('a')] };
+    core.applyVerdicts(reg, run, [fail(reg.entries[0])], opts);
+    core.applyVerdicts(reg, run, [fail(reg.entries[0])], opts);
+    expect(reg.entries[0].evidence).toHaveLength(1);
   });
 });

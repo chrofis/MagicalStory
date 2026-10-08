@@ -14,6 +14,12 @@
  *   HUMAN        lastChecked overwritten; status unchanged (stays pending) —
  *                a person looks, then --mark records the verdict
  *   NOT COVERED  lastChecked overwritten; status unchanged
+ * STATUS IS THE WORST ACROSS RUNS (2026-10-09): a failed entry stays failed
+ * when a later run, automated or human, passes — one passing run among
+ * several failing ones proves nothing about the failures (a passing run
+ * overwrote three failed ones). Only an explicit --mark=<id>:fixed --note=...
+ * (HUMAN-FIXED evidence) returns it to confirmed, after the fix is deployed.
+ * A FAILED on a confirmed entry is a regression: evidence + status -> failed.
  * Every judged run is logged once in registry.runs[] (story, env, build,
  * counts). evidence[] is append-only and never takes the same story+result
  * twice; lastChecked is a pointer, not history, so the file stays bounded.
@@ -25,6 +31,12 @@ const { fromPgNaive } = require('../lib/chTime');
 
 const RESULTS = ['FAILED', 'CONFIRMED', 'HUMAN', 'NOT COVERED'];
 const NOTE_MAX = 1500;
+
+/** Status after one more verdict: a failure always wins, a pass never clears a failure (see header). */
+function nextStatus(current, passed) {
+  if (!passed) return 'failed';
+  return current === 'failed' ? 'failed' : 'confirmed';
+}
 
 /** The stored run as the checks read it. `pool` is any pg-compatible { query }. */
 async function loadRun(pool, storyId, env) {
@@ -156,7 +168,7 @@ function applyVerdicts(reg, run, verdicts, { checkedAt, via }) {
       e.evidence = Array.isArray(e.evidence) ? e.evidence : [];
       const dup = e.evidence.some(x => x.storyId === run.storyId && x.env === run.env && x.result === v.result);
       if (!dup) e.evidence.push({ ...stamp, result: v.result, note: noteOf(v) });
-      const to = v.result === 'CONFIRMED' ? 'confirmed' : 'failed';
+      const to = nextStatus(e.status, v.result === 'CONFIRMED');
       if (e.status !== to) { flipped.push({ id: e.id, from: e.status, to }); e.status = to; }
     } else {
       e.lastChecked = { ...stamp, result: v.result, note: noteOf(v).slice(0, 400) };
@@ -185,14 +197,14 @@ function recordedStoryIds(reg) {
 function markVerdict(reg, run, { id, verdict, note, by }, { checkedAt }) {
   const e = reg.entries.find(x => x.id === id);
   if (!e) throw new Error(`no entry "${id}"`);
-  if (!['confirmed', 'failed'].includes(verdict)) throw new Error(`verdict for ${id} must be confirmed or failed, got "${verdict}"`);
+  if (!['confirmed', 'failed', 'fixed'].includes(verdict)) throw new Error(`verdict for ${id} must be confirmed, failed or fixed, got "${verdict}"`);
   if (!note || typeof note !== 'string' || !note.trim()) throw new Error(`verdict for ${id} needs a note saying what was looked at and seen`);
   e.evidence = Array.isArray(e.evidence) ? e.evidence : [];
   e.evidence.push({
     storyId: run.storyId, env: run.env, build: run.build, runDate: run.runDate, checkedAt,
     result: `HUMAN-${verdict.toUpperCase()}`, ...(by ? { by } : {}), note: note.trim(),
   });
-  e.status = verdict;
+  e.status = verdict === 'fixed' ? 'confirmed' : nextStatus(e.status, verdict === 'confirmed');
   return e;
 }
 
@@ -282,6 +294,6 @@ function urlsIn(text) {
 
 module.exports = {
   RESULTS, ASSUME_CONTAINED, IMAGE_KINDS,
-  loadRun, judge, verdictOf, judgeAll, verdictsFromReport, applyVerdicts, recordedStoryIds, markVerdict, noteOf,
+  loadRun, judge, verdictOf, judgeAll, verdictsFromReport, applyVerdicts, recordedStoryIds, nextStatus, markVerdict, noteOf,
   applyVerdictsFile, imagesFor, urlsIn,
 };
