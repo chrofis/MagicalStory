@@ -938,10 +938,13 @@ const MODEL_DEFAULTS = {
   // -> L*a*b* match toward the styled avatar, scaled by a skin-probed lighting
   // factor. Needs the local photo_analyzer (GroundingDINO + MobileSAM); fails
   // soft, so pages ship uncorrected if it is unavailable.
-  // Env: GARMENT_COLOUR_FIX=false to disable without a deploy.
-  garmentColourFix: process.env.GARMENT_COLOUR_FIX
-    ? process.env.GARMENT_COLOUR_FIX !== 'false'
-    : true,
+  // DEFAULT OFF (owner, 2026-10-08; docs/decisions.md 2026-10-08 "Garment colour
+  // fix switched off"): last 20 prod + 20 staging stories gave ~10 attempts, 6
+  // refused by gates, 4 painted pages, 0 useful. The code stays. While off,
+  // garment_colour findings stay findings: scoring.ZERO_POINT_TYPES bills them 0,
+  // so no page is pulled into repair for colour alone.
+  // Env: GARMENT_COLOUR_FIX=true to enable (Test Lab / experiments).
+  garmentColourFix: process.env.GARMENT_COLOUR_FIX === 'true',
 
   // Identity TIEBREAKER — DEFAULT OFF, deliberately, and NOT IMPLEMENTED yet.
   // The cross-check itself (server/lib/figureIdentityCheck.js) always runs and

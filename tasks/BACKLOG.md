@@ -230,7 +230,7 @@ The first two are corroborated by more than one source, which is why they lead.
       **Needs re-measurement, not re-coding: code moved since (40ac24430 restored watercolour's
       anti-photo clauses, plus 3f1b05f4a, 0a3049bce) — needs a scored re-run, not a new fix.**
       → `docs/showcase-2026-08-10-findings.md:40`, `docs/image-routing.md:163`
-- [ ] **`garment-recolour` makes pages much worse** (p14: 30 → −80). Independently measured
+- [x] (switched OFF by default 2026-10-08, docs/decisions.md "Garment colour fix switched off"; reopen only for a skin/held-object-excluding mask bench) **`garment-recolour` makes pages much worse** (p14: 30 → −80). Independently measured
       2026-08-20: recolour children swing 100 → 0 semantically on several prod pages.
       **Needs re-measurement, not re-coding: code moved since (d11cf70d0, c61ff290c, 1dcdb3c09 all
       attacked its failure mode) — needs a scored re-run, not a new fix.**
