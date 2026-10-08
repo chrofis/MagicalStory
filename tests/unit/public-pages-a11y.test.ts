@@ -83,7 +83,7 @@ describe('public pages landmarks and focus management (2026-10-07 follow-up)', (
     const walk = (dir: string): string[] => fs.readdirSync(dir, { withFileTypes: true }).flatMap((d) =>
       d.isDirectory() ? walk(path.join(dir, d.name)) : /\.tsx?$/.test(d.name) ? [path.join(dir, d.name)] : []);
     const offenders = walk(root)
-      .filter((f) => !/\/(App|SSRApp)\.tsx$/.test(f))
+      .filter((f) => !/[\\/](App|SSRApp)\.tsx$/.test(f))
       .filter((f) => mainTag.test(fs.readFileSync(f, 'utf8')) && (mainTag.lastIndex = 0, true));
     expect(offenders).toEqual([]);
   });
