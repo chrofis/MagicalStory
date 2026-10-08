@@ -6494,6 +6494,22 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "trial-create-story-no-prepare-title-wait-2026-10-08",
+      "title": "Trial create-story starts the job at once; the job awaits prepare-title; no panel on trials",
+      "commits": [],
+      "addedAt": "2026-10-08",
+      "claim": "On a live /try where create is clicked while prepare-title is still styling, POST /api/trial/create-story answers in about 1 s (no \"Awaiting in-flight prepare-title\" line; \"Story job ... started\" follows the request at once), the Sonnet trial writer starts within seconds of the click instead of 28 s later, the job logs \"Job awaits the in-flight prepare-title\", then \"prepare-title wait complete\", then \"Seeded N styled avatars from prepare-title cache\", the costumed sheet is NOT generated a second time (one set of [CHARACTER 2x4] Grok edits per sheet), the first page image lands earlier than on job_1791490151653 (click at 22:08:43 CH), and the trial job has a single text call (unified_story) with no arc_panel, plan_check or review call.",
+      "runShape": [
+        "trial"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Run a /try on staging and click create while the costume sheet is still being built. In the Railway log: the gap from the create-story request to \"Story job ... started\" (about 1 s); then \"Job awaits the in-flight prepare-title\" / \"prepare-title wait complete\" / \"Seeded ... styled avatars\"; no second set of [CHARACTER 2x4] edits for the costumed sheet; the time from the click to the first image (compare 22:08:43 CH to the first image on job_1791490151653_r9mypyn0c); and no arc_panel / plan_check / review line for the trial job id (calls of a concurrent beats job do not count, filter by job id)."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [

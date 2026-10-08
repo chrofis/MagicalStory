@@ -123,6 +123,40 @@ function trialSeasonOutfit(inputData = {}) {
   }
 }
 
+/**
+ * TRIAL: wait for the /api/trial/prepare-title task that is still styling this
+ * visitor's avatar sheets, then read what it persisted. create-story used to
+ * hold the whole request for this (28 s on job_1791490151653); now the job is
+ * created at once and only the avatar-styling task calls this, so the writer runs
+ * meanwhile. Waiting (not styling again) is what avoids duplicate sheets.
+ * Throws on timeout or a missing row; the caller's early-styling catch logs it
+ * and the coverage pass before the page loop restyles. No silent default.
+ * (docs/decisions.md 2026-10-08)
+ */
+const TRIAL_TITLE_AVATARS_WAIT_MS = 60000;
+async function awaitTitleAvatars(ready, { userId, characterId, timeoutMs = TRIAL_TITLE_AVATARS_WAIT_MS, pool = dbPool }) {
+  let timer;
+  const timedOut = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`prepare-title still styling avatars after ${timeoutMs}ms`)), timeoutMs);
+  });
+  const started = Date.now();
+  log.info(`[TRIAL] Job awaits the in-flight prepare-title for user ${userId} (avoid duplicate avatar styling)`);
+  try {
+    await Promise.race([ready, timedOut]);
+  } finally {
+    clearTimeout(timer);
+  }
+  const rowId = `characters_${userId}`;
+  const res = await pool.query('SELECT data FROM characters WHERE id = $1', [rowId]);
+  if (res.rows.length === 0) throw new Error(`awaitTitleAvatars: no characters row ${rowId}`);
+  const data = typeof res.rows[0].data === 'string' ? JSON.parse(res.rows[0].data) : res.rows[0].data;
+  const chars = Array.isArray(data) ? data : (data.characters || []);
+  const main = chars.find(c => String(c.id) === String(characterId));
+  if (!main) throw new Error(`awaitTitleAvatars: character ${characterId} not in ${rowId}`);
+  log.info(`[TRIAL] prepare-title wait complete after ${Date.now() - started}ms`);
+  return main.preGeneratedStyledAvatars || null;
+}
+
 // coverTypesFor lives in server/lib/coverKeys.js (the beats Art Director needs it too).
 const { coverTypesFor } = require('./server/lib/coverKeys');
 
@@ -696,9 +730,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         }));
       });
 
-      // Seed cache with pre-generated styled avatars from prepare-title (avoid re-generating)
-      const preGenAvatars = (inputData.characters || [])[0]?.preGeneratedStyledAvatars;
-      if (preGenAvatars) {
+      // Seed cache with pre-generated styled avatars from prepare-title (avoid re-generating).
+      // Called from the styling task below, AFTER the job has awaited an in-flight
+      // prepare-title (create-story no longer does: docs/decisions.md 2026-10-08).
+      const seedPreGeneratedAvatars = (preGenAvatars) => {
+        if (!preGenAvatars) return;
         let seeded = 0;
         // Seeding must write BOTH the module cache and the character object.
         // setStyledAvatar writes only the cache, and prepareStyledAvatars then
@@ -741,11 +777,20 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           }
         }
         if (seeded > 0) log.info(`♻️ [TRIAL] Seeded ${seeded} styled avatars from prepare-title cache (cache + character object)`);
-      }
+      };
 
       log.info(`🎨 [TRIAL] Starting immediate avatar styling (${trialAvatarRequirements.length} variants)...`);
       streamingAvatarStylingPromise = (async () => {
         try {
+          // The writer is already streaming; only this task waits for prepare-title.
+          // The same-scope cache already holds its sheets, the DB row carries the
+          // persisted copy the seeding reads. No in-flight prepare-title (it
+          // finished before the job, or never ran) = the job-start row read stands.
+          let preGeneratedAvatars = (inputData.characters || [])[0]?.preGeneratedStyledAvatars;
+          if (opts.titleAvatarsReady) {
+            preGeneratedAvatars = await awaitTitleAvatars(opts.titleAvatarsReady, { userId: job.user_id, characterId: (inputData.characters || [])[0]?.id });
+          }
+          seedPreGeneratedAvatars(preGeneratedAvatars);
           // Trial skips the sheet reviews (owner 2026-08-15): skipQualityEval
           // reaches generateComposited2x4 as skipReview — 1 try per row, no
           // bodies/heads/identity/style eval. Measured on job_1786818831439:
@@ -7359,7 +7404,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
 // Background worker function to process a story generation job
 // NEW STREAMING ARCHITECTURE: Generate images as story batches complete
-async function processStoryJob(jobId) {
+async function processStoryJob(jobId, opts = {}) {
   // Run entire job inside a cache scope so styled avatars + per-story dev
   // logs don't collide across concurrent jobs.
   // Trial mode uses `trial-${userId}` to match the scope `/api/trial/prepare-title`
@@ -7395,7 +7440,7 @@ async function processStoryJob(jobId) {
     // cancellation and early return all disarm it exactly once.
     const jobHeartbeat = startJobHeartbeat(jobId, dbPool);
     try {
-      return await _processStoryJobImpl(jobId);
+      return await _processStoryJobImpl(jobId, opts);
     } finally {
       jobHeartbeat.stop();
       require('./server/lib/analyzerClient').sessionEnd(`story:${jobId}`);
@@ -7410,7 +7455,7 @@ async function processStoryJob(jobId) {
   });
 }
 
-async function _processStoryJobImpl(jobId) {
+async function _processStoryJobImpl(jobId, opts = {}) {
   log.info(`🎬 Starting processing for job ${jobId}`);
 
   // Cancellation check — query DB status before each major phase
@@ -7887,4 +7932,5 @@ module.exports = {
   deleteJobCheckpoints,
   savePartialStoryFromCheckpoints,
   processStoryJob,
+  awaitTitleAvatars, // test seam
 };
