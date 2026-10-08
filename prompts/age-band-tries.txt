@@ -28,6 +28,8 @@ thing, the weather, or a size — not a person who means harm.[[/premise]]
 [[premise]]**Feelings named plainly.** Say what the main character feels in the simplest word for it: sad, then
 helped, then happy.[[/premise]][[craft]] One feeling per turn of the story, on the face and in what the body does.[[/craft]]
 
+[[premise]]{ESCORT_RULE}[[/premise]]
+
 [[craft]]**Food.** Only ordinary food a child of this age eats, named plainly. Never anything a small child
 cannot chew or swallow safely.[[/craft]]
 

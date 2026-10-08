@@ -1972,6 +1972,37 @@ function getReadingLevel(languageLevel, { pacing = true } = {}) {
 }
 
 /**
+ * The trial writer's page length, keyed on the reader's age band.
+ *
+ * The trial writes in ONE call and never read LANGUAGE_LEVELS: its template
+ * hard-coded "100-140 words per page" for every reader (owner 2026-08-25 kept
+ * that, scoped to a topic-only toddler mode). Staging 2026-10-08
+ * (job_1791496986667_r4sgw3870, job_1791500011394_yvjd5robo): a 1-year-old's
+ * book ran 66-101 words a page. Owner mandate 2026-10-09 reverses the 08-25
+ * ruling for the bands below `journey` (ages 0-4): they take the shortest
+ * reading level's page length from LANGUAGE_LEVELS, the same numbers a
+ * full-story '1st-grade' book is written and counted against. From age 5 (and
+ * with no readable age) the trial keeps its own 100-140. docs/decisions.md
+ * 2026-10-09 "The trial writer's page length follows the age band".
+ *
+ * @param {Object} inputData
+ * @returns {{rule: string, words: string}} `rule` fills the Rules bullet,
+ *   `words` the per-page "[Story text, N words]" example.
+ */
+function trialPageLength(inputData = {}) {
+  const band = resolvePacingBand(inputData);
+  if (band === 'journey' || band === 'standard') {
+    return { rule: '100-140 words per page, flowing paragraphs', words: '100-140' };
+  }
+  const lv = LANGUAGE_LEVELS['1st-grade'];
+  const words = `${lv.wordsPerPageMin}-${lv.wordsPerPageMax}`;
+  return {
+    rule: `${lv.sentencesPerPage} sentences, ${words} words per page, never more. ${lv.description}. ${lv.pacing}`,
+    words,
+  };
+}
+
+/**
  * Estimate tokens per page for batch size calculation
  */
 function getTokensPerPage(languageLevel) {
@@ -6923,6 +6954,17 @@ const ageWord = age => NUMBER_WORDS[age] || String(age);
  * interpolated into ~8 different parent templates, and a token that reached
  * fillTemplate unfilled would be stripped to nothing with only a log warning.
  */
+/**
+ * The independence a child under four is given, ONE string for the three simple
+ * band files ({ESCORT_RULE}). Before 2026-10-09 only `routine` carried a line on
+ * it and the trial's landmark mandate overrode it: a 1-year-old "ging mit dem
+ * Papagei zum Gartentor und hinaus auf den Weg zur Kirche"
+ * (job_1791500011394_yvjd5robo) because the idea ended at the church. The rule
+ * names the exit: a place beyond home is reached WITH a grown-up on the page, or
+ * the story stays where the child is. decisions.md 2026-10-09.
+ */
+const ESCORT_RULE = "**Nobody this young goes anywhere alone.** The child is never shown leaving home or its garden, crossing a street or travelling to a place by themselves: a place beyond home is reached in a grown-up's arms, by the hand or in a pushchair, with that grown-up on the page, or the story stays where the child already is. No stations, tickets, traffic, shops or crowds the child gets through by themselves. Inside the story's own make-believe world they may sail, ride, fly or be carried anywhere at all.";
+
 function fillBandTokens(text, inputData = {}) {
   if (!text || !text.includes('{')) return text;
   const age = focusAge(inputData);
@@ -6941,6 +6983,7 @@ function fillBandTokens(text, inputData = {}) {
     readerLine = `The reader this book is for is an adult of ${age}. Write a book an adult reads for themselves: the shape below is the same one, told at adult weight — never a children's book about a grown-up.`;
   }
   return text
+    .replace(/\{ESCORT_RULE\}/g, ESCORT_RULE)
     .replace(/\{BAND_TITLE\}/g, title)
     .replace(/\{READER_LINE\}/g, readerLine)
     .replace(/\{SHAPE_SCALE\}/g, mini ? ', in small' : ', at full size');
@@ -9464,7 +9507,7 @@ const POPULATION_FIELD_RULE = [
   "  - `\"sparse\"` — a place where one or two unnamed people may be far off: a lone fisherman on a distant pier, a figure on a far hillside.",
   "  - `\"wildlife\"` — the setting holds unnamed animals and no unnamed people: a reef with fish, a meadow with a flock, a plain with a herd. They belong in the picture and are not cast.",
   "  - `\"creature_crowd\"` — the page is written around a crowd of unnamed creatures: a shoal, a swarm, a stampede, a flock filling the sky.",
-  "  Omit it and the page is read as `\"cast_only\"`. Choose `\"ambient\"` over `\"cast_only\"` whenever the location is one the public can walk into; a square with nobody on it reads as abandoned. The prose then does not claim the place is empty — never write \"no other people are present\" about an `ambient` or `crowd` setting. Describe background people the way the setting holds them, in this page's own prose (\"a few distant passers-by cross the far side of the square\") and never in a plate, which holds no people; keep them unnamed, distant and small. The page render draws them. The rule runs both ways: prose that puts unnamed figures in the frame — people crossing the square, riders passing, adults at the tables, onlookers — is a setting with people in it, so `population` is `ambient` or `crowd` on that page, never `cast_only`.",
+  "  Omit it and the page is read as `\"cast_only\"`. Choose `\"ambient\"` over `\"cast_only\"` whenever the location is one the public can walk into; a square with nobody on it reads as abandoned. The prose then does not claim the place is empty — never write \"no other people are present\" about an `ambient` or `crowd` setting. Describe background people the way the setting holds them, in this page's own prose (\"a few distant passers-by cross the far side of the square\") and never in a plate, which holds no people; keep them unnamed, distant and small, and give each a garment kind and a colour no cast member wears (a cast in green and red has passers-by in grey, black, brown, white or dark purple): a picture left to invent them dresses them in the cast's own colours. The page render draws them. The rule runs both ways: prose that puts unnamed figures in the frame — people crossing the square, riders passing, adults at the tables, onlookers — is a setting with people in it, so `population` is `ambient` or `crowd` on that page, never `cast_only`.",
 ].join('\n');
 
 const COUNTS_RULE = '**COUNTS:** An exact number the scene states for a group of like things is three or fewer, and exactly that many are drawn. A group given as more than three, a cluster, a row, a few or several is drawn with no countable exact number.';
@@ -12912,6 +12955,8 @@ The story takes place in ${inputData.userLocation.city}. Use real place names �
       // instructions this template already carries.
       STORY_SHAPE: buildStoryShapeSection(inputData, pageCount, { arc: true }),
       AGE_MODE: buildAgeModeSection(inputData),
+      PAGE_LENGTH_RULE: trialPageLength(inputData).rule,
+      PAGE_WORDS: trialPageLength(inputData).words,
       // Same string the arc prompts get inside {TELLING_RULES}. The trial runs
       // no review stage of any kind, so the writer prompt is the only place a
       // framing rule can reach a trial story.
@@ -13586,6 +13631,7 @@ module.exports = {
   measurePageText,
   pageSentences,
   getReadingLevel,
+  trialPageLength,
   getTokensPerPage,
   NONE_WORDS,
   isNone,

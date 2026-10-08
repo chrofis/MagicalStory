@@ -53,9 +53,7 @@ clues, making a plan, solving a puzzle, or deciding for others.[[/premise]]
 the thing out, steadying them — and the doing on the page is still the child's: they pat, splash, feed,
 point, carry, give. Never a page where a grown-up's hands do the only thing that happens.[[/premise:agency]]
 
-[[premise]]**No real-world errands alone.** No stations, tickets, traffic, shops or crowds the child gets
-through by themselves. Inside the story's own make-believe world they may sail, ride, fly or be
-carried anywhere at all.[[/premise]]
+[[premise]]{ESCORT_RULE}[[/premise]]
 
 [[premise:subject]]**Topic.** A place full of things to look at, a child let loose in it, and one small thing that goes
 wrong and comes right. Never a quest, a search, a rescue, a secret or a prize. A costume or a

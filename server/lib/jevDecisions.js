@@ -1216,6 +1216,21 @@ async function decideGaze({ arc, pages, perPage }, opts = {}) {
  * staging, a gap action reframed, a group pulled wider — applies to the
  * staging inside it, never to the field (owner, 2026-09-28).
  */
+/**
+ * What a FIXED `population` line asks of the prose when people are present.
+ * The standing rule (scene-briefs-all.txt / scene-expansion.txt, "Background
+ * people ... are dressed apart from the cast") sits ~70k characters into the
+ * Art Director prompt, far from the page it governs: on staging
+ * job_1791497309909_6quecrr9t all four `ambient` pages named no extras, so the
+ * image model invented them in the cast's own colours. The ask now rides on the
+ * page's own FIXED line, where the author reads the population.
+ */
+function populationExtrasNote(population) {
+  return (population === 'ambient' || population === 'crowd')
+    ? ' — the prose places unnamed people in the setting, each named with a garment kind and a colour no cast member wears'
+    : '';
+}
+
 const JEV_FIXED_FIELDS_RULE = "A story page's FIXED block holds the fields decided before you write: its `shot`, `timeOfDay` and indoors, the Visual Bible ids its `objects[]` cites — its location or vantage, and for an element with looks the dotted id of the look it shows — its `aboard`, its `population` and each listed character's `looksAt`. A cover's FIXED block holds its `shot`, its light (`timeOfDay` and `weather`), its location, its `population`, its `era` and the gaze of every figure (the viewer). Code writes each into the page's METADATA: you never write a field the FIXED block lists (a field it does not list is yours — a cover's `aboard`, a `looksAt` for a story-page character it leaves out, an `objects[]` id it does not list such as a garment). Write the prose so the picture shows each: every cited element staged, even where only part of it is in frame, and no Visual Bible element staged that the FIXED `objects` leaves out. No other rule changes a fixed field; a rule that would change one applies to the staging inside it. A story page's `weather` stays yours — `none` indoors, never `none` outdoors. A cover's FIXED location is the vantage code writes first in `objects[]`, and the cover is seen as that vantage shows it.";
 
 /**
@@ -1274,7 +1289,7 @@ function fixedBlock(page) {
     if (f.shot) lines.push(`- shot: ${f.shot}`);
     if (f.timeOfDay) lines.push(`- timeOfDay: ${f.timeOfDay}; ${fixedLightPlace(f, `outdoors, weather ${f.weather || 'yours to write'}`)}`);
     if (f.location) lines.push(`- location: ${label(f.location)} — code puts it first in objects[]; write the cover's other ids after it, following its beat`);
-    if (f.population) lines.push(`- population: ${f.population}`);
+    if (f.population) lines.push(`- population: ${f.population}${populationExtrasNote(f.population)}`);
     if (f.era) lines.push(`- era: ${f.era}`);
     if (f.looksAtAll) lines.push(`- looksAt: every figure → ${f.looksAtAll} (the reader)`);
     return lines.length > 1 ? lines.join('\n') : '';
@@ -1286,7 +1301,7 @@ function fixedBlock(page) {
   const objects = [...(f.location ? [f.location] : []), ...(f.cites || [])];
   lines.push(`- objects: ${objects.length ? objects.map(label).join('; ') : 'none'}`);
   lines.push(`- aboard: ${f.aboard ? label(f.aboard) : 'none'}${f.aboard && f.aboardFromGround ? ' — the figures stand on its deck; the location line is the view they have from it' : ''}`);
-  if (f.population) lines.push(`- population: ${f.population}`);
+  if (f.population) lines.push(`- population: ${f.population}${populationExtrasNote(f.population)}`);
   const gaze = Object.entries(f.looksAt || {});
   if (gaze.length) lines.push(`- looksAt: ${gaze.map(([n, t]) => `${n} → ${G.gazeToken(t) ? `${t} (${G.gazeTokenRow(t).phrase})` : label(t)}`).join('; ')}`);
   return lines.join('\n');

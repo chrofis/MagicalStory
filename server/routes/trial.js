@@ -27,7 +27,7 @@ const { assertPromptFilled } = require('../services/prompts');
 // The trial's declared age is MANDATORY (owner, 2026-09-15) — one parser for
 // every entry point below. See server/lib/trialAge.js for the range and why
 // the field became load-bearing (de8753cc1).
-const { parseTrialAge, applyTrialPhotoTraits, reclampTrialApparentAge } = require('../lib/trialAge');
+const { parseTrialAge, applyTrialPhotoTraits, reclampTrialApparentAge, buildTrialPreviewAvatarPrompt } = require('../lib/trialAge');
 
 // Server.js-local dependencies received via initTrialRoutes()
 let deps = {};
@@ -1028,8 +1028,6 @@ router.post('/generate-preview-avatar', trialAvatarLimiter, async (req, res) => 
     // Build avatar prompt using standard clothing from the main avatar prompt template
     const isFemale = gender === 'female';
     const ageNum = parseInt(age) || 7;
-    const ageGroup = ageNum <= 5 ? 'toddler' : ageNum <= 8 ? 'young child' : ageNum <= 12 ? 'child' : 'teenager';
-    const genderWord = isFemale ? 'girl' : 'boy';
 
     // Use the same "standard" clothing style as the real avatar generation
     const { getClothingStylePrompt, extractTraitsWithGemini } = require('./avatars');
@@ -1055,26 +1053,7 @@ router.post('/generate-preview-avatar', trialAvatarLimiter, async (req, res) => 
       log.debug(`[TRIAL AVATAR] Trait extraction failed (non-critical): ${traitErr.message}`);
     }
 
-    const hairInstruction = hairDescription
-      ? `\n- HAIR: ${hairDescription}. Reproduce this EXACTLY — do not change length, color, or style.`
-      : '';
-
-    const prompt = `Create a full-body watercolor illustration of this ${ageGroup} ${genderWord} as a children's book character.
-
-REFERENCE: The attached photo shows the child's face. Match their facial features, skin tone, eye color, and hair color/style EXACTLY.
-- Biometric precision: The face must not be averaged or replaced.
-- Hair and face must be fully visible. Avoid hats and hoods.
-- Ultra-sharp focus on facial features.${hairInstruction}
-
-STYLE: Soft watercolor illustration style for a children's storybook. Warm, friendly, age-appropriate.
-
-POSE: Standing naturally, facing slightly toward the viewer, with a warm smile. Full body visible from head to feet.
-
-CLOTHING: ${standardClothing}
-
-BACKGROUND: Simple, clean white or very light watercolor wash background.
-
-OUTPUT: A single character illustration. No text, no borders, no additional elements.`;
+    const prompt = buildTrialPreviewAvatarPrompt({ age: ageNum, isFemale, hairDescription, standardClothing });
 
     const geminiApiKey = process.env.GEMINI_API_KEY;
     if (!geminiApiKey) {

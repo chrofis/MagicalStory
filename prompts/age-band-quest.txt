@@ -34,6 +34,8 @@ something out — clues, plans, puzzles, tricks or deciding for others.[[/premis
 
 [[premise:resolution]]**It resolves.** The wanted thing is found before the last page.[[/premise:resolution]]
 
+[[premise]]{ESCORT_RULE}[[/premise]]
+
 [[craft]]**Food.** Only ordinary food a child of this age eats, named plainly. Never sweets or ice cream, and
 never anything a small child cannot chew or swallow safely.[[/craft]]
 

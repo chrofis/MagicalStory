@@ -12,7 +12,7 @@ SHORT story — {PAGES} scenes. Keep it focused:
 **Rules:**
 - NO questions, just produce the output
 - Keep it simple, warm, and age-appropriate
-- 100-140 words per page, flowing paragraphs
+- {PAGE_LENGTH_RULE}
 - Page 1 starts with action, not weather or waking up
 - {PAGE_OPENING_VARIETY}
 {STYLE_RULEBOOK}
@@ -241,7 +241,7 @@ Front cover scene hint. The main character ({MAIN_CHARACTER_NAME}) is the only p
 
 --- Page 1 ---
 TEXT:
-[Story text, 100-140 words]
+[Story text, {PAGE_WORDS} words]
 
 SCENE HINT:
 ```json

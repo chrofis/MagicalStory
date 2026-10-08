@@ -118,6 +118,10 @@ const VB_ID_LEGITIMATE_LABELS = [
   'arc_',
   'beats_clothing_review', 'beats_plan', 'beats_replan', 'beats_scene_expansion',
   'beats_scene_review', 'beats_story_bible',
+  // The trial writer, the Visual Bible writer and the brief re-ask carry the
+  // id vocabulary in their own output spec (`"id": "CHR001"`, `["LOC001"]`):
+  // required output keys, not leaked content (decisions.md 2026-10-09 VB-ID-LEAK).
+  'unified_story', 'beats_visual_bible', 'beats_brief_reask',
   'clothing_review',
   'outline_review',
   'regen_expansion', 'regen_iterate', 'regen_refine', 'regen_scene',
