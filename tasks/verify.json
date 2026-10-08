@@ -7923,7 +7923,8 @@
         "kind": "human",
         "what": "View the trial cover next to page 1: held toy and pet match their reference cells; wizard hat shape and colour are the same on the costume sheet, the cover and every page."
       },
-      "status": "pending"
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [
