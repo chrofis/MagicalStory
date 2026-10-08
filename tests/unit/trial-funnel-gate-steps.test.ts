@@ -55,14 +55,16 @@ describe('gate steps in the funnel vocabulary', () => {
 describe('the waiting page emits both gate steps', () => {
   const page = read('client/src/pages/TrialGenerationPage.tsx');
 
-  it('gate_seen fires from an IntersectionObserver on the sign-in block at the gate, once per mount', () => {
+  it('gate_seen fires once per mount, reported by the sign-in slot of a locked page when it is on screen', () => {
     const at = page.indexOf("trackTrialStep('gate_seen')");
     expect(at).toBeGreaterThan(-1);
-    const around = page.slice(at - 700, at + 100);
-    expect(around).toContain('new IntersectionObserver(');
-    expect(around).toContain('gateSeenFiredRef.current = true');
-    // The observed element wraps the sign-in block only while a page is locked.
-    expect(page).toMatch(/ref=\{firstLockedIdx >= 0 \? gateRef : undefined\}>\{signInBlock\}/);
+    expect(page.slice(at - 300, at + 100)).toContain('gateSeenFiredRef.current = true');
+    // Only offered while a page is locked: after an unlock the block is a success state.
+    expect(page).toMatch(/onSeen: hasLockedPage \? onGateSeen : undefined/);
+    // The observer lives in the slot every locked page renders under its teaser.
+    const slot = read('client/src/components/book/TrialBook.tsx');
+    expect(slot).toContain('new IntersectionObserver(');
+    expect(slot).toContain('onSeen()');
   });
 
   it('gate_unlocked fires on the server-reported unlock in the job-status poll', () => {

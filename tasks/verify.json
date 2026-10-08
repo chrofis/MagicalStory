@@ -6542,6 +6542,22 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "trial-locked-teaser-signin-2026-10-08",
+      "title": "Trial locked pages show picture, 3-line teaser and the sign-in block under it (no separate gate page)",
+      "commits": [],
+      "addedAt": "2026-10-08",
+      "claim": "On a live /try the desktop book is a spread with the picture on the left page and its text on the right page (mobile: text under the picture). Pages 1-3 show their full text. From page 4 each locked page shows its picture, the first 3 lines of its text fading out, and directly under that the sign-in block (Google + email); job-status never carries the full text of a locked page, only a teaser of at most 240 chars cut at a word boundary. gate_seen fires when the first locked page is on screen; after unlocking, all pages show full text and the success / check-your-email state shows under the book.",
+      "runShape": [
+        "trial"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Open a /try on staging at desktop and phone width: flip to page 4, confirm 3 faded lines then the sign-in block; in DevTools Network open job-status and confirm pages 4-6 have `teaser` and no `text`; type an email and wait two polls (field keeps its value); submit and confirm the pages unlock with full text and the check-email state appears under the book; trial_events has gate_seen once, after reaching page 4."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [

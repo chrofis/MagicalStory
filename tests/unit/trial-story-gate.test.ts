@@ -12,6 +12,8 @@ const {
   buildTrialStoryPages,
   mergeTrialPageRecords,
   isTrialContactEmail,
+  buildTrialTeaser,
+  TRIAL_TEASER_MAX_CHARS,
 } = require('../../server/routes/trial.js');
 
 const six = [1, 2, 3, 4, 5, 6].map(n => ({ pageNumber: n, text: `Text ${n}`, imageData: `data:image/jpeg;base64,IMG${n}` }));
@@ -28,6 +30,29 @@ describe('buildTrialStoryPages', () => {
       expect(p.locked).toBe(true);
       expect('text' in p).toBe(false);
     }
+  });
+
+  // Regression (owner 2026-10-08, 3-line teaser): job-status serves this output
+  // verbatim, so a locked page may carry a teaser but the page text never.
+  it('a long locked page sends a teaser only; its full text appears nowhere in the payload', () => {
+    const long = 'Once upon a time there was a little fox who loved to explore the forest. '.repeat(12).trim();
+    const pages = buildTrialStoryPages(
+      [{ pageNumber: 1, text: 'free' }, { pageNumber: 4, text: long }],
+      { unlocked: false, freePages: 3 });
+    const locked = pages[1];
+    expect(locked.locked).toBe(true);
+    expect('text' in locked).toBe(false);
+    expect(locked.teaser.length).toBeGreaterThan(0);
+    expect(locked.teaser.length).toBeLessThanOrEqual(TRIAL_TEASER_MAX_CHARS);
+    expect(long.startsWith(locked.teaser)).toBe(true);
+    expect(JSON.stringify(pages)).not.toContain(long);
+    expect(JSON.stringify(pages)).not.toContain(long.slice(0, TRIAL_TEASER_MAX_CHARS + 40));
+  });
+
+  it('unlocked pages carry the full text and no teaser', () => {
+    const pages = buildTrialStoryPages([{ pageNumber: 5, text: 'full text of five' }], { unlocked: true, freePages: 3 });
+    expect(pages[0]).toMatchObject({ locked: false, text: 'full text of five' });
+    expect('teaser' in pages[0]).toBe(false);
   });
 
   it('keeps images on locked pages', () => {
@@ -93,5 +118,37 @@ describe('isTrialContactEmail', () => {
     expect(isTrialContactEmail('parent@example.com')).toBe(true);
     expect(isTrialContactEmail(null)).toBe(false);
     expect(isTrialContactEmail('')).toBe(false);
+  });
+});
+
+
+describe('buildTrialTeaser', () => {
+  const long = 'Alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu nu xi omicron pi rho sigma tau upsilon phi chi psi omega. '.repeat(5).trim();
+
+  it('cuts a long text at a word boundary within the cap', () => {
+    const t = buildTrialTeaser(long);
+    expect(t.length).toBeLessThanOrEqual(TRIAL_TEASER_MAX_CHARS);
+    expect(t.length).toBeGreaterThan(TRIAL_TEASER_MAX_CHARS - 30);
+    expect(long.startsWith(t)).toBe(true);
+    // the next char in the source is whitespace: no word was split
+    expect(/\s/.test(long[t.length])).toBe(true);
+    expect(t).toBe(t.trimEnd());
+  });
+
+  it('never returns the whole text, even for a short page (at most two thirds)', () => {
+    const short = 'The fox ran home through the quiet snowy wood before night.';
+    const t = buildTrialTeaser(short);
+    expect(t.length).toBeGreaterThan(0);
+    expect(t.length).toBeLessThanOrEqual(Math.floor(short.length * 2 / 3));
+    expect(t.length).toBeLessThan(short.length);
+    expect(short.startsWith(t)).toBe(true);
+  });
+
+  it('a single long word is cut at the cap; empty / non-string give empty', () => {
+    expect(buildTrialTeaser('x'.repeat(1000)).length).toBe(TRIAL_TEASER_MAX_CHARS);
+    expect(buildTrialTeaser('')).toBe('');
+    expect(buildTrialTeaser('   ')).toBe('');
+    expect(buildTrialTeaser(undefined as any)).toBe('');
+    expect(buildTrialTeaser('a')).toBe('');
   });
 });

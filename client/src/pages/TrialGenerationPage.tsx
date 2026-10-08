@@ -22,11 +22,12 @@ const API_URL = import.meta.env.VITE_API_URL || '';
 type PageState = 'starting' | 'generating' | 'completed' | 'failed';
 
 // One page of the story preview, as job-status returns it. `text` is absent on
-// a locked page: the server withholds it, the client never hides it.
+// a locked page: the server withholds it and sends only a `teaser`.
 interface PreviewPage {
   pageNumber: number;
   imageData?: string;
   text?: string;
+  teaser?: string;
   locked: boolean;
 }
 
@@ -351,26 +352,14 @@ export default function TrialGenerationPage() {
   const [storyTitle, setStoryTitle] = useState<string | null>(null);
   const [pages, setPages] = useState<PreviewPage[]>([]);
   const storyReady = isTrialBookReady(storyTitle, pages, titlePageImage);
-  // Where the sign-in block sits: before the first locked page. Remembered, so
-  // it does not jump to the bottom once an unlock removes the locked pages.
-  const gateIndexRef = useRef<number | null>(null);
-  // Funnel: `gate_seen` once per mount, the first time the sign-in block at the
-  // gate (locked pages after it) is actually on screen — a visitor who never
-  // scrolls down to it was not shown the gate. The server dedupes per visit.
+  // Funnel: `gate_seen` once per mount, the first time a locked page's sign-in
+  // block is actually on screen (GateSlot observes it) — a visitor who never
+  // reaches a locked page was not shown the gate. The server dedupes per visit.
   const gateSeenFiredRef = useRef(false);
-  const gateObserverRef = useRef<IntersectionObserver | null>(null);
-  const gateRef = useCallback((el: HTMLDivElement | null) => {
-    gateObserverRef.current?.disconnect();
-    gateObserverRef.current = null;
-    if (!el || gateSeenFiredRef.current || typeof IntersectionObserver === 'undefined') return;
-    const observer = new IntersectionObserver((entries) => {
-      if (!entries.some(e => e.isIntersecting) || gateSeenFiredRef.current) return;
-      gateSeenFiredRef.current = true;
-      observer.disconnect();
-      trackTrialStep('gate_seen');
-    }, { threshold: 0.25 });
-    observer.observe(el);
-    gateObserverRef.current = observer;
+  const onGateSeen = useCallback(() => {
+    if (gateSeenFiredRef.current) return;
+    gateSeenFiredRef.current = true;
+    trackTrialStep('gate_seen');
   }, []);
   // `gate_unlocked` the first time job-status reports the pages unlocked.
   const gateUnlockedFiredRef = useRef(false);
@@ -1051,15 +1040,10 @@ export default function TrialGenerationPage() {
   );
 
   // Story preview: title, then the book. Text is shown by the book itself; a
-  // locked page arrives without text and shows the image only; the sign-in gate
-  // is a page of the book (see TrialBook).
-  const firstLockedIdx = pages.findIndex(p => p.locked);
-  if (firstLockedIdx >= 0 && gateIndexRef.current === null) gateIndexRef.current = firstLockedIdx;
-  const gateIdx = firstLockedIdx >= 0 ? firstLockedIdx : (gateIndexRef.current ?? pages.length);
-  // Observed for `gate_seen` only while a page is locked: after an unlock the
-  // same block shows the success / check-your-email state, not a gate. The
-  // observer only reports once the gate page is actually visible in the book.
-  const gateSignInBlock = <div ref={firstLockedIdx >= 0 ? gateRef : undefined}>{signInBlock}</div>;
+  // locked page arrives with a teaser only, and the sign-in block sits under it
+  // (see TrialBook). Once nothing is locked (unlocked / contact left) the same
+  // block continues below the book as the success / check-your-email state.
+  const hasLockedPage = pages.some(p => p.locked);
   const imagePlaceholder = (
     <div className="w-full aspect-square flex flex-col items-center justify-center gap-2 rounded-xl bg-indigo-50 text-indigo-400 text-sm">
       <Loader2 className="w-5 h-5 animate-spin" />
@@ -1074,17 +1058,17 @@ export default function TrialGenerationPage() {
         )}
         <h1 className="text-2xl font-bold text-gray-800">{storyTitle}</h1>
       </div>
-      <TrialGateProvider value={gateSignInBlock}>
+      <TrialGateProvider value={{ node: signInBlock, onSeen: hasLockedPage ? onGateSeen : undefined }}>
         <TrialBook
           storyTitle={storyTitle || ''}
           language={state?.storyInput?.language || language}
           titlePageImage={titlePageImage}
           pages={pages}
-          gateIdx={gateIdx}
           pendingImageLabel={t.imagePending}
           titlePendingNode={imagePlaceholder}
         />
       </TrialGateProvider>
+      {!hasLockedPage && isLinked && <div className="mt-4">{signInBlock}</div>}
     </div>
   );
 

@@ -7,7 +7,7 @@ interface BookCustomPageProps {
 
 // Native listener: React's synthetic stopPropagation runs at the root, after the
 // flip container's own native mousedown handler has already started a drag.
-function bindCustomScroll(el: HTMLDivElement | null) {
+export function bindCustomScroll(el: HTMLDivElement | null) {
   if (!el) return;
   bindManualTouchScroll(el);
   el.addEventListener('mousedown', (e) => e.stopPropagation());

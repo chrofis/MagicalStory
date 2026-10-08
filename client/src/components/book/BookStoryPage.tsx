@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Maximize2, Loader2 } from 'lucide-react';
 import { uiLabel } from '@/utils/uiLabels';
 import { useLanguage } from '@/context/LanguageContext';
+import ClampedText from './ClampedText';
 
 interface BookStoryPageProps {
   imageUrl: string | null;
@@ -18,6 +19,10 @@ interface BookStoryPageProps {
   /** Image is still being generated: show a spinner placeholder (label = translated text) instead of "no image". */
   imagePending?: boolean;
   pendingLabel?: string;
+  /** Locked page (trial): show only the first N lines of `text`, faded. */
+  textClamp?: number;
+  /** Rendered below the text in the text-below layout (the trial's sign-in block). */
+  textFooter?: React.ReactNode;
 }
 
 const PendingImage: React.FC<{ label?: string }> = ({ label }) => (
@@ -32,7 +37,7 @@ const PendingImage: React.FC<{ label?: string }> = ({ label }) => (
  * react-pageflip requires forwardRef.
  */
 const BookStoryPage = React.forwardRef<HTMLDivElement, BookStoryPageProps>(
-  ({ imageUrl, text, pageNumber, showTextOverlay, textOnSidePage, textBelowImage, overlayImage, onImageClick, imagePending, pendingLabel }, ref) => {
+  ({ imageUrl, text, pageNumber, showTextOverlay, textOnSidePage, textBelowImage, overlayImage, onImageClick, imagePending, pendingLabel, textClamp, textFooter }, ref) => {
     const { language } = useLanguage();
     const trimmedText = text.trim();
 
@@ -47,6 +52,8 @@ const BookStoryPage = React.forwardRef<HTMLDivElement, BookStoryPageProps>(
           onImageClick={onImageClick}
           imagePending={imagePending}
           pendingLabel={pendingLabel}
+          textClamp={textClamp}
+          textFooter={textFooter}
           forwardedRef={ref}
         />
       );
@@ -160,10 +167,12 @@ interface TextBelowPageProps {
   onImageClick?: (url: string) => void;
   imagePending?: boolean;
   pendingLabel?: string;
+  textClamp?: number;
+  textFooter?: React.ReactNode;
   forwardedRef: React.ForwardedRef<HTMLDivElement>;
 }
 
-const TextBelowImagePage: React.FC<TextBelowPageProps> = ({ imageUrl, trimmedText, pageNumber, onImageClick, imagePending, pendingLabel, forwardedRef }) => {
+const TextBelowImagePage: React.FC<TextBelowPageProps> = ({ imageUrl, trimmedText, pageNumber, onImageClick, imagePending, pendingLabel, textClamp, textFooter, forwardedRef }) => {
   const { language } = useLanguage();
   const scrollEl = useRef<HTMLDivElement | null>(null);
 
@@ -184,9 +193,11 @@ const TextBelowImagePage: React.FC<TextBelowPageProps> = ({ imageUrl, trimmedTex
   const bindScroll = useCallback((el: HTMLDivElement | null) => {
     scrollEl.current = el;
     bindManualTouchScroll(el);
+    // A footer holds inputs/buttons: keep the flip handlers from starting a drag on them.
+    if (el) el.addEventListener('mousedown', (e) => e.stopPropagation());
   }, []);
 
-  const hasText = trimmedText.length > 0;
+  const hasText = trimmedText.length > 0 || !!textFooter;
 
   return (
     // Absolute-positioned split instead of flex: HTMLFlipBook wraps each page
@@ -238,12 +249,22 @@ const TextBelowImagePage: React.FC<TextBelowPageProps> = ({ imageUrl, trimmedTex
           className="absolute inset-0 overflow-y-auto overscroll-contain bg-white px-4 py-3"
           style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
         >
-          <p
-            className="text-gray-900 leading-relaxed whitespace-pre-wrap font-serif"
-            style={{ fontSize: 'clamp(0.95rem, 2.4vw, 1.05rem)', lineHeight: 1.55 }}
-          >
-            {trimmedText}
-          </p>
+          {textClamp ? (
+            <ClampedText
+              text={trimmedText}
+              lines={textClamp}
+              className="text-gray-900 leading-relaxed whitespace-pre-wrap font-serif"
+              style={{ fontSize: 'clamp(0.95rem, 2.4vw, 1.05rem)', lineHeight: 1.55 }}
+            />
+          ) : (
+            <p
+              className="text-gray-900 leading-relaxed whitespace-pre-wrap font-serif"
+              style={{ fontSize: 'clamp(0.95rem, 2.4vw, 1.05rem)', lineHeight: 1.55 }}
+            >
+              {trimmedText}
+            </p>
+          )}
+          {textFooter && <div className="mt-3">{textFooter}</div>}
         </div>
       </div>}
     </div>

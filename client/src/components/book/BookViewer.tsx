@@ -46,6 +46,10 @@ interface SharedStoryPage {
   imageSrc?: string;
   /** Image still being generated: render a spinner placeholder instead of "no image". */
   imagePending?: boolean;
+  /** Locked page (trial): show only the first N lines of `text`, faded out. */
+  textClamp?: number;
+  /** Rendered below the text (the trial's sign-in block), on the text page / text-below zone. */
+  textFooter?: React.ReactNode;
 }
 
 interface SharedStoryData {
@@ -334,6 +338,8 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
                 key={`text-${storyPage.pageNumber}`}
                 text={storyPage.text}
                 pageNumber={storyPage.pageNumber}
+                textClamp={storyPage.textClamp}
+                textFooter={storyPage.textFooter}
               />
             );
             physicalToLogical.push(i);
@@ -365,6 +371,8 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
                 onImageClick={onImageClick}
                 imagePending={storyPage.imagePending}
                 pendingLabel={pendingImageLabel}
+                textClamp={storyPage.textClamp}
+                textFooter={storyPage.textFooter}
               />
             );
             physicalToLogical.push(i);

@@ -1813,11 +1813,38 @@ router.post('/create-story', verifySessionToken, async (req, res) => {
 // number lives — the client learns the lock state from each page's `locked`.
 const TRIAL_FREE_PAGES = 3;
 
+// A locked page shows the first 3 lines of its text, then the sign-in block
+// (owner decision 2026-10-08; docs/decisions.md "Locked trial pages show a
+// 3-line teaser"). The client clamps to 3 lines; this is only the upper bound
+// of what is SENT. 240 chars = ~3 lines on the widest (desktop right-page)
+// layout with a little slack, and about two sentences: enough to hook, far
+// from the page.
+const TRIAL_TEASER_MAX_CHARS = 240;
+
+/**
+ * Pure: the opening of a locked page's text, cut at a word boundary, never the
+ * whole text. The cap is min(TRIAL_TEASER_MAX_CHARS, two thirds of the text), so
+ * even a short page withholds its ending.
+ */
+function buildTrialTeaser(text) {
+  const t = typeof text === 'string' ? text.trim() : '';
+  if (!t) return '';
+  const max = Math.min(TRIAL_TEASER_MAX_CHARS, Math.floor(t.length * 2 / 3));
+  if (max <= 0) return '';
+  const head = t.slice(0, max);
+  // Mid-word cut (the next char continues a word): back up to the last space.
+  const cutsWord = /\S/.test(t[max]) && /\S$/.test(head);
+  const lastSpace = head.search(/\s\S*$/);
+  const teaser = cutsWord && lastSpace > 0 ? head.slice(0, lastSpace) : head;
+  return teaser.trimEnd();
+}
+
 /**
  * Pure gate: merge nothing, decide only. `records` = [{ pageNumber, text?, imageData? }].
  * Returns [{ pageNumber, imageData?, text?, locked }] sorted by page. A page past
  * `freePages` for a visitor who is not `unlocked` has `locked: true` and NO `text`
- * key at all (the text must never reach the client). Images are never withheld.
+ * key at all (the page text must never reach the client); it carries only a
+ * `teaser` (buildTrialTeaser). Images are never withheld.
  */
 function buildTrialStoryPages(records, { unlocked, freePages }) {
   return [...(records || [])]
@@ -1826,7 +1853,14 @@ function buildTrialStoryPages(records, { unlocked, freePages }) {
       const locked = !unlocked && rec.pageNumber > freePages;
       const page = { pageNumber: rec.pageNumber, locked };
       if (rec.imageData) page.imageData = rec.imageData;
-      if (!locked && typeof rec.text === 'string' && rec.text.length > 0) page.text = rec.text;
+      if (typeof rec.text === 'string' && rec.text.length > 0) {
+        if (locked) {
+          const teaser = buildTrialTeaser(rec.text);
+          if (teaser) page.teaser = teaser;
+        } else {
+          page.text = rec.text;
+        }
+      }
       return page;
     });
 }
@@ -3645,6 +3679,8 @@ module.exports.TRIAL_ART_STYLE = TRIAL_ART_STYLE;
 module.exports.buildTrialUsedResponse = buildTrialUsedResponse;
 module.exports.existingTrialJobResponse = existingTrialJobResponse;
 module.exports.buildTrialStoryPages = buildTrialStoryPages;
+module.exports.buildTrialTeaser = buildTrialTeaser;
+module.exports.TRIAL_TEASER_MAX_CHARS = TRIAL_TEASER_MAX_CHARS;
 module.exports.mergeTrialPageRecords = mergeTrialPageRecords;
 module.exports.isTrialContactEmail = isTrialContactEmail;
 module.exports.verifyTurnstile = verifyTurnstile;
