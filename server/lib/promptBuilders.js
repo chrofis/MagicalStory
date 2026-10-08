@@ -12593,6 +12593,19 @@ function buildStoryBibleFromBeatsPrompt(inputData, beats = [], { arc = '' } = {}
   });
 }
 
+// The trial writer is ONE call that writes the reader-facing page text and the
+// scene hints. The tone block describes a creature's mouth, brow and eyes for
+// the picture; unmarked, it was written into the story text ("its orange beak
+// was closed", "a smooth, level brow"). Marked picture-only, the way the
+// Characters line is. The full pipeline's text writer never receives the block
+// (it goes to the Art Director and Visual Bible templates only).
+function labelCreatureToneForTrialWriter(tone) {
+  if (!tone) return '';
+  return `# Creature look (picture only)
+This is for the scene hints and the illustration, never for the story text. The story text never describes a creature's mouth, lips, teeth, brow, eyes or face; it says what the creature does and what it means to the child.
+${tone}`;
+}
+
 /**
  * Build a lightweight story prompt for trial stories.
  * Much simpler than the full unified prompt â€” no critical analysis, no character arcs,
@@ -12619,7 +12632,10 @@ function buildTrialStoryPrompt(inputData, sceneCount = null) {
     if (p.eyeColor)    physicalParts.push(`${p.eyeColor} eyes`);
     if (p.skinTone)    physicalParts.push(`${p.skinTone} skin`);
     if (physicalParts.length) parts.push(physicalParts.join(', '));
-    if (p.detailedHairAnalysis) parts.push(`hair detail: ${p.detailedHairAnalysis}`);
+    // detailedHairAnalysis is a structured object on trial photos; the one
+    // composer turns it into prose (a bare interpolation printed "[object Object]").
+    const hairDetail = p.detailedHairAnalysis ? buildHairDescription(p) : '';
+    if (hairDetail) parts.push(`hair detail: ${hairDetail}`);
     // Traits can be a flat array or structured { strengths, flaws, challenges, specialDetails }
     const t = char.traits;
     if (Array.isArray(t) && t.length) {
@@ -12799,7 +12815,7 @@ The story takes place in ${inputData.userLocation.city}. Use real place names â€
       POPULATION_ENUM: POPULATION_LEVELS.join('|'),
       // Same resolver the full pipeline's Art Director uses. Trial has no Art
       // Director, so without this the creature tone never reaches a trial page.
-      CREATURE_TONE: buildCreatureToneSection(inputData),
+      CREATURE_TONE: labelCreatureToneForTrialWriter(buildCreatureToneSection(inputData)),
       AVATAR_SELECTION: avatarSelection,
       CLOTHING_ENUM: clothingEnum,
       CLOTHING_RULE: clothingRule,

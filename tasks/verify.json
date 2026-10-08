@@ -6289,6 +6289,24 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "trial-writer-hair-and-creature-look-2026-10-08",
+      "title": "Trial writer: hair detail reads as prose; creature look stays out of page text",
+      "commits": [
+        "PENDING"
+      ],
+      "addedAt": "2026-10-08",
+      "claim": "On a trial story with a young cast and an animal, the stored outlinePrompt has no \"[object Object]\" and the hair detail reads as words; page text never describes the creature's mouth, beak, brow or eyes.",
+      "runShape": [
+        "trial"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Read stories.data outlinePrompt for 'hair detail:' and the page texts for creature face words."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [
