@@ -2545,9 +2545,12 @@ function vbShort(visualBible, id) {
   const { kind, entry } = hit;
   const state = (entry.states || []).find(s => s && s.id === id);
   const vantage = (entry.vantages || []).find(v => v && v.id === id);
-  if (kind === 'animals') return [entry.name, [entry.species, entry.coloring].filter(Boolean).join(', ')].filter(Boolean).join(' — ');
+  // No trailing full stop: callers append ". Face: ..." and a bible coloring that
+  // ends in one printed "sheen.. Face:" (job_1791497309909_6quecrr9t p3).
+  const bare = (t) => String(t == null ? '' : t).trim().replace(/[.\s]+$/, '');
+  if (kind === 'animals') return bare([entry.name, [entry.species, entry.coloring].filter(Boolean).join(', ')].filter(Boolean).join(' — '));
   if (kind === 'locations') return vantage ? `${entry.name} (${vantage.name})` : entry.name;
-  return state && state.delta ? `${entry.name} — ${state.delta}` : entry.name;
+  return state && state.delta ? bare(`${entry.name} — ${state.delta}`) : entry.name;
 }
 
 /** An animal or story-made figure by name, with its look from the bible. */
@@ -2635,7 +2638,9 @@ function buildTextStagePictureSpecs(briefs = [], { visualBible = null, clothingR
       `WHAT HAPPENS: ${String(meta.sceneIntent).trim()}`,
       who.length ? 'WHO:' : null,
       ...who,
-      inView.length ? `ALSO IN VIEW: ${inView.join('; ')}` : null,
+      // ' | ' between rows: a creature row ends in "Looks at: X" and the next row can be X itself,
+      // which '; ' printed as a duplicate ("large dragon egg; large dragon egg").
+      inView.length ? `ALSO IN VIEW: ${inView.join(' | ')}` : null,
     ].filter(Boolean).join('\n'));
   }
   return out;

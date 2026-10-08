@@ -636,7 +636,9 @@ async function applyCoverTypography(coverImages, { title, dedication, seed, tria
         }
       }
       const spec = top.spec;
-      log.info(`🅰️ [COVER TYPO] ${key}: baked title${ded ? '+dedication' : ''} (${spec.fontId || '?'}/${spec.layout || '?'})${spec.skipped ? ` (skipped: ${spec.skipped})` : ''}`);
+      log.info(spec.skipped
+        ? `🅰️ [COVER TYPO] ${key}: typography SKIPPED (${spec.skipped}) — the art is served unchanged`
+        : `🅰️ [COVER TYPO] ${key}: baked title${ded ? '+dedication' : ''} (${spec.fontId || '?'}/${spec.layout || '?'})`);
     } catch (err) {
       log.warn(`⚠️ [COVER TYPO] ${key}: ${err.message}`);
     }
@@ -712,7 +714,9 @@ async function bakeCoverTypographyPostPersist(storyId, storyData, { title, dedic
       await saveStoryImage(storyId, `${key}Art`, null, 'data:image/jpeg;base64,' + bytes.toString('base64'), { versionIndex: activeIdx });
       await saveStoryImage(storyId, key, null, 'data:image/jpeg;base64,' + buffer.toString('base64'), { versionIndex: activeIdx, cacheBust: true, preserveScore: true });
       if (storyData?.coverImages?.[key]) storyData.coverImages[key].typography = spec;
-      log.info(`🅰️ [COVER TYPO POST] ${key}: baked title${ded ? '+dedication' : ''} onto served v${activeIdx} (${spec.fontId || '?'}/${spec.layout || '?'})`);
+      log.info(spec.skipped
+        ? `🅰️ [COVER TYPO POST] ${key}: typography SKIPPED on served v${activeIdx} (${spec.skipped}) — the art is served unchanged`
+        : `🅰️ [COVER TYPO POST] ${key}: baked title${ded ? '+dedication' : ''} onto served v${activeIdx} (${spec.fontId || '?'}/${spec.layout || '?'})`);
 
       // Re-point stored detection fingerprints at the STAMPED bytes — the ONLY
       // sanctioned fp restamp (restampDetectionForCoverText). Text overlay
