@@ -143,6 +143,12 @@ describe('one rule reaches the planner and every brief-authoring template', () =
     expect(beats).not.toContain('{OTS_NO_CONTACT}');
   });
 
+  it('the no-contact rule allows hands acting outward toward the far subject and bans acts the crop cannot show', () => {
+    for (const outward of ['aiming', 'drawing', 'pointing', 'throwing', 'holding something up']) expect(OTS_NO_CONTACT_RULE).toContain(outward);
+    for (const hidden of ['own body or clothing', 'hand-over', 'within reach']) expect(OTS_NO_CONTACT_RULE).toContain(hidden);
+    expect(OTS_NO_CONTACT_RULE).not.toMatch(/^Over-the-shoulder never goes on a page where the near figure's hands act/);
+  });
+
   it('both Art Director templates carry the near-figure rule, filled', () => {
     const all = String(PB.buildSceneBriefsAllPrompt(inputData, [{ pageNumber: 1, planLine: 'medium — Levin — he waves — he is seen' }], {}));
     const one = String(PB.buildSceneExpansionPrompt(1, 'He waved.', CAST, 'en', VISUAL_BIBLE, '', null, {}));

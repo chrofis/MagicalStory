@@ -235,6 +235,13 @@ describe('REQUIRED CAST background tail never asks for blurred faces', () => {
       expect(line).not.toMatch(/indistinct|blurr|featureless|faceless/i);
     });
   }
+  it('extras are dressed for the story era, not in "everyday" (modern) clothes', () => {
+    for (const population of ['ambient', 'sparse', 'crowd']) {
+      const line = buildRequiredCastRule(population);
+      expect(line).toContain("dressed for the story's era");
+      expect(line).not.toMatch(/everyday/);
+    }
+  });
   it('ambient and crowd still keep extras unconfusable with the cast and ask for drawn faces', () => {
     for (const population of ['ambient', 'crowd']) {
       const line = buildRequiredCastRule(population);

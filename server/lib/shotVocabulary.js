@@ -150,7 +150,7 @@ const SHOTS = [
  * iterate templates. No counter checks it — a plan line is prose and carries no
  * structured contact field, and code does not classify prose.
  */
-const OTS_NO_CONTACT_RULE = "Over-the-shoulder never goes on a page where the near figure's hands act — a hand laid on something, a grip, a lean against it, a hand-over, tucking something away or taking it out: the crop shows no hands, and whatever they act on is within arm's reach, not small and deep in the far corner. Such a page takes another shot.";
+const OTS_NO_CONTACT_RULE = "Over-the-shoulder suits a near figure whose hands act outward toward the far subject: aiming, drawing, pointing, throwing, holding something up into frame. It never goes on an act the crop cannot show: one at the near figure's own body or clothing (tucking something away, taking it out), a hand-over, or a grip or lean on something within reach. Such a page takes another shot.";
 
 /**
  * AN OVER-THE-SHOULDER NEEDS A NEAR FIGURE AND SOMEONE IT FACES (owner,

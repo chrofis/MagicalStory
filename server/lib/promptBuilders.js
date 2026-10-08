@@ -9347,11 +9347,11 @@ const REQUIRED_CAST_LEAD = '**REQUIRED CAST:** Every named character is in the f
 const REQUIRED_CAST_UNACTED = 'A character given no action is still drawn, placed and occupied as the moment suggests.';
 const REQUIRED_CAST_BACKGROUND = {
   cast_only: ', and no one else is added.',
-  ambient: ". Add a few unnamed passers-by far behind the cast (where the scene description places them, if it does), each much smaller than any listed character, busy with their own business and mostly turned away, every face fully drawn, in plain everyday clothes, none sharing a listed character's hair, build or outfit. No one else is added.",
-  sparse: ". Add at most one or two unnamed people, tiny and far behind the cast, busy with their own business and turned away, every face fully drawn, in plain everyday clothes, none sharing a listed character's hair, build or outfit. No one else is added.",
+  ambient: ". Add a few unnamed passers-by far behind the cast (where the scene description places them, if it does), each much smaller than any listed character, busy with their own business and mostly turned away, every face fully drawn, dressed for the story's era, none sharing a listed character's hair, build or outfit. No one else is added.",
+  sparse: ". Add at most one or two unnamed people, tiny and far behind the cast, busy with their own business and turned away, every face fully drawn, dressed for the story's era, none sharing a listed character's hair, build or outfit. No one else is added.",
   wildlife: ". Add the unnamed animals the scene description places — fish, a flock, a herd — as ordinary members of their kind, none matching a listed character or creature. No unnamed people are added.",
   creature_crowd: ". Paint the crowd of unnamed creatures the scene description places, as it places them: many of their kind, varied in size and markings, none matching a listed character or creature. No unnamed people are added.",
-  crowd: ". Paint the unnamed people the scene description places, as it places them: busy with their own business, every face fully drawn, varied hair and garment colours and shapes, in plain everyday clothes, none sharing a listed character's hair, build or outfit. No one else is added.",
+  crowd: ". Paint the unnamed people the scene description places, as it places them: busy with their own business, every face fully drawn, varied hair and garment colours and shapes, dressed for the story's era, none sharing a listed character's hair, build or outfit. No one else is added.",
 };
 
 /** The REQUIRED CAST line for a page of this `population` (normalised). */
@@ -10109,7 +10109,7 @@ const WORN_ON_OTHER_RULE = "When the page has a character other than the item's 
  *  - PLAN_COVER: "behind pumpkin crates" became the location's empty stall frame (p5); rule 12e let a prop that is
  *    merely placed vanish, and a hiding place is not set dressing.
  */
-const OUTFIT_ONLY_RULE = "A figure wears exactly the garments and accessories its outfit text lists: no hat, scarf, cape, bag or other item that text does not name, and none taken from another figure's outfit. A crop or close-up names only the listed ones its frame shows.";
+const OUTFIT_ONLY_RULE = "A figure wears exactly the garments and accessories its outfit text lists: no hat, scarf, cape, bag or other item that text does not name, and none taken from another figure's outfit; an item the plan line or a `wornItems` row puts on the figure is the exception. A crop or close-up names only the listed ones its frame shows.";
 const ACTION_DIRECTION_RULE = "A plan line's direction words (off, out, away, down, back, in) are staged as that movement: taking something off, out or away leaves where it was, never lands on it. The prose and the interaction's `where` describe the same act.";
 const PLAN_COVER_RULE = "An object the plan line puts someone behind, under or inside — a hiding place, a cover, a barrier — is staged as that object, by its own name and kind, between the figures it separates; never swapped for a similar thing the location offers.";
 
