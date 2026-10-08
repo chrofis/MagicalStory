@@ -59,6 +59,13 @@ beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(new Date('2026-09-24T15:
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe('site_arrival', () => {
+  it('records the entry pathname without the query string', async () => {
+    stubBrowser('?utm_source=chatgpt.com', '/geschenk/geschenk-3-jahre');
+    const m = await load();
+    m.startSiteVisitTracking();
+    expect((await events())[0].meta?.path).toBe('/geschenk/geschenk-3-jahre');
+  });
+
   it('fires once for a page opened from an ad, carrying the campaign, keyword and click id', async () => {
     stubBrowser('?utm_source=google&utm_medium=search&utm_campaign=cheap-age-ch&utm_term=geschenk%203%20jahre&gclid=abc');
     const m = await load();
@@ -68,6 +75,7 @@ describe('site_arrival', () => {
     expect(ev.map((e) => e.step)).toEqual(['site_arrival']);
     expect(ev[0]).toMatchObject({ utmCampaign: 'cheap-age-ch', utmTerm: 'geschenk 3 jahre', gclid: 'abc' });
     expect(typeof ev[0].meta?.bootMs).toBe('number');
+    expect(ev[0].meta?.path).toBe('/');
   });
 
   it('a gclid alone (tags stripped) still counts as an ad arrival', async () => {
@@ -147,6 +155,17 @@ describe('server side', () => {
     expect(trial.sanitizeTrialEventMeta({ seconds: -1, pages: 0, bootMs: 1.5 })).toBeNull();
     expect(trial.sanitizeTrialEventMeta({ seconds: 86401, pages: 1001, bootMs: 600001 })).toBeNull();
     expect(trial.sanitizeTrialEventMeta({ seconds: '42', pages: 2 })).toEqual({ pages: 2 });
+  });
+
+  it('keeps the entry path only as a bare pathname (no query, hash, or over-long value)', () => {
+    expect(trial.sanitizeTrialEventMeta({ path: '/geschenk/geschenk-3-jahre' })).toEqual({ path: '/geschenk/geschenk-3-jahre' });
+    expect(trial.sanitizeTrialEventMeta({ path: '/' })).toEqual({ path: '/' });
+    expect(trial.sanitizeTrialEventMeta({ path: '/a?utm_source=chatgpt.com' })).toBeNull();
+    expect(trial.sanitizeTrialEventMeta({ path: '/a#frag' })).toBeNull();
+    expect(trial.sanitizeTrialEventMeta({ path: 'no-leading-slash' })).toBeNull();
+    expect(trial.sanitizeTrialEventMeta({ path: '/' + 'a'.repeat(200) })).toBeNull();
+    expect(trial.sanitizeTrialEventMeta({ path: '/' + 'a'.repeat(199) })).toEqual({ path: '/' + 'a'.repeat(199) });
+    expect(trial.sanitizeTrialEventMeta({ path: 42 })).toBeNull();
   });
 
   it('the child age bound is unchanged by the integer-kind refactor', () => {

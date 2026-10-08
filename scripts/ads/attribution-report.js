@@ -227,6 +227,27 @@ async function main() {
     console.log('  Keyword counts stay 0-1 for a long time at Swiss volume - read verdicts at campaign / ad-group level.');
   }
 
+  // Landing pages by source (site_arrival meta.path, since 2026-10-08): which page each referrer sends people
+  // to - e.g. which of our pages ChatGPT (utm_source=chatgpt.com) cites. Only tagged arrivals carry a path.
+  const lp = await pool.query(`
+    WITH visit AS (
+      SELECT visit_id,
+             MAX(COALESCE(utm_source, CASE WHEN gclid IS NOT NULL THEN 'google (gclid)' END)) AS source,
+             MAX(meta->>'path') FILTER (WHERE step = 'site_arrival') AS path,
+             BOOL_OR(step = $1) AS completed_trial
+        FROM trial_events WHERE created_at >= ${SINCE} GROUP BY visit_id
+    )
+    SELECT source, path, COUNT(*) visits, COUNT(*) FILTER (WHERE completed_trial) trials
+      FROM visit WHERE source IS NOT NULL AND path IS NOT NULL
+     GROUP BY 1, 2 ORDER BY visits DESC, trials DESC LIMIT 40`, [COMPLETED_STEP, startDate]);
+  console.log('\n=== landing pages by source (entry page of tagged arrivals) ===');
+  if (!lp.rows.length) {
+    console.log('  No tagged arrival with a recorded entry page in this window yet.');
+  } else {
+    console.log('  visits  trials  source / page');
+    for (const r of lp.rows) console.log(`  ${String(r.visits).padStart(6)}  ${String(r.trials).padStart(6)}  ${r.source} ${r.path}`);
+  }
+
   // GCLIDs of users who bought: the exact payload for a Google Ads offline
   // conversion import, which is how a days-later purchase gets attributed back
   // to the click that paid for it.

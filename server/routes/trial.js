@@ -474,7 +474,7 @@ const TRIAL_FUNNEL_STEPS = [
 // /try and left no row at all, so a page that never loaded, a 2-second bounce and
 // a minute of reading were indistinguishable.
 const SITE_VISIT_STEPS = [
-  'site_arrival',  // a page opened with campaign tags or a gclid (meta.bootMs)
+  'site_arrival',  // a page opened with campaign tags or a gclid (meta.bootMs, meta.path)
   'site_exit',     // first hide/leave of that visit (meta.seconds, meta.pages)
 ];
 const ACCEPTED_EVENT_STEPS = new Set([...TRIAL_FUNNEL_STEPS, ...SITE_VISIT_STEPS]);
@@ -523,6 +523,7 @@ const TRIAL_META_SCHEMA = {
   deepLink: 'bool',
   age: 'age',              // the child's declared age — decides which tiles were shown
   // site_arrival / site_exit (ad-tagged visits)
+  path: 'path',            // site_arrival: entry page pathname (no query/hash) - which page a referrer like ChatGPT sends people to
   bootMs: 'ms',            // ms from navigation start until the app ran — a slow mobile load shows here
   seconds: 'seconds',      // time on site until the visit first hid or left the page
   pages: 'count',          // distinct page paths viewed in that time
@@ -538,6 +539,9 @@ const TRIAL_META_INT_BOUNDS = {
 };
 
 const TRIAL_META_SLUG_RE = /^[a-z0-9][a-z0-9-]{0,39}$/;
+// A URL pathname: leading slash, URL-safe characters only, <= 200 chars. No '?' or '#', so a query string
+// (tokens, emails) or fragment can never be stored.
+const TRIAL_META_PATH_RE = /^\/[A-Za-z0-9\-._~%!$&'()*+,;=:@\/]{0,199}$/;
 
 /**
  * Keep only the allowlisted keys, each only in its declared shape. Anything
@@ -557,6 +561,8 @@ function sanitizeTrialEventMeta(meta) {
       if (typeof value === 'boolean') clean[key] = value;
     } else if (kind === 'slug') {
       if (typeof value === 'string' && TRIAL_META_SLUG_RE.test(value)) clean[key] = value;
+    } else if (kind === 'path') {
+      if (typeof value === 'string' && TRIAL_META_PATH_RE.test(value)) clean[key] = value;
     } else if (TRIAL_META_INT_BOUNDS[kind]) {
       const [min, max] = TRIAL_META_INT_BOUNDS[kind];
       if (typeof value === 'number' && Number.isInteger(value) && value >= min && value <= max) clean[key] = value;

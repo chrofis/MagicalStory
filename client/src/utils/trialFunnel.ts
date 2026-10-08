@@ -52,7 +52,7 @@ export type TrialStep =
  * match / the page), and dwell time is readable after a dozen clicks where trial counts need hundreds.
  */
 export type SiteVisitStep =
-  /** A page opened with campaign tags or a gclid in its URL. meta.bootMs = ms from navigation start. */
+  /** A page opened with campaign tags or a gclid in its URL. meta.bootMs = ms from navigation start, meta.path = entry pathname. */
   | 'site_arrival'
   /** First time that visit hid or left the page. meta.seconds on site, meta.pages viewed. */
   | 'site_exit';
@@ -238,7 +238,9 @@ export function startSiteVisitTracking(): void {
   try {
     if (siteVisit || !isTagged(attributionFromUrl())) return;
     siteVisit = { startedAt: Date.now(), pages: 1, lastPath: window.location.pathname, exited: false };
-    sendEvent('site_arrival', { bootMs: Math.round(performance.now()) });
+    // path = the entry page (pathname only: no query, no hash) so we can tell WHICH page a referrer such as
+    // ChatGPT (utm_source=chatgpt.com) sends visitors to. Server shape check: TRIAL_META_SCHEMA `path`.
+    sendEvent('site_arrival', { bootMs: Math.round(performance.now()), path: window.location.pathname.slice(0, 200) });
 
     const exit = () => {
       if (!siteVisit || siteVisit.exited) return;
