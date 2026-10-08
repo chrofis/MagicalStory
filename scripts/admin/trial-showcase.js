@@ -356,6 +356,7 @@ function faceDataUri(entry) {
   //    storyDetails is the bug this step exists to prevent.
   let storyDetails = presetDetails;
   let ideaKind = null;
+  let ideaPick = null;
   if (!storyDetails) {
     const ideas = await generateIdeas(args.base, entry, acct.sessionToken);
     const t = ideas.timing;
@@ -368,6 +369,8 @@ function faceDataUri(entry) {
     // The server reads ideaKind to decide whether the landmark mandate applies
     // ('fantasy' = card 2). The client stamps it from the card index; so do we.
     ideaKind = idx === 1 ? 'fantasy' : 'local';
+    // The click plus both cards on screen, as TrialWizard.tsx handleCreate sends it.
+    ideaPick = { index: idx, attempt: 1, offered: ideas.slice(0, 2).map(i => ({ title: i.title, summary: i.summary })) };
     console.log(`[${chTime(new Date())}] ideas generated — took card ${idx + 1} (${ideaKind}): ${idea.title}`);
     console.log(storyDetails.split('\n').map(l => '    | ' + l).join('\n'));
   }
@@ -381,6 +384,7 @@ function faceDataUri(entry) {
       storyTheme: entry.storyTheme || '',
       storyDetails,
       ...(ideaKind ? { ideaKind } : {}),
+      ...(ideaPick ? { ideaPick } : {}),
       language: entry.language,
       ...(entry.city ? { userLocation: { city: entry.city, country: 'Switzerland' } } : {}),
     },
