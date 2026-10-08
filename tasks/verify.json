@@ -6325,6 +6325,24 @@
         "result": "NOT COVERED",
         "note": "build 9bcab624f lacks 81125e505 | undecided — human check | LOOK: Read stories.data outlinePrompt for 'hair detail:' and the page texts for creature face words."
       }
+    },
+    {
+      "id": "haiku55-small-sites-2026-10-08",
+      "title": "Haiku 5.5 on scene translation, CHR-id dedup and the identity witness",
+      "commits": [
+        "9b72c071f"
+      ],
+      "addedAt": "2026-10-08",
+      "claim": "On a non-English full story the generation log shows scene_translation answered by claude-haiku-5-5 with one translated line per page (no 'Seite N:' prefix, no header line); any vb_chr_dedup call is answered by claude-haiku-5-5 instead of throwing 'Unknown text model override'; a SoM identity answer from the haiku-full tier names claude-haiku-5-5.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "In stories.data.generationLog / tokenUsage read the scene_translation row's model id and the sceneImages' translatedSummary lines; grep the Railway log for 'CHR dedup' and 'haiku-full'."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [
