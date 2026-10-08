@@ -6281,7 +6281,7 @@
       "addedAt": "2026-10-08",
       "claim": "On a 4-page story the generation log's api_usage costs sum to total_cost and to the spend-cap total; an Anthropic arc/plan bucket shows cached_input_tokens > 0 where the prompt prefix repeats; plate_qc, page_quality_inventory/_semantic buckets exist with their own models; a cut stream (if any) shows cut_calls; and the story total is within a few percent of the Anthropic, Google, xAI and OpenRouter consoles for the run window.",
       "runShape": [
-        "4-page-smoke"
+        "full-story"
       ],
       "check": {
         "kind": "human",

@@ -1642,6 +1642,9 @@ const MODEL_PRICING = {
 function findModelPricing(modelId) {
   if (!modelId || typeof modelId !== 'string') return null;
   if (MODEL_PRICING[modelId]) return MODEL_PRICING[modelId];
+  // A TEXT_MODELS key ('qwen3-vl') is an alias for its provider modelId; price that.
+  const aliasTarget = TEXT_MODELS[modelId]?.modelId;
+  if (aliasTarget && aliasTarget !== modelId && MODEL_PRICING[aliasTarget]) return MODEL_PRICING[aliasTarget];
 
   // OpenRouter models are keyed with their vendor prefix ('qwen/qwen-plus'),
   // but MODEL_DEFAULTS refers to them bare ('qwen-plus'), and neither branch

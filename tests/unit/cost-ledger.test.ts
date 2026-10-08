@@ -61,6 +61,12 @@ describe('priceUsage', () => {
     expect(pricingKnown('claude-sonnet-5-5')).toBe(true);
     expect(pricingKnown('definitely-not-a-model')).toBe(false);
   });
+
+  it('prices a TEXT_MODELS alias at its provider modelId (qwen3-vl landed as unpriced on the Fiona rerun)', () => {
+    expect(pricingKnown('qwen3-vl')).toBe(true);
+    expect(priceUsage('qwen3-vl', { input_tokens: M, output_tokens: M }))
+      .toBeCloseTo(priceUsage('qwen/qwen3-vl-32b-instruct', { input_tokens: M, output_tokens: M }), 6);
+  });
 });
 
 describe('Anthropic thinking', () => {
