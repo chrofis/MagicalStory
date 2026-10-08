@@ -145,3 +145,16 @@ describe('the trial path makes no arc-panel call', () => {
     expect(trialPrompt).not.toMatch(/panel/i);
   });
 });
+
+describe('the in-flight promise reaches the unified job', () => {
+  // Regression: 9a6c4a889 read opts.titleAvatarsReady and job.user_id inside
+  // processUnifiedStoryJob, where neither is in scope (ReferenceError on every
+  // trial). The promise travels as that function's own parameter.
+  it('processUnifiedStoryJob takes titleAvatarsReady and the impl passes it', () => {
+    const src = fs.readFileSync(path.join(root, 'storyJobPipeline.js'), 'utf8');
+    expect(src).toContain('checkCancellation = async () => {}, titleAvatarsReady = null) {');
+    expect(src).toMatch(/processUnifiedStoryJob([^;]*opts.titleAvatarsReady || null)/);
+    const body = src.slice(src.indexOf('async function processUnifiedStoryJob('), src.indexOf('async function _processStoryJobImpl('));
+    expect(body).not.toMatch(/opts.titleAvatarsReady/);
+  });
+});

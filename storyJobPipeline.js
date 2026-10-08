@@ -422,7 +422,7 @@ async function savePartialStoryFromCheckpoints(jobId, failureReason = 'Unknown f
 // UNIFIED STORY GENERATION
 // Single prompt generates complete story, Art Director expands scenes, then images
 // ============================================================================
-async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipImages, skipCovers, userId, modelOverrides = {}, isAdmin = false, enableFullRepair = true, checkCancellation = async () => {}) {
+async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipImages, skipCovers, userId, modelOverrides = {}, isAdmin = false, enableFullRepair = true, checkCancellation = async () => {}, titleAvatarsReady = null) {
   const timingStart = Date.now();
   log.debug(`📖 [UNIFIED] Starting unified story generation for job ${jobId}`);
 
@@ -787,8 +787,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // persisted copy the seeding reads. No in-flight prepare-title (it
           // finished before the job, or never ran) = the job-start row read stands.
           let preGeneratedAvatars = (inputData.characters || [])[0]?.preGeneratedStyledAvatars;
-          if (opts.titleAvatarsReady) {
-            preGeneratedAvatars = await awaitTitleAvatars(opts.titleAvatarsReady, { userId: job.user_id, characterId: (inputData.characters || [])[0]?.id });
+          if (titleAvatarsReady) {
+            preGeneratedAvatars = await awaitTitleAvatars(titleAvatarsReady, { userId, characterId: (inputData.characters || [])[0]?.id });
           }
           seedPreGeneratedAvatars(preGeneratedAvatars);
           // Trial skips the sheet reviews (owner 2026-08-15): skipQualityEval
@@ -7785,7 +7785,7 @@ async function _processStoryJobImpl(jobId, opts = {}) {
     );
 
     log.debug(`📚 [PIPELINE] Unified mode - single prompt + Art Director scene expansion`);
-    return await processUnifiedStoryJob(jobId, inputData, characterPhotos, skipImages, skipCovers, job.user_id, modelOverrides, isAdmin, enableFullRepair, checkCancellation);
+    return await processUnifiedStoryJob(jobId, inputData, characterPhotos, skipImages, skipCovers, job.user_id, modelOverrides, isAdmin, enableFullRepair, checkCancellation, opts.titleAvatarsReady || null);
 
   } catch (error) {
     // Clear styled avatar cache on error too
