@@ -2340,6 +2340,20 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               log.debug(`[TRIAL-COVER] Waiting for avatar styling...`);
               await streamingAvatarStylingPromise;
             }
+            // The cover shows VB elements (a held toy, a pet) and must render
+            // with their reference cells exactly as the trial pages do (they
+            // await this same promise before building their grid). Without the
+            // wait the cover was drawn before the sheet existed: the name
+            // invariant below saw "no reference image" and the grid was empty
+            // (job_1791500208126_at0wow7xa: a toy owl drawn as a live bird;
+            // job_1791500011394_yvjd5robo: the parrot lost its forehead patch).
+            // The sheet is one parallel batch started in onVisualBible, so the
+            // wait is the remainder of that batch (~40 s in those logs). A
+            // failed sheet already logged in its own catch; the cover then
+            // renders without cells, as the pages do. docs/decisions.md 2026-10-09.
+            if (trialReferenceSheetPromise) {
+              await trialReferenceSheetPromise;
+            }
 
             // Build scene description from the cover hint JSON
             // `let`: the cover NAME invariant may strip an unsendable entity

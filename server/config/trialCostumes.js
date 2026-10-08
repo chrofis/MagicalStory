@@ -9,24 +9,24 @@ const TRIAL_COSTUMES = {
   // ══════════════════════════════════════════════════════════════
   adventure: {
     pirate: {
-      male: "Red and white horizontal-striped sailor shirt, brown leather vest over it, dark brown canvas trousers tucked into tall black boots, wide black leather belt with brass buckle",
-      female: "Red and white horizontal-striped sailor blouse, brown leather corset vest over it, dark blue flowing skirt over dark trousers, tall black boots, wide black leather belt"
+      male: "Red and white horizontal-striped sailor shirt, brown leather vest over it, dark brown canvas trousers tucked into tall black boots, wide black leather belt with brass buckle, no hat, bare head",
+      female: "Red and white horizontal-striped sailor blouse, brown leather corset vest over it, dark blue flowing skirt over dark trousers, tall black boots, wide black leather belt, no hat, bare head"
     },
     knight: {
-      male: "Silver chain mail tunic over a grey padded gambeson, brown leather bracers, dark brown leather boots, plain brown sword belt",
-      female: "Silver chain mail tunic over a grey padded gambeson, brown leather bracers, dark brown leather boots, plain brown sword belt"
+      male: "Silver chain mail tunic over a grey padded gambeson, brown leather bracers, dark brown leather boots, plain brown sword belt, no helmet, bare head",
+      female: "Silver chain mail tunic over a grey padded gambeson, brown leather bracers, dark brown leather boots, plain brown sword belt, no helmet, bare head"
     },
     cowboy: {
-      male: "Blue denim jeans, red and black plaid flannel shirt, brown leather vest, brown cowboy boots with silver spurs, red bandana around neck",
-      female: "Blue denim jeans, red and black plaid flannel shirt, brown leather vest, brown cowboy boots, red bandana around neck"
+      male: "Blue denim jeans, red and black plaid flannel shirt, brown leather vest, brown cowboy boots with silver spurs, red bandana around neck, brown felt cowboy hat with a wide flat brim",
+      female: "Blue denim jeans, red and black plaid flannel shirt, brown leather vest, brown cowboy boots, red bandana around neck, brown felt cowboy hat with a wide flat brim"
     },
     ninja: {
-      male: "Dark blue traditional ninja outfit (shinobi shozoku), black cloth wraps on forearms, black soft tabi boots",
-      female: "Dark blue traditional ninja outfit (shinobi shozoku), black cloth wraps on forearms, black soft tabi boots"
+      male: "Dark blue traditional ninja outfit (shinobi shozoku), black cloth wraps on forearms, black soft tabi boots, no hood, no mask, bare head",
+      female: "Dark blue traditional ninja outfit (shinobi shozoku), black cloth wraps on forearms, black soft tabi boots, no hood, no mask, bare head"
     },
     viking: {
-      male: "Brown fur-trimmed tunic, brown leather bracers, thick brown leather belt with round bronze buckle, fur-lined brown boots, grey woolen cloak",
-      female: "Long dark red woolen dress with gold embroidered trim, brown leather belt with pouch, grey fur-lined cloak, brown leather boots"
+      male: "Brown fur-trimmed tunic, brown leather bracers, thick brown leather belt with round bronze buckle, fur-lined brown boots, grey woolen cloak, no helmet, bare head",
+      female: "Long dark red woolen dress with gold embroidered trim, brown leather belt with pouch, grey fur-lined cloak, brown leather boots, no helmet, bare head"
     },
     roman: {
       male: "White tunic (tunica) with red trim, brown leather sandals (caligae), brown leather wrist guards, simple brown belt",
@@ -45,12 +45,12 @@ const TRIAL_COSTUMES = {
       female: "Tan animal fur dress, brown leather cord belt, bare feet, white shell necklace"
     },
     samurai: {
-      male: "Dark grey hakama pants, navy kimono top with white family crest, red obi sash belt, brown wooden sandals (geta)",
-      female: "Dark grey hakama pants, pale pink kimono top with floral pattern, red obi sash belt, brown wooden sandals (geta)"
+      male: "Dark grey hakama pants, navy kimono top with white family crest, red obi sash belt, brown wooden sandals (geta), no helmet, bare head",
+      female: "Dark grey hakama pants, pale pink kimono top with floral pattern, red obi sash belt, brown wooden sandals (geta), no helmet, bare head"
     },
     wizard: {
-      male: "Long flowing robe in deep blue with silver star patterns, brown leather belt with pouch, pointed grey cloth shoes",
-      female: "Long flowing robe in deep purple with golden moon patterns, brown leather belt with pouch, pointed grey cloth shoes"
+      male: "Long flowing robe in deep blue with silver star patterns, brown leather belt with pouch, pointed grey cloth shoes, tall pointed deep blue wizard hat with a wide brim and a silver band",
+      female: "Long flowing robe in deep purple with golden moon patterns, brown leather belt with pouch, pointed grey cloth shoes, tall pointed deep purple wizard hat with a wide brim and a golden band"
     },
     dragon: {
       male: "Brown leather armor vest with scale pattern, dark brown sturdy boots, brown arm guards, brown adventurer's belt with pouches",
@@ -61,8 +61,8 @@ const TRIAL_COSTUMES = {
       female: "Bright red bodysuit with blue cape, blue boots, yellow utility belt, yellow emblem on chest"
     },
     detective: {
-      male: "Brown tweed jacket, white shirt, dark brown trousers, black polished shoes, brass magnifying glass on a chain",
-      female: "Brown tweed blazer, white blouse, green plaid skirt, black polished shoes, brass magnifying glass on a chain"
+      male: "Brown tweed jacket, white shirt, dark brown trousers, black polished shoes, brass magnifying glass on a chain, no hat, bare head",
+      female: "Brown tweed blazer, white blouse, green plaid skirt, black polished shoes, brass magnifying glass on a chain, no hat, bare head"
     },
     princess: {
       male: "Royal blue velvet doublet with gold embroidery, white silk shirt, dark blue trousers, polished boots, thin gold circlet crown",

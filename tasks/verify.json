@@ -7827,6 +7827,86 @@
         "result": "HUMAN",
         "note": "human check | LOOK: verify-run trialPromptParity plus looking at the costumed sheet and the lead cell image on a pirate story and a dog-lead story."
       }
+    },
+    {
+      "id": "replan-partial-restore-2026-10-09",
+      "title": "A refused re-plan change undoes only itself",
+      "commits": [],
+      "addedAt": "2026-10-09",
+      "claim": "On a story whose re-plan has a refused change and an accepted must-fix cast-in on the same page, the shipped plan line keeps the accepted names (log beats_replan_accepted_kept) and loses only the refused change.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Search the story log for beats_replan_change_refused followed by beats_replan_accepted_kept, and check the page plan line holds the added names."
+      },
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "arc-hints-empty-retry-2026-10-09",
+      "title": "An empty arc hint reply is retried once and reported",
+      "commits": [],
+      "addedAt": "2026-10-09",
+      "claim": "When the hint model returns nothing or only a control token, the log shows attempt 1 failed then a second call; a second failure is an ERROR arc_hints_failed and arcReviewReport.hintsFailure is set.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Check the story log for [ARC] hint pass lines and arcReviewReport.hintsFailure (null when hints were produced)."
+      },
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "creature-emotion-qwen-boxes-2026-10-09",
+      "title": "Creature emotion is compared when the inventory model answers on the 0-1000 scale",
+      "commits": [],
+      "addedAt": "2026-10-09",
+      "claim": "On a page whose brief declares a creature emotion that the picture contradicts, an [EMOTION] log line and an emotion finding appear.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Pick a page with a creatures[] row, look at its face, and check the [EMOTION] line and fixableIssues for type emotion when the face contradicts the brief."
+      },
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "refine-mismatch-precedence-2026-10-09",
+      "title": "Refine never keeps an out-of-frame figure doing a visible act",
+      "commits": [],
+      "addedAt": "2026-10-09",
+      "claim": "After the text refine, no page text has a figure its plan line leaves out of frame doing a visible act, and a MISMATCH ledger line reads fixed only when every gap is closed.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "For each MISMATCH finding in the audit, read the page text against the plan line who column and the ledger line."
+      },
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "creature-scale-semantic-type-2026-10-09",
+      "title": "A creature drawn too small is filed creature_scale by the semantic judge and redone",
+      "commits": [],
+      "addedAt": "2026-10-09",
+      "claim": "A page where the semantic judge says a creature is too small carries a creature_scale finding (not scale) and the next repair round is an iterate.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Look at semanticResult and fixableIssues types on a page with a too-small creature and the repair route chosen."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [
