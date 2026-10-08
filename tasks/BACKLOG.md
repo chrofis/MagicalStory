@@ -2252,3 +2252,13 @@ three below are prompt/classification questions and are the owner's call.
 - [ ] Cost ledger follow-ups: `evaluation.usage` is still the old summed display aggregate (counts the shared inventory and compliance stage twice); Lab cost displays read it → server/lib/evalPipeline.js:3921
 - [ ] Cost ledger: paid 4-page smoke story vs Anthropic/Google/xAI/OpenRouter consoles (cache, plate_qc, cut, eval components) → tasks/verify.json:cost-ledger-2026-10-08
 
+- [ ] Trial review 2026-10-08 (T1 Omar job_1791450270543_n1iu8ipsu): onomatopoeia in page text despite the rule → docs/trial-review-2026-10-08/t1-report.txt
+- [ ] Trial review T1: self-contradicting sentence on p3 → docs/trial-review-2026-10-08/t1-report.txt
+- [ ] Trial review T1: a log is "not across the brook" and the composition rule "never on or over water" forbids the log bridge the plot needs → docs/trial-review-2026-10-08/t1-report.txt
+- [ ] Trial review T2 (Ethan job_1791450452362_pv0l5hf49): goose drawn chest-high against a VB scaleClass of knee-high → docs/trial-review-2026-10-08/t2-report.txt
+- [ ] Trial review T2: tricolour flag drawn instead of the Swiss flag from the VB colours → docs/trial-review-2026-10-08/t2-report.txt
+- [ ] Trial review T3 (Rohan job_1791450780272_9u2u90wi2): plot holes: clue introduced at the moment it is used, small shoe prints vs a tall man, unexplained cord, unintroduced name → docs/trial-review-2026-10-08/t3-report.txt
+- [ ] Trial review T3: p2 shows the missing leash (the thing the plot says was stolen) → docs/trial-review-2026-10-08/t3-report.txt
+- [ ] Trial review T3: two magnifying glasses in frame (the costume's and the VB artifact) → docs/trial-review-2026-10-08/t3-report.txt
+- [ ] Trial review T3: invented family dog with no reference image drifts in look between pages → docs/trial-review-2026-10-08/t3-report.txt
+- [ ] Trial review T2: clumsy English on the story-idea card → docs/trial-review-2026-10-08/t2-report.txt

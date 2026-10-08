@@ -3996,7 +3996,7 @@
       "source": "Staging trials job_1791450270543_n1iu8ipsu (Omar, de) and job_1791450452362_pv0l5hf49 (Ethan, en); stored outlinePrompt and page 1 text. Review: docs/trial-review-2026-10-08/.",
       "status": "fixed",
       "fixedAt": "2026-10-08",
-      "fixedIn": "PENDING",
+      "fixedIn": "81125e505",
       "fix": "buildTrialStoryPrompt composes the hair detail with buildHairDescription (the one composer; no other site interpolates the object), and the creature tone block is labelled picture-only (labelCreatureToneForTrialWriter). The beats text writer never receives the tone block (Art Director and Visual Bible templates only). Test: tests/unit/trial-prompt-object-leak-and-creature-look.test.ts."
     }
   ]
