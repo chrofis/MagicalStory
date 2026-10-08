@@ -1089,7 +1089,10 @@ function applyRule7SceneFixGuard(plan, pageNumber) {
       && sceneTypes.every(t => NOT_INPAINTABLE_TYPES.has(t))) {
     // A creature drawn below its size is a page redo, not a character
     // repair (repairLogic ITERATE_ROUTED_TYPES) — the reason says which.
-    const redo = sceneTypes.every(t => ITERATE_ROUTED_TYPES.has(t));
+    // `some`, not `every` (2026-10-09): a creature drawn too small filed next to a
+    // person-scale finding (types scale + creature_scale, job_1791497309909_6quecrr9t
+    // p1) is still the page redo's, and the reason must say so.
+    const redo = sceneTypes.some(t => ITERATE_ROUTED_TYPES.has(t));
     plan.dropped_issues.push({
       issue: plan.scene_fix.instruction,
       severity: plan.scene_fix.severity || null,
