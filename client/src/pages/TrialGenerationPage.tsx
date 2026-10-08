@@ -11,6 +11,8 @@ import { trackEvent } from '@/utils/analytics';
 import { trackTrialStep } from '@/utils/trialFunnel';
 import { classifyJobStatusHttp, MAX_TRANSIENT_POLL_ERRORS, pollBackoffMs, mergeAvatarSlides } from '@/utils/trialPoll';
 import { Navigation } from '@/components/common';
+import TrialBook, { TrialGateProvider } from '@/components/book/TrialBook';
+import { isTrialBookReady } from '@/utils/trialBook';
 import { localizedApiError } from '@/utils/apiErrors';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
@@ -342,11 +344,13 @@ export default function TrialGenerationPage() {
   const [titlePageImage, setTitlePageImage] = useState<string | null>(null);
 
 
-  // Story preview (title + pages) once the writer step has finished. Until
-  // then the page shows the avatar rotation.
+  // Story preview (title + pages) once the writer step has finished. The book
+  // (BookViewer) replaces the avatar rotation as soon as the first picture exists
+  // (title page, or any page image) — text alone keeps the rotation running.
+  // See docs/decisions.md "trial shows the book in BookViewer once the first image exists".
   const [storyTitle, setStoryTitle] = useState<string | null>(null);
   const [pages, setPages] = useState<PreviewPage[]>([]);
-  const storyReady = !!storyTitle && pages.length > 0;
+  const storyReady = isTrialBookReady(storyTitle, pages, titlePageImage);
   // Where the sign-in block sits: before the first locked page. Remembered, so
   // it does not jump to the bottom once an unlock removes the locked pages.
   const gateIndexRef = useRef<number | null>(null);
@@ -1046,17 +1050,15 @@ export default function TrialGenerationPage() {
             </>
   );
 
-  // Story preview: title moment, then the pages. Text is rendered as plain
-  // paragraphs; locked pages arrive without text and show the image only.
-  const renderParagraphs = (text: string) =>
-    text.split(/\n+/).filter(line => line.trim().length > 0).map((line, i) => (
-      <p key={i} className="text-base text-gray-800 leading-relaxed mb-2">{line}</p>
-    ));
+  // Story preview: title, then the book. Text is shown by the book itself; a
+  // locked page arrives without text and shows the image only; the sign-in gate
+  // is a page of the book (see TrialBook).
   const firstLockedIdx = pages.findIndex(p => p.locked);
   if (firstLockedIdx >= 0 && gateIndexRef.current === null) gateIndexRef.current = firstLockedIdx;
   const gateIdx = firstLockedIdx >= 0 ? firstLockedIdx : (gateIndexRef.current ?? pages.length);
   // Observed for `gate_seen` only while a page is locked: after an unlock the
-  // same block shows the success / check-your-email state, not a gate.
+  // same block shows the success / check-your-email state, not a gate. The
+  // observer only reports once the gate page is actually visible in the book.
   const gateSignInBlock = <div ref={firstLockedIdx >= 0 ? gateRef : undefined}>{signInBlock}</div>;
   const imagePlaceholder = (
     <div className="w-full aspect-square flex flex-col items-center justify-center gap-2 rounded-xl bg-indigo-50 text-indigo-400 text-sm">
@@ -1072,36 +1074,17 @@ export default function TrialGenerationPage() {
         )}
         <h1 className="text-2xl font-bold text-gray-800">{storyTitle}</h1>
       </div>
-      <div className="mb-6">
-        {titlePageImage ? (
-          <img src={titlePageImage} alt={storyTitle || ''} className="w-full rounded-xl shadow-lg" />
-        ) : imagePlaceholder}
-      </div>
-      {pages.map((page, idx) => (
-        <div key={page.pageNumber}>
-          {idx === gateIdx && (
-            <>
-              <div className="h-px bg-gray-200 my-6" />
-              {gateSignInBlock}
-              <div className="h-px bg-gray-200 my-6" />
-            </>
-          )}
-          <div className="mb-6">
-            {page.imageData ? (
-              <img src={page.imageData} alt={`${page.pageNumber}`} className="w-full rounded-xl shadow-lg mb-3" />
-            ) : (
-              <div className="mb-3">{imagePlaceholder}</div>
-            )}
-            {!page.locked && page.text && renderParagraphs(page.text)}
-          </div>
-        </div>
-      ))}
-      {gateIdx >= pages.length && (
-        <>
-          <div className="h-px bg-gray-200 my-6" />
-          {gateSignInBlock}
-        </>
-      )}
+      <TrialGateProvider value={gateSignInBlock}>
+        <TrialBook
+          storyTitle={storyTitle || ''}
+          language={state?.storyInput?.language || language}
+          titlePageImage={titlePageImage}
+          pages={pages}
+          gateIdx={gateIdx}
+          pendingImageLabel={t.imagePending}
+          titlePendingNode={imagePlaceholder}
+        />
+      </TrialGateProvider>
     </div>
   );
 

@@ -6462,6 +6462,22 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "trial-book-viewer-first-image-2026-10-08",
+      "title": "Trial result page shows the book (BookViewer) once the first image exists",
+      "commits": [],
+      "addedAt": "2026-10-08",
+      "claim": "On a live /try the intro slideshow (avatars + funny messages, about 6 s per slide) runs until the title page image arrives; then the page-flip book replaces it with the title page and all pages; pages whose picture is still being drawn are spinner pages that fill in without the book resetting the reader's page; the sign-in gate is a page of the book at the same position as before, locked pages behind it show the picture without text, and gate_seen fires in trial_events when the visitor reaches the gate page (not before).",
+      "runShape": [
+        "trial"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Open a /try on staging (mobile and desktop width). Watch: slideshow until the title page lands, then the book; flip to a page still generating (spinner) and wait for it to fill in while staying on it; flip to the gate (form usable: type an email, Google button), check trial_events has gate_seen only after reaching it; after unlock the gate page shows the success state and later pages show text."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [

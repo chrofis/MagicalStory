@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Maximize2 } from 'lucide-react';
+import { Maximize2, Loader2 } from 'lucide-react';
 import { uiLabel } from '@/utils/uiLabels';
 import { useLanguage } from '@/context/LanguageContext';
 
@@ -15,14 +15,24 @@ interface BookStoryPageProps {
   textBelowImage?: boolean;
   overlayImage?: string | null;
   onImageClick?: (url: string) => void;
+  /** Image is still being generated: show a spinner placeholder (label = translated text) instead of "no image". */
+  imagePending?: boolean;
+  pendingLabel?: string;
 }
+
+const PendingImage: React.FC<{ label?: string }> = ({ label }) => (
+  <div className="w-full h-full flex flex-col items-center justify-center gap-2 bg-indigo-50 text-indigo-400 text-sm">
+    <Loader2 className="w-5 h-5 animate-spin" />
+    {label}
+  </div>
+);
 
 /**
  * Soft story page — image with text overlay (or translucent strip when overlay off).
  * react-pageflip requires forwardRef.
  */
 const BookStoryPage = React.forwardRef<HTMLDivElement, BookStoryPageProps>(
-  ({ imageUrl, text, pageNumber, showTextOverlay, textOnSidePage, textBelowImage, overlayImage, onImageClick }, ref) => {
+  ({ imageUrl, text, pageNumber, showTextOverlay, textOnSidePage, textBelowImage, overlayImage, onImageClick, imagePending, pendingLabel }, ref) => {
     const { language } = useLanguage();
     const trimmedText = text.trim();
 
@@ -35,6 +45,8 @@ const BookStoryPage = React.forwardRef<HTMLDivElement, BookStoryPageProps>(
           trimmedText={trimmedText}
           pageNumber={pageNumber}
           onImageClick={onImageClick}
+          imagePending={imagePending}
+          pendingLabel={pendingLabel}
           forwardedRef={ref}
         />
       );
@@ -49,6 +61,8 @@ const BookStoryPage = React.forwardRef<HTMLDivElement, BookStoryPageProps>(
             className="w-full h-full object-contain"
             draggable={false}
           />
+        ) : imagePending ? (
+          <PendingImage label={pendingLabel} />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-indigo-50 to-purple-50 text-indigo-300 text-sm font-medium">
             {uiLabel('noImage', language)}
@@ -107,15 +121,49 @@ export default BookStoryPage;
 // Also exposes a scroll-hint chevron + fade while there's still content below
 // the visible area — without it users don't realise the text is scrollable.
 
+// Touch-driven scroll — bypasses page-flip's window-level preventDefault.
+// Shared by every page that scrolls inside the book (text-below story pages, custom pages).
+export function bindManualTouchScroll(el: HTMLDivElement | null) {
+  if (!el) return;
+  let lastY: number | null = null;
+  const onStart = (e: TouchEvent) => {
+    e.stopPropagation();
+    lastY = e.touches[0]?.clientY ?? null;
+  };
+  const onMove = (e: TouchEvent) => {
+    e.stopPropagation();
+    const y = e.touches[0]?.clientY;
+    if (y == null || lastY == null) return;
+    const delta = lastY - y;
+    const atTop = el.scrollTop <= 0;
+    const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 1;
+    const wantsDown = delta > 0;
+    if ((wantsDown && !atBottom) || (!wantsDown && !atTop)) {
+      el.scrollTop += delta;
+    }
+    lastY = y;
+  };
+  const onEnd = (e: TouchEvent) => {
+    e.stopPropagation();
+    lastY = null;
+  };
+  el.addEventListener('touchstart', onStart, { passive: true });
+  el.addEventListener('touchmove', onMove, { passive: true });
+  el.addEventListener('touchend', onEnd, { passive: true });
+  el.addEventListener('touchcancel', onEnd, { passive: true });
+}
+
 interface TextBelowPageProps {
   imageUrl: string | null;
   trimmedText: string;
   pageNumber: number;
   onImageClick?: (url: string) => void;
+  imagePending?: boolean;
+  pendingLabel?: string;
   forwardedRef: React.ForwardedRef<HTMLDivElement>;
 }
 
-const TextBelowImagePage: React.FC<TextBelowPageProps> = ({ imageUrl, trimmedText, pageNumber, onImageClick, forwardedRef }) => {
+const TextBelowImagePage: React.FC<TextBelowPageProps> = ({ imageUrl, trimmedText, pageNumber, onImageClick, imagePending, pendingLabel, forwardedRef }) => {
   const { language } = useLanguage();
   const scrollEl = useRef<HTMLDivElement | null>(null);
 
@@ -133,37 +181,12 @@ const TextBelowImagePage: React.FC<TextBelowPageProps> = ({ imageUrl, trimmedTex
     return () => mq.removeEventListener('change', update);
   }, []);
 
-  // Touch-driven scroll — bypasses page-flip's window-level preventDefault.
   const bindScroll = useCallback((el: HTMLDivElement | null) => {
     scrollEl.current = el;
-    if (!el) return;
-    let lastY: number | null = null;
-    const onStart = (e: TouchEvent) => {
-      e.stopPropagation();
-      lastY = e.touches[0]?.clientY ?? null;
-    };
-    const onMove = (e: TouchEvent) => {
-      e.stopPropagation();
-      const y = e.touches[0]?.clientY;
-      if (y == null || lastY == null) return;
-      const delta = lastY - y;
-      const atTop = el.scrollTop <= 0;
-      const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 1;
-      const wantsDown = delta > 0;
-      if ((wantsDown && !atBottom) || (!wantsDown && !atTop)) {
-        el.scrollTop += delta;
-      }
-      lastY = y;
-    };
-    const onEnd = (e: TouchEvent) => {
-      e.stopPropagation();
-      lastY = null;
-    };
-    el.addEventListener('touchstart', onStart, { passive: true });
-    el.addEventListener('touchmove', onMove, { passive: true });
-    el.addEventListener('touchend', onEnd, { passive: true });
-    el.addEventListener('touchcancel', onEnd, { passive: true });
+    bindManualTouchScroll(el);
   }, []);
+
+  const hasText = trimmedText.length > 0;
 
   return (
     // Absolute-positioned split instead of flex: HTMLFlipBook wraps each page
@@ -175,8 +198,8 @@ const TextBelowImagePage: React.FC<TextBelowPageProps> = ({ imageUrl, trimmedTex
       <div
         className="absolute"
         style={sideBySide
-          ? { top: 0, bottom: 0, left: 0, width: '58%' }
-          : { top: 0, left: 0, right: 0, height: '55%' }}
+          ? { top: 0, bottom: 0, left: 0, width: hasText ? '58%' : '100%' }
+          : { top: 0, left: 0, right: 0, height: hasText ? '55%' : '100%' }}
       >
         {imageUrl ? (
           <img
@@ -185,6 +208,8 @@ const TextBelowImagePage: React.FC<TextBelowPageProps> = ({ imageUrl, trimmedTex
             className="w-full h-full object-contain"
             draggable={false}
           />
+        ) : imagePending ? (
+          <PendingImage label={pendingLabel} />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-indigo-50 to-purple-50 text-indigo-300 text-sm font-medium">
             {uiLabel('noImage', language)}
@@ -202,7 +227,7 @@ const TextBelowImagePage: React.FC<TextBelowPageProps> = ({ imageUrl, trimmedTex
           </button>
         )}
       </div>
-      <div
+      {hasText && <div
         className={`absolute ${sideBySide ? 'border-l' : 'border-t'} border-gray-200`}
         style={sideBySide
           ? { top: 0, bottom: 0, right: 0, width: '42%' }
@@ -220,7 +245,7 @@ const TextBelowImagePage: React.FC<TextBelowPageProps> = ({ imageUrl, trimmedTex
             {trimmedText}
           </p>
         </div>
-      </div>
+      </div>}
     </div>
   );
 };

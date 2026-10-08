@@ -4,6 +4,7 @@ import BookCoverPage from './BookCoverPage';
 import BookStoryPage from './BookStoryPage';
 import BookTextPage from './BookTextPage';
 import BookEndPage from './BookEndPage';
+import BookCustomPage from './BookCustomPage';
 import storyService from '@/services/storyService';
 import { uiLabel } from '@/utils/uiLabels';
 import { useLanguage } from '@/context/LanguageContext';
@@ -41,6 +42,10 @@ interface SharedStoryPage {
   // a version switch is a new URL — the image endpoints answer with a cacheable
   // redirect, and a URL without the version showed the old picture for a day.
   imageVersion?: number;
+  /** Direct image URL / data URI (trial preview): used as-is instead of the share-token image endpoint. */
+  imageSrc?: string;
+  /** Image still being generated: render a spinner placeholder instead of "no image". */
+  imagePending?: boolean;
 }
 
 interface SharedStoryData {
@@ -63,6 +68,8 @@ interface SharedStoryData {
     initialPage?: number;
     backCover?: number;
   };
+  /** Direct cover image URLs / data URIs (trial preview): used as-is instead of the share-token cover endpoint. */
+  coverImageSrc?: Partial<Record<'frontCover' | 'initialPage' | 'backCover', string>>;
   isOwner?: boolean;
   isShared?: boolean;
   needsPassword?: boolean;
@@ -74,7 +81,9 @@ type PageEntry =
   | { type: 'storyText'; storyPageIdx: number }
   | { type: 'story'; storyPageIdx: number }
   | { type: 'backCover' }
-  | { type: 'endPage' };
+  | { type: 'endPage' }
+  /** Caller-supplied page (trial sign-in gate, pending title placeholder). `key` must be stable. */
+  | { type: 'custom'; key: string; node: React.ReactNode };
 
 export interface BookViewerHandle {
   flipNext: () => void;
@@ -94,10 +103,14 @@ interface BookViewerProps {
   forceTextBelowOnMobile?: boolean;
   /** Optional logical page to open on — used to preserve position when parent remounts the book (e.g. on reading-mode switch). */
   initialLogicalPage?: number;
-  onImageClick: (url: string) => void;
-  onPageChange: (pageIndex: number) => void;
-  onNavigate: (path: string) => void;
-  onSetPassword: () => void;
+  /** Omit to hide the fullscreen button. */
+  onImageClick?: (url: string) => void;
+  onPageChange?: (pageIndex: number) => void;
+  /** Only used by the 'endPage' entry. */
+  onNavigate?: (path: string) => void;
+  onSetPassword?: () => void;
+  /** Label under the spinner of a pending story page image. */
+  pendingImageLabel?: string;
 }
 
 /** Blank white page — used to keep interior page count even for spread pairing. */
@@ -111,7 +124,7 @@ BlankPage.displayName = 'BlankPage';
  * and maps PageEntry[] to the appropriate book page components.
  */
 const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
-  ({ pageList, story, shareToken, showTextOverlay, textOnSidePage, forceTextBelowOnMobile, initialLogicalPage, onImageClick, onPageChange, onNavigate, onSetPassword }, ref) => {
+  ({ pageList, story, shareToken, showTextOverlay, textOnSidePage, forceTextBelowOnMobile, initialLogicalPage, onImageClick, onPageChange, onNavigate, onSetPassword, pendingImageLabel }, ref) => {
     // Advanced reading level stories (and any future square-layout stories)
     // flag textInImage=false — the PDF prints image on top + text strip below
     // on the SAME page. Force that layout in the reader too so Print Preview
@@ -265,9 +278,9 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
     const versionQuery = (version: number | undefined) =>
       `${tokenQuery ? '&' : '?'}v=${version ?? 0}`;
     const coverImageUrl = (type: 'frontCover' | 'initialPage' | 'backCover') =>
-      `/api/shared/${shareToken}/cover-image/${type}${tokenQuery}${versionQuery(story.coverVersions?.[type])}`;
+      story.coverImageSrc?.[type] ?? `/api/shared/${shareToken}/cover-image/${type}${tokenQuery}${versionQuery(story.coverVersions?.[type])}`;
     const pageImageUrl = (page: SharedStoryPage) =>
-      `/api/shared/${shareToken}/image/${page.pageNumber}${tokenQuery}${versionQuery(page.imageVersion)}`;
+      page.imageSrc ?? `/api/shared/${shareToken}/image/${page.pageNumber}${tokenQuery}${versionQuery(page.imageVersion)}`;
 
     // Build the page components list.
     // physicalToLogical maps each flipbook index back to the pageList index
@@ -335,7 +348,7 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
             // the image — endpoint would 404 and the browser console fills
             // with noise. BookStoryPage renders text-only with a placeholder
             // when imageUrl is null.
-            const imageUrl = storyPage.hasImage === false
+            const imageUrl = storyPage.hasImage === false || storyPage.imagePending
               ? null
               : pageImageUrl(storyPage);
             bookPages.push(
@@ -350,6 +363,8 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
                 textBelowImage={forceTextBelow || (isMobile && (forceTextBelowOnMobile || textOnSidePage))}
                 overlayImage={overlayImages[storyPage.pageNumber] || null}
                 onImageClick={onImageClick}
+                imagePending={storyPage.imagePending}
+                pendingLabel={pendingImageLabel}
               />
             );
             physicalToLogical.push(i);
@@ -379,10 +394,14 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
               storyTitle={story.title}
               language={story.language}
               needsPassword={story.needsPassword}
-              onNavigate={onNavigate}
-              onSetPassword={onSetPassword}
+              onNavigate={onNavigate ?? (() => {})}
+              onSetPassword={onSetPassword ?? (() => {})}
             />
           );
+          physicalToLogical.push(i);
+          break;
+        case 'custom':
+          bookPages.push(<BookCustomPage key={`custom-${entry.key}`}>{entry.node}</BookCustomPage>);
           physicalToLogical.push(i);
           break;
       }
@@ -396,8 +415,12 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
       const interiorCount = bookPages.length - 1;
       if (interiorCount > 0 && interiorCount % 2 !== 0) {
         const lastLogical = physicalToLogical[physicalToLogical.length - 1] ?? 0;
-        bookPages.splice(bookPages.length - 1, 0, <BlankPage key="parity-blank" />);
-        physicalToLogical.splice(physicalToLogical.length - 1, 0, lastLogical);
+        // The blank sits before the closing page (back cover / end page); a book
+        // that ends on a story or custom page (trial preview) gets it after it.
+        const lastType = pageList[pageList.length - 1]?.type;
+        const at = lastType === 'story' || lastType === 'custom' ? bookPages.length : bookPages.length - 1;
+        bookPages.splice(at, 0, <BlankPage key="parity-blank" />);
+        physicalToLogical.splice(at, 0, lastLogical);
       }
     }
 
@@ -430,7 +453,7 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
             onFlip={(e: any) => {
               const physicalIdx = Number(e.data) || 0;
               const logicalIdx = physicalToLogical[physicalIdx] ?? physicalIdx;
-              onPageChange(logicalIdx);
+              onPageChange?.(logicalIdx);
             }}
             className="book-viewer"
             style={{}}
