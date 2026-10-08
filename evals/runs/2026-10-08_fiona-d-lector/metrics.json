@@ -1,0 +1,11 @@
+{
+  "date": "2026-10-08",
+  "dataset": "job_1791450210539_nwi88y9lr lector input (16 pages)",
+  "model": "google/gemini-3.1-pro-preview, effort medium, temperature 0, real calls",
+  "arms": {
+    "old (proofread sha 1a4d7eb3...)": { "runs": 2, "targetFailures": ["Broetli->Broetchen", "Treppe hinunter unter Deck -> hinauf an Deck"], "reproduced": "1 of 2 (the other run: one no-op)" },
+    "v1 (f710e3c4...)": { "runs": 1, "targetFailures": ["Treppe changed", "gab ihm -> gab ihr"] },
+    "v2 shipped (5625eb22...)": { "runs": 3, "brotliKept": "3/3", "treppeChanged": "0/3", "otherChanges": ["sah ueber ihre Schulter -> sah ihr ueber die Schulter (idiom fix)", "hob ihn nicht ab -> setzte ihn nicht ab (act word changed)"] }
+  },
+  "rawOutputs": "scratchpad only (evals/runs/*/* is gitignored); the replies are summarised in evals/results/results.jsonl"
+}

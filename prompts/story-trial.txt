@@ -17,6 +17,8 @@ SHORT story — {PAGES} scenes. Keep it focused:
 - {PAGE_OPENING_VARIETY}
 {STYLE_RULEBOOK}
 - {MOTIVE_AT_THE_ACT}
+- {WHO_DOES_WHAT}
+- A figure's first scene brings them in, by arriving or by a name someone present says, before they speak or act
 - {PICTURE_COUNT}
 - {CLOSING_MOMENT}
 - The text never asserts a position, an action or an object the scene hint does not stage: a figure the hint leaves out of frame does nothing visible on that page, and an action the hint stages as its aftermath is told as its aftermath

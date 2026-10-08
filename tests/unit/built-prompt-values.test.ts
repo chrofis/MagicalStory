@@ -613,7 +613,7 @@ describe('the re-plan asks for only the pages it changes', () => {
       expect(p, `the declared vocabulary lost "${v.syntax}"`).toContain(v.syntax);
     }
     expect(PB.PLAN_CHANGE_VOCABULARY.map((v: any) => v.kind)).toEqual([
-      'cast_in', 'cast_out', 'action_in', 'action_out', 'action_to', 'material_from', 'material_to',
+      'cast_in', 'cast_out', 'action_in', 'action_out', 'action_to', 'instant_shortened', 'material_from', 'material_to',
     ]);
     // The retired verb is gone from the prompt too — `new material` meant both
     // "this page now also stages X" and "this page took the number a merge

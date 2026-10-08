@@ -655,6 +655,19 @@ describe('PEOPLELESS_ON_INTERACTION_PAGE', () => {
     expect(codesFor(pages, ['ship'])).not.toContain('NO_PEOPLELESS_PAGE');
   });
 
+  // Fiona rerun 2026-10-08 (group D #19): the planner writes the who column "nobody" for a
+  // people-free page, and the absence clause matched that very word, so the planner's
+  // correct people-free page (the opened chest, no one in frame) was flagged as drama.
+  it('does not read the who column: "nobody" is the marker of the format for a people-free page', () => {
+    const pages = [
+      page(1, line('wide', 'Ana and Ben')),
+      page(15, 'wide — nobody — the opened chest in the grass showing a compass and old coins — the treasure is revealed'),
+    ];
+    const codes = codesFor(pages, ['chest']);
+    expect(codes).not.toContain('PEOPLELESS_ON_INTERACTION_PAGE');
+    expect(codes).not.toContain('NO_PEOPLELESS_PAGE');
+  });
+
   it('flags a people-free page whose plan line stages a moment between people, naming the page', () => {
     // The real page-12 plan line from job_1789420511893_zly5rcdej.
     const pages = [
@@ -678,5 +691,30 @@ describe('PEOPLELESS_ON_INTERACTION_PAGE', () => {
   it('still requires a people-free page somewhere in the book', () => {
     const pages = [1, 2].map(n => page(n, line('wide', 'Ana and Ben')));
     expect(codesFor(pages)).toContain('NO_PEOPLELESS_PAGE');
+  });
+
+  // Fiona rerun 2026-10-08 (group D #19): the only people-free page was an
+  // interaction page. Fixing it (faces on it) minted NO_PEOPLELESS_PAGE on another
+  // page the next round, which the re-plan could not touch, so it never converged.
+  // Both findings now fire in the same round.
+  it('does not count an interaction page as the people-free page the book owes', () => {
+    const pages = [
+      page(1, line('wide', 'Ana and Ben')),
+      page(12, 'wide — the ship sliding away from the stone edge, no one at the gangway place'),
+    ];
+    const codes = codesFor(pages, ['ship']);
+    expect(codes).toContain('PEOPLELESS_ON_INTERACTION_PAGE');
+    expect(codes).toContain('NO_PEOPLELESS_PAGE');
+  });
+
+  it('keeps a legitimate people-free page next to an interaction one, so no second page is asked for', () => {
+    const pages = [
+      page(1, line('wide', 'Ana and Ben')),
+      page(2, line('ultra-wide', 'the ship alone', 'the ship tossed far out in the storm', 'the storm has the ship')),
+      page(12, 'wide — the empty quay, the shouting and waving carry out over the water'),
+    ];
+    const codes = codesFor(pages, ['ship', 'quay']);
+    expect(codes).toContain('PEOPLELESS_ON_INTERACTION_PAGE');
+    expect(codes).not.toContain('NO_PEOPLELESS_PAGE');
   });
 });

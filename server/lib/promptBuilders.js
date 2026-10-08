@@ -8420,6 +8420,16 @@ const PLAN_CHANGE_VOCABULARY = [
     re: /^action\s+to\s+page\s+(\d+)\b[:\s]*(.*)$/i,
     build: m => ({ toPage: Number(m[1]), subject: m[2].trim() }),
   },
+  // The answer to PLAN_INSTANT_TOO_LONG, a code the planner is asked to fix: the
+  // round declared it as "instant shortened" and `parsePlanChanges` read it as
+  // 'other', so nothing reviewed it (Fiona rerun 2026-10-08, group D #19). The
+  // words it drops move through `action out` / `action to page`.
+  {
+    kind: 'instant_shortened',
+    syntax: 'instant shortened',
+    re: /^instant\s+shortened\b[:\s]*(.*)$/i,
+    build: m => ({ subject: m[1].trim() }),
+  },
   {
     kind: 'material_from',
     syntax: 'material from page <M>',
@@ -8953,6 +8963,7 @@ function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', 
     // re-plan section carries none, so its template keeps it.
     WHOLE_CAST_RULE: String(replan || '').trim() && !typedPlan ? '' : ` ${WHOLE_CAST_DEF}`,
     NAMING_DEF,
+    WHO_DOES_WHAT: WHO_DOES_WHAT_RULE,
     ENDING_EVENT_DEF,
     EXCITING_START_DEF,
     HAPPY_ENDING_DEF,
@@ -10590,7 +10601,17 @@ function arcIssueLine({ lens = false } = {}) {
  * and into the panel lens that reads for it.
  */
 const ARC_ENTRANCE_RULE = 'Every figure is where a stated cause put them — never simply already there, never arriving exactly where they are needed. Figures who do not know each other meet on the page and learn each other\'s names before they act together.';
-const ARC_GIVEN_RULE = 'Nothing is used that the arc has not given: a name is exchanged before it is used, a place shown before it is relied on, an ability or a possession established — with how they came by it — before it does work, and knowledge is held only by someone who could hold it.';
+const ARC_GIVEN_RULE = 'Nothing is used that the arc has not given: a name is exchanged before it is used, a place shown before it is relied on, an ability or a possession established — with how they came by it — before it does work, and knowledge is held only by someone who could hold it. A plan, promise or appointment for after the ending is named only where the story set it up.';
+
+/**
+ * WHO DOES WHAT STAYS AS THE STORY STATES IT (Fiona rerun 2026-10-08, group D #18).
+ * The arc had a helper TELL a figure to keep clear of a running chain while the
+ * figure dropped the anchor; the planner staged it as the helper holding him
+ * back, the writer followed the plan line, and the figure's own act was taken
+ * from him on his page. One string for the planner (story-beats.txt), the plan
+ * check's question 12 that judges it, and the text writers.
+ */
+const WHO_DOES_WHAT_RULE = "Who does what stays as the story states it: an act the story gives one figure is that figure's, to its end, and another figure's word, warning or watching is never staged or written as that figure doing, stopping or taking the act.";
 const ARC_SENSE_RULE = 'Every turn holds against what the story has already made true — how big things are, what they give off (sound, light, warmth, smell), how far apart places are, who is watching, what anyone present would plainly do. No turn leaves a reader asking "but why don\'t they just …?" or saying "that could not happen".';
 
 /**
@@ -11708,6 +11729,7 @@ function buildPlanCheckPrompt(inputData, beats, arc = '', pagePlan = '', { arcHi
     FIGURE_PART_IN_FRAME_RULE,
     WHOLE_CAST_DEF,
     NAMING_DEF,
+    WHO_DOES_WHAT: WHO_DOES_WHAT_RULE,
     ENDING_EVENT_DEF,
     EXCITING_START_DEF,
     HAPPY_ENDING_DEF,
@@ -12501,6 +12523,7 @@ function buildStoryTextFromBeatsPrompt(inputData, beats = [], expansions = [], a
     // (2026-08-27) — the reader age is the "can a child say it" yardstick.
     TITLE_CRITERIA: titleCriteria(readerAge(inputData)),
     PAGE_OPENING_VARIETY: PAGE_OPENING_VARIETY_RULE,
+    WHO_DOES_WHAT: WHO_DOES_WHAT_RULE,
     STYLE_RULEBOOK: styleRulebook(inputData?.language),
     MOTIVE_AT_THE_ACT: MOTIVE_AT_THE_ACT_RULE,
     PICTURE_COUNT: PICTURE_COUNT_RULE,
@@ -12829,6 +12852,7 @@ The story takes place in ${inputData.userLocation.city}. Use real place names �
       RESOLVE_SCENES: `${Math.max(3, pageCount - 1)}-${pageCount}`,
       BACKGROUND_RANGE: `${Math.min(3, pageCount)}-${pageCount}`,
       PAGE_OPENING_VARIETY: PAGE_OPENING_VARIETY_RULE,
+      WHO_DOES_WHAT: WHO_DOES_WHAT_RULE,
       STYLE_RULEBOOK: styleRulebook(language),
       MOTIVE_AT_THE_ACT: MOTIVE_AT_THE_ACT_RULE,
       PICTURE_COUNT: PICTURE_COUNT_RULE,
@@ -13543,6 +13567,7 @@ module.exports = {
   premiseIsIdeaCard,
   ARC_ENTRANCE_RULE,
   ARC_GIVEN_RULE,
+  WHO_DOES_WHAT_RULE,
   ARC_SENSE_RULE,
   ARC_PLACE_RULE,
   SIZE_LOOK_RULE,

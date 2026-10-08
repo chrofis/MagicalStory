@@ -52,6 +52,7 @@
 const { log } = require('../utils/logger');
 const { extractSceneMetadata, findCastMissingFromMetadata, isSameFigureName } = require('./sceneMetadata');
 const { checkVbElementBudget } = require('./vbElementBudget');
+const { normalizeEmotion, EMOTION_ENUM_PHRASE } = require('./emotionVocabulary');
 // planCounters requires only shotVocabulary, so this is not a cycle. It is the
 // one declaration of how a shot column is read — the plan's word and the
 // brief's `shot` are classified by the SAME function, so `close‑up` written
@@ -1074,10 +1075,15 @@ function checkCharacterFields(page, metadata) {
     const expr = String(c.expression || '').trim();
     if (!expr) missing.push('`expression`');
     else if (!FACE_PART_RE.test(expr) && !faceHidden(c, metadata.shot)) missing.push(`an \`expression\` that names brows, eyes or mouth (it reads "${expr}")`);
+    // `emotion` is one value of the closed list the blind inventory answers in
+    // (emotionVocabulary.js), compared in code by emotionCheck. Nothing enforced
+    // it: the Art Director wrote "focused" on 3 of 28 rows of the Fiona rerun
+    // 2026-10-08 and verify `emotion-enum` fell under 90% (group D #20).
+    if (!normalizeEmotion(c.emotion)) missing.push(`an \`emotion\` that is exactly one of ${EMOTION_ENUM_PHRASE} (it reads "${String(c.emotion || '').trim()}")`);
     if (missing.length) {
       out.push({
         pageNumber: page.pageNumber, type: 'character_fields', character: c.name,
-        detail: `${c.name}'s characters[] row lacks ${missing.join(' and ')}. Every character carries its depth and a drawable expression naming brows, eyes or mouth; the one mood word goes in \`emotion\`.`,
+        detail: `${c.name}'s characters[] row lacks ${missing.join(' and ')}. Every character carries its depth and a drawable expression naming brows, eyes or mouth; the one mood word goes in \`emotion\`, from the closed list.`,
       });
     }
   }

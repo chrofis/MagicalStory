@@ -664,3 +664,34 @@ describe('the generator is told exactly what the review enforces', () => {
     expect(beats).toMatch(/is named in that page's plan line/);
   });
 });
+
+// Fiona rerun 2026-10-08 (group D #19): the round answered PLAN_INSTANT_TOO_LONG with
+// "instant shortened", which the vocabulary did not carry, so parsePlanChanges read it
+// as kind 'other' and nothing reviewed it (beats_replan_change_unreadable).
+describe('every code the planner is asked to fix has a verb to declare it with', () => {
+  it('reads "instant shortened" as a declared change, not as kind other', () => {
+    const parsed = parsePlanChanges([
+      '---CHANGES---',
+      'Page 6: instant shortened — PLAN[PLAN_INSTANT_TOO_LONG] — fits within 20 words',
+      'Changes: 1',
+    ].join('\n'));
+    expect(parsed.changes.map((c: any) => c.kind)).toEqual(['instant_shortened']);
+    expect(parsed.changes[0].answers).toEqual({ code: 'PLAN_INSTANT_TOO_LONG' });
+  });
+
+  it('offers the verb to the planner through the same list the parser reads', () => {
+    expect(PB.REPLAN_CHANGES_FORMAT).toContain('instant shortened');
+  });
+
+  it('has a verb for each re-plan code whose answer is a declarable change', () => {
+    const ANSWERED_BY: Record<string, string[]> = {
+      PLAN_INSTANT_TOO_LONG: ['instant_shortened'],
+      NO_PEOPLELESS_PAGE: ['cast_out'],
+      PEOPLELESS_ON_INTERACTION_PAGE: ['cast_in'],
+    };
+    const kinds = new Set(PB.PLAN_CHANGE_VOCABULARY.map((v: any) => v.kind));
+    for (const [code, verbs] of Object.entries(ANSWERED_BY)) {
+      for (const v of verbs) expect(kinds.has(v), `${code} -> ${v}`).toBe(true);
+    }
+  });
+});

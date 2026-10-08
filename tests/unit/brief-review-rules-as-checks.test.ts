@@ -18,7 +18,7 @@ const { extractSceneMetadata } = req('../../server/lib/sceneMetadata');
 
 const brief = (prose: string, m: any) => `${prose}\n\n---METADATA---\n${JSON.stringify(m, null, 2)}`;
 const full = (b: string) => { const m = extractSceneMetadata(b) || {}; return m.fullData || m; };
-const row = (name: string, extra: any = {}) => ({ name, depth: 'foreground', expression: 'brows raised, mouth open', ...extra });
+const row = (name: string, extra: any = {}) => ({ name, depth: 'foreground', expression: 'brows raised, mouth open', emotion: 'surprised', ...extra });
 
 describe('negation_named: a named absence is painted', () => {
   it('fires on the prose and on a metadata field', () => {
@@ -55,6 +55,15 @@ describe('character_fields: depth and a drawable expression on every row', () =>
   it('fires on a mood word and on a missing depth', () => {
     const b = brief('x', { shot: 'medium', characters: [row('Ana', { expression: 'calm, observing' }), row('Ben', { depth: '' })] });
     expect(SBC.checkCharacterFields({ pageNumber: 1 }, full(b)).map((f: any) => f.character)).toEqual(['Ana', 'Ben']);
+  });
+  // Fiona rerun 2026-10-08 (group D #20): the Art Director wrote "focused" and nothing
+  // enforced the closed list, so verify emotion-enum fell to 25/28.
+  it('fires on an emotion outside the closed list, and on a missing one', () => {
+    const b = brief('x', { shot: 'medium', characters: [row('Ana', { emotion: 'focused' }), row('Ben', { emotion: '' }), row('Cy', { emotion: 'Happy' })] });
+    const f = SBC.checkCharacterFields({ pageNumber: 1 }, full(b));
+    expect(f.map((x: any) => x.character)).toEqual(['Ana', 'Ben']);
+    expect(f[0].detail).toContain('`happy`');
+    expect(f[0].detail).toContain('"focused"');
   });
   it('accepts a named face part, and asks no face where none can be read', () => {
     const ok = brief('x', { shot: 'medium', characters: [row('Ana', { expression: 'wide-eyed, a small grin' })] });

@@ -22,7 +22,7 @@ const saved = textModels.callTextModelStreaming;
 afterEach(() => { textModels.callTextModelStreaming = saved; });
 beforeAll(async () => { await loadPromptTemplates(); });
 
-const meta = (m: any) => JSON.stringify({ sceneIntent: 'Ana and Ben look at the lamp.', characters: [{ name: 'Ana', looksAt: 'Ben', depth: 'foreground', footing: 'ground', expression: 'brows up, eyes wide, mouth open' }, { name: 'Ben', looksAt: 'Ana', depth: 'foreground', footing: 'ground', expression: 'brows up, eyes wide, mouth open' }], objects: ['LOC001'], shot: 'medium', timeOfDay: 'dusk', population: 'cast_only', interactions: [{ character: 'Ana', object: 'LOC001', where: 'stands on the quay', action: 'standing' }], ...m }, null, 2);
+const meta = (m: any) => JSON.stringify({ sceneIntent: 'Ana and Ben look at the lamp.', characters: [{ name: 'Ana', looksAt: 'Ben', depth: 'foreground', footing: 'ground', expression: 'brows up, eyes wide, mouth open', emotion: 'surprised' }, { name: 'Ben', looksAt: 'Ana', depth: 'foreground', footing: 'ground', expression: 'brows up, eyes wide, mouth open', emotion: 'surprised' }], objects: ['LOC001'], shot: 'medium', timeOfDay: 'dusk', population: 'cast_only', interactions: [{ character: 'Ana', object: 'LOC001', where: 'stands on the quay', action: 'standing' }], ...m }, null, 2);
 const brief = (m: any, prose = 'Ana and Ben stand on the quay at dusk, looking at each other.') => `${prose}\n\n---METADATA---\n${meta(m)}`;
 const PLAN = 'medium — Ana and Ben — they look at each other — the lamp is lit';
 const INPUT = { language: 'en', characters: [{ name: 'Ana' }, { name: 'Ben' }] };
@@ -84,7 +84,7 @@ describe('the brief checks and the one re-ask', () => {
   });
 
   it('a rewrite that drops a character the who column names is refused, whatever it resolved', async () => {
-    const onlyAna = brief({ weather: 'clear', characters: [{ name: 'Ana', looksAt: 'away', depth: 'foreground', footing: 'ground', expression: 'brows up, eyes wide, mouth open' }] }, 'Ana stands on the quay at dusk.');
+    const onlyAna = brief({ weather: 'clear', characters: [{ name: 'Ana', looksAt: 'away', depth: 'foreground', footing: 'ground', expression: 'brows up, eyes wide, mouth open', emotion: 'surprised' }] }, 'Ana stands on the quay at dusk.');
     stubModel(() => `## Page 1\n${onlyAna}`);
     const x = { pageNumber: 1, brief: brief({ weather: 'none' }) };
     const before = x.brief;

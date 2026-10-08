@@ -48,8 +48,9 @@ Style, on every page:
 {PAGE_OPENING_VARIETY}.
 {PAGE_CONTINUITY}
 {MOTIVE_AT_THE_ACT}.
+{WHO_DOES_WHAT}
 {NEIGHBOUR_PHRASE}
-Fill what the summary leaves out: dialogue, and the ordinary business between the story's turns (going somewhere and arriving, waiting, asking and being answered, a thing tried and let go). Invent no character, creature, object, place or turn of the plot the story does not carry, and nothing that changes what happens, to whom, or what it costs. A move between the story's states is told as it happens, never already finished when a page opens. A change of place, of what someone holds, or of the company they are among carries its path on the page.
+Fill what the summary leaves out: dialogue, and the ordinary business between the story's turns (going somewhere and arriving, waiting, asking and being answered, a thing tried and let go). Invent no character, creature, object, place or turn of the plot the story does not carry, and nothing that changes what happens, to whom, or what it costs. A move between the story's states is told as it happens, never already finished when a page opens. A change of place, of what someone holds, or of the company they are among carries its path on the page. A figure's first page brings them in, by arriving or by a name someone present says, before they speak or act.
 The final page gets the same care as the first sentence. {CLOSING_MOMENT}
 {PERIL_CEILING}
 No onomatopoeia or sound-effect words and no baby-talk. The register follows the reading level, never a character's age: every word is one a child at the reading level above already uses, and a sentence keeps to one idea when the word count is tight. {NO_ABBREVIATION}

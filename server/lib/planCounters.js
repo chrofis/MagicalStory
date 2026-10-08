@@ -831,6 +831,25 @@ function runPlanCounters({ pages = [], commissionedNames = [], listedNames = nul
   // in the book is a place, weather, a vessel or an object seen from afar, and
   // the picture is stronger for having no cast in it.
   const emptyPages = rows.filter(r => !r.peopled).map(r => r.pageNumber);
+  // A people-free page that stages a moment between people is wrong by
+  // PEOPLELESS_ON_INTERACTION_PAGE (4b below) and its fix gives that page faces,
+  // so it does not count as the book's people-free page: otherwise fixing 4b
+  // mints NO_PEOPLELESS_PAGE on another page in the next round, and a re-plan
+  // that cannot touch that page stops converging (Fiona rerun 2026-10-08, group
+  // D #19: p15 got faces, then p6 was asked to give up its cast). Both findings
+  // fire in the same round so the planner answers both at once.
+  // The who column is NOT read: "nobody" is the format's own marker for a people-free
+  // page, and the absence clause below matched it, so the planner's correct
+  // people-free page (Fiona p15, "nobody — the opened chest …") was flagged as drama
+  // and its fix removed the book's only people-free page. A line too short to have a
+  // who column (shot — rest) is read whole.
+  const dramaText = (planLine) => {
+    const segs = planSegments(planLine);
+    return stripQuoted(segs.length >= 3 ? segs.filter((_, i) => i !== 1).join(' — ') : planLine);
+  };
+  const drama = rows.filter(r => !r.peopled && INTERACTION_DRAMA_WORDS.test(dramaText(r.planLine)));
+  const dramaPages = new Set(drama.map(r => r.pageNumber));
+  const standingEmptyPages = emptyPages.filter(n => !dramaPages.has(n));
   // THE FINDING NAMES THE MOVE THAT ANSWERS IT (2026-09-20).
   //
   // This is a must-fix code, and the planner still failed it while tagging its
@@ -859,7 +878,7 @@ function runPlanCounters({ pages = [], commissionedNames = [], listedNames = nul
   // the OBSTACLES block does. Code never synthesises a page: when no
   // nomination arrives the finding is the same sentence without the page
   // clause, and beatsPipeline logs the miss.
-  if (emptyPages.length === 0) {
+  if (standingEmptyPages.length === 0) {
     const pick = peoplelessPick && Number.isFinite(Number(peoplelessPick.page))
       ? Number(peoplelessPick.page) : null;
     add('NO_PEOPLELESS_PAGE', pick ? [pick] : [],
@@ -874,7 +893,6 @@ function runPlanCounters({ pages = [], commissionedNames = [], listedNames = nul
   //     constrained WHICH page was people-free, and `NO_COMMISSIONED_ON_PAGE`
   //     below only inspects `peopled` rows, so a zero-cast page was skipped by
   //     construction. This counter is the constraint on WHICH page.
-  const drama = rows.filter(r => !r.peopled && INTERACTION_DRAMA_WORDS.test(stripQuoted(r.planLine)));
   if (drama.length) {
     add('PEOPLELESS_ON_INTERACTION_PAGE', drama.map(r => r.pageNumber),
       `${drama.length} page(s) put no one in frame while the plan line stages a moment between people — a people-free page belongs on drama that is a place, weather, a vessel or an object seen from afar, never on a parting, a confrontation or a moment of feeling between characters`);
