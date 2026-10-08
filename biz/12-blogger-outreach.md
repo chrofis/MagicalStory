@@ -1,115 +1,120 @@
-# Blogger & Influencer Outreach Strategy
+# Blogger & Influencer Outreach: Christmas 2026 seeding
 
-## Goal
-Get 5-10 Swiss parent bloggers to review MagicalStory and link to magicalstory.ch. Each review = a quality backlink + social proof + referral traffic.
+Revised 2026-10-08. Earlier version (March 2026) is in git history. Handles, follower counts and contacts below were
+seen on the cited pages on 2026-10-08. Instagram itself could not be opened by the research tool, so **open each
+profile by hand before writing** (still active? kids 2-8? current bio email?).
 
----
+## Why this channel now
+- Paid Google, 14 days to 2026-10-08: CHF 22.68, 33 clicks, 0 trials (`scripts/ads/attribution-report.js --days=14`).
+- Competitor pattern that already worked on these exact creators: Librio gifted books to MINT & MALVE (2022,
+  "(Werbung/Verlosung)", code MINTUNDMALVE20, giveaway) and Mamalicious (2018, 2020, code MAMAWIMMEL10), timed for
+  November/Christmas.
+- Personalised books are a Christmas gift: books must reach creators early enough for posts in the second half of
+  November.
 
-## Target Bloggers
+## The offer (uses what exists, no new code)
+1. **Credits for one full story** made by the creator in their own account with their own photos (they control
+   their child's images). Admin sets credits: `POST /api/admin/users/:userId/quota` (`server/routes/admin/users.js:119`).
+2. **One printed hardcover shipped to them**, paid by us (no free-print mechanism exists; order it via admin
+   impersonation, or refund their order).
+3. **Their own referral code** from the account page (format `Magic<Name><3 digits>`, `server/lib/referral.js`):
+   followers get CHF 10 off a first order, the creator earns CHF 10 per buyer (`server/config/credits.js` REFERRAL).
+   That is the commission; no extra fee in wave 1.
+4. Optional for top fits: a giveaway (second book) run on their account.
 
-### Tier 1 — High Reach, Active, Open to Cooperations
+**Ceiling cost per creator:** hardcover up to 30 pages CHF 37 + CHF 10 shipping at retail (`client/src/utils/bookPricing.ts`);
+actual print cost is lower. Wave 1 (12 creators) <= ~CHF 560 retail, plus CHF 10 per resulting buyer.
 
-| Blog | Person | Location | Focus | Why Good Fit |
-|------|--------|----------|-------|-------------|
-| [Mini & Stil](https://www.miniundstil.ch/) | Isabelle | Zürich | Lifestyle, kids fashion, gifts | Has kooperation page, reviews products, 2 daughters |
-| [Die Angelones](https://www.dieangelones.ch/) | Rita | Schweiz | Family life, Italian-Swiss | Founding member of Schweizer Familienblogs network, active since years |
-| [mama rocks](https://mamarocks.ch/) | — | Schweiz | Product tests, travel, parenting | Explicitly does product tests & experience reports |
-| [Chez Mama Poule](https://chezmamapoule.com/) | Ellen | Zürich | Montessori, books, DIY | Freelance journalist, has dedicated books section, reviews Bilderbücher |
-| [Mamalicious World](https://mamalicious.ch/) | — | Schweiz | Family lifestyle | Already reviewed competitor Librio (personalized children's book) — perfect fit |
-| [Mini & Stil](https://www.miniundstil.ch/) recommended blogs: | — | — | — | Her post "6 grossartige Mamablogs" lists additional targets |
+## Rules (legal-requirements R-30/R-31/R-33/R-34 in the Marketing repo)
+- Every post labelled "Werbung" (or "Anzeige") + the platform's paid-partnership toggle; a free book is payment in
+  kind (SLK B.15). Say this in the first email, not as an afterthought.
+- Keep proof: post URL + screenshot, date, label used (tracking sheet below).
+- We never repost a creator's child's face without their written OK for that use.
+- Say openly that the illustrations are made with AI.
+- Address parents and gift buyers, never children ("sag deinen Eltern..." style copy is banned).
 
-### Tier 2 — Niche / Smaller but Relevant
+## Wave 1: send first (Deutschschweiz, kids roughly 2-8, contact route known)
 
-| Blog | Person | Location | Focus | Why Good Fit |
-|------|--------|----------|-------|-------------|
-| [MOMof4](https://momof4.ch/) | — | Schweiz | Multi-kid family, work-life | 4 kids = 4 potential stories to showcase |
-| [Mamas Unplugged](https://www.mamasunplugged.ch/) | Multiple | Schweiz | Collective mommy blog | Multiple writers = multiple review angles |
-| [Family First](https://familyfirst.ch/) | — | Zürich | Family portal, bilingual DE/EN | Web portal for families, broad reach |
-| [The Family of 5](https://www.thefamilyof5.com/) | Jean & Camilla | Schweiz | Family travel, EN/FR | Switzerland Tourism ambassadors, English + French audience |
-| [MINT & MALVE](https://www.mintundmalve.ch/) | — | Schweiz | Children's book reviews | Dedicated book blog with media kit — reviews children's books specifically |
-| [Cakes, Cookies and more](https://cakescookiesandmore.ch/) | — | Schweiz | Food, family, lifestyle | Member of Schweizer Familienblogs network |
+| # | Who | Handle / site | Size (source, date) | Why | Contact |
+|---|---|---|---|---|---|
+| 1 | MINT & MALVE (Eliane) | @mintundmalve, mintundmalve.ch | IG 9,300+ (own media kit, Nov 2022) | Children's book blog, active Oct 2026, did Librio before | eliane@mintundmalve.ch ([mediakit](https://www.mintundmalve.ch/mediakit)) |
+| 2 | Mamalicious | @mamaliciousworld, mamalicious.ch | IG 13k ([Modash](https://www.modash.io/find-influencers/switzerland/mom), 21.09.2026) | Reviewed Librio twice, runs giveaways | hello@mamalicious.ch |
+| 3 | Mama Rocks | @mamarocks_ch (IG + TikTok), mamarocks.ch | unknown | "Mama testet" product tests, labels partnerships | info@mamarocks.ch ([Kooperationen](https://mamarocks.ch/kooperationen/)) |
+| 4 | Juana Fiedler | @juana.fiedler | 23.2k (Modash mom) | Boys 7 and 5, does UGC | swissfitmommylife@gmail.com (bio) |
+| 5 | Mona Shkele | @mona.shkele | 20.9k (Modash mom), 57.6% CH audience | Mum of 3 | mona.shkele@gmail.com (bio) |
+| 6 | Simon Aemmer (dad) | @simonaemmer | 7.5k ([Modash family](https://www.modash.io/find-influencers/switzerland/family), 22.09.2026) | Swiss German dad, "Reels für Brands" | aemmersimon@hotmail.com (bio) |
+| 7 | Dedee | @dedesmomlife | 10.6k, engagement 9.8% (Modash mom) | High engagement | justcallmededee@gmx.ch (bio) |
+| 8 | Die Angelones (Rita) | @die_angelones, dieangelones.ch | IG 5,173, FB 14,208 (own page, Jan 2024) | Kids are teens: ask her as **network hub** (Schweizer Familienblogs, 59 members), not for her own kids | rita@dieangelones.ch ([Werbung & PR](https://www.dieangelones.ch/werbung-und-pr/)) |
+| 9 | Phoebe | @itsphoebely | 25.1k (Modash family) | Two girls | DM |
+| 10 | Eli Simic | @eli_simic | 14.2k, 75.9% CH audience (Modash mom) | Single mum | DM |
+| 11 | Bärner Mamis | TikTok @baernermamis, IG baernermamis | TikTok 10,100 ([House of Influence](https://www.house-of-influence.ch/post/staff-choice-die-besten-family-influencer-der-schweiz)); IG 99.8K ([HypeAuditor](https://hypeauditor.com/de/top-instagram-family-switzerland/)) | Bern, four mums, Swiss German | DM (IG handle unconfirmed) |
+| 12 | Mamas Unplugged | mamasunplugged.ch | unknown | Group blog, active Sep 2026 | mail@mamasunplugged.ch |
 
-### Key Network
-[Schweizer Familienblogs](https://schweizerfamilienblogs.ch/) — Network of Swiss family bloggers with a [full member list](https://schweizerfamilienblogs.ch/netzwerk-teilnehmerliste/) and a [cooperation page](https://schweizerfamilienblogs.ch/gemeinsame-projekte/). Consider reaching out to the network directly for a multi-blogger campaign.
+## Wave 2 / reserve
+- **Deutschschweiz:** @fabzerzuben 43.6K (HypeAuditor), @busy_kids_switzerland 70.7K (HypeAuditor), @carameliita 3,750
+  (HoI), @yvipinto 17.3k but 75% DE audience (Modash), @jesca.li 5.4k (baby, too young now), Family First
+  (info (at) familyfirst.ch; "sehr reduzierte Anzahl an Kooperationen", or a paid listing from CHF 169/yr,
+  [familyfirst.ch/werbung](https://familyfirst.ch/werbung/)).
+- **English (expats):** @swiss.mom.life 30.8k (Modash), The Family of 5 (@familyof5.swiss, thefamilyof5.com, contact page),
+  @serafimagermann 15.3k (serafima.germann@gmail.com), @mama.on.board 8.4k Basel (kasia.mama.on.board@gmail.com),
+  Swiss Family Fun (swissfamilyfun.com).
+- **French:** @isaline_ackermann 32,500 (HoI), @yo_obrist 25.7k (Modash, already runs affiliate codes),
+  @mengojuice 22.4k (Modash), @byselo_ 16,000 (HoI).
+- **Italian:** @chiara_berti83 8,400 (HoI), @asinochileggeancora 20.8K (HypeAuditor, book angle unconfirmed).
+- **Too big for wave 1:** @valeriaharris__, @saraleutenegger 140.9K, @mrs_smoothies 147.7k.
 
-### Media / Magazines
-| Publication | URL | Type |
-|------------|-----|------|
-| Fritz+Fränzi | [fritzundfraenzi.ch](https://www.fritzundfraenzi.ch/) | Swiss parenting magazine, has [blog list](https://www.fritzundfraenzi.ch/service/blogliste/blogliste?page=all) and gift guides |
-| familienleben.ch | [familienleben.ch](https://www.familienleben.ch/) | Swiss family portal, published article on Schweizer Mamablogs |
-| Tages-Anzeiger Mamablog | [tagesanzeiger.ch/mamablog](https://www.tagesanzeiger.ch/mamablog) | Biggest Swiss newspaper's parenting section |
+## Dropped from the March list
+- Mini & Stil: last post 25.11.2019 ("Blogpause").
+- MOMof4: last post 11.12.2024 (dormant).
+- Chez Mama Poule and schweizerfamilienblogs.ch: domains did not answer on 2026-10-08; recheck by hand.
 
----
+## Agencies (if wave 1 is too slow)
+- influencer-finden.ch (House of Influence): curated creator list from CHF 790, has a filter by children's age.
+  hoi@influencer-finden.ch.
+- House of Influence, Zürich: ran Migros' Toniebox campaign with 9 family creators. hoi@houseofinfluence.ch.
+- Influee (influee.co): UGC videos "ab CHF 47"; such videos could also run in our own ads.
+- Kingfluencers, Zürich: no family focus or prices published.
 
-## Outreach Approach
-
-### What to Offer
-1. **Free personalized story** — create a story for their child with their photos (full experience, not trial)
-2. **Printed book** — ship a physical copy. The unboxing moment is the content
-3. **Exclusive discount code** — e.g. `MINIUNDSTIL20` for 20% off, trackable per blogger
-4. **CHF 50-100 fee** for a dedicated blog post (optional, some bloggers expect this)
-
-### Email Template (German)
+## Email (German, personalise the first line every time)
 
 ```
-Betreff: Personalisierte Kindergeschichte für [Kind-Name] — Kooperationsanfrage
+Betreff: Ein Buch, in dem [Kind] die Hauptfigur ist – Weihnachts-Kooperation (Werbung)
 
-Liebe [Name],
+Hallo [Name]
 
-ich bin Roger, Gründer von MagicalStory.ch. Wir erstellen mit KI personalisierte
-Kinderbücher — das Kind wird zur Hauptfigur in einer Abenteuergeschichte, mit
-eigenen Fotos als illustrierte Figur.
+Ich bin Roger und habe MagicalStory.ch gebaut: Eltern laden Fotos ihres Kindes hoch,
+wählen ein Thema oder ihre Stadt, und es entsteht ein illustriertes Bilderbuch mit
+dem Kind als Held – mit echten Schweizer Schauplätzen. Die Bilder entstehen mit KI.
 
-Ich lese deinen Blog regelmässig und finde [spezifisches Detail über ihren Blog].
+[Ein Satz zu einem konkreten Beitrag von dir.]
 
-Gerne würde ich für [Kind-Name(n)] eine kostenlose Geschichte erstellen und dir
-ein gedrucktes Buch zuschicken. Keine Verpflichtung — wenn es euch gefällt, würde
-ich mich über einen ehrlichen Erfahrungsbericht auf deinem Blog freuen.
+Mein Angebot vor Weihnachten:
+- Du erstellst kostenlos eine ganze Geschichte für [Kind] (ich schalte die Credits frei,
+  deine Fotos bleiben in deinem Konto).
+- Ich schicke dir das Buch gedruckt als Hardcover nach Hause.
+- Du bekommst deinen eigenen Code: deine Follower erhalten CHF 10 Rabatt auf ihr erstes
+  Buch, und du erhältst CHF 10 für jedes Buch, das damit bestellt wird.
 
-Was uns besonders macht:
-- Das Kind erscheint als illustrierte Figur im Buch (Pixar/Aquarell-Stil)
-- Lokale Schauplätze: echte Wahrzeichen aus eurer Stadt im Buch
-- Auf Deutsch, Englisch oder Französisch
-- In 5 Minuten erstellt, als Buch druckbar
+Wenn es euch gefällt, freue ich mich über einen ehrlichen Post oder Reel in der zweiten
+Novemberhälfte, gekennzeichnet als «Werbung». Wenn nicht, ist das auch ok – das Buch
+gehört euch.
 
-Darf ich dir eine Geschichte für deine Kinder erstellen?
+Hättest du Lust? Dann schicke ich dir den Zugang.
 
-Herzliche Grüsse,
+Herzliche Grüsse
 Roger
-magicalstory.ch
+www.magicalstory.ch
 ```
 
-### Key Principles
-- **Personalize every email** — mention a specific recent blog post they wrote
-- **Lead with value** — the free story IS the pitch. Don't ask first, offer first
-- **No strings attached** — "if you like it, share it" works better than "we need a post by date X"
-- **Ship the physical book** — a PDF review is weak. The printed book arriving is the wow moment
-- **Provide good photos** — include 2-3 screenshots of the generated story for their post
-- **Track with discount codes** — one per blogger, measure conversions
+Follow up once after 7 days, then stop. For EN/FR creators translate the same text; keep "Werbung" / "#ad" / "publicité".
 
-### Outreach Priority
-1. **Mamalicious** — already reviewed Librio (direct competitor), knows the space
-2. **MINT & MALVE** — dedicated children's book review blog, has media kit ready
-3. **Chez Mama Poule** — books section, journalist background, quality reviews
-4. **Mini & Stil** — high reach, active kooperation page
-5. **mama rocks** — product tests are their thing
-6. **Die Angelones** — network hub, can amplify via Schweizer Familienblogs
+## Timeline
+- Week of 2026-10-12: check profiles by hand, send wave 1 (12 emails/DMs).
+- 2026-10-19: one follow-up; send wave 2 to fill up to ~12 yes answers.
+- By end of October: credits granted, stories made, books ordered.
+- Second half of November: posts go live.
+- December: count codes, decide on paid repeats with the creators who sold.
 
-### Timeline
-- Week 1: Personalize and send 3 emails (Mamalicious, MINT & MALVE, Chez Mama Poule)
-- Week 2: Send 3 more (Mini & Stil, mama rocks, Die Angelones)
-- Week 3: Follow up on non-responses (one follow-up only)
-- Week 4+: Create stories for those who respond, ship books
-
-### Success Metrics
-- 5+ blog posts with backlinks within 2 months
-- Each post should include: link to magicalstory.ch, photos of the book, honest review
-- Track discount code usage per blogger
-- Monitor referral traffic in analytics
-
----
-
-## Competitor Intelligence
-- **Librio** was reviewed by Mamalicious and Familie.de — they're already in this space
-- **Hooray Heroes** built their brand almost entirely on UGC/influencer content (see biz/07-content-ugc-strategy.md)
-- Differentiation: MagicalStory uses the child's actual photos for AI-illustrated characters + local Swiss landmarks — neither competitor does this
+## Tracking (one row per creator)
+creator · contacted (date, channel) · answer · account user id · referral code · credits granted · book order id ·
+shipped · post URL + screenshot · label used · date live · buyers with code (`referral_events`) · revenue
