@@ -7946,7 +7946,8 @@
       "addedAt": "2026-10-09",
       "claim": "On a trial with a main character aged 1-4 every page text is at most ~70 words and no page shows the child leaving home or its garden without a grown-up; a trial for age 5+ still writes 100-140 words.",
       "runShape": [
-        "trial"
+        "trial",
+        "age-band:1"
       ],
       "check": {
         "kind": "human",
@@ -7964,7 +7965,7 @@
       "addedAt": "2026-10-09",
       "claim": "On a story whose pages are ambient/crowd, each such page brief names 1-2 unnamed people with garment kind and a colour no cast member wears, and the rendered extras are not in the cast colours.",
       "runShape": [
-        "story"
+        "full-story"
       ],
       "check": {
         "kind": "human",
