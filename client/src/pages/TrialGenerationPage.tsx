@@ -9,7 +9,7 @@ import { INITIAL_USER_CREDITS } from '@/constants/credits';
 import { trackEmailLead, trackTrialStoryCompleted } from '@/utils/gtagConversion';
 import { trackEvent } from '@/utils/analytics';
 import { trackTrialStep } from '@/utils/trialFunnel';
-import { classifyJobStatusHttp, MAX_TRANSIENT_POLL_ERRORS, pollBackoffMs } from '@/utils/trialPoll';
+import { classifyJobStatusHttp, MAX_TRANSIENT_POLL_ERRORS, pollBackoffMs, mergeAvatarSlides } from '@/utils/trialPoll';
 import { Navigation } from '@/components/common';
 import { localizedApiError } from '@/utils/apiErrors';
 
@@ -529,12 +529,15 @@ export default function TrialGenerationPage() {
 
       if (data.progress !== undefined) setProgress(data.progress);
 
-      // Pick up title page image and avatar slides from poll response
+      // Avatar slides exist from job start; the title page only minutes later. They are read on
+      // their own so the intro slideshow shows the turning avatars at once (until 2026-10-08 they
+      // were only picked up together with the title page, so a visitor who clicked "create" before
+      // prepare-title finished saw one static preview avatar for ~2.5 min).
+      setAvatarSlides(prev => mergeAvatarSlides(prev, data.avatarSlides));
+
       if (data.titlePageImage) {
         setTitlePageImage(data.titlePageImage);
         needTitlePageRef.current = false;
-
-        if (data.avatarSlides?.length) setAvatarSlides(data.avatarSlides);
       }
 
       setServerUnlocked(data.unlocked === true);

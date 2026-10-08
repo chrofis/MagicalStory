@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { classifyJobStatusHttp, pollBackoffMs, MAX_TRANSIENT_POLL_ERRORS } from '../../client/src/utils/trialPoll';
+import { classifyJobStatusHttp, pollBackoffMs, MAX_TRANSIENT_POLL_ERRORS, mergeAvatarSlides } from '../../client/src/utils/trialPoll';
 import { isTrialSessionDead, classifyAccountCreateFailure } from '../../client/src/utils/trialSession';
 
 describe('W4 trial job-status polling policy', () => {
@@ -32,5 +32,21 @@ describe('W6 account-creation refusal handling', () => {
     expect(classifyAccountCreateFailure(500)).toBe('generic');
     expect(classifyAccountCreateFailure(400)).toBe('generic');
     expect(classifyAccountCreateFailure(undefined)).toBe('generic');
+  });
+});
+
+describe('trial intro avatar slides (staging 2026-10-08: no turning avatars until the title page)', () => {
+  it('takes new slides from a poll, with or without a title page', () => {
+    expect(mergeAvatarSlides([], ['a', 'b', 'c'])).toEqual(['a', 'b', 'c']);
+  });
+  it('keeps the same array reference when the poll repeats the slides (no slideshow rebuild every 3 s)', () => {
+    const held = ['a', 'b', 'c'];
+    expect(mergeAvatarSlides(held, ['a', 'b', 'c'])).toBe(held);
+  });
+  it('a poll without slides never clears what is shown', () => {
+    const held = ['a'];
+    expect(mergeAvatarSlides(held, undefined)).toBe(held);
+    expect(mergeAvatarSlides(held, [])).toBe(held);
+    expect(mergeAvatarSlides(held, [null, ''])).toBe(held);
   });
 });

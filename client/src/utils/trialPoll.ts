@@ -18,3 +18,18 @@ export function pollBackoffMs(consecutiveErrors: number, baseMs = 3000, capMs = 
   if (consecutiveErrors <= 0) return 0;
   return Math.min(baseMs * 2 ** consecutiveErrors, capMs);
 }
+
+/**
+ * The avatar slides the job-status poll reports, folded into what the page already holds.
+ * Returns `prev` itself (same reference) when nothing new arrived: the slideshow memo depends on
+ * the array, and a fresh identical array every 3 s poll would rebuild it (and reshuffle its
+ * captions) on each tick. Slides are independent of the title page: they exist from job start,
+ * the title page only ~2.5 min later (staging job_1791490151653_r9mypyn0c).
+ */
+export function mergeAvatarSlides(prev: string[], incoming: unknown): string[] {
+  if (!Array.isArray(incoming) || incoming.length === 0) return prev;
+  const next = incoming.filter((s): s is string => typeof s === 'string' && s.length > 0);
+  if (next.length === 0) return prev;
+  if (next.length === prev.length && next.every((s, i) => s === prev[i])) return prev;
+  return next;
+}

@@ -6446,6 +6446,22 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "trial-intro-avatar-slides-2026-10-08",
+      "title": "Trial generation page shows the turning avatar slides from job start",
+      "commits": [],
+      "addedAt": "2026-10-08",
+      "claim": "On a /try run where the visitor clicks create before prepare-title has finished, the generation page rotates the preview avatar plus the 3 costumed body slides within one poll (about 3 s) of the job being created, not when the title page arrives; the slideshow does not reshuffle its captions on each poll.",
+      "runShape": [
+        "trial"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Watch staging /try: click create while the costumed avatar is still generating; once the progress screen shows, confirm the avatar image changes among 4 images within ~10 s of the job starting, well before the title page. Network tab: job-status?needTitlePage=1 returns avatarSlides before titlePageImage."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [
