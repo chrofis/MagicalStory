@@ -4046,7 +4046,7 @@ async function runAuditReplayStage(target, { params = {}, promptOverride = null 
   const runs = await Promise.all(models.map(async (model) => {
     const t = Date.now();
     try {
-      const res = await callTextModelStreaming(prompt, null, null, model, { usageLabel: 'testlab_audit_replay', temperature: 0, ...(params.effort ? { effort: params.effort } : {}) });
+      const res = await callTextModelStreaming(prompt, null, null, model, { usageLabel: 'testlab_audit_replay', temperature: 0, ...((params.effort || level !== 'arc') ? { effort: params.effort || MODEL_DEFAULTS.textAuditEffort } : {}) });
       const raw = String(res.text || '').trim();
       return {
         model,
@@ -10114,7 +10114,7 @@ async function runBeatsReplanStage(target, { params = {} }) {
   // modelOverrides are not stored: the run's defaults, as planCheckInputs and
   // generateStoryViaBeats resolve them. params.planModel / params.checkModel
   // are the A/B knobs.
-  const planModel = params.planModel || storyData.modelOverrides.outlineModel || MODEL_DEFAULTS.outline;
+  const planModel = params.planModel || storyData.modelOverrides.beatsPlanModel || MODEL_DEFAULTS.beatsPlanModel;
 
   const calls = [];
   const onCall = (res) => calls.push(res);

@@ -1555,10 +1555,10 @@ async function refineStoryText(storyData, pages, opts = {}) {
     try {
       // gemini-3.1-pro occasionally returns an empty body (see models.js) — one
       // retry, same call; a second empty is reported as a failed audit.
-      let r = await callTextModelStreaming(prompt, null, null, modelKey, { usageLabel: label });
+      let r = await callTextModelStreaming(prompt, null, null, modelKey, { usageLabel: label, effort: MODEL_DEFAULTS.textAuditEffort });
       if (!String(r.text || '').trim()) {
         log.warn(`⚠️ [TEXT-AUDIT/${source}] ${modelKey} returned empty output — retrying once`);
-        r = await callTextModelStreaming(prompt, null, null, modelKey, { usageLabel: label });
+        r = await callTextModelStreaming(prompt, null, null, modelKey, { usageLabel: label, effort: MODEL_DEFAULTS.textAuditEffort });
       }
       const raw = String(r.text || '').trim();
       const elapsedMs = Date.now() - t0;

@@ -2135,7 +2135,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   const pageCount = parseInt(opts.pageCount, 10) || parseInt(inputData?.pages, 10) || 10;
   const expected = Array.from({ length: pageCount }, (_, i) => i + 1);
 
-  const planModel = modelOverrides.outlineModel || MODEL_DEFAULTS.outline;
+  const planModel = modelOverrides.beatsPlanModel || MODEL_DEFAULTS.beatsPlanModel;
   const reviewModel = modelOverrides.outlineReviewModel || MODEL_DEFAULTS.outlineReviewModel;
   // THE ARC MACHINE (owner, 2026-08-30): creator + panel + rounds replace the
   // old arcAuditModel/arcReviewModel/childCriticModel chain here.
@@ -2904,7 +2904,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   // The call never throws: a beats run without a wardrobe is degraded (null
   // clothing, avatars from the stored wardrobe) but must still produce a story.
   await checkCancellation();
-  const bibleModel = planModel;
+  const bibleModel = modelOverrides.outlineModel || MODEL_DEFAULTS.outline;
   // The transcript spliced into rawOutline. The wardrobe section lands here
   // first; the Art Director's bible + cover sections are appended to it below.
   let bibleSections = null;

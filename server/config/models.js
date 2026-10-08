@@ -396,7 +396,13 @@ const MODEL_DEFAULTS = {
   // docs/decisions.md "qwen3.8-max zero-visible-output confound (verdict pending
   // retest)". Cap has since been raised to the real OpenRouter max (131072);
   // verdict on qwen3.8-max is open until a retest at the true limit is run.
-  textAuditModel: process.env.TEXT_AUDIT_MODEL || 'gemini-3.1-pro',
+  // ROUND 2 OF THE HAIKU 5.5 BAKE-OFF (owner rule 2026-10-08: "anywhere Haiku gives the same results at
+  // lower cost it should be used"): the arc-informed audit moved gemini-3.1-pro -> claude-haiku-5-5 at
+  // effort `textAuditEffort` (reproduces 67% of gemini's fault lines twice, Haiku's own repeat is 72%;
+  // $0.024 vs $0.176 per story; xhigh hit max_tokens on 1 of 4 stories). docs/decisions.md 2026-10-08
+  // "Haiku 5.5 round 2". Env TEXT_AUDIT_MODEL=gemini-3.1-pro restores the old auditor.
+  textAuditModel: process.env.TEXT_AUDIT_MODEL || 'claude-haiku-5-5',
+  textAuditEffort: 'high',
   // The BLIND text audit, run in parallel with the one above (owner ruling
   // 2026-09-03: "run 2 audits: the gemini we have today and a grok that is
   // blind"). It reads the pages and nothing else — no arc, no page plan — so
@@ -406,7 +412,9 @@ const MODEL_DEFAULTS = {
   // its 3/10 score as the ARC-INFORMED auditor (2026-08-27 bake-off) was
   // measured on the twelve-question causality prompt, not on this reader-side
   // one, so it is not evidence about this slot.
-  textAuditBlindModel: process.env.TEXT_AUDIT_BLIND_MODEL || 'grok-4.6',
+  // Round 2: grok-4.6 -> claude-haiku-5-5 at `textAuditEffort` (reproduces 68% of grok's 44 fault lines,
+  // grok reproduces 64% of itself; catches the two real non-words grok missed; $0.015 vs $0.13 per story).
+  textAuditBlindModel: process.env.TEXT_AUDIT_BLIND_MODEL || 'claude-haiku-5-5',
   // Arc/beats audit judges (2026-08-27 Lab experiments 876/877, frozen pirate
   // artifacts, known-defect ground truth). Arc: opus caught 8/8 + 3 finds no
   // other model made (incl. the only LIMIT catch); grok-4.6 caught 1. Beats:
@@ -573,6 +581,8 @@ const MODEL_DEFAULTS = {
   // false positives; claude-sonnet on the old closed defect-list prompt caught
   // 0/4 with 2 hallucinations. Never the refiner (deepseek must not proof its
   // own prose — it invented 4 typos when asked to find faults).
+  // Haiku 5.5 xhigh was tried as lector 2026-10-08 and NOT adopted: 8-9/11 real pages vs gemini 10/11 (decisions.md
+  // 2026-10-08 "Haiku 5.5 round 2").
   textProofreadModel: process.env.TEXT_PROOFREAD_MODEL || 'gemini-3.1-pro',
   // The DIFF pass that runs between the repair and the lector: it reads only
   // the repaired pages as BEFORE/AFTER and reports what the rewrite damaged.
@@ -596,6 +606,11 @@ const MODEL_DEFAULTS = {
   // reply on 2026-10-06 stories (508-1,365 before). Probed at low/medium: ~1.3-1.4k output tokens, ~$0.03,
   // ~10 s; medium's plan_check must-fix 12/8 vs the stored high plans' 10/8, low's 17/12. docs/decisions.md 2026-10-08.
   beatsPlanEffort: 'medium',
+  // The beats planner and every re-plan round (NOT the wardrobe bible, NOT the trial writer, which share
+  // MODEL_DEFAULTS.outline). Haiku 5.5 at medium matched Sonnet 5.5 on the plan check's must-fix count on
+  // both stories (11/4 and 8/8 vs 12/9) for $0.012-0.024 against $0.033 a plan call; it is slower (109-214 s),
+  // which the owner waived on 2026-10-08 for everything but the trial. docs/decisions.md 2026-10-08.
+  beatsPlanModel: 'claude-haiku-5-5',
   storyTextEffort: null,               // writer reasoning effort; null = the model's default (text-v4 measures medium vs high)
   // Trial writer effort (owner 2026-10-07: test lower effort). Sonnet 5.5 defaults to `high`;
   // 3 staging trials at the default spent 27-40k output tokens (~5-6k of it story text)

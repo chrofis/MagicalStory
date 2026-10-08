@@ -757,7 +757,7 @@ describe('beats_replan: no params = the run\'s plan check and re-plan rounds', (
     const shipped = await BP.runReplanRounds({
       inputData: STORY, pageCount: 4, plan, check1, replanRounds: rounds, approvedArc: ARC, arcHints: '', arcStoryLogic: LOGIC,
       arcCentralFigure: ['Mira'], castTable, commission: inputs.commission, commissionedNames: inputs.commissionedNames, maxCast: inputs.maxCast,
-      planModel: MODEL_DEFAULTS.outline, readPlan, runCheck, onChunk: null, gl, stage: async () => {}, checkCancellation: async () => {},
+      planModel: MODEL_DEFAULTS.beatsPlanModel, readPlan, runCheck, onChunk: null, gl, stage: async () => {}, checkCancellation: async () => {},
       beats: plan.pages, pagePlan: plan.pagePlan, jevReport: { castCuts: [] },
     });
     const prodShots = await BP.finalizePlanShots({ approvedArc: ARC, beats: shipped.beats, check: shipped.check, gl });

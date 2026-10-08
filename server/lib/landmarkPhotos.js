@@ -169,7 +169,7 @@ Reply with ONLY ${count} numbers separated by commas (e.g., "1,4,7"). Nothing el
   try {
     // null = model max (owner rule: no output caps); the reply is a short list
     // of numbers, and the ceiling is not what makes it short.
-    const result = await callTextModel(prompt, null, 'claude-haiku', { usageLabel: 'landmark_photo_pick' });
+    const result = await callTextModel(prompt, null, 'claude-haiku-5-5', { usageLabel: 'landmark_photo_pick', effort: 'low' });
     const response = result.text.trim();
 
     // Parse comma-separated numbers

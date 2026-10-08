@@ -6345,6 +6345,22 @@
       "evidence": []
     },
     {
+      "id": "haiku55-round2-2026-10-08",
+      "title": "Haiku 5.5 as beats planner, both text audits and the landmark pick",
+      "commits": [],
+      "addedAt": "2026-10-08",
+      "claim": "On a full story the generation log shows beats_plan / beats_replan answered by claude-haiku-5-5 at effort medium (beats_story_bible still Sonnet), text_audit and text_audit_blind answered by claude-haiku-5-5 at effort high with a non-empty fault list each (no max_tokens failure) and landmark_photo_pick by claude-haiku-5-5; text_lector is still gemini-3.1-pro.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "In stories.data tokenUsage / generationLog read the model ids and costs of beats_plan, beats_replan, text_audit, text_audit_blind, landmark_photo_pick; confirm the plan check's must-fix count did not buy extra re-plan rounds and no audit logged 'returned no text'."
+      },
+      "status": "pending",
+      "evidence": []
+    },
+    {
       "id": "fiona-group-a-2026-10-08",
       "title": "Repair: parent-shared findings tagged, recolour skin gate, descriptor ordinal",
       "commits": [
