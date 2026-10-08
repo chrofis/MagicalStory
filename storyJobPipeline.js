@@ -54,7 +54,8 @@ const {
   initializeVisualBibleMainCharacters,
   linkPreDiscoveredLandmarks,
   injectHistoricalLocations,
-  dedupeSecondaryCharacterIds
+  dedupeSecondaryCharacterIds,
+  adoptReferenceRenders
 } = require('./server/lib/visualBible');
 const { rollUpScenePrompts, projectSceneCast } = require('./server/lib/storyShape');
 const {
@@ -155,6 +156,54 @@ async function awaitTitleAvatars(ready, { userId, characterId, timeoutMs = TRIAL
   if (!main) throw new Error(`awaitTitleAvatars: character ${characterId} not in ${rowId}`);
   log.info(`[TRIAL] prepare-title wait complete after ${Date.now() - started}ms`);
   return main.preGeneratedStyledAvatars || null;
+}
+
+/**
+ * TRIAL early avatar styling (docs/decisions.md 2026-10-09). prepare-title only
+ * ever produces the COSTUMED sheet, so only the costumed variant waits for it
+ * (and is seeded from it). The standard sheet starts at once: awaiting
+ * prepare-title before styling anything held the whole early task, and with it
+ * every page and cover image behind "Waiting for early avatar styling"
+ * (Tobias +53 s). A failure of either variant is logged, not rethrown: the
+ * coverage pass before the page loop retries and fails the book if a sheet is
+ * still missing.
+ */
+function runTrialEarlyStyling({ requirements, titleAvatarsReady, awaitTitle, jobStartAvatars, seed, style, onDone }) {
+  const isCostumed = (r) => String(r.clothingCategory).startsWith('costumed');
+  const standardReqs = requirements.filter(r => !isCostumed(r));
+  const costumedReqs = requirements.filter(isCostumed);
+  if (!titleAvatarsReady) seed(jobStartAvatars);
+  const run = async (label, reqs, before) => {
+    if (reqs.length === 0) return;
+    try {
+      if (before) await before();
+      await style(reqs);
+    } catch (error) {
+      log.error(`❌ [TRIAL] Early ${label} avatar styling failed: ${error.message}`);
+    }
+  };
+  return (async () => {
+    await Promise.all([
+      run('standard', standardReqs, null),
+      run('costumed', costumedReqs, titleAvatarsReady ? async () => seed(await awaitTitle()) : null)
+    ]);
+    if (onDone) onDone();
+  })();
+}
+
+/**
+ * Progress a streaming checkpoint maps to, or null for a type this table does
+ * not know. Numbered by ARRIVAL order: 1=start, 2=arcs, 3=title, 4=clothing,
+ * 5=plot, 6=VB, 7=covers/pages. 'coverScene' was missing from the table and fell
+ * through to a default of 1, so a trial's bar went 6% -> 1% -> 7% (2026-10-09);
+ * the write is also GREATEST(progress, ...) so an out-of-order checkpoint can
+ * never move the bar back.
+ */
+const STREAMING_PROGRESS = Object.freeze({
+  arcs: 2, title: 3, clothing: 4, plot: 5, visualBible: 6, coverScene: 7, covers: 7, page: 7
+});
+function streamingProgressFor(type) {
+  return Object.prototype.hasOwnProperty.call(STREAMING_PROGRESS, type) ? STREAMING_PROGRESS[type] : null;
 }
 
 // coverTypesFor lives in server/lib/coverKeys.js (the beats Art Director needs it too).
@@ -575,8 +624,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
   try {
     // PHASE 1: Generate complete story with unified prompt
     await checkCancellation();
+    // GREATEST: the claim already wrote 5, and a visitor's bar never goes back.
     await dbPool.query(
-      'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
+      'UPDATE story_jobs SET progress = GREATEST(progress, $1), progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
       [1, 'Starting story generation...', jobId]
     );
 
@@ -780,33 +830,32 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       };
 
       log.info(`🎨 [TRIAL] Starting immediate avatar styling (${trialAvatarRequirements.length} variants)...`);
-      streamingAvatarStylingPromise = (async () => {
-        try {
-          // The writer is already streaming; only this task waits for prepare-title.
-          // The same-scope cache already holds its sheets, the DB row carries the
-          // persisted copy the seeding reads. No in-flight prepare-title (it
-          // finished before the job, or never ran) = the job-start row read stands.
-          let preGeneratedAvatars = (inputData.characters || [])[0]?.preGeneratedStyledAvatars;
-          if (titleAvatarsReady) {
-            preGeneratedAvatars = await awaitTitleAvatars(titleAvatarsReady, { userId, characterId: (inputData.characters || [])[0]?.id });
-          }
-          seedPreGeneratedAvatars(preGeneratedAvatars);
-          // Trial skips the sheet reviews (owner 2026-08-15): skipQualityEval
-          // reaches generateComposited2x4 as skipReview — 1 try per row, no
-          // bodies/heads/identity/style eval. Measured on job_1786818831439:
-          // 4 Gemini evals plus a body-row retry the trial cannot act on
-          // anyway (no repair stage).
-          await prepareStyledAvatars(inputData.characters || [], artStyle, trialAvatarRequirements, trialClothingRequirements, addUsage, modelOverrides.storyAvatarModel || null, { skipQualityEval: true, seasonOutfit: trialSeasonOutfit(inputData) });
+      // Two tasks, not one (docs/decisions.md 2026-10-09). prepare-title only ever
+      // produces the COSTUMED sheet, so only the costumed variant waits for it
+      // (and is seeded from it). The standard sheet starts at once: awaiting
+      // prepare-title first held the whole early task, and with it every page and
+      // cover image behind "Waiting for early avatar styling" (Tobias +53 s).
+      // Trial skips the sheet reviews (owner 2026-08-15): skipQualityEval
+      // reaches generateComposited2x4 as skipReview — 1 try per row, no
+      // bodies/heads/identity/style eval. Measured on job_1786818831439:
+      // 4 Gemini evals plus a body-row retry the trial cannot act on
+      // anyway (no repair stage).
+      streamingAvatarStylingPromise = runTrialEarlyStyling({
+        requirements: trialAvatarRequirements,
+        titleAvatarsReady,
+        // The same-scope cache already holds its sheet, the DB row carries the
+        // persisted copy the seeding reads.
+        awaitTitle: () => awaitTitleAvatars(titleAvatarsReady, { userId, characterId: (inputData.characters || [])[0]?.id }),
+        // No in-flight prepare-title (finished before the job, or never ran): the
+        // job-start row read is all there is.
+        jobStartAvatars: (inputData.characters || [])[0]?.preGeneratedStyledAvatars,
+        seed: seedPreGeneratedAvatars,
+        style: (reqs) => prepareStyledAvatars(inputData.characters || [], artStyle, reqs, trialClothingRequirements, addUsage, modelOverrides.storyAvatarModel || null, { skipQualityEval: true, seasonOutfit: trialSeasonOutfit(inputData) }),
+        onDone: () => {
           earlyAvatarStylingSucceeded = getStyledAvatarCacheStats().size > 0;
           log.info(`✅ [TRIAL] Early avatar styling complete: ${getStyledAvatarCacheStats().size} cached`);
-        } catch (error) {
-          // Not rethrown: the final coverage pass (prepareStyledAvatars before
-          // the page loop) retries and fails the book if the sheet is still
-          // missing. Until then every streamed page and cover refuses to
-          // render without its costumed ref (missingCostumedRefs).
-          log.error(`❌ [TRIAL] Early avatar styling failed: ${error.message}`);
         }
-      })();
+      });
     }
 
     // Rate limiters for streaming tasks (aggressive parallelism)
@@ -2567,14 +2616,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // Streaming: arcs → title → clothing → plot → VB → covers → pages
         // 1=start, 2=arcs, 3=title, 4=clothing, 5=plot, 6=VB, 7=covers/pages
         // 8=text done, 9=avatars, 10=scenes, 11-30=images, 31+=repair, 73=finalize, 100=done
-        let progress = 1;
-        if (type === 'arcs') progress = 2;                   // arrives first
-        else if (type === 'title') progress = 3;             // arrives second
-        else if (type === 'clothing') progress = 4;          // arrives third
-        else if (type === 'plot') progress = 5;              // arrives fourth
-        else if (type === 'visualBible') progress = 6;       // arrives fifth
-        else if (type === 'covers') progress = 7;            // cover hints
-        else if (type === 'page') progress = 7;              // pages streaming (same phase)
+        const progress = streamingProgressFor(type);
+        if (progress === null) {
+          log.warn(`[PROGRESS] Unknown streaming progress type "${type}" — progress not written (add it to STREAMING_PROGRESS)`);
+          return;
+        }
 
         // Enhance message to show parallel work
         let enhancedMessage = message;
@@ -2585,7 +2631,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
         try {
           await dbPool.query(
-            'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
+            'UPDATE story_jobs SET progress = GREATEST(progress, $1), progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
             [progress, enhancedMessage, jobId]
           );
         } catch (e) {
@@ -3862,6 +3908,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     let referenceSheetBatchMeta = null;
     if (referenceSheetPromise) {
       const refResult = await referenceSheetPromise;
+      // TRIAL: the sheet was rendered onto the stream-time bible object; the page
+      // phase below reads this finished parse. Carry the cells over (a full story
+      // renders on `visualBible` itself, so there is nothing to carry).
+      if (inputData.trialMode && streamingVisualBible && streamingVisualBible !== visualBible) {
+        const carried = adoptReferenceRenders(streamingVisualBible, visualBible);
+        log.info(`🖼️ [TRIAL] Carried ${carried} reference cell(s) from the stream-time bible onto the final parse`);
+      }
       resolveRefSheetsReady();
       if (refResult.generated > 0) {
         log.info(`🖼️ [UNIFIED] Reference images ready: ${refResult.generated} generated for secondary elements`);
@@ -6967,6 +7020,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           seed: jobId,
           trial: !!inputData.skipQualityEval,
           skipKeys: bakedCoverKeys,
+          // The trial renders front and back only (docs/decisions.md, buildInitialPageComposition).
+          notProducedKeys: inputData.trialMode ? ['initialPage'] : [],
         });
       } catch (e) {
         log.warn(`⚠️ [UNIFIED] Post-persist cover typography failed: ${e.message}`);
@@ -7933,4 +7988,6 @@ module.exports = {
   savePartialStoryFromCheckpoints,
   processStoryJob,
   awaitTitleAvatars, // test seam
+  runTrialEarlyStyling, // test seam
+  streamingProgressFor, // test seam
 };

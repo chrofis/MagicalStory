@@ -694,6 +694,7 @@ are listed stage by stage in the audit table.
 
 ## Verification pending (code shipped, proof not taken)
 - [ ] (2026-10-07) Next trial run: check verify entries trial-writer-shared-prose-rules, trial-page-grid-production-selector, trial-photo-glasses-and-features; review the last 2 weeks of prod trials (commands in the doc) → tasks/trial-quality-review-2026-10-07.md §6
+- [ ] (2026-10-09) Next staging /try: prove `trial-parallel-styling-refs-progress-2026-10-09` (standard sheet starts before the prepare-title wait ends, no NO usable cell, no initialPage typography error, progress never falls) and `trial-idea-pick-recorded-2026-10-09` (ideaPick on a trial story; also closes the trial half of the FAILED `idea-pick-recorded` lines below) → tasks/verify.json
 Run verifications now live in **`tasks/verify.json`** (judge a stored run: `node scripts/admin/verify-run.js <storyId> --write`); the lines below point at their registry ids. Non-run chores (UI, admin, SEO, state files) stay here only.
 
 - [ ] `creature-part-in-who-column` (3a65d887e): the figure-shown-in-part rule is in the planner, Art Director, iterate and scene-review prompts; Lab 1575 (scene_review_replay on dka3jpog9, stored plan lines) still left p11 uncited — the reviewer does not add a creature the who column omits, so the fix rests on the planner writing it there. Needs a full-story run (planner first division) → `tasks/verify.json` creature-part-in-who-column

@@ -44,6 +44,9 @@ export interface StoryInput {
   // card) or the make-believe-world one (second card). The story prompt
   // pins the story to the real town only for `local`.
   ideaKind?: 'local' | 'fantasy';
+  // The click itself plus the two cards on screen (server stores it on
+  // stories.data.ideaPick; the wizard path records the same field).
+  ideaPick?: { index: 0 | 1; attempt: number; offered: { title: string; summary: string }[] };
 }
 
 export interface GeneratedIdea {
@@ -447,7 +450,10 @@ export default function TrialWizard() {
     }
   };
 
+  // 1 = the first pair shown, >1 = after "Generate New Ideas".
+  const ideaAttemptRef = useRef(0);
   const handleIdeasGenerated = useCallback((ideas: GeneratedIdea[]) => {
+    ideaAttemptRef.current += 1;
     setGeneratedIdeas(ideas);
     setSelectedIdeaIndex(null);
   }, []);
@@ -482,6 +488,13 @@ export default function TrialWizard() {
         ? selectedIdea.title + '\n' + selectedIdea.summary
         : storyInput.storyDetails,
       ideaKind: selectedIdeaIndex === 1 ? 'fantasy' as const : 'local' as const,
+      ...(selectedIdeaIndex === 0 || selectedIdeaIndex === 1 ? {
+        ideaPick: {
+          index: selectedIdeaIndex as 0 | 1,
+          attempt: Math.max(1, ideaAttemptRef.current),
+          offered: generatedIdeas.slice(0, 2).map(i => ({ title: i.title, summary: i.summary })),
+        },
+      } : {}),
       ...(userLocation?.city ? { userLocation } : {}),
     };
     navigate('/trial-generation', {

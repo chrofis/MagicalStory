@@ -655,21 +655,28 @@ async function applyCoverTypography(coverImages, { title, dedication, seed, tria
 // dedication edit re-composites with no AI call. Idempotent: skips a cover whose
 // ${key}Art row already exists.
 //
+// notProducedKeys: covers the story mode never renders (trial: initialPage) —
+// skipped without the "no served version" error, which stays for a real miss.
+//
 // skipKeys: cover keys this pass must LEAVE ALONE. A baked-title front cover
 // (resolveCoverTitleMode → baked) already carries its title in the pixels, so
 // stamping it here would print a second one; the pipeline passes
 // ['frontCover'] in that mode while the initial page and back cover keep their
 // app-side dedication / branding.
 // ---------------------------------------------------------------------------
-async function bakeCoverTypographyPostPersist(storyId, storyData, { title, dedication, seed, trial = false, skipKeys = [] } = {}) {
+async function bakeCoverTypographyPostPersist(storyId, storyData, { title, dedication, seed, trial = false, skipKeys = [], notProducedKeys = [] } = {}) {
   const { log } = require('../utils/logger');
   const r2 = require('./r2');
   const { saveStoryImage, dbQuery } = require('../services/database');
   const meta = ((await dbQuery('SELECT image_version_meta FROM stories WHERE id=$1', [storyId]))[0]?.image_version_meta) || {};
   const ded = trial ? '' : (dedication || '');
   const skip = new Set(skipKeys || []);
+  const notProduced = new Set(notProducedKeys || []);
   for (const [key, kind] of [['frontCover', 'front'], ['initialPage', 'initial'], ['backCover', 'back']]) {
     try {
+      // A cover this story mode never renders (the trial has front and back only)
+      // is not a missing cover. Every OTHER absent served row still errors below.
+      if (notProduced.has(key)) { log.debug(`[COVER TYPO POST] ${key}: not produced by this story mode — skip`); continue; }
       if (skip.has(key)) { log.info(`🅰️ [COVER TYPO POST] ${key}: SKIPPED — title is baked into the render`); continue; }
       // EMPTY TITLE = nothing to stamp on the front cover (composited mode's
       // own path — this stamp IS the title mechanism there). LOUD, and

@@ -7506,6 +7506,38 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": null
+    },
+    {
+      "id": "trial-parallel-styling-refs-progress-2026-10-09",
+      "title": "Trial: standard sheet starts at once, stated-object cells reach the pages, no initialPage typography error, progress never goes back",
+      "commits": [],
+      "addedAt": "2026-10-09",
+      "claim": "On a trial whose create is clicked while prepare-title is still styling: the standard 2x4 Grok edit starts at the job start (not after \"prepare-title wait complete\") and the pages start no later than the costumed sheet; no \"[VB-REF] ... has a reference sheet but NO usable cell\" for a stated artifact (the log shows \"Carried N reference cell(s) from the stream-time bible\"); no \"[COVER TYPO POST] initialPage\" error; story_jobs.progress only rises.",
+      "runShape": [
+        "trial"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Railway log of a staging /try with a stated artifact, create clicked during prepare-title: (1) the first standard [CHARACTER 2x4]/[STYLED AVATAR] line is before \"prepare-title wait complete\"; (2) no NO usable cell line, and a Carried N reference cell line; (3) no COVER TYPO POST initialPage line; (4) poll story_jobs.progress during the run: never decreases (no 6 -> 1 -> 7)."
+      },
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "trial-idea-pick-recorded-2026-10-09",
+      "title": "A trial story records which of the two idea cards was picked, with both cards",
+      "commits": [],
+      "addedAt": "2026-10-09",
+      "claim": "stories.data.ideaPick on a trial story holds index (0 own-town, 1 make-believe), attempt, and offered (both cards title + summary), and an idea_picked row exists in idea_events for the job.",
+      "runShape": [
+        "trial"
+      ],
+      "check": {
+        "kind": "auto",
+        "fn": "ideaPickRecorded"
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [

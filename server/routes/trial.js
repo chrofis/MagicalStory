@@ -1673,7 +1673,7 @@ router.post('/create-story', verifySessionToken, async (req, res) => {
     }
   };
   try {
-    const { storyCategory, storyTopic, storyTheme, storyDetails, language, userLocation, ideaKind } = req.body;
+    const { storyCategory, storyTopic, storyTheme, storyDetails, language, userLocation, ideaKind, ideaPick } = req.body;
 
     const { getPool } = require('../services/database');
     pool = getPool();
@@ -1758,6 +1758,9 @@ router.post('/create-story', verifySessionToken, async (req, res) => {
       // 'fantasy' = the make-believe-world idea (second card); anything else
       // is the own-town idea and keeps the landmark mandate.
       ideaKind: ideaKind === 'fantasy' ? 'fantasy' : 'local',
+      // Which of the two cards the visitor clicked, with both cards, so a later
+      // review can read the pair (the wizard path stores the same field).
+      ideaPick: require('../lib/ideaEvents').buildTrialIdeaPick(ideaPick),
     };
 
     // Server-side location fallback if client didn't provide it
@@ -3207,6 +3210,7 @@ async function createTrialStoryJob(pool, userId, characterId, characterData, sto
     storyTheme: storyInput.storyTheme || '',
     storyDetails: storyInput.storyDetails || '',
     ideaKind: storyInput.ideaKind || 'local',
+    ...(storyInput.ideaPick ? { ideaPick: storyInput.ideaPick } : {}),
     characterId,
     characters: [trialCharacter],
     mainCharacters: [trialCharacter.id],
@@ -3248,6 +3252,9 @@ async function createTrialStoryJob(pool, userId, characterId, characterData, sto
      VALUES ($1, $2, $3, $4, $5, $6, $7)`,
     [jobId, userId, 'pending', JSON.stringify(inputData), 0, 'Job created, waiting to start...', 0]
   );
+
+  // The same idea_picked funnel row the wizard writes (fire-and-forget).
+  require('../lib/ideaEvents').recordIdeaPicked(inputData, { userId, storyId: jobId });
 
   log.debug(`[TRIAL] Created story job ${jobId} for user ${userId} (free trial, no credits reserved)`);
   return jobId;

@@ -3191,6 +3191,41 @@ function updateElementReferenceImage(visualBible, elementId, referenceImageData,
 }
 
 /**
+ * Carry the reference RENDERS from one bible object onto another that describes
+ * the same story. The trial renders its reference sheet on the bible object the
+ * stream parser produced (so page images can use it while the writer is still
+ * talking), but the job then re-parses the finished transcript into a second
+ * object — the one the page phase, the persisted story and the entity checks
+ * read. Without this the second object has the entries and the object states
+ * but none of their cells, and every stated artifact logged "[VB-REF] … NO usable
+ * cell" on every page though the cells had been rendered and set.
+ * Entries match by id, states by position; a render already on `to` is kept.
+ * @returns {number} how many cells (entries + states) were carried over
+ */
+function adoptReferenceRenders(from, to) {
+  if (!from || !to || from === to) return 0;
+  let carried = 0;
+  const carry = (src, dst) => {
+    if (!hasRefImage(src) || hasRefImage(dst)) return;
+    dst.referenceImageUrl = src.referenceImageUrl || null;
+    dst.referenceImageData = src.referenceImageUrl ? null : (src.referenceImageData || null);
+    carried++;
+  };
+  for (const key of ['secondaryCharacters', 'artifacts', 'animals', 'vehicles', 'locations']) {
+    const dstByBase = new Map((to[key] || []).map(e => [baseVbId(e.id) || String(e.id || '').trim().toUpperCase(), e]));
+    for (const src of from[key] || []) {
+      const dst = dstByBase.get(baseVbId(src.id) || String(src.id || '').trim().toUpperCase());
+      if (!dst) continue;
+      carry(src, dst);
+      if (src.referenceImageGenerated) dst.referenceImageGenerated = true;
+      const dstStates = objectStates(dst);
+      objectStates(src).forEach((st, i) => { if (dstStates[i]) carry(st, dstStates[i]); });
+    }
+  }
+  return carried;
+}
+
+/**
  * Get reference images for a specific page from Visual Bible elements
  * Returns elements that appear on this page and have reference images
  * Limited to MAX_ELEMENT_REFERENCES_PER_PAGE to avoid overloading the prompt
@@ -3947,6 +3982,7 @@ module.exports = {
   // Reference image support
   getElementsNeedingReferenceImages,
   updateElementReferenceImage,
+  adoptReferenceRenders,
   buildCharacterDescription,
   buildArtifactDescription,
   buildAnimalDescription,

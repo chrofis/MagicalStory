@@ -40,6 +40,8 @@ interface LocationState {
     storyTheme: string;
     storyDetails: string;
     language: string;
+    ideaKind?: 'local' | 'fantasy';
+    ideaPick?: { index: 0 | 1; attempt: number; offered: { title: string; summary: string }[] };
   };
   characterName: string;
   previewAvatar: string | null;

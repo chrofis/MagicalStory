@@ -170,4 +170,64 @@ function recordIdeaEvent(e = {}) {
   }
 }
 
-module.exports = { recordIdeaEvent, normaliseIdeaEvent, castFacts, shapeRef };
+
+/**
+ * The idea_picked event for a job's input — ONE writer for the wizard
+ * (routes/jobs.js) and the trial (routes/trial.js), so both record the same
+ * funnel row. armIndex null means the customer wrote their own premise, which is
+ * its own verdict on the pair, so the event is recorded whenever ideas were
+ * actually offered (docs/decisions.md 2026-10-09).
+ */
+function recordIdeaPicked(inputData, { userId, storyId }) {
+  if (!inputData || !(inputData.ideaGeneration || inputData.ideaPick)) return;
+  const pick = inputData.ideaPick || null;
+  const armIndex = pick ? pick.index : inputData.ideaGeneration?.selectedIndex;
+  recordIdeaEvent({
+    event: 'idea_picked',
+    userId,
+    storyId,
+    category: inputData.storyCategory,
+    topic: inputData.storyTopic,
+    theme: inputData.storyTheme,
+    language: inputData.language,
+    pages: inputData.pages,
+    characters: inputData.characters,
+    worldMode: pick?.worldMode,
+    attempt: pick?.attempt,
+    armIndex: armIndex === null || armIndex === undefined ? null : armIndex,
+    worlds: pick?.world || inputData.ideaWorld || null,
+    shapes: pick?.shape || null,
+    model: inputData.ideaGeneration?.model,
+    detail: { ideasOffered: inputData.ideaGeneration?.output?.length || pick?.offered?.length || 0 },
+  });
+}
+
+/**
+ * The trial's `ideaPick`, built from what the visitor's browser sent: the card
+ * index and the two cards that were on screen. The trial has exactly two
+ * cards, the own-town one (0) and the make-believe one (1), so the world follows
+ * from the index. Returns null when the body carries no valid pick (an old
+ * client); the caller then stores nothing rather than guessing one.
+ * Text only, bounded: nothing here can carry an image into JSONB.
+ */
+const TRIAL_IDEA_TEXT_MAX = 1200;
+function buildTrialIdeaPick(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const index = raw.index;
+  if (index !== 0 && index !== 1) return null;
+  const offered = (Array.isArray(raw.offered) ? raw.offered : []).slice(0, 2).map(c => ({
+    title: String(c?.title ?? '').slice(0, TRIAL_IDEA_TEXT_MAX),
+    summary: String(c?.summary ?? '').slice(0, TRIAL_IDEA_TEXT_MAX),
+  }));
+  const attempt = Number.isInteger(raw.attempt) && raw.attempt >= 1 && raw.attempt <= 50 ? raw.attempt : null;
+  return {
+    index,
+    world: { world: index === 1 ? 'fantasy' : 'location', theme: null, location: null },
+    shape: null,
+    worldMode: 'auto',
+    attempt,
+    offered,
+  };
+}
+
+module.exports = { recordIdeaPicked, buildTrialIdeaPick, recordIdeaEvent, normaliseIdeaEvent, castFacts, shapeRef };

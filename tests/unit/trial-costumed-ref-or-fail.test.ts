@@ -78,7 +78,7 @@ describe('the trial render sites refuse a bare costumed ref', () => {
   });
 
   it('the early styling failure is logged as an error, not a warning', () => {
-    expect(src).toMatch(/log\.error\(`❌ \[TRIAL\] Early avatar styling failed/);
-    expect(src).not.toMatch(/log\.warn\(`⚠️ \[TRIAL\] Early avatar styling failed/);
+    expect(src).toMatch(/log\.error\(`❌ \[TRIAL\] Early \$\{label\} avatar styling failed/);
+    expect(src).not.toMatch(/log\.warn\(`⚠️ \[TRIAL\] Early (\$\{label\} )?avatar styling failed/);
   });
 });
