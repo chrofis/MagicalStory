@@ -113,6 +113,13 @@ const DEFAULTS = {
   selectHueDeg: 40,
   selectMinChroma: 10,
   selectSkinMargin: 18,
+  // SKIN GATE on the detector mask (Fiona rerun 2026-10-08, p16). A sleeveless top's
+  // SAM silhouette took the arms and neck: 87% of the pixels the recolour moved sat within
+  // deltaE 18 of the figure's own skin, the "garment" mean was skin (L 61.9, chroma 26.7), and
+  // a cream->white fix hue-shifted bare skin by deltaE 22. Skin-like pixels (within
+  // `selectSkinMargin` of THIS figure's skin) leave the mask; a mask that is more than this
+  // share skin is not the garment and is refused outright.
+  maxSkinShare: 0.35,
   headGrowSide: 0.45,
   headGrowUp: 0.55,
   // Ask a vision model whether the marked pixels really are that garment.
@@ -471,6 +478,27 @@ function figureSkinLab(cropRaw, cw, ch, faceBoxCrop) {
   if (Ls.length < 40) return null;
   const med = arr => arr.slice().sort((u, v) => u - v)[arr.length >> 1];
   return { L: med(Ls), a: med(as), b: med(bs), samples: Ls.length };
+}
+
+/**
+ * Take the figure's own skin out of a garment mask. Pure.
+ *
+ * @param {Buffer} alpha   mask, one byte per pixel (mutated copy returned)
+ * @param {Buffer} raw     RGB bytes of the same crop
+ * @param {{L,a,b}} skin   figureSkinLab result
+ * @param {number} margin  deltaE under which a pixel counts as skin
+ * @returns {{alpha:Buffer, total:number, removed:number, share:number}} `share` = removed / total
+ */
+function removeSkinFromMask(alpha, raw, skin, margin) {
+  const out = Buffer.from(alpha);
+  let total = 0, removed = 0;
+  for (let i = 0; i < out.length; i++) {
+    if (out[i] <= 8) continue;
+    total++;
+    const l = _rgbToLab(raw[i * 3], raw[i * 3 + 1], raw[i * 3 + 2]);
+    if (Math.hypot(l[0] - skin.L, l[1] - skin.a, l[2] - skin.b) < margin) { out[i] = 0; removed++; }
+  }
+  return { alpha: out, total, removed, share: total ? removed / total : 0 };
 }
 
 /**
@@ -1312,13 +1340,34 @@ async function fixFigureGarmentColour(pageImageData, figure, avatarUri, options 
   report.cropPx = cw * ch;
 
   const { data: cropRaw } = await sharp(cropBuf).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  // SKIN GATE (see DEFAULTS.maxSkinShare). The colour-only mode already fences skin off in its
+  // selection; every detector mask is cleaned here, BEFORE the garment mean is measured, so the
+  // mean is the garment's and the move can never land on the figure's arms, neck or face.
+  const skinLab = mode === 'colour' ? null : figureSkinLab(cropRaw, cw, ch, faceBoxCrop);
+  if (mode !== 'colour') {
+    if (!skinLab) {
+      // A back view has no face box, so there is no skin sample to fence with. Said, not hidden.
+      report.skinGate = 'not applied: no face box to sample the figure skin from';
+      log.warn(`[GARMENT-COLOUR] ${report.name} ${garmentKey}: ${report.skinGate}`);
+    } else {
+      const cleaned = removeSkinFromMask(seg.alpha, cropRaw, skinLab, cfg.selectSkinMargin);
+      report.skinGate = { maskPx: cleaned.total, skinPx: cleaned.removed, share: +cleaned.share.toFixed(2) };
+      if (cleaned.share > cfg.maxSkinShare) {
+        report.reason = `mask is ${Math.round(cleaned.share * 100)}% skin (${cleaned.removed}/${cleaned.total}px within deltaE ${cfg.selectSkinMargin} of this figure's skin) — it is not the ${garmentKey}`;
+        log.warn(`⚠️ [GARMENT-COLOUR] ${report.name} ${garmentKey}: ${report.reason} — refusing to repaint`);
+        return { changed: false, imageData: pageImageData, report, steps };
+      }
+      seg.alpha = cleaned.alpha;
+    }
+  }
   let cur = meanLabMasked(cropRaw, seg.alpha);
   // Grow the mask onto the rim SAM left behind, then re-measure from the full
   // garment so the target offset is computed against every pixel it will touch.
   if (mode !== 'colour' && cur && cur.count >= cfg.minMaskPx && cfg.dilateRadius > 0) {
     const grown = dilateMaskByColour(seg.alpha, cropRaw, cw, ch, cur, cfg);
     if (grown.added) {
-      seg.alpha = grown.alpha;
+      // Growth is colour-gated against the garment mean only; skin beside the rim can pass it.
+      seg.alpha = skinLab ? removeSkinFromMask(grown.alpha, cropRaw, skinLab, cfg.selectSkinMargin).alpha : grown.alpha;
       report.maskDilated = grown.added;
       cur = meanLabMasked(cropRaw, seg.alpha) || cur;
     }
@@ -1480,6 +1529,7 @@ module.exports = {
   GARMENT_REGION,
   selectBadColourPixels,
   figureSkinLab,
+  removeSkinFromMask,
   keepConnectedComponents,
   maskBoundingBox,
   detectOnHighlighted,

@@ -188,6 +188,7 @@ Sizes measured 2026-08-09.
 |---|---|---|---|---|
 | image-evaluation.txt | 18,511 | 180 | images.js `evaluateImageQuality`; regeneration.js evaluate-single | Quality eval (fix_targets need gemini-2.5-flash) |
 | image-semantic.txt | 16,061 | 151 | images.js `evaluateThreeStage`; sceneValidator.js `evaluateSemanticFidelity` | Semantic fidelity eval |
+| parent-shared-findings.txt | 1,300 | 25 | sceneValidator.js `tagFindingsSharedWithParent` (repairPipeline.js round loop) | Tags a repair child's non-semantic findings that the parent picture shows too (`alsoInParent`) |
 | absence-second-look.txt | 786 | 15 | evalPipeline.js `evaluateImageQuality` via absenceCheck.js `secondLookAbsenceClaims` (image + claims only) | Independent second look at every CRITICAL/MAJOR absence claim before it may take a repair slot; unconfirmed → advisory (2026-09-23) |
 | image-vision-inventory.txt | 2,039 | 32 | testlab.js `split_stage1` arm only | **Not the production inventory**: the three-stage judge's stage 1 is image-inventory-unified.txt via `runVisualInventory` (evalPipeline.js); this file survives only as a Test Lab A/B arm |
 | image-prompt-compliance.txt | 15,268 | 155 | images.js `evaluateThreeStage` | Three-stage eval: prompt compliance (never sees the image) |

@@ -651,7 +651,7 @@ async function grokEditSceneExact(prompt, referenceUris, sceneBuf, sceneW, scene
  *   identifier there produced unreadable instructions (three copies of a
  *   30-word descriptor in two sentences, job_1788727233899 p7).
  */
-function stripCharacterNames(text, { names = [], vidByName = new Map(), fallbackByName = new Map(), ownVisualId = null, ownName = null } = {}) {
+function stripCharacterNames(text, { names = [], vidByName = new Map(), fallbackByName = new Map(), possessiveByName = new Map(), ownVisualId = null, ownName = null } = {}) {
   if (!text || typeof text !== 'string' || names.length === 0) return text;
   const escapeRe = (v) => String(v).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const own = ownName ? String(ownName).toLowerCase() : null;
@@ -666,7 +666,14 @@ function stripCharacterNames(text, { names = [], vidByName = new Map(), fallback
   // otherwise leaves a dangling apostrophe ("the character' hands").
   const re = new RegExp(`\\b(${alternation})(['’]s?)?(?!\\w)`, 'g');
   return text
-    .replace(re, (_m, name, poss) => (poss ? `${vidFor(name)}'s` : vidFor(name)))
+    .replace(re, (_m, name, poss) => {
+      if (!poss) return vidFor(name);
+      // A possessive takes the descriptor's own noun phrase: a trailing place clause would
+      // carry the 's ("fourth from the left's back"). Only the shared fallback has a placeless form.
+      const bare = possessiveByName.get(name.toLowerCase());
+      const planned = (own && name.toLowerCase() === own) || vidByName.get(name.toLowerCase()) || (own ? null : ownVisualId);
+      return `${(!planned && bare) || vidFor(name)}'s`;
+    })
     .replace(/\s{2,}/g, ' ')
     .trim();
 }

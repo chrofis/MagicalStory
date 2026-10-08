@@ -119,7 +119,7 @@ describe('inpaintPage: the instruction the image model receives', () => {
       per_character_fixes: [],
     });
     expect(sent[0]).not.toMatch(/Bramble|Oldwick|ANI001/);
-    expect(sent[0]).toContain("the young dragon with warm rust-red smooth scales (rounded snout, single pair of short blunt horns), second from the left's head");
+    expect(sent[0]).toContain("the young dragon with warm rust-red smooth scales (rounded snout, single pair of short blunt horns)'s head");
     expect(sent[0]).toContain('the 60-year-old figure in dark grey woollen tunic falling to the knees');
   }, 30000);
 
@@ -165,7 +165,7 @@ describe('char-fix pose lines (faceRepair.buildActionContext)', () => {
   it('names the creature, other cast and a secondary character by sight; the target keeps its name', () => {
     const ctx = faceRepair.buildActionContext(BRIEF, 'Mika', null, names);
     expect(ctx).not.toMatch(/Bramble|Lotte|Oldwick|ANI001/);
-    expect(ctx).toContain("the young dragon with warm rust-red smooth scales (rounded snout, single pair of short blunt horns), second from the left's snout");
+    expect(ctx).toContain("the young dragon with warm rust-red smooth scales (rounded snout, single pair of short blunt horns)'s snout");
     expect(ctx).toContain('the 7-year-old girl, on the far right');
     expect(ctx).toContain('the 60-year-old figure in dark grey woollen tunic falling to the knees');
     expect(ctx).toMatch(/^\n\nMika in this scene/);
@@ -192,7 +192,7 @@ describe('manual repair route (POST /:id/repair/image/:pageNum)', () => {
     const out = nameRepairText("Bramble is lying down instead of sitting. Mika's gaze misses ANI001", names);
     expect(out).not.toMatch(/Bramble|Mika|ANI001/);
     expect(out).toContain('the young dragon with warm rust-red smooth scales');
-    expect(out).toContain("the 5-year-old boy, on the far left's gaze");
+    expect(out).toContain("the 5-year-old boy's gaze");
   });
 
   it('the route sends its instruction through that map', () => {

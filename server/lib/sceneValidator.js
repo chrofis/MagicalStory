@@ -796,8 +796,83 @@ function buildParentCompareBlock(parent) {
   return [
     '**PARENT PICTURE (REPAIR CHECK):** this picture is a repair of an earlier picture, attached SECOND. Judge the FIRST picture only, by every rule here; the second is for comparison and is never itself judged. The earlier picture was found to have:',
     list.length ? list.join('\n') : '- (no findings recorded)',
-    'Add `parent_findings` to the JSON: one entry `{"id": "P1", "status": "fixed" | "still_present"}` for each finding above, answered from what the two pictures show. Add `also_in_parent` to EVERY `fixable_issues` entry: `true` when the same defect is visible in the second picture, else `false`.',
+    'Add `parent_findings` to the JSON: one entry `{"id": "P1", "status": "fixed" | "still_present"}` for each finding above. Look at the place each finding names in BOTH pictures. `fixed` needs two things: the first picture no longer has the defect, and it differs from the second picture there. A spot that looks the same in both pictures is `still_present`, and so is a defect the first picture still shows. Never answer from the wording of the finding alone. Add `also_in_parent` to EVERY `fixable_issues` entry: `true` when the same defect is visible in the second picture, else `false`.',
   ].join('\n');
+}
+
+/**
+ * SECOND HALF OF THE PAIRED RE-JUDGE (Fiona rerun 2026-10-08, dedication page). The semantic judge
+ * above tags only ITS OWN findings against the parent. The quality, compliance and reader findings
+ * on a repair child never saw the parent, so a page-wide defect the parent had just as much ("the
+ * page is photographic") was charged to the child alone, the child lost to the parent that still
+ * carried the CRITICAL the repair had removed, and the caption shipped. One call, both pictures:
+ * which of the child's remaining findings are also in the parent.
+ *
+ * @param {Array<{severity, type, character, description}>} entries  the findings to ask about
+ * @returns {string} the FINDINGS block, ids C1..Cn in entry order
+ */
+function buildSharedFindingsBlock(entries) {
+  return entries.map((f, i) =>
+    `- C${i + 1} [${String(f.severity || '').toUpperCase()}] ${f.type ? `(${f.type}) ` : ''}${f.character ? `${f.character}: ` : ''}${f.description}`).join('\n');
+}
+
+/** The ids answered `also_in_parent: true`, as entry indices. Unknown ids and non-booleans are ignored. */
+function parseSharedFindings(text, count) {
+  const m = String(text || '').match(/\{[\s\S]*\}/);
+  if (!m) throw new Error('no JSON in the reply');
+  const rows = JSON.parse(m[0]).findings;
+  if (!Array.isArray(rows)) throw new Error('reply has no findings array');
+  const shared = new Set();
+  for (const r of rows) {
+    const k = /^C(\d+)$/.exec(String(r?.id || ''));
+    if (k && +k[1] >= 1 && +k[1] <= count && r.also_in_parent === true) shared.add(+k[1] - 1);
+  }
+  return shared;
+}
+
+/**
+ * Tag the deduped entries of a repair child's plan that are also in its parent (`alsoInParent`).
+ * Only entries the semantic judge did not already answer for: MODERATE and above, not tagged, with
+ * at least one source other than `semantic`. Nothing to ask means no call. A failed call is
+ * logged at ERROR and tags nothing: the findings stay charged to the child (no fallback guess).
+ *
+ * @returns {Promise<{asked:number, tagged:number, usage:object|null, error:string|null}>}
+ */
+async function tagFindingsSharedWithParent({ childImage, parentImage, plan, pageNumber = null }) {
+  const { deductionPoints, SEVERITY_POINTS } = require('./scoring');
+  const issues = Array.isArray(plan?.deduped_issues) ? plan.deduped_issues : [];
+  const ask = issues.filter(i => i && !i.alsoInParent
+    && deductionPoints({ severity: String(i.severity || '').toLowerCase(), type: i.type }) >= SEVERITY_POINTS.moderate
+    && (Array.isArray(i.sources) ? i.sources : []).some(x => x !== 'semantic'));
+  if (!ask.length) return { asked: 0, tagged: 0, usage: null, error: null };
+  const template = PROMPT_TEMPLATES.parentSharedFindings;
+  if (!template) throw new Error('parent-shared-findings prompt not loaded');
+  const { GEMINI_SAFETY_SETTINGS } = require('./images');
+  const b64 = (d) => (d.startsWith('data:') ? d.split(',')[1] : d);
+  const prompt = fillTemplate(template, { FINDINGS: buildSharedFindingsBlock(ask.map(i => ({
+    severity: i.severity, type: i.type, character: i.character || i.name || null, description: i.description,
+  }))) });
+  const model = genAI.getGenerativeModel({
+    model: VISION_MODEL, safetySettings: GEMINI_SAFETY_SETTINGS, generationConfig: { temperature: EVAL_TEMPERATURE },
+  }, EVAL_REQUEST_OPTIONS);
+  const t0 = Date.now();
+  try {
+    const result = await model.generateContent([
+      prompt,
+      { inlineData: { mimeType: 'image/png', data: b64(childImage) } },
+      { inlineData: { mimeType: 'image/png', data: b64(parentImage) } },
+    ]);
+    const text = result.response.text();
+    require('./evalCallLog').recordEvalCall({ kind: 'parent_shared', pageNumber, model: VISION_MODEL, prompt, rawResponse: text });
+    const usage = { ...pricedUsage(result.response.usageMetadata, VISION_MODEL), elapsed: Date.now() - t0 };
+    const shared = parseSharedFindings(text, ask.length);
+    shared.forEach(i => { ask[i].alsoInParent = true; });
+    log.info(`[PARENT-SHARED] p${pageNumber}: ${shared.size}/${ask.length} finding(s) are also in the parent`);
+    return { asked: ask.length, tagged: shared.size, usage, error: null };
+  } catch (err) {
+    log.error(`[PARENT-SHARED] p${pageNumber}: could not tell which of ${ask.length} finding(s) are also in the parent — they stay charged to the repair: ${err.message}`);
+    return { asked: ask.length, tagged: 0, usage: null, error: err.message };
+  }
 }
 
 function buildSemanticPrompt(template, { storyText, sceneHint, imagePrompt, interactionsBlock, elementsBlock, declaredLight = '', evalContext = {} } = {}, level = 'light') {
@@ -1107,6 +1182,9 @@ module.exports = {
   evaluateSemanticFidelity,
   buildSemanticPrompt,
   buildParentCompareBlock,
+  buildSharedFindingsBlock,
+  parseSharedFindings,
+  tagFindingsSharedWithParent,
   semanticDeclaredLight,
   semanticDeclaredBlocks
 };

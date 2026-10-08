@@ -240,6 +240,8 @@ async function loadPromptTemplates() {
     ['imageInventoryUnified', 'image-inventory-unified.txt'],
     ['imagePromptCompliance', 'image-prompt-compliance.txt'],
     ['imageSemantic', 'image-semantic.txt'],
+    // Second half of the paired re-judge: tags the repair child's findings the semantic judge never saw.
+    ['parentSharedFindings', 'parent-shared-findings.txt'],
     ['absenceSecondLook', 'absence-second-look.txt'],
     // coverImageEvaluation: removed in commit 0f408228 (May 9 2026). The
     // file was deleted but the load-line stayed, which cascaded a load

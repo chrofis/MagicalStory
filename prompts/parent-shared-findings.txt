@@ -1,0 +1,14 @@
+Two pictures of the same page. The FIRST is a repaired version. The SECOND is the version it was repaired from. A reviewer filed the findings below against the FIRST picture.
+
+For each finding, say whether the same defect is also visible in the SECOND picture.
+
+FINDINGS (filed against the first picture):
+{FINDINGS}
+
+`also_in_parent` is true when the second picture shows the same defect: the same thing missing, wrong or off, on the same figure or in the same way. A page-wide defect (the medium, the style, the lighting) counts as shared when the second picture has it too.
+`also_in_parent` is false only when the second picture does not have it, so the repair introduced it.
+Look at the second picture for each finding. Do not guess from the wording.
+
+Return JSON only:
+{"findings": [{"id": "C1", "also_in_parent": true}]}
+One entry per finding, with the id as given.

@@ -1817,6 +1817,7 @@ function repairGarmentPhrase({
 function describeFigureForRepair({
   name, characters = null, characterClothing = null, clothingRequirements = null,
   artStyle = null, detectedFigures = null, visualBible = null, sceneMetadata = null, pageNumber = null,
+  placeless = false,
 } = {}) {
   const wanted = String(name || '').trim().toLowerCase();
   if (!wanted) return null;
@@ -1824,9 +1825,13 @@ function describeFigureForRepair({
 
   // PLACE. Rank by the box centre so the phrase says which of several it is.
   // Detector boxes are [ymin, xmin, ymax, xmax].
+  // Only the page's identified figures are counted: the detector files distant passers-by as
+  // UNKNOWN, and ranking among them gave "fourth from the left" on a two-figure page (Fiona rerun
+  // 2026-10-08, p4 — three tiny background walkers were counted). `placeless` is for a possessive,
+  // where a trailing place clause would take the 's ("fourth from the left's back").
   let place = null;
-  const figs = (detectedFigures || []).filter(f => f?.name && Array.isArray(f.bodyBox || f.box));
-  if (figs.length > 1) {
+  const figs = (detectedFigures || []).filter(f => f?.name && f.name !== 'UNKNOWN' && Array.isArray(f.bodyBox || f.box));
+  if (!placeless && figs.length > 1) {
     const cx = (f) => { const b = f.bodyBox || f.box; return (b[1] + b[3]) / 2; };
     const ordered = [...figs].sort((a, b) => cx(a) - cx(b));
     const idx = ordered.findIndex(f => String(f.name).trim().toLowerCase() === wanted);
@@ -1931,7 +1936,7 @@ function describeVbFigure(entry, pool) {
  * Carries the bible and page along so nameRepairText can resolve figure ids
  * (which sanitizeVbIdsInPrompt turns into names) before the strip.
  *
- * @returns {{ names: string[], fallbackByName: Map<string,string>, visualBible, pageNumber }}
+ * @returns {{ names: string[], fallbackByName: Map<string,string>, possessiveByName: Map<string,string>, visualBible, pageNumber }}
  */
 function buildRepairNameMap({
   characters = null, visualBible = null, characterClothing = null, clothingRequirements = null,
@@ -1939,6 +1944,8 @@ function buildRepairNameMap({
 } = {}) {
   const names = [];
   const fallbackByName = new Map();
+  // The same descriptor without its place clause, for a name used as a possessive.
+  const possessiveByName = new Map();
   const add = (name, fallback) => {
     const n = String(name || '').trim();
     if (!n || fallbackByName.has(n.toLowerCase())) return;
@@ -1948,12 +1955,17 @@ function buildRepairNameMap({
     });
     names.push(n);
     fallbackByName.set(n.toLowerCase(), described || fallback);
+    const bare = describeFigureForRepair({
+      name: n, characters, characterClothing, clothingRequirements, artStyle, detectedFigures, visualBible,
+      sceneMetadata, pageNumber, placeless: true,
+    });
+    possessiveByName.set(n.toLowerCase(), bare || fallback);
   };
   for (const c of (characters || [])) add(c?.name, 'the character');
   for (const pool of VB_FIGURE_POOLS) {
     for (const e of (visualBible?.[pool] || [])) { add(e?.name, 'the figure'); add(e?.properName, 'the figure'); }
   }
-  return { names, fallbackByName, visualBible, pageNumber };
+  return { names, fallbackByName, possessiveByName, visualBible, pageNumber };
 }
 
 /**
@@ -2025,6 +2037,7 @@ function nameRepairText(text, nameMap, { keep = null, vidByName, ownVisualId = n
   return stripCharacterNames(resolveRepairIds(text, nameMap), {
     names: kept ? nameMap.names.filter(n => n.toLowerCase() !== kept) : nameMap.names,
     fallbackByName: nameMap.fallbackByName,
+    possessiveByName: nameMap.possessiveByName,
     ...(vidByName ? { vidByName } : {}),
     ownVisualId, ownName,
   });

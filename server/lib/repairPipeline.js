@@ -2878,6 +2878,27 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         if (plan) roundConsolidated.set(ev.pageNumber, plan);
       })));
 
+      // PAIRED RE-JUDGE, second half. The semantic judge tagged only its own findings against the
+      // parent; the quality/compliance/reader findings on the child never saw it. One call per
+      // repaired page that still has such findings tags the ones the parent shows too, so a defect
+      // the parent has just as much cannot cost the child the win (dedication page, 2026-10-08).
+      await Promise.all(roundEvals.filter(ev => ev.evaluated !== false).map(ev => consolidateLimit(async () => {
+        const plan = roundConsolidated.get(ev.pageNumber);
+        const parentCompare = roundEvalInputs.find(i => i.pageNumber === ev.pageNumber)?.parentCompare;
+        const child = roundSuccess.find(r => r.pageNumber === ev.pageNumber);
+        if (!plan || !parentCompare?.imageData || typeof child?.imageData !== 'string') return;
+        const { tagFindingsSharedWithParent } = require('./sceneValidator');
+        const res = await tagFindingsSharedWithParent({
+          childImage: child.imageData, parentImage: parentCompare.imageData, plan, pageNumber: ev.pageNumber,
+        });
+        if (res.usage && usageTracker) {
+          usageTracker('gemini_quality', {
+            input_tokens: res.usage.input_tokens || 0, output_tokens: res.usage.output_tokens || 0,
+            thinking_tokens: res.usage.thinking_tokens || 0,
+          }, `parent_shared_r${round}`, res.usage.modelId || 'gemini-2.5-flash');
+        }
+      })));
+
       // pageVersions append is intentionally sequential here. Earlier audits
       // raised a concern about parallel .set() races — that concern was based
       // on a different code shape. Today each page picks ONE repair method
