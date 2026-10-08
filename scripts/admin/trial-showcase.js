@@ -24,6 +24,7 @@
  *   node scripts/admin/trial-showcase.js --dry-run        # print the plan, call nothing paid
  *   node scripts/admin/trial-showcase.js --no-wait        # fire and exit (job id printed)
  *   node scripts/admin/trial-showcase.js --idea=makebelieve  # take the fantasy card
+ *   node scripts/admin/trial-showcase.js --prepare-title=off # old path: no prepare-title call
  *
  * STORY PREMISE — the wizard never posts an empty storyDetails. A real user
  * picks one of the two cards on the ideas step and the client sends
@@ -61,7 +62,7 @@ const POLL_TIMEOUT_MS = 20 * 60 * 1000;
 const JOB_BASELINE_SECS = 123;
 
 function parseArgs() {
-  const out = { base: DEFAULT_BASE, entry: null, dryRun: false, wait: true, idea: 'grounded', over: {} };
+  const out = { base: DEFAULT_BASE, entry: null, dryRun: false, wait: true, idea: 'grounded', prepareTitle: 'on', over: {} };
   for (const a of process.argv.slice(2)) {
     if (a.startsWith('--entry=')) out.entry = Number(a.split('=')[1]);
     else if (a.startsWith('--base=')) out.base = a.split('=')[1].replace(/\/$/, '');
@@ -77,6 +78,8 @@ function parseArgs() {
     // Which of the two idea cards to take. 'grounded' (card 1, the child's own
     // town + landmark mandate) is the default — see IDEA_MODES.
     else if (a.startsWith('--idea=')) out.idea = a.split('=')[1];
+    // --prepare-title=off reproduces the pre-2026-10-08 path (no prepare-title call at all).
+    else if (a.startsWith('--prepare-title=')) out.prepareTitle = a.split('=')[1];
     else if (a === '--dry-run') out.dryRun = true;
     else if (a === '--no-wait') out.wait = false;
     else if (a === '--help' || a === '-h') { console.log(fs.readFileSync(__filename, 'utf8').split('*/')[0]); process.exit(0); }
@@ -84,6 +87,10 @@ function parseArgs() {
   }
   if (!IDEA_MODES.includes(out.idea)) {
     console.error(`--idea must be one of: ${IDEA_MODES.join('|')}`);
+    process.exit(1);
+  }
+  if (!['on', 'off'].includes(out.prepareTitle)) {
+    console.error('--prepare-title must be on|off');
     process.exit(1);
   }
   return out;
@@ -132,6 +139,9 @@ async function generateIdeas(base, entry, sessionToken) {
   if (!res.ok) throw new Error(`generate-ideas-stream → ${res.status}: ${(await res.text()).slice(0, 300)}`);
 
   const texts = ['', ''];
+  const tStart = Date.now();
+  const firstTextMs = [null, null];
+  const finalMs = [null, null];
   const decoder = new TextDecoder();
   let buffer = '';
   let streamError = null;
@@ -144,8 +154,12 @@ async function generateIdeas(base, entry, sessionToken) {
       let data;
       try { data = JSON.parse(line.slice(6)); } catch { continue; }
       if (data.error) { streamError = data.error; continue; }
-      if (data.story1 !== undefined) texts[0] = data.story1;
-      if (data.story2 !== undefined) texts[1] = data.story2;
+      ['story1', 'story2'].forEach((slot, i) => {
+        if (data[slot] === undefined) return;
+        texts[i] = data[slot];
+        if (firstTextMs[i] === null && data[slot]) firstTextMs[i] = Date.now() - tStart;
+        if (data.isFinal) finalMs[i] = Date.now() - tStart;
+      });
     }
   }
   // An error frame for ONE card still leaves the other usable, but a run that
@@ -155,6 +169,8 @@ async function generateIdeas(base, entry, sessionToken) {
   if (!ideas[0].title || !ideas[1].title) {
     throw new Error(`idea stream returned an unusable card (titles: ${JSON.stringify(ideas.map(i => i.title))})`);
   }
+  // Stream timing: what a visitor waits for the idea cards (first text, final card).
+  ideas.timing = { firstTextMs, finalMs, totalMs: Date.now() - tStart };
   return ideas;
 }
 
@@ -323,7 +339,7 @@ function faceDataUri(entry) {
   //     handoff (docs/decisions.md 2026-10-08 "create-story starts the job at once").
   //     Skipping it ran every showcase on a path no real visitor takes.
   const tPrepare = Date.now();
-  const preparePromise = api(args.base, '/api/trial/prepare-title', {
+  const preparePromise = args.prepareTitle === 'off' ? Promise.resolve(console.log(`[${chTime(new Date())}] prepare-title skipped (--prepare-title=off)`)) : api(args.base, '/api/trial/prepare-title', {
     bearer: acct.sessionToken,
     body: {
       storyTopic: entry.storyTopic || '', storyCategory: entry.storyCategory,
@@ -342,6 +358,9 @@ function faceDataUri(entry) {
   let ideaKind = null;
   if (!storyDetails) {
     const ideas = await generateIdeas(args.base, entry, acct.sessionToken);
+    const t = ideas.timing;
+    const sec = ms => (ms === null ? 'n/a' : `${(ms / 1000).toFixed(1)}s`);
+    console.log(`[${chTime(new Date())}] idea cards: first text ${sec(t.firstTextMs[0])}/${sec(t.firstTextMs[1])}, final ${sec(t.finalMs[0])}/${sec(t.finalMs[1])}, stream closed ${sec(t.totalMs)}`);
     const idx = pickIdeaIndex(args.idea);
     const idea = ideas[idx];
     // Byte-for-byte the client's shape (TrialWizard.tsx handleCreate).
