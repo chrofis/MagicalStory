@@ -88,7 +88,8 @@ function parseTrailers(message) {
     const n = NONE.exec(v);
     if (n) r.none.push(n[1].trim());
     else if (/^none\b/i.test(v)) r.bad.push(v);
-    else if (/^[a-z0-9][a-z0-9-]*$/i.test(v)) r.ids.push(v);
+    // One trailer may name several entries ("Verify: a, b"); each must still exist.
+    else if (/^[a-z0-9][a-z0-9-]*(\s*,\s*[a-z0-9][a-z0-9-]*)*$/i.test(v)) r.ids.push(...v.split(/\s*,\s*/));
     else r.bad.push(v);
   }
   return r;

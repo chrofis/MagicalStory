@@ -66,6 +66,11 @@ describe('check-verify-coupling: decision core', () => {
     expect(parseTrailers('s\n\nbody\nVerify: none (docs only)\nCo-Authored-By: x')).toEqual({ none: ['docs only'], ids: [], bad: [] });
   });
 
+  it('reads a comma list in one trailer as several entry ids', () => {
+    expect(parseTrailers('s\n\nVerify: a-1, b-2,c-3')).toEqual({ none: [], ids: ['a-1', 'b-2', 'c-3'], bad: [] });
+    expect(parseTrailers('s\n\nVerify: a-1, two words')).toEqual({ none: [], ids: [], bad: ['a-1, two words'] });
+  });
+
   it('counts added or re-specified entries, never evidence-only changes', () => {
     const base = { entries: [{ id: 'a', title: 't', claim: 'c', commits: ['1'], runShape: ['any'], check: { kind: 'human', what: 'w' }, status: 'pending', evidence: [] }] };
     const evidenceOnly = JSON.parse(JSON.stringify(base));
