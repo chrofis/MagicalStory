@@ -7744,7 +7744,7 @@
           "runDate": "2026-10-09 00:53:31 CH",
           "checkedAt": "2026-10-09 01:09:46 CH",
           "result": "FAILED",
-          "note": "stories.data.ideaPick is missing on a run started from a generated idea"
+          "note": "stories.data.ideaPick is missing on a run started from a generated idea (harness had not yet sent ideaPick; fixed in be60755f0, re-run pending)"
         },
         {
           "storyId": "job_1791500208126_at0wow7xa",
@@ -7753,7 +7753,7 @@
           "runDate": "2026-10-09 00:56:48 CH",
           "checkedAt": "2026-10-09 01:09:46 CH",
           "result": "FAILED",
-          "note": "stories.data.ideaPick is missing on a run started from a generated idea"
+          "note": "stories.data.ideaPick is missing on a run started from a generated idea (harness had not yet sent ideaPick; fixed in be60755f0, re-run pending)"
         }
       ]
     },
@@ -7907,6 +7907,23 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "trial-cover-waits-for-ref-sheet-2026-10-09",
+      "title": "The trial front cover renders with the reference cells of the elements it shows",
+      "commits": [
+        "345aa6386"
+      ],
+      "addedAt": "2026-10-09",
+      "claim": "On a trial the TRIAL-COVER 'Starting title page generation' log line comes after the early VB reference sheet finished; the cover shows a held toy or pet as its page cells do, and a wizard costume shows the stated pointed hat on sheet, cover and pages.",
+      "runShape": [
+        "trial"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "View the trial cover next to page 1: held toy and pet match their reference cells; wizard hat shape and colour are the same on the costume sheet, the cover and every page."
+      },
+      "status": "pending"
     }
   ],
   "runs": [
