@@ -9890,7 +9890,7 @@ function analyzeReplanCompliance({
   focalNames = [], keep = [], castFloor = null,
 } = {}) {
   const { parsePlanResponse, parsePlanChanges, parsePlanCheckObstacles, parsePlanCheckActions, findingPages, replanRank } = require('./promptBuilders');
-  const { reviewPlanChanges, castLostByReplan } = require('./planCounters');
+  const { reviewPlanChanges, castLostByReplan, restoreRefusedChanges } = require('./planCounters');
 
   const standingBy = new Map(standing.map(b => [Number(b.pageNumber), b]));
   const parsed = parsePlanResponse(String(replanText || ''), [...standingBy.keys()]);
@@ -9937,7 +9937,9 @@ function analyzeReplanCompliance({
     rankOf: replanRank,
     castFloor,
   });
-  restore(review.refusals.map(r => r.pageNumber));
+  // Production's partial restore: only the refused change is undone, the
+  // page's accepted cast changes are kept (beatsPipeline, 2026-10-09).
+  merged = restoreRefusedChanges({ pages: merged, standing, refusals: review.refusals, changes: declared.changes, castNames, aliases }).pages;
   const lost = castLostByReplan(standing, merged, castNames, aliases, review.declaredOut);
   restore(lost.map(l => l.pageNumber));
 

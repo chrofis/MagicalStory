@@ -1430,7 +1430,14 @@ async function callOpenRouterAPIStreaming(prompt, maxTokens, modelId, onChunk, o
  * GET /api/health/config. Never throws — callers decide (gates are guidelines).
  */
 function guardReply(result, model, modelName, capInForce, options) {
-  const { assessTextReply, describeTruncation, noteTruncation } = require('./textReplyGuard');
+  const { assessTextReply, describeTruncation, noteTruncation, stripControlTokens } = require('./textReplyGuard');
+  // A provider can return only its end-of-sequence token as the "reply"
+  // (grok-4.6 arc_hints, job_1791497309909_6quecrr9t: 11,622 reasoning tokens,
+  // content "<|eos|>"). That is an EMPTY reply, and the guard must see it as one.
+  if (result && typeof result.text === 'string') {
+    const cleaned = stripControlTokens(result.text);
+    if (cleaned !== result.text) result = { ...result, text: cleaned, controlTokensStripped: true };
+  }
   const truncation = assessTextReply(result, { model: result.modelId || model.modelId, provider: result.provider || model.provider, capInForce });
   if (truncation.suspected) {
     const label = options.usageLabel || 'text';

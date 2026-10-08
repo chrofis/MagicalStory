@@ -1599,9 +1599,11 @@ function reviewPlanChanges({ changes = [], standing = [], returned = [], castNam
     .flatMap(n => namesIn(String(n || ''), names, aliases)));
   const isProtected = page => protectedPages instanceof Map && protectedPages.has(Number(page));
   const isMust = tag => !!(tag && typeof rankOf === 'function' && rankOf(tag) === 'must');
-  const refuse = (pageNumber, rule, detail, line) => {
+  const refuse = (pageNumber, rule, detail, line, change = null) => {
     if (!Number.isFinite(pageNumber)) return;
-    refusals.push({ pageNumber: Number(pageNumber), rule, detail, line: String(line || '') });
+    // `clause` names WHICH declared change was refused, so a caller can undo only
+    // that one and keep the page's other, accepted, changes (2026-10-09).
+    refusals.push({ pageNumber: Number(pageNumber), rule, detail, line: String(line || ''), clause: change ? String(change.clause || '') : null });
   };
   // The declared subject is resolved against the DECLARED cast list, never read
   // as prose: a subject naming nobody on that list resolves to nothing, the
@@ -1617,7 +1619,7 @@ function reviewPlanChanges({ changes = [], standing = [], returned = [], castNam
     // A change answering several findings is allowed by ANY of them being must-fix (or breaking an arc fact).
     const tags = (Array.isArray(c.allAnswers) && c.allAnswers.length) ? c.allAnswers : [c.answers];
     if (isProtected(page) && !tags.some(isMust) && !tags.some(breaksArcFact)) {
-      refuse(page, 'protected', `${protectedPages.get(page)} stays, and ${c.answersText || 'an untagged change'} is a noted finding, not a must-fix one`, c.line);
+      refuse(page, 'protected', `${protectedPages.get(page)} stays, and ${c.answersText || 'an untagged change'} is a noted finding, not a must-fix one`, c.line, c);
       continue;
     }
 
@@ -1632,18 +1634,18 @@ function reviewPlanChanges({ changes = [], standing = [], returned = [], castNam
       const heldNames = held.length ? namesIn(held.join(', '), names, aliases) : [];
       const onObstacle = hit.filter(n => heldNames.includes(n));
       if (onObstacle.length) {
-        refuse(page, 'obstacle', `${onObstacle.join(', ')} holds this page's obstacle (the check's own OBSTACLES line)`, c.line);
+        refuse(page, 'obstacle', `${onObstacle.join(', ')} holds this page's obstacle (the check's own OBSTACLES line)`, c.line, c);
         continue;
       }
       const onAction = hit.filter(n => actionPageOf.get(n) === page);
       if (onAction.length) {
-        refuse(page, 'action', `${onAction.join(', ')}: this page stages their own action (the check's ACTION line)`, c.line);
+        refuse(page, 'action', `${onAction.join(', ')}: this page stages their own action (the check's ACTION line)`, c.line, c);
         continue;
       }
       const lastFocal = hit.filter(n => focalSet.has(n)
         && focalPagesIn(standing, beforeWho, n).includes(page) && focalPagesIn(returned, afterWho, n).length === 0);
       if (lastFocal.length) {
-        refuse(page, 'focal', `${lastFocal.join(', ')} would be left with no focal page`, c.line);
+        refuse(page, 'focal', `${lastFocal.join(', ')} would be left with no focal page`, c.line, c);
         continue;
       }
       const stranded = hit.filter((n) => {
@@ -1653,16 +1655,16 @@ function reviewPlanChanges({ changes = [], standing = [], returned = [], castNam
         return before >= 2 && after < 2;
       });
       if (stranded.length) {
-        refuse(page, 'span', stranded.map(n => `${n} ${beforeSpan.get(n) || 0}→${afterSpan.get(n) || 0} page(s) — ${floorSet.has(n) ? `${commissionedFloor} pages is this book's floor for a commissioned character` : 'two pages is the floor'}`).join('; '), c.line);
+        refuse(page, 'span', stranded.map(n => `${n} ${beforeSpan.get(n) || 0}→${afterSpan.get(n) || 0} page(s) — ${floorSet.has(n) ? `${commissionedFloor} pages is this book's floor for a commissioned character` : 'two pages is the floor'}`).join('; '), c.line, c);
         continue;
       }
       if (dir === 'more' && (beforeWho.get(page) || []).length < Number(maxCast)) {
-        refuse(page, 'direction', `${c.answersText || 'the finding'} asks for a name in frame and this page held ${(beforeWho.get(page) || []).length} of ${maxCast}, so there was room to add`, c.line);
+        refuse(page, 'direction', `${c.answersText || 'the finding'} asks for a name in frame and this page held ${(beforeWho.get(page) || []).length} of ${maxCast}, so there was room to add`, c.line, c);
         continue;
       }
     } else if (c.kind === 'cast_in') {
       if (dir === 'fewer') {
-        refuse(page, 'direction', `${c.answersText || 'the finding'} asks for fewer in frame and this change adds one`, c.line);
+        refuse(page, 'direction', `${c.answersText || 'the finding'} asks for fewer in frame and this change adds one`, c.line, c);
       }
     }
   }
@@ -1685,13 +1687,13 @@ function reviewPlanChanges({ changes = [], standing = [], returned = [], castNam
     .some(t => Number(t.pageNumber) === takerPage && Number(t.fromPage) === freedPage);
   for (const c of takes) {
     if (!givenBy(Number(c.fromPage), Number(c.pageNumber))) {
-      refuse(c.pageNumber, 'balance', `page ${c.fromPage}'s material moves here and page ${c.fromPage} declares no "material to page ${c.pageNumber}" saying what it stages instead`, c.line);
-      refuse(c.fromPage, 'balance', `its material moved to page ${c.pageNumber} and nothing was declared in its place`, c.line);
+      refuse(c.pageNumber, 'balance', `page ${c.fromPage}'s material moves here and page ${c.fromPage} declares no "material to page ${c.pageNumber}" saying what it stages instead`, c.line, c);
+      refuse(c.fromPage, 'balance', `its material moved to page ${c.pageNumber} and nothing was declared in its place`, c.line, c);
     }
   }
   for (const c of gives) {
     if (!takenBy(Number(c.toPage), Number(c.pageNumber))) {
-      refuse(c.pageNumber, 'balance', `its material goes to page ${c.toPage} and page ${c.toPage} declares no "material from page ${c.pageNumber}"`, c.line);
+      refuse(c.pageNumber, 'balance', `its material goes to page ${c.toPage} and page ${c.toPage} declares no "material from page ${c.pageNumber}"`, c.line, c);
     }
   }
   return { refusals, declaredOut, notes };
@@ -1937,6 +1939,55 @@ function typedPlanCounters({ pages = [], listedNames = [], commissionedNames = n
   };
 }
 
+/**
+ * Undo ONLY the refused changes on a page, keeping the ones that were accepted
+ * (2026-10-09, job_1791497309909_6quecrr9t). The restore used to be page-wide:
+ * one refused advisory change on p4 threw away the accepted must-fix `cast in`
+ * lines for p4 as well, and the ending shipped without the two figures the plan
+ * check had asked for.
+ *
+ * A page with no accepted change goes back to the standing line unchanged. A
+ * page with accepted CAST changes (`cast in` / `cast out`, which live in the who
+ * column) goes back to the standing line with those changes written into its
+ * who column. An accepted PROSE change (action / instant / material) cannot be
+ * re-applied to the standing sentence without code rewriting the planner's
+ * text, which is forbidden; it is reported in `lost` so the caller logs it and
+ * the recheck sees the finding still open.
+ *
+ * @returns {{pages:Array, applied:Array<{pageNumber:number, cast:string[]}>, lost:Array<{pageNumber:number, changes:string[]}>}}
+ */
+function restoreRefusedChanges({ pages = [], standing = [], refusals = [], changes = [], castNames = [], aliases = {}, skip = null } = {}) {
+  const standingBy = new Map((standing || []).map(b => [Number(b.pageNumber), b]));
+  const skipSet = skip instanceof Set ? skip : new Set(skip || []);
+  const refusedPages = new Set((refusals || []).map(r => Number(r.pageNumber)).filter(n => !skipSet.has(n)));
+  const refusedClauses = new Set((refusals || []).filter(r => r.clause != null).map(r => `${Number(r.pageNumber)}|${r.clause}`));
+  const names = (castNames || []).map(n => String(n || '').trim()).filter(Boolean);
+  const applied = [];
+  const lost = [];
+  const out = (pages || []).map((pg) => {
+    const n = Number(pg.pageNumber);
+    if (!refusedPages.has(n) || !standingBy.has(n)) return pg;
+    const base = standingBy.get(n);
+    const accepted = (changes || []).filter(c => Number(c.pageNumber) === n && !refusedClauses.has(`${n}|${c.clause}`));
+    const castChanges = accepted.filter(c => c.kind === 'cast_in' || c.kind === 'cast_out');
+    const proseChanges = accepted.filter(c => c.kind !== 'cast_in' && c.kind !== 'cast_out');
+    if (proseChanges.length) lost.push({ pageNumber: n, changes: proseChanges.map(c => c.clause || c.line) });
+    if (!castChanges.length) return base;
+    const parts = String(base.planLine || '').replace(/^\s*PLAN:\s*/i, '').trim().split(SEGMENT_SPLIT);
+    if (parts.length < 4) return base;
+    let who = namesIn(parts[1], names, aliases);
+    for (const c of castChanges) {
+      const hit = namesIn(String(c.subject || ''), names, aliases);
+      if (c.kind === 'cast_in') { for (const h of hit) { if (!who.includes(h)) who.push(h); } }
+      else who = who.filter(w => !hit.includes(w));
+    }
+    parts[1] = who.length <= 1 ? (who[0] || '') : `${who.slice(0, -1).join(', ')} and ${who[who.length - 1]}`;
+    applied.push({ pageNumber: n, cast: castChanges.map(c => `${c.kind === 'cast_in' ? '+' : '-'}${c.subject}`) });
+    return { ...base, planLine: parts.join(' — ') };
+  });
+  return { pages: out, applied, lost };
+}
+
 module.exports = {
   runPlanCounters,
   castTablePromises,
@@ -1963,6 +2014,7 @@ module.exports = {
   whoColumn,
   castLostByReplan,
   reviewPlanChanges,
+  restoreRefusedChanges,
   replanChangeDirection,
   isNamedFigure,
   REPLAN_FINDING_DIRECTION,

@@ -191,7 +191,8 @@ describe('the beats re-plan wiring', () => {
 
   it('restores the flagged pages from the standing division', () => {
     expect(BEATS_SRC).toMatch(/want\.has\(Number\(pg\.pageNumber\)\) && standing\.has\(pg\.pageNumber\) \? standing\.get\(pg\.pageNumber\) : pg/);
-    expect(BEATS_SRC).toMatch(/restore\(review\.refusals\.map\(r => r\.pageNumber\)\)/);
+    // refusals undo only the refused change (restoreRefusedChanges, 2026-10-09); undeclared cast loss still restores the whole page
+    expect(BEATS_SRC).toMatch(/restoreRefusedChanges\(\{[\s\S]{0,200}refusals: review\.refusals/);
     expect(BEATS_SRC).toMatch(/restore\(lost\.map\(l => l\.pageNumber\)\)/);
   });
 

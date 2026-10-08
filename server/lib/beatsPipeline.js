@@ -1,7 +1,7 @@
 
 
 const { mergeReplanPages, duplicatePlanLine, pageCountHolds } = require('./planGuards');
-const { runPlanCounters, collectPlaceNames, castLostByReplan, reviewPlanChanges, refreshPlanShot, namesIn } = require('./planCounters');
+const { runPlanCounters, collectPlaceNames, castLostByReplan, reviewPlanChanges, restoreRefusedChanges, refreshPlanShot, namesIn } = require('./planCounters');
 const { commissionedCast, castCoverage, parsePlanCastBlock } = require('./castCoverage');
 const { arcRepairFindingsWithCastCheck } = require('./jevAudit');
 const jevDecisions = require('./jevDecisions');
@@ -1255,7 +1255,20 @@ async function runReplanRounds({ inputData, pageCount, plan, check1, replanRound
           gl.info('beats_replan_change_notes', `Round ${round}: ${review.notes.length} declared change(s) could not be tied to a finding or a cast name`, null, { round, notes: review.notes });
         }
         if (review.refusals.length) {
-          restore(review.refusals.map(r => r.pageNumber));
+          // Only the REFUSED change is undone: a page's accepted must-fix
+          // `cast in` lines are written back onto the standing line (2026-10-09).
+          const kept = restoreRefusedChanges({
+            pages: second.parsed.pages, standing: beats, refusals: review.refusals, changes: declared.changes,
+            castNames: guardCast, aliases: guardAliases, skip: new Set(codeOwned.keys()),
+          });
+          second.parsed.pages = kept.pages;
+          if (kept.applied.length) {
+            gl.info('beats_replan_accepted_kept', `Round ${round}: on ${kept.applied.map(a => `p${a.pageNumber}`).join(', ')} only the refused change was undone; the accepted cast change(s) (${kept.applied.map(a => `p${a.pageNumber} ${a.cast.join(' ')}`).join('; ')}) were kept`, null, { round, applied: kept.applied });
+          }
+          if (kept.lost.length) {
+            log.error(`❌ [BEATS] Round ${round}: accepted prose change(s) on a page with a refused change could not be kept (${kept.lost.map(l => `p${l.pageNumber}: ${l.changes.join(' | ')}`).join('; ')}) - code does not rewrite the planner's sentence; the finding stays open for the recheck`);
+            gl.error('beats_replan_accepted_lost', `Round ${round}: ${kept.lost.length} page(s) had accepted prose changes that were lost with a refused change on the same page: ${kept.lost.map(l => `p${l.pageNumber}`).join(', ')}`, null, { round, lost: kept.lost });
+          }
           const detail = review.refusals.map(r => `p${r.pageNumber} (${r.rule}): ${r.detail}`).join('; ');
           log.warn(`⚠️ [BEATS] Round ${round}: ${review.refusals.length} declared change(s) refused on review - ${detail}`);
           gl.warn('beats_replan_change_refused', `Round ${round}: the review refused ${review.refusals.length} declared change(s) — ${detail}; ${review.refusals.length === 1 ? 'that page was' : 'those pages were'} restored from the division that stands`, null, { round, refusals: review.refusals });
@@ -2579,22 +2592,37 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     arcStoryLogic = currentLogic.text;
     let hintsPrompt = null;
     let hintsRaw = null;
+    let hintsFailure = null;
     const hintsModel = MODEL_DEFAULTS.arcHintsModel || 'grok-4.6';
-    try {
-      hintsPrompt = buildArcHintsPrompt(inputData, approvedArc, currentLogic.text);
-      if (!hintsPrompt) throw new Error('arc-hints template unavailable');
-      // null maxTokens = the model's own maximum; temp 0 on the non-Anthropic paths.
-      const hintsRes = await textModels.callTextModelStreaming(hintsPrompt, null, onChunk, hintsModel, { usageLabel: 'arc_hints', ...tempFor(hintsModel, 0) });
-      hintsRaw = hintsRes?.text || '';
-      arcHints = parseArcHints(hintsRaw);
-      if (!arcHints) throw new Error('no ISSUE → CHANGE lines parsed');
-      gl.info('arc_hints', `Hint pass (${hintsRes.modelId || hintsModel}): ${arcHints.split('\n').length} hint(s) on the final arc`, null, {
-        model: hintsRes.modelId || hintsModel, hints: arcHints.split('\n'),
-      });
-    } catch (hintErr) {
-      arcHints = '';
-      log.warn(`⚠️ [ARC] hint pass failed (${hintErr.message}) — beats and text proceed without hints`);
-      gl.warn('arc_hints_failed', `Arc hint pass failed: ${hintErr.message} — beats and text proceed without hints`);
+    // An empty or unparseable reply is a FAILED call, not "no hints" (no
+    // fallbacks, 2026-10-09: grok-4.6 spent 11,622 reasoning tokens on
+    // job_1791497309909_6quecrr9t and returned only "<|eos|>"; the story ran
+    // without hints and nothing but a warning said so). One retry, mechanical;
+    // a second failure is logged at ERROR and recorded in the arc report.
+    const hintAttempts = [];
+    hintsPrompt = buildArcHintsPrompt(inputData, approvedArc, currentLogic.text);
+    for (let attempt = 1; attempt <= 2 && !arcHints; attempt++) {
+      try {
+        if (!hintsPrompt) throw new Error('arc-hints template unavailable');
+        // null maxTokens = the model's own maximum; temp 0 on the non-Anthropic paths.
+        const hintsRes = await textModels.callTextModelStreaming(hintsPrompt, null, onChunk, hintsModel, { usageLabel: 'arc_hints', ...tempFor(hintsModel, 0) });
+        hintsRaw = hintsRes?.text || '';
+        arcHints = parseArcHints(hintsRaw);
+        if (!arcHints) throw new Error(hintsRaw.trim() ? 'no ISSUE → CHANGE lines parsed' : 'the model returned an empty reply');
+        gl.info('arc_hints', `Hint pass (${hintsRes.modelId || hintsModel}): ${arcHints.split('\n').length} hint(s) on the final arc${attempt > 1 ? ' (second attempt)' : ''}`, null, {
+          model: hintsRes.modelId || hintsModel, hints: arcHints.split('\n'), attempt,
+        });
+      } catch (hintErr) {
+        arcHints = '';
+        hintAttempts.push({ attempt, error: hintErr.message, raw: String(hintsRaw || '').slice(0, 200) });
+        if (attempt < 2) log.warn(`⚠️ [ARC] hint pass attempt ${attempt} failed (${hintErr.message}) — retrying once`);
+      }
+    }
+    if (!arcHints) {
+      hintsFailure = hintAttempts;
+      const why = hintAttempts.map(a => `attempt ${a.attempt}: ${a.error}`).join('; ');
+      log.error(`❌ [ARC] hint pass FAILED after 2 attempts (${why}) — beats and text run WITHOUT arc hints; recorded in arcReviewReport.hintsFailure`);
+      gl.error('arc_hints_failed', `Arc hint pass failed twice (${why}) — beats and text run without hints; this story has no outside look at its final arc`, null, { model: hintsModel, attempts: hintAttempts });
     }
 
     meta.timings.arcMs = Date.now() - t;
@@ -2633,6 +2661,8 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       hintsModel,
       hintsPrompt,
       hintsRaw,
+      // null when the pass produced hints; the failed attempts otherwise.
+      hintsFailure,
     };
     gl.info('beats_arc', `Arc machine done: ${roundReports.length}/${arcRounds} round(s)${retellSkipped ? ` (re-telling skipped: ${retellSkipped})` : ''}, final arc by ${lastRetold ? arcRetellModel : arcCreateModel} (${(meta.timings.arcMs / 1000).toFixed(1)}s)`, null, {
       rounds: roundReports.length, createModel: arcCreateModel, retellModel: lastRetold ? arcRetellModel : null,

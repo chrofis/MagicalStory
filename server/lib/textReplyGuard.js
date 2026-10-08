@@ -162,6 +162,18 @@ function resolveStopReason(result) {
 const NEAR_CAP_FRACTION = 0.99;
 
 /**
+ * A model's own control tokens (`<|eos|>`, `<|endoftext|>`, `<|im_end|>`) are
+ * never content. Some upstreams leak the end-of-sequence token as the whole
+ * reply after spending their budget on reasoning; left in, the reply looks
+ * non-empty to every guard and every parser. Stripped at the chokepoint so an
+ * eos-only reply is the EMPTY reply it is.
+ */
+function stripControlTokens(text) {
+  const out = String(text == null ? '' : text).replace(/<\|[A-Za-z0-9_]{1,24}\|>/g, '');
+  return out.trim() === '' ? '' : out;
+}
+
+/**
  * Decide whether a text reply is (suspected) truncated.
  *
  * @param {object} result  the provider result: { text, usage:{output_tokens,
@@ -302,6 +314,6 @@ function _resetTruncationStats() {
 
 module.exports = {
   assessTextReply, describeTruncation, describeStop, noteTruncation, getTruncationStats, _resetTruncationStats,
-  classifyStopReason, resolveStopReason, collectStopReasons,
+  classifyStopReason, resolveStopReason, collectStopReasons, stripControlTokens,
   NATURAL_STOP, TRUNCATING_STOP_REASONS, REFUSING_STOP_REASONS, TRUNCATING_STOP,
 };
