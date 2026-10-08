@@ -112,7 +112,7 @@ Return a JSON object with this EXACT structure:
     "lengthSides": "<MUST be one of: shaved | fade | tapered | buzz cut | short | ear-length | same as top>",
     "bangsEndAt": "<MUST be one of: above eyebrows | at eyebrows | below eyebrows | no bangs>",
     "styling": "<MUST be one of: natural | side-swept | combed | slicked | brushed back | tousled | messy | textured | ponytail | braids | bun | pigtails | spiky | layered | loose>",
-    "parting": "<MUST be one of: none | center part | side part left | side part right>",
+    "parting": "<MUST be one of: none | center part | side part> (never left or right: which side a parting falls on is not recorded)",
     "baseColorHex": "<primary hair color as HEX code>",
     "highlightsHex": "<highlight color HEX, or 'none'>"
   }

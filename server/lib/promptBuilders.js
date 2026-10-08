@@ -281,6 +281,22 @@ function getGenderTerm(gender, apparentAge) {
 }
 
 /**
+ * The parting as hair text names it: 'center part', 'side part' or '' (none).
+ * Owner decision 2026-10-08, docs/decisions.md "Parting side is not recorded": left/right of a
+ * parting is viewer-vs-subject ambiguous and flips between views, so the side is never written
+ * into hair text and never judged. Stored profiles still carry the old ENUM values 'side part
+ * left' / 'side part right'; this maps those known structured values to 'side part' at read time.
+ * It is a lookup on a closed enum field, not a rewrite of description prose. Anything that is not
+ * a known parting value (legacy 'natural' / 'back' / 'forward', a bare 'left') yields ''.
+ */
+function partingWord(value) {
+  const v = String(value ?? '').trim().toLowerCase();
+  if (/^(center|centre|middle) part$/.test(v)) return 'center part';
+  if (/^side part( (left|right))?$/.test(v)) return 'side part';
+  return '';
+}
+
+/**
  * Build detailed hair description using both simple fields and detailedHairAnalysis
  * Uses detailed analysis when available for better consistency across scenes
  * User-edited values (from physicalTraitsSource) take priority over auto-extracted values
@@ -375,11 +391,9 @@ function buildHairDescription(physical, physicalTraitsSource = null) {
     parts.push(`bangs ${bangs}`);
   }
 
-  // Parting — supports legacy `direction` alias.
-  const parting = pick('parting') || detailed?.direction;
-  if (parting && !['none', 'natural', 'back', 'forward'].includes(parting)) {
-    parts.push(parting);
-  }
+  // Parting — supports legacy `direction` alias. Side is never emitted (see partingWord).
+  const parting = partingWord(pick('parting') || detailed?.direction);
+  if (parting) parts.push(parting);
 
   return parts.join(', ');
 }
@@ -13424,6 +13438,7 @@ module.exports = {
   getAgeMarkers,
   getGenderTerm,
   buildHairDescription,
+  partingWord,
   buildCharacterDescriptionsForBbox,
   buildSecondaryCharacterDescriptions,
   buildSecondaryExpectedCharacters,

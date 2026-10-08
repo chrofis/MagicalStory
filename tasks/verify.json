@@ -6526,6 +6526,22 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "parting-side-not-recorded-2026-10-08",
+      "title": "Hair parting side is never written or judged",
+      "commits": [],
+      "addedAt": "2026-10-08",
+      "claim": "On the next trial avatar, no hair text names a side: the log line '[TRIAL AVATAR] Extracted hair traits' and the stored detailedHairAnalysis.parting read 'none', 'center part' or 'side part' (never left/right), and the sheet hair judge no longer fails a cell for the side of a parting: no row-judge hair reason says a parting is on the wrong side. A child photographed with a side parting passes the hair axis in profile and rear cells.",
+      "runShape": [
+        "trial"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Run a /try on staging with a photo of a child with a side parting (the Lukas photo). Read the Railway log for '[TRIAL AVATAR] Extracted hair traits' and '[AVATAR HAIR] read' (no left/right), the stored character's physical.detailedHairAnalysis.parting, and the hair reasons in the sheet judge report (report.hair.reason): none may say the parting is on the left/right or requested the other side. Record the hair-axis score."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [

@@ -35,7 +35,7 @@ describe('the hair verdict carries the judge\'s own reading', () => {
   it('the row-cells judge asks for the hair style and the parting it saw in each cell\'s reason, after the verdicts', () => {
     const t = String(PROMPT_TEMPLATES.sheetRowCellsEval);
     expect(t).toMatch(/hair down, up, in a ponytail or hidden/);
-    expect(t).toMatch(/parting seen on which side or not seen/);
+    expect(t).toMatch(/parting centre, side or none, never which side/);
     // the reason follows the cells in the JSON shape, so it can never steer the per-cell answers
     expect(t.indexOf('"cells"')).toBeLessThan(t.indexOf('"reason"'));
   });

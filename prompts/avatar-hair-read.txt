@@ -10,7 +10,7 @@ Fields, each answered from the picture:
 - lengthSides: shaved | fade | tapered | buzz cut | short | ear-length | same as top
 - bangsEndAt: no bangs | above eyebrows | at eyebrows | below eyebrows | past nose (hair swept across the forehead is not bangs)
 - styling: natural | side-swept | combed | slicked | brushed back | tousled | messy | textured | ponytail | braids | bun | pigtails | spiky | layered | loose (loose = worn down and free)
-- parting: none | center part | side part left | side part right (the person's own left or right; none when no parting shows)
+- parting: none | center part | side part (never say left or right: which side a parting falls on is not recorded; none when no parting shows)
 - baseColorHex: the main hair colour as a HEX code
 - highlightsHex: a highlight colour as a HEX code, or none
 - salonLevel: darkness 1-10, 1 black, 10 lightest blonde

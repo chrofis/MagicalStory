@@ -4,7 +4,7 @@ You receive ONE image: a row of 4 cells, left to right. The sheet is meant to sh
 
 For each cell:
 - medium: illustrated when the cell is drawn in that style; photographic when it looks like a photograph of a real person (visible skin pores, real eyes, camera lighting). A row can mix the two: answer each cell on its own.
-- hair: match when its hair matches REQUESTED_HAIR; differs otherwise. Read three things: the colour name, whether the hair is worn down, up or in a ponytail, and the parting. Light and shade do not change a colour name; a hairstyle REQUESTED_HAIR calls natural names no particular style; the lengths in REQUESTED_HAIR describe the top of the head and are not judged. A cell whose hair is hidden by a hat or hood is match. When REQUESTED_HAIR says none declared, match means the hair is the same as cell 1's.
+- hair: match when its hair matches REQUESTED_HAIR; differs otherwise. Read three things: the colour name, whether the hair is worn down, up or in a ponytail, and whether there is a parting. Light and shade do not change a colour name; a hairstyle REQUESTED_HAIR calls natural names no particular style; which side a parting falls on is never judged (left, right or not visible in a profile or rear view is not a difference); the lengths in REQUESTED_HAIR describe the top of the head and are not judged. A cell whose hair is hidden by a hat or hood is match. When REQUESTED_HAIR says none declared, match means the hair is the same as cell 1's.
 - person: same when the cell shows the same person as cell 1 of this row (same face, same hair colour, same glasses, same build); different otherwise. Pose and angle differ by design. Cell 1 is same.
 
 Also check the whole row: letteringSeen is true when any caption, label, word, letter or number is on the paper in or between the cells, however it is excused, and false otherwise. {SHEET_LETTERING}
@@ -21,5 +21,5 @@ Return EXACTLY this JSON shape. Every answer comes from what you see in this ima
   },
   "letteringSeen": <true|false>,
   "letteringQuoted": "<each word, letter or number you see on the paper, or none>",
-  "reason": "cell1: <hair colour; hair down, up, in a ponytail or hidden; parting seen on which side or not seen; glasses; medium>; cell2: <same five>; cell3: <same five>; cell4: <same five>"
+  "reason": "cell1: <hair colour; hair down, up, in a ponytail or hidden; parting centre, side or none, never which side; glasses; medium>; cell2: <same five>; cell3: <same five>; cell4: <same five>"
 }

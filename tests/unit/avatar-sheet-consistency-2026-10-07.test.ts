@@ -184,7 +184,7 @@ describe('hair: the generator and every judge read one value', () => {
     const hair = sheet.hairRequest(emma);
     expect(hair).toMatch(/brown/);
     expect(hair).toMatch(/ponytail/);
-    expect(hair).toMatch(/side part right/);
+    expect(hair).toMatch(/side part/); expect(hair).not.toMatch(/(left|right)/i); // parting side is not recorded (decisions.md 2026-10-08)
     expect(sheet.buildBodyRowPrompt('standard outfit', emma, false, null)).toContain(hair);
     expect(sheet.buildHeadRowPrompt(emma, '', false)).toContain(hair);
     expect(sheet.hairRequest({ name: 'x', physical: {} })).toBe('');

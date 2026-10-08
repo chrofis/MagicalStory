@@ -30,7 +30,7 @@ TASK 7: DECLARED GLASSES
 For each cell say whether its face wears the glasses REQUESTED_GLASSES names, in that frame: yes; no (a face without them, or in another frame); na (no face shows in that cell). When REQUESTED_GLASSES says none declared, answer na for every cell.
 
 TASK 8: HAIR
-For each cell say whether its hair matches REQUESTED_HAIR AND matches the other cells: match, or differs. Read four things in every cell: the colour name, the length, whether the hair is worn down, up or in a ponytail, and the parting. One cell whose colour name, length, up-or-down style or parting is not the one the other cells show, or not the one REQUESTED_HAIR names, is differs. Light and shade do not change a colour name; a hairstyle REQUESTED_HAIR calls natural names no particular style. When REQUESTED_HAIR says none declared, the cells are compared with each other alone. In the rear turn, judge what the hair shows.
+For each cell say whether its hair matches REQUESTED_HAIR AND matches the other cells: match, or differs. Read four things in every cell: the colour name, the length, whether the hair is worn down, up or in a ponytail, and the parting. One cell whose colour name, length, up-or-down style or parting is not the one the other cells show, or not the one REQUESTED_HAIR names, is differs. Light and shade do not change a colour name; a hairstyle REQUESTED_HAIR calls natural names no particular style. When REQUESTED_HAIR says none declared, the cells are compared with each other alone. In the rear turn, judge what the hair shows. Which side a parting falls on is never judged: a parting seen on the left, the right, or not at all in a profile or rear view is not a difference; only a centre parting against a side parting, or a parting against none, counts.
 
 TASK 9: ONE PERSON IN EVERY CELL
 For each cell say whether it shows the same person as cell 1: same, or different. Compare the face, the hair colour, the glasses and the build. A cell whose face, hair colour, glasses or build are another person's is different; pose and angle differ by design. Cell 1 is same.
@@ -53,7 +53,7 @@ Return EXACTLY this JSON shape. Every score and reason comes from what you see i
   "proportions": {"score": <1-10>, "reason": "<how many heads tall, and the age that reads>"},
   "background": {"backgroundScore": <1-10>, "reason": "<what is behind and around the figures, including any lettering>"},
   "glasses": {"perCell": {"cell1": "<yes|no|na>", "cell2": "<yes|no|na>", "cell3": "<yes|no|na>", "cell4": "<yes|no|na>"}, "reason": "<the glasses you see on each face, or none>"},
-  "hair": {"perCell": {"cell1": "<match|differs>", "cell2": "<match|differs>", "cell3": "<match|differs>", "cell4": "<match|differs>"}, "reason": "cell1: <colour name, length, up or down, parting>; cell2: <same four>; cell3: <same four>; cell4: <same four>"},
+  "hair": {"perCell": {"cell1": "<match|differs>", "cell2": "<match|differs>", "cell3": "<match|differs>", "cell4": "<match|differs>"}, "reason": "cell1: <colour name, length, up or down, parting centre / side / none, never which side>; cell2: <same four>; cell3: <same four>; cell4: <same four>"},
   "person": {"perCell": {"cell1": "same", "cell2": "<same|different>", "cell3": "<same|different>", "cell4": "<same|different>"}, "reason": "<the face, hair colour, glasses and build you see per cell>"},
   "letteringSeen": <true|false>,
   "letteringQuoted": "<each word, letter or number you see on the paper, or none>",

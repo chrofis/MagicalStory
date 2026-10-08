@@ -244,7 +244,8 @@ function hairRequest(character) {
     if (h.lengthSides) detail.push(`sides ${h.lengthSides}`);
     if (h.bangsEndAt && h.bangsEndAt !== 'no bangs') detail.push(`bangs ${h.bangsEndAt}`);
     if (h.styling)     detail.push(`styled ${h.styling}`);
-    if (h.parting && h.parting !== 'none') detail.push(h.parting);
+    const parting = require('./promptBuilders').partingWord(h.parting); // side never named, see partingWord
+    if (parting) detail.push(parting);
     if (detail.length) hairBits.push(`Hairstyle: ${detail.join(', ')}.`);
   } else if (typeof p.detailedHairAnalysis === 'string' && p.detailedHairAnalysis.trim()) {
     hairBits.push(`Hairstyle: ${p.detailedHairAnalysis.trim()}.`);
