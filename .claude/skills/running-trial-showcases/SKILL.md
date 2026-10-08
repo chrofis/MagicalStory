@@ -7,7 +7,7 @@ description: Use when the owner asks to run a trial showcase, test the /try funn
 
 A **trial showcase** runs one real trial story end-to-end through the public `/try` API and reports it. It is the trial counterpart of `npm run showcase` (which runs full stories on fresh demo-family accounts).
 
-**One trial = 5 pages + title page + one preview avatar ≈ CHF 0.20–0.35**, plus ~USD 0.02 and 5–10 s for the idea cards (see `--idea` below). This is a paid run under the CLAUDE.md spend-guard rule: launch only when the owner asked for it in this conversation. Preparing the command is never permission to fire it.
+**One trial ≈ USD 0.60–0.75** (measured 2026-10-09 over 9 staging trials: `stories.data.analytics.totalCost` 0.61–0.74 — Sonnet writer ~$0.21, page images ~$0.24, covers $0.10, plates/VB cells/2×4 sheets the rest), plus the preview avatar and the idea cards (~USD 0.01–0.02, not in that total). The old "CHF 0.20–0.35" figure predates the costumed 2×4 sheets and VB reference cells; budget from the stored total, never from this line alone. This is a paid run under the CLAUDE.md spend-guard rule: launch only when the owner asked for it in this conversation. Preparing the command is never permission to fire it.
 
 ## Run it
 
