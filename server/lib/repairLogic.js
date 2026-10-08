@@ -935,6 +935,20 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
   if (visualScore < iterateVisualFloor && !worthSalvaging) {
     return { method: 'iterate', reason: `image visually broken (visual=${visualScore} < ${iterateVisualFloor}, finalScore=${pageFinalScore})` };
   }
+  // SEMANTIC COLLAPSE (owner mandate 2026-10-08, decisions.md): a semantic score at
+  // or below this means the picture contradicts the brief outright -- the moment
+  // it shows is the wrong one. The salvage floor protects composition, likeness
+  // and background "nobody complained about", but a page whose whole scene is
+  // wrong has nothing of that kind to keep, and local repair (char-fix/inpaint)
+  // cannot change which scene is painted. job_1791489793707 p1: semantic 0
+  // (no red dragon, wrong place), finalScore 23 -> salvage kept it in char-fix on
+  // a doubtful clothing finding, which failed, and the page shipped at 23.
+  // Stays inside the salvage rule's spirit: the measured regressions were pages
+  // with a mostly-right scene; this gate is the opposite case.
+  const semanticCollapse = typeof semanticScore === 'number' && semanticScore <= (REPAIR_DEFAULTS.semanticCollapseForIterate ?? 0);
+  if (semanticCollapse) {
+    return { method: 'iterate', reason: `scene contradicts the brief (semantic=${semanticScore}, finalScore=${pageFinalScore}) — a repaint cannot change which scene is painted` };
+  }
   if (semanticTrips && !worthSalvaging) {
     return { method: 'iterate', reason: `wrong scene (semantic=${semanticScore} < ${iterateSemanticFloor}, finalScore=${pageFinalScore})` };
   }

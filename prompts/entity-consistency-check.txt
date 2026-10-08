@@ -49,7 +49,7 @@ Analyze whether this entity (specifically {ENTITY_NAME}) looks consistent across
 ## Clothing Rules
 
 - Every cell in this grid shares ONE declared wardrobe state. The expected clothing description already reflects it, including any garment the character has deliberately taken off — those removals are named in the Clothing Context.
-- A garment named there as removed is absent by intent: its absence in a cell is never a finding, and a cell that still wears it contradicts the state and is `clothing_inconsistent`.
+- A garment named there as removed is absent by intent: its absence in a cell is never a finding, and a cell that still WEARS it on the body contradicts the state and is `clothing_inconsistent`. A removed garment that the figure holds, carries, or has wrapped around another object (a scarf round an egg, a coat over an arm) is a prop in use, not a worn garment: it is NOT a finding, and neither is the figure's body being bare of it.
 - Different clothing between cells is EXPECTED if the clothing field differs
 - Only flag as inconsistent if clothing looks wrong WITHIN the same clothing category
 - When the Clothing Context provides an expected clothing description, judge outfits against that text — not against the reference photo's outfit
@@ -170,6 +170,8 @@ If a defect could match multiple `type` values, pick the most specific:
 - Object proportions drift → `shape_change`
 
 Before filing `hair_change` for a cell, compare that cell's face with the reference face: face shape, eyes, nose, mouth and apparent age. If the face differs too, the finding is one `identity_swap`, not a `hair_change` beside a face finding. Expression alone is not a face difference.
+
+Every difference you name for a cell must be a real difference from the reference: look at the reference (Cell R) for that same feature first, and never list a feature as differing when the reference has it too (blue eyes against a reference with blue eyes is no difference). `identity_swap` needs the hair colour family or style category to differ AND the face to differ; a lighter or more golden shade within the reference's own colour family is `hair_nuance` and cannot make a swap. If after removing the features that match the reference no face difference is left, do not file `identity_swap`.
 
 If two types apply equally, list the primary visual change first.
 

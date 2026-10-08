@@ -6742,6 +6742,70 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "cover-title-floor-major-only-2026-10-08",
+      "title": "A baked cover title with correct spelling is never floored to CRITICAL by a MINOR required_text note",
+      "commits": [],
+      "addedAt": "2026-10-08",
+      "claim": "On a story with a baked cover title, a cover whose only required_text finding is MINOR (rough letterforms, title present and correct) keeps that severity and is not sent to a repair round for it; a cover whose title is absent, misspelled or moved is still CRITICAL and loses to a version that has it.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "In the story log, grep '[COVER TITLE] required_text' : lines appear only for MAJOR-or-higher findings; the cover's stored fixableIssues show MINOR required_text unchanged and the cover's finalScore is not 15 for a correct title."
+      },
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "semantic-collapse-iterates-2026-10-08",
+      "title": "A page with semantic score 0 is regenerated, not char-fixed",
+      "commits": [],
+      "addedAt": "2026-10-08",
+      "claim": "A page whose semantic score is 0 (scene contradicts the brief) is routed to iterate by decideRepairMethod even when finalScore is above the salvage floor; the log shows 'scene contradicts the brief (semantic=0' in a [REPAIR-DECIDE] line instead of the 'numeric gate tripped ... repairing locally' line.",
+      "runShape": [
+        "needs-iterate-repair"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "grep the story log for REPAIR-DECIDE on any page whose BATCH EVAL shows 'Semantic 0%': it must say iterate with the 'scene contradicts the brief' reason. NOT COVERED when no page scores semantic 0."
+      },
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "held-removed-garment-not-worn-finding-2026-10-08",
+      "title": "A garment removed from the worn state but held or wrapped round a prop is not a clothing_inconsistent finding",
+      "commits": [],
+      "addedAt": "2026-10-08",
+      "claim": "Where a page's wardrobe state removes a garment (e.g. the scarf) and the brief has that item held or wrapped round an object, the entity check files no clothing_inconsistent / 'should be absent' finding for it, and no char-fix runs on that figure for it.",
+      "runShape": [
+        "needs-worn-off"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "In the story's entityIssues for pages whose brief holds a removed garment, no 'present but should be absent' finding for that garment; in the log no [CHAR-FIX] on the figure for a clothing finding about it."
+      },
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "identity-swap-needs-real-difference-2026-10-08",
+      "title": "identity_swap never cites a feature the reference shares",
+      "commits": [],
+      "addedAt": "2026-10-08",
+      "claim": "An identity_swap finding's description lists only features that actually differ from the reference (no 'blue eyes' against a blue-eyed reference), and a lighter shade inside the reference's colour family is hair_nuance, not a swap.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Read every identity_swap in the run's entityIssues: each named difference must be visible against cell R; any swap on a same-colour-family shade is a failure."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [

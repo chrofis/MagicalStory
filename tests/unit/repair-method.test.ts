@@ -245,3 +245,22 @@ test('a non-array scene_fix.types is ignored, not crashed on', () => {
   assert.strictEqual(plan.dropped_issues.length, 0);
 });
 
+
+// Semantic collapse: the picture contradicts the brief (semantic 0). The salvage
+// floor must not keep it in local repair (job_1791489793707 p1: semantic 0, finalScore 23).
+test('semantic score 0 with finalScore above the salvage floor → iterate, not char-fix/inpaint', () => {
+  const decision = decideRepairMethod(1, {
+    scoreBreakdown: { visual: { score: 100 }, semantic: { score: 0 } },
+    finalScore: 23,
+    fixableIssues: [{ description: 'jacket colour', severity: 'MAJOR', type: 'clothing' }],
+  }, null);
+  assert.strictEqual(decision.method, 'iterate', `expected iterate, got ${decision.method} (${decision.reason})`);
+});
+test('semantic 50 with finalScore above the salvage floor still repairs locally', () => {
+  const decision = decideRepairMethod(1, {
+    scoreBreakdown: { visual: { score: 100 }, semantic: { score: 50 } },
+    finalScore: 50,
+    fixableIssues: [{ description: 'jacket colour', severity: 'MAJOR', type: 'clothing' }],
+  }, null);
+  assert.notStrictEqual(decision.method, 'iterate');
+});

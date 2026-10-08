@@ -245,7 +245,14 @@ function floorCoverTitleSeverity(issues, items) {
   let raised = 0;
   for (const f of issues) {
     if (String(f?.type || '').toLowerCase() !== 'required_text') continue;
-    if ((SEVERITY_RANK[String(f.severity || '').toUpperCase()] || 0) >= SEVERITY_RANK.CRITICAL) continue;
+    const rank = SEVERITY_RANK[String(f.severity || '').toUpperCase()] || 0;
+    if (rank >= SEVERITY_RANK.CRITICAL) continue;
+    // Only the MAJOR classes (title absent / misspelled / out of order, image-evaluation.txt
+    // D-33) are floored. The prompt files rough-but-correct letterforms as MINOR, and a
+    // correct title must not become CRITICAL on a style nit (job_1791489793707 cover: MINOR
+    // "unsteady letterforms" -> CRITICAL, ate the only repair round, shipped 15 vs 100).
+    // Severity is the judge's own structured classification; no prose is read.
+    if (rank < SEVERITY_RANK.MAJOR) continue;
     log.info(`🔤 [COVER TITLE] required_text ${f.severity || '(none)'} raised to CRITICAL: a cover that lost or moved its title cannot outrank one that has it`);
     f.severity = 'CRITICAL';
     raised++;

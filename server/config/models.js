@@ -1396,6 +1396,7 @@ const REPAIR_DEFAULTS = {
   // keeping, and measured it came back worse 6 times out of 7 above this line.
   // A spec conflict and a CATASTROPHIC finding still iterate regardless.
   iterateSalvageFloor: 0,
+  semanticCollapseForIterate: 0,   // Semantic score at or below this -> iterate even above the salvage floor (scene contradicts the brief; decisions.md 2026-10-08)
   semanticThresholdForIterate: 30, // Below this semantic score → iterate (scene fundamentally wrong)
   qualityThresholdForIterate: 20,  // Below this quality score → iterate immediately
   inpaintMaxPasses: 1,             // Inpaint attempts per page per round

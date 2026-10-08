@@ -61,6 +61,12 @@ describe('floorCoverTitleSeverity', () => {
     expect(issues[0].severity).toBe('MAJOR');
   });
 
+  it('leaves MINOR/MODERATE required_text (correct title, rough letterforms) as filed', () => {
+    const issues = [{ type: 'required_text', severity: 'MINOR' }, { type: 'required_text', severity: 'MODERATE' }];
+    expect(RT.floorCoverTitleSeverity(issues, coverItems)).toBe(0);
+    expect(issues.map(i => i.severity)).toEqual(['MINOR', 'MODERATE']);
+  });
+
   it('never lowers CATASTROPHIC and ignores other types', () => {
     const issues = [
       { type: 'required_text', severity: 'CATASTROPHIC' },

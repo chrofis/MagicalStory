@@ -3077,7 +3077,7 @@ async function evaluateEntityConsistency(gridBuffer, manifest, entityInfo, headG
       if (removedGarments.length > 0) {
         lines.push(`On these pages the character has deliberately removed: ${removedGarments.join('; ')}. `
           + 'Every cell in this grid shares that one wardrobe state. Those garments are absent by intent — their absence is never a finding, '
-          + 'and a cell that still wears one contradicts the state.');
+          + 'and a cell that still WEARS one on the body contradicts the state. A removed garment the figure holds, carries or has wrapped around another object is a prop in use, not a worn garment, and is never a finding.');
       }
       lines.push('Judge clothing against this description; flag cells whose outfit contradicts it or differs from the other cells.');
     } else {
