@@ -2262,3 +2262,7 @@ three below are prompt/classification questions and are the owner's call.
 - [ ] Trial review T3: two magnifying glasses in frame (the costume's and the VB artifact) → docs/trial-review-2026-10-08/t3-report.txt
 - [ ] Trial review T3: invented family dog with no reference image drifts in look between pages → docs/trial-review-2026-10-08/t3-report.txt
 - [ ] Trial review T2: clumsy English on the story-idea card → docs/trial-review-2026-10-08/t2-report.txt
+- [ ] Haiku 5.5: keyed blind-audit recall run (slop-injected pages of jev-text-audit-v1, grok-4.6 vs Haiku 5.5 medium, 2+ reps); at or above grok switches `textAuditBlindModel` ($0.13 -> $0.007 and 300 s -> 50 s per story) → docs/decisions.md (2026-10-08 Haiku 5.5 bake-off)
+- [ ] Haiku 5.5: lector on more real-defect pages (9/11 vs gemini 10/11 so far; misses the static-position dative); at parity switch `textProofreadModel` and carry `effort` on the Anthropic path ($0.095 -> $0.005 per story) → docs/decisions.md (2026-10-08 Haiku 5.5 bake-off)
+- [ ] Haiku 5.5: planner at effort low (medium plans in 109-214 s vs Sonnet 10 s; Sonnet low lost 17/12 must-fix) and a fourth cheap arc-panel seat on more than 2 stories → docs/decisions.md (2026-10-08 Haiku 5.5 bake-off)
+- [ ] `phantom_patch` and `storyJobPipeline` sceneIteration both keep a `modelId || 'claude-haiku-5-5'` fallback that production never takes (modelId is always MODEL_DEFAULTS.sceneIteration = qwen-plus); delete the fallback and require the id (NO FALLBACKS) → server/lib/phantomCharacters.js, storyJobPipeline.js:3059

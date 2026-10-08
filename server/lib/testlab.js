@@ -4046,7 +4046,7 @@ async function runAuditReplayStage(target, { params = {}, promptOverride = null 
   const runs = await Promise.all(models.map(async (model) => {
     const t = Date.now();
     try {
-      const res = await callTextModelStreaming(prompt, null, null, model, { usageLabel: 'testlab_audit_replay', temperature: 0 });
+      const res = await callTextModelStreaming(prompt, null, null, model, { usageLabel: 'testlab_audit_replay', temperature: 0, ...(params.effort ? { effort: params.effort } : {}) });
       const raw = String(res.text || '').trim();
       return {
         model,
@@ -9051,7 +9051,7 @@ async function runArcPanelReplayStage(target, { params = {}, promptOverride = nu
     try {
       const t = Date.now();
       const res = await callTextModelStreaming(prompt, null, null, model, {
-        usageLabel: 'testlab_arc_panel_replay', ...tempFor(model, MODEL_DEFAULTS.arcPanelTemperature),
+        usageLabel: 'testlab_arc_panel_replay', ...tempFor(model, MODEL_DEFAULTS.arcPanelTemperature), ...(params.effort ? { effort: params.effort } : {}),
       });
       const text = String(res.text || '').trim();
       const outTok = res.usage?.output_tokens ?? null;
@@ -10136,6 +10136,8 @@ async function runBeatsReplanStage(target, { params = {} }) {
   let castTable = null;
   let castTableNote = null;
   const planAndCheck = params.planAndCheck === true || params.planAndCheck === 'true';
+  // checkOnly: the plan check on the STORED division (or the arcFromExperiment/planFresh one), no re-plan. The checker bake-off's arm.
+  const checkOnly = params.checkOnly === true || params.checkOnly === 'true';
   // TYPED-PLAN EXPERIMENT (2026-10-05; docs/decisions.md "Typed page plan"). Three arms on
   // the same stage: `measureStored` counts the stored shipped plan (free), `planFresh`
   // plans afresh with today's prompt and runs today's whole flow (check, re-plan, shots)
@@ -10202,7 +10204,7 @@ async function runBeatsReplanStage(target, { params = {} }) {
     const planPrompt = buildBeatsPrompt(storyData, pageCount, { finalArc: approvedArc, arcHints, storyLogic, centralFigure, ...labPromptOptions });
     if (!planPrompt) throw new Error('story-beats template unavailable');
     const t0 = Date.now();
-    const planRes = await callTextModelStreaming(planPrompt, null, null, planModel, { usageLabel: 'testlab_beats_replan_plan' });
+    const planRes = await callTextModelStreaming(planPrompt, null, null, planModel, { usageLabel: 'testlab_beats_replan_plan', effort: params.planEffort || MODEL_DEFAULTS.beatsPlanEffort });
     onCall(planRes);
     plannerReply = String(planRes.text || '');
     if (!plannerReply.trim()) throw new Error(`planner ${planModel} returned an empty response — provider failure, not a result`);
@@ -10284,10 +10286,10 @@ async function runBeatsReplanStage(target, { params = {} }) {
     checkRawResponse: (check1.reply || '').slice(0, 40000),
     events,
   };
-  if ((check1.lines.length === 0 && !planFresh) || planAndCheck) {
+  if ((check1.lines.length === 0 && !planFresh) || planAndCheck || checkOnly) {
     // Production re-plans on any finding (`check1.lines.length > 0`).
     // planAndCheck stops here by definition, findings or not.
-    if (!expArc && !planAndCheck && !firstPlan && check1.lines.length === 0) {
+    if (!expArc && !planAndCheck && !checkOnly && !firstPlan && check1.lines.length === 0) {
       throw new Error('the plan check raised no finding against this division — there is nothing for a re-plan to answer, so pick a story whose check fires');
     }
     return {

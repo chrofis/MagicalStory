@@ -239,7 +239,7 @@ async function detectAndPatchPhantomCharacters({ storyPages, visualBible, inputC
 
   let result;
   try {
-    result = await textModels.callClaudeAPI(prompt, null, modelId || 'claude-haiku-4-5', { usageLabel: 'phantom_patch' });
+    result = await textModels.callClaudeAPI(prompt, null, modelId || 'claude-haiku-5-5', { usageLabel: 'phantom_patch' });
   } catch (callErr) {
     log.warn(`👻 [PHANTOM] Patch call failed: ${callErr.message}`);
     return null;
@@ -431,7 +431,7 @@ Output ONLY a JSON array — no markdown fence, no commentary:
 
   let result;
   try {
-    result = await textModels.callClaudeAPI(prompt, null, modelId || 'claude-haiku-4-5', { usageLabel: 'phantom_patch' });
+    result = await textModels.callClaudeAPI(prompt, null, modelId || 'claude-haiku-5-5', { usageLabel: 'phantom_patch' });
   } catch (err) {
     log.warn(`👻 [ORPHAN-ID] Patch call failed: ${err.message}`);
     return null;

@@ -1297,13 +1297,16 @@ Answer JSON only, e.g. {"A": "name"}. Each name at most once.`;
     if (!key) return { fail: 'ANTHROPIC_API_KEY not set' };
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: require('../config/models').maxOutputTokensFor('claude-haiku-4-5-20251001'), temperature: 0,
+      // Haiku 5.5 (DECISIONS 2026-10-08): takes no temperature (omit or 1), thinking is on by
+      // default and bills as output, so effort is low for this one-line answer.
+      body: JSON.stringify({ model: require('../config/models').TEXT_MODELS['claude-haiku-5-5'].modelId, max_tokens: require('../config/models').maxOutputTokensFor('claude-haiku-5-5'), output_config: { effort: 'low' },
         messages: [{ role: 'user', content: [{ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: markedB64 } }, { type: 'text', text: promptText }] }] }),
       signal: AbortSignal.timeout(45_000),
     });
     if (!res.ok) return { fail: `Haiku HTTP ${res.status}` };
     const j = await res.json();
     if (j?.error) return { fail: `Haiku error: ${String(j.error.message).slice(0, 120)}` };
+    if (j?.stop_reason === 'refusal') return { fail: 'Haiku refused (stop_reason refusal)' };
     const text = (j?.content || []).map(c => c.text || '').join('') || '';
     if (!text.trim()) return { fail: 'Haiku empty answer' };
     return { text };

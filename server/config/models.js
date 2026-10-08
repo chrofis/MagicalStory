@@ -80,6 +80,17 @@ const TEXT_MODELS = {
     maxOutputTokens: 64000,
     description: 'Claude Haiku 4.5 - Fast and affordable'
   },
+  // Claude Haiku 5.5 (launched 2026-10-07). Ceiling: 128K output, 1M context
+  // (platform.claude.com/docs/en/models/haiku-5-5/overview). Adaptive thinking is
+  // ON by default; effort low..max, default medium. Takes no temperature knob
+  // (omit or 1), no prefill, no budget_tokens. A `refusal` stop_reason is a
+  // failed call (textReplyGuard), never a silent fallback. See DECISIONS 2026-10-08.
+  'claude-haiku-5-5': {
+    provider: 'anthropic',
+    modelId: 'claude-haiku-5-5',
+    maxOutputTokens: 128000,
+    description: 'Claude Haiku 5.5 - ($0.10/$0.50 per 1M up to 100k prompt tokens, 5x above). Adaptive thinking on by default.'
+  },
   'gemini-2.5-pro': {
     provider: 'google',
     modelId: 'gemini-2.5-pro',
@@ -1438,6 +1449,13 @@ const MODEL_PRICING = {
   'claude-sonnet-4-5-20250929': { input: 3.00, output: 15.00, thinking: 15.00, cacheRead: 0.30, cacheWrite: 3.75 },
   'claude-sonnet-4-5': { input: 3.00, output: 15.00, thinking: 15.00, cacheRead: 0.30, cacheWrite: 3.75 },
   'claude-sonnet': { input: 2.00, output: 10.00, thinking: 10.00, cacheRead: 0.10, cacheWrite: 2.50 }, // = Sonnet 5.5, the alias's model
+  // Haiku 5.5: pricing page fetched 2026-10-08. Priced by PROMPT length: a prompt
+  // over 100,000 tokens pays `overTokens.rates` on every token of that call
+  // (calculateTextCost). Cache: write 5m 0.125, read 0.01 (1h write 0.20 not modelled).
+  'claude-haiku-5-5': {
+    input: 0.10, output: 0.50, thinking: 0.50, cacheRead: 0.01, cacheWrite: 0.125,
+    overTokens: { threshold: 100000, input: 0.50, output: 2.50, thinking: 2.50, cacheRead: 0.05, cacheWrite: 0.625 },
+  },
   'claude-haiku-4-5-20251001': { input: 1.00, output: 5.00, thinking: 5.00, cacheRead: 0.10, cacheWrite: 1.25 },
   'claude-haiku-4-5': { input: 1.00, output: 5.00, thinking: 5.00, cacheRead: 0.10, cacheWrite: 1.25 },
   'claude-3-5-haiku-20241022': { input: 0.80, output: 4.00, thinking: 4.00, cacheRead: 0.08, cacheWrite: 1.00 },
@@ -1659,7 +1677,7 @@ function findModelPricing(modelId) {
  * @returns {number} Estimated cost in USD
  */
 function calculateTextCost(modelId, usage) {
-  const pricing = findModelPricing(modelId);
+  let pricing = findModelPricing(modelId);
 
   if (!pricing || pricing.perImage) {
     // Unknown text model or this is an image model (priceUsage prices those)
@@ -1674,6 +1692,10 @@ function calculateTextCost(modelId, usage) {
   const cachedRead = Math.min(u.cached_input_tokens || 0, inputTokens);
   const cacheWrite = Math.min(u.cache_write_tokens || 0, inputTokens - cachedRead);
   const plainInput = inputTokens - cachedRead - cacheWrite;
+
+  // Length-tiered models (Haiku 5.5): the whole call bills at the higher rates
+  // once the prompt passes the threshold.
+  if (pricing.overTokens && inputTokens > pricing.overTokens.threshold) pricing = pricing.overTokens;
 
   // Calculate cost: price per 1M tokens * (tokens / 1M)
   const inputCost = (pricing.input * plainInput

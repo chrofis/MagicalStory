@@ -82,7 +82,8 @@ describe('MODEL_PRICING — every configured model is priced', () => {
     // revision id like deepseek/deepseek-v4-pro-0813 silently borrowed
     // deepseek/deepseek-v4-pro's rate until it got its own line.
     for (const [key, price] of tokenEntries()) {
-      const got = calculateTextCost(key, { input_tokens: 1_000_000, output_tokens: 0 });
+      // 100k tokens = the base tier of a length-tiered model (Haiku 5.5 bills 5x above 100k).
+      const got = calculateTextCost(key, { input_tokens: 100_000, output_tokens: 0 }) * 10;
       expect(`${key}=${got.toFixed(6)}`).toBe(`${key}=${price.input.toFixed(6)}`);
     }
   });

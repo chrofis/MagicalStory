@@ -16,7 +16,7 @@ Machine-checkable lines are enforced by `scripts/admin/check-settled.js` (runs i
 ## Prompts & evaluation
 
 - **Text-overlay zone is CALM, never dark.** No "for white text" / dark-band language anywhere in prompts. *(guarded)*
-- **Eval judges run at temperature 0, always.** Non-zero made tuning non-reproducible for months. **Exception, Jev (2026-09-27, owner sign-off):** the Jev decision model has no temperature knob at all; its decisions are measured for flip rate, and the ones that flip (the group-page cast cuts, gaze) average 3 calls (`jevDecisions.JEV_DECISIONS`). See decisions.md 2026-09-27 "Jev decision layer wired".
+- **Eval judges run at temperature 0, always.** Non-zero made tuning non-reproducible for months. **Exception, Jev (2026-09-27, owner sign-off):** the Jev decision model has no temperature knob at all; its decisions are measured for flip rate, and the ones that flip (the group-page cast cuts, gaze) average 3 calls (`jevDecisions.JEV_DECISIONS`). See decisions.md 2026-09-27 "Jev decision layer wired". **Exception, Claude judges (2026-10-08, owner sign-off):** current Claude models take no temperature knob (omit or 1; top_p/top_k 400), so a Claude judge (Haiku 5.5 in the bake-off) cannot run at 0; its noise is measured with repeats instead (2+ runs per arm). See decisions.md 2026-10-08 "Haiku 5.5 bake-off".
 - **Pose mirrors (left/right body-part swaps) never deduct** in semantic eval.
 - **Positions are relational** ("behind Roger", "on the boat"), not left/right-grid, except cross-page continuity / text-zone / ultra-wide needs.
 - **Prompts are generic — no test-story names, characters, or settings.** Archetypes only. *(guarded)*

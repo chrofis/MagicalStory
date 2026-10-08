@@ -12607,6 +12607,25 @@ ${tone}`;
 }
 
 /**
+ * The batch scene-summary translation prompt (one call per story, output matched
+ * to the pages by POSITION, so the reply must be one line per summary).
+ * @param {Array<{pageNumber:number, imageSummary?:string}>} scenes
+ * @param {string} lang story language code
+ * @returns {{prompt:string, count:number}|null} null when no scene has a summary
+ */
+function buildSceneTranslationPrompt(scenes, lang) {
+  const summaries = (scenes || [])
+    .map(s => `Page ${s.pageNumber}: ${s.imageSummary || ''}`)
+    .filter(s => s.includes(': ') && s.split(': ')[1].trim());
+  if (!summaries.length) return null;
+  const { getLanguageInstruction } = require('./languages');
+  return {
+    prompt: `Translate each scene summary below to the target language. Output ONLY the translations, one per line, in the same order. Keep it concise (1-2 sentences each).\n\nTarget language: ${getLanguageInstruction(lang)}\n\n${summaries.join('\n')}`,
+    count: summaries.length,
+  };
+}
+
+/**
  * Build a lightweight story prompt for trial stories.
  * Much simpler than the full unified prompt — no critical analysis, no character arcs,
  * no plot structure planning. Just generates the story directly.
@@ -13688,6 +13707,7 @@ module.exports = {
   buildTitleRule,
   buildStoryBibleFromBeatsPrompt,
   buildTrialStoryPrompt,
+  buildSceneTranslationPrompt,
   buildAvailableLandmarksSection,
   buildTrialIdeaCostumeInstructions,
   buildTrialIdeaPrompts,

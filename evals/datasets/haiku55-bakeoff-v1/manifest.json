@@ -1,0 +1,166 @@
+{
+ "_doc": "haiku55-bakeoff-v1 (2026-10-08). Inputs of the Haiku 5.5 bake-off, by id only: story text is not committed (GDPR); rebuild from staging stories.data / story_jobs.result_data and evals/datasets/jev-text-audit-v1 (node scripts/analysis/jev-text-audit-dataset.js --extract). Answer keys: lector = the injected sentence of the jev-text-audit-v1 item (meta.original is the key); every other stage has NO ground truth and is scored against the stored production model's output on the same prompt (named per stage). The original 2026-08-27 pirate text-audit key (10 defects, gemini 8.5/10) and the 2026-09-06 lector key (piraterun4 G1-G4) existed only in scratchpads and are not recoverable.",
+ "trial_writer": {
+  "jobs": [
+   "job_1791450270543_n1iu8ipsu",
+   "job_1791450452362_pv0l5hf49",
+   "job_1791450780272_9u2u90wi2"
+  ],
+  "prompt": "story_jobs.result_data.outlinePrompt (exact prompt sent)",
+  "reference": "stored Sonnet 5.5 output (result_data.outline / story), effort medium",
+  "modelId": "claude-sonnet-5-5"
+ },
+ "planner": {
+  "stories": [
+   "job_1791315635053_t0t8qpebu",
+   "job_1791267520938_essbvehs8"
+  ],
+  "stage": "beats_replan planAndCheck",
+  "checker": "gpt-5.6-luna-pro",
+  "metric": "convergenceMustFixCount of the plan check",
+  "reference": {
+   "stored_sonnet_medium_mustfix": {
+    "job_1791315635053_t0t8qpebu": 12,
+    "job_1791267520938_essbvehs8": 8
+   }
+  }
+ },
+ "text_audit": {
+  "stories": [
+   "job_1790100385959_1nitlympp",
+   "job_1790107559778_fcmlfa8kn",
+   "job_1789853503332_riqncqg1i",
+   "job_1789420511893_zly5rcdej"
+  ],
+  "params": {
+   "fromWriterText": true
+  },
+  "levels": [
+   "text",
+   "text-blind"
+  ],
+  "reference_experiments": {
+   "text-blind grok-4.6": [
+    1454,
+    1455
+   ]
+  }
+ },
+ "arc_audit": {
+  "story": "job_1787812110559_n311ykfmin",
+  "reference_experiment": 876,
+  "reference_models": {
+   "claude-opus": 11,
+   "gemini-3.1-pro": 8,
+   "gpt-5.6-sol": 6,
+   "grok-4.6": 1
+  }
+ },
+ "lector": {
+  "dataset": "evals/datasets/jev-text-audit-v1",
+  "check": "grammar",
+  "unit": "story",
+  "items": [
+   {
+    "id": "i00260",
+    "kind": "agree"
+   },
+   {
+    "id": "i00007",
+    "kind": "case"
+   },
+   {
+    "id": "i00014",
+    "kind": "foreign"
+   },
+   {
+    "id": "i00028",
+    "kind": "nonword"
+   },
+   {
+    "id": "i00362",
+    "kind": "tense"
+   },
+   {
+    "id": "i00376",
+    "kind": "agree"
+   },
+   {
+    "id": "i00108",
+    "kind": "case"
+   },
+   {
+    "id": "i00021",
+    "kind": "foreign"
+   },
+   {
+    "id": "i00065",
+    "kind": "nonword"
+   },
+   {
+    "id": "i00405",
+    "kind": "agree"
+   },
+   {
+    "id": "i00253",
+    "kind": "case"
+   },
+   {
+    "id": "i00072",
+    "kind": "foreign"
+   },
+   {
+    "id": "i00000",
+    "kind": "original"
+   },
+   {
+    "id": "i00058",
+    "kind": "original"
+   },
+   {
+    "id": "i00087",
+    "kind": "original"
+   }
+  ],
+  "gemini_reference_items": [
+   "i00260",
+   "i00007",
+   "i00014",
+   "i00028",
+   "i00362",
+   "i00376",
+   "i00000",
+   "i00058"
+  ],
+  "key": "items.jsonl sentence-level twin: meta.mutated / meta.original"
+ },
+ "arc_hints": {
+  "stories": [
+   "job_1791315635053_t0t8qpebu",
+   "job_1791267520938_essbvehs8",
+   "job_1791222889407_ypl33vk8u"
+  ],
+  "prompt": "stories.data.arcReviewReport.hintsPrompt",
+  "reference": "hintsRaw (grok-4.6)"
+ },
+ "arc_panel": {
+  "stories": [
+   "job_1791315635053_t0t8qpebu",
+   "job_1791267520938_essbvehs8"
+  ],
+  "stage": "arc_panel_replay",
+  "reference": "arcReviewReport.rounds[0].panel (grok-4.6, deepseek-v4-pro, gpt-5.6-luna-pro)"
+ },
+ "sites": {
+  "translation": [
+   "job_1791450210539_nwi88y9lr",
+   "job_1791315635053_t0t8qpebu",
+   "job_1791267520938_essbvehs8"
+  ],
+  "dedup": "all pairs of stored secondaryCharacters of 6 stories (truth DIFFERENT)",
+  "phantom": "8 stored stories, one stored secondary character removed from the Visual Bible",
+  "landmark": "14 landmark_index rows with 6 photo descriptions, story_score desc",
+  "witness": "job_1791450210539_nwi88y9lr pages with >=2 figures (stored identity answer)",
+  "trait": "12 newest characters rows (face photo), reference = stored physical traits"
+ }
+}

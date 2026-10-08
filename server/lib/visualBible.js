@@ -3802,12 +3802,12 @@ async function dedupeSecondaryCharacterIds(visualBible, addUsage = null) {
           `Entry B:\n  name: ${other.name || '(none)'}\n  description: ${other.description || '(none)'}\n  pages: ${(other.appearsInPages || []).join(',')}\n\n` +
           `Question: are these two entries the same person (one character referenced in two different ways — e.g. by relation and by attribute) or two genuinely distinct characters?\n\n` +
           `Answer with exactly one word on the first line: SAME or DIFFERENT. Optionally add a short one-sentence reason on the next line.`;
-        const resp = await callClaudeAPI(prompt, null, 'claude-haiku-4-5', { usageLabel: 'vb_chr_dedup' });
+        const resp = await callClaudeAPI(prompt, null, 'claude-haiku-5-5', { usageLabel: 'vb_chr_dedup', effort: 'low' });
         const text = (resp?.text || '').trim();
         if (/^\s*SAME\b/i.test(text)) decision = 'merge';
         else if (/^\s*DIFFERENT\b/i.test(text)) decision = 'split';
         llmReason = text.replace(/\s+/g, ' ').slice(0, 240);
-        if (addUsage && resp?.usage) addUsage('anthropic', resp.usage, 'vb_chr_dedup', resp.modelId || 'claude-haiku-4-5');
+        if (addUsage && resp?.usage) addUsage('anthropic', resp.usage, 'vb_chr_dedup', resp.modelId || 'claude-haiku-5-5');
       } catch (err) {
         log.warn(`[VISUAL BIBLE] CHR dedup LLM call failed for ${collisionId}: ${err.message} — defaulting to merge`);
       }

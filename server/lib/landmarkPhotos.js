@@ -4313,6 +4313,7 @@ async function premiseNamedLandmarks(premiseText, excludeWords = null, location 
 }
 
 module.exports = {
+  selectDiversePhotosWithAI,
   stripLandmarkAbbreviations,
   isFreelyLicensedImageUrl,
   fetchLandmarkPhoto,

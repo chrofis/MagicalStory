@@ -3056,7 +3056,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         storyPages,
         visualBible,
         inputCharacters: inputData.characters || [],
-        modelId: MODEL_DEFAULTS.sceneIteration || 'claude-haiku-4-5',
+        modelId: MODEL_DEFAULTS.sceneIteration || 'claude-haiku-5-5',
       });
       // Usage recorded by the callClaudeAPI chokepoint inside the helper
       // (usageLabel 'phantom_patch'). The helper returns a COPY of the usage,
@@ -3067,7 +3067,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       await detectAndPatchOrphanObjectIds({
         storyPages,
         visualBible,
-        modelId: MODEL_DEFAULTS.sceneIteration || 'claude-haiku-4-5',
+        modelId: MODEL_DEFAULTS.sceneIteration || 'claude-haiku-5-5',
       });
     } catch (err) {
       log.warn(`👻 [PHANTOM] Detection/patch failed (continuing): ${err.message}`);
@@ -3535,19 +3535,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     if (!variantRenderStarted) resolveWardrobeVersions();
 
     // Batch-translate scene summaries to story language (separate from scene expansion)
-    // One cheap Haiku call with all summaries — ~1-2s, ~$0.001
+    // One cheap Haiku 5.5 call with all summaries — ~15-20s at effort low, ~$0.002
     if (lang !== 'en') {
       try {
-        const summaries = allSceneDescriptions
-          .map(s => `Page ${s.pageNumber}: ${s.imageSummary || ''}`)
-          .filter(s => s.includes(': ') && s.split(': ')[1].trim())
-          .join('\n');
-        if (summaries) {
-          const { getLanguageInstruction } = require('./server/lib/languages');
-          const langInstruction = getLanguageInstruction(lang);
-          const translationPrompt = `Translate each scene summary below to the target language. Output ONLY the translations, one per line, in the same order. Keep it concise (1-2 sentences each).\n\nTarget language: ${langInstruction}\n\n${summaries}`;
+        const built = require('./server/lib/promptBuilders').buildSceneTranslationPrompt(allSceneDescriptions, lang);
+        if (built) {
           const { callTextModelStreaming } = require('./server/lib/textModels');
-          const transResult = await callTextModelStreaming(translationPrompt, null, null, 'claude-haiku', { usageLabel: 'scene_translation' });
+          const transResult = await callTextModelStreaming(built.prompt, null, null, 'claude-haiku-5-5', { usageLabel: 'scene_translation', effort: 'low' }); // see DECISIONS 2026-10-08 Haiku 5.5
           if (transResult?.text) {
             const translations = transResult.text.trim().split('\n').filter(l => l.trim());
             let tIdx = 0;
