@@ -6343,6 +6343,24 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "fiona-group-a-2026-10-08",
+      "title": "Repair: parent-shared findings tagged, recolour skin gate, descriptor ordinal",
+      "commits": [
+        "2adfd0e52"
+      ],
+      "addedAt": "2026-10-08",
+      "claim": "On a story with a repaired page: the log shows [PARENT-SHARED] pN: k/n finding(s) are also in the parent for repair children with quality/reader findings, and a child that removed a CRITICAL without a new untagged MAJOR/CRITICAL wins; any [GARMENT-COLOUR] refusal for a sleeveless/bare-armed figure says 'mask is N% skin' instead of recolouring; no inpaint instruction says 'Nth from the left' counting background passers-by.",
+      "runShape": [
+        "needs-inpaint"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Generation log: grep PARENT-SHARED and GARMENT-COLOUR; read story_images inpaintInstruction text; compare skin pixels on a recoloured page."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [
