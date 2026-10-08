@@ -414,6 +414,17 @@ Cell 4 is a REAR TURN, distinct from cell 3's profile: ${REAR_TURN_POSE}. Cell 4
 Photographic / lifelike; identity from Image 2; hair, skin tone, and costume consistent with Image 3.${declaredAgeBlock(character)} No arrows or symbols. ${SHEET_NO_LETTERING_RULE} ${CELL_NAMES_NOT_DRAWN}`;
 }
 
+// Pure: the pixels of headroom to add on top of the head row so the sheet stack lands exactly on an aspect preset the
+// style transfer takes without cropping. A stack at least as wide as it is tall is padded up to the largest preset
+// width:height ratio that does not exceed it (1:1, 4:3, 16:9 — the ones the stack reaches by gaining height); a taller
+// stack is left alone (the pre-crop stack was ~1:1 within 2%).
+function sheetStackPad(width, height) {
+  const r = width / height;
+  if (!(r > 1)) return 0;
+  const ratio = [16 / 9, 4 / 3, 1].find(p => p <= r + 1e-9);
+  return Math.max(0, Math.round(width / ratio) - height);
+}
+
 // Composite the head row (top) over the body row (bottom) into one 2×4 sheet,
 // with a thin black seam so the row splitter (detectSheetRowDivider) locks onto
 // the boundary. Widths are matched to the body row; heights stay native.
@@ -432,12 +443,22 @@ async function stackRowsInto2x4(headRowData, bodyRowData) {
   // visible squeeze), columns stay at W/4 (no margins). The head/body boundary
   // is a SOLID WHITE gutter — a clean uniform (zero-variance) band the shared
   // splitter locks onto, matching the sheet's white background (owner request).
-  const H = hMeta.height + SEAM + bMeta.height;
-  const splitY = hMeta.height + Math.round(SEAM / 2);
+  // THE STACK IS BUILT TO AN EXACT PRESET (2026-10-08, Fiona rerun job_1791450210539_nwi88y9lr, Saira: the crown of her
+  // head was cut in all four styled head cells). cropHeadRowToShoulders (2026-10-07) shortens the head row from 576 to ~330
+  // px, so the stack is 1280x1060 = 1.21: the nearest preset is 4:3, and editWithGrok coerces its input to the preset by
+  // CROPPING the longer axis (fit:cover) — about 5% off the top and the bottom, and the generator leaves only ~4% headroom
+  // above the hair. The extra height goes on top of the head row instead (sheetStackPad), so the coercion crops nothing.
+  const pad = sheetStackPad(W, hMeta.height + SEAM + bMeta.height);
+  const headTop = pad > 0
+    ? await sharp(headResized).extend({ top: pad, extendWith: 'copy' }).toBuffer()
+    : headResized;
+  const headH = hMeta.height + pad;
+  const H = headH + SEAM + bMeta.height;
+  const splitY = headH + Math.round(SEAM / 2);
   const out = await sharp({ create: { width: W, height: H, channels: 3, background: { r: 255, g: 255, b: 255 } } })
     .composite([
-      { input: headResized, top: 0, left: 0 },
-      { input: bodyBuf, top: hMeta.height + SEAM, left: 0 },
+      { input: headTop, top: 0, left: 0 },
+      { input: bodyBuf, top: headH + SEAM, left: 0 },
     ])
     .jpeg({ quality: 92 })
     .toBuffer();
@@ -1086,7 +1107,10 @@ function mergeRowObservations(report, top, bottom) {
   };
   report.style = { ...report.style, perCell: perCell('medium') };
   report.identity = { ...report.identity, perCell: perCell('person') };
-  report.hair = { perCell: perCell('hair') };
+  // The rows' own reasons ride with the verdict: a 'differs' on a stored sheet can then be read (what hair, which parting
+  // the judge saw) instead of re-run — the Fiona rerun's 8/8 hair verdicts could not be reproduced from the stored sheet.
+  const rowReason = [['heads', top.report], ['bodies', bottom.report]].filter(([, r]) => typeof r?.reason === 'string').map(([k, r]) => `${k}: ${r.reason}`).join(' | ');
+  report.hair = { perCell: perCell('hair'), ...(rowReason ? { reason: rowReason } : {}) };
   const seen = [top.report, bottom.report].map(r => r?.letteringSeen);
   if (seen.every(v => typeof v === 'boolean')) {
     report.letteringSeen = seen.some(Boolean);
@@ -2396,5 +2420,5 @@ module.exports = {
   resolveFacePhoto,
   buildStyleTransferPrompt,
   // exposed for tests
-  _internal: { mergeRowObservations, observeStyledRow, hairRequest, headRowCropFraction, cropHeadRowToShoulders, applyRowConsistencyAxes, applyStyledSheetConsistencyAxes, TAIL_POSE_RULE, applyGlassesAxis, applyPoseHeadGate, detectBodyRowHeads, detectSheetRowDivider, parseJudgeJson, buildBodyRowPrompt, buildHeadRowPrompt, buildFootwearRule, buildGarmentRule, buildSeasonOutfitBlock, buildStyleTransferPrompt, resolveFacePhoto, resolveStandardAvatar, quickLayoutCheck, evaluateStyledSheetWithGemini, runStyleTransferPass, splitSheetRows, evaluateSheetRow, evaluateIdentity, evaluateSheetSplit, evaluateAvatarSheet, isEchoedJudgeVerdict, REAR_TURN_POSE, SHEET_GROUND_RULE, SHEET_NO_LETTERING_RULE, CELL_NAMES_NOT_DRAWN, garmentColourRule, buildUnnamedTrimRule, scoreHeadsReport, scoreStyleReport, scoreIdentityReport },
+  _internal: { sheetStackPad, stackRowsInto2x4, mergeRowObservations, observeStyledRow, hairRequest, headRowCropFraction, cropHeadRowToShoulders, applyRowConsistencyAxes, applyStyledSheetConsistencyAxes, TAIL_POSE_RULE, applyGlassesAxis, applyPoseHeadGate, detectBodyRowHeads, detectSheetRowDivider, parseJudgeJson, buildBodyRowPrompt, buildHeadRowPrompt, buildFootwearRule, buildGarmentRule, buildSeasonOutfitBlock, buildStyleTransferPrompt, resolveFacePhoto, resolveStandardAvatar, quickLayoutCheck, evaluateStyledSheetWithGemini, runStyleTransferPass, splitSheetRows, evaluateSheetRow, evaluateIdentity, evaluateSheetSplit, evaluateAvatarSheet, isEchoedJudgeVerdict, REAR_TURN_POSE, SHEET_GROUND_RULE, SHEET_NO_LETTERING_RULE, CELL_NAMES_NOT_DRAWN, garmentColourRule, buildUnnamedTrimRule, scoreHeadsReport, scoreStyleReport, scoreIdentityReport },
 };

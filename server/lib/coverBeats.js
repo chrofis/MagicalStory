@@ -54,9 +54,13 @@ const COVER_BEAT_TEXT = Object.freeze({
 /**
  * THE COPY SPACE OF EACH COVER, ONE SENTENCE (owner, 2026-10-06, Art Director review §1): the band the book's text will
  * sit in, written as the picture the band holds and never as an absence, and with no word about what the text is — a
- * title, a dedication or a book is lettering bait. One source for the full-story cover beats below and for the trial
- * cover's composition section (cover-composition.txt, filled by promptBuilders.buildCoverPrompt). `textPosition` is
- * COVER_TEXT_POSITION.
+ * title, a dedication or a book is lettering bait. Read by the TRIAL cover's composition section only
+ * (cover-composition.txt, filled by promptBuilders.buildCoverPrompt). A FULL-STORY cover beat does NOT carry it any more
+ * (2026-10-08, docs/decisions.md "Fiona rerun group B"): the Art Director copied the sentence into the brief prose on the
+ * first pass of every cover ("the top third of the picture is the empty dark grey sky", "feet placed along the bottom
+ * fifth") after the intent and prose bans of 2026-10-06 and 2026-10-07 — a sentence in the input is copied however the
+ * output rule is worded. The band reaches the render through the code-owned COMPOSITION - OPEN AREA block that
+ * `textPosition` builds (promptBuilders.js), never through the brief. `textPosition` is COVER_TEXT_POSITION.
  */
 const COVER_COPY_SPACE = Object.freeze({
   frontCover: "the top third of the picture is the scene's own sky or upper wall in its own colours, with every head, hand, prop, raised arm and effect below the one-third line and the group scaled down to the lower two thirds, feet at the bottom",
@@ -157,7 +161,7 @@ function buildCoverBeats(inputData = {}, { coverTypes = ['frontCover', 'initialP
       ...(placeDecided ? [COVER_DECIDED_PLACE] : [COVER_KEY_PLACE, COVER_OWN_PLACE]),
       anyCostumed(cast, clothingRequirements) ? COVER_COSTUME_FACT : null,
       `any animal, artifact or vehicle from the Visual Bible the picture calls for, at most ${VB_ELEMENT_BUDGET}`,
-      `${COVER_COPY_SPACE[coverKey]} (textPosition "${COVER_TEXT_POSITION[coverKey]}")`,
+      `textPosition "${COVER_TEXT_POSITION[coverKey]}"`,
     ].filter(Boolean).join('; ');
     beats.push({
       pageNumber: COVER_PAGE_NUMBERS[coverKey],

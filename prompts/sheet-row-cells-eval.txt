@@ -21,5 +21,5 @@ Return EXACTLY this JSON shape. Every answer comes from what you see in this ima
   },
   "letteringSeen": <true|false>,
   "letteringQuoted": "<each word, letter or number you see on the paper, or none>",
-  "reason": "cell1: <hair colour, glasses, medium>; cell2: <same three>; cell3: <same three>; cell4: <same three>"
+  "reason": "cell1: <hair colour; hair down, up, in a ponytail or hidden; parting seen on which side or not seen; glasses; medium>; cell2: <same five>; cell3: <same five>; cell4: <same five>"
 }

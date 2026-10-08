@@ -37,10 +37,17 @@ describe('§1 covers: a beat states the picture, never a mood, a title or a book
     }
   });
 
-  it('the copy space is the one constant, in the beat and in the trial cover composition, never worded as an absence', () => {
+  it('the copy space is the one constant, in the trial cover composition only, never worded as an absence; a full-story beat carries textPosition and no band sentence', () => {
     const lines = planLines();
-    expect(lines[0]).toContain(CB.COVER_COPY_SPACE.frontCover);
-    expect(lines[2]).toContain(CB.COVER_COPY_SPACE.backCover);
+    // Fiona rerun 2026-10-08 (regression, fails on the parent): the beat quoted COVER_COPY_SPACE and the Art Director copied it
+    // into the brief prose ("the top third of the picture is the empty dark grey sky"). A sentence in the input is copied; the
+    // band reaches the render through the OPEN AREA block that textPosition builds.
+    const { COVER_TEXT_POSITION } = require('../../server/lib/coverKeys');
+    (['frontCover', 'initialPage', 'backCover'] as const).forEach((key, i) => {
+      expect(lines[i]).not.toContain(CB.COVER_COPY_SPACE[key]);
+      expect(lines[i]).not.toMatch(/\b(third|fifth|tenth|half|one-third line)\b/i);
+      expect(lines[i]).toContain(`textPosition "${COVER_TEXT_POSITION[key]}"`);
+    });
     for (const k of Object.keys(CB.COVER_COPY_SPACE)) expect(CB.COVER_COPY_SPACE[k]).not.toMatch(/\bno\b|\bnothing\b|\bwithout\b|\bclear of\b|\bempty\b/i);
     const comp = fs.readFileSync('prompts/cover-composition.txt', 'utf8');
     expect(comp.match(/\{COVER_COPY_SPACE\}/g)).toHaveLength(2);

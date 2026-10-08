@@ -6361,6 +6361,22 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "fiona-group-b-2026-10-08",
+      "title": "Cover plan lines carry no band sentence; styled sheet stack lands on an exact preset; hair judge reasons stored",
+      "commits": [],
+      "addedAt": "2026-10-08",
+      "claim": "On a full story: (1) no cover brief prose (sceneDescriptions p-1/-2/-3, sceneIntent) contains a band, third, fifth, tenth or kept-empty phrase, and the cover plan lines end in textPosition only; (2) the styled avatar sheets send Grok an exactly 1:1 stack (log \"aspect: 1:1\", no \"aspect: 4:3\") and no styled head cell loses the crown of the head; (3) finalVerdict.hair.reason is stored on every styled attempt.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "stories.data sceneDescriptions (covers) and coverImages prompts; Generation log [GROK] Starting edit ... aspect on character_2x4_style_transfer; styledAvatarGeneration[].passes.pass2.finalVerdict.hair.reason; look at each styled head row."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [
