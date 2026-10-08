@@ -54,6 +54,7 @@ The plan line's instant is a single drawable moment:
 - {FRAME_RULE_LEAD} compose the frame — what fills it, how large something looks, where it sits, or where the camera stands.
 - {SIZE_LOOK_RULE} A plan line names each thing plainly; the Art Director sizes it.
 - The beat's main event wins the picture. A secondary figure or action is dropped before the main one is reduced to a shadow, a silhouette or a sound: the arriving creature is in frame as itself, and the reunion outranks the bystander.
+- An object the story puts in a place on one page and takes out of it on a later page is staged in that place on every page between where the story has it there: a page whose instant is the place "ready" or "waiting" while the next page lifts the object out of it names the object in it, and the page where the object is put there names it in the instant.
 - A beat that hands an object over, frees it or catches it stages that moment as its instant, the object named in it — the hand closing on it, the object between the hands — never the step before it; an object the beat turns on is not named only in what is true after.
 
 Requirements:

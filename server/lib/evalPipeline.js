@@ -3612,6 +3612,33 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         } catch { /* metrics are best-effort */ }
       }
 
+      // CREATURE SCALE FROM THE JUDGE'S OWN BOXES (D-34, 2026-10-08). The vision judge was handed "about three times
+      // the height of Levin" on twelve pages where the dragon stood 1.0-1.5 times a child and passed all of them; the
+      // drawn multiple is arithmetic over the `body_bbox` rows it filed, so code states it (creatureScaleCheck.js).
+      // Scenes only; a creature the judge already filed D-34 for is not filed twice.
+      if (evaluationType === 'scene') {
+        try {
+          const PB = require('./promptBuilders');
+          const scaleMeta = evalOptions.sceneMetadata || declaredSceneMeta;
+          const creatures = PB.creatureHeightMultiples(
+            evalOptions.visualBible || null,
+            Array.isArray(scaleMeta?.objects) ? scaleMeta.objects : [],
+            PB.wholeFiguresInFrame(Array.isArray(sceneCharacters) ? sceneCharacters : [], scaleMeta),
+          );
+          if (creatures.length) {
+            const filed = new Set(fixableIssues.filter(i => i && i.type === 'creature_scale').map(i => String(i.character || '').toLowerCase()));
+            for (const f of require('./creatureScaleCheck').checkCreatureScale({ creatures, matches, figures })) {
+              if (filed.has(String(f.character).toLowerCase())) continue;
+              fixableIssues.push(f);
+              log.info(`📏 [CREATURE-SCALE] ${pageContext || 'page'}: [${f.severity}] ${f.description}`);
+            }
+          }
+        } catch (e) {
+          log.error(`[CREATURE-SCALE] ${pageContext || 'page'}: check failed - ${e.message}`);
+          notEvaluated.record('creature_scale', 'scale_boxes_check_failed', e.message);
+        }
+      }
+
       // Merge P1 figure data if available (better age detection — P1 doesn't see the prompt)
       let p1Usage = null;
       // What the undeclared-lettering check compared (2026-09-24): the blind
@@ -3694,7 +3721,13 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
             // prose emotion rule. Same pairing and scene-only scope as gaze.
             try {
               const emotion = evaluationType !== 'scene' ? [] : require('./emotionCheck').checkDeclaredEmotion({
-                declared: require('./vbIdGuard').gazeCharacters(declaredSceneMeta),
+                // The cast AND the page's creatures (`creatures[]` rows carry an `emotion`): the checker was written to pair
+                // animals (emotionCheck.js) but this call only ever declared the cast, so a smiling dragon on a sad page
+                // (job_1791489793707_2ir6nl5kw p12, brief emotion sad) was compared with nothing and no judge filed it.
+                declared: [
+                  ...(require('./vbIdGuard').gazeCharacters(declaredSceneMeta) || []),
+                  ...require('./vbIdGuard').gazeCreatures(declaredSceneMeta, evalOptions.visualBible || null),
+                ],
                 inventory: p1Result,
                 matches,
               });

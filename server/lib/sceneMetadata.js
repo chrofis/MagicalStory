@@ -2553,6 +2553,14 @@ function figureShort(visualBible, name) {
   return null;
 }
 
+/** What a brief's `looksAt` names, as a reader needs it: a Visual Bible handle becomes the entry's name, a plain word stays as written. */
+function gazeTarget(visualBible, looksAt) {
+  const raw = String(looksAt || '').trim();
+  if (!raw) return null;
+  if (/^[A-Z]{3}\d+(\.\d+)?$/.test(raw)) return vbEntry(visualBible, raw)?.entry?.name || null;
+  return raw;
+}
+
 /**
  * THE PICTURE SPEC EVERY TEXT-STAGE READER GETS, built once per book (owner,
  * 2026-09-23: "worst thing someone wears green and the writer invents red").
@@ -2597,11 +2605,22 @@ function buildTextStagePictureSpecs(briefs = [], { visualBible = null, clothingR
       if (dressed && !outfit) log.warn(`⚠️ [TEXT-SPEC] p${x.pageNumber}: no contract outfit for ${c.name} (${c.clothing || 'standard'}) — the spec names no clothing for them`);
       // A creature or story-made figure is named with its look from the bible.
       const figure = !dressed ? figureShort(visualBible, c.name) : null;
-      return `- ${figure || c.name}${outfit ? `: wears ${outfit}` : ''}${c.expression ? `. Face: ${c.expression}` : ''}`;
+      const gaze = gazeTarget(visualBible, c.looksAt);
+      return `- ${figure || c.name}${outfit ? `: wears ${outfit}` : ''}${c.expression ? `. Face: ${c.expression}` : ''}${gaze ? `. Looks at: ${gaze}` : ''}`;
     });
+    // A creature the brief draws carries its own face and gaze (`creatures[]` row), exactly as a
+    // cast member does: the writer must not invent a head turn or a smile the picture does not show
+    // (job_1791489793707 p13: brief "looks down at the book, angry", text wrote a head turn).
+    const creatureRows = new Map((Array.isArray(meta.creatures) ? meta.creatures : []).map(r => [String(r.id).toUpperCase(), r]));
     const inView = objects
       .filter(id => !/^LOC/i.test(id) && !wornIds.has(String(id).split('.')[0]))
-      .map(id => vbShort(visualBible, id))
+      .map(id => {
+        const short = vbShort(visualBible, id);
+        const row = short ? creatureRows.get(String(id).split('.')[0].toUpperCase()) : null;
+        if (!row) return short;
+        const gaze = gazeTarget(visualBible, row.looksAt);
+        return `${short}${row.expression ? `. Face: ${row.expression}` : ''}${gaze ? `. Looks at: ${gaze}` : ''}`;
+      })
       .filter(Boolean);
     out.set(x.pageNumber, [
       where.length ? `WHERE: ${where.join('; ')}` : null,

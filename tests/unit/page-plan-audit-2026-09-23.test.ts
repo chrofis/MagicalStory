@@ -67,7 +67,8 @@ describe('the plan check and the planner', () => {
     expect(PB.replanRank({ kind: 'check', check: 12 })).toBe('must');
     expect(PB.replanRank({ kind: 'counter', code: 'CAST_NOT_IN_WHO_COLUMN' })).toBe('must');
     expect(PB.countsTowardConvergence({ kind: 'counter', code: 'CAST_NOT_IN_WHO_COLUMN' })).toBe(false);
-    expect(PB.replanRank({ kind: 'check', check: 13 })).toBe('also');
+    // Q13 (order) joined as must-fix 2026-10-08 (docs/decisions.md "Dragon run leftovers"); it was advisory until then.
+    expect(PB.replanRank({ kind: 'check', check: 13 })).toBe('must');
   });
 
   it('the WANTED and ACTION lines are read as data', () => {

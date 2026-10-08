@@ -6890,6 +6890,108 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": null
+    },
+    {
+      "id": "plan-order-must-fix-2026-10-08",
+      "title": "A plan-check order finding (Q13) forces the re-plan, also when it rides on a protected page",
+      "commits": [],
+      "addedAt": "2026-10-08",
+      "claim": "On a story whose plan check files an order finding (a page needs something a later page first brings about), the re-plan answers it: generationLog shows no beats_replan_change_refused for a change tagged CHECK[13], and the earlier page stages the carried object.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "generationLog beats_replan* events and the page plan lines: the page before the one that lifts/uses an object stages it in its place."
+      },
+      "status": "pending",
+      "evidence": [],
+      "lastChecked": null
+    },
+    {
+      "id": "writer-spec-creature-face-gaze-2026-10-08",
+      "title": "The writer picture spec gives a creature its brief face and gaze",
+      "commits": [],
+      "addedAt": "2026-10-08",
+      "claim": "On a story with a creature on a page, the text-stage picture spec (storyTextPrompts / writer ILLUSTRATION block) lists the creature with \"Face: ...\" and \"Looks at: ...\" and the page text does not invent a head turn or smile the brief does not state.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "storyTextPrompts ILLUSTRATION blocks for creature pages vs the page text and the brief creatures[] row."
+      },
+      "status": "pending",
+      "evidence": [],
+      "lastChecked": null
+    },
+    {
+      "id": "creature-scale-from-boxes-2026-10-08",
+      "title": "A creature drawn far below its given multiple is filed from the judge boxes",
+      "commits": [],
+      "addedAt": "2026-10-08",
+      "claim": "On a story with a grown creature given several times a child, a page where the creature is drawn barely taller than the child carries a creature_scale finding with source scale-boxes (log \"[CREATURE-SCALE]\") and is regenerated; pages near the given size carry none.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "sceneImages[].imageVersions[].fixableIssues type creature_scale source scale-boxes; log lines [CREATURE-SCALE]; compare the picture."
+      },
+      "status": "pending",
+      "evidence": [],
+      "lastChecked": null
+    },
+    {
+      "id": "creature-emotion-compared-2026-10-08",
+      "title": "A creature declared sad/angry that is drawn smiling is filed as an emotion finding",
+      "commits": [],
+      "addedAt": "2026-10-08",
+      "claim": "On a story whose brief declares a creature emotion, a page where the creature face reads the opposite tone carries an emotion finding for the creature (source emotion-check).",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "fixableIssues type emotion for the creature; compare the creature face with the brief creatures[] emotion."
+      },
+      "status": "pending",
+      "evidence": [],
+      "lastChecked": null
+    },
+    {
+      "id": "extras-garment-colour-line-2026-10-08",
+      "title": "Extras on ambient/crowd pages are not dressed in the cast garment colours (image prompt line)",
+      "commits": [],
+      "addedAt": "2026-10-08",
+      "claim": "On a story with ambient or crowd pages, the image prompt population line ends \"none sharing a listed character's hair, build, outfit or garment colour\" and the unnamed passers-by are not in the cast jacket colours.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "sceneImages[].prompt on ambient pages; the page pictures (background people vs cast colours)."
+      },
+      "status": "pending",
+      "evidence": [],
+      "lastChecked": null
+    },
+    {
+      "id": "brief-worn-absent-wearer-prompt-2026-10-08",
+      "title": "The Art Director does not cite a garment on a page its wearer is not on",
+      "commits": [],
+      "addedAt": "2026-10-08",
+      "claim": "On a story with a worn item whose wearer is off a page, that page brief objects[] and wornItems carry no row for it.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "sceneDescriptions[] METADATA objects/wornItems on pages without the garment wearer."
+      },
+      "status": "pending",
+      "evidence": [],
+      "lastChecked": null
     }
   ],
   "runs": [

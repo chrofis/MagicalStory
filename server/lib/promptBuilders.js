@@ -2566,6 +2566,35 @@ function pageElementScales(visualBible, objectIds, figures, { interactions = [],
 }
 
 /**
+ * The NUMBERS behind a creature's page-scale note: for every animal the page cites
+ * whose scale band has a height, how many times each figure's height it was given
+ * (band height / the figure's height — the same arithmetic as elementPageScaleNote,
+ * kept as numbers so the eval can measure the picture against them without
+ * reading the note's prose; creatureScaleCheck.js).
+ * @returns {Array<{id:string, name:string, givenTimes:Array<{name:string, times:number}>}>}
+ */
+function creatureHeightMultiples(visualBible, objectIds, figures) {
+  if (!visualBible || !Array.isArray(objectIds) || !objectIds.length) return [];
+  const VB = require('./visualBible');
+  const base = (raw) => String(typeof raw === 'string' ? raw : (raw?.id || '')).trim().toUpperCase().split('.')[0];
+  const wanted = new Set(objectIds.map(base).filter(Boolean));
+  const out = [];
+  for (const entry of (Array.isArray(visualBible.animals) ? visualBible.animals : [])) {
+    if (!entry?.id || !wanted.has(base(entry.id))) continue;
+    const band = VB.resolveScaleClass(entry.scaleClass);
+    const fraction = band ? VB.scaleAdultHeightFraction(band) : null;
+    if (!fraction) continue;
+    const givenTimes = [];
+    for (const f of (Array.isArray(figures) ? figures : [])) {
+      const cm = f && typeof f.name === 'string' && f.name.trim() ? figureHeightCm(f) : null;
+      if (cm > 0) givenTimes.push({ name: f.name.trim(), times: (fraction * STANDING_ADULT_CM) / cm });
+    }
+    if (givenTimes.length) out.push({ id: entry.id, name: entry.name || entry.label || 'creature', givenTimes });
+  }
+  return out;
+}
+
+/**
  * The judge's ELEMENT SIZES input (image-evaluation input 12; D-21 objects,
  * D-31 vehicles, D-34 creatures): one line per cited element. '' when the page
  * cites none that states a size.
@@ -7926,7 +7955,16 @@ function buildChallengeIdeasSection(inputData, count = 25) {
 // never a page spent or moved. On staging job_1790446348343_z3fw660ie p16 the
 // advisory reading let a posed row facing the viewer ship.
 // 14 is asked only on the Jev-outage backup (checkerShotFills).
-const REPLAN_MUST_FIX_CHECKS = new Set([4, 8, 12, 14, 15, 16, 17]);
+//
+// Q13 (order) joined as must-fix 2026-10-08 (owner mandate "fix all issues"; the
+// earlier "ranking Q13 must-fix" owner call). Evidence: job_1791489793707_2ir6nl5kw,
+// where the check filed "page 15 requires the egg laid in the nest, but page 14's
+// instant does not stage that" and the planner's change for p14 was REFUSED by
+// reviewPlanChanges ("protected ... CHECK[13] is a noted finding, not a must-fix
+// one"), so the plan shipped with the fault the check had named. It names only a
+// page that stages a moment before its cause, a handful per book, never a sweep
+// like Q5. docs/decisions.md 2026-10-08 "Plan order is must-fix".
+const REPLAN_MUST_FIX_CHECKS = new Set([4, 8, 12, 13, 14, 15, 16, 17]);
 
 /**
  * THE CHEAP-RELABEL BLOCK, declared ONCE (2026-09-20; shot codes removed 2026-09-27).
@@ -8386,6 +8424,20 @@ function buildReplanSection(pagePlan, findingLines, { pageCount = null, keep = [
   ].join('\n').trimEnd();
 }
 
+/**
+ * EVERY finding tag a change line declares (`CHECK[9] and CHECK[13]`): a change answers each finding it names, so the
+ * review asks whether ANY of them is must-fix. `parseFindingTag` below reads only the first, and it alone decided
+ * whether a protected page may change - on job_1791489793707_2ir6nl5kw p14 the change answered CHECK[9] (noted) and
+ * CHECK[13] (order), was read as CHECK[9] only and refused.
+ */
+function parseFindingTags(text) {
+  const t = String(text || '');
+  const tags = [];
+  for (const m of t.matchAll(/PLAN\s*\[\s*([A-Za-z0-9_]+)\s*\]/g)) tags.push({ code: m[1].toUpperCase() });
+  for (const m of t.matchAll(/CHECK\s*\[\s*(\d+)\s*\]/gi)) tags.push({ check: Number(m[1]) });
+  return tags;
+}
+
 /** A change line's declared finding tag: PLAN[CODE] or CHECK[n]. Null when it carries neither. */
 function parseFindingTag(text) {
   const t = String(text || '');
@@ -8568,6 +8620,7 @@ function parsePlanChanges(raw) {
     const fields = String(p[2]).split(CHANGE_FIELD_SPLIT).map(s => s.trim()).filter(Boolean);
     const answersText = fields[1] || '';
     const answers = parseFindingTag(answersText);
+    const allAnswers = parseFindingTags(answersText);
     const reason = fields.slice(2).join(' — ');
     const clauses = String(fields[0] || '').split(CHANGE_CLAUSE_SPLIT).map(s => s.trim()).filter(Boolean);
     if (clauses.length > 1) {
@@ -8611,7 +8664,7 @@ function parsePlanChanges(raw) {
           line,
         });
       }
-      changes.push({ pageNumber, ...parsed, answers, answersText, reason, clause, line });
+      changes.push({ pageNumber, ...parsed, answers, allAnswers, answersText, reason, clause, line });
     }
   }
   return { present: true, changes, declaredCount, counted: changes.length, lines, violations };
@@ -9378,11 +9431,11 @@ const REQUIRED_CAST_LEAD = '**REQUIRED CAST:** Every named character is in the f
 const REQUIRED_CAST_UNACTED = 'A character given no action is still drawn, placed and occupied as the moment suggests.';
 const REQUIRED_CAST_BACKGROUND = {
   cast_only: ', and no one else is added.',
-  ambient: ". Add a few unnamed passers-by far behind the cast (where the scene description places them, if it does), each much smaller than any listed character, busy with their own business and mostly turned away, every face fully drawn, dressed for the story's era, none sharing a listed character's hair, build or outfit. No one else is added.",
-  sparse: ". Add at most one or two unnamed people, tiny and far behind the cast, busy with their own business and turned away, every face fully drawn, dressed for the story's era, none sharing a listed character's hair, build or outfit. No one else is added.",
+  ambient: ". Add a few unnamed passers-by far behind the cast (where the scene description places them, if it does), each much smaller than any listed character, busy and mostly turned away, every face fully drawn, dressed for the story's era, none sharing a listed character's hair, build, outfit or garment colour. No one else is added.",
+  sparse: ". Add at most one or two unnamed people, tiny and far behind the cast, busy and turned away, every face fully drawn, dressed for the story's era, none sharing a listed character's hair, build, outfit or garment colour. No one else is added.",
   wildlife: ". Add the unnamed animals the scene description places — fish, a flock, a herd — as ordinary members of their kind, none matching a listed character or creature. No unnamed people are added.",
   creature_crowd: ". Paint the crowd of unnamed creatures the scene description places, as it places them: many of their kind, varied in size and markings, none matching a listed character or creature. No unnamed people are added.",
-  crowd: ". Paint the unnamed people the scene description places, as it places them: busy with their own business, every face fully drawn, varied hair and garment colours and shapes, dressed for the story's era, none sharing a listed character's hair, build or outfit. No one else is added.",
+  crowd: ". Paint the unnamed people the scene description places, as it places them: busy with their own business, every face fully drawn, varied hair and garment colours and shapes, dressed for the story's era, none sharing a listed character's hair, build, outfit or garment colour. No one else is added.",
 };
 
 /** The REQUIRED CAST line for a page of this `population` (normalised). */
@@ -13523,6 +13576,7 @@ module.exports = {
   elementContactNames,
   wholeFiguresInFrame,
   pageElementScales,
+  creatureHeightMultiples,
   buildElementSizesBlock,
   buildElementSizeRepairClause,
   ELEMENT_SIZE_PRECEDENCE_LINE,

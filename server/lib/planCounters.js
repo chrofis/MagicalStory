@@ -1614,7 +1614,9 @@ function reviewPlanChanges({ changes = [], standing = [], returned = [], castNam
     if (!c.answers) notes.push(`p${page}: "${String(c.line || '').slice(0, 120)}" names no finding tag`);
 
     // A page the re-plan was told stays changes only for a must-fix finding.
-    if (isProtected(page) && !isMust(c.answers) && !breaksArcFact(c.answers)) {
+    // A change answering several findings is allowed by ANY of them being must-fix (or breaking an arc fact).
+    const tags = (Array.isArray(c.allAnswers) && c.allAnswers.length) ? c.allAnswers : [c.answers];
+    if (isProtected(page) && !tags.some(isMust) && !tags.some(breaksArcFact)) {
       refuse(page, 'protected', `${protectedPages.get(page)} stays, and ${c.answersText || 'an untagged change'} is a noted finding, not a must-fix one`, c.line);
       continue;
     }
