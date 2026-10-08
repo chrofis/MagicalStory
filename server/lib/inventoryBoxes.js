@@ -31,7 +31,7 @@ function normaliseBox(box) {
 }
 
 /**
- * Normalise `body_bbox` and `face_bbox` on every figure in place. A box that
+ * Normalise `body_bbox` and `face_bbox` on every figure and object in place. A box that
  * cannot be normalised becomes null, which the pairing code already treats as
  * "no estimate" — never a wrong estimate.
  *
@@ -40,7 +40,15 @@ function normaliseBox(box) {
  */
 function normaliseInventoryBoxes(inventoryJson) {
   const stats = { fixed: 0, dropped: 0 };
-  const figures = Array.isArray(inventoryJson?.figures) ? inventoryJson.figures : [];
+  // Figures AND objects: an animal the inventory boxes (`objects[].body_bbox`,
+  // 2026-10-04) is paired to the brief's creature by the same positions as a
+  // figure. Until 2026-10-09 only figures were rescaled, so Qwen's 0-1000 animal
+  // box never paired and the creature emotion check silently compared nothing
+  // (job_1791497309909_6quecrr9t p3: a grinning dragon declared sad, no finding).
+  const figures = [
+    ...(Array.isArray(inventoryJson?.figures) ? inventoryJson.figures : []),
+    ...(Array.isArray(inventoryJson?.objects) ? inventoryJson.objects : []).filter(o => o && typeof o === 'object'),
+  ];
   for (const f of figures) {
     for (const key of ['body_bbox', 'face_bbox']) {
       if (f[key] == null) continue;

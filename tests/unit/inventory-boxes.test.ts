@@ -50,4 +50,29 @@ describe('normaliseInventoryBoxes', () => {
     expect(normaliseInventoryBoxes({})).toEqual({ fixed: 0, dropped: 0 });
     expect(normaliseInventoryBoxes(null)).toEqual({ fixed: 0, dropped: 0 });
   });
+
+  it('rescales an animal object box too, so the creature emotion check can pair it (job_1791497309909_6quecrr9t p3)', () => {
+    const inv: any = {
+      figures: [],
+      objects: [{ what: 'a green dragon', emotion: 'happy', body_bbox: [415, 0, 855, 240] }, { what: 'an egg', body_bbox: null }],
+    };
+    const stats = normaliseInventoryBoxes(inv);
+    expect(inv.objects[0].body_bbox).toEqual([0.415, 0, 0.855, 0.24]);
+    expect(stats.fixed).toBe(1);
+  });
+
+  it('a Qwen-scale dragon box ends in an emotion finding, as the stored p3 replay did', () => {
+    const { checkDeclaredEmotion } = require('../../server/lib/emotionCheck');
+    const inv: any = {
+      figures: [{ label: 'the child', emotion: 'neutral', body_bbox: [0, 370, 430, 1000] }],
+      objects: [{ what: 'a green dragon', emotion: 'happy', body_bbox: [415, 0, 855, 240] }],
+    };
+    normaliseInventoryBoxes(inv);
+    const matches = [
+      { figure: 1, reference: 'Julian', confidence: 0.9, body_bbox: [0, 0.37, 0.43, 1] },
+      { figure: 2, reference: 'Funka', confidence: 0.9, body_bbox: [0.41, 0, 0.8, 0.29] },
+    ];
+    const out = checkDeclaredEmotion({ declared: [{ name: 'Julian', emotion: 'neutral' }, { name: 'Funka', emotion: 'sad' }], inventory: inv, matches });
+    expect(out.map((f: any) => f.character)).toEqual(['Funka']);
+  });
 });
