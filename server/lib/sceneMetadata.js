@@ -2112,9 +2112,10 @@ function resolvePagePlate({ pageNumber = null, sceneMetadata = null, visualBible
  *
  * @param {object} v - a getPrimaryVantageForPage result
  * @param {string} [plateText] - the vantage's FRAMING paragraph
+ * @param {{interior?: boolean}} [opts] - the plate is an interior: the LOCATION line carries the name only
  * @returns {string}
  */
-function vantageSettingText(v, plateText = '') {
+function vantageSettingText(v, plateText = '', { interior = false } = {}) {
   const { englishLocationRef } = require('./visualBible');
   // English-only: the bare VB location name is story-language and carries no
   // visual info, so it goes out with the entry's English visual fields
@@ -2125,7 +2126,9 @@ function vantageSettingText(v, plateText = '') {
   // (staging job_1791315635053_t0t8qpebu: p4's underwater plate kept the beach's bench and dunes under a water
   // ceiling, p6's exterior of a wreck became its interior through "ribs forming the enclosed hull space"). The
   // vantage description, written from this camera, carries what is in view.
-  const locationRef = englishLocationRef(v?.location, description ? { fields: ['colors'] } : undefined) || v?.locationName || '';
+  // `interior`: the place's colours were authored for the whole place and may name an exterior's plants or ground
+  // (see platePipeline); an interior plate keeps its own description's palette only.
+  const locationRef = englishLocationRef(v?.location, description ? { fields: interior ? [] : ['colors'] } : undefined) || v?.locationName || '';
   return [
     `**LOCATION:** ${locationRef}\n**VANTAGE:** ${v?.name || ''}`,
     description && description !== String(plateText || '').trim() ? description : '',

@@ -187,11 +187,24 @@ describe('a prompt that does not fit fails loudly and never reaches Gemini', () 
   }, 30000);
 });
 
+describe("an interior plate does not take the place's palette line (Fiona rerun #24)", () => {
+  const { vantageSettingText } = require_('../../server/lib/sceneMetadata');
+  const v = { locationName: 'Museum', location: { name: 'Museum', colors: 'grey stone, green ivy, brown cobbles' }, name: 'gallery corner', description: 'A dim gallery with glass cases.' };
+  it('an exterior vantage keeps the colours', () => {
+    expect(vantageSettingText(v, 'Another plate.')).toContain('Museum (grey stone, green ivy, brown cobbles)');
+  });
+  it('an interior vantage carries the place name only', () => {
+    const t = vantageSettingText(v, 'Another plate.', { interior: true });
+    expect(t).toContain('**LOCATION:** Museum' + String.fromCharCode(10) + '**VANTAGE:** gallery corner');
+    expect(t).not.toContain('ivy');
+  });
+});
+
 describe('the vantage plate states its Art Director prose once', () => {
   it('drops the vantage description when FRAMING carries the same text', () => {
     // One builder since 2026-09-26 (the plate prompt and its QC's EXPECTED SCENE).
     const src = fs.readFileSync(path.join(__dirname, '..', '..', 'server/lib/platePipeline.js'), 'utf8');
-    expect(src).toContain('const vantageSetting = vantageSettingText(v, adEmptyPrompt);');
+    expect(src).toContain("const vantageSetting = vantageSettingText(v, adEmptyPrompt, { interior: baseLight.weather === 'none' });");
     const { vantageSettingText } = require_('../../server/lib/sceneMetadata');
     const v = { locationName: 'Quay', name: 'low landing', description: 'Looking up at the wall.' };
     expect(vantageSettingText(v, 'Looking up at the wall.')).toBe('**LOCATION:** Quay\n**VANTAGE:** low landing');

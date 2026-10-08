@@ -52,6 +52,16 @@ describe('checkStateBatch — both questions', () => {
     expect(seen[0][1].description).toBe(parent.description);
   });
 
+  it('asks identity of the first cell with ITS OWN description, delta included (a blank back is meant to be blank)', async () => {
+    const back = { id: 'ART010.1', stateName: 'away from viewer', delta: 'shows the blank back of the clean white sheet', description: 'A fresh sheet of clean white paper, shows the blank back of the clean white sheet' };
+    const seen: any[] = [];
+    await checkStateBatch(['back-cell', 'face-cell'], { ...parent, description: 'A fresh sheet of clean white paper' }, [back, cells[1]], 'watercolour', {
+      checkIdentity: (_cell: string, el: any) => { seen.push(el); return Promise.resolve({ ok: true, reason: '' }); },
+      checkConsistency: () => Promise.resolve({ ok: true, reason: '' }),
+    });
+    expect(seen[0].description).toContain('blank back');
+  });
+
   it('fails the batch when identity fails even though consistency passes (the ART001 case)', async () => {
     const res = await checkStateBatch(['a', 'b'], parent, cells, 'watercolour', {
       checkIdentity: () => Promise.resolve({ ok: false, reason: 'it reads as a broadcast camera, not a bicycle lamp' }),

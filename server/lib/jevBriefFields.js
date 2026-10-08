@@ -81,6 +81,30 @@ function pageLocations(visualBible, pageNumbers) {
 }
 
 /**
+ * Whether a page's decided `aboard` contradicts its cited vantage: the camera is on a vessel (Jev's reading of the
+ * arc) while the vantage the Visual Bible authored for the page is a ground view (the Visual Bible call never saw the
+ * decision). The brief author is told to stage the figures on the deck, and the page is reported. Pure; true only
+ * when both are known.
+ * see docs/decisions.md "Fiona rerun group C" (#13)
+ *
+ * @param {Object} visualBible
+ * @param {string|null} cite - the page's cited location or vantage id
+ * @param {string|null} aboard - the vehicle id Jev put the camera on
+ * @param {string[]} vehicleIds - what Jev may set `aboard` to (a vehicle or a ridden creature)
+ */
+function aboardOnGroundVantage(visualBible, cite, aboard, vehicleIds = []) {
+  if (!cite || !aboard) return false;
+  const baseOf = id => String(id || '').trim().toUpperCase().split('.')[0];
+  if (!vehicleIds.map(baseOf).includes(baseOf(aboard))) return false;
+  const want = String(cite).trim().toUpperCase();
+  for (const l of (visualBible && Array.isArray(visualBible.locations) ? visualBible.locations : [])) {
+    const v = (Array.isArray(l && l.vantages) ? l.vantages : []).find(x => x && String(x.id || '').trim().toUpperCase() === want);
+    if (v) return String(v.cameraOn || '').trim().toLowerCase() === 'ground';
+  }
+  return false;
+}
+
+/**
  * The pages at or aboard a SUBMERGED place (owner, 2026-10-07): a location or a vehicle the Visual Bible marks
  * `submerged: true` (written once by the Visual Bible call). A page is at a location (`locOf`: page -> base id)
  * and aboard a vehicle (`aboardOf`: page -> id or null). Pure.
@@ -192,8 +216,14 @@ async function decideBriefFields({ beats, visualBible, bibleSections, approvedAr
       ...(loc ? { location: loc.cite } : {}),
       ...(loc && pop.byLocation[loc.base] ? { population: pop.byLocation[loc.base].population } : {}),
       aboard: r ? r.aboard : null, aboardIds: vehicleIds,
+      ...(r && loc && aboardOnGroundVantage(vb, loc.cite, r.aboard, vehicleIds) ? { aboardFromGround: true } : {}),
       readsText: !!(r && r.readsText),
     };
+  }
+  for (const b of storyBeats) {
+    if (b.jevFixed.aboardFromGround) {
+      gl.warn('beats_jev_aboard_on_ground_vantage', `Page ${b.pageNumber}: the camera is aboard ${b.jevFixed.aboard} (decided from the arc) but its vantage ${b.jevFixed.location} is a ground view — the brief author is told the figures stand on the deck; the plate does not show one`, null, { pageNumber: Number(b.pageNumber), aboard: b.jevFixed.aboard, vantage: b.jevFixed.location });
+    }
   }
   // What lights a dark page: Jev says which cited element is lit or glowing (owner, 2026-10-06). Pages in a light
   // with sky and sun keep no list ([] clears a stale one when a brief is re-pinned).
@@ -752,6 +782,6 @@ async function decideCoverPopulation({ arc, coverBeats, visualBible, decided = {
 
 module.exports = {
   litCandidates, offFrameOf, coverLight, coverFacts, decideCoverPopulation, COVER_SHOT, COVER_GAZE,
-  decideBriefFields, assembleBriefs, pageLocations, submergedPages, visualBibleJsonOf,
+  decideBriefFields, assembleBriefs, pageLocations, aboardOnGroundVantage, submergedPages, visualBibleJsonOf,
   COVER_PLACE_SHOTS, COVER_PURPOSE, COVER_FOOTING, COVER_ONE_PLACE_NOTE, coverFitQuestion, COVER_PLACE_FLOOR, COVER_PHOTO_MIN_SCORE, coverPhotoOf, bibleLocationOf, materializeCoverPlaces, coverPlaceLabel, coverPlaceCandidates, assignCoverPlaces, coverPlaceState, decideCoverPlaces, applyCoverPlacePages,
 };

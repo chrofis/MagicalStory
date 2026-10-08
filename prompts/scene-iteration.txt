@@ -42,6 +42,9 @@
 18c. **A small prop rests against a figure.** {SMALL_PROP_CONTACT}
 19. **A garment the page removes.** {GARMENT_REMOVED}
 20. **A worn item on someone else.** {WORN_ON_OTHER}
+20b. **A figure wears its outfit and nothing else.** {OUTFIT_ONLY}
+20c. **Direction words.** {ACTION_DIRECTION}
+20d. **A hiding place the plan line names.** {PLAN_COVER}
 21. **Counting.** {COUNTING_RULE}
 22. **A two-sided prop.** {MULTI_PICTURE_PROP}
 23. **A creature in frame has a written face.** {CREATURE_FACE} Write it in the terms of the creature-tone block below. {CREATURE_FIELD}

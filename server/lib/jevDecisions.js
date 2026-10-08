@@ -1285,7 +1285,7 @@ function fixedBlock(page) {
   if (f.lightSources && f.lightSources.length) lines.push(`- lightSources: ${f.lightSources.join('; ')} (lit and glowing: the light the page is lit by)`);
   const objects = [...(f.location ? [f.location] : []), ...(f.cites || [])];
   lines.push(`- objects: ${objects.length ? objects.map(label).join('; ') : 'none'}`);
-  lines.push(`- aboard: ${f.aboard ? label(f.aboard) : 'none'}`);
+  lines.push(`- aboard: ${f.aboard ? label(f.aboard) : 'none'}${f.aboard && f.aboardFromGround ? ' — the figures stand on its deck; the location line is the view they have from it' : ''}`);
   if (f.population) lines.push(`- population: ${f.population}`);
   const gaze = Object.entries(f.looksAt || {});
   if (gaze.length) lines.push(`- looksAt: ${gaze.map(([n, t]) => `${n} → ${G.gazeToken(t) ? `${t} (${G.gazeTokenRow(t).phrase})` : label(t)}`).join('; ')}`);

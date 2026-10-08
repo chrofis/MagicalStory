@@ -1,0 +1,25 @@
+{
+  "date": "2026-10-08",
+  "story": "job_1791450210539_nwi88y9lr",
+  "note": "Fiona rerun group C validation. Raw prompts and replies sit beside this file on the machine that ran it (evals/runs/*/* is gitignored). Agent-as-model arms are Sonnet, not production; real arms are google/gemini-3.1-pro-preview, one sample each.",
+  "jev_shot_replay": {
+    "model": "Jev (real), $0.002 a run",
+    "p3_over_the_shoulder_score": { "old_rule": [0.67, 0.70], "new_rule": [0.14, 0.15] },
+    "p8_over_the_shoulder_score": { "old_rule": [0.64, 0.66], "new_rule": [0.56, 0.57] },
+    "p3_shot": { "old_rule": "over-the-shoulder", "new_rule": "medium" },
+    "second_ots_slot": { "old_rule": "p8 (and p3)", "new_rule": "p5 and p8" },
+    "violations": 0,
+    "unmet": null
+  },
+  "ad_briefs": {
+    "real_before": { "model": "gemini-3.1-pro", "usd": 0.199, "lorena_tricorn_p3": false, "p5_crates_named": true, "p13_aboard_deck": true },
+    "real_after": { "model": "gemini-3.1-pro", "usd": 0.194, "lorena_tricorn_p3": false, "p5_crates_named": "beside the crates, behind an empty stall frame", "p13_aboard_deck": true },
+    "agent_before_after": "Sonnet: no hat on Lorena, crates, aboard deck in both arms"
+  },
+  "visual_bible_real_runs": [
+    { "usd": 0.099, "ivy_in_museum_colors": true, "neat_copy_states": "unaltered + crumpled", "crates_entry": true },
+    { "usd": 0.110, "ivy_in_museum_colors": true, "neat_copy_states": "single crumpled state", "crates_entry": "colors only" },
+    { "usd": 0.107, "ivy_in_museum_colors": true, "neat_copy_states": "states unaltered/crumpled/crooked/wrapped on one galley sack", "crates_entry": true }
+  ],
+  "total_usd": 0.73
+}

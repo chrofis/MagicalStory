@@ -64,7 +64,7 @@ describe('every story-run plate QC gets its inputs whole, and the STRUCTURES the
     expect(perPage).toContain('structureGrid: emptySceneVbGrid || null,');
   });
   it('vantage: the setting text the prompt carries, the FRAMING apart; derived: the setting, no FRAMING, the base\'s structures', () => {
-    expect(vantage).toContain('const vantageSetting = vantageSettingText(v, adEmptyPrompt);');
+    expect(vantage).toContain("const vantageSetting = vantageSettingText(v, adEmptyPrompt, { interior: baseLight.weather === 'none' });");
     expect(vantage).toContain('`${shotPrefix}${vantageSetting}`,');
     expect(vantage).toContain('sceneDescription: `${shotPrefix}${vantageSetting}`,');
     expect(vantage).toMatch(/buildPlateStructuresText\(\{ visualBible, pageNumber: repPageData\.pageNumber, aboardId: repAboardId, sceneObjects: repSceneObjects \}\)/);

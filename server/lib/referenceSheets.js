@@ -945,7 +945,10 @@ async function checkStateBatch(cellsBase64, parent, cells, styleDescription = ''
   const askConsistency = deps.checkConsistency || checkStateCellsConsistency;
   const settle = (p) => p.then(v => v, () => null);
   const [identity, consistency] = await Promise.all([
-    settle(Promise.resolve().then(() => askIdentity(cellsBase64[0], parent, styleDescription))),
+    // The FIRST cell is asked about as it was drawn: base description plus its own delta. A two-sided prop's first
+    // state is the blank back, and the base text alone made the judge answer "a blank sheet, not a map" every time
+    // (Fiona rerun #21: the new-map entry failed both renders on a back that was meant to be blank).
+    settle(Promise.resolve().then(() => askIdentity(cellsBase64[0], { ...parent, description: String(cells[0]?.description || parent.description || '') }, styleDescription))),
     settle(Promise.resolve().then(() => askConsistency(cellsBase64, parent, cells))),
   ]);
   const failed = [];

@@ -168,7 +168,9 @@ async function renderVantagePlates(vantageId, group, env) {
   // already carries is not repeated. The plate QC reads this same
   // setting text as its EXPECTED SCENE and the FRAMING as its own field.
   const { vantageSettingText } = require('./storyHelpers');
-  const vantageSetting = vantageSettingText(v, adEmptyPrompt);
+  // An interior (weather `none`) plate takes the place's NAME only: the location's palette line is written once for the
+  // whole place and carried an exterior's ivy into the museum's indoor plates (Fiona rerun #24).
+  const vantageSetting = vantageSettingText(v, adEmptyPrompt, { interior: baseLight.weather === 'none' });
   const emptySceneDesc = [
     `${shotPrefix}${vantageSetting}`,
     adEmptyPrompt

@@ -3230,6 +3230,9 @@ function artDirectorFills(inputData, beats = [], options = {}) {
     GARMENT_REMOVED: GARMENT_REMOVED_RULE,
     WORN_ITEMS_ROW: WORN_ITEMS_ROW_RULE,
     WORN_ON_OTHER: WORN_ON_OTHER_RULE,
+    OUTFIT_ONLY: OUTFIT_ONLY_RULE,
+    ACTION_DIRECTION: ACTION_DIRECTION_RULE,
+    PLAN_COVER: PLAN_COVER_RULE,
     NEVER_NAME_ABSENT: ABSENT_THING_RULE,
     NO_HEADLINE_PHRASES: HEADLINE_PHRASE_RULE,
     // The page's declared light (sceneLight.js) — one rule for every brief author
@@ -3741,6 +3744,9 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     GARMENT_REMOVED: GARMENT_REMOVED_RULE,
     WORN_ITEMS_ROW: WORN_ITEMS_ROW_RULE,
     WORN_ON_OTHER: WORN_ON_OTHER_RULE,
+    OUTFIT_ONLY: OUTFIT_ONLY_RULE,
+    ACTION_DIRECTION: ACTION_DIRECTION_RULE,
+    PLAN_COVER: PLAN_COVER_RULE,
     NEVER_NAME_ABSENT: ABSENT_THING_RULE,
     NO_HEADLINE_PHRASES: HEADLINE_PHRASE_RULE,
     // The page's declared light (sceneLight.js) — one rule for every brief author
@@ -4240,6 +4246,9 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
     GARMENT_REMOVED: GARMENT_REMOVED_RULE,
     WORN_ITEMS_ROW: WORN_ITEMS_ROW_RULE,
     WORN_ON_OTHER: WORN_ON_OTHER_RULE,
+    OUTFIT_ONLY: OUTFIT_ONLY_RULE,
+    ACTION_DIRECTION: ACTION_DIRECTION_RULE,
+    PLAN_COVER: PLAN_COVER_RULE,
     NEVER_NAME_ABSENT: ABSENT_THING_RULE,
     NO_HEADLINE_PHRASES: HEADLINE_PHRASE_RULE,
     SCENE_INTENT_FIELD: SCENE_INTENT_FIELD_RULE,
@@ -9327,11 +9336,11 @@ const REQUIRED_CAST_LEAD = '**REQUIRED CAST:** Every named character is in the f
 const REQUIRED_CAST_UNACTED = 'A character given no action is still drawn, placed and occupied as the moment suggests.';
 const REQUIRED_CAST_BACKGROUND = {
   cast_only: ', and no one else is added.',
-  ambient: ". Add a few unnamed passers-by far behind the cast (where the scene description places them, if it does), each much smaller than any listed character, busy with their own business and mostly turned away, every face fully drawn, none sharing a listed character's hair, build or outfit. No one else is added.",
-  sparse: ". Add at most one or two unnamed people, tiny and far behind the cast, busy with their own business and turned away, every face fully drawn, none sharing a listed character's hair, build or outfit. No one else is added.",
+  ambient: ". Add a few unnamed passers-by far behind the cast (where the scene description places them, if it does), each much smaller than any listed character, busy with their own business and mostly turned away, every face fully drawn, in plain everyday clothes, none sharing a listed character's hair, build or outfit. No one else is added.",
+  sparse: ". Add at most one or two unnamed people, tiny and far behind the cast, busy with their own business and turned away, every face fully drawn, in plain everyday clothes, none sharing a listed character's hair, build or outfit. No one else is added.",
   wildlife: ". Add the unnamed animals the scene description places — fish, a flock, a herd — as ordinary members of their kind, none matching a listed character or creature. No unnamed people are added.",
   creature_crowd: ". Paint the crowd of unnamed creatures the scene description places, as it places them: many of their kind, varied in size and markings, none matching a listed character or creature. No unnamed people are added.",
-  crowd: ". Paint the unnamed people the scene description places, as it places them: busy with their own business, every face fully drawn, varied hair and garment colours and shapes, none sharing a listed character's hair, build or outfit. No one else is added.",
+  crowd: ". Paint the unnamed people the scene description places, as it places them: busy with their own business, every face fully drawn, varied hair and garment colours and shapes, in plain everyday clothes, none sharing a listed character's hair, build or outfit. No one else is added.",
 };
 
 /** The REQUIRED CAST line for a page of this `population` (normalised). */
@@ -10079,6 +10088,20 @@ const GARMENT_REMOVED_RULE = "When the page takes a normally-worn item off — c
 
 const WORN_ON_OTHER_RULE = "When the page has a character other than the item's owner wearing it, the row is `state: \"worn\"` plus `wearer` naming that character — not `off`. The prose puts the item on the wearer and on nobody else; the owner's description does not mention it.";
 
+/**
+ * Three brief-authoring rules from the Fiona pirate rerun (job_1791450210539_nwi88y9lr, docs/decisions.md
+ * "Fiona rerun group C"), one text at all four brief-authoring sites (both Art Director templates, both iterate
+ * templates; sibling set art-director-vs-iterate).
+ *  - OUTFIT_ONLY: the brief gave a figure a hat its outfit did not list (p3), and a critic then dropped the missing-hat
+ *    finding because the brief itself carried the hat.
+ *  - ACTION_DIRECTION: "throws off the bow rope" was staged as tossing it over the ring (p7).
+ *  - PLAN_COVER: "behind pumpkin crates" became the location's empty stall frame (p5); rule 12e let a prop that is
+ *    merely placed vanish, and a hiding place is not set dressing.
+ */
+const OUTFIT_ONLY_RULE = "A figure wears exactly the garments and accessories its outfit text lists: no hat, scarf, cape, bag or other item that text does not name, and none taken from another figure's outfit. A crop or close-up names only the listed ones its frame shows.";
+const ACTION_DIRECTION_RULE = "A plan line's direction words (off, out, away, down, back, in) are staged as that movement: taking something off, out or away leaves where it was, never lands on it. The prose and the interaction's `where` describe the same act.";
+const PLAN_COVER_RULE = "An object the plan line puts someone behind, under or inside — a hiding place, a cover, a barrier — is staged as that object, by its own name and kind, between the figures it separates; never swapped for a similar thing the location offers.";
+
 const ABSENT_THING_RULE = "\"no glow\", \"bare rail\", \"no other figures in the room\", \"does not wave\" each paint the named thing into the picture. Leave it unwritten and describe what does occupy that space instead (\"the rail runs smooth grey iron\", \"the far wall is plain plaster\"). This covers props, people and the medium alike — you are not shown the art style, and a ban on glow, colour, text, reflections or weather can contradict the style the picture is drawn in.";
 
 /**
@@ -10101,7 +10124,7 @@ const SCENE_INTENT_FIELD_RULE = "2-3 present-tense sentences naming the single m
 // light, so the brief authors are not told to compose a gaze target or to name the light in `sceneIntent`: the page's
 // FIXED block is their source, and these variants replace the three rules above on that path only. The Jev-outage backup
 // and the iterate rewrites keep the full rules (jevFieldFills).
-const GAZE_TARGET_FIXED_RULE = "Each figure's eyes are its FIXED `looksAt` and the prose clause for it says the same. Compose the frame so the page's one gaze target is the dominant element — large, central, or nearest the camera. Never write a gaze to the viewer. " + COVER_GAZE_EXCEPTION;
+const GAZE_TARGET_FIXED_RULE = "Each figure's eyes are its FIXED `looksAt`; any clause about a figure's eyes in the prose names that same target, never another. Compose the frame so the page's one gaze target is the dominant element — large, central, or nearest the camera. Never write a gaze to the viewer. " + COVER_GAZE_EXCEPTION;
 const LOOKS_AT_FIELD_FIXED_RULE = "A figure's eyes are its FIXED `looksAt` line's, and the prose clause for it says the same: eyes only, hands live in `interactions[]`. A figure the FIXED line leaves out takes `looksAt` as another character's name, a Visual Bible id, or a gaze word (" + GAZE_TOKEN_LIST + "), never the viewer. " + COVER_GAZE_EXCEPTION + " A secondary character (a CHR id in `objects[]`) has no `characters[]` row: its gaze is a `watching` interaction whose `object` is what it looks at, and its prose clause says the same.";
 const SCENE_INTENT_FIELD_FIXED_RULE = "1-2 sentences: the plan line's instant as the picture shows it, naming every figure in frame; the setting. Present tense, one moment only — not cause plus effect. List the main and primary characters among the figures in `characters[]`; secondary characters stay in the prose and carry their CHR id in `objects[]`. " + SCENE_INTENT_PICTURE_ONLY;
 
@@ -13592,6 +13615,9 @@ module.exports = {
   GARMENT_REMOVED_RULE,
   WORN_ITEMS_ROW_RULE,
   WORN_ON_OTHER_RULE,
+  OUTFIT_ONLY_RULE,
+  ACTION_DIRECTION_RULE,
+  PLAN_COVER_RULE,
   ABSENT_THING_RULE,
   HEADLINE_PHRASE_RULE,
   SCENE_INTENT_FIELD_RULE,

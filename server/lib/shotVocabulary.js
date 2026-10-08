@@ -150,7 +150,7 @@ const SHOTS = [
  * iterate templates. No counter checks it — a plan line is prose and carries no
  * structured contact field, and code does not classify prose.
  */
-const OTS_NO_CONTACT_RULE = "Over-the-shoulder never goes on a page where the near figure touches what they face — a hand laid on it, a grip, a lean against it, a hand-over: whatever is touched is within arm's reach and cannot sit small and deep in the far corner. Such a page takes another shot.";
+const OTS_NO_CONTACT_RULE = "Over-the-shoulder never goes on a page where the near figure's hands act — a hand laid on something, a grip, a lean against it, a hand-over, tucking something away or taking it out: the crop shows no hands, and whatever they act on is within arm's reach, not small and deep in the far corner. Such a page takes another shot.";
 
 /**
  * AN OVER-THE-SHOULDER NEEDS A NEAR FIGURE AND SOMEONE IT FACES (owner,
@@ -173,7 +173,7 @@ const OTS_MIN_IN_FRAME = 2;
  * what its prose may describe. Filled into scene-expansion.txt,
  * scene-expansion-all.txt, scene-iteration.txt and scene-iteration-free.txt.
  */
-const OTS_NEAR_FIGURE_RULE = `On an \`over-the-shoulder\` page the figure nearest the camera gets \`perspective: over-the-shoulder\` — never \`back view\` and never a glance over the shoulder — and is seen as a crop: ${OTS_NEAR_FIGURE_CROP}. Describe only what that crop shows: the hair, the collar and sleeve of the upper garment, anything held up into frame. That figure's prose names no legs, trousers, footwear or stance, and it looks straight ahead into the scene toward what it faces — never up at it. ${OTS_NEAR_FIGURE_FACING} ${OTS_NO_CONTACT_RULE}`;
+const OTS_NEAR_FIGURE_RULE = `On an \`over-the-shoulder\` page the figure nearest the camera gets \`perspective: over-the-shoulder\` — never \`back view\` and never a glance over the shoulder — and is seen as a crop: ${OTS_NEAR_FIGURE_CROP}. Describe only what that crop shows: the hair, the collar and sleeve of the upper garment, anything held up into frame. That figure's prose names no legs, trousers, footwear or stance. Its eyes are its gaze target, as the gaze rule says; when that is what it faces, it looks straight ahead into the scene toward it — never up at it. ${OTS_NEAR_FIGURE_FACING} ${OTS_NO_CONTACT_RULE}`;
 
 /**
  * Whether a character annotation declares the over-the-shoulder near figure.

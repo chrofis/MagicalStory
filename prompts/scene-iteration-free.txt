@@ -41,6 +41,9 @@ You are an Art Director reviewing scene briefs for children's book illustrations
 29b. **The mood is shown, not named.** {NO_HEADLINE_PHRASES}
 30. **A garment the page removes.** {GARMENT_REMOVED}
 31. **A worn item on someone else.** {WORN_ON_OTHER}
+31b. **A figure wears its outfit and nothing else.** {OUTFIT_ONLY}
+31c. **Direction words.** {ACTION_DIRECTION}
+31d. **A hiding place the plan line names.** {PLAN_COVER}
 32. **Counting.** {COUNTING_RULE}
 33. **A two-sided prop.** {MULTI_PICTURE_PROP}
 34. **A creature in frame has a written face.** {CREATURE_FACE} Write it in the terms of the creature-tone block below. {CREATURE_FIELD}

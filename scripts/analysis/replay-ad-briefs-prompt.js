@@ -50,7 +50,9 @@ async function rebuild(d) {
   const arc = stored.slice(stored.indexOf('\n\n', stored.indexOf('# THE STORY (for judgment')) + 2, stored.indexOf('**ALL LOCKED PLAN LINES')).trim();
   const vbAt = stored.indexOf('```json', stored.indexOf('**THE VISUAL BIBLE'));
   const vb = stored.slice(vbAt + 7, stored.indexOf('```', vbAt + 7)).trim();
-  let prompt = PB.buildSceneBriefsAllPrompt(d, beats, { maxCharactersPerScene: 6, finalArc: arc, clothingRequirements: d.clothingRequirements, visualBible: vb });
+  // availableAvatars as beatsPipeline passes it: without it every figure lists as `standard` and the outfit lines are wrong.
+  const availableAvatars = require('../../server/lib/clothingResolve').buildAvailableAvatarsForPrompt(d.characters || [], d.clothingRequirements);
+  let prompt = PB.buildSceneBriefsAllPrompt(d, beats, { maxCharactersPerScene: 6, finalArc: arc, clothingRequirements: d.clothingRequirements, visualBible: vb, availableAvatars });
   // The stored FIXED lines, back under each plan line.
   for (const b of beats) {
     const fixed = blocks[b.pageNumber] && blocks[b.pageNumber].fixed;
