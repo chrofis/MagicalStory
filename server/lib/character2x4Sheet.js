@@ -111,6 +111,10 @@ async function styleTransferGenerate(prompt, pass1ImageData, backendOverride = n
 // (style transfer) → 1 + 1 = 2 attempts.
 const MAX_SHEET_RETRIES = 1;
 
+// Pass-1 tries per row (body row, head row): the first attempt plus one retry.
+// The trial prewarm passes 1 (decisions 2026-10-08, "Trial avatar sheet").
+const PASS1_ROW_TRIES = 2;
+
 // The cell-4 / cell-8 pose, ONE definition. The live row generators
 // (buildBodyRowPrompt, buildHeadRowPrompt) and every sheet judge fill it from
 // here: until 2026-09-23 the generators asked for a rear turn while three of the
@@ -336,8 +340,8 @@ function buildGarmentRule() {
 // sheets of two characters (staging job_1790100385959_1nitlympp). On a redress
 // sheet the costume text is the whole outfit; otherwise the body reference is
 // part of the outfit too, so what it shows is not an invention.
-function buildUnnamedTrimRule(redress = false) {
-  return redress
+function buildUnnamedTrimRule(redress = false, bodyRef = true) {
+  return redress || !bodyRef
     ? 'No collar, placket, hood or trim the costume does not name.'
     : 'No collar, placket, hood or trim that neither the costume nor the body reference shows.';
 }
@@ -397,7 +401,8 @@ The outfit is identical in all four cells, layers included. ${buildUnnamedTrimRu
 // Head-row prompt (call 2): one row of 4 head-shots that match the body sheet.
 // Refs: Image 1 = mannequin head row (angles), Image 2 = face photo (identity),
 // Image 3 = the body row from call 1 (match its rendered face/hair).
-function buildHeadRowPrompt(character = null, costumeDescription = '', redress = false) {
+// bodyRef false is the PARALLEL trial path: no body row exists yet, so Image 3 is not sent and the prompt says nothing about it.
+function buildHeadRowPrompt(character = null, costumeDescription = '', redress = false, { bodyRef = true } = {}) {
   const hairBlock = buildHairBlock(character);
   // The costume text reaches this call at all only since the dungaree fault
   // (2026-09-14): the row was generated from the body IMAGE alone, so a part
@@ -407,11 +412,11 @@ function buildHeadRowPrompt(character = null, costumeDescription = '', redress =
 Costume: ${costumeDescription} — the same garment the body sheet wears. Every part of it that the head-and-shoulders crop reaches, straps and neckline included, is drawn.` : '';
   return `Image 1 shows the four camera angles for a head-shot row — use it ONLY for facing direction; ignore its face and features, and never draw arrows.
 Image 2 is the character's face photo — the identity; match this exact face.
-Image 3 is the character's full-body reference sheet — match the SAME face, hair colour, hairstyle, and skin tone shown there so the heads belong to that body.${outfitLine}
-${buildGarmentRule()} Where the neckline shows, it is the one Image 3 wears. ${buildUnnamedTrimRule(redress)}${hairBlock}${buildGlassesBlock(character)}
+${bodyRef ? `Image 3 is the character's full-body reference sheet — match the SAME face, hair colour, hairstyle, and skin tone shown there so the heads belong to that body.` : 'Hair colour, hairstyle and skin tone are the face photo\'s, with the hair exactly as described below.'}${outfitLine}
+${buildGarmentRule()}${bodyRef ? ' Where the neckline shows, it is the one Image 3 wears.' : ''} ${buildUnnamedTrimRule(redress, bodyRef)}${hairBlock}${buildGlassesBlock(character)}
 Output a 1×4 grid: ONE row, four cells side by side, thin black vertical dividers, pure white background. Each cell is framed like a passport photo of the SAME PERSON: head, neck and the top of the shoulders wearing the costume, cut off at the upper chest, with plain white above the hair and filling the rest of the cell; no bare skin below the neck. No waist, hands or lower body in any cell. Never crop the top of the head. Cell 1 front, cell 2 three-quarter, cell 3 profile.
 Cell 4 is a REAR TURN, distinct from cell 3's profile: ${REAR_TURN_POSE}. Cell 4 is never a second profile and never a flat back of the head with no face showing — Image 1's cell 4 is a plain placeholder silhouette, ignore its exact head angle entirely.
-Photographic / lifelike; identity from Image 2; hair, skin tone, and costume consistent with Image 3.${declaredAgeBlock(character)} No arrows or symbols. ${SHEET_NO_LETTERING_RULE} ${CELL_NAMES_NOT_DRAWN}`;
+Photographic / lifelike; identity from Image 2; hair, skin tone, and costume ${bodyRef ? 'consistent with Image 3' : 'as stated above'}.${declaredAgeBlock(character)} No arrows or symbols. ${SHEET_NO_LETTERING_RULE} ${CELL_NAMES_NOT_DRAWN}`;
 }
 
 // Pure: the pixels of headroom to add on top of the head row so the sheet stack lands exactly on an aspect preset the
@@ -587,12 +592,13 @@ async function reviewHeadRow(headRowData, { facePhoto, avatarFaces, model, usage
 }
 
 // Two-call generation → one composited 2×4 sheet, WITH review between the calls.
-// (1) body row, reviewed (pose + bodies eval); max 1 retry, keep least-bad.
-// (2) head row on the ACCEPTED body, reviewed (heads + identity); max 1 retry,
-// keep least-bad. Then composite. Rejected rows are discarded. Returns a verdict
+// (1) body row, reviewed (pose + bodies eval); up to rowTries tries (default 2), keep least-bad.
+// (2) head row on the ACCEPTED body, reviewed (heads + identity); same tries,
+// keep least-bad. parallelRows + rowTries 1 is the trial prewarm only (decisions
+// 2026-10-08): both rows start together and the head row has no body reference. Then composite. Rejected rows are discarded. Returns a verdict
 // in the evaluateSheetSplit shape so generateCharacter2x4Sheet / styledAvatars
 // consume it unchanged. skipReview → 1 try each, no eval (fast path for tests).
-async function generateComposited2x4(character, { costumeDescription, costumeName = null, redress = false, usageTracker = null, skipReview = false, seasonOutfit = null } = {}) {
+async function generateComposited2x4(character, { costumeDescription, costumeName = null, redress = false, usageTracker = null, skipReview = false, seasonOutfit = null, rowTries = PASS1_ROW_TRIES, parallelRows = false } = {}) {
   const facePhoto = await resolveFacePhoto(character);
   if (!facePhoto) throw new Error(`No face photo for ${character?.name || 'character'}.`);
   const standardAvatar = await resolveStandardAvatar(character);
@@ -603,102 +609,126 @@ async function generateComposited2x4(character, { costumeDescription, costumeNam
   const bodyRefs = standardAvatar ? [bodyPhantom, standardAvatar, facePhoto] : [bodyPhantom, facePhoto];
   const bodyPrompt = buildBodyRowPrompt(costumeDescription, character, redress, costumeName, seasonOutfit);
   const headPrompt = buildHeadRowPrompt(character, costumeDescription, redress);
+  const headPromptNoBody = parallelRows ? buildHeadRowPrompt(character, costumeDescription, redress, { bodyRef: false }) : null;
   const attemptHistory = [];
   let usage = { input_tokens: 0, output_tokens: 0 };
   const addUsage = (u, fn, id) => { if (u) { usage.input_tokens += u.input_tokens || 0; usage.output_tokens += u.output_tokens || 0; if (usageTracker) usageTracker('grok', u, fn, id); } };
 
-  // ── Stage 1: body row (max 1 retry, keep least-bad) ──
-  let bestBody = null;
-  let bodyGenError = null;
-  for (let t = 1; t <= 2; t++) {
-    // skipOutputCrop — see styleTransferGenerate: cropping a 16:9 row back to
-    // 16:9 from a squarer output would slice the figures' heads/feet off.
-    // A THROWN backend call consumes ONE try — it must never escape this loop.
-    // The 120s AbortSignal timeout in editWithGrok used to propagate straight
-    // out of generateComposited2x4, killing the whole sheet on try 1 and
-    // leaving the provisioned retry unused (measured: staging runs
-    // job_1789337998754_apslnsq1z / job_1789343124794_z2c779f7i, "The
-    // operation was aborted due to timeout"). Same containment Pass 2 already
-    // has (stage 'gen-error'); the eval calls below are wrapped for the same
-    // reason. If BOTH tries throw, the sheet still fails loudly at the throw
-    // after the loop, carrying the last provider error.
-    let res;
-    try {
-      res = await editWithGrok(bodyPrompt, bodyRefs, { aspectRatio: '16:9', model: GROK_MODELS.STANDARD, skipOutputCrop: true });
-    } catch (err) {
-      bodyGenError = err?.message || String(err);
-      attemptHistory.push({ stage: 'body', try: t, error: `gen-error: ${bodyGenError}` });
-      log.warn(`[CHARACTER 2×4] ${character?.name} body try ${t}/2 threw: ${bodyGenError}${t < 2 ? ' — retrying' : ''}`);
-      continue;
-    }
-    if (!res?.imageData) { attemptHistory.push({ stage: 'body', try: t, error: 'no image' }); continue; }
-    addUsage(res.usage, 'character_2x4_body_row', res.modelId);
-    // A SKIPPED review is UNKNOWN, never a 10 (staging job_1788763045123_z8so79ngb:
-    // a sheet with three strangers merged across its cells was stored at 10/10 on
-    // every axis without a single judge call). score null = unscored; valid stays
-    // true so the sheet still ships (the caller asked for no reviews).
-    let review = { valid: true, score: null, evaluated: false, bodies: null };
-    if (!skipReview) {
+  const runBodyRow = async () => {
+    // ── Stage 1: body row (up to rowTries tries, keep least-bad) ──
+    let bestBody = null;
+    let bodyGenError = null;
+    for (let t = 1; t <= rowTries; t++) {
+      // skipOutputCrop — see styleTransferGenerate: cropping a 16:9 row back to
+      // 16:9 from a squarer output would slice the figures' heads/feet off.
+      // A THROWN backend call consumes ONE try — it must never escape this loop.
+      // The 120s AbortSignal timeout in editWithGrok used to propagate straight
+      // out of generateComposited2x4, killing the whole sheet on try 1 and
+      // leaving the provisioned retry unused (measured: staging runs
+      // job_1789337998754_apslnsq1z / job_1789343124794_z2c779f7i, "The
+      // operation was aborted due to timeout"). Same containment Pass 2 already
+      // has (stage 'gen-error'); the eval calls below are wrapped for the same
+      // reason. If BOTH tries throw, the sheet still fails loudly at the throw
+      // after the loop, carrying the last provider error.
+      let res;
       try {
-        review = await reviewBodyRow(res.imageData, { costumeDescription, costumeName, model, usageTracker, declaredAge: character?.age, glasses: declaredGlasses(character), hair: hairRequest(character) });
+        res = await editWithGrok(bodyPrompt, bodyRefs, { aspectRatio: '16:9', model: GROK_MODELS.STANDARD, skipOutputCrop: true });
       } catch (err) {
-        // Keep the sheet. Losing the eval costs a quality gate; losing the
-        // sheet costs the character its face on every page of the book, which
-        // is strictly worse. Loud, and visible in attemptHistory.
-        log.error(`[CHARACTER 2×4] ${character?.name} body eval FAILED (${err.message}) — keeping the unscored sheet`);
-        review = { valid: true, score: 0, bodies: null, evalFailed: err.message };
+        bodyGenError = err?.message || String(err);
+        attemptHistory.push({ stage: 'body', try: t, error: `gen-error: ${bodyGenError}` });
+        log.warn(`[CHARACTER 2×4] ${character?.name} body try ${t}/${rowTries} threw: ${bodyGenError}${t < rowTries ? ' — retrying' : ''}`);
+        continue;
       }
+      if (!res?.imageData) { attemptHistory.push({ stage: 'body', try: t, error: 'no image' }); continue; }
+      addUsage(res.usage, 'character_2x4_body_row', res.modelId);
+      // A SKIPPED review is UNKNOWN, never a 10 (staging job_1788763045123_z8so79ngb:
+      // a sheet with three strangers merged across its cells was stored at 10/10 on
+      // every axis without a single judge call). score null = unscored; valid stays
+      // true so the sheet still ships (the caller asked for no reviews).
+      let review = { valid: true, score: null, evaluated: false, bodies: null };
+      if (!skipReview) {
+        try {
+          review = await reviewBodyRow(res.imageData, { costumeDescription, costumeName, model, usageTracker, declaredAge: character?.age, glasses: declaredGlasses(character), hair: hairRequest(character) });
+        } catch (err) {
+          // Keep the sheet. Losing the eval costs a quality gate; losing the
+          // sheet costs the character its face on every page of the book, which
+          // is strictly worse. Loud, and visible in attemptHistory.
+          log.error(`[CHARACTER 2×4] ${character?.name} body eval FAILED (${err.message}) — keeping the unscored sheet`);
+          review = { valid: true, score: 0, bodies: null, evalFailed: err.message };
+        }
+      }
+      attemptHistory.push({ stage: 'body', try: t, score: review.score, valid: review.valid, reasons: review.bodies?.failureReasons || [] });
+      const rank = (v) => (typeof v === 'number' ? v : -1); // unscored ranks below any judged attempt
+      if (!bestBody || rank(review.score) > rank(bestBody.review.score)) bestBody = { row: res.imageData, review };
+      if (review.valid) break;
+      log.warn(`[CHARACTER 2×4] ${character?.name} body try ${t} invalid (score=${review.score}) — ${skipReview ? '' : (review.bodies?.failureReasons || []).join('; ')}`);
     }
-    attemptHistory.push({ stage: 'body', try: t, score: review.score, valid: review.valid, reasons: review.bodies?.failureReasons || [] });
-    const rank = (v) => (typeof v === 'number' ? v : -1); // unscored ranks below any judged attempt
-    if (!bestBody || rank(review.score) > rank(bestBody.review.score)) bestBody = { row: res.imageData, review };
-    if (review.valid) break;
-    log.warn(`[CHARACTER 2×4] ${character?.name} body try ${t} invalid (score=${review.score}) — ${skipReview ? '' : (review.bodies?.failureReasons || []).join('; ')}`);
-  }
-  if (!bestBody) throw new Error(`[CHARACTER 2×4] body row produced no image for ${character?.name}${bodyGenError ? ` (last provider error: ${bodyGenError})` : ''}`);
+    if (!bestBody) throw new Error(`[CHARACTER 2×4] body row produced no image for ${character?.name}${bodyGenError ? ` (last provider error: ${bodyGenError})` : ''}`);
+    return bestBody;
+  };
 
-  // ── Stage 2: head row on the accepted body (max 1 retry, keep least-bad) ──
-  // Head row uses 20:9 — the widest/shortest ratio in Grok's aspect enum
-  // (16:3 is not allowed). Stacked under the 16:9 body row the composite is
-  // ~1:1 (720 + 576 ≈ 1280 tall), a native preset for the Pass-2 style call, so
-  // no padding/squeeze; full-width, no side margins. See stackRowsInto2x4.
-  const headRefs = [headPhantom, facePhoto, bestBody.row]; // exactly 3
-  let bestHead = null;
-  let headGenError = null;
-  for (let t = 1; t <= 2; t++) {
-    // skipOutputCrop — 20:9 is the extreme end of Grok's enum and drift is
-    // common; cropping a near-square output down to 20:9 would decapitate the
-    // head row. stackRowsInto2x4 resizes by width and keeps the full row.
-    // A thrown backend call consumes ONE try — see the body row above.
-    let res;
-    try {
-      res = await editWithGrok(headPrompt, headRefs, { aspectRatio: '20:9', model: GROK_MODELS.STANDARD, skipOutputCrop: true });
-    } catch (err) {
-      headGenError = err?.message || String(err);
-      attemptHistory.push({ stage: 'head', try: t, error: `gen-error: ${headGenError}` });
-      log.warn(`[CHARACTER 2×4] ${character?.name} head try ${t}/2 threw: ${headGenError}${t < 2 ? ' — retrying' : ''}`);
-      continue;
-    }
-    if (!res?.imageData) { attemptHistory.push({ stage: 'head', try: t, error: 'no image' }); continue; }
-    addUsage(res.usage, 'character_2x4_head_row', res.modelId);
-    const headCrop = await cropHeadRowToShoulders(res.imageData);
-    res = { ...res, imageData: headCrop.imageData };
-    let review = { valid: true, score: null, evaluated: false, heads: null, identity: null };
-    if (!skipReview) {
+  const runHeadRow = async (bodyRow) => {
+    // ── Stage 2: head row (up to rowTries tries, keep least-bad) ──
+    // Head row uses 20:9 — the widest/shortest ratio in Grok's aspect enum
+    // (16:3 is not allowed). Stacked under the 16:9 body row the composite is
+    // ~1:1 (720 + 576 ≈ 1280 tall), a native preset for the Pass-2 style call, so
+    // no padding/squeeze; full-width, no side margins. See stackRowsInto2x4.
+    const headRefs = bodyRow ? [headPhantom, facePhoto, bodyRow] : [headPhantom, facePhoto]; // 3 behind an accepted body, 2 in parallel
+    let bestHead = null;
+    let headGenError = null;
+    for (let t = 1; t <= rowTries; t++) {
+      // skipOutputCrop — 20:9 is the extreme end of Grok's enum and drift is
+      // common; cropping a near-square output down to 20:9 would decapitate the
+      // head row. stackRowsInto2x4 resizes by width and keeps the full row.
+      // A thrown backend call consumes ONE try — see the body row above.
+      let res;
       try {
-        review = await reviewHeadRow(res.imageData, { facePhoto, avatarFaces, model, usageTracker, declaredAge: character?.age, costumeDescription, glasses: declaredGlasses(character), hair: hairRequest(character) });
+        res = await editWithGrok(bodyRow ? headPrompt : headPromptNoBody, headRefs, { aspectRatio: '20:9', model: GROK_MODELS.STANDARD, skipOutputCrop: true });
       } catch (err) {
-        log.error(`[CHARACTER 2×4] ${character?.name} head eval FAILED (${err.message}) — keeping the unscored row`);
-        review = { valid: true, score: 0, heads: null, identity: null, evalFailed: err.message };
+        headGenError = err?.message || String(err);
+        attemptHistory.push({ stage: 'head', try: t, error: `gen-error: ${headGenError}` });
+        log.warn(`[CHARACTER 2×4] ${character?.name} head try ${t}/${rowTries} threw: ${headGenError}${t < rowTries ? ' — retrying' : ''}`);
+        continue;
       }
+      if (!res?.imageData) { attemptHistory.push({ stage: 'head', try: t, error: 'no image' }); continue; }
+      addUsage(res.usage, 'character_2x4_head_row', res.modelId);
+      const headCrop = await cropHeadRowToShoulders(res.imageData);
+      res = { ...res, imageData: headCrop.imageData };
+      let review = { valid: true, score: null, evaluated: false, heads: null, identity: null };
+      if (!skipReview) {
+        try {
+          review = await reviewHeadRow(res.imageData, { facePhoto, avatarFaces, model, usageTracker, declaredAge: character?.age, costumeDescription, glasses: declaredGlasses(character), hair: hairRequest(character) });
+        } catch (err) {
+          log.error(`[CHARACTER 2×4] ${character?.name} head eval FAILED (${err.message}) — keeping the unscored row`);
+          review = { valid: true, score: 0, heads: null, identity: null, evalFailed: err.message };
+        }
+      }
+      attemptHistory.push({ stage: 'head', try: t, score: review.score, valid: review.valid, reasons: review.heads?.failureReasons || [], crop: headCrop.crop });
+      const rank = (v) => (typeof v === 'number' ? v : -1); // unscored ranks below any judged attempt
+      if (!bestHead || rank(review.score) > rank(bestHead.review.score)) bestHead = { row: res.imageData, review };
+      if (review.valid) break;
+      log.warn(`[CHARACTER 2×4] ${character?.name} head try ${t} invalid (score=${review.score})`);
     }
-    attemptHistory.push({ stage: 'head', try: t, score: review.score, valid: review.valid, reasons: review.heads?.failureReasons || [], crop: headCrop.crop });
-    const rank = (v) => (typeof v === 'number' ? v : -1); // unscored ranks below any judged attempt
-    if (!bestHead || rank(review.score) > rank(bestHead.review.score)) bestHead = { row: res.imageData, review };
-    if (review.valid) break;
-    log.warn(`[CHARACTER 2×4] ${character?.name} head try ${t} invalid (score=${review.score})`);
+    if (!bestHead) throw new Error(`[CHARACTER 2×4] head row produced no image for ${character?.name}${headGenError ? ` (last provider error: ${headGenError})` : ''}`);
+    return bestHead;
+  };
+
+  // SEQUENTIAL (default): the head row is drawn against the ACCEPTED body row (decisions 2026-08-09), so the heads belong to that
+  // body. PARALLEL (trial prewarm, decisions 2026-10-08): both rows start at once and the head row has no body reference, only the
+  // face photo, the costume text and the hair block — the two calls overlap instead of adding up.
+  let bestBody;
+  let bestHead;
+  if (parallelRows) {
+    const [bodyS, headS] = await Promise.allSettled([runBodyRow(), runHeadRow(null)]);
+    if (bodyS.status === 'rejected') throw bodyS.reason;
+    if (headS.status === 'rejected') throw headS.reason;
+    bestBody = bodyS.value;
+    bestHead = headS.value;
+  } else {
+    bestBody = await runBodyRow();
+    bestHead = await runHeadRow(bestBody.row);
   }
-  if (!bestHead) throw new Error(`[CHARACTER 2×4] head row produced no image for ${character?.name}${headGenError ? ` (last provider error: ${headGenError})` : ''}`);
+
 
   // ── Composite + build the evaluateSheetSplit-shape verdict from the reviews ──
   const { imageData, splitY } = await stackRowsInto2x4(bestHead.row, bestBody.row);
@@ -1843,6 +1873,9 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
     // child is wearing. Never touches identity; ignored on a redress sheet,
     // where the costume owns the outfit.
     seasonOutfit = null,
+    // fastPass1 = the trial prewarm (decisions 2026-10-08): pass 1 draws the body row and the head row AT THE SAME TIME, one
+    // try each, and pass 2 restyles whatever comes back. The full-story path leaves it false: sequential rows, two tries each.
+    fastPass1 = false,
   } = opts;
 
   const facePhoto = await resolveFacePhoto(character);
@@ -1863,6 +1896,7 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
   try {
     composed = await generateComposited2x4(character, {
       costumeDescription, costumeName, redress, usageTracker, skipReview: skipQualityEval, seasonOutfit,
+      ...(fastPass1 ? { rowTries: 1, parallelRows: true } : {}),
     });
   } catch (err) {
     throw new Error(`[CHARACTER 2×4] pass-1 generation failed for ${character?.name}: ${err.message}`);

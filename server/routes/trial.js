@@ -2918,7 +2918,7 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
       // The hair text follows the approved preview avatar BEFORE the sheet is generated and judged
       // against it (docs/decisions.md "Hair text follows the approved avatar").
       await require('../lib/avatarHair').ensureAvatarDerivedHair(characters, { userId });
-      await prepareStyledAvatars(characters, TRIAL_ART_STYLE, avatarRequirements, avatarClothingRequirements, null, null, { seasonOutfit });
+      await prepareStyledAvatars(characters, TRIAL_ART_STYLE, avatarRequirements, avatarClothingRequirements, null, null, { seasonOutfit, fastPass1: true }); // body+head rows in parallel, one try each (docs/decisions.md 2026-10-08)
       log.info(`[TRIAL AVATARS] Avatar styling complete for "${character.name}"`);
 
       // Export styled avatars so the pipeline can reuse them (avoid regenerating)

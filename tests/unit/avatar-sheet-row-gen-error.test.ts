@@ -66,6 +66,7 @@ async function runPass1(throwsOn: string[] = []) {
     log: { info() {}, debug() {}, error() {}, warn(m: string) { calls.warns.push(m); } },
     GROK_MODELS: { STANDARD: 'grok-imagine-image' },
     MODEL_DEFAULTS: { sheetEvalModel: 'gemini-2.5-flash' },
+    PASS1_ROW_TRIES: 2,
     resolveFacePhoto: async () => 'data:image/jpeg;base64,FACE',
     resolveStandardAvatar: async () => 'data:image/jpeg;base64,AVATAR',
     splitSheetRows: async () => ({ topHeads: 'data:image/jpeg;base64,HEADS' }),

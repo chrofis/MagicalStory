@@ -6510,6 +6510,22 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "trial-avatar-sheet-parallel-one-try-2026-10-08",
+      "title": "Trial costumed sheet: body and head rows in parallel, one try each",
+      "commits": [],
+      "addedAt": "2026-10-08",
+      "claim": "On a live /try on staging, the prepare-title costumed sheet logs ONE \"body try\" and ONE \"head try\" per sheet (never \"try 2\"), the two [GROK] edits for the body row (16:9) and the head row (20:9) start within a second of each other, pass 1 is done roughly 30 s after \"Generating 1 costumed\" (was 64 s), and \"Stored 1/1 styled avatars in N ms\" is about 60 s or less (was 133137 ms on job_1791490151653_r9mypyn0c). A full story run still logs sequential rows (body, then head with three refs) and up to two tries each.",
+      "runShape": [
+        "trial"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Run a /try on staging with a costume theme. In the Railway log find \"[STYLED AVATAR] ... costumed:... -> 2x4 via Grok\": expect two \"[GROK] Starting edit\" lines (aspect 16:9 and 20:9, refs: 2 each) within 1 s of each other, at most one \"body try 1 invalid\" and one \"head try 1 invalid\" line and no \"try 2\", then the pass-1 line, then pass 2, then \"Stored 1/1 styled avatars in N ms\" with N near 60000 or less. Look at the stored sheet: do the head row and the body row show the same hair? Record the pass-2 hair-axis result (the \"Pass 2 eval\" lines) over 3 trials, because the head row has no body reference now."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [
