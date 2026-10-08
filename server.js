@@ -2424,6 +2424,20 @@ app.get('/sitemap.xml', (req, res) => {
   res.type('application/xml').send(sitemapXml);
 });
 
+// IndexNow key file (https://www.indexnow.org/documentation): proves we own the
+// host so Bing & co. accept URL submissions. The key comes from the environment
+// and there is no default: unset means no route at all (404). See docs/seo-indexnow.md.
+const INDEXNOW_KEY = process.env.INDEXNOW_KEY;
+if (INDEXNOW_KEY) {
+  if (!/^[A-Za-z0-9-]{8,128}$/.test(INDEXNOW_KEY)) {
+    console.error('[IndexNow] INDEXNOW_KEY must be 8-128 chars of a-z A-Z 0-9 -; key file NOT served');
+  } else {
+    app.get(`/${INDEXNOW_KEY}.txt`, (req, res) => {
+      res.type('text/plain; charset=utf-8').send(INDEXNOW_KEY);
+    });
+  }
+}
+
 // NOTE: Public shared story routes moved to server/routes/sharing.js
 
 // Pre-rendered SEO files live under dist/prerendered/{path}.{lang}.html
