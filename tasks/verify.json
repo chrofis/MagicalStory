@@ -6822,6 +6822,74 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "worn-absent-wearer-not-required-2026-10-08",
+      "title": "A garment whose wearer is not on the page is not listed or attributed",
+      "commits": [],
+      "addedAt": "2026-10-08",
+      "claim": "On the next staging story where a brief cites a worn item in objects on a page without its wearer, that page prompt has no REQUIRED OBJECTS line for it and the image shows it on nobody.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "sceneImages[].prompt on pages citing a CLO id whose wornBy is off the page; the page image."
+      },
+      "status": "pending",
+      "evidence": [],
+      "lastChecked": null
+    },
+    {
+      "id": "grown-creature-mature-species-2026-10-08",
+      "title": "A grown creature whose species says old/adult still states adult body proportions and its cell is not a juvenile",
+      "commits": [],
+      "addedAt": "2026-10-08",
+      "claim": "On the next story with a creature at adult-height or above whose species names an age (Old Dragon), its stored description starts \"<species> with adult body proportions\", its cellGates record is from gemini-2.5-flash, and vb/<id>.jpg shows a mature body.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "visualBible.animals[].description + cellGates; the vb cell; pages: creature size against the cast."
+      },
+      "status": "pending",
+      "evidence": [],
+      "lastChecked": null
+    },
+    {
+      "id": "vb-element-gate-flash-material-2026-10-08",
+      "title": "The element gate (flash) rejects a cell built of an unnamed material and the re-render honours the named one",
+      "commits": [],
+      "addedAt": "2026-10-08",
+      "claim": "On the next story with an object described as made only of one material (a leaf nest), its cell shows only that material; element_cell gate records come from gemini-2.5-flash; note the re-render rate (an egg false fail was seen in replay).",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "visualBible.artifacts[].cellGates (rerendered counts) and the vb cells."
+      },
+      "status": "pending",
+      "evidence": [],
+      "lastChecked": null
+    },
+    {
+      "id": "object-scale-vs-commissioned-size-2026-10-08",
+      "title": "The book scale audit names pages that depart from the bible size, not from the book mean",
+      "commits": [],
+      "addedAt": "2026-10-08",
+      "claim": "On the next story with a declared-size prop on 4+ pages, finalChecksReport.objectScale findings say \"than its commissioned size\" and name the pages visibly off against the bible size, never the correct page.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "finalChecksReport.objectScale vs the pages (view the prop on each)."
+      },
+      "status": "pending",
+      "evidence": [],
+      "lastChecked": null
     }
   ],
   "runs": [

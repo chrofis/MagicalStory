@@ -139,7 +139,7 @@ describe('scoping — declared-size, non-animal bible props with enough pages', 
 });
 
 describe('the question — ONE prop, outliers only, no numbers, "none" allowed', () => {
-  const candidate = { id: 'ART001', label: 'dragon egg', pages: [2, 3, 5, 9, 14] };
+  const candidate = { id: 'ART001', label: 'dragon egg', pages: [2, 3, 5, 9, 14], declaredSize: 'about as big as a human head, like a lantern or a football' };
 
   it('names ONE object and every page it is on, because one prop is asked at a time', () => {
     const { text, asked } = scale.buildScaleQuestion(candidate, [2, 3, 5, 9, 14]);
@@ -170,6 +170,19 @@ describe('the question — ONE prop, outliers only, no numbers, "none" allowed',
     expect(text).toMatch(/SCALE: none/);
     expect(text).toMatch(/Do not estimate a size, a ratio, a percentage/i);
     expect(text).toMatch(/do not write a page-by-page list/i);
+  });
+
+  it('the yardstick is the commissioned size, never the other pages (2026-10-08)', () => {
+    const { text } = scale.buildScaleQuestion(candidate, [2, 3, 5]);
+    expect(text).toMatch(/commissions this object at a size: "about as big as a human head, like a lantern or a football"/);
+    expect(text).toMatch(/departs? from the commissioned size|depart from the commissioned size/i);
+    expect(text).toMatch(/never the other pages/i);
+    expect(text).not.toMatch(/than on the rest|from how the object looks on the others/i);
+  });
+
+  it('a candidate with no declared size is asked nothing', () => {
+    const { declaredSize, ...bare } = candidate as any;
+    expect(scale.buildScaleQuestion(bare, [2, 3, 5]).text).toBe('');
   });
 
   it('a single page in the batch cannot be compared, so nothing is asked', () => {
@@ -214,15 +227,15 @@ describe('the finding is honest about a single read, and never repairs', () => {
     // decisions.md: it catches the worst offender, names the occasional page
     // sitting at the book's average, and misses the milder outliers.
     expect(t).toMatch(/named the worst size outlier in the book/i);
-    expect(t).toMatch(/two pages that merely sit near the book's own average size/i);
-    expect(t).toMatch(/missed two milder outliers/i);
+    expect(t).toMatch(/size the bible commissions, not against the other pages/i);
+    expect(t).toMatch(/missed a milder outlier/i);
     expect(t).toMatch(/go and look/i);
     expect(t).toMatch(/nothing is repainted/i);
   });
 
   it('a quiet run is explicitly not proof the object is consistent', () => {
     const t = scale.buildScaleFinding('dragon egg', [], [9]);
-    expect(t).toMatch(/drawn smaller on p9/);
+    expect(t).toMatch(/drawn smaller than its commissioned size on p9/);
     expect(t).toMatch(/do not read a quiet run as proof/i);
   });
 
@@ -295,8 +308,8 @@ describe('the wiring — ONE call PER PROP, in its own call, never per chunk', (
     const calls: any[] = [];
     const parts = [1, 2, 3, 5, 9, 14, 18].map(n => ({ pageNumber: n, part: { inline_data: { mime_type: 'image/jpeg', data: `img${n}` } } }));
     const candidates = [
-      { id: 'ART001', label: 'dragon egg', pages: [2, 3, 5, 9, 14] },
-      { id: 'VEH001', label: 'wooden cart', pages: [3, 5, 18] },
+      { id: 'ART001', label: 'dragon egg', pages: [2, 3, 5, 9, 14], declaredSize: 'about as big as a human head' },
+      { id: 'VEH001', label: 'wooden cart', pages: [3, 5, 18], declaredSize: 'about as long as a rowing boat' },
     ];
     const mod = require_('../../server/lib/bookAudit.js');
     const original = (globalThis as any).fetch;

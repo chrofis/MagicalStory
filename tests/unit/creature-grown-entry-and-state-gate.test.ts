@@ -96,13 +96,14 @@ describe('3 — the state-consistency gate: listed changes are intended, on its 
       return { ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: '{"ok": true, "reason": "same object"}' }] } }] }) };
     }) as any;
   };
-  it('the state gate runs on MODEL_DEFAULTS.vbStateCellGate; the element gate stays on lite', async () => {
+  it('the state gate runs on MODEL_DEFAULTS.vbStateCellGate; the element gate runs on MODEL_DEFAULTS.vbElementCellGate (flash since 2026-10-08)', async () => {
     stubGemini();
     await RS.checkStateCellsConsistency(['/9j/AAA', '/9j/BBB'], parent, cells);
     await RS.checkElementCellRender('/9j/AAA', { ...parent, type: 'animal' }, 'watercolor');
     expect(MODEL_DEFAULTS.vbStateCellGate).toBe('gemini-2.5-flash');
     expect(urls[0]).toContain(`/models/${MODEL_DEFAULTS.vbStateCellGate}:generateContent`);
-    expect(urls[1]).toContain('/models/gemini-2.5-flash-lite:generateContent');
+    expect(MODEL_DEFAULTS.vbElementCellGate).toBe('gemini-2.5-flash');
+    expect(urls[1]).toContain(`/models/${MODEL_DEFAULTS.vbElementCellGate}:generateContent`);
   });
 });
 
@@ -127,5 +128,27 @@ describe('4 — cute tone: a grown creature keeps its adult body; the tone is it
     const eight = PB.buildCreatureToneSection({ characters: [{ name: 'A', age: '8', isMain: true }] });
     expect(five).not.toContain('face and expression only');
     expect(eight).not.toContain('face and expression only');
+  });
+});
+
+describe('2026-10-08 — a grown creature whose species states a mature age still gets the build clause', () => {
+  // job_1791489793707_2ir6nl5kw ANI001 "Old Dragon", twice-adult-height: the lead was skipped
+  // because "old" counts as a stated age, and the cell came back a juvenile.
+  const OLD = { ...DRAGON, species: 'Old Dragon' };
+  it('"Old Dragon" at a grown band states adult body proportions', () => {
+    expect(VB.buildAnimalDescription(OLD).startsWith('Old Dragon with adult body proportions.')).toBe(true);
+  });
+  it('a YOUNG species word at a grown band is left alone', () => {
+    expect(VB.buildAnimalDescription({ ...DRAGON, species: 'baby giant' }).startsWith('baby giant.')).toBe(true);
+  });
+  it('the element gate asks about the stated age/build and about extra material', () => {
+    const q = RS.elementCellGatePrompt({ ...OLD, description: VB.buildAnimalDescription(OLD) }, 'watercolor');
+    expect(q).toMatch(/age or build match/);
+    expect(q).toMatch(/nothing else/);
+  });
+  it('the cell prompt states the mature-body and single-material rules', () => {
+    const txt = fs.readFileSync(path.join(ROOT, 'prompts/reference-sheet.txt'), 'utf8');
+    expect(txt).toMatch(/grown, adult or old has a mature body/);
+    expect(txt).toMatch(/Only the material the description names is drawn/);
   });
 });

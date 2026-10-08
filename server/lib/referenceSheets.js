@@ -877,7 +877,7 @@ function elementCellGatePrompt(el, styleDescription = '') {
   const desc = String(el?.description || '').trim();
   const text = String(el?.text || '').trim();
   const textClause = text ? ` (4) Lettering: the words "${text}" are readable and spelled exactly so; any other lettering fails.` : '';
-  return `You are checking one cell cut from a reference sheet for an illustrated children's book. The cell is meant to show ${article(kind)} ${kind}, described as: "${desc}". The book's declared art style: "${styleDescription}". Judge strictly: (1) Kind: does the depicted thing read as ${article(kind)} ${kind} — not a different kind of object that merely shares its shape, colour or size? (2) Match: do its material, colour and main parts follow the description? (3) Style: is it rendered in the declared art style?${textClause} If any check fails, ok is false. Reply as JSON: {"ok": true or false, "reason": "one short sentence"}`;
+  return `You are checking one cell cut from a reference sheet for an illustrated children's book. The cell is meant to show ${article(kind)} ${kind}, described as: "${desc}". The book's declared art style: "${styleDescription}". Judge strictly: (1) Kind: does the depicted thing read as ${article(kind)} ${kind} — not a different kind of object that merely shares its shape, colour or size? (2) Match: do its colour and main parts follow the description, and is it made of the material the description names and nothing else (an object built only of leaves, snow or sand that shows twigs, straw, wicker, a rim or a woven frame the description does not name fails), and does its age or build match the one the description states (a creature described as grown, adult or old has a mature body — long limbs, neck and tail, a head small for the body — not a young one's big head, round belly and short limbs)? (3) Style: is it rendered in the declared art style?${textClause} If any check fails, ok is false. Reply as JSON: {"ok": true or false, "reason": "one short sentence"}`;
 }
 
 /**
@@ -901,8 +901,8 @@ function stateCellsGatePrompt(parent, cells) {
   return `You are checking ${cells.length} cells cut from a reference sheet for an illustrated children's book. They are meant to show ONE object, ${article(kind)} ${kind}, described as: "${desc}", in ${cells.length} states, in this order: ${list} Each listed change is intended: whatever a state names — a colour, a surface, a glow, a part added, missing or broken — is expected in that cell, and where it differs from the description the state wins for that cell. Judge strictly: is it the same object in every cell — same shape, build and material, and the same colour except where a state names a colour change — differing only in what the states name? Two different objects, or a change no state names, fails. Reply as JSON: {"ok": true or false, "reason": "one short sentence"}`;
 }
 
-async function checkElementCellRender(cellBase64, el, styleDescription = '') {
-  const parsed = await askCellGate([cellBase64], elementCellGatePrompt(el, styleDescription));
+async function checkElementCellRender(cellBase64, el, styleDescription = '', modelKey = require('../config/models').MODEL_DEFAULTS.vbElementCellGate) {
+  const parsed = await askCellGate([cellBase64], elementCellGatePrompt(el, styleDescription), modelKey);
   return { ok: parsed.ok !== false, reason: String(parsed.reason || '') };
 }
 

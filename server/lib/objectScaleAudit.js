@@ -86,6 +86,19 @@
  *    a reply with no usable answer is recorded as NOT EVALUATED rather than
  *    read as "no outliers".
  *
+ * 2026-10-08 — THE YARDSTICK IS THE COMMISSIONED SIZE, NOT THE BOOK'S MEAN.
+ * Every question above compared a page with "the rest", so a book that drew the
+ * prop too large on most pages made the correct page the outlier: staging
+ * job_1791489793707_2ir6nl5kw drew the egg torso-sized on p7, p8, p11 and p15
+ * (the bible says a human head) and the audit flagged p12 - the one page that
+ * was right - as "smaller". The question now states the candidate's declared
+ * size (selectScaleObjects already requires one) and asks which pages depart
+ * from IT, still outliers only and never a number. Replayed on that story's
+ * stored pages (gemini-2.5-flash, 2 runs, ~CHF 0.01): egg LARGER p7 p8 p9 p11 /
+ * p7 p8 p9, p12 not named in either run. The nest prop's two runs disagreed
+ * (LARGER everywhere / SMALLER p18), so the finding says so. A candidate with no
+ * declared size is asked nothing.
+ *
  * NOTHING HERE REPAIRS. Shrinking a prop was measured to strand the hands off
  * it and never reached the target size anyway, and the reference-cell area
  * lever is dead (SETTLED.md, 2026-09-19). The finding goes to a human.
@@ -226,7 +239,9 @@ function selectScaleObjects(storyData, auditablePages, opts = {}) {
  * @returns {{text: string, asked: Object|null}} `text` is '' when nothing qualifies
  */
 function buildScaleQuestion(candidate, batchPages) {
-  if (!candidate) return { text: '', asked: null };
+  // No declared size, no yardstick, no question (selectScaleObjects already
+  // requires one; a candidate built by hand without it is asked nothing).
+  if (!candidate || !candidate.declaredSize) return { text: '', asked: null };
   const inBatch = new Set((batchPages || []).map(Number));
   const here = (candidate.pages || []).filter(p => inBatch.has(Number(p)));
   if (here.length < 2) return { text: '', asked: null };
@@ -236,9 +251,10 @@ function buildScaleQuestion(candidate, batchPages) {
     'OBJECT SIZE. Below are pages from one finished picture book, in reading order: a label for each page followed by the picture on it. One recurring object appears on the pages named:',
     `- ${asked.label}: pages ${here.map(p => `p${p}`).join(', ')}`,
     '',
-    'Looking only at how large that object is DRAWN relative to the people and the surroundings in its own picture, is it rendered significantly LARGER on some of those pages than on the rest, or significantly SMALLER? Its colour, its markings, its position and what is happening in the story are outside this question.',
+    `The book commissions this object at a size: "${String(asked.declaredSize).replace(/\.\s*$/, '')}".`,
+    'Looking only at how large that object is DRAWN relative to the people and the surroundings in its own picture, is it rendered significantly LARGER than that commissioned size on some of those pages, or significantly SMALLER? The commissioned size is the yardstick, never the other pages: if the object is drawn too large (or too small) on most pages, those pages are the ones to name. Its colour, its markings, its position and what is happening in the story are outside this question.',
     '',
-    'Name only the pages that depart from how the object looks on the others. Say nothing about a page that sits near the rest. Write at most one line of each kind, at the left margin:',
+    'Name only the pages that depart from the commissioned size. Say nothing about a page that sits near it. Write at most one line of each kind, at the left margin:',
     'SCALE[LARGER]: <object> — p<N>, p<N>',
     'SCALE[SMALLER]: <object> — p<N>',
     '',
@@ -295,10 +311,10 @@ function parseScaleAnswer(raw) {
  */
 function buildScaleFinding(label, larger, smaller) {
   const parts = [];
-  if ((larger || []).length) parts.push(`drawn larger than on the other pages on ${larger.map(p => `p${p}`).join(', ')}`);
-  if ((smaller || []).length) parts.push(`drawn smaller on ${smaller.map(p => `p${p}`).join(', ')}`);
+  if ((larger || []).length) parts.push(`drawn larger than its commissioned size on ${larger.map(p => `p${p}`).join(', ')}`);
+  if ((smaller || []).length) parts.push(`drawn smaller than its commissioned size on ${smaller.map(p => `p${p}`).join(', ')}`);
   if (!parts.length) return null;
-  return `SCALE: "${label}" — ${parts.join('; ')}. LOW CONFIDENCE: on the one story this check was validated against it named the worst size outlier in the book and repeated that answer exactly, byte-identical, across two runs; it also named two pages that merely sit near the book's own average size, and it missed two milder outliers — so treat this as "go and look", not as a verdict, and do not read a quiet run as proof the object is consistent. Reported for a human — nothing is repainted.`;
+  return `SCALE: "${label}" — ${parts.join('; ')}. LOW CONFIDENCE: measured against the size the bible commissions, not against the other pages. On the one story this wording was validated against it named the worst size outlier in the book and repeated that answer exactly across two runs; it also named a page that merely sits near the commissioned size and missed a milder outlier, and a second prop's two runs disagreed — so treat this as "go and look", not as a verdict, and do not read a quiet run as proof the object is consistent. Reported for a human — nothing is repainted.`;
 }
 
 module.exports = {

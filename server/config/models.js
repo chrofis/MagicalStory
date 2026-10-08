@@ -763,6 +763,14 @@ const MODEL_DEFAULTS = {
   // change as a fault; gemini-2.5-flash with the same new prompt passed it 3 of 3
   // and still failed both mismatch controls 6 of 6. The other cell gates stay on lite.
   vbStateCellGate: 'gemini-2.5-flash',
+  // The Visual Bible ELEMENT-cell gate (referenceSheets.checkElementCellRender: kind,
+  // match, material, age/build of one non-character cell). Moved off flash-lite
+  // (2026-10-08): on staging job_1791489793707_2ir6nl5kw's stored cells lite passed
+  // the leaf nest drawn as a woven twig basket 3 of 3 ("a nest filled with autumn
+  // leaves") and flash failed it 3 of 3 naming the twig structure; the grown dragon's
+  // juvenile cell failed on both once the description stated its build. Character
+  // cells stay on lite. See docs/decisions.md 2026-10-08.
+  vbElementCellGate: 'gemini-2.5-flash',
 
   // IDENTITY ARBITER — the only witness allowed to overrule the figure detector
   // on who-is-who (identityAgreement.arbitrateVeto, 2026-09-21).

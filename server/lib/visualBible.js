@@ -1092,6 +1092,14 @@ function isGrownCreatureScaleClass(raw) {
 // baby giant" would contradict itself. Reads the entry's OWN authored field to
 // avoid writing a second age beside it — never a finding's prose.
 const STATED_AGE_WORDS = /\b(baby|babies|young|juvenile|hatchling|infant|cub|foal|calf|puppy|kitten|chick|fledgling|adult|grown|full-grown|elderly|old)\b/i;
+// The mature subset. A species that states a MATURE age ("Old Dragon") keeps
+// it, but it says nothing about the BUILD a cell must draw: staging
+// job_1791489793707_2ir6nl5kw ANI001 "Old Dragon" (twice-adult-height) was
+// stored as "Old Dragon. <colour>. <anatomy>. <features>" with no maturity
+// sentence, and its cell came back a chubby big-headed juvenile that every page
+// copied. A mature word still gets the build clause; only a YOUNG word (a
+// contradiction with a grown band) is left alone.
+const STATED_MATURE_AGE_WORDS = /\b(adult|grown|full-grown|elderly|old)\b/i;
 
 function normaliseScaleClass(raw, id) {
   const who = id ? String(id) : 'entry';
@@ -1428,8 +1436,10 @@ function buildAnimalDescription(animal) {
   // A grown creature's MATURITY leads its description (see
   // GROWN_CREATURE_SCALE_CLASSES): identity the cell can draw, never a size.
   const species = typeof animal.species === 'string' ? animal.species.trim() : '';
-  const grown = isGrownCreatureScaleClass(animal.scaleClass) && !STATED_AGE_WORDS.test(species);
+  const isGrownBand = isGrownCreatureScaleClass(animal.scaleClass);
+  const grown = isGrownBand && !STATED_AGE_WORDS.test(species);
   if (grown) parts.push(`a fully grown adult ${species || 'creature'} with adult body proportions`);
+  else if (isGrownBand && STATED_MATURE_AGE_WORDS.test(species)) parts.push(`${species} with adult body proportions`);
   else if (species) parts.push(species);
   if (animal.coloring) parts.push(animal.coloring);
   // The body the cell must draw, every part counted (ANIMAL_ANATOMY_SPEC).

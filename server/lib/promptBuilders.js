@@ -5042,6 +5042,8 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
     // Dedupe by RESOLVED entity id: an id filed in both lists (or cited
     // once by id and once by name) is one entity and gets one line.
     const citedEntryIds = new Set();
+    const pageCastNames = [...(metadata.characters || []), ...(sceneCharacters || [])]
+      .map(c => (typeof c === 'string' ? c : c && c.name)).filter(Boolean);
     const pushRequired = (rec) => {
       const key = String(rec.id || rec.name || '').toUpperCase();
       if (key && citedEntryIds.has(key)) return;
@@ -5162,6 +5164,21 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
       // Look up in clothing/costumes
       const clothing = (visualBible.clothing || []).find(c => matchesEntry(c, objName));
       if (clothing) {
+        // A GARMENT WHOSE WEARER IS NOT ON THE PAGE IS NOT REQUIRED (2026-10-08,
+        // job_1791489793707_2ir6nl5kw p14: Julian's scarf cited in `objects` on a
+        // page without Julian; the resolver rightly dropped the row, nothing said
+        // "off", and the line "red scarf (worn by Julian)" went to the model,
+        // which put the scarf on Kiaan). Decided structurally on the wearer's
+        // presence in the page cast; a page that DOES carry a worn row keeps the
+        // state-aware path below.
+        if (clothing.wornBy && !wornById.has(String(clothing.id || '').toUpperCase())
+            && !pageCastNames.some(n => String(n).trim().toLowerCase() === String(clothing.wornBy).trim().toLowerCase())) {
+          log.info(`[WORN] Page ${pageNumber}: ${clothing.id} not required — its wearer ${clothing.wornBy} is not on this page`);
+          // The brief DID cite an element: the whole-bible fallback below must
+          // not fire and list the same garment (and every other entry) instead.
+          hasRequiredObjects = true;
+          continue;
+        }
         const description = clothing.extractedDescription || clothing.description;
         pushRequired({ name: clothing.name, id: clothing.id, type: 'clothing', description, wornBy: clothing.wornBy || null, entry: clothing });
       }
