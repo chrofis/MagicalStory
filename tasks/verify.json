@@ -6865,7 +6865,7 @@
         "kind": "human",
         "what": "Open a /try with a life-skill topic (e.g. reading-alone) and a role theme; time the two cards from the request in the Railway log (generate-ideas-stream start to the second final) and read both card texts for: obstacle -> act -> outcome connected, topic act forced by the obstacle, theme present as more than a label, no orphan object. Log lines \"failed its own check\" show the rerun rate."
       },
-      "status": "confirmed",
+      "status": "failed",
       "evidence": [
         {
           "storyId": "job_1791496201302_6vgktllu5",
@@ -6916,6 +6916,16 @@
           "result": "HUMAN-CONFIRMED",
           "by": "claude",
           "note": "Cards 1-4 s (00:03:01 -> 00:03:06 CH), no rerun. Picked card is one chain: wind takes the sail -> he crawls after it, holds it -> ship sails on, parrot, Mama. Pirate theme is the play itself. (Windstoss again: 4 of 5 picked cards tonight.)"
+        },
+        {
+          "storyId": "job_1791496611607_urmd4qkq2",
+          "env": "staging",
+          "build": "241cb90b61eec959f933257f4242fa20757f6c0a",
+          "runDate": "2026-10-08 23:56:51 CH",
+          "checkedAt": "2026-10-09 00:22:58 CH",
+          "result": "HUMAN-FAILED",
+          "by": "claude",
+          "note": "Overall verdict across the five 2026-10-08 trials: latency confirmed (2-10 s, no reruns) but 4 of 5 picked cards break the one-causal-chain claim (orphan basket/tin, undercut outcome, English 'Nachbarpeg' leak, incoherent reading card); only the Tobias card passed; 4 of 5 obstacles are a Windstoss."
         }
       ],
       "lastChecked": {
