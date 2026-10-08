@@ -6414,6 +6414,22 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "avatar-hair-follows-avatar-2026-10-08",
+      "title": "Hair text follows the approved avatar (existing characters, new avatars, trial)",
+      "commits": [],
+      "addedAt": "2026-10-08",
+      "claim": "On a story whose characters were made before 2026-10-08 the job log shows `[AVATAR HAIR] <name>: hair text now read from the avatar` once per character, the characters row then carries physical.detailedHairAnalysis matching the avatar, physical.photoHairAnalysis (the photo reading) and physicalTraitsSource.detailedHairAnalysis = 'avatar', a second story logs no new read, and the sheet hair judge no longer rejects a sheet whose hair matches the avatar. A new avatar made through the avatar job and a trial prewarm stamp the same fields.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Read the job log for [AVATAR HAIR] lines, then SELECT data->'characters' from the user's characters row: physical.detailedHairAnalysis, physical.photoHairAnalysis, physicalTraitsSource.detailedHairAnalysis. View the styled sheet and a page and compare its hair with the stored hair text; read finalVerdict.hair.reason of the sheets."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [

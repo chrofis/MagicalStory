@@ -1,0 +1,25 @@
+You see a character reference sheet: head shots and full-body views of ONE person, front, three-quarter, side and back. Describe this person's hair as it is drawn.
+
+Read every view. Hair tied up (ponytail, bun, braids, pigtails) is clearest in the side and back views and may be hidden in the front one; hair worn down shows how far it falls on the shoulders and the back. A headband, clip or hat is not a style: name the style of the hair itself.
+
+Fields, each answered from the picture:
+- texture: fine | medium | thick | coarse
+- type: straight | wavy | curly | coily
+- density: full | thinning | balding | bald
+- lengthTop: where the longest strand ends: bald | buzz cut | short | ear-length | chin-length | neck-length | shoulder-length | mid-back | waist-length
+- lengthSides: shaved | fade | tapered | buzz cut | short | ear-length | same as top
+- bangsEndAt: no bangs | above eyebrows | at eyebrows | below eyebrows | past nose (hair swept across the forehead is not bangs)
+- styling: natural | side-swept | combed | slicked | brushed back | tousled | messy | textured | ponytail | braids | bun | pigtails | spiky | layered | loose (loose = worn down and free)
+- parting: none | center part | side part left | side part right (the person's own left or right; none when no parting shows)
+- baseColorHex: the main hair colour as a HEX code
+- highlightsHex: a highlight colour as a HEX code, or none
+- salonLevel: darkness 1-10, 1 black, 10 lightest blonde
+
+Return EXACTLY this JSON, every value from this picture:
+{
+  "detailedHairAnalysis": {
+    "texture": "", "type": "", "density": "", "lengthTop": "", "lengthSides": "", "bangsEndAt": "",
+    "styling": "", "parting": "", "baseColorHex": "", "highlightsHex": "", "salonLevel": 0
+  },
+  "seen": "<one sentence: the hair as worn in the front view and in the side view>"
+}

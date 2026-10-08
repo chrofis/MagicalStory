@@ -504,6 +504,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
   // chokepoint is the single source of truth — see usageContext.js).
   require('./server/lib/usageContext').setUsageSink(addUsage);
 
+  // The hair text follows the approved avatar, read once per character and kept on the character row
+  // (docs/decisions.md "Hair text follows the approved avatar"). Before anything reads hair: the writer's
+  // cast, the Visual Bible, every sheet judge and every page prompt.
+  await require('./server/lib/avatarHair').ensureAvatarDerivedHair(inputData.characters || [], { userId, usageTracker: addUsage });
+
   // Spend guard shares the cancellation checkpoints: same call sites, same loud
   // failure path (the outer catch marks the job failed and refunds credits).
   const checkCancellationUpstream = checkCancellation;

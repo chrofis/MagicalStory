@@ -2147,6 +2147,7 @@ module.exports = {
   variantLogEntry,
   approvedBaseSheetFor,
   convertAvatarToStyle,
+  resolveAvatarBytes, // avatarHair.js reads the stored standard avatar through the same inline-or-R2 lookup
 
   // Apply styled avatars to photo arrays
   applyStyledAvatars,

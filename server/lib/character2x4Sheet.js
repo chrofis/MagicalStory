@@ -1087,6 +1087,19 @@ async function observeStyledRow(rowImageData, { styleLabel, hair = null, model =
   return { report, promptUsed: prompt };
 }
 
+/**
+ * The hair a character's avatar shows, as the detailedHairAnalysis shape every prompt reads (prompts/avatar-hair-read.txt).
+ * ONE call on the whole reference sheet: the generic photo analysis (character-analysis.txt) read Lorena's high ponytail,
+ * plainly visible in her side view, as "natural" (staging job_1791450210539_nwi88y9lr, 2026-10-08), so a dedicated question
+ * asks the reader to use every view. Used by avatarHair.js (docs/decisions.md "Hair text follows the approved avatar").
+ */
+async function readAvatarHair(avatarImageData, { model = MODEL_DEFAULTS.sheetEvalModel, usageTracker = null, apiKey = null } = {}) {
+  const prompt = PROMPT_TEMPLATES.avatarHairRead;
+  if (!prompt) throw new Error('avatarHairRead prompt template not loaded');
+  const report = await askSheetJudge({ model, parts: [inlinePartOf(avatarImageData), { text: prompt }], prompt, label: 'avatar hair read', usageTracker, usageFn: 'avatar_hair_read', apiKey: apiKey || process.env.GEMINI_API_KEY });
+  return { hair: report?.detailedHairAnalysis || null, seen: report?.seen || null };
+}
+
 async function observeStyledRows(styledSheet, opts) {
   const { topHeads, bottomBody } = await splitSheetRows(styledSheet);
   return Promise.all([topHeads, bottomBody].map(row => observeStyledRow(row, opts)));
@@ -2420,5 +2433,6 @@ module.exports = {
   resolveFacePhoto,
   buildStyleTransferPrompt,
   // exposed for tests
+  readAvatarHair,
   _internal: { sheetStackPad, stackRowsInto2x4, mergeRowObservations, observeStyledRow, hairRequest, headRowCropFraction, cropHeadRowToShoulders, applyRowConsistencyAxes, applyStyledSheetConsistencyAxes, TAIL_POSE_RULE, applyGlassesAxis, applyPoseHeadGate, detectBodyRowHeads, detectSheetRowDivider, parseJudgeJson, buildBodyRowPrompt, buildHeadRowPrompt, buildFootwearRule, buildGarmentRule, buildSeasonOutfitBlock, buildStyleTransferPrompt, resolveFacePhoto, resolveStandardAvatar, quickLayoutCheck, evaluateStyledSheetWithGemini, runStyleTransferPass, splitSheetRows, evaluateSheetRow, evaluateIdentity, evaluateSheetSplit, evaluateAvatarSheet, isEchoedJudgeVerdict, REAR_TURN_POSE, SHEET_GROUND_RULE, SHEET_NO_LETTERING_RULE, CELL_NAMES_NOT_DRAWN, garmentColourRule, buildUnnamedTrimRule, scoreHeadsReport, scoreStyleReport, scoreIdentityReport },
 };

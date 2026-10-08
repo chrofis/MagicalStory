@@ -23,6 +23,7 @@ const { generateWithRunware, generateAvatarWithACE, isRunwareConfigured } = requ
 const { editWithGrok } = require('../lib/grok');
 const { scoreAvatarLikeness, failsArcFaceGate, warmArcFace, ARCFACE_MIN } = require('../lib/faceIdentity');
 const { buildHairDescription, getAgeCategory, clampApparentAge } = require('../lib/storyHelpers');
+const { HAIR_SOURCE_AVATAR, applyAvatarHairToExtraction } = require('../lib/avatarHair');
 const { resolveDeclaredAvatarOverrides } = require('../lib/avatarOverrides');
 const { getFacePhoto } = require('../lib/characterPhotos');
 const { getImageIdentifier, getImageSizeKB } = require('../utils/imageMetadata');
@@ -2245,11 +2246,12 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
           results.extractedTraits = consensusResult;
           results.traitSources = sources; // For debugging
 
-          // Use detailedHairAnalysis from photo (ground truth), fall back to avatar
-          results.extractedTraits.detailedHairAnalysis =
-            photoTraitsResult?.detailedHairAnalysis ||
-            photoTraitsResult?.traits?.detailedHairAnalysis ||
-            evalResults.find(r => r.faceMatchResult?.detailedHairAnalysis)?.faceMatchResult.detailedHairAnalysis;
+          // HAIR: THE AVATAR WINS (owner 2026-10-08, docs/decisions.md "Hair text follows the approved
+          // avatar"; replaces the photo-first order). The photo's reading is held here and stays stored beside
+          // the avatar's (physical.photoHairAnalysis, audit only); applyAvatarHairToExtraction replaces it
+          // below, once the retries have settled which avatar the character keeps.
+          results.photoHairAnalysis = photoTraitsResult?.detailedHairAnalysis || photoTraitsResult?.traits?.detailedHairAnalysis || null;
+          results.extractedTraits.detailedHairAnalysis = results.photoHairAnalysis || undefined;
 
           // Clamp the analyzed apparentAge to within ±1 group of the user-stated
           // age. Trust the visual age normally (a 12yo who looks 13 stays as
@@ -2388,6 +2390,14 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
 
           log.debug(`🔄 [AVATAR JOB ${jobId}] Retry phase completed in ${Date.now() - retryStart}ms`);
         }
+
+        // The avatar the character keeps is final here: its hair becomes the character's hair text.
+        await applyAvatarHairToExtraction(results, {
+          usageTracker: (_provider, u, _fn, modelId) => {
+            const m = (results.tokenUsage.byModel[modelId] ||= { input_tokens: 0, output_tokens: 0, thinking_tokens: 0 });
+            m.input_tokens += u.input_tokens || 0; m.output_tokens += u.output_tokens || 0; m.thinking_tokens += u.thinking_tokens || 0;
+          },
+        });
       } catch (evalErr) {
         log.warn(`[AVATAR JOB ${jobId}] Evaluation failed (continuing without traits):`, evalErr.message);
       }
@@ -2666,6 +2676,11 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
               // wins forever until the user changes or removes it themselves.
               if (t.detailedHairAnalysis && existingSources['hairType'] !== 'user') {
                 physical.detailedHairAnalysis = t.detailedHairAnalysis;
+                if (results.hairFromAvatar) {
+                  traitSources.detailedHairAnalysis = HAIR_SOURCE_AVATAR;
+                  const photoHair = results.photoHairAnalysis || existingChar.physical?.photoHairAnalysis;
+                  if (photoHair) physical.photoHairAnalysis = photoHair;
+                }
               }
 
               // Merge with existing physical object

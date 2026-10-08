@@ -1741,6 +1741,7 @@ router.post('/create-story', verifySessionToken, async (req, res) => {
       traits: mainChar.traits,
       customTraits: mainChar.traits?.specialDetails || '',
       physical: mainChar.physical || {},
+      physicalTraitsSource: mainChar.physicalTraitsSource || {},
       photos: mainChar.photos || {},
       _charId: mainChar.id,
       _preGeneratedStyledAvatars: mainChar.preGeneratedStyledAvatars || null,
@@ -2837,6 +2838,7 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
 
     // Build character object for styled avatar pipeline
     const character = {
+      id: mainChar.id,
       name: mainChar.name,
       age: mainChar.age,
       gender: mainChar.gender,
@@ -2844,6 +2846,7 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
       photos: mainChar.photos || {},
       avatars: { standard: mainChar.previewAvatar || null },
       physical: mainChar.physical || {},
+      physicalTraitsSource: mainChar.physicalTraitsSource || {},
     };
     const characters = [character];
 
@@ -2917,6 +2920,9 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
       // it (the costume is the outfit).
       const { seasonOutfitGuidance } = require('../lib/season');
       const seasonOutfit = seasonOutfitGuidance({ storyCategory });
+      // The hair text follows the approved preview avatar BEFORE the sheet is generated and judged
+      // against it (docs/decisions.md "Hair text follows the approved avatar").
+      await require('../lib/avatarHair').ensureAvatarDerivedHair(characters, { userId });
       await prepareStyledAvatars(characters, TRIAL_ART_STYLE, avatarRequirements, avatarClothingRequirements, null, null, { seasonOutfit });
       log.info(`[TRIAL AVATARS] Avatar styling complete for "${character.name}"`);
 
@@ -3152,6 +3158,7 @@ async function createTrialStoryJob(pool, userId, characterId, characterData, sto
     role: 'main',
     isMainCharacter: true,
     physical: characterData.physical || {},
+    physicalTraitsSource: characterData.physicalTraitsSource || {},
     photos: characterData.photos || {},
     photoUrl: characterData.photos?.face || null,
     bodyPhotoUrl: characterData.photos?.body || null,
