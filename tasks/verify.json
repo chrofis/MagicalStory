@@ -7923,8 +7923,19 @@
         "kind": "human",
         "what": "View the trial cover next to page 1: held toy and pet match their reference cells; wizard hat shape and colour are the same on the costume sheet, the cover and every page."
       },
-      "status": "pending",
-      "evidence": []
+      "status": "confirmed",
+      "evidence": [
+        {
+          "storyId": "job_1791501996423_9z8aunkpx",
+          "env": "staging",
+          "build": "608269a42805fa172b4f73789cbdbafd0a347c9f",
+          "runDate": "2026-10-09 01:26:36 CH",
+          "checkedAt": "2026-10-09 01:30:37 CH",
+          "result": "HUMAN-CONFIRMED",
+          "by": "claude",
+          "note": "Cover magpie, potion bottle (red ribbon) and Rohrdorf bell tower match page 4; wizard hat deep purple pointed with gold band on cover and p4 as the costume states. Minor: p1 hat lying on a fence (off the head) drawn grey-brown."
+        }
+      ]
     }
   ],
   "runs": [
