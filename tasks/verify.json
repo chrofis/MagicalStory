@@ -6400,7 +6400,9 @@
     {
       "id": "fiona-group-d-2026-10-08",
       "title": "Lector keeps meaning and regional words; who-does-what rule; peopleless counters agree; instant-shortened verb; emotion enforced",
-      "commits": [],
+      "commits": [
+        "8b1a22da0"
+      ],
       "addedAt": "2026-10-08",
       "claim": "On a full de-CH story: (1) no lector or grammar-check correction in textRefineReport (lectorApplied, diffApplied) swaps a Swiss word for its standard form, changes a direction/place/person/number, or restores nothing; (2) the planner, plan check (Q12) and both writers carry the who-does-what sentence (plannerPrompt, checkReply prompt, storyTextPrompts); (3) a people-free page whose who column is nobody raises no PEOPLELESS_ON_INTERACTION_PAGE (beatsReviewReport.counterFindings) and a re-plan that declares 'instant shortened' raises no beats_replan_change_unreadable; (4) every brief characters[] row carries an emotion from the closed list (emotion-enum >= 90%) or the brief re-ask names the row; (5) no ending promise (a next day or next time) appears that the arc did not set up.",
       "runShape": [
