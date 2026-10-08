@@ -1714,19 +1714,14 @@ router.post('/create-story', verifySessionToken, async (req, res) => {
     }
     slotTaken = true;
 
-    // If a prepare-title call is still in flight for this user, wait for it
-    // (with a safety timeout) so preGeneratedStyledAvatars are persisted before
-    // the trial story job reads the character DB. Avoids duplicate styling work.
-    const inFlightTitlePromise = inFlightTitlePagePromises.get(userId);
-    if (inFlightTitlePromise) {
-      log.info(`[TRIAL] Awaiting in-flight prepare-title for user ${userId} (avoid duplicate avatar styling)`);
-      const startWait = Date.now();
-      await Promise.race([
-        inFlightTitlePromise,
-        new Promise(resolve => setTimeout(resolve, 60000)), // 60s max wait
-      ]);
-      log.info(`[TRIAL] prepare-title wait complete after ${Date.now() - startWait}ms`);
-    }
+    // A prepare-title call may still be styling this visitor's avatars. The
+    // request does NOT wait for it (it blocked 28 s on job_1791490151653 while
+    // nothing else could start; docs/decisions.md 2026-10-08): the job is created
+    // and started at once, and the JOB awaits this promise right before the step
+    // that needs the styled sheets, so the writer runs meanwhile and the sheets
+    // are still styled once (the job claims prepare-title's result instead of
+    // styling a second set).
+    const titleAvatarsReady = inFlightTitlePagePromises.get(userId) || null;
 
     const characterId = `characters_${userId}`;
     const charResult = await pool.query('SELECT data FROM characters WHERE id = $1', [characterId]);
@@ -1795,12 +1790,12 @@ router.post('/create-story', verifySessionToken, async (req, res) => {
     slotTaken = false; // the job row now accounts for the slot
 
     if (deps.processStoryJob) {
-      deps.processStoryJob(jobId).catch(err => {
+      deps.processStoryJob(jobId, { titleAvatarsReady }).catch(err => {
         log.error(`[TRIAL] Job ${jobId} processing failed:`, err);
       });
     }
 
-    log.info(`[TRIAL] Story job ${jobId} started for anonymous user ${userId}`);
+    log.info(`[TRIAL] Story job ${jobId} started for anonymous user ${userId}${titleAvatarsReady ? ' (prepare-title still styling avatars — the job awaits it)' : ''}`);
     res.json({ jobId });
   } catch (err) {
     await releaseSlot(err.code || err.message);
@@ -2572,6 +2567,7 @@ router.post('/generate-ideas-stream', verifySessionToken, trialIdeasLimiter, asy
     log.debug(`  Category: ${storyCategory}, Topic: ${storyTopic}, Theme: ${storyTheme}, Language: ${language}`);
 
     const { callTextModelStreaming } = require('../lib/textModels');
+    const { MODEL_DEFAULTS } = require('../config/models');
     const { stripIdeaSelfCheck, parseIdeaSelfCheck, buildIdeaRerunPrompt } = require('../lib/trialIdeaCheck');
     const { getLanguageInstruction } = require('../lib/languages');
     const modelToUse = 'claude-sonnet';
@@ -2595,16 +2591,9 @@ router.post('/generate-ideas-stream', verifySessionToken, trialIdeasLimiter, asy
     let categoryContext = '';
     if (storyCategory === 'life-challenge') {
       // The topic and the theme are the two things the user chose; the idea
-      // carries both, with the topic's own guide behind it (same guide the
-      // story prompt gets).
-      const { getTeachingGuide } = require('../lib/promptBuilders');
-      // The theme arrives as a catalogue ID, which is not English prose — the
-      // sentence is built from the shared table so a place or an occasion does
-      // not come out as a role (server/config/storyThemes.js).
-      const { buildThemePlaySentence } = require('../config/storyThemes');
-      const themeSentence = buildThemePlaySentence(storyTheme);
-      const guide = getTeachingGuide('life-challenge', storyTopic);
-      categoryContext = `This is a life skills story about "${storyTopic}". What stands in the way is a person, a creature or a thing that answers back, and the idea says what it costs them.${themeSentence ? ` ${themeSentence}` : ''}${guide ? `\nGuidance for this topic:\n${String(guide).trim()}` : ''}`;
+      // carries both, with the topic's own guide behind it. One builder, shared
+      // with the Lab's variety stage (sibling set trial-idea-prompt-mirror).
+      categoryContext = require('../lib/promptBuilders').buildTrialLifeChallengeContext(storyTopic, storyTheme);
     } else if (storyCategory === 'historical') {
       categoryContext = `This is a historical story about "${storyTopic}". Keep it age-appropriate and educational.`;
     } else if (storyCategory === 'swiss-stories') {
@@ -2718,13 +2707,13 @@ router.post('/generate-ideas-stream', verifySessionToken, trialIdeasLimiter, asy
           if (!started) { log.debug(`  ${slot} streaming started`); started = true; }
         }
       };
-      return callTextModelStreaming(basePrompt, null, onDelta, modelToUse, { signal }).then(async () => {
+      return callTextModelStreaming(basePrompt, null, onDelta, modelToUse, { signal, effort: MODEL_DEFAULTS.trialIdeaEffort }).then(async () => {
         // Throws on a malformed block — an unparseable card is a broken
         // contract, not a passing card. No fallback to shipping it unchecked.
         let parsed = parseIdeaSelfCheck(full);
         if (!parsed.ok) {
           log.warn(`  ${slot} failed its own check (${parsed.failure}) — one rerun`);
-          const rerun = await callTextModelStreaming(buildIdeaRerunPrompt(basePrompt, parsed), null, null, modelToUse, { signal });
+          const rerun = await callTextModelStreaming(buildIdeaRerunPrompt(basePrompt, parsed), null, null, modelToUse, { signal, effort: MODEL_DEFAULTS.trialIdeaEffort });
           // Exactly ONE rerun: whatever comes back is the final answer.
           const reparsed = parseIdeaSelfCheck(String(rerun.text || ''));
           log.info(`  ${slot} rerun ${reparsed.ok ? 'passed' : `still failing (${reparsed.failure})`}`);
@@ -3649,6 +3638,7 @@ module.exports.resolveTrialWindow = resolveTrialWindow;
 module.exports.loadTrialCountersFromDb = loadTrialCountersFromDb;
 module.exports.checkAndIncrementTrialCap = checkAndIncrementTrialCap;
 module.exports.resetTrialRateLimits = resetTrialRateLimits;
+module.exports.inFlightTitlePagePromises = inFlightTitlePagePromises; // test hook: the prepare-title registry create-story hands to the job
 module.exports.triggerAvatarGenerationForUser = triggerAvatarGenerationForUser;
 module.exports.TRIAL_FREE_PAGES = TRIAL_FREE_PAGES;
 module.exports.TRIAL_ART_STYLE = TRIAL_ART_STYLE;

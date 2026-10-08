@@ -60,10 +60,13 @@ describe('theme play sentence', () => {
    * builder — a literal copy at either site is the regression.
    */
   it('both sites build the sentence from the shared table, not a literal', () => {
+    // 2026-10-08: the sentence is built once in buildTrialLifeChallengeContext; both sites call it.
+    const shared = fs.readFileSync(path.join(ROOT, 'server/lib/promptBuilders.js'), 'utf8');
+    expect(shared).toContain("buildThemePlaySentence(storyTheme)");
+    expect(shared).toContain("${themeSentence ? ` ${themeSentence}` : ''}");
     for (const rel of ['server/routes/trial.js', 'server/lib/testlab.js']) {
       const src = fs.readFileSync(path.join(ROOT, rel), 'utf8');
-      expect(src, rel).toContain("buildThemePlaySentence(storyTheme)");
-      expect(src, rel).toContain('${themeSentence ? ` ${themeSentence}` : \'\'}');
+      expect(src, rel).toContain('buildTrialLifeChallengeContext(storyTopic, storyTheme)');
       expect(src, rel).not.toContain('plays at being a ${storyTheme}');
     }
   });

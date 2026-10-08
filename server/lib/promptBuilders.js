@@ -13208,13 +13208,13 @@ function buildTrialIdeaCostumeInstructions(costume) {
   if (costume) {
     return {
       costumeRule: '',
-      themeShows: 'A costume or theme shows in what they wear and how they play',
+      themeShows: 'The theme shapes what they do, what they use and the trouble they meet, not only what they wear',
       fantasyOpening: 'dressing up, or starting to play'
     };
   }
   return {
     costumeRule: ' No character puts on, changes into or wears a costume, disguise or special outfit; a costume may appear as an object in the scene — on display, on a rack, carried — never on a character.',
-    themeShows: 'The theme shows in what they play with and where they play',
+    themeShows: 'The theme shapes what they play with, what they do and the trouble they meet',
     fantasyOpening: 'starting to play'
   };
 }
@@ -13312,6 +13312,22 @@ function nextIdeaAxisPair() {
       text: ideaAxisText(entry.want, fantasyCompanion),
     },
   };
+}
+
+/**
+ * The life-skill category context of the trial idea prompt, one copy for the
+ * /try route and the Lab's variety stage (sibling set trial-idea-prompt-mirror).
+ * The theme arrives as a catalogue ID, which is not English prose: its sentence
+ * is built from the shared table so a place or an occasion does not come out as
+ * a role (server/config/storyThemes.js).
+ */
+function buildTrialLifeChallengeContext(storyTopic, storyTheme) {
+  const { buildThemePlaySentence } = require('../config/storyThemes');
+  const themeSentence = buildThemePlaySentence(storyTheme);
+  const guide = getTeachingGuide('life-challenge', storyTopic);
+  return `This is a life skills story about "${storyTopic}". The idea says what the difficulty costs them.${themeSentence ? ` ${themeSentence}` : ''}${guide ? `
+Background on this topic (its world, not a list to fit in: the idea takes only what its own event and act need, and ends in its own way, never by repeating the guide's \"small thing that goes wrong\" or \"Ending\" lines):
+${String(guide).trim()}` : ''}`;
 }
 
 /**
@@ -13762,6 +13778,7 @@ module.exports = {
   buildAvailableLandmarksSection,
   buildTrialIdeaCostumeInstructions,
   buildTrialIdeaPrompts,
+  buildTrialLifeChallengeContext,
   trialIdeaLandmarksText,
   AGE_OWNS_PROPS_RULE,
   nextIdeaVarietyAxis,

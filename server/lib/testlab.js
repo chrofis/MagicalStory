@@ -9459,12 +9459,12 @@ function groupIdeasByPremise(ideas, opts = {}) {
 async function runTrialIdeaVarietyStage(target, { params = {}, promptOverride = null }) {
   const { loadPromptTemplates } = require('../services/prompts');
   await loadPromptTemplates();
-  const { buildTrialIdeaPrompts, getTeachingGuide } = require('./promptBuilders');
+  const { buildTrialIdeaPrompts } = require('./promptBuilders');
   const { parseIdeaSelfCheck, stripIdeaSelfCheck } = require('./trialIdeaCheck');
   const { buildSeasonInstruction } = require('./season');
   const { getLanguageInstruction } = require('./languages');
   const { callTextModelStreaming } = require('./textModels');
-  const { TEXT_MODELS, priceUsage } = require('../config/models');
+  const { TEXT_MODELS, MODEL_DEFAULTS, priceUsage } = require('../config/models');
 
   const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
 
@@ -9496,10 +9496,7 @@ async function runTrialIdeaVarietyStage(target, { params = {}, promptOverride = 
   // ── route mirror: category context ──
   let categoryContext = '';
   if (storyCategory === 'life-challenge') {
-    const { buildThemePlaySentence } = require('../config/storyThemes');
-    const themeSentence = buildThemePlaySentence(storyTheme);
-    const guide = getTeachingGuide('life-challenge', storyTopic);
-    categoryContext = `This is a life skills story about "${storyTopic}". What stands in the way is a person, a creature or a thing that answers back, and the idea says what it costs them.${themeSentence ? ` ${themeSentence}` : ''}${guide ? `\nGuidance for this topic:\n${String(guide).trim()}` : ''}`;
+    categoryContext = require('./promptBuilders').buildTrialLifeChallengeContext(storyTopic, storyTheme);
   } else if (storyCategory === 'historical') {
     categoryContext = `This is a historical story about "${storyTopic}". Keep it age-appropriate and educational.`;
   } else if (storyCategory === 'swiss-stories') {
@@ -9564,8 +9561,8 @@ async function runTrialIdeaVarietyStage(target, { params = {}, promptOverride = 
     const drawPrompts = buildTrialIdeaPrompts(ideaArgs);
     if (i === 1) { promptLocal = drawPrompts.local; promptFantasy = drawPrompts.fantasy; }
     const [localRes, fantasyRes] = await Promise.all([
-      callTextModelStreaming(drawPrompts.local, null, null, model, { usageLabel: 'testlab_trial_idea_variety' }).catch(err => ({ error: err.message })),
-      callTextModelStreaming(drawPrompts.fantasy, null, null, model, { usageLabel: 'testlab_trial_idea_variety' }).catch(err => ({ error: err.message })),
+      callTextModelStreaming(drawPrompts.local, null, null, model, { usageLabel: 'testlab_trial_idea_variety', effort: MODEL_DEFAULTS.trialIdeaEffort }).catch(err => ({ error: err.message })),
+      callTextModelStreaming(drawPrompts.fantasy, null, null, model, { usageLabel: 'testlab_trial_idea_variety', effort: MODEL_DEFAULTS.trialIdeaEffort }).catch(err => ({ error: err.message })),
     ]);
     for (const r of [localRes, fantasyRes]) if (!r.error) usage.push({ cost: costOf(r), modelId: r.modelId, usage: r.usage });
     // Every card now ends with its own CHECK block (server/lib/trialIdeaCheck.js).

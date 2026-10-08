@@ -6464,6 +6464,22 @@
       "evidence": []
     },
     {
+      "id": "trial-idea-effort-low-chain-2026-10-08",
+      "title": "Trial idea cards: effort low (fast) and one causal chain",
+      "commits": [],
+      "addedAt": "2026-10-08",
+      "claim": "On a live /try the two idea cards arrive in about 4 s instead of 17-39 s (Railway shows no card call over ~10 s), and each card is one chain: the obstacle is what sentence 2 works on, sentence 3 follows from 2, no orphan object, no creature that merely answers back, the theme shapes what the child does and not only what they wear; a card that fails its own check still reruns once at the same effort.",
+      "runShape": [
+        "trial"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Open a /try with a life-skill topic (e.g. reading-alone) and a role theme; time the two cards from the request in the Railway log (generate-ideas-stream start to the second final) and read both card texts for: obstacle -> act -> outcome connected, topic act forced by the obstacle, theme present as more than a label, no orphan object. Log lines \"failed its own check\" show the rerun rate."
+      },
+      "status": "pending",
+      "evidence": []
+    },
+    {
       "id": "trial-book-viewer-first-image-2026-10-08",
       "title": "Trial result page shows the book (BookViewer) once the first image exists",
       "commits": [],

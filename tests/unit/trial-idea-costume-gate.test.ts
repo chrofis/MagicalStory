@@ -50,9 +50,9 @@ describe('buildTrialIdeaCostumeInstructions', () => {
   const withCostume = buildTrialIdeaCostumeInstructions({ costumeType: 'pirate', description: 'x' });
   const without = buildTrialIdeaCostumeInstructions(null);
 
-  it('leaves the costume-available branch at its pre-gate wording', () => {
+  it('costume branch: no costume rule, and the theme is more than a costume label', () => {
     expect(withCostume.costumeRule).toBe('');
-    expect(withCostume.themeShows).toBe('A costume or theme shows in what they wear and how they play');
+    expect(withCostume.themeShows).toBe('The theme shapes what they do, what they use and the trouble they meet, not only what they wear');
     expect(withCostume.fantasyOpening).toBe('dressing up, or starting to play');
   });
 

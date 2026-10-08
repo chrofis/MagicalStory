@@ -110,9 +110,11 @@ describe('the idea templates carry none of the story writer\'s inputs', () => {
   });
 });
 
-describe('the life-skill obstacle claim is one wording on every idea path', () => {
+// The trial idea no longer states it (docs/decisions.md 2026-10-08 "Trial ideas: effort low, one chain"): it made a
+// creature that answers back the obstacle whatever the topic. The trial route and the Lab share ONE builder instead.
+describe('the life-skill obstacle claim stays on the full wizard idea route', () => {
   const CLAIM = 'a person, a creature or a thing that answers back';
-  for (const f of ['server/routes/storyIdeas.js', 'server/routes/trial.js', 'server/lib/testlab.js']) {
+  for (const f of ['server/routes/storyIdeas.js']) {
     it(`${path.basename(f)} states it`, () => {
       expect(read(f)).toContain(CLAIM);
       expect(read(f)).not.toContain('this skill being hard');

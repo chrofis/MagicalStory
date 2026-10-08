@@ -616,6 +616,10 @@ const MODEL_DEFAULTS = {
   // 3 staging trials at the default spent 27-40k output tokens (~5-6k of it story text)
   // and 199-285 s in the writer vs the 123 s trial baseline. Staging A/B in progress.
   trialStoryEffort: 'medium',
+  // Trial IDEA cards (two parallel Sonnet 5.5 calls of ~300 output tokens; the visitor waits on them).
+  // At the default `high` the model thinks 2-3.5k tokens first: 17-29 s on the real prompt, against
+  // 3.2-3.4 s at `low` (first visible token ~1 s). docs/decisions.md 2026-10-08 "Trial ideas: effort low".
+  trialIdeaEffort: 'low',
   // Art Director (scene expansion). gemini-3.1-pro since 2026-08-29: 3-story x
   // 4-model hazard bake-off on frozen beats (Lab 893-944, v3 judge): gemini
   // 49 raw / 32 reviewed hazards vs sonnet 91/65, sol 80/65, opus 40/51 —
