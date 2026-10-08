@@ -35,6 +35,6 @@ Walk the pages in order and for every page answer the questions below:
 15. COUNT: {PICTURE_COUNT}. Name each page whose text gives a number for a group, or says all, both or every one of them, while that page's plan line leaves out of frame someone it counts.
 {HINT_QUESTION}
 
-Also name every page whose text and picture tell different moments, tagged MISMATCH.
+Also name every page whose text and picture tell different moments, tagged MISMATCH. A page whose text has a figure doing something that shows, while that page's plan line leaves the figure out of frame, is a MISMATCH too, and so is a page that was given a passage naming a figure its picture lacks.
 
 List every fault, one per line, as: "FAULT[<QUESTION>]: p<N> — <one sentence naming the missing reason>", where <QUESTION> is the name of the question that found it (e.g. FAULT[ASSUMED]:). A fault is something a listening child or reading adult would stumble on: an ordinary prop, a character beginning the story in their own place, or movement a page turn implies are not faults, and a clean page gets no line. State each fault once — never argue with, repeat or withdraw a line; a finding you doubt is omitted. After the list write one line: "FAULTS: <count>".
