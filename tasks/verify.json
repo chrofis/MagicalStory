@@ -8383,7 +8383,7 @@
         "kind": "human",
         "what": "For each MISMATCH finding in the audit, read the page text against the plan line who column and the ledger line."
       },
-      "status": "failed",
+      "status": "superseded",
       "evidence": [
         {
           "storyId": "job_1791531449494_o0kaatvmq",
@@ -8404,6 +8404,11 @@
         "checkedAt": "2026-10-09 10:37:51 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: For each MISMATCH finding in the audit, read the page text against the plan line who column and the ledger line."
+      },
+      "triage": {
+        "date": "2026-10-09",
+        "status": "superseded",
+        "note": "Dropped: the absent-figure rule replayed once pushed p1 to 44.9% edited words against the 30% cap, so no net gain was shown; prompts reverted. See docs/decisions.md \"Book audit is told what each figure wears; refine absent-figure rule and stricter element-cell gate measured and DROPPED\"."
       }
     },
     {
@@ -8678,6 +8683,60 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "trial-costume-page1-2026-10-09",
+      "title": "Trial costume starts where the story puts it on; English scene hints",
+      "commits": [
+        "7bdb0f502"
+      ],
+      "addedAt": "2026-10-09",
+      "status": "pending",
+      "evidence": [],
+      "claim": "On a costumed trial whose story opens in role, page 1 is costumed; when it opens in everyday clothes, the first costumed page's text shows the change of clothes; scene hints carry no story-language noun except a landmark name.",
+      "runShape": [
+        "trial"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "sceneImages[0].sceneMetadata.fullData.characters[main].clothing against page 1 text; the first costumed page text shows putting the costume on; Setting and hint text of every page carry no non-English noun besides a landmark name."
+      }
+    },
+    {
+      "id": "replan-reissue-lost-prose-2026-10-09",
+      "title": "Re-plan re-asks a page that lost accepted prose",
+      "commits": [
+        "7fcafc1b6"
+      ],
+      "addedAt": "2026-10-09",
+      "status": "pending",
+      "evidence": [],
+      "claim": "When a re-plan round loses accepted prose to a refused change on the same page, the planner is re-asked once for that page and a returned page passes the same review and guards.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "runMetrics beats_replan_reissue >= 1 on a run with a refused change; beats_replan_reissue_failed not above half of it; the round record carries reissuedPages; no kept round raises the must-fix count."
+      }
+    },
+    {
+      "id": "avatar-hard-fail-extra-attempt-2026-10-09",
+      "title": "Styled sheet hard-fail gets one fed-back extra attempt",
+      "commits": [
+        "7bdb0f502"
+      ],
+      "addedAt": "2026-10-09",
+      "status": "pending",
+      "evidence": [],
+      "claim": "A styled 2x4 sheet with an axis at or below 3/10 after the ordinary attempts gets exactly one extra attempt whose prompt names the failed axis with the judge reason; shipping it still below the bar logs an ERROR and counts avatar_sheet_shipped_hard_fail.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "styledAvatarGeneration[].passes.pass2.attempts: an extraAttempt carries fedBack lines when an axis was <=3; avatar_sheet_shipped_hard_fail stays near or below the measured 2.5% of sheets."
+      }
     }
   ],
   "runs": [
