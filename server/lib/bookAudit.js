@@ -237,11 +237,36 @@ function auditPageBrief(scene, storyData = null) {
       extraNames: scene.outlineCharacters || [],
       storyData,
     });
-    return { cast: roster.names, sceneIntent };
+    return { cast: roster.names, sceneIntent, outfits: auditPageOutfits(scene, roster.names, storyData) };
   } catch (err) {
     log.error(`❌ [BOOK-AUDIT] p${scene.pageNumber}: cast roster failed (${err.message}) — the reader gets no cast for this page`);
     return { cast: null, sceneIntent };
   }
+}
+
+/**
+ * WHAT EACH DRAWN FIGURE WEARS (2026-10-09, job_1791531449494_o0kaatvmq p3).
+ * The reader was given the cast as bare names, so for "who wears what" it
+ * matched figures across pages by eye: it charged Julian (yellow puffer) with
+ * "a blue hoodie on the cover pages", the hoodie being Max's. The outfit is the
+ * story's stored one (clothingRequirements + the page's rendered category, the
+ * same resolver the repairs use), so the reader checks a figure against its
+ * listed garments and never against another figure's. A figure with no stored
+ * outfit is simply left out of the list: no outfit, no clothing claim.
+ *
+ * @returns {Object<string,string>} name -> garment description
+ */
+function auditPageOutfits(scene, names, storyData) {
+  const out = {};
+  if (!storyData?.clothingRequirements) return out;
+  const { resolveRenderedClothingCategory, resolveCharacterReqs } = require('./clothingCategories');
+  for (const name of names || []) {
+    const category = resolveRenderedClothingCategory(storyData, scene.pageNumber, name, scene);
+    const reqs = category ? resolveCharacterReqs(storyData.clothingRequirements, name) : null;
+    const description = String(reqs?.[category]?.description || '').trim();
+    if (description) out[name] = description.replace(/[.\s]+$/, '');
+  }
+  return out;
 }
 
 /** The BRIEF line the reader gets between a page's text and its picture. */
@@ -250,6 +275,8 @@ function briefLine(heading, brief) {
   const parts = [];
   if (brief.sceneIntent) parts.push(`the moment drawn: ${brief.sceneIntent.replace(/[.\s]+$/, '')}`);
   if (brief.cast !== null) parts.push(`drawn with: ${brief.cast.length ? brief.cast.join(', ') : 'nobody — no character is in this picture by design'}`);
+  const worn = Object.entries(brief.outfits || {}).map(([n, d]) => `${n}: ${d}`);
+  if (worn.length) parts.push(`what each wears: ${worn.join('; ')}`);
   return `${heading} BRIEF — ${parts.join('. ')}`;
 }
 
