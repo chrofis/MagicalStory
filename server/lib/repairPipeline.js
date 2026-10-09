@@ -2035,6 +2035,31 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     objectScale: audit.objectScale || null,
       });
 
+  // The versions the most recent audit read (page -> version object). The
+  // baseline "what ships" is compared against, both right after an audit and
+  // again after Steps 4/5.
+  let lastAuditRead = null;
+
+  // Re-read the shipping book when it differs from the last read (repairLogic.
+  // rereadShippedIfMoved). The record is measurement only and carries
+  // `shippedReread`; being the last round with an objectScale it is the one
+  // finalChecksReport surfaces. On failure the audit record that DID run says
+  // so (`shippedPickUnread`) and the log is an ERROR -- never a silent
+  // description of a book that does not ship.
+  const rereadShippingBook = async ({ round, record, why, shippingByPage = pickedVersionsByPage() }) => {
+    const { rereadShippedIfMoved } = require('./repairLogic');
+    const out = await rereadShippedIfMoved({ readByPage: lastAuditRead, shippingByPage, readBook });
+    if (!out) return;
+    log.warn(`📖 [BOOK-AUDIT] ${why} on page(s) ${out.moved.join(', ')} — reading the shipping book once more`);
+    if (out.reread) {
+      bookAuditRounds.push({ ...auditRecord(out.reread, round), shippedReread: true, movedPages: out.moved });
+      lastAuditRead = shippingByPage;
+    } else {
+      log.error(`❌ [BOOK-AUDIT] Re-read of the shipping book failed — the stored audit describes version(s) that do not ship on page(s) ${out.moved.join(', ')}`);
+      if (record) record.shippedPickUnread = out.moved;
+    }
+  };
+
   const runBookAuditRound = async ({ round, bookUnchanged, finalRound }) => {
     const { planBookAuditRound, admitPagesFromAudit, attributeReaderFindings } = require('./repairLogic');
     const auditPlan = planBookAuditRound({ round, roundLimit, bookUnchanged, extraRoundUsed: extraAuditRoundUsed, finalRound, maxPasses: maxRegenAttempts });
@@ -2099,19 +2124,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           // is left to feed, and charging it could flip the pick again); its
           // record carries `shippedReread` and, being the last round with an
           // objectScale, is the one finalChecksReport surfaces.
+          lastAuditRead = auditedVersionByPage;
           if (record.finalRound && !record.extraRoundGranted) {
-            const shippingByPage = pickedVersionsByPage();
-            const moved = require('./repairLogic').pagesWherePickMoved(auditedVersionByPage, shippingByPage);
-            if (moved.length > 0) {
-              log.warn(`📖 [BOOK-AUDIT] The audit's own findings moved the shipped pick on page(s) ${moved.join(', ')} — reading the shipping book once more`);
-              const reread = await readBook(shippingByPage);
-              if (reread) {
-                bookAuditRounds.push({ ...auditRecord(reread, round), shippedReread: true, movedPages: moved });
-              } else {
-                log.error(`❌ [BOOK-AUDIT] Re-read of the shipping book failed — the stored audit describes version(s) that do not ship on page(s) ${moved.join(', ')}`);
-                record.shippedPickUnread = moved;
-              }
-            }
+            await rereadShippingBook({ round, record, why: "The audit's own findings moved the shipped pick" });
           }
         }
       } catch (auditErr) {
@@ -3763,6 +3778,28 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   } catch (styleErr) {
     log.warn(`⚠️ [UNIFIED PIPELINE] Step 5: style consistency check failed: ${styleErr.message}`);
     styleConsistency = null;
+  }
+
+  // THE FINAL REPORT DESCRIBES WHAT SHIPS (2026-10-09). Step 4 (calm-zone
+  // recovery) and Step 5 (style repair) run AFTER the last audit and can swap
+  // or repaint a page; any page whose shipped version is no longer the one the
+  // last audit read is read again (measurement only, same mechanism as the
+  // in-audit re-read). Without a prior audit there is nothing to be stale.
+  try {
+    if (lastAuditRead) {
+      const shippingByPage = new Map();
+      for (const img of rawImages) {
+        const v = finalBestPerPage.get(img.pageNumber);
+        if (v?.imageData) shippingByPage.set(img.pageNumber, v);
+      }
+      const lastRec = bookAuditRounds[bookAuditRounds.length - 1] || null;
+      await rereadShippingBook({
+        round: lastRec?.round ?? roundLimit, record: lastRec, shippingByPage,
+        why: 'Calm-zone recovery / style repair changed the shipped version after the last audit',
+      });
+    }
+  } catch (rereadErr) {
+    log.error(`❌ [BOOK-AUDIT] Post-repair re-read of the shipping book failed: ${rereadErr.message} — the stored audit may describe version(s) that do not ship`);
   }
 
   await updateProgress(96, 'Finalizing repair results...');
