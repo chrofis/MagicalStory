@@ -12,10 +12,15 @@ describe('ideasOfferedDetail', () => {
       { armIndex: 1, text: 'Zweite Idee\nText', ideaKind: 'fantasy' },
     ], { rerun: true, city: ' Baden ' });
     expect(d.ideas).toHaveLength(2);
-    expect(d.ideas[0]).toMatchObject({ armIndex: 0, title: 'Der Hafen', text: '**Der Hafen**\nMia sucht das Schiff.', ideaKind: 'location', selfCheck: { ok: true } });
+    expect(d.ideas[0]).toMatchObject({ armIndex: 0, title: null, text: '**Der Hafen**\nMia sucht das Schiff.', ideaKind: 'location', selfCheck: { ok: true } });
     expect(d.ideas[1].selfCheck).toBeUndefined();
     expect(d.rerun).toBe(true);
     expect(d.city).toBe('Baden');
+  });
+  it('never takes the first line of the text for a title (regression: title held the first 200 characters)', () => {
+    const d = ideasOfferedDetail([{ armIndex: 0, text: 'Mia wants the ship. A storm stops her.' }, { armIndex: 1, text: 'x', title: ' Real ' }]);
+    expect(d.ideas[0].title).toBeNull();
+    expect(d.ideas[1].title).toBe('Real');
   });
   it('is bounded: two ideas, 4000 characters each', () => {
     const d = ideasOfferedDetail([{ armIndex: 0, text: 'x'.repeat(9000) }, { armIndex: 1, text: 'b' }, { armIndex: 2, text: 'c' }]);

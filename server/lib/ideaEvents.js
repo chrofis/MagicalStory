@@ -125,19 +125,15 @@ function _allowed() {
  * 2026-10-09). ONE shape for the trial stream and the wizard's two idea routes (sibling set idea-offered-record).
  * `ideas` carry the text exactly as sent to the client. Bounded: at most two ideas of at most 4000 characters, the city only.
  *
- * @param {Array<{armIndex:number, text:string, ideaKind?:string|null, selfCheck?:object|null}>} ideas
+ * @param {Array<{armIndex:number, text:string, title?:string|null, ideaKind?:string|null, selfCheck?:object|null}>} ideas
  * @param {{rerun?:boolean, city?:string|null, extra?:object}} [opts]
  */
 function ideasOfferedDetail(ideas, { rerun = false, city = null, extra = {} } = {}) {
-  const titleOf = (text) => {
-    const first = String(text || '').split(/\r?\n/).find(l => l.trim()) || '';
-    return first.replace(/^[#*\s]+/, '').replace(/[*]+$/, '').trim().slice(0, 200);
-  };
   return {
     ...extra,
     ideas: (Array.isArray(ideas) ? ideas : []).slice(0, 2).map(i => ({
       armIndex: _int(i.armIndex),
-      title: titleOf(i.text),
+      title: _trim(i.title, 200),   // an idea card has no title (three plain sentences): null unless a caller passes the card's own
       text: String(i.text || '').slice(0, 4000),
       ideaKind: _trim(i.ideaKind, 40),
       ...(i.selfCheck ? { selfCheck: i.selfCheck } : {}),
