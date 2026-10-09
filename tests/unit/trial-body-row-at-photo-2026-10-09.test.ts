@@ -105,13 +105,13 @@ describe('2. who the row is drawn for, and when it is redrawn', () => {
     expect(r('adult')).toBe(18);
     expect(r('not-a-category')).toBeNull();
   });
-  it('the stamp is the age BAND, the phantom tier and the gender: another year in the same band is the same sheet, another band/tier/gender is not', () => {
+  it('the stamp is the gender only: a trial keeps the drawn body row across any age band or tier (owner 2026-10-09), a gender change redraws', () => {
     const stamp = trialSheets.standardSheetStamp;
-    expect(stamp({ age: '7', gender: 'male' })).toBe(stamp({ age: '8', gender: 'male' }));      // same band (7-8) and tier
-    expect(stamp({ age: '8', gender: 'male' })).not.toBe(stamp({ age: '9', gender: 'male' }));  // next band
+    expect(stamp({ age: '7', gender: 'male' })).toBe(stamp({ age: '8', gender: 'male' }));
+    expect(stamp({ age: '8', gender: 'male' })).toBe(stamp({ age: '9', gender: 'male' }));      // next band: kept
+    expect(stamp({ age: '11', gender: 'male' })).toBe(stamp({ age: '12', gender: 'male' }));    // across the child/teen phantom: kept
+    expect(stamp({ age: '1', gender: 'male' })).toBe(stamp({ age: '16', gender: 'male' }));
     expect(stamp({ age: '8', gender: 'male' })).not.toBe(stamp({ age: '8', gender: 'female' }));
-    expect(stamp({ age: '11', gender: 'male' })).not.toBe(stamp({ age: '12', gender: 'male' })); // preteen straddles the child/teen phantom
-    expect(stamp({ age: '', gender: 'male' })).toBe('|male');
   });
 
   it('prepare-standard-body draws from the photo estimate while the form is empty, answers with the FIRST cell only, and starts no sheet', async () => {
@@ -176,13 +176,19 @@ describe('2. who the row is drawn for, and when it is redrawn', () => {
     expect(warn.mock.calls.some(c => /drawn for/.test(String(c[0])))).toBe(false);
   });
 
-  it('a different band or gender declared: the row is redrawn by the sheet, loudly, and only the row (never the whole sheet twice)', async () => {
-    const other = await runBothPhases({ age: '9', gender: 'female' });
-    expect(other.style.mock.calls[0][0].styleOptions.precomputedBodies).toEqual({});
-    expect(other.warn.mock.calls.some(c => /drawn for ".*" but the visitor declared ".*" — the sheet draws its own body row/.test(String(c[0])))).toBe(true);
-    trialRouter.standardBodyRows.clear();
+  it('a different age band or tier declared: the drawn row is KEPT and the stamp on the row matches it, so the job seeds the sheet', async () => {
+    const other = await runBothPhases({ age: '9', gender: 'female' }); // estimate is band 5-6, the declaration band 9-10
+    expect(Object.keys(other.style.mock.calls[0][0].styleOptions.precomputedBodies)).toEqual(['Mia:standard']);
+    expect(other.warn.mock.calls.some(c => /drawn for/.test(String(c[0])))).toBe(false);
+    const stamp = other.style.mock.calls[0][0].fields.preGeneratedStandardFor;
+    const kept = trialSheets.usablePreparedAvatars({ name: 'Mia', age: '9', gender: 'female', preGeneratedStandardFor: stamp, preGeneratedStyledAvatars: { Mia: { standard: 's' } } });
+    expect(kept).toEqual({ Mia: { standard: 's' } });
+  });
+
+  it('a gender change declared: only the row is redrawn by the sheet, loudly (never the whole sheet twice)', async () => {
     const otherGender = await runBothPhases({ age: '5', gender: 'male' });
     expect(otherGender.style.mock.calls[0][0].styleOptions.precomputedBodies).toEqual({});
+    expect(otherGender.warn.mock.calls.some(c => String(c[0]).includes('(a gender change) — the sheet draws its own body row'))).toBe(true);
   });
 });
 

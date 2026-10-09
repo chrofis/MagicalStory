@@ -1234,12 +1234,15 @@ router.patch('/update-character-details', verifySessionToken, async (req, res) =
         if (clamp?.clamped) log.info(`[AGE CLAMP] trial ${characterId}: ${clamp.reason}`);
       }
       c.gender = gender || '';
-      // Measurement for the body-row-at-the-photo decision: how often the photo's estimate and the declared values land in
-      // another band/tier/gender (that is when the body row is redrawn). docs/decisions.md 2026-10-09.
+      // Measurement: how often the declared age lands in another band than the photo's estimate. The drawn body row is
+      // kept anyway (docs/decisions.md 2026-10-09 "Trial keeps the drawn body row"); only a gender change redraws it.
       if (c.photoEstimate) {
         const estAge = representativeTrialAge(c.photoEstimate.apparentAge);
-        const sameSheet = estAge != null && trialSheets.standardSheetStamp({ age: estAge, gender: c.photoEstimate.gender || c.gender }) === trialSheets.standardSheetStamp({ age: patchedAge ?? c.age, gender: gender || '' });
-        log.info(`[TRIAL AVATARS] photo estimate (${c.photoEstimate.apparentAge || '-'}, ${c.photoEstimate.gender || '-'}) vs declared (${patchedAge ?? c.age}, ${gender || '-'}): ${sameSheet ? 'same band/tier/gender, the body row is reused' : 'DIFFERENT, the body row is redrawn'}`);
+        const { getAgeCategory } = require('../lib/promptBuilders');
+        const declaredAge = patchedAge ?? c.age;
+        const bandDiffers = estAge != null && getAgeCategory(estAge) !== getAgeCategory(parseInt(declaredAge, 10));
+        const genderDiffers = !!(c.photoEstimate.gender && gender && c.photoEstimate.gender !== gender);
+        log.info(`[TRIAL AVATARS] photo estimate (${c.photoEstimate.apparentAge || '-'}, ${c.photoEstimate.gender || '-'}) vs declared (${declaredAge}, ${gender || '-'}): age band ${bandDiffers ? 'DIFFERENT, the drawn body row is kept' : 'same'}, gender ${genderDiffers ? 'DIFFERENT, the body row is redrawn' : 'same, the body row is reused'}`);
       }
       c.traits = structuredTraits;
       if (customTraits != null) c.customTraits = customTraits;
@@ -2680,7 +2683,7 @@ async function trialAvatarAccountProblem(userId) {
 }
 
 // The standard sheet's FULL-BODY row, drawn at the photo (prepare-standard-body) and reused by the sheet (prepare-standard-avatar)
-// when the age band, tier and gender it was drawn for still hold. userId -> { stamp, promise -> { row, review, attemptHistory } }.
+// when the gender it was drawn for still holds. userId -> { stamp, promise -> { row, review, attemptHistory } }.
 // In memory on purpose: a row is a large image, and a lost one only means the sheet draws its own body row (logged).
 const standardBodyRows = new Map();
 const STANDARD_BODY_ROW_TTL_MS = 30 * 60 * 1000;
@@ -2708,8 +2711,8 @@ function bodyRowIdentity(mainChar) {
  * Draws the standard sheet's FULL-BODY row (the body stage of the 2x4, its own render before the head row) the moment the
  * photo is analysed, from the photo's age/gender estimates when the form is still empty, and answers with the row's FIRST
  * cell (front view) as the hero picture. The row's other cells feed the waiting-page slides. The row itself never leaves the
- * server: only cut cells are sent (clientAvatarImages). prepare-standard-avatar reuses the row when the declared age band,
- * tier and gender match what it was drawn for, and draws its own otherwise. One call per account.
+ * server: only cut cells are sent (clientAvatarImages). prepare-standard-avatar reuses the row unless the declared gender changed (an age band or tier difference keeps it),
+ * and then draws its own. One call per account.
  * docs/decisions.md 2026-10-09 "Trial: the body row starts at the photo".
  */
 router.post('/prepare-standard-body', verifySessionToken, async (req, res) => {
@@ -2775,11 +2778,11 @@ router.post('/prepare-standard-body', verifySessionToken, async (req, res) => {
  * character row, and answers with the sheet's whole front body cell, which the wizard shows as the hero's picture.
  * prepare-title (costumed sheet) and the story job reuse the sheet; the job awaits this call when it is still in flight
  * (create-story hands the promise over), so the standard sheet is styled once per trial. The sheet's body row is the one
- * prepare-standard-body drew at the photo when its band/tier/gender stamp equals the declared one; otherwise the body row is
- * drawn again, loudly. docs/decisions.md 2026-10-09.
+ * prepare-standard-body drew at the photo whenever the gender is the declared one (an age band or tier difference keeps it); after a
+ * gender change the body row is drawn again, loudly. docs/decisions.md 2026-10-09.
  *
  * One sheet per account: a repeat call after the sheet exists returns it without styling again. A sheet
- * whose band/tier/gender no longer match the row is not re-styled here; the job notices (usablePreparedAvatars)
+ * whose gender no longer matches the row is not re-styled here; the job notices (usablePreparedAvatars)
  * and styles it itself, loudly, so this endpoint cannot be driven to style sheets without bound.
  * Protected by: session token + the avatar limiter + the daily avatar cap.
  */
@@ -2819,7 +2822,7 @@ router.post('/prepare-standard-avatar', verifySessionToken, async (req, res) => 
 
     const stamp = trialSheets.standardSheetStamp(mainChar);
     // The body row drawn at the photo is part of this sheet (its cap use was counted there). Reused only when it was drawn for the
-    // band, tier and gender the visitor declared; otherwise the sheet draws its own and says so.
+    // gender the visitor declared; otherwise the sheet draws its own and says so.
     const preBody = standardBodyRows.get(userId);
     standardBodyRows.delete(userId);
     const precomputedBodies = {};
@@ -2830,7 +2833,7 @@ router.post('/prepare-standard-avatar', verifySessionToken, async (req, res) => 
           precomputedBodies[`${character.name}:standard`] = { row: drawn.row, review: drawn.review, attemptHistory: drawn.attemptHistory };
           log.info(`[TRIAL AVATARS] prepare-standard-avatar for user ${userId}: reusing the body row drawn at the photo (stamp ${stamp})`);
         } else {
-          log.warn(`⚠️ [TRIAL AVATARS] prepare-standard-avatar for user ${userId}: the body row was drawn for "${preBody.stamp}" but the visitor declared "${stamp}" — the sheet draws its own body row (one extra body-row call)`);
+          log.warn(`⚠️ [TRIAL AVATARS] prepare-standard-avatar for user ${userId}: the body row was drawn for "${preBody.stamp}" but the visitor declared "${stamp}" (a gender change) — the sheet draws its own body row (one extra body-row call)`);
         }
       } catch {
         log.warn(`[TRIAL AVATARS] prepare-standard-avatar for user ${userId}: the body row from the photo failed — the sheet draws its own`);

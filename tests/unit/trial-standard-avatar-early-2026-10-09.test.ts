@@ -99,7 +99,7 @@ describe('1. the standard sheet starts at the form', () => {
     const args = style.mock.calls[0][0];
     expect(args.requirements).toEqual([{ pageNumber: 'pre-cover', clothingCategory: 'standard', characterNames: ['Kid'] }]);
     expect(args.fields).toEqual({ preGeneratedStandardFor: STAMP });
-    expect(STAMP).toBe('young-school-age/child|male'); // the age BAND, the phantom tier and the gender, not the year
+    expect(STAMP).toBe('gender:male'); // gender only: an age band or tier difference keeps the sheet
     expect(args.styleOptions.skipQualityEval).toBe(true); // the job's own options for this sheet
     expect(JSON.stringify(args)).not.toMatch(/costumed:/);
     expect(res.body).toEqual({ avatarImage: cell('FRONT') });
@@ -223,16 +223,19 @@ describe('2. prepare-title and the job reuse it', () => {
       expect(gen).not.toHaveBeenCalled();
     });
 
-    it('a standard sheet drawn for another age/gender than the row now holds is NOT reused (loud), a matching one is', () => {
+    it('a standard sheet drawn for another GENDER than the row now holds is NOT reused (loud); another age band is kept, a matching one is', () => {
       const err = vi.spyOn(log, 'error').mockImplementation(() => {});
       const base = { name: 'Kid', age: '10', gender: 'male', preGeneratedStyledAvatars: { Kid: { standard: 's', costumed: { default: 'c' } } } };
-      const toddlerStamp = trialSheets.standardSheetStamp({ age: '1', gender: 'male' });
+      const girlStamp = trialSheets.standardSheetStamp({ age: '10', gender: 'female' });
       const nowStamp = trialSheets.standardSheetStamp({ age: '10', gender: 'male' });
-      const stale = trialSheets.usablePreparedAvatars({ ...base, preGeneratedStandardFor: toddlerStamp });
+      const stale = trialSheets.usablePreparedAvatars({ ...base, preGeneratedStandardFor: girlStamp });
       expect(stale).toEqual({ Kid: { costumed: { default: 'c' } } });
-      expect(err.mock.calls.some(c => String(c[0]).includes(`drawn for "${toddlerStamp}" but the row now says "${nowStamp}"`))).toBe(true);
+      expect(err.mock.calls.some(c => String(c[0]).includes(`drawn for "${girlStamp}" but the row now says "${nowStamp}"`))).toBe(true);
       const current = trialSheets.usablePreparedAvatars({ ...base, preGeneratedStandardFor: nowStamp });
       expect(current).toEqual({ Kid: { standard: 's', costumed: { default: 'c' } } });
+      // drawn at toddler proportions, row now says 10: kept (owner 2026-10-09)
+      const toddler = trialSheets.usablePreparedAvatars({ ...base, preGeneratedStandardFor: trialSheets.standardSheetStamp({ age: '1', gender: 'male' }) });
+      expect(toddler).toEqual({ Kid: { standard: 's', costumed: { default: 'c' } } });
       expect(trialSheets.usablePreparedAvatars({ name: 'Kid' })).toBeNull();
     });
 

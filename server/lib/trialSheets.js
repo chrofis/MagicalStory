@@ -25,18 +25,15 @@ const { writeCutSlides } = require('./clientAvatarImages');
 const TRIAL_ART_STYLE = 'watercolor';
 
 /**
- * What the standard sheet (and the body row drawn ahead of it) was drawn FOR: the age BAND, the phantom tier and the
- * gender. The body row is drawn at the photo from the photo's own estimates, before the visitor has typed anything, so the
- * stamp must be the thing the drawing depends on, not the exact year: the age line states one year but the proportions
- * come from the band's markers (getAgeMarkers) and the tier's phantom. A sheet whose stamp differs from the declared
- * band/tier/gender is stale and must not be reused (docs/decisions.md 2026-10-09).
+ * What the standard sheet (and the body row drawn ahead of it) was drawn FOR: the gender, and nothing else. The body row is
+ * drawn at the photo from the photo's own estimates before the visitor has typed anything; the owner's rule (2026-10-09:
+ * "don't throw the images for trials, just keep them") is that a trial keeps what was drawn when the declared age lands in
+ * another band or phantom tier, so the age is NOT part of the stamp. A gender change redraws: the figure, hair and clothes
+ * are cut differently. A sheet whose stamp differs from the declared gender is stale and is not reused
+ * (docs/decisions.md 2026-10-09 "Trial keeps the drawn body row"; it replaces the band/tier clause of the body-row entry).
  */
 function standardSheetStamp(character) {
-  const { getAgeCategory } = require('./promptBuilders');
-  const { phantomTierForAge } = require('./character2x4Sheet');
-  const age = parseInt(character?.age, 10);
-  if (!Number.isFinite(age)) return `|${character?.gender || ''}`;
-  return `${getAgeCategory(age)}/${phantomTierForAge(age)}|${character?.gender || ''}`;
+  return `gender:${character?.gender || ''}`;
 }
 
 /**
