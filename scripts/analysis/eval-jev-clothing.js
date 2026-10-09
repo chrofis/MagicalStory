@@ -24,6 +24,10 @@ const VARIANTS = {
   F: noul(c => ({ type: 'noul', instructions: `The text does not mention any clothing of ${c.name}.` }), true),
   G: noul(c => ({ type: 'noul', instructions: `A reader of the text alone could draw what ${c.name} wears.` })),
   H: noul(c => ({ type: 'noul', instructions: `The text says ${c.name} is in a costume or a named outfit.` })),
+  // E3: the same choice without relying on the name (briefs often describe a character without naming them)
+  E3: { q: c => ({ type: 'choice', instructions: 'What the text says about the clothing of the people in it.', criteria: { s0: `somebody wears this outfit: ${c.outfit}`, s1: 'the people wear other clothing than that outfit', s2: 'the text gives no clothing for anybody' } }), read: a => a.probabilities.s0 },
+  // E4: E with a note that the text may not use the name
+  E4: { q: c => ({ type: 'choice', instructions: `What the text says ${c.name} wears. The text may describe ${c.name} without using the name.`, criteria: { s0: `the clothing of this outfit: ${c.outfit}`, s1: 'clothing that differs from that outfit', s2: 'nothing, the text does not say' } }), read: a => a.probabilities.s0 },
   // E2: as E, with a separate option for a costume named but not described garment by garment
   E2: { q: c => ({ type: 'choice', instructions: `What the text says ${c.name} wears.`, criteria: { s0: `the clothing of this outfit: ${c.outfit}`, s1: 'a costume or outfit by name, without listing its garments', s2: 'clothing that differs from that outfit', s3: 'nothing, the text does not say' } }), read: a => a.probabilities.s0 + a.probabilities.s1 },
   // E: a choice over what the text says the character wears
