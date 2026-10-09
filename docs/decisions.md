@@ -67822,3 +67822,11 @@ Touched files: server/lib/vbIdGuard.js, server/lib/promptBuilders.js, server/lib
 **Rationale:** the landmark photo identifies which place; the name carries no visual information and is lettered onto the page. Owner rule: no change without proof, so only the measured path changes.
 **Revisit if:** a full story paints a place name, or trials still paint place names after this change.
 **Touched files:** server/lib/sceneMetadata.js, tests/unit/trial-review-fixes-2026-10-09.test.ts.
+
+## 2026-10-09 — Cover title judged "unrequested" once: judge noise, no change
+
+**Context:** on job_1791551239260_a0dpn715x (build a2c40ec5) the front-cover quality judge filed a CATASTROPHIC rendered_text for the baked title "Das Ei unter der Linde" (eval_calls id 1298), which cost one needless iterate round; the shipped cover was the original with its title.
+**Decision:** no change. The judge received the title in TEXT RULES as permitted lettering (prompt identical in shape to the morning run that scored 100), the inventory listed it as declared, and the code lettering check filed nothing; the judge contradicted its own summary ("the required text is present"). 1 of 16 stored cover judge calls since 2026-10-02 has a rendered_text finding; three replays of the real evaluateImageQuality on the stored cover gave 100 / 100 / 80 with none. No commit between c5f4a2d0 and a2c40ec5 touches the TEXT RULES path.
+**Rationale:** a single judge-noise instance is below the evidence bar for a prompt change or a code guard overriding the judge (CLAUDE.md eval-logic rule). Pick-best kept the correct cover.
+**Revisit if:** a second and third occurrence appear; then the options are a structural guard (drop a rendered_text whose quoted string is a declared string) or a D-23 prompt change, with owner sign-off.
+**Touched files:** none.
