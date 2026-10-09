@@ -2076,73 +2076,49 @@ function groupPagesByVantage(pageDataArray, visualBible) {
 }
 
 /**
- * Group the TRIAL empty-scene plate pages by vantage.
+ * The TRIAL empty-scene plates: ONE plate per `visualBible.backgrounds[]` entry.
  *
  * Trial renders its backdrop plates during outline streaming, from
- * `visualBible.backgrounds[]` prose — long before any page has scene metadata,
- * so `groupPagesByVantage` cannot be called on a `pageDataArray` that does not
- * exist yet. The grouping fact it needs, though, IS already in the bible:
- * `locations[].pages[]` says which pages stand in which LOC, and that is the
- * same LOC the page's own `setting.location` will name later (the trial prompt
- * tells the model to reference the bible LOC id). So we synthesize the minimal
- * page shape `groupPagesByVantage` reads — `objects: ["Name [LOC001]"]`, the
- * exact string form `extractSceneMetadata` emits — and reuse the real grouper.
- * No parallel grouping logic.
+ * `visualBible.backgrounds[]` — long before any page has scene metadata. The
+ * writer declares those entries (story-trial.txt: exactly 3 on a 6-page story,
+ * each a different place or a different part / angle of one place), so the
+ * entry IS the plate. It used to be grouped by LOCATION (one plate per LOC, the
+ * 2026-09-13 cost cut), which collapsed every story set at one landmark to a
+ * single backdrop: 18 of 43 stored staging trials, all pages on one picture
+ * (docs/decisions.md 2026-10-09 "Trial backgrounds").
  *
- * Trial bibles carry no `vantages[]` (deliberately — `LOC001.N` means
- * photo-variant in trial, vantage in full mode), so every group here is a
- * synthesized `LOC###.1`: one plate per distinct location.
+ * A page named by two entries belongs to the FIRST. An entry whose pages were
+ * all claimed earlier is dropped (nothing would render on it). `landmarkPhoto`
+ * is the entry's own photo citation (undefined → the location's).
  *
- * A page with no LOC lands in `__unassigned__` and is returned as its OWN
- * single-page group — it still gets a plate, it just cannot share one.
- *
- * DESCRIPTION when a group spans two different `backgrounds[]` entries: the
- * FIRST page's prose wins. Same rule the full-mode vantage path uses for its
- * representative page (`group.pageNumbers[0]` supplies framing, aspect, model
- * and landmark refs) — one plate, one description, chosen deterministically.
+ * `vantageId` is `LOC00N.k`: the location the group's first page stands in, k =
+ * the order of the plates within that location. Trial bibles carry no
+ * `vantages[]`, so this is a label for the page record and the cover-plate
+ * lookup, not a key into one. A page in no location has `vantageId: null`.
  *
  * @param {Object} visualBible - needs `backgrounds[]`; uses `locations[]` when present
- * @returns {Array<{vantageId: string|null, pages: number[], description: string}>}
- *   ordered by first page; covers exactly the pages `backgrounds[]` names.
+ * @returns {Array<{vantageId: string|null, pages: number[], description: string, landmarkPhoto: *}>}
+ *   ordered by first page; covers exactly the pages `backgrounds[]` names, once.
  */
 function groupTrialPlatePagesByVantage(visualBible) {
   const backgrounds = Array.isArray(visualBible?.backgrounds) ? visualBible.backgrounds : [];
-  // page → plate prose. First backgrounds[] entry naming a page wins, so a page
-  // listed twice is still rendered once (today's loop would render it twice).
-  const descByPage = new Map();
-  for (const bg of backgrounds) {
-    if (!bg?.description || !Array.isArray(bg.pages) || bg.pages.length === 0) continue;
-    for (const pn of bg.pages) {
-      if (typeof pn !== 'number' || descByPage.has(pn)) continue;
-      descByPage.set(pn, bg.description);
-    }
-  }
-  const pages = Array.from(descByPage.keys()).sort((a, b) => a - b);
-  if (pages.length === 0) return [];
-
   const locations = Array.isArray(visualBible?.locations) ? visualBible.locations : [];
-  const synthetic = pages.map(pageNumber => {
-    const loc = locations.find(l => l?.id && Array.isArray(l.pages) && l.pages.includes(pageNumber)) || null;
-    return {
-      pageNumber,
-      sceneMetadata: { objects: loc ? [`${loc.name || ''} [${loc.id}]`.trim()] : [] },
-      emptyScenePrompt: '',
-    };
-  });
-
-  const grouped = groupPagesByVantage(synthetic, visualBible);
+  const claimed = new Set();
+  const perLoc = new Map();
   const out = [];
-  for (const [key, group] of grouped.entries()) {
-    if (key === '__unassigned__') {
-      // No LOC → no shared backdrop is knowable. One plate per page, exactly
-      // as trial does today.
-      for (const pn of group.pageNumbers) {
-        out.push({ vantageId: null, pages: [pn], description: descByPage.get(pn) });
-      }
-      continue;
+  for (const bg of backgrounds) {
+    if (!bg?.description || !Array.isArray(bg.pages)) continue;
+    const pages = [...new Set(bg.pages.filter(pn => typeof pn === 'number' && !claimed.has(pn)))].sort((a, b) => a - b);
+    if (pages.length === 0) continue;
+    pages.forEach(pn => claimed.add(pn));
+    const loc = locations.find(l => l?.id && Array.isArray(l.pages) && l.pages.includes(pages[0])) || null;
+    let vantageId = null;
+    if (loc) {
+      const k = (perLoc.get(loc.id) || 0) + 1;
+      perLoc.set(loc.id, k);
+      vantageId = `${loc.id}.${k}`;
     }
-    const groupPages = group.pageNumbers.slice().sort((a, b) => a - b);
-    out.push({ vantageId: key, pages: groupPages, description: descByPage.get(groupPages[0]) });
+    out.push({ vantageId, pages, description: bg.description, landmarkPhoto: bg.landmarkPhoto });
   }
   out.sort((a, b) => a.pages[0] - b.pages[0]);
   return out;

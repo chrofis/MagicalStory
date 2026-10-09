@@ -1,0 +1,181 @@
+---TITLE---
+TITLE: Tobias und der Apfel für Jack
+
+---VISUAL BIBLE---
+```json
+{
+  "secondaryCharacters": [
+    {
+      "id": "CHR001",
+      "name": "Mama",
+      "pages": [1, 6],
+      "scaleClass": "adult-height",
+      "age": "a woman in her thirties",
+      "build": "average height, slim build",
+      "hair": "dark brown, shoulder length, tied back loosely",
+      "face": "brown eyes, a warm smile, brown skin",
+      "signatureLook": "a loose dark brown ponytail",
+      "clothing": "a light blue cardigan over a white blouse, a dark grey skirt, brown leather shoes"
+    }
+  ],
+  "animals": [
+    {
+      "id": "ANI001",
+      "name": "Jack",
+      "pages": [1, 5, 6],
+      "scaleClass": "forearm-sized",
+      "generic": false,
+      "species": "green parrot",
+      "coloring": "bright green body and wings, yellow head, blue and red tail feathers",
+      "anatomy": "two wings, two feet with grey claws, one long tail, one curved beak",
+      "features": "round dark eyes, a curved grey beak, a small wooden perch in the grass"
+    },
+    {
+      "id": "ANI002",
+      "name": "Squirrel",
+      "pages": [2, 3, 4],
+      "scaleClass": "forearm-sized",
+      "generic": false,
+      "species": "red squirrel",
+      "coloring": "reddish-brown back, cream belly, bushy reddish tail",
+      "anatomy": "four legs with small claws, two ears, one bushy tail",
+      "features": "round dark eyes, small rounded ears, a soft rounded snout"
+    }
+  ],
+  "artifacts": [
+    {
+      "id": "ART001",
+      "label": "red apple",
+      "name": "red apple",
+      "pages": [1, 2, 3, 4, 5, 6],
+      "scaleClass": "palm-sized",
+      "generic": false,
+      "type": "fruit",
+      "description": "a round red apple with a short brown stalk and a few green leaves on its stalk"
+    }
+  ],
+  "locations": [
+    {
+      "id": "LOC001",
+      "name": "Kirche Rohrdorf",
+      "pages": [1, 2, 3, 4, 5, 6],
+      "scaleClass": "house-height",
+      "setting": "outdoor churchyard lawn beside a church, Fislisbach",
+      "colors": "white concrete church, green grass, golden autumn leaves, pale blue sky",
+      "features": "white concrete church with a tall bell tower, wooden bench, old apple tree with low branches, wooden perch on the grass",
+      "signatureElement": "the tall white bell tower",
+      "isRealLandmark": true,
+      "landmarkQuery": "Kirche Rohrdorf",
+      "landmarkPhoto": 1
+    }
+  ],
+  "backgrounds": [
+    {
+      "pages": [1, 2],
+      "description": "Wide view of the churchyard lawn in front of the white concrete church with its tall bell tower. A wooden bench stands at the right, and an old apple tree with low branches stands at the left edge. Soft autumn afternoon light from the left, long shadows on the grass. Open grass in the foreground.",
+      "landmarkPhoto": 1
+    },
+    {
+      "pages": [3, 4],
+      "description": "Close view of the old apple tree trunk and its lowest branches against a pale blue sky. Grass with fallen golden leaves lies at the base of the trunk, and a white church wall edge shows at the far right. Soft autumn afternoon light from the left. Open grass in front of the trunk.",
+      "landmarkPhoto": "none"
+    },
+    {
+      "pages": [5, 6],
+      "description": "Low view across the grass beside a short wooden perch post, a wooden bench and the white church wall behind them. The apple tree stands at the edge of the frame. Warm low autumn sunlight from the right. Open lawn in the foreground.",
+      "landmarkPhoto": "none"
+    }
+  ]
+}
+```
+
+---COVER SCENE---
+```json
+{
+  "title": "Tobias und der Apfel für Jack",
+  "scene": {
+    "imageSummary": "Tobias stands on the churchyard lawn with one arm raised toward the sky, grinning, in full pirate costume: a red and white horizontal-striped sailor shirt, a brown leather vest, dark brown canvas trousers tucked into tall black boots and a wide black leather belt with a brass buckle, with his head bare. Jack the green parrot perches on the wooden perch beside him, and a red apple rests on the grass at his feet.",
+    "setting": {
+      "location": "Kirche Rohrdorf [LOC001]",
+      "indoorOutdoor": "outdoor",
+      "description": "Churchyard lawn with green grass and golden autumn leaves, the white concrete church with its tall bell tower, an old apple tree at the edge",
+      "lighting": "warm soft autumn afternoon sun from the left",
+      "camera": "wide",
+      "depthLayers": "foreground: grass and the red apple; midground: Tobias and the wooden perch with Jack; background: the white church with its tall bell tower and the apple tree"
+    },
+    "timeOfDay": "afternoon",
+    "weather": "clear",
+    "characters": [
+      {
+        "id": null,
+        "name": "Tobias",
+        "position": "center",
+        "action": "stands tall with one arm raised, pointing at the parrot",
+        "expression": "grinning, eyes bright",
+        "clothing": "costumed"
+      }
+    ],
+    "objects": [
+      {"id": "LOC001", "name": "Kirche Rohrdorf", "position": "background"},
+      {"id": "ANI001", "name": "Jack", "position": "center-right on the wooden perch"},
+      {"id": "ART001", "name": "red apple", "position": "lying on the grass at Tobias's feet"}
+    ]
+  }
+}
+```
+
+---STORY PAGES---
+
+--- Page 1 ---
+TEXT:
+Tobias ist ein Pirat und rennt mit einem roten Apfel über die Wiese. «Ahoi, Jack!», ruft er. Jack sitzt auf seiner Stange im Gras. Mama sitzt auf der Bank vor der Kirche Rohrdorf und schaut zu.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Tobias runs across the green lawn in front of the white church, holding a red apple out in front of him. He wears a red and white horizontal-striped sailor shirt, a brown leather vest, dark brown canvas trousers tucked into tall black boots and a wide black leather belt with a brass buckle, with his head bare. Jack the green parrot sits on his wooden perch in the grass, and Mama sits on the bench in the background.","setting":{"location":"Kirche Rohrdorf [LOC001]","indoorOutdoor":"outdoor","description":"Churchyard lawn with short green grass and golden leaves, a white concrete church with a tall bell tower, a wooden bench, a wooden perch in the grass","lighting":"soft autumn afternoon sun from the left, long shadows on the grass","camera":"medium","depthLayers":"foreground: grass and the running boy; midground: the wooden perch with Jack; background: the bench with Mama and the white church with its bell tower"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Tobias","position":"center","action":"runs across the lawn holding the red apple out in front of him","expression":"grinning with bright eyes","clothing":"costumed","depth":"midground","perspective":"front"},{"id":"CHR001","name":"Mama","position":"right","action":"sits on the bench and watches","expression":"warm smile","clothing":"standard","depth":"background","perspective":"front"}],"objects":[{"id":"ANI001","name":"Jack","position":"center-left on the wooden perch"},{"id":"ART001","name":"red apple","position":"in Tobias's hand"}],"interactions":[{"character":"Tobias","object":"ART001","where":"holds the red apple out in front of him","priority":"essential"}],"background":"a few distant passers-by on the far path","population":"ambient"}}
+```
+
+--- Page 2 ---
+TEXT:
+Ein Eichhörnchen springt aus dem Gras. Es schnappt den Apfel aus Tobias' Hand. Dann klettert es mit dem Apfel den Stamm hinauf. Tobias bleibt stehen und reisst die Augen auf.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"A squirrel has jumped onto the trunk of the old apple tree and is climbing up it with the red apple held in its front paws. Tobias stands on the grass below, eyes wide, one arm still stretched toward the tree. He wears a red and white horizontal-striped sailor shirt, a brown leather vest, dark brown canvas trousers tucked into tall black boots and a wide black leather belt with a brass buckle, with his head bare.","setting":{"location":"Kirche Rohrdorf [LOC001]","indoorOutdoor":"outdoor","description":"Old apple tree trunk with its lower branches at the left, short green grass with golden leaves, the white church wall at the far right","lighting":"soft autumn afternoon sun from the left, long shadows on the grass","camera":"medium","depthLayers":"foreground: grass and fallen leaves; midground: Tobias standing on the grass; background: the apple tree trunk climbing up and the white church wall"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Tobias","position":"left","action":"stands still on the grass with one arm stretched toward the tree","expression":"surprised, wide eyes, mouth open","clothing":"costumed","depth":"midground","perspective":"front"}],"objects":[{"id":"ANI002","name":"Squirrel","position":"center on the apple tree trunk, climbing up"},{"id":"ART001","name":"red apple","position":"held in the squirrel's front paws"}],"interactions":[{"character":"Tobias","object":"ANI002","where":"reaches up toward the squirrel with one arm","priority":"essential"}],"background":"empty","population":"cast_only"}}
+```
+
+--- Page 3 ---
+TEXT:
+Tobias streckt sich zum untersten Ast hinauf. «Hier!», ruft er. Das Eichhörnchen hält den Apfel fest und rührt sich nicht. Tobias ruft noch lauter: «Hier!»
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Tobias stretches up toward the lowest branch of the apple tree and calls out loudly, his face set in a frown. The squirrel sits on the branch above him, holding the red apple tight in its front paws. He wears a red and white horizontal-striped sailor shirt, a brown leather vest, dark brown canvas trousers tucked into tall black boots and a wide black leather belt with a brass buckle, with his head bare.","setting":{"location":"Kirche Rohrdorf [LOC001]","indoorOutdoor":"outdoor","description":"Close view of the old apple tree trunk and its lowest branch, golden leaves on the grass, pale blue sky above","lighting":"soft autumn afternoon sun from the left","camera":"medium","depthLayers":"foreground: grass with fallen leaves; midground: Tobias reaching up; background: the branch with the squirrel holding the apple against the pale sky"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Tobias","position":"left","action":"reaches up with both arms toward the branch and calls out","expression":"frowning, mouth open calling","clothing":"costumed","depth":"midground","perspective":"front"}],"objects":[{"id":"ANI002","name":"Squirrel","position":"center on the lowest branch, holding still"},{"id":"ART001","name":"red apple","position":"held in the squirrel's front paws"}],"interactions":[{"character":"Tobias","object":"ANI002","where":"raises both arms toward the squirrel on the branch","priority":"essential"}],"background":"empty","population":"cast_only"}}
+```
+
+--- Page 4 ---
+TEXT:
+Das Eichhörnchen lässt den Apfel fallen und springt davon. Der Apfel rollt ins Gras. Tobias hebt ihn mit beiden Händen auf und lacht. Er reibt den Apfel an seiner Weste.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Tobias crouches on the grass at the foot of the apple tree and picks up the red apple with both hands, grinning. The squirrel is gone from the frame. He wears a red and white horizontal-striped sailor shirt, a brown leather vest, dark brown canvas trousers tucked into tall black boots and a wide black leather belt with a brass buckle, with his head bare.","setting":{"location":"Kirche Rohrdorf [LOC001]","indoorOutdoor":"outdoor","description":"Base of the old apple tree trunk, grass with fallen golden leaves, pale blue sky through the branches","lighting":"soft autumn afternoon sun from the left","camera":"medium","depthLayers":"foreground: grass and fallen leaves; midground: Tobias crouching at the apple tree; background: the trunk and branches of the apple tree"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Tobias","position":"center","action":"picks the red apple up from the grass with both hands","expression":"delighted grin","clothing":"costumed","depth":"midground","perspective":"front"}],"objects":[{"id":"ART001","name":"red apple","position":"in Tobias's hands"}],"interactions":[{"character":"Tobias","object":"ART001","where":"picks the red apple up from the grass with both hands","priority":"essential"}],"background":"empty","population":"cast_only"}}
+```
+
+--- Page 5 ---
+TEXT:
+«Hier, Jack!», ruft Tobias. Er kniet vor der Stange und hält dem Papagei den Apfel hin. Jack pickt ein Stück ab.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Tobias kneels in the grass beside the wooden perch and holds the red apple out toward Jack, who sits on the perch and pecks at a piece of it. He wears a red and white horizontal-striped sailor shirt, a brown leather vest, dark brown canvas trousers tucked into tall black boots and a wide black leather belt with a brass buckle, with his head bare.","setting":{"location":"Kirche Rohrdorf [LOC001]","indoorOutdoor":"outdoor","description":"Churchyard lawn with short green grass and golden leaves, a wooden perch post, the white church wall behind, the apple tree at the edge","lighting":"warm low autumn sunlight from the right","camera":"medium","depthLayers":"foreground: grass and fallen leaves; midground: Tobias kneeling beside the perch; background: the white church wall and the apple tree"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Tobias","position":"left","action":"kneels in the grass and holds the apple out toward the parrot","expression":"beaming, bright eyes","clothing":"costumed","depth":"midground","perspective":"front"}],"objects":[{"id":"ANI001","name":"Jack","position":"right on the wooden perch, pecking at the apple"},{"id":"ART001","name":"red apple","position":"held out in Tobias's hand"}],"interactions":[{"character":"Tobias","object":"ART001","where":"holds the red apple out toward the parrot","priority":"essential"}],"background":"empty","population":"cast_only"}}
+```
+
+--- Page 6 ---
+TEXT:
+Mama sitzt auf der Bank und sieht herüber. Tobias sitzt im Gras neben der Stange und strahlt. Er hält Jack das letzte Stück Apfel hin. «Für dich, Jack!», sagt er.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Tobias sits in the grass beside the wooden perch, beaming, and holds a small piece of the red apple out to Jack, who sits on the perch. Mama sits on the wooden bench in the background. Tobias wears a red and white horizontal-striped sailor shirt, a brown leather vest, dark brown canvas trousers tucked into tall black boots and a wide black leather belt with a brass buckle, with his head bare.","setting":{"location":"Kirche Rohrdorf [LOC001]","indoorOutdoor":"outdoor","description":"Churchyard lawn with short green grass and golden leaves, a wooden perch post, a wooden bench, the white church wall behind","lighting":"warm low autumn sunlight from the right","camera":"medium","depthLayers":"foreground: grass and fallen leaves; midground: Tobias sitting beside the perch with Jack; background: the wooden bench with Mama and the white church wall"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Tobias","position":"left","action":"sits in the grass and holds a piece of the apple out toward the parrot","expression":"beaming, happy","clothing":"costumed","depth":"midground","perspective":"front"},{"id":"CHR001","name":"Mama","position":"right","action":"sits on the bench and looks over","expression":"warm smile","clothing":"standard","depth":"background","perspective":"front"}],"objects":[{"id":"ANI001","name":"Jack","position":"right on the wooden perch"},{"id":"ART001","name":"red apple","position":"piece held in Tobias's hand"}],"interactions":[{"character":"Tobias","object":"ART001","where":"holds a piece of the red apple out toward the parrot","priority":"essential"}],"background":"empty","population":"cast_only"}}
+```

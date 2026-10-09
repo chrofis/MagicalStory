@@ -1,0 +1,171 @@
+---TITLE---
+TITLE: Noah und das Rüebli für Hansli
+
+---VISUAL BIBLE---
+```json
+{
+  "secondaryCharacters": [
+    {
+      "id": "CHR001",
+      "name": "Frau Keller",
+      "pages": [1, 2, 6],
+      "scaleClass": "adult-height",
+      "age": "a woman in her forties",
+      "build": "average height, slim build",
+      "hair": "dark blonde, shoulder-length, tied back loosely",
+      "face": "warm brown eyes, fine laugh lines around the eyes",
+      "signatureLook": "a set of keys on a red cord at her waist",
+      "clothing": "a mustard-yellow cardigan over a dark blue top, dark trousers"
+    }
+  ],
+  "animals": [
+    {
+      "id": "ANI001",
+      "name": "Hansli",
+      "pages": [1, 2, 5, 6],
+      "scaleClass": "forearm-sized",
+      "generic": false,
+      "species": "domestic rabbit",
+      "coloring": "soft white body with grey-brown patches on the back, white underside",
+      "anatomy": "two long upright ears, four legs, a short round tail",
+      "features": "large round dark eyes, a closed rounded mouth, a soft rounded snout, no collar"
+    }
+  ],
+  "artifacts": [
+    {
+      "id": "ART001",
+      "label": "orange carrot",
+      "name": "fresh orange carrot with a short green leafy top",
+      "pages": [1, 2, 3, 4, 5, 6],
+      "scaleClass": "hand-sized",
+      "generic": false,
+      "type": "vegetable",
+      "description": "a long orange carrot, tapering to a point, with a short green leafy top",
+      "states": [
+        {"name": "whole", "delta": "unbitten, full length, green top intact", "pages": [1, 2, 3, 4]},
+        {"name": "nibbled", "delta": "one end bitten into and shorter", "pages": [5, 6]}
+      ]
+    }
+  ],
+  "locations": [
+    {
+      "id": "LOC001",
+      "name": "Kindergarten in Council Bluffs",
+      "pages": [1, 2, 3, 4, 5, 6],
+      "scaleClass": "house-height",
+      "setting": "indoor, kindergarten building with a classroom, a cloakroom and a hallway",
+      "colors": "warm wood tones, cream walls, light blue coat hooks, muted green floor",
+      "features": "long wooden tables, wall paintings, a wire rabbit pen in the corner, rows of coat hooks, tall windows",
+      "signatureElement": "a wire rabbit pen with a wooden lid in the classroom corner",
+      "isRealLandmark": false,
+      "landmarkQuery": null
+    }
+  ],
+  "backgrounds": [
+    {
+      "pages": [1, 2],
+      "description": "Bright kindergarten classroom seen from the front, light wooden tables with small chairs, paintings pinned along the cream wall, a wire rabbit pen in the left corner, an open doorway to a dim cloakroom in the back wall. Soft autumn morning light from tall windows on the left. Open floor space in the centre."
+    },
+    {
+      "pages": [3, 4, 5],
+      "description": "Dark kindergarten cloakroom with rows of coat hooks on the walls, small jackets hanging on the hooks, a low wooden bench along the far wall, a wooden floor. The light is off. A pale rectangle of light from the classroom falls through the open doorway on the right. No people."
+    },
+    {
+      "pages": [6],
+      "description": "Kindergarten classroom corner seen from the side, the wire rabbit pen with its wooden lid in the foreground, low wooden tables and a shelf of school bags beyond. An open doorway to a hallway in the back wall, with a glimpse of a tiled floor. Warm afternoon light through tall windows on the right."
+    }
+  ]
+}
+```
+
+---COVER SCENE---
+```json
+{
+  "title": "Noah und das Rüebli für Hansli",
+  "scene": {
+    "imageSummary": "Noah stands in the open classroom doorway of the kindergarten, holding a carrot up in one hand, with the small rabbit Hansli sitting beside his feet. Warm autumn light and a calm, hopeful mood.",
+    "setting": {
+      "location": "Kindergarten in Council Bluffs [LOC001]",
+      "indoorOutdoor": "indoor",
+      "description": "Bright kindergarten classroom with light wooden tables, paintings on the cream walls and a wire rabbit pen in the corner",
+      "lighting": "soft warm daylight from tall windows on the left",
+      "camera": "wide",
+      "depthLayers": "foreground: Noah and the rabbit on the floor; midground: the wooden tables and the wire rabbit pen; background: the cloakroom doorway and the coat hooks beyond"
+    },
+    "timeOfDay": "morning",
+    "weather": "none",
+    "characters": [
+      {
+        "id": null,
+        "name": "Noah",
+        "position": "center",
+        "action": "standing in the doorway, holding up a carrot in one hand",
+        "expression": "confident and happy",
+        "clothing": "standard",
+        "depth": "foreground",
+        "perspective": "front"
+      }
+    ],
+    "objects": [
+      {"id": "LOC001", "name": "Kindergarten in Council Bluffs", "position": "background"},
+      {"id": "ANI001", "name": "Hansli", "position": "beside Noah, low on the floor"}
+    ]
+  }
+}
+```
+
+---STORY PAGES---
+
+--- Page 1 ---
+TEXT:
+Noah hielt sein Rüebli mit beiden Händen vor den Hasenstall. Es war sein erster Tag im Kindergarten. «Frau Keller, darf ich Hansli ein Rüebli geben?», fragte er. Frau Keller nickte. «Hansli liebt Rüebli», sagte sie. Hansli schnupperte am Gitter.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Noah holds a carrot out through the wire of the rabbit pen toward Hansli, who sniffs at the wire. Frau Keller stands beside Noah and looks down at him. Soft morning light fills the classroom.","setting":{"location":"Kindergarten in Council Bluffs [LOC001]","indoorOutdoor":"indoor","description":"Bright classroom with light wooden tables, paintings on cream walls, a wire rabbit pen in the corner","lighting":"soft morning daylight from tall windows on the left","camera":"medium","depthLayers":"foreground: Noah and the wire rabbit pen; midground: Frau Keller beside him; background: a few children painting at distant tables"},"timeOfDay":"morning","weather":"none","characters":[{"id":null,"name":"Noah","position":"left","action":"holding a carrot out through the wire of the rabbit pen","expression":"calm and focused","clothing":"standard","depth":"foreground","perspective":"front"},{"id":"CHR001","name":"Frau Keller","position":"right","action":"standing beside Noah, looking down at him","expression":"warm and attentive","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[{"id":"ANI001","name":"Hansli","position":"center, inside the pen, sniffing at the wire"},{"id":"ART001","name":"orange carrot","position":"in Noah's hands, held out through the wire"}],"interactions":[{"character":"Noah","object":"ART001","where":"holds the carrot out through the wire","priority":"essential"},{"character":"Frau Keller","object":"ANI001","where":"watches the rabbit in the pen","priority":"low"}],"background":"a few children painting at distant tables","population":"ambient"}}
+```
+
+--- Page 2 ---
+TEXT:
+Im Raum malten die anderen Kinder an langen Tischen. Frau Keller führte Noah zu seinem Haken in der Garderobe. Da hoppelte Hansli aus dem offenen Stall, über den Boden und über die Schwelle. Er verschwand zwischen den Jacken. «Hansli!», rief Noah.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Hansli hops across the classroom floor toward the open cloakroom doorway, caught mid-hop. Noah turns toward him with the carrot in his hand and calls out. Frau Keller stands by the doorway, turned toward the rabbit.","setting":{"location":"Kindergarten in Council Bluffs [LOC001]","indoorOutdoor":"indoor","description":"Classroom with light wooden tables and paintings on cream walls, an open doorway to the cloakroom with coat hooks visible beyond","lighting":"soft morning daylight from tall windows on the left, the cloakroom doorway lit more dimly","camera":"medium","depthLayers":"foreground: Hansli mid-hop across the floor; midground: Noah turning and Frau Keller at the doorway; background: children painting at tables and the cloakroom beyond"},"timeOfDay":"morning","weather":"none","characters":[{"id":null,"name":"Noah","position":"center","action":"turns toward the rabbit with the carrot in one hand and calls out","expression":"surprised and alert","clothing":"standard","depth":"midground","perspective":"front"},{"id":"CHR001","name":"Frau Keller","position":"left","action":"stands at the cloakroom doorway, turned toward the rabbit","expression":"alert","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[{"id":"ANI001","name":"Hansli","position":"right, mid-hop across the floor toward the doorway"},{"id":"ART001","name":"orange carrot","position":"in Noah's hand, held at his side"}],"interactions":[{"character":"Noah","object":"ART001","where":"holds the carrot at his side","priority":"essential"},{"character":"Frau Keller","object":"ANI001","where":"watches the rabbit hop toward the doorway","priority":"low"}],"background":"a few children painting at distant tables","population":"ambient"}}
+```
+
+--- Page 3 ---
+TEXT:
+Das Licht in der Garderobe ging aus. Die Jacken hingen dicht nebeneinander, und man sah kaum den Boden. Frau Keller war in den Flur gelaufen, um den Hauswart zu holen. Noah blieb an der Tür stehen. Seine Finger umklammerten das Rüebli. Er sah keinen Hasen.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Noah stands alone in the doorway of the dark cloakroom, holding the carrot tightly against his chest with both hands. Rows of jackets hang on the hooks in the dim light. Pale light from the classroom falls through the doorway behind him.","setting":{"location":"Kindergarten in Council Bluffs [LOC001]","indoorOutdoor":"indoor","description":"Dark cloakroom with rows of coat hooks, small jackets hanging, a low wooden bench along the far wall","lighting":"dim, with a faint strip of light from the classroom falling through the doorway behind Noah","camera":"medium","depthLayers":"foreground: Noah in the doorway; midground: rows of hanging jackets; background: dark cloakroom wall and hooks"},"timeOfDay":"morning","weather":"none","characters":[{"id":null,"name":"Noah","position":"center","action":"stands in the doorway holding the carrot tightly against his chest","expression":"still and uncertain, eyes on the dark room","clothing":"standard","depth":"foreground","perspective":"front"}],"objects":[{"id":"ART001","name":"orange carrot","position":"held against Noah's chest in both hands"}],"interactions":[{"character":"Noah","object":"ART001","where":"holds the carrot against his chest","priority":"essential"}],"background":"the dark cloakroom with coat hooks and jackets","population":"cast_only"}}
+```
+
+--- Page 4 ---
+TEXT:
+Zwischen den Jacken war es still. Noah atmete tief ein und ging einen Schritt hinein. Er streckte das Rüebli in das Dunkle. «Hansli, hier ist ein Rüebli», flüsterte er. Dann wartete er mit ausgestrecktem Arm.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Noah stands between the hanging jackets inside the dark cloakroom, holding the carrot out at arm's length into the shadows. The faint light from the doorway shows only the edge of his figure and the jackets beside him.","setting":{"location":"Kindergarten in Council Bluffs [LOC001]","indoorOutdoor":"indoor","description":"Dark cloakroom with rows of coat hooks and jackets hanging close together, wooden floor","lighting":"dim, with a faint strip of light from the classroom at the doorway behind Noah","camera":"medium","depthLayers":"foreground: Noah with the carrot held out; midground: rows of hanging jackets on both sides; background: shadowed cloakroom wall"},"timeOfDay":"morning","weather":"none","characters":[{"id":null,"name":"Noah","position":"center","action":"steps between the jackets and holds the carrot out at arm's length into the dark","expression":"quiet and determined","clothing":"standard","depth":"foreground","perspective":"front"}],"objects":[{"id":"ART001","name":"orange carrot","position":"held out at arm's length in Noah's hand, pointing into the dark"}],"interactions":[{"character":"Noah","object":"ART001","where":"holds the carrot out at arm's length into the dark","priority":"essential"}],"background":"the dark cloakroom with hanging jackets","population":"cast_only"}}
+```
+
+--- Page 5 ---
+TEXT:
+Hinter einer Jacke bewegte sich etwas. Hansli hoppelte langsam hervor und kam auf Noah zu. Er knabberte am Rüebli. Noah hielt es ganz still. Durch die Tür fiel Licht aus dem Raum. Noah ging langsam zurück, und Hansli hoppelte neben ihm her.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Hansli comes out from behind a jacket and nibbles the carrot that Noah holds steady at arm's length. The light from the classroom doorway falls across the floor behind them.","setting":{"location":"Kindergarten in Council Bluffs [LOC001]","indoorOutdoor":"indoor","description":"Dark cloakroom with coat hooks and hanging jackets, a wooden floor, a pale strip of light from the classroom","lighting":"dim, with a pale strip of light from the classroom doorway on the right","camera":"medium","depthLayers":"foreground: Hansli nibbling the carrot end; midground: Noah holding the carrot steady; background: hanging jackets and the lit doorway"},"timeOfDay":"morning","weather":"none","characters":[{"id":null,"name":"Noah","position":"center","action":"holds the carrot steady at arm's length while the rabbit nibbles it","expression":"calm and quiet","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[{"id":"ANI001","name":"Hansli","position":"center-low, in front of Noah, nibbling the carrot end"},{"id":"ART001","name":"orange carrot","position":"held out by Noah, its end bitten into"}],"interactions":[{"character":"Noah","object":"ART001","where":"holds the carrot steady at arm's length","priority":"essential"}],"background":"the dark cloakroom with hanging jackets and the lit doorway","population":"cast_only"}}
+```
+
+--- Page 6 ---
+TEXT:
+Am Nachmittag kam Mama durch die Tür des Kindergartens. Noah ging zum Hasenstall und hielt das letzte Stück Rüebli durch das Gitter. «Tschüss, Hansli», sagte er. Frau Keller winkte von den Tischen her. «Schön, dass du heute da warst, Noah.» Dann ging Noah zu Mama und nahm ihre Hand.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Noah bends at the wire rabbit pen and pushes the last piece of carrot through to Hansli. Frau Keller waves from the tables, and Mama waits in the hallway doorway. Warm afternoon light fills the classroom.","setting":{"location":"Kindergarten in Council Bluffs [LOC001]","indoorOutdoor":"indoor","description":"Classroom corner with a wire rabbit pen and wooden lid, low wooden tables, a shelf of school bags, an open doorway to a tiled hallway","lighting":"warm afternoon daylight from tall windows on the right","camera":"medium","depthLayers":"foreground: the wire rabbit pen with Noah bending over it; midground: Frau Keller at the tables; background: Mama in the hallway doorway and a few children packing bags"},"timeOfDay":"afternoon","weather":"none","characters":[{"id":null,"name":"Noah","position":"left","action":"bends over the rabbit pen and holds the last piece of carrot through the wire","expression":"content and calm","clothing":"standard","depth":"foreground","perspective":"front"},{"id":"CHR001","name":"Frau Keller","position":"right","action":"stands at the tables and raises a hand in a wave","expression":"warm and smiling","clothing":"standard","depth":"midground","perspective":"front"},{"name":"Mama","position":"center-right","action":"stands in the hallway doorway, waiting","expression":"patient and warm","depth":"background","perspective":"front","description":"a woman in her thirties, average build, shoulder-length brown hair, a dark green jacket"}],"objects":[{"id":"ANI001","name":"Hansli","position":"inside the pen, reaching toward the carrot end"},{"id":"ART001","name":"orange carrot","position":"held by Noah, its end pushed through the wire"}],"interactions":[{"character":"Noah","object":"ART001","where":"holds the carrot end through the wire of the pen","priority":"essential"},{"character":"Frau Keller","object":"ANI001","where":"watches Noah and the rabbit from the tables","priority":"low"},{"character":"Mama","object":"ANI001","where":"watches Noah from the hallway doorway","priority":"low"}],"background":"a few children packing school bags in the far background","population":"ambient"}}
+```

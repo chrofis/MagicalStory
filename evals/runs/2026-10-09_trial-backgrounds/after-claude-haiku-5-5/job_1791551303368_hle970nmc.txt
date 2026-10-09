@@ -1,0 +1,169 @@
+---TITLE---
+TITLE: Emma und der starke Knoten
+
+---VISUAL BIBLE---
+```json
+{
+  "secondaryCharacters": [],
+  "animals": [],
+  "artifacts": [
+    {
+      "id": "ART001",
+      "label": "wooden toy shield",
+      "name": "round wooden toy shield with a leather strap",
+      "pages": [1, 2, 3, 4, 5, 6],
+      "scaleClass": "arm-sized",
+      "type": "toy shield",
+      "description": "round wooden toy shield in pale varnished wood, dark brown rim, a broad brown leather strap fixed across its back",
+      "states": [
+        {"name": "strap whole", "delta": "leather strap unbroken and fixed across the back", "pages": [1]},
+        {"name": "strap torn", "delta": "leather strap torn through into two loose ends", "pages": [2, 3, 4]},
+        {"name": "strap knotted", "delta": "two strap ends joined in a firm knot", "pages": [5, 6]}
+      ]
+    },
+    {
+      "id": "ART002",
+      "label": "wooden toy sword",
+      "name": "wooden toy sword",
+      "pages": [1, 2, 3, 4, 5, 6],
+      "scaleClass": "arm-sized",
+      "type": "toy sword",
+      "description": "straight wooden toy sword in pale wood with a plain crossguard and a flat grip"
+    }
+  ],
+  "locations": [
+    {
+      "id": "LOC001",
+      "name": "Kirche Rohrdorf",
+      "pages": [1, 2, 3, 4, 5],
+      "scaleClass": "house-height",
+      "setting": "outdoor, meadow beside a church on a hillside",
+      "colors": "white concrete church, green and gold meadow grass, dark green trees",
+      "features": "plain modern white church, tall detached concrete bell pillar, gravel path across the meadow, wooded hill behind",
+      "signatureElement": "tall white detached bell pillar",
+      "isRealLandmark": true,
+      "landmarkQuery": "Kirche Rohrdorf",
+      "landmarkPhoto": 1
+    },
+    {
+      "id": "LOC002",
+      "name": "Klosterkirche Wettingen",
+      "pages": [6],
+      "scaleClass": "house-height",
+      "setting": "outdoor, gate of a monastery church",
+      "colors": "pale grey stone, dark wooden gate, green trees, pale gravel",
+      "features": "tall pale stone church facade behind an arched stone gate, gravel path, low wall",
+      "signatureElement": "arched stone gate in the wall",
+      "isRealLandmark": false,
+      "landmarkQuery": null
+    }
+  ],
+  "backgrounds": [
+    {
+      "pages": [1],
+      "description": "Wide view across a green and gold meadow below the Kirche Rohrdorf: a gravel path crosses the grass, fallen yellow leaves lie on the ground, the plain white concrete church with its tall detached bell pillar stands on the rise, a wooded hill rises behind. Clear morning light from low on the left. Open grass in the foreground.",
+      "landmarkPhoto": 1
+    },
+    {
+      "pages": [2, 3, 4, 5],
+      "description": "Grassy slope at the edge of the meadow with a low hawthorn hedge and a shallow ditch, fallen beech leaves in gold and brown on wet grass, a grey stone wall at the far end. Clear daylight from above. Open ground in the centre.",
+      "landmarkPhoto": "none"
+    },
+    {
+      "pages": [6],
+      "description": "Stone gate of the Klosterkirche Wettingen: a tall pale stone church facade behind an arched gate of dark wood, a gravel path leading toward it, a low wall to the side, autumn trees with yellow leaves behind. Clear afternoon light from the left. Open gravel in the foreground."
+    }
+  ]
+}
+```
+
+---COVER SCENE---
+```json
+{
+  "title": "Emma und der starke Knoten",
+  "scene": {
+    "imageSummary": "Emma stands tall on the meadow path beside the Kirche Rohrdorf, the wooden toy sword raised in her right hand and the round wooden toy shield on her left forearm. She wears a silver chain mail tunic over a grey padded gambeson, brown leather bracers, dark brown leather boots, a plain brown sword belt and no helmet, bare head. Yellow autumn leaves lie on the grass around her.",
+    "setting": {
+      "location": "Kirche Rohrdorf [LOC001]",
+      "indoorOutdoor": "outdoor",
+      "description": "Green and gold meadow with fallen yellow leaves, a gravel path, the plain white concrete church with its tall detached bell pillar, wooded hill behind.",
+      "lighting": "clear morning light from low on the left, long soft shadows",
+      "camera": "wide",
+      "depthLayers": "foreground: grass and fallen leaves; midground: Emma on the path; background: white church and wooded hill"
+    },
+    "timeOfDay": "morning",
+    "weather": "clear",
+    "characters": [
+      {
+        "id": null,
+        "name": "Emma",
+        "position": "center",
+        "action": "stands on the path with the sword raised high",
+        "expression": "confident",
+        "clothing": "costumed"
+      }
+    ],
+    "objects": [
+      {"id": "LOC001", "name": "Kirche Rohrdorf", "position": "background"},
+      {"id": "ART001", "name": "wooden toy shield", "position": "on her left forearm"},
+      {"id": "ART002", "name": "wooden toy sword", "position": "raised in her right hand"}
+    ]
+  }
+}
+```
+
+---STORY PAGES---
+
+--- Page 1 ---
+TEXT:
+Mit dem Holzschwert in der rechten Hand stapfte Emma über die Wiese bei der Kirche Rohrdorf. Am linken Arm trug sie ihren Schild, den ein breiter Lederriemen hielt. Der Riemen war fest, und der Schild lag sicher. Bei jedem Schritt raschelten die gelben Blätter unter ihren Füssen. «Vorwärts, Schild! Heute erreichen wir das Kloster Wettingen», rief sie über das Gras. Am Küchentisch hatte Grossvater ihr gezeigt, wie man einen Knoten bindet, der hält: zuerst eine Schlaufe, dann herum und durch. Emma hatte es mehrmals geübt, bis ihre Finger es allein konnten. Sie schwang das Schwert über den Kopf und lief los, denn hinter dem Hügel wartete das Kloster.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Emma strides across the autumn meadow beside the Kirche Rohrdorf in low morning sun, a wooden toy sword in her right hand and a round wooden toy shield on her left forearm by its leather strap. She wears a silver chain mail tunic over a grey padded gambeson, brown leather bracers, dark brown leather boots, a plain brown sword belt and no helmet, bare head. Mid-stride, yellow leaves lifting from the grass around her boots.","setting":{"location":"Kirche Rohrdorf [LOC001]","indoorOutdoor":"outdoor","description":"Green and gold meadow grass with fallen yellow leaves, a gravel path crossing the field, a plain white concrete church with a tall detached bell pillar on the rise, wooded hill behind.","lighting":"low morning sun from the left, long soft shadows across the grass","camera":"medium","depthLayers":"foreground: grass and fallen leaves; midground: Emma on the path; background: white church and wooded hill"},"timeOfDay":"morning","weather":"clear","characters":[{"id":null,"name":"Emma","position":"center","action":"strides forward along the path with the sword held out","expression":"determined","clothing":"costumed","depth":"foreground","perspective":"front"}],"objects":[{"id":"ART001","name":"wooden toy shield","position":"on her forearm"},{"id":"ART002","name":"wooden toy sword","position":"held out in front of her"}],"interactions":[{"character":"Emma","object":"ART002","where":"holds the wooden toy sword out in front","priority":"essential"}],"background":"empty meadow with a few autumn trees","population":"cast_only"}}
+```
+
+--- Page 2 ---
+TEXT:
+Auf der Wiese bei der Kirche Rohrdorf hob Emma den Schild hoch, um einen Drachen abzuwehren. Der Lederriemen spannte sich, dann riss er an einer Stelle auf. Bis der Riemen ganz entzwei war, lief der Riss weiter. Der Schild rutschte vom Arm und fiel ins Gras. Emma kniete sich hin und nahm die beiden Enden in die Hände. Ein Ende hing noch am Schild, das andere lag als loser Streifen im nassen Gras. Sie drückte die Enden fest aneinander, doch sie rutschten sofort wieder auseinander. Sie legte sie nebeneinander und versuchte es noch einmal.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Emma kneels in the wet grass of the meadow beside the Kirche Rohrdorf, holding the two loose ends of the torn leather strap while the wooden toy shield lies on the grass by her knee. She wears a silver chain mail tunic over a grey padded gambeson, brown leather bracers, dark brown leather boots, a plain brown sword belt and no helmet, bare head. Yellow leaves and grass blades are scattered around the shield.","setting":{"location":"Kirche Rohrdorf [LOC001]","indoorOutdoor":"outdoor","description":"Wet green and gold meadow grass, fallen yellow leaves, a gravel path at the edge, the white concrete church on the rise behind.","lighting":"clear morning light from low on the left","camera":"medium","depthLayers":"foreground: shield and torn strap on the grass; midground: Emma kneeling; background: white church and trees"},"timeOfDay":"morning","weather":"clear","characters":[{"id":null,"name":"Emma","position":"center","action":"kneels by the shield holding the torn strap ends apart","expression":"frowning, eyes on the strap","clothing":"costumed","depth":"foreground","perspective":"front"}],"objects":[{"id":"ART001","name":"wooden toy shield","position":"on the grass by her knee, strap torn"},{"id":"ART002","name":"wooden toy sword","position":"in the sword belt"}],"interactions":[{"character":"Emma","object":"ART001","where":"holds the two loose ends of the torn strap","priority":"essential"}],"background":"empty meadow with a few autumn trees","population":"cast_only"}}
+```
+
+--- Page 3 ---
+TEXT:
+«Nein, noch nicht!» rief Emma und zog die Enden straff. Sie machte eine Schlaufe, wie Grossvater es gezeigt hatte, doch der Knoten ging auf, sobald sie den Schild hochhob. Der nächste Knoten sass zu locker. Das Gras war nass, und die Enden glitten ihr immer wieder aus den Händen. Den dritten Knoten konnte sie gar nicht festziehen, weil die Enden zu kurz waren. Emma biss die Zähne aufeinander, hob den Schild wieder auf und legte den Riemen erneut um den Rand. Die Sonne stand inzwischen hoch über dem Hügel, und der Weg zum Kloster schien weit.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Emma kneels with the wooden toy shield across her knees and pulls the two torn strap ends tight in both hands, mid-knot, her jaw set. She wears a silver chain mail tunic over a grey padded gambeson, brown leather bracers, dark brown leather boots, a plain brown sword belt and no helmet, bare head. High midday sun falls on the meadow and the white church on the rise.","setting":{"location":"Kirche Rohrdorf [LOC001]","indoorOutdoor":"outdoor","description":"Meadow grass gone dry in the midday sun, fallen yellow leaves, a gravel path at the edge, white concrete church on the rise, wooded hill behind.","lighting":"high midday sun from above, short shadows under the figure","camera":"medium","depthLayers":"foreground: shield on her knees and strap ends; midground: Emma kneeling; background: white church and wooded hill"},"timeOfDay":"midday","weather":"clear","characters":[{"id":null,"name":"Emma","position":"center","action":"kneels pulling the strap ends tight over the shield","expression":"eyes narrowed, focused on the knot","clothing":"costumed","depth":"foreground","perspective":"front"}],"objects":[{"id":"ART001","name":"wooden toy shield","position":"across her knees, strap torn"},{"id":"ART002","name":"wooden toy sword","position":"in the sword belt"}],"interactions":[{"character":"Emma","object":"ART001","where":"pulls the two strap ends tight","priority":"essential"}],"background":"empty meadow with a few autumn trees","population":"cast_only"}}
+```
+
+--- Page 4 ---
+TEXT:
+Emma setzte sich mitten ins Gras. Der Schild lag mit dem losen Riemen auf ihren Knien, und das Holzschwert steckte im Gürtel. Sie versuchte es ein letztes Mal, doch die Enden glitten ihr aus den Fingern, bevor der Knoten fest war. Ohne Riemen konnte sie den Schild nicht auf dem Arm tragen, und der Weg bis zum Hügel war noch lang. Ein gelbes Blatt landete auf dem Schild, und Emma liess es dort liegen. «Dann komme ich heute nicht bis zum Kloster», sagte sie leise zu dem Schild. Der Schild lag still auf ihren Knien.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Emma sits in the grass of the meadow beside the Kirche Rohrdorf with the wooden toy shield across her lap, its torn leather strap hanging in two loose ends, a yellow leaf resting on the shield. She wears a silver chain mail tunic over a grey padded gambeson, brown leather bracers, dark brown leather boots, a plain brown sword belt and no helmet, bare head. Afternoon light is soft and clear.","setting":{"location":"Kirche Rohrdorf [LOC001]","indoorOutdoor":"outdoor","description":"Meadow grass in afternoon light, fallen yellow leaves, a gravel path at the edge, white concrete church on the rise, wooded hill behind.","lighting":"soft afternoon light from the right, long shadows","camera":"medium","depthLayers":"foreground: shield across the lap and strap ends; midground: Emma seated in the grass; background: white church and wooded hill"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Emma","position":"center","action":"sits in the grass holding the loose strap across her lap","expression":"lips pressed together, eyes lowered to the shield","clothing":"costumed","depth":"foreground","perspective":"front"}],"objects":[{"id":"ART001","name":"wooden toy shield","position":"across her lap, strap torn"},{"id":"ART002","name":"wooden toy sword","position":"in the sword belt"}],"interactions":[{"character":"Emma","object":"ART001","where":"holds the loose strap across her lap","priority":"essential"}],"background":"empty meadow with a few autumn trees","population":"cast_only"}}
+```
+
+--- Page 5 ---
+TEXT:
+Da fiel Emma wieder ein, wie Grossvater die Schlaufe gelegt hatte. Sie zog den Riemen durch ihre Finger, legte eine Schlaufe und sagte leise: «Schlaufe, herum, durch.» Dann wickelte sie das lange Ende einmal um die Mitte und führte es durch die Öffnung. Sie zog langsam, bis der Knoten fest war. Danach rüttelte sie am Schild, doch der Knoten hielt. Sie hob den Schild wieder auf den linken Arm und schob den Arm durch den Riemen. Dann zog sie das Holzschwert aus dem Gürtel und stand auf.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Emma sits in the grass pulling the two strap ends tight in both hands to finish a firm knot in the leather strap of the wooden toy shield lying across her knees. She wears a silver chain mail tunic over a grey padded gambeson, brown leather bracers, dark brown leather boots, a plain brown sword belt and no helmet, bare head. Afternoon light is soft and clear over the meadow.","setting":{"location":"Kirche Rohrdorf [LOC001]","indoorOutdoor":"outdoor","description":"Meadow grass in afternoon light, fallen yellow leaves, a gravel path at the edge, white concrete church on the rise, wooded hill behind.","lighting":"soft afternoon light from the right, long shadows","camera":"medium","depthLayers":"foreground: shield and knot on her knees; midground: Emma seated; background: white church and wooded hill"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Emma","position":"center","action":"pulls the knotted strap tight","expression":"focused, eyes on the knot","clothing":"costumed","depth":"foreground","perspective":"front"}],"objects":[{"id":"ART001","name":"wooden toy shield","position":"across her knees, strap knotted"},{"id":"ART002","name":"wooden toy sword","position":"in the sword belt"}],"interactions":[{"character":"Emma","object":"ART001","where":"pulls the knotted strap tight","priority":"essential"}],"background":"empty meadow with a few autumn trees","population":"cast_only"}}
+```
+
+--- Page 6 ---
+TEXT:
+Vor dem grossen Tor der Klosterkirche Wettingen blieb Emma stehen. Der Schild sass fest auf ihrem Arm, und das Holzschwert hielt sie in der rechten Hand. «Wir sind da!», rief sie laut über den Platz. Weit hinten auf dem Weg ging eine Frau in einem blauen Mantel vorbei. Emma legte die freie Hand auf den Schildrand und sagte leise: «Das hast du gut gehalten.» Der Weg von Rohrdorf war lang gewesen, und Emma hatte ihn selbst gelaufen, Schritt für Schritt.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Emma stands on the gravel path before the arched stone gate of the Klosterkirche Wettingen, the wooden toy sword hanging in her right hand and her left hand resting on the rim of the shield fixed to her forearm. She wears a silver chain mail tunic over a grey padded gambeson, brown leather bracers, dark brown leather boots, a plain brown sword belt and no helmet, bare head. Far down the path a woman in a blue coat walks away.","setting":{"location":"Klosterkirche Wettingen [LOC002]","indoorOutdoor":"outdoor","description":"Pale grey stone church facade behind an arched dark wooden gate, gravel path, low wall, autumn trees with yellow leaves.","lighting":"clear afternoon light from the left, soft shadows on the gravel","camera":"medium","depthLayers":"foreground: gravel path; midground: Emma before the gate; background: stone church facade and a distant figure on the path"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Emma","position":"center","action":"stands before the gate with her left hand on the shield rim, sword lowered","expression":"steady and content, looking toward the gate","clothing":"costumed","depth":"foreground","perspective":"front"}],"objects":[{"id":"ART001","name":"wooden toy shield","position":"on her forearm, strap knotted"},{"id":"ART002","name":"wooden toy sword","position":"hanging in her right hand"}],"interactions":[{"character":"Emma","object":"ART001","where":"rests the hand on the rim of the shield","priority":"essential"}],"background":"a distant woman in a blue coat on the far path","population":"ambient"}}
+```

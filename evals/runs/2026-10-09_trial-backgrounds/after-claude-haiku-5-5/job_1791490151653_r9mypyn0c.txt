@@ -1,0 +1,187 @@
+---TITLE---
+TITLE: Lukas und das schwierige Wort
+
+---VISUAL BIBLE---
+```json
+{
+  "secondaryCharacters": [],
+  "animals": [
+    {
+      "id": "ANI001",
+      "name": "Eli",
+      "pages": [1, 3, 6],
+      "scaleClass": "hand-sized",
+      "species": "plush elephant toy",
+      "coloring": "soft grey plush with pale pink inner ears and pink patched feet",
+      "anatomy": "two ears, four legs, one trunk, one tail",
+      "features": "stitched dark eyes, rounded trunk, soft worn plush body"
+    },
+    {
+      "id": "ANI002",
+      "name": "Rabe",
+      "pages": [1, 2, 3, 5],
+      "scaleClass": "forearm-sized",
+      "species": "common raven",
+      "coloring": "glossy blue-black feathers with grey-black beak and legs",
+      "anatomy": "two wings, two legs with three forward claws and one back claw each, one beak, one tail",
+      "features": "shaggy throat feathers, heavy hooked grey beak, sharp grey claws"
+    }
+  ],
+  "artifacts": [
+    {
+      "id": "ART001",
+      "label": "pocket guidebook with fold-out map",
+      "name": "small guidebook with a fold-out map",
+      "pages": [1, 5, 6],
+      "scaleClass": "hand-sized",
+      "type": "guidebook",
+      "text": "Die Ruine Stein steht auf dem Hügel.",
+      "description": "small paperback guidebook with a dark green cover and a fold-out map tucked into its back flap, its pages open to a text page"
+    },
+    {
+      "id": "ART002",
+      "label": "wooden signpost",
+      "name": "weathered wooden signpost with one painted arrow board",
+      "pages": [1, 2, 4],
+      "scaleClass": "chest-high",
+      "type": "signpost",
+      "text": "Burgruine Stein",
+      "description": "grey weathered wooden post with one board arm pointing up the slope to the right, dark painted lettering on the board"
+    }
+  ],
+  "locations": [
+    {
+      "id": "LOC001",
+      "name": "Ruine Stein",
+      "pages": [5, 6],
+      "scaleClass": "house-height",
+      "setting": "outdoor, hilltop castle ruin",
+      "colors": "grey stone, green moss, rust and gold autumn leaves",
+      "features": "crumbling stone wall, round stone tower rising above the wall, grassy courtyard, wooded valley below",
+      "signatureElement": "round-topped stone tower above the crumbling wall",
+      "isRealLandmark": true,
+      "landmarkQuery": "Ruine Stein",
+      "landmarkPhoto": 1
+    },
+    {
+      "id": "LOC002",
+      "name": "Waldweg unterhalb der Ruine",
+      "pages": [1, 2, 3, 4],
+      "scaleClass": "house-height",
+      "setting": "outdoor, wooded hillside paths",
+      "colors": "brown earth, yellow and red beech leaves, pale grey beech trunks",
+      "features": "beech trees, fallen leaves, a path fork at a wooden signpost, a rusted wire fence in a steep gully",
+      "signatureElement": "wooden signpost at the path fork",
+      "isRealLandmark": false,
+      "landmarkQuery": null
+    }
+  ],
+  "backgrounds": [
+    {
+      "pages": [1, 2, 4],
+      "description": "A forest path on a wooded hillside below a ruined castle. Pale grey beech trunks rise on both sides, with yellow and red leaves on the branches and on the brown earth. A grey weathered wooden signpost stands where the path forks, one board arm pointing up the slope to the right and the path to the left running down between the trees. Clear afternoon light from the left. Open path in the foreground."
+    },
+    {
+      "pages": [3],
+      "description": "A lower forest path that ends at a rusted wire fence above a steep wooded gully. Brambles grow thick along the bank up to the wire. Beech trunks and fallen leaves cover the ground. A grey tree root lies across the path. Clear afternoon light from the upper left. Open ground in the foreground, with the tops of the trees and a distant stone tower above them."
+    },
+    {
+      "pages": [5, 6],
+      "landmarkPhoto": 1,
+      "description": "The top of a crumbling stone wall of a hilltop castle ruin, a round stone tower rising above the wall. Moss covers the grey stones and autumn leaves lie on the grassy courtyard inside. Beyond the wall the land falls to a wooded river valley with distant hills in autumn colours. Clear afternoon light from the right. Open stone top of the wall in the foreground."
+    }
+  ]
+}
+```
+
+---COVER SCENE---
+```json
+{
+  "title": "Lukas und das schwierige Wort",
+  "scene": {
+    "imageSummary": "Lukas stands on the stone wall of the Ruine Stein, in a dark blue robe with silver stars, a brown leather belt with pouch, pointed grey cloth shoes and a tall pointed deep blue wizard hat with a wide brim and silver band. He holds the open guidebook up in both hands and looks out over the wooded valley. Golden autumn light, warm and clear.",
+    "setting": {
+      "location": "Ruine Stein [LOC001]",
+      "indoorOutdoor": "outdoor",
+      "description": "hilltop castle ruin with a round stone tower, grey stone wall covered with green moss, autumn leaves on the grass, wooded valley and distant hills",
+      "lighting": "clear afternoon sun from the right, warm golden light on the stone",
+      "camera": "wide",
+      "depthLayers": "foreground: top of the crumbling wall; midground: Lukas standing on the wall; background: the round stone tower and the wooded valley with distant hills"
+    },
+    "timeOfDay": "afternoon",
+    "weather": "clear",
+    "characters": [
+      {
+        "id": null,
+        "name": "Lukas",
+        "position": "center",
+        "action": "stands on the wall holding the open guidebook up in both hands",
+        "expression": "confident and pleased",
+        "clothing": "costumed",
+        "depth": "foreground",
+        "perspective": "front"
+      }
+    ],
+    "objects": [
+      {"id": "LOC001", "name": "Ruine Stein", "position": "background"},
+      {"id": "ART001", "name": "pocket guidebook with fold-out map", "position": "held in Lukas's hands at the center"}
+    ]
+  }
+}
+```
+
+---STORY PAGES---
+
+--- Page 1 ---
+TEXT:
+Am Wegweiser unterhalb der Ruine stand Lukas und hielt das Buch mit der Faltkarte in beiden Händen. Er trug seinen dunkelblauen Zauberumhang, den braunen Ledergürtel mit dem Beutel und den hohen Spitzhut, denn heute wollte er als Zauberer zur Ruine Stein wandern. Eli, sein Plüschelefant, ragte oben aus dem Beutel, und im Beutel lag ausserdem ein Rüebli für den Znüni. Da schoss ein Rabe aus der Buche, packte das Buch und flog damit auf den höchsten Ast. «Bring es zurück!», rief Lukas und hob beide Arme. Der Rabe krallte sich am Buch fest und ahmte Lukas' Stimme nach: «Zauberer!»
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"On the forest path beside the wooden signpost, Lukas in a dark blue robe with silver stars, a brown leather belt with pouch, pointed grey cloth shoes and a tall pointed deep blue wizard hat with a wide brim and silver band raises both arms toward a raven high in a beech branch. The raven grips the small guidebook in its claws. Eli the plush elephant peeks out of Lukas's belt pouch. Yellow and red beech leaves, low golden afternoon light.","setting":{"location":"Waldweg unterhalb der Ruine [LOC002]","indoorOutdoor":"outdoor","description":"wooded hillside path with pale grey beech trunks, yellow and red leaves, a wooden signpost at the fork","lighting":"clear afternoon sun from the left, warm light through the leaves","camera":"medium","depthLayers":"foreground: the path and the signpost; midground: Lukas with arms raised; background: beech branches with the raven holding the guidebook"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Lukas","position":"left","action":"raises both arms toward the raven in the branch above","expression":"focused and determined","clothing":"costumed","depth":"foreground","perspective":"front"}],"objects":[{"id":"ART002","name":"wooden signpost","position":"right of Lukas, at the path fork"},{"id":"ART001","name":"pocket guidebook with fold-out map","position":"high in the raven's claws on the beech branch"},{"id":"ANI002","name":"raven","position":"upper center, on the high beech branch"},{"id":"ANI001","name":"Eli","position":"in Lukas's belt pouch, top of the plush head visible"}],"interactions":[{"character":"Lukas","object":"ART001","where":"reaches both arms up toward the guidebook in the raven's claws","priority":"essential"}],"background":"empty forest path","population":"cast_only"}}
+```
+
+--- Page 2 ---
+TEXT:
+Der Wegweiser stand am Abzweig, ein grauer Holzpfosten mit einem Schild, und darauf stand ein langes Wort. Mama hatte ihm beim letzten Bibliotheksbesuch gezeigt, dass man ein langes Wort in Stücke teilen kann. Lukas vergass es jedoch und buchstabierte leise: «B-u-r-g-r-u-i-n-e.» Beim Wort Ruine blieb er hängen. Er tippte mit dem Finger auf die Holzplatte und fing von vorn an, doch die Buchstaben wollten sich wieder nicht fügen. Hoch oben in der Buche sass der Rabe und beobachtete den Beutel an seinem Gürtel. Lukas nahm den Pfad nach links, der steil zwischen den Bäumen hinunterführte, und Eli wackelte bei jedem Schritt im Beutel.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Lukas in a dark blue robe with silver stars, a brown leather belt with pouch, pointed grey cloth shoes and a tall pointed deep blue wizard hat with a wide brim and silver band stands at the path fork, taps the wooden signpost board with one finger and leans toward the lettering. The raven sits on a beech branch above, watching his belt pouch. Yellow and red beech leaves, clear afternoon light.","setting":{"location":"Waldweg unterhalb der Ruine [LOC002]","indoorOutdoor":"outdoor","description":"wooded hillside path at a fork, grey beech trunks, leaves on the brown earth, the left path running steeply downhill between the trees","lighting":"clear afternoon sun from the left, warm light on the signpost","camera":"medium","depthLayers":"foreground: the signpost board; midground: Lukas at the fork; background: beech branches with the raven and the path running down to the left"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Lukas","position":"center","action":"taps the signpost board with one finger while spelling the word","expression":"concentrating, brows drawn together","clothing":"costumed","depth":"foreground","perspective":"front"}],"objects":[{"id":"ART002","name":"wooden signpost","position":"right of Lukas at the fork"},{"id":"ANI002","name":"raven","position":"upper left, on a beech branch above the path"},{"id":"ANI001","name":"Eli","position":"in Lukas's belt pouch"}],"interactions":[{"character":"Lukas","object":"ART002","where":"taps the signpost board with one finger","priority":"essential"}],"background":"empty forest path","population":"cast_only"}}
+```
+
+--- Page 3 ---
+TEXT:
+Unten am Zaun endete der Pfad. Dahinter fiel der Hang steil in eine Schlucht, und Brombeeren wucherten bis an den Draht. Lukas drehte sich um, doch vom Wegweiser war nichts mehr zu sehen, nur Buchen und feuchtes Laub. Über den Baumwipfeln flog der Rabe mit dem Buch in den Krallen zum Turm der Ruine hinauf und verschwand hinter der Mauer. Lukas setzte sich auf eine Wurzel und nahm Eli aus dem Beutel. «Wir wissen nicht, wo die Burg ist», sagte er leise. Eli lag still auf seinem Knie. Lukas hatte keine Karte mehr, und den Weg zur Burg kannte er nicht.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Lukas in a dark blue robe with silver stars, a brown leather belt with pouch, pointed grey cloth shoes and a tall pointed deep blue wizard hat with a wide brim and silver band sits on a tree root at the end of the path. He holds the plush elephant Eli on his knee in both hands. Beyond him a rusted wire fence runs along a steep gully full of brambles. Far above the treetops, the raven flies toward a stone tower, carrying the guidebook in its claws. Clear afternoon light.","setting":{"location":"Waldweg unterhalb der Ruine [LOC002]","indoorOutdoor":"outdoor","description":"lower forest path ending at a rusted wire fence, steep wooded gully with brambles, pale beech trunks and fallen leaves","lighting":"clear afternoon sun from the upper left, soft light on the root and the leaves","camera":"medium","depthLayers":"foreground: the grey tree root and the fallen leaves; midground: Lukas seated on the root; background: the rusted wire fence, the gully, and the raven flying above the treetops toward a distant stone tower"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Lukas","position":"left","action":"sits on the tree root holding Eli on his knee","expression":"quiet and uncertain","clothing":"costumed","depth":"foreground","perspective":"front"}],"objects":[{"id":"ANI001","name":"Eli","position":"on Lukas's knee"},{"id":"ANI002","name":"raven","position":"far background, high above the treetops, flying toward the stone tower"}],"interactions":[{"character":"Lukas","object":"ANI001","where":"holds Eli on his knee in both hands","priority":"essential"}],"background":"empty forest path at a fence","population":"cast_only"}}
+```
+
+--- Page 4 ---
+TEXT:
+Lukas kehrte den Pfad zurück, bis er wieder vor dem Wegweiser stand. Er legte die Hand auf die Holzplatte und las das Wort langsam, Stück für Stück. «Burg», sagte er, dann machte er eine kurze Pause. «Ruine.» Die beiden Teile liessen sich lesen, und nun erinnerte er sich an Mamas Rat. Er sprach beide Teile noch einmal laut aus. Der rechte Arm zeigte den Hang hinauf, und Lukas ging diesen Weg mit dem Beutel fest am Gürtel. Auf dem ganzen Weg hielt er den Beutel fest. Zwischen den Bäumen wurde es heller, und vor ihm führten steinerne Stufen zur Mauer hinauf.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Lukas in a dark blue robe with silver stars, a brown leather belt with pouch, pointed grey cloth shoes and a tall pointed deep blue wizard hat with a wide brim and silver band stands at the wooden signpost with one hand resting flat on the board. He reads the word aloud with his face turned to the board, and the arm of the signpost points up the slope to the right. Yellow and red beech leaves, clear afternoon light.","setting":{"location":"Waldweg unterhalb der Ruine [LOC002]","indoorOutdoor":"outdoor","description":"wooded hillside path at the fork, grey beech trunks, yellow and red leaves, the path rising to the right between the trees","lighting":"clear afternoon sun from the left, brighter light ahead on the upper path","camera":"medium","depthLayers":"foreground: the signpost and the fallen leaves; midground: Lukas beside the signpost; background: the upper path rising between the beech trunks toward more light"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Lukas","position":"left","action":"rests one hand on the signpost board and reads the word aloud","expression":"focused, lips parted as he reads","clothing":"costumed","depth":"foreground","perspective":"front"}],"objects":[{"id":"ART002","name":"wooden signpost","position":"right of Lukas at the fork"},{"id":"ANI001","name":"Eli","position":"in Lukas's belt pouch"}],"interactions":[{"character":"Lukas","object":"ART002","where":"rests a hand on the signpost board","priority":"essential"}],"background":"empty forest path","population":"cast_only"}}
+```
+
+--- Page 5 ---
+TEXT:
+Oben auf der Mauer lag die Ruine im warmen Licht, und der Rabe sass auf dem Rand eines Steins neben dem Buch. Lukas blieb auf der obersten Stufe stehen und zog ein Rüebli aus dem Beutel. Er hielt es über den Mauerrand, und der Rabe hüpfte näher und ergriff es. Dabei liess er das Buch auf den Steinrand fallen. Lukas trat vor, zog es zu sich und hielt es mit beiden Händen fest. Der Rabe flog mit dem Rüebli davon zum Turm, und Lukas sah ihm nach, bis er zwischen den Zinnen verschwand.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Lukas in a dark blue robe with silver stars, a brown leather belt with pouch, pointed grey cloth shoes and a tall pointed deep blue wizard hat with a wide brim and silver band stands on the top stone step below the wall and holds a carrot out over the edge. The raven has landed on the wall top and takes the carrot in its claws, while the small guidebook slips off the stone edge beside it. Round stone tower behind, warm afternoon light.","setting":{"location":"Ruine Stein [LOC001]","indoorOutdoor":"outdoor","description":"top of a crumbling grey stone wall of the castle ruin, moss on the stones, a round stone tower above, autumn leaves on the courtyard","lighting":"clear afternoon sun from the right, warm light on the wall top","camera":"medium","depthLayers":"foreground: the wall edge with the guidebook sliding off the stone; midground: the raven on the wall and Lukas on the step below; background: the round stone tower and the wooded valley"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Lukas","position":"left","action":"holds a carrot out over the wall edge while stepping up toward the wall","expression":"determined, watching the raven closely","clothing":"costumed","depth":"foreground","perspective":"front"}],"objects":[{"id":"ANI002","name":"raven","position":"upper right, on the wall top, claws closing on the carrot","depth":"background"},{"id":"ART001","name":"pocket guidebook with fold-out map","position":"on the wall edge beside the raven, sliding off the stone"}],"interactions":[{"character":"Lukas","object":"carrot","where":"holds a carrot out over the wall edge","priority":"essential"}],"background":"empty stone wall top","population":"cast_only"}}
+```
+
+--- Page 6 ---
+TEXT:
+«Schau, Eli», sagte Lukas und setzte sich mit dem Rücken an die warme Mauer. Er legte den Elefanten auf sein Knie und schlug das Buch auf. Unten im Tal glänzte der Fluss in der Sonne. Er fuhr mit dem Finger unter jeder Zeile entlang, wie Mama es ihm gezeigt hatte. «Die Ruine Stein steht auf dem Hügel.» Bei Ruine stockte er nur kurz, dann teilte er das Wort und las weiter. Er drehte die Seite um, hielt sie Eli hin und las den nächsten Satz laut vor, und Eli hörte zu.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Lukas in a dark blue robe with silver stars, a brown leather belt with pouch, pointed grey cloth shoes and a tall pointed deep blue wizard hat with a wide brim and silver band sits with his back against the warm stone wall of the ruin. He holds the open guidebook in both hands, the plush elephant Eli resting on his knee. The round stone tower stands behind him and the wooded valley lies below. Clear afternoon light, warm on the stones.","setting":{"location":"Ruine Stein [LOC001]","indoorOutdoor":"outdoor","description":"top of a crumbling grey stone wall of the castle ruin, moss on the stones, a grassy courtyard, a round stone tower and the wooded valley with a river below","lighting":"clear afternoon sun from the right, warm light on the stone and the open pages","camera":"medium","depthLayers":"foreground: Lukas seated against the wall with the open guidebook and Eli on his knee; midground: the stone wall top; background: the round stone tower and the wooded valley with the river"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Lukas","position":"center","action":"sits against the wall reading the open guidebook aloud","expression":"calm and proud, eyes on the page","clothing":"costumed","depth":"foreground","perspective":"front"}],"objects":[{"id":"ART001","name":"pocket guidebook with fold-out map","position":"open in Lukas's hands"},{"id":"ANI001","name":"Eli","position":"on Lukas's knee"}],"interactions":[{"character":"Lukas","object":"ART001","where":"holds the open guidebook in both hands","priority":"essential"}],"background":"empty stone wall top","population":"cast_only"}}
+```

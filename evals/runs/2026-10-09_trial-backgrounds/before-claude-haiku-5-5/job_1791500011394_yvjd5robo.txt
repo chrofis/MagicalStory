@@ -1,0 +1,168 @@
+---TITLE---
+TITLE: Tobias und der Apfel für Pippo
+
+---VISUAL BIBLE---
+```json
+{
+  "secondaryCharacters": [
+    {
+      "id": "CHR001",
+      "name": "Mama",
+      "pages": [1, 3, 4, 6],
+      "scaleClass": "adult-height",
+      "age": "a woman in her thirties",
+      "build": "average height, slim build",
+      "hair": "dark brown, tied back at the neck",
+      "face": "brown eyes, warm smile, brown skin",
+      "signatureLook": "a green knitted scarf",
+      "clothing": "mustard-yellow knitted jumper, dark blue jeans, brown ankle boots"
+    }
+  ],
+  "animals": [
+    {
+      "id": "ANI001",
+      "name": "Pippo",
+      "pages": [1, 5, 6],
+      "scaleClass": "hand-sized",
+      "species": "green parrot",
+      "coloring": "bright green body, blue and yellow wing feathers, red patch on the forehead",
+      "anatomy": "two wings, two feet, a long tail, a hooked beak",
+      "features": "round dark eyes, grey hooked beak, red forehead patch, perches on a wooden stand"
+    },
+    {
+      "id": "ANI002",
+      "name": "Eichhörnchen",
+      "pages": [2, 3, 4],
+      "scaleClass": "hand-sized",
+      "species": "red squirrel",
+      "coloring": "reddish-brown back, white belly, reddish-brown bushy tail",
+      "anatomy": "four legs, one long bushy tail, two small ears",
+      "features": "round dark eyes, small rounded ears, tail held over its back"
+    }
+  ],
+  "artifacts": [
+    {
+      "id": "ART001",
+      "label": "red apple",
+      "name": "red apple",
+      "pages": [1, 2, 3, 4, 5, 6],
+      "scaleClass": "palm-sized",
+      "type": "fruit",
+      "description": "a round, shiny red apple with a short green stalk"
+    }
+  ],
+  "locations": [
+    {
+      "id": "LOC001",
+      "name": "Kirche Rohrdorf",
+      "pages": [1, 2, 3, 4, 5, 6],
+      "scaleClass": "house-height",
+      "setting": "outdoor, grassy lawn in front of a church, Fislisbach, autumn",
+      "colors": "white concrete, green grass, golden fallen leaves, pale blue sky",
+      "features": "plain modern white concrete church with a tall detached bell tower, wooden bench, a wooden perch on the grass, a tree at the edge of the lawn",
+      "signatureElement": "tall detached concrete bell tower",
+      "isRealLandmark": true,
+      "landmarkQuery": "Kirche Rohrdorf",
+      "landmarkPhoto": 1
+    }
+  ],
+  "backgrounds": [
+    {
+      "pages": [1, 2, 3, 4, 5, 6],
+      "description": "A plain modern white concrete church with a tall detached bell tower stands on a hillside in Fislisbach, seen from the front lawn. A green lawn with fallen golden autumn leaves spreads in the foreground. A wooden bench and a wooden perch stand on the grass at the left, and a tree with autumn colours stands at the right edge. Soft afternoon light, pale blue sky. Wide open grass in the centre for the characters."
+    }
+  ]
+}
+```
+
+---COVER SCENE---
+```json
+{
+  "title": "Tobias und der Apfel für Pippo",
+  "scene": {
+    "imageSummary": "Tobias, a pirate in a red and white horizontal-striped sailor shirt, a brown leather vest, dark brown canvas trousers tucked into tall black boots and a wide black leather belt with a brass buckle, stands tall on the lawn with a red apple raised high in one hand. Pippo the green parrot sits on the wooden perch beside him. Warm golden autumn light.",
+    "setting": {
+      "location": "Kirche Rohrdorf [LOC001]",
+      "indoorOutdoor": "outdoor",
+      "description": "Grassy lawn in front of a plain modern white concrete church with a tall detached bell tower, golden fallen leaves on the grass.",
+      "lighting": "warm low afternoon sun from the left",
+      "camera": "wide",
+      "depthLayers": "foreground: Tobias and the grass with fallen leaves; midground: the wooden perch with Pippo; background: the white church and bell tower under a pale blue sky"
+    },
+    "timeOfDay": "afternoon",
+    "weather": "clear",
+    "characters": [
+      {
+        "id": null,
+        "name": "Tobias",
+        "position": "center",
+        "action": "stands tall and raises a red apple in one hand",
+        "expression": "confident and happy",
+        "clothing": "costumed",
+        "depth": "foreground",
+        "perspective": "front"
+      }
+    ],
+    "objects": [
+      {"id": "LOC001", "name": "Kirche Rohrdorf", "position": "background"},
+      {"id": "ANI001", "name": "Pippo", "position": "midground left on the wooden perch"}
+    ]
+  }
+}
+```
+
+---STORY PAGES---
+
+--- Page 1 ---
+TEXT:
+«Ahoi!», ruft Tobias. Er ist ein Pirat auf dem Rasen vor der Kirche Rohrdorf in Fislisbach. Er trägt sein Piratenhemd, die Weste und die hohen Stiefel. Sein Papagei Pippo sitzt auf der Stange neben der Bank. Tobias hält einen roten Apfel hoch. «Für dich, Pippo!», sagt er. Mama sitzt auf der Bank und lacht.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Tobias, a pirate in a red and white horizontal-striped sailor shirt, a brown leather vest, dark brown canvas trousers tucked into tall black boots and a wide black leather belt with a brass buckle, holds a red apple up toward Pippo, a green parrot on a wooden perch beside a bench. Mama sits on the bench in a mustard-yellow jumper, laughing. Warm afternoon light on the lawn.","setting":{"location":"Kirche Rohrdorf [LOC001]","indoorOutdoor":"outdoor","description":"Grassy lawn in front of a plain modern white concrete church with a tall detached bell tower, a wooden bench, a wooden perch, golden fallen leaves on the grass.","lighting":"warm low afternoon sun from the left","camera":"medium","depthLayers":"foreground: Tobias and the grass; midground: the perch with the parrot and the bench with Mama; background: the white church and bell tower under a pale blue sky"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Tobias","position":"left","action":"holds a red apple up toward the parrot","expression":"beaming with delight","clothing":"costumed","depth":"foreground","perspective":"front"},{"id":"CHR001","name":"Mama","position":"right","action":"sits on the bench and watches","expression":"laughing","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[{"id":"ART001","name":"red apple","position":"in Tobias's raised hand"},{"id":"ANI001","name":"Pippo","position":"on the wooden perch beside the bench"}],"interactions":[{"character":"Tobias","object":"ART001","where":"holds the red apple up in one hand","priority":"essential"},{"character":"Mama","object":"Tobias","where":"watches Tobias from the bench","priority":"low"}],"background":"empty lawn with fallen leaves","population":"cast_only"}}
+```
+
+--- Page 2 ---
+TEXT:
+Tobias streckt den Apfel zur Stange. Da kommt ein Eichhörnchen über den Rasen. Flink schnappt es den Apfel aus seiner Hand. Mit dem Apfel rennt es den Stamm hinauf. Tobias bleibt stehen und schaut nach oben. «Oh!», sagt er leise.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Tobias, a pirate in a red and white horizontal-striped sailor shirt, a brown leather vest, dark brown canvas trousers tucked into tall black boots and a wide black leather belt with a brass buckle, is surprised as a red squirrel snatches the red apple from his hand. The squirrel scrambles up the tree trunk with the apple. Warm afternoon light.","setting":{"location":"Kirche Rohrdorf [LOC001]","indoorOutdoor":"outdoor","description":"Grassy lawn in front of a plain modern white concrete church, a tree trunk at the edge of the lawn with autumn leaves, golden fallen leaves on the grass.","lighting":"warm low afternoon sun from the left","camera":"medium","depthLayers":"foreground: Tobias with an empty hand reaching; midground: the squirrel climbing the tree trunk with the apple; background: the white church and bell tower under a pale blue sky"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Tobias","position":"left","action":"reaches toward the squirrel with an empty hand","expression":"surprised","clothing":"costumed","depth":"foreground","perspective":"front"}],"objects":[{"id":"ART001","name":"red apple","position":"in the squirrel's paws on the tree trunk"},{"id":"ANI002","name":"Eichhörnchen","position":"midground, climbing the tree trunk"}],"interactions":[{"character":"Tobias","object":"ART001","where":"reaches toward the red apple in the squirrel's paws","priority":"essential"}],"background":"empty lawn with fallen leaves","population":"cast_only"}}
+```
+
+--- Page 3 ---
+TEXT:
+Oben am Ast hält das Eichhörnchen den Apfel fest. Tobias fängt an zu weinen. Mama kommt von der Bank und hebt ihn unter den Armen hoch. Tobias streckt beide Arme zum Ast hinauf. «Hier!», ruft er laut. Mama hält ihn sicher fest.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Mama, in a mustard-yellow jumper and a green knitted scarf, holds Tobias up under the arms beside the tree. Tobias, a pirate in a red and white horizontal-striped sailor shirt, a brown leather vest, dark brown canvas trousers tucked into tall black boots and a wide black leather belt with a brass buckle, is crying and stretches both arms up toward a low branch, where a red squirrel sits holding the red apple. Warm afternoon light.","setting":{"location":"Kirche Rohrdorf [LOC001]","indoorOutdoor":"outdoor","description":"Grassy lawn in front of a plain modern white concrete church, a tree with autumn leaves at the right edge, golden fallen leaves on the grass.","lighting":"warm low afternoon sun from the left","camera":"medium","depthLayers":"foreground: the grass and fallen leaves; midground: Mama holding Tobias up beside the tree; background: the tree branch with the squirrel and the white church under a pale blue sky"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Tobias","position":"center","action":"stretches both arms up toward the branch while being held up","expression":"crying, arms stretched up","clothing":"costumed","depth":"foreground","perspective":"front"},{"id":"CHR001","name":"Mama","position":"right","action":"holds Tobias up under the arms beside the tree","expression":"calm and focused","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[{"id":"ART001","name":"red apple","position":"on the low branch in the squirrel's paws"},{"id":"ANI002","name":"Eichhörnchen","position":"on the low branch above Tobias"}],"interactions":[{"character":"Tobias","object":"ART001","where":"stretches both arms toward the red apple on the branch","priority":"essential"},{"character":"Mama","object":"Tobias","where":"holds Tobias up under the arms","priority":"normal"}],"background":"empty lawn with fallen leaves","population":"cast_only"}}
+```
+
+--- Page 4 ---
+TEXT:
+«Hier!», ruft Tobias noch einmal. Da lässt das Eichhörnchen den Apfel fallen. Der Apfel landet im Gras. Mama setzt Tobias auf den Rasen. Tobias krabbelt zum Apfel und hebt ihn auf.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Tobias, a pirate in a red and white horizontal-striped sailor shirt, a brown leather vest, dark brown canvas trousers tucked into tall black boots and a wide black leather belt with a brass buckle, sits on the grass and lifts the red apple from the grass with both hands, grinning. Mama, in a mustard-yellow jumper and a green knitted scarf, stands beside him. Warm afternoon light.","setting":{"location":"Kirche Rohrdorf [LOC001]","indoorOutdoor":"outdoor","description":"Grassy lawn in front of a plain modern white concrete church, golden fallen leaves on the grass, a tree at the edge of the lawn.","lighting":"warm low afternoon sun from the left","camera":"medium","depthLayers":"foreground: Tobias and the apple on the grass; midground: Mama standing beside him; background: the tree and the white church under a pale blue sky"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Tobias","position":"left","action":"sits on the grass and lifts the apple with both hands","expression":"delighted, grinning","clothing":"costumed","depth":"foreground","perspective":"front"},{"id":"CHR001","name":"Mama","position":"right","action":"stands beside Tobias","expression":"smiling","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[{"id":"ART001","name":"red apple","position":"on the grass in front of Tobias"}],"interactions":[{"character":"Tobias","object":"ART001","where":"lifts the red apple from the grass with both hands","priority":"essential"},{"character":"Mama","object":"Tobias","where":"stands beside Tobias on the grass","priority":"low"}],"background":"empty lawn with fallen leaves","population":"cast_only"}}
+```
+
+--- Page 5 ---
+TEXT:
+Auf der Stange wartet Pippo schon. Tobias krabbelt zur Bank und hält ihm den Apfel hin. Pippo pickt ein Stück ab. Tobias lacht und zeigt auf seinen Papagei. «Pippo!», sagt er.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Tobias, a pirate in a red and white horizontal-striped sailor shirt, a brown leather vest, dark brown canvas trousers tucked into tall black boots and a wide black leather belt with a brass buckle, kneels on the grass by the bench and holds the red apple out toward Pippo, a green parrot on the wooden perch. Pippo pecks at the apple in Tobias's hand. Warm afternoon light.","setting":{"location":"Kirche Rohrdorf [LOC001]","indoorOutdoor":"outdoor","description":"Grassy lawn in front of a plain modern white concrete church, a wooden bench and a wooden perch on the grass, golden fallen leaves.","lighting":"warm low afternoon sun from the left","camera":"medium","depthLayers":"foreground: Tobias and the grass; midground: the perch with Pippo and the bench; background: the white church and bell tower under a pale blue sky"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Tobias","position":"left","action":"holds the red apple out toward the parrot","expression":"laughing with delight","clothing":"costumed","depth":"foreground","perspective":"front"}],"objects":[{"id":"ART001","name":"red apple","position":"in Tobias's outstretched hand"},{"id":"ANI001","name":"Pippo","position":"midground on the wooden perch, pecking at the apple"}],"interactions":[{"character":"Tobias","object":"ART001","where":"holds the red apple out in one hand toward the parrot","priority":"essential"}],"background":"empty lawn with fallen leaves","population":"cast_only"}}
+```
+
+--- Page 6 ---
+TEXT:
+Vor der Kirche Rohrdorf sitzt Tobias jetzt neben Mama auf der Bank. Pippo sitzt auf der Lehne. Tobias hält den Apfel hoch. «Hier, Mama!», sagt er. Mama nimmt einen Bissen und lacht.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Tobias, a pirate in a red and white horizontal-striped sailor shirt, a brown leather vest, dark brown canvas trousers tucked into tall black boots and a wide black leather belt with a brass buckle, sits on the bench beside Mama and holds the red apple out toward her, grinning. Mama, in a mustard-yellow jumper and a green knitted scarf, reaches for the apple and smiles. Pippo the green parrot sits on the back of the bench. Warm afternoon light.","setting":{"location":"Kirche Rohrdorf [LOC001]","indoorOutdoor":"outdoor","description":"Wooden bench on the grassy lawn in front of a plain modern white concrete church, golden fallen leaves on the grass.","lighting":"warm low afternoon sun from the left","camera":"medium","depthLayers":"foreground: the bench with Tobias and Mama; midground: Pippo on the back of the bench; background: the white church and bell tower under a pale blue sky"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Tobias","position":"left","action":"sits on the bench and holds the apple out toward Mama","expression":"happy grin","clothing":"costumed","depth":"foreground","perspective":"front"},{"id":"CHR001","name":"Mama","position":"right","action":"sits on the bench and reaches for the apple","expression":"smiling","clothing":"standard","depth":"foreground","perspective":"front"}],"objects":[{"id":"ART001","name":"red apple","position":"in Tobias's outstretched hand"},{"id":"ANI001","name":"Pippo","position":"on the back of the bench"}],"interactions":[{"character":"Tobias","object":"ART001","where":"holds the red apple out toward Mama","priority":"essential"},{"character":"Mama","object":"ART001","where":"reaches for the red apple","priority":"normal"}],"background":"empty lawn with fallen leaves","population":"cast_only"}}
+```

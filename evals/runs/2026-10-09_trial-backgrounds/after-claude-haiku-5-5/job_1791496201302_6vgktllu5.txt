@@ -1,0 +1,180 @@
+---TITLE---
+TITLE: Emma und das Laubnest für Stacheli
+
+---VISUAL BIBLE---
+```json
+{
+  "secondaryCharacters": [],
+  "animals": [
+    {
+      "id": "ANI001",
+      "name": "Stacheli",
+      "pages": [5, 6],
+      "scaleClass": "palm-sized",
+      "species": "European hedgehog",
+      "coloring": "brown and grey spines covering the back, pale underside, pale face",
+      "anatomy": "four short legs, one small rounded snout, a back covered in short spines",
+      "features": "small dark eyes, dark rounded snout, closed rounded mouth, short pale claws folded at rest"
+    }
+  ],
+  "artifacts": [
+    {
+      "id": "ART001",
+      "label": "wicker basket",
+      "name": "round wicker basket with two side handles",
+      "pages": [2, 3, 4, 5],
+      "scaleClass": "forearm-sized",
+      "type": "basket",
+      "description": "basket woven from pale willow strips, open top, round rim, two side handles",
+      "states": [
+        {"name": "empty", "delta": "no leaves inside, lying on its side on the grass", "pages": [3]}
+      ]
+    },
+    {
+      "id": "ART002",
+      "label": "flat stone",
+      "name": "flat grey stone with a smooth top",
+      "pages": [4, 5],
+      "scaleClass": "hand-sized",
+      "type": "stone",
+      "description": "stone, flat and grey, with a smooth top and rough edges"
+    }
+  ],
+  "locations": [
+    {
+      "id": "LOC001",
+      "name": "Fislisbach",
+      "pages": [1, 5, 6],
+      "scaleClass": "landmark",
+      "setting": "outdoor, family garden with lawn, low hedge, wooden fence and compost box, village of Fislisbach beyond",
+      "colors": "green lawn strewn with brown and red autumn leaves, dark green hedge, grey wooden fence, pale wooden compost box",
+      "features": "low clipped hedge along the back, wooden gate, wooden compost box with a grey stone on its lid, fence posts",
+      "signatureElement": "heap of fallen leaves against the hedge",
+      "isRealLandmark": true,
+      "landmarkQuery": "Fislisbach (Stadt)",
+      "landmarkPhoto": "none"
+    },
+    {
+      "id": "LOC002",
+      "name": "Kirche Rohrdorf",
+      "pages": [2, 3, 4],
+      "scaleClass": "house-height",
+      "setting": "outdoor, open meadow field beside a church with a tall bell tower",
+      "colors": "white concrete church, dry golden stubble and grass, dark green hedge, blue autumn sky",
+      "features": "modern white concrete church, tall bell tower, stone wall with hedge at the field edge, field path",
+      "signatureElement": "tall white bell tower above the field",
+      "isRealLandmark": true,
+      "landmarkQuery": "Kirche Rohrdorf",
+      "landmarkPhoto": 1
+    }
+  ],
+  "backgrounds": [
+    {
+      "pages": [1],
+      "landmarkPhoto": "none",
+      "description": "Family garden in Fislisbach seen from the lawn. Fallen leaves lie across the grass, a low clipped hedge runs along the back, a grey wooden fence with a gate separates the garden from an open field beyond. A pale wooden compost box with a grey stone on its lid stands at the right. Low autumn sun from the left, long soft shadows. Wide view. Open lawn in the foreground. No people."
+    },
+    {
+      "pages": [2, 3, 4],
+      "landmarkPhoto": 1,
+      "description": "Open meadow field sloping down from a dirt field path, dry golden stubble and tall grass. At the far side stands the modern white concrete church Kirche Rohrdorf with its tall bell tower on the hillside. A stone wall with a dark green hedge runs along the church edge of the field. Blue autumn sky, clear light from the left. Medium-wide view. No people in the foreground."
+    },
+    {
+      "pages": [5, 6],
+      "landmarkPhoto": "none",
+      "description": "Corner of a garden under a dark green hedge, close view. Ground covered with fallen brown leaves, a pale wooden compost box with a grey stone on its lid at the left, a grey wooden fence post at the right. Warm low autumn light from the right, soft shadows on the leaves. Open grass and lawn in the middle distance. No people."
+    }
+  ]
+}
+```
+
+---COVER SCENE---
+```json
+{
+  "title": "Emma und das Laubnest für Stacheli",
+  "scene": {
+    "imageSummary": "Emma stands on the field path in front of the church, holding the full wicker basket of leaves against her hip with both arms. The hedgehog Stacheli sits on the grass at her feet, and the golden stubble of the field and the white church tower fill the background under a clear blue sky.",
+    "setting": {
+      "location": "Kirche Rohrdorf [LOC002]",
+      "indoorOutdoor": "outdoor",
+      "description": "Open meadow field with golden stubble and grass, field path, white modern concrete church with tall bell tower, dark green hedge along the field edge, scattered autumn leaves",
+      "lighting": "clear autumn daylight from the left, warm light on the grass",
+      "camera": "wide",
+      "depthLayers": "foreground: hedgehog and scattered leaves on the grass; midground: Emma with the wicker basket on the field path; background: stone wall, hedge and the white church with its tall bell tower"
+    },
+    "timeOfDay": "afternoon",
+    "weather": "clear",
+    "characters": [
+      {
+        "id": null,
+        "name": "Emma",
+        "position": "center",
+        "action": "stands on the field path holding the full wicker basket against her hip with both arms",
+        "expression": "proud, looking straight ahead",
+        "clothing": "standard"
+      }
+    ],
+    "objects": [
+      {"id": "LOC002", "name": "Kirche Rohrdorf", "position": "background"},
+      {"id": "ART001", "name": "wicker basket", "position": "center, held by Emma"},
+      {"id": "ANI001", "name": "Stacheli", "position": "foreground, on the grass beside Emma"}
+    ]
+  }
+}
+```
+
+---STORY PAGES---
+
+--- Page 1 ---
+TEXT:
+«Stacheli, dein Bett ist fast fertig!» Emma kniete vor der Hecke und drückte den grossen Laubhaufen flach, bis er weich und dicht war. Neben dem Haufen stand der Kompost, und auf dem Deckel lag ein schwerer Stein, den Papa dort hingelegt hatte. Emma legte ein letztes rotes Blatt oben auf den Haufen. Bald musste der Igel in den Winterschlaf, und dann sollte er ein warmes Nest haben. Da kam ein kräftiger Windstoss über den Garten. Der ganze Laubhaufen hob sich, flog über den Zaun und verteilte sich über das Feld. Emma sprang auf und rannte hinterher.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Emma springs up from the leaf heap by the hedge as a gust lifts the leaves off the heap and sends them swirling over the garden fence. Her arms are open and her hair flies back. Brown and red leaves fill the air above the lawn in the warm afternoon light.","setting":{"location":"Fislisbach [LOC001]","indoorOutdoor":"outdoor","description":"family garden lawn strewn with autumn leaves, low clipped hedge, grey wooden fence and gate, pale compost box with a grey stone on its lid","lighting":"low autumn sun from the left, long soft shadows across the lawn","camera":"medium","depthLayers":"foreground: leaves swirling over the lawn; midground: Emma springing up from the leaf heap; background: hedge, fence and the open field beyond"},"timeOfDay":"afternoon","weather":"windy","characters":[{"id":null,"name":"Emma","position":"center","action":"springs up from the leaf heap, arms open, leaves lifting around her","expression":"eyes wide, mouth open in surprise","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[],"interactions":[{"character":"Emma","object":"leaf heap","where":"presses both hands into the leaf heap as she rises","priority":"essential"}],"background":"empty garden with leaves in the air","population":"cast_only"}}
+```
+
+--- Page 2 ---
+TEXT:
+Auf dem Feld hinter dem Zaun wirbelten die Blätter in alle Richtungen. Emma lief quer durch das hohe Gras und fing auf, was sie erwischen konnte. Sie stopfte die Blätter vorne in ihre Jacke, bis sie kaum noch den Reissverschluss schliessen konnte. Am Weg lag ein geflochtener Korb, den jemand dort vergessen hatte. Emma leerte die Jacke hinein und rannte weiter. Immer wieder flog ihr ein Blatt davon, doch sie sammelte weiter, bis der Korb halb voll war. In der Ferne stand die weisse Kirche Rohrdorf mit dem hohen Glockenturm. An der Mauer bei der Kirchenhecke lagen einige Blätter still im Gras, weil der Wind dort nicht hinkam.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Emma kneels on the field path beside the wicker basket and tips leaves from the front of her open jacket into it. Leaves still drift across the golden stubble around her. The white church tower stands far off across the field under a blue sky.","setting":{"location":"Kirche Rohrdorf [LOC002]","indoorOutdoor":"outdoor","description":"open meadow field with golden stubble and tall grass, dirt field path, dark green hedge, white modern concrete church with tall bell tower in the distance","lighting":"clear afternoon light from the left, warm on the grass","camera":"medium","depthLayers":"foreground: leaves drifting over the stubble; midground: Emma and the wicker basket on the field path; background: stone wall, hedge and the white church tower"},"timeOfDay":"afternoon","weather":"windy","characters":[{"id":null,"name":"Emma","position":"center","action":"kneels on the field path and tips leaves from her open jacket into the basket","expression":"focused, eyes down on the basket","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[{"id":"ART001","name":"wicker basket","position":"center, on the field path in front of Emma"},{"id":"LOC002","name":"Kirche Rohrdorf","position":"background"}],"interactions":[{"character":"Emma","object":"ART001","where":"holds the wicker basket steady with one hand while the other hand empties the jacket","priority":"essential"}],"background":"a few distant walkers far off across the field","population":"ambient"}}
+```
+
+--- Page 3 ---
+TEXT:
+Kurz vor der Mauer kam ein neuer Windstoss. Emma hielt die Jacke als Deckel über die Blätter im Korb, doch der Stoss riss ihr das Kleidungsstück aus den Händen. Der Korb kippte zur Seite und rollte den Hang hinunter. Die Blätter wirbelten über das ganze Feld bis zur Hecke bei der Kirche. Emma lief dem Korb nach, doch er lag bereits leer im Gras. Sie setzte sich auf den Weg und liess die Arme sinken. Irgendwo im hohen Gras musste die Jacke liegen, doch Emma konnte sie nicht sehen.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"A new gust tips the wicker basket over on the slope, and the leaves stream out across the field toward the church hedge. Emma lunges down the slope after the rolling basket with one arm reaching out. The white church tower stands far off above the stubble.","setting":{"location":"Kirche Rohrdorf [LOC002]","indoorOutdoor":"outdoor","description":"sloping open meadow with golden stubble and tall grass, dirt field path, dark green hedge at the church edge, white modern concrete church with tall bell tower in the distance","lighting":"clear afternoon light from the left, bright on the stubble","camera":"medium","depthLayers":"foreground: the wicker basket tipping on the slope; midground: Emma lunging down the slope; background: stone wall, hedge and the white church tower"},"timeOfDay":"afternoon","weather":"windy","characters":[{"id":null,"name":"Emma","position":"center","action":"lunges down the slope after the rolling basket, one arm reaching out","expression":"eyes fixed on the basket, mouth shut tight","clothing":"standard","depth":"midground","perspective":"side"}],"objects":[{"id":"ART001","name":"wicker basket","position":"foreground, tipping over on the slope, leaves spilling out"},{"id":"LOC002","name":"Kirche Rohrdorf","position":"background"}],"interactions":[{"character":"Emma","object":"ART001","where":"reaches toward the wicker basket as it rolls down the slope","priority":"essential"}],"background":"a few distant walkers far off across the field","population":"ambient"}}
+```
+
+--- Page 4 ---
+TEXT:
+An der Mauer hing die Jacke in den Zweigen der Hecke. Emma zog sie vorsichtig heraus und schüttelte das Laub ab. Am Fuss der Mauer lag ein flacher Stein. Sie erinnerte sich an den Stein auf dem Kompostdeckel daheim. «Der Stein hält den Deckel fest», sagte sie leise. Sie hob den Korb auf und stellte ihn in die Ecke, wo der Wind nicht hinkam. Blatt für Blatt sammelte sie aus dem Gras und legte es in den Korb, bis er fast überquoll. Dann breitete sie die Jacke über die Blätter. Sie hielt den Stein mit beiden Händen und legte ihn auf die Jacke. Der Korb blieb stehen, und kein Blatt flog mehr davon.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Emma kneels in the corner of the church wall and lowers the flat stone with both hands onto her jacket, which covers the full wicker basket. Leaves lie still in the grass around her. The white church tower rises above the hedge in the distance.","setting":{"location":"Kirche Rohrdorf [LOC002]","indoorOutdoor":"outdoor","description":"corner of a stone wall with a dark green hedge at the church edge of the meadow, grass and leaves at the foot of the wall, white modern concrete church with tall bell tower in the distance","lighting":"clear afternoon light from the left, soft on the wall and the grass","camera":"medium","depthLayers":"foreground: leaves in the grass; midground: Emma kneeling by the basket at the wall; background: hedge and the white church tower"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Emma","position":"center","action":"kneels by the wicker basket and lowers the flat stone onto the jacket covering the leaves","expression":"concentrated, eyes on the stone","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[{"id":"ART001","name":"wicker basket","position":"center, at the foot of the wall, covered by the jacket"},{"id":"ART002","name":"flat stone","position":"center, held over the jacket"},{"id":"LOC002","name":"Kirche Rohrdorf","position":"background"}],"interactions":[{"character":"Emma","object":"ART002","where":"holds the flat stone in both hands and lowers it onto the jacket","priority":"essential"}],"background":"a few distant walkers far off across the field","population":"ambient"}}
+```
+
+--- Page 5 ---
+TEXT:
+Am Gartentor hob Emma den Korb mit beiden Armen an und trug ihn zur Hecke. Sie stellte ihn ab, nahm den Stein von der Jacke und legte ihn neben den grossen Stein auf den Kompostdeckel. Dann zog sie die Jacke vom Korb und hängte sie über den Zaun. Danach hob sie den Korb wieder an und kippte die Blätter vorsichtig in die Ecke unter der Hecke, wo der grosse Haufen gelegen hatte. Zwischen den Zweigen bewegte sich etwas Kleines. Stacheli kroch aus dem Gebüsch, schob sich in das Nest und verschwand unter den Blättern.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Emma tips the wicker basket with both arms into the corner under the hedge, and leaves slide out in a soft heap. The hedgehog Stacheli creeps out from the bushes into the leaf nest. The pale compost box with its stones stands at the side.","setting":{"location":"Fislisbach [LOC001]","indoorOutdoor":"outdoor","description":"corner of a garden under a dark green hedge, fallen brown leaves on the ground, pale wooden compost box with two grey stones on its lid, grey wooden fence post","lighting":"warm low autumn light from the right, soft shadows on the leaves","camera":"medium","depthLayers":"foreground: leaves spilling from the basket; midground: Emma tipping the basket at the hedge; background: hedge, fence and compost box"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Emma","position":"center","action":"tips the wicker basket with both arms into the corner under the hedge","expression":"careful, eyes on the leaves","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[{"id":"ART001","name":"wicker basket","position":"center, tipped in Emma's arms over the hedge corner"},{"id":"ANI001","name":"Stacheli","position":"background, at the foot of the hedge, creeping in among the leaves"}],"interactions":[{"character":"Emma","object":"ART001","where":"holds the wicker basket in both arms and tips it into the corner","priority":"essential"}],"background":"empty garden corner","population":"cast_only"}}
+```
+
+--- Page 6 ---
+TEXT:
+Aus dem Laub schob sich der Igel hervor. Er schnüffelte am Rand des Nestes, dann trottete er über den Rasen zurück zur Hecke. Emma kniete neben dem Nest und rührte sich nicht. Der Igel blieb einen Moment liegen, dann setzte er sich in Bewegung. Emma zog die Blätter, die auf dem Rasen liegen geblieben waren, mit der Hand zu einem kleinen Haufen zusammen. Sie stand auf, stellte sich an die Hecke und sah dem Igel nach, bis er unter den Zweigen verschwand. «Bis im Frühling, Stacheli!», rief sie und winkte ihm zu.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"The hedgehog Stacheli trots away across the lawn toward the hedge, leaving the leaf nest in the corner. Emma stands at the hedge with one arm raised in a wave toward him. Low autumn light falls across the grass and the fallen leaves.","setting":{"location":"Fislisbach [LOC001]","indoorOutdoor":"outdoor","description":"corner of a garden under a dark green hedge, lawn with fallen brown leaves, leaf nest in the corner, grey wooden fence post, pale compost box","lighting":"warm low autumn light from the right, long soft shadows on the lawn","camera":"medium","depthLayers":"foreground: lawn and leaves with the hedgehog trotting; midground: Emma standing at the hedge, arm raised; background: hedge, fence and compost box"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Emma","position":"center","action":"stands at the hedge and waves toward the hedgehog","expression":"smiling, eyes on the hedgehog","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[{"id":"ANI001","name":"Stacheli","position":"foreground, trotting across the lawn toward the hedge"},{"id":"LOC001","name":"Fislisbach","position":"background"}],"interactions":[{"character":"Emma","object":"ANI001","where":"raises one arm and waves toward the hedgehog","priority":"essential"}],"background":"empty garden","population":"cast_only"}}
+```

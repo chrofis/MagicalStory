@@ -1,0 +1,193 @@
+---TITLE---
+TITLE: Noah und Bommel hinter der Kartontür
+
+---VISUAL BIBLE---
+```json
+{
+  "secondaryCharacters": [
+    {
+      "id": "CHR001",
+      "name": "Mia",
+      "pages": [1, 2, 3, 6],
+      "scaleClass": "waist-high",
+      "age": "a girl of about five",
+      "build": "small, slim, about the height of a young child",
+      "hair": "brown, shoulder-length, pulled back with a red clip",
+      "face": "brown eyes, round cheeks, a quiet expression",
+      "signatureLook": "red hair clip",
+      "clothing": "yellow top, blue trousers, red shoes"
+    }
+  ],
+  "animals": [
+    {
+      "id": "ANI001",
+      "name": "Schattenbär",
+      "pages": [3, 4, 5],
+      "scaleClass": "adult-height",
+      "species": "shadow bear, a grown bear made of soft shade",
+      "coloring": "deep grey-blue fur with darker, softer edges like shade, paler grey on the muzzle and belly",
+      "anatomy": "four legs, two round ears, one short tail, a rounded head with a soft rounded snout",
+      "features": "round ears, large round eyes, soft rounded paws"
+    }
+  ],
+  "artifacts": [
+    {
+      "id": "ART001",
+      "label": "stuffed rabbit",
+      "name": "small stuffed rabbit toy",
+      "properName": "Bommel",
+      "pages": [1, 2, 3, 4, 5, 6],
+      "scaleClass": "hand-sized",
+      "type": "stuffed toy",
+      "description": "small grey stuffed rabbit with long floppy ears and a faded blue ribbon round its neck"
+    },
+    {
+      "id": "ART002",
+      "label": "cardboard door",
+      "name": "tall free-standing cardboard door",
+      "pages": [1, 2, 3, 4, 5, 6],
+      "scaleClass": "adult-height",
+      "type": "play door",
+      "description": "tall free-standing door made of brown cardboard with a painted frame and a round knob",
+      "states": [
+        {"name": "closed", "delta": "door shut flat against its frame", "pages": [1]},
+        {"name": "open", "delta": "door swung wide open onto the meadow beyond", "pages": [2, 3, 5, 6]},
+        {"name": "closing", "delta": "door swung about halfway shut, leaving a narrow gap", "pages": [4]}
+      ]
+    }
+  ],
+  "locations": [
+    {
+      "id": "LOC001",
+      "name": "Kindergarten Bauecke",
+      "pages": [1, 2, 6],
+      "scaleClass": "house-height",
+      "setting": "indoor, classroom corner with building blocks",
+      "colors": "pale plaster walls, warm wooden shelves, rug in soft red and green",
+      "features": "low wooden shelves of blocks, a woven rug, large windows with morning light",
+      "signatureElement": "tall wooden block tower on the rug",
+      "isRealLandmark": false,
+      "landmarkQuery": null
+    },
+    {
+      "id": "LOC002",
+      "name": "Fislisbach meadow view",
+      "pages": [3, 4, 5],
+      "scaleClass": "landmark",
+      "setting": "outdoor, green valley meadow seen through the doorway",
+      "colors": "fresh green grass, grey-blue shadow, pale sky",
+      "features": "green meadow running out to a wooded ridge, white houses on a far hillside",
+      "signatureElement": "a narrow path through the grass",
+      "isRealLandmark": true,
+      "landmarkQuery": "Fislisbach (Stadt)",
+      "landmarkPhoto": 1
+    }
+  ],
+  "backgrounds": [
+    {
+      "pages": [1, 2],
+      "description": "Wide view of a bright classroom corner with low wooden shelves full of building blocks, a woven rug in red and green, and pale plaster walls. A tall free-standing cardboard door stands against the far wall beside a wooden block tower. Soft morning daylight comes in from large windows on the left. Open floor in the centre of the rug."
+    },
+    {
+      "pages": [3, 4, 5],
+      "landmarkPhoto": 1,
+      "description": "View from inside the classroom corner through the frame of a tall cardboard door standing open at the threshold. Beyond the threshold a green meadow runs out in front, with a narrow path through the grass toward a wooded ridge. White houses sit on a far hillside of a valley town under a pale morning sky. Morning light falls across the grass. Open grass on the path in the middle distance."
+    },
+    {
+      "pages": [6],
+      "description": "Close view of the classroom corner: a low wooden shelf of building blocks on the left, a rug in red and green on the floor, and a tall cardboard door standing open at the right edge of the frame. Pale plaster wall behind. Soft morning daylight from the windows on the left. Open floor in the centre of the rug."
+    }
+  ]
+}
+```
+
+---COVER SCENE---
+```json
+{
+  "title": "Noah und Bommel hinter der Kartontür",
+  "scene": {
+    "imageSummary": "Noah stands on the green meadow path in front of the free-standing cardboard door, holding Bommel in both arms and looking toward the wooded ridge. The morning light is warm and clear over the grass.",
+    "setting": {
+      "location": "Fislisbach meadow view [LOC002]",
+      "indoorOutdoor": "outdoor",
+      "description": "green valley meadow with a narrow grass path, a wooded ridge and white houses on a far hillside, with a tall cardboard door standing in the grass",
+      "lighting": "soft morning sunlight from the left, long gentle shadows across the grass",
+      "camera": "wide",
+      "depthLayers": "foreground grass and path, midground Noah with the cardboard door beside him, background wooded ridge and white houses on the hillside"
+    },
+    "timeOfDay": "morning",
+    "weather": "clear",
+    "characters": [
+      {
+        "id": null,
+        "name": "Noah",
+        "position": "center",
+        "action": "stands on the path holding Bommel in both arms",
+        "expression": "determined, eyes forward",
+        "clothing": "standard"
+      }
+    ],
+    "objects": [
+      {"id": "LOC002", "name": "Fislisbach meadow view", "position": "background"},
+      {"id": "ART001", "name": "Bommel", "position": "held in Noah's arms, centre"},
+      {"id": "ART002", "name": "cardboard door", "position": "right, standing in the grass"}
+    ]
+  }
+}
+```
+
+---STORY PAGES---
+
+--- Page 1 ---
+TEXT:
+In der Bauecke sass Mia vor einer Tür aus Karton. Sie zog die Knie an die Brust und schaute zur Wand. Frau Berger zeigte Noah am Morgen seinen Haken. Noah hielt Bommel, sein Stoffkaninchen, fest im Arm und ging langsam auf Mia zu.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"In the classroom corner, Mia sits on the rug in front of a tall free-standing cardboard door, knees drawn up, face turned toward the wall. Noah walks toward her across the rug, holding the grey stuffed rabbit Bommel in both arms. Soft morning light falls from the windows.","setting":{"location":"Kindergarten Bauecke [LOC001]","indoorOutdoor":"indoor","description":"classroom corner with low wooden shelves of building blocks, a woven rug in red and green, pale plaster walls and large windows","lighting":"soft morning daylight from the windows on the left","camera":"medium","depthLayers":"foreground rug and floor, midground Mia sitting and Noah walking, background cardboard door against the far wall"},"timeOfDay":"morning","weather":"none","characters":[{"id":"CHR001","name":"Mia","position":"left","action":"sits on the rug in front of the cardboard door, knees drawn up","expression":"quiet, downcast","clothing":"standard","depth":"midground","perspective":"front"},{"id":null,"name":"Noah","position":"center","action":"walks toward Mia holding Bommel in both arms","expression":"careful, a small frown","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[{"id":"ART002","name":"cardboard door","position":"far wall, right of centre"},{"id":"ART001","name":"Bommel","position":"held in Noah's arms"}],"interactions":[{"character":"Noah","object":"ART001","where":"holds Bommel in both arms against his chest","priority":"essential"},{"character":"Mia","object":"ART002","where":"sits in front of the cardboard door, looking at the wall","priority":"low"}],"background":"a few shelves of blocks along the wall","population":"cast_only"}}
+```
+
+--- Page 2 ---
+TEXT:
+Noah trat an den Klötzturm, und sein Ärmel streifte die oberste Reihe. Der Turm kippte, und die Klötze rollten über den Boden. Die Tür aus Karton schwang auf. Dahinter führte ein Weg durch eine grüne Wiese, und Mia stand auf und ging hindurch.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"The wooden block tower tips over at the edge of the rug as Noah's sleeve brushes its top row, blocks tumbling across the floor. Behind them the cardboard door swings wide open onto a green meadow, and Mia steps through the doorway.","setting":{"location":"Kindergarten Bauecke [LOC001]","indoorOutdoor":"indoor","description":"classroom corner with low wooden shelves of blocks, a woven rug in red and green and pale plaster walls","lighting":"soft morning daylight from the windows on the left, with bright green light from the open doorway","camera":"medium","depthLayers":"foreground rug with blocks rolling, midground Noah beside the falling tower, background open cardboard door with the meadow beyond and Mia stepping through"},"timeOfDay":"morning","weather":"none","characters":[{"id":null,"name":"Noah","position":"left","action":"stands beside the falling block tower, his sleeve brushing its top row","expression":"startled, eyes on the falling blocks","clothing":"standard","depth":"midground","perspective":"front"},{"id":"CHR001","name":"Mia","position":"right","action":"steps through the open cardboard door toward the meadow","expression":"quiet, looking ahead","clothing":"standard","depth":"midground","perspective":"back view"}],"objects":[{"id":"ART002","name":"cardboard door","position":"far wall, right, swung open"},{"id":"ART001","name":"Bommel","position":"held against Noah's side"}],"interactions":[{"character":"Noah","object":"ART001","where":"holds Bommel tight against his side","priority":"essential"},{"character":"Mia","object":"ART002","where":"steps through the open cardboard door","priority":"normal"}],"background":"scattered building blocks across the rug","population":"cast_only"}}
+```
+
+--- Page 3 ---
+TEXT:
+«Mia!», rief Noah. Mia drehte sich nicht um. Auf dem Weg vor ihr stand ein Bär aus Schatten. Noah blieb an der Schwelle stehen, zitterte und hielt Bommel mit beiden Händen fest.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Noah stands at the threshold of the open cardboard door, holding Bommel with both hands and trembling. Beyond the doorway a shadow bear stands on the grass path, blocking the way, and Mia walks further along the path with her back turned.","setting":{"location":"Fislisbach meadow view [LOC002]","indoorOutdoor":"outdoor","description":"green valley meadow seen through the cardboard doorway, a narrow path through the grass, a wooded ridge and white houses on a far hillside","lighting":"soft morning sunlight over the meadow, with the classroom light falling across the threshold","camera":"medium","depthLayers":"foreground threshold of the doorway with Noah, midground the shadow bear on the path, background Mia on the path near the wooded ridge"},"timeOfDay":"morning","weather":"clear","characters":[{"id":null,"name":"Noah","position":"left","action":"stands on the threshold holding Bommel with both hands","expression":"frightened, eyes wide","clothing":"standard","depth":"foreground","perspective":"front"},{"id":"ANI001","name":"Schattenbär","position":"center","action":"stands on the grass path, blocking the way forward","expression":"calm, watching Noah","clothing":"standard","depth":"midground","perspective":"front"},{"id":"CHR001","name":"Mia","position":"right","action":"walks away along the path toward the ridge","expression":"quiet, back turned","clothing":"standard","depth":"background","perspective":"back view"}],"objects":[{"id":"ART002","name":"cardboard door","position":"at the threshold, open"},{"id":"ART001","name":"Bommel","position":"held in Noah's hands"}],"interactions":[{"character":"Noah","object":"ART001","where":"holds Bommel tight in both hands","priority":"essential"},{"character":"Schattenbär","object":"ART002","where":"stands on the path beyond the open cardboard door, watching the doorway","priority":"low"},{"character":"Mia","object":"ART002","where":"walks away from the cardboard door along the path","priority":"low"}],"background":"empty meadow path","population":"cast_only"}}
+```
+
+--- Page 4 ---
+TEXT:
+Die Tür begann sich zu schliessen. Noah machte einen Schritt zurück und stiess mit dem Rücken an den Tisch. Durch den schmalen Spalt sah er nur noch den Bären.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"The cardboard door swings halfway shut, leaving a narrow gap. Noah takes a step back and his back touches the edge of a table, Bommel held tight in front of him. Through the gap the shadow bear stands on the grass.","setting":{"location":"Fislisbach meadow view [LOC002]","indoorOutdoor":"outdoor","description":"green valley meadow seen through the narrowing cardboard doorway, grass and a narrow path, a wooded ridge and white houses on a far hillside","lighting":"morning sunlight through the narrowing gap, the classroom corner in shade","camera":"medium","depthLayers":"foreground Noah stepping back with Bommel, midground the closing cardboard door, background the shadow bear on the grass path through the gap"},"timeOfDay":"morning","weather":"clear","characters":[{"id":null,"name":"Noah","position":"left","action":"steps back with Bommel held in front of him, his back touching a table edge","expression":"afraid, eyes on the bear","clothing":"standard","depth":"foreground","perspective":"front"},{"id":"ANI001","name":"Schattenbär","position":"right","action":"stands on the grass path inside the narrowing gap","expression":"calm, facing the doorway","clothing":"standard","depth":"background","perspective":"front"}],"objects":[{"id":"ART002","name":"cardboard door","position":"centre, swung about halfway shut"},{"id":"ART001","name":"Bommel","position":"held in front of Noah"}],"interactions":[{"character":"Noah","object":"ART001","where":"holds Bommel tight in front of his body","priority":"essential"},{"character":"Schattenbär","object":"ART002","where":"stands in the narrow gap of the cardboard door","priority":"low"}],"background":"a low table and shelves in shade","population":"cast_only"}}
+```
+
+--- Page 5 ---
+TEXT:
+Mit einem Schritt ging Noah wieder nach vorn, und dann noch einen. Er hielt Bommel dem Bären hin. «Du darfst daran riechen», sagte er leise. Der Bär senkte den Kopf und schnupperte an dem Stoffkaninchen. Dann hob er Noah sanft mit beiden Armen hoch.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Noah steps forward to the threshold and holds Bommel out toward the shadow bear, which lowers its head to sniff the rabbit. The bear's paws are drawn in gently, and the morning light falls across the grass beyond the doorway.","setting":{"location":"Fislisbach meadow view [LOC002]","indoorOutdoor":"outdoor","description":"green valley meadow seen through the cardboard doorway, grass and a narrow path, a wooded ridge and white houses on a far hillside","lighting":"morning sunlight across the meadow, falling on the threshold from the front","camera":"medium","depthLayers":"foreground Noah at the threshold holding out Bommel, midground the shadow bear leaning toward the rabbit, background wooded ridge and white houses"},"timeOfDay":"morning","weather":"clear","characters":[{"id":null,"name":"Noah","position":"left","action":"stands at the threshold and holds Bommel out toward the bear","expression":"determined, steady gaze","clothing":"standard","depth":"foreground","perspective":"front"},{"id":"ANI001","name":"Schattenbär","position":"right","action":"lowers its head toward Bommel to sniff the rabbit","expression":"gentle, attentive","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[{"id":"ART002","name":"cardboard door","position":"at the threshold, open"},{"id":"ART001","name":"Bommel","position":"held out in Noah's hand"}],"interactions":[{"character":"Noah","object":"ART001","where":"holds Bommel out toward the bear in one hand","priority":"essential"},{"character":"Schattenbär","object":"ART001","where":"sniffs at Bommel with its nose","priority":"essential"}],"background":"empty meadow path","population":"cast_only"}}
+```
+
+--- Page 6 ---
+TEXT:
+Der Bär hatte Noah sanft zurück in die Bauecke getragen. Mia kam den Weg entlang und blieb vor ihm stehen. Noah gab ihr Bommel. «Pass gut auf ihn auf», sagte er. Mia drückte das Stoffkaninchen an sich und lächelte.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Back in the classroom corner, Noah holds Bommel out to Mia, who has just come in from the open cardboard door. Mia reaches for the rabbit and draws it to her chest with a smile, the morning light bright on the rug.","setting":{"location":"Kindergarten Bauecke [LOC001]","indoorOutdoor":"indoor","description":"classroom corner with a low shelf of building blocks, a woven rug in red and green, pale plaster walls and the cardboard door standing open at the right edge","lighting":"soft morning daylight from the windows on the left","camera":"medium","depthLayers":"foreground rug, midground Noah holding Bommel out and Mia reaching for it, background open cardboard door and pale wall"},"timeOfDay":"morning","weather":"none","characters":[{"id":null,"name":"Noah","position":"left","action":"holds Bommel out toward Mia","expression":"proud, a small smile","clothing":"standard","depth":"midground","perspective":"front"},{"id":"CHR001","name":"Mia","position":"right","action":"reaches for Bommel and takes it, drawing it to her chest","expression":"happy, smiling","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[{"id":"ART002","name":"cardboard door","position":"right edge, open"},{"id":"ART001","name":"Bommel","position":"between Noah and Mia"}],"interactions":[{"character":"Noah","object":"ART001","where":"holds Bommel out to Mia","priority":"essential"},{"character":"Mia","object":"ART001","where":"reaches for Bommel and draws it to her chest","priority":"essential"}],"background":"a low shelf of blocks along the wall","population":"cast_only"}}
+```

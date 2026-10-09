@@ -1,0 +1,175 @@
+---TITLE---
+TITLE: Lily and the Gnomes of Cobble Hill
+
+---VISUAL BIBLE---
+```json
+{
+  "secondaryCharacters": [
+    {
+      "id": "CHR001",
+      "name": "Grumbold",
+      "pages": [3, 4],
+      "scaleClass": "waist-high",
+      "age": "a gnome of about sixty",
+      "build": "short and stout, about as tall as a young child, with a round belly under a brown waistcoat",
+      "hair": "thick grey hair under a red woollen cap, with a grey beard reaching his chest",
+      "face": "broad nose, bushy grey eyebrows, a bushy grey beard",
+      "signatureLook": "a red woollen cap with a long tassel",
+      "clothing": "brown waistcoat over a cream shirt, green trousers, a red woollen cap"
+    }
+  ],
+  "animals": [],
+  "artifacts": [
+    {
+      "id": "ART001",
+      "label": "toy owl",
+      "name": "soft toy owl",
+      "properName": "Hoot",
+      "pages": [1, 2, 3, 4, 5, 6],
+      "scaleClass": "hand-sized",
+      "type": "soft toy",
+      "description": "brown felt toy owl with a round cream patch on its front, two large round eyes stitched in gold thread, and small folded felt wings"
+    },
+    {
+      "id": "ART002",
+      "label": "wooden barrel",
+      "name": "wooden barrel",
+      "pages": [4, 5],
+      "scaleClass": "waist-high",
+      "type": "barrel",
+      "description": "upright oak barrel with dark iron hoops, standing on the grassy bank beside the lane"
+    }
+  ],
+  "locations": [
+    {
+      "id": "LOC001",
+      "name": "Cobble Hill above Fislisbach",
+      "pages": [3, 4, 5, 6],
+      "scaleClass": "landmark",
+      "setting": "outdoor, a cobbled lane climbing a green hillside above a valley town",
+      "colors": "green grass, grey cobblestones, white town buildings far below, dark green wooded ridge, pale autumn sky",
+      "features": "two grassy banks along the lane, golden grass at the edges, a low stone wall at the hilltop, the roofs of a town spread across the valley",
+      "signatureElement": "the cobbled lane winding up the hill towards the wall at the top",
+      "isRealLandmark": true,
+      "landmarkQuery": "Fislisbach (Stadt)",
+      "landmarkPhoto": 1
+    },
+    {
+      "id": "LOC002",
+      "name": "Lily's bedroom",
+      "pages": [1, 2],
+      "scaleClass": "house-height",
+      "setting": "indoor, a child's bedroom",
+      "colors": "cream walls, a patchwork quilt in red and blue, dark wood wardrobe, warm lamplight",
+      "features": "single bed, tall wooden wardrobe with its door open, small window, bedside lamp on a low chest",
+      "signatureElement": "the open wardrobe door with coats hanging inside",
+      "isRealLandmark": false,
+      "landmarkQuery": null
+    }
+  ],
+  "backgrounds": [
+    {
+      "pages": [1, 2],
+      "description": "A cosy bedroom with cream walls, a single bed with a red and blue patchwork quilt, and a tall dark wooden wardrobe with its door standing open and coats hanging inside. Warm lamplight from a bedside lamp on a low chest, soft evening light from a small window with autumn leaves outside. Open floor space in the centre."
+    },
+    {
+      "pages": [3, 4, 5],
+      "description": "A cobbled lane climbing between two grassy banks on a green hillside, with the roofs of a white town spread across the valley far below and a dark green wooded ridge beyond. Clear autumn afternoon light from the side, golden grass at the edges. Open cobbles in the middle of the lane."
+    },
+    {
+      "pages": [6],
+      "description": "The top of a grassy hill with a low grey stone wall along one edge, looking out over a green valley with the roofs of a white town and a dark green wooded ridge beyond. Dusk light, a pale sky going gold near the horizon. Open grass in the foreground."
+    }
+  ]
+}
+```
+
+---COVER SCENE---
+```json
+{
+  "title": "Lily and the Gnomes of Cobble Hill",
+  "scene": {
+    "imageSummary": "Lily stands tall on the cobbled lane below the wall at the top of the hill, wearing a long flowing robe in deep purple with golden moon patterns, a brown leather belt with pouch, pointed grey cloth shoes, and a tall pointed deep purple wizard hat with a wide brim and a golden band. She holds the toy owl Hoot up in one arm, and the green valley with the town spreads out behind her.",
+    "setting": {
+      "location": "Cobble Hill above Fislisbach [LOC001]",
+      "indoorOutdoor": "outdoor",
+      "description": "A cobbled lane climbing a green hillside, grassy banks on each side, a low grey stone wall at the top, the roofs of a white town and a dark green wooded ridge in the valley below.",
+      "lighting": "Clear autumn light from the low sun on the right, warm and golden on the grass.",
+      "camera": "wide",
+      "depthLayers": "Foreground: cobbled lane and golden grass. Midground: Lily standing on the lane. Background: the stone wall, the valley town and the wooded ridge."
+    },
+    "timeOfDay": "afternoon",
+    "weather": "clear",
+    "characters": [
+      {
+        "id": null,
+        "name": "Lily",
+        "position": "center",
+        "action": "stands on the cobbled lane holding the toy owl up in one arm",
+        "expression": "confident, chin up",
+        "clothing": "costumed"
+      }
+    ],
+    "objects": [
+      {"id": "LOC001", "name": "Cobble Hill above Fislisbach", "position": "background"},
+      {"id": "ART001", "name": "toy owl Hoot", "position": "held up in Lily's arm"}
+    ]
+  }
+}
+```
+
+---STORY PAGES---
+
+--- Page 1 ---
+TEXT:
+Lily pulled the wardrobe door wide and lifted her toy owl, Hoot, from the foot of her bed. Everyone in Fislisbach knew that the sad old wizard at the top of Cobble Hill had no one to keep him company since his own owl had flown away. Lily had decided he needed Hoot far more than she did. She took the purple robe from its hook and held it against her jumper, then reached up to the shelf for the tall hat with the golden band. "We are going to see him," she told Hoot, and she stood on her tiptoes to reach the hat.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Lily, wearing a jumper and trousers, stands by her open wardrobe holding a purple robe against her jumper with one hand and tucking the toy owl Hoot under her other arm. Lamplight warms the cream walls and the patchwork quilt.","setting":{"location":"Lily's bedroom [LOC002]","indoorOutdoor":"indoor","description":"Cream walls, red and blue patchwork quilt on a single bed, tall dark wooden wardrobe with its door standing open and coats hanging inside, a bedside lamp on a low chest.","lighting":"Warm lamplight from the bedside lamp on the left, soft evening light from a small window behind.","camera":"medium","depthLayers":"Foreground: corner of the bed with the quilt. Midground: Lily beside the open wardrobe. Background: small window with autumn leaves outside."},"timeOfDay":"evening","weather":"none","characters":[{"id":null,"name":"Lily","position":"center","action":"holds a purple robe against her jumper and reaches up towards the shelf","expression":"determined, lips pressed together","clothing":"standard","depth":"foreground","perspective":"front"}],"objects":[{"id":"ART001","name":"toy owl Hoot","position":"tucked under Lily's arm"}],"interactions":[{"character":"Lily","object":"ART001","where":"holds the toy owl tucked under one arm","priority":"essential"}],"background":"empty room","population":"cast_only"}}
+```
+
+--- Page 2 ---
+TEXT:
+Pulling the robe on over her jumper, Lily fastened the brown leather belt and tucked the little pouch in place. She set the tall purple hat on her head and tugged the wide brim straight. Then she tucked Hoot firmly under one arm and stepped through the coats at the back of the wardrobe. The coats brushed against her hat as she pushed through them. The soft carpet gave way to something hard and uneven under her feet. Lily had a plan, and it was a simple one. She would walk up the hill, hand Hoot to the wizard, and walk straight home again.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Lily, wearing a long flowing robe in deep purple with golden moon patterns, a brown leather belt with pouch, pointed grey cloth shoes, and a tall pointed deep purple wizard hat with a wide brim and a golden band, sets the hat on her head beside the open wardrobe, the toy owl Hoot tucked under one arm. Coats hang at the edge of the frame.","setting":{"location":"Lily's bedroom [LOC002]","indoorOutdoor":"indoor","description":"Cream walls, red and blue patchwork quilt on a single bed, tall dark wooden wardrobe with its door standing open and coats hanging inside, a bedside lamp on a low chest.","lighting":"Warm lamplight from the bedside lamp on the left, soft evening light from a small window behind.","camera":"medium","depthLayers":"Foreground: the bed quilt. Midground: Lily in her costume beside the wardrobe. Background: the open wardrobe with coats hanging inside."},"timeOfDay":"evening","weather":"none","characters":[{"id":null,"name":"Lily","position":"center","action":"sets the tall purple hat on her head beside the open wardrobe","expression":"determined, lips pressed together","clothing":"costumed","depth":"foreground","perspective":"front"}],"objects":[{"id":"ART001","name":"toy owl Hoot","position":"tucked under Lily's arm"}],"interactions":[{"character":"Lily","object":"ART001","where":"holds the toy owl tucked under one arm","priority":"essential"}],"background":"empty room","population":"cast_only"}}
+```
+
+--- Page 3 ---
+TEXT:
+At the foot of Cobble Hill, a lane of cobblestones wound up between two grassy banks, with the green meadow falling away to the roofs of Fislisbach far below. The lane was full of gnomes. They stood shoulder to shoulder in red caps and brown, and not one of them stepped aside. Lily walked up to the back of the crowd. "Please, I need to get to the top of the hill," she said. A gnome standing on a wooden crate at the front folded his arms. "Grumbold says the lane stays shut," called a gnome beside her. Behind them, a gnome chanted a rhyme about pears and a sleepy bear, and his friends giggled.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"At the back of a crowd of gnomes on a cobbled hill lane, Lily, wearing a long flowing robe in deep purple with golden moon patterns, a brown leather belt with pouch, pointed grey cloth shoes, and a tall pointed deep purple wizard hat with a wide brim and a golden band, holds the toy owl Hoot under one arm and speaks. Grumbold stands on a wooden crate at the front of the crowd with his arms folded, watching her.","setting":{"location":"Cobble Hill above Fislisbach [LOC001]","indoorOutdoor":"outdoor","description":"A cobbled lane climbing between two grassy banks on a green hillside, the roofs of a white town spread across the valley far below and a dark green wooded ridge beyond.","lighting":"Clear autumn afternoon light from the right, golden on the grass.","camera":"medium","depthLayers":"Foreground: Lily at the back of the crowd and the cobbles. Midground: the crowd of gnomes filling the lane. Background: Grumbold on his crate, the grassy banks, the valley town."},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Lily","position":"left","action":"stands at the back of the crowd and speaks","expression":"polite and determined, mouth open mid-word","clothing":"costumed","depth":"foreground","perspective":"front"},{"id":"CHR001","name":"Grumbold","position":"right","action":"stands on a wooden crate at the front with his arms folded","expression":"stubborn, eyebrows low","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[{"id":"ART001","name":"toy owl Hoot","position":"tucked under Lily's arm"}],"interactions":[{"character":"Lily","object":"ART001","where":"holds the toy owl tucked under one arm","priority":"essential"},{"character":"Grumbold","object":"ART002","where":"watches the lane from the crate","priority":"low"}],"background":"busy crowd of gnomes filling the lane","population":"crowd"}}
+```
+
+--- Page 4 ---
+TEXT:
+Ducking low, Lily wriggled between two gnomes and made it halfway along the lane. Then a broad gnome shoulder met her, and another met her from the other side, and the crowd pressed in against her. Her hat tipped sideways over one eye. Hoot slipped from under her arm, and she caught him against her chest before he could hit the cobbles. "Please let me through," she said. Grumbold leaned out over his crate. "Back to the grass with you, little wizard." The gnomes pushed her out onto the bank beside a wooden barrel, and the gap closed behind her. The lane stayed shut.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Lily, wearing a long flowing robe in deep purple with golden moon patterns, a brown leather belt with pouch, pointed grey cloth shoes, and a tall pointed deep purple wizard hat with a wide brim and a golden band, has been pushed onto the grassy bank beside a wooden barrel, her hat tipped sideways, the toy owl Hoot held against her chest. Behind her the gnome crowd fills the cobbled lane, and Grumbold leans out over his crate.","setting":{"location":"Cobble Hill above Fislisbach [LOC001]","indoorOutdoor":"outdoor","description":"A cobbled lane climbing between two grassy banks on a green hillside, a wooden barrel on the grassy bank, the roofs of a white town spread across the valley far below.","lighting":"Clear autumn afternoon light from the right, longer shadows across the grass.","camera":"medium","depthLayers":"Foreground: Lily on the grassy bank with the barrel beside her. Midground: the crowd of gnomes packed into the lane. Background: Grumbold on his crate, the valley town and the wooded ridge."},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Lily","position":"left","action":"holds the toy owl against her chest after being pushed back onto the bank","expression":"startled, eyes wide, mouth pressed shut","clothing":"costumed","depth":"foreground","perspective":"front"},{"id":"CHR001","name":"Grumbold","position":"right","action":"leans out over the edge of his crate","expression":"stern, eyebrows low","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[{"id":"ART001","name":"toy owl Hoot","position":"held against Lily's chest"},{"id":"ART002","name":"wooden barrel","position":"on the grassy bank beside Lily"}],"interactions":[{"character":"Lily","object":"ART001","where":"holds the toy owl against her chest","priority":"essential"},{"character":"Grumbold","object":"ART002","where":"leans out over the edge of the crate towards the lane","priority":"low"}],"background":"busy crowd of gnomes filling the lane","population":"crowd"}}
+```
+
+--- Page 5 ---
+TEXT:
+Climbing onto the barrel, Lily stood tall above the crowd and held Hoot up on one arm. She remembered the rhyme about pears and the sleepy bear, and how every gnome had giggled at it. Gnomes loved a good rhyme. She took a deep breath and sang out in her loudest voice, "Flap, flap, Hoot, and wiggle your wing, gnomes in a crowd, now dance in a ring!" She jiggled his arm so his wings flapped at the front row. "Hop to the left, and hop to the right, open a lane for a wizard's delight!" One gnome snorted with laughter, then another, and soon the whole front row was bouncing on their toes. They clapped in time to the rhyme, and the gnomes shuffled apart until a lane lay open up the hill.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Lily, wearing a long flowing robe in deep purple with golden moon patterns, a brown leather belt with pouch, pointed grey cloth shoes, and a tall pointed deep purple wizard hat with a wide brim and a golden band, stands on the wooden barrel at the edge of the lane, holding the toy owl Hoot up on one arm with his wings spread. Below her the front row of gnomes laughs and claps, and the crowd starts to part.","setting":{"location":"Cobble Hill above Fislisbach [LOC001]","indoorOutdoor":"outdoor","description":"A cobbled lane climbing between two grassy banks on a green hillside, a wooden barrel on the grassy bank, the roofs of a white town spread across the valley far below and a dark green wooded ridge beyond.","lighting":"Clear autumn afternoon light from the right, golden on the grass and warm on the cobbles.","camera":"medium","depthLayers":"Foreground: the front row of gnomes clapping at the lane edge. Midground: Lily standing on the barrel above the crowd. Background: the cobbled lane opening up the hill, the valley town and the wooded ridge."},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Lily","position":"center","action":"stands on the barrel and holds the toy owl up on one arm, wings spread","expression":"bright and bold, grinning, mouth open mid-song","clothing":"costumed","depth":"foreground","perspective":"front"}],"objects":[{"id":"ART001","name":"toy owl Hoot","position":"held up on Lily's arm"},{"id":"ART002","name":"wooden barrel","position":"under Lily, on the grassy bank"}],"interactions":[{"character":"Lily","object":"ART001","where":"holds the toy owl up on one arm with his wings spread","priority":"essential"}],"background":"busy crowd of gnomes clapping at the lane edge","population":"crowd"}}
+```
+
+--- Page 6 ---
+TEXT:
+At the top of Cobble Hill, an old wizard sat on a low stone wall, with the roofs of Fislisbach spread across the green valley below him. He looked up when Lily came puffing over the last of the cobbles. She held Hoot out in both hands, the way she had carried him all the way up. The wizard took the owl slowly, turned him towards the light, and smiled, the first smile Lily had seen on him. Lily gave Hoot one last flap of his wing. "Look after him," she said. Then she set her hat straight and walked home down the lane.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"At the top of the hill, Lily, wearing a long flowing robe in deep purple with golden moon patterns, a brown leather belt with pouch, pointed grey cloth shoes, and a tall pointed deep purple wizard hat with a wide brim and a golden band, holds out the toy owl Hoot to an old wizard seated on a low grey stone wall. The wizard, with long white hair and a long white beard under a faded grey-blue pointed hat, reaches for the owl and smiles. The green valley and the roofs of the white town lie below in dusk light.","setting":{"location":"Cobble Hill above Fislisbach [LOC001]","indoorOutdoor":"outdoor","description":"The top of a grassy hill with a low grey stone wall, looking out over a green valley with the roofs of a white town and a dark green wooded ridge beyond.","lighting":"Dusk light from the low sun on the left, a pale sky going gold near the horizon.","camera":"medium","depthLayers":"Foreground: open grass and the cobbled path up the hill. Midground: Lily and the old wizard at the stone wall. Background: the valley town, the wooded ridge and the gold sky."},"timeOfDay":"dusk","weather":"clear","characters":[{"name":"Lily","id":null,"position":"left","action":"holds the toy owl out to the wizard in both hands","expression":"warm, a small smile","clothing":"costumed","depth":"foreground","perspective":"front"},{"name":"Old wizard","description":"an old wizard of great age, thin and slightly stooped, with long white hair and a long white beard, wearing a faded grey-blue robe and a pointed grey-blue hat","position":"right","action":"reaches for the owl and takes it","expression":"a slow, glad smile","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[{"id":"ART001","name":"toy owl Hoot","position":"held out between Lily and the wizard"}],"interactions":[{"character":"Lily","object":"ART001","where":"holds the toy owl out at arm's length","priority":"essential"},{"character":"Old wizard","object":"ART001","where":"reaches for the toy owl with both hands","priority":"essential"}],"background":"empty hilltop","population":"cast_only"}}
+```

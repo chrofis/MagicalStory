@@ -12927,9 +12927,9 @@ The main character has two avatar styles available:
 
     // Build landmarks instruction for the visual bible.
     // Each landmark lists its numbered photos (landmarkPhotoListLines), and
-    // the writer cites the one its location's plate shows in the location's
-    // `landmarkPhoto` (LANDMARK_PHOTO_CITE_RULE; a trial bible has one plate
-    // per location). Never a dotted `[LOC###.N]`: that reading served the
+    // the writer cites the one a plate shows in the `landmarkPhoto` of the
+    // plate's `backgrounds[]` entry, defaulting to the location's
+    // (LANDMARK_PHOTO_CITE_RULE; a trial bible has no vantages). Never a dotted `[LOC###.N]`: that reading served the
     // wrong photo (docs/decisions.md 2026-09-24, 2026-09-26).
     let landmarksInstruction = '';
     if (inputData.ideaKind === 'fantasy') {
@@ -12961,7 +12961,7 @@ At least one scene MUST take place at one of these real local landmarks:
 ${landmarkBlock}
 Include the chosen landmark(s) in the visual bible locations section with their real name and accurate visual description.
 Reference the landmark by its LOC ID in the relevant scene hints.
-${LANDMARK_PHOTO_CITE_RULE} The plate of a location is its \`backgrounds[]\` description, and the citation goes on the location's own entry.`;
+${LANDMARK_PHOTO_CITE_RULE} The plate is a \`backgrounds[]\` entry: the citation goes on that entry, and on the location's own entry as the default for its backgrounds.`;
     } else if (inputData.userLocation?.city) {
       landmarksInstruction = `# Location: ${inputData.userLocation.city}
 The story takes place in ${inputData.userLocation.city}. Use real place names â€” do NOT invent fictional city names.`;
@@ -13006,10 +13006,10 @@ The story takes place in ${inputData.userLocation.city}. Use real place names â€
       TITLE_CRITERIA: titleCriteria(readerAge(inputData)),
       // Scene arithmetic follows the page count (trial.js sets 6; the template
       // used to hard-code the old 5-page split): intro 1, tension 2..N-2,
-      // resolution N-1..N; backgrounds min(3,N)..N.
+      // resolution N-1..N; exactly min(3,N) backgrounds.
       TENSION_SCENES: `2-${Math.max(2, pageCount - 2)}`,
       RESOLVE_SCENES: `${Math.max(3, pageCount - 1)}-${pageCount}`,
-      BACKGROUND_RANGE: `${Math.min(3, pageCount)}-${pageCount}`,
+      BACKGROUND_COUNT: String(Math.min(3, pageCount)),
       PAGE_OPENING_VARIETY: PAGE_OPENING_VARIETY_RULE,
       WHO_DOES_WHAT: WHO_DOES_WHAT_RULE,
       STYLE_RULEBOOK: styleRulebook(language),

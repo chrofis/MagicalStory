@@ -1,0 +1,160 @@
+---TITLE---
+TITLE: Rohan und Bello folgen dem Pfiff
+
+---VISUAL BIBLE---
+```json
+{
+  "secondaryCharacters": [],
+  "animals": [
+    {
+      "id": "ANI001",
+      "name": "Bello",
+      "pages": [1, 2, 3, 4, 5, 6],
+      "scaleClass": "knee-high",
+      "generic": false,
+      "species": "golden retriever mix dog",
+      "coloring": "golden-brown coat with a cream chest and cream paws",
+      "anatomy": "four legs, one tail, two floppy ears",
+      "features": "brown eyes, a soft rounded snout, a dark leather collar with a metal ring"
+    }
+  ],
+  "artifacts": [
+    {
+      "id": "ART001",
+      "label": "metal whistle",
+      "name": "small silver metal whistle",
+      "generic": false,
+      "type": "whistle",
+      "slot": "accessories",
+      "wornAs": "Rohan.accessories",
+      "back": "a dark cord crossing the back of the neck, the small silver whistle hanging below the collar",
+      "pages": [1, 2, 3, 4, 5],
+      "scaleClass": "palm-sized",
+      "description": "small silver metal whistle with a loop at one end for a cord",
+      "states": [
+        {"name": "on cord", "delta": "intact dark cord looped round the neck", "pages": [1, 2, 3]},
+        {"name": "cord snapped", "delta": "cord snapped, a loose end trailing", "pages": [4, 5]}
+      ]
+    }
+  ],
+  "locations": [
+    {
+      "id": "LOC001",
+      "name": "Lake Manawa shoreline",
+      "pages": [1, 2, 3, 4, 5, 6],
+      "scaleClass": "landmark",
+      "setting": "outdoor, lake shoreline with a narrow wooden walkway over water, Council Bluffs",
+      "colors": "rust, gold and orange autumn leaves, grey-green water, pale wooden planks, tan grass",
+      "features": "grassy shore, tall reeds, a wooded island across the water, a fallen tree lying across the walkway",
+      "signatureElement": "a large fallen tree trunk lying across the wooden walkway",
+      "isRealLandmark": false,
+      "landmarkQuery": null
+    }
+  ],
+  "backgrounds": [
+    {
+      "pages": [1, 2],
+      "description": "Wide view along a narrow wooden walkway that runs out from a grassy lake shore over grey-green water toward a wooded island. A large fallen tree lies across the walkway near the shore, its branches reaching into tall reeds. A yellow flag on a post stands at the island shore. Autumn trees in rust and gold line the shore. Warm afternoon light from the left. Open grass in the foreground."
+    },
+    {
+      "pages": [3, 4, 5],
+      "description": "Low side view beside the wooden walkway over the lake, showing the fallen trunk crossing the planks above grey-green water, reeds on both sides, the wooded island ahead. Rust and gold autumn leaves on the trees. Soft afternoon light from the left. Open water in the middle distance and the grassy shore at the lower left."
+    },
+    {
+      "pages": [6],
+      "description": "Sandy and grassy island bank at the far end of the wooden walkway, a bare wooden post standing in the grass. The lake lies behind with the reeds and shoreline visible across the water, autumn trees with gold leaves. Afternoon light from the left. Open grass in the foreground."
+    }
+  ]
+}
+```
+
+---COVER SCENE---
+```json
+{
+  "title": "Rohan und Bello folgen dem Pfiff",
+  "scene": {
+    "imageSummary": "Rohan stands at the end of the wooden walkway with the metal whistle in his hand, looking out toward the island. Bello sits upright at his side, and the fallen trunk lies across the planks behind them. Clear autumn afternoon light falls from the left over the lake.",
+    "setting": {
+      "location": "Lake Manawa shoreline [LOC001]",
+      "indoorOutdoor": "outdoor",
+      "description": "wooden walkway over grey-green water, reeds, autumn trees in rust and gold, a wooded island across the lake",
+      "lighting": "warm low afternoon sun from the left",
+      "camera": "wide",
+      "depthLayers": "foreground: the walkway planks and Bello; midground: Rohan at the walkway with the whistle; background: the fallen trunk, reeds and wooded island"
+    },
+    "timeOfDay": "afternoon",
+    "weather": "clear",
+    "characters": [
+      {
+        "id": null,
+        "name": "Rohan",
+        "position": "center",
+        "action": "stands on the walkway holding the whistle in one hand",
+        "expression": "determined",
+        "clothing": "standard"
+      }
+    ],
+    "objects": [
+      {"id": "ANI001", "name": "Bello", "position": "right, foreground, sitting upright beside Rohan"},
+      {"id": "ART001", "name": "metal whistle", "position": "in Rohan's raised hand"},
+      {"id": "LOC001", "name": "Lake Manawa shoreline", "position": "background"}
+    ]
+  }
+}
+```
+
+---STORY PAGES---
+
+--- Page 1 ---
+TEXT:
+Bello zog so fest an der Leine, dass Rohan beinahe über eine Wurzel stolperte. «Langsam, Bello!» Rohan hielt die Karte des Entdeckerspiels in der anderen Hand. Auf der Insel im Lake Manawa steckte die gelbe Fahne an einem Pfosten, und genau diese Fahne musste die Gruppe finden. Bello sollte dabei sein. Opa hatte Rohan gezeigt, mit zwei Fingern zu pfeifen, und Bello gelehrt, jedem Pfiff zu folgen. Die Pfeife hing an einer dunklen Schnur um Rohans Hals. Vor ihnen lag der schmale Holzsteg über das Wasser, der als einziger Weg zur Insel führte. Rohan lief schneller.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Rohan leans back on the leash at the grassy shore while Bello strains forward toward the narrow wooden walkway. The fallen trunk lies across the walkway ahead, and the island with its yellow flag post shows across the water. Warm afternoon light, autumn trees in rust and gold.","setting":{"location":"Lake Manawa shoreline [LOC001]","indoorOutdoor":"outdoor","description":"grassy shoreline, narrow wooden walkway over grey-green water, autumn trees with rust and gold leaves, wooded island beyond","lighting":"warm low afternoon sun from the left","camera":"medium","depthLayers":"foreground: shore grass and the leash; midground: Rohan and Bello on the path; background: walkway, fallen trunk, island with yellow flag post"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Rohan","position":"left","action":"leans back with feet planted, pulling on the leash","expression":"determined","clothing":"standard","depth":"foreground","perspective":"front"}],"objects":[{"id":"ANI001","name":"Bello","position":"right, midground, pulling toward the walkway"},{"id":"ART001","name":"metal whistle","position":"on the dark cord at Rohan's neck"},{"id":"LOC001","name":"Lake Manawa shoreline","position":"background"}],"interactions":[{"character":"Rohan","object":"leash","where":"grips the leash","priority":"essential"},{"character":"Bello","object":"walkway","where":"watches the walkway ahead","priority":"low"}],"background":"a few distant passers-by in grey coats far along the shore","population":"ambient"}}
+```
+
+--- Page 2 ---
+TEXT:
+Am Anfang des Stegs blieb Rohan stehen. Ein grosser Baum war umgestürzt und lag quer über den Holzweg, seine Äste ragten ins Schilf. Bello schnupperte am Stamm und setzte sich hin. Rohan packte das Halsband und zog. Bello rührte sich nicht. Rohan schob die Arme unter Bellos Brust und hob, doch der Hund war zu schwer, als dass Rohan ihn hätte tragen können. Bello gab keinen Schritt nach. Rohan liess ihn los und stand eine Weile still auf dem Holz. Der Uferweg um den See endete im Gebüsch. Dort führte kein anderer Weg zur Insel.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Rohan stands on the wooden walkway with both arms under Bello's chest, straining to lift the dog, while Bello sits planted beside the fallen trunk that lies across the planks. The reeds, the lake and the island lie behind them in soft afternoon light.","setting":{"location":"Lake Manawa shoreline [LOC001]","indoorOutdoor":"outdoor","description":"wooden walkway planks, a large fallen tree trunk with branches reaching into tall reeds, grey-green water on both sides, autumn leaves in rust and gold","lighting":"warm low afternoon sun from the left","camera":"medium","depthLayers":"foreground: the walkway planks and Bello sitting; midground: Rohan lifting from behind the dog; background: the fallen trunk, reeds and wooded island"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Rohan","position":"center","action":"lifts from under the dog's chest with both arms, straining","expression":"strained, eyes narrowed","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[{"id":"ANI001","name":"Bello","position":"right, foreground, sitting on the walkway beside the trunk"},{"id":"ART001","name":"metal whistle","position":"on the dark cord at Rohan's neck"},{"id":"LOC001","name":"Lake Manawa shoreline","position":"background"}],"interactions":[{"character":"Rohan","object":"Bello","where":"lifts under the chest with both arms","priority":"essential"}],"background":"a few distant passers-by in grey coats far along the shore","population":"ambient"}}
+```
+
+--- Page 3 ---
+TEXT:
+«Komm, Bello, komm!» Bello blieb sitzen, und sein Schwanz wedelte unruhig über die Planken. Rohan kletterte auf den Stamm und drehte sich zu ihm um. Die Hände hielt er seitlich ausgestreckt. Er hob die Pfeife an den Mund und pfiff. Dann setzte er den ersten Fuss zurück, dann den zweiten. Rückwärts ging er über die rauhe Rinde, auf die Insel zu, und pfiff weiter. Bello stand auf, setzte eine Pfote auf den Stamm und zögerte. Wieder pfiff Rohan. Der Hund kam nach, Schritt für Schritt, bis er dicht hinter Rohan über dem Wasser lief.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Rohan stands on the fallen trunk above the water, facing back toward the shore, the whistle pressed between his lips and his arms spread out to the sides. Bello stands at the start of the trunk on the walkway, one forepaw stepping onto the bark. Soft afternoon light from the left, reeds on both sides.","setting":{"location":"Lake Manawa shoreline [LOC001]","indoorOutdoor":"outdoor","description":"a large fallen tree trunk crossing wooden planks above grey-green water, rough bark, tall reeds on both sides, autumn leaves in rust and gold","lighting":"soft low afternoon sun from the left","camera":"medium","depthLayers":"foreground: the rough trunk and Bello's forepaw; midground: Rohan balancing on the trunk; background: reeds, water and the wooded island"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Rohan","position":"center","action":"walks backward along the trunk with arms spread out to the sides, whistle between his lips","expression":"focused","clothing":"standard","depth":"midground","perspective":"side"}],"objects":[{"id":"ANI001","name":"Bello","position":"right, foreground, one forepaw stepping onto the trunk"},{"id":"ART001","name":"metal whistle","position":"between Rohan's lips"}],"interactions":[{"character":"Rohan","object":"metal whistle","where":"presses the whistle between his lips","priority":"essential"},{"character":"Bello","object":"fallen trunk","where":"steps onto the fallen trunk","priority":"low"}],"background":"a few distant passers-by in grey coats far along the shore","population":"ambient"}}
+```
+
+--- Page 4 ---
+TEXT:
+Auf halbem Weg fand Rohans Ferse keinen Halt. Er rutschte weg und ruderte mit den Armen, und die Pfeife flog ihm aus dem Mund. Die Schnur riss, und die Pfeife fiel ins Wasser zwischen Stamm und Schilf. Rohan klammerte sich mit beiden Händen an die Rinde und blieb sitzen, bis das Holz wieder still lag. Bello war beim Sturz vom Stamm gesprungen und stand nun im Gras. Rohan rief nach dem Hund, doch Bello blieb am Ufer. Am Hals hing nur noch das lose Ende der Schnur. Die gelbe Fahne auf der Insel war noch weit weg.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Rohan sits low on the fallen trunk above the water, both hands clamped to the bark as he slips, the whistle falling from his mouth on its snapped cord. Bello stands at the bank in the grass, away from the trunk. Soft afternoon light from the left, reeds and grey-green water below.","setting":{"location":"Lake Manawa shoreline [LOC001]","indoorOutdoor":"outdoor","description":"a large fallen tree trunk crossing wooden planks above grey-green water, rough bark, tall reeds on both sides, grassy bank at the shore, autumn leaves in rust and gold","lighting":"soft low afternoon sun from the left","camera":"medium","depthLayers":"foreground: the grassy bank with Bello; midground: Rohan clinging to the trunk; background: reeds, water and the wooded island"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Rohan","position":"center","action":"slips on the trunk and grips the bark with both hands","expression":"alarmed, mouth open","clothing":"standard","depth":"midground","perspective":"side"}],"objects":[{"id":"ANI001","name":"Bello","position":"left, foreground, standing in the grass at the bank"},{"id":"ART001","name":"metal whistle","position":"in the air above the water beside the trunk, falling, its cord snapped","size":"small, held at the scale of a fist"}],"interactions":[{"character":"Rohan","object":"fallen trunk","where":"grips the bark of the fallen trunk with both hands","priority":"essential"},{"character":"Bello","object":"fallen trunk","where":"watches the fallen trunk","priority":"low"}],"background":"a few distant passers-by in grey coats far along the shore","population":"ambient"}}
+```
+
+--- Page 5 ---
+TEXT:
+Rohan legte zwei Finger an die Lippen und pfiff, so laut er konnte. Bello hob den Kopf und lief zurück auf den Stamm. Er setzte die Vorderpfoten auf die Rinde und kam Schritt für Schritt näher. «Gut so, Bello, komm weiter!» Rohan ging rückwärts weiter und pfiff wieder mit den zwei Fingern. Die Pfeife trieb im Wasser zwischen den Halmen, zu weit weg zum Greifen. Bello folgte ihm über den letzten Teil des Stamms, bis Rohan den festen Boden der Insel unter den Sohlen spürte.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Rohan stands on the fallen trunk near the island end, facing back toward the shore, with two fingers pressed to his lips. Bello steps up onto the trunk from the shore end, following him. Soft afternoon light from the left, the whistle floating in the reeds below.","setting":{"location":"Lake Manawa shoreline [LOC001]","indoorOutdoor":"outdoor","description":"a large fallen tree trunk crossing wooden planks above grey-green water, rough bark, tall reeds on both sides, wooded island ahead, autumn leaves in rust and gold","lighting":"soft low afternoon sun from the left","camera":"medium","depthLayers":"foreground: the rough trunk with Bello's forepaws; midground: Rohan on the trunk; background: reeds, water and the wooded island"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Rohan","position":"center","action":"walks backward along the trunk, two fingers pressed to his lips","expression":"focused","clothing":"standard","depth":"midground","perspective":"side"}],"objects":[{"id":"ANI001","name":"Bello","position":"right, foreground, stepping up onto the trunk"},{"id":"ART001","name":"metal whistle","position":"floating in the reeds below the trunk, not touched by anyone"}],"interactions":[{"character":"Rohan","object":"fingers","where":"presses two fingers to his lips","priority":"essential"},{"character":"Bello","object":"fallen trunk","where":"steps onto the fallen trunk","priority":"low"}],"background":"a few distant passers-by in grey coats far along the shore","population":"ambient"}}
+```
+
+--- Page 6 ---
+TEXT:
+Auf der Insel rannte Bello bellend voraus über das Gras. Rohan lief hinterher zum Pfosten, löste die gelbe Fahne und hielt sie hoch über den Kopf. «Wir haben es geschafft, Bello!» Bello kam zurück gelaufen, und die Vögel im Schilf flogen auf. Von hier aus sah Rohan den schmalen Steg, auf dem sie gekommen waren, und die Stelle, wo die Pfeife im Wasser lag. Am Hals baumelte die leere Schnur. Er kniete sich neben den Hund ins Gras und sagte: «Das hast du gut gemacht, Bello.»
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Rohan stands on the island bank in the grass, holding the yellow flag up over his head, while Bello stands beside him looking up at the flag. The bare wooden post stands behind them and the lake with the walkway lies across the water. Clear afternoon light from the left, autumn trees with gold leaves.","setting":{"location":"Lake Manawa shoreline [LOC001]","indoorOutdoor":"outdoor","description":"sandy and grassy island bank, a bare wooden post in the grass, the lake behind with the walkway and reeds visible across the water, autumn trees with gold leaves","lighting":"warm low afternoon sun from the left","camera":"medium","depthLayers":"foreground: grass and Bello; midground: Rohan holding the flag up; background: wooden post, the lake, reeds and the far shore"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Rohan","position":"center","action":"holds the yellow flag up over his head in one hand","expression":"joyful, chin raised","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[{"id":"ANI001","name":"Bello","position":"right, foreground, standing in the grass beside Rohan"},{"id":"LOC001","name":"Lake Manawa shoreline","position":"background"}],"interactions":[{"character":"Rohan","object":"yellow flag","where":"holds the yellow flag up in one hand","priority":"essential"},{"character":"Bello","object":"yellow flag","where":"watches the yellow flag","priority":"low"}],"background":"a lone figure in a grey coat far along the far shore","population":"sparse"}}
+```

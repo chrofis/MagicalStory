@@ -1,0 +1,168 @@
+---TITLE---
+TITLE: Emma und der dreifache Pfiff
+
+---VISUAL BIBLE---
+```json
+{
+  "secondaryCharacters": [],
+  "animals": [
+    {
+      "id": "ANI001",
+      "name": "Bello",
+      "pages": [1, 2, 5, 6],
+      "scaleClass": "knee-high",
+      "species": "small mixed-breed dog",
+      "coloring": "white coat with brown patches over the ears and along the back",
+      "anatomy": "four legs, one tail, two ears",
+      "features": "brown ears, round black nose, soft rounded snout, red leather collar with a silver ring"
+    }
+  ],
+  "artifacts": [
+    {
+      "id": "ART001",
+      "label": "leather dog leash",
+      "name": "plain brown leather dog leash with a loop handle and a metal clip",
+      "pages": [1, 3, 4, 5, 6],
+      "scaleClass": "hand-sized",
+      "type": "dog leash",
+      "description": "a long plain brown leather leash with a loop handle at one end and a small metal clip at the other"
+    }
+  ],
+  "locations": [
+    {
+      "id": "LOC001",
+      "name": "Fislisbach village lane",
+      "pages": [1, 2, 3, 4, 5],
+      "scaleClass": "landmark",
+      "setting": "outdoor, narrow village lane and small square in Fislisbach",
+      "colors": "cream and white house walls, grey cobblestones, yellow and orange autumn leaves, blue sky",
+      "features": "steep lane climbing between old white houses with small windows and wooden shutters, a small square at the top with a stone fountain",
+      "signatureElement": "a flowering planter box on a white house wall beside the lane",
+      "isRealLandmark": true,
+      "landmarkQuery": "Fislisbach (Stadt)",
+      "landmarkPhoto": "none"
+    },
+    {
+      "id": "LOC002",
+      "name": "Kirche Rohrdorf",
+      "pages": [6],
+      "scaleClass": "house-height",
+      "setting": "outdoor, modern church gate on a hillside",
+      "colors": "bright white concrete, pale gravel path, golden autumn leaves, blue sky",
+      "features": "plain white concrete church with austere linear design and a tall detached bell tower",
+      "signatureElement": "the tall white concrete bell tower",
+      "isRealLandmark": true,
+      "landmarkQuery": "Kirche Rohrdorf",
+      "landmarkPhoto": 1
+    }
+  ],
+  "backgrounds": [
+    {
+      "pages": [1, 2],
+      "description": "A steep narrow village lane in Fislisbach climbing uphill between cream and white old houses with wooden shutters. Grey cobblestones run up the middle, yellow autumn leaves lie on the stones, and a planter box hangs on one white wall. Clear morning sky above the roofs, warm low light from the left. Wide open space on the cobbles in the middle of the lane where characters would stand. A few distant passers-by in dark purple and mustard coats stand far up the lane. Medium-wide view looking up the lane.",
+      "landmarkPhoto": "none"
+    },
+    {
+      "pages": [3, 4, 5],
+      "description": "A small village square at the top end of a Fislisbach lane. A stone fountain stands at one side, white house fronts with shutters close in on three sides, and a bandstand platform sits empty against one wall. Grey cobblestones cover the square, scattered with yellow leaves. Clear morning sky, light falling from the upper left. Open paving in the centre where a ring of people could gather. Medium view across the square toward the lane entrance.",
+      "landmarkPhoto": "none"
+    },
+    {
+      "pages": [6],
+      "description": "The gate of the Kirche Rohrdorf on a hillside. A modern white concrete church with a tall detached bell tower and austere linear walls rises behind a low wall and an iron gate. A pale gravel path leads from the gate toward the church entrance, with yellow autumn leaves scattered on the gravel. Clear blue sky, bright morning light from the front right. Open gravel in the foreground where characters would stand.",
+      "landmarkPhoto": 1
+    }
+  ]
+}
+```
+
+---COVER SCENE---
+```json
+{
+  "title": "Emma und der dreifache Pfiff",
+  "scene": {
+    "imageSummary": "Emma stands tall on the gravel path before the white concrete tower of the church, holding the leash in one hand while Bello sits beside her with his ears up. She wears a silver chain mail tunic over a grey padded gambeson, brown leather bracers, dark brown leather boots and a plain brown sword belt, with a bare head and a brown wavy ponytail. Warm autumn light falls across the gravel and yellow leaves.",
+    "setting": {
+      "location": "Kirche Rohrdorf [LOC002]",
+      "indoorOutdoor": "outdoor",
+      "description": "Bright white concrete church with a tall detached bell tower on a hillside, pale gravel path, golden autumn leaves, blue sky",
+      "lighting": "clear autumn morning light from the front right",
+      "camera": "wide",
+      "depthLayers": "foreground: gravel path with scattered leaves, Emma and Bello; midground: iron gate and low wall; background: white concrete church and bell tower against blue sky"
+    },
+    "timeOfDay": "morning",
+    "weather": "clear",
+    "characters": [
+      {
+        "id": null,
+        "name": "Emma",
+        "position": "center",
+        "action": "stands upright on the gravel, holding the leash with a firm grip",
+        "expression": "determined",
+        "clothing": "costumed"
+      }
+    ],
+    "objects": [
+      {"id": "LOC002", "name": "Kirche Rohrdorf", "position": "background"},
+      {"id": "ANI001", "name": "Bello", "position": "beside Emma, sitting on the gravel"},
+      {"id": "ART001", "name": "leather dog leash", "position": "in Emma's hand"}
+    ]
+  }
+}
+```
+
+---STORY PAGES---
+
+--- Page 1 ---
+TEXT:
+Emma lief mit Bello an der Leine durch die Gasse von Fislisbach. Ihr Kettenhemd glänzte im Herbstlicht, und das Laub raschelte unter ihren braunen Lederstiefeln. Bello trottete mit wedelndem Schwanz neben ihr her, und jeder Schritt brachte sie näher an die Kirche Rohrdorf. Oma wartete dort am Tor, denn um elf Uhr sollten die Glocken läuten, und Emma wollte Bello dabei vorstellen. Als sie zweimal pfiff, setzte sich Bello sofort hin und drehte sich danach einmal im Kreis. Emma lachte und zog ihn weiter. Die Gasse führte steil bergauf zwischen weissen Häusern hindurch, und Emma hielt die Leine fest in der Hand.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Emma walks uphill along the narrow lane in Fislisbach, holding the leash in one hand while Bello trots at her side with his tail up. She wears a silver chain mail tunic over a grey padded gambeson, brown leather bracers, dark brown leather boots and a plain brown sword belt, with a bare head and a brown wavy ponytail. Warm autumn light falls across the cobbles and yellow leaves.","setting":{"location":"Fislisbach village lane [LOC001]","indoorOutdoor":"outdoor","description":"Steep narrow lane between cream and white old houses with wooden shutters, grey cobblestones, yellow leaves on the stones","lighting":"low warm morning light from the left","camera":"medium","depthLayers":"foreground: cobblestones and leash; midground: Emma and Bello walking uphill; background: white houses rising up the lane and a few distant passers-by"},"timeOfDay":"morning","weather":"clear","characters":[{"id":null,"name":"Emma","position":"center","action":"walks uphill holding the leash","expression":"cheerful and focused","clothing":"costumed","depth":"foreground","perspective":"front"}],"objects":[{"id":"ANI001","name":"Bello","position":"beside Emma, left"},{"id":"ART001","name":"leather dog leash","position":"in Emma's right hand, running down to Bello"}],"interactions":[{"character":"Emma","object":"ART001","where":"grips the leash","priority":"essential"},{"character":"Bello","object":"ANI001","where":"trots beside Emma","priority":"low"}],"background":"a few distant passers-by in dark purple and mustard coats far up the lane","population":"ambient"}}
+```
+
+--- Page 2 ---
+TEXT:
+Am Ende der Gasse stand eine Menschenmenge dicht an dicht, und eine Blasmusik spielte auf dem kleinen Platz. Emma blieb stehen und rief: «Entschuldigung, wir müssen zur Kirche!» Eine Frau in einer grünen Jacke schaute kurz zu ihr, dann wandte sie sich wieder der Musik zu. Emma schob sich vorsichtig zwischen zwei Männer in blauen Mänteln, doch vor ihr blieben die Schultern fest. Bello zog an der Leine und suchte einen Weg, aber links standen Beine, rechts stand eine Hauswand mit Blumenkasten. Diese Gasse war der einzige Weg zur Kirche, und die Menge füllte sie ganz aus.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Emma stands at the back of a packed crowd filling the lane, one hand on the leash, calling toward the people in front of her. She wears a silver chain mail tunic over a grey padded gambeson, brown leather bracers, dark brown leather boots and a plain brown sword belt, with a bare head and a brown wavy ponytail. Bello pulls at the leash beside her among the legs of the crowd.","setting":{"location":"Fislisbach village lane [LOC001]","indoorOutdoor":"outdoor","description":"Narrow lane packed shoulder to shoulder with onlookers, cream and white house walls with a planter box, grey cobblestones","lighting":"warm morning light from the left, falling between the heads of the crowd","camera":"medium","depthLayers":"foreground: Emma and Bello with leash; midground: backs of the crowd in blue and green coats; background: a brass band playing in the small square beyond the crowd"},"timeOfDay":"morning","weather":"clear","characters":[{"id":null,"name":"Emma","position":"left","action":"stands pressed at the edge of the crowd, one arm raised toward the people ahead","expression":"calling out, eyes searching the people ahead","clothing":"costumed","depth":"foreground","perspective":"front"}],"objects":[{"id":"ANI001","name":"Bello","position":"at Emma's feet, pulling forward"},{"id":"ART001","name":"leather dog leash","position":"taut from Emma's hand to Bello"}],"interactions":[{"character":"Emma","object":"ART001","where":"grips the leash","priority":"essential"},{"character":"Bello","object":"ANI001","where":"pulls forward at the end of the leash","priority":"low"}],"background":"a dense crowd of onlookers in blue, green and mustard coats filling the lane","population":"crowd"}}
+```
+
+--- Page 3 ---
+TEXT:
+«Platz da, bitte!» rief Emma noch einmal, doch niemand machte Platz. Bello sprang nach vorne, die Leine rutschte aus ihrer Hand, und schon verschwand er zwischen den Beinen der Leute. Emma kniete sich hin und sah nur Stiefel, Hosen und Rocksäume. «Bello, komm zurück!» rief sie. Die Blasmusik spielte weiter, und keiner schaute herunter. Emma rief noch lauter, doch ihre Stimme ging im Lärm unter. Sie stand wieder auf und suchte mit den Augen nach dem kleinen Hund, aber zwischen den Menschen war nichts von ihm zu sehen. Emma hob die leere Leine vom Pflaster auf.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Emma kneels on the cobbles in the packed lane, peering between a forest of legs in dark trousers and long skirts, the leash lying loose on the stones beside her. She wears a silver chain mail tunic over a grey padded gambeson, brown leather bracers, dark brown leather boots and a plain brown sword belt, with a bare head and a brown wavy ponytail. Warm morning light falls across the leaves and the stones.","setting":{"location":"Fislisbach village lane [LOC001]","indoorOutdoor":"outdoor","description":"Packed lane of onlookers' legs and coats, grey cobblestones with yellow leaves, cream house walls","lighting":"warm morning light from the left, low across the stones","camera":"medium","depthLayers":"foreground: Emma kneeling and the loose leash on the cobbles; midground: legs and coats of the crowd; background: house walls and the band's platform"},"timeOfDay":"morning","weather":"clear","characters":[{"id":null,"name":"Emma","position":"center","action":"kneels on the cobbles, leaning forward to look between the legs of the crowd","expression":"anxious and searching","clothing":"costumed","depth":"foreground","perspective":"front"}],"objects":[{"id":"ART001","name":"leather dog leash","position":"lying loose on the cobbles beside Emma's knee"}],"interactions":[{"character":"Emma","object":"ART001","where":"reaches toward the leash lying on the cobbles","priority":"essential"}],"background":"a dense crowd of onlookers in blue, green and mustard coats, showing only their legs and coat hems","population":"crowd"}}
+```
+
+--- Page 4 ---
+TEXT:
+Vom Kirchturm schlugen die ersten Glockenschläge herüber. Emma stand mitten in der Gasse, die leere Leine in der Hand. Sie reckte sich auf die Zehenspitzen, doch über den Hüten der Leute sah sie nur Schultern und Himmel. Die Blasmusik übertönte jeden Ruf, und die Menge rührte sich nicht. Eine andere Strasse gab es nicht, und die Glocken schlugen weiter. Oma würde am Tor warten, und Bello war irgendwo zwischen all den Beinen verschwunden. Trotzdem rief Emma wieder seinen Namen. Der Weg zur Kirche blieb verschlossen.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Emma stands on tiptoe in the middle of the packed lane, the empty leash hanging from her hand, looking over the heads of the crowd. She wears a silver chain mail tunic over a grey padded gambeson, brown leather bracers, dark brown leather boots and a plain brown sword belt, with a bare head and a brown wavy ponytail. Light from the upper left falls across the crowd's shoulders and the grey stones.","setting":{"location":"Fislisbach village lane [LOC001]","indoorOutdoor":"outdoor","description":"Lane packed with onlookers in blue, green and mustard coats, cream house walls, grey cobblestones, a bell tower visible above the roofs","lighting":"morning light from the upper left, soft and even","camera":"medium","depthLayers":"foreground: Emma with the empty leash; midground: shoulders and heads of the crowd; background: house walls and the roofline with the bell tower"},"timeOfDay":"morning","weather":"clear","characters":[{"id":null,"name":"Emma","position":"center","action":"stands on tiptoe, one arm lowered with the empty leash, looking over the crowd","expression":"tense, eyes searching the crowd","clothing":"costumed","depth":"foreground","perspective":"front"}],"objects":[{"id":"ART001","name":"leather dog leash","position":"hanging empty from Emma's hand"}],"interactions":[{"character":"Emma","object":"ART001","where":"grips the empty leash","priority":"essential"}],"background":"a dense crowd of onlookers in blue, green and mustard coats","population":"crowd"}}
+```
+
+--- Page 5 ---
+TEXT:
+Zu Hause im Garten hatte Emma Bello beigebracht, auf drei Pfiffe drei Kunststücke zu zeigen: erst sitzen, dann sich drehen, dann eine Pfote heben. Emma holte tief Luft und pfiff einmal, zweimal, dreimal. Bello kam zwischen den Mänteln hervor, setzte sich vor ihr hin, drehte sich einmal im Kreis und hob die Pfote. Die Leute lachten, traten einen Schritt zurück und bildeten um den Hund einen Kreis. Die Frau in der grünen Jacke lachte am lautesten. Zwischen den Rücken der Leute lag nun die Gasse frei, bis hinauf zur Kirche.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Bello sits on the cobbles in front of Emma, one front paw lifted, inside a ring of laughing onlookers who have stepped back to make a circle. Emma stands with her lips pursed to whistle and the leash hanging from her hand. She wears a silver chain mail tunic over a grey padded gambeson, brown leather bracers, dark brown leather boots and a plain brown sword belt, with a bare head and a brown wavy ponytail.","setting":{"location":"Fislisbach village lane [LOC001]","indoorOutdoor":"outdoor","description":"Small square at the top of the lane with a ring of onlookers in blue, green and mustard coats around the dog, the lane behind them opening up, cream house walls, grey cobblestones with yellow leaves","lighting":"morning light from the upper left, bright on the open paving","camera":"medium","depthLayers":"foreground: Bello sitting and lifting a paw; midground: Emma with the leash and the ring of laughing onlookers; background: the lane opening toward the houses and the stone fountain"},"timeOfDay":"morning","weather":"clear","characters":[{"id":null,"name":"Emma","position":"right","action":"stands with lips pursed to whistle, the leash hanging loose from one hand","expression":"focused and hopeful","clothing":"costumed","depth":"midground","perspective":"front"}],"objects":[{"id":"ANI001","name":"Bello","position":"center, sitting in front of Emma with one paw lifted"},{"id":"ART001","name":"leather dog leash","position":"hanging loose from Emma's hand"}],"interactions":[{"character":"Emma","object":"ART001","where":"holds the leash at her side","priority":"normal"},{"character":"Bello","object":"ANI001","where":"sits on the cobbles with one paw lifted","priority":"essential"}],"background":"a ring of laughing onlookers in blue, green and mustard coats stepped back around the dog","population":"crowd"}}
+```
+
+--- Page 6 ---
+TEXT:
+Als die letzte Glocke verklang, stand Emma mit Bello am Tor der Kirche Rohrdorf. Sie führte ihn an der Leine den letzten Weg hinauf und hielt den Kopf hoch, während Bello neben ihr über den Kies trottete. Auf dem Kies lagen gelbe Blätter. Oma stand am Tor und schaute ihnen entgegen. «Ihr seid ja gerade noch rechtzeitig gekommen!» rief sie. Emma blieb vor dem Tor stehen, pfiff einmal leise, und Bello setzte sich sofort hin. «Bello hat uns den Weg freigemacht», sagte Emma. Dann kniete sie sich neben ihn und strich ihm über das Halsband. «Gut gemacht, Bello.»
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Emma stands at the iron gate of the church with the leash in her hand, Bello sitting upright on the gravel beside her. Oma waits just inside the gate in a dark plum coat. Emma wears a silver chain mail tunic over a grey padded gambeson, brown leather bracers, dark brown leather boots and a plain brown sword belt, with a bare head and a brown wavy ponytail.","setting":{"location":"Kirche Rohrdorf [LOC002]","indoorOutdoor":"outdoor","description":"White concrete church with a tall detached bell tower, pale gravel path, iron gate in a low wall, yellow autumn leaves on the gravel","lighting":"bright clear morning light from the front right","camera":"medium","depthLayers":"foreground: Bello sitting on the gravel and the leash; midground: Emma at the iron gate and Oma beside it; background: white concrete church and bell tower against blue sky"},"timeOfDay":"morning","weather":"clear","characters":[{"id":null,"name":"Emma","position":"left","action":"stands at the gate, leash in hand, her arm extended toward Bello as he sits","expression":"proud and calm","clothing":"costumed","depth":"foreground","perspective":"front"},{"id":null,"name":"Oma","position":"right","action":"stands just inside the gate, watching Emma and Bello","expression":"warm and welcoming","depth":"midground","perspective":"front","description":"older woman in her seventies, slim build, grey hair in a low bun, dark plum wool coat over a brown skirt, kind eyes and a soft face"}],"objects":[{"id":"LOC002","name":"Kirche Rohrdorf","position":"background"},{"id":"ANI001","name":"Bello","position":"center, sitting on the gravel by the gate"},{"id":"ART001","name":"leather dog leash","position":"in Emma's hand, running to Bello's collar"}],"interactions":[{"character":"Emma","object":"ART001","where":"holds the leash taut toward Bello","priority":"essential"},{"character":"Oma","object":"LOC002","where":"watches Emma and Bello from beside the gate","priority":"low"},{"character":"Bello","object":"ANI001","where":"sits upright on the gravel by the gate","priority":"low"}],"background":"a few distant passers-by on the far end of the gravel path, in grey and white coats","population":"ambient"}}
+```

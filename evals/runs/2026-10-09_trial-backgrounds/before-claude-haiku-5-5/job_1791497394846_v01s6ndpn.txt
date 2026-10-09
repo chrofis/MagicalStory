@@ -1,0 +1,176 @@
+---TITLE---
+TITLE: Mia and Captain Pip's Rooftop Adventure
+
+---VISUAL BIBLE---
+```json
+{
+  "secondaryCharacters": [
+    {
+      "id": "CHR001",
+      "name": "Jonas",
+      "pages": [1, 2, 3, 5, 6],
+      "scaleClass": "waist-high",
+      "age": "a boy of about six",
+      "build": "small for his age, slim build",
+      "hair": "dark brown, short, straight, neat",
+      "face": "brown eyes, round face, small nose",
+      "signatureLook": "a green jacket worn open over a plain top",
+      "clothing": "green jacket, grey trousers, dark blue trainers"
+    }
+  ],
+  "animals": [],
+  "artifacts": [
+    {
+      "id": "ART001",
+      "label": "toy parrot",
+      "name": "plush toy parrot",
+      "properName": "Captain Pip",
+      "pages": [1, 2, 4, 5, 6],
+      "scaleClass": "hand-sized",
+      "generic": false,
+      "type": "toy",
+      "description": "bright green plush toy parrot with red and yellow wing tips and a short loop of string on its back"
+    },
+    {
+      "id": "ART002",
+      "label": "coil of rope",
+      "name": "thick rope",
+      "pages": [1, 6],
+      "scaleClass": "hand-sized",
+      "generic": false,
+      "type": "rope",
+      "description": "thick brown hemp rope wound in a loose coil"
+    }
+  ],
+  "locations": [
+    {
+      "id": "LOC001",
+      "name": "Fislisbach meadow above the village",
+      "pages": [1],
+      "scaleClass": "landmark",
+      "setting": "outdoor, green meadow slope above a village in a valley",
+      "colors": "green grass, gold autumn grass edges, white houses, red roofs, dark green wooded ridge",
+      "features": "narrow dirt path winding down through long grass, valley town spread below, church among the houses",
+      "signatureElement": "the dirt path running down the meadow",
+      "isRealLandmark": true,
+      "landmarkQuery": "Fislisbach (Stadt)",
+      "landmarkPhoto": 1
+    },
+    {
+      "id": "LOC002",
+      "name": "Kirche Rohrdorf churchyard",
+      "pages": [2, 3, 4, 5, 6],
+      "scaleClass": "house-height",
+      "setting": "outdoor, churchyard beside a modern church",
+      "colors": "white concrete church, grey gravel, green lawn, copper autumn leaves, grey tiled roof",
+      "features": "plain white concrete church with a tall bell tower on a separate concrete pillar, low grey wall, gravel path",
+      "signatureElement": "the iron hook at the top of the far gable",
+      "isRealLandmark": true,
+      "landmarkQuery": "Kirche Rohrdorf",
+      "landmarkPhoto": 1
+    }
+  ],
+  "backgrounds": [
+    {
+      "pages": [1],
+      "description": "A green meadow sloping down to a valley, with a narrow dirt path winding through long grass in the foreground. Below, the town of Fislisbach spreads across the valley with white houses, red roofs and a white church among them, and a dark green wooded ridge rises behind. Clear autumn afternoon light from the left, with gold grass and copper-coloured trees at the edges. Open grass beside the path for the figures to stand."
+    },
+    {
+      "pages": [2, 3, 4, 5, 6],
+      "description": "A modern white concrete church with a plain tiled roof and a tall bell tower standing on its own concrete pillar nearby. A small iron hook sits at the top of the far gable. Grey gravel path and a low grey wall run along the lawn, with copper autumn leaves scattered on the grass. Soft afternoon sunlight from the right, autumn trees around the edges. Open grass in front of the church for characters to stand."
+    }
+  ]
+}
+```
+
+---COVER SCENE---
+```json
+{
+  "title": "Mia and Captain Pip's Rooftop Adventure",
+  "scene": {
+    "imageSummary": "Mia stands tall on the gravel path in front of the church, lifting Captain Pip high in one hand, wearing a red and white horizontal-striped sailor shirt, a brown leather vest over it, dark brown canvas trousers tucked into tall black boots and a wide black leather belt with a brass buckle. Warm autumn light falls across the lawn and copper leaves.",
+    "setting": {
+      "location": "Kirche Rohrdorf churchyard [LOC002]",
+      "indoorOutdoor": "outdoor",
+      "description": "Modern white concrete church with a tall bell tower on its own pillar, grey gravel path, green lawn with copper autumn leaves",
+      "lighting": "soft afternoon sunlight from the right",
+      "camera": "wide",
+      "depthLayers": "foreground gravel path with copper leaves, midground Mia standing with the parrot raised, background white church with bell tower against a blue sky"
+    },
+    "timeOfDay": "afternoon",
+    "weather": "clear",
+    "characters": [
+      {
+        "id": null,
+        "name": "Mia",
+        "position": "center",
+        "action": "stands with feet planted, lifting Captain Pip high in one hand",
+        "expression": "confident and determined",
+        "clothing": "costumed",
+        "depth": "midground",
+        "perspective": "front"
+      }
+    ],
+    "objects": [
+      {"id": "LOC002", "name": "Kirche Rohrdorf churchyard", "position": "background"},
+      {"id": "ART001", "name": "toy parrot (Captain Pip)", "position": "raised in Mia's hand, centre"}
+    ]
+  }
+}
+```
+
+---STORY PAGES---
+
+--- Page 1 ---
+TEXT:
+Mia raced down the meadow path with Captain Pip tucked under one arm and a coil of rope bouncing on his belt. Below him, the village of Fislisbach spread across the green valley, with white houses and red roofs. For a whole week, Mia had seen a boy sitting alone on the wall of the church, watching other children kick a ball. Today the boy was there again. Mia reached the bottom of the path, took a deep breath and called across the grass, "Ahoy, Jonas! I have got a present for you!" Jonas looked up. Mia lifted the parrot high so that his bright feathers caught the sun.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Mia stands on the grassy meadow path above the valley, lifting Captain Pip high in one hand, wearing a red and white horizontal-striped sailor shirt, a brown leather vest over it, dark brown canvas trousers tucked into tall black boots and a wide black leather belt with a brass buckle. Far below on the church wall, Jonas sits small in a green jacket and grey trousers, looking up toward the path.","setting":{"location":"Fislisbach meadow above the village [LOC001]","indoorOutdoor":"outdoor","description":"Green meadow slope above a valley town of white houses and red roofs, a white church among them, dark green wooded ridge behind","lighting":"clear autumn afternoon sun from the left","camera":"medium","depthLayers":"foreground dirt path and long grass, midground Mia with the parrot raised, background valley town with the church and the wooded ridge"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Mia","position":"center","action":"stands on the path with the parrot lifted high in one hand","expression":"proud and cheerful","clothing":"costumed","depth":"foreground","perspective":"front"},{"id":"CHR001","name":"Jonas","position":"right","action":"sits on the church wall far below, looking up","expression":"quiet and watchful","clothing":"standard","depth":"background","perspective":"front"}],"objects":[{"id":"ART001","name":"toy parrot (Captain Pip)","position":"raised in Mia's hand"}],"interactions":[{"character":"Mia","object":"ART001","where":"lifts the parrot high in one hand","priority":"essential"},{"character":"Jonas","object":"church wall","where":"sits on the wall and looks up toward the path","priority":"low"}],"background":"quiet valley town with a few distant houses","population":"ambient"}}
+```
+
+--- Page 2 ---
+TEXT:
+Beside the church, Mia held out Captain Pip, and Jonas stepped close to take him. A gust of wind tugged the parrot from Mia's fingers and carried him up over the roof. The roof rose three times Mia's height above the gravel. Captain Pip sailed over the ridge and caught on an iron hook at the top of the far gable. Mia ran round the side of the church, but the far wall had only a steep slope of tiles and a long drop to the path. "He is up there now," Jonas said quietly.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Mia leans forward on the gravel with one arm reaching after Captain Pip, who tumbles through the air above the church roof as a gust pulls him away. Mia wears a red and white horizontal-striped sailor shirt, a brown leather vest over it, dark brown canvas trousers tucked into tall black boots and a wide black leather belt with a brass buckle. Jonas, in a green jacket and grey trousers, watches the parrot rise.","setting":{"location":"Kirche Rohrdorf churchyard [LOC002]","indoorOutdoor":"outdoor","description":"Modern white concrete church with a plain tiled roof and a tall bell tower on its own pillar, grey gravel path, green lawn with copper autumn leaves","lighting":"soft afternoon sunlight from the right","camera":"medium","depthLayers":"foreground gravel and copper leaves, midground Mia reaching and Jonas watching, background white church roof and bell tower with the parrot in the air above it"},"timeOfDay":"afternoon","weather":"windy","characters":[{"id":null,"name":"Mia","position":"left","action":"reaches after the parrot with open fingers","expression":"startled and determined","clothing":"costumed","depth":"foreground","perspective":"front"},{"id":"CHR001","name":"Jonas","position":"right","action":"stands beside the path looking up at the parrot","expression":"wide-eyed and still","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[{"id":"ART001","name":"toy parrot (Captain Pip)","position":"in the air above the church roof, away from everyone"}],"interactions":[{"character":"Mia","object":"ART001","where":"reaches after the parrot with open fingers","priority":"essential"},{"character":"Jonas","object":"ART001","where":"watches the parrot rise over the roof","priority":"low"}],"background":"quiet churchyard with copper leaves blowing across the lawn","population":"cast_only"}}
+```
+
+--- Page 3 ---
+TEXT:
+By the side door of the church hall, Mia found a stack of old wooden crates. "We will make a ladder," he said, and piled them against the church wall. Jonas held the bottom crate with both hands while Mia set the next one on top. Mia said he would test every crate first, and he pressed down hard on each one before stepping up. Then he climbed, one foot at a time, until he could grip the edge of the gutter. "Hold on tight, Jonas," he called down.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Mia stands on the top of a stack of four old wooden crates against the white church wall, gripping the edge of the gutter with one hand. Mia wears a red and white horizontal-striped sailor shirt, a brown leather vest over it, dark brown canvas trousers tucked into tall black boots and a wide black leather belt with a brass buckle. Below, Jonas in a green jacket and grey trousers holds the bottom crate steady with both hands.","setting":{"location":"Kirche Rohrdorf churchyard [LOC002]","indoorOutdoor":"outdoor","description":"White concrete church wall with a grey tiled roof edge and a metal gutter, stacked old wooden crates, grey gravel, copper autumn leaves","lighting":"soft afternoon sunlight from the right","camera":"medium","depthLayers":"foreground Jonas holding the bottom crate, midground Mia on the stacked crates, background white church wall and roof edge"},"timeOfDay":"afternoon","weather":"windy","characters":[{"id":null,"name":"Mia","position":"right","action":"stands on the top crate and grips the gutter edge","expression":"focused and careful","clothing":"costumed","depth":"midground","perspective":"front"},{"id":"CHR001","name":"Jonas","position":"left","action":"holds the bottom crate steady","expression":"serious and steady","clothing":"standard","depth":"foreground","perspective":"front"}],"objects":[],"interactions":[{"character":"Mia","object":"gutter","where":"grips the edge of the gutter with one hand while standing on the stacked crates","priority":"essential"},{"character":"Jonas","object":"wooden crate","where":"holds the bottom wooden crate with both hands","priority":"essential"}],"background":"quiet churchyard with stacked crates against the wall","population":"cast_only"}}
+```
+
+--- Page 4 ---
+TEXT:
+"Steady now," Mia whispered as he stepped from the top crate onto the gutter. He pulled himself up the tiles, crawled to the ridge and stood with his arms spread wide. One boot slipped on a wet tile, so he dropped to one knee and waited until it steadied. Then he walked along the ridge, placing each boot with care. At the far gable, Captain Pip hung from the iron hook by his loop of string. Mia lifted the parrot free and pressed him against his chest with one hand, keeping the other arm out for balance.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Mia balances along the top of the grey tiled church roof with both arms spread wide, one hand pressing Captain Pip against his chest as he reaches the far gable. Mia wears a red and white horizontal-striped sailor shirt, a brown leather vest over it, dark brown canvas trousers tucked into tall black boots and a wide black leather belt with a brass buckle. The roof ridge runs out ahead to the iron hook on the gable.","setting":{"location":"Kirche Rohrdorf churchyard [LOC002]","indoorOutdoor":"outdoor","description":"White concrete church with a grey tiled roof, a narrow ridge along the top, an iron hook on the far gable, autumn sky behind","lighting":"soft afternoon sunlight from the right","camera":"medium","depthLayers":"foreground the grey tiled slope and ridge, midground Mia balancing on the ridge, background the far gable with the iron hook and the bell tower"},"timeOfDay":"afternoon","weather":"windy","characters":[{"id":null,"name":"Mia","position":"center","action":"walks along the ridge with arms spread wide, one hand holding the parrot to the chest","expression":"brave and careful","clothing":"costumed","depth":"foreground","perspective":"side"}],"objects":[{"id":"ART001","name":"toy parrot (Captain Pip)","position":"pressed against Mia's chest"}],"interactions":[{"character":"Mia","object":"ART001","where":"holds the parrot pressed against his chest with one hand","priority":"essential"}],"background":"empty roof ridge against the autumn sky","population":"cast_only"}}
+```
+
+--- Page 5 ---
+TEXT:
+Below him, the crates lay scattered across the gravel. When Mia stepped off the top crate, the bottom one had slid on the wet grass and the whole stack had tipped over. Jonas stood among the crates and looked up. "I cannot reach you," he called. Mia looked down at the long drop to the path. There was no ladder left, and the wall was too smooth to climb. "I am stuck up here," he said, and held Captain Pip tight against his vest.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Mia sits astride the church roof ridge high above, holding Captain Pip tight against his brown leather vest, while Jonas in a green jacket and grey trousers stands among the scattered wooden crates on the gravel far below. Mia wears a red and white horizontal-striped sailor shirt, a brown leather vest over it, dark brown canvas trousers tucked into tall black boots and a wide black leather belt with a brass buckle.","setting":{"location":"Kirche Rohrdorf churchyard [LOC002]","indoorOutdoor":"outdoor","description":"White concrete church with a grey tiled roof and ridge, a bare smooth wall, grey gravel path with wooden crates scattered across it, copper autumn leaves on the lawn","lighting":"soft afternoon sunlight from the right","camera":"medium","depthLayers":"foreground scattered crates and gravel, midground Jonas among the crates on the ground, background Mia sitting on the high ridge against the sky"},"timeOfDay":"afternoon","weather":"windy","characters":[{"id":null,"name":"Mia","position":"right","action":"sits on the ridge holding the parrot tight against the chest","expression":"worried and determined","clothing":"costumed","depth":"background","perspective":"front"},{"id":"CHR001","name":"Jonas","position":"left","action":"stands among the scattered crates, looking up at the roof","expression":"anxious and watchful","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[{"id":"ART001","name":"toy parrot (Captain Pip)","position":"held tight against Mia's chest on the ridge"}],"interactions":[{"character":"Mia","object":"ART001","where":"holds the parrot tight against the chest","priority":"essential"},{"character":"Jonas","object":"wooden crate","where":"stands among the scattered wooden crates and watches Mia from the gravel","priority":"low"}],"background":"quiet churchyard with scattered crates on the gravel","population":"cast_only"}}
+```
+
+--- Page 6 ---
+TEXT:
+Mia remembered the coil of rope on his belt. He unhooked it, looped one end twice round the iron hook and pulled the knot tight. Then he tied Captain Pip to the other end. "Jonas, catch!" he called, and let the rope down over the edge. Jonas caught it, lifted the parrot off the end and held the rope steady for Mia. Mia gripped the rope and walked down the wall one careful step at a time. "Go slowly," Jonas called. When Mia's boots touched the grass, Jonas held Captain Pip up high. "Welcome aboard the crew, Jonas," Mia said.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Jonas in a green jacket and grey trousers lifts Captain Pip off the end of a rope hanging down the white church wall, both hands raised to take the parrot. Mia, in a red and white horizontal-striped sailor shirt, a brown leather vest over it, dark brown canvas trousers tucked into tall black boots and a wide black leather belt with a brass buckle, grips the rope above and walks down the wall toward the grass. The rope is looped round the iron hook at the top of the gable.","setting":{"location":"Kirche Rohrdorf churchyard [LOC002]","indoorOutdoor":"outdoor","description":"White concrete church wall with a grey tiled roof edge and an iron hook at the top of the gable, thick brown rope hanging down the wall, grey gravel, copper autumn leaves on the lawn","lighting":"soft afternoon sunlight from the right","camera":"medium","depthLayers":"foreground Jonas on the gravel lifting the parrot, midground Mia on the rope partway down the wall, background the iron hook and the grey roof edge"},"timeOfDay":"afternoon","weather":"windy","characters":[{"id":null,"name":"Mia","position":"right","action":"walks down the wall gripping the rope, one careful step at a time","expression":"determined and careful","clothing":"costumed","depth":"midground","perspective":"side"},{"id":"CHR001","name":"Jonas","position":"left","action":"lifts the parrot off the end of the rope with both hands","expression":"eager and steady","clothing":"standard","depth":"foreground","perspective":"front"}],"objects":[{"id":"ART001","name":"toy parrot (Captain Pip)","position":"at the end of the rope, lifted by Jonas"},{"id":"ART002","name":"coil of rope","position":"looped round the iron hook and hanging down the wall"}],"interactions":[{"character":"Mia","object":"ART002","where":"grips the rope and walks down the wall with his boots","priority":"essential"},{"character":"Jonas","object":"ART001","where":"lifts the parrot off the end of the rope with both hands","priority":"essential"}],"background":"quiet churchyard with copper leaves on the lawn","population":"cast_only"}}
+```

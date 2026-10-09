@@ -1,0 +1,186 @@
+---TITLE---
+TITLE: Emma und die glänzende Elster
+
+---VISUAL BIBLE---
+```json
+{
+  "secondaryCharacters": [
+    {
+      "id": "CHR001",
+      "name": "Herr Bühler",
+      "pages": [1, 6],
+      "scaleClass": "adult-height",
+      "age": "a man in his sixties",
+      "build": "medium height, slim, upright posture",
+      "hair": "short grey hair, neatly combed",
+      "face": "grey eyes, fine lines around the eyes, clean-shaven",
+      "signatureLook": "round wire-rimmed glasses",
+      "clothing": "dark green knitted wool jumper, beige trousers, brown leather shoes"
+    }
+  ],
+  "animals": [
+    {
+      "id": "ANI001",
+      "name": "Elster",
+      "pages": [1, 2, 3, 4, 5],
+      "scaleClass": "forearm-sized",
+      "species": "Eurasian magpie",
+      "coloring": "black head, back and long tail with a blue-green sheen, white belly and white shoulder patches",
+      "anatomy": "two wings, two legs, one long tail, one beak",
+      "features": "black pointed beak, round dark eyes, long graduated tail"
+    }
+  ],
+  "artifacts": [
+    {
+      "id": "ART001",
+      "label": "small glass bottle",
+      "name": "small glass bottle with a golden stopper",
+      "pages": [1, 2, 3, 4, 5, 6],
+      "scaleClass": "palm-sized",
+      "type": "glass bottle",
+      "description": "small glass bottle with a golden stopper, the liquid inside pale green"
+    },
+    {
+      "id": "ART002",
+      "label": "star-tipped wand",
+      "name": "wooden wand with a silver star",
+      "pages": [1, 3, 4],
+      "scaleClass": "hand-sized",
+      "type": "magic wand",
+      "description": "star-tipped wand: a slim wooden wand with a silver star at the tip",
+      "states": [
+        {"name": "still", "delta": "silver star at rest, no light around it", "pages": [1, 3]},
+        {"name": "sparkling", "delta": "silver sparks streaming out from the star", "pages": [4]}
+      ]
+    }
+  ],
+  "locations": [
+    {
+      "id": "LOC001",
+      "name": "Fislisbach meadow path and village",
+      "pages": [1, 6],
+      "scaleClass": "landmark",
+      "setting": "outdoor, village edge meadow path",
+      "colors": "green meadow, white houses, dark green forested ridge, pale autumn light",
+      "features": "narrow grass path across the meadow, wooden garden gate at the path's end, white houses on the hillside",
+      "signatureElement": "wooden garden gate at the end of the meadow path",
+      "isRealLandmark": true,
+      "landmarkQuery": "Fislisbach (Stadt)",
+      "landmarkPhoto": 1
+    },
+    {
+      "id": "LOC002",
+      "name": "Kirche Rohrdorf",
+      "pages": [2, 3, 4, 5],
+      "scaleClass": "house-height",
+      "setting": "outdoor, churchyard with gravel path",
+      "colors": "white concrete church, grey and white walls, autumn trees with yellow leaves, blue sky",
+      "features": "plain modern white church with a tall detached concrete bell pillar, gravel path, low churchyard wall",
+      "signatureElement": "tall white concrete bell pillar with three bells",
+      "isRealLandmark": true,
+      "landmarkQuery": "Kirche Rohrdorf",
+      "landmarkPhoto": 1
+    }
+  ],
+  "backgrounds": [
+    {
+      "pages": [1, 6],
+      "description": "Green meadow in the foreground with a narrow grass path running across it toward a wooden garden gate. White houses spread across the hillside of the village beyond, with a dark forested ridge in the background. Clear autumn light, wide open space in the middle of the meadow."
+    },
+    {
+      "pages": [2, 3, 4, 5],
+      "description": "Plain modern white concrete church with a tall detached bell pillar, set on a hillside. Gravel path in the foreground with fallen yellow leaves, low churchyard wall to one side, a tree with yellow leaves beside the path. Clear blue sky, bright morning light from the side."
+    }
+  ]
+}
+```
+
+---COVER SCENE---
+```json
+{
+  "title": "Emma und die glänzende Elster",
+  "scene": {
+    "imageSummary": "Emma stands on the gravel path in front of the church, wearing her deep purple robe with golden moon patterns, a brown leather belt with pouch, pointed grey cloth shoes and a tall pointed deep purple wizard hat with a wide brim and golden band. She raises her wand with its silver star high, and a magpie sits on the roof edge of the church above her.",
+    "setting": {
+      "location": "Kirche Rohrdorf [LOC002]",
+      "indoorOutdoor": "outdoor",
+      "description": "white concrete church with a tall detached bell pillar, gravel path, yellow autumn leaves on the ground, blue sky",
+      "lighting": "clear morning light from the left",
+      "camera": "wide",
+      "depthLayers": "foreground gravel path and fallen leaves, midground Emma with raised wand, background white church and bell pillar with the magpie on the roof edge"
+    },
+    "timeOfDay": "morning",
+    "weather": "clear",
+    "characters": [
+      {
+        "id": null,
+        "name": "Emma",
+        "position": "center",
+        "action": "standing on the gravel path, wand raised high with silver sparks",
+        "expression": "determined",
+        "clothing": "costumed"
+      }
+    ],
+    "objects": [
+      {"id": "LOC002", "name": "Kirche Rohrdorf", "position": "background"},
+      {"id": "ANI001", "name": "magpie", "position": "on the roof edge of the church, upper right"}
+    ]
+  }
+}
+```
+
+---STORY PAGES---
+
+--- Page 1 ---
+TEXT:
+Emma rannte den schmalen Weg über die Wiese, die kleine Flasche fest in der Hand. Darin lag ihr Glückstrank, den sie am Morgen in der Küche gebraut hatte. Ihr Umhang mit den goldenen Monden flatterte hinter ihr, und der Zauberstab steckte sicher im Gürtel. Sie schaute kaum auf den Weg, so eilig hatte sie es. Am Gartentor am Wiesenende stand Herr Bühler und sah ihr entgegen. «Emma, du kommst ja schon!», rief er. Sie hob die Flasche hoch, damit er den goldenen Verschluss sehen konnte. Da fuhr ein schwarz-weisser Schatten aus der Hecke. Eine Elster stiess herab, schnappte die Flasche mit dem Schnabel und flog davon.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Emma, in her deep purple robe with golden moon patterns, brown leather belt with pouch, pointed grey cloth shoes and tall pointed deep purple wizard hat, runs along the grass path across the meadow with a small glass bottle held up in one hand. A magpie swoops out of the hedge beside her and grips the bottle in its beak at the peak of its dive. Herr Bühler stands at the wooden garden gate far down the path, watching her come.","setting":{"location":"Fislisbach (Stadt) [LOC001]","indoorOutdoor":"outdoor","description":"grassy meadow path at the edge of the village, green fields, a green hedge, white houses on the hillside, dark forested ridge behind","lighting":"low morning sun from the left, long soft shadows on the grass","camera":"medium","depthLayers":"foreground grass and path with Emma, midground the magpie beside the hedge, background the wooden gate and village houses"},"timeOfDay":"morning","weather":"clear","characters":[{"id":null,"name":"Emma","position":"left","action":"running along the path with the bottle raised","expression":"determined","clothing":"costumed","depth":"foreground","perspective":"front"},{"id":"CHR001","name":"Herr Bühler","position":"right","action":"standing at the garden gate","expression":"pleased","clothing":"standard","depth":"background","perspective":"front"}],"objects":[{"id":"ART001","name":"small glass bottle","position":"in the magpie's beak"},{"id":"ANI001","name":"magpie","position":"midair beside the hedge, diving toward Emma's raised hand"}],"interactions":[{"character":"magpie (ANI001)","object":"ART001","where":"grips the bottle in its beak","priority":"essential"},{"character":"Emma","object":"ANI001","where":"reaches up toward the magpie with her empty hand","priority":"low"},{"character":"Herr Bühler","object":"wooden garden gate","where":"watches the path from beside the gate","priority":"low"}],"background":"empty meadow with a few distant houses","population":"sparse"}}
+```
+
+--- Page 2 ---
+TEXT:
+Auf dem Dach der Kirche Rohrdorf landete die Elster mit der Flasche im Schnabel. Der Turm stand frei neben der Kirche, schlank und weiss. Emma rannte den Hügel hinauf, bis sie unter dem Turm stand. Auf dem Kiesweg lagen gelbe Blätter, und die Luft roch nach feuchtem Laub. Sie rief laut nach dem Vogel, doch er blieb oben auf dem Dachrand und liess die Flasche nicht los. Emma wusste, dass sie den Turm nicht hinaufklettern konnte. Ihre Grossmutter hatte ihr einmal erzählt, dass Elstern alles Glänzende sammeln. Emma dachte daran und blieb stehen, um zu überlegen, was sie tun konnte.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Emma, in her deep purple robe with golden moon patterns, brown leather belt with pouch, pointed grey cloth shoes and tall pointed deep purple wizard hat, stands on the gravel path below the church and looks up at the magpie on the roof edge. The magpie holds the small glass bottle in its beak against the white church wall. The bell pillar rises beside them against the blue sky.","setting":{"location":"Kirche Rohrdorf [LOC002]","indoorOutdoor":"outdoor","description":"white concrete church with a tall detached bell pillar, gravel path covered with yellow leaves, blue sky","lighting":"bright morning light from the left, the church wall lit on its left side","camera":"medium","depthLayers":"foreground gravel path with fallen leaves, midground Emma standing, background the white church wall, roof edge and magpie high above"},"timeOfDay":"morning","weather":"clear","characters":[{"id":null,"name":"Emma","position":"left","action":"standing on the gravel path, looking up at the roof","expression":"thoughtful","clothing":"costumed","depth":"midground","perspective":"front"}],"objects":[{"id":"ANI001","name":"magpie","position":"on the roof edge of the church, upper right"},{"id":"ART001","name":"small glass bottle","position":"in the magpie's beak"}],"interactions":[{"character":"Emma","object":"ANI001","where":"looks up at the magpie on the roof edge","priority":"low"},{"character":"magpie (ANI001)","object":"ART001","where":"grips the bottle in its beak","priority":"essential"}],"background":"empty churchyard with a tree beside the path","population":"sparse"}}
+```
+
+--- Page 3 ---
+TEXT:
+«Gib sie her!», rief Emma und streckte den Zauberstab in die Höhe. Die Elster legte die Flasche auf den Dachrand und hüpfte zur Seite. «Wenn du sie fallen lässt, geht sie kaputt!», rief Emma. Der Vogel schnappte die Flasche wieder, flog auf die Spitze des Glockenturms und blieb dort sitzen. Emma setzte sich auf die niedrige Mauer am Kirchhof. Der Zauberstab war nur ein dunkler Stab mit einem stumpfen Stern. Sie schwenkte ihn hin und her, doch kein Funke kam heraus. Oben auf dem Turm hielt die Elster die Flasche fest und schaute auf das Dorf hinunter. Emma sass still auf der Mauer und wusste nicht weiter.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Emma, in her deep purple robe with golden moon patterns, brown leather belt with pouch, pointed grey cloth shoes and tall pointed deep purple wizard hat, sits on the low churchyard wall and holds her wooden wand with its dull silver star up in one hand. High on the top of the bell pillar the magpie holds the small glass bottle in its beak, far above her. The mood is quiet and the light is plain morning light.","setting":{"location":"Kirche Rohrdorf [LOC002]","indoorOutdoor":"outdoor","description":"white concrete church with a tall detached bell pillar, low churchyard wall of grey stone, gravel path, blue sky","lighting":"plain morning light from the left","camera":"medium","depthLayers":"foreground low churchyard wall and gravel, midground Emma sitting, background the bell pillar with the magpie at its top"},"timeOfDay":"morning","weather":"clear","characters":[{"id":null,"name":"Emma","position":"left","action":"sitting on the low wall, wand held up","expression":"unsure","clothing":"costumed","depth":"foreground","perspective":"front"}],"objects":[{"id":"ART002","name":"wooden wand with a silver star","position":"held up in Emma's hand"},{"id":"ANI001","name":"magpie","position":"top of the bell pillar, far above"},{"id":"ART001","name":"small glass bottle","position":"in the magpie's beak at the top of the bell pillar"}],"interactions":[{"character":"Emma","object":"ART002","where":"holds the wand up","priority":"essential"},{"character":"magpie (ANI001)","object":"ART001","where":"grips the bottle in its beak","priority":"normal"}],"background":"empty churchyard with a tree beside the path","population":"sparse"}}
+```
+
+--- Page 4 ---
+TEXT:
+Unten am Kirchhof erinnerte sich Emma an die Worte ihrer Grossmutter. Elstern lieben alles, was glänzt, hatte sie gesagt. Emma hob den Zauberstab wieder hoch und hielt ihn gegen die Sonne. Dann schwenkte sie ihn langsam hin und her, und silberne Funken sprühten vom Stern. Auf dem Dach der Kirche wurde die Elster unruhig und rückte an den Rand. Emma blieb auf dem Kiesweg stehen, damit der Vogel sie gut sehen konnte, und schwenkte den Stab weiter. Der Vogel breitete die Flügel aus und liess sich vom Turm auf das Dach des Kirchenschiffs gleiten, die Flasche weiterhin im Schnabel.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Emma, in her deep purple robe with golden moon patterns, brown leather belt with pouch, pointed grey cloth shoes and tall pointed deep purple wizard hat, stands on the gravel path and swings her wooden wand with its silver star over her head, silver sparks streaming out into the air. The magpie has glided down to the edge of the church roof, still holding the small glass bottle in its beak. The bright sun is low over the church.","setting":{"location":"Kirche Rohrdorf [LOC002]","indoorOutdoor":"outdoor","description":"white concrete church with the nave roof and bell pillar, gravel path with yellow leaves, blue sky","lighting":"bright low sun from the right, sparks catching the light","camera":"medium","depthLayers":"foreground gravel path with fallen leaves, midground Emma with the raised wand and sparks, background the church nave roof with the magpie at its edge"},"timeOfDay":"morning","weather":"clear","characters":[{"id":null,"name":"Emma","position":"left","action":"swinging the wand over her head with silver sparks flying","expression":"focused","clothing":"costumed","depth":"foreground","perspective":"front"}],"objects":[{"id":"ART002","name":"wooden wand with a silver star","position":"raised over Emma's head"},{"id":"ANI001","name":"magpie","position":"edge of the church roof, background"},{"id":"ART001","name":"small glass bottle","position":"in the magpie's beak on the roof edge"}],"interactions":[{"character":"Emma","object":"ART002","where":"swings the wand over her head","priority":"essential"},{"character":"magpie (ANI001)","object":"ART001","where":"grips the bottle in its beak","priority":"normal"}],"background":"empty churchyard with a tree beside the path","population":"sparse"}}
+```
+
+--- Page 5 ---
+TEXT:
+Mit dem Stab in der Hand lockte Emma den Vogel Schritt für Schritt tiefer. Die Elster kam vom Dach auf den Rand der Mauer und dann auf einen Ast des Baumes am Weg. Die Flasche hielt sie noch im Schnabel. Emma schwenkte den Stab höher, und die Funken glitzerten über ihrem Kopf. Der Vogel kam näher an den Glanz. Ganz nah über dem Weg liess er die Flasche los. Emma steckte den Stab rasch in den Gürtel, streckte beide Hände aus und fing das kleine Fläschchen auf. Der Verschluss sass noch fest, und der Trank war heil.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Emma, in her deep purple robe with golden moon patterns, brown leather belt with pouch, pointed grey cloth shoes and tall pointed deep purple wizard hat, stands on the gravel path with both hands cupped out and catches the small glass bottle as it falls. The magpie sits on a low branch of the tree beside the path, just above her head. The bottle is caught mid-fall just below the branch.","setting":{"location":"Kirche Rohrdorf [LOC002]","indoorOutdoor":"outdoor","description":"gravel path beside a tree with yellow autumn leaves, white church wall behind, blue sky","lighting":"bright morning light from the right, warm on the leaves","camera":"medium","depthLayers":"foreground gravel path and fallen leaves with Emma, midground the low branch with the magpie, background the white church wall"},"timeOfDay":"morning","weather":"clear","characters":[{"id":null,"name":"Emma","position":"center","action":"catching the falling bottle with both hands","expression":"relieved","clothing":"costumed","depth":"foreground","perspective":"front"}],"objects":[{"id":"ART001","name":"small glass bottle","position":"falling into Emma's cupped hands"},{"id":"ANI001","name":"magpie","position":"on a low branch of the tree beside the path, above Emma"}],"interactions":[{"character":"Emma","object":"ART001","where":"catches the falling bottle with both hands","priority":"essential"}],"background":"empty churchyard with a tree beside the path","population":"sparse"}}
+```
+
+--- Page 6 ---
+TEXT:
+Herr Bühler stand noch am Gartentor, als Emma den Weg über die Wiese zurückkam. Ihr Spitzhut war schief, aber das störte sie nicht. Sie hielt das Fläschchen mit beiden Händen vor sich. «Der Glückstrank», sagte sie und reichte es ihm über das Gartentor. Er drehte den goldenen Verschluss auf, sah die Flasche lange an und lachte. «Das hast du dir aber gut ausgedacht», sagte er. Dann hob er die Flasche und trank einen kleinen Schluck. «Auf deine Zauberkunst, Emma!», rief er. Emma lachte mit ihm, und die Sonne stand schon tief über den Hügeln von Fislisbach.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Emma, in her deep purple robe with golden moon patterns, brown leather belt with pouch, pointed grey cloth shoes and tall pointed deep purple wizard hat, holds out the small glass bottle over the wooden garden gate. Herr Bühler reaches across the gate for it, his face lit with a smile, while the afternoon sun sits low over the village. The meadow path runs behind them.","setting":{"location":"Fislisbach (Stadt) [LOC001]","indoorOutdoor":"outdoor","description":"green meadow path ending at a wooden garden gate, white houses on the hillside, dark forested ridge behind, low afternoon light","lighting":"low afternoon sun from the left, long shadows across the meadow","camera":"medium","depthLayers":"foreground the wooden gate and grass, midground Emma holding out the bottle and Herr Bühler reaching, background the meadow path and village houses"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Emma","position":"left","action":"holding the bottle out over the gate","expression":"proud","clothing":"costumed","depth":"foreground","perspective":"front"},{"id":"CHR001","name":"Herr Bühler","position":"right","action":"reaching across the gate for the bottle","expression":"laughing","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[{"id":"ART001","name":"small glass bottle","position":"held out over the gate between Emma and Herr Bühler"}],"interactions":[{"character":"Emma","object":"ART001","where":"holds the bottle out over the gate","priority":"essential"},{"character":"Herr Bühler","object":"ART001","where":"reaches across the gate for the bottle","priority":"essential"}],"background":"empty meadow with a few distant houses","population":"sparse"}}
+```

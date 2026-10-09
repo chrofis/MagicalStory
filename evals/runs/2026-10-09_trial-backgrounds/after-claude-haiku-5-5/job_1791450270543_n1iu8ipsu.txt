@@ -1,0 +1,175 @@
+---TITLE---
+TITLE: Omar und die flachen Steine
+
+---VISUAL BIBLE---
+```json
+{
+  "secondaryCharacters": [],
+  "animals": [
+    {
+      "id": "ANI001",
+      "name": "Kätzchen",
+      "pages": [1, 2, 5, 6],
+      "scaleClass": "forearm-sized",
+      "species": "young tabby cat",
+      "coloring": "ginger and cream striped coat, cream chest, cream paws",
+      "anatomy": "four legs, one tail, two ears",
+      "features": "round amber eyes, soft rounded snout, closed rounded mouth, small cream bib"
+    }
+  ],
+  "artifacts": [
+    {
+      "id": "ART001",
+      "label": "fallen tree trunk",
+      "name": "fallen tree trunk lying across a forest stream, bark rough and grey-brown, branch stubs on one side",
+      "pages": [1, 2, 3],
+      "scaleClass": "waist-high",
+      "type": "fallen tree trunk",
+      "description": "long fallen tree trunk with rough grey-brown bark, pale cut ends, a few short branch stubs, lying across a narrow forest stream"
+    },
+    {
+      "id": "ART002",
+      "label": "flat stepping stones",
+      "name": "row of flat grey stepping stones rising out of a shallow forest stream",
+      "pages": [4, 5],
+      "scaleClass": "palm-sized",
+      "type": "stepping stone",
+      "description": "flat grey stones with smooth tops and damp edges, set across a shallow forest stream, each stone wide and level"
+    }
+  ],
+  "locations": [
+    {
+      "id": "LOC001",
+      "name": "Fislisbach",
+      "pages": [6],
+      "scaleClass": "landmark",
+      "setting": "outdoor meadow edge above the town, forest path, valley view",
+      "colors": "green meadow, golden and red autumn trees, white buildings on the hillside, dark green wooded ridge",
+      "features": "green meadow in the foreground, spread-out suburban town across the valley, wooded ridge behind",
+      "signatureElement": "white town buildings spread across the valley below the wooded ridge",
+      "isRealLandmark": true,
+      "landmarkQuery": "Fislisbach (Stadt)",
+      "landmarkPhoto": 1
+    },
+    {
+      "id": "LOC002",
+      "name": "Ninjawald Bachufer",
+      "pages": [1, 2, 3, 4, 5],
+      "scaleClass": "landmark",
+      "setting": "outdoor forest stream bank, autumn woodland",
+      "colors": "mossy brown earth, dark green ferns, yellow and orange fallen leaves, grey stones, clear pale water",
+      "features": "narrow forest stream with grassy banks, tall beech and oak trunks, fallen leaves on the ground",
+      "signatureElement": "a single fallen tree trunk spanning the stream",
+      "isRealLandmark": false,
+      "landmarkQuery": null
+    }
+  ],
+  "backgrounds": [
+    {
+      "pages": [1, 2, 3],
+      "description": "Forest stream bank in autumn, seen from the near bank at medium distance. A fallen grey-brown tree trunk lies across the narrow stream and reaches the far bank. Mossy grassy bank in the foreground, open space for the character. Tall beech and oak trunks behind, yellow and orange leaves on the ground, dark green ferns on the far bank. Clear afternoon light from the upper left. Clear sky visible through the canopy."
+    },
+    {
+      "pages": [4, 5],
+      "description": "Same forest stream from a lower angle near the water. Several flat grey stones rise from the shallow clear stream in a line from the near bank to the far bank. Damp grassy bank on the near side and a grassy far bank with dark green ferns. Yellow and orange fallen leaves on the bank. Afternoon light from the upper left, soft reflections on the water surface."
+    },
+    {
+      "pages": [6],
+      "description": "Edge of a forest path where it opens onto a green meadow, seen from a slightly raised viewpoint. Green meadow in the foreground with grass and a few autumn-coloured bushes. In the valley below, the white buildings of the town spread across the hillside, and a dark green wooded ridge rises behind. Clear afternoon light from the left. Open space on the path in the foreground.",
+      "landmarkPhoto": 1
+    }
+  ]
+}
+```
+
+---COVER SCENE---
+```json
+{
+  "title": "Omar und die flachen Steine",
+  "scene": {
+    "imageSummary": "Omar stands on the green meadow above the valley, in a dark blue ninja outfit with black cloth wraps on his forearms, black tabi boots and a dark blue ninja hood. He looks down at the kitten sitting at his feet, one foot forward, ready to walk. Soft autumn light over the meadow and the town.",
+    "setting": {
+      "location": "Fislisbach [LOC001]",
+      "indoorOutdoor": "outdoor",
+      "description": "Green meadow edge above the town of Fislisbach, golden and red autumn trees, white town buildings across the valley, dark green wooded ridge behind.",
+      "lighting": "Soft afternoon autumn light from the left.",
+      "camera": "wide",
+      "depthLayers": "Foreground: grass and the kitten at Omar's feet. Midground: Omar standing on the meadow path. Background: the town spread across the valley and the wooded ridge."
+    },
+    "timeOfDay": "afternoon",
+    "weather": "clear",
+    "characters": [
+      {
+        "id": null,
+        "name": "Omar",
+        "position": "center",
+        "action": "stands on the meadow path, one foot forward, looking ahead",
+        "expression": "confident, mouth set in a small smile",
+        "clothing": "costumed",
+        "depth": "midground",
+        "perspective": "front"
+      }
+    ],
+    "objects": [
+      {"id": "LOC001", "name": "Fislisbach", "position": "background"},
+      {"id": "ANI001", "name": "kitten", "position": "foreground, at Omar's feet"}
+    ]
+  }
+}
+```
+
+---STORY PAGES---
+
+--- Page 1 ---
+TEXT:
+Im Ninjawald zieht Omar die Ninjakapuze über den Kopf. Vor ihm fliesst ein Bach. Auf der anderen Seite sitzt ein Kätzchen im Gras. Ein dicker Baumstamm liegt quer über dem Wasser. Omar will zum Kätzchen.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Omar, in a dark blue ninja outfit with black cloth wraps on his forearms, black tabi boots and a dark blue ninja hood, pulls the hood up over his head at the edge of a forest stream. The fallen tree trunk lies across the water toward the far bank, where the kitten sits in the grass. Clear autumn light, yellow leaves on the ground.","setting":{"location":"Ninjawald Bachufer [LOC002]","indoorOutdoor":"outdoor","description":"Forest stream bank in autumn with mossy earth, yellow and orange leaves, tall beech and oak trunks, dark green ferns on the far bank.","lighting":"Clear afternoon light from the upper left.","camera":"medium","depthLayers":"Foreground: the near grassy bank with Omar. Midground: the stream and the fallen trunk. Background: the far bank with the kitten and the forest trees."},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Omar","position":"left","action":"pulls the dark blue ninja hood up over his head","expression":"determined, eyes forward","clothing":"costumed","depth":"foreground","perspective":"front"}],"objects":[{"id":"ART001","name":"fallen tree trunk","position":"lying across the stream from the near bank to the far bank"},{"id":"ANI001","name":"kitten","position":"on the far bank in the grass"}],"interactions":[{"character":"Omar","object":"ART001","where":"looks at the fallen tree trunk across the stream","priority":"low"}],"background":"empty forest stream with fallen leaves","population":"cast_only"}}
+```
+
+--- Page 2 ---
+TEXT:
+«Ich komme!», ruft Omar. Er steigt auf den Stamm und geht langsam Schritt für Schritt. Auf halbem Weg rollt der Stamm weg. Omar rutscht ab und landet im nassen Ufergras. Das Kätzchen schaut zu ihm herüber.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Omar, in a dark blue ninja outfit with black cloth wraps on his forearms, black tabi boots and a dark blue ninja hood, is slipping off the fallen tree trunk as it rolls away from him over the stream. His feet are leaving the trunk, and his arms are flung out for balance. The kitten sits on the far bank looking toward him.","setting":{"location":"Ninjawald Bachufer [LOC002]","indoorOutdoor":"outdoor","description":"Forest stream bank in autumn with mossy earth, yellow and orange leaves, tall beech and oak trunks, dark green ferns on the far bank.","lighting":"Clear afternoon light from the upper left.","camera":"medium","depthLayers":"Foreground: the near bank and wet grass. Midground: Omar on the rolling trunk above the stream. Background: the far bank with the kitten and the forest trees."},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Omar","position":"left","action":"slides off the rolling tree trunk, arms flung out","expression":"surprised, mouth open","clothing":"costumed","depth":"midground","perspective":"front"}],"objects":[{"id":"ART001","name":"fallen tree trunk","position":"tilting away from the near bank over the stream"},{"id":"ANI001","name":"kitten","position":"on the far bank in the grass, looking across"}],"interactions":[{"character":"Omar","object":"ART001","where":"slides off the trunk with his feet as it rolls away","priority":"essential"}],"background":"empty forest stream with fallen leaves","population":"cast_only"}}
+```
+
+--- Page 3 ---
+TEXT:
+Omar klammert sich mit beiden Armen an die Rinde und hält den Stamm fest. Der Stamm rollt trotzdem weiter. Omar fällt ins Gras zurück. Er ist traurig.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Omar, in a dark blue ninja outfit with black cloth wraps on his forearms, black tabi boots and a dark blue ninja hood, clings to the bark of the fallen tree trunk with both arms while the trunk rolls away from the near bank. His body leans back against the pull. His face is sad, mouth turned down.","setting":{"location":"Ninjawald Bachufer [LOC002]","indoorOutdoor":"outdoor","description":"Forest stream bank in autumn with mossy earth, yellow and orange leaves, tall beech and oak trunks, dark green ferns on the far bank.","lighting":"Clear afternoon light from the upper left.","camera":"medium","depthLayers":"Foreground: the near bank and grass. Midground: Omar clinging to the rolling trunk. Background: the stream and the far bank with the forest trees."},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Omar","position":"left","action":"clings to the rolling tree trunk with both arms","expression":"sad, mouth turned down, eyes narrowed","clothing":"costumed","depth":"foreground","perspective":"front"}],"objects":[{"id":"ART001","name":"fallen tree trunk","position":"tilting away from the near bank over the stream"}],"interactions":[{"character":"Omar","object":"ART001","where":"clings to the fallen tree trunk with both arms","priority":"essential"}],"background":"empty forest stream with fallen leaves","population":"cast_only"}}
+```
+
+--- Page 4 ---
+TEXT:
+Im flachen Bach liegen flache Steine, die aus dem Wasser ragen. Omar schaut genauer hin. Er setzt den Fuss auf den nächsten Stein. Der Stein bleibt still liegen. Omar ist erleichtert.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Omar, in a dark blue ninja outfit with black cloth wraps on his forearms, black tabi boots and a dark blue ninja hood, stands on the grassy near bank and steps one foot onto the first flat stepping stone rising from the shallow stream. His shoulders drop with relief. The row of flat stones runs across the water toward the far bank.","setting":{"location":"Ninjawald Bachufer [LOC002]","indoorOutdoor":"outdoor","description":"Shallow forest stream in autumn with a row of flat grey stones, damp grassy bank, yellow and orange leaves, dark green ferns on the far bank.","lighting":"Clear afternoon light from the upper left, soft reflections on the water.","camera":"medium","depthLayers":"Foreground: the damp grassy near bank with Omar. Midground: the first flat stone and the stepping stones in the stream. Background: the far bank and the forest trees."},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Omar","position":"left","action":"steps one foot onto the first flat stone","expression":"relieved, shoulders dropping","clothing":"costumed","depth":"foreground","perspective":"side"}],"objects":[{"id":"ART002","name":"flat stepping stones","position":"in the shallow stream from the near bank toward the far bank"}],"interactions":[{"character":"Omar","object":"ART002","where":"steps one foot onto the first flat stone","priority":"essential"}],"background":"empty forest stream with flat stones","population":"cast_only"}}
+```
+
+--- Page 5 ---
+TEXT:
+Von Stein zu Stein hüpft Omar über den Bach. Jeder Stein hält ihn. Auf dem letzten Stein springt er ans andere Ufer. Das Kätzchen kommt ihm entgegen.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Omar, in a dark blue ninja outfit with black cloth wraps on his forearms, black tabi boots and a dark blue ninja hood, leaps from the last flat stepping stone toward the far bank, arms slightly out for balance. The kitten comes down the grassy far bank toward him. The stones stay level in the shallow stream.","setting":{"location":"Ninjawald Bachufer [LOC002]","indoorOutdoor":"outdoor","description":"Shallow forest stream in autumn with a row of flat grey stones, grassy far bank, dark green ferns, yellow and orange leaves.","lighting":"Clear afternoon light from the upper left, soft reflections on the water.","camera":"medium","depthLayers":"Foreground: the water and the stones. Midground: Omar leaping from the last stone. Background: the far bank with the kitten and the forest trees."},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Omar","position":"left","action":"leaps from the last flat stone toward the far bank","expression":"determined, eyes forward","clothing":"costumed","depth":"midground","perspective":"side"}],"objects":[{"id":"ART002","name":"flat stepping stones","position":"in the shallow stream, the last stone under Omar's feet"},{"id":"ANI001","name":"kitten","position":"on the far bank, coming down toward the water"}],"interactions":[{"character":"Omar","object":"ART002","where":"jumps from the last flat stone toward the far bank","priority":"essential"}],"background":"empty forest stream with flat stones","population":"cast_only"}}
+```
+
+--- Page 6 ---
+TEXT:
+«Komm mit, Kätzchen!», sagt Omar. Der Waldweg führt zwischen den bunten Blättern hinauf. Das Kätzchen springt vom Ufer und läuft mit ihm davon. Omar ist glücklich.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Omar, in a dark blue ninja outfit with black cloth wraps on his forearms, black tabi boots and a dark blue ninja hood, walks up the forest path beside the kitten at the edge of a green meadow. Below, the white buildings of the town of Fislisbach spread across the valley. Warm autumn light, golden and red trees along the path.","setting":{"location":"Fislisbach [LOC001]","indoorOutdoor":"outdoor","description":"Edge of a forest path where it opens onto a green meadow, golden and red autumn trees, white town buildings across the valley, dark green wooded ridge.","lighting":"Clear afternoon light from the left.","camera":"medium","depthLayers":"Foreground: the forest path with Omar and the kitten. Midground: the meadow and autumn bushes. Background: the town across the valley and the wooded ridge."},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Omar","position":"center","action":"walks up the forest path beside the kitten","expression":"happy, mouth open in a smile","clothing":"costumed","depth":"foreground","perspective":"front"}],"objects":[{"id":"ANI001","name":"kitten","position":"beside Omar on the path, running alongside him"},{"id":"LOC001","name":"Fislisbach","position":"background"}],"interactions":[{"character":"Omar","object":"ANI001","where":"walks beside the kitten up the forest path","priority":"low"}],"background":"one distant walker far across the meadow in a grey jacket","population":"sparse"}}
+```

@@ -68164,3 +68164,33 @@ Jev against the after labels (thresholds set on the before labels, so held out):
 **Decision:** none changes; `trialStoryEffort` stays 'medium'. Low is not "same quality, less wait": it cuts about 80 s of wait and half the cost, and costs logic and causality that the trial story is sold on. n=5 and a single reader; the direction matches the 2026-10-08 plan-check result (low worse than medium).
 **Revisit if:** the wait matters more than story logic (then low is the lever: image work can start at about 8 s instead of about 87 s), or a cheap logic check can run on the page text (then low plus one fix pass is the next arm to measure).
 **Touched files:** scripts/analysis/eval-trial-writer-effort.js, evals/results/results.jsonl, evals/runs/2026-10-09_trial-writer-effort/metrics.json.
+
+## 2026-10-09 - Trial backgrounds: one plate per declared background, three of them, each a different picture
+
+**Context.** Owner's staging trial job_1791579344291_rk2bno6av (Grossmuenster, Zurich) logged "1 plate(s) for 6 page(s): LOC001.1->p1,2,3,4,5,6": one backdrop for the whole book, pages 3 and 5 near-identical. Cause: the writer was already asked for 3-6 `backgrounds[]`, but `groupTrialPlatePagesByVantage` grouped plates by LOCATION (the 2026-09-13 cut from one plate per page to one per location), and a story at one landmark has one location. The prompt also capped locations at 2 and said "fewer backgrounds if scenes share a setting". No recorded reason for a single backdrop was found in decisions.md or memory: the grouping was a cost cut (6 plates = $0.12 = 17-23% of a trial), justified by an observation ("1-3 distinct vantages per trial"), not a product requirement. Trial latency is a product requirement, but plates render in parallel while the writer is still streaming (pLimit 5), so more plates add cost, not wait.
+
+**Measured before (stored staging trials, 43 with backgrounds):** plates per trial 1: 18 (42%), 2: 21, 3: 2, 4: 1, 6: 1; mean 1.77. Prod (13): 1: 2, 2: 8, 3: 2, 4: 1.
+
+**Decision.** (1) A plate is a `backgrounds[]` entry (`groupTrialPlatePagesByVantage` rewritten, no longer calls `groupPagesByVantage`; a page named twice belongs to the first entry; label `LOC00N.k`). (2) story-trial.txt asks for exactly 3 backgrounds on a 6-page story (`{BACKGROUND_COUNT}` = min(3, pages)), each a different picture (another place, or another part/angle/distance of one place), not split by time of day or colour. (3) A background on a real landmark may carry its own `landmarkPhoto` (same PHOTOS list, same cite rule; absent = the location's), so one landmark with several photos backs several plates; `trialPlateLandmarkPromisesByPage(vb, groups, opts)` resolves per plate and `landmarkPhotoCitationFaults` checks the per-background citations. The writer declares it; code only groups.
+
+**Measured after (real buildTrialStoryPrompt on 24 stored trial inputs, claude-haiku-5-5, text only, USD 0.50):** plates per story 3: 23, 6: 1; at least 2: 24/24, at least 3: 24/24, one plate: 0/24; all 6 pages covered once: 24/24. Same inputs, old template, old grouping (12 stories, USD 0.24): 1 plate 3/12, 2 plates 9/12, 3 or more 0/12. Landmark mandate: of 20 stories with landmarks offered, 20/20 stage a real landmark and 20/20 use one as the front-cover location (before: 11/11). Stories citing 2 or more distinct photos: 14 of 20; 6 of 20 cite one photo on every background (their 3 plates differ by description only). Not measured: rendered plates (no images were made), so whether three plates from one photo look different enough is open. Model caveat: Haiku 5.5, not the production Sonnet 5.5 (about USD 0.2 per Sonnet call, over the task cap); rerun `scripts/analysis/eval-trial-backgrounds.js --model=claude-sonnet` to confirm. Fidelity check: the rebuilt prompt for the owner's job differs from the stored `outlinePrompt` only in the lines changed here.
+
+**Cost and latency.** Plate = grok-imagine edit tier, USD 0.02/image (server/config/models.js `emptyScenePlateModel`). Mean plates 1.77 -> 3.0: +1.2 plates, about +USD 0.025 per trial (+USD 0.08 for a 6-plate story, 1 in 24). Latency: all plates start in the same tick during writer streaming and a page awaits only its own plate, so expected added wait is about 0; not measured live (verify.json `trial-backgrounds-2026-10-09`).
+
+**Why 3.** Owner: "at least 2, better 3". More buys little on 6 pages and each plate costs.
+
+**Revisit if** the owner's next trial shows three plates that look alike (then require a different photo per background or allow a third location), or trial cost matters more than variety.
+
+**Touched files:** prompts/story-trial.txt, server/lib/promptBuilders.js, server/lib/sceneMetadata.js, server/lib/storyHelpers.js, storyJobPipeline.js, tests/unit/trial-plate-grouping.test.ts, tests/unit/landmark-plate-resolve.test.ts, tests/unit/writer-shared-rules-reach.test.ts, scripts/analysis/eval-trial-backgrounds.js, evals/datasets/trial-backgrounds-v1/, evals/runs/2026-10-09_trial-backgrounds/. Supersedes the "one plate per location" economy of 2026-09-13.
+
+## 2026-10-09 - Trial reference sheets: no render gate
+
+**Context.** Over the last 30 staging trials the VB reference-sheet cell gate (Gemini yes/no per cell, one re-render on NO) judged 76 cells: 59 passed first time, 17 were re-rendered (13 of 30 stories), 8 passed after re-render, 9 still failed and were accepted anyway. Most failures were nitpicks (button holes, ear count, apple colour); 3 were real (wrong-age secondary, cropped head, blue skin). The gates run one after another per element (about 7 s each; owner's job_1791579344291_rk2bno6av: gates at 22:57:35, :46, :53, 22:58:00 CH) and the trial page images wait for the sheet (`trialReferenceSheetPromise`), so a trial pays about 25 s plus 10-15 s per re-render.
+
+**Decision.** Owner: no gate on the trial path (no Gemini check, no re-render). `generateReferenceSheet` takes `renderGate` (default true); the trial call passes `renderGate: false`, the full-story call passes nothing and keeps the gate unchanged. An explicit option, not a mode sniff in the module. The trial logs once that the gate is skipped by design. Nothing used by full stories was deleted.
+
+**Rationale.** A gate that accepts 9 of 17 failures anyway and flags nitpicks buys little at a cost in the critical path. Expected page-image start on the owner's job: VB ready + render time (about 6-10 s) instead of +31 s. Not measured on a live trial yet (verify.json `trial-no-ref-gate-2026-10-09`).
+
+**Revisit if** wrong-age or cropped-head references start reaching trial pages visibly more often.
+
+**Touched files:** server/lib/referenceSheets.js, storyJobPipeline.js, tests/unit/reference-sheet-render-gate-option.test.ts.

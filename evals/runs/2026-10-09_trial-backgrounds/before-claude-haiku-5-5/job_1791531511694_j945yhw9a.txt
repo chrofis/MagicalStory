@@ -1,0 +1,166 @@
+---TITLE---
+TITLE: Rohan und der Knoten im Graben
+
+---VISUAL BIBLE---
+```json
+{
+  "secondaryCharacters": [],
+  "animals": [],
+  "artifacts": [
+    {
+      "id": "ART001",
+      "label": "school backpack",
+      "name": "dark blue school backpack with two shoulder straps",
+      "pages": [1, 2, 3, 4, 5, 6],
+      "scaleClass": "arm-sized",
+      "type": "backpack",
+      "slot": "accessories",
+      "wornAs": "Rohan.accessories",
+      "back": "dark blue fabric back panel with two padded shoulder straps running over the shoulders",
+      "description": "dark blue backpack with a rectangular body, two padded shoulder straps and a small fabric loop stitched onto the left strap",
+      "states": [
+        {"name": "intact", "delta": "both shoulder straps whole and fastened at the seams", "pages": [1]},
+        {"name": "strap torn", "delta": "left shoulder strap torn loose at its seam and hanging down", "pages": [2]},
+        {"name": "strap tied", "delta": "left shoulder strap knotted back together with a short white shoelace", "pages": [3, 4, 5, 6]}
+      ]
+    },
+    {
+      "id": "ART002",
+      "label": "bicycle lock with key",
+      "name": "a bicycle lock with a key on a small ring",
+      "pages": [1, 2, 3, 4, 5, 6],
+      "scaleClass": "hand-sized",
+      "type": "bicycle lock",
+      "description": "black bicycle lock with a round body and a thick U-shaped metal shackle, a small key on a short steel ring"
+    }
+  ],
+  "locations": [
+    {
+      "id": "LOC001",
+      "name": "Kirche Rohrdorf",
+      "pages": [6],
+      "scaleClass": "house-height",
+      "setting": "outdoor, church with a detached bell tower on a hillside lawn",
+      "colors": "white concrete, grey shadows, green lawn, blue sky, yellow and orange autumn trees",
+      "features": "plain modern white concrete church with austere linear design, tall bell tower standing apart from the church, a bicycle stand at the edge of the lawn",
+      "signatureElement": "tall white concrete bell tower with straight vertical lines",
+      "isRealLandmark": true,
+      "landmarkQuery": "Kirche Rohrdorf",
+      "landmarkPhoto": 1
+    },
+    {
+      "id": "LOC002",
+      "name": "Feldweg mit Graben bei Fislisbach",
+      "pages": [1, 2, 3, 4, 5],
+      "scaleClass": "house-height",
+      "setting": "outdoor, unpaved farm track beside a deep ditch",
+      "colors": "brown earth, wet dark leaves, yellow and red autumn foliage, grey-green grass, murky dark water",
+      "features": "narrow dirt track with ruts, a deep grassy ditch running alongside, bare hedges, a hazel bush, fields and trees further back",
+      "signatureElement": "deep ditch with dark water hidden under a layer of wet fallen leaves",
+      "isRealLandmark": false,
+      "landmarkQuery": null
+    }
+  ],
+  "backgrounds": [
+    {
+      "pages": [1, 2, 3, 4, 5],
+      "description": "Narrow unpaved farm track between a grassy field on the right and a deep ditch on the left, ruts in brown earth, wet yellow and red leaves scattered on the verge, a hazel bush near the ditch edge, bare hedges and autumn trees further back. Soft low morning light from the right, long shadows across the track. Open track in the foreground. No people."
+    },
+    {
+      "pages": [6],
+      "description": "Modern white concrete church with a tall detached bell tower standing apart on a hillside, green lawn in front, a bicycle stand at the edge of the lawn, yellow and orange autumn trees on the sides, clear blue sky. Morning light from the left, long soft shadows on the lawn. Open grass in the foreground. No people."
+    }
+  ]
+}
+```
+
+---COVER SCENE---
+```json
+{
+  "title": "Rohan und der Knoten im Graben",
+  "scene": {
+    "imageSummary": "Rohan stands in front of the white concrete church with the dark blue backpack on his back and the bicycle lock held up in one hand, its key ring catching the light. Autumn leaves lie on the lawn and the tall bell tower rises behind him.",
+    "setting": {
+      "location": "Kirche Rohrdorf [LOC001]",
+      "indoorOutdoor": "outdoor",
+      "description": "Modern white concrete church with a tall detached bell tower on a hillside lawn, yellow and orange autumn trees, clear blue sky, a bicycle stand at the edge of the grass",
+      "lighting": "clear morning sun from the left, long soft shadows falling across the lawn",
+      "camera": "wide",
+      "depthLayers": "foreground: green lawn with fallen autumn leaves; midground: Rohan standing; background: the white church and its bell tower against the blue sky"
+    },
+    "timeOfDay": "morning",
+    "weather": "clear",
+    "characters": [
+      {
+        "id": null,
+        "name": "Rohan",
+        "position": "center",
+        "action": "stands with the bicycle lock held up in one hand, the backpack on his back",
+        "expression": "determined",
+        "clothing": "standard"
+      }
+    ],
+    "objects": [
+      {"id": "LOC001", "name": "Kirche Rohrdorf", "position": "background"},
+      {"id": "ART001", "name": "school backpack", "position": "on Rohan's back"},
+      {"id": "ART002", "name": "bicycle lock with key", "position": "held up in Rohan's hand"}
+    ]
+  }
+}
+```
+
+---STORY PAGES---
+
+--- Page 1 ---
+TEXT:
+Rohan fuhr mit seinem Velo den Feldweg hinunter, den Rucksack fest auf den Schultern. An einer Schlaufe des Rucksacks hing das Velo-Schloss, und der Schlüssel baumelte daran bei jedem Holperer. Die Klasse wollte sich bei der Kirche Rohrdorf treffen, um dort das Znüni im Freien zu essen, und Rohan wollte pünktlich sein. Links vom Weg zog sich ein tiefer Graben entlang, gefüllt mit nassem, braunem Laub. Die Bäume leuchteten gelb und rot, und einzelne Blätter lösten sich und segelten über den Weg. Rohan trat kräftiger in die Pedalen und hielt den Lenker gerade, damit das Velo nicht in die Furchen geriet.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Rohan rides his bicycle down a dirt road in autumn, the dark blue backpack on his back and a bicycle lock hanging from a loop on the left strap. A deep ditch runs along the left side of the track, lined with fallen yellow and red leaves. Low morning light crosses the field.","setting":{"location":"Feldweg mit Graben bei Fislisbach [LOC002]","indoorOutdoor":"outdoor","description":"Narrow unpaved farm track between a grassy field and a deep ditch, brown wet leaves on the verge, bare hedges, yellow and red autumn trees further back","lighting":"soft low morning sun from the right, long shadows across the track","camera":"medium","depthLayers":"foreground: the dirt track with ruts; midground: Rohan on the bicycle; background: the ditch, the field and the trees"},"timeOfDay":"morning","weather":"clear","characters":[{"id":null,"name":"Rohan","position":"center","action":"rides a bicycle along the track, the backpack on his back","expression":"focused, eyes forward","clothing":"standard","depth":"foreground","perspective":"front"}],"objects":[{"id":"ART001","name":"school backpack","position":"on Rohan's back"},{"id":"ART002","name":"bicycle lock with key","position":"hanging from a loop on the left backpack strap"}],"interactions":[{"character":"Rohan","object":"bicycle handlebars","where":"grips the handlebars","priority":"essential"}],"background":"empty track beside a field","population":"cast_only"}}
+```
+
+--- Page 2 ---
+TEXT:
+Am Rand des Feldwegs riss der linke Riemen des Rucksacks direkt an der Naht. Rohan spürte den Zug an seiner Schulter und bremste, bis das Velo stillstand. Das Velo-Schloss rutschte an seiner Schlaufe über den Rucksack hinab, fiel über den Rand und prallte auf die Böschung. Dann verschwand es im Laub am Grund des Grabens. Rohan stellte das Velo ins Gras, kniete sich an den Rand und spähte hinunter. Der Graben war tiefer, als er gedacht hatte. Unten stand dunkles Wasser zwischen Wurzeln und Schlamm, und weder das Schloss noch der Schlüssel waren zu sehen. Rohan hielt den losen Riemen mit einer Hand fest.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Rohan kneels at the edge of a deep ditch, holding the torn left strap of his backpack with one hand. The bicycle lies in the grass behind him. Dark water and wet leaves fill the bottom of the ditch, and the lock has disappeared from sight.","setting":{"location":"Dirt road beside a ditch near Fislisbach [LOC002]","indoorOutdoor":"outdoor","description":"Narrow unpaved farm track beside a deep grassy ditch, brown wet leaves on the bank, dark water and roots at the bottom of the ditch, a hazel bush near the edge","lighting":"soft low morning sun from the right, the ditch floor in shade","camera":"medium","depthLayers":"foreground: the crumbling bank edge and wet leaves; midground: Rohan kneeling; background: the dark ditch, the field and the trees"},"timeOfDay":"morning","weather":"clear","characters":[{"id":null,"name":"Rohan","position":"center","action":"kneels at the ditch edge, the torn strap in one hand, leaning forward to look down","expression":"worried, eyes wide open","clothing":"standard","depth":"foreground","perspective":"side"}],"objects":[{"id":"ART001","name":"school backpack","position":"on Rohan's back, the left strap torn loose and hanging"},{"id":"ART002","name":"bicycle lock with key","position":"fallen into the ditch, hidden under wet leaves and dark water"}],"interactions":[{"character":"Rohan","object":"school backpack","where":"grips the loose backpack strap","priority":"essential"}],"background":"empty track beside a ditch","population":"cast_only"}}
+```
+
+--- Page 3 ---
+TEXT:
+«Das Schloss kann ich nicht einfach liegen lassen.» Rohan sagte es zu sich selbst, während er den linken Schnürsenkel aus seinem Turnschuh zog. Damit band er die beiden Enden des Riemens zusammen und zog den Knoten fest. Er hängte den Rucksack wieder über die Schulter und ruckelte daran, bis der Riemen hielt. Dann brach er an einem Haselstrauch einen langen, dünnen Ast ab und entfernte die Zweige. Den rechten Schnürsenkel band er zu einer Schlaufe am Ende des Astes. Er dachte an den Vater, der ihm am Gartentor einen Knoten gezeigt hatte, und kniete sich wieder an den Rand des Grabens.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Rohan kneels at the ditch edge and holds a long thin hazel branch out over the water, a shoelace loop tied at its tip. The backpack strap is knotted back together. The lock lies somewhere below in the dark leaves.","setting":{"location":"Dirt road beside a ditch near Fislisbach [LOC002]","indoorOutdoor":"outdoor","description":"Narrow unpaved farm track beside a deep grassy ditch, brown wet leaves on the bank, dark water at the bottom, a bare hazel bush with its twigs stripped nearby","lighting":"soft low morning sun from the right, the ditch floor in shade","camera":"medium","depthLayers":"foreground: the bank edge with wet leaves; midground: Rohan kneeling with the branch; background: the dark ditch, the field and the trees"},"timeOfDay":"morning","weather":"clear","characters":[{"id":null,"name":"Rohan","position":"center","action":"kneels at the ditch edge, holding the long branch out over the water","expression":"focused, mouth set in a line, eyes on the water","clothing":"standard","depth":"foreground","perspective":"side"}],"objects":[{"id":"ART001","name":"school backpack","position":"on Rohan's back, the left strap knotted back together with a shoelace"},{"id":"ART002","name":"bicycle lock with key","position":"lying at the bottom of the ditch under dark leaves"}],"interactions":[{"character":"Rohan","object":"long hazel branch","where":"holds the long branch out over the ditch, its tip bound with a shoelace loop","priority":"essential"}],"background":"empty track beside a ditch","population":"cast_only"}}
+```
+
+--- Page 4 ---
+TEXT:
+Unten im Graben lag das Schloss unter dem nassen Laub. Rohan liess den Ast langsam hinunter, bis die Schlaufe das Wasser berührte. Er suchte nach dem Bügel, zog den Ast zu sich, und die Schlaufe glitt ab. Das Schloss rutschte tiefer und blieb im dunklen Schlamm liegen, weit ausserhalb seiner Reichweite. Rohan legte sich bäuchlings an den Rand und streckte den Ast so weit aus, wie er konnte. Die Spitze reichte nicht bis zum Schloss. Er zog den Ast zurück, setzte sich ins nasse Gras und liess die Arme auf die Knie sinken. Neben ihm lag das Velo, und quer über dem Graben lag der Ast mit dem Schnürsenkel.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Rohan lies on his belly at the edge of the ditch, stretching a long branch down toward the water. The shoelace loop has slipped off, and the lock sits far below in dark mud, beyond the reach of the branch tip.","setting":{"location":"Dirt road beside a ditch near Fislisbach [LOC002]","indoorOutdoor":"outdoor","description":"Narrow unpaved farm track beside a deep grassy ditch, wet brown leaves on the bank, dark mud and water at the bottom of the ditch, roots along the sides","lighting":"soft low morning sun from the right, the ditch floor in shade","camera":"medium","depthLayers":"foreground: the wet bank and leaves; midground: Rohan lying at the edge with the branch; background: the dark ditch, the field and the trees"},"timeOfDay":"morning","weather":"clear","characters":[{"id":null,"name":"Rohan","position":"center","action":"lies on his belly at the bank, stretching the branch down over the ditch","expression":"strained, lips pressed together, eyes on the water","clothing":"standard","depth":"foreground","perspective":"side"}],"objects":[{"id":"ART002","name":"bicycle lock with key","position":"far down in the dark mud at the bottom of the ditch, out of reach"}],"interactions":[{"character":"Rohan","object":"long hazel branch","where":"grips the long branch, its tip reaching over the water","priority":"essential"}],"background":"empty track beside a ditch","population":"cast_only"}}
+```
+
+--- Page 5 ---
+TEXT:
+Rohan blieb eine Weile still im Gras sitzen. Dann stand er auf, nahm den Ast und dachte an den festen Seemannsknoten, den ihm der Vater gezeigt hatte. Er legte den Schnürsenkel zweimal um den Ast, machte eine Schlaufe und zog das Ende durch, so wie der Vater es ihm vorgemacht hatte. Diesmal blieb die Schlaufe am Ast, als er ihn wieder über den Graben hielt. Rohan liess sie ins Wasser sinken, bis sie unter den Bügel glitt. Dann zog er am Ast, und je fester er zog, desto enger zog sich der Knoten um den Bügel. Langsam hob er den Ast aus dem Graben. Das Schloss hing schwer und tropfend an der Schnur, und Schlamm lief in dünnen Fäden daran hinunter.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Rohan stands at the ditch edge and lifts the long branch clear of the water, a bicycle lock hanging on a tight shoelace knot at its tip, dripping mud. His feet are planted firmly on the bank.","setting":{"location":"Dirt road beside a ditch near Fislisbach [LOC002]","indoorOutdoor":"outdoor","description":"Narrow unpaved farm track beside a deep grassy ditch, wet brown leaves on the bank, muddy water below, a hazel bush at the edge","lighting":"soft low morning sun from the right, light on the wet lock","camera":"medium","depthLayers":"foreground: the wet bank edge; midground: Rohan standing and lifting the branch; background: the ditch, the field and the trees"},"timeOfDay":"morning","weather":"clear","characters":[{"id":null,"name":"Rohan","position":"center","action":"stands at the ditch edge, lifting the branch with the lock swinging from its tip","expression":"focused, eyes on the lock","clothing":"standard","depth":"foreground","perspective":"side"}],"objects":[{"id":"ART001","name":"school backpack","position":"on Rohan's back, the left strap knotted back together with a shoelace"},{"id":"ART002","name":"bicycle lock with key","position":"dangling from the tip of the branch, dripping mud"}],"interactions":[{"character":"Rohan","object":"long hazel branch","where":"lifts the branch, the bicycle lock dangling from its tip","priority":"essential"}],"background":"empty track beside a ditch","population":"cast_only"}}
+```
+
+--- Page 6 ---
+TEXT:
+Vor der Kirche Rohrdorf stellte Rohan das Velo an den Velo-Ständer. Er wischte das Schloss an einem Büschel Gras ab, band die Schnur vom Bügel und hängte den Schlüssel an seinen Ring. Der Rucksack sass fest auf seinem Rücken, und der geflickte Riemen hielt. Er schloss das Velo ab, drehte den Schlüssel, bis das Schloss einrastete, und trat einen Schritt zurück. Dann setzte er sich auf die Stufe vor dem Eingang und packte sein Znüni aus: zwei Brote und ein Rüebli. Er biss in das Brot. «Der Knoten hält.»
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Rohan sits on the church steps with his backpack on, a bread roll and a carrot in his hands. The bicycle is locked to the stand on the lawn, the lock clipped through its frame. The white concrete church and its tall bell tower rise behind him in morning light.","setting":{"location":"Kirche Rohrdorf [LOC001]","indoorOutdoor":"outdoor","description":"Modern white concrete church with a tall detached bell tower, green lawn with fallen autumn leaves, a bicycle stand at the edge of the grass, yellow and orange trees, clear blue sky","lighting":"clear morning sun from the left, soft shadows on the steps and the lawn","camera":"medium","depthLayers":"foreground: the lawn and the church steps; midground: Rohan sitting on the step with the bicycle at the stand; background: the white church and bell tower against the blue sky"},"timeOfDay":"morning","weather":"clear","characters":[{"id":null,"name":"Rohan","position":"center","action":"sits on the church step, eating a bread roll, a carrot in his other hand","expression":"calm, a small smile at the corners of the mouth","clothing":"standard","depth":"foreground","perspective":"front"}],"objects":[{"id":"LOC001","name":"Kirche Rohrdorf","position":"background"},{"id":"ART001","name":"school backpack","position":"on Rohan's back, the left strap knotted back together with a shoelace"},{"id":"ART002","name":"bicycle lock with key","position":"clipped through the bicycle frame at the stand on the lawn"}],"interactions":[{"character":"Rohan","object":"bread roll and carrot","where":"holds the bread roll and the carrot in his hands","priority":"essential"}],"background":"empty lawn in front of the church","population":"ambient"}}
+```

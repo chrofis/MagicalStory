@@ -1,0 +1,161 @@
+---TITLE---
+TITLE: Noah und der Wolkenschlüssel
+
+---VISUAL BIBLE---
+```json
+{
+  "secondaryCharacters": [],
+  "animals": [],
+  "artifacts": [
+    {
+      "id": "ART001",
+      "label": "magic letter",
+      "name": "magic letter, a folded sheet of parchment",
+      "pages": [1, 2, 3, 4, 5, 6],
+      "scaleClass": "hand-sized",
+      "type": "letter",
+      "text": "Wolkenschlüssel, öffne dich",
+      "description": "letter of cream parchment with brown ink lines, folded once, written in a neat hand across the sheet",
+      "states": [
+        {"name": "dry", "delta": "flat and smooth, cream parchment with crisp brown ink lines", "pages": [1, 5, 6]},
+        {"name": "wet", "delta": "soaked and limp, parchment darkened at the edges, ink lines blurred but the words still visible", "pages": [2, 3, 4]}
+      ]
+    }
+  ],
+  "locations": [
+    {
+      "id": "LOC001",
+      "name": "Ruine Stein",
+      "pages": [1, 2, 3, 4],
+      "scaleClass": "landmark",
+      "setting": "outdoor, hilltop castle ruin above a wooded river valley in Baden",
+      "colors": "grey stone, green moss, brown and gold autumn foliage, pale sky",
+      "features": "stone tower rising from a rocky outcrop, low stone walls, flagstone path, ivy and moss on the masonry",
+      "signatureElement": "the tall grey stone tower on the hilltop",
+      "isRealLandmark": true,
+      "landmarkQuery": "Ruine Stein",
+      "landmarkPhoto": 1
+    },
+    {
+      "id": "LOC002",
+      "name": "Stadtpfarrkirche Maria Himmelfahrt",
+      "pages": [5, 6],
+      "scaleClass": "house-height",
+      "setting": "outdoor, church with a square in the old town of Baden",
+      "colors": "cream stone walls, dark roof tiles, gold and red spire pattern, grey cobblestones",
+      "features": "church steps at the entrance, spire with a geometric harlequin pattern",
+      "signatureElement": "the patterned gold and red spire",
+      "isRealLandmark": true,
+      "landmarkQuery": "Stadtpfarrkirche Maria Himmelfahrt (Baden)",
+      "landmarkPhoto": 1
+    }
+  ],
+  "backgrounds": [
+    {
+      "pages": [1, 2],
+      "landmarkPhoto": 1,
+      "description": "Hilltop ruin of Ruine Stein: a prominent grey stone tower rises from a rocky outcrop, moss and vegetation cover the old fortress walls, a flagstone path runs along a low stone wall, and the wooded river valley lies far below under a pale autumn sky. Wide view with open path space in the foreground."
+    },
+    {
+      "pages": [3, 4],
+      "landmarkPhoto": 3,
+      "description": "Close stretch of the Ruine Stein walls: weathered grey stone masonry covered with ivy and moss, a flat grey stone on a wet flagstone path, a shallow puddle reflecting the pale sky, scattered brown autumn leaves. Medium view from path level with open ground in the foreground."
+    },
+    {
+      "pages": [5, 6],
+      "landmarkPhoto": 1,
+      "description": "Stadtpfarrkirche Maria Himmelfahrt in Baden: the church spire with a geometric harlequin pattern in gold and red rises over old-town rooftops, cream stone walls and dark roof tiles below, and a grey cobblestone square with stone church steps in the foreground. Afternoon autumn light. Open square space in the foreground."
+    }
+  ]
+}
+```
+
+---COVER SCENE---
+```json
+{
+  "title": "Noah und der Wolkenschlüssel",
+  "scene": {
+    "imageSummary": "Noah stands tall on the hilltop path below the stone tower, holding the magic letter up in both hands. He wears a long dark blue robe with silver stars, a brown leather belt with a pouch, grey pointed cloth shoes and a tall pointed dark blue wizard hat with a wide brim and a silver band. Golden autumn light falls across the ruin.",
+    "setting": {
+      "location": "Ruine Stein [LOC001]",
+      "indoorOutdoor": "outdoor",
+      "description": "Hilltop ruin with a grey stone tower, moss and ivy on the walls, brown and gold autumn trees in the valley below.",
+      "lighting": "warm afternoon sunlight from the right, long soft shadows on the flagstones",
+      "camera": "wide",
+      "depthLayers": "foreground: flagstone path and Noah; midground: low stone wall; background: stone tower and wooded river valley"
+    },
+    "timeOfDay": "afternoon",
+    "weather": "clear",
+    "characters": [
+      {
+        "id": null,
+        "name": "Noah",
+        "position": "center",
+        "action": "stands on the path holding the magic letter up in both hands",
+        "expression": "determined",
+        "clothing": "costumed"
+      }
+    ],
+    "objects": [
+      {"id": "LOC001", "name": "Ruine Stein", "position": "background"},
+      {"id": "ART001", "name": "magic letter", "position": "held up in both hands in front of Noah"}
+    ]
+  }
+}
+```
+
+---STORY PAGES---
+
+--- Page 1 ---
+TEXT:
+Auf der Ruine Stein stand Noah in seinem langen Zauberkleid. Mit beiden Händen hielt er den Zauberbrief fest. «Den Brief bringe ich zur Stadtpfarrkirche», sagte er. Dann stieg er den Weg vom Hügel hinunter, Schritt für Schritt.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Noah stands on the flagstone path at the Ruine Stein, holding the magic letter in both hands in front of his chest. He wears a long dark blue robe with silver stars, a brown leather belt with a pouch, grey pointed cloth shoes and a tall pointed dark blue wizard hat with a wide brim and a silver band. The stone tower rises behind him in clear afternoon light.","setting":{"location":"Ruine Stein [LOC001]","indoorOutdoor":"outdoor","description":"Hilltop ruin with a grey stone tower, moss and ivy on the walls, a low stone wall along a flagstone path, brown and gold autumn trees in the valley below.","lighting":"clear afternoon sunlight from the left, long soft shadows on the flagstones","camera":"medium","depthLayers":"foreground: flagstone path and Noah; midground: low stone wall; background: stone tower and wooded river valley"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Noah","position":"center","action":"stands on the path holding the magic letter in both hands","expression":"serious and careful","clothing":"costumed","depth":"foreground","perspective":"front"}],"objects":[{"id":"ART001","name":"magic letter","position":"held in both hands in front of Noah's chest"}],"interactions":[{"character":"Noah","object":"ART001","where":"holds the letter in both hands","priority":"essential"}],"background":"one distant walker far below on the valley path","population":"sparse"}}
+```
+
+--- Page 2 ---
+TEXT:
+Der Wind riss an dem Brief. Noah hielt fest, doch der Brief flog aus seinen Händen. Er landete in einer Pfütze auf dem Weg unter der Mauer. Noah kniete sich hin und schaute ins Wasser. Die Wörter waren noch lesbar, aber das Papier war nass.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Noah kneels on the wet path beside a puddle at the foot of the low wall, looking down at the magic letter lying open in the water. He wears a long dark blue robe with silver stars, a brown leather belt with a pouch, grey pointed cloth shoes and a tall pointed dark blue wizard hat with a wide brim and a silver band. Wind pushes at the brown leaves on the path.","setting":{"location":"Ruine Stein [LOC001]","indoorOutdoor":"outdoor","description":"Flagstone path below the ruin walls, a shallow puddle on the stones, scattered brown leaves, moss on the stone wall, the tower above.","lighting":"clear afternoon sunlight from the left, broken by moving clouds","camera":"medium","depthLayers":"foreground: puddle and letter; midground: Noah kneeling on the path; background: low wall and stone tower"},"timeOfDay":"afternoon","weather":"windy","characters":[{"id":null,"name":"Noah","position":"center","action":"kneels on the path beside the puddle, leaning toward the letter","expression":"startled, eyes on the letter","clothing":"costumed","depth":"foreground","perspective":"side"}],"objects":[{"id":"ART001","name":"magic letter","position":"lying open in the puddle on the path"}],"interactions":[{"character":"Noah","object":"ART001","where":"looks down at the letter lying in the puddle","priority":"essential"}],"background":"empty","population":"sparse"}}
+```
+
+--- Page 3 ---
+TEXT:
+Noah hob den nassen Brief aus der Pfütze und las laut. «Wol-ken», sagte er. Dann kam das lange Wort. «Schlü», sagte er und blieb stecken. Das Wort wollte nicht zusammenkommen. Noah sass still auf dem nassen Weg und hielt den Brief fest.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Noah sits on the wet flagstone path with the dripping magic letter held in both hands on his knees, reading it with a focused look. He wears a long dark blue robe with silver stars, a brown leather belt with a pouch, grey pointed cloth shoes and a tall pointed dark blue wizard hat with a wide brim and a silver band. A grey stone wall and damp moss sit behind him.","setting":{"location":"Ruine Stein [LOC001]","indoorOutdoor":"outdoor","description":"Damp flagstone path, grey stone wall covered with moss and ivy, a small puddle beside the path, brown leaves on the stones.","lighting":"soft afternoon light under overcast clouds from above","camera":"medium","depthLayers":"foreground: wet path and Noah; midground: puddle and leaves; background: stone wall with moss"},"timeOfDay":"afternoon","weather":"windy","characters":[{"id":null,"name":"Noah","position":"center","action":"sits on the wet path holding the wet letter in both hands and reads it","expression":"focused, lips parted as he reads","clothing":"costumed","depth":"foreground","perspective":"front"}],"objects":[{"id":"ART001","name":"magic letter","position":"held in both hands on Noah's knees"}],"interactions":[{"character":"Noah","object":"ART001","where":"holds the wet letter in both hands and reads it","priority":"essential"}],"background":"empty","population":"sparse"}}
+```
+
+--- Page 4 ---
+TEXT:
+«Noch einmal», sagte Noah leise. Diesmal las er jeden Buchstaben einzeln. «S, c, h, ü», sagte er, «s, s, e, l.» Das lange Wort zerfiel in kleine Teile, und er kannte jeden Teil. «Wolkenschlüssel», las er ganz laut. Dann legte er den Brief auf einen flachen Stein an der Mauer. Ein zweiter Stein hielt die Ecke fest.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Noah kneels at a flat grey stone against the wall, pressing the wet magic letter flat on the stone with his fingers while a second small stone holds one corner. He wears a long dark blue robe with silver stars, a brown leather belt with a pouch, grey pointed cloth shoes and a tall pointed dark blue wizard hat with a wide brim and a silver band. His lips move as he sounds out each letter.","setting":{"location":"Ruine Stein [LOC001]","indoorOutdoor":"outdoor","description":"Close stretch of the ruin wall with moss and ivy, a flat grey stone at the foot of the wall, damp flagstones, a few brown leaves.","lighting":"soft afternoon light from above, even on the stones","camera":"medium","depthLayers":"foreground: flat stone with letter and Noah's hands; midground: Noah kneeling; background: moss-covered wall"},"timeOfDay":"afternoon","weather":"windy","characters":[{"id":null,"name":"Noah","position":"center","action":"presses the letter flat on the stone and reads each letter aloud","expression":"concentrating, eyes on the letter","clothing":"costumed","depth":"foreground","perspective":"front"}],"objects":[{"id":"ART001","name":"magic letter","position":"lying flat on the flat grey stone"}],"interactions":[{"character":"Noah","object":"ART001","where":"presses the letter flat on the stone with his fingers","priority":"essential"}],"background":"empty","population":"sparse"}}
+```
+
+--- Page 5 ---
+TEXT:
+Vor der Stadtpfarrkirche Maria Himmelfahrt blieb Noah stehen. Der Brief war trocken und glatt. Er steckte ihn in den Beutel an seinem Gürtel und zog die Klappe zu. Ein Velofahrer fuhr langsam über den Platz. Dann stieg Noah die Stufen zur Kirche hinauf.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Noah stands on the cobblestone square in front of the church steps and tucks the dry magic letter into the leather pouch on his brown belt. He wears a long dark blue robe with silver stars, a brown leather belt with a pouch, grey pointed cloth shoes and a tall pointed dark blue wizard hat with a wide brim and a silver band. The patterned spire rises behind him in warm afternoon light.","setting":{"location":"Stadtpfarrkirche Maria Himmelfahrt (Baden) [LOC002]","indoorOutdoor":"outdoor","description":"Cobblestone square in front of the church, cream stone walls, dark roof tiles, stone entrance steps, the gold and red spire above the old-town rooftops.","lighting":"warm afternoon sunlight from the left, long shadows across the cobblestones","camera":"medium","depthLayers":"foreground: cobblestones and Noah at the pouch; midground: church steps and entrance; background: patterned spire and rooftops"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Noah","position":"center","action":"tucks the letter into the leather pouch on his belt","expression":"calm and steady","clothing":"costumed","depth":"foreground","perspective":"front"}],"objects":[{"id":"ART001","name":"magic letter","position":"being pushed into the belt pouch at Noah's waist"}],"interactions":[{"character":"Noah","object":"ART001","where":"tucks the letter into the belt pouch","priority":"essential"}],"background":"a cyclist in a dark grey jacket rides slowly across the far side of the square","population":"ambient"}}
+```
+
+--- Page 6 ---
+TEXT:
+Noah setzte sich auf die oberste Stufe und nahm den Brief aus dem Beutel. Er hielt ihn mit beiden Händen und las laut. «Wolkenschlüssel, öffne dich.» Die Wörter kamen eins nach dem anderen. Auf dem Platz ging ein Mann in grauem Mantel vorbei. Ganz allein las Noah die nächste Zeile und lachte dabei. «Jetzt weiter.»
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Noah sits on the top church step reading the dry magic letter held in both hands on his knees, smiling as he reads. He wears a long dark blue robe with silver stars, a brown leather belt with a pouch, grey pointed cloth shoes and a tall pointed dark blue wizard hat with a wide brim and a silver band. The patterned spire rises above the square.","setting":{"location":"Stadtpfarrkirche Maria Himmelfahrt (Baden) [LOC002]","indoorOutdoor":"outdoor","description":"Stone church steps at the entrance, cream stone walls, dark roof tiles, gold and red spire, grey cobblestone square below.","lighting":"warm afternoon sunlight from the left, soft shadows on the steps","camera":"medium","depthLayers":"foreground: top step and Noah with the letter; midground: lower steps and square; background: church facade and patterned spire"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Noah","position":"center","action":"sits on the top step and reads the letter aloud","expression":"proud, smiling while reading","clothing":"costumed","depth":"foreground","perspective":"front"}],"objects":[{"id":"ART001","name":"magic letter","position":"held in both hands on Noah's knees"}],"interactions":[{"character":"Noah","object":"ART001","where":"holds the letter in both hands and reads it","priority":"essential"}],"background":"a man in a grey coat walks across the far side of the square","population":"ambient"}}
+```

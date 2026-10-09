@@ -1,0 +1,193 @@
+---TITLE---
+TITLE: Emma und die glitzernde Elster
+
+---VISUAL BIBLE---
+```json
+{
+  "secondaryCharacters": [
+    {
+      "id": "CHR001",
+      "name": "Herr Keller",
+      "pages": [1, 6],
+      "scaleClass": "adult-height",
+      "age": "a man in his sixties",
+      "build": "medium height, sturdy build",
+      "hair": "short grey hair, combed back",
+      "face": "blue eyes, laugh lines around the eyes, clean-shaven",
+      "signatureLook": "a green garden apron worn over his clothes",
+      "clothing": "light blue checked shirt, dark trousers, green garden apron"
+    }
+  ],
+  "animals": [
+    {
+      "id": "ANI001",
+      "name": "Elster",
+      "pages": [1, 2, 3, 4, 5],
+      "scaleClass": "hand-sized",
+      "species": "European magpie",
+      "coloring": "black head, back and long tail with a blue-green sheen, white belly, white patches on the wings",
+      "anatomy": "two wings, two legs, one long tail, one short beak",
+      "features": "dark brown round eyes, a short black beak, a long glossy tail"
+    }
+  ],
+  "artifacts": [
+    {
+      "id": "ART001",
+      "label": "potion bottle",
+      "name": "small round glass bottle with a cork stopper, filled with golden liquid",
+      "pages": [1, 2, 3, 4, 5, 6],
+      "scaleClass": "palm-sized",
+      "type": "glass bottle",
+      "description": "small round glass bottle with a cork stopper, filled with golden liquid"
+    },
+    {
+      "id": "ART002",
+      "label": "silver-star wand",
+      "name": "slender wooden wand with a small silver star at the tip",
+      "pages": [1, 3, 4, 5, 6],
+      "scaleClass": "forearm-sized",
+      "type": "magic wand",
+      "description": "slender pale wooden wand with a small star-shaped silver tip",
+      "states": [
+        {"name": "bright star", "delta": "silver star tip shines brightly", "pages": [1, 3, 5, 6]},
+        {"name": "dull star", "delta": "silver star tip looks dull and grey", "pages": [4]}
+      ]
+    }
+  ],
+  "locations": [
+    {
+      "id": "LOC001",
+      "name": "Fislisbach (Stadt)",
+      "pages": [1, 2, 6],
+      "scaleClass": "landmark",
+      "setting": "outdoor village street and garden gates, valley view beyond",
+      "colors": "pale stone walls, green meadows, white houses, dark forested ridge, warm sunlight",
+      "features": "wooden garden fences, hedges, a tall wooden gate post, gravel street",
+      "signatureElement": "a weathered wooden gate post with a garden gate",
+      "isRealLandmark": true,
+      "landmarkQuery": "Fislisbach (Stadt)",
+      "landmarkPhoto": 1
+    },
+    {
+      "id": "LOC002",
+      "name": "Kirche Rohrdorf",
+      "pages": [3, 4, 5],
+      "scaleClass": "landmark",
+      "setting": "outdoor churchyard beside a modern church",
+      "colors": "white concrete, grey gravel, green grass, blue sky",
+      "features": "plain white concrete church, detached tall bell tower, low grey wall, gravel path",
+      "signatureElement": "tall white concrete bell tower",
+      "isRealLandmark": true,
+      "landmarkQuery": "Kirche Rohrdorf",
+      "landmarkPhoto": 1
+    }
+  ],
+  "backgrounds": [
+    {
+      "pages": [1, 2],
+      "landmarkPhoto": 1,
+      "description": "Village street in Fislisbach with a wooden garden fence and a hedge, white houses on the hillside, green meadows and a dark forested ridge beyond. Clear afternoon sunlight from the left. Medium-wide view down the street, open gravel space in the foreground."
+    },
+    {
+      "pages": [3, 4, 5],
+      "landmarkPhoto": 1,
+      "description": "Churchyard of Kirche Rohrdorf with a low grey wall, a strip of green grass and a gravel path, and the plain white concrete church with its tall bell tower rising behind, under a clear blue sky. Clear afternoon light. Open grass in front of the wall."
+    },
+    {
+      "pages": [6],
+      "landmarkPhoto": "none",
+      "description": "Garden gate of a house in Fislisbach, a wooden gate set in a green hedge, a grassy strip and a gravel path, a village street stretching away with white houses on the hillside. Clear afternoon light from the left. Open gravel space in the foreground."
+    }
+  ]
+}
+```
+
+---COVER SCENE---
+```json
+{
+  "title": "Emma und die glitzernde Elster",
+  "scene": {
+    "imageSummary": "Emma stands on the grass in her long flowing robe in deep purple with golden moon patterns, a brown leather belt with pouch and a tall pointed deep purple wizard hat with a wide brim and a golden band. She raises her slender silver-star wand toward a magpie perched on the low churchyard wall beside her, while silver sparks fly from the star.",
+    "setting": {
+      "location": "Kirche Rohrdorf [LOC002]",
+      "indoorOutdoor": "outdoor",
+      "description": "churchyard with a low grey wall, green grass and gravel path, the plain white concrete church and its tall bell tower behind",
+      "lighting": "clear afternoon sunlight from the left",
+      "camera": "wide",
+      "depthLayers": "foreground: grass and gravel path; midground: Emma and the low wall with the magpie; background: white concrete church and bell tower under blue sky"
+    },
+    "timeOfDay": "afternoon",
+    "weather": "clear",
+    "characters": [
+      {
+        "id": null,
+        "name": "Emma",
+        "position": "center",
+        "action": "raises the silver-star wand toward the magpie",
+        "expression": "determined",
+        "clothing": "costumed"
+      }
+    ],
+    "objects": [
+      {"id": "LOC002", "name": "Kirche Rohrdorf", "position": "background"},
+      {"id": "ANI001", "name": "magpie", "position": "on the low wall, right of Emma"}
+    ]
+  }
+}
+```
+
+---STORY PAGES---
+
+--- Page 1 ---
+TEXT:
+Emma rannte die Dorfstrasse hinunter, das kleine Fläschchen mit dem Glückstrank fest in der Hand. Ihr Zauberstab trug an der Spitze ein silbernes Sternchen, das bei jedem Schritt funkelte. Vor dem Gartenzaun von Herrn Keller blieb sie stehen. Auf dem Pfosten sass eine Elster, die einen silbernen Knopf festhielt. «Das ist mein Knopf!», rief Emma, doch die Elster liess sich nicht stören. Herr Keller kam mit einer Gartenschere um die Hecke herum. «Da bist du ja, Emma!», sagte er. «Hast du den Trank dabei?» Emma hob das Fläschchen hoch, damit er den goldenen Trank sehen konnte.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Emma, in her long flowing robe in deep purple with golden moon patterns, brown leather belt with pouch and tall pointed deep purple wizard hat with a golden band, runs down a village street holding a small round glass bottle of golden liquid up in one hand and a slender silver-star wand in the other. A magpie perches on a wooden gate post holding a silver button. Herr Keller comes around the hedge in a light blue checked shirt, dark trousers and a green garden apron, carrying garden shears. Warm afternoon sunlight.","setting":{"location":"Fislisbach (Stadt) [LOC001]","indoorOutdoor":"outdoor","description":"village street with a wooden garden fence and hedge, white houses on the hillside, green meadows and a dark forested ridge beyond","lighting":"clear afternoon sunlight from the left","camera":"medium","depthLayers":"foreground: gravel street; midground: Emma and Herr Keller by the gate; background: hedge, meadows and forested ridge"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Emma","position":"left","action":"runs down the street holding the potion bottle up in one hand","expression":"eager","clothing":"costumed","depth":"foreground","perspective":"front"},{"id":"CHR001","name":"Herr Keller","position":"right","action":"comes around the hedge carrying garden shears","expression":"cheerful","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[{"id":"ANI001","name":"magpie","position":"on the gate post, right of centre"},{"id":"ART001","name":"potion bottle","position":"in Emma's raised hand"},{"id":"ART002","name":"silver-star wand","position":"in Emma's other hand"}],"interactions":[{"character":"Emma","object":"ART001","where":"holds the potion bottle up in one hand","priority":"essential"},{"character":"Emma","object":"ART002","where":"grips the wand in the other hand","priority":"normal"},{"character":"Herr Keller","object":"garden shears","where":"carries the garden shears at his side","priority":"normal"}],"background":"a few distant passers-by near the far corner of the street","population":"ambient"}}
+```
+
+--- Page 2 ---
+TEXT:
+Vom Pfosten schoss die Elster auf Emma zu. Mit einem raschen Griff schnappte sich die Elster das Fläschchen und flog damit über die Hecke davon. Emma stand am Gartenzaun, den Zauberstab noch in der Hand. Herr Keller war ins Haus gegangen. Das Fläschchen glänzte im Sonnenlicht, während die Elster in Richtung Rohrdorf flog, dorthin, wo der weisse Turm der Kirche aufragte. «Komm sofort zurück!», rief Emma. Doch die Elster wurde nicht langsamer. Emma lief die Dorfstrasse entlang, vorbei an den Gärten, bis ihr der Atem knapp wurde. Am Ende der Strasse bog sie auf den Weg nach Rohrdorf ab, und der Zauberstab schlug bei jedem Schritt gegen ihr Bein.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Emma, in her long flowing robe in deep purple with golden moon patterns, brown leather belt with pouch and tall pointed deep purple wizard hat with a golden band, stands at the wooden garden gate with one arm stretched after the magpie. The magpie flies away over the green hedge, the small glass bottle of golden liquid clutched in its grip and catching the sunlight. Clear afternoon light.","setting":{"location":"Fislisbach (Stadt) [LOC001]","indoorOutdoor":"outdoor","description":"village street with a wooden garden fence and hedge, white houses on the hillside, green meadows and a dark forested ridge beyond","lighting":"clear afternoon sunlight from the left","camera":"medium","depthLayers":"foreground: gravel street and garden gate; midground: Emma at the gate and the hedge; background: meadows, white houses and forested ridge"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Emma","position":"left","action":"stands at the gate with one arm stretched after the magpie","expression":"startled","clothing":"costumed","depth":"foreground","perspective":"front"}],"objects":[{"id":"ANI001","name":"magpie","position":"in mid-air above the hedge, right of centre"},{"id":"ART001","name":"potion bottle","position":"in the magpie's grip"},{"id":"ART002","name":"silver-star wand","position":"in Emma's hand at her side"}],"interactions":[{"character":"Emma","object":"ART002","where":"grips the wand in one hand","priority":"normal"},{"character":"Magpie","object":"ART001","where":"carries the potion bottle away in its grip","priority":"essential"}],"background":"a few distant passers-by near the far corner of the street","population":"ambient"}}
+```
+
+--- Page 3 ---
+TEXT:
+Auf dem Kirchplatz in Rohrdorf rannte Emma an der weissen Kirche entlang. Die Elster sass oben auf dem Dach beim Glockenturm und hielt das Fläschchen fest. «Gib mir sofort meinen Trank zurück!», rief Emma. Die Elster rückte ein Stück weiter zum Dachrand, ohne den Trank loszulassen. Emma stellte sich an die niedrige Mauer am Kirchplatz und reckte sich, doch das Dach war noch weit über ihr. Sie schwenkte den Zauberstab und rief noch einmal. Schon bald wurde ihr Arm müde vom Schwenken. Die Elster blieb auf dem Dach sitzen und bewegte sich nicht von der Stelle. Emma stampfte mit dem Fuss auf den Kies. Das half nichts.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Emma, in her long flowing robe in deep purple with golden moon patterns, brown leather belt with pouch and tall pointed deep purple wizard hat with a golden band, stands at the low grey wall of the churchyard and raises her silver-star wand toward the roof. High above, the magpie sits on the roof edge beside the white bell tower, holding the potion bottle. Clear afternoon light.","setting":{"location":"Kirche Rohrdorf [LOC002]","indoorOutdoor":"outdoor","description":"churchyard with a low grey wall, green grass and gravel path, the plain white concrete church and its tall bell tower rising behind","lighting":"clear afternoon sunlight from the upper left","camera":"medium","depthLayers":"foreground: gravel path; midground: Emma at the low wall; background: white church roof, bell tower and blue sky"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Emma","position":"left","action":"stands at the low wall and raises the wand toward the roof","expression":"determined","clothing":"costumed","depth":"midground","perspective":"front"}],"objects":[{"id":"LOC002","name":"Kirche Rohrdorf","position":"background"},{"id":"ANI001","name":"magpie","position":"on the roof edge beside the bell tower, high above, right"},{"id":"ART001","name":"potion bottle","position":"in the magpie's grip on the roof edge"},{"id":"ART002","name":"silver-star wand","position":"raised in Emma's hand"}],"interactions":[{"character":"Emma","object":"ART002","where":"waves the wand up toward the roof","priority":"essential"},{"character":"Magpie","object":"ART001","where":"holds the potion bottle on the roof edge","priority":"low"}],"background":"a few distant passers-by cross the far side of the churchyard","population":"ambient"}}
+```
+
+--- Page 4 ---
+TEXT:
+Die Elster flog hinauf zum Glockenturm und setzte sich dort oben auf den Rand, weit über der Mauer. Emma liess die Silberfunken noch einmal aufsprühen, doch der Vogel blieb oben sitzen und liess sich nicht locken. «Komm herunter!», rief Emma, bis ihre Stimme heiser wurde. Dann setzte sie sich ins Gras an die Mauer. Der Zauberstab lag quer über ihrem Schoss, und das Sternchen an der Spitze war stumpf geworden. Der Trank war fort, und Herr Keller wartete am Gartentor auf sie.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Emma sits in the grass against the low grey churchyard wall, the silver-star wand lying across her lap, her shoulders low as she looks up. High above on the top of the white bell tower, the magpie sits on the ledge holding the potion bottle. Clear afternoon light.","setting":{"location":"Kirche Rohrdorf [LOC002]","indoorOutdoor":"outdoor","description":"churchyard with a low grey wall, green grass and gravel path, the plain white concrete church and its tall bell tower rising behind","lighting":"clear afternoon sunlight from the upper left","camera":"wide","depthLayers":"foreground: grass and gravel path; midground: Emma sitting at the low wall; background: white church roof and tall bell tower against blue sky"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Emma","position":"left","action":"sits in the grass against the wall with the wand across her lap","expression":"weary","clothing":"costumed","depth":"midground","perspective":"front"}],"objects":[{"id":"LOC002","name":"Kirche Rohrdorf","position":"background"},{"id":"ANI001","name":"magpie","position":"on the ledge at the top of the bell tower, high above"},{"id":"ART001","name":"potion bottle","position":"in the magpie's grip on the bell tower ledge"},{"id":"ART002","name":"silver-star wand","position":"lying across Emma's lap, the star tip dull"}],"interactions":[{"character":"Emma","object":"ART002","where":"rests the wand across the lap","priority":"normal"},{"character":"Magpie","object":"ART001","where":"holds the potion bottle on the bell tower ledge","priority":"low"}],"background":"a few distant passers-by cross the far side of the churchyard","population":"ambient"}}
+```
+
+--- Page 5 ---
+TEXT:
+«Jetzt!», sagte Emma und sprang auf. Sie dachte an den silbernen Knopf am Gartenzaun, den die Elster so fest gehalten hatte. Sie hob den Zauberstab über den Kopf und drehte ihn in der Sonne, bis das Sternchen blitzte und Silberfunken flogen. Die Elster wurde unruhig. Sie hüpfte vom Glockenturm auf den Dachrand und von dort auf die Mauer, ganz nah bei Emma. Emma hielt den Zauberstab nach vorn. Der Vogel griff nach dem glänzenden Sternchen und liess dabei das Fläschchen fallen. «Vorsicht!», rief Emma. Sie streckte die freie Hand aus und fing das Fläschchen auf, kurz bevor es auf die harten Steine fiel.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Emma, in her long flowing robe in deep purple with golden moon patterns, brown leather belt with pouch and tall pointed deep purple wizard hat with a golden band, stands up at the foot of the low grey wall and holds her silver-star wand out toward the magpie, the star flashing with silver sparks. The magpie stands on the top of the wall above her and reaches toward the star while the small glass bottle of golden liquid falls from its grip, and Emma's free hand is stretched out to catch it. Clear afternoon light.","setting":{"location":"Kirche Rohrdorf [LOC002]","indoorOutdoor":"outdoor","description":"churchyard with a low grey wall, green grass and gravel path, the plain white concrete church and its tall bell tower rising behind","lighting":"clear afternoon sunlight from the upper left","camera":"medium","depthLayers":"foreground: grass and gravel; midground: Emma at the wall foot, the magpie on the wall top; background: white church and bell tower against blue sky"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Emma","position":"left","action":"stands at the wall foot holding the wand out toward the magpie and catching the falling bottle","expression":"determined","clothing":"costumed","depth":"midground","perspective":"front"}],"objects":[{"id":"LOC002","name":"Kirche Rohrdorf","position":"background"},{"id":"ANI001","name":"magpie","position":"on the top of the low wall, right of Emma"},{"id":"ART001","name":"potion bottle","position":"falling from the magpie's grip toward Emma's free hand"},{"id":"ART002","name":"silver-star wand","position":"held out in Emma's hand, star flashing"}],"interactions":[{"character":"Emma","object":"ART002","where":"holds the wand out toward the magpie","priority":"essential"},{"character":"Emma","object":"ART001","where":"catches the falling potion bottle in her free hand","priority":"essential"},{"character":"Magpie","object":"ART002","where":"reaches toward the silver star tip","priority":"normal"}],"background":"a few distant passers-by cross the far side of the churchyard","population":"ambient"}}
+```
+
+--- Page 6 ---
+TEXT:
+Am Gartentor wartete Herr Keller schon. Emma kam die Dorfstrasse hinauf, das Fläschchen in der einen Hand, den Zauberstab in der anderen. Sie reichte ihm das Fläschchen über den Zaun. «Der Trank ist da!», rief sie. Herr Keller nahm es entgegen, zog den Korken heraus und lachte laut. «Dann trinken wir auf deine Zauberkunst!», sagte er und nahm einen Schluck. Dann schüttelte er den Kopf vor Lachen und hielt das Fläschchen hoch in die Sonne. «Du bist eine richtige Zauberin!», sagte er noch einmal, und Emma lachte mit ihm.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"At the wooden garden gate, Herr Keller in a light blue checked shirt, dark trousers and a green garden apron takes the small glass bottle of golden liquid over the fence and lifts it up into the sunlight, laughing. Emma, in her long flowing robe in deep purple with golden moon patterns, brown leather belt with pouch and tall pointed deep purple wizard hat with a golden band, stands on the street side of the gate and holds her silver-star wand up in one hand, laughing. Clear afternoon light.","setting":{"location":"Fislisbach (Stadt) [LOC001]","indoorOutdoor":"outdoor","description":"garden gate in a green hedge, a grassy strip and gravel path, a village street with white houses on the hillside beyond","lighting":"clear afternoon sunlight from the left","camera":"medium","depthLayers":"foreground: gravel path and gate; midground: Herr Keller and Emma at the gate; background: hedge, white houses and green hillside"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":"CHR001","name":"Herr Keller","position":"left","action":"takes the bottle over the gate and lifts it up into the sunlight","expression":"laughing","clothing":"standard","depth":"foreground","perspective":"front"},{"id":null,"name":"Emma","position":"right","action":"holds the wand up in one hand beside the gate","expression":"laughing","clothing":"costumed","depth":"midground","perspective":"front"}],"objects":[{"id":"ART001","name":"potion bottle","position":"in Herr Keller's raised hand"},{"id":"ART002","name":"silver-star wand","position":"raised in Emma's hand"}],"interactions":[{"character":"Herr Keller","object":"ART001","where":"takes the potion bottle over the gate and lifts it up","priority":"essential"},{"character":"Emma","object":"ART002","where":"holds the wand up in one hand","priority":"normal"}],"background":"a few distant passers-by on the village street","population":"ambient"}}
+```

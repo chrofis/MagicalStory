@@ -1,0 +1,180 @@
+---TITLE---
+TITLE: Lukas und die Rettungsmission am Grossmünster
+
+---VISUAL BIBLE---
+```json
+{
+  "secondaryCharacters": [
+    {
+      "id": "CHR001",
+      "name": "Nina",
+      "pages": [1, 2, 3, 4, 5, 6],
+      "scaleClass": "waist-high",
+      "age": "a girl of about six",
+      "build": "small and slim, a young child's height",
+      "hair": "dark blonde, shoulder-length, tied back in a low ponytail",
+      "face": "brown eyes, round face, freckles across the nose",
+      "signatureLook": "a small wooden box with a painted lid, held in her arms",
+      "clothing": "a mustard-coloured jacket, dark blue trousers and red shoes"
+    }
+  ],
+  "animals": [
+    {
+      "id": "ANI001",
+      "name": "Eli",
+      "pages": [1, 3, 4, 6],
+      "scaleClass": "forearm-sized",
+      "species": "plush teddy bear",
+      "coloring": "soft golden-brown plush with a cream muzzle and cream paw pads",
+      "anatomy": "two round ears, two arms, two legs, a round head and a short stubby tail",
+      "features": "a red ribbon tied around the neck, black button eyes"
+    },
+    {
+      "id": "ANI002",
+      "name": "Eichhörnchen",
+      "pages": [2, 3],
+      "scaleClass": "hand-sized",
+      "species": "grey squirrel",
+      "coloring": "grey-brown back, pale belly, rust-coloured fur on the tail edges",
+      "anatomy": "four legs with sharp claws on each paw, one long bushy tail, two small ears with tufts",
+      "features": "a long bushy tail held high, small ear tufts"
+    }
+  ],
+  "artifacts": [
+    {
+      "id": "ART001",
+      "label": "drawstring cloth bag",
+      "name": "toy bag",
+      "pages": [1, 2, 3, 4, 6],
+      "scaleClass": "melon-sized",
+      "type": "bag",
+      "description": "dark green cloth drawstring bag with a long thin cord that pulls the top closed",
+      "states": [
+        {"name": "closed", "delta": "cord drawn tight, round and bulging with twelve toy figures", "pages": [1, 6]},
+        {"name": "empty", "delta": "flat and limp, cord trailing loose", "pages": [2, 3, 4]}
+      ]
+    },
+    {
+      "id": "ART002",
+      "label": "yellow-caped superhero figure",
+      "name": "toy superhero figure",
+      "pages": [1, 5, 6],
+      "scaleClass": "palm-sized",
+      "type": "toy figure",
+      "description": "small plastic superhero figure in blue with a flowing yellow cape, short dark hair moulded on the head, blue boots"
+    }
+  ],
+  "locations": [
+    {
+      "id": "LOC001",
+      "name": "Grossmünster courtyard",
+      "pages": [1, 2, 3, 4, 5, 6],
+      "scaleClass": "landmark",
+      "setting": "outdoor, stone courtyard in front of a church in Zurich",
+      "colors": "grey stone, cream-coloured towers, blue-and-white flags, yellow-brown autumn leaves, green chestnut tree",
+      "features": "twin church towers with pyramidal cupolas, grey stone benches, gravel path, low stone wall at the back",
+      "signatureElement": "the twin cream-coloured towers of the Grossmünster rising above the courtyard",
+      "isRealLandmark": true,
+      "landmarkQuery": "Grossmünster",
+      "landmarkPhoto": 1
+    }
+  ],
+  "backgrounds": [
+    {
+      "pages": [1, 2, 3, 4, 5, 6],
+      "description": "Courtyard of the Grossmünster in Zurich. Gravel path crosses open ground covered with yellow-brown autumn leaves, grey stone benches stand along the path, a low stone wall runs along the back left, a chestnut tree with thinning leaves stands at the right. Twin cream-coloured church towers with pyramidal cupolas and blue-and-white flags rise at the back. Warm low afternoon sun from the left, long soft shadows. A few distant passers-by in grey and brown coats cross the far side of the courtyard. Open gravel in the centre."
+    }
+  ]
+}
+```
+
+---COVER SCENE---
+```json
+{
+  "title": "Lukas und die Rettungsmission am Grossmünster",
+  "scene": {
+    "imageSummary": "Lukas stands tall in the middle of the courtyard in a bright red bodysuit with a blue cape, blue boots, a yellow utility belt and a yellow emblem on the chest, one fist raised and the green drawstring bag in the other hand. Eli the plush bear sits on a stone bench at the side. Warm late afternoon light on the cream towers, yellow leaves on the gravel.",
+    "setting": {
+      "location": "Grossmünster courtyard [LOC001]",
+      "indoorOutdoor": "outdoor",
+      "description": "Stone courtyard in front of the Grossmünster, grey stone benches, gravel path, yellow-brown leaves, cream towers with pyramidal cupolas and blue-and-white flags.",
+      "lighting": "warm low afternoon sun from the left",
+      "camera": "wide",
+      "depthLayers": "foreground gravel and leaves, midground Lukas with the bench, background the twin towers of the Grossmünster"
+    },
+    "timeOfDay": "afternoon",
+    "weather": "clear",
+    "characters": [
+      {
+        "id": null,
+        "name": "Lukas",
+        "position": "center",
+        "action": "stands tall on the gravel with the bag held up in one hand",
+        "expression": "confident and happy",
+        "clothing": "costumed"
+      }
+    ],
+    "objects": [
+      {"id": "LOC001", "name": "Grossmünster courtyard", "position": "background"},
+      {"id": "ART001", "name": "toy bag", "position": "held in Lukas's raised hand"},
+      {"id": "ANI001", "name": "Eli", "position": "on the stone bench at the right"}
+    ]
+  }
+}
+```
+
+---STORY PAGES---
+
+--- Page 1 ---
+TEXT:
+«Nina, ich habe alle zwölf mitgebracht!», rief Lukas und rannte über den Hof des Grossmünsters. Sein roter Umhang flatterte hinter ihm her, und in seiner Hand baumelte der Beutel mit den Spielzeugfiguren. Eli, sein Stofftierbär, sass schon auf der Bank neben Nina. Sie hielt ihre Kiste auf den Knien und wartete. Lukas blieb vor ihr stehen, öffnete den Beutel und zeigte ihr jede Figur. Da war ein Superheld mit gelbem Umhang, eine Eisbärin und ein grüner Wächter. Im Beutel lag ausserdem ein Stück Brezel fürs Zvieri. «Die sind alle für dich», sagte er. Nina streckte beide Hände aus und lächelte.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Lukas in a bright red bodysuit with a blue cape, blue boots, a yellow utility belt and a yellow emblem on the chest runs up to a stone bench, holding his open drawstring bag. Nina sits on the bench with her box on her knees and reaches out both hands toward him. Eli the plush bear sits beside her. Warm low afternoon sun on the cream towers behind.","setting":{"location":"Grossmünster courtyard [LOC001]","indoorOutdoor":"outdoor","description":"Stone courtyard in front of the Grossmünster, grey stone bench, gravel path, yellow-brown leaves on the ground, cream towers with pyramidal cupolas and flags behind.","lighting":"warm low afternoon sun from the left","camera":"medium","depthLayers":"foreground gravel and fallen leaves, midground Lukas and the bench with Nina and Eli, background the twin towers and a few distant passers-by in grey and brown coats"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Lukas","position":"left","action":"stands at the bench holding the bag open","expression":"beaming, eager","clothing":"costumed","depth":"foreground","perspective":"front"},{"id":"CHR001","name":"Nina","position":"right","action":"sits on the bench with her box on her knees, both hands reaching out","expression":"smiling","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[{"id":"ART001","name":"toy bag","position":"open in Lukas's hand"},{"id":"ART002","name":"yellow-caped superhero figure","position":"inside the open bag"},{"id":"ANI001","name":"Eli","position":"on the bench beside Nina"}],"interactions":[{"character":"Lukas","object":"ART001","where":"holds the bag open in one hand","priority":"essential"},{"character":"Nina","object":"Nina's box","where":"holds her box on her knees","priority":"normal"}],"background":"A few distant passers-by in grey and brown coats cross the far side of the courtyard.","population":"ambient"}}
+```
+
+--- Page 2 ---
+TEXT:
+Aus dem Laub unter der Kastanie schoss ein Eichhörnchen über den Kiesweg. Es sprang auf Lukas zu, packte die Schnur des Beutels und riss sie ihm aus der Hand. Lukas griff nach dem Beutel, doch das Tier rannte mit ihm quer über den Hof. Der Beutel kippte, und die Figuren fielen einzeln ins Laub. Die Eisbärin landete unter der ersten Bank, der grüne Wächter rollte bis an die Mauer und der Held mit dem gelben Umhang unter die zweite Bank. Das Eichhörnchen liess den leeren Beutel fallen, schnappte sich das Stück Brezel und verschwand hinter der zweiten Bank. «Rettungsmission!», rief Lukas und hob den leeren Beutel auf. Nina sprang von der Bank und kniete sich neben ihn ins Laub.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"A grey squirrel races across the gravel with the drawstring bag dragged behind it by its cord, its bushy tail held high. Lukas in a bright red bodysuit with a blue cape, blue boots, a yellow utility belt and a yellow emblem on the chest lunges after it with one arm stretched out. Nina kneels in the autumn leaves beside the bench, looking at the scattered leaves.","setting":{"location":"Grossmünster courtyard [LOC001]","indoorOutdoor":"outdoor","description":"Stone courtyard in front of the Grossmünster, grey stone benches, gravel path scattered with yellow-brown leaves, cream towers with pyramidal cupolas behind.","lighting":"warm low afternoon sun from the left, long shadows on the gravel","camera":"medium","depthLayers":"foreground scattered leaves and the squirrel's running path, midground Lukas lunging and Nina kneeling by the bench, background the twin towers and distant passers-by"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Lukas","position":"left","action":"lunges forward reaching for the bag cord","expression":"eyes narrowed, determined","clothing":"costumed","depth":"foreground","perspective":"front"},{"id":"CHR001","name":"Nina","position":"right","action":"kneels in the leaves beside the bench","expression":"surprised, mouth open","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[{"id":"ART001","name":"toy bag","position":"trailing from the squirrel's cord across the gravel"},{"id":"ANI002","name":"Eichhörnchen","position":"centre of the courtyard, running away with the bag"}],"interactions":[{"character":"Lukas","object":"ART001","where":"reaches for the bag cord","priority":"essential"},{"character":"Nina","object":"scattered leaves","where":"kneels in the leaves watching the scattered figures","priority":"low"}],"background":"A few distant passers-by in grey and brown coats cross the far side of the courtyard.","population":"ambient"}}
+```
+
+--- Page 3 ---
+TEXT:
+Nina kroch unter die erste Bank und zog eine Figur nach der andern hervor. Lukas suchte im Laub bei der Mauer, fand den grünen Wächter und dann die Eisbärin. Er legte alle Figuren in Reihen auf die Bank neben Eli und ordnete sie nach Farben. Das Eichhörnchen kam hinter der zweiten Bank hervor und lief immer wieder in denselben Spalt zwischen Holz und Mauer. Lukas sah ihm kurz zu, dann zählte er laut: «Elf!» Es fehlte also nur noch eine. «Der Held mit dem gelben Umhang fehlt», sagte Nina. «Wir schauen zuerst unter allen Bänken und dann im Laub.» Lukas hielt den Beutel auf und lief zur nächsten Bank.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Nina in a mustard-coloured jacket crouches by the first bench and reaches under it. Lukas in a bright red bodysuit with a blue cape, blue boots, a yellow utility belt and a yellow emblem on the chest holds the empty bag open against his knee while eleven toy figures lie in neat rows on the bench beside Eli. At the far right a grey squirrel slips into the narrow gap between the second bench and the wall.","setting":{"location":"Grossmünster courtyard [LOC001]","indoorOutdoor":"outdoor","description":"Stone courtyard in front of the Grossmünster, grey stone benches, gravel path, yellow-brown leaves, low stone wall with a narrow gap behind the second bench, cream towers behind.","lighting":"warm afternoon sun from the left, long soft shadows","camera":"medium","depthLayers":"foreground gravel and leaves, midground the bench with the figures and Eli, Nina and Lukas, background the second bench, the wall gap and the towers","},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Lukas","position":"left","action":"sits on the end of the bench holding the bag open","expression":"focused, counting","clothing":"costumed","depth":"midground","perspective":"front"},{"id":"CHR001","name":"Nina","position":"center","action":"crouches by the first bench and reaches under it","expression":"concentrating","clothing":"standard","depth":"foreground","perspective":"front"}],"objects":[{"id":"ART001","name":"toy bag","position":"open on Lukas's knee"},{"id":"ANI001","name":"Eli","position":"on the bench beside the row of figures"},{"id":"ANI002","name":"Eichhörnchen","position":"at the gap between the second bench and the wall, background","size":"hand-sized"}],"interactions":[{"character":"Lukas","object":"ART001","where":"holds the bag open on his knee","priority":"essential"},{"character":"Nina","object":"first bench","where":"reaches under the first bench","priority":"essential"}],"background":"A few distant passers-by in grey and brown coats cross the far side of the courtyard.","population":"ambient"}}
+```
+
+--- Page 4 ---
+TEXT:
+Vom Turm schlug es halb fünf, und Nina stand von der Bank auf. «Um fünf muss ich heim», sagte sie. Lukas suchte unter allen Bänken, hinter dem Brunnen und im Laub bis zur Mauer, doch der Held mit dem gelben Umhang blieb verschwunden. Er zählte die Figuren auf der Bank, elf Stück, und dann noch einmal. Es blieben elf. Lukas setzte sich auf den Rand der Bank neben Eli, den leeren Beutel auf dem Schoss, und sah auf die Reihen mit den elf Figuren. Nina stellte ihre Kiste neben sich ab und schaute zu den Bänken hinüber, unter denen noch niemand nachgesehen hatte.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Nina in a mustard-coloured jacket stands beside the bench holding her box against her side and looks toward the benches. Lukas in a bright red bodysuit with a blue cape, blue boots, a yellow utility belt and a yellow emblem on the chest sits on the end of the bench with the empty bag across his lap. Eleven toy figures lie in rows along the bench beside Eli. Low golden late-afternoon light from the left.","setting":{"location":"Grossmünster courtyard [LOC001]","indoorOutdoor":"outdoor","description":"Stone courtyard in front of the Grossmünster, grey stone benches, gravel path, yellow-brown leaves, low stone wall at the back, cream towers with flags behind.","lighting":"low golden late-afternoon sun from the left, long shadows","camera":"medium","depthLayers":"foreground gravel and leaves, midground the bench with rows of figures and Eli, Lukas and Nina, background the other benches and the towers","},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Lukas","position":"left","action":"sits on the edge of the bench looking down at the rows of figures","expression":"quiet, thoughtful","clothing":"costumed","depth":"midground","perspective":"front"},{"id":"CHR001","name":"Nina","position":"right","action":"stands beside the bench with her box","expression":"serious, glancing at the benches","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[{"id":"ART001","name":"toy bag","position":"empty on Lukas's lap"},{"id":"ANI001","name":"Eli","position":"on the bench beside Lukas"}],"interactions":[{"character":"Lukas","object":"ART001","where":"holds the empty bag on his lap","priority":"essential"},{"character":"Nina","object":"Nina's box","where":"holds her box against her side","priority":"normal"}],"background":"A few distant passers-by in grey and brown coats cross the far side of the courtyard.","population":"ambient"}}
+```
+
+--- Page 5 ---
+TEXT:
+Hinter der zweiten Bank hatte das Eichhörnchen immer wieder gestanden. Lukas kniete sich auf den Kies und schaute in den Spalt zwischen Holz und Mauer. Ganz hinten lag ein Zipfel gelber Stoff. Seine Finger reichten nicht bis dorthin. Er griff nach einem dünnen, trockenen Zweig, schob ihn in den Spalt und hakte den Umhang an der Spitze. Vorsichtig zog er, Stück für Stück, bis der Held herausrutschte. «Du hast ihn!», rief Nina und hielt ihre Kiste fest. Lukas hob den Helden hoch und lachte.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Lukas in a bright red bodysuit with a blue cape, blue boots, a yellow utility belt and a yellow emblem on the chest kneels on the gravel beside the second bench and pushes a thin dry twig into the narrow gap between the bench and the wall. The tip of the twig hooks the yellow cape of the superhero figure, which is just coming out of the gap. Nina in a mustard-coloured jacket stands beside him holding her box against her chest.","setting":{"location":"Grossmünster courtyard [LOC001]","indoorOutdoor":"outdoor","description":"Gravel courtyard at the back of a grey stone bench, narrow dark gap between the wooden bench slats and the low stone wall, yellow-brown leaves, cream towers behind.","lighting":"low golden afternoon sun from the left, the gap in shadow","camera":"medium","depthLayers":"foreground the gravel and the gap with the twig, midground Lukas kneeling and Nina standing, background the bench and the towers","},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Lukas","position":"left","action":"kneels and pushes the twig into the gap","expression":"focused, eyes on the gap","clothing":"costumed","depth":"foreground","perspective":"side"},{"id":"CHR001","name":"Nina","position":"right","action":"stands beside him holding her box","expression":"hopeful, leaning in","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[{"id":"ART002","name":"yellow-caped superhero figure","position":"at the mouth of the gap, the cape just visible, the figure caught on the twig"}],"interactions":[{"character":"Lukas","object":"dry twig","where":"pushes a dry twig into the gap","priority":"essential"},{"character":"Nina","object":"Nina's box","where":"holds her box against her chest","priority":"normal"}],"background":"A few distant passers-by in grey and brown coats cross the far side of the courtyard.","population":"ambient"}}
+```
+
+--- Page 6 ---
+TEXT:
+«Eli, wir haben sie alle!», rief Lukas und hielt Nina den Beutel hin. Den Helden mit dem gelben Umhang steckte er zu den andern hinein. Dann zählte er laut bis zwölf. Nina nahm den Beutel und kippte die Figuren eine nach der andern in ihre Kiste. Der Superheld mit dem gelben Umhang landete zuoberst, und Nina lachte. Bevor vom Turm die fünfte Glocke schlug, war die Kiste voll. Auf dem Kiesweg lag kein Laub mehr, und der Weg war wieder frei. «Jetzt können wir spielen!», sagte Nina.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Lukas in a bright red bodysuit with a blue cape, blue boots, a yellow utility belt and a yellow emblem on the chest holds the green drawstring bag out toward Nina. Nina in a mustard-coloured jacket reaches for it with one hand and holds her open box in the other arm. Eli the plush bear sits on the bench behind them. Warm low afternoon sun on the cleared gravel path and the cream towers.","setting":{"location":"Grossmünster courtyard [LOC001]","indoorOutdoor":"outdoor","description":"Stone courtyard in front of the Grossmünster, grey stone benches, clear gravel path with the leaves swept to the edges, cream towers with pyramidal cupolas and blue-and-white flags behind.","lighting":"warm low afternoon sun from the left, long soft shadows on the gravel","camera":"medium","depthLayers":"foreground the clear gravel path, midground Lukas holding out the bag and Nina reaching, background the bench with Eli and the towers","},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Lukas","position":"left","action":"holds the bag out toward Nina","expression":"grinning, relieved","clothing":"costumed","depth":"foreground","perspective":"front"},{"id":"CHR001","name":"Nina","position":"right","action":"reaches for the bag and tips the figures into her box","expression":"laughing","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[{"id":"ART001","name":"toy bag","position":"held out between Lukas and Nina, full and round"},{"id":"ANI001","name":"Eli","position":"on the bench behind them"}],"interactions":[{"character":"Lukas","object":"ART001","where":"holds the bag out toward Nina","priority":"essential"},{"character":"Nina","object":"ART001","where":"reaches for the bag","priority":"essential"}],"background":"A few distant passers-by in grey and brown coats cross the far side of the courtyard.","population":"ambient"}}
+```

@@ -1201,6 +1201,10 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
     // (default 1) so none inherits the primary's face. Non-character elements
     // keep `minAppearances`. Same rule in trial (bounded by maxElements).
     characterMinAppearances = 1,
+    // false = no cell render gate and no gate re-render. The trial passes false
+    // (docs/decisions.md 2026-10-09 "Trial reference sheets: no render gate");
+    // a full story keeps the default.
+    renderGate = true,
     // Artifacts qualify on a single page too (owner, 2026-08-20). A prop with
     // no reference is drawn from prose alone, so two renders of the same object
     // have nothing anchoring them to each other.
@@ -1393,7 +1397,7 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
       };
       const isStateBatch = batch.length > 1 && batch.every(c => c.stateName) && references.every(Boolean);
 
-      if (isStateBatch) {
+      if (renderGate && isStateBatch) {
         // Every cell is one object; the question is asked of the set.
         const parent = { ...batch[0], name: batch[0].displayName, description: batch[0].baseDescription };
         // BOTH questions: is this the described object at all (identity, asked
@@ -1444,7 +1448,7 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
         }
       }
 
-      for (let i = 0; i < batch.length && !isStateBatch; i++) {
+      for (let i = 0; i < batch.length && !isStateBatch && renderGate; i++) {
         const element = batch[i];
         if (!references[i]) continue;
         const isChar = element.type === 'character';

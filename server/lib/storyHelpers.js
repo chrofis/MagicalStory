@@ -264,6 +264,16 @@ function landmarkPhotoCitationFaults(visualBible) {
       else if (cited !== 'none' && !allowed.includes(cited)) reason = `landmarkPhoto ${cited} is not one of its photos (${allowed.join(',') || 'none servable'})`;
       if (reason) faults.push({ locId: loc.id, locName: loc.name, plateId: p.id, cited: p.raw ?? null, reason });
     }
+    // A trial `backgrounds[]` entry on this landmark may cite its OWN photo
+    // (its plate is painted from it); absent → the location's, checked above.
+    for (const bg of (visualBible?.backgrounds || [])) {
+      if (bg?.landmarkPhoto === undefined || bg.landmarkPhoto === null || bg.landmarkPhoto === '') continue;
+      if (!Array.isArray(bg.pages) || !bg.pages.some(pn => Array.isArray(loc.pages) && loc.pages.includes(pn))) continue;
+      const cited = parseLandmarkPhotoCitation(bg.landmarkPhoto);
+      const reason = cited == null ? `landmarkPhoto ${JSON.stringify(bg.landmarkPhoto)} is not a photo number or "none"`
+        : (cited !== 'none' && !allowed.includes(cited)) ? `landmarkPhoto ${cited} is not one of its photos (${allowed.join(',') || 'none servable'})` : null;
+      if (reason) faults.push({ locId: loc.id, locName: loc.name, plateId: `background p${bg.pages.join(',')}`, cited: bg.landmarkPhoto, reason });
+    }
   }
   return faults;
 }
@@ -454,6 +464,12 @@ async function ensureLandmarkPhotoBytes(photos, opts = {}) {
 /**
  * page → landmark-photo promise for the TRIAL early background plates.
  *
+ * One promise per PLATE (a `backgrounds[]` entry, groupTrialPlatePagesByVantage),
+ * registered under each of the plate's pages. The plate's photo is the one its
+ * own entry cites (`group.landmarkPhoto`), else the one its landmark location
+ * cites — so one landmark with several photos can back several different plates.
+ * The location is the first real landmark any page of the plate stands in.
+ *
  * Registered synchronously (the outline-stream callback that calls this cannot
  * be async — an un-awaited promise on the stream handler), but every actual
  * resolution is deferred behind `descriptionsPromise`.
@@ -470,21 +486,28 @@ async function ensureLandmarkPhotoBytes(photos, opts = {}) {
  * promise) got the photo. Measured on staging job_1789337873076_qf2at21ui p6.
  *
  * @param {Object} visualBible
+ * @param {Array<{pages:number[], landmarkPhoto?:*}>} groups - groupTrialPlatePagesByVantage(visualBible)
  * @param {Object} [opts]
  * @param {Promise} [opts.descriptionsPromise] - loadLandmarkPhotoDescriptions()
  * @returns {Object<number, Promise<Object|null>>} page number → photo promise
  *   (never rejects; a failed resolve yields null)
  */
-function trialPlateLandmarkPromisesByPage(visualBible, opts = {}) {
+function trialPlateLandmarkPromisesByPage(visualBible, groups, opts = {}) {
   const byPage = {};
-  for (const loc of (visualBible?.locations || [])) {
-    if (!loc.isRealLandmark || !loc.pages?.length) continue;
+  const locations = visualBible?.locations || [];
+  for (const group of groups || []) {
+    const loc = group.pages
+      .map(pn => locations.find(l => l?.isRealLandmark && Array.isArray(l.pages) && l.pages.includes(pn)))
+      .find(Boolean);
+    if (!loc) continue;
+    // The entry's own citation wins; absent → the location's (a copy, so the
+    // bible itself is never rewritten).
+    const cited = group.landmarkPhoto !== undefined && group.landmarkPhoto !== null && group.landmarkPhoto !== ''
+      ? { ...loc, landmarkPhoto: group.landmarkPhoto } : loc;
     const p = (async () => {
       if (opts.descriptionsPromise) await opts.descriptionsPromise;
-      // One plate per location (trial bibles carry no vantages), so the photo
-      // is the one the trial writer cited on the location's own entry.
-      const photo = await resolveLandmarkPhotoForLocation(visualBible, loc, {
-        citation: landmarkPhotoCitation(visualBible, loc, { pageNumber: loc.pages[0] }),
+      const photo = await resolveLandmarkPhotoForLocation(visualBible, cited, {
+        citation: landmarkPhotoCitation(visualBible, cited, { pageNumber: group.pages[0] }),
       });
       if (!photo) return null;
       // block ⇔ bytes: a legacy entry can resolve to a URL with no inline data,
@@ -496,7 +519,7 @@ function trialPlateLandmarkPromisesByPage(visualBible, opts = {}) {
       log.warn(`⚠️ [TRIAL] Landmark photo resolve failed for "${loc.name}": ${err.message}`);
       return null;
     });
-    for (const pn of loc.pages) {
+    for (const pn of group.pages) {
       if (!byPage[pn]) byPage[pn] = p;
     }
   }

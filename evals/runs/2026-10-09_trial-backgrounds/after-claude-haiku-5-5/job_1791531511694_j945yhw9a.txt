@@ -1,0 +1,154 @@
+---TITLE---
+TITLE: Rohan und der Weg nach Rohrdorf
+
+---VISUAL BIBLE---
+```json
+{
+  "secondaryCharacters": [],
+  "animals": [],
+  "artifacts": [
+    {
+      "id": "ART001",
+      "label": "bike lock",
+      "name": "black steel bike lock with a U-shaped shackle, a locking block and a small key on a ring",
+      "pages": [1, 2, 3, 4, 5, 6],
+      "scaleClass": "hand-sized",
+      "type": "bike lock",
+      "description": "bike lock: a black steel U-shaped shackle joined to a locking block, with a small brass key hanging from a steel ring on the block"
+    }
+  ],
+  "locations": [
+    {
+      "id": "LOC001",
+      "name": "Kirche Rohrdorf",
+      "pages": [6],
+      "scaleClass": "house-height",
+      "setting": "outdoor, modern church forecourt with stone steps and a bike stand",
+      "colors": "white concrete walls, grey stone steps, green lawn, autumn-coloured trees behind",
+      "features": "plain modern white church with austere linear design and a tall detached concrete bell tower",
+      "signatureElement": "the tall detached concrete bell tower",
+      "isRealLandmark": true,
+      "landmarkQuery": "Kirche Rohrdorf",
+      "landmarkPhoto": 1
+    },
+    {
+      "id": "LOC002",
+      "name": "Strassenrand am Waldrand in Fislisbach",
+      "pages": [1, 2, 3, 4, 5],
+      "scaleClass": "landmark",
+      "setting": "outdoor, narrow village road beside a wooded slope with a drainage ditch",
+      "colors": "grey asphalt, green and brown grass, brown ditch water, orange and yellow autumn leaves",
+      "features": "narrow road climbing between a low wooden fence and a wooded slope, grassy bank falling to a ditch",
+      "signatureElement": "the brown ditch water beneath the grassy bank",
+      "isRealLandmark": true,
+      "landmarkQuery": "Fislisbach (Stadt)",
+      "landmarkPhoto": "none"
+    }
+  ],
+  "backgrounds": [
+    {
+      "pages": [1, 2],
+      "description": "A narrow grey asphalt road climbs uphill beside a wooded slope on the left, with orange and yellow autumn leaves in the trees. On the right a low wooden fence runs along a grassy bank that slopes down to a ditch of brown water. Clear morning sun comes from the upper left, casting long soft shadows across the road. Medium wide shot, open road in the foreground."
+    },
+    {
+      "pages": [3, 4, 5],
+      "description": "Close view of a muddy grassy bank at the edge of a roadside ditch. Dark brown water lies still in the ditch, with a tangle of roots reaching out from the far bank and a few fallen leaves floating on the surface. Low morning sun comes across the water from the left. Open muddy bank in the foreground, the forest edge in the background. No people."
+    },
+    {
+      "pages": [6],
+      "landmarkPhoto": 1,
+      "description": "Plain white modern church with an austere linear design and a tall detached concrete bell tower, set on a hillside. Grey stone steps lead up to the entrance. A metal bike stand stands on the paved forecourt in front of the steps. Green lawn and trees with autumn colours behind the church. Clear morning light from the left. Medium wide shot, open paved space in the foreground."
+    }
+  ]
+}
+```
+
+---COVER SCENE---
+```json
+{
+  "title": "Rohan und der Weg nach Rohrdorf",
+  "scene": {
+    "imageSummary": "Rohan stands on the forecourt of the church, holding the bike lock up in one hand beside his bicycle at the stand. His rucksack hangs from one shoulder and the autumn light falls across the white concrete walls.",
+    "setting": {
+      "location": "Kirche Rohrdorf [LOC001]",
+      "indoorOutdoor": "outdoor",
+      "description": "white modern concrete church with a tall detached bell tower, grey stone steps, green lawn and autumn trees",
+      "lighting": "clear morning sun from the left, warm autumn light",
+      "camera": "wide",
+      "depthLayers": "foreground: the stone steps and the bicycle; midground: Rohan with the bike lock; background: the church and its bell tower against the sky"
+    },
+    "timeOfDay": "morning",
+    "weather": "clear",
+    "characters": [
+      {
+        "id": null,
+        "name": "Rohan",
+        "position": "center",
+        "action": "stands beside the bicycle at the stand, holding the bike lock up in one hand",
+        "expression": "calm and determined",
+        "clothing": "standard"
+      }
+    ],
+    "objects": [
+      {"id": "LOC001", "name": "Kirche Rohrdorf", "position": "background"},
+      {"id": "ART001", "name": "bike lock", "position": "held up in Rohan's hand"}
+    ]
+  }
+}
+```
+
+---STORY PAGES---
+
+--- Page 1 ---
+TEXT:
+Rohan trat so fest in die Pedale, wie er konnte, den steilen Hügel nach Rohrdorf hinauf. Im Rucksack lagen sein Znüni und die Noten für den Kinderchor, in der Seitentasche steckte das Velo-Schloss mit dem Schlüssel am Ring. Um halb elf begann die Probe in der Kirche Rohrdorf, und er wollte rechtzeitig vor dem Glockenschlag dort sein. Die Strasse führte dem Waldrand entlang, und daneben lag ein tiefer Graben mit braunem Wasser. Da riss der Riemen seines Rucksacks mit einem scharfen Ruck entzwei, und die Last hing nur noch an einer Schulter. Rohan bremste und stellte beide Füsse auf den Boden.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Rohan rides his bicycle up a narrow road beside a wooded slope. The strap of his rucksack has just torn at the shoulder and the bag swings loose, while he grips the handlebar and brakes. Orange and yellow autumn leaves line the roadside under clear morning light.","setting":{"location":"Strassenrand am Waldrand in Fislisbach [LOC002]","indoorOutdoor":"outdoor","description":"grey asphalt road climbing uphill, low wooden fence on the right, grassy bank sloping down to a brown ditch, wooded slope with orange and yellow autumn leaves","lighting":"clear morning sun from the upper left, long soft shadows across the road","camera":"medium","depthLayers":"foreground: the road and the bicycle front wheel; midground: Rohan on the bicycle; background: the fence, the ditch and the wooded slope"},"timeOfDay":"morning","weather":"clear","characters":[{"id":null,"name":"Rohan","position":"center","action":"brakes the bicycle on the uphill road as the rucksack strap tears and the bag swings from one shoulder","expression":"eyes on the road, mouth set","clothing":"standard","depth":"foreground","perspective":"front"}],"objects":[{"id":"ART001","name":"bike lock","position":"in the side pocket of the rucksack"}],"interactions":[{"character":"Rohan","object":"bicycle handlebar","where":"grips the handlebar with both hands","priority":"essential"},{"character":"Rohan","object":"bike lock","where":"carries the bike lock in the rucksack side pocket","priority":"low"}],"background":"the road climbs between the wooden fence and the wooded slope","population":"ambient"}}
+```
+
+--- Page 2 ---
+TEXT:
+Am Strassenrand rutschte der Rucksack über den Arm, und mit ihm glitt das Schloss aus der Seitentasche. Es fiel in den Graben und blieb auf dem schlammigen Grund liegen, knapp unter der Wasseroberfläche. Rohan kniete sich ans Ufer und streckte den Arm hinunter, doch seine Fingerspitzen reichten nur bis zum Wasser. Er brauchte beide Hände, also zog er den linken Schnürsenkel aus dem Schuh und band den Riemen damit am Rucksack fest. Vater hatte ihm am Steg gezeigt, wie ein richtiger Knoten hält, und Rohan zog den Knoten fest, bis er sich nicht mehr bewegte. Dann stellte er das Velo an den Zaun und sah über den Rand des Grabens.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Rohan kneels on the grassy bank of the ditch and ties his shoelace around the torn rucksack strap. The bike lock lies on the muddy bottom of the ditch under the brown water, out of reach, and the bicycle stands against the wooden fence.","setting":{"location":"Strassenrand am Waldrand in Fislisbach [LOC002]","indoorOutdoor":"outdoor","description":"grassy bank sloping down to a brown ditch, grey asphalt road and low wooden fence above, wooded slope with autumn leaves","lighting":"clear morning sun from the upper left, warm light on the grass","camera":"medium","depthLayers":"foreground: the grassy bank and the ditch water; midground: Rohan kneeling on the bank; background: the fence, the road and the wooded slope"},"timeOfDay":"morning","weather":"clear","characters":[{"id":null,"name":"Rohan","position":"center","action":"kneels on the grassy bank and ties a shoelace around the rucksack strap","expression":"focused, eyes on his hands","clothing":"standard","depth":"foreground","perspective":"front"}],"objects":[{"id":"ART001","name":"bike lock","position":"on the muddy bottom of the ditch beneath the brown water"}],"interactions":[{"character":"Rohan","object":"shoelace","where":"ties the shoelace around the rucksack strap","priority":"essential"}],"background":"the road and the fence above the bank","population":"ambient"}}
+```
+
+--- Page 3 ---
+TEXT:
+«Ein langer Ast muss her.» Rohan suchte am Waldrand, bis er einen langen, geraden Ast fand. Er streifte die Blätter ab und kehrte zum Graben zurück. Dann schob er das Ende ins Wasser und tastete über den Grund, bis er den Bügel spürte. Der Ast war nass bis zur Hand. Seine Finger waren kalt geworden. Er hielt ihn mit beiden Händen fest, und die Spitze zitterte. Vorsichtig hob er an. Das Schloss rutschte vom Ast, kippte zur Seite und sank tiefer in den schwarzen Schlamm zwischen den Wurzeln. Rohan atmete tief aus und zog den Ast aus dem Wasser, und die Oberfläche lag wieder glatt da.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Rohan leans over the ditch bank holding a long branch with both hands, its tip lifting the bike lock from the water. The lock slips off the tip and tilts toward the dark water while the branch bends.","setting":{"location":"Strassenrand am Waldrand in Fislisbach [LOC002]","indoorOutdoor":"outdoor","description":"muddy grassy bank at the edge of a roadside ditch, dark brown water with tangled roots on the far bank, fallen leaves floating on the surface","lighting":"low morning sun from the left, falling across the water","camera":"medium","depthLayers":"foreground: the muddy bank and the water; midground: Rohan leaning over the ditch; background: the forest edge"},"timeOfDay":"morning","weather":"clear","characters":[{"id":null,"name":"Rohan","position":"center","action":"leans over the ditch and lifts a long branch from the water while the lock slips from its tip","expression":"tense, eyes on the water","clothing":"standard","depth":"foreground","perspective":"front"}],"objects":[{"id":"ART001","name":"bike lock","position":"at the tip of the branch just above the water, tilting off"}],"interactions":[{"character":"Rohan","object":"long branch","where":"holds the long branch with both hands","priority":"essential"}],"background":"the forest edge behind the ditch","population":"cast_only"}}
+```
+
+--- Page 4 ---
+TEXT:
+Von der Kirche her schlugen die Glocken halb elf und hallten lange über das Tal. Rohan sass am Ufer, den Ast neben sich im Gras, und das Wasser lag wieder glatt über dem Graben. Das Schloss war nicht mehr zu sehen. Er tauchte den Ast noch einmal hinein und stiess ihn so tief hinunter, wie es ging, doch die Spitze fand nur Schlamm. Der Ast reichte nicht bis auf den Grund. Rohan zog ihn heraus, stand auf, nahm das Velo vom Zaun und sagte: «Ohne Schloss kann ich das Velo nicht parkieren.» Dann blieb er mit dem Velo am Lenker stehen und schaute auf das Wasser.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Rohan stands at the edge of the ditch bank with his head lowered toward the still brown water. The long branch lies in the grass beside him and the water shows no sign of the bike lock.","setting":{"location":"Strassenrand am Waldrand in Fislisbach [LOC002]","indoorOutdoor":"outdoor","description":"muddy grassy bank at the edge of a roadside ditch, still dark brown water, tangled roots on the far bank, fallen leaves on the surface","lighting":"low morning sun from the left, flat light on the water","camera":"medium","depthLayers":"foreground: the branch lying in the grass; midground: Rohan standing at the bank; background: the forest edge and the still water"},"timeOfDay":"morning","weather":"clear","characters":[{"id":null,"name":"Rohan","position":"center","action":"stands at the edge of the ditch bank looking down at the water","expression":"still, lips pressed together","clothing":"standard","depth":"foreground","perspective":"front"}],"objects":[],"interactions":[{"character":"Rohan","object":"ditch water","where":"watches the still water of the ditch","priority":"low"}],"background":"the forest edge and the still ditch water","population":"cast_only"}}
+```
+
+--- Page 5 ---
+TEXT:
+Am Ufer blieb Rohan stehen und dachte an den Steg. Dort hatte Vater ihm gezeigt, wie man den festen Seemannsknoten bindet, eine Schlaufe, die nicht rutscht, wenn man daran zieht. Rohan zog den rechten Schnürsenkel aus seinem Schuh, legte ihn um das Ende des Astes und band die Schlaufe, so wie Vater es getan hatte. Dann tauchte er den Ast langsam ins Wasser und liess die Schlaufe über den Grund gleiten. Er spürte den Bügel, zog vorsichtig an, und das Schloss kam aus dem Schlamm an die Oberfläche. Rohan hob den Ast, bis das Schloss über dem Ufer baumelte, und legte es ins Gras.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Rohan kneels at the ditch bank and lifts a long branch whose tip carries a knotted shoelace loop. The bike lock hangs from the loop above the water, dripping, as the branch rises.","setting":{"location":"Strassenrand am Waldrand in Fislisbach [LOC002]","indoorOutdoor":"outdoor","description":"muddy grassy bank at the edge of a roadside ditch, dark brown water with tangled roots on the far bank, fallen leaves on the surface","lighting":"low morning sun from the left, light catching the wet lock","camera":"medium","depthLayers":"foreground: the muddy bank and the water; midground: Rohan kneeling and lifting the branch; background: the forest edge"},"timeOfDay":"morning","weather":"clear","characters":[{"id":null,"name":"Rohan","position":"center","action":"kneels at the ditch bank and lifts the long branch so the lock rises from the water","expression":"eyes on the branch tip, lips set","clothing":"standard","depth":"foreground","perspective":"front"}],"objects":[{"id":"ART001","name":"bike lock","position":"hanging from the shoelace loop at the branch tip above the water"}],"interactions":[{"character":"Rohan","object":"long branch","where":"holds the long branch with both hands","priority":"essential"}],"background":"the forest edge behind the ditch","population":"cast_only"}}
+```
+
+--- Page 6 ---
+TEXT:
+Vor der Kirche Rohrdorf schob Rohan das Velo zum Ständer. Er legte den Bügel des Schlosses um das Vorderrad und den Rahmen, steckte den kleinen Schlüssel ins Schloss und drehte ihn. Den Schlüssel steckte er in die Hosentasche. Dann zog er zweimal kräftig am Schloss, und es hielt. Die Glocken waren verklungen. Rohan setzte sich auf die Stufen, öffnete den Rucksack und packte sein Znüni aus, ein Stück Brot und ein Rüebli. Den Riemen prüfte er mit einem Blick, und der Knoten sass fest. Er legte das Rüebli neben sich auf die Stufe und sagte: «Der Knoten hält.»
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Rohan sits on the grey stone steps of the church, holding a bread roll in both hands beside his open rucksack. His bicycle stands at the bike stand on the forecourt with the lock closed through its front wheel.","setting":{"location":"Kirche Rohrdorf [LOC001]","indoorOutdoor":"outdoor","description":"white modern concrete church with a tall detached bell tower, grey stone steps, a metal bike stand on the paved forecourt, green lawn and autumn trees","lighting":"clear morning sun from the left, warm autumn light on the white walls","camera":"medium","depthLayers":"foreground: the stone steps and the open rucksack; midground: Rohan on the steps and the bicycle at the stand; background: the church and its bell tower"},"timeOfDay":"morning","weather":"clear","characters":[{"id":null,"name":"Rohan","position":"center","action":"sits on the church steps and breaks bread from his Znüni","expression":"relaxed, looking at the bread","clothing":"standard","depth":"foreground","perspective":"front"}],"objects":[{"id":"LOC001","name":"Kirche Rohrdorf","position":"background"},{"id":"ART001","name":"bike lock","position":"locked through the front wheel and frame of the bicycle at the stand"}],"interactions":[{"character":"Rohan","object":"bread roll","where":"holds the bread roll in both hands","priority":"essential"}],"background":"the bike stand and the church forecourt","population":"ambient"}}
+```

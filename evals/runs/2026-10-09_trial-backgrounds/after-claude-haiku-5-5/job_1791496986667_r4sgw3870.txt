@@ -1,0 +1,170 @@
+---TITLE---
+TITLE: Tobias segelt zur Insel
+
+---VISUAL BIBLE---
+```json
+{
+  "secondaryCharacters": [],
+  "animals": [
+    {
+      "id": "ANI001",
+      "name": "Papagei",
+      "pages": [5],
+      "scaleClass": "hand-sized",
+      "species": "parrot",
+      "coloring": "bright green body, blue wing tips, a small orange-yellow patch on the chest",
+      "anatomy": "two legs, two wings, one tail, one hooked beak",
+      "features": "large round eyes, a soft rounded beak, small grey claws"
+    }
+  ],
+  "artifacts": [
+    {
+      "id": "ART001",
+      "label": "cardboard toy ship",
+      "name": "toy ship made of cardboard with a round brown hull and one mast",
+      "pages": [1, 2, 3, 4, 5],
+      "scaleClass": "arm-sized",
+      "type": "toy ship",
+      "description": "a cardboard ship with a round brown hull and a single upright mast on the deck",
+      "states": [
+        {"name": "mit Segel", "delta": "a white paper sail is fixed to the mast", "pages": [1, 2, 4, 5]},
+        {"name": "ohne Segel", "delta": "the mast stands bare, no sail on it", "pages": [3]}
+      ]
+    }
+  ],
+  "locations": [
+    {
+      "id": "LOC001",
+      "name": "Wohnzimmer",
+      "pages": [1, 2, 3, 4, 5],
+      "scaleClass": "house-height",
+      "setting": "indoor living room with a soft carpet on the floor",
+      "colors": "warm beige walls, a brown sofa, a light grey carpet with a round blue cushion",
+      "features": "a sofa against the wall, a window with a pale curtain, a low wooden table",
+      "signatureElement": "the round blue cushion that serves as the island on the carpet",
+      "isRealLandmark": false,
+      "landmarkQuery": null
+    },
+    {
+      "id": "LOC002",
+      "name": "Balkon mit Blick auf Fislisbach",
+      "pages": [6],
+      "scaleClass": "house-height",
+      "setting": "outdoor balcony with a view over the town",
+      "colors": "grey stone balcony floor, white railing, green meadow and dark trees beyond",
+      "features": "a balcony railing, a wooden armchair, the town spread across the valley below",
+      "signatureElement": "the white houses on the hillside of the town",
+      "isRealLandmark": true,
+      "landmarkQuery": "Fislisbach (Stadt)",
+      "landmarkPhoto": 1
+    }
+  ],
+  "backgrounds": [
+    {
+      "pages": [1, 2],
+      "description": "Wide view of a living room interior in the afternoon. A brown sofa stands against a beige wall, a window with a pale curtain on the left lets in soft daylight, a light grey carpet covers the floor with a round blue cushion in the middle. Open floor space in the foreground for the characters."
+    },
+    {
+      "pages": [3, 4, 5],
+      "description": "Low view across a light grey carpet in the living room, the round blue cushion island at the far edge, a brown table leg at the side. A window at the far end is open, daylight falls across the carpet from the left. Open carpet space in the foreground."
+    },
+    {
+      "pages": [6],
+      "landmarkPhoto": 1,
+      "description": "Wide view from a balcony over a green meadow in the foreground, the town spreading across the valley below, white buildings on the hillside, a forested ridge in the background. Dusk light, soft evening sky. A wooden armchair stands on the grey balcony floor, open space in front of it."
+    }
+  ]
+}
+```
+
+---COVER SCENE---
+```json
+{
+  "title": "Tobias segelt zur Insel",
+  "scene": {
+    "imageSummary": "Tobias stands at the balcony railing in a red and white horizontal-striped sailor shirt, a brown leather vest over it, dark brown canvas trousers tucked into tall black boots, a wide black leather belt with a brass buckle, and a dark pirate cap on his head. He holds the cardboard toy ship up in both arms, the town spread across the valley behind him.",
+    "setting": {
+      "location": "Balkon mit Blick auf Fislisbach [LOC002]",
+      "indoorOutdoor": "outdoor",
+      "description": "balcony with a grey stone floor and white railing, green meadow and white houses of the town in the valley",
+      "lighting": "soft evening light from the low sky on the right",
+      "camera": "wide",
+      "depthLayers": "foreground: the balcony floor and railing; midground: Tobias holding the ship; background: the green meadow, the town and the forested ridge"
+    },
+    "timeOfDay": "dusk",
+    "weather": "clear",
+    "characters": [
+      {
+        "id": null,
+        "name": "Tobias",
+        "position": "center",
+        "action": "stands at the railing holding the ship up in both arms",
+        "expression": "happy and proud",
+        "clothing": "costumed",
+        "depth": "foreground",
+        "perspective": "front"
+      }
+    ],
+    "objects": [
+      {"id": "LOC002", "name": "Balkon mit Blick auf Fislisbach", "position": "background"},
+      {"id": "ART001", "name": "cardboard toy ship", "position": "held in both arms in front of Tobias"}
+    ]
+  }
+}
+```
+
+---STORY PAGES---
+
+--- Page 1 ---
+TEXT:
+Tobias zog das gestreifte Matrosenshirt an und darüber die braune Lederweste. Er schnallte den breiten Gürtel zu. Dann steckte er die Hosen in die hohen Stiefel und setzte sich die Piratenkappe auf. Auf dem Teppich wartete sein Kartonschiff. Tobias lachte und klatschte in die Hände.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Tobias sits on the living room carpet, wearing a red and white horizontal-striped sailor shirt, a brown leather vest over it, dark brown canvas trousers tucked into tall black boots, a wide black leather belt with a brass buckle, and a dark pirate cap on his head. He claps his hands and laughs beside a cardboard toy ship with a single mast on the carpet.","setting":{"location":"Wohnzimmer [LOC001]","indoorOutdoor":"indoor","description":"warm beige living room, brown sofa against the wall, light grey carpet with a round blue cushion","lighting":"afternoon daylight from the window on the left","camera":"medium","depthLayers":"foreground: Tobias and the ship on the carpet; midground: the round blue cushion; background: the sofa and the window"},"timeOfDay":"afternoon","weather":"none","characters":[{"id":null,"name":"Tobias","position":"center","action":"sits on the carpet clapping his hands","expression":"laughing with delight","clothing":"costumed","depth":"foreground","perspective":"front"}],"objects":[{"id":"ART001","name":"cardboard toy ship","position":"on the carpet beside Tobias"}],"interactions":[{"character":"Tobias","object":"ART001","where":"sits beside the ship on the carpet","priority":"low"}],"background":"living room interior with a round blue cushion on the carpet","population":"cast_only"}}
+```
+
+--- Page 2 ---
+TEXT:
+Auf dem Teppich schob Tobias das Schiff über das Meer. Das Segel stand hoch am Mast. «Schiff!», rief er und lachte. Das Schiff glitt auf die Insel aus dem runden Kissen zu. Tobias schob weiter, so schnell er konnte.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Tobias kneels on the living room carpet in a red and white horizontal-striped sailor shirt, a brown leather vest over it, dark brown canvas trousers tucked into tall black boots, a wide black leather belt with a brass buckle, and a dark pirate cap on his head. He pushes the cardboard ship with its paper sail across the carpet toward the round blue cushion island.","setting":{"location":"Wohnzimmer [LOC001]","indoorOutdoor":"indoor","description":"warm beige living room, light grey carpet with a round blue cushion island","lighting":"afternoon daylight from the window on the left","camera":"medium","depthLayers":"foreground: Tobias and the ship; midground: the carpet; background: the round blue cushion island and the sofa"},"timeOfDay":"afternoon","weather":"none","characters":[{"id":null,"name":"Tobias","position":"left","action":"kneels and pushes the ship forward with both hands","expression":"beaming with delight","clothing":"costumed","depth":"foreground","perspective":"side"}],"objects":[{"id":"ART001","name":"cardboard toy ship","position":"center of the carpet, moving toward the island"}],"interactions":[{"character":"Tobias","object":"ART001","where":"pushes the ship across the carpet with both hands","priority":"essential"}],"background":"living room interior with the round blue cushion island on the carpet","population":"cast_only"}}
+```
+
+--- Page 3 ---
+TEXT:
+Ein Windstoss kam durch das offene Fenster. Das Segel löste sich vom Mast und flog weit über den Teppich. Nun stand der Mast ohne Segel da. Tobias riss die Augen auf und blieb sitzen. Dann fing er laut an zu weinen.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Tobias sits on the carpet in a red and white horizontal-striped sailor shirt, a brown leather vest over it, dark brown canvas trousers tucked into tall black boots, a wide black leather belt with a brass buckle, and a dark pirate cap on his head. Beside him the cardboard ship stands with a bare mast, while a loose white paper sail tumbles through the air across the carpet.","setting":{"location":"Wohnzimmer [LOC001]","indoorOutdoor":"indoor","description":"living room with a light grey carpet, the open window at the far end, the round blue cushion on the carpet","lighting":"afternoon daylight from the open window at the far end","camera":"medium","depthLayers":"foreground: Tobias sitting and the bare-masted ship; midground: the loose paper sail in the air over the carpet; background: the open window and the sofa"},"timeOfDay":"afternoon","weather":"none","characters":[{"id":null,"name":"Tobias","position":"center","action":"sits still on the carpet, looking at the flying sail","expression":"wide eyes and crying","clothing":"costumed","depth":"foreground","perspective":"front"}],"objects":[{"id":"ART001","name":"cardboard toy ship","position":"beside Tobias on the carpet","states":"ohne Segel"}],"interactions":[{"character":"Tobias","object":"ART001","where":"sits beside the bare mast of the ship","priority":"low"}],"background":"living room interior with the open window at the far end","population":"cast_only"}}
+```
+
+--- Page 4 ---
+TEXT:
+Tobias krabbelte los über den Teppich. Er packte das Segel mit beiden Händen und kroch damit zurück zum Schiff. Dort drückte er das Segel wieder auf den Mast. «Schiff!», rief er laut, und das Segel blieb stehen.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Tobias kneels on the living room carpet in a red and white horizontal-striped sailor shirt, a brown leather vest over it, dark brown canvas trousers tucked into tall black boots, a wide black leather belt with a brass buckle, and a dark pirate cap on his head. He presses a white paper sail back onto the mast of the cardboard ship with both hands while calling out.","setting":{"location":"Wohnzimmer [LOC001]","indoorOutdoor":"indoor","description":"living room with a light grey carpet, the round blue cushion on the carpet, the open window at the far end","lighting":"afternoon daylight from the open window at the far end","camera":"medium","depthLayers":"foreground: Tobias pressing the sail onto the mast; midground: the cardboard ship on the carpet; background: the round blue cushion and the window"},"timeOfDay":"afternoon","weather":"none","characters":[{"id":null,"name":"Tobias","position":"center","action":"presses the sail onto the mast with both hands","expression":"determined, mouth open as he calls out","clothing":"costumed","depth":"foreground","perspective":"front"}],"objects":[{"id":"ART001","name":"cardboard toy ship","position":"center of the carpet","states":"mit Segel"}],"interactions":[{"character":"Tobias","object":"ART001","where":"presses the sail onto the mast with both hands","priority":"essential"}],"background":"living room interior with the round blue cushion on the carpet","population":"cast_only"}}
+```
+
+--- Page 5 ---
+TEXT:
+«Weiter!», rief Tobias. Das Schiff glitt über den Teppich bis zur Insel. Am Ufer sass ein Papagei. Tobias winkte ihm zu. Der Papagei flatterte mit den Flügeln, und Tobias strahlte.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Tobias sits on the living room carpet in a red and white horizontal-striped sailor shirt, a brown leather vest over it, dark brown canvas trousers tucked into tall black boots, a wide black leather belt with a brass buckle, and a dark pirate cap on his head. He waves one arm toward a green parrot standing at the shore of the round blue cushion island, while the cardboard ship with its paper sail rests beside him.","setting":{"location":"Wohnzimmer [LOC001]","indoorOutdoor":"indoor","description":"light grey carpet with the round blue cushion island at the edge of the frame","lighting":"afternoon daylight from the open window at the far end","camera":"medium","depthLayers":"foreground: Tobias and the ship; midground: the parrot on the island cushion; background: the window and the sofa"},"timeOfDay":"afternoon","weather":"none","characters":[{"id":null,"name":"Tobias","position":"left","action":"sits beside the ship and waves toward the parrot","expression":"beaming with delight","clothing":"costumed","depth":"foreground","perspective":"side"}],"objects":[{"id":"ART001","name":"cardboard toy ship","position":"beside Tobias, near the island","states":"mit Segel"},{"id":"ANI001","name":"Papagei","position":"at the shore of the round blue cushion island, flapping its wings"}],"interactions":[{"character":"Tobias","object":"ART001","where":"sits beside the ship on the carpet","priority":"low"}],"background":"living room interior with the round blue cushion island","population":"cast_only"}}
+```
+
+--- Page 6 ---
+TEXT:
+Am Abend kam Mama ins Wohnzimmer. Sie hob Tobias vom Teppich auf und trug ihn auf den Balkon hinaus. Tobias rief «Tschüss, Papagei!» Dann setzte sich Mama in den Stuhl, und Tobias kuschelte sich an sie. «Gute Nacht, Kapitän», sagte Mama leise.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Mama sits in a wooden armchair on the balcony at dusk, holding Tobias on her lap. Tobias wears a red and white horizontal-striped sailor shirt, a brown leather vest over it, dark brown canvas trousers tucked into tall black boots, a wide black leather belt with a brass buckle, and a dark pirate cap on his head. Mama wears a dark blue cardigan and grey trousers. Behind them the town spreads across the valley below the green meadow.","setting":{"location":"Balkon mit Blick auf Fislisbach [LOC002]","indoorOutdoor":"outdoor","description":"grey stone balcony floor, white railing, the town spread across the valley, green meadow and forested ridge","lighting":"soft dusk light from the low sky on the left","camera":"medium","depthLayers":"foreground: the balcony floor and the armchair with Mama and Tobias; midground: the white railing; background: the town, the meadow and the forested ridge"},"timeOfDay":"dusk","weather":"clear","characters":[{"name":"Mama","position":"center","action":"sits in the armchair holding Tobias on her lap","expression":"smiling softly","clothing":"a dark blue cardigan and grey trousers, dark hair pinned up","description":"a woman in her thirties, medium build, dark hair pinned up, a dark blue cardigan and grey trousers","depth":"midground","perspective":"front"},{"id":null,"name":"Tobias","position":"center","action":"leans against Mama on her lap","expression":"calm and content","clothing":"costumed","depth":"foreground","perspective":"front"}],"objects":[{"id":"LOC002","name":"Balkon mit Blick auf Fislisbach","position":"background"}],"interactions":[{"character":"Mama","object":"Tobias","where":"holds Tobias on her lap in both arms","priority":"essential"},{"character":"Tobias","object":"Mama","where":"leans against Mama's chest","priority":"low"}],"background":"balcony with the town and the valley below","population":"cast_only"}}
+```

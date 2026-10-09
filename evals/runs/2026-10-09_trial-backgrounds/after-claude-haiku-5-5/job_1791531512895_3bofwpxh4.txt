@@ -1,0 +1,180 @@
+---TITLE---
+TITLE: Tobias und das Blatt für Mama
+
+---VISUAL BIBLE---
+```json
+{
+  "secondaryCharacters": [
+    {
+      "id": "CHR001",
+      "name": "Mama",
+      "pages": [1, 2, 3, 4, 5, 6],
+      "scaleClass": "adult-height",
+      "age": "a woman in her thirties",
+      "build": "average height, slim build",
+      "hair": "dark brown, shoulder-length, tied back loosely",
+      "face": "brown eyes, warm and open features, small smile lines",
+      "signatureLook": "a beige scarf worn loosely around the neck",
+      "clothing": "rust-coloured jacket, dark jeans, beige scarf, brown ankle boots"
+    }
+  ],
+  "animals": [
+    {
+      "id": "ANI001",
+      "name": "Elster",
+      "pages": [2, 3, 4],
+      "scaleClass": "hand-sized",
+      "species": "magpie",
+      "coloring": "black and white plumage with a green-blue sheen on the long black tail",
+      "anatomy": "two wings, two legs, one long tail, a short dark beak",
+      "features": "round soft body, short dark beak, a soft rounded head"
+    }
+  ],
+  "artifacts": [
+    {
+      "id": "ART001",
+      "label": "yellow autumn leaf",
+      "name": "yellow autumn leaf",
+      "pages": [1, 2, 3, 4, 5, 6],
+      "scaleClass": "palm-sized",
+      "type": "leaf",
+      "description": "a yellow-brown leaf with five lobes and a short pale stalk"
+    }
+  ],
+  "locations": [
+    {
+      "id": "LOC001",
+      "name": "Wiese über Fislisbach",
+      "pages": [1, 2, 6],
+      "scaleClass": "landmark",
+      "setting": "outdoor, open meadow above the town of Fislisbach",
+      "colors": "gold and green grass, white houses, dark green wooded ridge, pale blue sky",
+      "features": "dry autumn grass, fallen leaves, a valley with the town spread across it",
+      "signatureElement": "the town of Fislisbach spread across the valley below",
+      "isRealLandmark": true,
+      "landmarkQuery": "Fislisbach (Stadt)",
+      "landmarkPhoto": 1
+    },
+    {
+      "id": "LOC002",
+      "name": "Kirche Rohrdorf",
+      "pages": [3, 4, 5, 6],
+      "scaleClass": "house-height",
+      "setting": "outdoor, church grounds with a low stone wall",
+      "colors": "white concrete church, grey stone wall, green lawn, pale blue sky",
+      "features": "modern white concrete church with a tall detached bell tower",
+      "signatureElement": "the tall white concrete bell tower",
+      "isRealLandmark": true,
+      "landmarkQuery": "Kirche Rohrdorf",
+      "landmarkPhoto": 1
+    }
+  ],
+  "backgrounds": [
+    {
+      "pages": [1, 2],
+      "landmarkPhoto": 1,
+      "description": "A green meadow in the foreground with dry autumn grass and a few fallen yellow leaves, sloping down to a town spread across a valley, with white buildings on the hillside and a forested ridge behind. Clear afternoon light from the left. Wide open grassy space in the foreground."
+    },
+    {
+      "pages": [3, 4],
+      "landmarkPhoto": 1,
+      "description": "A modern white concrete church with a tall bell tower standing apart from the main building, a low grey stone wall running along the green lawn in front, autumn trees at the edge of the grounds, pale blue sky. Medium distance view from the lawn. Open grass in the foreground."
+    },
+    {
+      "pages": [5, 6],
+      "landmarkPhoto": "none",
+      "description": "A strip of grass at the foot of the white concrete church wall, with a few fallen yellow leaves on the lawn, a curved concrete edge of the church building at the right, and a clear pale blue sky above. Low camera angle close to the grass. Open lawn in the foreground."
+    }
+  ]
+}
+```
+
+---COVER SCENE---
+```json
+{
+  "title": "Tobias und das Blatt für Mama",
+  "scene": {
+    "imageSummary": "Tobias stands in the meadow with both arms raised, holding the yellow autumn leaf up high. He looks happy while the town of Fislisbach spreads across the valley behind him.",
+    "setting": {
+      "location": "Wiese über Fislisbach [LOC001]",
+      "indoorOutdoor": "outdoor",
+      "description": "open meadow with gold and green autumn grass, fallen leaves, white houses on the far hillside and a wooded ridge",
+      "lighting": "warm afternoon sun from the left",
+      "camera": "wide",
+      "depthLayers": "foreground: grass and fallen leaves; midground: Tobias holding the leaf; background: the town in the valley and the wooded ridge"
+    },
+    "timeOfDay": "afternoon",
+    "weather": "clear",
+    "characters": [
+      {
+        "id": null,
+        "name": "Tobias",
+        "position": "center",
+        "action": "stands in the grass holding the yellow autumn leaf up in both hands",
+        "expression": "happy",
+        "clothing": "standard"
+      }
+    ],
+    "objects": [
+      {"id": "LOC001", "name": "Wiese über Fislisbach", "position": "background"},
+      {"id": "ART001", "name": "yellow autumn leaf", "position": "held up in Tobias's hands"}
+    ]
+  }
+}
+```
+
+---STORY PAGES---
+
+--- Page 1 ---
+TEXT:
+Auf der Wiese über Fislisbach kniet Mama im Gras. Tobias hält ein gelbes Blatt in der Hand. Er lacht und streckt es ihr entgegen. «Mama!», ruft er. Mama hebt die Hände, bereit für das Geschenk.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Tobias stands in the meadow with his arm stretched out, holding the yellow autumn leaf toward Mama, who kneels in the grass. He laughs while the town spreads across the valley behind them.","setting":{"location":"Wiese über Fislisbach [LOC001]","indoorOutdoor":"outdoor","description":"dry autumn grass in gold and green, a few fallen leaves on the ground, white buildings on the far hillside and a wooded ridge","lighting":"warm afternoon sun from the left","camera":"medium","depthLayers":"foreground: Tobias and the grass; midground: Mama kneeling; background: the town in the valley and the ridge"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Tobias","position":"left","action":"stands in the grass holding the leaf out toward Mama","expression":"delighted, laughing","clothing":"standard","depth":"foreground","perspective":"front"},{"id":"CHR001","name":"Mama","position":"right","action":"kneels in the grass with both hands open","expression":"smiling","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[{"id":"ART001","name":"yellow autumn leaf","position":"in Tobias's outstretched hand"}],"interactions":[{"character":"Tobias","object":"ART001","where":"holds the yellow autumn leaf out toward Mama","priority":"essential"},{"character":"Mama","object":"ART001","where":"watches the yellow autumn leaf","priority":"low"}],"background":"a few fallen leaves on the grass, the town far below","population":"cast_only"}}
+```
+
+--- Page 2 ---
+TEXT:
+Mit einem schnellen Flügelschlag landet eine Elster im Gras. Sie schnappt das Blatt aus Tobias' Hand und hüpft davon. Tobias reisst die Arme hoch und schaut dem Vogel nach. Mama steht sofort auf.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"A magpie has landed in the grass and grabbed the yellow autumn leaf from Tobias's outstretched hand. Tobias throws both arms up toward the bird while Mama rises from her knees beside him.","setting":{"location":"Wiese über Fislisbach [LOC001]","indoorOutdoor":"outdoor","description":"dry autumn grass in gold and green, scattered fallen leaves, white buildings in the valley and a wooded ridge","lighting":"warm afternoon sun from the left","camera":"medium","depthLayers":"foreground: Tobias and the magpie in the grass; midground: Mama rising; background: the town in the valley"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Tobias","position":"left","action":"throws both arms up toward the magpie","expression":"surprised","clothing":"standard","depth":"foreground","perspective":"front"},{"id":"CHR001","name":"Mama","position":"right","action":"rises from her knees beside Tobias","expression":"startled","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[{"id":"ANI001","name":"magpie","position":"in the grass in front of Tobias, holding the leaf"},{"id":"ART001","name":"yellow autumn leaf","position":"held in the magpie's grip"}],"interactions":[{"character":"Tobias","object":"ART001","where":"reaches toward the magpie with an open hand","priority":"essential"},{"character":"Mama","object":"ANI001","where":"rises from her knees beside Tobias, watching the magpie","priority":"low"},{"character":"Elster","object":"ART001","where":"holds the yellow autumn leaf in its grip","priority":"essential"}],"background":"a few fallen leaves on the grass","population":"cast_only"}}
+```
+
+--- Page 3 ---
+TEXT:
+«Gib!», ruft Tobias. Mama hat ihn auf den Arm genommen und trägt ihn zur Mauer der Kirche Rohrdorf. Dort sitzt die Elster oben auf den Steinen und hält das Blatt fest. Tobias weint leise, zeigt aber mit dem Finger und ruft noch einmal «Gib!»
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Mama holds Tobias on her hip beside the low stone wall of Kirche Rohrdorf. He points at the magpie perched on top of the wall, still holding the yellow autumn leaf, while he cries quietly.","setting":{"location":"Kirche Rohrdorf [LOC002]","indoorOutdoor":"outdoor","description":"low grey stone wall along a green lawn, the white concrete church and its tall bell tower behind, autumn trees at the edge of the grounds","lighting":"warm afternoon sun from the left","camera":"medium","depthLayers":"foreground: the lawn and wall base; midground: Mama holding Tobias by the wall; background: the white church and bell tower"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":"CHR001","name":"Mama","position":"center","action":"holds Tobias on her hip by the wall","expression":"calm, looking toward the magpie","clothing":"standard","depth":"midground","perspective":"front"},{"id":null,"name":"Tobias","position":"center","action":"sits on Mama's hip and points at the magpie with an outstretched arm","expression":"crying quietly, upset","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[{"id":"ANI001","name":"magpie","position":"on top of the low stone wall"},{"id":"ART001","name":"yellow autumn leaf","position":"held in the magpie's grip on the wall top"}],"interactions":[{"character":"Mama","object":"Tobias","where":"holds Tobias on her hip with one arm","priority":"normal"},{"character":"Tobias","object":"ANI001","where":"points at the magpie with an outstretched arm","priority":"essential"},{"character":"Elster","object":"ART001","where":"sits on the top of the wall holding the yellow autumn leaf","priority":"low"}],"background":"a few distant passers-by far off near the church door","population":"ambient"}}
+```
+
+--- Page 4 ---
+TEXT:
+Die Elster lässt das Blatt los. Es fällt ins Gras neben der Mauer, und sie fliegt davon. Tobias hört auf zu weinen und schaut dem Blatt nach. Mama drückt ihn fest an sich.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"The yellow autumn leaf falls from the magpie's released grip toward the grass beside the wall, and the magpie lifts away above the wall. Mama holds Tobias close against her shoulder while he watches the falling leaf.","setting":{"location":"Kirche Rohrdorf [LOC002]","indoorOutdoor":"outdoor","description":"low grey stone wall along a green lawn, the white concrete church and its tall bell tower behind, autumn trees at the edge of the grounds","lighting":"warm afternoon sun from the left","camera":"medium","depthLayers":"foreground: the lawn and falling leaf; midground: Mama and Tobias by the wall; background: the white church, bell tower and the magpie in flight"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":"CHR001","name":"Mama","position":"center","action":"holds Tobias close against her shoulder","expression":"relieved, smiling gently","clothing":"standard","depth":"midground","perspective":"front"},{"id":null,"name":"Tobias","position":"center","action":"watches the falling leaf over Mama's shoulder","expression":"calm, quiet","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[{"id":"ART001","name":"yellow autumn leaf","position":"in mid-air, falling toward the grass beside the wall"},{"id":"ANI001","name":"magpie","position":"in flight above the wall, flying away"}],"interactions":[{"character":"Mama","object":"Tobias","where":"holds Tobias close against her shoulder","priority":"normal"},{"character":"Tobias","object":"ART001","where":"watches the falling yellow autumn leaf","priority":"low"},{"character":"Elster","object":"ANI001","where":"flies up above the wall","priority":"low"}],"background":"a few distant passers-by far off near the church door","population":"ambient"}}
+```
+
+--- Page 5 ---
+TEXT:
+Im Gras neben der Mauer setzt Mama Tobias ab. Er krabbelt zum Blatt und hebt es auf. Dann hält er es mit beiden Händen fest.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Tobias kneels on the grass at the foot of the church wall and picks up the yellow autumn leaf from the lawn. Mama stands beside him, watching.","setting":{"location":"Kirche Rohrdorf [LOC002]","indoorOutdoor":"outdoor","description":"strip of green grass at the foot of the white concrete church wall, a few fallen yellow leaves on the lawn, the curved concrete edge of the church building at the right","lighting":"warm afternoon sun from the left, low angle","camera":"medium","depthLayers":"foreground: the grass and fallen leaves; midground: Tobias kneeling and Mama standing beside him; background: the white church wall"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Tobias","position":"left","action":"kneels on the grass and picks up the yellow autumn leaf","expression":"focused, calm","clothing":"standard","depth":"midground","perspective":"front"},{"id":"CHR001","name":"Mama","position":"right","action":"stands beside Tobias with her hands at her sides","expression":"smiling","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[{"id":"ART001","name":"yellow autumn leaf","position":"on the grass in front of Tobias"}],"interactions":[{"character":"Tobias","object":"ART001","where":"picks up the yellow autumn leaf from the grass","priority":"essential"},{"character":"Mama","object":"ART001","where":"stands beside him, watching the leaf","priority":"low"}],"background":"a few fallen yellow leaves on the lawn","population":"cast_only"}}
+```
+
+--- Page 6 ---
+TEXT:
+Mama kniet sich vor ihn ins Gras. Tobias tapst zu ihr und streckt ihr das Blatt mit beiden Händen entgegen. «Danke, mein Schatz», sagt Mama. Tobias lacht.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Tobias walks across the grass toward Mama and holds the yellow autumn leaf out in front of him with both hands. Mama kneels in front of him with open hands, smiling, as he laughs.","setting":{"location":"Kirche Rohrdorf [LOC002]","indoorOutdoor":"outdoor","description":"strip of green grass at the foot of the white concrete church wall, a few fallen yellow leaves on the lawn, the curved concrete edge of the church building at the right","lighting":"warm afternoon sun from the left, low angle","camera":"medium","depthLayers":"foreground: the grass and fallen leaves; midground: Tobias holding the leaf out and Mama kneeling; background: the white church wall"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Tobias","position":"left","action":"walks toward Mama, holding the leaf out in front of himself with both hands","expression":"delighted, laughing","clothing":"standard","depth":"foreground","perspective":"front"},{"id":"CHR001","name":"Mama","position":"right","action":"kneels in the grass with open hands in front of him","expression":"warm smile","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[{"id":"ART001","name":"yellow autumn leaf","position":"held out in front of Tobias"}],"interactions":[{"character":"Tobias","object":"ART001","where":"holds the yellow autumn leaf out in front of himself with both hands","priority":"essential"},{"character":"Mama","object":"ART001","where":"kneels with open hands in front of him","priority":"normal"}],"background":"a few fallen yellow leaves on the lawn","population":"cast_only"}}
+```

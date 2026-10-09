@@ -9644,6 +9644,38 @@
         "kind": "human",
         "what": "Owner watches the waiting screen on iPhone through to the title page. Log: '[TRIAL AVATARS] photo estimate ... age band DIFFERENT, the drawn body row is kept' and no 'the sheet draws its own body row' unless the gender was changed."
       }
+    },
+    {
+      "id": "trial-backgrounds-2026-10-09",
+      "title": "Trial story uses 3 different backgrounds (plates) instead of one per location",
+      "commits": [],
+      "addedAt": "2026-10-09",
+      "status": "pending",
+      "evidence": [],
+      "claim": "On the owner's next trial at a real landmark: log '[TRIAL] 3 plate(s) for 6 page(s)' with three distinct ids, the three plates look like different pictures, the front cover is still a real landmark, and the first page image does not start later than before (plates render during writer streaming).",
+      "runShape": [
+        "trial"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Read the TRIAL plate log lines and look at the three plates and the pages on them; compare the p1 image start time with the previous trial."
+      }
+    },
+    {
+      "id": "trial-no-ref-gate-2026-10-09",
+      "title": "Trial VB reference sheets run without the cell render gate",
+      "commits": [],
+      "addedAt": "2026-10-09",
+      "status": "pending",
+      "evidence": [],
+      "claim": "On the next trial the log says the cell render gate is skipped by design, shows no vb_*_cell_gate / rerender lines, and the first page image starts about 25 s earlier than on job_1791579344291_rk2bno6av. A full story still logs its cell gates.",
+      "runShape": [
+        "trial"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Trial log: 'cell render gate skipped by design', no 'Cell render gate' lines; compare VB-ready to first page-image start."
+      }
     }
   ],
   "runs": [

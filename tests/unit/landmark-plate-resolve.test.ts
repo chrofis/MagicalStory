@@ -122,7 +122,7 @@ describe('trialPlateLandmarkPromisesByPage — the plate gets the landmark', () 
 
   it('REGRESSION: waits for the photo descriptions before deciding', async () => {
     const { vb, descriptionsPromise } = lateLoadingBible();
-    const byPage = trialPlateLandmarkPromisesByPage(vb, { descriptionsPromise });
+    const byPage = trialPlateLandmarkPromisesByPage(vb, [{ pages: [6] }], { descriptionsPromise });
     const photo = await byPage[6];
     expect(photo).toBeTruthy();
     expect(photo.name).toBe('A Church');
@@ -132,7 +132,7 @@ describe('trialPlateLandmarkPromisesByPage — the plate gets the landmark', () 
   it('every page of the location awaits the same resolution', async () => {
     const { vb, descriptionsPromise } = lateLoadingBible();
     vb.locations[0].pages = [4, 5, 6];
-    const byPage = trialPlateLandmarkPromisesByPage(vb, { descriptionsPromise });
+    const byPage = trialPlateLandmarkPromisesByPage(vb, [{ pages: [4, 5, 6] }], { descriptionsPromise });
     expect(Object.keys(byPage).sort()).toEqual(['4', '5', '6']);
     expect(byPage[4]).toBe(byPage[6]);
     expect((await byPage[4]).photoData).toBeTruthy();
@@ -140,7 +140,7 @@ describe('trialPlateLandmarkPromisesByPage — the plate gets the landmark', () 
 
   it('registers synchronously — the stream callback is never left awaiting', () => {
     const { vb, descriptionsPromise } = lateLoadingBible();
-    const byPage = trialPlateLandmarkPromisesByPage(vb, { descriptionsPromise });
+    const byPage = trialPlateLandmarkPromisesByPage(vb, [{ pages: [6] }], { descriptionsPromise });
     expect(typeof byPage[6].then).toBe('function');
   });
 
@@ -150,7 +150,7 @@ describe('trialPlateLandmarkPromisesByPage — the plate gets the landmark', () 
         { id: 'LOC001', name: 'A meadow', isRealLandmark: false, pages: [1, 2] },
         { id: 'LOC003', name: 'Unstaged', isRealLandmark: true, pages: [] },
       ],
-    }, {});
+    }, [{ pages: [1, 2] }, { pages: [3] }], {});
     expect(Object.keys(byPage)).toEqual([]);
   });
 
@@ -158,9 +158,31 @@ describe('trialPlateLandmarkPromisesByPage — the plate gets the landmark', () 
     const vb: any = {
       locations: [{ id: 'LOC002', name: 'A Church', isRealLandmark: true, pages: [6] }],
     };
-    const byPage = trialPlateLandmarkPromisesByPage(vb, {
+    const byPage = trialPlateLandmarkPromisesByPage(vb, [{ pages: [6] }], {
       descriptionsPromise: Promise.reject(new Error('index query failed')),
     });
     await expect(byPage[6]).resolves.toBeNull();
+  });
+});
+
+describe('trialPlateLandmarkPromisesByPage — one landmark, several plates', () => {
+  it('a background entry cites its own photo; one without it takes the one of its location', async () => {
+    const loc: any = {
+      id: 'LOC001', name: 'A Bridge', isRealLandmark: true, pages: [1, 2, 3, 4, 5, 6], landmarkPhoto: 1,
+      photoVariants: [
+        { variantNumber: 1, kind: 'exterior', description: 'front', url: 'https://x/1.jpg', cachedPhotoData: 'data:image/jpeg;base64,AAAA' },
+        { variantNumber: 2, kind: 'close', description: 'side', url: 'https://x/2.jpg', cachedPhotoData: 'data:image/jpeg;base64,BBBB' },
+      ],
+    };
+    const vb: any = { locations: [loc] };
+    const byPage = trialPlateLandmarkPromisesByPage(vb, [
+      { pages: [1, 2] }, { pages: [3, 4], landmarkPhoto: 2 }, { pages: [5, 6], landmarkPhoto: 'none' },
+    ], {});
+    const a = await byPage[1];
+    const b = await byPage[3];
+    expect(a?.variantNumber).toBe(1);
+    expect(b?.variantNumber).toBe(2);
+    expect(await byPage[5]).toBeNull();
+    expect(loc.landmarkPhoto).toBe(1); // the bible is never rewritten
   });
 });

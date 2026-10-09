@@ -1,0 +1,184 @@
+---TITLE---
+TITLE: Captain Mia and the Runaway Parrot
+
+---VISUAL BIBLE---
+```json
+{
+  "secondaryCharacters": [
+    {
+      "id": "CHR001",
+      "name": "Jonas",
+      "pages": [1, 2, 3, 4, 5, 6],
+      "scaleClass": "waist-high",
+      "age": "a boy of about six",
+      "build": "small and slim, about the height of a young child",
+      "hair": "dark brown, short and cropped",
+      "face": "brown eyes, round face, a few freckles across the nose",
+      "signatureLook": "a red woollen bobble hat",
+      "clothing": "navy jumper, grey trousers, brown lace-up shoes"
+    }
+  ],
+  "animals": [],
+  "artifacts": [
+    {
+      "id": "ART001",
+      "label": "toy parrot",
+      "name": "plush parrot",
+      "pages": [1, 2, 4, 6],
+      "scaleClass": "hand-sized",
+      "type": "soft toy",
+      "description": "A plush parrot with a green body, red and yellow wings and a red tail, with a loop of red ribbon sewn to its back."
+    }
+  ],
+  "locations": [
+    {
+      "id": "LOC001",
+      "name": "Kirche Rohrdorf churchyard",
+      "pages": [2, 3, 4, 5, 6],
+      "scaleClass": "house-height",
+      "setting": "outdoor churchyard, white concrete church on a suburban hillside",
+      "colors": "white concrete walls, grey slate roof, dark green hedge, golden autumn leaves on pale gravel",
+      "features": "plain modern white church, tall detached concrete bell tower, low boundary wall, church hall with brick walls, wooden fence",
+      "signatureElement": "tall detached concrete bell tower",
+      "isRealLandmark": true,
+      "landmarkQuery": "Kirche Rohrdorf",
+      "landmarkPhoto": 1
+    },
+    {
+      "id": "LOC002",
+      "name": "Fislisbach village lane",
+      "pages": [1],
+      "scaleClass": "landmark",
+      "setting": "outdoor village lane with a view over the valley",
+      "colors": "green meadow, white houses on the hillside, dark wooded ridge, pale grey tarmac",
+      "features": "lane running past a low wall, town spreading across the valley, bus stop",
+      "signatureElement": "town spreading across the green valley",
+      "isRealLandmark": true,
+      "landmarkQuery": "Fislisbach (Stadt)",
+      "landmarkPhoto": 1
+    }
+  ],
+  "backgrounds": [
+    {
+      "pages": [1],
+      "landmarkPhoto": 1,
+      "description": "A village lane in Fislisbach with a green meadow in the foreground, white houses spread across the hillside of the valley, and a dark wooded ridge behind. A low wall runs beside the lane near a bus stop. Clear afternoon light from a low autumn sun on the left. Wide shot with open lane in the foreground."
+    },
+    {
+      "pages": [2],
+      "landmarkPhoto": 1,
+      "description": "The churchyard of Kirche Rohrdorf seen from the lane: the plain white concrete church with its tall detached bell tower, a grassy open lawn in front, scattered golden leaves on the grass, and a low boundary wall at the left. Windy afternoon light from the left. Open grass in the foreground."
+    },
+    {
+      "pages": [3],
+      "landmarkPhoto": "none",
+      "description": "Behind the church hall of Kirche Rohrdorf: a pale grey gravel yard with a pile of wooden crates by a wooden fence, a brick hall wall on the right, and the white church wall rising at the back. Windy afternoon light from above. Open gravel in the centre."
+    },
+    {
+      "pages": [4],
+      "landmarkPhoto": 1,
+      "description": "The white concrete church of Kirche Rohrdorf seen from the side, its grey slate roof sloping steeply to a ridge and a gutter at the far edge, with the tall bell tower beyond. Windy afternoon light from the right. Open sky above the roof."
+    },
+    {
+      "pages": [5],
+      "landmarkPhoto": "none",
+      "description": "The foot of a white church wall with a dark green hedge at its base and pale gravel in front. Wooden crates lie scattered across the gravel, with golden leaves blown among them. Overcast afternoon light from above. Open gravel in the foreground."
+    },
+    {
+      "pages": [6],
+      "landmarkPhoto": "none",
+      "description": "A dark green hedge running along the edge of the churchyard, beside a low white wall and a stretch of pale gravel. A single crate stands against the wall. Windy afternoon light from the left. Open gravel in the foreground."
+    }
+  ]
+}
+```
+
+---COVER SCENE---
+```json
+{
+  "title": "Captain Mia and the Runaway Parrot",
+  "scene": {
+    "imageSummary": "Mia stands on the low churchyard wall in front of the white church, raising a plush parrot high above his head with one arm while his other arm points toward the church roof. He wears a red and white horizontal-striped sailor shirt under a brown leather vest, dark brown canvas trousers tucked into tall black boots, and a wide black leather belt with a brass buckle, with a bare head. Golden autumn leaves blow across the grass.",
+    "setting": {
+      "location": "Kirche Rohrdorf churchyard [LOC001]",
+      "indoorOutdoor": "outdoor",
+      "description": "Plain white concrete church with a tall detached bell tower, grey slate roof, dark green hedge and pale gravel, golden autumn leaves on the grass",
+      "lighting": "low afternoon autumn sun from the left, warm light on the wall and the church",
+      "camera": "wide",
+      "depthLayers": "foreground: pale gravel and grass with blowing leaves; midground: Mia on the low wall; background: the white church roof and bell tower against a blue sky"
+    },
+    "timeOfDay": "afternoon",
+    "weather": "windy",
+    "characters": [
+      {
+        "id": null,
+        "name": "Mia",
+        "position": "center",
+        "action": "stands on the low wall, raising the parrot high with one arm and pointing toward the roof with the other",
+        "expression": "determined, mouth open as if calling out",
+        "clothing": "costumed"
+      }
+    ],
+    "objects": [
+      {"id": "LOC001", "name": "Kirche Rohrdorf churchyard", "position": "background"},
+      {"id": "ART001", "name": "plush parrot", "position": "raised high in Mia's hand, above the wall"}
+    ]
+  }
+}
+```
+
+---STORY PAGES---
+
+--- Page 1 ---
+TEXT:
+Mia clattered down the lane in his tall black boots, a parrot tucked under one arm. He had been saving the parrot for a special job, and today was the day. On the low wall outside the church sat a boy on his own. He was not kicking his heels or throwing stones like the children who had walked home from school. He only watched the bus pull away from the stop. Mia marched up to the wall and raised the parrot high. "Ahoy!" he called. "I am Captain Mia, and this is my parrot. My ship needs a crew, and you look like a sailor."
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Mia strides along the village lane in Fislisbach toward a low wall, raising a plush parrot high above his head in one hand. He wears a red and white horizontal-striped sailor shirt under a brown leather vest, dark brown canvas trousers tucked into tall black boots, and a wide black leather belt with a brass buckle, with a bare head. A boy in a red bobble hat sits on the low wall in the midground, watching the bus pull away.","setting":{"location":"Fislisbach village lane [LOC002]","indoorOutdoor":"outdoor","description":"Village lane of pale grey tarmac beside a low wall, green meadow falling away to white houses across the valley, dark wooded ridge behind, bus stop at the far end","lighting":"low clear autumn sun from the left, long shadows on the lane","camera":"medium","depthLayers":"foreground: pale grey tarmac and the lane; midground: Mia raising the parrot and the boy on the low wall; background: the green valley, white houses and the wooded ridge"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Mia","position":"left","action":"strides toward the wall, raising the parrot high","expression":"determined, mouth open as if calling out","clothing":"costumed","depth":"foreground","perspective":"front"},{"id":"CHR001","name":"Jonas","position":"right","action":"sits on the low wall, watching the bus pull away","expression":"quiet, eyes on the bus stop","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[{"id":"ART001","name":"plush parrot","position":"raised high in Mia's hand"}],"interactions":[{"character":"Mia","object":"plush parrot","where":"raises the parrot high over his head","priority":"essential"},{"character":"Jonas","object":"low wall","where":"sits on the low wall, watches the bus stop","priority":"low"}],"background":"a few passers-by at the bus stop far off","population":"sparse"}}
+```
+
+--- Page 2 ---
+TEXT:
+Beside the white church, a cold breeze rustled the fallen leaves across the grass. The boy slid off the wall and looked at the parrot without taking it. "I'm Jonas," he said. "I'm not allowed to climb anything." Mia nodded. "Then you can be my first mate," he said. "First mates stay on the ground and hold the rope." Jonas stepped closer and stretched out his arms. Mia held the parrot out. A strong gust swept over the grass, lifted the parrot from his hand, and carried it up and over the roof of Kirche Rohrdorf. Mia ran to the wall and stared at the far side of the roof.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Mia, in a red and white horizontal-striped sailor shirt under a brown leather vest, dark brown canvas trousers tucked into tall black boots and a wide black leather belt with a brass buckle, with a bare head, reaches after the plush parrot as a strong gust lifts it away from his open hand toward the church roof. Jonas in a red bobble hat stretches both arms up toward the parrot beside him. Golden leaves swirl over the churchyard grass.","setting":{"location":"Kirche Rohrdorf churchyard [LOC001]","indoorOutdoor":"outdoor","description":"Plain white concrete church with tall detached bell tower, grey slate roof, low boundary wall, golden leaves on green lawn","lighting":"low afternoon autumn sun from the right, bright on the white church walls","camera":"medium","depthLayers":"foreground: lawn and blowing leaves; midground: Mia and Jonas with the parrot in the air between them; background: the white church with its roof edge and bell tower"},"timeOfDay":"afternoon","weather":"windy","characters":[{"id":null,"name":"Mia","position":"left","action":"reaches after the parrot as the gust lifts it from his hand","expression":"startled, eyes on the parrot","clothing":"costumed","depth":"midground","perspective":"front"},{"id":"CHR001","name":"Jonas","position":"right","action":"stretches both arms up toward the parrot","expression":"open-mouthed, reaching","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[{"id":"ART001","name":"plush parrot","position":"lifted by the gust above the grass, heading toward the church roof"}],"interactions":[{"character":"Mia","object":"plush parrot","where":"reaches after the parrot as it leaves his open fingers","priority":"essential"},{"character":"Jonas","object":"plush parrot","where":"reaches up toward the parrot with both arms","priority":"normal"}],"background":"a few passers-by far off on the lane","population":"sparse"}}
+```
+
+--- Page 3 ---
+TEXT:
+Behind the church hall, a pile of wooden crates waited by the fence. Mia and Jonas dragged them across the gravel one at a time. "I'm not allowed to climb," Jonas said, frowning up at the roof. "Then you can hold the bottom," said Mia. Jonas planted his feet and gripped the lowest crate with both hands. Mia set a second crate on top, then a third, leaning the pile against the church wall until its top touched the gutter. The pile wobbled, so Jonas pressed harder and it held. "I am going up," said Mia, and he put one boot on the first crate.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Mia, in a red and white horizontal-striped sailor shirt under a brown leather vest, dark brown canvas trousers tucked into tall black boots and a wide black leather belt with a brass buckle, with a bare head, leans a wooden crate onto a stack built against the white church wall. Jonas in a red bobble hat grips the bottom crate with both hands, feet planted on the gravel. The stack reaches almost to the gutter.","setting":{"location":"Kirche Rohrdorf churchyard [LOC001]","indoorOutdoor":"outdoor","description":"Pale grey gravel yard behind the church hall, a brick hall wall, a wooden fence, the white concrete church wall rising at the back with its gutter","lighting":"windy afternoon light from above, soft shadows on the gravel","camera":"medium","depthLayers":"foreground: gravel and the bottom crate; midground: Mia setting the crate on the stack and Jonas beside it; background: the white church wall and gutter"},"timeOfDay":"afternoon","weather":"windy","characters":[{"id":null,"name":"Mia","position":"left","action":"sets a crate on top of the stack","expression":"concentrating, lips pressed together","clothing":"costumed","depth":"midground","perspective":"front"},{"id":"CHR001","name":"Jonas","position":"right","action":"grips the bottom crate with both hands, feet planted","expression":"serious, eyes on the stack","clothing":"standard","depth":"foreground","perspective":"front"}],"objects":[],"interactions":[{"character":"Mia","object":"top crate","where":"sets the top crate on the stack","priority":"essential"},{"character":"Jonas","object":"bottom crate","where":"grips the bottom crate with both hands","priority":"normal"}],"background":"empty gravel yard","population":"cast_only"}}
+```
+
+--- Page 4 ---
+TEXT:
+With three steps up the crates, the gutter came level with his hands. Mia pulled himself onto the roof, found his footing on the cold tiles, and climbed to the ridge. He stood up slowly with his arms out wide. "Careful," he said, and he walked along the top of the roof one step at a time. Below him, Jonas called his name. The parrot had caught in the gutter on the far side, its red ribbon hooked over a bracket. Mia crept along the ridge on his knees, leaned over the slope and reached. His fingers touched its soft green wing. Then another gust swept over the roof, the ribbon slipped free, and the parrot tumbled over the edge into the hedge behind the church.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Mia, in a red and white horizontal-striped sailor shirt under a brown leather vest, dark brown canvas trousers tucked into tall black boots and a wide black leather belt with a brass buckle, with a bare head, kneels on the steep grey slate ridge of the church roof, leaning out to reach for a plush parrot caught in the gutter on the far side. Far below on the churchyard ground, Jonas in a red bobble hat looks up at him. Golden leaves blow past the roof edge.","setting":{"location":"Kirche Rohrdorf churchyard [LOC001]","indoorOutdoor":"outdoor","description":"White concrete church with a steep grey slate roof sloping to a ridge, gutter along the far edge with a metal bracket, tall bell tower beyond, dark green hedge below","lighting":"windy afternoon light from the right, bright on the white walls","camera":"medium","depthLayers":"foreground: the near roof slope and ridge; midground: Mia on the ridge reaching for the gutter; background: Jonas on the ground below and the bell tower beyond"},"timeOfDay":"afternoon","weather":"windy","characters":[{"id":null,"name":"Mia","position":"center","action":"kneels on the ridge and reaches over the slope toward the parrot in the gutter","expression":"eyes narrowed, reaching","clothing":"costumed","depth":"midground","perspective":"side"},{"id":"CHR001","name":"Jonas","position":"right","action":"stands at the foot of the wall looking up","expression":"looking up, hands at his sides","clothing":"standard","depth":"background","perspective":"front"}],"objects":[{"id":"ART001","name":"plush parrot","position":"in the far gutter, ribbon hooked over the bracket"}],"interactions":[{"character":"Mia","object":"plush parrot","where":"reaches for the parrot caught in the gutter","priority":"essential"}],"background":"empty gravel and hedge below","population":"cast_only"}}
+```
+
+--- Page 5 ---
+TEXT:
+The stack had stayed steady while he climbed, but as Mia stepped off the top crate, the crates slid apart on the wet leaves and tumbled across the gravel. Jonas had jumped back in time and stood unhurt beside the fallen crates. Mia flattened himself on the tiles and gripped the ridge with both hands. He peered over the edge. The wall below was bare, nothing left to climb, and the hedge hid the parrot. "Jonas, I am stuck," he called. Jonas looked up with his hands at his sides. "I cannot reach you," he said, and his voice came out small.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Mia, in a red and white horizontal-striped sailor shirt under a brown leather vest, dark brown canvas trousers tucked into tall black boots and a wide black leather belt with a brass buckle, with a bare head, lies flat on the grey slate roof at the top of the white church wall, gripping the ridge and peering over the edge. Below on the gravel, Jonas in a red bobble hat stands beside the scattered wooden crates, looking up. Golden leaves lie on the gravel.","setting":{"location":"Kirche Rohrdorf churchyard [LOC001]","indoorOutdoor":"outdoor","description":"White concrete church wall rising to a grey slate roof edge, dark green hedge at the base, pale gravel strewn with wooden crates and golden leaves","lighting":"overcast afternoon light from above, flat and soft","camera":"wide","depthLayers":"foreground: scattered crates and gravel with Jonas; midground: the church wall; background: Mia flat on the roof edge above and the dark hedge"},"timeOfDay":"afternoon","weather":"overcast","characters":[{"id":null,"name":"Mia","position":"right","action":"lies flat on the roof edge, gripping the ridge, peering down","expression":"worried, eyes on the ground below","clothing":"costumed","depth":"background","perspective":"side"},{"id":"CHR001","name":"Jonas","position":"left","action":"stands beside the scattered crates, looking up","expression":"small voice, face turned up","clothing":"standard","depth":"foreground","perspective":"front"}],"objects":[],"interactions":[{"character":"Mia","object":"roof ridge","where":"grips the ridge with both hands","priority":"normal"},{"character":"Jonas","object":"roof edge","where":"watches the roof edge above him","priority":"low"}],"background":"empty gravel and hedge","population":"cast_only"}}
+```
+
+--- Page 6 ---
+TEXT:
+On the roof, Mia looped his wide belt over a bracket of the gutter and pulled the buckle through. "Jonas, catch the end!" he called. Jonas ran to the wall, caught the strap in both hands, and wound it twice round the one crate still standing. Mia held the belt and lowered himself over the edge, one hand after another, until his boots found the crate. He climbed down to the gravel, then pushed into the hedge with both arms. When he came out, he was holding the parrot by one wing. He held it out to Jonas. "You are first mate now," he said.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Mia, in a red and white horizontal-striped sailor shirt under a brown leather vest, dark brown canvas trousers tucked into tall black boots and a wide black leather belt with a brass buckle, with a bare head, holds out a plush parrot toward Jonas in a red bobble hat, who reaches for it with both arms. They stand on the gravel by the dark green hedge and the low white wall. Golden leaves blow across the ground.","setting":{"location":"Kirche Rohrdorf churchyard [LOC001]","indoorOutdoor":"outdoor","description":"Dark green hedge along the churchyard, low white concrete wall, a single wooden crate against the wall, pale gravel with golden leaves","lighting":"windy afternoon light from the left, soft shadows on the gravel","camera":"medium","depthLayers":"foreground: gravel and golden leaves; midground: Mia holding out the parrot and Jonas reaching; background: the dark green hedge and the white wall"},"timeOfDay":"afternoon","weather":"windy","characters":[{"id":null,"name":"Mia","position":"left","action":"holds the parrot out toward Jonas","expression":"proud, mouth open as if speaking","clothing":"costumed","depth":"midground","perspective":"front"},{"id":"CHR001","name":"Jonas","position":"right","action":"reaches for the parrot with both arms","expression":"wide grin, eyes on the parrot","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[{"id":"ART001","name":"plush parrot","position":"held out in front of Mia at the height of Jonas's arms"}],"interactions":[{"character":"Mia","object":"plush parrot","where":"holds the parrot out to Jonas","priority":"essential"},{"character":"Jonas","object":"plush parrot","where":"reaches for the parrot with both arms","priority":"normal"}],"background":"empty gravel and hedge","population":"cast_only"}}
+```

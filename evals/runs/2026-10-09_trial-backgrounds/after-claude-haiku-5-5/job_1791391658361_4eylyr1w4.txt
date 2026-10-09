@@ -1,0 +1,164 @@
+---TITLE---
+TITLE: Jules et l'oie de Bayliss Park
+
+---VISUAL BIBLE---
+```json
+{
+  "secondaryCharacters": [
+    {
+      "id": "CHR001",
+      "name": "Papa",
+      "pages": [1, 6],
+      "scaleClass": "adult-height",
+      "age": "a man in his thirties",
+      "build": "tall, slim build",
+      "hair": "short, dark brown, neatly combed",
+      "face": "dark brown eyes, short trimmed beard",
+      "signatureLook": "long grey wool scarf",
+      "clothing": "dark blue jacket, grey trousers, brown leather shoes, grey wool scarf"
+    }
+  ],
+  "animals": [
+    {
+      "id": "ANI001",
+      "name": "Berthe",
+      "pages": [1, 2, 3, 4, 6],
+      "scaleClass": "knee-high",
+      "species": "Canada goose, adult female",
+      "coloring": "grey-brown body, black neck and head, white chin patch",
+      "anatomy": "two wings, two legs, one beak, one long neck",
+      "features": "black neck, white chin patch, black bill"
+    }
+  ],
+  "artifacts": [
+    {
+      "id": "ART001",
+      "label": "red playground ball",
+      "name": "round red rubber ball",
+      "pages": [1, 2, 3, 4, 5, 6],
+      "scaleClass": "melon-sized",
+      "type": "ball",
+      "description": "round red rubber ball, scuffed on one side"
+    }
+  ],
+  "locations": [
+    {
+      "id": "LOC001",
+      "name": "Bayliss Park",
+      "pages": [1, 2, 3, 4, 5, 6],
+      "scaleClass": "landmark",
+      "setting": "outdoor city park, Council Bluffs, Iowa, autumn",
+      "colors": "green lawn turning yellow, orange and red maple leaves, grey stone fountain",
+      "features": "paved path, wooden benches, a pond edged with tall reeds",
+      "signatureElement": "stone fountain with a central jet of water",
+      "isRealLandmark": false,
+      "landmarkQuery": null
+    }
+  ],
+  "backgrounds": [
+    {
+      "pages": [1, 6],
+      "description": "Wide view of Bayliss Park in autumn. A paved path curves across a lawn of yellowing grass. A green wooden bench stands at the right beside the path. A stone fountain rises in the middle distance with water arcing into its basin. Orange and red maple trees line the far edge. Clear afternoon light from the left. Open grass in the foreground."
+    },
+    {
+      "pages": [2, 3, 4],
+      "description": "The grassy bank of a park pond beside the fountain. Tall reeds and cattails grow along the water edge, and a strip of trampled grass and fallen yellow leaves lies in front of them. The still pond fills the middle ground. A bare oak stands on the far bank. Clear afternoon light from above, soft shadows on the grass."
+    },
+    {
+      "pages": [5],
+      "description": "Close view of the round stone basin of a park fountain. Water rises from a central jet and falls back into the basin. The wet stone rim is pale grey. Yellow leaves lie scattered on the paving around the base. Grass and maple trees stand behind at a distance. Clear afternoon light from the right."
+    }
+  ]
+}
+```
+
+---COVER SCENE---
+```json
+{
+  "title": "Jules et l'oie de Bayliss Park",
+  "scene": {
+    "imageSummary": "Jules walks along the paved path of Bayliss Park with the red ball tucked under one arm, his face turned toward the fountain ahead. Berthe the goose stands at the edge of the reeds nearby, close to the path. Golden autumn light and yellow leaves fill the park.",
+    "setting": {
+      "location": "Bayliss Park [LOC001]",
+      "indoorOutdoor": "outdoor",
+      "description": "Yellowing lawn, a paved path, orange and red maple trees, a stone fountain in the distance, a pond edged with reeds.",
+      "lighting": "warm afternoon sun from the left",
+      "camera": "wide",
+      "depthLayers": "foreground: paved path and fallen leaves; midground: Jules and the goose at the reeds; background: the stone fountain and maple trees"
+    },
+    "timeOfDay": "afternoon",
+    "weather": "clear",
+    "characters": [
+      {
+        "id": null,
+        "name": "Jules",
+        "position": "center",
+        "action": "walks along the path with the ball under one arm",
+        "expression": "determined, eyes on the fountain",
+        "clothing": "standard"
+      }
+    ],
+    "objects": [
+      {"id": "LOC001", "name": "Bayliss Park", "position": "background"},
+      {"id": "ANI001", "name": "Berthe the goose", "position": "right, at the edge of the reeds"},
+      {"id": "ART001", "name": "red playground ball", "position": "under Jules's arm"}
+    ]
+  }
+}
+```
+
+---STORY PAGES---
+
+--- Page 1 ---
+TEXT:
+«Attention!» crie Jules en donnant un grand coup de pied dans son ballon rouge. Le ballon file sur la pelouse de Bayliss Park, passe devant les bancs et s'arrête près du chemin qui mène à la fontaine. Jules veut être le premier à toucher l'eau de la vasque. Papa est assis sur le banc, son Natel posé sur les genoux. «Je te regarde d'ici, c'est toi qui y vas!» dit-il. «Et rappelle-toi: Berthe, l'oie du bassin, siffle dès qu'on court vers elle.» Juste à côté du ballon, une grande oie se redresse et tend le cou.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Jules kicks the red ball across the lawn of Bayliss Park toward the fountain path, and a goose stands up beside the ball. Papa sits on a bench at the far side with a phone on his knees. Warm afternoon light and yellow autumn leaves.","setting":{"location":"Bayliss Park [LOC001]","indoorOutdoor":"outdoor","description":"Open lawn turning yellow, a paved path, a wooden bench, a stone fountain in the middle distance, orange maple leaves.","lighting":"warm afternoon sun from the left","camera":"medium","depthLayers":"foreground: lawn and path; midground: Jules and the goose beside the ball; background: bench with Papa, fountain, a few distant passers-by in grey and dark purple"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Jules","position":"left","action":"kicks the ball with his foot, mid-swing","expression":"eager, eyes on the ball","clothing":"standard","depth":"foreground","perspective":"front"},{"id":"CHR001","name":"Papa","position":"right","action":"sits on the bench with a phone on his knees","expression":"calm, watching","clothing":"standard","depth":"background","perspective":"front"}],"objects":[{"id":"ART001","name":"red playground ball","position":"center, rolling on the grass near the path"},{"id":"ANI001","name":"goose","position":"center, beside the ball, standing upright"}],"interactions":[{"character":"Jules","object":"ART001","where":"kicks the ball with his foot","priority":"essential"},{"character":"Papa","object":"ANI001","where":"watches the goose","priority":"low"}],"background":"a few distant passers-by in grey and dark purple","population":"ambient"}}
+```
+
+--- Page 2 ---
+TEXT:
+Sur le chemin, Jules court déjà vers son ballon. Berthe se précipite, se plante dessus et siffle si fort que Jules s'arrête net. Derrière les roseaux du bassin, trois petits oisons se serrent contre l'herbe. «C'est mon ballon!» lance Jules. Berthe ne bouge pas. Puis elle pousse le ballon avec son bec jusqu'au bord de la rive, et se remet dessus, les ailes à demi ouvertes. Jules fait un pas en avant, puis reste immobile. La fontaine coule de l'autre côté du chemin, à quelques pas seulement.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"On the grassy bank of the pond, the goose stands over the red ball with its wings half open and its neck low toward the child. Jules has stopped a step away on the path, his hands empty. Three small goslings hide among the reeds behind. Clear afternoon light.","setting":{"location":"Bayliss Park [LOC001]","indoorOutdoor":"outdoor","description":"Grassy pond bank with tall reeds and cattails, trampled grass and fallen yellow leaves, still pond water, a bare oak on the far bank.","lighting":"clear afternoon light from above, soft shadows on the grass","camera":"medium","depthLayers":"foreground: grass and fallen leaves with the ball; midground: Jules on the path and the goose over the ball; background: reeds with three goslings, the pond, a few distant passers-by"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Jules","position":"left","action":"stands still on the path a step from the goose","expression":"firm, eyes on the goose","clothing":"standard","depth":"foreground","perspective":"front"}],"objects":[{"id":"ANI001","name":"goose","position":"center, standing over the ball on the bank, wings half open"},{"id":"ART001","name":"red playground ball","position":"center, on the grass under the goose"}],"interactions":[{"character":"Jules","object":"ART001","where":"stands a step from the ball, both hands empty and off it","priority":"essential"}],"background":"three goslings among the reeds, a few distant passers-by in grey and dark purple","population":"ambient"}}
+```
+
+--- Page 3 ---
+TEXT:
+Jules s'élance vers son ballon sans réfléchir. Berthe se dresse, déploie ses ailes et siffle encore, si près que Jules recule en trébuchant. Le ballon roule dans le talus et s'arrête entre les roseaux, à deux pas de l'eau. Berthe revient s'installer devant lui, et les oisons se rapprochent de leur mère. Jules s'assoit dans l'herbe, les mains posées à côté de lui. Le ballon reste là-bas, coincé dans les tiges, et Jules ne se relève pas. Des feuilles jaunes tombent sur l'herbe autour de lui.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Jules sits on the grass by the pond bank with both hands resting on the grass beside him. The red ball is wedged between the reeds at the water's edge, and the goose stands in front of it with wings spread. Yellow leaves drift down onto the grass. Clear afternoon light.","setting":{"location":"Bayliss Park [LOC001]","indoorOutdoor":"outdoor","description":"Grassy pond bank with tall reeds and cattails, trampled grass and fallen yellow leaves, still pond water, a bare oak on the far bank.","lighting":"clear afternoon light from above, soft shadows on the grass","camera":"medium","depthLayers":"foreground: Jules sitting on the grass; midground: the goose and the reeds with the ball; background: the pond and the bare oak, three goslings in the reeds"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Jules","position":"left","action":"sits on the grass after stumbling back, both hands resting on the grass","expression":"still, eyes on the reeds","clothing":"standard","depth":"foreground","perspective":"front"}],"objects":[{"id":"ANI001","name":"goose","position":"center, in front of the reeds, wings spread"},{"id":"ART001","name":"red playground ball","position":"center, wedged between the reeds at the water's edge"}],"interactions":[{"character":"Jules","object":"ART001","where":"watches the ball wedged in the reeds","priority":"low"}],"background":"three goslings among the reeds, a few distant passers-by in grey and dark purple","population":"ambient"}}
+```
+
+--- Page 4 ---
+TEXT:
+Jules se rappelle ce que Papa a dit: une oie siffle dès qu'on court. Il se relève doucement et avance d'un pas lent, puis d'un autre, en comptant à voix basse. Berthe siffle encore, mais Jules ne court pas. Il s'arrête quand elle s'agite, puis reprend son chemin dès qu'elle se calme. Peu à peu, elle recule vers ses oisons, qui s'éloignent entre les roseaux. Jules arrive au bord de la rive, se baisse et tire le ballon hors des tiges avec les deux mains. Son ballon est enfin dans ses bras. Les oisons ne quittent plus les roseaux.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Jules bends at the edge of the reeds and pulls the red ball out from between the stems with both hands. The goose walks away through the reeds toward three goslings in the background. Yellow leaves on the grass. Clear afternoon light.","setting":{"location":"Bayliss Park [LOC001]","indoorOutdoor":"outdoor","description":"Grassy pond bank with tall reeds and cattails, trampled grass and fallen yellow leaves, still pond water, a bare oak on the far bank.","lighting":"clear afternoon light from above, soft shadows on the grass","camera":"medium","depthLayers":"foreground: grass and fallen leaves; midground: Jules bending at the reeds with the ball; background: the goose walking toward three goslings in the reeds, the pond, the bare oak"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Jules","position":"left","action":"bends down and pulls the ball out of the reeds","expression":"focused, eyes on the ball","clothing":"standard","depth":"foreground","perspective":"front"}],"objects":[{"id":"ANI001","name":"goose","position":"right, walking away into the reeds toward the goslings"},{"id":"ART001","name":"red playground ball","position":"center, half out from between the reeds"}],"interactions":[{"character":"Jules","object":"ART001","where":"pulls the ball out of the reeds with both hands","priority":"essential"}],"background":"three goslings among the reeds, a few distant passers-by in grey and dark purple","population":"ambient"}}
+```
+
+--- Page 5 ---
+TEXT:
+Jules serre le ballon sous son bras et traverse la pelouse à petits pas. Il compte chaque pas, jusqu'à septante. Arrivé devant la fontaine, il pose la main sur le rebord de pierre, puis il l'avance vers l'eau qui jaillit de la vasque. L'eau est fraîche sous ses doigts, et Jules garde la main dans la fraîcheur un moment. Autour de la vasque, les feuilles jaunes s'accrochent aux pierres mouillées. Papa est resté sur le banc, à l'autre bout de la pelouse.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Jules stands at the rim of the stone fountain with the red ball under one arm and his free hand reaching down to touch the water rising from the basin. Wet stone and yellow leaves surround him. Clear afternoon light from the right.","setting":{"location":"Bayliss Park [LOC001]","indoorOutdoor":"outdoor","description":"Round stone basin of a park fountain, water rising from a central jet and falling back, pale grey wet stone rim, yellow leaves on the paving, grass and maple trees behind.","lighting":"clear afternoon light from the right","camera":"medium","depthLayers":"foreground: the fountain rim and scattered leaves; midground: Jules at the basin with the water jet; background: grass and maple trees"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Jules","position":"center","action":"reaches down with his free hand to touch the water in the basin","expression":"content, eyes on the water","clothing":"standard","depth":"foreground","perspective":"front"}],"objects":[{"id":"ART001","name":"red playground ball","position":"tucked under his other arm"}],"interactions":[{"character":"Jules","object":"ART001","where":"holds the ball tucked under one arm","priority":"essential"}],"background":"grass and maple trees, a few distant passers-by in grey and dark purple","population":"ambient"}}
+```
+
+--- Page 6 ---
+TEXT:
+Au bord du chemin, Jules se retourne vers les roseaux. «Merci, Berthe!» lance-t-il. Au loin, l'oie reste au bord de l'eau, près de ses oisons, et ne siffle plus. Jules rejoint le banc à petits pas, le ballon sous le bras. Les feuilles des érables tombent doucement sur le chemin. Papa range son Natel dans sa poche et lui fait une place sur le banc. Jules s'assoit à côté de lui et pose le ballon sur ses genoux.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Jules walks back along the paved path toward the bench with the red ball under one arm. Papa sits on the bench and puts a phone into his pocket. Far off, the goose stands at the reeds by the pond. Yellow leaves on the path. Clear afternoon light.","setting":{"location":"Bayliss Park [LOC001]","indoorOutdoor":"outdoor","description":"Paved path curving across a lawn of yellowing grass, a green wooden bench at the right, a stone fountain in the middle distance, orange and red maple trees.","lighting":"clear afternoon sun from the left","camera":"wide","depthLayers":"foreground: paved path and fallen leaves; midground: Jules walking toward the bench; background: Papa on the bench, the fountain, the reeds with the goose far off, a few distant passers-by in grey and dark purple"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Jules","position":"center","action":"walks along the path toward the bench with the ball under one arm","expression":"content, eyes on the bench","clothing":"standard","depth":"midground","perspective":"front"},{"id":"CHR001","name":"Papa","position":"right","action":"sits on the bench and puts a phone into his pocket","expression":"warm, watching Jules come back","clothing":"standard","depth":"background","perspective":"front"}],"objects":[{"id":"ANI001","name":"goose","position":"far background, at the reeds by the pond"},{"id":"ART001","name":"red playground ball","position":"under Jules's arm"}],"interactions":[{"character":"Jules","object":"ART001","where":"carries the ball under one arm","priority":"essential"},{"character":"Papa","object":"ANI001","where":"watches the goose far off at the reeds","priority":"low"}],"background":"a few distant passers-by in grey and dark purple","population":"ambient"}}
+```

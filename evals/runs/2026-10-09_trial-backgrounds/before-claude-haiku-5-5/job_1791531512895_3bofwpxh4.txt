@@ -1,0 +1,159 @@
+---TITLE---
+TITLE: Tobias und die Elster
+
+---VISUAL BIBLE---
+```json
+{
+  "secondaryCharacters": [
+    {
+      "id": "CHR001",
+      "name": "Mama",
+      "pages": [1, 2, 3, 4, 5, 6],
+      "scaleClass": "adult-height",
+      "age": "a woman in her thirties",
+      "build": "medium height, slim, relaxed posture",
+      "hair": "dark brown, coily, short and close to the head",
+      "face": "brown eyes, brown skin, a warm open face",
+      "signatureLook": "a rust-coloured knitted scarf",
+      "clothing": "a rust-coloured knitted scarf, a dark green autumn jacket, dark blue jeans, white sneakers"
+    }
+  ],
+  "animals": [
+    {
+      "id": "ANI001",
+      "name": "Elster",
+      "pages": [2, 3, 4],
+      "scaleClass": "forearm-sized",
+      "generic": false,
+      "species": "magpie (Elster)",
+      "coloring": "black and white plumage, long black tail, glossy blue-green sheen on the wings",
+      "anatomy": "two wings, one long tail, two legs, one black bill, two large round eyes",
+      "features": "soft rounded body, closed rounded mouth, short black bill, white belly"
+    }
+  ],
+  "artifacts": [
+    {
+      "id": "ART001",
+      "label": "autumn leaf",
+      "name": "red autumn leaf",
+      "pages": [1, 2, 3, 4, 5, 6],
+      "scaleClass": "palm-sized",
+      "generic": false,
+      "type": "leaf",
+      "description": "an autumn leaf, red and yellow, with a short green stem, flat and whole"
+    }
+  ],
+  "locations": [
+    {
+      "id": "LOC001",
+      "name": "Kirche Rohrdorf",
+      "pages": [1, 2, 3, 4, 5, 6],
+      "scaleClass": "house-height",
+      "setting": "outdoor, church forecourt with a low concrete wall",
+      "colors": "white concrete, warm grey paving, red and yellow autumn leaves, green hillside",
+      "features": "modern white concrete church with a tall bell tower, low white concrete wall along the paved Trottoir, a green hill behind",
+      "signatureElement": "tall white concrete bell tower",
+      "isRealLandmark": true,
+      "landmarkQuery": "Kirche Rohrdorf",
+      "landmarkPhoto": 1
+    }
+  ],
+  "backgrounds": [
+    {
+      "pages": [1, 2, 3, 4, 5, 6],
+      "description": "Forecourt of the modern white concrete Kirche Rohrdorf, tall bell tower rising behind, a low white concrete wall running along a paved Trottoir with scattered red and yellow autumn leaves, green hillside beyond. A few distant passers-by in grey and dark purple cross the far side of the forecourt. Afternoon light, soft and clear, from the left. Medium wide shot with open paving in the foreground."
+    }
+  ]
+}
+```
+
+---COVER SCENE---
+```json
+{
+  "title": "Tobias und die Elster",
+  "scene": {
+    "imageSummary": "Tobias stands on the paved Trottoir in front of the white concrete church, holding the red autumn leaf up high with one hand. A magpie sits on the low wall beside him, tail raised, and the tall bell tower rises behind in soft afternoon light.",
+    "setting": {
+      "location": "Kirche Rohrdorf [LOC001]",
+      "indoorOutdoor": "outdoor",
+      "description": "White concrete church forecourt with a low concrete wall, scattered autumn leaves on the paving, green hillside behind",
+      "lighting": "soft afternoon light from the left",
+      "camera": "wide",
+      "depthLayers": "foreground: paved Trottoir with autumn leaves; midground: Tobias with the leaf and the low wall with the magpie; background: white concrete church with tall bell tower and green hillside"
+    },
+    "timeOfDay": "afternoon",
+    "weather": "clear",
+    "characters": [
+      {
+        "id": null,
+        "name": "Tobias",
+        "position": "center",
+        "action": "stands on the Trottoir holding the autumn leaf up high",
+        "expression": "happy and proud",
+        "clothing": "standard"
+      }
+    ],
+    "objects": [
+      {"id": "LOC001", "name": "Kirche Rohrdorf", "position": "background"},
+      {"id": "ANI001", "name": "Elster", "position": "on the low wall, right of Tobias"},
+      {"id": "ART001", "name": "red autumn leaf", "position": "held up in Tobias's hand"}
+    ]
+  }
+}
+```
+
+---STORY PAGES---
+
+--- Page 1 ---
+TEXT:
+«Für Mama!», ruft Tobias und hält ein rotes Blatt hoch. Er sitzt auf Mamas Arm vor der Kirche Rohrdorf. Mama beugt sich zu ihm und lacht. «Ist das für mich?», fragt sie. Tobias hält das Blatt noch höher.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Tobias sits on Mama's arm on the paved forecourt and holds the red autumn leaf up high. Mama leans toward him, smiling, with the white concrete church and its bell tower behind them in clear afternoon light.","setting":{"location":"Kirche Rohrdorf [LOC001]","indoorOutdoor":"outdoor","description":"Church forecourt with a low concrete wall, paved Trottoir with scattered autumn leaves, green hillside behind the church","lighting":"soft afternoon light from the left","camera":"medium","depthLayers":"foreground: paved Trottoir; midground: Tobias on Mama's arm and the leaf; background: white concrete church with tall bell tower"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Tobias","position":"left","action":"sits on Mama's arm and holds the autumn leaf up high","expression":"delighted, eyes bright, mouth open in a call","clothing":"standard","depth":"foreground","perspective":"front"},{"id":"CHR001","name":"Mama","position":"right","action":"leans toward Tobias with him on her arm","expression":"laughing, warm","clothing":"standard","depth":"foreground","perspective":"front"}],"objects":[{"id":"ART001","name":"red autumn leaf","position":"held up above Tobias's head","size":"palm-sized against his hand"}],"interactions":[{"character":"Tobias","object":"ART001","where":"holds the autumn leaf up high","priority":"essential"},{"character":"Mama","object":"ART001","where":"watches the autumn leaf held up by Tobias","priority":"low"}],"background":"a few distant passers-by in grey and dark purple cross the far side of the forecourt","population":"ambient"}}
+```
+
+--- Page 2 ---
+TEXT:
+Von der Mauer her fliegt eine Elster heran. Sie schnappt das Blatt aus Tobias' Hand und hüpft damit auf die Mauer bei der Kirche Rohrdorf. Tobias schaut ihr nach. Seine Hand bleibt leer in der Luft. Mama trägt ihn näher an die Mauer.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"A magpie has snatched the red autumn leaf and stands on the low concrete wall, holding the leaf in its bill. Tobias on Mama's arm reaches toward it with his empty hand, and Mama steps closer to the wall in the afternoon light.","setting":{"location":"Kirche Rohrdorf [LOC001]","indoorOutdoor":"outdoor","description":"Low white concrete wall along the paved Trottoir, scattered autumn leaves on the paving, white church behind","lighting":"soft afternoon light from the left","camera":"medium","depthLayers":"foreground: paved Trottoir with leaves; midground: Mama and Tobias; background: low wall with the magpie on top and the white church with bell tower"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Tobias","position":"left","action":"sits on Mama's arm and reaches toward the wall with an empty hand","expression":"surprised, brows raised, mouth open","clothing":"standard","depth":"foreground","perspective":"front"},{"id":"CHR001","name":"Mama","position":"right","action":"steps closer to the wall, carrying Tobias on her arm","expression":"alert, looking toward the wall","clothing":"standard","depth":"foreground","perspective":"front"}],"objects":[{"id":"LOC001","name":"Kirche Rohrdorf","position":"background"},{"id":"ANI001","name":"Elster","position":"on top of the low wall, midground","size":"forearm-sized"},{"id":"ART001","name":"red autumn leaf","position":"held in the magpie's bill on the wall"}],"interactions":[{"character":"Tobias","object":"ART001","where":"reaches toward the autumn leaf with an empty hand","priority":"essential"},{"character":"Mama","object":"ART001","where":"watches the autumn leaf on the wall","priority":"low"}],"background":"a few distant passers-by in grey and dark purple cross the far side of the forecourt","population":"ambient"}}
+```
+
+--- Page 3 ---
+TEXT:
+Tobias zeigt mit dem Finger zur Elster. «Gib!», ruft er laut. Die Elster sitzt oben auf der Mauer und hält das Blatt fest. Tobias fängt an zu weinen. Mama hält ihn ganz nah.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Tobias on Mama's arm points with one finger at the magpie on the low wall and cries out. The magpie keeps the red autumn leaf held in its bill, and Mama holds him close in the afternoon light.","setting":{"location":"Kirche Rohrdorf [LOC001]","indoorOutdoor":"outdoor","description":"Low white concrete wall along the paved Trottoir, scattered autumn leaves on the paving, white church behind","lighting":"soft afternoon light from the left","camera":"medium","depthLayers":"foreground: Mama and Tobias with paved Trottoir; midground: low wall with the magpie on top; background: white church with bell tower and green hillside"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Tobias","position":"left","action":"points one finger at the magpie on the wall while calling out","expression":"upset, crying, mouth turned down","clothing":"standard","depth":"foreground","perspective":"front"},{"id":"CHR001","name":"Mama","position":"right","action":"holds Tobias close on her arm","expression":"concerned, gentle","clothing":"standard","depth":"foreground","perspective":"front"}],"objects":[{"id":"ANI001","name":"Elster","position":"on top of the low wall, midground","size":"forearm-sized"},{"id":"ART001","name":"red autumn leaf","position":"held in the magpie's bill on the wall"}],"interactions":[{"character":"Tobias","object":"ART001","where":"points one finger at the autumn leaf held by the magpie","priority":"essential"},{"character":"Mama","object":"ART001","where":"looks toward the autumn leaf on the wall","priority":"low"}],"background":"a few distant passers-by in grey and dark purple cross the far side of the forecourt","population":"ambient"}}
+```
+
+--- Page 4 ---
+TEXT:
+Da lässt die Elster das Blatt fallen. Es landet auf dem Trottoir bei der Mauer. Mama setzt Tobias auf den Boden. Tobias hört auf zu weinen und schaut hinunter auf das Blatt.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"The magpie has let the red autumn leaf fall and lifts off the low wall. The leaf drops toward the paving while Mama sets Tobias on his feet beside the wall, and Tobias looks down at the leaf.","setting":{"location":"Kirche Rohrdorf [LOC001]","indoorOutdoor":"outdoor","description":"Low white concrete wall along the paved Trottoir, scattered autumn leaves on the paving, white church behind","lighting":"soft afternoon light from the left","camera":"medium","depthLayers":"foreground: paved Trottoir with autumn leaves; midground: Tobias standing and Mama crouching beside him; background: low wall, white church with bell tower and magpie lifting off"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Tobias","position":"left","action":"stands on the Trottoir beside the wall and looks down at the falling leaf","expression":"calm, quiet, eyes on the leaf","clothing":"standard","depth":"foreground","perspective":"front"},{"id":"CHR001","name":"Mama","position":"right","action":"crouches beside Tobias after setting him on his feet","expression":"relieved, smiling gently","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[{"id":"ANI001","name":"Elster","position":"lifting off above the wall, background","size":"forearm-sized"},{"id":"ART001","name":"red autumn leaf","position":"falling toward the paving near the wall"}],"interactions":[{"character":"Tobias","object":"ART001","where":"watches the autumn leaf fall toward the paving","priority":"low"},{"character":"Mama","object":"ART001","where":"watches the autumn leaf fall toward the paving","priority":"low"}],"background":"a few distant passers-by in grey and dark purple cross the far side of the forecourt","population":"ambient"}}
+```
+
+--- Page 5 ---
+TEXT:
+Mit grossen Schritten läuft Tobias zum Blatt. Er greift danach und hebt es auf. Dann dreht er sich zu Mama um.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Tobias crouches on the Trottoir and picks the red autumn leaf up from the paving with one hand. Mama stands a short distance behind him by the low wall, watching him, in the soft afternoon light.","setting":{"location":"Kirche Rohrdorf [LOC001]","indoorOutdoor":"outdoor","description":"Low white concrete wall along the paved Trottoir, scattered autumn leaves on the paving, white church behind","lighting":"soft afternoon light from the left","camera":"medium","depthLayers":"foreground: paved Trottoir with autumn leaves and Tobias; midground: Mama beside the low wall; background: white church with bell tower and green hillside"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Tobias","position":"left","action":"crouches on the Trottoir and picks up the autumn leaf from the paving","expression":"determined, focused on the leaf","clothing":"standard","depth":"foreground","perspective":"front"},{"id":"CHR001","name":"Mama","position":"right","action":"stands beside the wall and watches Tobias","expression":"warm, attentive","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[{"id":"ART001","name":"red autumn leaf","position":"on the paving, picked up by Tobias","size":"palm-sized against his hand"}],"interactions":[{"character":"Tobias","object":"ART001","where":"picks the autumn leaf up from the paving","priority":"essential"},{"character":"Mama","object":"ART001","where":"watches the autumn leaf in Tobias's hand","priority":"low"}],"background":"a few distant passers-by in grey and dark purple cross the far side of the forecourt","population":"ambient"}}
+```
+
+--- Page 6 ---
+TEXT:
+Er läuft zurück zu Mama und streckt ihr das Blatt mit beiden Händen entgegen. «Für Mama!», sagt er. Mama bückt sich und nimmt das Blatt. «Danke, Tobias!», sagt sie und lacht.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Tobias stands on the Trottoir and holds the red autumn leaf out toward Mama with both hands. Mama bends down with a smile to take it, the white church and its bell tower behind them in soft afternoon light.","setting":{"location":"Kirche Rohrdorf [LOC001]","indoorOutdoor":"outdoor","description":"Paved Trottoir with scattered autumn leaves, low white concrete wall, white church with tall bell tower, green hillside behind","lighting":"soft afternoon light from the left","camera":"medium","depthLayers":"foreground: paved Trottoir with autumn leaves; midground: Tobias holding out the leaf and Mama bending toward him; background: low wall and white church with bell tower"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Tobias","position":"left","action":"holds the autumn leaf out toward Mama with both hands","expression":"happy, mouth open in a call","clothing":"standard","depth":"foreground","perspective":"front"},{"id":"CHR001","name":"Mama","position":"right","action":"bends down toward Tobias to take the leaf","expression":"smiling, delighted","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[{"id":"ART001","name":"red autumn leaf","position":"held out between Tobias and Mama","size":"palm-sized against his hands"}],"interactions":[{"character":"Tobias","object":"ART001","where":"holds the autumn leaf out in both hands","priority":"essential"},{"character":"Mama","object":"ART001","where":"reaches for the autumn leaf being held out","priority":"essential"}],"background":"a few distant passers-by in grey and dark purple cross the far side of the forecourt","population":"ambient"}}
+```

@@ -2179,6 +2179,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             // trial as full mode; the maxElements cap below still bounds total refs.
             characterMinAppearances: 1,
             maxPerBatch: 4,
+            // No cell render gate on the trial, by design (docs/decisions.md
+            // 2026-10-09 "Trial reference sheets: no render gate"). A full story
+            // keeps it.
+            renderGate: false,
             maxElements: 6,  // trial cap — story-trial.txt limits to max 2 secondaries + 2 artifacts + 2 locations
             storyId: jobId,
             // See the full-mode call site for why: non-character elements
@@ -2188,7 +2192,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             log.warn(`⚠️ [TRIAL] Early VB reference sheet generation failed: ${err.message}`);
             return { generated: 0, failed: 0, elements: [] };
           });
-          log.info(`📚 [TRIAL] Early VB reference-sheet generation started (parallel with empty scenes + costumed avatars)`);
+          log.info(`📚 [TRIAL] Early VB reference-sheet generation started (parallel with empty scenes + costumed avatars); cell render gate skipped by design`);
         }
 
         // Trial: empty scene generation re-enabled per user. The scene
@@ -2237,20 +2241,22 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // always awaited it before resolving landmark photos; this was the
           // one sibling that did not.
           const { buildLandmarkFidelityBlock, trialPlateLandmarkPromisesByPage } = require('./server/lib/storyHelpers');
-          const landmarkPromiseByPage = trialPlateLandmarkPromisesByPage(vb, {
+
+          // ONE plate per `backgrounds[]` entry the writer declared, fanned out to
+          // that entry's pages. It used to be one plate per LOCATION (the 2026-09-13
+          // cost cut from one plate per page), which put every page of a story set
+          // at one landmark on a single backdrop (18 of 43 stored staging trials) —
+          // docs/decisions.md 2026-10-09 "Trial backgrounds". The writer is told to
+          // declare exactly 3 distinct ones (story-trial.txt), so 3 plates, rendered
+          // in parallel. Pages in no location still get their entry's plate.
+          const { groupTrialPlatePagesByVantage } = require('./server/lib/sceneMetadata');
+          const plateGroups = groupTrialPlatePagesByVantage(vb);
+          // Each plate's landmark photo is its own entry's citation, else its
+          // location's — so one landmark with several photos backs several plates.
+          const landmarkPromiseByPage = trialPlateLandmarkPromisesByPage(vb, plateGroups, {
             descriptionsPromise: landmarkDescriptionsPromise,
           });
 
-          // ONE plate per distinct vantage, fanned out to that vantage's pages —
-          // the same economy full mode has had since Phase 5a-pre-vantage. Trial
-          // used to render one plate PER PAGE (6 calls / $0.12 on a 6-page trial,
-          // 17-23% of the whole trial cost) while measuring only 1-3 distinct
-          // vantages across 12 measured trials. The grouping is the real grouper
-          // (groupPagesByVantage) fed a synthesized page shape — see
-          // groupTrialPlatePagesByVantage. Pages with no LOC come back as their
-          // own single-page group, so nobody loses a plate.
-          const { groupTrialPlatePagesByVantage } = require('./server/lib/sceneMetadata');
-          const plateGroups = groupTrialPlatePagesByVantage(vb);
           log.info(`🎬 [TRIAL] ${plateGroups.length} plate(s) for ${plateGroups.reduce((n, g) => n + g.pages.length, 0)} page(s): ${plateGroups.map(g => `${g.vantageId || 'unassigned'}→p${g.pages.join(',')}`).join('; ')}`);
           for (const plateGroup of plateGroups) {
             const bg = { description: plateGroup.description, pages: plateGroup.pages };

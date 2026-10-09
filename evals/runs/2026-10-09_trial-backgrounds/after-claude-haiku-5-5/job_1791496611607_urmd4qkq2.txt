@@ -1,0 +1,168 @@
+---TITLE---
+TITLE: Lily and the Rattling Biscuit Tin
+
+---VISUAL BIBLE---
+```json
+{
+  "secondaryCharacters": [],
+  "animals": [
+    {
+      "id": "ANI001",
+      "name": "Pippa",
+      "pages": [1, 2, 5, 6],
+      "scaleClass": "knee-high",
+      "species": "medium-sized mixed-breed dog",
+      "coloring": "sandy-brown coat with a white chest and a white tip on the tail",
+      "anatomy": "four legs, one tail, two ears, one nose",
+      "features": "red collar, dark nose, bushy tail"
+    }
+  ],
+  "artifacts": [
+    {
+      "id": "ART001",
+      "label": "biscuit tin",
+      "name": "round metal biscuit tin with a dented lid",
+      "pages": [1, 3, 4],
+      "scaleClass": "hand-sized",
+      "type": "tin",
+      "description": "round metal biscuit tin, painted blue, with a dented lid and a rattle of treats inside"
+    }
+  ],
+  "locations": [
+    {
+      "id": "LOC001",
+      "name": "Fislisbach lanes",
+      "pages": [1, 2, 3, 4],
+      "scaleClass": "landmark",
+      "setting": "outdoor village lanes on a hillside, autumn",
+      "colors": "cream plaster walls, green hedges, orange and brown fallen leaves, grey stone",
+      "features": "steep sloping lane between low hedges and garden walls, a low stone wall at the bottom where three narrow paths meet",
+      "signatureElement": "low stone wall at the bottom corner",
+      "isRealLandmark": true,
+      "landmarkQuery": "Fislisbach (Stadt)",
+      "landmarkPhoto": "none"
+    },
+    {
+      "id": "LOC002",
+      "name": "Kirche Rohrdorf",
+      "pages": [5, 6],
+      "scaleClass": "house-height",
+      "setting": "outdoor church on a hillside, autumn",
+      "colors": "white concrete, grey gravel path, green grass, bronze-brown autumn trees",
+      "features": "plain modern white church building with a tall detached concrete bell pillar",
+      "signatureElement": "tall detached concrete bell pillar",
+      "isRealLandmark": true,
+      "landmarkQuery": "Kirche Rohrdorf",
+      "landmarkPhoto": 1
+    }
+  ],
+  "backgrounds": [
+    {
+      "pages": [1, 2],
+      "description": "A steep village lane sloping downhill between low green hedges and cream garden walls. Wet grey stone path strewn with orange leaves, a row of parked bicycles near a gate, the lane bending out of sight at the bottom. Overcast autumn sky, soft light from above. Wide view down the slope with open path in the foreground.",
+      "landmarkPhoto": "none"
+    },
+    {
+      "pages": [3, 4],
+      "description": "The bottom of the lane where three narrow paths meet beside a low grey stone wall. Beyond the wall a road runs past with bare trees and damp fallen leaves at its edge. A hedge gap opens onto a field. Overcast light, cool grey tones. Open paved ground in front of the wall.",
+      "landmarkPhoto": "none"
+    },
+    {
+      "pages": [5, 6],
+      "description": "A gravel path climbing toward a white concrete church with a plain modern building and a tall detached concrete bell pillar, set on a grassy hillside. Autumn trees with bronze-brown leaves line the path, and a low garden gate stands at the side. Soft afternoon light. Open gravel path in the foreground.",
+      "landmarkPhoto": 1
+    }
+  ]
+}
+```
+
+---COVER SCENE---
+```json
+{
+  "title": "Lily and the Rattling Biscuit Tin",
+  "scene": {
+    "imageSummary": "Lily stands on the gravel path at the foot of the church steps, holding the lead firmly in both hands while the biscuit tin is tucked under her arm. Pippa sits calmly beside her, and the tall white church rises behind them under a clear sky.",
+    "setting": {
+      "location": "Kirche Rohrdorf [LOC002]",
+      "indoorOutdoor": "outdoor",
+      "description": "white concrete church with a tall detached bell pillar on a grassy hillside, gravel path, bronze-brown autumn trees, orange leaves on the ground",
+      "lighting": "soft clear afternoon light from the left",
+      "camera": "wide",
+      "depthLayers": "foreground gravel path and fallen leaves, midground Lily and Pippa at the church steps, background white church with bell pillar and autumn trees"
+    },
+    "timeOfDay": "afternoon",
+    "weather": "clear",
+    "characters": [
+      {
+        "id": null,
+        "name": "Lily",
+        "position": "center",
+        "action": "stands at the foot of the church steps holding the lead in both hands, the biscuit tin tucked under one arm",
+        "expression": "confident, lips set in a small smile",
+        "clothing": "standard"
+      }
+    ],
+    "objects": [
+      {"id": "LOC002", "name": "Kirche Rohrdorf", "position": "background"},
+      {"id": "ANI001", "name": "Pippa", "position": "right, sitting beside Lily's leg"},
+      {"id": "ART001", "name": "biscuit tin", "position": "under Lily's arm"}
+    ]
+  }
+}
+```
+
+---STORY PAGES---
+
+--- Page 1 ---
+TEXT:
+Pippa pulled hard on the lead, nose down, sniffing every wet leaf along the lane. Lily leaned back, dug her heels in and held on with both hands. Inside her canvas bag, the biscuit tin of treats knocked against her hip with every step. Pippa always stopped when that tin rattled. Ahead, the white tower of Kirche Rohrdorf rose above the hedges, and the lane flattened out near the top of the hill. Then a strong gust of wind swept up the slope. It tore the lead out of Lily's fingers. Pippa gave a joyful bark and shot off down the hill, the lead snaking behind her across the wet stones.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Lily leans back with both hands out toward the lead as a gust tears it from her grip, while Pippa, a sandy-brown dog with a red collar, bolts down the sloping lane. Overcast light, bare hedges and wet orange leaves on the path.","setting":{"location":"Fislisbach lanes [LOC001]","indoorOutdoor":"outdoor","description":"steep village lane sloping downhill between low hedges and cream garden walls, wet grey stone path strewn with orange leaves, white church tower visible above the hedges at the top of the hill","lighting":"soft overcast afternoon light from above","camera":"medium","depthLayers":"foreground Lily on the wet path, midground Pippa racing downhill, background hedges, garden walls and a few distant passers-by"},"timeOfDay":"afternoon","weather":"windy","characters":[{"id":null,"name":"Lily","position":"left","action":"leans back and reaches toward the lead as it is torn away","expression":"determined, eyes narrowed","clothing":"standard","depth":"foreground","perspective":"front"}],"objects":[{"id":"ANI001","name":"Pippa","position":"right, midground, bounding down the lane"}],"interactions":[{"character":"Lily","object":"lead","where":"reaches after the lead as it slips from her grip","priority":"essential"}],"background":"a few distant passers-by","population":"ambient"}}
+```
+
+--- Page 2 ---
+TEXT:
+Calling Pippa's name, Lily ran down the hill after her. Pippa did not look back. Her tail streamed out and her paws kicked up orange leaves as she raced past the garden walls and a row of parked bicycles. Lily's shoes slapped on the stones, and her bag thumped against her side. The lead bounced over the leaves behind her. "Pippa, stop!" she shouted, but the lane only carried her voice back up the hill. At the bottom, Pippa swung round the corner and vanished from sight. Lily ran harder, her breath coming fast, and reached the bend just a moment later.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Lily runs down the sloping lane with her arms pumping and her bag bouncing at her hip, while Pippa races ahead and swings round the lower bend. Overcast light, orange leaves kicked up on the wet stones.","setting":{"location":"Fislisbach lanes [LOC001]","indoorOutdoor":"outdoor","description":"steep village lane sloping downhill between low hedges and cream garden walls, a row of parked bicycles by a gate, wet grey stone path with orange leaves, the lane bending out of sight at the bottom","lighting":"soft overcast afternoon light from above","camera":"medium","depthLayers":"foreground Lily running on the wet stones, midground parked bicycles and garden walls, background Pippa rounding the lower bend"},"timeOfDay":"afternoon","weather":"windy","characters":[{"id":null,"name":"Lily","position":"left","action":"runs downhill after the dog with her arm stretched forward","expression":"breathless, determined","clothing":"standard","depth":"foreground","perspective":"front"}],"objects":[{"id":"ANI001","name":"Pippa","position":"right, background, rounding the lower bend"}],"interactions":[{"character":"Lily","object":"lead","where":"runs after the trailing lead","priority":"essential"}],"background":"a few distant passers-by","population":"ambient"}}
+```
+
+--- Page 3 ---
+TEXT:
+At the bottom of the lane, three narrow paths met beside a low stone wall. Lily reached the wall out of breath. Pippa was nowhere to be seen. Lily ran to the first path and looked along it, then to the second, then to the third. No dog came trotting back, and the only sound was a car passing on the road beyond the wall. Lily sat down on the wall with the bag in her lap and stared at the road. She called Pippa's name twice more. Nothing answered, and no ears appeared round the hedge. Her shoes scuffed the wet stone.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Lily sits on the low stone wall at the bottom of the lane with the biscuit tin held in both hands in her lap, her eyes fixed on the road beyond the wall. The three paths stretch empty behind her. Overcast light, grey stone, bare trees.","setting":{"location":"Fislisbach lanes [LOC001]","indoorOutdoor":"outdoor","description":"low grey stone wall where three narrow paths meet at the bottom of the hill, a road beyond the wall with bare trees and damp fallen leaves, a hedge gap opening onto a field","lighting":"cool overcast afternoon light from above","camera":"medium","depthLayers":"foreground Lily on the wall, midground the low stone wall and three paths, background the road, bare trees and hedge gap"},"timeOfDay":"afternoon","weather":"overcast","characters":[{"id":null,"name":"Lily","position":"center","action":"sits on the low wall holding the biscuit tin in her lap","expression":"worried, lips pressed together, eyes on the road","clothing":"standard","depth":"foreground","perspective":"front"}],"objects":[{"id":"ART001","name":"biscuit tin","position":"in Lily's lap"}],"interactions":[{"character":"Lily","object":"biscuit tin","where":"holds the biscuit tin in both hands in her lap","priority":"essential"}],"background":"a car passing on the road beyond the wall","population":"ambient"}}
+```
+
+--- Page 4 ---
+TEXT:
+After a moment, Lily opened the bag and took out the biscuit tin. She stood up beside the wall, held the tin at arm's length and shook it hard. The treats rattled loudly against the metal. Lily shook it again, longer this time, and kept her eyes on the middle path. Then she walked to the corner where the paths met and shook it once more. Far up the middle path, a bark rang out, but no dog came into view. Lily's arm ached from the shaking, but she did not stop. Her bag lay open on the wall.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Lily stands at the corner where the paths meet and holds the blue biscuit tin at arm's length, shaking it toward the middle path. Her open bag rests on the wall behind her. Overcast light, grey stone and bare hedges.","setting":{"location":"Fislisbach lanes [LOC001]","indoorOutdoor":"outdoor","description":"the corner where three narrow paths meet beside a low grey stone wall, the middle path climbing away between green hedges, damp fallen leaves on the paving","lighting":"cool overcast afternoon light from above","camera":"medium","depthLayers":"foreground Lily at the corner with the tin, midground the low stone wall with the open bag, background the middle path climbing between hedges"},"timeOfDay":"afternoon","weather":"overcast","characters":[{"id":null,"name":"Lily","position":"center","action":"stands at the corner shaking the biscuit tin at arm's length toward the middle path","expression":"focused, eyes on the path","clothing":"standard","depth":"foreground","perspective":"front"}],"objects":[{"id":"ART001","name":"biscuit tin","position":"held out at arm's length in Lily's hand"}],"interactions":[{"character":"Lily","object":"biscuit tin","where":"shakes the biscuit tin at arm's length","priority":"essential"}],"background":"a few distant passers-by","population":"ambient"}}
+```
+
+--- Page 5 ---
+TEXT:
+"Come on, Pippa," Lily called, and she climbed the middle path, shaking the tin at every corner. At the first bend nothing happened. At the second bend she shook it harder. The tin rattled again in Lily's hand, and the sound carried up the path. Far above, Pippa stood beside a garden gate, and at the sound she turned round. She came bounding down the lane with her ears flying and leapt straight into Lily's arms. Lily caught her, then held the trailing lead tight. Lily had kept her eyes on the gate the whole climb.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Pippa leaps down the gravel lane toward Lily, ears flying, and Lily catches her in her arms at the foot of the path below the white church. Overcast light, bare trees and a low garden gate beside the path.","setting":{"location":"Kirche Rohrdorf [LOC002]","indoorOutdoor":"outdoor","description":"gravel path climbing toward a white concrete church with a tall detached bell pillar, low garden gate at the side, autumn trees with bronze-brown leaves, grass bank","lighting":"soft overcast afternoon light from above","camera":"medium","depthLayers":"foreground Lily on the gravel path, midground Pippa leaping down the lane, background the garden gate, autumn trees and white church with bell pillar"},"timeOfDay":"afternoon","weather":"overcast","characters":[{"id":null,"name":"Lily","position":"left","action":"catches the leaping dog in her arms","expression":"startled and smiling","clothing":"standard","depth":"foreground","perspective":"front"}],"objects":[{"id":"ANI001","name":"Pippa","position":"center, midground, leaping down the lane toward Lily"}],"interactions":[{"character":"Lily","object":"Pippa","where":"catches Pippa in her arms","priority":"essential"}],"background":"a few distant passers-by","population":"ambient"}}
+```
+
+--- Page 6 ---
+TEXT:
+At the top of the path, the white church tower stood against the sky. Lily walked up the last stretch with Pippa trotting at her side. She held the lead in both hands and did not let it slip, even when a gust pushed against her. At the church gate, she stopped and turned to face the steps. "Good girl, Pippa," she said, and Pippa sat down beside her leg. Pippa's tail swept the gravel as she settled. Lily stood a little taller. Lily kept the lead tight as they climbed the church steps together.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Lily stands at the church gate facing the steps, holding the lead in both hands, while Pippa sits beside her leg. The white concrete church rises behind them under a clear afternoon sky.","setting":{"location":"Kirche Rohrdorf [LOC002]","indoorOutdoor":"outdoor","description":"white concrete church with a tall detached bell pillar on a grassy hillside, a low garden gate, gravel path leading to steps, autumn trees with bronze-brown leaves","lighting":"soft clear afternoon light from the left","camera":"medium","depthLayers":"foreground gravel path and the gate, midground Lily and Pippa at the steps, background the white church with bell pillar and autumn trees"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Lily","position":"center","action":"stands at the church gate holding the lead in both hands, facing the steps","expression":"calm, chin up, a small smile","clothing":"standard","depth":"foreground","perspective":"front"}],"objects":[{"id":"ANI001","name":"Pippa","position":"right, sitting beside Lily's leg"}],"interactions":[{"character":"Lily","object":"lead","where":"holds the lead in both hands","priority":"essential"}],"background":"a few distant passers-by","population":"ambient"}}
+```

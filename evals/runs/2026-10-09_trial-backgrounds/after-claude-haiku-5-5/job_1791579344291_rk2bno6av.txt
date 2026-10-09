@@ -1,0 +1,193 @@
+---TITLE---
+TITLE: Lukas und die Rettungsmission im Hof
+
+---VISUAL BIBLE---
+```json
+{
+  "secondaryCharacters": [
+    {
+      "id": "CHR001",
+      "name": "Nora",
+      "pages": [1, 2, 3, 4, 5, 6],
+      "scaleClass": "waist-high",
+      "age": "a girl of about six",
+      "build": "small, slim, about the height of a young child",
+      "hair": "dark brown, shoulder-length, tied in a loose ponytail",
+      "face": "brown eyes, a few freckles across the nose",
+      "signatureLook": "a purple knitted hat",
+      "clothing": "purple jacket, grey leggings, brown shoes"
+    }
+  ],
+  "animals": [
+    {
+      "id": "ANI001",
+      "name": "Eli",
+      "pages": [6],
+      "scaleClass": "hand-sized",
+      "generic": false,
+      "species": "plush teddy bear",
+      "coloring": "light brown plush with a slightly darker muzzle patch",
+      "anatomy": "one head, two round ears, two arms, two legs",
+      "features": "small red ribbon tied around the neck, worn seams"
+    },
+    {
+      "id": "ANI002",
+      "name": "grey squirrel",
+      "pages": [1, 2],
+      "scaleClass": "palm-sized",
+      "generic": false,
+      "species": "grey squirrel",
+      "coloring": "grey-brown fur with a pale cream belly",
+      "anatomy": "four legs, one long bushy tail, two small rounded ears",
+      "features": "dark curved claws on all four feet"
+    }
+  ],
+  "artifacts": [
+    {
+      "id": "ART001",
+      "label": "cloth drawstring bag",
+      "name": "small cloth drawstring bag",
+      "pages": [1, 2, 3, 4, 5, 6],
+      "scaleClass": "hand-sized",
+      "generic": false,
+      "type": "bag",
+      "description": "small beige cotton bag with a dark brown drawstring cord that closes the opening",
+      "states": [
+        {"name": "full", "delta": "bulging with toy figures, cord pulled tight", "pages": [6]}
+      ]
+    },
+    {
+      "id": "ART002",
+      "label": "yellow-belted toy figure",
+      "name": "small plastic superhero toy figure",
+      "pages": [4, 5, 6],
+      "scaleClass": "palm-sized",
+      "generic": false,
+      "type": "toy figure",
+      "description": "small plastic superhero figure with a blue cape and a bright yellow belt across the waist"
+    }
+  ],
+  "locations": [
+    {
+      "id": "LOC001",
+      "name": "Hof des Grossmünsters",
+      "pages": [1, 2, 3, 4, 5, 6],
+      "scaleClass": "landmark",
+      "setting": "outdoor, stone courtyard in front of a church",
+      "colors": "cream-coloured stone, grey paving, gold and yellow linden leaves, blue and white flags",
+      "features": "twin cream towers with pyramidal cupolas, a large linden tree, a row of wooden benches, a low stone kerb along the paving",
+      "signatureElement": "twin towers with pyramidal cupolas topped by flags",
+      "isRealLandmark": true,
+      "landmarkQuery": "Grossmünster",
+      "landmarkPhoto": 1
+    }
+  ],
+  "backgrounds": [
+    {
+      "pages": [1, 2],
+      "landmarkPhoto": 1,
+      "description": "The courtyard of the Grossmünster in autumn: grey stone paving scattered with yellow linden leaves, a row of wooden benches under a large linden tree on the left, the twin cream towers with pyramidal cupolas and blue and white flags rising at the back. Warm afternoon light from the upper left. Wide view with open paving in the centre. A few distant passers-by in grey and brown coats cross the far side."
+    },
+    {
+      "pages": [3, 4],
+      "landmarkPhoto": "none",
+      "description": "Close view of the base of a wooden bench and the stone kerb beside the paving. A narrow gap runs between the bench foot and a flat grey stone slab. Fallen linden leaves are banked against the kerb in yellow and brown. Low side light in the late afternoon. Open paving in front. A few distant passers-by in grey and brown coats cross the far side."
+    },
+    {
+      "pages": [5, 6],
+      "landmarkPhoto": 3,
+      "description": "The bench row and the linden trunk seen from the path. Twin stone towers with cupolas stand against a clear blue sky above the roofs. The paving is swept clear of leaves, and the path runs open across the courtyard. Afternoon light. A few distant passers-by in grey and brown coats cross the far side."
+    }
+  ]
+}
+```
+
+---COVER SCENE---
+```json
+{
+  "title": "Lukas und die Rettungsmission im Hof",
+  "scene": {
+    "imageSummary": "Lukas in a bright red bodysuit with a blue cape, blue boots, a yellow utility belt and a yellow emblem on his chest stands tall in the middle of the courtyard, holding the small beige cloth bag up in one hand. Golden linden leaves lie across the paving and the twin towers rise behind him under a clear blue sky.",
+    "setting": {
+      "location": "Hof des Grossmünsters [LOC001]",
+      "indoorOutdoor": "outdoor",
+      "description": "Stone courtyard with grey paving, yellow linden leaves, benches and the twin cream towers with pyramidal cupolas and flags",
+      "lighting": "warm afternoon sun from the upper left",
+      "camera": "wide",
+      "depthLayers": "foreground: scattered leaves and paving; midground: Lukas standing in the open courtyard; background: linden tree and the twin towers"
+    },
+    "timeOfDay": "afternoon",
+    "weather": "clear",
+    "characters": [
+      {
+        "id": null,
+        "name": "Lukas",
+        "position": "center",
+        "action": "stands tall with the cloth bag raised in one hand",
+        "expression": "confident",
+        "clothing": "costumed"
+      }
+    ],
+    "objects": [
+      {"id": "LOC001", "name": "Hof des Grossmünsters", "position": "background"},
+      {"id": "ART001", "name": "cloth drawstring bag", "position": "raised in Lukas's hand"}
+    ]
+  }
+}
+```
+
+---STORY PAGES---
+
+--- Page 1 ---
+TEXT:
+Das Eichhörnchen sprang von der Linde auf die Bank und packte den Beutel, den Lukas seiner Nachbarin Nora gerade hinhalten wollte. Die Kordel rutschte aus Lukas' Hand. Der Beutel kippte, und die zwölf Spielzeugfiguren kullerten über das gelbe Laub im Hof des Grossmünsters. Eine landete am Trottoir, andere verschwanden unter der Bank, und eine blieb am Fuss der Linde liegen. Das Eichhörnchen liess den leeren Beutel fallen und kletterte mit einem Satz zurück auf den Ast. «Oh nein!», rief Nora und blieb wie angewurzelt stehen. Lukas aber lief schon los, bevor sie den Satz beendet hatte.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Lukas in a bright red bodysuit with a blue cape, blue boots, a yellow utility belt and a yellow emblem on his chest lunges across the courtyard toward the bench, one arm stretched out, as a grey squirrel leaps down from the linden with the cloth bag in its claws. Toy figures lie scattered across the yellow leaves. Nora stands at the end of the bench and watches.","setting":{"location":"Hof des Grossmünsters [LOC001]","indoorOutdoor":"outdoor","description":"Stone courtyard with grey paving, yellow linden leaves scattered across the ground, a row of wooden benches, twin cream towers with pyramidal cupolas and flags at the back","lighting":"warm low afternoon sun from the upper left","camera":"medium","depthLayers":"foreground: scattered toy figures and leaves; midground: Lukas lunging and Nora by the bench; background: linden tree with the squirrel and the twin towers"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Lukas","position":"left","action":"lunges toward the bench with one arm outstretched","expression":"determined","clothing":"costumed","depth":"foreground","perspective":"front"},{"id":"CHR001","name":"Nora","position":"right","action":"stands at the end of the bench and watches","expression":"startled","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[{"id":"ANI002","name":"grey squirrel","position":"on the bench seat, leaping down from the linden"},{"id":"ART001","name":"cloth drawstring bag","position":"in the squirrel's claws"},{"id":"ART002","name":"yellow-belted toy figure","position":"on the leaves at the foot of the linden"}],"interactions":[{"character":"Lukas","object":"cloth drawstring bag","where":"reaches for the bag as it is pulled away","priority":"essential"},{"character":"Nora","object":"grey squirrel","where":"watches the squirrel on the bench","priority":"low"}],"background":"a few distant passers-by in grey and brown coats cross the far side","population":"ambient"}}
+```
+
+--- Page 2 ---
+TEXT:
+«Rettungsmission!», rief Lukas und machte einen grossen Schritt in die Mitte des Hofes. «Zuerst die nahen Figuren, dann die Ecken, und jede kommt sofort in den Beutel!» Nora nickte und ging zum Stamm, wo das Laub am dicksten lag. Lukas kniete sich vor die Bank und schaute genau hin. Unter der Linde fand er einen langen, geraden Stock, der sich gut als Rettungsstab eignete. Er legte ihn oben auf die Lehne der Bank, damit er ihn gleich zur Hand hatte. Über ihnen sass das Eichhörnchen im Ast und sah zu, wie die Kinder das Laub durchwühlten. «Eins!», zählte Nora und hielt eine kleine Figur hoch.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Lukas in a bright red bodysuit with a blue cape, blue boots, a yellow utility belt and a yellow emblem on his chest kneels by the bench and lays a long stick across the top of the backrest. Nora stands at the linden trunk in the leaves holding up a small toy figure. The grey squirrel sits high on a branch above them. The cloth bag lies open on the paving.","setting":{"location":"Hof des Grossmünsters [LOC001]","indoorOutdoor":"outdoor","description":"Stone courtyard with grey paving, deep yellow linden leaves piled at the trunk, a wooden bench row, twin cream towers with cupolas and blue and white flags behind","lighting":"warm afternoon sun from the upper left","camera":"medium","depthLayers":"foreground: the open cloth bag on the paving; midground: Lukas kneeling at the bench and Nora at the trunk; background: linden branches with the squirrel and the twin towers"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Lukas","position":"left","action":"kneels by the bench and lays a long stick across the backrest","expression":"focused","clothing":"costumed","depth":"midground","perspective":"front"},{"id":"CHR001","name":"Nora","position":"right","action":"stands at the linden trunk holding up a small toy figure","expression":"proud","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[{"id":"ART001","name":"cloth drawstring bag","position":"open on the paving in front of the bench"},{"id":"ANI002","name":"grey squirrel","position":"high on a linden branch above the courtyard"}],"interactions":[{"character":"Lukas","object":"long stick","where":"lays the long stick across the top of the bench backrest","priority":"essential"},{"character":"Nora","object":"small toy figure","where":"holds up the small toy figure","priority":"normal"}],"background":"a few distant passers-by in grey and brown coats cross the far side","population":"ambient"}}
+```
+
+--- Page 3 ---
+TEXT:
+Unter dem Laub am Stamm legte Nora eine Figur nach der anderen in den Beutel. «Vier», sagte sie und strich die Blätter zur Seite. Lukas zog die Figuren unter der Bank hervor und setzte sie in die Öffnung. «Fünf, sechs, sieben, acht, neun», zählte er. Dann griff er in die Lücke am Trottoir und fand eine Figur mit einem Helm. «Zehn!» Nora zog noch eine aus dem Laub, und Lukas zählte laut mit: «Elf!» Die zwölfte fehlte, und es war Lukas' Lieblingsfigur, die mit dem gelben Gürtel. Er kniete sich hin, schaute in jede Ecke der Bank und fand nur Laub und ein Stück Papier.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Lukas in a bright red bodysuit with a blue cape, blue boots, a yellow utility belt and a yellow emblem on his chest kneels at the gap by the bench and lifts a small toy figure out from under the seat. Nora stands beside him holding the cloth bag open with both hands. Yellow leaves lie thick at the foot of the bench.","setting":{"location":"Hof des Grossmünsters [LOC001]","indoorOutdoor":"outdoor","description":"Close corner of the courtyard at the base of a wooden bench, a low stone kerb, yellow and brown linden leaves banked against it, grey paving","lighting":"low afternoon sun from the side, long soft shadows under the bench","camera":"medium","depthLayers":"foreground: leaves and the kerb; midground: Lukas kneeling and Nora holding the bag; background: the bench row and the linden trunk"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Lukas","position":"left","action":"kneels at the gap under the bench and lifts a small toy figure out","expression":"focused","clothing":"costumed","depth":"midground","perspective":"front"},{"id":"CHR001","name":"Nora","position":"right","action":"stands beside him holding the cloth bag open","expression":"concentrating","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[{"id":"ART001","name":"cloth drawstring bag","position":"held open by Nora in front of her"}],"interactions":[{"character":"Lukas","object":"small toy figure","where":"lifts the small toy figure out from under the bench","priority":"essential"},{"character":"Nora","object":"cloth drawstring bag","where":"holds the cloth drawstring bag open","priority":"normal"}],"background":"a few distant passers-by in grey and brown coats cross the far side","population":"ambient"}}
+```
+
+--- Page 4 ---
+TEXT:
+«Noch fünf Minuten!», rief Noras Mami vom Tor her. Lukas schob den Arm unter die Bank, so weit er konnte, doch seine Finger reichten nur bis zur Kante. Dort, zwischen Bankfuss und Steinplatte, lag die Figur mit dem gelben Gürtel. Nora legte sich neben ihn auf das Pflaster und streckte die Hand aus, aber die Figur rutschte nur ein Stück tiefer in den Spalt. «Sie ist zu weit weg», sagte Nora leise. Lukas setzte sich auf die Fersen und schaute auf den Beutel. Elf Figuren lagen darin, und die zwölfte war unerreichbar. «Dann suchen wir sie morgen», sagte Nora und nahm den Beutel an sich.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Lukas in a bright red bodysuit with a blue cape, blue boots, a yellow utility belt and a yellow emblem on his chest kneels on the paving with one arm pushed far under the bench. Nora lies on the paving beside him, reaching into the same gap. The yellow-belted figure lies wedged deep in the gap between the bench foot and the stone slab, out of reach.","setting":{"location":"Hof des Grossmünsters [LOC001]","indoorOutdoor":"outdoor","description":"Base of a wooden bench on grey paving, a flat grey stone slab beside it, dry yellow leaves against the kerb, a narrow dark gap under the seat","lighting":"low afternoon sun from the side, the gap under the bench in shadow","camera":"medium","depthLayers":"foreground: the stone slab and leaves; midground: Lukas kneeling and Nora lying on the paving; background: the bench row and the linden trunk"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Lukas","position":"left","action":"kneels and pushes one arm far under the bench","expression":"strained","clothing":"costumed","depth":"midground","perspective":"front"},{"id":"CHR001","name":"Nora","position":"right","action":"lies on the paving beside him reaching into the gap","expression":"worried","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[{"id":"ART002","name":"yellow-belted toy figure","position":"wedged in the gap between the bench foot and the stone slab"}],"interactions":[{"character":"Lukas","object":"yellow-belted toy figure","where":"reaches under the bench toward the toy figure","priority":"essential"},{"character":"Nora","object":"yellow-belted toy figure","where":"reaches into the gap beside him","priority":"normal"}],"background":"a few distant passers-by in grey and brown coats cross the far side","population":"ambient"}}
+```
+
+--- Page 5 ---
+TEXT:
+Auf der Lehne der Bank lag noch der Stock, den Lukas vorhin dort abgelegt hatte. Er sprang auf, griff danach und schob das Ende unter die Bank, bis es sich unter den Arm der Figur schob. Vorsichtig zog er den Stock zurück, und die Figur kam Stück für Stück aus dem Spalt. «Ich hab sie!», rief Lukas. Nora hielt den Beutel am Rand weit offen, damit er die Figur sofort hineinlegen konnte. Lukas steckte sie hinein und zählte laut: «Zwölf!» Oben im Ast sass das Eichhörnchen und beobachtete, wie Nora den Beutel fest zuzog.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Lukas in a bright red bodysuit with a blue cape, blue boots, a yellow utility belt and a yellow emblem on his chest kneels by the bench and guides the long stick under the seat, its end hooking the yellow-belted figure as it slides out of the gap. Nora holds the cloth bag wide open beside him. The grey squirrel watches from a high branch.","setting":{"location":"Hof des Grossmünsters [LOC001]","indoorOutdoor":"outdoor","description":"Base of a wooden bench on grey paving, a flat stone slab, yellow leaves at the kerb, linden branches overhead","lighting":"warm afternoon sun from the upper left, reaching under the bench","camera":"medium","depthLayers":"foreground: stone slab and leaves; midground: Lukas kneeling and Nora holding the bag; background: linden branches with the squirrel and the twin towers"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Lukas","position":"left","action":"guides the long stick under the bench to hook the figure out","expression":"focused","clothing":"costumed","depth":"midground","perspective":"front"},{"id":"CHR001","name":"Nora","position":"right","action":"holds the cloth bag wide open","expression":"hopeful","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[{"id":"ART001","name":"cloth drawstring bag","position":"held wide open by Nora"},{"id":"ART002","name":"yellow-belted toy figure","position":"under the bench, caught on the end of the long stick"},{"id":"ANI002","name":"grey squirrel","position":"high on a linden branch above"}],"interactions":[{"character":"Lukas","object":"long stick","where":"guides the long stick under the bench","priority":"essential"},{"character":"Nora","object":"cloth drawstring bag","where":"holds the cloth drawstring bag wide open","priority":"normal"}],"background":"a few distant passers-by in grey and brown coats cross the far side","population":"ambient"}}
+```
+
+--- Page 6 ---
+TEXT:
+Nora nahm den vollen Beutel entgegen und setzte sich damit auf die Bank. Eine Figur nach der anderen legte sie in die Kiste, die ihre Mami mitgebracht hatte. Die Figur mit dem gelben Gürtel kam zuletzt hinein. «Die passt ganz hinten», sagte sie und lachte. Lukas holte Eli aus dem Rucksack neben der Bank und setzte den Plüschbären auf die Lehne. «Du hast gut aufgepasst», sagte er. Dann lief er quer über den Hof bis zur Linde, wo kein Spielzeug mehr im Laub lag. «Jetzt suchst du mich!», rief Nora und sprang von der Bank. «Eins!», zählte Lukas laut und drehte sich zum Stamm.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Nora sits on the bench with a cardboard box on her lap, tipping the cloth bag into it, and she is laughing. Lukas in a bright red bodysuit with a blue cape, blue boots, a yellow utility belt and a yellow emblem on his chest sets a light brown plush teddy bear with a red ribbon on the bench backrest beside her. The paving is clear of leaves in front of the linden tree.","setting":{"location":"Hof des Grossmünsters [LOC001]","indoorOutdoor":"outdoor","description":"Wooden bench row on swept grey paving, the linden tree with clear ground beneath it, twin cream towers with cupolas and blue and white flags behind","lighting":"warm afternoon sun from the upper left","camera":"medium","depthLayers":"foreground: the cardboard box on Nora's lap; midground: Lukas beside the bench with the plush bear; background: the linden and the twin towers"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Lukas","position":"left","action":"sets the plush bear on the bench backrest","expression":"warm","clothing":"costumed","depth":"midground","perspective":"front"},{"id":"CHR001","name":"Nora","position":"right","action":"sits on the bench tipping the cloth bag into the box on her lap","expression":"laughing","clothing":"standard","depth":"foreground","perspective":"front"}],"objects":[{"id":"ANI001","name":"Eli","position":"on the bench backrest"},{"id":"ART001","name":"cloth drawstring bag","position":"tipped over the box on Nora's lap"},{"id":"ART002","name":"yellow-belted toy figure","position":"inside the box on Nora's lap, at the back"}],"interactions":[{"character":"Lukas","object":"Eli","where":"sets the plush bear on the bench backrest","priority":"essential"},{"character":"Nora","object":"cloth drawstring bag","where":"tips the cloth drawstring bag into the box on her lap","priority":"normal"}],"background":"a few distant passers-by in grey and brown coats cross the far side","population":"ambient"}}
+```

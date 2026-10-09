@@ -1,0 +1,191 @@
+---TITLE---
+TITLE: Rohan und die gestohlene Leine
+
+---VISUAL BIBLE---
+```json
+{
+  "secondaryCharacters": [
+    {
+      "id": "CHR001",
+      "name": "Fabio",
+      "pages": [1, 3, 4, 5, 6],
+      "scaleClass": "waist-high",
+      "age": "a boy of about eight",
+      "build": "slim, about as tall as Rohan",
+      "hair": "short black hair, cut straight across the forehead",
+      "face": "brown eyes, round cheeks, no facial hair",
+      "signatureLook": "a red and grey striped scarf",
+      "clothing": "dark blue jacket, dark trousers, red and grey striped scarf"
+    }
+  ],
+  "animals": [
+    {
+      "id": "ANI001",
+      "name": "Bello",
+      "pages": [1, 2, 3, 4, 5, 6],
+      "scaleClass": "knee-high",
+      "species": "medium mixed-breed dog",
+      "coloring": "light brown back with white paws and a white chest",
+      "anatomy": "four legs, one tail, two floppy ears",
+      "features": "red collar with a small metal ring"
+    }
+  ],
+  "artifacts": [
+    {
+      "id": "ART001",
+      "label": "dog leash",
+      "name": "long woven leash with a metal clip",
+      "pages": [1, 3, 4, 5, 6],
+      "scaleClass": "hand-sized",
+      "type": "dog leash",
+      "description": "a long woven red leash with a metal clip at one end and a loop at the other"
+    },
+    {
+      "id": "ART002",
+      "label": "brass magnifying glass",
+      "name": "brass magnifying glass on a chain",
+      "pages": [2, 3, 4, 5, 6],
+      "scaleClass": "palm-sized",
+      "type": "magnifying glass",
+      "slot": "accessories",
+      "wornAs": "Rohan.accessories",
+      "back": "fine brass chain hanging down the back of the neck",
+      "description": "round brass magnifying glass in a brass rim on a long fine brass chain ending in a small hook"
+    }
+  ],
+  "locations": [
+    {
+      "id": "LOC001",
+      "name": "Kapellbrücke",
+      "pages": [2, 3, 4, 5, 6],
+      "scaleClass": "house-height",
+      "setting": "covered wooden bridge over the Reuss river, outdoor walkway and timber-beamed interior",
+      "colors": "red-tiled roof, dark brown timber, pink flowers on the railings, grey water",
+      "features": "timber roof beams, railings with gaps between posts, central stone water tower, town and mountains beyond the water",
+      "signatureElement": "the central water tower",
+      "isRealLandmark": true,
+      "landmarkQuery": "Kapellbrücke",
+      "landmarkPhoto": 1
+    },
+    {
+      "id": "LOC002",
+      "name": "Kapellplatz",
+      "pages": [1],
+      "scaleClass": "house-height",
+      "setting": "outdoor stone square, town centre",
+      "colors": "warm grey cobbles, cream and ochre house fronts, yellow autumn leaves",
+      "features": "round stone fountain, plane trees, the entrance to the covered bridge at the far edge",
+      "signatureElement": "the round stone fountain",
+      "isRealLandmark": false,
+      "landmarkQuery": null
+    }
+  ],
+  "backgrounds": [
+    {
+      "pages": [1],
+      "description": "An open stone square with cobbled ground and a round stone fountain near the centre. Cream and ochre house fronts line the far side, and autumn trees drop yellow leaves beside the fountain. Clear afternoon sunlight falls from the left over open cobbles in the foreground, with the entrance to a covered wooden bridge visible at the far edge. Wide medium shot."
+    },
+    {
+      "pages": [2, 6],
+      "landmarkPhoto": 1,
+      "description": "The covered wooden bridge with its red-tiled roof, central water tower and pink flowers along the railings, seen from its entrance, with the water and the town beyond. Clear afternoon light. Open wooden walkway planks in the foreground."
+    },
+    {
+      "pages": [3, 4, 5],
+      "landmarkPhoto": 2,
+      "description": "The inside of the covered wooden bridge: a long walkway of dark timber planks under a row of timber roof beams, a railing along one side with gaps between its posts, daylight coming through the openings at the far end, and the water visible below the gaps. Muted warm wood colours."
+    }
+  ]
+}
+```
+
+---COVER SCENE---
+```json
+{
+  "title": "Rohan und die gestohlene Leine",
+  "scene": {
+    "imageSummary": "Rohan stands on the wooden walkway of the covered bridge in a brown tweed jacket over a white shirt, dark brown trousers and black polished shoes, with a brass magnifying glass on a chain at his chest. He raises the magnifying glass toward the light while Bello sits beside him on the planks. Warm afternoon light, pink flowers on the railings, the water and town behind.",
+    "setting": {
+      "location": "Kapellbrücke [LOC001]",
+      "indoorOutdoor": "outdoor",
+      "description": "covered wooden bridge with red-tiled roof, central water tower, pink flowers on the railings, river and town beyond",
+      "lighting": "clear afternoon sunlight from the right, warm on the timber",
+      "camera": "wide",
+      "depthLayers": "foreground bridge planks with Bello, midground Rohan at the railing, background the water tower and the town"
+    },
+    "timeOfDay": "afternoon",
+    "weather": "clear",
+    "characters": [
+      {
+        "id": null,
+        "name": "Rohan",
+        "position": "center",
+        "action": "raises the magnifying glass on its chain toward the light",
+        "expression": "determined",
+        "clothing": "costumed"
+      }
+    ],
+    "objects": [
+      {"id": "LOC001", "name": "Kapellbrücke", "position": "background"},
+      {"id": "ANI001", "name": "Bello", "position": "foreground, sitting beside Rohan"},
+      {"id": "ART002", "name": "brass magnifying glass", "position": "held up in Rohan's hand"}
+    ]
+  }
+}
+```
+
+---STORY PAGES---
+
+--- Page 1 ---
+TEXT:
+«Bello, bleib bei mir!», rief Rohan und hielt die Leine fest in der Hand. Heute begann die Detektivrunde, und Bello sollte als Erster den Spuren folgen. Am Morgen hatte Fabio aus seiner Klasse gefragt, ob er mitkommen dürfe. Rohan hatte Nein gesagt, weil ein Detektiv allein mit seinem Hund arbeitet. Jetzt stand er auf dem Kapellplatz, und Bello schnupperte am Brunnenrand. Rohan wandte sich kurz zu einer Taube um. In diesem Augenblick riss jemand die Leine aus seiner Hand, und ein Junge rannte los, Richtung Kapellbrücke. Bello bellte und zog ihm nach.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Rohan, in everyday modern clothes of a dark blue jacket and jeans, turns his head toward a pigeon while his hand is wrenched away from the red dog leash. Fabio, in a dark jacket and a red and grey striped scarf, runs away toward the covered bridge holding the leash. Bello pulls after him beside the stone fountain. Clear afternoon light, yellow leaves on the cobbles.","setting":{"location":"Kapellplatz [LOC002]","indoorOutdoor":"outdoor","description":"open stone square, warm grey cobbles, round stone fountain, cream and ochre house fronts, autumn trees","lighting":"clear afternoon sunlight from the left, long soft shadows","camera":"medium","depthLayers":"foreground cobbles with Rohan, midground the fountain and Bello, background the boy running toward the covered bridge entrance"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Rohan","position":"left","action":"reaches toward the leash while turning his head toward a pigeon","expression":"startled","clothing":"standard","depth":"foreground","perspective":"front"},{"id":"CHR001","name":"Fabio","position":"right","action":"runs away holding the leash","expression":"determined","clothing":"standard","depth":"background","perspective":"back view"}],"objects":[{"id":"ANI001","name":"Bello","position":"center, beside the fountain, pulling forward"},{"id":"ART001","name":"dog leash","position":"between Rohan and Fabio, pulled taut"}],"interactions":[{"character":"Rohan","object":"ART001","where":"reaches toward the dog leash","priority":"essential"},{"character":"Fabio","object":"ART001","where":"grips the dog leash and runs","priority":"normal"}],"background":"a few distant passers-by in grey coats near the far houses","population":"ambient"}}
+```
+
+--- Page 2 ---
+TEXT:
+Am Eingang der Kapellbrücke blieb Rohan stehen und sah sich um. Ein Detektiv durfte jetzt keine Eile zeigen. Die Reuss floss ruhig unter den Balken hindurch. Er öffnete seinen Rucksack, zog die braune Tweedjacke heraus und streifte sie über. Dann hängte er sich das Vergrösserungsglas an die lange Messingkette um den Hals, deren Ende in einem kleinen Haken endete. Bello lief bereits über die Holzbretter, die Nase dicht am Boden. Seine Spur führte direkt zur Mitte der Brücke. Rohan folgte ihm Schritt für Schritt und suchte die Bretter nach Spuren ab.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Rohan fastens the top button of his brown tweed jacket, worn over a white shirt with dark brown trousers and black polished shoes, while the brass magnifying glass on its long chain hangs at his chest. Bello runs ahead over the wooden planks with his nose low. Clear afternoon light, pink flowers on the railings, water and town beyond.","setting":{"location":"Kapellbrücke [LOC001]","indoorOutdoor":"outdoor","description":"covered wooden bridge entrance, red-tiled roof, pink flowers on the railings, timber planks, river and town beyond","lighting":"clear afternoon sunlight from the right, warm on the timber","camera":"medium","depthLayers":"foreground bridge planks, midground Rohan at the entrance and Bello running ahead, background the river and the town"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Rohan","position":"center","action":"fastens the top button of the jacket","expression":"focused","clothing":"costumed","depth":"foreground","perspective":"front"}],"objects":[{"id":"ANI001","name":"Bello","position":"midground, running ahead over the planks"},{"id":"ART002","name":"brass magnifying glass","position":"at Rohan's chest on its chain"}],"interactions":[{"character":"Rohan","object":"ART002","where":"holds the magnifying glass on its chain","priority":"essential"}],"background":"a few distant passers-by in grey coats at the far end of the bridge","population":"ambient"}}
+```
+
+--- Page 3 ---
+TEXT:
+Zwischen den alten Holzbalken hörte Rohan Bellos Pfoten auf den Brettern stoppen. Am Geländer stand ein Junge, die Leine um die Hand gewickelt, und Bello sass neben ihm. Rohan erkannte den Schal wieder, den er am Morgen im Schulhaus gesehen hatte. «Fabio, die Leine gehört mir!», rief Rohan und blieb ein paar Schritte vor ihm stehen. Fabio drehte sich um, zog die Hand mit der Leine hinter den Rücken und schwieg einen Moment. «Du hast gesagt, ich darf nicht mit», murmelte er schliesslich. Rohan streckte die Hand aus und wartete.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Rohan stands a few steps away on the timber walkway in his brown tweed jacket over a white shirt, dark brown trousers and black polished shoes, with the brass magnifying glass on its chain at his chest, one arm stretched toward Fabio. Fabio, in a dark blue jacket and a red and grey striped scarf, stands at the railing with the leash held behind his back while Bello sits at his side. Soft daylight through the far openings.","setting":{"location":"Kapellbrücke [LOC001]","indoorOutdoor":"indoor","description":"covered wooden bridge interior, dark timber planks, timber roof beams overhead, railing with gaps between the posts, daylight at the far end","lighting":"soft daylight from the far openings, warm on the wood","camera":"medium","depthLayers":"foreground Rohan's outstretched arm, midground Fabio at the railing with Bello, background the timber beams and the far daylight"},"timeOfDay":"afternoon","weather":"none","characters":[{"id":null,"name":"Rohan","position":"left","action":"reaches toward the leash behind Fabio's back","expression":"stern","clothing":"costumed","depth":"foreground","perspective":"front"},{"id":"CHR001","name":"Fabio","position":"right","action":"holds the leash behind his back at the railing","expression":"sulky, looking down","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[{"id":"ANI001","name":"Bello","position":"midground, sitting beside Fabio"},{"id":"ART001","name":"dog leash","position":"behind Fabio's back, in his hand"}],"interactions":[{"character":"Rohan","object":"ART001","where":"reaches toward the dog leash","priority":"essential"},{"character":"Fabio","object":"ART001","where":"holds the dog leash behind his back","priority":"normal"}],"background":"a few distant passers-by in grey coats near the far daylight","population":"ambient"}}
+```
+
+--- Page 4 ---
+TEXT:
+Fabio atmete tief ein. Dann hob er die Leine über das Geländer und liess sie fallen. Sie glitt zwischen den Stäben hindurch und blieb auf einem schmalen Balken unter dem Brückenboden liegen, weit ausserhalb jeder Reichweite. Rohan beugte sich vor und streckte den Arm durch die Lücke, doch seine Finger berührten nur kaltes Holz. Fabio rannte bereits zum anderen Ende der Brücke. Vom Turm schlug die Glocke fünf. Mama hatte gesagt, er müsse vor sechs Uhr zu Hause sein. Bello winselte am Geländer.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Rohan leans over the railing in his brown tweed jacket, dark brown trousers and black polished shoes, with the brass magnifying glass on its chain swinging at his chest, and stretches one arm down through a gap between the posts. The red dog leash lies on a narrow timber beam far below the walkway. Bello sits whining at the railing. Fabio runs away toward the far end of the bridge.","setting":{"location":"Kapellbrücke [LOC001]","indoorOutdoor":"indoor","description":"covered wooden bridge interior, dark timber planks, timber roof beams overhead, railing with gaps between the posts, water visible below the gaps, daylight at the far end","lighting":"soft daylight from the far openings, cool grey on the water below","camera":"medium","depthLayers":"foreground Rohan at the railing, midground Bello sitting by the railing, background the leash on the beam below and Fabio running toward the far end"},"timeOfDay":"afternoon","weather":"none","characters":[{"id":null,"name":"Rohan","position":"left","action":"leans over the railing with one arm stretched down through the gap toward the leash","expression":"strained","clothing":"costumed","depth":"foreground","perspective":"side"},{"id":"CHR001","name":"Fabio","position":"right","action":"runs away toward the far end of the bridge","expression":"guilty","clothing":"standard","depth":"background","perspective":"back view"}],"objects":[{"id":"ANI001","name":"Bello","position":"midground, sitting by the railing"},{"id":"ART001","name":"dog leash","position":"on a narrow timber beam below the walkway, out of reach"},{"id":"ART002","name":"brass magnifying glass","position":"at Rohan's chest on its chain"}],"interactions":[{"character":"Rohan","object":"ART001","where":"stretches an arm through the gap between the railing posts toward the dog leash","priority":"essential"}],"background":"a few distant passers-by in grey coats near the far daylight","population":"ambient"}}
+```
+
+--- Page 5 ---
+TEXT:
+Rohan richtete sich auf und dachte an die lange Messingkette mit dem kleinen Haken am Ende. Er nahm das Vergrösserungsglas vom Hals, schob den Arm durch den Spalt zwischen den Geländerstäben und liess den Haken langsam hinab. Der Haken pendelte über dem Balken, fand die Schlaufe der Leine und blieb darin hängen. Vorsichtig zog Rohan die Kette hoch, bis die Leine über das Geländer kam und daran hin und her schwang. «Pass auf, sonst fällst du ins Wasser!», rief Fabio vom anderen Ende der Brücke, wohin er zurückgekommen war.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Rohan leans over the railing in his brown tweed jacket, dark brown trousers and black polished shoes, and lowers the chain of the brass magnifying glass through a gap between the posts, its small hook swinging toward the leash. The red dog leash hangs from the hook above the timber beam below the walkway. Bello sits by the railing. Fabio stands at the far end of the bridge, calling out.","setting":{"location":"Kapellbrücke [LOC001]","indoorOutdoor":"indoor","description":"covered wooden bridge interior, dark timber planks, timber roof beams overhead, railing with gaps between the posts, water visible below the gaps, daylight at the far end","lighting":"soft daylight from the far openings, cool grey on the water below","camera":"medium","depthLayers":"foreground Rohan at the railing with the chain, midground Bello by the railing, background the leash on the beam and Fabio at the far end","},"timeOfDay":"afternoon","weather":"none","characters":[{"id":null,"name":"Rohan","position":"left","action":"lowers the chain of the magnifying glass through the gap between the railing posts","expression":"focused","clothing":"costumed","depth":"foreground","perspective":"side"},{"id":"CHR001","name":"Fabio","position":"right","action":"stands at the far end of the bridge, calling out","expression":"worried","clothing":"standard","depth":"background","perspective":"front"}],"objects":[{"id":"ANI001","name":"Bello","position":"midground, sitting by the railing"},{"id":"ART001","name":"dog leash","position":"hanging from the chain's hook, dangling below the walkway above the beam"},{"id":"ART002","name":"brass magnifying glass","position":"held in Rohan's hand, its chain running down through the railing"}],"interactions":[{"character":"Rohan","object":"ART002","where":"lowers the magnifying glass chain through the gap between the railing posts","priority":"essential"}],"background":"a few distant passers-by in grey coats near the far daylight","population":"ambient"}}
+```
+
+--- Page 6 ---
+TEXT:
+Auf der Brücke kam Fabio langsam näher. Er löste die Leine vom Haken, hielt sie Rohan hin und sah dabei zu Boden. «Die gehört dir», sagte er leise. Rohan nahm sie entgegen, kniete sich vor Bello hin und klinkte den Karabiner ans Halsband. Bello leckte ihm über die Hand und wedelte mit dem ganzen Hinterteil. Rohan stand auf, und Bello lief an seiner Seite los. Hinter ihnen blieb Fabio am Geländer stehen und sah ihnen nach. Mit geradem Rücken ging Rohan über die Brücke zurück Richtung Kapellplatz, die Leine straff in der Hand. Er hatte noch viele Spuren vor sich.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Rohan kneels on the wooden walkway in his brown tweed jacket, dark brown trousers and black polished shoes, and clips the red dog leash onto the collar of Bello, who stands beside him with his tail up. The brass magnifying glass on its chain hangs at his chest. Fabio, in a dark blue jacket and a red and grey striped scarf, stands a few steps back at the railing. Clear afternoon light, pink flowers on the railings.","setting":{"location":"Kapellbrücke [LOC001]","indoorOutdoor":"outdoor","description":"covered wooden bridge walkway, red-tiled roof edge, pink flowers on the railings, timber planks, river and town beyond","lighting":"clear afternoon sunlight from the right, warm on the timber","camera":"medium","depthLayers":"foreground Rohan kneeling with Bello, midground Fabio at the railing, background the river and the town"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Rohan","position":"left","action":"kneels and clips the leash onto the collar","expression":"proud","clothing":"costumed","depth":"foreground","perspective":"front"},{"id":"CHR001","name":"Fabio","position":"right","action":"stands a few steps back at the railing, watching","expression":"quiet","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[{"id":"ANI001","name":"Bello","position":"foreground beside Rohan, tail up"},{"id":"ART001","name":"dog leash","position":"in Rohan's hands, being clipped to the collar"},{"id":"ART002","name":"brass magnifying glass","position":"at Rohan's chest on its chain"}],"interactions":[{"character":"Rohan","object":"ART001","where":"clips the leash onto the collar","priority":"essential"},{"character":"Fabio","object":"ANI001","where":"watches Bello from a few steps back","priority":"low"}],"background":"a few distant passers-by in grey coats at the far end of the bridge","population":"ambient"}}
+```

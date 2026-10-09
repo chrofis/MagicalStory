@@ -159,7 +159,7 @@ An entry shaped like a person — an invented figure, a small winged being, a do
 **Real-world landmarks:** Any location whose name comes from (or is recognisably) an entry in the LANDMARKS section above is a real-world landmark. For every such location:
 - `"isRealLandmark": true` (not false — if you wrote the landmark's name, you picked it from the list, so it is real)
 - `"landmarkQuery"`: the exact landmark name from the LANDMARKS section. Copy it verbatim — do not paraphrase, do not drop parens, do not anglicise.
-- `"landmarkPhoto"`: the number of the photo from its PHOTOS list that the location's background shows, or `"none"` (the citation rule in the LANDMARKS section).
+- `"landmarkPhoto"`: the number of the photo from its PHOTOS list that the location's background shows, or `"none"` (the citation rule in the LANDMARKS section). It is the default for every background of that location; a background may cite another photo of its own.
 
 This is the difference between the system fetching a real Wikipedia photo of the actual building (correct) and the model inventing a generic illustration of what it thinks the building looks like (wrong). A place that exists in reality but is not listed in the LANDMARKS section stays `"isRealLandmark": false` — when in doubt, leave it false. With no LANDMARKS section, every location is false.
 
@@ -178,8 +178,9 @@ Example — picking "Kapellbrücke (Luzern) [Bridge]" from the LANDMARKS section
 Note: `name` can be styled for your story, but `landmarkQuery` must match the LANDMARKS entry character-for-character (parentheses and umlauts included).
 
 **BACKGROUNDS (style anchors for each scene):**
-Each background describes a scene with no people, no human figures. Include: location details, architecture, objects, lighting, weather, camera angle. Leave open space where characters would stand. Backgrounds can be reused across multiple pages. Every page must have a background.
-- A real landmark's background shows what the photo its location cites shows; a location citing "none" is described in words
+Each background describes a scene with no people, no human figures. Include: location details, architecture, objects, lighting, weather, camera angle. Leave open space where characters would stand. Every page is in exactly one background's `pages`; the backgrounds together cover pages 1 to {PAGES} once each.
+- The backgrounds are DIFFERENT PICTURES. Each is another place, or another part, angle or distance of one place (a wide view, a street corner, a doorway, a bridge seen from below, the water's edge). Two backgrounds a reader would call the same picture are one background too many. Several pages in one place still get different backgrounds when the story moves within it. Never split a place into backgrounds that differ only in time of day, weather or colour.
+- A real landmark's background shows what the photo it cites shows. A background on a real landmark carries its own `"landmarkPhoto"` (same rule, same PHOTOS list; omit it and the location's is used). When the landmark has several photos, give its backgrounds different ones, each described as that photo shows it; a citation of "none" is described in words
 - For indoor scenes: describe furniture, walls, lighting, floor
 - For outdoor scenes: describe landscape, sky, vegetation, architecture
 
@@ -197,7 +198,7 @@ Each background describes a scene with no people, no human figures. Include: loc
 - A name the story gives an element lives in `properName` and nowhere else — never in `label`, `name`, `description` or the page prose. One `properName` belongs to one id: two entries never share a name. An object that transforms later in the story and the creature it becomes are separate ids, and only one of them carries the name.
 - max **2 artifacts** (only props that actually drive the action across multiple scenes — not background dressing)
 - max **2 secondary characters**, and only a person who is drawn on 2 or more pages. A person who is in one page only gets no entry and no name; the prose calls them "a friend" or "a neighbour"
-- {BACKGROUND_RANGE} backgrounds (one per scene if scenes change settings, fewer if scenes share a setting)
+- exactly {BACKGROUND_COUNT} backgrounds, as the BACKGROUNDS section says
 
 Every entry costs a reference image generation pass. A {PAGES}-page story rarely benefits from more than 2 of each — pick the elements that need consistency across scenes and leave the rest as scene-prose details.
 

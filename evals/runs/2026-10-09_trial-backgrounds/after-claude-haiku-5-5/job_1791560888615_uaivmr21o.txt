@@ -1,0 +1,183 @@
+---TITLE---
+TITLE: Serafin und Mira auf dem Wachturm
+
+---VISUAL BIBLE---
+```json
+{
+  "secondaryCharacters": [
+    {
+      "id": "CHR001",
+      "name": "Mira",
+      "pages": [1, 2, 3, 4, 5, 6],
+      "scaleClass": "waist-high",
+      "age": "a girl of about five",
+      "build": "small and slender, about waist-high to a grown-up",
+      "hair": "dark brown, shoulder-length, plaited at the back",
+      "face": "brown eyes, round face, a few freckles across the nose",
+      "signatureLook": "a grey knitted cardigan worn over a yellow dress",
+      "clothing": "mustard-yellow dress, grey knitted cardigan, dark leggings, sturdy brown shoes"
+    }
+  ],
+  "animals": [],
+  "artifacts": [
+    {
+      "id": "ART001",
+      "label": "red-thread belt",
+      "name": "plain grey cotton ninja belt with a single red thread woven along its length",
+      "pages": [2, 6],
+      "scaleClass": "arm-sized",
+      "generic": false,
+      "type": "belt",
+      "slot": "belt/waist",
+      "wornAs": "Serafin.belt/waist",
+      "description": "A plain grey cotton belt with one red thread woven along its whole length, knotted at the back.",
+      "back": "grey cotton band tied in a knot at the back, a red thread running along its length"
+    },
+    {
+      "id": "ART002",
+      "label": "rope ladder",
+      "name": "rope ladder with wooden rungs",
+      "pages": [1, 4, 5, 6],
+      "scaleClass": "twice-adult-height",
+      "generic": false,
+      "type": "rope ladder",
+      "description": "A rope ladder with rough wooden rungs set between two grey rope sides.",
+      "states": [
+        {"name": "hanging", "delta": "hangs upright from the platform with its lower end free", "pages": [1, 5, 6]},
+        {"name": "fallen", "delta": "lying flat in the wet grass at the foot of the tower", "pages": [4]}
+      ]
+    }
+  ],
+  "locations": [
+    {
+      "id": "LOC001",
+      "name": "Garden with wooden watch tower",
+      "pages": [1, 4, 5, 6],
+      "scaleClass": "house-height",
+      "setting": "outdoor, autumn garden with a tall wooden watch tower",
+      "colors": "dry yellow grass, brown timber, yellow apple leaves, grey sky",
+      "features": "tall wooden watch tower with a small railed platform and a crossbeam, apple tree, wooden bench, bamboo hut at the far edge",
+      "signatureElement": "the rope ladder hanging from the platform",
+      "isRealLandmark": false,
+      "landmarkQuery": null
+    },
+    {
+      "id": "LOC002",
+      "name": "Bamboo hut",
+      "pages": [2, 3],
+      "scaleClass": "twice-adult-height",
+      "setting": "indoor, small bamboo hut with an open doorway",
+      "colors": "pale bamboo, warm honey tones, dark woven mats",
+      "features": "bamboo walls, woven floor mats, a flat basket in the corner, doorway showing the garden",
+      "signatureElement": "the flat basket of grey belts in the corner",
+      "isRealLandmark": false,
+      "landmarkQuery": null
+    }
+  ],
+  "backgrounds": [
+    {
+      "pages": [1],
+      "description": "Wide view of an autumn garden in the afternoon. A tall wooden watch tower with a small railed platform stands in the centre, a rope ladder hanging from it. An apple tree with yellow leaves and a wooden bench beside it on the right. A bamboo hut at the far edge. Dry grass in the foreground with fallen leaves. Low sun from the left, wind moving the branches. No people."
+    },
+    {
+      "pages": [2, 3],
+      "description": "Inside a small bamboo hut. Pale bamboo walls, woven mats covering the floor, a flat basket standing in the far corner. An open doorway on the right shows bright garden light and dry grass. Warm dusty light falls from the doorway across the mats. Open floor space in the centre. No people."
+    },
+    {
+      "pages": [4, 5, 6],
+      "description": "Looking up at the base of a tall wooden watch tower at dusk. Rough grey timber posts rise to a small railed platform with a crossbeam at the top. Wet grass and dead leaves cover the ground around the tower foot. Dim evening light with a deep blue sky behind the tower. Open ground in the foreground. No people."
+    }
+  ]
+}
+```
+
+---COVER SCENE---
+```json
+{
+  "title": "Serafin und Mira auf dem Wachturm",
+  "scene": {
+    "imageSummary": "Serafin stands at the foot of the wooden watch tower in a dark blue traditional ninja outfit (shinobi shozoku) with black cloth wraps on his forearms and black soft tabi boots, holding the grey cotton red-thread belt up high in one hand. The rope ladder hangs from the platform above him. Autumn dusk light, dry grass and yellow leaves around him.",
+    "setting": {
+      "location": "Garden with wooden watch tower [LOC001]",
+      "indoorOutdoor": "outdoor",
+      "description": "Autumn garden with a tall wooden watch tower, dry grass, yellow apple leaves and a bamboo hut at the far edge.",
+      "lighting": "Low evening light from the left, warm on the timber, deep blue sky behind the tower.",
+      "camera": "wide",
+      "depthLayers": "Foreground: dry grass and fallen leaves. Midground: Serafin at the tower foot. Background: the watch tower with its platform and the rope ladder, the bamboo hut at the far edge."
+    },
+    "timeOfDay": "dusk",
+    "weather": "windy",
+    "characters": [
+      {
+        "id": null,
+        "name": "Serafin",
+        "position": "center",
+        "action": "stands at the foot of the tower and holds the red-thread belt up high in one hand",
+        "expression": "determined, eyes narrowed",
+        "clothing": "costumed"
+      }
+    ],
+    "objects": [
+      {"id": "LOC001", "name": "Garden with wooden watch tower", "position": "background"},
+      {"id": "ART002", "name": "rope ladder", "position": "hanging from the platform of the tower"},
+      {"id": "ART001", "name": "red-thread belt", "position": "held up in one hand"}
+    ]
+  }
+}
+```
+
+---STORY PAGES---
+
+--- Page 1 ---
+TEXT:
+Mit einem Satz sprang Serafin über die Wurzel und packte das Seil, das von der obersten Plattform des Wachturms hing. Im dunkelblauen Ninja-Gewand zog er die Leiter zu sich, doch das lose Ende schwankte im Wind. «Ohne festen Knoten fällt sie herunter», sagte er zu sich selbst. Er brauchte seinen Gürtel mit dem roten Faden, denn der war lang und fest genug. Auf der Bank unter dem Apfelbaum sass Mira mit einem Rüebli in den Händen. «Darf ich auch auf den Turm?», fragte sie. «Nein, du bist noch zu klein», antwortete Serafin, ohne sich umzudrehen. «Immer sagst du Nein», murmelte Mira. Serafin lief zum Bambushaus, so schnell er konnte.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Serafin in a dark blue traditional ninja outfit (shinobi shozoku) with black cloth wraps on his forearms and black soft tabi boots grips the loose end of a rope ladder that swings from the platform of the wooden watch tower, leaning back against the wind. Mira sits on a wooden bench under an apple tree on the right, a carrot in her lap. Windy autumn afternoon, dry leaves on the grass.","setting":{"location":"Garden with wooden watch tower [LOC001]","indoorOutdoor":"outdoor","description":"Autumn garden with dry grass, a tall wooden watch tower with a small railed platform, an apple tree with yellow leaves, a bamboo hut at the far edge.","lighting":"Low afternoon sun from the left, long soft shadows across the grass.","camera":"medium","depthLayers":"Foreground: Serafin and the swinging ladder. Midground: the bench with Mira under the apple tree. Background: the watch tower and the bamboo hut."},"timeOfDay":"afternoon","weather":"windy","characters":[{"id":null,"name":"Serafin","position":"left","action":"grips the loose end of the rope ladder with both hands, pulling it toward himself","expression":"determined, eyes narrowed","clothing":"costumed","depth":"foreground","perspective":"front"},{"id":"CHR001","name":"Mira","position":"right","action":"sits on the bench with a carrot in her lap","expression":"lips pressed together, watching Serafin","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[{"id":"ART002","name":"rope ladder","position":"hanging from the platform, its loose end swinging in front of Serafin"}],"interactions":[{"character":"Serafin","object":"ART002","where":"grips the loose end of the rope ladder","priority":"essential"},{"character":"Mira","object":"carrot","where":"holds the carrot in her lap","priority":"low"}],"background":"empty garden","population":"cast_only"}}
+```
+
+--- Page 2 ---
+TEXT:
+Im Bambushaus roch es nach trockenem Stroh. Serafin kniete vor dem flachen Korb in der Ecke und griff hinein. Zwanzig graue Gürtel lagen darin, alle gleich grau und gleich lang. Er zog einen nach dem anderen heraus und legte ihn auf die Matte. Kein einziger trug den roten Faden. «Mira, wo ist mein Gürtel?» Mira sass auf der Matte neben der Tür und sah zu, wie die Gürtel über den Boden rutschten. Serafin kippte den ganzen Korb um. Dann zog er einen der Gürtel mit beiden Händen straff, und er hielt. «Du hast ihn versteckt», sagte er laut.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Serafin in a dark blue traditional ninja outfit (shinobi shozoku) with black cloth wraps on his forearms and black soft tabi boots kneels on the woven mats and tips over a flat basket, grey belts spilling across the floor. He pulls one grey belt taut with both hands. Mira sits on the mat by the open doorway in a mustard-yellow dress and grey cardigan, watching the belts. Warm afternoon light from the doorway.","setting":{"location":"Bamboo hut [LOC002]","indoorOutdoor":"indoor","description":"Small bamboo hut with pale bamboo walls, woven mats on the floor, a flat basket in the corner, an open doorway showing the garden.","lighting":"Warm afternoon light coming in from the doorway on the right.","camera":"medium","depthLayers":"Foreground: spilled grey belts on the mats. Midground: Serafin kneeling by the basket and Mira by the door. Background: bamboo walls and the open doorway."},"timeOfDay":"afternoon","weather":"none","characters":[{"id":null,"name":"Serafin","position":"left","action":"kneels by the tipped basket and pulls a grey belt taut with both hands","expression":"frustrated, jaw set","clothing":"costumed","depth":"midground","perspective":"front"},{"id":"CHR001","name":"Mira","position":"right","action":"sits on the mat by the doorway, watching the belts slide across the floor","expression":"lips pressed together","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[],"interactions":[{"character":"Serafin","object":"grey belt","where":"pulls a grey belt taut with both hands","priority":"essential"},{"character":"Mira","object":"grey belt","where":"watches the scattered grey belts","priority":"low"}],"background":"empty bamboo hut","population":"cast_only"}}
+```
+
+--- Page 3 ---
+TEXT:
+Serafin atmete tief durch. Dann setzte er sich neben Mira auf die Matte und legte einen Gürtel über die Knie. «Ich habe dich vergessen», sagte er ruhig. «Ich habe nie gefragt, ob du mitspielen willst, und das war nicht fair.» Mira schaute auf ihre Knie. «Hilfst du mir beim Suchen?», fragte Serafin. «Der Gürtel muss das Seil am Pfosten festbinden, sonst fällt die Leiter herunter.» Mira zog die Strickjacke enger um sich. Sie stand nicht auf, doch ihre Hand blieb unter dem Stoff. «Vielleicht», sagte sie leise.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Serafin in a dark blue traditional ninja outfit (shinobi shozoku) with black cloth wraps on his forearms and black soft tabi boots sits cross-legged on the woven mat beside Mira, a grey belt resting across his knees, and speaks calmly. Mira sits beside him in a mustard-yellow dress and grey knitted cardigan, one hand held against the cardigan at her front, looking down at her knees. Soft afternoon light from the open doorway.","setting":{"location":"Bamboo hut [LOC002]","indoorOutdoor":"indoor","description":"Small bamboo hut with pale bamboo walls, woven mats on the floor, the flat basket tipped in the corner, an open doorway showing the garden.","lighting":"Soft afternoon light from the doorway on the right.","camera":"medium","depthLayers":"Foreground: scattered grey belts on the mat. Midground: Serafin and Mira sitting side by side. Background: bamboo walls and the open doorway."},"timeOfDay":"afternoon","weather":"none","characters":[{"id":null,"name":"Serafin","position":"left","action":"sits beside Mira and rests a grey belt across his knees while speaking","expression":"calm, steady gaze","clothing":"costumed","depth":"midground","perspective":"front"},{"id":"CHR001","name":"Mira","position":"right","action":"sits beside Serafin with one hand kept under the cardigan at her front, looking down","expression":"quiet, unsure","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[],"interactions":[{"character":"Serafin","object":"grey belt","where":"rests a grey belt across his knees","priority":"normal"},{"character":"Mira","object":"cardigan","where":"holds the cardigan closed at her front with one hand","priority":"low"}],"background":"empty bamboo hut","population":"cast_only"}}
+```
+
+--- Page 4 ---
+TEXT:
+Draussen wurde das Licht schwächer. Serafin trug einen Arm voll grauer Gürtel aus dem Bambushaus, und Mira folgte ihm bis an den Rand des Grases. Sie hatten jeden der zwanzig Gürtel durchsucht, und keiner trug den roten Faden. Der Wind wurde stärker, das Seil rutschte vom Pfosten, und die Leiter fiel ins nasse Gras. Vom Haus her rief Mama, dass es bald Znacht gebe. Serafin sah auf die Leiter hinab, die jetzt am Boden lag. «Ohne den Faden kommen wir nicht hinauf», sagte er leise. Mira blickte auf ihre Strickjacke und sagte nichts.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Serafin in a dark blue traditional ninja outfit (shinobi shozoku) with black cloth wraps on his forearms and black soft tabi boots stands in the wet grass at the foot of the tower, carrying an armful of grey belts against his chest and looking down at the rope ladder lying flat in the grass. Mira in a mustard-yellow dress and grey knitted cardigan stands at the edge of the grass, looking at her cardigan. Dusk light, wind moving the dry grass, the tower rising behind them.","setting":{"location":"Garden with wooden watch tower [LOC001]","indoorOutdoor":"outdoor","description":"Autumn garden at dusk with wet grass and dead leaves at the foot of a tall wooden watch tower, a bamboo hut at the far edge.","lighting":"Dim evening light from the left, a deep blue sky behind the tower.","camera":"medium","depthLayers":"Foreground: the fallen rope ladder in the wet grass. Midground: Serafin and Mira. Background: the watch tower and its platform."},"timeOfDay":"dusk","weather":"windy","characters":[{"id":null,"name":"Serafin","position":"left","action":"carries an armful of grey belts against his chest, looking down at the fallen ladder","expression":"tired, lips set","clothing":"costumed","depth":"midground","perspective":"front"},{"id":"CHR001","name":"Mira","position":"right","action":"stands at the edge of the grass, looking at her cardigan","expression":"downcast, quiet","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[{"id":"ART002","name":"rope ladder","position":"lying flat in the wet grass at the foot of the tower"}],"interactions":[{"character":"Serafin","object":"grey belt","where":"carries an armful of grey belts against his chest","priority":"essential"},{"character":"Mira","object":"ART002","where":"watches the rope ladder lying in the grass","priority":"low"}],"background":"empty garden at the tower foot","population":"cast_only"}}
+```
+
+--- Page 5 ---
+TEXT:
+Serafin legte die grauen Gürtel auf das Gras und begann zu knoten. Er band den ersten an den zweiten, den zweiten an den dritten, bis alle zwanzig eine lange Schnur bildeten. Mira kam herbei und fasste das untere Ende der Leiter mit beiden Händen, damit sie nicht schwankte. «Halt fest», sagte Serafin. «Ich halte», antwortete Mira. Er warf das eine Ende der Schnur über den Querbalken am Pfosten, zog den Knoten fest und band die Leiter daran. Serafin hob die Leiter aus dem Gras, und Mira hielt das untere Ende, bis die Leiter gerade hing.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Serafin in a dark blue traditional ninja outfit (shinobi shozoku) with black cloth wraps on his forearms and black soft tabi boots throws one end of a long knotted line of grey belts up over the crossbeam at the top of the tower, his arm raised. Mira in a mustard-yellow dress and grey knitted cardigan grips the bottom rung of the rope ladder with both hands to keep it steady. Dusk light, wind in the dry grass.","setting":{"location":"Garden with wooden watch tower [LOC001]","indoorOutdoor":"outdoor","description":"Autumn garden at dusk beside a tall wooden watch tower with a crossbeam at the top, wet grass and dead leaves at its foot.","lighting":"Dim evening light from the left, a deep blue sky behind the tower.","camera":"medium","depthLayers":"Foreground: the lower rungs of the rope ladder and wet grass. Midground: Mira gripping the ladder and Serafin throwing the belts. Background: the tower posts and crossbeam."},"timeOfDay":"dusk","weather":"windy","characters":[{"id":null,"name":"Serafin","position":"right","action":"throws one end of a knotted line of grey belts up over the crossbeam","expression":"focused, eyes on the crossbeam","clothing":"costumed","depth":"midground","perspective":"front"},{"id":"CHR001","name":"Mira","position":"left","action":"grips the bottom rung of the rope ladder with both hands","expression":"determined, lips set","clothing":"standard","depth":"foreground","perspective":"front"}],"objects":[{"id":"ART002","name":"rope ladder","position":"hanging from the crossbeam, its lower end held by Mira"}],"interactions":[{"character":"Serafin","object":"grey belt","where":"throws one end of a knotted line of grey belts up over the crossbeam","priority":"essential"},{"character":"Mira","object":"ART002","where":"grips the bottom rung of the rope ladder with both hands","priority":"normal"}],"background":"empty garden at the tower foot","population":"cast_only"}}
+```
+
+--- Page 6 ---
+TEXT:
+Aus ihrer Strickjacke zog Mira den Gürtel hervor, und der rote Faden lief durch das Grau. «Ich habe ihn behalten», sagte sie. «Ich wollte auch einmal ein Ninja sein.» Serafin nahm den Gürtel und stieg als Erster die Leiter hinauf. Oben auf der Plattform band er ihn um seine Taille und knotete ihn am Rücken fest. «Komm, Mira», rief er hinab. Mira kletterte Sprosse um Sprosse nach, und Serafin sagte ihr laut, wo sie ihre Füsse setzen sollte. Als sie oben stand, reichte er ihr die Hand. Bevor Mama zum Znacht rief, sassen die beiden nebeneinander auf der Plattform des Wachturms. «Gut gemacht, Mira», sagte Serafin.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Serafin in a dark blue traditional ninja outfit (shinobi shozoku) with black cloth wraps on his forearms and black soft tabi boots stands at the platform edge at the top of the tower and ties a grey cotton belt with a red thread around his waist. Mira in a mustard-yellow dress and grey knitted cardigan climbs the rope ladder below him, gripping the rungs with both hands. Dusk light, wind in the dry grass far below.","setting":{"location":"Garden with wooden watch tower [LOC001]","indoorOutdoor":"outdoor","description":"Autumn garden at dusk, a tall wooden watch tower with a small railed platform, the rope ladder hanging from the platform, dry grass below.","lighting":"Dim evening light from the left, a deep blue sky behind the tower.","camera":"medium","depthLayers":"Foreground: the lower rungs of the rope ladder with Mira. Midground: the ladder and tower posts. Background: Serafin at the platform edge above."},"timeOfDay":"dusk","weather":"windy","characters":[{"id":null,"name":"Serafin","position":"right","action":"stands at the platform edge above and ties the red-thread belt around his waist","expression":"calm, focused","clothing":"costumed","depth":"background","perspective":"front"},{"id":"CHR001","name":"Mira","position":"left","action":"climbs the rope ladder, gripping its rungs with both hands","expression":"determined, looking up","clothing":"standard","depth":"foreground","perspective":"front"}],"objects":[{"id":"ART001","name":"red-thread belt","position":"tied around Serafin's waist"},{"id":"ART002","name":"rope ladder","position":"hanging from the platform, Mira on its lower rungs"}],"interactions":[{"character":"Serafin","object":"ART001","where":"ties the red-thread belt around his waist","priority":"essential"},{"character":"Mira","object":"ART002","where":"climbs the rope ladder, gripping its rungs with both hands","priority":"normal"}],"background":"empty garden at the tower foot","population":"cast_only"}}
+```

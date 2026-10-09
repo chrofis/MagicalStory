@@ -1,0 +1,165 @@
+---TITLE---
+TITLE: Serafin und der rote Faden
+
+---VISUAL BIBLE---
+```json
+{
+  "secondaryCharacters": [
+    {
+      "id": "CHR001",
+      "name": "Mira",
+      "pages": [1, 2, 3, 4, 5, 6],
+      "scaleClass": "waist-high",
+      "age": "a girl of about five",
+      "build": "small and slim, about waist-high to an adult",
+      "hair": "short dark-blond hair tied in a small ponytail",
+      "face": "brown eyes, round cheeks, a small nose",
+      "signatureLook": "a mustard-yellow tunic over brown leggings",
+      "clothing": "mustard-yellow tunic, brown leggings, soft brown slippers"
+    }
+  ],
+  "animals": [],
+  "artifacts": [
+    {
+      "id": "ART001",
+      "label": "grey ninja belt",
+      "name": "long grey cloth belt with a red thread knotted at one end",
+      "pages": [1, 5, 6],
+      "scaleClass": "forearm-sized",
+      "type": "belt",
+      "slot": "belt/waist",
+      "description": "long grey cloth belt, one end knotted with a short red thread",
+      "wornAs": "Serafin.belt/waist",
+      "back": "grey cloth band wrapped round the waist, knotted end hanging at the back"
+    }
+  ],
+  "locations": [
+    {
+      "id": "LOC001",
+      "name": "Watch tower in the Shadow Forest",
+      "pages": [6],
+      "scaleClass": "house-height",
+      "setting": "outdoor, wooden watch tower with a steep stair and railing in an autumn forest",
+      "colors": "weathered grey-brown wood, rust and gold leaves, dusk-blue sky",
+      "features": "narrow wooden stair with a handrail, loose plank on the third step, iron bell hanging in the open top",
+      "signatureElement": "iron bell in the open top of the tower",
+      "isRealLandmark": false,
+      "landmarkQuery": null
+    },
+    {
+      "id": "LOC002",
+      "name": "Bamboo house in the Shadow Forest",
+      "pages": [1, 2, 3, 4, 5],
+      "scaleClass": "house-height",
+      "setting": "indoor, one room of a bamboo house",
+      "colors": "pale bamboo, warm honey tones, woven mats in ochre and brown",
+      "features": "slatted bamboo walls, low shelf, bamboo peg on the wall, round sitting cushion",
+      "signatureElement": "slatted window letting warm light into the room",
+      "isRealLandmark": false,
+      "landmarkQuery": null
+    }
+  ],
+  "backgrounds": [
+    {
+      "pages": [1, 2, 3, 4, 5],
+      "description": "Inside a bamboo house room with pale bamboo walls, slatted windows on the left letting in warm light, woven mats in ochre and brown on the floor, a low bamboo shelf against the back wall, a bamboo peg on the wall. Open floor space in the centre for figures. Medium shot."
+    },
+    {
+      "pages": [6],
+      "description": "A watch tower of weathered grey-brown wood in a clearing of an autumn forest, with a steep wooden stair running up its side and a handrail beside it. Rust and gold leaves cover the ground, and the dusk sky above the treetops is dark blue with a last orange band of light. Open ground at the foot of the stair. Wide shot."
+    }
+  ]
+}
+```
+
+---COVER SCENE---
+```json
+{
+  "title": "Serafin und der rote Faden",
+  "scene": {
+    "imageSummary": "Serafin in a dark blue shinobi shozoku with black cloth wraps on the forearms and black soft tabi boots, bare head, stands at the foot of the watch tower in a confident pose, a long grey cloth belt at his waist with its red thread end hanging at his side. Autumn leaves cover the ground around him and the wooden tower rises behind him against a dusk-blue sky.",
+    "setting": {
+      "location": "Watch tower in the Shadow Forest [LOC001]",
+      "indoorOutdoor": "outdoor",
+      "description": "weathered grey-brown wooden watch tower with a steep stair, rust and gold autumn leaves on the ground, dark forest edge",
+      "lighting": "last orange light from the low sun on the left, dusk-blue sky above",
+      "camera": "wide",
+      "depthLayers": "foreground: fallen leaves and the first stair step; midground: Serafin at the foot of the stair; background: the tower rising into the dusk sky above the dark trees"
+    },
+    "timeOfDay": "dusk",
+    "weather": "clear",
+    "characters": [
+      {
+        "id": null,
+        "name": "Serafin",
+        "position": "center",
+        "action": "stands at the foot of the stair with one hand on his hip, looking up at the tower",
+        "expression": "confident and determined",
+        "clothing": "costumed",
+        "depth": "midground",
+        "perspective": "front"
+      }
+    ],
+    "objects": [
+      {"id": "LOC001", "name": "Watch tower in the Shadow Forest", "position": "background"},
+      {"id": "ART001", "name": "grey ninja belt", "position": "at his waist, red thread end hanging at his side"}
+    ]
+  }
+}
+```
+
+---STORY PAGES---
+
+--- Page 1 ---
+TEXT:
+Serafin stiess die Tür des Bambushauses auf und lief zum Haken an der Wand. Sein Gürtel gehörte dorthin, und er wollte ihn umbinden, bevor er zum Wachturm rannte. Am Haken hing nur ein Stück Bambus. Auf der Matte sass Mira, seine kleine Schwester, mit einem Stapel grauer Gürtel auf dem Schoss. Gerade schob sie etwas hinter ihren Rücken. Serafin dachte an den roten Faden, den er am Ende seines Gürtels geknotet hatte. Draussen stand die Sonne schon tief über dem Schattenwald. Er wollte an diesem Abend als Erster die Glocke im Wachturm läuten. «Wo ist mein Gürtel?», fragte er. Mira schwieg und schaute auf ihre Knie.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Serafin in a dark blue shinobi shozoku with black cloth wraps on the forearms and black soft tabi boots, bare head, pushes into the bamboo room and reaches toward the wall hook, which holds only a plain bamboo peg. Mira sits on a woven mat in the midground in a mustard-yellow tunic over brown leggings, a stack of grey belts in her lap and one arm tucked behind her back. Warm afternoon light falls through the slatted windows.","setting":{"location":"Bamboo house in the Shadow Forest [LOC002]","indoorOutdoor":"indoor","description":"pale bamboo walls, slatted windows, woven ochre mats, low bamboo shelf, bamboo peg on the wall","lighting":"warm light from the slatted windows on the left","camera":"medium","depthLayers":"foreground: open floor and Serafin at the doorway; midground: Mira on the mat; background: low shelf and bamboo wall"},"timeOfDay":"afternoon","weather":"none","characters":[{"id":null,"name":"Serafin","position":"left","action":"reaches toward the wall hook","expression":"eager, lips set in a firm line","clothing":"costumed","depth":"foreground","perspective":"front"},{"id":"CHR001","name":"Mira","position":"right","action":"sits on the mat holding a stack of grey belts in her lap","expression":"watchful, lips pressed shut","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[],"interactions":[{"character":"Serafin","object":"wall hook","where":"reaches toward the wall hook","priority":"essential"},{"character":"Mira","object":"stack of grey belts","where":"holds the stack of grey belts in her lap","priority":"normal"}],"background":"empty bamboo room","population":"cast_only"}}
+```
+
+--- Page 2 ---
+TEXT:
+Im Bambushaus roch es nach Stroh und feuchtem Holz. Serafin kniete sich vor den Stapel und hob einen grauen Gürtel nach dem andern hoch. Alle sahen gleich aus, und der Faden war nirgends zu sehen. «Gib mir den Stapel, Mira!», rief er. Mira hielt den Stapel weiter fest und drückte die Gürtel an ihre Brust. Sie drehte sich zur Seite. «Die gehören jetzt mir!» Serafin zog an einem Gürtel, doch Mira hielt dagegen, und der ganze Stapel rutschte auf die Matte. Schräges Licht fiel durch die Latten. «Du hast meinen Gürtel versteckt, das weiss ich genau!», sagte er laut.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Serafin in a dark blue shinobi shozoku with black cloth wraps on the forearms and black soft tabi boots, bare head, kneels on the mat and pulls at one grey belt while a loose heap of grey belts lies spread across the mat. Mira in a mustard-yellow tunic over brown leggings sits on the far side, pressing the rest of the stack to her chest and turning her shoulder away. Slanted afternoon light cuts through the bamboo slats.","setting":{"location":"Bamboo house in the Shadow Forest [LOC002]","indoorOutdoor":"indoor","description":"pale bamboo walls, slatted windows, woven ochre mats, low bamboo shelf","lighting":"slanted light through the slatted windows from the left","camera":"medium","depthLayers":"foreground: grey belts spread on the mat; midground: Serafin kneeling and Mira seated; background: bamboo wall and shelf"},"timeOfDay":"afternoon","weather":"none","characters":[{"id":null,"name":"Serafin","position":"left","action":"kneels on the mat and pulls at a grey belt","expression":"frowning, arm stretched out","clothing":"costumed","depth":"midground","perspective":"front"},{"id":"CHR001","name":"Mira","position":"right","action":"presses the stack of grey belts to her chest and turns away","expression":"jaw set, eyes on the door","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[],"interactions":[{"character":"Serafin","object":"grey belt on the mat","where":"grips a grey belt on the mat","priority":"essential"},{"character":"Mira","object":"stack of grey belts","where":"presses the stack of grey belts to her chest","priority":"essential"}],"background":"empty bamboo room","population":"cast_only"}}
+```
+
+--- Page 3 ---
+TEXT:
+«Mira», sagte Serafin leise. Er hob den letzten Gürtel auf, legte ihn auf die Matte und setzte sich neben sie. «Ich habe dich vergessen, als ich zum Spielen losging. Das war nicht richtig.» Mira schaute auf den Stapel und sagte nichts. «Kannst du mir beim Suchen helfen?», fragte er. Mira zog die Knie an. «Du spielst nie mit mir Ninja. Immer sagst du, ich bin zu klein.» Serafin nahm den ersten Gürtel und hielt ihn gegen das Licht. «Dann spielen wir heute zusammen. Such mit mir.» Mira stand auf und nahm den Stapel vom Boden. Sie legte jeden Gürtel vor sich hin.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Serafin in a dark blue shinobi shozoku with black cloth wraps on the forearms and black soft tabi boots, bare head, sits beside Mira on the mat and holds a grey belt up toward the light from the slatted window. Mira in a mustard-yellow tunic over brown leggings sits with her knees drawn up, looking at the grey belts on the mat. The mood is calm, with warm afternoon light falling across the mat.","setting":{"location":"Bamboo house in the Shadow Forest [LOC002]","indoorOutdoor":"indoor","description":"pale bamboo walls, slatted windows, woven ochre mats, low bamboo shelf","lighting":"warm light from the slatted window on the left","camera":"medium","depthLayers":"foreground: grey belts on the mat; midground: Serafin and Mira seated side by side; background: bamboo wall and shelf"},"timeOfDay":"afternoon","weather":"none","characters":[{"id":null,"name":"Serafin","position":"left","action":"sits on the mat and holds a grey belt up toward the window","expression":"calm, turned toward Mira","clothing":"costumed","depth":"foreground","perspective":"side"},{"id":"CHR001","name":"Mira","position":"right","action":"sits with her knees drawn up","expression":"guarded, watching the belts","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[],"interactions":[{"character":"Serafin","object":"grey belt","where":"holds a grey belt up toward the window","priority":"essential"},{"character":"Mira","object":"grey belts on the mat","where":"looks down at the grey belts on the mat","priority":"low"}],"background":"empty bamboo room","population":"cast_only"}}
+```
+
+--- Page 4 ---
+TEXT:
+Die Sonne sank hinter die Hügel, und durch die Latten wurde es dämmrig. Serafin und Mira suchten jeden Gürtel ab, drehten sie um und zogen die Enden auseinander. An keinem war ein roter Faden. Mira schaute unter die Matten und hinter das Regal, doch dort lag nur Staub. «Ich weiss nicht mehr, wo ich ihn hingelegt habe», sagte sie. Mira legte die Hände in den Schoss. Serafin legte den letzten Gürtel auf den Stapel. «Dann komme ich heute nicht mehr zum Turm», sagte er und blieb sitzen. Draussen wurden die Bäume grau. Vom Wachturm war kein Läuten zu hören.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Serafin in a dark blue shinobi shozoku with black cloth wraps on the forearms and black soft tabi boots, bare head, sits back on his heels on the mat with his hands resting on his knees, grey belts scattered in front of him. Mira in a mustard-yellow tunic over brown leggings stands by the low bamboo shelf and lifts the edge of a mat with one hand. Dim dusk light comes through the slatted windows and the room has grown dark.","setting":{"location":"Bamboo house in the Shadow Forest [LOC002]","indoorOutdoor":"indoor","description":"pale bamboo walls gone dim, slatted windows showing grey dusk, woven mats, low bamboo shelf","lighting":"dim grey dusk light through the slatted windows on the left","camera":"medium","depthLayers":"foreground: scattered grey belts; midground: Serafin sitting and Mira standing by the shelf; background: bamboo wall and window slats"},"timeOfDay":"dusk","weather":"none","characters":[{"id":null,"name":"Serafin","position":"left","action":"sits back on his heels with his hands on his knees","expression":"tired, gaze on the scattered belts","clothing":"costumed","depth":"midground","perspective":"front"},{"id":"CHR001","name":"Mira","position":"right","action":"lifts the edge of a mat by the shelf","expression":"searching, brow drawn","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[],"interactions":[{"character":"Serafin","object":"scattered grey belts","where":"rests his hands on his knees beside the scattered grey belts","priority":"low"},{"character":"Mira","object":"mat by the shelf","where":"lifts the edge of a mat by the shelf","priority":"essential"}],"background":"empty bamboo room","population":"cast_only"}}
+```
+
+--- Page 5 ---
+TEXT:
+Er erinnerte sich an die Stelle, an der Mira vorhin etwas hinter ihren Rücken geschoben hatte. Serafin kniete neben dem runden Sitzkissen nieder und hob es an. Darunter lag der Gürtel, und am Ende war der rote Faden zu sehen. Er erkannte ihn sofort an dem roten Knoten. «Hier ist er», sagte Serafin. Mira kam näher, nahm den Gürtel in beide Hände und reichte ihn ihm. «Er war unter meinem Kissen», sagte sie. Serafin band ihn sich um die Hüfte, zog den Knoten fest und prüfte den Sitz am Rücken. Dann stellte sich Mira neben ihn, und sie gingen hinaus.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Serafin in a dark blue shinobi shozoku with black cloth wraps on the forearms and black soft tabi boots, bare head, kneels beside a round sitting cushion and lifts it with both hands, revealing the grey belt underneath. Mira in a mustard-yellow tunic over brown leggings steps close and holds the grey belt out to him in both hands, its red thread end hanging down. Dim dusk light comes through the slatted windows.","setting":{"location":"Bamboo house in the Shadow Forest [LOC002]","indoorOutdoor":"indoor","description":"pale bamboo walls gone dim, slatted windows showing grey dusk, woven mats, low bamboo shelf, round sitting cushion on the floor","lighting":"dim dusk light through the slatted windows on the left","camera":"medium","depthLayers":"foreground: round cushion lifted by Serafin; midground: Mira holding out the belt; background: bamboo wall and shelf"},"timeOfDay":"dusk","weather":"none","characters":[{"id":null,"name":"Serafin","position":"left","action":"kneels and lifts a round cushion with both hands","expression":"focused, eyes on the belt","clothing":"costumed","depth":"foreground","perspective":"front"},{"id":"CHR001","name":"Mira","position":"right","action":"holds the grey belt out to Serafin in both hands","expression":"steady, offering the belt","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[{"id":"ART001","name":"grey ninja belt","position":"in Mira's hands, red thread end hanging down"}],"interactions":[{"character":"Serafin","object":"round cushion","where":"lifts the round cushion with both hands","priority":"essential"},{"character":"Mira","object":"grey ninja belt","where":"holds the grey ninja belt out in both hands","priority":"essential"}],"background":"empty bamboo room","population":"cast_only"}}
+```
+
+--- Page 6 ---
+TEXT:
+Am Fuss des Turms lagen die ersten Stufen im feuchten Laub. Serafin stieg hinauf, und bei der dritten Stufe bewegte sich ein Brett unter seinem Fuss. «Vorsicht», sagte Mira. «Das Brett ist locker.» Serafin wickelte das eine Ende des Gürtels um den Handlauf und zog den Knoten fest. Das andere Ende blieb an seiner Hüfte. «Halt den Gürtel fest, Mira, dann kann ich nicht fallen.» Mira packte das Band mit beiden Händen und schaute nicht nach unten. Serafin trat über das lockere Brett, und der Gürtel hielt ihn. Oben am Turm hing der Glockenstrang. «Danke, Mira», sagte Serafin. «Jetzt sind wir ein Ninja-Paar.» Gemeinsam zogen sie am Strang, bis die Glocke über den dunklen Schattenwald klang.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Serafin in a dark blue shinobi shozoku with black cloth wraps on the forearms and black soft tabi boots, bare head, climbs the wooden tower stair at dusk and ties one end of a grey cloth belt to the railing post. Mira in a mustard-yellow tunic over brown leggings stands on the lowest step below him and grips the belt with both hands, watching the loose plank on the third step. The last orange light lies on the treetops above the dark forest.","setting":{"location":"Watch tower in the Shadow Forest [LOC001]","indoorOutdoor":"outdoor","description":"weathered grey-brown wooden watch tower with a steep stair and handrail, rust and gold leaves on the ground, dark autumn trees around the clearing","lighting":"last orange light from low on the left, dusk-blue sky above","camera":"medium","depthLayers":"foreground: Mira on the lowest step and the fallen leaves; midground: Serafin on the stair with the railing post; background: the tower's open top with the iron bell and the dark trees"},"timeOfDay":"dusk","weather":"clear","characters":[{"id":null,"name":"Serafin","position":"center","action":"climbs the stair and ties the belt to the railing post","expression":"steady, eyes on the knot","clothing":"costumed","depth":"midground","perspective":"side"},{"id":"CHR001","name":"Mira","position":"right","action":"grips the belt with both hands on the lowest step","expression":"serious, looking at the loose plank","clothing":"standard","depth":"foreground","perspective":"front"}],"objects":[{"id":"ART001","name":"grey ninja belt","position":"running from the railing post to Serafin's waist and into Mira's hands"}],"interactions":[{"character":"Serafin + Mira","object":"grey ninja belt","where":"Serafin ties one end of the grey ninja belt to the railing post while Mira grips the belt with both hands","priority":"essential"}],"background":"empty clearing at the foot of the watch tower","population":"cast_only"}}
+```

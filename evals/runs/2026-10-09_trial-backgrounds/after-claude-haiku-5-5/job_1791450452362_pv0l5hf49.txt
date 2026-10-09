@@ -1,0 +1,174 @@
+---TITLE---
+TITLE: Ethan and the Forty Stones
+
+---VISUAL BIBLE---
+```json
+{
+  "secondaryCharacters": [
+    {
+      "id": "CHR001",
+      "name": "Lena",
+      "pages": [2, 3, 4, 5, 6],
+      "scaleClass": "adult-height",
+      "age": "a woman in her thirties",
+      "build": "average height, slim, sturdy walking shoes",
+      "hair": "dark brown, shoulder length, tied back loosely",
+      "face": "brown eyes, light skin, calm and open features",
+      "signatureLook": "a small canvas bag slung over one shoulder",
+      "clothing": "a mustard jumper, dark green trousers, a navy walking jacket"
+    }
+  ],
+  "animals": [
+    {
+      "id": "ANI001",
+      "name": "Goose",
+      "pages": [1, 2, 3, 4, 5],
+      "scaleClass": "knee-high",
+      "species": "domestic grey goose",
+      "coloring": "grey-brown feathers on the back and wings, white feathers on the underside, orange bill and orange feet",
+      "anatomy": "one long neck, one round body, two wings, two legs, two feet, one bill",
+      "features": "round dark eyes, soft rounded bill, no collar"
+    }
+  ],
+  "artifacts": [],
+  "locations": [
+    {
+      "id": "LOC001",
+      "name": "Ruine Stein",
+      "pages": [1, 2, 3, 4, 5, 6],
+      "scaleClass": "landmark",
+      "setting": "outdoor, hilltop castle ruin above a wooded river valley in Baden",
+      "colors": "grey stone, green moss, golden and rust autumn trees, red and white flag",
+      "features": "stony path climbing the hillside, low moss-covered stone wall beside the path, tall ruined tower on the rocky top",
+      "signatureElement": "red and white Swiss flag flying from the top of the tower",
+      "isRealLandmark": true,
+      "landmarkQuery": "Ruine Stein",
+      "landmarkPhoto": 1
+    }
+  ],
+  "backgrounds": [
+    {
+      "pages": [1, 2],
+      "description": "A stony path climbing a wooded hillside towards a hilltop ruin with a tall grey stone tower and moss-covered walls, autumn trees in gold and rust on both sides, a wooded river valley far below. Clear morning light from the left. Wide open gravel space in the foreground.",
+      "landmarkPhoto": 1
+    },
+    {
+      "pages": [3, 4, 5],
+      "description": "A low moss-covered grey stone wall running along a gravel path, a flat stone resting at its side, bushes with fallen leaves at the far end, the ruin tower rising on the rocky outcrop above. Clear morning light from the left. Open gravel path in the foreground.",
+      "landmarkPhoto": 1
+    },
+    {
+      "pages": [6],
+      "description": "The top of the hilltop ruin with a stone tower, a red and white Swiss flag on a pole, stone walls covered with ivy, and open sky. Beyond the wall the town roofs and a river bridge lie far below among wooded hills. Clear morning light from the left. Open stone floor in the foreground.",
+      "landmarkPhoto": 3
+    }
+  ]
+}
+```
+
+---COVER SCENE---
+```json
+{
+  "title": "Ethan and the Forty Stones",
+  "scene": {
+    "imageSummary": "Ethan stands tall on the stony path below the ruin, looking up at the stone tower and the red and white flag above it. Autumn trees frame the hill in gold and rust.",
+    "setting": {
+      "location": "Ruine Stein [LOC001]",
+      "indoorOutdoor": "outdoor",
+      "description": "Hilltop castle ruin with a tall grey stone tower, moss-covered walls, a stony path climbing through autumn trees.",
+      "lighting": "clear morning sun from the left, warm light on the stone",
+      "camera": "wide",
+      "depthLayers": "foreground: the stony path and Ethan; midground: the low stone wall and trees; background: the tower with its flag against a clear sky"
+    },
+    "timeOfDay": "morning",
+    "weather": "clear",
+    "characters": [
+      {
+        "id": null,
+        "name": "Ethan",
+        "position": "center",
+        "action": "stands on the stony path, looking up at the tower",
+        "expression": "determined",
+        "clothing": "standard"
+      }
+    ],
+    "objects": [
+      {"id": "LOC001", "name": "Ruine Stein", "position": "background"}
+    ]
+  }
+}
+```
+
+---STORY PAGES---
+
+--- Page 1 ---
+TEXT:
+Ethan pounded up the stony path towards Ruine Stein, the gravel crunching under his trainers. The tower stood high above him on the hill, and a red and white flag fluttered at the very top. Then a grey goose stepped out of the bushes and stood right in the middle of the path. Ethan skidded to a halt.
+
+"Move, goose!" he shouted. "I need to get to the top!"
+
+The goose spread its wings wide and hissed at him. Ethan took one step back, then he shouted again, even louder. The goose hissed back louder still, and it did not move one step. Ethan planted his feet and frowned up at the flag. He wanted to reach the top now, and the goose was standing in the way.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Ethan stops short on the stony path below the tower, one arm flung up the path and mouth open in a shout. A grey goose stands in the middle of the path with its wings spread wide in front of him.","setting":{"location":"Ruine Stein [LOC001]","indoorOutdoor":"outdoor","description":"Stony path climbing a wooded hillside, autumn trees in gold and rust, moss-covered stone walls.","lighting":"bright morning sun from the left, long soft shadows on the gravel","camera":"medium","depthLayers":"foreground: gravel path and Ethan; midground: the goose across the path; background: the stone tower with a red and white flag on the hilltop"},"timeOfDay":"morning","weather":"clear","characters":[{"id":null,"name":"Ethan","position":"center","action":"skids to a halt on the gravel path, one arm flung up the path towards the tower","expression":"shouting, brows pulled low","clothing":"standard","depth":"foreground","perspective":"front"}],"objects":[{"id":"ANI001","name":"Goose","position":"midground, centre of the path"}],"interactions":[{"character":"Ethan","object":"Goose","where":"faces the goose, feet planted on the gravel","priority":"essential"}],"background":"empty stony path and wooded slope","population":"cast_only"}}
+```
+
+--- Page 2 ---
+TEXT:
+"Ethan, you cannot shout a goose off a path," called Mum from the bottom of the steps. She climbed the last few stones and stopped beside him, breathing hard. "Let's go round it. There is another way through the trees."
+
+"No, this way," Ethan said, cutting across her before she could finish. "The goose is in the way, so I want it to go now."
+
+He stamped his trainer on the gravel. The goose hissed and took two steps towards him, and Ethan hopped back. Mum reached an open hand towards him, but he folded his arms and stared at the goose. "Then we will wait a little while," Mum said.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Ethan folds his arms and stands firm on the stony path, glaring at the goose, which takes a step towards him. Lena stops beside Ethan on the path, one hand reaching out toward him.","setting":{"location":"Ruine Stein [LOC001]","indoorOutdoor":"outdoor","description":"Stony path climbing a wooded hillside, autumn trees in gold and rust, moss-covered stone walls.","lighting":"bright morning sun from the left, long soft shadows on the gravel","camera":"medium","depthLayers":"foreground: gravel path; midground: Ethan, Lena and the goose; background: the stone tower with its flag on the hilltop"},"timeOfDay":"morning","weather":"clear","characters":[{"id":null,"name":"Ethan","position":"center","action":"folds his arms and stands firm on the path","expression":"frowning, eyes fixed on the goose","clothing":"standard","depth":"foreground","perspective":"front"},{"id":"CHR001","name":"Lena","position":"right","action":"stops beside Ethan with one open hand reaching towards him","expression":"calm, lips pressed together","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[{"id":"ANI001","name":"Goose","position":"midground, left of the path"}],"interactions":[{"character":"Ethan","object":"Goose","where":"folds his arms and watches the goose","priority":"essential"},{"character":"Lena","object":"Ethan","where":"reaches an open hand towards Ethan","priority":"low"}],"background":"empty stony path and wooded slope","population":"cast_only"}}
+```
+
+--- Page 3 ---
+TEXT:
+Beside the low wall, Ethan sat down on a flat stone and began to count the stones in it. He pointed at each one with a finger. "One, two, three," he said, loudly at first. The goose lifted its wings a little and then folded them again.
+
+Ethan did not stop. Mum sat down beside him and counted along with him, her voice slower. "Ten, eleven, twelve," they said together. Ethan kept his finger moving along the wall, and the stones went on and on, all the way to the bushes. "Twenty," he said, and his legs kept wanting to jump up.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Ethan sits on a flat stone beside a low moss-covered wall, one finger raised as he counts the stones. Lena sits on the stone beside him, counting along with a calm face.","setting":{"location":"Ruine Stein [LOC001]","indoorOutdoor":"outdoor","description":"Low moss-covered grey stone wall running along a gravel path, bushes with fallen leaves at the far end, autumn trees around.","lighting":"clear morning sun from the left, the wall in warm light","camera":"medium","depthLayers":"foreground: gravel path; midground: Ethan and Lena on the flat stone beside the wall; background: bushes and the ruin tower on the rocky top"},"timeOfDay":"morning","weather":"clear","characters":[{"id":null,"name":"Ethan","position":"left","action":"sits on the flat stone, one finger raised towards the wall as he counts","expression":"concentrating, lips moving","clothing":"standard","depth":"foreground","perspective":"front"},{"id":"CHR001","name":"Lena","position":"right","action":"sits on the flat stone beside Ethan, counting along","expression":"calm, eyes on the wall","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[{"id":"ANI001","name":"Goose","position":"background, centre of the path"}],"interactions":[{"character":"Ethan","object":"Goose","where":"watches the goose, one finger raised as he counts","priority":"essential"},{"character":"Lena","object":"Ethan","where":"sits beside Ethan, counting along with him","priority":"low"}],"background":"empty stony path and wooded slope","population":"cast_only"}}
+```
+
+--- Page 4 ---
+TEXT:
+At twenty-six, Ethan could not wait any longer. He jumped up and ran at the goose with both arms out wide. The goose opened its wings, hissed hard and chased him back down the path. Ethan tripped on a root and landed on the gravel, his palms scraped and his knees on the stones.
+
+When he got up, the goose was back in the middle of the path, pulling at a clump of grass. Ethan had lost his count in the rush, and he could not remember whether the last stone had been twenty-six or twenty-seven. Mum asked whether they should go home. Ethan did not answer, because the flag still looked very far away.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Ethan sits on the gravel at the foot of the wall, having fallen, and looks up at the goose standing in the middle of the path. Lena kneels on the gravel beside him, her face turned toward him.","setting":{"location":"Ruine Stein [LOC001]","indoorOutdoor":"outdoor","description":"Stony gravel path beside a low moss-covered grey stone wall, a root across the path, bushes and autumn trees beyond.","lighting":"clear morning sun from the left, long shadows across the gravel","camera":"medium","depthLayers":"foreground: Ethan and Lena on the gravel; midground: the goose on the path; background: the wall and the ruin tower with its flag on the hilltop"},"timeOfDay":"morning","weather":"clear","characters":[{"id":null,"name":"Ethan","position":"left","action":"sits on the gravel after falling, palms scraped and resting on the stones","expression":"lips pressed tight, eyes on the goose","clothing":"standard","depth":"foreground","perspective":"front"},{"id":"CHR001","name":"Lena","position":"right","action":"kneels on the gravel beside Ethan","expression":"serious, looking at Ethan","clothing":"standard","depth":"foreground","perspective":"front"}],"objects":[{"id":"ANI001","name":"Goose","position":"midground, centre of the path, pulling at grass"}],"interactions":[{"character":"Ethan","object":"Goose","where":"watches the goose from the gravel","priority":"low"},{"character":"Lena","object":"Ethan","where":"kneels on the gravel, watching Ethan","priority":"low"}],"background":"empty stony path and wooded slope","population":"cast_only"}}
+```
+
+--- Page 5 ---
+TEXT:
+Ethan wiped his palms on his trousers and sat down on the flat stone again. He began at one. Mum sat beside him, and this time she waited for him to start. "One, two, three," Ethan said, pointing at each stone in turn, and he kept his voice steady as the numbers grew.
+
+At thirty-nine he crouched by the last stone of the wall, ready to dash past the goose. His breath came fast, and his knees bent low. He stopped himself and said the number out loud. "Thirty-nine." Then he said, "Forty." The goose turned, walked slowly into the bushes and left the path clear. Ethan stood up and looked at the tower.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Ethan crouches at the end of the low wall, weight forward, ready to dash along the path. The goose turns and walks away from the path into the bushes at the right.","setting":{"location":"Ruine Stein [LOC001]","indoorOutdoor":"outdoor","description":"Low moss-covered grey stone wall ending at a gravel path, a flat stone beside the wall, bushes with fallen leaves at the far end, autumn trees around.","lighting":"clear morning sun from the left, the wall in warm light","camera":"medium","depthLayers":"foreground: Ethan crouched on the gravel; midground: the goose walking towards the bushes and Lena on the flat stone by the wall; background: the ruin tower on the rocky top"},"timeOfDay":"morning","weather":"clear","characters":[{"id":null,"name":"Ethan","position":"left","action":"crouches by the last stone of the wall, weight forward, ready to dash","expression":"tense, eyes fixed on the goose","clothing":"standard","depth":"foreground","perspective":"front"},{"id":"CHR001","name":"Lena","position":"right","action":"sits on the flat stone by the wall, watching Ethan","expression":"calm, hands resting in her lap","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[{"id":"ANI001","name":"Goose","position":"midground, right, walking into the bushes"}],"interactions":[{"character":"Ethan","object":"Goose","where":"crouches ready to dash past the goose","priority":"essential"},{"character":"Lena","object":"Ethan","where":"watches Ethan from the flat stone","priority":"low"}],"background":"empty stony path and wooded slope","population":"cast_only"}}
+```
+
+--- Page 6 ---
+TEXT:
+At the top of Ruine Stein, the stone steps ended beside the old tower. Ethan climbed the last steps and stood by the wall, with the flag fluttering high above him. Mum came up behind him, puffing. Below them the roofs of the town spread along the river, and a bridge crossed the water.
+
+"Did you count all the way?" Mum asked.
+
+"Every stone," said Ethan. He put his palm flat on the warm top of the wall and grinned at the view. "Forty stones, and then the top."
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Ethan stands at the top of the ruin beside the stone wall, one palm resting on the wall, looking out over the town and the river. Lena stands beside him, watching him with a smile.","setting":{"location":"Ruine Stein [LOC001]","indoorOutdoor":"outdoor","description":"Top of the hilltop ruin, a stone tower with a red and white Swiss flag on a pole, ivy-covered stone walls, the town roofs and a river bridge far below among wooded hills.","lighting":"clear morning sun from the left, warm light on the stone","camera":"medium","depthLayers":"foreground: the top of the wall and Ethan; midground: Lena beside him; background: the tower with its flag and the town and river far below"},"timeOfDay":"morning","weather":"clear","characters":[{"id":null,"name":"Ethan","position":"left","action":"stands at the top wall with one palm resting on the stone, looking out over the town","expression":"grinning, eyes on the view","clothing":"standard","depth":"foreground","perspective":"front"},{"id":"CHR001","name":"Lena","position":"right","action":"stands beside Ethan, looking at him","expression":"smiling, head tilted toward him","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[{"id":"LOC001","name":"Ruine Stein","position":"background"}],"interactions":[{"character":"Ethan","object":"Ruine Stein","where":"rests one palm on the warm top of the wall","priority":"essential"},{"character":"Lena","object":"Ethan","where":"watches Ethan at the wall","priority":"low"}],"background":"empty stone floor and distant town","population":"cast_only"}}
+```

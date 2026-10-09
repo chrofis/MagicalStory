@@ -1,0 +1,177 @@
+---TITLE---
+TITLE: Emma und die Elster auf dem Dach
+
+---VISUAL BIBLE---
+```json
+{
+  "secondaryCharacters": [],
+  "animals": [
+    {
+      "id": "ANI001",
+      "name": "Elster",
+      "pages": [1, 2, 3, 4, 5],
+      "scaleClass": "forearm-sized",
+      "species": "magpie",
+      "coloring": "black head, back and tail with a blue-green iridescent sheen, white belly and white shoulder patches",
+      "anatomy": "two wings, two legs with clawed toes, one long tail, one pointed beak",
+      "features": "dark brown eyes, a long glossy tail"
+    }
+  ],
+  "artifacts": [
+    {
+      "id": "ART001",
+      "label": "wooden toy sword",
+      "name": "wooden toy sword",
+      "pages": [1, 2, 3, 4, 5, 6],
+      "scaleClass": "arm-sized",
+      "type": "toy sword",
+      "description": "a child's wooden sword with a plain straight blade, a short crossguard and a rounded grip, in pale honey-brown wood"
+    },
+    {
+      "id": "ART002",
+      "label": "glossy chestnuts",
+      "name": "glossy chestnuts",
+      "pages": [1, 4, 5],
+      "scaleClass": "fingertip-sized",
+      "type": "nuts",
+      "description": "glossy dark brown chestnuts with one pale flat side each"
+    }
+  ],
+  "locations": [
+    {
+      "id": "LOC001",
+      "name": "Kirche Rohrdorf",
+      "pages": [1, 2, 3, 4, 5],
+      "scaleClass": "house-height",
+      "setting": "outdoor, church forecourt with a low grey concrete wall and a chestnut tree, hillside village in Fislisbach",
+      "colors": "white concrete, grey wall, green lawn, yellow and brown autumn leaves, pale blue sky",
+      "features": "modern white concrete church with a tall detached bell tower and a flat roof edge with a thin metal rim",
+      "signatureElement": "tall white concrete bell tower",
+      "isRealLandmark": true,
+      "landmarkQuery": "Kirche Rohrdorf",
+      "landmarkPhoto": 1
+    },
+    {
+      "id": "LOC002",
+      "name": "Kloster Wettingen",
+      "pages": [6],
+      "scaleClass": "house-height",
+      "setting": "outdoor, monastery courtyard with a gravel path and an iron gate in a white wall",
+      "colors": "white monastery walls, red roof of the church tower, green lawn, grey gravel",
+      "features": "white monastery buildings with a red-roofed church tower topped by a cross, green courtyard lawn",
+      "signatureElement": "red-roofed church tower",
+      "isRealLandmark": true,
+      "landmarkQuery": "Kloster Wettingen",
+      "landmarkPhoto": 1
+    }
+  ],
+  "backgrounds": [
+    {
+      "pages": [1, 2],
+      "description": "Outdoor church forecourt in Fislisbach: a low grey concrete wall runs beside a gravel path, a chestnut tree and green lawn stand next to it, and the white concrete church wall with its tall bell tower rises behind. Clear autumn sky, soft low morning sun from the left. Open gravel path in the foreground. Wide view with no people.",
+      "landmarkPhoto": 1
+    },
+    {
+      "pages": [3, 4, 5],
+      "description": "Close view of the low grey concrete wall at the foot of the white church wall, with the flat roof edge and its thin metal rim above and the eave casting shade over the wall top. Grass and yellow autumn leaves on the ground in front of the wall. Plain white concrete surfaces, no people.",
+      "landmarkPhoto": "none"
+    },
+    {
+      "pages": [6],
+      "description": "Courtyard of the Kloster Wettingen: a green lawn and a grey gravel path lead to an iron gate set in a white monastery wall, with the white buildings and the red-roofed church tower behind. Overcast autumn light. Open gravel path in the foreground. No people.",
+      "landmarkPhoto": 1
+    }
+  ]
+}
+```
+
+---COVER SCENE---
+```json
+{
+  "title": "Emma und die Elster auf dem Dach",
+  "scene": {
+    "imageSummary": "Emma stands on the gravel path below the white bell tower, wearing a silver chain mail tunic over a grey padded gambeson, brown leather bracers, dark brown leather boots and a plain brown sword belt, bare head. She raises the wooden toy sword high in her right hand, chin up. A magpie stands on the roof edge far above her, small in the sky.",
+    "setting": {
+      "location": "Kirche Rohrdorf [LOC001]",
+      "indoorOutdoor": "outdoor",
+      "description": "White concrete church with a tall detached bell tower, green lawn, yellow autumn leaves on the path, pale blue sky.",
+      "lighting": "clear soft autumn sunlight from the left",
+      "camera": "wide",
+      "depthLayers": "foreground: gravel path and fallen leaves; midground: Emma with the sword raised; background: white church and bell tower with the magpie on the roof edge"
+    },
+    "timeOfDay": "morning",
+    "weather": "clear",
+    "characters": [
+      {
+        "id": null,
+        "name": "Emma",
+        "position": "center",
+        "action": "raises the wooden toy sword high in one hand",
+        "expression": "determined, chin up",
+        "clothing": "costumed"
+      }
+    ],
+    "objects": [
+      {"id": "LOC001", "name": "Kirche Rohrdorf", "position": "background"},
+      {"id": "ANI001", "name": "Elster", "position": "on the roof edge high above Emma"},
+      {"id": "ART001", "name": "wooden toy sword", "position": "raised in Emma's hand"}
+    ]
+  }
+}
+```
+
+---STORY PAGES---
+
+--- Page 1 ---
+TEXT:
+Emma lief den Weg hinauf zur Kirche Rohrdorf. In der einen Hand trug sie ihr Holzschwert, in der anderen einen Beutel mit Kastanien, die sie am Morgen unter dem grossen Baum gesammelt hatte. Heute sollte der alte Torwächter beim Kloster Wettingen ihr Schwert bekommen. Unter dem Dach der Kirche setzte sich Emma auf die niedrige Mauer und öffnete den Beutel. Auf dem Stein sass eine Elster, die jede ihrer Bewegungen beobachtete. Emma nahm eine glänzende Kastanie heraus und legte sie vor sich auf die Mauer. Die Elster hüpfte näher, schnappte die Kastanie und flog mit ihr davon. Emma schüttelte den Kopf und griff nach der nächsten Kastanie.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Emma sits on the low grey concrete wall beside the church path, wearing a silver chain mail tunic over a grey padded gambeson, brown leather bracers, dark brown leather boots and a plain brown sword belt, bare head. She sets a glossy chestnut on the wall with one hand while the wooden toy sword rests in her other hand across her knee. A magpie on the wall beside her lunges for the chestnut with its wings half open.","setting":{"location":"Kirche Rohrdorf [LOC001]","indoorOutdoor":"outdoor","description":"Church forecourt with a low grey concrete wall, a chestnut tree and green lawn, white concrete church wall behind, yellow autumn leaves on the gravel.","lighting":"soft low morning sun from the left","camera":"medium","depthLayers":"foreground: Emma on the wall; midground: the magpie on the wall; background: white church wall and tall bell tower"},"timeOfDay":"morning","weather":"clear","characters":[{"id":null,"name":"Emma","position":"left","action":"sets a chestnut on the wall","expression":"focused, lips pressed together","clothing":"costumed","depth":"foreground","perspective":"front"}],"objects":[{"id":"ANI001","name":"Elster","position":"right, on the wall"},{"id":"ART001","name":"wooden toy sword","position":"resting across Emma's knee"},{"id":"ART002","name":"glossy chestnuts","position":"on the wall beside Emma"}],"interactions":[{"character":"Emma","object":"ART002","where":"sets a chestnut on the wall","priority":"essential"},{"character":"Elster","object":"ART002","where":"snatches the chestnut from the wall","priority":"essential"}],"background":"empty forecourt with a few autumn leaves","population":"cast_only"}}
+```
+
+--- Page 2 ---
+TEXT:
+Kaum hatte Emma nach der nächsten Kastanie gegriffen, kehrte die Elster zurück. Sie landete auf dem Mäuerchen, packte das Holzschwert am Griff und zog kräftig. Emma hielt fest, doch der Vogel war stärker, als sie gedacht hatte. Das Schwert rutschte aus ihrer Hand und flog mit der Elster über den Weg. Der Vogel landete auf dem Dach der Kirche, weit über der Mauer, und setzte sich an den Dachrand. Emma rief laut: «Gib mir das Schwert zurück!» Die Elster blieb dort oben sitzen. Das Holzschwert hielt sie noch immer fest, und Emma stand mit dem Beutel in der Hand auf dem Weg.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Emma stands on the gravel path below the church wall, wearing a silver chain mail tunic over a grey padded gambeson, brown leather bracers, dark brown leather boots and a plain brown sword belt, bare head. Her empty hand reaches up toward the sword as the magpie flies off the wall across the path, carrying the wooden toy sword by its grip. The magpie is at the peak of its flight with wings spread wide over the path.","setting":{"location":"Kirche Rohrdorf [LOC001]","indoorOutdoor":"outdoor","description":"Church forecourt with gravel path, low grey wall, green lawn and yellow autumn leaves, white church wall and bell tower rising behind.","lighting":"soft low morning sun from the left","camera":"medium","depthLayers":"foreground: gravel path and Emma; midground: the magpie in flight with the sword; background: white church wall and tall bell tower"},"timeOfDay":"morning","weather":"clear","characters":[{"id":null,"name":"Emma","position":"left","action":"reaches up with an empty hand toward the sword and calls out","expression":"eyes narrowed, mouth open as she calls","clothing":"costumed","depth":"foreground","perspective":"front"}],"objects":[{"id":"ANI001","name":"Elster","position":"center, in flight over the path"},{"id":"ART001","name":"wooden toy sword","position":"carried by the magpie by its grip"}],"interactions":[{"character":"Emma","object":"ART001","where":"reaches up with an empty hand toward the sword","priority":"essential"},{"character":"Elster","object":"ART001","where":"carries the sword by its grip in flight","priority":"essential"}],"background":"empty forecourt with a few autumn leaves","population":"cast_only"}}
+```
+
+--- Page 3 ---
+TEXT:
+Unter dem Dach der Kirche suchte Emma im Gras nach einem langen Ast. Sie fand einen, hielt ihn hoch in die Luft und streckte sich so weit sie konnte. Doch der Ast reichte nur bis zur Regenrinne, und das Schwert war viel weiter oben. Emma stellte sich auf die Mauer und versuchte, am rauen Stein hinaufzuklettern. Sie rutschte ab und landete auf dem Boden. Sie stand auf, klopfte den Staub von den Knien und probierte es noch einmal. Oben auf dem Dach hüpfte die Elster hin und her, das Holzschwert noch immer bei sich.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Emma stands on the grass at the foot of the church wall, wearing a silver chain mail tunic over a grey padded gambeson, brown leather bracers, dark brown leather boots and a plain brown sword belt, bare head. She holds a long fallen branch straight up toward the roof edge with both arms fully stretched, and the branch stops short of the roof. High on the roof edge the magpie stands holding the wooden toy sword by its grip.","setting":{"location":"Kirche Rohrdorf [LOC001]","indoorOutdoor":"outdoor","description":"Low grey concrete wall at the foot of the white church wall, grass and yellow autumn leaves on the ground, the flat roof edge with a thin metal rim above.","lighting":"bright midday light from overhead","camera":"medium","depthLayers":"foreground: grass and Emma; midground: the low wall; background: the magpie on the roof edge with the sword"},"timeOfDay":"midday","weather":"clear","characters":[{"id":null,"name":"Emma","position":"left","action":"holds the long branch up toward the roof with both arms stretched","expression":"eyes narrowed, lips pressed together","clothing":"costumed","depth":"foreground","perspective":"front"}],"objects":[{"id":"ANI001","name":"Elster","position":"background, on the roof edge"},{"id":"ART001","name":"wooden toy sword","position":"held by the magpie on the roof edge"}],"interactions":[{"character":"Emma","object":"a long fallen branch","where":"holds the long branch up toward the roof","priority":"essential"},{"character":"Elster","object":"ART001","where":"holds the sword by its grip on the roof edge","priority":"low"}],"background":"empty forecourt with a few autumn leaves","population":"cast_only"}}
+```
+
+--- Page 4 ---
+TEXT:
+Am Nachmittag wurde das Licht schwächer, und Emma sass noch immer auf der Mauer, den Ast neben sich im Gras. Die Elster flog zur hintersten Ecke des Daches, weit weg von allem, was Emma erreichen konnte. Dort blieb sie sitzen und hielt das Schwert fest. Emma rief noch einmal nach oben, doch die Elster bewegte sich nicht. Am Weg lagen die Blätter der Kastanie, gelb und feucht. Im Beutel lagen noch sieben Kastanien. Der alte Torwächter in Wettingen würde warten. Emma legte die Hände in den Schoss und blickte lange zum Dach hinauf, ohne etwas zu sagen.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Emma sits on the low grey concrete wall, wearing a silver chain mail tunic over a grey padded gambeson, brown leather bracers, dark brown leather boots and a plain brown sword belt, bare head. The chestnuts sit in her lap and the long branch lies in the grass beside the wall. Far off at the back corner of the roof the magpie sits small against the grey sky, still holding the wooden toy sword by its grip.","setting":{"location":"Kirche Rohrdorf [LOC001]","indoorOutdoor":"outdoor","description":"Low grey concrete wall in front of the white church wall, grass and yellow autumn leaves on the ground, the flat roof edge far above with its thin metal rim.","lighting":"dim flat light from a grey overcast sky","camera":"medium","depthLayers":"foreground: the branch in the grass; midground: Emma on the wall; background: the far corner of the roof with the magpie"},"timeOfDay":"afternoon","weather":"overcast","characters":[{"id":null,"name":"Emma","position":"left","action":"sits on the wall with her hands in her lap, looking up at the roof","expression":"lips pressed together, eyes lifted to the roof","clothing":"costumed","depth":"foreground","perspective":"front"}],"objects":[{"id":"ANI001","name":"Elster","position":"background, at the far corner of the roof"},{"id":"ART001","name":"wooden toy sword","position":"held by the magpie at the far roof corner"},{"id":"ART002","name":"glossy chestnuts","position":"in Emma's lap"}],"interactions":[{"character":"Emma","object":"ART002","where":"holds the chestnuts in her lap","priority":"low"},{"character":"Elster","object":"ART001","where":"holds the sword by its grip at the far roof corner","priority":"essential"}],"background":"empty forecourt with yellow autumn leaves","population":"cast_only"}}
+```
+
+--- Page 5 ---
+TEXT:
+Emma erinnerte sich an die Kastanie, die die Elster am Anfang weggetragen hatte. Sie griff in den Beutel und legte die Kastanien einzeln auf die Mauer unter dem Dachrand, eine nach der anderen. Die Elster beobachtete sie vom Dach aus. Als die dritte Kastanie auf dem Stein lag, rief Emma: «Komm, hol sie dir!» Die Elster hüpfte den Dachrand entlang und sprang hinunter auf die Mauer. Dabei liess sie das Holzschwert los. Es rutschte über die Kante und fiel nach unten. Emma stand genau darunter, streckte die Arme aus und fing es mit beiden Händen auf.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Emma stands at the foot of the low grey concrete wall, wearing a silver chain mail tunic over a grey padded gambeson, brown leather bracers, dark brown leather boots and a plain brown sword belt, bare head. She raises both arms and opens her hands to catch the wooden toy sword as it falls off the roof edge above her. Glossy chestnuts lie in a row on the wall top, and the magpie has just hopped down onto the wall beside them.","setting":{"location":"Kirche Rohrdorf [LOC001]","indoorOutdoor":"outdoor","description":"Low grey concrete wall with glossy chestnuts in a row on its top, grass and yellow autumn leaves below, the white church wall and flat roof edge with its thin metal rim above.","lighting":"dim flat light from a grey overcast sky","camera":"medium","depthLayers":"foreground: Emma and the grass; midground: the wall with chestnuts and the magpie; background: the roof edge with the sword falling from it"},"timeOfDay":"afternoon","weather":"overcast","characters":[{"id":null,"name":"Emma","position":"left","action":"catches the falling sword with both hands","expression":"eyes fixed on the falling sword, mouth open","clothing":"costumed","depth":"foreground","perspective":"front"}],"objects":[{"id":"ANI001","name":"Elster","position":"midground, on the wall beside the chestnuts"},{"id":"ART001","name":"wooden toy sword","position":"falling from the roof edge above Emma"},{"id":"ART002","name":"glossy chestnuts","position":"in a row on the wall top"}],"interactions":[{"character":"Emma","object":"ART001","where":"catches the falling sword with both hands","priority":"essential"},{"character":"Elster","object":"ART002","where":"hops down onto the wall beside the chestnuts","priority":"essential"}],"background":"empty forecourt with yellow autumn leaves","population":"cast_only"}}
+```
+
+--- Page 6 ---
+TEXT:
+Vor dem Tor des Klosters Wettingen wartete der alte Torwächter. Emma lief den letzten Weg entlang und hielt das Holzschwert vor sich. Der Weg führte über den grünen Rasen bis zum weissen Tor. Als sie vor ihm stand, streckte sie es ihm entgegen. Der Torwächter nahm es lachend entgegen und hob es hoch über den Kopf. «Ein Schwert für mein Tor», sagte er. «Die Elster wollte es auch», sagte Emma. «Ich hänge es neben die Tür», sagte der Torwächter. Emma lachte mit ihm.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Emma stands on the gravel path in front of the iron gate, wearing a silver chain mail tunic over a grey padded gambeson, brown leather bracers, dark brown leather boots and a plain brown sword belt, bare head. She holds the wooden toy sword out toward the old gatekeeper with both arms extended. The gatekeeper, an old man in a dark blue work jacket and grey trousers, takes the sword by its grip and lifts it high, laughing, beside the white monastery wall and the red-roofed church tower.","setting":{"location":"Kloster Wettingen [LOC002]","indoorOutdoor":"outdoor","description":"Monastery courtyard with a green lawn, a grey gravel path and an iron gate in a white monastery wall, the white buildings and red-roofed church tower behind.","lighting":"soft grey overcast light from above","camera":"medium","depthLayers":"foreground: gravel path; midground: Emma and the gatekeeper at the gate; background: white monastery wall and red-roofed church tower"},"timeOfDay":"afternoon","weather":"overcast","characters":[{"id":null,"name":"Emma","position":"left","action":"holds the wooden toy sword out toward the gatekeeper","expression":"smiling, eyes bright","clothing":"costumed","depth":"foreground","perspective":"front"},{"name":"Torwächter","position":"right","action":"takes the sword by its grip and lifts it high","expression":"laughing with mouth open","clothing":"standard","depth":"midground","perspective":"front","description":"an old man of about seventy, slim build, short grey hair under a flat cap, lined face, dark blue work jacket and grey trousers"}],"objects":[{"id":"LOC002","name":"Kloster Wettingen","position":"background"},{"id":"ART001","name":"wooden toy sword","position":"held between Emma and the gatekeeper"}],"interactions":[{"character":"Emma","object":"ART001","where":"holds the sword out toward the gatekeeper","priority":"essential"},{"character":"Torwächter","object":"ART001","where":"takes the sword by its grip and lifts it high","priority":"essential"}],"background":"empty courtyard with a few autumn leaves on the gravel","population":"sparse"}}
+```

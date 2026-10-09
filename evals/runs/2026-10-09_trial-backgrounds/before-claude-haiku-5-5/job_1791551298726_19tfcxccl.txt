@@ -1,0 +1,188 @@
+---TITLE---
+TITLE: Rohan und die Elster im Klosterhof
+
+---VISUAL BIBLE---
+```json
+{
+  "secondaryCharacters": [
+    {
+      "id": "CHR001",
+      "name": "Herr Keller",
+      "pages": [1, 6],
+      "scaleClass": "adult-height",
+      "age": "a man in his sixties",
+      "build": "medium height, slightly stooped, sturdy",
+      "hair": "short grey hair, combed back",
+      "face": "light grey eyes, clean-shaven, lined forehead",
+      "signatureLook": "a silver watch chain across a dark green cardigan",
+      "clothing": "dark green cardigan over a white collared shirt, grey trousers, brown leather shoes"
+    }
+  ],
+  "animals": [
+    {
+      "id": "ANI001",
+      "name": "Elster",
+      "pages": [1, 2, 3, 4, 5, 6],
+      "scaleClass": "forearm-sized",
+      "generic": false,
+      "species": "Eurasian magpie (Elster)",
+      "coloring": "black and white with a glossy blue-black sheen on the wings and long tail, white belly and white wing patches",
+      "anatomy": "two wings, two legs, one long tail, one beak",
+      "features": "dark eyes, black head, strong black beak, long graduated tail"
+    }
+  ],
+  "artifacts": [
+    {
+      "id": "ART001",
+      "label": "iron key ring",
+      "name": "plain iron key ring with several old church keys",
+      "pages": [1, 2, 3, 4, 5, 6],
+      "scaleClass": "palm-sized",
+      "generic": false,
+      "type": "key ring",
+      "description": "iron key ring holding several old keys with worn brass bows",
+      "states": null
+    },
+    {
+      "id": "ART002",
+      "label": "brass buttons",
+      "name": "small round brass buttons with four holes",
+      "pages": [3, 4, 5, 6],
+      "scaleClass": "fingertip-sized",
+      "generic": false,
+      "type": "buttons",
+      "description": "small round brass buttons with four holes and a bright polished face"
+    }
+  ],
+  "locations": [
+    {
+      "id": "LOC001",
+      "name": "Kirche Rohrdorf",
+      "pages": [1, 6],
+      "scaleClass": "house-height",
+      "setting": "outdoor, church with churchyard and gate in a suburban hillside",
+      "colors": "white concrete walls, dark grey roof edges, green hedge, pale grey gravel path",
+      "features": "plain modern white church with a tall detached concrete bell tower, a wooden church door, a garden gate in a low hedge",
+      "signatureElement": "tall white concrete bell tower standing apart from the church",
+      "isRealLandmark": true,
+      "landmarkQuery": "Kirche Rohrdorf",
+      "landmarkPhoto": 1
+    },
+    {
+      "id": "LOC002",
+      "name": "Klosterhof Wettingen",
+      "pages": [2, 3, 4, 5],
+      "scaleClass": "house-height",
+      "setting": "outdoor, stone courtyard of the Kloster Wettingen behind a tall stone wall",
+      "colors": "warm grey stone, ochre and red roof tiles, golden autumn leaves on the cobbles",
+      "features": "tall stone courtyard wall with a wooden gate, a stone trough fountain in the centre of the courtyard, a pitched roof with a ridge along the back of the buildings",
+      "signatureElement": "stone trough fountain in the middle of the courtyard",
+      "isRealLandmark": false,
+      "landmarkQuery": null
+    }
+  ],
+  "backgrounds": [
+    {
+      "pages": [1, 6],
+      "description": "Plain modern white concrete church with a tall detached concrete bell tower beside it, set on a suburban hillside with a green hedge along the churchyard gate and a pale gravel path. Overcast afternoon light, soft and even. Medium wide shot. Open gravel in the foreground where characters stand, a few distant passers-by in grey and dark purple coats cross the far side of the churchyard."
+    },
+    {
+      "pages": [2, 3, 4, 5],
+      "description": "Stone courtyard of the Kloster Wettingen with a tall grey stone wall along one side, a wooden gate, and a stone trough fountain in the middle. Pitched ochre and red roof tiles rise behind the buildings at the back. Golden autumn leaves lie on the cobbles. Overcast light, soft and grey, with dusk deepening on later pages. A few distant passers-by in grey and dark purple coats stand at the far side of the courtyard. Open cobbled space in the foreground."
+    }
+  ]
+}
+```
+
+---COVER SCENE---
+```json
+{
+  "title": "Rohan und die Elster im Klosterhof",
+  "scene": {
+    "imageSummary": "Rohan stands on the gravel path in front of the white concrete church, one arm lifted with a bunch of iron keys held high. A magpie with black and white feathers and a long tail perches on the hedge beside him. He wears a brown tweed jacket, white shirt, dark brown trousers, black polished shoes, and a brass magnifying glass on a chain, bare head.",
+    "setting": {
+      "location": "Kirche Rohrdorf [LOC001]",
+      "indoorOutdoor": "outdoor",
+      "description": "White concrete church with a tall detached bell tower, green hedge, pale gravel path, hillside behind",
+      "lighting": "soft overcast autumn light from above, even on the path",
+      "camera": "wide",
+      "depthLayers": "foreground: gravel path with Rohan; midground: hedge with the magpie; background: white church and tall bell tower on the hillside"
+    },
+    "timeOfDay": "afternoon",
+    "weather": "overcast",
+    "characters": [
+      {
+        "id": null,
+        "name": "Rohan",
+        "position": "center",
+        "action": "stands on the gravel path holding the iron key ring up high",
+        "expression": "determined",
+        "clothing": "costumed",
+        "depth": "foreground",
+        "perspective": "front"
+      }
+    ],
+    "objects": [
+      {"id": "LOC001", "name": "Kirche Rohrdorf", "position": "background"},
+      {"id": "ANI001", "name": "Elster", "position": "midground, on the hedge beside Rohan"},
+      {"id": "ART001", "name": "iron key ring", "position": "raised in Rohan's hand"}
+    ]
+  }
+}
+```
+
+---STORY PAGES---
+
+--- Page 1 ---
+TEXT:
+Rohan rannte den Kiesweg zur Kirche Rohrdorf hinauf, den Schlüsselbund fest in der Hand. Er hatte ihn unter der Hecke beim Gartentor gefunden, zwischen nassen Blättern. Vor der hohen Kirchentür stand Herr Keller, der Mesmer, und klopfte seine Taschen ab. «Herr Keller, hier sind Ihre Schlüssel!», rief Rohan. Der alte Mann drehte sich um und streckte die Hand aus. Im selben Augenblick strich eine Elster vom Mauerrand herab, packte den Bund mit dem Schnabel und flog davon über die Felder. Rohan sah ihr nach. Herr Keller machte einen Schritt nach vorn, dann hielt er sich am Gartentor fest, denn sein Knie war steif. «Das gibt es doch nicht», sagte er leise.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Rohan, in everyday clothes, holds the iron key ring up in one hand on the gravel path in front of the white church. A magpie swoops down from the wall edge, its beak closing on the keys. Herr Keller stretches one arm toward the keys from the church door, grey light, the bunch in mid-snatch.","setting":{"location":"Kirche Rohrdorf [LOC001]","indoorOutdoor":"outdoor","description":"White modern concrete church with a tall detached bell tower, green hedge along the gate, pale gravel path, hillside beyond","lighting":"soft overcast afternoon light from above","camera":"medium","depthLayers":"foreground: gravel path with Rohan and the keys; midground: Herr Keller at the church door and the hedge; background: white church, bell tower and hillside"},"timeOfDay":"afternoon","weather":"overcast","characters":[{"id":null,"name":"Rohan","position":"left","action":"holds the iron key ring up in his hand on the gravel path","expression":"eager, eyes fixed on the keys","clothing":"standard","depth":"foreground","perspective":"front"},{"id":"CHR001","name":"Herr Keller","position":"right","action":"stretches one arm out toward the keys from the church door","expression":"surprised","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[{"id":"ART001","name":"iron key ring","position":"in Rohan's raised hand"},{"id":"ANI001","name":"Elster","position":"swooping down above Rohan's hand, beak closing on the keys"}],"interactions":[{"character":"Rohan","object":"ART001","where":"holds the iron key ring up in his hand","priority":"essential"},{"character":"Herr Keller","object":"ART001","where":"reaches toward the key ring without touching it","priority":"normal"}],"background":"a few distant passers-by in grey and dark purple coats cross the far side of the churchyard","population":"ambient"}}
+```
+
+--- Page 2 ---
+TEXT:
+Über die Wiesen und den Feldweg hinunter lief Rohan und zog sich dabei seine Tweedjacke über, bis er das Klostertor in Wettingen erreichte. Die Elster sass auf der Mauer des Klosterhofs und hüpfte hin und her, den Schlüsselbund fest im Schnabel. Mitten im Hof stand ein steinerner Brunnen, aus dem der Vogel vorhin getrunken hatte, bevor er auf die Mauer flog. Rohan blieb unter dem Tor stehen und sah zu ihm hinauf. «Gib den Bund zurück», sagte er, doch die Elster liess ihn nicht fallen. Stattdessen hüpfte sie einen Schritt weiter an den Mauerrand. Rohan dachte an Herr Keller, der in Rohrdorf auf seine Schlüssel wartete.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Rohan stands under the wooden gate of the Klosterhof, pulling his brown tweed jacket onto his shoulders, a brass magnifying glass on a chain at his chest, white shirt, dark brown trousers, black polished shoes. On the stone courtyard wall above him the magpie hops along the top with the iron key ring in its beak. The stone trough fountain stands in the middle of the courtyard behind.","setting":{"location":"Klosterhof Wettingen [LOC002]","indoorOutdoor":"outdoor","description":"Grey stone courtyard wall with a wooden gate, stone trough fountain in the middle of the courtyard, ochre and red roof tiles behind, golden autumn leaves on the cobbles","lighting":"soft overcast afternoon light from above","camera":"medium","depthLayers":"foreground: cobbles and Rohan at the gate; midground: the courtyard wall with the magpie on top; background: stone trough fountain and roof tiles"},"timeOfDay":"afternoon","weather":"overcast","characters":[{"id":null,"name":"Rohan","position":"left","action":"pulls his brown tweed jacket onto his shoulders beneath the gate","expression":"determined, gaze up at the wall","clothing":"costumed","depth":"foreground","perspective":"front"}],"objects":[{"id":"ANI001","name":"Elster","position":"on top of the courtyard wall, hopping with keys in beak"},{"id":"ART001","name":"iron key ring","position":"in the magpie's beak"}],"interactions":[{"character":"Rohan","object":"tweed jacket","where":"pulls the tweed jacket onto his shoulders","priority":"essential"}],"background":"a few distant passers-by in grey and dark purple coats stand at the far side of the courtyard","population":"ambient"}}
+```
+
+--- Page 3 ---
+TEXT:
+Aus der Jackentasche zog Rohan eine Handvoll glänzender Messingknöpfe und legte sie einen nach dem andern auf den warmen Mauerstein. Nur einen behielt er in der Tasche. Die Elster kam näher, hüpfte zum ersten Knopf und pickte nach ihm. Den Schlüsselbund hielt sie dabei weiter im Schnabel, deshalb konnte sie den Knopf nicht aufnehmen. Rohan legte den nächsten Knopf hin, dann noch einen, und jeder blinkte im Licht. Die Elster schaute auf die Reihe, hüpfte bis zum letzten Knopf und flog dann mit einem Satz auf das Dach des Klostergebäudes. Rohan sah ihr nach.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Rohan stands at the courtyard wall in his brown tweed jacket, white shirt, dark brown trousers, black polished shoes and brass magnifying glass on a chain, placing shiny brass buttons in a row along the warm grey stone top of the wall. The magpie hops along the wall toward the first button, the iron key ring still in its beak.","setting":{"location":"Klosterhof Wettingen [LOC002]","indoorOutdoor":"outdoor","description":"Grey stone courtyard wall with a wooden gate, stone trough fountain in the centre, ochre and red roof tiles behind, golden autumn leaves on the cobbles","lighting":"soft overcast afternoon light from above","camera":"medium","depthLayers":"foreground: Rohan beside the wall; midground: the row of brass buttons and the magpie on the wall top; background: courtyard trough and roof tiles"},"timeOfDay":"afternoon","weather":"overcast","characters":[{"id":null,"name":"Rohan","position":"left","action":"sets brass buttons one by one along the top of the wall","expression":"focused","clothing":"costumed","depth":"foreground","perspective":"front"}],"objects":[{"id":"ANI001","name":"Elster","position":"on the wall top, bending toward the first button"},{"id":"ART001","name":"iron key ring","position":"in the magpie's beak"},{"id":"ART002","name":"brass buttons","position":"in a row along the wall top"}],"interactions":[{"character":"Rohan","object":"brass buttons","where":"sets the brass buttons one by one along the wall top","priority":"essential"}],"background":"a few distant passers-by in grey and dark purple coats stand at the far side of the courtyard","population":"ambient"}}
+```
+
+--- Page 4 ---
+TEXT:
+Auf dem First des Klosterdaches sass die Elster nun, den Schlüsselbund noch immer im Schnabel. Rohan reckte sich, so hoch er konnte, doch das Dach war viel zu hoch. Die Knöpfe lagen unberührt auf dem Mauerstein. Vom Turm der Klosterkirche schlug es sechs, und über dem Hof wurde es dunkler. In Rohrdorf stand Herr Keller vor der verschlossenen Kirchentür, und niemand konnte sie öffnen. Rohan sah hinauf, bis ihm der Nacken schmerzte, und sagte leise: «Ich komme nicht hinauf.»
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Rohan stretches up toward the high ridge of the courtyard roof, arm raised, in his brown tweed jacket, white shirt, dark brown trousers, black polished shoes and brass magnifying glass on a chain. The magpie sits far above on the roof ridge with the iron key ring in its beak. Brass buttons lie untouched in a row along the grey wall beside him at dusk.","setting":{"location":"Klosterhof Wettingen [LOC002]","indoorOutdoor":"outdoor","description":"Grey stone courtyard wall with a wooden gate, stone trough fountain in the centre, pitched ochre and red roof tiles along the ridge, dark autumn leaves on the cobbles","lighting":"dim dusk light, grey and cool, falling from above","camera":"medium","depthLayers":"foreground: Rohan on the cobbles reaching up; midground: the courtyard wall with the brass buttons; background: the roof ridge with the magpie far above"},"timeOfDay":"dusk","weather":"overcast","characters":[{"id":null,"name":"Rohan","position":"left","action":"reaches up toward the roof ridge with one arm stretched high","expression":"strained, looking up","clothing":"costumed","depth":"foreground","perspective":"front"}],"objects":[{"id":"ANI001","name":"Elster","position":"high on the roof ridge, far above the courtyard","depth":"background"},{"id":"ART001","name":"iron key ring","position":"in the magpie's beak on the roof ridge"},{"id":"ART002","name":"brass buttons","position":"untouched in a row along the wall top"}],"interactions":[{"character":"Rohan","object":"tweed jacket","where":"stretches one arm up toward the roof ridge","priority":"low"}],"background":"a few distant passers-by in grey and dark purple coats stand at the far side of the courtyard","population":"ambient"}}
+```
+
+--- Page 5 ---
+TEXT:
+Kurz darauf kam die Elster vom Dach herab und setzte sich auf den Rand des Brunnentrogs. Rohan erinnerte sich, dass sie hier getrunken hatte. Er lief zur Mauer, nahm einen Knopf vom Stein und kniete neben dem Trog nieder. Zwischen Daumen und Zeigefinger hielt er den Knopf knapp über dem Steinrand. Die Elster hüpfte näher und reckte sich nach dem Glanz. Sie liess den Bund auf den Stein fallen und schnappte nach dem Knopf. Rohan griff sofort nach dem Schlüsselbund und hielt ihn fest in der Hand.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Rohan kneels on the cobbles beside the stone trough fountain in his brown tweed jacket, white shirt, dark brown trousers, black polished shoes and brass magnifying glass on a chain, holding one brass button between thumb and finger just above the rim. The magpie stands on the rim of the trough and lunges for the button, letting the iron key ring drop onto the stone rim as its beak opens.","setting":{"location":"Klosterhof Wettingen [LOC002]","indoorOutdoor":"outdoor","description":"Grey stone courtyard with a stone trough fountain in the centre, grey stone wall behind, ochre and red roof tiles, dark autumn leaves on the cobbles","lighting":"dim dusk light, grey and cool, falling from above","camera":"medium","depthLayers":"foreground: Rohan kneeling on the cobbles; midground: the stone trough with the magpie on its rim; background: courtyard wall and roof tiles"},"timeOfDay":"dusk","weather":"overcast","characters":[{"id":null,"name":"Rohan","position":"left","action":"kneels beside the trough holding one brass button over the rim","expression":"steady, focused on the button","clothing":"costumed","depth":"foreground","perspective":"front"}],"objects":[{"id":"ANI001","name":"Elster","position":"on the rim of the stone trough, lunging toward the button"},{"id":"ART001","name":"iron key ring","position":"dropped on the stone rim of the trough"},{"id":"ART002","name":"brass buttons","position":"one held between Rohan's thumb and finger"}],"interactions":[{"character":"Rohan","object":"brass buttons","where":"holds one brass button between thumb and finger over the trough rim","priority":"essential"}],"background":"a few distant passers-by in grey and dark purple coats stand at the far side of the courtyard","population":"ambient"}}
+```
+
+--- Page 6 ---
+TEXT:
+Rohan rannte den ganzen Weg zurück nach Rohrdorf und blieb am Gartentor stehen, wo Herr Keller wartete. Er hielt ihm den Schlüsselbund hin. Herr Keller nahm ihn, betrachtete die Schlüssel und lachte laut auf. «Du hast ihn zurückgebracht», sagte er. Auf der Mauer neben dem Tor landete die Elster, die Rohan bis hierher gefolgt war. Rohan zog den einen Knopf aus seiner Tasche, legte ihn auf den Stein und trat einen Schritt zurück. Der Vogel pickte den Knopf auf und flog davon. Herr Keller drehte den grössten Schlüssel im Schloss, öffnete die Kirchentür und sagte: «Komm herein, Rohan, du darfst heute die Glocken sehen.»
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"At the garden gate of the white concrete church, Herr Keller holds the iron key ring up in one hand and laughs, a dark green cardigan and grey trousers. Rohan, in his brown tweed jacket, white shirt, dark brown trousers, black polished shoes and brass magnifying glass on a chain, sets one brass button on top of the low churchyard wall, stepping back. The magpie lands on the wall beside the button.","setting":{"location":"Kirche Rohrdorf [LOC001]","indoorOutdoor":"outdoor","description":"White modern concrete church with a tall detached bell tower, green hedge along the gate, pale gravel path, hillside beyond","lighting":"dim overcast dusk light from above","camera":"medium","depthLayers":"foreground: Rohan at the wall with the button; midground: Herr Keller at the gate with the keys and the magpie on the wall; background: white church door and bell tower"},"timeOfDay":"dusk","weather":"overcast","characters":[{"id":null,"name":"Rohan","position":"right","action":"sets one brass button on top of the low churchyard wall and steps back","expression":"calm, watching the magpie","clothing":"costumed","depth":"foreground","perspective":"front"},{"id":"CHR001","name":"Herr Keller","position":"left","action":"holds the iron key ring up in one hand at the gate","expression":"laughing","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[{"id":"ANI001","name":"Elster","position":"landing on the churchyard wall beside the button"},{"id":"ART001","name":"iron key ring","position":"held up in Herr Keller's hand"},{"id":"ART002","name":"brass buttons","position":"on the top of the churchyard wall"},{"id":"LOC001","name":"Kirche Rohrdorf","position":"background"}],"interactions":[{"character":"Rohan","object":"brass buttons","where":"sets one brass button on top of the low churchyard wall","priority":"essential"},{"character":"Herr Keller","object":"iron key ring","where":"holds the iron key ring up in one hand","priority":"normal"}],"background":"a few distant passers-by in grey and dark purple coats cross the far side of the churchyard","population":"ambient"}}
+```

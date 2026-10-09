@@ -150,7 +150,7 @@ describe('shared prose rules reach both writers as one constant each', () => {
     expect(unfilled(six)).toEqual([]);
     expect(six).toContain('build tension (2-4), resolve (5-6)');
     expect(six).toContain('Keep it MINIMAL for a 6-scene story');
-    expect(six).toContain('3-6 backgrounds');
+    expect(six).toContain('exactly 3 backgrounds');
     expect(six).toContain('A 6-page story rarely benefits');
     expect(six).toContain('at least 4 out of 6');
     expect(six).not.toMatch(/5-scene|out of 5|5-page story|resolve \(4-5\)|3-5 backgrounds/);

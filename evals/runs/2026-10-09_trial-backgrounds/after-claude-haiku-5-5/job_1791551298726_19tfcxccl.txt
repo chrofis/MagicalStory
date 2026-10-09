@@ -1,0 +1,195 @@
+---TITLE---
+TITLE: Rohan und der verlorene Schlüsselbund
+
+---VISUAL BIBLE---
+```json
+{
+  "secondaryCharacters": [
+    {
+      "id": "CHR001",
+      "name": "Herr Bühler",
+      "pages": [1, 2, 6],
+      "scaleClass": "adult-height",
+      "age": "a man in his sixties",
+      "build": "medium height, slim, slightly stooped",
+      "hair": "short grey hair combed back",
+      "face": "grey-blue eyes, neat grey moustache",
+      "signatureLook": "half-moon spectacles pushed up on his forehead",
+      "clothing": "dark green wool waistcoat over a white shirt, dark grey trousers, black lace-up shoes"
+    }
+  ],
+  "animals": [
+    {
+      "id": "ANI001",
+      "name": "magpie",
+      "pages": [2, 3, 4, 5],
+      "scaleClass": "forearm-sized",
+      "species": "European magpie",
+      "coloring": "glossy black head, back and long tail with a blue-green sheen, white belly and white wing patches",
+      "anatomy": "two wings, two legs, one long tapering tail",
+      "features": "strong black bill, black-and-white plumage"
+    }
+  ],
+  "artifacts": [
+    {
+      "id": "ART001",
+      "label": "iron key bundle",
+      "name": "ring of iron keys",
+      "pages": [1, 2, 3, 4, 5, 6],
+      "scaleClass": "hand-sized",
+      "type": "key ring",
+      "description": "bundle of five dark iron keys on a heavy iron ring",
+      "states": null
+    },
+    {
+      "id": "ART002",
+      "label": "brass jacket buttons",
+      "name": "brass buttons",
+      "pages": [1, 5, 6],
+      "scaleClass": "fingertip-sized",
+      "type": "buttons",
+      "description": "small round polished brass buttons with metal shanks"
+    }
+  ],
+  "locations": [
+    {
+      "id": "LOC001",
+      "name": "Kirche Rohrdorf",
+      "pages": [1, 2, 6],
+      "scaleClass": "house-height",
+      "setting": "outdoor, church on a hillside in Fislisbach",
+      "colors": "white concrete, grey gravel, damp green grass, autumn yellow and brown trees",
+      "features": "tall detached concrete bell tower, plain white church walls, gravel path up to the entrance",
+      "signatureElement": "the tall white bell tower beside the church",
+      "isRealLandmark": true,
+      "landmarkQuery": "Kirche Rohrdorf",
+      "landmarkPhoto": 1
+    },
+    {
+      "id": "LOC002",
+      "name": "Klosterhof Wettingen",
+      "pages": [3, 4, 5],
+      "scaleClass": "house-height",
+      "setting": "outdoor, monastery courtyard with an arched gate and a cloister walk",
+      "colors": "warm grey and ochre stone, dark red roof tiles, green lawn, autumn trees beyond the walls",
+      "features": "tall stone archway gate, low stone courtyard wall, cloister walk with a sloped tiled roof",
+      "signatureElement": "the stone archway of the gate",
+      "isRealLandmark": false,
+      "landmarkQuery": null
+    }
+  ],
+  "backgrounds": [
+    {
+      "pages": [1, 2, 6],
+      "landmarkPhoto": 1,
+      "description": "Exterior of the white concrete Kirche Rohrdorf seen from its gravel path, with the tall detached concrete bell tower standing beside the plain white church against a pale sky. Damp grass and autumn trees on the hillside. Open gravel path in the foreground where characters would stand. Medium distance view."
+    },
+    {
+      "pages": [3],
+      "description": "A tall ochre stone archway gate of the Klosterhof Wettingen seen from the lane outside, with a worn stone wall running along both sides. Beyond the arch the courtyard opens out, with the sloped tiled roof of a cloister walk rising behind the wall. Autumn trees and a grey sky above. Open lane in the foreground."
+    },
+    {
+      "pages": [4, 5],
+      "description": "Inside the Klosterhof Wettingen courtyard, a low warm grey stone wall runs across an open lawn. Behind it the sloped dark red tiled roof of the cloister walk and its ridge line stand against the sky, and tall autumn trees rise above the walls at the back. Open lawn in the centre of the courtyard where characters would stand."
+    }
+  ]
+}
+```
+
+---COVER SCENE---
+```json
+{
+  "title": "Rohan und der verlorene Schlüsselbund",
+  "scene": {
+    "imageSummary": "Rohan, in a brown tweed jacket, white shirt, dark brown trousers and black polished shoes, stands on the gravel path in front of the church and holds the iron key bundle up high in one hand. The white church and its tall bell tower rise behind him under a pale autumn sky, and the golden light of late afternoon falls across the grass.",
+    "setting": {
+      "location": "Kirche Rohrdorf [LOC001]",
+      "indoorOutdoor": "outdoor",
+      "description": "white concrete church with tall detached bell tower, gravel path, damp autumn grass, yellow and brown trees on the hillside",
+      "lighting": "soft low afternoon light from the left",
+      "camera": "wide",
+      "depthLayers": "foreground gravel path with Rohan, midground grass and hedges, background white church and bell tower"
+    },
+    "timeOfDay": "afternoon",
+    "weather": "clear",
+    "characters": [
+      {
+        "id": null,
+        "name": "Rohan",
+        "position": "center",
+        "action": "stands on the gravel path holding the key bundle up high",
+        "expression": "determined",
+        "clothing": "costumed"
+      }
+    ],
+    "objects": [
+      {"id": "LOC001", "name": "Kirche Rohrdorf", "position": "background"},
+      {"id": "ART001", "name": "iron key bundle", "position": "held up in Rohan's hand"}
+    ]
+  }
+}
+```
+
+---STORY PAGES---
+
+--- Page 1 ---
+TEXT:
+Rohan kniete auf dem Kiesweg neben der Kirche Rohrdorf und hob einen Schlüsselbund aus dem feuchten Gras. Fünf Schlüssel hingen an dem schweren Ring, und er war noch kalt vom Morgen. Rohan rannte den Weg hinauf zur Kirchentür, wo Herr Bühler, der Mesmer, die Glocken kontrollierte.
+«Ich habe Ihren Schlüsselbund gefunden», rief Rohan.
+Herr Bühler drehte sich um und atmete tief aus. «Seit dem Morgen suche ich ihn. Um sechs Uhr muss die Tür offen sein.» Er schaute auf den Bund und hob den Zeigefinger. «Pass gut auf. Die Elstern holen sich alles, was glänzt.»
+Rohan spürte durch den Stoff seiner Jacke die glatten Messingknöpfe in der Tasche und hielt den Bund fester.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Rohan, in a brown tweed jacket, white shirt, dark brown trousers and black polished shoes, hurries up the gravel path holding a ring of iron keys up in one hand. Herr Bühler waits at the church door in a dark green waistcoat in the midground. Overcast afternoon light, grey stone and muted autumn greens.","setting":{"location":"Kirche Rohrdorf [LOC001]","indoorOutdoor":"outdoor","description":"white concrete church with tall detached bell tower, gravel path, damp grass, autumn trees on the slope","lighting":"soft overcast daylight from above","camera":"medium","depthLayers":"foreground gravel path with Rohan, midground Herr Bühler at the church door, background white church and bell tower"},"timeOfDay":"afternoon","weather":"overcast","characters":[{"id":null,"name":"Rohan","position":"left","action":"holds the key bundle up while hurrying up the path","expression":"eager","clothing":"costumed","depth":"foreground","perspective":"front"},{"id":"CHR001","name":"Herr Bühler","position":"right","action":"stands at the church door with his hands loose at his sides","expression":"relieved","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[{"id":"ART001","name":"iron key bundle","position":"held up in Rohan's hand"}],"interactions":[{"character":"Rohan","object":"ART001","where":"holds the iron key bundle up","priority":"essential"},{"character":"Herr Bühler","object":"ART001","where":"watches the key bundle","priority":"low"}],"background":"a few passers-by far off on the road below the slope","population":"ambient"}}
+```
+
+--- Page 2 ---
+TEXT:
+«Ich gebe Ihnen den Bund gleich», sagte Rohan und streckte den Arm aus. Herr Bühler lächelte und öffnete die Hand. In diesem Moment liess sich eine Elster auf die Mauer neben der Kirche fallen. Sie hüpfte näher, und mit einem schnellen Griff packte sie den Bund. Rohan hielt ihn noch fest, doch der Vogel riss ihm die Schlüssel aus den Fingern und schwang sich über den Friedhof in die Luft.
+«Der Bund!», rief Herr Bühler und hob beide Arme. Die Elster flog über die Felder Richtung Westen, dorthin, wo das Kloster Wettingen liegt.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Rohan, in a brown tweed jacket, white shirt, dark brown trousers and black polished shoes, stands on the gravel path with his arm stretched out, holding the iron key bundle. A magpie with black and white plumage and a blue-green sheen on its tail swoops in from the wall and snatches at the keys. Herr Bühler in a dark green waistcoat stands behind Rohan with open hands. Overcast light, grey stone and autumn trees.","setting":{"location":"Kirche Rohrdorf [LOC001]","indoorOutdoor":"outdoor","description":"white concrete church with tall detached bell tower, gravel path, damp grass, autumn trees on the slope","lighting":"soft overcast daylight from above","camera":"medium","depthLayers":"foreground gravel path with Rohan holding the bundle, midground magpie in the air and Herr Bühler, background white church wall and bell tower"},"timeOfDay":"afternoon","weather":"overcast","characters":[{"id":null,"name":"Rohan","position":"left","action":"holds the key bundle out at arm's length","expression":"startled","clothing":"costumed","depth":"foreground","perspective":"front"},{"id":"CHR001","name":"Herr Bühler","position":"right","action":"stands with both hands opened wide","expression":"alarmed","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[{"id":"ART001","name":"iron key bundle","position":"held in Rohan's outstretched hand, pulled toward the magpie"},{"id":"ANI001","name":"magpie","position":"in the air above Rohan's hand, swooping in"}],"interactions":[{"character":"Rohan","object":"ART001","where":"holds the iron key bundle out at arm's length","priority":"essential"},{"character":"Herr Bühler","object":"ART001","where":"watches the key bundle","priority":"low"}],"background":"a few passers-by far off on the road below the slope","population":"ambient"}}
+```
+
+--- Page 3 ---
+TEXT:
+Über die Felder rannte Rohan dem Vogel nach, den Feldweg entlang und über die Strasse, bis er das grosse Tor des Klosters Wettingen erreichte. Die Elster landete auf der Mauer im Klosterhof und hielt den Bund fest. Rohan blieb unter dem Torbogen stehen und rang nach Atem. Er trat einen Schritt vor und streckte die Hand aus. Da flog der Vogel auf das Dach des Kreuzgangs und setzte sich oben auf den First.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Rohan, in a brown tweed jacket, white shirt, dark brown trousers and black polished shoes, stands breathless under the stone archway of the monastery gate with one arm reaching forward. Far above him on the ridge of the sloped cloister roof, a magpie sits holding the iron key bundle. Autumn trees and a grey sky above the warm ochre stone.","setting":{"location":"Klosterhof Wettingen [LOC002]","indoorOutdoor":"outdoor","description":"tall ochre stone archway gate, worn stone wall along the lane, courtyard beyond, sloped dark red tiled cloister roof, autumn trees","lighting":"clear afternoon sunlight from the side, long soft shadows","camera":"medium","depthLayers":"foreground lane and gate threshold with Rohan, midground stone archway, background cloister roof ridge with the magpie and trees"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Rohan","position":"left","action":"stands under the archway with one arm reaching toward the roof","expression":"breathless","clothing":"costumed","depth":"foreground","perspective":"front"}],"objects":[{"id":"ANI001","name":"magpie","position":"on the ridge of the cloister roof, holding the key bundle"},{"id":"ART001","name":"iron key bundle","position":"held in the magpie's grip on the roof ridge"}],"interactions":[{"character":"Rohan","object":"ANI001","where":"watches the magpie on the roof ridge","priority":"low"}],"background":"a few passers-by far off on the lane beyond the gate","population":"ambient"}}
+```
+
+--- Page 4 ---
+TEXT:
+Im Klosterhof wurde es still. Rohan rief nach dem Vogel, doch die Elster flog hinter dem Dach davon, über die hohen Bäume hinweg, bis sie nicht mehr zu sehen war. Rohan lief zur hinteren Ecke des Hofes und spähte in die Baumkronen, aber dort oben war nur grauer Himmel. Rohan schaute zum Dach hinauf, doch dort bewegte sich nichts mehr. Vom Turm des Klosters schlug die Glocke fünf. Rohan stand mit leeren Händen da. In Rohrdorf wartete Herr Bühler an der verschlossenen Kirchentür, und der Bund war weit weg.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Rohan, in a brown tweed jacket, white shirt, dark brown trousers and black polished shoes, stands alone on the lawn of the courtyard beside the low stone wall, with empty hands at his sides, looking up at the empty roof ridge of the cloister walk. Tall autumn trees rise behind the wall under a grey sky.","setting":{"location":"Klosterhof Wettingen [LOC002]","indoorOutdoor":"outdoor","description":"low warm grey stone courtyard wall, open lawn, sloped dark red tiled cloister roof, tall autumn trees behind the walls","lighting":"flat grey afternoon daylight from above","camera":"medium","depthLayers":"foreground lawn with Rohan, midground low stone wall, background cloister roof ridge and autumn trees"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Rohan","position":"center","action":"stands on the lawn looking up at the empty roof ridge","expression":"worried","clothing":"costumed","depth":"foreground","perspective":"front"}],"objects":[],"interactions":[{"character":"Rohan","object":"roof ridge","where":"looks up at the roof ridge","priority":"low"}],"background":"a few passers-by far off near the gate","population":"ambient"}}
+```
+
+--- Page 5 ---
+TEXT:
+Rohan griff in seine Jackentasche und zog die Messingknöpfe heraus. Er erinnerte sich an Herr Bühlers Worte: Die Elstern holen sich alles, was glänzt. Er legte einen Knopf nach dem anderen auf die niedrige Mauer, in einer Reihe, und trat einen Schritt zurück. Dann wartete er still. Es dauerte nicht lange, bis die Elster über die Bäume zurückkehrte und auf der Mauer landete. Den Bund hielt sie noch im Griff. Als sie nach dem ersten Knopf greifen wollte, liess sie den Bund auf die Mauer fallen. Rohan trat vor und nahm den Bund. Die Elster flog mit einem Knopf davon, und Rohan sammelte die übrigen Knöpfe ein.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Rohan, in a brown tweed jacket, white shirt, dark brown trousers and black polished shoes, steps forward to the low stone wall and lifts the iron key bundle that lies on it. A magpie with black and white plumage stands on the wall beside him, bending toward a row of small brass buttons set along the wall top. Dusk light, warm grey stone and dark autumn trees.","setting":{"location":"Klosterhof Wettingen [LOC002]","indoorOutdoor":"outdoor","description":"low warm grey stone courtyard wall, open lawn, sloped dark red tiled cloister roof, tall autumn trees behind the walls","lighting":"low dusk light from the side, fading blue sky","camera":"medium","depthLayers":"foreground lawn with Rohan, midground low stone wall with the magpie and the buttons, background cloister roof and trees"},"timeOfDay":"dusk","weather":"clear","characters":[{"id":null,"name":"Rohan","position":"right","action":"steps forward and lifts the key bundle from the wall","expression":"focused","clothing":"costumed","depth":"foreground","perspective":"front"}],"objects":[{"id":"ART001","name":"iron key bundle","position":"lying on the wall top beside the buttons"},{"id":"ART002","name":"brass buttons","position":"in a row along the wall top"},{"id":"ANI001","name":"magpie","position":"on the wall top, bending toward the first button"}],"interactions":[{"character":"Rohan","object":"ART001","where":"lifts the iron key bundle from the wall","priority":"essential"}],"background":"empty courtyard with a few passers-by far off near the gate","population":"ambient"}}
+```
+
+--- Page 6 ---
+TEXT:
+Kurz vor sechs Uhr lief Rohan den Kiesweg hinauf und hielt den Bund hoch. Herr Bühler stand noch am Portal und schaute auf seine Uhr.
+«Hier ist Ihr Bund», sagte Rohan.
+Herr Bühler lachte laut, nahm den Bund entgegen und suchte den richtigen Schlüssel. Er drehte ihn im Schloss, und die schwere Tür ging auf. Rohan zog einen Messingknopf aus der Tasche und hielt ihm den Knopf hin.
+«Der ist für Sie», sagte er.
+Herr Bühler nahm den Knopf und steckte ihn in seine Westentasche. «Komm herein, Rohan», sagte er.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Rohan, in a brown tweed jacket, white shirt, dark brown trousers and black polished shoes, stands at the foot of the church steps and holds out one small brass button on his open palm. Herr Bühler in a dark green waistcoat stands in the open church doorway and reaches toward the button. The iron key bundle hangs from the lock of the open door. Dusk light on white concrete and grey gravel.","setting":{"location":"Kirche Rohrdorf [LOC001]","indoorOutdoor":"outdoor","description":"white concrete church with tall detached bell tower, gravel path, damp grass, open church door","lighting":"low dusk light from the left, warm light falling from the open doorway","camera":"medium","depthLayers":"foreground gravel path with Rohan, midground church doorway with Herr Bühler, background white church wall and bell tower"},"timeOfDay":"dusk","weather":"clear","characters":[{"id":null,"name":"Rohan","position":"left","action":"holds out a brass button on his open palm","expression":"pleased","clothing":"costumed","depth":"foreground","perspective":"front"},{"id":"CHR001","name":"Herr Bühler","position":"right","action":"reaches for the brass button in the doorway","expression":"amused","clothing":"standard","depth":"midground","perspective":"front"}],"objects":[{"id":"ART001","name":"iron key bundle","position":"hanging from the lock of the open door"},{"id":"ART002","name":"brass buttons","position":"one button on Rohan's open palm"}],"interactions":[{"character":"Rohan","object":"ART002","where":"holds the brass button out on his open palm","priority":"essential"},{"character":"Herr Bühler","object":"ART002","where":"reaches for the brass button","priority":"essential"}],"background":"a few passers-by far off on the road below the slope","population":"ambient"}}
+```
