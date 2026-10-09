@@ -2055,7 +2055,7 @@ ${bibleBody}` : bibleBody;
   meta.timings.sceneExpansionMs = vbMs + briefsMs;
 
   // ── Assemble: code merges the decided fields into the Art Director's metadata ──
-  assembleBriefs(expansions, briefBeats, gl);
+  assembleBriefs(expansions, briefBeats, gl, visualBible);
   // Jev's weather is an ADVICE: a disagreement with the Art Director's own
   // weather is logged, never written.
   const disagree = beats.filter(b => b.fixed && b.fixed.weatherAdvice).map((b) => {

@@ -5231,8 +5231,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
         // which put the scarf on Kiaan). Decided structurally on the wearer's
         // presence in the page cast; a page that DOES carry a worn row keeps the
         // state-aware path below.
-        if (clothing.wornBy && !wornById.has(String(clothing.id || '').toUpperCase())
-            && !pageCastNames.some(n => String(n).trim().toLowerCase() === String(clothing.wornBy).trim().toLowerCase())) {
+        if (require('./wornItems').garmentWearerAbsent(clothing, pageCastNames, wornById.has(String(clothing.id || '').toUpperCase()))) {
           log.info(`[WORN] Page ${pageNumber}: ${clothing.id} not required — its wearer ${clothing.wornBy} is not on this page`);
           // The brief DID cite an element: the whole-bible fallback below must
           // not fire and list the same garment (and every other entry) instead.

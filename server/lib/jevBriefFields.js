@@ -277,17 +277,31 @@ async function decideBriefFields({ beats, visualBible, bibleSections, approvedAr
  * flagged it. An outdoor page with no outdoor weather is left to the brief
  * checks (collectBriefFindings), never guessed here.
  */
-function assembleBriefs(expansions, briefBeats, gl) {
+function assembleBriefs(expansions, briefBeats, gl, visualBible = null) {
   for (const x of expansions) {
     const b = (briefBeats || []).find(bb => bb && bb.pageNumber === x.pageNumber);
-    if (!b || !b.jevFixed) continue;
-    const merged = jevDecisions.pinBrief(x.brief, b.jevFixed);
-    if (merged.unparsed) {
-      gl.error('beats_jev_brief_unparsed', `Page ${x.pageNumber}: the brief carries no parseable METADATA — the decided fields could not be written`, null, { pageNumber: x.pageNumber });
-      continue;
+    if (b && b.jevFixed) {
+      const merged = jevDecisions.pinBrief(x.brief, b.jevFixed);
+      if (merged.unparsed) {
+        gl.error('beats_jev_brief_unparsed', `Page ${x.pageNumber}: the brief carries no parseable METADATA — the decided fields could not be written`, null, { pageNumber: x.pageNumber });
+        continue;
+      }
+      x.brief = merged.brief;
     }
-    x.brief = merged.brief;
+    x.brief = dropAbsentWearerCites(x.brief, visualBible, x.pageNumber, 'brief assembly');
   }
+}
+
+/**
+ * A worn garment whose wearer is not in the page's cast leaves objects[]
+ * (wornItems.dropAbsentWearerGarments), with a log line per drop. One call for
+ * every site that produces a final brief: assembly, the brief re-ask, the
+ * iterate rewrite.
+ */
+function dropAbsentWearerCites(brief, visualBible, pageNumber, where) {
+  const r = require('./wornItems').dropAbsentWearerGarments(brief, visualBible);
+  for (const d of r.dropped) log.info(`[WORN] Page ${pageNumber}: ${d.id} taken out of objects[] (${where}) — its wearer ${d.wearer} is not on this page`);
+  return r.brief;
 }
 
 /** The Visual Bible JSON inside a transcript's ---VISUAL BIBLE--- section, as the page-brief call reads it. */
@@ -782,6 +796,6 @@ async function decideCoverPopulation({ arc, coverBeats, visualBible, decided = {
 
 module.exports = {
   litCandidates, offFrameOf, coverLight, coverFacts, decideCoverPopulation, COVER_SHOT, COVER_GAZE,
-  decideBriefFields, assembleBriefs, pageLocations, aboardOnGroundVantage, submergedPages, visualBibleJsonOf,
+  decideBriefFields, assembleBriefs, dropAbsentWearerCites, pageLocations, aboardOnGroundVantage, submergedPages, visualBibleJsonOf,
   COVER_PLACE_SHOTS, COVER_PURPOSE, COVER_FOOTING, COVER_ONE_PLACE_NOTE, coverFitQuestion, COVER_PLACE_FLOOR, COVER_PHOTO_MIN_SCORE, coverPhotoOf, bibleLocationOf, materializeCoverPlaces, coverPlaceLabel, coverPlaceCandidates, assignCoverPlaces, coverPlaceState, decideCoverPlaces, applyCoverPlacePages,
 };

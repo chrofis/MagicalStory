@@ -205,6 +205,56 @@ function findVbEntryById(visualBible, id) {
 }
 
 /**
+ * A GARMENT WHOSE WEARER IS NOT ON THE PAGE (2026-10-08, 2026-10-09). One
+ * structural question, asked by the image-prompt side (REQUIRED OBJECTS) and by
+ * the brief parse (objects[]): the bible entry names its wearer (`wornBy`), the
+ * page declares no worn row for it, and that wearer is not in the page cast.
+ * Ids and names only -- no prose is read.
+ *
+ * @param {Object} entry          the Visual Bible clothing entry
+ * @param {string[]} castNames    names of the characters on the page
+ * @param {boolean} hasWornRow    the page declares a wornItems row for this id
+ */
+function garmentWearerAbsent(entry, castNames, hasWornRow) {
+  if (!entry || !entry.wornBy || hasWornRow) return false;
+  const wearer = String(entry.wornBy).trim().toLowerCase();
+  return !(castNames || []).some(n => String(n).trim().toLowerCase() === wearer);
+}
+
+/**
+ * Take the cites of absent-wearer garments out of a brief's `objects[]`
+ * (staging job_1791531449494_o0kaatvmq: CLO001, Kiaan's beanie, cited on p2
+ * with Max alone and on p3 with Julian and Funka, after the prompt rule that
+ * forbids it had been written). The prompt asks; this holds. The prose is not
+ * touched. A brief whose METADATA does not parse is returned unchanged.
+ *
+ * @returns {{brief:string, dropped:Array<{id:string, wearer:string}>}}
+ */
+function dropAbsentWearerGarments(brief, visualBible) {
+  const none = { brief, dropped: [] };
+  if (!visualBible || !Array.isArray(visualBible.clothing) || visualBible.clothing.length === 0) return none;
+  const { parseProseMetadataFormat } = require('./sceneMetadata');
+  const parsed = parseProseMetadataFormat(String(brief || ''));
+  if (!parsed || !Array.isArray(parsed.metadata && parsed.metadata.objects)) return none;
+  const m = { ...parsed.metadata };
+  const cast = (Array.isArray(m.characters) ? m.characters : []).map(c => (typeof c === 'string' ? c : c && c.name)).filter(Boolean);
+  const wornIds = new Set((Array.isArray(m.wornItems) ? m.wornItems : []).map(r => String((r && r.id) || '').trim().toUpperCase()).filter(Boolean));
+  const dropped = [];
+  m.objects = m.objects.filter((o) => {
+    const base = String(typeof o === 'string' ? o : (o && o.id) || '').trim().toUpperCase().split('.')[0];
+    const found = base ? findVbEntryById({ clothing: visualBible.clothing }, base) : null;
+    if (!found || !garmentWearerAbsent(found.entry, cast, wornIds.has(base))) return true;
+    dropped.push({ id: base, wearer: String(found.entry.wornBy).trim() });
+    return false;
+  });
+  if (dropped.length === 0) return none;
+  return { brief: `${parsed.prose}
+
+---METADATA---
+${JSON.stringify(m, null, 2)}`, dropped };
+}
+
+/**
  * Which outfit slot a VB element belongs to, from its own NAME.
  *
  * WHAT THIS IS NOT (corrected 2026-09-18 — the previous note here was wrong and
@@ -1850,6 +1900,8 @@ module.exports = {
   wornItemsFromMetadata,
   wornAsEntries,
   findVbEntryById,
+  garmentWearerAbsent,
+  dropAbsentWearerGarments,
   deriveSlotFromName,
   slotFromType,
   elementIdentityTerms,

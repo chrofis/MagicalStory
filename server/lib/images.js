@@ -5100,6 +5100,10 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     }
   }
 
+  // A worn garment whose wearer is not on the rewritten page leaves objects[]
+  // (same drop as the authored brief: jevBriefFields.dropAbsentWearerCites).
+  newSceneDescription = require('./jevBriefFields').dropAbsentWearerCites(newSceneDescription, visualBible, pageNumber, 'iterate rewrite');
+
   // Extract previewMismatches + checks from the metadata JSON block. parseProseMetadataFormat
   // splits on ---METADATA--- and parses the JSON — the fields live alongside scene structure.
   let previewMismatches = [];

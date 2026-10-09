@@ -399,6 +399,7 @@ async function runBriefChecks({ inputData, expansions, briefBeats, visualBible, 
       const fixed = beatOf(n).jevFixed;
       // The re-ask writes no decided field either: code merges them back in.
       if (fixed) candidate = pinBrief(candidate, fixed).brief;
+      candidate = require('./jevBriefFields').dropAbsentWearerCites(candidate, visualBible, n, 'brief re-ask');
       const guard = assessSceneBrief(candidate);
       const recheck = (text) => collectBriefFindings(expansions.map(e => (e.pageNumber === n ? { pageNumber: n, brief: text } : e)), ctx)
         .findings.filter(f => f.pageNumber === n);
