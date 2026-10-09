@@ -107,8 +107,8 @@ const imageRegenerationLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-// Trial avatar preview rate limiter (prevent abuse of free avatar generation)
-// Fronts /generate-preview-avatar AND /create-anonymous-account. Admin bypass
+// Trial avatar rate limiter (prevent abuse of free avatar generation)
+// Fronts /create-anonymous-account AND /prepare-standard-avatar (one trial = those two hits). Admin bypass
 // tokens skip it: the handlers already skip Turnstile/fingerprint for admins,
 // but this middleware answered 429 first, capping admin trial testing at 2 runs
 // per day per IP. The global daily caps (DAILY_TRIAL_*_CAP in routes/trial.js)

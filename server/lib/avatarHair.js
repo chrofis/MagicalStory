@@ -11,12 +11,13 @@
  *   - routes/avatars.js (a new avatar): once the retries have settled which avatar
  *     is kept, ONE read of it (readAvatarHair) replaces the photo's reading.
  *   - ensureAvatarDerivedHair() (a character whose hair is still the photo's
- *     reading: every character made before this decision, and a trial character):
+ *     reading: every character made before this decision):
  *     the same ONE read of the stored avatar, persisted, so a character is read
- *     once for every later story.
+ *     once for every later story. A TRIAL character has no avatar before its
+ *     sheets (the preview portrait is gone, docs/decisions.md 2026-10-09): its
+ *     hair text stays the photo's reading and the job does not call this for it.
  *
- * ORDER (circularity): the text is derived from the permanent avatar (or, for a
- * trial character, the preview avatar the visitor approved), BEFORE any story
+ * ORDER (circularity): the text is derived from the permanent avatar, BEFORE any story
  * sheet exists. The sheet judges then compare a sheet against text that came from
  * a different image, never against a reading of that same sheet. The photo
  * reading stays stored as `physical.photoHairAnalysis` (audit only, no prompt reads it).
@@ -79,13 +80,10 @@ function applyAvatarHair(character, avatarHair) {
   return patch;
 }
 
-/** The avatar image to read: the permanent standard avatar, else a trial character's approved preview. */
+/** The avatar image to read: the permanent standard avatar, or null. */
 async function resolveAvatarImage(character) {
   const { resolveAvatarBytes } = require('./styledAvatars');
-  const standard = await resolveAvatarBytes(character.avatars || character.clothingAvatars, 'standard');
-  if (standard) return standard;
-  const preview = character.previewAvatar;
-  return typeof preview === 'string' && preview.startsWith('data:image') ? preview : null;
+  return (await resolveAvatarBytes(character.avatars || character.clothingAvatars, 'standard')) || null;
 }
 
 /** ONE vision read of the hair on an avatar image (character2x4Sheet.readAvatarHair, prompts/avatar-hair-read.txt). */

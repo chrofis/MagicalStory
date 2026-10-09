@@ -22,35 +22,35 @@ const root = path.resolve(__dirname, '../..');
 
 afterEach(() => { vi.restoreAllMocks(); });
 
-describe('1. early avatar styling runs the standard sheet at once', () => {
+describe('1. early avatar styling: the two sheets never wait for each other', () => {
   const reqs = [
     { pageNumber: 'pre-cover', clothingCategory: 'costumed:pirate', characterNames: ['T'] },
     { pageNumber: 'pre-cover', clothingCategory: 'standard', characterNames: ['T'] },
   ];
-  it('starts standard before prepare-title resolves; costumed waits, is seeded, and is styled once', async () => {
+  it('with nothing prepared the standard sheet is styled at once; costumed waits for prepare-title, is seeded, and is styled once', async () => {
     const order: string[] = [];
     let releaseTitle!: () => void;
     const titleReady = new Promise<void>(r => { releaseTitle = r; });
     const style = vi.fn(async (r: any[]) => { order.push(`style:${r.map(x => x.clothingCategory).join('+')}`); });
-    const seed = vi.fn((a: any) => { order.push(`seed:${a ? 'title' : 'none'}`); });
+    const seed = vi.fn((a: any) => { order.push(`seed:${a ? Object.keys(a.T).join('+') : 'none'}`); });
     const done = pipeline.runTrialEarlyStyling({
-      requirements: reqs, titleAvatarsReady: titleReady,
-      awaitTitle: async () => { await titleReady; return { T: { costumed: { pirate: 'x' } } }; },
+      requirements: reqs, titleAvatarsReady: titleReady, standardAvatarsReady: null,
+      awaitPrepared: async (_ready: any, what: string) => { expect(what).toBe('prepare-title'); await titleReady; return { T: { costumed: { pirate: 'x' } } }; },
       jobStartAvatars: null, seed, style, onDone: () => order.push('done'),
     });
     await new Promise(r => setTimeout(r, 20));
     // Title still running: the standard sheet is already being styled.
-    expect(order).toEqual(['style:standard']);
+    expect(order).toEqual(['seed:none', 'style:standard']);
     releaseTitle();
     await done;
-    expect(order).toEqual(['style:standard', 'seed:title', 'style:costumed:pirate', 'done']);
+    expect(order).toEqual(['seed:none', 'style:standard', 'seed:costumed', 'style:costumed:pirate', 'done']);
     expect(style).toHaveBeenCalledTimes(2); // no duplicate costumed styling
   });
 
-  it('with no in-flight prepare-title it seeds the job-start row first, then styles both', async () => {
+  it('with no prepare call in flight it seeds the job-start row first, then styles both', async () => {
     const order: string[] = [];
     await pipeline.runTrialEarlyStyling({
-      requirements: reqs, titleAvatarsReady: null, awaitTitle: async () => { throw new Error('must not wait'); },
+      requirements: reqs, titleAvatarsReady: null, standardAvatarsReady: null, awaitPrepared: async () => { throw new Error('must not wait'); },
       jobStartAvatars: { T: {} }, seed: () => order.push('seed'), style: async (r: any[]) => { order.push(`style:${r.length}`); },
     });
     expect(order[0]).toBe('seed');
@@ -61,7 +61,7 @@ describe('1. early avatar styling runs the standard sheet at once', () => {
     const err = vi.spyOn(pipelineLog, 'error').mockImplementation(() => {});
     const style = vi.fn(async () => {});
     await pipeline.runTrialEarlyStyling({
-      requirements: reqs, titleAvatarsReady: Promise.resolve(), awaitTitle: async () => { throw new Error('timeout'); },
+      requirements: reqs, titleAvatarsReady: Promise.resolve(), standardAvatarsReady: null, awaitPrepared: async () => { throw new Error('timeout'); },
       jobStartAvatars: null, seed: () => {}, style,
     });
     // staging job_1791554548909_kl0phznw2: the costumed half gave up on a wait timeout and the front cover shipped missing

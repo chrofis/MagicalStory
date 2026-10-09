@@ -141,7 +141,8 @@ describe('reclampTrialApparentAge (age changed after the prewarm)', () => {
 describe('trial.js writes apparentAge only through the clamp', () => {
   it('has no direct physical.apparentAge assignment', () => {
     expect(TRIAL_ROUTE).not.toMatch(/physical\.apparentAge\s*=/);
-    expect((TRIAL_ROUTE.match(/applyTrialPhotoTraits\(physical,/g) || []).length).toBe(2);
+    // one writer left: create-anonymous-account's background save (generate-preview-avatar was the other, 2026-10-09)
+    expect((TRIAL_ROUTE.match(/applyTrialPhotoTraits\(physical,/g) || []).length).toBe(1);
     expect(TRIAL_ROUTE).toMatch(/reclampTrialApparentAge\(c\.physical, patchedAge\)/);
   });
 });

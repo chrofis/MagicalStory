@@ -59,11 +59,10 @@ describe('the server refuses a trial character with no age', () => {
     // The row stores the NORMALISED age — never the raw string, and never the
     // old `age || ''` that let an empty one through.
     expect(TRIAL_ROUTE).toMatch(/age: String\(parsedAge\.years\),/);
-    // The only surviving valid-if-present guard is generate-preview-avatar's:
-    // that endpoint fires while the user is still on the photo phase, before
-    // any age has been typed, so it cannot require one.
+    // No endpoint accepts an optional age any more: generate-preview-avatar was the last one (it fired
+    // before any age was typed) and is gone, the standard avatar starts only once the form holds an age.
     const optionalGuards = TRIAL_ROUTE.match(/if \(age && \(isNaN\(parseInt\(age\)\)/g) || [];
-    expect(optionalGuards.length, 'only the pre-age preview-avatar endpoint may stay optional').toBe(1);
+    expect(optionalGuards.length, 'no trial endpoint may take the age as optional').toBe(0);
   });
 
   it('update-character-details refuses an invalid age and never clears a stored one', () => {

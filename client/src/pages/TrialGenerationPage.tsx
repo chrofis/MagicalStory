@@ -45,7 +45,7 @@ interface LocationState {
     ideaPick?: { index: 0 | 1; attempt: number; offered: { title: string; summary: string }[] };
   };
   characterName: string;
-  previewAvatar: string | null;
+  heroAvatar: string | null;
   titlePageData?: {
     costumeType: string | null;
     avatarSlides?: string[];
@@ -754,7 +754,7 @@ export default function TrialGenerationPage() {
     // captions while the pipeline warms up.
     const avatarPool: { src: string; label: string }[] = [];
     const heroLabel = characterName || t.brand;
-    if (state?.previewAvatar) avatarPool.push({ src: state.previewAvatar, label: heroLabel });
+    if (state?.heroAvatar) avatarPool.push({ src: state.heroAvatar, label: heroLabel });
     for (let i = 0; i < avatarSlides.length; i++) {
       avatarPool.push({ src: avatarSlides[i], label: `${heroLabel} - Style ${i + 1}` });
     }
@@ -782,7 +782,7 @@ export default function TrialGenerationPage() {
     return items;
   // funnyMessages is a module-scope const (declared above the component); safe to omit from deps
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state?.previewAvatar, state?.characterName, state?.storyInput?.language, language, avatarSlides, t, funnyOrder]);
+  }, [state?.heroAvatar, state?.characterName, state?.storyInput?.language, language, avatarSlides, t, funnyOrder]);
 
   // Rotate slideshow — info messages stay up longer so they're readable;
   // funny + image-only slides tick faster. The interval re-fires on every

@@ -126,23 +126,23 @@ function trialSeasonOutfit(inputData = {}) {
 }
 
 /**
- * TRIAL: wait for the /api/trial/prepare-title task that is still styling this
- * visitor's avatar sheets, then read what it persisted. create-story used to
- * hold the whole request for this (28 s on job_1791490151653); now the job is
- * created at once and only the avatar-styling task calls this, so the writer runs
- * meanwhile. Waiting (not styling again) is what avoids duplicate sheets.
- * Throws on timeout or a missing row; the caller's early-styling catch logs it
- * and the coverage pass before the page loop restyles. No silent default.
- * (docs/decisions.md 2026-10-08)
+ * TRIAL: wait for a prepare task that is still styling one of this visitor's avatar sheets
+ * (/api/trial/prepare-title: the costumed sheet; /api/trial/prepare-standard-avatar: the standard sheet),
+ * then read what it persisted. create-story used to hold the whole request for this (28 s on
+ * job_1791490151653); now the job is created at once and only the avatar-styling task calls this, so the
+ * writer runs meanwhile. Waiting (not styling again) is what avoids duplicate sheets.
+ * Returns the sheets the job may seed (a standard sheet drawn for another age/gender is left out, loudly).
+ * Throws on timeout or a missing row; the caller's early-styling catch logs it and styles the sheet
+ * itself. No silent default. (docs/decisions.md 2026-10-08, 2026-10-09)
  */
-const TRIAL_TITLE_AVATARS_WAIT_MS = 60000;
-async function awaitTitleAvatars(ready, { userId, characterId, timeoutMs = TRIAL_TITLE_AVATARS_WAIT_MS, pool = dbPool }) {
+const TRIAL_PREPARED_AVATARS_WAIT_MS = 120000; // a costumed sheet took 86 s, a standard one ~60 s, on staging
+async function awaitPreparedAvatars(ready, { userId, characterId, what, timeoutMs = TRIAL_PREPARED_AVATARS_WAIT_MS, pool = dbPool }) {
   let timer;
   const timedOut = new Promise((_, reject) => {
-    timer = setTimeout(() => reject(new Error(`prepare-title still styling avatars after ${timeoutMs}ms`)), timeoutMs);
+    timer = setTimeout(() => reject(new Error(`${what} still styling avatars after ${timeoutMs}ms`)), timeoutMs);
   });
   const started = Date.now();
-  log.info(`[TRIAL] Job awaits the in-flight prepare-title for user ${userId} (avoid duplicate avatar styling)`);
+  log.info(`[TRIAL] Job awaits the in-flight ${what} for user ${userId} (avoid duplicate avatar styling)`);
   try {
     await Promise.race([ready, timedOut]);
   } finally {
@@ -150,30 +150,31 @@ async function awaitTitleAvatars(ready, { userId, characterId, timeoutMs = TRIAL
   }
   const rowId = `characters_${userId}`;
   const res = await pool.query('SELECT data FROM characters WHERE id = $1', [rowId]);
-  if (res.rows.length === 0) throw new Error(`awaitTitleAvatars: no characters row ${rowId}`);
+  if (res.rows.length === 0) throw new Error(`awaitPreparedAvatars: no characters row ${rowId}`);
   const data = typeof res.rows[0].data === 'string' ? JSON.parse(res.rows[0].data) : res.rows[0].data;
   const chars = Array.isArray(data) ? data : (data.characters || []);
   const main = chars.find(c => String(c.id) === String(characterId));
-  if (!main) throw new Error(`awaitTitleAvatars: character ${characterId} not in ${rowId}`);
-  log.info(`[TRIAL] prepare-title wait complete after ${Date.now() - started}ms`);
-  return main.preGeneratedStyledAvatars || null;
+  if (!main) throw new Error(`awaitPreparedAvatars: character ${characterId} not in ${rowId}`);
+  log.info(`[TRIAL] ${what} wait complete after ${Date.now() - started}ms`);
+  return require('./server/lib/trialSheets').usablePreparedAvatars(main);
 }
 
 /**
- * TRIAL early avatar styling (docs/decisions.md 2026-10-09). prepare-title only
- * ever produces the COSTUMED sheet, so only the costumed variant waits for it
- * (and is seeded from it). The standard sheet starts at once: awaiting
- * prepare-title before styling anything held the whole early task, and with it
- * every page and cover image behind "Waiting for early avatar styling"
- * (Tobias +53 s). A failure of either variant is logged, not rethrown: the
- * coverage pass before the page loop retries and fails the book if a sheet is
- * still missing.
+ * TRIAL early avatar styling (docs/decisions.md 2026-10-09). Both sheets are PREPARED before the job:
+ * the standard sheet by prepare-standard-avatar (the moment the form is filled), the costumed sheet by
+ * prepare-title (when the ideas are shown). The job seeds what the row held at job start, awaits whichever
+ * prepare call is still in flight and seeds its result, and styles only what is still missing
+ * (the two variants are independent: neither waits for the other, so a slow costumed sheet never holds the
+ * standard one, which was +53 s on every page and cover for Tobias). A failure of either variant is logged,
+ * not rethrown: the coverage pass before the page loop retries and fails the book if a sheet is still missing.
+ *
+ * awaitPrepared(ready) resolves to the persisted sheets of the finished prepare call.
  */
-function runTrialEarlyStyling({ requirements, titleAvatarsReady, awaitTitle, jobStartAvatars, seed, style, onDone }) {
+function runTrialEarlyStyling({ requirements, titleAvatarsReady, standardAvatarsReady, awaitPrepared, jobStartAvatars, seed, style, onDone }) {
   const isCostumed = (r) => String(r.clothingCategory).startsWith('costumed');
   const standardReqs = requirements.filter(r => !isCostumed(r));
   const costumedReqs = requirements.filter(isCostumed);
-  if (!titleAvatarsReady) seed(jobStartAvatars);
+  seed(jobStartAvatars); // what the row already held at job start (a finished sheet; no-op when null)
   const run = async (label, reqs, before) => {
     if (reqs.length === 0) return;
     try {
@@ -194,8 +195,8 @@ function runTrialEarlyStyling({ requirements, titleAvatarsReady, awaitTitle, job
   };
   return (async () => {
     await Promise.all([
-      run('standard', standardReqs, null),
-      run('costumed', costumedReqs, titleAvatarsReady ? async () => seed(await awaitTitle()) : null)
+      run('standard', standardReqs, standardAvatarsReady ? async () => seed(await awaitPrepared(standardAvatarsReady, 'prepare-standard-avatar')) : null),
+      run('costumed', costumedReqs, titleAvatarsReady ? async () => seed(await awaitPrepared(titleAvatarsReady, 'prepare-title')) : null)
     ]);
     if (onDone) onDone();
   })();
@@ -506,7 +507,7 @@ async function savePartialStoryFromCheckpoints(jobId, failureReason = 'Unknown f
 // UNIFIED STORY GENERATION
 // Single prompt generates complete story, Art Director expands scenes, then images
 // ============================================================================
-async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipImages, skipCovers, userId, modelOverrides = {}, isAdmin = false, enableFullRepair = true, checkCancellation = async () => {}, titleAvatarsReady = null) {
+async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipImages, skipCovers, userId, modelOverrides = {}, isAdmin = false, enableFullRepair = true, checkCancellation = async () => {}, titleAvatarsReady = null, standardAvatarsReady = null) {
   const timingStart = Date.now();
   log.debug(`📖 [UNIFIED] Starting unified story generation for job ${jobId}`);
 
@@ -625,7 +626,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
   // The hair text follows the approved avatar, read once per character and kept on the character row
   // (docs/decisions.md "Hair text follows the approved avatar"). Before anything reads hair: the writer's
   // cast, the Visual Bible, every sheet judge and every page prompt.
-  await require('./server/lib/avatarHair').ensureAvatarDerivedHair(inputData.characters || [], { userId, usageTracker: addUsage });
+  // A trial has no avatar before its sheets (the preview portrait is gone, docs/decisions.md 2026-10-09): nothing to read.
+  if (!inputData.trialMode) {
+    await require('./server/lib/avatarHair').ensureAvatarDerivedHair(inputData.characters || [], { userId, usageTracker: addUsage });
+  }
 
   // Spend guard shares the cancellation checkpoints: same call sites, same loud
   // failure path (the outer catch marks the job failed and refunds credits).
@@ -815,9 +819,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         }));
       });
 
-      // Seed cache with pre-generated styled avatars from prepare-title (avoid re-generating).
-      // Called from the styling task below, AFTER the job has awaited an in-flight
-      // prepare-title (create-story no longer does: docs/decisions.md 2026-10-08).
+      // Seed cache with the sheets the prepare calls made (avoid re-generating): the standard sheet from
+      // prepare-standard-avatar, the costumed one from prepare-title. Called from the styling task below, AFTER the
+      // job has awaited whichever call is still in flight (create-story no longer does: docs/decisions.md 2026-10-08).
+      // standardPrepared: the standard sheet came from a prepare call, so its slides are already stored.
+      let standardPrepared = false;
       const seedPreGeneratedAvatars = (preGenAvatars) => {
         if (!preGenAvatars) return;
         let seeded = 0;
@@ -857,19 +863,20 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             } else if (category !== 'costumed') {
               setStyledAvatar(charName, category, artStyle, imageData);
               rememberOnCharacter(charName, category, imageData);
+              if (category === 'standard') standardPrepared = true;
               seeded++;
             }
           }
         }
-        if (seeded > 0) log.info(`♻️ [TRIAL] Seeded ${seeded} styled avatars from prepare-title cache (cache + character object)`);
+        if (seeded > 0) log.info(`♻️ [TRIAL] Seeded ${seeded} prepared styled avatars (cache + character object)`);
       };
 
       log.info(`🎨 [TRIAL] Starting immediate avatar styling (${trialAvatarRequirements.length} variants)...`);
-      // Two tasks, not one (docs/decisions.md 2026-10-09). prepare-title only ever
-      // produces the COSTUMED sheet, so only the costumed variant waits for it
-      // (and is seeded from it). The standard sheet starts at once: awaiting
-      // prepare-title first held the whole early task, and with it every page and
-      // cover image behind "Waiting for early avatar styling" (Tobias +53 s).
+      // Two tasks, not one (docs/decisions.md 2026-10-09). Both sheets are normally PREPARED before the job
+      // (standard at the form, costumed with the ideas), so each task seeds its sheet from the row and awaits the
+      // prepare call if it is still in flight; only a sheet nobody prepared is styled here. The two never wait for
+      // each other: awaiting prepare-title before styling anything held every page and cover image behind
+      // "Waiting for early avatar styling" (Tobias +53 s).
       // Trial skips the sheet reviews (owner 2026-08-15): skipQualityEval
       // reaches generateComposited2x4 as skipReview — 1 try per row, no
       // bodies/heads/identity/style eval. Measured on job_1786818831439:
@@ -878,21 +885,23 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       streamingAvatarStylingPromise = runTrialEarlyStyling({
         requirements: trialAvatarRequirements,
         titleAvatarsReady,
-        // The same-scope cache already holds its sheet, the DB row carries the
+        standardAvatarsReady,
+        // The same-scope cache already holds the sheet, the DB row carries the
         // persisted copy the seeding reads.
-        awaitTitle: () => awaitTitleAvatars(titleAvatarsReady, { userId, characterId: (inputData.characters || [])[0]?.id }),
-        // No in-flight prepare-title (finished before the job, or never ran): the
-        // job-start row read is all there is.
-        jobStartAvatars: (inputData.characters || [])[0]?.preGeneratedStyledAvatars,
+        awaitPrepared: (ready, what) => awaitPreparedAvatars(ready, { userId, characterId: (inputData.characters || [])[0]?.id, what }),
+        // What the row held when the job started (a finished prepare call): seeded first. A standard sheet
+        // drawn for another age/gender than the row now says is left out, loudly (usablePreparedAvatars).
+        jobStartAvatars: require('./server/lib/trialSheets').usablePreparedAvatars((inputData.characters || [])[0]),
         seed: seedPreGeneratedAvatars,
         style: (reqs) => prepareStyledAvatars(inputData.characters || [], artStyle, reqs, trialClothingRequirements, addUsage, modelOverrides.storyAvatarModel || null, { skipQualityEval: true, seasonOutfit: trialSeasonOutfit(inputData) }),
         onDone: () => {
           earlyAvatarStylingSucceeded = getStyledAvatarCacheStats().size > 0;
           log.info(`✅ [TRIAL] Early avatar styling complete: ${getStyledAvatarCacheStats().size} cached`);
-          // The standard sheet exists only now (prepare-title makes the costumed one): put its head and body
-          // cells into the waiting-page slideshow next to the costumed ones (docs/decisions.md 2026-10-09).
+          // A standard sheet the job styled itself (no prepare call made it) is new to the waiting-page slideshow:
+          // put its head and body cells next to the costumed ones. A prepared one is already in the stored slides,
+          // cut by the prepare call (docs/decisions.md 2026-10-09).
           const main = (inputData.characters || [])[0];
-          const styled = main && getStyledAvatarsForCharacter(main.name, artStyle);
+          const styled = !standardPrepared && main && getStyledAvatarsForCharacter(main.name, artStyle);
           if (styled) {
             require('./server/lib/avatarSlides')
               .persistAvatarSlides({ characterId: `characters_${userId}`, userId, styledAvatars: styled })
@@ -7899,7 +7908,7 @@ async function _processStoryJobImpl(jobId, opts = {}) {
     );
 
     log.debug(`📚 [PIPELINE] Unified mode - single prompt + Art Director scene expansion`);
-    return await processUnifiedStoryJob(jobId, inputData, characterPhotos, skipImages, skipCovers, job.user_id, modelOverrides, isAdmin, enableFullRepair, checkCancellation, opts.titleAvatarsReady || null);
+    return await processUnifiedStoryJob(jobId, inputData, characterPhotos, skipImages, skipCovers, job.user_id, modelOverrides, isAdmin, enableFullRepair, checkCancellation, opts.titleAvatarsReady || null, opts.standardAvatarsReady || null);
 
   } catch (error) {
     // Clear styled avatar cache on error too
@@ -8046,7 +8055,7 @@ module.exports = {
   deleteJobCheckpoints,
   savePartialStoryFromCheckpoints,
   processStoryJob,
-  awaitTitleAvatars, // test seam
+  awaitPreparedAvatars, // test seam
   runTrialEarlyStyling, // test seam
   streamingProgressFor, // test seam
 };

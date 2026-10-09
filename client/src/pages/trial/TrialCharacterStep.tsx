@@ -12,6 +12,9 @@ import { classifyAccountCreateFailure } from '@/utils/trialSession';
 import { localizedApiError } from '@/utils/apiErrors';
 
 const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY || '';
+// The standard avatar sheet starts once the form has not changed for this long (an age of two digits passes the
+// validity check at its first digit, and the account is created on that instant).
+const STANDARD_AVATAR_QUIET_MS = 2000;
 
 // ─── Localized strings ──────────────────────────────────────────────────────
 
@@ -238,8 +241,8 @@ interface TrialCharacterStepProps {
   characterData: CharacterData;
   onChange: (data: CharacterData) => void;
   onNext: () => void;
-  previewAvatar?: string | null;
-  onAvatarGenerated?: (avatarImage: string) => void;
+  /** Receives the standard avatar sheet's front cell (the hero's picture) when it is drawn. */
+  onHeroAvatar?: (avatarImage: string) => void;
   onAccountCreated?: (sessionToken: string, characterId: string) => void;
   sessionToken?: string | null;
   language: string;
@@ -248,7 +251,7 @@ interface TrialCharacterStepProps {
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export default function TrialCharacterStep({ characterData, onChange, onNext, previewAvatar, onAvatarGenerated, onAccountCreated, sessionToken, language, adminToken }: TrialCharacterStepProps) {
+export default function TrialCharacterStep({ characterData, onChange, onNext, onHeroAvatar, onAccountCreated, sessionToken, language, adminToken }: TrialCharacterStepProps) {
   const t = strings[language] || strings.en;
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -306,8 +309,6 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
   const [nextWaitingForPhoto, setNextWaitingForPhoto] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
 
-  // Avatar generation state
-  const [isGeneratingAvatar, setIsGeneratingAvatar] = useState(false);
   const [avatarError, setAvatarError] = useState<string | null>(null);
   const [isCreatingAccount, setIsCreatingAccount] = useState(false);
 
@@ -358,72 +359,6 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
   const photoPending = !hasPhoto && !!pickedFaceThumb;
   const canQueueNext = !!(characterData.name.trim() && characterData.gender && ageIsValid && photoPending);
 
-  // Track which face photo the current avatar was generated for
-  const facePhotoKey = characterData.photos.face ? characterData.photos.face.slice(-40) : '';
-  // Initialize with current facePhotoKey if avatar already exists (survives component remount)
-  const avatarPhotoKeyRef = useRef<string>(previewAvatar ? facePhotoKey : '');
-  // Latest photo key (read by the in-flight generation when it lands) and the key a generation was
-  // last started for (stops a failed generation from re-triggering itself in a loop).
-  const currentPhotoKeyRef = useRef<string>(facePhotoKey);
-  currentPhotoKeyRef.current = facePhotoKey;
-  const avatarAttemptKeyRef = useRef<string>('');
-
-  // Start avatar generation in the background as soon as photo is ready
-  // Re-triggers when photo changes (different face photo = different key)
-  useEffect(() => {
-    if (!hasPhoto || isGeneratingAvatar) return;
-    if (!characterData.photos.face) return;
-    // Skip if avatar was already generated for this exact photo
-    if (previewAvatar && avatarPhotoKeyRef.current === facePhotoKey) return;
-    // Already tried for this exact photo (a failed attempt must not loop)
-    if (avatarAttemptKeyRef.current === facePhotoKey) return;
-    avatarAttemptKeyRef.current = facePhotoKey;
-
-    // Clear stale avatar from previous photo
-    if (previewAvatar && avatarPhotoKeyRef.current !== facePhotoKey) {
-      onAvatarGenerated?.(null as any);
-    }
-
-    setIsGeneratingAvatar(true);
-
-    const generateAvatar = async () => {
-      try {
-        // Use current character data for prompt hints (defaults if not yet filled in)
-        const data = characterDataRef.current;
-        // Prefer bodyNoBg (shows clothing) with face as fallback
-        const photoToSend = data.photos.bodyNoBg || data.photos.face;
-        const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/trial/generate-preview-avatar`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: data.name || 'Child',
-            age: data.age || '7',
-            gender: data.gender || '',
-            facePhoto: photoToSend,
-            fingerprint,
-          }),
-        });
-
-        const result = await response.json();
-        // The visitor may have swapped photos while this was generating: a result for a photo
-        // that is no longer current is dropped, the effect re-runs for the new one when we finish.
-        if (response.ok && result.avatarImage && currentPhotoKeyRef.current === facePhotoKey) {
-          avatarPhotoKeyRef.current = facePhotoKey;
-          trackTrialStep('avatar_ready');
-          onAvatarGenerated?.(result.avatarImage);
-        }
-      } catch {
-        // Avatar generation failure is non-blocking
-      } finally {
-        setIsGeneratingAvatar(false);
-      }
-    };
-
-    generateAvatar();
-  // Trigger when photo changes (facePhotoKey changes when different photo uploaded)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasPhoto, facePhotoKey, isGeneratingAvatar]);
-
   // Shared account creation logic — invoked either by the background prewarm
   // effect (the moment the form first becomes valid) or by handleNext as a
   // fallback if the prewarm hasn't fired yet. Returns null on failure so the
@@ -464,7 +399,6 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
         bodyPhoto: data.photos.body,
         bodyNoBgPhoto: data.photos.bodyNoBg,
         faceBox: data.photos.faceBox,
-        previewAvatar: previewAvatar || undefined,
         turnstileToken: token,
         fingerprint,
         ...(adminToken ? { adminToken } : {}),
@@ -548,6 +482,44 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
     }
   };
 
+  // The standard avatar sheet (the hero's picture, and the sheet the story reuses): it needs only the photo, the age
+  // and the gender, so it starts as soon as the account exists and the form has been quiet for a moment, not when the
+  // topic is picked. It runs in the background; nothing here waits for it. One call per account (the server styles one
+  // sheet per trial); a failure only means the story job styles the sheet itself. docs/decisions.md 2026-10-09.
+  const standardAvatarStartedRef = useRef(false);
+  const startStandardAvatar = async (token: string) => {
+    if (standardAvatarStartedRef.current) return;
+    standardAvatarStartedRef.current = true;
+    // The account was created with whatever the form held the moment it first looked valid (age "1" while "10" is
+    // still being typed); the sheet is drawn for the age and gender on the server's row, so bring it up to date first.
+    await syncDetails(token);
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/trial/prepare-standard-avatar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: '{}',
+      });
+      const result = await response.json();
+      if (response.ok && result.avatarImage) {
+        trackTrialStep('avatar_ready');
+        onHeroAvatar?.(result.avatarImage);
+      }
+    } catch {
+      // Non-blocking: the story job styles the standard sheet itself.
+    }
+  };
+
+  // Fire it once the prewarmed account has resolved and the form has stopped changing.
+  useEffect(() => {
+    if (!canProceed || standardAvatarStartedRef.current) return;
+    const timer = setTimeout(async () => {
+      const account = await accountCreationPromiseRef.current;
+      if (account) startStandardAvatar(account.sessionToken);
+    }, STANDARD_AVATAR_QUIET_MS);
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canProceed, characterData.name, characterData.age, characterData.gender]);
+
   // Create anonymous account (if not already done in background) and advance.
   const handleNext = async () => {
     if (!canProceed || !characterData.photos.face) return;
@@ -583,6 +555,7 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
       // a fixed body; later name/gender/age/traits/customTraits edits
       // wouldn't reach the DB without this PATCH.
       await syncDetails(activeSession!.sessionToken);
+      void startStandardAvatar(activeSession!.sessionToken); // no-op when the quiet-form trigger already started it
 
       if (onAccountCreated && activeSession) {
         onAccountCreated(activeSession.sessionToken, activeSession.characterId);
@@ -1105,14 +1078,6 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
             {isCreatingAccount || nextWaitingForPhoto ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
-              </>
-            ) : isGeneratingAvatar && canProceed ? (
-              // Avatar prewarm running but all required fields filled — button
-              // is enabled, label reflects the background work that's finishing.
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span>{characterData.name || '...'} {language === 'de' ? 'wird erstellt' : language === 'fr' ? 'en cours de création' : language === 'it' ? 'in fase di creazione' : 'is being created'}</span>
-                <ArrowRight className="w-4 h-4" />
               </>
             ) : !canProceed && !canQueueNext ? (
               // Button is disabled because required fields are missing — tell

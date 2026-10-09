@@ -4,7 +4,7 @@
  *
  * The trial equivalent of scripts/admin/showcase.js. Drives the same public
  * trial API the /try wizard uses (no browser): analyze-photo →
- * generate-preview-avatar → create-anonymous-account → generate-ideas-stream →
+ * create-anonymous-account → prepare-standard-avatar → generate-ideas-stream →
  * create-story → poll.
  * Turnstile and the fingerprint check are bypassed with the purpose-scoped
  * admin HMAC from GET /api/trial/admin-bypass-token (5-min TTL, admin JWT
@@ -36,7 +36,7 @@
  * /api/trial/generate-ideas-stream and parses the cards exactly as
  * TrialIdeasStep.tsx does, posting the selected one in the same shape.
  *
- * COST: one trial = 5 pages + title page + one preview avatar ≈ CHF 0.20–0.35.
+ * COST: one trial = 5 pages + title page + the two avatar sheets ≈ CHF 0.20–0.35.
  * The idea call adds two claude-sonnet completions (~1.5k in / ~300 out each)
  * ≈ USD 0.02. Per CLAUDE.md this is a paid run — only launch when the owner
  * asked for it.
@@ -292,7 +292,7 @@ if (require.main === module) (async () => {
   //
   // Before 2026-09-07 this script printed only end-to-end and invited a
   // comparison against "123s baseline". End-to-end also contains photo
-  // analysis and the preview avatar — ~67s on an idle staging, where the
+  // analysis — ~67s on an idle staging, where the
   // Python analyzer is cold: measured 45s for a fully-cold analyze-photo
   // against ~6.5s warm (tests/manual/time-analyzer-warmup.js). Production
   // traffic keeps that service warm, so no real user pays it. Reading the two
@@ -319,21 +319,7 @@ if (require.main === module) (async () => {
   if (!analysis.faceThumbnail) console.warn(`[${chTime(new Date())}] no faceThumbnail returned — falling back to the full photo (identity anchor will be weak)`);
   console.log(`[${chTime(new Date())}] photo analysed — faceCount: ${analysis.faceCount ?? 'n/a'}, faceCrop: ${analysis.faceThumbnail ? 'yes' : 'NO'}, traits: ${Object.keys(traits).join(',') || 'none'}`);
 
-  // 2. Preview avatar — the wizard generates one before account creation, and
-  //    the pipeline seeds avatars.standard from it. Skipping it would diverge
-  //    from the real trial path.
-  let previewAvatar = null;
-  try {
-    const av = await api(args.base, '/api/trial/generate-preview-avatar', {
-      body: { name: entry.name, age: entry.age, gender: entry.gender, facePhoto: faceCrop, adminToken },
-    });
-    previewAvatar = av.avatarImage || null;
-    console.log(`[${chTime(new Date())}] preview avatar generated`);
-  } catch (e) {
-    console.warn(`[${chTime(new Date())}] preview avatar failed (${e.message.slice(0, 120)}) — continuing without it`);
-  }
-
-  // 3. Anonymous trial account (fresh every run → the one-trial-per-user cap
+  // 2. Anonymous trial account (fresh every run → the one-trial-per-user cap
   //    never blocks a showcase).
   const acct = await api(args.base, '/api/trial/create-anonymous-account', {
     body: {
@@ -344,10 +330,19 @@ if (require.main === module) (async () => {
       bodyPhoto: analysis.bodyCrop || null,
       bodyNoBgPhoto: analysis.bodyNoBg || null,
       faceBox: analysis.faceBox || null,
-      previewAvatar, adminToken,
+      adminToken,
     },
   });
   console.log(`[${chTime(new Date())}] trial account ${acct.userId} created`);
+
+  // 3a. prepare-standard-avatar, fired WITHOUT awaiting, exactly as TrialCharacterStep.tsx does once the form
+  //     is filled: it styles the standard sheet the job and the waiting page reuse (docs/decisions.md
+  //     2026-10-09). A create-story that lands while it still runs exercises the in-flight handoff.
+  const tStandard = Date.now();
+  const standardPromise = api(args.base, '/api/trial/prepare-standard-avatar', { bearer: acct.sessionToken, body: {} }).then(
+    () => console.log(`[${chTime(new Date())}] standard sheet done in ${Math.round((Date.now() - tStandard) / 1000)}s`),
+    e => console.warn(`[${chTime(new Date())}] prepare-standard-avatar failed: ${e.message.slice(0, 160)}`),
+  );
 
   // 3b. prepare-title, fired WITHOUT awaiting, exactly as TrialIdeasStep.tsx does on
   //     mount (parallel with the ideas). It styles the costumed sheet the job reuses;
@@ -407,7 +402,7 @@ if (require.main === module) (async () => {
   });
   const jobId = started.jobId || started.id;
   tJobStart = Date.now();
-  console.log(`[${chTime(new Date())}] story job ${jobId} started — setup took ${Math.round((tJobStart - t0) / 1000)}s (photo analysis + preview avatar; not part of the job baseline)`);
+  console.log(`[${chTime(new Date())}] story job ${jobId} started — setup took ${Math.round((tJobStart - t0) / 1000)}s (photo analysis; not part of the job baseline)`);
   if (picked.fromRotation) {
     advanceState(entry, entries);
   }
@@ -449,11 +444,11 @@ if (require.main === module) (async () => {
       console.log('─'.repeat(72));
       console.log(`${st.status.toUpperCase()} in ${secs}s (${(secs / 60).toFixed(1)} min) end-to-end`);
       if (jobSecs != null) {
-        console.log(`  setup : ${setupSecs}s  (photo analysis + preview avatar — cold on an idle staging, warm in production)`);
+        console.log(`  setup : ${setupSecs}s  (photo analysis — cold on an idle staging, warm in production)`);
         console.log(`  job   : ${jobSecs}s  ← compare THIS against the baseline`);
       }
       console.log(`  first visible (job +s): slides ${seen.slides ?? '—'}, title ${seen.title ?? '—'}, page ${seen.page ?? '—'}, teaser ${seen.teaser ?? '—'}`);
-      await preparePromise;
+      await Promise.all([preparePromise, standardPromise]);
       if (st.error_message) console.log(`error: ${st.error_message}`);
       console.log(`story : ${args.base}/create?storyId=${jobId}`);
       console.log(`job   : ${jobId}`);

@@ -30,8 +30,11 @@ describe('trial art style', () => {
   const src = fs.readFileSync(path.resolve(__dirname, '../../server/routes/trial.js'), 'utf8');
   it('exports one constant and no code path hardcodes the style literal', () => {
     expect(trial.TRIAL_ART_STYLE).toBe('watercolor');
-    const literals = src.match(/'watercolor'/g) || [];
-    expect(literals).toHaveLength(1); // the constant definition
+    // the constant is defined once, in lib/trialSheets.js (both avatar endpoints and the route share it); the route imports it
+    const lib = fs.readFileSync(path.resolve(__dirname, '../../server/lib/trialSheets.js'), 'utf8');
+    expect((lib.match(/'watercolor'/g) || []).length).toBe(1);
+    expect((src.match(/'watercolor'/g) || []).length).toBe(0);
+    expect(src).toContain('const { TRIAL_ART_STYLE } = trialSheets;');
   });
 });
 

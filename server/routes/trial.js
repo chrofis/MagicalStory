@@ -28,7 +28,10 @@ const { plausiblePhysical } = require('../lib/characterPhysical');
 // The trial's declared age is MANDATORY (owner, 2026-09-15) — one parser for
 // every entry point below. See server/lib/trialAge.js for the range and why
 // the field became load-bearing (de8753cc1).
-const { parseTrialAge, applyTrialPhotoTraits, reclampTrialApparentAge, buildTrialPreviewAvatarPrompt } = require('../lib/trialAge');
+const { parseTrialAge, applyTrialPhotoTraits, reclampTrialApparentAge } = require('../lib/trialAge');
+// The trial's prepared avatar sheets (standard + costumed): styling, persistence, reuse. TRIAL_ART_STYLE is the one art style.
+const trialSheets = require('../lib/trialSheets');
+const { TRIAL_ART_STYLE } = trialSheets;
 
 // Server.js-local dependencies received via initTrialRoutes()
 let deps = {};
@@ -37,13 +40,10 @@ function initTrialRoutes(serverDeps) {
   deps = serverDeps;
 }
 
-// Trait-extraction in-flight + value cache. The trial flow calls
-// extractTraitsWithGemini concurrently from generate-preview-avatar and
-// create-anonymous-account — the prewarm fires the second call ~2s after
-// the first while the first is still running, so a value-only cache never
-// gets populated in time. We cache the in-flight Promise itself so the
-// second caller awaits the same Gemini call. Resolved values stay cached
-// for 10 minutes for late callers (back/forward nav etc).
+// Trait-extraction in-flight + value cache for create-anonymous-account. A repeat call for the same photo
+// (the prewarm retried, back/forward navigation) awaits the same in-flight Gemini call instead of starting a
+// second one; resolved values stay cached for 10 minutes. (generate-preview-avatar used to be the second
+// caller; it is gone, docs/decisions.md 2026-10-09.)
 const TRAIT_CACHE_TTL_MS = 10 * 60 * 1000;
 const traitValueCache = new Map();   // hash -> { traits, expiresAt }
 const traitPromiseCache = new Map(); // hash -> Promise<traits|null>
@@ -176,10 +176,13 @@ const titlePageLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-// Registry of in-flight title-page generation promises, keyed by userId.
-// The trial /start route awaits these so styled avatars are persisted before
-// the story job reads the character DB — avoiding duplicate avatar styling.
+// Registries of in-flight avatar-sheet promises, keyed by userId: prepare-title (the COSTUMED sheet) and
+// prepare-standard-avatar (the STANDARD sheet). create-story hands them to the story job, which awaits them
+// before it reads the character row, so each sheet is styled once (docs/decisions.md 2026-10-08, 2026-10-09).
 const inFlightTitlePagePromises = new Map(); // userId -> Promise
+const inFlightStandardAvatarPromises = new Map(); // userId -> Promise
+// create-anonymous-account's background photo-trait save; the standard sheet awaits it so it is drawn with the traits.
+const inFlightTraitSaves = new Map(); // userId -> Promise (never rejects)
 
 // ─── Admin bypass: admins can test the trial flow repeatedly ─────────────────
 // Checks for an adminToken in req.body — if it decodes to a valid admin JWT,
@@ -423,7 +426,7 @@ async function getTrialFunnel(days = 30) {
 // and the event endpoint rejects anything not in this list — the whole point of
 // the table is that steps are a closed set that groups, not free text.
 //
-// Everything up to and including `avatar_ready` happens BEFORE an anonymous
+// Everything up to and including `face_picked` happens BEFORE an anonymous
 // account exists, which is the stretch that was previously invisible.
 const TRIAL_FUNNEL_STEPS = [
   'landing',              // /try mounted (includes bots; intro_start is the first human click)
@@ -432,12 +435,11 @@ const TRIAL_FUNNEL_STEPS = [
   'photo_selected',       // chose a file
   'photo_analyzed',       // analyze-photo returned a usable face
   'face_picked',          // resolved the multi-face modal
-  // Avatar generation starts the moment the photo is ready (a background effect
-  // in TrialCharacterStep), while the account prewarm waits for name + gender —
-  // so avatar_ready genuinely precedes character_saved. Measured on prod
-  // 2026-08-20: 2 visits reached avatar_ready with 0 accounts created.
-  'avatar_ready',         // preview avatar rendered
   'character_saved',      // create-anonymous-account returned — a users row now exists
+  // The standard avatar sheet starts once the account exists and the form is quiet, so this step now follows
+  // character_saved (until 2026-10-09 it was the preview avatar and came before it). OPTIONAL: a visitor
+  // who presses Next before the sheet is drawn never emits it, which is not a loss.
+  'avatar_ready',         // the standard sheet's front cell arrived while still in the wizard
   'character_done',       // left step 1 for the topic step
   'topic_selected',       // left the topic step
   'ideas_generated',      // ideas came back
@@ -487,7 +489,7 @@ const ACCEPTED_EVENT_STEPS = new Set([...TRIAL_FUNNEL_STEPS, ...SITE_VISIT_STEPS
 // and drive the next step's rate to 0%. The two gate steps are optional for the
 // same reason: not every visit reaches a locked page (writer-phase quitters,
 // Google before the text), and not every visit unlocks one.
-const OPTIONAL_TRIAL_STEPS = new Set(['face_picked', 'gate_seen', 'gate_unlocked', 'email_submitted']);
+const OPTIONAL_TRIAL_STEPS = new Set(['face_picked', 'avatar_ready', 'gate_seen', 'gate_unlocked', 'email_submitted']);
 
 // Crawlers hit /try and would otherwise inflate `landing`. Not a security
 // control — a bot that wants in can lie — just noise reduction so the top of
@@ -977,247 +979,6 @@ function generateSessionToken(userId) {
   );
 }
 
-// ─── Task 0: Trial Preview Avatar Generation ────────────────────────────────
-
-/**
- * POST /api/trial/generate-preview-avatar
- *
- * Generate a single preview avatar for the "Meet [Name]!" celebration screen.
- * Protected by: IP rate limit + Turnstile + fingerprint.
- * Does NOT create a user account or store anything in the database.
- */
-router.post('/generate-preview-avatar', trialAvatarLimiter, async (req, res) => {
-  try {
-    const { name, age, gender, facePhoto, turnstileToken, fingerprint } = req.body;
-
-    // Validate required fields
-    if (!facePhoto || !name) {
-      return res.status(400).json({ error: 'Name and photo are required', code: 'NAME_AND_PHOTO_REQUIRED' });
-    }
-    if (typeof name !== 'string' || name.length > 50) {
-      return res.status(400).json({ error: 'Invalid name', code: 'INVALID_NAME' });
-    }
-    if (gender && !['male', 'female'].includes(gender)) {
-      return res.status(400).json({ error: 'Invalid gender', code: 'INVALID_GENDER' });
-    }
-    if (age && (isNaN(parseInt(age)) || parseInt(age) < 1 || parseInt(age) > 18)) {
-      return res.status(400).json({ error: 'Invalid age', code: 'INVALID_AGE' });
-    }
-
-    // Sanitize name for logging (strip newlines to prevent log injection)
-    const safeName = name.replace(/[\r\n]/g, '');
-
-    // Fingerprint + Turnstile verified at account creation instead —
-    // preview avatars are non-critical and already rate-limited by trialAvatarLimiter.
-
-    // Check daily cap
-    if (!checkAndIncrementTrialCap('avatar')) {
-      return res.status(503).json({ error: 'Service temporarily unavailable. Please try again tomorrow.', code: 'DAILY_CAPACITY_REACHED' });
-    }
-
-    log.info(`[TRIAL AVATAR] Generating preview avatar for "${safeName}" (age: ${age}, gender: ${gender})`);
-
-    // Resize face photo for Gemini
-    const base64Input = stripDataUriPrefix(facePhoto);
-    const inputBuffer = Buffer.from(base64Input, 'base64');
-    const resizedBuffer = await sharp(inputBuffer)
-      .resize({ width: 512, height: 512, fit: 'inside', withoutEnlargement: true })
-      .jpeg({ quality: 85 })
-      .toBuffer();
-    const resizedBase64 = resizedBuffer.toString('base64');
-
-    // Build avatar prompt using standard clothing from the main avatar prompt template
-    const isFemale = gender === 'female';
-    const ageNum = parseInt(age) || 7;
-
-    // Use the same "standard" clothing style as the real avatar generation
-    const { getClothingStylePrompt, extractTraitsWithGemini } = require('./avatars');
-    const standardClothing = getClothingStylePrompt('standard', isFemale);
-
-    // Extract physical traits from photo (especially hair) for consistent avatar generation
-    let hairDescription = '';
-    let extractedTraits = null;
-    try {
-      // Shared in-flight: if create-anonymous-account fired the same
-      // extraction a moment ago we piggyback on it. Otherwise we start it
-      // and a later caller piggybacks on us.
-      const photoDataUri = `data:image/jpeg;base64,${resizedBase64}`;
-      extractedTraits = await extractTraitsShared(facePhoto, photoDataUri, extractTraitsWithGemini);
-      if (extractedTraits) {
-        const { buildHairDescription } = require('../lib/storyHelpers');
-        hairDescription = buildHairDescription(plausiblePhysical(extractedTraits, { age: ageNum, gender }));
-        if (hairDescription) {
-          log.info(`[TRIAL AVATAR] Extracted hair traits: "${hairDescription}"`);
-        }
-      }
-    } catch (traitErr) {
-      log.debug(`[TRIAL AVATAR] Trait extraction failed (non-critical): ${traitErr.message}`);
-    }
-
-    const prompt = buildTrialPreviewAvatarPrompt({ age: ageNum, isFemale, hairDescription, standardClothing });
-
-    const geminiApiKey = process.env.GEMINI_API_KEY;
-    if (!geminiApiKey) {
-      log.error('[TRIAL AVATAR] No GEMINI_API_KEY configured');
-      return res.status(503).json({ error: 'Avatar generation service unavailable' });
-    }
-
-    const requestBody = {
-      contents: [{
-        parts: [
-          {
-            inline_data: {
-              mime_type: 'image/jpeg',
-              data: resizedBase64
-            }
-          },
-          { text: prompt }
-        ]
-      }],
-      generationConfig: {
-        temperature: 0.3,
-        responseModalities: ['TEXT', 'IMAGE'],
-        imageConfig: { aspectRatio: '9:16' }
-      },
-      safetySettings: [
-        { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_ONLY_HIGH' },
-        { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_ONLY_HIGH' },
-        { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_ONLY_HIGH' },
-        { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_ONLY_HIGH' }
-      ]
-    };
-
-    assertPromptFilled(requestBody.contents[0].parts, 'trial:generate-preview-avatar');
-
-    // Try Gemini with one retry on 503, then fall back to Grok
-    let avatarImage = null;
-    let safetyBlocked = false;
-    let data = null;
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${geminiApiKey}`;
-
-    for (let attempt = 0; attempt < 2 && !avatarImage; attempt++) {
-      try {
-        if (attempt > 0) {
-          log.info(`[TRIAL AVATAR] Retry ${attempt} after 5s delay...`);
-          await new Promise(r => setTimeout(r, 5000));
-        }
-        const response = await fetch(geminiUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(requestBody)
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          log.error(`[TRIAL AVATAR] Gemini API error ${response.status} (attempt ${attempt + 1}): ${errorText.substring(0, 200)}`);
-          if (response.status !== 503 && response.status !== 429) break; // Only retry on transient errors
-          continue;
-        }
-
-        data = await response.json();
-        if (data.promptFeedback?.blockReason) {
-          log.warn(`[TRIAL AVATAR] Blocked by safety: ${data.promptFeedback.blockReason}`);
-          safetyBlocked = true;
-          break;
-        }
-
-        if (data.candidates?.[0]?.content?.parts) {
-          for (const part of data.candidates[0].content.parts) {
-            if (part.inlineData?.mimeType?.startsWith('image/')) {
-              avatarImage = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-              break;
-            }
-          }
-        }
-      } catch (fetchErr) {
-        log.error(`[TRIAL AVATAR] Gemini fetch error (attempt ${attempt + 1}): ${fetchErr.message}`);
-      }
-    }
-
-    if (safetyBlocked) {
-      return res.status(422).json({ error: 'Photo could not be processed. Please try a different photo.', code: 'PHOTO_UNPROCESSABLE' });
-    }
-
-    // Fallback to Grok if Gemini failed
-    if (!avatarImage) {
-      try {
-        const { generateImageOnly } = require('../lib/images');
-        const { isGrokConfigured } = require('../lib/grok');
-        if (isGrokConfigured()) {
-          log.info('[TRIAL AVATAR] Gemini failed — falling back to Grok');
-          const faceDataUri = `data:image/jpeg;base64,${resizedBase64}`;
-          const grokResult = await generateImageOnly(prompt, [{ name: `${safeName}_face`, data: faceDataUri }], {
-            imageModelOverride: 'grok-imagine',
-            imageBackendOverride: 'grok',
-            aspectRatio: '9:16',
-            skipCache: true,
-            stripBorder: false // avatar face — never crop
-          });
-          if (grokResult?.imageData) {
-            avatarImage = grokResult.imageData;
-            log.info('[TRIAL AVATAR] Grok fallback succeeded');
-          }
-        }
-      } catch (grokErr) {
-        log.error(`[TRIAL AVATAR] Grok fallback failed: ${grokErr.message}`);
-      }
-    }
-
-    if (!avatarImage) {
-      log.error('[TRIAL AVATAR] All avatar generation attempts failed');
-      return res.status(502).json({ error: 'Avatar generation failed. Please try again.', code: 'AVATAR_FAILED' });
-    }
-
-    // Compress to JPEG
-    const { compressImageToJPEG } = require('../lib/images');
-    const compressed = await compressImageToJPEG(avatarImage, 85, 768);
-    const finalImage = compressed || avatarImage;
-
-    const { input_tokens: inputTokens, output_tokens: outputTokens, thinking_tokens: thinkingTokens } = require('../lib/providerUsage').geminiUsage(data?.usageMetadata);
-    log.info(`[TRIAL AVATAR] ✅ Generated preview avatar for "${safeName}" (${inputTokens} in / ${outputTokens} out / ${thinkingTokens} thinking)`);
-
-    // If session token provided, save avatar to character in DB
-    const authHeader = req.headers['authorization'];
-    const sessionTokenStr = authHeader && authHeader.split(' ')[1];
-    if (sessionTokenStr && req.body.characterId) {
-      try {
-        const decoded = verifyToken(sessionTokenStr);
-        if (decoded.anonymous && decoded.userId) {
-          // Slow work (R2 upload of the avatar bytes) first; then a short locked
-          // merge of only the fields this route owns (review 2026-10 T5). A trial
-          // user's row id is always characters_<userId>, which is the ownership check.
-          const rowId = req.body.characterId;
-          if (rowId === `characters_${decoded.userId}`) {
-            const fragment = { previewAvatar: finalImage };
-            await offloadCharacterImages(rowId, decoded.userId, fragment);
-            const saved = await modifyCharactersRow(rowId, decoded.userId, (charData) => {
-              if (!charData.characters?.[0]) return false;
-              charData.characters[0].previewAvatar = fragment.previewAvatar;
-              // Save extracted physical traits for story generation pipeline
-              if (extractedTraits) {
-                const physical = charData.characters[0].physical || {};
-                // apparentAge is clamped against the age on the row (applyTrialPhotoTraits).
-                const { clamp } = applyTrialPhotoTraits(physical, extractedTraits, charData.characters[0].age);
-                if (clamp?.clamped) log.info(`[AGE CLAMP] trial ${rowId}: ${clamp.reason}`);
-                charData.characters[0].physical = physical;
-              }
-            });
-            if (saved) log.debug(`[TRIAL AVATAR] Saved avatar${extractedTraits ? ' + physical traits' : ''} to character ${rowId}`);
-          }
-        }
-      } catch (saveErr) {
-        log.warn(`[TRIAL AVATAR] Failed to save avatar to DB: ${saveErr.message}`);
-      }
-    }
-
-    res.json({ avatarImage: finalImage });
-
-  } catch (err) {
-    log.error(`[TRIAL AVATAR] Error: ${err.message}`);
-    res.status(500).json({ error: 'Avatar generation failed. Please try again.', code: 'AVATAR_FAILED' });
-  }
-});
-
 // ─── Anonymous Account Endpoints ────────────────────────────────────────────
 
 /**
@@ -1229,7 +990,7 @@ router.post('/generate-preview-avatar', trialAvatarLimiter, async (req, res) => 
  */
 router.post('/create-anonymous-account', trialAvatarLimiter, async (req, res) => {
   try {
-    const { name, age, gender, traits, customTraits, facePhoto, bodyPhoto, bodyNoBgPhoto, faceBox, previewAvatar, turnstileToken, fingerprint } = req.body;
+    const { name, age, gender, traits, customTraits, facePhoto, bodyPhoto, bodyNoBgPhoto, faceBox, turnstileToken, fingerprint } = req.body;
 
     if (!facePhoto || !name) {
       return res.status(400).json({ error: 'Name and photo are required', code: 'NAME_AND_PHOTO_REQUIRED' });
@@ -1324,38 +1085,12 @@ router.post('/create-anonymous-account', trialAvatarLimiter, async (req, res) =>
 
     const { characterId, charId } = await saveTrialCharacter(pool, userId, characterData);
 
-    // Save preview avatar if we have one — quick UPDATE, keep it inline so
-    // the row is already populated when prepare-title reads it.
-    // NOTE: we deliberately do NOT mirror the preview into `avatars.standard`.
-    // The trial has exactly one source photo; the 2×4 sheet generator must
-    // build off that photo directly so each render starts from the source
-    // identity. Using a derived watercolor preview as the body reference
-    // would compound style drift (photo→preview→sheet) and lock the sheet
-    // to whatever artefacts the preview accumulated.
-    if (previewAvatar && typeof previewAvatar === 'string' && previewAvatar.startsWith('data:image/')) {
-      try {
-        const charResult = await pool.query('SELECT data FROM characters WHERE id = $1', [characterId]);
-        if (charResult.rows.length > 0) {
-          const charData = typeof charResult.rows[0].data === 'string'
-            ? JSON.parse(charResult.rows[0].data) : charResult.rows[0].data;
-          if (charData.characters?.[0]) {
-            charData.characters[0].previewAvatar = previewAvatar;
-            await offloadCharacterImages(characterId, userId, charData);
-            await pool.query('UPDATE characters SET data = $1 WHERE id = $2', [JSON.stringify(charData), characterId]);
-          }
-        }
-      } catch (saveErr) {
-        log.warn(`[TRIAL] Failed to save preview avatar: ${saveErr.message}`);
-      }
-    }
-
     // Trait extraction runs as a background task — the endpoint returns the
-    // session token without waiting on Gemini. Prepare-title fires ~30s
-    // later (user navigates topic → ideas → click) and reads `physical`
-    // from the character row at that point; the background save lands well
-    // before then. Uses extractTraitsShared so we piggyback on
-    // generate-preview-avatar's already-in-flight call.
-    (async () => {
+    // session token without waiting on Gemini. The avatar sheets read `physical`
+    // from the character row when they start; the standard sheet starts a few
+    // seconds after the form settles (prepare-standard-avatar), which awaits this
+    // promise so the sheet is drawn with the traits (it never rejects).
+    const traitSave = (async () => {
       try {
         const { extractTraitsWithGemini } = require('./avatars');
         const photoDataUri = facePhoto.startsWith('data:') ? facePhoto : `data:image/jpeg;base64,${facePhoto}`;
@@ -1379,6 +1114,8 @@ router.post('/create-anonymous-account', trialAvatarLimiter, async (req, res) =>
         log.debug(`[TRIAL] Background trait save failed (non-critical): ${err.message}`);
       }
     })();
+    inFlightTraitSaves.set(userId, traitSave);
+    traitSave.finally(() => { if (inFlightTraitSaves.get(userId) === traitSave) inFlightTraitSaves.delete(userId); });
 
     const sessionToken = generateSessionToken(userId);
 
@@ -1574,9 +1311,6 @@ router.post('/claim-session', verifySessionToken, async (req, res) => {
   }
 });
 
-/** The one art style every trial story uses (avatars, export, job input). */
-const TRIAL_ART_STYLE = 'watercolor';
-
 /**
  * Body of the 409 TRIAL_USED answer. Carries the visitor's existing trial job
  * so the waiting page can resume it after a reload. No job row means the
@@ -1694,14 +1428,14 @@ router.post('/create-story', verifySessionToken, async (req, res) => {
     }
     slotTaken = true;
 
-    // A prepare-title call may still be styling this visitor's avatars. The
-    // request does NOT wait for it (it blocked 28 s on job_1791490151653 while
-    // nothing else could start; docs/decisions.md 2026-10-08): the job is created
-    // and started at once, and the JOB awaits this promise right before the step
-    // that needs the styled sheets, so the writer runs meanwhile and the sheets
-    // are still styled once (the job claims prepare-title's result instead of
-    // styling a second set).
+    // A prepare-title call (the costumed sheet) and a prepare-standard-avatar call (the standard sheet) may
+    // still be styling this visitor's avatars. The request does NOT wait for them (it blocked 28 s on
+    // job_1791490151653 while nothing else could start; docs/decisions.md 2026-10-08): the job is created
+    // and started at once, and the JOB awaits these promises right before the step that needs the styled
+    // sheets, so the writer runs meanwhile and each sheet is still styled once (the job claims the prepared
+    // result instead of styling a second set).
     const titleAvatarsReady = inFlightTitlePagePromises.get(userId) || null;
+    const standardAvatarsReady = inFlightStandardAvatarPromises.get(userId) || null;
 
     const characterId = `characters_${userId}`;
     const charResult = await pool.query('SELECT data FROM characters WHERE id = $1', [characterId]);
@@ -1726,7 +1460,7 @@ router.post('/create-story', verifySessionToken, async (req, res) => {
       photos: mainChar.photos || {},
       _charId: mainChar.id,
       _preGeneratedStyledAvatars: mainChar.preGeneratedStyledAvatars || null,
-      _previewAvatar: mainChar.previewAvatar || null,
+      _preGeneratedStandardFor: mainChar.preGeneratedStandardFor || null,
     };
 
     const storyInput = {
@@ -1773,12 +1507,12 @@ router.post('/create-story', verifySessionToken, async (req, res) => {
     slotTaken = false; // the job row now accounts for the slot
 
     if (deps.processStoryJob) {
-      deps.processStoryJob(jobId, { titleAvatarsReady }).catch(err => {
+      deps.processStoryJob(jobId, { titleAvatarsReady, standardAvatarsReady }).catch(err => {
         log.error(`[TRIAL] Job ${jobId} processing failed:`, err);
       });
     }
 
-    log.info(`[TRIAL] Story job ${jobId} started for anonymous user ${userId}${titleAvatarsReady ? ' (prepare-title still styling avatars — the job awaits it)' : ''}`);
+    log.info(`[TRIAL] Story job ${jobId} started for anonymous user ${userId}${titleAvatarsReady ? ' (prepare-title still styling avatars — the job awaits it)' : ''}${standardAvatarsReady ? ' (the standard sheet is still styling — the job awaits it)' : ''}`);
     res.json({ jobId });
   } catch (err) {
     await releaseSlot(err.code || err.message);
@@ -2788,9 +2522,119 @@ router.post('/generate-ideas-stream', verifySessionToken, trialIdeasLimiter, asy
 // ─── Pre-generate Styled Avatars ────────────────────────────────────────────
 
 /**
+ * The trial character, loaded from its row, in the shape the styled-avatar pipeline takes. No `avatars`
+ * entry: the sheets are drawn from the source photo (the body cut-out and the face thumbnail), the one
+ * identity anchor a trial has (there is no preview portrait any more, docs/decisions.md 2026-10-09).
+ * @returns {Promise<{ characterId: string, mainChar: object, character: object }|null>} null when there is no row or no character
+ */
+async function loadTrialSheetCharacter(userId) {
+  const { getPool } = require('../services/database');
+  const characterId = `characters_${userId}`;
+  const charResult = await getPool().query('SELECT data FROM characters WHERE id = $1', [characterId]);
+  if (charResult.rows.length === 0) return null;
+  const charData = typeof charResult.rows[0].data === 'string' ? JSON.parse(charResult.rows[0].data) : charResult.rows[0].data;
+  const mainChar = charData.characters?.[0];
+  if (!mainChar) return null;
+  const character = {
+    id: mainChar.id,
+    name: mainChar.name,
+    age: mainChar.age,
+    gender: mainChar.gender,
+    isMainCharacter: true,
+    photos: mainChar.photos || {},
+    avatars: {},
+    physical: mainChar.physical || {},
+    physicalTraitsSource: mainChar.physicalTraitsSource || {},
+  };
+  return { characterId, mainChar, character };
+}
+
+/**
+ * POST /api/trial/prepare-standard-avatar
+ *
+ * Styles the STANDARD 2×4 sheet (everyday clothes) as soon as the form is filled: it needs only the photo,
+ * the age and the gender, never the topic. Runs in the background of the wizard (the client does not wait),
+ * persists the sheet on the character row, and answers with the sheet's whole front body cell, which the
+ * wizard shows as the hero's picture. prepare-title (costumed sheet) and the story job reuse the sheet; the
+ * job awaits this call when it is still in flight (create-story hands the promise over), so the standard
+ * sheet is styled once per trial. docs/decisions.md 2026-10-09.
+ *
+ * One sheet per account: a repeat call after the sheet exists returns it without styling again. A sheet
+ * whose age/gender no longer match the row is not re-styled here; the job notices (usablePreparedAvatars)
+ * and styles it itself, loudly, so this endpoint cannot be driven to style sheets without bound.
+ * Protected by: session token + the avatar limiter + the daily avatar cap.
+ */
+router.post('/prepare-standard-avatar', trialAvatarLimiter, verifySessionToken, async (req, res) => {
+  const { userId } = req.sessionUser;
+  if (inFlightStandardAvatarPromises.has(userId)) {
+    log.warn(`[TRIAL AVATARS] prepare-standard-avatar called concurrently for user ${userId} — rejecting duplicate (first call still running)`);
+    return res.status(409).json({ error: 'Standard avatar already in progress', retryable: true });
+  }
+  let resolveInFlight;
+  const inFlightPromise = new Promise(resolve => { resolveInFlight = resolve; });
+  inFlightStandardAvatarPromises.set(userId, inFlightPromise);
+  try {
+    const { getPool: getUsedPool } = require('../services/database');
+    const used = await getUsedPool().query('SELECT stories_generated FROM users WHERE id = $1 AND is_trial = true', [userId]);
+    if (used.rows.length === 0) return res.status(404).json({ error: 'Account not found', code: 'ACCOUNT_NOT_FOUND' });
+    if (used.rows[0].stories_generated >= 1) return res.status(409).json({ error: 'Trial already used', code: 'TRIAL_USED' });
+
+    // The photo traits are saved by create-anonymous-account in the background a few seconds after the row
+    // exists; the sheet is drawn with them (hair, eye colour, skin tone). That promise never rejects.
+    await inFlightTraitSaves.get(userId);
+
+    const loaded = await loadTrialSheetCharacter(userId);
+    if (!loaded) {
+      log.warn(`[TRIAL AVATARS] prepare-standard-avatar: no character row for user ${userId}`);
+      return res.status(404).json({ error: 'Character not found', code: 'CHARACTER_NOT_FOUND' });
+    }
+    const { characterId, mainChar, character } = loaded;
+    const parsedAge = parseTrialAge(mainChar.age);
+    if (!parsedAge.ok) return res.status(400).json({ error: parsedAge.error });
+    if (!mainChar.photos?.face) return res.status(400).json({ error: 'The character has no photo' });
+
+    const { frontBodyCell } = require('../lib/avatarSlides');
+    const stored = mainChar.preGeneratedStyledAvatars?.[mainChar.name]?.standard;
+    if (stored) {
+      log.info(`[TRIAL AVATARS] prepare-standard-avatar repeat for user ${userId}: returning the stored sheet (no regeneration)`);
+      return res.json({ avatarImage: await frontBodyCell(stored) });
+    }
+
+    if (!checkAndIncrementTrialCap('avatar')) {
+      return res.status(503).json({ error: 'Service temporarily unavailable. Please try again tomorrow.', code: 'DAILY_CAPACITY_REACHED' });
+    }
+
+    log.info(`[TRIAL AVATARS] Styling the standard sheet for user ${userId} (age ${mainChar.age}, gender ${mainChar.gender || 'unset'}) at the form, before any topic`);
+    const { seasonOutfitGuidance } = require('../lib/season');
+    const stamp = trialSheets.standardSheetStamp(mainChar);
+    const clothing = { [character.name]: { standard: { used: true, signature: 'none' }, costumed: { used: false } } };
+    const requirements = [{ pageNumber: 'pre-cover', clothingCategory: 'standard', characterNames: [character.name] }];
+    // Same options the story job styled this sheet with (storyJobPipeline runTrialEarlyStyling): sequential
+    // rows, no sheet reviews (decisions 2026-08-15), the season the job would resolve from the date. The
+    // story category is not known yet, so a historical story's standard sheet carries the season outfit too.
+    const { slides } = await trialSheets.styleAndPersistTrialSheets({
+      userId, characterId, character, requirements, clothingRequirements: clothing,
+      styleOptions: { skipQualityEval: true, seasonOutfit: seasonOutfitGuidance({}) },
+      fields: { preGeneratedStandardFor: stamp },
+    });
+    const standard = (await loadTrialSheetCharacter(userId))?.mainChar.preGeneratedStyledAvatars?.[character.name]?.standard;
+    if (!standard) throw new Error('the standard sheet is not on the row after styling');
+    log.info(`[TRIAL AVATARS] Standard sheet ready for "${character.name}" (${slides.length} slides stored)`);
+    res.json({ avatarImage: await frontBodyCell(standard) });
+  } catch (err) {
+    log.error(`[TRIAL AVATARS] prepare-standard-avatar failed for user ${userId}: ${err.message} — the story job styles the standard sheet itself`);
+    if (!res.headersSent) res.status(500).json({ error: 'Avatar generation failed', code: 'AVATAR_FAILED' });
+  } finally {
+    if (inFlightStandardAvatarPromises.get(userId) === inFlightPromise) inFlightStandardAvatarPromises.delete(userId);
+    resolveInFlight();
+  }
+});
+
+/**
  * POST /api/trial/prepare-title
  *
- * Pre-generate costumed styled avatars while the user is picking a story idea.
+ * Pre-generate the COSTUMED styled avatar sheet while the user is picking a story idea (the topic decides
+ * the costume). The standard sheet is made earlier, at the form (prepare-standard-avatar), and is not made here.
  * Title page image generation has moved into the streaming story pipeline.
  * This is a non-critical optimization — failures return nulls gracefully.
  * Protected by: session token + rate limit.
@@ -2839,54 +2683,24 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
     const { resolveTrialCostumeLookup } = require('../config/trialCostumes');
     const { topic: lookupTopic, category: lookupCategory } = resolveTrialCostumeLookup({ storyCategory, storyTheme, storyTopic });
 
-    log.info(`[TRIAL AVATARS] Preparing styled avatars for user ${userId} (topic: ${storyTopic}, category: ${storyCategory}, theme: ${storyTheme || 'none'}, lookup: ${lookupCategory}/${lookupTopic})`);
+    log.info(`[TRIAL AVATARS] Preparing the costumed avatar for user ${userId} (topic: ${storyTopic}, category: ${storyCategory}, theme: ${storyTheme || 'none'}, lookup: ${lookupCategory}/${lookupTopic})`);
 
-    // Load character from DB
-    const { getPool } = require('../services/database');
-    const pool = getPool();
-    const characterId = `characters_${userId}`;
-
-    const charResult = await pool.query('SELECT data FROM characters WHERE id = $1', [characterId]);
-    if (charResult.rows.length === 0) {
-      log.warn(`[TRIAL AVATARS] No character found for user ${userId}`);
+    const loaded = await loadTrialSheetCharacter(userId);
+    if (!loaded) {
+      log.warn(`[TRIAL AVATARS] No character (row) found for user ${userId}`);
       return res.json({ costumeType: null, avatarSlides: [] });
     }
-
-    const charData = typeof charResult.rows[0].data === 'string'
-      ? JSON.parse(charResult.rows[0].data) : charResult.rows[0].data;
-    const mainChar = charData.characters?.[0];
-    if (!mainChar) {
-      log.warn(`[TRIAL AVATARS] No main character in data for user ${userId}`);
-      return res.json({ costumeType: null, avatarSlides: [] });
-    }
-
-    const gender = mainChar.gender || 'male';
+    const { characterId, mainChar, character } = loaded;
 
     // Look up costume using the resolved lookup topic/category
     const { getTrialCostume } = require('../config/trialCostumes');
-    const costume = getTrialCostume(lookupTopic, lookupCategory, gender);
-
-    // Build character object for styled avatar pipeline
-    const character = {
-      id: mainChar.id,
-      name: mainChar.name,
-      age: mainChar.age,
-      gender: mainChar.gender,
-      isMainCharacter: true,
-      photos: mainChar.photos || {},
-      avatars: { standard: mainChar.previewAvatar || null },
-      physical: mainChar.physical || {},
-      physicalTraitsSource: mainChar.physicalTraitsSource || {},
-    };
-    const characters = [character];
-
-    // Determine clothing requirements
+    const costume = getTrialCostume(lookupTopic, lookupCategory, mainChar.gender || 'male');
     const costumeType = costume ? costume.costumeType : null;
 
-    // ONE sheet generation per trial (code review 2026-10 T3, docs/decisions.md): a repeat call for
-    // the same costume returns what is stored; a call for a DIFFERENT costume generates nothing -
-    // the story job builds whichever category is missing from the stored set itself.
-    if (mainChar.preGeneratedStyledAvatars) {
+    // ONE costumed sheet per trial (code review 2026-10 T3, docs/decisions.md): a repeat call for the same
+    // costume returns what is stored; a call for a DIFFERENT costume generates nothing - the story job builds
+    // whichever category is missing from the stored set itself.
+    if ('preGeneratedCostumeType' in mainChar) {
       const storedCostume = mainChar.preGeneratedCostumeType ?? null;
       if (storedCostume === costumeType) {
         log.info(`[TRIAL AVATARS] prepare-title repeat for user ${userId}: returning the stored sheets (no regeneration)`);
@@ -2896,123 +2710,39 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
       return res.json({ costumeType: null, avatarSlides: [] });
     }
 
-    // Format for prepareStyledAvatars (needs standard/costumed config for on-demand generation)
+    // No costume for this topic: nothing to style here. The standard sheet is made at the form, and the job
+    // styles anything still missing.
+    if (!costume) {
+      log.info(`[TRIAL AVATARS] prepare-title for user ${userId}: no costume for ${lookupCategory}/${lookupTopic}, nothing to prepare`);
+      return res.json({ costumeType: null, avatarSlides: mainChar.preGeneratedAvatarSlides || [] });
+    }
+
     const avatarClothingRequirements = {
       [character.name]: {
         standard: { used: true, signature: 'none' },
-        costumed: costume
-          ? { used: true, costume: costume.costumeType, description: costume.description }
-          : { used: false },
+        costumed: { used: true, costume: costume.costumeType, description: costume.description },
       },
     };
+    const avatarRequirements = [{
+      pageNumber: 'cover',
+      clothingCategory: `costumed:${costume.costumeType}`,
+      characterNames: [character.name],
+    }];
 
-    // Build avatar requirements for prepareStyledAvatars.
-    // The preview avatar is NOT the standard reference: the 2026-08-15 "preview
-    // IS the standard" policy was reversed 2026-08-16 (docs/decisions.md). Only
-    // the costumed sheet is built here; with no costume the standard sheet is.
-    const avatarRequirements = [];
-    if (costume) {
-      avatarRequirements.push({
-        pageNumber: 'cover',
-        clothingCategory: `costumed:${costume.costumeType}`,
-        characterNames: [character.name],
-      });
-    } else {
-      // No costume — fall back to generating the standard sheet so pages
-      // have something. (Unusual for trial, but supported.)
-      avatarRequirements.push({
-        pageNumber: 'cover',
-        clothingCategory: 'standard',
-        characterNames: [character.name],
-      });
-    }
-
-    // Lazy require the styled avatar module
-    const { runInCacheScope, prepareStyledAvatars, clearStyledAvatarCache, retainCacheScopeForHandoff, exportStyledAvatarsForPersistence, _styledAvatarCacheForTrial } = require('../lib/styledAvatars');
-
-    // Run avatar styling inside the trial user's cache scope. Same scope key
-    // the trial story job uses (see processStoryJob → `trial-${userId}`) so:
-    //   1. The job's avatar cache hits the pre-warmed entries here (perf win:
-    //      avoids regenerating the same 2×4 sheet during the job).
-    //   2. The avatar-log entries we push here flow through to the job's
-    //      finalize-time `getStyledAvatarGenerationLog()` capture.
-    // Trial is 1-per-user enforced, so the userId-keyed scope is unique to
-    // this trial run end-to-end.
-    await runInCacheScope(`trial-${userId}`, async () => {
-      // Prepare styled avatars (costumed only for trial — see decision above).
-      //
-      // The season rides along for the same reason the premise takes one at
-      // :2194: /try asks the visitor nothing, so it resolves from the date —
-      // the same default the trial job's own `resolveSeason` lands on minutes
-      // later, so the prewarmed sheet and the job agree. It only bites on the
-      // no-costume branch below, where a `standard` sheet IS generated here and
-      // nothing else in a trial ever states an outfit; a costumed sheet ignores
-      // it (the costume is the outfit).
-      const { seasonOutfitGuidance } = require('../lib/season');
-      const seasonOutfit = seasonOutfitGuidance({ storyCategory });
-      // The hair text follows the approved preview avatar BEFORE the sheet is generated and judged
-      // against it (docs/decisions.md "Hair text follows the approved avatar").
-      await require('../lib/avatarHair').ensureAvatarDerivedHair(characters, { userId });
-      await prepareStyledAvatars(characters, TRIAL_ART_STYLE, avatarRequirements, avatarClothingRequirements, null, null, { seasonOutfit, fastPass1: true }); // body+head rows in parallel, one try each (docs/decisions.md 2026-10-08)
-      log.info(`[TRIAL AVATARS] Avatar styling complete for "${character.name}"`);
-
-      // Export styled avatars so the pipeline can reuse them (avoid regenerating)
-      const styledAvatarExport = exportStyledAvatarsForPersistence(characters, TRIAL_ART_STYLE);
-      const styledAvatarsData = {};
-      for (const [charName, avatars] of styledAvatarExport) {
-        styledAvatarsData[charName] = avatars;
-      }
-
-      // Hand the scope over to the story job instead of wiping it. The job
-      // enters `trial-${userId}` a moment after this handler's generation
-      // finishes (prod job_1788698812047_q5b1vuds7: 220 ms), and the refcount
-      // guard inside clearStyledAvatarCache only covers an OVERLAP - with no
-      // overlap the clear below ran and the job regenerated the identical sheet
-      // (a second Grok 2x4 + style transfer, ~58 s and real money). The DB
-      // handoff below cannot be relied on either: /start waits at most 60 s for
-      // this handler and the character row is written AFTER this point.
-      // The retention expires on its own if no job ever arrives (abandoned
-      // trial), so nothing leaks; clearStyledAvatarCache is still called so the
-      // scope IS freed here whenever there is no pending consumer.
-      retainCacheScopeForHandoff(`trial-${userId}`);
-      clearStyledAvatarCache();
-
-      // One slide per whole head cell and per whole body cell of every sheet (server/lib/avatarSlides.js).
-      const avatarSlides = [];
-      for (const perCharAvatars of Object.values(styledAvatarsData)) {
-        if (!perCharAvatars || typeof perCharAvatars !== 'object') continue;
-        avatarSlides.push(...await require('../lib/avatarSlides').buildAvatarSlides(perCharAvatars, log));
-      }
-      if (avatarSlides.length > 0) log.info(`[TRIAL AVATARS] ${avatarSlides.length} head/body cell slides cut from the styled sheets`);
-
-      // Store avatar data on character in DB
-      try {
-        // The sheets and the sliced slides above are built as data: URIs in
-        // memory; nothing uploaded them. Sweep the fragment BEFORE the row lock,
-        // then merge only these three fields into the CURRENT row (review 2026-10 T5:
-        // this route reads the row up to ~100 s before it writes).
-        const fragment = { preGeneratedStyledAvatars: styledAvatarsData, ...(avatarSlides.length > 0 ? { preGeneratedAvatarSlides: avatarSlides } : {}) };
-        await offloadCharacterImages(characterId, userId, fragment);
-        await modifyCharactersRow(characterId, userId, (fresh) => {
-          const c = fresh.characters?.[0];
-          if (!c) return false;
-          c.preGeneratedCostumeType = costumeType;
-          c.preGeneratedStyledAvatars = fragment.preGeneratedStyledAvatars;
-          if (fragment.preGeneratedAvatarSlides) c.preGeneratedAvatarSlides = fragment.preGeneratedAvatarSlides;
-        });
-        log.debug(`[TRIAL AVATARS] Saved styled avatars to character ${characterId}`);
-      } catch (dbErr) {
-        log.warn(`[TRIAL AVATARS] Failed to save avatars to DB: ${dbErr.message}`);
-      }
-
-      log.info(`[TRIAL AVATARS] Avatars ready for "${character.name}" (costumeType: ${costumeType}, avatarSlides: ${avatarSlides.length})`);
-      res.json({ costumeType, avatarSlides });
+    // A costumed sheet ignores the season (the costume is the outfit); it is passed for parity with the job.
+    const { seasonOutfitGuidance } = require('../lib/season');
+    const { slides } = await trialSheets.styleAndPersistTrialSheets({
+      userId, characterId, character, requirements: avatarRequirements, clothingRequirements: avatarClothingRequirements,
+      styleOptions: { seasonOutfit: seasonOutfitGuidance({ storyCategory }), fastPass1: true }, // body+head rows in parallel, one try each (docs/decisions.md 2026-10-08)
+      fields: { preGeneratedCostumeType: costumeType },
     });
+    log.info(`[TRIAL AVATARS] Avatars ready for "${character.name}" (costumeType: ${costumeType}, avatarSlides: ${slides.length})`);
+    res.json({ costumeType, avatarSlides: slides });
 
   } catch (err) {
     log.error(`[TRIAL AVATARS] Error generating styled avatars: ${err.message}`);
     // Non-critical optimization — return nulls gracefully
-    res.json({ costumeType: null, avatarSlides: [] });
+    if (!res.headersSent) res.json({ costumeType: null, avatarSlides: [] });
   } finally {
     // Always resolve and clean up the in-flight registry, regardless of outcome.
     if (inFlightTitlePagePromises.get(userId) === inFlightPromise) {
@@ -3146,8 +2876,9 @@ async function createTrialStoryJob(pool, userId, characterId, characterData, sto
     photoUrl: characterData.photos?.face || null,
     bodyPhotoUrl: characterData.photos?.body || null,
     bodyNoBgUrl: characterData.photos?.bodyNoBg || null,
-    avatars: characterData._previewAvatar ? { standard: characterData._previewAvatar } : {},
+    avatars: {},
     preGeneratedStyledAvatars: characterData._preGeneratedStyledAvatars || null,
+    preGeneratedStandardFor: characterData._preGeneratedStandardFor || null,
   };
 
   // Build input_data matching the format expected by processStoryJob
@@ -3632,6 +3363,7 @@ module.exports.resolveTrialWindow = resolveTrialWindow;
 module.exports.loadTrialCountersFromDb = loadTrialCountersFromDb;
 module.exports.checkAndIncrementTrialCap = checkAndIncrementTrialCap;
 module.exports.resetTrialRateLimits = resetTrialRateLimits;
+module.exports.inFlightStandardAvatarPromises = inFlightStandardAvatarPromises; // test hook: the prepare-standard-avatar registry create-story hands to the job
 module.exports.inFlightTitlePagePromises = inFlightTitlePagePromises; // test hook: the prepare-title registry create-story hands to the job
 module.exports.triggerAvatarGenerationForUser = triggerAvatarGenerationForUser;
 module.exports.TRIAL_FREE_PAGES = TRIAL_FREE_PAGES;

@@ -263,8 +263,9 @@ export default function TrialWizard() {
   const [generatedIdeas, setGeneratedIdeas] = useState<GeneratedIdea[]>([]);
   const [selectedIdeaIndex, setSelectedIdeaIndex] = useState<number | null>(null);
 
-  // Preview avatar (generated before topic selection, used by future "Meet [Name]!" screen)
-  const [previewAvatar, setPreviewAvatar] = useState<string | null>(null);
+  // The hero's picture: the front cell of the standard avatar sheet, shown on the topic step and the waiting page.
+  // There is no separate preview portrait (docs/decisions.md 2026-10-09); it arrives when the sheet is drawn.
+  const [heroAvatar, setHeroAvatar] = useState<string | null>(null);
 
   // Title preparation data (costume type + avatar slides from prepare-title)
   const [titlePageData, setTitlePageData] = useState<{
@@ -506,11 +507,11 @@ export default function TrialWizard() {
         characterId,
         storyInput: finalStoryInput,
         characterName: characterData.name,
-        previewAvatar,
+        heroAvatar,
         titlePageData,
       },
     });
-  }, [selectedIdeaIndex, generatedIdeas, sessionToken, characterId, storyInput, characterData.name, previewAvatar, titlePageData, navigate, handleSessionExpired]);
+  }, [selectedIdeaIndex, generatedIdeas, sessionToken, characterId, storyInput, characterData.name, heroAvatar, titlePageData, navigate, handleSessionExpired]);
 
   // ─── Logged-in user redirect ────────────────────────────────────────────────
 
@@ -733,8 +734,7 @@ export default function TrialWizard() {
                 characterData={characterData}
                 onChange={setCharacterData}
                 onNext={goNext}
-                previewAvatar={previewAvatar}
-                onAvatarGenerated={setPreviewAvatar}
+                onHeroAvatar={setHeroAvatar}
                 onAccountCreated={handleAccountCreated}
                 sessionToken={sessionToken}
                 language={language}
@@ -747,7 +747,7 @@ export default function TrialWizard() {
                 onChange={setStoryInput}
                 onBack={goBack}
                 onNext={goNext}
-                previewAvatar={previewAvatar}
+                heroAvatar={heroAvatar}
                 characterName={characterData.name}
                 characterGender={characterData.gender}
                 characterAge={characterData.age}

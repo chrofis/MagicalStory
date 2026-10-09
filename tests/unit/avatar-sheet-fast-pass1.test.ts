@@ -164,7 +164,9 @@ describe('the trial prewarm is the one caller that asks for it', () => {
     expect(styled.match(/fastPass1/g)!.length).toBeGreaterThanOrEqual(8);
     const trial = fs.readFileSync(path.join(ROOT, 'server/routes/trial.js'), 'utf8');
     expect(trial.match(/fastPass1: true/g)).toHaveLength(1);
-    expect(trial).toMatch(/prepareStyledAvatars\([^)]*\{ seasonOutfit, fastPass1: true \}\)/);
+    // prepare-title hands it to the one styling helper (styleAndPersistTrialSheets -> prepareStyledAvatars); the standard
+    // sheet endpoint does not set it: its head row has no costume text, so it must agree with the body row on the garment
+    expect(trial).toContain('styleOptions: { seasonOutfit: seasonOutfitGuidance({ storyCategory }), fastPass1: true }');
     for (const f of ['server/lib/storyAvatars.js', 'storyJobPipeline.js', 'server/lib/testlab.js']) {
       const t = fs.readFileSync(path.join(ROOT, f), 'utf8');
       expect(t).not.toMatch(/fastPass1/);

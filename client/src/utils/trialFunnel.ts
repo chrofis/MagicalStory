@@ -23,8 +23,9 @@ export type TrialStep =
   | 'photo_selected'
   | 'photo_analyzed'
   | 'face_picked'
-  | 'avatar_ready'
   | 'character_saved'
+  /** The standard avatar sheet's front cell arrived while still in the wizard — optional (Next may come first). */
+  | 'avatar_ready'
   | 'character_done'
   | 'topic_selected'
   | 'ideas_generated'

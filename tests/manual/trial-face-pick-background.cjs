@@ -21,7 +21,7 @@ const json = (route, body, status = 200) => route.fulfill({ status, contentType:
         return json(route, { success: true, faceThumbnail: IMG, bodyCrop: IMG, bodyNoBg: IMG, faceBox: { x: 0, y: 0, width: 1, height: 1 } });
       }
       if (u.includes('create-anonymous-account')) { calls.push('createAccount'); return json(route, { sessionToken: 't', characterId: 'c' }); }
-      if (u.includes('generate-preview-avatar')) { calls.push('avatar'); return json(route, { avatarImage: IMG }); }
+      if (u.includes('prepare-standard-avatar')) { calls.push('avatar'); return json(route, { avatarImage: IMG }); }
       return json(route, {});
     });
     await page.goto('http://localhost:5173/try', { waitUntil: 'domcontentloaded' });

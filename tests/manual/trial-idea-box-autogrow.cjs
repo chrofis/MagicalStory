@@ -14,7 +14,7 @@ const IDEA = 'Der kleine Mia Fuchs Titel\n' + words(80, ['Mia', 'möchte', 'unbe
       const u = route.request().url();
       if (u.includes('analyze-photo')) return json(route, { success: true, faceThumbnail: IMG, bodyCrop: IMG, bodyNoBg: IMG, faceBox: { x: 0, y: 0, width: 1, height: 1 } });
       if (u.includes('create-anonymous-account')) return json(route, { sessionToken: 't', characterId: 'c' });
-      if (u.includes('generate-preview-avatar')) return json(route, { avatarImage: IMG });
+      if (u.includes('prepare-standard-avatar')) return json(route, { avatarImage: IMG });
       if (u.includes('generate-ideas-stream')) {
         const ev = (o) => `data: ${JSON.stringify(o)}\n\n`;
         return route.fulfill({ status: 200, contentType: 'text/event-stream', body: ev({ story1: IDEA, story2: IDEA, isFinal: true }) + ev({ done: true }) });

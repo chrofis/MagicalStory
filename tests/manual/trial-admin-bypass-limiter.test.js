@@ -1,7 +1,7 @@
 /**
  * Regression: the admin bypass token must skip the per-IP trial limiters.
  *
- * trialAvatarLimiter (2/IP/day) fronts /generate-preview-avatar AND
+ * trialAvatarLimiter (2/IP/day) fronts /prepare-standard-avatar AND
  * /create-anonymous-account as middleware, so it answered 429 before the
  * handler's isAdminRequest() check ran — capping admin trial testing at two
  * runs per day (hit on 2026-08-15 during a trial showcase). Asserts both

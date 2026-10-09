@@ -19,7 +19,8 @@ interface Props {
   onBack: () => void;
   /** `next`: the input this click completed — the parent reads it before its own state catches up (auto-advance). */
   onNext: (next?: StoryInput) => void;
-  previewAvatar?: string | null;
+  /** The standard avatar sheet's front cell, once drawn (null until then: the banner shows a spinner). */
+  heroAvatar?: string | null;
   characterName?: string;
   characterGender?: string;
   /** Declared child age, free text from the character step ('' when skipped). */
@@ -104,7 +105,7 @@ const strings: Record<string, {
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export default function TrialTopicStep({ storyInput, onChange, onBack, onNext, previewAvatar, characterName, characterGender, characterAge }: Props) {
+export default function TrialTopicStep({ storyInput, onChange, onBack, onNext, heroAvatar, characterName, characterGender, characterAge }: Props) {
   // Match on the BASE language so regional codes ('de-ch', 'fr-ch', 'it-ch') resolve too.
   const langBase = (storyInput.language || '').toLowerCase().split('-')[0];
   const lang = (langBase === 'de' ? 'de' : langBase === 'fr' ? 'fr' : langBase === 'it' ? 'it' : 'en') as Language;
@@ -121,9 +122,9 @@ export default function TrialTopicStep({ storyInput, onChange, onBack, onNext, p
 
   const avatarBanner = characterName ? (
     <div className="flex flex-col items-center text-center mb-8">
-      {previewAvatar ? (
+      {heroAvatar ? (
         <img
-          src={previewAvatar}
+          src={heroAvatar}
           alt={characterName}
           className="w-40 h-auto max-h-56 rounded-xl object-contain shadow-lg mb-4"
         />
@@ -133,7 +134,7 @@ export default function TrialTopicStep({ storyInput, onChange, onBack, onNext, p
         </div>
       )}
       <h2 className="text-2xl font-bold text-gray-900 mb-1">
-        {previewAvatar
+        {heroAvatar
           ? t.avatarReady(characterName, characterGender || '')
           : t.avatarLoading(characterName)}
       </h2>

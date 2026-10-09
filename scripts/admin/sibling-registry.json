@@ -1180,11 +1180,10 @@
     },
     {
       "id": "avatar-hair-source",
-      "axis": "avatar job vs story job vs trial prewarm",
-      "reason": "The character's hair text (physical.detailedHairAnalysis) follows the approved avatar since 2026-10-08. A new avatar is read in routes/avatars.js (applyAvatarHairToExtraction); a character still carrying the photo reading is read once by avatarHair.ensureAvatarDerivedHair, called at the top of processUnifiedStoryJob and in the trial prewarm before prepareStyledAvatars. A path that builds sheets or prompts from character.physical without one of these runs again judges and generates against the photo text (Fiona, staging job_1791450210539_nwi88y9lr: 'neck-length, brushed back' against long hair worn down).",
+      "axis": "avatar job vs story job",
+      "reason": "The character's hair text (physical.detailedHairAnalysis) follows the approved avatar since 2026-10-08. A new avatar is read in routes/avatars.js (applyAvatarHairToExtraction); a character still carrying the photo reading is read once by avatarHair.ensureAvatarDerivedHair, called at the top of processUnifiedStoryJob (not for a trial: it has no avatar before its sheets, the preview portrait is gone, docs/decisions.md 2026-10-09). A path that builds sheets or prompts from character.physical without one of these runs again judges and generates against the photo text (Fiona, staging job_1791450210539_nwi88y9lr: 'neck-length, brushed back' against long hair worn down).",
       "members": [
         "server/routes/avatars.js",
-        "server/routes/trial.js",
         "storyJobPipeline.js"
       ],
       "severity": "block",

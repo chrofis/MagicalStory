@@ -17,18 +17,23 @@ const { log: defaultLog } = require('../utils/logger');
 // front / three-quarter / profile; the back view has no face and is skipped.
 const SLIDE_POSES = ['front', 'threeQuarter', 'profile'];
 
-/**
- * The six cells of one styled sheet as JPEG data URIs, alternating head and body per angle:
- * [head front, body front, head 3/4, body 3/4, head profile, body profile].
- * Throws on an image that is not a 2x4 sheet (a portrait is a single figure, slicing it gives a
- * sliver) so the caller logs it and shows no slide rather than a wrong one.
- */
-async function slidesFromSheet(source) {
+/** The sheet's bytes; throws on an image that is not a 2x4 sheet (a portrait is a single figure, slicing it gives a sliver). */
+async function readSheet(source) {
   const buf = await bytesFromAnyImage(source);
   if (!buf) throw new Error('avatar sheet could not be read');
   const { width, height } = await sharp(buf).metadata();
   const aspect = width && height ? width / height : 0;
   if (aspect < 0.9 || aspect > 2.4) throw new Error(`image ${width}x${height} is not a 2x4 sheet`);
+  return buf;
+}
+
+/**
+ * The six cells of one styled sheet as JPEG data URIs, alternating head and body per angle:
+ * [head front, body front, head 3/4, body 3/4, head profile, body profile].
+ * Throws on an image that is not a 2x4 sheet so the caller logs it and shows no slide rather than a wrong one.
+ */
+async function slidesFromSheet(source) {
+  const buf = await readSheet(source);
   const { cropAvatarCell } = require('./sceneComposite');
   const slides = [];
   for (const pose of SLIDE_POSES) {
@@ -39,6 +44,18 @@ async function slidesFromSheet(source) {
     }
   }
   return slides;
+}
+
+/**
+ * The whole front-facing BODY cell of one sheet as a JPEG data URI: the hero image the wizard shows next to the
+ * hero's name (the standard sheet is the only avatar the wizard draws; there is no separate preview portrait).
+ */
+async function frontBodyCell(source) {
+  const buf = await readSheet(source);
+  const { cropAvatarCell } = require('./sceneComposite');
+  const { body } = await cropAvatarCell(buf, { pose: 'front' });
+  const jpeg = await sharp(body).jpeg({ quality: 88 }).toBuffer();
+  return `data:image/jpeg;base64,${jpeg.toString('base64')}`;
 }
 
 /** Pure: the sheet sources of one character's styled avatars, costumed first (it is ready first). */
@@ -97,4 +114,4 @@ async function persistAvatarSlides({ characterId, userId, styledAvatars }, log =
   return slides.length;
 }
 
-module.exports = { persistAvatarSlides, buildAvatarSlides, slidesFromSheet, sheetSourcesOf, interleaveSheetSlides, SLIDE_POSES };
+module.exports = { persistAvatarSlides, buildAvatarSlides, slidesFromSheet, frontBodyCell, sheetSourcesOf, interleaveSheetSlides, SLIDE_POSES };

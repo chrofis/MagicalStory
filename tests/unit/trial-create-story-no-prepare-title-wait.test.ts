@@ -17,7 +17,7 @@ import path from 'path';
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-secret-trial-wait';
 const trialRouter = require('../../server/routes/trial.js');
 const database = require('../../server/services/database.js');
-const { awaitTitleAvatars } = require('../../storyJobPipeline.js');
+const { awaitPreparedAvatars } = require('../../storyJobPipeline.js');
 const { resolvePipelineMode } = require('../../server/lib/beatsPipeline.js');
 
 const root = path.resolve(__dirname, '../..');
@@ -49,6 +49,7 @@ const origGetPool = database.getPool;
 afterEach(() => {
   database.getPool = origGetPool;
   trialRouter.inFlightTitlePagePromises.clear();
+  trialRouter.inFlightStandardAvatarPromises.clear();
 });
 
 describe('create-story does not await an in-flight prepare-title', () => {
@@ -101,33 +102,33 @@ describe('create-story does not await an in-flight prepare-title', () => {
   });
 });
 
-describe('the job awaits prepare-title, then reads what it persisted', () => {
+describe('the job awaits a prepare call, then reads what it persisted', () => {
   const rowWith = (avatars: any) => ({ query: async () => ({ rows: [{ data: { characters: [{ id: 7, preGeneratedStyledAvatars: avatars }] } }] }) });
 
   it('waits for the in-flight promise before reading the row (no read while styling runs)', async () => {
     let released = false;
     let readBeforeRelease = false;
-    const pool = { query: async () => { if (!released) readBeforeRelease = true; return { rows: [{ data: { characters: [{ id: 7, preGeneratedStyledAvatars: { Lukas: { standard: 'x' } } }] } }] }; } };
+    const pool = { query: async () => { if (!released) readBeforeRelease = true; return { rows: [{ data: { characters: [{ id: 7, preGeneratedStyledAvatars: { Lukas: { costumed: { default: 'x' } } } }] } }] }; } };
     let release!: () => void;
     const ready = new Promise<void>(r => { release = r; });
-    const p = awaitTitleAvatars(ready, { userId: 'u1', characterId: 7, pool });
+    const p = awaitPreparedAvatars(ready, { userId: 'u1', characterId: 7, what: 'prepare-title', pool });
     await new Promise(r => setTimeout(r, 30));
     released = true; release();
-    expect(await p).toEqual({ Lukas: { standard: 'x' } });
+    expect(await p).toEqual({ Lukas: { costumed: { default: 'x' } } });
     expect(readBeforeRelease).toBe(false);
   });
 
   it('returns null when prepare-title persisted nothing (it failed): the job then styles fresh, once', async () => {
-    expect(await awaitTitleAvatars(Promise.resolve(), { userId: 'u1', characterId: 7, pool: rowWith(null) })).toBeNull();
+    expect(await awaitPreparedAvatars(Promise.resolve(), { userId: 'u1', characterId: 7, what: 'prepare-title', pool: rowWith(null) })).toBeNull();
   });
 
   it('throws on timeout instead of silently defaulting', async () => {
-    await expect(awaitTitleAvatars(new Promise(() => {}), { userId: 'u1', characterId: 7, timeoutMs: 20, pool: rowWith(null) }))
-      .rejects.toThrow(/still styling avatars/);
+    await expect(awaitPreparedAvatars(new Promise(() => {}), { userId: 'u1', characterId: 7, what: 'prepare-title', timeoutMs: 20, pool: rowWith(null) }))
+      .rejects.toThrow(/prepare-title still styling avatars/);
   });
 
   it('throws when the character is gone from the row', async () => {
-    await expect(awaitTitleAvatars(Promise.resolve(), { userId: 'u1', characterId: 99, pool: rowWith(null) }))
+    await expect(awaitPreparedAvatars(Promise.resolve(), { userId: 'u1', characterId: 99, what: 'prepare-title', pool: rowWith(null) }))
       .rejects.toThrow(/not in characters_u1/);
   });
 });
@@ -150,11 +151,11 @@ describe('the in-flight promise reaches the unified job', () => {
   // Regression: 9a6c4a889 read opts.titleAvatarsReady and job.user_id inside
   // processUnifiedStoryJob, where neither is in scope (ReferenceError on every
   // trial). The promise travels as that function's own parameter.
-  it('processUnifiedStoryJob takes titleAvatarsReady and the impl passes it', () => {
+  it('processUnifiedStoryJob takes both in-flight promises and the impl passes them', () => {
     const src = fs.readFileSync(path.join(root, 'storyJobPipeline.js'), 'utf8');
-    expect(src).toContain('checkCancellation = async () => {}, titleAvatarsReady = null) {');
-    expect(src).toMatch(/processUnifiedStoryJob([^;]*opts.titleAvatarsReady || null)/);
+    expect(src).toContain('checkCancellation = async () => {}, titleAvatarsReady = null, standardAvatarsReady = null) {');
+    expect(src).toMatch(/processUnifiedStoryJob\([^;]*opts\.titleAvatarsReady \|\| null, opts\.standardAvatarsReady \|\| null\)/);
     const body = src.slice(src.indexOf('async function processUnifiedStoryJob('), src.indexOf('async function _processStoryJobImpl('));
-    expect(body).not.toMatch(/opts.titleAvatarsReady/);
+    expect(body).not.toMatch(/\bopts\.(titleAvatarsReady|standardAvatarsReady)\b/);
   });
 });
