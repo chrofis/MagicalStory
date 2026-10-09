@@ -4128,6 +4128,26 @@
       "fixedAt": "2026-10-09",
       "fixedIn": "8fa02ff1d",
       "fix": "image fills frame; nextAvatarSource; dedupe; tests/e2e/trial-waiting-slide-frame.spec.ts"
+    },
+    {
+      "id": "idea-event-title-is-text",
+      "title": "idea_generated detail.ideas[].title held the first 200 characters of the idea text",
+      "reportedAt": "2026-10-09",
+      "source": "Staging idea_events row, user 880b53c1.",
+      "status": "fixed",
+      "fixedAt": "2026-10-09",
+      "fixedIn": "6b3cc8a54",
+      "fix": "title null unless a card title is passed; tests/unit/idea-offered-record.test.ts"
+    },
+    {
+      "id": "trial-slides-overwritten-positional-keys",
+      "title": "Trial slide list stored the same cell at two positions (slide 1=3, 2=6)",
+      "reportedAt": "2026-10-09",
+      "source": "Stored slides of user 880b53c1 vs replay of the stored sheets (analyzer cleared).",
+      "status": "fixed",
+      "fixedAt": "2026-10-09",
+      "fixedIn": "a9aac2592",
+      "fix": "content-keyed R2 objects + figure labels; tests/unit/trial-slides-content-keys.test.ts, trial-waiting-slides-rotation-2026-10-09.test.ts"
     }
   ]
 }
