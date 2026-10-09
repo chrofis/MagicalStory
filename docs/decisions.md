@@ -67937,3 +67937,11 @@ Touched files: server/lib/vbIdGuard.js, server/lib/promptBuilders.js, server/lib
 **Revisit if:** the owner's next iPhone run still shows any of them (location, drag, crash are inferred causes).
 **Open owner decision:** the clothing check (`missingGarments`) cannot see comma-list costumes (pirate, knight, wizard); splitting on commas flags every page. It only logs; fix with a structured garment field or remove.
 **Touched files:** see the commits above.
+
+## 2026-10-09 — Art Director stage models: Visual Bible on Haiku 5.5, page briefs on Gemini 3.7 Flash; re-ask and lector stay on Pro
+
+**Context:** owner rule (a cheaper model with the same result wins; latency counts only on the trial path). The four gemini-3.1-pro calls cost about USD 0.63 per 18-page book (job_1791489793707_2ir6nl5kw). Stored prompts of 6 staging stories replayed, scored by the stages' own code checks plus a blind reading (scripts/analysis/ad-stage-model-replay.js; evals/runs/2026-10-09_ad-stage-replay).
+**Decision:** beats_visual_bible on claude-haiku-5-5 (effort medium) and beats_scene_expansion on gemini-3.7-flash (reasoning low), via server/config/models.js visualBibleModel / sceneBriefsModel and beatsPipeline.adStageModels (Lab follows the same routing; a dev or Lab sceneModel override still forces one model). The brief re-ask and both lectors stay on Pro. arc_create untouched.
+**Rationale:** Visual Bible: parsed 6/6, label faults 0 vs Pro 2, element-budget overflows 0 vs 1, blind 3/3 for Haiku, USD 0.011-0.032 vs 0.13-0.33. Briefs: re-ask triggers 65 vs Pro 63 over 6 stories (Pro re-run noise +-3), blind 3-way tie, USD 0.03-0.06 vs 0.11-0.23, one refusal in 9 calls (retried by the existing second attempt). Rejected: Haiku briefs (8 negation_named on one story), Haiku re-ask (findings left 5 vs 2, introduced 2 vs 0), Flash/Haiku lector (missed real fixes). Saves about USD 0.36 per 18-page book. Spend USD 1.88 of a 2.00 cap.
+**Revisit if:** Flash briefs refuse twice in a row in production, post-brief finding counts on Flash stories exceed Pro's by more than the noise over 10+ stories, or Flash pricing changes.
+**Touched files:** server/config/models.js, server/lib/beatsPipeline.js, scripts/analysis/ad-stage-model-replay.js, tests/unit/ad-stage-models-routing.test.ts (commit e590a522f).

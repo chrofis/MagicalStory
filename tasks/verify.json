@@ -9393,6 +9393,42 @@
         "kind": "human",
         "what": "Owner runs /try on iPhone (Safari, ideally with Private Relay on). Railway log for the visit: an IP-location line (or the warn with the address); no \"scene prose does not dress\" line; no vb_sheet_no_reference. Watch slides, messages, completion."
       }
+    },
+    {
+      "id": "ad-vb-haiku-2026-10-09",
+      "title": "Visual Bible on Haiku 5.5",
+      "commits": [
+        "e590a522f"
+      ],
+      "addedAt": "2026-10-09",
+      "status": "pending",
+      "evidence": [],
+      "runShape": [
+        "full-story"
+      ],
+      "claim": "beats_visual_bible runs on Haiku 5.5; the bible parses; label-round findings and element-budget overflows do not exceed the Pro baseline.",
+      "check": {
+        "kind": "human",
+        "what": "sceneExpansionReport.visualBibleReplies[0].modelId is claude-haiku-5-5; labelRound.findings <= 2; no more element-budget overflow / wornAs warnings than the 2026-10-08 Pro stories."
+      }
+    },
+    {
+      "id": "ad-briefs-flash-2026-10-09",
+      "title": "Page briefs on Gemini 3.7 Flash",
+      "commits": [
+        "e590a522f"
+      ],
+      "addedAt": "2026-10-09",
+      "status": "pending",
+      "evidence": [],
+      "runShape": [
+        "full-story"
+      ],
+      "claim": "beats_scene_expansion runs on gemini-3.7-flash with no truncation/incomplete events and re-ask findings within the Pro range.",
+      "check": {
+        "kind": "human",
+        "what": "replies[0].modelId is google/gemini-3.7-flash; no beats_scene_expansion_truncated / _incomplete in generationLog; briefCheckReport.findingsBefore within about 40 on an 18-page story."
+      }
     }
   ],
   "runs": [
