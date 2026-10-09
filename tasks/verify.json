@@ -29,11 +29,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: Read the trial character's physical (glasses, other, detailedHairAnalysis) in stories.data.characters; in the avatar sheet log find the glasses line; in a page prompt find the DISTINCTIVE FEATURES block; confirm only one character-analysis call ran for the photo."
       }
@@ -76,11 +76,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: In the generation log read the `[VB-GRID] Trial page N:` lines (cell count <= 4, a VEH or building-scale element dropped on plated pages that cite it); in stories.data.sceneImages[].prompt check the 'rough images of' claim names only those cells and no landmark; count page image calls (one per page)."
       }
@@ -102,11 +102,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -189,11 +189,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -246,11 +246,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -302,11 +302,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -357,11 +357,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -423,11 +423,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -478,11 +478,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -540,6 +540,15 @@
           "checkedAt": "2026-10-09 09:47:23 CH",
           "result": "CONFIRMED",
           "note": "1 animal description(s), none states a scale"
+        },
+        {
+          "storyId": "job_1791532133366_svf6xj2rd",
+          "env": "staging",
+          "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
+          "runDate": "2026-10-09 09:48:53 CH",
+          "checkedAt": "2026-10-09 09:52:30 CH",
+          "result": "CONFIRMED",
+          "note": "1 animal description(s), none states a scale"
         }
       ],
       "lastChecked": {
@@ -573,11 +582,11 @@
       "evidence": [],
       "backlog": "tasks/BACKLOG.md 'Verification pending' — over-the-shoulder / ultra-wide line",
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       },
@@ -654,11 +663,11 @@
       ],
       "backlog": "tasks/BACKLOG.md 'Verification pending' — over-the-shoulder / ultra-wide line (OTS accepted as is by the owner 2026-09-23; subject-size idea untried)",
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -720,11 +729,11 @@
       ],
       "backlog": "tasks/BACKLOG.md 'Verification pending' — over-the-shoulder / ultra-wide line (same check as ots-crop-no-contact; a first division with an over-the-shoulder contact page should show a check-14 entry in beatsReviewReport.modelFindings)",
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -781,6 +790,15 @@
           "checkedAt": "2026-10-09 09:47:43 CH",
           "result": "CONFIRMED",
           "note": "idea text carries no slot label"
+        },
+        {
+          "storyId": "job_1791532133366_svf6xj2rd",
+          "env": "staging",
+          "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
+          "runDate": "2026-10-09 09:48:53 CH",
+          "checkedAt": "2026-10-09 09:52:30 CH",
+          "result": "CONFIRMED",
+          "note": "idea text carries no slot label"
         }
       ],
       "lastChecked": {
@@ -835,11 +853,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "needs-iterate-repair: no iterate repair ran"
       }
@@ -873,11 +891,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "needs-char-fix: no char-fix repair ran"
       }
@@ -919,11 +937,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "needs-worn-off: no page takes a worn garment off"
       }
@@ -984,11 +1002,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -1052,11 +1070,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -1107,11 +1125,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "needs-inpaint: no inpaint repair ran"
       }
@@ -1172,11 +1190,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "needs-inpaint: no inpaint repair ran"
       }
@@ -1230,11 +1248,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "needs-inpaint: no inpaint repair ran"
       },
@@ -1552,6 +1570,15 @@
           "checkedAt": "2026-10-09 09:47:43 CH",
           "result": "CONFIRMED",
           "note": "2/6 pages open on a name (33%; baseline trial 45-48%, full 23%; pass <= 35%); EXACT POSES in 6/6 built prompts"
+        },
+        {
+          "storyId": "job_1791532133366_svf6xj2rd",
+          "env": "staging",
+          "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
+          "runDate": "2026-10-09 09:48:53 CH",
+          "checkedAt": "2026-10-09 09:52:30 CH",
+          "result": "CONFIRMED",
+          "note": "0/6 pages open on a name (0%; baseline trial 45-48%, full 23%; pass <= 35%); EXACT POSES in 6/6 built prompts"
         }
       ],
       "backlog": "tasks/BACKLOG.md 'Verification pending' — Trial prompt parity",
@@ -1608,6 +1635,15 @@
           "checkedAt": "2026-10-09 09:47:43 CH",
           "result": "CONFIRMED",
           "note": "2 vantage(s), one plate prompt each"
+        },
+        {
+          "storyId": "job_1791532133366_svf6xj2rd",
+          "env": "staging",
+          "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
+          "runDate": "2026-10-09 09:48:53 CH",
+          "checkedAt": "2026-10-09 09:52:30 CH",
+          "result": "CONFIRMED",
+          "note": "2 vantage(s), one plate prompt each"
         }
       ],
       "backlog": "tasks/BACKLOG.md 'Verification pending' — 2026-09-13 commits line",
@@ -1643,11 +1679,11 @@
       "evidence": [],
       "backlog": "tasks/BACKLOG.md 'Verification pending' — 2026-09-13 commits line",
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: read each trial page's emptyScenePrompt for the sentence naming the attached reference; look at the plate (story_images empty_scene) against its landmark photo"
       },
@@ -1701,11 +1737,11 @@
       ],
       "backlog": "tasks/BACKLOG.md 'Verification pending' — 2026-09-13 commits line",
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: compare stories.data.season with the trial's styled avatar sheet (styledAvatarGeneration[].output / characterAvatars)"
       }
@@ -1779,11 +1815,11 @@
       ],
       "backlog": "tasks/BACKLOG.md 'Verification pending' — 2026-09-13 commits line",
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: open each styledAvatarGeneration[] output of this run and check the feet on every full-body cell"
       }
@@ -1871,13 +1907,13 @@
       ],
       "backlog": "tasks/BACKLOG.md 'Verification pending' — Five age bands unrun",
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
-        "note": "age-band:1: no character aged 1 (ages: 8)"
+        "note": "age-band:1: no character aged 1 (ages: 5)"
       }
     },
     {
@@ -1904,13 +1940,13 @@
       "evidence": [],
       "backlog": "tasks/BACKLOG.md 'Verification pending' — Five age bands unrun",
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
-        "note": "age-band:2: no character aged 2 (ages: 8)"
+        "note": "age-band:2: no character aged 2 (ages: 5)"
       },
       "triage": {
         "date": "2026-09-27",
@@ -1953,13 +1989,13 @@
       ],
       "backlog": "tasks/BACKLOG.md 'Verification pending' — Five age bands unrun",
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
-        "note": "age-band:4: no character aged 4 (ages: 8)"
+        "note": "age-band:4: no character aged 4 (ages: 5)"
       }
     },
     {
@@ -1997,13 +2033,13 @@
       ],
       "backlog": "tasks/BACKLOG.md 'Verification pending' — Five age bands unrun",
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
-        "result": "NOT COVERED",
-        "note": "age-band:5: no character aged 5 (ages: 8)"
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
+        "result": "HUMAN",
+        "note": "human check | LOOK: read the story text and look at the pages for age fit"
       }
     },
     {
@@ -2030,13 +2066,13 @@
       "evidence": [],
       "backlog": "tasks/BACKLOG.md 'Verification pending' — Five age bands unrun",
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
-        "result": "HUMAN",
-        "note": "human check | LOOK: read the story text and look at the pages for age fit"
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
+        "result": "NOT COVERED",
+        "note": "age-band:8|12: no character aged 8 or 12 (ages: 5)"
       },
       "triage": {
         "date": "2026-09-27",
@@ -2089,11 +2125,11 @@
       ],
       "backlog": "tasks/BACKLOG.md 'Verification pending' — T5",
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -2167,11 +2203,11 @@
       ],
       "backlog": "tasks/BACKLOG.md 'Verification pending' — T6",
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: compare each styledAvatarGeneration[] output with clothingRequirements / pageClothing for that character"
       }
@@ -2203,11 +2239,11 @@
       ],
       "backlog": "tasks/BACKLOG.md 'Verification pending' — one /figure-mask call",
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "needs-char-fix: no char-fix repair ran"
       },
@@ -2271,11 +2307,11 @@
       ],
       "backlog": "tasks/BACKLOG.md 'Verification pending' — One full showcase re-run to confirm redo counts drop",
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       },
@@ -2425,11 +2461,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -2481,11 +2517,11 @@
       ],
       "backlog": "tasks/BACKLOG.md 'Verification pending' — Re-plan regression guard",
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -2606,6 +2642,15 @@
           "result": "HUMAN-FIXED",
           "by": "claude",
           "note": "The FAILED run job_1791497394846_v01s6ndpn predates the harness ideaPick fix be60755f0; ideaPick with both offered cards is stored on job_1791531512895_3bofwpxh4 and job_1791531511694_j945yhw9a."
+        },
+        {
+          "storyId": "job_1791532133366_svf6xj2rd",
+          "env": "staging",
+          "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
+          "runDate": "2026-10-09 09:48:53 CH",
+          "checkedAt": "2026-10-09 09:52:30 CH",
+          "result": "CONFIRMED",
+          "note": "ideaPick recorded (index 0, world location)"
         }
       ],
       "lastChecked": {
@@ -2669,11 +2714,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       },
@@ -2701,11 +2746,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: In the wizard story step, click generate ideas and watch both cards: spinner/progress until a clean idea appears at once; no text streaming in, no [DRAFT]/[REVIEW] words."
       },
@@ -2761,11 +2806,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       },
@@ -2821,11 +2866,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -2867,11 +2912,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -2912,11 +2957,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -2961,11 +3006,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -3005,11 +3050,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -3049,11 +3094,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: Lab arc_effort stage=create, model claude-opus-5-5, efforts max, on one stored story: the arm is ok with no parseError, outputTokens below 128000, and arms[].taskBudget recorded"
       }
@@ -3094,11 +3139,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -3138,11 +3183,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -3182,11 +3227,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -3217,11 +3262,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       },
@@ -3273,11 +3318,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -3311,11 +3356,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       },
@@ -3343,11 +3388,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       },
@@ -3395,11 +3440,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -3440,11 +3485,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -3484,11 +3529,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -3521,11 +3566,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "lab-stage: proved by a Test Lab stage, not a story run — --mark it from the Lab result"
       }
@@ -3562,11 +3607,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       },
@@ -3608,11 +3653,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "needs-shot:over-the-shoulder: no over-the-shoulder page"
       },
@@ -3654,11 +3699,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "needs-inpaint: no inpaint repair ran"
       },
@@ -3700,11 +3745,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       },
@@ -3746,11 +3791,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       },
@@ -3792,11 +3837,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       },
@@ -3828,11 +3873,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       },
@@ -3875,11 +3920,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       },
@@ -3921,11 +3966,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       },
@@ -3967,11 +4012,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       },
@@ -4003,11 +4048,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       },
@@ -4038,11 +4083,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       },
@@ -4081,11 +4126,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       },
@@ -4128,11 +4173,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       },
@@ -4171,11 +4216,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       },
@@ -4217,11 +4262,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       },
@@ -4260,11 +4305,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       },
@@ -4292,11 +4337,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       },
@@ -4327,11 +4372,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       },
@@ -4421,11 +4466,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       },
@@ -4467,11 +4512,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       },
@@ -4550,11 +4595,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: SELECT counts, report FROM story_verify_reports WHERE story_id = '<storyId>' on staging; run node scripts/admin/verify-run.js <storyId> (dry) and compare verdict per entry; then node scripts/admin/verify-run.js --pull and confirm it records the run (registry runs[] via 'pull'); Railway log: '[VERIFY] <storyId>: N registry entries judged' after 'completed successfully', no 'auto"
       }
@@ -4577,11 +4622,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -4605,11 +4650,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -4687,11 +4732,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -4748,6 +4793,15 @@
           "checkedAt": "2026-10-09 09:47:43 CH",
           "result": "CONFIRMED",
           "note": "0 prompt_fit_failed event(s); 0 render(s) needed the ranked cut; longest built page prompt 7579 chars"
+        },
+        {
+          "storyId": "job_1791532133366_svf6xj2rd",
+          "env": "staging",
+          "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
+          "runDate": "2026-10-09 09:48:53 CH",
+          "checkedAt": "2026-10-09 09:52:30 CH",
+          "result": "CONFIRMED",
+          "note": "0 prompt_fit_failed event(s); 0 render(s) needed the ranked cut; longest built page prompt 7803 chars"
         }
       ],
       "backlog": "tasks/BACKLOG.md 'Verification pending' — FAILED verify jev-decision-layer-wired smoke p1/p4 line"
@@ -4781,11 +4835,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -4821,11 +4875,11 @@
       ],
       "backlog": "tasks/BACKLOG.md dragon front-cover line; supersedes nothing — page-prompt-fixed-blocks-fit FAILED on job_1790539784661_6mjcny1c7 (front cover + p18 repair)",
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -4885,11 +4939,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -4912,11 +4966,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -4954,11 +5008,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -4996,11 +5050,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -5034,11 +5088,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -5061,11 +5115,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -5099,11 +5153,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -5137,11 +5191,11 @@
       ],
       "backlog": "tasks/BACKLOG.md p18 repair owner-call line (resolved 2026-09-30); docs/decisions.md 2026-09-30",
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -5177,11 +5231,11 @@
       ],
       "backlog": "none",
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: (no instruction)"
       }
@@ -5202,11 +5256,11 @@
       "status": "confirmed",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "replay: proved by a replay over stored data, not a story run — --mark it from the replay result"
       }
@@ -5243,11 +5297,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -5270,11 +5324,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -5312,11 +5366,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -5354,11 +5408,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -5395,11 +5449,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -5423,11 +5477,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -5462,11 +5516,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -5500,11 +5554,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -5536,11 +5590,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -5587,11 +5641,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: stories.data.pageClothing vs characters[].name spelling; sceneImages[].referencePhotos[].requestedClothingCategory per page; pixels of the page and its debug ref. Baseline: prod job_1790769860433_2bhhj0pyi (all pages standard, LUNA vs Luna). Replay evidence 2026-10-04: new path resolves costumed p1-p5, standard p6 on that story; Enaya and Neva unchanged."
       }
@@ -5612,11 +5666,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -5642,11 +5696,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: Compare stories.data.characters[].name, the title and the cover pixels for a hero typed in caps. Replay 2026-10-04 over prod characters: 4 of 104 distinct names change (LUNA, ELIAN, sophie, katara), 0 mixed-case names altered."
       }
@@ -5669,11 +5723,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -5696,11 +5750,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: Open /book-builder with a short story on staging, read the box for both cover types, then compare with 'Snapping X -> Y pages' in the order log or the PDF page count of a test order."
       }
@@ -5733,11 +5787,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "needs-worn-off: no page takes a worn garment off"
       }
@@ -5771,11 +5825,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: After a staging run: SELECT page_number, plan->'fix_errors' FROM consolidator_calls WHERE story_id=<id>, and grep generationLog for consolidator_fix_unbacked; run node scripts/analysis/measure-consolidator-orphan-fixes.js --env=staging --since=<run date> and expect 0 flagged fixes, or each flagged one to have a matching ERROR."
       }
@@ -5796,11 +5850,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -5823,11 +5877,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: Open the wizard step 2 on staging with demo-agebands (14 chars) and a 2-child account; exercise radio swap, disabled button, shrink-trim, reload; compare the age line with the story's age band."
       }
@@ -5850,11 +5904,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: Read arcReviewReport.centralFigure, the VB character list and the front-cover plan line of the run; view the front cover."
       }
@@ -5877,11 +5931,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: Open a staging beats story's stored sceneExpansionReport.replies: each row has stopReason/outputTokens > 0/provider/elapsedMs; grep the Railway log for 'STREAM] CUT' followed by a successful re-send when a cut occurred."
       }
@@ -5918,11 +5972,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -5959,11 +6013,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "needs-worn-off: no page takes a worn garment off"
       }
@@ -5986,11 +6040,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -6013,11 +6067,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -6038,11 +6092,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -6065,11 +6119,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -6092,11 +6146,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -6130,11 +6184,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -6157,11 +6211,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -6184,11 +6238,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -6211,11 +6265,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -6238,11 +6292,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -6265,11 +6319,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -6292,11 +6346,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "lab-stage: proved by a Test Lab stage, not a story run — --mark it from the Lab result"
       }
@@ -6318,11 +6372,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -6344,11 +6398,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -6370,11 +6424,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -6396,11 +6450,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -6423,11 +6477,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -6447,11 +6501,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -6528,11 +6582,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: Read the six pages of the stored trial text: count em/en-dashes (expect 0 outside Swiss-French speaker turns), abbreviations, a phrase echoed in the next sentence, a page that states as true what an earlier page told otherwise; check the peril stays frightening not deadly; check the title gives away no ending and names the adventure or bond. Confirm the stored unified_story pro"
       }
@@ -6569,11 +6623,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: Open the six stored trial scene hints: each has `population` in {cast_only, sparse, ambient, crowd, wildlife, creature_crowd}, and a hint whose `background` names passers-by or a crowd is not cast_only. On each stored page prompt read REQUIRED CAST beside BACKGROUND: they agree (a crowd/ambient page asks for unnamed people, a cast_only page adds no one). Look at the pages: crow"
       }
@@ -6593,11 +6647,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -6651,11 +6705,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: Compare storyGenDurationMs and unified_story output_tokens with the three effort-high runs; read both versions of each entry side by side for arc, age fit, continuity and language."
       }
@@ -6681,11 +6735,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: Confirm tokenUsage.phantom_patch.calls >= 1 (else NOT COVERED); for the patched entry (visualBible.secondaryCharacters with pages and no appearsInPages) read each staged page's stored prompt for its CAST line, then look at the page: hair, build and clothing match the bible entry and differ from the other described cast."
       }
@@ -6708,11 +6762,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -6735,11 +6789,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -6762,11 +6816,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -6789,11 +6843,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -6814,11 +6868,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -6840,11 +6894,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -6865,11 +6919,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -6890,11 +6944,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -6917,11 +6971,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -7005,11 +7059,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: Read stories.data outlinePrompt for 'hair detail:' and the page texts for creature face words."
       }
@@ -7032,11 +7086,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -7068,11 +7122,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -7095,11 +7149,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "needs-inpaint: no inpaint repair ran"
       }
@@ -7120,11 +7174,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -7148,11 +7202,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -7175,11 +7229,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -7211,11 +7265,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -7236,11 +7290,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: Watch staging /try: click create while the costumed avatar is still generating; once the progress screen shows, confirm the avatar image changes among 4 images within ~10 s of the job starting, well before the title page. Network tab: job-status?needTitlePage=1 returns avatarSlides before titlePageImage."
       }
@@ -7322,11 +7376,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: Open a /try with a life-skill topic (e.g. reading-alone) and a role theme; time the two cards from the request in the Railway log (generate-ideas-stream start to the second final) and read both card texts for: obstacle -> act -> outcome connected, topic act forced by the obstacle, theme present as more than a label, no orphan object. Log lines \"failed its own check\" show the re"
       }
@@ -7347,11 +7401,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: Open a /try on staging (mobile and desktop width). Watch: slideshow until the title page lands, then the book; flip to a page still generating (spinner) and wait for it to fill in while staying on it; flip to the gate (form usable: type an email, Google button), check trial_events has gate_seen only after reaching it; after unlock the gate page shows the success state and later"
       }
@@ -7393,11 +7447,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: Run a /try on staging and click create while the costume sheet is still being built. In the Railway log: the gap from the create-story request to \"Story job ... started\" (about 1 s); then \"Job awaits the in-flight prepare-title\" / \"prepare-title wait complete\" / \"Seeded ... styled avatars\"; no second set of [CHARACTER 2x4] edits for the costumed sheet; the time from the click t"
       }
@@ -7449,11 +7503,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: Run a /try on staging with a costume theme. In the Railway log find \"[STYLED AVATAR] ... costumed:... -> 2x4 via Grok\": expect two \"[GROK] Starting edit\" lines (aspect 16:9 and 20:9, refs: 2 each) within 1 s of each other, at most one \"body try 1 invalid\" and one \"head try 1 invalid\" line and no \"try 2\", then the pass-1 line, then pass 2, then \"Stored 1/1 styled avatars in N ms"
       }
@@ -7495,11 +7549,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: Run a /try on staging with a photo of a child with a side parting (the Lukas photo). Read the Railway log for '[TRIAL AVATAR] Extracted hair traits' and '[AVATAR HAIR] read' (no left/right), the stored character's physical.detailedHairAnalysis.parting, and the hair reasons in the sheet judge report (report.hair.reason): none may say the parting is on the left/right or requested"
       }
@@ -7520,11 +7574,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: Open a /try on staging at desktop and phone width: flip to page 4, confirm 3 faded lines then the sign-in block; in DevTools Network open job-status and confirm pages 4-6 have `teaser` and no `text`; type an email and wait two polls (field keeps its value); submit and confirm the pages unlock with full text and the check-email state appears under the book; trial_events has gate"
       }
@@ -7545,11 +7599,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -7570,11 +7624,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "needs-iterate-repair: no iterate repair ran"
       }
@@ -7595,11 +7649,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "needs-worn-off: no page takes a worn garment off"
       }
@@ -7620,11 +7674,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -7656,11 +7710,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -7681,11 +7735,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -7717,11 +7771,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -7742,11 +7796,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -7767,11 +7821,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -7792,11 +7846,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -7828,11 +7882,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -7853,11 +7907,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -7889,11 +7943,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -7925,11 +7979,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -7950,11 +8004,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -7975,11 +8029,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: Railway log of a staging /try with a stated artifact, create clicked during prepare-title: (1) the first standard [CHARACTER 2x4]/[STYLED AVATAR] line is before \"prepare-title wait complete\"; (2) no NO usable cell line, and a Carried N reference cell line; (3) no COVER TYPO POST initialPage line; (4) poll story_jobs.progress during the run: never decreases (no 6 -> 1 -> 7)."
       }
@@ -8044,6 +8098,15 @@
           "result": "HUMAN-FIXED",
           "by": "claude",
           "note": "The FAILED run job_1791497394846_v01s6ndpn predates the harness ideaPick fix be60755f0; ideaPick with both offered cards is stored on job_1791531512895_3bofwpxh4 and job_1791531511694_j945yhw9a."
+        },
+        {
+          "storyId": "job_1791532133366_svf6xj2rd",
+          "env": "staging",
+          "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
+          "runDate": "2026-10-09 09:48:53 CH",
+          "checkedAt": "2026-10-09 09:52:30 CH",
+          "result": "CONFIRMED",
+          "note": "ideaPick recorded (index 0, world location)"
         }
       ]
     },
@@ -8063,11 +8126,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: Read the idea cards of 5+ staging /try draws and the \"failed its own check\" log lines."
       }
@@ -8109,11 +8172,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: verify-run trialPromptParity plus looking at the costumed sheet and the lead cell image on a pirate story and a dog-lead story."
       }
@@ -8134,11 +8197,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -8159,11 +8222,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -8184,11 +8247,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -8209,11 +8272,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -8234,11 +8297,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -8272,11 +8335,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: View the trial cover next to page 1: held toy and pet match their reference cells; wizard hat shape and colour are the same on the costume sheet, the cover and every page."
       }
@@ -8311,13 +8374,13 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
-        "note": "age-band:1: no character aged 1 (ages: 8)"
+        "note": "age-band:1: no character aged 1 (ages: 5)"
       }
     },
     {
@@ -8338,11 +8401,11 @@
       "status": "pending",
       "evidence": [],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
@@ -8376,11 +8439,11 @@
         }
       ],
       "lastChecked": {
-        "storyId": "job_1791531511694_j945yhw9a",
+        "storyId": "job_1791532133366_svf6xj2rd",
         "env": "staging",
         "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
-        "runDate": "2026-10-09 09:38:31 CH",
-        "checkedAt": "2026-10-09 09:47:43 CH",
+        "runDate": "2026-10-09 09:48:53 CH",
+        "checkedAt": "2026-10-09 09:52:30 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: View the plain avatar of a 6-9 year old next to the photo: proportions and face read school-age, not preschool."
       }
@@ -9029,6 +9092,20 @@
         "FAILED": 0,
         "HUMAN": 35,
         "NOT COVERED": 153
+      }
+    },
+    {
+      "storyId": "job_1791532133366_svf6xj2rd",
+      "env": "staging",
+      "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
+      "runDate": "2026-10-09 09:48:53 CH",
+      "checkedAt": "2026-10-09 09:52:30 CH",
+      "via": "write",
+      "counts": {
+        "CONFIRMED": 7,
+        "FAILED": 0,
+        "HUMAN": 35,
+        "NOT COVERED": 152
       }
     }
   ]
