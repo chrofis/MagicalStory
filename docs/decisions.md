@@ -68010,3 +68010,10 @@ Touched files: server/lib/vbIdGuard.js, server/lib/promptBuilders.js, server/lib
 **Rationale:** 0/257 firing, and a keyword list over prose is the pattern the owner ruled out ("reading text is the issue"). Replaces the 2026-07-18 deterministic-detection decision (the Addendum around "model-side detection proved input-dependent, ~2/3") only for the code half; the model half stays. Regression: tests/unit/no-code-spec-conflict-check.test.ts. Full unit suite 782 files / 8863 tests green.
 **Revisit if:** the consolidator model misses interaction conflicts that stored pages show (then add a typed `bodyPart` field to the interaction schema, not a keyword list).
 **Touched files:** server/lib/feedbackConsolidator.js, repairPipeline.js, testlab.js, server/routes/regeneration.js, docs/image-generation-methods.html, tests/unit/no-code-spec-conflict-check.test.ts.
+
+## 2026-10-09 — bboxDetection unmatched-issue log level reads `issue.type` only
+
+**Context:** in `enrichWithBoundingBoxes`, an issue with no matching bbox is logged at debug when it is a missing-thing issue, else warn. `isMissing` also ran `/\b(missing|entirely missing|not present|absent)\b/i` over the free-text description.
+**Decision:** deleted the description regex; `isMissing` is `issue.type === 'missing_character' || 'missing_element'`.
+**Rationale:** the regex only chose a log level (type already decides), and reading description prose is ruled out. No stored data or score depends on it. Regression: tests/unit/bbox-enrich-log-level-by-type.test.ts.
+**Touched files:** server/lib/bboxDetection.js, tests/unit/bbox-enrich-log-level-by-type.test.ts.

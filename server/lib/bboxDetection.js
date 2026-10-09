@@ -2186,8 +2186,7 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches 
     } else {
       // Missing-character/element issues have no bbox by definition — that's
       // the issue. Only warn when we expected to find a region.
-      const isMissing = issue.type === 'missing_character' || issue.type === 'missing_element' ||
-        /\b(missing|entirely missing|not present|absent)\b/i.test(issue.description || '');
+      const isMissing = issue.type === 'missing_character' || issue.type === 'missing_element';
       if (isMissing) {
         log.debug(`[BBOX-ENRICH] No bbox for missing-element issue: ${issue.description.substring(0, 50)}...`);
       } else {
