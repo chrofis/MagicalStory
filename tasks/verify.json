@@ -9367,6 +9367,32 @@
         "result": "HUMAN",
         "note": "human check | LOOK: Stored trial page prompts carry no Setting: <place name>. lead; all page images show no painted caption equal to a place name; landmark photos still attached on landmark pages. Baseline 3 captions in 48 viewed trial pages."
       }
+    },
+    {
+      "id": "trial-iphone-fixes-2026-10-09",
+      "title": "iPhone trial: location, idea box, slides, messages, viewer, payload, costume text, face pick",
+      "commits": [
+        "447487376",
+        "d861a173b",
+        "94cd88bc8",
+        "72cd4c39e",
+        "836fd05bb",
+        "595a7ff93",
+        "4ccd99335",
+        "ec07209eb",
+        "814333dab"
+      ],
+      "addedAt": "2026-10-09",
+      "status": "pending",
+      "evidence": [],
+      "claim": "On an iPhone /try: a town is found or asked for; the idea (<= ~75 words) shows fully with no sideways drag or inner scroll; the name form opens at once after a face pick; slides show whole head and body cells of both outfits; funny lines do not repeat; the viewer does not crash at completion; job-status polls are a few KB; costumed pages name the costume.",
+      "runShape": [
+        "trial"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Owner runs /try on iPhone (Safari, ideally with Private Relay on). Railway log for the visit: an IP-location line (or the warn with the address); no \"scene prose does not dress\" line; no vb_sheet_no_reference. Watch slides, messages, completion."
+      }
     }
   ],
   "runs": [

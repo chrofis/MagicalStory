@@ -67918,3 +67918,22 @@ Touched files: server/lib/vbIdGuard.js, server/lib/promptBuilders.js, server/lib
 **Rationale:** staging counts: 1 child with gray hair (Mia), 0 children or women with structured baldness or facial hair, 4 adult men with baldness (kept); production not counted (read not authorised). A child's dropped hair colour is not replaced by a guess.
 **Revisit if:** a legitimately bald woman or gray-haired teenager is a real use case, or stored counts show the cutoffs dropping real traits.
 **Touched files:** server/lib/characterPhysical.js, promptBuilders.js, styledAvatars.js, entityConsistency.js, avatarOverrides.js, visualBible.js, sceneValidator.js, server/routes/avatars.js, trial.js, regeneration.js; tests/unit/trait-plausibility-2026-10-09.test.ts (commit ffe1c1083).
+
+## 2026-10-09 — iPhone trial fixes (owner report): location, idea box, avatar slides, messages, viewer, payload, costume text, reference sheets, face pick
+
+**Context:** owner's iPhone /try run job_1791560888615_uaivmr21o (Railway log 17:45-17:52 CH) and his report: no location; the idea editor drags sideways; the idea is too long and scrolls; avatars badly cut, heads only, no body or costume; worse funny messages that repeat; bad German "image is being drawn"; crash when the story is done; 39 s wait after picking a face. The log added two: the trial scene text never dressed the costumed child, and the sister had no reference image.
+**Decision:**
+1. Location: `isPrivateIp` treated every 172.x as private, so iCloud Private Relay (172.224.0.0/12) was never looked up; real ranges (incl. IPv6, ::ffff:), 5 s timeout, a skipped lookup logs a warning; with no town found the ideas step asks for one, with an explicit skip (447487376).
+2. Sideways drag: no layout overflow in WebKit at 390/430 px; best-fit cause iOS focus zoom on 14 px fields; idea and city fields 16 px on phones (d861a173b, c43890e55).
+3+11. Idea length: ideas grew from 47-50 to 61-110 words after fd5c7d00e; owner: about 75 is fine if it fits. TRIAL_IDEA_MAX_WORDS 75 (25 per sentence, one constant) and an auto-height idea editor with no inner scroll (94cd88bc8, 814333dab).
+4+5. Avatar slides were 1:4 head-over-body strips in a square frame; each slide is now one whole cell (cropAvatarCell), head and body alternating, costumed and standard sheets alternating; the job adds the standard slides once styled (72cd4c39e, 836fd05bb).
+6. One shared funny-message list (61 lines, de/en/fr/it, union of the two earlier sets plus 13 new), shuffled once per view, no repeat in a pass.
+7. "Das Bild wird gerade gemalt…" (+ fr/en/it).
+8. Polls carried every page image as base64 (0.5-4.8 MB per 3 s poll) and swapped to URLs at completion; images now go to R2 when rendered, checkpoints hold URLs, polls are 3.2-3.7 KB (trial and full story); a completed job serves its stored cover; the /stories redirect fires only for verified or Google-linked users (595a7ff93). The crash itself never reproduced locally.
+9. The trial writer must name the costume's garments in every costumed imageSummary (a trial has no Art Director) (4ccd99335).
+10. Reference sheets: a calm row is not a gutter (false single-figure splits 17/71 -> 6/71); the cell-identification call names one garment and reports a safety block by name (blocks 3/137 -> 1/137); only the assignments array is parsed (ec07209eb).
+12. Picking one of several faces opens the name form at once; the body analysis runs in the background, Next waits for it, a failure returns to the picker (814333dab).
+**Rationale:** each fix is measured on stored data or in WebKit at iPhone sizes; none ran a paid story or trial.
+**Revisit if:** the owner's next iPhone run still shows any of them (location, drag, crash are inferred causes).
+**Open owner decision:** the clothing check (`missingGarments`) cannot see comma-list costumes (pirate, knight, wizard); splitting on commas flags every page. It only logs; fix with a structured garment field or remove.
+**Touched files:** see the commits above.
