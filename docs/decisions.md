@@ -68140,3 +68140,10 @@ Jev against the after labels (thresholds set on the before labels, so held out):
 **Decision:** the image fills the frame (`absolute inset-0 w-full h-full object-contain`, padding for avatars). The hero is in the pool only until slides exist. The picture on screen is chosen by `nextAvatarSource` (first not-yet-shown picture after the current one, round restarts when all have shown), by picture identity not counter, so slides arriving in stages or a replaced list never restart it. `buildAvatarSlides` drops byte-identical cells. Why the analyzer cut returned the same cell twice is NOT established (locally, with the analyzer down, the fixed-math fallback gives 12 distinct cells); the dedupe is the guard, not the explanation. Known remainder: the early body-row slides and the finished sheet's body cells are the same figures with different bytes, so that figure can show once more after the list is replaced.
 **Test:** tests/unit/trial-waiting-slides-rotation-2026-10-09.test.ts; tests/e2e/trial-waiting-slide-frame.spec.ts (iPhone WebKit; fails before: img top 44 < frame top 138).
 **Touched files:** client/src/pages/TrialGenerationPage.tsx, client/src/utils/trialPoll.ts, server/lib/avatarSlides.js, tests above, tests/unit/trial-waiting-page-2026-10-09.test.ts (fixture figures now differ per sheet).
+
+## 2026-10-09 - Trial keeps the drawn body row for age 2 and under, whatever the gender
+
+**Context:** the entry "Trial keeps the drawn body row: only a gender change redraws it" redrew on any gender difference. Owner: "Gender redraws if age is more than 2."
+**Decision:** one predicate, `trialSheets.keepsDrawnBody(drawnStamp, character)`: kept when the stamp equals the declared one, or the declared age is 2 or under; a gender change at age 3 or more redraws. prepare-standard-avatar, the PATCH measurement log and `usablePreparedAvatars` all call it (no second copy). An unreadable age redraws (strict).
+**Replaces:** the gender clause of the 2026-10-09 "Trial keeps the drawn body row" entry (age band and tier clauses unchanged).
+**Touched files:** server/lib/trialSheets.js, server/routes/trial.js, tests/unit/trial-keeps-drawn-body-age.test.ts.

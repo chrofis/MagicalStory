@@ -36,6 +36,20 @@ function standardSheetStamp(character) {
   return `gender:${character?.gender || ''}`;
 }
 
+/** Declared ages up to this keep the drawn body row whatever the gender (owner 2026-10-09: "gender redraws if age is more than 2"). */
+const GENDER_KEEP_MAX_AGE = 2;
+
+/**
+ * THE rule for reusing something drawn under `drawnStamp` (the body row, the standard sheet): it is kept when the stamp equals
+ * the declared one, or when the declared age is 2 or under (a baby's gender barely shows in the figure). Otherwise a gender
+ * change redraws. Used by prepare-standard-avatar, the PATCH measurement log and usablePreparedAvatars.
+ */
+function keepsDrawnBody(drawnStamp, character) {
+  if (drawnStamp === standardSheetStamp(character)) return true;
+  const age = parseInt(character?.age, 10);
+  return Number.isFinite(age) && age <= GENDER_KEEP_MAX_AGE;
+}
+
 /**
  * The persisted sheets a story job may seed, from one character-row object. The standard sheet is dropped
  * (loudly) when it was drawn for another age/gender than the row holds now; the job then styles it itself.
@@ -49,7 +63,7 @@ function usablePreparedAvatars(character, log = defaultLog) {
     const { standard, ...rest } = avatars || {};
     out[name] = rest;
     if (!standard) continue;
-    if (character.preGeneratedStandardFor === current) {
+    if (keepsDrawnBody(character.preGeneratedStandardFor, character)) {
       out[name].standard = standard;
     } else {
       log.error(`❌ [TRIAL] The prepared standard sheet of ${name} was drawn for "${character.preGeneratedStandardFor}" but the row now says "${current}" — it is not reused`);
@@ -225,6 +239,7 @@ async function styleAndPersistTrialSheets({ userId, characterId, character, requ
 module.exports = {
   TRIAL_ART_STYLE,
   standardSheetStamp,
+  keepsDrawnBody,
   usablePreparedAvatars,
   mergePreparedAvatars,
   onlyRequestedSheets,

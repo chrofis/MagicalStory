@@ -188,7 +188,7 @@ describe('2. who the row is drawn for, and when it is redrawn', () => {
   it('a gender change declared: only the row is redrawn by the sheet, loudly (never the whole sheet twice)', async () => {
     const otherGender = await runBothPhases({ age: '5', gender: 'male' });
     expect(otherGender.style.mock.calls[0][0].styleOptions.precomputedBodies).toEqual({});
-    expect(otherGender.warn.mock.calls.some(c => String(c[0]).includes('(a gender change) — the sheet draws its own body row'))).toBe(true);
+    expect(otherGender.warn.mock.calls.some(c => String(c[0]).includes('(a gender change at age above 2) — the sheet draws its own body row'))).toBe(true);
   });
 });
 

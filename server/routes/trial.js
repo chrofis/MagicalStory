@@ -1241,8 +1241,9 @@ router.patch('/update-character-details', verifySessionToken, async (req, res) =
         const { getAgeCategory } = require('../lib/promptBuilders');
         const declaredAge = patchedAge ?? c.age;
         const bandDiffers = estAge != null && getAgeCategory(estAge) !== getAgeCategory(parseInt(declaredAge, 10));
-        const genderDiffers = !!(c.photoEstimate.gender && gender && c.photoEstimate.gender !== gender);
-        log.info(`[TRIAL AVATARS] photo estimate (${c.photoEstimate.apparentAge || '-'}, ${c.photoEstimate.gender || '-'}) vs declared (${declaredAge}, ${gender || '-'}): age band ${bandDiffers ? 'DIFFERENT, the drawn body row is kept' : 'same'}, gender ${genderDiffers ? 'DIFFERENT, the body row is redrawn' : 'same, the body row is reused'}`);
+        const genderDiffers = !!(c.photoEstimate.gender && gender && c.photoEstimate.gender !== gender)
+          && !trialSheets.keepsDrawnBody(`gender:${c.photoEstimate.gender}`, c);
+        log.info(`[TRIAL AVATARS] photo estimate (${c.photoEstimate.apparentAge || '-'}, ${c.photoEstimate.gender || '-'}) vs declared (${declaredAge}, ${gender || '-'}): age band ${bandDiffers ? 'DIFFERENT, the drawn body row is kept' : 'same'}, gender ${genderDiffers ? 'DIFFERENT, the body row is redrawn' : 'same or declared age 2 or under, the body row is reused'}`);
       }
       c.traits = structuredTraits;
       if (customTraits != null) c.customTraits = customTraits;
@@ -2829,11 +2830,11 @@ router.post('/prepare-standard-avatar', verifySessionToken, async (req, res) => 
     if (preBody) {
       try {
         const drawn = await preBody.promise;
-        if (preBody.stamp === stamp) {
+        if (trialSheets.keepsDrawnBody(preBody.stamp, mainChar)) {
           precomputedBodies[`${character.name}:standard`] = { row: drawn.row, review: drawn.review, attemptHistory: drawn.attemptHistory };
           log.info(`[TRIAL AVATARS] prepare-standard-avatar for user ${userId}: reusing the body row drawn at the photo (stamp ${stamp})`);
         } else {
-          log.warn(`⚠️ [TRIAL AVATARS] prepare-standard-avatar for user ${userId}: the body row was drawn for "${preBody.stamp}" but the visitor declared "${stamp}" (a gender change) — the sheet draws its own body row (one extra body-row call)`);
+          log.warn(`⚠️ [TRIAL AVATARS] prepare-standard-avatar for user ${userId}: the body row was drawn for "${preBody.stamp}" but the visitor declared "${stamp}" (a gender change at age above 2) — the sheet draws its own body row (one extra body-row call)`);
         }
       } catch {
         log.warn(`[TRIAL AVATARS] prepare-standard-avatar for user ${userId}: the body row from the photo failed — the sheet draws its own`);
