@@ -1908,7 +1908,7 @@ ${bibleBody}` : bibleBody;
   if (jevActive(jevReport)) try {
     const decided = await decideBriefFields({ beats, visualBible, bibleSections, approvedArc, inputData, present, gl, light: jevReport ? jevReport.light : null });
     bibleSections = decided.bibleSections;
-    if (jevReport) Object.assign(jevReport, { vb: decided.report.vb, population: decided.report.population, gaze: decided.report.gaze, locations: decided.report.locations });
+    if (jevReport) Object.assign(jevReport, { vb: decided.report.vb, population: decided.report.population, gaze: decided.report.gaze, emotions: decided.report.emotions, locations: decided.report.locations });
   } catch (err) {
     if (!(err instanceof JevDecisionError) || !jevReport) throw err;
     // The backup: nothing is fixed, and the page-brief call authors every
@@ -2224,7 +2224,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   // layer makes on this story — cast cuts per re-plan round, shots, light, VB
   // citations, aboard, population, gaze — stored as `stories.data.jevDecisions`
   // so a run can be replayed; `fallback` is the backup switch (jevFallBack).
-  const jevReport = { castCuts: [], shots: null, light: null, vb: null, population: null, gaze: null, fallback: null, probe: null };
+  const jevReport = { castCuts: [], shots: null, light: null, vb: null, population: null, gaze: null, emotions: null, fallback: null, probe: null };
   // B — THE PRE-START HEALTH CHECK: one tiny Jev question. Down → the whole
   // story runs the backup (today's setup before the layer), never refused.
   {

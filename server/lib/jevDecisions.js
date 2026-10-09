@@ -50,6 +50,7 @@ const J = require('./jevAudit');
 const SV = require('./shotVocabulary');
 const { TIMES_OF_DAY, CLOCK_HOURS, isSkylessLight, isSkyHidden, WEATHERS, JEV_TIME_CRITERIA, JEV_WEATHER_CRITERIA, JEV_SUBMERGED_CRITERIA } = require('./sceneLight');
 const G = require('./gazeTargets');
+const { EMOTIONS, EMOTION_MOOD } = require('./emotionVocabulary');
 const { openRouterUsage } = require('./providerUsage');
 const { recordTextUsage } = require('./usageContext');
 const { log } = require('../utils/logger');
@@ -79,6 +80,7 @@ const JEV_DECISIONS = {
   population: { reps: 1, publicAt: 0.5, crowdAt: 0.5, creatureCrowdAt: 0.5, wildlifeAt: 0.4, sparseAt: 0.5 }, // wildlifeAt 0.4: a reef's fish read 0.44-0.56 on the two sea books (replay 2026-10-06), a land place 0.26-0.31; 13/13 for crowd/ambient/cast_only; the creature and sparse questions only ever read a place that was cast_only
   gaze: { reps: 3 },                // G2 128/139 averaged (owner: 3 calls for this field)
   state: { reps: 3 },               // a choice, averaged as gaze is (owner, 2026-09-28)
+  emotions: { reps: 1 },            // ONE call per story for every figure of every page (E10: 158/211 = 74.9%; a single call flips ~3%)
 };
 
 // ───────────────────────── the plan line ─────────────────────────
@@ -1199,6 +1201,65 @@ async function decideGaze({ arc, pages, perPage }, opts = {}) {
   return { pages: out, stats: summarise(stats) };
 }
 
+// ───────────────────────── EMOTION (characters[].emotion, creatures[].emotion) ─────────────────────────
+
+/**
+ * The state of the one story-level emotion call: the arc and the whole plan
+ * (shot stripped), exactly as the other decisions read them — the page TEXT does
+ * not exist yet when the briefs are written (page text follows the final
+ * briefs, beatsPipeline step 6). Trials and any caller that holds the prose pass
+ * `text` per page instead and get the measured text state.
+ */
+function emotionState(arc, pages) {
+  if (pages.some(p => p.text)) {
+    const block = p => `--- Page ${p.pageNumber} ---\n${String(p.text || '').trim()}${p.planLine ? `\nPLAN: ${stripPlanShot(p.planLine)}` : ''}`;
+    return `THE STORY TEXT:\n${pages.map(block).join('\n\n')}`;
+  }
+  return `THE STORY, beat by beat:\n${String(arc || '').trim() || '(no arc stored)'}\n\n${PLAN_HEAD}\n${planBlock(pages)}`;
+}
+
+/**
+ * Each figure's emotion (owner, 2026-10-09, "Metadata and review should come
+ * from Jev where possible"): ONE CHOICE over the closed list
+ * (emotionVocabulary.EMOTIONS, described by EMOTION_MOOD) per figure per page,
+ * every question of the story in ONE call (variant E10; docs/decisions.md
+ * 2026-10-09 "Jev decides each figure's emotion before the briefs"). The
+ * question wording is the measured one — "as the story tells it"; the "face
+ * shows" wording defaults to neutral. Code writes the answer into `emotion`
+ * (pinBrief); the Art Director draws `expression` to show it.
+ *
+ * @param {{arc:string, pages:Array<{pageNumber:number, planLine?:string, text?:string}>,
+ *          perPage:Array<{pageNumber:number, figures:Array<{key:string, label:string}>}>}} input
+ *   `key` is what the answer is stored under (a character's name, a creature's id), `label` how the question names it.
+ * @returns {Promise<{byPage:Object<number,Object<string,string>>, stats:Object}>}
+ */
+async function decideEmotions({ arc, pages, perPage }, opts = {}) {
+  const stats = newStats();
+  const known = new Set(pages.map(p => Number(p.pageNumber)));
+  const asked = [];
+  const questions = {};
+  for (const p of perPage) {
+    if (!known.has(Number(p.pageNumber))) continue;
+    for (const f of p.figures || []) {
+      const id = `Q${asked.length}`;
+      asked.push({ id, pageNumber: Number(p.pageNumber), key: f.key });
+      questions[id] = { type: 'choice', instructions: `The feeling ${f.label} has at the moment of page ${p.pageNumber}, as the story tells it.`, criteria: EMOTION_MOOD };
+    }
+  }
+  const byPage = {};
+  if (asked.length) {
+    const ans = await runJevRequests(repeat({ key: 'emotions', state: emotionState(arc, pages), questions }, JEV_DECISIONS.emotions.reps), { ...opts, usageLabel: 'jev_decisions_emotions', stats });
+    const reps = ans.get('emotions') || [];
+    for (const q of asked) {
+      const emotion = modalChoice(reps, q.id);
+      if (!EMOTIONS.includes(emotion)) throw new JevDecisionError(`Jev emotion answer "${emotion}" for ${q.key} on page ${q.pageNumber} is outside ${EMOTIONS.join('|')}`);
+      (byPage[q.pageNumber] = byPage[q.pageNumber] || {})[q.key] = emotion;
+    }
+  }
+  log.info(`🙂 [JEV/emotions] ${Object.entries(byPage).map(([n, m]) => `p${n}:${Object.entries(m).map(([k, e]) => `${k}=${e}`).join(',')}`).join(' ')} (${stats.calls} call(s))`);
+  return { byPage, stats: summarise(stats) };
+}
+
 // ───────────────────────── the FIXED fields in the brief ─────────────────────────
 
 /**
@@ -1231,7 +1292,7 @@ function populationExtrasNote(population) {
     : '';
 }
 
-const JEV_FIXED_FIELDS_RULE = "A story page's FIXED block holds the fields decided before you write: its `shot`, `timeOfDay` and indoors, the Visual Bible ids its `objects[]` cites — its location or vantage, and for an element with looks the dotted id of the look it shows — its `aboard`, its `population` and each listed character's `looksAt`. A cover's FIXED block holds its `shot`, its light (`timeOfDay` and `weather`), its location, its `population`, its `era` and the gaze of every figure (the viewer). Code writes each into the page's METADATA: you never write a field the FIXED block lists (a field it does not list is yours — a cover's `aboard`, a `looksAt` for a story-page character it leaves out, an `objects[]` id it does not list such as a garment). Write the prose so the picture shows each: every cited element staged, even where only part of it is in frame, and no Visual Bible element staged that the FIXED `objects` leaves out. No other rule changes a fixed field; a rule that would change one applies to the staging inside it. A story page's `weather` stays yours — `none` indoors, never `none` outdoors. A cover's FIXED location is the vantage code writes first in `objects[]`, and the cover is seen as that vantage shows it.";
+const JEV_FIXED_FIELDS_RULE = "A story page's FIXED block holds the fields decided before you write: its `shot`, `timeOfDay` and indoors, the Visual Bible ids its `objects[]` cites — its location or vantage, and for an element with looks the dotted id of the look it shows — its `aboard`, its `population`, each listed character's `looksAt` and each listed figure's `emotion`. A cover's FIXED block holds its `shot`, its light (`timeOfDay` and `weather`), its location, its `population`, its `era` and the gaze of every figure (the viewer). Code writes each into the page's METADATA: you never write a field the FIXED block lists (a field it does not list is yours — a cover's `aboard`, a `looksAt` or an `emotion` for a story-page figure it leaves out, an `objects[]` id it does not list such as a garment). Write the prose so the picture shows each: every cited element staged, even where only part of it is in frame, and no Visual Bible element staged that the FIXED `objects` leaves out. No other rule changes a fixed field; a rule that would change one applies to the staging inside it. A story page's `weather` stays yours — `none` indoors, never `none` outdoors. A cover's FIXED location is the vantage code writes first in `objects[]`, and the cover is seen as that vantage shows it.";
 
 /**
  * Which shot a vantage holds, as the Visual Bible call is told it (owner,
@@ -1304,6 +1365,8 @@ function fixedBlock(page) {
   if (f.population) lines.push(`- population: ${f.population}${populationExtrasNote(f.population)}`);
   const gaze = Object.entries(f.looksAt || {});
   if (gaze.length) lines.push(`- looksAt: ${gaze.map(([n, t]) => `${n} → ${G.gazeToken(t) ? `${t} (${G.gazeTokenRow(t).phrase})` : label(t)}`).join('; ')}`);
+  const feelings = Object.entries(f.emotions || {});
+  if (feelings.length) lines.push(`- emotion: ${feelings.map(([n, e]) => `${n} → ${e}`).join('; ')} (the feeling each face shows: draw its expression to show it)`);
   return lines.join('\n');
 }
 
@@ -1325,6 +1388,7 @@ function fixedBlock(page) {
  *                                    `aboard` outside `aboardIds` (a structure) stays
  *   looksAt                        — { characterName: target }
    looksAtAll                     — one target for EVERY character row (a cover: `viewer`)
+   emotions                       — { characterName | creatureId: emotion } (decideEmotions), the figures it lists
    weather, era                   — written as given (a cover's; a story page's weather stays the Art Director's)
  */
 function pinBrief(brief, fixed) {
@@ -1400,6 +1464,22 @@ function pinBrief(brief, fixed) {
       return { ...c, looksAt: to };
     });
   }
+  // EACH FIGURE'S EMOTION IS JEV'S (decideEmotions): a character row by name, a creature row by id.
+  if (fixed.emotions) {
+    const pinRows = (key, idOf) => {
+      if (!Array.isArray(m[key])) return;
+      m[key] = m[key].map((c) => {
+        const id = c && typeof c === 'object' ? idOf(c) : null;
+        if (!id || !Object.prototype.hasOwnProperty.call(fixed.emotions, id)) return c;
+        const to = fixed.emotions[id];
+        if (c.emotion === to) return c;
+        changes.push({ field: 'emotion', name: id, from: c.emotion ?? null, to });
+        return { ...c, emotion: to };
+      });
+    };
+    pinRows('characters', c => c.name);
+    pinRows('creatures', c => c.id);
+  }
   if (!changes.some(c => !c.problem)) return { brief, changes };
   return { brief: `${parsed.prose}\n\n---METADATA---\n${JSON.stringify(m, null, 2)}`, changes };
 }
@@ -1464,6 +1544,8 @@ module.exports = {
   gazePageMaterial,
   gazeCandidates,
   decideGaze,
+  decideEmotions,
+  emotionState,
   namedIn,
   JEV_DECISIONS,
   JEV_DECISION_CONCURRENCY,

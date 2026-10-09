@@ -22,6 +22,24 @@
 /** The closed list, in the order the prompts show it. */
 const EMOTIONS = Object.freeze(['happy', 'sad', 'angry', 'afraid', 'surprised', 'disgusted', 'neutral']);
 
+/**
+ * The criteria Jev chooses among when it DECIDES a figure's emotion
+ * (jevDecisions.decideEmotions), one description per value of the closed list.
+ * Verbatim from the measured variant (scripts/analysis/eval-jev-brief-metadata.js
+ * MOOD, E10: 158/211 = 74.9% against the Art Director's 60.7%, docs/decisions.md
+ * 2026-10-09 "Jev decides each figure's emotion"): re-wording a line is a new
+ * measurement, not an edit.
+ */
+const EMOTION_MOOD = Object.freeze({
+  happy: 'happy, glad, excited, proud',
+  sad: 'sad, disappointed, lonely, worried about a loss',
+  angry: 'angry, cross, defiant',
+  afraid: 'afraid, scared, nervous, worried about danger',
+  surprised: 'surprised, amazed, startled',
+  disgusted: 'disgusted',
+  neutral: 'neutral: calm, attentive, concentrating, no strong feeling',
+});
+
 /** The inventory's one extra answer: the face cannot be read. Never a defect. */
 const EMOTION_UNREADABLE = 'unreadable';
 
@@ -56,6 +74,6 @@ function compareEmotion(intended, seen) {
 }
 
 module.exports = {
-  EMOTIONS, EMOTION_UNREADABLE, EMOTION_TONE, EMOTION_ENUM_PHRASE,
+  EMOTIONS, EMOTION_MOOD, EMOTION_UNREADABLE, EMOTION_TONE, EMOTION_ENUM_PHRASE,
   normalizeEmotion, compareEmotion,
 };

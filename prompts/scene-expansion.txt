@@ -45,7 +45,7 @@
 8i. **A back-view character with a meaningful expression turns the head.** Write `back view, head turned toward [left|right] shoulder`, describing only what that turn reveals — a cheek, one eye, a brow — and give every reacting figure in a shared reaction the same treatment.
 8c. **Shared-action facing consistency.** Characters moving to the same destination or sharing one activity get the SAME facing treatment — all back view when the group heads for a background target, never one companion facing the camera while the others walk away. A character's facing is written inside that character's own clause ("…, seen from behind, walking away from the viewer, face not visible"); one collective sentence for the group does not bind. A look-down task (reading, examining a held object) cannot combine with `facing the camera`. Never describe front-only details (visor front, chest emblem, garment print) as visible on a back-view figure.
 8j. **Eyes are a field.** {LOOKS_AT_FIELD}
-8k. **A face is a field.** {EXPRESSION_FIELD}
+8k. **A face is a field.** {EXPRESSION_FIELD}<!-- JEV_FIXED_BEGIN --> Where the page's FIXED block lists an `emotion` for a figure, that feeling is already decided: code writes it, you write none, and the `expression` you write draws exactly that feeling.<!-- JEV_FIXED_END -->
 8d. **Age = apparent-age category.** Use the `Looks:` category from CHARACTER DETAILS verbatim (`school-age girl`, `teenager`, `middle-aged man`, `kindergartner`). Never use a numeric age in years and never substitute a different bucket.
 8e. **Scale is anchored in frame.** `small in the distance`, `far off`, `tiny` render at foreground size. Measure the distant thing against something visible beside it: "the far ship spans less than the main character's hand", "the tower is a thumb's width beside the near roof". A person at `depth: background` is measured the same way, in their own clause — "a small figure no taller than the ledge is wide" — and is still described, in one short clause, by hair colour and top colour only: no build, face, bottoms or footwear.
 8f. **True relative size.** {TRUE_RELATIVE_SIZE}
@@ -149,8 +149,8 @@ Then a single-line JSON object:
 {
   "sceneIntent": "<!-- JEV_BACKUP_BEGIN -->CharacterA kneels in the open doorway and reaches for a package on the floor. CharacterB stands beside the table and watches, head tilted. Bright midday light falls through the doorway, and CharacterB's shoulders hang loose.<!-- JEV_BACKUP_END --><!-- JEV_FIXED_BEGIN -->CharacterA kneels in the open kitchen doorway and reaches for a package on the floor while CharacterB stands beside the table and watches, head tilted. The kitchen has cream cabinets and a wooden table.<!-- JEV_FIXED_END -->",
   "characters": [
-    {"name": "CharacterA", "clothing": "standard", "position": "in the doorway", "depth": "foreground", "footing": "ground", <!-- JEV_BACKUP_BEGIN -->"looksAt": "CharacterB", <!-- JEV_BACKUP_END -->"expression": "wide-eyed, mouth half open, brows lifted", "emotion": "surprised"},
-    {"name": "CharacterB", "clothing": "costumed:<costume>", "position": "beside the table", "perspective": "back view, head turned toward right shoulder", "depth": "background", "footing": "ground", <!-- JEV_BACKUP_BEGIN -->"looksAt": "ART001", <!-- JEV_BACKUP_END -->"expression": "one eye and cheek visible, brows level, faint smile", "emotion": "happy"}
+    {"name": "CharacterA", "clothing": "standard", "position": "in the doorway", "depth": "foreground", "footing": "ground", <!-- JEV_BACKUP_BEGIN -->"looksAt": "CharacterB", <!-- JEV_BACKUP_END -->"expression": "wide-eyed, mouth half open, brows lifted"<!-- JEV_BACKUP_BEGIN -->, "emotion": "surprised"<!-- JEV_BACKUP_END -->},
+    {"name": "CharacterB", "clothing": "costumed:<costume>", "position": "beside the table", "perspective": "back view, head turned toward right shoulder", "depth": "background", "footing": "ground", <!-- JEV_BACKUP_BEGIN -->"looksAt": "ART001", <!-- JEV_BACKUP_END -->"expression": "one eye and cheek visible, brows level, faint smile"<!-- JEV_BACKUP_BEGIN -->, "emotion": "happy"<!-- JEV_BACKUP_END -->}
   ],
 <!-- JEV_BACKUP_BEGIN -->
   "shot": "medium",
@@ -167,7 +167,7 @@ Then a single-line JSON object:
   "textPosition": "top-left|top-right|bottom-left|bottom-right|top-full|bottom-full",
   "textZoneDescription": "5–15 words naming the calm, uncluttered surface in that corner",
 <!-- TEXT_OVERLAY_END -->
-  "creatures": [{"id": "ANI001", "depth": "midground", <!-- JEV_BACKUP_BEGIN -->"looksAt": "CharacterB", <!-- JEV_BACKUP_END -->"expression": "brows level, eyes wide, mouth closed", "emotion": "neutral"}],
+  "creatures": [{"id": "ANI001", "depth": "midground", <!-- JEV_BACKUP_BEGIN -->"looksAt": "CharacterB", <!-- JEV_BACKUP_END -->"expression": "brows level, eyes wide, mouth closed"<!-- JEV_BACKUP_BEGIN -->, "emotion": "neutral"<!-- JEV_BACKUP_END -->}],
   "interactions": [
     {"character": "CharacterA", "object": "an item", "where": "carries the item in a pocket", "action": "holding", "storyRelevant": false, "priority": "low"},
     {"character": "CharacterB", "object": "wooden ladder", "where": "climbs the wooden ladder", "action": "climbing the ladder", "hands": true, "storyRelevant": true, "priority": "essential"}
@@ -228,7 +228,7 @@ A story page's METADATA carries no `shot`, `population`, `aboard`, `timeOfDay` o
 <!-- JEV_BACKUP_END -->
 - {PLACE_INSIDE_OUTSIDE}
 
-**`depth`, `expression` and `emotion`** — required for every character: `depth` is `foreground`, `midground` or `background`; `expression` is 3-8 words naming brows, eyes and mouth ("brows pulled tight, eyes narrowed, jaw set"). Never write a bare mood word in `expression` — "happy" and "sad" cannot be drawn; the one word goes in `emotion`, from rule 8k's list. An expression is one instant: never a transition ("changing from X to Y") — pick the single expression the picture shows. On a `wide` shot, or a plain `back view` with no head turn, faces are too small or hidden to read — describe body language in the prose instead of facial detail (rule 8i covers a back-view character whose expression must read).
+**`depth`, `expression`<!-- JEV_BACKUP_BEGIN --> and `emotion`<!-- JEV_BACKUP_END -->** — required for every character: `depth` is `foreground`, `midground` or `background`; `expression` is 3-8 words naming brows, eyes and mouth ("brows pulled tight, eyes narrowed, jaw set"). Never write a bare mood word in `expression` — "happy" and "sad" cannot be drawn; <!-- JEV_BACKUP_BEGIN -->the one word goes in `emotion`, from rule 8k's list.<!-- JEV_BACKUP_END --><!-- JEV_FIXED_BEGIN -->the feeling is the page's FIXED `emotion`, which `expression` draws (rule 8k).<!-- JEV_FIXED_END --> An expression is one instant: never a transition ("changing from X to Y") — pick the single expression the picture shows. On a `wide` shot, or a plain `back view` with no head turn, faces are too small or hidden to read — describe body language in the prose instead of facial detail (rule 8i covers a back-view character whose expression must read).
 
 **Characters are solid.** Never `translucent`, `transparent`, `ghostly`, `see-through`, `spectral` — a character is always fully opaque, whatever the story calls them.
 

@@ -56,6 +56,14 @@ function fixedOfBlock(block, { decidedIds, aboardIds }) {
       return [name.trim(), /^away\b/.test(target) ? 'away' : (target.match(ID_RE) || [target.trim()])[0]];
     }));
   }
+  // `- emotion: Ana → afraid; ANI001 → neutral (the feeling each face shows: ...)` (jevDecisions.fixedBlock)
+  const feel = line('emotion');
+  if (feel) {
+    f.emotions = Object.fromEntries(feel.replace(/\s*\(the feeling.*$/, '').split('; ').map((part) => {
+      const [name, e] = part.split(' → ');
+      return [name.trim(), e.trim()];
+    }));
+  }
   return f;
 }
 
@@ -87,6 +95,15 @@ function stripDecided(brief, fixed) {
       m.characters = m.characters.map((c) => {
         if (!c || typeof c !== 'object' || !(c.name in fixed.looksAt)) return c;
         const { looksAt, ...rest } = c;
+        return rest;
+      });
+    }
+    // the emotion of every figure the FIXED block lists is code's (pinBrief), so the author leaves it out
+    for (const [key, idOf] of [['characters', c => c.name], ['creatures', c => c.id]]) {
+      if (!fixed.emotions || !Array.isArray(m[key])) continue;
+      m[key] = m[key].map((c) => {
+        if (!c || typeof c !== 'object' || !(idOf(c) in fixed.emotions)) return c;
+        const { emotion, ...rest } = c;
         return rest;
       });
     }

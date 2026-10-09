@@ -4473,7 +4473,7 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
     if (params.landmarks === false) storyData.availableLandmarks = undefined;
     const sceneModel = params.sceneModel || storyData.modelOverrides.sceneDescriptionModel || MODEL_DEFAULTS.sceneDescription;
     const adCalls = [];
-    labJevReport = { light: null, vb: null, population: null, gaze: null, coverPlaces: null };
+    labJevReport = { light: null, vb: null, population: null, gaze: null, emotions: null, coverPlaces: null };
     const expStart = Date.now();
     const meta = { timings: {}, labelRound: null };
     const ad = await runArtDirector({

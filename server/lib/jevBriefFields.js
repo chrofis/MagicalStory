@@ -140,7 +140,9 @@ function submergedPages(visualBible, locOf, aboardOf) {
  *   - each commissioned character's `looksAt` (decideGaze; the roster is the
  *     shipped plan check's head count — the same `present` the shots read —
  *     and the candidates are the page's cites and the figures its plan line
- *     names, since no interaction row exists yet).
+ *     names, since no interaction row exists yet),
+ *   - each figure's `emotion` (decideEmotions: the same roster plus the cited
+ *     animals, ONE call per story, the closed list of emotionVocabulary.js).
  * With the shot (plan field 0) and the light (b.fixed) they become
  * `b.jevFixed`, which the page-brief call receives as the page's FIXED block
  * (jevDecisions.fixedBlock) and code merges them into the brief after it
@@ -241,11 +243,23 @@ async function decideBriefFields({ beats, visualBible, bibleSections, approvedAr
     const offFrame = offFrameOf(commissioned, roster, b.planLine);
     return { pageNumber: n, roster, offFrame, ...jevDecisions.gazePageMaterial({ objects, interactions: [], planLine: b.planLine, index: gIndex }) };
   });
-  const gaze = await jevDecisions.decideGaze({ arc: approvedArc, pages: storyBeats, perPage });
+  // Emotion: the same roster plus the animals the page cites, in the SAME wall-clock step as the gaze
+  // (independent calls; the emotion call is one per story). Answers are stored under a character's name
+  // and a creature's id, which is how pinBrief finds the row.
+  const emotionFigures = perPage.map((pp) => {
+    const b = storyBeats.find(s => Number(s.pageNumber) === pp.pageNumber);
+    const creatures = [...new Set(b.jevFixed.cites.map(baseOf))].map(id => gIndex[id]).filter(e => e && e.kind === 'creature');
+    return { pageNumber: pp.pageNumber, figures: [...pp.roster.map(n => ({ key: n, label: n })), ...creatures.map(e => ({ key: e.id, label: e.name }))] };
+  });
+  const [gaze, emotions] = await Promise.all([
+    jevDecisions.decideGaze({ arc: approvedArc, pages: storyBeats, perPage }),
+    jevDecisions.decideEmotions({ arc: approvedArc, pages: storyBeats, perPage: emotionFigures }),
+  ]);
   for (const g of gaze.pages) {
     const b = storyBeats.find(s => Number(s.pageNumber) === g.pageNumber);
     b.jevFixed.looksAt = Object.fromEntries(g.characters.map(c => [c.name, c.looksAt]));
   }
+  for (const b of storyBeats) b.jevFixed.emotions = emotions.byPage[Number(b.pageNumber)] || {};
   for (const b of storyBeats) {
     const f = b.jevFixed;
     const ids = [f.location, ...f.cites, f.aboard, ...Object.values(f.looksAt || {})].filter(id => id && /^[A-Z]{3}\d{3}/i.test(String(id)));
@@ -261,9 +275,9 @@ async function decideBriefFields({ beats, visualBible, bibleSections, approvedAr
       else bibleSections = synced;
     }
   }
-  const report = { vb: decidedVb, population: pop, gaze, lightSources: Object.fromEntries([...lit.byPage]), locations: Object.fromEntries([...located.byPage].map(([n, r]) => [n, r.cite])), unlocated: located.unplaced, elapsedMs: Date.now() - t0 };
-  gl.info('beats_jev_brief_fields', `Jev decided the cited elements, looks, location, aboard, population and gaze of ${storyBeats.length} page(s) before the briefs (${decidedVb.stats.calls + pop.stats.calls + gaze.stats.calls} Jev calls, ${(report.elapsedMs / 1000).toFixed(1)}s)`, null, {
-    stats: { vb: decidedVb.stats, population: pop.stats, gaze: gaze.stats, lightSources: lit.stats },
+  const report = { vb: decidedVb, population: pop, gaze, emotions, lightSources: Object.fromEntries([...lit.byPage]), locations: Object.fromEntries([...located.byPage].map(([n, r]) => [n, r.cite])), unlocated: located.unplaced, elapsedMs: Date.now() - t0 };
+  gl.info('beats_jev_brief_fields', `Jev decided the cited elements, looks, location, aboard, population, gaze and emotions of ${storyBeats.length} page(s) before the briefs (${decidedVb.stats.calls + pop.stats.calls + gaze.stats.calls + emotions.stats.calls} Jev calls, ${(report.elapsedMs / 1000).toFixed(1)}s)`, null, {
+    stats: { vb: decidedVb.stats, population: pop.stats, gaze: gaze.stats, emotions: emotions.stats, lightSources: lit.stats },
   });
   return { bibleSections, report };
 }
