@@ -8576,8 +8576,19 @@
           "versions"
         ]
       },
-      "status": "pending",
-      "evidence": [],
+      "status": "confirmed",
+      "evidence": [
+        {
+          "storyId": "job_1791531449494_o0kaatvmq",
+          "env": "staging",
+          "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
+          "runDate": "2026-10-09 09:37:29 CH",
+          "checkedAt": "2026-10-09 10:54:40 CH",
+          "result": "HUMAN-CONFIRMED",
+          "by": "claude",
+          "note": "Test Lab experiment 1733 (stage inpaint, staging build f7a114be) replayed p3 v0's stored eval and plan: the instruction sent to Grok was '1. Paint over the lettering on the stone facade of the church towers as continuous stone.' (no read letters); the result p3 v2 shows the towers with their ornament band and no lettering. Before the fix the same page's inpaint-round-1 sent 'Paint over BANZ' and Grok painted BANZ on both towers."
+        }
+      ],
       "lastChecked": {
         "storyId": "job_1791531449494_o0kaatvmq",
         "env": "staging",
