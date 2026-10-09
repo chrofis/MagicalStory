@@ -67838,3 +67838,11 @@ Touched files: server/lib/vbIdGuard.js, server/lib/promptBuilders.js, server/lib
 **Rationale:** the costumed sheet is required for the cover either way; generating it in the job yields the same kind of sheet (not a degraded substitute) and costs one style transfer only on the slow path.
 **Revisit if:** prewarms routinely exceed 60 s (then raise the cap or start prepare-title earlier).
 **Touched files:** storyJobPipeline.js (runTrialEarlyStyling), tests/unit/trial-five-trials-fixes-2026-10-09.test.ts; tasks/bugs.json trial-front-cover-missing-after-late-prewarm.
+
+## 2026-10-09 — Text describing figures the picture leaves out: accepted as is
+
+**Context:** the page text can describe a figure doing something visible while the Art Director, by design, trims that figure from the picture (job_1791531449494_o0kaatvmq p1-p3). A refine-only fix was measured and dropped (p1 would exceed the 30% edit cap; see "Book audit is told what each figure wears; refine absent-figure rule ... DROPPED").
+**Decision:** owner, 2026-10-09: leave as is. The Art Director keeps trimming the cast and the text keeps its actions; no rule is added on either side.
+**Rationale:** owner call; the alternatives (picture follows text, text follows picture) trade crowded pictures or rewritten text for the gap.
+**Revisit if:** the owner raises it again.
+**Touched files:** none.
