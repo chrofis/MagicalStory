@@ -24,7 +24,7 @@
  * generator is given and in the SELF-CHECK it answers, so the two cannot drift
  * into differently-worded copies of one rule (`generator-vs-critic`).
  */
-const COMMISSIONED_ACT_PHRASE = 'the hard thing this story was asked for';
+const { COMMISSIONED_ACT_PHRASE, COHERENCE_FEEDBACK, coherenceRule, judgeCoherence } = require('./ideaCoherence');
 
 /** The obstacle rule, verbatim as it stood in prompts/trial-idea.txt. */
 const TRIAL_IDEA_COMMISSION_RULE = `What gets in the way is an outside event that leaves the main character no way through but
@@ -33,7 +33,8 @@ outright. The event is what makes that hard thing unavoidable, and slot 2 is the
 doing it; an event that merely happens alongside it is a fault. The setting is where that struggle
 happens, not scenery around it. When the story was asked for no particular hard thing, the trouble
 comes out of the theme's own world: the kind of trouble that world makes for the people in it, never
-a creature, villain or quest borrowed from another kind of story.`;
+a creature, villain or quest borrowed from another kind of story.
+${coherenceRule()}`;
 
 // The idea card's length. 11 of 11 stored trial ideas before the causal-chain
 // rule (docs/decisions.md 2026-10-08) were 47-50 words; the 16 after it ran 61-110
@@ -134,6 +135,26 @@ function parseIdeaSelfCheck(raw) {
   return result;
 }
 
+// ───────────────────────── Jev coherence check ─────────────────────────
+// The rules and the Jev questions live in ideaCoherence.js, shared with the
+// wizard idea (sibling set idea-coherence-paths).
+
+/**
+ * Run the coherence check on a card that passed its own self-check. Sets
+ * `ok=false` and `failure='incoherent-forced'|'incoherent-follows'` when Jev
+ * fails a question, and always attaches `jev` with the probabilities. A card
+ * that already failed is returned as is: it is going to rerun, and Jev adds
+ * nothing. A Jev failure THROWS (the route's per-card error path reports it).
+ * @param {{topic?:string, theme?:string}} context  topic only for a life challenge
+ */
+async function judgeIdeaCard(parsed, context = {}, opts = {}) {
+  if (!parsed || !parsed.ok) return parsed;
+  const j = await judgeCoherence(parsed.idea, context, opts);
+  const out = { ...parsed, jev: j };
+  if (!j.ok) { out.ok = false; out.failure = j.failure; }
+  return out;
+}
+
 /** Why the card was sent back, in the generator's own terms. English by design. */
 const FAILURE_FEEDBACK = {
   'no-act': `your second sentence did not show the main character doing ${COMMISSIONED_ACT_PHRASE}`,
@@ -150,6 +171,7 @@ const FAILURE_FEEDBACK = {
   'no-result': 'sentence 3 did not settle the want from sentence 1',
   'result-not-quoted': 'the words you copied as the result were not in the idea you wrote',
   'result-not-in-slot-3': 'the words you copied as the result were not in sentence 3',
+  ...COHERENCE_FEEDBACK,
 };
 
 /**
@@ -163,11 +185,12 @@ function buildIdeaRerunPrompt(basePrompt, { idea, failure } = {}) {
 Your previous attempt is rejected: ${reason}.
 Rejected attempt:
 ${String(idea || '').trim()}
-Write a different idea. Sentence 2 must be the main character doing ${COMMISSIONED_ACT_PHRASE}, and the outside event in sentence 1 must be what leaves them no other way. Everything sentence 2 works with is named in sentence 1, and sentence 3 settles exactly the want from sentence 1. Then write the CHECK block for the new idea.`;
+Write a different idea. Sentence 2 must be the main character doing ${COMMISSIONED_ACT_PHRASE}, and the outside event in sentence 1 must be what leaves them no other way. Everything sentence 2 works with is named in sentence 1, and sentence 3 settles exactly the want from sentence 1. Then write the CHECK block for the new idea. Write only the new idea and its CHECK block: no commentary, no remark on the rejected attempt, nothing before the first sentence.`;
 }
 
 module.exports = {
   COMMISSIONED_ACT_PHRASE,
+  judgeIdeaCard,
   TRIAL_IDEA_COMMISSION_RULE,
   TRIAL_IDEA_SELF_CHECK_RULE,
   TRIAL_IDEA_MAX_WORDS,

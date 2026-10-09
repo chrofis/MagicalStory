@@ -38,8 +38,8 @@ describe('trial idea self-check — the rule is ONE constant, given to the write
       expect(p).toContain(check.TRIAL_IDEA_SELF_CHECK_RULE);
       // The self-check is the last thing the model reads.
       expect(p.trimEnd().endsWith(check.TRIAL_IDEA_SELF_CHECK_RULE.trimEnd())).toBe(true);
-      // The phrase exists exactly twice: once in the rule, once in the check.
-      expect(p.split(check.COMMISSIONED_ACT_PHRASE).length - 1).toBe(2);
+      // The phrase exists exactly three times: the obstacle rule, the shared coherence rule (ideaCoherence.js), the check.
+      expect(p.split(check.COMMISSIONED_ACT_PHRASE).length - 1).toBe(3);
     }
   });
 });

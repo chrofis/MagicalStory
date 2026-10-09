@@ -38,7 +38,7 @@ const { recordIdeaEvent, ideasOfferedDetail } = require('../lib/ideaEvents');
 // template holds a line of age branching in prose: a main character aged two or
 // under gets the PATTERN contract (docs/decisions.md 2026-09-21).
 const { buildIdeaContract, IDEA_CONTRACT_PATTERN } = require('../lib/ideaContract');
-const { coherenceRule, judgeCoherence, buildIdeaCoherenceRerunPrompt, ideaCoherenceContext } = require('../lib/ideaCoherence');
+const { coherenceRule } = require('../lib/ideaCoherence');
 const { pickPatternSeeds, patternSeedInstruction } = require('../lib/patternSeeds');
 
 /**
@@ -992,36 +992,18 @@ function buildStreamArmPrompts({ ctx, ideaWorlds, characters, storyTopic, storyT
 // the client's idle timeout alive without carrying any text. No [FINAL]
 // section = no idea: the arm sends an error event, never the raw response.
 // Resolves (never rejects) with what the call produced, for the funnel record.
-function streamIdeaArm({ arm, prompt, res, callStreaming, model, signal, coherence = null }) {
+function streamIdeaArm({ arm, prompt, res, callStreaming, model, signal }) {
   const key = `story${arm + 1}`;
   let fullText = '';
   let lastPing = 0;
-  const callOpts = signal ? { signal } : {};
   return callStreaming(prompt, null, (delta, text) => {
     fullText = text;
     if (text.length > lastPing + 200) {
       res.write(': generating\n\n');
       lastPing = text.length;
     }
-  }, model, callOpts).then(async (streamResult) => {
-    let finalContent = parseIdeaFinal(fullText);
-    let usage = streamResult?.usage || null;
-    let jev = null;
-    // The coherence check (server/lib/ideaCoherence.js, shared with the trial
-    // idea): one Jev call on the final; an idea that fails it reruns ONCE with
-    // the reason fed back, and whatever the rerun returns is the answer. A
-    // Jev failure throws into the arm's error event: no unchecked idea ships.
-    if (finalContent && coherence) {
-      jev = await judgeCoherence(finalContent, coherence);
-      if (!jev.ok) {
-        log.warn(`  Idea ${arm + 1} failed the coherence check (${jev.failure}: forced ${jev.forced ?? '-'}, follows ${jev.follows}) - one rerun`);
-        const rerun = await callStreaming(buildIdeaCoherenceRerunPrompt(prompt, finalContent, jev.failure), null, null, model, callOpts);
-        const reparsed = parseIdeaFinal(String(rerun?.text || ''));
-        fullText = `${fullText}\n\n=== COHERENCE RERUN (${jev.failure}) ===\n${rerun?.text || ''}`;
-        usage = usage && rerun?.usage ? { ...usage, input_tokens: (usage.input_tokens || 0) + (rerun.usage.input_tokens || 0), output_tokens: (usage.output_tokens || 0) + (rerun.usage.output_tokens || 0) } : usage;
-        finalContent = reparsed;
-      }
-    }
+  }, model, signal ? { signal } : {}).then((streamResult) => {
+    const finalContent = parseIdeaFinal(fullText);
     if (finalContent) {
       res.write(`data: ${JSON.stringify({ [key]: finalContent, isFinal: true })}\n\n`);
       log.debug(`  Idea ${arm + 1} final: ${finalContent.length} chars`);
@@ -1029,7 +1011,7 @@ function streamIdeaArm({ arm, prompt, res, callStreaming, model, signal, coheren
       log.error(`  Idea ${arm + 1}: response has no [FINAL] section (${fullText.length} chars) - not sent`);
       res.write(`data: ${JSON.stringify({ error: `Idea ${arm + 1} has no final text` })}\n\n`);
     }
-    return { fullText, idea: finalContent || null, jev, usage, modelId: streamResult?.modelId || null };
+    return { fullText, idea: finalContent || null, usage: streamResult?.usage || null, modelId: streamResult?.modelId || null };
   }).catch((err) => {
     log.error(`  Idea ${arm + 1} generation failed:`, err.message);
     res.write(`data: ${JSON.stringify({ error: `Failed to generate story idea ${arm + 1}` })}\n\n`);
@@ -1123,8 +1105,6 @@ router.post('/generate-story-ideas-stream', authenticateToken, storyIdeasLimiter
     // with landmarks (requirements-1), 'fantasy' = direct start in the theme
     // world, no landmarks (requirements-2). Fantasy prompts get the location
     // and landmarks sections blanked so the real city cannot leak in.
-    // What the visitor chose, for the coherence check: a topic only for a life challenge (the commissioned hard thing).
-    const coherence = ideaCoherenceContext({ storyCategory, storyTopic, storyTheme: storyTheme || storyTypeName });
     const [prompt1, prompt2] = buildStreamArmPrompts({ ctx, ideaWorlds, characters, storyTopic, storyTheme, language });
 
     // Send initial event with prompt info for dev mode + per-idea worlds so the
@@ -1134,8 +1114,8 @@ router.post('/generate-story-ideas-stream', authenticateToken, storyIdeasLimiter
     log.debug('  Starting parallel story generation...');
     // Two independent calls; the funnel's cost is their sum.
     const [arm1, arm2] = await Promise.all([
-      streamIdeaArm({ arm: 0, prompt: prompt1, res, callStreaming: callTextModelStreaming, model: modelToUse, signal, coherence }),
-      streamIdeaArm({ arm: 1, prompt: prompt2, res, callStreaming: callTextModelStreaming, model: modelToUse, signal, coherence }),
+      streamIdeaArm({ arm: 0, prompt: prompt1, res, callStreaming: callTextModelStreaming, model: modelToUse, signal }),
+      streamIdeaArm({ arm: 1, prompt: prompt2, res, callStreaming: callTextModelStreaming, model: modelToUse, signal }),
     ]);
     const streamModelId = arm1.modelId || arm2.modelId || null;
 

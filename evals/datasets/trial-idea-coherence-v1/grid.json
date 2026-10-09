@@ -1,0 +1,23 @@
+{
+  "version": "trial-idea-coherence-v1",
+  "note": "17 cells x 2 arms (local, fantasy) = 34 ideas. One character per cell. town=null means no location (no town, no landmarks). Cell c01 is the owner report of 2026-10-09 (staging trial). Topics are ones whose story needs no other person, plus adventure themes.",
+  "cells": [
+    {"id":"c01","name":"Lukas","age":8,"gender":"male","language":"de-ch","category":"life-challenge","topic":"screen-time","theme":"superhero","town":"Zürich"},
+    {"id":"c02","name":"Mia","age":11,"gender":"female","language":"fr","category":"life-challenge","topic":"screen-time","theme":"space","town":null},
+    {"id":"c03","name":"Noah","age":8,"gender":"male","language":"de-ch","category":"life-challenge","topic":"telling-truth","theme":"detective","town":"Zürich"},
+    {"id":"c04","name":"Elias","age":5,"gender":"male","language":"de-ch","category":"life-challenge","topic":"cleaning-up","theme":"pirate","town":null},
+    {"id":"c05","name":"Lina","age":3,"gender":"female","language":"fr","category":"life-challenge","topic":"going-to-bed","theme":"dragon","town":"Zürich"},
+    {"id":"c06","name":"Ben","age":5,"gender":"male","language":"de-ch","category":"life-challenge","topic":"eating-vegetables","theme":"farm","town":null},
+    {"id":"c07","name":"Emma","age":3,"gender":"female","language":"de-ch","category":"life-challenge","topic":"brushing-teeth","theme":"mermaid","town":"Zürich"},
+    {"id":"c08","name":"Jonas","age":11,"gender":"male","language":"fr","category":"life-challenge","topic":"managing-time","theme":"ninja","town":null},
+    {"id":"c09","name":"Luca","age":8,"gender":"male","language":"de-ch","category":"life-challenge","topic":"homework","theme":"wizard","town":null},
+    {"id":"c10","name":"Sofia","age":5,"gender":"female","language":"fr","category":"life-challenge","topic":"being-brave","theme":"knight","town":"Zürich"},
+    {"id":"c11","name":"Nora","age":11,"gender":"female","language":"de-ch","category":"life-challenge","topic":"test-stress","theme":"jungle","town":"Zürich"},
+    {"id":"c12","name":"Zara","age":8,"gender":"female","language":"fr","category":"life-challenge","topic":"responsibility","theme":"fireman","town":null},
+    {"id":"c13","name":"Finn","age":11,"gender":"male","language":"de-ch","category":"life-challenge","topic":"not-giving-up","theme":"dragon","town":null},
+    {"id":"c14","name":"Leo","age":8,"gender":"male","language":"de-ch","category":"adventure","topic":"","theme":"pirate","town":"Zürich"},
+    {"id":"c15","name":"Alina","age":5,"gender":"female","language":"fr","category":"adventure","topic":"","theme":"space","town":null},
+    {"id":"c16","name":"Mara","age":11,"gender":"female","language":"de-ch","category":"adventure","topic":"","theme":"detective","town":"Zürich"},
+    {"id":"c17","name":"Tim","age":3,"gender":"male","language":"de-ch","category":"adventure","topic":"","theme":"dragon","town":null}
+  ]
+}

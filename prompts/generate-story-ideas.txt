@@ -46,6 +46,8 @@ Your entire output must be in the language specified above.
 
 {IDEA_CONTRACT}
 
+{IDEA_COHERENCE}
+
 {STORY_SCOPE}
 
 {AGE_MODE}

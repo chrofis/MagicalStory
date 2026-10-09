@@ -9502,6 +9502,22 @@
         "kind": "human",
         "what": "Read stories.data.visualBible.clothing[].slot and clothingRequirements.*.*.garments on the run; confirm the log has no '[WARDROBE] ... no garments list' and no '[CLOTHING-CHECK] ... clothing entry with no slot' lines."
       }
+    },
+    {
+      "id": "idea-coherence-trial-2026-10-09",
+      "title": "Trial ideas: topic drives the problem, every act follows, Jev check reruns a failing card once",
+      "commits": [],
+      "addedAt": "2026-10-09",
+      "status": "pending",
+      "evidence": [],
+      "claim": "On a fresh trial (life-challenge topic, e.g. screen-time, one character) the two offered ideas are about the topic because the situation forces it, and no act is there only to mention the topic or theme; a card Jev fails is replaced once.",
+      "runShape": [
+        "trial"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Owner reads the two ideas on the next iPhone trial. Needs the trial.js one-line wiring (judgeIdeaCard) first; log shows 'failed its own check (incoherent-...)' on a rerun."
+      }
     }
   ],
   "runs": [

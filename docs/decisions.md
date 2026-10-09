@@ -68082,3 +68082,24 @@ Samichlaus is registered everywhere halloween/easter are: storyTypes.ts, server/
 **Context:** the seasonal-topics entry above set samichlaus to 15 Nov-6 Dec. Owner: "Samichlaus is 6th of Dez. Show one month in advance."
 **Decision:** samichlaus window 6 Nov-6 Dec. The other windows are unchanged.
 **Touched files:** client/src/constants/seasons.ts, tests/unit/seasonal-topics-offer-window.test.ts.
+
+## 2026-10-09 - Trial and wizard idea coherence: two rules in one shared module, Jev gate on the trial card only
+
+**Context:** owner report (staging trial, screen-time, superhero, age 8): "They are incoherent." The card's screen-free act (muting a playmate's phone) was quotable but nothing required it (the self-check's known blind spot, #self-check 2026-09-19). Owner decisions the same day: the idea need not resolve, characters need not be introduced, mixed worlds are fine, so none of those is a rule or a check. What stays: (1) the topic drives the problem, (2) every act follows from the situation before it. The two idea prompts stay different but are siblings.
+**Decision:** `server/lib/ideaCoherence.js` holds the rule (`coherenceRule`, built from `COMMISSIONED_ACT_PHRASE` and `INSERTED_ACT_PHRASE`), the two Jev noul questions (built from the same phrases) and `judgeCoherence`. The rule is injected into the trial card (`TRIAL_IDEA_COMMISSION_RULE`) and into both wizard templates (`{IDEA_COHERENCE}`). The trial card is judged by Jev after its self-check passes (`judgeIdeaCard`); a failing card reruns once with the reason fed back, through the existing rerun. Thresholds forced 0.8, follows 0.6. The wizard gets the rule only. Sibling set `idea-coherence-paths`.
+**Measured (34 trial ideas = 17 cells x 2 arms, de-ch/fr, ages 3-11, with/without Zürich, evals/datasets/trial-idea-coherence-v1; hand labels in evals/runs/2026-10-09_trial-idea-coherence/):**
+
+| trial | before | after |
+|---|---|---|
+| topic forces the act (26 life-challenge cards) | 15/26 (58%) | 19/26 (73%) |
+| every act follows (34) | 26/34 | 26/34 (flat) |
+| cards that rerun | 15/34 (self-check) | 20/34 (10 self-check + 10 Jev) |
+| cost per card | USD 0.0153 | USD 0.0207 |
+| Jev added latency, passing card | | 213 ms mean |
+
+Jev against the after labels (thresholds set on the before labels, so held out): forced precision 0.57 / recall 0.57 (4/7), follows precision 0.83 / recall 0.63 (5/8). Jev wording: AUC forced 0.74, follows 0.88 over 10 wordings tried on the before labels (scripts/analysis/eval-idea-coherence-wording.js). Regression found and fixed: the Jev-triggered rerun shipped the model's own commentary in 2 of 34 cards ("Das ist zu verworren; hier die neue Idee:"); `buildIdeaRerunPrompt` now says to write only the idea and its CHECK block, 3/3 clean on a replay of c06/c09, not a rate.
+**Wizard:** 3 usable premises before, 3 after (spend cap, and a harness bug lost the fourth card): topic forces 2/3 -> 3/3, follows 3/3 -> 3/3, far too few to call a rule effect. The trial-calibrated Jev thresholds failed 3/3 premises before and 3/3 after, and the wizard rerun costs USD 0.13-0.19 per card and 76-121 s against 0.065-0.09 and 39-62 s, so the wizard Jev gate was built, measured and removed (not demoted).
+**Considered:** a Jev gate on the wizard (above, rejected on cost, latency and miscalibration); a rule against open endings, new characters or mixed worlds (owner: not defects); a second judge call for the trial (the Jev call is ~0.2 s and parallel per card, the owner's "no added call but Jev" decision).
+**Revisit if:** the owner's iPhone trial still reads incoherent (verify.json `idea-coherence-trial-2026-10-09`); a wizard-premise label set (>=30) lets thresholds be calibrated for the wizard; the 29% Jev rerun rate proves too slow on the trial (raise follows threshold toward 0.5). Needs `server/routes/trial.js` to call `judgeIdeaCard` (one line, see the report): until then the trial gets the rule but not the gate.
+**Spend note:** USD 2.29 against a USD 2.00 cap (the wizard rerun prompts, which resend the whole 150-line prompt, cost more than estimated); reported, no further paid calls.
+**Touched files:** server/lib/ideaCoherence.js, server/lib/trialIdeaCheck.js, server/routes/storyIdeas.js (buildStreamArmPrompts extracted for the eval, IDEA_COHERENCE), prompts/generate-story-idea-single.txt, prompts/generate-story-ideas.txt, scripts/admin/sibling-registry.json, scripts/analysis/eval-trial-idea-coherence.js, score-trial-idea-coherence.js, eval-idea-coherence-wording.js, tests/unit/idea-coherence.test.ts, tests/unit/trial-idea-self-check.test.ts.
