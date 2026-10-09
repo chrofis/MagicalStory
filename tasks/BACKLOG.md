@@ -47,7 +47,6 @@ Last full sweep: **2026-09-06**.
 ---
 
 ## In flight
-- [ ] (2026-10-09) MERGE trial and wizard idea prompts into one (owner decision): prompts/trial-idea.txt vs generate-story-ideas.txt / generate-story-idea-single.txt; trial differences as parameters (one character, 2 cards, effort low); one coherence check (topic drives the problem, acts follow the situation); measure both paths on evals/datasets 2026-10-09 trial-idea-coherence grid, delete the losing prompt. Starts after the trial.js agent lands → server/routes/storyIdeas.js:423, server/services/prompts.js:397
 - [ ] (2026-10-07) Branch claude/backlog-trial-2026-10-07 (~125 commits) awaiting staging + owner OK; 8 stopped follow-up tasks incl. the owner-approved keyword H1s → tasks/session-handover-2026-10-07.md
 
 - [ ] Step-4 idea pre-generation sometimes does not fire (staging 2026-10-05, demo-berger, entry 18, twice): step 5 shows the empty placeholder. Diagnose the pre-generate effect; suspect the abort-on-input-change effect right below it → client/src/pages/StoryWizard.tsx:1998 (spec works around it at tests/demo-story.spec.ts, Step 5)
