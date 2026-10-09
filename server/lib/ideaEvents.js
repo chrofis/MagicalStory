@@ -121,6 +121,33 @@ function _allowed() {
 }
 
 /**
+ * The `detail` of an idea_generated row: WHAT was offered, so "the ideas are incoherent" can be checked afterwards (owner
+ * 2026-10-09). ONE shape for the trial stream and the wizard's two idea routes (sibling set idea-offered-record).
+ * `ideas` carry the text exactly as sent to the client. Bounded: at most two ideas of at most 4000 characters, the city only.
+ *
+ * @param {Array<{armIndex:number, text:string, ideaKind?:string|null, selfCheck?:object|null}>} ideas
+ * @param {{rerun?:boolean, city?:string|null, extra?:object}} [opts]
+ */
+function ideasOfferedDetail(ideas, { rerun = false, city = null, extra = {} } = {}) {
+  const titleOf = (text) => {
+    const first = String(text || '').split(/\r?\n/).find(l => l.trim()) || '';
+    return first.replace(/^[#*\s]+/, '').replace(/[*]+$/, '').trim().slice(0, 200);
+  };
+  return {
+    ...extra,
+    ideas: (Array.isArray(ideas) ? ideas : []).slice(0, 2).map(i => ({
+      armIndex: _int(i.armIndex),
+      title: titleOf(i.text),
+      text: String(i.text || '').slice(0, 4000),
+      ideaKind: _trim(i.ideaKind, 40),
+      ...(i.selfCheck ? { selfCheck: i.selfCheck } : {}),
+    })),
+    rerun: rerun === true,
+    city: _trim(city, 80),
+  };
+}
+
+/**
  * Record one idea-funnel event. Fire-and-forget: returns immediately, never
  * rejects.
  *
@@ -230,4 +257,4 @@ function buildTrialIdeaPick(raw) {
   };
 }
 
-module.exports = { recordIdeaPicked, buildTrialIdeaPick, recordIdeaEvent, normaliseIdeaEvent, castFacts, shapeRef };
+module.exports = { recordIdeaPicked, buildTrialIdeaPick, recordIdeaEvent, ideasOfferedDetail, normaliseIdeaEvent, castFacts, shapeRef };

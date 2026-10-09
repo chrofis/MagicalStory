@@ -32,12 +32,13 @@ const jevSelection = require('../lib/jevSelection');
 // The idea funnel: one row per idea generation and one per pick, so "would a
 // parent buy this" is measured from the production click instead of from a
 // rater's proxy (migrations/039, docs/decisions.md 2026-09-21).
-const { recordIdeaEvent } = require('../lib/ideaEvents');
+const { recordIdeaEvent, ideasOfferedDetail } = require('../lib/ideaEvents');
 // What an idea IS — the slot list, its rules and its check — plus the parent's
 // four questions that go with it. ONE placeholder each, so neither sibling
 // template holds a line of age branching in prose: a main character aged two or
 // under gets the PATTERN contract (docs/decisions.md 2026-09-21).
 const { buildIdeaContract, IDEA_CONTRACT_PATTERN } = require('../lib/ideaContract');
+const { coherenceRule, judgeCoherence, buildIdeaCoherenceRerunPrompt, ideaCoherenceContext } = require('../lib/ideaCoherence');
 const { pickPatternSeeds, patternSeedInstruction } = require('../lib/patternSeeds');
 
 /**
@@ -485,6 +486,8 @@ ${adventureGuideContent}` : '',
     // rule and its critic cannot drift because they are the same string. The
     // toddler cast gets the toddler four, injected identically.
     ...ideaContract,
+    // The coherence rules, one module shared with the trial idea (server/lib/ideaCoherence.js, sibling set idea-coherence-paths).
+    IDEA_COHERENCE: coherenceRule({ withTopic: effectiveCategory === 'life-challenge' }),
     PREMISE_SHAPE: premiseShapeLines[0],
     PREMISE_SHAPE_1: premiseShapeLines[0],
     PREMISE_SHAPE_2: premiseShapeLines[1],
@@ -908,7 +911,7 @@ router.post('/generate-story-ideas', authenticateToken, storyIdeasLimiter, async
       shapes: ctx.premiseShapes,
       model: result.modelId || modelToUse,
       costUsd: ideaCallCost(result.modelId || modelToUse, result.usage),
-      detail: { streaming: false, ideasParsed: storyIdeas.length, worldSeeds: ctx.worldSeeds, landmarkSource: landmarkPick?.source ?? null },
+      detail: { ...ideasOfferedDetail(storyIdeas.map((text, i) => ({ armIndex: i, text, ideaKind: ideaWorlds?.[i]?.world ?? null })), { city: effectiveLocation?.city }), streaming: false, ideasParsed: storyIdeas.length, worldSeeds: ctx.worldSeeds, landmarkSource: landmarkPick?.source ?? null },
     });
 
     // Return ideas array, prompt and model for dev mode display
@@ -952,6 +955,34 @@ function parseIdeaFinal(text) {
   return result || null;
 }
 
+// The two arm prompts of the streaming endpoint, one assembly for the route and
+// for the idea evals (scripts/analysis/eval-trial-idea-coherence.js).
+// The world decides the requirements file: 'location' = real-world setting with
+// landmarks (requirements-1), 'fantasy' = direct start in the theme world, no
+// landmarks (requirements-2). Fantasy prompts get the location and landmarks
+// sections blanked so the real city cannot leak in.
+function buildStreamArmPrompts({ ctx, ideaWorlds, characters, storyTopic, storyTheme, language }) {
+  const buildSinglePrompt = (world, variantInstruction, arm) => {
+    const requirements = world === 'fantasy' ? ctx.storyRequirements2 : ctx.storyRequirements1;
+    const worldOverrides = world === 'fantasy'
+      ? { USER_LOCATION_INSTRUCTION: '', AVAILABLE_LANDMARKS: '' }
+      : {};
+    return ctx.applyReplacements(ctx.singlePromptTemplate, {
+      STORY_VARIANT_INSTRUCTION: variantInstruction,
+      STORY_REQUIREMENTS: requirements,
+      PREMISE_SHAPE: ctx.premiseShapeLines[arm],
+      PATTERN_SEED: ctx.patternSeedLines[arm],
+      WORLD_SEED: ctx.worldSeedLines[arm],
+      WORLD_PLACE: world === 'fantasy' ? worldPlaceInstruction(ctx.worldPlaces[arm]) : '',
+      ...worldOverrides
+    });
+  };
+  const world1 = ideaWorlds ? ideaWorlds[0].world : 'location';
+  const world2 = ideaWorlds ? ideaWorlds[1].world : 'fantasy';
+  const [firstInstruction, secondInstruction] = buildVariantInstructions(world1, world2, { characters, storyTopic, storyTheme, language });
+  return [buildSinglePrompt(world1, firstInstruction, 0), buildSinglePrompt(world2, secondInstruction, 1)];
+}
+
 // One idea arm of the streaming endpoint. The model writes
 // [DRAFT] -> [REVIEW] -> [FINAL]; only the [FINAL] section is ever sent to the
 // browser, as ONE `story<N>` event once the call returns. The draft and review
@@ -961,18 +992,36 @@ function parseIdeaFinal(text) {
 // the client's idle timeout alive without carrying any text. No [FINAL]
 // section = no idea: the arm sends an error event, never the raw response.
 // Resolves (never rejects) with what the call produced, for the funnel record.
-function streamIdeaArm({ arm, prompt, res, callStreaming, model, signal }) {
+function streamIdeaArm({ arm, prompt, res, callStreaming, model, signal, coherence = null }) {
   const key = `story${arm + 1}`;
   let fullText = '';
   let lastPing = 0;
+  const callOpts = signal ? { signal } : {};
   return callStreaming(prompt, null, (delta, text) => {
     fullText = text;
     if (text.length > lastPing + 200) {
       res.write(': generating\n\n');
       lastPing = text.length;
     }
-  }, model, signal ? { signal } : {}).then((streamResult) => {
-    const finalContent = parseIdeaFinal(fullText);
+  }, model, callOpts).then(async (streamResult) => {
+    let finalContent = parseIdeaFinal(fullText);
+    let usage = streamResult?.usage || null;
+    let jev = null;
+    // The coherence check (server/lib/ideaCoherence.js, shared with the trial
+    // idea): one Jev call on the final; an idea that fails it reruns ONCE with
+    // the reason fed back, and whatever the rerun returns is the answer. A
+    // Jev failure throws into the arm's error event: no unchecked idea ships.
+    if (finalContent && coherence) {
+      jev = await judgeCoherence(finalContent, coherence);
+      if (!jev.ok) {
+        log.warn(`  Idea ${arm + 1} failed the coherence check (${jev.failure}: forced ${jev.forced ?? '-'}, follows ${jev.follows}) - one rerun`);
+        const rerun = await callStreaming(buildIdeaCoherenceRerunPrompt(prompt, finalContent, jev.failure), null, null, model, callOpts);
+        const reparsed = parseIdeaFinal(String(rerun?.text || ''));
+        fullText = `${fullText}\n\n=== COHERENCE RERUN (${jev.failure}) ===\n${rerun?.text || ''}`;
+        usage = usage && rerun?.usage ? { ...usage, input_tokens: (usage.input_tokens || 0) + (rerun.usage.input_tokens || 0), output_tokens: (usage.output_tokens || 0) + (rerun.usage.output_tokens || 0) } : usage;
+        finalContent = reparsed;
+      }
+    }
     if (finalContent) {
       res.write(`data: ${JSON.stringify({ [key]: finalContent, isFinal: true })}\n\n`);
       log.debug(`  Idea ${arm + 1} final: ${finalContent.length} chars`);
@@ -980,11 +1029,11 @@ function streamIdeaArm({ arm, prompt, res, callStreaming, model, signal }) {
       log.error(`  Idea ${arm + 1}: response has no [FINAL] section (${fullText.length} chars) - not sent`);
       res.write(`data: ${JSON.stringify({ error: `Idea ${arm + 1} has no final text` })}\n\n`);
     }
-    return { fullText, usage: streamResult?.usage || null, modelId: streamResult?.modelId || null };
+    return { fullText, idea: finalContent || null, jev, usage, modelId: streamResult?.modelId || null };
   }).catch((err) => {
     log.error(`  Idea ${arm + 1} generation failed:`, err.message);
     res.write(`data: ${JSON.stringify({ error: `Failed to generate story idea ${arm + 1}` })}\n\n`);
-    return { fullText, usage: null, modelId: null };
+    return { fullText, idea: null, usage: null, modelId: null };
   });
 }
 
@@ -1074,28 +1123,9 @@ router.post('/generate-story-ideas-stream', authenticateToken, storyIdeasLimiter
     // with landmarks (requirements-1), 'fantasy' = direct start in the theme
     // world, no landmarks (requirements-2). Fantasy prompts get the location
     // and landmarks sections blanked so the real city cannot leak in.
-    const buildSinglePrompt = (world, variantInstruction, arm) => {
-      const requirements = world === 'fantasy' ? ctx.storyRequirements2 : ctx.storyRequirements1;
-      const worldOverrides = world === 'fantasy'
-        ? { USER_LOCATION_INSTRUCTION: '', AVAILABLE_LANDMARKS: '' }
-        : {};
-      return ctx.applyReplacements(ctx.singlePromptTemplate, {
-        STORY_VARIANT_INSTRUCTION: variantInstruction,
-        STORY_REQUIREMENTS: requirements,
-        PREMISE_SHAPE: ctx.premiseShapeLines[arm],
-        PATTERN_SEED: ctx.patternSeedLines[arm],
-        WORLD_SEED: ctx.worldSeedLines[arm],
-        WORLD_PLACE: world === 'fantasy' ? worldPlaceInstruction(ctx.worldPlaces[arm]) : '',
-        ...worldOverrides
-      });
-    };
-
-    const world1 = ideaWorlds ? ideaWorlds[0].world : 'location';
-    const world2 = ideaWorlds ? ideaWorlds[1].world : 'fantasy';
-    const [firstInstruction, secondInstruction] = buildVariantInstructions(world1, world2, { characters, storyTopic, storyTheme, language });
-
-    const prompt1 = buildSinglePrompt(world1, firstInstruction, 0);
-    const prompt2 = buildSinglePrompt(world2, secondInstruction, 1);
+    // What the visitor chose, for the coherence check: a topic only for a life challenge (the commissioned hard thing).
+    const coherence = ideaCoherenceContext({ storyCategory, storyTopic, storyTheme: storyTheme || storyTypeName });
+    const [prompt1, prompt2] = buildStreamArmPrompts({ ctx, ideaWorlds, characters, storyTopic, storyTheme, language });
 
     // Send initial event with prompt info for dev mode + per-idea worlds so the
     // wizard can label each card before/while the ideas stream in
@@ -1104,8 +1134,8 @@ router.post('/generate-story-ideas-stream', authenticateToken, storyIdeasLimiter
     log.debug('  Starting parallel story generation...');
     // Two independent calls; the funnel's cost is their sum.
     const [arm1, arm2] = await Promise.all([
-      streamIdeaArm({ arm: 0, prompt: prompt1, res, callStreaming: callTextModelStreaming, model: modelToUse, signal }),
-      streamIdeaArm({ arm: 1, prompt: prompt2, res, callStreaming: callTextModelStreaming, model: modelToUse, signal }),
+      streamIdeaArm({ arm: 0, prompt: prompt1, res, callStreaming: callTextModelStreaming, model: modelToUse, signal, coherence }),
+      streamIdeaArm({ arm: 1, prompt: prompt2, res, callStreaming: callTextModelStreaming, model: modelToUse, signal, coherence }),
     ]);
     const streamModelId = arm1.modelId || arm2.modelId || null;
 
@@ -1120,7 +1150,7 @@ router.post('/generate-story-ideas-stream', authenticateToken, storyIdeasLimiter
       model: streamModelId || modelToUse,
       costUsd: (ideaCallCost(streamModelId || modelToUse, arm1.usage) || 0)
              + (ideaCallCost(streamModelId || modelToUse, arm2.usage) || 0),
-      detail: { streaming: true, chars1: arm1.fullText.length, chars2: arm2.fullText.length, worldSeeds: ctx.worldSeeds, landmarkSource: landmarkPick?.source ?? null },
+      detail: { ...ideasOfferedDetail([arm1, arm2].map((a, i) => ({ armIndex: i, text: a.idea, ideaKind: ideaWorlds?.[i]?.world ?? null })).filter(a => a.text), { city: effectiveLocation?.city }), streaming: true, chars1: arm1.fullText.length, chars2: arm2.fullText.length, worldSeeds: ctx.worldSeeds, landmarkSource: landmarkPick?.source ?? null },
     });
     log.debug('  Both stories complete, sending done event...');
 
@@ -1149,3 +1179,4 @@ module.exports.pickPremiseShapes = pickPremiseShapes;
 module.exports.premiseShapeInstruction = premiseShapeInstruction;
 module.exports.parseIdeaFinal = parseIdeaFinal;
 module.exports.streamIdeaArm = streamIdeaArm;
+module.exports.buildStreamArmPrompts = buildStreamArmPrompts;

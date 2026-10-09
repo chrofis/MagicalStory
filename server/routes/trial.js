@@ -1036,6 +1036,9 @@ function startTraitSave({ userId, characterId, facePhoto }) {
  * Protected by: IP rate limit + Turnstile + fingerprint + daily cap.
  * Returns a session token for subsequent trial API calls.
  */
+// The per-IP limiter (2 accounts/day) sits HERE only: update-photo / prepare-standard-body / prepare-standard-avatar are bound by the
+// session token, one call per account and the global DAILY_TRIAL_AVATAR_CAP. Fronting them too made one trial cost 4 hits against a
+// budget of 2, so the body row and the sheet were refused with a silent 429 (docs/decisions.md 2026-10-09 "limiter budget").
 router.post('/create-anonymous-account', trialAvatarLimiter, async (req, res) => {
   try {
     const { name, age, gender, traits, customTraits, facePhoto, bodyPhoto, bodyNoBgPhoto, faceBox, turnstileToken, fingerprint } = req.body;
@@ -1261,7 +1264,7 @@ router.patch('/update-character-details', verifySessionToken, async (req, res) =
  * for any avatar drawing still running on the old photo, clears everything derived from it (traits, estimate, body row,
  * sheets, slides), stores the new photos and starts the trait extraction again. docs/decisions.md 2026-10-09.
  */
-router.put('/update-photo', trialAvatarLimiter, verifySessionToken, async (req, res) => {
+router.put('/update-photo', verifySessionToken, async (req, res) => {
   try {
     const { userId } = req.sessionUser;
     const { facePhoto, bodyPhoto, bodyNoBgPhoto, faceBox } = req.body || {};
@@ -2557,6 +2560,8 @@ router.post('/generate-ideas-stream', verifySessionToken, trialIdeasLimiter, asy
     // judge taxes the ~85% of trials whose cards are already right in order to
     // fix the rest (owner, 2026-09-19). A passing card costs one extra output
     // line and nothing else; only a card that failed its own check reruns.
+    // What the visitor was offered, kept for the idea funnel (idea_generated.detail.ideas).
+    const offered = { rerun: false };
     const runIdeaCard = (slot, basePrompt) => {
       let full = '';
       let lastLen = 0;
@@ -2579,7 +2584,9 @@ router.post('/generate-ideas-stream', verifySessionToken, trialIdeasLimiter, asy
         // Throws on a malformed block — an unparseable card is a broken
         // contract, not a passing card. No fallback to shipping it unchecked.
         let parsed = parseIdeaSelfCheck(full);
+        let reran = false;
         if (!parsed.ok) {
+          reran = true;
           log.warn(`  ${slot} failed its own check (${parsed.failure}) — one rerun`);
           const rerun = await callTextModelStreaming(buildIdeaRerunPrompt(basePrompt, parsed), null, null, modelToUse, { signal, effort: MODEL_DEFAULTS.trialIdeaEffort });
           // Exactly ONE rerun: whatever comes back is the final answer.
@@ -2588,6 +2595,9 @@ router.post('/generate-ideas-stream', verifySessionToken, trialIdeasLimiter, asy
           parsed = reparsed;
         }
         if (parsed.idea) {
+          offered[slot] = { armIndex: slot === 'story1' ? 0 : 1, text: parsed.idea, ideaKind: slot === 'story1' ? 'location' : 'fantasy',
+            selfCheck: { ok: parsed.ok, failure: parsed.failure, want: parsed.want, event: parsed.event, uses: parsed.uses, act: parsed.act, result: parsed.result } };
+          if (reran) offered.rerun = true;
           emit(parsed.idea, true);
           log.debug(`  ${slot} final (${parsed.idea.length} chars)`);
         }
@@ -2603,6 +2613,18 @@ router.post('/generate-ideas-stream', verifySessionToken, trialIdeasLimiter, asy
     // Wait for both to complete
     await Promise.all([streamStory1, streamStory2]);
     log.debug('  Both stories complete, sending done event...');
+
+    // The idea funnel: the idea texts exactly as sent (owner 2026-10-09: "the ideas are incoherent" could not be checked).
+    // Fire-and-forget; the sibling is the wizard's idea routes (routes/storyIdeas.js), same detail shape.
+    const { recordIdeaEvent, ideasOfferedDetail } = require('../lib/ideaEvents');
+    recordIdeaEvent({
+      event: 'idea_generated',
+      userId: req.sessionUser?.userId,
+      category: storyCategory, topic: storyTopic, theme: storyTheme,
+      language, characters,
+      model: modelToUse,
+      detail: { ...ideasOfferedDetail([offered.story1, offered.story2].filter(Boolean), { rerun: offered.rerun, city: userLocation?.city }), streaming: true, trial: true },
+    });
 
     // Send completion event
     res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
@@ -2690,7 +2712,7 @@ function bodyRowIdentity(mainChar) {
  * tier and gender match what it was drawn for, and draws its own otherwise. One call per account.
  * docs/decisions.md 2026-10-09 "Trial: the body row starts at the photo".
  */
-router.post('/prepare-standard-body', trialAvatarLimiter, verifySessionToken, async (req, res) => {
+router.post('/prepare-standard-body', verifySessionToken, async (req, res) => {
   const { userId } = req.sessionUser;
   try {
     const existing = standardBodyRows.get(userId);
@@ -2761,7 +2783,7 @@ router.post('/prepare-standard-body', trialAvatarLimiter, verifySessionToken, as
  * and styles it itself, loudly, so this endpoint cannot be driven to style sheets without bound.
  * Protected by: session token + the avatar limiter + the daily avatar cap.
  */
-router.post('/prepare-standard-avatar', trialAvatarLimiter, verifySessionToken, async (req, res) => {
+router.post('/prepare-standard-avatar', verifySessionToken, async (req, res) => {
   const { userId } = req.sessionUser;
   if (inFlightStandardAvatarPromises.has(userId)) {
     log.warn(`[TRIAL AVATARS] prepare-standard-avatar called concurrently for user ${userId} — rejecting duplicate (first call still running)`);
