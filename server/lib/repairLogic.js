@@ -194,6 +194,26 @@ function admitPagesFromAudit(imgFaults) {
 }
 
 /**
+ * PAGES WHOSE SHIPPING VERSION IS NOT THE ONE THE READER READ (2026-10-09).
+ *
+ * Both maps are { pageNumber -> version object }. A page is "moved" when the
+ * version now picked to ship is a different object from the one the audit
+ * read. Pure identity comparison -- structural, no text.
+ *
+ * @param {Map<number,Object>} auditedByPage
+ * @param {Map<number,Object>} shippingByPage
+ * @returns {number[]} page numbers, ascending
+ */
+function pagesWherePickMoved(auditedByPage, shippingByPage) {
+  const moved = [];
+  for (const [page, read] of auditedByPage || []) {
+    const ships = shippingByPage?.get(page) || null;
+    if (ships && ships !== read) moved.push(page);
+  }
+  return moved.sort((a, b) => a - b);
+}
+
+/**
  * A READER FINDING BELONGS TO THE VERSION THE READER READ (2026-09-23).
  *
  * The book audit reads each page's picked version. Its IMG faults used to go
@@ -2059,4 +2079,4 @@ function nameRepairText(text, nameMap, { keep = null, vidByName, ownVisualId = n
 
 module.exports = {
   expressionEditBlocked, describeFigureForRepair, buildRepairNameMap, buildPageRepairNameMap, nameRepairText, resolveRepairIds,
-  repairAttemptFromResult, describeCharFixFailure, detectionForRetryEntry, findBadPages, applyRoundCap, LAST_ROUND_CRITICAL_MAX, planBookAuditRound, admitPagesFromAudit, attributeReaderFindings, summarizeRepairRound, baseRepairMethod, AUDIT_ADMIT_MAX, AUDIT_ADMIT_SEVERITIES, collectShippedDefective, collectSurvivingCriticals, resolveDeclaredCast, inheritSceneContract, resolveVersionCompressedScene, resolveVersionPrompt, resolveOwnRenderPrompt, SAFE_REPAIRABLE_TYPES, typesAreInpaintable, semanticFindings, findSafeRepairableFinding, selectCharRepairTasks, decideRepairMethod, charFixEntityFindings, NOT_INPAINTABLE_TYPES, ITERATE_ROUTED_TYPES, CROP_ARTIFACT_TYPES, isCropArtifact, hasCriticalSeverityFinding, collectCriticalFindings, buildPreserveClause, PRESERVE_MAX, scoredFindingPools };
+  repairAttemptFromResult, describeCharFixFailure, detectionForRetryEntry, findBadPages, applyRoundCap, LAST_ROUND_CRITICAL_MAX, planBookAuditRound, admitPagesFromAudit, attributeReaderFindings, pagesWherePickMoved, summarizeRepairRound, baseRepairMethod, AUDIT_ADMIT_MAX, AUDIT_ADMIT_SEVERITIES, collectShippedDefective, collectSurvivingCriticals, resolveDeclaredCast, inheritSceneContract, resolveVersionCompressedScene, resolveVersionPrompt, resolveOwnRenderPrompt, SAFE_REPAIRABLE_TYPES, typesAreInpaintable, semanticFindings, findSafeRepairableFinding, selectCharRepairTasks, decideRepairMethod, charFixEntityFindings, NOT_INPAINTABLE_TYPES, ITERATE_ROUTED_TYPES, CROP_ARTIFACT_TYPES, isCropArtifact, hasCriticalSeverityFinding, collectCriticalFindings, buildPreserveClause, PRESERVE_MAX, scoredFindingPools };

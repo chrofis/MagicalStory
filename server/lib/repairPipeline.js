@@ -1967,39 +1967,81 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     log.info(`📖 [BOOK-AUDIT] Round ${round} p${pageNumber}: ${findings.length} reader finding(s) charged to ${version.source || '?'} (the version read) — finalScore ${before} → ${version.finalScore}`);
   };
 
+  // The version each page is read from, held as the OBJECT the reader saw — its
+  // findings are attributed to exactly this version. A version without bytes is
+  // not what buildAuditPages shows, so it is not recorded as read.
+  const pickedVersionsByPage = () => {
+    const byPage = new Map();
+    for (const img of rawImages) {
+      const v = selectBestVersion(pageVersions.get(img.pageNumber) || []);
+      if (v?.imageData) byPage.set(img.pageNumber, v);
+    }
+    return byPage;
+  };
+
+  // ONE resolver for "what does the reader actually get on this page" — the
+  // given versions' bytes and the final page text. Never rebuild this
+  // expression inline: the inline version read `img.text` straight off the page
+  // object, which was PRE-REFINE prose.
+  const readBook = async (versionByPage) => {
+    const { auditStoryBook, buildAuditPages } = require('./bookAudit');
+    const auditPages = buildAuditPages(rawImages, (pageNumber) => versionByPage.get(pageNumber) || null);
+    if (auditPages.length === 0) return null;
+    // The BIBLE rides along (2026-09-20). `auditPages` is a projection — page
+    // number, final text, shipped bytes, cited object ids — and the object-scale
+    // check also needs the visual bible to know which props carry a declared
+    // size. Passing only the projection starved it: zero candidates, zero skips,
+    // no notEvaluated row, total silence in the live path. bookAudit now
+    // log.errors on a starved call. `characters` too (2026-09-24): the reader's
+    // per-page cast is resolved through the evaluator's roster, which indexes them.
+    return auditStoryBook(
+      { id: consolidatorStoryId, visualBible: storyData?.visualBible || visualBible || null, characters: storyData?.characters || [], sceneImages: auditPages },
+      { usageTracker });
+  };
+
+  // Compact per-round record — same shape as entityHistory's entries. The full
+  // `raw` transcript is kept for the FINAL audit only.
+  const auditRecord = (audit, round) => ({
+    round,
+    checkedAt: new Date().toISOString(),
+    modelId: audit.modelId,
+    faults: audit.faults,
+    byRouteCounts: { IMG: audit.byRoute.IMG.length, TEXT: audit.byRoute.TEXT.length },
+    // IMG faults verbatim — the evidence for what the next round was
+    // told.
+    imgFaults: audit.byRoute.IMG,
+    // TEXT faults verbatim — and since 2026-09-21 (owner, finding A8)
+    // they are also the INPUT to a fixer. The pipeline reads these
+    // lines after the repair loop and runs ONE corrective text round
+    // scoped to the pages they name (textRefine.runPostAuditTextRound,
+    // called from storyJobPipeline); its record lands in
+    // textRefineReport.postAuditRound. Until then nothing read the
+    // route at all: the refine chain had joined long before this audit,
+    // so a TEXT fault arrived after its fixer had gone home. Storing
+    // the count alone made the route unauditable — measured 2026-09-19
+    // over 13 staging stories / 23 rounds: 527 IMG against ONE TEXT,
+    // and that single line could not be read back to tell a broken
+    // route from a pointless one. The lines are the evidence AND the
+    // brief; keep them next to the IMG lines they were routed against.
+    textFaults: audit.byRoute.TEXT,
+    pagesRead: audit.pagesRead,
+    pagesSkipped: audit.pagesSkipped,
+    // OBJECT SCALE (2026-09-20). It was computed and then DROPPED here:
+    // the record is a hand-kept whitelist of fields, so a new audit
+    // field that nobody adds to it is discarded no matter how good the
+    // measurement was. Same class of bug as notEvaluated, degradedScene
+    // and threeStageResult. It fires no repair — it flags a human — so
+    // being stored IS the whole deliverable.
+    objectScale: audit.objectScale || null,
+      });
+
   const runBookAuditRound = async ({ round, bookUnchanged, finalRound }) => {
     const { planBookAuditRound, admitPagesFromAudit, attributeReaderFindings } = require('./repairLogic');
     const auditPlan = planBookAuditRound({ round, roundLimit, bookUnchanged, extraRoundUsed: extraAuditRoundUsed, finalRound, maxPasses: maxRegenAttempts });
     if (auditPlan.runAudit) {
       try {
-        const { auditStoryBook, buildAuditPages } = require('./bookAudit');
-        // ONE resolver for "what does the reader actually get on this page" —
-        // the picked version's bytes and the final page text. Never rebuild
-        // this expression inline: the inline version read `img.text` straight
-        // off the page object, which was PRE-REFINE prose.
-        // The version each page is read from, held as the OBJECT the reader
-        // saw — its findings are attributed to exactly this version below. A
-        // version without bytes is not what buildAuditPages shows, so it is not
-        // recorded as read.
-        const auditedVersionByPage = new Map();
-        for (const img of rawImages) {
-          const v = selectBestVersion(pageVersions.get(img.pageNumber) || []);
-          if (v?.imageData) auditedVersionByPage.set(img.pageNumber, v);
-        }
-        const auditPages = buildAuditPages(rawImages, (pageNumber) => auditedVersionByPage.get(pageNumber) || null);
-        const audit = auditPages.length > 0
-          // The BIBLE rides along (2026-09-20). `auditPages` is a projection —
-          // page number, final text, shipped bytes, cited object ids — and the
-          // object-scale check also needs the visual bible to know which props
-          // carry a declared size. Passing only the projection starved it: zero
-          // candidates, zero skips, no notEvaluated row, total silence in the
-          // live path. bookAudit now log.errors on a starved call.
-          // `characters` too (2026-09-24): the reader's per-page cast is
-          // resolved through the evaluator's roster, which indexes them.
-          ? await auditStoryBook(
-              { id: consolidatorStoryId, visualBible: storyData?.visualBible || visualBible || null, characters: storyData?.characters || [], sceneImages: auditPages },
-              { usageTracker })
-          : null;
+        const auditedVersionByPage = pickedVersionsByPage();
+        const audit = await readBook(auditedVersionByPage);
         if (audit) {
           // Each IMG fault is bound to the version the audit read on its page
           // and charged to THAT version only: it is re-consolidated with the
@@ -2008,41 +2050,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           const attributed = attributeReaderFindings(audit.byRoute.IMG, auditedVersionByPage);
           await Promise.all([...attributed.entries()].map(([pageNumber, { version, findings }]) =>
             consolidateLimit(() => rescoreWithReaderFindings(pageNumber, version, findings, round))));
-          // Compact per-round record — same shape as entityHistory's entries.
-          // The full `raw` transcript is kept for the FINAL audit only.
-          bookAuditRounds.push({
-            round,
-            checkedAt: new Date().toISOString(),
-            modelId: audit.modelId,
-            faults: audit.faults,
-            byRouteCounts: { IMG: audit.byRoute.IMG.length, TEXT: audit.byRoute.TEXT.length },
-            // IMG faults verbatim — the evidence for what the next round was
-            // told.
-            imgFaults: audit.byRoute.IMG,
-            // TEXT faults verbatim — and since 2026-09-21 (owner, finding A8)
-            // they are also the INPUT to a fixer. The pipeline reads these
-            // lines after the repair loop and runs ONE corrective text round
-            // scoped to the pages they name (textRefine.runPostAuditTextRound,
-            // called from storyJobPipeline); its record lands in
-            // textRefineReport.postAuditRound. Until then nothing read the
-            // route at all: the refine chain had joined long before this audit,
-            // so a TEXT fault arrived after its fixer had gone home. Storing
-            // the count alone made the route unauditable — measured 2026-09-19
-            // over 13 staging stories / 23 rounds: 527 IMG against ONE TEXT,
-            // and that single line could not be read back to tell a broken
-            // route from a pointless one. The lines are the evidence AND the
-            // brief; keep them next to the IMG lines they were routed against.
-            textFaults: audit.byRoute.TEXT,
-            pagesRead: audit.pagesRead,
-            pagesSkipped: audit.pagesSkipped,
-            // OBJECT SCALE (2026-09-20). It was computed and then DROPPED here:
-            // the record is a hand-kept whitelist of fields, so a new audit
-            // field that nobody adds to it is discarded no matter how good the
-            // measurement was. Same class of bug as notEvaluated, degradedScene
-            // and threeStageResult. It fires no repair — it flags a human — so
-            // being stored IS the whole deliverable.
-            objectScale: audit.objectScale || null,
-          });
+          bookAuditRounds.push(auditRecord(audit, round));
           const record = bookAuditRounds[bookAuditRounds.length - 1];
           // SAY WHERE THE FAULTS ACTUALLY GO (2026-09-21, finding B8). This
           // line read "→ next round's consolidator" unconditionally, which is
@@ -2076,6 +2084,33 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             } else {
               record.extraRoundGranted = false;
               log.info(`📖 [BOOK-AUDIT] Final audit: no CRITICAL/CATASTROPHIC IMG fault — book ships as audited`);
+            }
+          }
+
+          // THE BOOK THAT SHIPS MUST BE THE BOOK THAT WAS READ (2026-10-09).
+          // The reader charges its faults to the version it read, which can drop
+          // that version below its sibling: on job_1791531449494_o0kaatvmq p4 the
+          // audit read the original (67), charged it a MAJOR (-> 22), and the
+          // iterate rewrite (56) became the shipped pick -- a picture no part of
+          // the audit (reader faults, object-scale finding) had ever seen, so
+          // finalChecksReport described a page the book does not contain. When
+          // the audit was the last one and a pick moved, the shipping versions
+          // are read once more. That read is a measurement only (no repair round
+          // is left to feed, and charging it could flip the pick again); its
+          // record carries `shippedReread` and, being the last round with an
+          // objectScale, is the one finalChecksReport surfaces.
+          if (record.finalRound && !record.extraRoundGranted) {
+            const shippingByPage = pickedVersionsByPage();
+            const moved = require('./repairLogic').pagesWherePickMoved(auditedVersionByPage, shippingByPage);
+            if (moved.length > 0) {
+              log.warn(`📖 [BOOK-AUDIT] The audit's own findings moved the shipped pick on page(s) ${moved.join(', ')} — reading the shipping book once more`);
+              const reread = await readBook(shippingByPage);
+              if (reread) {
+                bookAuditRounds.push({ ...auditRecord(reread, round), shippedReread: true, movedPages: moved });
+              } else {
+                log.error(`❌ [BOOK-AUDIT] Re-read of the shipping book failed — the stored audit describes version(s) that do not ship on page(s) ${moved.join(', ')}`);
+                record.shippedPickUnread = moved;
+              }
             }
           }
         }
