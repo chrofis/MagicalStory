@@ -67894,3 +67894,19 @@ Touched files: server/lib/vbIdGuard.js, server/lib/promptBuilders.js, server/lib
 **Rationale:** the declared age governs the body; the photo supplies identity. A trait that reaches the page prompt but not the sheets splits the two. Stored data: 1 of 238 stored characters under 13 had a beard word (staging Mia); prod 0. Replay of the real buildImagePrompt: the new analyzer shape yields no beard anywhere. Spend USD 0; the new analyzer field is not yet run against a live vision model.
 **Revisit if:** the analyzer puts facial hair back into `other`, or the age threshold needs moving.
 **Touched files:** prompts/character-analysis.txt, server/lib/promptBuilders.js, server/lib/trialAge.js, server/lib/avatarOverrides.js, server/lib/styledAvatars.js, server/lib/entityConsistency.js, server/routes/avatars.js, tests/unit/facial-hair-declared-child-2026-10-09.test.ts (commit ad43d1ee2; bug entry child-character-drawn-with-photo-beard).
+
+## 2026-10-09 — style_check is not a duplicate of the STYLE GATE: both stay
+
+**Context:** a separate `style_check` call (10 calls, USD 0.10 on job_1791489793707_2ir6nl5kw) runs beside the per-page STYLE GATE in image-evaluation.txt.
+**Decision:** no change. The gate is an absolute per-page verdict that files a style_consistency MAJOR on its page; style_check is a relative cross-page grid audit that also owns the wrong-medium anchor guard, the style-repair outlier list (repaint OFF since 2026-09-19), the visual-flow measurement (time of day, weather, facing vs the declared light) and the finalChecksReport / StoryDisplay style panel.
+**Rationale:** replay over staging, 80 stories / 1454 pages: style_check flagged 196 outlier pages, the gate failed 47, both flagged 23 (11.7% of outliers); 24 of the gate's 47 fails were not outliers. Different questions, verdicts and consumers. Spend USD 0.
+**Revisit if:** the grid audit is replaced by a per-page check that sees faces, or visual flow moves elsewhere.
+**Touched files:** none.
+
+## 2026-10-09 — Action judge wording re-measured on 15 real defects: still not adopted; the judge's weakness is recall
+
+**Context:** the earlier recalibration entry asked for at least 30 real-defect pages; labels now hold 37 real (156 pages, 80 stories; commit eda025ed5).
+**Decision:** the ff653dec0 wording stays reverted; no scoring.js cap.
+**Rationale:** 21 pages within the USD 1.70 cap (15 real, 6 flagged-noise), two runs per arm. Baseline recall 0.27 / 0.33, page precision 0.83 / 0.86, finding precision 0.67; wording recall 0.13 / 0.13, page precision 0.67 / 0.50, finding precision 0.40 / 0.33. The wording lowers recall without raising precision. The judge catches only about 0.3 of real action defects (re-detection recall on candidates found through stored findings), so its weakness is recall, not noise. Spend USD 1.62.
+**Revisit if:** a per-finding labelled set measuring discovery recall exists, or the judge model changes.
+**Touched files:** scripts/analysis/action-judge-labels.json (eda025ed5).
