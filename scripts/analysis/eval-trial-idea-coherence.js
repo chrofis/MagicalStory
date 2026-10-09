@@ -133,7 +133,12 @@ ${coherenceRule({ withTopic: cell.category === 'life-challenge' })}`;
   const runner = which === 'wizard' ? runWizardCell : runCell;
   const cells = grid.cells.filter(c => !only || only.includes(c.id));
   const rows = [];
-  for (let i = 0; i < cells.length; i += 4) rows.push(...await Promise.all(cells.slice(i, i + 4).map(runner)));
+  // --cap=<usd>: stop launching batches when spend plus the worst-case batch (4 cells, ~USD 0.04 per card with a rerun) would pass it.
+  const cap = Number(arg('cap')) || Infinity;
+  for (let i = 0; i < cells.length; i += 4) {
+    if (spend + 0.32 * 0.5 > cap) { console.log(`cap ${cap}: stopped before batch at cell ${i}, spend ${spend.toFixed(4)}`); break; }
+    rows.push(...await Promise.all(cells.slice(i, i + 4).map(runner)));
+  }
   fs.writeFileSync(path.join(outDir, 'out.json'), JSON.stringify({ path: which, phase, date: new Date().toISOString(), spendUsd: spend, rows }, null, 2));
   console.log(`wrote ${outDir}/out.json  cards=${rows.length * 2}  spend=$${spend.toFixed(4)}`);
 })().catch(e => { console.error(e); process.exit(1); });

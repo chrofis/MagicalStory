@@ -68103,3 +68103,19 @@ Jev against the after labels (thresholds set on the before labels, so held out):
 **Revisit if:** the owner's iPhone trial still reads incoherent (verify.json `idea-coherence-trial-2026-10-09`); a wizard-premise label set (>=30) lets thresholds be calibrated for the wizard; the 29% Jev rerun rate proves too slow on the trial (raise follows threshold toward 0.5). Needs `server/routes/trial.js` to call `judgeIdeaCard` (one line, see the report): until then the trial gets the rule but not the gate.
 **Spend note:** USD 2.29 against a USD 2.00 cap (the wizard rerun prompts, which resend the whole 150-line prompt, cost more than estimated); reported, no further paid calls.
 **Touched files:** server/lib/ideaCoherence.js, server/lib/trialIdeaCheck.js, server/routes/storyIdeas.js (buildStreamArmPrompts extracted for the eval, IDEA_COHERENCE), prompts/generate-story-idea-single.txt, prompts/generate-story-ideas.txt, scripts/admin/sibling-registry.json, scripts/analysis/eval-trial-idea-coherence.js, score-trial-idea-coherence.js, eval-idea-coherence-wording.js, tests/unit/idea-coherence.test.ts, tests/unit/trial-idea-self-check.test.ts.
+
+## 2026-10-09 - Addendum to "Trial and wizard idea coherence": the rule alone vs the rule plus the Jev gate (what staging runs now)
+
+**Context:** owner: "Measure first." Staging runs the shared rule with the existing self-check and rerun but no Jev gate (the `trial.js` line is not wired). A third arm on the same grid, cells c01-c16 (32 cards; the USD 0.60 cap stopped before c17, spend USD 0.474), labelled in shuffled order with the arm hidden. All three columns below use the same 32 cards.
+
+| | before | rule only (staging now) | rule + Jev gate |
+|---|---|---|---|
+| topic forces the act (26 life-challenge cards) | 15/26 | 17/26 | 19/26 |
+| acts follow (32) | 24/32 | 26/32 | 24/32 |
+| cards that rerun | 15/32 | 9/32 | 19/32 |
+| latency per card p50 / p90 (all calls plus Jev) | 4.6 s / 7.9 s | 4.3 s / 9.8 s | 7.9 s / 19.4 s |
+| cost per card | USD 0.0156 | USD 0.0148 | USD 0.0211 |
+
+**Decision:** none changes; this is the number the earlier entry lacked. The rule alone moves the topic axis +2 of 26 and "acts follow" +2 of 32, and it cuts reruns (the self-check fires less often with the rule in the prompt), so it costs nothing. The Jev gate adds +2 more on the topic axis, nothing on "acts follow", at +3.6 s p50, +9.6 s p90 and +43% cost. Every difference here is inside the noise of 26-32 hand-labelled cards, so neither the rule nor the gate is shown to help beyond what the earlier entry could say; the gate's marginal gain is the weakest part. Wiring the gate in `trial.js` is therefore not recommended on this evidence.
+**Revisit if:** a larger label set (>=100 cards) or the owner's iPhone trial shows the rule alone still reads incoherent; then wire `judgeIdeaCard` and raise the follows threshold to cut the rerun rate.
+**Touched files:** scripts/analysis/eval-trial-idea-coherence.js (`--cap`), evals/results/results.jsonl, evals/runs/2026-10-09_trial-idea-coherence/ (trial-ruleonly, labels-trial-ruleonly.json).
