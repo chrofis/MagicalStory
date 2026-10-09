@@ -23,6 +23,7 @@ const { generateWithRunware, generateAvatarWithACE, isRunwareConfigured } = requ
 const { editWithGrok } = require('../lib/grok');
 const { scoreAvatarLikeness, failsArcFaceGate, warmArcFace, ARCFACE_MIN } = require('../lib/faceIdentity');
 const { buildHairDescription, getAgeCategory, clampApparentAge } = require('../lib/storyHelpers');
+const { facialHairForAge } = require('../lib/promptBuilders');
 const { HAIR_SOURCE_AVATAR, applyAvatarHairToExtraction } = require('../lib/avatarHair');
 const { resolveDeclaredAvatarOverrides } = require('../lib/avatarOverrides');
 const { getFacePhoto } = require('../lib/characterPhotos');
@@ -1270,11 +1271,13 @@ function buildPhysicalTraitsForAvatar(character) {
   if (hairDesc) parts.push(`Hair: ${hairDesc}`);
 
   if (traits.eyeColor) parts.push(`Eye color: ${traits.eyeColor}`);
-  if (traits.facialHair && traits.facialHair !== 'none') {
-    if (traits.facialHair.toLowerCase() === 'clean-shaven') {
+  // Not stated for a declared child (promptBuilders.facialHairForAge, decisions 2026-10-09).
+  const facialHair = facialHairForAge(traits.facialHair, character?.age);
+  if (facialHair && facialHair !== 'none') {
+    if (facialHair.toLowerCase() === 'clean-shaven') {
       parts.push(`Facial hair: NO beard, NO mustache, NO stubble — clean-shaven face`);
     } else {
-      parts.push(`Facial hair: ${traits.facialHair}`);
+      parts.push(`Facial hair: ${facialHair}`);
     }
   }
   if (traits.skinTone) parts.push(`Skin tone: ${traits.skinTone}`);
@@ -2958,3 +2961,4 @@ module.exports.processAvatarJobInBackground = processAvatarJobInBackground;
 module.exports.adoptRetryAvatar = adoptRetryAvatar;
 module.exports.getClothingStylePrompt = getClothingStylePrompt;
 module.exports.extractTraitsWithGemini = extractTraitsWithGemini;
+module.exports.buildPhysicalTraitsForAvatar = buildPhysicalTraitsForAvatar;

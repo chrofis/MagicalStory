@@ -98,7 +98,8 @@ function resolveDeclaredAvatarOverrides({ physicalTraits = null, clothing = null
     if (isSet(t.build)) { traitLines.push(`- Body build: ${t.build}`); declaredFacts.push(`Body build: ${t.build}`); }
     if (isSet(t.skinTone)) { traitLines.push(`- Skin tone: ${t.skinTone}`); declaredFacts.push(`Skin tone: ${t.skinTone}`); }
     if (isSet(t.face)) { traitLines.push(`- Face shape: ${t.face}`); declaredFacts.push(`Face shape: ${t.face}`); }
-    if (isSet(t.facialHair)) {
+    // Not stated for a declared child (promptBuilders.facialHairForAge, decisions 2026-10-09).
+    if (isSet(t.facialHair) && require('./promptBuilders').facialHairForAge(t.facialHair, years)) {
       if (String(t.facialHair).trim().toLowerCase() === 'clean-shaven') {
         traitLines.push(`- Facial hair: NO beard, NO mustache, NO stubble — clean-shaven face`);
         declaredFacts.push(`Facial hair: none — clean-shaven`);

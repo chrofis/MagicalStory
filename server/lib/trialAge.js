@@ -79,6 +79,10 @@ function applyTrialPhotoTraits(physical, traits, statedAge) {
   // sheet generator's glasses line, both row judges' glasses check and the
   // page prompt's DISTINCTIVE FEATURES block were empty on every trial.
   if (traits.glasses) physical.glasses = traits.glasses;
+  // Facial hair has its own field (character-analysis.txt) so it never lands in `other`; the readers
+  // drop it for a declared child (promptBuilders.facialHairForAge). Same key the regular path's
+  // consensus stores (routes/avatars.js).
+  if (traits.facialHair) physical.facialHair = traits.facialHair;
   const other = traits.other || traits['distinctive markings'];
   if (other) physical.other = other;
   let clamp = null;

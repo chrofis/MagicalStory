@@ -266,11 +266,13 @@ function buildPhysicalTraitsString(character) {
   if (traits.build) parts.push(`Build: ${traits.build}`);
   if (traits.skinTone) parts.push(`Skin tone: ${traits.skinTone}`);
   if (traits.eyeColor) parts.push(`Eye color: ${traits.eyeColor}`);
-  if (traits.facialHair && traits.facialHair !== 'none') {
-    if (traits.facialHair.toLowerCase() === 'clean-shaven') {
+  // Not stated for a declared child (promptBuilders.facialHairForAge, decisions 2026-10-09).
+  const facialHair = require('./promptBuilders').facialHairForAge(traits.facialHair, character?.age);
+  if (facialHair && facialHair !== 'none') {
+    if (facialHair.toLowerCase() === 'clean-shaven') {
       parts.push(`Facial hair: NO beard, NO mustache, NO stubble — clean-shaven face`);
     } else {
-      parts.push(`Facial hair: ${traits.facialHair}`);
+      parts.push(`Facial hair: ${facialHair}`);
     }
   }
   if (traits.glasses && traits.glasses !== 'none') {
@@ -2141,6 +2143,7 @@ module.exports = {
   // Core functions
   getOrCreateStyledAvatar,
   prepareStyledAvatars,
+  buildPhysicalTraitsString,
   MissingRequiredCostumeSheetError,
   missingCostumedRefs,
   ensureStyledAvatarCoverage,

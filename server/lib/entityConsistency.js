@@ -3469,7 +3469,9 @@ function buildPhysicalTraitsDescription(character) {
   if (face) parts.push(`${face} face`);
 
   // Facial hair (for males)
-  if (p.facialHair && p.facialHair !== 'none') parts.push(p.facialHair);
+  // Not stated for a declared child (promptBuilders.facialHairForAge, decisions 2026-10-09).
+  const facialHair = require('./promptBuilders').facialHairForAge(p.facialHair, character.age);
+  if (facialHair && facialHair !== 'none') parts.push(facialHair);
 
   // Other distinctive features
   if (p.other) parts.push(p.other);

@@ -29,7 +29,8 @@ Return a JSON object with this exact structure:
     "eyeColor": "<eye color (e.g. blue, brown, green, hazel, gray)>",
     "hairColor": "<MUST be one of: black | dark brown | brown | light brown | chestnut | auburn | red | strawberry blonde | dark blonde | blonde | light blonde | platinum blonde | gray | silver | white | salt and pepper>",
     "glasses": "<describe glasses if worn: frame shape, color, style (e.g. 'round black-framed glasses', 'rectangular silver wireframe glasses'). Use 'none' if no glasses visible>",
-    "distinctive markings": "<facial hair, scars, moles, freckles, jewelry, piercings, braces or 'none'>"
+    "facialHair": "<MUST be one of: none | clean-shaven | stubble | mustache | goatee | short beard | full beard | long beard> (the person's facial hair, reported ONLY here)",
+    "distinctive markings": "<scars, moles, freckles, jewelry, piercings, braces or 'none'. Facial hair is NOT listed here: it has its own field above>"
   },
   "detailedHairAnalysis": {
     "texture": "<fine | medium | thick | coarse>",

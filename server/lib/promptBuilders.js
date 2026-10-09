@@ -2059,7 +2059,7 @@ function extractCharacterVisualProfile(char, options = {}) {
     // hairDensity are no longer read — they drifted from detailedHairAnalysis
     // and produced wrong prose (e.g. calling a bald character "white, straight").
     hair: buildHairDescription(physical, char.physicalTraitsSource) || null,
-    facialHair: physical.facialHair || char.physical?.facialHair || null,
+    facialHair: facialHairForAge(physical.facialHair || char.physical?.facialHair || null, resolvedAge),
     face: physical.face || char.physical?.face || char.otherFeatures || null,
     glasses: physical.glasses || null,
     other: physical.other || char.physical?.other || null,
@@ -2069,6 +2069,28 @@ function extractCharacterVisualProfile(char, options = {}) {
     clothingStyle: char.clothingStyle || char.clothing_style || char.clothing?.style ||
       char.clothingColors || char.clothing_colors || char.clothing?.colors || null,
   };
+}
+
+/**
+ * Youngest DECLARED age at which a recorded facial-hair trait is still stated to a
+ * generator or a judge. The photo of a child character is often a parent's (a trial
+ * child, Mia age 6, uploaded her father: "short gray beard and mustache"), the
+ * styled sheets are drawn for the declared age, and a trait that reaches only the
+ * page prompt gets a bearded six-year-old (staging trial job_1791497394846_v01s6ndpn
+ * pages 1, 4, 5, 6). docs/decisions.md 2026-10-09 "Facial hair is not stated for a
+ * declared child".
+ */
+const FACIAL_HAIR_MIN_AGE = 13;
+
+/**
+ * A recorded facial-hair value for a character of this DECLARED age: the value
+ * itself, or null for a declared child. An unknown age keeps the value (nothing is
+ * known to contradict it). The ONE gate every appearance, avatar-prompt and judge
+ * line goes through (sibling set character-physical-traits-to-prompt).
+ */
+function facialHairForAge(facialHair, declaredAge) {
+  const age = parseInt(declaredAge, 10);
+  return Number.isFinite(age) && age < FACIAL_HAIR_MIN_AGE ? null : (facialHair || null);
 }
 
 /**
@@ -13639,6 +13661,8 @@ module.exports = {
   extractCharacterVisualProfile,
   buildLabeledPhysicalParts,
   recordedFeatures,
+  facialHairForAge,
+  FACIAL_HAIR_MIN_AGE,
   buildCharacterPhysicalDescription,
   buildFaceDescription,
   buildGroundingPrompt,
