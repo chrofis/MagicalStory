@@ -1,0 +1,37 @@
+# Reading labels for emotion per figure on stored TRIAL stories (6 pages, single writer call), written by the evaluator
+# from the page text BEFORE any Jev call. format: @sid / page Name=emotion; ...
+@7yp1e0rh3
+1 Noah=sad; Frau Carter=neutral
+2 Noah=sad
+3 Noah=afraid
+4 Noah=afraid
+5 Noah=happy; Lily=happy; Frau Carter=neutral
+6 Noah=happy; Mama=happy; Frau Carter=neutral
+@2o820i76x
+1 Rohan=happy
+2 Rohan=afraid
+3 Rohan=afraid
+4 Rohan=sad
+5 Rohan=neutral
+6 Rohan=happy
+@j5diensbo
+1 Jules=happy; Moka=neutral; Noé=sad
+2 Jules=afraid; Moka=afraid; The goose=angry
+3 Jules=sad; Moka=sad; The goose=angry
+4 Jules=neutral; Moka=afraid; The goose=neutral
+5 Jules=happy; Noé=surprised; Moka=happy
+6 Jules=happy; Noé=happy; Moka=happy
+@h0y6ktpoe
+1 Noah=neutral; Frau Keller=neutral; Hase=neutral
+2 Noah=sad; Hase=afraid
+3 Noah=afraid; Frau Keller=neutral
+4 Noah=neutral; Hase=neutral
+5 Noah=happy; Hase=happy; Mama=happy
+6 Noah=happy; Mama=happy; Frau Keller=neutral
+@4eylyr1w4
+1 Jules=happy; Papa=happy
+2 Jules=afraid; L'oie=angry; Papa=neutral
+3 Jules=sad; L'oie=angry; Papa=neutral
+4 Jules=neutral; L'oie=neutral
+5 Jules=happy; L'oie=neutral; Papa=neutral
+6 Jules=happy; Papa=happy; L'oie=neutral

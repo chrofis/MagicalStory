@@ -1,0 +1,121 @@
+# Reading labels for emotion per figure, written by the evaluator (Claude) from page text + plan line BEFORE any Jev call.
+# format: @sid / page Name=emotion; Name=emotion ...
+@n9wrh5u0j
+1 Noah=angry; Hans=neutral
+2 Sarah=neutral; Emma=neutral; Noah=neutral
+3 Noah=afraid
+4 Emma=happy; Noah=happy; Hans=neutral; Daniel=neutral; Sarah=happy
+@atbttop6w
+1 Levin=happy; Julian=happy; Max=happy; Kiaan=neutral
+2 Levin=neutral
+3 Julian=surprised
+4 Julian=surprised; Levin=surprised
+5 Levin=surprised; Julian=surprised; Max=surprised; Kiaan=surprised
+6 Julian=neutral
+7 Levin=afraid
+8 Max=neutral
+10 Max=neutral
+11 Kiaan=neutral
+12 Julian=afraid; Kiaan=sad
+13 Julian=surprised
+14 Levin=afraid
+15 Levin=neutral
+16 Kiaan=neutral; Max=neutral
+17 Levin=happy
+18 Levin=happy; Julian=happy; Max=happy; Kiaan=happy
+@50osg2osm
+1 Emma=afraid; Sarah=neutral; Hans=neutral
+2 Daniel=neutral; Noah=afraid
+3 Sarah=neutral; Emma=afraid; Hans=neutral
+4 Emma=afraid
+5 Emma=afraid; Daniel=neutral
+6 Daniel=sad; Gessler=angry
+7 Emma=neutral; Noah=neutral
+8 Noah=surprised
+9 Daniel=neutral; Gessler=angry
+10 Emma=happy; Daniel=happy; Noah=happy; Sarah=happy; Hans=happy
+@ypl33vk8u
+1 Emma=happy; Noah=neutral; Hans=sad
+2 Sarah=neutral
+3 Emma=neutral
+4 Emma=surprised; Noah=neutral
+5 Emma=neutral
+6 Emma=afraid
+7 Noah=angry
+9 Emma=afraid
+10 Noah=angry; Emma=neutral
+11 Emma=neutral
+12 Daniel=happy; Sarah=happy; Emma=happy; Noah=happy
+13 Emma=happy; Hans=happy
+14 Hans=happy; Sarah=happy; Daniel=happy; Emma=happy; Noah=happy
+@essbvehs8
+1 Hans=neutral; Emma=surprised
+2 Emma=neutral; Daniel=neutral
+3 Emma=surprised; Hans=happy; Sarah=neutral
+5 Emma=sad; Noah=surprised
+6 Emma=sad
+7 Noah=angry; Emma=afraid
+8 Emma=neutral; Fridolin=sad
+9 Noah=neutral; Emma=neutral
+10 Emma=happy
+12 Emma=happy
+13 Daniel=happy; Sarah=happy
+14 Hans=happy; Emma=happy; Noah=happy; Daniel=happy; Sarah=happy
+@t0t8qpebu
+1 Hans=sad
+2 Emma=neutral
+3 Daniel=neutral; Sarah=neutral; Emma=happy
+4 Noah=happy; Emma=happy
+5 Noah=happy; Emma=afraid
+6 Emma=afraid; Noah=angry
+7 Emma=surprised
+8 Emma=afraid
+9 Emma=neutral
+10 Emma=happy
+12 Emma=happy
+13 Sarah=happy; Daniel=happy; Emma=happy; Noah=happy; Hans=happy
+14 Emma=happy; Sarah=happy; Daniel=happy; Hans=happy
+@nwi88y9lr
+1 Fiona=happy; Sarah=happy; Facundo=happy
+2 Fiona=surprised
+3 Lorena=afraid; Herr Frei=angry
+4 Saira=afraid
+5 Sarah=happy; Herr Frei=angry
+6 Fiona=surprised; Lorena=neutral
+7 Saira=happy; Herr Frei=angry
+8 Fiona=neutral; Käpt'n Vreni=neutral
+9 Facundo=happy; Käpt'n Vreni=neutral
+10 Fiona=neutral; Saira=neutral
+11 Lorena=angry; Sarah=afraid
+12 Fiona=neutral
+13 Facundo=happy; Sarah=afraid
+14 Lorena=happy; Facundo=happy
+15 Fiona=surprised; Facundo=surprised; Herr Frei=surprised
+16 Fiona=happy; Lorena=happy; Sarah=happy; Saira=happy; Facundo=happy
+@2ir6nl5kw
+1 Levin=happy; Julian=surprised; Max=surprised; Kiaan=happy
+2 Levin=surprised
+3 Levin=happy; Kiaan=neutral
+4 Levin=neutral; Julian=neutral; Max=neutral; Kiaan=neutral
+5 Max=neutral
+6 Julian=afraid
+7 Levin=sad
+8 Levin=neutral; Max=neutral
+9 Julian=afraid
+11 Max=neutral
+12 Max=sad; Glutta=sad
+13 Levin=neutral
+14 Kiaan=neutral; Levin=neutral
+15 Julian=neutral
+17 Julian=happy
+18 Levin=happy; Julian=happy; Max=happy; Kiaan=happy
+@6quecrr9t
+1 Levin=happy
+2 Levin=surprised; Kiaan=neutral
+3 Julian=neutral
+4 Levin=happy; Max=happy
+@o0kaatvmq
+1 Levin=surprised; Kiaan=surprised
+2 Max=happy
+3 Julian=neutral
+4 Levin=happy; Julian=happy; Max=happy; Kiaan=happy; Funka=happy; Lindi=happy
