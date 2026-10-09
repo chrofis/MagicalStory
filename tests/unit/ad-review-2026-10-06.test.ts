@@ -13,7 +13,7 @@ const SV = req('../../server/lib/shotVocabulary.js');
 const CB = req('../../server/lib/coverBeats.js');
 const SM = req('../../server/lib/sceneMetadata.js');
 const BC = req('../../server/lib/briefChecks.js');
-const { checkScenes } = req('../../server/lib/sceneBriefCheck.js');
+import { checkScenes, ctxWithIndex } from '../helpers/cast-index';
 const { loadPromptTemplates, PROMPT_TEMPLATES } = req('../../server/services/prompts.js');
 
 const chars = [
@@ -125,7 +125,7 @@ describe('§3 the decision layer\'s fields are not asked of the Art Director twi
     expect(BC.JEV_OWNED.has('vb_page_uncited')).toBe(true);
     const vb = { artifacts: [{ id: 'ART001', label: 'lamp', name: 'lamp', pages: [1], description: 'a brass lamp' }], locations: [{ id: 'LOC001', name: 'quay', pages: [1] }] };
     const brief = 'Levin stands on the quay.\n\n---METADATA---\n' + JSON.stringify({ sceneIntent: 'Levin stands.', characters: [{ name: 'Levin', clothing: 'standard', position: 'on the quay', depth: 'foreground' }], objects: ['LOC001'], interactions: [] });
-    const ctx = (fixed: any) => ({
+    const ctx = (fixed: any) => ctxWithIndex({
       inputData: input(), clothingRequirements: null, visualBible: vb,
       briefBeats: [{ pageNumber: 1, planLine: 'wide — Levin — waits — nothing', ...(fixed ? { jevFixed: fixed } : {}) }],
     });

@@ -16,7 +16,8 @@ import { createRequire } from 'node:module';
 
 const require_ = createRequire(import.meta.url);
 const PB = require_('../../server/lib/promptBuilders');
-const { checkPage, REVIEWABLE, renderFindingsBlock, checkScenes } = require_('../../server/lib/sceneBriefCheck');
+const { REVIEWABLE, renderFindingsBlock } = require_('../../server/lib/sceneBriefCheck');
+import { checkPage, checkScenes } from '../helpers/cast-index';
 const { GROUP_STAGING_RULE, GROUP_WIDER_SHOTS, SHOT_TYPES } = require_('../../server/lib/shotVocabulary');
 const IB = require_('../../server/lib/iterateBeat');
 const { loadPromptTemplates } = require_('../../server/services/prompts');

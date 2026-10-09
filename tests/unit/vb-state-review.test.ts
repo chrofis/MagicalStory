@@ -20,8 +20,9 @@ import { createRequire } from 'node:module';
 
 const require_ = createRequire(import.meta.url);
 const {
-  checkPage, checkScenes, renderFindingsBlock, REVIEWABLE,
+  renderFindingsBlock, REVIEWABLE,
 } = require_('../../server/lib/sceneBriefCheck');
+import { checkPage, checkScenes } from '../helpers/cast-index';
 
 // ── Fixtures: the stored shape, names archetypal. ───────────────────────────
 const DESCRIPTION = 'a smooth, perfectly oval shell about the size of a school bag, emitting a warm glowing internal light, completely unlettered';

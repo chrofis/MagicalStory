@@ -157,7 +157,7 @@ function submergedPages(visualBible, locOf, aboardOf) {
  */
 async function decideBriefFields({ beats, visualBible, bibleSections, approvedArc, inputData, present, gl, light = null }) {
   const { isCoverPage } = require('./coverBeats');
-  const { isSameFigureName } = require('./sceneMetadata');
+  const { sameEntity, buildCastIndex } = require('./castResolver');
   const t0 = Date.now();
   const storyBeats = beats.filter(b => !isCoverPage(b.pageNumber));
   const missingCount = storyBeats.filter(b => !(present && present.has(Number(b.pageNumber)))).map(b => b.pageNumber);
@@ -166,6 +166,7 @@ async function decideBriefFields({ beats, visualBible, bibleSections, approvedAr
   }
   const vb = visualBible || {};
   const commissioned = (inputData.characters || []).map(c => c && c.name).filter(Boolean);
+  const castIndex = buildCastIndex({ characters: inputData.characters || [] }, vb);
   const els = jevDecisions.vbElements(vb, commissioned);
   const decidedIds = els.map(e => e.id);
   const vehicleIds = els.filter(e => e.type === 'vehicle' || e.type === 'creature').map(e => e.id); // what Jev may set `aboard` to
@@ -239,7 +240,7 @@ async function decideBriefFields({ beats, visualBible, bibleSections, approvedAr
   const perPage = storyBeats.map((b) => {
     const n = Number(b.pageNumber);
     const inFrame = present.get(n) || [];
-    const roster = commissioned.filter(c => inFrame.some(name => isSameFigureName(c, name)));
+    const roster = commissioned.filter(c => inFrame.some(name => sameEntity(c, name, castIndex)));
     const objects = [...(b.jevFixed.location ? [b.jevFixed.location] : []), ...b.jevFixed.cites];
     const offFrame = offFrameOf(commissioned, roster, b.planLine);
     return { pageNumber: n, roster, offFrame, ...jevDecisions.gazePageMaterial({ objects, interactions: [], planLine: b.planLine, index: gIndex }) };

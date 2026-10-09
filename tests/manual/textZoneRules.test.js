@@ -24,9 +24,14 @@
 const assert = require('assert');
 const { textZoneRulesActive, SETTINGS } = require('../../server/config/runtime');
 const { resolveLayout } = require('../../server/lib/layout');
-const {
-  checkTextZoneDistribution, checkPage, parseTextPosition,
-} = require('../../server/lib/sceneBriefCheck');
+const sbc = require('../../server/lib/sceneBriefCheck');
+const { checkTextZoneDistribution, parseTextPosition } = sbc;
+const { buildCastIndex } = require('../../server/lib/castResolver');
+// The checks take the story's cast index (built once by the real callers); the fixtures build theirs here.
+const castIndexOf = (cast, vb) => buildCastIndex({ characters: (cast || []).map(name => ({ name })) }, vb);
+const checkPage = (p, cast, vb, o = {}) => sbc.checkPage(p, cast, vb, { ...o, castIndex: castIndexOf(cast, vb) });
+const checkScenes = (p, cast, vb, o = {}) => sbc.checkScenes(p, cast, vb, { ...o, castIndex: castIndexOf(cast, vb) });
+
 
 let passed = 0, failed = 0;
 const ok = (label, fn) => {
@@ -143,7 +148,6 @@ console.log('\n── R1: the distribution floors ──');
 console.log('\n── R1 + R4 are produced ONLY when the flag is on ──');
 {
   const offBook = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => page(n, 'top-left'));
-  const { checkScenes } = require('../../server/lib/sceneBriefCheck');
   ok('flag on → distribution findings appear', () =>
     assert.ok(checkScenes(offBook, [], null, { textZoneRules: true }).findings
       .some(f => f.type.startsWith('textzone_'))));

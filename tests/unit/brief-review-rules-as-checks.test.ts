@@ -8,6 +8,7 @@
 import { describe, it, expect } from 'vitest';
 import { createRequire } from 'node:module';
 import { makeJevStub } from '../helpers/jev-stub';
+import { checkCastNotInPlan, ctxWithIndex } from '../helpers/cast-index';
 
 const req = createRequire(import.meta.url);
 const SBC = req('../../server/lib/sceneBriefCheck');
@@ -93,7 +94,7 @@ describe('creature_row_missing: a cited animal carries a creatures[] row', () =>
   });
   it('reaches the re-ask: collectBriefFindings reports it', () => {
     const b = brief('Ana waves at Pip.', { shot: 'medium', characters: [row('Ana')], objects: ['ANI001'] });
-    const ctx = { inputData: { characters: [{ name: 'Ana' }] }, clothingRequirements: null, visualBible: VB, briefBeats: [] };
+    const ctx = ctxWithIndex({ inputData: { characters: [{ name: 'Ana' }] }, clothingRequirements: null, visualBible: VB, briefBeats: [] });
     const { findings } = BC.collectBriefFindings([{ pageNumber: 3, brief: b }], ctx);
     expect(findings.map((f: any) => f.type)).toContain('creature_row_missing');
   });
@@ -102,15 +103,15 @@ describe('creature_row_missing: a cited animal carries a creatures[] row', () =>
 describe('cast_not_in_plan: the head count decides who is in the picture', () => {
   const b = brief('x', { shot: 'medium', characters: [row('Ana'), row('Ben')] });
   it('fires on a commissioned character outside the page\'s head count', () => {
-    const f = SBC.checkCastNotInPlan({ pageNumber: 4, planLine: 'medium — Ana — x — y', inFrame: ['Ana'] }, full(b), ['Ana', 'Ben']);
+    const f = checkCastNotInPlan({ pageNumber: 4, planLine: 'medium — Ana — x — y', inFrame: ['Ana'] }, full(b), ['Ana', 'Ben']);
     expect(f[0].names).toEqual(['Ben']);
   });
   it('reads a collective who column through the head count', () => {
-    expect(SBC.checkCastNotInPlan({ pageNumber: 4, planLine: 'medium — both children — x — y', inFrame: ['Ana', 'Ben'] }, full(b), ['Ana', 'Ben'])).toEqual([]);
+    expect(checkCastNotInPlan({ pageNumber: 4, planLine: 'medium — both children — x — y', inFrame: ['Ana', 'Ben'] }, full(b), ['Ana', 'Ben'])).toEqual([]);
   });
   it('checks no cover and no page without a head count', () => {
-    expect(SBC.checkCastNotInPlan({ pageNumber: -1, planLine: 'medium — Ana — x — y', inFrame: ['Ana'] }, full(b), ['Ana', 'Ben'])).toEqual([]);
-    expect(SBC.checkCastNotInPlan({ pageNumber: 4, planLine: 'medium — Ana — x — y' }, full(b), ['Ana', 'Ben'])).toEqual([]);
+    expect(checkCastNotInPlan({ pageNumber: -1, planLine: 'medium — Ana — x — y', inFrame: ['Ana'] }, full(b), ['Ana', 'Ben'])).toEqual([]);
+    expect(checkCastNotInPlan({ pageNumber: 4, planLine: 'medium — Ana — x — y' }, full(b), ['Ana', 'Ben'])).toEqual([]);
   });
 });
 
@@ -183,10 +184,10 @@ describe('collectBriefFindings sends the new checks to the re-ask', () => {
   it('reads the beat\'s head count and its READ answer', () => {
     const vb = { artifacts: [{ id: 'ART001', name: 'sign', description: 'a sign' }] };
     const b = brief('Ana and Ben read the sign.', { shot: 'medium', characters: [row('Ana'), row('Ben')], objects: ['ART001'] });
-    const { findings } = BC.collectBriefFindings([{ pageNumber: 2, brief: b }], {
+    const { findings } = BC.collectBriefFindings([{ pageNumber: 2, brief: b }], ctxWithIndex({
       inputData: { characters: [{ name: 'Ana' }, { name: 'Ben' }] }, clothingRequirements: null, visualBible: vb,
       briefBeats: [{ pageNumber: 2, planLine: 'medium — Ana — reads the sign — y', inFrame: ['Ana'], jevFixed: { readsText: true, cites: ['ART001'], decidedIds: ['ART001'] } }],
-    });
+    }));
     const types = findings.map((f: any) => f.type);
     expect(types).toContain('cast_not_in_plan');
     expect(types).toContain('required_text_undeclared');

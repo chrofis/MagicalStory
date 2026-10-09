@@ -13,7 +13,7 @@ import path from 'node:path';
 const nodeRequire = createRequire(import.meta.url);
 const vbMod: any = nodeRequire('../../server/lib/visualBible.js');
 const { rankPageElements, checkVbElementBudget }: any = nodeRequire('../../server/lib/vbElementBudget.js');
-const { checkBiblePageTable }: any = nodeRequire('../../server/lib/sceneBriefCheck.js');
+import { checkBiblePageTable } from '../helpers/cast-index';
 const worn: any = nodeRequire('../../server/lib/wornItems.js');
 const { checkWardrobeAgainstBible, applyWardrobeBibleCorrections }: any = nodeRequire('../../server/lib/clothingCheck.js');
 

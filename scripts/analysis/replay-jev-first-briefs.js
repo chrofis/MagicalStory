@@ -70,7 +70,7 @@ async function checks(pool) {
     const briefs = ((d.sceneReviewReport && d.sceneReviewReport.briefsIn) || []).map(b => ({ pageNumber: b.pageNumber, brief: b.brief }));
     if (!briefs.length) continue;
     const vb = (d.sceneReviewReport && d.sceneReviewReport.visualBibleIn) || d.visualBible || null;
-    const res = collectBriefFindings(briefs, { inputData: d, clothingRequirements: d.clothingRequirements || null, visualBible: vb, briefBeats: briefBeatsOf(d) });
+    const res = collectBriefFindings(briefs, { inputData: d, clothingRequirements: d.clothingRequirements || null, visualBible: vb, briefBeats: briefBeatsOf(d), castIndex: require('../../server/lib/castResolver').buildCastIndex({ characters: d.characters || [] }, vb) });
     const pages = [...new Set(res.findings.map(f => f.pageNumber))].sort((a, b) => a - b);
     for (const f of res.findings) byType[f.type] = (byType[f.type] || 0) + 1;
     rows.push({ id: r.id, briefs: briefs.length, findings: res.findings.length, flaggedPages: pages, types: [...new Set(res.findings.map(f => f.type))] });
@@ -180,6 +180,7 @@ async function newchecks(pool) {
     const beats = briefBeatsOf(d);
     const present = resolveReplayPresent(d);
     const commissioned = (d.characters || []).map(c => c && c.name).filter(Boolean);
+    const castIndex = require('../../server/lib/castResolver').buildCastIndex({ characters: d.characters || [] }, vb);
     for (const x of briefs) {
       pages++;
       const meta = extractSceneMetadata(x.brief) || {};
@@ -196,7 +197,7 @@ async function newchecks(pool) {
         ...SBC.checkNegationNamed(page, meta),
         ...SBC.checkElementUncited(page, full, vb, commissioned),
         ...SBC.checkCharacterFields(page, full),
-        ...SBC.checkCastNotInPlan(page, full, commissioned),
+        ...SBC.checkCastNotInPlan(page, full, commissioned, castIndex),
         ...SBC.checkRequiredTextUndeclared(page, full, vb),
         ...checkClothingIncomplete({ pageNumber: x.pageNumber, prose: splitBrief(x.brief).prose, cast: (full.characters || []).map(c => (typeof c === 'string' ? c : c && c.name)).filter(Boolean), perCharClothing: meta.characterClothing || {}, shot: full.shot }, d.clothingRequirements || null),
       ];

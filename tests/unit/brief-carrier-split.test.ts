@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest';
 
 const {
-  splitBrief, parseProseMetadataFormat, stripSceneMetadata, extractSceneMetadata, findCastMissingFromMetadata,
+  splitBrief, parseProseMetadataFormat, stripSceneMetadata, extractSceneMetadata,
 } = require('../../server/lib/sceneMetadata');
+import { findCastMissingFromMetadata } from '../helpers/cast-index';
 
 // Page 7 of production job_1790107559778_fcmlfa8kn as the scene review
 // returned it (stories.data.sceneReviewReport.pages[].after), shortened: prose,

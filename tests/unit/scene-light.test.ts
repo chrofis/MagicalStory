@@ -20,7 +20,8 @@ const { extractSceneMetadata } = require_('../../server/lib/sceneMetadata');
 const { buildSemanticPrompt } = require_('../../server/lib/sceneValidator');
 const { buildEmptySceneQcPrompt } = require_('../../server/lib/evalPipeline');
 const { shrinkPromptForModel } = require_('../../server/lib/images');
-const { checkPage, REVIEWABLE } = require_('../../server/lib/sceneBriefCheck');
+const { REVIEWABLE } = require_('../../server/lib/sceneBriefCheck');
+import { checkPage } from '../helpers/cast-index';
 const { buildPlateDeriveInstruction } = require_('../../server/lib/shotVocabulary');
 const { selectGeometryFacts } = require_('../../server/lib/sceneGeometry');
 

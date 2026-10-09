@@ -11,7 +11,8 @@ import sceneBriefCheck from '../../server/lib/sceneBriefCheck.js';
 
 const { closeUpBelowWaistVerbs, CLOSEUP_BELOW_WAIST_PHRASE, CLOSEUP_BELOW_WAIST_VERBS } = shotVocabulary as any;
 const { runPlanCounters, nameCandidates } = planCounters as any;
-const { checkPage, REVIEWABLE } = sceneBriefCheck as any;
+const { REVIEWABLE } = sceneBriefCheck as any;
+import { checkPage } from '../helpers/cast-index';
 
 /**
  * A close-up frame ends at the waist. Two stages can lose that: the PLANNER,

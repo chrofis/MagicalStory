@@ -6,6 +6,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { createRequire } from 'node:module';
+import { ctxWithIndex } from '../helpers/cast-index';
 import fs from 'node:fs';
 
 const req = createRequire(import.meta.url);
@@ -46,7 +47,7 @@ describe('footing_in_water: a vantage in the water holds only swimming figures',
   });
   it('reaches the re-ask: collectBriefFindings reports both types', () => {
     const b = `Emma stands at the shore.\n\n---METADATA---\n${JSON.stringify(meta([row('Emma', 'ground')]))}`;
-    const ctx = { inputData: { characters: [{ name: 'Emma' }] }, clothingRequirements: null, visualBible: VB('water'), briefBeats: [] };
+    const ctx = ctxWithIndex({ inputData: { characters: [{ name: 'Emma' }] }, clothingRequirements: null, visualBible: VB('water'), briefBeats: [] });
     const types = BC.collectBriefFindings([{ pageNumber: 3, brief: b }], ctx).findings.map((f: any) => f.type);
     expect(types).toContain('footing_in_water');
     const b2 = `Emma stands at the shore.\n\n---METADATA---\n${JSON.stringify(meta([row('Emma')]))}`;

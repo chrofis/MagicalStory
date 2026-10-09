@@ -13,7 +13,8 @@ import { describe, it, expect } from 'vitest';
 import { createRequire } from 'node:module';
 
 const require_ = createRequire(import.meta.url);
-const { checkBiblePageTable, checkPage, REVIEWABLE } = require_('../../server/lib/sceneBriefCheck');
+const { REVIEWABLE } = require_('../../server/lib/sceneBriefCheck');
+import { checkBiblePageTable, checkPage } from '../helpers/cast-index';
 
 const typesOf = (f: any[]) => f.map((x: any) => x.type);
 const idsFor = (f: any[], type: string) =>
@@ -79,7 +80,7 @@ describe('checkBiblePageTable — the bible claims a page the brief never cites'
 
   it('treats a figure on the roster as cited, and never as a citation of its own', () => {
     // job_1789163494908_kc2joi4ax p2: the cast row "Mother" and the bible entry
-    // "Mother Dragon" are one name under isSameFigureName. A name may SUPPRESS
+    // "Mother Dragon" are two names (castResolver.sameEntity); a name may SUPPRESS
     // an absence; reading it as a citation reported the creature off-page.
     const vb = {
       animals: [{ id: 'ANI002', name: 'Mother Dragon', pages: [5, 6, 13, 18] }],

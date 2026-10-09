@@ -10,6 +10,7 @@
  */
 import { describe, it, expect, beforeAll, afterEach } from 'vitest';
 import { createRequire } from 'node:module';
+import { ctxWithIndex } from '../helpers/cast-index';
 
 const req = createRequire(import.meta.url);
 const textModels = req('../../server/lib/textModels');
@@ -123,7 +124,7 @@ describe('the brief checks and the one re-ask', () => {
   it('on a page whose fields Jev decided, the field-owned types are withheld from the re-ask', () => {
     const b = brief({ weather: 'clear', shot: 'medium' });
     const beats = [{ pageNumber: 1, planLine: 'close-up — Ana and Ben — they look at each other — the lamp is lit', jevFixed: fixed }];
-    const r = BC.collectBriefFindings([{ pageNumber: 1, brief: b }], { inputData: INPUT, clothingRequirements: null, visualBible: VB, briefBeats: beats });
+    const r = BC.collectBriefFindings([{ pageNumber: 1, brief: b }], ctxWithIndex({ inputData: INPUT, clothingRequirements: null, visualBible: VB, briefBeats: beats }));
     expect(r.findings.some((f: any) => BC.JEV_OWNED.has(f.type))).toBe(false);
   });
 });
@@ -133,7 +134,7 @@ describe('the "wearing no clothing" kind reaches the re-ask (Q7)', () => {
     const reqs = { Ana: { standard: { used: true, description: 'red wool sweater; blue denim jeans; white canvas sneakers' } }, Ben: { standard: { used: true, description: 'green hooded raincoat; grey corduroy trousers; brown leather boots' } } };
     const b = brief({ weather: 'clear', characters: [{ name: 'Ana', clothing: 'standard', looksAt: 'Ben' }, { name: 'Ben', clothing: 'standard', looksAt: 'Ana' }] },
       'Ana in her red wool sweater, blue denim jeans and white canvas sneakers stands on the quay; Ben stands beside her in his standard clothes.');
-    const r = BC.collectBriefFindings([{ pageNumber: 1, brief: b }], { inputData: INPUT, clothingRequirements: reqs, visualBible: VB, briefBeats: [{ pageNumber: 1, planLine: PLAN }] });
+    const r = BC.collectBriefFindings([{ pageNumber: 1, brief: b }], ctxWithIndex({ inputData: INPUT, clothingRequirements: reqs, visualBible: VB, briefBeats: [{ pageNumber: 1, planLine: PLAN }] }));
     const missing = r.findings.filter((f: any) => f.type === 'outfit_missing');
     expect(missing.map((f: any) => f.character)).toEqual(['Ben']);
     expect(BC.REASK_CLOTHING_EXTRA.has('outfit_missing')).toBe(true);

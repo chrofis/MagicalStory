@@ -10,7 +10,8 @@
 import { describe, it, expect } from 'vitest';
 
 const CR = require('../../server/lib/castResolver');
-const { getCharactersInScene, unionPageCast, findCastMissingFromMetadata } = require('../../server/lib/sceneMetadata');
+const { getCharactersInScene, unionPageCast } = require('../../server/lib/sceneMetadata');
+import { findCastMissingFromMetadata } from '../helpers/cast-index';
 const { namesIn } = require('../../server/lib/planCounters');
 const { selectGeometryFacts } = require('../../server/lib/sceneGeometry');
 const { characterWindow } = require('../../server/lib/clothingCheck');

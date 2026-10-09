@@ -140,7 +140,7 @@ function scoreVb(raw) {
 
 function briefCtx(story) {
   const briefBeats = rebuildBriefBeats(story);
-  return { inputData: story, clothingRequirements: story.clothingRequirements || null, visualBible: story.visualBible, briefBeats };
+  return { inputData: story, clothingRequirements: story.clothingRequirements || null, visualBible: story.visualBible, briefBeats, castIndex: require('../../server/lib/castResolver').buildCastIndex({ characters: story.characters || [] }, story.visualBible) };
 }
 
 function scoreBriefs(raw, story) {

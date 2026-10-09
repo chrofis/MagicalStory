@@ -23,7 +23,11 @@
  */
 'use strict';
 
-const { findCastMissingFromMetadata } = require('../../server/lib/sceneMetadata');
+const sm = require('../../server/lib/sceneMetadata');
+const { buildCastIndex } = require('../../server/lib/castResolver');
+// The check takes the story's cast index (built once by the real caller); the fixtures build theirs here.
+const findCastMissingFromMetadata = (desc, cast, md = null, also = []) =>
+  sm.findCastMissingFromMetadata(desc, cast, md, also, buildCastIndex({ characters: (Array.isArray(cast) ? cast : []).map(name => ({ name })) }, null));
 
 let passed = 0, failed = 0;
 const check = (d, c, extra) => c

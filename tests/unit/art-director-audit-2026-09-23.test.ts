@@ -10,7 +10,8 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { createRequire } from 'node:module';
 
 const require_ = createRequire(import.meta.url);
-const { checkPage, REVIEWABLE } = require_('../../server/lib/sceneBriefCheck');
+const { REVIEWABLE } = require_('../../server/lib/sceneBriefCheck');
+import { checkPage, checkSceneConsistency } from '../helpers/cast-index';
 const PB = require_('../../server/lib/promptBuilders');
 const { loadPromptTemplates } = require_('../../server/services/prompts');
 const { VANTAGE_SHOT_RULE, PLATE_DERIVED_SHOTS } = require_('../../server/lib/shotVocabulary');
@@ -169,7 +170,6 @@ describe('built prompts', () => {
 // "2 characters have hands on loc002.3" for banking leaves on the ground.
 describe('the hand-off counters never count a location id as a one-grip object', () => {
   const { handsPerObject } = require_('../../server/lib/sceneMetadata');
-  const { checkSceneConsistency } = require_('../../server/lib/sceneConsistencyCheck');
   const rows = [
     { character: 'Levin + Kiaan', object: 'LOC002.3', hands: true, action: 'banking leaves' },
     { character: 'Max', object: 'LOC002', hands: true, action: 'banking leaves' },

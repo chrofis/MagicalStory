@@ -544,15 +544,17 @@ const INTRODUCED_TYPES = new Set([
  * @param {string} [parentBrief] the brief being replaced. Without it every
  *   INTRODUCED_TYPES finding is suppressed rather than guessed at — a caller
  *   that cannot say what the parent declared cannot say what the rewrite added.
+ * @param {object} castIndex the story's cast index, `buildCastIndex({characters}, visualBible)`, built once by the caller. Required.
  * @returns {Array} findings: all of REINSTATE_TYPES, plus INTRODUCED_TYPES the
  *   parent brief was free of
  */
-function checkRewrittenBrief({ pageNumber, brief, parentBrief = null, planLine = null, castNames = [], visualBible = null } = {}) {
+function checkRewrittenBrief({ pageNumber, brief, parentBrief = null, planLine = null, castNames = [], visualBible = null, castIndex = null } = {}) {
   if (!String(brief || '').trim()) return [];
+  if (!castIndex) throw new Error('checkRewrittenBrief: castIndex is required (castResolver.buildCastIndex)');
   try {
     const { checkPage } = require('./sceneBriefCheck');
     const run = (text) => (String(text || '').trim()
-      ? checkPage({ pageNumber, brief: String(text), planLine: planLine || '' }, castNames, visualBible, {})
+      ? checkPage({ pageNumber, brief: String(text), planLine: planLine || '' }, castNames, visualBible, { castIndex })
       : []);
     const findings = run(brief);
     const parentTypes = new Set(run(parentBrief).map(f => f && f.type));

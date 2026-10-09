@@ -19,8 +19,9 @@
 import { describe, it, expect } from 'vitest';
 
 const {
-  checkPopulationContradiction, checkPage, renderFindingsBlock, REVIEWABLE,
+  checkPopulationContradiction, renderFindingsBlock, REVIEWABLE,
 } = require('../../server/lib/sceneBriefCheck');
+import { checkPage } from '../helpers/cast-index';
 const { INTRODUCED_TYPES } = require('../../server/lib/iterateBeat');
 const fs = require('fs');
 const path = require('path');

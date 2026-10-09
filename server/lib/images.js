@@ -4578,9 +4578,10 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   // on them (they legitimately have no per-page outfit), killing the repair for
   // every page of job_1786147254924_8nuyywjii. If we do not know who is on the
   // page, we do not guess — we fail here.
+  // The story's cast index, built once: the roster resolution below and the rewrite's brief checks share it.
+  const iterateIdx = buildCastIndex({ characters: characters || [] }, visualBible);
   const analysisCharacters = (() => {
     // RESOLVE: page cast names → roster entries through the one resolver.
-    const iterateIdx = buildCastIndex({ characters: characters || [] }, visualBible);
     const names = (savedScene.sceneCharacters || []).map(c => String(c?.name || '').trim()).filter(Boolean);
     if (names.length === 0) {
       // An EMPTY cast and an UNKNOWN cast are different states. A landscape page
@@ -4951,7 +4952,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   // model call — and both feed the ONE corrective re-ask below, never a second.
   const runBriefChecks = (text) => [
     ...checkRewrittenBrief({
-      pageNumber, brief: text, parentBrief: sceneDescText, planLine, castNames: castNamesForCheck, visualBible,
+      pageNumber, brief: text, parentBrief: sceneDescText, planLine, castNames: castNamesForCheck, visualBible, castIndex: iterateIdx,
     }),
     ...checkCarriedFields({
       // The parent BRIEF's own metadata: it is the contract this rewrite

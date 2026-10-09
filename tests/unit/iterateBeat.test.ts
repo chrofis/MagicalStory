@@ -19,8 +19,9 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 
 const {
   resolvePlanLine, planStagedSegment, collectStagedFigures,
-  renderStagedFiguresBlock, checkRewrittenBrief,
+  renderStagedFiguresBlock,
 } = nodeRequire('../../server/lib/iterateBeat.js');
+import { checkRewrittenBrief } from './../helpers/cast-index';
 const { buildSceneDescriptionPrompt } = nodeRequire('../../server/lib/promptBuilders.js');
 const { loadPromptTemplates } = nodeRequire('../../server/services/prompts.js');
 

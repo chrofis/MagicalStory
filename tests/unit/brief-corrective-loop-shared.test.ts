@@ -26,6 +26,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { createRequire } from 'node:module';
+import { checkRewrittenBrief } from '../helpers/cast-index';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -46,7 +47,7 @@ const label = (r: Round) => `${r.job.slice(-8)} p${r.pageNumber}`;
 
 /** The declaration half of the production check set, exactly as images.js runs it. */
 const checksFor = (r: Round) => (text: string) => [
-  ...IB.checkRewrittenBrief({
+  ...checkRewrittenBrief({
     pageNumber: r.pageNumber, brief: text, parentBrief: r.parentBrief,
     planLine: r.planLine, castNames: storyOf(r).castNames, visualBible: storyOf(r).visualBible,
   }),

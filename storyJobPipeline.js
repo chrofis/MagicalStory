@@ -2919,7 +2919,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       try {
         const draftPages = new UnifiedStoryParser(unifiedResponse).extractPages();
         draftConsistencyIssues = checkSceneConsistency(draftPages, unifiedResponse, {
-          knownCharacterNames: (inputData.characters || []).map(c => c.name)
+          knownCharacterNames: (inputData.characters || []).map(c => c.name),
+          // No Visual Bible exists yet at the draft stage: the cast alone.
+          castIndex: buildCastIndex({ characters: inputData.characters || [] }, null)
         });
         for (const line of formatSceneConsistencySummary(draftConsistencyIssues)) log.info(`${line} (pre-review draft)`);
       } catch (preErr) {
@@ -3138,11 +3140,15 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // Skipped in beats mode: the check compares page metadata against the
     // unified outline's SCENE DESIGN blocks, which a beats transcript has not
     // got — the scene review is the equivalent gate there.
+    // The story's cast index, built once from the final cast + Visual Bible and
+    // shared by the consistency check below and the per-page cast check later.
+    const storyCastIndex = buildCastIndex({ characters: inputData.characters || [] }, visualBible);
     let sceneConsistencyResult = null;
     if (!beatsMode) {
       try {
         sceneConsistencyResult = checkSceneConsistency(storyPages, unifiedResponse, {
-          knownCharacterNames: (inputData.characters || []).map(c => c.name)
+          knownCharacterNames: (inputData.characters || []).map(c => c.name),
+          castIndex: storyCastIndex
         });
         const issueCount = sceneConsistencyResult.reduce((n, e) => n + e.issues.length, 0);
         for (const line of formatSceneConsistencySummary(sceneConsistencyResult)) log.warn(line);
@@ -4398,7 +4404,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         const castMissing = findCastMissingFromMetadata(
           scene.sceneDescription,
           (inputData.characters || []).map(c => c.name),
-          sceneMetadata
+          sceneMetadata,
+          [],
+          storyCastIndex
         );
         if (castMissing.length > 0) {
           const listed = (sceneMetadata?.characters || []).join(', ') || 'none';

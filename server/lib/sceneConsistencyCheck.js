@@ -28,9 +28,9 @@ const DEPTH_WORDS = ['foreground', 'midground', 'background'];
 // Name identity — a bible figure written "Kapitänin Rossa" and a characters[]
 // entry written "Rossa" are one person. Shared with sceneBriefCheck so both
 // emitters of this fault agree; string equality here produced six unclearable
-// cast_unlisted findings on job_1788215224103_avu132n7je (2026-09-01).
-const { isSameFigureName } = require('./sceneMetadata');
-const { isNameMentioned } = require('./castResolver');
+// cast_unlisted findings on job_1788215224103_avu132n7je (2026-09-01). Two
+// stored names compare only through the resolver (docs/SETTLED.md).
+const { isNameMentioned, sameEntity } = require('./castResolver');
 
 function baseName(name) {
   return String(name || '').replace(/\s*\([^)]*\)\s*$/, '').trim();
@@ -87,9 +87,12 @@ function extractSceneSequenceCasts(rawOutput) {
  * @param {string[]} [options.knownCharacterNames] - Cast names from inputData
  *   (main + primary characters). Used for the prose→metadata and sceneIntent
  *   directions where free-text matching needs a closed name list.
+ * @param {object} options.castIndex - the story's cast index (castResolver.buildCastIndex), built once by the caller. Required.
  * @returns {Array<{page:number, issues:Array<{type:string, detail:string}>}>}
  */
 function checkSceneConsistency(pages, rawOutput = null, options = {}) {
+  const castIndex = options.castIndex;
+  if (!castIndex && (pages || []).length) throw new Error('checkSceneConsistency: options.castIndex is required (castResolver.buildCastIndex)');
   const knownNames = (options.knownCharacterNames || [])
     .map(n => baseName(n))
     .filter(n => n && n.length >= 2);
@@ -112,7 +115,7 @@ function checkSceneConsistency(pages, rawOutput = null, options = {}) {
 
     const metaChars = Array.isArray(meta.characters) ? meta.characters : [];
     const metaCharNames = metaChars.map(c => baseName(c && c.name)).filter(Boolean);
-    const listedAs = (who) => metaCharNames.some(entry => isSameFigureName(entry, who));
+    const listedAs = (who) => metaCharNames.some(entry => sameEntity(entry, who, castIndex));
     const objects = Array.isArray(meta.objects) ? meta.objects : [];
     const objectStrings = objects.map(o => (typeof o === 'string' ? o : (o && (o.name || o.id)) || '')).filter(Boolean);
     const background = typeof meta.background === 'string' ? meta.background : '';
@@ -158,7 +161,7 @@ function checkSceneConsistency(pages, rawOutput = null, options = {}) {
       }
       const obj = String(inter.object || '').trim();
       if (obj) {
-        const objIsKnownChar = knownNames.some(n => isSameFigureName(n, baseName(obj)));
+        const objIsKnownChar = knownNames.some(n => sameEntity(n, baseName(obj), castIndex));
         if (objIsKnownChar) {
           if (!listedAs(baseName(obj))) {
             issues.push({ type: 'interaction_target_char_unknown', detail: `interactions[] targets character '${obj}' who is not in characters[]` });

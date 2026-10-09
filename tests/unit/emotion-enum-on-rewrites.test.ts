@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { createRequire } from 'node:module';
+import { ctxWithIndex } from '../helpers/cast-index';
 
 const nodeRequire = createRequire(import.meta.url);
 const SBC = nodeRequire('../../server/lib/sceneBriefCheck.js');
@@ -39,9 +40,9 @@ describe('emotion_off_list: one closed-list check for characters[] and creatures
   it('the authored-brief collector reports it too (same function, one implementation)', () => {
     const rows = p4Rewrite.characters.map(c => ({ ...c, position: 'left' }));
     const brief = 'Funka watches the egg.\n\n```json\n' + JSON.stringify({ shot: 'medium', characters: rows, creatures: p4Rewrite.creatures, objects: ['ANI001'] }) + '\n```';
-    const { findings } = BC.collectBriefFindings([{ pageNumber: 4, brief }], {
+    const { findings } = BC.collectBriefFindings([{ pageNumber: 4, brief }], ctxWithIndex({
       inputData: { characters: [] }, clothingRequirements: null, visualBible: null, briefBeats: [],
-    });
+    }));
     expect(findings.filter((f: any) => f.type === 'emotion_off_list').length).toBe(2);
   });
   it('the iterate rewrite check runs the same function', () => {

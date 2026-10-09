@@ -19,6 +19,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { createRequire } from 'node:module';
+import { checkPage, checkRewrittenBrief } from '../helpers/cast-index';
 
 const nodeRequire = createRequire(import.meta.url);
 const IB = nodeRequire('../../server/lib/iterateBeat.js');
@@ -34,7 +35,7 @@ const ROUNDS: Round[] = FIXTURE.rounds;
 const storyOf = (r: Round) => FIXTURE.stories[r.job];
 const label = (r: Round) => `${r.job.slice(-8)} p${r.pageNumber}`;
 
-const checkRewrite = (r: Round, opts: any = {}) => IB.checkRewrittenBrief({
+const checkRewrite = (r: Round, opts: any = {}) => checkRewrittenBrief({
   pageNumber: r.pageNumber,
   brief: r.rewriteBrief,
   planLine: r.planLine,
@@ -167,7 +168,7 @@ describe('introduced vs inherited, on the stored rounds', () => {
     // under two pairs of hands. Both survive into the rewrite's shape, and
     // neither is the rewrite's to fix inside a page rewrite.
     const r = ROUNDS.find(x => x.job.endsWith('rts4wqupm') && x.pageNumber === 9)!;
-    const parentTypes = SBC.checkPage(
+    const parentTypes = checkPage(
       { pageNumber: r.pageNumber, brief: r.parentBrief, planLine: r.planLine },
       storyOf(r).castNames, storyOf(r).visualBible, {},
     ).map((f: any) => f.type);

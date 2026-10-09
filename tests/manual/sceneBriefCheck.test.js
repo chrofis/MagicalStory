@@ -23,7 +23,14 @@
  */
 'use strict';
 
-const { checkPage, checkScenes, renderFindingsBlock, knownIds, REVIEWABLE } = require('../../server/lib/sceneBriefCheck');
+const sbc = require('../../server/lib/sceneBriefCheck');
+const { renderFindingsBlock, knownIds, REVIEWABLE } = sbc;
+const { buildCastIndex } = require('../../server/lib/castResolver');
+// The checks take the story's cast index (built once by the real callers); the fixtures build theirs here.
+const castIndexOf = (cast, vb) => buildCastIndex({ characters: (cast || []).map(name => ({ name })) }, vb);
+const checkPage = (p, cast, vb, o = {}) => sbc.checkPage(p, cast, vb, { ...o, castIndex: castIndexOf(cast, vb) });
+const checkScenes = (p, cast, vb, o = {}) => sbc.checkScenes(p, cast, vb, { ...o, castIndex: castIndexOf(cast, vb) });
+
 
 let passed = 0, failed = 0;
 const check = (d, c, extra) => c

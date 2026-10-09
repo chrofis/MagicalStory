@@ -5,7 +5,7 @@
 
 const { log } = require('../utils/logger');
 const { OutlineParser, extractCharacterNamesFromScene } = require('./outlineParser');
-const { buildCastIndex, resolveEntity, entriesMentioned, isNameMentioned } = require('./castResolver');
+const { buildCastIndex, resolveEntity, sameEntity, entriesMentioned, isNameMentioned } = require('./castResolver');
 
 /**
  * Extract JSON object from a string that may have text before/after it or be wrapped in code blocks
@@ -1453,48 +1453,6 @@ function collectSceneObjectFigureNames(sceneMetadata, visualBible) {
 }
 
 /**
- * A name reduced to the tokens that identify a person: lower-cased, with any
- * parenthetical stripped and any possessive-marked token dropped. A possessive
- * token is a modifier, never the head — "Rossa's crew member (trapped)" is a
- * crew member, not Rossa.
- */
-function nameTokens(name) {
-  return String(name || '')
-    .replace(/\([^)]*\)/g, ' ')
-    .toLowerCase()
-    .split(/[\s,]+/)
-    .map(t => t.replace(/^[^\p{L}\p{N}]+/u, '').replace(/[^\p{L}\p{N}'’]+$/u, ''))
-    .filter(t => t && !/['’]s$/u.test(t));
-}
-
-/**
- * Do two written names denote the same figure?
- *
- * The visual bible and a brief's `characters[]` routinely write the same person
- * differently: the bible declares "Kapitänin Rossa", the brief lists "Rossa".
- * String equality calls those two people, which is the whole of the
- * `cast_unlisted` false positive on staging `job_1788215224103_avu132n7je` —
- * six findings on six pages, unchanged by a paid review round, because no
- * rewrite of the prose could ever make the two strings equal.
- *
- * The rule is token-based and deliberately narrow: the shorter name must be a
- * leading or trailing RUN of the longer one. That admits a title prefix
- * ("Kapitänin Rossa" ⊃ "Rossa") and a trailing epithet, and refuses a merely
- * shared token — "Hans Meier" and "Anna Meier" stay two people, and
- * "Rossa's crew member" stays distinct from "Rossa" because the possessive
- * token is dropped before comparing.
- */
-function isSameFigureName(a, b) {
-  const x = nameTokens(a);
-  const y = nameTokens(b);
-  if (x.length === 0 || y.length === 0) return false;
-  const [short, long] = x.length <= y.length ? [x, y] : [y, x];
-  const s = short.join(' ');
-  return s === long.slice(0, short.length).join(' ')
-    || s === long.slice(long.length - short.length).join(' ');
-}
-
-/**
  * Cast members the scene PROSE describes but the metadata `characters` list
  * omits. The Art Director emits prose plus a metadata block; the image model
  * renders the prose, while figure naming, the entity grid, clothing validation
@@ -1509,21 +1467,25 @@ function isSameFigureName(a, b) {
  * flagged were exactly that. Boundaries are letter/number based, so a cast
  * member "Ann" never matches "Anna".
  *
- * A cast name counts as LISTED when `isSameFigureName` says it and a
+ * A cast name counts as LISTED when `castResolver.sameEntity` says it and a
  * `characters[]` entry are the same figure — not when the two strings are
  * equal. The bible names a secondary "Kapitänin Rossa" and the brief lists her
  * as "Rossa"; under string equality that page reported her missing on every
- * pass, forever (see that helper).
+ * pass, forever. Two stored names compare ONLY through the resolver; an
+ * ambiguous short name refuses (docs/SETTLED.md, name matching). The index is
+ * the story's, built once by the caller: `buildCastIndex({characters}, visualBible)`.
  *
  * @param {string} sceneDescription - Prose + ---METADATA--- block
  * @param {string[]} castNames - Story cast names
  * @param {Object|null} [sceneMetadata] - Already-parsed metadata, when the caller has it
  * @param {string[]} [alsoListed] - names the brief lists by another handle (a VB figure cited by id)
+ * @param {object} castIndex - the story's cast index (castResolver.buildCastIndex)
  * @returns {string[]} Cast names described in the prose but not listed (cast order)
  */
-function findCastMissingFromMetadata(sceneDescription, castNames, sceneMetadata = null, alsoListed = []) {
+function findCastMissingFromMetadata(sceneDescription, castNames, sceneMetadata = null, alsoListed = [], castIndex = null) {
   if (!sceneDescription || typeof sceneDescription !== 'string') return [];
   if (!Array.isArray(castNames) || castNames.length === 0) return [];
+  if (!castIndex) throw new Error('findCastMissingFromMetadata: castIndex is required (castResolver.buildCastIndex)');
   const metadata = sceneMetadata || extractSceneMetadata(sceneDescription);
   if (!metadata || !Array.isArray(metadata.characters)) return [];
 
@@ -1538,7 +1500,7 @@ function findCastMissingFromMetadata(sceneDescription, castNames, sceneMetadata 
   const missing = [];
   for (const rawName of castNames) {
     const name = String(rawName || '').trim();
-    if (!name || listed.some(entry => isSameFigureName(entry, name))) continue;
+    if (!name || listed.some(entry => sameEntity(entry, name, castIndex))) continue;
     if (isNameMentioned(prose, name, { possessive: false, caseSensitive: true })) missing.push(name);
   }
   return missing;
@@ -2871,7 +2833,6 @@ module.exports = {
   collectSceneCharacterNames,
   collectSceneObjectFigureNames,
   findCastMissingFromMetadata,
-  isSameFigureName,
   getCharactersInScene,
   castOfRewrittenBrief,
   unionPageCast,

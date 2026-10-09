@@ -15,10 +15,12 @@
  * types in REVIEWABLE reach a prompt.
  *
  * Comparison is deterministic but NOT string equality where names are
- * concerned: `isSameFigureName` (sceneMetadata.js) treats a title prefix or a
- * trailing epithet as the same figure, because the visual bible and a brief's
- * `characters[]` routinely write one person two ways. See that helper for the
- * measured failure that forced it.
+ * concerned: two stored names compare ONLY through `castResolver.sameEntity`
+ * (docs/SETTLED.md), because the visual bible and a brief's `characters[]`
+ * routinely write one person two ways ("Kapitänin Rossa" / "Rossa"). An
+ * ambiguous short name refuses. The cast index is the story's, built once by
+ * the entry point (`buildCastIndex({characters}, visualBible)`) and passed down
+ * as `opts.castIndex`; a missing index throws, it never degrades to strings.
  *
  *   cast_unlisted       a cast member the prose describes is absent from
  *                       `characters[]`. Staging `job_1786397108357_q1fjbdzbx`
@@ -50,7 +52,13 @@
  */
 
 const { log } = require('../utils/logger');
-const { extractSceneMetadata, findCastMissingFromMetadata, isSameFigureName } = require('./sceneMetadata');
+const { extractSceneMetadata, findCastMissingFromMetadata } = require('./sceneMetadata');
+const { sameEntity } = require('./castResolver');
+
+function requireCastIndex(castIndex, who) {
+  if (!castIndex) throw new Error(`${who}: castIndex is required (castResolver.buildCastIndex)`);
+  return castIndex;
+}
 const { isNameMentioned } = require('./castResolver');
 const { checkVbElementBudget } = require('./vbElementBudget');
 const { normalizeEmotion, EMOTION_ENUM_PHRASE } = require('./emotionVocabulary');
@@ -214,9 +222,10 @@ function checkCoverCast(page, metadata, visualBible) {
  * (Art Director, iterate, scene review 5a) — and this check then holds the
  * brief to it.
  */
-function checkPlanCastCited(page, metadata, visualBible) {
+function checkPlanCastCited(page, metadata, visualBible, castIndex) {
   const n = Number(page && page.pageNumber);
   if (!Number.isFinite(n) || n <= 0) return [];
+  requireCastIndex(castIndex, 'checkPlanCastCited');
   const castField = planSegments(String((page && page.planLine) || '').replace(/^\s*PLAN:\s*/i, ''))[1] || '';
   const named = castField.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
   if (named.length === 0) return [];
@@ -233,7 +242,7 @@ function checkPlanCastCited(page, metadata, visualBible) {
       const id = String(e.id).trim().toUpperCase().split('.')[0];
       const handles = [e.name, e.label].map(s => String(s || '').trim().toLowerCase()).filter(Boolean);
       if (!handles.some(h => named.includes(h)) || cited.has(id)) continue;
-      if (onCast.some(name => isSameFigureName(name, e.name))) continue;
+      if (onCast.some(name => sameEntity(name, e.name, castIndex))) continue;
       missing.push(`${e.name || e.label} (${id})`);
     }
   }
@@ -839,7 +848,7 @@ function citedBaseIds(metadata) {
  *
  * A figure carried in `characters[]` counts as cited: a secondary character on
  * the roster is in the frame already, and `objects[]` is not where they belong.
- * Compared with `isSameFigureName`, for the same reason check A is.
+ * Compared with `sameEntity`, for the same reason check A is.
  *
  * A garment with a `wornItems` row on this page counts as present too
  * (2026-09-23): the row IS the page's declaration of it, worn or off, and a
@@ -847,7 +856,8 @@ function citedBaseIds(metadata) {
  * worn outer layer faulted — 11 of 11 `vb_page_uncited` findings on staging
  * job_1790100385959_1nitlympp — and the review padded `objects[]` to match.
  */
-function checkBiblePageTable(page, metadata, visualBible) {
+function checkBiblePageTable(page, metadata, visualBible, castIndex) {
+  requireCastIndex(castIndex, 'checkBiblePageTable');
   const n = Number(page && page.pageNumber);
   if (!Number.isFinite(n) || n <= 0) return [];
   const entries = bibleEntries(visualBible);
@@ -868,10 +878,10 @@ function checkBiblePageTable(page, metadata, visualBible) {
       // A figure on the roster is in the frame already — a name match only ever
       // SUPPRESSES an absence, it is never itself a citation. The other way
       // round costs a false positive: an animal entry named "Mother Dragon"
-      // against a cast entry "Mother" is one name under isSameFigureName, and
+      // against a cast entry "Mother" is two names under sameEntity (the old token matcher read them as one), and
       // reading that as a citation reported the creature off-page on a page it
       // was never on (staging job_1789163494908_kc2joi4ax p2).
-      if (!cited.has(id) && !declaredWorn.has(id) && !onCast.some(name => isSameFigureName(name, entry.name))) uncited.push({ id, entry });
+      if (!cited.has(id) && !declaredWorn.has(id) && !onCast.some(name => sameEntity(name, entry.name, castIndex))) uncited.push({ id, entry });
     } else if (cited.has(id)) {
       offpage.push({ id, entry, handle: cited.get(id) });
     }
@@ -1191,12 +1201,13 @@ function checkCreatureRows(page, metadata, visualBible) {
  * collective who column ("all four children"). A page without a head count is
  * not checked. Covers are checked by cover_cast_dropped.
  */
-function checkCastNotInPlan(page, metadata, commissionedNames = []) {
+function checkCastNotInPlan(page, metadata, commissionedNames = [], castIndex = null) {
+  requireCastIndex(castIndex, 'checkCastNotInPlan');
   if (!(Number(page && page.pageNumber) > 0) || !Array.isArray(page.inFrame)) return [];
   const rows = (metadata && Array.isArray(metadata.characters)) ? metadata.characters : [];
   const listed = rows.map(c => String(typeof c === 'string' ? c : (c && c.name) || '').trim()).filter(Boolean);
-  const extra = listed.filter(n => commissionedNames.some(c => isSameFigureName(c, n)))
-    .filter(n => !page.inFrame.some(x => isSameFigureName(x, n)));
+  const extra = listed.filter(n => commissionedNames.some(c => sameEntity(c, n, castIndex)))
+    .filter(n => !page.inFrame.some(x => sameEntity(x, n, castIndex)));
   if (!extra.length) return [];
   const who = planSegments(String(page.planLine || '').replace(/^\s*PLAN:\s*/i, ''))[1] || '';
   return [{
@@ -1240,7 +1251,8 @@ function checkPage(page, castNames = [], visualBible = null, opts = {}) {
   const metadata = (page && page.metadata) || extractSceneMetadata(brief);
   findings.push(...checkCoverBrief(page, metadata));
   findings.push(...checkCoverCast(page, metadata, visualBible));
-  findings.push(...checkPlanCastCited(page, metadata, visualBible));
+  const castIndex = requireCastIndex(opts && opts.castIndex, 'checkPage');
+  findings.push(...checkPlanCastCited(page, metadata, visualBible, castIndex));
 
   // A — cast the prose describes, `characters[]` omits. Possessive-aware by
   // construction: `Hans's attic` and `Daniel's phone torch` name a place and a
@@ -1254,7 +1266,7 @@ function checkPage(page, castNames = [], visualBible = null, opts = {}) {
   // Mama; characters[] lists Julian, Max, Kiaan" while objects[] cited CHR001),
   // and on p2 and p7 the scene review answered it by removing Mama, whom both
   // who columns name.
-  const missing = findCastMissingFromMetadata(brief, castNames, metadata, vbFigureNamesCited(metadata, visualBible));
+  const missing = findCastMissingFromMetadata(brief, castNames, metadata, vbFigureNamesCited(metadata, visualBible), castIndex);
   if (missing.length > 0) {
     const listed = (metadata && Array.isArray(metadata.characters) ? metadata.characters : [])
       .map(c => String(typeof c === 'string' ? c : (c && c.name) || '').trim())
@@ -1332,7 +1344,7 @@ function checkPage(page, castNames = [], visualBible = null, opts = {}) {
   // the picture — the prose still described them — it removed only the line
   // saying what they were doing. So the row is kept and the disagreement is
   // reported here instead, for the review that authored both halves to settle.
-  // Compared with isSameFigureName, not string equality, for the same reason
+  // Compared with sameEntity, not string equality, for the same reason
   // check A is: an interactions row saying "Kapitänin Rossa" while
   // characters[] lists "Rossa" is one figure, not an unresolvable actor.
   const castOnPage = ((metadata && Array.isArray(metadata.characters) ? metadata.characters : [])
@@ -1344,7 +1356,7 @@ function checkPage(page, castNames = [], visualBible = null, opts = {}) {
     if (!row || !row.character) continue;
     for (const part of String(row.character).split(/\s*(?:\+|&|\band\b|,)\s*/i)) {
       const name = part.trim();
-      if (!name || castOnPage.some(entry => isSameFigureName(entry, name))) continue;
+      if (!name || castOnPage.some(entry => sameEntity(entry, name, castIndex))) continue;
       const handle = /^([A-Z]{3})(\d{3})(?:\.\d+)?$/.exec(name.toUpperCase());
       if (handle && vbKnown.has(handle[1] + handle[2])) continue;  // a visual-bible actor
       unresolved.add(name);
@@ -1394,7 +1406,7 @@ function checkPage(page, castNames = [], visualBible = null, opts = {}) {
   findings.push(...checkObjectStateContradiction(page, metadata, visualBible));
 
   // K — the bible's page table and this page's citations disagree.
-  findings.push(...checkBiblePageTable(page, metadata, visualBible));
+  findings.push(...checkBiblePageTable(page, metadata, visualBible, castIndex));
 
   // E2 — the plan asked for a close-up and the brief came back wider.
   //
@@ -1551,8 +1563,10 @@ function checkShotOffPlate(page, metadata, visualBible) {
  * @param {Object} [opts]
  * @param {boolean} [opts.textZoneRules] run the text-zone checks (R1 + R4).
  *   Pass runtime.textZoneRulesActive(inputData) — see that helper.
+ * @param {Object} opts.castIndex the story's cast index, `buildCastIndex({characters}, visualBible)`, built once by the caller. Required.
  */
 function checkScenes(pages, castNames = [], visualBible = null, opts = {}) {
+  requireCastIndex(opts && opts.castIndex, 'checkScenes');
   const all = [];
   for (const page of (pages || [])) {
     try {
@@ -1596,7 +1610,7 @@ function checkScenes(pages, castNames = [], visualBible = null, opts = {}) {
 //     widening to visual-bible secondaries: across every story then held on
 //     staging the type fired on 6 pages, and all 6 were one false positive —
 //     the bible's "Kapitänin Rossa" against a characters[] entry "Rossa",
-//     compared as strings. With isSameFigureName the corpus is 0. The type
+//     compared as strings. With a name matcher the corpus was 0. The type
 //     stays SENT: the false positives are gone, and the true shape it was
 //     built for (a described figure genuinely absent from characters[]) is
 //     covered by tests/manual/sceneCastConsistency.test.js.

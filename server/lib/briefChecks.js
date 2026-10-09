@@ -136,7 +136,8 @@ function briefCastNames(inputData, visualBible) {
  * after list, so the three can never count different things.
  *
  * @param {Array<{pageNumber:number, brief:string}>} expansions
- * @param {{inputData:Object, clothingRequirements:Object|null, visualBible:Object|null, briefBeats:Array}} ctx
+ * @param {{inputData:Object, clothingRequirements:Object|null, visualBible:Object|null, briefBeats:Array, castIndex:Object}} ctx
+ *   `castIndex` is the story's cast index (`buildCastIndex({characters}, visualBible)`), built once by runBriefChecks.
  */
 function collectBriefFindings(expansions, ctx) {
   const {
@@ -154,7 +155,7 @@ function collectBriefFindings(expansions, ctx) {
     expansions.map(x => ({ pageNumber: x.pageNumber, brief: x.brief, planLine: beatOf(x.pageNumber).planLine || '', placeDecided: !!(beatOf(x.pageNumber).jevFixed && beatOf(x.pageNumber).jevFixed.location && beatOf(x.pageNumber).jevFixed.coverPlace) })),
     briefCastNames(ctx.inputData, ctx.visualBible),
     ctx.visualBible,
-    { textZoneRules: textZoneRulesActive(ctx.inputData) },
+    { textZoneRules: textZoneRulesActive(ctx.inputData), castIndex: ctx.castIndex },
   );
   for (const f of briefRes.findings) {
     if (!f || !REVIEWABLE.has(f.type) || f.pageNumber === 0) continue;
@@ -190,7 +191,7 @@ function collectBriefFindings(expansions, ctx) {
       ...checkEmotionEnum(page, full),
       ...checkFooting(page, full, ctx.visualBible),
       ...checkCreatureRows(page, full, ctx.visualBible),
-      ...checkCastNotInPlan(page, full, commissioned),
+      ...checkCastNotInPlan(page, full, commissioned, ctx.castIndex),
       ...checkRequiredTextUndeclared(page, full, ctx.visualBible),
       ...checkClothingIncomplete({
         pageNumber: x.pageNumber, prose: splitBrief(x.brief).prose, shot: full.shot, perCharClothing: meta.characterClothing || {},
@@ -229,9 +230,10 @@ function namesInBrief(brief, visualBible) {
  * removes a character the plan line puts in frame). A name counts only when
  * the plan line's who column names it and the brief before the rewrite had it.
  */
-function whoColumnDropped(prior, rewritten, planLine, visualBible, commissionedNames = []) {
+function whoColumnDropped(prior, rewritten, planLine, visualBible, commissionedNames = [], castIndex = null) {
+  if (!castIndex) throw new Error('whoColumnDropped: castIndex is required (castResolver.buildCastIndex)');
   const { planSegments, namesIn } = require('./planCounters');
-  const { isSameFigureName } = require('./sceneMetadata');
+  const { sameEntity } = require('./castResolver');
   const who = planSegments(String(planLine || '').replace(/^\s*PLAN:\s*/i, ''))[1] || '';
   if (!who) return [];
   const figures = [];
@@ -242,7 +244,7 @@ function whoColumnDropped(prior, rewritten, planLine, visualBible, commissionedN
   const inWho = namesIn(who, [...commissionedNames, ...figures]);
   const before = namesInBrief(prior, visualBible);
   const after = namesInBrief(rewritten, visualBible);
-  const has = (list, n) => list.some(x => isSameFigureName(x, n));
+  const has = (list, n) => list.some(x => sameEntity(x, n, castIndex));
   return inWho.filter(n => has(before, n) && !has(after, n));
 }
 
@@ -309,7 +311,9 @@ async function runBriefChecks({ inputData, expansions, briefBeats, visualBible, 
   const { correctFindings, partitionFindings } = require('./briefCorrection');
   const { assessSceneBrief, describeSceneBrief } = require('./iterateBriefGuard');
   const { pinBrief } = require('./jevDecisions');
-  const ctx = { inputData, clothingRequirements, visualBible, briefBeats };
+  // The story's cast index, built once: every name comparison in the checks goes through it.
+  const castIndex = require('./castResolver').buildCastIndex({ characters: inputData.characters || [] }, visualBible);
+  const ctx = { inputData, clothingRequirements, visualBible, briefBeats, castIndex };
   const beatOf = n => (briefBeats || []).find(b => b && Number(b.pageNumber) === Number(n)) || {};
   const commissioned = (inputData.characters || []).map(c => c && c.name).filter(Boolean);
   const briefsIn = expansions.map(x => ({ pageNumber: x.pageNumber, brief: x.brief }));
@@ -420,7 +424,7 @@ async function runBriefChecks({ inputData, expansions, briefBeats, visualBible, 
       let accepted = verdict.accepted;
       let reason = verdict.reason;
       if (accepted) {
-        const dropped = whoColumnDropped(prior, candidate, beatOf(n).planLine, visualBible, commissioned);
+        const dropped = whoColumnDropped(prior, candidate, beatOf(n).planLine, visualBible, commissioned, castIndex);
         if (dropped.length) {
           accepted = false;
           reason = `refused: the rewrite drops ${dropped.join(', ')}, whom the plan line puts in frame`;

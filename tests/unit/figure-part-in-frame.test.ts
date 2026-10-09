@@ -19,6 +19,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { createRequire } from 'node:module';
+import { checkPage, checkPlanCastCited } from '../helpers/cast-index';
 const nodeRequire = createRequire(import.meta.url);
 
 const PB = nodeRequire('../../server/lib/promptBuilders.js');
@@ -37,7 +38,7 @@ const brief = (objects: string[], characters: string[] = ['Ada', 'Ben']) =>
     shot: 'wide', objects,
   })}`;
 const check = (planLine: string, objects: string[], characters?: string[]) =>
-  SBC.checkPlanCastCited({ pageNumber: 11, planLine }, extractSceneMetadata(brief(objects, characters)), vb);
+  checkPlanCastCited({ pageNumber: 11, planLine }, extractSceneMetadata(brief(objects, characters)), vb);
 
 describe('one sentence: a figure shown in part is in the picture', () => {
   it('reaches the planner field contract and the reader cast rule', () => {
@@ -70,12 +71,12 @@ describe('checkPlanCastCited', () => {
   });
 
   it('a cover page is checkCoverCast\'s, not this', () => {
-    expect(SBC.checkPlanCastCited({ pageNumber: -1, planLine: 'wide — Ada, Mira — x — y' },
+    expect(checkPlanCastCited({ pageNumber: -1, planLine: 'wide — Ada, Mira — x — y' },
       extractSceneMetadata(brief(['LOC001'])), vb)).toEqual([]);
   });
 
   it('runs inside checkPage, is sent to the scene review, and a rewrite that introduces it is caught', () => {
-    const types = SBC.checkPage({ pageNumber: 11, brief: brief(['LOC004.3']), planLine: 'wide — Ada, Ben, Mira — x — y' },
+    const types = checkPage({ pageNumber: 11, brief: brief(['LOC004.3']), planLine: 'wide — Ada, Ben, Mira — x — y' },
       ['Ada', 'Ben'], vb).map((x: any) => x.type);
     expect(types).toContain('plan_cast_uncited');
     expect(SBC.REVIEWABLE.has('plan_cast_uncited')).toBe(true);
