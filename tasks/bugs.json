@@ -4126,7 +4126,7 @@
       "source": "Owner iPhone; stored cells measured whole, WebKit render of the real cell cropped.",
       "status": "fixed",
       "fixedAt": "2026-10-09",
-      "fixedIn": "9d478a016",
+      "fixedIn": "8fa02ff1d",
       "fix": "image fills frame; nextAvatarSource; dedupe; tests/e2e/trial-waiting-slide-frame.spec.ts"
     }
   ]
