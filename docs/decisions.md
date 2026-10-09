@@ -67814,3 +67814,11 @@ Touched files: server/lib/vbIdGuard.js, server/lib/promptBuilders.js, server/lib
 **Revisit if:** a CRITICAL gaze finding fires on a correct picture, or the witness changes.
 **Replaces:** the "always MAJOR" severity of the 2026-09-21/22 gaze decisions (the detector itself stays).
 **Touched files:** server/lib/gazeCheck.js, server/lib/evalPipeline.js, server/lib/compositeCastBuilder.js, tests/unit/gaze-severity.test.ts, tests/unit/gaze-check.test.ts, scripts/analysis/gaze-severity-{replay,labelled}.js (commit 46b917887).
+
+## 2026-10-09 — Trial Setting line: the place's description, not its name
+
+**Context:** three staging trial pages carried a painted caption that exactly matched the place name in the image prompt's "Setting:" line: job_1791531511694_j945yhw9a p6 ("Rohan / Rüebli / Kirche Rohrdorf"), job_1791496201302_6vgktllu5 p2 ("Fislisbach (Stadt)"), job_1791551303368_hle970nmc p2 ("Kirche Rohrdorf"). Measured: trials 3 of 48 viewed pages (6%), every trial prompt leads the Setting line with the place name; full stories have no Setting line and painted a place name on 0 of 200 inventoried pages.
+**Decision:** `sceneMetadata.buildTextFromJson` writes the Setting line as the description; the location name stays only when there is no description. A broader change (name-free location refs everywhere, a prose name mask, a name-free landmark fidelity block, an Art Director rule; commit b1f92c088) was reverted: full stories show no need for it and it could weaken famous-landmark rendering.
+**Rationale:** the landmark photo identifies which place; the name carries no visual information and is lettered onto the page. Owner rule: no change without proof, so only the measured path changes.
+**Revisit if:** a full story paints a place name, or trials still paint place names after this change.
+**Touched files:** server/lib/sceneMetadata.js, tests/unit/trial-review-fixes-2026-10-09.test.ts.

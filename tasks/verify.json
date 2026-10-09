@@ -9088,6 +9088,24 @@
         "result": "NOT COVERED",
         "note": "full-story: trial run"
       }
+    },
+    {
+      "id": "no-place-name-in-image-prompt-2026-10-09",
+      "title": "Trial Setting line carries the description, not the place name",
+      "commits": [
+        "3cbe966e9"
+      ],
+      "addedAt": "2026-10-09",
+      "status": "pending",
+      "evidence": [],
+      "claim": "A trial page prompt Setting line is the place description, never its name (the name stays only without a description), and trial pages no longer show a painted caption equal to the place name.",
+      "runShape": [
+        "trial"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Stored trial page prompts carry no Setting: <place name>. lead; all page images show no painted caption equal to a place name; landmark photos still attached on landmark pages. Baseline 3 captions in 48 viewed trial pages."
+      }
     }
   ],
   "runs": [
