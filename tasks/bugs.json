@@ -4048,6 +4048,16 @@
       "fixedAt": "2026-10-09",
       "fixedIn": "31988b472",
       "fix": "storyJobPipeline.runTrialEarlyStyling: a failed or timed-out prepare-title wait is logged and the costumed sheet is styled in the job. Test: tests/unit/trial-five-trials-fixes-2026-10-09.test.ts."
+    },
+    {
+      "id": "child-character-drawn-with-photo-beard",
+      "title": "A declared child whose photo shows a bearded adult was drawn with a beard: the analyzer wrote the beard into free-text physical.other and every page prompt stated it under DISTINCTIVE FEATURES",
+      "reportedAt": "2026-10-09",
+      "source": "Staging trial job_1791497394846_v01s6ndpn (2026-10-08): Mia, age 6, male, physical.other = \"short gray beard and mustache\"; Grok drew a bearded six-year-old on pages 1, 4, 5, 6. Reproduced over the stored character row with the real buildImagePrompt.",
+      "status": "fixed",
+      "fixedAt": "2026-10-09",
+      "fixedIn": "ad43d1ee2",
+      "fix": "prompts/character-analysis.txt gets a facialHair field (and keeps facial hair out of distinctive markings); trialAge.applyTrialPhotoTraits stamps it; promptBuilders.facialHairForAge (FACIAL_HAIR_MIN_AGE 13) gates every facial-hair reader for a declared child. Test: tests/unit/facial-hair-declared-child-2026-10-09.test.ts. The one stored legacy row (staging Mia) keeps its beard text in other until re-analysed."
     }
   ]
 }
