@@ -63,6 +63,8 @@ const strings: Record<string, {
   changeCity: string;
   cityNotFound: string;
   chooseCity: string;
+  locationUnknown: string;
+  skipLocation: string;
   createStory: string;
   regenerate: string;
   back: string;
@@ -84,6 +86,8 @@ const strings: Record<string, {
     changeCity: 'Change city',
     cityNotFound: 'City not found. Please check the spelling.',
     chooseCity: 'Several places share that name — which one?',
+    locationUnknown: "We could not detect your town. Where do you live? The first idea will play there.",
+    skipLocation: "Continue without a town",
     createStory: 'Create My Story',
     regenerate: 'Generate New Ideas',
     back: 'Back',
@@ -105,6 +109,8 @@ const strings: Record<string, {
     changeCity: 'Ort ändern',
     cityNotFound: 'Ort nicht gefunden. Bitte Schreibweise prüfen.',
     chooseCity: 'Mehrere Orte heissen so — welcher ist es?',
+    locationUnknown: "Wir konnten deinen Ort nicht erkennen. Wo wohnst du? Die erste Idee spielt dort.",
+    skipLocation: "Ohne Ort weitermachen",
     createStory: 'Meine Geschichte erstellen',
     regenerate: 'Neue Ideen erstellen',
     back: 'Zurück',
@@ -126,6 +132,8 @@ const strings: Record<string, {
     changeCity: 'Modifier la ville',
     cityNotFound: "Ville introuvable. Vérifie l'orthographe.",
     chooseCity: 'Plusieurs lieux portent ce nom — lequel ?',
+    locationUnknown: "Nous n'avons pas pu détecter votre ville. Où habitez-vous ? La première idée s'y déroulera.",
+    skipLocation: "Continuer sans ville",
     createStory: 'Créer mon histoire',
     regenerate: 'Générer de nouvelles idées',
     back: 'Retour',
@@ -147,6 +155,8 @@ const strings: Record<string, {
     changeCity: 'Cambia città',
     cityNotFound: 'Città non trovata. Controlla come è scritta.',
     chooseCity: 'Più località hanno questo nome — quale?',
+    locationUnknown: "Non siamo riusciti a rilevare la tua città. Dove vivi? La prima idea si svolgerà lì.",
+    skipLocation: "Continua senza città",
     createStory: 'Crea la mia storia',
     regenerate: 'Genera nuove idee',
     back: 'Indietro',
@@ -191,6 +201,16 @@ export default function TrialIdeasStep({
 
   // Determine if we already have final ideas (from previous generation)
   const hasFinalIdeas = generatedIdeas.length === 2 && generatedIdeas[0].title && generatedIdeas[1].title;
+
+  // The trial's town comes from IP geolocation, which can come back empty (VPN,
+  // carrier or relay address). An empty answer used to produce a placeless first
+  // idea with a bare "Deine Stadt" label and no hint. Now the step waits for the
+  // lookup, and when it found no town it asks for one; the visitor can also
+  // choose to go on without. null or undefined means still looking up.
+  const [skipLocation, setSkipLocation] = useState(false);
+  const locationPending = !!onLocationChange && userLocation == null;
+  const locationUnknown = !!onLocationChange && userLocation != null && !userLocation.city && !skipLocation && !hasFinalIdeas;
+  const mayGenerate = !locationPending && !locationUnknown;
 
   // ─── Generate ideas via SSE stream ─────────────────────────────────────────
 
@@ -348,17 +368,16 @@ export default function TrialIdeasStep({
     }
   }, [streamingIdeas, onIdeasGenerated]);
 
-  // Auto-generate on mount (only if we don't have ideas already)
+  // Auto-generate once the town is settled (found, entered, or skipped) and only
+  // if we don't have ideas already
   useEffect(() => {
-    if (!hasFinalIdeas && !hasGenerated && !isGenerating) {
+    if (mayGenerate && !hasFinalIdeas && !hasGenerated && !isGenerating) {
       generateIdeas();
     }
-
-    return () => {
-      abortControllerRef.current?.abort();
-    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [mayGenerate]);
+
+  useEffect(() => () => { abortControllerRef.current?.abort(); }, []);
 
   // Fire prepare-title in background on mount (parallel with idea generation)
   const titlePageStartedRef = useRef(false);
@@ -421,7 +440,9 @@ export default function TrialIdeasStep({
   const regenAfterCityRef = useRef(false);
   const startCityEdit = () => { setCityDraft(userLocation?.city || ''); setCityState('idle'); setCityMatches([]); setEditingCity(true); };
   const applyCity = (m: CityMatch) => {
-    regenAfterCityRef.current = true;
+    // Before the first ideas exist the auto-generate effect starts them (the town
+    // just ended its wait); only a visitor who already has ideas gets a regen.
+    regenAfterCityRef.current = hasGenerated || !!hasFinalIdeas || isGenerating;
     onLocationChange!({ city: m.city, region: m.region ?? null, country: m.country ?? null, latitude: m.lat ?? null, longitude: m.lon ?? null });
     setCityMatches([]);
     setEditingCity(false);
@@ -475,7 +496,7 @@ export default function TrialIdeasStep({
       {onLocationChange && (
         <div className="flex flex-wrap items-center justify-center gap-2 mb-6 text-sm">
           <MapPin size={14} className="text-sky-600" />
-          {editingCity ? (
+          {(editingCity || locationUnknown) ? (
             <>
               <input
                 type="text"
@@ -489,10 +510,21 @@ export default function TrialIdeasStep({
                 className="p-1.5 rounded-md text-indigo-500 hover:bg-indigo-50 hover:text-indigo-600 transition-colors border border-indigo-200">
                 {cityState === 'checking' ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
               </button>
-              <button type="button" onClick={() => setEditingCity(false)}
-                className="p-1.5 rounded-md text-red-500 hover:bg-red-50 hover:text-red-600 transition-colors border border-red-200">
-                <X size={14} />
-              </button>
+              {!locationUnknown && (
+                <button type="button" onClick={() => setEditingCity(false)}
+                  className="p-1.5 rounded-md text-red-500 hover:bg-red-50 hover:text-red-600 transition-colors border border-red-200">
+                  <X size={14} />
+                </button>
+              )}
+              {locationUnknown && (
+                <>
+                  <span className="basis-full text-center text-xs text-amber-700">{t.locationUnknown}</span>
+                  <button type="button" onClick={() => setSkipLocation(true)}
+                    className="basis-full text-center text-xs text-gray-500 underline">
+                    {t.skipLocation}
+                  </button>
+                </>
+              )}
               {cityState === 'fail' && <span className="basis-full text-center text-xs text-red-600">{t.cityNotFound}</span>}
               {cityMatches.length > 1 && (
                 <div className="basis-full flex flex-col items-center gap-1 mt-1">
@@ -538,7 +570,7 @@ export default function TrialIdeasStep({
       )}
 
       {/* Loading indicator (before any text arrives) */}
-      {isGenerating && !displayIdeas[0].text && !displayIdeas[1].text && !error && (
+      {(isGenerating || locationPending) && !displayIdeas[0].text && !displayIdeas[1].text && !error && (
         <div className="flex flex-col items-center justify-center py-16 gap-4">
           <Loader2 className="w-10 h-10 text-indigo-500 animate-spin" />
           <p className="text-indigo-500 font-medium">{t.generating}</p>
