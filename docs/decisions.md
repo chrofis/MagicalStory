@@ -67830,3 +67830,11 @@ Touched files: server/lib/vbIdGuard.js, server/lib/promptBuilders.js, server/lib
 **Rationale:** a single judge-noise instance is below the evidence bar for a prompt change or a code guard overriding the judge (CLAUDE.md eval-logic rule). Pick-best kept the correct cover.
 **Revisit if:** a second and third occurrence appear; then the options are a structural guard (drop a rendered_text whose quoted string is a declared string) or a D-23 prompt change, with owner sign-off.
 **Touched files:** none.
+
+## 2026-10-09 — A late costume prewarm no longer costs a trial its front cover
+
+**Context:** staging trial job_1791554548909_kl0phznw2 (build 574f7b34) shipped without a front cover ("frontCover: costumed sheet missing for Emma"). The job waits at most 60 s (TRIAL_TITLE_AVATARS_WAIT_MS) for the in-flight prepare-title; this one finished about 78 s after job start (today's prewarms took 66-91 s). On the timeout `runTrialEarlyStyling` skipped the costumed sheet entirely. Pages recover in the final coverage pass; the trial front cover renders once, before that pass, and failed by the COSTUME OR FAIL rule. 1 of 28 staging trials in 30 days.
+**Decision:** a failed or timed-out prepare-title wait is logged and the job styles the costumed sheet itself; seeding from prepare-title remains the shortcut when it is in time. The 60 s cap and the COSTUME OR FAIL rule are unchanged.
+**Rationale:** the costumed sheet is required for the cover either way; generating it in the job yields the same kind of sheet (not a degraded substitute) and costs one style transfer only on the slow path.
+**Revisit if:** prewarms routinely exceed 60 s (then raise the cap or start prepare-title earlier).
+**Touched files:** storyJobPipeline.js (runTrialEarlyStyling), tests/unit/trial-five-trials-fixes-2026-10-09.test.ts; tasks/bugs.json trial-front-cover-missing-after-late-prewarm.
