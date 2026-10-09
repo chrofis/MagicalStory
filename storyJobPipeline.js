@@ -176,7 +176,16 @@ function runTrialEarlyStyling({ requirements, titleAvatarsReady, awaitTitle, job
   const run = async (label, reqs, before) => {
     if (reqs.length === 0) return;
     try {
-      if (before) await before();
+      // A late or failed prepare-title must not leave the costumed sheet
+      // unstyled: the pages recover in the coverage pass, but the trial front
+      // cover renders once, before it, and shipped without a cover
+      // (staging job_1791554548909_kl0phznw2: prepare-title 78 s after job
+      // start, 60 s wait). Style it here instead; seeding is only a shortcut.
+      if (before) {
+        try { await before(); } catch (waitError) {
+          log.error(`❌ [TRIAL] Early ${label} avatar wait failed: ${waitError.message} — styling it in the job`);
+        }
+      }
       await style(reqs);
     } catch (error) {
       log.error(`❌ [TRIAL] Early ${label} avatar styling failed: ${error.message}`);

@@ -57,15 +57,17 @@ describe('1. early avatar styling runs the standard sheet at once', () => {
     expect(order.slice(1).sort()).toEqual(['style:1', 'style:1']);
   });
 
-  it('a failed prepare-title wait is logged and does not stop the standard sheet', async () => {
+  it('a failed prepare-title wait is logged, and both sheets are still styled (the cover needs the costumed one)', async () => {
     const err = vi.spyOn(pipelineLog, 'error').mockImplementation(() => {});
     const style = vi.fn(async () => {});
     await pipeline.runTrialEarlyStyling({
       requirements: reqs, titleAvatarsReady: Promise.resolve(), awaitTitle: async () => { throw new Error('timeout'); },
       jobStartAvatars: null, seed: () => {}, style,
     });
-    expect(style).toHaveBeenCalledTimes(1);
-    expect(err.mock.calls.some(c => /costumed avatar styling failed: timeout/.test(String(c[0])))).toBe(true);
+    // staging job_1791554548909_kl0phznw2: the costumed half gave up on a wait timeout and the front cover shipped missing
+    expect(style).toHaveBeenCalledTimes(2);
+    expect(style.mock.calls.map((c: any) => c[0][0].clothingCategory).sort()).toEqual(['costumed:pirate', 'standard']);
+    expect(err.mock.calls.some(c => /costumed avatar wait failed: timeout/.test(String(c[0])))).toBe(true);
   });
 });
 
