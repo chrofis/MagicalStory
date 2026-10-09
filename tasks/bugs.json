@@ -4108,6 +4108,26 @@
       "fixedAt": "2026-10-09",
       "fixedIn": "84a0a76d7",
       "fix": "pin only when not in the grid; typed flag needsSecondCharacter; tests/unit/trial-topic-grid-second-character.test.ts"
+    },
+    {
+      "id": "trial-viewer-white-page",
+      "title": "Trial: white page when the title page arrives (react-pageflip child swap -> WebKit NotFoundError, React unmounts)",
+      "reportedAt": "2026-10-09",
+      "source": "Owner iPhone, twice; reproduced on iPhone WebKit with the real job-status sequence.",
+      "status": "fixed",
+      "fixedAt": "2026-10-09",
+      "fixedIn": "9d478a016",
+      "fix": "TrialBook remounts BookViewer on a structural change; RenderErrorBoundary; tests/e2e/trial-viewer-no-white-page.spec.ts"
+    },
+    {
+      "id": "trial-slides-cut-and-repeat",
+      "title": "Trial waiting screen: full-body slides cropped at head and feet on iPhone; the front avatar repeats at the start",
+      "reportedAt": "2026-10-09",
+      "source": "Owner iPhone; stored cells measured whole, WebKit render of the real cell cropped.",
+      "status": "fixed",
+      "fixedAt": "2026-10-09",
+      "fixedIn": "9d478a016",
+      "fix": "image fills frame; nextAvatarSource; dedupe; tests/e2e/trial-waiting-slide-frame.spec.ts"
     }
   ]
 }

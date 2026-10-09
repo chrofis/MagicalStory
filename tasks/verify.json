@@ -9608,6 +9608,22 @@
         "result": "HUMAN",
         "note": "human check | LOOK: Owner reads the two ideas on the next iPhone trial. Needs the trial.js one-line wiring (judgeIdeaCard) first; log shows 'failed its own check (incoherent-...)' on a rerun."
       }
+    },
+    {
+      "id": "trial-viewer-slides-2026-10-09",
+      "title": "Trial page: no white page when the title arrives; slides whole and not repeating; drawn body row kept across an age band",
+      "commits": [],
+      "addedAt": "2026-10-09",
+      "status": "pending",
+      "evidence": [],
+      "claim": "On the next iPhone trial: (1) the book appears when the title page arrives, no white page, no refresh needed; (2) the waiting-screen avatars show every picture once before any repeats, the front figure is not shown 3 times at the start; (3) full-body avatars show head to feet with margin; (4) a declared age in another band than the photo estimate logs 'the drawn body row is kept' and no 'draws its own body row' warning.",
+      "runShape": [
+        "trial"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Owner watches the waiting screen on iPhone through to the title page. Log: '[TRIAL AVATARS] photo estimate ... age band DIFFERENT, the drawn body row is kept' and no 'the sheet draws its own body row' unless the gender was changed."
+      }
     }
   ],
   "runs": [
