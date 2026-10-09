@@ -24,7 +24,7 @@ import {
 const popular = getLifeChallengesByGroup('popular');
 const trialPool = trialLifeChallengeIds
   .map(tid => lifeChallenges.find(c => c.id === tid)!)
-  .filter(Boolean);
+  .filter(c => !!c && !c.needsSecondCharacter); // the trial has one character: sibling topics are never offered (owner 2026-10-09)
 const id = (list: { id: string }[]) => list.map(c => c.id);
 const width = (tid: string) => {
   const w = lifeChallenges.find(c => c.id === tid)!.suitableAges;
@@ -300,7 +300,8 @@ describe('trial topic list — SEO deep links (/try?category=…&topic=…)', ()
   it('does not duplicate a deep-linked topic that is already in window', () => {
     const list = id(getTrialLifeChallenges(4, 'first-kindergarten'));
     expect(list.filter(x => x === 'first-kindergarten')).toHaveLength(1);
-    expect(list[0]).toBe('first-kindergarten');
+    // Already in the grid: it keeps its place (pinning it first moved the tile on every selection, owner 2026-10-09).
+    expect(list).toEqual(id(getTrialLifeChallenges(4)));
   });
 
   it('ignores an unknown topic id rather than rendering a hole', () => {

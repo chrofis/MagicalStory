@@ -1,3 +1,4 @@
+import type { SeasonWindow } from '../constants/seasons';
 import type { Character, RelationshipMap, RelationshipTextMap, LocalizedString, VisualBible } from './character';
 
 // UI Language - matches LocalizedString keys (used for UI translations)
@@ -23,6 +24,8 @@ export interface StoryType {
   name: LocalizedString;
   emoji: string;
   group?: AdventureThemeGroupId;
+  /** Seasonal topics only: the dates around which a picker OFFERS it (constants/seasons.ts). Absent = always offered. */
+  season?: SeasonWindow;
 }
 
 export interface AdventureThemeGroup {
@@ -139,6 +142,8 @@ export interface LifeChallenge {
    * different thing.
    */
   suitableAges?: [number, number];
+  /** The topic is about another family member (a sibling, a parent, a grandparent): not offered where the cast is one child (the trial). */
+  needsSecondCharacter?: boolean;
   /**
    * How LIVE this topic is for a family right now, in either direction, 1-5.
    * High means the parent is either currently struggling with it (the

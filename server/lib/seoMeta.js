@@ -57,6 +57,7 @@ const THEMES = {
     doctor: { en: 'Helpful Doctor', de: 'Hilfreicher Arzt', fr: 'Docteur Serviable', it: 'Dottore Premuroso' },
     police: { en: 'Police Officer', de: 'Polizist', fr: 'Policier', it: 'Poliziotto' },
     detective: { en: 'Detective Mystery', de: 'Detektiv-Geheimnis', fr: 'Mystère détective', it: 'Mistero da Detective' },
+    samichlaus: { en: 'St. Nicholas Day Story', de: 'Samichlaus-Geschichte', fr: 'Histoire de la Saint-Nicolas', it: 'Storia di San Nicolao' },
     christmas: { en: 'Christmas Story', de: 'Weihnachts-Geschichte', fr: 'Histoire de Noël', it: 'Storia di Natale' },
     newyear: { en: 'New Year Story', de: 'Neujahrs-Geschichte', fr: 'Histoire du nouvel an', it: "Storia di Capodanno" },
     easter: { en: 'Easter Story', de: 'Oster-Geschichte', fr: 'Histoire de Pâques', it: 'Storia di Pasqua' },

@@ -99,7 +99,7 @@ function getCategoryConfig(category: CategorySlug): CategoryConfig | null {
           .filter(g => g.id !== 'popular' && g.id !== 'custom')
           .map(g => ({ id: g.id, name: g.name })),
         getThemesByGroup: (groupId: string) =>
-          getStoryTypesByGroup(groupId as AdventureThemeGroupId).filter(t => t.id !== 'custom'),
+          getStoryTypesByGroup(groupId as AdventureThemeGroupId, null).filter(t => t.id !== 'custom'),
         totalCount: storyTypes.filter(t => t.id !== 'custom').length,
       };
     case 'life-challenges':

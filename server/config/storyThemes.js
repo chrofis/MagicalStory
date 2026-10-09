@@ -67,6 +67,7 @@ const THEME_PLAY = {
 
   // Occasions — a day the story sits ON, not a game
   christmas: ['occasion', 'Christmas'],
+  samichlaus: ['occasion', 'St. Nicholas Day (the Swiss Samichlaus on 6 December)'],
   newyear: ['occasion', 'New Year'],
   easter: ['occasion', 'Easter'],
   halloween: ['occasion', 'Halloween'],

@@ -106,7 +106,7 @@ describe('Italian copy uses tu', () => {
 
   it('trial titles are sentence case (proper nouns excepted)', () => {
     const { TRIAL_TITLES } = require('../../server/config/trialTitles.js');
-    const KEEP = new Set(['Roma', 'Olimpo', 'Sempach', 'Solferino', 'Alpi', 'Parigi', 'Grecia', 'Halloween', 'Natale', 'Pasqua', 'Capodanno', 'West', 'Selvaggio']);
+    const KEEP = new Set(['Roma', 'Olimpo', 'Sempach', 'Solferino', 'Alpi', 'Parigi', 'Grecia', 'Halloween', 'Natale', 'Pasqua', 'Capodanno', 'West', 'Selvaggio', 'San', 'Nicolao']);
     const titles: string[] = [];
     const walk = (v: any) => {
       if (!v || typeof v !== 'object') return;

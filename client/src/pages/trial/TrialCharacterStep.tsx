@@ -675,6 +675,27 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, on
 
   // ─── Photo upload ────────────────────────────────────────────────────────────
 
+  /**
+   * The analysis request. A cold face pick runs ~16 s (background-removal model load) and on a phone connection that long-held
+   * request can be dropped between the phone and the server although the server answers 200 (owner iPhone, 2026-10-09: pick #1
+   * 16.4 s failed on the phone, the same pick 2.1 s later worked). A NETWORK-level failure (fetch rejects) is retried once: the
+   * analyzer is warm by then, so the retry takes seconds. An HTTP answer, error or not, is never retried.
+   * docs/decisions.md 2026-10-09 "photo analysis network retry".
+   */
+  const postAnalyzePhoto = async (body: unknown): Promise<Response> => {
+    const send = () => fetch(`${import.meta.env.VITE_API_URL || ''}/api/trial/analyze-photo`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    try {
+      return await send();
+    } catch (err) {
+      console.warn('[TRIAL] analyze-photo network failure, retrying once:', err);
+      return await send();
+    }
+  };
+
   /** Resolves true when the photo yielded what the step needs, false when an error is showing. */
   const analyzePhoto = useCallback(async (base64: string, selectedFaceId?: string, cachedFaces?: any): Promise<boolean> => {
     setIsAnalyzing(true);
@@ -688,12 +709,7 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, on
         body.cachedFaces = cachedFaces;
       }
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/trial/analyze-photo`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-
+      const response = await postAnalyzePhoto(body);
       const result = await response.json();
 
       if (!response.ok) {

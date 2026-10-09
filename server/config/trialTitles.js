@@ -456,6 +456,22 @@ const TRIAL_TITLES = {
         it: "La grande caccia alle uova di Pasqua"
       }
     },
+    samichlaus: {
+      male: {
+        en: "The Night of the Samichlaus",
+        de: "Die Nacht des Samichlaus",
+        gsw: "Die Nacht vom Samichlaus",
+        fr: "La nuit de la Saint-Nicolas",
+        it: "La notte di San Nicolao"
+      },
+      female: {
+        en: "The Night of the Samichlaus",
+        de: "Die Nacht des Samichlaus",
+        gsw: "Die Nacht vom Samichlaus",
+        fr: "La nuit de la Saint-Nicolas",
+        it: "La notte di San Nicolao"
+      }
+    },
     halloween: {
       male: {
         en: "The Spooky Halloween Night",

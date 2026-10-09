@@ -1,4 +1,5 @@
 import topicAgeWindows from '../../../shared/topic-age-windows.json';
+import { SEASON_WINDOWS, isInSeason } from './seasons';
 import type { StoryType, StoryCategory, LifeChallenge, EducationalTopic, LifeChallengeGroup, EducationalGroup, AdventureThemeGroup, AdventureThemeGroupId, HistoricalEvent, HistoricalEventGroup } from '@/types/story';
 
 // =============================================================================
@@ -78,10 +79,10 @@ export const storyCategories: StoryCategory[] = [
 // =============================================================================
 
 // Popular adventure theme IDs (shown in expanded "Popular" section).
-// Easter removed after the 2026 holiday (no point promoting it until March 2027);
-// mothers-day and fathers-day featured for the May/June window.
+// The six seasonal topics are listed here and gated by date in getStoryTypesByGroup (constants/seasons.ts): shown only around
+// their occasion.
 export const popularAdventureThemeIds = [
-  'pirate', 'knight', 'cowboy', 'ninja', 'wizard', 'dragon', 'superhero', 'detective', 'mothers-day', 'fathers-day', 'unicorn', 'mermaid', 'roman'
+  'pirate', 'knight', 'cowboy', 'ninja', 'wizard', 'dragon', 'superhero', 'detective', 'halloween', 'samichlaus', 'christmas', 'newyear', 'easter', 'mothers-day', 'fathers-day', 'unicorn', 'mermaid', 'roman'
 ];
 
 export const adventureThemeGroups: AdventureThemeGroup[] = [
@@ -130,12 +131,13 @@ export const storyTypes: StoryType[] = [
   { id: 'detective', name: { en: 'Detective Mystery', de: 'Detektiv-Geheimnis', fr: 'Mystère détective', it: 'Mistero del Detective' }, emoji: '🔍', group: 'professions' },
 
   // Seasonal (christmas, new year, easter, halloween, mother's day, father's day)
-  { id: 'christmas', name: { en: 'Christmas Story', de: 'Weihnachts-Geschichte', fr: 'Histoire de Noël', it: 'Storia di Natale' }, emoji: '🎄', group: 'seasonal' },
-  { id: 'newyear', name: { en: 'New Year Story', de: 'Neujahrs-Geschichte', fr: 'Histoire du nouvel an', it: 'Storia di Capodanno' }, emoji: '🎆', group: 'seasonal' },
-  { id: 'easter', name: { en: 'Easter Story', de: 'Oster-Geschichte', fr: 'Histoire de Pâques', it: 'Storia di Pasqua' }, emoji: '🐰', group: 'seasonal' },
-  { id: 'halloween', name: { en: 'Halloween Story', de: 'Halloween-Geschichte', fr: 'Histoire d\'Halloween', it: 'Storia di Halloween' }, emoji: '🎃', group: 'seasonal' },
-  { id: 'mothers-day', name: { en: 'Mother\'s Day Story', de: 'Geschichte zum Muttertag', fr: 'Histoire fête des mères', it: 'Storia per la Festa della Mamma' }, emoji: '💐', group: 'seasonal' },
-  { id: 'fathers-day', name: { en: 'Father\'s Day Story', de: 'Geschichte zum Vatertag', fr: 'Histoire fête des pères', it: 'Storia per la Festa del Papà' }, emoji: '🧢', group: 'seasonal' },
+  { id: 'christmas', name: { en: 'Christmas Story', de: 'Weihnachts-Geschichte', fr: 'Histoire de Noël', it: 'Storia di Natale' }, emoji: '🎄', group: 'seasonal', season: SEASON_WINDOWS['christmas'] },
+  { id: 'samichlaus', name: { en: 'St. Nicholas Day Story', de: 'Samichlaus-Geschichte', fr: 'Histoire de la Saint-Nicolas', it: 'Storia di San Nicolao' }, emoji: '🥕', group: 'seasonal', season: SEASON_WINDOWS['samichlaus'] },
+  { id: 'newyear', name: { en: 'New Year Story', de: 'Neujahrs-Geschichte', fr: 'Histoire du nouvel an', it: 'Storia di Capodanno' }, emoji: '🎆', group: 'seasonal', season: SEASON_WINDOWS['newyear'] },
+  { id: 'easter', name: { en: 'Easter Story', de: 'Oster-Geschichte', fr: 'Histoire de Pâques', it: 'Storia di Pasqua' }, emoji: '🐰', group: 'seasonal', season: SEASON_WINDOWS['easter'] },
+  { id: 'halloween', name: { en: 'Halloween Story', de: 'Halloween-Geschichte', fr: 'Histoire d\'Halloween', it: 'Storia di Halloween' }, emoji: '🎃', group: 'seasonal', season: SEASON_WINDOWS['halloween'] },
+  { id: 'mothers-day', name: { en: 'Mother\'s Day Story', de: 'Geschichte zum Muttertag', fr: 'Histoire fête des mères', it: 'Storia per la Festa della Mamma' }, emoji: '💐', group: 'seasonal', season: SEASON_WINDOWS['mothers-day'] },
+  { id: 'fathers-day', name: { en: 'Father\'s Day Story', de: 'Geschichte zum Vatertag', fr: 'Histoire fête des pères', it: 'Storia per la Festa del Papà' }, emoji: '🧢', group: 'seasonal', season: SEASON_WINDOWS['fathers-day'] },
 
   // Custom - user creates their own theme
   { id: 'custom', name: { en: 'Create Your Own', de: 'Eigenes Thema', fr: 'Créer le vôtre', it: 'Crea la tua storia' }, emoji: '✨', group: 'custom' },
@@ -193,7 +195,7 @@ const lifeChallengeCatalogue: Omit<LifeChallenge, 'suitableAges'>[] = [
   { id: 'first-kindergarten', name: { en: 'First Day of Kindergarten', de: 'Erster Kindergartentag', fr: 'Premier jour d\'école enfantine', it: 'Primo giorno all\'asilo' }, emoji: '🎒', ageGroup: 'preschool', liveness: 5, pole: 'both', family: 'school-start' },
   { id: 'making-friends', name: { en: 'Making Real Friends', de: 'Echte Freunde finden', fr: 'Se faire de vrais amis', it: 'Fare veri amici' }, emoji: '👫', ageGroup: 'preschool', liveness: 4, pole: 'both' },
   { id: 'being-brave', name: { en: 'Being Brave', de: 'Mutig sein', fr: 'Être courageux', it: 'Essere coraggiosi' }, emoji: '💪', ageGroup: 'preschool', liveness: 3, pole: 'milestone' },
-  { id: 'new-sibling', name: { en: 'New Baby Sibling', de: 'Neues Geschwisterchen', fr: 'Nouveau bébé dans la famille', it: 'Nuovo fratellino o sorellina' }, emoji: '👶', ageGroup: 'preschool', liveness: 4, pole: 'both' },
+  { id: 'new-sibling', name: { en: 'New Baby Sibling', de: 'Neues Geschwisterchen', fr: 'Nouveau bébé dans la famille', it: 'Nuovo fratellino o sorellina' }, emoji: '👶', ageGroup: 'preschool', liveness: 4, pole: 'both', needsSecondCharacter: true },
   { id: 'managing-emotions', name: { en: 'Managing Big Emotions', de: 'Grosse Gefühle bewältigen', fr: 'Gérer les grandes émotions', it: 'Gestire le grandi emozioni' }, emoji: '😤', ageGroup: 'preschool', liveness: 5, pole: 'friction' },
   { id: 'whining', name: { en: 'Using a Nice Voice', de: 'Nicht jammern', fr: 'Parler sans pleurnicher', it: 'Usare una voce gentile' }, emoji: '🗣️', ageGroup: 'preschool', liveness: 4, pole: 'friction' },
   { id: 'saying-sorry', name: { en: 'Saying Sorry & Meaning It', de: 'Sich aufrichtig entschuldigen', fr: 'S\'excuser sincèrement', it: 'Chiedere scusa sinceramente' }, emoji: '🙏', ageGroup: 'preschool', liveness: 3, pole: 'friction' },
@@ -209,7 +211,7 @@ const lifeChallengeCatalogue: Omit<LifeChallenge, 'suitableAges'>[] = [
   { id: 'dealing-bully', name: { en: 'Standing Up for Yourself', de: 'Für sich einstehen', fr: 'S\'affirmer face aux autres', it: 'Difendersi da soli' }, emoji: '🛡️', ageGroup: 'early-school', liveness: 4, pole: 'friction' },
   { id: 'telling-truth', name: { en: 'Telling the Truth', de: 'Die Wahrheit sagen', fr: 'Dire la vérité', it: 'Dire la verità' }, emoji: '✅', ageGroup: 'early-school', liveness: 4, pole: 'friction' },
   { id: 'trying-new-things', name: { en: 'Growing & Learning', de: 'Wachsen & Lernen', fr: 'Grandir & apprendre', it: 'Crescere e imparare' }, emoji: '🌟', ageGroup: 'early-school', liveness: 3, pole: 'milestone' },
-  { id: 'sibling-fighting', name: { en: 'Getting Along with Siblings', de: 'Geschwisterstreit', fr: 'S\'entendre avec ses frères et sœurs', it: 'Andare d\'accordo con i fratelli' }, emoji: '👧👦', ageGroup: 'early-school', liveness: 5, pole: 'friction' },
+  { id: 'sibling-fighting', name: { en: 'Getting Along with Siblings', de: 'Geschwisterstreit', fr: 'S\'entendre avec ses frères et sœurs', it: 'Andare d\'accordo con i fratelli' }, emoji: '👧👦', ageGroup: 'early-school', liveness: 5, pole: 'friction', needsSecondCharacter: true },
   { id: 'jealousy', name: { en: 'Dealing with Jealousy', de: 'Mit Eifersucht umgehen', fr: 'Gérer la jalousie', it: 'Gestire la gelosia' }, emoji: '💚', ageGroup: 'early-school', liveness: 3, pole: 'friction' },
   { id: 'not-giving-up', name: { en: 'Not Giving Up', de: 'Nicht aufgeben', fr: 'Ne pas abandonner', it: 'Non arrendersi' }, emoji: '🧗', ageGroup: 'early-school', liveness: 3, pole: 'milestone' },
   { id: 'being-left-out', name: { en: 'Being Left Out', de: 'Ausgeschlossen werden', fr: 'Être mis à l\'écart', it: 'Essere esclusi' }, emoji: '😔', ageGroup: 'early-school', liveness: 3, pole: 'friction' },
@@ -467,11 +469,13 @@ export const historicalEvents: HistoricalEvent[] = [
 // HELPER FUNCTIONS
 // =============================================================================
 
-export function getStoryTypesByGroup(groupId: AdventureThemeGroupId): StoryType[] {
-  if (groupId === 'popular') {
-    return popularAdventureThemeIds.map(id => storyTypes.find(t => t.id === id)).filter((t): t is StoryType => !!t);
-  }
-  return storyTypes.filter(t => t.group === groupId);
+export function getStoryTypesByGroup(groupId: AdventureThemeGroupId, offeredAt: Date | null = new Date()): StoryType[] {
+  const inGroup = groupId === 'popular'
+    ? popularAdventureThemeIds.map(id => storyTypes.find(t => t.id === id)).filter((t): t is StoryType => !!t)
+    : storyTypes.filter(t => t.group === groupId);
+  // THE one place a seasonal topic is gated: every picker reads its themes here. Only what is OFFERED changes; a stored
+  // hidden topic still resolves (getStoryTypeById). Landing pages pass null to list every topic.
+  return offeredAt ? inGroup.filter(t => isInSeason(t.season, offeredAt)) : inGroup;
 }
 
 /**
@@ -592,9 +596,11 @@ function composeTrialGrid(ranked: LifeChallenge[]): LifeChallenge[] {
 }
 
 export function getTrialLifeChallenges(age?: number | null, selectedTopicId?: string): LifeChallenge[] {
+  // The trial has ONE character: a topic that is about another family member (a sibling, a parent, a grandparent) is not offered
+  // (typed flag `needsSecondCharacter`, owner 2026-10-09). A deep-linked one is dropped too.
   const pool = trialLifeChallengeIds
     .map(id => lifeChallenges.find(c => c.id === id))
-    .filter((c): c is LifeChallenge => !!c);
+    .filter((c): c is LifeChallenge => !!c && !c.needsSecondCharacter);
 
   const inWindow = pool.filter(c => topicFitsAge(c, age));
   const hasAge = age !== null && age !== undefined && Number.isFinite(age);
@@ -605,7 +611,11 @@ export function getTrialLifeChallenges(age?: number | null, selectedTopicId?: st
     : inWindow;
   const composed = hasAge ? composeTrialGrid(ranked) : ranked;
 
-  const pinned = selectedTopicId ? lifeChallenges.find(c => c.id === selectedTopicId) : undefined;
+  // Pinned FIRST only when the selected topic is NOT already in the grid (a deep link from a landing page). A topic the visitor
+  // picked from the grid stays where it was: pinning it moved the tile to first place on every selection.
+  const inGrid = composed.slice(0, TRIAL_GRID_SIZE).some(c => c.id === selectedTopicId);
+  const pinnedTopic = selectedTopicId && !inGrid ? lifeChallenges.find(c => c.id === selectedTopicId) : undefined;
+  const pinned = pinnedTopic && !pinnedTopic.needsSecondCharacter ? pinnedTopic : undefined;
   const list = pinned ? [pinned, ...composed.filter(c => c.id !== pinned.id)] : composed;
   return list.slice(0, TRIAL_GRID_SIZE);
 }

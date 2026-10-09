@@ -1,5 +1,5 @@
 import type { TextareaHTMLAttributes } from 'react';
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
 import { ArrowLeft, Check, Loader2, MapPin, Pencil, RefreshCw, Sparkles, X } from 'lucide-react';
 import { storyTypes } from '@/constants/storyTypes';
 import type { CharacterData, StoryInput, GeneratedIdea } from '../TrialWizard';
@@ -20,8 +20,12 @@ function AutoGrowTextarea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
     el.style.height = 'auto';
     el.style.height = `${el.scrollHeight}px`;
   }, []);
-  useEffect(() => { fit(); }, [fit, props.value]);
+  // Layout effect: measured before the first paint, so the box is never painted one line tall (the "collapse" the owner saw
+  // when the idea was finished). Re-measured when the text changes, when the web fonts have loaded (a measure taken with the
+  // fallback font is the wrong height) and whenever the box's width changes.
+  useLayoutEffect(() => { fit(); }, [fit, props.value]);
   useEffect(() => {
+    void document.fonts?.ready.then(fit);
     const el = ref.current;
     if (!el || typeof ResizeObserver === 'undefined') return;
     let width = el.clientWidth;
@@ -610,11 +614,12 @@ export default function TrialIdeasStep({
           {displayIdeas.map((idea, index) => {
             const isSelected = selectedIdeaIndex === index;
             const hasText = !!idea.text;
-            const isEditable = idea.isFinal || hasFinalIdeas;
+            // Only a COMPLETE card is shown and editable; the previous round's finals never stand in for a card being rewritten.
+            const isEditable = idea.isFinal;
             // Sibling of WizardStep6Summary: a leading casting block ("Rollen: …")
             // is writer instruction, not back-cover text. Shown as a cast list,
             // rejoined verbatim before anything leaves the client.
-            const editText = hasFinalIdeas
+            const editText = hasFinalIdeas && !isGenerating
               ? generatedIdeas[index].title + (generatedIdeas[index].summary ? '\n' + generatedIdeas[index].summary : '')
               : idea.text;
             const { rolesBlock, cast, blurb } = splitIdeaRoles(isEditable ? editText : idea.text);
@@ -677,11 +682,10 @@ export default function TrialIdeasStep({
                       placeholder={t.idea}
                     />
                   ) : (
-                    <div className="text-sm text-gray-700 leading-relaxed whitespace-pre-line flex-1">
-                      {blurb}
-                      {idea.isStreaming && (
-                        <span className="inline-block w-1.5 h-4 bg-indigo-500 animate-pulse ml-0.5 align-text-bottom rounded-sm" />
-                      )}
+                    // The idea is still being written: the spinner stays until THIS card is complete, then the whole idea
+                    // appears at once (owner 2026-10-09: showing it as it streams made the box jump).
+                    <div className="flex items-center gap-2 py-8 justify-center flex-1">
+                      <Loader2 className="w-5 h-5 text-gray-300 animate-spin" />
                     </div>
                   )
                 ) : (

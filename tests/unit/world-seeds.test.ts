@@ -36,7 +36,7 @@ describe('parseWorldSeeds', () => {
     }
     // Marked by hand across all 32 lists (owner, 2026-09-21). Pinned so a new
     // centre bullet cannot be added without deciding what it is.
-    expect(tagged).toBe(80);
+    expect(tagged).toBe(82);
   });
 
   it('returns null when a guide carries no lists', () => {

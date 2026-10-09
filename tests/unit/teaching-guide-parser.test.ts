@@ -93,7 +93,7 @@ describe('parseTeachingGuideFile', () => {
         expect(banner, `${f} [${id}] has banner pollution`).toBeUndefined();
       }
     }
-    expect(total).toBe(206);
+    expect(total).toBe(207);
   });
 
   it('every life-challenge guide is in the band register — no advice voice left', () => {

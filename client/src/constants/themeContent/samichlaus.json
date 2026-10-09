@@ -1,0 +1,37 @@
+{
+  "description": {
+    "en": "Your child joins the St. Nicholas procession through a lantern-lit winter forest, meets the Samichlaus and his donkey, and shares what is in the sack.",
+    "de": "Dein Kind zieht mit dem Samichlaus und seinem Esel durch den Laternenwald, sagt sein Versli auf und teilt, was im Sack steckt.",
+    "fr": "Votre enfant accompagne la Saint-Nicolas et son âne à travers une forêt éclairée de lanternes et partage le contenu de la hotte.",
+    "it": "Tuo figlio accompagna San Nicolao e il suo asinello in un bosco illuminato da lanterne e condivide ciò che c'è nel sacco."
+  },
+  "longDescription": {
+    "en": "Your child walks with the Samichlaus, his donkey and a lantern-bearing procession through a quiet winter forest on the evening of 6 December. A verse has to be recited, a mandarin shared, and a small worry turns out to be nothing to fear.\n\nThe story is warm and gentle: nobody is scolded or punished, and the Schmutzli is a funny helper who carries the sack. It celebrates courage with something kind, saying a few words out loud and sharing what has been given. Perfect for children aged 3 to 8 around St. Nicholas Day.",
+    "de": "Dein Kind läuft am Abend des 6. Dezember mit dem Samichlaus, seinem Esel und einem Laternenzug durch den stillen Winterwald. Ein Versli muss aufgesagt, ein Mandarinli geteilt werden, und eine kleine Angst entpuppt sich als unbegründet.\n\nDie Geschichte ist warm und sanft: Niemand wird geschimpft oder bestraft, und der Schmutzli ist ein lustiger Helfer, der den Sack trägt. Sie feiert Mut mit etwas Freundlichem, ein paar Worte laut zu sagen und zu teilen, was man geschenkt bekommen hat. Perfekt für Kinder von 3 bis 8 Jahren rund um den Samichlaustag.",
+    "fr": "Votre enfant marche avec la Saint-Nicolas, son âne et un cortège de lanternes à travers une forêt d'hiver paisible le soir du 6 décembre. Il faut réciter un petit poème, partager une mandarine, et une petite crainte se révèle sans fondement.\n\nL'histoire est chaleureuse et douce : personne n'est grondé ni puni, et le Père Fouettard est un drôle d'assistant qui porte la hotte. Elle célèbre le courage avec quelque chose de gentil, dire quelques mots à voix haute et partager ce que l'on a reçu. Parfait pour les enfants de 3 à 8 ans autour de la Saint-Nicolas.",
+    "it": "Tuo figlio cammina con San Nicolao, il suo asinello e un corteo di lanterne in un tranquillo bosco d'inverno la sera del 6 dicembre. Bisogna recitare una poesia, condividere un mandarino, e una piccola paura si rivela infondata.\n\nLa storia è calda e dolce: nessuno viene sgridato o punito, e lo Schmutzli è un buffo aiutante che porta il sacco. Celebra il coraggio con qualcosa di gentile, dire poche parole ad alta voce e condividere ciò che si è ricevuto. Perfetta per bambini dai 3 agli 8 anni nel periodo di San Nicolao."
+  },
+  "skills": {
+    "en": "Courage, speaking up, sharing, gratitude.",
+    "de": "Mut, sich trauen zu sprechen, Teilen, Dankbarkeit.",
+    "fr": "Courage, oser parler, partage, gratitude.",
+    "it": "Coraggio, osare parlare, condivisione, gratitudine."
+  },
+  "ageRecommendation": "3-8",
+  "faq": [
+    {
+      "q": {
+        "en": "Is the Schmutzli scary?",
+        "de": "Ist der Schmutzli gruselig?",
+        "fr": "Le Père Fouettard fait-il peur ?",
+        "it": "Lo Schmutzli fa paura?"
+      },
+      "a": {
+        "en": "No. In this story the Schmutzli is a gentle, funny helper, nobody is scolded, and nothing frightening happens.",
+        "de": "Nein. In dieser Geschichte ist der Schmutzli ein sanfter, lustiger Helfer, niemand wird geschimpft, und nichts Beängstigendes passiert.",
+        "fr": "Non. Dans cette histoire, le Père Fouettard est un assistant doux et drôle, personne n'est grondé et rien d'effrayant n'arrive.",
+        "it": "No. In questa storia lo Schmutzli è un aiutante gentile e buffo, nessuno viene sgridato e non succede nulla di spaventoso."
+      }
+    }
+  ]
+}
