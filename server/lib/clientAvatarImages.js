@@ -22,6 +22,7 @@ const MAX_REMEMBERED_CELLS = 500;
 const cutCells = new Set();
 const CUT_LIST = Symbol('cutAvatarCells');
 const ATTESTED_LIST = Symbol('attestedAvatarSlides');
+const FIGURES = Symbol('cutAvatarFigures');
 
 /** Register one cell the cutters just produced (a data URI) and return it. */
 function markCutCell(dataUri) {
@@ -32,10 +33,19 @@ function markCutCell(dataUri) {
 }
 
 /** The cutters return their slide lists through this so writeCutSlides can tell them from any other array. */
-function brandCutList(cells) {
+function brandCutList(cells, figures = null) {
   const list = cells.map(markCutCell);
   Object.defineProperty(list, CUT_LIST, { value: true });
+  if (figures) {
+    if (figures.length !== cells.length) throw new Error('brandCutList: one figure label per cell');
+    Object.defineProperty(list, FIGURES, { value: [...figures] });
+  }
   return list;
+}
+
+/** The figure label of each cell of a cut list (e.g. `standard-front-body`), or null when the cutter gave none. */
+function figuresOf(list) {
+  return list && list[FIGURES] ? [...list[FIGURES]] : null;
 }
 
 /**
@@ -94,4 +104,4 @@ function heroForClient(dataUri) {
   return dataUri;
 }
 
-module.exports = { markCutCell, brandCutList, isSingleCellWidth, writeCutSlides, slidesForClient, heroForClient };
+module.exports = { markCutCell, brandCutList, figuresOf, isSingleCellWidth, writeCutSlides, slidesForClient, heroForClient };

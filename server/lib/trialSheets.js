@@ -123,6 +123,7 @@ function defaultDeps() {
       const data = typeof res.rows[0].data === 'string' ? JSON.parse(res.rows[0].data) : res.rows[0].data;
       return data.characters?.[0] || null;
     },
+    storeSlides: (...a) => require('./avatarSlides').storeSlides(...a),
     buildSlides: (sheets) => require('./avatarSlides').buildAvatarSlides(sheets),
   };
 }
@@ -167,14 +168,13 @@ async function persistPreparedSheets({ userId, characterId, exported, fields = {
     const signature = sheetSignature(sheets);
     const slides = await deps.buildSlides(sheets);
     if (slides.length === 0) throw new Error('persistPreparedSheets: no sheet could be cut into slides');
-    const slideFragment = { preGeneratedAvatarSlides: slides };
-    await deps.offload(characterId, userId, slideFragment);
+    const storedSlides = await deps.storeSlides(characterId, userId, slides);
     let written = false;
     let attestedSlides = null;
     await deps.modifyRow(characterId, userId, (fresh) => {
       const c = fresh.characters?.[0];
       if (!c || sheetSignature(c.preGeneratedStyledAvatars?.[rowName]) !== signature) return false;
-      attestedSlides = writeCutSlides(c, slides, slideFragment.preGeneratedAvatarSlides);
+      attestedSlides = writeCutSlides(c, slides, storedSlides);
       written = true;
     });
     if (written) return attestedSlides;
@@ -190,13 +190,12 @@ async function persistPreparedSheets({ userId, characterId, exported, fields = {
  * the ones it had.
  */
 async function persistBodyRowSlides({ userId, characterId, slides }, deps = defaultDeps()) {
-  const fragment = { preGeneratedAvatarSlides: slides };
-  await deps.offload(characterId, userId, fragment);
+  const storedSlides = await deps.storeSlides(characterId, userId, slides);
   let attestedSlides = null;
   await deps.modifyRow(characterId, userId, (fresh) => {
     const c = fresh.characters?.[0];
     if (!c || (Array.isArray(c.preGeneratedAvatarSlides) && c.preGeneratedAvatarSlides.length > 0)) return false;
-    attestedSlides = writeCutSlides(c, slides, fragment.preGeneratedAvatarSlides);
+    attestedSlides = writeCutSlides(c, slides, storedSlides);
   });
   return attestedSlides;
 }

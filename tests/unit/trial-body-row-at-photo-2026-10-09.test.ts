@@ -301,6 +301,7 @@ describe('5. a rename moves the sheets; a persisted sheet lands under the row\'s
     const rowChar: any = { id: 7, name: 'Mia' };
     const deps = {
       offload: async () => {},
+    storeSlides: async (_c: string, _u: string, slides: string[]) => [...slides],
       modifyRow: async (_i: string, _u: string, mutate: any) => { const d = { characters: [rowChar] }; return (await mutate(d)) === false ? null : d; },
       readCharacter: async () => rowChar,
       buildSlides: async () => clientImages.brandCutList([clientImages.markCutCell('data:image/jpeg;base64,Z')]),

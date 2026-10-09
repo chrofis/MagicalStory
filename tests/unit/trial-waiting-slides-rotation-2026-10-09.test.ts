@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import sharp from 'sharp';
-import { avatarPoolSources, nextAvatarSource } from '../../client/src/utils/trialPoll';
+import { avatarPoolSources, nextAvatarSource, avatarFigureOf } from '../../client/src/utils/trialPoll';
 
 const avatarSlides = require('../../server/lib/avatarSlides');
 const sceneComposite = require('../../server/lib/sceneComposite');
@@ -49,14 +49,35 @@ describe('trial waiting-screen avatar rotation (owner iPhone 2026-10-09: the mai
   });
 });
 
-describe('server: a picture the cutters returned twice shows once', () => {
-  it('buildAvatarSlides drops byte-identical cells', async () => {
+describe('server: every slide carries its figure label', () => {
+  it('buildAvatarSlides labels cells variant-pose-kind and slidesOfBodyRowCells uses the standard body labels', async () => {
+    const { figuresOf } = require('../../server/lib/clientAvatarImages');
     const png = await sharp({ create: { width: 256, height: 512, channels: 3, background: '#fff' } }).png().toBuffer();
-    // every cell of the sheet is the same picture -> one slide per distinct cell
     vi.spyOn(sceneComposite, 'cropAvatarCell').mockResolvedValue({ body: png, face: png });
     const sheet = await sharp({ create: { width: 1024, height: 1024, channels: 3, background: '#fff' } }).jpeg().toBuffer();
-    const slides = await avatarSlides.buildAvatarSlides({ standard: `data:image/jpeg;base64,${sheet.toString('base64')}` });
-    expect(slides).toHaveLength(1);
+    const uri = `data:image/jpeg;base64,${sheet.toString('base64')}`;
+    const slides = await avatarSlides.buildAvatarSlides({ standard: uri, costumed: { default: uri } });
+    expect(figuresOf(slides)?.slice(0, 4)).toEqual(['costumed-default-front-head', 'costumed-default-front-body', 'standard-front-head', 'standard-front-body']);
     vi.restoreAllMocks();
+    const early = avatarSlides.slidesOfBodyRowCells(await Promise.all([0, 1, 2, 3].map(async () => `data:image/jpeg;base64,${(await sharp({ create: { width: 64, height: 128, channels: 3, background: '#fff' } }).jpeg().toBuffer()).toString('base64')}`)));
+    expect(figuresOf(early)).toEqual(['standard-front-body', 'standard-threeQuarter-body', 'standard-profile-body']);
+  });
+});
+
+describe('one figure never repeats when the early body-row slides are replaced by the finished sheet (figure label in the URL)', () => {
+  const u = (figure: string, hash: string) => `https://img/characters/u/c/slides/${figure}-${hash.padEnd(24, '0')}.jpg`;
+  it('avatarFigureOf reads the label before the hash', () => {
+    expect(avatarFigureOf(u('standard-front-body', 'ab'))).toBe('standard-front-body');
+    expect(avatarFigureOf('data:image/png;base64,xx')).toBe('data:image/png;base64,xx');
+  });
+  it('the same figure under new bytes is not shown again before the rest', () => {
+    const early = [u('standard-front-body', 'a1'), u('standard-threeQuarter-body', 'a2'), u('standard-profile-body', 'a3')];
+    const full = [u('costumed-default-front-head', 'b1'), u('standard-front-body', 'b2'), u('standard-threeQuarter-body', 'b3'), u('standard-profile-body', 'b4'), u('costumed-default-front-body', 'b5')];
+    const seen = run(8, (step) => (step < 2 ? early : full));
+    expect(seen.slice(0, 3).map(avatarFigureOf)).toEqual(['standard-front-body', 'standard-threeQuarter-body', 'standard-profile-body']);
+    expect(new Set(seen.slice(3, 5).map(avatarFigureOf))).toEqual(new Set(['costumed-default-front-head', 'costumed-default-front-body']));
+  });
+  it('the pool keeps one picture per figure', () => {
+    expect(avatarPoolSources(null, [u('x-front-body', 'a'), u('x-front-body', 'b')])).toHaveLength(1);
   });
 });

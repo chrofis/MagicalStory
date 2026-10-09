@@ -11,12 +11,21 @@
  * See docs/decisions.md 2026-10-09 "Trial avatar slides".
  */
 const sharp = require('sharp');
-const { bytesFromAnyImage } = require('./r2');
+const crypto = require('crypto');
+const { bytesFromAnyImage, uploadImage } = require('./r2');
 const { log: defaultLog } = require('../utils/logger');
-const { markCutCell, brandCutList, isSingleCellWidth, writeCutSlides } = require('./clientAvatarImages');
+const { markCutCell, brandCutList, figuresOf, isSingleCellWidth, writeCutSlides } = require('./clientAvatarImages');
 
 // front / three-quarter / profile; the back view has no face and is skipped.
 const SLIDE_POSES = ['front', 'threeQuarter', 'profile'];
+
+/**
+ * The identity of a figure on the waiting screen: sheet variant, pose, head or body. The early body-row slides and the
+ * finished standard sheet's body cells are the same figure with different bytes, so the label (not the bytes) says that a
+ * picture already shown is not shown again. It is the filename prefix of the stored object (storeSlides) and the client
+ * reads it back from the URL (utils/trialPoll avatarFigureOf).
+ */
+const figureLabel = (variant, pose, kind) => `${variant}-${pose}-${kind}`.replace(/[^a-zA-Z0-9-]/g, '_');
 
 /** The sheet's bytes; throws on an image that is not a 2x4 sheet (a portrait is a single figure, slicing it gives a sliver). */
 async function readSheet(source) {
@@ -33,16 +42,20 @@ async function readSheet(source) {
  * [head front, body front, head 3/4, body 3/4, head profile, body profile].
  * Throws on an image that is not a 2x4 sheet so the caller logs it and shows no slide rather than a wrong one.
  */
-async function slidesFromSheet(source) {
+async function slidesFromSheet(source, variant = 'sheet') {
   const buf = await readSheet(source);
   const { cropAvatarCell } = require('./sceneComposite');
   const sheetWidth = (await sharp(buf).metadata()).width;
   const slides = [];
+  const figures = [];
   for (const pose of SLIDE_POSES) {
     const { body, face } = await cropAvatarCell(buf, { pose, includeFace: true });
-    for (const cell of [face, body]) slides.push(await singleCellJpeg(cell, sheetWidth));
+    for (const [kind, cell] of [['head', face], ['body', body]]) {
+      slides.push(await singleCellJpeg(cell, sheetWidth));
+      figures.push(figureLabel(variant, pose, kind));
+    }
   }
-  return brandCutList(slides);
+  return brandCutList(slides, figures);
 }
 
 /** A cut cell as a JPEG data URI; throws when it is wider than one column of its source (an uncut row or sheet). */
@@ -74,7 +87,7 @@ async function bodyRowCells(source) {
 
 /** The slides a body row feeds, from its cells (bodyRowCells): front, three-quarter and profile; the back view has no face and is skipped. */
 function slidesOfBodyRowCells(cells) {
-  return brandCutList(cells.slice(0, SLIDE_POSES.length));
+  return brandCutList(cells.slice(0, SLIDE_POSES.length), SLIDE_POSES.map(pose => figureLabel('standard', pose, 'body')));
 }
 
 /**
@@ -88,19 +101,22 @@ async function frontBodyCell(source) {
   return singleCellJpeg(body, (await sharp(buf).metadata()).width);
 }
 
-/** Pure: the sheet sources of one character's styled avatars, costumed first (it is ready first). */
-function sheetSourcesOf(styledAvatars) {
-  const sources = [];
+/** Pure: the sheets of one character's styled avatars as { variant, source }, costumed first (it is ready first). */
+function sheetEntriesOf(styledAvatars) {
+  const entries = [];
   const pick = (v) => (typeof v === 'string' ? v : (v && (v.imageData || v.imageUrl || v.url)) || null);
   const costumed = styledAvatars && styledAvatars.costumed;
   if (costumed && typeof costumed === 'object' && !costumed.imageData && !costumed.imageUrl) {
-    for (const v of Object.values(costumed)) if (pick(v)) sources.push(pick(v));
+    for (const [k, v] of Object.entries(costumed)) if (pick(v)) entries.push({ variant: `costumed-${k}`, source: pick(v) });
   }
   for (const [key, v] of Object.entries(styledAvatars || {})) {
-    if (key !== 'costumed' && pick(v)) sources.push(pick(v));
+    if (key !== 'costumed' && pick(v)) entries.push({ variant: key, source: pick(v) });
   }
-  return sources;
+  return entries;
 }
+
+/** Pure: the sheet sources of one character's styled avatars, costumed first. */
+const sheetSourcesOf = (styledAvatars) => sheetEntriesOf(styledAvatars).map(e => e.source);
 
 /** Pure: head+body pairs of every sheet in turn, so the costumed and the standard sheet alternate. */
 function interleaveSheetSlides(perSheet) {
@@ -118,13 +134,35 @@ function interleaveSheetSlides(perSheet) {
  */
 async function buildAvatarSlides(styledAvatars, log = defaultLog) {
   const perSheet = [];
-  for (const source of sheetSourcesOf(styledAvatars)) {
-    try { perSheet.push(await slidesFromSheet(source)); }
-    catch (err) { log.error(`[TRIAL AVATARS] avatar slides: sheet skipped (${err.message})`); }
+  for (const { variant, source } of sheetEntriesOf(styledAvatars)) {
+    try {
+      const cut = await slidesFromSheet(source, variant);
+      const figures = figuresOf(cut);
+      perSheet.push(cut.map((cell, i) => ({ cell, figure: figures[i] })));
+    } catch (err) { log.error(`[TRIAL AVATARS] avatar slides: sheet skipped (${err.message})`); }
   }
-  // A picture the cutters returned twice (identical bytes) shows once: the stored list of the owner's iPhone trial held the
-  // standard front body twice and a head twice (docs/decisions.md 2026-10-09 "Trial waiting slides").
-  return brandCutList([...new Set(interleaveSheetSlides(perSheet))]);
+  const ordered = interleaveSheetSlides(perSheet);
+  return brandCutList(ordered.map(o => o.cell), ordered.map(o => o.figure));
+}
+
+/**
+ * Store cut slides in R2 under a CONTENT key and return their URLs, in order. The generic row offload names an object by its
+ * position in the row (`preGeneratedAvatarSlides-3.jpg`), so two slide lists written close together (the body row's, the
+ * costumed sheet's, the finished sheet's) overwrote each other's objects: the stored list of user 880b53c1 held the standard
+ * front body at two positions and a head at two, while the cutters returned twelve distinct cells (docs/decisions.md
+ * 2026-10-09 "Trial slides: content keys"). A content key can only ever hold its own bytes.
+ */
+async function storeSlides(characterId, userId, slides, upload = uploadImage) {
+  const safe = (v) => String(v).replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 40);
+  const figures = figuresOf(slides) || slides.map(() => 'slide');
+  const urls = [];
+  for (const [i, dataUri] of slides.entries()) {
+    const hash = crypto.createHash('sha256').update(dataUri).digest('hex').slice(0, 24);
+    const url = await upload(dataUri, `characters/${safe(userId || 'unknown')}/${safe(characterId)}/slides/${figures[i]}-${hash}.jpg`);
+    if (!url) throw new Error('avatar slide could not be stored in R2');
+    urls.push(url);
+  }
+  return urls;
 }
 
 /**
@@ -135,15 +173,14 @@ async function buildAvatarSlides(styledAvatars, log = defaultLog) {
 async function persistAvatarSlides({ characterId, userId, styledAvatars }, log = defaultLog) {
   const slides = await buildAvatarSlides(styledAvatars, log);
   if (slides.length === 0) throw new Error('no sheet could be cut into slides');
-  const { offloadCharacterImages, modifyCharactersRow } = require('../services/database');
-  const fragment = { preGeneratedAvatarSlides: slides };
-  await offloadCharacterImages(characterId, userId, fragment);
+  const { modifyCharactersRow } = require('../services/database');
+  const stored = await storeSlides(characterId, userId, slides);
   await modifyCharactersRow(characterId, userId, (fresh) => {
     const c = fresh.characters?.[0];
     if (!c) return false;
-    writeCutSlides(c, slides, fragment.preGeneratedAvatarSlides);
+    writeCutSlides(c, slides, stored);
   });
   return slides.length;
 }
 
-module.exports = { persistAvatarSlides, buildAvatarSlides, slidesFromSheet, bodyRowCells, slidesOfBodyRowCells, frontBodyCell, sheetSourcesOf, interleaveSheetSlides, SLIDE_POSES };
+module.exports = { storeSlides, persistAvatarSlides, buildAvatarSlides, slidesFromSheet, bodyRowCells, slidesOfBodyRowCells, frontBodyCell, sheetSourcesOf, sheetEntriesOf, interleaveSheetSlides, SLIDE_POSES };

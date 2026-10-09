@@ -253,6 +253,7 @@ describe('2. prepare-title and the job reuse it', () => {
 describe('3. the slides hold the standard cells from job start', () => {
   const fakeDeps = (rowChar: any, built: string[][]) => ({
     offload: async () => {},
+    storeSlides: async (_c: string, _u: string, slides: string[]) => [...slides],
     modifyRow: async (_id: string, _u: string, mutate: any) => {
       const data = { characters: [rowChar] };
       if ((await mutate(data)) === false) return null;

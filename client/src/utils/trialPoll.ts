@@ -44,35 +44,55 @@ export function shouldRedirectToStories(pageState: string, isVerified: boolean, 
 }
 
 /**
+ * Which figure a slide shows. The server stores each slide as `.../slides/<variant>-<pose>-<head|body>-<hash>.jpg`
+ * (avatarSlides.storeSlides): the early body-row slides and the finished sheet's body cells are the same figure with
+ * different bytes, so the label before the hash, not the URL, decides that a figure was already shown. Anything else
+ * (the hero's data URI) is its own figure.
+ */
+export function avatarFigureOf(src: string): string {
+  const m = /\/slides\/([A-Za-z0-9-]+)-[0-9a-f]{24}\.jpg(?:\?.*)?$/.exec(src);
+  return m ? m[1] : src;
+}
+
+/**
  * The waiting-screen avatar pool: the slides once the server has any, the hero's front picture only until then.
  * The hero IS the front body cell of the standard sheet, which is also the first body slide: keeping both showed that
  * figure three times in the first five slots (owner iPhone, 2026-10-09: "the main avatar comes up too often at the
  * start"). Strings can not tell them apart (hero is a data URI, slides are stored URLs), so the hero steps aside.
+ * One picture per figure.
  */
 export function avatarPoolSources(hero: string | null | undefined, slides: string[]): string[] {
   const out: string[] = [];
-  for (const s of slides.length > 0 ? slides : hero ? [hero] : []) if (s && !out.includes(s)) out.push(s);
+  const seen = new Set<string>();
+  for (const s of slides.length > 0 ? slides : hero ? [hero] : []) {
+    if (!s || seen.has(avatarFigureOf(s))) continue;
+    seen.add(avatarFigureOf(s));
+    out.push(s);
+  }
   return out;
 }
 
 /**
- * The next avatar to show: walking on from the current one in list order, the first that has not been shown yet; once
- * every picture of the pool has been shown the round starts again (`shown` is cleared in place, the current one kept).
- * Position comes from the picture, not from a counter, so a pool that grows or is replaced while the slideshow runs
- * (slides arrive in stages) never restarts it at the first picture. Returns the pool's first picture when nothing is current.
+ * The next avatar to show: walking on from the current one in list order, the first FIGURE that has not been shown yet;
+ * once every figure of the pool has been shown the round starts again (`shown` holds figure labels and is cleared in place,
+ * the current one kept). Position comes from the figure, not from a counter or the URL, so a pool that grows or is replaced
+ * while the slideshow runs (body-row slides, then the finished sheet's) never restarts it and never repeats a figure.
+ * Returns the pool's first picture when nothing is current.
  */
 export function nextAvatarSource(pool: string[], shown: Set<string>, current: string | null): string | null {
   if (pool.length === 0) return null;
-  const at = current ? pool.indexOf(current) : -1;
-  if (current) shown.add(current);
-  if (pool.every(s => shown.has(s))) {
+  const figures = pool.map(avatarFigureOf);
+  const curFigure = current ? avatarFigureOf(current) : null;
+  const at = curFigure ? figures.indexOf(curFigure) : -1;
+  if (curFigure) shown.add(curFigure);
+  if (figures.every(f => shown.has(f))) {
     shown.clear();
-    if (current) shown.add(current);
+    if (curFigure) shown.add(curFigure);
     if (pool.length === 1) return pool[0];
   }
   for (let k = 1; k <= pool.length; k++) {
-    const candidate = pool[(at + k + pool.length) % pool.length];
-    if (!shown.has(candidate)) return candidate;
+    const i = (at + k + pool.length) % pool.length;
+    if (!shown.has(figures[i])) return pool[i];
   }
   return pool[0];
 }
