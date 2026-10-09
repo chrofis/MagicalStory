@@ -28,15 +28,8 @@ const RUN = path.join(ROOT, 'evals/runs/2026-10-09_jev-brief-metadata');
 const ANS = path.join(RUN, 'emotion_answers.jsonl');
 const argv = Object.fromEntries(process.argv.slice(3).map(a => { const [k, v] = a.replace(/^--/, '').split('='); return [k, v ?? true]; }));
 
-const MOOD = {
-  happy: 'happy, glad, excited, proud',
-  sad: 'sad, disappointed, lonely, worried about a loss',
-  angry: 'angry, cross, defiant',
-  afraid: 'afraid, scared, nervous, worried about danger',
-  surprised: 'surprised, amazed, startled',
-  disgusted: 'disgusted',
-  neutral: 'neutral: calm, attentive, concentrating, no strong feeling',
-};
+// One source: the shipped decideEmotions reads the same descriptions.
+const { EMOTION_MOOD: MOOD } = require('../../server/lib/emotionVocabulary');
 
 function readLabels(file) {
   const L = {}; let sid;

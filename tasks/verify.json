@@ -8737,6 +8737,24 @@
         "kind": "human",
         "what": "styledAvatarGeneration[].passes.pass2.attempts: an extraAttempt carries fedBack lines when an axis was <=3; avatar_sheet_shipped_hard_fail stays near or below the measured 2.5% of sheets."
       }
+    },
+    {
+      "id": "jev-emotion-decided-2026-10-09",
+      "title": "Jev decides each figure emotion before the briefs",
+      "commits": [
+        "d76fe92c3"
+      ],
+      "addedAt": "2026-10-09",
+      "status": "pending",
+      "evidence": [],
+      "claim": "On the full path Jev picks every figure emotion from the closed list in ONE call per story beside the gaze; the brief metadata carries that value (characters[] by name, creatures[] by id) and the Art Director no longer chooses it.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "beats_jev_brief_fields stats show emotions with exactly 1 call and jev_decisions_emotions appears once in usage; every page jevFixed.emotions lists the in-frame figures; stored briefs characters[].emotion and creatures[].emotion equal jevFixed.emotions; no emotion_off_list finding for a listed figure; 3+ faces read as the pinned emotion; the Jev step elapsed time rises by at most one call."
+      }
     }
   ],
   "runs": [

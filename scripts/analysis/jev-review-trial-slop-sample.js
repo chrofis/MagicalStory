@@ -1,0 +1,10 @@
+const fs=require('fs');const D=__dirname+'/../../evals/runs/2026-10-09_jev-review/';
+const a=fs.readFileSync(D+'trials_answers.jsonl','utf8').trim().split('\n').map(JSON.parse);
+const tr=JSON.parse(fs.readFileSync(D+'trials.json','utf8'));
+const P=require('../../server/lib/proseSlop.js');
+const q={};P.SLOP_TYPES.forEach(t=>q[t.id]=t.question);
+const src=a.filter(x=>x.kind==='source');
+const flags=src.flatMap(x=>x.flags.map(f=>({t:x.trial,p:f.pageNumber,q:f.questionId,pr:f.p})));
+const sel=[...flags.filter(f=>f.q.startsWith('LOGIC')),...['SLOP_BODY_CLICHE','SLOP_PARALLEL_NEGATION','SLOP_INTENSIFIER','SLOP_GENERIC_ENDING','SLOP_RULE_OF_THREE','SLOP_REPETITIVE_OPENINGS','SLOP_PURPLE_SIMILE','SLOP_LESSON_EXPLAIN','SLOP_MORAL_SUMMARY'].flatMap(k=>flags.filter(f=>f.q===k).sort((x,y)=>y.pr-x.pr).filter((f,i,arr)=>i%Math.max(1,Math.floor(arr.length/3))==0).slice(0,3))];
+fs.writeFileSync(D+'trial_sel.json',JSON.stringify(sel));
+sel.forEach((f,i)=>{const T=tr.find(x=>x.id===f.t);const pg=T.pages.find(x=>x.pageNumber===f.p);console.log('\n#'+i+' '+f.q+' p'+f.pr.toFixed(2)+' ('+T.id.slice(4,17)+' p'+f.p+') Q: '+(q[f.q]||'(logic)').slice(0,260)+'\n'+pg.text.slice(0,800))});

@@ -1,0 +1,33 @@
+{
+  "run": "2026-10-09_jev-review",
+  "model": "typesafe/jev-1.13",
+  "dataset": "staging, 30-day window: 17 full stories with stored text audits (212 pages), 39 stored plan-check divisions (506 page lines, 680 checker findings, 20 stories), 38 stored trial stories (228 pages)",
+  "calls": 34000,
+  "usd_estimated": 0.53,
+  "text_audit_full": {
+    "MISMATCH_absent_figure": { "pairs": 300, "definitional_positives": 223, "arc_informed_filed": 15, "arc_informed_filed_and_positive": 13,
+      "A1_noul": { "auc": 0.929, "at0.5": { "p": 0.953, "r": 0.906 }, "at0.7": { "p": 0.957, "r": 0.803 } },
+      "A2_reworded": { "auc": 0.930 }, "A3_score": { "auc": 0.953, "at0.5": { "p": 0.943, "r": 0.96 } }, "A4_per_sentence_max": { "auc": 0.926 }, "A3A4": { "auc": 0.963 },
+      "C1_central_noul": { "auc": 0.735 }, "C2_central_score": { "auc": 0.798 },
+      "selecting_the_13_filed_among_223": { "A1_auc": 0.682, "A3_auc": 0.642, "C1_auc": 0.514, "C2_auc": 0.539 } },
+    "STYLE_LOOK": { "findings": 26, "sentences": 1936, "L1_auc": 0.925, "L3_score_auc": 0.937, "L4_decomposed_auc": 0.942, "flags_per_story_at_recall": { "0.8": 8.6, "0.9": 11.0, "1.0": 42.8 } },
+    "STYLE_EXPLAIN": { "findings": 39, "E1_auc": 0.903, "E3_score_auc": 0.916, "E4_decomposed_auc": 0.887, "flags_per_story_at_recall": { "0.8": 16.0, "0.9": 31.8, "1.0": 73.9 } },
+    "PULL": { "positives": 6, "auc_noul": 0.595, "auc_score": 0.541 },
+    "ENDING": { "pages": 17, "positives": 9, "auc_noul": 0.521, "auc_score": 0.722 },
+    "first_mention_CONFUSION_ENTRANCE": { "pairs": 111, "positives": 14, "auc_noul": 0.535, "auc_score": 0.464 }
+  },
+  "text_review_trials": {
+    "trials": 38, "pages": 228,
+    "wired_source_calls_per_trial": 12, "usd_per_trial": 0.00055, "latency_ms_p50": 657, "latency_ms_max": 2152,
+    "age_extra_latency_ms_p50": 1932,
+    "flags": 94, "flags_in_oct_trials_23": 9, "flags_in_sep_english_trials_15": 85,
+    "slop_precision_sampled": "23/25", "logic_precision_sampled": "0/6",
+    "danger_climb_pages_8_positives": { "S1_noul_auc": 0.862, "S2_score_auc": 0.926 },
+    "toddler_known_defect": { "S1_S2_missed": true, "decomposed_D5x(1-D6)_auc": 0.86, "rank_of_known_page": "3 of 120 on P", "flagged_pages_of_children_le_4": "29/118 at >= known page score" },
+    "mismatch_pairs": { "pairs": 28, "positives": 10, "A1_auc": 0.944, "A3_auc": 0.933, "A3_at0.7": { "tp": 8, "fp": 1, "fn": 2 } }
+  },
+  "plan_check_vs_luna_pro": {
+    "Q1": { "auc": 0.823, "tp_fp_at0.5": "59/40" }, "Q2": { "auc": 0.53 }, "Q3": { "auc": 0.637 }, "Q5": { "auc": 0.875 }, "Q9": { "auc": 0.695 },
+    "Q10": { "auc": 0.849 }, "Q12": { "auc_none_detection": 0.966 }, "Q15": { "auc": 0.529 }, "Q8": { "auc": 0.574 }, "Q17": { "auc": 0.712, "vs_reading_earlier": 0.95 }
+  }
+}
