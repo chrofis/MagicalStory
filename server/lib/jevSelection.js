@@ -356,7 +356,7 @@ async function awaitIdeaLandmarks(args) {
 async function resolveTrialIdeaLandmarks(location, language) {
   if (!location?.city) return [];
   const { resolveAvailableLandmarks } = require('./landmarkPhotos');
-  return resolveAvailableLandmarks(location, { limit: STORY_LANDMARK_LIMIT, discoverOnMiss: false, language });
+  return resolveAvailableLandmarks(location, { limit: STORY_LANDMARK_LIMIT, discoverOnMiss: false, language, placesOnly: true });
 }
 
 /**

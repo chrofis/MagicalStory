@@ -156,7 +156,7 @@ function ideaLandmarkLocation({ storyCategory, storyTopic, userLocation }) {
 /** The town's list for an idea: the story's resolver and limit, with live discovery on a miss. */
 function resolveIdeaLandmarkList(location, language, onStatus = null) {
   return resolveAvailableLandmarks(location, {
-    limit: jevSelection.STORY_LANDMARK_LIMIT, discoverOnMiss: true, language,
+    limit: jevSelection.STORY_LANDMARK_LIMIT, discoverOnMiss: true, language, placesOnly: true,
     ...(onStatus ? { onStatus } : {}),
   });
 }
@@ -171,7 +171,7 @@ function ideaLandmarkRows({ characters, storyCategory, storyTheme, storyTopic, l
   const setup = jevSelection.selectionSetup({ characters, storyCategory, storyTheme, storyTopic, userLocation: location });
   const pick = jevSelection.pickIdeaLandmarks({ setup, language, landmarks, n: jevSelection.IDEA_LANDMARKS.wizard });
   log.info(`[LANDMARK] idea landmarks (${pick.source}): ${pick.landmarks.map(l => l.name).join(', ')}`);
-  return pick.landmarks;
+  return pick;
 }
 
 async function buildIdeasPromptContext({
@@ -788,6 +788,7 @@ router.post('/generate-story-ideas', authenticateToken, storyIdeasLimiter, async
     // Skip for historical stories - they use historically accurate locations, not local landmarks.
     // Shared resolver: landmark_index (proximity fallback) -> shared cache -> live discovery.
     let availableLandmarks = [];
+    let landmarkPick = null; // pickIdeaLandmarks result: its `source` (jev/pending/absent) goes into idea_events.detail
     if (effectiveLocation?.city && storyCategory !== 'historical') {
       log.debug(`  📍 Story location: ${effectiveLocation.city}, ${effectiveLocation.country || ''}`);
       availableLandmarks = await resolveIdeaLandmarkList(effectiveLocation, language);
@@ -817,7 +818,7 @@ router.post('/generate-story-ideas', authenticateToken, storyIdeasLimiter, async
     // Build available landmarks section for the prompt
     let availableLandmarksSection = '';
     if (availableLandmarks && availableLandmarks.length > 0 && effectiveCategory_loc !== 'historical') {
-      availableLandmarksSection = buildIdeaLandmarksSection(ideaLandmarkRows({ characters, storyCategory, storyTheme, storyTopic, language }, effectiveLocation, availableLandmarks));
+      availableLandmarksSection = buildIdeaLandmarksSection((landmarkPick = ideaLandmarkRows({ characters, storyCategory, storyTheme, storyTopic, language }, effectiveLocation, availableLandmarks)).landmarks);
       const withDesc = availableLandmarks.filter(l => l.wikipediaExtract || l.photoDescription).length;
       log.info(`[LANDMARK] ✅ Including ${availableLandmarks.length} landmarks in ideas prompt (${withDesc} with descriptions): ${availableLandmarks.slice(0, 3).map(l => l.name).join(', ')}...`);
     } else {
@@ -907,7 +908,7 @@ router.post('/generate-story-ideas', authenticateToken, storyIdeasLimiter, async
       shapes: ctx.premiseShapes,
       model: result.modelId || modelToUse,
       costUsd: ideaCallCost(result.modelId || modelToUse, result.usage),
-      detail: { streaming: false, ideasParsed: storyIdeas.length, worldSeeds: ctx.worldSeeds },
+      detail: { streaming: false, ideasParsed: storyIdeas.length, worldSeeds: ctx.worldSeeds, landmarkSource: landmarkPick?.source ?? null },
     });
 
     // Return ideas array, prompt and model for dev mode display
@@ -1013,6 +1014,7 @@ router.post('/generate-story-ideas-stream', authenticateToken, storyIdeasLimiter
     // Skip for historical stories - they use historically accurate locations, not local landmarks.
     // Shared resolver: landmark_index (proximity fallback) -> shared cache -> live discovery.
     let availableLandmarks = [];
+    let landmarkPick = null; // pickIdeaLandmarks result: its `source` (jev/pending/absent) goes into idea_events.detail
     if (effectiveLocation?.city && storyCategory !== 'historical') {
       log.debug(`  📍 Story location: ${effectiveLocation.city}, ${effectiveLocation.country || ''}`);
       availableLandmarks = await resolveIdeaLandmarkList(effectiveLocation, language,
@@ -1043,7 +1045,7 @@ router.post('/generate-story-ideas-stream', authenticateToken, storyIdeasLimiter
     // Build available landmarks section for the prompt
     let availableLandmarksSection = '';
     if (availableLandmarks && availableLandmarks.length > 0 && effectiveCategory_loc !== 'historical') {
-      availableLandmarksSection = buildIdeaLandmarksSection(ideaLandmarkRows({ characters, storyCategory, storyTheme, storyTopic, language }, effectiveLocation, availableLandmarks));
+      availableLandmarksSection = buildIdeaLandmarksSection((landmarkPick = ideaLandmarkRows({ characters, storyCategory, storyTheme, storyTopic, language }, effectiveLocation, availableLandmarks)).landmarks);
       const withDesc = availableLandmarks.filter(l => l.wikipediaExtract || l.photoDescription).length;
       log.info(`[LANDMARK] ✅ [STREAM] Including ${availableLandmarks.length} landmarks in ideas prompt (${withDesc} with descriptions): ${availableLandmarks.slice(0, 3).map(l => l.name).join(', ')}...`);
     } else {
@@ -1118,7 +1120,7 @@ router.post('/generate-story-ideas-stream', authenticateToken, storyIdeasLimiter
       model: streamModelId || modelToUse,
       costUsd: (ideaCallCost(streamModelId || modelToUse, arm1.usage) || 0)
              + (ideaCallCost(streamModelId || modelToUse, arm2.usage) || 0),
-      detail: { streaming: true, chars1: arm1.fullText.length, chars2: arm2.fullText.length, worldSeeds: ctx.worldSeeds },
+      detail: { streaming: true, chars1: arm1.fullText.length, chars2: arm2.fullText.length, worldSeeds: ctx.worldSeeds, landmarkSource: landmarkPick?.source ?? null },
     });
     log.debug('  Both stories complete, sending done event...');
 

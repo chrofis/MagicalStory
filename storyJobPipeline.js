@@ -7731,7 +7731,7 @@ async function _processStoryJobImpl(jobId, opts = {}) {
         // guild houses and archives no children's story reaches for.
         // The trial idea route resolves the same list (jevSelection
         // .resolveTrialIdeaLandmarks), so an idea only names places the story has.
-        limit: require('./server/lib/jevSelection').STORY_LANDMARK_LIMIT, discoverOnMiss: false, language: inputData.language, shuffle: true,
+        limit: require('./server/lib/jevSelection').STORY_LANDMARK_LIMIT, discoverOnMiss: false, language: inputData.language, shuffle: true, jobId,
         // A landmark the family names in their idea is pinned first (after the
         // shuffle), so the writer's top-3 opens on it.
         premiseText: [inputData.storyDetails, inputData.title].filter(Boolean).join('\n'),

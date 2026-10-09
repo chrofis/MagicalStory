@@ -3064,11 +3064,6 @@ async function getIndexedLandmarks(cityOrLocation, limit = 30) {
     // columns arrive from node-pg as STRINGS, so coerce rather than
     // typeof-check (the caller's own values were normalised to number|null at
     // the top of this function).
-    const rowCoord = v => {
-      if (v === null || v === undefined || v === '') return null;
-      const n = Number(v);
-      return Number.isFinite(n) ? n : null;
-    };
     let searchLat = latitude;
     let searchLon = longitude;
     if (typeof searchLat !== 'number' || typeof searchLon !== 'number') {
@@ -4175,13 +4170,91 @@ function servedLandmark(l, judged) {
   };
 }
 
+// DECIMAL columns arrive from node-pg as STRINGS: coerce, never typeof-check.
+const rowCoord = v => {
+  if (v === null || v === undefined || v === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+};
+
+// Every resolver hands a story or an idea at least this many REAL places when
+// the index has them (owner, 2026-10-09: "Ensure we always get 5 landmarks").
+// A town's own list can be tiny (Fislisbach: its own "(Stadt)" aerial and one
+// church), and a pool of two makes every idea name the same place. Short of
+// five, the list is topped up from the nearby index, nearest first.
+// see docs/decisions.md "Landmark resolvers always return five".
+const MIN_LANDMARKS_OFFERED = 5;
+const TOP_UP_RADII_KM = [5, 10, 20, 50];
+const isPlaceRow = r => !NON_PLACE_TYPES_SET.has(r.type || 'x');
+
+/**
+ * Top a resolver's index rows up to MIN_LANDMARKS_OFFERED real places.
+ *
+ * The one implementation every resolver shares (full/trial story, wizard idea,
+ * trial idea all go through resolveAvailableLandmarks). Real = not a class-0
+ * row such as the town's own aerial; the aerial stays in the list but never
+ * counts. The radius widens 5 -> 10 -> 20 -> 50 km until enough distinct
+ * places exist; everything found at that radius is appended nearest first, up
+ * to `limit`, so Jev ranks a pool larger than five. The query is the one the
+ * 20/50/100 km name-miss fallback uses (getIndexedLandmarksNearLocation), so
+ * the photo / judged-usable / class filters are identical.
+ *
+ * When the index cannot supply five within the last radius, the rows that do
+ * exist are returned, the shortfall is logged at error level and counted as
+ * `landmarks_under_min` (runMetrics). Nothing is invented.
+ *
+ * @returns {Promise<Array>} index rows (the input rows first, then additions)
+ */
+async function topUpToMinimum(rows, location, { limit = 30, min = MIN_LANDMARKS_OFFERED, jobId = null } = {}) {
+  const need = Math.min(min, limit);
+  const real = rows.filter(isPlaceRow).length;
+  if (real >= need) return rows;
+
+  const centre = (typeof location?.latitude === 'number' && typeof location?.longitude === 'number')
+    ? { lat: location.latitude, lon: location.longitude, from: 'caller' }
+    : (() => {
+      const anchor = rows.find(r => rowCoord(r.latitude) !== null && rowCoord(r.longitude) !== null);
+      return anchor ? { lat: rowCoord(anchor.latitude), lon: rowCoord(anchor.longitude), from: anchor.name } : null;
+    })();
+
+  const metrics = require('./runMetrics').forJob(jobId);
+  const shortfall = (have, why) => {
+    metrics.count('landmarks_under_min');
+    log.error(`[LANDMARK] "${location?.city}" has only ${have} real landmark(s), wanted ${need} - ${why}. Returning what exists.`);
+  };
+  if (!centre) {
+    shortfall(real, 'no coordinates to search around');
+    return rows;
+  }
+
+  const have = new Set(rows.map(r => r.id));
+  for (const radiusKm of TOP_UP_RADII_KM) {
+    const nearby = await getIndexedLandmarksNearLocation(centre.lat, centre.lon, radiusKm, limit, location?.city || '');
+    const fresh = nearby.filter(r => !have.has(r.id) && isPlaceRow(r));
+    if (real + fresh.length < need && radiusKm !== TOP_UP_RADII_KM[TOP_UP_RADII_KM.length - 1]) continue;
+    fresh.sort((a, b) => Number(a.distance_km) - Number(b.distance_km)); // stable: ties keep the ranking
+    const added = fresh.slice(0, Math.max(0, limit - rows.length));
+    if (real + added.length < need) shortfall(real + added.length, `the index holds no more within ${radiusKm} km`);
+    if (added.length) {
+      metrics.count('landmarks_topped_up');
+      log.info(`[LANDMARK] "${location?.city}": ${real} real landmark(s) < ${need} - topped up with ${added.length} within ${radiusKm} km of ${centre.from === 'caller' ? 'the caller coordinates' : `"${centre.from}"`}: ${added.map(r => r.name).join(', ')}`);
+    }
+    return [...rows, ...added];
+  }
+  return rows;
+}
+
 async function resolveAvailableLandmarks(location, opts = {}) {
-  const { limit = 30, discoverOnMiss = false, language = null, shuffle = false, onStatus = null, premiseText = '' } = opts;
+  // placesOnly: ideas never name a town's own "(Stadt)" aerial (or any other
+  // class-0 row); stories keep it in the list as before. jobId: runMetrics scope.
+  const { limit = 30, discoverOnMiss = false, language = null, shuffle = false, onStatus = null, premiseText = '', placesOnly = false, jobId = null } = opts;
   if (!location?.city) return [];
   let landmarks = [];
 
   try {
-    const indexed = await getIndexedLandmarks(location, limit);
+    let indexed = await getIndexedLandmarks(location, limit);
+    if (indexed.length > 0) indexed = await topUpToMinimum(indexed, location, { limit, jobId });
+    if (placesOnly) indexed = indexed.filter(isPlaceRow);
     const bestSlot = await bestPhotoSlots(indexed.map(l => l.id));
     landmarks = indexed.map(l => servedLandmark(l, bestSlot.get(l.id)));
     if (landmarks.length > 0) log.info(`[LANDMARK] 📍 ${landmarks.length} indexed landmarks for ${location.city}`);
@@ -4318,6 +4391,8 @@ module.exports = {
   isFreelyLicensedImageUrl,
   fetchLandmarkPhoto,
   resolveAvailableLandmarks,
+  topUpToMinimum,
+  MIN_LANDMARKS_OFFERED,
   servedLandmark,
   premiseMentionsLandmark,
   availableLandmarkCache,
