@@ -61,7 +61,9 @@ describe('reader findings belong to the version the audit read', () => {
     const withFindings = calls.filter(c => c.split(',').length >= 6);
     expect(withFindings).toEqual(['consolidatePageEval(ev, entityResult.issues, pageNumber, round, version.description || null, findings)']);
     // The audit is read from the same map the findings are attributed through.
-    expect(pipelineSrc).toMatch(/buildAuditPages\(rawImages, \(pageNumber\) => auditedVersionByPage\.get\(pageNumber\)/);
+    // (readBook builds the pages from the map it is handed -- the same map.)
+    expect(pipelineSrc).toMatch(/buildAuditPages\(rawImages, \(pageNumber\) => versionByPage\.get\(pageNumber\)/);
+    expect(pipelineSrc).toMatch(/readBook\(auditedVersionByPage\)/);
     expect(pipelineSrc).toMatch(/attributeReaderFindings\(audit\.byRoute\.IMG, auditedVersionByPage\)/);
   });
 });

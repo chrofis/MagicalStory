@@ -8587,6 +8587,60 @@
         "result": "NOT COVERED",
         "note": "build c5f4a2d0f lacks 4ff0969df | undecided — human check | LOOK: On a page with a CRITICAL rendered_text finding repaired by inpaint: read the stored inpaint instruction (no quoted word from letteringInventory.items[].text), then view the repaired version at full size next to the original: no lettering was added where the finding pointed."
       }
+    },
+    {
+      "id": "book-audit-reads-shipped-pick-2026-10-09",
+      "title": "The final book audit describes the versions that ship",
+      "commits": [
+        "c4738ecbc"
+      ],
+      "addedAt": "2026-10-09",
+      "claim": "On a story where the book audit's own charge moves a page's pick (a repaired page ships), bookAuditRounds ends with a record flagged shippedReread, and finalChecksReport.objectScale and the last record's imgFaults describe the shipped image of each page.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "finalChecksReport.bookAuditRounds: a movedPages record with shippedReread; its imgFaults and finalChecksReport.objectScale against the bestSource image of each named page (view them)."
+      },
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "emotion-enum-on-rewrites-2026-10-09",
+      "title": "Every emotion on a shipped brief, rewrite and creature rows included, is on the closed list",
+      "commits": [
+        "3bd52115e"
+      ],
+      "addedAt": "2026-10-09",
+      "claim": "On a story with an iterate rewrite, every characters[] and creatures[] emotion on the shipped version's brief is on the closed list.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "auto",
+        "fn": "emotionEnumShipped"
+      },
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "brief-worn-absent-wearer-code-2026-10-09",
+      "title": "A worn garment is not cited in objects[] on a page its wearer is not on",
+      "commits": [
+        "2bff703eb"
+      ],
+      "addedAt": "2026-10-09",
+      "claim": "On a story with a worn garment whose wearer is off a page, that page's brief objects[] carries no cite for it, and generationLog/server log shows the [WORN] drop line.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "auto",
+        "fn": "wornGarmentWearerOnPage"
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [

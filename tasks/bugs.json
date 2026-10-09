@@ -4008,6 +4008,36 @@
       "fixedAt": "2026-10-09",
       "fixedIn": "4ff0969df",
       "fix": "letteringCheck.redactReadLettering strips the inventory-read strings (declared ones excepted) from every text bound for an image model: consolidated plan (feedbackConsolidator.redactPlanLettering), inpaintPage send time, buildRegenFeedback, iterate issue list, trial cover iterate; consolidator rule 7f. Test: tests/unit/lettering-never-sent-to-image-model.test.ts."
+    },
+    {
+      "id": "final-book-audit-reads-a-version-that-did-not-ship",
+      "title": "The final book audit read p4's original, charged it a reader fault that dropped it from 67 to 22, and the iterate rewrite shipped instead: the audit's findings (reader faults, object-scale) described a picture that is not in the book",
+      "reportedAt": "2026-10-09",
+      "source": "Staging job_1791531449494_o0kaatvmq (4 pages), stories.data. p4 imageVersions: original finalScore 22, iterate-round-1 56, bestSource iterate-round-1; repairRounds p4 before 67 after 56 (the round-start snapshot, taken before the audit's charge); the single bookAuditRound (checkedAt 08:17:35Z) imgFault 'Lindi is not emerging' is true only of v0; finalChecksReport.objectScale named p4 from v0.",
+      "status": "fixed",
+      "fixedAt": "2026-10-09",
+      "fixedIn": "c4738ecbc",
+      "fix": "repairPipeline.runBookAuditRound: on the last audit, when repairLogic.pagesWherePickMoved reports a page whose pick changed after the audit's own charge, the shipping versions are read once more (record shippedReread, measurement only). Test: tests/unit/book-audit-shipped-pick-moved.test.ts."
+    },
+    {
+      "id": "iterate-rewrite-emotion-not-held-to-closed-list",
+      "title": "An iterate rewrite's characters[]/creatures[] rows could carry an emotion off the closed list (\"focused\" on Funka and ANI001, shipped p4); emotionCheck normalises it to null and skips the figure silently",
+      "reportedAt": "2026-10-09",
+      "source": "Staging job_1791531449494_o0kaatvmq (4 pages), stories.data. sceneImages[3].imageVersions[1] (iterate-round-1, shipped) brief: characters[Funka].emotion 'focused', creatures[ANI001].emotion 'focused'. The authored path enforced the list only on characters[] (character_fields).",
+      "status": "fixed",
+      "fixedAt": "2026-10-09",
+      "fixedIn": "3bd52115e",
+      "fix": "sceneBriefCheck.checkEmotionEnum (characters[] and creatures[]), run by briefChecks.collectBriefFindings and by images.js iteratePageCore's rewrite checks. Test: tests/unit/emotion-enum-on-rewrites.test.ts."
+    },
+    {
+      "id": "ad-brief-cites-worn-garment-without-its-wearer",
+      "title": "The Art Director's objects[] cited CLO001 (Kiaan's beanie) on p2 (Max only) and p3 (Julian, Funka), pages its wearer is not on; the prompt rule against it did not hold",
+      "reportedAt": "2026-10-09",
+      "source": "Staging job_1791531449494_o0kaatvmq (4 pages), stories.data. sceneDescriptions p2 objects [LOC001.2, ART001.1, CLO001] cast [Max]; p3 [LOC002, ART001.1, ANI001, CLO001] cast [Julian, Funka]; wornItems owner Kiaan on p4. Verify entry brief-worn-absent-wearer-prompt-2026-10-08 failed.",
+      "status": "fixed",
+      "fixedAt": "2026-10-09",
+      "fixedIn": "2bff703eb",
+      "fix": "wornItems.dropAbsentWearerGarments (+ shared garmentWearerAbsent) at brief assembly, brief re-ask and iterate rewrite via jevBriefFields.dropAbsentWearerCites. Test: tests/unit/brief-worn-absent-wearer-drop.test.ts."
     }
   ]
 }

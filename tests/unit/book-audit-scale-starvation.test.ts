@@ -84,7 +84,7 @@ describe('objectScale survives the whitelist to finalChecksReport', () => {
   const jobPipeline = fs.readFileSync('storyJobPipeline.js', 'utf8');
 
   it('the bookAuditRounds record stores the audit’s objectScale', () => {
-    const push = repair.slice(repair.indexOf('bookAuditRounds.push({'));
+    const push = repair.slice(repair.indexOf('const auditRecord = (audit, round) => ({'));
     expect(push.slice(0, push.indexOf('});'))).toMatch(/objectScale:\s*audit\.objectScale/);
   });
 

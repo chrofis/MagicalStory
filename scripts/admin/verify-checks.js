@@ -371,6 +371,52 @@ checks.emotionEnum = (ctx) => {
   };
 };
 
+/** Every emotion on the SHIPPED version's brief (characters[] and creatures[] rows) is on the closed list. */
+checks.emotionEnumShipped = (ctx) => {
+  const { EMOTIONS } = emotionVocabulary();
+  const enumSet = new Set(EMOTIONS);
+  let rows = 0; const off = [];
+  for (const p of pages(ctx)) {
+    const v = versions(p).find(x => x && x.source === p.bestSource) || versions(p)[0];
+    const m = v?.sceneMetadata ? (v.sceneMetadata.fullData || v.sceneMetadata) : brief(p);
+    const rowsOf = [...(m.characters || []).filter(c => c && typeof c === 'object').map(c => [c.name, c.emotion]),
+      ...(m.creatures || []).filter(c => c && typeof c === 'object').map(c => [c.id, c.emotion])];
+    for (const [who, emotion] of rowsOf) {
+      rows += 1;
+      if (!enumSet.has(String(emotion || '').trim().toLowerCase())) off.push(`p${p.pageNumber} ${who} "${emotion ?? ''}"`);
+    }
+  }
+  if (!rows) return notCovered('no characters[]/creatures[] rows on any shipped brief');
+  const detail = off.length ? `${off.length}/${rows} shipped emotion(s) off the closed list: ${off.join(', ')}` : `all ${rows} shipped emotion(s) are on the closed list`;
+  return { covered: true, pass: off.length === 0, detail };
+};
+
+/** A worn garment is not cited in objects[] on a page its wearer is not on (owner: a wornItems row on any page, or the bible's wornBy). */
+checks.wornGarmentWearerOnPage = (ctx) => {
+  const owner = new Map();
+  for (const e of (ctx.data?.visualBible?.clothing || [])) if (e?.id && e.wornBy) owner.set(String(e.id).toUpperCase(), String(e.wornBy).trim().toLowerCase());
+  for (const p of pages(ctx)) for (const w of (brief(p).wornItems || [])) {
+    if (w?.id && w.owner && !owner.has(String(w.id).toUpperCase())) owner.set(String(w.id).toUpperCase(), String(w.owner).trim().toLowerCase());
+  }
+  if (!owner.size) return notCovered('no worn garment with a known wearer');
+  const bad = [];
+  let cited = 0;
+  for (const p of pages(ctx)) {
+    if (!(p.pageNumber > 0)) continue;
+    const b = brief(p);
+    const cast = (b.characters || []).map(c => String(typeof c === 'string' ? c : c?.name || '').trim().toLowerCase());
+    const rowIds = new Set((b.wornItems || []).map(w => String(w?.id || '').toUpperCase()));
+    for (const o of (b.objects || [])) {
+      const id = String(o).toUpperCase().split('.')[0];
+      if (!owner.has(id)) continue;
+      cited += 1;
+      if (!cast.includes(owner.get(id)) && !rowIds.has(id)) bad.push(`p${p.pageNumber} ${id} (wearer ${owner.get(id)})`);
+    }
+  }
+  if (!cited) return notCovered('no page cites a worn garment');
+  return { covered: true, pass: bad.length === 0, detail: bad.length ? `worn garment cited without its wearer: ${bad.join(', ')}` : `${cited} worn-garment cite(s), each with its wearer on the page` };
+};
+
 /** a11662c21 + 725a4cd45 — the arc panel ran with the SENSE lens. */
 checks.arcSenseLens = (ctx) => {
   const rounds = ctx.data?.arcReviewReport?.rounds;
