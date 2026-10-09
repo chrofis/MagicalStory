@@ -4009,6 +4009,16 @@ async function inpaintPage(imageData, evaluation, options = {}) {
   // before the instruction reaches the image model — image models DRAW what
   // a prompt names. Previously only character-repair prompts were guarded.
   editInstruction = sanitizeIssueForInpaint(editInstruction);
+  // The letters of lettering nobody asked for never reach the image model: it
+  // paints what it reads (job_1791531449494_o0kaatvmq p3: "Paint over 'BANZ'"
+  // painted BANZ). Applied here too, not only in the consolidator, because a
+  // plan stored before the redaction and the sole-finding shortcut both reach
+  // this line. Required lettering (requiredTextClause below) is untouched.
+  {
+    const { redactReadLettering } = require('./letteringCheck');
+    editInstruction = redactReadLettering(editInstruction, evaluation?.letteringInventory);
+    if (preserveClause) preserveClause = redactReadLettering(preserveClause, evaluation?.letteringInventory);
+  }
   // Resolve raw VB ids that evals quote back verbatim ("missing ART001") —
   // an unresolved id makes Grok invent an object with the id painted on it
   // as lettering (observed: gadget labelled "ART001" instead of the VB
@@ -4634,7 +4644,8 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     fixIssues: (() => {
       if (!evaluationFeedback) return [];
       const src = evaluationFeedback.fixableIssues || [];
-      const issues = src.slice(0, 10).map(i => i?.description || i?.issue || String(i));
+      const issues = src.slice(0, 10).map(i => require('./letteringCheck').redactReadLettering(
+        i?.description || i?.issue || String(i), evaluationFeedback.letteringInventory));
       // Consolidator-declared spec conflicts lead the list: the rewrite's
       // primary job is resolving them (change the interactions), not
       // re-transcribing the conflicting requirements from the story text.

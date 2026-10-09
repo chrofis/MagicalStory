@@ -728,6 +728,29 @@ function nameSceneFixInstruction(instruction, repairNames) {
   return require('./repairLogic').nameRepairText(instruction, repairNames);
 }
 
+/**
+ * Strip the letters the lettering inventory read from every plan field that is
+ * sent to (or drafts text for) an image model. One mechanism for all routes:
+ * letteringCheck.redactReadLettering. Staging job_1791531449494_o0kaatvmq p3:
+ * scene_fix.instruction "Paint over 'BANZ' on stone bands ..." made Grok paint
+ * BANZ onto the towers.
+ */
+function redactPlanLettering(plan, record) {
+  if (!plan || !record) return plan;
+  const { redactReadLettering } = require('./letteringCheck');
+  const red = (v) => (typeof v === 'string' ? redactReadLettering(v, record) : v);
+  const sf = plan.scene_fix;
+  if (sf && typeof sf === 'object') {
+    for (const f of ['instruction', 'fix_draft', 'fix_critique']) sf[f] = red(sf[f]);
+    if (Array.isArray(sf.preserve)) sf.preserve = sf.preserve.map(red);
+  }
+  for (const pcf of (Array.isArray(plan.per_character_fixes) ? plan.per_character_fixes : [])) {
+    if (!pcf || typeof pcf !== 'object') continue;
+    for (const f of ['fix_instruction', 'fix_draft', 'fix_critique']) pcf[f] = red(pcf[f]);
+  }
+  return plan;
+}
+
 async function consolidateFeedback({
   evaluation = {},
   entityReport = null,
@@ -1309,6 +1332,7 @@ async function consolidateEvaluation({
 
 module.exports = {
   applyRule7SceneFixGuard,
+  redactPlanLettering, // exported for testing
   indexFindings, // exported for testing
   resolveDedupedIssues, // exported for testing
   checkFixesRestOnKeptFindings, // exported for testing

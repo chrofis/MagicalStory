@@ -122,4 +122,53 @@ function letteringRecord({ lettering, declared } = {}) {
   return { items, declared: (Array.isArray(declared) ? declared : []).map(str).filter(Boolean) };
 }
 
-module.exports = { checkUndeclaredLettering, letteringRecord, isDeclared, squash };
+/**
+ * UNREQUESTED LETTERING NEVER GOES TO THE IMAGE MODEL AS LETTERS.
+ *
+ * An image model paints the word it reads in its instruction. Staging
+ * job_1791531449494_o0kaatvmq p3: the judge's inventory misread an ornament
+ * band as "BANZ" and filed a CRITICAL rendered_text finding; the repair
+ * instruction quoted it ("Paint over 'BANZ' on stone bands ..."), and Grok
+ * PAINTED "BANZ" onto both towers — the repair created the defect it was told
+ * to remove. The finding's description keeps the quote (humans and judges read
+ * it); every text that is SENT to an image model is passed through here first,
+ * so it says where the lettering is (the surface, from the sentence around it)
+ * and never what it reads.
+ *
+ * What is removed is exactly the strings the lettering inventory itself read
+ * from this image (record.items[].text) — a mechanical match against the
+ * evaluator's own output, never a reading of the finding's prose. A string the
+ * page DECLARES (record.declared; requiredText.js) is not touched: repainting
+ * required lettering correctly has to name it.
+ *
+ * @param {string} text   an instruction / issue line bound for an image model
+ * @param {{items?: Array<{text}>, declared?: string[]}|null} record  letteringRecord() of the same image
+ * @returns {string}
+ */
+function redactReadLettering(text, record) {
+  if (typeof text !== 'string' || !text) return text;
+  const items = Array.isArray(record?.items) ? record.items : [];
+  const declaredSquashed = (Array.isArray(record?.declared) ? record.declared : []).map(squash).filter(Boolean);
+  const seen = [...new Set(items.map(i => String(i?.text || '').trim()).filter(Boolean))]
+    .filter(t => !isDeclared(t, declaredSquashed))
+    .sort((a, b) => b.length - a.length);
+  if (!seen.length) return text;
+  const QUOTE = '["\'“”‘’«»„‹›`]';
+  const NOUN = '(?:the\\s+)?(?:(?:lettering|letters|text|words?|writing|caption|label|inscription)\\s+)?';
+  const keepCase = (m, repl) => (/^\p{Lu}/u.test(m) ? repl.charAt(0).toUpperCase() + repl.slice(1) : repl);
+  let out = text;
+  for (const t of seen) {
+    const body = t.split(/\s+/).map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('\\s+');
+    const quoted = new RegExp(NOUN + QUOTE + '\\s*' + body + '\\s*' + QUOTE, 'giu');
+    out = out.replace(quoted, (m) => keepCase(m, 'the lettering'));
+    // A bare mention ("the word BANZ"): only a string long enough to be a word,
+    // so a one-letter reading cannot eat ordinary prose.
+    if (squash(t).length >= 3) {
+      const bare = new RegExp(NOUN + '(?<![\\p{L}\\p{N}])' + body + '(?![\\p{L}\\p{N}])', 'giu');
+      out = out.replace(bare, (m) => keepCase(m, 'the lettering'));
+    }
+  }
+  return out.replace(/(the lettering)(\s+the lettering)+/gi, '$1');
+}
+
+module.exports = { checkUndeclaredLettering, letteringRecord, redactReadLettering, isDeclared, squash };

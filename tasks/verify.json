@@ -8447,6 +8447,25 @@
         "result": "HUMAN",
         "note": "human check | LOOK: View the plain avatar of a 6-9 year old next to the photo: proportions and face read school-age, not preschool."
       }
+    },
+    {
+      "id": "repair-never-sends-read-lettering-2026-10-09",
+      "title": "A repair of unrequested lettering never sends the letters the judge read to the image model",
+      "commits": [],
+      "addedAt": "2026-10-09",
+      "claim": "On a page whose inventory read lettering the page did not ask for, the inpaint instruction (stored inpaintInstruction / consolidatedPlan.scene_fix.instruction) names where the lettering is and never contains the letters it read, and the repaired version shows no new lettering.",
+      "runShape": [
+        "needs-inpaint"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "On a page with a CRITICAL rendered_text finding repaired by inpaint: read the stored inpaint instruction (no quoted word from letteringInventory.items[].text), then view the repaired version at full size next to the original: no lettering was added where the finding pointed.",
+        "images": [
+          "versions"
+        ]
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [

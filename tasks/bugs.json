@@ -3998,6 +3998,13 @@
       "fixedAt": "2026-10-08",
       "fixedIn": "81125e505",
       "fix": "buildTrialStoryPrompt composes the hair detail with buildHairDescription (the one composer; no other site interpolates the object), and the creature tone block is labelled picture-only (labelCreatureToneForTrialWriter). The beats text writer never receives the tone block (Art Director and Visual Bible templates only). Test: tests/unit/trial-prompt-object-leak-and-creature-look.test.ts."
+    },
+    {
+      "id": "repair-quotes-misread-lettering-and-grok-paints-it",
+      "title": "A repair of unrequested lettering quoted the word the judge read (\"Paint over 'BANZ' on stone bands of both church towers\"), and the image model painted that word onto the page: the repair created the defect it was told to remove",
+      "reportedAt": "2026-10-09",
+      "source": "Staging job_1791531449494_o0kaatvmq page 3. v0 (original) has only a carved ornament band on the two church towers; the quality judge's lettering inventory read it as \"BANZ\" and filed a CRITICAL rendered_text finding. inpaint-round-1 sent Grok \"1. Paint over 'BANZ' on stone bands of both church towers.\" (consolidatedPlan.scene_fix.instruction, derived from the finding description). Full-resolution crops: v0 has no letters, v1 has \"BANZ\" in two plaques.",
+      "status": "open"
     }
   ]
 }

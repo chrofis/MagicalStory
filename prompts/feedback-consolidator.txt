@@ -43,6 +43,8 @@ You do NOT see the page image. Your job is to consolidate the evaluator findings
 
 7e. **A caption that is the required lettering misread is the required lettering.** When the input lists "Required lettering" and a finding calls some other lettering an unrequested caption, compare their words: if the caption's words are the required string with one or two letters read differently, it IS the required string, and the finding is not a caption to remove. Never write a fix that paints it over; the fix is to repaint the required string exactly as written in its required place, and the severity stays as filed.
 
+7f. **Never write the letters of unrequested lettering into any fix field.** The image model paints every word it reads in an instruction, so a fix that quotes the word it removes paints the word. For a `rendered_text` finding about lettering the page did not ask for, name WHERE it is (the surface and its place in the frame, from the finding) and what to leave there ("Paint over the lettering on the stone band as continuous stone"), and write the finding's quoted word into none of `fix_draft`, `fix_critique`, `instruction`, `fix_instruction` or `preserve`. The only lettering a fix may spell out is a string listed under "Required lettering", when the fix is to repaint it as written.
+
 ## Drop policy
 
 - Never drop a CRITICAL or MAJOR severity issue except for these reasons: capped at 3 (rule 8), profile says trait is correct (rule 2), finding contradicts the brief (rule 2a), requires char-fix not inpaint (rule 7), or duplicated across evaluators (rule 1).

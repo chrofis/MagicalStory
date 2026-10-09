@@ -7,6 +7,7 @@
  */
 
 const { log } = require('../utils/logger');
+const { redactReadLettering } = require('./letteringCheck');
 const { baseVbId } = require('./vbIdGuard');
 const { MODEL_DEFAULTS, IMAGE_MODELS, emptyScenePlateRouting } = require('../config/models');
 const { resolveArtStyle } = require('./storyHelpers');
@@ -1177,11 +1178,11 @@ async function iterateCover(coverKey, storyData, options = {}) {
   if (evaluationFeedback) {
     const feedbackParts = [];
     if (evaluationFeedback.reasoning) {
-      feedbackParts.push(`IMPORTANT - The previous generation had these quality issues that MUST be fixed:\n${evaluationFeedback.reasoning}`);
+      feedbackParts.push(`IMPORTANT - The previous generation had these quality issues that MUST be fixed:\n${redactReadLettering(evaluationFeedback.reasoning, evaluationFeedback.letteringInventory)}`);
     }
     if (evaluationFeedback.fixableIssues?.length > 0) {
       feedbackParts.push('Specific problems to avoid:\n' +
-        evaluationFeedback.fixableIssues.slice(0, 10).map(i => `- ${i.description || i.issue || i}`).join('\n'));
+        evaluationFeedback.fixableIssues.slice(0, 10).map(i => `- ${redactReadLettering(i.description || i.issue || String(i), evaluationFeedback.letteringInventory)}`).join('\n'));
     }
     if (feedbackParts.length > 0) {
       coverPrompt = `${coverPrompt}\n\n${feedbackParts.join('\n\n')}`;

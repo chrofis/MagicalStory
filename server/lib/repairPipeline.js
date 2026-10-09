@@ -30,6 +30,7 @@ const { MODEL_DEFAULTS, REPAIR_DEFAULTS } = require('../config/models');
 const { pickBestVersionIndex, applyScore, computeFinalScore } = require('./scoring');
 const { decideRepairMethod, findBadPages, collectCriticalFindings, resolveDeclaredCast, inheritSceneContract, resolveVersionCompressedScene, resolveVersionPrompt, resolveOwnRenderPrompt, AUDIT_ADMIT_MAX } = require('./repairLogic');
 const { sanitizeIssueForInpaint } = require('./imageCompositing');
+const { redactReadLettering } = require('./letteringCheck');
 const pLimit = require('p-limit');
 
 const getStoryHelpers = () => require('./storyHelpers');
@@ -68,7 +69,7 @@ function buildRegenFeedback(evaluation) {
     // sanitizeIssueForInpaint: entity-grid vocabulary ("cells A, D, F") in an
     // issue description would otherwise reach the regeneration prompt.
     parts.push('IMPORTANT — Fix these issues from the previous attempt:\n' +
-      evaluation.fixableIssues.map(i => `- ${sanitizeIssueForInpaint(i.description || i.issue || i)}`).join('\n'));
+      evaluation.fixableIssues.map(i => `- ${redactReadLettering(sanitizeIssueForInpaint(i.description || i.issue || i), evaluation.letteringInventory)}`).join('\n'));
   }
   // Cap total feedback to 2000 chars to stay within prompt limits
   const feedback = parts.join('\n\n');
@@ -1274,6 +1275,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         score: latestEval.score ?? latestEval.qualityScore,
         reasoning: latestEval.reasoning?.substring(0, 4000),
         fixableIssues: (latestEval.fixableIssues || []).slice(0, 10),
+        // What the blind inventory read: the iterate legs keep the letters of
+        // unrequested lettering out of what they send on (letteringCheck.redactReadLettering).
+        letteringInventory: latestEval.letteringInventory ?? null,
         fixTargets: (latestEval.enrichedFixTargets || latestEval.fixTargets || []).slice(0, 8),
       } : null;
       const versions = pageVersions.get(img.pageNumber) || [];
