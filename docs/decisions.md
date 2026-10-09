@@ -67773,3 +67773,11 @@ Touched files: server/lib/vbIdGuard.js, server/lib/promptBuilders.js, server/lib
 **Rationale:** (1) repair costs USD 0.475 of 5.58 per story (8.5%); never-shipped attempts USD 0.25/story. (2) action_interaction is on 47% of first renders, triggers 74% of repaired pages and 29% of repair spend (39% in the current build); a fresh render clears it 28% of the time; 7 of 12 sampled were judge noise; overall 18 of 37 sampled top findings were noise (clothing 4/5, identity 3/5, setting 2/5, object_presence 1/5, missing_element 1/5). (3) turning the blind compliance judge off on 2026-09-19 cut repair spend from USD 0.68 to 0.40 per story and pages repaired from 49% to 36%. (4) inpaint ships 52%, iterate 45%, char-fix 45% (55% lower the score), scale-repair 0/5; a CRITICAL is fully cleared in 32% of attempts. Rounds 2+ are not waste (37 of 122 shipped, 35 improved, mean +20). Single reviewer, n 4-12 per type: rates are plus or minus 25 points.
 **Revisit if:** action_interaction judge calibration lands (re-measure; expect repair below USD 0.30/story and shipped CRITICALs below 5%), or a per-attempt cost ledger exists.
 **Touched files:** scripts/analysis/repair-economics-extract.js, repair-economics.js, repair-economics-samples.js, repair-economics-report.js (analysis only).
+
+## 2026-10-09 — No code age check; a toddler alone in a public place is not a trial defect
+
+**Context:** two open owner calls from the Jev measurements: a code compare of drawn vs declared age (4/4 real, 0 false on 211 rows), and whether a child aged 4 or younger in a public place with no adult named is a trial defect (29 of 118 toddler pages would flag).
+**Decision:** owner, 2026-10-09: "No age check." and "Toddler alone is ok." Neither check is built.
+**Rationale:** owner call. The age compare stays measured only (scripts/analysis/eval-jev-blind-age.js); the existing escort rule in the trial writer (simple age bands) is unchanged.
+**Revisit if:** the owner asks again.
+**Touched files:** none.
