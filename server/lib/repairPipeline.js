@@ -302,6 +302,50 @@ function mergeEntityIssues(base, fresh, repairedPages) {
   return merged;
 }
 
+// ---------------------------------------------------------------------
+// PAIRED RE-JUDGE, every repair child (owner 2026-10-09: "Full rejudge, as repair can introduce
+// new issues. But also judge against the old image to see if an issue is really new and not eval
+// noise"). A repaired version is judged in full, and each finding on it is checked against the
+// picture it was repaired from: visible there too = not introduced by the repair (tagged
+// alsoInParent, charged to the parent as well); absent there = introduced, charged in full.
+// Labelled by eye on 44 stored "new" MAJOR+ findings: 31 were visible in the parent, 5 judge
+// noise, 8 really new. Two halves, ONE helper pair for every repair method, round, cover and
+// page (iterate, inpaint, char-fix, recolour, the post-repair text re-render): attachParentCompare
+// hands the semantic judge the parent beside the child; checkFindingsAgainstParent asks the
+// quality / compliance / entity / reader findings in one batched call (docs/decisions.md 2026-10-09).
+// ---------------------------------------------------------------------
+function attachParentCompare(input, parent) {
+  if (parent && typeof parent.imageData === 'string' && parent.imageData.length > 0) {
+    const { parentFindingsForCompare } = require('./scoring');
+    input.parentCompare = { imageData: parent.imageData, findings: parentFindingsForCompare(parent) };
+    return;
+  }
+  log.error(`❌ [PARENT-SHARED] p${input.pageNumber}: the parent picture has no bytes in memory — this repair child cannot be judged beside it, its findings stay charged to the repair`);
+}
+
+async function checkFindingsAgainstParent({ plan, childImage, parentCompare, pageNumber, label, usageTracker = null }) {
+  if (!plan) return;
+  if (!parentCompare?.imageData || typeof childImage !== 'string') {
+    plan.parentCheck = { asked: 0, tagged: 0, error: 'no parent picture or no child bytes to compare' };
+    log.error(`❌ [PARENT-SHARED] p${pageNumber}: no parent picture or child bytes to compare — the child's findings stay charged to the repair`);
+    return;
+  }
+  const { tagFindingsSharedWithParent } = require('./sceneValidator');
+  const res = await tagFindingsSharedWithParent({
+    childImage, parentImage: parentCompare.imageData, plan, parentFindings: parentCompare.findings, pageNumber,
+  });
+  plan.parentCheck = { asked: res.asked, tagged: res.tagged, error: res.error };
+  if (res.usage && usageTracker) {
+    usageTracker('gemini_quality', {
+      input_tokens: res.usage.input_tokens || 0, output_tokens: res.usage.output_tokens || 0,
+      thinking_tokens: res.usage.thinking_tokens || 0,
+    }, label, res.usage.modelId || 'gemini-2.5-flash');
+  }
+}
+
+// Also run by the Test Lab's eval, variance and consolidate stages (testlab.js), so a Lab score of a repair
+// child is the production score. `parent` is a version-like { imageData, deductions }.
+
 /**
  * ONE evaluateImageBatch input for a page version: `entry` is the version being
  * judged, `orig` the page's first-render record (the run's rawImages entry), and
@@ -1027,47 +1071,6 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     } catch (err) {
       log.warn(`🧠 [EVAL-CONSOLIDATION] P${pageNumber}: threw (${err.message}) — the version will be left unevaluated (never scored on raw issues)`);
       return null;
-    }
-  };
-
-  // ---------------------------------------------------------------------
-  // PAIRED RE-JUDGE, every repair child (owner 2026-10-09: "Full rejudge, as repair can introduce
-  // new issues. But also judge against the old image to see if an issue is really new and not eval
-  // noise"). A repaired version is judged in full, and each finding on it is checked against the
-  // picture it was repaired from: visible there too = not introduced by the repair (tagged
-  // alsoInParent, charged to the parent as well); absent there = introduced, charged in full.
-  // Labelled by eye on 44 stored "new" MAJOR+ findings: 31 were visible in the parent, 5 judge
-  // noise, 8 really new. Two halves, ONE helper pair for every repair method, round, cover and
-  // page (iterate, inpaint, char-fix, recolour, the post-repair text re-render): attachParentCompare
-  // hands the semantic judge the parent beside the child; checkFindingsAgainstParent asks the
-  // quality / compliance / entity / reader findings in one batched call (docs/decisions.md 2026-10-09).
-  // ---------------------------------------------------------------------
-  const attachParentCompare = (input, parent) => {
-    if (parent && typeof parent.imageData === 'string' && parent.imageData.length > 0) {
-      const { parentFindingsForCompare } = require('./scoring');
-      input.parentCompare = { imageData: parent.imageData, findings: parentFindingsForCompare(parent) };
-      return;
-    }
-    log.error(`❌ [PARENT-SHARED] p${input.pageNumber}: the parent picture has no bytes in memory — this repair child cannot be judged beside it, its findings stay charged to the repair`);
-  };
-
-  const checkFindingsAgainstParent = async ({ plan, childImage, parentCompare, pageNumber, label }) => {
-    if (!plan) return;
-    if (!parentCompare?.imageData || typeof childImage !== 'string') {
-      plan.parentCheck = { asked: 0, tagged: 0, error: 'no parent picture or no child bytes to compare' };
-      log.error(`❌ [PARENT-SHARED] p${pageNumber}: no parent picture or child bytes to compare — the child's findings stay charged to the repair`);
-      return;
-    }
-    const { tagFindingsSharedWithParent } = require('./sceneValidator');
-    const res = await tagFindingsSharedWithParent({
-      childImage, parentImage: parentCompare.imageData, plan, parentFindings: parentCompare.findings, pageNumber,
-    });
-    plan.parentCheck = { asked: res.asked, tagged: res.tagged, error: res.error };
-    if (res.usage && usageTracker) {
-      usageTracker('gemini_quality', {
-        input_tokens: res.usage.input_tokens || 0, output_tokens: res.usage.output_tokens || 0,
-        thinking_tokens: res.usage.thinking_tokens || 0,
-      }, label, res.usage.modelId || 'gemini-2.5-flash');
     }
   };
 
@@ -2538,6 +2541,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             parentCompare: recolourInputsByPage.get(ev.pageNumber)?.parentCompare,
             pageNumber: ev.pageNumber,
             label: `parent_shared_recolour_r${round}`,
+            usageTracker,
           }))));
 
           for (const ev of recolourEvals) {
@@ -2975,6 +2979,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         parentCompare: roundEvalInputs.find(i => i.pageNumber === ev.pageNumber)?.parentCompare,
         pageNumber: ev.pageNumber,
         label: `parent_shared_r${round}`,
+        usageTracker,
       }))));
 
       // pageVersions append is intentionally sequential here. Earlier audits
@@ -3423,7 +3428,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         await checkFindingsAgainstParent({
           plan, childImage: c.newVersion.imageData,
           parentCompare: tsInputs.find(i => i.pageNumber === c.pageNumber)?.parentCompare,
-          pageNumber: c.pageNumber, label: 'parent_shared_text_space',
+          pageNumber: c.pageNumber, label: 'parent_shared_text_space', usageTracker,
         });
         c.newVersion.evaluation = ev;
         c.newVersion.score = ev.score ?? ev.qualityScore ?? null;
@@ -4335,6 +4340,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
 }
 
 module.exports = {
+  attachParentCompare,
+  checkFindingsAgainstParent,
   buildEvalInput,
   buildInpaintCall,
   consolidationInputs,

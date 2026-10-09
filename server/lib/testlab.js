@@ -239,6 +239,30 @@ function pinnedVersionIndex(versionIndex) {
   return Number.isFinite(n) ? n : null;
 }
 
+/**
+ * The stored version a pinned repair child was repaired from, with its picture loaded
+ * (`target.parentVersionIndex`), or null when the target pins none. PAIRED RE-JUDGE parity (owner
+ * 2026-10-09): production judges every repair child beside this version and checks its findings
+ * against it (repairPipeline.attachParentCompare / checkFindingsAgainstParent); every Lab stage that
+ * evaluates or consolidates a child uses the same two functions on this parent. Loads the parent
+ * picture, which resets getLastPageLoad(): call it AFTER the child's load has been read.
+ */
+async function labParentVersion(ctx) {
+  const parentIdx = pinnedVersionIndex(ctx.target?.parentVersionIndex);
+  if (parentIdx === null) return null;
+  const versions = ctx.scene.imageVersions || [];
+  const parentVersion = versions[require('./versionManager').arrayIndexForDb(versions, parentIdx, 'scene')] || null;
+  if (!parentVersion) throw new Error(`parentVersionIndex ${parentIdx} not found on this page`);
+  return { ...parentVersion, imageData: await loadActivePageImage(ctx.storyId, ctx.pageNumber, parentIdx) };
+}
+
+/** The `parentCompare` production's attachParentCompare builds for a child eval input, for a stage that has no input to attach to. */
+function labParentCompareOf(ctx, parent) {
+  const holder = { pageNumber: ctx.pageNumber };
+  require('./repairPipeline').attachParentCompare(holder, parent);
+  return holder.parentCompare || null;
+}
+
 async function loadActivePageImage(storyId, pageNumber, versionIndex = null, imageType = null) {
   _lastPageLoad = null;
   const { getActiveVersion, getStoryImage } = require('../services/database');
@@ -1268,6 +1292,9 @@ async function runQualityEvalStage(ctx, { promptOverride, experimentId, params =
     // because an override wins there too, the P1 inventory) for one experiment.
     qualityModelOverride: params.model || null,
   });
+  // PAIRED RE-JUDGE: a pinned repair child is judged beside its parent, as the repair round does it.
+  const labParent = await labParentVersion(ctx);
+  if (labParent) require('./repairPipeline').attachParentCompare(input, labParent);
   const [result] = await images.evaluateImageBatch([input], options);
   const elapsedMs = Date.now() - t0;
   if (!result || !result.evaluated) throw new Error(`Quality evaluation failed: ${result?.error || result?.evalError || 'no result'}`);
@@ -1395,6 +1422,9 @@ async function runEvalVarianceStage(ctx, { experimentId, params = {} }) {
   // (detection enrichment, identity reconcile) are not repeated: this stage
   // scores the evaluators' findings itself (composeDeductions).
   const { input: evalInput, options: evalBatchOptions } = labEvalCall(ctx, { imageData, loadedVersion: getLastPageLoad()?.loadedVersion ?? null });
+  // PAIRED RE-JUDGE: a pinned repair child is judged beside its parent (every repeat), as production does.
+  const labParent = await labParentVersion(ctx);
+  if (labParent) require('./repairPipeline').attachParentCompare(evalInput, labParent);
   const evalCall = require('./images').batchEvalQualityCall(evalInput, evalBatchOptions);
   const sceneDescription = evalCall.sceneDescription;
 
@@ -1459,6 +1489,13 @@ async function runEvalVarianceStage(ctx, { experimentId, params = {} }) {
         });
         plan = res.plan || null;
         if (res.error) consolidateError = res.error;
+        // The same parent-picture check the repair round runs on the plan (one batched call).
+        if (plan && labParent) {
+          await require('./repairPipeline').checkFindingsAgainstParent({
+            plan, childImage: imageData, parentCompare: evalInput.parentCompare,
+            pageNumber: ctx.pageNumber, label: 'testlab_parent_shared',
+          });
+        }
       } catch (err) { consolidateError = err.message; }
     }
     const scored = plan ? composeDeductions({ evalResult, consolidated: plan.deduped_issues }) : raw;
@@ -1637,19 +1674,10 @@ async function runSemanticEvalStage(ctx, { promptOverride, experimentId }) {
   const { input, options } = labEvalCall(ctx, { imageData, loadedVersion: ctx.imageDataOverride ? null : (getLastPageLoad()?.loadedVersion ?? null) });
   // PAIRED RE-JUDGE (A2): `target.parentVersionIndex` is the stored version this one was repaired
   // from. The run hands the judge the same two things for a repair child: the parent picture and
-  // the parent's stored findings (scoring.parentFindingsForCompare), carried on the batch input.
-  const parentIdx = pinnedVersionIndex(ctx.target?.parentVersionIndex);
-  let parentCompare = null;
-  if (parentIdx !== null) {
-    const versions = ctx.scene.imageVersions || [];
-    const parentVersion = versions[require('./versionManager').arrayIndexForDb(versions, parentIdx, 'scene')] || null;
-    if (!parentVersion) throw new Error(`parentVersionIndex ${parentIdx} not found on this page`);
-    parentCompare = {
-      imageData: await loadActivePageImage(ctx.storyId, ctx.pageNumber, parentIdx),
-      findings: require('./scoring').parentFindingsForCompare(parentVersion),
-    };
-    input.parentCompare = parentCompare;
-  }
+  // the parent's stored findings (built by repairPipeline.attachParentCompare), carried on the batch input.
+  const labParent = await labParentVersion(ctx);
+  if (labParent) require('./repairPipeline').attachParentCompare(input, labParent);
+  const parentCompare = input.parentCompare || null;
   const evalCall = require('./images').batchEvalQualityCall(input, options);
   const { judgedSceneText, prepareEvalJudgeInputs, semanticFidelityOptions } = require('./evalPipeline');
   const pageContext = `testlab-exp${experimentId}-P${ctx.pageNumber}`;
@@ -4945,6 +4973,7 @@ async function runConsolidateStage(ctx, { promptOverride, experimentId, params =
   const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber, ctx.versionIndex ?? null);
   const stored = labStoredPageEval(ctx, { imageData, loadedVersion: getLastPageLoad()?.loadedVersion ?? null });
   const inputs = await labConsolidationInputs(ctx, { evaluation: params.evaluation || stored.evaluation, orig: stored.orig, version: stored.version, params });
+  const labParent = await labParentVersion(ctx);
   const t0 = Date.now();
   const result = await consolidateEvaluation({
     ...inputs,
@@ -4954,6 +4983,13 @@ async function runConsolidateStage(ctx, { promptOverride, experimentId, params =
     promptOverride: promptOverride || null,
     modelOverride: params.model || null,
   });
+  // PAIRED RE-JUDGE: the plan of a pinned repair child gets the repair round's parent-picture check.
+  if (result?.plan && labParent) {
+    await require('./repairPipeline').checkFindingsAgainstParent({
+      plan: result.plan, childImage: imageData, parentCompare: labParentCompareOf(ctx, labParent),
+      pageNumber: ctx.pageNumber, label: 'testlab_parent_shared',
+    });
+  }
   const elapsedMs = Date.now() - t0;
   // Severity mix is the point of these runs — surface it next to the plan so a
   // comparison doesn't require reading every issue by hand.
