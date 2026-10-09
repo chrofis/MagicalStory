@@ -42,3 +42,37 @@ export function mergeAvatarSlides(prev: string[], incoming: unknown): string[] {
 export function shouldRedirectToStories(pageState: string, isVerified: boolean, googleLinked: boolean): boolean {
   return pageState === 'completed' && (isVerified || googleLinked);
 }
+
+/**
+ * The waiting-screen avatar pool: the slides once the server has any, the hero's front picture only until then.
+ * The hero IS the front body cell of the standard sheet, which is also the first body slide: keeping both showed that
+ * figure three times in the first five slots (owner iPhone, 2026-10-09: "the main avatar comes up too often at the
+ * start"). Strings can not tell them apart (hero is a data URI, slides are stored URLs), so the hero steps aside.
+ */
+export function avatarPoolSources(hero: string | null | undefined, slides: string[]): string[] {
+  const out: string[] = [];
+  for (const s of slides.length > 0 ? slides : hero ? [hero] : []) if (s && !out.includes(s)) out.push(s);
+  return out;
+}
+
+/**
+ * The next avatar to show: walking on from the current one in list order, the first that has not been shown yet; once
+ * every picture of the pool has been shown the round starts again (`shown` is cleared in place, the current one kept).
+ * Position comes from the picture, not from a counter, so a pool that grows or is replaced while the slideshow runs
+ * (slides arrive in stages) never restarts it at the first picture. Returns the pool's first picture when nothing is current.
+ */
+export function nextAvatarSource(pool: string[], shown: Set<string>, current: string | null): string | null {
+  if (pool.length === 0) return null;
+  const at = current ? pool.indexOf(current) : -1;
+  if (current) shown.add(current);
+  if (pool.every(s => shown.has(s))) {
+    shown.clear();
+    if (current) shown.add(current);
+    if (pool.length === 1) return pool[0];
+  }
+  for (let k = 1; k <= pool.length; k++) {
+    const candidate = pool[(at + k + pool.length) % pool.length];
+    if (!shown.has(candidate)) return candidate;
+  }
+  return pool[0];
+}

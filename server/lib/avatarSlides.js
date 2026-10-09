@@ -122,7 +122,9 @@ async function buildAvatarSlides(styledAvatars, log = defaultLog) {
     try { perSheet.push(await slidesFromSheet(source)); }
     catch (err) { log.error(`[TRIAL AVATARS] avatar slides: sheet skipped (${err.message})`); }
   }
-  return brandCutList(interleaveSheetSlides(perSheet));
+  // A picture the cutters returned twice (identical bytes) shows once: the stored list of the owner's iPhone trial held the
+  // standard front body twice and a head twice (docs/decisions.md 2026-10-09 "Trial waiting slides").
+  return brandCutList([...new Set(interleaveSheetSlides(perSheet))]);
 }
 
 /**

@@ -10,11 +10,12 @@ process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-secret-waiting-page';
 
 // A styled 2x4 sheet as the pipeline stacks it: a SHORT head row over a TALLER body row, white gutter between.
 const W = 1024, HEAD_H = 440, SEAM = 8, BODY_H = 576;
-async function sheet() {
+// `tint` makes every figure of the sheet differ from the other sheet's: the slide list drops byte-identical cells.
+async function sheet(tint = 0) {
   const cells = [];
   for (let c = 0; c < 4; c++) {
-    cells.push({ input: await sharp({ create: { width: 200, height: 396, channels: 3, background: { r: 200, g: 120, b: 60 } } }).png().toBuffer(), left: c * 256 + 28, top: 40 });
-    cells.push({ input: await sharp({ create: { width: 140, height: 480, channels: 3, background: { r: 60, g: 90, b: 200 } } }).png().toBuffer(), left: c * 256 + 58, top: HEAD_H + SEAM + 40 });
+    cells.push({ input: await sharp({ create: { width: 200, height: 396, channels: 3, background: { r: 200 - c * 15 - tint, g: 120, b: 60 } } }).png().toBuffer(), left: c * 256 + 28, top: 40 });
+    cells.push({ input: await sharp({ create: { width: 140, height: 480, channels: 3, background: { r: 60 + c * 15 + tint, g: 90, b: 200 } } }).png().toBuffer(), left: c * 256 + 58, top: HEAD_H + SEAM + 40 });
   }
   const buf = await sharp({ create: { width: W, height: HEAD_H + SEAM + BODY_H, channels: 3, background: { r: 255, g: 255, b: 255 } } })
     .composite(cells).jpeg({ quality: 92 }).toBuffer();
@@ -50,7 +51,7 @@ describe('avatar slides are whole cells (not 1:4 column strips)', () => {
     const { buildAvatarSlides, sheetSourcesOf, interleaveSheetSlides } = require('../../server/lib/avatarSlides');
     expect(sheetSourcesOf({ standard: 'S', costumed: { default: 'C' } })).toEqual(['C', 'S']);
     expect(interleaveSheetSlides([['c0', 'c1', 'c2', 'c3'], ['s0', 's1', 's2', 's3']])).toEqual(['c0', 'c1', 's0', 's1', 'c2', 'c3', 's2', 's3']);
-    const both = await buildAvatarSlides({ standard: await sheet(), costumed: { default: await sheet() } }, { error: () => {} });
+    const both = await buildAvatarSlides({ standard: await sheet(), costumed: { default: await sheet(7) } }, { error: () => {} });
     expect(both).toHaveLength(12);
   });
 

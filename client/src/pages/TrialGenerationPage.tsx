@@ -10,7 +10,7 @@ import { trackEmailLead, trackTrialStoryCompleted } from '@/utils/gtagConversion
 import { trackEvent } from '@/utils/analytics';
 import { trackTrialStep } from '@/utils/trialFunnel';
 import { FUNNY_MESSAGES, NAMELESS_FUNNY_MESSAGES, funnyDeck, funnyLine } from '@/utils/funnyMessages';
-import { classifyJobStatusHttp, MAX_TRANSIENT_POLL_ERRORS, pollBackoffMs, mergeAvatarSlides, shouldRedirectToStories } from '@/utils/trialPoll';
+import { classifyJobStatusHttp, MAX_TRANSIENT_POLL_ERRORS, pollBackoffMs, mergeAvatarSlides, shouldRedirectToStories, avatarPoolSources, nextAvatarSource } from '@/utils/trialPoll';
 import { Navigation } from '@/components/common';
 import RenderErrorBoundary from '@/components/common/RenderErrorBoundary';
 import TrialBook, { TrialGateProvider } from '@/components/book/TrialBook';
@@ -741,6 +741,13 @@ export default function TrialGenerationPage() {
   const hasHeroName = !!state?.characterName;
   const funnyOrder = useMemo(() => funnyDeck(hasHeroName ? FUNNY_MESSAGES.length : NAMELESS_FUNNY_MESSAGES.length), [hasHeroName]);
 
+  // The pool and the picture on screen. A picture is chosen when the slideshow advances (nextAvatarSource), so more
+  // slides arriving never restart the sequence and no picture repeats before all have shown.
+  const avatarPool = useMemo(() => avatarPoolSources(state?.heroAvatar, avatarSlides), [state?.heroAvatar, avatarSlides]);
+  const shownAvatarsRef = useRef<Set<string>>(new Set());
+  const [avatarSrc, setAvatarSrc] = useState<string | null>(null);
+  const currentAvatar = avatarSrc && avatarPool.includes(avatarSrc) ? avatarSrc : avatarPool[0] ?? null;
+
   const slideshowItems = useMemo<Slide[]>(() => {
     const items: Slide[] = [];
     // The resume paths (the wizard's "View your story", storage recovery) carry
@@ -753,13 +760,10 @@ export default function TrialGenerationPage() {
 
     // Intro phase — no story images yet. Rotate avatar + benefits/funny
     // captions while the pipeline warms up.
-    const avatarPool: { src: string; label: string }[] = [];
+    // Which picture shows is decided by currentAvatar (never repeats before all have shown); the slot only
+    // carries the caption. A slot exists while there is a pool.
     const heroLabel = characterName || t.brand;
-    if (state?.heroAvatar) avatarPool.push({ src: state.heroAvatar, label: heroLabel });
-    for (let i = 0; i < avatarSlides.length; i++) {
-      avatarPool.push({ src: avatarSlides[i], label: `${heroLabel} - Style ${i + 1}` });
-    }
-    const pickAvatar = (i: number) => avatarPool.length > 0 ? avatarPool[i % avatarPool.length] : null;
+    const pickAvatar = () => avatarPool.length > 0 ? { src: avatarPool[0], label: heroLabel } : null;
     // The funny deck is drawn ONCE per page view (funnyOrder, a ref-backed memo): a rebuild of this list when
     // more avatar slides arrive must not reshuffle the captions already shown, or a line repeats.
     let funnySlot = 0;
@@ -772,7 +776,7 @@ export default function TrialGenerationPage() {
     // before it can wrap (about 6 s a slot, 9 s for an info caption: 60+ lines cover a 6 minute wait).
     const slotCount = funnyPool.length + 2;
     for (let i = 0; i < slotCount; i++) {
-      const a = pickAvatar(i);
+      const a = pickAvatar();
       if (!a) break;
       const caption: SlideCaption =
         i === 0 ? { kind: 'message', text: trialIntro, tone: 'info' }
@@ -783,7 +787,7 @@ export default function TrialGenerationPage() {
     return items;
   // funnyMessages is a module-scope const (declared above the component); safe to omit from deps
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state?.heroAvatar, state?.characterName, state?.storyInput?.language, language, avatarSlides, t, funnyOrder]);
+  }, [avatarPool.length > 0, state?.characterName, state?.storyInput?.language, language, t, funnyOrder]);
 
   // Rotate slideshow — info messages stay up longer so they're readable;
   // funny + image-only slides tick faster. The interval re-fires on every
@@ -800,9 +804,10 @@ export default function TrialGenerationPage() {
     else if (currentSlide.caption.kind === 'none') dwellMs = 10000;
     const id = setTimeout(() => {
       setSlideshowIndex(prev => (prev + 1) % Math.max(1, slideshowItems.length));
+      setAvatarSrc(nextAvatarSource(avatarPool, shownAvatarsRef.current, currentAvatar));
     }, dwellMs);
     return () => clearTimeout(id);
-  }, [slideshowIndex, slideshowItems]);
+  }, [slideshowIndex, slideshowItems, avatarPool, currentAvatar]);
 
   // Smoothed-progress driver. Floors the visible bar with a time-based optimistic
   // curve so the user sees forward motion immediately, even when the server
@@ -1104,16 +1109,19 @@ export default function TrialGenerationPage() {
                     {/* Image area — a fixed frame keeps the slot stable while avatars, title and
                         pages of different aspect ratios rotate through. An avatar slide is ONE whole
                         sheet cell (a head or a body, about 1:2): a 3:4 frame shows it whole,
-                        object-contain never crops it, and it is centred (the old top-aligned square
+                        object-contain never crops it, and it is centred. The image FILLS the frame (absolute, h-full): with
+                        max-h-full on an in-flow image WebKit does not resolve the percentage against an aspect-ratio box, so a
+                        1:2 body cell rendered at its natural 2:1 height and the frame cropped head and feet (owner iPhone,
+                        2026-10-09) (the old top-aligned square
                         frame was for 1:4 strips and left a cell hugging the top-left). Title and page
                         images keep the square frame. */}
                     <div
                       className={`relative w-full ${isAvatarLike ? 'max-w-[15rem] aspect-[3/4] items-center' : 'max-w-sm aspect-square items-start'} flex justify-center rounded-xl overflow-hidden bg-indigo-50 ${isAvatarLike ? 'border-4 border-indigo-100' : 'shadow-lg'} transition-opacity duration-300`}
                     >
                       <img
-                        src={item.imageSrc}
+                        src={isAvatarLike && currentAvatar ? currentAvatar : item.imageSrc}
                         alt={item.label}
-                        className="max-w-full max-h-full object-contain"
+                        className={`absolute inset-0 w-full h-full object-contain ${isAvatarLike ? 'p-2' : ''}`}
                       />
                     </div>
 
