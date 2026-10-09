@@ -4038,6 +4038,16 @@
       "fixedAt": "2026-10-09",
       "fixedIn": "2bff703eb",
       "fix": "wornItems.dropAbsentWearerGarments (+ shared garmentWearerAbsent) at brief assembly, brief re-ask and iterate rewrite via jevBriefFields.dropAbsentWearerCites. Test: tests/unit/brief-worn-absent-wearer-drop.test.ts."
+    },
+    {
+      "id": "trial-front-cover-missing-after-late-prewarm",
+      "title": "A trial shipped without a front cover when prepare-title finished more than 60 s after job start: the costumed half of the early styling gave up on the wait timeout",
+      "reportedAt": "2026-10-09",
+      "source": "Staging job_1791554548909_kl0phznw2 (build 574f7b34): generationLog cover_failed \"frontCover: costumed sheet missing for Emma\", covers_missing; prepare-title done 86 s after the harness fired it (about 78 s after job start); character ends with costumed.default (coverage pass made it). 1 of 28 trials in 30 days.",
+      "status": "fixed",
+      "fixedAt": "2026-10-09",
+      "fixedIn": "31988b472",
+      "fix": "storyJobPipeline.runTrialEarlyStyling: a failed or timed-out prepare-title wait is logged and the costumed sheet is styled in the job. Test: tests/unit/trial-five-trials-fixes-2026-10-09.test.ts."
     }
   ]
 }
