@@ -195,6 +195,8 @@ folded whole-word overlap; same usable/never-a-setting filters, class > 0,
 `resolveAvailableLandmarks(location, opts)` is the **single entry point** for both
 the ideas route and the story pipeline. `getIndexedLandmarks()` tries in order:
 
+**Always five real places (2026-10-09, owner).** After the ladder, `topUpToMinimum` guarantees at least `MIN_LANDMARKS_OFFERED` (5) REAL landmarks when the index has them: a short list is topped up from `getIndexedLandmarksNearLocation`, widening 5 → 10 → 20 → 50 km, nearest first, up to the limit. A town's own class-0 "(Stadt)" aerial never counts; idea routes pass `placesOnly` so it is not offered to ideas at all. A shortfall returns what exists and counts `landmarks_under_min`; nothing is invented and discovery is not triggered. docs/decisions.md 2026-10-09.
+
 1. exact town-name match, in two rungs (since 2026-09-05, owner's call):
    - **1a own locality** — rows whose `locality` is the town, plus rows with
      `locality IS NULL` inside a `municipality` of that name (Nominatim zoom 14

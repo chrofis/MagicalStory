@@ -8773,6 +8773,24 @@
         "kind": "human",
         "what": "beatsReviewReport modelFindings / recheck.modelFindings carry check 10/17 lines \"Page N: ...\" with recheck.jev scores; stored checkPrompt has no \"10. Heights\" or \"17. The whole cast\" and says fifteen; jev_plan_check usage rows; planCheckMs not longer than before; no jev_fallback or *_jev_skipped event; any CHECK[17] finding sits on a page whose ROSTER holds every commissioned name."
       }
+    },
+    {
+      "id": "landmarks-always-five-2026-10-09",
+      "title": "Landmark resolvers always return five real places",
+      "commits": [
+        "04c556a80"
+      ],
+      "addedAt": "2026-10-09",
+      "status": "pending",
+      "evidence": [],
+      "claim": "Every landmark resolver (story full/trial, wizard idea, trial idea) hands the writer or idea prompt at least 5 real landmarks when the index has them; a short list is topped up from the nearby index (5/10/20/50 km, nearest first); the town aerial does not count and is not offered to ideas; wizard idea_generated events record detail.landmarkSource.",
+      "runShape": [
+        "any"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "node scripts/analysis/probe-landmarks-always-five.js Fislisbach Baden Zürich --find-small shows >=5 real entries per town (Fislisbach 19) and no aerial in idea lists; a staging idea_generated row has detail.landmarkSource in (jev,pending,absent); a small-town story has no landmarks_under_min in runMetrics; Fislisbach trial-idea landmarks vary over several runs."
+      }
     }
   ],
   "runs": [

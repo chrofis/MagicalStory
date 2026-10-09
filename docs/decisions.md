@@ -67781,3 +67781,11 @@ Touched files: server/lib/vbIdGuard.js, server/lib/promptBuilders.js, server/lib
 **Rationale:** owner call. The age compare stays measured only (scripts/analysis/eval-jev-blind-age.js); the existing escort rule in the trial writer (simple age bands) is unchanged.
 **Revisit if:** the owner asks again.
 **Touched files:** none.
+
+## 2026-10-09 — Landmark resolvers always return five real places
+
+**Context:** Fislisbach's own landmark list was 2 entries (its "(Stadt)" aerial and Kirche Rohrdorf), so 12 of 12 stored Fislisbach trials picked Kirche Rohrdorf, while the index holds 20 real places within 5 km. Owner: "Ensure we always get 5 landmarks."
+**Decision:** `resolveAvailableLandmarks` (the one resolver behind full/trial stories, wizard ideas and trial ideas) guarantees at least 5 REAL landmarks when the index has them. `topUpToMinimum` tops a short list up from `getIndexedLandmarksNearLocation` (same query and filters as the proximity ladder), widening 5 → 10 → 20 → 50 km, nearest first, up to the limit of 20. The town's class-0 aerial never counts; idea routes pass `placesOnly` and do not see it. A shortfall returns what exists, logs an error and counts `landmarks_under_min`; nothing is invented, paid discovery is not triggered. Wizard `idea_generated` events record `detail.landmarkSource` (jev / pending / absent). The weaker additions (bridges, power plants) stay in the pool: Jev ranks the pool and only its top 5 are drawn. The /try flow gets no new idea event for landmarkSource: its landmarks always come from the prepared Jev ranking, and a new event only for that is not worth it.
+**Rationale:** monotony was pool size, not ranking. Staging probe (read-only): Fislisbach 1 → 19 real, Oberwald 1 → 17, Alpthal 1 → 12, Fideris 4 → 12, Baden and Zürich unchanged at 20.
+**Revisit if:** idea quality on small towns drops because of weak additions (then cap the additions or keep the first radius only).
+**Touched files:** server/lib/landmarkPhotos.js, server/lib/jevSelection.js, server/routes/storyIdeas.js, storyJobPipeline.js (jobId for the counters), tests/unit/landmark-always-five.test.ts, scripts/analysis/probe-landmarks-always-five.js. Commit 04c556a80.
