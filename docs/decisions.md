@@ -67862,3 +67862,19 @@ Touched files: server/lib/vbIdGuard.js, server/lib/promptBuilders.js, server/lib
 **Rationale:** 2 misreads in 16 already land mostly at MINOR under the relevance grading. Spend USD 0.
 **Revisit if:** the labelled set reaches about 30 findings with at least 5 misreads, or the inventory describes the eyes separately from the body.
 **Touched files:** scripts/analysis/gaze-misread-set.js (commit 26441b5ad).
+
+## 2026-10-09 — Duplicate main child on trial pages: not a recurring defect, no fix
+
+**Context:** job_1791531512895_3bofwpxh4 p2 showed Tobias twice (carried by Mama and standing) from a clean prompt.
+**Decision:** no prompt or reference change; item removed.
+**Rationale:** all 156 v0 scene pages of the 26 staging trials of the last 22 days viewed: the main child appears twice on 1 page (0.6%), 1 of 26 stories; other carried/held-child pages are clean. Below the 3-instance bar for a shared cause. Spend USD 0.
+**Revisit if:** a later sweep finds at least 3 duplicates (then test "carried pose + full-body standing cell reference").
+**Touched files:** none.
+
+## 2026-10-09 — FINAL-only idea writer rejected on stored evidence: the in-stream review improves the idea
+
+**Context:** idea cards would appear in about 28 s instead of 54 s without [DRAFT]/[REVIEW]; an earlier 4-prompt writer test lost 2 of 4. Free follow-up on stored streams.
+**Decision:** keep the three-step stream; item removed.
+**Rationale:** none of 406 stored ideas has FINAL equal to DRAFT (word-overlap median 0.40). Blind buy score: round-7 study FINAL better 13 / same 7 / worse 0 of 20; a further blind read of 30 random later pairs better 15 / tie 14 / worse 1 (Sonnet 4.6 output). Together 28 better, 21 tie, 1 worse of 50: the review cuts leaked middle/ending sentences and structure leftovers and adds the stake or closing picture. Spend USD 0.
+**Revisit if:** a blind run of at least 22 prompts on the current writer model shows FINAL-only parity.
+**Touched files:** none.
