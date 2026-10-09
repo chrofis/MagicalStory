@@ -68002,3 +68002,11 @@ Touched files: server/lib/vbIdGuard.js, server/lib/promptBuilders.js, server/lib
 4. Not measured: PERSON_WORDS / INTERACTION_DRAMA_WORDS (no stored roster, see the clothing entry above); sceneGeometry isClean (measured in that entry, not clearly better); bboxDetection `isMissing` regex on the issue text only picks a log level (type already decides), left.
 **Revisit if:** the owner chooses one of 1-3; item 2 is the strongest case (90% to 100% on 69 names, but one set).
 **Touched files:** scripts/analysis/extract-spec-conflict-cases.js, measure-jev-spec-conflict.js, measure-jev-worn-slot.js, measure-jev-garment-colour.js, measure-slot-fallback.js, evals/runs/2026-10-09_jev-specconflict/.
+
+## 2026-10-09 — Deleted `feedbackConsolidator.detectDeclaredSpecConflicts` (owner decision on the prose-meaning measurement)
+
+**Context:** the code check read body-part keywords in interaction `where`/`object` text to flag two interactions fighting over one body part. Measured in the "Prose-meaning sites" entry above: 0 of 257 stored pairs flagged, so it never fired on stored data; the Jev alternative was not clearly better (19 flagged, about 6 real).
+**Decision:** deleted the function, `SPEC_BODY_PARTS`, its `plan.spec_conflicts` merge in `consolidateEvaluation`, and the `sceneDescription` argument that only it read (four callers and `consolidationInputs` updated). Spec conflicts now come only from the consolidator model's own `spec_conflicts`.
+**Rationale:** 0/257 firing, and a keyword list over prose is the pattern the owner ruled out ("reading text is the issue"). Replaces the 2026-07-18 deterministic-detection decision (the Addendum around "model-side detection proved input-dependent, ~2/3") only for the code half; the model half stays. Regression: tests/unit/no-code-spec-conflict-check.test.ts. Full unit suite 782 files / 8863 tests green.
+**Revisit if:** the consolidator model misses interaction conflicts that stored pages show (then add a typed `bodyPart` field to the interaction schema, not a keyword list).
+**Touched files:** server/lib/feedbackConsolidator.js, repairPipeline.js, testlab.js, server/routes/regeneration.js, docs/image-generation-methods.html, tests/unit/no-code-spec-conflict-check.test.ts.

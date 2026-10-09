@@ -81,7 +81,6 @@ async function stampCanonicalScore(version, imageResult, opts = {}) {
       const res = await consolidateEvaluation({
         evalResult,
         entityIssues: entityResult?.issues || [],
-        sceneDescription: ctx.sceneDescription || version.description || '',
         characters: ctx.characters || [],
         sceneClothing: ctx.sceneClothing || null,
         storyId: ctx.storyId || null,

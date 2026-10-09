@@ -561,10 +561,6 @@ function consolidationInputs({ ev, entityIssues, orig, pageNumber, round, sceneD
     entityIssues,
     sceneClothing,
     readerFindings,
-    // A repaired version is consolidated against ITS OWN contract (an
-    // iterate rewrite resolves spec conflicts — checking the ORIGINAL
-    // description would re-flag the fixed version and loop the repair).
-    sceneDescription: sceneDescriptionOverride || orig?.sceneDescription || '',
     characters: characters || [],
     storyId,
     pageNumber,

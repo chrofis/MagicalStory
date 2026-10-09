@@ -13,7 +13,7 @@
  */
 
 const { callTextModel } = require('./textModels');
-const { buildCastIndex, lookupByName, nameRegExp } = require('./castResolver');
+const { buildCastIndex, lookupByName } = require('./castResolver');
 const { PROMPT_TEMPLATES } = require('../services/prompts');
 const { extractJsonFromText, buildCharacterPhysicalDescription } = require('./storyHelpers');
 const { log } = require('../utils/logger');
@@ -1169,7 +1169,6 @@ async function persistConsolidatorCall({ storyId, pageNumber, round, fullPrompt,
  * @param {object} args
  * @param {object} args.evalResult    evaluateImageQuality output (fixableIssues, semanticResult, threeStageResult, bboxDetection)
  * @param {Array}  [args.entityIssues] per-page entity issues from getEntityPenaltyAndIssues ({ name, severity, description })
- * @param {string} [args.sceneDescription]
  * @param {Array}  [args.characters]
  * @param {object} [args.sceneClothing]
  * @param {string} [args.storyId]
@@ -1177,61 +1176,11 @@ async function persistConsolidatorCall({ storyId, pageNumber, round, fullPrompt,
  * @param {number|string} [args.round]
  * @returns {Promise<{plan: object|null, dedupedIssues: Array|null, usage: object|null, error: string|null, skipped: boolean}>}
  */
-/**
- * Deterministic spec-conflict detection on the DECLARED interactions of a
- * scene description. Flags pairs where a body part is committed in one
- * interaction while another interaction targets that same character's part
- * (held or reached-for). Pure code — no model judgment, no dependence on
- * eval wording.
- */
-const SPEC_BODY_PARTS = ['hand', 'hands', 'arm', 'arms', 'shoulder', 'shoulders', 'head', 'foot', 'feet', 'leg', 'legs', 'finger', 'fingers', 'knee', 'knees'];
-function detectDeclaredSpecConflicts(sceneDescription) {
-  const { extractSceneMetadata } = require('./storyHelpers');
-  const interactions = extractSceneMetadata(sceneDescription || '')?.interactions;
-  if (!Array.isArray(interactions) || interactions.length < 2) return [];
-  const out = [];
-  for (let i = 0; i < interactions.length; i++) {
-    for (let j = 0; j < interactions.length; j++) {
-      if (i === j) continue;
-      const A = interactions[i] || {};
-      const B = interactions[j] || {};
-      const aName = String(A.character || '').trim();
-      if (!aName) continue;
-      const bText = `${B.where || ''} ${B.object || ''}`;
-      // B targets A ("Emma's hand" / object === "Emma")
-      const bTargetsA = String(B.object || '').trim() === aName
-        || new RegExp(`${nameRegExp(aName).source}['’]s`, 'iu').test(bText);
-      if (!bTargetsA) continue;
-      const part = SPEC_BODY_PARTS.find(p => new RegExp(`\\b${p}\\b`, 'i').test(bText));
-      if (!part) continue;
-      const partRoot = part.replace(/s$/, '');
-      // A commits that same body part in its own interaction
-      if (!new RegExp(`\\b${partRoot}s?\\b`, 'i').test(String(A.where || ''))) continue;
-      // Dedupe mirrored pairs — the loop visits (i,j) and (j,i); the same
-      // physical conflict must be listed once, not twice.
-      const key = [i, j].sort((x, y) => x - y).join('-');
-      if (out.some(o => o._pair === key)) continue;
-      out.push({
-        a: `${A.character}: ${A.where}`,
-        b: `${B.character}: ${B.where}`,
-        why: `${aName}'s ${partRoot} is committed in one interaction and targeted in the other`,
-        source: 'declared-spec-check',
-        _pair: key,
-      });
-    }
-  }
-  return out.map(({ _pair, ...rest }) => rest);
-}
-
 async function consolidateEvaluation({
   evalResult,
   entityIssues = [],
   // Page-scoped IMG faults from the previous round's book audit.
   readerFindings = [],
-  // The page's DECLARED brief, read only for its `interactions` list by the
-  // deterministic spec-conflict check below. The scene the consolidator is
-  // shown is the one the judges scored (`evalResult.judgedPrompt`).
-  sceneDescription = '',
   characters = [],
   sceneClothing = null,
   storyId = null,
@@ -1308,25 +1257,6 @@ async function consolidateEvaluation({
   if (!plan) {
     return { plan: null, dedupedIssues: null, usage, error: error || 'consolidation failed', skipped: false };
   }
-  // Deterministic spec-conflict check on the DECLARED interactions (user
-  // decision 2026-07-18): detection must work from the original spec alone,
-  // independent of how the eval happened to word its issues. A body part
-  // committed in one interaction while another interaction targets that same
-  // character's part (held or reached-for) is flagged in code — the model's
-  // own spec_conflicts (which key off eval wording) are merged in on top.
-  try {
-    const codeConflicts = detectDeclaredSpecConflicts(sceneDescription);
-    if (codeConflicts.length > 0) {
-      const existing = Array.isArray(plan.spec_conflicts) ? plan.spec_conflicts : [];
-      const merged = [...existing];
-      for (const c of codeConflicts) {
-        if (!merged.some(m => m.a === c.a && m.b === c.b)) merged.push(c);
-      }
-      plan.spec_conflicts = merged;
-    }
-  } catch (specErr) {
-    log.debug(`[FEEDBACK-CONSOLIDATOR] declared spec-conflict check skipped: ${specErr.message}`);
-  }
   return { plan, dedupedIssues: plan.deduped_issues, usage, error: null, skipped: false };
 }
 
@@ -1344,5 +1274,4 @@ module.exports = {
   consolidateEvaluation,
   buildFeedbackInput, // exported for testing
   flattenEntityIssues, // exported for testing
-  detectDeclaredSpecConflicts, // exported for testing
 };

@@ -1427,8 +1427,6 @@ async function runEvalVarianceStage(ctx, { experimentId, params = {} }) {
   const labParent = await labParentVersion(ctx);
   if (labParent) require('./repairPipeline').attachParentCompare(evalInput, labParent);
   const evalCall = require('./images').batchEvalQualityCall(evalInput, evalBatchOptions);
-  const sceneDescription = evalCall.sceneDescription;
-
   const runs = [];
   for (let i = 1; i <= repeats; i++) {
     const t0 = Date.now();
@@ -1482,7 +1480,7 @@ async function runEvalVarianceStage(ctx, { experimentId, params = {} }) {
       try {
         const res = await consolidateEvaluation({
           evalResult, entityIssues: [],
-          sceneDescription, characters: ctx.characters || [],
+          characters: ctx.characters || [],
           storyId: ctx.storyId, pageNumber: ctx.pageNumber, round: i,
           visualBible: ctx.visualBible || null,
           landmarkPhotos: ctx.scene?.landmarkPhotos || null,
@@ -5602,7 +5600,6 @@ async function runRepairRoundStage(ctx, { experimentId, params = {} }) {
       const cons = await consolidateEvaluation({
         evalResult: fresh,
         entityIssues: [],
-        sceneDescription: ctx.scene.sceneDescription || '',
         characters: storyData.characters || [],
         storyId: ctx.storyId,
         pageNumber: ctx.pageNumber,
