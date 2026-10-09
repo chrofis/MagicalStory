@@ -649,4 +649,6 @@ async function buildCoverCompositeCast(characters, coverHint, storyData, deps = 
 module.exports = { buildCompositeCast, resolveStyledSheetSlot, buildCoverCompositeCast, splitCastByStratum, secondaryCastSeeds, unreferencedSecondaryCreatures,
   // The one place a `looksAt` turns into a name. Also read by the
   // declared-vs-observed gaze comparison, which must not print a raw id.
-  resolveLooksAt };
+  resolveLooksAt,
+  // Also read by gazeCheck.gazeSeverity to find which interaction rows name a figure.
+  splitInteractionNames };

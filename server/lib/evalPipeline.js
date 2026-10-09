@@ -3704,6 +3704,9 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
                 ],
                 inventory: p1Result,
                 matches,
+                // The brief's interaction rows grade how much each look matters (gazeSeverity).
+                interactions: declaredSceneMeta?.interactions
+                  || (Array.isArray(declaredSceneMeta?.fullData?.interactions) ? declaredSceneMeta.fullData.interactions : []),
                 resolveTarget: (t) => require('./compositeCastBuilder')
                   .resolveLooksAt(t, evalOptions.visualBible || null),
               });

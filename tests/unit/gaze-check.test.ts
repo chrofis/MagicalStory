@@ -29,11 +29,15 @@ const PAGES: any = FIXTURE.pages;
 const NOUNS: Record<string, string> = { ART001: 'large egg', ANI001: 'Zippi', LOC002: 'Schipfe Steps' };
 const resolveTarget = (id: string) => NOUNS[id] ?? null;
 
-const run = (page: string) => checkDeclaredGaze({
+// The brief's interaction rows set each finding's severity (gazeSeverity); every page here is one where the
+// children are declared to be doing something WITH the egg, so a gaze away from it is part of a declared interaction.
+const EGG_ROWS = [{ character: 'Levin + Julian + Max + Kiaan', object: 'ART001', action: 'examining', where: 'crouch round the egg' }];
+const run = (page: string, interactions: any[] = EGG_ROWS) => checkDeclaredGaze({
   declared: PAGES[page].declared,
   inventory: PAGES[page].inventory,
   matches: PAGES[page].matches,
   resolveTarget,
+  interactions,
 });
 
 describe('reading the blind describer\'s per-figure gaze', () => {

@@ -112,6 +112,62 @@ function eyesNotVisible(inventory, figureLabel) {
 }
 
 /**
+ * HOW MUCH THE LOOK MATTERS TO THE PAGE (owner, 2026-10-09; decisions.md "Gaze severity follows the page's story").
+ *
+ * Every gaze finding used to be MAJOR. The same wrong look is a different loss on different pages: the page
+ * about a child watching a hatching egg, or an eye resting on the spot a figure only stands near. The grade
+ * reads the brief's STRUCTURED interaction rows (`character`, `object`, `action`, `storyRelevant`) and never
+ * a description:
+ *
+ *   CRITICAL  the look IS the beat: a row pairing the figure with the look's target whose `action` is
+ *             `watching` (the one label that means the act itself is looking, the same reading
+ *             compositeCastBuilder and sceneComposite give it) and which is `storyRelevant: true`.
+ *   MAJOR     the look is part of a declared interaction between the figure and the target (any other row
+ *             pairing them, either way round).
+ *   MINOR     no row pairs them: the eyes only rest there.
+ *
+ * Only the figure <-> target pairing counts. Two figures named in the SAME row ("A + B" digging) are
+ * co-actors of the act, not an interaction between each other. A row names its parties as names or Visual
+ * Bible ids and a gaze target as either, so both sides are compared through `resolveTarget`.
+ *
+ * @returns {'CRITICAL'|'MAJOR'|'MINOR'}
+ */
+function gazeSeverity({ name, looksAt, interactions, resolveTarget } = {}) {
+  const rows = Array.isArray(interactions) ? interactions : [];
+  if (!rows.length) return 'MINOR';
+  const { splitInteractionNames } = require('./compositeCastBuilder');
+  // every spelling a party can go by: the raw token, its base id, its resolved name
+  const keys = (raw) => {
+    const t = norm(raw);
+    const out = new Set();
+    if (!t) return out;
+    out.add(t);
+    const base = baseVbId(raw);
+    if (base) out.add(base.toLowerCase());
+    if (typeof resolveTarget === 'function') {
+      // split tokens arrive lower-cased; the bible resolves an id in its own spelling
+      const named = norm(resolveTarget(base || String(raw)));
+      if (named) out.add(named);
+    }
+    return out;
+  };
+  const meets = (a, b) => [...a].some(k => b.has(k));
+  const me = keys(name);
+  const target = keys(looksAt);
+  let level = 'MINOR';
+  for (const row of rows) {
+    const actors = splitInteractionNames(row?.character).map(keys);
+    const objects = splitInteractionNames(row?.object).map(keys);
+    const paired = (actors.some(a => meets(a, me)) && objects.some(o => meets(o, target)))
+      || (objects.some(o => meets(o, me)) && actors.some(a => meets(a, target)));
+    if (!paired) continue;
+    if (norm(row.action) === 'watching' && row.storyRelevant === true) return 'CRITICAL';
+    level = 'MAJOR';
+  }
+  return level;
+}
+
+/**
  * Compare the brief's declared gaze against the blind inventory's observation.
  *
  * @param {Object}   args
@@ -120,9 +176,11 @@ function eyesNotVisible(inventory, figureLabel) {
  * @param {Array}    args.matches    the eval's figure→character pairing, each
  *                                   entry carrying `reference` and `body_bbox`
  * @param {Function} [args.resolveTarget] (looksAt) => human-readable target name
+ * @param {Array}    [args.interactions] the brief's interactions[] rows; they set each finding's severity
+ *                                   (gazeSeverity). Without them every look is incidental: MINOR.
  * @returns {Array} findings, each {type, severity, character, description, fix}
  */
-function checkDeclaredGaze({ declared, inventory, matches, resolveTarget } = {}) {
+function checkDeclaredGaze({ declared, inventory, matches, resolveTarget, interactions } = {}) {
   const chars = Array.isArray(declared) ? declared : [];
   if (!chars.length || !inventory) return [];
 
@@ -208,7 +266,7 @@ function checkDeclaredGaze({ declared, inventory, matches, resolveTarget } = {})
 
     findings.push({
       type: 'action_interaction',
-      severity: 'MAJOR',
+      severity: gazeSeverity({ name, looksAt, interactions, resolveTarget }),
       character: name,
       source: 'gaze-check',
       description: declaredAway
@@ -223,5 +281,5 @@ function checkDeclaredGaze({ declared, inventory, matches, resolveTarget } = {})
 }
 
 module.exports = {
-  checkDeclaredGaze, observedGaze, eyesNotVisible, LOOK_RELATION,
+  checkDeclaredGaze, gazeSeverity, observedGaze, eyesNotVisible, LOOK_RELATION,
 };
