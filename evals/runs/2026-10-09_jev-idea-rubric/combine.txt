@@ -1,0 +1,45 @@
+
+=== variant all: FORCED, FOLLOWS, TOPIC_ACT, KID_ENJOY, PARENT_BUY, CHAR_CONSISTENT, AGENCY, CHALLENGE, ACT_ON_EVENT, NAMED_IN_1, WANT_EVENT
+splits 199, cards 102, bad 37 (36%)
+held-out AUC card-good: 0.80 (sd 0.07)   (forced+follows prod wording alone: 0.81 (sd 0.05))
+PICK (pairs whose labels differ; n over splits 2074): combined 0.73, forced+follows prod wording 0.72, chance 0.50
+GATE flag lowest 10% (train threshold): test rerun rate 0.09 (sd 0.09), precision 0.78 (sd 0.19), recall 0.18 (sd 0.14)
+GATE flag lowest 15% (train threshold): test rerun rate 0.13 (sd 0.11), precision 0.76 (sd 0.17), recall 0.25 (sd 0.16)
+GATE flag lowest 20% (train threshold): test rerun rate 0.18 (sd 0.12), precision 0.72 (sd 0.18), recall 0.33 (sd 0.18)
+GATE flag lowest 30% (train threshold): test rerun rate 0.29 (sd 0.15), precision 0.66 (sd 0.16), recall 0.50 (sd 0.19)
+in-sample AUC 0.86
+in-sample pick 0.81 pairs 21
+production Jev gate (forced<0.8 or follows<0.6) on these 102 cards: {"flagged":47,"rate":0.46078431372549017,"precision":0.6170212765957447,"recall":0.7837837837837838}
+
+=== variant withSettles: FORCED, FOLLOWS, TOPIC_ACT, KID_ENJOY, PARENT_BUY, CHAR_CONSISTENT, AGENCY, CHALLENGE, SETTLES, ACT_ON_EVENT, NAMED_IN_1, WANT_EVENT
+splits 199, cards 102, bad 37 (36%)
+held-out AUC card-good: 0.81 (sd 0.06)   (forced+follows prod wording alone: 0.81 (sd 0.05))
+PICK (pairs whose labels differ; n over splits 2074): combined 0.73, forced+follows prod wording 0.72, chance 0.50
+GATE flag lowest 10% (train threshold): test rerun rate 0.09 (sd 0.08), precision 0.76 (sd 0.20), recall 0.17 (sd 0.15)
+GATE flag lowest 15% (train threshold): test rerun rate 0.13 (sd 0.11), precision 0.76 (sd 0.17), recall 0.25 (sd 0.18)
+GATE flag lowest 20% (train threshold): test rerun rate 0.18 (sd 0.12), precision 0.74 (sd 0.19), recall 0.34 (sd 0.20)
+GATE flag lowest 30% (train threshold): test rerun rate 0.28 (sd 0.15), precision 0.68 (sd 0.14), recall 0.51 (sd 0.20)
+in-sample AUC 0.87
+in-sample pick 0.81 pairs 21
+
+=== variant holisticOnly: KID_ENJOY, PARENT_BUY, CHAR_CONSISTENT
+splits 199, cards 102, bad 37 (36%)
+held-out AUC card-good: 0.75 (sd 0.08)   (forced+follows prod wording alone: 0.81 (sd 0.05))
+PICK (pairs whose labels differ; n over splits 2074): combined 0.62, forced+follows prod wording 0.72, chance 0.50
+GATE flag lowest 10% (train threshold): test rerun rate 0.09 (sd 0.07), precision 0.66 (sd 0.23), recall 0.15 (sd 0.12)
+GATE flag lowest 15% (train threshold): test rerun rate 0.14 (sd 0.10), precision 0.65 (sd 0.24), recall 0.25 (sd 0.16)
+GATE flag lowest 20% (train threshold): test rerun rate 0.20 (sd 0.12), precision 0.63 (sd 0.21), recall 0.35 (sd 0.19)
+GATE flag lowest 30% (train threshold): test rerun rate 0.29 (sd 0.16), precision 0.60 (sd 0.18), recall 0.49 (sd 0.23)
+in-sample AUC 0.77
+in-sample pick 0.62 pairs 21
+
+=== variant noCoherence: TOPIC_ACT, KID_ENJOY, PARENT_BUY, CHAR_CONSISTENT, AGENCY, CHALLENGE, SETTLES, ACT_ON_EVENT, NAMED_IN_1, WANT_EVENT
+splits 199, cards 102, bad 37 (36%)
+held-out AUC card-good: 0.73 (sd 0.09)   (forced+follows prod wording alone: 0.81 (sd 0.05))
+PICK (pairs whose labels differ; n over splits 2074): combined 0.72, forced+follows prod wording 0.72, chance 0.50
+GATE flag lowest 10% (train threshold): test rerun rate 0.08 (sd 0.08), precision 0.73 (sd 0.23), recall 0.16 (sd 0.13)
+GATE flag lowest 15% (train threshold): test rerun rate 0.12 (sd 0.09), precision 0.70 (sd 0.23), recall 0.23 (sd 0.15)
+GATE flag lowest 20% (train threshold): test rerun rate 0.18 (sd 0.11), precision 0.63 (sd 0.21), recall 0.30 (sd 0.16)
+GATE flag lowest 30% (train threshold): test rerun rate 0.29 (sd 0.14), precision 0.56 (sd 0.16), recall 0.44 (sd 0.18)
+in-sample AUC 0.81
+in-sample pick 0.81 pairs 21

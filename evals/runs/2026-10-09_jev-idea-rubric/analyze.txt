@@ -1,0 +1,82 @@
+FORCED           A real:forced                good  51 bad  27  AUC 0.73  P/R@best 0.54/0.74 t=0.875
+FORCED           B real:forced                good  51 bad  27  AUC 0.87  P/R@best 0.59/0.96 t=0.7
+FOLLOWS          A real:follows               good  78 bad  22  AUC 0.86  P/R@best 0.51/0.82 t=0.625
+FOLLOWS          B real:follows               good  78 bad  22  AUC 0.81  P/R@best 0.41/0.82 t=0.5
+TOPIC_ACT        A real:topic                 good  70 bad  10  AUC 0.49  P/R@best 0.15/1 t=0.6
+TOPIC_ACT        B real:topic                 good  70 bad  10  AUC 0.89  P/R@best 0.47/0.7 t=0.75
+THEME            A real:theme                 good 100 bad   2  AUC   -   P/R@best 
+THEME            B real:theme                 good 100 bad   2  AUC   -   P/R@best 
+AGE_FIT          A real:agefit                good 102 bad   0  AUC   -   P/R@best 
+AGE_FIT          B real:agefit                good 102 bad   0  AUC   -   P/R@best 
+AGE_FIT          S real:agefit                good 102 bad   0  AUC   -   P/R@best 
+AGENCY           A real:agency                good  92 bad  10  AUC 0.59  P/R@best 0.14/0.4 t=0.825
+AGENCY           B real:agency                good  92 bad  10  AUC 0.61  P/R@best 0.14/0.7 t=0.875
+AGENCY           C real:agency                good  92 bad  10  AUC 0.56  P/R@best 0.2/0.3 t=0.825
+CHAR_CONSISTENT  A real:charcon               good 102 bad   0  AUC   -   P/R@best 
+CHAR_CONSISTENT  B real:charcon               good 102 bad   0  AUC   -   P/R@best 
+CHAR_CONSISTENT  S real:charcon               good 102 bad   0  AUC   -   P/R@best 
+KID_ENJOY        A real:enjoy                 good  90 bad  12  AUC 0.79  P/R@best 1/0.25 t=0.6
+KID_ENJOY        B real:enjoy                 good  90 bad  12  AUC 0.78  P/R@best 0.26/0.92 t=0.725
+KID_ENJOY        S real:enjoy                 good  90 bad  12  AUC 0.77  P/R@best 0.22/1 t=0.75
+PARENT_BUY       A real:buy                   good  91 bad  11  AUC 0.68  P/R@best 0.2/0.73 t=0.625
+PARENT_BUY       B real:buy                   good  91 bad  11  AUC 0.71  P/R@best 0.19/0.91 t=0.725
+PARENT_BUY       S real:buy                   good  91 bad  11  AUC 0.63  P/R@best 0.16/0.82 t=0.65
+WANT_EVENT       A real:card-good             good  65 bad  37  AUC 0.51  P/R@best 0.37/1 t=0.925
+WANT_EVENT       B real:card-good             good  65 bad  37  AUC 0.43  P/R@best 0.37/1 t=0.85
+ACT_ON_EVENT     A real:card-good             good  65 bad  37  AUC 0.57  P/R@best 0.4/0.97 t=0.7
+ACT_ON_EVENT     B real:card-good             good  65 bad  37  AUC 0.60  P/R@best 0.42/0.84 t=0.55
+ACT_ON_EVENT     C real:card-good             good  65 bad  37  AUC 0.63  P/R@best 0.43/0.81 t=0.575
+SETTLES          A real:card-good             good  65 bad  37  AUC 0.65  P/R@best 0.44/0.86 t=0.875
+SETTLES          B real:card-good             good  65 bad  37  AUC 0.69  P/R@best 0.46/0.86 t=0.675
+SETTLES          C real:card-good             good  65 bad  37  AUC 0.67  P/R@best 0.49/0.68 t=0.95
+NAMED_IN_1       A real:card-good             good  65 bad  37  AUC 0.57  P/R@best 0.37/0.97 t=0.6
+NAMED_IN_1       B real:card-good             good  65 bad  37  AUC 0.50  P/R@best 0.36/1 t=0.75
+CHALLENGE        A real:card-good             good  65 bad  37  AUC 0.42  P/R@best 0.36/1 t=0.95
+CHALLENGE        B real:card-good             good  65 bad  37  AUC 0.52  P/R@best 0.42/0.95 t=0.7
+KID_ENJOY        A real:card-good             good  65 bad  37  AUC 0.71  P/R@best 0.44/0.86 t=0.8
+KID_ENJOY        B real:card-good             good  65 bad  37  AUC 0.65  P/R@best 0.4/0.95 t=0.8
+KID_ENJOY        S real:card-good             good  65 bad  37  AUC 0.72  P/R@best 0.55/0.81 t=0.75
+PARENT_BUY       A real:card-good             good  65 bad  37  AUC 0.69  P/R@best 0.49/0.92 t=0.7
+PARENT_BUY       B real:card-good             good  65 bad  37  AUC 0.72  P/R@best 0.52/0.92 t=0.75
+PARENT_BUY       S real:card-good             good  65 bad  37  AUC 0.66  P/R@best 0.5/0.86 t=0.675
+CHAR_CONSISTENT  A real:card-good             good  65 bad  37  AUC 0.73  P/R@best 0.5/0.73 t=0.9
+CHAR_CONSISTENT  B real:card-good             good  65 bad  37  AUC 0.58  P/R@best 0.36/1 t=0.85
+CHAR_CONSISTENT  S real:card-good             good  65 bad  37  AUC 0.79  P/R@best 0.55/0.76 t=0.925
+AGENCY           A real:card-good             good  65 bad  37  AUC 0.58  P/R@best 0.4/0.86 t=0.925
+AGENCY           B real:card-good             good  65 bad  37  AUC 0.60  P/R@best 0.41/0.89 t=0.925
+AGENCY           C real:card-good             good  65 bad  37  AUC 0.60  P/R@best 0.5/0.43 t=0.95
+FOLLOWS          A real:card-good             good  65 bad  37  AUC 0.74  P/R@best 0.52/0.89 t=0.7
+FOLLOWS          B real:card-good             good  65 bad  37  AUC 0.72  P/R@best 0.49/0.86 t=0.55
+FORCED           A real:card-good             good  47 bad  33  AUC 0.76  P/R@best 0.65/0.73 t=0.875
+FORCED           B real:card-good             good  47 bad  33  AUC 0.87  P/R@best 0.69/0.94 t=0.7
+NAMED_IN_1       A mechanical:check-failure   good  72 bad  28  AUC 0.46  P/R@best 0.29/0.96 t=0.6
+NAMED_IN_1       B mechanical:check-failure   good  72 bad  28  AUC 0.48  P/R@best 0.28/1 t=0.75
+ACT_ON_EVENT     A mechanical:check-failure   good  94 bad   6  AUC 0.48  P/R@best 0.13/0.17 t=0.525
+ACT_ON_EVENT     B mechanical:check-failure   good  94 bad   6  AUC 0.45  P/R@best 0.07/1 t=0.6
+ACT_ON_EVENT     C mechanical:check-failure   good  94 bad   6  AUC 0.50  P/R@best 0.14/0.17 t=0.325
+WANT_EVENT       A mechanical:check-failure   good 100 bad   0  AUC   -   P/R@best 
+WANT_EVENT       B mechanical:check-failure   good 100 bad   0  AUC   -   P/R@best 
+SETTLES          A mechanical:check-failure   good 100 bad   0  AUC   -   P/R@best 
+SETTLES          B mechanical:check-failure   good 100 bad   0  AUC   -   P/R@best 
+SETTLES          C mechanical:check-failure   good 100 bad   0  AUC   -   P/R@best 
+TOPIC_ACT        A control:topic              good  30 bad  30  AUC 0.81  P/R@best 0.63/0.9 t=0.45
+TOPIC_ACT        B control:topic              good  30 bad  30  AUC 0.97  P/R@best 0.96/0.9 t=0.65
+FORCED           A control:topic              good  30 bad  30  AUC 0.92  P/R@best 0.93/0.83 t=0.75
+FORCED           B control:topic              good  30 bad  30  AUC 0.89  P/R@best 0.87/0.87 t=0.6
+THEME            A control:theme              good  30 bad  30  AUC 0.99  P/R@best 1/0.93 t=0.7
+THEME            B control:theme              good  30 bad  30  AUC 1.00  P/R@best 1/1 t=0.775
+AGE_FIT          A control:age                good  30 bad  30  AUC 1.00  P/R@best 1/1 t=0.75
+AGE_FIT          B control:age                good  30 bad  30  AUC 1.00  P/R@best 1/0.97 t=0.675
+AGE_FIT          S control:age                good  30 bad  30  AUC 1.00  P/R@best 1/1 t=0.725
+NO_COMMENTARY    A control:commentary         good  30 bad  30  AUC 1.00  P/R@best 1/1 t=0.05
+NO_COMMENTARY    B control:commentary         good  30 bad  30  AUC 1.00  P/R@best 1/1 t=0.05
+ACT_ON_EVENT     A control:slot2              good  30 bad  30  AUC 0.73  P/R@best 0.64/0.83 t=0.625
+ACT_ON_EVENT     B control:slot2              good  30 bad  30  AUC 0.65  P/R@best 0.57/0.87 t=0.55
+ACT_ON_EVENT     C control:slot2              good  30 bad  30  AUC 0.74  P/R@best 0.65/0.8 t=0.5
+NAMED_IN_1       A control:slot2              good  30 bad  30  AUC 0.89  P/R@best 0.67/0.97 t=0.55
+NAMED_IN_1       B control:slot2              good  30 bad  30  AUC 0.65  P/R@best 0.57/0.87 t=0.525
+FOLLOWS          A control:slot2              good  30 bad  30  AUC 0.95  P/R@best 0.83/0.97 t=0.625
+FOLLOWS          B control:slot2              good  30 bad  30  AUC 0.96  P/R@best 0.9/0.9 t=0.425
+SETTLES          A control:slot3              good  30 bad  30  AUC 1.00  P/R@best 1/1 t=0.6
+SETTLES          B control:slot3              good  30 bad  30  AUC 1.00  P/R@best 0.94/1 t=0.4
+SETTLES          C control:slot3              good  30 bad  30  AUC 1.00  P/R@best 1/1 t=0.6

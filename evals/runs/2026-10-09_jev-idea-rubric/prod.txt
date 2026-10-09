@@ -1,0 +1,9 @@
+calls 102, questions per call 10, latency p50 265 ms, p90 327 ms, max 415 ms, cost/card USD 0.000040
+in-sample AUC (adopted weights, production-shaped call): 0.86
+flag score < 0.627 (lowest 10%): rerun rate 0.10, precision 0.80, recall 0.22  [in-sample]
+flag score < 0.646 (lowest 15%): rerun rate 0.15, precision 0.73, recall 0.30  [in-sample]
+flag score < 0.666 (lowest 20%): rerun rate 0.20, precision 0.75, recall 0.41  [in-sample]
+flag score < 0.689 (lowest 30%): rerun rate 0.29, precision 0.77, recall 0.62  [in-sample]
+tripwires tripped on real cards: [["b079",["NO_COMMENTARY"]],["b051",["NO_COMMENTARY"]]]
+in-sample pick 0.81 pairs 21
+owner day cards (staging idea_events, user 880b53c1): owner.0 score 0.67 tripped - | owner.1 score 0.75 tripped -

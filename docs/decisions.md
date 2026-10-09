@@ -68194,3 +68194,38 @@ Jev against the after labels (thresholds set on the before labels, so held out):
 **Revisit if** wrong-age or cropped-head references start reaching trial pages visibly more often.
 
 **Touched files:** server/lib/referenceSheets.js, storyJobPipeline.js, tests/unit/reference-sheet-render-gate-option.test.ts.
+
+## 2026-10-09 - Jev idea rubric: one question per generator requirement plus the owner's holistic ones; built and measured, NOT wired
+
+**Context:** owner: "Improve Jev ... what we tell the idea to create we should be able to rate with Jev. Jev is the only thing fast enough for quality control of trials." `server/lib/ideaJevRubric.js` holds 15 questions (slots 1-3, named-in-1, commissioned act, forced, follows, theme, age, agency, challenge, character consistent, kid enjoys, parent buys, no remark by the writer), each in 2-4 phrasings (statement noul, defect-statement noul, 5-level score, choice with generous options). Slot, topic and inserted-act wording is built from the prompt's own phrases and the `ideaCoherence.js` constants, pinned by a test against `prompts/trial-idea.txt`. Owner scope kept: no adopted question asks for resolution, introduction or one world.
+**Labels:** 102 final trial cards of the coherence run (3 arms x 17 cells x 2 worlds, plus the owner's 2 cards of 2026-10-09 from staging `idea_events`). Existing hand labels forced / follows; NEW hand labels enjoy, buy, charcon, agency, agefit, topic, theme, written blind to arm and Jev scores after the rubric was written (evals/runs/2026-10-09_jev-idea-rubric/rubric.md, labels-holistic.txt). ONE labeller, a model of the generator's own family: the holistic labels are weak ground truth (charcon, agefit and theme have 0 failing cards, so they cannot be tested on real data). Also: the 100 FIRST cards of that run with the generator's own CHECK verdict as a mechanical label, and 30 each of cards changed on purpose (wrong topic, theme or age; a remark spliced in; sentence 2 or 3 taken from another card), label true by construction. The owner's original reported card is not stored (idea_events only started recording today); its cell c01 is in the set. 37 of the 102 real cards (36%) fail at least one hand label. The earlier child/parent-scored three-slot rounds are not stored per card, only their means.
+**Per question (AUC against the hand label on the real cards; control = injected cards; best phrasing):**
+
+| question | real AUC | failing cards | control AUC | verdict |
+|---|---|---|---|---|
+| FORCED (defect wording) | 0.87 (production wording 0.73) | 27/78 | 0.89 | signal; defect wording beats the production wording |
+| FOLLOWS | 0.86 | 22/100 | 0.96 | signal |
+| TOPIC_ACT (defect wording) | 0.89 (statement wording 0.49) | 10/80 | 0.97 | signal, the phrasing decides |
+| KID_ENJOY | 0.77-0.79 (any mode) | 12/102 | n/a | modest |
+| PARENT_BUY | 0.63-0.71 | 11/102 | n/a | weak |
+| CHAR_CONSISTENT | 0.79 (score) vs "card good" | 0 | n/a | modest, only against the composite |
+| SETTLES | 0.65-0.69 vs "card good" | not labelled | 0.96-0.99 | separates a swapped sentence 3; EXCLUDED (an idea that stays open would read as a fault, owner scope) |
+| ACT_ON_EVENT | 0.57-0.63 vs "card good" | not labelled | 0.67-0.74 | weak, small weight |
+| NAMED_IN_1 | 0.46-0.50 vs the CHECK verdict | 28 | 0.69-0.90 (swapped act) | noise on real defects |
+| WANT_EVENT, CHALLENGE | 0.42-0.52 | - | - | noise, dropped |
+| AGENCY | 0.56-0.61 (3 modes) | 10/102 | n/a | noise |
+| NO_COMMENTARY | 2/2 real remark cards found, 0 false | 2 | 1.00 | tripwire |
+| AGE_FIT (score) | no failing real card | 0 | 0.99 | tripwire: 24/30 caught, 0/102 false alarms |
+| THEME (defect wording) | no failing real card | 0 | 1.00 | tripwire: 25/30 caught, 0/102 false alarms |
+
+Phrasing: the defect statement ("... only because the story must mention it") beat the positive statement on forced (0.87 vs 0.73) and topic (0.89 vs 0.49); the score mode won for enjoy and consistency; choice never won. Detail: evals/runs/2026-10-09_jev-idea-rubric/analyze.txt, per-question.json.
+**Combined score** (weighted mean of P(good), weight = train AUC - 0.5, a question kept when train AUC >= 0.62, phrasing chosen on the train half; 199 random splits BY CELL so the three arms of one cell stay together; target = the card fails no hand label): held-out AUC **0.80** (sd 0.07) against **0.81** for the two production coherence questions alone. Holistic questions alone 0.75; everything except forced and follows 0.73. On these labels the rubric does not beat forced + follows, and the holistic questions add nothing measurable on top of them.
+- PICK (the two cards offered; 21 cell-arm pairs whose hand labels differ, a small set): combined 0.73, forced+follows 0.72, chance 0.50; in-sample 0.81.
+- GATE (threshold set on train scores, read on held-out cells): flag the lowest 10% -> precision 0.78, recall 0.18; 15% -> 0.76 / 0.25 (rerun rate 13%); 20% -> 0.72 / 0.33; 30% -> 0.66 / 0.50. The unwired coherence gate on the same 102 cards flags 46% for precision 0.62, recall 0.78. A 15% budget trims the worst quarter of the bad cards at about 3 in 4 precision; it does not filter the bad ones out.
+- Production-shaped call (10 questions, ONE call per card, 2 cards at a time): p50 **265 ms**, p90 327 ms, max 415 ms, USD 0.00004 per card (the 37-question bundle used for the search: p50 267 ms, so the question count does not move latency). In-sample AUC 0.86; the flag score 0.646 is the 15% quantile of those 102 scores (`RUBRIC_GATE`), to be recalibrated when the generator changes.
+- The owner's two cards of today (cleaning-up, superhero, Zürich): scores 0.67 and 0.75, no tripwire; both hand-labelled good, so there is no pair to order.
+**Decision:** built as a pure module with measurement and tests, not wired (owner call 2026-10-09: the Jev idea gate stays off). Recommendation: (1) the four tripwires, above all NO_COMMENTARY, are the one part clearly worth wiring: they caught every spliced-in remark (30/30 injected, 2/2 real) with 0 false alarms and ride in the same single Jev call; (2) as a PICKER the score is only marginally better than forced + follows (0.73 vs 0.72 on 21 pairs, not distinguishable): wire it only if a pick is wanted; (3) as a GATE only with a rerun budget of about 15% (precision 0.76); what the rerun does to card quality is NOT measured here (the earlier gate measured +2 of 26 on topic). To make the holistic questions testable the owner would have to label about 100 cards for enjoy and buy (11-12 failing cards cannot calibrate them).
+**Considered:** SETTLES in the score (+0.01 AUC, penalises open ideas); a choice mode for agency (0.56); per-question thresholds instead of a weighted mean; logistic regression (102 cards at 36% bad is too few for more than a weighted mean).
+**Revisit if:** more labelled cards (>= 200, a second labeller, the owner's iPhone verdicts) exist; the idea prompt's slot wording changes (a test pins it); Jev is wired on the trial idea at all.
+**Spend:** about USD 0.07 of Jev calls (about 1,000 calls); idea generation USD 0, stored cards only.
+**Touched files:** server/lib/ideaJevRubric.js, tests/unit/idea-jev-rubric.test.ts, scripts/analysis/eval-jev-idea-rubric.js, scripts/analysis/jev-idea-rubric-extract.js, evals/runs/2026-10-09_jev-idea-rubric/, evals/results/results.jsonl.
