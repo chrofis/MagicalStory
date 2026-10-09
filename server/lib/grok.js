@@ -1171,54 +1171,6 @@ async function buildCharacterGroupSlot(rawBuffers, photoTypes, aspectRatio, char
 }
 
 /**
- * Extract the first 3 full-column strips from a 2×4 character sheet
- * (front-facing, 3/4, profile — skipping the back view at column 4).
- *
- * Each strip spans both rows: the head cell (top row) stacked above the
- * body cell (bottom row), same angle. Used for the trial slideshow so the
- * viewer sees face + body together rather than a faceless body.
- *
- * Aspect of the input sheet is roughly 2:1 (width:height) since 4 columns
- * × 2 rows of roughly square cells produces a 4:2 grid. If the input
- * doesn't look like a 2×4 sheet we return an empty array so callers can
- * fall back to the original image.
- */
-async function extractBottomBody3Columns(buffer) {
-  try {
-    const meta = await sharp(buffer).metadata();
-    if (!meta.width || !meta.height) return [];
-    // A 2×4 sheet is 4 columns wide whatever the canvas: Grok now returns it
-    // on a square canvas (tall cells), older sheets were ~2:1. Reject only a
-    // portrait image, which is a single figure (a raw cutout or a 9:16
-    // preview), never a grid — slicing that gives a sliver of dress. The old
-    // 1.6–2.4 gate rejected every square sheet, so every trial slideshow got
-    // ONE slide, the whole grid, and never changed.
-    const aspect = meta.width / meta.height;
-    if (aspect < 0.9 || aspect > 2.4) return [];
-
-    const w = meta.width;
-    const h = meta.height;
-    const colW = Math.floor(w / 4);
-    const cells = [];
-    for (let col = 0; col < 3; col++) {
-      const left = col * colW;
-      // Full column height — head + body, same angle. Previously took only
-      // the bottom row which produced faceless body shots ("cropping off
-      // the face" complaint).
-      const cell = await sharp(buffer)
-        .extract({ left, top: 0, width: colW, height: h })
-        .jpeg({ quality: 88 })
-        .toBuffer();
-      cells.push(cell);
-    }
-    return cells;
-  } catch (err) {
-    log.warn(`⚠️ [GROK] extractBottomBody3Columns failed: ${err.message}`);
-    return [];
-  }
-}
-
-/**
  * Pack reference images into max 3 slots for Grok's edit endpoint.
  *
  * Strategy:
@@ -2158,7 +2110,6 @@ module.exports = {
   // layout arithmetic, and reaching it through packReferences means composing
   // four character cards just to read back two numbers.
   composeCharWithVbRow,
-  extractBottomBody3Columns,
   detectMinVarianceSeparator,
   buildCharacterGroupSlot,
   // Pure arithmetic, exported for its unit test — the layout decision is the

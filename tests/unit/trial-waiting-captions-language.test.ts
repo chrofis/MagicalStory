@@ -13,6 +13,7 @@
 import fs from 'fs';
 import path from 'path';
 import { describe, it, expect } from 'vitest';
+import { FUNNY_MESSAGES } from '../../client/src/utils/funnyMessages';
 
 const PAGE = fs.readFileSync(
   path.join(__dirname, '..', '..', 'client', 'src', 'pages', 'TrialGenerationPage.tsx'),
@@ -21,11 +22,9 @@ const PAGE = fs.readFileSync(
 
 const LANGS = ['en', 'de', 'fr', 'it'] as const;
 
-/** The funnyMessages rows, as { en, de, fr, it } strings. */
+/** The shared funny rows (client/src/utils/funnyMessages.ts, one list for both waiting screens). */
 function funnyRows(): Record<(typeof LANGS)[number], string>[] {
-  const block = PAGE.slice(PAGE.indexOf('const funnyMessages = ['), PAGE.indexOf('];', PAGE.indexOf('const funnyMessages = [')));
-  // eslint-disable-next-line no-new-func
-  return new Function(`return [${block.slice(block.indexOf('[') + 1)}];`)();
+  return FUNNY_MESSAGES as any;
 }
 
 describe('waiting-page captions on a resume without a name', () => {
@@ -36,8 +35,8 @@ describe('waiting-page captions on a resume without a name', () => {
 
   it('use no placeholder name: the pool is the lines without a {name} slot', () => {
     expect(PAGE).not.toContain("'Your hero'");
-    expect(PAGE).toContain("const funnyPool = characterName ? funnyMessages : funnyMessages.filter(m => !m.en.includes('{name}'));");
-    expect(PAGE).toContain('const msg = funnyPool[');
+    expect(PAGE).toContain('const funnyPool = characterName ? FUNNY_MESSAGES : NAMELESS_FUNNY_MESSAGES;');
+    expect(PAGE).toContain('funnyLine(funnyPool,');
   });
 
   it('enough nameless lines exist, in every language, for the four funny slots of the intro rotation', () => {

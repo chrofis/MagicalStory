@@ -1940,6 +1940,31 @@ async function loadTrialStorySource(pool, jobId, userId, jobStatus) {
 }
 
 /**
+ * The title page of a trial job: { image, title } or null. Running job: the front `partial_cover`
+ * checkpoint. Completed job: the checkpoints are deleted, so the stored story's front cover is the
+ * source (it was missing: a visitor whose tab slept through the last minutes - a locked phone - came
+ * back to "done" with the title page still "being painted" for good; docs/decisions.md 2026-10-09).
+ */
+async function loadTrialTitlePage(pool, jobId, jobStatus) {
+  if (jobStatus === 'completed') {
+    const { getActiveStoryImages } = require('../services/database');
+    const front = (await getActiveStoryImages(jobId)).find(r => r.image_type === 'frontCover');
+    const image = front ? trialImageSrc(front) : null;
+    if (!image) return null;
+    const t = await pool.query(`SELECT data::jsonb->>'title' AS title FROM stories WHERE id = $1`, [jobId]);
+    return { image, title: t.rows[0]?.title || null };
+  }
+  const coverResult = await pool.query(
+    `SELECT step_data FROM story_job_checkpoints
+     WHERE job_id = $1 AND step_name = 'partial_cover' AND step_index = 0
+     LIMIT 1`,
+    [jobId]
+  );
+  const data = coverResult.rows[0]?.step_data;
+  return data?.imageData ? { image: data.imageData, title: data.storyTitle || null } : null;
+}
+
+/**
  * GET /api/trial/job-status/:jobId
  *
  * Poll story generation progress for anonymous trial users.
@@ -2007,20 +2032,13 @@ router.get('/job-status/:jobId', jobStatusLimiter, verifySessionToken, async (re
     // Fetch title page from cover checkpoints
     if (req.query.needTitlePage === '1') {
       try {
-        const coverResult = await pool.query(
-          `SELECT step_data FROM story_job_checkpoints
-           WHERE job_id = $1 AND step_name = 'partial_cover' AND step_index = 0
-           LIMIT 1`,
-          [jobId]
-        );
-        if (coverResult.rows.length > 0 && coverResult.rows[0].step_data?.imageData) {
-          response.titlePageImage = coverResult.rows[0].step_data.imageData;
-          if (coverResult.rows[0].step_data?.storyTitle) {
-            response.titlePageTitle = coverResult.rows[0].step_data.storyTitle;
-          }
+        const titlePage = await loadTrialTitlePage(pool, jobId, job.status);
+        if (titlePage) {
+          response.titlePageImage = titlePage.image;
+          if (titlePage.title) response.titlePageTitle = titlePage.title;
         }
       } catch (err) {
-        log.debug(`[TRIAL] Cover checkpoint query failed: ${err.message}`);
+        log.error(`[TRIAL] Title page query failed: ${err.message}`);
       }
 
       // Avatar slides from character data (independent of title page)
@@ -2959,60 +2977,13 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
       retainCacheScopeForHandoff(`trial-${userId}`);
       clearStyledAvatarCache();
 
-      // Split styled avatars into individual full-body images for the
-      // trial slideshow. The styled avatar IS a 2×4 sheet (head×4 angles on
-      // top, body×4 angles on bottom). We slice the BOTTOM row, columns
-      // 1-3 (front / 3/4 / profile) and skip the back-view (no face) and
-      // the top head-only row. Result: 3 distinct portrait body shots per
-      // sheet → 6 total for standard + costumed.
-      const { extractBottomBody3Columns } = require('../lib/grok');
+      // One slide per whole head cell and per whole body cell of every sheet (server/lib/avatarSlides.js).
       const avatarSlides = [];
-      // bytesFromAnyImage handles data: URIs, raw base64, and R2 URLs uniformly.
-      const r2 = require('../lib/r2');
-      try {
-        // styledAvatarsData is keyed by character name; each entry is
-        //   { standard, winter, summer, costumed: { default: ... } }
-        // Walk both levels (character → clothing) to reach the actual avatar
-        // bytes.
-        const pushBodyCellsFromAvatar = async (avatarValue) => {
-          if (!avatarValue) return;
-          // Avatar may be a string (data URI or URL) or an object with .imageData/.imageUrl
-          let src = null;
-          if (typeof avatarValue === 'string') src = avatarValue;
-          else if (typeof avatarValue === 'object') src = avatarValue.imageData || avatarValue.imageUrl || avatarValue.url || null;
-          if (!src || typeof src !== 'string') return;
-          const buf = await r2.bytesFromAnyImage(src);
-          if (!buf) return;
-          const cells = await extractBottomBody3Columns(buf);
-          if (cells.length === 0) {
-            // Fallback: original isn't recognisable as a 2×4 sheet — push it
-            // as-is so the slideshow has something to show.
-            avatarSlides.push(`data:image/jpeg;base64,${buf.toString('base64')}`);
-            return;
-          }
-          for (const cell of cells) {
-            avatarSlides.push(`data:image/jpeg;base64,${cell.toString('base64')}`);
-          }
-        };
-        for (const perCharAvatars of Object.values(styledAvatarsData)) {
-          if (!perCharAvatars || typeof perCharAvatars !== 'object') continue;
-          for (const [clothingKey, avatarValue] of Object.entries(perCharAvatars)) {
-            // `costumed` is nested one more level (e.g. { default: ..., pirate: ... })
-            if (clothingKey === 'costumed' && avatarValue && typeof avatarValue === 'object' && !avatarValue.imageData && !avatarValue.imageUrl) {
-              for (const costumeAvatar of Object.values(avatarValue)) {
-                await pushBodyCellsFromAvatar(costumeAvatar);
-              }
-            } else {
-              await pushBodyCellsFromAvatar(avatarValue);
-            }
-          }
-        }
-        if (avatarSlides.length > 0) {
-          log.info(`[TRIAL AVATARS] Split ${avatarSlides.length} full-body slides from styled avatars`);
-        }
-      } catch (splitErr) {
-        log.debug(`[TRIAL AVATARS] Avatar split failed (non-critical): ${splitErr.message}`);
+      for (const perCharAvatars of Object.values(styledAvatarsData)) {
+        if (!perCharAvatars || typeof perCharAvatars !== 'object') continue;
+        avatarSlides.push(...await require('../lib/avatarSlides').buildAvatarSlides(perCharAvatars, log));
       }
+      if (avatarSlides.length > 0) log.info(`[TRIAL AVATARS] ${avatarSlides.length} head/body cell slides cut from the styled sheets`);
 
       // Store avatar data on character in DB
       try {
@@ -3641,6 +3612,7 @@ function resetTrialRateLimits() {
 
 module.exports = router;
 module.exports.initTrialRoutes = initTrialRoutes;
+module.exports.loadTrialTitlePage = loadTrialTitlePage;
 module.exports.saveTrialCharacter = saveTrialCharacter;
 module.exports.createTrialStoryJob = createTrialStoryJob;
 module.exports.getTrialStats = getTrialStats;

@@ -31,6 +31,7 @@ const {
   runInCacheScope,
   clearStyledAvatarCache,
   getStyledAvatarCacheStats,
+  getStyledAvatarsForCharacter,
   exportStyledAvatarsForPersistence,
   getStyledAvatarGenerationLog,
   clearStyledAvatarGenerationLog
@@ -863,6 +864,16 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         onDone: () => {
           earlyAvatarStylingSucceeded = getStyledAvatarCacheStats().size > 0;
           log.info(`✅ [TRIAL] Early avatar styling complete: ${getStyledAvatarCacheStats().size} cached`);
+          // The standard sheet exists only now (prepare-title makes the costumed one): put its head and body
+          // cells into the waiting-page slideshow next to the costumed ones (docs/decisions.md 2026-10-09).
+          const main = (inputData.characters || [])[0];
+          const styled = main && getStyledAvatarsForCharacter(main.name, artStyle);
+          if (styled) {
+            require('./server/lib/avatarSlides')
+              .persistAvatarSlides({ characterId: `characters_${userId}`, userId, styledAvatars: styled })
+              .then(n => log.info(`🎞️ [TRIAL] ${n} avatar slides stored for the waiting page`))
+              .catch(err => log.error(`❌ [TRIAL] Avatar slides for the waiting page failed: ${err.message}`));
+          }
         }
       });
     }

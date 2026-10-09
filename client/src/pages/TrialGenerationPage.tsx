@@ -9,6 +9,7 @@ import { INITIAL_USER_CREDITS } from '@/constants/credits';
 import { trackEmailLead, trackTrialStoryCompleted } from '@/utils/gtagConversion';
 import { trackEvent } from '@/utils/analytics';
 import { trackTrialStep } from '@/utils/trialFunnel';
+import { FUNNY_MESSAGES, NAMELESS_FUNNY_MESSAGES, funnyDeck, funnyLine } from '@/utils/funnyMessages';
 import { classifyJobStatusHttp, MAX_TRANSIENT_POLL_ERRORS, pollBackoffMs, mergeAvatarSlides } from '@/utils/trialPoll';
 import { Navigation } from '@/components/common';
 import TrialBook, { TrialGateProvider } from '@/components/book/TrialBook';
@@ -96,7 +97,7 @@ const translations = {
     ],
     rotationTrialIntro: 'This is a trial story — it should be ready in a few minutes. Trial stories are short. A full story takes a bit longer but gives you many more pages and richer scenes.',
     storyReadyKicker: 'Your story is ready to read',
-    imagePending: 'The picture is still being drawn...',
+    imagePending: 'The picture is being painted...',
     gateTitle: 'What happens next?',
     gateDesc: 'Leave your email or sign in with Google and read on right away.',
     keepStoryNote: 'Check your email to keep your story',
@@ -144,7 +145,7 @@ const translations = {
     ],
     rotationTrialIntro: 'Das ist eine Probegeschichte — sie sollte in ein paar Minuten fertig sein. Probegeschichten sind kurz. Eine vollständige Geschichte dauert etwas länger, hat dafür viel mehr Seiten und reichhaltigere Szenen.',
     storyReadyKicker: 'Deine Geschichte ist bereit zum Lesen',
-    imagePending: 'Das Bild wird noch gezeichnet...',
+    imagePending: 'Das Bild wird gerade gemalt...',
     gateTitle: 'Wie geht es weiter?',
     gateDesc: 'Gib deine E-Mail-Adresse an oder melde dich mit Google an und lies sofort weiter.',
     keepStoryNote: 'Prüfe deine E-Mails, um deine Geschichte zu behalten',
@@ -192,7 +193,7 @@ const translations = {
     ],
     rotationTrialIntro: 'Ceci est une histoire d\'essai — elle devrait être prête en quelques minutes. Les histoires d\'essai sont courtes. Une histoire complète prend un peu plus de temps mais offre beaucoup plus de pages et des scènes plus riches.',
     storyReadyKicker: 'Votre histoire est prête à être lue',
-    imagePending: 'L\'illustration est encore en cours de dessin…',
+    imagePending: "L'illustration est en train d'être peinte…",
     gateTitle: 'Que se passe-t-il ensuite ?',
     gateDesc: 'Indiquez votre e-mail ou connectez-vous avec Google et lisez la suite tout de suite.',
     keepStoryNote: 'Vérifiez vos e-mails pour garder votre histoire',
@@ -240,53 +241,13 @@ const translations = {
     ],
     rotationTrialIntro: 'Questa è una storia di prova — dovrebbe essere pronta in pochi minuti. Le storie di prova sono brevi. Una storia completa richiede un po\' più di tempo, ma offre molte più pagine e scene più ricche.',
     storyReadyKicker: 'La tua storia è pronta da leggere',
-    imagePending: 'L\'immagine è ancora in disegno...',
+    imagePending: "Stiamo dipingendo l'immagine...",
     gateTitle: 'Come continua?',
     gateDesc: 'Inserisci la tua e-mail o accedi con Google e continua subito a leggere.',
     keepStoryNote: 'Controlla la tua e-mail per conservare la tua storia',
     rotationEmailHint: 'Inserisci la tua e-mail al termine, così possiamo inviarti la storia in PDF. Imposta anche una password e ricevi crediti gratuiti per una storia completa.',
   },
 };
-
-// Funny messages reused inside the rotation. Module-scope so the
-// slideshowItems memo (which references them) doesn't hit a TDZ — the
-// previous in-component declaration sat AFTER the memo, so the first
-// render threw "Cannot access 'funnyMessages' before initialization"
-// and the whole page rendered blank.
-const funnyMessages = [
-  { en: '{name} is getting ready for their big adventure...', de: '{name} macht sich bereit für das grosse Abenteuer...', fr: '{name} se prépare pour sa grande aventure…', it: '{name} si sta preparando per la grande avventura...' },
-  { en: '{name} is practicing their hero pose...', de: '{name} übt gerade die Heldenpose...', fr: '{name} s\'entraîne à prendre la pose du héros…', it: '{name} sta provando la posa da eroe...' },
-  { en: '{name} can\'t wait to see what happens next!', de: '{name} kann es kaum erwarten zu sehen, was als Nächstes passiert!', fr: '{name} a hâte de voir ce qui va se passer !', it: "{name} non vede l'ora di scoprire cosa succede dopo!" },
-  { en: '{name} just found a magic feather! Adding it to the story...', de: '{name} hat gerade eine Zauberfeder gefunden!', fr: '{name} vient de trouver une plume magique !', it: '{name} ha appena trovato una piuma magica!' },
-  { en: '{name} is whispering secrets to the story wizard...', de: '{name} flüstert dem Geschichtenzauberer Geheimnisse zu...', fr: '{name} chuchote des secrets au magicien des histoires…', it: '{name} sussurra segreti al mago delle storie...' },
-  { en: '{name} is doing a little happy dance!', de: '{name} macht einen kleinen Freudentanz!', fr: '{name} fait une petite danse de joie !', it: '{name} fa un piccolo ballo di gioia!' },
-  { en: '{name} is painting the next scene with imagination...', de: '{name} malt die nächste Szene mit viel Fantasie...', fr: '{name} peint la prochaine scène avec imagination…', it: '{name} dipinge la prossima scena con tanta fantasia...' },
-  { en: '{name} made friends with a talking squirrel!', de: '{name} hat sich mit einem sprechenden Eichhörnchen angefreundet!', fr: '{name} s\'est fait ami avec un écureuil parlant !', it: '{name} ha fatto amicizia con uno scoiattolo parlante!' },
-  { en: 'The story wizard is adding extra sparkle for {name}...', de: 'Der Geschichtenzauberer fügt extra Glitzer für {name} hinzu...', fr: 'Le magicien ajoute des paillettes supplémentaires pour {name}…', it: 'Il mago delle storie aggiunge scintille extra per {name}...' },
-  { en: '{name} is choosing the perfect adventure outfit...', de: '{name} sucht das perfekte Abenteuer-Outfit aus...', fr: '{name} choisit la tenue d\'aventure parfaite…', it: "{name} sta scegliendo il vestito perfetto per l'avventura..." },
-  { en: '{name} is teaching the story characters a secret handshake...', de: '{name} bringt den Geschichtsfiguren einen geheimen Handschlag bei...', fr: '{name} apprend une poignée de main secrète aux personnages…', it: '{name} insegna ai personaggi una stretta di mano segreta...' },
-  { en: '{name} is sneaking into the next page already...', de: '{name} schleicht sich schon auf die nächste Seite...', fr: '{name} se glisse déjà dans la page suivante…', it: '{name} si sta già intrufolando nella pagina successiva...' },
-  { en: 'The illustrator is mixing fresh paint just for {name}...', de: 'Der Illustrator mischt neue Farben — extra für {name}...', fr: 'L\'illustrateur prépare des couleurs neuves pour {name}…', it: "L'illustratore sta mescolando i colori freschi solo per {name}..." },
-  { en: '{name} is double-checking every comma...', de: '{name} prüft noch einmal jedes Komma...', fr: '{name} relit chaque virgule…', it: '{name} sta ricontrollando ogni virgola...' },
-  { en: '{name} is asking the moon for a tiny smile...', de: '{name} bittet den Mond um ein kleines Lächeln...', fr: '{name} demande à la lune un petit sourire…', it: '{name} sta chiedendo alla luna un piccolo sorriso...' },
-  { en: 'A tiny dragon just offered {name} some help. Polite refusal.', de: 'Ein kleiner Drache hat {name} Hilfe angeboten. Höflich abgelehnt.', fr: 'Un petit dragon propose son aide à {name}. Refus poli.', it: 'Un draghetto ha offerto aiuto a {name}. Rifiuto gentile.' },
-  { en: '{name} is collecting just one more sparkle...', de: '{name} sammelt noch ein letztes Glitzern...', fr: '{name} ramasse encore un éclat de paillette…', it: '{name} sta raccogliendo ancora una scintilla...' },
-  { en: 'The story wizard mislaid a comma. Looking now.', de: 'Der Geschichtenzauberer hat ein Komma verlegt. Sucht es gerade.', fr: 'Le magicien a égaré une virgule. Il la cherche.', it: 'Il mago delle storie ha perso una virgola. La sta cercando.' },
-  { en: '{name} is humming the title page tune...', de: '{name} summt die Melodie vom Titelbild...', fr: '{name} fredonne l\'air de la couverture…', it: '{name} canticchia la melodia della pagina del titolo...' },
-  { en: 'Adding extra colors to {name}\'s scarf...', de: 'Mehr Farben für {name}s Schal...', fr: 'Encore des couleurs pour l\'écharpe de {name}…', it: 'Aggiungiamo altri colori alla sciarpa di {name}...' },
-  { en: '{name} is reading the last chapter twice for luck...', de: '{name} liest das letzte Kapitel zweimal, für\'s Glück...', fr: '{name} relit le dernier chapitre, pour porter chance…', it: "{name} rilegge l'ultimo capitolo due volte per fortuna..." },
-  { en: 'A fox in the margins waves at {name}...', de: 'Ein Fuchs am Seitenrand winkt {name} zu...', fr: 'Un renard dans la marge salue {name}…', it: 'Una volpe ai margini saluta {name}...' },
-  { en: '{name} is stretching before the final scene...', de: '{name} streckt sich vor der letzten Szene...', fr: '{name} s\'étire avant la dernière scène…', it: '{name} si sta scaldando prima della scena finale...' },
-  { en: 'The font is fluffing its serifs for {name}...', de: 'Die Schrift macht ihre Serifen schön für {name}...', fr: 'La police arrange ses sérifs pour {name}…', it: 'Il carattere si sta sistemando le grazie per {name}...' },
-  { en: '{name} just found a hidden door in the story!', de: '{name} hat eine geheime Tür in der Geschichte entdeckt!', fr: '{name} a trouvé une porte secrète dans l\'histoire !', it: '{name} ha trovato una porta segreta nella storia!' },
-  { en: 'Polishing the moonlight before the night scene...', de: 'Das Mondlicht wird poliert für die Nachtszene...', fr: 'On lustre le clair de lune pour la scène nocturne…', it: 'Stiamo lucidando il chiaro di luna prima della scena notturna...' },
-  { en: '{name} is convincing a cloud to pose nicely...', de: '{name} überredet eine Wolke, schön zu posieren...', fr: '{name} convainc un nuage de poser joliment…', it: '{name} sta convincendo una nuvola a mettersi in posa...' },
-  { en: '{name} is checking that all the leaves are the right green...', de: '{name} prüft, ob alle Blätter im richtigen Grün leuchten...', fr: '{name} vérifie que toutes les feuilles ont le bon vert…', it: '{name} controlla che tutte le foglie siano del verde giusto...' },
-  { en: 'A page is being rewritten because it wasn\'t magical enough...', de: 'Eine Seite wird neu geschrieben — sie war nicht magisch genug...', fr: 'Une page est réécrite — elle n\'était pas assez magique…', it: 'Una pagina viene riscritta perché non era abbastanza magica...' },
-  { en: '{name} is rehearsing the very last sentence...', de: '{name} probt den allerletzten Satz...', fr: '{name} répète la toute dernière phrase…', it: "{name} sta provando l'ultima frase..." },
-  { en: 'The story wizard is brewing one last bit of imagination...', de: 'Der Geschichtenzauberer braut die letzte Portion Fantasie...', fr: 'Le magicien brasse une dernière dose d\'imagination…', it: 'Il mago delle storie prepara un ultimo pizzico di fantasia...' },
-  { en: '{name} is asking a star for an extra wish...', de: '{name} bittet einen Stern um einen weiteren Wunsch...', fr: '{name} demande à une étoile un vœu de plus…', it: '{name} sta chiedendo a una stella un desiderio in più...' },
-];
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
@@ -775,6 +736,10 @@ export default function TrialGenerationPage() {
     | { kind: 'none' };
   type Slide = { imageSrc: string; emphasis: 'avatar' | 'title' | 'page'; label: string; caption: SlideCaption };
 
+  // Shuffled once per page view (and per pool: with or without the hero's name), see funnyDeck.
+  const hasHeroName = !!state?.characterName;
+  const funnyOrder = useMemo(() => funnyDeck(hasHeroName ? FUNNY_MESSAGES.length : NAMELESS_FUNNY_MESSAGES.length), [hasHeroName]);
+
   const slideshowItems = useMemo<Slide[]>(() => {
     const items: Slide[] = [];
     // The resume paths (the wizard's "View your story", storage recovery) carry
@@ -783,7 +748,7 @@ export default function TrialGenerationPage() {
     // 2026-10-07 they defaulted to German and read "Your hero macht sich bereit".
     const lang = (state?.storyInput?.language || language).split('-')[0] as 'en' | 'de' | 'fr' | 'it';
     const characterName = state?.characterName || '';
-    const funnyPool = characterName ? funnyMessages : funnyMessages.filter(m => !m.en.includes('{name}'));
+    const funnyPool = characterName ? FUNNY_MESSAGES : NAMELESS_FUNNY_MESSAGES;
 
     // Intro phase — no story images yet. Rotate avatar + benefits/funny
     // captions while the pipeline warms up.
@@ -794,43 +759,30 @@ export default function TrialGenerationPage() {
       avatarPool.push({ src: avatarSlides[i], label: `${heroLabel} - Style ${i + 1}` });
     }
     const pickAvatar = (i: number) => avatarPool.length > 0 ? avatarPool[i % avatarPool.length] : null;
-    // Pick funny captions WITHOUT repeating until the whole pool is exhausted.
-    // shuffleDeck draws once per intro build so the deck is stable across
-    // re-renders within the same intro phase.
-    const shuffledFunny = (() => {
-      const idx = funnyPool.map((_, i) => i);
-      for (let i = idx.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [idx[i], idx[j]] = [idx[j], idx[i]];
-      }
-      return idx;
-    })();
-    const funnyAt = (slot: number) => {
-      const msg = funnyPool[shuffledFunny[slot % shuffledFunny.length]];
-      const tmpl = msg[lang] || msg.en;
-      return tmpl.replace('{name}', characterName);
-    };
+    // The funny deck is drawn ONCE per page view (funnyOrder, a ref-backed memo): a rebuild of this list when
+    // more avatar slides arrive must not reshuffle the captions already shown, or a line repeats.
+    let funnySlot = 0;
+    const nextFunny = () => funnyLine(funnyPool, funnyOrder, funnySlot++, lang, characterName);
 
     const trialIntro = (t as { rotationTrialIntro?: string }).rotationTrialIntro || '';
     const emailHint  = (t as { rotationEmailHint?: string  }).rotationEmailHint  || '';
 
-    const introSpecs: SlideCaption[] = [
-      { kind: 'message', text: trialIntro, tone: 'info' },
-      { kind: 'funny', text: funnyAt(0) },
-      { kind: 'funny', text: funnyAt(1) },
-      { kind: 'message', text: emailHint, tone: 'info' },
-      { kind: 'funny', text: funnyAt(2) },
-      { kind: 'funny', text: funnyAt(3) },
-    ];
-    for (let i = 0; i < introSpecs.length; i++) {
+    // One slot per funny line plus the two info captions, so the sequence runs through the WHOLE pool
+    // before it can wrap (about 6 s a slot, 9 s for an info caption: 60+ lines cover a 6 minute wait).
+    const slotCount = funnyPool.length + 2;
+    for (let i = 0; i < slotCount; i++) {
       const a = pickAvatar(i);
       if (!a) break;
-      items.push({ imageSrc: a.src, emphasis: 'avatar', label: a.label, caption: introSpecs[i] });
+      const caption: SlideCaption =
+        i === 0 ? { kind: 'message', text: trialIntro, tone: 'info' }
+        : i === 3 ? { kind: 'message', text: emailHint, tone: 'info' }
+        : { kind: 'funny', text: nextFunny() };
+      items.push({ imageSrc: a.src, emphasis: 'avatar', label: a.label, caption });
     }
     return items;
   // funnyMessages is a module-scope const (declared above the component); safe to omit from deps
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state?.previewAvatar, state?.characterName, state?.storyInput?.language, language, avatarSlides, t]);
+  }, [state?.previewAvatar, state?.characterName, state?.storyInput?.language, language, avatarSlides, t, funnyOrder]);
 
   // Rotate slideshow — info messages stay up longer so they're readable;
   // funny + image-only slides tick faster. The interval re-fires on every
@@ -1146,15 +1098,14 @@ export default function TrialGenerationPage() {
                 const isAvatarLike = item.emphasis === 'avatar';
                 return (
                   <>
-                    {/* Image area — fixed aspect-square frame keeps the slot
-                        stable when avatars/title/pages of different aspect
-                        ratios rotate through. object-contain prevents
-                        cropping; items-start TOP-ALIGNS so portrait
-                        images (avatar 9:16 with face at top, title 3:4
-                        with title text at top) don't get their top half
-                        pushed off-screen by vertical centering. */}
+                    {/* Image area — a fixed frame keeps the slot stable while avatars, title and
+                        pages of different aspect ratios rotate through. An avatar slide is ONE whole
+                        sheet cell (a head or a body, about 1:2): a 3:4 frame shows it whole,
+                        object-contain never crops it, and it is centred (the old top-aligned square
+                        frame was for 1:4 strips and left a cell hugging the top-left). Title and page
+                        images keep the square frame. */}
                     <div
-                      className={`relative w-full ${isAvatarLike ? 'max-w-xs' : 'max-w-sm'} aspect-square flex items-start justify-center rounded-xl overflow-hidden bg-indigo-50 ${isAvatarLike ? 'border-4 border-indigo-100' : 'shadow-lg'} transition-opacity duration-300`}
+                      className={`relative w-full ${isAvatarLike ? 'max-w-[15rem] aspect-[3/4] items-center' : 'max-w-sm aspect-square items-start'} flex justify-center rounded-xl overflow-hidden bg-indigo-50 ${isAvatarLike ? 'border-4 border-indigo-100' : 'shadow-lg'} transition-opacity duration-300`}
                     >
                       <img
                         src={item.imageSrc}
