@@ -7935,7 +7935,7 @@ async function runStoryBibleReplayStage(target, { params = {}, promptOverride = 
 async function runClothingReviewStage(target, { params = {}, promptOverride = null }) {
   const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../services/prompts');
   await loadPromptTemplates();
-  const { buildClothingReviewPrompt, parseClothingReview, getPageText, extractSceneMetadata } = require('./storyHelpers');
+  const { buildClothingReviewPrompt, parseClothingReview, applyClothingFix, getPageText, extractSceneMetadata } = require('./storyHelpers');
   const { callTextModelStreaming } = require('./textModels');
   const { MODEL_DEFAULTS, TEXT_MODELS, priceUsage } = require('../config/models');
 
@@ -7987,7 +7987,7 @@ async function runClothingReviewStage(target, { params = {}, promptOverride = nu
     if (!entry || !entry.used) { stray.push(`${fix.name}/${fix.category}`); continue; }
     if ((entry.description || '') === fix.description) continue;
     changed.push({ name, category: fix.costume ? `costumed:${fix.costume}` : fix.category, before: entry.description || '', after: fix.description });
-    entry.description = fix.description;
+    applyClothingFix(entry, fix, `${name}/${fix.category}`);
   }
 
   return {

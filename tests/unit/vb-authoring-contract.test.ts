@@ -216,7 +216,7 @@ describe('auditVisualBibleContract — earned appearsInPages', () => {
         animals: [{ id: 'ANI001', name: 'the cat', appearsInPages: [1, 2, 3, 4, 5, 6, 7, 8] }],
         artifacts: [{ id: 'ART001', name: 'the lantern', appearsInPages: [1, 2, 3, 4, 5, 6, 7, 8] }],
         vehicles: [{ id: 'VEH001', name: 'the cart', appearsInPages: [1, 2, 3, 4, 5, 6, 7, 8] }],
-        clothing: [{ id: 'CLO001', name: 'the red cloak', appearsInPages: [1, 2, 3, 4, 5, 6, 7, 8] }],
+        clothing: [{ id: 'CLO001', name: 'the red cloak', slot: 'outer layer', appearsInPages: [1, 2, 3, 4, 5, 6, 7, 8] }],
       },
       { pageCount: 8 }
     );
@@ -228,7 +228,7 @@ describe('auditVisualBibleContract — earned appearsInPages', () => {
     const found = auditVisualBibleContract(
       {
         animals: [{ id: 'ANI001', name: 'the cat', appearsInPages: [1, 2, 3, 4, 5, 6, 7, 8] }],
-        clothing: [{ id: 'CLO001', name: 'the red cloak', appearsInPages: [1, 2, 3, 4, 5, 6, 7, 8] }],
+        clothing: [{ id: 'CLO001', name: 'the red cloak', slot: 'outer layer', appearsInPages: [1, 2, 3, 4, 5, 6, 7, 8] }],
       },
       { pageCount: 8 }
     );
@@ -437,5 +437,18 @@ describe('the authored `label` — one English name per element', () => {
       // four schema slots point at.
       expect(templates[key], key).toMatch(/"label":\s*"\[the one English name every prompt uses|`label` is the one English name every prompt uses/);
     }
+  });
+});
+
+describe('auditVisualBibleContract - the typed worn slot', () => {
+  it('reports a clothing entry with no slot, an unknown slot, and a slot that disagrees with wornAs', () => {
+    const found = auditVisualBibleContract({
+      clothing: [{ id: 'CLO001', name: 'a hat' }, { id: 'CLO002', name: 'a scarf', slot: 'neck' }],
+      artifacts: [{ id: 'ART001', name: 'a cap', slot: 'top', wornAs: 'Max.headwear' }, { id: 'ART002', name: 'a rope' }],
+    });
+    expect(codes(found)).toEqual(['ART001:worn-slot-disagrees', 'CLO001:worn-slot-missing', 'CLO002:worn-slot-unknown']);
+  });
+  it('is silent for a typed clothing entry and an untyped prop', () => {
+    expect(auditVisualBibleContract({ clothing: [{ id: 'CLO001', name: 'a hat', slot: 'headwear' }], artifacts: [{ id: 'ART002', name: 'a rope' }] })).toEqual([]);
   });
 });

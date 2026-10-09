@@ -40,6 +40,7 @@ Determine which clothing variants each character needs, based on the page plan.
 - **A garment the story turns on is described IN FULL in the outfit that wears it** — a garment the arc or plan has someone hold, lend, wrap or lose goes in the outfit of the character who wears it first (the one the plan first gives it to, when no one wears it), as the garment they name, with colour, material and what makes this one recognisable, in the slot it occupies. The Visual Bible copies those words for its own entry of the same object, so the two never describe it differently. It stays in the outfit as worn even on pages the character is without it; those pages record it off in their `wornItems` row.
 - `description` is the FULL final outfit for this story — top, bottom, footwear, accessories — as one self-contained sentence. The avatar generator uses it verbatim.
 - {OUTFIT_APPEARANCE_RULE}
+- {GARMENT_LIST}
 - {GARMENT_ONE_OUTFIT_RULE}
 - **A prop is not a garment.** {PROP_NOT_GARMENT_DEF}
 - Costumed descriptions name every slot the character actually wears: headwear, top, bottom, footwear, belt/waist, outer layer. Each slot names colour and material. OMIT a slot they do not wear; never write it out as `none`. Clothing only — no pets, carried objects or bag contents.
@@ -66,13 +67,13 @@ Only the block below. No preamble, no commentary.
 {
   "clothingRequirements": {
     "[CharacterName]": {
-      "standard": { "used": true, "description": "[full final outfit]" },
+      "standard": { "used": true, "description": "[full final outfit]", "garments": [{ "slot": "top", "name": "[garment]", "colour": "[colour word]" }] },
       "winter": { "used": false },
       "summer": { "used": false },
-      "costumed": { "used": true, "costume": "[costume name, e.g. wizard]", "description": "[full costumed outfit]" }
+      "costumed": { "used": true, "costume": "[costume name, e.g. wizard]", "description": "[full costumed outfit]", "garments": [{ "slot": "headwear", "name": "[garment]", "colour": "[colour word]" }] }
     },
     "[AnotherCharacter]": {
-      "standard": { "used": true, "description": "[full final outfit]" },
+      "standard": { "used": true, "description": "[full final outfit]", "garments": [{ "slot": "top", "name": "[garment]", "colour": "[colour word]" }] },
       "winter": { "used": false },
       "summer": { "used": false },
       "costumed": { "used": false }

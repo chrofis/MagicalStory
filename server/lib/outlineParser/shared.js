@@ -828,6 +828,45 @@ function auditVisualBibleContract(visualBible, options = {}) {
     }
   }
 
+  // (2b) A worn entry's `slot` is a slot that exists, and a clothing entry has one.
+  // Reported, never repaired: the authoring prompt (WORN_SLOT_FIELD_RULE) is where
+  // the closed list lives, and code that mapped "neck" onto `accessories` would be
+  // guessing what the author meant. An entry without `slot` is simply unmappable
+  // for the removable-item path (wornItems.elementSlot).
+  {
+    const { WORN_SLOTS, parseWornAs } = require('../wornItems');
+    for (const cat of ['artifacts', 'clothing']) {
+      for (const entry of entriesOf(cat)) {
+        const who = `${entry?.id || '(no id)'} "${entry?.name || '(unnamed)'}"`;
+        if (entry.slot != null && !WORN_SLOTS.includes(entry.slot)) {
+          findings.push({
+            code: 'worn-slot-unknown',
+            id: entry?.id || entry?.name || '(unnamed)',
+            category: cat,
+            message: `${who} declares slot "${entry.slot}" — not an outfit slot (${WORN_SLOTS.join(', ')}), so it is treated as unmappable`,
+          });
+        } else if (entry.slot == null && cat === 'clothing') {
+          findings.push({
+            code: 'worn-slot-missing',
+            id: entry?.id || entry?.name || '(unnamed)',
+            category: cat,
+            message: `${who} is a clothing entry with no \`slot\` — no page can strip or swap it`,
+          });
+        } else if (entry.slot != null) {
+          const link = parseWornAs(entry.wornAs);
+          if (link && link.slotKnown && link.slot !== entry.slot) {
+            findings.push({
+              code: 'worn-slot-disagrees',
+              id: entry?.id || entry?.name || '(unnamed)',
+              category: cat,
+              message: `${who} declares slot "${entry.slot}" but wornAs "${entry.wornAs}" names "${link.slot}"`,
+            });
+          }
+        }
+      }
+    }
+  }
+
   // (3) A range covering nearly the whole book was almost certainly not earned.
   // A genuinely single-setting story can trip this on its one location; the
   // warning is a prompt for a human look, not a defect claim.

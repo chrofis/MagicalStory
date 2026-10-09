@@ -407,7 +407,7 @@ function applyCoverWornHeldDedupe(photos, coverHint, visualBible) {
     heldByChar.get(key).add(id);
   }
 
-  const { parseWornAs, deriveSlotFromName, sameName, SLOT_NOUNS: WORN_SLOT_NOUNS, WORN_SLOTS } = require('./wornItems');
+  const { parseWornAs, slotOfOutfitText, elementSlot, sameName, SLOT_NOUNS: WORN_SLOT_NOUNS } = require('./wornItems');
   const artifactMeta = artifacts
     .filter(a => a?.id)
     .map(a => ({
@@ -416,12 +416,10 @@ function applyCoverWornHeldDedupe(photos, coverHint, visualBible) {
       nameTokens: significantTokens(a.name),
       allTokens: new Set([...significantTokens(a.name), ...significantTokens(a.extractedDescription || a.description)]),
       // Declarative slot identity. `wornAs` is the writer's own link and is
-      // authoritative when present; `type`/name give the slot when it is not.
+      // authoritative when present; the typed `slot` (else a slot-named `type`)
+      // gives the slot when it is not. Never guessed from the name.
       wornAs: parseWornAs(a.wornAs),
-      slot: (() => {
-        const declared = String(a.type || '').trim().toLowerCase();
-        return WORN_SLOTS.includes(declared) ? declared : deriveSlotFromName(a.label || a.name);
-      })(),
+      slot: elementSlot(a),
     }));
 
   /**
@@ -445,7 +443,7 @@ function applyCoverWornHeldDedupe(photos, coverHint, visualBible) {
    * the writer declared one, the closed slot vocabulary otherwise.
    */
   const classifyOverlap = (segment, meta, charName) => {
-    const segSlot = deriveSlotFromName(segment);
+    const segSlot = slotOfOutfitText(segment);
     if (meta.wornAs) {
       if (!sameName(meta.wornAs.owner, charName)) return 'unrelated';
       return meta.wornAs.slot === segSlot ? 'duplicate' : 'unrelated';

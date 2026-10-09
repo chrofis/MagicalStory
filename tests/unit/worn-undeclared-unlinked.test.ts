@@ -24,8 +24,8 @@ const { resolveWornItemsForPage, trackedWornGarments, missingWornRows } =
  *
  * Shapes are that story's, with archetypal names.
  */
-const CAP = { id: 'CLO001', name: 'red wool cap', wornBy: 'Owner', description: 'A red knitted wool cap.' };
-const JACKET = { id: 'CLO002', name: 'green fleece jacket', wornBy: 'Owner', description: 'A green zip-up fleece jacket.' };
+const CAP = { id: 'CLO001', name: 'red wool cap', slot: 'headwear', wornBy: 'Owner', description: 'A red knitted wool cap.' };
+const JACKET = { id: 'CLO002', name: 'green fleece jacket', slot: 'outer layer', wornBy: 'Owner', description: 'A green zip-up fleece jacket.' };
 const LINKED = { id: 'ART004', name: 'brown leather boots', type: 'footwear', wornAs: 'Owner.footwear', description: 'Scuffed brown leather boots.' };
 // A row the Art Director wrote against something that is not clothing at all.
 const TOY = { id: 'ART009', name: 'soft toy mouse', type: 'soft toy comfort mouse', wornBy: 'Owner', description: 'A grey soft toy mouse.' };

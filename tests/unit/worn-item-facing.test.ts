@@ -28,7 +28,7 @@ const { loadPromptTemplates, PROMPT_TEMPLATES } = cjs('../../server/services/pro
 // The stored CLO001 of the run above, verbatim.
 const FRONT = 'A purple quilted autumn jacket with a full-length front zip, two patch pockets at the hip and a stand-up collar.';
 const clo = (extra: any = {}) => ({
-  id: 'CLO001', name: 'autumn jacket', label: 'autumn jacket', pages: [1, 5], appearsInPages: [1, 5],
+  id: 'CLO001', name: 'autumn jacket', label: 'autumn jacket', slot: 'outer layer', pages: [1, 5], appearsInPages: [1, 5],
   wornBy: 'Kiaan', howWorn: 'worn over the torso and arms', description: FRONT, ...extra,
 });
 const bible = (extra: any = {}) => ({ clothing: [clo(extra)], artifacts: [], animals: [], vehicles: [], locations: [] });
@@ -74,7 +74,7 @@ describe('1 — the worn line follows the wearer’s facing', () => {
 
   it('two worn items of one back-view character share one tagged line', () => {
     const vb = bible({ back: 'purple quilted jacket' });
-    vb.clothing.push({ id: 'CLO002', name: 'wool scarf', label: 'wool scarf', pages: [5], appearsInPages: [5],
+    vb.clothing.push({ id: 'CLO002', name: 'wool scarf', label: 'wool scarf', slot: 'accessories', pages: [5], appearsInPages: [5],
       wornBy: 'Kiaan', description: 'A red wool scarf with a knotted front.', back: 'red wool scarf' } as any);
     const m: any = meta('back view');
     m.wornItems.push({ id: 'CLO002', owner: 'Kiaan', state: 'worn' });

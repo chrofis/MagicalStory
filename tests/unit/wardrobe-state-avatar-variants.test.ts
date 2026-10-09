@@ -22,9 +22,9 @@ const { carryForwardWornItems, resolveWornItemsForPage } = require('../../server
 // One character, one cap (headwear), one fleece (outer layer) over a named shirt.
 const VB = {
   clothing: [
-    { id: 'CLO001', name: 'red wool cap', wornBy: 'Levin', description: 'a chunky-knit red wool cap' },
-    { id: 'CLO002', name: 'green fleece jacket', wornBy: 'Levin', description: 'a forest-green zip-up fleece jacket' },
-    { id: 'CLO009', name: 'blue wool cap', wornBy: 'Julian', description: 'a blue cap' },
+    { id: 'CLO001', name: 'red wool cap', slot: 'headwear', wornBy: 'Levin', description: 'a chunky-knit red wool cap' },
+    { id: 'CLO002', name: 'green fleece jacket', slot: 'outer layer', wornBy: 'Levin', description: 'a forest-green zip-up fleece jacket' },
+    { id: 'CLO009', name: 'blue wool cap', slot: 'headwear', wornBy: 'Julian', description: 'a blue cap' },
   ],
 };
 const CONTRACT =

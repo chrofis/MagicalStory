@@ -50,8 +50,7 @@ const STOPWORDS = new Set([
   'none', 'slot', 'chest', 'waist', 'shoulder', 'sleeve', 'sleeves', 'cotton', 'linen',
 ]);
 
-// The garment vocabulary: which nouns name a thing worn on a body. `colourBefore`
-// walks it to find the colour a garment carries (repairLogic), and `deriveSlotFromName` in wornItems has
+// The garment vocabulary: which nouns name a thing worn on a body. wornItems has
 // its own for slots. A word here is a garment; a colour, material or shape is
 // not one and never stands in for one — an object described in a page's prose
 // ("dark brown planks … round coins") shares those words with every wardrobe in
@@ -77,22 +76,6 @@ const GARMENT_NOUNS = new Set([
 const COLOUR_WORDS = new Set([
   'red', 'blue', 'green', 'yellow', 'orange', 'purple', 'brown', 'black', 'white', 'grey', 'gray',
 ]);
-
-/**
- * The colour that belongs to the garment at index i. Materials, cuts and
- * shades sit between them ("blue short-sleeved linen robe", "deep purple
- * robe"), so scan back a few words rather than requiring adjacency — but stop
- * at another garment noun, whose colour is its own ("blue robe over white
- * collared shirt": the shirt is white, not blue).
- */
-function colourBefore(words, i) {
-  for (let k = i - 1; k >= 0 && k >= i - 4; k--) {
-    const w = words[k];
-    if (COLOUR_WORDS.has(w)) return w === 'gray' ? 'grey' : w;
-    if (GARMENT_NOUNS.has(w)) return null;
-  }
-  return null;
-}
 
 /** Significant lowercase tokens (≥4 chars, not stopwords). */
 function tokens(text) {
@@ -238,9 +221,8 @@ function checkPage(page, clothingRequirements, opts = {}) {
   //     this file's own GARMENT_NOUNS comment says colours attribute nothing:
   //     only ONE of the three matches had to be a garment noun, so "brown" out
   //     of "brown eyes" was evidence that a garment had moved.
-  // The first two die with the rule. The colour-word reading survives in
-  // `colourBefore`, which rule 3 below uses on a different basis — per garment,
-  // inside one character's own window — and is not this defect.
+  // The first two die with the rule. (`colourBefore`, the colour-word scan the repair
+  // descriptor used, was deleted 2026-10-09: the outfit's typed `garments` carry the colour.)
 
   // DELETED 2026-10-09 — `garment_colour_wrong`, "the prose gives a garment a colour the
   // contract gives differently". It compared COLOUR WORDS found in prose, and
@@ -447,7 +429,7 @@ function characterWindow(prose, name, cast = []) {
  *     tricorn hat" is one hat, described twice).
  */
 
-const { WORN_SLOTS, SLOT_NOUNS, parseWornAs, deriveSlotFromName, slotFromType, indexOfElementAmong, sameName, spliceClause, CLAUSE_LEAD_RE, outfitVersionOf, DEPENDENT_OPENER_RE } = require('./wornItems');
+const { WORN_SLOTS, SLOT_NOUNS, parseWornAs, slotOfOutfitText, elementSlot, indexOfElementAmong, sameName, spliceClause, CLAUSE_LEAD_RE, outfitVersionOf, DEPENDENT_OPENER_RE } = require('./wornItems');
 
 // The slots this check arbitrates. See the scope note above.
 const ARBITRATED_SLOTS = ['headwear', 'footwear', 'outer layer'];
@@ -494,21 +476,6 @@ function slotNounsIn(slot, text) {
   return nouns.filter(n => new RegExp(`\\b${n}\\b`, 'i').test(lower));
 }
 
-/**
- * Which slot a VB entry occupies — DECLARED fields first (2026-09-23): the
- * `wornAs` link's own slot, then the entry's `type` through the one type map
- * (wornItems.slotFromType), and only then its name through the slot nouns.
- * This used to read `type` only when it was literally a slot name and otherwise
- * guess from the name, so a garment typed "outerwear", linked `Max.outer layer`
- * and named "hooded sweatshirt" (no slot noun) had no slot and was never
- * compared at all (staging job_1790100385959_1nitlympp ART005).
- */
-function bibleEntrySlot(entry) {
-  const link = parseWornAs(entry?.wornAs);
-  if (link && link.slotKnown) return link.slot;
-  return slotFromType(entry?.type) || deriveSlotFromName(entry?.label || entry?.name);
-}
-
 // spliceClause / CLAUSE_LEAD_RE live in wornItems: the page resolver splices an
 // outfit version in with the same function that built the version's text.
 /** A clause without its joiner and article — what "the same words" compares. */
@@ -529,8 +496,15 @@ function wearableBibleEntries(visualBible) {
   for (const pool of WEARABLE_POOLS) {
     for (const entry of (Array.isArray(visualBible?.[pool]) ? visualBible[pool] : [])) {
       if (!entry || !(entry.name || entry.label)) continue;
-      const slot = bibleEntrySlot(entry);
-      if (!slot || !ARBITRATED_SLOTS.includes(slot)) continue;
+      const slot = elementSlot(entry);
+      if (!slot) {
+        // A clothing entry is worn by definition: no slot means the author did not
+        // type it (a Visual Bible stored before the `slot` field existed). Skipped,
+        // never guessed from its name — docs/decisions.md, 2026-10-09.
+        if (pool === 'clothing') log.error(`[CLOTHING-CHECK] ${entry.id || ''} "${entry.label || entry.name}" is a clothing entry with no slot — not compared with the wardrobe`);
+        continue;
+      }
+      if (!ARBITRATED_SLOTS.includes(slot)) continue;
       out.push({ entry, slot });
     }
   }
@@ -583,7 +557,7 @@ function checkWardrobeAgainstBible(clothingRequirements, visualBible) {
         const own = link
           ? indexOfElementAmong(clauses, { name: el.name, label: el.label, aliases: el.aliases })
           : -1;
-        const clause = own >= 0 ? clauses[own] : clauses.find(c => deriveSlotFromName(c) === slot);
+        const clause = own >= 0 ? clauses[own] : clauses.find(c => slotOfOutfitText(c) === slot);
         if (!clause) continue;                                        // wardrobe silent — the bible just adds it
         const elNouns = slotNounsIn(slot, elText);
         const clauseNouns = slotNounsIn(slot, clause);
@@ -706,7 +680,7 @@ function applyWardrobeBibleCorrections(clothingRequirements, visualBible, opts =
  * a code check): a character the prose dresses at all, whose own stretch of
  * prose (characterWindow) leaves out the outfit's top, bottom or footwear. The
  * slot comes from the outfit's own label, or from the garment noun
- * (wornItems.deriveSlotFromName) on an unlabelled clause; a clause of no
+ * (wornItems.slotOfOutfitText) on an unlabelled clause; a clause of no
  * required slot is never asked for, and an outfit with a tail or fin asks for
  * no bottom and no footwear. A close-up ends at the waist (shotVocabulary's
  * own definition), so it asks for the top only. A character dressed in
@@ -714,7 +688,6 @@ function applyWardrobeBibleCorrections(clothingRequirements, visualBible, opts =
  */
 const REQUIRED_SLOTS = ['top', 'bottom', 'footwear'];
 function checkClothingIncomplete(page, clothingRequirements) {
-  const { deriveSlotFromName } = require('./wornItems');
   const { resolveShotId } = require('./shotVocabulary');
   const prose = String(page?.prose || '');
   const cast = (page.cast || []).map(c => (typeof c === 'string' ? c : c?.name)).filter(Boolean);
@@ -735,12 +708,12 @@ function checkClothingIncomplete(page, clothingRequirements) {
     // plural, through wornItems' slot nouns. The contract clause's own words
     // (slotStated) count too, for garments no slot noun lists.
     const windowSlots = new Set(String(window).toLowerCase().split(/[^a-z-]+/).filter(Boolean)
-      .flatMap(w => [deriveSlotFromName(w), deriveSlotFromName(`${w}s`)]).filter(Boolean));
+      .flatMap(w => [slotOfOutfitText(w), slotOfOutfitText(`${w}s`)]).filter(Boolean));
     const named = (clause) => (clause.slot && windowSlots.has(clause.slot)) || slotStated(clause.text, own);
     const parts = splitSlots(text);
     const clauses = parts.some(p => p.slot)
       ? parts.map(p => ({ slot: p.slot, text: p.text }))
-      : String(text).split(/\s*;\s*/).filter(Boolean).map(c => ({ slot: deriveSlotFromName(c), text: c }));
+      : String(text).split(/\s*;\s*/).filter(Boolean).map(c => ({ slot: slotOfOutfitText(c), text: c }));
     const legless = /\b(tail|fins?)\b/i.test(text);
     const waistUp = resolveShotId(page.shot) === 'close-up';
     const stated = clauses.filter(c => named(c));
@@ -788,4 +761,4 @@ function outfitAbsent(clothingRequirements, names = []) {
 // The image prompt's own "does the prose dress this character" check is Jev's
 // (jevDecisions.decideOutfitsStated); the token match it used to share with this
 // file (missingGarments) was deleted 2026-10-09, docs/decisions.md.
-module.exports = { REVIEWABLE, GARMENT_NOUNS, outfitAbsent, checkClothingIncomplete, checkPage, checkWardrobeAgainstBible, applyWardrobeBibleCorrections, outfitClauses, checkScenes, renderFindingsBlock, splitSlots, slotStated, characterWindow, tokens, colourBefore };
+module.exports = { REVIEWABLE, GARMENT_NOUNS, outfitAbsent, checkClothingIncomplete, checkPage, checkWardrobeAgainstBible, applyWardrobeBibleCorrections, outfitClauses, checkScenes, renderFindingsBlock, splitSlots, slotStated, characterWindow, tokens };

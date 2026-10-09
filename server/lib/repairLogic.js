@@ -1757,33 +1757,29 @@ function detectionForRetryEntry(scene, entry, index = null) {
 const REPAIR_GARMENT_SLOTS = ['outer layer', 'top', 'bottom', 'headwear', 'footwear'];
 
 /**
- * "blue anorak" — colour word + garment noun, both from closed vocabularies,
- * for one character on one page. Sources, in order: a tracked worn item this
- * character wears on the page (its Visual Bible name), then the story outfit
- * by slot. Every garment the page's resolved worn state takes off this
- * character is excluded, by its slot and by the nouns of its name.
+ * "blue anorak" - colour + garment, both TYPED fields, for one character on one
+ * page. Sources, in order: a tracked worn item this character wears on the page
+ * (its Visual Bible label), then the story outfit's typed `garments` list
+ * (wornItems.GARMENT_LIST_RULE) by slot. Every garment the page's resolved worn
+ * state takes off this character is excluded, by its slot and by the words of
+ * its name. Nothing is read out of the outfit's prose: the colour is the
+ * author's `colour` field (docs/decisions.md, 2026-10-09; the word scan it
+ * replaces returned no colour on 25 of 90 sampled mentions).
  *
- * Null (logged as an error) when no garment can be built: the descriptor then
- * carries no garment clause, never prose.
+ * Null (logged as an error) when no garment can be built - an outfit stored
+ * before the list existed, or an authoring miss: the descriptor then carries no
+ * garment clause, never prose.
  */
 function repairGarmentPhrase({
-  character, category = null, artStyle = null, clothingRequirements = null,
+  character, category = null, clothingRequirements = null,
   visualBible = null, sceneMetadata = null, pageNumber = null,
 } = {}) {
   const name = String(character?.name || '').trim();
   if (!name) return null;
-  const { SLOT_NOUNS, resolveWornItemsForPage, isOffForCharacter, sameName } = require('./wornItems');
-  const { colourBefore, GARMENT_NOUNS } = require('./clothingCheck');
+  const { resolveWornItemsForPage, isOffForCharacter, sameName } = require('./wornItems');
+  const { resolveCharacterReqs } = require('./clothingCategories');
   const words = (text) => String(text || '').toLowerCase().split(/[^a-z]+/).filter(Boolean);
-  const phraseFor = (text, allowed) => {
-    const w = words(text);
-    for (let i = 0; i < w.length; i++) {
-      if (!allowed(w[i])) continue;
-      const colour = colourBefore(w, i);
-      return colour ? `${colour} ${w[i]}` : w[i];
-    }
-    return null;
-  };
+  const where = `${name}${pageNumber != null ? ` p${pageNumber}` : ''}`;
 
   const rows = visualBible
     ? resolveWornItemsForPage(visualBible, [name], sceneMetadata || {}, { pageNumber: pageNumber ?? undefined, castComplete: false })
@@ -1795,35 +1791,32 @@ function repairGarmentPhrase({
     if (r.slot) offSlots.add(r.slot);
     for (const w of words(r.name)) offNouns.add(w);
   }
-  const allNouns = new Set([...Object.values(SLOT_NOUNS).flat(), ...GARMENT_NOUNS]);
-  const wearable = (w) => allNouns.has(w) && !offNouns.has(w);
-  const inOffSlot = (w) => [...offSlots].some(s => (SLOT_NOUNS[s] || []).includes(w));
 
-  // 1. A tracked item this character wears on this page — the story's own
+  // 1. A tracked item this character wears on this page - the story's own
   //    distinguishing garment, including one handed to them.
   for (const r of rows) {
     if (r.state !== 'worn' || !sameName(r.wearer || r.owner, name)) continue;
-    const phrase = phraseFor(r.name, wearable);
+    const phrase = String((r.entry && r.entry.label) || r.name || '').trim();
     if (phrase) return phrase;
   }
 
-  // 2. The story outfit, by slot, then any other garment it names. A character
-  //    the page's brief does not dress is not on this page: no garment to name.
+  // 2. The story outfit's typed garment list, by slot, then any other garment.
+  //    A character the page's brief does not dress is not on this page: no garment.
   if (!category) return null;
-  const { buildClothingDescription } = require('./entityConsistency');
-  const outfit = String(buildClothingDescription(character, category, artStyle, clothingRequirements) || '');
-  // The whole text, not clause heads: an outfit sentence opens its outer layer
-  // with "over these he wears …", which the clause splitter files as a
-  // dependent of the garment before it.
-  for (const slot of REPAIR_GARMENT_SLOTS) {
-    if (offSlots.has(slot)) continue;
-    const inSlot = new Set(SLOT_NOUNS[slot] || []);
-    const phrase = phraseFor(outfit, w => inSlot.has(w) && wearable(w));
-    if (phrase) return phrase;
+  const reqs = resolveCharacterReqs(clothingRequirements, name);
+  const garments = reqs?.[String(category).startsWith('costumed') ? 'costumed' : category]?.garments;
+  if (!Array.isArray(garments) || garments.length === 0) {
+    log.error(`[REPAIR-NAMES] ${where}: the ${category} outfit carries no typed garment list (stored before the field existed, or authored without it) - the descriptor carries no garment`);
+    return null;
   }
-  const anyGarment = phraseFor(outfit, w => wearable(w) && !inOffSlot(w));
-  if (anyGarment) return anyGarment;
-  log.error(`[REPAIR-NAMES] ${name}${pageNumber != null ? ` p${pageNumber}` : ''}: no garment from the closed vocabulary in the ${category} outfit — the descriptor carries no garment`);
+  const usable = garments.filter(g => g && !offSlots.has(g.slot) && !words(g.name).some(w => offNouns.has(w)));
+  const phraseOf = (g) => (g.colour ? `${g.colour} ${g.name}` : g.name);
+  for (const slot of REPAIR_GARMENT_SLOTS) {
+    const g = usable.find(x => x.slot === slot);
+    if (g) return phraseOf(g);
+  }
+  if (usable.length > 0) return phraseOf(usable[0]);
+  log.error(`[REPAIR-NAMES] ${where}: every garment of the ${category} outfit is off this page - the descriptor carries no garment`);
   return null;
 }
 
@@ -2078,5 +2071,5 @@ function nameRepairText(text, nameMap, { keep = null, vidByName, ownVisualId = n
 }
 
 module.exports = {
-  expressionEditBlocked, describeFigureForRepair, buildRepairNameMap, buildPageRepairNameMap, nameRepairText, resolveRepairIds,
+  expressionEditBlocked, describeFigureForRepair, repairGarmentPhrase, buildRepairNameMap, buildPageRepairNameMap, nameRepairText, resolveRepairIds,
   repairAttemptFromResult, describeCharFixFailure, detectionForRetryEntry, findBadPages, applyRoundCap, LAST_ROUND_CRITICAL_MAX, planBookAuditRound, admitPagesFromAudit, attributeReaderFindings, pagesWherePickMoved, summarizeRepairRound, baseRepairMethod, AUDIT_ADMIT_MAX, AUDIT_ADMIT_SEVERITIES, collectShippedDefective, collectSurvivingCriticals, resolveDeclaredCast, inheritSceneContract, resolveVersionCompressedScene, resolveVersionPrompt, resolveOwnRenderPrompt, SAFE_REPAIRABLE_TYPES, typesAreInpaintable, semanticFindings, findSafeRepairableFinding, selectCharRepairTasks, decideRepairMethod, charFixEntityFindings, NOT_INPAINTABLE_TYPES, ITERATE_ROUTED_TYPES, CROP_ARTIFACT_TYPES, isCropArtifact, hasCriticalSeverityFinding, collectCriticalFindings, buildPreserveClause, PRESERVE_MAX, scoredFindingPools };

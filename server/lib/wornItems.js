@@ -255,45 +255,23 @@ ${JSON.stringify(m, null, 2)}`, dropped };
 }
 
 /**
- * Which outfit slot a VB element belongs to, from its own NAME.
+ * Which outfit slot a piece of OUTFIT text belongs to: a wardrobe clause, a
+ * cover-contract segment, or one word of either, matched against the closed
+ * garment nouns of SLOT_NOUNS. Null when the text names nouns of two slots, or
+ * of none.
  *
- * WHAT THIS IS NOT (corrected 2026-09-18 — the previous note here was wrong and
- * the error mattered). It used to claim the caller has always pre-filtered to an
- * id the Art Director declared worn, so the function "never decides whether
- * something is clothing". Three of its six call sites do no such thing: they
- * sweep RAW Visual Bible pools and this regex is the only thing standing between
- * a prop and an outfit slot —
- *   - `unlinkedWornCandidates` below (every unlinked artifact/clothing/vehicle);
- *   - `clothingCheck.bibleEntrySlot` (every artifact/clothing entry);
- *   - `coverIterate`'s `artifactMeta` (every artifact).
- * Two more pass an outfit CLAUSE rather than a name (`clothingCheck` line ~637,
- * `coverIterate` line ~407), against the paragraph below.
- *
- * So it DOES decide, and it is wrong on names where a slot noun is not the
- * garment: measured over 937 stored staging elements it derives a slot for 64,
- * and 4 of those are props — "bottle cap" and "Gessler's hat pole" land in
- * headwear, "Knotted sash line" in belt/waist (jobs job_1788551692337_bc479p945
- * ART004, job_1785513128428_fw26s7r7y ART003, job_1777923092665_wkhxd3mg9
- * ART001, job_1789207854566_l43qgl34w ART007). None of the four reached a
- * consumer — every call site applies a second gate — so the measured shipped
- * damage is zero, but the matcher is not the safe lookup this note used to
- * promise. The standing proposal is to have the writer/Art Director emit the
- * slot as a closed enum and retire the regex; until that is ruled on, a DECLARED
- * `type` always wins over this (see `slotFromType`, and source 2 of
- * `resolveWornItemsForPage`).
- *
- * When the name matches nouns from more than one slot, or from none, the answer
- * is null and the caller must treat the item as unmappable rather than guess.
- *
- * The NAME only, never the description: a description ("a scarf-sized square of
- * cloth she ties over her hair") can carry nouns from slots the item is not in.
+ * OUTFIT TEXT ONLY. A Visual Bible ELEMENT never gets its slot from its name:
+ * that guess (`deriveSlotFromName`) slotted props ("bottle cap" and a pole that
+ * carries a hat as headwear, a knotted line as belt/waist) and was deleted
+ * 2026-10-09 (docs/decisions.md). An element's slot is the typed `slot` field
+ * its author wrote — see `elementSlot`.
  */
-function deriveSlotFromName(name) {
-  const text = String(name || '');
-  if (!text.trim()) return null;
+function slotOfOutfitText(text) {
+  const t = String(text || '');
+  if (!t.trim()) return null;
   const hits = WORN_SLOTS.filter((slot) => {
     const nouns = SLOT_NOUNS[slot];
-    return nouns && new RegExp(`\\b(?:${nouns.join('|')})\\b`, 'i').test(text);
+    return nouns && new RegExp(`\\b(?:${nouns.join('|')})\\b`, 'i').test(t);
   });
   return hits.length === 1 ? hits[0] : null;
 }
@@ -323,6 +301,21 @@ function slotFromType(type) {
 }
 
 /**
+ * The outfit slot a Visual Bible element occupies, from what its author
+ * DECLARED, in this order: the `wornAs` link's slot, the typed `slot` field
+ * (WORN_SLOT_FIELD_RULE), then the free-text `type` through the one type map.
+ * Null when it declares none — a prop, or an entry stored before the `slot`
+ * field existed; callers treat that as unmappable and say so, they never guess
+ * from the name.
+ */
+function elementSlot(entry) {
+  const link = parseWornAs(entry && entry.wornAs);
+  if (link && link.slotKnown) return link.slot;
+  if (entry && WORN_SLOTS.includes(entry.slot)) return entry.slot;
+  return slotFromType(entry && entry.type);
+}
+
+/**
  * Elements that are CLEARLY worn but carry no `wornAs` link — GAP 1.
  *
  * The whole removable-item path hangs off the writer emitting `wornAs`, and
@@ -332,12 +325,15 @@ function slotFromType(type) {
  * the plot hands from one character to another was `type: "headwear"` and
  * linked to nobody.
  *
- * Two deterministic triggers, no prose inference:
- *   'type'   — the element's own `type` IS an outfit slot.
- *   'outfit' — exactly one character's outfit text names the same garment,
- *              through the closed SLOT_NOUNS vocabulary of a slot the element's
- *              NAME also lands in.
- * `owner` is filled only by the second trigger, which actually identifies one.
+ * One trigger, no prose inference: the element DECLARES an outfit slot
+ * (`elementSlot`: the typed `slot` field, else a slot-named `type`). An entry
+ * stored before the `slot` field existed and with no slot-named `type` declares
+ * none and is not a candidate — it is never slotted from its name
+ * (docs/decisions.md, 2026-10-09).
+ *   reason 'outfit'   — exactly one character's outfit text also names the
+ *                       garment, by the element's name against the declared
+ *                       slot's closed SLOT_NOUNS: `owner` is filled.
+ *   reason 'declared' — no owner could be identified.
  */
 function unlinkedWornCandidates(visualBible, outfitTexts = new Map()) {
   const out = [];
@@ -345,22 +341,17 @@ function unlinkedWornCandidates(visualBible, outfitTexts = new Map()) {
     const list = Array.isArray(visualBible && visualBible[pool]) ? visualBible[pool] : [];
     for (const entry of list) {
       if (!entry || !entry.id || parseWornAs(entry.wornAs)) continue;
-      const nameSlot = deriveSlotFromName(entry.name || '');
-      const typeSlot = slotFromType(entry.type);
-      const slot = typeSlot || nameSlot;
+      const slot = elementSlot(entry);
       if (!slot) continue;
       // Which characters' outfits name this same garment, by the element's own
-      // name — the same closed vocabulary, never free prose.
+      // name against the declared slot's closed garment nouns — never free prose.
       let owner = null;
-      if (nameSlot) {
-        const nouns = (SLOT_NOUNS[nameSlot] || []).filter(n => new RegExp(`\\b${n}\\b`, 'i').test(String(entry.name || '')));
-        if (nouns.length > 0) {
-          const re = new RegExp(`\\b(?:${nouns.join('|')})\\b`, 'i');
-          const hits = [...outfitTexts.entries()].filter(([, text]) => re.test(String(text || ''))).map(([n]) => n);
-          if (hits.length === 1) [owner] = hits;
-        }
+      const nouns = (SLOT_NOUNS[slot] || []).filter(n => new RegExp(`\\b${n}\\b`, 'i').test(String(entry.name || '')));
+      if (nouns.length > 0) {
+        const re = new RegExp(`\\b(?:${nouns.join('|')})\\b`, 'i');
+        const hits = [...outfitTexts.entries()].filter(([, text]) => re.test(String(text || ''))).map(([n]) => n);
+        if (hits.length === 1) [owner] = hits;
       }
-      if (!typeSlot && !owner) continue;
       out.push({
         id: String(entry.id).toUpperCase(),
         name: entry.name || entry.id,
@@ -368,7 +359,7 @@ function unlinkedWornCandidates(visualBible, outfitTexts = new Map()) {
         slot,
         owner,
         pages: Array.isArray(entry.appearsInPages) ? entry.appearsInPages : null,
-        reason: owner ? 'outfit' : 'type',
+        reason: owner ? 'outfit' : 'declared',
       });
     }
   }
@@ -568,18 +559,11 @@ function resolveWornItemsForPage(visualBible, cast, sceneMetadata, options = {})
     const found = findVbEntryById(visualBible, d.id);
     const entry = found ? found.entry : null;
     const owner = String((entry && entry.wornBy) || d.owner || '').trim();
-    // DECLARED TYPE FIRST (2026-09-18). `unlinkedWornCandidates` has always read
-    // `slotFromType(entry.type) || deriveSlotFromName(entry.name)`; this path —
-    // the one that actually strips and swaps a rendered outfit line — read the
-    // name regex alone, so the same element could be slotted two different ways
-    // by two functions in this file. The declaration is the Art Director's own
-    // word for what the element IS; the regex is a guess at English made from
-    // its label, and it is the guess that mis-slots props (see
-    // deriveSlotFromName). Over every stored staging/prod story the two never
-    // disagreed (0 of 937 + 777 elements), so this changes no shipped outfit —
-    // it removes the fork, and puts the declared field in front of the regex on
-    // the path where a wrong slot deletes a garment.
-    const slot = entry ? (slotFromType(entry.type) || deriveSlotFromName(entry.name || entry.id)) : null;
+    // DECLARED SLOT ONLY (2026-10-09). The slot is what the element's author
+    // wrote (`elementSlot`); it is never guessed from the name, which slotted
+    // props (docs/decisions.md). An element with none is unmappable, and the
+    // error below says so for an `off` row.
+    const slot = entry ? elementSlot(entry) : null;
     if (!entry || !owner || !slot) {
       // Loud, and only for the state that silently changes nothing downstream:
       // an `off` the resolver cannot map leaves the garment in the generator's
@@ -589,7 +573,7 @@ function resolveWornItemsForPage(visualBible, cast, sceneMetadata, options = {})
         const why = !entry
           ? 'no Visual Bible element carries that id'
           : (!owner ? 'the element names no wearer and the row names no owner'
-            : `its type "${entry.type || ''}" is not an outfit slot and no single slot can be derived from its name "${entry.name || entry.id}"`);
+            : `it declares no outfit slot (no \`slot\` field, no slot-named type "${entry.type || ''}"; a Visual Bible stored before the \`slot\` field existed has none)`);
         log.error(`[WORN] Page ${pageLabel}: ${d.id} is declared "off" but cannot be mapped to an outfit — ${why}. `
           + `Nothing is stripped: the image model is still told to draw it and every clothing judge still demands it.`);
       }
@@ -612,8 +596,8 @@ function resolveWornItemsForPage(visualBible, cast, sceneMetadata, options = {})
       // wardrobe, so no attached reference shows it on them.
       wornAsLinked: false,
       slot,
-      // Source 2 derives the slot from `slotFromType` / `deriveSlotFromName`,
-      // both of which only ever answer with a member of WORN_SLOTS.
+      // Source 2 takes the slot from `elementSlot`, which only ever answers
+      // with a member of WORN_SLOTS.
       slotKnown: true,
       entry,
       state: w2.state,
@@ -721,9 +705,8 @@ function trackedWornGarments(visualBible, pagesWornItems) {
       // (it leaves the garment in the contract and logs an error on an `off`).
       // Demanding a row for one would ask for a row the resolver then discards,
       // and would print "<a soft toy> is <the child>'s costume" at a reviewer.
-      // Same slot question as source 2, in the same precedence — declared
-      // `type` first, the name regex only otherwise.
-      const slot = slotFromType(entry.type) || deriveSlotFromName(entry.name || entry.id);
+      // Same slot question as source 2: the declared slot, never the name.
+      const slot = elementSlot(entry);
       if (!slot) continue;
       out.set(d.id, {
         id: d.id,
@@ -1006,6 +989,63 @@ function carryForwardWornItemsInBrief(newBrief, savedBrief) {
  * its front; code reading the description cannot.
  */
 const GARMENT_BACK_RULE = "Every worn garment's entry — each `clothing` entry and each entry with `wornAs` — carries `back`: the garment as seen from behind, one short phrase of its colour, material and outline, plus anything that sits on its back (a hood, a back print). Nothing only its front shows: no front fastening, front pockets, collar opening, buttons or front print.";
+
+/**
+ * The typed `slot` of a worn Visual Bible entry (2026-10-09), filled into both
+ * Visual Bible authoring sites as {WORN_SLOT} (sibling set vb-authoring-sites).
+ * The author knows whether a "hat on a pole" is worn; code reading the name
+ * cannot (decisions.md: the name guess slotted props).
+ */
+const WORN_SLOT_FIELD_RULE = "Every entry a character wears on the body — each `clothing` entry, and each `artifacts` entry that is part of an outfit — carries `slot`: where on the body it is worn, exactly one of " + WORN_SLOTS.map(s => '`' + s + '`').join(', ') + ", and never another word; neckwear, handwear, eyewear and a bag or backpack worn on the body are `accessories`. When the entry also has `wornAs`, `slot` is the slot named there. Anything not worn on the body has no `slot` field at all, whatever its name says: an object that is held, carried in the hand, hung up, tied round another object, set on a pole or lying somewhere.";
+
+/**
+ * The colour words a wardrobe outfit may use, alone (prompts COLOUR_WORDS_DEF,
+ * built from this list) and the closed set of a garment's typed `colour`.
+ */
+const WARDROBE_COLOURS = ['red', 'blue', 'green', 'yellow', 'orange', 'purple', 'brown', 'black', 'white', 'grey'];
+
+/**
+ * The typed `garments` list of a wardrobe outfit (2026-10-09), filled into the
+ * wardrobe bible writer and the wardrobe reviewer as {GARMENT_LIST}. The author
+ * of an outfit knows which colour belongs to which garment; code scanning the
+ * description for a colour word near a garment noun does not
+ * (docs/decisions.md: it returned no colour on 25 of 90 sampled mentions).
+ */
+const GARMENT_LIST_RULE = "`garments` lists every garment `description` names, one row each: `slot` is where on the body it is worn, exactly one of " + WORN_SLOTS.map(s => '`' + s + '`').join(', ') + "; `name` is the garment's noun phrase as `description` words it, without its colour (\"hooded anorak\", \"canvas trainers\"); `colour` is its main colour, one of " + WARDROBE_COLOURS.join(', ') + " and nothing else, or omitted when the garment has no single main colour. A row for every garment `description` names, and none for anything it does not.";
+
+/**
+ * Validate an outfit's authored `garments` list. Returns the clean rows
+ * `[{slot, name, colour|null}]`, or null (logged as an error) when the list is
+ * absent or holds no usable row: nothing is repaired or guessed, a row with an
+ * unknown slot or no name is dropped, an unknown colour word is dropped to null.
+ * An outfit stored before the field existed has no list; its readers say so.
+ */
+function normaliseGarments(raw, who) {
+  if (!Array.isArray(raw) || raw.length === 0) {
+    log.error(`[WARDROBE] ${who}: the outfit carries no \`garments\` list (an outfit stored before the field existed, or the author left it out)`);
+    return null;
+  }
+  const out = [];
+  for (const g of raw) {
+    const name = g && typeof g.name === 'string' ? g.name.trim() : '';
+    if (!g || !WORN_SLOTS.includes(g.slot) || !name) {
+      log.error(`[WARDROBE] ${who}: garment row dropped, needs a slot from the closed list and a name: ${JSON.stringify(g)}`);
+      continue;
+    }
+    let colour = null;
+    if (g.colour != null && String(g.colour).trim() !== '') {
+      const c = String(g.colour).trim().toLowerCase();
+      if (WARDROBE_COLOURS.includes(c)) colour = c;
+      else log.error(`[WARDROBE] ${who}: garment "${name}" colour "${g.colour}" is not one of the colour words - no colour kept`);
+    }
+    out.push({ slot: g.slot, name, colour });
+  }
+  if (out.length === 0) {
+    log.error(`[WARDROBE] ${who}: no usable garment row`);
+    return null;
+  }
+  return out;
+}
 
 /** The facing tag both the worn line and the judges' clothing contract carry. */
 const SEEN_FROM_BACK = 'seen from the back';
@@ -1902,7 +1942,12 @@ module.exports = {
   findVbEntryById,
   garmentWearerAbsent,
   dropAbsentWearerGarments,
-  deriveSlotFromName,
+  slotOfOutfitText,
+  elementSlot,
+  WORN_SLOT_FIELD_RULE,
+  WARDROBE_COLOURS,
+  GARMENT_LIST_RULE,
+  normaliseGarments,
   slotFromType,
   elementIdentityTerms,
   indexOfElementAmong,

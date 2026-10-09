@@ -69,7 +69,7 @@ describe('GAP 1 — a worn element with no wornAs link is reported', () => {
     const c = unlinkedWornCandidates({ artifacts: [TRICORN] }, new Map(Object.entries({ Sarah: SARAH_OUTFIT })));
     expect(c).toHaveLength(1);
     expect(c[0].owner).toBeNull();
-    expect(c[0].reason).toBe('type');
+    expect(c[0].reason).toBe('declared');
   });
 });
 

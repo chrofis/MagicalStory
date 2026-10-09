@@ -53,10 +53,13 @@ Both blocks, in this order, nothing before or after.
 ---CLOTHING---
 ## <CharacterName> / <category>
 <corrected full outfit — every slot the character wears, each with colour and material, as one self-contained description>
+GARMENTS: <a JSON array of {"slot", "name", "colour"} rows for exactly the garments that outfit names>
 
 Every fault a check names must produce a corrected or added entry below — naming a fault and answering NONE leaves it in the book.
 
-Under a heading write the outfit and nothing else: no reasoning, no commentary, no correction of what you just wrote. Rework it before you write it. One heading per character and category.
+{GARMENT_LIST}
+
+Under a heading write the outfit, then its GARMENTS line, and nothing else: no reasoning, no commentary, no correction of what you just wrote. Rework it before you write it. One heading per character and category.
 
 Include a character and category only if you rewrote or added it. Use the character's real name and the category exactly as it appears above. When nothing needs rewriting, still output the analysis, then:
 

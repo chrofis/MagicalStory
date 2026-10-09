@@ -76,7 +76,7 @@ describe('1 — the variant is judged by the pass-2 style judge plus a garment-g
 });
 
 describe('3 — costumed sheets get off variants too', () => {
-  const VB = { clothing: [{ id: 'CLO001', name: 'pirate coat', wornBy: 'Mia', description: 'a grey wool pirate coat' }] };
+  const VB = { clothing: [{ id: 'CLO001', name: 'pirate coat', slot: 'outer layer', wornBy: 'Mia', description: 'a grey wool pirate coat' }] };
   const REQS = { Mia: { costumed: { used: true, costume: 'pirate', description: 'A white blouse; a grey wool pirate coat; black trousers; boots.' }, standard: { used: false } } };
   const off = { id: 'CLO001', owner: 'Mia', state: 'off', wearer: null, location: 'over the rail', redressNote: 'The coat is off; the white blouse is outermost.', keptGarments: [{ type: 'blouse', colour: 'white', details: '' }] };
 

@@ -18,7 +18,7 @@ const { commissionedChildBand, buildChildAgeBandNote, secondaryAgeCues } = requi
 // this module was the prose worn-vs-held matcher deleted 2026-09-18. It stays
 // exported from visualBible.js for coverIterate.js, which still uses it.
 const { REQUIRED_TEXT_AUTHORING_RULE } = require('./requiredText');
-const { GARMENT_BACK_RULE } = require('./wornItems');
+const { GARMENT_BACK_RULE, WORN_SLOT_FIELD_RULE, GARMENT_LIST_RULE, WARDROBE_COLOURS, normaliseGarments } = require('./wornItems');
 const { SCALE_CLASS_SPEC, ANIMAL_ANATOMY_SPEC, GROWN_CREATURE_SCALE_CLASSES, buildVisualBiblePrompt, englishEntityRef, englishLocationRef, clauseRef, objectStates, resolveObjectState, elementScaleNote, withScaleNote } = require('./visualBible');
 const { SHOT_ENUM, SHOT_POSITIONS, DISTANCE_SHOTS, SHOT_DEFINITIONS, CLOSEUP_BELOW_WAIST_PHRASE, CLOSEUP_KEPT_RULE, CLOSEUP_KEPT_FIXED_SHOT_RULE, FOOTING_RULE, FOOTING_FIELD, PLAN_SHOT_PLACEHOLDER, shotDistributionPhrase, buildShotDefinitions, OTS_NEAR_FIGURE_CROP, OTS_NEAR_FIGURE_RULE, OTS_NO_CONTACT_RULE, isOverTheShoulderPerspective, VANTAGE_SHOT_RULE, GROUP_STAGING_RULE, GROUP_STAGING_FIXED_SHOT_RULE } = require('./shotVocabulary');
 const { labelOf } = require('./vbLabel');
@@ -3336,6 +3336,8 @@ function artDirectorFills(inputData, beats = [], options = {}) {
     // ONE back-view garment look for both bible-authoring sites — see
     // wornItems.GARMENT_BACK_RULE.
     GARMENT_BACK: GARMENT_BACK_RULE,
+    // ...and the typed worn `slot` (wornItems.WORN_SLOT_FIELD_RULE).
+    WORN_SLOT: WORN_SLOT_FIELD_RULE,
     CREATURE_FEATURES: CREATURE_FEATURES_RULE,
     TRUE_RELATIVE_SIZE: TRUE_RELATIVE_SIZE_RULE,
     // ONE shot vocabulary for every stage that writes or reads a `shot` — the
@@ -12396,7 +12398,7 @@ const GARMENT_ONE_OUTFIT_RULE = "A garment belongs to ONE outfit: that of the ch
  */
 const WARDROBE_RULES = {
   COSTUME_RECOGNISABLE_DEF: 'Every garment is one that costume is known for, named with the word that names it there. A garment that only hints at the theme does not count, and neither does one borrowed from a different costume or named with a word belonging to one.',
-  COLOUR_WORDS_DEF: 'Every colour is one of these words, alone: red, blue, green, yellow, orange, purple, brown, black, white, grey. No shade name, no modifier (dark, light, pale) and no compound.',
+  COLOUR_WORDS_DEF: 'Every colour is one of these words, alone: ' + WARDROBE_COLOURS.join(', ') + '. No shade name, no modifier (dark, light, pale) and no compound.',
   SEX_FIT_DEF: "A male character wears garments made for boys or men, a female character garments made for girls or women. When a costume has a male and a female form, each character wears the form matching theirs.",
   CHILD_TOP_DEF: "A child's swimwear or costume always has a covering top: a long-sleeve or short-sleeve `swim shirt` (rash-guard) over the whole torso, shoulders to waist. Never a `bikini`, a bare chest, a bare midriff, or a one-piece (a skirt or tail below it leaves the torso reading bare).",
   TAIL_DEF: 'A costume that replaces the legs (a tail, a fin) is one tail from the waist down, written as replacing the legs. Never a skirt over legs, and no feet, bare feet or footwear.',
@@ -12409,7 +12411,7 @@ const WARDROBE_RULES = {
   PROP_NOT_GARMENT_DEF: 'A garment is clothing a person wears: coat, scarf, hat, cloak, boots. A blanket, towel, sheet, tablecloth, bag, umbrella, toy, tool or any other object that is carried, held, spread out, shared or wrapped around someone for a page is a story prop, never a garment: no outfit names it, however the plan uses it. The plan line and the Visual Bible carry a prop.',
   FACE_COVER_DEF: 'No garment covers the face or the eyes, or shadows them with a brim: no mask, visor, veil, helmet, crown or low brim. Glasses are identity, not a garment: a character whose outfit lists glasses keeps them, and every rewrite of that outfit still lists them.',
 };
-const wardrobeSharedFills = () => ({ ...WARDROBE_RULES });
+const wardrobeSharedFills = () => ({ ...WARDROBE_RULES, GARMENT_LIST: GARMENT_LIST_RULE });
 
 /**
  * Wardrobe review of the bible's clothing contract. Returns null when the
@@ -12459,6 +12461,21 @@ function buildClothingReviewPrompt(inputData, clothingRequirements, beats = []) 
  */
 /** The clothing-review template's no-change marker, as a whole answer. */
 const CLOTHING_NO_CHANGE_RE = /^\s*NONE\s*\.?\s*$/i;
+const GARMENTS_LINE_RE = /(?:^|\n)[ \t]*GARMENTS[ \t]*:[ \t]*(\[[\s\S]*\])[ \t]*$/i;
+
+/**
+ * Apply one reviewed outfit to a wardrobe entry: the new description AND its
+ * typed garment list together, so the list never describes a different outfit
+ * than the text (pipeline and Test Lab share this). A reply without a usable
+ * list leaves the entry with NO list and says so; the old list described the
+ * outfit that was just replaced.
+ */
+function applyClothingFix(entry, fix, who) {
+  entry.description = fix.description;
+  const garments = normaliseGarments(fix.garments, who);
+  if (garments) entry.garments = garments;
+  else delete entry.garments;
+}
 
 function parseClothingReview(raw) {
   const full = String(raw || '');
@@ -12506,14 +12523,22 @@ function parseClothingReview(raw) {
   const byKey = new Map();
   for (let i = 0; i < marks.length; i++) {
     const end = i + 1 < marks.length ? marks[i + 1].headStart : body.length;
-    const description = body.slice(marks[i].bodyStart, end).trim();
+    const chunk = body.slice(marks[i].bodyStart, end).trim();
+    // The outfit's typed garment list rides on a trailing `GARMENTS: [...]` line
+    // (wornItems.GARMENT_LIST_RULE); it is not part of the description.
+    const gm = chunk.match(GARMENTS_LINE_RE);
+    const description = (gm ? chunk.slice(0, gm.index) : chunk).trim();
+    let garments = null;
+    if (gm) {
+      try { garments = JSON.parse(gm[1]); } catch (e) { log.error(`[CLOTHING-REVIEW] ${marks[i].name}/${marks[i].category}: the GARMENTS line is not JSON (${e.message})`); }
+    }
     if (!marks[i].name || !description) continue;
     // A heading answered with the template's own no-change marker is not a
     // rewrite (bug clothing-review-none-body-erases-outfit: staging
     // job_1790529840433_ar4u7qry3 wrote "NONE" over Noah's pirate outfit).
     if (CLOTHING_NO_CHANGE_RE.test(description)) continue;
     const key = `${marks[i].name.toLowerCase()}/${marks[i].category}`;
-    byKey.set(key, { name: marks[i].name, category: marks[i].category, costume: marks[i].costume || null, description });
+    byKey.set(key, { name: marks[i].name, category: marks[i].category, costume: marks[i].costume || null, description, garments });
   }
   return { analysis, entries: [...byKey.values()] };
 }
@@ -13045,6 +13070,7 @@ The story takes place in ${inputData.userLocation.city}. Use real place names �
       ELEMENT_ENTRY_PAGE: ELEMENT_ENTRY_PAGE_RULE,
       // ...and the same back-view garment look (wornItems.GARMENT_BACK_RULE).
       GARMENT_BACK: GARMENT_BACK_RULE,
+      WORN_SLOT: WORN_SLOT_FIELD_RULE,
       CREATURE_FEATURES: CREATURE_FEATURES_RULE,
       TRUE_RELATIVE_SIZE: TRUE_RELATIVE_SIZE_RULE,
     });
@@ -13934,6 +13960,7 @@ module.exports = {
   GARMENT_ONE_OUTFIT_RULE,
   WARDROBE_RULES,
   parseClothingReview,
+  applyClothingFix,
   parseBeats,
   parsePagePlan,
   parsePlanResponse,

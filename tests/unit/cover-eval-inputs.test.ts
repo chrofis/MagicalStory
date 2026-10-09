@@ -22,8 +22,8 @@ const { MODEL_DEFAULTS } = require('../../server/config/models.js');
 
 const visualBible = {
   artifacts: [
-    { id: 'ART002', name: 'Red Cape', description: 'A red handmade cape with golden trim and a round clasp' },
-    { id: 'ART003', name: 'Blue Scarf', description: 'a blue knitted scarf with a white snowflake pattern' },
+    { id: 'ART002', name: 'Red Cape', slot: 'outer layer', description: 'A red handmade cape with golden trim and a round clasp' },
+    { id: 'ART003', name: 'Blue Scarf', slot: 'accessories', description: 'a blue knitted scarf with a white snowflake pattern' },
   ],
   locations: [{ id: 'LOC001', name: 'Summer Garden', features: 'flowering arbors' }],
 };

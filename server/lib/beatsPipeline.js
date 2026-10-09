@@ -135,6 +135,7 @@ const {
   findingPages,
   buildClothingReviewPrompt,
   parseClothingReview,
+  applyClothingFix,
   parsePlanResponse,
   pickMainCharacters,
   buildSceneExpansionPrompt,
@@ -3136,7 +3137,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
           if (!entry || !entry.used) { stray.push(`${fix.name}/${fix.category}`); continue; }
           const before = entry.description || '';
           if (before === fix.description) continue;
-          entry.description = fix.description;
+          applyClothingFix(entry, fix, `${name}/${fix.category}`);
           rewrites.push({ name, category: fix.costume ? `costumed:${fix.costume}` : fix.category, before, after: fix.description });
         }
         // The transcript is the contract everything after this pipeline reads.

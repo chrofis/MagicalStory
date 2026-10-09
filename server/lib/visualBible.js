@@ -1281,6 +1281,9 @@ function tryParseVisualBibleJSON(outline) {
         appearsInPages: artifact.pages || [],
         description: buildArtifactDescription(artifact),
         type: artifact.type,
+        // The typed worn slot (wornItems.WORN_SLOT_FIELD_RULE); a whitelist parse
+        // drops a field it does not list.
+        slot: typeof artifact.slot === 'string' && artifact.slot.trim() ? artifact.slot.trim() : null,
         // Words that must be READABLE on the object (a sign, a plaque). Its
         // cell renders solo on the typography-aware tier with the words
         // quoted in a sentence (referenceSheets.elementTextSentence).
@@ -1367,6 +1370,7 @@ function tryParseVisualBibleJSON(outline) {
         howWorn: item.howWorn,
         // The garment seen from behind (wornItems.GARMENT_BACK_RULE).
         back: item.back || null,
+        slot: typeof item.slot === 'string' && item.slot.trim() ? item.slot.trim() : null,
         type: 'clothing',
         extractedDescription: null,
         firstAppearanceAnalyzed: false,
@@ -2448,6 +2452,7 @@ function tryParseNewEntriesJSON(section) {
         howWorn: item.howWorn,
         // The garment seen from behind (wornItems.GARMENT_BACK_RULE).
         back: item.back || null,
+        slot: typeof item.slot === 'string' && item.slot.trim() ? item.slot.trim() : null,
         type: 'clothing',
         pages: item.pages || [],
         source: 'story_text'

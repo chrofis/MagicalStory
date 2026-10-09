@@ -38,6 +38,7 @@ const STORED_BIBLE = {
     id: 'CLO001',
     name: 'red zip-up hoodie',
     label: 'red hoodie',
+    slot: 'top',
     pages: [8, 10],
     wornBy: 'Levin',
     howWorn: 'tied loosely by the sleeves into a knot',

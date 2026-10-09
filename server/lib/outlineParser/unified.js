@@ -161,6 +161,17 @@ class UnifiedStoryParser {
       const parsed = getExtractJsonFromText()(section);
       if (parsed) {
         this._cache.clothingRequirements = parsed.clothingRequirements || parsed;
+        // The typed garment list (wornItems.GARMENT_LIST_RULE) is checked the moment it is
+        // read: a used outfit with no usable list loses the field and the error says which.
+        const { normaliseGarments } = require('../wornItems');
+        for (const [who, categories] of Object.entries(this._cache.clothingRequirements || {})) {
+          for (const [category, entry] of Object.entries(categories || {})) {
+            if (!entry || typeof entry !== 'object' || !entry.used || !entry.description) continue;
+            const garments = normaliseGarments(entry.garments, `${who}/${category}`);
+            if (garments) entry.garments = garments;
+            else delete entry.garments;
+          }
+        }
         log.debug(`[UNIFIED-PARSER] Clothing requirements for ${Object.keys(this._cache.clothingRequirements).length} characters`);
         return this._cache.clothingRequirements;
       }

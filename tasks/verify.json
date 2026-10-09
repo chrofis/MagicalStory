@@ -9484,6 +9484,24 @@
         "kind": "human",
         "what": "One /try on staging from a phone: Railway log shows 'Drawing the standard body row' and 'Styling the standard sheet' for the new user; topic step shows no sibling topic and Halloween in the adventure list; idea cards fit their text; idea_events idea_generated detail.ideas holds both texts."
       }
+    },
+    {
+      "id": "typed-worn-slot-and-garments-2026-10-09",
+      "title": "Visual Bible writes a typed slot on worn items; the wardrobe writes a typed garments list",
+      "commits": [
+        "HEAD"
+      ],
+      "addedAt": "2026-10-09",
+      "status": "pending",
+      "evidence": [],
+      "claim": "A fresh story stores a valid slot on every clothing entry of its Visual Bible and a garments list with a colour on each used outfit of its clothingRequirements.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Read stories.data.visualBible.clothing[].slot and clothingRequirements.*.*.garments on the run; confirm the log has no '[WARDROBE] ... no garments list' and no '[CLOTHING-CHECK] ... clothing entry with no slot' lines."
+      }
     }
   ],
   "runs": [

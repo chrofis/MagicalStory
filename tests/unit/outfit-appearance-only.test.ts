@@ -24,11 +24,13 @@ const CAST = [
 ];
 const CREATURE = 'Grumble';
 const REQS: any = {
-  Pim: { standard: { used: true, description: `Pim wears a white long-sleeve top under a red hooded sweatshirt, grey wool dungaree trousers, and blue ankle boots; over the sweatshirt he wears a blue padded hooded anorak with a front zip and kangaroo pocket. The pocket holds the warm paper bag from page 2 until he hands it to ${CREATURE} on page 16.` } },
-  Ottilie: { standard: { used: true, description: 'Ottilie wears a green crew-neck wool jumper, blue corduroy trousers and brown ankle boots; over these she wears an orange quilted zip-up jacket with a stand collar — the jacket she removes on page 7 and wears again from page 14.' } },
+  Pim: { standard: { used: true, description: `Pim wears a white long-sleeve top under a red hooded sweatshirt, grey wool dungaree trousers, and blue ankle boots; over the sweatshirt he wears a blue padded hooded anorak with a front zip and kangaroo pocket. The pocket holds the warm paper bag from page 2 until he hands it to ${CREATURE} on page 16.`,
+    garments: [{ slot: 'top', name: 'long-sleeve top', colour: 'white' }, { slot: 'outer layer', name: 'hooded anorak', colour: 'blue' }, { slot: 'bottom', name: 'dungaree trousers', colour: 'grey' }, { slot: 'footwear', name: 'ankle boots', colour: 'blue' }] } },
+  Ottilie: { standard: { used: true, description: 'Ottilie wears a green crew-neck wool jumper, blue corduroy trousers and brown ankle boots; over these she wears an orange quilted zip-up jacket with a stand collar — the jacket she removes on page 7 and wears again from page 14.',
+    garments: [{ slot: 'top', name: 'wool jumper', colour: 'green' }, { slot: 'outer layer', name: 'quilted jacket', colour: 'orange' }, { slot: 'bottom', name: 'corduroy trousers', colour: 'blue' }, { slot: 'footwear', name: 'ankle boots', colour: 'brown' }] } },
 };
 const VB: any = {
-  clothing: [{ id: 'CLO001', name: 'orange quilted jacket', label: 'orange jacket', wornBy: 'Ottilie' }],
+  clothing: [{ id: 'CLO001', name: 'orange quilted jacket', label: 'orange jacket', slot: 'outer layer', wornBy: 'Ottilie' }],
   animals: [{ id: 'ANI001', name: CREATURE, species: 'young dragon', coloring: 'green scales' }],
   secondaryCharacters: [], artifacts: [], vehicles: [], locations: [],
 };
