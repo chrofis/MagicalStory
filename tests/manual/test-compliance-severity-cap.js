@@ -53,16 +53,18 @@ function check(desc, cond) {
   check('cap is stamped for the dev panel', issues[0].severityCapped === 'identity-input');
 }
 
-// 2. CRITICAL "not identified in matches[]" wording (type drifted) → MAJOR
+// 2. Description WORDING alone never caps (owner 2026-10-09: code does not read finding text).
+//    Real stored findings the old regex wrongly capped: a clothing CRITICAL that said
+//    "absent from matches", an action_interaction CRITICAL that said "an unidentified animal".
 {
   const issues = [
     { description: 'CharacterA not identified in QUALITY_FIGURES.matches[] despite being named in prompt', severity: 'CRITICAL', type: 'default' },
-    { description: 'CharacterB has no entry in matches[] and no plausible figure', severity: 'CRITICAL', type: 'compliance' },
-    { description: 'CharacterC absent from matches[]', severity: 'CRITICAL', type: 'scene' },
+    { description: 'Sarah is absent from matches; inventory Figure 3 wears orange wide-leg cropped pants', severity: 'CRITICAL', type: 'clothing' },
+    { description: 'Levin watches Fuenkli; currently interacting with an unidentified animal', severity: 'CRITICAL', type: 'action_interaction' },
   ];
   cap(issues);
   for (const i of issues) {
-    check(`identity-absence wording capped (${i.description.slice(0, 30)}...)`, i.severity === 'MAJOR');
+    check(`wording does not cap (${i.type})`, i.severity === 'CRITICAL' && i.severityCapped === undefined);
   }
 }
 
@@ -107,11 +109,11 @@ function check(desc, cond) {
   check('malformed entries tolerated; severity-only CRITICAL not capped', issues[2].severity === 'CRITICAL');
 }
 
-// 7. Case-insensitivity of severity + wording
+// 7. Case-insensitivity of severity
 {
-  const issues = [{ description: 'characterA Not Identified in the matches [] block', severity: 'critical', type: 'default' }];
+  const issues = [{ description: 'CharacterA is missing', severity: 'critical', type: 'missing_character' }];
   cap(issues);
-  check('lowercase critical + spaced matches [] still capped', issues[0].severity === 'MAJOR');
+  check('lowercase critical missing_character still capped', issues[0].severity === 'MAJOR');
 }
 
 // 8. SCOPE: the cap never reaches the code-derived presence finding

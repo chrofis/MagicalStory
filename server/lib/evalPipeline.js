@@ -925,7 +925,8 @@ async function validateEmptyScene(imageData, textPosition, pageContext = '', opt
  * the same broken input. The image-seeing quality eval still owns true
  * missing-character CRITICALs, so capping the blind judge at MAJOR loses no
  * real detection power. Enforced in CODE (not only in the prompt) so a model
- * that disobeys its own contract cannot re-open the loop.
+ * that disobeys its own contract cannot re-open the loop. The trigger is the
+ * finding's TYPE (`missing_character`), never its description text.
  *
  * Mutates severity in place; stamps `severityCapped` for the dev panel.
  * @param {Array<{description: string, severity: string, type: string}>} issues
@@ -933,15 +934,17 @@ async function validateEmptyScene(imageData, textPosition, pageContext = '', opt
  */
 function capComplianceIdentitySeverity(issues) {
   if (!Array.isArray(issues)) return issues;
-  // Self-contained (no module-scope deps) so unit tests can vm-extract it.
-  const identityAbsenceRe = /\bnot identified\b|\bunidentified\b|matches\s*\[\s*\]|\bno (?:entry|match(?:es)?) in\b|\babsent from (?:the )?match/i;
   for (const issue of issues) {
     if (!issue || typeof issue !== 'object') continue;
     const sev = String(issue.severity || '').toUpperCase();
     if (sev !== 'CRITICAL' && sev !== 'CATASTROPHIC') continue;
-    const isIdentityAbsence = issue.type === 'missing_character'
-      || identityAbsenceRe.test(String(issue.description || ''));
-    if (isIdentityAbsence) {
+    // The TYPE the judge filed, nothing else. A description-wording test here
+    // ("not identified", "absent from matches") capped 8 of 42 stored findings
+    // that were NOT identity absences: a real CRITICAL clothing finding that
+    // happened to say "absent from matches", an action_interaction finding that
+    // mentioned "an unidentified animal" (scripts/analysis/replay-identity-cap.js,
+    // docs/decisions.md 2026-10-09). Classification belongs to the prompt.
+    if (issue.type === 'missing_character') {
       issue.severity = 'MAJOR';
       issue.severityCapped = 'identity-input'; // eval-input deficiency, not an observed defect
     }
