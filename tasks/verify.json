@@ -4991,7 +4991,7 @@
         "kind": "auto",
         "fn": "pagePromptsFit"
       },
-      "status": "failed",
+      "status": "confirmed",
       "evidence": [
         {
           "storyId": "job_1790536739048_ruynosw80",
@@ -5082,6 +5082,16 @@
           "checkedAt": "2026-10-09 22:58:52 CH",
           "result": "FAILED",
           "note": "12 prompt_fit_failed event(s); 1 render(s) needed the ranked cut; longest built page prompt 14372 chars: IMAGE GEN-ONLY page 2: prompt-shrink [IMAGE GEN-ONLY]: 9049 chars after every allowed drop (COUNTS,… | IMAGE GEN-ONLY page 1: prompt-shrink [IMAGE GEN-ONLY]: 8272 chars after every allowed drop (COUNTS,… | IMAGE GEN-ONLY page 4: prompt-shrink [IMAGE GEN-ONLY]: 10990 chars after every allowed drop (COUNTS… | IMAGE GEN-ONLY page -3: prompt-shrink [IMAGE GEN-ONLY]: 8991 chars after every allowed drop (Compos…"
+        },
+        {
+          "storyId": "job_1791551303368_hle970nmc",
+          "env": "staging",
+          "build": "a2c40ec5f199c4de206715f49a899d40518f2c9b",
+          "runDate": "2026-10-09 15:08:23 CH",
+          "checkedAt": "2026-10-09 23:26:11 CH",
+          "result": "HUMAN-FIXED",
+          "by": "claude",
+          "note": "Fixed by 08f6c8f46 (Grok caps are the real 16000/64000 bytes, not 7900 chars) and 0832cc784 (over-cap scene shortened). Old failures were build 38c43870e (2026-09-28) and 15489e69 (09-27), both before the fix. Evidence: 0 prompt_fit_failed in 40 staging stories since 2026-10-01 (10 full stories, builds a7fbbb7ba..a2c40ec5f); replay of n9wrh5u0j p1/p2/p4 with the current builder: 11667/12462/14456 chars vs cap 63900, all fit."
         }
       ],
       "backlog": "tasks/BACKLOG.md 'Verification pending' — FAILED verify jev-decision-layer-wired smoke p1/p4 line"
@@ -5141,7 +5151,7 @@
         "kind": "auto",
         "fn": "pagePromptsFit"
       },
-      "status": "failed",
+      "status": "confirmed",
       "evidence": [
         {
           "storyId": "job_1791040103540_atbttop6w",
@@ -5169,6 +5179,16 @@
           "checkedAt": "2026-10-09 22:58:52 CH",
           "result": "FAILED",
           "note": "12 prompt_fit_failed event(s); 1 render(s) needed the ranked cut; longest built page prompt 14372 chars: IMAGE GEN-ONLY page 2: prompt-shrink [IMAGE GEN-ONLY]: 9049 chars after every allowed drop (COUNTS,… | IMAGE GEN-ONLY page 1: prompt-shrink [IMAGE GEN-ONLY]: 8272 chars after every allowed drop (COUNTS,… | IMAGE GEN-ONLY page 4: prompt-shrink [IMAGE GEN-ONLY]: 10990 chars after every allowed drop (COUNTS… | IMAGE GEN-ONLY page -3: prompt-shrink [IMAGE GEN-ONLY]: 8991 chars after every allowed drop (Compos…"
+        },
+        {
+          "storyId": "job_1791551239260_a0dpn715x",
+          "env": "staging",
+          "build": "a2c40ec5f199c4de206715f49a899d40518f2c9b",
+          "runDate": "2026-10-09 15:07:19 CH",
+          "checkedAt": "2026-10-09 23:26:11 CH",
+          "result": "HUMAN-FIXED",
+          "by": "claude",
+          "note": "Fixed by 08f6c8f46 (Grok caps are the real 16000/64000 bytes, not 7900 chars) and 0832cc784 (over-cap scene shortened). Old failures were build 38c43870e (2026-09-28) and 15489e69 (09-27), both before the fix. Evidence: 0 prompt_fit_failed in 40 staging stories since 2026-10-01 (10 full stories, builds a7fbbb7ba..a2c40ec5f); replay of n9wrh5u0j p1/p2/p4 with the current builder: 11667/12462/14456 chars vs cap 63900, all fit."
         }
       ],
       "backlog": "tasks/BACKLOG.md dragon front-cover line; supersedes nothing — page-prompt-fixed-blocks-fit FAILED on job_1790539784661_6mjcny1c7 (front cover + p18 repair)",

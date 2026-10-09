@@ -134,3 +134,37 @@ describe('status is the worst across runs (2026-10-09)', () => {
     expect(reg.entries[0].evidence).toHaveLength(1);
   });
 });
+
+describe('applyVerdicts: an older build never overrides a newer pass', () => {
+  const fail = (e: any) => [{ e, v: { id: e.id, result: 'FAILED', detail: 'old' } }];
+  const oldRun = { ...run, storyId: 'old', build: 'a'.repeat(40) };
+  const withPass = () => {
+    const e = entry('a', 'confirmed');
+    e.evidence.push({ storyId: 'new', env: 'staging', build: 'b'.repeat(40), result: 'CONFIRMED' });
+    return { entries: [e] } as any;
+  };
+
+  it('a FAILED from an ancestor of a confirmed build is kept as history and leaves the status', () => {
+    const reg = withPass();
+    const seen: string[][] = [];
+    core.applyVerdicts(reg, oldRun, fail(reg.entries[0]), { ...opts, buildContains: (c: string, b: string) => { seen.push([c, b]); return true; } });
+    expect(reg.entries[0].status).toBe('confirmed');
+    expect(reg.entries[0].evidence[1]).toMatchObject({ result: 'FAILED', superseded: true, storyId: 'old' });
+    expect(seen).toEqual([[oldRun.build, 'b'.repeat(40)]]);
+  });
+
+  it('a FAILED on a build that is NOT an ancestor of the pass (or unknown) still fails the entry', () => {
+    for (const answer of [false, null]) {
+      const reg = withPass();
+      core.applyVerdicts(reg, oldRun, fail(reg.entries[0]), { ...opts, buildContains: () => answer });
+      expect(reg.entries[0].status).toBe('failed');
+      expect(reg.entries[0].evidence[1].superseded).toBeUndefined();
+    }
+  });
+
+  it('without a git check the failure stands (callers without git)', () => {
+    const reg = withPass();
+    core.applyVerdicts(reg, oldRun, fail(reg.entries[0]), opts);
+    expect(reg.entries[0].status).toBe('failed');
+  });
+});

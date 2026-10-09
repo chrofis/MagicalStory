@@ -163,7 +163,7 @@ async function pull(env) {
     const run = { storyId: r.story_id, env, build: report.build || null, runDate: report.runAt ? ch(new Date(report.runAt)) : null };
     console.log(`\n${r.story_id} (${env}) — run ${run.runDate || '?'}, build ${run.build ? run.build.slice(0, 9) : 'UNRECORDED'}`);
     for (const { e, v } of verdicts) if (v.result !== 'NOT COVERED') printRow(e, v);
-    const { counts, flipped } = core.applyVerdicts(reg, run, verdicts, { checkedAt, via: 'pull' });
+    const { counts, flipped } = core.applyVerdicts(reg, run, verdicts, { checkedAt, via: 'pull', buildContains });
     console.log(`  ${counts.CONFIRMED} CONFIRMED, ${counts.FAILED} FAILED, ${counts.HUMAN} HUMAN, ${counts['NOT COVERED']} NOT COVERED`
       + `${flipped.length ? ` — status changed: ${flipped.map(f => `${f.id} ${f.from}->${f.to}`).join(', ')}` : ''}`);
     for (const { e, v } of verdicts) if (v.result === 'FAILED') allFailed.push(`${e.id} on ${r.story_id}`);
@@ -278,7 +278,7 @@ async function main() {
     console.log('!!! The change did not do what it claims on this run. Investigate, and add a tasks/BACKLOG.md line for each.');
   }
   if (write) {
-    const { flipped } = core.applyVerdicts(reg, run, judged, { checkedAt, via: 'write' });
+    const { flipped } = core.applyVerdicts(reg, run, judged, { checkedAt, via: 'write', buildContains });
     saveRegistry(reg);
     console.log(`\nverdicts written to tasks/verify.json${flipped.length ? ` — status changed: ${flipped.map(f => `${f.id} ${f.from}->${f.to}`).join(', ')}` : ''}`);
     console.log('Commit it: git commit -m "chore(verify): ..." -- tasks/verify.json');

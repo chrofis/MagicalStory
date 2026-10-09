@@ -158,7 +158,21 @@ function noteOf(v) {
  * @param opts     { checkedAt, via: 'write' | 'pull' }
  * @returns        { counts, flipped: [{id, from, to}] }
  */
-function applyVerdicts(reg, run, verdicts, { checkedAt, via }) {
+/**
+ * A FAILED on a run whose build is an ANCESTOR of a build already CONFIRMED for
+ * this entry is old code speaking: later code passed, so the failure is history,
+ * not a regression (2026-10-09: a 09-28 report first pulled on 10-09 flipped two
+ * entries that 10-03 and 10-09 builds had confirmed). `buildContains(commit,
+ * build)` is the caller's git check (true / false / null = unknown); unknown is
+ * never superseded, the failure stands.
+ */
+function supersededByNewerPass(e, run, buildContains) {
+  if (typeof buildContains !== 'function' || !run.build) return false;
+  return (e.evidence || []).some(x => /CONFIRMED$/.test(String(x.result)) && x.build && x.build !== run.build
+    && buildContains(run.build, x.build) === true);
+}
+
+function applyVerdicts(reg, run, verdicts, { checkedAt, via, buildContains }) {
   const counts = { CONFIRMED: 0, FAILED: 0, HUMAN: 0, 'NOT COVERED': 0 };
   const flipped = [];
   const stamp = { storyId: run.storyId, env: run.env, build: run.build, runDate: run.runDate, checkedAt };
@@ -167,8 +181,10 @@ function applyVerdicts(reg, run, verdicts, { checkedAt, via }) {
     if (v.result === 'CONFIRMED' || v.result === 'FAILED') {
       e.evidence = Array.isArray(e.evidence) ? e.evidence : [];
       const dup = e.evidence.some(x => x.storyId === run.storyId && x.env === run.env && x.result === v.result);
-      if (!dup) e.evidence.push({ ...stamp, result: v.result, note: noteOf(v) });
-      const to = nextStatus(e.status, v.result === 'CONFIRMED');
+      const superseded = v.result === 'FAILED' && supersededByNewerPass(e, run, buildContains);
+      if (!dup) e.evidence.push({ ...stamp, result: v.result, ...(superseded ? { superseded: true } : {}), note: noteOf(v) });
+      if (superseded) continue; // history only: the status follows the newest build
+      const to =nextStatus(e.status, v.result === 'CONFIRMED');
       if (e.status !== to) { flipped.push({ id: e.id, from: e.status, to }); e.status = to; }
     } else {
       e.lastChecked = { ...stamp, result: v.result, note: noteOf(v).slice(0, 400) };
