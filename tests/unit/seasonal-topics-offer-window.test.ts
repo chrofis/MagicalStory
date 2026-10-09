@@ -33,7 +33,7 @@ describe('who is offered when', () => {
   const cases: Array<[string, string, boolean]> = [
     ['halloween', '2026-09-30', false], ['halloween', '2026-10-01', true], ['halloween', '2026-10-31', true], ['halloween', '2026-11-01', false],
     ['christmas', '2026-10-31', false], ['christmas', '2026-11-01', true], ['christmas', '2026-12-26', true], ['christmas', '2026-12-27', false],
-    ['samichlaus', '2026-11-14', false], ['samichlaus', '2026-11-15', true], ['samichlaus', '2026-12-06', true], ['samichlaus', '2026-12-07', false],
+    ['samichlaus', '2026-11-05', false], ['samichlaus', '2026-11-06', true], ['samichlaus', '2026-12-06', true], ['samichlaus', '2026-12-07', false],
     ['newyear', '2026-12-14', false], ['newyear', '2026-12-15', true], ['newyear', '2027-01-06', true], ['newyear', '2027-01-07', false], ['newyear', '2026-01-03', true],
     // Easter 2026-04-05: from 2026-03-01 (35 days before) to Easter Monday 2026-04-06
     ['easter', '2026-02-28', false], ['easter', '2026-03-01', true], ['easter', '2026-04-06', true], ['easter', '2026-04-07', false],
@@ -73,8 +73,8 @@ describe('samichlaus is registered everywhere a seasonal topic is', () => {
     expect(read('prompts/adventure-guides.txt')).toMatch(/^\[samichlaus\]$/m);
     expect(read('server/config/trialTitles.js')).toMatch(/samichlaus:/);
   });
-  it('window is 15 Nov - 6 Dec', () => {
+  it('window is 6 Nov - 6 Dec (one month ahead, owner 2026-10-09)', () => {
     const w = SEASON_WINDOWS.samichlaus.occurrence(2026);
-    expect([ymd(w.from), ymd(w.to)]).toEqual(['2026-11-15', '2026-12-06']);
+    expect([ymd(w.from), ymd(w.to)]).toEqual(['2026-11-06', '2026-12-06']);
   });
 });

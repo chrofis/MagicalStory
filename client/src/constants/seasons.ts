@@ -46,7 +46,7 @@ const FOUR_WEEKS = 28 * DAY_MS;
 export const SEASON_WINDOWS = {
   halloween: { occurrence: (y: number) => ({ from: day(y, 10, 1), to: day(y, 10, 31) }) },
   christmas: { occurrence: (y: number) => ({ from: day(y, 11, 1), to: day(y, 12, 26) }) },
-  samichlaus: { occurrence: (y: number) => ({ from: day(y, 11, 15), to: day(y, 12, 6) }) },
+  samichlaus: { occurrence: (y: number) => ({ from: day(y, 11, 6), to: day(y, 12, 6) }) }, // 6 Dec, one month ahead (owner 2026-10-09)
   // wraps the year: 15 Dec of y to 6 Jan of y + 1
   newyear: { occurrence: (y: number) => ({ from: day(y, 12, 15), to: day(y + 1, 1, 6) }) },
   // five weeks before Easter Sunday through Easter Monday

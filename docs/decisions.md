@@ -68076,3 +68076,9 @@ Samichlaus is registered everywhere halloween/easter are: storyTypes.ts, server/
 **Considered:** keeping the scan for old stories (rejected: NO FALLBACKS); a separate model call that extracts colours from the finished description (rejected: a second reader of the same prose).
 **Revisit if:** a fresh batch shows rows missing for costumed outfits, or the repair descriptor on the 169 old stories hurts a real repair (backfill by regenerating the wardrobe).
 **Touched files:** prompts/story-bible-from-beats.txt, prompts/clothing-review.txt, server/lib/wornItems.js, promptBuilders.js, storyHelpers.js, beatsPipeline.js, testlab.js, repairLogic.js, clothingCheck.js, outlineParser/unified.js, docs/prompt-inventory.md, scripts/analysis/replay-wardrobe-garments.js, tests/unit/wardrobe-typed-garments.test.ts, outfit-appearance-only.test.ts.
+
+## 2026-10-09 — Samichlaus is offered from 6 November
+
+**Context:** the seasonal-topics entry above set samichlaus to 15 Nov-6 Dec. Owner: "Samichlaus is 6th of Dez. Show one month in advance."
+**Decision:** samichlaus window 6 Nov-6 Dec. The other windows are unchanged.
+**Touched files:** client/src/constants/seasons.ts, tests/unit/seasonal-topics-offer-window.test.ts.
