@@ -503,7 +503,7 @@ export default function TrialIdeasStep({
                 value={cityDraft}
                 onChange={(e) => { setCityDraft(e.target.value); setCityState('idle'); }}
                 onKeyDown={(e) => { if (e.key === 'Enter') saveCity(); if (e.key === 'Escape') setEditingCity(false); }}
-                className="px-2 py-1 rounded-md border border-gray-300 text-sm w-44"
+                className="px-2 py-1 rounded-md border border-gray-300 text-base md:text-sm w-44"
                 autoFocus
               />
               <button type="button" onClick={saveCity} disabled={cityState === 'checking'}
@@ -646,7 +646,7 @@ export default function TrialIdeasStep({
                         onIdeaEdited(updated);
                       }}
                       onClick={(e) => e.stopPropagation()}
-                      className="flex-1 w-full text-sm text-gray-700 leading-relaxed bg-transparent border-0 outline-none resize-none p-0"
+                      className="flex-1 w-full text-base md:text-sm text-gray-700 leading-relaxed bg-transparent border-0 outline-none resize-none p-0"
                       placeholder={t.idea}
                     />
                   ) : (
