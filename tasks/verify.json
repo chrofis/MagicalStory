@@ -9489,7 +9489,7 @@
       "id": "typed-worn-slot-and-garments-2026-10-09",
       "title": "Visual Bible writes a typed slot on worn items; the wardrobe writes a typed garments list",
       "commits": [
-        "HEAD"
+        "b4c4737a1"
       ],
       "addedAt": "2026-10-09",
       "status": "pending",
