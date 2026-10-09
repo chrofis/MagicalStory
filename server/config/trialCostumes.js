@@ -135,236 +135,240 @@ const TRIAL_COSTUMES = {
   // Period costumes extracted from prompts/historical-guides.txt
   // ══════════════════════════════════════════════════════════════
   historical: {
+    // Every garment names its colour (as the adventure block does) so the head
+    // row and the body row of an avatar sheet, and every page, agree on the
+    // outfit. Colours are plausible for the era: undyed or vegetable-dyed
+    // wool and linen for the medieval and early modern entries, and so on.
     // Swiss History
     'swiss-founding': {
-      male: "Simple woolen tunic, leather belt, fur-lined cloak, leather boots, woolen leggings",
-      female: "Long woolen dress with linen apron, leather belt, woolen shawl, leather shoes"
+      male: "Undyed beige woolen tunic, dark brown leather belt, grey fur-lined cloak, brown leather boots, dark grey woolen leggings",
+      female: "Long dark green woolen dress with a cream linen apron, brown leather belt, grey woolen shawl, brown leather shoes"
     },
     'wilhelm-tell': {
-      male: "Simple farmer's tunic, leather breeches, sturdy boots, woolen cloak, leather belt",
-      female: "Long woolen dress with embroidered bodice, white linen apron, leather shoes"
+      male: "Moss green farmer's tunic, tan leather breeches, brown sturdy boots, grey woolen cloak, dark brown leather belt",
+      female: "Long dark red woolen dress with a green embroidered bodice, white linen apron, brown leather shoes"
     },
     'battle-morgarten': {
-      male: "Padded linen gambeson, leather bracers, simple chain mail vest, leather boots, woolen cloak",
-      female: "Long woolen dress with linen apron, leather belt, woolen shawl"
+      male: "Off-white padded linen gambeson, brown leather bracers, grey simple chain mail vest, dark brown leather boots, dark green woolen cloak",
+      female: "Long brown woolen dress with a cream linen apron, dark brown leather belt, grey woolen shawl"
     },
     'battle-sempach': {
-      male: "Padded gambeson, leather bracers, chain mail vest, leather boots, cloth surcoat with Swiss cross",
-      female: "Long woolen dress with embroidered trim, leather belt, linen head covering"
+      male: "Off-white padded gambeson, brown leather bracers, grey chain mail vest, dark brown leather boots, red cloth surcoat with a white Swiss cross",
+      female: "Long blue woolen dress with cream embroidered trim, brown leather belt, white linen head covering"
     },
     'swiss-reformation': {
-      male: "Dark scholar's robe, white collar, simple leather shoes, leather belt with book pouch",
-      female: "Plain dark dress with white collar and cuffs, linen cap, leather shoes"
+      male: "Black scholar's robe, white collar, black leather shoes, brown leather belt with a brown book pouch",
+      female: "Plain black dress with a white collar and white cuffs, white linen cap, black leather shoes"
     },
     'red-cross-founding': {
-      male: "Dark formal suit with white shirt, cravat, leather shoes, top hat (carried)",
-      female: "Dark dress with white collar, nurse's apron with red cross, leather shoes"
+      male: "Black formal suit with a white shirt, white cravat, black leather shoes, black top hat (carried)",
+      female: "Dark grey dress with a white collar, white nurse's apron with a red cross, black leather shoes"
     },
     'general-dufour': {
-      male: "Swiss military uniform with brass buttons, dark blue jacket, white trousers, leather boots",
-      female: "Simple dress with white apron, bonnet, leather shoes"
+      male: "Swiss military uniform in a dark blue jacket with gold brass buttons, white trousers, black leather boots",
+      female: "Simple navy blue dress with a white apron, cream bonnet, brown leather shoes"
     },
     'sonderbund-war': {
-      male: "Swiss military coat with brass buttons, dark trousers, leather boots, peaked cap (carried)",
-      female: "Simple dress with shawl, leather shoes, bonnet"
+      male: "Swiss military coat in dark blue with gold brass buttons, grey trousers, black leather boots, dark blue peaked cap (carried)",
+      female: "Simple brown dress with a grey shawl, black leather shoes, cream bonnet"
     },
     'swiss-constitution': {
-      male: "Formal dark suit, white shirt with high collar, leather shoes, pocket watch chain",
-      female: "Elegant dress with lace collar, leather shoes, small brooch"
+      male: "Black formal suit, white shirt with a high collar, black leather shoes, gold pocket watch chain",
+      female: "Elegant burgundy dress with a cream lace collar, black leather shoes, small gold brooch"
     },
     'gotthard-tunnel': {
-      male: "Work shirt, sturdy trousers, heavy leather boots, suspenders, cloth cap",
-      female: "Simple work dress with apron, sturdy boots, kerchief"
+      male: "Off-white work shirt, brown sturdy trousers, heavy brown leather boots, dark red suspenders, grey cloth cap",
+      female: "Simple blue work dress with a grey apron, sturdy brown boots, red kerchief"
     },
     'swiss-ww1-neutrality': {
-      male: "Swiss military uniform (grey-green), puttees, leather boots, kepi cap (carried)",
-      female: "White blouse with dark skirt, Red Cross armband, sensible shoes"
+      male: "Swiss military uniform in grey-green, olive puttees, brown leather boots, grey-green kepi cap (carried)",
+      female: "White blouse with a dark grey skirt, white Red Cross armband with a red cross, black sensible shoes"
     },
     'general-guisan': {
-      male: "Swiss WWII military uniform, leather boots, officer's belt, peaked cap (carried)",
-      female: "Practical dress with cardigan, sensible shoes, civil defense armband"
+      male: "Swiss WWII military uniform in grey-green, brown leather boots, brown officer's belt, grey-green peaked cap (carried)",
+      female: "Practical navy blue dress with a grey cardigan, brown sensible shoes, white civil defense armband"
     },
     'swiss-ww2-neutrality': {
-      male: "Swiss military uniform (grey-green), leather boots, ammunition belt, field cap (carried)",
-      female: "Practical dress with apron, cardigan, sensible shoes"
+      male: "Swiss military uniform in grey-green, brown leather boots, brown leather ammunition belt, grey-green field cap (carried)",
+      female: "Practical dark green dress with a cream apron, grey cardigan, brown sensible shoes"
     },
     'swiss-womens-vote': {
-      male: "1970s suit with wide lapels, patterned tie, leather shoes",
-      female: "1970s dress or blouse with A-line skirt, sensible shoes, protest sash"
+      male: "1970s brown suit with wide lapels, orange patterned tie, brown leather shoes",
+      female: "1970s mustard yellow blouse with a brown A-line skirt, tan sensible shoes, purple protest sash"
     },
 
     // Exploration & Discovery
     'moon-landing': {
-      male: "White NASA spacesuit with American flag patch, life support chest panel, white boots",
-      female: "White NASA spacesuit with American flag patch, life support chest panel, white boots"
+      male: "White NASA spacesuit with a red, white and blue American flag patch, grey life support chest panel, white boots",
+      female: "White NASA spacesuit with a red, white and blue American flag patch, grey life support chest panel, white boots"
     },
     'columbus-voyage': {
-      male: "Renaissance sailor tunic, loose trousers, leather shoes, cloth cap, rope belt",
-      female: "Renaissance blouse with laced bodice, long skirt, leather shoes, cloth cap"
+      male: "Renaissance sailor tunic in faded red, beige loose trousers, brown leather shoes, dark blue cloth cap, hemp-coloured rope belt",
+      female: "Cream Renaissance blouse with a dark green laced bodice, long brown skirt, brown leather shoes, white cloth cap"
     },
     'wright-brothers': {
-      male: "Early 1900s suit with waistcoat, white shirt, bow tie, leather shoes, newsboy cap",
-      female: "Early 1900s blouse with long skirt, leather boots, simple jacket"
+      male: "Early 1900s grey suit with a dark waistcoat, white shirt, black bow tie, black leather shoes, grey newsboy cap",
+      female: "Early 1900s white blouse with a long dark blue skirt, black leather boots, simple grey jacket"
     },
     'lindbergh-flight': {
-      male: "Leather flight jacket, white scarf, flight goggles (on forehead), leather boots",
-      female: "Leather flight jacket, white scarf, flight goggles (on forehead), leather boots"
+      male: "Brown leather flight jacket, white scarf, brown flight goggles (on forehead), dark brown leather boots",
+      female: "Brown leather flight jacket, white scarf, brown flight goggles (on forehead), dark brown leather boots"
     },
     'everest-summit': {
-      male: "Thick down climbing jacket, insulated trousers, heavy climbing boots, goggles (on forehead)",
-      female: "Thick down climbing jacket, insulated trousers, heavy climbing boots, goggles (on forehead)"
+      male: "Thick orange down climbing jacket, black insulated trousers, heavy black climbing boots, dark goggles (on forehead)",
+      female: "Thick red down climbing jacket, black insulated trousers, heavy black climbing boots, dark goggles (on forehead)"
     },
     'south-pole': {
-      male: "Heavy wool sweater, fur-lined anorak, thick trousers, mukluks, mittens",
-      female: "Heavy wool sweater, fur-lined anorak, thick trousers, mukluks, mittens"
+      male: "Heavy cream wool sweater, dark green fur-lined anorak, thick grey trousers, brown mukluks, brown mittens",
+      female: "Heavy cream wool sweater, dark red fur-lined anorak, thick grey trousers, brown mukluks, brown mittens"
     },
     'magellan-circumnavigation': {
-      male: "Renaissance sailor outfit, loose shirt, knee breeches, leather shoes, cloth sash belt",
-      female: "Renaissance blouse, long skirt, leather shoes, cloth sash belt"
+      male: "Renaissance sailor outfit with a cream loose shirt, brown knee breeches, black leather shoes, red cloth sash belt",
+      female: "Cream Renaissance blouse, long dark blue skirt, black leather shoes, red cloth sash belt"
     },
     'mariana-trench': {
-      male: "Deep-sea research jumpsuit, utility belt, waterproof boots",
-      female: "Deep-sea research jumpsuit, utility belt, waterproof boots"
+      male: "Orange deep-sea research jumpsuit, grey utility belt, black waterproof boots",
+      female: "Orange deep-sea research jumpsuit, grey utility belt, black waterproof boots"
     },
 
     // Science & Medicine
     'electricity-discovery': {
-      male: "18th century waistcoat over white shirt, knee breeches, white stockings, buckle shoes",
-      female: "18th century dress with lace trim, leather shoes, simple bonnet"
+      male: "18th century burgundy waistcoat over a white shirt, brown knee breeches, white stockings, black buckle shoes",
+      female: "18th century dusty blue dress with cream lace trim, black leather shoes, simple white bonnet"
     },
     'penicillin': {
-      male: "White lab coat, shirt and tie underneath, leather shoes, round spectacles",
-      female: "White lab coat, blouse underneath, leather shoes, hair pinned up"
+      male: "White lab coat, pale blue shirt and dark blue tie underneath, black leather shoes, round gold spectacles",
+      female: "White lab coat, cream blouse underneath, brown leather shoes, hair pinned up"
     },
     'vaccine-discovery': {
-      male: "18th century doctor's coat, white shirt, waistcoat, knee breeches, leather shoes",
-      female: "18th century dress with linen apron, leather shoes, bonnet"
+      male: "18th century dark brown doctor's coat, white shirt, cream waistcoat, grey knee breeches, black leather shoes",
+      female: "18th century blue-grey dress with a white linen apron, black leather shoes, white bonnet"
     },
     'dna-discovery': {
-      male: "1950s lab coat over shirt and tie, leather shoes, reading glasses",
-      female: "1950s lab coat over blouse, leather shoes, hair pinned neatly"
+      male: "1950s white lab coat over a pale blue shirt and a dark blue tie, brown leather shoes, black-framed reading glasses",
+      female: "1950s white lab coat over a cream blouse, brown leather shoes, hair pinned neatly"
     },
     'dinosaur-discovery': {
-      male: "Victorian field outfit: tweed jacket, sturdy trousers, leather boots, canvas satchel",
-      female: "Victorian field outfit: practical dress with apron, leather boots, canvas satchel"
+      male: "Victorian field outfit: brown tweed jacket, tan sturdy trousers, dark brown leather boots, khaki canvas satchel",
+      female: "Victorian field outfit: practical olive green dress with a cream apron, dark brown leather boots, khaki canvas satchel"
     },
     'einstein-relativity': {
-      male: "Rumpled tweed suit, white shirt (no tie), wild hair, leather shoes, chalk-dusted sleeves",
-      female: "Early 1900s blouse with long skirt, leather shoes, hair in bun"
+      male: "Rumpled grey tweed suit, white shirt (no tie), wild hair, black leather shoes, white chalk-dusted sleeves",
+      female: "Early 1900s white blouse with a long dark grey skirt, black leather shoes, hair in a bun"
     },
     'galapagos-darwin': {
-      male: "Victorian naturalist outfit: linen shirt, waistcoat, sturdy trousers, leather boots, specimen bag",
-      female: "Victorian explorer dress with practical apron, leather boots, specimen bag"
+      male: "Victorian naturalist outfit: cream linen shirt, brown waistcoat, tan sturdy trousers, dark brown leather boots, khaki specimen bag",
+      female: "Victorian explorer dress in olive green with a cream practical apron, dark brown leather boots, khaki specimen bag"
     },
     'first-heart-transplant': {
-      male: "Surgical scrubs, white coat, surgical cap, comfortable shoes",
-      female: "Surgical scrubs, white coat, surgical cap, comfortable shoes"
+      male: "Pale green surgical scrubs, white coat, pale green surgical cap, white comfortable shoes",
+      female: "Pale green surgical scrubs, white coat, pale green surgical cap, white comfortable shoes"
     },
     'human-genome': {
-      male: "Modern lab coat over casual shirt, safety glasses, comfortable shoes",
-      female: "Modern lab coat over casual blouse, safety glasses, comfortable shoes"
+      male: "White modern lab coat over a blue casual shirt, clear safety glasses, grey comfortable shoes",
+      female: "White modern lab coat over a teal casual blouse, clear safety glasses, grey comfortable shoes"
     },
     'hubble-launch': {
-      male: "NASA flight suit with mission patches, boots, crew badge",
-      female: "NASA flight suit with mission patches, boots, crew badge"
+      male: "Blue NASA flight suit with colourful mission patches, black boots, white crew badge",
+      female: "Blue NASA flight suit with colourful mission patches, black boots, white crew badge"
     },
 
     // Inventions
     'telephone-invention': {
-      male: "Victorian suit with waistcoat, white shirt, cravat, leather shoes",
-      female: "Victorian dress with bustle, lace collar, leather boots"
+      male: "Victorian dark brown suit with a cream waistcoat, white shirt, black cravat, black leather shoes",
+      female: "Victorian plum purple dress with a bustle, cream lace collar, black leather boots"
     },
     'light-bulb': {
-      male: "Dark waistcoat over white shirt, dark trousers, leather shoes, bow tie",
-      female: "Victorian blouse with long skirt, leather shoes, simple brooch"
+      male: "Dark grey waistcoat over a white shirt, dark grey trousers, black leather shoes, black bow tie",
+      female: "Victorian cream blouse with a long dark green skirt, black leather shoes, simple gold brooch"
     },
     'printing-press': {
-      male: "Medieval craftsman's tunic, leather apron, simple leather shoes, cloth cap",
-      female: "Medieval dress with linen apron, leather shoes, linen head covering"
+      male: "Medieval craftsman's undyed beige tunic, brown leather apron, brown simple leather shoes, grey cloth cap",
+      female: "Medieval dark red dress with a cream linen apron, brown leather shoes, white linen head covering"
     },
     'internet-creation': {
-      male: "1990s casual: polo shirt, khaki trousers, sneakers",
-      female: "1990s casual: blouse, khaki trousers, sneakers"
+      male: "1990s casual: navy blue polo shirt, khaki trousers, white sneakers",
+      female: "1990s casual: pale yellow blouse, khaki trousers, white sneakers"
     },
 
     // Human Rights & Freedom
     'emancipation': {
-      male: "Simple cotton shirt, suspenders, worn trousers, bare feet or simple shoes",
-      female: "Simple cotton dress, head wrap, bare feet or simple shoes"
+      male: "Simple off-white cotton shirt, brown suspenders, worn grey-brown trousers, bare feet or simple brown shoes",
+      female: "Simple faded blue cotton dress, red and white head wrap, bare feet or simple brown shoes"
     },
     'womens-suffrage': {
-      male: "Early 1900s suit, white shirt, tie, leather shoes",
-      female: "Early 1900s white blouse with long skirt, sash reading 'Votes for Women', leather boots"
+      male: "Early 1900s dark grey suit, white shirt, black tie, black leather shoes",
+      female: "Early 1900s white blouse with a long dark purple skirt, white sash with green and purple lettering reading 'Votes for Women', black leather boots"
     },
     'rosa-parks': {
-      male: "1950s suit, white shirt, tie, fedora hat (carried), leather shoes",
-      female: "1950s modest dress with coat, small hat, gloves, sensible shoes"
+      male: "1950s grey suit, white shirt, dark blue tie, grey fedora hat (carried), black leather shoes",
+      female: "1950s modest teal dress with a dark grey coat, small black hat, white gloves, black sensible shoes"
     },
     'berlin-wall-fall': {
-      male: "1989 casual: jeans, denim jacket, sneakers, scarf",
-      female: "1989 casual: jeans, warm jacket, sneakers, scarf"
+      male: "1989 casual: blue jeans, light blue denim jacket, white sneakers, red scarf",
+      female: "1989 casual: blue jeans, warm green jacket, white sneakers, red scarf"
     },
     'mandela-freedom': {
-      male: "Colorful African-print shirt (Madiba shirt), dark trousers, leather shoes",
-      female: "Colorful African-print dress, headwrap, leather shoes"
+      male: "Colorful African-print shirt (Madiba shirt) in orange, brown and gold, dark grey trousers, black leather shoes",
+      female: "Colorful African-print dress in orange, blue and gold, orange and gold headwrap, black leather shoes"
     },
 
     // Great Constructions
     'pyramids': {
-      male: "White linen kilt (shendyt), leather sandals, beaded collar, gold arm bands",
-      female: "White linen dress, leather sandals, beaded collar, gold arm bands"
+      male: "White linen kilt (shendyt), tan leather sandals, blue and gold beaded collar, gold arm bands",
+      female: "White linen dress, tan leather sandals, blue and gold beaded collar, gold arm bands"
     },
     'eiffel-tower': {
-      male: "1880s work shirt, sturdy trousers, leather boots, suspenders, cloth cap",
-      female: "1880s dress with bustle and lace trim, leather boots, parasol"
+      male: "1880s cream work shirt, brown sturdy trousers, dark brown leather boots, dark red suspenders, grey cloth cap",
+      female: "1880s dusty rose dress with a bustle and cream lace trim, dark brown leather boots, cream parasol"
     },
     'panama-canal': {
-      male: "Work shirt, khaki trousers, leather boots, wide-brimmed hat (carried), bandana",
-      female: "Practical blouse, khaki skirt, leather boots, sun bonnet"
+      male: "Pale blue work shirt, khaki trousers, brown leather boots, beige wide-brimmed hat (carried), red bandana",
+      female: "Practical white blouse, khaki skirt, brown leather boots, beige sun bonnet"
     },
     'golden-gate': {
-      male: "1930s work overalls, flannel shirt, leather boots, cloth cap",
-      female: "1930s dress with cardigan, sensible shoes, cloche hat"
+      male: "1930s blue work overalls, red flannel shirt, brown leather boots, grey cloth cap",
+      female: "1930s navy blue dress with a grey cardigan, brown sensible shoes, grey cloche hat"
     },
     'channel-tunnel': {
-      male: "Modern construction jumpsuit, safety vest, steel-toe boots",
-      female: "Modern construction jumpsuit, safety vest, steel-toe boots"
+      male: "Modern white construction jumpsuit, bright orange safety vest, black steel-toe boots",
+      female: "Modern white construction jumpsuit, bright orange safety vest, black steel-toe boots"
     },
 
     // Culture & Arts
     'first-olympics': {
-      male: "Ancient Greek athletic tunic (chiton), leather sandals, olive wreath crown",
-      female: "Ancient Greek dress (peplos), leather sandals, olive wreath crown"
+      male: "Ancient Greek white athletic tunic (chiton), brown leather sandals, green olive wreath crown",
+      female: "Ancient Greek white dress (peplos), brown leather sandals, green olive wreath crown"
     },
     'disneyland-opening': {
-      male: "1950s casual: polo shirt, slacks, saddle shoes, crew cut",
-      female: "1950s dress with petticoat, bobby socks, saddle shoes, hair ribbon"
+      male: "1950s casual: yellow polo shirt, grey slacks, brown and white saddle shoes, crew cut",
+      female: "1950s light blue dress with a white petticoat, white bobby socks, brown and white saddle shoes, red hair ribbon"
     },
     'first-movie': {
-      male: "1890s suit with bowler hat (carried), waistcoat, pocket watch chain, leather shoes",
-      female: "1890s dress with high collar, cameo brooch, leather boots"
+      male: "1890s dark grey suit with a black bowler hat (carried), cream waistcoat, gold pocket watch chain, black leather shoes",
+      female: "1890s dark green dress with a high white collar, cream cameo brooch, black leather boots"
     },
     'first-zoo': {
-      male: "Regency-era tailcoat, white cravat, knee breeches, leather boots",
-      female: "Regency-era dress with high waist, bonnet, leather shoes, parasol"
+      male: "Regency-era navy blue tailcoat, white cravat, buff knee breeches, black leather boots",
+      female: "Regency-era pale yellow high-waisted dress, cream bonnet, brown leather shoes, white parasol"
     },
     'natural-history-museum': {
-      male: "Victorian suit, top hat (carried), walking cane, leather shoes",
-      female: "Victorian dress with bustle, lace gloves, leather boots, small hat"
+      male: "Victorian black suit, black top hat (carried), brown walking cane, black leather shoes",
+      female: "Victorian deep blue dress with a bustle, white lace gloves, black leather boots, small black hat"
     },
 
     // Archaeological Discoveries
     'king-tut': {
-      male: "1920s khaki safari suit, leather boots, pith helmet (carried), field notebook",
-      female: "1920s khaki field outfit, leather boots, wide-brimmed sun hat, field notebook"
+      male: "1920s khaki safari suit, brown leather boots, white pith helmet (carried), brown field notebook",
+      female: "1920s khaki field outfit, brown leather boots, beige wide-brimmed sun hat, brown field notebook"
     },
     'pompeii-discovery': {
-      male: "18th century scholar's outfit: coat, waistcoat, breeches, leather shoes, sketch pad",
-      female: "18th century dress with practical apron, leather shoes, sketch pad"
+      male: "18th century scholar's outfit: dark green coat, cream waistcoat, brown breeches, black leather shoes, cream sketch pad",
+      female: "18th century dusty blue dress with a cream practical apron, black leather shoes, cream sketch pad"
     },
     'terracotta-army': {
-      male: "1970s archaeologist outfit: khaki shirt, sturdy trousers, leather boots, sun hat (carried)",
-      female: "1970s archaeologist outfit: khaki shirt, sturdy trousers, leather boots, sun hat (carried)"
+      male: "1970s archaeologist outfit: khaki shirt, brown sturdy trousers, brown leather boots, beige sun hat (carried)",
+      female: "1970s archaeologist outfit: khaki shirt, brown sturdy trousers, brown leather boots, beige sun hat (carried)"
     }
   }
 };

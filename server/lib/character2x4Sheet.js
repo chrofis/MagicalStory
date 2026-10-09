@@ -1352,7 +1352,10 @@ function stampVerdict(report, { final, failing }) {
   report.valid = final >= SHEET_VALID_MIN;
   const reasons = Array.isArray(report.failureReasons) ? report.failureReasons.slice() : [];
   for (const axis of failing) {
-    if (!reasons.some(r => String(r).toLowerCase().startsWith(axis.toLowerCase()))) {
+    // `<axis>:` - a bare field name ("backgroundScore", staging job_1791531449494_o0kaatvmq
+    // Julian) is not a reason, and used to hide the axis's own `reason` from the log.
+    const named = new RegExp(`^${axis}\s*[:—-]`, 'i');
+    if (!reasons.some(r => named.test(String(r).trim()))) {
       const why = report[axis]?.reason;
       reasons.push(`${axis}: ${why || 'scored below ' + SHEET_VALID_MIN}`);
     }
@@ -1381,6 +1384,62 @@ const STYLE_AXES = ['layout', 'identity', 'style', 'clean', 'bodyFace', 'age', '
 // person (identity) or extra people in the sheet (solo). Every other axis ships
 // with a warning on the final strike — see generateCharacter2x4Sheet.
 const STYLED_IDENTITY_AXES = ['identity', 'solo'];
+// HARD FAIL (2026-10-09). The style judge's own bands: 1-3 is a wrecked layout, a
+// different person, an extra person, a photographic sheet, a scene behind the
+// figures, a recoloured garment. An axis at or below this is not a rough edge a
+// shipped sheet can carry; it earns ONE extra, fed-back attempt (below) and, if
+// that fails too, a loud ERROR when the best sheet ships. Staging
+// job_1791531449494_o0kaatvmq: Julian background 3/10 (two adult strangers
+// painted behind the head cells), Levin hair 1/10 (light blonde declared,
+// ginger-brown painted) - both shipped on the old ship-best path.
+const SHEET_HARD_FAIL_MAX = 3;
+
+// What a retry tells Grok about a failed axis: ONE fixed instruction per axis plus
+// the judge's own reading of the rejected sheet. No story, name or place in the
+// wording - the axis is the only variable. The hair axis states the DECLARED hair
+// and names the cells the judge flagged (its per-cell reason repeats one reading
+// eight times, so the flagged cells carry it).
+const STYLE_AXIS_FEEDBACK = {
+  layout: () => 'Keep the 4 by 2 grid of Image 1: eight separate cells, each facing the way the same cell of Image 1 faces.',
+  identity: () => 'Every cell shows the same person as Image 1, with the same face.',
+  style: () => 'Every cell is fully painted in the requested style, none left photographic.',
+  clean: () => 'No colour patch, streak, mark or symbol on the skin, hair or clothes that Image 1 does not have.',
+  bodyFace: () => 'Every body cell shows a complete face: eyes, nose and mouth.',
+  age: () => 'The figure keeps the age and the body proportions of Image 1.',
+  solo: () => 'Only the one character appears, in every cell: no second face, figure or partial person anywhere.',
+  background: () => 'The ground behind and around every figure is plain blank paper: no other person, face or figure and no scenery anywhere on the sheet.',
+  garment: () => 'Every garment keeps exactly the colour it has in Image 1.',
+  hair: (verdict, { hair }) => {
+    const bad = Object.entries(verdict?.hair?.perCell || {})
+      .filter(([, v]) => String(v).trim().toLowerCase() === 'differs').map(([k]) => k.replace(/^cell/, ''));
+    const where = bad.length ? `Cells ${bad.join(', ')} showed other hair. ` : '';
+    return `${where}Every cell shows the requested hair, ${hair || 'the same hair as Image 1'}, in one colour, length and style.`;
+  },
+};
+
+// The fed-back lines for a rejected styled verdict: one per axis at or below
+// SHEET_HARD_FAIL_MAX, lowest first. [] means nothing is hard-failed and no extra
+// attempt is owed. The axis score is read from the flat `<axis>Score` the verdict
+// carries (scoreStyleReport); the judge's reading from `<axis>.reason`.
+function hardFailFeedback(verdict, { hair = null } = {}) {
+  if (!verdict || typeof verdict !== 'object') return [];
+  const failed = Object.keys(STYLE_AXIS_FEEDBACK)
+    .map(axis => ({ axis, score: verdict[`${axis}Score`] ?? verdict[axis]?.score }))
+    .filter(a => typeof a.score === 'number' && a.score <= SHEET_HARD_FAIL_MAX)
+    .sort((a, b) => a.score - b.score);
+  return failed.map(({ axis }) => {
+    const rule = STYLE_AXIS_FEEDBACK[axis](verdict, { hair });
+    const reason = axis === 'hair' ? '' : String(verdict[axis]?.reason || '').trim();
+    return reason ? `${axis}: ${rule} The judge saw: ${reason}` : `${axis}: ${rule}`;
+  });
+}
+
+// The retry prompt: the base style-transfer prompt plus the failed axes, stated.
+function buildFedBackPrompt(basePrompt, lines) {
+  if (!lines || !lines.length) return basePrompt;
+  return `${basePrompt}\n\nTHE PREVIOUS ATTEMPT WAS REJECTED. Correct exactly this, change nothing else:\n${lines.map(l => `- ${l}`).join('\n')}`;
+}
+
 function scoreStyleReport(report) {
   const verdict = lowestAxis(report, STYLE_AXES, 'style-eval');
   // The flat xScore fields are what runStyleTransferPass logs and stores.
@@ -1971,6 +2030,18 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
   // warning (styled-avatar audit entry + log).
   const styleJudgeRejected = !!pass2 && pass2.valid === false;
   const styleJudgeReasons = styleJudgeRejected ? (pass2.finalVerdict?.failureReasons || []) : [];
+  const hardFailAxes = (pass2 && pass2.hardFailAxes) || [];
+  if (styleJudgeRejected && hardFailAxes.length) {
+    // SHIPPED BELOW THE BAR, LOUDLY (2026-10-09). Gates are guidelines, so the best
+    // sheet still ships - but a sheet that hard-fails an axis after the extra,
+    // fed-back attempt is an error somebody reads, and a counted one.
+    log.error(`❌ [CHARACTER 2×4] ${character?.name} styled sheet SHIPPED BELOW THE BAR: ${hardFailAxes.join(', ')} at or below ${SHEET_HARD_FAIL_MAX}/10 after ${pass2.attempts?.length || 0} attempt(s)${pass2.extraAttempt ? ' (one extra attempt fed back the failed axis)' : ''}: ${styleJudgeReasons.join('; ') || 'no reason given'}`);
+    try {
+      const metrics = require('./runMetrics').forJob(require('./runMetrics').ambientJobId());
+      metrics.count('avatar_sheet_shipped_hard_fail');
+      for (const axis of hardFailAxes) metrics.count(`avatar_sheet_shipped_hard_fail_${axis}`);
+    } catch { /* metrics are never fatal */ }
+  }
   if (styleJudgeRejected) {
     log.warn(`⚠️ [CHARACTER 2×4] ${character?.name} Pass 2 failed the style judge on all ${pass2.attempts?.length || 0} attempt(s) — shipping the best styled attempt (#${pass2.selectedAttempt}, score=${pass2.finalScore}/10: ${styleJudgeReasons.join('; ') || 'no reason given'})`);
   }
@@ -2017,6 +2088,11 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
   const promptNoAnchor = promptOverride || buildStyleTransferPrompt(artStyle, { hasAnchor: false });
   if (styleAnchor) log.info(`[CHARACTER 2×4] ${characterName} Pass 2 using style anchor (style-anchor-${artStyle})`);
   const totalAttempts = 1 + MAX_SHEET_RETRIES;
+  // ONE extra, fed-back attempt when the best sheet so far hard-fails an axis
+  // (SHEET_HARD_FAIL_MAX). The loop limit is raised once, at the last ordinary
+  // attempt, and never again.
+  let attemptLimit = totalAttempts;
+  let feedbackLines = null;
   const attempts = [];
   // `best` = the highest-scoring attempt that may SHIP (identity not failed).
   // `bestIdentityRejected` = the highest-scoring attempt the judge rejected on
@@ -2049,7 +2125,7 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
     }
   };
 
-  for (let attempt = 1; attempt <= totalAttempts; attempt++) {
+  for (let attempt = 1; attempt <= attemptLimit; attempt++) {
     // THE RETRY DROPS THE STYLE ANCHOR (2026-08-20). Every style-anchor-*.jpg
     // asset is a finished illustration of THREE PEOPLE on white — the same
     // shape as the sheet it is meant to restyle — so Grok sometimes blends the
@@ -2077,8 +2153,8 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
     // slice of it (four pages a HEADLESS torso). Style fidelity is worth a
     // re-roll; it is not worth an unguarded one.
     const anchorForAttempt = promptOverride ? styleAnchor : ((attempt === 1 && canJudge) ? styleAnchor : null);
-    const prompt = anchorForAttempt ? promptWithAnchor : promptNoAnchor;
-    log.info(`[CHARACTER 2×4] ${characterName} Pass 2 (style=${artStyle}, backend=${MODEL_DEFAULTS.avatarStyleTransferBackend}) attempt ${attempt}/${totalAttempts}${styleAnchor && !anchorForAttempt ? (canJudge ? ' — anchor dropped after failed attempt' : ' — anchor dropped: nothing can judge or retry this sheet') : ''}`);
+    const prompt = buildFedBackPrompt(anchorForAttempt ? promptWithAnchor : promptNoAnchor, attempt > totalAttempts ? feedbackLines : null);
+    log.info(`[CHARACTER 2×4] ${characterName} Pass 2 (style=${artStyle}, backend=${MODEL_DEFAULTS.avatarStyleTransferBackend}) attempt ${attempt}/${attemptLimit}${attempt > totalAttempts ? ` (EXTRA, fed back: ${feedbackLines.map(l => l.split(':')[0]).join(', ')})` : ''}${styleAnchor && !anchorForAttempt ? (canJudge ? ' — anchor dropped after failed attempt' : ' — anchor dropped: nothing can judge or retry this sheet') : ''}`);
     // A thrown backend call consumes ONE attempt — it must never escape this
     // loop. Previously this line was unprotected: one Gemini IMAGE_OTHER
     // safety refusal (photorealistic ADULT face on the Pass-1 sheet) threw
@@ -2091,7 +2167,7 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
     try {
       result = await styleTransferGenerate(prompt, pass1ImageData, backendOverride, anchorForAttempt);
     } catch (err) {
-      log.warn(`[CHARACTER 2×4] ${characterName} Pass 2 attempt ${attempt}/${totalAttempts} (${MODEL_DEFAULTS.avatarStyleTransferBackend}) threw: ${err.message}${attempt < totalAttempts ? ' — retrying' : ''}`);
+      log.warn(`[CHARACTER 2×4] ${characterName} Pass 2 attempt ${attempt}/${attemptLimit} (${MODEL_DEFAULTS.avatarStyleTransferBackend}) threw: ${err.message}${attempt < attemptLimit ? ' — retrying' : ''}`);
       attempts.push({ attempt, stage: 'gen-error', score: 0, reason: err.message, usedAnchor: !!anchorForAttempt });
       continue;
     }
@@ -2190,6 +2266,7 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
       usedAnchor: !!anchorForAttempt,
       layoutValid,
       identityRejected: identityFailing.length > 0,
+      ...(attempt > totalAttempts ? { extraAttempt: true, fedBack: feedbackLines } : {}),
     });
     const candidate = { result, attempt, score, verdict, prompt, layoutValid, identityFailing };
     if (identityFailing.length) {
@@ -2199,6 +2276,17 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
     }
     if (verdict.valid) break;
     log.warn(`[CHARACTER 2×4] ${characterName} Pass 2 attempt ${attempt} score=${score} (valid=false${identityFailing.length ? `, IDENTITY failed: ${identityFailing.join(', ')}` : ''})`);
+    // THE LAST ORDINARY ATTEMPT FAILED: if the sheet that would ship hard-fails an
+    // axis, buy ONE more attempt that names that axis (decisions 2026-10-09).
+    // Never on a Test Lab prompt A/B (that run measures one exact prompt).
+    if (attempt === totalAttempts && attemptLimit === totalAttempts && !promptOverride) {
+      const shipping = best || bestIdentityRejected;
+      const lines = hardFailFeedback(shipping?.verdict, { hair });
+      if (lines.length) {
+        feedbackLines = lines;
+        attemptLimit = totalAttempts + 1;
+      }
+    }
   }
 
   // A sheet whose two rows disagree on garment colour is caught by the STYLE
@@ -2225,10 +2313,17 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
   // null verdict and stay valid — the trial must never lose its styled sheet
   // to an eval outage.
   const valid = chosen.verdict ? chosen.verdict.valid !== false : true;
+  // The axes of the sheet that SHIPS that are still at or below the hard-fail
+  // line after every attempt, extra one included. The caller makes it loud.
+  const hardFailAxes = (!valid && chosen.verdict)
+    ? hardFailFeedback(chosen.verdict, { hair }).map(l => l.split(':')[0])
+    : [];
 
   return {
     imageData: chosen.result.imageData,
     shippable,
+    hardFailAxes,
+    extraAttempt: feedbackLines != null && attempts.some(a => a.extraAttempt),
     identityFailing: shippable ? [] : chosen.identityFailing,
     valid,
     selectedAttempt: chosen.attempt,
@@ -2469,5 +2564,5 @@ module.exports = {
   buildStyleTransferPrompt,
   // exposed for tests
   readAvatarHair,
-  _internal: { sheetStackPad, stackRowsInto2x4, mergeRowObservations, observeStyledRow, hairRequest, headRowCropFraction, cropHeadRowToShoulders, applyRowConsistencyAxes, applyStyledSheetConsistencyAxes, TAIL_POSE_RULE, applyGlassesAxis, applyPoseHeadGate, detectBodyRowHeads, detectSheetRowDivider, parseJudgeJson, buildBodyRowPrompt, buildHeadRowPrompt, buildFootwearRule, buildGarmentRule, buildSeasonOutfitBlock, buildStyleTransferPrompt, resolveFacePhoto, resolveStandardAvatar, quickLayoutCheck, evaluateStyledSheetWithGemini, runStyleTransferPass, splitSheetRows, evaluateSheetRow, evaluateIdentity, evaluateSheetSplit, evaluateAvatarSheet, isEchoedJudgeVerdict, REAR_TURN_POSE, SHEET_GROUND_RULE, SHEET_NO_LETTERING_RULE, CELL_NAMES_NOT_DRAWN, garmentColourRule, buildUnnamedTrimRule, scoreHeadsReport, scoreStyleReport, scoreIdentityReport },
+  _internal: { SHEET_HARD_FAIL_MAX, hardFailFeedback, buildFedBackPrompt, stampVerdict, sheetStackPad, stackRowsInto2x4, mergeRowObservations, observeStyledRow, hairRequest, headRowCropFraction, cropHeadRowToShoulders, applyRowConsistencyAxes, applyStyledSheetConsistencyAxes, TAIL_POSE_RULE, applyGlassesAxis, applyPoseHeadGate, detectBodyRowHeads, detectSheetRowDivider, parseJudgeJson, buildBodyRowPrompt, buildHeadRowPrompt, buildFootwearRule, buildGarmentRule, buildSeasonOutfitBlock, buildStyleTransferPrompt, resolveFacePhoto, resolveStandardAvatar, quickLayoutCheck, evaluateStyledSheetWithGemini, runStyleTransferPass, splitSheetRows, evaluateSheetRow, evaluateIdentity, evaluateSheetSplit, evaluateAvatarSheet, isEchoedJudgeVerdict, REAR_TURN_POSE, SHEET_GROUND_RULE, SHEET_NO_LETTERING_RULE, CELL_NAMES_NOT_DRAWN, garmentColourRule, buildUnnamedTrimRule, scoreHeadsReport, scoreStyleReport, scoreIdentityReport },
 };

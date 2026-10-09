@@ -106,7 +106,7 @@ async function runPass2(attempts: Record<string, number>[]) {
   const ctx: any = {
     module: { exports: {} },
     log: { info() {}, debug() {}, error() {}, warn() {} },
-    MAX_SHEET_RETRIES: attempts.length - 1,
+    MAX_SHEET_RETRIES: attempts.length - 1, SHEET_HARD_FAIL_MAX: 3, hardFailFeedback: () => [], buildFedBackPrompt: (p: string) => p,
     MODEL_DEFAULTS: { avatarStyleTransferBackend: 'grok' },
     process: { env: { GEMINI_API_KEY: 'k' } },
     loadStyleAnchor: () => null,

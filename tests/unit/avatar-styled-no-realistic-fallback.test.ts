@@ -59,7 +59,7 @@ function makeCtx(attempts: Attempt[]) {
   const ctx: any = {
     module: { exports: {} },
     log: { info() {}, debug() {}, error() {}, warn(m: string) { calls.warns.push(m); } },
-    MAX_SHEET_RETRIES: attempts.length - 1,
+    MAX_SHEET_RETRIES: attempts.length - 1, SHEET_HARD_FAIL_MAX: 3, hardFailFeedback: () => [], buildFedBackPrompt: (p: string) => p,
     MODEL_DEFAULTS: { avatarStyleTransferBackend: 'grok' },
     process: { env: { GEMINI_API_KEY: 'k' } },
     hairRequest: () => '',

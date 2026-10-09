@@ -115,7 +115,7 @@ describe('buildTrialStoryPrompt costume instructions', () => {
     expect(prompt).toContain('"clothing": "[standard | costumed]"');
     expect(prompt).toContain('"clothing": "costumed"');
     expect(prompt).toContain('Characters in costumed clothing');
-    expect(prompt).toContain('wears it in every scene except the very first');
+    expect(prompt).toContain('is `costumed` from page 1');
     expect(prompt).not.toContain('this story has no costume variant');
   });
 });

@@ -58,6 +58,7 @@ SHORT story — {PAGES} scenes. Keep it focused:
 
 Each scene hint is a JSON block for direct image generation (no further expansion).
 It must be detailed enough to illustrate without additional context.
+Every field of a scene hint is written in English, whatever the story language: a word of the story language for a thing, a dish or a creature becomes its English noun in the hint (the page text keeps the story's own word). A real place's name stays as the LANDMARKS list gives it.
 
 ```json
 {

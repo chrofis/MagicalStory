@@ -68,7 +68,7 @@ async function runPass2(scores: Record<string, number>) {
   const ctx: any = {
     module: { exports: {} },
     log: noopLog,
-    MAX_SHEET_RETRIES: 1,
+    MAX_SHEET_RETRIES: 1, SHEET_HARD_FAIL_MAX: 3, hardFailFeedback: () => [], buildFedBackPrompt: (p: string) => p,
     SHEET_VALID_MIN: 6,
     STYLED_IDENTITY_AXES: ['identity', 'solo'],
     MODEL_DEFAULTS: { avatarStyleTransferBackend: 'grok' },

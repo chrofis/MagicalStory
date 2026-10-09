@@ -12871,7 +12871,7 @@ function buildTrialStoryPrompt(inputData, sceneCount = null) {
     // than worn (prod job_1788698812047_q5b1vuds7).
     const clothingEnum = costume ? '[standard | costumed]' : 'standard';
     const clothingRule = costume
-      ? '- `characters.clothing`: a character with a `costumed` variant wears it in every scene except the very first, which is set before the adventure starts. Never `standard` on every page.'
+      ? '- `characters.clothing`: a character with a `costumed` variant is `costumed` on every page where the story has them in costume and `standard` on every page where the story has them in everyday clothes. A story that opens already in role (the child is the knight, the pilot, the queen from its first sentence) is `costumed` from page 1. A story that opens in everyday clothes and moves into the costume shows that change in the TEXT of the first `costumed` page, as an action (the child pulls it on, is handed it, is dressed in it), never as a description of how it looks. The picture never shows a costume the text has not put on, and never everyday clothes where the text has the character in role. Never `standard` on every page.'
       : '- `characters.clothing`: always `standard` — this story has no costume variant. Nobody puts on or wears a costume; a costume named in the story idea stays something in the scene, never a garment on a character.';
     const coverClothingNote = costume ? ' Characters in costumed clothing.' : '';
     const coverClothing = costume ? 'costumed' : 'standard';
@@ -12891,7 +12891,9 @@ The main character has two avatar styles available:
 - \`standard\` — everyday modern clothes
 - \`costumed\` — ${costume.description}
 
-**IMPORTANT**: The MAJORITY of scenes (at least ${costumedMin} out of ${pageCount}) MUST use \`costumed\` for the main character's clothing in scene hints. Use \`standard\` only for 1-${standardMax} scenes where it makes narrative sense (e.g., before a transformation, or a brief real-world moment).`;
+**IMPORTANT**: The MAJORITY of scenes (at least ${costumedMin} out of ${pageCount}) MUST use \`costumed\` for the main character's clothing in scene hints. Use \`standard\` only for 1-${standardMax} scenes where it makes narrative sense (e.g., the opening pages before the character puts the costume on, or a brief real-world moment).
+
+**Self-check before the output:** for every page whose main-character \`clothing\` differs from the page before, the text of that page shows the change as an action (putting on, taking off, being dressed); a page 1 marked \`standard\` has the character in everyday clothes in its text, and a page 1 whose text has the character in role is marked \`costumed\`.`;
     }
 
     // Build landmarks instruction for the visual bible.
