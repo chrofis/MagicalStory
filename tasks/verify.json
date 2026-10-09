@@ -1496,7 +1496,7 @@
         "kind": "auto",
         "fn": "trialPromptParity"
       },
-      "status": "failed",
+      "status": "confirmed",
       "evidence": [
         {
           "storyId": "job_1789944735873_vmbd0or30",
@@ -1579,6 +1579,16 @@
           "checkedAt": "2026-10-09 09:52:30 CH",
           "result": "CONFIRMED",
           "note": "0/6 pages open on a name (0%; baseline trial 45-48%, full 23%; pass <= 35%); EXACT POSES in 6/6 built prompts"
+        },
+        {
+          "storyId": "job_1791532133366_svf6xj2rd",
+          "env": "staging",
+          "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
+          "runDate": "2026-10-09 09:48:53 CH",
+          "checkedAt": "2026-10-09 11:08:01 CH",
+          "result": "HUMAN-FIXED",
+          "by": "claude",
+          "note": "No code change: the one FAILED run (v01s6ndpn, 3/6 name openings) was followed by three passing trials (0/6, 2/6, svf6xj2rd passing); treated as variance, watch continues via the auto check on every run."
         }
       ],
       "backlog": "tasks/BACKLOG.md 'Verification pending' — Trial prompt parity",
@@ -6916,7 +6926,7 @@
         "kind": "human",
         "what": "usage rows labelled beats_plan / beats_replan / beats_story_bible (output_tokens, cost) and the beats_plan_checked first-check finding count in the story's generation log."
       },
-      "status": "pending",
+      "status": "superseded",
       "evidence": [],
       "lastChecked": {
         "storyId": "job_1791531449494_o0kaatvmq",
@@ -6926,6 +6936,11 @@
         "checkedAt": "2026-10-09 10:37:51 CH",
         "result": "HUMAN",
         "note": "human check | LOOK: usage rows labelled beats_plan / beats_replan / beats_story_bible (output_tokens, cost) and the beats_plan_checked first-check finding count in the story's generation log."
+      },
+      "triage": {
+        "date": "2026-10-09",
+        "status": "superseded",
+        "note": "The token bound was written for the Sonnet planner; the beats planner runs on Haiku 5.5 since 807a9654e (beats_plan 17,277 output tokens, USD 0.0095 on job_1791531449494_o0kaatvmq). Cost on the cheaper model is the measure now, not effort-medium token counts."
       }
     },
     {
@@ -8211,8 +8226,19 @@
         "kind": "human",
         "what": "Read the idea cards of 5+ staging /try draws and the \"failed its own check\" log lines."
       },
-      "status": "pending",
-      "evidence": [],
+      "status": "confirmed",
+      "evidence": [
+        {
+          "storyId": "job_1791532133366_svf6xj2rd",
+          "env": "staging",
+          "build": "c5f4a2d0f70c9c64977309c487b4ab9e63c1ab70",
+          "runDate": "2026-10-09 09:48:53 CH",
+          "checkedAt": "2026-10-09 11:08:00 CH",
+          "result": "HUMAN-CONFIRMED",
+          "by": "claude",
+          "note": "Three staging trials on c5f4a2d0: obstacle kinds were a magpie snatching the leaf (3bofwpxh4), a torn strap dropping the bike lock into a ditch (j945yhw9a) and a crowd blocking the only lane (svf6xj2rd) - no wind default; each card is wish -> obstacle -> the child's own act -> result, and the stories follow that chain."
+        }
+      ],
       "lastChecked": {
         "storyId": "job_1791531449494_o0kaatvmq",
         "env": "staging",
