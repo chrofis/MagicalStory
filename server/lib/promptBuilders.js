@@ -8984,11 +8984,11 @@ function plannerTypedFills(targets, mainName = null) {
 function checkerShotFills(legacyShots = false) {
   return legacyShots ? {
     PLAN_LINE_HEAD: 'One line per page: shot — who is in frame — the instant the picture shows — what is true after this page that was not before.',
-    CHECK_COUNT: 'eighteen',
+    CHECK_COUNT: 'sixteen',
     OTS_CHECK: `14. Over-the-shoulder. ${OTS_NO_CONTACT_RULE} Name every over-the-shoulder page whose instant has the figure nearest the camera touching what they face, and ask for another shot.`,
   } : {
     PLAN_LINE_HEAD: `One line per page: ${PLAN_SHOT_PLACEHOLDER} — who is in frame — the instant the picture shows — what is true after this page that was not before. The first field is a placeholder: each page's camera shot is chosen after this check, so no point below is about a shot.`,
-    CHECK_COUNT: 'seventeen',
+    CHECK_COUNT: 'fifteen',
     OTS_CHECK: '',
   };
 }
@@ -11848,12 +11848,12 @@ function buildPlanCheckPrompt(inputData, beats, arc = '', pagePlan = '', { arcHi
     PEOPLELESS_WEIGHT_DEF,
     // The fourth field's contract, shared with the planner that writes it.
     PAGE_CHANGE: PAGE_CHANGE_DEF,
-    TWO_HEIGHTS_DEF,
-    TWO_HEIGHTS_REMEDY,
+    // Questions 10 (heights: TWO_HEIGHTS_DEF) and 17 (whole cast: WHOLE_CAST_DEF) are Jev's since 2026-10-09
+    // (server/lib/jevPlanCheck.js); the checker is not asked them, so neither constant is filled here. Their
+    // numbers keep their gap, as 14's does, so a stored CHECK[n] means the same question across time.
     THIRD_CHARACTER_DEF,
     // The roster's UNLISTED line reads the same sentence the planner's who column is held to.
     FIGURE_PART_IN_FRAME_RULE,
-    WHOLE_CAST_DEF,
     NAMING_DEF,
     WHO_DOES_WHAT: WHO_DOES_WHAT_RULE,
     ENDING_EVENT_DEF,

@@ -49,8 +49,6 @@ Answer only these {CHECK_COUNT}:
 
 9. Deed and effect. Name every page whose instant shows an action and the result of that action together. {DEED_AND_EFFECT_DEF} The instant shows one, and what follows it belongs in what is true after. {PAGE_CHANGE} Name every page whose what-is-true-after states no change its instant does not already show. Name a page once here, under the half that fits it.
 
-10. Heights. Name every page whose instant puts {TWO_HEIGHTS_DEF} {TWO_HEIGHTS_REMEDY}
-
 11. Obstacles. Name every page whose instant works against what a character is doing — a way blocked, a place kept, a thing taken or withheld, a refusal. For each, give that page an OBSTACLES line naming that character, and say whether the page's plan line names them. A page whose obstacle is held by a character the plan line does not name is a finding.
 
 12. Each character's own action. {CAST_ACTION} For each commissioned character, and for the central figure when one is named here, give an ACTION line: the sentence where the story gives them an action of their own, and the page whose instant stages it. A character whose action no page stages as its instant is a finding, and so is a central figure that is only carried where it appears. {WHO_DOES_WHAT} A page whose instant breaks it is a finding. When a central figure is named here, also give a CENTRAL line: every page whose picture shows it, under any of its names — in the who column or in the instant, alone, held or carried; what is true after is not the picture.
@@ -59,7 +57,6 @@ Answer only these {CHECK_COUNT}:
 {OTS_CHECK}
 15. The opening. {EXCITING_START_DEF} Say whether it does. A page 1 whose instant is a pose, a look at the place or someone waiting is a finding.
 16. The ending's cast. {HAPPY_ENDING_DEF} Say whether it does. A commissioned character missing from the last page's who column while the story keeps them with the others is a finding.
-17. The whole cast. Name every page whose ROSTER line holds every commissioned character — under people or covers — and say what one action its instant gives all of them. {WHOLE_CAST_DEF} A whole-cast page whose instant only stands, gathers or shows them together, or gives each a different thing to do, is a finding.
 18. The story logic. Name every page that breaks a fact THE STORY LOGIC states, and the fact it breaks. When no story logic is given, write no line for this check.
 
 # OUTPUT FORMAT

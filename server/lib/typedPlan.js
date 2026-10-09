@@ -21,6 +21,7 @@
 const J = require('./jevAudit');
 const SV = require('./shotVocabulary');
 const jev = require('./jevDecisions');
+const JPC = require('./jevPlanCheck');
 const PB = require('./promptBuilders');
 const { typedPlanCounters, countPlanTargets, parseTypedLine, parseTypedWho, whoClassOf, deriveRowType, classifyShot } = require('./planCounters');
 const { mergeReplanPages, duplicatePlanLine, pageCountHolds } = require('./planGuards');
@@ -36,12 +37,10 @@ const { castTableBlock } = require('./castCoverage');
 /** The neutral midpoint: used only for a metric's "below" count, never as a flag threshold. */
 const THRESHOLD = 0.5;
 
-const PLAN_LINE_HEAD = 'A picture plan line (who is in frame — the instant the picture shows — what is true after):';
+const PLAN_LINE_HEAD = jev.LOCAL_PLAN_LINE_HEAD;
 
 /** The plan line without field 0 (the type or the shot): the question never sees what it may choose. */
-const bareLine = planLine => jev.planParts(planLine).slice(1).join(' — ');
-
-const localState = planLine => `${PLAN_LINE_HEAD}\n${bareLine(planLine)}`;
+const localState = jev.localLineState;
 
 // Every question is asked in the PAIRED form (owner 2026-10-06, as WHOLE was
 // measured): a `virtue` statement and its inverse `fault`, one noul each, and
@@ -112,10 +111,11 @@ const PLAN_QUESTIONS = {
     fix: 'Give this people-free page a subject with story weight (a discovery, an arrival, a payoff, or the danger or obstacle faced now), or give the page a character.',
     relax: { who: true },
   },
-  // Q17, as measured: the planner's own definition plus its inverse (eval-jev-replan-guard.js, `wholecast`).
+  // Q17, as measured: the planner's own definition plus its inverse (eval-jev-replan-guard.js, `wholecast`). The
+  // wording is jevPlanCheck's: plan-check Q17 is answered by the same two questions in production.
   WHOLE: {
-    virtue: `The instant gives every character in frame one and the same action, by this rule: ${PB.WHOLE_CAST_DEF}`,
-    fault: 'In the instant, the characters in frame only stand, gather or are shown together, or one of them acts while the others look on or do something else.',
+    virtue: JPC.WHOLE_CAST_VIRTUE,
+    fault: JPC.WHOLE_CAST_FAULT,
     applies: (r, ctx) => ctx.listed.length > 1 && ctx.listed.every(n => r.names.some(x => String(x).toLowerCase() === String(n).toLowerCase())),
     fix: 'Give every character of the cast in frame one shared action, or take some of them out of the page.',
     relax: { who: true },
@@ -150,7 +150,7 @@ const CALIBRATION = {
   THIRD: { at: 1, noise: 0.05, calibrated: false, guardsAdded: 0.5 }, // scored; guards a rewrite that adds a figure (acceptReplanPages)
 };
 
-const faultScore = (pVirtue, pFault) => +(((1 - pVirtue) + pFault) / 2).toFixed(3);
+const faultScore = jev.faultScore;
 
 /**
  * The fault score at which a question flags a page: its calibrated threshold plus the repeat noise, so a flag is

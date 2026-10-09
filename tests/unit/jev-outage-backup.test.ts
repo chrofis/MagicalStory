@@ -137,10 +137,12 @@ describe('Jev lost half-way: what was decided stays, the rest goes to the backup
     expect(r.prompts.beats_scene_expansion).toContain(JD.JEV_BACKUP_SHOT_RULE);
     expect(r.prompts.beats_scene_expansion).not.toContain('FIXED');                  // no later Jev step ran
     expect(r.labels.some(l => /scene_review/.test(l))).toBe(false);
-    // Before the shots only the probe, the challenge ranking and the arc's cast
-    // check (it answers through the same stub since 2026-09-30) asked Jev anything.
+    // Before the shots only the probe, the challenge ranking, the arc's cast
+    // check (it answers through the same stub since 2026-09-30) and the plan check's
+    // questions 10 and 17 (jevPlanCheck, single question id Q, since 2026-10-09) asked Jev anything.
     const selection = (c: any) => c.questions.PROBE || Object.keys(c.questions).every(k => /^c\d+$/.test(k))
-      || Object.keys(c.questions).every(k => /^ARC_CAST_BEAT__\d+$/.test(k));
+      || Object.keys(c.questions).every(k => /^ARC_CAST_BEAT__\d+$/.test(k))
+      || Object.keys(c.questions).join() === 'Q';
     expect(r.jevCalls.filter((c: any) => Object.keys(c.questions).every(k => /^c\d+$/.test(k)))).toHaveLength(1);
     expect(r.jevCalls.filter((c: any) => !selection(c)).every((c: any) => Object.keys(c.questions).some(k => /^S\d$/.test(k)))).toBe(true);
   });

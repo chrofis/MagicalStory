@@ -11,6 +11,7 @@ const { salvageReplanRound } = require('./replanSalvage');
 // so a replay or a test can load them without the pipeline's provider graph.
 const { decideBriefFields, assembleBriefs, pageLocations, visualBibleJsonOf } = require('./jevBriefFields');
 const { JevDecisionError } = jevDecisions;
+const jevPlanCheck = require('./jevPlanCheck');
 const jevSelection = require('./jevSelection');
 const { lookupByName } = require('./castResolver');
 const { commissionedChildBand, applySecondaryAgeBand } = require('./inventedAgeBand');
@@ -810,7 +811,7 @@ function planCheckInputs(inputData, { arcPremiseNames = [], modelOverrides = {} 
 // first any more: who is on a page is a question about English, the model
 // call answers it as a ROSTER, and the counters do arithmetic on that answer
 // instead of re-deriving the cast from the prose with a grammar heuristic.
-function createPlanCheckRunner({ inputData, approvedArc, arcHints, arcStoryLogic, arcCentralFigure, castTable, commission, commissionedNames, placeNames, maxCast, arcInventedNames, arcInventedLimit, mainName, planCheckModel, onChunk, gl, labPromptOptions = {}, onCall = null }) {
+function createPlanCheckRunner({ inputData, approvedArc, arcHints, arcStoryLogic, arcCentralFigure, castTable, commission, commissionedNames, placeNames, maxCast, arcInventedNames, arcInventedLimit, mainName, planCheckModel, onChunk, gl, labPromptOptions = {}, onCall = null, jevReport = null, jevCall = null }) {
   // The counters over one division's parsed check facts — shared by the real
   // check below and `compose` (a division mixing two checks' pages, judged
   // without a model call: replanSalvage.js).
@@ -820,6 +821,20 @@ function createPlanCheckRunner({ inputData, approvedArc, arcHints, arcStoryLogic
     ...modelFindings.map(f => ({ kind: 'check', check: f.check, line: `CHECK[${f.check}]: ${f.text}` })),
   ];
   const run = async (label, pages, planText) => {
+    // QUESTIONS 10 AND 17 ARE JEV'S (2026-10-09, server/lib/jevPlanCheck.js). They are asked while the checker
+    // call is in flight: the checker prompt no longer carries them and its roster is only needed to gate Q17
+    // below, so the Jev batch (about 2 s) ends long before the checker's reply and adds no wall clock. The
+    // outcome is captured now so a checker failure can never leave a rejected promise behind.
+    let jevAsk = null;
+    if (jevActive(jevReport)) {
+      jevAsk = jevPlanCheck.askPlanCheckJev({ pages, commissionedNames, callImpl: jevCall })
+        .then(r => ({ r }), e => ({ e }));
+    } else {
+      // The backup path (Jev was down before this story began, or went down earlier in it). NO FALLBACK to asking
+      // the LLM checker these two questions: this check files no Q10 and no Q17 finding, and says so.
+      log.error(`❌ [BEATS] Plan check (${label}): Jev is on the backup path (${jevReport.fallback.step}) — plan-check Q10 (heights) and Q17 (whole cast) are NOT asked this round`);
+      gl.error(`${label}_jev_skipped`, `Plan-check Q10 and Q17 were not asked: the Jev layer is on the backup path since step "${jevReport.fallback.step}"`, null, { fallback: jevReport.fallback });
+    }
     let modelFindings = [];
     let roster = null;
     // The check's OBSTACLES block: per page, the character whose action that
@@ -893,6 +908,31 @@ function createPlanCheckRunner({ inputData, approvedArc, arcHints, arcStoryLogic
       log.error(`❌ [BEATS] Plan check (${label}) failed (${err.message}) — NO ROSTER, so the entire plan-counter layer is skipped this round`);
       gl.error(`${label}_failed`, `Plan check failed: ${err.message} — no roster, so every plan counter (cast, invented cast, shot variety, focal pages) is skipped this round`, null, { error: err.message, model: planCheckModel });
     }
+    // The checker is not asked 10 and 17; a line it files under them anyway is dropped, so one judge answers each.
+    const volunteered = modelFindings.filter(f => jevPlanCheck.JEV_PLAN_CHECKS.has(f.check));
+    if (volunteered.length) {
+      modelFindings = modelFindings.filter(f => !jevPlanCheck.JEV_PLAN_CHECKS.has(f.check));
+      log.warn(`⚠️ [BEATS] Plan check (${label}): the checker volunteered ${volunteered.length} line(s) under check 10/17, which Jev answers — dropped`);
+      gl.warn(`${label}_checker_volunteered`, `The checker volunteered ${volunteered.length} line(s) under check 10/17 (Jev's); dropped`, null, { lines: volunteered });
+    }
+    // Jev's half: its scores arrive with the roster, which gates Q17 to the pages that hold the whole cast.
+    let jevResult = null;
+    if (jevAsk) {
+      const outcome = await jevAsk;
+      if (outcome.e) {
+        // The existing Jev policy (jevDecisions OUTAGES): a failed batch switches this story to the backup, once,
+        // at error level; with no jevReport (the Test Lab) it throws.
+        if (!(outcome.e instanceof JevDecisionError)) throw outcome.e;
+        jevFallBack(jevReport, 'plan_check', outcome.e, gl);
+      } else {
+        const jf = jevPlanCheck.planCheckJevFindings({ scores: outcome.r, roster, commissionedNames });
+        modelFindings = [...modelFindings, ...jf.findings].sort((a, b) => a.check - b.check);
+        jevResult = {
+          heights: Object.fromEntries(outcome.r.heights), wholeCast: Object.fromEntries(outcome.r.whole),
+          skipped: outcome.r.skipped, stats: outcome.r.stats, findings: jf.findings.map(f => ({ check: f.check, text: f.text, score: f.jev.score })),
+        };
+      }
+    }
     const parsed = { roster, obstacles, peoplelessPick, wanted, actions, centralPages };
     const counters = countersFor(pages, parsed);
     // The central-figure counter counts on the CENTRAL line alone; a check
@@ -920,9 +960,9 @@ function createPlanCheckRunner({ inputData, approvedArc, arcHints, arcStoryLogic
     const structured = structure(counters, modelFindings);
     const all = structured.map(f => f.line);
     gl.info(label, `Plan check by ${checkModelId || planCheckModel}: ${counters.lines.length} counter finding(s), ${modelFindings.length} model finding(s)`, null, {
-      counterFindings: counters.lines, modelFindings, model: checkModelId, stats: counters.stats, cast: counters.cast,
+      counterFindings: counters.lines, modelFindings, model: checkModelId, stats: counters.stats, cast: counters.cast, jev: jevResult,
     });
-    return { counters, modelFindings, findings: structured, lines: all, checkModelId, prompt, obstacles, reply, rosterLines, wanted, actions, parsed };
+    return { counters, modelFindings, findings: structured, lines: all, checkModelId, prompt, obstacles, reply, rosterLines, wanted, actions, parsed, jev: jevResult };
   };
   /** A division judged from parsed facts already held — no model call, no log. */
   run.compose = (pages, parsed, modelFindings) => {
@@ -956,6 +996,8 @@ function recheckRecord(c) {
     prompt: c.prompt || '',
     wanted: c.wanted || [],
     actions: c.actions || [],
+    // Jev's scores for check 10 / 17 per page (jevPlanCheck): the evidence behind the findings it filed.
+    jev: c.jev || null,
   } : null);
 }
 
@@ -2842,6 +2884,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     inputData, approvedArc, arcHints, arcStoryLogic, arcCentralFigure, castTable, commission, commissionedNames, placeNames,
     maxCast, arcInventedNames, arcInventedLimit, mainName, planCheckModel, onChunk, gl,
     labPromptOptions: legacyShotsOf(jevReport) ? { legacyShots: true } : {},
+    jevReport,
   });
 
 

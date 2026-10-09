@@ -143,6 +143,19 @@ function pageState(arc, pages, page) {
   return `THE STORY, beat by beat:\n${String(arc || '').trim() || '(no arc stored)'}\n\n${PLAN_HEAD}\n${planBlock(pages)}\n\nPAGE TO JUDGE: Page ${page.pageNumber} — ${stripPlanShot(page.planLine)}`;
 }
 
+/**
+ * ONE plan line, judged alone (the typed-plan questions and the plan check's Q17): the line without field 0, so the
+ * question never sees the shot it may choose. Moved here from typedPlan.js when plan-check Q17 became Jev's.
+ */
+const LOCAL_PLAN_LINE_HEAD = 'A picture plan line (who is in frame — the instant the picture shows — what is true after):';
+const localLineState = planLine => `${LOCAL_PLAN_LINE_HEAD}\n${planParts(planLine).slice(1).join(' — ')}`;
+
+/**
+ * The paired form (owner 2026-10-06): a `virtue` statement and its inverse `fault`, one noul each. The score is the
+ * FAULT probability, so a model that says yes to both is pulled to 0.5 instead of agreeing with itself.
+ */
+const faultScore = (pVirtue, pFault) => +(((1 - pVirtue) + pFault) / 2).toFixed(3);
+
 // ───────────────────────── the call pool ─────────────────────────
 
 /**
@@ -1558,6 +1571,9 @@ module.exports = {
   POP_CROWD_Q,
   stripPlanShot,
   planParts,
+  LOCAL_PLAN_LINE_HEAD,
+  localLineState,
+  faultScore,
   withShot,
   withWho,
   whoText,

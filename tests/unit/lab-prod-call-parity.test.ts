@@ -763,7 +763,12 @@ describe('beats_replan: no params = the run\'s plan check and re-plan rounds', (
     const prodShots = await BP.finalizePlanShots({ approvedArc: ARC, beats: shipped.beats, check: shipped.check, gl });
     const prodCalls = modelCalls.splice(0);
     const prodJev = jevCalls.splice(0);
-    expect(prodJev.length).toBe(4);                                            // one A1 call per page
+    // One A1 call per page for the shots; plus plan-check Q10 and Q17 (jevPlanCheck, question id Q): 3 calls per page
+    // per check (heights, and the whole-cast pair), asked of the check and of the recheck (2026-10-09).
+    expect(prodJev.filter((c: any) => Object.keys(c.questions).some((k: string) => /^S\d$/.test(k))).length).toBe(4);
+    const planCheckJev = prodJev.filter((c: any) => Object.keys(c.questions).join() === 'Q');
+    expect(planCheckJev.length).toBe(3 * 4 * (1 + rounds.length));
+    expect(prodJev.length).toBe(4 + planCheckJev.length);
     expect(prodCalls.length).toBeGreaterThanOrEqual(3);                        // check, re-plan, recheck
     // THE LAB, no params.
     const r = await testlab.runBeatsReplanStage({ storyId: 'job_parity' }, { params: {} });

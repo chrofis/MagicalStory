@@ -3,6 +3,7 @@ import { describe, it, beforeAll, expect } from 'vitest';
 const pb = require('../../server/lib/promptBuilders');
 const { loadPromptTemplates } = require('../../server/services/prompts');
 const { PLAN_INSTANT_MAX_WORDS } = require('../../server/lib/castCoverage');
+const JPC = require('../../server/lib/jevPlanCheck');
 
 const input = () => ({
   pages: 18, language: 'de-CH', languageLevel: '1st-grade', storyDetails: 'x',
@@ -23,12 +24,30 @@ const checker = () => pb.buildPlanCheckPrompt(
 describe('planner and checker share one definition, not two copies', () => {
   beforeAll(async () => { await loadPromptTemplates(); });
 
-  for (const name of ['DEED_AND_EFFECT_DEF', 'TWO_HEIGHTS_DEF', 'TWO_HEIGHTS_REMEDY', 'THIRD_CHARACTER_DEF', 'WHOLE_CAST_DEF', 'NAMING_DEF', 'ENDING_EVENT_DEF', 'EXCITING_START_DEF', 'HAPPY_ENDING_DEF']) {
+  for (const name of ['DEED_AND_EFFECT_DEF', 'THIRD_CHARACTER_DEF', 'NAMING_DEF', 'ENDING_EVENT_DEF', 'EXCITING_START_DEF', 'HAPPY_ENDING_DEF']) {
     it(`${name} reaches BOTH prompts, verbatim`, () => {
       const def = pb[name];
       expect(def, `${name} is not exported`).toBeTruthy();
       expect(planner(), `${name} missing from the planner`).toContain(def);
       expect(checker(), `${name} missing from the checker`).toContain(def);
+    });
+  }
+
+  // Plan-check questions 10 (heights) and 17 (whole cast) are Jev's since 2026-10-09: their critic is
+  // server/lib/jevPlanCheck.js, which quotes the SAME constants the planner is given, and the checker prompt
+  // no longer carries them.
+  const JEV_CRITIC_TEXT: Record<string, string> = {
+    TWO_HEIGHTS_DEF: JPC.HEIGHTS_QUESTION,
+    TWO_HEIGHTS_REMEDY: JPC.planCheckJevFindings({ scores: { heights: new Map([[1, 1]]), whole: new Map() }, roster: null, commissionedNames: [] }).findings[0].text,
+    WHOLE_CAST_DEF: JPC.WHOLE_CAST_VIRTUE,
+  };
+  for (const name of ['TWO_HEIGHTS_DEF', 'TWO_HEIGHTS_REMEDY', 'WHOLE_CAST_DEF']) {
+    it(`${name} reaches the planner and the Jev critic, verbatim, and no longer the checker prompt`, () => {
+      const def = pb[name];
+      expect(def, `${name} is not exported`).toBeTruthy();
+      expect(planner(), `${name} missing from the planner`).toContain(def);
+      expect(JEV_CRITIC_TEXT[name], `${name} missing from jevPlanCheck`).toContain(def);
+      expect(checker(), `${name} still in the checker`).not.toContain(def);
     });
   }
 
@@ -194,7 +213,7 @@ describe('the re-plan block carries the whole-cast definition the check grades b
       [{ check: 17, line: 'CHECK[17]: page 1 holds the whole commissioned cast, but they only stand.' }],
       { pageCount: 1 });
     expect(section).toContain(pb.WHOLE_CAST_DEF);
-    expect(checker()).toContain(pb.WHOLE_CAST_DEF);
+    expect(JPC.WHOLE_CAST_VIRTUE).toContain(pb.WHOLE_CAST_DEF);
     expect(section.indexOf(pb.WHOLE_CAST_DEF)).toBeLessThan(section.indexOf('## MUST FIX'));
   });
 
@@ -214,7 +233,7 @@ describe('the re-plan block carries the whole-cast definition the check grades b
     expect(pb.WHOLE_CAST_DEF).toContain('facing the viewer it never is');
     expect(pb.WHOLE_CAST_DEF).not.toContain('all turned toward one thing ahead of them');
     const section = pb.buildReplanSection(plan, [{ check: 17, line: 'CHECK[17]: page 1 x' }], { pageCount: 1 });
-    for (const text of [planner(), checker(), section]) expect(text).toContain(clause);
+    for (const text of [planner(), JPC.WHOLE_CAST_VIRTUE, section]) expect(text).toContain(clause);
   });
 
   it('it is stated once in the block', () => {

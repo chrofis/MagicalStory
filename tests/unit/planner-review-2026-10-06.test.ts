@@ -142,7 +142,11 @@ describe('the built planner, plan check and re-plan', () => {
   it('one remedy for a third height, and the owner\'s "people, animals or objects" wording', () => {
     expect(PB.TWO_HEIGHTS_DEF).toContain('people, animals or objects');
     expect(PB.TWO_HEIGHTS_DEF).not.toContain('A frame holds at most two height levels');
-    for (const p of [planner(), checker()]) expect(p.split(PB.TWO_HEIGHTS_REMEDY).length - 1).toBe(1);
+    expect(planner().split(PB.TWO_HEIGHTS_REMEDY).length - 1).toBe(1);
+    // The checker is no longer asked question 10 (Jev's since 2026-10-09, jevPlanCheck): its finding carries the same remedy.
+    expect(checker()).not.toContain(PB.TWO_HEIGHTS_REMEDY);
+    const JPC = require('../../server/lib/jevPlanCheck');
+    expect(JPC.planCheckJevFindings({ scores: { heights: new Map([[3, 1]]), whole: new Map() }, roster: null, commissionedNames: [] }).findings[0].text).toContain(PB.TWO_HEIGHTS_REMEDY);
     expect(TP.fixOf('HEIGHTS')).toBe(PB.TWO_HEIGHTS_REMEDY);
   });
 

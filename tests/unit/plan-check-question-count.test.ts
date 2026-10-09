@@ -82,7 +82,8 @@ describe('the plan check asks every question it says it asks', () => {
   // RETIRED numbers keep their gap so a stored CHECK[n] means the same question
   // across time (the Jev re-plan guard is measured on CHECK[17]). Q14 (over-the-
   // shoulder on contact) retired 2026-09-27 with the planner's shot word.
-  const RETIRED = [14];
+  // Q10 (heights) and Q17 (whole cast) are Jev's since 2026-10-09 (server/lib/jevPlanCheck.js): not asked here.
+  const RETIRED = [10, 14, 17];
   it('numbers its questions 1..N with no gap but a retired number, and no repeat', () => {
     const nums = questionNumbers(prompt);
     expect(nums.length).toBeGreaterThan(0);
