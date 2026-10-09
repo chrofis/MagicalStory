@@ -1,7 +1,7 @@
 
 
 const { mergeReplanPages, duplicatePlanLine, pageCountHolds } = require('./planGuards');
-const { runPlanCounters, collectPlaceNames, castLostByReplan, reviewPlanChanges, restoreRefusedChanges, refreshPlanShot, namesIn } = require('./planCounters');
+const { runPlanCounters, collectPlaceNames, castLostByReplan, reviewPlanChanges, restoreRefusedChanges, buildReissueSection, reissueLostPages, refreshPlanShot, namesIn } = require('./planCounters');
 const { commissionedCast, castCoverage, parsePlanCastBlock } = require('./castCoverage');
 const { arcRepairFindingsWithCastCheck } = require('./jevAudit');
 const jevDecisions = require('./jevDecisions');
@@ -966,7 +966,7 @@ function recheckRecord(c) {
  *
  * @returns {Promise<{beats: Array, pagePlan: string}>}
  */
-async function runReplanRounds({ inputData, pageCount, plan, check1, replanRounds, approvedArc, arcHints, arcStoryLogic, arcCentralFigure, castTable, commission, commissionedNames, maxCast, planModel, readPlan, runCheck, onChunk, gl, stage, checkCancellation, labPromptOptions = {}, onCall = null, beats, pagePlan, jevReport = null }) {
+async function runReplanRounds({ inputData, pageCount, plan, check1, replanRounds, approvedArc, arcHints, arcStoryLogic, arcCentralFigure, castTable, commission, commissionedNames, maxCast, planModel, readPlan, runCheck, onChunk, gl, stage, checkCancellation, labPromptOptions = {}, onCall = null, beats, pagePlan, jevReport = null, jobId = null }) {
   // The check whose roster describes the division that ships — the head count
   // the shot assignment reads (jevDecisions.decideShots).
   let bestCheck = check1;
@@ -1221,6 +1221,7 @@ async function runReplanRounds({ inputData, pageCount, plan, check1, replanRound
         if (jevReport) jevReport.castCuts[jevReport.castCuts.length - 1].applied = { pages: [...codeOwned.keys()], rejected: cutRejects };
       }
       let reviewRefusals = [];
+      let reissuedPages = [];
       {
         const guardCast = (pendingCheck.counters.cast && pendingCheck.counters.cast.all) || commissionedNames;
         const guardAliases = (pendingCheck.counters.cast && pendingCheck.counters.cast.aliases) || {};
@@ -1232,12 +1233,12 @@ async function runReplanRounds({ inputData, pageCount, plan, check1, replanRound
           ));
         };
 
-        const review = reviewPlanChanges({
-          // A code-cut page is decided, not proposed: the planner's own
-          // declarations on it are not reviewed (code wrote its who column).
-          changes: declared.changes.filter(c => !codeOwned.has(Number(c.pageNumber))),
+        // One argument set for the round's review AND for a re-issued page's review:
+        // the same evidence, the same rules (reissueLostPages below).
+        const reviewWith = (changes, returned) => reviewPlanChanges({
+          changes,
           standing: beats,
-          returned: second.parsed.pages,
+          returned,
           castNames: guardCast,
           aliases: guardAliases,
           maxCast,
@@ -1249,6 +1250,9 @@ async function runReplanRounds({ inputData, pageCount, plan, check1, replanRound
           // The commissioned span floor the re-plan was told (2026-09-25).
           castFloor: coverageRule ? { names: commission.listed, min: coverageRule.appearances.min } : null,
         });
+        // A code-cut page is decided, not proposed: the planner's own
+        // declarations on it are not reviewed (code wrote its who column).
+        const review = reviewWith(declared.changes.filter(c => !codeOwned.has(Number(c.pageNumber))), second.parsed.pages);
         reviewRefusals = review.refusals;
         lastRefusals = review.refusals;
         if (review.notes.length) {
@@ -1268,6 +1272,46 @@ async function runReplanRounds({ inputData, pageCount, plan, check1, replanRound
           if (kept.lost.length) {
             log.error(`❌ [BEATS] Round ${round}: accepted prose change(s) on a page with a refused change could not be kept (${kept.lost.map(l => `p${l.pageNumber}: ${l.changes.join(' | ')}`).join('; ')}) - code does not rewrite the planner's sentence; the finding stays open for the recheck`);
             gl.error('beats_replan_accepted_lost', `Round ${round}: ${kept.lost.length} page(s) had accepted prose changes that were lost with a refused change on the same page: ${kept.lost.map(l => `p${l.pageNumber}`).join(', ')}`, null, { round, lost: kept.lost });
+            // FED-BACK RE-ISSUE, ONCE (2026-10-09, job_1791531449494_o0kaatvmq: p2
+            // in round 1, p4 in round 2). Code may not re-apply the planner's
+            // sentence, so the planner is asked for the listed pages again with the
+            // accepted change text and the refusal reason. A returned page passes
+            // the same review; it then rides the round's recheck and regression
+            // guard like any other changed page. Failure leaves the restored page
+            // and the finding open, loudly.
+            try {
+              const reissue = await reissueLostPages({
+                pages: second.parsed.pages,
+                lost: kept.lost,
+                review: reviewWith,
+                ask: async ({ lost: toAsk, pages: current }) => {
+                  const reissuePrompt = buildBeatsPrompt(inputData, pageCount, {
+                    finalArc: approvedArc, arcHints, storyLogic: arcStoryLogic, centralFigure: arcCentralFigure, castTable,
+                    legacyShots: legacyShotsOf(jevReport), ...labPromptOptions,
+                    replan: buildReissueSection(current.map(pg => `Page ${pg.pageNumber}: ${pg.planLine || ''}`).join(String.fromCharCode(10)), toAsk),
+                  });
+                  if (!reissuePrompt) throw new Error('story-beats template unavailable');
+                  const res = await textModels.callTextModelStreaming(reissuePrompt, null, onChunk, planModel, { usageLabel: 'beats_replan_reissue', effort: MODEL_DEFAULTS.beatsPlanEffort });
+                  if (onCall) onCall(res);
+                  return { pages: readPlan(res.text).parsed.pages, changes: parsePlanChanges(res.text).changes };
+                },
+              });
+              second.parsed.pages = reissue.pages;
+              reissuedPages = reissue.reissued;
+              try { require('./runMetrics').forJob(jobId).count('beats_replan_reissue'); } catch { /* metrics are never fatal */ }
+              if (reissue.reissued.length) {
+                gl.info('beats_replan_reissued', `Round ${round}: re-asked the planner for ${kept.lost.map(l => `p${l.pageNumber}`).join(', ')}; ${reissue.reissued.map(n => `p${n}`).join(', ')} came back with the accepted change(s) and passed review`, null, { round, reissued: reissue.reissued });
+              }
+              if (reissue.failed.length) {
+                try { require('./runMetrics').forJob(jobId).count('beats_replan_reissue_failed'); } catch { /* metrics are never fatal */ }
+                log.error(`❌ [BEATS] Round ${round}: re-issue could not restore the accepted change(s) on ${reissue.failed.map(f => `p${f.pageNumber} (${f.reason})`).join('; ')} - the restored line stands and the finding stays open`);
+                gl.error('beats_replan_reissue_failed', `Round ${round}: re-issue failed on ${reissue.failed.map(f => `p${f.pageNumber}: ${f.reason}`).join('; ')}`, null, { round, failed: reissue.failed });
+              }
+            } catch (reissueErr) {
+              try { require('./runMetrics').forJob(jobId).count('beats_replan_reissue_failed'); } catch { /* metrics are never fatal */ }
+              log.error(`❌ [BEATS] Round ${round}: re-issue call failed (${reissueErr.message}) - the restored line stands and the finding stays open`);
+              gl.error('beats_replan_reissue_failed', `Round ${round}: re-issue call failed: ${reissueErr.message}`, null, { round, error: reissueErr.message });
+            }
           }
           const detail = review.refusals.map(r => `p${r.pageNumber} (${r.rule}): ${r.detail}`).join('; ');
           log.warn(`⚠️ [BEATS] Round ${round}: ${review.refusals.length} declared change(s) refused on review - ${detail}`);
@@ -1364,6 +1408,8 @@ async function runReplanRounds({ inputData, pageCount, plan, check1, replanRound
         // `declaredChanges: null` marks a round that emitted no block.
         declaredChanges: declared.present ? declared.changes.map(c => c.line) : null,
         changeRefusals: reviewRefusals,
+        // Pages the planner was re-asked for after a refused change took their accepted prose with it, and which passed review.
+        reissuedPages,
       };
       replanRounds.push(roundRecord);
       // THE GUARD — every round, round 1 included (owner, 2026-09-24). Until
@@ -2812,7 +2858,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   if (check1.lines.length > 0) {
     ({ beats, pagePlan, check: shippedCheck } = await runReplanRounds({
       inputData, pageCount, plan, check1, replanRounds, approvedArc, arcHints, arcStoryLogic, arcCentralFigure, castTable,
-      commission, commissionedNames, maxCast, planModel, readPlan, runCheck, onChunk, gl, stage, checkCancellation, beats, pagePlan, jevReport,
+      commission, commissionedNames, maxCast, planModel, readPlan, runCheck, onChunk, gl, stage, checkCancellation, beats, pagePlan, jevReport, jobId,
     }));
   }
   meta.timings.planCheckMs = Date.now() - t;

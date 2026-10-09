@@ -1954,7 +1954,7 @@ function typedPlanCounters({ pages = [], listedNames = [], commissionedNames = n
  * text, which is forbidden; it is reported in `lost` so the caller logs it and
  * the recheck sees the finding still open.
  *
- * @returns {{pages:Array, applied:Array<{pageNumber:number, cast:string[]}>, lost:Array<{pageNumber:number, changes:string[]}>}}
+ * @returns {{pages:Array, applied:Array<{pageNumber:number, cast:string[]}>, lost:Array<{pageNumber:number, changes:string[], accepted:Array, refused:Array}>}}
  */
 function restoreRefusedChanges({ pages = [], standing = [], refusals = [], changes = [], castNames = [], aliases = {}, skip = null } = {}) {
   const standingBy = new Map((standing || []).map(b => [Number(b.pageNumber), b]));
@@ -1971,7 +1971,16 @@ function restoreRefusedChanges({ pages = [], standing = [], refusals = [], chang
     const accepted = (changes || []).filter(c => Number(c.pageNumber) === n && !refusedClauses.has(`${n}|${c.clause}`));
     const castChanges = accepted.filter(c => c.kind === 'cast_in' || c.kind === 'cast_out');
     const proseChanges = accepted.filter(c => c.kind !== 'cast_in' && c.kind !== 'cast_out');
-    if (proseChanges.length) lost.push({ pageNumber: n, changes: proseChanges.map(c => c.clause || c.line) });
+    if (proseChanges.length) {
+      // `changes` (clauses) is the log line; `accepted` / `refused` carry the full
+      // text so a re-issue (reissueLostPages) is self-contained.
+      lost.push({
+        pageNumber: n,
+        changes: proseChanges.map(c => c.clause || c.line),
+        accepted: proseChanges.map(c => ({ kind: c.kind, clause: c.clause || null, line: c.line || c.clause || '' })),
+        refused: (refusals || []).filter(r => Number(r.pageNumber) === n).map(r => ({ rule: r.rule, detail: r.detail, clause: r.clause || null, line: r.line || r.clause || '' })),
+      });
+    }
     if (!castChanges.length) return base;
     const parts = String(base.planLine || '').replace(/^\s*PLAN:\s*/i, '').trim().split(SEGMENT_SPLIT);
     if (parts.length < 4) return base;
@@ -1988,8 +1997,84 @@ function restoreRefusedChanges({ pages = [], standing = [], refusals = [], chang
   return { pages: out, applied, lost };
 }
 
+/**
+ * The re-issue request for pages that lost accepted prose with a refused change
+ * (beats_replan_accepted_lost). Code may not rewrite the planner's sentence, so
+ * the planner is asked once more, FED BACK: per page, the accepted change(s) as
+ * it wrote them and the refused change with the review's own reason. Generic: it
+ * names no character, place or story. Passed as the `replan` section of the
+ * beats prompt, so the reply is read and its ---CHANGES--- block parsed exactly
+ * like a re-plan reply.
+ *
+ * @param {string} pagePlan the division as it stands after the restore
+ * @param {Array<{pageNumber:number, accepted:Array<{line:string}>, refused:Array<{rule:string, detail:string, line:string}>}>} lost
+ */
+function buildReissueSection(pagePlan, lost = []) {
+  const blocks = (lost || []).map((l) => [
+    `Page ${l.pageNumber}:`,
+    ...(l.accepted || []).map(a => `  ACCEPTED, apply it as you wrote it: ${String(a.line || a.clause || '').trim()}`),
+    ...(l.refused || []).map(r => `  REFUSED, do not repeat it (${r.rule}): ${String(r.line || r.clause || '').trim()} — ${String(r.detail || '').trim()}`),
+  ].join('\n'));
+  return [
+    '# RE-ISSUE',
+    '',
+    'You re-divided this story once. On each page below the review refused one of your changes and put the page back to its earlier line, which also undid the change(s) on it that were accepted. Write each listed page again: carry the accepted change(s) as you wrote them, and leave the refused one out (answer its finding another way, or not at all). Return a line for each listed page, in the same format, and for no other page. Declare every change you make under ---CHANGES---, with the finding it answers and why. A change you do not declare is undone.',
+    '',
+    '## YOUR PAGE PLAN',
+    String(pagePlan || '').trim() || '(none)',
+    '',
+    '## PAGES TO WRITE AGAIN',
+    blocks.join('\n\n'),
+  ].join('\n').trimEnd();
+}
+
+/**
+ * Re-ask the planner ONCE for the pages in `lost`, and take back only a page
+ * that passes the same review a re-plan page passes. Everything else stands:
+ * a page the planner does not return, returns unchanged, or whose declared
+ * changes the review refuses again keeps its restored line and is reported in
+ * `failed` (the caller logs it at ERROR and counts it).
+ *
+ * The re-issued pages ride into the round's recheck and `replanRoundRegressed`
+ * like every other changed page, so a re-issue that raises the must-fix count
+ * discards or is salvaged by the same guard.
+ *
+ * @param {Object} args
+ * @param {Array} args.pages the division after restoreRefusedChanges
+ * @param {Array} args.lost restoreRefusedChanges().lost
+ * @param {({lost:Array, pages:Array}) => Promise<{pages:Array, changes:Array}>} args.ask one planner call
+ * @param {(changes:Array, returned:Array) => {refusals:Array}} args.review reviewPlanChanges, bound to the round's evidence
+ * @returns {Promise<{pages:Array, reissued:number[], failed:Array<{pageNumber:number, reason:string}>}>}
+ */
+async function reissueLostPages({ pages = [], lost = [], ask, review } = {}) {
+  if (!lost.length) return { pages, reissued: [], failed: [] };
+  const reply = await ask({ lost, pages });
+  const returned = new Map(((reply && reply.pages) || []).map(pg => [Number(pg.pageNumber), pg]));
+  const changes = (reply && reply.changes) || [];
+  const out = pages.slice();
+  const reissued = [];
+  const failed = [];
+  for (const l of lost) {
+    const n = Number(l.pageNumber);
+    const idx = out.findIndex(pg => Number(pg.pageNumber) === n);
+    const cand = returned.get(n);
+    if (idx < 0) { failed.push({ pageNumber: n, reason: 'the page is not in the division' }); continue; }
+    if (!cand || !String(cand.planLine || '').trim()) { failed.push({ pageNumber: n, reason: 'the re-issue did not return the page' }); continue; }
+    if (String(cand.planLine).trim() === String(out[idx].planLine || '').trim()) { failed.push({ pageNumber: n, reason: 'the re-issue returned the restored line unchanged' }); continue; }
+    const trial = out.map((pg, k) => (k === idx ? cand : pg));
+    const rv = review(changes.filter(c => Number(c.pageNumber) === n), trial);
+    const bad = ((rv && rv.refusals) || []).filter(r => Number(r.pageNumber) === n);
+    if (bad.length) { failed.push({ pageNumber: n, reason: `refused again on review: ${bad.map(r => `(${r.rule}) ${r.detail}`).join('; ')}` }); continue; }
+    out[idx] = cand;
+    reissued.push(n);
+  }
+  return { pages: out, reissued, failed };
+}
+
 module.exports = {
   runPlanCounters,
+  buildReissueSection,
+  reissueLostPages,
   castTablePromises,
   typedPlanCounters,
   countPlanTargets,

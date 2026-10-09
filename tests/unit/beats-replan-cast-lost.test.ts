@@ -183,7 +183,7 @@ describe('the beats re-plan wiring', () => {
   it('reviews the DECLARED changes before it hunts undeclared ones', () => {
     // Order matters: the review produces `declaredOut`, which is what stops the
     // undeclared-loss guard reporting a removal the round openly stated.
-    const reviewAt = BEATS_SRC.indexOf('const review = reviewPlanChanges({');
+    const reviewAt = BEATS_SRC.indexOf('const review = reviewWith(');
     const guardAt = BEATS_SRC.indexOf('castLostByReplan(beats, second.parsed.pages');
     expect(reviewAt).toBeGreaterThan(0);
     expect(guardAt).toBeGreaterThan(reviewAt);
