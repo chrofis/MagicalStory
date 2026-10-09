@@ -67846,3 +67846,11 @@ Touched files: server/lib/vbIdGuard.js, server/lib/promptBuilders.js, server/lib
 **Rationale:** owner call; the alternatives (picture follows text, text follows picture) trade crowded pictures or rewritten text for the gap.
 **Revisit if:** the owner raises it again.
 **Touched files:** none.
+
+## 2026-10-09 — Correction: the text-vs-picture "gap" was never open
+
+**Context:** the entry "Text describing figures the picture leaves out: accepted as is" (same day) and the earlier "refine absent-figure rule ... DROPPED" treated text narrating actions the picture does not show as a defect to decide on.
+**Decision:** it was already settled: docs/SETTLED.md line 35 (owner, 2026-09-13; decisions.md 2026-09-13 and 2026-09-18 "The page text is not a checklist for the picture"). A page whose text narrates three actions while the picture shows one is correct by design; the brief picks the moment and the Art Director trims the cast. Nothing is open and nothing is changed.
+**Rationale:** owner, 2026-10-09: "Text having 3 actions. Image having 1 is fine. That should already be documented!!!" Listing it as a defect re-opened a settled verdict without reading SETTLED.md.
+**Revisit if:** only through the SETTLED reversal protocol.
+**Touched files:** none.

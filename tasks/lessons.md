@@ -975,3 +975,7 @@ A fix agent parked the French label rewording as "needs a data migration first";
 One read-only count: 0 stored relationship labels in prod (rename was free), 83 trait strings (a
 French-only alias map in TraitSelector covered them). **Rule:** before calling a stored-text change
 blocked, count the stored rows; 0 → change it, some → alias map at the read site, migration last.
+
+## 2026-10-09 — Check SETTLED.md before calling anything a defect
+Mistake: I reported "page text describes figures the picture doesn't show" as a defect, dispatched an agent to fix it and asked the owner to decide — while docs/SETTLED.md line 35 (2026-09-13) and my own memory (feedback_page_text_not_a_checklist) say the page text is NOT a checklist for the picture.
+Rule: before listing a finding as a defect or a fix candidate, grep docs/SETTLED.md and the memory index for the topic. A settled verdict is not a finding; re-opening it needs the reversal protocol, not a question.
