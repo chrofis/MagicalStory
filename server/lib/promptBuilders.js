@@ -4883,21 +4883,25 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
     // patched downstream by a second, worse copy of the same job.
     if (referencePhotos && referencePhotos.length > 0) {
       try {
-        const { missingGarments } = require('./clothingCheck');
-        // Slots that must be named, because an unstated garment is simply not
-        // drawn. Deliberately stricter than clothingCheck's REVIEW rules, which
-        // treat a partial omission as normal (a close-up need not mention
-        // shoes) — right for nagging a reviewer, wrong for the image prompt.
+        // Does the prose dress each character in their contract outfit? Jev decides (one call
+        // per page, all figures at once); the old token match was blind for every comma-list
+        // costume. DETACHED on purpose: it only logs, so it never waits on the image prompt,
+        // and a failed call is logged loudly instead of being replaced by a second checker.
+        // see DECISIONS: docs/decisions.md 2026-10-09 "The clothing check goes to Jev".
         const pageLabel = pageNumber != null ? `page ${pageNumber}` : 'page';
-        for (const photo of effectiveReferencePhotos) {
-          if (!photo?.name || !photo?.clothingDescription) continue;
-          // The over-the-shoulder crop shows the upper garment only; trousers
-          // and shoes are below the frame and the prose rightly names neither.
-          const requiredSlots = isOtsFigure(photo.name) ? ['top'] : undefined;
-          const missing = missingGarments(photo.clothingDescription, cleanSceneDescription || '', requiredSlots, photo.name);
-          if (missing.length > 0) {
-            log.error(`👕 [CLOTHING] ${pageLabel}: the scene prose does not dress ${photo.name} — missing ${missing.join(', ')}. The prose is the only description the image model gets; fix the brief, nothing downstream will.`);
-          }
+        // The over-the-shoulder crop shows the upper garment only; trousers and shoes are below
+        // the frame and the prose rightly names neither.
+        const figures = effectiveReferencePhotos
+          .filter(photo => photo?.name && photo?.clothingDescription)
+          .map(photo => ({ name: photo.name, outfit: photo.clothingDescription, upperOnly: isOtsFigure(photo.name) }));
+        if (figures.length > 0) {
+          require('./jevDecisions').decideOutfitsStated({ prose: cleanSceneDescription || '', figures })
+            .then(({ missing }) => {
+              for (const name of missing) {
+                log.error(`👕 [CLOTHING] ${pageLabel}: the scene prose does not dress ${name} in their outfit. The prose is the only description the image model gets; fix the brief, nothing downstream will.`);
+              }
+            })
+            .catch(err => log.error(`👕 [CLOTHING] ${pageLabel}: the outfit check could not run (${err.message}); the prose was not checked.`));
         }
       } catch (err) {
         log.warn(`👕 [CLOTHING] slot check skipped: ${err.message}`);

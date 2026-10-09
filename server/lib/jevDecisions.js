@@ -80,6 +80,7 @@ const JEV_DECISIONS = {
   population: { reps: 1, publicAt: 0.5, crowdAt: 0.5, creatureCrowdAt: 0.5, wildlifeAt: 0.4, sparseAt: 0.5 }, // wildlifeAt 0.4: a reef's fish read 0.44-0.56 on the two sea books (replay 2026-10-06), a land place 0.26-0.31; 13/13 for crowd/ambient/cast_only; the creature and sparse questions only ever read a place that was cast_only
   gaze: { reps: 3 },                // G2 128/139 averaged (owner: 3 calls for this field)
   state: { reps: 3 },               // a choice, averaged as gaze is (owner, 2026-09-28)
+  outfit: { reps: 1, statedAt: 0.3 }, // outfit stated in the prose: P(s0) below 0.3 = not stated. 90/90 missing caught, 9/48 stated flagged on 138 read pages (decisions.md 2026-10-09 "clothing check to Jev")
   emotions: { reps: 1 },            // ONE call per story for every figure of every page (E10: 158/211 = 74.9%; a single call flips ~3%)
 };
 
@@ -1273,6 +1274,50 @@ async function decideEmotions({ arc, pages, perPage }, opts = {}) {
   return { byPage, stats: summarise(stats) };
 }
 
+// ───────────────────────── is the outfit in the prose ─────────────────────────
+
+/**
+ * Per figure: does the scene prose dress this character in the outfit of their
+ * wardrobe contract? One choice per figure over the SAME state (the prose):
+ * the contract outfit / other clothing / nothing said. P(first option) is the
+ * answer; below JEV_DECISIONS.outfit.statedAt the outfit is not stated.
+ * Replaces clothingCheck.missingGarments, a token match that was blind for
+ * every comma-list costume (an accessory word dropped the whole costume) and
+ * flagged a third of the pages that did state their outfit.
+ * see docs/decisions.md 2026-10-09 "The clothing check goes to Jev".
+ *
+ * @param {{prose:string, figures:Array<{name:string, outfit:string, upperOnly?:boolean}>}} input
+ * @returns {Promise<{missing:string[], stated:Object<string,number>, stats:Object}>}
+ */
+async function decideOutfitsStated({ prose, figures }, opts = {}) {
+  const stats = newStats();
+  if (!String(prose || '').trim() || !(figures || []).length) return { missing: [], stated: {}, stats: summarise(stats) };
+  const questions = {};
+  figures.forEach((f, i) => {
+    questions[`Q${i}`] = {
+      type: 'choice',
+      instructions: `What the text says ${f.name} wears.`,
+      criteria: {
+        s0: f.upperOnly ? `the upper garment of this outfit: ${f.outfit}` : `the clothing of this outfit: ${f.outfit}`,
+        s1: 'clothing that differs from that outfit',
+        s2: 'nothing, the text does not say',
+      },
+    };
+  });
+  const ans = await runJevRequests([{ key: 'outfit', state: prose, questions }], { ...opts, usageLabel: 'jev_decisions_clothing', stats });
+  const answers = (ans.get('outfit') || [])[0] || {};
+  const stated = {};
+  const missing = [];
+  figures.forEach((f, i) => {
+    const a = answers[`Q${i}`];
+    const p = a && a.probabilities && a.probabilities.s0;
+    if (typeof p !== 'number') throw new JevDecisionError(`Jev outfit answer for ${f.name} carries no probability for the contract outfit: ${JSON.stringify(a)}`);
+    stated[f.name] = p;
+    if (p < JEV_DECISIONS.outfit.statedAt) missing.push(f.name);
+  });
+  return { missing, stated, stats: summarise(stats) };
+}
+
 // ───────────────────────── the FIXED fields in the brief ─────────────────────────
 
 /**
@@ -1558,6 +1603,7 @@ module.exports = {
   gazeCandidates,
   decideGaze,
   decideEmotions,
+  decideOutfitsStated,
   emotionState,
   namedIn,
   JEV_DECISIONS,

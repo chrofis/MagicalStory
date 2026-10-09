@@ -112,22 +112,30 @@ describe('the over-the-shoulder near figure is drawn as a crop', () => {
     expect(control).toMatch(/Levin/);
   });
 
-  it('below-shoulder garments are not demanded of the near figure; the far figure still owes hers', () => {
+  it('below-shoulder garments are not demanded of the near figure; the far figure still owes hers', async () => {
+    // The outfit check is Jev's (decideOutfitsStated, decisions.md 2026-10-09): the crop shows the
+    // upper garment only, so the near figure is asked for the upper garment; the far figure for
+    // the whole outfit. Jev is stubbed with an answer that finds both unstated.
+    const JD = require_('../../server/lib/jevDecisions');
+    const calls: any[] = [];
+    const orig = JD.decideOutfitsStated;
+    JD.decideOutfitsStated = async (input: any) => { calls.push(input); return { missing: input.figures.map((f: any) => f.name), stated: {}, stats: {} }; };
     const errors: string[] = [];
-    const orig = log.error;
+    const origErr = log.error;
     log.error = (m: any) => { errors.push(String(m)); };
     try {
       build('over-the-shoulder', REFERENCE_PHOTOS);
+      await new Promise(r => setTimeout(r, 0));
     } finally {
-      log.error = orig;
+      log.error = origErr;
+      JD.decideOutfitsStated = orig;
     }
-    const levin = errors.filter(e => /dress Levin/.test(e)).join(' ');
-    // The prose names no red shirt either, so `top` is still owed — the crop
-    // shows the upper garment. Trousers and shoes are not.
-    expect(levin).toMatch(/\btop\b/);
-    expect(levin).not.toMatch(/\bbottom\b|\bfootwear\b/);
-    const mira = errors.filter(e => /dress Mira/.test(e)).join(' ');
-    expect(mira).toMatch(/footwear/);
+    expect(calls).toHaveLength(1);
+    const byName = Object.fromEntries(calls[0].figures.map((f: any) => [f.name, f]));
+    expect(byName.Levin.upperOnly).toBe(true);
+    expect(byName.Mira.upperOnly).toBeFalsy();
+    expect(errors.some(e => /dress Levin/.test(e))).toBe(true);
+    expect(errors.some(e => /dress Mira/.test(e))).toBe(true);
   });
 });
 
