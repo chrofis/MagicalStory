@@ -67878,3 +67878,11 @@ Touched files: server/lib/vbIdGuard.js, server/lib/promptBuilders.js, server/lib
 **Rationale:** none of 406 stored ideas has FINAL equal to DRAFT (word-overlap median 0.40). Blind buy score: round-7 study FINAL better 13 / same 7 / worse 0 of 20; a further blind read of 30 random later pairs better 15 / tie 14 / worse 1 (Sonnet 4.6 output). Together 28 better, 21 tie, 1 worse of 50: the review cuts leaked middle/ending sentences and structure leftovers and adds the stake or closing picture. Spend USD 0.
 **Revisit if:** a blind run of at least 22 prompts on the current writer model shows FINAL-only parity.
 **Touched files:** none.
+
+## 2026-10-09 — Backdrop reuse measured; no change, item removed
+
+**Context:** the last 18-page staging story (job_1791489793707_2ir6nl5kw) showed 17 empty_scene rows for 18 pages, read as "almost no backdrop reuse".
+**Decision:** no code or prompt change; item removed.
+**Rationale:** the rows are per-page copies of the shared vantage plate (p2=p3 and p12=p14 byte-identical); real renders were 11 (6 base plates, 5 light re-derives), and p10 is a cast-0 page with no plate. Over 22 stored stories: 224 renders for 411 pages. Low reuse comes from the Art Director opening one vantage per (location, shot): since 2026-09-25, 101 of 108 vantages hold one shot, and vantages per page rose from 0.42 to 0.72, driven by vantageShotRule ("a page whose shot a shared plate cannot hold takes its own vantage") and the close-stage plate rule. A plate's framing carries into the page render, so merging across shots would give wrong-framing backdrops; merging same-shot same-location vantages (15 of 120, each a different part of the place) would save at most about USD 0.03-0.05 per book, change content, and need reading vantage prose in code (forbidden). Spend USD 0.
+**Revisit if:** plate cost per book rises above about USD 0.50, or an Art Director replay on stored plan lines with a looser vantageShotRule shows shared plates at equal framing quality on 20+ pages.
+**Touched files:** none.
