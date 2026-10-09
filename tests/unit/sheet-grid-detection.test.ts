@@ -207,3 +207,42 @@ describe('parseCellIdentification', () => {
     expect(missing).toEqual([0, 1]);
   });
 });
+
+/**
+ * Staging job_1791560888615_uaivmr21o (Lina) and 10 more single-character
+ * sheets in stored data (replayed over 698 stored sheets, 71 single-element:
+ * 17 were split in two, 6 still are after this fix): ONE full-height figure on
+ * pale paper had a single quiet row, the quietest row of one soft wash, that
+ * passed every wide-window test and split a one-cell sheet into two cells.
+ * A real gutter steps away from the rows beside it, in texture or in tone.
+ */
+describe('detectSheetGrid: a quiet row inside one wash is not a gutter', () => {
+  // Rows of a two-level pattern: 40% of the width at `level`, the rest at 230.
+  // std = |230 - level| * sqrt(0.4 * 0.6), mean = 230 - 0.4 * (230 - level).
+  async function figureSheet(quietRowLevel: number): Promise<Buffer> {
+    const w = 200, h = 400;
+    const data = Buffer.alloc(w * h);
+    for (let y = 0; y < h; y++) {
+      const level = y === 200 ? quietRowLevel
+        : (y >= 190 && y <= 210) ? 203   // std 13: the calm wash around the quiet row
+          : 100;                          // std 64: the figure
+      for (let x = 0; x < w; x++) data[y * w + x] = x < w * 0.4 ? level : 230;
+    }
+    return sharp(data, { raw: { width: w, height: h, channels: 1 } }).png().toBuffer();
+  }
+
+  it('a single figure with one quiet row stays ONE cell', async () => {
+    const grid = await detectSheetGrid(await figureSheet(207));   // std 11, mean 221 vs 219
+    expect(grid.count).toBe(1);
+  });
+});
+
+describe('parseCellIdentification: a degenerate tail does not void the answer', () => {
+  // Real reply shape (staging job_1789337873076_qf2at21ui, 8 of 8 reruns): the
+  // assignments are complete, then the unused `empty` list degenerates into
+  // repeated letters and raw newlines, so the whole object is invalid JSON.
+  const reply = '{"assignments": [{"element": 1, "label": "A"}], "empty": ["B", "C", "F]}\n"E", "F"]}\n", "E", "F", "G", "N",';
+  it('reads the complete assignments array', () => {
+    expect(parseCellIdentification(reply, 1, 3).map).toEqual([0]);
+  });
+});

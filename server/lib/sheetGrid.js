@@ -51,6 +51,11 @@ const NEIGHBOUR_STD_RATIO = 2.0;    // and it must be this much noisier than the
 // line on paint, or a white gutter between two pictures. A calm stripe the
 // same brightness as its surroundings is paint, not a divider.
 const MEAN_CONTRAST_MIN = 20;       // 0-255
+// A band must step away from the lines right beside it, in texture or in tone
+// (see the abruptness check in detectGutterBands).
+const EDGE_LINES = 3;
+const EDGE_STD_RATIO = 3.0;
+const EDGE_TONE_STEP_MIN = 8;       // 0-255, the same scale as MEAN_CONTRAST_MIN
 
 /**
  * Per-line mean and standard deviation along one axis.
@@ -138,6 +143,20 @@ function detectGutterBands(data, width, height, axis) {
     const meanAfter = avg(mean, run.end + 1, Math.min(n - 1, run.end + maxBand * 3));
     const contrast = Math.max(Math.abs(bandMean - meanBefore), Math.abs(bandMean - meanAfter));
     if (contrast < MEAN_CONTRAST_MIN) continue;
+    // A drawn line is ABRUPT: against the lines right beside it there is a step
+    // in texture (they are far busier) or in tone. A calm row inside one soft
+    // wash is merely the quietest row of a gradient, a step in neither.
+    // Staging job_1791560888615_uaivmr21o: a single full-height figure on pale
+    // paper had one row at std 11.3 (mean 198.0) between rows at std 13.3 / 12.1
+    // (mean 197.1 / 197.9), passed every wide-window test above, and split a
+    // ONE-cell sheet into two cells.
+    const edgeBefore = avg(std, Math.max(0, run.start - EDGE_LINES), run.start - 1);
+    const edgeAfter = avg(std, run.end + 1, Math.min(n - 1, run.end + EDGE_LINES));
+    const toneStep = Math.max(
+      Math.abs(bandMean - avg(mean, Math.max(0, run.start - EDGE_LINES), run.start - 1)),
+      Math.abs(bandMean - avg(mean, run.end + 1, Math.min(n - 1, run.end + EDGE_LINES)))
+    );
+    if (Math.max(edgeBefore, edgeAfter) < bandStd * EDGE_STD_RATIO && toneStep < EDGE_TONE_STEP_MIN) continue;
     bands.push({ start: run.start, end: run.end, centre: Math.round((run.start + run.end) / 2) });
   }
 
@@ -289,6 +308,40 @@ async function labelCells(buffer, cells) {
 }
 
 /**
+ * The `assignments` array of an identification reply, parsed on its own.
+ * Returns [] when the reply has no such key (everything unmatched); throws when
+ * the array is unclosed or is not valid JSON.
+ */
+function extractAssignmentsArray(body) {
+  const key = /"assignments"\s*:\s*\[/.exec(body);
+  if (!key) return [];
+  const open = key.index + key[0].length - 1;
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+  for (let i = open; i < body.length; i++) {
+    const ch = body[i];
+    if (escape) { escape = false; continue; }
+    if (inString) {
+      if (ch === '\\') escape = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') inString = true;
+    else if (ch === '[') depth++;
+    else if (ch === ']' && --depth === 0) {
+      try {
+        const arr = JSON.parse(body.slice(open, i + 1));
+        return Array.isArray(arr) ? arr : [];
+      } catch (err) {
+        throw new Error('identification reply is not valid JSON: ' + err.message);
+      }
+    }
+  }
+  throw new Error('identification reply is not valid JSON: the assignments array is not closed');
+}
+
+/**
  * Parse the identification model's reply into element-index -> cell-index.
  *
  * Expected shape: {"assignments":[{"element":1,"label":"C"},…]}.
@@ -309,23 +362,21 @@ async function labelCells(buffer, cells) {
  *          map[i] = cell index for element i, or null when unmatched
  */
 function parseCellIdentification(text, elementCount, cellCount) {
-  const { extractBalancedJsonObject } = require('./outlineParser/shared');
   const raw = String(text || '');
   const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
   const body = (fenced ? fenced[1] : raw).trim();
-  const objText = extractBalancedJsonObject(body);
-  if (!objText) throw new Error('identification reply contained no JSON object');
+  if (!body.includes('{')) throw new Error('identification reply contained no JSON object');
 
-  let parsed;
-  try {
-    parsed = JSON.parse(objText);
-  } catch (err) {
-    throw new Error('identification reply is not valid JSON: ' + err.message);
-  }
+  // Only the `assignments` array is read — it is the whole answer. The reply's
+  // other field (`empty`) is never used, and flash-lite sometimes degenerates
+  // INSIDE it, repeating letters and emitting raw newlines, which made the
+  // whole object invalid JSON although the assignments before it were
+  // complete (2 of 274 stored calls, staging job_1789337873076_qf2at21ui).
+  const assignments = extractAssignmentsArray(body);
 
   const map = new Array(elementCount).fill(null);
   const taken = new Set();
-  for (const a of Array.isArray(parsed.assignments) ? parsed.assignments : []) {
+  for (const a of assignments) {
     const elementNo = Number(a && a.element);
     if (!Number.isInteger(elementNo) || elementNo < 1 || elementNo > elementCount) continue;
     const cellIdx = labelToIndex(a && a.label);

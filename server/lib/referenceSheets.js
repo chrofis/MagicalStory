@@ -57,6 +57,33 @@ function recordReferenceSheetUsage(result, label = REFERENCE_SHEET_USAGE_LABEL) 
 }
 
 /**
+ * The line that names ONE element in the cell-identification call.
+ *
+ * The call only has to tell the cells apart, so a character is named by who
+ * they are (age, hair, face) plus ONE garment, never by the full wardrobe
+ * paragraph. Gemini's minor-safety filter blocks a child's age wording
+ * together with a full wardrobe paragraph (measured 2026-08-16 for the
+ * figure-identity call, see figureDetection.js; reproduced 2026-10-09 on staging
+ * job_1791560888615_uaivmr21o: the full description of a five-year-old girl
+ * blocked 5/5 with PROHIBITED_CONTENT, the same line with one garment passed
+ * 5/5). The one-garment shortening is figureDetection._shortGarmentPhrase, the
+ * same one that call uses.
+ *
+ * @param {Object} element a requested sheet element
+ * @param {number} [index] 0-based position, for the unnamed-element label
+ * @returns {string}
+ */
+function sheetCellIdentityLine(element, index = 0) {
+  const text = String(element.description || element.appearance || element.name || `element ${index + 1}`).trim();
+  const tail = /\b(?:Clothing|Wearing):\s*([\s\S]*)$/i.exec(text);
+  if (!tail) return text;
+  const { _shortGarmentPhrase } = require('./figureDetection');
+  const garment = _shortGarmentPhrase(tail[1]);
+  const identity = text.slice(0, tail.index).trim().replace(/[.\s]+$/, '');
+  return garment ? `${identity}. Wearing: ${garment}.` : `${identity}.`;
+}
+
+/**
  * Ask the eval model which detected cell holds which requested element.
  *
  * ONE call, only on the mismatch path. The sheet arrives with a letter drawn
@@ -72,7 +99,7 @@ async function identifySheetCellsImpl(buffer, cells, elements) {
   const cfg = TEXT_MODELS['gemini-2.5-flash-lite'];
 
   const elementList = elements
-    .map((e, i) => `${i + 1}. ${e.description || e.appearance || e.name || `element ${i + 1}`}`)
+    .map((e, i) => `${i + 1}. ${sheetCellIdentityLine(e, i)}`)
     .join('\n');
   const prompt = guardPromptString(fillTemplate(PROMPT_TEMPLATES.sheetCellIdentification, { ELEMENT_LIST: elementList }), 'identifySheetCellsImpl');
 
@@ -95,6 +122,13 @@ async function identifySheetCellsImpl(buffer, cells, elements) {
     const { recordTextUsage } = require('./usageContext');
     recordTextUsage('gemini_text', geminiUsage(usage), 'vb_sheet_cell_id', cfg.modelId);
   }
+  // A blocked prompt is HTTP 200 with NO candidates and promptFeedback.blockReason
+  // set. Reading candidates[0] then gave an empty string and the failure read
+  // "reply contained no JSON object", hiding the real reason (staging
+  // job_1791560888615_uaivmr21o). Name it.
+  const { assessImageResponse, describeImageBlock } = require('./imageReplyGuard');
+  const verdict = assessImageResponse(j);
+  if (verdict.blocked) throw new Error(`sheet cell identification ${describeImageBlock(verdict)}`);
   const raw = String(j?.candidates?.[0]?.content?.parts?.[0]?.text || '').trim();
   return parseCellIdentification(raw, elements.length, cells.length);
 }
@@ -1850,6 +1884,8 @@ module.exports = {
   referencesFromCells,
   cellPositionName,
   identifySheetCellsWithRetry,
+  identifySheetCellsImpl,
+  sheetCellIdentityLine,
   fillMissingReferencesSolo,
   MAX_SOLO_REFERENCE_RERENDERS,
   buildReferenceSheetPrompt,
