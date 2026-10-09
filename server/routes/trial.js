@@ -1933,8 +1933,8 @@ async function loadTrialStorySource(pool, jobId, userId, jobStatus) {
     [jobId]
   );
   const images = pageRes.rows
-    .filter(r => r.step_data?.imageData)
-    .map(r => ({ pageNumber: r.step_index, imageData: r.step_data.imageData }));
+    .filter(r => r.step_data?.imageUrl)
+    .map(r => ({ pageNumber: r.step_index, imageData: r.step_data.imageUrl }));
   const records = mergeTrialPageRecords(st.pageTexts, images);
   return { title: st.title || '', totalPages: st.totalScenes || records.length, records };
 }
@@ -1961,7 +1961,7 @@ async function loadTrialTitlePage(pool, jobId, jobStatus) {
     [jobId]
   );
   const data = coverResult.rows[0]?.step_data;
-  return data?.imageData ? { image: data.imageData, title: data.storyTitle || null } : null;
+  return data?.imageUrl ? { image: data.imageUrl, title: data.storyTitle || null } : null;
 }
 
 /**
@@ -3613,6 +3613,7 @@ function resetTrialRateLimits() {
 module.exports = router;
 module.exports.initTrialRoutes = initTrialRoutes;
 module.exports.loadTrialTitlePage = loadTrialTitlePage;
+module.exports.loadTrialStorySource = loadTrialStorySource;
 module.exports.saveTrialCharacter = saveTrialCharacter;
 module.exports.createTrialStoryJob = createTrialStoryJob;
 module.exports.getTrialStats = getTrialStats;

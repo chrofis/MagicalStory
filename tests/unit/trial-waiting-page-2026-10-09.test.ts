@@ -105,11 +105,77 @@ describe('job-status title page once the job is completed', () => {
     expect(res).toEqual({ image: 'https://r2/cover.jpg', title: 'Serafin und die Guertel' });
   });
   it('running job: still the partial_cover checkpoint', async () => {
-    const pool = { query: vi.fn(async () => ({ rows: [{ step_data: { imageData: 'data:image/jpeg;base64,X', storyTitle: 'T' } }] })) };
-    expect(await trial.loadTrialTitlePage(pool, 'job_1', 'processing')).toEqual({ image: 'data:image/jpeg;base64,X', title: 'T' });
+    const pool = { query: vi.fn(async () => ({ rows: [{ step_data: { imageUrl: 'https://r2/preview/frontCover-1.jpg', storyTitle: 'T' } }] })) };
+    expect(await trial.loadTrialTitlePage(pool, 'job_1', 'processing')).toEqual({ image: 'https://r2/preview/frontCover-1.jpg', title: 'T' });
   });
   it('completed job without a stored cover answers null, not a made-up image', async () => {
     db.getActiveStoryImages = async () => [{ image_type: 'scene', page_number: 1, image_url: 'https://r2/p1.jpg' }];
     expect(await trial.loadTrialTitlePage({ query: vi.fn() }, 'job_1', 'completed')).toBeNull();
+  });
+});
+
+describe('the poll carries URLs, never image bytes (iPhone memory, owner 2026-10-09)', () => {
+  const fsx = require('fs');
+  const pathx = require('path');
+  const ROOT = pathx.resolve(__dirname, '../..');
+
+  it('uploads one rendered image under the story prefix and hands back the URL only', async () => {
+    const r2 = require('../../server/lib/r2');
+    const calls: any[] = [];
+    const orig = r2.uploadImage;
+    r2.uploadImage = async (buf: Buffer, key: string, type: string) => { calls.push({ len: buf.length, key, type }); return `https://cdn/${key}`; };
+    try {
+      const { uploadCheckpointImage } = require('../../server/lib/checkpointImages');
+      const jpeg = (await sharp({ create: { width: 8, height: 8, channels: 3, background: '#fff' } }).jpeg().toBuffer()).toString('base64');
+      const url = await uploadCheckpointImage('job_9', 'p3', `data:image/jpeg;base64,${jpeg}`);
+      expect(url).toMatch(/^https:\/\/cdn\/stories\/job_9\/preview\/p3-[0-9a-f]{10}\.jpg$/);
+      expect(calls[0].type).toBe('image/jpeg');
+    } finally { r2.uploadImage = orig; }
+  });
+
+  it('a failed upload throws: no base64 is stored in its place', async () => {
+    const r2 = require('../../server/lib/r2');
+    const orig = r2.uploadImage;
+    r2.uploadImage = async () => null;
+    try {
+      const { uploadCheckpointImage } = require('../../server/lib/checkpointImages');
+      await expect(uploadCheckpointImage('job_9', 'p3', 'data:image/jpeg;base64,AAAA')).rejects.toThrow(/R2/);
+    } finally { r2.uploadImage = orig; }
+  });
+
+  it('every partial_page / partial_cover save goes through the R2 wrapper', () => {
+    const src = fsx.readFileSync(pathx.join(ROOT, 'storyJobPipeline.js'), 'utf8');
+    expect(src).not.toMatch(/saveCheckpoint\(jobId, 'partial_(page|cover)'/);
+    expect([...src.matchAll(/saveImageCheckpoint\(jobId, 'partial_/g)].length).toBe(5);
+  });
+
+  it('a running trial poll of six rendered pages plus the cover is a few KB, not megabytes', async () => {
+    const trial = require('../../server/routes/trial.js');
+    const url = (n: number) => `https://images.magicalstory.ch/stories/job_1/preview/p${n}-0123456789.jpg`;
+    const pool = { query: vi.fn(async (sql: string) => {
+      if (/step_name = 'story_text'/.test(sql)) return { rows: [{ step_data: { title: 'T', totalScenes: 6, pageTexts: Object.fromEntries([1, 2, 3, 4, 5, 6].map(n => [n, 'Text '.repeat(60)])) } }] };
+      return { rows: [1, 2, 3, 4, 5, 6].map(n => ({ step_index: n, step_data: { pageNumber: n, imageUrl: url(n) } })) };
+    }) };
+    const src = await trial.loadTrialStorySource(pool, 'job_1', 'u', 'processing');
+    const pages = trial.buildTrialStoryPages(src.records, { unlocked: false, freePages: 3 });
+    expect(pages.every((p: any) => /^https:\/\//.test(p.imageData))).toBe(true);
+    expect(JSON.stringify({ storyTitle: src.title, pages }).length).toBeLessThan(6000);
+  });
+
+  it('the full-story poll serves the preview URL under its old imageData name', () => {
+    const { previewImageField } = require('../../server/lib/checkpointImages');
+    expect(previewImageField({ pageNumber: 2, imageUrl: 'https://x/p2.jpg', modelId: 'm' })).toEqual({ pageNumber: 2, modelId: 'm', imageData: 'https://x/p2.jpg' });
+    const legacy = { pageNumber: 1, imageData: 'data:old' };
+    expect(previewImageField(legacy)).toBe(legacy);
+  });
+});
+
+describe('the finished-story redirect to /stories', () => {
+  it('never fires for an anonymous trial visitor, nor one who only typed an email', async () => {
+    const { shouldRedirectToStories } = await import('../../client/src/utils/trialPoll');
+    expect(shouldRedirectToStories('completed', false, false)).toBe(false);
+    expect(shouldRedirectToStories('generating', true, true)).toBe(false);
+    expect(shouldRedirectToStories('completed', true, false)).toBe(true);
+    expect(shouldRedirectToStories('completed', false, true)).toBe(true);
   });
 });

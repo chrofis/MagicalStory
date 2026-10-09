@@ -35,7 +35,7 @@ describe('job status poll: knownPages filtered in SQL', () => {
 
   it('step_index is the pageNumber at every partial_page save site', () => {
     const pipeline = fs.readFileSync(path.join(ROOT, 'storyJobPipeline.js'), 'utf8');
-    const sites = [...pipeline.matchAll(/saveCheckpoint\(jobId, 'partial_page', \{[\s\S]*?\}, ([\w.]+)\)/g)];
+    const sites = [...pipeline.matchAll(/saveImageCheckpoint\(jobId, 'partial_page', \{[\s\S]*?\}, ([\w.]+), /g)];
     expect(sites.length).toBe(2);
     for (const m of sites) expect(m[1]).toMatch(/\.pageNumber$/);
   });

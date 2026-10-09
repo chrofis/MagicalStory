@@ -19,6 +19,7 @@ const { CREDIT_CONFIG } = require('../config/credits');
 // Services
 const crypto = require('crypto');
 const { log } = require('../utils/logger');
+const { previewImageField } = require('../lib/checkpointImages');
 const { getPool, withTransaction, offloadJsonbImages, inlineOffloadPrefix } = require('../services/database');
 const email = require('../../email');
 const { normalizeCharacterName } = require('../lib/characterName');
@@ -651,7 +652,7 @@ router.get('/:jobId/status', jobStatusLimiter, authenticateToken, async (req, re
            ORDER BY step_index ASC`,
           [jobId, [...knownPages]]
         );
-        partialPages = partialPagesResult.rows.map(row => row.step_data);
+        partialPages = partialPagesResult.rows.map(row => previewImageField(row.step_data));
 
         // Fetch partial covers (generated during streaming)
         const partialCoversResult = await getDbPool().query(
@@ -663,7 +664,7 @@ router.get('/:jobId/status', jobStatusLimiter, authenticateToken, async (req, re
         );
         // Convert to object: { frontCover: {...}, initialPage: {...}, backCover: {...} }
         partialCoversResult.rows.forEach(row => {
-          const coverData = row.step_data;
+          const coverData = previewImageField(row.step_data);
           if (coverData && coverData.type) {
             partialCovers[coverData.type] = coverData;
           }

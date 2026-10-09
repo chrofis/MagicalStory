@@ -256,6 +256,29 @@ async function saveCheckpoint(jobId, stepName, stepData, stepIndex = 0) {
   }
 }
 
+// Progressive-display image checkpoints (partial_page / partial_cover): the image goes to R2 and the
+// checkpoint keeps its URL (`imageUrl`), never the bytes - see server/lib/checkpointImages.js. An upload
+// failure is logged as an error and THIS checkpoint is skipped; the render itself is unaffected.
+async function saveImageCheckpoint(jobId, stepName, stepData, stepIndex, slug) {
+  const { imageData, ...rest } = stepData;
+  try {
+    const imageUrl = await require('./server/lib/checkpointImages').uploadCheckpointImage(jobId, slug, imageData);
+    await saveCheckpoint(jobId, stepName, { ...rest, imageUrl }, stepIndex);
+  } catch (err) {
+    log.error(`❌ [CHECKPOINT] ${stepName} ${slug} for ${jobId} not saved: ${err.message}`);
+  }
+}
+
+// The bytes of a progressive-display checkpoint image (salvage path: a failed job saves its partial story,
+// and stories store image bytes, not the preview URL).
+async function checkpointImageData(data) {
+  if (data.imageData) return data.imageData;
+  if (!data.imageUrl) return null;
+  const buf = await require('./server/lib/r2').bytesFromAnyImage(data.imageUrl);
+  if (!buf) throw new Error(`checkpoint image ${data.imageUrl} could not be read back`);
+  return `data:image/jpeg;base64,${buf.toString('base64')}`;
+}
+
 // Get checkpoint for a step (returns null if not found)
 async function getCheckpoint(jobId, stepName, stepIndex = 0) {
   if (STORAGE_MODE !== 'database' || !dbPool) return null;
@@ -410,16 +433,18 @@ async function savePartialStoryFromCheckpoints(jobId, failureReason = 'Unknown f
         const pageNum = cp.step_index;
         const sceneDesc = data.description || data.sceneDescription?.description || data.sceneDescription || '';
         if (sceneDesc && !sceneDescMap.has(pageNum)) sceneDescMap.set(pageNum, sceneDesc);
-        if (data.imageData) {
-          sceneImages.push({ pageNumber: pageNum, imageData: data.imageData, description: sceneDesc, prompt: data.prompt || data.imagePrompt || '', qualityScore: data.qualityScore || data.score, qualityReasoning: data.qualityReasoning || data.reasoning, totalAttempts: data.totalAttempts, retryHistory: data.retryHistory, wasRegenerated: data.wasRegenerated, originalImage: data.originalImage, originalScore: data.originalScore, originalReasoning: data.originalReasoning, modelId: data.modelId || null, referencePhotos: data.referencePhotos || null, imageAspect: inputData?.layout?.imageAspect || data.imageAspect, textInImage: inputData?.layout?.textInImage ?? data.textInImage });
+        const pageImage = await checkpointImageData(data);
+        if (pageImage) {
+          sceneImages.push({ pageNumber: pageNum, imageData: pageImage, description: sceneDesc, prompt: data.prompt || data.imagePrompt || '', qualityScore: data.qualityScore || data.score, qualityReasoning: data.qualityReasoning || data.reasoning, totalAttempts: data.totalAttempts, retryHistory: data.retryHistory, wasRegenerated: data.wasRegenerated, originalImage: data.originalImage, originalScore: data.originalScore, originalReasoning: data.originalReasoning, modelId: data.modelId || null, referencePhotos: data.referencePhotos || null, imageAspect: inputData?.layout?.imageAspect || data.imageAspect, textInImage: inputData?.layout?.textInImage ?? data.textInImage });
         }
       } else if (cp.step_name === 'cover' || cp.step_name === 'partial_cover') {
         if (!checkpointTitle && data.storyTitle && String(data.storyTitle).trim()) checkpointTitle = String(data.storyTitle).trim();
-        if (data.imageData && data.type) {
+        const coverImage = data.type ? await checkpointImageData(data) : null;
+        if (coverImage) {
           // titleBaked travels with the render (checkpointed at generation) so
           // downstream consumers of a salvaged cover — eval textMode, the
           // post-persist typography skip — treat a baked-title cover correctly.
-          coverImages[data.type] = { imageData: data.imageData, description: data.description || '', prompt: data.prompt || '', qualityScore: data.qualityScore || data.score, qualityReasoning: data.qualityReasoning || data.reasoning, modelId: data.modelId || null, titleBaked: data.titleBaked === true };
+          coverImages[data.type] = { imageData: coverImage, description: data.description || '', prompt: data.prompt || '', qualityScore: data.qualityScore || data.score, qualityReasoning: data.qualityReasoning || data.reasoning, modelId: data.modelId || null, titleBaked: data.titleBaked === true };
         }
       }
     }
@@ -1394,13 +1419,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
           // Save partial_page checkpoint for progressive display
           if (genResult.imageData) {
-            await saveCheckpoint(jobId, 'partial_page', {
+            await saveImageCheckpoint(jobId, 'partial_page', {
               pageNumber: page.pageNumber,
               text: page.text,
               sceneDescription,
               imageData: genResult.imageData,
               modelId: genResult.modelId
-            }, page.pageNumber);
+            }, page.pageNumber, `p${page.pageNumber}`);
           }
 
           // Detect calm region for text overlay (~30ms, non-blocking)
@@ -2003,7 +2028,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           checkpointData.storyTitle = streamingTitle;
         }
         const checkpointIndex = coverType === 'frontCover' ? 0 : coverType === 'initialPage' ? 1 : 2;
-        await saveCheckpoint(jobId, 'partial_cover', checkpointData, checkpointIndex);
+        await saveImageCheckpoint(jobId, 'partial_cover', checkpointData, checkpointIndex, coverKey);
         log.debug(`💾 [UNIFIED] Saved ${coverKey} for progressive display`);
 
         return {
@@ -2585,12 +2610,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
             // Save checkpoint for progressive display
             if (result.imageData) {
-              await saveCheckpoint(jobId, 'partial_cover', {
+              await saveImageCheckpoint(jobId, 'partial_cover', {
                 type: 'frontCover',
                 imageData: result.imageData,
                 storyTitle: coverTitle,
                 titleBaked: trialCoverTitleMode.baked
-              }, 0);
+              }, 0, 'frontCover');
               log.debug(`[TRIAL-COVER] Saved partial_cover checkpoint`);
             }
 
@@ -5227,22 +5252,22 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             if (activeImageData && pageData.coverOpts) {
               // A cover's progressive display is the cover checkpoint (read by
               // routes/jobs.js and the salvage path), never a story page.
-              await saveCheckpoint(jobId, 'partial_cover', {
+              await saveImageCheckpoint(jobId, 'partial_cover', {
                 type: pageData.coverOpts.coverKey,
                 imageData: activeImageData,
                 description: pageData.scene.sceneDescription,
                 modelId: activeModelId,
                 titleBaked: pageData.coverOpts.titleBaked,
                 ...(pageData.coverOpts.coverKey === 'frontCover' ? { storyTitle: title || inputData.title || '' } : {}),
-              }, ['frontCover', 'initialPage', 'backCover'].indexOf(pageData.coverOpts.coverKey));
+              }, ['frontCover', 'initialPage', 'backCover'].indexOf(pageData.coverOpts.coverKey), pageData.coverOpts.coverKey);
             } else if (activeImageData) {
-              await saveCheckpoint(jobId, 'partial_page', {
+              await saveImageCheckpoint(jobId, 'partial_page', {
                 pageNumber: pageData.pageNumber,
                 text: pageData.scene.text,
                 sceneDescription: pageData.scene.sceneDescription,
                 imageData: activeImageData,
                 modelId: activeModelId
-              }, pageData.pageNumber);
+              }, pageData.pageNumber, `p${pageData.pageNumber}`);
             }
 
             // Detect calm region for text overlay (~30ms, non-blocking)

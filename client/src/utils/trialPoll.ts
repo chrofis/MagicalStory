@@ -33,3 +33,12 @@ export function mergeAvatarSlides(prev: string[], incoming: unknown): string[] {
   if (next.length === prev.length && next.every((s, i) => s === prev[i])) return prev;
   return next;
 }
+
+/**
+ * The finished-story hard redirect to /stories fires only for a visitor who has an account to read it in:
+ * email verified (claim-session succeeded) or Google linked. An anonymous trial visitor, or one who has
+ * only typed an address, stays on the page and reads the book there.
+ */
+export function shouldRedirectToStories(pageState: string, isVerified: boolean, googleLinked: boolean): boolean {
+  return pageState === 'completed' && (isVerified || googleLinked);
+}

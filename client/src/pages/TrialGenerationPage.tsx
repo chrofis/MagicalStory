@@ -10,7 +10,7 @@ import { trackEmailLead, trackTrialStoryCompleted } from '@/utils/gtagConversion
 import { trackEvent } from '@/utils/analytics';
 import { trackTrialStep } from '@/utils/trialFunnel';
 import { FUNNY_MESSAGES, NAMELESS_FUNNY_MESSAGES, funnyDeck, funnyLine } from '@/utils/funnyMessages';
-import { classifyJobStatusHttp, MAX_TRANSIENT_POLL_ERRORS, pollBackoffMs, mergeAvatarSlides } from '@/utils/trialPoll';
+import { classifyJobStatusHttp, MAX_TRANSIENT_POLL_ERRORS, pollBackoffMs, mergeAvatarSlides, shouldRedirectToStories } from '@/utils/trialPoll';
 import { Navigation } from '@/components/common';
 import TrialBook, { TrialGateProvider } from '@/components/book/TrialBook';
 import { isTrialBookReady } from '@/utils/trialBook';
@@ -582,7 +582,7 @@ export default function TrialGenerationPage() {
 
   // ── Auto-redirect when story is complete AND user is verified ──────────────
   useEffect(() => {
-    if (pageState === 'completed' && (isVerified || googleLinked)) {
+    if (shouldRedirectToStories(pageState, isVerified, googleLinked)) {
       // Small delay so user sees the "100% complete" state
       const timer = setTimeout(() => {
         // Clean up trial generation state from localStorage
