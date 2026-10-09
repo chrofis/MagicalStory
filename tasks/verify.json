@@ -9447,6 +9447,24 @@
         "kind": "human",
         "what": "prepare-standard-avatar starts within ~15 s of Anonymous account created and finishes ~60 s later; no generate-preview-avatar request; the job log shows Seeded N prepared styled avatars or awaits the in-flight prepare-standard-avatar, with no second standard 2x4 styling; the first job-status poll carries standard cells."
       }
+    },
+    {
+      "id": "trial-body-row-at-photo-2026-10-09",
+      "title": "Trial body row starts at the photo; only cut cells reach a client",
+      "commits": [
+        "0a919f0c0"
+      ],
+      "addedAt": "2026-10-09",
+      "status": "pending",
+      "evidence": [],
+      "claim": "The first full-body cell shows on the character step within about 40 s of the photo landing, before the sheet exists; no row or whole sheet reaches any client page.",
+      "runShape": [
+        "trial"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "One /try on staging with a photo, form left empty for 20 s: trial_events avatar_ready minus photo_analyzed <= 40 s; Railway log shows \"Standard body row ready ... in Ns\" and either \"reusing the body row drawn at the photo\" or the \"drawn for ... but the visitor declared\" warning; every avatar image on wizard, slides and spinner is a single figure."
+      }
     }
   ],
   "runs": [
