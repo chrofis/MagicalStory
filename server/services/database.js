@@ -991,7 +991,6 @@ async function extractJsonbInlineImagesToR2(prefix, label, data) {
   const sanitize = (s) => String(s).replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 40);
 
   const tasks = [];
-  const usedKeys = new Set();
   const seen = new WeakSet();
 
   const sweep = (node, pathSegments) => {
@@ -1001,11 +1000,9 @@ async function extractJsonbInlineImagesToR2(prefix, label, data) {
     for (const k of Object.keys(node)) {
       const child = node[k];
       if (typeof child === 'string' && looksLikeBytes(child)) {
-        const base = `${prefix}/${[...pathSegments, sanitize(k)].join('-')}`;
-        let key = `${base}.jpg`;
-        let n = 1;
-        while (usedKeys.has(key)) key = `${base}__${n++}.jpg`;
-        usedKeys.add(key);
+        // Named by CONTENT (r2.contentKey): a positional name let a later story's sheet overwrite the
+        // bytes an earlier story still referenced (docs/decisions.md 2026-10-09 "Offloaded images are named by content").
+        const key = r2.contentKey(prefix, [...pathSegments, sanitize(k)].join('-'), child);
         tasks.push({ input: child, key, apply: (url) => { node[k] = url; } });
       } else if (child && typeof child === 'object') {
         sweep(child, [...pathSegments, sanitize(k)]);
@@ -1639,7 +1636,6 @@ async function extractInlineImagesToR2(storyId, data) {
   // - bounds key length (R2 limit 1024 bytes)
   const sanitizeKeySegment = (s) =>
     String(s).replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 40);
-  const sweptKeys = new Set(tasks.map(t => t.key));
   const seenObjects = new WeakSet();
   // Slots holding bytes an explicit walker already owns. They are NOT queued
   // again (that was the double-upload); instead they are resolved after the
@@ -1655,11 +1651,7 @@ async function extractInlineImagesToR2(storyId, data) {
       aliasSlots.push({ parent, key, input: child, owner });
       return;
     }
-    const keyBase = `stories/${storyId}/aux/${[...pathSegments, sanitizeKeySegment(key)].join('-')}`;
-    let k = `${keyBase}.jpg`;
-    let suffix = 1;
-    while (sweptKeys.has(k)) k = `${keyBase}__${suffix++}.jpg`;
-    sweptKeys.add(k);
+    const k = r2.contentKey(`stories/${storyId}/aux`, [...pathSegments, sanitizeKeySegment(key)].join('-'), child);
     const task = {
       input: child,
       key: k,

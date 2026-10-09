@@ -508,7 +508,20 @@ async function fetchImageBytes(url, { retries = 3, timeoutMs = 30000 } = {}) {
   }
 }
 
+/**
+ * The ONE way to name an R2 object whose content can change: `<prefix>/<label>-<sha256 first 24>.jpg`.
+ * A key that holds only its own bytes cannot be overwritten by a later write, so no reference
+ * can ever end up pointing at someone else's picture (docs/decisions.md 2026-10-09 "Offloaded
+ * images are named by content"). Positional names (`styledAvatars-0-standard.jpg`) did exactly
+ * that. `input` is the data URI / base64 string or Buffer that is about to be uploaded.
+ */
+function contentKey(prefix, label, input) {
+  const hash = crypto.createHash('sha256').update(input).digest('hex').slice(0, 24);
+  return `${prefix}/${label}-${hash}.jpg`;
+}
+
 module.exports = {
+  contentKey,
   isConfigured,
   stripDataUriPrefix,
   uploadImage,

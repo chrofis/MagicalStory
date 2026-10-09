@@ -1909,19 +1909,46 @@ function getStyledAvatarsForCharacter(characterName, artStyle) {
  *
  * @param {Array} characters - Array of character objects
  * @param {string} artStyle - Target art style
- * @returns {Map<string, Record<string, string>>} Map of characterName -> {clothingCategory: styledAvatar}
+ * @param {(char: object) => string} [keyOf] map key per character; the name by default (trial: one character),
+ *        `characterIdKey` for anything that writes the result back onto character rows
+ * @returns {Map<string, Record<string, string>>} Map of key -> {clothingCategory: styledAvatar}
  */
-function exportStyledAvatarsForPersistence(characters, artStyle) {
+function exportStyledAvatarsForPersistence(characters, artStyle, keyOf = (c) => c.name) {
   const result = new Map();
 
   for (const char of characters) {
     const avatars = getStyledAvatarsForCharacter(char.name, artStyle);
     if (avatars) {
-      result.set(char.name, avatars);
+      result.set(keyOf(char), avatars);
     }
   }
 
   return result;
+}
+
+/**
+ * Two characters can share a name (three "Sarah"s of different ages on one account), so sheets travel from
+ * the pipeline to character rows by character ID. A name key handed every same-name row the story's sheets
+ * (staging user 680c30fd; docs/decisions.md 2026-10-09 "Styled sheets reach character rows by id", SETTLED:
+ * names resolve through castResolver, never by equality). Throws on a character without an id: no id, no write.
+ */
+function characterIdKey(char) {
+  if (char?.id == null || char.id === '') throw new Error(`character "${char?.name}" has no id; styled sheets are stored by character id`);
+  return String(char.id);
+}
+
+/** Write `byId` (from exportStyledAvatarsForPersistence(…, characterIdKey)) onto `characters[].avatars.styledAvatars[artStyle]`. Returns how many characters were updated. */
+function applyStyledAvatarsById(characters, byId, artStyle) {
+  let updated = 0;
+  for (const char of characters || []) {
+    const avatars = byId.get(characterIdKey(char));
+    if (!avatars) continue;
+    if (!char.avatars) char.avatars = {};
+    if (!char.avatars.styledAvatars) char.avatars.styledAvatars = {};
+    char.avatars.styledAvatars[artStyle] = avatars;
+    updated++;
+  }
+  return updated;
 }
 
 /**
@@ -1945,11 +1972,9 @@ function exportStyledAvatarsForPersistence(characters, artStyle) {
  */
 function publishStyledAvatarsToCharacters(characters, artStyle) {
   if (!Array.isArray(characters) || !artStyle) return 0;
-  const map = exportStyledAvatarsForPersistence(characters, artStyle);
-  if (map.size === 0) return 0;
   let published = 0;
   for (const char of characters) {
-    const avatars = map.get(char.name) || map.get(char.name?.trim());
+    const avatars = getStyledAvatarsForCharacter(char.name, artStyle);
     if (!avatars) continue;
     if (!char.avatars) char.avatars = {};
     if (!char.avatars.styledAvatars) char.avatars.styledAvatars = {};
@@ -2197,6 +2222,8 @@ module.exports = {
   // Persistence
   getStyledAvatarsForCharacter,
   exportStyledAvatarsForPersistence,
+  characterIdKey,
+  applyStyledAvatarsById,
   publishStyledAvatarsToCharacters,
 
   // Developer mode auditing

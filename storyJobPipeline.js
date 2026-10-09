@@ -34,6 +34,8 @@ const {
   getStyledAvatarCacheStats,
   getStyledAvatarsForCharacter,
   exportStyledAvatarsForPersistence,
+  characterIdKey,
+  applyStyledAvatarsById,
   getStyledAvatarGenerationLog,
   clearStyledAvatarGenerationLog
 } = require('./server/lib/styledAvatars');
@@ -6996,20 +6998,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
     if (inputData.characters) {
       try {
-        const styledAvatarsMap = exportStyledAvatarsForPersistence(inputData.characters, artStyle);
+        const styledAvatarsMap = exportStyledAvatarsForPersistence(inputData.characters, artStyle, characterIdKey);
         if (styledAvatarsMap.size > 0) {
           log.debug(`💾 [UNIFIED] Persisting ${styledAvatarsMap.size} styled avatar sets...`);
 
           // 1. Save to story data (inputData.characters) - IMPORTANT for repair workflow
-          for (const char of inputData.characters) {
-            const styledAvatars = styledAvatarsMap.get(char.name) || styledAvatarsMap.get(char.name?.trim());
-            if (styledAvatars) {
-              if (!char.avatars) char.avatars = {};
-              if (!char.avatars.styledAvatars) char.avatars.styledAvatars = {};
-              char.avatars.styledAvatars[artStyle] = styledAvatars;
-              log.debug(`   ✓ Story data: ${Object.keys(styledAvatars).length} ${artStyle} avatars for "${char.name}"`);
-            }
-          }
+          applyStyledAvatarsById(inputData.characters, styledAvatarsMap, artStyle);
 
           // 2. Also save to characters table (for character editor)
           const characterId = `characters_${userId}`;
@@ -7021,17 +7015,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           await offloadCharacterImages(characterId, userId, { styledAvatars: [...styledAvatarsMap.values()] });
           let updatedCount = 0;
           await modifyCharactersRow(characterId, userId, (charData) => {
-            updatedCount = 0;
-            for (const dbChar of charData.characters || []) {
-              // Match by name (trim to handle trailing spaces)
-              const styledAvatars = styledAvatarsMap.get(dbChar.name) || styledAvatarsMap.get(dbChar.name?.trim());
-              if (styledAvatars) {
-                if (!dbChar.avatars) dbChar.avatars = {};
-                if (!dbChar.avatars.styledAvatars) dbChar.avatars.styledAvatars = {};
-                dbChar.avatars.styledAvatars[artStyle] = styledAvatars;
-                updatedCount++;
-              }
-            }
+            // By character ID: same-name characters on one account must not share sheets.
+            updatedCount = applyStyledAvatarsById(charData.characters, styledAvatarsMap, artStyle);
             return updatedCount > 0;
           });
           if (updatedCount > 0) {

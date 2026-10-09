@@ -11,8 +11,7 @@
  * See docs/decisions.md 2026-10-09 "Trial avatar slides".
  */
 const sharp = require('sharp');
-const crypto = require('crypto');
-const { bytesFromAnyImage, uploadImage } = require('./r2');
+const { bytesFromAnyImage, uploadImage, contentKey } = require('./r2');
 const { log: defaultLog } = require('../utils/logger');
 const { markCutCell, brandCutList, figuresOf, isSingleCellWidth, writeCutSlides } = require('./clientAvatarImages');
 
@@ -157,8 +156,7 @@ async function storeSlides(characterId, userId, slides, upload = uploadImage) {
   const figures = figuresOf(slides) || slides.map(() => 'slide');
   const urls = [];
   for (const [i, dataUri] of slides.entries()) {
-    const hash = crypto.createHash('sha256').update(dataUri).digest('hex').slice(0, 24);
-    const url = await upload(dataUri, `characters/${safe(userId || 'unknown')}/${safe(characterId)}/slides/${figures[i]}-${hash}.jpg`);
+    const url = await upload(dataUri, contentKey(`characters/${safe(userId || 'unknown')}/${safe(characterId)}/slides`, figures[i], dataUri));
     if (!url) throw new Error('avatar slide could not be stored in R2');
     urls.push(url);
   }
