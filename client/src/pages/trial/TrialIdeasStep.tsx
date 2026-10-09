@@ -132,7 +132,7 @@ const strings: Record<string, {
     changeCity: 'Modifier la ville',
     cityNotFound: "Ville introuvable. Vérifie l'orthographe.",
     chooseCity: 'Plusieurs lieux portent ce nom — lequel ?',
-    locationUnknown: "Nous n'avons pas pu détecter votre ville. Où habitez-vous ? La première idée s'y déroulera.",
+    locationUnknown: "Nous n'avons pas pu détecter votre ville. Où habitez-vous ? La première idée s'y déroulera.",
     skipLocation: "Continuer sans ville",
     createStory: 'Créer mon histoire',
     regenerate: 'Générer de nouvelles idées',
