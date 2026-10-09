@@ -66,6 +66,8 @@ function declaredAgeJudgeLine(years) {
   return years === null || years === undefined ? null : `${years} years old`;
 }
 
+const { plausiblePhysical } = require('./characterPhysical');
+
 /**
  * @param {object}  opts
  * @param {object=} opts.physicalTraits   user-edited traits (hairColor, eyeColor, build, …)
@@ -74,12 +76,13 @@ function declaredAgeJudgeLine(years) {
  * @param {string=} opts.category         avatar category; clothing is a declared override for 'standard' only,
  *                                        matching the generator, which appends the clothing section only there.
  * @param {number|string=} opts.declaredAge  the age the USER entered for this character.
+ * @param {string=} opts.gender  the character's gender (facial hair is declared for a male only).
  * @returns {{traitLines: string[], clothingParts: string[], declaredFacts: string[], text: string|null,
  *            declaredAge: number|null, ageLine: string|null, ageFact: string|null}}
  *   traitLines/clothingParts keep the GENERATOR's existing wording;
  *   `text` is the neutral declaration block handed to the judge (null when nothing was declared).
  */
-function resolveDeclaredAvatarOverrides({ physicalTraits = null, clothing = null, hairDescription = null, category = null, declaredAge = null } = {}) {
+function resolveDeclaredAvatarOverrides({ physicalTraits = null, clothing = null, hairDescription = null, category = null, declaredAge = null, gender = null } = {}) {
   const traitLines = [];
   const clothingParts = [];
   const declaredFacts = [];
@@ -90,7 +93,8 @@ function resolveDeclaredAvatarOverrides({ physicalTraits = null, clothing = null
   const ageLine = declaredAgeGeneratorLine(years);
   if (ageLine) traitLines.push(ageLine);
 
-  const t = physicalTraits && typeof physicalTraits === 'object' ? physicalTraits : null;
+  // Gated like every reader of photo traits (characterPhysical.plausiblePhysical, decisions 2026-10-09).
+  const t = physicalTraits && typeof physicalTraits === 'object' ? plausiblePhysical(physicalTraits, { age: years, gender }) : null;
   if (t && Object.keys(t).length > 0) {
     if (isSet(t.hairColor)) { traitLines.push(`- Hair color: ${t.hairColor}`); declaredFacts.push(`Hair color: ${t.hairColor}`); }
     if (isSet(t.eyeColor)) { traitLines.push(`- Eye color: ${t.eyeColor}`); declaredFacts.push(`Eye color: ${t.eyeColor}`); }
@@ -98,8 +102,7 @@ function resolveDeclaredAvatarOverrides({ physicalTraits = null, clothing = null
     if (isSet(t.build)) { traitLines.push(`- Body build: ${t.build}`); declaredFacts.push(`Body build: ${t.build}`); }
     if (isSet(t.skinTone)) { traitLines.push(`- Skin tone: ${t.skinTone}`); declaredFacts.push(`Skin tone: ${t.skinTone}`); }
     if (isSet(t.face)) { traitLines.push(`- Face shape: ${t.face}`); declaredFacts.push(`Face shape: ${t.face}`); }
-    // Not stated for a declared child (promptBuilders.facialHairForAge, decisions 2026-10-09).
-    if (isSet(t.facialHair) && require('./promptBuilders').facialHairForAge(t.facialHair, years)) {
+    if (isSet(t.facialHair)) {
       if (String(t.facialHair).trim().toLowerCase() === 'clean-shaven') {
         traitLines.push(`- Facial hair: NO beard, NO mustache, NO stubble — clean-shaven face`);
         declaredFacts.push(`Facial hair: none — clean-shaven`);

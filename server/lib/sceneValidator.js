@@ -20,7 +20,7 @@ const { EVAL_TEMPERATURE } = require('../config/models');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { log } = require('../utils/logger');
 const { expandPositionAbbreviations, stripEntityIds, buildHairDescription } = require('./storyHelpers');
-const { getPhysical } = require('./characterPhysical');
+const { getPlausiblePhysical } = require('./characterPhysical');
 const { buildClothingDescription } = require('./entityConsistency');
 
 // Initialize Gemini
@@ -334,7 +334,7 @@ function formatCharacterContext(characters, clothingRequirements = {}) {
     if (!clothingDesc) {
       throw new Error(`[SCENE-VALIDATOR] ${char.name}: clothing category "${clothing}" has no description in this story's clothingRequirements. Refusing to guess an outfit.`);
     }
-    const physical = getPhysical(char);
+    const physical = getPlausiblePhysical(char);
 
     const traits = [];
     const hairDesc = buildHairDescription(physical, char.physicalTraitsSource);

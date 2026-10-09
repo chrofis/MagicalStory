@@ -10,7 +10,7 @@
 const { log } = require('../utils/logger');
 const { PROMPT_TEMPLATES, fillTemplate, assertPromptFilled } = require('../services/prompts');
 const { MODEL_DEFAULTS } = require('./textModels');
-const { getPhysical } = require('./characterPhysical');
+const { getPlausiblePhysical } = require('./characterPhysical');
 const { stripDataUriPrefix } = require('./r2');
 const { baseVbId, vbIdFacet } = require('./vbIdGuard');
 const { COVER_PAGE_NUMBERS } = require('./coverKeys');
@@ -1720,7 +1720,7 @@ function initializeVisualBibleMainCharacters(visualBible, characters) {
     // Historically this stripped copy dropped glasses, hairStyle, hairLength,
     // facialHair, eyeColor, skinTone, causing downstream consumers (image
     // prompts, evals) to lose identity traits and flag correct renders as bugs.
-    const physical = { ...getPhysical(char) };
+    const physical = { ...getPlausiblePhysical(char) };
     // Dev-panel back-compat: the frontend reads `physical.hair` as a flat
     // string. Build it from detailedHairAnalysis + hairColor (the single
     // source of truth for hair shape/length/density/styling).

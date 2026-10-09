@@ -31,7 +31,7 @@ describe('declared avatar overrides reach the judge', () => {
   });
 
   it('declares a removed beard (clean-shaven) on both sides', () => {
-    const out = resolveDeclaredAvatarOverrides({ physicalTraits: { facialHair: 'clean-shaven' } });
+    const out = resolveDeclaredAvatarOverrides({ physicalTraits: { facialHair: 'clean-shaven' }, gender: 'male' });
     expect(out.traitLines.join('\n')).toMatch(/NO beard/);
     expect(out.text).toMatch(/clean-shaven/);
   });

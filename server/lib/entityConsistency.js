@@ -19,6 +19,7 @@ const { log } = require('../utils/logger');
 const { geminiUsage } = require('./providerUsage');
 const { buildCharRepairRequest } = require('./charRepairRequest');
 const { extractSceneMetadata, buildCharacterPhysicalDescription, getCharactersInScene, buildHairDescription, extractJsonFromText } = require('./storyHelpers');
+const { getPlausiblePhysical } = require('./characterPhysical');
 const { getFacePhoto, loadAvatarBytes } = require('./characterPhotos');
 const { detectAllBoundingBoxes, sanitizeForGemini } = require('./images');
 const { getCurrentLogger } = require('./generationLogger');
@@ -3440,7 +3441,7 @@ async function prepareForGeminiRepair(cropBuffer) {
  * @returns {string} Physical traits description
  */
 function buildPhysicalTraitsDescription(character) {
-  const p = character.physical || {};
+  const p = getPlausiblePhysical(character);
   const parts = [];
 
   // Age and gender
@@ -3469,8 +3470,8 @@ function buildPhysicalTraitsDescription(character) {
   if (face) parts.push(`${face} face`);
 
   // Facial hair (for males)
-  // Not stated for a declared child (promptBuilders.facialHairForAge, decisions 2026-10-09).
-  const facialHair = require('./promptBuilders').facialHairForAge(p.facialHair, character.age);
+  // Already gated by getPlausiblePhysical (male, 13+; decisions 2026-10-09).
+  const facialHair = p.facialHair;
   if (facialHair && facialHair !== 'none') parts.push(facialHair);
 
   // Other distinctive features

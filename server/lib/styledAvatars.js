@@ -17,6 +17,7 @@ const { log } = require('../utils/logger');
 const { compressImageToJPEG, callGeminiAPIForImage } = require('./images');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { buildHairDescription, getHeadBodyRatio } = require('./storyHelpers');
+const { getPlausiblePhysical } = require('./characterPhysical');
 const { getFacePhoto, getPrimaryPhoto, getStandardAvatar } = require('./characterPhotos');
 const { normalizeClothingCategory } = require('./clothingCategories');
 const { fetchImageBytes } = require('./r2');
@@ -240,7 +241,7 @@ const ART_STYLE_PROMPTS = loadArtStylePrompts();
  * @returns {string} Physical traits description or default message
  */
 function buildPhysicalTraitsString(character) {
-  const traits = character?.physical || {};
+  const traits = getPlausiblePhysical(character);
   const parts = [];
 
   // Age and body proportions — critical for correct child vs adult rendering.
@@ -266,8 +267,8 @@ function buildPhysicalTraitsString(character) {
   if (traits.build) parts.push(`Build: ${traits.build}`);
   if (traits.skinTone) parts.push(`Skin tone: ${traits.skinTone}`);
   if (traits.eyeColor) parts.push(`Eye color: ${traits.eyeColor}`);
-  // Not stated for a declared child (promptBuilders.facialHairForAge, decisions 2026-10-09).
-  const facialHair = require('./promptBuilders').facialHairForAge(traits.facialHair, character?.age);
+  // Already gated by getPlausiblePhysical (male, 13+; decisions 2026-10-09).
+  const facialHair = traits.facialHair;
   if (facialHair && facialHair !== 'none') {
     if (facialHair.toLowerCase() === 'clean-shaven') {
       parts.push(`Facial hair: NO beard, NO mustache, NO stubble — clean-shaven face`);

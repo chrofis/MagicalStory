@@ -9,6 +9,7 @@ const express = require('express');
 const { buildCastIndex, resolveEntity, canonicalName } = require('../lib/castResolver');
 const router = express.Router();
 const crypto = require('crypto');
+const { getPlausiblePhysical } = require('../lib/characterPhysical');
 const pLimit = require('p-limit');
 
 // Middleware
@@ -5761,8 +5762,8 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
               } else {
                 const bbox = appearance.faceBox || appearance.bodyBox;
                 const hairConfig = {
-                  color: character.physical?.hairColor,
-                  style: buildHairDescription(character.physical || {}, character.physicalTraitsSource) || null,
+                  color: getPlausiblePhysical(character).hairColor,
+                  style: buildHairDescription(getPlausiblePhysical(character), character.physicalTraitsSource) || null,
                   property: 'textured'
                 };
 

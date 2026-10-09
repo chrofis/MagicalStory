@@ -256,8 +256,66 @@ function normalizeAllPhysical(characters) {
   return characters;
 }
 
+// ---------------------------------------------------------------------------
+// Trait plausibility gate. docs/decisions.md 2026-10-09 "Photo traits are gated by the declared age and gender".
+//
+// The photo behind a character is often a PARENT's (a trial child, Mia age 6, uploaded her father: gray hair,
+// a gray beard) or a misread. A trait the photo analysis recorded that is implausible for the DECLARED age/gender
+// is not stated to any generator or judge. ONE function decides; every reader of a character's physical traits
+// goes through getPlausiblePhysical (or plausiblePhysical for a bare trait object), and keeps no age or gender
+// check of its own. Only STRUCTURED enum fields are tested (facialHair, hairColor, detailedHairAnalysis.density /
+// lengthTop and the userHairOverride copies of those two); free prose (`other`, `face`) is never classified.
+//   - facial hair: stated for a male of FACIAL_HAIR_MIN_AGE+ only (female, unknown gender, child: dropped);
+//   - gray / silver / white / salt-and-pepper hair colour: not under CHILD_MAX_AGE+1 (dropped for a child);
+//   - baldness / balding / thinning: never for a female; not for a child aged BALD_MIN_AGE to 12 (under
+//     BALD_MIN_AGE a baby's bare or sparse scalp is real, so it is kept).
+// An unknown age drops nothing on the age rules; an unknown gender drops facial hair (males only).
+// ---------------------------------------------------------------------------
+const FACIAL_HAIR_MIN_AGE = 13;
+const BALD_MIN_AGE = 3;
+const AGED_HAIR_COLOUR_RE = /^(gray|grey|silver|white|salt and pepper)$/i;
+const BALD_DENSITY_RE = /^(thinning|balding|bald)$/i;
+
+/**
+ * @param {Object} physical  a physical-traits object (not mutated)
+ * @param {{age?: number|string|null, gender?: string|null}} [who]  the DECLARED age and gender
+ * @returns {Object} a copy without the traits implausible for who
+ */
+function plausiblePhysical(physical, { age, gender } = {}) {
+  if (!physical || typeof physical !== 'object') return physical || {};
+  const years = parseInt(age, 10);
+  const known = Number.isFinite(years);
+  const child = known && years < FACIAL_HAIR_MIN_AGE;
+  const out = { ...physical };
+
+  if (gender !== 'male' || child) delete out.facialHair;
+  if (child && AGED_HAIR_COLOUR_RE.test(String(out.hairColor || '').trim())) delete out.hairColor;
+
+  const noBaldness = gender === 'female' || (known && years >= BALD_MIN_AGE && child);
+  if (noBaldness) {
+    for (const key of ['detailedHairAnalysis', 'userHairOverride']) {
+      const h = out[key];
+      if (!h || typeof h !== 'object') continue;
+      const copy = { ...h };
+      if (BALD_DENSITY_RE.test(String(copy.density || '').trim())) delete copy.density;
+      if (/^bald$/i.test(String(copy.lengthTop || '').trim())) delete copy.lengthTop;
+      out[key] = copy;
+    }
+  }
+  return out;
+}
+
+/** getPhysical(character), gated by the character's own declared age and gender. */
+function getPlausiblePhysical(character) {
+  return plausiblePhysical(getPhysical(character), { age: character?.age, gender: character?.gender });
+}
+
 module.exports = {
   getPhysical,
+  getPlausiblePhysical,
+  plausiblePhysical,
+  FACIAL_HAIR_MIN_AGE,
+  BALD_MIN_AGE,
   getPhysicalAttr,
   hasPhysical,
   normalizePhysical,

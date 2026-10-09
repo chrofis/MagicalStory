@@ -23,7 +23,7 @@ const { generateWithRunware, generateAvatarWithACE, isRunwareConfigured } = requ
 const { editWithGrok } = require('../lib/grok');
 const { scoreAvatarLikeness, failsArcFaceGate, warmArcFace, ARCFACE_MIN } = require('../lib/faceIdentity');
 const { buildHairDescription, getAgeCategory, clampApparentAge } = require('../lib/storyHelpers');
-const { facialHairForAge } = require('../lib/promptBuilders');
+const { getPlausiblePhysical, plausiblePhysical } = require('../lib/characterPhysical');
 const { HAIR_SOURCE_AVATAR, applyAvatarHairToExtraction } = require('../lib/avatarHair');
 const { resolveDeclaredAvatarOverrides } = require('../lib/avatarOverrides');
 const { getFacePhoto } = require('../lib/characterPhotos');
@@ -1211,7 +1211,7 @@ const ART_STYLE_PROMPTS = loadArtStylePrompts();
  * @returns {string} Physical traits description
  */
 function buildPhysicalTraitsForAvatar(character) {
-  const traits = character?.physical || {};
+  const traits = getPlausiblePhysical(character);
   const parts = [];
 
   // Age and body proportions (CRITICAL for correct head-to-body ratio)
@@ -1271,8 +1271,8 @@ function buildPhysicalTraitsForAvatar(character) {
   if (hairDesc) parts.push(`Hair: ${hairDesc}`);
 
   if (traits.eyeColor) parts.push(`Eye color: ${traits.eyeColor}`);
-  // Not stated for a declared child (promptBuilders.facialHairForAge, decisions 2026-10-09).
-  const facialHair = facialHairForAge(traits.facialHair, character?.age);
+  // Already gated by getPlausiblePhysical (male, 13+; decisions 2026-10-09).
+  const facialHair = traits.facialHair;
   if (facialHair && facialHair !== 'none') {
     if (facialHair.toLowerCase() === 'clean-shaven') {
       parts.push(`Facial hair: NO beard, NO mustache, NO stubble — clean-shaven face`);
@@ -1782,18 +1782,22 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
     // prompt AND the judge (see server/lib/avatarOverrides.js) — when only the
     // generator knew about them, every correction was graded against the photo
     // that by definition does not show it, and the avatar was rejected forever.
+    // The hair text of the user's declared traits goes through the same plausibility gate as every other reader.
+    const declaredHairDescription = physicalTraits ? buildHairDescription(plausiblePhysical(physicalTraits, { age, gender })) : null;
     const overrides = resolveDeclaredAvatarOverrides({
       physicalTraits,
       clothing,
-      hairDescription: physicalTraits ? buildHairDescription(physicalTraits) : null,
+      hairDescription: declaredHairDescription,
       declaredAge: age,
+      gender,
     });
     const declaredOverridesFor = (category) => resolveDeclaredAvatarOverrides({
       physicalTraits,
       clothing,
-      hairDescription: physicalTraits ? buildHairDescription(physicalTraits) : null,
+      hairDescription: declaredHairDescription,
       category,
       declaredAge: age,
+      gender,
     }).text;
     // The judge's rendering of the SAME declared age the generator's trait
     // block carries (overrides.ageLine) — one resolver, two wordings.

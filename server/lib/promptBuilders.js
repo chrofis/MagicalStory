@@ -30,7 +30,7 @@ const { PLAN_TYPE_IDS } = require('./shotVocabulary');
 const requiredTextLib = require('./requiredText');
 const { baseVbId } = require('./vbIdGuard');
 const { COVER_PAGE_NUMBERS } = require('./coverKeys');
-const { getPhysical } = require('./characterPhysical');
+const { getPlausiblePhysical, FACIAL_HAIR_MIN_AGE } = require('./characterPhysical');
 const { getTraits } = require('./characterTraits');
 const { frameColorForName } = require('./characterFrames');
 const { getLanguageNote, getLanguageInstruction, getLanguageNameEnglish, getNarrationTenseRule } = require('./languages');
@@ -93,10 +93,10 @@ function wrapUserInput(value) {
  * Uses the characterPhysical helper to read from canonical or legacy fields
  * @param {Object} char - Character object
  * @returns {Object} Physical traits object with camelCase keys
- * @deprecated Use getPhysical() from characterPhysical.js directly
+ * @deprecated Use getPlausiblePhysical() from characterPhysical.js directly
  */
 function getPhysicalFromChar(char) {
-  return getPhysical(char);
+  return getPlausiblePhysical(char);
 }
 
 /**
@@ -2059,7 +2059,7 @@ function extractCharacterVisualProfile(char, options = {}) {
     // hairDensity are no longer read — they drifted from detailedHairAnalysis
     // and produced wrong prose (e.g. calling a bald character "white, straight").
     hair: buildHairDescription(physical, char.physicalTraitsSource) || null,
-    facialHair: facialHairForAge(physical.facialHair || char.physical?.facialHair || null, resolvedAge),
+    facialHair: physical.facialHair || null,
     face: physical.face || char.physical?.face || char.otherFeatures || null,
     glasses: physical.glasses || null,
     other: physical.other || char.physical?.other || null,
@@ -2069,28 +2069,6 @@ function extractCharacterVisualProfile(char, options = {}) {
     clothingStyle: char.clothingStyle || char.clothing_style || char.clothing?.style ||
       char.clothingColors || char.clothing_colors || char.clothing?.colors || null,
   };
-}
-
-/**
- * Youngest DECLARED age at which a recorded facial-hair trait is still stated to a
- * generator or a judge. The photo of a child character is often a parent's (a trial
- * child, Mia age 6, uploaded her father: "short gray beard and mustache"), the
- * styled sheets are drawn for the declared age, and a trait that reaches only the
- * page prompt gets a bearded six-year-old (staging trial job_1791497394846_v01s6ndpn
- * pages 1, 4, 5, 6). docs/decisions.md 2026-10-09 "Facial hair is not stated for a
- * declared child".
- */
-const FACIAL_HAIR_MIN_AGE = 13;
-
-/**
- * A recorded facial-hair value for a character of this DECLARED age: the value
- * itself, or null for a declared child. An unknown age keeps the value (nothing is
- * known to contradict it). The ONE gate every appearance, avatar-prompt and judge
- * line goes through (sibling set character-physical-traits-to-prompt).
- */
-function facialHairForAge(facialHair, declaredAge) {
-  const age = parseInt(declaredAge, 10);
-  return Number.isFinite(age) && age < FACIAL_HAIR_MIN_AGE ? null : (facialHair || null);
 }
 
 /**
@@ -2138,7 +2116,7 @@ function buildLabeledPhysicalParts(profile, options = {}) {
   if (includeEyeColor && profile.eyeColor) parts.push(`Eyes: ${profile.eyeColor}`);
   if (profile.hair) parts.push(`Hair: ${profile.hair}`);
 
-  if (profile.gender === 'male' && !isNone(profile.facialHair)) {
+  if (!isNone(profile.facialHair)) {
     parts.push(profile.facialHair.toLowerCase() === 'clean-shaven'
       ? 'Facial hair: NO beard, NO mustache, NO stubble — clean-shaven face'
       : `Facial hair: ${profile.facialHair}`);
@@ -2187,7 +2165,7 @@ function buildCharacterPhysicalDescription(char, clothingOverride = null) {
     : `${p.name} is a ${age}-year-old ${genderLabel}`;
   if (p.build && !BUILD_MIDPOINT_RE.test(String(p.build).trim())) s += `, ${p.build} build`;
   if (p.hair) s += `. Hair: ${p.hair}`;
-  if (p.gender === 'male' && !isNone(p.facialHair)) {
+  if (!isNone(p.facialHair)) {
     s += p.facialHair.toLowerCase() === 'clean-shaven'
       ? '. Facial hair: NO beard, NO mustache, NO stubble — clean-shaven face'
       : `. Facial hair: ${p.facialHair}`;
@@ -2223,7 +2201,7 @@ function buildGroundingPrompt(char) {
   // Hair COLOUR only (first comma-segment of the full hair prose), not style.
   const hairColour = p.hair ? String(p.hair).split(',')[0].trim() : '';
   if (hairColour) parts.push(`${hairColour} hair`);
-  if (p.gender === 'male' && !isNone(p.facialHair) && p.facialHair.toLowerCase() !== 'clean-shaven') {
+  if (!isNone(p.facialHair) && p.facialHair.toLowerCase() !== 'clean-shaven') {
     parts.push('a beard');
   }
   if (!isNone(p.glasses)) parts.push('glasses');
@@ -13661,7 +13639,6 @@ module.exports = {
   extractCharacterVisualProfile,
   buildLabeledPhysicalParts,
   recordedFeatures,
-  facialHairForAge,
   FACIAL_HAIR_MIN_AGE,
   buildCharacterPhysicalDescription,
   buildFaceDescription,

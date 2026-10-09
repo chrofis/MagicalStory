@@ -24,6 +24,7 @@ const { trialSourceWhereClause } = require('../lib/trialSource');
 // failure it alarms and lets the write proceed (see its JSDoc).
 const { offloadCharacterImages, modifyCharactersRow, offloadJsonbImages, inlineOffloadPrefix } = require('../services/database');
 const { assertPromptFilled } = require('../services/prompts');
+const { plausiblePhysical } = require('../lib/characterPhysical');
 // The trial's declared age is MANDATORY (owner, 2026-09-15) — one parser for
 // every entry point below. See server/lib/trialAge.js for the range and why
 // the field became load-bearing (de8753cc1).
@@ -1044,7 +1045,7 @@ router.post('/generate-preview-avatar', trialAvatarLimiter, async (req, res) => 
       extractedTraits = await extractTraitsShared(facePhoto, photoDataUri, extractTraitsWithGemini);
       if (extractedTraits) {
         const { buildHairDescription } = require('../lib/storyHelpers');
-        hairDescription = buildHairDescription(extractedTraits);
+        hairDescription = buildHairDescription(plausiblePhysical(extractedTraits, { age: ageNum, gender }));
         if (hairDescription) {
           log.info(`[TRIAL AVATAR] Extracted hair traits: "${hairDescription}"`);
         }
