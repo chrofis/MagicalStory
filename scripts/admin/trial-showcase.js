@@ -197,6 +197,20 @@ function pickEntry(explicitIndex) {
   return { entry, entries, fromRotation: true };
 }
 
+// The wizard's own completeness rule (TrialWizard.tsx, the prepare-title effect):
+// an adventure needs a theme, a life challenge needs a topic AND a theme. An
+// entry the wizard could never submit made /api/trial/prepare-title answer 400
+// on two 2026-10-09 runs, so they skipped the costumed sheet and the avatar
+// slides that every real trial gets. Refuse such an entry before any paid call.
+function missingWizardPicks(entry) {
+  const missing = [];
+  if (entry.storyCategory === 'adventure' || entry.storyCategory === 'life-challenge') {
+    if (!entry.storyTheme) missing.push('storyTheme (--theme=)');
+  }
+  if (entry.storyCategory !== 'adventure' && !entry.storyTopic) missing.push('storyTopic (--topic=)');
+  return missing;
+}
+
 function advanceState(entry, entries) {
   const nextIndex = (entry.index + 1) % entries.length;
   fs.writeFileSync(STATE_PATH, JSON.stringify({ nextIndex, lastRunAt: new Date().toISOString(), lastEntry: entry.index }, null, 2) + '\n');
@@ -233,11 +247,13 @@ function faceDataUri(entry) {
   return 'data:image/jpeg;base64,' + fs.readFileSync(p).toString('base64');
 }
 
-(async () => {
+if (require.main === module) (async () => {
   const args = parseArgs();
   const picked = pickEntry(args.entry);
   const entries = picked.entries;
   const entry = { ...picked.entry, ...args.over };
+  const missing = missingWizardPicks(entry);
+  if (missing.length) { console.error(`entry ${entry.index} is not a request the wizard can send — missing ${missing.join(', ')}`); process.exit(1); }
   const envLabel = /staging\./.test(args.base) ? 'STAGING' : 'PRODUCTION';
   // Printed in the banner, before anything runs, because this used to be
   // invisible: a targeted run moved the shared pointer and nobody saw it.
@@ -249,7 +265,7 @@ function faceDataUri(entry) {
   console.log(`TRIAL SHOWCASE — entry ${entry.index}: ${entry.description}`);
   console.log(`  environment : ${envLabel} (${args.base})`);
   console.log(`  character   : ${entry.name} (${entry.age}, ${entry.gender}) — ${entry.family}/${entry.face}`);
-  console.log(`  story       : ${entry.storyCategory}${entry.storyTopic ? ` / ${entry.storyTopic}` : ''} [${entry.language}]`);
+  console.log(`  story       : ${entry.storyCategory}${entry.storyTopic ? ` / ${entry.storyTopic}` : ''}${entry.storyTheme ? ` · theme ${entry.storyTheme}` : ''} [${entry.language}]`);
   console.log(`  started     : ${ch(new Date())}`);
   console.log(`  rotation    : ${rotationNote}`);
   // PRECEDENCE for the premise: an explicit --details= wins, then a non-empty
@@ -452,3 +468,5 @@ function faceDataUri(entry) {
   console.error(`timeout after ${Math.round(POLL_TIMEOUT_MS / 60000)} min — job ${jobId} still running`);
   process.exit(2);
 })().catch(e => { console.error(`trial-showcase failed: ${e.message}`); process.exit(1); });
+
+module.exports = { missingWizardPicks };

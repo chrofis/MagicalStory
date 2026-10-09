@@ -11,6 +11,7 @@
       "language": "de",
       "storyCategory": "adventure",
       "storyTopic": "",
+      "storyTheme": "knight",
       "storyDetails": "",
       "description": "Berger/DE — Emma (5), Abenteuer, freies Thema"
     },
@@ -24,6 +25,7 @@
       "language": "de",
       "storyCategory": "life-challenge",
       "storyTopic": "first-kindergarten",
+      "storyTheme": "farm",
       "storyDetails": "",
       "description": "Berger/DE — Noah (4), Lebensthema: erster Kindergartentag"
     },
@@ -37,6 +39,7 @@
       "language": "fr",
       "storyCategory": "adventure",
       "storyTopic": "",
+      "storyTheme": "mermaid",
       "storyDetails": "",
       "description": "Dubois/FR — Léa (6), aventure"
     },
@@ -50,6 +53,7 @@
       "language": "en",
       "storyCategory": "adventure",
       "storyTopic": "",
+      "storyTheme": "space",
       "storyDetails": "",
       "description": "Miller/EN — Lily (7), adventure"
     },
@@ -62,7 +66,8 @@
       "gender": "male",
       "language": "en",
       "storyCategory": "life-challenge",
-      "storyTopic": "",
+      "storyTopic": "brushing-teeth",
+      "storyTheme": "dinosaur",
       "storyDetails": "",
       "description": "Miller/EN — Ethan (5), life skill"
     },
@@ -75,7 +80,8 @@
       "gender": "male",
       "language": "fr",
       "storyCategory": "life-challenge",
-      "storyTopic": "",
+      "storyTopic": "first-school",
+      "storyTheme": "forest",
       "storyDetails": "",
       "description": "Dubois/FR — Jules (6), thème de vie"
     },
@@ -89,6 +95,7 @@
       "language": "de",
       "storyCategory": "adventure",
       "storyTopic": "",
+      "storyTheme": "dinosaur",
       "storyDetails": "",
       "description": "Agebands/DE — Omar (3), Abenteuer, freies Thema — Altersband 'tries'"
     },
@@ -102,6 +109,7 @@
       "language": "de",
       "storyCategory": "adventure",
       "storyTopic": "",
+      "storyTheme": "farm",
       "storyDetails": "",
       "description": "Agebands/DE — Tobias (1), Abenteuer, freies Thema — Altersband 'routine'"
     },
@@ -115,6 +123,7 @@
       "language": "de",
       "storyCategory": "adventure",
       "storyTopic": "",
+      "storyTheme": "detective",
       "storyDetails": "",
       "description": "Agebands/DE — Rohan (8), Abenteuer, freies Thema — Altersband 'journey' (Shape), Pacing 'standard'"
     }

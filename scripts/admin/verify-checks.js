@@ -489,7 +489,7 @@ const SLOT_LABEL = /\b(?:Satz|Sentence|Phrase|Slot)\s*\d+\s*[—–:-]/i;
 checks.ideaPickRecorded = (ctx) => {
   const pick = ctx.data?.ideaPick;
   if (!pick) return { covered: true, pass: false, detail: 'stories.data.ideaPick is missing on a run started from a generated idea' };
-  return { covered: true, pass: true, detail: `ideaPick recorded (index ${pick.index ?? 'own premise'}, world ${pick.world ?? '-'})` };
+  return { covered: true, pass: true, detail: `ideaPick recorded (index ${pick.index ?? 'own premise'}, world ${(pick.world && typeof pick.world === 'object' ? pick.world.world : pick.world) ?? '-'})` };
 };
 
 /** 1d6598368 — a generated idea reaches the story with no slot labels. */
