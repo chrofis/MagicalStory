@@ -155,20 +155,22 @@ function redactReadLettering(text, record) {
   if (!seen.length) return text;
   const QUOTE = '["\'“”‘’«»„‹›`]';
   const NOUN = '(?:the\\s+)?(?:(?:lettering|letters|text|words?|writing|caption|label|inscription)\\s+)?';
+  const BARE_NOUN = '(?:the\\s+)?(?:lettering|letters|text|words?|writing|caption|label|inscription)\\s+';
   const keepCase = (m, repl) => (/^\p{Lu}/u.test(m) ? repl.charAt(0).toUpperCase() + repl.slice(1) : repl);
   let out = text;
   for (const t of seen) {
     const body = t.split(/\s+/).map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('\\s+');
     const quoted = new RegExp(NOUN + QUOTE + '\\s*' + body + '\\s*' + QUOTE, 'giu');
     out = out.replace(quoted, (m) => keepCase(m, 'the lettering'));
-    // A bare mention ("the word BANZ"): only a string long enough to be a word,
-    // so a one-letter reading cannot eat ordinary prose.
+    // A bare mention ("the word BANZ"): only right after a lettering noun, and
+    // only a string long enough to be a word. Without the noun a reading that is
+    // also an ordinary word (a sign reading DRAGON, THE) would eat the fix prose.
     if (squash(t).length >= 3) {
-      const bare = new RegExp(NOUN + '(?<![\\p{L}\\p{N}])' + body + '(?![\\p{L}\\p{N}])', 'giu');
+      const bare = new RegExp(BARE_NOUN + '(?<![\\p{L}\\p{N}])' + body + '(?![\\p{L}\\p{N}])', 'giu');
       out = out.replace(bare, (m) => keepCase(m, 'the lettering'));
     }
   }
-  return out.replace(/(the lettering)(\s+the lettering)+/gi, '$1');
+  return out.replace(/(the lettering)(\s+the lettering)+/gi, '$1');
 }
 
 module.exports = { checkUndeclaredLettering, letteringRecord, redactReadLettering, isDeclared, squash };

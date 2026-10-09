@@ -81,6 +81,12 @@ describe('redactReadLettering', () => {
   it('does not eat ordinary words that merely contain a short reading', () => {
     expect(redactReadLettering('A banzai tree', INVENTORY)).toBe('A banzai tree');
   });
+
+  it('keeps a reading that is also an ordinary word when the prose uses it as a word', () => {
+    const sign = { items: [{ text: 'DRAGON' }, { text: 'THE' }], declared: [] };
+    expect(redactReadLettering('Keep the dragon beside the egg; paint over the word DRAGON on the sign', sign))
+      .toBe('Keep the dragon beside the egg; paint over the lettering on the sign');
+  });
 });
 
 describe('redactPlanLettering: the consolidated plan', () => {
