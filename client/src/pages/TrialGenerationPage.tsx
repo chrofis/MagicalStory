@@ -12,6 +12,7 @@ import { trackTrialStep } from '@/utils/trialFunnel';
 import { FUNNY_MESSAGES, NAMELESS_FUNNY_MESSAGES, funnyDeck, funnyLine } from '@/utils/funnyMessages';
 import { classifyJobStatusHttp, MAX_TRANSIENT_POLL_ERRORS, pollBackoffMs, mergeAvatarSlides, shouldRedirectToStories } from '@/utils/trialPoll';
 import { Navigation } from '@/components/common';
+import RenderErrorBoundary from '@/components/common/RenderErrorBoundary';
 import TrialBook, { TrialGateProvider } from '@/components/book/TrialBook';
 import { isTrialBookReady } from '@/utils/trialBook';
 import { localizedApiError } from '@/utils/apiErrors';
@@ -1013,7 +1014,8 @@ export default function TrialGenerationPage() {
         <h1 className="text-2xl font-bold text-gray-800">{storyTitle}</h1>
       </div>
       <TrialGateProvider value={{ node: signInBlock, onSeen: hasLockedPage ? onGateSeen : undefined }}>
-        <TrialBook
+        <RenderErrorBoundary area="TrialBook" title={t.failedTitle} retryLabel={t.tryAgain}>
+          <TrialBook
           storyTitle={storyTitle || ''}
           language={state?.storyInput?.language || language}
           titlePageImage={titlePageImage}
@@ -1021,6 +1023,7 @@ export default function TrialGenerationPage() {
           pendingImageLabel={t.imagePending}
           titlePendingNode={imagePlaceholder}
         />
+        </RenderErrorBoundary>
       </TrialGateProvider>
       {!hasLockedPage && isLinked && <div className="mt-4">{signInBlock}</div>}
     </div>

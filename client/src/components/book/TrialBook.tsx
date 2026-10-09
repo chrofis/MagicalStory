@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import BookViewer from './BookViewer';
 import { buildTrialBook, type TrialPreviewPage } from '@/utils/trialBook';
 
@@ -77,6 +77,14 @@ const TrialBook = React.memo(function TrialBook({ storyTitle, language, titlePag
     hasImages: true,
     coverImageSrc: titlePageImage ? { frontCover: titlePageImage } : undefined,
   }), [storyTitle, language, storyPages, titlePageImage]);
+  // react-pageflip moves its page elements out of React's tree, so a change of the page LIST (the pending
+  // title page becoming the cover, more pages arriving) makes React remove nodes that are no longer where it
+  // put them: WebKit throws NotFoundError ("The object can not be found here") and React unmounts the whole
+  // page - the white page when the title arrived (owner iPhone, 2026-10-09). A changed structure therefore
+  // remounts the viewer, on the page the visitor was reading. Image/text updates keep the same structure.
+  const structureKey = `${isMobile ? 'm' : 'd'}:${titlePageImage ? 'cover' : 'pending'}:${pages.length}`;
+  const logicalPageRef = useRef(0);
+  const onPageChange = useCallback((i: number) => { logicalPageRef.current = i; }, []);
   const pageList = useMemo(() => entries.map(e => {
     if (e.type === 'titlePending') return { type: 'custom' as const, key: 'title-pending', node: titlePendingNode };
     return e;
@@ -85,7 +93,9 @@ const TrialBook = React.memo(function TrialBook({ storyTitle, language, titlePag
   return (
     <div className="h-[72vh] min-h-[440px] max-h-[780px] w-full lg:w-[min(1000px,calc(100vw-4rem))] lg:relative lg:left-1/2 lg:-translate-x-1/2">
       <BookViewer
-        key={isMobile ? 'm' : 'd'}
+        key={structureKey}
+        initialLogicalPage={logicalPageRef.current}
+        onPageChange={onPageChange}
         textOnSidePage
         pageList={pageList}
         story={story}
