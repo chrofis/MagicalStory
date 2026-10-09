@@ -8791,6 +8791,24 @@
         "kind": "human",
         "what": "node scripts/analysis/probe-landmarks-always-five.js Fislisbach Baden Zürich --find-small shows >=5 real entries per town (Fislisbach 19) and no aerial in idea lists; a staging idea_generated row has detail.landmarkSource in (jev,pending,absent); a small-town story has no landmarks_under_min in runMetrics; Fislisbach trial-idea landmarks vary over several runs."
       }
+    },
+    {
+      "id": "repair-findings-vs-parent-2026-10-09",
+      "title": "Repair children: new findings checked against the parent picture",
+      "commits": [
+        "775a9bfd2"
+      ],
+      "addedAt": "2026-10-09",
+      "status": "pending",
+      "evidence": [],
+      "claim": "Every repair child (iterate, inpaint, char-fix, recolour, text re-render; pages and covers) is re-judged in full and its MAJOR+ findings that the parent findings do not carry are checked against the parent picture in one batched call; findings shown in the parent are tagged alsoInParent and do not decide pick-best; a child whose MAJOR+ findings the parent already carries triggers no call; a failed check is an ERROR, never a silent pass.",
+      "runShape": [
+        "needs-inpaint"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Log shows [PARENT-SHARED] pN: k/n finding(s) are also in the parent for each repair child with a new MAJOR+ finding and no ERROR PARENT-SHARED; tokenUsage.byFunction has parent_shared_r*, parent_shared_recolour_r* or parent_shared_text_space; each repaired version consolidatedPlan.parentCheck is {asked, tagged, error:null}."
+      }
     }
   ],
   "runs": [
