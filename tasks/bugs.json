@@ -4004,7 +4004,10 @@
       "title": "A repair of unrequested lettering quoted the word the judge read (\"Paint over 'BANZ' on stone bands of both church towers\"), and the image model painted that word onto the page: the repair created the defect it was told to remove",
       "reportedAt": "2026-10-09",
       "source": "Staging job_1791531449494_o0kaatvmq page 3. v0 (original) has only a carved ornament band on the two church towers; the quality judge's lettering inventory read it as \"BANZ\" and filed a CRITICAL rendered_text finding. inpaint-round-1 sent Grok \"1. Paint over 'BANZ' on stone bands of both church towers.\" (consolidatedPlan.scene_fix.instruction, derived from the finding description). Full-resolution crops: v0 has no letters, v1 has \"BANZ\" in two plaques.",
-      "status": "open"
+      "status": "fixed",
+      "fixedAt": "2026-10-09",
+      "fixedIn": "4ff0969df",
+      "fix": "letteringCheck.redactReadLettering strips the inventory-read strings (declared ones excepted) from every text bound for an image model: consolidated plan (feedbackConsolidator.redactPlanLettering), inpaintPage send time, buildRegenFeedback, iterate issue list, trial cover iterate; consolidator rule 7f. Test: tests/unit/lettering-never-sent-to-image-model.test.ts."
     }
   ]
 }

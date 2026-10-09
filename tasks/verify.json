@@ -8451,7 +8451,9 @@
     {
       "id": "repair-never-sends-read-lettering-2026-10-09",
       "title": "A repair of unrequested lettering never sends the letters the judge read to the image model",
-      "commits": [],
+      "commits": [
+        "4ff0969df"
+      ],
       "addedAt": "2026-10-09",
       "claim": "On a page whose inventory read lettering the page did not ask for, the inpaint instruction (stored inpaintInstruction / consolidatedPlan.scene_fix.instruction) names where the lettering is and never contains the letters it read, and the repaired version shows no new lettering.",
       "runShape": [
