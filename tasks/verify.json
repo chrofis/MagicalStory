@@ -8809,6 +8809,29 @@
         "kind": "human",
         "what": "Log shows [PARENT-SHARED] pN: k/n finding(s) are also in the parent for each repair child with a new MAJOR+ finding and no ERROR PARENT-SHARED; tokenUsage.byFunction has parent_shared_r*, parent_shared_recolour_r* or parent_shared_text_space; each repaired version consolidatedPlan.parentCheck is {asked, tagged, error:null}."
       }
+    },
+    {
+      "id": "action-judge-recalibrated-2026-10-09",
+      "title": "Action judge recalibration wording",
+      "commits": [
+        "ff653dec0"
+      ],
+      "addedAt": "2026-10-09",
+      "status": "superseded",
+      "evidence": [],
+      "claim": "The recalibrated action wording (N-18 to N-20, D-16 read-test) lowers prompt-sourced action_interaction noise without hiding real exact-state defects.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Re-run scripts/analysis/action-judge-run.js on scripts/analysis/action-judge-labels.json --runs=2 and score with action-judge-score.js against the baseline in docs/decisions.md."
+      },
+      "triage": {
+        "date": "2026-10-09",
+        "status": "superseded",
+        "note": "Reverted in bfb72b210: effect inside judge run-to-run noise on 56 labelled pages; recall on the 7 real-defect pages not shown. See docs/decisions.md \"Action judge recalibration measured and not adopted\"."
+      }
     }
   ],
   "runs": [
