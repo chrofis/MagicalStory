@@ -67710,3 +67710,10 @@ Touched files: server/lib/vbIdGuard.js, server/lib/promptBuilders.js, server/lib
 **Proof:** unit tests; prompt replay of buildTrialStoryPrompt over all 5 stored trial inputs (old builder and template from HEAD vs new): a trial without a costume differs by exactly one added line (the English-hint rule, +282 characters); the three costumed trials differ by the two replaced/added clothing lines and that same line (about +1,200 characters, input only); no other line changed. Not validated on a real trial run (no trial run was assigned): verify entry trial-costume-page1-2026-10-09 needs a costumed trial whose page 1 text is in role.
 **Revisit if:** a costumed trial again shows `standard` on a page whose text has the child in role, or a first costumed page without a change of clothes.
 **Touched files:** server/lib/promptBuilders.js, prompts/story-trial.txt, server/config/trialCostumes.js, tests/unit/trial-costume-page1-and-hint-language.test.ts, tests/unit/trial-costume-historical-colours.test.ts, tests/unit/page-clothing-reconcile.test.ts
+
+## 2026-10-09 — Trial page check: archived code removed
+
+**Context:** the entry "Trial page check ... measured, NOT built" above kept the un-wired module, its replay harness and the storyJobPipeline.js wiring patch in docs/archive/trial-page-check-2026-10-09/.
+**Decision:** deleted from the tree (owner, 2026-10-09: open items are fixed or removed, never parked). Git is the backup: all three files are in commit 7bdb0f502 (`git show 7bdb0f502:docs/archive/trial-page-check-2026-10-09/trialPageCheck.js`).
+**Rationale:** an un-wired copy of a feature drifts from the code it would hook into; the measured numbers in the entry above are what a revisit needs.
+**Touched files:** docs/archive/trial-page-check-2026-10-09/ (removed).
