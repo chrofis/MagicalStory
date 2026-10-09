@@ -39,10 +39,10 @@ const { buildCharacterDescription } = require('./visualBible');
  *      checking happens at this layer by design (owner, 2026-09-01)
  *   3. beats_story_bible     MODEL_DEFAULTS.outline    CLOTHING REQUIREMENTS only
  *   4. THE ART DIRECTOR, two calls (owner, 2026-09-28, "Jev first"):
- *      beats_visual_bible    MODEL_DEFAULTS.sceneDescription  the VISUAL BIBLE alone;
+ *      beats_visual_bible    MODEL_DEFAULTS.visualBibleModel  the VISUAL BIBLE alone;
  *      then the Jev decision layer fixes every story page's cited elements,
  *      looks, location, aboard, population and gaze (jevBriefFields.js);
- *      beats_scene_expansion MODEL_DEFAULTS.sceneDescription  ONE call over ALL pages
+ *      beats_scene_expansion MODEL_DEFAULTS.sceneBriefsModel  ONE call over ALL pages
  *      — the covers included, as pages -1/-2/-3 from code-written cover beats
  *      (coverBeats.js) — each story page with its FIXED block
  *   5. beats_brief_reask     MODEL_DEFAULTS.sceneDescription  code checks every brief
@@ -1661,6 +1661,19 @@ function adBriefsCallOptions() {
 }
 
 /**
+ * THE MODEL OF EACH ART DIRECTOR CALL. The Visual Bible and the all-pages briefs
+ * run on their own cheaper models (MODEL_DEFAULTS.visualBibleModel /
+ * sceneBriefsModel); the brief re-ask, the label round and the per-page fallback
+ * stay on `sceneModel` (gemini-3.1-pro). An explicit sceneModel (a dev override or a
+ * Lab arm) is honoured for every call: the routed models apply only while
+ * `sceneModel` is the default. docs/decisions.md 2026-10-09 "Art Director stage models".
+ */
+function adStageModels(sceneModel) {
+  if (sceneModel !== MODEL_DEFAULTS.sceneDescription) return { vb: sceneModel, briefs: sceneModel };
+  return { vb: MODEL_DEFAULTS.visualBibleModel || sceneModel, briefs: MODEL_DEFAULTS.sceneBriefsModel || sceneModel };
+}
+
+/**
  * STEP 4 OF THE BEATS PIPELINE — the Art Director, in two calls with the
  * decision layer between them (owner, 2026-09-28: "Jev first, then remove the
  * scene review"):
@@ -1792,6 +1805,9 @@ async function runArtDirector({ inputData, modelOverrides, clothingRequirements,
   const vbPrompt = buildVisualBibleCallPrompt(inputData, briefBeats, {
     jevBackup: !jevActive(jevReport), availableAvatars, maxCharactersPerScene, finalArc: approvedArc, clothingRequirements,
   });
+  const stageModels = adStageModels(sceneModel);
+  const vbModel = visualBibleModel || stageModels.vb;
+  const briefsModel = stageModels.briefs;
   const vbReplies = [];
   let adBible = null;
   if (!vbPrompt) {
@@ -1809,13 +1825,13 @@ async function runArtDirector({ inputData, modelOverrides, clothingRequirements,
     await stage(30, 'Writing the visual bible...', { next: 36, ms: 90000 });
     for (let attempt = 1; attempt <= 2 && !adBible; attempt++) {
       try {
-        const res = await textModels.callTextModelStreaming(vbPrompt, null, onChunk, visualBibleModel || sceneModel, { usageLabel: 'beats_visual_bible', ...labCallOptions });
+        const res = await textModels.callTextModelStreaming(vbPrompt, null, onChunk, vbModel, { usageLabel: 'beats_visual_bible', ...(vbModel === MODEL_DEFAULTS.visualBibleModel && MODEL_DEFAULTS.visualBibleEffort ? { effort: MODEL_DEFAULTS.visualBibleEffort } : {}), ...labCallOptions });
         if (onCall) onCall(res);
         const raw = res?.text || '';
-        vbReplies.push({ attempt, modelId: res?.modelId || visualBibleModel || sceneModel, text: raw });
+        vbReplies.push({ attempt, modelId: res?.modelId || vbModel, text: raw });
         const sections = extractBibleSections(raw, AD_BIBLE_MARKERS);
         const parsedVb = sections ? new UnifiedStoryParser(sections.body).extractVisualBible() : null;
-        if (sections && parsedVb) adBible = { body: sections.body, visualBible: parsedVb, found: sections.found, modelId: res?.modelId || visualBibleModel || sceneModel };
+        if (sections && parsedVb) adBible = { body: sections.body, visualBible: parsedVb, found: sections.found, modelId: res?.modelId || vbModel };
         else log.error(`🚨 [BEATS] Visual Bible attempt ${attempt}: ${sections ? `---VISUAL BIBLE--- present but its JSON did not parse (${sections.body.length} chars)` : `no ---VISUAL BIBLE--- section (${raw.length} chars)`}`);
       } catch (err) {
         log.error(`🚨 [BEATS] Visual Bible attempt ${attempt} failed: ${err.message}`);
@@ -1875,7 +1891,7 @@ async function runArtDirector({ inputData, modelOverrides, clothingRequirements,
 
 ${bibleBody}` : bibleBody;
     const vbCount = Object.values(visualBible).reduce((n, v) => n + (Array.isArray(v) ? v.length : 0), 0);
-    gl.info('beats_visual_bible', `Visual Bible by ${adBible.modelId || sceneModel}: ${vbCount} entr(ies), written before the page briefs (${(vbMs / 1000).toFixed(1)}s)`, null, {
+    gl.info('beats_visual_bible', `Visual Bible by ${adBible.modelId || vbModel}: ${vbCount} entr(ies), written before the page briefs (${(vbMs / 1000).toFixed(1)}s)`, null, {
       vbEntries: vbCount, sections: adBible.found,
     });
   } else if (vbPrompt) {
@@ -2071,17 +2087,17 @@ ${bibleBody}` : bibleBody;
   } else {
     // Two attempts; the first attempt's pages win the merge, so a retry can
     // only FILL gaps (job_1788123310558 lost pages 12-16 to a cut reply).
-    let allModelId = sceneModel;
+    let allModelId = briefsModel;
     const byPage = new Map();
     await stage(36, 'Writing the scene briefs...', { next: 42, ms: 140000 });
     for (let attempt = 1; attempt <= 2; attempt++) {
       let allRaw = '';
       const attemptStart = Date.now();
       try {
-        const res = await textModels.callTextModelStreaming(allPrompt, null, onChunk, sceneModel, { usageLabel: 'beats_scene_expansion', ...adBriefsCallOptions(), ...labCallOptions });
+        const res = await textModels.callTextModelStreaming(allPrompt, null, onChunk, briefsModel, { usageLabel: 'beats_scene_expansion', ...adBriefsCallOptions(), ...labCallOptions });
         if (onCall) onCall(res);
         allRaw = res?.text || '';
-        allModelId = res?.modelId || sceneModel;
+        allModelId = res?.modelId || briefsModel;
         // Per-attempt diagnostics (2026-10-05): why the stream ended, so a cut is
         // diagnosable from the stored report without Railway logs. Small scalars only.
         adReplies.push({
@@ -2096,7 +2112,7 @@ ${bibleBody}` : bibleBody;
         });
       } catch (err) {
         // The transport already retried; a stream that never finished arrives here as streamCut.
-        adReplies.push({ attempt, modelId: sceneModel, text: '', error: String(err.message).slice(0, 300), elapsedMs: Date.now() - attemptStart, cut: err.streamCut === true });
+        adReplies.push({ attempt, modelId: briefsModel, text: '', error: String(err.message).slice(0, 300), elapsedMs: Date.now() - attemptStart, cut: err.streamCut === true });
         log.error(`🚨 [BEATS] All-pages scene briefs attempt ${attempt} failed (${err.message}) — falling back to per-page expansion`);
         gl.warn('beats_scene_expansion_failed', `All-pages call failed on attempt ${attempt}: ${err.message} — falling back to per-page expansion`);
         break;
@@ -2258,9 +2274,9 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   const sceneModel = modelOverrides.sceneDescriptionModel || MODEL_DEFAULTS.sceneDescription;
   const textModel = modelOverrides.textModel || MODEL_DEFAULTS.storyText;
 
-  const meta = { pageCount, models: { planModel, arcCreateModel, arcRetellModel, arcPanelModels, arcRounds, planCheckModel: modelOverrides.planCheckModel || MODEL_DEFAULTS.planCheckModel, reviewModel, clothingReviewModel, sceneModel, briefReaskModel: sceneModel, textModel }, timings: {} };
+  const meta = { pageCount, models: { planModel, arcCreateModel, arcRetellModel, arcPanelModels, arcRounds, planCheckModel: modelOverrides.planCheckModel || MODEL_DEFAULTS.planCheckModel, reviewModel, clothingReviewModel, sceneModel, visualBibleModel: adStageModels(sceneModel).vb, sceneBriefsModel: adStageModels(sceneModel).briefs, briefReaskModel: sceneModel, textModel }, timings: {} };
   const started = Date.now();
-  log.info(`🪜 [BEATS] job=${jobId} pages=${pageCount} plan=${planModel} arcCreate=${arcCreateModel} arcRetell=${arcRetellModel} arcPanel=${arcPanelModels.join('+')} arcRounds=${arcRounds} planCheck=${modelOverrides.planCheckModel || MODEL_DEFAULTS.planCheckModel} review=${reviewModel} wardrobeReview=${clothingReviewModel} scenes=${sceneModel} (bible + briefs + re-ask) text=${textModel}`);
+  log.info(`🪜 [BEATS] job=${jobId} pages=${pageCount} plan=${planModel} arcCreate=${arcCreateModel} arcRetell=${arcRetellModel} arcPanel=${arcPanelModels.join('+')} arcRounds=${arcRounds} planCheck=${modelOverrides.planCheckModel || MODEL_DEFAULTS.planCheckModel} review=${reviewModel} wardrobeReview=${clothingReviewModel} scenes=${sceneModel} (re-ask, labels, fallback) bible=${adStageModels(sceneModel).vb} briefs=${adStageModels(sceneModel).briefs} text=${textModel}`);
 
   // THE JEV DECISION LAYER'S REPORT (owner, 2026-09-27): every decision the
   // layer makes on this story — cast cuts per re-plan round, shots, light, VB
@@ -3722,4 +3738,4 @@ async function applyTitleProofread(inputData, parsed, gl, deps = {}) {
   };
 }
 
-module.exports = { generateStoryViaBeats, applyTitleProofread, reportChallengeMemoryBreach, finalizePlanShots, presentOf, decideBriefFields, assembleBriefs, pageLocations, visualBibleJsonOf, runArtDirector, arcTempFor, makeArcCreatorCall, makePlanReader, planCheckInputs, createPlanCheckRunner, recheckRecord, runReplanRounds, runVisualBibleLabelRound, resolvePipelineMode, PIPELINE_MODES, loadUsedChallengeIds, syncVisualBibleSection, replaceClothingSection, extractBibleSections, shippedReplanState, BIBLE_MARKERS, CLOTHING_MARKERS, AD_BIBLE_MARKERS };
+module.exports = { adStageModels, generateStoryViaBeats, applyTitleProofread, reportChallengeMemoryBreach, finalizePlanShots, presentOf, decideBriefFields, assembleBriefs, pageLocations, visualBibleJsonOf, runArtDirector, arcTempFor, makeArcCreatorCall, makePlanReader, planCheckInputs, createPlanCheckRunner, recheckRecord, runReplanRounds, runVisualBibleLabelRound, resolvePipelineMode, PIPELINE_MODES, loadUsedChallengeIds, syncVisualBibleSection, replaceClothingSection, extractBibleSections, shippedReplanState, BIBLE_MARKERS, CLOTHING_MARKERS, AD_BIBLE_MARKERS };

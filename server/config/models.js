@@ -627,6 +627,21 @@ const MODEL_DEFAULTS = {
   // Sonnet note kept for history: Haiku produced unstable clothing labels;
   // sonnet was the default until this bake-off.
   sceneDescription: process.env.SCENE_DESCRIPTION_MODEL || 'gemini-3.1-pro',
+  // The Art Director's two big calls run on cheaper models than sceneDescription (which stays the
+  // model of the brief re-ask, the element-label round and the per-page fallback). Replayed on STORED
+  // prompts of 3-6 staging stories, scored with each stage's own checks (evals/results/results.jsonl,
+  // 2026-10-09_ad-stage-replay; scripts/analysis/ad-stage-model-replay.js):
+  //  - Visual Bible: claude-haiku-5-5 at effort medium. Parsed 6/6, 0 label faults (Pro 2), 0 element-budget
+  //    overflows (Pro 1), blind pairwise 3/3 for Haiku, USD 0.011-0.032 against Pro 0.13-0.33.
+  //  - Page briefs: gemini-3.7-flash at reasoning low. Re-ask triggers 65 vs 63 over 6 stories (Pro re-run
+  //    noise +-3), blind 3-way reading tied 10/10/10, USD 0.03-0.06 against Pro 0.11-0.23. One PROHIBITED_CONTENT
+  //    refusal in 9 calls (attempt 2 of the pipeline retries it; a refusal is billed 0). Haiku was rejected
+  //    here (8 negation_named on one story vs 1). Re-ask (Haiku left 5 findings + 2 introduced vs Pro 2 + 0)
+  //    and lector (flash found 4 of Pro's 10, Haiku fewer) were NOT switched. docs/decisions.md 2026-10-09.
+  //  Env SCENE_DESCRIPTION_MODEL / a dev override of sceneDescriptionModel puts every call back on one model.
+  visualBibleModel: process.env.VISUAL_BIBLE_MODEL || 'claude-haiku-5-5',
+  visualBibleEffort: 'medium',
+  sceneBriefsModel: process.env.SCENE_BRIEFS_MODEL || 'gemini-3.7-flash',
   // Scene iteration/retry — the full-scene re-expansion during repair. Moved to
   // Qwen for cost (2026-07-12): its diagnosis + fix quality matched Sonnet in the
   // A/B; the one gap (copying German Visual-Bible names into English prose) is
