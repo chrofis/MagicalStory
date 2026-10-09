@@ -68017,3 +68017,44 @@ Touched files: server/lib/vbIdGuard.js, server/lib/promptBuilders.js, server/lib
 **Decision:** deleted the description regex; `isMissing` is `issue.type === 'missing_character' || 'missing_element'`.
 **Rationale:** the regex only chose a log level (type already decides), and reading description prose is ruled out. No stored data or score depends on it. Regression: tests/unit/bbox-enrich-log-level-by-type.test.ts.
 **Touched files:** server/lib/bboxDetection.js, tests/unit/bbox-enrich-log-level-by-type.test.ts.
+
+## 2026-10-09 - Trial: the per-IP limiter fronts account creation only (owner iPhone /try, body row and sheet never started)
+
+**Context:** `trialAvatarLimiter` (2 per IP per day) fronted create-anonymous-account AND update-photo, prepare-standard-body and prepare-standard-avatar. It was sized for "one trial = create + sheet". Since the body row starts at the photo (0a919f0c0) one trial costs 3+ hits, so the 3rd call of a trial, and every call after the visitor's earlier tries that day, got a silent 429; the client treats a failed body row/sheet as non-blocking, so nothing showed. Staging log for user 0ef873ec: account + PATCH, then no "Drawing the standard body row" and no sheet. Admin bypass skips the limiter, which is why Test Lab and admin runs never saw it.
+**Decision:** the limiter stays on create-anonymous-account only (2 accounts per IP per day, unchanged). The other three are bound by the session token, one call per account and the global DAILY_TRIAL_AVATAR_CAP.
+**Rationale:** the limiter's job is abuse of account creation; spend on the follow-up calls is bounded by the account and the daily cap. Regression: tests/unit/trial-limiter-only-on-account.test.ts (fails on the old placement).
+**Revisit if:** photo swaps on one account are abused (cap them per account, not per IP).
+**Touched files:** server/routes/trial.js, server/middleware/rateLimit.js.
+
+## 2026-10-09 - Trial: photo analysis retries a network-level failure once
+
+**Context:** iPhone: the first face pick (cold analyzer, server 200 after 16.4 s) showed "Foto konnte nicht analysiert werden"; the same photo and pick 2.1 s later worked. Client code on that path cannot throw after a 200 (no timeout or abort in the client), so the phone's request failed at network level while the server completed.
+**Decision:** `postAnalyzePhoto` repeats the request once when fetch itself rejects. An HTTP answer is never retried. Which network element dropped the long-held request is not proven; the retry hits a warm analyzer (seconds).
+**Considered:** shortening the cold start (the presence warm-up already loads the face worker including U2-Net; the 16 s was the model load still running on a freshly deployed analyzer), a server keep-alive (no bytes can be sent before the JSON).
+**Revisit if:** trial_events show photo_analyzed gaps on mobile after this.
+**Touched files:** client/src/pages/trial/TrialCharacterStep.tsx. Harness: tests/manual/trial-real-order.cjs.
+
+## 2026-10-09 - Trial topic grid: stable selection, no topics that need a second character
+
+**Context:** owner: 6 topics show; the selected one jumps to first place; "Geschwisterstreit needs a sibling we do not have in trial".
+**Decision:** (1) 6 tiles is TRIAL_GRID_SIZE by design (2026-09-13: fills both grid geometries), unchanged. (2) A topic is pinned first only when it is NOT already in the grid (an SEO deep link); one picked from the grid keeps its place. (3) LifeChallenge gets a typed flag `needsSecondCharacter`, set on sibling-fighting and new-sibling; the trial pool and the deep-link pin drop flagged topics. parents-splitting and grandparent-sick are not flagged: they are deep-link-only already.
+**Touched files:** client/src/constants/storyTypes.ts, client/src/types/story.ts, tests/unit/trial-topic-grid-second-character.test.ts (and trial-age-appropriate-topics.test.ts: the in-grid pin-first and the no-age source-order expectations changed with the owner request).
+
+## 2026-10-09 - Seasonal topics are offered only around their occasion; Samichlaus added
+
+**Context:** owner: Mother's/Father's Day must not show in October, Halloween must; "ensure this changes automatically"; "Samichlaus is missing".
+**Decision:** each seasonal StoryType carries a typed `season` window (client/src/constants/seasons.ts), evaluated against the current date in ONE place, `getStoryTypesByGroup(group, offeredAt = now)`, which every picker (trial, full wizard) reads. Landing pages pass `null` and list everything. Only OFFERING is gated: ids still resolve (getStoryTypeById), so a stored draft or story with a hidden seasonal topic loads. No server list or validation exists to gate (storyThemes.js only maps ids to prompt wording). The dates are SWISS by owner decision, for every story language: halloween 1 Oct-31 Oct; christmas 1 Nov-26 Dec; samichlaus 15 Nov-6 Dec; newyear 15 Dec-6 Jan; easter 35 days before Easter Sunday to Easter Monday (Gregorian algorithm, tested 2026-2030); mothers-day 28 days before through the 2nd Sunday of May; fathers-day 28 days before through the 1st Sunday of June. The popular list now holds all six seasonal ids plus samichlaus (replacing the hard-coded mothers-day/fathers-day).
+Samichlaus is registered everywhere halloween/easter are: storyTypes.ts, server/config/storyThemes.js (occasion), server/lib/seoMeta.js, prompts/adventure-guides.txt (gentle tone, Schmutzli a helper, nobody scolded), server/config/trialTitles.js. No trialCostumes entry (like mothers-day: no costumed sheet). The occasion/gift SEO pages are untouched.
+**Touched files:** client/src/constants/seasons.ts (new), storyTypes.ts, types/story.ts, pages/ThemeCategory.tsx, the files above, tests/unit/seasonal-topics-offer-window.test.ts.
+
+## 2026-10-09 - Trial ideas: the spinner stays until a card is complete; the box measures before paint
+
+**Context:** owner: the idea box adapts while streaming, then collapses when the ideas are done, and streaming text is worse than waiting.
+**Decision:** a card shows its spinner until its final text arrives, then the whole idea at once (cards may complete one by one); the streaming text element is gone. The server stream is unchanged (the final text still arrives as an SSE event; the partial events are simply not rendered). AutoGrowTextarea measures in a layout effect (before first paint) and again when web fonts are ready. Editable means THIS card is final (a previous round's finals no longer stand in during a rewrite). WebKit harness tests/manual/trial-idea-box-autogrow.cjs against a real SSE server: no streamed text ever in the page; scrollHeight equals clientHeight (364 at 375 px, 338 at 430 px, 200 desktop) for an 85-word idea. The exact collapse mechanism was not reproduced; the old streaming-to-textarea swap it belonged to no longer exists.
+**Touched files:** client/src/pages/trial/TrialIdeasStep.tsx.
+
+## 2026-10-09 - The ideas offered are recorded (idea_generated.detail.ideas)
+
+**Context:** owner: "Save the ideas in future trials"; the offered texts were stored nowhere, so "the ideas are incoherent" was uncheckable.
+**Decision:** `ideasOfferedDetail` (server/lib/ideaEvents.js) builds one bounded detail (per idea: armIndex, title, text exactly as sent, ideaKind, self-check verdict; rerun flag; city only). The trial stream, the wizard stream and the wizard single-call route write it into the EXISTING `idea_generated` row. No new event slug and no migration (idea_events.event is VARCHAR(40), unconstrained), because a second event beside idea_generated would be a parallel record of the same moment. Fire-and-forget as before. Sibling set `idea-offered-record` added to scripts/admin/sibling-registry.json.
+**Touched files:** server/lib/ideaEvents.js, server/routes/trial.js, server/routes/storyIdeas.js, scripts/admin/sibling-registry.json, tests/unit/idea-offered-record.test.ts.

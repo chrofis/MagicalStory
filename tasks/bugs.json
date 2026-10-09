@@ -4078,6 +4078,36 @@
       "fixedAt": "2026-10-09",
       "fixedIn": "ec07209eb",
       "fix": "sheetGrid.detectGutterBands abruptness check; referenceSheets.sheetCellIdentityLine (one garment) and a named block error; parseCellIdentification reads only the assignments array. Tests: tests/unit/sheet-grid-detection.test.ts, tests/unit/sheet-cell-identification-block.test.ts."
+    },
+    {
+      "id": "trial-limiter-blocks-body-row-and-sheet",
+      "title": "Trial: the per-IP avatar limiter (2/day) also fronted update-photo, prepare-standard-body and prepare-standard-avatar, so the body row and the standard sheet were refused with a silent 429 and never drawn",
+      "reportedAt": "2026-10-09",
+      "source": "Owner iPhone /try on staging 28492445f: user 0ef873ec had account + PATCH in the Railway log and no body-row or sheet entry; limiter max 2 vs 3+ calls per trial; admin bypass skips the limiter.",
+      "status": "fixed",
+      "fixedAt": "2026-10-09",
+      "fixedIn": "730a80c8d",
+      "fix": "trialAvatarLimiter on create-anonymous-account only; regression tests/unit/trial-limiter-only-on-account.test.ts"
+    },
+    {
+      "id": "trial-photo-analysis-network-drop",
+      "title": "Trial: a long (cold, 16 s) face-pick analysis failed on the phone with 'Foto konnte nicht analysiert werden' although the server answered 200; the same pick worked 2 s later",
+      "reportedAt": "2026-10-09",
+      "source": "Owner iPhone, server log: pick 16382 ms 200, then 2099 ms 200.",
+      "status": "fixed",
+      "fixedAt": "2026-10-09",
+      "fixedIn": "84a0a76d7",
+      "fix": "postAnalyzePhoto retries a network-level failure once (the dropping network element is not proven); harness tests/manual/trial-real-order.cjs"
+    },
+    {
+      "id": "trial-topic-jumps-to-first",
+      "title": "Trial topic grid: the selected topic jumped to first place, and Geschwisterstreit / new sibling were offered although the trial has one character",
+      "reportedAt": "2026-10-09",
+      "source": "Owner iPhone /try.",
+      "status": "fixed",
+      "fixedAt": "2026-10-09",
+      "fixedIn": "84a0a76d7",
+      "fix": "pin only when not in the grid; typed flag needsSecondCharacter; tests/unit/trial-topic-grid-second-character.test.ts"
     }
   ]
 }

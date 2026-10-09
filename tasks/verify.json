@@ -9465,6 +9465,25 @@
         "kind": "human",
         "what": "One /try on staging with a photo, form left empty for 20 s: trial_events avatar_ready minus photo_analyzed <= 40 s; Railway log shows \"Standard body row ready ... in Ns\" and either \"reusing the body row drawn at the photo\" or the \"drawn for ... but the visitor declared\" warning; every avatar image on wizard, slides and spinner is a single figure."
       }
+    },
+    {
+      "id": "trial-iphone-recheck-2026-10-09",
+      "title": "Trial iPhone recheck: body row + sheet start, face pick, topic grid, seasonal topics, ideas",
+      "commits": [
+        "730a80c8d",
+        "84a0a76d7"
+      ],
+      "addedAt": "2026-10-09",
+      "status": "pending",
+      "evidence": [],
+      "claim": "On an iPhone /try after earlier same-IP tries: the body row and the sheet are requested and shown, a cold face pick shows no error, the topic grid keeps the picked tile in place and offers no sibling topic, Halloween is offered and Mother's/Father's Day are not, ideas show a spinner and then the full idea with no inner scrolling.",
+      "runShape": [
+        "trial"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "One /try on staging from a phone: Railway log shows 'Drawing the standard body row' and 'Styling the standard sheet' for the new user; topic step shows no sibling topic and Halloween in the adventure list; idea cards fit their text; idea_events idea_generated detail.ideas holds both texts."
+      }
     }
   ],
   "runs": [
