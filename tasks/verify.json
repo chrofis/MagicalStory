@@ -8832,6 +8832,24 @@
         "status": "superseded",
         "note": "Reverted in bfb72b210: effect inside judge run-to-run noise on 56 labelled pages; recall on the 7 real-defect pages not shown. See docs/decisions.md \"Action judge recalibration measured and not adopted\"."
       }
+    },
+    {
+      "id": "gaze-severity-by-relevance-2026-10-09",
+      "title": "Gaze finding severity follows the page story",
+      "commits": [
+        "46b917887"
+      ],
+      "addedAt": "2026-10-09",
+      "status": "pending",
+      "evidence": [],
+      "claim": "A declared-gaze finding is CRITICAL only when a storyRelevant watching row pairs the figure with the target, MAJOR for any other pairing row, MINOR otherwise; gaze-check MAJOR+ page flags drop with no real-defect finding lost.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Replay scripts/analysis/gaze-severity-replay.js --days=21 and gaze-severity-labelled.js: no new repair trigger, no labelled real-defect finding dropped. On a story run every source gaze-check finding carries the severity its page interaction rows imply; every CRITICAL gaze finding is viewed for a witness misread."
+      }
     }
   ],
   "runs": [
