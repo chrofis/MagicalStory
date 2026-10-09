@@ -4961,6 +4961,14 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
       parentMetadata: sceneMetadata,
       rewriteMetadata: extractSceneMetadata(String(text || '')),
     }),
+    // The closed emotion list holds on a rewrite exactly as on an authored
+    // brief (sceneBriefCheck.checkEmotionEnum, also run by briefChecks). A value
+    // off the list normalises to null and emotionCheck skips the figure; the
+    // shipped p4 of staging job_1791531449494_o0kaatvmq carried "focused".
+    ...(() => {
+      const meta = extractSceneMetadata(String(text || ''));
+      return require('./sceneBriefCheck').checkEmotionEnum({ pageNumber }, meta?.fullData || meta);
+    })(),
   ];
   // ── ONE CORRECTIVE RE-ASK, FOR BOTH CHECK FAMILIES (2026-09-17) ───────────
   // Owner: "All 3 same as pipeline. These should be siblings or even identical

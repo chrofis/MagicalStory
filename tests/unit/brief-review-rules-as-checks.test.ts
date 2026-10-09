@@ -57,10 +57,13 @@ describe('character_fields: depth and a drawable expression on every row', () =>
     expect(SBC.checkCharacterFields({ pageNumber: 1 }, full(b)).map((f: any) => f.character)).toEqual(['Ana', 'Ben']);
   });
   // Fiona rerun 2026-10-08 (group D #20): the Art Director wrote "focused" and nothing
-  // enforced the closed list, so verify emotion-enum fell to 25/28.
+  // enforced the closed list, so verify emotion-enum fell to 25/28. The list is now its
+  // own check (emotion_off_list, also run on iterate rewrites and creatures[] rows):
+  // character_fields no longer reports it.
   it('fires on an emotion outside the closed list, and on a missing one', () => {
     const b = brief('x', { shot: 'medium', characters: [row('Ana', { emotion: 'focused' }), row('Ben', { emotion: '' }), row('Cy', { emotion: 'Happy' })] });
-    const f = SBC.checkCharacterFields({ pageNumber: 1 }, full(b));
+    expect(SBC.checkCharacterFields({ pageNumber: 1 }, full(b))).toEqual([]);
+    const f = SBC.checkEmotionEnum({ pageNumber: 1 }, full(b));
     expect(f.map((x: any) => x.character)).toEqual(['Ana', 'Ben']);
     expect(f[0].detail).toContain('`happy`');
     expect(f[0].detail).toContain('"focused"');

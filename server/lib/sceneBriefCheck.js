@@ -1075,11 +1075,6 @@ function checkCharacterFields(page, metadata) {
     const expr = String(c.expression || '').trim();
     if (!expr) missing.push('`expression`');
     else if (!FACE_PART_RE.test(expr) && !faceHidden(c, metadata.shot)) missing.push(`an \`expression\` that names brows, eyes or mouth (it reads "${expr}")`);
-    // `emotion` is one value of the closed list the blind inventory answers in
-    // (emotionVocabulary.js), compared in code by emotionCheck. Nothing enforced
-    // it: the Art Director wrote "focused" on 3 of 28 rows of the Fiona rerun
-    // 2026-10-08 and verify `emotion-enum` fell under 90% (group D #20).
-    if (!normalizeEmotion(c.emotion)) missing.push(`an \`emotion\` that is exactly one of ${EMOTION_ENUM_PHRASE} (it reads "${String(c.emotion || '').trim()}")`);
     if (missing.length) {
       out.push({
         pageNumber: page.pageNumber, type: 'character_fields', character: c.name,
@@ -1087,6 +1082,36 @@ function checkCharacterFields(page, metadata) {
       });
     }
   }
+  return out;
+}
+
+/**
+ * emotion_off_list — every `emotion` a brief declares (characters[] rows AND
+ * creatures[] rows) is exactly one value of the closed list the blind inventory
+ * answers in (emotionVocabulary.js), compared in code by emotionCheck. An
+ * off-list value ("focused") normalises to null there, and emotionCheck skips
+ * the figure without a word: the comparison is silently off for that figure.
+ * Nothing enforced the list until the Fiona rerun 2026-10-08 (group D #20,
+ * verify `emotion-enum`), and then only for the authored characters[]; the
+ * iterate rewrite (staging job_1791531449494_o0kaatvmq p4: "focused" on the
+ * creature Funka, skipped on the shipped page) and creatures[] rows had no
+ * check. ONE function, run on the authored brief (briefChecks) and on the
+ * iterate rewrite (images.js): a missing value is a fault too, as it always
+ * was. Structural on the field's value; no prose is read.
+ */
+function checkEmotionEnum(page, metadata) {
+  const m = metadata || {};
+  const rowsOf = (key) => (Array.isArray(m[key]) ? m[key] : []).filter(r => r && typeof r === 'object');
+  const out = [];
+  const flag = (kind, who, row) => {
+    if (normalizeEmotion(row.emotion)) return;
+    out.push({
+      pageNumber: page.pageNumber, type: 'emotion_off_list', [kind]: who,
+      detail: `${who}'s ${kind === 'character' ? 'characters[]' : 'creatures[]'} row needs an \`emotion\` that is exactly one of ${EMOTION_ENUM_PHRASE} (it reads "${String(row.emotion || '').trim()}"). The one mood word goes in \`emotion\`, from the closed list; the \`expression\` still draws it.`,
+    });
+  };
+  for (const c of rowsOf('characters')) if (c.name) flag('character', c.name, c);
+  for (const r of rowsOf('creatures')) if (r.id) flag('creature', r.id, r);
   return out;
 }
 
@@ -1762,6 +1787,7 @@ module.exports = {
   checkNegationNamed,
   checkElementUncited,
   checkCharacterFields,
+  checkEmotionEnum,
   checkFooting,
   checkCreatureRows,
   checkCastNotInPlan,
