@@ -39,9 +39,7 @@ describe('sanitizeVbIdsInPrompt — vantage suffixes', () => {
   it('resolves LOC005.1 to the location, leaving no dangling ".1"', () => {
     const out = sanitizeVbIdsInPrompt('The scene is staged at LOC005.1 at dusk.', VB, 8);
     assertNoVbIds(out, 'sanitised vantage line');
-    // A place reaches the image model by description, never by name (decisions.md 2026-10-09).
-    expect(out).toContain('tree-lined cobbled path along the Limmat');
-    expect(out).not.toContain('Holzbrücke');
+    expect(out).toContain('The chestnut path to the Holzbrücke');
     // The old pattern matched only `LOC005` and glued the leftover onto the
     // substituted name — the exact token an image model letters onto the page.
     expect(out).not.toContain('Holzbrücke.1');
@@ -51,15 +49,13 @@ describe('sanitizeVbIdsInPrompt — vantage suffixes', () => {
   it('falls back to the parent location for a vantage the bible does not list', () => {
     const out = sanitizeVbIdsInPrompt('Framed from LOC005.9.', VB, 8);
     assertNoVbIds(out, 'unknown vantage');
-    expect(out).toContain('tree-lined cobbled path along the Limmat');
-    expect(out).not.toContain('Holzbrücke');
+    expect(out).toContain('The chestnut path to the Holzbrücke');
   });
 
   it('still resolves the bare id and orphans to a generic noun', () => {
     // (The prop-NAME pass then rewrites "log pile" to ART007's type — a
     // pre-existing behaviour of the name substitution, not part of this fix.)
-    expect(sanitizeVbIdsInPrompt('at LOC006', VB, 8)).toMatch(/^at outdoor, enclosed nook/);
-    expect(sanitizeVbIdsInPrompt('at LOC006', VB, 8)).not.toContain('Inside the log pile gap');
+    expect(sanitizeVbIdsInPrompt('at LOC006', VB, 8)).toMatch(/^at Inside the .+ gap$/);
     const orphan = sanitizeVbIdsInPrompt('holding the ART099', VB, 8);
     assertNoVbIds(orphan, 'orphan id');
     expect(orphan).toContain('object');
@@ -106,8 +102,7 @@ describe('feedback consolidator input — p8 of job_1788641639919_mpjwlzkf1', ()
     for (const w of ['skyline', 'masts', 'antennas']) {
       expect(clean.toLowerCase()).not.toContain(w);
     }
-    // The protected landmark is named to the consolidator by what it looks like, not by its name.
-    expect(clean).not.toContain('The chestnut path to the Holzbrücke');
+    expect(clean).toContain('The chestnut path to the Holzbrücke');
   });
 });
 

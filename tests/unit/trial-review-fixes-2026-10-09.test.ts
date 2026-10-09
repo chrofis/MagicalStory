@@ -25,10 +25,7 @@ describe('trial writer prompt', () => {
 
 describe('index qualifier never reaches an image prompt', () => {
   it('drops "(Stadt)" before a LOC tag in the Setting line', () => {
-    // With a description the Setting line carries no place name at all (decisions.md 2026-10-09);
-    // with none, the location stays, qualifier stripped.
-    expect(buildTextFromJson({ setting: { location: 'Fislisbach (Stadt) [LOC002]', description: 'Wide meadow' } })).toBe('Setting: Wide meadow');
-    expect(buildTextFromJson({ setting: { location: 'Fislisbach (Stadt) [LOC002]' } })).toBe('Setting: Fislisbach');
+    expect(buildTextFromJson({ setting: { location: 'Fislisbach (Stadt) [LOC002]', description: 'Wide meadow' } })).toBe('Setting: Fislisbach. Wide meadow');
     expect(stripEntityIds('Kapellbrücke (Luzern) [LOC001.1]')).toBe('Kapellbrücke');
   });
   it('keeps a parenthesis that is not a location name qualifier', () => {

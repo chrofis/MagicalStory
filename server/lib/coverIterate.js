@@ -2195,7 +2195,6 @@ function buildCoverSceneFromHint(hint, visualBible, characters, opts = {}) {
   const loc = locId && Array.isArray(visualBible?.locations)
     ? visualBible.locations.find(l => l?.id && l.id.toUpperCase() === locId.toUpperCase())
     : null;
-  // `englishLocationRef` is name-free: the cover's backdrop is described, never named.
   const landmarkName = (loc && englishLocationRef(loc))
     || (locId ? 'the landmark' : 'a scenic outdoor setting');
 

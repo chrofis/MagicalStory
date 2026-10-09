@@ -81,10 +81,9 @@ describe('labelOf', () => {
       expect(labelOf({ id: 'ANI001', name: 'Bruno', type: 'dog' })).toBe('Bruno');
     });
 
-    it('labels a location, real or invented, by its features and never by its name', () => {
-      // A place name in an image prompt is painted as a caption (decisions.md 2026-10-09).
+    it('labels a real landmark by name and an invented location by its features', () => {
       expect(labelOf({ id: 'LOC001', name: 'Chapel Bridge', isRealLandmark: true, features: 'covered wooden bridge' }))
-        .toBe('covered wooden bridge');
+        .toBe('Chapel Bridge');
       expect(labelOf({ id: 'LOC002', name: 'Waldhütte', features: 'timber cabin with a mossy roof, deep in pines' }))
         .toBe('timber cabin');
     });

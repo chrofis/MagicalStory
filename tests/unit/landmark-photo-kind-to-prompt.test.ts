@@ -65,8 +65,7 @@ describe('buildLandmarkFidelityBlock — branches on the photo kind', () => {
     for (const kind of ['distant', 'view-from']) {
       const wide = buildLandmarkFidelityBlock({ name: 'A Village', photoType: kind });
       expect(wide).not.toBe(single);
-      expect(wide).toContain('WIDE VIEW');
-      expect(wide).not.toContain('A Village');
+      expect(wide).toContain('A Village');
     }
   });
 

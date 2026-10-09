@@ -151,10 +151,9 @@ function labelOf(entry, poolHint) {
       // every other consumer already uses.
       out = name;
     } else if (pool === 'LOC') {
-      // Never the name: a place name in an image prompt is painted as a caption
-      // (docs/decisions.md 2026-10-09). A real landmark is identified by its
-      // reference photo, not by its name.
-      out = clauseRef(entry.features || entry.description, { maxWords: 4, hardCap: 6 });
+      out = entry.isRealLandmark
+        ? name
+        : (clauseRef(entry.features || entry.description, { maxWords: 4, hardCap: 6 }) || name);
     } else {
       const type = String(entry.type ?? '').trim();
       const typeUsable = type

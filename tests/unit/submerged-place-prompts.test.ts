@@ -59,11 +59,10 @@ describe('the page prompt carries no SEASON line for a picture with no sky', () 
 });
 
 describe('a vantage plate\'s LOCATION line holds only what its camera sees', () => {
-  const loc = { name: 'The Shore', setting: 'outdoor shore', features: 'sandy shoreline, rolling dunes', colors: 'pale yellow, dark blue', signatureElement: 'a weathered wooden bench' };
-  it('with its own description: the place\'s setting kind and colours, never its features, signature element or name', () => {
+  const loc = { name: 'The Shore', features: 'sandy shoreline, rolling dunes', colors: 'pale yellow, dark blue', signatureElement: 'a weathered wooden bench' };
+  it('with its own description: the place\'s name and colours, never its features or signature element', () => {
     const text = vantageSettingText({ location: loc, locationName: 'The Shore', name: 'Under the Surface', description: 'Water all around, a sandy seabed below.' }, '');
-    expect(text).toContain('outdoor shore (pale yellow, dark blue)');
-    expect(text).not.toContain('The Shore');
+    expect(text).toContain('The Shore (pale yellow, dark blue)');
     expect(text).not.toMatch(/bench|dunes|shoreline/);
     expect(text).toContain('Water all around');
   });
@@ -72,8 +71,8 @@ describe('a vantage plate\'s LOCATION line holds only what its camera sees', () 
     expect(text).toMatch(/bench/);
     expect(text).toMatch(/dunes/);
   });
-  it('englishLocationRef keeps its default fields: features, colours and signature, behind the setting kind and with no name', () => {
-    expect(englishLocationRef(loc)).toBe('outdoor shore (sandy shoreline, rolling dunes; pale yellow, dark blue; a weathered wooden bench)');
+  it('englishLocationRef keeps its default: features, colours and signature', () => {
+    expect(englishLocationRef(loc)).toBe('The Shore (sandy shoreline, rolling dunes; pale yellow, dark blue; a weathered wooden bench)');
   });
 });
 

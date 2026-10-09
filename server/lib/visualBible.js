@@ -1960,29 +1960,22 @@ function englishEntityRef(entry, genericNoun = 'object', opts = {}) {
 }
 
 /**
- * Image-facing reference for a VB location: what the place LOOKS like, never
- * its name. A place name in an image prompt is text the image model paints as
- * a caption (staging trials job_1791531511694 p6 "Kirche Rohrdorf",
- * job_1791496201302 p2 "Fislisbach (Stadt)", job_1791551303368 p2 — each an
- * exact match to the page's Setting line; docs/decisions.md 2026-10-09). The
- * identity of a real place rides on its reference photo, not on its name, and
- * the story-language name carries no visual information anyway. So the ref is
- * the entry's English setting kind with the visual fields inlined behind it
- * ("outdoor meadow beside a modern church (features; colors; signature)").
- * ONE helper for every image-facing site (sanitizeVbIdsInPrompt, covers,
- * vantage plates). Returns null when the entry has nothing visual to say —
- * callers keep their own generic wording.
+ * Image-facing reference for a VB location. The bare location name is
+ * story-language and — for invented locations — carries zero visual
+ * information, so the name is only emitted WITH the entry's English visual
+ * fields (features / colors / signatureElement) inlined in parentheses
+ * (settled cover-prompt pattern, docs/decisions.md 2026-07-31). Returns null
+ * when the entry has no name — callers keep their own fallbacks.
  */
 function englishLocationRef(loc, { fields = ['features', 'colors', 'signatureElement'] } = {}) {
   if (!loc) return null;
+  const name = String(loc.name || '').trim();
+  if (!name) return null;
   const visuals = fields.map(f => loc[f])
     .map(v => String(v || '').trim())
     .filter(Boolean)
     .join('; ');
-  const kind = String(loc.setting || '').trim();
-  if (kind && visuals) return `${kind} (${visuals})`;
-  if (kind || visuals) return kind || visuals;
-  return clauseRef(loc.description, { maxWords: 12 }) || null;
+  return visuals ? `${name} (${visuals})` : name;
 }
 
 /**

@@ -189,15 +189,13 @@ describe('a prompt that does not fit fails loudly and never reaches Gemini', () 
 
 describe("an interior plate does not take the place's palette line (Fiona rerun #24)", () => {
   const { vantageSettingText } = require_('../../server/lib/sceneMetadata');
-  const v = { locationName: 'Museum', location: { name: 'Museum', setting: 'indoor museum hall', colors: 'grey stone, green ivy, brown cobbles' }, name: 'gallery corner', description: 'A dim gallery with glass cases.' };
-  it('an exterior vantage keeps the colours, never the name', () => {
-    const t = vantageSettingText(v, 'Another plate.');
-    expect(t).toContain('indoor museum hall (grey stone, green ivy, brown cobbles)');
-    expect(t).not.toContain('Museum');
+  const v = { locationName: 'Museum', location: { name: 'Museum', colors: 'grey stone, green ivy, brown cobbles' }, name: 'gallery corner', description: 'A dim gallery with glass cases.' };
+  it('an exterior vantage keeps the colours', () => {
+    expect(vantageSettingText(v, 'Another plate.')).toContain('Museum (grey stone, green ivy, brown cobbles)');
   });
-  it('an interior vantage carries the setting kind only', () => {
+  it('an interior vantage carries the place name only', () => {
     const t = vantageSettingText(v, 'Another plate.', { interior: true });
-    expect(t).toContain('**LOCATION:** indoor museum hall' + String.fromCharCode(10) + '**VANTAGE:** gallery corner');
+    expect(t).toContain('**LOCATION:** Museum' + String.fromCharCode(10) + '**VANTAGE:** gallery corner');
     expect(t).not.toContain('ivy');
   });
 });
@@ -208,8 +206,8 @@ describe('the vantage plate states its Art Director prose once', () => {
     const src = fs.readFileSync(path.join(__dirname, '..', '..', 'server/lib/platePipeline.js'), 'utf8');
     expect(src).toContain("const vantageSetting = vantageSettingText(v, adEmptyPrompt, { interior: baseLight.weather === 'none' });");
     const { vantageSettingText } = require_('../../server/lib/sceneMetadata');
-    const v = { locationName: 'Quay', location: { name: 'Quay', setting: 'outdoor stone quay' }, name: 'low landing', description: 'Looking up at the wall.' };
-    expect(vantageSettingText(v, 'Looking up at the wall.')).toBe('**LOCATION:** outdoor stone quay\n**VANTAGE:** low landing');
+    const v = { locationName: 'Quay', name: 'low landing', description: 'Looking up at the wall.' };
+    expect(vantageSettingText(v, 'Looking up at the wall.')).toBe('**LOCATION:** Quay\n**VANTAGE:** low landing');
     expect(vantageSettingText(v, 'Another plate.')).toContain('Looking up at the wall.');
   });
 });
