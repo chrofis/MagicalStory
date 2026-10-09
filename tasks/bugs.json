@@ -4058,6 +4058,26 @@
       "fixedAt": "2026-10-09",
       "fixedIn": "ad43d1ee2",
       "fix": "prompts/character-analysis.txt gets a facialHair field (and keeps facial hair out of distinctive markings); trialAge.applyTrialPhotoTraits stamps it; promptBuilders.facialHairForAge (FACIAL_HAIR_MIN_AGE 13) gates every facial-hair reader for a declared child. Test: tests/unit/facial-hair-declared-child-2026-10-09.test.ts. The one stored legacy row (staging Mia) keeps its beard text in other until re-analysed."
+    },
+    {
+      "id": "trial-costume-not-named-in-image-summary",
+      "title": "The trial writer never named the costume garments in imageSummary, so the image prompt clothing check logged \"the scene prose does not dress <child>\" on every page and the cover of a costumed trial",
+      "reportedAt": "2026-10-09",
+      "source": "Staging trial job_1791560888615_uaivmr21o (ninja life-challenge, owner iPhone): ERROR 👕 [CLOTHING] on pages 2-6 and the cover. Replay over 27 staging trials of 14 days: 12 of 82 costumed character-pages flagged (ninja 10 of 12); pirate/wizard/knight pass only because missingGarments skips a comma-list costume that contains an accessory word.",
+      "status": "fixed",
+      "fixedAt": "2026-10-09",
+      "fixedIn": "4ccd99335",
+      "fix": "promptBuilders.buildTrialStoryPrompt: the costume clothing rule and the cover note require imageSummary to name the costume garments in the words of the costumed line. Test: tests/unit/trial-costume-named-in-image-summary.test.ts. Open: clothingCheck.missingGarments cannot fire for most costumes (owner call, see report)."
+    },
+    {
+      "id": "ref-sheet-single-figure-split-and-id-blocked",
+      "title": "A single-figure reference sheet was read as two cells (calm row taken for a gutter), the cell-identification call was blocked by the safety filter (PROHIBITED_CONTENT, reported as no JSON object), and the solo re-render failed the same way: the character shipped with NO reference image",
+      "reportedAt": "2026-10-09",
+      "source": "Staging trial job_1791560888615_uaivmr21o, Lina: vb_sheet_layout_mismatch 1x2, vb_sheet_identification_failed twice, vb_sheet_no_reference. Reproduced on the stored ref_sheet_source p0: grid 1x2 from one quiet row; the identification call with the full description returned blockReason PROHIBITED_CONTENT 5/5.",
+      "status": "fixed",
+      "fixedAt": "2026-10-09",
+      "fixedIn": "ec07209eb",
+      "fix": "sheetGrid.detectGutterBands abruptness check; referenceSheets.sheetCellIdentityLine (one garment) and a named block error; parseCellIdentification reads only the assignments array. Tests: tests/unit/sheet-grid-detection.test.ts, tests/unit/sheet-cell-identification-block.test.ts."
     }
   ]
 }
