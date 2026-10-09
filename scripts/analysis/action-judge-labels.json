@@ -1,0 +1,1101 @@
+{
+ "version": 1,
+ "date": "2026-10-09",
+ "note": "Labels made by viewing each stored staging page image. findings are the stored (consolidated) action_interaction findings in stored order. realPage = a real action defect is visible. borderline = judgement call, scored as noise in the headline and reported as sensitivity. No story text stored. realMatch = analysis-only keywords: a re-run finding on a real page counts as hitting the real defect when its description contains one of them and is not a gaze comparison (\"declared looking\").",
+ "pages": [
+  {
+   "id": "1nitlympp_p12_v1",
+   "story": "job_1790100385959_1nitlympp",
+   "pn": 12,
+   "vi": 1,
+   "kind": "ai",
+   "src": "inpaint-round-1",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "critical",
+     "label": "noise",
+     "reason": "pose nuance; act of searching reads (one figure bends to a pile, others distressed)",
+     "borderline": true
+    },
+    {
+     "i": 1,
+     "sev": "critical",
+     "label": "noise",
+     "reason": "pose nuance",
+     "borderline": true
+    },
+    {
+     "i": 2,
+     "sev": "critical",
+     "label": "noise",
+     "reason": "pose nuance",
+     "borderline": true
+    },
+    {
+     "i": 3,
+     "sev": "critical",
+     "label": "noise",
+     "reason": "pose nuance",
+     "borderline": true
+    }
+   ]
+  },
+  {
+   "id": "fcmlfa8kn_p8_v2",
+   "story": "job_1790107559778_fcmlfa8kn",
+   "pn": 8,
+   "vi": 2,
+   "kind": "ai",
+   "src": "inpaint-round-2",
+   "realPage": true,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "critical",
+     "label": "noise",
+     "reason": "gaze",
+     "borderline": false
+    },
+    {
+     "i": 1,
+     "sev": "critical",
+     "label": "noise",
+     "reason": "gaze",
+     "borderline": false
+    },
+    {
+     "i": 2,
+     "sev": "major",
+     "label": "real",
+     "reason": "pointing target contradicts declared target",
+     "borderline": false
+    }
+   ],
+   "realMatch": [
+    "point",
+    "root"
+   ]
+  },
+  {
+   "id": "essbvehs8_p3_v1",
+   "story": "job_1791267520938_essbvehs8",
+   "pn": 3,
+   "vi": 1,
+   "kind": "ai",
+   "src": "iterate-round-1",
+   "realPage": true,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "noise",
+     "reason": "gaze",
+     "borderline": false
+    },
+    {
+     "i": 1,
+     "sev": "major",
+     "label": "real",
+     "reason": "declared footing in shallow water contradicted (stands on dry sand)",
+     "borderline": false
+    },
+    {
+     "i": 2,
+     "sev": "major",
+     "label": "noise",
+     "reason": "secondary; the wave reads",
+     "borderline": false
+    }
+   ],
+   "realMatch": [
+    "sand",
+    "water",
+    "tail",
+    "feet",
+    "foot"
+   ]
+  },
+  {
+   "id": "essbvehs8_p14_v1",
+   "story": "job_1791267520938_essbvehs8",
+   "pn": 14,
+   "vi": 1,
+   "kind": "ai",
+   "src": "char-fix-round-1",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "noise",
+     "reason": "gaze",
+     "borderline": false
+    },
+    {
+     "i": 1,
+     "sev": "moderate",
+     "label": "noise",
+     "reason": "gaze",
+     "borderline": false
+    },
+    {
+     "i": 2,
+     "sev": "moderate",
+     "label": "noise",
+     "reason": "gaze",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "50osg2osm_p4_v1",
+   "story": "job_1791145238223_50osg2osm",
+   "pn": 4,
+   "vi": 1,
+   "kind": "ai",
+   "src": "iterate-round-1",
+   "realPage": true,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "critical",
+     "label": "real",
+     "reason": "hand holds stranger instead of pressing flat on coat",
+     "borderline": false
+    },
+    {
+     "i": 1,
+     "sev": "major",
+     "label": "noise",
+     "reason": "left/right misattribution, resting hand",
+     "borderline": false
+    },
+    {
+     "i": 2,
+     "sev": "critical",
+     "label": "real",
+     "reason": "declared cheek-puff absent",
+     "borderline": false
+    }
+   ],
+   "realMatch": [
+    "cheek",
+    "hand",
+    "coat"
+   ]
+  },
+  {
+   "id": "6mjcny1c7_p10_v1",
+   "story": "job_1790539784661_6mjcny1c7",
+   "pn": 10,
+   "vi": 1,
+   "kind": "ai",
+   "src": "inpaint-round-1",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "critical",
+     "label": "noise",
+     "reason": "act reads approximately (object offered at the jacket); grip/hand-count nuance",
+     "borderline": true
+    },
+    {
+     "i": 1,
+     "sev": "minor",
+     "label": "noise",
+     "reason": "hand-count nuance",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "fcmlfa8kn_p6_v2",
+   "story": "job_1790107559778_fcmlfa8kn",
+   "pn": 6,
+   "vi": 2,
+   "kind": "ai",
+   "src": "iterate-round-2",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "critical",
+     "label": "noise",
+     "reason": "tool grip nuance; act reads",
+     "borderline": false
+    },
+    {
+     "i": 1,
+     "sev": "critical",
+     "label": "noise",
+     "reason": "posture nuance; act reads",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "ypl33vk8u_p13_v1",
+   "story": "job_1791222889407_ypl33vk8u",
+   "pn": 13,
+   "vi": 1,
+   "kind": "ai",
+   "src": "char-fix-round-1",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "critical",
+     "label": "noise",
+     "reason": "placing vs hands near; act reads",
+     "borderline": false
+    },
+    {
+     "i": 1,
+     "sev": "major",
+     "label": "noise",
+     "reason": "mouth state not visible-defining",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "z3fw660ie_p7_v1",
+   "story": "job_1790446348343_z3fw660ie",
+   "pn": 7,
+   "vi": 1,
+   "kind": "ai",
+   "src": "iterate-round-1",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "minor",
+     "label": "noise",
+     "reason": "gaze",
+     "borderline": false
+    },
+    {
+     "i": 1,
+     "sev": "major",
+     "label": "noise",
+     "reason": "hand placement nuance; contest over the item reads",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "6mjcny1c7_p4_v1",
+   "story": "job_1790539784661_6mjcny1c7",
+   "pn": 4,
+   "vi": 1,
+   "kind": "ai",
+   "src": "iterate-round-1",
+   "realPage": true,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "critical",
+     "label": "real",
+     "reason": "declared lift-off from behind absent; figure sits",
+     "borderline": false
+    }
+   ],
+   "realMatch": [
+    "behind",
+    "lift",
+    "crouch",
+    "sitting",
+    "perch"
+   ]
+  },
+  {
+   "id": "nwi88y9lr_p12_v1",
+   "story": "job_1791450210539_nwi88y9lr",
+   "pn": 12,
+   "vi": 1,
+   "kind": "ai",
+   "src": "inpaint-round-1",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "critical",
+     "label": "noise",
+     "reason": "thumb vs finger; contact beside the mark reads",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "nwi88y9lr_p7_v1",
+   "story": "job_1791450210539_nwi88y9lr",
+   "pn": 7,
+   "vi": 1,
+   "kind": "ai",
+   "src": "inpaint-round-1",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "noise",
+     "reason": "gaze, figure seen from behind",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "6mjcny1c7_p1_v0",
+   "story": "job_1790539784661_6mjcny1c7",
+   "pn": 1,
+   "vi": 0,
+   "kind": "ai",
+   "src": "original",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "noise",
+     "reason": "gaze",
+     "borderline": false
+    },
+    {
+     "i": 1,
+     "sev": "major",
+     "label": "noise",
+     "reason": "gaze",
+     "borderline": false
+    },
+    {
+     "i": 2,
+     "sev": "major",
+     "label": "noise",
+     "reason": "gaze",
+     "borderline": false
+    },
+    {
+     "i": 3,
+     "sev": "major",
+     "label": "noise",
+     "reason": "gaze",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "fcmlfa8kn_p6_v0",
+   "story": "job_1790107559778_fcmlfa8kn",
+   "pn": 6,
+   "vi": 0,
+   "kind": "ai",
+   "src": "original",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "critical",
+     "label": "noise",
+     "reason": "tool type detail; act at the hinge reads",
+     "borderline": true
+    },
+    {
+     "i": 1,
+     "sev": "critical",
+     "label": "noise",
+     "reason": "grip nuance",
+     "borderline": false
+    },
+    {
+     "i": 2,
+     "sev": "major",
+     "label": "noise",
+     "reason": "arm-bend nuance",
+     "borderline": false
+    },
+    {
+     "i": 3,
+     "sev": "moderate",
+     "label": "noise",
+     "reason": "gaze",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "5herh01j7_p1_v0",
+   "story": "job_1790277448294_5herh01j7",
+   "pn": 1,
+   "vi": 0,
+   "kind": "ai",
+   "src": "original",
+   "realPage": true,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "critical",
+     "label": "real",
+     "reason": "locomotion direction reversed (descends, declared climbs)",
+     "borderline": false
+    },
+    {
+     "i": 1,
+     "sev": "critical",
+     "label": "real",
+     "reason": "locomotion direction reversed",
+     "borderline": false
+    },
+    {
+     "i": 2,
+     "sev": "moderate",
+     "label": "noise",
+     "reason": "gaze",
+     "borderline": false
+    },
+    {
+     "i": 3,
+     "sev": "moderate",
+     "label": "noise",
+     "reason": "gaze",
+     "borderline": false
+    }
+   ],
+   "realMatch": [
+    "down",
+    "climb",
+    "step"
+   ]
+  },
+  {
+   "id": "ypl33vk8u_p12_v0",
+   "story": "job_1791222889407_ypl33vk8u",
+   "pn": 12,
+   "vi": 0,
+   "kind": "ai",
+   "src": "original",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "noise",
+     "reason": "gaze",
+     "borderline": false
+    },
+    {
+     "i": 1,
+     "sev": "major",
+     "label": "noise",
+     "reason": "gaze",
+     "borderline": false
+    },
+    {
+     "i": 2,
+     "sev": "major",
+     "label": "noise",
+     "reason": "gaze",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "6mjcny1c7_p7_v0",
+   "story": "job_1790539784661_6mjcny1c7",
+   "pn": 7,
+   "vi": 0,
+   "kind": "ai",
+   "src": "original",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "noise",
+     "reason": "gaze",
+     "borderline": false
+    },
+    {
+     "i": 1,
+     "sev": "major",
+     "label": "noise",
+     "reason": "gaze",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "nwi88y9lr_p1_v0",
+   "story": "job_1791450210539_nwi88y9lr",
+   "pn": 1,
+   "vi": 0,
+   "kind": "ai",
+   "src": "original",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "critical",
+     "label": "noise",
+     "reason": "approximate pose still reads as the act (chestnuts in hand, other hand at pocket)",
+     "borderline": true
+    },
+    {
+     "i": 1,
+     "sev": "minor",
+     "label": "noise",
+     "reason": "posture nuance",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "6quecrr9t_p1_v0",
+   "story": "job_1791497309909_6quecrr9t",
+   "pn": 1,
+   "vi": 0,
+   "kind": "ai",
+   "src": "original",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "noise",
+     "reason": "gaze",
+     "borderline": false
+    },
+    {
+     "i": 1,
+     "sev": "major",
+     "label": "noise",
+     "reason": "lighting detail, not the act",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "ypl33vk8u_p8_v0",
+   "story": "job_1791222889407_ypl33vk8u",
+   "pn": 8,
+   "vi": 0,
+   "kind": "ai",
+   "src": "original",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "noise",
+     "reason": "gaze/body-turn nuance; swimming through the ink reads",
+     "borderline": true
+    },
+    {
+     "i": 1,
+     "sev": "major",
+     "label": "noise",
+     "reason": "gaze",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "50osg2osm_p6_v0",
+   "story": "job_1791145238223_50osg2osm",
+   "pn": 6,
+   "vi": 0,
+   "kind": "ai",
+   "src": "original",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "moderate",
+     "label": "noise",
+     "reason": "gaze",
+     "borderline": false
+    },
+    {
+     "i": 1,
+     "sev": "major",
+     "label": "noise",
+     "reason": "weapon angle nuance",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "z3fw660ie_p1_v0",
+   "story": "job_1790446348343_z3fw660ie",
+   "pn": 1,
+   "vi": 0,
+   "kind": "ai",
+   "src": "original",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "noise",
+     "reason": "page-text vs image, not the brief",
+     "borderline": false
+    },
+    {
+     "i": 1,
+     "sev": "major",
+     "label": "noise",
+     "reason": "page-text vs image, not the brief",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "6mjcny1c7_p4_v0",
+   "story": "job_1790539784661_6mjcny1c7",
+   "pn": 4,
+   "vi": 0,
+   "kind": "ai",
+   "src": "original",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "critical",
+     "label": "noise",
+     "reason": "spec incoherent (behind view vs visible chest); lift-off reads",
+     "borderline": true
+    }
+   ]
+  },
+  {
+   "id": "fcmlfa8kn_p2_v0",
+   "story": "job_1790107559778_fcmlfa8kn",
+   "pn": 2,
+   "vi": 0,
+   "kind": "ai",
+   "src": "original",
+   "realPage": true,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "critical",
+     "label": "real",
+     "reason": "object state contradicted (lit vs declared unlit)",
+     "borderline": false
+    }
+   ],
+   "realMatch": [
+    "lit",
+    "flame",
+    "candle"
+   ]
+  },
+  {
+   "id": "fcmlfa8kn_p5_v0",
+   "story": "job_1790107559778_fcmlfa8kn",
+   "pn": 5,
+   "vi": 0,
+   "kind": "ai",
+   "src": "original",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "critical",
+     "label": "noise",
+     "reason": "act of peering at the object reads approximately",
+     "borderline": true
+    }
+   ]
+  },
+  {
+   "id": "nwi88y9lr_p9_v0",
+   "story": "job_1791450210539_nwi88y9lr",
+   "pn": 9,
+   "vi": 0,
+   "kind": "ai",
+   "src": "original",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "noise",
+     "reason": "held-object detail; act reads",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "nwi88y9lr_p7_v0",
+   "story": "job_1791450210539_nwi88y9lr",
+   "pn": 7,
+   "vi": 0,
+   "kind": "ai",
+   "src": "original",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "noise",
+     "reason": "gaze/posture nuance; act reads",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "essbvehs8_p6_v0",
+   "story": "job_1791267520938_essbvehs8",
+   "pn": 6,
+   "vi": 0,
+   "kind": "ai",
+   "src": "original",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "noise",
+     "reason": "floating vs standing not determinable; empty hands and tears read",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "essbvehs8_p8_v0",
+   "story": "job_1791267520938_essbvehs8",
+   "pn": 8,
+   "vi": 0,
+   "kind": "ai",
+   "src": "original",
+   "realPage": true,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "critical",
+     "label": "real",
+     "reason": "declared empty extended hand; creature sits on the hand instead",
+     "borderline": false
+    }
+   ],
+   "realMatch": [
+    "hand",
+    "extend",
+    "holding"
+   ]
+  },
+  {
+   "id": "essbvehs8_p14_v0",
+   "story": "job_1791267520938_essbvehs8",
+   "pn": 14,
+   "vi": 0,
+   "kind": "ai",
+   "src": "original",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "noise",
+     "reason": "gaze",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "6quecrr9t_p3_v0",
+   "story": "job_1791497309909_6quecrr9t",
+   "pn": 3,
+   "vi": 0,
+   "kind": "ai",
+   "src": "original",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "noise",
+     "reason": "hand/bag grip nuance",
+     "borderline": true
+    }
+   ]
+  },
+  {
+   "id": "ypl33vk8u_p9_v0",
+   "story": "job_1791222889407_ypl33vk8u",
+   "pn": 9,
+   "vi": 0,
+   "kind": "ai",
+   "src": "original",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "noise",
+     "reason": "expression nuance",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "atbttop6w_p3_v0",
+   "story": "job_1791040103540_atbttop6w",
+   "pn": 3,
+   "vi": 0,
+   "kind": "ai",
+   "src": "original",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "critical",
+     "label": "noise",
+     "reason": "act reads approximately (hands on egg in leaf pile)",
+     "borderline": true
+    }
+   ]
+  },
+  {
+   "id": "atbttop6w_p7_v0",
+   "story": "job_1791040103540_atbttop6w",
+   "pn": 7,
+   "vi": 0,
+   "kind": "ai",
+   "src": "original",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "noise",
+     "reason": "page-text vs image",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "6mjcny1c7_p8_v0",
+   "story": "job_1790539784661_6mjcny1c7",
+   "pn": 8,
+   "vi": 0,
+   "kind": "clean",
+   "src": "original",
+   "realPage": false,
+   "storedFindings": []
+  },
+  {
+   "id": "6mjcny1c7_p11_v0",
+   "story": "job_1790539784661_6mjcny1c7",
+   "pn": 11,
+   "vi": 0,
+   "kind": "clean",
+   "src": "original",
+   "realPage": false,
+   "storedFindings": []
+  },
+  {
+   "id": "fcmlfa8kn_p9_v0",
+   "story": "job_1790107559778_fcmlfa8kn",
+   "pn": 9,
+   "vi": 0,
+   "kind": "clean",
+   "src": "original",
+   "realPage": false,
+   "storedFindings": []
+  },
+  {
+   "id": "fcmlfa8kn_p10_v0",
+   "story": "job_1790107559778_fcmlfa8kn",
+   "pn": 10,
+   "vi": 0,
+   "kind": "clean",
+   "src": "original",
+   "realPage": false,
+   "storedFindings": []
+  },
+  {
+   "id": "nwi88y9lr_p15_v0",
+   "story": "job_1791450210539_nwi88y9lr",
+   "pn": 15,
+   "vi": 0,
+   "kind": "clean",
+   "src": "original",
+   "realPage": false,
+   "storedFindings": []
+  },
+  {
+   "id": "nwi88y9lr_p8_v0",
+   "story": "job_1791450210539_nwi88y9lr",
+   "pn": 8,
+   "vi": 0,
+   "kind": "clean",
+   "src": "original",
+   "realPage": false,
+   "storedFindings": []
+  },
+  {
+   "id": "essbvehs8_p13_v0",
+   "story": "job_1791267520938_essbvehs8",
+   "pn": 13,
+   "vi": 0,
+   "kind": "clean",
+   "src": "original",
+   "realPage": false,
+   "storedFindings": []
+  },
+  {
+   "id": "essbvehs8_p9_v0",
+   "story": "job_1791267520938_essbvehs8",
+   "pn": 9,
+   "vi": 0,
+   "kind": "clean",
+   "src": "original",
+   "realPage": false,
+   "storedFindings": []
+  },
+  {
+   "id": "6quecrr9t_p2_v0",
+   "story": "job_1791497309909_6quecrr9t",
+   "pn": 2,
+   "vi": 0,
+   "kind": "clean",
+   "src": "original",
+   "realPage": false,
+   "storedFindings": []
+  },
+  {
+   "id": "6quecrr9t_p4_v0",
+   "story": "job_1791497309909_6quecrr9t",
+   "pn": 4,
+   "vi": 0,
+   "kind": "clean",
+   "src": "original",
+   "realPage": false,
+   "storedFindings": []
+  },
+  {
+   "id": "ypl33vk8u_p14_v0",
+   "story": "job_1791222889407_ypl33vk8u",
+   "pn": 14,
+   "vi": 0,
+   "kind": "clean",
+   "src": "original",
+   "realPage": false,
+   "storedFindings": []
+  },
+  {
+   "id": "ypl33vk8u_p11_v0",
+   "story": "job_1791222889407_ypl33vk8u",
+   "pn": 11,
+   "vi": 0,
+   "kind": "clean",
+   "src": "original",
+   "realPage": false,
+   "storedFindings": []
+  },
+  {
+   "id": "atbttop6w_p18_v0",
+   "story": "job_1791040103540_atbttop6w",
+   "pn": 18,
+   "vi": 0,
+   "kind": "clean",
+   "src": "original",
+   "realPage": false,
+   "storedFindings": []
+  },
+  {
+   "id": "atbttop6w_p14_v0",
+   "story": "job_1791040103540_atbttop6w",
+   "pn": 14,
+   "vi": 0,
+   "kind": "clean",
+   "src": "original",
+   "realPage": false,
+   "storedFindings": []
+  },
+  {
+   "id": "t0t8qpebu_p14_v0",
+   "story": "job_1791315635053_t0t8qpebu",
+   "pn": 14,
+   "vi": 0,
+   "kind": "clean",
+   "src": "original",
+   "realPage": false,
+   "storedFindings": []
+  },
+  {
+   "id": "t0t8qpebu_p7_v0",
+   "story": "job_1791315635053_t0t8qpebu",
+   "pn": 7,
+   "vi": 0,
+   "kind": "clean",
+   "src": "original",
+   "realPage": false,
+   "storedFindings": []
+  },
+  {
+   "id": "50osg2osm_p4_v0",
+   "story": "job_1791145238223_50osg2osm",
+   "pn": 4,
+   "vi": 0,
+   "kind": "clean",
+   "src": "original",
+   "realPage": false,
+   "storedFindings": []
+  },
+  {
+   "id": "50osg2osm_p1_v0",
+   "story": "job_1791145238223_50osg2osm",
+   "pn": 1,
+   "vi": 0,
+   "kind": "clean",
+   "src": "original",
+   "realPage": false,
+   "storedFindings": []
+  },
+  {
+   "id": "1nitlympp_p15_v0",
+   "story": "job_1790100385959_1nitlympp",
+   "pn": 15,
+   "vi": 0,
+   "kind": "clean",
+   "src": "original",
+   "realPage": false,
+   "storedFindings": []
+  },
+  {
+   "id": "1nitlympp_p3_v0",
+   "story": "job_1790100385959_1nitlympp",
+   "pn": 3,
+   "vi": 0,
+   "kind": "clean",
+   "src": "original",
+   "realPage": false,
+   "storedFindings": []
+  },
+  {
+   "id": "2ir6nl5kw_p18_v0",
+   "story": "job_1791489793707_2ir6nl5kw",
+   "pn": 18,
+   "vi": 0,
+   "kind": "clean",
+   "src": "original",
+   "realPage": false,
+   "storedFindings": []
+  },
+  {
+   "id": "2ir6nl5kw_p3_v0",
+   "story": "job_1791489793707_2ir6nl5kw",
+   "pn": 3,
+   "vi": 0,
+   "kind": "clean",
+   "src": "original",
+   "realPage": false,
+   "storedFindings": []
+  }
+ ]
+}
