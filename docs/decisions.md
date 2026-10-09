@@ -67741,3 +67741,11 @@ Touched files: server/lib/vbIdGuard.js, server/lib/promptBuilders.js, server/lib
 **Rationale:** 2 real clothing and 4 real age positives are too few for significant recall; the numbers are indicative. Spend about USD 1.27 against a 0.60 cap: the agent ran unpriced inventory passes.
 **Revisit if:** at least 30 real clothing defects are labelled and the pairing problem is solved, or an inventory call runs under 5 s.
 **Touched files:** scripts/analysis/jev-blind-*.js, eval-jev-blind-garment.js, eval-jev-blind-age.js (measurement only).
+
+## 2026-10-09 — Jev does not replace the idea writer's in-stream review; small-town landmark monotony is a pool-size problem
+
+**Context:** owner proposed Jev as the idea reviewer for speed, with no quality loss, and asked about landmark selection.
+**Decision:** keep the [DRAFT]/[REVIEW]/[FINAL] stream; Jev is not wired as idea reviewer, on full or trial ideas. Landmark selection by Jev stays as built.
+**Rationale:** 406 stored ideas (812 texts, narrow nouls, defect nouls, SCORE mode). Jev does not rate the final above the draft (0.37-0.64), does not track blind buy scores (AUC 0.19-0.70), recalls 2/5 owner-session defects, and passed a T-rex in a 4-year-old's idea (peril 0.07). It catches blatant injected defects (AUC 0.86-1.00). Speed: FINAL-only writer, live on claude-sonnet-5-5, median 28.0 s vs 53.7 s today at about half the cost, but blind quality 1 win / 1 tie / 2 losses (n=4), so not adopted. Trial ideas already run one stream with a CHECK block; Jev would save at most 0.3 s. Landmarks: Fislisbach's pool is 2 entries ("Fislisbach (Stadt)" and Kirche Rohrdorf), so 12/12 stored Fislisbach trials picked Kirche Rohrdorf; 20-place pools vary (top-5 Jaccard 0.41-0.49). Fit of 17 picks: 7 fit, 8 neutral, 0 bad. Spent USD 0.82.
+**Revisit if:** a blind run of at least 22 prompts on the current model shows FINAL-only parity, or Jev gets a peril/stake question with AUC >= 0.85 on >= 30 real defects.
+**Touched files:** scripts/analysis/*jev-idea*, eval-jev-trial-idea.js, probe-fislisbach-near.js (measurement only).
