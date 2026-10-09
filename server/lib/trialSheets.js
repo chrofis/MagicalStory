@@ -19,18 +19,24 @@
  * holds exactly those sheets (see persistPreparedSheets).
  */
 const { log: defaultLog } = require('../utils/logger');
+const { writeCutSlides } = require('./clientAvatarImages');
 
 /** The one art style of a trial (routes/trial.js re-exports it as TRIAL_ART_STYLE). */
 const TRIAL_ART_STYLE = 'watercolor';
 
 /**
- * What the standard sheet was drawn FOR. The sheet depends on the declared age (body proportions, phantom
- * tier) and gender, and the account row can still change both after the form first looked valid (the account
- * is created the moment age "1" is typed on the way to "10"). A sheet whose stamp differs from the row's
- * age/gender now is stale and must not be reused.
+ * What the standard sheet (and the body row drawn ahead of it) was drawn FOR: the age BAND, the phantom tier and the
+ * gender. The body row is drawn at the photo from the photo's own estimates, before the visitor has typed anything, so the
+ * stamp must be the thing the drawing depends on, not the exact year: the age line states one year but the proportions
+ * come from the band's markers (getAgeMarkers) and the tier's phantom. A sheet whose stamp differs from the declared
+ * band/tier/gender is stale and must not be reused (docs/decisions.md 2026-10-09).
  */
 function standardSheetStamp(character) {
-  return `${String(character?.age ?? '').trim()}|${character?.gender || ''}`;
+  const { getAgeCategory } = require('./promptBuilders');
+  const { phantomTierForAge } = require('./character2x4Sheet');
+  const age = parseInt(character?.age, 10);
+  if (!Number.isFinite(age)) return `|${character?.gender || ''}`;
+  return `${getAgeCategory(age)}/${phantomTierForAge(age)}|${character?.gender || ''}`;
 }
 
 /**
@@ -131,34 +137,57 @@ async function persistPreparedSheets({ userId, characterId, exported, fields = {
 
   const fragment = { preGeneratedStyledAvatars: exported };
   await deps.offload(characterId, userId, fragment);
+  // The sheets are stored under the row's CURRENT name: the visitor may have renamed the (provisional) character while the
+  // sheet was being drawn, and the story job looks the sheets up by the row's name.
+  let rowName = name;
   const saved = await deps.modifyRow(characterId, userId, (fresh) => {
     const c = fresh.characters?.[0];
     if (!c) return false;
-    c.preGeneratedStyledAvatars = mergePreparedAvatars(c.preGeneratedStyledAvatars, fragment.preGeneratedStyledAvatars);
+    rowName = c.name || name;
+    c.preGeneratedStyledAvatars = mergePreparedAvatars(c.preGeneratedStyledAvatars, { [rowName]: fragment.preGeneratedStyledAvatars[name] });
     Object.assign(c, fields);
   });
   if (!saved) throw new Error(`persistPreparedSheets: character row ${characterId} is gone`);
 
   for (let attempt = 1; attempt <= MAX_SLIDE_ATTEMPTS; attempt++) {
     const character = await deps.readCharacter(characterId);
-    const sheets = character?.preGeneratedStyledAvatars?.[name];
-    if (!sheets) throw new Error(`persistPreparedSheets: ${name} has no sheets on ${characterId} after the merge`);
+    const sheets = character?.preGeneratedStyledAvatars?.[rowName];
+    if (!sheets) throw new Error(`persistPreparedSheets: ${rowName} has no sheets on ${characterId} after the merge`);
     const signature = sheetSignature(sheets);
     const slides = await deps.buildSlides(sheets);
     if (slides.length === 0) throw new Error('persistPreparedSheets: no sheet could be cut into slides');
     const slideFragment = { preGeneratedAvatarSlides: slides };
     await deps.offload(characterId, userId, slideFragment);
     let written = false;
+    let attestedSlides = null;
     await deps.modifyRow(characterId, userId, (fresh) => {
       const c = fresh.characters?.[0];
-      if (!c || sheetSignature(c.preGeneratedStyledAvatars?.[name]) !== signature) return false;
-      c.preGeneratedAvatarSlides = slideFragment.preGeneratedAvatarSlides;
+      if (!c || sheetSignature(c.preGeneratedStyledAvatars?.[rowName]) !== signature) return false;
+      attestedSlides = writeCutSlides(c, slides, slideFragment.preGeneratedAvatarSlides);
       written = true;
     });
-    if (written) return slideFragment.preGeneratedAvatarSlides;
+    if (written) return attestedSlides;
     log.info(`[TRIAL AVATARS] the sheets of ${name} changed while the slides were cut (attempt ${attempt}/${MAX_SLIDE_ATTEMPTS}) — cutting again`);
   }
   throw new Error(`persistPreparedSheets: the sheets kept changing; slides not stored after ${MAX_SLIDE_ATTEMPTS} attempts`);
+}
+
+/**
+ * The first slides of a trial: the cells of the standard sheet's body row, written the moment that row lands (long before
+ * the sheet is finished). Only when the row holds no slides yet (a costumed sheet may have landed first); the finished
+ * sheet's slides replace them in persistPreparedSheets. Returns the slides the row holds afterwards, or null when it kept
+ * the ones it had.
+ */
+async function persistBodyRowSlides({ userId, characterId, slides }, deps = defaultDeps()) {
+  const fragment = { preGeneratedAvatarSlides: slides };
+  await deps.offload(characterId, userId, fragment);
+  let attestedSlides = null;
+  await deps.modifyRow(characterId, userId, (fresh) => {
+    const c = fresh.characters?.[0];
+    if (!c || (Array.isArray(c.preGeneratedAvatarSlides) && c.preGeneratedAvatarSlides.length > 0)) return false;
+    attestedSlides = writeCutSlides(c, slides, fragment.preGeneratedAvatarSlides);
+  });
+  return attestedSlides;
 }
 
 /**
@@ -204,5 +233,6 @@ module.exports = {
   onlyRequestedSheets,
   sheetSignature,
   persistPreparedSheets,
+  persistBodyRowSlides,
   styleAndPersistTrialSheets,
 };

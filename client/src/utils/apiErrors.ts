@@ -40,6 +40,7 @@ const BY_CODE: Record<string, Table> = {
   DAILY_CAPACITY_REACHED: t('The service is at capacity for today. Please try again tomorrow.', 'Der Dienst ist für heute ausgelastet. Bitte versuche es morgen erneut.', 'Le service est complet pour aujourd’hui. Veuillez réessayer demain.', 'Il servizio ha raggiunto la capacità per oggi. Riprova domani.'),
   TURNSTILE_FAILED: t('The security check failed. Please try again.', 'Die Sicherheitsprüfung ist fehlgeschlagen. Bitte versuche es erneut.', 'La vérification de sécurité a échoué. Veuillez réessayer.', 'Il controllo di sicurezza non è riuscito. Riprova.'),
   NAME_AND_PHOTO_REQUIRED: t('Please enter a name and add a photo.', 'Bitte gib einen Namen ein und füge ein Foto hinzu.', 'Veuillez saisir un nom et ajouter une photo.', 'Inserisci un nome e aggiungi una foto.'),
+  AGE_REQUIRED: t('Please enter your child’s age.', 'Bitte gib das Alter deines Kindes ein.', 'Veuillez saisir l’âge de votre enfant.', 'Inserisci l’età di tuo figlio.'),
   INVALID_NAME: t('Please check the name.', 'Bitte überprüfe den Namen.', 'Veuillez vérifier le nom.', 'Controlla il nome.'),
   INVALID_GENDER: t('Please check the gender.', 'Bitte überprüfe das Geschlecht.', 'Veuillez vérifier le genre.', 'Controlla il genere.'),
   INVALID_AGE: t('Please check the age.', 'Bitte überprüfe das Alter.', 'Veuillez vérifier l’âge.', 'Controlla l’età.'),

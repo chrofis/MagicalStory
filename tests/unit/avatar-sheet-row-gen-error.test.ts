@@ -91,7 +91,8 @@ async function runPass1(throwsOn: string[] = []) {
   ctx.globalThis = ctx;
   vm.createContext(ctx);
   vm.runInContext(
-    `${extractFunction(SRC, 'generateComposited2x4')}\nmodule.exports = generateComposited2x4;`,
+    `${extractFunction(SRC, 'runBodyRowStage')}
+${extractFunction(SRC, 'generateComposited2x4')}\nmodule.exports = generateComposited2x4;`,
     ctx
   );
   const fn = ctx.module.exports as (c: any, o: any) => Promise<any>;

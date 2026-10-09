@@ -16,6 +16,9 @@ const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY || '';
 // validity check at its first digit, and the account is created on that instant).
 const STANDARD_AVATAR_QUIET_MS = 2000;
 
+/** Whole years 1-18, matching the server's parseTrialAge; the server rejects the same values independently. */
+const isValidTrialAge = (raw: string) => /^\d{1,3}$/.test(raw.trim()) && Number(raw) >= 1 && Number(raw) <= 18;
+
 // ─── Localized strings ──────────────────────────────────────────────────────
 
 const strings: Record<string, {
@@ -241,8 +244,13 @@ interface TrialCharacterStepProps {
   characterData: CharacterData;
   onChange: (data: CharacterData) => void;
   onNext: () => void;
-  /** Receives the standard avatar sheet's front cell (the hero's picture) when it is drawn. */
-  onHeroAvatar?: (avatarImage: string) => void;
+  /**
+   * Receives the hero's picture: first the FRONT cell of the standard body row (drawn at the photo), later the front cell of the
+   * finished sheet. Always one cut figure, never a row or a sheet (server/lib/clientAvatarImages.js). null clears it (new photo).
+   */
+  onHeroAvatar?: (avatarImage: string | null) => void;
+  /** The hero's picture so far, shown above the form. */
+  heroAvatar?: string | null;
   onAccountCreated?: (sessionToken: string, characterId: string) => void;
   sessionToken?: string | null;
   language: string;
@@ -251,7 +259,7 @@ interface TrialCharacterStepProps {
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export default function TrialCharacterStep({ characterData, onChange, onNext, onHeroAvatar, onAccountCreated, sessionToken, language, adminToken }: TrialCharacterStepProps) {
+export default function TrialCharacterStep({ characterData, onChange, onNext, onHeroAvatar, heroAvatar, onAccountCreated, sessionToken, language, adminToken }: TrialCharacterStepProps) {
   const t = strings[language] || strings.en;
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -318,6 +326,8 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, on
   // no perceivable wait. Without this, the click triggers a 5-12s blocking
   // call (DB inserts + Gemini trait extraction + DB updates).
   const accountCreationPromiseRef = useRef<Promise<{ sessionToken: string; characterId: string } | null> | null>(null);
+  // The face photo the account was created with: a different one later is a photo change (update-photo).
+  const accountPhotoRef = useRef<string | null>(null);
   // Snapshot of the user-facing fields that were sent with the prewarm. On
   // Next we compare this to the current form state and PATCH any
   // diffs to /api/trial/update-character-details — so a name edited after
@@ -350,7 +360,7 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, on
   // Whole years 1-18, matching the server's parseTrialAge; the server rejects
   // the same values independently, this is only the fast feedback.
   const ageRaw = String(characterData.age || '').trim();
-  const ageIsValid = /^\d{1,3}$/.test(ageRaw) && Number(ageRaw) >= 1 && Number(ageRaw) <= 18;
+  const ageIsValid = isValidTrialAge(ageRaw);
   // Shown once the user has a photo (i.e. is actually in the details phase) and
   // has either typed something wrong or left the field behind.
   const showAgeError = hasPhoto && !ageIsValid && ageRaw !== '';
@@ -365,7 +375,12 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, on
   // caller can decide how to surface the error.
   const startAccountCreation = async (): Promise<{ sessionToken: string; characterId: string } | null> => {
     const data = characterDataRef.current;
-    if (!data.photos.face || !data.name?.trim()) return null;
+    if (!data.photos.face) return null;
+    // The account is created the moment the photo is analysed, usually before anything is typed (provisional): the standard
+    // avatar's body row starts then (docs/decisions.md 2026-10-09). Only what is valid is sent; the rest follows by PATCH.
+    const sentData = { ...data, name: data.name?.trim() ? data.name : '', age: isValidTrialAge(String(data.age || '')) ? data.age : '' };
+    const formComplete = !!(sentData.name && sentData.gender && sentData.age);
+    accountPhotoRef.current = data.photos.face;
 
     // Refresh Turnstile token if expired.
     let token = turnstileToken;
@@ -385,14 +400,15 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, on
 
     // Snapshot the user-facing fields we're sending so the dirty-check on
     // Next knows whether a PATCH is needed.
-    sentSnapshotRef.current = buildDetailsSnapshot(data);
+    sentSnapshotRef.current = buildDetailsSnapshot(sentData);
     const accountResponse = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/trial/create-anonymous-account`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        name: data.name,
-        age: data.age,
+        name: sentData.name,
+        age: sentData.age,
         gender: data.gender,
+        provisional: !formComplete,
         traits: data.traits,
         customTraits: data.customTraits,
         facePhoto: data.photos.face,
@@ -436,13 +452,17 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, on
   // accounts on every keystroke. Trade-off documented; revisit if reports
   // surface.
   useEffect(() => {
-    if (!canProceed) return;
+    if (!hasPhoto) return;
     if (sessionToken) return; // already have one (back/forward nav)
     if (accountCreationPromiseRef.current) return; // already in flight
-    accountCreationPromiseRef.current = startAccountCreation().catch(() => null);
-  // Trigger exactly when canProceed flips true — readiness to fire.
+    // The wizard keeps the session from here on (localStorage), so a visitor who leaves after the photo comes back to the SAME
+    // account (one account per visitor per day: a second create would be refused) and a new photo goes to update-photo.
+    accountCreationPromiseRef.current = startAccountCreation()
+      .then((account) => { if (account) onAccountCreated?.(account.sessionToken, account.characterId); return account; })
+      .catch(() => null);
+  // Trigger exactly when the photo has landed (hasPhoto flips true), not when the form is complete.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canProceed, sessionToken]);
+  }, [hasPhoto, sessionToken]);
 
   // Push the current user-facing fields onto the character row. Called on both
   // advance paths — the freshly-created account (the prewarm sent a body that
@@ -482,9 +502,86 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, on
     }
   };
 
-  // The standard avatar sheet (the hero's picture, and the sheet the story reuses): it needs only the photo, the age
-  // and the gender, so it starts as soon as the account exists and the form has been quiet for a moment, not when the
-  // topic is picked. It runs in the background; nothing here waits for it. One call per account (the server styles one
+  // The hero's picture. Two things reach it, both ONE cut figure from the server: the FRONT cell of the standard body row
+  // (drawn at the photo, a few seconds after the account exists) and later the front cell of the finished, styled sheet.
+  // The first one fires the funnel step; a late body-row answer never replaces the styled picture.
+  const heroShownRef = useRef(false);
+  const styledHeroRef = useRef(false);
+  const showHero = (image: string, styled: boolean) => {
+    if (!styled && styledHeroRef.current) return;
+    if (styled) styledHeroRef.current = true;
+    if (!heroShownRef.current) { heroShownRef.current = true; trackTrialStep('avatar_ready'); }
+    onHeroAvatar?.(image);
+  };
+
+  // The standard avatar's FULL-BODY row starts the moment the account exists, from the photo's own age and gender estimates
+  // when the form is still empty. One call per photo; a failure only means the sheet draws its own body row later.
+  const bodyRowStartedRef = useRef(false);
+  const startBodyRow = async (token: string) => {
+    if (bodyRowStartedRef.current) return;
+    bodyRowStartedRef.current = true;
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/trial/prepare-standard-body`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: '{}',
+      });
+      const result = await response.json();
+      if (response.ok && result.avatarImage) showHero(result.avatarImage, false);
+    } catch {
+      // Non-blocking: the sheet draws its own body row.
+    }
+  };
+  useEffect(() => {
+    // A restored session's account holds an older photo: its body row starts after update-photo (the photo effect below).
+    if (!hasPhoto || bodyRowStartedRef.current || !accountPhotoRef.current) return;
+    (async () => {
+      const account = await accountCreationPromiseRef.current;
+      const token = account?.sessionToken || sessionToken;
+      if (token) startBodyRow(token);
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasPhoto, sessionToken]);
+
+  // A different photo after the account exists: the same account takes it (one account per visitor), the server drops
+  // everything drawn from the old one, and the avatar starts again.
+  const faceNow = characterData.photos.face;
+  useEffect(() => {
+    const accountFace = accountPhotoRef.current;
+    if (!faceNow || faceNow === accountFace) return;
+    // No account made by this page yet and none restored: the account effect creates it with this photo. A RESTORED session
+    // (the visitor came back; its account, often a provisional one, holds an older photo) takes the new photo here.
+    if (!accountFace && !sessionToken) return;
+    accountPhotoRef.current = faceNow;
+    (async () => {
+      const account = await accountCreationPromiseRef.current;
+      const token = account?.sessionToken || sessionToken;
+      if (!token) return;
+      const data = characterDataRef.current;
+      try {
+        const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/trial/update-photo`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ facePhoto: data.photos.face, bodyPhoto: data.photos.body, bodyNoBgPhoto: data.photos.bodyNoBg, faceBox: data.photos.faceBox }),
+        });
+        if (!response.ok) { setAvatarError(t.accountFailed); return; }
+      } catch {
+        setAvatarError(t.accountFailed);
+        return;
+      }
+      heroShownRef.current = false;
+      styledHeroRef.current = false;
+      standardAvatarStartedRef.current = false;
+      bodyRowStartedRef.current = false;
+      onHeroAvatar?.(null);
+      startBodyRow(token);
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [faceNow]);
+
+  // The standard avatar sheet (the hero's picture, and the sheet the story reuses): it needs only the photo, the DECLARED age
+  // and the gender (its body row is already drawn, above), so it starts as soon as the form is complete and has been quiet for
+  // a moment, not when the topic is picked. It runs in the background; nothing here waits for it. One call per account (the server styles one
   // sheet per trial); a failure only means the story job styles the sheet itself. docs/decisions.md 2026-10-09.
   const standardAvatarStartedRef = useRef(false);
   const startStandardAvatar = async (token: string) => {
@@ -500,10 +597,7 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, on
         body: '{}',
       });
       const result = await response.json();
-      if (response.ok && result.avatarImage) {
-        trackTrialStep('avatar_ready');
-        onHeroAvatar?.(result.avatarImage);
-      }
+      if (response.ok && result.avatarImage) showHero(result.avatarImage, true);
     } catch {
       // Non-blocking: the story job styles the standard sheet itself.
     }
@@ -528,6 +622,7 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, on
     // creation — but still sync the details, see syncDetails.
     if (sessionToken) {
       await syncDetails(sessionToken);
+      void startStandardAvatar(sessionToken); // no-op when the quiet-form trigger already started it
       onNext();
       return;
     }
@@ -1061,6 +1156,13 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, on
             <ArrowRight className="w-4 h-4 rotate-180" />
             {t.back}
           </button>
+
+          {/* The hero's picture: one figure, shown the moment the body row's first cell is drawn (same frame as the topic step). */}
+          {heroAvatar && (
+            <div className="flex justify-center">
+              <img src={heroAvatar} alt={characterData.name || 'Character'} className="w-40 h-auto max-h-56 rounded-xl object-contain shadow-lg" />
+            </div>
+          )}
 
           {detailsBlock}
 

@@ -109,4 +109,36 @@ function reclampTrialApparentAge(physical, statedAge) {
   return clamp;
 }
 
-module.exports = { parseTrialAge, applyTrialPhotoTraits, reclampTrialApparentAge, TRIAL_MIN_AGE, TRIAL_MAX_AGE };
+/**
+ * The photo analysis's own estimate of who is in the photo: the apparentAge category and the gender, from the traits
+ * the trial already extracts (prompts/character-analysis.txt). Gender is kept only when it is male or female ('other' or
+ * missing is no estimate). Stored on the character row as `photoEstimate` so the standard avatar's body row can be
+ * drawn at the photo, before the visitor has typed an age or a gender (docs/decisions.md 2026-10-09).
+ * @returns {{apparentAge: string|null, gender: string}|null} null when the photo analysis gave neither
+ */
+function photoEstimateOf(traits) {
+  if (!traits) return null;
+  const apparentAge = typeof traits.apparentAge === 'string' && traits.apparentAge.trim() ? traits.apparentAge.trim() : null;
+  const g = String(traits.gender || '').trim().toLowerCase();
+  const gender = g === 'male' || g === 'female' ? g : '';
+  if (!apparentAge && !gender) return null;
+  return { apparentAge, gender };
+}
+
+/**
+ * The whole-year age that stands for an age CATEGORY inside the trial's 1-18 range: the middle of the years that
+ * getAgeCategory maps to it (rounded up), e.g. kindergartner (5-6) is 6, teenager (15-17) is 16. A category with no year
+ * in the range (adult and older) is the top of the range. Used ONLY to draw the body row before an age is declared; the
+ * declared age replaces it, and the sheet is restyled only when its band, tier or gender differs.
+ * @returns {number|null} null for an unknown category
+ */
+function representativeTrialAge(category) {
+  const { getAgeCategory, getAgeCategoryIndex } = require('./promptBuilders');
+  if (getAgeCategoryIndex(category) < 0) return null;
+  const years = [];
+  for (let y = TRIAL_MIN_AGE; y <= TRIAL_MAX_AGE; y++) if (getAgeCategory(y) === category) years.push(y);
+  if (years.length === 0) return TRIAL_MAX_AGE; // every category below the range has a year in it (infant is age 1)
+  return Math.ceil((years[0] + years[years.length - 1]) / 2);
+}
+
+module.exports = { photoEstimateOf, representativeTrialAge, parseTrialAge, applyTrialPhotoTraits, reclampTrialApparentAge, TRIAL_MIN_AGE, TRIAL_MAX_AGE };

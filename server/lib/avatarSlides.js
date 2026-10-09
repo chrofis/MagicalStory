@@ -13,6 +13,7 @@
 const sharp = require('sharp');
 const { bytesFromAnyImage } = require('./r2');
 const { log: defaultLog } = require('../utils/logger');
+const { markCutCell, brandCutList, isSingleCellWidth, writeCutSlides } = require('./clientAvatarImages');
 
 // front / three-quarter / profile; the back view has no face and is skipped.
 const SLIDE_POSES = ['front', 'threeQuarter', 'profile'];
@@ -35,15 +36,45 @@ async function readSheet(source) {
 async function slidesFromSheet(source) {
   const buf = await readSheet(source);
   const { cropAvatarCell } = require('./sceneComposite');
+  const sheetWidth = (await sharp(buf).metadata()).width;
   const slides = [];
   for (const pose of SLIDE_POSES) {
     const { body, face } = await cropAvatarCell(buf, { pose, includeFace: true });
-    for (const cell of [face, body]) {
-      const jpeg = await sharp(cell).jpeg({ quality: 88 }).toBuffer();
-      slides.push(`data:image/jpeg;base64,${jpeg.toString('base64')}`);
-    }
+    for (const cell of [face, body]) slides.push(await singleCellJpeg(cell, sheetWidth));
   }
-  return slides;
+  return brandCutList(slides);
+}
+
+/** A cut cell as a JPEG data URI; throws when it is wider than one column of its source (an uncut row or sheet). */
+async function singleCellJpeg(cell, sourceWidth) {
+  const jpeg = await sharp(cell).jpeg({ quality: 88 }).toBuffer();
+  const { width } = await sharp(jpeg).metadata();
+  if (!isSingleCellWidth(width, sourceWidth)) throw new Error(`cut cell is ${width}px wide in a ${sourceWidth}px source: not a single cell`);
+  return markCutCell(`data:image/jpeg;base64,${jpeg.toString('base64')}`);
+}
+
+/**
+ * The cells of a 1x4 FULL-BODY row (the body stage of a sheet, drawn before the head row): [front, threeQuarter, profile,
+ * back] as JPEG data URIs. The row is drawn on four equal columns, so each cut is a quarter of its width; an image that is
+ * not wide (a sheet or a single figure) is refused.
+ */
+async function bodyRowCells(source) {
+  const buf = await bytesFromAnyImage(source);
+  if (!buf) throw new Error('body row could not be read');
+  const { width, height } = await sharp(buf).metadata();
+  if (!width || !height || width / height < 1.5) throw new Error(`image ${width}x${height} is not a 1x4 body row`);
+  const cellW = Math.floor(width / 4);
+  const cells = [];
+  for (let col = 0; col < 4; col++) {
+    const cell = await sharp(buf).extract({ left: col * cellW, top: 0, width: cellW, height }).png().toBuffer();
+    cells.push(await singleCellJpeg(cell, width));
+  }
+  return brandCutList(cells);
+}
+
+/** The slides a body row feeds, from its cells (bodyRowCells): front, three-quarter and profile; the back view has no face and is skipped. */
+function slidesOfBodyRowCells(cells) {
+  return brandCutList(cells.slice(0, SLIDE_POSES.length));
 }
 
 /**
@@ -54,8 +85,7 @@ async function frontBodyCell(source) {
   const buf = await readSheet(source);
   const { cropAvatarCell } = require('./sceneComposite');
   const { body } = await cropAvatarCell(buf, { pose: 'front' });
-  const jpeg = await sharp(body).jpeg({ quality: 88 }).toBuffer();
-  return `data:image/jpeg;base64,${jpeg.toString('base64')}`;
+  return singleCellJpeg(body, (await sharp(buf).metadata()).width);
 }
 
 /** Pure: the sheet sources of one character's styled avatars, costumed first (it is ready first). */
@@ -92,7 +122,7 @@ async function buildAvatarSlides(styledAvatars, log = defaultLog) {
     try { perSheet.push(await slidesFromSheet(source)); }
     catch (err) { log.error(`[TRIAL AVATARS] avatar slides: sheet skipped (${err.message})`); }
   }
-  return interleaveSheetSlides(perSheet);
+  return brandCutList(interleaveSheetSlides(perSheet));
 }
 
 /**
@@ -109,9 +139,9 @@ async function persistAvatarSlides({ characterId, userId, styledAvatars }, log =
   await modifyCharactersRow(characterId, userId, (fresh) => {
     const c = fresh.characters?.[0];
     if (!c) return false;
-    c.preGeneratedAvatarSlides = fragment.preGeneratedAvatarSlides;
+    writeCutSlides(c, slides, fragment.preGeneratedAvatarSlides);
   });
   return slides.length;
 }
 
-module.exports = { persistAvatarSlides, buildAvatarSlides, slidesFromSheet, frontBodyCell, sheetSourcesOf, interleaveSheetSlides, SLIDE_POSES };
+module.exports = { persistAvatarSlides, buildAvatarSlides, slidesFromSheet, bodyRowCells, slidesOfBodyRowCells, frontBodyCell, sheetSourcesOf, interleaveSheetSlides, SLIDE_POSES };

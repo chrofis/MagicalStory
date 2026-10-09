@@ -82,7 +82,8 @@ async function runPass1(opts: Opts, { bodyScores = [9], headScores = [9], ms = 3
   };
   ctx.globalThis = ctx;
   vm.createContext(ctx);
-  vm.runInContext(`${extractFunction(SRC, 'generateComposited2x4')}\nmodule.exports = generateComposited2x4;`, ctx);
+  vm.runInContext(`${extractFunction(SRC, 'runBodyRowStage')}
+${extractFunction(SRC, 'generateComposited2x4')}\nmodule.exports = generateComposited2x4;`, ctx);
   const fn = ctx.module.exports as (c: any, o: any) => Promise<any>;
   const out = await fn({ name: 'T', age: 9 }, { costumeDescription: 'a robe', ...opts });
   return { out, calls, log };
@@ -171,5 +172,17 @@ describe('the trial prewarm is the one caller that asks for it', () => {
       const t = fs.readFileSync(path.join(ROOT, f), 'utf8');
       expect(t).not.toMatch(/fastPass1/);
     }
+  });
+});
+
+describe('pass 1 rows: a body row drawn ahead of the sheet (trial, at the photo)', () => {
+  it('skips stage 1: no body call, the head row is drawn against the precomputed row, and the sheet composites it', async () => {
+    const pre = { row: 'PREBODY', review: { valid: true, score: null, evaluated: false, bodies: null }, attemptHistory: [{ stage: 'body', try: 1 }] };
+    const { out, calls } = await runPass1({ precomputedBody: pre });
+    expect(calls.body).toBe(0);
+    expect(calls.head).toBe(1);
+    expect(calls.headRefs[0]).toEqual(['PHANTOM', 'FACE', 'PREBODY']);
+    expect(out.imageData).toBe('SHEET(HEAD1|PREBODY)');
+    expect(out.attemptHistory.map((a: any) => `${a.stage}${a.try}`)).toEqual(['body1', 'head1']);
   });
 });

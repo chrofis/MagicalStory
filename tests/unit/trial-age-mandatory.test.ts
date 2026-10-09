@@ -54,15 +54,20 @@ describe('parseTrialAge — the one server-side range', () => {
 
 describe('the server refuses a trial character with no age', () => {
   it('create-anonymous-account validates through parseTrialAge before writing the row', () => {
-    expect(TRIAL_ROUTE).toMatch(/const parsedAge = parseTrialAge\(age\);/);
-    expect(TRIAL_ROUTE).toMatch(/if \(!parsedAge\.ok\) \{\s*\n\s*return res\.status\(400\)\.json\(\{ error: parsedAge\.error \}\);/);
-    // The row stores the NORMALISED age — never the raw string, and never the
-    // old `age || ''` that let an empty one through.
-    expect(TRIAL_ROUTE).toMatch(/age: String\(parsedAge\.years\),/);
+    // A provisional account (created at the photo, before anything is typed) may omit the age; any age that IS sent, and every
+    // non-provisional account, is parsed by parseTrialAge. docs/decisions.md 2026-10-09.
+    expect(TRIAL_ROUTE).toMatch(/const parsedAge = provisional && !ageGiven \? null : parseTrialAge\(age\);/);
+    expect(TRIAL_ROUTE).toMatch(/if \(parsedAge && !parsedAge\.ok\) \{\s*return res\.status\(400\)\.json\(\{ error: parsedAge\.error \}\);/);
+    // The row stores the NORMALISED age — never the raw string, and never an unparsed one.
+    expect(TRIAL_ROUTE).toMatch(/age: parsedAge \? String\(parsedAge\.years\) : '',/);
     // No endpoint accepts an optional age any more: generate-preview-avatar was the last one (it fired
     // before any age was typed) and is gone, the standard avatar starts only once the form holds an age.
     const optionalGuards = TRIAL_ROUTE.match(/if \(age && \(isNaN\(parseInt\(age\)\)/g) || [];
     expect(optionalGuards.length, 'no trial endpoint may take the age as optional').toBe(0);
+  });
+
+  it('a provisional (ageless) account can never start a story: create-story refuses a row without a declared age', () => {
+    expect(TRIAL_ROUTE).toMatch(/if \(!parseTrialAge\(mainChar\.age\)\.ok\) \{\s*await releaseSlot\('declared age missing'\);\s*return res\.status\(400\)\.json\(\{ error: 'Age is required', code: 'AGE_REQUIRED' \}\);/);
   });
 
   it('update-character-details refuses an invalid age and never clears a stored one', () => {
@@ -73,7 +78,8 @@ describe('the server refuses a trial character with no age', () => {
 
 describe('the client cannot submit without an age', () => {
   it('canProceed requires a valid age, on the same 1-18 range as the server', () => {
-    expect(TRIAL_STEP).toContain('const ageIsValid = /^' + String.fromCharCode(92) + 'd{1,3}$/.test(ageRaw) && Number(ageRaw) >= 1 && Number(ageRaw) <= 18;');
+    expect(TRIAL_STEP).toContain('const isValidTrialAge = (raw: string) => /^' + String.fromCharCode(92) + 'd{1,3}$/.test(raw.trim()) && Number(raw) >= 1 && Number(raw) <= 18;');
+    expect(TRIAL_STEP).toContain('const ageIsValid = isValidTrialAge(ageRaw);');
     expect(TRIAL_STEP).toMatch(/const canProceed = characterData\.name\.trim\(\) && characterData\.gender && ageIsValid && hasPhoto;/);
   });
 

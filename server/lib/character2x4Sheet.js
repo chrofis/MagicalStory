@@ -592,6 +592,62 @@ async function reviewHeadRow(headRowData, { facePhoto, avatarFaces, model, usage
   return { valid: score >= 6, score, heads, identity, promptUsed: headsR.promptUsed, identityPromptUsed: identityR?.promptUsed || null };
 }
 
+// Stage 1 of the decoupled sheet: the 1×4 FULL-BODY row (up to rowTries tries, keep least-bad). Its own render, before and
+// independent of the head row, so a caller can draw it ahead of the rest (generateBodyRow) and hand it back to
+// generateComposited2x4 as `precomputedBody` (docs/decisions.md 2026-10-09, trial body row at the photo).
+async function runBodyRowStage({ character, bodyPrompt, bodyRefs, rowTries, skipReview, costumeDescription, costumeName, model, usageTracker, attemptHistory, addUsage }) {
+  // ── Stage 1: body row (up to rowTries tries, keep least-bad) ──
+  let bestBody = null;
+  let bodyGenError = null;
+  for (let t = 1; t <= rowTries; t++) {
+    // skipOutputCrop — see styleTransferGenerate: cropping a 16:9 row back to
+    // 16:9 from a squarer output would slice the figures' heads/feet off.
+    // A THROWN backend call consumes ONE try — it must never escape this loop.
+    // The 120s AbortSignal timeout in editWithGrok used to propagate straight
+    // out of generateComposited2x4, killing the whole sheet on try 1 and
+    // leaving the provisioned retry unused (measured: staging runs
+    // job_1789337998754_apslnsq1z / job_1789343124794_z2c779f7i, "The
+    // operation was aborted due to timeout"). Same containment Pass 2 already
+    // has (stage 'gen-error'); the eval calls below are wrapped for the same
+    // reason. If BOTH tries throw, the sheet still fails loudly at the throw
+    // after the loop, carrying the last provider error.
+    let res;
+    try {
+      res = await editWithGrok(bodyPrompt, bodyRefs, { aspectRatio: '16:9', model: GROK_MODELS.STANDARD, skipOutputCrop: true });
+    } catch (err) {
+      bodyGenError = err?.message || String(err);
+      attemptHistory.push({ stage: 'body', try: t, error: `gen-error: ${bodyGenError}` });
+      log.warn(`[CHARACTER 2×4] ${character?.name} body try ${t}/${rowTries} threw: ${bodyGenError}${t < rowTries ? ' — retrying' : ''}`);
+      continue;
+    }
+    if (!res?.imageData) { attemptHistory.push({ stage: 'body', try: t, error: 'no image' }); continue; }
+    addUsage(res.usage, 'character_2x4_body_row', res.modelId);
+    // A SKIPPED review is UNKNOWN, never a 10 (staging job_1788763045123_z8so79ngb:
+    // a sheet with three strangers merged across its cells was stored at 10/10 on
+    // every axis without a single judge call). score null = unscored; valid stays
+    // true so the sheet still ships (the caller asked for no reviews).
+    let review = { valid: true, score: null, evaluated: false, bodies: null };
+    if (!skipReview) {
+      try {
+        review = await reviewBodyRow(res.imageData, { costumeDescription, costumeName, model, usageTracker, declaredAge: character?.age, glasses: declaredGlasses(character), hair: hairRequest(character) });
+      } catch (err) {
+        // Keep the sheet. Losing the eval costs a quality gate; losing the
+        // sheet costs the character its face on every page of the book, which
+        // is strictly worse. Loud, and visible in attemptHistory.
+        log.error(`[CHARACTER 2×4] ${character?.name} body eval FAILED (${err.message}) — keeping the unscored sheet`);
+        review = { valid: true, score: 0, bodies: null, evalFailed: err.message };
+      }
+    }
+    attemptHistory.push({ stage: 'body', try: t, score: review.score, valid: review.valid, reasons: review.bodies?.failureReasons || [] });
+    const rank = (v) => (typeof v === 'number' ? v : -1); // unscored ranks below any judged attempt
+    if (!bestBody || rank(review.score) > rank(bestBody.review.score)) bestBody = { row: res.imageData, review };
+    if (review.valid) break;
+    log.warn(`[CHARACTER 2×4] ${character?.name} body try ${t} invalid (score=${review.score}) — ${skipReview ? '' : (review.bodies?.failureReasons || []).join('; ')}`);
+  }
+  if (!bestBody) throw new Error(`[CHARACTER 2×4] body row produced no image for ${character?.name}${bodyGenError ? ` (last provider error: ${bodyGenError})` : ''}`);
+  return bestBody;
+}
+
 // Two-call generation → one composited 2×4 sheet, WITH review between the calls.
 // (1) body row, reviewed (pose + bodies eval); up to rowTries tries (default 2), keep least-bad.
 // (2) head row on the ACCEPTED body, reviewed (heads + identity); same tries,
@@ -599,7 +655,7 @@ async function reviewHeadRow(headRowData, { facePhoto, avatarFaces, model, usage
 // 2026-10-08): both rows start together and the head row has no body reference. Then composite. Rejected rows are discarded. Returns a verdict
 // in the evaluateSheetSplit shape so generateCharacter2x4Sheet / styledAvatars
 // consume it unchanged. skipReview → 1 try each, no eval (fast path for tests).
-async function generateComposited2x4(character, { costumeDescription, costumeName = null, redress = false, usageTracker = null, skipReview = false, seasonOutfit = null, rowTries = PASS1_ROW_TRIES, parallelRows = false } = {}) {
+async function generateComposited2x4(character, { costumeDescription, costumeName = null, redress = false, usageTracker = null, skipReview = false, seasonOutfit = null, rowTries = PASS1_ROW_TRIES, parallelRows = false, precomputedBody = null } = {}) {
   const facePhoto = await resolveFacePhoto(character);
   if (!facePhoto) throw new Error(`No face photo for ${character?.name || 'character'}.`);
   const standardAvatar = await resolveStandardAvatar(character);
@@ -615,58 +671,8 @@ async function generateComposited2x4(character, { costumeDescription, costumeNam
   let usage = { input_tokens: 0, output_tokens: 0 };
   const addUsage = (u, fn, id) => { if (u) { usage.input_tokens += u.input_tokens || 0; usage.output_tokens += u.output_tokens || 0; if (usageTracker) usageTracker('grok', u, fn, id); } };
 
-  const runBodyRow = async () => {
-    // ── Stage 1: body row (up to rowTries tries, keep least-bad) ──
-    let bestBody = null;
-    let bodyGenError = null;
-    for (let t = 1; t <= rowTries; t++) {
-      // skipOutputCrop — see styleTransferGenerate: cropping a 16:9 row back to
-      // 16:9 from a squarer output would slice the figures' heads/feet off.
-      // A THROWN backend call consumes ONE try — it must never escape this loop.
-      // The 120s AbortSignal timeout in editWithGrok used to propagate straight
-      // out of generateComposited2x4, killing the whole sheet on try 1 and
-      // leaving the provisioned retry unused (measured: staging runs
-      // job_1789337998754_apslnsq1z / job_1789343124794_z2c779f7i, "The
-      // operation was aborted due to timeout"). Same containment Pass 2 already
-      // has (stage 'gen-error'); the eval calls below are wrapped for the same
-      // reason. If BOTH tries throw, the sheet still fails loudly at the throw
-      // after the loop, carrying the last provider error.
-      let res;
-      try {
-        res = await editWithGrok(bodyPrompt, bodyRefs, { aspectRatio: '16:9', model: GROK_MODELS.STANDARD, skipOutputCrop: true });
-      } catch (err) {
-        bodyGenError = err?.message || String(err);
-        attemptHistory.push({ stage: 'body', try: t, error: `gen-error: ${bodyGenError}` });
-        log.warn(`[CHARACTER 2×4] ${character?.name} body try ${t}/${rowTries} threw: ${bodyGenError}${t < rowTries ? ' — retrying' : ''}`);
-        continue;
-      }
-      if (!res?.imageData) { attemptHistory.push({ stage: 'body', try: t, error: 'no image' }); continue; }
-      addUsage(res.usage, 'character_2x4_body_row', res.modelId);
-      // A SKIPPED review is UNKNOWN, never a 10 (staging job_1788763045123_z8so79ngb:
-      // a sheet with three strangers merged across its cells was stored at 10/10 on
-      // every axis without a single judge call). score null = unscored; valid stays
-      // true so the sheet still ships (the caller asked for no reviews).
-      let review = { valid: true, score: null, evaluated: false, bodies: null };
-      if (!skipReview) {
-        try {
-          review = await reviewBodyRow(res.imageData, { costumeDescription, costumeName, model, usageTracker, declaredAge: character?.age, glasses: declaredGlasses(character), hair: hairRequest(character) });
-        } catch (err) {
-          // Keep the sheet. Losing the eval costs a quality gate; losing the
-          // sheet costs the character its face on every page of the book, which
-          // is strictly worse. Loud, and visible in attemptHistory.
-          log.error(`[CHARACTER 2×4] ${character?.name} body eval FAILED (${err.message}) — keeping the unscored sheet`);
-          review = { valid: true, score: 0, bodies: null, evalFailed: err.message };
-        }
-      }
-      attemptHistory.push({ stage: 'body', try: t, score: review.score, valid: review.valid, reasons: review.bodies?.failureReasons || [] });
-      const rank = (v) => (typeof v === 'number' ? v : -1); // unscored ranks below any judged attempt
-      if (!bestBody || rank(review.score) > rank(bestBody.review.score)) bestBody = { row: res.imageData, review };
-      if (review.valid) break;
-      log.warn(`[CHARACTER 2×4] ${character?.name} body try ${t} invalid (score=${review.score}) — ${skipReview ? '' : (review.bodies?.failureReasons || []).join('; ')}`);
-    }
-    if (!bestBody) throw new Error(`[CHARACTER 2×4] body row produced no image for ${character?.name}${bodyGenError ? ` (last provider error: ${bodyGenError})` : ''}`);
-    return bestBody;
-  };
+  if (precomputedBody?.attemptHistory) attemptHistory.push(...precomputedBody.attemptHistory);
+  const runBodyRow = async () => precomputedBody || runBodyRowStage({ character, bodyPrompt, bodyRefs, rowTries, skipReview, costumeDescription, costumeName, model, usageTracker, attemptHistory, addUsage });
 
   const runHeadRow = async (bodyRow) => {
     // ── Stage 2: head row (up to rowTries tries, keep least-bad) ──
@@ -771,6 +777,28 @@ async function generateComposited2x4(character, { costumeDescription, costumeNam
     },
     bodyRow: bestBody.row, headRow: bestHead.row, attemptHistory,
   };
+}
+
+/**
+ * The 1×4 full-body row of a sheet as its OWN render (stage 1 of generateComposited2x4), drawn ahead of the rest.
+ * The trial draws it the moment the photo is analysed, from the photo's age/gender estimates, so the visitor sees a
+ * full-body figure while the form is still being filled; the finished sheet reuses it (`precomputedBody`) when the
+ * age band and gender it was drawn for still hold. No extra paid call: the same body-row call the sheet would make.
+ *
+ * @returns {Promise<{ row: string, review: object, attemptHistory: object[], usage: object }>} `row` is the row image (data URI)
+ */
+async function generateBodyRow(character, { costumeDescription = 'standard outfit', costumeName = null, redress = false, usageTracker = null, skipReview = false, seasonOutfit = null, rowTries = PASS1_ROW_TRIES } = {}) {
+  const facePhoto = await resolveFacePhoto(character);
+  if (!facePhoto) throw new Error(`No face photo for ${character?.name || 'character'}.`);
+  const standardAvatar = await resolveStandardAvatar(character);
+  const bodyPhantom = await phantomRow(loadPhantomVariant(character?.age, 'plain'), 'bottom');
+  const bodyRefs = standardAvatar ? [bodyPhantom, standardAvatar, facePhoto] : [bodyPhantom, facePhoto];
+  const bodyPrompt = buildBodyRowPrompt(costumeDescription, character, redress, costumeName, seasonOutfit);
+  const attemptHistory = [];
+  const usage = { input_tokens: 0, output_tokens: 0 };
+  const addUsage = (u, fn, id) => { if (u) { usage.input_tokens += u.input_tokens || 0; usage.output_tokens += u.output_tokens || 0; if (usageTracker) usageTracker('grok', u, fn, id); } };
+  const best = await runBodyRowStage({ character, bodyPrompt, bodyRefs, rowTries, skipReview, costumeDescription, costumeName, model: MODEL_DEFAULTS.sheetEvalModel, usageTracker, attemptHistory, addUsage });
+  return { row: best.row, review: best.review, attemptHistory, usage };
 }
 
 /**
@@ -1936,6 +1964,8 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
     // fastPass1 = the trial prewarm (decisions 2026-10-08): pass 1 draws the body row and the head row AT THE SAME TIME, one
     // try each, and pass 2 restyles whatever comes back. The full-story path leaves it false: sequential rows, two tries each.
     fastPass1 = false,
+    // A body row drawn ahead of the sheet by generateBodyRow (the trial draws it at the photo); stage 1 is skipped.
+    precomputedBody = null,
   } = opts;
 
   const facePhoto = await resolveFacePhoto(character);
@@ -1956,6 +1986,7 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
   try {
     composed = await generateComposited2x4(character, {
       costumeDescription, costumeName, redress, usageTracker, skipReview: skipQualityEval, seasonOutfit,
+      precomputedBody,
       ...(fastPass1 ? { rowTries: 1, parallelRows: true } : {}),
     });
   } catch (err) {
@@ -2544,6 +2575,8 @@ async function redressSheetVariant(baseSheetImageData, opts = {}) {
 
 module.exports = {
   generateCharacter2x4Sheet,
+  generateBodyRow,
+  phantomTierForAge,
   redressSheetVariant,
   gateRecordOf,
   buildRedressPrompt,

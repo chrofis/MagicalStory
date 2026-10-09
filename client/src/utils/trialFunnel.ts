@@ -24,7 +24,7 @@ export type TrialStep =
   | 'photo_analyzed'
   | 'face_picked'
   | 'character_saved'
-  /** The standard avatar sheet's front cell arrived while still in the wizard — optional (Next may come first). */
+  /** The hero's first picture (the front cell of the standard body row, drawn at the photo) arrived while still in the wizard — optional (Next may come first). */
   | 'avatar_ready'
   | 'character_done'
   | 'topic_selected'

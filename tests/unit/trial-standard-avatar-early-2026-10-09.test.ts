@@ -19,6 +19,9 @@ const trialRouter = require('../../server/routes/trial.js');
 const database = require('../../server/services/database.js');
 const trialSheets = require('../../server/lib/trialSheets.js');
 const avatarSlides = require('../../server/lib/avatarSlides.js');
+const { markCutCell, brandCutList, writeCutSlides } = require('../../server/lib/clientAvatarImages.js');
+const cell = (label: string) => markCutCell('data:image/jpeg;base64,' + label);
+const STAMP = trialSheets.standardSheetStamp({ age: '8', gender: 'male' });
 const { log } = require('../../server/utils/logger');
 const pipeline = require('../../storyJobPipeline.js');
 const root = path.resolve(__dirname, '../..');
@@ -78,16 +81,16 @@ describe('1. the standard sheet starts at the form', () => {
   it('the client sends no topic with it, and the picture it gets back is the hero avatar', () => {
     const call = step.slice(step.indexOf('/api/trial/prepare-standard-avatar'), step.indexOf('/api/trial/prepare-standard-avatar') + 400);
     expect(call).toContain("body: '{}'");
-    expect(step).toContain('onHeroAvatar?.(result.avatarImage)');
+    expect(step).toContain('showHero(result.avatarImage, true)');
   });
 
   it('the server styles ONLY the standard sheet, with no topic, and stamps the age/gender it was drawn for', async () => {
     const state = { char: row() };
     database.getPool = () => fakePool(state);
     const style = vi.spyOn(trialSheets, 'styleAndPersistTrialSheets').mockResolvedValue({ slides: ['s0', 's1'] });
-    vi.spyOn(avatarSlides, 'frontBodyCell').mockResolvedValue('data:image/jpeg;base64,FRONT');
+    vi.spyOn(avatarSlides, 'frontBodyCell').mockResolvedValue(cell('FRONT'));
     // the sheet is on the row after styling (the real persist wrote it)
-    style.mockImplementation(async () => { state.char = row({ preGeneratedStyledAvatars: { Kid: { standard: 'https://r2/std.jpg' } }, preGeneratedStandardFor: '8|male' }); return { slides: ['s0'] }; });
+    style.mockImplementation(async () => { state.char = row({ preGeneratedStyledAvatars: { Kid: { standard: 'https://r2/std.jpg' } }, preGeneratedStandardFor: STAMP }); return { slides: ['s0'] }; });
 
     const res = fakeRes();
     await finalHandler('/prepare-standard-avatar')({ sessionUser: { userId: 'u1' }, body: {}, headers: {} }, res);
@@ -95,10 +98,11 @@ describe('1. the standard sheet starts at the form', () => {
     expect(style).toHaveBeenCalledTimes(1);
     const args = style.mock.calls[0][0];
     expect(args.requirements).toEqual([{ pageNumber: 'pre-cover', clothingCategory: 'standard', characterNames: ['Kid'] }]);
-    expect(args.fields).toEqual({ preGeneratedStandardFor: '8|male' });
+    expect(args.fields).toEqual({ preGeneratedStandardFor: STAMP });
+    expect(STAMP).toBe('young-school-age/child|male'); // the age BAND, the phantom tier and the gender, not the year
     expect(args.styleOptions.skipQualityEval).toBe(true); // the job's own options for this sheet
     expect(JSON.stringify(args)).not.toMatch(/costumed:/);
-    expect(res.body).toEqual({ avatarImage: 'data:image/jpeg;base64,FRONT' });
+    expect(res.body).toEqual({ avatarImage: cell('FRONT') });
     expect(trialRouter.inFlightStandardAvatarPromises.has('u1')).toBe(false); // released
   });
 
@@ -109,10 +113,10 @@ describe('1. the standard sheet starts at the form', () => {
     const styleGate = new Promise<void>(r => { release = r; });
     vi.spyOn(trialSheets, 'styleAndPersistTrialSheets').mockImplementation(async () => {
       await styleGate;
-      state.char = row({ preGeneratedStyledAvatars: { Kid: { standard: 'u' } }, preGeneratedStandardFor: '8|male' });
+      state.char = row({ preGeneratedStyledAvatars: { Kid: { standard: 'u' } }, preGeneratedStandardFor: STAMP });
       return { slides: [] };
     });
-    vi.spyOn(avatarSlides, 'frontBodyCell').mockResolvedValue('x');
+    vi.spyOn(avatarSlides, 'frontBodyCell').mockResolvedValue(cell('X'));
     const first = finalHandler('/prepare-standard-avatar')({ sessionUser: { userId: 'u1' }, body: {}, headers: {} }, fakeRes());
     await new Promise(r => setTimeout(r, 10));
     expect(trialRouter.inFlightStandardAvatarPromises.has('u1')).toBe(true);
@@ -125,14 +129,14 @@ describe('1. the standard sheet starts at the form', () => {
   });
 
   it('a repeat call after the sheet exists styles nothing again', async () => {
-    const state = { char: row({ preGeneratedStyledAvatars: { Kid: { standard: 'https://r2/std.jpg' } }, preGeneratedStandardFor: '8|male' }) };
+    const state = { char: row({ preGeneratedStyledAvatars: { Kid: { standard: 'https://r2/std.jpg' } }, preGeneratedStandardFor: STAMP }) };
     database.getPool = () => fakePool(state);
     const style = vi.spyOn(trialSheets, 'styleAndPersistTrialSheets');
-    vi.spyOn(avatarSlides, 'frontBodyCell').mockResolvedValue('data:image/jpeg;base64,STORED');
+    vi.spyOn(avatarSlides, 'frontBodyCell').mockResolvedValue(cell('STORED'));
     const res = fakeRes();
     await finalHandler('/prepare-standard-avatar')({ sessionUser: { userId: 'u1' }, body: {}, headers: {} }, res);
     expect(style).not.toHaveBeenCalled();
-    expect(res.body.avatarImage).toBe('data:image/jpeg;base64,STORED');
+    expect(res.body.avatarImage).toBe(cell('STORED'));
   });
 
   it('a failure is loud (ERROR) and answers 500, so the job styles the sheet itself', async () => {
@@ -148,8 +152,9 @@ describe('1. the standard sheet starts at the form', () => {
 
 describe('2. prepare-title and the job reuse it', () => {
   it('prepare-title styles only the costumed sheet (never a standard one), with the costume and the parallel rows', async () => {
-    database.getPool = () => fakePool({ char: row({ preGeneratedStyledAvatars: { Kid: { standard: 'https://r2/std.jpg' } }, preGeneratedStandardFor: '8|male' }) });
-    const style = vi.spyOn(trialSheets, 'styleAndPersistTrialSheets').mockResolvedValue({ slides: ['a', 'b'] });
+    database.getPool = () => fakePool({ char: row({ preGeneratedStyledAvatars: { Kid: { standard: 'https://r2/std.jpg' } }, preGeneratedStandardFor: STAMP }) });
+    const sent = writeCutSlides({}, brandCutList([cell('A'), cell('B')]), ['https://r2/a.jpg', 'https://r2/b.jpg']);
+    const style = vi.spyOn(trialSheets, 'styleAndPersistTrialSheets').mockResolvedValue({ slides: sent });
     const res = fakeRes();
     await finalHandler('/prepare-title')({ sessionUser: { userId: 'u1' }, body: { storyCategory: 'adventure', storyTheme: 'pirate', storyTopic: '' }, headers: {} }, res);
     expect(style).toHaveBeenCalledTimes(1);
@@ -158,7 +163,7 @@ describe('2. prepare-title and the job reuse it', () => {
     expect(args.requirements[0].clothingCategory).toMatch(/^costumed:/);
     expect(args.styleOptions.fastPass1).toBe(true);
     expect(args.fields).toHaveProperty('preGeneratedCostumeType');
-    expect(res.body.avatarSlides).toEqual(['a', 'b']); // slides of both sheets, built by the persist step
+    expect(res.body.avatarSlides).toEqual(['https://r2/a.jpg', 'https://r2/b.jpg']); // slides of both sheets, built by the persist step
   });
 
   it('prepare-title with no costume for the topic styles nothing (the old fall-back to a standard sheet is gone)', async () => {
@@ -221,10 +226,12 @@ describe('2. prepare-title and the job reuse it', () => {
     it('a standard sheet drawn for another age/gender than the row now holds is NOT reused (loud), a matching one is', () => {
       const err = vi.spyOn(log, 'error').mockImplementation(() => {});
       const base = { name: 'Kid', age: '10', gender: 'male', preGeneratedStyledAvatars: { Kid: { standard: 's', costumed: { default: 'c' } } } };
-      const stale = trialSheets.usablePreparedAvatars({ ...base, preGeneratedStandardFor: '1|male' });
+      const toddlerStamp = trialSheets.standardSheetStamp({ age: '1', gender: 'male' });
+      const nowStamp = trialSheets.standardSheetStamp({ age: '10', gender: 'male' });
+      const stale = trialSheets.usablePreparedAvatars({ ...base, preGeneratedStandardFor: toddlerStamp });
       expect(stale).toEqual({ Kid: { costumed: { default: 'c' } } });
-      expect(err.mock.calls.some(c => /drawn for "1\|male" but the row now says "10\|male"/.test(String(c[0])))).toBe(true);
-      const current = trialSheets.usablePreparedAvatars({ ...base, preGeneratedStandardFor: '10|male' });
+      expect(err.mock.calls.some(c => String(c[0]).includes(`drawn for "${toddlerStamp}" but the row now says "${nowStamp}"`))).toBe(true);
+      const current = trialSheets.usablePreparedAvatars({ ...base, preGeneratedStandardFor: nowStamp });
       expect(current).toEqual({ Kid: { standard: 's', costumed: { default: 'c' } } });
       expect(trialSheets.usablePreparedAvatars({ name: 'Kid' })).toBeNull();
     });
@@ -249,18 +256,18 @@ describe('3. the slides hold the standard cells from job start', () => {
       return data;
     },
     readCharacter: async () => rowChar,
-    buildSlides: async (sheets: any) => { const s = [`${Object.keys(sheets).sort().join('+')}`]; built.push(s); return s; },
+    buildSlides: async (sheets: any) => { const label = Object.keys(sheets).sort().join('+'); built.push([label]); return brandCutList([cell(label)]); },
   });
 
   it('merges the new sheet into the row and cuts slides from every sheet the row then holds', async () => {
     const rowChar: any = { id: 7, preGeneratedStyledAvatars: { Kid: { costumed: { default: 'cos' } } } };
     const built: string[][] = [];
-    const slides = await trialSheets.persistPreparedSheets({ userId: 'u1', characterId: 'characters_u1', exported: { Kid: { standard: 'std' } }, fields: { preGeneratedStandardFor: '8|male' } }, fakeDeps(rowChar, built));
+    const slides = await trialSheets.persistPreparedSheets({ userId: 'u1', characterId: 'characters_u1', exported: { Kid: { standard: 'std' } }, fields: { preGeneratedStandardFor: STAMP } }, fakeDeps(rowChar, built));
     expect(rowChar.preGeneratedStyledAvatars.Kid).toEqual({ costumed: { default: 'cos' }, standard: 'std' });
-    expect(rowChar.preGeneratedStandardFor).toBe('8|male');
+    expect(rowChar.preGeneratedStandardFor).toBe(STAMP);
     expect(built).toEqual([['costumed+standard']]); // the slides cover BOTH sheets
-    expect(slides).toEqual(['costumed+standard']);
-    expect(rowChar.preGeneratedAvatarSlides).toEqual(['costumed+standard']);
+    expect(slides).toEqual([cell('costumed+standard')]);
+    expect(rowChar.preGeneratedAvatarSlides).toEqual([cell('costumed+standard')]);
   });
 
   it('when the other endpoint lands its sheet while the slides are cut, the cut is redone (the last writer never drops a sheet)', async () => {
@@ -272,21 +279,21 @@ describe('3. the slides hold the standard cells from job start', () => {
         calls++;
         const label = Object.keys(sheets).sort().join('+');
         if (calls === 1) rowChar.preGeneratedStyledAvatars.Kid.costumed = { default: 'cos' }; // prepare-title persists meanwhile
-        return [label];
+        return brandCutList([cell(label)]);
       },
     };
     const info = vi.spyOn(log, 'info').mockImplementation(() => {});
     const slides = await trialSheets.persistPreparedSheets({ userId: 'u1', characterId: 'c', exported: { Kid: { standard: 'std' } } }, deps);
     expect(calls).toBe(2);
-    expect(slides).toEqual(['costumed+standard']);
-    expect(rowChar.preGeneratedAvatarSlides).toEqual(['costumed+standard']);
+    expect(slides).toEqual([cell('costumed+standard')]);
+    expect(rowChar.preGeneratedAvatarSlides).toEqual([cell('costumed+standard')]);
     expect(info.mock.calls.some(c => /changed while the slides were cut/.test(String(c[0])))).toBe(true);
   });
 
   it('gives up loudly (throws) rather than store slides that lack a sheet', async () => {
     const rowChar: any = { id: 7, preGeneratedStyledAvatars: { Kid: { standard: 'std' } } };
     let n = 0;
-    const deps = { ...fakeDeps(rowChar, []), buildSlides: async () => { rowChar.preGeneratedStyledAvatars.Kid.costumed = { default: `c${++n}` }; return ['x']; } };
+    const deps = { ...fakeDeps(rowChar, []), buildSlides: async () => { rowChar.preGeneratedStyledAvatars.Kid.costumed = { default: `c${++n}` }; return brandCutList([cell('x')]); } };
     vi.spyOn(log, 'info').mockImplementation(() => {});
     await expect(trialSheets.persistPreparedSheets({ userId: 'u1', characterId: 'c', exported: { Kid: { standard: 'std' } } }, deps)).rejects.toThrow(/kept changing/);
     expect(rowChar.preGeneratedAvatarSlides).toBeUndefined();

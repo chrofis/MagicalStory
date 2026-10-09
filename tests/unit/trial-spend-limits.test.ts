@@ -204,10 +204,13 @@ describe('T3: prepare-title once per trial', () => {
     const look = resolveTrialCostumeLookup({ storyCategory: 'adventure', storyTheme: 'pirate', storyTopic: undefined });
     const costume = getTrialCostume(look.topic, look.category, 'male');
     const storedType = costume ? costume.costumeType : null;
-    poolQuery = pool(0, { characters: [{ name: 'Mia', gender: 'male', preGeneratedStyledAvatars: { Mia: {} }, preGeneratedCostumeType: storedType, preGeneratedAvatarSlides: ['s1', 's2'] }] });
+    const { markCutCell, brandCutList, writeCutSlides } = nodeRequire('../../server/lib/clientAvatarImages.js');
+    const stored: any = { name: 'Mia', gender: 'male', preGeneratedStyledAvatars: { Mia: {} }, preGeneratedCostumeType: storedType };
+    writeCutSlides(stored, brandCutList([markCutCell('data:image/jpeg;base64,S1'), markCutCell('data:image/jpeg;base64,S2')]), ['https://r2/s1.jpg', 'https://r2/s2.jpg']);
+    poolQuery = pool(0, { characters: [stored] });
     const res = mockRes();
     await handler({ sessionUser: { userId: uid() }, body }, res);
-    expect(res.body).toEqual({ costumeType: storedType, avatarSlides: ['s1', 's2'] });
+    expect(res.body).toEqual({ costumeType: storedType, avatarSlides: ['https://r2/s1.jpg', 'https://r2/s2.jpg'] });
   });
   it('generates nothing for a different costume once sheets exist', async () => {
     poolQuery = pool(0, { characters: [{ name: 'Mia', gender: 'male', preGeneratedStyledAvatars: { Mia: {} }, preGeneratedCostumeType: 'some-other-costume', preGeneratedAvatarSlides: ['s1'] }] });
