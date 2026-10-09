@@ -9429,6 +9429,24 @@
         "kind": "human",
         "what": "replies[0].modelId is google/gemini-3.7-flash; no beats_scene_expansion_truncated / _incomplete in generationLog; briefCheckReport.findingsBefore within about 40 on an 18-page story."
       }
+    },
+    {
+      "id": "trial-standard-avatar-at-form-2026-10-09",
+      "title": "Trial standard sheet at the form; no preview avatar",
+      "commits": [
+        "b34e15e2f"
+      ],
+      "addedAt": "2026-10-09",
+      "status": "pending",
+      "evidence": [],
+      "claim": "The standard sheet starts at the form, the spinner has standard and costumed cells from the first poll, and no sheet is styled twice.",
+      "runShape": [
+        "trial"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "prepare-standard-avatar starts within ~15 s of Anonymous account created and finishes ~60 s later; no generate-preview-avatar request; the job log shows Seeded N prepared styled avatars or awaits the in-flight prepare-standard-avatar, with no second standard 2x4 styling; the first job-status poll carries standard cells."
+      }
     }
   ],
   "runs": [
