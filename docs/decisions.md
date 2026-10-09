@@ -67854,3 +67854,11 @@ Touched files: server/lib/vbIdGuard.js, server/lib/promptBuilders.js, server/lib
 **Rationale:** owner, 2026-10-09: "Text having 3 actions. Image having 1 is fine. That should already be documented!!!" Listing it as a defect re-opened a settled verdict without reading SETTLED.md.
 **Revisit if:** only through the SETTLED reversal protocol.
 **Touched files:** none.
+
+## 2026-10-09 — Gaze witness misreads: no structural guard adopted, item removed
+
+**Context:** "Gaze severity follows the page's story" accepted the witness's misreads and left two guards unmeasured. Re-measured by viewing the page image of every declared-gaze finding of the last 30 days (277 replayed page versions, 15 stories; 16 distinct findings on 8 pages), scripts/analysis/gaze-misread-set.js.
+**Decision:** no guard; gazeCheck.js unchanged. Labels: 2 misread, 7 correct, 7 can't tell. Guards on structured inventory fields only: (a) figure holds an item and the declared target is an object removes 1 misread and 1 correct read; (b) mutual gaze removes 1 misread and 3 correct reads; (c) facing contradicting the gaze removes 0; back/profile views are already skipped (eyesNotVisible). Bar: 0 correct reads lost, so none qualifies. A two-read agreement would add an inventory call per page with no proof, so it is not built.
+**Rationale:** 2 misreads in 16 already land mostly at MINOR under the relevance grading. Spend USD 0.
+**Revisit if:** the labelled set reaches about 30 findings with at least 5 misreads, or the inventory describes the eyes separately from the body.
+**Touched files:** scripts/analysis/gaze-misread-set.js (commit 26441b5ad).
