@@ -8755,6 +8755,24 @@
         "kind": "human",
         "what": "beats_jev_brief_fields stats show emotions with exactly 1 call and jev_decisions_emotions appears once in usage; every page jevFixed.emotions lists the in-frame figures; stored briefs characters[].emotion and creatures[].emotion equal jevFixed.emotions; no emotion_off_list finding for a listed figure; 3+ faces read as the pinned emotion; the Jev step elapsed time rises by at most one call."
       }
+    },
+    {
+      "id": "jev-plan-check-q10-q17-2026-10-09",
+      "title": "Jev answers plan-check Q10 (heights) and Q17 (whole cast)",
+      "commits": [
+        "5b0a10839"
+      ],
+      "addedAt": "2026-10-09",
+      "status": "pending",
+      "evidence": [],
+      "claim": "Plan-check questions 10 (heights) and 17 (whole cast) are answered by Jev in parallel with the checker; the checker prompt no longer asks them; Jev findings reach the counters, the guard, the re-plan section and the report as CHECK[10]/CHECK[17] (17 must-fix, 10 noted), with no added wall clock and no LLM fallback.",
+      "runShape": [
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "beatsReviewReport modelFindings / recheck.modelFindings carry check 10/17 lines \"Page N: ...\" with recheck.jev scores; stored checkPrompt has no \"10. Heights\" or \"17. The whole cast\" and says fifteen; jev_plan_check usage rows; planCheckMs not longer than before; no jev_fallback or *_jev_skipped event; any CHECK[17] finding sits on a page whose ROSTER holds every commissioned name."
+      }
     }
   ],
   "runs": [
