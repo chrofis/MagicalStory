@@ -4148,6 +4148,20 @@
       "fixedAt": "2026-10-09",
       "fixedIn": "a9aac2592",
       "fix": "content-keyed R2 objects + figure labels; tests/unit/trial-slides-content-keys.test.ts, trial-waiting-slides-rotation-2026-10-09.test.ts"
+    },
+    {
+      "id": "styled-sheets-overwritten-positional-keys",
+      "title": "A later story overwrites the styled sheets earlier stories point at (R2 name = cast position only)",
+      "reportedAt": "2026-10-09",
+      "source": "staging: 26 of 78 story sheet references differ from the story's own archived story-sheets copy (2 users, 7 stories), e.g. job_1791145238223_50osg2osm Emma oil costumed now shows a later story's mermaid sheet; storyJobPipeline.js:7021 offloads styledAvatars before the row lock as inline/styledAvatars-<i>-*.jpg",
+      "status": "open"
+    },
+    {
+      "id": "same-name-characters-share-sheets",
+      "title": "Characters with the same name in one user row share one styled sheet",
+      "reportedAt": "2026-10-09",
+      "source": "staging user 680c30fd: three different Sarah characters (36, 25, 30, own photos) point at one anime standard and one costumed sheet; suspected styledAvatarsMap.get(dbChar.name)",
+      "status": "open"
     }
   ]
 }
