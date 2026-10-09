@@ -19,7 +19,7 @@ const WIZARD = read('TrialWizard.tsx');
 
 describe('an idea edit keeps the selection', () => {
   it('the textarea reports edits through onIdeaEdited, never onIdeasGenerated', () => {
-    const textarea = STEP.slice(STEP.indexOf('<textarea'), STEP.indexOf('</textarea>') > 0 ? STEP.indexOf('</textarea>') : STEP.indexOf('/>', STEP.indexOf('<textarea')));
+    const textarea = STEP.slice(STEP.indexOf('<AutoGrowTextarea'), STEP.indexOf('/>', STEP.indexOf('<AutoGrowTextarea')));
     expect(textarea).toContain('onIdeaEdited(updated);');
     expect(textarea).not.toContain('onIdeasGenerated(');
   });

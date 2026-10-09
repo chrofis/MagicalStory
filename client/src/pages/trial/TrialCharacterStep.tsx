@@ -297,6 +297,13 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
   const [detectedFaces, setDetectedFaces] = useState<DetectedFace[]>([]);
   const [cachedFacesData, setCachedFacesData] = useState<any>(null);
   const [originalImageData, setOriginalImageData] = useState<string | null>(null);
+  // Multi-face photo: the moment the visitor picks a face its thumbnail (already in hand from
+  // the first analysis) stands in for the photo, so the name/age/gender form opens at once.
+  // The slow part (body crop + background removal for that face, ~20s) runs in the
+  // background and fills characterData.photos when it lands. Cleared when it lands or fails.
+  const [pickedFaceThumb, setPickedFaceThumb] = useState<string | null>(null);
+  // Next was pressed while that analysis was still running: advance when it has landed.
+  const [nextWaitingForPhoto, setNextWaitingForPhoto] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
 
   // Avatar generation state
@@ -347,6 +354,9 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
   // has either typed something wrong or left the field behind.
   const showAgeError = hasPhoto && !ageIsValid && ageRaw !== '';
   const canProceed = characterData.name.trim() && characterData.gender && ageIsValid && hasPhoto;
+  // The picked face's analysis is still running: every required field is in, only the photo data is missing
+  const photoPending = !hasPhoto && !!pickedFaceThumb;
+  const canQueueNext = !!(characterData.name.trim() && characterData.gender && ageIsValid && photoPending);
 
   // Track which face photo the current avatar was generated for
   const facePhotoKey = characterData.photos.face ? characterData.photos.face.slice(-40) : '';
@@ -597,7 +607,8 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
 
   // ─── Photo upload ────────────────────────────────────────────────────────────
 
-  const analyzePhoto = useCallback(async (base64: string, selectedFaceId?: string, cachedFaces?: any) => {
+  /** Resolves true when the photo yielded what the step needs, false when an error is showing. */
+  const analyzePhoto = useCallback(async (base64: string, selectedFaceId?: string, cachedFaces?: any): Promise<boolean> => {
     setIsAnalyzing(true);
     setPhotoError(null);
     setDetectedFaces([]);
@@ -619,7 +630,7 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
 
       if (!response.ok) {
         setPhotoError(localizedApiError({ code: result.code, status: response.status }, language, t.photoError));
-        return;
+        return false;
       }
 
       if (result.success) {
@@ -646,11 +657,13 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
           });
           setDetectedFaces([]);
         }
-      } else {
-        setPhotoError(t.noFaceDetected);
+        return true;
       }
+      setPhotoError(t.noFaceDetected);
+      return false;
     } catch (err) {
       setPhotoError(t.photoError);
+      return false;
     } finally {
       setIsAnalyzing(false);
     }
@@ -704,11 +717,29 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
   };
 
   const handleFaceSelect = (faceId: string) => {
-    if (originalImageData && cachedFacesData) {
-      trackTrialStep('face_picked');
-      analyzePhoto(originalImageData, faceId, cachedFacesData);
-    }
+    const picked = detectedFaces.find((f) => f.id === faceId);
+    if (!originalImageData || !cachedFacesData || !picked) return;
+    trackTrialStep('face_picked');
+    const facesBeforePick = detectedFaces;
+    setPickedFaceThumb(picked.thumbnail);
+    analyzePhoto(originalImageData, faceId, cachedFacesData).then((ok) => {
+      setPickedFaceThumb(null);
+      if (ok) return;
+      // The analysis failed after the form had already opened: bring the face picker and the error
+      // back where the visitor can retry, and drop a queued Next so it cannot advance without a photo.
+      setNextWaitingForPhoto(false);
+      setDetectedFaces(facesBeforePick);
+      setPhase('photo');
+    });
   };
+
+  // Next was pressed while the picked face was still being analysed: go on as soon as it has landed.
+  useEffect(() => {
+    if (!nextWaitingForPhoto || !canProceed) return;
+    setNextWaitingForPhoto(false);
+    handleNext();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nextWaitingForPhoto, canProceed]);
 
   const handleRemovePhoto = () => {
     onChange({
@@ -719,6 +750,7 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
     setDetectedFaces([]);
     setOriginalImageData(null);
     setCachedFacesData(null);
+    setPickedFaceThumb(null);
   };
 
   // Drag and drop handlers
@@ -848,7 +880,7 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
             </div>
           )}
 
-          {!hasPhoto ? (
+          {!hasPhoto && !pickedFaceThumb ? (
             <div
               onDragOver={canUpload ? handleDragOver : undefined}
               onDragLeave={canUpload ? handleDragLeave : undefined}
@@ -889,7 +921,7 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
           ) : (
             <div className="flex items-center gap-4 p-4 bg-white rounded-xl border border-gray-200 shadow-sm">
               <img
-                src={characterData.photos.face!}
+                src={characterData.photos.face || pickedFaceThumb!}
                 alt={characterData.name || 'Character'}
                 className="w-20 h-20 rounded-full object-cover border-2 border-indigo-200"
               />
@@ -1038,8 +1070,8 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
           {/* Continue → details phase (enabled once a photo exists) */}
           <button
             onClick={() => setPhase('details')}
-            disabled={!hasPhoto}
-            className={ctaClass(!!hasPhoto)}
+            disabled={!hasPhoto && !pickedFaceThumb}
+            className={ctaClass(hasPhoto || !!pickedFaceThumb)}
           >
             {t.continueLabel}
             <ArrowRight className="w-4 h-4" />
@@ -1066,11 +1098,11 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
 
           {/* Next button — wired to handleNext (unchanged) */}
           <button
-            onClick={handleNext}
-            disabled={!canProceed || isCreatingAccount}
-            className={ctaClass(!!canProceed && !isCreatingAccount)}
+            onClick={canQueueNext ? () => setNextWaitingForPhoto(true) : handleNext}
+            disabled={!(canProceed || canQueueNext) || isCreatingAccount || nextWaitingForPhoto}
+            className={ctaClass(!!(canProceed || canQueueNext) && !isCreatingAccount && !nextWaitingForPhoto)}
           >
-            {isCreatingAccount ? (
+            {isCreatingAccount || nextWaitingForPhoto ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
               </>
@@ -1082,7 +1114,7 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
                 <span>{characterData.name || '...'} {language === 'de' ? 'wird erstellt' : language === 'fr' ? 'en cours de création' : language === 'it' ? 'in fase di creazione' : 'is being created'}</span>
                 <ArrowRight className="w-4 h-4" />
               </>
-            ) : !canProceed ? (
+            ) : !canProceed && !canQueueNext ? (
               // Button is disabled because required fields are missing — tell
               // the user what's outstanding instead of a plain greyed-out "Weiter".
               <span>{!hasPhoto ? t.nextNoPhoto : t.nextNoDetails}</span>

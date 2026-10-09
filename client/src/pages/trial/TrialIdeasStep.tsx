@@ -1,3 +1,4 @@
+import type { TextareaHTMLAttributes } from 'react';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { ArrowLeft, Check, Loader2, MapPin, Pencil, RefreshCw, Sparkles, X } from 'lucide-react';
 import { storyTypes } from '@/constants/storyTypes';
@@ -6,6 +7,32 @@ import { trackTrialStep } from '@/utils/trialFunnel';
 import { splitIdeaRoles, joinIdeaRoles } from '@/utils/ideaRoles';
 import { isTrialSessionDead } from '@/utils/trialSession';
 import { localizedApiError } from '@/utils/apiErrors';
+
+// ─── Auto-height textarea ────────────────────────────────────────────────────
+
+/** A textarea that is always as tall as its text, so the idea never scrolls inside its box
+ *  (owner 2026-10-09: ideas run to ~75 words). Re-measures on text and on width change. */
+function AutoGrowTextarea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  const fit = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, []);
+  useEffect(() => { fit(); }, [fit, props.value]);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    let width = el.clientWidth;
+    const ro = new ResizeObserver(() => {
+      if (el.clientWidth !== width) { width = el.clientWidth; fit(); }
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [fit]);
+  return <textarea ref={ref} rows={1} {...props} />;
+}
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -630,7 +657,7 @@ export default function TrialIdeasStep({
                 {/* Content */}
                 {hasText ? (
                   isEditable ? (
-                    <textarea
+                    <AutoGrowTextarea
                       value={blurb}
                       onChange={(e) => {
                         e.stopPropagation();
@@ -646,7 +673,7 @@ export default function TrialIdeasStep({
                         onIdeaEdited(updated);
                       }}
                       onClick={(e) => e.stopPropagation()}
-                      className="flex-1 w-full text-base md:text-sm text-gray-700 leading-relaxed bg-transparent border-0 outline-none resize-none p-0"
+                      className="w-full text-base md:text-sm text-gray-700 leading-relaxed bg-transparent border-0 outline-none resize-none overflow-hidden p-0"
                       placeholder={t.idea}
                     />
                   ) : (

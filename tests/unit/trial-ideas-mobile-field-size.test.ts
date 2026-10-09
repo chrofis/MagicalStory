@@ -13,7 +13,8 @@ const STEP = fs.readFileSync(path.join(__dirname, '..', '..', 'client', 'src', '
 
 describe('trial ideas step fields do not trigger iOS focus zoom', () => {
   it('every textarea and text input is text-base (16px) below md', () => {
-    const fields = STEP.match(/<(textarea|input)\b[\s\S]*?\/>/g) || [];
+    // AutoGrowTextarea is the idea editor; its inner <textarea {...props}> only forwards the caller's className
+    const fields = (STEP.match(/<(AutoGrowTextarea|textarea|input)\b[\s\S]*?\/>/g) || []).filter((f) => !f.includes('{...props}'));
     expect(fields.length).toBeGreaterThanOrEqual(2);
     for (const f of fields) {
       expect(f).toContain('text-base md:text-sm');

@@ -40,7 +40,7 @@ a creature, villain or quest borrowed from another kind of story.`;
 // (median ~75) because "Maximum 50 words" was one clause at the end of a long
 // chain rule. The limit is now a stated, per-sentence budget (prompts/trial-idea.txt
 // {MAX_WORDS} / {SENTENCE_WORDS}), one constant for the prompt and the test.
-const TRIAL_IDEA_MAX_WORDS = 50;
+const TRIAL_IDEA_MAX_WORDS = 75;
 const TRIAL_IDEA_SENTENCE_WORDS = Math.ceil(TRIAL_IDEA_MAX_WORDS / 3);
 
 const CHECK_MARKER = 'CHECK';
