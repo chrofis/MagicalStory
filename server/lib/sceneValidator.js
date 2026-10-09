@@ -831,20 +831,40 @@ function parseSharedFindings(text, count) {
 }
 
 /**
+ * The identity a finding has for "is this the parent's defect": declared type plus subject, lower
+ * case. The same shape scoring.severeFindings compares on, built from a stored/consolidated entry
+ * (`character` or `name`) or from a parentFindingsForCompare row (`type`, `character`).
+ */
+function findingClassId(f) {
+  return `${String(f?.subType || f?.type || '').toLowerCase()}|${String(f?.character || f?.name || '').trim().toLowerCase()}`;
+}
+
+/**
  * Tag the deduped entries of a repair child's plan that are also in its parent (`alsoInParent`).
  * Only entries the semantic judge did not already answer for: MODERATE and above, not tagged, with
- * at least one source other than `semantic`. Nothing to ask means no call. A failed call is
+ * at least one source other than `semantic` (the semantic judge sees the parent in the same call,
+ * so its own answer stands; every caller attaches `parentCompare` to the child's eval input).
+ *
+ * The call is made when a MAJOR-or-worse entry is NEW against the parent's own findings: one whose
+ * type and subject `parentFindings` (parentFindingsForCompare) does not carry. A finding the
+ * parent's judging already filed needs no picture check. Measured 2026-10-09 on 44 such "new"
+ * findings of stored repair children, labelled by eye against the parent picture: 31 were visible
+ * in the parent, 5 judge noise, 8 really new. Nothing to ask means no call. A failed call is
  * logged at ERROR and tags nothing: the findings stay charged to the child (no fallback guess).
  *
  * @returns {Promise<{asked:number, tagged:number, usage:object|null, error:string|null}>}
  */
-async function tagFindingsSharedWithParent({ childImage, parentImage, plan, pageNumber = null }) {
+async function tagFindingsSharedWithParent({ childImage, parentImage, plan, parentFindings, pageNumber = null }) {
+  if (!Array.isArray(parentFindings)) throw new Error('tagFindingsSharedWithParent needs parentFindings (parentFindingsForCompare)');
   const { deductionPoints, SEVERITY_POINTS } = require('./scoring');
   const issues = Array.isArray(plan?.deduped_issues) ? plan.deduped_issues : [];
   const ask = issues.filter(i => i && !i.alsoInParent
     && deductionPoints({ severity: String(i.severity || '').toLowerCase(), type: i.type }) >= SEVERITY_POINTS.moderate
     && (Array.isArray(i.sources) ? i.sources : []).some(x => x !== 'semantic'));
-  if (!ask.length) return { asked: 0, tagged: 0, usage: null, error: null };
+  const inParent = new Set(parentFindings.map(findingClassId));
+  const hasNewSevere = ask.some(i => deductionPoints({ severity: String(i.severity || '').toLowerCase(), type: i.type }) >= SEVERITY_POINTS.major
+    && !inParent.has(findingClassId(i)));
+  if (!ask.length || !hasNewSevere) return { asked: 0, tagged: 0, usage: null, error: null };
   const template = PROMPT_TEMPLATES.parentSharedFindings;
   if (!template) throw new Error('parent-shared-findings prompt not loaded');
   const { GEMINI_SAFETY_SETTINGS } = require('./images');

@@ -1030,6 +1030,47 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     }
   };
 
+  // ---------------------------------------------------------------------
+  // PAIRED RE-JUDGE, every repair child (owner 2026-10-09: "Full rejudge, as repair can introduce
+  // new issues. But also judge against the old image to see if an issue is really new and not eval
+  // noise"). A repaired version is judged in full, and each finding on it is checked against the
+  // picture it was repaired from: visible there too = not introduced by the repair (tagged
+  // alsoInParent, charged to the parent as well); absent there = introduced, charged in full.
+  // Labelled by eye on 44 stored "new" MAJOR+ findings: 31 were visible in the parent, 5 judge
+  // noise, 8 really new. Two halves, ONE helper pair for every repair method, round, cover and
+  // page (iterate, inpaint, char-fix, recolour, the post-repair text re-render): attachParentCompare
+  // hands the semantic judge the parent beside the child; checkFindingsAgainstParent asks the
+  // quality / compliance / entity / reader findings in one batched call (docs/decisions.md 2026-10-09).
+  // ---------------------------------------------------------------------
+  const attachParentCompare = (input, parent) => {
+    if (parent && typeof parent.imageData === 'string' && parent.imageData.length > 0) {
+      const { parentFindingsForCompare } = require('./scoring');
+      input.parentCompare = { imageData: parent.imageData, findings: parentFindingsForCompare(parent) };
+      return;
+    }
+    log.error(`❌ [PARENT-SHARED] p${input.pageNumber}: the parent picture has no bytes in memory — this repair child cannot be judged beside it, its findings stay charged to the repair`);
+  };
+
+  const checkFindingsAgainstParent = async ({ plan, childImage, parentCompare, pageNumber, label }) => {
+    if (!plan) return;
+    if (!parentCompare?.imageData || typeof childImage !== 'string') {
+      plan.parentCheck = { asked: 0, tagged: 0, error: 'no parent picture or no child bytes to compare' };
+      log.error(`❌ [PARENT-SHARED] p${pageNumber}: no parent picture or child bytes to compare — the child's findings stay charged to the repair`);
+      return;
+    }
+    const { tagFindingsSharedWithParent } = require('./sceneValidator');
+    const res = await tagFindingsSharedWithParent({
+      childImage, parentImage: parentCompare.imageData, plan, parentFindings: parentCompare.findings, pageNumber,
+    });
+    plan.parentCheck = { asked: res.asked, tagged: res.tagged, error: res.error };
+    if (res.usage && usageTracker) {
+      usageTracker('gemini_quality', {
+        input_tokens: res.usage.input_tokens || 0, output_tokens: res.usage.output_tokens || 0,
+        thinking_tokens: res.usage.thinking_tokens || 0,
+      }, label, res.usage.modelId || 'gemini-2.5-flash');
+    }
+  };
+
   // Consolidate the initial-pass evaluations (winner images + the non-winner
   // original baselines) in parallel.
   const consolidatedByPage = new Map();
@@ -2462,10 +2503,16 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
 
         if (recolourResults.length > 0) {
           log.info(`🎨 [GARMENT-COLOUR] Round ${round}: ${recolourResults.length} page(s) recoloured — evaluating as their own version(s)`);
+          // The version each recolour repaints — its parent for the paired re-judge and the lineage.
+          const recolourParentOf = new Map(recolourResults.map(rc => [rc.pageNumber, selectBestVersion(pageVersions.get(rc.pageNumber))]));
           let recolourEvals = [];
+          // PAIRED RE-JUDGE: the recolour is judged beside the version it recoloured.
+          const recolourInputs = buildEvalInputs(recolourResults);
+          for (const input of recolourInputs) attachParentCompare(input, recolourParentOf.get(input.pageNumber));
+          const recolourInputsByPage = new Map(recolourInputs.map(i => [i.pageNumber, i]));
           try {
             recolourEvals = await images().evaluateImageBatch(
-              buildEvalInputs(recolourResults),
+              recolourInputs,
               { concurrency: evalConcurrency, qualityModelOverride, visualBible, clothingRequirements: storyData?.clothingRequirements || null, storyData, artStyle, ...evalStoryMeta }
             );
           } catch (err) {
@@ -2485,6 +2532,13 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             const plan = await consolidatePageEval(ev, entityResult.issues, ev.pageNumber, round, null);
             if (plan) recolourConsolidated.set(ev.pageNumber, plan);
           })));
+          await Promise.all(recolourEvals.filter(ev => ev.evaluated !== false).map(ev => consolidateLimit(() => checkFindingsAgainstParent({
+            plan: recolourConsolidated.get(ev.pageNumber),
+            childImage: recolourMap.get(ev.pageNumber)?.imageData,
+            parentCompare: recolourInputsByPage.get(ev.pageNumber)?.parentCompare,
+            pageNumber: ev.pageNumber,
+            label: `parent_shared_recolour_r${round}`,
+          }))));
 
           for (const ev of recolourEvals) {
             if (ev.usage && usageTracker) {
@@ -2497,7 +2551,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             const { applyScore } = require('./scoring');
             // Lineage: a recolour repaints a garment on the version it was
             // handed — same contract, new pixels.
-            const recolourParent = selectBestVersion(versions);
+            const recolourParent = recolourParentOf.get(ev.pageNumber);
             const recolourVersion = {
               imageData: rc.imageData,
               score: ev.score ?? ev.qualityScore ?? null,
@@ -2527,6 +2581,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             if (ev.evalImageFp && images().hashImageData(rc.imageData) !== ev.evalImageFp) {
               log.error(`❌ [GARMENT-COLOUR] p${ev.pageNumber} round ${round}: version bytes do not match the bytes the eval graded (eval fp ${ev.evalImageFp}) — eval/bytes decoupled at creation`);
             }
+            // A finding the paired judge saw in the parent too is charged to the parent as well (A2).
+            if (recolourParent) require('./scoring').chargeSharedFindingsToParent(recolourVersion, recolourParent);
+            recolourVersion.parentFindings = ev.semanticResult?.parentFindings || null;
             inheritSceneContract(recolourVersion, recolourParent);
             versions.push(recolourVersion);
             recolourVersioned.add(ev.pageNumber);
@@ -2822,15 +2879,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       const roundEvalInputs = buildEvalInputs(roundSuccess);
       // PAIRED RE-JUDGE (A2): each repaired version is judged beside the version it was repaired
       // from, with that version's findings. Happy-path pages never reach this loop.
-      {
-        const { parentFindingsForCompare } = require('./scoring');
-        for (const input of roundEvalInputs) {
-          const parent = roundParent.get(input.pageNumber);
-          if (parent && typeof parent.imageData === 'string' && parent.imageData.length > 0) {
-            input.parentCompare = { imageData: parent.imageData, findings: parentFindingsForCompare(parent) };
-          }
-        }
-      }
+      for (const input of roundEvalInputs) attachParentCompare(input, roundParent.get(input.pageNumber));
 
       const evalProgressPct = progressBase + 6;
       await updateProgress(evalProgressPct, `Round ${round}: Evaluating + entity check ${roundSuccess.length} repaired images...`);
@@ -2917,26 +2966,16 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         if (plan) roundConsolidated.set(ev.pageNumber, plan);
       })));
 
-      // PAIRED RE-JUDGE, second half. The semantic judge tagged only its own findings against the
-      // parent; the quality/compliance/reader findings on the child never saw it. One call per
-      // repaired page that still has such findings tags the ones the parent shows too, so a defect
-      // the parent has just as much cannot cost the child the win (dedication page, 2026-10-08).
-      await Promise.all(roundEvals.filter(ev => ev.evaluated !== false).map(ev => consolidateLimit(async () => {
-        const plan = roundConsolidated.get(ev.pageNumber);
-        const parentCompare = roundEvalInputs.find(i => i.pageNumber === ev.pageNumber)?.parentCompare;
-        const child = roundSuccess.find(r => r.pageNumber === ev.pageNumber);
-        if (!plan || !parentCompare?.imageData || typeof child?.imageData !== 'string') return;
-        const { tagFindingsSharedWithParent } = require('./sceneValidator');
-        const res = await tagFindingsSharedWithParent({
-          childImage: child.imageData, parentImage: parentCompare.imageData, plan, pageNumber: ev.pageNumber,
-        });
-        if (res.usage && usageTracker) {
-          usageTracker('gemini_quality', {
-            input_tokens: res.usage.input_tokens || 0, output_tokens: res.usage.output_tokens || 0,
-            thinking_tokens: res.usage.thinking_tokens || 0,
-          }, `parent_shared_r${round}`, res.usage.modelId || 'gemini-2.5-flash');
-        }
-      })));
+      // PAIRED RE-JUDGE, second half: the quality/compliance/reader findings on the child never saw
+      // the parent; one batched call per repaired page tags the ones the parent shows too, so a
+      // defect the parent has just as much cannot cost the child the win (dedication page, 2026-10-08).
+      await Promise.all(roundEvals.filter(ev => ev.evaluated !== false).map(ev => consolidateLimit(() => checkFindingsAgainstParent({
+        plan: roundConsolidated.get(ev.pageNumber),
+        childImage: roundSuccess.find(r => r.pageNumber === ev.pageNumber)?.imageData,
+        parentCompare: roundEvalInputs.find(i => i.pageNumber === ev.pageNumber)?.parentCompare,
+        pageNumber: ev.pageNumber,
+        label: `parent_shared_r${round}`,
+      }))));
 
       // pageVersions append is intentionally sequential here. Earlier audits
       // raised a concern about parallel .set() races — that concern was based
@@ -3365,7 +3404,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     // DO NOT APPOINT (owner, 2026-08-09): one image, one score, highest wins.
     if (textSpaceCandidates.length > 0) {
       const tsEntries = textSpaceCandidates.map(c => ({ pageNumber: c.pageNumber, imageData: c.newVersion.imageData, ...c.newVersion }));
-      const tsEvals = await images().evaluateImageBatch(buildEvalInputs(tsEntries), { concurrency: evalConcurrency, qualityModelOverride, visualBible, clothingRequirements: storyData?.clothingRequirements || null, storyData, artStyle, ...evalStoryMeta });
+      // PAIRED RE-JUDGE: the re-render is judged beside the picked best it was recomposed from.
+      const tsInputs = buildEvalInputs(tsEntries);
+      for (const input of tsInputs) attachParentCompare(input, textSpaceCandidates.find(c => c.pageNumber === input.pageNumber)?.best);
+      const tsEvals = await images().evaluateImageBatch(tsInputs, { concurrency: evalConcurrency, qualityModelOverride, visualBible, clothingRequirements: storyData?.clothingRequirements || null, storyData, artStyle, ...evalStoryMeta });
       for (const c of textSpaceCandidates) {
         const ev = tsEvals.find(e => e.pageNumber === c.pageNumber);
         if (ev?.usage && usageTracker) recordEvalUsage(usageTracker, ev, 'post_repair_text_quality');
@@ -3378,10 +3420,18 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         // consolidation are fresh, on the new bytes.
         const entityResult = { issues: c.best.entityIssues || [], penalty: c.best.entityPenaltyRaw ?? c.best.entityPenalty ?? 0 };
         const plan = await consolidatePageEval(ev, entityResult.issues, c.pageNumber, null, c.newVersion.description || null);
+        await checkFindingsAgainstParent({
+          plan, childImage: c.newVersion.imageData,
+          parentCompare: tsInputs.find(i => i.pageNumber === c.pageNumber)?.parentCompare,
+          pageNumber: c.pageNumber, label: 'parent_shared_text_space',
+        });
         c.newVersion.evaluation = ev;
         c.newVersion.score = ev.score ?? ev.qualityScore ?? null;
         c.newVersion.consolidatedPlan = plan;
         applyScore(c.newVersion, { evalResult: ev, entityResult, consolidatedPlan: plan, requireConsolidation: true });
+        // A finding the paired judge saw in the parent too is charged to the parent as well (A2).
+        require('./scoring').chargeSharedFindingsToParent(c.newVersion, c.best);
+        c.newVersion.parentFindings = ev.semanticResult?.parentFindings || null;
         c.versions.push(c.newVersion);
         finalBestPerPage.set(c.pageNumber, selectBestVersion(c.versions));
       }

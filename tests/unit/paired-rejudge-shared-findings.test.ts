@@ -81,7 +81,7 @@ describe('tagFindingsSharedWithParent', () => {
   it('asks nothing, and calls no model, when every finding is minor, semantic or already tagged', async () => {
     const spy = vi.spyOn(GoogleGenerativeAI.prototype, 'getGenerativeModel');
     const p = { deduped_issues: plan().deduped_issues.slice(1) };
-    const r = await SV.tagFindingsSharedWithParent({ childImage: 'data:image/png;base64,AA', parentImage: 'data:image/png;base64,AA', plan: p, pageNumber: 1 });
+    const r = await SV.tagFindingsSharedWithParent({ childImage: 'data:image/png;base64,AA', parentImage: 'data:image/png;base64,AA', plan: p, parentFindings: [], pageNumber: 1 });
     expect(r).toMatchObject({ asked: 0, tagged: 0 });
     expect(spy).not.toHaveBeenCalled();
     spy.mockRestore();
@@ -93,7 +93,7 @@ describe('tagFindingsSharedWithParent', () => {
       generateContent: async (parts: any[]) => { sentPrompt = parts[0]; return { response: { text: () => '{"findings":[{"id":"C1","also_in_parent":true}]}', usageMetadata: {} } }; },
     } as any);
     const p = plan();
-    const r = await SV.tagFindingsSharedWithParent({ childImage: 'data:image/png;base64,AA', parentImage: 'data:image/png;base64,AA', plan: p, pageNumber: 1 });
+    const r = await SV.tagFindingsSharedWithParent({ childImage: 'data:image/png;base64,AA', parentImage: 'data:image/png;base64,AA', plan: p, parentFindings: [], pageNumber: 1 });
     expect(r).toMatchObject({ asked: 1, tagged: 1, error: null });
     expect(sentPrompt).toContain('C1 [MAJOR] (style_consistency) photographic');
     expect(sentPrompt).not.toContain('C2');
@@ -107,9 +107,85 @@ describe('tagFindingsSharedWithParent', () => {
       generateContent: async () => { throw new Error('boom'); },
     } as any);
     const p = plan();
-    const r = await SV.tagFindingsSharedWithParent({ childImage: 'data:image/png;base64,AA', parentImage: 'data:image/png;base64,AA', plan: p, pageNumber: 1 });
+    const r = await SV.tagFindingsSharedWithParent({ childImage: 'data:image/png;base64,AA', parentImage: 'data:image/png;base64,AA', plan: p, parentFindings: [], pageNumber: 1 });
     expect(r).toMatchObject({ asked: 1, tagged: 0, error: 'boom' });
     expect(p.deduped_issues[0].alsoInParent).toBeUndefined();
     spy.mockRestore();
+  });
+});
+
+// Every MAJOR+ finding on a repair child that the parent's own findings do not carry gets the
+// picture check (owner 2026-10-09). Stored shape: staging job_1789078732136_622wecmhj p18, the
+// iterate child's compliance finding on Levin that the parent's findings did not list, and the
+// parentFindingsForCompare rows of that parent.
+describe('which findings need the parent-picture check', () => {
+  beforeAll(async () => { await loadPromptTemplates(); });
+  const okReply = (ids: string[]) => ({ generateContent: async () => ({ response: { text: () => JSON.stringify({ findings: ids.map(id => ({ id, also_in_parent: true })) }), usageMetadata: {} } }) } as any);
+  const img = 'data:image/png;base64,AA';
+
+  it('regression: a new MAJOR (not in the parent findings) is checked, a fresh call is made and it is tagged', async () => {
+    const spy = vi.spyOn(GoogleGenerativeAI.prototype, 'getGenerativeModel').mockReturnValue(okReply(['C1']));
+    const p = { deduped_issues: [{ type: 'action_interaction', character: 'Levin', severity: 'major', sources: ['compliance'], description: 'Levin facing viewer, not gripping the neck ridges' }] };
+    const r = await SV.tagFindingsSharedWithParent({ childImage: img, parentImage: img, plan: p, parentFindings: [{ id: 'P1', severity: 'CRITICAL', type: 'missing_character', character: 'Lindi', description: 'x' }], pageNumber: 18 });
+    expect(r).toMatchObject({ asked: 1, tagged: 1 });
+    expect(p.deduped_issues[0]).toMatchObject({ alsoInParent: true });
+    spy.mockRestore();
+  });
+
+  it('a MAJOR whose type and subject the parent findings already carry needs no picture check', async () => {
+    const spy = vi.spyOn(GoogleGenerativeAI.prototype, 'getGenerativeModel');
+    const p = { deduped_issues: [{ type: 'action_interaction', character: 'Levin', severity: 'major', sources: ['compliance'], description: 'again' }] };
+    const r = await SV.tagFindingsSharedWithParent({ childImage: img, parentImage: img, plan: p, parentFindings: [{ id: 'P1', severity: 'MAJOR', type: 'action_interaction', character: 'levin', description: 'x' }], pageNumber: 18 });
+    expect(r).toMatchObject({ asked: 0, tagged: 0 });
+    expect(spy).not.toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  it('only MODERATE findings new against the parent: no call (they cannot decide a pick)', async () => {
+    const spy = vi.spyOn(GoogleGenerativeAI.prototype, 'getGenerativeModel');
+    const p = { deduped_issues: [{ type: 'clothing_detail', character: 'Max', severity: 'moderate', sources: ['compliance'], description: 'shirt grey' }] };
+    const r = await SV.tagFindingsSharedWithParent({ childImage: img, parentImage: img, plan: p, parentFindings: [], pageNumber: 18 });
+    expect(r.asked).toBe(0);
+    expect(spy).not.toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  it('with a new MAJOR present the same call also carries the MODERATE entries', async () => {
+    let sent = '';
+    const spy = vi.spyOn(GoogleGenerativeAI.prototype, 'getGenerativeModel').mockReturnValue({
+      generateContent: async (parts: any[]) => { sent = parts[0]; return { response: { text: () => '{"findings":[]}', usageMetadata: {} } }; },
+    } as any);
+    const p = { deduped_issues: [
+      { type: 'clothing_detail', character: 'Max', severity: 'moderate', sources: ['compliance'], description: 'shirt grey' },
+      { type: 'scale', character: 'Julian', severity: 'major', sources: ['compliance'], description: 'same height' },
+    ] };
+    const r = await SV.tagFindingsSharedWithParent({ childImage: img, parentImage: img, plan: p, parentFindings: [], pageNumber: 2 });
+    expect(r.asked).toBe(2);
+    expect(sent).toContain('C1 [MODERATE]');
+    expect(sent).toContain('C2 [MAJOR]');
+    spy.mockRestore();
+  });
+
+  it('refuses a call that does not say what the parent findings were (no silent default)', async () => {
+    await expect(SV.tagFindingsSharedWithParent({ childImage: img, parentImage: img, plan: { deduped_issues: [] }, pageNumber: 1 })).rejects.toThrow(/parentFindings/);
+  });
+});
+
+// Every path that makes a repair child is judged beside its parent. Before 2026-10-09 only the
+// round loop (iterate / inpaint / char-fix) was; the garment recolour and the post-repair text
+// re-render scored their children with no parent check at all.
+describe('repairPipeline wires the parent check into every repair-child path', () => {
+  // @ts-ignore
+  const src: string = require('fs').readFileSync(require('path').join(__dirname, '../../server/lib/repairPipeline.js'), 'utf8');
+  it.each([
+    ['round loop', 'parent_shared_r${round}', 'roundEvalInputs'],
+    ['recolour', 'parent_shared_recolour_r${round}', 'recolourInputs'],
+    ['text re-render', 'parent_shared_text_space', 'tsInputs'],
+  ])('%s attaches the parent to the eval input and checks the plan', (_n, label, inputs) => {
+    expect(src).toContain(label);
+    expect(src).toContain(`for (const input of ${inputs}) attachParentCompare`);
+  });
+  it('recolour and text re-render charge shared findings to the parent like the round loop does', () => {
+    expect(src.split('chargeSharedFindingsToParent(').length - 1).toBeGreaterThanOrEqual(3);
   });
 });
