@@ -823,8 +823,8 @@ function buildTextZoneInstruction(textPosition, textZoneDescription, areaPct, op
     'top-right': 'upper-right corner',
     'bottom-left': 'lower-left corner',
     'bottom-right': 'lower-right corner',
-    'top-full': 'upper third',
-    'bottom-full': 'lower third',
+    'top-full': 'top strip',
+    'bottom-full': 'bottom strip',
   };
   const displacementDesc = {
     'top-left': 'down and to the right of it',
