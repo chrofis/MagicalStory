@@ -40,10 +40,10 @@ const ok = (label, fn) => {
 };
 const types = (findings) => findings.map(f => f.type).sort();
 
-// A brief carrying only the metadata the text-zone checks read.
+// A brief carrying only the metadata the text-zone checks read (page() adds a declared light: a page without one also reports light_undeclared, 17f6f533e).
 const brief = (metadata) => `Some prose.\n\n---METADATA---\n${JSON.stringify(metadata)}`;
 const page = (pageNumber, textPosition, characters = []) =>
-  ({ pageNumber, brief: brief({ textPosition, characters }) });
+  ({ pageNumber, brief: brief({ textPosition, characters, timeOfDay: 'morning', weather: 'clear' }) });
 
 console.log('\n── The flag: which reading levels activate the rules ──');
 {

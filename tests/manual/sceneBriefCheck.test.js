@@ -42,6 +42,9 @@ const eq = (d, actual, expected) =>
 /** A brief in the real prose + ---METADATA--- shape. */
 const brief = (prose, listed, objects = []) => `${prose}\n\n---METADATA---\n${JSON.stringify({
   sceneIntent: 'One moment.',
+  // Every page declares its light since 17f6f533e (decisions: time of day + weather); without it each brief also carries light_undeclared.
+  timeOfDay: 'morning',
+  weather: 'clear',
   characters: listed.map(name => ({ name, clothing: 'standard', position: 'center', depth: 'foreground', expression: 'calm, faint smile' })),
   objects,
   interactions: [],
@@ -61,6 +64,8 @@ const VB = {
 };
 
 const types = (findings) => findings.map(f => f.type);
+// These fixtures carry no light on purpose (no metadata / null fields): light_undeclared is then correct (17f6f533e); the assertion is about cast and id findings.
+const typesNoLight = (findings) => types(findings).filter(t => t !== 'light_undeclared');
 
 console.log('\n── Check A: cast in the prose, absent from characters[] ──');
 {
@@ -130,13 +135,13 @@ console.log('\n── Empty / missing input does not crash ──');
   const noObjects = { pageNumber: 1, brief: brief('Aria and Bruno crouch over the map.', ['Aria', 'Bruno']) };
   eq('missing objects[]', types(checkPage(noObjects, CAST, VB)), []);
   const nullObjects = { pageNumber: 1, brief: 'Aria and Bruno crouch.\n\n---METADATA---\n{"characters":[{"name":"Aria"},{"name":"Bruno"}],"objects":null}' };
-  eq('objects[] null', types(checkPage(nullObjects, CAST, VB)), []);
+  eq('objects[] null', typesNoLight(checkPage(nullObjects, CAST, VB)), []);
   const mixed = { pageNumber: 1, brief: brief('Aria and Bruno crouch.', ['Aria', 'Bruno'], [null, 42, { id: 'ART016' }, 'CHR003']) };
   eq('non-string entries are skipped', types(checkPage(mixed, CAST, VB)), ['cast_id_unresolved']);
   eq('no brief', types(checkPage({ pageNumber: 1, brief: '' }, CAST, VB)), []);
   eq('no page at all', types(checkPage(null, CAST, VB)), []);
-  eq('no metadata block', types(checkPage({ pageNumber: 1, brief: 'Aria and Bruno crouch.' }, CAST, VB)), []);
-  eq('unparseable metadata', types(checkPage({ pageNumber: 1, brief: 'Aria crouches.\n\n---METADATA---\n{not json' }, CAST, VB)), []);
+  eq('no metadata block', typesNoLight(checkPage({ pageNumber: 1, brief: 'Aria and Bruno crouch.' }, CAST, VB)), []);
+  eq('unparseable metadata', typesNoLight(checkPage({ pageNumber: 1, brief: 'Aria crouches.\n\n---METADATA---\n{not json' }, CAST, VB)), []);
   eq('no cast', types(checkPage({ pageNumber: 1, brief: brief('Aria crouches.', [], ['CHR003']) }, [], VB)), ['cast_id_unresolved']);
   eq('no visual bible at all flags every id', checkPage({ pageNumber: 1, brief: brief('Aria and Bruno crouch.', ['Aria', 'Bruno'], ['ART001']) }, CAST, null)[0].ids, ['ART001']);
   eq('an empty visual bible has no known ids', knownIds({}).size, 0);
@@ -172,14 +177,16 @@ console.log('\n── Rendering: only the reviewable types reach the prompt ─�
     { pageNumber: 2, brief: brief('Aria reaches while Dora watches.', ['Aria']) },
   ], CAST, VB);
   const block = renderFindingsBlock(res.byPage);
-  check('the block is headed', block.startsWith('# BRIEF CONTRADICTIONS'), block.slice(0, 40));
+  check('the block is headed', block.startsWith('# BRIEF FAULTS'), block.slice(0, 40));
   check('pages are listed in order', block.indexOf('- Page 2:') < block.indexOf('- Page 14:'), block);
   check('the diagnostic-only page is absent', !block.includes('- Page 4:') && !block.includes('ART016'), block);
   check('each line carries its type tag', block.includes('[cast_unlisted]') && block.includes('[cast_id_unresolved]'), block);
   check('the reviewer is allowed to decline', /judge each one/.test(block), block);
   check('no MUST/CRITICAL banner', !/\bMUST\b|CRITICAL/.test(block), block);
 
-  eq('the sent types are exactly the two', [...REVIEWABLE].sort(), ['cast_id_unresolved', 'cast_unlisted']);
+  // The sent set grew from the original two as each check was made reviewable (header widened to BRIEF FAULTS, decisions.md);
+  // the two cast types stay in it, and the id-only diagnostic stays out.
+  check('both cast types are sent', REVIEWABLE.has('cast_id_unresolved') && REVIEWABLE.has('cast_unlisted'));
   check('object_id_unresolved is computed but withheld', !REVIEWABLE.has('object_id_unresolved'));
 }
 
