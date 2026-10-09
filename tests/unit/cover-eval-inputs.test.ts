@@ -79,11 +79,12 @@ describe('cover eval receives a visualBible so VB ids keep their nouns', () => {
     expect(scrubbed.toLowerCase()).toContain('the object');
   });
 
-  it('the real bible resolves ids to the names the generator prompt carried', () => {
+  it('the real bible resolves ids to the descriptions the generator prompt carried', () => {
     const scrubbed = scrubVbIds(brief, visualBible);
     expect(scrubbed).not.toMatch(/ART002|LOC001/);
     expect(scrubbed).toMatch(/red handmade cape/i);
-    expect(scrubbed).toMatch(/Summer Garden/i);
+    expect(scrubbed).toMatch(/flowering arbors/i);
+    expect(scrubbed).not.toMatch(/Summer Garden/i);
     expect(scrubbed.toLowerCase()).not.toContain('the object');
   });
 });

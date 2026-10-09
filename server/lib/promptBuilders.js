@@ -922,6 +922,9 @@ function buildEraGuard(era) {
 const LANDMARK_PHOTO_AUTHORITY = 'The photo is the authority on how the structures it shows look: where any words in this prompt describe their shape, structure, material or colour differently from the photo, the photo is right. It never decides which structure or view fills the frame: the camera, the framing and everything the photo does not show come from the words.';
 
 function buildLandmarkFidelityBlock(landmark, opts = {}) {
+  // Emitted only for a NAMED landmark, but never says the name: the photo
+  // identifies the place, and a name in an image prompt is painted as a
+  // caption (decisions.md 2026-10-09).
   const name = typeof landmark === 'string'
     ? landmark.trim()
     : String(landmark?.name || '').trim();
@@ -940,7 +943,7 @@ function buildLandmarkFidelityBlock(landmark, opts = {}) {
     // ⚠️ DRAFT WORDING — NOT OWNER-APPROVED (2026-09-14). The plumbing above is
     // the shipped part; this text is awaiting sign-off and must not reach
     // master before it has it.
-    return `**LANDMARK IN THIS SCENE: ${name}.** The attached reference photo is a WIDE VIEW: it shows this real place as a whole, not one building close up. The scene is set in this place.
+    return `**LANDMARK IN THIS SCENE:** The attached reference photo is a WIDE VIEW: it shows this real place as a whole, not one building close up. The scene is set in this place.
 
 **IDENTITY (from the photo):** Take the character of the place — the shapes and pitch of its roofs, the materials and colours of walls and roofs, how densely the buildings stand, and the landscape around them: hills, water, trees, skyline. Someone who knows the place must recognise it from those, not from one façade. Do not pull a single structure out of the photo and make it the subject unless the scene description asks for it. ${LANDMARK_PHOTO_AUTHORITY}
 
@@ -950,7 +953,7 @@ function buildLandmarkFidelityBlock(landmark, opts = {}) {
 
 **EXCLUDE:** ${eraClause}Separate props sit in open space — never mounted on or overlapping the buildings.`;
   }
-  return `**LANDMARK IN THIS SCENE: ${name}.** The attached reference photo shows this exact real-world landmark. The scene depicts this specific building (or part of it), not a generic version.
+  return `**LANDMARK IN THIS SCENE:** The attached reference photo shows this exact real-world landmark. The scene depicts this specific building (or part of it), not a generic version.
 
 **IDENTITY (from the photo):** Preserve the silhouette, architectural details, distinctive features and overall proportions exactly as in the photo. Someone who has seen the real building must immediately recognise it. ${LANDMARK_PHOTO_AUTHORITY}
 
@@ -5776,6 +5779,50 @@ function elementLeadLabel(entry, opts = {}) {
   return clauseRef(englishEntityRef(entry, generic, { language }), { maxWords: 6, hardCap: 10 });
 }
 
+/**
+ * Replace every VB location NAME in an image-prompt line by the place's short
+ * English label. The Art Director sometimes writes a place's name into its
+ * prose ("in the Lindenhof square"), and a trial's Setting line used to lead
+ * with it; the image model paints such a name as a caption (decisions.md
+ * 2026-10-09). The name is known exactly (the Visual Bible entry), so this is
+ * an exact-string substitution, not a text heuristic. Longest names first so
+ * "Kinderzimmer in Fislisbach" goes before "Fislisbach"; names under four
+ * characters are left alone (too likely to be an ordinary word).
+ *
+ * @param {string} line
+ * @param {Array<{name: string, ref: string}>} placeNames
+ * @returns {string}
+ */
+function maskPlaceNames(line, placeNames) {
+  if (!placeNames.length) return line;
+  const entries = placeNames
+    .map(p => ({ name: String(p.name || '').replace(/\s*\([^()]*\)\s*$/, '').trim(), ref: p.ref }))
+    .filter(p => p.name.length >= 4 && p.ref)
+    .sort((a, b) => b.name.length - a.name.length);
+  if (!entries.length) return line;
+  // Quoted text is REQUIRED TEXT (a cover title, a sign's words — requiredText.js
+  // quotes every string the page must letter), so a place name inside quotes is
+  // lettering the page asked for and is never touched.
+  const parts = line.split(/("[^"]*"|“[^”]*”|«[^»]*»|„[^“”]*[“”])/u);
+  return parts.map((part, i) => {
+    if (i % 2 === 1) return part;
+    let out = part;
+    for (const { name, ref } of entries) {
+      const esc = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      // "the Lindenhof plaza" → the label's noun already ends the phrase, so a
+      // following copy of that noun is swallowed rather than doubled.
+      const lastWord = ref.split(/\s+/).pop();
+      out = out.replace(
+        new RegExp('(?<![\\p{L}\\p{N}])' + esc + '(?![\\p{L}\\p{N}])(?:\\s+(\\p{L}+))?', 'giu'),
+        (m, next) => (next && next.toLowerCase() === lastWord.toLowerCase())
+          ? ref
+          : (next ? `${ref} ${next}` : ref),
+      );
+    }
+    return out;
+  }).join('');
+}
+
 function sanitizeVbIdsInPrompt(prompt, visualBible, pageNumber = null) {
   if (!prompt || typeof prompt !== 'string') return prompt;
   if (!visualBible || typeof visualBible !== 'object') return prompt;
@@ -5785,13 +5832,16 @@ function sanitizeVbIdsInPrompt(prompt, visualBible, pageNumber = null) {
   // (identity anchors), but artifact/location/vehicle/clothing NAMES follow
   // the story language ("Roter Umhang" must not reach the English prompt), so
   // those resolve to the element's authored English `label` (vbLabel.labelOf)
-  // — the same string the REQUIRED OBJECTS lead and the detector use. Real
-  // landmarks keep their name (a real-world identifier the model knows); an
-  // invented place keeps its English visual fields inlined behind the label.
+  // — the same string the REQUIRED OBJECTS lead and the detector use. A place
+  // (real or invented) never reaches the image model by NAME — the model paints
+  // a name as a caption (decisions.md 2026-10-09); a real landmark is carried
+  // by its reference photo and described like any other place, its English
+  // visual fields inlined behind the label.
   // properName never reaches an image model (SETTLED).
   const REF_POOLS = { artifacts: 'object', vehicles: 'vehicle', clothing: 'outfit' };
   const NAME_POOLS = ['mainCharacters', 'secondaryCharacters', 'animals'];
   const idToName = new Map();
+  const placeNames = [];
   for (const pool of NAME_POOLS) {
     for (const entry of (Array.isArray(visualBible[pool]) ? visualBible[pool] : [])) {
       if (!entry?.id || !entry?.name) continue;
@@ -5815,13 +5865,15 @@ function sanitizeVbIdsInPrompt(prompt, visualBible, pageNumber = null) {
     const visuals = [entry.features, entry.colors, entry.signatureElement]
       .map(v => String(v || '').trim()).filter(Boolean).join('; ');
     const labelled = String(entry.label || '').trim();
-    const ref = entry.isRealLandmark
-      ? (entry.name || englishLocationRef(entry))
-      : (labelled
-        ? (visuals ? `${labelOf(entry)} (${visuals})` : labelOf(entry))
-        : (englishLocationRef(entry) || englishEntityRef(entry, 'place')));
+    const ref = labelled
+      ? (visuals ? `${labelOf(entry)} (${visuals})` : labelOf(entry))
+      : (englishLocationRef(entry) || englishEntityRef(entry, 'place'));
     if (!ref) continue;
     idToName.set(String(entry.id).toUpperCase(), ref);
+    // Only a REAL place has a proper name worth masking: an invented place's
+    // name is the story's own descriptive wording ("the foggy summit") and
+    // reads as part of the sentence.
+    if (entry.isRealLandmark) placeNames.push({ name: entry.name, ref: labelOf(entry) });
     // VANTAGE HANDLES. A location shown from more than one viewpoint carries
     // `vantages[]`, and the Art Director cites one as the dotted form
     // `LOC005.1` (prompts/scene-expansion-all.txt "vantages"). The old id pattern
@@ -5853,7 +5905,7 @@ function sanitizeVbIdsInPrompt(prompt, visualBible, pageNumber = null) {
   const orphans = [];
   for (const line of lines) {
     const lineOrphans = [];
-    const resolved = line.replace(ID_PATTERN, (id) => {
+    const resolved = maskPlaceNames(line, placeNames).replace(ID_PATTERN, (id) => {
       const upper = id.toUpperCase();
       let name = idToName.get(upper);
       // A dotted handle whose vantage the bible does not list falls back to the

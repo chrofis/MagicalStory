@@ -597,9 +597,16 @@ function buildTextFromJson(scene) {
 
   // Setting summary (one line)
   if (scene.setting) {
+    // The place's NAME is not part of the line when the description says what
+    // it looks like: the image model paints a name as a caption (staging
+    // trials job_1791531511694 p6, job_1791496201302 p2, job_1791551303368 p2,
+    // docs/decisions.md 2026-10-09). With no description the location stays,
+    // and the prompt's final place-name mask (sanitizeVbIdsInPrompt) swaps a
+    // Visual Bible name for its description.
     const settingParts = [];
-    if (scene.setting.location) settingParts.push(stripEntityIds(scene.setting.location));
-    if (scene.setting.description) settingParts.push(stripEntityIds(scene.setting.description));
+    const settingDescription = scene.setting.description ? stripEntityIds(scene.setting.description) : '';
+    if (scene.setting.location && !settingDescription) settingParts.push(stripEntityIds(scene.setting.location));
+    if (settingDescription) settingParts.push(settingDescription);
     if (settingParts.length > 0) {
       lines.push('');
       lines.push('Setting: ' + settingParts.join('. '));
@@ -2120,25 +2127,26 @@ function resolvePagePlate({ pageNumber = null, sceneMetadata = null, visualBible
  *
  * @param {object} v - a getPrimaryVantageForPage result
  * @param {string} [plateText] - the vantage's FRAMING paragraph
- * @param {{interior?: boolean}} [opts] - the plate is an interior: the LOCATION line carries the name only
+ * @param {{interior?: boolean}} [opts] - the plate is an interior: the LOCATION line carries the place's setting kind only, no colours
  * @returns {string}
  */
 function vantageSettingText(v, plateText = '', { interior = false } = {}) {
   const { englishLocationRef } = require('./visualBible');
-  // English-only: the bare VB location name is story-language and carries no
-  // visual info, so it goes out with the entry's English visual fields
-  // inlined (same rule as covers / sanitizeVbIdsInPrompt; decisions.md 2026-07-31).
+  // English-only and name-free: a place name in an image prompt is painted as a
+  // caption, so the LOCATION line is the entry's setting kind plus its English
+  // visual fields (same helper as covers / sanitizeVbIdsInPrompt; decisions.md 2026-10-09).
   const description = String(v?.description || '').trim();
-  // A vantage that has its own description gets the place's NAME and COLOURS only: the location's features and
+  // A vantage that has its own description gets the place's SETTING KIND and COLOURS only: the location's features and
   // signature element belong to the place as a whole, and a camera that cannot see them was told to paint them
   // (staging job_1791315635053_t0t8qpebu: p4's underwater plate kept the beach's bench and dunes under a water
   // ceiling, p6's exterior of a wreck became its interior through "ribs forming the enclosed hull space"). The
   // vantage description, written from this camera, carries what is in view.
   // `interior`: the place's colours were authored for the whole place and may name an exterior's plants or ground
   // (see platePipeline); an interior plate keeps its own description's palette only.
-  const locationRef = englishLocationRef(v?.location, description ? { fields: interior ? [] : ['colors'] } : undefined) || v?.locationName || '';
+  const locationRef = englishLocationRef(v?.location, description ? { fields: interior ? [] : ['colors'] } : undefined) || '';
   return [
-    `**LOCATION:** ${locationRef}\n**VANTAGE:** ${v?.name || ''}`,
+    // A place with nothing visual to say gets no LOCATION line, never an empty one.
+    `${locationRef ? `**LOCATION:** ${locationRef}\n` : ''}**VANTAGE:** ${v?.name || ''}`,
     description && description !== String(plateText || '').trim() ? description : '',
   ].filter(Boolean).join('\n\n');
 }

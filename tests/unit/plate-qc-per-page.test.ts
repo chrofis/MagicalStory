@@ -74,9 +74,9 @@ describe('every story-run plate QC gets its inputs whole, and the STRUCTURES the
   });
   it('vantageSettingText: LOCATION/VANTAGE lines, and the description only when it is not the plate text', () => {
     const { vantageSettingText } = require_('../../server/lib/sceneMetadata');
-    const v = { locationName: 'Harbour', name: 'quay view', description: 'Stone quay, moored boats.' };
-    expect(vantageSettingText(v, 'A plate.')).toBe('**LOCATION:** Harbour\n**VANTAGE:** quay view\n\nStone quay, moored boats.');
-    expect(vantageSettingText(v, 'Stone quay, moored boats.')).toBe('**LOCATION:** Harbour\n**VANTAGE:** quay view');
+    const v = { locationName: 'Harbour', location: { name: 'Harbour', setting: 'outdoor harbour' }, name: 'quay view', description: 'Stone quay, moored boats.' };
+    expect(vantageSettingText(v, 'A plate.')).toBe('**LOCATION:** outdoor harbour\n**VANTAGE:** quay view\n\nStone quay, moored boats.');
+    expect(vantageSettingText(v, 'Stone quay, moored boats.')).toBe('**LOCATION:** outdoor harbour\n**VANTAGE:** quay view');
   });
 });
 

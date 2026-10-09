@@ -74,7 +74,7 @@
 12e. **A named prop is held, or it is the subject.** Props in a character's hands survive; props merely placed in the scene vanish. A plot-critical object goes into a named character's hands, or becomes the page's subject filling the foreground at full detail — never set dressing. At most two named props stand unheld on a page. This rule governs named plot-critical props only; the ambient furnishing of rule 1b is unnamed, uncounted, and not covered by it.
 12f. **A real place in another era is described, not named.** Naming a real location pulls in how it looks today — modern seating, signage, fittings — into a historical or fantastical story. When the page's `era` or genre differs from the place as it stands, write the landmark's shape, materials and surroundings into the prose and leave its name out; its LOC id still goes in `objects[]`.
 
-12c. **No lettering on any surface.** No words, names or letters anywhere in the image; the only exception is text the Visual Bible explicitly specifies for an element, painted exactly as specified. Applies to `sceneIntent` and every metadata field, not only the prose.
+12c. **No lettering on any surface.** No words, names or letters anywhere in the image; the only exception is text the Visual Bible explicitly specifies for an element, painted exactly as specified. Applies to `sceneIntent` and every metadata field, not only the prose. A place's name is a word too: write a place by what it looks like ("the square", "the white church"), never by its proper name; its LOC id still goes in `objects[]`.
 
 12l. **The mood is shown, not named.** {NO_HEADLINE_PHRASES}
 

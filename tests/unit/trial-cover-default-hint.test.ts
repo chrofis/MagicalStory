@@ -43,7 +43,8 @@ describe('the trial default cover hint', () => {
     back.objects = ['LOC001']; // the pipeline's backdrop check gives it the story's location
     const scene = buildCoverSceneFromHint(back, vb, trialInput.characters, { language: 'en' });
     expect(scene).toMatch(/^Calm/);
-    expect(scene).toContain('the park');
+    expect(scene).toContain('green park'); // the place is described, never named (decisions.md 2026-10-09)
+    expect(scene).not.toContain('the park');
     expect(scene).toContain('Child1');
   });
   it('a costume trial dresses the cast in its costume', () => {
