@@ -21,6 +21,7 @@
 const sharp = require('sharp');
 const { log } = require('../utils/logger');
 const { closestGrokAspect, GROK_ASPECT_PRESETS } = require('./grokAspect');
+const { replaceNamesWith } = require('./castResolver');
 const { editWithGrok } = require('./grok');
 const r2Lib = require('./r2');
 const { MODEL_DEFAULTS } = require('../config/models');
@@ -653,7 +654,6 @@ async function grokEditSceneExact(prompt, referenceUris, sceneBuf, sceneW, scene
  */
 function stripCharacterNames(text, { names = [], vidByName = new Map(), fallbackByName = new Map(), possessiveByName = new Map(), ownVisualId = null, ownName = null } = {}) {
   if (!text || typeof text !== 'string' || names.length === 0) return text;
-  const escapeRe = (v) => String(v).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const own = ownName ? String(ownName).toLowerCase() : null;
   // ownVisualId stands in for a name only when the caller gave no ownName
   // (legacy). With ownName known, another character never inherits the
@@ -661,19 +661,14 @@ function stripCharacterNames(text, { names = [], vidByName = new Map(), fallback
   const vidFor = (name) => (own && name.toLowerCase() === own ? 'this character' : null)
     || vidByName.get(name.toLowerCase()) || (own ? null : ownVisualId)
     || fallbackByName.get(name.toLowerCase()) || 'the character';
-  const alternation = [...names].sort((a, b) => b.length - a.length).map(escapeRe).join('|');
-  // Possessives: both "Hans's" and bare-apostrophe "Hans'" — the bare form
-  // otherwise leaves a dangling apostrophe ("the character' hands").
-  const re = new RegExp(`\\b(${alternation})(['’]s?)?(?!\\w)`, 'g');
-  return text
-    .replace(re, (_m, name, poss) => {
-      if (!poss) return vidFor(name);
-      // A possessive takes the descriptor's own noun phrase: a trailing place clause would
-      // carry the 's ("fourth from the left's back"). Only the shared fallback has a placeless form.
-      const bare = possessiveByName.get(name.toLowerCase());
-      const planned = (own && name.toLowerCase() === own) || vidByName.get(name.toLowerCase()) || (own ? null : ownVisualId);
-      return `${(!planned && bare) || vidFor(name)}'s`;
-    })
+  return replaceNamesWith(text, names, (name, poss) => {
+    if (!poss) return vidFor(name);
+    // A possessive takes the descriptor's own noun phrase: a trailing place clause would
+    // carry the 's ("fourth from the left's back"). Only the shared fallback has a placeless form.
+    const bare = possessiveByName.get(name.toLowerCase());
+    const planned = (own && name.toLowerCase() === own) || vidByName.get(name.toLowerCase()) || (own ? null : ownVisualId);
+    return `${(!planned && bare) || vidFor(name)}'s`;
+  }, { caseSensitive: true })
     .replace(/\s{2,}/g, ' ')
     .trim();
 }

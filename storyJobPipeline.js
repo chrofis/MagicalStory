@@ -14,6 +14,7 @@ const crypto = require('crypto');
 const { log } = require('./server/lib/serverLog');
 const { settleJobWithRefund, JOB_SAVING_PROGRESS } = require('./server/lib/jobCredits');
 const pLimit = require('p-limit');
+const { buildCastIndex, resolveEntity, entriesMentioned, lookupByName } = require('./server/lib/castResolver');
 const email = require('./email');
 const { upsertStory, saveStoryImage, rehydrateStoryImages } = require('./server/services/database');
 const { PROMPT_TEMPLATES, fillTemplate, buildEmptyScenePrompt } = require('./server/services/prompts');
@@ -957,20 +958,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // Also scan the outline's background field for secondary characters.
         let sceneCharacters = [];
         const allChars = inputData.characters || [];
+        const sceneCastIndex = buildCastIndex({ characters: allChars }, null);
 
         // 1. Characters from outline's characters[] array (primary — foreground/center)
         if (page.characters && page.characters.length > 0) {
           for (const parsed of page.characters) {
-            const parsedLower = parsed.toLowerCase().replace(/\s*\([^)]*\)\s*$/, '').trim();
-            const match = allChars.find(char => {
-              if (!char.name) return false;
-              const nameLower = char.name.toLowerCase().trim();
-              const firstName = nameLower.split(' ')[0];
-              return parsedLower === nameLower || parsedLower === firstName;
-            });
-            if (match && !sceneCharacters.some(sc => sc.name === match.name)) {
-              sceneCharacters.push(match);
-            }
+            const hit = resolveEntity(parsed, sceneCastIndex);
+            if (hit && !sceneCharacters.includes(hit.entry)) sceneCharacters.push(hit.entry);
           }
         }
 
@@ -982,14 +976,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         const backgroundMentionAdded = [];
         try {
           const hintParsed = JSON.parse(hintJson.replace(/```json\s*/gi, '').replace(/```\s*/gi, '').trim());
-          const bgText = (hintParsed.background || '').toLowerCase();
-          if (bgText) {
-            for (const char of allChars) {
-              if (char.name && bgText.includes(char.name.toLowerCase()) && !sceneCharacters.some(sc => sc.name === char.name)) {
-                sceneCharacters.push(char);
-                backgroundMentionAdded.push(char.name);
-              }
-            }
+          for (const hit of entriesMentioned(hintParsed.background || '', sceneCastIndex)) {
+            if (sceneCharacters.includes(hit.entry)) continue;
+            sceneCharacters.push(hit.entry);
+            backgroundMentionAdded.push(hit.name);
           }
         } catch { /* not valid JSON — skip background parsing */ }
         if (backgroundMentionAdded.length > 0) {
@@ -2082,13 +2072,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // early kickoff and the post-correction re-render must ask for the SAME
     // buckets or the second one renders a different avatar than it replaces.
     const avatarRequirementsFor = (chars, requirements) => (chars || []).flatMap(char => {
-      const charNameTrimmed = char.name?.trim();
-      const charNameLower = charNameTrimmed?.toLowerCase();
-      const charReqs = requirements?.[char.name] ||
-                       requirements?.[charNameTrimmed] ||
-                       requirements?.[charNameLower] ||
-                       (requirements && Object.entries(requirements)
-                         .find(([k]) => k.trim().toLowerCase() === charNameLower)?.[1]);
+      const charReqs = lookupByName(requirements, char.name, buildCastIndex({ characters: chars }, null))?.value;
       let usedCategories = charReqs
         ? Object.entries(charReqs)
             .filter(([cat, config]) => config?.used)
@@ -2417,10 +2401,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             // Determine which characters appear in the cover scene
             let coverCharacters = [];
             if (coverScene.characters?.length > 0) {
-              const sceneCharNames = coverScene.characters.map(c => c.name?.toLowerCase());
-              coverCharacters = (inputData.characters || []).filter(c =>
-                sceneCharNames.includes(c.name?.toLowerCase())
-              );
+              const coverCastIndex = buildCastIndex({ characters: inputData.characters || [] }, null);
+              const named = new Set(coverScene.characters.map(c => resolveEntity(c && c.name, coverCastIndex)).filter(Boolean).map(e => e.entry));
+              coverCharacters = (inputData.characters || []).filter(c => named.has(c));
             }
             if (coverCharacters.length === 0) {
               coverCharacters = (inputData.characters || []).filter(c => c.isMainCharacter === true);
@@ -3410,12 +3393,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // Fallback: style avatars now if early styling didn't start
         log.debug(`🎨 [UNIFIED] Preparing styled avatars for covers (fallback)...`);
         try {
+          const basicCoverCastIndex = buildCastIndex({ characters: inputData.characters || [] }, null);
           const basicCoverRequirements = (inputData.characters || []).flatMap(char => {
-            const charNameLower = char.name?.toLowerCase();
-            const charReqs = clothingRequirements?.[char.name] ||
-                             clothingRequirements?.[charNameLower] ||
-                             (clothingRequirements && Object.entries(clothingRequirements)
-                               .find(([k]) => k.toLowerCase() === charNameLower)?.[1]);
+            const charReqs = lookupByName(clothingRequirements, char.name, basicCoverCastIndex)?.value;
 
             let usedCategories = charReqs
               ? Object.entries(charReqs)

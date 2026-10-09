@@ -64,6 +64,7 @@
 
 const { log } = require('../utils/logger');
 const { vbIdFacet, baseVbId } = require('./vbIdGuard');
+const { isNameMentioned } = require('./castResolver');
 
 const PLAN_PREFIX = /^\s*PLAN:\s*/i;
 
@@ -125,14 +126,6 @@ function figurePool(visualBible) {
 
 const baseId = (o) => String(typeof o === 'string' ? o : (o && o.id) || '')
   .trim().toUpperCase().split('.')[0];
-
-/** Whole-word, diacritic-safe presence of `name` in `haystack`. */
-function namedIn(haystack, name) {
-  const word = String(name || '').trim();
-  if (word.length < 2) return false;
-  const esc = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return new RegExp('(^|[^\\p{L}\\p{N}])' + esc + '([^\\p{L}\\p{N}]|$)', 'iu').test(haystack);
-}
 
 /**
  * DOES THIS VISUAL-BIBLE ENTRY BELONG ON THIS PAGE? (2026-09-16)
@@ -227,8 +220,8 @@ function collectStagedFigures({ visualBible = null, sceneMetadata = null, savedS
   const picked = [];
   for (const f of pool) {
     const hit = citedIds.has(f.id)
-      || namedRefs.some(n => namedIn(n, f.name) || namedIn(f.name, n))
-      || (staged && namedIn(staged, f.name) && vbEntityCoversPage(f.entry, pageNumber) !== false);
+      || namedRefs.some(n => isNameMentioned(n, f.name) || isNameMentioned(f.name, n))
+      || (staged && isNameMentioned(staged, f.name) && vbEntityCoversPage(f.entry, pageNumber) !== false);
     if (hit) picked.push({ id: f.id, name: f.name, kind: f.kind, description: f.description });
   }
   return picked;
@@ -327,7 +320,7 @@ function collectPlanLineCast({ characters = [], planLine = null, alreadyLocked =
   for (const c of (Array.isArray(characters) ? characters : [])) {
     if (!c || have.has(c)) continue;
     const name = String(c.name || '').trim();
-    if (!name || !namedIn(staged, name)) continue;
+    if (!name || !isNameMentioned(staged, name)) continue;
     out.push(c);
   }
   return out;

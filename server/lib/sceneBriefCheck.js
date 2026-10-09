@@ -51,6 +51,7 @@
 
 const { log } = require('../utils/logger');
 const { extractSceneMetadata, findCastMissingFromMetadata, isSameFigureName } = require('./sceneMetadata');
+const { isNameMentioned } = require('./castResolver');
 const { checkVbElementBudget } = require('./vbElementBudget');
 const { normalizeEmotion, EMOTION_ENUM_PHRASE } = require('./emotionVocabulary');
 // planCounters requires only shotVocabulary, so this is not a cycle. It is the
@@ -516,7 +517,7 @@ function checkPopulationContradiction(page, metadata, castNames = []) {
     if (!NOT_THE_CAST.test(clause) && !AWAY_FROM_THE_CAST.test(clause)) continue;
     if (CAST_COLLECTIVE.test(clause) && !NOT_THE_CAST.test(clause)) continue;
     if (PEOPLE_NEGATED.test(clause)) continue;
-    if (names.some(n => clause.toLowerCase().includes(n.toLowerCase()))) continue;
+    if (names.some(n => isNameMentioned(clause, n))) continue;
     const quoted = clause.length > 120 ? `${clause.slice(0, 117)}…` : clause;
     // The same sentence reaches here twice on most briefs (the prose body and
     // `imageSummary` restate each other); a finding quoting it twice reads as
@@ -976,7 +977,6 @@ function checkIdLabelMismatch(page, visualBible) {
 // over stored staging briefs before it was wired (numbers in decisions.md
 // 2026-09-28 "The scene review is deleted …").
 
-const esc = s => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 /** Every string value in a metadata object, ids and enum words included. */
 function metadataStrings(m, out = []) {
   if (typeof m === 'string') out.push(m);
@@ -1039,7 +1039,7 @@ function checkElementUncited(page, metadata, visualBible, castNames = []) {
       if (cited.has(base)) continue;
       const names = [e.label, e.properName, ...(key === 'animals' || key === 'secondaryCharacters' ? [e.name] : [])]
         .map(n => String(n || '').trim()).filter(n => n.length >= 3 && !commissioned.has(n.toLowerCase()));
-      const hit = names.find(n => new RegExp(`(?<![\\p{L}])${esc(n)}(?!['’]s\\b)(?![\\p{L}])`, 'iu').test(prose));
+      const hit = names.find(n => isNameMentioned(prose, n, { possessive: false }));
       if (!hit) continue;
       out.push({
         pageNumber: page.pageNumber, type: 'element_uncited', id: base, name: hit,

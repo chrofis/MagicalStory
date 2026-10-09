@@ -16,6 +16,7 @@
 
 const { log } = require('../utils/logger');
 const jevDecisions = require('./jevDecisions');
+const { isNameMentioned } = require('./castResolver');
 const { JevDecisionError } = jevDecisions;
 const { resolveShotId } = require('./shotVocabulary');
 const { isDimLight, isSkyHidden } = require('./sceneLight');
@@ -41,7 +42,7 @@ function litCandidates(vbRow, gIndex, lookOf) {
  */
 function offFrameOf(commissioned, roster, planLine) {
   const planText = jevDecisions.planParts(planLine).slice(1).join(' ');
-  return (commissioned || []).filter(c => !(roster || []).includes(c) && jevDecisions.namedIn(c, planText));
+  return (commissioned || []).filter(c => !(roster || []).includes(c) && isNameMentioned(planText, c));
 }
 
 

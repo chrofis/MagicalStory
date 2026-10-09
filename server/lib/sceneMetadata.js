@@ -5,6 +5,7 @@
 
 const { log } = require('../utils/logger');
 const { OutlineParser, extractCharacterNamesFromScene } = require('./outlineParser');
+const { buildCastIndex, resolveEntity, entriesMentioned, isNameMentioned } = require('./castResolver');
 
 /**
  * Extract JSON object from a string that may have text before/after it or be wrapped in code blocks
@@ -1494,18 +1495,6 @@ function isSameFigureName(a, b) {
 }
 
 /**
- * ONE whole-name matcher for prose scans: Unicode letter/number lookarounds, so
- * "Zoé" and "Émile" match where ASCII word boundaries never do ("Ann" still
- * never matches "Anna"). `apostropheEnds` additionally refuses a trailing ' or ’
- * (a possessive "Anna's" is not a bare mention). Review 2026-10-04 C8.
- */
-function wholeNameRegex(name, { apostropheEnds = false } = {}) {
-  const escaped = String(name).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const after = apostropheEnds ? "[\\p{L}\\p{N}'’]" : '[\\p{L}\\p{N}]';
-  return new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?!${after})`, 'u');
-}
-
-/**
  * Cast members the scene PROSE describes but the metadata `characters` list
  * omits. The Art Director emits prose plus a metadata block; the image model
  * renders the prose, while figure naming, the entity grid, clothing validation
@@ -1550,7 +1539,7 @@ function findCastMissingFromMetadata(sceneDescription, castNames, sceneMetadata 
   for (const rawName of castNames) {
     const name = String(rawName || '').trim();
     if (!name || listed.some(entry => isSameFigureName(entry, name))) continue;
-    if (wholeNameRegex(name, { apostropheEnds: true }).test(prose)) missing.push(name);
+    if (isNameMentioned(prose, name, { possessive: false, caseSensitive: true })) missing.push(name);
   }
   return missing;
 }
@@ -1567,30 +1556,14 @@ function findCastMissingFromMetadata(sceneDescription, castNames, sceneMetadata 
  * matches nobody.
  */
 function matchRosterByListedNames(listedNames, characters) {
-  const names = (Array.isArray(listedNames) ? listedNames : [])
-    .map(n => String(typeof n === 'string' ? n : (n && n.name) || '').toLowerCase().trim())
-    .filter(Boolean);
-  return (characters || []).filter(char => {
-    if (!char || !char.name) return false;
-    const nameLower = char.name.toLowerCase().trim();
-    const firstName = nameLower.split(' ')[0];
-
-    return names.some(jsonLower => {
-      const jsonFirstName = jsonLower.split(' ')[0];
-
-      // Exact match on full name or first name
-      if (jsonLower === nameLower || jsonLower === firstName) return true;
-      if (jsonFirstName === nameLower || jsonFirstName === firstName) return true;
-
-      // Only allow partial matches if the character name IS the scene entry
-      // (e.g., character "Lukas" matches scene entry "Lukas", not "Lukas Zimmer")
-      // Avoid matching if scene entry is longer and contains additional words
-      if (jsonLower.includes(nameLower) && jsonLower.split(' ').length === nameLower.split(' ').length) return true;
-      if (nameLower.includes(jsonLower) && nameLower.split(' ').length === jsonLower.split(' ').length) return true;
-
-      return false;
-    });
-  });
+  const roster = (characters || []).filter(c => c && c.name);
+  const index = buildCastIndex({ characters: roster }, null);
+  const hit = new Set();
+  for (const n of (Array.isArray(listedNames) ? listedNames : [])) {
+    const e = resolveEntity(typeof n === 'string' ? n : (n && n.name), index);
+    if (e) hit.add(e.entry);
+  }
+  return roster.filter(c => hit.has(c));
 }
 
 /**
@@ -1651,48 +1624,18 @@ function getCharactersInScene(sceneDescription, characters) {
   const parsedNames = extractCharacterNamesFromScene(sceneDescription);
 
   if (parsedNames.length > 0) {
-    // Match main characters whose names appear in the parsed list
-    // Use STRICT matching to avoid partial name matches
-    const matchedCharacters = characters.filter(char => {
-      if (!char.name) return false;
-      const nameLower = char.name.toLowerCase().trim();
-      const firstName = nameLower.split(' ')[0];
-
-      return parsedNames.some(parsed => {
-        const parsedFirstName = parsed.split(' ')[0];
-
-        // Exact match on full name or first name
-        if (parsed === nameLower || parsed === firstName) return true;
-        if (parsedFirstName === nameLower || parsedFirstName === firstName) return true;
-
-        // Only allow partial matches if same word count (avoid "Lukas Zimmer" matching "Lukas")
-        if (parsed.includes(nameLower) && parsed.split(' ').length === nameLower.split(' ').length) return true;
-        if (nameLower.includes(parsed) && nameLower.split(' ').length === parsed.split(' ').length) return true;
-
-        return false;
-      });
-    });
-
+    const matchedCharacters = matchRosterByListedNames(parsedNames, characters);
     if (matchedCharacters.length > 0) {
       return matchedCharacters;
     }
   }
 
-  // Step 2: Fallback to simple text matching if parser found nothing
-  // Use word boundary matching to avoid partial matches
-  const sceneLower = sceneDescription.toLowerCase();
-
-  return characters.filter(char => {
-    if (!char.name) return false;
-    const nameLower = char.name.toLowerCase();
-    const firstName = nameLower.split(' ')[0];
-
-    // Whole-word match, Unicode-aware (ASCII word boundaries miss "Zoé" and "Émile")
-    const nameRegex = wholeNameRegex(nameLower);
-    const firstNameRegex = wholeNameRegex(firstName);
-
-    return nameRegex.test(sceneLower) || firstNameRegex.test(sceneLower);
-  });
+  // Step 2: the parser found nothing — fall back to a whole-word scan of the
+  // text for the cast's names (castResolver: never a substring, a bare first
+  // name only when it is unambiguous).
+  const roster = characters.filter(c => c && c.name);
+  const found = new Set(entriesMentioned(sceneDescription, buildCastIndex({ characters: roster }, null), { firstToken: true }).map(e => e.entry));
+  return roster.filter(c => found.has(c));
 }
 
 /**
@@ -1722,24 +1665,15 @@ function getCharactersInScene(sceneDescription, characters) {
 function unionPageCast(sceneDescription, hintNames, characters) {
   const all = Array.isArray(characters) ? characters : [];
   if (all.length === 0) return [];
-  const fromProse = getCharactersInScene(sceneDescription, all);
-  const wanted = new Set(fromProse.map(c => String(c?.name || '').toLowerCase()));
-  for (const raw of (Array.isArray(hintNames) ? hintNames : [])) {
-    // Hint entries arrive as plain names or as records; they may carry a
-    // parenthetical qualifier ("Sarah (background)").
-    const parsed = String((raw && typeof raw === 'object' ? raw.name : raw) || '')
-      .toLowerCase().replace(/\s*\([^)]*\)\s*$/, '').trim();
-    if (!parsed) continue;
-    const match = all.find(c => {
-      const n = String(c?.name || '').toLowerCase().trim();
-      if (!n) return false;
-      return parsed === n || parsed === n.split(' ')[0];
-    });
-    if (match) wanted.add(String(match.name).toLowerCase());
-  }
+  // Hint entries arrive as plain names or as records, and may carry a
+  // parenthetical qualifier ("Sarah (background)") — castResolver folds both.
+  const wanted = new Set([
+    ...getCharactersInScene(sceneDescription, all),
+    ...matchRosterByListedNames(hintNames, all),
+  ]);
   // Story order, not discovery order — every downstream roster compares by set,
   // and a stable order keeps logs and prompts diffable.
-  return all.filter(c => c?.name && wanted.has(String(c.name).toLowerCase()));
+  return all.filter(c => c?.name && wanted.has(c));
 }
 
 /**

@@ -19,6 +19,7 @@
 
 const { log } = require('../utils/logger');
 const { geminiUsage } = require('./providerUsage');
+const { isNameMentioned } = require('./castResolver');
 const { samUnionBlend, maskBlurThreshold, fetchMaskWithRetry, BLEND_RULE_VERSION } = require('./samBlend');
 const { assertReviewedArtifactUsable, pickReviewedBrief } = require('./sceneReviewGuard');
 // Production's arguments for the beats writer/Art-Director calls, resolved from
@@ -10991,7 +10992,7 @@ async function checkRuleGenericity(ruleText, storyId) {
         for (const e of (pool || [])) if (e?.name) names.add(String(e.name));
       }
       for (const n of names) {
-        if (n.length >= 3 && new RegExp(`\\b${n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(text)) {
+        if (n.length >= 3 && isNameMentioned(text, n)) {
           issues.push(`references story entity "${n}" — prompts must use archetypes, never names`);
         }
       }

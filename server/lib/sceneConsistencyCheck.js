@@ -24,23 +24,13 @@
 
 const DEPTH_WORDS = ['foreground', 'midground', 'background'];
 
-/** Escape a string for use inside a RegExp. */
-function escapeRe(s) {
-  return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-/** Case-insensitive whole-word presence of `name` in `text`. */
-function nameMentioned(name, text) {
-  if (!name || !text) return false;
-  return new RegExp(`(?:^|[^\\p{L}\\p{N}])${escapeRe(name)}(?=$|[^\\p{L}\\p{N}])`, 'iu').test(text);
-}
-
 /** Strip a trailing parenthesised annotation from a character name. */
 // Name identity — a bible figure written "Kapitänin Rossa" and a characters[]
 // entry written "Rossa" are one person. Shared with sceneBriefCheck so both
 // emitters of this fault agree; string equality here produced six unclearable
 // cast_unlisted findings on job_1788215224103_avu132n7je (2026-09-01).
 const { isSameFigureName } = require('./sceneMetadata');
+const { isNameMentioned } = require('./castResolver');
 
 function baseName(name) {
   return String(name || '').replace(/\s*\([^)]*\)\s*$/, '').trim();
@@ -133,7 +123,7 @@ function checkSceneConsistency(pages, rawOutput = null, options = {}) {
     const castLine = sequenceCasts.get(pageNumber);
     if (castLine && knownNames.length > 0) {
       for (const name of knownNames) {
-        const inCast = nameMentioned(name, castLine);
+        const inCast = isNameMentioned(castLine, name);
         const inMeta = listedAs(name);
         if (inCast && !inMeta) {
           issues.push({ type: 'cast_char_missing_from_metadata', detail: `locked Scene ${pageNumber} cast names '${name}' but METADATA characters[] does not` });
@@ -147,12 +137,12 @@ function checkSceneConsistency(pages, rawOutput = null, options = {}) {
     if (prose) {
       for (const name of metaCharNames) {
         if (isEntityId(name)) continue; // ids are legal in metadata, never in prose
-        if (!nameMentioned(name, prose)) {
+        if (!isNameMentioned(prose, name)) {
           issues.push({ type: 'metadata_char_absent_from_prose', detail: `metadata char '${name}' absent from prose` });
         }
       }
       for (const name of knownNames) {
-        if (nameMentioned(name, prose) && !listedAs(name)) {
+        if (isNameMentioned(prose, name) && !listedAs(name)) {
           issues.push({ type: 'prose_char_absent_from_metadata', detail: `SCENE prose mentions '${name}' but METADATA characters[] does not list them` });
         }
       }
@@ -179,7 +169,7 @@ function checkSceneConsistency(pages, rawOutput = null, options = {}) {
           const haystacks = [objectStrings.join(' | '), background, emptyScenePrompt, prose];
           const anchored = haystacks.some(h => h && h.toLowerCase().includes(obj.toLowerCase()))
             || obj.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(w => w.length > 3)
-              .some(word => haystacks.some(h => nameMentioned(word, h)));
+              .some(word => haystacks.some(h => isNameMentioned(h, word)));
           if (!anchored) {
             issues.push({ type: 'interaction_object_unanchored', detail: `interactions[] object '${obj}' appears in neither objects[], background, emptyScenePrompt, nor the SCENE prose` });
           }
@@ -235,7 +225,7 @@ function checkSceneConsistency(pages, rawOutput = null, options = {}) {
     const sceneIntent = typeof meta.sceneIntent === 'string' ? meta.sceneIntent : '';
     if (sceneIntent && knownNames.length > 0) {
       for (const name of knownNames) {
-        if (nameMentioned(name, sceneIntent) && !listedAs(name)) {
+        if (isNameMentioned(sceneIntent, name) && !listedAs(name)) {
           issues.push({ type: 'scene_intent_char_absent', detail: `sceneIntent names '${name}' but METADATA characters[] does not list them` });
         }
       }

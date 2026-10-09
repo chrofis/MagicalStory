@@ -42,6 +42,7 @@ const { log } = require('../utils/logger');
 const { geminiUsage } = require('./providerUsage');
 const { generateWithGrok, editWithGrok, GROK_MODELS, grokPromptBudget } = require('./grok');
 const { promptBytes } = require('./promptFitError');
+const { isNameMentioned, replaceNames } = require('./castResolver');
 const { renderCharacterInPhantomPose } = require('./phantomPoseRender');
 const { stripDataUriPrefix, bytesFromAnyImage } = require('./r2');
 const { GROK_ASPECT_PRESETS, closestGrokAspect } = require('./grokAspect');
@@ -1941,20 +1942,9 @@ function filterBriefByStratum(brief, keepNames = [], dropNames = [], substitutes
   const drop = dropNames.filter(Boolean).map(n => String(n));
   if (drop.length === 0) return brief;
 
-  const escape = (n) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const mentions = (text, names) => {
-    if (names.length === 0) return false;
-    return names.some(n => new RegExp(`\\b${escape(n)}\\b`, 'i').test(text));
-  };
-  const substituteDropNames = (text) => {
-    let out = text;
-    for (const n of drop) {
-      const sub = substitutes[n] || `the figure`;
-      out = out.replace(new RegExp(`\\b${escape(n)}'s\\b`, 'gi'), `${sub}'s`);
-      out = out.replace(new RegExp(`\\b${escape(n)}\\b`, 'gi'), sub);
-    }
-    return out;
-  };
+  const mentions = (text, names) => names.some(n => isNameMentioned(text, n));
+  // One pass (castResolver.replaceNames): "Noah's" becomes "the figure's", the possessive 's stays in place.
+  const substituteDropNames = (text) => replaceNames(text, new Map(drop.map(n => [n, substitutes[n] || 'the figure'])));
 
   // Step 1 — paragraph pre-pass. Paragraphs separated by `\n\n+`. A
   // paragraph that mentions zero names from either list is generic prose
@@ -2718,16 +2708,8 @@ function buildAnchorPlatePrompt(scene, frontCast, backCast, cleanBackgroundPromp
   // Daniel is the back stratum (silhouette now) so his name leaks.
   const subBackNames = (s) => {
     if (!s) return s;
-    let out = s;
-    for (const bc of backCast) {
-      const n = bc.name;
-      if (!n) continue;
-      const esc = n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const sub = `the ${bc.colorName || (bc.color || 'coloured').toLowerCase()} silhouette`;
-      out = out.replace(new RegExp(`\\b${esc}'s\\b`, 'gi'), `${sub}'s`);
-      out = out.replace(new RegExp(`\\b${esc}\\b`, 'gi'), sub);
-    }
-    return out;
+    return replaceNames(s, new Map(backCast.filter(bc => bc.name)
+      .map(bc => [bc.name, `the ${bc.colorName || (bc.color || 'coloured').toLowerCase()} silhouette`])));
   };
   const sanitisedFrontCast = frontCast.map(c => ({ ...c, position: subBackNames(c.position), action: subBackNames(c.action) }));
   // Back-cast positions also need substitution — scene expansion can write

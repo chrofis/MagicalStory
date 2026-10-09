@@ -8,6 +8,7 @@
 const fs = require('fs');
 const path = require('path');
 const { log } = require('../utils/logger');
+const { nameRegExp } = require('./castResolver');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { IMAGE_MODELS, MODEL_DEFAULTS } = require('../config/models');
 const { textZoneRulesActive } = require('../config/runtime');
@@ -5697,13 +5698,12 @@ const LETTERING_DECLARATION = /\b(?:painted|paint|lettered|letters|lettering|car
 function vbDeclaredLetteringNames(visualBible) {
   const exempt = new Set();
   if (!visualBible || typeof visualBible !== 'object') return exempt;
-  const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   for (const pool of ['artifacts', 'vehicles', 'clothing']) {
     for (const entry of (Array.isArray(visualBible[pool]) ? visualBible[pool] : [])) {
       const name = String((entry && entry.name) || '').trim();
       const description = String((entry && entry.description) || '');
       if (name.length < 4 || !description) continue;
-      const nameRe = new RegExp(`(^|[^\\p{L}\\p{N}])${esc(name)}(?![\\p{L}\\p{N}])`, 'iu');
+      const nameRe = nameRegExp(name);
       // Clause-scoped: the lettering word has to sit with the name, not merely
       // somewhere in a 200-word description that happens to mention ink.
       for (const clause of description.split(/[,;.]/)) {

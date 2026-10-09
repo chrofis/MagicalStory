@@ -238,6 +238,141 @@ function lookupByName(map, ref, index) {
   return null;
 }
 
+// ───────────────────────────────────────────────────────────────────────────
+// NAMES INSIDE TEXT. The one place that decides "is this cast name in this
+// string?". Before 2026-10-09 at least fourteen call sites each wrote their own
+// answer — a `.includes()` substring ("Max" in "Maximilian", "Ann" in "Anna"),
+// an ASCII `\b` regex (blind to "Zoé" and "Émile"), a Unicode lookaround regex
+// copied six times with slightly different edges — and they disagreed.
+// Rule (docs/SETTLED.md, castResolver line): a name is in a text only as a WHOLE
+// WORD, letters and digits being the word characters, so a longer name that
+// merely starts with it never counts.
+//
+// Reading free text for a name is still reading text; the sites that do it are
+// listed in docs/decisions.md (2026-10-09, name matchers). This module makes
+// them agree, it does not make the reading structured.
+// ───────────────────────────────────────────────────────────────────────────
+
+/** Escape a literal for use inside a RegExp. */
+function escapeRegExp(s) {
+  return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Whole-word, case-insensitive, Unicode regex for ONE literal name.
+ * `possessive: true` (default) lets a trailing 's / s' / ’s follow ("Anna's");
+ * `possessive: false` refuses it — a possessive names a place or a prop
+ * ("Anna's attic"), not the person. `caseSensitive: true` keeps a name that is
+ * also a word ("Rose", "Raven") from matching its lower-case noun.
+ *
+ * @param {string} name
+ * @param {{possessive?: boolean, global?: boolean, caseSensitive?: boolean}} [opts]
+ * @returns {RegExp}
+ */
+function nameRegExp(name, { possessive = true, global = false, caseSensitive = false } = {}) {
+  // A one-letter "name" is a word of the language ("A", "I"), never a person in a text.
+  if (String(name === null || name === undefined ? '' : name).trim().length < 2) return global ? /(?!)/g : /(?!)/;
+  const after = possessive ? '[\\p{L}\\p{N}]' : "[\\p{L}\\p{N}'’]";
+  return new RegExp(`(?<![\\p{L}\\p{N}])${escapeRegExp(name)}(?!${after})`, `${global ? 'g' : ''}${caseSensitive ? '' : 'i'}u`);
+}
+
+/** Is `name` a whole word of `text`? An empty name is in no text. */
+function isNameMentioned(text, name, opts) {
+  const n = String(name === null || name === undefined ? '' : name).trim();
+  if (!n || text === null || text === undefined) return false;
+  return nameRegExp(n, opts).test(String(text));
+}
+
+/**
+ * The names (and their aliases) of `names` present in `text`, in `names` order.
+ * `aliases` maps a name to other spellings that count as that same name
+ * (planCounters.resolveCast().aliases: a bare first name for its full name).
+ *
+ * @param {string} text
+ * @param {string[]} names
+ * @param {Object<string,string[]>} [aliases]
+ * @param {{possessive?: boolean}} [opts]
+ * @returns {string[]}
+ */
+function namesMentioned(text, names, aliases = {}, opts) {
+  const t = String(text === null || text === undefined ? '' : text);
+  return (Array.isArray(names) ? names : []).filter((n) => {
+    if (!n) return false;
+    return [n, ...((aliases && aliases[n]) || [])].some(f => f && nameRegExp(f, opts).test(t));
+  });
+}
+
+/**
+ * The index entries whose name is a whole word of `text`, in pool order.
+ * With `firstToken: true` a bare first token also counts, but only when it is
+ * unambiguous across the whole cast: no other entry carries that token as any
+ * word of its name ("Mother" is never an alias of "Mother Dragon" once a
+ * secondary is called "Mother").
+ *
+ * @param {string} text
+ * @param {object} index - from buildCastIndex
+ * @param {{possessive?: boolean, kinds?: string[], firstToken?: boolean}} [opts] - kinds limits the pools
+ * @returns {Array} index entries
+ */
+function entriesMentioned(text, index, opts = {}) {
+  if (!index || !Array.isArray(index.entries)) return [];
+  const { kinds, firstToken = false, ...regexOpts } = opts;
+  const t = String(text === null || text === undefined ? '' : text);
+  if (!t) return [];
+  const hits = [];
+  for (const e of index.entries) {
+    if (kinds && !kinds.includes(e.kind)) continue;
+    const full = String(e.name).replace(/\s*\([^)]*\)\s*$/, '').trim();
+    if (full && nameRegExp(full, regexOpts).test(t)) { hits.push(e); continue; }
+    if (!firstToken || e.words.length < 2) continue;
+    const token = e.words[0];
+    const shared = index.entries.some(o => o !== e && o.words.includes(token));
+    if (shared || token.length < 2) continue;
+    // the token as the prose spells it, not the folded form: match on the original first word
+    const original = full.split(/\s+/)[0];
+    if (original && nameRegExp(original, regexOpts).test(t)) hits.push(e);
+  }
+  return hits;
+}
+
+/**
+ * Replace every whole-word occurrence of any of `names`, in ONE pass (never
+ * sequential, or A->B->C cascades); longer names win over shorter ones
+ * ("Anna Maria" over "Anna"). A trailing possessive ("Hans's", "Hans'") is
+ * consumed with the name and handed to `fn` so the caller decides what becomes
+ * of it.
+ *
+ * @param {string} text
+ * @param {string[]} names
+ * @param {(matchedName: string, possessive: string) => string} fn
+ * @param {{caseSensitive?: boolean}} [opts] - a name that is also a word ("Rose") needs its capital
+ * @returns {string}
+ */
+function replaceNamesWith(text, names, fn, { caseSensitive = false } = {}) {
+  if (!text || typeof text !== 'string') return text;
+  const list = [...new Set((Array.isArray(names) ? names : []).map(n => String(n === null || n === undefined ? '' : n).trim()).filter(n => n.length >= 2))];
+  if (list.length === 0) return text;
+  list.sort((a, b) => b.length - a.length);
+  const re = new RegExp(`(?<![\\p{L}\\p{N}])(${list.map(escapeRegExp).join('|')})(['’]s?)?(?![\\p{L}\\p{N}])`, caseSensitive ? 'gu' : 'giu');
+  return text.replace(re, (_m, name, poss) => fn(name, poss || ''));
+}
+
+/**
+ * `replaceNamesWith` for a plain substitution table. Keys are matched
+ * case-insensitively; the possessive suffix, if any, stays after the
+ * replacement ("Noah's" -> "the figure's").
+ *
+ * @param {string} text
+ * @param {Map<string,string>|Object<string,string>} replacements
+ * @returns {string}
+ */
+function replaceNames(text, replacements) {
+  const map = new Map();
+  const src = replacements instanceof Map ? replacements.entries() : Object.entries(replacements || {});
+  for (const [k, v] of src) if (k) map.set(String(k).toLowerCase(), v);
+  return replaceNamesWith(text, [...map.keys()], (name, poss) => map.get(name.toLowerCase()) + poss);
+}
+
 /**
  * One INFO line per page so a resolution failure is visible on the day it
  * ships, not five stories later. Silent when nothing was resolved.
@@ -262,4 +397,11 @@ module.exports = {
   kindLabel,
   lookupByName,
   flushResolverStats,
+  escapeRegExp,
+  nameRegExp,
+  isNameMentioned,
+  namesMentioned,
+  entriesMentioned,
+  replaceNames,
+  replaceNamesWith,
 };

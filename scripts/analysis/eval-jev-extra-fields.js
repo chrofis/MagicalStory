@@ -65,8 +65,8 @@ const ANSWERS = path.join(RUN_DIR, 'answers.jsonl');
 const hash = s => crypto.createHash('sha1').update(String(s)).digest('hex').slice(0, 16);
 const STORIES = ['5herh01j7', 'vnx5l8iy7', 'z3fw660ie', 'dka3jpog9']; // the four books whose briefs carry the fields
 const baseId = id => String(id || '').split('.')[0];
-const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const namedIn = (name, text) => new RegExp(`(^|[^\\p{L}])${esc(name)}($|[^\\p{L}])`, 'iu').test(text);
+const { isNameMentioned } = require("../../server/lib/castResolver");
+const namedIn = (name, text) => isNameMentioned(text, name);
 
 // ───────────────────────── extract ─────────────────────────
 

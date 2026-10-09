@@ -39,6 +39,7 @@
  */
 
 const { log } = require('../utils/logger');
+const { replaceNames } = require('./castResolver');
 
 
 // Pair on BODIES, not faces. Identity here is carried by clothing, and clothing
@@ -467,14 +468,6 @@ function buildRenameMap(conflicts, heldNames = []) {
   return map;
 }
 
-/** Simultaneous whole-word substitution — never sequential, or A→B→C cascades. */
-function renameInProse(text, map) {
-  if (!text || typeof text !== 'string') return text;
-  const names = [...map.keys()].sort((a, b) => b.length - a.length);
-  const re = new RegExp(`\\b(${names.map(n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})\\b`, 'gi');
-  return text.replace(re, m => map.get(m.toLowerCase()) || m);
-}
-
 /**
  * Make the DETECTOR's identities the ones the rest of the pipeline sees.
  *
@@ -572,7 +565,7 @@ function applyConflicts(evalLike, report, conflicts, opts = {}, vetoed = 0) {
       // Prose is rewritten whenever it names a contested character, even on a
       // finding whose own `character` agreed — one sentence can name two.
       for (const key of ['description', 'issue', 'problem', 'fix']) {
-        if (typeof f[key] === 'string') f[key] = renameInProse(f[key], map);
+        if (typeof f[key] === 'string') f[key] = replaceNames(f[key], map);
       }
     }
   }

@@ -17,7 +17,7 @@ const { applyStyledAvatars } = require('./styledAvatars');
 const { coverKeyToType, coverLabel, COVER_PAGE_NUMBERS } = require('./coverKeys');
 const { parseHoldsId } = require('./coverHolds');
 const { normalizeName, isKnownName } = require('./phantomCharacters');
-const { canonicalName, buildCastIndex } = require('./castResolver');
+const { canonicalName, buildCastIndex, nameRegExp, entriesMentioned } = require('./castResolver');
 
 // Hard cap on figures a cover may declare (title page is narrowed to mains).
 // ONE constant with the cover JUDGE and with the first-generation path — see
@@ -155,12 +155,6 @@ const COVER_NAME_MATCH_POOLS = [
 // while the grid would happily have carried it.
 const hasEntityReference = hasElementReference;
 
-/** Word-boundary, case-insensitive matcher for one entity name. */
-function entityNameRegex(name, flags = 'i') {
-  const escaped = String(name).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, `${flags}u`);
-}
-
 /**
  * SINGLE SOURCE OF TRUTH for "which Visual Bible entities does this cover
  * scene description name?".
@@ -190,7 +184,7 @@ function matchVbEntitiesInText(text, visualBible) {
       if (!name) continue;                       // skip entries with no name
       const id = entry.id ? String(entry.id).toUpperCase() : null;
       if (id && seen.has(id)) continue;
-      if (!entityNameRegex(name).test(str)) continue;
+      if (!nameRegExp(name).test(str)) continue;
       if (id) seen.add(id);
       matched.push({
         id,
@@ -241,7 +235,7 @@ function warnTitleNamedEntitiesMissingFromCover({ title, objects, visualBible, l
       const id = baseVbId(entry?.id);
       if (!id || listed.has(id)) continue;
       const names = [entry.name, entry.properName].map(n => String(n || '').trim()).filter(Boolean);
-      if (!names.some(n => entityNameRegex(foldForTitleMatch(n)).test(folded))) continue;
+      if (!names.some(n => nameRegExp(foldForTitleMatch(n)).test(folded))) continue;
       missing.push({ id, name: names[0] });
     }
   }
@@ -263,8 +257,7 @@ function stripEntityNameFromDescription(description, name, opts = {}) {
   // structured blob (the trial cover ships a fenced JSON object as its
   // description) — clause surgery there would break the JSON.
   const tokenOnly = opts.stripMode === 'token';
-  const esc = String(name).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const B = `(?<![\\p{L}\\p{N}])${esc}(?![\\p{L}\\p{N}])`;
+  const B = nameRegExp(name).source;
   const tidy = (s) => s
     .replace(/\s*,\s*,/g, ',')
     .replace(/\s+,/g, ',')
@@ -283,15 +276,15 @@ function stripEntityNameFromDescription(description, name, opts = {}) {
     ''
   );
   // 2. Any remaining comma-delimited clause naming it.
-  if (entityNameRegex(name).test(out)) {
+  if (nameRegExp(name).test(out)) {
     out = out.replace(new RegExp(`\\s*,\\s*[^,.]*${B}[^,.]*(?=[,.])`, 'giu'), '');
   }
   // 3. Whole sentence.
-  if (entityNameRegex(name).test(out)) {
-    out = out.split(/(?<=\.)\s+/).filter(s => !entityNameRegex(name).test(s)).join(' ');
+  if (nameRegExp(name).test(out)) {
+    out = out.split(/(?<=\.)\s+/).filter(s => !nameRegExp(name).test(s)).join(' ');
   }
   // 4. Last resort — the bare word, so the name can never survive.
-  if (!tidy(out) || entityNameRegex(name).test(out)) {
+  if (!tidy(out) || nameRegExp(name).test(out)) {
     const base = tidy(out) ? out : original;
     out = base.replace(new RegExp(`\\s*(?:the\\s+)?${B}`, 'giu'), '');
   }
@@ -948,8 +941,8 @@ async function iterateCover(coverKey, storyData, options = {}) {
     log.info(`🔄 [COVER-ITERATE] ${coverKey}: Selected ${selectedCoverCharacters.map(c => c.name).join(', ')} from coverHints`);
   } else {
     // Fallback: extract characters mentioned in the scene description
-    const sceneDescLower = sceneDescription.toLowerCase();
-    const mentionedChars = mergedCharacters.filter(c => sceneDescLower.includes(c.name.toLowerCase()));
+    const mentionedEntries = new Set(entriesMentioned(sceneDescription, buildCastIndex({ characters: mergedCharacters }, null)).map(e => e.entry));
+    const mentionedChars = mergedCharacters.filter(c => mentionedEntries.has(c));
 
     if (mentionedChars.length > 0) {
       selectedCoverCharacters = mentionedChars.slice(0, MAX_COVER_CHARACTERS);

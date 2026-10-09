@@ -13,7 +13,7 @@
  */
 
 const { callTextModel } = require('./textModels');
-const { buildCastIndex, lookupByName } = require('./castResolver');
+const { buildCastIndex, lookupByName, nameRegExp } = require('./castResolver');
 const { PROMPT_TEMPLATES } = require('../services/prompts');
 const { extractJsonFromText, buildCharacterPhysicalDescription } = require('./storyHelpers');
 const { log } = require('../utils/logger');
@@ -1200,7 +1200,7 @@ function detectDeclaredSpecConflicts(sceneDescription) {
       const bText = `${B.where || ''} ${B.object || ''}`;
       // B targets A ("Emma's hand" / object === "Emma")
       const bTargetsA = String(B.object || '').trim() === aName
-        || new RegExp(`${aName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[’']s`, 'i').test(bText);
+        || new RegExp(`${nameRegExp(aName).source}['’]s`, 'iu').test(bText);
       if (!bTargetsA) continue;
       const part = SPEC_BODY_PARTS.find(p => new RegExp(`\\b${p}\\b`, 'i').test(bText));
       if (!part) continue;

@@ -33,6 +33,8 @@
  * salvaged line is re-checked against the figure and cast-name filters.
  */
 
+const { isNameMentioned } = require('./castResolver');
+
 // Every dimension word starts at a word boundary. Unanchored, the lists matched
 // inside other words — "b-ROAD", "s-LIGHT-ly", "de-LIGHT-ed", "LIT-tle" — and
 // a character's look ("a BROAD orange sash", "a SLIGHTly larger head") entered
@@ -191,8 +193,7 @@ function stripCastAppositives(sentence, names) {
 function isClean(text, names) {
   if (FIGURE_RE.test(text)) return false;
   if (GARMENT_RE.test(text)) return false;
-  const lower = text.toLowerCase();
-  return !names.some(n => lower.includes(n));
+  return !names.some(n => isNameMentioned(text, n));
 }
 
 /**

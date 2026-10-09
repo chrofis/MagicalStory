@@ -15,10 +15,8 @@
  * for the one brief re-ask to fix (briefChecks.js; the scene review until its
  * deletion on 2026-09-28).
  *
- * Four findings, in the order they matter:
+ * Three findings, in the order they matter:
  *   outfit_missing       the prose never names this character's outfit
- *   garment_colour_wrong the prose gives a character's garment a colour their
- *                        contract gives the SAME garment differently
  *   removal_unstated     a tracked garment whose owner is on the page has no
  *                        `wornItems` state (or an "off" state with no place)
  *   worn_link_missing    a Visual Bible element that is clearly a worn garment
@@ -35,7 +33,7 @@
  */
 
 const { log } = require('../utils/logger');
-const { lookupByName } = require('./castResolver');
+const { lookupByName, nameRegExp } = require('./castResolver');
 const { resolveCharacterReqs } = require('./clothingCategories');
 const { resolveWornItemsForPage, unlinkedWornCandidates, trackedWornGarments, missingWornRows } = require('./wornItems');
 
@@ -53,8 +51,7 @@ const STOPWORDS = new Set([
 ]);
 
 // The garment vocabulary: which nouns name a thing worn on a body. `colourBefore`
-// walks it to find the colour a garment carries, `contractPairs` builds the
-// (garment, colour) contract from it, and `deriveSlotFromName` in wornItems has
+// walks it to find the colour a garment carries (repairLogic), and `deriveSlotFromName` in wornItems has
 // its own for slots. A word here is a garment; a colour, material or shape is
 // not one and never stands in for one — an object described in a page's prose
 // ("dark brown planks … round coins") shares those words with every wardrobe in
@@ -96,29 +93,6 @@ function colourBefore(words, i) {
   }
   return null;
 }
-
-/** Every (garment, colour) pair a contract slot states. */
-function contractPairs(parts) {
-  const pairs = new Map();   // garment -> Set(colours)
-  for (const part of parts) {
-    const words = String(part.text || '').toLowerCase().split(/[^a-z-]+/).filter(Boolean);
-    for (let i = 0; i < words.length; i++) {
-      const g = words[i];
-      if (!GARMENT_NOUNS.has(g)) continue;
-      const c = colourBefore(words, i);
-      if (!c) continue;
-      if (!pairs.has(g)) pairs.set(g, new Set());
-      pairs.get(g).add(c);
-    }
-  }
-  return pairs;
-}
-
-// Prose only states an outfit where it ATTACHES clothing to a body. Rule 3
-// reads a colour only inside a window that carries one of these — a window that
-// merely names a character, without dressing anyone, states no garment colour to
-// disagree with.
-const ATTACHES = /\b(wearing|wears|dressed in|clad in|in (?:his|her|their|a|an|the))/i;
 
 /** Significant lowercase tokens (≥4 chars, not stopwords). */
 function tokens(text) {
@@ -268,40 +242,12 @@ function checkPage(page, clothingRequirements, opts = {}) {
   // `colourBefore`, which rule 3 below uses on a different basis — per garment,
   // inside one character's own window — and is not this defect.
 
-  // 3. garment_colour_wrong — the prose gives a character's garment a colour
-  // their contract gives the SAME garment differently. The five-identical-robes
-  // failure (job_1786484554633) passed every check above: the prose was verbose
-  // (so nothing was "missing") and every character shared "robe"/"hat"/"shoes"
-  // (so no token was distinctive enough to misattribute). Colour was the only
-  // signal, and nothing read it. Compared PER GARMENT, never per character: a
-  // colour the contract never attaches to that garment — a prop, a wall, a
-  // slot the contract leaves colourless — is not a finding.
-  for (const [name, { parts }] of outfits) {
-    const pairs = contractPairs(parts);
-    if (pairs.size === 0) continue;
-    // Window = from this character's name to the next cast member's name (or
-    // 400 chars), across sentence boundaries: the clothing usually sits AFTER
-    // the em-dash physical block.
-    const own = characterWindow(prose, name, cast);
-    if (!own || !ATTACHES.test(own)) continue;
-    const words = own.toLowerCase().split(/[^a-z-]+/).filter(Boolean);
-    const seen = new Set();
-    for (let i = 0; i < words.length; i++) {
-      const g = words[i];
-      const expected = pairs.get(g);
-      if (!expected) continue;                 // garment the contract never colours
-      const c = colourBefore(words, i);
-      if (!c || expected.has(c)) continue;     // no colour stated, or it matches
-      const key = `${g}/${c}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      findings.push({
-        pageNumber: page.pageNumber, type: 'garment_colour_wrong', character: name, slot: g,
-        detail: `${name}'s ${g} is described as ${c}; their outfit gives it ${[...expected].join(' / ')}. `
-          + `Rewrite the ${g} in ${name}'s own colour — never move another character's colour onto them.`,
-      });
-    }
-  }
+  // DELETED 2026-10-09 — `garment_colour_wrong`, "the prose gives a garment a colour the
+  // contract gives differently". It compared COLOUR WORDS found in prose, and
+  // every consumer dropped the finding (not in REVIEWABLE, not in the re-ask's
+  // extra set, not logged), so it computed text readings nothing used. Owner:
+  // "Code reading a metadata finding is fine. Code reading text is not."
+  // docs/decisions.md 2026-10-09 (name matchers).
 
   // 3. removal_unstated — STRUCTURED since 2026-09-06 (owner ruling). A VB
   // entry that is also part of a character's outfit (`wornAs: "Name.slot"`)
@@ -452,13 +398,12 @@ function renderFindingsBlock(byPage) {
  */
 function characterWindow(prose, name, cast = []) {
   const text = String(prose || '');
-  const esc = (n) => String(n).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const start = text.search(new RegExp(`\\b${esc(name)}\\b`, 'i'));
+  const start = text.search(nameRegExp(name));
   if (start < 0) return '';
   let end = Math.min(text.length, start + 400);
   for (const other of cast) {
     if (!other || other.toLowerCase() === String(name).toLowerCase()) continue;
-    const i = text.slice(start + name.length).search(new RegExp(`\\b${esc(other)}\\b`, 'i'));
+    const i = text.slice(start + name.length).search(nameRegExp(other));
     if (i >= 0) end = Math.min(end, start + name.length + i);
   }
   return text.slice(start, end);
@@ -843,4 +788,4 @@ function outfitAbsent(clothingRequirements, names = []) {
 // The image prompt's own "does the prose dress this character" check is Jev's
 // (jevDecisions.decideOutfitsStated); the token match it used to share with this
 // file (missingGarments) was deleted 2026-10-09, docs/decisions.md.
-module.exports = { REVIEWABLE, GARMENT_NOUNS, outfitAbsent, checkClothingIncomplete, checkPage, checkWardrobeAgainstBible, applyWardrobeBibleCorrections, outfitClauses, checkScenes, renderFindingsBlock, splitSlots, slotStated, characterWindow, tokens, contractPairs, colourBefore };
+module.exports = { REVIEWABLE, GARMENT_NOUNS, outfitAbsent, checkClothingIncomplete, checkPage, checkWardrobeAgainstBible, applyWardrobeBibleCorrections, outfitClauses, checkScenes, renderFindingsBlock, splitSlots, slotStated, characterWindow, tokens, colourBefore };

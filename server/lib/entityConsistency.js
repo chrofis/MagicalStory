@@ -26,7 +26,7 @@ const { getCurrentLogger } = require('./generationLogger');
 const { COVER_PAGE_NUMBERS } = require('./coverKeys');
 const r2 = require('./r2');
 const geminiPad = require('./geminiPad');
-const { canonicalName } = require('./castResolver');
+const { canonicalName, buildCastIndex, entriesMentioned, isNameMentioned } = require('./castResolver');
 const { ENTITY_CHECK_TYPES, isEntityCheckType } = require('./evalBuckets');
 const { baseVbId } = require('./vbIdGuard');
 
@@ -1994,17 +1994,12 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
 
         // Also check for VB animals and secondary characters mentioned in the scene
         // (e.g., "Funke the dragon" — not a main character but should be detected)
-        const sceneText = sceneDesc.description.toLowerCase();
         const vb = visualBible || null;
         if (vb) {
-          for (const animal of (vb.animals || [])) {
-            if (animal.name && sceneText.includes(animal.name.toLowerCase()) && !pageCharNames.includes(animal.name)) {
-              pageCharNames.push(animal.name);
-            }
-          }
-          for (const sc of (vb.secondaryCharacters || [])) {
-            if (sc.name && sceneText.includes(sc.name.toLowerCase()) && !pageCharNames.includes(sc.name)) {
-              pageCharNames.push(sc.name);
+          const vbIndex = buildCastIndex(null, vb);
+          for (const kind of ['animal', 'secondary']) {
+            for (const e of entriesMentioned(sceneDesc.description, vbIndex, { kinds: [kind] })) {
+              if (!pageCharNames.includes(e.name)) pageCharNames.push(e.name);
             }
           }
         }
@@ -2192,9 +2187,8 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
           // Escape regex metacharacters (PIPE-8) — names like "Lea (Mami)" or "A+"
           // would otherwise mis-match or throw SyntaxError (swallowed upstream →
           // entity check silently disabled for the whole story).
-          const escapedName = charNameLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-          const namePattern = new RegExp(`\\b${escapedName}\\b`, 'i');
-          return namePattern.test(label);
+          // (castResolver.isNameMentioned escapes the name, so "Lea (Mami)" is a literal.)
+          return isNameMentioned(label, charNameLower);
         });
       }
 

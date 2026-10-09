@@ -35,6 +35,7 @@ const {
   SHOT_PATTERNS, SHOT_AXIS, POSITION_SHOTS, MID_DISTANCE_SHOTS, SHOT_FLOOR_CODE,
   shotFloors, MAX_MEDIUM_WIDE_SHARE, closeUpBelowWaistVerbs, PEOPLELESS_SHARED_SHOT,
 } = require('./shotVocabulary');
+const { namesMentioned, isNameMentioned } = require('./castResolver');
 const { castCoverage, groupPageBudget, underCoveredFix, noFocalFix, NO_COMMISSIONED_PAGES_MAX, PLAN_INSTANT_MAX_WORDS } = require('./castCoverage');
 
 /** Words that look like names but never are, in the who-column's grammar. */
@@ -337,16 +338,6 @@ function collectPlaceNames(inputData = {}, extraNames = []) {
   return [...new Set(names)];
 }
 
-/** Whole-word regex for a literal name. */
-function nameRe(name, flags = 'iu') {
-  return new RegExp(`\\b${String(name).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, flags);
-}
-
-/** Escape a literal for use inside a RegExp. */
-function reEscape(s) {
-  return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
 /*
  * THE THING-MARKER GRAMMAR IS GONE (owner, 2026-09-11: "we have AI calls for
  * this, not some stupid Regex that we fix 1000 times").
@@ -487,10 +478,10 @@ function resolveCast(pages, commissionedNames = [], placeNames = [], roster = nu
     if (commissioned.some(c => c.toLowerCase() === name.toLowerCase())) continue;
     // A name that CONTAINS a commissioned one is that character wearing a title
     // ("Captain <name>"), never a second person.
-    if (commissioned.some(c => new RegExp(`\\b${c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(name))) continue;
+    if (commissioned.some(c => isNameMentioned(name, c))) continue;
     // The story's own place data still outranks the roster: a landmark the
     // planner was handed is never a figure, however the model read the line.
-    if (places.some(pl => pl.toLowerCase() === name.toLowerCase() || nameRe(pl).test(name) || nameRe(name).test(pl))) {
+    if (places.some(pl => pl.toLowerCase() === name.toLowerCase() || isNameMentioned(name, pl) || isNameMentioned(pl, name))) {
       if (!excludedPlaces.includes(name)) excludedPlaces.push(name);
       continue;
     }
@@ -522,11 +513,7 @@ function isNamedFigure(entry) {
  * first name count as its full name, so both forms on one page are one person.
  */
 function namesIn(text, cast, aliases = {}) {
-  const clean = stripQuoted(text);
-  return cast.filter((n) => {
-    const forms = [n, ...(aliases[n] || [])].map(reEscape);
-    return new RegExp(`\\b(?:${forms.join('|')})(?:'s|s')?\\b`, 'iu').test(clean);
-  });
+  return namesMentioned(stripQuoted(text), cast, aliases);
 }
 
 /**

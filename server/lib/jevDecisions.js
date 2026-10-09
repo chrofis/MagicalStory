@@ -47,6 +47,7 @@
  */
 
 const J = require('./jevAudit');
+const { isNameMentioned } = require('./castResolver');
 const SV = require('./shotVocabulary');
 const { TIMES_OF_DAY, CLOCK_HOURS, isSkylessLight, isSkyHidden, WEATHERS, JEV_TIME_CRITERIA, JEV_WEATHER_CRITERIA, JEV_SUBMERGED_CRITERIA } = require('./sceneLight');
 const G = require('./gazeTargets');
@@ -1126,8 +1127,6 @@ function gazeIndex(visualBible) {
   return out;
 }
 
-const esc = s => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const namedIn = (name, text) => new RegExp(`(^|[^\\p{L}])${esc(name)}($|[^\\p{L}])`, 'iu').test(text);
 
 /**
  * The page's gaze candidates' raw material (the eval's extract): the elements
@@ -1142,7 +1141,7 @@ function gazePageMaterial({ objects = [], interactions = [], planLine = '', inde
   const elements = [...cited, ...new Set(clothingActedOn.map(baseId))].map(id => (index[id] ? { id, kind: index[id].kind, name: index[id].name, desc: index[id].desc } : null)).filter(Boolean);
   // Uncited items the plan line names are targets too (a held or mentioned thing, a vehicle), not only creatures and figures.
   const named = Object.values(index).filter(e => ['creature', 'figure', 'thing', 'vehicle'].includes(e.kind) && !/^CLO/i.test(String(e.id)) && !e.vantage && !cited.includes(e.id)
-    && namedIn(e.name, stripPlanShot(planLine))).map(e => ({ id: e.id, kind: e.kind, name: e.name, desc: e.desc }));
+    && isNameMentioned(stripPlanShot(planLine), e.name)).map(e => ({ id: e.id, kind: e.kind, name: e.name, desc: e.desc }));
   return { elements, named };
 }
 
@@ -1605,7 +1604,6 @@ module.exports = {
   decideEmotions,
   decideOutfitsStated,
   emotionState,
-  namedIn,
   JEV_DECISIONS,
   JEV_DECISION_CONCURRENCY,
   PLAN_SHOT_PLACEHOLDER,

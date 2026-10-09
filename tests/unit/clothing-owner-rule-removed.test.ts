@@ -191,24 +191,20 @@ describe('outfit_misattributed is gone from clothingCheck', () => {
     }
   });
 
-  it('the deletion took nothing else — the surviving types still fire on the same pages', () => {
-    // A page whose prose says nothing about one character's clothes is still
-    // `outfit_missing`; a page that recolours a contracted garment is still
-    // `garment_colour_wrong`. Both are diagnostics of the same module and both
-    // must be unaffected by removing rule 2.
+  it('the deletion took nothing else — outfit_missing still fires on a silent page', () => {
     const silent = checkPage(
       { ...lilyEthanPage('Lily and Ethan stand together at the rail, looking out.'), pageNumber: 4 } as any,
       LILY_ETHAN_REQS,
     );
     expect(typesOf(silent)).toContain('outfit_missing');
+  });
 
+  it('garment_colour_wrong is gone: a recoloured garment is no longer a finding (it read colour words in prose and every consumer dropped it)', () => {
     const recoloured = checkPage(
       lilyEthanPage('Lily, wearing a red quilted gilet over a white long-sleeved top and dark navy corduroy trousers with black leather ankle boots, waits at the rail.') as any,
       LILY_ETHAN_REQS,
     );
-    const colour = recoloured.filter((f: Finding) => f.type === 'garment_colour_wrong');
-    expect(colour.length).toBeGreaterThan(0);
-    expect(colour[0].character).toBe('Lily');
+    expect(typesOf(recoloured)).not.toContain('garment_colour_wrong');
   });
 });
 

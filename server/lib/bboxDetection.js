@@ -41,7 +41,7 @@ const { geminiUsage, sumUsage } = require('./providerUsage');
 const { PROMPT_TEMPLATES, fillTemplate, applyRepairStyleGuard } = require('../services/prompts');
 const { assertPromptFilled, guardPromptString } = require('../services/prompts');
 const { MODEL_DEFAULTS, withRetry } = require('./textModels');
-const { canonicalName } = require('./castResolver');
+const { canonicalName, namesMentioned } = require('./castResolver');
 const { MODEL_DEFAULTS: CONFIG_DEFAULTS, TEXT_MODELS, GROK_VISION_FALLBACK } = require('../config/models');
 const { getCurrentLogger } = require('./generationLogger');
 const { AnalyzerError, reportAnalyzerFailure } = require('./photoAnalyzerClient');
@@ -2047,18 +2047,7 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches 
   ];
 
   // Helper: extract character names mentioned in issue text
-  const extractCharacterNames = (text) => {
-    const textLower = (text || '').toLowerCase();
-    const foundChars = [];
-    for (const charName of Object.keys(charToDetectionFigure)) {
-      const escapedName = charName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const regex = new RegExp(`\\b${escapedName}(?:[\u2019']s)?\\b`, 'i');
-      if (regex.test(textLower)) {
-        foundChars.push(charName);
-      }
-    }
-    return foundChars;
-  };
+  const extractCharacterNames = (text) => namesMentioned(text, Object.keys(charToDetectionFigure));
 
   // Helper: extract meaningful keywords from text
   const commonWords = new Set(['with', 'that', 'this', 'from', 'have', 'been', 'were', 'being', 'their', 'there', 'which', 'would', 'could', 'should', 'about', 'figure', 'image', 'shown', 'visible']);
