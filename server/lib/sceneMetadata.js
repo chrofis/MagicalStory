@@ -597,9 +597,14 @@ function buildTextFromJson(scene) {
 
   // Setting summary (one line)
   if (scene.setting) {
+    // The place NAME leaves the line when a description says what it looks like:
+    // the image model paints the Setting line's name as a caption (3 of 48 viewed
+    // trial pages, each an exact match; full stories have no Setting line).
+    // docs/decisions.md 2026-10-09 "Trial Setting line".
     const settingParts = [];
-    if (scene.setting.location) settingParts.push(stripEntityIds(scene.setting.location));
-    if (scene.setting.description) settingParts.push(stripEntityIds(scene.setting.description));
+    const settingDescription = scene.setting.description ? stripEntityIds(scene.setting.description) : '';
+    if (scene.setting.location && !settingDescription) settingParts.push(stripEntityIds(scene.setting.location));
+    if (settingDescription) settingParts.push(settingDescription);
     if (settingParts.length > 0) {
       lines.push('');
       lines.push('Setting: ' + settingParts.join('. '));
