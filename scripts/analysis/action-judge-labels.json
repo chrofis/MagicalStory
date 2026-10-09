@@ -1,7 +1,7 @@
 {
- "version": 1,
+ "version": 2,
  "date": "2026-10-09",
- "note": "Labels made by viewing each stored staging page image. findings are the stored (consolidated) action_interaction findings in stored order. realPage = a real action defect is visible. borderline = judgement call, scored as noise in the headline and reported as sensitivity. No story text stored. realMatch = analysis-only keywords: a re-run finding on a real page counts as hitting the real defect when its description contains one of them and is not a gaze comparison (\"declared looking\").",
+ "note": "Labels made by viewing each stored staging page image. findings are the stored (consolidated) action_interaction findings in stored order. realPage = a real action defect is visible. borderline = judgement call, scored as noise in the headline and reported as sensitivity. No story text stored. realMatch = analysis-only keywords: a re-run finding on a real page counts as hitting the real defect when its description contains one of them and is not a gaze comparison (\"declared looking\"). SET 2 (added 2026-10-09 later): pages with src \"set2-2026-10-09\" were labelled at PAGE level only (storedFindings carry the page label, not a per-finding verdict); candidates were located through stored non-gaze serious action_interaction findings, so recall on them is re-detection recall, not discovery recall. Borderline = view/orientation or unverifiable-identity calls, scored as noise.",
  "pages": [
   {
    "id": "1nitlympp_p12_v1",
@@ -1096,6 +1096,2406 @@
    "src": "original",
    "realPage": false,
    "storedFindings": []
+  },
+  {
+   "id": "a0dpn715x_p3_v1",
+   "story": "job_1791551239260_a0dpn715x",
+   "pn": 3,
+   "vi": 1,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "2ir6nl5kw_p15_v0",
+   "story": "job_1791489793707_2ir6nl5kw",
+   "pn": 15,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "t0t8qpebu_p10_v0",
+   "story": "job_1791315635053_t0t8qpebu",
+   "pn": 10,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "critical",
+     "label": "borderline",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": true
+    }
+   ]
+  },
+  {
+   "id": "dka3jpog9_p6_v1",
+   "story": "job_1790508305061_dka3jpog9",
+   "pn": 6,
+   "vi": 1,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": true,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "critical",
+     "label": "page-real",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    },
+    {
+     "i": 1,
+     "sev": "major",
+     "label": "page-real",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    },
+    {
+     "i": 2,
+     "sev": "major",
+     "label": "page-real",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ],
+   "realMatch": [
+    "hold",
+    "kiaan"
+   ]
+  },
+  {
+   "id": "riqncqg1i_p15_v1",
+   "story": "job_1789853503332_riqncqg1i",
+   "pn": 15,
+   "vi": 1,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "p08djwhbl_p1_v0",
+   "story": "job_1789759147125_p08djwhbl",
+   "pn": 1,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    },
+    {
+     "i": 1,
+     "sev": "critical",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "wkt20ckod_p2_v0",
+   "story": "job_1789681157795_wkt20ckod",
+   "pn": 2,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "critical",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "rts4wqupm_p1_v1",
+   "story": "job_1789584708605_rts4wqupm",
+   "pn": 1,
+   "vi": 1,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "3kxqshifx_p1_v0",
+   "story": "job_1789506283204_3kxqshifx",
+   "pn": 1,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": true,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "critical",
+     "label": "page-real",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ],
+   "realMatch": [
+    "hold",
+    "jacket",
+    "tuck"
+   ]
+  },
+  {
+   "id": "zly5rcdej_p2_v0",
+   "story": "job_1789420511893_zly5rcdej",
+   "pn": 2,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    },
+    {
+     "i": 1,
+     "sev": "major",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "9oxos7dwv_p2_v1",
+   "story": "job_1789348171785_9oxos7dwv",
+   "pn": 2,
+   "vi": 1,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "z2c779f7i_p1_v0",
+   "story": "job_1789343124794_z2c779f7i",
+   "pn": 1,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "critical",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "apslnsq1z_p2_v0",
+   "story": "job_1789337998754_apslnsq1z",
+   "pn": 2,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    },
+    {
+     "i": 1,
+     "sev": "major",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "y3n0euk3z_p6_v0",
+   "story": "job_1789304198359_y3n0euk3z",
+   "pn": 6,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "critical",
+     "label": "borderline",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": true
+    }
+   ]
+  },
+  {
+   "id": "ueh8h145m_p2_v0",
+   "story": "job_1789301291267_ueh8h145m",
+   "pn": 2,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "critical",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "z18dmvnt6_p2_v1",
+   "story": "job_1789227389389_z18dmvnt6",
+   "pn": 2,
+   "vi": 1,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "l43qgl34w_p4_v0",
+   "story": "job_1789207854566_l43qgl34w",
+   "pn": 4,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "kc2joi4ax_p5_v0",
+   "story": "job_1789163494908_kc2joi4ax",
+   "pn": 5,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": true,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "page-real",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ],
+   "realMatch": [
+    "perch",
+    "fly",
+    "flight",
+    "circl"
+   ]
+  },
+  {
+   "id": "m3uam0nxi_p6_v1",
+   "story": "job_1789147573901_m3uam0nxi",
+   "pn": 6,
+   "vi": 1,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    },
+    {
+     "i": 1,
+     "sev": "major",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "17lz946ik_p2_v0",
+   "story": "job_1789083667794_17lz946ik",
+   "pn": 2,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "critical",
+     "label": "borderline",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": true
+    }
+   ]
+  },
+  {
+   "id": "622wecmhj_p1_v0",
+   "story": "job_1789078732136_622wecmhj",
+   "pn": 1,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "csjcyp1q9_p2_v0",
+   "story": "job_1788983823620_csjcyp1q9",
+   "pn": 2,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "ijseol49a_p8_v0",
+   "story": "job_1788957347999_ijseol49a",
+   "pn": 8,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": true,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "critical",
+     "label": "page-real",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ],
+   "realMatch": [
+    "hold",
+    "hand"
+   ]
+  },
+  {
+   "id": "iqvhj4l8m_p3_v0",
+   "story": "job_1788903616404_iqvhj4l8m",
+   "pn": 3,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "9erw6xc01_p6_v0",
+   "story": "job_1788820396445_9erw6xc01",
+   "pn": 6,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "25b31uqlp_p1_v0",
+   "story": "job_1788816451791_25b31uqlp",
+   "pn": 1,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "1dpnym94p_p3_v0",
+   "story": "job_1788727233899_1dpnym94p",
+   "pn": 3,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "critical",
+     "label": "borderline",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": true
+    }
+   ]
+  },
+  {
+   "id": "xqmtk2gcs_p1_v0",
+   "story": "job_1788681313413_xqmtk2gcs",
+   "pn": 1,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "mpjwlzkf1_p5_v1",
+   "story": "job_1788641639919_mpjwlzkf1",
+   "pn": 5,
+   "vi": 1,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "critical",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    },
+    {
+     "i": 1,
+     "sev": "critical",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "vxnu60yjg_p7_v0",
+   "story": "job_1788614817116_vxnu60yjg",
+   "pn": 7,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "critical",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    },
+    {
+     "i": 1,
+     "sev": "critical",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "d7472jys3_p3_v0",
+   "story": "job_1788590495460_d7472jys3",
+   "pn": 3,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "critical",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "g9dqyirre_p3_v0",
+   "story": "job_1788471969309_9cg9dqyirre",
+   "pn": 3,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": true,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "critical",
+     "label": "page-real",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    },
+    {
+     "i": 1,
+     "sev": "critical",
+     "label": "page-real",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    },
+    {
+     "i": 2,
+     "sev": "major",
+     "label": "page-real",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ],
+   "realMatch": [
+    "hold",
+    "rope",
+    "map"
+   ]
+  },
+  {
+   "id": "9mr11xszu_p2_v0",
+   "story": "job_1788380714660_4p9mr11xszu",
+   "pn": 2,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "critical",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "028ggiq7a_p10_v0",
+   "story": "job_1788295892348_l028ggiq7a",
+   "pn": 10,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "vu132n7je_p4_v0",
+   "story": "job_1788215224103_avu132n7je",
+   "pn": 4,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": true,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "critical",
+     "label": "page-real",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    },
+    {
+     "i": 1,
+     "sev": "major",
+     "label": "page-real",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    },
+    {
+     "i": 2,
+     "sev": "critical",
+     "label": "page-real",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ],
+   "realMatch": [
+    "boot",
+    "shov",
+    "hold"
+   ]
+  },
+  {
+   "id": "x71oyo1wg_p3_v1",
+   "story": "job_1788123310558_1yx71oyo1wg",
+   "pn": 3,
+   "vi": 1,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "critical",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "i9ah2221i_p1_v0",
+   "story": "job_1787991502308_i9ah2221i",
+   "pn": 1,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "critical",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "n257i2cmk_p3_v1",
+   "story": "job_1787984454250_n257i2cmk",
+   "pn": 3,
+   "vi": 1,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "bz19gm36h_p5_v0",
+   "story": "job_1787959478282_bz19gm36h",
+   "pn": 5,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": true,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "critical",
+     "label": "page-real",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    },
+    {
+     "i": 1,
+     "sev": "major",
+     "label": "page-real",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ],
+   "realMatch": [
+    "wheel",
+    "grip"
+   ]
+  },
+  {
+   "id": "z9bwoo3yp_p1_v0",
+   "story": "job_1787867402809_z9bwoo3yp",
+   "pn": 1,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": true,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "page-real",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ],
+   "realMatch": [
+    "point",
+    "hat",
+    "touch"
+   ]
+  },
+  {
+   "id": "311ykfmin_p1_v0",
+   "story": "job_1787812110559_n311ykfmin",
+   "pn": 1,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "l5dyf4k8g_p1_v0",
+   "story": "job_1787777447720_ll5dyf4k8g",
+   "pn": 1,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": true,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "critical",
+     "label": "page-real",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    },
+    {
+     "i": 1,
+     "sev": "critical",
+     "label": "page-real",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ],
+   "realMatch": [
+    "map",
+    "hold",
+    "plank",
+    "dock"
+   ]
+  },
+  {
+   "id": "6ew0y1kae_p8_v1",
+   "story": "job_1787689073034_1v6ew0y1kae",
+   "pn": 8,
+   "vi": 1,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    },
+    {
+     "i": 1,
+     "sev": "major",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    },
+    {
+     "i": 2,
+     "sev": "major",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    },
+    {
+     "i": 3,
+     "sev": "major",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "70901tfsn_p2_v1",
+   "story": "job_1787638394061_hs70901tfsn",
+   "pn": 2,
+   "vi": 1,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    },
+    {
+     "i": 1,
+     "sev": "major",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    },
+    {
+     "i": 2,
+     "sev": "critical",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "gr5nukroz_p1_v0",
+   "story": "job_1787493968756_4fgr5nukroz",
+   "pn": 1,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": true,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "page-real",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ],
+   "realMatch": [
+    "hold",
+    "note",
+    "toes"
+   ]
+  },
+  {
+   "id": "27p42el7l_p3_v0",
+   "story": "job_1787469664089_9e27p42el7l",
+   "pn": 3,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "r9llf5yi9_p3_v0",
+   "story": "job_1787423677246_r9llf5yi9",
+   "pn": 3,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "fedxinwqd_p5_v0",
+   "story": "job_1787436913379_mfedxinwqd",
+   "pn": 5,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "v76p0rokg_p1_v0",
+   "story": "job_1787349305313_hpv76p0rokg",
+   "pn": 1,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "zb960muni_p3_v0",
+   "story": "job_1787262655143_s9zb960muni",
+   "pn": 3,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "borderline",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": true
+    },
+    {
+     "i": 1,
+     "sev": "major",
+     "label": "borderline",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": true
+    }
+   ]
+  },
+  {
+   "id": "6sn8z0nh2_p1_v0",
+   "story": "job_1787252581387_6sn8z0nh2",
+   "pn": 1,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": true,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "page-real",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    },
+    {
+     "i": 1,
+     "sev": "major",
+     "label": "page-real",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    },
+    {
+     "i": 2,
+     "sev": "major",
+     "label": "page-real",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    },
+    {
+     "i": 3,
+     "sev": "major",
+     "label": "page-real",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    },
+    {
+     "i": 4,
+     "sev": "major",
+     "label": "page-real",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    },
+    {
+     "i": 5,
+     "sev": "critical",
+     "label": "page-real",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ],
+   "realMatch": [
+    "hand",
+    "pocket",
+    "map",
+    "clasp"
+   ]
+  },
+  {
+   "id": "o6deqtv5s_p1_v0",
+   "story": "job_1786998860057_o6deqtv5s",
+   "pn": 1,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": true,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "critical",
+     "label": "page-real",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    },
+    {
+     "i": 1,
+     "sev": "major",
+     "label": "page-real",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    },
+    {
+     "i": 2,
+     "sev": "critical",
+     "label": "page-real",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    },
+    {
+     "i": 3,
+     "sev": "major",
+     "label": "page-real",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ],
+   "realMatch": [
+    "hold",
+    "paper",
+    "hand"
+   ]
+  },
+  {
+   "id": "rur4nskfv_p1_v0",
+   "story": "job_1786917840874_rur4nskfv",
+   "pn": 1,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": true,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "critical",
+     "label": "page-real",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    },
+    {
+     "i": 1,
+     "sev": "critical",
+     "label": "page-real",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    },
+    {
+     "i": 2,
+     "sev": "critical",
+     "label": "page-real",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ],
+   "realMatch": [
+    "asleep",
+    "awake",
+    "shell",
+    "hold"
+   ]
+  },
+  {
+   "id": "rgzoyoprx_p2_v0",
+   "story": "job_1786829555599_rgzoyoprx",
+   "pn": 2,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": true,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "critical",
+     "label": "page-real",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    },
+    {
+     "i": 1,
+     "sev": "major",
+     "label": "page-real",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    },
+    {
+     "i": 2,
+     "sev": "major",
+     "label": "page-real",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ],
+   "realMatch": [
+    "grip",
+    "lung",
+    "arm",
+    "hold"
+   ]
+  },
+  {
+   "id": "s980g4s9a_p2_v0",
+   "story": "job_1786780194082_s980g4s9a",
+   "pn": 2,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": true,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "page-real",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ],
+   "realMatch": [
+    "kneel",
+    "stand"
+   ]
+  },
+  {
+   "id": "kcx0p939w_p1_v0",
+   "story": "job_1786743927715_kcx0p939w",
+   "pn": 1,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    },
+    {
+     "i": 1,
+     "sev": "major",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "d66c7bg9g_p1_v0",
+   "story": "job_1786737619634_d66c7bg9g",
+   "pn": 1,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "borderline",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": true
+    },
+    {
+     "i": 1,
+     "sev": "major",
+     "label": "borderline",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": true
+    },
+    {
+     "i": 2,
+     "sev": "major",
+     "label": "borderline",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": true
+    },
+    {
+     "i": 3,
+     "sev": "major",
+     "label": "borderline",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": true
+    }
+   ]
+  },
+  {
+   "id": "yhzn4dv5q_p4_v0",
+   "story": "job_1786653013328_yhzn4dv5q",
+   "pn": 4,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "e6oymm389_p2_v0",
+   "story": "job_1786648282940_e6oymm389",
+   "pn": 2,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": true,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "critical",
+     "label": "page-real",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ],
+   "realMatch": [
+    "hand",
+    "spoon",
+    "map"
+   ]
+  },
+  {
+   "id": "0sgrd0f4g_p8_v1",
+   "story": "job_1786571353564_0sgrd0f4g",
+   "pn": 8,
+   "vi": 1,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "critical",
+     "label": "borderline",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": true
+    },
+    {
+     "i": 1,
+     "sev": "major",
+     "label": "borderline",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": true
+    }
+   ]
+  },
+  {
+   "id": "8ktpkfhec_p4_v1",
+   "story": "job_1786567053374_8ktpkfhec",
+   "pn": 4,
+   "vi": 1,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "vb3f0zy6v_p2_v0",
+   "story": "job_1786563358202_vb3f0zy6v",
+   "pn": 2,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "crojok432_p2_v0",
+   "story": "job_1786484554633_crojok432",
+   "pn": 2,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "q1fjbdzbx_p1_v0",
+   "story": "job_1786397108357_q1fjbdzbx",
+   "pn": 1,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": true,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "critical",
+     "label": "page-real",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    },
+    {
+     "i": 1,
+     "sev": "critical",
+     "label": "page-real",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    },
+    {
+     "i": 2,
+     "sev": "critical",
+     "label": "page-real",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ],
+   "realMatch": [
+    "push",
+    "door",
+    "hold"
+   ]
+  },
+  {
+   "id": "4zwhrn08y_p1_v2",
+   "story": "job_1786309527338_4zwhrn08y",
+   "pn": 1,
+   "vi": 2,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": true,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "page-real",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    },
+    {
+     "i": 1,
+     "sev": "major",
+     "label": "page-real",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ],
+   "realMatch": [
+    "fan",
+    "paper",
+    "hand"
+   ]
+  },
+  {
+   "id": "7f75jspcz_p1_v0",
+   "story": "job_1786287569165_7f75jspcz",
+   "pn": 1,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": true,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "page-real",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    },
+    {
+     "i": 1,
+     "sev": "major",
+     "label": "page-real",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ],
+   "realMatch": [
+    "crouch",
+    "kneel",
+    "grip",
+    "hand",
+    "stand"
+   ]
+  },
+  {
+   "id": "vorw1f7ve_p1_v0",
+   "story": "job_1786277779744_vorw1f7ve",
+   "pn": 1,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "ytd5c7eek_p2_v0",
+   "story": "job_1786235099497_ytd5c7eek",
+   "pn": 2,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "critical",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "7baiaeftb_p2_v1",
+   "story": "job_1786193650012_7baiaeftb",
+   "pn": 2,
+   "vi": 1,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    },
+    {
+     "i": 1,
+     "sev": "major",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "dka3jpog9_p9_v1",
+   "story": "job_1790508305061_dka3jpog9",
+   "pn": 9,
+   "vi": 1,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "p08djwhbl_p3_v1",
+   "story": "job_1789759147125_p08djwhbl",
+   "pn": 3,
+   "vi": 1,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": true,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "critical",
+     "label": "page-real",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    },
+    {
+     "i": 1,
+     "sev": "major",
+     "label": "page-real",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ],
+   "realMatch": [
+    "lean",
+    "trunk",
+    "ball",
+    "hand"
+   ]
+  },
+  {
+   "id": "wkt20ckod_p4_v0",
+   "story": "job_1789681157795_wkt20ckod",
+   "pn": 4,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "rts4wqupm_p4_v0",
+   "story": "job_1789584708605_rts4wqupm",
+   "pn": 4,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": true,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "critical",
+     "label": "page-real",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ],
+   "realMatch": [
+    "ear",
+    "press",
+    "hand"
+   ]
+  },
+  {
+   "id": "3kxqshifx_p2_v0",
+   "story": "job_1789506283204_3kxqshifx",
+   "pn": 2,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    },
+    {
+     "i": 1,
+     "sev": "major",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "zly5rcdej_p3_v0",
+   "story": "job_1789420511893_zly5rcdej",
+   "pn": 3,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "9oxos7dwv_p7_v0",
+   "story": "job_1789348171785_9oxos7dwv",
+   "pn": 7,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": true,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "page-real",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    },
+    {
+     "i": 1,
+     "sev": "critical",
+     "label": "page-real",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ],
+   "realMatch": [
+    "hold",
+    "carry",
+    "arm"
+   ]
+  },
+  {
+   "id": "z2c779f7i_p6_v0",
+   "story": "job_1789343124794_z2c779f7i",
+   "pn": 6,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    },
+    {
+     "i": 1,
+     "sev": "major",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "apslnsq1z_p5_v0",
+   "story": "job_1789337998754_apslnsq1z",
+   "pn": 5,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    },
+    {
+     "i": 1,
+     "sev": "major",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "y3n0euk3z_p7_v1",
+   "story": "job_1789304198359_y3n0euk3z",
+   "pn": 7,
+   "vi": 1,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "ueh8h145m_p3_v0",
+   "story": "job_1789301291267_ueh8h145m",
+   "pn": 3,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "critical",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "z18dmvnt6_p5_v0",
+   "story": "job_1789227389389_z18dmvnt6",
+   "pn": 5,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "critical",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "l43qgl34w_p5_v1",
+   "story": "job_1789207854566_l43qgl34w",
+   "pn": 5,
+   "vi": 1,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "borderline",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": true
+    },
+    {
+     "i": 1,
+     "sev": "major",
+     "label": "borderline",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": true
+    },
+    {
+     "i": 2,
+     "sev": "major",
+     "label": "borderline",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": true
+    },
+    {
+     "i": 3,
+     "sev": "major",
+     "label": "borderline",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": true
+    },
+    {
+     "i": 4,
+     "sev": "major",
+     "label": "borderline",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": true
+    },
+    {
+     "i": 5,
+     "sev": "major",
+     "label": "borderline",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": true
+    },
+    {
+     "i": 6,
+     "sev": "major",
+     "label": "borderline",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": true
+    },
+    {
+     "i": 7,
+     "sev": "major",
+     "label": "borderline",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": true
+    }
+   ]
+  },
+  {
+   "id": "kc2joi4ax_p7_v0",
+   "story": "job_1789163494908_kc2joi4ax",
+   "pn": 7,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": true,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "page-real",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    },
+    {
+     "i": 1,
+     "sev": "major",
+     "label": "page-real",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ],
+   "realMatch": [
+    "anorak",
+    "wrap",
+    "egg"
+   ]
+  },
+  {
+   "id": "m3uam0nxi_p9_v0",
+   "story": "job_1789147573901_m3uam0nxi",
+   "pn": 9,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": true,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "critical",
+     "label": "page-real",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    },
+    {
+     "i": 1,
+     "sev": "critical",
+     "label": "page-real",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ],
+   "realMatch": [
+    "kneel",
+    "lower",
+    "bike",
+    "seated"
+   ]
+  },
+  {
+   "id": "17lz946ik_p6_v1",
+   "story": "job_1789083667794_17lz946ik",
+   "pn": 6,
+   "vi": 1,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "borderline",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": true
+    },
+    {
+     "i": 1,
+     "sev": "major",
+     "label": "borderline",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": true
+    },
+    {
+     "i": 2,
+     "sev": "major",
+     "label": "borderline",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": true
+    },
+    {
+     "i": 3,
+     "sev": "major",
+     "label": "borderline",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": true
+    },
+    {
+     "i": 4,
+     "sev": "major",
+     "label": "borderline",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": true
+    }
+   ]
+  },
+  {
+   "id": "622wecmhj_p3_v0",
+   "story": "job_1789078732136_622wecmhj",
+   "pn": 3,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "critical",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "csjcyp1q9_p3_v0",
+   "story": "job_1788983823620_csjcyp1q9",
+   "pn": 3,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": true,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "page-real",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ],
+   "realMatch": [
+    "point",
+    "chain",
+    "hand"
+   ]
+  },
+  {
+   "id": "ijseol49a_p13_v1",
+   "story": "job_1788957347999_ijseol49a",
+   "pn": 13,
+   "vi": 1,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": true,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "critical",
+     "label": "page-real",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ],
+   "realMatch": [
+    "scale",
+    "barrier",
+    "door",
+    "wing"
+   ]
+  },
+  {
+   "id": "iqvhj4l8m_p5_v0",
+   "story": "job_1788903616404_iqvhj4l8m",
+   "pn": 5,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": true,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "page-real",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ],
+   "realMatch": [
+    "hold",
+    "scale",
+    "empty",
+    "hand"
+   ]
+  },
+  {
+   "id": "9erw6xc01_p13_v1",
+   "story": "job_1788820396445_9erw6xc01",
+   "pn": 13,
+   "vi": 1,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "25b31uqlp_p2_v0",
+   "story": "job_1788816451791_25b31uqlp",
+   "pn": 2,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "1dpnym94p_p4_v0",
+   "story": "job_1788727233899_1dpnym94p",
+   "pn": 4,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "xqmtk2gcs_p9_v0",
+   "story": "job_1788681313413_xqmtk2gcs",
+   "pn": 9,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "critical",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "mpjwlzkf1_p7_v0",
+   "story": "job_1788641639919_mpjwlzkf1",
+   "pn": 7,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": true,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "critical",
+     "label": "page-real",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    },
+    {
+     "i": 1,
+     "sev": "major",
+     "label": "page-real",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ],
+   "realMatch": [
+    "squeez",
+    "gap",
+    "press",
+    "stack"
+   ]
+  },
+  {
+   "id": "vxnu60yjg_p10_v0",
+   "story": "job_1788614817116_vxnu60yjg",
+   "pn": 10,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "d7472jys3_p8_v0",
+   "story": "job_1788590495460_d7472jys3",
+   "pn": 8,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": true,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "critical",
+     "label": "page-real",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    },
+    {
+     "i": 1,
+     "sev": "critical",
+     "label": "page-real",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    },
+    {
+     "i": 2,
+     "sev": "critical",
+     "label": "page-real",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ],
+   "realMatch": [
+    "roll",
+    "lantern",
+    "bundle",
+    "held"
+   ]
+  },
+  {
+   "id": "g9dqyirre_p4_v0",
+   "story": "job_1788471969309_9cg9dqyirre",
+   "pn": 4,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": true,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "critical",
+     "label": "page-real",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ],
+   "realMatch": [
+    "step",
+    "foot",
+    "boot"
+   ]
+  },
+  {
+   "id": "9mr11xszu_p8_v0",
+   "story": "job_1788380714660_4p9mr11xszu",
+   "pn": 8,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "vu132n7je_p5_v0",
+   "story": "job_1788215224103_avu132n7je",
+   "pn": 5,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "critical",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ]
+  },
+  {
+   "id": "x71oyo1wg_p4_v0",
+   "story": "job_1788123310558_1yx71oyo1wg",
+   "pn": 4,
+   "vi": 0,
+   "kind": "ai",
+   "src": "set2-2026-10-09",
+   "realPage": false,
+   "storedFindings": [
+    {
+     "i": 0,
+     "sev": "major",
+     "label": "noise",
+     "reason": "page-level label, set 2 (finding text not stored)",
+     "borderline": false
+    }
+   ]
   }
  ]
 }
