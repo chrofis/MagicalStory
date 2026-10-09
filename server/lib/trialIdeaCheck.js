@@ -35,6 +35,14 @@ happens, not scenery around it. When the story was asked for no particular hard 
 comes out of the theme's own world: the kind of trouble that world makes for the people in it, never
 a creature, villain or quest borrowed from another kind of story.`;
 
+// The idea card's length. 11 of 11 stored trial ideas before the causal-chain
+// rule (docs/decisions.md 2026-10-08) were 47-50 words; the 16 after it ran 61-110
+// (median ~75) because "Maximum 50 words" was one clause at the end of a long
+// chain rule. The limit is now a stated, per-sentence budget (prompts/trial-idea.txt
+// {MAX_WORDS} / {SENTENCE_WORDS}), one constant for the prompt and the test.
+const TRIAL_IDEA_MAX_WORDS = 50;
+const TRIAL_IDEA_SENTENCE_WORDS = Math.ceil(TRIAL_IDEA_MAX_WORDS / 3);
+
 const CHECK_MARKER = 'CHECK';
 const NO_ACT = 'NONE';
 
@@ -162,6 +170,8 @@ module.exports = {
   COMMISSIONED_ACT_PHRASE,
   TRIAL_IDEA_COMMISSION_RULE,
   TRIAL_IDEA_SELF_CHECK_RULE,
+  TRIAL_IDEA_MAX_WORDS,
+  TRIAL_IDEA_SENTENCE_WORDS,
   CHECK_MARKER,
   NO_ACT,
   FAILURE_FEEDBACK,

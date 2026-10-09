@@ -13320,7 +13320,7 @@ function buildPreviousScenesContext(sceneDescriptions, currentPage, maxPrevious 
 // ============================================================================
 
 
-const { TRIAL_IDEA_COMMISSION_RULE, TRIAL_IDEA_SELF_CHECK_RULE } = require('./trialIdeaCheck');
+const { TRIAL_IDEA_COMMISSION_RULE, TRIAL_IDEA_SELF_CHECK_RULE, TRIAL_IDEA_MAX_WORDS, TRIAL_IDEA_SENTENCE_WORDS } = require('./trialIdeaCheck');
 
 /**
  * Costume instructions for the trial idea generator.
@@ -13545,6 +13545,8 @@ function buildTrialIdeaPrompts({
     // pair in server/lib/trialIdeaCheck.js — the generator's rule and the
     // check's wording cannot drift into two hand-kept copies.
     COMMISSION_RULE: TRIAL_IDEA_COMMISSION_RULE,
+    MAX_WORDS: String(TRIAL_IDEA_MAX_WORDS),
+    SENTENCE_WORDS: String(TRIAL_IDEA_SENTENCE_WORDS),
   });
 
   const townClause = townName ? `in ${townName}` : `in the child's own town`;
