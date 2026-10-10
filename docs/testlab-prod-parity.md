@@ -71,7 +71,7 @@ Audit date: 2026-09-27 (staging `c76dac6fc`). Every B/C divergence still open ha
 | trial_idea_variety / trial_challenge_draw | trial idea route / trial writer | B+C | Character and location inputs are reconstructed. |
 | vb_element_cell | `generateReferenceSheet` | C | One element alone, not batched. |
 | cover_title_paintin | `paintCoverTitle` (only in `mode:'plate'`) | C by default | |
-| avatar_realistic / avatar_style / avatar_eval | `generateCharacter2x4Sheet` passes | B | Uses the user's current character record, a derived outfit, and no `costumeName`. |
+| avatar_sheet_variant (variant oneCall) | `oneCallSheet.generateJudgedOneCallSheet` (the production function, incl. judge and redo) | A | The stage runs the wired function itself; params.references / grokModel / costume are the only knobs. (The old avatar_realistic / avatar_style / avatar_eval stages were deleted 2026-10-10 with the two-pass sheet.) |
 | arc_rounds, arc_amend, scene_hazard_count, story_scorecard, score_rejudge | none | R | |
 
 ## Cross-cutting gaps that a fix needs stored data for

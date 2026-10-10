@@ -9805,9 +9805,9 @@
       "title": "Trial sheet: the pass-1 row judges no longer sit between two renders",
       "commits": [],
       "addedAt": "2026-10-10",
-      "status": "pending",
+      "status": "superseded",
       "evidence": [],
-      "claim": "On a trial costumed/standard sheet the body judge runs while the head row renders and the head and identity judges while pass 2 runs, so the sheet is stored about 8 s earlier than before; the stored verdict (finalVerdict, passes.pass1.attempts scores) is unchanged.",
+      "claim": "On a trial costumed/standard sheet the body judge runs while the head row renders and the head and identity judges while pass 2 runs, so the sheet is stored about 8 s earlier than before; the stored verdict (finalVerdict, passes.pass1.attempts scores) is unchanged. SUPERSEDED 2026-10-10: the pass-1 rows and their judges no longer exist (avatar-sheet-one-call-2026-10-10).",
       "runShape": [
         "trial"
       ],
@@ -9860,7 +9860,7 @@
         "32b84baba"
       ],
       "addedAt": "2026-10-10",
-      "claim": "On a full story, every shipped styled avatar sheet (standard and costumed) has solo and background at 6 or above and style above 3 on the shipped attempt; an attempt blocked on one of them shows BLOCKED in the log and the sheet shipped is an unblocked attempt, or the avatar throws loudly.",
+      "claim": "On a full story, every shipped styled avatar sheet (standard and costumed) has solo and background at 6 or above and style above 3 on the shipped attempt; an attempt blocked on one of them shows BLOCKED in the log and the sheet shipped is an unblocked attempt, or the avatar throws loudly. SUPERSEDED 2026-10-10: the pass-2 judge and its blocking axes no longer exist; the one sheet judge replaces them (avatar-sheet-one-call-2026-10-10).",
       "runShape": [
         "full-story",
         "needs-fresh-avatar-sheet"
@@ -9869,7 +9869,7 @@
         "kind": "human",
         "what": "Open the story's styled-avatar generation (dev panel / stories.data.styledAvatarGeneration): for each pass2, the selected attempt has soloScore >= 6, backgroundScore >= 6, styleScore > 3 and identityRejected false; any attempt with identityRejected true lists the blocked axis and a later attempt is the selected one. Look at the shipped sheets: no stranger, no painted scene, no photograph."
       },
-      "status": "pending",
+      "status": "superseded",
       "evidence": []
     },
     {
@@ -9879,13 +9879,46 @@
         "32b84baba"
       ],
       "addedAt": "2026-10-10",
-      "claim": "On a trial run, the standard avatar sheet is judged once by the whole-sheet defect judge; a flagged sheet is redone exactly once (log: \"trial sheet flagged ... one redo without the anchor\"), the better sheet ships, a judge error ships the sheet with an ERROR log, and the costumed sheet is not judged.",
+      "claim": "On a trial run, the standard avatar sheet is judged once by the whole-sheet defect judge; a flagged sheet is redone exactly once (log: \"trial sheet flagged ... one redo without the anchor\"), the better sheet ships, a judge error ships the sheet with an ERROR log, and the costumed sheet is not judged. SUPERSEDED 2026-10-10: the trial standard sheet judge is now the judge of every sheet (avatar-sheet-one-call-2026-10-10).",
       "runShape": [
         "trial"
       ],
       "check": {
         "kind": "human",
         "what": "In the staging log of a trial run: one \"trial sheet\" judge outcome per standard sheet (clean, or flagged then redo), never a second redo; the shipped standard sheet has no bald cell, held object, stranger or photograph; no added wait above about 25 s on a redo. Costumed sheet has no judge line."
+      },
+      "status": "superseded",
+      "evidence": []
+    },
+    {
+      "id": "avatar-sheet-one-call-2026-10-10",
+      "title": "Every avatar sheet (standard and costume, trial and full story) is ONE Grok 2.0 call, one judge, one redo",
+      "commits": [],
+      "addedAt": "2026-10-10",
+      "claim": "A trial and a full story each draw every avatar sheet in one grok-imagine-image-2.0 call from the face photo and the body cut-out (about 17-34 s with the judge, USD 0.04 + 0.003), judged by the one sheet judge, redone once on a flag; no body row, head row or pass 2 call appears in the log; the trial hero is the front cell of the sheet drawn at the photo; the stored styled-avatar entries carry sheetCheck.",
+      "runShape": [
+        "trial",
+        "full-story"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "One /try on staging and one 4-page smoke story on demo-b-hnecf: Railway log shows \"[STYLED AVATAR] ... one-call sheet\" lines, no \"Pass 2\" / \"body row\" / \"head row\" lines, api_usage has character_2x4_one_call (and no character_2x4_style_transfer); the trial hero appears about 20 s after the photo; every sheet viewed (grid, hat identical in all 8 cells, no bald cell). Validated through the wired functions on 6 stored characters, 12 sheets: docs/decisions.md 2026-10-10."
+      },
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "avatar-sheet-check-usefulness-50-runs",
+      "title": "After 50 sheets: did the avatar sheet check ever fire, and did the redo ever help? Remove it if not",
+      "commits": [],
+      "addedAt": "2026-10-10",
+      "claim": "RULE (owner, 2026-10-10: \"add the check now and remove it if it never was used after 50 runs\"): after 50 recorded sheets (node scripts/admin/avatar-sheet-check-report.js), if the check never fired, or no redo ever shipped a cleaner sheet, remove the judge call, the redo and the avatar_sheet_check_* counters (server/lib/oneCallSheet.js, avatarSheetJudge.js, the tail question). Record the count and the decision in docs/decisions.md. 12 of 12 sheets were clean in the wired validation (0 flags), so the count starts at 0 fired / 12 judged.",
+      "runShape": [
+        "any"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Run `node scripts/admin/avatar-sheet-check-report.js --env=prod` (and staging). Read: sheets judged, flagged by type, redone, redo shipped, shipped flagged, judge errors. Fewer than 50 sheets: wait. 50 or more and fired = 0, or redo shipped = 0: remove the check (decisions entry). Otherwise record \"kept\" with the numbers."
       },
       "status": "pending",
       "evidence": []

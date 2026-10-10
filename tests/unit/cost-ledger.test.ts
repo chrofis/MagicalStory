@@ -6,6 +6,10 @@
  * tokens and cut streams were dropped, and a price table lived outside models.js.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
+
+// Two tests of this file read every source file under server/ (and client/src/); under the full-suite load (hundreds of files in
+// parallel workers) that walk takes longer than the 10 s default, alone it takes about 1 s. Longer timeout, same assertions.
+vi.setConfig({ testTimeout: 60000 });
 import { createRequire } from 'node:module';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';

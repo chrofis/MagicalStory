@@ -1,0 +1,278 @@
+{
+ "Daniel-costume-a_face.png": [
+  {
+   "eye": 158,
+   "chin": 218,
+   "feet": 956,
+   "head": 128,
+   "n": 6.78
+  },
+  {
+   "eye": 154,
+   "chin": 218,
+   "feet": 947,
+   "head": 136,
+   "n": 6.35
+  },
+  {
+   "eye": 182,
+   "chin": 236,
+   "feet": 970,
+   "head": 115,
+   "n": 7.39
+  }
+ ],
+ "Daniel-costume-b_face_avatar2x2.png": [
+  {
+   "eye": 139,
+   "chin": 196,
+   "feet": 948,
+   "head": 121,
+   "n": 7.2
+  },
+  {
+   "eye": 158,
+   "chin": 218,
+   "feet": 940,
+   "head": 128,
+   "n": 6.66
+  },
+  {
+   "eye": 128,
+   "chin": 186,
+   "feet": 958,
+   "head": 123,
+   "n": 7.26
+  }
+ ],
+ "Emma-costume-a_face.png": [
+  {
+   "eye": 218,
+   "chin": 298,
+   "feet": 948,
+   "head": 170,
+   "n": 4.82
+  },
+  {
+   "eye": 218,
+   "chin": 272,
+   "feet": 935,
+   "head": 115,
+   "n": 6.77
+  },
+  {
+   "eye": 196,
+   "chin": 257,
+   "feet": 956,
+   "head": 130,
+   "n": 6.39
+  }
+ ],
+ "Daniel-costume-c_face_bodyNoBg.png": [
+  {
+   "eye": 150,
+   "chin": 204,
+   "feet": 922,
+   "head": 115,
+   "n": 7.25
+  },
+  {
+   "eye": 218,
+   "chin": 286,
+   "feet": 969,
+   "head": 145,
+   "n": 5.72
+  },
+  {
+   "eye": 147,
+   "chin": 196,
+   "feet": 940,
+   "head": 104,
+   "n": 8.14
+  }
+ ],
+ "Emma-costume-b_face_avatar2x2.png": [
+  {
+   "eye": 194,
+   "chin": 272,
+   "feet": 940,
+   "head": 166,
+   "n": 5.03
+  },
+  {
+   "eye": 158,
+   "chin": 218,
+   "feet": 990,
+   "head": 128,
+   "n": 7.05
+  },
+  {
+   "eye": 158,
+   "chin": 218,
+   "feet": 935,
+   "head": 128,
+   "n": 6.62
+  }
+ ],
+ "Emma-costume-c_face_bodyNoBg.png": [
+  {
+   "eye": 218,
+   "chin": 272,
+   "feet": 956,
+   "head": 115,
+   "n": 6.95
+  },
+  {
+   "eye": 269,
+   "chin": 349,
+   "feet": 980,
+   "head": 170,
+   "n": 4.71
+  },
+  {
+   "eye": 218,
+   "chin": 286,
+   "feet": 956,
+   "head": 145,
+   "n": 5.63
+  }
+ ],
+ "Noah-costume-a_face.png": [
+  {
+   "eye": 158,
+   "chin": 236,
+   "feet": 907,
+   "head": 166,
+   "n": 5.04
+  },
+  {
+   "eye": 218,
+   "chin": 296,
+   "feet": 956,
+   "head": 166,
+   "n": 4.98
+  },
+  {
+   "eye": 154,
+   "chin": 218,
+   "feet": 940,
+   "head": 136,
+   "n": 6.3
+  }
+ ],
+ "Noah-costume-b_face_avatar2x2.png": [
+  {
+   "eye": 158,
+   "chin": 218,
+   "feet": 956,
+   "head": 128,
+   "n": 6.78
+  },
+  {
+   "eye": 213,
+   "chin": 272,
+   "feet": 959,
+   "head": 126,
+   "n": 6.47
+  },
+  {
+   "eye": 218,
+   "chin": 286,
+   "feet": 958,
+   "head": 145,
+   "n": 5.64
+  }
+ ],
+ "Noah-costume-c_face_bodyNoBg.png": [
+  {
+   "eye": 269,
+   "chin": 346,
+   "feet": 966,
+   "head": 164,
+   "n": 4.78
+  },
+  {
+   "eye": 158,
+   "chin": 218,
+   "feet": 966,
+   "head": 128,
+   "n": 6.86
+  },
+  {
+   "eye": 182,
+   "chin": 248,
+   "feet": 966,
+   "head": 140,
+   "n": 6.11
+  }
+ ],
+ "Noah-standard-a_face.png": [
+  {
+   "eye": 154,
+   "chin": 236,
+   "feet": 935,
+   "head": 174,
+   "n": 5.01
+  },
+  {
+   "eye": 158,
+   "chin": 218,
+   "feet": 950,
+   "head": 128,
+   "n": 6.73
+  },
+  {
+   "eye": 128,
+   "chin": 194,
+   "feet": 947,
+   "head": 140,
+   "n": 6.36
+  }
+ ],
+ "Noah-standard-b_face_avatar2x2.png": [
+  {
+   "eye": 126,
+   "chin": 182,
+   "feet": 948,
+   "head": 119,
+   "n": 7.43
+  },
+  {
+   "eye": 154,
+   "chin": 218,
+   "feet": 962,
+   "head": 136,
+   "n": 6.46
+  },
+  {
+   "eye": 158,
+   "chin": 218,
+   "feet": 958,
+   "head": 128,
+   "n": 6.8
+  }
+ ],
+ "Noah-standard-c_face_bodyNoBg.png": [
+  {
+   "eye": 218,
+   "chin": 296,
+   "feet": 956,
+   "head": 166,
+   "n": 4.98
+  },
+  {
+   "eye": 210,
+   "chin": 284,
+   "feet": 940,
+   "head": 157,
+   "n": 5.17
+  },
+  {
+   "eye": 158,
+   "chin": 234,
+   "feet": 948,
+   "head": 162,
+   "n": 5.42
+  }
+ ]
+}

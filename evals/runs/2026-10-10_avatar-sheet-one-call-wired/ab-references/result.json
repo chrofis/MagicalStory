@@ -1,0 +1,53 @@
+{
+ "spentUsd": 0.4799999999999999,
+ "results": [
+  {
+   "file": "Emma-costume-c_face_bodyNoBg.png",
+   "ms": 17637
+  },
+  {
+   "file": "Emma-costume-a_face.png",
+   "ms": 19319
+  },
+  {
+   "file": "Emma-costume-b_face_avatar2x2.png",
+   "ms": 29492
+  },
+  {
+   "file": "Noah-costume-a_face.png",
+   "ms": 12236
+  },
+  {
+   "file": "Noah-costume-b_face_avatar2x2.png",
+   "ms": 22934
+  },
+  {
+   "file": "Noah-costume-c_face_bodyNoBg.png",
+   "ms": 29067
+  },
+  {
+   "file": "Daniel-costume-a_face.png",
+   "ms": 9546
+  },
+  {
+   "file": "Daniel-costume-b_face_avatar2x2.png",
+   "ms": 13978
+  },
+  {
+   "file": "Daniel-costume-c_face_bodyNoBg.png",
+   "ms": 17164
+  },
+  {
+   "file": "Noah-standard-b_face_avatar2x2.png",
+   "ms": 13963
+  },
+  {
+   "file": "Noah-standard-c_face_bodyNoBg.png",
+   "ms": 14364
+  },
+  {
+   "file": "Noah-standard-a_face.png",
+   "ms": 16700
+  }
+ ]
+}

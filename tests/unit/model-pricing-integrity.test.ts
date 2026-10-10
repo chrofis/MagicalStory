@@ -25,7 +25,11 @@
  * Class 1 (a wrong-but-well-formed number) is not unit-testable — that is what
  * scripts/admin/check-model-pricing.js is for, against the live vendor APIs.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+
+// Two tests of this file read every source file under server/ (and client/src/); under the full-suite load (hundreds of files in
+// parallel workers) that walk takes longer than the 10 s default, alone it takes about 1 s. Longer timeout, same assertions.
+vi.setConfig({ testTimeout: 60000 });
 import { readFileSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
 
