@@ -1040,7 +1040,6 @@ export default function TrialGenerationPage() {
           titlePageImage={titlePageImage}
           pages={pages}
           pendingImageLabel={t.imagePending}
-          showArrows={pageState === 'completed'}
           titlePendingNode={imagePlaceholder}
         />
         </RenderErrorBoundary>

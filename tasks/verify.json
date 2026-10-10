@@ -9741,13 +9741,13 @@
       "id": "trial-iphone-dwell-and-finished-arrows",
       "commits": [],
       "addedAt": "2026-10-10",
-      "claim": "On the trial waiting screen every avatar picture stays its full slide time (6 s, 9 s for info captions) even while the body-row and sheet slides arrive; there are no arrows while the story generates; once the story is complete, round previous/next arrows lie over the left and right edge of the page image and turn the page.",
+      "claim": "On the trial waiting screen every avatar picture stays its full slide time (6 s, 9 s for info captions) even while the body-row and sheet slides arrive; round previous/next arrows lie over the left and right edge of the page image as soon as pages are readable (also while the story generates, last-ready page disables next) and turn the page; the avatar slideshow has none.",
       "runShape": [
         "trial"
       ],
       "check": {
         "kind": "human",
-        "what": "Owner iPhone trial: the first avatar (hero) stays about 6-9 s before the next picture; no arrows during generation; after completion arrows sit on the page image, visible without scrolling."
+        "what": "Owner iPhone trial: the first avatar (hero) stays about 6-9 s before the next picture; arrows sit on the page image as soon as the book shows (during generation too), visible without scrolling; none on the avatar slideshow."
       },
       "status": "pending",
       "evidence": []

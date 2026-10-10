@@ -50,8 +50,6 @@ interface TrialBookProps {
   pendingImageLabel: string;
   /** Rendered as the title page while it is still being drawn. */
   titlePendingNode: React.ReactNode;
-  /** Page arrows on the book: only once the story is complete (owner: no arrows while it is generating). */
-  showArrows: boolean;
 }
 
 function samePages(a: TrialPreviewPage[], b: TrialPreviewPage[]) {
@@ -64,7 +62,7 @@ function samePages(a: TrialPreviewPage[], b: TrialPreviewPage[]) {
  * preview. Memoized on content, so the 3 s poll (new array identity, same data)
  * does not re-render the viewer; when an image lands only that page's props change.
  */
-const TrialBook = React.memo(function TrialBook({ storyTitle, language, titlePageImage, pages, pendingImageLabel, titlePendingNode, showArrows }: TrialBookProps) {
+const TrialBook = React.memo(function TrialBook({ storyTitle, language, titlePageImage, pages, pendingImageLabel, titlePendingNode }: TrialBookProps) {
   const isMobile = useIsMobile();
   // Desktop spread: picture on the left page, its text on the right page.
   const { storyPages, entries } = useMemo(
@@ -111,19 +109,19 @@ const TrialBook = React.memo(function TrialBook({ storyTitle, language, titlePag
           pendingImageLabel={pendingImageLabel}
         />
         {/* Previous / next over the page edges, as on the waiting screen: a swipe is not discoverable on its own. */}
-        {showArrows && <OverlayArrows
+        <OverlayArrows
           onPrev={() => bookRef.current?.flipPrev()}
           onNext={() => bookRef.current?.flipNext()}
           prevDisabled={currentPage === 0}
           nextDisabled={currentPage >= pageList.length - 1}
           labels={bookNavLabelsFor(language)}
-        />}
+        />
       </div>
       <p className="mt-1 text-center text-indigo-400 text-sm font-medium">{Math.min(currentPage, pageList.length - 1) + 1} / {pageList.length}</p>
     </>
   );
 }, (a, b) =>
   a.storyTitle === b.storyTitle && a.language === b.language && a.titlePageImage === b.titlePageImage &&
-  a.pendingImageLabel === b.pendingImageLabel && a.showArrows === b.showArrows && samePages(a.pages, b.pages));
+  a.pendingImageLabel === b.pendingImageLabel && samePages(a.pages, b.pages));
 
 export default TrialBook;
