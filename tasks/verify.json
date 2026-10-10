@@ -9676,6 +9676,21 @@
         "kind": "human",
         "what": "Trial log: 'cell render gate skipped by design', no 'Cell render gate' lines; compare VB-ready to first page-image start."
       }
+    },
+    {
+      "id": "trial-idea-jev-rubric-gate",
+      "commits": [],
+      "addedAt": "2026-10-10",
+      "claim": "On /try, each idea card is read by ONE Jev rubric call after its own CHECK; a tripped tripwire (writer remark, age fit, theme) or a score under 0.646 reruns the card once with the reason fed back (about 15% of cards), and idea_generated.detail.ideas[i].gate records first/final {score, tripped, ok, failure, ms, error?}, rerun and reason.",
+      "runShape": [
+        "trial"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "After the owner's next trial: SELECT detail FROM idea_events WHERE event='idea_generated' ORDER BY created_at DESC LIMIT 1 and read ideas[].gate: a score for each card, tripped list, rerun true/false with reason; a Jev error shows gate.*.error and an 'ships un-gated' line in the logs."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [

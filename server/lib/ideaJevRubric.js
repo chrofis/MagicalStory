@@ -4,7 +4,7 @@
  * Owner, 2026-10-09: "what we tell the idea to create we should be able to rate
  * with Jev. Jev is the only thing fast enough for quality control of trials."
  *
- * PURE and NOT WIRED: no route calls this. It builds the Jev request, reads the
+ * WIRED on the trial idea (trialIdeaCheck.finishIdeaCard; docs/decisions.md 2026-10-10). It builds the Jev request, reads the
  * answers into probabilities and combines them; the call itself is
  * `jevAudit.callJev`. Measured in scripts/analysis/eval-jev-idea-rubric.js,
  * numbers in docs/decisions.md 2026-10-09 "Jev idea rubric".
@@ -276,7 +276,7 @@ function evaluateAdopted(answers, keys) {
 }
 
 /**
- * One Jev call for a card. THROWS when Jev does not answer (no unchecked card ships, as ideaCoherence.judgeCoherence).
+ * One Jev call for a card. THROWS when Jev does not answer; the caller (trialIdeaCheck.gateCard) logs it and ships the card un-gated.
  * @param {{age:number, topic?:string, theme?:string}} ctx
  * @param {{callImpl?:Function, flagBelow?:number}} [opts]
  */
@@ -300,7 +300,7 @@ const RUBRIC_FEEDBACK = {
   'rubric-tripwire-no_commentary': 'the text held a remark about the idea itself; write only the idea',
   'rubric-tripwire-age_fit': 'the want, the outside event or the act do not suit the age of the main character',
   'rubric-tripwire-theme': 'the theme cannot be seen in the idea',
-    'rubric-low-score': 'the idea reads weak on the whole: the act does not follow from the situation, or the topic is not what the situation calls for',
+  'rubric-low-score': 'the idea reads weak on the whole: the act does not follow from the situation, or the topic is not what the situation calls for',
 };
 
 module.exports = {

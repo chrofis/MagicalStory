@@ -69,18 +69,13 @@ const grid = JSON.parse(fs.readFileSync(path.join(ROOT, 'evals/datasets/trial-id
       const card = { calls: [] };
       try {
         const first = await callModel(base, 'first'); card.calls.push(first);
-        let parsed = chk.parseIdeaSelfCheck(first.text);
-        card.first = { idea: parsed.idea, ok: parsed.ok, failure: parsed.failure, event: parsed.event, act: parsed.act };
-        if (phase === 'after') {
-          const t = Date.now();
-          parsed = await chk.judgeIdeaCard(parsed, { topic: cell.topic, theme: cell.theme });
-          card.jevMs = Date.now() - t; card.jev = parsed.jev;
-        }
-        if (!parsed.ok) {
-          const rr = await callModel(chk.buildIdeaRerunPrompt(base, parsed), 'rerun'); card.calls.push(rr);
-          parsed = chk.parseIdeaSelfCheck(rr.text);
-          card.rerun = { idea: parsed.idea, ok: parsed.ok, failure: parsed.failure };
-        }
+        // phase 'before' = self-check rerun only (gate skipped by an un-askable ctx); 'after' = the wired finishIdeaCard (self-check + Jev rubric, one rerun).
+        const ctx = chk.ideaGateContext({ storyCategory: cell.category, storyTopic: cell.topic, storyTheme: cell.theme, age: phase === 'after' ? cell.age : NaN });
+        const t = Date.now();
+        const fin = await chk.finishIdeaCard({ firstText: first.text, basePrompt: base, ctx,
+          rerunCall: async (p) => { const rr = await callModel(p, 'rerun'); card.calls.push(rr); return rr.text; } });
+        card.jevMs = Date.now() - t; card.gate = { first: fin.firstGate, final: fin.finalGate, rerun: fin.rerun, reason: fin.rerunReason };
+        const parsed = fin.parsed;
         card.final = parsed.idea;
       } catch (e) { card.error = e.message; }
       row.cards[arm] = card;

@@ -17,7 +17,8 @@ describe('trial idea call effort', () => {
   });
   it('the Lab variety stage sends the same effort', () => {
     const src = read('server/lib/testlab.js');
-    expect(src.match(/effort: MODEL_DEFAULTS\.trialIdeaEffort/g)?.length).toBe(2);
+    // two draws plus the rerun inside finishIdeaCard's rerunCall
+    expect(src.match(/effort: MODEL_DEFAULTS\.trialIdeaEffort/g)?.length).toBe(3);
   });
 });
 

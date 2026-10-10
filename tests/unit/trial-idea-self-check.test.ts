@@ -139,21 +139,22 @@ describe('the rerun carries the card back with its own stated reason', () => {
 describe('the /try route reruns a failing card exactly once, and a passing card never', () => {
   const routeSrc = fs.readFileSync(path.join(ROOT, 'server/routes/trial.js'), 'utf8');
 
-  it('the rerun is inside the !parsed.ok branch and is not itself retried', () => {
+  it('the route has no rerun of its own: it calls finishIdeaCard, whose single rerun path is not retried', () => {
     const body = routeSrc.slice(routeSrc.indexOf('const runIdeaCard ='), routeSrc.indexOf('const streamStory1 = runIdeaCard'));
-    expect(body).toContain('if (!parsed.ok)');
-    // ONE call to buildIdeaRerunPrompt, and no loop around it.
-    expect(body.split('buildIdeaRerunPrompt(').length - 1).toBe(1);
-    expect(body).not.toMatch(/\b(while|for)\s*\(/);
-    // The second parse assigns the final answer and is never re-checked.
-    expect(body).toContain('parsed = reparsed;');
+    expect(body).toContain('finishIdeaCard(');
+    expect(body).not.toContain('buildIdeaRerunPrompt');
+    expect(body).not.toMatch(/(while|for)\s*\(/);
+    const fn = String(check.finishIdeaCard);
+    // ONE rerun prompt build, no loop; the reparsed card is the final answer.
+    expect(fn.split('buildIdeaRerunPrompt(').length - 1).toBe(1);
+    expect(fn).not.toMatch(/(while|for)\s*\(/);
+    expect(fn).toContain('parsed = reparsed;');
   });
 
-  it('there is no second judge call on the happy path — one model call per card unless it fails', () => {
+  it('one model call per card unless it is sent back: the draw, and the rerun inside rerunCall', () => {
     const body = routeSrc.slice(routeSrc.indexOf('const runIdeaCard ='), routeSrc.indexOf('const streamStory1 = runIdeaCard'));
-    const calls = body.split('callTextModelStreaming(').length - 1;
-    expect(calls).toBe(2); // the draw, and the rerun inside the failure branch
-    expect(body.indexOf('callTextModelStreaming(buildIdeaRerunPrompt')).toBeGreaterThan(body.indexOf('if (!parsed.ok)'));
+    expect(body.split('callTextModelStreaming(').length - 1).toBe(2);
+    expect(body.indexOf('rerunCall:')).toBeGreaterThan(body.indexOf('finishIdeaCard('));
   });
 
   it('streamed fragments are stripped, so the block never reaches the client', () => {
@@ -166,6 +167,11 @@ describe('the Lab idea stage reads the same contract (sibling: trial-idea-prompt
   it('strips and records the check instead of feeding it to premise grouping', () => {
     expect(labSrc).toContain("require('./trialIdeaCheck')");
     expect(labSrc).toContain('selfCheck: { local: localCard.selfCheck, fantasy: fantasyCard.selfCheck }');
+  });
+  it('runs the same finishing as the route: finishIdeaCard (self-check, Jev rubric gate, one rerun)', () => {
+    expect(labSrc).toContain('finishIdeaCard(');
+    expect(labSrc).toContain('ideaGateContext(');
+    expect(labSrc).toContain('gate: { local: localCard.gate, fantasy: fantasyCard.gate }');
   });
 });
 

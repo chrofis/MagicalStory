@@ -24,7 +24,8 @@
  * generator is given and in the SELF-CHECK it answers, so the two cannot drift
  * into differently-worded copies of one rule (`generator-vs-critic`).
  */
-const { COMMISSIONED_ACT_PHRASE, COHERENCE_FEEDBACK, coherenceRule, judgeCoherence } = require('./ideaCoherence');
+const { COMMISSIONED_ACT_PHRASE, coherenceRule, ideaCoherenceContext } = require('./ideaCoherence');
+const { RUBRIC_FEEDBACK, judgeIdeaRubric } = require('./ideaJevRubric');
 
 /** The obstacle rule, verbatim as it stood in prompts/trial-idea.txt. */
 const TRIAL_IDEA_COMMISSION_RULE = `What gets in the way is an outside event that leaves the main character no way through but
@@ -135,24 +136,56 @@ function parseIdeaSelfCheck(raw) {
   return result;
 }
 
-// ───────────────────────── Jev coherence check ─────────────────────────
-// The rules and the Jev questions live in ideaCoherence.js, shared with the
-// wizard idea (sibling set idea-coherence-paths).
+// ───────────────────────── the Jev gate and the one rerun ─────────────────────────
+
+/** What the visitor chose and who the card is about, as the rubric needs it. Topic only for a life challenge (ideaCoherence.js). */
+function ideaGateContext({ storyCategory, storyTopic, storyTheme, age } = {}) {
+  return { age: parseInt(age, 10), ...ideaCoherenceContext({ storyCategory, storyTopic, storyTheme }) };
+}
 
 /**
- * Run the coherence check on a card that passed its own self-check. Sets
- * `ok=false` and `failure='incoherent-forced'|'incoherent-follows'` when Jev
- * fails a question, and always attaches `jev` with the probabilities. A card
- * that already failed is returned as is: it is going to rerun, and Jev adds
- * nothing. A Jev failure THROWS (the route's per-card error path reports it).
- * @param {{topic?:string, theme?:string}} context  topic only for a life challenge
+ * One Jev rubric call for one card. FAIL-OPEN BY OWNER DECISION (docs/decisions.md
+ * 2026-10-10 "Jev idea rubric wired"; precedent 2026-09-11 element-cell gate): a Jev
+ * outage logs an error and the card ships un-gated; it never fails the visitor's idea.
+ * @returns {Promise<{ok:boolean, failure:string|null, score?:number, tripped?:string[], ms?:number, cost?:number, error?:string}>}
  */
-async function judgeIdeaCard(parsed, context = {}, opts = {}) {
-  if (!parsed || !parsed.ok) return parsed;
-  const j = await judgeCoherence(parsed.idea, context, opts);
-  const out = { ...parsed, jev: j };
-  if (!j.ok) { out.ok = false; out.failure = j.failure; }
-  return out;
+async function gateCard(idea, ctx, { judgeImpl, log } = {}) {
+  try {
+    if (!Number.isFinite(ctx?.age)) throw new Error('the main character has no age');
+    const r = await (judgeImpl || judgeIdeaRubric)(idea, ctx);
+    return { ok: r.ok, failure: r.failure, score: r.score, tripped: r.tripped, ms: r.ms, cost: r.cost };
+  } catch (err) {
+    if (log) log.error(`  idea rubric gate failed, card ships un-gated: ${err.message}`);
+    return { ok: true, failure: null, error: err.message };
+  }
+}
+
+/**
+ * Finish one generated card: its own CHECK block, then the Jev rubric (tripwires +
+ * score gate), then AT MOST ONE rerun with the reason fed back. One rerun path for
+ * both causes; whatever the rerun returns is the answer. A card that fails its own
+ * CHECK reruns without a Jev call (Jev adds nothing to a card already going back).
+ * The rerun result is scored too, for the record only.
+ *
+ * @param {object} a
+ * @param {string} a.firstText    the raw first response (idea + CHECK block)
+ * @param {string} a.basePrompt   the prompt that produced it
+ * @param {(prompt:string)=>Promise<string>} a.rerunCall  returns the rerun's raw text
+ * @param {{age:number, topic?:string, theme?:string}} a.ctx
+ * @returns {Promise<{parsed:object, rerun:boolean, rerunReason:string|null, firstGate:object|null, finalGate:object|null}>}
+ *   THROWS when either response has no parseable CHECK block (unchanged).
+ */
+async function finishIdeaCard({ firstText, basePrompt, rerunCall, ctx, judgeImpl, log }) {
+  let parsed = parseIdeaSelfCheck(firstText);
+  const firstGate = parsed.ok ? await gateCard(parsed.idea, ctx, { judgeImpl, log }) : null;
+  const rerunReason = !parsed.ok ? parsed.failure : (firstGate && !firstGate.ok ? firstGate.failure : null);
+  if (!rerunReason) return { parsed, rerun: false, rerunReason: null, firstGate, finalGate: firstGate };
+  if (log) log.warn(`  card sent back (${rerunReason}) — one rerun`);
+  const reparsed = parseIdeaSelfCheck(String(await rerunCall(buildIdeaRerunPrompt(basePrompt, { idea: parsed.idea, failure: rerunReason })) || ''));
+  const finalGate = reparsed.ok ? await gateCard(reparsed.idea, ctx, { judgeImpl, log }) : null;
+  if (log) log.info(`  rerun ${reparsed.ok ? 'passed its check' : `still failing (${reparsed.failure})`}${finalGate?.score !== undefined ? `, rubric ${finalGate.score.toFixed(3)}` : ''}`);
+  parsed = reparsed;
+  return { parsed, rerun: true, rerunReason, firstGate, finalGate };
 }
 
 /** Why the card was sent back, in the generator's own terms. English by design. */
@@ -171,7 +204,7 @@ const FAILURE_FEEDBACK = {
   'no-result': 'sentence 3 did not settle the want from sentence 1',
   'result-not-quoted': 'the words you copied as the result were not in the idea you wrote',
   'result-not-in-slot-3': 'the words you copied as the result were not in sentence 3',
-  ...COHERENCE_FEEDBACK,
+  ...RUBRIC_FEEDBACK,
 };
 
 /**
@@ -190,7 +223,8 @@ Write a different idea. Sentence 2 must be the main character doing ${COMMISSION
 
 module.exports = {
   COMMISSIONED_ACT_PHRASE,
-  judgeIdeaCard,
+  finishIdeaCard,
+  ideaGateContext,
   TRIAL_IDEA_COMMISSION_RULE,
   TRIAL_IDEA_SELF_CHECK_RULE,
   TRIAL_IDEA_MAX_WORDS,

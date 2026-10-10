@@ -2443,7 +2443,7 @@ router.post('/generate-ideas-stream', verifySessionToken, trialIdeasLimiter, asy
 
     const { callTextModelStreaming } = require('../lib/textModels');
     const { MODEL_DEFAULTS } = require('../config/models');
-    const { stripIdeaSelfCheck, parseIdeaSelfCheck, buildIdeaRerunPrompt } = require('../lib/trialIdeaCheck');
+    const { stripIdeaSelfCheck, finishIdeaCard, ideaGateContext } = require('../lib/trialIdeaCheck');
     const { getLanguageInstruction } = require('../lib/languages');
     const modelToUse = 'claude-sonnet';
 
@@ -2560,10 +2560,9 @@ router.post('/generate-ideas-stream', verifySessionToken, trialIdeasLimiter, asy
 
     log.debug('  Starting parallel story generation...');
 
-    // The card certifies itself IN THIS CALL — no second judge call, because a
-    // judge taxes the ~85% of trials whose cards are already right in order to
-    // fix the rest (owner, 2026-09-19). A passing card costs one extra output
-    // line and nothing else; only a card that failed its own check reruns.
+    // The card certifies itself IN THIS CALL (a passing card costs one extra output
+    // line), and one cheap Jev call (~0.3 s, USD 0.00004) then reads it for the three
+    // tripwires and the score gate; a card that fails either reruns once.
     // What the visitor was offered, kept for the idea funnel (idea_generated.detail.ideas).
     const offered = { rerun: false };
     const runIdeaCard = (slot, basePrompt) => {
@@ -2585,22 +2584,23 @@ router.post('/generate-ideas-stream', verifySessionToken, trialIdeasLimiter, asy
         }
       };
       return callTextModelStreaming(basePrompt, null, onDelta, modelToUse, { signal, effort: MODEL_DEFAULTS.trialIdeaEffort }).then(async () => {
-        // Throws on a malformed block — an unparseable card is a broken
-        // contract, not a passing card. No fallback to shipping it unchecked.
-        let parsed = parseIdeaSelfCheck(full);
-        let reran = false;
-        if (!parsed.ok) {
-          reran = true;
-          log.warn(`  ${slot} failed its own check (${parsed.failure}) — one rerun`);
-          const rerun = await callTextModelStreaming(buildIdeaRerunPrompt(basePrompt, parsed), null, null, modelToUse, { signal, effort: MODEL_DEFAULTS.trialIdeaEffort });
-          // Exactly ONE rerun: whatever comes back is the final answer.
-          const reparsed = parseIdeaSelfCheck(String(rerun.text || ''));
-          log.info(`  ${slot} rerun ${reparsed.ok ? 'passed' : `still failing (${reparsed.failure})`}`);
-          parsed = reparsed;
-        }
+        // One finishing for both causes of a rerun (server/lib/trialIdeaCheck.js
+        // finishIdeaCard, also run by the Lab's idea stage): the card's own check,
+        // then the Jev rubric (three tripwires + the 15%-budget score gate), then at
+        // most ONE rerun with the reason fed back. A malformed CHECK block throws —
+        // an unparseable card is a broken contract. A Jev outage ships the card
+        // un-gated, logged (docs/decisions.md 2026-10-10).
+        const fin = await finishIdeaCard({
+          firstText: full, basePrompt, log,
+          ctx: ideaGateContext({ storyCategory, storyTopic, storyTheme, age: mainChar?.age }),
+          rerunCall: async (p) => (await callTextModelStreaming(p, null, null, modelToUse, { signal, effort: MODEL_DEFAULTS.trialIdeaEffort })).text,
+        });
+        const parsed = fin.parsed;
+        const reran = fin.rerun;
         if (parsed.idea) {
           offered[slot] = { armIndex: slot === 'story1' ? 0 : 1, text: parsed.idea, ideaKind: slot === 'story1' ? 'location' : 'fantasy',
-            selfCheck: { ok: parsed.ok, failure: parsed.failure, want: parsed.want, event: parsed.event, uses: parsed.uses, act: parsed.act, result: parsed.result } };
+            selfCheck: { ok: parsed.ok, failure: parsed.failure, want: parsed.want, event: parsed.event, uses: parsed.uses, act: parsed.act, result: parsed.result },
+            gate: { first: fin.firstGate, final: fin.finalGate, rerun: fin.rerun, reason: fin.rerunReason } };
           if (reran) offered.rerun = true;
           emit(parsed.idea, true);
           log.debug(`  ${slot} final (${parsed.idea.length} chars)`);

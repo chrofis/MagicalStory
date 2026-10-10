@@ -137,6 +137,8 @@ function ideasOfferedDetail(ideas, { rerun = false, city = null, extra = {} } = 
       text: String(i.text || '').slice(0, 4000),
       ideaKind: _trim(i.ideaKind, 40),
       ...(i.selfCheck ? { selfCheck: i.selfCheck } : {}),
+      // The Jev rubric gate: { first, final: {ok, failure, score, tripped, ms, cost, error?}, rerun, reason } (trialIdeaCheck.finishIdeaCard).
+      ...(i.gate ? { gate: i.gate } : {}),
     })),
     rerun: rerun === true,
     city: _trim(city, 80),

@@ -9494,7 +9494,7 @@ async function runTrialIdeaVarietyStage(target, { params = {}, promptOverride = 
   const { loadPromptTemplates } = require('../services/prompts');
   await loadPromptTemplates();
   const { buildTrialIdeaPrompts } = require('./promptBuilders');
-  const { parseIdeaSelfCheck, stripIdeaSelfCheck } = require('./trialIdeaCheck');
+  const { stripIdeaSelfCheck, finishIdeaCard, ideaGateContext } = require('./trialIdeaCheck');
   const { buildSeasonInstruction } = require('./season');
   const { getLanguageInstruction } = require('./languages');
   const { callTextModelStreaming } = require('./textModels');
@@ -9599,29 +9599,38 @@ async function runTrialIdeaVarietyStage(target, { params = {}, promptOverride = 
       callTextModelStreaming(drawPrompts.fantasy, null, null, model, { usageLabel: 'testlab_trial_idea_variety', effort: MODEL_DEFAULTS.trialIdeaEffort }).catch(err => ({ error: err.message })),
     ]);
     for (const r of [localRes, fantasyRes]) if (!r.error) usage.push({ cost: costOf(r), modelId: r.modelId, usage: r.usage });
-    // Every card now ends with its own CHECK block (server/lib/trialIdeaCheck.js).
-    // It is not part of the idea: left in, it would feed the premise-grouping
-    // word frequencies. This stage measures the RAW draw, so it strips and
-    // RECORDS the verdict and does not rerun — the rerun is the /try route's
-    // job, and a stage that reran would stop measuring what the prompt produces.
-    const readCard = (r) => {
-      if (r.error) return { text: null, selfCheck: null };
-      const raw = String(r.text || '');
+    // Every card now ends with its own CHECK block and goes through the SAME
+    // finishing as the /try route (trialIdeaCheck.finishIdeaCard: own check, Jev
+    // rubric gate, at most one rerun with the reason fed back; sibling set
+    // trial-idea-prompt-mirror). The card recorded is what the visitor would be
+    // offered; `selfCheck` / `gate` carry the first verdicts and why it reran.
+    const gateCtx = ideaGateContext({ storyCategory, storyTopic, storyTheme, age: mainChar.age });
+    const finishCard = async (r, prompt) => {
+      if (r.error) return { text: null, selfCheck: null, gate: null };
       try {
-        const parsed = parseIdeaSelfCheck(raw);
-        return { text: parsed.idea, selfCheck: { ok: parsed.ok, failure: parsed.failure, event: parsed.event, act: parsed.act } };
+        const fin = await finishIdeaCard({
+          firstText: String(r.text || ''), basePrompt: prompt, ctx: gateCtx, log,
+          rerunCall: async (p) => {
+            const rr = await callTextModelStreaming(p, null, null, model, { usageLabel: 'testlab_trial_idea_variety', effort: MODEL_DEFAULTS.trialIdeaEffort });
+            usage.push({ cost: costOf(rr), modelId: rr.modelId, usage: rr.usage });
+            return rr.text;
+          },
+        });
+        const p = fin.parsed;
+        return { text: p.idea, selfCheck: { ok: p.ok, failure: p.failure, event: p.event, act: p.act },
+          gate: { first: fin.firstGate, final: fin.finalGate, rerun: fin.rerun, reason: fin.rerunReason } };
       } catch (err) {
-        return { text: stripIdeaSelfCheck(raw) || null, selfCheck: { ok: false, failure: 'malformed', error: err.message } };
+        return { text: stripIdeaSelfCheck(String(r.text || '')) || null, selfCheck: { ok: false, failure: 'malformed', error: err.message }, gate: null };
       }
     };
-    const localCard = readCard(localRes);
-    const fantasyCard = readCard(fantasyRes);
+    const [localCard, fantasyCard] = await Promise.all([finishCard(localRes, drawPrompts.local), finishCard(fantasyRes, drawPrompts.fantasy)]);
     pairs.push({
       draw: i,
       axes: { local: drawPrompts.axes.local.want, fantasy: drawPrompts.axes.fantasy.want },
       local: localCard.text,
       fantasy: fantasyCard.text,
       selfCheck: { local: localCard.selfCheck, fantasy: fantasyCard.selfCheck },
+      gate: { local: localCard.gate, fantasy: fantasyCard.gate },
       errors: [localRes.error, fantasyRes.error].filter(Boolean),
     });
   }
