@@ -804,16 +804,40 @@ ${headPrompt}`,
   };
 }
 
+// Head-to-standing-height norms of the Lab costume-sheet measurement (docs/decisions.md 2026-10-10 "Trial costume sheet: two fast
+// options measured"): the owner's brief (2-3 y 1/4, 5-6 y 1/5, 9-10 y 1/6, adult 1/7-7.5), the gaps interpolated, cross-checked
+// against the head-height table of getAgeMarkers. ONE table: the one-call prompt line and the Lab's measurement both read it.
+function headFractionNorm(age) {
+  const a = parseInt(age, 10);
+  if (!Number.isFinite(a) || a < 0) return null;
+  if (a <= 3) return 4;
+  if (a === 4) return 4.5;
+  if (a <= 6) return 5;
+  if (a <= 8) return 5.5;
+  if (a <= 10) return 6;
+  if (a <= 12) return 6.5;
+  if (a <= 17) return 7;
+  return 7.25;
+}
+
+/** Lab only: the explicit proportions line of the one-call sheet (variant 'oneCall', params.ageLine). */
+function ageProportionsLine(character) {
+  const n = headFractionNorm(character?.age ?? character?.declaredAge);
+  if (!n) return '';
+  return ` Head size: in every full-body cell the head is about 1/${n} of the figure's standing height (a ${n}-head figure), with long legs and the build of a real ${parseInt(character.age ?? character.declaredAge, 10) >= 18 ? 'adult' : 'child of that age'}: not chibi, not doll-like, not a big-head cartoon.`;
+}
+
 // ── Test Lab only: the whole styled 2×4 sheet from the photo in ONE call (avatar_sheet_variant 'oneCall') ──────────────────────
 // Built from the same rule constants and prompt blocks the two row prompts use. NOT wired into any production path: the 2026-08-08
 // split into two row calls exists because one combined call gave a headless bottom row ~70% of the time (docs/decisions.md); the
 // Lab stage measures whether a stronger Grok tier changes that. Layout guide = the axes phantom's head row over the plain
 // phantom's body row, the two guides the production rows are drawn against.
-function buildOneCallSheetPrompt(character, { costumeDescription, costumeName = null, seasonOutfit = null, styleLine }) {
+function buildOneCallSheetPrompt(character, { costumeDescription, costumeName = null, seasonOutfit = null, styleLine, ageLine = false }) {
   const named = costumeName ? ` — a ${costumeName}` : '';
   const declaredAge = declaredAgeBlock(character);
   const ageFromPhoto = declaredAge ? '' : " matching the person's apparent age in Image 2";
-  const proportionsRule = declaredAge ? declaredAge.trimStart() : "Body proportions match the person's apparent age (an adult is roughly 7 to 8 heads tall).";
+  const proportionsRule = (declaredAge ? declaredAge.trimStart() : "Body proportions match the person's apparent age (an adult is roughly 7 to 8 heads tall).")
+    + (ageLine ? ageProportionsLine(character) : '');
   return `Image 1 is a layout guide ONLY: a 2×4 grid (two rows of four cells) showing the camera angle and facing direction of each cell. Ignore its silhouettes, bodies and faces. The output contains no arrows.
 Image 2 is the character's face photo — the identity; match this exact face.
 
@@ -829,7 +853,7 @@ ${SHEET_EMPTY_HANDS_RULE}
 The outfit is identical in all eight cells, layers included, and the neckline in the top row is the one the body below wears. ${buildUnnamedTrimRule(false)} ${SHEET_GROUND_RULE} ${SHEET_NO_LETTERING_RULE} ${CELL_NAMES_NOT_DRAWN}`;
 }
 
-async function generateOneCallSheet(character, { artStyle, costumeDescription = 'standard outfit', costumeName = null, seasonOutfit = null, usageTracker = null, grokModel = GROK_MODELS.STANDARD } = {}) {
+async function generateOneCallSheet(character, { artStyle, costumeDescription = 'standard outfit', costumeName = null, seasonOutfit = null, usageTracker = null, grokModel = GROK_MODELS.STANDARD, ageLine = false } = {}) {
   if (!artStyle || artStyle === 'realistic') throw new Error('generateOneCallSheet: a non-realistic art style is required');
   const facePhoto = await resolveFacePhoto(character);
   if (!facePhoto) throw new Error(`No face photo for ${character?.name || 'character'}.`);
@@ -841,7 +865,7 @@ async function generateOneCallSheet(character, { artStyle, costumeDescription = 
   const bH = (await sharp(body).metadata()).height;
   const guide = await sharp({ create: { width: W, height: hH + bH, channels: 3, background: '#ffffff' } })
     .composite([{ input: headFit, top: 0, left: 0 }, { input: body, top: hH, left: 0 }]).png().toBuffer();
-  const prompt = buildOneCallSheetPrompt(character, { costumeDescription, costumeName, seasonOutfit, styleLine: resolveStyleLineForSheet(artStyle) });
+  const prompt = buildOneCallSheetPrompt(character, { costumeDescription, costumeName, seasonOutfit, styleLine: resolveStyleLineForSheet(artStyle), ageLine });
   const res = await editWithGrok(prompt, [`data:image/png;base64,${guide.toString('base64')}`, facePhoto], { aspectRatio: '1:1', model: grokModel, skipOutputCrop: true });
   if (!res?.imageData) throw new Error(`generateOneCallSheet: no image for ${character?.name}`);
   if (usageTracker && res.usage) usageTracker('grok', res.usage, 'character_2x4_one_call', res.modelId);
@@ -2683,6 +2707,9 @@ module.exports = {
   generateBodyRow,
   generateOneCallSheet,
   buildOneCallSheetPrompt,
+  headFractionNorm,
+  ageProportionsLine,
+  SHEET_EMPTY_HANDS_RULE,
   styleBodyRow,
   phantomTierForAge,
   redressSheetVariant,

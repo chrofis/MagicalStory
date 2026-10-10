@@ -9815,6 +9815,43 @@
         "kind": "human",
         "what": "One /try on staging: in the Railway log the \"body eval\" judge calls start right after the body row (before the head row's 'Edit complete'), the pass-1 line '[CHARACTER 2x4] ... pass-1 (decoupled 2-call): ... final=' appears after pass 2 attempt 1 and carries a score; the costumed sheet is stored at most ~35 s after pass 2 starts instead of ~47 s."
       }
+    },
+    {
+      "id": "avatar-sheet-variant-costume-lab",
+      "title": "Lab stage avatar_sheet_variant: costumeFromStandard, measure, oneCall age line",
+      "commits": [
+        "56c60bf51"
+      ],
+      "addedAt": "2026-10-10",
+      "claim": "A Lab experiment of stage avatar_sheet_variant with variant costumeFromStandard returns one costume sheet from one redress edit of the stored standard sheet, and variant oneCall with ageLine adds the head-to-height line; both report time, calls, cost and per-cell head geometry (Lab only, nothing wired).",
+      "runShape": [
+        "lab-stage"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Open the experiment: each result has variant, totalMs, grokCalls, costUsd, measure.{out,base,baseline} and a saved tl_avatar sheet that cuts into 8 figures."
+      },
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "trial-one-call-sheets-2026-10-10",
+      "title": "Trial standard and costumed sheet in ONE Grok call each (withdrawn and reverted)",
+      "commits": [
+        "9bc64275d",
+        "3345a9548"
+      ],
+      "addedAt": "2026-10-10",
+      "claim": "Withdrawn: the one-call trial sheets gave distorted head-to-body ratios and bald front cells; reverted in 3345a9548 (docs/decisions.md 2026-10-10, SETTLED avatar line). Nothing to prove.",
+      "runShape": [
+        "any"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Superseded: the feature no longer exists."
+      },
+      "status": "superseded",
+      "evidence": []
     }
   ],
   "runs": [
