@@ -50,7 +50,7 @@ describe('analyzerJson — the one client every call goes through', () => {
   });
   it('throws on success:false', async () => {
     globalThis.fetch = reply(200, { success: false, error: 'Failed to decode image' }) as any;
-    await expect(pac.analyzerJson('/pose-heads', {})).rejects.toThrow(/Failed to decode image/);
+    await expect(pac.analyzerJson('/lpips', {})).rejects.toThrow(/Failed to decode image/);
   });
   it('survives a minimal stubbed response without .text()', async () => {
     globalThis.fetch = (async () => ({ ok: false, status: 500, json: async () => ({}) })) as any;

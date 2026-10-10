@@ -41,20 +41,8 @@ Output Quality: 4k, Photorealistic.
 ---
 CLOTHING_STYLES:
 
-[WINTER_FEMALE]
-Heavy winter coat or parka, warm pants or leggings, winter boots, gloves. Colors and patterns matching reference clothing.
-
-[WINTER_MALE]
-Heavy winter coat or parka, warm pants or jeans, winter boots, gloves. Colors and patterns matching reference clothing.
-
 [STANDARD_FEMALE]
 Long-sleeved dress, T-shirt, or cozy sweater, jeans or leggings, casual shoes. Colors and patterns matching reference clothing.
 
 [STANDARD_MALE]
 Long-sleeved T-shirt, casual hoodie, or sweater, jeans or casual trousers, casual shoes. Colors and patterns matching reference clothing.
-
-[SUMMER_FEMALE]
-Short-sleeved T-shirt, sundress, or tank top, shorts or skirt, sandals or flip-flops. Colors and patterns matching reference clothing.
-
-[SUMMER_MALE]
-Short-sleeved T-shirt or tank top, shorts, sandals or flip-flops. Colors and patterns matching reference clothing.

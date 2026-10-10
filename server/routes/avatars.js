@@ -103,7 +103,7 @@ const onlyIfNoUrl = (inline, url) => (url ? undefined : inline);
  * logs the moment it happens, not weeks later via a housekeeping sweep.
  */
 function alarmInlineAvatarFallback(context, characterId, results) {
-  for (const slot of ['standard', 'winter', 'summer']) {
+  for (const slot of ['standard']) {
     if (!onlyIfNoUrl(results?.[slot], results?.[`${slot}Url`])) continue;
     const mb = (String(results[slot]).length / 1024 / 1024).toFixed(2);
     log.error(
@@ -964,12 +964,8 @@ function getClothingStylePrompt(category, isFemale) {
   const styleSection = splitPromptFromCatalogue(template).catalogue;
 
   let tag;
-  if (category === 'winter') {
-    tag = isFemale ? '[WINTER_FEMALE]' : '[WINTER_MALE]';
-  } else if (category === 'standard') {
+  if (category === 'standard') {
     tag = isFemale ? '[STANDARD_FEMALE]' : '[STANDARD_MALE]';
-  } else if (category === 'summer') {
-    tag = isFemale ? '[SUMMER_FEMALE]' : '[SUMMER_MALE]';
   } else {
     return 'Full outfit with shoes matching the style of the reference.';
   }
@@ -993,12 +989,8 @@ function getClothingStylePromptFromAce(category, isFemale, aceTemplate) {
   const styleSection = splitPromptFromCatalogue(aceTemplate).catalogue;
 
   let tag;
-  if (category === 'winter') {
-    tag = isFemale ? '[WINTER_FEMALE]' : '[WINTER_MALE]';
-  } else if (category === 'standard') {
+  if (category === 'standard') {
     tag = isFemale ? '[STANDARD_FEMALE]' : '[STANDARD_MALE]';
-  } else if (category === 'summer') {
-    tag = isFemale ? '[SUMMER_FEMALE]' : '[SUMMER_MALE]';
   } else {
     return 'Casual comfortable outfit matching reference clothing style.';
   }
@@ -1019,7 +1011,7 @@ function getClothingStylePromptFromAce(category, isFemale, aceTemplate) {
  * Build clothing prompt for dynamic avatar generation
  * Handles signature items (additions to base) and full costume descriptions
  *
- * @param {string} category - 'standard', 'winter', 'summer', or 'costumed'
+ * @param {string} category - 'standard' or 'costumed'
  * @param {Object} config - { signature?: string, costume?: string, description?: string }
  * @param {boolean} isFemale - Whether character is female
  * @returns {string} - Clothing prompt for avatar generation
@@ -1036,7 +1028,7 @@ Include ALL costume elements: headwear, shirt/top, pants/skirt/dress, footwear, 
 The costume should look authentic and age-appropriate for a children's book illustration.`;
   }
 
-  // For standard/winter/summer: use base prompt + optional signature items
+  // For standard: use base prompt + optional signature items
   const basePrompt = getClothingStylePrompt(category, isFemale);
 
   if (config.signature) {
@@ -1058,7 +1050,7 @@ Add them to the base outfit described above. They should be prominently visible.
  * Called internally from story generation flow
  *
  * @param {Object} character - Character object with photoUrl, physicalTraits, etc.
- * @param {string} category - 'standard', 'winter', 'summer', or 'costumed'
+ * @param {string} category - 'standard' or 'costumed'
  * @param {Object} config - { signature?: string, costume?: string, description?: string }
  * @returns {Promise<Object>} - { success, imageData, clothing, error? }
  */
@@ -1739,9 +1731,9 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
     log.debug(`👔 [AVATAR JOB ${jobId}] Starting background generation for ${name || 'unnamed'} (id: ${characterId}), model: ${selectedModel}, backend: ${useGrok ? 'grok' : useRunware ? 'runware' : 'gemini'}`);
 
     const clothingCategories = {
-      winter: { emoji: '❄️' },
-      standard: { emoji: '👕' },
-      summer: { emoji: '☀️' }
+      // Standard only: winter/summer base sheets are no longer generated (docs/decisions.md 2026-10-10);
+      // season dress comes through the standard outfit description.
+      standard: { emoji: '👕' }
     };
 
     const results = {
@@ -1814,7 +1806,7 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
     }
 
     job.progress = 20;
-    job.message = 'Generating winter, standard, summer avatars...';
+    job.message = 'Generating standard avatar...';
 
     // Generate avatars (simplified - uses Gemini API directly)
     const generationStart = Date.now();
@@ -2537,7 +2529,7 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
             }
 
             // Save avatars data including faceThumbnails
-            if (results.faceThumbnails || results.standard || results.winter || results.summer) {
+            if (results.faceThumbnails || results.standard) {
               log.debug(`💾 [AVATAR JOB ${jobId}] Will apply avatar data including faceThumbnails`);
             }
 
@@ -2585,11 +2577,7 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
               ...(fbThumbs && { faceThumbnails: fbThumbs }),
               ...(bbThumbs && { bodyThumbnails: bbThumbs }),
               ...(onlyIfNoUrl(results.standard, results.standardUrl) && { standard: results.standard }),
-              ...(onlyIfNoUrl(results.winter, results.winterUrl) && { winter: results.winter }),
-              ...(onlyIfNoUrl(results.summer, results.summerUrl) && { summer: results.summer }),
               ...(results.standardUrl && { standardUrl: results.standardUrl }),
-              ...(results.winterUrl && { winterUrl: results.winterUrl }),
-              ...(results.summerUrl && { summerUrl: results.summerUrl }),
               ...(results.faceThumbnailsUrl && { faceThumbnailsUrl: results.faceThumbnailsUrl }),
               ...(results.bodyThumbnailsUrl && { bodyThumbnailsUrl: results.bodyThumbnailsUrl }),
               ...(results.clothing && { clothing: results.clothing }),
@@ -2635,7 +2623,7 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
 
             // Avatar data (always update if we have results)
             // Use SQL-level merge: COALESCE(existing, '{}') || new_data to preserve other avatar fields
-            if (results.faceThumbnails || results.standard || results.winter || results.summer) {
+            if (results.faceThumbnails || results.standard) {
               // Merge new avatars with existing DB avatars (references current DB value, not stale in-memory)
               dataUpdate = `jsonb_set(${dataUpdate}, '{characters,${freshCharIndex},avatars}', COALESCE(data->'characters'->${freshCharIndex}->'avatars', '{}'::jsonb) || $${paramIndex}::jsonb, true)`;
               metaUpdate = `jsonb_set(${metaUpdate}, '{characters,${freshCharIndex},avatars}', $${paramIndex + 1}::jsonb, true)`;
@@ -2825,7 +2813,7 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
 
 /**
  * POST /api/generate-clothing-avatars
- * Generate clothing avatars for a character (winter, standard, summer, formal)
+ * Generate clothing avatars for a character (standard)
  *
  * Query params:
  *   - async=true: Return immediately with job ID, poll /api/avatar-jobs/:jobId for result

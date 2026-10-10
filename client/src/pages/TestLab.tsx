@@ -986,6 +986,12 @@ function ExperimentsTab() {
     const targets = (d.targets || []) as { storyId: string; pageNumber?: number; coverType?: string; character?: string }[];
     const info = TESTLAB_STAGES.find(s => s.id === d.stage) as { storyLevel?: boolean; characterLevel?: boolean } | undefined;
 
+    // A stage deleted from the server (e.g. the two-call avatar stages) stays viewable read-only; it cannot be re-run.
+    if (!info) {
+      alert(`Stage "${d.stage}" no longer exists, so this experiment is read-only and cannot be re-run.`);
+      return;
+    }
+
     setStage(d.stage);
     setLabel(d.label ? `${d.label} · re-run of #${d.id}` : `Re-run of #${d.id}`);
     setOverride(d.promptOverride || '');

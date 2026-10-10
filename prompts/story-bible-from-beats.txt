@@ -68,14 +68,10 @@ Only the block below. No preamble, no commentary.
   "clothingRequirements": {
     "[CharacterName]": {
       "standard": { "used": true, "description": "[full final outfit]", "garments": [{ "slot": "top", "name": "[garment]", "colour": "[colour word]" }] },
-      "winter": { "used": false },
-      "summer": { "used": false },
       "costumed": { "used": true, "costume": "[costume name, e.g. wizard]", "description": "[full costumed outfit]", "garments": [{ "slot": "headwear", "name": "[garment]", "colour": "[colour word]" }] }
     },
     "[AnotherCharacter]": {
       "standard": { "used": true, "description": "[full final outfit]", "garments": [{ "slot": "top", "name": "[garment]", "colour": "[colour word]" }] },
-      "winter": { "used": false },
-      "summer": { "used": false },
       "costumed": { "used": false }
     }
   }

@@ -5,7 +5,7 @@
 
 const { log } = require('../utils/logger');
 const { lookupByName } = require('./castResolver');
-const { resolveCharacterReqs } = require('./clothingCategories');
+const { resolveCharacterReqs, STORED_AVATAR_SLOTS } = require('./clothingCategories');
 const { getPrimaryPhoto, getStandardAvatar, getFaceThumb, getBodyThumb } = require('./characterPhotos');
 
 let imagesModule = null;
@@ -153,6 +153,18 @@ function applyReferenceMode({
 
 
 /**
+ * A story that asked for a stored-only season sheet (winter/summer) must read that
+ * sheet. Missing is an ERROR, never a stand-in (docs/decisions.md 2026-10-10: winter
+ * and summer base sheets are no longer generated; the 5 stored summer stories keep
+ * rendering from the sheets their characters still hold).
+ */
+function assertStoredSeasonSheet(charName, category, photoUrl) {
+  if (category !== 'winter' && category !== 'summer') return;
+  if (photoUrl) return;
+  throw new Error(`[AVATAR] ${charName}: the story asks for "${category}" clothing but this character has no stored ${category} sheet. ${category} sheets are no longer generated; no other sheet is substituted.`);
+}
+
+/**
  * Get photo URLs for specific characters based on clothing category
  * Prefers clothing avatar for the category > fallback categories > body with no background > body crop > face photo
  * @param {Array} characters - Array of character objects (filtered to scene)
@@ -173,13 +185,10 @@ function getCharacterPhotos(characters, clothingCategory = null) {
     return null;
   };
 
-  // Fallback priority for clothing avatars (same as getCharacterPhotoDetails)
-  const clothingFallbackOrder = {
-    winter: ['standard', 'summer'],
-    summer: ['standard', 'winter'],
-    standard: ['summer', 'winter'],
-    costumed: ['standard']
-  };
+  // Only a costume may stand on the standard sheet (same as getCharacterPhotoDetails).
+  // Winter/summer are never substituted: a stored story that asked for one reads its
+  // stored sheet or errors (docs/decisions.md 2026-10-10).
+  const clothingFallbackOrder = { costumed: ['standard'] };
 
   return characters
     .map(char => {
@@ -200,9 +209,11 @@ function getCharacterPhotos(characters, clothingCategory = null) {
         return extractUrl(avatars[clothingCategory]);
       }
 
+      assertStoredSeasonSheet(char.name, clothingCategory, null);
+
       // Try fallback clothing categories before falling back to body photos
       if (clothingCategory && avatars) {
-        const fallbacks = clothingFallbackOrder[clothingCategory] || ['standard', 'summer', 'winter'];
+        const fallbacks = clothingFallbackOrder[clothingCategory] || [];
         for (const fallbackCategory of fallbacks) {
           if (avatars[fallbackCategory]) {
             log.debug(`[AVATAR FALLBACK] ${char.name}: wanted ${clothingCategory}, using ${fallbackCategory}`);
@@ -296,7 +307,7 @@ function parseClothingCategory(sceneDescription, warnOnInvalid = true) {
     if (warnOnInvalid) {
       const invalidValueMatch = nearbyText.match(/:\s*\*{0,2}(\w+)/i);
       const invalidValue = invalidValueMatch ? invalidValueMatch[1] : '(empty)';
-      log.error(`[CLOTHING] No valid clothing value near keyword (found: "${invalidValue}"). Valid values: winter, summer, standard, costumed`);
+      log.error(`[CLOTHING] No valid clothing value near keyword (found: "${invalidValue}"). Valid values: standard, costumed (winter, summer: stored stories only)`);
     }
     return null;
   }
@@ -346,10 +357,10 @@ function parseCharacterClothing(sceneDescription) {
  * the result via the optional `avatarBytesCache` parameter.
  *
  * @param {Array} characters
- * @param {string[]} slotsNeeded - default ['standard', 'summer', 'winter']
+ * @param {string[]} slotsNeeded - default STORED_AVATAR_SLOTS (reads stored winter/summer sheets too)
  * @returns {Promise<Map<string, string>>}
  */
-async function prefetchAvatarBytesForCharacters(characters, slotsNeeded = ['standard', 'summer', 'winter']) {
+async function prefetchAvatarBytesForCharacters(characters, slotsNeeded = STORED_AVATAR_SLOTS) {
   const { loadAvatarBytes } = require('./characterPhotos');
   const cache = new Map();
   if (!Array.isArray(characters) || characters.length === 0) return cache;
@@ -372,14 +383,9 @@ async function prefetchAvatarBytesForCharacters(characters, slotsNeeded = ['stan
 function getCharacterPhotoDetails(characters, defaultClothing = null, artStyle = null, clothingRequirements = null, avatarBytesCache = null) {
   if (!characters || characters.length === 0) return [];
 
-  // Fallback priority for clothing avatars when exact match not found
-  // Note: 'formal' was a legacy clothing category — fully removed Phase 5.
-  const clothingFallbackOrder = {
-    winter: ['standard', 'summer'],
-    summer: ['standard', 'winter'],
-    standard: ['summer', 'winter'],
-    costumed: ['standard']  // Costumed falls back to standard
-  };
+  // Only a costume falls back to the standard sheet. Winter/summer are stored-only
+  // categories: never substituted (docs/decisions.md 2026-10-10).
+  const clothingFallbackOrder = { costumed: ['standard'] };
 
   // Per-story clothingRequirements (signature/description) is the
   // source of truth for the CURRENT story. avatars.clothing[category] is
@@ -573,8 +579,9 @@ function getCharacterPhotoDetails(characters, defaultClothing = null, artStyle =
       // Try fallback clothing avatars before falling back to body photo
       // NOTE: We skip styled avatar fallbacks - only use unstyled base avatars
       // applyStyledAvatars() will convert to target style via fresh cache
+      assertStoredSeasonSheet(char.name, resolvedClothing, photoUrl);
       if (!photoUrl && resolvedClothing && avatars) {
-        const fallbacks = clothingFallbackOrder[resolvedClothing] || ['standard', 'summer', 'winter'];
+        const fallbacks = clothingFallbackOrder[resolvedClothing] || [];
 
         // Check unstyled avatars only (styling applied later via cache).
         // Cache fallback covers the URL-only post-migration shape.
@@ -955,6 +962,7 @@ function buildAvailableAvatarsForPrompt(characters, clothingRequirements = null)
     // `avatars.{variant}` (URL string) first, falls back to OLD `avatars.{variant}Url`
     // or inline object form. One helper, one source of truth.
     if (getStandardAvatar(avatars, 'standard')) available.push('standard');
+    // winter/summer: stored-only sheets of older characters, listed so a stored story still sees them.
     if (getStandardAvatar(avatars, 'winter'))   available.push('winter');
     if (getStandardAvatar(avatars, 'summer'))   available.push('summer');
 

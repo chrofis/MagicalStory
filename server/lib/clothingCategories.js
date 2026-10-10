@@ -8,8 +8,8 @@
  *
  * Four buckets:
  *   - "standard"  — default everyday clothing
- *   - "winter"    — cold-weather variant
- *   - "summer"    — warm-weather variant
+ *   - "winter"    — STORED ONLY: old stories/characters (never generated since 2026-10-10)
+ *   - "summer"    — STORED ONLY: old stories/characters (never generated since 2026-10-10)
  *   - "costumed"  — story-specific outfit (costume subtype lives elsewhere)
  *
  * Tolerates:
@@ -27,9 +27,16 @@
 const CANONICAL = Object.freeze(['standard', 'winter', 'summer', 'costumed']);
 const { buildCastIndex, lookupByName } = require('./castResolver');
 
-// The three avatar slots that every character is expected to have (excludes
-// story-specific 'costumed', which is generated on demand).
-const AVATAR_SLOTS = Object.freeze(['standard', 'winter', 'summer']);
+// The base avatar slot every character gets GENERATED (excludes story-specific
+// 'costumed', which is generated on demand). Winter and summer base sheets are no
+// longer generated (docs/decisions.md 2026-10-10: winter used in 0 stories, summer in
+// 5 over 60 days; season dress comes through the standard outfit description).
+const AVATAR_SLOTS = Object.freeze(['standard']);
+
+// Slots a stored character may still HAVE (winter/summer exist only on characters
+// created before 2026-10-10). READERS iterate this so stored characters and stored
+// stories that asked for summer keep loading; nothing generates them.
+const STORED_AVATAR_SLOTS = Object.freeze(['standard', 'winter', 'summer']);
 
 /**
  * Normalize any clothing category string to one of 4 canonical buckets.
@@ -339,6 +346,7 @@ function resolveRenderedClothingCategory(storyData, pageNumber, charName, record
 module.exports = {
   CANONICAL,
   AVATAR_SLOTS,
+  STORED_AVATAR_SLOTS,
   normalizeClothingCategory,
   getUsedClothingCategories,
   reconcileCoverClothingWithRequirements,

@@ -257,8 +257,8 @@ After the prose, emit exactly `---METADATA---` on its own line, then a single JS
     "fixesApplied": []
   },
   "characters": [
-    {"name": "CharacterA", "clothing": "winter", "position": "right foreground", "depth": "foreground", "footing": "ground", "looksAt": "distance", "expression": "eyes wide, mouth open, brows pulled tight", "emotion": "afraid"},
-    {"name": "CharacterB", "clothing": "winter", "position": "beside CharacterA", "depth": "midground", "footing": "ground", "looksAt": "CharacterA", "expression": "eyes steady on CharacterA, brows level, mouth closed", "emotion": "neutral"}
+    {"name": "CharacterA", "clothing": "standard", "position": "right foreground", "depth": "foreground", "footing": "ground", "looksAt": "distance", "expression": "eyes wide, mouth open, brows pulled tight", "emotion": "afraid"},
+    {"name": "CharacterB", "clothing": "standard", "position": "beside CharacterA", "depth": "midground", "footing": "ground", "looksAt": "CharacterA", "expression": "eyes steady on CharacterA, brows level, mouth closed", "emotion": "neutral"}
   ],
   "shot": "medium",
   "timeOfDay": "afternoon",

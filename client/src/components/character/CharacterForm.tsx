@@ -1737,8 +1737,8 @@ export function CharacterForm({
             )}
           </h4>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            {/* Show winter, standard, summer avatars (formal is not generated) */}
-            {(['winter', 'standard', 'summer'] as const).map((category) => (
+            {/* Standard is the only generated base avatar; winter/summer show only when an older character still stores one (docs/decisions.md 2026-10-10) */}
+            {(['winter', 'standard', 'summer'] as const).filter((category) => category === 'standard' || !!character.avatars?.[category]).map((category) => (
               <div key={category} className="text-center">
                 <div className="text-xs font-medium text-gray-600 mb-1 capitalize">
                   {category === 'winter' ? '❄️' : category === 'summer' ? '☀️' : '👕'}

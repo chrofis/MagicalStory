@@ -1,6 +1,7 @@
 // Database Service - PostgreSQL connection and query utilities
 const { Pool } = require('pg');
 const { dbIndexFor, arrayIndexForDb } = require('../lib/versionManager');
+const { STORED_AVATAR_SLOTS } = require('../lib/clothingCategories');
 const r2 = require('../lib/r2');
 const { log } = require('../utils/logger');
 
@@ -1798,7 +1799,7 @@ function stripInlineImagesFromStoryData(data, { keepDisplayBytes = false } = {})
       // live under `standard` (inline) OR `standardUrl` (URL string); post
       // Phase-2 migration they collapse onto `standard` (URL string). We
       // null both for consistency (the canonical character row owns these).
-      for (const k of ['standard', 'summer', 'winter']) {
+      for (const k of STORED_AVATAR_SLOTS) {
         c.avatars[k] = undefined;
         c.avatars[`${k}Url`] = undefined;
       }

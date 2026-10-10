@@ -25,11 +25,11 @@
 const { log } = require('../utils/logger');
 
 const HAIR_SOURCE_AVATAR = 'avatar';
-const AVATAR_CATEGORY_ORDER = ['standard', 'summer', 'winter'];
+const AVATAR_CATEGORY_ORDER = ['standard'];
 
 /**
  * The avatar job's extraction result, once the retries have settled which avatar is kept: ONE read of
- * that avatar (standard first, else summer, winter) replaces the photo's reading in extractedTraits, and
+ * that avatar (the standard sheet) replaces the photo's reading in extractedTraits, and
  * `hairFromAvatar` says so (the DB write stamps the source map from it). No readable avatar or a failed
  * read: the photo's reading stays, unstamped, and the failure is logged (ensureAvatarDerivedHair retries
  * from the stored avatar at the next story).

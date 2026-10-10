@@ -33,6 +33,7 @@
  */
 
 const { log } = require('../utils/logger');
+const { STORED_AVATAR_SLOTS } = require('./clothingCategories');
 const {
   WORN_SLOTS, resolveWornItemsForPage, isOffForCharacter, sameName, outfitVersionOf,
 } = require('./wornItems');
@@ -175,7 +176,7 @@ function baseCategoryFor(clothingRequirements, characterName) {
   const charReqs = resolveCharacterReqs(clothingRequirements, characterName);
   if (!charReqs) return null;
   if (charReqs.costumed?.used === true) return 'costumed';
-  for (const cat of ['standard', 'winter', 'summer']) {
+  for (const cat of STORED_AVATAR_SLOTS) {
     if (charReqs[cat]?.used === true) return cat;
   }
   return null;

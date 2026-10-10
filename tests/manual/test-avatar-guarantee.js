@@ -143,6 +143,12 @@ async function part3() {
   const fnSrc = extractFunction(STYLED_SRC, 'ensureStyledAvatarCoverage');
   ok(fnSrc.includes('resolveGuaranteedReference'), 'slice: coverage fn uses the guarantee chain');
 
+  // A required costume with no sheet fails the book ("no costume, no book", decisions 2026-10-05):
+  // the real class runs in the vm, so the assertions below see the real throw.
+  const errStart = STYLED_SRC.indexOf('class MissingRequiredCostumeSheetError');
+  const errClassSrc = STYLED_SRC.slice(errStart, STYLED_SRC.indexOf(String.fromCharCode(10) + '}', errStart) + 2);
+  ok(errClassSrc.includes('extends Error'), 'slice: costume error class extracted');
+
   const makeCoverageSandbox = () => {
     const cache = new Map();
     const genLogEvents = [];
@@ -152,13 +158,13 @@ async function part3() {
       Promise, Map, Set, Array, String, Object, Date, JSON,
       log: { debug: () => {}, info: () => {}, warn: () => {}, error: (m) => sandbox.__errors.push(m) },
       __errors: [],
-      STYLED_AVATAR_BUCKETS: ['costumed', 'standard', 'winter', 'summer'],
+      STYLED_AVATAR_BUCKETS: ['costumed', 'standard', 'winter', 'summer'],  // stored-only winter/summer, see STORED_AVATAR_SLOTS
       styledAvatarCache: cache,
       guaranteeSeededKeys: new Set(),
       // Mirror prod key shape (scope::name_category_style) minus AsyncLocalStorage.
       getAvatarCacheKey: (n, c, a) => {
         const cat = sandbox.normalizeClothingCategory(c);
-        return `scope::${String(n).trim().toLowerCase()}_${cat}_${a}`;
+        return `scope::${String(n && n.name !== undefined ? n.name : n).trim().toLowerCase()}_${cat}_${a}`;
       },
       normalizeClothingCategory: (c) => String(c || 'standard').toLowerCase().startsWith('costumed') ? 'costumed' : String(c || 'standard').toLowerCase(),
       resolveAvatarBytes: async (avatars, cat) => avatars?.[cat] || null,
@@ -183,27 +189,26 @@ async function part3() {
 
   const run = async (sandbox, characters, artStyle, reqs) => {
     const context = vm.createContext(sandbox);
-    vm.runInContext(`${fnSrc}; __run = ensureStyledAvatarCoverage;`, context);
+    vm.runInContext(`${errClassSrc}\n${fnSrc}; __run = ensureStyledAvatarCoverage; __Err = MissingRequiredCostumeSheetError;`, context);
+    sandbox.__Err = context.__Err;
     return context.__run(characters, artStyle, reqs);
   };
 
   const IMG_STD2 = 'data:image/jpeg;base64,ROGER_STANDARD';
   const reqsCostumed = [{ pageNumber: 1, clothingCategory: 'costumed:knight', characterNames: ['Roger'] }];
 
-  // A. Required character, zero styled avatars, standard avatar resolvable →
-  // seeded at 'standard', loud error + genLog event + audit entry.
+  // A. Costume required, zero styled avatars → the book fails: throws, loud error + genLog
+  // event, NOTHING seeded (no other sheet stands in for a costume).
   let sb = makeCoverageSandbox();
-  await run(sb, [{ name: 'Roger', avatars: { standard: IMG_STD2 } }], 'pixar', reqsCostumed);
-  ok(sb.styledAvatarCache.get('scope::roger_standard_pixar') === IMG_STD2,
-    '11a: fallback reference seeded into cache at standard bucket');
-  ok(sb.__errors.some(m => /Roger has no styled avatar after retries/.test(m)),
-    '11b: loud [AVATAR] error logged');
-  ok(sb.__genLogEvents.some(e => e.ev === 'avatar_guarantee_fallback' && e.char === 'Roger'),
-    '11c: generationLog avatar_guarantee_fallback emitted');
-  ok((sb.__auditLogs.get('scope') || []).some(e => e.characterName === 'Roger' && e.guaranteeFallback),
-    '11d: styled-avatar audit entry recorded');
-  ok(sb.guaranteeSeededKeys.has('scope::roger_standard_pixar'),
-    '11e: seeded key registered as retryable (does not block later real conversion)');
+  let thrown = null;
+  try { await run(sb, [{ name: 'Roger', avatars: { standard: IMG_STD2 } }], 'pixar', reqsCostumed); } catch (e) { thrown = e; }
+  ok(thrown && thrown.name === 'MissingRequiredCostumeSheetError' && thrown.characterNames.includes('Roger'),
+    '11a: a required costume with no sheet throws MissingRequiredCostumeSheetError');
+  ok(sb.styledAvatarCache.size === 0, '11b: nothing is seeded in place of a costume');
+  ok(sb.__errors.some(m => /Roger has no styled avatar and the story requires a costume/.test(m)),
+    '11c: loud [AVATAR] error logged');
+  ok(sb.__genLogEvents.some(e => e.ev === 'avatar_category_missing' && e.char === 'Roger'),
+    '11d: generationLog avatar_category_missing emitted');
 
   // B. Character already has a costumed avatar in cache → untouched, silent.
   sb = makeCoverageSandbox();
@@ -219,16 +224,26 @@ async function part3() {
   ok(sb.__errors.length === 0, '13a: realistic standard-only miss does not fire');
   // …but realistic + costumed required DOES fire.
   sb = makeCoverageSandbox();
-  await run(sb, [{ name: 'Roger', avatars: { standard: IMG_STD2 } }], 'realistic', reqsCostumed);
-  ok(sb.styledAvatarCache.get('scope::roger_standard_realistic') === IMG_STD2,
-    '13b: realistic costumed-required miss fires the guarantee');
+  thrown = null;
+  try { await run(sb, [{ name: 'Roger', avatars: { standard: IMG_STD2 } }], 'realistic', reqsCostumed); } catch (e) { thrown = e; }
+  ok(thrown && thrown.name === 'MissingRequiredCostumeSheetError',
+    '13b: realistic costumed-required miss fires the guarantee (throws)');
 
-  // D. No fallback reference at all → exhausted event, no cache write, no throw.
+  // D. A NON-costume requirement with zero styled avatars keeps the seeded identity reference.
+  const reqsStandard = [{ pageNumber: 1, clothingCategory: 'standard', characterNames: ['Roger'] }];
   sb = makeCoverageSandbox();
-  await run(sb, [{ name: 'Roger', avatars: {}, photos: {} }], 'pixar', reqsCostumed);
-  ok(sb.styledAvatarCache.size === 0, '14a: nothing seeded when no reference exists');
-  ok(sb.__genLogEvents.some(e => e.ev === 'avatar_guarantee_exhausted'),
-    '14b: avatar_guarantee_exhausted emitted');
+  await run(sb, [{ name: 'Roger', avatars: { standard: IMG_STD2 } }], 'pixar', reqsStandard);
+  ok(sb.styledAvatarCache.get('scope::roger_standard_pixar') === IMG_STD2,
+    '14a: fallback reference seeded into cache at the standard bucket');
+  ok(sb.__genLogEvents.some(e => e.ev === 'avatar_guarantee_fallback' && e.char === 'Roger'),
+    '14b: generationLog avatar_guarantee_fallback emitted');
+  ok(sb.guaranteeSeededKeys.has('scope::roger_standard_pixar'),
+    '14c: seeded key registered as retryable');
+  // …and with no reference at all: exhausted event, no cache write, no throw.
+  sb = makeCoverageSandbox();
+  await run(sb, [{ name: 'Roger', avatars: {}, photos: {} }], 'pixar', reqsStandard);
+  ok(sb.styledAvatarCache.size === 0, '14d: nothing seeded when no reference exists');
+  ok(sb.__genLogEvents.some(e => e.ev === 'avatar_guarantee_exhausted'), '14e: avatar_guarantee_exhausted emitted');
 
   // E. Character not required by any page → ignored even with empty cache.
   sb = makeCoverageSandbox();

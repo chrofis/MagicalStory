@@ -12,6 +12,7 @@
  */
 
 const fs = require('fs');
+const { STORED_AVATAR_SLOTS } = require('./clothingCategories');
 const path = require('path');
 const { log } = require('../utils/logger');
 const { compressImageToJPEG, callGeminiAPIForImage } = require('./images');
@@ -951,7 +952,8 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
 }
 
 // Canonical buckets a styled avatar can live under in the cache.
-const STYLED_AVATAR_BUCKETS = ['costumed', 'standard', 'winter', 'summer'];
+// winter/summer buckets: stored-only (old stories), see clothingCategories STORED_AVATAR_SLOTS.
+const STYLED_AVATAR_BUCKETS = ['costumed', ...STORED_AVATAR_SLOTS];
 
 /**
  * A required costumed sheet could not be generated. "No costume, no book"
@@ -1186,7 +1188,7 @@ function getStyledAvatar(characterRef, clothingCategory, artStyle) {
   // better than a raw modern-day photo for a medieval scene (the latter
   // leaks modern clothing into the rendered image).
   //
-  // Preference order: costumed > standard > winter > summer (costumed wins
+  // Preference order: costumed > standard (costumed wins
   // because it's the strongest signal for "this is the only outfit this
   // character has in this story").
   const requestedCanonical = normalizeClothingCategory(clothingCategory);
@@ -1197,7 +1199,7 @@ function getStyledAvatar(characterRef, clothingCategory, artStyle) {
     log.error(`❌ [STYLED-AVATAR] COSTUMED CACHE MISS: ${cacheKey} — no other bucket substitutes for a costume`);
     return null;
   }
-  const fallbackOrder = ['costumed', 'standard', 'winter', 'summer'];
+  const fallbackOrder = ['costumed', 'standard'];  // winter/summer sheets never stand in (decisions 2026-10-10)
   for (const bucket of fallbackOrder) {
     if (bucket === requestedCanonical) continue;
     const altKey = getAvatarCacheKey(characterRef, bucket, artStyle);
@@ -1777,7 +1779,7 @@ function collectAvatarRequirements(sceneDescriptions, characters, pageClothing =
  * @returns {Record<string, string>|null} Map of clothingCategory -> styledAvatar, or null if none found
  */
 function getStyledAvatarsForCharacter(characterRef, artStyle) {
-  const clothingCategories = ['winter', 'standard', 'summer'];
+  const clothingCategories = STORED_AVATAR_SLOTS;
   const result = {};
   let foundAny = false;
 

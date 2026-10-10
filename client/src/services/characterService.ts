@@ -1288,7 +1288,7 @@ export const characterService = {
         };
 
         try {
-          if (!forceRegenerate && listChar.avatars?.winter) {
+          if (!forceRegenerate && listChar.avatars?.standard) {
             result.skipped = true;
             result.skipReason = 'Avatars already exist';
             return result;

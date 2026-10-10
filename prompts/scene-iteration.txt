@@ -79,7 +79,7 @@ A feedback line marked SPEC CONFLICT overrides the declared interactions: rewrit
 Clothing rules:
 - Select clothing for each character ONLY from their available avatars listed above.
 - The `clothing` value is the one EXPECTED CLOTHING below gives that character on this page, spelled as the list above spells it (`costumed:<costume>` included).
-- When the prose mentions clothing, write the outfit itself. `standard`, `summer`, `winter` and `costumed` are metadata keys — never write them as prose ("wearing his standard clothes", "in a summer outfit").
+- When the prose mentions clothing, write the outfit itself. `standard` and `costumed` are metadata keys — never write them as prose ("wearing his standard clothes", "in a standard outfit").
 {EXPECTED_CLOTHING}
 {LOCKED_PERSPECTIVES}
 
@@ -143,8 +143,8 @@ After the prose, emit exactly `---METADATA---` on its own line, then a single JS
     "fixesApplied": []
   },
   "characters": [
-    {"name": "CharacterA", "clothing": "winter", "position": "foreground", "depth": "foreground", "footing": "ground", "looksAt": "distance", "expression": "eyes wide, mouth open, brows pulled tight", "emotion": "afraid"},
-    {"name": "CharacterB", "clothing": "winter", "position": "beside CharacterA", "depth": "midground", "footing": "ground", "looksAt": "CharacterA", "expression": "eyes steady on CharacterA, brows level, mouth closed", "emotion": "neutral"}
+    {"name": "CharacterA", "clothing": "standard", "position": "foreground", "depth": "foreground", "footing": "ground", "looksAt": "distance", "expression": "eyes wide, mouth open, brows pulled tight", "emotion": "afraid"},
+    {"name": "CharacterB", "clothing": "standard", "position": "beside CharacterA", "depth": "midground", "footing": "ground", "looksAt": "CharacterA", "expression": "eyes steady on CharacterA, brows level, mouth closed", "emotion": "neutral"}
   ],
   "shot": "medium",
   "timeOfDay": "afternoon",

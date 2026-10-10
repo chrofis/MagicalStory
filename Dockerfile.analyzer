@@ -162,7 +162,7 @@ RUN python3 -c "from deepface import DeepFace; \
 #
 # Reproduces the production image's contents EXACTLY. Note what is NOT here:
 # blaze_face_short_range.tflite (photo_analyzer.py:168, MediaPipe) and
-# yolo11n-pose.pt (POSE_WEIGHTS, /pose-heads) exist on dev machines but are
+# (the pose weights and /pose-heads were deleted 2026-10-10) exist on dev machines but are
 # untracked and have never been in the deployed image — so those paths already
 # fall back or fail in production today. Copying them in would be a silent
 # behaviour change smuggled into a refactor; it is filed in BACKLOG instead.

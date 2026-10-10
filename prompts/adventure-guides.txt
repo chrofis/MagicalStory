@@ -245,7 +245,7 @@ Story guidance:
 
 [detective]
 PROMISE: A mystery is solved by detection: the children find clues, follow them and work out the answer from what they noticed.
-COSTUME: not needed - use standard, summer or winter avatar
+COSTUME: not needed - use standard avatar
 
 Who lives here (pick one):
 - A neighbour's dog who keeps arriving with something that belongs to someone else
@@ -865,7 +865,7 @@ Story guidance:
 
 [dragon]
 PROMISE: A grown dragon is a character in the story, named, present from early on and at the turning point, wanting and doing things of its own; an egg, or a hatchling only at the end, does not keep this promise, though a hatchling may be there too.
-COSTUME: not needed - use standard, summer or winter avatar
+COSTUME: not needed - use standard avatar
 
 Who lives here (pick one):
 - An egg found somewhere very ordinary
@@ -914,7 +914,7 @@ Story guidance:
 
 [unicorn]
 PROMISE: A unicorn is a character in the story, named, present from early on and at the turning point, wanting and doing things of its own; a picture, a toy or a horn alone does not keep this promise.
-COSTUME: not needed - use standard, summer or winter avatar
+COSTUME: not needed - use standard avatar
 
 Who lives here (pick one):
 - A lost foal too young to find the herd and too proud to be carried
@@ -963,7 +963,7 @@ Story guidance:
 
 [dinosaur]
 PROMISE: Living dinosaurs are in the story, and at least one is a character that wants and does things of its own; bones, fossils or toys alone do not keep this promise.
-COSTUME: not needed - use standard, summer or winter avatar
+COSTUME: not needed - use standard avatar
 
 Who lives here (pick one):
 - A hatchling who has followed someone home from the nesting ground
@@ -1062,7 +1062,7 @@ Story guidance:
 
 [ocean]
 PROMISE: The story goes out on the sea or under it, and a sea creature is a character that wants and does things of its own.
-COSTUME: not needed - use standard, summer or winter avatar
+COSTUME: not needed - use standard avatar
 
 Who lives here (pick one):
 - A sea turtle tangled in something that does not belong in the water
@@ -1111,7 +1111,7 @@ Story guidance:
 
 [jungle]
 PROMISE: The story goes into the jungle, and a jungle animal is a character that wants and does things of its own.
-COSTUME: not needed - use standard, summer or winter avatar
+COSTUME: not needed - use standard avatar
 
 Who lives here (pick one):
 - A monkey who takes the one thing that matters and wants to be followed
@@ -1160,7 +1160,7 @@ Story guidance:
 
 [farm]
 PROMISE: A farm is the world the story happens in: farm animals are characters, and farm work is part of the adventure.
-COSTUME: not needed - use standard, summer or winter avatar
+COSTUME: not needed - use standard avatar
 
 Who lives here (pick one):
 - A lamb born in the night whose mother will not take him
@@ -1209,7 +1209,7 @@ Story guidance:
 
 [forest]
 PROMISE: The story goes into the forest, and a forest animal is a character that wants and does things of its own.
-COSTUME: not needed - use standard, summer or winter avatar
+COSTUME: not needed - use standard avatar
 
 Who lives here (pick one):
 - A fox cub alone at the edge of a clearing, back at the same spot each evening
@@ -1450,7 +1450,7 @@ Story guidance:
 
 [halloween]
 PROMISE: Halloween is in the story: costumes, carved pumpkins and the evening of trick-or-treating are part of what happens, playful rather than frightening.
-COSTUME: not needed - use standard, summer or winter avatar; children may also wear costumes they invent within the story
+COSTUME: not needed - use standard avatar; children may also wear costumes they invent within the story
 
 Who lives here (pick one):
 - A small ghost who is more frightened of the dark than anyone
@@ -1499,7 +1499,7 @@ Story guidance:
 
 [mothers-day]
 PROMISE: Mother's Day is the reason for the story: something is made, done or given for a mother, and she receives it before the end.
-COSTUME: not needed - use standard, summer or winter avatar
+COSTUME: not needed - use standard avatar
 
 Who lives here (pick one):
 - A mother who has been tired for weeks and keeps saying she is fine [grown-up]
@@ -1548,7 +1548,7 @@ Story guidance:
 
 [fathers-day]
 PROMISE: Father's Day is the reason for the story: something is made, done or given for a father, and he receives it before the end.
-COSTUME: not needed - use standard, summer or winter avatar
+COSTUME: not needed - use standard avatar
 
 Who lives here (pick one):
 - A father who has been promising to finish something for a year [grown-up]

@@ -304,7 +304,7 @@ router.delete('/benchmark/:id', async (req, res) => {
 
 // ─────────────────────────────────────────────────────────────────────
 // Test Lab sets — named, stage-typed collections of failing cases for ANY
-// stage (avatar_eval, char_repair, cover, image, …). Pin a case from a result,
+// stage (avatar_sheet_variant, char_repair, cover, image, …). Pin a case from a result,
 // then "Run set" fires ONE experiment of the set's stage over every member,
 // merging {set.params, member.params} per target.
 // ─────────────────────────────────────────────────────────────────────

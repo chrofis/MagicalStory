@@ -19,6 +19,7 @@
  */
 
 const { fetchImageBytes } = require('./r2');
+const { STORED_AVATAR_SLOTS } = require('./clothingCategories');
 
 const _avatarFetchCache = new Map();
 async function _getOrFetch(url) {
@@ -366,7 +367,7 @@ async function loadVbReferenceBytes(vbEntry) {
 function normalizeAvatarsForResponse(avatars) {
   if (!avatars || typeof avatars !== 'object') return avatars;
   const out = { ...avatars };
-  for (const slot of ['standard', 'summer', 'winter']) {
+  for (const slot of STORED_AVATAR_SLOTS) {
     const url = out[`${slot}Url`];
     if (url) out[slot] = url;
     delete out[`${slot}Url`];
