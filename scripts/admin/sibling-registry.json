@@ -229,6 +229,19 @@
       }
     },
     {
+      "id": "avatar-sheet-generator-vs-defect-judge",
+      "axis": "generator-vs-critic",
+      "reason": "The sheet defect judge (prompts/avatar-sheet-defect-judge.txt, parsed by server/lib/avatarSheetJudge.js) deducts for headgear that grows, vanishes or differs between cells, hair that changes, bald or headless cells, an outfit that differs between cells, head-row clothes that differ from the body row, a held object and a broken 2x4 layout; the sheet prompts in character2x4Sheet.js (buildOneCallSheetPrompt, buildBodyRowPrompt, buildHeadRowPrompt) are the only instructions the sheet generator receives. A rule the judge applies that the generator was never given fails sheets no redraw can fix. Not wired yet (docs/decisions.md 2026-10-10).",
+      "generators": [
+        "server/lib/character2x4Sheet.js"
+      ],
+      "critics": [
+        "prompts/avatar-sheet-defect-judge.txt",
+        "server/lib/avatarSheetJudge.js"
+      ],
+      "severity": "block"
+    },
+    {
       "id": "page-image-generator-vs-critics",
       "axis": "generator-vs-critic",
       "reason": "image-generation.txt is the only instruction the illustrator receives; image-evaluation.txt, image-semantic.txt and image-prompt-compliance.txt are the three judges that score the result. A rule added to a judge and not to the generator penalises a page for something it was never asked to do.",

@@ -6,7 +6,7 @@ The sheet is meant to be a 2 x 4 grid of the SAME single child or adult on plain
 
 {SHEET_KIND_RULE}
 
-STEP 1 - read every cell on its own, from the pixels, before judging anything. For each of the 8 cells answer:
+STEP 1 - read every cell on its own, from the pixels, before judging anything. Each cell is its own question: look at THAT cell. A common error is to repeat the answer of cell 1 for all eight cells; the cells of one sheet DO differ sometimes, and finding where they differ is your job. The bottom-row cells are small, so look closely at the top of each head there: a hat in cell 5 says nothing about cell 6. For each of the 8 cells answer:
 - headgear: none | hat | hood | headband_or_scarf | crown_or_tiara | other. A hood pulled up over the head is "hood"; a hood hanging down behind the neck is "none". Hair clips and ribbons are "none".
 - hairVisible: full | thin_or_buzzed | bald | hidden_by_headgear | not_in_frame. "bald" means a smooth hairless scalp where the head should carry hair.
 - hairColour: black | dark_brown | brown | light_brown | blonde | red | grey_or_white | other | none.
@@ -14,7 +14,7 @@ STEP 1 - read every cell on its own, from the pixels, before judging anything. F
 - head: present | missing_or_blank_face | cut_off.
 - top: the main upper garment as "<colour> <kind>" in at most 6 words, for example "blue hoodie" or "red striped shirt, brown vest".
 - extras: anything else worn on the body that you can see (cape, backpack, belt, necklace, glasses) in at most 4 words, or "none".
-- heldObject: none | something. "something" means an object is held in a hand or carried in an arm, however small. Hands in pockets, on hips or empty are none. A garment or a belt-attached pouch is not a held object.
+- heldObject: none | something. "something" means an object is held in a hand or carried in an arm, however small. Hands in pockets, on hips or empty are none. A garment, a belt-attached pouch, or a sword or tool hanging in a sheath or from a belt is not a held object.
 
 A head cell ends at the shoulders or chest, so it cannot show a belt, trousers, skirt, boots or any piece that sits lower: such a piece being absent from a head cell is NOT a difference. Compare a head cell with its body twin only on what both can show (head, hair, headgear, neckline, collar, shoulders, straps, sleeves, upper chest). A view from behind shows the back of the same garments, so a chest emblem or front pocket that cannot be seen from behind is NOT a difference.
 
@@ -38,13 +38,13 @@ bald - Is any cell missing hair or head?
   bald_cell: at least one cell shows a smooth hairless scalp where the other cells show hair, or a clearly thinner crop where the others show a full head of hair.
   headless_or_blank_face: a head is missing, cut off, or has no face where a face should be.
 
-costume - Is the outfit the same in all 8 cells?
+costume - Is the outfit the same in all 8 cells? Compare the four body cells with each other, and the four head cells with each other. Head cell against body cell is the NEXT question, not this one.
   ok: the same garments, colours, trims and emblems in every cell, seen from different sides.
   pieces_differ: a garment or accessory present in some cells is missing or added in others (a vest, belt, cape, collar, straps, sleeves, pouch).
   colours_differ: the same garment is a different colour in different cells.
   emblem_differs: a chest emblem, print or pattern is drawn as a clearly DIFFERENT design in different cells (another shape, another picture). A smaller, partly hidden or turned view of the same design is not a difference.
 
-rowMatch - Do the head row and the body row wear the same clothes?
+rowMatch - Do the head cells and the body cells wear the same clothes? Compare ONLY what a head cell can show: the neckline, collar, shoulder straps, sleeves at the shoulder, and the colour and kind of the top. A belt, pouch, sword, wristbands, necklace pendant, trousers or boots are never part of this question. Naming the same garment differently (shirt, robe, hoodie) is not a difference when the neckline, collar, hood and colour match.
   ok: each head cell shows the same neckline, collar, straps and top as its full-body twin.
   head_row_differs: a head cell shows a different top, collar, neckline or straps (for example bare shoulders, overall straps, a different collar or garment colour) than its full-body twin.
 
