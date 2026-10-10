@@ -2948,7 +2948,16 @@ async function measureSheetBodies(imageData) {
     let pose = null;
     try { pose = (await analyzerJson('/pose-heads', { image: `data:image/png;base64,${buf.toString('base64')}`, cols: 1 }, { timeoutMs: 60_000 })).cells?.[0] || null; } catch (err) { pose = { error: err.message }; }
     const rel = (frac) => (frac == null || !figH ? null : Number(((frac * info.height - span.start) / figH).toFixed(4)));
-    cells.push({ figH, pieceH: info.height, head: pose?.head ?? null, eye: rel(pose?.head_y_frac), nose: rel(pose?.nose_y_frac), shoulder: rel(pose?.shoulder_y_frac), poseError: pose?.error || null });
+    // The head height itself: a vision model reads crown, chin and feet off the single cell (the pose model has no chin point).
+    let gem = null;
+    try {
+      const { _internal: { askSheetJudge, inlinePartOf } } = require('./character2x4Sheet');
+      const prompt = require('fs').readFileSync(require('path').join(__dirname, '../../prompts/experiments/sheet-head-box-measure.txt'), 'utf8');
+      const v = await askSheetJudge({ model: 'gemini-2.5-flash', parts: [inlinePartOf(`data:image/png;base64,${buf.toString('base64')}`), { text: prompt }], prompt, label: 'head measure', apiKey: process.env.GEMINI_API_KEY });
+      const [c, k, f] = [Number(v.crownY), Number(v.chinY), Number(v.feetY)];
+      gem = Number.isFinite(c + k + f) && f > c && k > c ? { crown: c, chin: k, feet: f, headShare: Number(((k - c) / (f - c)).toFixed(4)), n: Number(((f - c) / (k - c)).toFixed(2)) } : { error: 'unusable', v };
+    } catch (err) { gem = { error: err.message }; }
+    cells.push({ figH, pieceH: info.height, head: pose?.head ?? null, eye: rel(pose?.head_y_frac), nose: rel(pose?.nose_y_frac), shoulder: rel(pose?.shoulder_y_frac), poseError: pose?.error || null, gem });
   }
   return cells;
 }
