@@ -979,3 +979,6 @@ blocked, count the stored rows; 0 → change it, some → alias map at the read 
 ## 2026-10-09 — Check SETTLED.md before calling anything a defect
 Mistake: I reported "page text describes figures the picture doesn't show" as a defect, dispatched an agent to fix it and asked the owner to decide — while docs/SETTLED.md line 35 (2026-09-13) and my own memory (feedback_page_text_not_a_checklist) say the page text is NOT a checklist for the picture.
 Rule: before listing a finding as a defect or a fix candidate, grep docs/SETTLED.md and the memory index for the topic. A settled verdict is not a finding; re-opening it needs the reversal protocol, not a question.
+
+## 2026-10-10 — A storage-key change must be replayed over stored stories before it ships
+f18b47ab9 made the VB-reference key content-hashed; a caller computed it eagerly for a location with no photo, hashed `undefined`, and every story with such a location crashed at save (owner's iPhone trial). Unit tests used locations that all had bytes. Rule: any change to how stored data is written (keys, offload, persistence) is replayed through `persistStoryToDatabase`/`extractInlineImagesToR2` (R2 stubbed) over >= 20 stored stories before push — the stored data has the shapes the fixtures lack.

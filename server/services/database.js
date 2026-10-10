@@ -1503,6 +1503,10 @@ async function extractInlineImagesToR2(storyId, data) {
       if (!loc || typeof loc !== 'object') continue;
       const entryId = loc.id || loc.dbKey || loc.name;
       if (!entryId) continue;
+      // The key is named by content, so it can only be computed from bytes: a location with no photo
+      // (fetchStatus pending_lazy) has none, and hashing undefined crashed every save (staging
+      // job_1791612491444_ezf1ksaku, 2026-10-10).
+      if (!looksLikeBytes(loc.referencePhotoData)) continue;
       const safeId = String(entryId).replace(/[^a-zA-Z0-9_-]/g, '_');
       upload(loc.referencePhotoData, r2.keyForVbReference(storyId, safeId, loc.referencePhotoData), (url) => {
         loc.referencePhotoUrl = url;
