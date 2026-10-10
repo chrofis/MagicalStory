@@ -433,6 +433,7 @@ def _track_request_end(exc=None):
 # ═══════════════════════════════════════════════════════════════════════════
 import json
 import subprocess
+from analyzer_reap_policy import SESSION_END_GRACE_S, reap_wait_seconds, cache_drop_allowed
 import uuid
 import urllib.request as _urlreq
 import urllib.error as _urlerr
@@ -448,6 +449,10 @@ _workers = {}            # role -> subprocess.Popen
 # no-op instead of someone else's loss.
 #   id -> {'label': str, 'started': float}
 _sessions = {}
+# Wall-clock of the last session that ended; drives the reap grace period
+# (analyzer_reap_policy.py). 0 = none yet.
+_last_session_end_ts = 0.0
+_reap_timer = None
 # Derived count, kept in step with `_sessions` so every existing reader
 # (/health, /release-memory, the reaper) stays unchanged.
 _active_sessions = 0
@@ -839,6 +844,26 @@ _SESSION_MAX_AGE_S = int(os.environ.get('SESSION_MAX_AGE_S', str(3 * 3600)))
 _MAX_SESSIONS = int(os.environ.get('MAX_ANALYZER_SESSIONS', '200'))
 
 
+def _schedule_reap_recheck(wait_s):
+    """Re-run the reap check once the grace period has elapsed (single timer)."""
+    global _reap_timer
+    with _workers_lock:
+        if _reap_timer is not None:
+            return
+        def _fire():
+            global _reap_timer
+            with _workers_lock:
+                _reap_timer = None
+            try:
+                _maybe_reap_workers()
+            except Exception as e:
+                print(f"[WORKERS] deferred reap check failed: {e}")
+        _reap_timer = threading.Timer(wait_s + 0.5, _fire)
+        _reap_timer.daemon = True
+        _reap_timer.start()
+    print(f"[WORKERS] reap deferred {wait_s:.0f}s (session ended moments ago)")
+
+
 def _maybe_reap_workers():
     """Kill workers when no session is active and nothing is in flight.
 
@@ -860,6 +885,14 @@ def _maybe_reap_workers():
     with _workers_lock:
         have_workers = bool(_workers or _adopted)
     if sessions == 0 and not busy and have_workers:
+        # GRACE (2026-10-10): a presence leave/arrive bounce (page remount) ends
+        # the only session and starts a new one seconds later. Reaping at once
+        # killed the just-spawned warm worker and evicted its files, so the
+        # next face pick re-paid a 57 s cold load. Defer; the timer re-checks.
+        wait = reap_wait_seconds(sessions, _last_session_end_ts, time.time())
+        if wait > 0:
+            _schedule_reap_recheck(wait)
+            return
         # Pass the epoch: if a request arrived between the check above and the
         # kill, abort rather than terminate a worker mid-call.
         if kill_workers('sessions=0, idle', expect_epoch=epoch):
@@ -1011,6 +1044,9 @@ def session_end():
             known = _sessions.pop(str(sid), None)
             if known is None:
                 print(f"[SESSION] end {sid} — not open, ignoring")
+            else:
+                global _last_session_end_ts
+                _last_session_end_ts = time.time()
         _recount_sessions_locked()
         n = _active_sessions
     if known is not None:
@@ -2485,6 +2521,19 @@ def _drop_file_cache_async(reason):
             print(f"[CACHE-DROP] {reason}: skipped, a sweep is already running")
             return
         try:
+            # Evicting model files is only useful if nothing is about to read
+            # them again. Settle first, then skip if a session/worker returned
+            # (2026-10-10: the sweep ran in the same second a new session
+            # spawned a worker, so U2-Net cold-loaded from disk in 57 s).
+            time.sleep(SESSION_END_GRACE_S)
+            with _request_lock:
+                sess = _active_sessions
+            with _workers_lock:
+                have = bool(_workers or _adopted)
+                coming = bool(_bringing_up or _warm_hold)
+            if not cache_drop_allowed(sess, have, coming):
+                print(f"[CACHE-DROP] {reason}: skipped, workers/session returned")
+                return
             since = time.time() - _last_cache_drop_ts
             if since < _CACHE_DROP_MIN_INTERVAL_S:
                 print(f"[CACHE-DROP] {reason}: skipped, last sweep {since:.0f}s ago")

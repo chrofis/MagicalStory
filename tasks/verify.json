@@ -9721,6 +9721,21 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "analyzer-presence-bounce-grace",
+      "commits": [],
+      "addedAt": "2026-10-10",
+      "claim": "A presence leave/arrive bounce no longer kills the warm face worker or drops the page cache; the owner's next trial face pick (after the character traits step) is answered in about 15-20 s or less from arrival, not 50+ s.",
+      "runShape": [
+        "trial"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Analyzer logs on the next trial: '[WORKERS] reap deferred 30s' instead of 'killing face worker' on a leave/arrive bounce, no '[CACHE-DROP] workers reaped' within seconds of an arrival, '[WARMUP] face done' time, and the face-pick wait. Confirm the ANALYZER deployment runs the commit first."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [
