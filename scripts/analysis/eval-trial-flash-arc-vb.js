@@ -29,12 +29,16 @@ const FRESH = {
   job_1788181867610_qfo6zmnvw: 'DATABASE_URL',         // fr-ch, 6, life-challenge, dinosaurs and travel
 };
 const FRESHON = arg('set') === 'fresh';
-const OUT = path.join(ROOT, FRESHON ? 'evals/runs/2026-10-10_trial-flash-arc-vb-v2-fresh' : V2ON ? 'evals/runs/2026-10-10_trial-flash-arc-vb-v2' : 'evals/runs/2026-10-10_trial-flash-arc-vb');
+// --v=3 (owner 2026-10-10 "Use Flash. But think how to improve quality"): call B is bound to the Visual Bible only, the arc is advisory (prompts/experiments/story-trial-flasharc-b3.txt); call A's stored v2 output is reused, so only B differs
+const V3ON = arg('v') === '3';
+const FRESH_DIR = path.join(ROOT, 'evals/runs/2026-10-10_trial-flash-arc-vb-v2-fresh');
+const FRESH3 = ['job_1791490151653_r9mypyn0c', 'job_1789944735873_vmbd0or30', 'job_1791497394846_v01s6ndpn'];
+const OUT = path.join(ROOT, V3ON ? 'evals/runs/2026-10-10_trial-flash-arc-vb-v3' : FRESHON ? 'evals/runs/2026-10-10_trial-flash-arc-vb-v2-fresh' : V2ON ? 'evals/runs/2026-10-10_trial-flash-arc-vb-v2' : 'evals/runs/2026-10-10_trial-flash-arc-vb');
 const VBF = path.join(ROOT, 'evals/runs/2026-10-10_trial-vb-first');
 const OLD_IDS = ['job_1791579344291_rk2bno6av', 'job_1791496820206_qwcnrq30r', 'job_1791391658361_4eylyr1w4', 'job_1791554548909_kl0phznw2', 'job_1791551298726_19tfcxccl'];
 const NEW_IDS = ['job_1791450452362_pv0l5hf49', 'job_1791450270543_n1iu8ipsu', 'job_1790769860433_2bhhj0pyi', 'job_1790680992018_nd95o89r7', 'job_1791500208126_at0wow7xa'];
-const IDS = FRESHON ? Object.keys(FRESH) : [...OLD_IDS, ...NEW_IDS];
-const inputDir = id => FRESHON ? path.join(OUT, id) : (OLD_IDS.includes(id) ? path.join(BASE, id) : path.join(V2, id));
+const IDS = V3ON ? [...OLD_IDS, ...NEW_IDS, ...FRESH3] : FRESHON ? Object.keys(FRESH) : [...OLD_IDS, ...NEW_IDS];
+const inputDir = id => V3ON && FRESH3.includes(id) ? path.join(FRESH_DIR, id) : FRESHON ? path.join(OUT, id) : (OLD_IDS.includes(id) ? path.join(BASE, id) : path.join(V2, id));
 const range = s => { if (!s) return IDS; const [a, b] = s.split('-').map(Number); return IDS.slice(a - 1, (b || a)); };
 const readJson = (f, d) => (fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')) : d);
 
@@ -133,6 +137,7 @@ function parseSimple(text) {
   const build = (tpl, input) => { PROMPT_TEMPLATES.storyTrial = tpl; try { let t = buildTrialStoryPrompt(input, input.pages); if (V2ON) { const m = mandatoryLine(input); if (m) { if (!t.includes('- **Story Idea**:')) throw new Error('story idea line not found'); t = t.replace('- **Story Idea**:', () => m + '- **Story Idea**:'); } } return t; } finally { PROMPT_TEMPLATES.storyTrial = orig; } };
   const loadInput = id => JSON.parse(fs.readFileSync(path.join(inputDir(id), 'inputData.json'), 'utf8'));
   const mediumFile = id => {
+    if (V3ON && FRESH3.includes(id)) return path.join(FRESH_DIR, id, 'output-medium.txt');
     if (FRESHON) return path.join(OUT, id, 'output-medium.txt');
     if (!OLD_IDS.includes(id)) return path.join(V2, id, 'output-medium.txt');
     const k = readJson(path.join(BASE, 'arms-key.json'), {})[id];
@@ -270,6 +275,34 @@ function arcRespect(arc, hints, vb) {
       fs.writeFileSync(path.join(dir, 'output-medium.txt'), c.r.text); book({ part: 'baseline', id, cost: c.cost });
       fs.writeFileSync(path.join(dir, 'baseline-metrics.json'), JSON.stringify({ id, vbMs: c.ev.vb, page1Ms: c.ev.pages[1], totalMs: c.ms, costUsd: c.cost, real: realParse(c.r.text) }, null, 2));
       console.log(id, 'MEDIUM vb=' + (c.ev.vb / 1000).toFixed(1) + 's p1=' + (c.ev.pages[1] / 1000).toFixed(1) + 's total=' + (c.ms / 1000).toFixed(1) + 's $' + c.cost.toFixed(3) + ' spend=$' + spendOf().toFixed(3));
+    } catch (e) { console.log(id, 'ERROR', String(e.message || e).slice(0, 300)); } }));
+    console.log('DONE spend', spendOf().toFixed(3));
+    return;
+  }
+
+  if (phase === 'run3') {
+    const ids = range(arg('ids')).filter(id => !fs.existsSync(path.join(OUT, id, 'run-metrics.json')));
+    guard(0.1 * ids.length);
+    const tplB3 = fs.readFileSync(path.join(ROOT, 'prompts/experiments/story-trial-flasharc-b3.txt'), 'utf8');
+    await Promise.all(ids.map(async id => { try {
+      const input = loadInput(id); const dir = path.join(OUT, id); fs.mkdirSync(dir, { recursive: true });
+      const mainName = (input.characters.find(c => c.role === 'main') || input.characters[0]).name;
+      const srcDir = FRESH3.includes(id) ? path.join(FRESH_DIR, id) : path.join(ROOT, 'evals/runs/2026-10-10_trial-flash-arc-vb-v2', id);
+      const aText = fs.readFileSync(path.join(srcDir, 'output-A.txt'), 'utf8'); const a2 = readJson(path.join(srcDir, 'run-metrics.json'));
+      fs.writeFileSync(path.join(dir, 'output-A.txt'), aText);
+      const promptB = build(tplB3, input).replace('{ARC_PLAN}', () => aText.trim());
+      fs.writeFileSync(path.join(dir, 'prompt-B.txt'), promptB);
+      const b = await timedCall(promptB, 'claude-sonnet-5-5', 'medium', aText.trim());
+      fs.writeFileSync(path.join(dir, 'output-B.txt'), b.r.text); book({ part: 'v3', id, call: 'B', cost: b.cost });
+      const merged = `${aText.trim()}
+
+${b.r.text.trim()}`;
+      const sa = parseSimple(aText), sb = parseSimple(b.r.text);
+      const m = { id, aVbMs: a2.aVbMs, aTotalMs: a2.aTotalMs, aCost: a2.aCost, bPage1Ms: b.ev.pages[1], bTotalMs: b.ms, bOut: b.r.usage?.output_tokens, bIn: b.r.usage?.input_tokens, bCost: b.cost,
+        page1ImageStartS: (a2.aTotalMs + b.ev.pages[1]) / 1000, totalS: (a2.aTotalMs + b.ms) / 1000, costUsd: a2.aCost + b.cost, stops: [b.r.stop_reason],
+        real: realParse(merged), respect: sa.vb ? vbRespect(sa.vb, sb.pages, mainName) : { error: sa.vbError || 'no vb' } };
+      fs.writeFileSync(path.join(dir, 'run-metrics.json'), JSON.stringify(m, null, 2));
+      console.log(id, `B p1=${(m.bPage1Ms / 1000).toFixed(1)}s total=${(b.ms / 1000).toFixed(1)}s | p1img@${m.page1ImageStartS.toFixed(1)}s all=${m.totalS.toFixed(1)}s $${m.costUsd.toFixed(3)} spend=$${spendOf().toFixed(3)}`);
     } catch (e) { console.log(id, 'ERROR', String(e.message || e).slice(0, 300)); } }));
     console.log('DONE spend', spendOf().toFixed(3));
     return;

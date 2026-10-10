@@ -1,0 +1,243 @@
+{
+ "job_1789944735873_vmbd0or30": {
+  "p1img": 42.212,
+  "totalS": 60.715,
+  "cost": 0.10054500000000001,
+  "respect": {
+   "vbIds": 4,
+   "foreign": [],
+   "outside": [],
+   "unused": [
+    "ART001",
+    "ART002",
+    "LOC001",
+    "LOC002"
+   ],
+   "unlistedFigs": [],
+   "unlistedObjs": [],
+   "noLocId": [
+    "p1",
+    "p2",
+    "p3",
+    "p4",
+    "p5",
+    "p6"
+   ]
+  },
+  "real": {
+   "title": true,
+   "vbOk": true,
+   "vbCounts": {
+    "sec": 0,
+    "ani": 0,
+    "art": 2,
+    "loc": 2,
+    "bg": 3
+   },
+   "coverOk": false,
+   "pages": 6,
+   "hints": 6,
+   "pageKeys": "pageNumber,text,sceneHint,sceneProse,characterClothing,characterPerspectives,characters"
+  }
+ },
+ "job_1790680992018_nd95o89r7": {
+  "p1img": 50.48,
+  "totalS": 75.524,
+  "cost": 0.1210735,
+  "respect": {
+   "vbIds": 4,
+   "foreign": [],
+   "outside": [
+    "p5:LOC002"
+   ],
+   "unused": [],
+   "unlistedFigs": [],
+   "unlistedObjs": [],
+   "noLocId": []
+  },
+  "real": {
+   "title": true,
+   "vbOk": true,
+   "vbCounts": {
+    "sec": 0,
+    "ani": 1,
+    "art": 1,
+    "loc": 2,
+    "bg": 3
+   },
+   "coverOk": false,
+   "pages": 6,
+   "hints": 6,
+   "pageKeys": "pageNumber,text,sceneHint,sceneProse,characterClothing,characterPerspectives,characters"
+  }
+ },
+ "job_1791391658361_4eylyr1w4": {
+  "p1img": 30.736,
+  "totalS": 56.713,
+  "cost": 0.10115500000000001,
+  "respect": {
+   "vbIds": 4,
+   "foreign": [],
+   "outside": [],
+   "unused": [
+    "CHR001",
+    "ANI001"
+   ],
+   "unlistedFigs": [
+    "p1:Papa",
+    "p2:Goose",
+    "p3:Papa",
+    "p4:Goose",
+    "p5:Goose",
+    "p6:Papa"
+   ],
+   "unlistedObjs": [],
+   "noLocId": []
+  },
+  "real": {
+   "title": true,
+   "vbOk": true,
+   "vbCounts": {
+    "sec": 1,
+    "ani": 1,
+    "art": 1,
+    "loc": 1,
+    "bg": 3
+   },
+   "coverOk": false,
+   "pages": 6,
+   "hints": 6,
+   "pageKeys": "pageNumber,text,sceneHint,sceneProse,characterClothing,characterPerspectives,characters"
+  }
+ },
+ "job_1791490151653_r9mypyn0c": {
+  "p1img": 41.103,
+  "totalS": 72.273,
+  "cost": 0.12379025,
+  "respect": {
+   "vbIds": 4,
+   "foreign": [
+    "p1:ART003",
+    "p2:ART003",
+    "p3:ART003",
+    "p4:ART003",
+    "p5:ART003",
+    "p6:ART003"
+   ],
+   "outside": [
+    "p1:ANI001",
+    "p1:ART002",
+    "p2:ART002",
+    "p4:ANI001",
+    "p5:ANI001",
+    "p5:ART002",
+    "p6:ANI001"
+   ],
+   "unused": [],
+   "unlistedFigs": [],
+   "unlistedObjs": [],
+   "noLocId": []
+  },
+  "real": {
+   "title": true,
+   "vbOk": true,
+   "vbCounts": {
+    "sec": 0,
+    "ani": 1,
+    "art": 2,
+    "loc": 1,
+    "bg": 3
+   },
+   "coverOk": false,
+   "pages": 6,
+   "hints": 6,
+   "pageKeys": "pageNumber,text,sceneHint,sceneProse,characterClothing,characterPerspectives,characters"
+  }
+ },
+ "job_1791497394846_v01s6ndpn": {
+  "p1img": 47.511,
+  "totalS": 73.547,
+  "cost": 0.1234715,
+  "respect": {
+   "vbIds": 4,
+   "foreign": [
+    "p1:LOC002"
+   ],
+   "outside": [
+    "p2:ART002"
+   ],
+   "unused": [
+    "CHR001"
+   ],
+   "unlistedFigs": [
+    "p1:the boy",
+    "p2:the boy",
+    "p3:the boy",
+    "p4:the boy",
+    "p5:the boy",
+    "p6:the boy"
+   ],
+   "unlistedObjs": [],
+   "noLocId": []
+  },
+  "real": {
+   "title": true,
+   "vbOk": true,
+   "vbCounts": {
+    "sec": 1,
+    "ani": 0,
+    "art": 2,
+    "loc": 1,
+    "bg": 3
+   },
+   "coverOk": false,
+   "pages": 6,
+   "hints": 6,
+   "pageKeys": "pageNumber,text,sceneHint,sceneProse,characterClothing,characterPerspectives,characters"
+  }
+ },
+ "job_1791551298726_19tfcxccl": {
+  "p1img": 44.666,
+  "totalS": 75.318,
+  "cost": 0.1212815,
+  "respect": {
+   "vbIds": 6,
+   "foreign": [],
+   "outside": [
+    "p2:ART002",
+    "p2:LOC002",
+    "p4:ART002"
+   ],
+   "unused": [
+    "CHR001",
+    "ANI001"
+   ],
+   "unlistedFigs": [
+    "p1:Mesmer",
+    "p1:Elster",
+    "p2:Elster",
+    "p3:Elster",
+    "p4:Elster",
+    "p5:Elster",
+    "p6:Mesmer"
+   ],
+   "unlistedObjs": [],
+   "noLocId": []
+  },
+  "real": {
+   "title": true,
+   "vbOk": true,
+   "vbCounts": {
+    "sec": 1,
+    "ani": 1,
+    "art": 2,
+    "loc": 2,
+    "bg": 3
+   },
+   "coverOk": false,
+   "pages": 6,
+   "hints": 6,
+   "pageKeys": "pageNumber,text,sceneHint,sceneProse,characterClothing,characterPerspectives,characters"
+  }
+ }
+}

@@ -1,0 +1,14 @@
+{
+ "note": "One reader (the agent), arm hidden by blind-key-run.json (shuffled per input). Only 6 of 13 inputs run on the final prompt: the USD 3.00 cap was reached (v3a 1.300 on all 13, v3b 0.612, v3 0.614; total 2.53 before reading). Call A is the stored v2 output (identical A), only call B differs.",
+ "verdicts": {
+  "job_1791391658361_4eylyr1w4": "test better: medium says Natel in an Iowa park; test clean (slip: 'Je vous ai vu courir' to a child)",
+  "job_1791551298726_19tfcxccl": "test better: button-on-the-grass payoff, no invented names; medium invents Herr Hofer, Erntedank, Grossmutter",
+  "job_1790680992018_nd95o89r7": "test better: medium again changes clothes while the unicorn lies hurt",
+  "job_1791490151653_r9mypyn0c": "tie: test pays the raven off (it learns the word), Eli in a pouch; medium tight too",
+  "job_1789944735873_vmbd0or30": "medium better: test starts in the present then switches to passe compose, animals trait unused; medium uses the animal (invents a name Bouli)",
+  "job_1791497394846_v01s6ndpn": "tie: test invents no name (v2 invented Barnaby and Lukas) but medium has the wall-walking payoff"
+ },
+ "tally": {"test_better": 3, "tie": 2, "medium_better": 1},
+ "v2_on_the_same_six": {"test_better": 2, "tie": 0, "medium_better": 4},
+ "contract": "Bible binding worse than v2 (v2: 0 foreign, 0 unused on 13/13): on the final prompt 3 of 6 inputs cite an id the bible lacks or cite no bible id at all (location 'none', objects empty), 4 of 6 leave bible ids unused"
+}
