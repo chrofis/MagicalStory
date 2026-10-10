@@ -1,0 +1,120 @@
+{
+ "pages": 6,
+ "layout": {
+  "mode": "square-below",
+  "imageAspect": "1:1",
+  "textInImage": false
+ },
+ "artStyle": "watercolor",
+ "ideaKind": "local",
+ "ideaPick": {
+  "index": 0,
+  "shape": null,
+  "world": {
+   "theme": null,
+   "world": "location",
+   "location": null
+  },
+  "attempt": 1,
+  "offered": [
+   {
+    "title": "Lukas, der als Superheld spielt, will seine Bauklötze dem kleinen Nachbarsbuben schenken, doch am Grossmünster reisst eine Krähe die Kiste um und verstreut alle Klötze über den Boden.",
+    "summary": "Als schneller Superheld sammelt er die Klötze in kleinen Runden ein, sucht die letzten unter den Bänken hervor und ordnet sie wieder in die Kiste.\nDie Kiste ist voll, der Platz ist frei, und der Nachbarsbub nimmt die Klötze strahlend entgegen."
+   },
+   {
+    "title": "Lukas, acht Jahre alt, spielt Superheld im Kinderzimmer und will als «Blitzmann» durch den Raum zur Türe rennen, um die Welt jenseits der Schwelle zu retten, doch sein Heldenschlüssel ist zwischen hundert gleich aussehenden Bauklötzen und Spielsteinen auf dem Boden verloren gegangen. Mit seiner Superschnelligkeit sortiert er die Klötze im Wettlauf gegen die Uhr in die Kiste, die Spielsteine in die Dose, und hebt Stapel um Stapel hoch, bis die Bodenfläche frei wird. Unter dem letzten Stapel blitzt der Schlüssel auf, Lukas schliesst die Türe auf und rennt über den freien Boden hinaus, um die Welt zu retten.",
+    "summary": ""
+   }
+  ],
+  "worldMode": "auto"
+ },
+ "language": "de-ch",
+ "trialMode": true,
+ "characters": [
+  {
+   "id": 1791628333517,
+   "age": "8",
+   "name": "Lukas",
+   "role": "main",
+   "gender": "male",
+   "photos": {
+    "body": "https://images-staging.magicalstory.ch/characters/af459e2d-2bdc-4a0e-8130-aaf4671a8b42/characters_af459e2d-2bdc-4a0e-8130-aaf46/inline/characters-0-photos-body-f20e12f67b8ff78be06fbeca.jpg",
+    "face": "https://images-staging.magicalstory.ch/characters/af459e2d-2bdc-4a0e-8130-aaf4671a8b42/characters_af459e2d-2bdc-4a0e-8130-aaf46/inline/characters-0-photos-face-8a6333a09bca9633dcecd379.jpg",
+    "faceBox": {
+     "x": 64.41666666666667,
+     "y": 39.666666666666664,
+     "id": 0,
+     "width": 6,
+     "height": 10.444444444444445,
+     "confidence": 1
+    },
+    "bodyNoBg": "https://images-staging.magicalstory.ch/characters/af459e2d-2bdc-4a0e-8130-aaf4671a8b42/characters_af459e2d-2bdc-4a0e-8130-aaf46/inline/characters-0-photos-bodyNoBg-207a1035987694f0dcb25d1f.jpg"
+   },
+   "traits": {
+    "flaws": [],
+    "strengths": [
+     "Energiegeladen",
+     "Schnell",
+     "Stark"
+    ],
+    "challenges": [],
+    "specialDetails": "Stofftier Elefant "
+   },
+   "avatars": {},
+   "photoUrl": "https://images-staging.magicalstory.ch/characters/af459e2d-2bdc-4a0e-8130-aaf4671a8b42/characters_af459e2d-2bdc-4a0e-8130-aaf46/inline/characters-0-photos-face-8a6333a09bca9633dcecd379.jpg",
+   "physical": {
+    "other": "none",
+    "glasses": "none",
+    "eyeColor": "blue",
+    "skinTone": "light",
+    "hairColor": "light brown",
+    "facialHair": "none",
+    "apparentAge": "school-age",
+    "detailedHairAnalysis": {
+     "type": "straight",
+     "density": "full",
+     "parting": "side part",
+     "styling": "combed",
+     "texture": "medium",
+     "lengthTop": "ear-length",
+     "bangsEndAt": "no bangs",
+     "salonLevel": 6,
+     "lengthSides": "ear-length",
+     "baseColorHex": "#8B6A4D",
+     "highlightsHex": "#B2916F"
+    }
+   },
+   "bodyNoBgUrl": "https://images-staging.magicalstory.ch/characters/af459e2d-2bdc-4a0e-8130-aaf4671a8b42/characters_af459e2d-2bdc-4a0e-8130-aaf46/inline/characters-0-photos-bodyNoBg-207a1035987694f0dcb25d1f.jpg",
+   "bodyPhotoUrl": "https://images-staging.magicalstory.ch/characters/af459e2d-2bdc-4a0e-8130-aaf4671a8b42/characters_af459e2d-2bdc-4a0e-8130-aaf46/inline/characters-0-photos-body-f20e12f67b8ff78be06fbeca.jpg",
+   "isMainCharacter": true,
+   "physicalTraitsSource": {},
+   "preGeneratedStandardFor": null,
+   "preGeneratedStyledAvatars": null
+  }
+ ],
+ "coverTypes": [
+  "frontCover",
+  "backCover"
+ ],
+ "skipCovers": false,
+ "storyTheme": "superhero",
+ "storyTopic": "cleaning-up",
+ "characterId": "characters_af459e2d-2bdc-4a0e-8130-aaf4671a8b42",
+ "storyDetails": "Lukas, der als Superheld spielt, will seine Bauklötze dem kleinen Nachbarsbuben schenken, doch am Grossmünster reisst eine Krähe die Kiste um und verstreut alle Klötze über den Boden.\nAls schneller Superheld sammelt er die Klötze in kleinen Runden ein, sucht die letzten unter den Bänken hervor und ordnet sie wieder in die Kiste.\nDie Kiste ist voll, der Platz ist frei, und der Nachbarsbub nimmt die Klötze strahlend entgegen.",
+ "userLocation": {
+  "city": "Zurich",
+  "region": "Zurich",
+  "country": "Switzerland",
+  "latitude": 47.3643,
+  "longitude": 8.5437
+ },
+ "languageLevel": "standard",
+ "storyCategory": "life-challenge",
+ "titlePageOnly": true,
+ "mainCharacters": [
+  1791628333517
+ ],
+ "skipQualityEval": true,
+ "enableFullRepair": false,
+ "serverAuthoredInput": true
+}

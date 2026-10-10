@@ -1,0 +1,89 @@
+---STORY PAGES---
+
+--- Page 1 ---
+TEXT:
+Lukas rannte über den Platz beim Grossmünster, so schnell, dass sein blauer Umhang hinter ihm flatterte. In den Armen trug er die Holzkiste, bis oben gefüllt mit roten, blauen und gelben Bauklötzen. Unter dem rechten Ellbogen klemmte sein Stoffelefant, der Elefant hiess und bei jedem Abenteuer dabei war.
+
+«Achtung, Superheld Lukas im Einsatz!», rief er. «Eine wichtige Lieferung für den kleinen Nachbarn!»
+
+Der Bub von nebenan baute so gern Türme, hatte aber keine eigenen Klötze. Heute sollte er alle bekommen. Lukas hielt die Kiste fest und lief über die Pflastersteine, an den Steinbänken und den goldenen Blättern vorbei. Die beiden Türme der Kirche ragten vor ihm in den Himmel, und er musste nur noch den Platz überqueren.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Lukas runs across the Grossmünster plaza in his superhero suit of a bright red bodysuit with blue cape, blue boots, yellow utility belt and yellow emblem on chest. He carries the full wooden toy box in both arms and the plush elephant tucked under one elbow, under a crisp autumn sky.","setting":{"location":"Grossmünster [LOC001]","indoorOutdoor":"outdoor","description":"Grey cobblestone plaza with golden autumn leaves, cream sandstone twin towers behind, stone benches along the edge.","lighting":"warm afternoon sunlight from the left","camera":"wide","depthLayers":"foreground cobblestones with a few leaves; midground Lukas running; background twin towers and medieval facades"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Lukas","position":"center","action":"runs with the box held in both arms, cape flying","expression":"cheerful and determined","clothing":"costumed","depth":"midground","perspective":"front"}],"objects":[{"id":"ART001","name":"wooden toy box","position":"in Lukas's arms","size":"melon-sized"},{"id":"ART002","name":"plush elephant","position":"tucked under Lukas's elbow","size":"hand-sized"}],"interactions":[{"character":"Lukas","object":"wooden toy box","where":"carries the box in both arms","priority":"essential"},{"character":"Lukas","object":"plush elephant","where":"clamps the elephant under one elbow","priority":"normal"}],"background":"a few passersby in grey and brown coats far across the plaza","population":"ambient"}}
+```
+
+--- Page 2 ---
+TEXT:
+Ein Krächzen schallte über den Platz. Eine schwarze Krähe stiess von einem Dach herab, flog dicht an Lukas vorbei und schlug mit dem Flügel gegen die Kiste. Lukas stolperte einen Schritt zur Seite. Die Kiste kippte ihm aus den Armen und schlug auf die Pflastersteine.
+
+Der Deckel rutschte auf, und die Klötze sprangen heraus. Rote rollten zum Brunnenrand, blaue hüpften über die Steine, gelbe kullerten unter die Bänke. Die Krähe landete auf einer Mauer und blickte auf das Durcheinander, als wäre es ihr Fund.
+
+«Halt!», rief Lukas. Den Elefanten hielt er fest an sich gedrückt. Die leere Kiste lag auf der Seite, und überall um ihn herum lagen bunte Klötze.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"A black crow flaps away just after striking the wooden toy box, which tumbles from Lukas's arms; colourful blocks fly across the cobblestones. Lukas, in his bright red bodysuit with blue cape, blue boots, yellow utility belt and yellow emblem on chest, clutches the plush elephant to his chest with a startled look.","setting":{"location":"Grossmünster [LOC001]","indoorOutdoor":"outdoor","description":"Open cobblestone plaza with golden leaves and the twin towers behind.","lighting":"warm afternoon sunlight from the left","camera":"medium","depthLayers":"foreground flying and scattered blocks and the tipping box; midground Lukas and the crow; background towers"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Lukas","position":"left","action":"stumbles sideways, holding the elephant to his chest, box falling beside him","expression":"startled","clothing":"costumed","depth":"midground","perspective":"front"},{"id":"ANI001","name":"mischievous crow","position":"right","action":"flaps its wings in mid-air above the box, glossy black feathers, sharp beak and claws visible","expression":"cheeky and sharp-eyed","clothing":"standard","depth":"midground","perspective":"side"}],"objects":[{"id":"ART001","name":"wooden toy box","position":"center, tipping onto its side, blocks spilling out","size":"melon-sized"},{"id":"ART002","name":"plush elephant","position":"held against Lukas's chest","size":"hand-sized"}],"interactions":[{"character":"Lukas","object":"plush elephant","where":"hugs the elephant against his chest","priority":"essential"},{"character":"mischievous crow","object":"wooden toy box","where":"strikes the box with a wing","priority":"normal"}],"background":"a few passersby in grey coats far off","population":"ambient"}}
+```
+
+--- Page 3 ---
+TEXT:
+Lukas stürzte los. Mit beiden Händen raffte er Klötze zusammen, rote, blaue und gelbe auf einmal, und drückte sie an die Brust. Doch der Stapel wackelte, und die Klötze glitten ihm durch die Finger. Sie fielen auf die Steine und kullerten noch weiter weg als vorher.
+
+Er bückte sich nach den nächsten, da stiess er mit dem Fuss an einen Klotz, der davonrollte. Ein Würfel verschwand unter einer Bank. Ein anderer sprang die Stufen hinunter.
+
+«So geht das nicht», murmelte Lukas. Seine Hände waren leer, und der Platz sah schlimmer aus als zuvor. Die Kiste lag noch immer auf der Seite. Den Elefanten hielt er fest unter dem Arm.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Lukas, in his bright red bodysuit with blue cape, blue boots, yellow utility belt and yellow emblem on chest, crouches amid wider-scattered blocks as an armful of blocks slips from his hands. The elephant is tucked under his arm and the empty box lies on its side nearby.","setting":{"location":"Grossmünster [LOC001]","indoorOutdoor":"outdoor","description":"Terrace corner with a wooden bench, low stone parapet and leaves on the paving.","lighting":"warm afternoon sunlight from the left","camera":"medium","depthLayers":"foreground rolling blocks; midground Lukas; background bench, parapet and masonry"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Lukas","position":"center","action":"bends over with an armful of blocks slipping out of his hands","expression":"overwhelmed, frowning","clothing":"costumed","depth":"foreground","perspective":"front"}],"objects":[{"id":"ART001","name":"wooden toy box","position":"left, lying empty on its side","size":"melon-sized"},{"id":"ART002","name":"plush elephant","position":"tucked under Lukas's arm","size":"hand-sized"}],"interactions":[{"character":"Lukas","object":"plush elephant","where":"clamps the elephant under one arm","priority":"normal"}],"background":"a few passersby in brown coats far off","population":"ambient"}}
+```
+
+--- Page 4 ---
+TEXT:
+Lukas atmete tief durch und blieb stehen. Dann setzte er den Elefanten auf die Holzbank, mitten in die Sonne.
+
+«Du bist mein Beobachter», sagte er. «Pass gut auf, was ich mache.»
+
+Er sah auf den Platz und überlegte. Alles auf einmal war zu viel gewesen. Aber eine Farbe nach der anderen, das konnte ein Superheld schaffen.
+
+«Runde eins: alle roten Klötze!», rief er. «Runde zwei: die blauen! Runde drei: die gelben!»
+
+Er stellte die Kiste auf und schob den Deckel zurück. Dann lief er los und holte den ersten roten Klotz vom Brunnenrand. Er legte ihn in die Kiste, und es klang schön hohl. Der Elefant sass auf der Bank und sah ihm dabei zu.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Lukas, in his bright red bodysuit with blue cape, blue boots, yellow utility belt and yellow emblem on chest, has just set the plush elephant on the wooden bench and points across the plaza announcing his rounds. The box stands upright with its lid slid open and one red block placed inside.","setting":{"location":"Grossmünster [LOC001]","indoorOutdoor":"outdoor","description":"Terrace corner with a heavy wooden bench and low stone parapet, leaves on the paving, blocks still scattered.","lighting":"warm afternoon sunlight from the left","camera":"medium","depthLayers":"foreground scattered blocks and box; midground Lukas beside the bench; background parapet and masonry"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Lukas","position":"center","action":"points at the scattered red blocks with a determined stance","expression":"focused and confident","clothing":"costumed","depth":"foreground","perspective":"side"}],"objects":[{"id":"ART001","name":"wooden toy box","position":"right foreground, upright with lid open","size":"melon-sized"},{"id":"ART002","name":"plush elephant","position":"sitting on the wooden bench at left","size":"hand-sized"}],"interactions":[{"character":"Lukas","object":"plush elephant","where":"looks at the elephant on the bench","priority":"low"}],"background":"a few passersby in grey coats far off","population":"ambient"}}
+```
+
+--- Page 5 ---
+TEXT:
+Lukas flitzte über die Steine. Rot, rot, rot, und alle lagen in der Kiste. Dann kamen die blauen, die er von den Stufen und aus den Blättern sammelte. Bei jeder Runde blieb er kurz stehen und zählte, was fehlte. So wurde der Platz Stück für Stück leerer.
+
+Nur die gelben fehlten noch. Lukas kniete sich hin und schaute unter die Steinbank. Dort lagen sie im Schatten, drei Klötze, ganz hinten an der Wand. Er streckte sich, bis er sie mit den Fingerspitzen erreichte, und zog sie einen nach dem anderen heraus.
+
+«Der letzte!», rief er und legte ihn zu den anderen. Er ordnete alle Klötze ordentlich ein und schob den Deckel zu. Der Elefant sass auf der Bank und hatte alles gesehen.
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Lukas, in his bright red bodysuit with blue cape, blue boots, yellow utility belt and yellow emblem on chest, kneels at a stone bench and reaches underneath for the last yellow block. The plush elephant sits on the wooden bench behind him and the box stands nearby, nearly full.","setting":{"location":"Grossmünster [LOC001]","indoorOutdoor":"outdoor","description":"Square near the arched portal with stone benches, cobblestones now almost clear, autumn leaves at the edges.","lighting":"warm afternoon light from the left","camera":"medium","depthLayers":"foreground Lukas kneeling at the bench; midground box and elephant; background portal and tower bases"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Lukas","position":"center","action":"kneels and stretches an arm under the stone bench to grasp a yellow block","expression":"concentrated","clothing":"costumed","depth":"foreground","perspective":"side"}],"objects":[{"id":"ART001","name":"wooden toy box","position":"right, nearly full, lid open","size":"melon-sized"},{"id":"ART002","name":"plush elephant","position":"sitting on the wooden bench in the midground","size":"hand-sized"}],"interactions":[{"character":"Lukas","object":"yellow building block","where":"grasps the block under the bench with his fingertips","priority":"essential"}],"background":"a few passersby in grey coats far off","population":"ambient"}}
+```
+
+--- Page 6 ---
+TEXT:
+Am Nachmittag lag der Platz so sauber da, dass man ohne Stolpern darüber gehen konnte. Lukas nahm den Elefanten von der Bank und klemmte ihn unter den Arm. Dann hob er die volle Kiste auf.
+
+Da kam der kleine Nachbar über die Pflastersteine, die gelbe Bommelmütze wippte bei jedem Schritt. Seine Mutter folgte ihm langsam.
+
+«Das ist für dich», sagte Lukas und hielt ihm die Kiste hin. «Es sind alle Klötze drin. Rote, blaue und gelbe.»
+
+Der Kleine fasste mit beiden Händen die Kiste und lachte. Dann schob er den Deckel auf, nahm einen roten Klotz heraus und stellte ihn auf die Bank.
+
+«Turm», sagte er.
+
+«Ja», sagte Lukas. «Komm, wir bauen den ersten zusammen.»
+
+SCENE HINT:
+```json
+{"scene":{"imageSummary":"Lukas, in his bright red bodysuit with blue cape, blue boots, yellow utility belt and yellow emblem on chest, holds the full wooden toy box out to the little neighbour, a toddler in a yellow pompom beanie, dark blue jacket, grey trousers and green boots. Lukas has the plush elephant under his arm, and the cleared plaza stretches behind them in warm light.","setting":{"location":"Grossmünster [LOC001]","indoorOutdoor":"outdoor","description":"Clear cobblestone terrace looking toward the arched portal and the base of the twin towers, golden leaves at the edges.","lighting":"warm afternoon sunlight from the left","camera":"medium","depthLayers":"foreground Lukas and the toddler with the box; midground clear cobblestones; background portal and towers"},"timeOfDay":"afternoon","weather":"clear","characters":[{"id":null,"name":"Lukas","position":"left","action":"holds out the full box with both hands, elephant tucked under one arm","expression":"proud and smiling","clothing":"costumed","depth":"foreground","perspective":"side"},{"id":"CHR001","name":"little neighbour","position":"right","action":"reaches up with both hands for the box","expression":"beaming","clothing":"standard","depth":"foreground","perspective":"side"}],"objects":[{"id":"ART001","name":"wooden toy box","position":"between the two, held out by Lukas","size":"melon-sized"},{"id":"ART002","name":"plush elephant","position":"tucked under Lukas's arm","size":"hand-sized"}],"interactions":[{"character":"Lukas","object":"wooden toy box","where":"holds the box out with both hands","priority":"essential"},{"character":"little neighbour","object":"wooden toy box","where":"reaches for the box","priority":"essential"}],"background":"a few passersby in grey coats far off","population":"ambient"}}
+```

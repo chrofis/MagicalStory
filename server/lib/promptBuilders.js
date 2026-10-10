@@ -10418,6 +10418,14 @@ const RISK_FRAMING_RULE = '- Where a child does something with real physical ris
  */
 const PAGE_OPENING_VARIETY_RULE = "Vary how each page begins: at most one page in three begins with a character's name (a six-page story has two such pages at most), the others open with time, place, speech, sound or action, and no two consecutive pages start the same way";
 
+
+/**
+ * A toy, pet or creature whose name the characters' details do not give has no name in the story.
+ * Measured 2026-10-10 on a live trial: details "Stofftier Elefant" (no name) came out as "sein Stoffelefant,
+ * der Elefant hiess" - the species written as the name. Shared by the beats text writer and the trial pages
+ * writer. docs/decisions.md 2026-10-10 "Trial pages: openings and unnamed toys".
+ */
+const UNNAMED_FIGURE_RULE = "A toy, pet or creature the characters' details give no name for has no name in the story: it is called by what it is (the toy elephant, the dog), and no sentence says it is called or named anything, least of all its own kind. A name written in the details is used exactly as written";
 /**
  * SIZES AND LOOKS BELONG TO THE PICTURES (owner, 2026-09-23). ONE string for
  * the page plan ({SIZE_LOOK_RULE} in story-beats.txt) and every prose pass
@@ -12678,6 +12686,7 @@ function buildStoryTextFromBeatsPrompt(inputData, beats = [], expansions = [], a
     // (2026-08-27) â€” the reader age is the "can a child say it" yardstick.
     TITLE_CRITERIA: titleCriteria(readerAge(inputData)),
     PAGE_OPENING_VARIETY: PAGE_OPENING_VARIETY_RULE,
+    UNNAMED_FIGURE: UNNAMED_FIGURE_RULE,
     WHO_DOES_WHAT: WHO_DOES_WHAT_RULE,
     STYLE_RULEBOOK: styleRulebook(inputData?.language),
     MOTIVE_AT_THE_ACT: MOTIVE_AT_THE_ACT_RULE,
@@ -13012,6 +13021,7 @@ The story takes place in ${inputData.userLocation.city}. Use real place names â€
       RESOLVE_SCENES: `${Math.max(3, pageCount - 1)}-${pageCount}`,
       BACKGROUND_COUNT: String(Math.min(3, pageCount)),
       PAGE_OPENING_VARIETY: PAGE_OPENING_VARIETY_RULE,
+      UNNAMED_FIGURE: UNNAMED_FIGURE_RULE,
       WHO_DOES_WHAT: WHO_DOES_WHAT_RULE,
       STYLE_RULEBOOK: styleRulebook(language),
       MOTIVE_AT_THE_ACT: MOTIVE_AT_THE_ACT_RULE,
@@ -13929,6 +13939,7 @@ module.exports = {
   buildCompositionBlock,
   SPLIT_STATE_MARKINGS_RULE,
   PAGE_OPENING_VARIETY_RULE,
+  UNNAMED_FIGURE_RULE,
   STYLE_RULEBOOK,
   styleRulebook,
   MOTIVE_AT_THE_ACT_RULE,

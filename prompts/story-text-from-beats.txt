@@ -46,6 +46,7 @@ Write the text for all {PAGE_COUNT} pages, in page order, plus a title. Each pag
 Style, on every page:
 {STYLE_RULEBOOK}
 {PAGE_OPENING_VARIETY}.
+{UNNAMED_FIGURE}.
 {PAGE_CONTINUITY}
 {MOTIVE_AT_THE_ACT}.
 {WHO_DOES_WHAT}

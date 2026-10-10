@@ -8,6 +8,8 @@
  *
  *   node scripts/analysis/eval-trial-flash-arc-vb.js --phase=run   --ids=1-13 [--cap=1.5] [--out=evals/runs/<dir>]
  *   node scripts/analysis/eval-trial-flash-arc-vb.js --phase=blind --ids=1-13
+ *   node scripts/analysis/eval-trial-flash-arc-vb.js --phase=pages --ids=1-13 --arcs=evals/runs/2026-10-10_trial-flash-arc-vb-v4 --out=<dir>
+ *     (pages call B only, over the stored planner output A of an earlier run: measures a pages-prompt change)
  */
 require('dotenv').config();
 const fs = require('fs');
@@ -24,8 +26,11 @@ const FRESH_DIR = path.join(ROOT, 'evals/runs/2026-10-10_trial-flash-arc-vb-v2-f
 const OLD_IDS = ['job_1791579344291_rk2bno6av', 'job_1791496820206_qwcnrq30r', 'job_1791391658361_4eylyr1w4', 'job_1791554548909_kl0phznw2', 'job_1791551298726_19tfcxccl'];
 const NEW_IDS = ['job_1791450452362_pv0l5hf49', 'job_1791450270543_n1iu8ipsu', 'job_1790769860433_2bhhj0pyi', 'job_1790680992018_nd95o89r7', 'job_1791500208126_at0wow7xa'];
 const FRESH3 = ['job_1791490151653_r9mypyn0c', 'job_1789944735873_vmbd0or30', 'job_1791497394846_v01s6ndpn'];
-const IDS = [...OLD_IDS, ...NEW_IDS, ...FRESH3];
-const inputDir = id => (FRESH3.includes(id) ? path.join(FRESH_DIR, id) : OLD_IDS.includes(id) ? path.join(BASE, id) : path.join(V2, id));
+// the owner's first live trial on the two-call writer (staging, unnamed toy): inputData, planner output A and pages B as stored
+const STORED_DIR = path.join(ROOT, 'evals/runs/2026-10-10_trial-pages-openings-stored');
+const STORED = ['job_1791628382638_yka3zzxte'];
+const IDS = [...OLD_IDS, ...NEW_IDS, ...FRESH3, ...STORED];
+const inputDir = id => (STORED.includes(id) ? path.join(STORED_DIR, id) : FRESH3.includes(id) ? path.join(FRESH_DIR, id) : OLD_IDS.includes(id) ? path.join(BASE, id) : path.join(V2, id));
 const range = s => { if (!s) return IDS; const [a, b] = s.split('-').map(Number); return IDS.slice(a - 1, (b || a)); };
 const readJson = (f, d) => (fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')) : d);
 const mediumFile = id => {
@@ -135,6 +140,28 @@ function arcRespect(arc, hints, vb) {
     return { vbIds: Object.keys(el).length, foreign, outside, unused, unlistedFigs, unlistedObjs, noLocId: badLoc };
   }
   const guard = (est) => { const s = spendOf(); if (s + est > CAP) { console.log(`STOP: spend ${s.toFixed(3)} + est ${est} > cap ${CAP}`); process.exit(0); } };
+
+  if (phase === 'pages') {
+    await loadPromptTemplates();
+    const { buildTrialPagesPrompt } = require(path.join(ROOT, 'server/lib/promptBuilders'));
+    const { callTextModelStreaming } = require(path.join(ROOT, 'server/lib/textModels'));
+    const { MODEL_DEFAULTS } = require(path.join(ROOT, 'server/config/models'));
+    const arcsDir = path.join(ROOT, arg('arcs'));
+    const ids = range(arg('ids')).filter(id => !fs.existsSync(path.join(OUT, id, 'output-B.txt')));
+    guard(0.095 * ids.length);
+    await Promise.all(ids.map(async id => { try {
+      const input = loadInput(id); const dir = path.join(OUT, id); fs.mkdirSync(dir, { recursive: true });
+      const arcFile = path.join(arcsDir, id, 'output-A.txt');
+      const arcText = fs.readFileSync(fs.existsSync(arcFile) ? arcFile : path.join(STORED_DIR, id, 'output-A.txt'), 'utf8');
+      const prompt = buildTrialPagesPrompt(input, input.pages, arcText);
+      const r = await callTextModelStreaming(prompt, null, () => {}, 'claude-sonnet', { usageLabel: 'unified_story', effort: MODEL_DEFAULTS.trialStoryEffort });
+      const cost = priceUsage(r.modelId, r.usage || {});
+      fs.writeFileSync(path.join(dir, 'output-B.txt'), String(r.text || '').trim()); fs.writeFileSync(path.join(dir, 'prompt-B.txt'), prompt);
+      book({ id, cost }); console.log(id, `$${cost.toFixed(3)} spend=$${spendOf().toFixed(3)}`);
+    } catch (e) { console.log(id, 'ERROR', String(e.message || e).slice(0, 300)); } }));
+    console.log('DONE spend', spendOf().toFixed(3));
+    return;
+  }
 
   if (phase === 'run') {
     await loadPromptTemplates();

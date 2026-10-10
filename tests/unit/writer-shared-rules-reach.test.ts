@@ -7,6 +7,7 @@ const {
   buildTrialArcPrompt,
   buildTrialPagesPrompt,
   PAGE_OPENING_VARIETY_RULE,
+  UNNAMED_FIGURE_RULE,
   AD_COMPOSITION_RULE,
   buildStoryTextFromBeatsPrompt,
   } = require('../../server/lib/promptBuilders.js');
@@ -235,5 +236,21 @@ describe('shared image rules reach the trial scene-hint author as one constant e
     expect(jev).toContain("`population` is the page's FIXED `population`, written by code");
     expect(unfilled(backup)).toEqual([]);
     expect(unfilled(jev)).toEqual([]);
+  });
+});
+
+// Measured 2026-10-10 on a live trial (docs/decisions.md "Trial pages: openings and unnamed toys").
+describe('trial pages writer: arc-habit openings and unnamed toys', () => {
+  it.each(['beats', 'trial'])('%s carries the unnamed-figure rule', (name) => {
+    expect(built[name]).toContain(UNNAMED_FIGURE_RULE);
+  });
+  it('the unnamed-figure rule forbids a name that is the figure's own kind', () => {
+    expect(UNNAMED_FIGURE_RULE).toMatch(/no name/);
+    expect(UNNAMED_FIGURE_RULE).toMatch(/least of all its own kind/);
+  });
+  it('the pages prompt tells the writer the arc lines open on a name by habit and caps name openings', () => {
+    expect(built.trial).toContain('The arc lines each begin on a name by habit');
+    expect(built.trial).toContain('of the other pages at most one does');
+    expect(built.trial).toContain('check the first words of every page');
   });
 });

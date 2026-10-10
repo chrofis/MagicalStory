@@ -1,0 +1,154 @@
+---STORY ARC---
+PAGE 1: Lukas, dressed in his superhero suit, carries a wooden toy box full of colourful building blocks across the Grossmünster plaza to give them to his little neighbour, with his toy elephant tucked securely under his arm. | WITH: Lukas; wooden toy box; plush elephant | STATE: the wooden toy box is full of colourful building blocks and held by Lukas
+PAGE 2: A sudden crow swoops down and knocks against the wooden toy box, sending the box tumbling and scattering all the building blocks widely across the stone plaza. | WITH: Lukas; wooden toy box; plush elephant; mischievous crow | STATE: the wooden toy box is knocked onto its side; the colourful building blocks are scattered across the ground
+PAGE 3: Lukas tries to grab all the blocks at once in a big rush, but they slip out of his hands and roll even farther away, making the mess worse and leaving him overwhelmed. | WITH: Lukas; wooden toy box; plush elephant | STATE: none
+PAGE 4: Lukas stops, places his toy elephant on the wooden bench to watch as his superhero observer, and comes up with a clever superhero sorting game: tackling the mess in small, focused rounds by colour. | WITH: Lukas; plush elephant; wooden toy box | STATE: the plush elephant is placed sitting on the wooden bench
+PAGE 5: Using his superhero speed and systematic rounds, Lukas gathers the red and blue blocks, then peeks under the stone benches to retrieve the final hidden yellow blocks and packs everything neatly into the box. | WITH: Lukas; wooden toy box; plush elephant | STATE: the wooden toy box is neatly filled and closed; all blocks are packed
+PAGE 6: With the plaza completely cleared and the wooden toy box packed full, Lukas retrieves his toy elephant and proudly hands the tidy box over to the smiling little neighbour. | WITH: Lukas; wooden toy box; plush elephant; little neighbour | STATE: the wooden toy box is handed over to the little neighbour; the plush elephant is held by Lukas
+
+---TITLE---
+TITLE: Superheld Lukas und der grosse Klötzli-Einsatz
+
+---VISUAL BIBLE---
+```json
+{
+  "secondaryCharacters": [
+    {
+      "id": "CHR001",
+      "name": "little neighbour",
+      "pages": [6],
+      "scaleClass": "waist-high",
+      "age": "a toddler boy of about three",
+      "build": "small, chubby toddler build",
+      "hair": "blond, curly, short cropped hair",
+      "face": "round rosy cheeks, brown eyes, friendly open expression",
+      "signatureLook": "bright yellow knitted pompom beanie",
+      "clothing": "dark blue autumn jacket, grey trousers, small green boots"
+    }
+  ],
+  "animals": [
+    {
+      "id": "ANI001",
+      "name": "mischievous crow",
+      "pages": [2],
+      "scaleClass": "forearm-sized",
+      "species": "carrion crow",
+      "coloring": "glossy black plumage with subtle charcoal sheen",
+      "anatomy": "two large wings, two slender clawed black legs, one sturdy black beak, one fan tail",
+      "features": "a sharp pointed black beak, dark round glossy eyes, smooth black head feathers"
+    }
+  ],
+  "artifacts": [
+    {
+      "id": "ART001",
+      "label": "wooden toy box",
+      "name": "wooden toy box with colourful building blocks",
+      "pages": [1, 2, 3, 4, 5, 6],
+      "scaleClass": "melon-sized",
+      "type": "toy chest",
+      "description": "wooden toy box made of light-grained pine wood with two cut-out side handles and a sliding lid, accompanied by smooth painted red, blue, and yellow wooden cubes and rectangular building blocks",
+      "states": [
+        {
+          "name": "full",
+          "delta": "filled to the brim with neatly arranged colourful building blocks",
+          "pages": [1, 5, 6]
+        },
+        {
+          "name": "empty and tipped",
+          "delta": "lying on its side on the stones, completely empty",
+          "pages": [2, 3, 4]
+        }
+      ]
+    },
+    {
+      "id": "ART002",
+      "label": "plush elephant",
+      "name": "grey stuffed elephant toy",
+      "properName": "Elefant",
+      "pages": [1, 2, 3, 4, 5, 6],
+      "scaleClass": "hand-sized",
+      "type": "soft toy",
+      "description": "plush elephant made of soft grey velour fabric with oversized floppy ears, stitched black thread eyes, a curved little trunk, and stubby padded legs",
+      "states": [
+        {
+          "name": "held",
+          "delta": "tucked securely under the superhero cape or in a child arm",
+          "pages": [1, 2, 3, 6]
+        },
+        {
+          "name": "sitting",
+          "delta": "perched upright on a wooden bench surface watching the scene",
+          "pages": [4, 5]
+        }
+      ]
+    }
+  ],
+  "locations": [
+    {
+      "id": "LOC001",
+      "name": "Grossmünster",
+      "pages": [1, 2, 3, 4, 5, 6],
+      "scaleClass": "landmark",
+      "setting": "outdoor public church plaza",
+      "colors": "pale cream sandstone, grey cobblestones, warm golden autumn leaves",
+      "features": "historic twin romanesque church towers with decorative cupolas, stone benches along the cobblestone square, views of medieval facades",
+      "signatureElement": "iconic twin cream-coloured church towers topped with flags",
+      "isRealLandmark": true,
+      "landmarkQuery": "Grossmünster",
+      "landmarkPhoto": 1
+    }
+  ],
+  "backgrounds": [
+    {
+      "pages": [1, 2],
+      "landmarkPhoto": 1,
+      "description": "A wide view of the Grossmünster plaza paved with grey cobblestones, with the majestic twin cream-coloured romanesque towers rising into a crisp autumn sky with scattered golden foliage. Open plaza in foreground."
+    },
+    {
+      "pages": [3, 4],
+      "landmarkPhoto": 1,
+      "description": "A medium shot of the Grossmünster church terrace corner near a heavy wooden bench and low stone parapet wall, with autumn leaves on the paving stones and romanesque stone masonry in background. Open ground space in center."
+    },
+    {
+      "pages": [5, 6],
+      "landmarkPhoto": 1,
+      "description": "A lower-angle perspective of the Grossmünster square looking toward the arched portal and the base of the twin stone towers, with a clear expanse of cobblestone terrace and warm afternoon autumn lighting."
+    }
+  ]
+}
+```
+
+---COVER SCENE---
+```json
+{
+  "title": "Superheld Lukas und der grosse Klötzli-Einsatz",
+  "scene": {
+    "imageSummary": "Lukas stands heroically on the cobblestone plaza of the Grossmünster in his superhero suit consisting of a bright red bodysuit with blue cape, blue boots, yellow utility belt, and yellow emblem on chest, holding the wooden toy box and plush elephant with confident determination in warm autumn sunlight.",
+    "setting": {
+      "location": "Grossmünster [LOC001]",
+      "indoorOutdoor": "outdoor",
+      "description": "The historic Grossmünster plaza with its weathered cobblestone ground, golden autumn leaves blowing gently, and the towering romanesque twin towers behind.",
+      "lighting": "warm afternoon sunlight streaming from the left, casting long soft shadows across the stone plaza",
+      "camera": "wide",
+      "depthLayers": "foreground paved cobblestones; midground Lukas posing with his wooden toy box; background iconic Grossmünster twin towers against clear autumn sky"
+    },
+    "timeOfDay": "afternoon",
+    "weather": "clear",
+    "characters": [
+      {
+        "id": null,
+        "name": "Lukas",
+        "position": "center",
+        "action": "standing in a dynamic superhero pose, holding the wooden toy box in one arm and the plush elephant under the other",
+        "expression": "confident",
+        "clothing": "costumed"
+      }
+    ],
+    "objects": [
+      {"id": "LOC001", "name": "Grossmünster", "position": "background"},
+      {"id": "ART001", "name": "wooden toy box", "position": "held in Lukas's arm"},
+      {"id": "ART002", "name": "plush elephant", "position": "tucked under Lukas's arm"}
+    ]
+  }
+}
+```
