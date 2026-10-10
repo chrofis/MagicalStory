@@ -6,7 +6,10 @@
  * provider call. The only exceptions are the allow-listed sites below, each
  * with the reason the owner may veto.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+
+// Whole-tree source scans: they take seconds alone and exceed the 10s default under full-suite load.
+vi.setConfig({ testTimeout: 60000 });
 import fs from 'node:fs';
 import path from 'node:path';
 

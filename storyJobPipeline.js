@@ -840,9 +840,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // trial page shipped the WHOLE 2×4 sheet as its reference instead of the
         // one matching pose cell (verified on prod job_1787647410717_5dvfqu8jg
         // p2). Shape mirrors the write-back in styledAvatars.js exactly.
+        const characterNamed = (charName) => (inputData.characters || []).find(c => c?.name === charName)
+          || (inputData.characters || []).find(c => String(c?.name || '').toLowerCase() === String(charName).toLowerCase());
         const rememberOnCharacter = (charName, clothingCategory, imageData) => {
-          const char = (inputData.characters || []).find(c => c?.name === charName)
-            || (inputData.characters || []).find(c => String(c?.name || '').toLowerCase() === String(charName).toLowerCase());
+          const char = characterNamed(charName);
           if (!char || !imageData) return;
           if (!char.avatars) char.avatars = {};
           if (!char.avatars.styledAvatars) char.avatars.styledAvatars = {};
@@ -859,12 +860,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           for (const [category, imageData] of Object.entries(avatars)) {
             if (category === 'costumed' && typeof avatars.costumed === 'object') {
               for (const [costumeType, img] of Object.entries(avatars.costumed)) {
-                setStyledAvatar(charName, `costumed:${costumeType}`, artStyle, img);
+                setStyledAvatar(characterNamed(charName) || charName, `costumed:${costumeType}`, artStyle, img);
                 rememberOnCharacter(charName, `costumed:${costumeType}`, img);
                 seeded++;
               }
             } else if (category !== 'costumed') {
-              setStyledAvatar(charName, category, artStyle, imageData);
+              setStyledAvatar(characterNamed(charName) || charName, category, artStyle, imageData);
               rememberOnCharacter(charName, category, imageData);
               if (category === 'standard') standardPrepared = true;
               seeded++;
@@ -904,7 +905,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // put its head and body cells next to the costumed ones. A prepared one is already in the stored slides,
           // cut by the prepare call (docs/decisions.md 2026-10-09).
           const main = (inputData.characters || [])[0];
-          const styled = !standardPrepared && main && getStyledAvatarsForCharacter(main.name, artStyle);
+          const styled = !standardPrepared && main && getStyledAvatarsForCharacter(main, artStyle);
           if (styled) {
             require('./server/lib/avatarSlides')
               .persistAvatarSlides({ characterId: `characters_${userId}`, userId, styledAvatars: styled })

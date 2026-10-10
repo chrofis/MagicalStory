@@ -1,4 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+
+// The server/scripts source walk takes seconds alone and exceeds the 10s default under full-suite load.
+vi.setConfig({ testTimeout: 60000 });
 import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import path from 'node:path';

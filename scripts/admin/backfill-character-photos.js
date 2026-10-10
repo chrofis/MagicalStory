@@ -127,7 +127,7 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
                     ? val
                     : (val && typeof val === 'object' && typeof val.imageData === 'string') ? val.imageData : null;
                   if (!inline) continue;
-                  queue(inline, r2.keyForCharacterStyledAvatar(userId, charId, `${artStyle}-costumed-${name}`), (url) => {
+                  queue(inline, r2.keyForCharacterStyledAvatar(userId, charId, `${artStyle}-costumed-${name}`, inline), (url) => {
                     slot[name] = { imageUrl: url };
                   });
                 }
@@ -136,7 +136,7 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
                   ? slot
                   : (slot && typeof slot === 'object' && typeof slot.imageData === 'string') ? slot.imageData : null;
                 if (!inline) continue;
-                queue(inline, r2.keyForCharacterStyledAvatar(userId, charId, `${artStyle}-${clothing}`), (url) => {
+                queue(inline, r2.keyForCharacterStyledAvatar(userId, charId, `${artStyle}-${clothing}`, inline), (url) => {
                   perArt[clothing] = { imageUrl: url };
                 });
               }

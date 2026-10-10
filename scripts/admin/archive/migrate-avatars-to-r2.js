@@ -235,7 +235,7 @@ async function migrateCharacters(pool) {
             }
             const value = (typeof inline === 'object' && inline?.imageData) ? inline.imageData : inline;
             if (!isInlineBase64(value)) continue;
-            const r2Key = r2.keyForCharacterStyledAvatar(userId, charId, `${artStyle}_${key}`);
+            const r2Key = r2.keyForCharacterStyledAvatar(userId, charId, `${artStyle}_${key}`, value);
             if (DRY_RUN) {
               perRowUploads++;
               perRowBytes += byteSize(value);
@@ -337,7 +337,7 @@ async function migrateVbRefs(pool) {
           const url = entry.referenceImageUrl;
 
           const result = await uploadIfMissing(
-            (b64) => r2.uploadImage(b64, r2.keyForVbReference(row.id, entry.id)),
+            (b64) => r2.uploadImage(b64, r2.keyForVbReference(row.id, entry.id, b64)),
             inline,
             url,
           );

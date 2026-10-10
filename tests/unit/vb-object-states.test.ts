@@ -431,9 +431,9 @@ describe('updateElementReferenceImage — dotted writes land on the state', () =
     expect(vb.artifacts[1].referenceImageUrl).toBe('https://r2/plain.jpg');
   });
 
-  it('the R2 key has no second extension, and bare-id keys are unchanged', () => {
-    expect(keyForVbReference('s1', 'ART001.2')).toBe('stories/s1/vb/ART001_2.jpg');
-    expect(keyForVbReference('s1', 'ART001')).toBe('stories/s1/vb/ART001.jpg');
+  it('the R2 key has no second extension; it is named by content', () => {
+    expect(keyForVbReference('s1', 'ART001.2', 'bytes')).toMatch(/^stories\/s1\/vb\/ART001_2-[0-9a-f]{24}\.jpg$/);
+    expect(keyForVbReference('s1', 'ART001', 'bytes')).toMatch(/^stories\/s1\/vb\/ART001-[0-9a-f]{24}\.jpg$/);
   });
 });
 

@@ -244,7 +244,7 @@ describe('2. prepare-title and the job reuse it', () => {
       expect(src).toContain("jobStartAvatars: require('./server/lib/trialSheets').usablePreparedAvatars((inputData.characters || [])[0])");
       expect(src).toContain("return require('./server/lib/trialSheets').usablePreparedAvatars(main);");
       // the job persists slides only for a standard sheet it styled itself
-      expect(src).toContain('const styled = !standardPrepared && main && getStyledAvatarsForCharacter(main.name, artStyle);');
+      expect(src).toContain('const styled = !standardPrepared && main && getStyledAvatarsForCharacter(main, artStyle);');
       expect(read('server/routes/trial.js')).toContain('preGeneratedStandardFor: characterData._preGeneratedStandardFor || null,');
     });
   });

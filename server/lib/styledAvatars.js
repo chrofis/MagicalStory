@@ -150,7 +150,7 @@ function loadStyleSampleImage(artStyle) {
 }
 
 // In-memory cache for styled avatars, scoped per job to prevent cross-job collisions
-// Key: `${scopePrefix}${characterName}_${clothingCategory}_${artStyle}`
+// Key: `${scopePrefix}${ownerKey}_${clothingCategory}_${artStyle}` — ownerKey is the character id (avatarOwnerKey)
 // Value: base64 image data (downsized)
 const styledAvatarCache = new Map();
 
@@ -287,13 +287,27 @@ function buildPhysicalTraitsString(character) {
 }
 
 /**
+ * Who a cached sheet belongs to: the character's ID when it has one, else its lowercase name. A name key made two
+ * characters called "Sarah" in one story share sheets (docs/decisions.md 2026-10-10; SETTLED: names resolve through
+ * castResolver, ids exist). `ref` is a character-like object ({id, name}: a character, a photo detail) or a bare
+ * name string for callers that only have one (a character without an id).
+ */
+function avatarOwnerKey(ref) {
+  if (ref && typeof ref === 'object') {
+    if (ref.id != null && ref.id !== '') return `#${ref.id}`;
+    return String(ref.name || '').trim().toLowerCase();
+  }
+  return String(ref || '').trim().toLowerCase();
+}
+
+/**
  * Generate cache key for styled avatar
- * @param {string} characterName
+ * @param {string|{id?:string|number,name:string}} characterRef character (preferred) or bare name
  * @param {string} clothingCategory
  * @param {string} artStyle
  * @returns {string}
  */
-function getAvatarCacheKey(characterName, clothingCategory, artStyle) {
+function getAvatarCacheKey(characterRef, clothingCategory, artStyle) {
   // Collapse clothing category to one of 4 canonical buckets BEFORE building
   // the key. Phase 5/6 — costumed subtype keying is gone. One costume per
   // character per story → bare 'costumed' is enough; the subtype lives on
@@ -306,8 +320,7 @@ function getAvatarCacheKey(characterName, clothingCategory, artStyle) {
   const keyCategory = off
     ? buildOffCategory(normalizeClothingCategory(off.baseCategory), off.offIds)
     : normalizeClothingCategory(clothingCategory);
-  const name = String(characterName || '').trim().toLowerCase();
-  return `${getCacheScope()}${name}_${keyCategory}_${artStyle}`;
+  return `${getCacheScope()}${avatarOwnerKey(characterRef)}_${keyCategory}_${artStyle}`;
 }
 
 /**
@@ -409,7 +422,7 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
     }
     const downsizedSheet = await compressImageToJPEG(result.imageData, 85, 1024);
     if (result.realisticImageData) {
-      styledPass1Sheets.set(getAvatarCacheKey(characterName, clothingCategory, artStyle), await compressImageToJPEG(result.realisticImageData, 85, 1024));
+      styledPass1Sheets.set(getAvatarCacheKey(character || characterName, clothingCategory, artStyle), await compressImageToJPEG(result.realisticImageData, 85, 1024));
     }
 
     const usedPhantom = result.refs?.phantom || null;
@@ -529,7 +542,7 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
  * @returns {Promise<string>} Styled avatar as base64 data URL
  */
 async function getOrCreateStyledAvatar(characterName, clothingCategory, artStyle, originalAvatar, facePhoto = null, clothingDescription = null, addUsage = null, character = null, imageModelOverride = null, { skipQualityEval = false, redress = false, seasonOutfit = null, fastPass1 = false, precomputedBody = null } = {}) {
-  const cacheKey = getAvatarCacheKey(characterName, clothingCategory, artStyle);
+  const cacheKey = getAvatarCacheKey(character || characterName, clothingCategory, artStyle);
 
   // Check cache first. A guarantee-seeded raw reference does NOT count — the
   // whole point of the seed is to cover reads while a real conversion can
@@ -645,7 +658,7 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
       const char = (resolved && resolved.kind === 'cast') ? resolved.entry : null;
       if (!char) continue;
 
-      const cacheKey = getAvatarCacheKey(charName, clothingCategory, artStyle);
+      const cacheKey = getAvatarCacheKey(char, clothingCategory, artStyle);
 
       // Skip if already cached (a guarantee-seeded raw reference doesn't
       // count — the real conversion must still be retried). The character
@@ -977,7 +990,7 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
     const fallbackPromises = [];
     for (const { charName, char } of failedCostumed) {
       if (!char) continue;
-      const fallbackKey = getAvatarCacheKey(charName, 'standard', artStyle);
+      const fallbackKey = getAvatarCacheKey(char, 'standard', artStyle);
       if (styledAvatarCache.has(fallbackKey) && !guaranteeSeededKeys.has(fallbackKey)) continue;
       const avatars = char.avatars || char.clothingAvatars;
       // Same resolveAvatarBytes pattern — handles inline + R2 URL. Without it,
@@ -1144,7 +1157,7 @@ async function ensureStyledAvatarCoverage(characters, artStyle, pageRequirements
     if (!required) continue;
     // Realistic: only a required costume implies a sheet must exist.
     if (isRealistic && !required.has('costumed')) continue;
-    const hasAny = STYLED_AVATAR_BUCKETS.some(b => styledAvatarCache.has(getAvatarCacheKey(char.name, b, artStyle)));
+    const hasAny = STYLED_AVATAR_BUCKETS.some(b => styledAvatarCache.has(getAvatarCacheKey(char, b, artStyle)));
     // Per-category gap check: a character with SOME avatar used to pass the
     // guarantee silently even when a REQUIRED category was missing (a failed
     // costumed sheet fell back to 'standard', hasAny was true, and the costume
@@ -1153,7 +1166,7 @@ async function ensureStyledAvatarCoverage(characters, artStyle, pageRequirements
     if (hasAny) {
       const missing = [...required].filter(cat => {
         if (isRealistic && cat !== 'costumed') return false;
-        const key = getAvatarCacheKey(char.name, cat, artStyle);
+        const key = getAvatarCacheKey(char, cat, artStyle);
         return !styledAvatarCache.has(key) || guaranteeSeededKeys.has(key);
       });
       if (missing.length > 0 && !final) {
@@ -1163,7 +1176,7 @@ async function ensureStyledAvatarCoverage(characters, artStyle, pageRequirements
         log.error(`[AVATAR] ❌ ${char.name} is missing required styled avatar categor${missing.length === 1 ? 'y' : 'ies'} ${missing.join(', ')} — pages will substitute another bucket's sheet and render the outfit from prompt text only`);
         getCurrentLogger()?.error('avatar_category_missing',
           `Required styled avatar categor${missing.length === 1 ? 'y' : 'ies'} missing after all retries: ${missing.join(', ')} — another bucket's sheet substitutes`,
-          char.name, { artStyle, missing, cached: STYLED_AVATAR_BUCKETS.filter(b => styledAvatarCache.has(getAvatarCacheKey(char.name, b, artStyle))) });
+          char.name, { artStyle, missing, cached: STYLED_AVATAR_BUCKETS.filter(b => styledAvatarCache.has(getAvatarCacheKey(char, b, artStyle))) });
         const scope = cacheContext.getStore() || _STYLED_LOG_UNSCOPED;
         let bucket = styledAvatarGenerationLogs.get(scope);
         if (!bucket) { bucket = []; styledAvatarGenerationLogs.set(scope, bucket); }
@@ -1213,7 +1226,7 @@ async function ensureStyledAvatarCoverage(characters, artStyle, pageRequirements
       // Seed at 'standard' — getStyledAvatar's bucket substitution serves it
       // for costumed/winter/summer requests too. Registered as seeded so a
       // later prepareStyledAvatars call still retries the real conversion.
-      const seedKey = getAvatarCacheKey(char.name, 'standard', artStyle);
+      const seedKey = getAvatarCacheKey(char, 'standard', artStyle);
       styledAvatarCache.set(seedKey, imageData);
       guaranteeSeededKeys.add(seedKey);
       log.error(`[AVATAR] ❌ ${char.name} has no styled avatar after retries — using ${source} as identity reference for all pages/covers (required: ${[...required].join(', ')}; chain: ${warnings.join('; ') || 'none'})`);
@@ -1259,8 +1272,8 @@ async function ensureStyledAvatarCoverage(characters, artStyle, pageRequirements
  * @param {string} artStyle
  * @returns {string|null} Styled avatar base64 or null if not cached
  */
-function getStyledAvatar(characterName, clothingCategory, artStyle) {
-  const cacheKey = getAvatarCacheKey(characterName, clothingCategory, artStyle);
+function getStyledAvatar(characterRef, clothingCategory, artStyle) {
+  const cacheKey = getAvatarCacheKey(characterRef, clothingCategory, artStyle);
   const styledAvatar = styledAvatarCache.get(cacheKey);
 
   // Safety: if we have no cache scope set, log a WARN — means a code path escaped
@@ -1294,7 +1307,7 @@ function getStyledAvatar(characterName, clothingCategory, artStyle) {
   const fallbackOrder = ['costumed', 'standard', 'winter', 'summer'];
   for (const bucket of fallbackOrder) {
     if (bucket === requestedCanonical) continue;
-    const altKey = getAvatarCacheKey(characterName, bucket, artStyle);
+    const altKey = getAvatarCacheKey(characterRef, bucket, artStyle);
     const alt = styledAvatarCache.get(altKey);
     if (alt) {
       log.warn(`🧥 [STYLED-AVATAR] Bucket substitution: ${cacheKey} not in cache → using ${altKey} (only available variant for this character)`);
@@ -1314,8 +1327,8 @@ function getStyledAvatar(characterName, clothingCategory, artStyle) {
  * @param {string} artStyle
  * @returns {boolean}
  */
-function hasStyledAvatar(characterName, clothingCategory, artStyle) {
-  const cacheKey = getAvatarCacheKey(characterName, clothingCategory, artStyle);
+function hasStyledAvatar(characterRef, clothingCategory, artStyle) {
+  const cacheKey = getAvatarCacheKey(characterRef, clothingCategory, artStyle);
   return styledAvatarCache.has(cacheKey);
 }
 
@@ -1327,17 +1340,17 @@ function hasStyledAvatar(characterName, clothingCategory, artStyle) {
  * @param {string} artStyle
  * @param {string} imageData - Base64 image data
  */
-function setStyledAvatar(characterName, clothingCategory, artStyle, imageData) {
+function setStyledAvatar(characterRef, clothingCategory, artStyle, imageData) {
   // Refuse to write when called outside a runInCacheScope wrapper. The cache
   // key prefix would be empty, so the entry would live in a shared bucket
   // visible to every other unscoped caller — same cross-story bleed class as
   // the avatar-log bug. Loud failure is better than silent collision; downstream
   // hits the existing bucket-substitution fallback in getStyledAvatar.
   if (getCacheScope() === '') {
-    log.error(`❌ [STYLED-AVATAR] setStyledAvatar called outside cache scope for "${characterName}/${clothingCategory}/${artStyle}" — REFUSED to write (would collide with other unscoped callers). Wrap the caller in runInCacheScope.`);
+    log.error(`❌ [STYLED-AVATAR] setStyledAvatar called outside cache scope for "${avatarOwnerKey(characterRef)}/${clothingCategory}/${artStyle}" — REFUSED to write (would collide with other unscoped callers). Wrap the caller in runInCacheScope.`);
     return;
   }
-  const cacheKey = getAvatarCacheKey(characterName, clothingCategory, artStyle);
+  const cacheKey = getAvatarCacheKey(characterRef, clothingCategory, artStyle);
   styledAvatarCache.set(cacheKey, imageData);
   log.debug(`📥 [STYLED AVATARS] Added to cache: ${cacheKey}`);
 }
@@ -1532,7 +1545,7 @@ function getStyledAvatarCacheStats() {
  * @param {Object} character - Optional character object to also clear styledAvatars from character data
  */
 function invalidateStyledAvatarForCategory(characterName, clothingCategory, character = null) {
-  const charLower = characterName.trim().toLowerCase();
+  const charLower = avatarOwnerKey(character || characterName);
   const scope = getCacheScope();
   let clearedCount = 0;
 
@@ -1612,7 +1625,7 @@ function applyStyledAvatars(characterPhotos, artStyle) {
     // fallback in getCharacterPhotoDetails, photo.clothingCategory reports
     // 'standard' — but a styled winter avatar in cache is the correct ref.
     const lookupCategory = photo.requestedClothingCategory || photo.clothingCategory;
-    const styledAvatar = getStyledAvatar(photo.name, lookupCategory, artStyle);
+    const styledAvatar = getStyledAvatar(photo, lookupCategory, artStyle);
     if (styledAvatar) {
       if (photo.requestedClothingCategory && photo.clothingCategory
           && photo.requestedClothingCategory !== photo.clothingCategory) {
@@ -1874,14 +1887,14 @@ function collectAvatarRequirements(sceneDescriptions, characters, pageClothing =
  * @param {string} artStyle
  * @returns {Record<string, string>|null} Map of clothingCategory -> styledAvatar, or null if none found
  */
-function getStyledAvatarsForCharacter(characterName, artStyle) {
+function getStyledAvatarsForCharacter(characterRef, artStyle) {
   const clothingCategories = ['winter', 'standard', 'summer'];
   const result = {};
   let foundAny = false;
 
   // Check standard categories
   for (const category of clothingCategories) {
-    const cacheKey = getAvatarCacheKey(characterName, category, artStyle);
+    const cacheKey = getAvatarCacheKey(characterRef, category, artStyle);
     const styledAvatar = styledAvatarCache.get(cacheKey);
     if (styledAvatar) {
       result[category] = styledAvatar;
@@ -1892,7 +1905,7 @@ function getStyledAvatarsForCharacter(characterName, artStyle) {
   // Costumed entry — Phase 5/6: one costume slot per character, cached at
   // bare `_costumed_` key. Persists under `result.costumed.default` so the
   // exporter caller (which iterates Object.values) sees it.
-  const costumedKey = getAvatarCacheKey(characterName, 'costumed', artStyle);
+  const costumedKey = getAvatarCacheKey(characterRef, 'costumed', artStyle);
   const costumedValue = styledAvatarCache.get(costumedKey);
   if (costumedValue) {
     if (!result.costumed) result.costumed = {};
@@ -1917,7 +1930,7 @@ function exportStyledAvatarsForPersistence(characters, artStyle, keyOf = (c) => 
   const result = new Map();
 
   for (const char of characters) {
-    const avatars = getStyledAvatarsForCharacter(char.name, artStyle);
+    const avatars = getStyledAvatarsForCharacter(char, artStyle);
     if (avatars) {
       result.set(keyOf(char), avatars);
     }
@@ -1974,7 +1987,7 @@ function publishStyledAvatarsToCharacters(characters, artStyle) {
   if (!Array.isArray(characters) || !artStyle) return 0;
   let published = 0;
   for (const char of characters) {
-    const avatars = getStyledAvatarsForCharacter(char.name, artStyle);
+    const avatars = getStyledAvatarsForCharacter(char, artStyle);
     if (!avatars) continue;
     if (!char.avatars) char.avatars = {};
     if (!char.avatars.styledAvatars) char.avatars.styledAvatars = {};
@@ -2097,7 +2110,7 @@ async function prepareWardrobeVariantAvatars(characters, artStyle, variantRequir
       log.warn(`👕 [WARDROBE-VARIANT] "${charName}" is not in the commissioned cast — no variant sheet`);
       continue;
     }
-    const cacheKey = getAvatarCacheKey(charName, row.clothingCategory, artStyle);
+    const cacheKey = getAvatarCacheKey(char, row.clothingCategory, artStyle);
     if (styledAvatarCache.has(cacheKey) && !guaranteeSeededKeys.has(cacheKey)) {
       rememberStyledAvatarOnCharacter(char, artStyle, row.clothingCategory, styledAvatarCache.get(cacheKey));
       continue;
@@ -2112,7 +2125,7 @@ async function prepareWardrobeVariantAvatars(characters, artStyle, variantRequir
     }
     const facePhoto = await photoAsDataUri(getFacePhoto(char), `${charName} face photo`);
     // The Pass-1 sheet the base was approved against (the style judge's Image 2).
-    const realisticSheet = styledPass1Sheets.get(getAvatarCacheKey(charName, off.baseCategory, artStyle)) || null;
+    const realisticSheet = styledPass1Sheets.get(getAvatarCacheKey(char, off.baseCategory, artStyle)) || null;
     jobs.push({ charName, char, row, off, cacheKey, baseSheet, facePhoto, realisticSheet });
   }
 
@@ -2239,6 +2252,7 @@ module.exports = {
 
   // Utility
   getAvatarCacheKey,
+  avatarOwnerKey,
 
   // Loaded prompts (for external use)
   ART_STYLE_PROMPTS

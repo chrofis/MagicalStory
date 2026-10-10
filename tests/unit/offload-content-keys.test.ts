@@ -45,3 +45,21 @@ describe('offloadCharacterImages names objects by content', () => {
     expect(bucket.size).toBe(1);
   });
 });
+
+describe('styled sheets and VB references are named by content', () => {
+  const { saveStyledAvatarToR2, saveVbReferenceToR2 } = require_('../../server/services/database');
+  it('a later sheet for the same style and category does not overwrite the earlier one', async () => {
+    const u1 = await saveStyledAvatarToR2('u1', 'c1', 'anime/standard', bytes('A'));
+    const u2 = await saveStyledAvatarToR2('u1', 'c1', 'anime/standard', bytes('B'));
+    expect(u1).not.toBe(u2);
+    expect(bucket.get(key(u1))).toBe(bytes('A'));
+    expect(bucket.get(key(u2))).toBe(bytes('B'));
+  });
+  it('a VB reference rewritten for the same entry keeps the earlier bytes under the earlier URL', async () => {
+    const u1 = await saveVbReferenceToR2('s1', 'LOC001', bytes('A'));
+    const u2 = await saveVbReferenceToR2('s1', 'LOC001', bytes('B'));
+    expect(u1).not.toBe(u2);
+    expect(bucket.get(key(u1))).toBe(bytes('A'));
+    expect(bucket.get(key(u2))).toBe(bytes('B'));
+  });
+});

@@ -4157,7 +4157,7 @@
       "status": "fixed",
       "fixedAt": "2026-10-09",
       "fixedIn": "96c6e35d1",
-      "fix": "r2.contentKey names every offloaded object; tests/unit/offload-content-keys.test.ts. Stored refs: scripts/admin/repair-overwritten-story-sheets.js (owner applies)"
+      "fix": "r2.contentKey names every offloaded object; tests/unit/offload-content-keys.test.ts. Stored refs: scripts/admin/repair-overwritten-story-sheets.js (owner applies) Follow-up (styled sheets content-keyed, VB references content-keyed, in-run cache keyed by character id): see the 2026-10-10 docs/decisions.md entry."
     },
     {
       "id": "same-name-characters-share-sheets",
@@ -4167,7 +4167,7 @@
       "status": "fixed",
       "fixedAt": "2026-10-09",
       "fixedIn": "96c6e35d1",
-      "fix": "sheet write-back by character id; tests/unit/styled-sheets-by-character-id.test.ts"
+      "fix": "sheet write-back by character id; tests/unit/styled-sheets-by-character-id.test.ts Follow-up (styled sheets content-keyed, VB references content-keyed, in-run cache keyed by character id): see the 2026-10-10 docs/decisions.md entry."
     }
   ]
 }

@@ -1504,7 +1504,7 @@ async function extractInlineImagesToR2(storyId, data) {
       const entryId = loc.id || loc.dbKey || loc.name;
       if (!entryId) continue;
       const safeId = String(entryId).replace(/[^a-zA-Z0-9_-]/g, '_');
-      upload(loc.referencePhotoData, r2.keyForVbReference(storyId, safeId), (url) => {
+      upload(loc.referencePhotoData, r2.keyForVbReference(storyId, safeId, loc.referencePhotoData), (url) => {
         loc.referencePhotoUrl = url;
         loc.referencePhotoData = undefined;
       });
@@ -2811,7 +2811,7 @@ async function saveAvatarToR2(userId, characterId, slot, imageData, version) {
 
 /**
  * Upload a styled avatar (per-clothing variant) to R2.
- * Key format: characters/{userId}/{characterId}/avatars/styled/{key}.jpg
+ * Key format: characters/{userId}/{characterId}/avatars/styled/{key}-{content hash}.jpg
  * @param {string|number} userId
  * @param {string|number} characterId
  * @param {string} key            - styled avatar key (e.g. 'medieval', 'modern-summer')
@@ -2823,7 +2823,7 @@ async function saveStyledAvatarToR2(userId, characterId, key, imageData) {
   try {
     const r2 = require('../lib/r2');
     if (!r2.isConfigured()) return null;
-    const r2Key = r2.keyForCharacterStyledAvatar(userId, characterId, key);
+    const r2Key = r2.keyForCharacterStyledAvatar(userId, characterId, key, imageData);
     return await r2.uploadImage(imageData, r2Key);
   } catch (err) {
     console.warn(`[R2] saveStyledAvatarToR2 upload skipped (${userId}/${characterId}/${key}): ${err.message}`);
@@ -2980,7 +2980,7 @@ async function saveAvatarThumbToR2(userId, characterId, kind, slot, imageData, v
 
 /**
  * Upload a Visual Bible reference image to R2. Stateless.
- * Key format: stories/{storyId}/vb/{entryId}.jpg
+ * Key format: stories/{storyId}/vb/{entryId}-{content hash}.jpg
  * @param {string} storyId
  * @param {string} entryId        - VB entry id (e.g. 'ART003', 'CHR012')
  * @param {string} imageData      - base64
@@ -2991,7 +2991,7 @@ async function saveVbReferenceToR2(storyId, entryId, imageData) {
   try {
     const r2 = require('../lib/r2');
     if (!r2.isConfigured()) return null;
-    const key = r2.keyForVbReference(storyId, entryId);
+    const key = r2.keyForVbReference(storyId, entryId, imageData);
     return await r2.uploadImage(imageData, key);
   } catch (err) {
     console.warn(`[R2] saveVbReferenceToR2 upload skipped (${storyId}/${entryId}): ${err.message}`);

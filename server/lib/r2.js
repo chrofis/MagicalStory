@@ -155,8 +155,10 @@ function keyForCharacterAvatar(userId, characterId, slot, version) {
   return `characters/${userId}/${characterId}/avatars/${slot}${suffix}.jpg`;
 }
 
-function keyForCharacterStyledAvatar(userId, characterId, key) {
-  return `characters/${userId}/${characterId}/avatars/styled/${key}.jpg`;
+// Styled sheets are named by CONTENT (contentKey): a fixed per-style key let a later sheet overwrite the bytes an
+// earlier story's row still referenced (docs/decisions.md 2026-10-10). `input` = the bytes about to be uploaded.
+function keyForCharacterStyledAvatar(userId, characterId, key, input) {
+  return contentKey(`characters/${userId}/${characterId}/avatars/styled`, String(key).replace(/\//g, '-'), input);
 }
 
 function keyForCharacterThumb(userId, characterId, kind, slot, version) {
@@ -164,11 +166,13 @@ function keyForCharacterThumb(userId, characterId, kind, slot, version) {
   return `characters/${userId}/${characterId}/avatars/thumbs/${kind}-${slot}${suffix}.jpg`;
 }
 
-function keyForVbReference(storyId, entryId) {
+// Named by CONTENT too: the generated cell and a location's Wikimedia photo both land on one entry id, and
+// a re-run of the same job rewrites it; a recorded referenceImageUrl must keep its own bytes.
+function keyForVbReference(storyId, entryId, input) {
   // An object-state cell is addressed by a dotted handle (`ART001.2`). The dot
   // would read as a second extension in the key, so it becomes `_`. Bare ids
-  // carry no dot, so every existing key is unchanged.
-  return `stories/${storyId}/vb/${String(entryId).replace(/\./g, '_')}.jpg`;
+  // carry no dot, so only the content hash is appended.
+  return contentKey(`stories/${storyId}/vb`, String(entryId).replace(/\./g, '_'), input);
 }
 
 // ─── Debug-image keys ───────────────────────────────────────────────────────
