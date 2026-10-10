@@ -16,6 +16,7 @@ import RenderErrorBoundary from '@/components/common/RenderErrorBoundary';
 import TrialBook, { TrialGateProvider } from '@/components/book/TrialBook';
 import { isTrialBookReady } from '@/utils/trialBook';
 import { localizedApiError } from '@/utils/apiErrors';
+import { reportImageFrame } from '@/utils/frameDiagnostics';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 
@@ -1131,6 +1132,7 @@ export default function TrialGenerationPage() {
                         src={isAvatarLike && currentAvatar ? currentAvatar : item.imageSrc}
                         alt={item.label}
                         className={`absolute inset-0 w-full h-full object-contain ${isAvatarLike ? 'p-2' : ''}`}
+                        onLoad={(e) => reportImageFrame(e.currentTarget, item.emphasis)}
                       />
                     </div>
 
