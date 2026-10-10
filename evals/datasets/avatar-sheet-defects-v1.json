@@ -1,0 +1,1312 @@
+{
+ "version": 1,
+ "date": "2026-10-10",
+ "labellingRule": {
+  "text": "Labelled by viewing the pixels (2026-10-10) BEFORE any judge ran. A sheet = 4 head cells over 4 body cells. hat: headgear is missing in some cells, differs in shape/colour between cells, is deformed/towering, or appears on an everyday sheet where the photo shows none (a costume hat worn identically in all 8 cells is NOT a defect). hair: colour, length or style differs between cells (hair down in one cell, ponytail in another) or from the photo. bald: any cell with a smooth hairless scalp where other cells show hair, or a missing/blank head. costume: garments, colours or chest emblems differ between cells. rowMatch: a head cell shows a different top/collar/straps than its full-body twin. held: any held or carried object. layout: not a 2x4 grid, extra people, lettering on the paper, or photographic/cut-out rather than painted cells. identity: clearly another person/gender than the photo. age: apparent age more than 3 years off. Sheets whose label is genuinely unclear are marked ambiguous and excluded from every metric.",
+  "types": [
+   "hat",
+   "hair",
+   "bald",
+   "costume",
+   "rowMatch",
+   "held",
+   "layout",
+   "identity",
+   "age"
+  ]
+ },
+ "note": "Image files are NOT committed (stored staging avatars, Lab experiments 1734-1747, trial characters). `file` names resolve in the --images-dir the eval script is given; source ids: stored = <uid8>-<Name><age>-<std|cos> from staging characters.data.avatars.styledAvatars.watercolor, lab = expNNNN-<storyId>-vN from story_images.experiment_id, trial = base-<Name><age>-<standard|costumed>.",
+ "entries": [
+  {
+   "id": "exp1734-17916378-v0",
+   "file": "exp1734-17916378-v0.jpg",
+   "photoFile": "photo-Lukas8.jpg",
+   "kind": "costume",
+   "character": "Lukas8",
+   "source": "lab",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "exp1735-17914901-v0",
+   "file": "exp1735-17914901-v0.jpg",
+   "photoFile": "photo-Lukas9.jpg",
+   "kind": "standard",
+   "character": "Lukas9",
+   "source": "lab",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "exp1735-17914901-v1",
+   "file": "exp1735-17914901-v1.jpg",
+   "photoFile": "photo-Lukas9.jpg",
+   "kind": "costume",
+   "character": "Lukas9",
+   "source": "lab",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "exp1736-17914968-v0",
+   "file": "exp1736-17914968-v0.jpg",
+   "photoFile": "photo-Noah4.jpg",
+   "kind": "standard",
+   "character": "Noah4",
+   "source": "lab",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "exp1736-17914968-v1",
+   "file": "exp1736-17914968-v1.jpg",
+   "photoFile": "photo-Noah4.jpg",
+   "kind": "costume",
+   "character": "Noah4",
+   "source": "lab",
+   "defects": [
+    "hat",
+    "costume"
+   ],
+   "ambiguous": null
+  },
+  {
+   "id": "exp1737-17916378-v1",
+   "file": "exp1737-17916378-v1.jpg",
+   "photoFile": "photo-Lukas8.jpg",
+   "kind": "standard",
+   "character": "Lukas8",
+   "source": "lab",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "exp1738-17915545-v0",
+   "file": "exp1738-17915545-v0.jpg",
+   "photoFile": "photo-Emma5.jpg",
+   "kind": "standard",
+   "character": "Emma5",
+   "source": "lab",
+   "defects": [
+    "hair"
+   ],
+   "ambiguous": null
+  },
+  {
+   "id": "exp1738-17915545-v1",
+   "file": "exp1738-17915545-v1.jpg",
+   "photoFile": "photo-Emma5.jpg",
+   "kind": "costume",
+   "character": "Emma5",
+   "source": "lab",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "exp1739-17916378-v2",
+   "file": "exp1739-17916378-v2.jpg",
+   "photoFile": "photo-Lukas8.jpg",
+   "kind": "costume",
+   "character": "Lukas8",
+   "source": "lab",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "exp1739-17916378-v3",
+   "file": "exp1739-17916378-v3.jpg",
+   "photoFile": "photo-Lukas8.jpg",
+   "kind": "costume",
+   "character": "Lukas8",
+   "source": "lab",
+   "defects": [
+    "identity",
+    "hair"
+   ],
+   "ambiguous": null
+  },
+  {
+   "id": "exp1739-17916378-v4",
+   "file": "exp1739-17916378-v4.jpg",
+   "photoFile": "photo-Lukas8.jpg",
+   "kind": "costume",
+   "character": "Lukas8",
+   "source": "lab",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "exp1739-17916378-v6",
+   "file": "exp1739-17916378-v6.jpg",
+   "photoFile": "photo-Lukas8.jpg",
+   "kind": "costume",
+   "character": "Lukas8",
+   "source": "lab",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "exp1739-17916378-v7",
+   "file": "exp1739-17916378-v7.jpg",
+   "photoFile": "photo-Lukas8.jpg",
+   "kind": "costume",
+   "character": "Lukas8",
+   "source": "lab",
+   "defects": [
+    "layout"
+   ],
+   "ambiguous": null
+  },
+  {
+   "id": "exp1740-17915545-v2",
+   "file": "exp1740-17915545-v2.jpg",
+   "photoFile": "photo-Emma5.jpg",
+   "kind": "costume",
+   "character": "Emma5",
+   "source": "lab",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "exp1740-17915545-v3",
+   "file": "exp1740-17915545-v3.jpg",
+   "photoFile": "photo-Emma5.jpg",
+   "kind": "costume",
+   "character": "Emma5",
+   "source": "lab",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "exp1740-17915545-v5",
+   "file": "exp1740-17915545-v5.jpg",
+   "photoFile": "photo-Emma5.jpg",
+   "kind": "costume",
+   "character": "Emma5",
+   "source": "lab",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "exp1740-17915545-v6",
+   "file": "exp1740-17915545-v6.jpg",
+   "photoFile": "photo-Emma5.jpg",
+   "kind": "costume",
+   "character": "Emma5",
+   "source": "lab",
+   "defects": [
+    "layout"
+   ],
+   "ambiguous": null
+  },
+  {
+   "id": "exp1741-17914901-v2",
+   "file": "exp1741-17914901-v2.jpg",
+   "photoFile": "photo-Lukas9.jpg",
+   "kind": "costume",
+   "character": "Lukas9",
+   "source": "lab",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "exp1741-17914901-v3",
+   "file": "exp1741-17914901-v3.jpg",
+   "photoFile": "photo-Lukas9.jpg",
+   "kind": "costume",
+   "character": "Lukas9",
+   "source": "lab",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "exp1741-17914901-v4",
+   "file": "exp1741-17914901-v4.jpg",
+   "photoFile": "photo-Lukas9.jpg",
+   "kind": "costume",
+   "character": "Lukas9",
+   "source": "lab",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "exp1741-17914901-v6",
+   "file": "exp1741-17914901-v6.jpg",
+   "photoFile": "photo-Lukas9.jpg",
+   "kind": "costume",
+   "character": "Lukas9",
+   "source": "lab",
+   "defects": [
+    "hat"
+   ],
+   "ambiguous": null
+  },
+  {
+   "id": "exp1741-17914901-v7",
+   "file": "exp1741-17914901-v7.jpg",
+   "photoFile": "photo-Lukas9.jpg",
+   "kind": "costume",
+   "character": "Lukas9",
+   "source": "lab",
+   "defects": [
+    "hat",
+    "layout"
+   ],
+   "ambiguous": null
+  },
+  {
+   "id": "exp1742-17914968-v2",
+   "file": "exp1742-17914968-v2.jpg",
+   "photoFile": "photo-Noah4.jpg",
+   "kind": "costume",
+   "character": "Noah4",
+   "source": "lab",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "exp1742-17914968-v3",
+   "file": "exp1742-17914968-v3.jpg",
+   "photoFile": "photo-Noah4.jpg",
+   "kind": "costume",
+   "character": "Noah4",
+   "source": "lab",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "exp1742-17914968-v5",
+   "file": "exp1742-17914968-v5.jpg",
+   "photoFile": "photo-Noah4.jpg",
+   "kind": "costume",
+   "character": "Noah4",
+   "source": "lab",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "exp1742-17914968-v6",
+   "file": "exp1742-17914968-v6.jpg",
+   "photoFile": "photo-Noah4.jpg",
+   "kind": "costume",
+   "character": "Noah4",
+   "source": "lab",
+   "defects": [
+    "hat",
+    "layout"
+   ],
+   "ambiguous": null
+  },
+  {
+   "id": "exp1743-17915608-v0",
+   "file": "exp1743-17915608-v0.jpg",
+   "photoFile": null,
+   "kind": "costume",
+   "character": "lab-17915608",
+   "source": "lab",
+   "defects": [
+    "bald"
+   ],
+   "ambiguous": null
+  },
+  {
+   "id": "exp1744-17914502-v0",
+   "file": "exp1744-17914502-v0.jpg",
+   "photoFile": null,
+   "kind": "costume",
+   "character": "lab-17914502",
+   "source": "lab",
+   "defects": [
+    "hair"
+   ],
+   "ambiguous": null
+  },
+  {
+   "id": "exp1745-17915512-v0",
+   "file": "exp1745-17915512-v0.jpg",
+   "photoFile": null,
+   "kind": "costume",
+   "character": "lab-17915512",
+   "source": "lab",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "exp1746-17915002-v0",
+   "file": "exp1746-17915002-v0.jpg",
+   "photoFile": null,
+   "kind": "costume",
+   "character": "lab-17915002",
+   "source": "lab",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "exp1747-17914504-v0",
+   "file": "exp1747-17914504-v0.jpg",
+   "photoFile": null,
+   "kind": "costume",
+   "character": "lab-17914504",
+   "source": "lab",
+   "defects": [
+    "bald"
+   ],
+   "ambiguous": null
+  },
+  {
+   "id": "base-Emma5-costumed",
+   "file": "base-Emma5-costumed.jpg",
+   "photoFile": "photo-Emma5.jpg",
+   "kind": "costume",
+   "character": "Emma5",
+   "source": "trial",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "base-Emma5-standard",
+   "file": "base-Emma5-standard.jpg",
+   "photoFile": "photo-Emma5.jpg",
+   "kind": "standard",
+   "character": "Emma5",
+   "source": "trial",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "base-Lily7-costumed",
+   "file": "base-Lily7-costumed.jpg",
+   "photoFile": "photo-Lily7.jpg",
+   "kind": "costume",
+   "character": "Lily7",
+   "source": "trial",
+   "defects": [
+    "rowMatch"
+   ],
+   "ambiguous": null
+  },
+  {
+   "id": "base-Lily7-standard",
+   "file": "base-Lily7-standard.jpg",
+   "photoFile": "photo-Lily7.jpg",
+   "kind": "standard",
+   "character": "Lily7",
+   "source": "trial",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "base-Lukas8-costumed",
+   "file": "base-Lukas8-costumed.jpg",
+   "photoFile": "photo-Lukas8.jpg",
+   "kind": "costume",
+   "character": "Lukas8",
+   "source": "trial",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "base-Lukas8-standard",
+   "file": "base-Lukas8-standard.jpg",
+   "photoFile": "photo-Lukas8.jpg",
+   "kind": "standard",
+   "character": "Lukas8",
+   "source": "trial",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "base-Lukas9-costumed",
+   "file": "base-Lukas9-costumed.jpg",
+   "photoFile": "photo-Lukas9.jpg",
+   "kind": "costume",
+   "character": "Lukas9",
+   "source": "trial",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "base-Lukas9-standard",
+   "file": "base-Lukas9-standard.jpg",
+   "photoFile": "photo-Lukas9.jpg",
+   "kind": "standard",
+   "character": "Lukas9",
+   "source": "trial",
+   "defects": [
+    "rowMatch"
+   ],
+   "ambiguous": null
+  },
+  {
+   "id": "base-Noah4-costumed",
+   "file": "base-Noah4-costumed.jpg",
+   "photoFile": "photo-Noah4.jpg",
+   "kind": "costume",
+   "character": "Noah4",
+   "source": "trial",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "base-Noah4-standard",
+   "file": "base-Noah4-standard.jpg",
+   "photoFile": "photo-Noah4.jpg",
+   "kind": "standard",
+   "character": "Noah4",
+   "source": "trial",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "base-Omar3-costumed",
+   "file": "base-Omar3-costumed.jpg",
+   "photoFile": "photo-Omar3.jpg",
+   "kind": "costume",
+   "character": "Omar3",
+   "source": "trial",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "base-Omar3-standard",
+   "file": "base-Omar3-standard.jpg",
+   "photoFile": "photo-Omar3.jpg",
+   "kind": "standard",
+   "character": "Omar3",
+   "source": "trial",
+   "defects": [
+    "costume",
+    "rowMatch"
+   ],
+   "ambiguous": null
+  },
+  {
+   "id": "base-Rohan8-costumed",
+   "file": "base-Rohan8-costumed.jpg",
+   "photoFile": "photo-Rohan8.jpg",
+   "kind": "costume",
+   "character": "Rohan8",
+   "source": "trial",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "base-Rohan8-standard",
+   "file": "base-Rohan8-standard.jpg",
+   "photoFile": "photo-Rohan8.jpg",
+   "kind": "standard",
+   "character": "Rohan8",
+   "source": "trial",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "base-Serafin8-costumed",
+   "file": "base-Serafin8-costumed.jpg",
+   "photoFile": "photo-Serafin8.jpg",
+   "kind": "costume",
+   "character": "Serafin8",
+   "source": "trial",
+   "defects": [
+    "rowMatch"
+   ],
+   "ambiguous": null
+  },
+  {
+   "id": "base-Serafin8-standard",
+   "file": "base-Serafin8-standard.jpg",
+   "photoFile": "photo-Serafin8.jpg",
+   "kind": "standard",
+   "character": "Serafin8",
+   "source": "trial",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "17667708-Levin5-std",
+   "file": "17667708-Levin5-std.jpg",
+   "photoFile": "photo-17667708-Levin5.jpg",
+   "kind": "standard",
+   "character": "Levin5",
+   "source": "stored",
+   "defects": [
+    "layout"
+   ],
+   "ambiguous": null
+  },
+  {
+   "id": "17667708-Julian3-std",
+   "file": "17667708-Julian3-std.jpg",
+   "photoFile": "photo-17667708-Julian3.jpg",
+   "kind": "standard",
+   "character": "Julian3",
+   "source": "stored",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "17667708-Max3-std",
+   "file": "17667708-Max3-std.jpg",
+   "photoFile": "photo-17667708-Max3.jpg",
+   "kind": "standard",
+   "character": "Max3",
+   "source": "stored",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "17667708-Kiaan3-std",
+   "file": "17667708-Kiaan3-std.jpg",
+   "photoFile": "photo-17667708-Kiaan3.jpg",
+   "kind": "standard",
+   "character": "Kiaan3",
+   "source": "stored",
+   "defects": [],
+   "ambiguous": "head row shows waist-up crops instead of head shots"
+  },
+  {
+   "id": "63f21ca1-Sarah25-std",
+   "file": "63f21ca1-Sarah25-std.jpg",
+   "photoFile": "photo-63f21ca1-Sarah25.jpg",
+   "kind": "standard",
+   "character": "Sarah25",
+   "source": "stored",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "63f21ca1-Sarah25-cos",
+   "file": "63f21ca1-Sarah25-cos.jpg",
+   "photoFile": "photo-63f21ca1-Sarah25.jpg",
+   "kind": "costume",
+   "character": "Sarah25",
+   "source": "stored",
+   "defects": [
+    "hat"
+   ],
+   "ambiguous": null
+  },
+  {
+   "id": "63f21ca1-Saira24-std",
+   "file": "63f21ca1-Saira24-std.jpg",
+   "photoFile": "photo-63f21ca1-Saira24.jpg",
+   "kind": "standard",
+   "character": "Saira24",
+   "source": "stored",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "63f21ca1-Saira24-cos",
+   "file": "63f21ca1-Saira24-cos.jpg",
+   "photoFile": "photo-63f21ca1-Saira24.jpg",
+   "kind": "costume",
+   "character": "Saira24",
+   "source": "stored",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "63f21ca1-Facundo25-std",
+   "file": "63f21ca1-Facundo25-std.jpg",
+   "photoFile": "photo-63f21ca1-Facundo25.jpg",
+   "kind": "standard",
+   "character": "Facundo25",
+   "source": "stored",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "63f21ca1-Facundo25-cos",
+   "file": "63f21ca1-Facundo25-cos.jpg",
+   "photoFile": "photo-63f21ca1-Facundo25.jpg",
+   "kind": "costume",
+   "character": "Facundo25",
+   "source": "stored",
+   "defects": [
+    "hat"
+   ],
+   "ambiguous": null
+  },
+  {
+   "id": "63f21ca1-Fiona25-std",
+   "file": "63f21ca1-Fiona25-std.jpg",
+   "photoFile": "photo-63f21ca1-Fiona25.jpg",
+   "kind": "standard",
+   "character": "Fiona25",
+   "source": "stored",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "63f21ca1-Fiona25-cos",
+   "file": "63f21ca1-Fiona25-cos.jpg",
+   "photoFile": "photo-63f21ca1-Fiona25.jpg",
+   "kind": "costume",
+   "character": "Fiona25",
+   "source": "stored",
+   "defects": [
+    "hat",
+    "rowMatch"
+   ],
+   "ambiguous": null
+  },
+  {
+   "id": "63f21ca1-Lorena22-std",
+   "file": "63f21ca1-Lorena22-std.jpg",
+   "photoFile": "photo-63f21ca1-Lorena22.jpg",
+   "kind": "standard",
+   "character": "Lorena22",
+   "source": "stored",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "63f21ca1-Lorena22-cos",
+   "file": "63f21ca1-Lorena22-cos.jpg",
+   "photoFile": "photo-63f21ca1-Lorena22.jpg",
+   "kind": "costume",
+   "character": "Lorena22",
+   "source": "stored",
+   "defects": [
+    "hat"
+   ],
+   "ambiguous": null
+  },
+  {
+   "id": "f1ca3d89-Levin5-std",
+   "file": "f1ca3d89-Levin5-std.jpg",
+   "photoFile": "photo-f1ca3d89-Levin5.jpg",
+   "kind": "standard",
+   "character": "Levin5",
+   "source": "stored",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "f1ca3d89-Julian3-std",
+   "file": "f1ca3d89-Julian3-std.jpg",
+   "photoFile": "photo-f1ca3d89-Julian3.jpg",
+   "kind": "standard",
+   "character": "Julian3",
+   "source": "stored",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "f1ca3d89-Max3-std",
+   "file": "f1ca3d89-Max3-std.jpg",
+   "photoFile": "photo-f1ca3d89-Max3.jpg",
+   "kind": "standard",
+   "character": "Max3",
+   "source": "stored",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "f1ca3d89-Kiaan3-std",
+   "file": "f1ca3d89-Kiaan3-std.jpg",
+   "photoFile": "photo-f1ca3d89-Kiaan3.jpg",
+   "kind": "standard",
+   "character": "Kiaan3",
+   "source": "stored",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "85eeb8a8-Noah3-std",
+   "file": "85eeb8a8-Noah3-std.jpg",
+   "photoFile": "photo-85eeb8a8-Noah3.jpg",
+   "kind": "standard",
+   "character": "Noah3",
+   "source": "stored",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "85eeb8a8-Noah3-cos",
+   "file": "85eeb8a8-Noah3-cos.jpg",
+   "photoFile": "photo-85eeb8a8-Noah3.jpg",
+   "kind": "costume",
+   "character": "Noah3",
+   "source": "stored",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "275bdae0-Noah3-std",
+   "file": "275bdae0-Noah3-std.jpg",
+   "photoFile": "photo-275bdae0-Noah3.jpg",
+   "kind": "standard",
+   "character": "Noah3",
+   "source": "stored",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "275bdae0-Noah3-cos",
+   "file": "275bdae0-Noah3-cos.jpg",
+   "photoFile": "photo-275bdae0-Noah3.jpg",
+   "kind": "costume",
+   "character": "Noah3",
+   "source": "stored",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "fecd4226-Lily6-std",
+   "file": "fecd4226-Lily6-std.jpg",
+   "photoFile": "photo-fecd4226-Lily6.jpg",
+   "kind": "standard",
+   "character": "Lily6",
+   "source": "stored",
+   "defects": [
+    "bald"
+   ],
+   "ambiguous": null
+  },
+  {
+   "id": "fecd4226-Lily6-cos",
+   "file": "fecd4226-Lily6-cos.jpg",
+   "photoFile": "photo-fecd4226-Lily6.jpg",
+   "kind": "costume",
+   "character": "Lily6",
+   "source": "stored",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "c3554c2b-La6-std",
+   "file": "c3554c2b-La6-std.jpg",
+   "photoFile": "photo-c3554c2b-La6.jpg",
+   "kind": "standard",
+   "character": "Léa6",
+   "source": "stored",
+   "defects": [
+    "layout"
+   ],
+   "ambiguous": null
+  },
+  {
+   "id": "d8db1403-Lily6-std",
+   "file": "d8db1403-Lily6-std.jpg",
+   "photoFile": "photo-d8db1403-Lily6.jpg",
+   "kind": "standard",
+   "character": "Lily6",
+   "source": "stored",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "d8db1403-Lily6-cos",
+   "file": "d8db1403-Lily6-cos.jpg",
+   "photoFile": "photo-d8db1403-Lily6.jpg",
+   "kind": "costume",
+   "character": "Lily6",
+   "source": "stored",
+   "defects": [
+    "hat"
+   ],
+   "ambiguous": null
+  },
+  {
+   "id": "7643a4a9-Lily6-std",
+   "file": "7643a4a9-Lily6-std.jpg",
+   "photoFile": "photo-7643a4a9-Lily6.jpg",
+   "kind": "standard",
+   "character": "Lily6",
+   "source": "stored",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "7643a4a9-Lily6-cos",
+   "file": "7643a4a9-Lily6-cos.jpg",
+   "photoFile": "photo-7643a4a9-Lily6.jpg",
+   "kind": "costume",
+   "character": "Lily6",
+   "source": "stored",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "882bb8ec-Noah3-std",
+   "file": "882bb8ec-Noah3-std.jpg",
+   "photoFile": "photo-882bb8ec-Noah3.jpg",
+   "kind": "standard",
+   "character": "Noah3",
+   "source": "stored",
+   "defects": [
+    "layout"
+   ],
+   "ambiguous": null
+  },
+  {
+   "id": "882bb8ec-Noah3-cos",
+   "file": "882bb8ec-Noah3-cos.jpg",
+   "photoFile": "photo-882bb8ec-Noah3.jpg",
+   "kind": "costume",
+   "character": "Noah3",
+   "source": "stored",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "0eb46cea-Omar3-std",
+   "file": "0eb46cea-Omar3-std.jpg",
+   "photoFile": "photo-0eb46cea-Omar3.jpg",
+   "kind": "standard",
+   "character": "Omar3",
+   "source": "stored",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "6468a1df-Omar3-std",
+   "file": "6468a1df-Omar3-std.jpg",
+   "photoFile": "photo-6468a1df-Omar3.jpg",
+   "kind": "standard",
+   "character": "Omar3",
+   "source": "stored",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "c291e5de-Felix4-std",
+   "file": "c291e5de-Felix4-std.jpg",
+   "photoFile": "photo-c291e5de-Felix4.jpg",
+   "kind": "standard",
+   "character": "Felix4",
+   "source": "stored",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "c291e5de-Felix4-cos",
+   "file": "c291e5de-Felix4-cos.jpg",
+   "photoFile": "photo-c291e5de-Felix4.jpg",
+   "kind": "costume",
+   "character": "Felix4",
+   "source": "stored",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "680c30fd-Emma4-cos",
+   "file": "680c30fd-Emma4-cos.jpg",
+   "photoFile": "photo-680c30fd-Emma4.jpg",
+   "kind": "costume",
+   "character": "Emma4",
+   "source": "stored",
+   "defects": [
+    "hat"
+   ],
+   "ambiguous": null
+  },
+  {
+   "id": "680c30fd-Noah7-cos",
+   "file": "680c30fd-Noah7-cos.jpg",
+   "photoFile": "photo-680c30fd-Noah7.jpg",
+   "kind": "costume",
+   "character": "Noah7",
+   "source": "stored",
+   "defects": [
+    "hat"
+   ],
+   "ambiguous": null
+  },
+  {
+   "id": "680c30fd-Daniel38-std",
+   "file": "680c30fd-Daniel38-std.jpg",
+   "photoFile": "photo-680c30fd-Daniel38.jpg",
+   "kind": "standard",
+   "character": "Daniel38",
+   "source": "stored",
+   "defects": [
+    "hat"
+   ],
+   "ambiguous": null
+  },
+  {
+   "id": "680c30fd-Sarah36-cos",
+   "file": "680c30fd-Sarah36-cos.jpg",
+   "photoFile": "photo-680c30fd-Sarah36.jpg",
+   "kind": "costume",
+   "character": "Sarah36",
+   "source": "stored",
+   "defects": [],
+   "ambiguous": "photo hair straight, sheet wavy, glasses dropped"
+  },
+  {
+   "id": "680c30fd-Hans68-std",
+   "file": "680c30fd-Hans68-std.jpg",
+   "photoFile": "photo-680c30fd-Hans68.jpg",
+   "kind": "standard",
+   "character": "Hans68",
+   "source": "stored",
+   "defects": [
+    "hat"
+   ],
+   "ambiguous": null
+  },
+  {
+   "id": "680c30fd-Saira24-cos",
+   "file": "680c30fd-Saira24-cos.jpg",
+   "photoFile": "photo-680c30fd-Saira24.jpg",
+   "kind": "costume",
+   "character": "Saira24",
+   "source": "stored",
+   "defects": [],
+   "ambiguous": "head cells cropped at the top by letterboxing"
+  },
+  {
+   "id": "680c30fd-Facundo25-cos",
+   "file": "680c30fd-Facundo25-cos.jpg",
+   "photoFile": "photo-680c30fd-Facundo25.jpg",
+   "kind": "costume",
+   "character": "Facundo25",
+   "source": "stored",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "680c30fd-Fiona25-cos",
+   "file": "680c30fd-Fiona25-cos.jpg",
+   "photoFile": "photo-680c30fd-Fiona25.jpg",
+   "kind": "costume",
+   "character": "Fiona25",
+   "source": "stored",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "680c30fd-Lorena22-cos",
+   "file": "680c30fd-Lorena22-cos.jpg",
+   "photoFile": "photo-680c30fd-Lorena22.jpg",
+   "kind": "costume",
+   "character": "Lorena22",
+   "source": "stored",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "680c30fd-Levin5-std",
+   "file": "680c30fd-Levin5-std.jpg",
+   "photoFile": "photo-680c30fd-Levin5.jpg",
+   "kind": "standard",
+   "character": "Levin5",
+   "source": "stored",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "680c30fd-Julian3-std",
+   "file": "680c30fd-Julian3-std.jpg",
+   "photoFile": "photo-680c30fd-Julian3.jpg",
+   "kind": "standard",
+   "character": "Julian3",
+   "source": "stored",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "680c30fd-Max3-std",
+   "file": "680c30fd-Max3-std.jpg",
+   "photoFile": "photo-680c30fd-Max3.jpg",
+   "kind": "standard",
+   "character": "Max3",
+   "source": "stored",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "680c30fd-Kiaan3-std",
+   "file": "680c30fd-Kiaan3-std.jpg",
+   "photoFile": "photo-680c30fd-Kiaan3.jpg",
+   "kind": "standard",
+   "character": "Kiaan3",
+   "source": "stored",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "af459e2d-Lukas8-std",
+   "file": "af459e2d-Lukas8-std.jpg",
+   "photoFile": "photo-af459e2d-Lukas8.jpg",
+   "kind": "standard",
+   "character": "Lukas8",
+   "source": "stored",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "af459e2d-Lukas8-cos",
+   "file": "af459e2d-Lukas8-cos.jpg",
+   "photoFile": "photo-af459e2d-Lukas8.jpg",
+   "kind": "costume",
+   "character": "Lukas8",
+   "source": "stored",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "f1c14f8c-Noah4-std",
+   "file": "f1c14f8c-Noah4-std.jpg",
+   "photoFile": "photo-f1c14f8c-Noah4.jpg",
+   "kind": "standard",
+   "character": "Noah4",
+   "source": "stored",
+   "defects": [
+    "costume",
+    "rowMatch"
+   ],
+   "ambiguous": null
+  },
+  {
+   "id": "6ab7f913-Rohan8-std",
+   "file": "6ab7f913-Rohan8-std.jpg",
+   "photoFile": "photo-6ab7f913-Rohan8.jpg",
+   "kind": "standard",
+   "character": "Rohan8",
+   "source": "stored",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "6ab7f913-Rohan8-cos",
+   "file": "6ab7f913-Rohan8-cos.jpg",
+   "photoFile": "photo-6ab7f913-Rohan8.jpg",
+   "kind": "costume",
+   "character": "Rohan8",
+   "source": "stored",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "af181890-Emma5-std",
+   "file": "af181890-Emma5-std.jpg",
+   "photoFile": "photo-af181890-Emma5.jpg",
+   "kind": "standard",
+   "character": "Emma5",
+   "source": "stored",
+   "defects": [
+    "rowMatch"
+   ],
+   "ambiguous": null
+  },
+  {
+   "id": "91679aa3-Ethan5-std",
+   "file": "91679aa3-Ethan5-std.jpg",
+   "photoFile": "photo-91679aa3-Ethan5.jpg",
+   "kind": "standard",
+   "character": "Ethan5",
+   "source": "stored",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "07b5004d-Lily7-std",
+   "file": "07b5004d-Lily7-std.jpg",
+   "photoFile": "photo-07b5004d-Lily7.jpg",
+   "kind": "standard",
+   "character": "Lily7",
+   "source": "stored",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "8c4ed141-Mia6-std",
+   "file": "8c4ed141-Mia6-std.jpg",
+   "photoFile": "photo-8c4ed141-Mia6.jpg",
+   "kind": "standard",
+   "character": "Mia6",
+   "source": "stored",
+   "defects": [],
+   "ambiguous": "stored photo is an adult man; identity not assessable"
+  },
+  {
+   "id": "8c4ed141-Mia6-cos",
+   "file": "8c4ed141-Mia6-cos.jpg",
+   "photoFile": "photo-8c4ed141-Mia6.jpg",
+   "kind": "costume",
+   "character": "Mia6",
+   "source": "stored",
+   "defects": [
+    "rowMatch"
+   ],
+   "ambiguous": null
+  },
+  {
+   "id": "728e8f21-Tobias1-std",
+   "file": "728e8f21-Tobias1-std.jpg",
+   "photoFile": "photo-728e8f21-Tobias1.jpg",
+   "kind": "standard",
+   "character": "Tobias1",
+   "source": "stored",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "728e8f21-Tobias1-cos",
+   "file": "728e8f21-Tobias1-cos.jpg",
+   "photoFile": "photo-728e8f21-Tobias1.jpg",
+   "kind": "costume",
+   "character": "Tobias1",
+   "source": "stored",
+   "defects": [
+    "costume",
+    "rowMatch"
+   ],
+   "ambiguous": null
+  },
+  {
+   "id": "0858fd27-Tobias1-std",
+   "file": "0858fd27-Tobias1-std.jpg",
+   "photoFile": "photo-0858fd27-Tobias1.jpg",
+   "kind": "standard",
+   "character": "Tobias1",
+   "source": "stored",
+   "defects": [
+    "rowMatch"
+   ],
+   "ambiguous": null
+  },
+  {
+   "id": "0858fd27-Tobias1-cos",
+   "file": "0858fd27-Tobias1-cos.jpg",
+   "photoFile": "photo-0858fd27-Tobias1.jpg",
+   "kind": "costume",
+   "character": "Tobias1",
+   "source": "stored",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "b2b25aa3-Emma5-std",
+   "file": "b2b25aa3-Emma5-std.jpg",
+   "photoFile": "photo-b2b25aa3-Emma5.jpg",
+   "kind": "standard",
+   "character": "Emma5",
+   "source": "stored",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "b2b25aa3-Emma5-cos",
+   "file": "b2b25aa3-Emma5-cos.jpg",
+   "photoFile": "photo-b2b25aa3-Emma5.jpg",
+   "kind": "costume",
+   "character": "Emma5",
+   "source": "stored",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "3211e8df-Tobias1-std",
+   "file": "3211e8df-Tobias1-std.jpg",
+   "photoFile": "photo-3211e8df-Tobias1.jpg",
+   "kind": "standard",
+   "character": "Tobias1",
+   "source": "stored",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "374ab828-Rohan8-std",
+   "file": "374ab828-Rohan8-std.jpg",
+   "photoFile": "photo-374ab828-Rohan8.jpg",
+   "kind": "standard",
+   "character": "Rohan8",
+   "source": "stored",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "880b53c1-Lukas8-std",
+   "file": "880b53c1-Lukas8-std.jpg",
+   "photoFile": "photo-880b53c1-Lukas8.jpg",
+   "kind": "standard",
+   "character": "Lukas8",
+   "source": "stored",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "880b53c1-Lukas8-cos",
+   "file": "880b53c1-Lukas8-cos.jpg",
+   "photoFile": "photo-880b53c1-Lukas8.jpg",
+   "kind": "costume",
+   "character": "Lukas8",
+   "source": "stored",
+   "defects": [
+    "costume"
+   ],
+   "ambiguous": null
+  },
+  {
+   "id": "432994b3-Emma5-std",
+   "file": "432994b3-Emma5-std.jpg",
+   "photoFile": "photo-432994b3-Emma5.jpg",
+   "kind": "standard",
+   "character": "Emma5",
+   "source": "stored",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "432994b3-Emma5-cos",
+   "file": "432994b3-Emma5-cos.jpg",
+   "photoFile": "photo-432994b3-Emma5.jpg",
+   "kind": "costume",
+   "character": "Emma5",
+   "source": "stored",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "3eb52357-Emma5-std",
+   "file": "3eb52357-Emma5-std.jpg",
+   "photoFile": "photo-3eb52357-Emma5.jpg",
+   "kind": "standard",
+   "character": "Emma5",
+   "source": "stored",
+   "defects": [],
+   "ambiguous": null
+  },
+  {
+   "id": "3eb52357-Emma5-cos",
+   "file": "3eb52357-Emma5-cos.jpg",
+   "photoFile": "photo-3eb52357-Emma5.jpg",
+   "kind": "costume",
+   "character": "Emma5",
+   "source": "stored",
+   "defects": [],
+   "ambiguous": "muddy colour blotches only, not one of the judged types"
+  },
+  {
+   "id": "10e1d43c-Lukas8-std",
+   "file": "10e1d43c-Lukas8-std.jpg",
+   "photoFile": "photo-10e1d43c-Lukas8.jpg",
+   "kind": "standard",
+   "character": "Lukas8",
+   "source": "stored",
+   "defects": [
+    "rowMatch",
+    "held"
+   ],
+   "ambiguous": null
+  },
+  {
+   "id": "10e1d43c-Lukas8-cos",
+   "file": "10e1d43c-Lukas8-cos.jpg",
+   "photoFile": "photo-10e1d43c-Lukas8.jpg",
+   "kind": "costume",
+   "character": "Lukas8",
+   "source": "stored",
+   "defects": [
+    "costume"
+   ],
+   "ambiguous": null
+  }
+ ]
+}

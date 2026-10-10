@@ -1,0 +1,1680 @@
+{
+ "runId": "2026-10-10_avatar-sheet-judge-v1",
+ "sheets": 114,
+ "failed": [
+  {
+   "id": "63f21ca1-Facundo25-std",
+   "error": "avatarSheetJudge: costume.verdict \"pieces_differs\" is not one of ok|pieces_differ|colours_differ|emblem_differs"
+  },
+  {
+   "id": "0858fd27-Tobias1-std",
+   "error": "avatarSheetJudge: costume.verdict \"pieces_differs\" is not one of ok|pieces_differ|colours_differ|emblem_differs"
+  }
+ ],
+ "chosen": {
+  "hat": "verdict",
+  "hair": "cells",
+  "bald": "verdict",
+  "costume": "verdict",
+  "rowMatch": "verdict",
+  "held": "verdict",
+  "layout": "verdict",
+  "identity": "consistency",
+  "age": "consistency"
+ },
+ "tuneChars": 17,
+ "testChars": 16,
+ "tables": {
+  "verdict": {
+   "all": {
+    "hat": {
+     "tp": 8,
+     "fp": 2,
+     "fn": 5,
+     "tn": 99,
+     "positives": 13,
+     "recall": 0.6153846153846154,
+     "precision": 0.8
+    },
+    "hair": {
+     "tp": 2,
+     "fp": 40,
+     "fn": 1,
+     "tn": 71,
+     "positives": 3,
+     "recall": 0.6666666666666666,
+     "precision": 0.047619047619047616
+    },
+    "bald": {
+     "tp": 3,
+     "fp": 0,
+     "fn": 0,
+     "tn": 111,
+     "positives": 3,
+     "recall": 1,
+     "precision": 1
+    },
+    "costume": {
+     "tp": 5,
+     "fp": 43,
+     "fn": 1,
+     "tn": 65,
+     "positives": 6,
+     "recall": 0.8333333333333334,
+     "precision": 0.10416666666666667
+    },
+    "rowMatch": {
+     "tp": 10,
+     "fp": 26,
+     "fn": 0,
+     "tn": 78,
+     "positives": 10,
+     "recall": 1,
+     "precision": 0.2777777777777778
+    },
+    "held": {
+     "tp": 1,
+     "fp": 5,
+     "fn": 0,
+     "tn": 108,
+     "positives": 1,
+     "recall": 1,
+     "precision": 0.16666666666666666
+    },
+    "layout": {
+     "tp": 5,
+     "fp": 1,
+     "fn": 2,
+     "tn": 106,
+     "positives": 7,
+     "recall": 0.7142857142857143,
+     "precision": 0.8333333333333334
+    },
+    "identity": {
+     "tp": 1,
+     "fp": 18,
+     "fn": 0,
+     "tn": 95,
+     "positives": 1,
+     "recall": 1,
+     "precision": 0.05263157894736842
+    },
+    "age": {
+     "tp": 0,
+     "fp": 14,
+     "fn": 0,
+     "tn": 100,
+     "positives": 0,
+     "recall": null,
+     "precision": 0
+    },
+    "ANY": {
+     "tp": 35,
+     "fp": 44,
+     "fn": 0,
+     "tn": 35,
+     "positives": 35,
+     "recall": 1,
+     "precision": 0.4430379746835443
+    }
+   },
+   "tune": {
+    "hat": {
+     "tp": 4,
+     "fp": 1,
+     "fn": 2,
+     "tn": 41,
+     "positives": 6,
+     "recall": 0.6666666666666666,
+     "precision": 0.8
+    },
+    "hair": {
+     "tp": 0,
+     "fp": 16,
+     "fn": 0,
+     "tn": 32,
+     "positives": 0,
+     "recall": null,
+     "precision": 0
+    },
+    "bald": {
+     "tp": 3,
+     "fp": 0,
+     "fn": 0,
+     "tn": 45,
+     "positives": 3,
+     "recall": 1,
+     "precision": 1
+    },
+    "costume": {
+     "tp": 1,
+     "fp": 22,
+     "fn": 0,
+     "tn": 25,
+     "positives": 1,
+     "recall": 1,
+     "precision": 0.043478260869565216
+    },
+    "rowMatch": {
+     "tp": 6,
+     "fp": 12,
+     "fn": 0,
+     "tn": 30,
+     "positives": 6,
+     "recall": 1,
+     "precision": 0.3333333333333333
+    },
+    "held": {
+     "tp": 0,
+     "fp": 1,
+     "fn": 0,
+     "tn": 47,
+     "positives": 0,
+     "recall": null,
+     "precision": 0
+    },
+    "layout": {
+     "tp": 1,
+     "fp": 1,
+     "fn": 1,
+     "tn": 45,
+     "positives": 2,
+     "recall": 0.5,
+     "precision": 0.5
+    },
+    "identity": {
+     "tp": 0,
+     "fp": 6,
+     "fn": 0,
+     "tn": 42,
+     "positives": 0,
+     "recall": null,
+     "precision": 0
+    },
+    "age": {
+     "tp": 0,
+     "fp": 3,
+     "fn": 0,
+     "tn": 45,
+     "positives": 0,
+     "recall": null,
+     "precision": 0
+    },
+    "ANY": {
+     "tp": 15,
+     "fp": 16,
+     "fn": 0,
+     "tn": 17,
+     "positives": 15,
+     "recall": 1,
+     "precision": 0.4838709677419355
+    }
+   },
+   "test": {
+    "hat": {
+     "tp": 4,
+     "fp": 1,
+     "fn": 3,
+     "tn": 58,
+     "positives": 7,
+     "recall": 0.5714285714285714,
+     "precision": 0.8
+    },
+    "hair": {
+     "tp": 2,
+     "fp": 24,
+     "fn": 1,
+     "tn": 39,
+     "positives": 3,
+     "recall": 0.6666666666666666,
+     "precision": 0.07692307692307693
+    },
+    "bald": {
+     "tp": 0,
+     "fp": 0,
+     "fn": 0,
+     "tn": 66,
+     "positives": 0,
+     "recall": null,
+     "precision": null
+    },
+    "costume": {
+     "tp": 4,
+     "fp": 21,
+     "fn": 1,
+     "tn": 40,
+     "positives": 5,
+     "recall": 0.8,
+     "precision": 0.16
+    },
+    "rowMatch": {
+     "tp": 4,
+     "fp": 14,
+     "fn": 0,
+     "tn": 48,
+     "positives": 4,
+     "recall": 1,
+     "precision": 0.2222222222222222
+    },
+    "held": {
+     "tp": 1,
+     "fp": 4,
+     "fn": 0,
+     "tn": 61,
+     "positives": 1,
+     "recall": 1,
+     "precision": 0.2
+    },
+    "layout": {
+     "tp": 4,
+     "fp": 0,
+     "fn": 1,
+     "tn": 61,
+     "positives": 5,
+     "recall": 0.8,
+     "precision": 1
+    },
+    "identity": {
+     "tp": 1,
+     "fp": 12,
+     "fn": 0,
+     "tn": 53,
+     "positives": 1,
+     "recall": 1,
+     "precision": 0.07692307692307693
+    },
+    "age": {
+     "tp": 0,
+     "fp": 11,
+     "fn": 0,
+     "tn": 55,
+     "positives": 0,
+     "recall": null,
+     "precision": 0
+    },
+    "ANY": {
+     "tp": 20,
+     "fp": 28,
+     "fn": 0,
+     "tn": 18,
+     "positives": 20,
+     "recall": 1,
+     "precision": 0.4166666666666667
+    }
+   }
+  },
+  "either": {
+   "all": {
+    "hat": {
+     "tp": 8,
+     "fp": 2,
+     "fn": 5,
+     "tn": 99,
+     "positives": 13,
+     "recall": 0.6153846153846154,
+     "precision": 0.8
+    },
+    "hair": {
+     "tp": 2,
+     "fp": 40,
+     "fn": 1,
+     "tn": 71,
+     "positives": 3,
+     "recall": 0.6666666666666666,
+     "precision": 0.047619047619047616
+    },
+    "bald": {
+     "tp": 3,
+     "fp": 0,
+     "fn": 0,
+     "tn": 111,
+     "positives": 3,
+     "recall": 1,
+     "precision": 1
+    },
+    "costume": {
+     "tp": 5,
+     "fp": 43,
+     "fn": 1,
+     "tn": 65,
+     "positives": 6,
+     "recall": 0.8333333333333334,
+     "precision": 0.10416666666666667
+    },
+    "rowMatch": {
+     "tp": 10,
+     "fp": 26,
+     "fn": 0,
+     "tn": 78,
+     "positives": 10,
+     "recall": 1,
+     "precision": 0.2777777777777778
+    },
+    "held": {
+     "tp": 1,
+     "fp": 5,
+     "fn": 0,
+     "tn": 108,
+     "positives": 1,
+     "recall": 1,
+     "precision": 0.16666666666666666
+    },
+    "layout": {
+     "tp": 5,
+     "fp": 1,
+     "fn": 2,
+     "tn": 106,
+     "positives": 7,
+     "recall": 0.7142857142857143,
+     "precision": 0.8333333333333334
+    },
+    "identity": {
+     "tp": 1,
+     "fp": 18,
+     "fn": 0,
+     "tn": 95,
+     "positives": 1,
+     "recall": 1,
+     "precision": 0.05263157894736842
+    },
+    "age": {
+     "tp": 0,
+     "fp": 14,
+     "fn": 0,
+     "tn": 100,
+     "positives": 0,
+     "recall": null,
+     "precision": 0
+    },
+    "ANY": {
+     "tp": 35,
+     "fp": 44,
+     "fn": 0,
+     "tn": 35,
+     "positives": 35,
+     "recall": 1,
+     "precision": 0.4430379746835443
+    }
+   },
+   "tune": {
+    "hat": {
+     "tp": 4,
+     "fp": 1,
+     "fn": 2,
+     "tn": 41,
+     "positives": 6,
+     "recall": 0.6666666666666666,
+     "precision": 0.8
+    },
+    "hair": {
+     "tp": 0,
+     "fp": 16,
+     "fn": 0,
+     "tn": 32,
+     "positives": 0,
+     "recall": null,
+     "precision": 0
+    },
+    "bald": {
+     "tp": 3,
+     "fp": 0,
+     "fn": 0,
+     "tn": 45,
+     "positives": 3,
+     "recall": 1,
+     "precision": 1
+    },
+    "costume": {
+     "tp": 1,
+     "fp": 22,
+     "fn": 0,
+     "tn": 25,
+     "positives": 1,
+     "recall": 1,
+     "precision": 0.043478260869565216
+    },
+    "rowMatch": {
+     "tp": 6,
+     "fp": 12,
+     "fn": 0,
+     "tn": 30,
+     "positives": 6,
+     "recall": 1,
+     "precision": 0.3333333333333333
+    },
+    "held": {
+     "tp": 0,
+     "fp": 1,
+     "fn": 0,
+     "tn": 47,
+     "positives": 0,
+     "recall": null,
+     "precision": 0
+    },
+    "layout": {
+     "tp": 1,
+     "fp": 1,
+     "fn": 1,
+     "tn": 45,
+     "positives": 2,
+     "recall": 0.5,
+     "precision": 0.5
+    },
+    "identity": {
+     "tp": 0,
+     "fp": 6,
+     "fn": 0,
+     "tn": 42,
+     "positives": 0,
+     "recall": null,
+     "precision": 0
+    },
+    "age": {
+     "tp": 0,
+     "fp": 3,
+     "fn": 0,
+     "tn": 45,
+     "positives": 0,
+     "recall": null,
+     "precision": 0
+    },
+    "ANY": {
+     "tp": 15,
+     "fp": 16,
+     "fn": 0,
+     "tn": 17,
+     "positives": 15,
+     "recall": 1,
+     "precision": 0.4838709677419355
+    }
+   },
+   "test": {
+    "hat": {
+     "tp": 4,
+     "fp": 1,
+     "fn": 3,
+     "tn": 58,
+     "positives": 7,
+     "recall": 0.5714285714285714,
+     "precision": 0.8
+    },
+    "hair": {
+     "tp": 2,
+     "fp": 24,
+     "fn": 1,
+     "tn": 39,
+     "positives": 3,
+     "recall": 0.6666666666666666,
+     "precision": 0.07692307692307693
+    },
+    "bald": {
+     "tp": 0,
+     "fp": 0,
+     "fn": 0,
+     "tn": 66,
+     "positives": 0,
+     "recall": null,
+     "precision": null
+    },
+    "costume": {
+     "tp": 4,
+     "fp": 21,
+     "fn": 1,
+     "tn": 40,
+     "positives": 5,
+     "recall": 0.8,
+     "precision": 0.16
+    },
+    "rowMatch": {
+     "tp": 4,
+     "fp": 14,
+     "fn": 0,
+     "tn": 48,
+     "positives": 4,
+     "recall": 1,
+     "precision": 0.2222222222222222
+    },
+    "held": {
+     "tp": 1,
+     "fp": 4,
+     "fn": 0,
+     "tn": 61,
+     "positives": 1,
+     "recall": 1,
+     "precision": 0.2
+    },
+    "layout": {
+     "tp": 4,
+     "fp": 0,
+     "fn": 1,
+     "tn": 61,
+     "positives": 5,
+     "recall": 0.8,
+     "precision": 1
+    },
+    "identity": {
+     "tp": 1,
+     "fp": 12,
+     "fn": 0,
+     "tn": 53,
+     "positives": 1,
+     "recall": 1,
+     "precision": 0.07692307692307693
+    },
+    "age": {
+     "tp": 0,
+     "fp": 11,
+     "fn": 0,
+     "tn": 55,
+     "positives": 0,
+     "recall": null,
+     "precision": 0
+    },
+    "ANY": {
+     "tp": 20,
+     "fp": 28,
+     "fn": 0,
+     "tn": 18,
+     "positives": 20,
+     "recall": 1,
+     "precision": 0.4166666666666667
+    }
+   }
+  },
+  "consistency": {
+   "all": {
+    "hat": {
+     "tp": 8,
+     "fp": 1,
+     "fn": 5,
+     "tn": 100,
+     "positives": 13,
+     "recall": 0.6153846153846154,
+     "precision": 0.8888888888888888
+    },
+    "hair": {
+     "tp": 1,
+     "fp": 16,
+     "fn": 2,
+     "tn": 95,
+     "positives": 3,
+     "recall": 0.3333333333333333,
+     "precision": 0.058823529411764705
+    },
+    "bald": {
+     "tp": 3,
+     "fp": 0,
+     "fn": 0,
+     "tn": 111,
+     "positives": 3,
+     "recall": 1,
+     "precision": 1
+    },
+    "costume": {
+     "tp": 5,
+     "fp": 43,
+     "fn": 1,
+     "tn": 65,
+     "positives": 6,
+     "recall": 0.8333333333333334,
+     "precision": 0.10416666666666667
+    },
+    "rowMatch": {
+     "tp": 10,
+     "fp": 26,
+     "fn": 0,
+     "tn": 78,
+     "positives": 10,
+     "recall": 1,
+     "precision": 0.2777777777777778
+    },
+    "held": {
+     "tp": 1,
+     "fp": 5,
+     "fn": 0,
+     "tn": 108,
+     "positives": 1,
+     "recall": 1,
+     "precision": 0.16666666666666666
+    },
+    "layout": {
+     "tp": 5,
+     "fp": 1,
+     "fn": 2,
+     "tn": 106,
+     "positives": 7,
+     "recall": 0.7142857142857143,
+     "precision": 0.8333333333333334
+    },
+    "identity": {
+     "tp": 0,
+     "fp": 0,
+     "fn": 1,
+     "tn": 113,
+     "positives": 1,
+     "recall": 0,
+     "precision": null
+    },
+    "age": {
+     "tp": 0,
+     "fp": 0,
+     "fn": 0,
+     "tn": 114,
+     "positives": 0,
+     "recall": null,
+     "precision": null
+    },
+    "ANY": {
+     "tp": 31,
+     "fp": 33,
+     "fn": 4,
+     "tn": 46,
+     "positives": 35,
+     "recall": 0.8857142857142857,
+     "precision": 0.484375
+    }
+   },
+   "tune": {
+    "hat": {
+     "tp": 4,
+     "fp": 1,
+     "fn": 2,
+     "tn": 41,
+     "positives": 6,
+     "recall": 0.6666666666666666,
+     "precision": 0.8
+    },
+    "hair": {
+     "tp": 0,
+     "fp": 4,
+     "fn": 0,
+     "tn": 44,
+     "positives": 0,
+     "recall": null,
+     "precision": 0
+    },
+    "bald": {
+     "tp": 3,
+     "fp": 0,
+     "fn": 0,
+     "tn": 45,
+     "positives": 3,
+     "recall": 1,
+     "precision": 1
+    },
+    "costume": {
+     "tp": 1,
+     "fp": 22,
+     "fn": 0,
+     "tn": 25,
+     "positives": 1,
+     "recall": 1,
+     "precision": 0.043478260869565216
+    },
+    "rowMatch": {
+     "tp": 6,
+     "fp": 12,
+     "fn": 0,
+     "tn": 30,
+     "positives": 6,
+     "recall": 1,
+     "precision": 0.3333333333333333
+    },
+    "held": {
+     "tp": 0,
+     "fp": 1,
+     "fn": 0,
+     "tn": 47,
+     "positives": 0,
+     "recall": null,
+     "precision": 0
+    },
+    "layout": {
+     "tp": 1,
+     "fp": 1,
+     "fn": 1,
+     "tn": 45,
+     "positives": 2,
+     "recall": 0.5,
+     "precision": 0.5
+    },
+    "identity": {
+     "tp": 0,
+     "fp": 0,
+     "fn": 0,
+     "tn": 48,
+     "positives": 0,
+     "recall": null,
+     "precision": null
+    },
+    "age": {
+     "tp": 0,
+     "fp": 0,
+     "fn": 0,
+     "tn": 48,
+     "positives": 0,
+     "recall": null,
+     "precision": null
+    },
+    "ANY": {
+     "tp": 14,
+     "fp": 14,
+     "fn": 1,
+     "tn": 19,
+     "positives": 15,
+     "recall": 0.9333333333333333,
+     "precision": 0.5
+    }
+   },
+   "test": {
+    "hat": {
+     "tp": 4,
+     "fp": 0,
+     "fn": 3,
+     "tn": 59,
+     "positives": 7,
+     "recall": 0.5714285714285714,
+     "precision": 1
+    },
+    "hair": {
+     "tp": 1,
+     "fp": 12,
+     "fn": 2,
+     "tn": 51,
+     "positives": 3,
+     "recall": 0.3333333333333333,
+     "precision": 0.07692307692307693
+    },
+    "bald": {
+     "tp": 0,
+     "fp": 0,
+     "fn": 0,
+     "tn": 66,
+     "positives": 0,
+     "recall": null,
+     "precision": null
+    },
+    "costume": {
+     "tp": 4,
+     "fp": 21,
+     "fn": 1,
+     "tn": 40,
+     "positives": 5,
+     "recall": 0.8,
+     "precision": 0.16
+    },
+    "rowMatch": {
+     "tp": 4,
+     "fp": 14,
+     "fn": 0,
+     "tn": 48,
+     "positives": 4,
+     "recall": 1,
+     "precision": 0.2222222222222222
+    },
+    "held": {
+     "tp": 1,
+     "fp": 4,
+     "fn": 0,
+     "tn": 61,
+     "positives": 1,
+     "recall": 1,
+     "precision": 0.2
+    },
+    "layout": {
+     "tp": 4,
+     "fp": 0,
+     "fn": 1,
+     "tn": 61,
+     "positives": 5,
+     "recall": 0.8,
+     "precision": 1
+    },
+    "identity": {
+     "tp": 0,
+     "fp": 0,
+     "fn": 1,
+     "tn": 65,
+     "positives": 1,
+     "recall": 0,
+     "precision": null
+    },
+    "age": {
+     "tp": 0,
+     "fp": 0,
+     "fn": 0,
+     "tn": 66,
+     "positives": 0,
+     "recall": null,
+     "precision": null
+    },
+    "ANY": {
+     "tp": 17,
+     "fp": 19,
+     "fn": 3,
+     "tn": 27,
+     "positives": 20,
+     "recall": 0.85,
+     "precision": 0.4722222222222222
+    }
+   }
+  },
+  "chosen": {
+   "all": {
+    "hat": {
+     "tp": 8,
+     "fp": 2,
+     "fn": 5,
+     "tn": 99,
+     "positives": 13,
+     "recall": 0.6153846153846154,
+     "precision": 0.8
+    },
+    "hair": {
+     "tp": 0,
+     "fp": 1,
+     "fn": 3,
+     "tn": 110,
+     "positives": 3,
+     "recall": 0,
+     "precision": 0
+    },
+    "bald": {
+     "tp": 3,
+     "fp": 0,
+     "fn": 0,
+     "tn": 111,
+     "positives": 3,
+     "recall": 1,
+     "precision": 1
+    },
+    "costume": {
+     "tp": 5,
+     "fp": 43,
+     "fn": 1,
+     "tn": 65,
+     "positives": 6,
+     "recall": 0.8333333333333334,
+     "precision": 0.10416666666666667
+    },
+    "rowMatch": {
+     "tp": 10,
+     "fp": 26,
+     "fn": 0,
+     "tn": 78,
+     "positives": 10,
+     "recall": 1,
+     "precision": 0.2777777777777778
+    },
+    "held": {
+     "tp": 1,
+     "fp": 5,
+     "fn": 0,
+     "tn": 108,
+     "positives": 1,
+     "recall": 1,
+     "precision": 0.16666666666666666
+    },
+    "layout": {
+     "tp": 5,
+     "fp": 1,
+     "fn": 2,
+     "tn": 106,
+     "positives": 7,
+     "recall": 0.7142857142857143,
+     "precision": 0.8333333333333334
+    },
+    "identity": {
+     "tp": 0,
+     "fp": 0,
+     "fn": 1,
+     "tn": 113,
+     "positives": 1,
+     "recall": 0,
+     "precision": null
+    },
+    "age": {
+     "tp": 0,
+     "fp": 0,
+     "fn": 0,
+     "tn": 114,
+     "positives": 0,
+     "recall": null,
+     "precision": null
+    },
+    "ANY": {
+     "tp": 29,
+     "fp": 31,
+     "fn": 6,
+     "tn": 48,
+     "positives": 35,
+     "recall": 0.8285714285714286,
+     "precision": 0.48333333333333334
+    }
+   },
+   "tune": {
+    "hat": {
+     "tp": 4,
+     "fp": 1,
+     "fn": 2,
+     "tn": 41,
+     "positives": 6,
+     "recall": 0.6666666666666666,
+     "precision": 0.8
+    },
+    "hair": {
+     "tp": 0,
+     "fp": 1,
+     "fn": 0,
+     "tn": 47,
+     "positives": 0,
+     "recall": null,
+     "precision": 0
+    },
+    "bald": {
+     "tp": 3,
+     "fp": 0,
+     "fn": 0,
+     "tn": 45,
+     "positives": 3,
+     "recall": 1,
+     "precision": 1
+    },
+    "costume": {
+     "tp": 1,
+     "fp": 22,
+     "fn": 0,
+     "tn": 25,
+     "positives": 1,
+     "recall": 1,
+     "precision": 0.043478260869565216
+    },
+    "rowMatch": {
+     "tp": 6,
+     "fp": 12,
+     "fn": 0,
+     "tn": 30,
+     "positives": 6,
+     "recall": 1,
+     "precision": 0.3333333333333333
+    },
+    "held": {
+     "tp": 0,
+     "fp": 1,
+     "fn": 0,
+     "tn": 47,
+     "positives": 0,
+     "recall": null,
+     "precision": 0
+    },
+    "layout": {
+     "tp": 1,
+     "fp": 1,
+     "fn": 1,
+     "tn": 45,
+     "positives": 2,
+     "recall": 0.5,
+     "precision": 0.5
+    },
+    "identity": {
+     "tp": 0,
+     "fp": 0,
+     "fn": 0,
+     "tn": 48,
+     "positives": 0,
+     "recall": null,
+     "precision": null
+    },
+    "age": {
+     "tp": 0,
+     "fp": 0,
+     "fn": 0,
+     "tn": 48,
+     "positives": 0,
+     "recall": null,
+     "precision": null
+    },
+    "ANY": {
+     "tp": 13,
+     "fp": 14,
+     "fn": 2,
+     "tn": 19,
+     "positives": 15,
+     "recall": 0.8666666666666667,
+     "precision": 0.48148148148148145
+    }
+   },
+   "test": {
+    "hat": {
+     "tp": 4,
+     "fp": 1,
+     "fn": 3,
+     "tn": 58,
+     "positives": 7,
+     "recall": 0.5714285714285714,
+     "precision": 0.8
+    },
+    "hair": {
+     "tp": 0,
+     "fp": 0,
+     "fn": 3,
+     "tn": 63,
+     "positives": 3,
+     "recall": 0,
+     "precision": null
+    },
+    "bald": {
+     "tp": 0,
+     "fp": 0,
+     "fn": 0,
+     "tn": 66,
+     "positives": 0,
+     "recall": null,
+     "precision": null
+    },
+    "costume": {
+     "tp": 4,
+     "fp": 21,
+     "fn": 1,
+     "tn": 40,
+     "positives": 5,
+     "recall": 0.8,
+     "precision": 0.16
+    },
+    "rowMatch": {
+     "tp": 4,
+     "fp": 14,
+     "fn": 0,
+     "tn": 48,
+     "positives": 4,
+     "recall": 1,
+     "precision": 0.2222222222222222
+    },
+    "held": {
+     "tp": 1,
+     "fp": 4,
+     "fn": 0,
+     "tn": 61,
+     "positives": 1,
+     "recall": 1,
+     "precision": 0.2
+    },
+    "layout": {
+     "tp": 4,
+     "fp": 0,
+     "fn": 1,
+     "tn": 61,
+     "positives": 5,
+     "recall": 0.8,
+     "precision": 1
+    },
+    "identity": {
+     "tp": 0,
+     "fp": 0,
+     "fn": 1,
+     "tn": 65,
+     "positives": 1,
+     "recall": 0,
+     "precision": null
+    },
+    "age": {
+     "tp": 0,
+     "fp": 0,
+     "fn": 0,
+     "tn": 66,
+     "positives": 0,
+     "recall": null,
+     "precision": null
+    },
+    "ANY": {
+     "tp": 16,
+     "fp": 17,
+     "fn": 4,
+     "tn": 29,
+     "positives": 20,
+     "recall": 0.8,
+     "precision": 0.48484848484848486
+    }
+   }
+  }
+ },
+ "latencyMs": {
+  "p50": 4367,
+  "p90": 4737,
+  "mean": 4407
+ },
+ "costPerSheetUsd": 0.0032714245614035107,
+ "totalCostUsd": 0.37294240000000023,
+ "misses": [
+  {
+   "id": "exp1738-17915545-v0",
+   "type": "hair",
+   "fold": "test"
+  },
+  {
+   "id": "exp1739-17916378-v3",
+   "type": "identity",
+   "fold": "test"
+  },
+  {
+   "id": "exp1739-17916378-v3",
+   "type": "hair",
+   "fold": "test"
+  },
+  {
+   "id": "exp1741-17914901-v7",
+   "type": "layout",
+   "fold": "tune"
+  },
+  {
+   "id": "exp1742-17914968-v6",
+   "type": "hat",
+   "fold": "test"
+  },
+  {
+   "id": "exp1742-17914968-v6",
+   "type": "layout",
+   "fold": "test"
+  },
+  {
+   "id": "exp1744-17914502-v0",
+   "type": "hair",
+   "fold": "test"
+  },
+  {
+   "id": "base-Omar3-standard",
+   "type": "costume",
+   "fold": "test"
+  },
+  {
+   "id": "680c30fd-Emma4-cos",
+   "type": "hat",
+   "fold": "tune"
+  },
+  {
+   "id": "680c30fd-Noah7-cos",
+   "type": "hat",
+   "fold": "tune"
+  },
+  {
+   "id": "680c30fd-Daniel38-std",
+   "type": "hat",
+   "fold": "test"
+  },
+  {
+   "id": "680c30fd-Hans68-std",
+   "type": "hat",
+   "fold": "test"
+  }
+ ],
+ "falseAlarms": [
+  {
+   "id": "exp1735-17914901-v1",
+   "type": "costume",
+   "fold": "tune",
+   "evidence": "The top row shows a blue checkered shirt, while the bottom row shows a blue robe with a belt and pouch, indicating diffe"
+  },
+  {
+   "id": "exp1735-17914901-v1",
+   "type": "rowMatch",
+   "fold": "tune",
+   "evidence": "The top row shows a blue checkered shirt, while the bottom row shows a blue robe with a belt and pouch, indicating diffe"
+  },
+  {
+   "id": "exp1736-17914968-v1",
+   "type": "rowMatch",
+   "fold": "test",
+   "evidence": "The hat differs in shape and size between cells 1,2,5,6 and cells 3,4,7,8. The costume is missing the belt and pouch in "
+  },
+  {
+   "id": "exp1738-17915545-v1",
+   "type": "costume",
+   "fold": "test",
+   "evidence": "The arm guards and belt are missing from the head-and-shoulder cells (1-4) but present in the full-body cells (5-8)."
+  },
+  {
+   "id": "exp1738-17915545-v1",
+   "type": "held",
+   "fold": "test",
+   "evidence": "The arm guards and belt are missing from the head-and-shoulder cells (1-4) but present in the full-body cells (5-8)."
+  },
+  {
+   "id": "exp1740-17915545-v6",
+   "type": "costume",
+   "fold": "test",
+   "evidence": "The hair style differs between cells, being down in cells 1, 2, 5, 6 and in a ponytail in cells 3, 4, 7, 8. The costume "
+  },
+  {
+   "id": "exp1740-17915545-v6",
+   "type": "rowMatch",
+   "fold": "test",
+   "evidence": "The hair style differs between cells, being down in cells 1, 2, 5, 6 and in a ponytail in cells 3, 4, 7, 8. The costume "
+  },
+  {
+   "id": "exp1740-17915545-v6",
+   "type": "held",
+   "fold": "test",
+   "evidence": "The hair style differs between cells, being down in cells 1, 2, 5, 6 and in a ponytail in cells 3, 4, 7, 8. The costume "
+  },
+  {
+   "id": "exp1741-17914901-v2",
+   "type": "costume",
+   "fold": "tune",
+   "evidence": "The top row shows a blue hoodie, while the bottom row shows a blue robe with a belt and pouch, indicating a difference i"
+  },
+  {
+   "id": "exp1741-17914901-v2",
+   "type": "rowMatch",
+   "fold": "tune",
+   "evidence": "The top row shows a blue hoodie, while the bottom row shows a blue robe with a belt and pouch, indicating a difference i"
+  },
+  {
+   "id": "exp1741-17914901-v3",
+   "type": "costume",
+   "fold": "tune",
+   "evidence": "The child in the sheet has a different face and hair color than the child in the photo. The top row cells are missing th"
+  },
+  {
+   "id": "exp1741-17914901-v3",
+   "type": "rowMatch",
+   "fold": "tune",
+   "evidence": "The child in the sheet has a different face and hair color than the child in the photo. The top row cells are missing th"
+  },
+  {
+   "id": "exp1741-17914901-v4",
+   "type": "costume",
+   "fold": "tune",
+   "evidence": "The hair color and style on the sheet are different from the photo. The costume in the top row is missing the belt and p"
+  },
+  {
+   "id": "exp1741-17914901-v4",
+   "type": "rowMatch",
+   "fold": "tune",
+   "evidence": "The hair color and style on the sheet are different from the photo. The costume in the top row is missing the belt and p"
+  },
+  {
+   "id": "exp1742-17914968-v3",
+   "type": "costume",
+   "fold": "test",
+   "evidence": "The pouch is missing from the belt in cell 8."
+  },
+  {
+   "id": "exp1742-17914968-v5",
+   "type": "costume",
+   "fold": "test",
+   "evidence": "The top row cells are missing the belt and pouch that are present in the bottom row cells."
+  },
+  {
+   "id": "exp1742-17914968-v5",
+   "type": "rowMatch",
+   "fold": "test",
+   "evidence": "The top row cells are missing the belt and pouch that are present in the bottom row cells."
+  },
+  {
+   "id": "exp1742-17914968-v6",
+   "type": "costume",
+   "fold": "test",
+   "evidence": "The top row cells (1-4) are missing the belt and pouch that are present in the bottom row cells (5-8)."
+  },
+  {
+   "id": "exp1742-17914968-v6",
+   "type": "rowMatch",
+   "fold": "test",
+   "evidence": "The top row cells (1-4) are missing the belt and pouch that are present in the bottom row cells (5-8)."
+  },
+  {
+   "id": "exp1743-17915608-v0",
+   "type": "costume",
+   "fold": "tune",
+   "evidence": "Cell 5 shows a bald head, while cells 1, 2, 3, 4, 6, 7, and 8 show a full head of hair."
+  },
+  {
+   "id": "exp1743-17915608-v0",
+   "type": "rowMatch",
+   "fold": "tune",
+   "evidence": "Cell 5 shows a bald head, while cells 1, 2, 3, 4, 6, 7, and 8 show a full head of hair."
+  },
+  {
+   "id": "exp1744-17914502-v0",
+   "type": "costume",
+   "fold": "test",
+   "evidence": "The top row cells (1-4) are missing the belt that is present in the bottom row cells (5-8)."
+  },
+  {
+   "id": "exp1745-17915512-v0",
+   "type": "costume",
+   "fold": "tune",
+   "evidence": "The necklace in the top row is a simple gold chain, while in the bottom row it is a gold magnifying glass on a chain."
+  },
+  {
+   "id": "exp1745-17915512-v0",
+   "type": "rowMatch",
+   "fold": "tune",
+   "evidence": "The necklace in the top row is a simple gold chain, while in the bottom row it is a gold magnifying glass on a chain."
+  },
+  {
+   "id": "exp1746-17915002-v0",
+   "type": "costume",
+   "fold": "tune",
+   "evidence": "The top row cells (1-4) are missing the belt and pouch that are present in the bottom row cells (5-8)."
+  },
+  {
+   "id": "exp1746-17915002-v0",
+   "type": "rowMatch",
+   "fold": "tune",
+   "evidence": "The top row cells (1-4) are missing the belt and pouch that are present in the bottom row cells (5-8)."
+  },
+  {
+   "id": "exp1747-17914504-v0",
+   "type": "hair",
+   "fold": "tune",
+   "evidence": "Cell 5 shows a child with thinner, lighter hair than the other cells. Cells 6, 7, and 8 show a sword attached to the bel"
+  },
+  {
+   "id": "exp1747-17914504-v0",
+   "type": "costume",
+   "fold": "tune",
+   "evidence": "Cell 5 shows a child with thinner, lighter hair than the other cells. Cells 6, 7, and 8 show a sword attached to the bel"
+  },
+  {
+   "id": "exp1747-17914504-v0",
+   "type": "rowMatch",
+   "fold": "tune",
+   "evidence": "Cell 5 shows a child with thinner, lighter hair than the other cells. Cells 6, 7, and 8 show a sword attached to the bel"
+  },
+  {
+   "id": "exp1747-17914504-v0",
+   "type": "held",
+   "fold": "tune",
+   "evidence": "Cell 5 shows a child with thinner, lighter hair than the other cells. Cells 6, 7, and 8 show a sword attached to the bel"
+  },
+  {
+   "id": "base-Emma5-costumed",
+   "type": "costume",
+   "fold": "test",
+   "evidence": "The hair style differs between cells 1 and 2 (down) and cells 3 and 4 (ponytail). The costume differs as the top row lac"
+  },
+  {
+   "id": "base-Emma5-costumed",
+   "type": "rowMatch",
+   "fold": "test",
+   "evidence": "The hair style differs between cells 1 and 2 (down) and cells 3 and 4 (ponytail). The costume differs as the top row lac"
+  },
+  {
+   "id": "base-Emma5-standard",
+   "type": "costume",
+   "fold": "test",
+   "evidence": "The hair style differs between cells, being down in cells 1, 2, 5, 6 and in a ponytail in cells 3, 4, 7, 8. The costume "
+  },
+  {
+   "id": "base-Emma5-standard",
+   "type": "rowMatch",
+   "fold": "test",
+   "evidence": "The hair style differs between cells, being down in cells 1, 2, 5, 6 and in a ponytail in cells 3, 4, 7, 8. The costume "
+  },
+  {
+   "id": "base-Lily7-costumed",
+   "type": "costume",
+   "fold": "tune",
+   "evidence": "The top row shows a dress, while the bottom row shows a robe with a belt and pouch, indicating different costume pieces."
+  },
+  {
+   "id": "base-Lily7-standard",
+   "type": "rowMatch",
+   "fold": "tune",
+   "evidence": "The top row shows the child wearing only a yellow overall dress, while the bottom row shows a white long-sleeve shirt un"
+  },
+  {
+   "id": "base-Lukas8-costumed",
+   "type": "costume",
+   "fold": "test",
+   "evidence": "The top row cells (1-4) are missing the black belt and wristbands that are present in the bottom row cells (5-8)."
+  },
+  {
+   "id": "base-Lukas8-costumed",
+   "type": "rowMatch",
+   "fold": "test",
+   "evidence": "The top row cells (1-4) are missing the black belt and wristbands that are present in the bottom row cells (5-8)."
+  },
+  {
+   "id": "base-Lukas9-costumed",
+   "type": "hat",
+   "fold": "tune",
+   "evidence": "The headgear in the top row is a simple hood, while in the bottom row it is a hood attached to a full robe, making it di"
+  },
+  {
+   "id": "base-Lukas9-costumed",
+   "type": "costume",
+   "fold": "tune",
+   "evidence": "The headgear in the top row is a simple hood, while in the bottom row it is a hood attached to a full robe, making it di"
+  },
+  {
+   "id": "base-Lukas9-costumed",
+   "type": "rowMatch",
+   "fold": "tune",
+   "evidence": "The headgear in the top row is a simple hood, while in the bottom row it is a hood attached to a full robe, making it di"
+  },
+  {
+   "id": "base-Lukas9-standard",
+   "type": "costume",
+   "fold": "tune",
+   "evidence": "The top row shows the child wearing blue overalls, while the bottom row shows the child wearing blue trousers and a grey"
+  },
+  {
+   "id": "base-Noah4-costumed",
+   "type": "costume",
+   "fold": "test",
+   "evidence": "The top row shows a blue shirt, while the bottom row shows a blue starry robe, which is a different costume."
+  },
+  {
+   "id": "base-Noah4-costumed",
+   "type": "rowMatch",
+   "fold": "test",
+   "evidence": "The top row shows a blue shirt, while the bottom row shows a blue starry robe, which is a different costume."
+  },
+  {
+   "id": "base-Noah4-standard",
+   "type": "costume",
+   "fold": "test",
+   "evidence": "The emblem on the green hoodie differs between the top row (white shapes) and the bottom row (white dinosaur)."
+  },
+  {
+   "id": "base-Serafin8-costumed",
+   "type": "costume",
+   "fold": "tune",
+   "evidence": "The top row shows a simple blue tunic, while the bottom row shows a blue kimono with a belt and wristbands, indicating a"
+  },
+  {
+   "id": "base-Serafin8-standard",
+   "type": "costume",
+   "fold": "tune",
+   "evidence": "The backpack is present in the bottom row but missing in the top row."
+  },
+  {
+   "id": "63f21ca1-Sarah25-cos",
+   "type": "rowMatch",
+   "fold": "test",
+   "evidence": "The headgear is missing in cells 1, 2, and 3, but present in cells 4, 5, 6, 7, and 8. The head row does not show the ful"
+  },
+  {
+   "id": "63f21ca1-Fiona25-std",
+   "type": "costume",
+   "fold": "tune",
+   "evidence": "The necklace is missing in cells 3, 4, 7, and 8."
+  },
+  {
+   "id": "63f21ca1-Fiona25-cos",
+   "type": "costume",
+   "fold": "tune",
+   "evidence": "The top row shows no headgear, while the bottom row shows a hat, which is a defect for a costume sheet."
+  },
+  {
+   "id": "63f21ca1-Lorena22-std",
+   "type": "costume",
+   "fold": "test",
+   "evidence": "The bottom row (cells 5-8) shows the person wearing blue denim shorts, which are not present in the top row (cells 1-4)."
+  },
+  {
+   "id": "63f21ca1-Lorena22-cos",
+   "type": "costume",
+   "fold": "test",
+   "evidence": "The headgear is missing in cells 1, 2, 3, and 4, but present in cells 5, 6, 7, and 8."
+  },
+  {
+   "id": "63f21ca1-Lorena22-cos",
+   "type": "rowMatch",
+   "fold": "test",
+   "evidence": "The headgear is missing in cells 1, 2, 3, and 4, but present in cells 5, 6, 7, and 8."
+  },
+  {
+   "id": "85eeb8a8-Noah3-std",
+   "type": "costume",
+   "fold": "tune",
+   "evidence": "The dinosaur emblem on the front of the hoodie differs in shape and detail between cells 1, 2, 5, and 6."
+  },
+  {
+   "id": "d8db1403-Lily6-cos",
+   "type": "costume",
+   "fold": "tune",
+   "evidence": "The headgear (crown) is missing in cells 1, 2, 3, and 4, but present in cells 5, 6, 7, and 8. The costume differs as the"
+  },
+  {
+   "id": "882bb8ec-Noah3-std",
+   "type": "costume",
+   "fold": "tune",
+   "evidence": "The layout is not a clean 2x4 grid of one person, as there are multiple adult figures in the background of the top row a"
+  },
+  {
+   "id": "c291e5de-Felix4-std",
+   "type": "costume",
+   "fold": "tune",
+   "evidence": "The chest emblem on the sweatshirt differs between cells 1, 2, 5, and 6, with the text 'HOCHWACHT' appearing in cells 2 "
+  },
+  {
+   "id": "c291e5de-Felix4-std",
+   "type": "layout",
+   "fold": "tune",
+   "evidence": "The chest emblem on the sweatshirt differs between cells 1, 2, 5, and 6, with the text 'HOCHWACHT' appearing in cells 2 "
+  },
+  {
+   "id": "680c30fd-Fiona25-cos",
+   "type": "costume",
+   "fold": "tune",
+   "evidence": "The hair color in the sheet is brown, while the photo shows light brown hair. Cells 1 and 2 show a necklace that is miss"
+  },
+  {
+   "id": "680c30fd-Fiona25-cos",
+   "type": "rowMatch",
+   "fold": "tune",
+   "evidence": "The hair color in the sheet is brown, while the photo shows light brown hair. Cells 1 and 2 show a necklace that is miss"
+  },
+  {
+   "id": "680c30fd-Kiaan3-std",
+   "type": "hat",
+   "fold": "test",
+   "evidence": "The sheet shows a different child than the photo, with different facial features and hair. The sheet also shows a hat in"
+  },
+  {
+   "id": "af459e2d-Lukas8-cos",
+   "type": "costume",
+   "fold": "test",
+   "evidence": "The top row shows a red shirt, while the bottom row shows a red jumpsuit, which is a different garment."
+  },
+  {
+   "id": "af459e2d-Lukas8-cos",
+   "type": "rowMatch",
+   "fold": "test",
+   "evidence": "The top row shows a red shirt, while the bottom row shows a red jumpsuit, which is a different garment."
+  },
+  {
+   "id": "6ab7f913-Rohan8-cos",
+   "type": "held",
+   "fold": "test",
+   "evidence": "none"
+  },
+  {
+   "id": "af181890-Emma5-std",
+   "type": "costume",
+   "fold": "test",
+   "evidence": "The hair style differs between cells, being down in some and in a ponytail in others. The costume differs, with overalls"
+  },
+  {
+   "id": "91679aa3-Ethan5-std",
+   "type": "costume",
+   "fold": "test",
+   "evidence": "The rocket emblem on the t-shirt differs in design between cells 1, 2 and cells 5, 6."
+  },
+  {
+   "id": "8c4ed141-Mia6-cos",
+   "type": "costume",
+   "fold": "tune",
+   "evidence": "The child in the sheet is a different person and much younger than the adult in the photo. Cell 4 shows a blue collar on"
+  },
+  {
+   "id": "0858fd27-Tobias1-cos",
+   "type": "costume",
+   "fold": "tune",
+   "evidence": "Cell 1 shows a red striped shirt without a vest, while its full-body twin cell 5 shows a red striped shirt with a brown "
+  },
+  {
+   "id": "0858fd27-Tobias1-cos",
+   "type": "rowMatch",
+   "fold": "tune",
+   "evidence": "Cell 1 shows a red striped shirt without a vest, while its full-body twin cell 5 shows a red striped shirt with a brown "
+  },
+  {
+   "id": "b2b25aa3-Emma5-std",
+   "type": "costume",
+   "fold": "test",
+   "evidence": "The hair style differs between cells, with cells 1, 2, 5, 6 showing hair down and cells 3, 4, 7, 8 showing a ponytail. T"
+  },
+  {
+   "id": "880b53c1-Lukas8-cos",
+   "type": "rowMatch",
+   "fold": "test",
+   "evidence": "The top in cells 3 and 4 is a blue shirt, while the full-body twins (cells 7 and 8) show a red shirt."
+  },
+  {
+   "id": "432994b3-Emma5-std",
+   "type": "costume",
+   "fold": "test",
+   "evidence": "The hair style differs between cells, being down in cells 1, 2, 5, 6 and in a ponytail in cells 3, 4, 7, 8. The chest em"
+  },
+  {
+   "id": "432994b3-Emma5-cos",
+   "type": "costume",
+   "fold": "test",
+   "evidence": "The hair style differs between cells, with hair down in cells 1, 2, 5, 6 and in a ponytail in cells 3, 4, 7, 8. The cost"
+  },
+  {
+   "id": "432994b3-Emma5-cos",
+   "type": "rowMatch",
+   "fold": "test",
+   "evidence": "The hair style differs between cells, with hair down in cells 1, 2, 5, 6 and in a ponytail in cells 3, 4, 7, 8. The cost"
+  },
+  {
+   "id": "432994b3-Emma5-cos",
+   "type": "held",
+   "fold": "test",
+   "evidence": "The hair style differs between cells, with hair down in cells 1, 2, 5, 6 and in a ponytail in cells 3, 4, 7, 8. The cost"
+  },
+  {
+   "id": "3eb52357-Emma5-std",
+   "type": "costume",
+   "fold": "test",
+   "evidence": "The hair style differs between cells, being down in cells 1, 2, 5, 6 and in a ponytail in cells 3, 4, 7, 8. The butterfl"
+  },
+  {
+   "id": "10e1d43c-Lukas8-std",
+   "type": "costume",
+   "fold": "test",
+   "evidence": "The sheet shows a different child than the photo, and the top row of cells shows the child in overalls while the bottom "
+  },
+  {
+   "id": "10e1d43c-Lukas8-cos",
+   "type": "rowMatch",
+   "fold": "test",
+   "evidence": "The chest emblem differs between cell 1 (yellow X) and cell 5 (yellow S), and the top in the head row is a shirt while t"
+  }
+ ]
+}

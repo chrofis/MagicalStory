@@ -1,0 +1,89 @@
+You are inspecting ONE character reference sheet before it is used. Find defects; do not be generous. A sheet that goes on to illustrate a whole book must be flawless in the points below.
+
+{INPUT_IMAGES}
+
+The sheet is meant to be a 2 x 4 grid of the SAME single child or adult on plain paper: the top row is four head-and-shoulder cells (front, three-quarter, profile, back), the bottom row is four full-body cells in the same four views. Number the cells 1-4 across the top row and 5-8 across the bottom row. Cell 5 is the full-body twin of cell 1, cell 6 of cell 2, cell 7 of cell 3, cell 8 of cell 4.
+
+{SHEET_KIND_RULE}
+
+STEP 1 - read every cell on its own, from the pixels, before judging anything. For each of the 8 cells answer:
+- headgear: none | hat | hood | headband_or_scarf | crown_or_tiara | other. A hood pulled up over the head is "hood"; a hood hanging down behind the neck is "none". Hair clips and ribbons are "none".
+- hairVisible: full | thin_or_buzzed | bald | hidden_by_headgear | not_in_frame. "bald" means a smooth hairless scalp where the head should carry hair.
+- hairColour: black | dark_brown | brown | light_brown | blonde | red | grey_or_white | other | none.
+- hairStyle: down | ponytail | braids | bun | short_crop | hidden | none.
+- head: present | missing_or_blank_face | cut_off.
+- top: the main upper garment as "<colour> <kind>" in at most 6 words, for example "blue hoodie" or "red striped shirt, brown vest".
+- extras: anything else worn on the body that you can see (cape, backpack, belt, necklace, glasses) in at most 4 words, or "none".
+- heldObject: none | something. "something" means an object is held in a hand or carried in an arm, however small. Hands in pockets, on hips or empty are none. A garment or a belt-attached pouch is not a held object.
+
+A head cell ends at the shoulders or chest, so it cannot show a belt, trousers, skirt, boots or any piece that sits lower: such a piece being absent from a head cell is NOT a difference. Compare a head cell with its body twin only on what both can show (head, hair, headgear, neckline, collar, shoulders, straps, sleeves, upper chest). A view from behind shows the back of the same garments, so a chest emblem or front pocket that cannot be seen from behind is NOT a difference.
+
+STEP 2 - judge the whole sheet. Answer each question with exactly one of the listed words, and list the cell numbers involved.
+
+hat - Does headgear grow, deform or differ?
+  ok: every cell shows the same headgear, or no cell shows any, and nothing is out of proportion.
+  missing_in_some_cells: some cells show headgear and others do not (compare each head cell with its full-body twin and with the other views).
+  differs_between_cells: headgear in different cells differs in shape, size, colour or trim.
+  deformed: headgear is stretched, towering, melted or otherwise out of proportion in any cell.
+  unexpected: {HEADGEAR_EXPECTATION}
+
+hair - Is the hair the same person's hair in all 8 cells{AND_PHOTO}?
+  ok: the same colour, length and style in every cell that shows hair.
+  colour_differs: the hair colour in some cells differs from other cells. Light and shade do not change a colour; lighter, darker or another hue does.
+  style_differs: hair is down in some cells and tied up in others, or its length or style differs between cells. A ponytail seen from the front can look like hair worn down, so call this only when a cell shows the hair clearly worn differently.
+  differs_from_photo (only when a photo is given): the sheet's hair is consistent but clearly not the photo's hair (another colour, another length, another style).
+
+bald - Is any cell missing hair or head?
+  ok: every cell has the hair its other cells show and a complete head.
+  bald_cell: at least one cell shows a smooth hairless scalp where the other cells show hair, or a clearly thinner crop where the others show a full head of hair.
+  headless_or_blank_face: a head is missing, cut off, or has no face where a face should be.
+
+costume - Is the outfit the same in all 8 cells?
+  ok: the same garments, colours, trims and emblems in every cell, seen from different sides.
+  pieces_differ: a garment or accessory present in some cells is missing or added in others (a vest, belt, cape, collar, straps, sleeves, pouch).
+  colours_differ: the same garment is a different colour in different cells.
+  emblem_differs: a chest emblem, print or pattern is drawn as a clearly DIFFERENT design in different cells (another shape, another picture). A smaller, partly hidden or turned view of the same design is not a difference.
+
+rowMatch - Do the head row and the body row wear the same clothes?
+  ok: each head cell shows the same neckline, collar, straps and top as its full-body twin.
+  head_row_differs: a head cell shows a different top, collar, neckline or straps (for example bare shoulders, overall straps, a different collar or garment colour) than its full-body twin.
+
+held - Is anything held?
+  ok: no cell shows a held or carried object.
+  object_in_hand: at least one cell shows a held or carried object.
+
+layout - Is the sheet a clean 2 x 4 grid of one person?
+  ok: 8 cells, one figure per cell, only that person, plain ground, no captions.
+  not_a_grid: not a 2 x 4 grid (a single figure, a different number of cells, cells merged or overlapping).
+  extra_figures: a second person, a ghost figure or a part of another person appears anywhere.
+  lettering: a caption, label, word or number is written on the paper (print on a garment does not count).
+  not_illustrated: the cells are photographs or cut-outs rather than painted illustrations.
+
+identity - Is it the right person?
+  ok: it could be the same person{AND_PHOTO}.
+  different_person: clearly a different person than the photo (a different face, or a different gender).
+  not_assessable: no photo was given.
+
+age - Does the figure look the age of the photo's person?
+  ok: about the same age.
+  much_younger: clearly more than 3 years younger.
+  much_older: clearly more than 3 years older.
+  not_assessable: no photo was given.
+
+Write each cell object on ONE line, with no line breaks inside it. Return EXACTLY this JSON shape. Every answer comes from what you see - never return these placeholders:
+{
+  "cells": [
+    {"cell": 1, "headgear": "<word>", "hairVisible": "<word>", "hairColour": "<word>", "hairStyle": "<word>", "head": "<word>", "top": "<colour kind>", "extras": "<text>", "heldObject": "<none|something>"},
+    {"cell": 2, "...": "same fields for each of the 8 cells"}
+  ],
+  "hat":      {"verdict": "<word>", "cells": [<cell numbers>]},
+  "hair":     {"verdict": "<word>", "cells": [<cell numbers>]},
+  "bald":     {"verdict": "<word>", "cells": [<cell numbers>]},
+  "costume":  {"verdict": "<word>", "cells": [<cell numbers>]},
+  "rowMatch": {"verdict": "<word>", "cells": [<cell numbers>]},
+  "held":     {"verdict": "<word>", "cells": [<cell numbers>]},
+  "layout":   {"verdict": "<word>", "cells": [<cell numbers>]},
+  "identity": {"verdict": "<word>", "cells": []},
+  "age":      {"verdict": "<word>", "cells": []},
+  "evidence": "<one sentence naming the worst defect you found and where, or none>"
+}
