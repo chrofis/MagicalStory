@@ -982,3 +982,6 @@ Rule: before listing a finding as a defect or a fix candidate, grep docs/SETTLED
 
 ## 2026-10-10 — A storage-key change must be replayed over stored stories before it ships
 f18b47ab9 made the VB-reference key content-hashed; a caller computed it eagerly for a location with no photo, hashed `undefined`, and every story with such a location crashed at save (owner's iPhone trial). Unit tests used locations that all had bytes. Rule: any change to how stored data is written (keys, offload, persistence) is replayed through `persistStoryToDatabase`/`extractInlineImagesToR2` (R2 stubbed) over >= 20 stored stories before push — the stored data has the shapes the fixtures lack.
+
+## 2026-10-10 — Analysis scripts must exit when done
+Eight finished measurement scripts (eval-trial-*, scratch replays) were still alive hours later: requiring server modules opens a DB pool / timers, so node never exits, and the 16 GB machine hit "critically low memory". Rule: every script under scripts/analysis/ and every scratch replay ends with `await pool.end()` and `process.exit(0)` (also on error), and an agent checks for its own leftover processes (by PID, never by image name) before reporting done.
