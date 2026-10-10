@@ -244,7 +244,7 @@ describe('trial pages writer: arc-habit openings and unnamed toys', () => {
   it.each(['beats', 'trial'])('%s carries the unnamed-figure rule', (name) => {
     expect(built[name]).toContain(UNNAMED_FIGURE_RULE);
   });
-  it('the unnamed-figure rule forbids a name that is the figure's own kind', () => {
+  it('the unnamed-figure rule forbids a name that is its own kind', () => {
     expect(UNNAMED_FIGURE_RULE).toMatch(/no name/);
     expect(UNNAMED_FIGURE_RULE).toMatch(/least of all its own kind/);
   });
