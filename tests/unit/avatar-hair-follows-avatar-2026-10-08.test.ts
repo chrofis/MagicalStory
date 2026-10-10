@@ -68,12 +68,12 @@ describe('applyAvatarHairToExtraction (the avatar job)', () => {
     expect(results.extractedTraits.detailedHairAnalysis.lengthTop).toBe('shoulder-length');
     expect(results.hairFromAvatar).toBe(true);
   });
-  it('reads the standard avatar first, then summer, then winter', async () => {
+  it('reads the standard avatar only (winter and summer sheets are no longer generated, decisions 2026-10-10)', async () => {
     const seen: string[] = [];
     const reader = async (img: string) => { seen.push(img); return avatarHair; };
     await hairMod.applyAvatarHairToExtraction(job({ standard: undefined, winter: 'data:image/jpeg;base64,W', summer: 'data:image/jpeg;base64,S' }), { reader });
     await hairMod.applyAvatarHairToExtraction(job({ winter: 'data:image/jpeg;base64,W' }), { reader });
-    expect(seen).toEqual(['data:image/jpeg;base64,S', DATA_URI]);
+    expect(seen).toEqual([DATA_URI]);
   });
   it('no readable avatar, or a failed read: the photo reading stays, unstamped', async () => {
     const none: any = job({ standard: undefined });
