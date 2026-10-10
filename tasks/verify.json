@@ -9833,6 +9833,25 @@
       },
       "status": "pending",
       "evidence": []
+    },
+    {
+      "id": "trial-one-call-sheets-2026-10-10",
+      "title": "Trial standard and costumed sheet in ONE Grok call each (withdrawn and reverted)",
+      "commits": [
+        "9bc64275d",
+        "3345a9548"
+      ],
+      "addedAt": "2026-10-10",
+      "claim": "Withdrawn: the one-call trial sheets gave distorted head-to-body ratios and bald front cells; reverted in 3345a9548 (docs/decisions.md 2026-10-10, SETTLED avatar line). Nothing to prove.",
+      "runShape": [
+        "any"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Superseded: the feature no longer exists."
+      },
+      "status": "superseded",
+      "evidence": []
     }
   ],
   "runs": [
