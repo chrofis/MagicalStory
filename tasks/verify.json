@@ -9852,6 +9852,43 @@
       },
       "status": "superseded",
       "evidence": []
+    },
+    {
+      "id": "styled-sheet-blocking-axes-2026-10-10",
+      "title": "A styled full-story sheet never ships with extra people, scenery behind the figures or a photographic look",
+      "commits": [
+        "32b84baba"
+      ],
+      "addedAt": "2026-10-10",
+      "claim": "On a full story, every shipped styled avatar sheet (standard and costumed) has solo and background at 6 or above and style above 3 on the shipped attempt; an attempt blocked on one of them shows BLOCKED in the log and the sheet shipped is an unblocked attempt, or the avatar throws loudly.",
+      "runShape": [
+        "full-story",
+        "needs-fresh-avatar-sheet"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "Open the story's styled-avatar generation (dev panel / stories.data.styledAvatarGeneration): for each pass2, the selected attempt has soloScore >= 6, backgroundScore >= 6, styleScore > 3 and identityRejected false; any attempt with identityRejected true lists the blocked axis and a later attempt is the selected one. Look at the shipped sheets: no stranger, no painted scene, no photograph."
+      },
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "trial-sheet-judge-redo-2026-10-10",
+      "title": "The trial standard sheet is judged (bald / held / layout) and redone once without the anchor when flagged",
+      "commits": [
+        "32b84baba"
+      ],
+      "addedAt": "2026-10-10",
+      "claim": "On a trial run, the standard avatar sheet is judged once by the whole-sheet defect judge; a flagged sheet is redone exactly once (log: \"trial sheet flagged ... one redo without the anchor\"), the better sheet ships, a judge error ships the sheet with an ERROR log, and the costumed sheet is not judged.",
+      "runShape": [
+        "trial"
+      ],
+      "check": {
+        "kind": "human",
+        "what": "In the staging log of a trial run: one \"trial sheet\" judge outcome per standard sheet (clean, or flagged then redo), never a second redo; the shipped standard sheet has no bald cell, held object, stranger or photograph; no added wait above about 25 s on a redo. Costumed sheet has no judge line."
+      },
+      "status": "pending",
+      "evidence": []
     }
   ],
   "runs": [
