@@ -68368,3 +68368,11 @@ Touched files: server/lib/character2x4Sheet.js, tests/unit/{avatar-sheet-empty-h
 **Considered:** changing the shared PAGE_OPENING_VARIETY_RULE (would alter the full writer, which is at 23%); making the planner write arc lines that do not open on the name (planner is Flash, untested); a code check plus a fed-back rerun (a second Sonnet call, and code reading page prose).
 **Revisit if:** the next trials still exceed 35%: try arc lines without leading names in story-trial-arc.txt, or a pronoun allowance.
 **Touched files:** prompts/story-trial-pages.txt, prompts/story-text-from-beats.txt, server/lib/promptBuilders.js, tests/unit/writer-shared-rules-reach.test.ts, scripts/analysis/eval-trial-flash-arc-vb.js (--phase=pages), evals/runs/2026-10-10_trial-pages-openings-{stored,v1,v2}/, evals/results/results.jsonl.
+
+## 2026-10-10 - Trial planner: arc PAGE lines do not begin on a character's name
+**Context:** follow-up to "Trial pages: arc-habit openings and unnamed toys" (pages bullet alone: 65% to 40% name openings, above the 35% line). The cause named there was the arc lines' own grammar.
+**Decision:** story-trial-arc.txt adds one sentence before the arc rules: no PAGE line begins its sentence on a character's name; it begins on the place, the time, the event or the thing that just changed, and names the character further in. Generic wording, everything else unchanged; the pages-prompt bullet stays.
+**Rationale (full two-call writer, 7 stored inputs, text only):** name openings 29/42 (69%) with the original prompts, 12/42 (29%) now: Noah 1/6, Jules 2/6, Omar 3/6, Neva 2/6, Lukas with Eli 3/6, Serena 1/6, the live trial input 0/6. Spot check: Eli named in arc and story, the unnamed plush elephant stays "der Elefant", Jules and Lukas arcs keep their setups (ball, goose, fountain; raven, signpost); whole story 36-49 s, cost USD 0.087-0.101 per input. Openings read natural ("Entlang der alten Mauern pfiff der Wind durch die Steine."). Not read blind against the previous arcs, so the 4-3-... quality tally is not updated.
+**Considered:** a pronoun allowance; a code check with fed-back rerun.
+**Revisit if:** the next trials exceed 35% again, or the arcs read stilted in a blind comparison.
+**Touched files:** prompts/story-trial-arc.txt, evals/runs/2026-10-10_trial-arc-nolead/ (gitignored), evals/results/results.jsonl.

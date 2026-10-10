@@ -48,6 +48,8 @@ Output all sections in this exact order. Do not skip any. The Visual Bible must 
 One line per scene, all {PAGES} scenes, written in English (planning notes, not story prose):
 PAGE [n]: [1-3 sentences: what happens, who does it and why, what is at stake or changes] | WITH: [every figure, animal and object that takes part, by name, separated by semicolons] | STATE: [any object whose state changes or whose holder or place changes on this page, e.g. "the letter gets soaked", "the key is set down on the bench"; "none" otherwise]
 
+No PAGE line begins its sentence on a character's name: each begins on the place, the time, the event or the thing that just changed, and names the character further in (the pages writer copies the grammar of these lines).
+
 The arc is the whole story, so build it right: every beat follows from the one before it for a reason the reader can see, the low point has a scene of its own, and an object keeps its state and its place until a beat changes it (a wet thing stays wet until time or a drying beat; a thing set down stays there until someone picks it up). Build it sound: every setup (a skill, clue, trick, object, promise) pays off in a later beat or is not introduced; counts, object states and places stay consistent from page to page; the commissioned topic and the Story Idea drive the problem; each page's action follows from the previous page; no figure, animal or place gets a name except the characters and the Visual Bible entries. Every figure, animal and object the Story Idea names, and every one it plainly implies (a companion, a toy, a creature, an object the plot turns on), appears in the arc on the scenes where it matters.
 
 ---TITLE---
