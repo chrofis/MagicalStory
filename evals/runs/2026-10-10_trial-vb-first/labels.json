@@ -1,0 +1,23 @@
+{
+ "note": "One reader (the agent), arm hidden by blind-key-*.json (X/Y random per input); unblinded afterwards. Flash/opus/pro arms were read as the single test side against medium sides read earlier, so those verdicts are less blind.",
+ "vbfirst_vs_medium": {
+  "job_1791579344291_rk2bno6av": "medium better (clear): VB-first drops the stuffed elephant Eli named in the idea",
+  "job_1791496820206_qwcnrq30r": "medium better: VB-first letter is dry again on p6 with no time passing; spell logic weaker",
+  "job_1791391658361_4eylyr1w4": "VB-first slightly better: medium uses Natel for a phone in a Council Bluffs park",
+  "job_1791554548909_kl0phznw2": "medium better (slight): VB-first premise muddled (fetches something first yet carries the gift), motive planted retroactively",
+  "job_1791551298726_19tfcxccl": "medium better (slight): VB-first adds Beton roof and a key that returns itself",
+  "job_1791450452362_pv0l5hf49": "medium better: VB-first contradicts itself, the tenth pebble is set down on p4 and picked from the pocket on p6",
+  "job_1791450270543_n1iu8ipsu": "medium better: VB-first has the garbled \"Er war geholfen\" and drops Mama",
+  "job_1790769860433_2bhhj0pyi": "tie",
+  "job_1790680992018_nd95o89r7": "tie",
+  "job_1791500208126_at0wow7xa": "medium better (slight): flute motif and lost owl tie the ending together"
+ },
+ "tally": {
+  "medium_better": 7,
+  "tie": 2,
+  "vbfirst_better": 1
+ },
+ "flash_vs_medium": "medium better 8, tie 2 (Omar, Emma), flash better 0. Quotes: septante millimetres par mouvement; Natel magique / ardoise / tablette for one device; nonante minutes avant le souper; huitante centimetres; Wizard Eldon invented; long adult sentences",
+ "opus_low_vs_medium": "n=3: Lukas better than medium (Eli does the rescue), Noah good (invents Grosi), Jules good but invents a sister Lina and a passer-by",
+ "pro_vs_medium": "n=1: medium better (poutser tes vetements; huitante oies dans ce parc; clipped repetitive sentences)"
+}

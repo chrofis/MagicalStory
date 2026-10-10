@@ -1,0 +1,1149 @@
+{
+ "part1": [
+  {
+   "id": "job_1790680992018_nd95o89r7",
+   "aVbMs": 8764,
+   "aTitleMs": 1281,
+   "aTotalMs": 11547,
+   "aOut": 1748,
+   "aIn": 11303,
+   "aCost": 0.040086,
+   "bFirstMs": 2980,
+   "bPage1Ms": 9173,
+   "bPagesMs": {
+    "1": 9173,
+    "2": 15039,
+    "3": 20772,
+    "4": 26105,
+    "5": 31706,
+    "6": 37093
+   },
+   "bTotalMs": 37093,
+   "bOut": 5444,
+   "bIn": 13919,
+   "bCost": 0.082278,
+   "page1ImageStartS": 20.72,
+   "totalS": 48.64,
+   "costUsd": 0.122364,
+   "stops": [
+    "end_turn",
+    "end_turn"
+   ],
+   "real": {
+    "title": true,
+    "vbOk": true,
+    "vbCounts": {
+     "sec": 0,
+     "ani": 1,
+     "art": 1,
+     "loc": 2,
+     "bg": 3
+    },
+    "coverOk": false,
+    "pages": 6,
+    "hints": 6,
+    "pageKeys": "pageNumber,text,sceneHint,sceneProse,characterClothing,characterPerspectives,characters",
+    "coverEventWithSentinel": true
+   },
+   "respect": {
+    "vbIds": 4,
+    "foreign": [],
+    "outside": [],
+    "unused": [],
+    "unlistedFigs": [],
+    "unlistedObjs": [],
+    "noLocId": []
+   }
+  },
+  {
+   "id": "job_1790769860433_2bhhj0pyi",
+   "aVbMs": 9102,
+   "aTitleMs": 1086,
+   "aTotalMs": 12182,
+   "aOut": 1803,
+   "aIn": 11796,
+   "aCost": 0.041622,
+   "bFirstMs": 46217,
+   "bPage1Ms": 52037,
+   "bPagesMs": {
+    "1": 52037,
+    "2": 57678,
+    "3": 63530,
+    "4": 69844,
+    "5": 75694,
+    "6": 81041
+   },
+   "bTotalMs": 81041,
+   "bOut": 10663,
+   "bIn": 14476,
+   "bCost": 0.135582,
+   "page1ImageStartS": 64.219,
+   "totalS": 93.223,
+   "costUsd": 0.177204,
+   "stops": [
+    "end_turn",
+    "end_turn"
+   ],
+   "real": {
+    "title": true,
+    "vbOk": true,
+    "vbCounts": {
+     "sec": 1,
+     "ani": 0,
+     "art": 2,
+     "loc": 2,
+     "bg": 3
+    },
+    "coverOk": false,
+    "pages": 6,
+    "hints": 6,
+    "pageKeys": "pageNumber,text,sceneHint,sceneProse,characterClothing,characterPerspectives,characters",
+    "coverEventWithSentinel": true
+   },
+   "respect": {
+    "vbIds": 5,
+    "foreign": [],
+    "outside": [],
+    "unused": [],
+    "unlistedFigs": [
+     "p1:Luna",
+     "p2:Luna",
+     "p3:Luna",
+     "p4:Luna",
+     "p5:Luna",
+     "p6:Luna"
+    ],
+    "unlistedObjs": [],
+    "noLocId": []
+   }
+  },
+  {
+   "id": "job_1791391658361_4eylyr1w4",
+   "aVbMs": 7978,
+   "aTitleMs": 1102,
+   "aTotalMs": 10960,
+   "aOut": 1679,
+   "aIn": 10914,
+   "aCost": 0.038618,
+   "bFirstMs": 19446,
+   "bPage1Ms": 24664,
+   "bPagesMs": {
+    "1": 24664,
+    "2": 30907,
+    "3": 36263,
+    "4": 41194,
+    "5": 47188,
+    "6": 53034
+   },
+   "bTotalMs": 53033,
+   "bOut": 7927,
+   "bIn": 13248,
+   "bCost": 0.105766,
+   "page1ImageStartS": 35.624,
+   "totalS": 63.993,
+   "costUsd": 0.144384,
+   "stops": [
+    "end_turn",
+    "end_turn"
+   ],
+   "real": {
+    "title": true,
+    "vbOk": true,
+    "vbCounts": {
+     "sec": 1,
+     "ani": 1,
+     "art": 2,
+     "loc": 1,
+     "bg": 3
+    },
+    "coverOk": false,
+    "pages": 6,
+    "hints": 6,
+    "pageKeys": "pageNumber,text,sceneHint,sceneProse,characterClothing,characterPerspectives,characters",
+    "coverEventWithSentinel": true
+   },
+   "respect": {
+    "vbIds": 5,
+    "foreign": [],
+    "outside": [],
+    "unused": [],
+    "unlistedFigs": [],
+    "unlistedObjs": [],
+    "noLocId": []
+   }
+  },
+  {
+   "id": "job_1791450270543_n1iu8ipsu",
+   "aVbMs": 9366,
+   "aTitleMs": 1247,
+   "aTotalMs": 12579,
+   "aOut": 1870,
+   "aIn": 12565,
+   "aCost": 0.04383,
+   "bFirstMs": 522,
+   "bPage1Ms": 4904,
+   "bPagesMs": {
+    "1": 4904,
+    "2": 8629,
+    "3": 12282,
+    "4": 15829,
+    "5": 19233,
+    "6": 22315
+   },
+   "bTotalMs": 22314,
+   "bOut": 3811,
+   "bIn": 15398,
+   "bCost": 0.068906,
+   "page1ImageStartS": 17.483,
+   "totalS": 34.893,
+   "costUsd": 0.112736,
+   "stops": [
+    "end_turn",
+    "end_turn"
+   ],
+   "real": {
+    "title": true,
+    "vbOk": true,
+    "vbCounts": {
+     "sec": 0,
+     "ani": 1,
+     "art": 2,
+     "loc": 2,
+     "bg": 3
+    },
+    "coverOk": false,
+    "pages": 6,
+    "hints": 6,
+    "pageKeys": "pageNumber,text,sceneHint,sceneProse,characterClothing,characterPerspectives,characters",
+    "coverEventWithSentinel": true
+   },
+   "respect": {
+    "vbIds": 5,
+    "foreign": [],
+    "outside": [],
+    "unused": [],
+    "unlistedFigs": [],
+    "unlistedObjs": [],
+    "noLocId": []
+   }
+  },
+  {
+   "id": "job_1791450452362_pv0l5hf49",
+   "aVbMs": 8173,
+   "aTitleMs": 1405,
+   "aTotalMs": 11155,
+   "aOut": 1650,
+   "aIn": 12332,
+   "aCost": 0.041164,
+   "bFirstMs": 902,
+   "bPage1Ms": 5330,
+   "bPagesMs": {
+    "1": 5330,
+    "2": 10362,
+    "3": 14796,
+    "4": 19596,
+    "5": 23929,
+    "6": 28456
+   },
+   "bTotalMs": 28456,
+   "bOut": 4491,
+   "bIn": 14616,
+   "bCost": 0.074142,
+   "page1ImageStartS": 16.485,
+   "totalS": 39.611,
+   "costUsd": 0.11530599999999999,
+   "stops": [
+    "end_turn",
+    "end_turn"
+   ],
+   "real": {
+    "title": true,
+    "vbOk": true,
+    "vbCounts": {
+     "sec": 0,
+     "ani": 1,
+     "art": 1,
+     "loc": 1,
+     "bg": 3
+    },
+    "coverOk": false,
+    "pages": 6,
+    "hints": 6,
+    "pageKeys": "pageNumber,text,sceneHint,sceneProse,characterClothing,characterPerspectives,characters",
+    "coverEventWithSentinel": true
+   },
+   "respect": {
+    "vbIds": 3,
+    "foreign": [],
+    "outside": [
+     "p6:ART001"
+    ],
+    "unused": [],
+    "unlistedFigs": [],
+    "unlistedObjs": [],
+    "noLocId": []
+   }
+  },
+  {
+   "id": "job_1791496820206_qwcnrq30r",
+   "aVbMs": 9247,
+   "aTitleMs": 1784,
+   "aTotalMs": 12471,
+   "aOut": 1951,
+   "aIn": 13230,
+   "aCost": 0.04597,
+   "bFirstMs": 822,
+   "bPage1Ms": 4783,
+   "bPagesMs": {
+    "1": 4783,
+    "2": 8576,
+    "3": 12159,
+    "4": 16236,
+    "5": 20279,
+    "6": 23995
+   },
+   "bTotalMs": 23995,
+   "bOut": 4022,
+   "bIn": 16144,
+   "bCost": 0.07250799999999999,
+   "page1ImageStartS": 17.254,
+   "totalS": 36.466,
+   "costUsd": 0.11847799999999999,
+   "stops": [
+    "end_turn",
+    "end_turn"
+   ],
+   "real": {
+    "title": true,
+    "vbOk": true,
+    "vbCounts": {
+     "sec": 0,
+     "ani": 0,
+     "art": 1,
+     "loc": 2,
+     "bg": 3
+    },
+    "coverOk": false,
+    "pages": 6,
+    "hints": 6,
+    "pageKeys": "pageNumber,text,sceneHint,sceneProse,characterClothing,characterPerspectives,characters",
+    "coverEventWithSentinel": true
+   },
+   "respect": {
+    "vbIds": 3,
+    "foreign": [],
+    "outside": [],
+    "unused": [],
+    "unlistedFigs": [],
+    "unlistedObjs": [],
+    "noLocId": []
+   }
+  },
+  {
+   "id": "job_1791500208126_at0wow7xa",
+   "aVbMs": 11478,
+   "aTitleMs": 1100,
+   "aTotalMs": 14839,
+   "aOut": 2093,
+   "aIn": 11860,
+   "aCost": 0.04465,
+   "bFirstMs": 45541,
+   "bPage1Ms": 50583,
+   "bPagesMs": {
+    "1": 50583,
+    "2": 56014,
+    "3": 61480,
+    "4": 67358,
+    "5": 72501,
+    "6": 77862
+   },
+   "bTotalMs": 77862,
+   "bOut": 10717,
+   "bIn": 14817,
+   "bCost": 0.136804,
+   "page1ImageStartS": 65.422,
+   "totalS": 92.701,
+   "costUsd": 0.181454,
+   "stops": [
+    "end_turn",
+    "end_turn"
+   ],
+   "real": {
+    "title": true,
+    "vbOk": true,
+    "vbCounts": {
+     "sec": 2,
+     "ani": 0,
+     "art": 1,
+     "loc": 2,
+     "bg": 3
+    },
+    "coverOk": false,
+    "pages": 6,
+    "hints": 6,
+    "pageKeys": "pageNumber,text,sceneHint,sceneProse,characterClothing,characterPerspectives,characters",
+    "coverEventWithSentinel": true
+   },
+   "respect": {
+    "vbIds": 5,
+    "foreign": [],
+    "outside": [],
+    "unused": [],
+    "unlistedFigs": [],
+    "unlistedObjs": [],
+    "noLocId": []
+   }
+  },
+  {
+   "id": "job_1791551298726_19tfcxccl",
+   "aVbMs": 10631,
+   "aTitleMs": 1110,
+   "aTotalMs": 14178,
+   "aOut": 2157,
+   "aIn": 12242,
+   "aCost": 0.046054,
+   "bFirstMs": 596,
+   "bPage1Ms": 7816,
+   "bPagesMs": {
+    "1": 7816,
+    "2": 13524,
+    "3": 19518,
+    "4": 25658,
+    "5": 31612,
+    "6": 38379
+   },
+   "bTotalMs": 38379,
+   "bOut": 6351,
+   "bIn": 15263,
+   "bCost": 0.094036,
+   "page1ImageStartS": 21.994,
+   "totalS": 52.557,
+   "costUsd": 0.14009,
+   "stops": [
+    "end_turn",
+    "end_turn"
+   ],
+   "real": {
+    "title": true,
+    "vbOk": true,
+    "vbCounts": {
+     "sec": 1,
+     "ani": 1,
+     "art": 2,
+     "loc": 2,
+     "bg": 3
+    },
+    "coverOk": false,
+    "pages": 6,
+    "hints": 6,
+    "pageKeys": "pageNumber,text,sceneHint,sceneProse,characterClothing,characterPerspectives,characters",
+    "coverEventWithSentinel": true
+   },
+   "respect": {
+    "vbIds": 6,
+    "foreign": [],
+    "outside": [
+     "p1:ANI001",
+     "p6:ANI001",
+     "p6:ART002"
+    ],
+    "unused": [],
+    "unlistedFigs": [],
+    "unlistedObjs": [],
+    "noLocId": [
+     "p2",
+     "p5"
+    ]
+   }
+  },
+  {
+   "id": "job_1791554548909_kl0phznw2",
+   "aVbMs": 11182,
+   "aTitleMs": 1124,
+   "aTotalMs": 14440,
+   "aOut": 2320,
+   "aIn": 12826,
+   "aCost": 0.048852,
+   "bFirstMs": 840,
+   "bPage1Ms": 7676,
+   "bPagesMs": {
+    "1": 7676,
+    "2": 13882,
+    "3": 19449,
+    "4": 24239,
+    "5": 29555,
+    "6": 34773
+   },
+   "bTotalMs": 34773,
+   "bOut": 5632,
+   "bIn": 16014,
+   "bCost": 0.08834800000000001,
+   "page1ImageStartS": 22.116,
+   "totalS": 49.213,
+   "costUsd": 0.13720000000000002,
+   "stops": [
+    "end_turn",
+    "end_turn"
+   ],
+   "real": {
+    "title": true,
+    "vbOk": true,
+    "vbCounts": {
+     "sec": 1,
+     "ani": 1,
+     "art": 2,
+     "loc": 2,
+     "bg": 3
+    },
+    "coverOk": false,
+    "pages": 6,
+    "hints": 6,
+    "pageKeys": "pageNumber,text,sceneHint,sceneProse,characterClothing,characterPerspectives,characters",
+    "coverEventWithSentinel": true
+   },
+   "respect": {
+    "vbIds": 6,
+    "foreign": [],
+    "outside": [
+     "p1:ART002"
+    ],
+    "unused": [],
+    "unlistedFigs": [],
+    "unlistedObjs": [],
+    "noLocId": []
+   }
+  },
+  {
+   "id": "job_1791579344291_rk2bno6av",
+   "aVbMs": 9707,
+   "aTitleMs": 1232,
+   "aTotalMs": 13003,
+   "aOut": 1906,
+   "aIn": 13079,
+   "aCost": 0.045218,
+   "bFirstMs": 61862,
+   "bPage1Ms": 67563,
+   "bPagesMs": {
+    "1": 67563,
+    "2": 73483,
+    "3": 79914,
+    "4": 85295,
+    "5": 91254,
+    "6": 97401
+   },
+   "bTotalMs": 97401,
+   "bOut": 13291,
+   "bIn": 15849,
+   "bCost": 0.164608,
+   "page1ImageStartS": 80.566,
+   "totalS": 110.404,
+   "costUsd": 0.209826,
+   "stops": [
+    "end_turn",
+    "end_turn"
+   ],
+   "real": {
+    "title": true,
+    "vbOk": true,
+    "vbCounts": {
+     "sec": 1,
+     "ani": 1,
+     "art": 2,
+     "loc": 1,
+     "bg": 3
+    },
+    "coverOk": false,
+    "pages": 6,
+    "hints": 6,
+    "pageKeys": "pageNumber,text,sceneHint,sceneProse,characterClothing,characterPerspectives,characters"
+   },
+   "respect": {
+    "vbIds": 5,
+    "foreign": [
+     "p5:one-off",
+     "p6:one-off"
+    ],
+    "outside": [],
+    "unused": [],
+    "unlistedFigs": [],
+    "unlistedObjs": [],
+    "noLocId": []
+   }
+  }
+ ],
+ "part2": [
+  {
+   "id": "job_1790680992018_nd95o89r7",
+   "label": "gemini-3.7-flash-medium",
+   "model": "gemini-3.7-flash",
+   "effort": "medium",
+   "vbMs": 7772,
+   "coverMs": 10056,
+   "page1Ms": 15244,
+   "totalMs": 38766,
+   "firstMs": 2300,
+   "out": 5055,
+   "think": 0,
+   "costUsd": 0.0294315,
+   "stop": "stop",
+   "real": {
+    "title": true,
+    "vbOk": true,
+    "vbCounts": {
+     "sec": 0,
+     "ani": 1,
+     "art": 1,
+     "loc": 2,
+     "bg": 3
+    },
+    "coverOk": false,
+    "pages": 6,
+    "hints": 6,
+    "pageKeys": "pageNumber,text,sceneHint,sceneProse,characterClothing,characterPerspectives,characters"
+   },
+   "respect": {
+    "vbIds": 4,
+    "foreign": [],
+    "outside": [],
+    "unused": [],
+    "unlistedFigs": [],
+    "unlistedObjs": [],
+    "noLocId": []
+   },
+   "truncation": null
+  },
+  {
+   "id": "job_1790769860433_2bhhj0pyi",
+   "label": "gemini-3.7-flash-medium",
+   "model": "gemini-3.7-flash",
+   "effort": "medium",
+   "vbMs": 24056,
+   "coverMs": 26539,
+   "page1Ms": 32015,
+   "totalMs": 57871,
+   "firstMs": 16845,
+   "out": 7641,
+   "think": 1812,
+   "costUsd": 0.039396,
+   "stop": "stop",
+   "real": {
+    "title": true,
+    "vbOk": true,
+    "vbCounts": {
+     "sec": 1,
+     "ani": 0,
+     "art": 2,
+     "loc": 2,
+     "bg": 3
+    },
+    "coverOk": false,
+    "pages": 6,
+    "hints": 6,
+    "pageKeys": "pageNumber,text,sceneHint,sceneProse,characterClothing,characterPerspectives,characters"
+   },
+   "respect": {
+    "vbIds": 5,
+    "foreign": [],
+    "outside": [],
+    "unused": [],
+    "unlistedFigs": [
+     "p1:Luna",
+     "p2:Luna",
+     "p3:Luna",
+     "p4:Luna",
+     "p5:Luna",
+     "p6:Luna"
+    ],
+    "unlistedObjs": [],
+    "noLocId": []
+   },
+   "truncation": null
+  },
+  {
+   "id": "job_1791391658361_4eylyr1w4",
+   "label": "claude-opus-5-5-low",
+   "model": "claude-opus-5-5",
+   "effort": "low",
+   "vbMs": 35536,
+   "coverMs": 40125,
+   "page1Ms": 47830,
+   "totalMs": 85416,
+   "firstMs": 25015,
+   "out": 9316,
+   "think": 0,
+   "costUsd": 0.261564,
+   "stop": "end_turn",
+   "real": {
+    "title": true,
+    "vbOk": true,
+    "vbCounts": {
+     "sec": 1,
+     "ani": 1,
+     "art": 1,
+     "loc": 1,
+     "bg": 3
+    },
+    "coverOk": false,
+    "pages": 6,
+    "hints": 6,
+    "pageKeys": "pageNumber,text,sceneHint,sceneProse,characterClothing,characterPerspectives,characters"
+   },
+   "respect": {
+    "vbIds": 4,
+    "foreign": [],
+    "outside": [],
+    "unused": [],
+    "unlistedFigs": [],
+    "unlistedObjs": [],
+    "noLocId": []
+   },
+   "truncation": null
+  },
+  {
+   "id": "job_1791391658361_4eylyr1w4",
+   "label": "gemini-3.1-pro-medium",
+   "model": "gemini-3.1-pro",
+   "effort": "medium",
+   "vbMs": 68689,
+   "coverMs": 71464,
+   "page1Ms": 75748,
+   "totalMs": 94993,
+   "firstMs": 63074,
+   "out": 13217,
+   "think": 8080,
+   "costUsd": 0.185672,
+   "stop": "stop",
+   "real": {
+    "title": true,
+    "vbOk": true,
+    "vbCounts": {
+     "sec": 1,
+     "ani": 1,
+     "art": 2,
+     "loc": 1,
+     "bg": 3
+    },
+    "coverOk": false,
+    "pages": 6,
+    "hints": 6,
+    "pageKeys": "pageNumber,text,sceneHint,sceneProse,characterClothing,characterPerspectives,characters"
+   },
+   "respect": {
+    "vbIds": 5,
+    "foreign": [],
+    "outside": [],
+    "unused": [],
+    "unlistedFigs": [],
+    "unlistedObjs": [],
+    "noLocId": []
+   },
+   "truncation": null
+  },
+  {
+   "id": "job_1791391658361_4eylyr1w4",
+   "label": "gemini-3.7-flash-medium",
+   "model": "gemini-3.7-flash",
+   "effort": "medium",
+   "vbMs": 20226,
+   "coverMs": 22698,
+   "page1Ms": 26433,
+   "totalMs": 45795,
+   "firstMs": 15279,
+   "out": 5431,
+   "think": 1577,
+   "costUsd": 0.03051675,
+   "stop": "stop",
+   "real": {
+    "title": true,
+    "vbOk": true,
+    "vbCounts": {
+     "sec": 1,
+     "ani": 1,
+     "art": 1,
+     "loc": 1,
+     "bg": 3
+    },
+    "coverOk": false,
+    "pages": 6,
+    "hints": 6,
+    "pageKeys": "pageNumber,text,sceneHint,sceneProse,characterClothing,characterPerspectives,characters"
+   },
+   "respect": {
+    "vbIds": 4,
+    "foreign": [],
+    "outside": [],
+    "unused": [],
+    "unlistedFigs": [],
+    "unlistedObjs": [],
+    "noLocId": []
+   },
+   "truncation": null
+  },
+  {
+   "id": "job_1791450270543_n1iu8ipsu",
+   "label": "gemini-3.7-flash-medium",
+   "model": "gemini-3.7-flash",
+   "effort": "medium",
+   "vbMs": 8156,
+   "coverMs": 10839,
+   "page1Ms": 14582,
+   "totalMs": 32772,
+   "firstMs": 2505,
+   "out": 4585,
+   "think": 0,
+   "costUsd": 0.02841075,
+   "stop": "stop",
+   "real": {
+    "title": true,
+    "vbOk": true,
+    "vbCounts": {
+     "sec": 0,
+     "ani": 1,
+     "art": 1,
+     "loc": 1,
+     "bg": 3
+    },
+    "coverOk": false,
+    "pages": 6,
+    "hints": 6,
+    "pageKeys": "pageNumber,text,sceneHint,sceneProse,characterClothing,characterPerspectives,characters"
+   },
+   "respect": {
+    "vbIds": 3,
+    "foreign": [],
+    "outside": [],
+    "unused": [
+     "ART001"
+    ],
+    "unlistedFigs": [],
+    "unlistedObjs": [],
+    "noLocId": []
+   },
+   "truncation": null
+  },
+  {
+   "id": "job_1791450452362_pv0l5hf49",
+   "label": "gemini-3.7-flash-medium",
+   "model": "gemini-3.7-flash",
+   "effort": "medium",
+   "vbMs": 12189,
+   "coverMs": 14344,
+   "page1Ms": 18137,
+   "totalMs": 36914,
+   "firstMs": 7220,
+   "out": 4863,
+   "think": 688,
+   "costUsd": 0.029043,
+   "stop": "stop",
+   "real": {
+    "title": true,
+    "vbOk": true,
+    "vbCounts": {
+     "sec": 0,
+     "ani": 1,
+     "art": 1,
+     "loc": 1,
+     "bg": 3
+    },
+    "coverOk": false,
+    "pages": 6,
+    "hints": 6,
+    "pageKeys": "pageNumber,text,sceneHint,sceneProse,characterClothing,characterPerspectives,characters"
+   },
+   "respect": {
+    "vbIds": 3,
+    "foreign": [],
+    "outside": [
+     "p6:ART001"
+    ],
+    "unused": [],
+    "unlistedFigs": [],
+    "unlistedObjs": [],
+    "noLocId": []
+   },
+   "truncation": null
+  },
+  {
+   "id": "job_1791496820206_qwcnrq30r",
+   "label": "claude-opus-5-5-low",
+   "model": "claude-opus-5-5",
+   "effort": "low",
+   "vbMs": 56928,
+   "coverMs": 61175,
+   "page1Ms": 67629,
+   "totalMs": 95359,
+   "firstMs": 45433,
+   "out": 10302,
+   "think": 0,
+   "costUsd": 0.292024,
+   "stop": "end_turn",
+   "real": {
+    "title": true,
+    "vbOk": true,
+    "vbCounts": {
+     "sec": 1,
+     "ani": 0,
+     "art": 1,
+     "loc": 2,
+     "bg": 3
+    },
+    "coverOk": false,
+    "pages": 6,
+    "hints": 6,
+    "pageKeys": "pageNumber,text,sceneHint,sceneProse,characterClothing,characterPerspectives,characters"
+   },
+   "respect": {
+    "vbIds": 4,
+    "foreign": [],
+    "outside": [],
+    "unused": [],
+    "unlistedFigs": [],
+    "unlistedObjs": [],
+    "noLocId": []
+   },
+   "truncation": null
+  },
+  {
+   "id": "job_1791496820206_qwcnrq30r",
+   "label": "gemini-3.7-flash-medium",
+   "model": "gemini-3.7-flash",
+   "effort": "medium",
+   "vbMs": 8119,
+   "coverMs": 10595,
+   "page1Ms": 14035,
+   "totalMs": 32675,
+   "firstMs": 2524,
+   "out": 4408,
+   "think": 0,
+   "costUsd": 0.027945,
+   "stop": "stop",
+   "real": {
+    "title": true,
+    "vbOk": true,
+    "vbCounts": {
+     "sec": 0,
+     "ani": 0,
+     "art": 1,
+     "loc": 2,
+     "bg": 3
+    },
+    "coverOk": false,
+    "pages": 6,
+    "hints": 6,
+    "pageKeys": "pageNumber,text,sceneHint,sceneProse,characterClothing,characterPerspectives,characters"
+   },
+   "respect": {
+    "vbIds": 3,
+    "foreign": [],
+    "outside": [],
+    "unused": [],
+    "unlistedFigs": [],
+    "unlistedObjs": [],
+    "noLocId": []
+   },
+   "truncation": null
+  },
+  {
+   "id": "job_1791500208126_at0wow7xa",
+   "label": "gemini-3.7-flash-medium",
+   "model": "gemini-3.7-flash",
+   "effort": "medium",
+   "vbMs": 7834,
+   "coverMs": 10095,
+   "page1Ms": 14456,
+   "totalMs": 35494,
+   "firstMs": 1816,
+   "out": 4739,
+   "think": 0,
+   "costUsd": 0.02853,
+   "stop": "stop",
+   "real": {
+    "title": true,
+    "vbOk": true,
+    "vbCounts": {
+     "sec": 1,
+     "ani": 0,
+     "art": 1,
+     "loc": 2,
+     "bg": 3
+    },
+    "coverOk": false,
+    "pages": 6,
+    "hints": 6,
+    "pageKeys": "pageNumber,text,sceneHint,sceneProse,characterClothing,characterPerspectives,characters"
+   },
+   "respect": {
+    "vbIds": 4,
+    "foreign": [],
+    "outside": [],
+    "unused": [],
+    "unlistedFigs": [],
+    "unlistedObjs": [],
+    "noLocId": []
+   },
+   "truncation": null
+  },
+  {
+   "id": "job_1791551298726_19tfcxccl",
+   "label": "gemini-3.7-flash-medium",
+   "model": "gemini-3.7-flash",
+   "effort": "medium",
+   "vbMs": 9577,
+   "coverMs": 11936,
+   "page1Ms": 16840,
+   "totalMs": 37313,
+   "firstMs": 2302,
+   "out": 4539,
+   "think": 0,
+   "costUsd": 0.0279225,
+   "stop": "stop",
+   "real": {
+    "title": true,
+    "vbOk": true,
+    "vbCounts": {
+     "sec": 1,
+     "ani": 1,
+     "art": 2,
+     "loc": 2,
+     "bg": 3
+    },
+    "coverOk": false,
+    "pages": 6,
+    "hints": 6,
+    "pageKeys": "pageNumber,text,sceneHint,sceneProse,characterClothing,characterPerspectives,characters"
+   },
+   "respect": {
+    "vbIds": 6,
+    "foreign": [],
+    "outside": [],
+    "unused": [
+     "ANI001"
+    ],
+    "unlistedFigs": [],
+    "unlistedObjs": [],
+    "noLocId": []
+   },
+   "truncation": null
+  },
+  {
+   "id": "job_1791554548909_kl0phznw2",
+   "label": "gemini-3.7-flash-medium",
+   "model": "gemini-3.7-flash",
+   "effort": "medium",
+   "vbMs": 11038,
+   "coverMs": 13697,
+   "page1Ms": 19222,
+   "totalMs": 42109,
+   "firstMs": 2190,
+   "out": 5859,
+   "think": 0,
+   "costUsd": 0.0331515,
+   "stop": "stop",
+   "real": {
+    "title": true,
+    "vbOk": true,
+    "vbCounts": {
+     "sec": 1,
+     "ani": 1,
+     "art": 2,
+     "loc": 2,
+     "bg": 3
+    },
+    "coverOk": false,
+    "pages": 6,
+    "hints": 6,
+    "pageKeys": "pageNumber,text,sceneHint,sceneProse,characterClothing,characterPerspectives,characters"
+   },
+   "respect": {
+    "vbIds": 6,
+    "foreign": [],
+    "outside": [],
+    "unused": [],
+    "unlistedFigs": [],
+    "unlistedObjs": [],
+    "noLocId": []
+   },
+   "truncation": null
+  },
+  {
+   "id": "job_1791579344291_rk2bno6av",
+   "label": "claude-opus-5-5-low",
+   "model": "claude-opus-5-5",
+   "effort": "low",
+   "vbMs": 74839,
+   "coverMs": 79739,
+   "page1Ms": 88642,
+   "totalMs": 132798,
+   "firstMs": 58032,
+   "out": 13754,
+   "think": 0,
+   "costUsd": 0.36008,
+   "stop": "end_turn",
+   "real": {
+    "title": true,
+    "vbOk": true,
+    "vbCounts": {
+     "sec": 2,
+     "ani": 1,
+     "art": 2,
+     "loc": 2,
+     "bg": 3
+    },
+    "coverOk": false,
+    "pages": 6,
+    "hints": 6,
+    "pageKeys": "pageNumber,text,sceneHint,sceneProse,characterClothing,characterPerspectives,characters"
+   },
+   "respect": {
+    "vbIds": 7,
+    "foreign": [],
+    "outside": [],
+    "unused": [],
+    "unlistedFigs": [],
+    "unlistedObjs": [],
+    "noLocId": []
+   },
+   "truncation": null
+  },
+  {
+   "id": "job_1791579344291_rk2bno6av",
+   "label": "gemini-3.7-flash-medium",
+   "model": "gemini-3.7-flash",
+   "effort": "medium",
+   "vbMs": 11477,
+   "coverMs": 13777,
+   "page1Ms": 18611,
+   "totalMs": 39505,
+   "firstMs": 4080,
+   "out": 4760,
+   "think": 239,
+   "costUsd": 0.0291645,
+   "stop": "stop",
+   "real": {
+    "title": true,
+    "vbOk": true,
+    "vbCounts": {
+     "sec": 1,
+     "ani": 1,
+     "art": 2,
+     "loc": 2,
+     "bg": 3
+    },
+    "coverOk": false,
+    "pages": 6,
+    "hints": 6,
+    "pageKeys": "pageNumber,text,sceneHint,sceneProse,characterClothing,characterPerspectives,characters"
+   },
+   "respect": {
+    "vbIds": 6,
+    "foreign": [],
+    "outside": [],
+    "unused": [],
+    "unlistedFigs": [],
+    "unlistedObjs": [],
+    "noLocId": []
+   },
+   "truncation": null
+  }
+ ]
+}
