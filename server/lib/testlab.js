@@ -2923,44 +2923,8 @@ async function runAvatarRealisticStage(target, { experimentId, params = {} }) {
 
 // The Grok tiers a sheet variant may name (params.grokModel). Ids come from GROK_MODELS, the one definition.
 const SHEET_VARIANT_MODELS = { standard: 'STANDARD', 'grok-imagine-image-2.0': 'IMAGE_2', '2.0': 'IMAGE_2', pro: 'PRO' };
-const SHEET_VARIANTS = ['current', 'oneCall', 'styledBodyRow', 'costumeFromStandard', 'measure'];
+const SHEET_VARIANTS = ['current', 'oneCall', 'styledBodyRow', 'costumeFromStandard'];
 
-
-/**
- * Lab only: the raw head/body geometry of every BODY cell of a 2x4 sheet (cut by the production cutter sheetCut.js).
- * Per cell, as fractions of the figure's own painted height (crown or hat top to the lowest paint): where the pose model puts the
- * eye line (top of the head keypoints), the nose and the shoulder line, plus the figure height in px. The pose model has no chin
- * point, so the head height itself is derived by the caller from these (decisions.md 2026-10-10 "Trial costume sheet").
- */
-async function measureSheetBodies(imageData) {
-  const sharp = require('sharp');
-  const { cutSheet, paintMask, contentSpan } = require('./sheetCut');
-  const { analyzerJson } = require('./photoAnalyzerClient');
-  const pieces = await cutSheet(Buffer.from(require('./r2').stripDataUriPrefix(imageData), 'base64'));
-  const cells = [];
-  for (const buf of pieces.slice(4)) {
-    const { data, info } = await sharp(buf).removeAlpha().raw().toBuffer({ resolveWithObject: true });
-    const mask = paintMask(data, info.width, info.height);
-    const rowInk = new Float32Array(info.height);
-    for (let y = 0; y < info.height; y++) { let c = 0; for (let x = 0; x < info.width; x++) c += mask[y * info.width + x]; rowInk[y] = c / info.width; }
-    const span = contentSpan(rowInk);
-    const figH = span ? span.end - span.start : null;
-    let pose = null;
-    try { pose = (await analyzerJson('/pose-heads', { image: `data:image/png;base64,${buf.toString('base64')}`, cols: 1 }, { timeoutMs: 60_000 })).cells?.[0] || null; } catch (err) { pose = { error: err.message }; }
-    const rel = (frac) => (frac == null || !figH ? null : Number(((frac * info.height - span.start) / figH).toFixed(4)));
-    // The head height itself: a vision model reads crown, chin and feet off the single cell (the pose model has no chin point).
-    let gem = null;
-    try {
-      const { _internal: { askSheetJudge, inlinePartOf } } = require('./character2x4Sheet');
-      const prompt = require('fs').readFileSync(require('path').join(__dirname, '../../prompts/experiments/sheet-head-box-measure.txt'), 'utf8');
-      const v = await askSheetJudge({ model: 'gemini-2.5-flash', parts: [inlinePartOf(`data:image/png;base64,${buf.toString('base64')}`), { text: prompt }], prompt, label: 'head measure', apiKey: process.env.GEMINI_API_KEY });
-      const [c, k, f] = [Number(v.crownY), Number(v.chinY), Number(v.feetY)];
-      gem = Number.isFinite(c + k + f) && f > c && k > c ? { crown: c, chin: k, feet: f, headShare: Number(((k - c) / (f - c)).toFixed(4)), n: Number(((f - c) / (k - c)).toFixed(2)) } : { error: 'unusable', v };
-    } catch (err) { gem = { error: err.message }; }
-    cells.push({ figH, pieceH: info.height, head: pose?.head ?? null, eye: rel(pose?.head_y_frac), nose: rel(pose?.nose_y_frac), shoulder: rel(pose?.shoulder_y_frac), poseError: pose?.error || null, gem });
-  }
-  return cells;
-}
 
 /** Lab only: a stored watercolour sheet of the character by bucket ('standard' | 'costumed') as a data URI, or null. */
 async function loadStoredStyledSheet(character, artStyle, bucket) {
@@ -2977,7 +2941,7 @@ async function loadStoredStyledSheet(character, artStyle, bucket) {
  *   params.variant  'current' (body row -> head row -> pass 2; fastPass1), 'oneCall' (photo -> styled 2x4 in one call),
  *                   'styledBodyRow' (photo -> styled body row, then the head row against it; no photoreal pass, no pass 2),
  *                   'costumeFromStandard' (ONE redress edit of the character's stored STANDARD sheet in params.artStyle: the costume sheet
- *                   without a photo pass; the real redressSheetVariant, unscored), 'measure' (no paid call: only measures the stored sheets)
+ *                   without a photo pass; the real redressSheetVariant, unscored),
  *   params.ageLine  true = 'oneCall' adds the explicit head-to-height line (ageProportionsLine)
  *   params.grokModel  Grok tier: standard | grok-imagine-image-2.0 | pro (every Grok call of the sheet)
  *   params.passTwoAttempts  total pass-2 attempts ('current' only)   params.anchor false = no style anchor ('current' only)
@@ -3023,18 +2987,9 @@ async function runAvatarSheetVariantStage(target, { experimentId, params = {} })
 
   let imageData, realisticImageData = null, finalScore = null, styleJudgeRejected = false, prompt = null;
   const stored = { standard: null, costumed: null };
-  if (variant === 'measure' || variant === 'costumeFromStandard') {
+  if (variant === 'costumeFromStandard') {
     stored.standard = await loadStoredStyledSheet(character, artStyle, 'standard');
     if (!stored.standard) throw new Error(`avatar_sheet_variant: ${character.name} has no stored ${artStyle} standard sheet`);
-  }
-  if (variant === 'measure') {
-    // No paid call: the geometry of the stored standard sheet and of the stored costumed two-call sheet (the baseline), if any.
-    stored.costumed = await loadStoredStyledSheet(character, artStyle, 'costumed');
-    return {
-      character: character.name, declaredAge: character.age ?? null, variant, artStyle, costUsd: 0, grokCalls: 0,
-      headFractionNorm: sheet.headFractionNorm(character.age),
-      measure: { base: await measureSheetBodies(stored.standard), baseline: stored.costumed ? await measureSheetBodies(stored.costumed) : null },
-    };
   }
   if (variant === 'oneCall') {
     const r = await sheet.generateOneCallSheet(character, { artStyle, costumeDescription, costumeName, seasonOutfit, usageTracker, grokModel, ageLine: params.ageLine === true });
@@ -3074,18 +3029,6 @@ async function runAvatarSheetVariantStage(target, { experimentId, params = {} })
     cut = { ok: pieces.length === 8, error: null, figures: pieces.length };
   } catch (err) { cut = { ok: false, error: err.message, figures: 0 }; }
 
-  // Head/body geometry of the output, of the stored standard sheet (base) and of the stored costumed sheet (baseline). Free: no paid call.
-  let measure = null;
-  try {
-    if (!stored.standard) stored.standard = await loadStoredStyledSheet(character, artStyle, 'standard');
-    stored.costumed = await loadStoredStyledSheet(character, artStyle, 'costumed');
-    measure = {
-      out: await measureSheetBodies(imageData),
-      base: stored.standard ? await measureSheetBodies(stored.standard) : null,
-      baseline: stored.costumed ? await measureSheetBodies(stored.costumed) : null,
-    };
-  } catch (err) { measure = { error: err.message }; }
-
   const versionIndex = await saveTestVersion(target.storyId, 'tl_avatar', null, imageData, experimentId, finalScore != null ? Math.round(finalScore) : null);
   const realisticVersionIndex = realisticImageData
     ? await saveTestVersion(target.storyId, 'tl_avatar', null, realisticImageData, experimentId) : null;
@@ -3094,7 +3037,7 @@ async function runAvatarSheetVariantStage(target, { experimentId, params = {} })
     variant, model: grokModel, costume: costumeParam, artStyle,
     options: { passTwoAttempts: params.passTwoAttempts ?? null, anchor: params.anchor !== false, skipReview: params.skipReview === true, fastPass1: params.fastPass1 !== false },
     totalMs, steps, grokCalls, costUsd, cut, finalScore, styleJudgeRejected,
-    headFractionNorm: sheet.headFractionNorm(character.age), measure,
+    headFractionNorm: sheet.headFractionNorm(character.age),
     promptUsed: prompt ? String(prompt).slice(0, 12000) : undefined,
   };
 }
