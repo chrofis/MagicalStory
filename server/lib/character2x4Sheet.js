@@ -604,7 +604,9 @@ async function reviewHeadRow(headRowData, { facePhoto, avatarFaces, model, usage
 // Stage 1 of the decoupled sheet: the 1×4 FULL-BODY row (up to rowTries tries, keep least-bad). Its own render, before and
 // independent of the head row, so a caller can draw it ahead of the rest (generateBodyRow) and hand it back to
 // generateComposited2x4 as `precomputedBody` (docs/decisions.md 2026-10-09, trial body row at the photo).
-async function runBodyRowStage({ character, bodyPrompt, bodyRefs, rowTries, skipReview, costumeDescription, costumeName, model, usageTracker, attemptHistory, addUsage }) {
+// deferReview (one try only, see generateComposited2x4): the judge runs in the background and its promise rides on the result, so the
+// caller can start the next render while it works. The attempt entry is filled in when the judge answers.
+async function runBodyRowStage({ character, bodyPrompt, bodyRefs, rowTries, skipReview, costumeDescription, costumeName, model, usageTracker, attemptHistory, addUsage, deferReview = false }) {
   // ── Stage 1: body row (up to rowTries tries, keep least-bad) ──
   let bestBody = null;
   let bodyGenError = null;
@@ -636,20 +638,24 @@ async function runBodyRowStage({ character, bodyPrompt, bodyRefs, rowTries, skip
     // every axis without a single judge call). score null = unscored; valid stays
     // true so the sheet still ships (the caller asked for no reviews).
     let review = { valid: true, score: null, evaluated: false, bodies: null };
-    if (!skipReview) {
+    let reviewPromise = null;
+    const judge = async () => {
       try {
-        review = await reviewBodyRow(res.imageData, { costumeDescription, costumeName, model, usageTracker, declaredAge: character?.age, glasses: declaredGlasses(character), hair: hairRequest(character) });
+        return await reviewBodyRow(res.imageData, { costumeDescription, costumeName, model, usageTracker, declaredAge: character?.age, glasses: declaredGlasses(character), hair: hairRequest(character) });
       } catch (err) {
         // Keep the sheet. Losing the eval costs a quality gate; losing the
         // sheet costs the character its face on every page of the book, which
         // is strictly worse. Loud, and visible in attemptHistory.
         log.error(`[CHARACTER 2×4] ${character?.name} body eval FAILED (${err.message}) — keeping the unscored sheet`);
-        review = { valid: true, score: 0, bodies: null, evalFailed: err.message };
+        return { valid: true, score: 0, bodies: null, evalFailed: err.message };
       }
-    }
-    attemptHistory.push({ stage: 'body', try: t, score: review.score, valid: review.valid, reasons: review.bodies?.failureReasons || [] });
+    };
+    if (!skipReview) { if (deferReview) reviewPromise = judge(); else review = await judge(); }
+    const entry = { stage: 'body', try: t, score: review.score, valid: review.valid, reasons: review.bodies?.failureReasons || [] };
+    attemptHistory.push(entry);
+    if (reviewPromise) reviewPromise.then(r => Object.assign(entry, { score: r.score, valid: r.valid, reasons: r.bodies?.failureReasons || [] }));
     const rank = (v) => (typeof v === 'number' ? v : -1); // unscored ranks below any judged attempt
-    if (!bestBody || rank(review.score) > rank(bestBody.review.score)) bestBody = { row: res.imageData, review };
+    if (!bestBody || rank(review.score) > rank(bestBody.review.score)) bestBody = { row: res.imageData, review, reviewPromise };
     if (review.valid) break;
     log.warn(`[CHARACTER 2×4] ${character?.name} body try ${t} invalid (score=${review.score}) — ${skipReview ? '' : (review.bodies?.failureReasons || []).join('; ')}`);
   }
@@ -663,7 +669,10 @@ async function runBodyRowStage({ character, bodyPrompt, bodyRefs, rowTries, skip
 // keep least-bad. rowTries 1 is the trial prewarm (fastPass1). Then composite. Rejected rows are discarded. Returns a verdict
 // in the evaluateSheetSplit shape so generateCharacter2x4Sheet / styledAvatars
 // consume it unchanged. skipReview → 1 try each, no eval (fast path for tests).
-async function generateComposited2x4(character, { costumeDescription, costumeName = null, redress = false, usageTracker = null, skipReview = false, seasonOutfit = null, rowTries = PASS1_ROW_TRIES, precomputedBody = null } = {}) {
+// deferJudges (honoured only with one try per row and reviews on, the trial prewarm): with one try nothing can act on a row verdict, so
+// the judges only record. The body judge then runs while the head row renders, the head and identity judges while the caller styles the
+// sheet, and the verdict arrives as `verdictPromise` (never rejects) instead of `verdict`. docs/decisions.md 2026-10-10.
+async function generateComposited2x4(character, { costumeDescription, costumeName = null, redress = false, usageTracker = null, skipReview = false, seasonOutfit = null, rowTries = PASS1_ROW_TRIES, precomputedBody = null, deferJudges = false } = {}) {
   const facePhoto = await resolveFacePhoto(character);
   if (!facePhoto) throw new Error(`No face photo for ${character?.name || 'character'}.`);
   const standardAvatar = await resolveStandardAvatar(character);
@@ -675,11 +684,12 @@ async function generateComposited2x4(character, { costumeDescription, costumeNam
   const bodyPrompt = buildBodyRowPrompt(costumeDescription, character, redress, costumeName, seasonOutfit);
   const headPrompt = buildHeadRowPrompt(character, costumeDescription, redress);
   const attemptHistory = [];
+  const defer = deferJudges && rowTries === 1 && !skipReview;
   let usage = { input_tokens: 0, output_tokens: 0 };
   const addUsage = (u, fn, id) => { if (u) { usage.input_tokens += u.input_tokens || 0; usage.output_tokens += u.output_tokens || 0; if (usageTracker) usageTracker('grok', u, fn, id); } };
 
   if (precomputedBody?.attemptHistory) attemptHistory.push(...precomputedBody.attemptHistory);
-  const runBodyRow = async () => precomputedBody || runBodyRowStage({ character, bodyPrompt, bodyRefs, rowTries, skipReview, costumeDescription, costumeName, model, usageTracker, attemptHistory, addUsage });
+  const runBodyRow = async () => precomputedBody || runBodyRowStage({ character, bodyPrompt, bodyRefs, rowTries, skipReview, costumeDescription, costumeName, model, usageTracker, attemptHistory, addUsage, deferReview: defer });
 
   const runHeadRow = async (bodyRow) => {
     // ── Stage 2: head row (up to rowTries tries, keep least-bad) ──
@@ -709,17 +719,21 @@ async function generateComposited2x4(character, { costumeDescription, costumeNam
       const headCrop = await cropHeadRowToShoulders(res.imageData);
       res = { ...res, imageData: headCrop.imageData };
       let review = { valid: true, score: null, evaluated: false, heads: null, identity: null };
-      if (!skipReview) {
+      let reviewPromise = null;
+      const judge = async () => {
         try {
-          review = await reviewHeadRow(res.imageData, { facePhoto, avatarFaces, model, usageTracker, declaredAge: character?.age, costumeDescription, glasses: declaredGlasses(character), hair: hairRequest(character) });
+          return await reviewHeadRow(res.imageData, { facePhoto, avatarFaces, model, usageTracker, declaredAge: character?.age, costumeDescription, glasses: declaredGlasses(character), hair: hairRequest(character) });
         } catch (err) {
           log.error(`[CHARACTER 2×4] ${character?.name} head eval FAILED (${err.message}) — keeping the unscored row`);
-          review = { valid: true, score: 0, heads: null, identity: null, evalFailed: err.message };
+          return { valid: true, score: 0, heads: null, identity: null, evalFailed: err.message };
         }
-      }
-      attemptHistory.push({ stage: 'head', try: t, score: review.score, valid: review.valid, reasons: review.heads?.failureReasons || [], crop: headCrop.crop });
+      };
+      if (!skipReview) { if (defer) reviewPromise = judge(); else review = await judge(); }
+      const entry = { stage: 'head', try: t, score: review.score, valid: review.valid, reasons: review.heads?.failureReasons || [], crop: headCrop.crop };
+      attemptHistory.push(entry);
+      if (reviewPromise) reviewPromise.then(r => Object.assign(entry, { score: r.score, valid: r.valid, reasons: r.heads?.failureReasons || [] }));
       const rank = (v) => (typeof v === 'number' ? v : -1); // unscored ranks below any judged attempt
-      if (!bestHead || rank(review.score) > rank(bestHead.review.score)) bestHead = { row: res.imageData, review };
+      if (!bestHead || rank(review.score) > rank(bestHead.review.score)) bestHead = { row: res.imageData, review, reviewPromise };
       if (review.valid) break;
       log.warn(`[CHARACTER 2×4] ${character?.name} head try ${t} invalid (score=${review.score})`);
     }
@@ -735,42 +749,52 @@ async function generateComposited2x4(character, { costumeDescription, costumeNam
 
   // ── Composite + build the evaluateSheetSplit-shape verdict from the reviews ──
   const { imageData, splitY } = await stackRowsInto2x4(bestHead.row, bestBody.row);
-  const bodies = bestBody.review.bodies;
-  const heads = bestHead.review.heads;
-  const identity = bestHead.review.identity;
-  // skipReview → nothing was judged: every axis is null (unknown), not 10.
-  const sc = (v) => (skipReview ? null : v);
-  const idScore = skipReview ? null : (identity?.identityScore ?? 10);
-  const finalScore = skipReview ? null : Math.min(heads?.finalScore ?? 0, bodies?.finalScore ?? 0, idScore);
-  // When a row judge threw, its sub-report is null and the ?? defaults below
-  // read as a perfect 10. Carry the failure so consumers show "unscored", not
-  // a fake pass — the sheet still ships, it just wasn't judged.
-  const evalFailed = bestBody.review.evalFailed || bestHead.review.evalFailed || null;
-  const verdict = {
-    split: true, splitY, finalScore,
-    // Unevaluated is not a failure: the sheet ships, it is simply unjudged.
-    valid: skipReview ? true : finalScore >= 6,
-    evaluated: !skipReview, evalSkipped: skipReview ? 'skipQualityEval' : null, evalFailed,
-    failureReasons: [...(heads?.failureReasons || []), ...(bodies?.failureReasons || [])],
-    layout: { layoutScore: sc(bodies?.fullBody?.fullBodyScore ?? 10) },
-    identity: { identityScore: idScore, reason: identity?.reason },
-    outfit: { outfitScore: sc(bodies?.outfit?.outfitScore ?? 10) },
-    sourceMatch: { sourceMatchScore: idScore },
-    cleanRender: { cleanScore: sc(heads?.cleanRender?.cleanScore ?? 10) },
-    heads, bodies, identityReport: identity,
-  };
-  return {
-    imageData, verdict, usage, modelId: GROK_MODELS.STANDARD,
-    refs: { phantom: headPhantom, bodyPhantom, standardAvatar, facePhoto },
-    prompt: `— BODY ROW —\n${bodyPrompt}\n\n— HEAD ROW —\n${headPrompt}`,
+  const settle = ([bodyReview, headReview]) => {
+    const bodies = bodyReview.bodies;
+    const heads = headReview.heads;
+    const identity = headReview.identity;
+    // skipReview → nothing was judged: every axis is null (unknown), not 10.
+    const sc = (v) => (skipReview ? null : v);
+    const idScore = skipReview ? null : (identity?.identityScore ?? 10);
+    const finalScore = skipReview ? null : Math.min(heads?.finalScore ?? 0, bodies?.finalScore ?? 0, idScore);
+    // When a row judge threw, its sub-report is null and the ?? defaults below
+    // read as a perfect 10. Carry the failure so consumers show "unscored", not
+    // a fake pass — the sheet still ships, it just wasn't judged.
+    const evalFailed = bodyReview.evalFailed || headReview.evalFailed || null;
+    const verdict = {
+      split: true, splitY, finalScore,
+      // Unevaluated is not a failure: the sheet ships, it is simply unjudged.
+      valid: skipReview ? true : finalScore >= 6,
+      evaluated: !skipReview, evalSkipped: skipReview ? 'skipQualityEval' : null, evalFailed,
+      failureReasons: [...(heads?.failureReasons || []), ...(bodies?.failureReasons || [])],
+      layout: { layoutScore: sc(bodies?.fullBody?.fullBodyScore ?? 10) },
+      identity: { identityScore: idScore, reason: identity?.reason },
+      outfit: { outfitScore: sc(bodies?.outfit?.outfitScore ?? 10) },
+      sourceMatch: { sourceMatchScore: idScore },
+      cleanRender: { cleanScore: sc(heads?.cleanRender?.cleanScore ?? 10) },
+      heads, bodies, identityReport: identity,
+    };
     // What each judge of the shipped rows was sent (text only — the images are
     // the rows themselves), so a stored verdict can be read against its prompt.
     // null when nothing was judged.
-    judgePrompts: skipReview ? null : {
-      bodies: bestBody.review.promptUsed || null,
-      heads: bestHead.review.promptUsed || null,
-      identity: bestHead.review.identityPromptUsed || null,
-    },
+    const judgePrompts = skipReview ? null : {
+      bodies: bodyReview.promptUsed || null,
+      heads: headReview.promptUsed || null,
+      identity: headReview.identityPromptUsed || null,
+    };
+    return { verdict, judgePrompts };
+  };
+  const verdictPromise = Promise.all([bestBody.reviewPromise || bestBody.review, bestHead.reviewPromise || bestHead.review]).then(settle);
+  // Not deferred: the verdict is part of the result, as ever. Deferred: the caller awaits verdictPromise when it needs the verdict.
+  const settled = defer ? null : await verdictPromise;
+  return {
+    imageData, ...(settled || {}), verdictPromise, usage, modelId: GROK_MODELS.STANDARD,
+    refs: { phantom: headPhantom, bodyPhantom, standardAvatar, facePhoto },
+    prompt: `— BODY ROW —
+${bodyPrompt}
+
+— HEAD ROW —
+${headPrompt}`,
     bodyRow: bestBody.row, headRow: bestHead.row, attemptHistory,
   };
 }
@@ -2003,28 +2027,13 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
   try {
     composed = await generateComposited2x4(character, {
       costumeDescription, costumeName, redress, usageTracker, skipReview: skipQualityEval, seasonOutfit,
+      // fastPass1 = the trial prewarm: one try per row, so the row judges only record; they run beside the next render and pass 2 (see generateComposited2x4).
       precomputedBody,
-      ...(fastPass1 ? { rowTries: 1 } : {}),
+      ...(fastPass1 ? { rowTries: 1, deferJudges: true } : {}),
     });
   } catch (err) {
     throw new Error(`[CHARACTER 2×4] pass-1 generation failed for ${character?.name}: ${err.message}`);
   }
-  const verdict = composed.verdict;
-  log.info(`[CHARACTER 2×4] ${character?.name} pass-1 (decoupled 2-call): layout=${verdict.layout?.layoutScore} identity=${verdict.identity?.identityScore} outfit=${verdict.outfit?.outfitScore} final=${verdict.finalScore} valid=${verdict.valid}`);
-
-  const pass1 = {
-    imageData: composed.imageData,
-    selectedAttempt: 1,
-    finalScore: verdict.finalScore,
-    finalVerdict: verdict,
-    attempts: composed.attemptHistory,
-    prompt: composed.prompt,
-    bodyRow: composed.bodyRow,
-    headRow: composed.headRow,
-    judgePrompts: composed.judgePrompts || null,
-    sentToGrok: null,
-  };
-
   // ── PASS 2: style transfer (always runs when artStyle is non-realistic) ─
   // Previously gated on pass1.finalScore >= 6 to avoid styling a broken
   // sheet. Removed (2026-05-17 per user direction) — the quickLayoutCheck
@@ -2058,7 +2067,7 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
   let pass2 = null;
   if (wantStyleTransfer) {
     pass2 = await runStyleTransferPass({
-      pass1ImageData: pass1.imageData,
+      pass1ImageData: composed.imageData,
       facePhoto,
       artStyle,
       characterName: character?.name,
@@ -2072,6 +2081,22 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
       throw new Error(`[CHARACTER 2×4] ${character?.name} Pass 2: every styled attempt (${pass2.attempts?.length || 0}) failed IDENTITY (${pass2.identityFailing.join(', ')}; best score=${pass2.finalScore}/10: ${reasons}) — no styled sheet ships, and the realistic sheet is not a substitute`);
     }
   }
+
+  // The pass-1 row judges (deferred in the trial prewarm) have had the whole of pass 2 to answer; their verdict is read only now.
+  const { verdict, judgePrompts } = await composed.verdictPromise;
+  log.info(`[CHARACTER 2×4] ${character?.name} pass-1 (decoupled 2-call): layout=${verdict.layout?.layoutScore} identity=${verdict.identity?.identityScore} outfit=${verdict.outfit?.outfitScore} final=${verdict.finalScore} valid=${verdict.valid}`);
+  const pass1 = {
+    imageData: composed.imageData,
+    selectedAttempt: 1,
+    finalScore: verdict.finalScore,
+    finalVerdict: verdict,
+    attempts: composed.attemptHistory,
+    prompt: composed.prompt,
+    bodyRow: composed.bodyRow,
+    headRow: composed.headRow,
+    judgePrompts: judgePrompts || null,
+    sentToGrok: null,
+  };
 
   // `styleJudgeRejected`: the shipped styled sheet was judged and failed the
   // style judge on a non-identity axis. It ships; the caller surfaces the

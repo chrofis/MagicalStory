@@ -36,10 +36,10 @@ function extractFunction(src: string, name: string): string {
   return src.slice(start, i);
 }
 
-type Opts = { rowTries?: number };
+type Opts = { rowTries?: number; deferJudges?: boolean };
 
 /** Both rows take `ms` to draw. `bodyScores` / `headScores` give the review score of try 1, 2, ... */
-async function runPass1(opts: Opts, { bodyScores = [9], headScores = [9], ms = 30 } = {}) {
+async function runPass1(opts: Opts, { bodyScores = [9], headScores = [9], ms = 30, judgeMs = 0 } = {}) {
   const log: string[] = [];
   const calls = { body: 0, head: 0, inFlight: 0, maxInFlight: 0, headRefs: [] as string[][], headPrompts: [] as string[] };
   const ctx: any = {
@@ -70,10 +70,12 @@ async function runPass1(opts: Opts, { bodyScores = [9], headScores = [9], ms = 3
       return { imageData: `${row.toUpperCase()}${t}`, usage: null, modelId: 'grok' };
     },
     reviewBodyRow: async (row: string) => {
+      log.push('start bodyJudge'); await new Promise(r => setTimeout(r, judgeMs)); log.push('end bodyJudge');
       const s = bodyScores[Math.min(Number(row.slice(4)) - 1, bodyScores.length - 1)];
       return { valid: s >= 6, score: s, bodies: { finalScore: s, outfit: { outfitScore: 9 }, fullBody: { fullBodyScore: 10 }, failureReasons: [] } };
     },
     reviewHeadRow: async (row: string) => {
+      log.push('start headJudge'); await new Promise(r => setTimeout(r, judgeMs)); log.push('end headJudge');
       const s = headScores[Math.min(Number(row.slice(4)) - 1, headScores.length - 1)];
       return { valid: s >= 6, score: s, heads: { finalScore: s, cleanRender: { cleanScore: 9 }, failureReasons: [] }, identity: { identityScore: s, reason: 'x' } };
     },
@@ -86,7 +88,8 @@ async function runPass1(opts: Opts, { bodyScores = [9], headScores = [9], ms = 3
 ${extractFunction(SRC, 'generateComposited2x4')}\nmodule.exports = generateComposited2x4;`, ctx);
   const fn = ctx.module.exports as (c: any, o: any) => Promise<any>;
   const out = await fn({ name: 'T', age: 9 }, { costumeDescription: 'a robe', ...opts });
-  return { out, calls, log };
+  // `log` is the order of the renders; `events` also holds the judges.
+  return { out, calls, log: log.filter(e => /^(start|end) (body|head)\d/.test(e)), events: log };
 }
 
 describe('pass 1 rows: one try each, head row after the body row (trial prewarm)', () => {
@@ -147,7 +150,7 @@ describe('the trial prewarm is the one caller that asks for it', () => {
   });
 
   it('generateCharacter2x4Sheet maps fastPass1 to one try per row, nothing else does', () => {
-    expect(SRC).toMatch(/fastPass1 \? \{ rowTries: 1 \} : \{\}/);
+    expect(SRC).toMatch(/fastPass1 \? \{ rowTries: 1, deferJudges: true \} : \{\}/);
   });
 
   it('styledAvatars threads fastPass1 down to the sheet builder, and only the trial prewarm sets it', () => {
@@ -174,5 +177,40 @@ describe('pass 1 rows: a body row drawn ahead of the sheet (trial, at the photo)
     expect(calls.headRefs[0]).toEqual(['PHANTOM', 'FACE', 'PREBODY']);
     expect(out.imageData).toBe('SHEET(HEAD1|PREBODY)');
     expect(out.attemptHistory.map((a: any) => `${a.stage}${a.try}`)).toEqual(['body1', 'head1']);
+  });
+});
+
+describe('deferred judges (trial prewarm, one try per row): the verdict never stands between two renders', () => {
+  it('the body judge runs while the head row renders; the head judge is still running when the sheet is returned', async () => {
+    const { out, events: log } = await runPass1({ rowTries: 1, deferJudges: true }, { ms: 60, judgeMs: 30 });
+    // body judge starts the moment the body row exists, in parallel with the head render (not before it)
+    expect(log.indexOf('start bodyJudge')).toBeGreaterThan(log.indexOf('end body1'));
+    expect(log.indexOf('start bodyJudge')).toBeLessThan(log.indexOf('end head1'));
+    expect(log.indexOf('end bodyJudge')).toBeGreaterThan(-1);
+    expect(log.indexOf('end bodyJudge')).toBeLessThan(log.indexOf('end head1')); // the 30 ms judge finishes inside the 60 ms head render
+    // the sheet is returned before the head judge has answered, and carries no verdict yet
+    expect(log).not.toContain('end headJudge');
+    expect(out.verdict).toBeUndefined();
+    expect(out.imageData).toBe('SHEET(HEAD1|BODY1)');
+    // the verdict arrives afterwards and is the one the sequential run gives
+    const settled = await out.verdictPromise;
+    expect(settled.verdict.valid).toBe(true);
+    expect(settled.verdict.finalScore).toBe(9);
+    expect(out.attemptHistory.map((a: any) => `${a.stage}${a.try}:${a.score}`).sort()).toEqual(['body1:9', 'head1:9']);
+  });
+  it('an invalid deferred verdict is still reported invalid, and nothing is retried', async () => {
+    const { out, calls } = await runPass1({ rowTries: 1, deferJudges: true }, { bodyScores: [1], headScores: [3] });
+    expect((await out.verdictPromise).verdict.valid).toBe(false);
+    expect(calls.body).toBe(1);
+    expect(calls.head).toBe(1);
+  });
+  it('two tries per row ignore the deferral: the judge decides whether to retry, so it is awaited in sequence', async () => {
+    const { out, events: log } = await runPass1({ rowTries: 2, deferJudges: true }, { bodyScores: [4, 9], headScores: [9], judgeMs: 5 });
+    expect(out.verdict).toBeDefined();
+    expect(log.indexOf('end bodyJudge')).toBeLessThan(log.indexOf('start body2'));
+  });
+  it('without the deferral (the full story) the judges are awaited before the head row starts', async () => {
+    const { events: log } = await runPass1({ rowTries: 1 }, { judgeMs: 10 });
+    expect(log.indexOf('end bodyJudge')).toBeLessThan(log.indexOf('start head1'));
   });
 });
