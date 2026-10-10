@@ -231,15 +231,13 @@
     {
       "id": "avatar-sheet-generator-vs-defect-judge",
       "axis": "generator-vs-critic",
-      "reason": "The sheet defect judge (prompts/avatar-sheet-defect-judge.txt, parsed by server/lib/avatarSheetJudge.js) deducts for headgear that grows, vanishes or differs between cells, hair that changes, bald or headless cells, an outfit that differs between cells, head-row clothes that differ from the body row, a held object and a broken 2x4 layout; the sheet prompts in character2x4Sheet.js (buildOneCallSheetPrompt, buildBodyRowPrompt, buildHeadRowPrompt) are the only instructions the sheet generator receives. A rule the judge applies that the generator was never given fails sheets no redraw can fix. Not wired yet (docs/decisions.md 2026-10-10).",
+      "reason": "The sheet defect judge (prompts/avatar-sheet-defect-judge.txt, parsed by server/lib/avatarSheetJudge.js) deducts for headgear that grows, vanishes or differs between cells, hair that changes, bald or headless cells, an outfit that differs between cells, head-row clothes that differ from the body row, a held object and a broken 2x4 layout; the sheet prompts in character2x4Sheet.js (buildOneCallSheetPrompt, buildBodyRowPrompt, buildHeadRowPrompt) are the only instructions the sheet generator receives. A rule the judge applies that the generator was never given fails sheets no redraw can fix. Wired into the trial's one-call sheets (server/lib/oneCallSheet.js: judge, one redo with the judge's defect types fed back; docs/decisions.md 2026-10-10 \"one-call sheets in the trial\").",
       "generators": [
         "server/lib/character2x4Sheet.js"
       ],
       "critics": [
         "prompts/avatar-sheet-defect-judge.txt",
-        "server/lib/avatarSheetJudge.js",
-        "prompts/avatar-cell-judge.txt",
-        "server/lib/avatarCellJudge.js"
+        "server/lib/avatarSheetJudge.js"
       ],
       "severity": "block"
     },
