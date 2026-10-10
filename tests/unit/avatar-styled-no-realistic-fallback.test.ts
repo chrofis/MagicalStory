@@ -101,7 +101,7 @@ async function runSheet(attempts: Attempt[], artStyle = 'watercolor') {
     resolveStandardAvatar: async () => 'STD',
     generateComposited2x4: async () => ({
       imageData: 'PASS1_REALISTIC',
-      verdictPromise: Promise.resolve({ verdict: { finalScore: 9, valid: true, layout: {}, identity: {}, outfit: {} }, judgePrompts: null }),
+      verdict: { finalScore: 9, valid: true, layout: {}, identity: {}, outfit: {} }, judgePrompts: null,
       attemptHistory: [], prompt: 'P1', usage: null, refs: {},
     }),
   });

@@ -9834,7 +9834,9 @@
     {
       "id": "trial-one-call-sheets-2026-10-10",
       "title": "Trial: standard and costumed sheet are one Grok call each, judged as a whole, one redo; the sheet starts at the photo",
-      "commits": [],
+      "commits": [
+        "9bc64275d"
+      ],
       "addedAt": "2026-10-10",
       "status": "pending",
       "evidence": [],
