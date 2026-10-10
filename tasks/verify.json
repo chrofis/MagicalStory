@@ -9823,13 +9823,13 @@
         "56c60bf51"
       ],
       "addedAt": "2026-10-10",
-      "claim": "A Lab experiment of stage avatar_sheet_variant with variant costumeFromStandard returns one costume sheet from one redress edit of the stored standard sheet, and variant oneCall with ageLine adds the head-to-height line; both report time, calls, cost and per-cell head geometry (Lab only, nothing wired).",
+      "claim": "A Lab experiment of stage avatar_sheet_variant with variant costumeFromStandard returns one costume sheet from one redress edit of the stored standard sheet, and variant oneCall with params.ageLine adds the head-to-height line; both report time, calls and cost (Lab only, nothing wired). Run and recorded: exps 1749-1755, docs/decisions.md 2026-10-10.",
       "runShape": [
         "lab-stage"
       ],
       "check": {
         "kind": "human",
-        "what": "Open the experiment: each result has variant, totalMs, grokCalls, costUsd, measure.{out,base,baseline} and a saved tl_avatar sheet that cuts into 8 figures."
+        "what": "Open the experiment: each result has variant, totalMs, grokCalls, costUsd and a saved tl_avatar sheet that cuts into 8 figures."
       },
       "status": "pending",
       "evidence": []

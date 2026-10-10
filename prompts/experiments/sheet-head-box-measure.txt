@@ -1,8 +1,8 @@
 This image shows one full-body figure standing on plain paper. Measure it as heights in the image, integers from 0 (top edge of the image) to 1000 (bottom edge).
 
-crownY: the top of the head itself (the top of the hair or skull); a hat, hood or brim is NOT the head, so ignore it.
+eyeY: the height of the line through the centres of the eyes (the visible eye or eyes of the face).
 chinY: the bottom of the chin.
 feetY: the lowest point of the figure's feet, shoes or hem.
 
-Ignore faint washes, shadows and other paint that are not part of this one figure.
-Answer with JSON only: {"crownY": 0, "chinY": 0, "feetY": 0}
+A hat, hood or brim is never measured. Ignore faint washes, shadows and other paint that are not part of this one figure.
+Answer with JSON only: {"eyeY": 0, "chinY": 0, "feetY": 0}
